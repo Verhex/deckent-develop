@@ -5,6 +5,7 @@
 import type { TaskDNA, IntentType } from '../core/routing-types.js';
 import type { SkillDefinition } from '../core/skill-types.js';
 import { evaluateActivation } from '../core/activation-engine.js';
+import { debugLog } from '../core/utils.js';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,24 @@ const INTENT_SKILL_AFFINITY: Record<IntentType, string[]> = {
   architecture:   ['architecture', 'design', 'system', 'adr', 'roadmap', 'module', 'structure'],
   unknown:        [],
 };
+
+// ─── Word-boundary matching ────────────────────────────────────────────────────
+
+/**
+ * Word-boundary-aware containment: true when `term` occurs inside `text` delimited
+ * by string edges or non-alphanumeric characters (hyphen, space, dot, …).
+ *
+ * Replaces raw `String.includes` in the relevance heuristics below so a short token
+ * no longer produces a spurious inside-a-word hit: the keyword `test` must NOT match
+ * inside `latest`, and the skill name `script` must NOT match inside the keyword
+ * `typescript`. Callers already lowercase their inputs; the `i` flag + regex-escaping
+ * keep the helper correct even if that ever changes.
+ */
+function containsWord(text: string, term: string): boolean {
+  if (!term) return false;
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`, 'i').test(text);
+}
 
 // ─── Core Functions ───────────────────────────────────────────────────────────
 
@@ -56,11 +75,12 @@ export function computeSkillRelevance(skill: SkillDefinition, taskDNA: TaskDNA):
 
   for (const trigger of skill.triggers) {
     const triggerLower = trigger.toLowerCase();
-    if (affinityKeywords.some(kw => triggerLower.includes(kw) || kw.includes(triggerLower))) {
+    // Word-boundary match, not raw substring: keyword `test` must not match inside `latest`.
+    if (affinityKeywords.some(kw => containsWord(triggerLower, kw) || containsWord(kw, triggerLower))) {
       score += 2;
     }
     for (const domain of domainNames) {
-      if (triggerLower.includes(domain) || domain.includes(triggerLower)) {
+      if (containsWord(triggerLower, domain) || containsWord(domain, triggerLower)) {
         score += 3;
       }
     }
@@ -68,7 +88,7 @@ export function computeSkillRelevance(skill: SkillDefinition, taskDNA: TaskDNA):
 
   if (skill.category) {
     const catLower = skill.category.toLowerCase();
-    if (affinityKeywords.some(kw => catLower.includes(kw))) {
+    if (affinityKeywords.some(kw => containsWord(catLower, kw))) {
       score += 1;
     }
   }
@@ -111,13 +131,40 @@ export function filterSkillPrompts(skills: SkillDefinition[], taskDNA: TaskDNA):
  *
  * @param skillPrompts - Array of {name, content} pairs
  * @param taskDNA - Task DNA from intent classification
- * @returns Filtered skill prompts (always non-empty if input is non-empty)
+ * @returns Skill prompts scoring at/above the relevance threshold. MAY be empty when
+ *   nothing is relevant (see the below-threshold branch) — a skill-less worker prompt
+ *   is legitimate and cheaper than injecting relevance-0 skill bodies.
  */
+/**
+ * PCOMP-6 D4: narrow-domain skills and the file/text signals that justify them —
+ * the SINGLE source shared with prompt-lint's W5 check. A narrow skill with zero
+ * signal in the task's write targets/text is dropped regardless of its coarse
+ * affinity score (generic intent keywords like 'command'/'script' hit almost any
+ * skill prose — the corpus relevance-inversion class).
+ */
+export const NARROW_SKILL_DOMAIN_SIGNALS: Record<string, RegExp> = {
+  'sh-portability': /\.(sh|bash)\b|shell|wrapper|trap |posix|spawn.*(docker|tmux)/i,
+  'file-watch-hygiene': /fs\.watch|watcher|polling|chokidar|watch mode|file.?watch/i,
+  'devops-engineer': /docker|dockerfile|kubernetes|k8s|\.github\/workflows|ci\/cd|pipeline|deploy/i,
+  'dashboard-frontend': /dashboard|react|\.tsx\b|vite|tailwind/i,
+};
+
+export interface SkillFilterTaskSignals {
+  /** task.scope.filesWrite — write targets carry the strongest domain signal. */
+  filesWrite?: readonly string[];
+  /** title + description (+ criteria) free text. */
+  taskText?: string;
+}
+
 export function filterSkillPromptsByDNA(
   skillPrompts: Array<{ name: string; content: string }>,
   taskDNA: TaskDNA,
+  signals?: SkillFilterTaskSignals,
 ): Array<{ name: string; content: string }> {
-  if (skillPrompts.length <= 1) return skillPrompts;
+  // PCOMP-6 D4 (CC): the historical single-skill short-circuit is retired — a
+  // lone irrelevant skill body was the highest-frequency corpus leak
+  // (sh-portability 10/31, file-watch-hygiene 6/31, all single-assignment).
+  // An empty result is a valid outcome; buildSkillBlock renders nothing for [].
 
   const primaryIntent = taskDNA.intent.primary;
   const affinityKeywords = INTENT_SKILL_AFFINITY[primaryIntent] ?? [];
@@ -127,17 +174,22 @@ export function filterSkillPromptsByDNA(
     const nameLower = sp.name.toLowerCase();
     let score = 0;
 
-    // Name matches intent affinity keywords
-    if (affinityKeywords.some(kw => nameLower.includes(kw) || kw.includes(nameLower))) {
+    // Name contains an intent affinity keyword at a word boundary. The REVERSE
+    // direction (`kw.includes(nameLower)`) was removed (441): a short skill name is a
+    // substring of almost every keyword, so it spuriously matched everything.
+    if (affinityKeywords.some(kw => containsWord(nameLower, kw))) {
       score += 3;
     }
 
-    // Name matches task domain names
-    if (domainNames.some(d => nameLower.includes(d) || d.includes(nameLower))) {
+    // Name contains a task domain name at a word boundary. Reverse direction
+    // (`d.includes(nameLower)`) removed for the same reason as the affinity check above.
+    if (domainNames.some(d => containsWord(nameLower, d))) {
       score += 4;
     }
 
-    // Scan first 200 chars of content for affinity keyword hits (capped at 2 points)
+    // Scan first 200 chars of content for affinity keyword hits (capped at 2 points).
+    // This prose scan stays substring-based on purpose — it is a coarse secondary
+    // signal, distinct from the word-boundary identity matching on name/domain above.
     const snippet = sp.content.slice(0, 200).toLowerCase();
     const contentHits = affinityKeywords.filter(kw => snippet.includes(kw)).length;
     score += Math.min(contentHits, 2);
@@ -145,9 +197,28 @@ export function filterSkillPromptsByDNA(
     return { sp, score };
   });
 
+  // Narrow-domain gate (D4): when the caller supplied task signals and the
+  // skill is a known narrow domain, require an actual domain hit — the coarse
+  // affinity score alone cannot admit it.
+  const haystack = `${(signals?.filesWrite ?? []).join('\n')}\n${signals?.taskText ?? ''}`;
+  const gated = scored.filter(({ sp }) => {
+    const sig = NARROW_SKILL_DOMAIN_SIGNALS[sp.name.toLowerCase()];
+    if (!sig || haystack.trim().length === 0) return true;
+    return sig.test(haystack);
+  });
+
   const PROMPT_THRESHOLD = 1;
-  const passing = scored.filter(s => s.score >= PROMPT_THRESHOLD);
-  if (passing.length === 0) return skillPrompts; // safe fallback: no filter applied
+  const passing = gated.filter(s => s.score >= PROMPT_THRESHOLD);
+  if (passing.length === 0) {
+    // Pre-441 this returned the full `skillPrompts` list as a "safe fallback: no filter
+    // applied" — the fear being a worker left with zero skill context. That reasoning is
+    // retired: injecting relevance-0 skill bodies wastes tokens, and a skill-less prompt
+    // is legitimate (buildSkillBlock renders nothing for []). When NOTHING clears the
+    // relevance bar we now drop everything and record it on the existing debug channel,
+    // instead of silently re-adding the whole set.
+    debugLog('filterSkillPromptsByDNA', 'skill-prompts filtered to zero (all below relevance)');
+    return [];
+  }
 
   return passing.map(s => s.sp);
 }

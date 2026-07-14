@@ -34,7 +34,7 @@ import { analyzeSkillInMemory } from '../orchestra/ecosystem-intelligence.js';
 import { resolveComposition } from './skill-selector.js';
 import { modelRegistry } from './model-registry.js';
 import { normalizeTechStack, taskKindToIntent } from './work-model.js';
-import type { TaskKind, TechStackKind } from './work-model.js';
+import type { TaskKind } from './work-model.js';
 import { getAgentDomain, getAgentRole, type AgentDomain, type AgentRole } from './agent-pool.js';
 import { debugLog } from './utils.js';
 import { resolveOpenRouterDocRoute, type OpenRouterRouteConfig } from './routing-openrouter.js';
@@ -1555,83 +1555,32 @@ function selectBestAgent(
 
 // ─── Skill Selection ────────────────────────────────────────────────────────
 
-/** ROUTE-1 B4 — guaranteed skill when none cleared skillMinScore. */
-const KIND_DEFAULT_SKILL: Partial<Record<TaskKind, string>> = {
-  'code-development': 'typescript-expert',
-  refactor:          'code-simplifier',
-  documentation:     'documentation-writer',
-  audit:             'code-simplifier',
-  test:              'testing-expert',
-};
-// Fallback when taskKind is unavailable (pickSkillFloor tries KIND_DEFAULT_SKILL first).
-const INTENT_DEFAULT_SKILL: Partial<Record<IntentType, string>> = {
-  refactor:       'code-simplifier',
-  implementation: 'typescript-expert',
-  documentation:  'documentation-writer',
-};
-
-/** ROUTE-1 — project stack language → the built-in language-expert skill id.
- *  Only stacks with a real built-in expert are listed; others fall back to
- *  code-simplifier (language-agnostic) inside resolvePrincipledDefault. */
-const LANGUAGE_EXPERT_SKILL: Partial<Record<TechStackKind, string>> = {
-  typescript: 'typescript-expert',
-  javascript: 'typescript-expert',
-  python:     'python-expert',
-};
-
-/**
- * Resolve the principled floor default for a task (the kind/intent-appropriate
- * skill), stack-aware for code work. Returns null when no curated default fits.
- * Skipped for `unknown` intent by the caller to preserve the honest-empty contract.
- */
-function resolvePrincipledDefault(
-  intent: IntentType,
-  taskKind: TaskKind | undefined,
-  projectStack: { language: string } | null | undefined,
-  pool: Map<string, SkillDefinition>,
-): string | null {
-  const isCode = taskKind === 'code-development' || intent === 'implementation' || intent === 'bugfix';
-  if (isCode) {
-    const lang = normalizeTechStack(projectStack?.language);
-    const langSkill = LANGUAGE_EXPERT_SKILL[lang];
-    if (langSkill && pool.has(langSkill)) return langSkill;
-    if (pool.has('code-simplifier')) return 'code-simplifier'; // language-agnostic code skill
-    // else fall through to the kind/intent defaults below
-  }
-  const byKind = taskKind ? KIND_DEFAULT_SKILL[taskKind] : undefined;
-  if (byKind && pool.has(byKind)) return byKind;
-  const byIntent = INTENT_DEFAULT_SKILL[intent];
-  if (byIntent && pool.has(byIntent)) return byIntent;
-  return null;
-}
-
-/**
- * Pick a floor skill when no candidate cleared the threshold:
- *  (1) the kind/intent principled default (stack-aware for code work), else
- *  (2) the best sub-threshold candidate (score > 0).
- * Returns null for genuinely unclassifiable tasks (intent 'unknown', no default,
- * no sub-threshold) so an empty pool / no-signal task honestly yields no skill.
- */
-function pickSkillFloor(
-  subThreshold: Array<{ id: string; finalScore: number }>,
-  intent: IntentType,
-  taskKind: TaskKind | undefined,
-  pool: Map<string, SkillDefinition>,
-  projectStack?: { language: string } | null,
-): string | null {
-  // Principled default first (the kind/intent-appropriate skill is a stronger
-  // signal than a coincidentally-bonused sub-threshold candidate). Skipped for
-  // `unknown` intent so an unclassifiable task can still return [].
-  if (intent !== 'unknown') {
-    const principled = resolvePrincipledDefault(intent, taskKind, projectStack, pool);
-    if (principled) return principled;
-  }
-  // Fallback: best sub-threshold candidate (some real signal scored, just below threshold).
-  if (subThreshold.length > 0) {
-    return [...subThreshold].sort((a, b) => b.finalScore - a.finalScore)[0]!.id;
-  }
-  return null;
-}
+// ROUTE-1 B4 skill-floor — REMOVED (sprint-441, task 441-002).
+//
+// HISTORY (why it existed): selectBestSkills used to GUARANTEE a skill whenever
+// no candidate cleared `skillMinScore`, via a `pickSkillFloor()` helper that
+// returned, in order:
+//   (1) a kind/intent principled default, stack-aware for code work
+//       (KIND_DEFAULT_SKILL / INTENT_DEFAULT_SKILL / LANGUAGE_EXPERT_SKILL), else
+//   (2) the best sub-threshold candidate (any skill scoring 0 < s < skillMinScore).
+// The contract was "never return [] for a classified task".
+//
+// WHY REMOVED (root cause C — skill-injection RELEVANCE INVERSION): that
+// never-empty contract INJECTED IRRELEVANT skills. On the 430-438 prompt corpus
+// the floor put sh-portability into 10/31 prompts and file-watch-hygiene into
+// 6/31 — shell/watcher guidance forced onto TypeScript/contract tasks where it
+// did not belong. It was one of the TWO never-empty fallbacks behind the P3
+// finding (the other lived in prompt-token-optimizer's "return all" skill filter).
+// Ref: .analysis/prompt-refactor-6-step1-groundtruth-2026-07-14.md.
+//
+// NEW BEHAVIOR (honest-empty): when no candidate clears `skillMinScore`,
+// selectBestSkills now assigns NO skill and emits a loud debug note, instead of
+// forcing an irrelevant one ("skill'siz-geç + loud-not"). This extends the
+// honest-empty contract that already governed `unknown`-intent tasks to EVERY
+// below-threshold task. The default maps and pickSkillFloor() are gone with the
+// mechanism; skills surface ONLY through real activation + stack/intent bonuses
+// (the candidate loop below). The budget-cap floor further down is unrelated — it
+// only ever preserves a candidate that ALREADY cleared the threshold.
 
 function selectBestSkills(
   taskDNA: TaskDNA,
@@ -1736,13 +1685,18 @@ function selectBestSkills(
   }
 
   if (candidates.length === 0) {
-    // ROUTE-1 B4 — empty-skill floor: never return [] for a classified task.
-    const floorId = pickSkillFloor(subThreshold, taskDNA.intent.primary, taskKind, pool, projectStack);
-    if (floorId) {
-      reasoning.push(`Skill floor: '${floorId}' (no candidate ≥ ${cfg.skillMinScore})`);
-      return { skillIds: [floorId], scores: new Map([[floorId, 0]]), confidence: 'low', reasoning };
-    }
-    reasoning.push('No skill met minimum score threshold');
+    // ROUTE-1 B4 skill-floor REMOVED (sprint-441) → honest-empty. No candidate
+    // cleared skillMinScore, so assign NO skill. The `subThreshold` skills
+    // (0 < score < skillMinScore) are intentionally NOT promoted — that arm, plus
+    // the kind/intent principled default, was the relevance-inversion source (see
+    // the rationale block above selectBestSkills). Emit a loud debug note instead
+    // of injecting an irrelevant skill.
+    debugLog(
+      'routing-engine',
+      `Skill floor removed (honest-empty): no candidate ≥ ${cfg.skillMinScore}; ` +
+        `${subThreshold.length} sub-threshold skill(s) NOT promoted → skillIds=[]`,
+    );
+    reasoning.push('No skill met minimum score threshold — honest-empty (ROUTE-1 B4 floor removed, sprint-441)');
     return { skillIds: [], scores: new Map(), confidence: 'uncertain', reasoning };
   }
 
@@ -1769,11 +1723,14 @@ function selectBestSkills(
     .slice(0, budget.maxSkills);
 
   // ROUTE-1 B4 — budget-cap floor: trivial tasks (maxSkills=0) would drop all
-  // candidates; preserve the best-scored candidate as a floor instead.
-  // Unknown-intent guard: mirrors pickSkillFloor contract — unclassifiable tasks return [].
+  // candidates; preserve the best-scored candidate as a floor instead. This is
+  // DISTINCT from the removed below-threshold floor: `candidates[0]` here ALWAYS
+  // cleared skillMinScore (the candidates-empty case returned early above), so
+  // this only ever surfaces a threshold-passing skill — never a sub-threshold one.
+  // It is therefore NOT part of the sprint-441 relevance-inversion removal.
+  // Unknown-intent guard: unclassifiable tasks return [] (honest-empty).
   if (finalCandidates.length === 0 && taskDNA.intent.primary !== 'unknown') {
-    const budgetFloorId = candidates[0]?.id
-      ?? pickSkillFloor(subThreshold, taskDNA.intent.primary, taskKind, pool, projectStack);
+    const budgetFloorId = candidates[0]?.id;
     if (budgetFloorId) {
       const topScore = candidates[0]?.finalScore ?? 0;
       reasoning.push(`Skill floor (budget cap): '${budgetFloorId}' (maxSkills=${budget.maxSkills})`);

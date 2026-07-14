@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-441 Learnings
+- Sprint sprint-441 Learnings: ## Sprint sprint-441 Learnings
+- SKILL-RETRIEVAL çift-eşik entegrasyon testleri ve regresyon-yeşili kanıtı: NO_GO — Cascade-skipped (SCHED6-EFF persist-before-commit executor): dependency 441-002 ended NO_GO/MANUAL_REVIEW, so this depen
+
+## Gains
+- 441-001 — prompt-token-optimizer skill-DNA filtresi çift-eşik ve kelime-sınırı düzeltmesi — Three skill-layer mechanism fixes in src/orchestra/prompt-token-optimizer.ts, plus synced unit te...
+- 441-002 — routing-engine B4 skill-floor kaldırma ve eşik-altı boş-atama davranışı — Worker exited without writing result (exitCode=1, source=wrapper).
+- 441-003 — prompt-god-template boş-skill render doğrulaması ve hermetik test — Verified buildSkillBlock (src/orchestra/prompt-god-template.ts:552-569): the first guard `if (!sk...
+
 ## Sprint sprint-440 Learnings
 - Sprint sprint-440 Learnings: ## Sprint sprint-440 Learnings
 - Yeni hermetik birim-testler test-yazarligi ve implementation senaryolari: NO_GO — Cascade-skipped (SCHED6-EFF persist-before-commit executor): dependency 440-001 ended NO_GO/MANUAL_REVIEW, so this depen

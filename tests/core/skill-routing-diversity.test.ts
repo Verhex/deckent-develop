@@ -3,8 +3,11 @@ import {
   INTENT_TO_SKILL_ID,
   TASK_DOMAIN_TO_SKILL_ID,
   SKILL_DOMAIN_BONUS,
+  routeTaskV2,
 } from '../../src/core/routing-engine.js';
 import { classifyIntent } from '../../src/core/intent-classifier.js';
+import type { SkillDefinition } from '../../src/core/skill-types.js';
+import { createSkillDefinition } from '../../src/core/skill-types.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -178,5 +181,57 @@ describe('classifyIntent → domain signals for skill routing', () => {
     if (dna.domains.some(d => d.name === 'docker')) {
       expect(TASK_DOMAIN_TO_SKILL_ID['docker']).toBe('docker-expert');
     }
+  });
+});
+
+// ─── skill-floor removed — the intent/domain maps are now the SOLE selection path ──
+// sprint-441, task 441-002. The ROUTE-1 B4 skill-floor (a never-empty fallback that
+// injected a principled default, else the best sub-threshold candidate) was removed
+// because it caused RELEVANCE INVERSION — sh-portability into 10/31 prompts,
+// file-watch-hygiene into 6/31 on the 430-438 corpus. The intent/domain→skill maps
+// exercised above are now the ONLY way a skill that lacks a matching activation rule
+// reaches the threshold; when even that map has no entry in the pool, selection is
+// honestly EMPTY instead of a forced irrelevant skill. These two tests pin both sides.
+describe('skill-floor removed — map path lives, no-map path is honest-empty (sprint-441)', () => {
+  function poolOf(...skills: SkillDefinition[]): Map<string, SkillDefinition> {
+    return new Map(skills.map(s => [s.id, s]));
+  }
+
+  it('POSITIVE CONTROL: refactor task with code-simplifier in pool → mapped skill selected', () => {
+    // INTENT_TO_SKILL_ID.refactor = code-simplifier → +SKILL_DOMAIN_BONUS lifts it to
+    // the threshold even with no activation rule. The map path is intact post-removal.
+    const decision = routeTaskV2(
+      {
+        title: 'refactor the module',
+        description: 'refactor and restructure the module for clarity',
+        scope: { directories: ['src/x/'], filesRead: [], filesWrite: ['src/x/y.ts'] },
+        type: 'refactor',
+      },
+      new Map(),
+      poolOf(createSkillDefinition({ id: 'code-simplifier', name: 'Code Simplifier', category: 'workflow', triggers: ['refactor'] })),
+    );
+    expect(INTENT_TO_SKILL_ID['refactor']).toBe('code-simplifier');
+    expect(decision.skillIds).toContain('code-simplifier');
+  });
+
+  it('HONEST-EMPTY: classified task whose mapped skill is absent + nothing clears threshold → []', () => {
+    // Pool holds only graphql-expert (activation needs a graphql domain — absent → 0)
+    // and NOT code-simplifier, so no candidate clears the threshold. The removed floor
+    // would have injected the refactor principled default (code-simplifier); now → [].
+    const decision = routeTaskV2(
+      {
+        title: 'refactor the module',
+        description: 'refactor and restructure the module for clarity',
+        scope: { directories: ['src/x/'], filesRead: [], filesWrite: ['src/x/y.ts'] },
+        type: 'refactor',
+      },
+      new Map(),
+      poolOf(createSkillDefinition({
+        id: 'graphql-expert', name: 'GraphQL Expert', category: 'workflow', triggers: ['graphql'],
+        activation: { rules: [{ when: { 'domains': { $contains: 'graphql' } }, score: 10 }], exclude: [], minScore: 5 },
+      })),
+    );
+    expect(decision.taskDNA.intent.primary).toBe('refactor'); // guard: classified, not 'unknown'
+    expect(decision.skillIds).toEqual([]);
   });
 });

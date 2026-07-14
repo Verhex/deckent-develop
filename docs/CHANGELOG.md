@@ -9,6 +9,17 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint441] - 2026-07-14
+
+### Added
+
+- prompt-token-optimizer skill-DNA filtresi çift-eşik ve kelime-sınırı düzeltmesi
+- routing-engine B4 skill-floor kaldırma ve eşik-altı boş-atama davranışı
+- prompt-god-template boş-skill render doğrulaması ve hermetik test
+
+
+_Tasks: 5 total, 4 done, 0 tech debt, 1 no-go_
+
 ## [1.0.0-beta.1-sprint440] - 2026-07-14
 
 ### Added

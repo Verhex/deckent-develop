@@ -1668,8 +1668,17 @@ export function buildWorkerPrompt(
   const isV2 = task.routingMeta?.routingVersion === 'v2';
   const rawDNA = task.routingMeta?.taskDNA;
   let effectiveSkillPrompts = skillPrompts;
-  if (isV2 && rawDNA && skillPrompts && skillPrompts.length > 1) {
-    effectiveSkillPrompts = filterSkillPromptsByDNA(skillPrompts, rawDNA as TaskDNA);
+  // PCOMP-6 D4 (CC completion): the historical `> 1` guard meant a SINGLE
+  // assigned skill bypassed relevance filtering entirely — the exact corpus
+  // class where an irrelevant sh-portability/file-watch-hygiene body rode
+  // along on one-skill tasks (10/31 + 6/31). Post-441 the filter may return
+  // an empty list (empty skill block is a valid render), so every V2 task
+  // with any skills goes through it.
+  if (isV2 && rawDNA && skillPrompts && skillPrompts.length > 0) {
+    effectiveSkillPrompts = filterSkillPromptsByDNA(skillPrompts, rawDNA as TaskDNA, {
+      filesWrite: task.scope?.filesWrite,
+      taskText: `${task.title ?? ''}\n${task.description ?? ''}`,
+    });
   }
 
   // Load accepted ADRs from Memory V2 if available (best-effort) for the ADR block.

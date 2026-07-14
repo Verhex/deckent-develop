@@ -1,13 +1,27 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// 441: filterSkillPromptsByDNA now records the "all below relevance" drop on the
+// existing debugLog channel. Partial-mock utils.js so we can assert that call
+// while leaving every other util (readJsonSafe, formatDate, …) real.
+vi.mock('../../src/core/utils.js', async (importOriginal) => {
+  const actual = await importOriginal() as typeof import('../../src/core/utils.js');
+  return { ...actual, debugLog: vi.fn() };
+});
+
 import {
   computeSkillRelevance,
   filterSkillPrompts,
   filterSkillPromptsByDNA,
 } from '../../src/orchestra/prompt-token-optimizer.js';
+import { debugLog } from '../../src/core/utils.js';
 import type { SkillDefinition } from '../../src/core/skill-types.js';
 import { createSkillDefinition } from '../../src/core/skill-types.js';
 import { createDefaultTaskDNA } from '../../src/core/routing-types.js';
 import type { TaskDNA } from '../../src/core/routing-types.js';
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -72,6 +86,17 @@ describe('computeSkillRelevance', () => {
     expect(score).toBeGreaterThanOrEqual(0);
     expect(score).toBeLessThanOrEqual(1);
   });
+
+  it('does NOT match a keyword inside a longer word — word-boundary aware (441)', () => {
+    // Regression guard: pre-441 raw substring matching credited the trigger 'latest'
+    // for both the 'test' affinity keyword and the 'test' domain, because
+    // 'latest'.includes('test') === true. Word-boundary matching must score this zero —
+    // 'test' is not a whole word inside 'latest'.
+    const skill = makeSkill('release-notes', ['latest']);
+    const dna = makeTaskDNA('implementation', ['test']);
+    const score = computeSkillRelevance(skill, dna);
+    expect(score).toBe(0);
+  });
 });
 
 // ─── filterSkillPrompts ───────────────────────────────────────────────────────
@@ -131,14 +156,52 @@ describe('filterSkillPromptsByDNA', () => {
     expect(result.some(p => p.name === 'testing-expert')).toBe(true);
   });
 
-  it('falls back to all prompts when no prompt passes scoring', () => {
+  it('returns an EMPTY list (not the full set) when no prompt clears relevance, and logs it (441)', () => {
+    // HISTORICAL RATIONALE (retired, not blind-deleted): pre-441 this returned the
+    // original `prompts` list as a "safe fallback: no filter applied" — the fear being
+    // a worker left with zero skill context. That fallback is retired: a skill-less
+    // prompt is legitimate (buildSkillBlock renders nothing for []) and injecting
+    // relevance-0 skill bodies wastes tokens. Nothing relevant → [] + a debug line on
+    // the existing channel.
     const prompts = [
       { name: 'zzz-unknown-1', content: 'xxxxxxxxxxx' },
       { name: 'zzz-unknown-2', content: 'yyyyyyyyyyy' },
     ];
     const dna = makeTaskDNA('security');
     const result = filterSkillPromptsByDNA(prompts, dna);
-    // Fallback: returns original list when nothing passes
-    expect(result.length).toBe(prompts.length);
+    expect(result).toEqual([]);
+    expect(debugLog).toHaveBeenCalledWith(
+      'filterSkillPromptsByDNA',
+      'skill-prompts filtered to zero (all below relevance)',
+    );
+  });
+
+  it('drops a skill whose name only matched via the removed reverse direction (441)', () => {
+    // Pre-441 the name check was bidirectional: `kw.includes(nameLower)` credited the
+    // name 'script' because the keyword 'typescript' contains it. That reverse direction
+    // is gone — a short name that is merely a substring of a keyword no longer scores,
+    // while a name that contains the keyword at a word boundary still passes.
+    const prompts = [
+      { name: 'typescript-expert', content: 'zzz' }, // forward match: name contains 'typescript'
+      { name: 'script', content: 'zzz' },            // pre-441 matched ONLY via the removed reverse direction
+    ];
+    const dna = makeTaskDNA('implementation');
+    const result = filterSkillPromptsByDNA(prompts, dna);
+    expect(result.map(p => p.name)).toEqual(['typescript-expert']);
+  });
+
+  it('drops a skill whose name only matched a DOMAIN via the removed reverse direction (441)', () => {
+    // The symmetric domain check had the same reverse-direction bug: pre-441
+    // `d.includes(nameLower)` credited the name 'data' for the domain 'database'
+    // ('database'.includes('data') === true). That reverse direction is gone too — a
+    // name that is merely a substring of a domain no longer scores, while a name that
+    // contains the domain at a word boundary still passes.
+    const prompts = [
+      { name: 'database-migrator', content: 'zzz' }, // forward match: name contains 'database'
+      { name: 'data', content: 'zzz' },              // pre-441 matched ONLY via the removed reverse direction
+    ];
+    const dna = makeTaskDNA('implementation', ['database']);
+    const result = filterSkillPromptsByDNA(prompts, dna);
+    expect(result.map(p => p.name)).toEqual(['database-migrator']);
   });
 });

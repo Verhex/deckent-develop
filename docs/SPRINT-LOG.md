@@ -10793,3 +10793,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 440-004: Regresyon dogrulamasi mevcut intent-routing-prompt test aileleri ve tsc (NO_GO)
 
 ---
+## Sprint 441 — sprint-441
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-14
+**Duration:** 2675s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | NaN% |
+| Duration | 2675422ms |
+
+### Tasks
+
+- 441-001: prompt-token-optimizer skill-DNA filtresi çift-eşik ve kelime-sınırı düzeltmesi (DONE)
+- 441-002: routing-engine B4 skill-floor kaldırma ve eşik-altı boş-atama davranışı (DONE)
+- 441-003: prompt-god-template boş-skill render doğrulaması ve hermetik test (DONE)
+- 441-004: SKILL-RETRIEVAL çift-eşik entegrasyon testleri ve regresyon-yeşili kanıtı (NO_GO)
+
+---

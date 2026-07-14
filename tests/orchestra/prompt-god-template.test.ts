@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildTaskPrompt, buildBehaviorPrecedenceNote } from '../../src/orchestra/prompt-god-template.js';
+import { buildTaskPrompt, buildTaskPromptSegmented, buildBehaviorPrecedenceNote } from '../../src/orchestra/prompt-god-template.js';
 import type { SprintContext } from '../../src/orchestra/prompt-god-template.js';
 import type { Task } from '../../src/core/task-types.js';
 import { TaskStatus } from '../../src/core/task-types.js';
@@ -197,6 +197,48 @@ describe('buildTaskPrompt', () => {
     expect(result.prompt).not.toContain('=== Agent:');
     expect(result.prompt).not.toContain('=== Skills ===');
     expect(result.prompt).not.toContain('=== Mandatory Architecture');
+  });
+
+  // Test 7b (441-003): empty skill list — isolated from Test 7's "everything empty"
+  // case. D4's contract makes an empty `assignedSkills` legitimate (not an error); this
+  // pins the render-side guarantee — buildSkillBlock must omit the ENTIRE `=== Skills ===`
+  // block (header included) with no dangling separator/artifact, while the rest of the
+  // prompt (agent + ADR blocks, both populated here) still renders validly.
+  it('should omit the skills segment entirely for an empty skill list (441-003)', () => {
+    const task = makeTask({ assignedSkills: [] });
+    const ctx = makeCtx({ skillPrompts: [] });
+    const { prompt, segments, metadata } = buildTaskPromptSegmented(task, ctx);
+
+    // Structural pin: no 'skills' segment was ever pushed — the strongest guarantee
+    // against a dangling SEGMENT_SEPARATOR or orphan header, since a segment string
+    // check alone cannot prove the block was skipped rather than merely emptied.
+    expect(segments.some(s => s.kind === 'skills')).toBe(false);
+    expect(prompt).not.toContain('=== Skills ===');
+    // The `--- name ---` entry separator is unique to buildSkillBlock's per-skill
+    // output (no other block in prompt-god-template.ts uses this exact pattern) —
+    // its absence rules out a leftover skill entry without its header.
+    expect(prompt).not.toMatch(/^--- .+ ---$/m);
+    expect(metadata.skills).toEqual([]);
+
+    // Prompt still renders validly: non-empty, leads with the Agent block (no blank/
+    // dangling block where skills would have sat), and the rest of the template
+    // (task body, scope rules) is intact.
+    expect(prompt.length).toBeGreaterThan(0);
+    expect(prompt.startsWith('=== Agent: architect ===')).toBe(true);
+    expect(prompt).toContain('## Scope Rules');
+    expect(prompt).toContain('## Your Task');
+  });
+
+  it('should omit the skills segment when skillPrompts is undefined (441-003)', () => {
+    const task = makeTask({ assignedSkills: [] });
+    const ctx = makeCtx({ skillPrompts: undefined });
+    const { prompt, segments, metadata } = buildTaskPromptSegmented(task, ctx);
+
+    expect(segments.some(s => s.kind === 'skills')).toBe(false);
+    expect(prompt).not.toContain('=== Skills ===');
+    expect(prompt).not.toMatch(/^--- .+ ---$/m);
+    expect(metadata.skills).toEqual([]);
+    expect(prompt.startsWith('=== Agent: architect ===')).toBe(true);
   });
 
   // Test 8: Agent prompt is NOT truncated

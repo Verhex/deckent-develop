@@ -88,6 +88,11 @@ afterEach(() => {
 
 // ─── Tests ──────────────────────────────────────────────────────────
 
+// 441 sync note: filterSkillPromptsByDNA changed under this suite (reverse-direction
+// substring removed + word-boundary matching + "all below relevance → []" instead of
+// "return the full set"). These fixtures are unaffected and assertions are unchanged:
+// every case keeps ≥1 relevant skill, so the new empty-list branch is never hit, and no
+// fixture relies on the removed reverse direction or the 'test'/'latest' overlap.
 describe('resolveSkillPrompts — DNA-filter stat credit (born-593)', () => {
   it('excludes a DNA-filtered skill from assignedSkills credit and emits skill.dna_filtered', async () => {
     writeSkill('documentation-writer', 'A skill for writing documentation and guides.');

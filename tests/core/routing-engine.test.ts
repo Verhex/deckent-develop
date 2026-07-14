@@ -1083,3 +1083,64 @@ describe('routeTaskV2 — forceSkills phantom-id validation', () => {
     expect(decision.overrideWarnings ?? []).toEqual([]);
   });
 });
+
+// ─── ROUTE-1 B4 skill-floor REMOVED — honest-empty below threshold ───────────
+// sprint-441, task 441-002. The B4 skill-floor used to GUARANTEE a skill whenever
+// no candidate cleared skillMinScore — first a kind/intent principled default, else
+// the best sub-threshold candidate. That "never return [] for a classified task"
+// contract caused skill-injection RELEVANCE INVERSION: on the 430-438 prompt corpus
+// it forced sh-portability into 10/31 prompts and file-watch-hygiene into 6/31
+// (shell/watcher guidance onto TS/contract tasks). New behavior: when nothing clears
+// the threshold, skillIds is [] (honest-empty) + a debug note. These two tests reach
+// the removed path — under the OLD floor each returned a NON-empty skillIds, so they
+// pin the flip, not merely the pre-existing unknown-intent empty case.
+describe('routeTaskV2 — ROUTE-1 B4 skill-floor removed (honest-empty)', () => {
+  it('sub-threshold arm removed: classified task whose only skill scores 0<s<minScore → []', () => {
+    // 'weak-helper' matches refactor intent at score 2 (< skillMinScore 3) and is NOT
+    // the refactor intent-skill (code-simplifier), so it earns no INTENT_TO_SKILL_ID
+    // bonus and stays sub-threshold. No code-simplifier in the pool → OLD principled
+    // default is null, so the OLD floor promoted the best sub-threshold candidate →
+    // ['weak-helper']. New behavior → [].
+    const weak = makeSkill('weak-helper', {
+      activation: { rules: [{ when: { 'intent.primary': 'refactor' }, score: 2 }], exclude: [], minScore: 5 },
+    });
+    const decision = routeTaskV2(
+      {
+        title: 'refactor the dispatcher',
+        description: 'refactor and restructure the dispatcher for clarity',
+        scope: { directories: ['src/orchestra/'], filesRead: [], filesWrite: ['src/orchestra/x.ts'] },
+        type: 'refactor',
+      },
+      makePool(),
+      makeSkillPool(weak),
+    );
+    expect(decision.taskDNA.intent.primary).toBe('refactor'); // guard: classified, not 'unknown'
+    expect(decision.skillIds).toEqual([]);
+    expect(decision.reasoning.some(r => r.includes('honest-empty'))).toBe(true);
+  });
+
+  it('principled-default arm removed: classified code task, default id present but below threshold → []', () => {
+    // typescript-expert is in the pool but its activation needs a `typescript` domain
+    // (absent) and there is NO typescript projectStack, so it scores 0 (no stack/intent
+    // bonus). OLD floor returned the KIND_DEFAULT_SKILL/INTENT_DEFAULT_SKILL principled
+    // default (typescript-expert). New behavior → [].
+    const tsExpert = makeSkill('typescript-expert', {
+      category: 'language',
+      triggers: ['typescript'],
+      activation: { rules: [{ when: { 'domains': { $contains: 'typescript' } }, score: 10 }], exclude: [], minScore: 5 },
+    });
+    const decision = routeTaskV2(
+      {
+        title: 'add lifecycle hook',
+        description: 'implement a cleanup hook in the dispatcher module',
+        scope: { directories: ['src/orchestra/'], filesRead: [], filesWrite: ['src/orchestra/hook.ts'] },
+        type: 'code-development',
+      },
+      makePool(),
+      makeSkillPool(tsExpert),
+      // deliberately NO projectStack → no stack bonus, no implementation+TS intent bonus
+    );
+    expect(decision.taskDNA.intent.primary).toBe('implementation'); // guard: classified
+    expect(decision.skillIds).toEqual([]);
+  });
+});

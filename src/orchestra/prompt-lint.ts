@@ -25,6 +25,7 @@
 
 import type { Task } from '../core/types.js';
 import { resolveTargetedTestPaths } from './prompt-god-template.js';
+import { NARROW_SKILL_DOMAIN_SIGNALS } from './prompt-token-optimizer.js';
 
 export type PromptLintCheckId =
   | 'mentioned-file-outside-write-authority'
@@ -154,12 +155,8 @@ function checkPersonaTestAuthorship(task: Task): PromptLintFinding[] {
 /** Skills whose domain is recognizably narrow, with the file/text signals that
  *  justify them. A listed skill with zero signal hits is suspect. Unlisted
  *  skills are never flagged (unknown domain ≠ irrelevant). */
-const NARROW_SKILL_SIGNALS: Record<string, RegExp> = {
-  'sh-portability': /\.(sh|bash)\b|shell|wrapper|trap |posix|spawn.*(docker|tmux)/i,
-  'file-watch-hygiene': /fs\.watch|watcher|polling|chokidar|watch mode|file.?watch/i,
-  'devops-engineer': /docker|dockerfile|kubernetes|k8s|\.github\/workflows|ci\/cd|pipeline|deploy/i,
-  'dashboard-frontend': /dashboard|react|\.tsx\b|vite|tailwind/i,
-};
+// D4: single source shared with the prompt-time filter (prompt-token-optimizer).
+const NARROW_SKILL_SIGNALS = NARROW_SKILL_DOMAIN_SIGNALS;
 
 /** W5 — an assigned narrow-domain skill has no signal anywhere in the task's
  *  text or write targets (the relevance-inversion class: substring routing +
