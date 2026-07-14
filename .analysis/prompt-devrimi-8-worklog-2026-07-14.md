@@ -141,3 +141,41 @@
 - **DK3 · Kural→mekanizma bütçesi:** her çalışma-bloğunda ≥1 kanun mekanizmaya gömülür (ilk sıra: G6 aralık-config — scale_up kanunu koddan zorlanır).
 - **DK4 · İlan-dili:** "TAMAM/✅/🏁" yalnız Alperen-rubrik-onayı sonrası; öncesinde tek meşru ifade "teslim-edildi, sınav-bekliyor".
 - **DK5 · Ön-yarı-önceliği:** A5-sıralaması kaldıraç-listesine kilitli (G2+G1 → G3+G4+G6 → G7+G20 → G8+G9); arka-yarıya yeni cila, ön-yarı sözleşmeleri kurulmadan YASAK.
+
+## A5 — HEDEF-MİMARİ + MALİYET (kaldıraç-kilitli; 2026-07-14)
+
+> İlke: "derlenen-prompt" = her katmanın ÇIKTI-SÖZLEŞMESİ vardır; sözleşmeyi bozan çıktı ilerleyemez (fail-closed) ya da deterministik tamamlanır. Tespit-katmanları (lint) yalnız sözleşme-ihlalinin son-şahididir. MVP yok — her kalem tam-tasarım.
+
+### KALDIRAÇ-1 · Metadata-hijyeni + intent-motoru (G2+G1 → G15-kalıcılık, G13-v2 dahil 4 kusur)
+**G2:** `DirectiveBuildTask`/Task-şemasına ayrı `meta:{flowId,revision,tenant,actor,origin}`; `toDirectiveTask` description'a ASLA gömmez; DIRECTIVES'te ayrı `### meta`-satırı (yazıcı+iki-okuyucu); classifier/planner YALNIZ title+description okur. Geriye-uyum: okuyucular eski gömülü-satırı tanıyıp strip eder (dual-read).
+**G1:** classifier eşleşmesi `containsWord` (D4-helper'ı core-paylaşımlı yapılır — 'içindeki' artık 'ci' üretemez: sınır-karakteri 'i' alnum) + dosya-deseni ağırlıkları kalır + **confidence<0.5 → intent='unknown'** (jenerik-persona; behavior-bloğu zaten unknown'da basılmıyor). Ölüm-kanıtı: 442-metinleri yeniden-sınıflanır → devops ÇIKMAMALI (regresyon-fixture).
+
+### KALDIRAÇ-2 · Planner çıktı-sözleşmesi (G3+G4+G6 → G5, G11 dahil 5 kusur)
+Zod-şema sertleşir + deterministik-tamamlayıcı çifti:
+- **filesRead ZORUNLU:** planner boş bırakırsa compose-katmanı import-scan'le doldurur (mevcut `sourceImportNeedles` altyapısı) — eksik-scope sınıfı DOĞAMAZ.
+- **mirror-test ZORUNLU:** davranış-değiştiren her src-task'ının filesWrite'ına mirror-test dosyası şemada eklenir (planner koymadıysa tamamlayıcı ekler; "yoksa-yarat" semantiğiyle exact-verify'a girer → G5 placeholder-sınıfı ölür). Ayrık test-task istisnası açık-işaretli (`testOwnership: separate-task`).
+- **aralık CONFIG:** `ZERO_CONFIG_MIN/MAX` → `planner.task_range` config'i (dogfood default hedef ≥8; NL'de açık küçük-iş beyanı istisna) — scale_up KANUNU mekanizmada (DK3'ün ilk gömüsü).
+- Şema-ihlalinde: typed-hata + tek-retry (ihlal-geri-bildirimli) — sessiz-kabul yok.
+
+### KALDIRAÇ-3 · Spec-şablonu (G7+G20)
+Zorunlu-bölümlü NL/spec şablonu (CC-tarafı süreç + ileride `do --spec`): **Amaç · Dosya-kapsamı · Edge-politikaları (sıralama/çakışma/legacy) · Dönüş/mutasyon-semantiği · Kanıt (davranış-koşusu ZORUNLU; yalnız-tsc YASAK) · Yasaklar**. Boş-bölüm = gönderilemez. Format-kuralları (virgül/tam-yol/rapor-yasağı) şablonda sabit — elle-tekrar ölür.
+
+### KALDIRAÇ-4 · Focused-render (G8+G9) — EN BÜYÜK MALİYET-KAZANCI
+- **Persona:** manifest'e görev-tipi→`guidance` kesitleri (5-15 satır); tam-gövde yalnız referans-link. (442-örneği: coordinator-işine devops-personası düşse bile Dockerfile-rehberi artık inmezdi.)
+- **ADR:** clause-level render — adr-constraints yapısı genişler (DB'ye taşınır, G-019 roadmap); task-relevant 4-5 satır.
+
+### MALİYET-MODELİ + KURTARICI ADIMLAR (soru-4)
+Bugün: ort **21.6KB ≈ 5.5K token/prompt** (görev-çekirdeği %11). 8-worker sprint ≈ 8-14 spawn (+fix'ler).
+| Adım | Kazanç | Not |
+|---|---|---|
+| K4-persona-focused | −%15-18/prompt | 4.6KB→~0.8KB |
+| K4-ADR-clause | −%8-10/prompt | 3.1KB→~0.6KB |
+| Tekrar-birleştirme (goCriteria 4.5-tema→2) | −%3-4 | render-tekilleştirme |
+| **Toplam prompt-kısalması** | **≈ −%28-32** | görev-çekirdeği payı %11→~%16 |
+| Leading-T0 reorder FLIP (bugün default-off) | cache-hit ↑ | worker'lar cache PAYLAŞMIYOR (ampirik) → prefix-stabilite kazancı per-worker; flip ölçümle |
+| Exact-verify yan-kazancı (D1a ✓) | tam-suite kaçak-koşuları ↓ | zaten canlı |
+| Planner-prompt ADR-özet (zaten kısıt-satırı) | planner-çağrı maliyeti sabit-küçük | büyümesin diye kısıt-tablosu ≤10 kayıt kuralı |
+
+### UYGULAMA-DİLİMLERİ (sıra KİLİTLİ; her dilim A6-sınavından geçmeden sonraki başlamaz)
+U1: Kaldıraç-1 (G2 metadata + G1 motor) → U2: Kaldıraç-2 (planner-sözleşmesi+tamamlayıcı) → U3: Kaldıraç-3 (şablon) → U4: Kaldıraç-4 (focused-render+maliyet-ölçümü) → U5: kalan-🟡'lar (W7-genişleme, warn→fail-closed Alperen-kararı, 698-b/c).
+Yürütme-biçimi (Alperen-kararına sunulur): U1-U2 prompt-mekanizmasının kendisi olduğundan CC-el + her adım canlı-442-fixture-sınavlı; U3 süreç; U4-U5 dogfood.
