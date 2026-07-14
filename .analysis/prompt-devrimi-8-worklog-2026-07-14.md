@@ -192,3 +192,8 @@ Kod: e0cef74c (G1 motor · G1b güven-demotion · G1c doc-yapısal · G2 meta-ro
 - sinav2 gerçek-devops: ilk-task **devops** (korunum ✓) + impl + 2 doc
 - sinav3 test-yazarlığı: 4 impl + 1 doc (ADR-G-023 dünyasında doğru-sınıf; behavior-bloğu all-test'te zaten susuyor)
 İlan: **teslim-edildi, sınav-bekliyor.**
+
+## U2 — TESLİM + A6-SINAV (Alperen-skoru bekleniyor)
+Kod: 4a675b4b — planner-normalize (N1 mentioned→read · N2 import-scan→read · N3 mirror-test create-if-missing, plan-genel çakışma-istisnalı) + şema-retry + 3-5-hardcode ölümü (env-parametrik).
+**Kanıtlar:** 442-gerçek-planı: filesRead 0→4 (dört task) · 113 test · **A6-canlı (taze-NL, tam-zincir): 4 task, read 6/29/3/6 (sıfır-boş), mirror-test 3/4'te filesWrite'ta** (`.analysis/a6-sinav-u1/sinav4-u2-canli.md`).
+İlan: teslim-edildi, sınav-bekliyor. Kalan-U: U3 spec-şablonu · U4 focused-render · U5 kalan-🟡'lar.
