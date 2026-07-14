@@ -19,8 +19,7 @@
 // drift from the real `resolveApproval` signature. A real `Executor` instance
 // satisfies it with zero adapter glue; tests inject a duck-typed fake.
 //
-// Gotcha parity (project_nervous_accept_pending_not_cleared,
-// .deckent/docs/core-memory/): historically, accepting a nervous suggestion
+// Gotcha parity (tarihçe: nervous-accept pending-temizleme asimetrisi, 2026-06-24 fix): historically, accepting a nervous suggestion
 // left it stale in the pending store while reject correctly cleared it — fixed
 // at the Executor level (2026-06-24) by making `resolveApproval` clear the
 // pending store unconditionally for both decisions. This module does not
@@ -141,7 +140,7 @@ export function planReject(
  * Build an accept-with-edited-payload plan for `id` (APPROVE-007b). Same shape
  * as `planAccept` plus `modifiedPayload`, and — deliberately, not a
  * special case — the identical `clear-pending` step: this is the path the
- * task's disk-verified gotcha (project_nervous_accept_pending_not_cleared)
+ * task's disk-verified gotcha (nervous-accept-pending-asymmetry (2026-06-24 fix))
  * historically broke, so it gets no different treatment than a plain accept.
  * Does not execute anything — see `applyNervousBridgePlan`.
  */

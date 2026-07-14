@@ -17,4 +17,3 @@ Alperen (2026-06-28, iki ayrı direktif): **"testler için maks 16GB RAM — üs
 - Orchestra fork'ları CI'da 8GB heap (NODE_OPTIONS) kullandığı için global execArgv heap-cap KOYMA (orchestra'yı kırar) — bellek kontrolü yalnız **fork-sayısı** üzerinden.
 - CI shard'ları zaten ≤16GB (maxForks=2, 16GB runner) — CI tarafı ek-tuning gerektirmedi.
 
-İlgili: [[project_ci_green_root_causes]] (Desen D teardown-RPC ≠ bu OOM), [[feedback_millions_environments_scale]] (WSL bir hedef-ortam).

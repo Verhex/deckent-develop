@@ -317,7 +317,10 @@ export function replaceSentinel(content: string, newInner: string): string {
   }
   const before = content.slice(0, startIdx);
   const after = content.slice(endIdx + AUTO_END.length);
-  return `${before}${AUTO_START}\n${newInner}\n${AUTO_END}${after}`;
+  // Memory-reform 2026-07-14 (Alperen b-karari): her uretimde AUTO-blok basina
+  // tek-satir AUTOGEN damgasi — kaynak .claude/rules/*, elle duzenleme ezilir.
+  const AUTOGEN_STAMP = '<!-- AUTOGEN: kaynak .claude/rules/* — elle duzenleme bir sonraki uretimde ezilir -->';
+  return `${before}${AUTO_START}\n${AUTOGEN_STAMP}\n${newInner}\n${AUTO_END}${after}`;
 }
 
 // ─── Pure Render From Store (Sprint 168 C0a-2) ────────────────────

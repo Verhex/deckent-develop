@@ -26,4 +26,3 @@ metadata:
 
 **Karpathy bağlantısı:** Discipline 1 (Think Before Coding) — bug fix'in altındaki root cause'a kalıcı yapısal çözüm tasarlanmalı.
 
-İlgili: [[project_deckent_god_level_vision]], [[project_karpathy_skill_discipline]], [[feedback_no_minimum_no_mvp_deckent]]

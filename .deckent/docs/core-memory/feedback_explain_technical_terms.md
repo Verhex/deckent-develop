@@ -17,4 +17,3 @@ Alperen (2026-06-23): "her teknik terimi bilmiyorum, teknik terimleri de açıkl
 - Analoji kullan (god-level değil, anlaşılır).
 - Bu KALICI — Alperen açıkça "bu terimi öğrendim / artık açıklama" diyene kadar sürdür. Öğrendiği terimleri tekrar tekrar açıklayıp bunaltma; yeni/az-geçen terimlere odaklan.
 - **ÖĞRENDİĞİ TERİMLER (artık açıklama YOK)** — 2026-06-23: wire, dormant, tsc, ssot, subprocess worker, commit/push, drift, mod-split. Bu listeyi Alperen yeni terim öğrendikçe güncelle.
-- Türkçe-konuş kuralının ([[user_language_turkish]]) üstüne biner: anlatım TR + terim-açıklaması TR.

@@ -16,7 +16,7 @@
 //    (the existing `deckent_nervous_accept`/`deckent_nervous_reject` tool/handler
 //    outcome, or `Executor.resolveApproval`'s decision) onto `ApprovalDecisionInput`
 //    and forwards it to the injected broker's `decide()`. The known gotcha
-//    (project_nervous_accept_pending_not_cleared — accept used to leave
+//    (nervous-accept-pending-asymmetry (2026-06-24 fix) — accept used to leave
 //    `nervous-pending.json` stale while reject correctly cleared it) is owned here for
 //    THIS bridge's own decide-forwarding path: pending-store cleanup runs
 //    unconditionally, including when `decide()` throws `APR_ALREADY_DECIDED` — a
@@ -108,7 +108,7 @@ export class NervousApprovalBridge {
    * for an already-decided id is swallowed (`applied: false`, never thrown) — the
    * pending-store cleanup ALWAYS runs regardless, so a duplicate accept/reject can
    * never leave the pending store stale (parity fix for
-   * project_nervous_accept_pending_not_cleared, scoped to this bridge's own path).
+   * nervous-accept-pending-asymmetry (2026-06-24 fix), scoped to this bridge's own path).
    */
   applyNervousDecision(input: NervousBridgeDecisionInput): NervousBridgeApplyResult {
     const decisionInput: ApprovalDecisionInput = {

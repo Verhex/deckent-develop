@@ -39,7 +39,7 @@ export const EXCLUDE = [
   'docs/archive/',
   'docs/audits/',
   'docs/analysis/',
-  'docs/core-memory/',
+  '.deckent/docs/core-memory/',
   // personal root markdowns
   'DIRECTIVES.md',
   'RESUME-MONDAY.md',

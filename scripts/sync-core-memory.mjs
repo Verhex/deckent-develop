@@ -15,7 +15,7 @@
  *   --dry-run       show what would happen without writing
  */
 
-import { existsSync, readdirSync, readFileSync, writeFileSync, statSync, mkdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync, statSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -38,7 +38,9 @@ const userMemoryDir = resolve(
 
 const coreMemoryDir = resolve(
   process.env.DECKENT_CORE_MEMORY_PATH ||
-  join(projectRoot, 'docs', 'core-memory')
+  // 2026-07-14 memory-reformu (Alperen): tek repo-içi ayna = .deckent/docs/core-memory
+  // (izleme+müdahale noktası); docs/core-memory kopyası kaldırıldı.
+  join(projectRoot, '.deckent', 'docs', 'core-memory')
 );
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -76,6 +78,17 @@ function syncBackup() {
 
   ensureDir(coreMemoryDir);
   const files = listMarkdownFiles(userMemoryDir);
+  // MIRROR (2026-07-14): hedefte olup kaynakta olmayan .md dosyaları SİLİNİR —
+  // aksi halde kaynaktan silinen eski memory'ler aynada hayalet olarak yaşar
+  // (bugünkü kirliliğin kökü). archive/ alt-dizini kaynak-listeye girmediği
+  // için aynaya hiç taşınmaz.
+  const srcSet = new Set(files);
+  for (const stale of listMarkdownFiles(coreMemoryDir)) {
+    if (!srcSet.has(stale)) {
+      if (!dryRun) unlinkSync(join(coreMemoryDir, stale));
+      console.log(`[sync] mirror-removed stale: ${stale}`);
+    }
+  }
   let synced = 0;
   let skipped = 0;
 

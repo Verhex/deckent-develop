@@ -18,6 +18,10 @@ Alperen direktifi (Sprint 206, 2026-05-31): **zero-hard-code felsefesi.** Tüm C
 - CLI/MCP çıktılarındaki her sabit değer (model, sürüm, sayaç, tier, agent/skill sayısı) → deckent runtime verisinden türetilmeli, manifest/registry/config'ten okunmalı.
 - Yeni kod sabit string/sayı basacaksa: "bu canlı veriden gelebilir mi?" sorusu zorunlu. Gelebiliyorsa hard-code etme.
 - Bundled snapshot'lar periyodik güncel tutulmalı VEYA build-time models.dev'den generate edilmeli (ideal: kaynak tek = models.dev).
-- İlgili: [[feedback_trust_brain_eval_not_worker]] (disk/canlı ground-truth), [[project_deckent_god_level_vision]] (god-level, no-minimum).
 
 Sprint 207+ teması: "Live-Data / Zero-Hard-Code" — model-registry bundled refresh + cost-estimator catalog-aware + CLI çıktı parametrikleştirme audit.
+
+
+---
+
+**🔴 KESİN-KURAL yükseltmesi (Alperen, 2026-07-12):** "Sistemde hardcode bir akış ASLA istemiyoruz — her şey sistematik ve parametrik olacak. Sonnet kullanmayan kullanıcı olursa sistem ayakta kalamazsa, sonnet model-adı değişirse sistem ayakta kalamazsa patlarız. 0 hardcode; bu kural ADR'lerde mevcut olmalıydı." Kapsam yalnız CLI-çıktısı değil: **model-adı/provider/akış-değeri literal'i kod-yolunda YASAK** — literal yalnız model-registry/catalog SSOT'unda yaşar; tüm default'lar tier-bazlı registry-türevi + config-override'lı çözülür. Program: born-683 / MASTER-PLAN 565 (ADR + lint-ratchet [lint-no-spawnsync emsali] + resolveDefaultModel/resolveBrainModel tek-kaynak). İlk dilim born-682 (do-planner 'sonnet'). Envanter 2026-07-12: src'de ~19 gerçek-ihlal (config DEFAULT_MODES, tmux.ts spawn-fallback, mcp/run + cli agent/run default'ları, autonomous realPlannerComplete×2).
