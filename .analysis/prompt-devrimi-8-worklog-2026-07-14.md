@@ -116,3 +116,28 @@
 | G20 | Verify-kanıtı=tsc'ye indirgeme riski (davranış-kusurlarını tsc yakalamaz) | L1+L6 | 🔴 | NL'lerimde "kanıt: tsc" yazma alışkanlığım | spec-şablonunda kanıt-bölümü davranış-testi/canlı-koşu ZORUNLU alanı |
 
 **A3-SENTEZ:** 20 kusurun dağılımı: **🔴 9 AÇIK — 8'i L1-L4 ön-yarıda** · 🟡 6 KISMİ · ✅ 5 KAPALI (hepsi L3-L6 arka-yarı). A2-asimetrisi sayısal doğrulandı. En yüksek-kaldıraç sıralaması (A5-girdisi): **G2+G1** (metadata-hijyeni+motor — bir fix-çifti, dört kusuru söndürür: G1/G2/G15-kalıcılık/G13-v2) → **G3+G4+G6** (planner çıktı-sözleşmesi — tek şema-işi, beş kusuru söndürür: G3/G4/G5/G6/G11) → **G7+G20** (spec-şablonu) → **G8+G9** (gövde→focused-render; en büyük maliyet-kazancı ~%25-30).
+
+## A4 — "NEDEN 8 TUR?" META-ANALİZİ (acımasız; 2026-07-14)
+
+> Konu mekanizma değil, SÜREÇ ve BEN. Her kök kanıt-referanslı.
+
+**M1 · Kısmi-fix deseni (baş-suçlu):** her tur belirtinin GÖRÜLDÜĞÜ katmanı onardı, ÜRETEN motoru değil. Kanıt: D3 'implementation' kelime-listesini düzeltti, eşleşme-motorunu (substring) bırakcı → 'ci'⊂'içindeki' hayatta kaldı; D4 kelime-sınırını optimizer'a koydu, classifier'a koymadı. Kökün-kökü: "dar-diff/cerrahi" disiplinini "yüzeysel-diff" olarak yanlış işlettim — cerrahi, kökü kesmek demek; ben semptom-dokusunu aldım.
+
+**M2 · Yanlış-ölçüm alışkanlığı:** üç ayrı kirli-ölçüm (golden-set'i canlı sanmak · regen-defter kirliliği · vitest-defter kirliliği) + bir kanıt-hatası (rapor-etiketi≠prompt-gövdesi) + erken-🏁 iştahı. Kök: "yeşil=doğru" önyargısı ve ölçüm-protokolünün hiç tanımlanmamışlığı. (Kanun-3 bunu kırdı: A1'de iki hatamı kendim yakaladım.)
+
+**M3 · Görünürlük-önyargısı → katman-sahipsizliği:** turlar hep prompt'ta GÖRÜNENDEN başladı (render görünür); L1-L2 (spec-şablonu, planner-sözleşmesi) hiçbir turun scope'una girmedi çünkü çıktıları doğrudan görünmüyor. 9 açık-kusurun 8'inin orada birikmesi tesadüf değil.
+
+**M4 · Tespit≠çözüm yanılgısı:** linter/gate koymak "düzeltme" sayıldı; warn-modda bulgular kimseyi durdurmadı (442: 7 isabetli bulgu deftere yazıldı, prompt aynen uçtu). Tespit-katmanı ancak düzeltme/imkânsızlaştırma katmanıyla birlikte değer üretir.
+
+**M5 · Kural-mekanizma ayrılığı (500-ihlalin kökü):** kanunlar benim dikkatime emanet edildi; dikkat görevde eriyor (memory-reform gerekçesi). Kanıt: scale_up-ihlali — kural ile kod-sabiti (3-5) aylarca çelişti, ben kuralı çiğnedim, mekanizmayı düzeltmedim.
+
+**M6 · Tur-hafızasızlığı:** 397-doğrulaması, catalog-audit ve PCOMP-6 kısmen AYNI kökleri yeniden keşfetti — konsolide kusur-envanteri (A3 gibi) hiç tutulmadı; her tur sıfırdan teşhis maliyeti ödedi.
+
+**M7 · Onay-akışı gevşekliğim:** kapsam-kararlarını (born-699-erteleme, "meşru-fallback" sınıflaması, 🏁-ilanları) kendim verdim; Alperen her turu kendi kontrolüyle kapatmak zorunda kaldı. Kanunlaştı (kanun-3) — bu belge onun ilk tam-uygulaması.
+
+### DÖNGÜ-KIRMA TASARIMI (5 kilit)
+- **DK1 · Motor-sorusu zorunlu:** her fix "motoru mu çevreyi mi kesiyor?" cevabıyla açılır; A3-matrisi YAŞAYAN-belge olur — yeni kusur=satır, fix=ölüm-koşulu-kapatma; "tur" kavramı ölür, tek hedef=matris-sıfır.
+- **DK2 · Ölçüm-protokolü (A6):** tek-kanıt = canlı-üretim rubrik-sınavı (Alperen-skorlu); ölçüm-aracının kendi kalibrasyonu ayrı-adım; golden-set yalnız regresyon-yardımcısı.
+- **DK3 · Kural→mekanizma bütçesi:** her çalışma-bloğunda ≥1 kanun mekanizmaya gömülür (ilk sıra: G6 aralık-config — scale_up kanunu koddan zorlanır).
+- **DK4 · İlan-dili:** "TAMAM/✅/🏁" yalnız Alperen-rubrik-onayı sonrası; öncesinde tek meşru ifade "teslim-edildi, sınav-bekliyor".
+- **DK5 · Ön-yarı-önceliği:** A5-sıralaması kaldıraç-listesine kilitli (G2+G1 → G3+G4+G6 → G7+G20 → G8+G9); arka-yarıya yeni cila, ön-yarı sözleşmeleri kurulmadan YASAK.
