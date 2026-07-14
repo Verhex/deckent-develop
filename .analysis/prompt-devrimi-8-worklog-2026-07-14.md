@@ -85,3 +85,34 @@
 
 ### A2-SENTEZ — tek cümle
 **Boru hattının ARKA yarısı (L5-L7) 6-7. turlarda gerçekten sertleşti; ÖN yarısı (L1-L4: spec-şablonu, planner-decomposition, metadata-hijyeni, intent-motoru) neredeyse hiç dokunulmadı — 8 turun "düzelmiyor" hissinin yapısal nedeni bu asimetri.** 100/100, ön-yarı sözleşmeleri kurulmadan imkânsız (A3-gap-matrisi bunun envanterini çıkaracak).
+
+## A3 — 100/100 GAP-MATRİSİ (kusur-envanteri; 2026-07-14)
+
+> Kaynak: Alperen'in 3 analizi (438×2 + 442) + tur-1..7 tarihçesi + A1/A2-kanıtları.
+> Durum: 🔴 AÇIK · 🟡 KISMİ (kanıtlı-kalan var) · ✅ KAPALI (canlı-doğrulanmış).
+> "Ölüm-koşulu" = kusurun bir daha DOĞAMAYACAĞI yapısal değişiklik (tespit değil, imkânsızlaştırma).
+
+| # | Kusur | Kök | Durum | Neden 7 turda ölmedi | Kalıcı ölüm-koşulu |
+|---|---|---|---|---|---|
+| G1 | Persona-görev uyumsuzluğu (devops→event-sourcing; refactorer→test-yazarlığı) | L4 | 🔴 | Fix'ler hep ÇEVREYE (kelime-listesi, guard, bonus); MOTOR (substring-eşleşme) hiç değişmedi | classifier'da kelime-sınırlı+dil-farkındalı eşleşme + düşük-confidence'ta persona-fallback politikası + operation-class routing (G3-vizyonu) |
+| G2 | Metadata description-kirliliği ('cd'⊂flowId-hex → yanlış-intent) | L3 | 🔴 | Kimse description'ın İÇİNİ veri-kaynağı olarak denetlemedi; traceability "zararsız ek" sanıldı | flowId/revision/actor task-şemasında AYRI alan; description'a asla gömülmez; classifier yalnız içerik-alanlarını okur |
+| G3 | filesRead HİÇ üretilmiyor → gerekli-import'lar read-scope dışı | L2 | 🔴 | Planner çıktı-SÖZLEŞMESİ hiç tanımlanmadı; her tur render/routing'e odaklandı | planner-şemasında filesRead zorunlu + compose-katmanında import-türevli otomatik-tamamlama (deterministik) |
+| G4 | Test-zorunluluğu var / test-write-yetkisi yok (decomposition ayrıştırıyor) | L2 | 🔴 | Aynı: decomposition-kuralı yok; NL'ye elle yazılan kurallar planner'da sözleşme değil | davranış-değiştiren her src-task'ının filesWrite'ına mirror-test OTOMATİK eklenir (şema-kuralı); test-only ayrık-task istisnası açıkça işaretli |
+| G5 | Verify exact-set "test-başka-task'ta" sınıfında placeholder'a düşüyor | L6 | 🟡 (26/31 exact ✓; bu sınıf açık) | D1a "yol uydurma" korkusuyla yoksa-yarat'ı dışladı — en riskli sınıf tam oydu | G4-şeması + mirror-yolu tracked-olmasa-da "yoksa-yarat" semantiğiyle basılır |
+| G6 | Task-aralığı kodda 3-5 ↔ 20-40-mikro kanunu | L2 | 🔴 | Kural insan-hafızasına emanet; mekanizma hiç hizalanmadı (İHLAL-İTİRAFI kayıtlı) | ZERO_CONFIG aralığı config'ten + iş-büyüklüğüne göre bölme-politikası; kanun mekanizmada |
+| G7 | Spec-şablonu yok (sequence-policy, dönüş-semantiği, mutation/clone, dikiş-tanımı muğlak) | L1 | 🔴 | Spec-kalitesi "yazarın dikkatine" bırakıldı; şablon hiç kurulmadı | zorunlu-bölümlü NL/spec şablonu (boş-bölüm=gönderilemez) + format-kuralları şablonda (elle-tekrar ölür) |
+| G8 | ADR tam-gövde enjeksiyonu (C4/C5 alakasız clause'lar; 2KB/ADR) | L6 | 🔴 | Focused-clause hep "roadmap"ta kaldı | adr-selector clause-level render (task-relevant 4-5 satır) — G-019 enforcement-yapısıyla birleşik |
+| G9 | Persona tam-gövde (150-satır Dockerfile-rehberi işle alakasız) | L6 | 🔴 | Persona=dosya-kopyala varsayımı hiç sorgulanmadı | görev-tipine göre focused-guidance render (5-15 satır) + persona-gövdesi referans-olarak |
+| G10 | Lint warn-only → tespit var, düzeltme yok | L5 | 🟡 (bilinçli-rollout kararı) | Task-compiler önerisi reddedildi; ölçüm-defterleri iki kez kirlendi (regen/vitest — ikisi de fix'li) | temiz-defter N-sprint ölçümü → Alperen-onaylı fail-closed + deterministik-düzeltme kalemleri (A5'te kanıt-temelli yeniden-öneri) |
+| G11 | P1 write-çelişkisi (metin dosya-ister, yetki yok) | L2+L5 | 🟡 (W1 tespit ✓; koşullu-izin cümlesi false-negative) | Tespit kondu, üretim (planner) düzeltilmedi | G3/G4-şema-kuralları + W1'in koşullu-yazma dili (v2) |
+| G12 | DONE-gevşekliği ("both pass" ≠ checklist) | L6 | ✅ D1b (canlı-442'de checklist-bağlı) | — | korunuyor; rubric-eval tarafıyla çift-taraflı pin |
+| G13 | Skill relevance-inversion (sh-portability 10/31) | L4+L5 | ✅ D4+CC (442'de canlı: sinyalsiz-devops-skill gövdesi DÜŞTÜ) | — | dar-domain tablosu manifest'e taşınınca (v2) tamamen şema-tabanlı |
+| G14 | \;-sızıntısı | L3 | ✅ D5 (yazım-anı unescape; birim-testli) | — | round-trip testi pinli |
+| G15 | Behavior-bloğu test-yazarlığında | L4+L6 | ✅ D3 (all-test-suppress; 19→14) | — | G1-motor-fix'i kalıcılaştırır |
+| G16 | 'test/spec/coverage' çifte-sayımı | L4 | ✅ D3 (440-001 Part-1) | — | — |
+| G17 | ADR-körlüğü (planner+gate) | L2+L5 | 🟡 (D4.5: planner-bloğu+W7 ✓; kısıt-tablosu 3-kayıt, DB'ye taşınmadı) | ADR'ler makine-okur değildi | kısıtlar DB-şemasında + kapsam genişler; W7 fail-closed'a katılır |
+| G18 | Ölçüm-yanılgıları (golden-set≠canlı; defter-kirliliği ×2; rapor-etiketi≠gövde) | süreç | 🟡 (kanun-3 + VITEST-guard + itiraflar) | Ölçüm-protokolü tanımsızdı; "yeşil"e inanma eğilimim | A6-protokolü: tek-kanıt=canlı-üretim rubrik-sınavı, Alperen-skorlu |
+| G19 | do-sessiz-ölüm (PLAN-ölümü result-turn'e düşmüyor) | L7 | 🟡 (698a ön-kapı ✓; b/c açık) | — | coordinator-göçünde (SURF-1c) FAILED-kaydı+notify |
+| G20 | Verify-kanıtı=tsc'ye indirgeme riski (davranış-kusurlarını tsc yakalamaz) | L1+L6 | 🔴 | NL'lerimde "kanıt: tsc" yazma alışkanlığım | spec-şablonunda kanıt-bölümü davranış-testi/canlı-koşu ZORUNLU alanı |
+
+**A3-SENTEZ:** 20 kusurun dağılımı: **🔴 9 AÇIK — 8'i L1-L4 ön-yarıda** · 🟡 6 KISMİ · ✅ 5 KAPALI (hepsi L3-L6 arka-yarı). A2-asimetrisi sayısal doğrulandı. En yüksek-kaldıraç sıralaması (A5-girdisi): **G2+G1** (metadata-hijyeni+motor — bir fix-çifti, dört kusuru söndürür: G1/G2/G15-kalıcılık/G13-v2) → **G3+G4+G6** (planner çıktı-sözleşmesi — tek şema-işi, beş kusuru söndürür: G3/G4/G5/G6/G11) → **G7+G20** (spec-şablonu) → **G8+G9** (gövde→focused-render; en büyük maliyet-kazancı ~%25-30).
