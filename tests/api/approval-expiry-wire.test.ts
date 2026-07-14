@@ -182,23 +182,35 @@ describe('live roundtrip: the composed driver actually sweeps an expired pending
     expect(snapshot.pending.some((e) => e.request.id === 'apr-404-004-expired')).toBe(false);
   });
 
-  it('a request submitted directly to disk (not through api.approvalBroker) is left alone — documents the single-broker-instance scope of this wiring', async () => {
+  it('a request submitted by a DIFFERENT broker instance (other process) IS swept — the born-679 cross-process expiry capability', async () => {
     writeProjectConfig({ approval: { expiry_sweep_ms: 20 } });
     api = createHttpServer(tmpRoot, { port: 0 });
 
     // Bypass api.approvalBroker entirely: a SEPARATE ApprovalBroker instance
-    // pointed at the same directory (e.g. simulating a different process).
+    // pointed at the same directory (e.g. simulating a different process —
+    // the exact live Telegram case where the submitting process was long gone).
     const { ApprovalBroker } = await import('../../src/core/approval-broker.js');
     const otherProcessBroker = new ApprovalBroker(tmpRoot);
     otherProcessBroker.submit(buildExpiredRequest('apr-404-004-other-process'));
 
     await new Promise((resolve) => setTimeout(resolve, 150));
 
-    // ApprovalBroker.expire() only sweeps requests submitted through ITS OWN
-    // instance (requestsById is populated solely by submit()) — a request
-    // written via a different broker instance is never seen by the server's
-    // driver, so no decision file is produced for it. This is pre-existing
-    // approval-broker.ts behavior, unrelated to this task's write scope.
-    expect(existsSync(decisionFilePath('apr-404-004-other-process'))).toBe(false);
+    // Pre-679, ApprovalBroker.expire() only swept its OWN in-memory
+    // requestsById, so a foreign-process card looped forever (the live bug).
+    // The sprint-437 sweep is disk-based: ANY expired request file in the
+    // shared directory gets an honest system closure record — regardless of
+    // which process wrote it. Assert the full closure contract.
+    const decisionPath = decisionFilePath('apr-404-004-other-process');
+    expect(existsSync(decisionPath)).toBe(true);
+    const decision = JSON.parse(readFileSync(decisionPath, 'utf-8')) as {
+      decision: string;
+      decidedBy: string;
+      channel: string;
+      closureReason: string;
+    };
+    expect(decision.decision).toBe('deny');
+    expect(decision.decidedBy).toBe('system');
+    expect(decision.channel).toBe('ttl-expire');
+    expect(decision.closureReason).toBe('expired');
   });
 });
