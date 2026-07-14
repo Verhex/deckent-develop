@@ -179,3 +179,16 @@ Bugün: ort **21.6KB ≈ 5.5K token/prompt** (görev-çekirdeği %11). 8-worker 
 ### UYGULAMA-DİLİMLERİ (sıra KİLİTLİ; her dilim A6-sınavından geçmeden sonraki başlamaz)
 U1: Kaldıraç-1 (G2 metadata + G1 motor) → U2: Kaldıraç-2 (planner-sözleşmesi+tamamlayıcı) → U3: Kaldıraç-3 (şablon) → U4: Kaldıraç-4 (focused-render+maliyet-ölçümü) → U5: kalan-🟡'lar (W7-genişleme, warn→fail-closed Alperen-kararı, 698-b/c).
 Yürütme-biçimi (Alperen-kararına sunulur): U1-U2 prompt-mekanizmasının kendisi olduğundan CC-el + her adım canlı-442-fixture-sınavlı; U3 süreç; U4-U5 dogfood.
+
+## A6 — DOĞRULAMA-PROTOKOLÜ (onaylı; 2026-07-14)
+Her U-dilimi sonunda: (1) ölüm-kanıtı regresyon-fixture'ları (442-gerçek-metinleri dahil) yeşil; (2) **canlı-üretim sınavı: 3 farklı gerçek-NL → planner → prompt**; çıkan prompt'lar ALPEREN'e sunulur, rubrikle O skorlar; hedef-skoru o koyar. "Teslim-edildi, sınav-bekliyor" tek meşru ilan; ✅ yalnız Alperen-skoru sonrası. Yürütme: U1-U2 CC-el · U3 süreç · U4-U5 dogfood (onaylı).
+
+## U1 — UYGULAMA GÜNLÜĞÜ (başladı)
+
+## U1 — TESLİM + A6-SINAV ÇIKTILARI (Alperen-skoru bekleniyor)
+Kod: e0cef74c (G1 motor · G1b güven-demotion · G1c doc-yapısal · G2 meta-round-trip). Ölüm-fixture'ları 442-gerçek-metinli; 7917 test; korpus-kaymaları 4/31 hepsi-meşru.
+**A6-canlı-sınav (gerçek planner, 3 NL — dosyalar `.analysis/a6-sinav-u1/`):**
+- sinav1 event-sourcing: 4/4 **implementation** (eski-dünyada devops'a giderdi — hedef-düzelme)
+- sinav2 gerçek-devops: ilk-task **devops** (korunum ✓) + impl + 2 doc
+- sinav3 test-yazarlığı: 4 impl + 1 doc (ADR-G-023 dünyasında doğru-sınıf; behavior-bloğu all-test'te zaten susuyor)
+İlan: **teslim-edildi, sınav-bekliyor.**
