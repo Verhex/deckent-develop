@@ -162,6 +162,7 @@ function toDirectiveTask(task: PlannerTask, proposal: RunProposal): DirectiveBui
       flowId: proposal.flowId,
       revision: String(proposal.revision),
       tenant: proposal.tenant,
+      project: proposal.project,
       actor: describeActor(proposal),
       origin: proposal.origin,
     },

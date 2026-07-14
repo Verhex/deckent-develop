@@ -30,7 +30,7 @@ describe('evolvePrompt', () => {
     ];
     const result = evolvePrompt('Base prompt.', outcomes);
     expect(result.changes).toContain('reinforced-success-pattern');
-    expect(result.evolvedPrompt).toContain('Başarı Pattern');
+    expect(result.evolvedPrompt).toContain('Success Pattern');
     expect(result.evolvedPrompt).toContain('refactorer');
     expect(result.successRate).toBe(1);
     expect(result.outcomeCount).toBe(4);
@@ -44,7 +44,7 @@ describe('evolvePrompt', () => {
     ];
     const result = evolvePrompt('Base prompt.', outcomes);
     expect(result.changes).toContain('added-failure-warning');
-    expect(result.evolvedPrompt).toContain('Risk Uyarısı');
+    expect(result.evolvedPrompt).toContain('Risk Warning');
     expect(result.evolvedPrompt).toContain('bug-fixer (2x)');
   });
 

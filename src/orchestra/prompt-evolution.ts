@@ -19,8 +19,9 @@ export interface PromptEvolutionResult {
   successRate: number;
 }
 
-const SUCCESS_HEADER = '## Başarı Pattern (Outcome-Driven)';
-const FAILURE_HEADER = '## Risk Uyarısı (Outcome-Driven)';
+// English — model-facing hint blocks (PCOMP-8 U3 language unification).
+const SUCCESS_HEADER = '## Success Pattern (Outcome-Driven)';
+const FAILURE_HEADER = '## Risk Warning (Outcome-Driven)';
 
 const MIN_SUCCESS_OUTCOMES = 3;
 const SUCCESS_RATE_THRESHOLD = 0.75;
@@ -79,9 +80,9 @@ function buildSuccessBlock(outcomes: RoutingOutcome[], rate: number): string {
   const topAgents = pickTop(counts).map(([id]) => id).join(', ');
   const percent = Math.round(rate * 100);
   const tail = topAgents.length > 0
-    ? ` Yüksek başarılı agent: ${topAgents}. Bu yaklaşımı sürdür.`
+    ? ` High-success agents: ${topAgents}. Keep this approach.`
     : '';
-  return `${SUCCESS_HEADER}\nGeçmiş ${outcomes.length} task'ta %${percent} başarı.${tail}`;
+  return `${SUCCESS_HEADER}\n${percent}% success across the last ${outcomes.length} tasks.${tail}`;
 }
 
 function buildFailureBlock(outcomes: RoutingOutcome[], failCount: number): string {
@@ -90,9 +91,9 @@ function buildFailureBlock(outcomes: RoutingOutcome[], failCount: number): strin
     .map(([id, n]) => `${id} (${n}x)`)
     .join(', ');
   const tail = topFails.length > 0
-    ? ` Tekrarlanan başarısızlık: ${topFails}.`
+    ? ` Recurring failures: ${topFails}.`
     : '';
-  return `${FAILURE_HEADER}\n${failCount}/${outcomes.length} geçmiş NO_GO.${tail} Bu pattern'i tekrarlamamaya dikkat et: gereksinim doğrulama, scope sınırı, test koşumu.`;
+  return `${FAILURE_HEADER}\n${failCount}/${outcomes.length} past NO_GO.${tail} Take care not to repeat this pattern: verify requirements, respect scope boundaries, run the tests.`;
 }
 
 function countAgents(outcomes: RoutingOutcome[], side: 'success' | 'fail'): Map<string, number> {

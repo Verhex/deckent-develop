@@ -584,7 +584,7 @@ export class OutcomeTracker {
       .map(c => {
         const total = c.success + c.fail;
         const rate = Math.round((c.success / total) * 100);
-        return `- agent:${c.agentId} + skill:${c.skillId} → %${rate} başarı (${total} task)`;
+        return `- agent:${c.agentId} + skill:${c.skillId} → ${rate}% success (${total} tasks)`;
       })
       .join('\n');
   }

@@ -175,7 +175,7 @@ describe('buildPlanPrompt — max_workers is execution limit, not task count cap
   it('instructs AI to plan ALL directive tasks', () => {
     const ctx = makeBrainContext('## Görev 1: Task 1\n## Görev 2: Task 2');
     const prompt = buildPlanPrompt(ctx, makeRecommendation(3), 'test-project');
-    expect(prompt).toContain('TÜM görevleri');
+    expect(prompt).toContain('Plan ALL tasks');
   });
 
   it('includes maxWorkers value as concurrent execution limit info', () => {

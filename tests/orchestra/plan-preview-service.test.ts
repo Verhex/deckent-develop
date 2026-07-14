@@ -254,16 +254,21 @@ describe('compileRunProposal (builder-adapter round-trip)', () => {
     expect(parsed[0]!.scope.directories.length).toBeGreaterThan(0);
   });
 
-  it('folds flowId/tenant/project/actor/origin into the description as traceability prose (never a directive label line)', () => {
+  it('carries flowId/tenant/project/actor/origin on the `- Meta:` line — never inside the description (U1-G2)', () => {
     const { directivesMarkdown } = compileRunProposal(proposal({ flowId: 'flow-42', tenant: 'acme', project: 'widgets' }), fakeSingleTaskPlanner);
 
+    // No information loss: every traceability field survives into the markdown…
     expect(directivesMarkdown).toContain('flow-42');
     expect(directivesMarkdown).toContain('acme');
     expect(directivesMarkdown).toContain('widgets');
+    expect(directivesMarkdown).toMatch(/^- Meta: .*flowId=flow-42/m);
 
-    // Must still round-trip — a stray "Label:" line would corrupt parseStructuredDirectives.
+    // …and stays OUT of the description (embedding it there poisoned intent
+    // classification — sprint-442, A1-İz#2). Round-trip must hold.
     const parsed = parseStructuredDirectives(directivesMarkdown);
     expect(parsed).toHaveLength(1);
+    expect(parsed[0]!.description).not.toContain('flow-42');
+    expect(parsed[0]!.meta?.project).toBe('widgets');
   });
 
   it('is deterministic — same RunProposal ⇒ byte-identical markdown', () => {

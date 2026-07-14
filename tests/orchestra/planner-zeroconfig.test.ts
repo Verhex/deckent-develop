@@ -124,8 +124,8 @@ describe('buildPlanPrompt with zeroConfigDescription', () => {
 
   it('backward compatible — existing tests unaffected (no 4th arg)', () => {
     const prompt = buildPlanPrompt(makeContext(), makeRecommendation(), 'my-app');
-    expect(prompt).toContain('KURALLAR');
-    expect(prompt).toContain('TÜM görevleri');
+    expect(prompt).toContain('RULES:');
+    expect(prompt).toContain('Plan ALL tasks');
   });
 });
 
@@ -169,7 +169,7 @@ describe('buildZeroConfigPlanPrompt', () => {
 
   it('instructs last task to be integration/test task', () => {
     const prompt = buildZeroConfigPlanPrompt('Add feature', 'app');
-    expect(prompt).toContain('entegrasyon');
+    expect(prompt).toContain('The last task MUST be an integration/test task');
   });
 
   it('includes file tree when provided', () => {
@@ -193,7 +193,7 @@ describe('buildZeroConfigPlanPrompt', () => {
 
   it('includes task splitting parallelism rules', () => {
     const prompt = buildZeroConfigPlanPrompt('Add feature', 'app');
-    expect(prompt).toContain('paralel');
+    expect(prompt).toContain('parallel execution');
   });
 });
 

@@ -85,7 +85,7 @@ describe('sprint-reporter — prompt evolution retro wire', () => {
     expect(result.outcomeCount).toBe(4);
     expect(result.changes.length).toBeGreaterThan(0);
     expect(result.changes).toContain('reinforced-success-pattern');
-    expect(result.evolvedPrompt).toContain('Başarı Pattern');
+    expect(result.evolvedPrompt).toContain('Success Pattern');
     expect(result.successRate).toBe(1);
   });
 
@@ -140,7 +140,7 @@ describe('sprint-reporter — prompt evolution retro wire', () => {
 
   it('retro çıktısına yazılır: formats a non-empty suggestion as markdown', () => {
     const result: PromptEvolutionResult = {
-      evolvedPrompt: 'Base.\n\n## Başarı Pattern (Outcome-Driven)\nGeçmiş 4 task...',
+      evolvedPrompt: 'Base.\n\n## Success Pattern (Outcome-Driven)\n100% success across the last 4 tasks...',
       changes: ['reinforced-success-pattern'],
       outcomeCount: 4,
       successRate: 1,
@@ -152,7 +152,7 @@ describe('sprint-reporter — prompt evolution retro wire', () => {
     expect(md).toContain('Success rate: 100%');
     expect(md).toContain('Suggested changes: reinforced-success-pattern');
     expect(md).toContain('### Evolved Prompt (suggestion — not applied)');
-    expect(md).toContain('Başarı Pattern');
+    expect(md).toContain('Success Pattern');
     expect(md.endsWith('\n')).toBe(true);
   });
 
@@ -192,7 +192,7 @@ describe('sprint-reporter — prompt evolution retro wire', () => {
     expect(result.changes).toContain('added-failure-warning');
     expect(md).toContain('## Prompt Evolution Suggestion');
     expect(md).toContain('Suggested changes: added-failure-warning');
-    expect(md).toContain('Risk Uyarısı');
+    expect(md).toContain('Risk Warning');
     expect(md).toContain('bug-fixer');
   });
 });

@@ -24,7 +24,8 @@
 export interface AdrConstraint {
   /** Accepted ADR this constraint is derived from (lowercase doc id). */
   readonly adrId: string;
-  /** One-line, planner-facing statement of the binding rule (TR/EN mixed is fine). */
+  /** One-line, planner-facing statement of the binding rule (English — model-facing text
+   *  is EN-only per the PCOMP-8 U3 language unification, Alperen 2026-07-14). */
   readonly plannerSummary: string;
   /** A task whose title/description/goCriteria matches this pattern violates the ADR. */
   readonly forbiddenPattern: RegExp;
@@ -36,7 +37,7 @@ export const ADR_CONSTRAINTS: readonly AdrConstraint[] = [
   {
     adrId: 'adr-g-023',
     plannerSummary:
-      "ADR-G-023: 'testing' bir primary-intent DEĞİLDİR — test-yazarlığı işleri 'implementation' intent'i + 'test-coverage' TAG'i ile sınıflanır; intent.primary='test' talep eden task ÜRETME.",
+      "ADR-G-023: 'testing' is NOT a primary intent — test-authorship work is classified as the 'implementation' intent plus the 'test-coverage' TAG; do NOT produce a task demanding intent.primary='test'.",
     forbiddenPattern: /intent\.primary\s*(?:=|:|==|===)?\s*(?:literal\s+)?['"`]?(?:test|testing)\b/i,
     message:
       "demands an intent.primary='test|testing' value — ADR-G-023 retired 'testing' as a primary intent (use the test-coverage tag mechanism)",
@@ -44,7 +45,7 @@ export const ADR_CONSTRAINTS: readonly AdrConstraint[] = [
   {
     adrId: 'adr-d-002',
     plannerSummary:
-      'ADR-D-002 (hermeticity): test/verify adımlarında spawnSync KULLANDIRMA — async spawn şart; spawnSync isteyen task üretme.',
+      'ADR-D-002 (hermeticity): do NOT direct spawnSync usage in test/verify steps — async spawn is mandatory; do not produce a task that asks for spawnSync.',
     forbiddenPattern: /\b(?:use|kullan|add|ekle|çağır|cagir)\w*\s+spawnSync\b|spawnSync\s+kullan/i,
     message:
       'asks for spawnSync usage — the hermeticity contract (ADR-D-002 family) mandates async spawn; spawnSync blocks the event loop and is ratcheted',
@@ -52,7 +53,7 @@ export const ADR_CONSTRAINTS: readonly AdrConstraint[] = [
   {
     adrId: 'adr-g-035',
     plannerSummary:
-      'ADR-G-035 (memory architecture): kalıcılık = better-sqlite evrimi (+opsiyonel sqlite-vec); Postgres/harici-vector-DB göçü REDDEDİLDİ — böyle bir göç öneren/isteyen task üretme.',
+      'ADR-G-035 (memory architecture): persistence = the better-sqlite evolution path (+optional sqlite-vec); a Postgres/external-vector-DB migration was REJECTED — do not produce a task proposing or requesting such a migration.',
     forbiddenPattern: /\b(?:migrate|move|geç|gec|switch)\w*\s+(?:to\s+)?(?:postgres|postgresql|pinecone|weaviate|qdrant)\b|postgres(?:ql)?['"`\s]*(?:'e|e)\s*geç/i,
     message:
       'proposes a Postgres/external-vector-DB migration — ADR-G-035 fixed persistence on the better-sqlite evolution path',
@@ -66,5 +67,5 @@ export const ADR_CONSTRAINTS: readonly AdrConstraint[] = [
 export function buildAdrConstraintsPlannerBlock(): string {
   if (ADR_CONSTRAINTS.length === 0) return '';
   const lines = ADR_CONSTRAINTS.map((c) => `- ${c.plannerSummary}`);
-  return `\nBAĞLAYICI ADR-KISITLARI (bu kurallara aykırı task ÜRETME; gerekli görünüyorsa task yerine amendment-önerisi notu yaz):\n${lines.join('\n')}\n`;
+  return `\nBINDING ADR CONSTRAINTS (do NOT produce a task that violates these; if one seems necessary, write an amendment-proposal note instead of the task):\n${lines.join('\n')}\n`;
 }

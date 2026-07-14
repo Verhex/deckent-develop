@@ -570,8 +570,8 @@ describe('Evolution Pipeline Integration', () => {
       const result = tracker.getWorstCombinations(5);
       expect(result).toContain('agent:bug-fixer');
       expect(result).toContain('skill:typescript-expert');
-      expect(result).toContain('%0');
-      expect(result).toContain('4 task');
+      expect(result).toContain('0% success');
+      expect(result).toContain('4 tasks');
     });
 
     it('sorts by success rate ascending and respects limit', () => {

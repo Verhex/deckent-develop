@@ -85,7 +85,7 @@ describe('wirePromptEvolutionFromOutcomes', () => {
     });
 
     expect(result.changes).toContain('reinforced-success-pattern');
-    expect(result.evolvedPrompt).toContain('Başarı Pattern');
+    expect(result.evolvedPrompt).toContain('Success Pattern');
     expect(result.evolvedPrompt).toContain('refactorer');
     expect(result.successRate).toBeGreaterThanOrEqual(0.75);
   });
@@ -104,7 +104,7 @@ describe('wirePromptEvolutionFromOutcomes', () => {
     });
 
     expect(result.changes).toContain('added-failure-warning');
-    expect(result.evolvedPrompt).toContain('Risk Uyarısı');
+    expect(result.evolvedPrompt).toContain('Risk Warning');
     expect(result.evolvedPrompt).toContain('bug-fixer (2x)');
   });
 

@@ -132,18 +132,19 @@ export function buildPriorityContextBlock(
 /**
  * @internal Used only within orchestra/ — builds the AI planner prompt.
  * Not part of the public API surface.
- * @param language - Prompt language: 'tr' (default) or 'en'
+ *
+ * SINGLE English prompt (PCOMP-8 U3 language unification, Alperen 2026-07-14):
+ * the former TR/EN fork had already drifted — the ADR-constraints block existed
+ * only in the TR branch — which is exactly the contradiction class the prompt
+ * revolution exists to kill. Model-facing text is EN-only; one source, no fork.
  */
 export function buildPlanPrompt(
   context: BrainContext,
   recommendation: SprintSizeRecommendation,
   projectName: string,
   zeroConfigDescription?: string,
-  language: string = 'tr',
   worstCombinations?: string,
 ): string {
-  const isEn = language === 'en';
-
   const criticalDebt = context.debt.filter(d => d.priority === 'CRITICAL' && !d.resolved);
   const critDebtText = criticalDebt.length > 0
     ? `CRITICAL DEBT:\n${criticalDebt.map(d => `- ${d.id}: ${d.description}`).join('\n')}`
@@ -156,9 +157,7 @@ export function buildPlanPrompt(
 
   let zeroConfigText = '';
   if (zeroConfigDescription) {
-    zeroConfigText = isEn
-      ? `ZERO-CONFIG MODE:\nUser started sprint with: "${zeroConfigDescription}"\nSplit into 3-5 independent tasks. Each must be completable on its own.\nExample: "Add login page with Google OAuth" → 1) Auth API endpoints, 2) Google OAuth integration, 3) Login page UI, 4) Tests`
-      : `ZERO-CONFIG MODE:\nKullanıcı tek satır doğal dil ile sprint başlattı: "${zeroConfigDescription}"\nBu açıklamayı 3-5 bağımsız göreve böl. Her görev kendi başına tamamlanabilmeli.\nÖrnek: "Add login page with Google OAuth" → 1) Auth API endpoints, 2) Google OAuth integration, 3) Login page UI, 4) Tests`;
+    zeroConfigText = `ZERO-CONFIG MODE:\nUser started sprint with: "${zeroConfigDescription}"\nSplit into ${zeroConfigTaskRange().min}-${zeroConfigTaskRange().max} independent tasks. Each must be completable on its own.\nExample: "Add login page with Google OAuth" → 1) Auth API endpoints, 2) Google OAuth integration, 3) Login page UI, 4) Tests`;
   }
 
   // Sections with priority: DIRECTIVES(1) > MEMORY(2) > DEBT(3) > PATTERNS(4) > others(5+)
@@ -180,15 +179,12 @@ export function buildPlanPrompt(
   );
 
   // Inject worst combinations from OutcomeTracker.getWorstCombinations() when available
-  // Adds GECMIS SONUCLAR block so the AI planner avoids historically poor agent+skill combos
+  // so the AI planner avoids historically poor agent+skill combos
   const worstCombinationsSection = worstCombinations
-    ? (isEn
-      ? `\nPAST RESULTS (combinations to avoid):\n${worstCombinations}`
-      : `\nGEÇMİŞ SONUCLAR (kaçınılması gereken kombinasyonlar):\n${worstCombinations}`)
+    ? `\nPAST RESULTS (combinations to avoid):\n${worstCombinations}`
     : '';
 
-  if (isEn) {
-    return `You are a software project orchestrator. Analyze the given directives and create a structured task plan.
+  return `You are a software project orchestrator. Analyze the given directives and create a structured task plan.
 
 RULES:
 - Plan ALL tasks from the directives as task JSON — do not limit the task count
@@ -198,6 +194,7 @@ RULES:
 - Define scope (directories + filesWrite) for each task
 - Write GO/NO-GO criteria for each task
 
+${buildAdrConstraintsPlannerBlock()}
 MODEL SELECTION CRITERIA (CHOOSE THE RIGHT MODEL FOR EACH TASK):
 - **opus**: Complex architecture changes, tasks touching multiple modules, new patterns/abstractions, cross-cutting concerns, large features requiring test + implementation together
 - **sonnet**: Standard CRUD operations, single file/module changes, adding new files following existing patterns, template/config updates, documentation, simple API endpoints, UI components (following existing patterns)
@@ -223,45 +220,6 @@ OUTPUT FORMAT (JSON ONLY, nothing else):
     }
   ],
   "reasoning": "Plan rationale"
-}`;
-  }
-
-  return `Sen bir yazılım proje orkestratörüsün. Verilen directive'leri analiz et ve yapılandırılmış görev planı oluştur.
-
-KURALLAR:
-- Directive'deki TÜM görevleri task JSON olarak planla — görev sayısını sınırlama
-- max_workers (${recommendation.maxWorkers}) sadece eş zamanlı çalışma limitidir, görev sayısını etkilemez
-- Her görev bağımsız çalışabilmeli (paralel execution)
-- Bağımlılık varsa dependencies array'inde belirt
-- Her görev için scope (directories + filesWrite) belirle
-- Her görev için GO/NO-GO kriterleri yaz
-
-${buildAdrConstraintsPlannerBlock()}
-MODEL SEÇİM KRİTERLERİ (HER GÖREV İÇİN DOĞRU MODELİ SEÇ):
-- **opus**: Karmaşık mimari değişiklik, birden fazla modüle dokunan görevler, yeni pattern/abstraction oluşturan işler, cross-cutting concern'ler (yeni CLI+MCP+API birlikte), test + implementasyon birlikte gereken büyük feature'lar
-- **sonnet**: Standart CRUD işlemleri, tek dosya/modül değişikliği, mevcut pattern'i takip eden yeni dosya ekleme, template/config güncellemesi, dokümantasyon yazımı, basit API endpoint ekleme, UI component ekleme (mevcut pattern ile)
-- **haiku**: Sadece trivial işler — rename, typo fix, dosya kopyalama, .gitignore satırı ekleme, placeholder dosya oluşturma, tek satırlık config değişikliği
-- "reason" alanında model seçimini AÇIKLA (neden bu model, ne kadar karmaşık)
-
-CONTEXT:
-${contextBlock}${worstCombinationsSection}
-
-ÇIKTI FORMAT (SADECE JSON, başka bir şey yazma):
-{
-  "tasks": [
-    {
-      "title": "...",
-      "description": "...",
-      "model": "sonnet|opus|haiku",
-      "effort": "low|normal|high",
-      "priority": "CRITICAL|HIGH|NORMAL|LOW",
-      "reason": "Neden bu model/effort",
-      "scope": { "directories": [...], "filesRead": [...], "filesWrite": [...] },
-      "dependencies": [],
-      "goNogo": { "goCriteria": "...", "noGoCriteria": "...", "techDebtAcceptable": "..." }
-    }
-  ],
-  "reasoning": "Plan gerekçesi"
 }`;
 }
 
@@ -455,7 +413,7 @@ export function callBrainPlannerWithReason(
   timeout?: number,
   worstCombinations?: string,
 ): PlannerCallResult {
-  const prompt = buildPlanPrompt(context, recommendation, projectName, undefined, 'tr', worstCombinations);
+  const prompt = buildPlanPrompt(context, recommendation, projectName, undefined, worstCombinations);
 
   // resolveAdapter throws ProviderError when registry is empty or provider missing.
   // Surface as `no_providers` reason so the caller does not silently fall back.
@@ -592,22 +550,23 @@ function zeroConfigTaskRange(): { min: number; max: number } {
 
 /**
  * Build a prompt specifically for splitting a single natural-language description
- * into 3–5 structured tasks that the AI planner can assign to workers.
+ * into structured tasks (range from zeroConfigTaskRange()) that the AI planner
+ * can assign to workers.
+ *
+ * SINGLE English prompt (PCOMP-8 U3 language unification, Alperen 2026-07-14):
+ * the former TR/EN fork had drifted — the ADR-constraints block existed only in
+ * the TR branch while production defaulted to TR. One source, no fork.
  */
 export function buildZeroConfigPlanPrompt(
   description: string,
   projectName: string,
   fileTree: string[] = [],
-  language: string = 'tr',
 ): string {
   const treeSection = fileTree.length > 0
     ? `\nFILE TREE (first ${Math.min(fileTree.length, 50)}):\n${fileTree.slice(0, 50).join('\n')}`
     : '';
 
-  const isEn = language === 'en';
-
-  if (isEn) {
-    return `You are a software project orchestrator. A user requested a feature in natural language.
+  return `You are a software project orchestrator. A user requested a feature in natural language.
 Split this request into ${zeroConfigTaskRange().min}-${zeroConfigTaskRange().max} independent, parallel-executable tasks.
 
 PROJECT: ${projectName}
@@ -630,6 +589,7 @@ EXAMPLE SPLIT:
 3. Login page UI (React component, form, redirect logic)
 4. Integration tests (E2E auth flow, token validation tests)
 
+${buildAdrConstraintsPlannerBlock()}
 MODEL SELECTION:
 - **opus**: Complex architecture, multiple modules, new patterns/abstractions
 - **sonnet**: Standard implementation, single module, follows existing patterns
@@ -652,59 +612,11 @@ OUTPUT FORMAT (JSON ONLY, nothing else):
   ],
   "reasoning": "Why you split it this way"
 }`;
-  }
-
-  return `Sen bir yazılım proje orkestratörüsün. Kullanıcı tek satır doğal dil ile bir özellik talep etti.
-Bu talebi ${zeroConfigTaskRange().min}-${zeroConfigTaskRange().max} bağımsız, paralel çalışabilir göreve böl.
-
-PROJE: ${projectName}
-KULLANICI TALEBİ: "${description}"${treeSection}
-
-GÖREV BÖLME KURALLARI:
-- Her görev bağımsız çalışabilmeli (paralel execution mümkün olmalı)
-- Bağımlılık varsa dependencies array'inde belirt (örn. UI, backend API'ye bağlıysa)
-- Toplam ${zeroConfigTaskRange().min}-${zeroConfigTaskRange().max} görev oluştur (ne az ne fazla)
-- Her görev için scope (directories + filesWrite) belirle
-- HER görevin scope.filesWrite alanı EN AZ bir dosya yolu içermeli — boş filesWrite array'i geçersizdir
-- Bir görevin "title" alanı VİRGÜL (,) karakteri İÇEREMEZ — bunun yerine "ve" bağlacı veya tire kullan
-- Her görev için GO/NO-GO kriterleri yaz
-- Son görev MUTLAKA entegrasyon/test görevi olsun
-
-ÖRNEK BÖLME:
-"Add login page with Google OAuth" →
-1. Auth API endpoints (backend, POST /auth/login, /auth/google-callback)
-2. Google OAuth integration (oauth2 client setup, token exchange)
-3. Login page UI (React component, form, redirect logic)
-4. Integration tests (E2E auth flow, token validation tests)
-
-${buildAdrConstraintsPlannerBlock()}
-MODEL SEÇİM KRİTERLERİ:
-- **opus**: Karmaşık mimari, çoklu modül, yeni pattern/abstraction
-- **sonnet**: Standart implementasyon, tek modül, mevcut pattern takip
-- **haiku**: Sadece trivial işler — rename, typo fix, placeholder oluşturma
-
-ÇIKTI FORMAT (SADECE JSON, başka bir şey yazma):
-{
-  "tasks": [
-    {
-      "title": "...",
-      "description": "...",
-      "model": "sonnet|opus|haiku",
-      "effort": "low|normal|high",
-      "priority": "CRITICAL|HIGH|NORMAL|LOW",
-      "reason": "Neden bu model/effort",
-      "scope": { "directories": [...], "filesRead": [...], "filesWrite": [...] },
-      "dependencies": [],
-      "goNogo": { "goCriteria": "...", "noGoCriteria": "...", "techDebtAcceptable": "..." }
-    }
-  ],
-  "reasoning": "Neden bu şekilde böldün"
-}`;
 }
 
 /**
  * Call the AI planner with a zero-config (single natural-language) description.
- * The AI splits the description into 3–5 structured tasks.
+ * The AI splits the description into structured tasks (range from zeroConfigTaskRange()).
  *
  * Falls back to null if the AI call fails; callers should fall back to
  * structured (single-task) mode in that case.
@@ -737,7 +649,7 @@ export function callZeroConfigPlanner(
   // with the violation named beats silently returning null (which upstream
   // reads as "provider unavailable").
   if (!parsed) {
-    const retryPrompt = `${prompt}\n\nÖNCEKİ YANITIN GEÇERSİZDİ (şema/JSON hatası). YALNIZ istenen JSON şemasında, başka hiçbir metin olmadan yeniden yanıtla.`;
+    const retryPrompt = `${prompt}\n\nYOUR PREVIOUS RESPONSE WAS INVALID (schema/JSON error). Respond again with ONLY the requested JSON schema and no other text.`;
     const { command: c2, args: a2 } = buildPlannerSpawnArgs(resolved, retryPrompt, model);
     const retry = spawnSync(c2, a2, { encoding: 'utf-8', timeout: timeout ?? BRAIN_PLAN_TIMEOUT_MS });
     if (retry.status === 0 && retry.stdout) parsed = parsePlannerResponse(retry.stdout, resolved);

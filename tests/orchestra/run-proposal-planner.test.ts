@@ -296,31 +296,19 @@ describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(c
 //        passes through the `vi.mock(...)` spread above (`...actual`) untouched.
 
 describe('buildZeroConfigPlanPrompt — pins the two new TASK SPLITTING RULES (435-002)', () => {
-  it('EN prompt states EVERY task.scope.filesWrite must contain at least one file path', () => {
-    const prompt = buildZeroConfigPlanPrompt('Ship a feature', 'deckent', [], 'en');
+  // Single English prompt since the PCOMP-8 U3 language unification — the
+  // former TR variants of these pins died with the TR/EN fork.
+  it('states EVERY task.scope.filesWrite must contain at least one file path', () => {
+    const prompt = buildZeroConfigPlanPrompt('Ship a feature', 'deckent');
     expect(prompt).toContain(
       "EVERY task's scope.filesWrite MUST contain at least one file path — an empty filesWrite array is invalid",
     );
   });
 
-  it('EN prompt states a task title MUST NOT contain a comma character', () => {
-    const prompt = buildZeroConfigPlanPrompt('Ship a feature', 'deckent', [], 'en');
+  it('states a task title MUST NOT contain a comma character', () => {
+    const prompt = buildZeroConfigPlanPrompt('Ship a feature', 'deckent');
     expect(prompt).toContain(
       'A task\'s "title" MUST NOT contain a comma (,) character — rephrase with "and"/a dash instead',
-    );
-  });
-
-  it('TR prompt (default language) states scope.filesWrite EN AZ bir dosya yolu içermeli', () => {
-    const prompt = buildZeroConfigPlanPrompt('Bir özellik gönder', 'deckent');
-    expect(prompt).toContain(
-      "HER görevin scope.filesWrite alanı EN AZ bir dosya yolu içermeli — boş filesWrite array'i geçersizdir",
-    );
-  });
-
-  it('TR prompt (default language) states title VİRGÜL karakteri İÇEREMEZ', () => {
-    const prompt = buildZeroConfigPlanPrompt('Bir özellik gönder', 'deckent');
-    expect(prompt).toContain(
-      'Bir görevin "title" alanı VİRGÜL (,) karakteri İÇEREMEZ — bunun yerine "ve" bağlacı veya tire kullan',
     );
   });
 });

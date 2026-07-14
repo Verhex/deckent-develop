@@ -141,7 +141,7 @@ describe('buildPlanPrompt', () => {
 
   it('instructs AI to plan ALL directive tasks without count limit', () => {
     const prompt = buildPlanPrompt(makeContext(), makeRecommendation({ maxWorkers: 5 }), 'test');
-    expect(prompt).toContain('TÜM görevleri');
+    expect(prompt).toContain('Plan ALL tasks');
   });
 
   it('includes JSON format instruction', () => {
@@ -185,7 +185,7 @@ describe('buildPlanPrompt', () => {
   it('handles empty context gracefully', () => {
     const emptyCtx = makeContext({ directives: '', memory: '', retro: '', patterns: '', decisions: '' });
     const prompt = buildPlanPrompt(emptyCtx, makeRecommendation(), 'test');
-    expect(prompt).toContain('KURALLAR');
+    expect(prompt).toContain('RULES:');
   });
 });
 
@@ -777,73 +777,51 @@ describe('buildPriorityContextBlock', () => {
   });
 });
 
-// ═══ buildPlanPrompt i18n ═════════════════════════════════════════════
+// ═══ prompt language unification (PCOMP-8 U3) ═════════════════════════
+// Model-facing prompts are SINGLE-SOURCE English — the former TR/EN fork had
+// drifted (ADR block only in the TR branch while production defaulted to TR).
+// These pins keep the fork dead: no Turkish prompt text may reappear.
 
-describe('buildPlanPrompt i18n', () => {
-  it('uses Turkish by default (no language param)', () => {
+describe('buildPlanPrompt — single English source', () => {
+  it('is English with no language parameter', () => {
     const prompt = buildPlanPrompt(makeContext(), makeRecommendation(), 'test-project');
-    expect(prompt).toContain('TÜM görevleri');
-  });
-
-  it('uses Turkish when language=tr', () => {
-    const prompt = buildPlanPrompt(makeContext(), makeRecommendation(), 'test-project', undefined, 'tr');
-    expect(prompt).toContain('KURALLAR');
-    expect(prompt).toContain('ÇIKTI FORMAT');
-  });
-
-  it('uses English when language=en', () => {
-    const prompt = buildPlanPrompt(makeContext(), makeRecommendation(), 'test-project', undefined, 'en');
     expect(prompt).toContain('RULES:');
     expect(prompt).toContain('OUTPUT FORMAT');
     expect(prompt).toContain('Plan ALL tasks');
+    expect(prompt).not.toContain('KURALLAR');
+    expect(prompt).not.toContain('ÇIKTI FORMAT');
   });
 
-  it('English prompt still includes context block', () => {
+  it('includes the context block', () => {
     const prompt = buildPlanPrompt(
       makeContext({ directives: 'Build something great' }),
       makeRecommendation(),
       'test-project',
-      undefined,
-      'en',
     );
     expect(prompt).toContain('Build something great');
   });
 
-  it('zero-config uses Turkish by default', () => {
+  it('zero-config mode block is English', () => {
     const prompt = buildPlanPrompt(
       makeContext(), makeRecommendation(), 'test-project',
-      'Add dark mode', 'tr',
-    );
-    expect(prompt).toContain('ZERO-CONFIG MODE');
-    expect(prompt).toContain('Kullanıcı');
-  });
-
-  it('zero-config uses English when language=en', () => {
-    const prompt = buildPlanPrompt(
-      makeContext(), makeRecommendation(), 'test-project',
-      'Add dark mode', 'en',
+      'Add dark mode',
     );
     expect(prompt).toContain('ZERO-CONFIG MODE');
     expect(prompt).toContain('User started sprint');
+    expect(prompt).not.toContain('Kullanıcı');
   });
 });
 
-// ═══ buildZeroConfigPlanPrompt i18n ══════════════════════════════════
-
-describe('buildZeroConfigPlanPrompt i18n', () => {
-  it('uses Turkish by default', () => {
+describe('buildZeroConfigPlanPrompt — single English source', () => {
+  it('is English with no language parameter', () => {
     const prompt = buildZeroConfigPlanPrompt('Add feature', 'my-app');
-    expect(prompt).toContain('KULLANICI TALEBİ');
-  });
-
-  it('uses English when language=en', () => {
-    const prompt = buildZeroConfigPlanPrompt('Add feature', 'my-app', [], 'en');
     expect(prompt).toContain('USER REQUEST');
     expect(prompt).toContain('OUTPUT FORMAT');
+    expect(prompt).not.toContain('KULLANICI TALEBİ');
   });
 
-  it('English prompt still contains description', () => {
-    const prompt = buildZeroConfigPlanPrompt('Add dark mode', 'my-app', [], 'en');
+  it('contains the description and project name', () => {
+    const prompt = buildZeroConfigPlanPrompt('Add dark mode', 'my-app');
     expect(prompt).toContain('Add dark mode');
     expect(prompt).toContain('my-app');
   });

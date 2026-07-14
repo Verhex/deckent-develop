@@ -77,8 +77,7 @@ describe('W7 adr-constraint-violation — the 440-001 live exam', () => {
 describe('planner prompts carry the binding block (contradiction dies at birth)', () => {
   it('zero-config planner prompt includes the constraints block', () => {
     const prompt = buildZeroConfigPlanPrompt('add a login page', 'proj', []);
-    expect(prompt).toContain('BAĞLAYICI ADR-KISITLARI');
-    expect(prompt).toContain('adr-g-023'.toUpperCase().replace('ADR-G-023', 'ADR-G-023'));
+    expect(prompt).toContain('BINDING ADR CONSTRAINTS');
     expect(prompt).toContain('ADR-G-023');
   });
 
@@ -89,7 +88,7 @@ describe('planner prompts carry the binding block (contradiction dies at birth)'
     } as unknown as BrainContext;
     const rec = { size: 'full', maxWorkers: 4, modelConstraint: null, reason: 'ok' } as SprintSizeRecommendation;
     const prompt = buildPlanPrompt(ctx, rec, 'proj');
-    expect(prompt).toContain('BAĞLAYICI ADR-KISITLARI');
+    expect(prompt).toContain('BINDING ADR CONSTRAINTS');
   });
 
   it('block renders one line per constraint', () => {
