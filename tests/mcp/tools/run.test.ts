@@ -58,8 +58,8 @@ vi.mock('../../../src/core/stack-detector.js', () => ({
   detectProjectStack: vi.fn().mockReturnValue({ primaryLanguage: 'typescript' }),
 }));
 
-vi.mock('../../../src/core/routing-engine.js', () => ({
-  routeTaskV2: vi.fn().mockReturnValue({ agentId: 'bug-fixer', skillIds: ['typescript-expert'] }),
+vi.mock('../../../src/orchestra/routing-plan-adapter.js', () => ({
+  routeSingleTaskV3: vi.fn().mockResolvedValue({ agentId: 'bug-fixer', skillIds: ['typescript-expert'], confidence: 0.8, workType: 'build', escalation: null, storySummary: '' }),
 }));
 
 vi.mock('../../../src/core/utils.js', () => ({
@@ -67,7 +67,7 @@ vi.mock('../../../src/core/utils.js', () => ({
 }));
 
 import { loadConfig } from '../../../src/core/config.js';
-import { routeTaskV2 } from '../../../src/core/routing-engine.js';
+import { routeSingleTaskV3 } from '../../../src/orchestra/routing-plan-adapter.js';
 
 // ─── Mock Server ────────────────────────────────────────────────────
 
@@ -91,10 +91,10 @@ function createMockServer(): MockServer {
 describe('deckent_run MCP — WM-1b routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(routeTaskV2).mockReturnValue({ agentId: 'bug-fixer', skillIds: ['typescript-expert'] } as never);
+    vi.mocked(routeSingleTaskV3).mockResolvedValue({ agentId: 'bug-fixer', skillIds: ['typescript-expert'], confidence: 0.8, workType: 'build', escalation: null, storySummary: '' });
   });
 
-  it('sets assignedAgent and assignedSkills from routeTaskV2 decision', async () => {
+  it('sets assignedAgent and assignedSkills from routeSingleTaskV3 decision', async () => {
     vi.mocked(loadConfig).mockResolvedValue({
       routing_engine: 'v2',
       spawn_backend: 'subprocess',
@@ -114,10 +114,10 @@ describe('deckent_run MCP — WM-1b routing', () => {
     const task = JSON.parse(writtenCall![1] as string);
     expect(task.assignedAgent).toBe('bug-fixer');
     expect(task.assignedSkills).toEqual(['typescript-expert']);
-    expect(vi.mocked(routeTaskV2)).toHaveBeenCalledOnce();
+    expect(vi.mocked(routeSingleTaskV3)).toHaveBeenCalledOnce();
   });
 
-  it('calls routeTaskV2 with overrides array and projectRoot context', async () => {
+  it('calls routeSingleTaskV3 with the task and projectRoot (V3 signature)', async () => {
     vi.mocked(loadConfig).mockResolvedValue({
       routing_engine: 'v2',
       spawn_backend: 'subprocess',
@@ -130,21 +130,20 @@ describe('deckent_run MCP — WM-1b routing', () => {
     const handler = server.tools.get('deckent_run')!.handler;
     await handler({ description: 'fix a bug', model: 'sonnet', autoApprove: true });
 
-    expect(vi.mocked(routeTaskV2)).toHaveBeenCalledOnce();
-    const callArgs = vi.mocked(routeTaskV2).mock.calls[0];
-    // 4th arg is the routing context
-    const ctx = callArgs[3] as { overrides: unknown[]; projectRoot: string; sprintId: string };
-    expect(Array.isArray(ctx.overrides)).toBe(true);
-    expect(typeof ctx.projectRoot).toBe('string');
-    expect(ctx.sprintId).toBe('');
+    expect(vi.mocked(routeSingleTaskV3)).toHaveBeenCalledOnce();
+    const callArgs = vi.mocked(routeSingleTaskV3).mock.calls[0]!;
+    // V3 signature: (task, projectRoot) — overrides ride the task's own
+    // force/exclude fields, verified inside the pipeline.
+    expect(callArgs[0]).toMatchObject({ title: expect.any(String) });
+    expect(typeof callArgs[1]).toBe('string');
   });
 
-  it('falls back to generic when routeTaskV2 throws (fail-safe)', async () => {
+  it('falls back to generic when routeSingleTaskV3 throws (fail-safe)', async () => {
     vi.mocked(loadConfig).mockResolvedValue({
       routing_engine: 'v2',
       spawn_backend: 'subprocess',
     } as never);
-    vi.mocked(routeTaskV2).mockImplementationOnce(() => { throw new Error('routing failure'); });
+    vi.mocked(routeSingleTaskV3).mockImplementationOnce(() => { throw new Error('routing failure'); });
 
     const { registerRunTool } = await import('../../../src/mcp/tools/run.ts');
     const server = createMockServer() as never;
@@ -162,9 +161,9 @@ describe('deckent_run MCP — WM-1b routing', () => {
     expect(writtenCall).toBeDefined();
   });
 
-  it('always routes via routeTaskV2 (V1 purged — ROUTE-V1-PURGE / ADR-G-006)', async () => {
-    // Previously this asserted routing_engine=v1 SKIPPED routeTaskV2. V1 is gone,
-    // so routing now always flows through routeTaskV2 regardless of config.
+  it('always routes via routeSingleTaskV3 (V1 purged — ROUTE-V1-PURGE / ADR-G-006)', async () => {
+    // Previously this asserted routing_engine=v1 SKIPPED routeSingleTaskV3. V1 is gone,
+    // so routing now always flows through routeSingleTaskV3 regardless of config.
     vi.mocked(loadConfig).mockResolvedValue({
       routing_engine: 'v2',
       spawn_backend: 'subprocess',
@@ -177,6 +176,6 @@ describe('deckent_run MCP — WM-1b routing', () => {
     const handler = server.tools.get('deckent_run')!.handler;
     await handler({ description: 'do work', model: 'sonnet', autoApprove: true });
 
-    expect(vi.mocked(routeTaskV2)).toHaveBeenCalled();
+    expect(vi.mocked(routeSingleTaskV3)).toHaveBeenCalled();
   });
 });

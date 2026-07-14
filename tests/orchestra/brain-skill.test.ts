@@ -167,6 +167,18 @@ describe('planSprint — skill selection integration', () => {
       promptInjection: { position: 'append', maxTokens: 1500 },
       enabled: true,
       stats: { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '' },
+      // ROUTING-V3 (S3): skills attach via matching profiles, not V2 triggers —
+      // this is the custom-skill authoring contract a real user follows.
+      profile: {
+        profileVersion: 3,
+        workTypes: [
+          { type: 'build', proficiency: 'able' },
+          { type: 'fix', proficiency: 'able' },
+        ],
+        domains: [{ id: '*', proficiency: 'able' }],
+        expertise: ['security'],
+        deliverables: [],
+      },
     }), 'utf8');
 
     writeFileSync(join(tempDir, 'package.json'), JSON.stringify({}), 'utf8');

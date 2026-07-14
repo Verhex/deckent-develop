@@ -225,7 +225,7 @@ deckent is built to be watched, not to be a black box.
 - **Nervous System** — a proactive meta-orchestrator that watches for idle workers, routing anomalies, scope collisions, agent-health drops, and debt trends, and proposes action
 
 ### Agents & skills
-- **20 built-in agents** — e.g. security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner (full list: `docs/reference/agents.md`)
+- **21 built-in agents** — e.g. security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner (full list: `docs/reference/agents.md`)
 - **31 built-in skills** — typescript-expert, testing-expert, react-specialist, security-specialist, docker-expert, python-expert, anthropic-sdk, and more
 - **Plugins** — drop a `manifest.json` + `SKILL.md` into `.deckent/plugins/` to add your own reusable capabilities
 

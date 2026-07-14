@@ -67,8 +67,8 @@ vi.mock('../../src/core/stack-detector.js', () => ({
   detectProjectStack: vi.fn().mockReturnValue({ primaryLanguage: 'typescript' }),
 }));
 
-vi.mock('../../src/core/routing-engine.js', () => ({
-  routeTaskV2: vi.fn().mockReturnValue({ agentId: 'generic', skillIds: [] }),
+vi.mock('../../src/orchestra/routing-plan-adapter.js', () => ({
+  routeSingleTaskV3: vi.fn().mockResolvedValue({ agentId: 'generic', skillIds: [], confidence: 0.8, workType: 'build', escalation: null, storySummary: '' }),
 }));
 
 vi.mock('../../src/core/utils.js', () => ({

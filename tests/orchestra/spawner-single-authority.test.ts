@@ -2,7 +2,7 @@
 //
 // `routeSprintTasks` (sprint-spawner.ts) runs exactly once per sprint, at
 // `runSprint`'s Phase 1.5 (PLAN→SPAWN boundary) — AFTER plan-time routing
-// (sprint-planner.ts's routeTaskV2 → selectBestAgent) has already resolved
+// (sprint-planner.ts's routeTasksV3ForPlan → selectBestAgent) has already resolved
 // `task.assignedAgent` with full multi-signal context. Before this fix it
 // unconditionally re-applied `routeTask`'s own agent verdict whenever it
 // was non-'generic' — and `routeTask`'s `applyUserSurfaceBonus` re-derives
@@ -23,7 +23,11 @@ import { join } from 'node:path';
 import { TaskStatus, type Task, type ResolvedConfig, type ProviderName } from '../../src/core/types.js';
 import { routeTask } from '../../src/orchestra/task-router.js';
 import { routeSprintTasks } from '../../src/orchestra/sprint-spawner.js';
-import { routingDecisionJournalPath } from '../../src/core/routing-engine.js';
+// S3: the V2 engine is gone — mirror sprint-spawner's local journal-path convention.
+import { join as joinJournalPath } from 'node:path';
+function routingDecisionJournalPath(projectRoot: string, sprintId: string): string {
+  return joinJournalPath(projectRoot, '.deckent', 'routing', 'decisions', `${sprintId}.jsonl`);
+}
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -53,15 +57,14 @@ const cliCommandsScope = {
   filesWrite: ['src/cli/commands/chat-native.ts'],
 };
 
-describe('ROUTING-TEK-OTORİTE — RED evidence (routeTask disagrees with plan-time)', () => {
-  it('routeTask returns a DIFFERENT agent than a meaningful plan-time assignment', () => {
-    // This is the exact collision: plan-time (V2/selectBestAgent) chose
-    // 'refactorer' for this task; routeTask's own surface-bonus re-derivation
-    // disagrees and would pick 'api-builder' instead.
+describe('ROUTING-TEK-OTORİTE — S3: the override lane itself is retired', () => {
+  it('routeTask NEVER re-derives an agent — the plan-time V3 decision is verbatim-authoritative', () => {
+    // Pre-S3, routeTask's surface-bonus re-derivation could disagree with the
+    // plan-time assignment (the double-authority class). The lane is deleted:
+    // whatever the V3 planner assigned is exactly what spawn-time sees.
     const task = makeTask({ scope: cliCommandsScope, assignedAgent: 'refactorer' });
     const routing = routeTask(task, config, allProviders);
-    expect(routing.agent).toBe('api-builder');
-    expect(routing.agent).not.toBe(task.assignedAgent);
+    expect(routing.agent).toBe('refactorer');
   });
 });
 
@@ -83,25 +86,25 @@ describe('ROUTING-TEK-OTORİTE — single-authority pin', () => {
     expect(tasks[0]!.assignedAgent).toBe('custom-agent');
   });
 
-  it('falls back to routeTask agent when plan-time left assignedAgent undefined', () => {
+  it('an unassigned task stays honestly generic — no spawn-time re-derivation exists (S3)', () => {
     const tasks = [makeTask({ scope: cliCommandsScope })];
     expect(tasks[0]!.assignedAgent).toBeUndefined();
     routeSprintTasks(tasks, config, allProviders);
-    expect(tasks[0]!.assignedAgent).toBe('api-builder');
+    // Spawn-time cannot invent an agent: an unrouted task surfaces as-is
+    // (the V3 plan gate blocks unassigned tasks long before spawn).
+    expect(tasks[0]!.assignedAgent).toBeUndefined();
   });
 
-  it("falls back to routeTask agent when plan-time left assignedAgent literally 'generic'", () => {
-    // sprint-planner.ts:730 writes `decision.agentId ?? 'generic'` — a genuine
-    // V2 'generic' verdict is not a meaningful pin either.
+  it("a literal 'generic' assignment passes through unchanged (S3: no re-derivation)", () => {
     const tasks = [makeTask({ scope: cliCommandsScope, assignedAgent: 'generic' })];
     routeSprintTasks(tasks, config, allProviders);
-    expect(tasks[0]!.assignedAgent).toBe('api-builder');
+    expect(tasks[0]!.assignedAgent).toBe('generic');
   });
 
-  it("falls back to routeTask agent when plan-time left assignedAgent as ''", () => {
+  it("an '' assignment resolves to the spawn floor 'generic' only (S3: no re-derivation)", () => {
     const tasks = [makeTask({ scope: cliCommandsScope, assignedAgent: '' })];
     routeSprintTasks(tasks, config, allProviders);
-    expect(tasks[0]!.assignedAgent).toBe('api-builder');
+    expect(['', 'generic']).toContain(tasks[0]!.assignedAgent ?? '');
   });
 
   it('stays generic when neither plan-time nor routeTask has a real signal (NO_GO guard)', () => {
@@ -128,25 +131,16 @@ describe('ROUTING-TEK-OTORİTE — spawn-fallback decision journal (tagged, fail
     if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
   });
 
-  it('journals the spawn-fallback decision (source-tagged) when the fallback actually fires', () => {
+  it('S3: the spawn-fallback lane is retired — an unpinned task journals NOTHING', () => {
     projectRoot = mkdtempSync(join(tmpdir(), 'deckent-409-003-'));
     const sprintId = 'sprint-409';
-    const tasks = [makeTask({ scope: cliCommandsScope })]; // no plan-time pin → fallback fires
+    const tasks = [makeTask({ scope: cliCommandsScope })]; // no plan-time pin
     routeSprintTasks(tasks, config, allProviders, { projectRoot, sprintId });
 
+    // No override → no spawn-fallback record. The V3 plan-time journal
+    // (decisions-v3) is the sole routing record.
     const filePath = routingDecisionJournalPath(projectRoot, sprintId);
-    expect(existsSync(filePath)).toBe(true);
-    const lines = readFileSync(filePath, 'utf-8').trim().split('\n');
-    expect(lines).toHaveLength(1);
-    const record = JSON.parse(lines[0]!);
-    expect(record).toMatchObject({
-      taskId: tasks[0]!.id,
-      sprintId,
-      winner: 'api-builder',
-      source: 'spawn-fallback',
-      cached: false,
-    });
-    expect(typeof record.ts).toBe('string');
+    expect(existsSync(filePath)).toBe(false);
   });
 
   it('does NOT journal anything when plan-time already pinned the agent', () => {
@@ -162,6 +156,6 @@ describe('ROUTING-TEK-OTORİTE — spawn-fallback decision journal (tagged, fail
   it('is fail-soft/no-op when journalContext is omitted (current production call site)', () => {
     const tasks = [makeTask({ scope: cliCommandsScope })];
     expect(() => routeSprintTasks(tasks, config, allProviders)).not.toThrow();
-    expect(tasks[0]!.assignedAgent).toBe('api-builder');
+    expect(tasks[0]!.assignedAgent).toBeUndefined(); // S3: no spawn-time re-derivation
   });
 });

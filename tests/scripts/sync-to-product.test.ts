@@ -95,7 +95,7 @@ describe('partitionFiles + isExcluded', () => {
       'docs/archive/',
       'docs/audits/',
       'docs/analysis/',
-      'docs/core-memory/',
+      '.deckent/docs/core-memory/',
       'DIRECTIVES.md',
       'RESUME-MONDAY.md',
       'DECKENT-ANA-PLAN.md',

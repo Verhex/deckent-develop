@@ -2,7 +2,7 @@
 // Pins: (1) loadAgents parses+validates an optional `capabilities` block via
 // capabilityVectorSchema; (2) invalid capabilities are dropped + recorded as a
 // WARNING (visible-skip) — never a full manifest reject; (3) the V2 scoring
-// path (routeTaskV2) is completely unaffected by capabilities' presence,
+// path was verified V2-identical until the V2 engine's S3 retirement,
 // absence, or validity — bit-identical RoutingDecision either way.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -32,7 +32,6 @@ import * as fs from 'node:fs';
 import { AgentPoolManager } from '../../../src/core/agent-pool.js';
 import { createAgentDefinition } from '../../../src/core/agent-types.js';
 import type { AgentDefinition, AgentPool } from '../../../src/core/agent-types.js';
-import { routeTaskV2 } from '../../../src/core/routing-engine.js';
 import type { SkillDefinition } from '../../../src/core/skill-types.js';
 import { createSkillDefinition } from '../../../src/core/skill-types.js';
 import type { ActivationConfig } from '../../../src/core/routing-types.js';
@@ -190,88 +189,3 @@ function makeSkillPool(...skills: SkillDefinition[]): Map<string, SkillDefinitio
   return new Map(skills.map((s) => [s.id, s]));
 }
 
-describe('routeTaskV2 — V2-decision-identical pin (capabilities is a no-op for scoring)', () => {
-  it('pool ± capabilities on every agent → identical RoutingDecision', () => {
-    const secActivation: ActivationConfig = {
-      rules: [{ when: { 'intent.primary': 'security' }, score: 10 }],
-      exclude: [],
-      minScore: 5,
-    };
-    const refActivation: ActivationConfig = {
-      rules: [{ when: { 'intent.primary': 'implementation' }, score: 7 }],
-      exclude: [],
-      minScore: 5,
-    };
-
-    const task = {
-      title: 'Fix JWT token validation',
-      description: 'Audit JWT verification logic for vulnerabilities',
-      scope: { directories: ['src/auth/'], filesRead: [], filesWrite: ['src/auth/jwt.ts'] },
-    };
-
-    const poolWithoutCapabilities = makePool(
-      makeAgent('security-auditor', secActivation),
-      makeAgent('refactorer', refActivation),
-    );
-    const poolWithCapabilities = makePool(
-      makeAgent('security-auditor', secActivation, validCapabilities()),
-      makeAgent('refactorer', refActivation, validCapabilities()),
-    );
-
-    const decisionWithout = routeTaskV2(task, poolWithoutCapabilities, makeSkillPool());
-    const decisionWith = routeTaskV2(task, poolWithCapabilities, makeSkillPool());
-
-    expect(decisionWith).toEqual(decisionWithout);
-  });
-
-  it('same pin holds even with a malformed capabilities value on the in-memory agent (routeTaskV2 never reads the field)', () => {
-    const activation: ActivationConfig = {
-      rules: [{ when: { 'intent.primary': 'implementation' }, score: 7 }],
-      exclude: [],
-      minScore: 5,
-    };
-    const task = {
-      title: 'Refactor the config loader',
-      description: 'Restructure config.ts for clarity',
-      scope: { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/config.ts'] },
-    };
-
-    const agent = makeAgent('refactorer', activation);
-    const decisionWithout = routeTaskV2(task, makePool(agent), makeSkillPool());
-
-    const agentWithMalformedCaps = { ...agent, capabilities: { nonsense: true } } as unknown as AgentDefinition;
-    const decisionWithMalformed = routeTaskV2(task, makePool(agentWithMalformedCaps), makeSkillPool());
-
-    expect(decisionWithMalformed).toEqual(decisionWithout);
-  });
-
-  it('reordering which agent carries the (identical) capabilities block does not change the decision', () => {
-    const frontendActivation: ActivationConfig = {
-      rules: [{ when: { 'intent.primary': 'design' }, score: 10 }],
-      exclude: [],
-      minScore: 5,
-    };
-    const reactActivation: ActivationConfig = {
-      rules: [{ when: { 'intent.primary': 'design' }, score: 8 }],
-      exclude: [],
-      minScore: 3,
-    };
-    const task = {
-      title: 'Build UI component',
-      description: 'Create a responsive design component for the dashboard',
-      scope: { directories: ['src/dashboard/'], filesRead: [], filesWrite: ['src/dashboard/Card.tsx'] },
-    };
-
-    const frontendAgent = makeAgent('frontend-designer', frontendActivation);
-    const reactSkill = makeSkill('react-specialist', reactActivation);
-    const baseline = routeTaskV2(task, makePool(frontendAgent), makeSkillPool(reactSkill));
-
-    const withCaps = routeTaskV2(
-      task,
-      makePool(makeAgent('frontend-designer', frontendActivation, validCapabilities())),
-      makeSkillPool(reactSkill),
-    );
-
-    expect(withCaps).toEqual(baseline);
-  });
-});

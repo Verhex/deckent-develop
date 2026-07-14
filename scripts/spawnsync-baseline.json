@@ -246,24 +246,20 @@
       "code": "const res = spawnSync('git', args, {"
     },
     {
-      "file": "src/orchestra/heartbeat-monitor.ts",
-      "code": "const res = spawnSync("
-    },
-    {
-      "file": "src/orchestra/heartbeat-monitor.ts",
-      "code": "const res = spawnSync("
-    },
-    {
-      "file": "src/orchestra/heartbeat-monitor.ts",
-      "code": "spawnSync(cmd, args, { encoding: 'utf-8', timeout: TASKLIST_PROBE_TIMEOUT_MS }),"
-    },
-    {
       "file": "src/orchestra/honest-gate.ts",
       "code": "const res = spawnSync('git', args, {"
     },
     {
       "file": "src/orchestra/planner.ts",
+      "code": "const ls = spawnSync('git', ['ls-files'], { encoding: 'utf-8', cwd });"
+    },
+    {
+      "file": "src/orchestra/planner.ts",
       "code": "const result = spawnSync(command, args, {"
+    },
+    {
+      "file": "src/orchestra/planner.ts",
+      "code": "const retry = spawnSync(c2, a2, { encoding: 'utf-8', timeout: timeout ?? BRAIN_PLAN_TIMEOUT_MS });"
     },
     {
       "file": "src/orchestra/planner.ts",

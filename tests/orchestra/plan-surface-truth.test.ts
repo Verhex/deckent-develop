@@ -24,7 +24,6 @@ import {
   splitDirectiveLineSegments,
   findDirectiveValue,
 } from '../../src/orchestra/task-builder.js';
-import { routeTaskV2 } from '../../src/core/routing-engine.js';
 import { createAgentDefinition } from '../../src/core/agent-types.js';
 import type { AgentDefinition, AgentPool } from '../../src/core/agent-types.js';
 import type { TaskScope } from '../../src/core/task-types.js';
@@ -192,61 +191,3 @@ describe('parseBulletOrNumberedTasks — combined "- Model: X | Agent: Y" line (
   });
 });
 
-// ─── End-to-end: parse → task-directive override → routeTaskV2 honors it ───
-// Mirrors the existing pattern in tests/orchestra/route-v2-integration.test.ts
-// (c) force-* overrides preserved — building the SAME { source: 'task-directive',
-// forceAgent, priority: 3 } shape sprint-planner.ts:676-685 builds from
-// task.forceAgent, then calling the real routeTaskV2.
-
-function makeAgent(id: string, activation: ActivationConfig): AgentDefinition {
-  return createAgentDefinition({
-    id,
-    name: id,
-    description: `${id} fixture agent`,
-    manifestVersion: 2,
-    activation,
-  });
-}
-
-function buildFixturePool(): AgentPool {
-  const pool: AgentPool = new Map();
-  pool.set('refactorer', makeAgent('refactorer', {
-    rules: [{ name: 'intent-implementation', when: { 'intent.primary': 'implementation' }, score: 8 }],
-    exclude: [],
-    minScore: 5,
-  }));
-  pool.set('doc-writer', makeAgent('doc-writer', {
-    rules: [{ name: 'weak-fallback', when: { 'intent.primary': 'implementation' }, score: 1 }],
-    exclude: [],
-    minScore: 5,
-  }));
-  return pool;
-}
-
-const FIXTURE_TASK = {
-  title: 'Fix task-builder directive parsing',
-  description: 'Repair the combined Model/Agent hint parsing in task-builder.ts.',
-  scope: { directories: ['src/orchestra/'], filesRead: [], filesWrite: ['src/orchestra/task-builder.ts'] } satisfies TaskScope,
-};
-
-describe('end-to-end: DIRECTIVES text → parse → task-directive override → routeTaskV2', () => {
-  it('parses forceAgent=doc-writer from directive text and routeTaskV2 honors it', () => {
-    const content = '## Task 1: PLAN-SURFACE-TRUTH\n- Model: sonnet | Agent: doc-writer\n- Scope: src/orchestra/\n\n### Description\nFix it.';
-    const [parsed] = parseStructuredDirectives(content);
-    expect(parsed!.forceAgent).toBe('doc-writer');
-
-    const pool = buildFixturePool();
-
-    // Baseline sanity: without the override, the stronger-scoring agent wins.
-    const baseline = routeTaskV2(FIXTURE_TASK, pool, new Map());
-    expect(baseline.agentId).toBe('refactorer');
-
-    // Same override shape sprint-planner.ts builds from task.forceAgent
-    // (sprint-planner.ts ~676-685: { source: 'task-directive', forceAgent, priority: 3 }).
-    const decision = routeTaskV2(FIXTURE_TASK, pool, new Map(), {
-      overrides: [{ source: 'task-directive', forceAgent: parsed!.forceAgent, priority: 3 }],
-    });
-    expect(decision.agentId).toBe('doc-writer');
-    expect(decision.overrideSource).toBe('task-directive');
-  });
-});

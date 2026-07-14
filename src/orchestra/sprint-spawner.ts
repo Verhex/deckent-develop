@@ -136,7 +136,13 @@ import { aggregateSprintHistory } from './timeout-estimator.js';
 // re-implemented locally (routing-engine.ts's own appendRoutingDecisionRecord
 // is unexported and out of this task's write scope) using the same fail-soft
 // contract (ADR-G-009): a journal-write fault must never affect spawn.
-import { routingDecisionJournalPath, type RoutingDecisionCandidate } from '../core/routing-engine.js';
+// S3: the V2 routing-engine is retired — its born-622 journal-path convention
+// and candidate record shape live on here (spawn-time records only).
+import { join as joinPath } from 'node:path';
+interface RoutingDecisionCandidate { agentId: string; totalScore: number; signals: Record<string, number>; bypass: boolean }
+function routingDecisionJournalPath(projectRoot: string, sprintId: string): string {
+  return joinPath(projectRoot, '.deckent', 'routing', 'decisions', `${sprintId}.jsonl`);
+}
 
 // Sprint 280 root-cause fix: adaptive per-task timeout is wired into every spawn
 // path (emitTimeoutEvents was a 0-caller dormant function, so docker_timeout

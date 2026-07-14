@@ -24,7 +24,7 @@
 - Planning mode: brain_planning = 'ai' | 'structured' | 'auto'
 
 ## Agents & Skills
-- 20 built-in agents + 31 built-in skills (src/core/builtins/{agents,skills} — canlı-sayım kaynağı) — aşağıdaki **Built-in Agents** / **Built-in Skills** bölümleri örnek/temsili bir alt-küme gösterir; tam liste `docs/reference/agents.md` + `src/core/builtins/skills/`.
+- 21 built-in agents + 31 built-in skills (src/core/builtins/{agents,skills} — canlı-sayım kaynağı) — aşağıdaki **Built-in Agents** / **Built-in Skills** bölümleri örnek/temsili bir alt-küme gösterir; tam liste `docs/reference/agents.md` + `src/core/builtins/skills/`.
 - Agent pool: .deckent/agents/*/agent.json — LRU eviction (max 50 temp, 5 sprint age)
 - Skill registry: .deckent/skills/*/skill.json — AST sandbox validation
 - Task routing: task-router.ts assigns agent + skills + provider per task

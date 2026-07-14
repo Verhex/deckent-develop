@@ -202,14 +202,14 @@ describe('Built-in Agent + Skill Seeding Pipeline', () => {
 });
 
 describe('Built-in Source Directory Integrity', () => {
-  it('src/core/builtins/agents/ contains exactly 20 agents', () => {
+  it('src/core/builtins/agents/ contains exactly 21 agents', () => {
     const builtinsAgentDir = join(process.cwd(), 'src', 'core', 'builtins', 'agents');
     expect(existsSync(builtinsAgentDir)).toBe(true);
     const agents = readdirSync(builtinsAgentDir);
     // 17 fully-wired (EXPECTED_AGENTS) + 3 manifest-incomplete carryovers
     // (api-designer, i18n-specialist, observability-engineer — sprint-369,
     // PROMPT.md only, no agent.json yet).
-    expect(agents.length).toBe(20);
+    expect(agents.length).toBe(21); // 445: +implementer (F3)
     for (const agent of EXPECTED_AGENTS) {
       expect(agents).toContain(agent);
     }

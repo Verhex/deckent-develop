@@ -84,7 +84,7 @@ _Tasks: 7 total, 7 done, 3 tech debt, 0 no-go_
 
 _Tasks: 29 total, 28 done, 6 tech debt, 1 no-go_
 
-## [invalid-version-sprint442] - 2026-07-14
+## [1.0.0-beta.1-sprint442] - 2026-07-14
 
 ### Added
 

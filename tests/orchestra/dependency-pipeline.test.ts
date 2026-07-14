@@ -110,8 +110,8 @@ vi.mock('../../src/core/agent-selector.js', () => ({
   selectAgent: vi.fn().mockReturnValue(null),
 }));
 
-vi.mock('../../src/core/routing-engine.js', () => ({
-  routeTaskV2: vi.fn(),
+vi.mock('../../src/orchestra/routing-plan-adapter.js', () => ({
+  routeSingleTaskV3: vi.fn(),
 }));
 
 vi.mock('../../src/core/stack-detector.js', () => ({

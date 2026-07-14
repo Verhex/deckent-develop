@@ -210,6 +210,10 @@ export class MidSprintAdapter {
       const { routeTasksV3ForPlan } = await import('./routing-plan-adapter.js');
       const { resolveRoutingV3Config } = await import('../core/routing/config.js');
       const probe = { ...task } as Task; // never mutate the live task on a probe
+      // Clear the stale assignment — a catalog gap must read as "no
+      // alternative", never echo the failed agent back as a fresh decision.
+      (probe as { assignedAgent?: string }).assignedAgent = undefined;
+      (probe as { assignedSkills?: string[] }).assignedSkills = undefined;
       const v3Config = resolveRoutingV3Config(null, {});
       const result = await routeTasksV3ForPlan([probe], this.projectRoot, v3Config, {
         journal: false,

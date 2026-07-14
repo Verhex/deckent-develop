@@ -29,7 +29,7 @@ import {
   BUILTIN_DOMAINS,
 } from './vocabulary-builtin.js';
 import { matchGlob } from '../doc-tracking/glob.js';
-import { detectHeuristicLanguage } from '../routing-engine.js';
+import { detectHeuristicLanguage } from './language.js';
 import { DEFAULT_ROUTING_V3_CONFIG } from './config.js';
 
 // ─── Component schemas (spec §2a) — local refine-based guards, mirroring

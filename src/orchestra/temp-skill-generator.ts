@@ -156,6 +156,20 @@ export function generateProjectConventionsSkill(
     id: 'project-conventions',
     name: 'Project Conventions',
     version: '1.0.0',
+    // ROUTING-V3 profile (S3): the conventions skill is DELIBERATELY broad —
+    // construction lanes across every domain — so it keeps attaching to
+    // build/fix/refactor work exactly as the V2 keyword lane did.
+    profile: {
+      profileVersion: 3,
+      workTypes: [
+        { type: 'build', proficiency: 'able' },
+        { type: 'fix', proficiency: 'able' },
+        { type: 'refactor', proficiency: 'able' },
+      ],
+      domains: [{ id: '*', proficiency: 'able' }],
+      expertise: ['project conventions', 'stack idioms'],
+      deliverables: [],
+    },
     description: `Auto-generated conventions for ${analysis.language} project`,
     entrypoint: 'SKILL.md',
     category: 'domain' as SkillCategory,

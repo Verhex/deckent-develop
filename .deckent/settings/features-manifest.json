@@ -1,14 +1,13 @@
 {
   "_meta": {
     "version": "2.0",
-    "generatedAt": "2026-07-14T20:10:24.865Z",
+    "generatedAt": "2026-07-14T23:09:42.247Z",
     "generatedBy": "scripts/sync-manifest.mjs",
-    "sprintId": "sprint-445",
+    "sprintId": "sprint-446",
     "description": "Feature usage manifest — curated feature catalog (FEATURE_DEFINITIONS in scripts/sync-manifest.mjs) bucketed by an import-count heuristic plus manual lifecycle annotations. NOT a full import-graph analysis. Categories: active, lightly_used, dormant, dead.",
     "usageWindow": "last-10-sprints",
     "sourceAnalysis": {
       "sprintsChecked": [
-        "sprint-436",
         "sprint-437",
         "sprint-438",
         "sprint-439",
@@ -17,7 +16,8 @@
         "sprint-442",
         "sprint-443",
         "sprint-444",
-        "sprint-445"
+        "sprint-445",
+        "sprint-446"
       ],
       "methodology": "curated catalog + grep-based import count (basename match) + @deprecated detection + manual blockedBy/deprecatedSince/supersededBy annotations"
     }
@@ -78,17 +78,6 @@
         "src/cli/commands/resume.ts"
       ],
       "description": "Writes checkpoint every N tasks. Resume command restores sprint state.",
-      "importCount": "high"
-    },
-    {
-      "id": "routing-engine-v2",
-      "label": "Routing Engine V2 — Intent-Based Task Router",
-      "files": [
-        "src/core/routing-engine.ts",
-        "src/core/intent-classifier.ts",
-        "src/core/activation-engine.ts"
-      ],
-      "description": "V2 intent-based routing: routeTaskV2(), confidence scoring, agent/skill/provider assignment.",
       "importCount": "high"
     },
     {
@@ -279,6 +268,17 @@
   ],
   "lightly_used": [
     {
+      "id": "routing-engine-v3",
+      "label": "Routing Engine V3 — Vectorial 3-Axis Task Router",
+      "files": [
+        "src/core/routing/route-task-v3.ts",
+        "src/core/routing/verifier.ts",
+        "src/core/routing/vocabulary-builtin.ts",
+        "src/orchestra/routing-plan-adapter.ts"
+      ],
+      "description": "V3 vector-selection: RequirementVector×CapabilityVector, 5-stage hybrid pipeline (eliminate/content-fit/verify/rank/decide), policy packs, learning cells, replayable journal."
+    },
+    {
       "id": "archive-debt",
       "label": "Archive Debt — CLI Debt Rotation Command",
       "files": [
@@ -381,7 +381,7 @@
         "src/orchestra/ecosystem-intelligence.ts"
       ],
       "description": "analyzeNewSkill + persistSkillActivation called from CLI skill add workflow.",
-      "blockedBy": "analysis output not consumed by routing-engine-v2"
+      "blockedBy": "analysis output not consumed by routing-engine-v3"
     },
     {
       "id": "human-checkpoint-cli",

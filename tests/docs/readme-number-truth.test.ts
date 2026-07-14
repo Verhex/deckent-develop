@@ -75,8 +75,8 @@ describe('live counts match the current known-true values', () => {
     expect(MCP_RESOURCES).toBe(8);
   });
 
-  it('20 built-in agents, 31 built-in skills (src/core/builtins)', () => {
-    expect(BUILTIN_AGENTS).toBe(20);
+  it('21 built-in agents, 31 built-in skills (src/core/builtins)', () => {
+    expect(BUILTIN_AGENTS).toBe(21); // 445: +implementer (F3)
     expect(BUILTIN_SKILLS).toBe(31);
   });
 

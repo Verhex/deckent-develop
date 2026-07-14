@@ -34,6 +34,9 @@ export interface SkillStats {
 // ─── Skill Definition ───────────────────────────────────────────────────────
 
 export interface SkillDefinition {
+  /** ROUTING-V3 skill matching profile (capability-vector.ts SkillProfile shape);
+   *  optional — profile-less skills are simply not V3 candidates. */
+  profile?: unknown;
   id: string;
   name: string;
   version: string;

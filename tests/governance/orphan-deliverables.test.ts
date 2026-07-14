@@ -454,7 +454,6 @@ const KNOWN_ORPHANS = [
   'src/connectors/approval-clients-wire.ts',
   'src/connectors/approval-telegram.ts',
   'src/connectors/identity/verify-bind.ts',
-  'src/core/agent-selector.ts',
   // 'src/core/approval-expiry-driver.ts' — KAPANDI born-631 (405-004, 2026-07-11):
   // server-start'ta canlı-sürücü (unref'd + dispose) → artık orphan değil.
   'src/core/approval-fallback.ts',
@@ -480,6 +479,8 @@ const KNOWN_ORPHANS = [
   'src/core/notification-providers/slack.ts',
   'src/core/provider-capabilities.ts',
   'src/core/rate-limiter.ts',
+  // S3 rename artifact: vocabulary-bootstrap's CLI wire (analyze/init) is SURF-era follow-up work.
+  'src/core/routing/vocabulary-bootstrap.ts',
   'src/core/skill-registry.ts',
   'src/core/spawn-safety.ts',
   'src/core/state-paths.ts',

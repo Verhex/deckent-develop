@@ -149,3 +149,24 @@ export function resolveRoutingV3Config(
 
   return validateRoutingV3Config(merged);
 }
+
+// ─── Work-type → default effort tier (S3: replaces V2 resolveEffortTier) ─────
+// Faithful mapping of the retired LOW/HIGH_EFFORT_INTENTS semantics onto the
+// closed work-type core: documentation/config work runs light; deep analysis
+// runs high; construction lanes default to normal.
+export const WORK_TYPE_EFFORT: Readonly<Record<string, 'low' | 'normal' | 'high'>> = {
+  build: 'normal',
+  fix: 'normal',
+  refactor: 'normal',
+  document: 'low',
+  review: 'normal',
+  configure: 'low',
+  migrate: 'normal',
+  analyze: 'high',
+};
+
+/** Default effort tier for a work-type ('normal' for unknown/subtyped input). */
+export function effortForWorkType(workType: string): 'low' | 'normal' | 'high' {
+  const parent = workType.includes(':') ? workType.split(':')[0]! : workType;
+  return WORK_TYPE_EFFORT[parent] ?? 'normal';
+}

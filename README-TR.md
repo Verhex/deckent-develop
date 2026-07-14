@@ -227,7 +227,7 @@ deckent izlenmek için kuruldu, bir kara kutu olmak için değil.
 - **Nervous System** — boşta worker'ları, routing anomalilerini, kapsam çakışmalarını, agent-sağlık düşüşlerini ve borç trendlerini izleyip aksiyon öneren proaktif bir meta-orkestratör
 
 ### Agent'lar ve skill'ler
-- **20 built-in agents** — security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist ve daha fazlası (tam liste: `docs/reference/agents.md`)
+- **21 built-in agents** — security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist ve daha fazlası (tam liste: `docs/reference/agents.md`)
 - **31 built-in skills** — typescript-expert, testing-expert, react-specialist, security-specialist, docker-expert, python-expert, anthropic-sdk ve daha fazlası
 - **Plugin'ler** — kendi yeniden-kullanılabilir yeteneklerinizi eklemek için `.deckent/plugins/` içine bir `manifest.json` + `SKILL.md` bırakın
 

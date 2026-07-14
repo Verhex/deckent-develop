@@ -273,11 +273,11 @@ describe('D) Agent/Skill Selection Error Logging', () => {
       'utf-8',
     );
     // Outer catch for pool loading failure
-    expect(source).toContain('routeTaskV2') // ROUTE-V1-PURGE: per-task selection lives in routeTaskV2; planner no longer hosts a V1 agent-pool loop;
-    // ROUTE-V1-PURGE: the V1 pool-loading block is gone; selection safety lives in routeTaskV2's fallback.
+    expect(source).toContain('routeTasksV3ForPlan') // ROUTE-V1-PURGE: per-task selection lives in routeTasksV3ForPlan; planner no longer hosts a V1 agent-pool loop;
+    // ROUTE-V1-PURGE: the V1 pool-loading block is gone; selection safety lives in routeTasksV3ForPlan's fallback.
     // Inner per-task catch for individual agent selection failure
-    expect(source).toContain('routeTaskV2');
-    // V1 per-task selection loop purged (ROUTE-V1-PURGE) — failure-safety = routeTaskV2 fallback.
+    expect(source).toContain('routeTasksV3ForPlan');
+    // V1 per-task selection loop purged (ROUTE-V1-PURGE) — failure-safety = routeTasksV3ForPlan fallback.
   });
 
   it('has per-task skill selection error handling with debugLog', async () => {

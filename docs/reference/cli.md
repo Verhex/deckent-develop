@@ -1214,7 +1214,7 @@ deckent autonomous-mission list --json
 > Hand-curated sections above are produced by `scripts/generate-cli-docs.ts`; this block is maintained by `scripts/gen-reference-docs.mjs`.
 
 <!-- AUTOGEN:START id="cli" -->
-> 170 commands. Generated from `src/cli/commands/*.ts`.
+> 171 commands. Generated from `src/cli/commands/*.ts`.
 
 | Command | Description |
 |---------|-------------|
@@ -1293,6 +1293,7 @@ deckent autonomous-mission list --json
 | `deckent kill [taskId]` | Kill a running worker |
 | `deckent kpi` | Show the KPI scorecard for the current (or a specific) sprint |
 | `deckent limits` | Check live subscription-window usage (session/week) and the configured start-gate thresholds |
+| `deckent lint` | Lint the agent catalog: reachability, coverage gaps, capability overlaps (V3) |
 | `deckent list` | List all agents in the pool |
 | `deckent list` | List all missions (summary table) |
 | `deckent list` | List autonomous backlog entries |

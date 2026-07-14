@@ -53,7 +53,6 @@ import { detectProjectStack, detectFullStack } from '../core/stack-detector.js';
 import { normalizeTechStack, rubricTypeToKind } from '../core/work-model.js';
 import { detectTaskType } from './rubric-registry.js';
 import { SkillPoolManager } from '../core/skill-pool.js';
-import { classifyIntent } from '../core/intent-classifier.js';
 
 // ─── Planner ─────────────────────────────────────────────────────
 import { callBrainPlanner, callBrainPlannerWithReason } from './planner.js';
@@ -107,11 +106,9 @@ import { detectDeadlocks } from '../monitor/auditor.js';
 
 // ─── Agent Pool & Selection ──────────────────────────────────────
 import { AgentPoolManager } from '../core/agent-pool.js';
-import { resolveEffortTier } from '../core/routing-engine.js';
-import {
-  InMemoryAgentSelectionSink,
-  summarizeAgentDistribution,
-} from '../core/routing-affinity-observability.js';
+import { effortForWorkType } from '../core/routing/config.js';
+import { produceContentStructural, producePositional } from '../core/routing/requirement-vector.js';
+import { BUILTIN_DOMAINS } from '../core/routing/vocabulary-builtin.js';
 
 // ─── Sub-module imports ──────────────────────────────────────────
 import { resolveTaskModel, parsePatterns, deduplicatePatterns } from './model-selector.js';
@@ -510,7 +507,12 @@ export async function planSprint(
       const detectedTaskType = detectTaskType({ scope: src.scope } as Task);
       const tieredEffort: TaskEffort = detectedTaskType === 'audit'
         ? 'high'
-        : resolveEffortTier(classifyIntent({ title: src.title, description: src.description, scope: src.scope }).intent.primary);
+        : effortForWorkType(
+            produceContentStructural(
+              { title: src.title, description: src.description, scope: src.scope } as Task,
+              producePositional({ title: src.title, description: src.description, scope: src.scope } as Task, { domains: BUILTIN_DOMAINS }),
+            ).workType,
+          );
       // `- Effort:` directive ALWAYS wins (404-003 hint-chain, unchanged `??`);
       // flag-off (default) preserves the exact pre-existing 'normal' fallback.
       const resolvedEffort = src.forceEffort ?? (effortTieringEnabled ? tieredEffort : 'normal');
@@ -591,20 +593,8 @@ export async function planSprint(
     const skillPoolV2 = new SkillPoolManager(projectRoot);
     const skillsV2 = skillPoolV2.loadSkills();
 
-    // Load learning bonuses from previous sprints
-    let learningData: import('../core/routing-types.js').LearningBonus[] = [];
-    try {
-      const { OutcomeTracker } = await import('./outcome-tracker.js');
-      const tracker = new OutcomeTracker(projectRoot);
-      const { classifyIntent } = await import('../core/intent-classifier.js');
-      if (tasks.length > 0) {
-        const sampleDNA = classifyIntent(tasks[0]!);
-        learningData = tracker.calculateBonuses(sampleDNA);
-        debugLog('planSprint:learning-bonuses', `Loaded ${learningData.length} learning bonuses from previous sprints`);
-      }
-    } catch (e) {
-      debugLog('planSprint:learning-bonuses:No learning data available (first sprint or missing learnings.json)', e);
-    }
+    // S3: the V2 learning-bonus block (the tasks[0]-DNA K4 bug) is retired —
+    // V3's learning-cells feed the numerical axis per-task inside the adapter.
 
     // Generate project conventions temp skill
     try {
@@ -703,8 +693,6 @@ export async function planSprint(
     // ADR-075 routing-balance gate (343-007): accumulate per-task agent
     // selections so the affinity distribution can be measured BEFORE the flag
     // is defaulted on. In-memory, non-blocking, never throws.
-    const affinitySink = new InMemoryAgentSelectionSink();
-    const skillAgentAffinity = config.routing?.skill_agent_affinity ?? false;
 
     // ─── ROUTING-V3 branch (Slice-2 integration; default OFF until Slice-3) ──
     // When routing_v3.enabled, every task routes through the vector pipeline:
@@ -720,24 +708,37 @@ export async function planSprint(
 
       // One-shot completion over the same provider machinery the AI planner
       // uses (governance mode = no completion → structural content).
+      // Zero-hardcode: the batch rides the configured BRAIN model (planner's
+      // own tier) — no model literal, no new spawnSync (async spawn + await).
+      const contentBatchModel = config.activeModeConfig.brain_model;
       const completeFn =
         v3Config.governanceMode === 'ai'
           ? async (prompt: string): Promise<string> => {
-              const { spawnSync: spawn } = await import('node:child_process');
+              const { spawn } = await import('node:child_process');
               const { resolveAdapter, buildPlannerSpawnArgs } = await import('./planner.js');
-              const adapter = resolveAdapter(undefined, 'sonnet');
-              const cmd = buildPlannerSpawnArgs(adapter, prompt, 'sonnet');
-              const run = spawn(cmd.command, cmd.args, { encoding: 'utf-8', timeout: 120_000 });
-              if (run.status !== 0 || !run.stdout) {
-                throw new Error(`content-batch completion failed (provider=${adapter.name}, status=${run.status})`);
-              }
-              return run.stdout;
+              const adapter = resolveAdapter(undefined, contentBatchModel);
+              const cmd = buildPlannerSpawnArgs(adapter, prompt, contentBatchModel);
+              return await new Promise<string>((resolvePromise, rejectPromise) => {
+                const child = spawn(cmd.command, cmd.args, { timeout: 120_000 });
+                let out = '';
+                let err = '';
+                child.stdout?.on('data', (d: Buffer) => { out += d.toString(); });
+                child.stderr?.on('data', (d: Buffer) => { err += d.toString(); });
+                child.on('error', rejectPromise);
+                child.on('close', (code: number | null) => {
+                  if (code === 0 && out) resolvePromise(out);
+                  else rejectPromise(new BrainError(`content-batch completion failed (provider=${adapter.name}, code=${code}): ${err.slice(0, 200)}`));
+                });
+              });
             }
           : undefined;
 
       const v3Result = await routeTasksV3ForPlan(tasks, projectRoot, v3Config, {
         ...(completeFn ? { complete: completeFn } : {}),
         sprintId,
+        // In-memory pools: generated temp agents + the project-conventions
+        // temp-skill must be V3-visible (they never exist on disk at plan time).
+        pools: { agents: pool, skills: skillsV2 },
       });
 
       for (const esc of v3Result.escalations) {
@@ -764,13 +765,6 @@ export async function planSprint(
     }
 
 
-    // ADR-075 routing-balance gate (343-007): surface the agent-distribution
-    // snapshot (counts per agent + % affinity-influenced) for the dogfood
-    // measurement that must precede any default-on. Dev-only (DECKENT_DEBUG).
-    debugLog(
-      'planSprint:routing-affinity',
-      `affinity=${skillAgentAffinity} distribution: ${JSON.stringify(summarizeAgentDistribution(affinitySink.records))}`,
-    );
 
     // G-series plan-time prompt-gate (G1a persona + G1d decision-space + G1c premise):
     // flag every finalized task's (persona × intent) fit, goCriteria decision-shape, and

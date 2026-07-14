@@ -32,6 +32,12 @@ export interface RouteTasksV3Options {
   journal?: boolean;
   /** Fresh-eyes exclusion for FIX-path reroutes (threaded into routeTaskV3). */
   excludeAgentIds?: readonly string[];
+  /** Pre-loaded pools (planner passes its in-memory pool so generated temp
+   *  agents/skills — e.g. project-conventions — are V3-visible; absent = disk load). */
+  pools?: {
+    agents?: import('../core/agent-types.js').AgentPool;
+    skills?: Map<string, import('../core/skill-types.js').SkillDefinition>;
+  };
 }
 
 export interface RouteTasksV3Escalation {
@@ -65,7 +71,7 @@ export async function routeTasksV3ForPlan(
   const result: RouteTasksV3Result = { routed: [], escalations: [], contentFallbacks: [] };
 
   // ── Catalog ────────────────────────────────────────────────────────────
-  const pool = new AgentPoolManager(projectRoot).loadAgents();
+  const pool = options.pools?.agents ?? new AgentPoolManager(projectRoot).loadAgents();
   const agents: RouteCatalog['agents'][number][] = [];
   for (const agent of pool.values()) {
     const caps = (agent as unknown as Record<string, unknown>)['capabilities'];
@@ -78,7 +84,7 @@ export async function routeTasksV3ForPlan(
     });
   }
 
-  const skillPool = new SkillPoolManager(projectRoot).loadSkills();
+  const skillPool = options.pools?.skills ?? new SkillPoolManager(projectRoot).loadSkills();
   const skills: RouteCatalog['skills'][number][] = [];
   for (const skill of skillPool.values()) {
     const profile = (skill as unknown as Record<string, unknown>)['profile'];

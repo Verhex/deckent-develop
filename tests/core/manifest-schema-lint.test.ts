@@ -12,7 +12,6 @@ vi.mock('node:fs', () => ({
 import * as fs from 'node:fs';
 import { SkillPoolManager } from '../../src/core/skill-pool.js';
 import { AgentPoolManager } from '../../src/core/agent-pool.js';
-import { selectSkills } from '../../src/core/skill-selector.js';
 import type { SkillDefinition, ProjectStack } from '../../src/core/skill-types.js';
 import type { AgentDefinition } from '../../src/core/agent-types.js';
 
@@ -194,19 +193,4 @@ describe('born-641 manifest schema normalization (pool-load)', () => {
 
   // ─── Concrete crash-repro: the actual born-641 class bug ───────────────────
 
-  describe('born-641 crash-repro: selectSkills() must not throw on a normalized pool', () => {
-    it('does not throw when a loaded skill was missing stackDetection entirely', () => {
-      const raw = rawSkillManifest();
-      delete raw['stackDetection'];
-      const skill = loadOneSkill(raw);
-      expect(skill).toBeDefined();
-
-      const pool = new Map<string, SkillDefinition>([[skill!.id, skill!]]);
-
-      // Before the pool-load normalization fix, `skill.stackDetection` is `undefined`
-      // here, and skill-selector.ts's unguarded `skill.stackDetection.dependencies`
-      // read (line 97) throws TypeError — this is the exact born-641 class bug.
-      expect(() => selectSkills({ title: 'implement x', description: 'y' }, PROJECT_STACK, pool)).not.toThrow();
-    });
-  });
 });
