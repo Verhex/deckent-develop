@@ -3065,10 +3065,11 @@
   "born_id": 679,
   "title": "Approvals cross-process EXPIRY yok + expired-karara sessiz-ret + bot re-notify dedup yok — suresi-dolmus request sonsuz onay-dongusu yaratiyor (Telegram canli-vaka)",
   "priority": "P1",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "Alperen Telegram-vakasi (2026-07-12): DECKENT_APPROVAL_DEMO fixture karti (10dk-expiry) suresi doldu; dosya .deckent/approvals/ta kaldi; bot her turda yeniden sordu; onay/red karar uretmedi. MASTER-PLAN 523 APPROVAL-QOL \"KALAN: cross-process expire (404-004)\" notunun canli-kaniti. Bilesik neden: bot 34h bayat-dist (ops-kurali kondu).",
   "spec": "UC is: (a) cross-process feed/broker expiresAt gecmis request-dosyasini SWEEP eder (karar-dosyasiz kapanis kaydi + dosya arsiv/silme); (b) expired isteğe gelen approve/reject DURUST yanit dondurur (\"suresi dolmus\") — sessiz no-op olmez; (c) bot ayni request-id icin notify-DEDUP yapar (bir kez sor + hatirlatma-politikasi ayri). Regresyon: expired-request fixture + bot-callback e2e.",
-  "date": "2026-07-12"
+  "date": "2026-07-12",
+  "fix": "sprint-437 (Fable-Brain ilk kosusu, 7/7 2-debt 0-NO_GO; ilk deneme sprint-436 API-instabilitesiyle olmustu): (a) EXPIRE-SWEEP cekirdek + okuma-yolu wiring (CLI status / nervous status / bot-polling feed); (b) durust kapanis-kaydi; (c) NOTIFY-DEDUP kalici modul (approval-notify-dedup.ts) + relay wiring; (d) typed expired-yanit + i18n. GERCEK-BINARY KABUL-SMOKE (CC): expired test-karti status-cagrisiyla supuruldu -> decision.json {decidedBy:system, channel:ttl-expire, closureReason:expired}; pending'de gorunmuyor; accept sessiz no-op degil. 886 approval/nervous/status testi yesil. Kalan son-mil = born-697. 4. flowId-receipt: 9a1255ba (M2=4/4)."
  },
  {
   "born_id": 680,
@@ -3233,5 +3234,14 @@
   "spec": "(a) icin is: worker-wrapper stream-idle-timeout'u TIPLI provider-hata olarak yakalayip result'a yazsin (EXIT_WITHOUT_RESULT yerine PROVIDER_STREAM_TIMEOUT marker'i) + FIX-fazina 'API-saglik-bekle + tek-retry' politikasi; (b) icin is: FIX-spawn'inin queued-task'i worker-havuzu bosaldiginda GERCEKTEN tetikledigini garanti eden watchdog/receipt (queued>Ndk + 0-worker = loud-alert). born-679 isi bu sprint'ten CIKMADI — API duzelince yeniden kosulacak.",
   "master_plan_row": null,
   "evidence_update": "30dk gozlem (02:00-02:35): self-recovery YOK — fix-task 'Queued' + 0 worker sabit; FIX-spawn watchdog eksikligi KESINLESTI. Mudahale (kill/recover) Alperen sabah-kararina birakildi; born-679 yeniden-kosusu API-saglik-sonrasi."
+ },
+ {
+  "born_id": 697,
+  "title": "APPROVAL SON-MIL WIRING (437-003/004 debt'lerinin ayristirilmisi): typed-expired-yanit + dedup'un canli Telegram-butonu ve terminal-keypress kanallarina uctan-uca teslimi — approval-relay.ts + approval-terminal-channel.ts 437'de write-scope disindaydi",
+  "priority": "P2",
+  "status": "OPEN",
+  "source": "sprint-437 debt-notlari (437-003 relay-constructor additive-param + 437-004 'end-to-end delivery needs follow-up wiring')",
+  "spec": "Is: (a) approval-relay expired-yanit render'ini bot-callback'e baglasin (Telegram butonuna basinca 'suresi dolmus' i18n-mesaji kullaniciya gorunur); (b) terminal-channel ayni typed-yaniti REPL onay-kartinda gostersin; (c) canli-smoke: expired karta buton/keypress -> gorunur-mesaj. SURF-3 canli-approval dilimiyle birlesebilir.",
+  "master_plan_row": 572
  }
 ]

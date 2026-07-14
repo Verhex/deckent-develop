@@ -45,6 +45,28 @@ export interface ApprovalStoreWatchOptions {
   /** Injectable one-shot scan (tests). Default: `ApprovalStore.load`, the
    *  EXISTING tolerant/categorizing read helper — never re-derived here. */
   scan?: (dir: string, now: Date) => ApprovalStoreSnapshot;
+  /** Injectable expiry sweep (tests substitute a throwing fake to prove
+   *  fail-soft). Default: a fresh `ApprovalStore` pointed at `storeDir`,
+   *  calling its own `sweepExpired`. Runs before every poll-tick's `scan()` —
+   *  EXPIRE-SWEEP wiring (Task-1's `ApprovalStore.sweepExpired()`). Without
+   *  this, an overdue-but-undecided request sits in the `expired` category
+   *  with a `null` decision, which BOTH the pending loop (already excluded —
+   *  `categorize()` buckets it `expired` by `expiresAt` alone) AND the
+   *  decided loop (`if (!entry.decision) continue`) below skip — so
+   *  `onDecided` never fires for it and a bot that already sent the pending
+   *  card upstream waits forever (the Telegram infinite-approval-loop root
+   *  cause). Sweeping writes the honest ttl-expire closure so the NEXT tick's
+   *  decided loop reports it and the wait ends. */
+  sweep?: (dir: string, now: Date) => void;
+  /** Fail-soft sink for a sweep error (tests). Defaults to `console.error`. A
+   *  sweep failure is logged, never thrown — it must never block a poll tick. */
+  onSweepError?: (error: unknown) => void;
+}
+
+/** Default sweep — a fresh `ApprovalStore` instance pointed EXACTLY at `dir`
+ *  (the `storeDir` override makes the first constructor argument irrelevant). */
+function defaultSweep(dir: string, now: Date): void {
+  new ApprovalStore(dir, { storeDir: dir }).sweepExpired(now);
 }
 
 export interface ApprovalStoreWatchHandle {
@@ -84,6 +106,9 @@ export function createApprovalStoreWatch(
 ): ApprovalStoreWatchHandle {
   const clock = opts.clock ?? (() => new Date());
   const scan = opts.scan ?? ((dir, now) => ApprovalStore.load(dir, now));
+  const sweep = opts.sweep ?? defaultSweep;
+  const onSweepError =
+    opts.onSweepError ?? ((error: unknown) => console.error('[approval-store-watch] sweepExpired failed:', error));
   const pollIntervalMs = opts.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
 
   const seenPending = new Set<string>();
@@ -93,9 +118,16 @@ export function createApprovalStoreWatch(
   function runScan(): void {
     if (disposed) return;
 
+    const now = clock();
+    try {
+      sweep(storeDir, now);
+    } catch (error) {
+      onSweepError(error);
+    }
+
     let snapshot: ApprovalStoreSnapshot;
     try {
-      snapshot = scan(storeDir, clock());
+      snapshot = scan(storeDir, now);
     } catch {
       return; // tolerant — mirrors ApprovalStore's own torn-read tolerance
     }

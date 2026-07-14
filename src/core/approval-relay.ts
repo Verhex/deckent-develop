@@ -29,6 +29,7 @@
 import { EventEmitter } from 'node:events';
 import type { ApprovalBroker, ApprovalDecisionInput } from './approval-broker.js';
 import type { ApprovalDecision, ApprovalRequest } from './approval-contract.js';
+import type { ApprovalNotifyDedup } from './approval-notify-dedup.js';
 
 // ─── Channel contract ─────────────────────────────────────────────────────────
 
@@ -110,13 +111,27 @@ export class ApprovalRelay extends EventEmitter {
   private readonly handlePending: (request: ApprovalRequest) => void;
   private readonly handleDecided: (decision: ApprovalDecision, request: ApprovalRequest | undefined) => void;
 
-  constructor(broker: ApprovalBroker) {
+  /**
+   * @param dedup Optional persistent notify-state guard (APR-NOTIFY-DEDUP).
+   *   When provided, a 'pending' event whose `request.id` was already
+   *   dispatched (in this process or a prior one — e.g. a cross-process
+   *   store-replay re-firing 'pending' on restart, see
+   *   approval-notify-dedup.ts module docs) is skipped entirely instead of
+   *   re-notifying every channel. Omit to preserve today's undeduped
+   *   behavior (every 'pending' event dispatches).
+   */
+  constructor(broker: ApprovalBroker, dedup?: ApprovalNotifyDedup) {
     super();
     this.broker = broker;
     this.handlePending = (request) => {
+      if (dedup?.wasNotified(request.id)) return;
       this.dispatch(undefined, { kind: 'pending', request });
+      dedup?.markNotified(request.id);
     };
     this.handleDecided = (decision, request) => {
+      // Decided or TTL-expired — the dedup record (if any) is no longer
+      // needed and would otherwise grow the state file unbounded.
+      dedup?.clear([decision.requestId]);
       // No locally-known request (foreign-only broker instance) — nothing to
       // render a cross-broadcast card from; skip rather than notify with a gap.
       if (!request) return;

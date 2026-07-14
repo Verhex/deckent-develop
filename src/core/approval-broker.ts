@@ -57,6 +57,37 @@ export type ApprovalRequestInput = z.input<typeof approvalRequestSchema>;
  *  input with `requestId` omitted (the broker supplies it from the `id` arg). */
 export type ApprovalDecisionInput = Omit<z.input<typeof approvalDecisionSchema>, 'requestId'>;
 
+// ─── decideChecked result (additive — decide() itself is untouched) ─────────
+
+/**
+ * {@link ApprovalBroker.decideChecked} outcome for a request whose TTL had
+ * already elapsed at call time — either `expiresAt <= now`, or the TTL sweep
+ * ({@link ApprovalBroker.expire}) already settled it with `channel:
+ * 'ttl-expire'`. No decision is ever written for this outcome (the request is
+ * left exactly as found — still pending, or already TTL-decided) so a late
+ * human decide() attempt can never clobber/duplicate a decision.
+ */
+export interface ApprovalDecideExpiredResult {
+  readonly outcome: 'expired';
+  readonly requestId: string;
+  readonly expiresAt: string;
+}
+
+/**
+ * {@link ApprovalBroker.decideChecked} return shape — the existing
+ * `ApprovalDecision` success shape, additively unioned with the expired
+ * outcome above. `ApprovalDecision` (the contract's `.strict()` schema) never
+ * carries an `outcome` field, so `isExpiredDecideResult` below is a safe,
+ * exhaustive discriminant.
+ */
+export type ApprovalDecideResult = ApprovalDecision | ApprovalDecideExpiredResult;
+
+/** Type guard for {@link ApprovalDecideResult} — true iff `result` is the
+ *  additive expired-outcome member (never a normal `ApprovalDecision`). */
+export function isExpiredDecideResult(result: ApprovalDecideResult): result is ApprovalDecideExpiredResult {
+  return 'outcome' in result && result.outcome === 'expired';
+}
+
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
 export type ApprovalBrokerErrorCode =
@@ -220,6 +251,47 @@ export class ApprovalBroker extends EventEmitter {
       );
     }
     return this.settleDecision(result.value, { persist: true });
+  }
+
+  /**
+   * Honest decide (additive — {@link ApprovalBroker.decide} itself is
+   * unchanged, so every existing caller keeps its exact current
+   * throw-or-`ApprovalDecision` behavior). Checks TTL expiry BEFORE attempting
+   * any decision: if `id`'s request has already elapsed (`expiresAt <= now`)
+   * or was already settled by the TTL sweep (`channel: 'ttl-expire'`), returns
+   * the typed `{ outcome: 'expired', ... }` result and writes NOTHING —
+   * neither a fresh decision file nor an overwrite of the sweep's own
+   * decision (no double-decision). Otherwise delegates to {@link
+   * ApprovalBroker.decide} unchanged, so a live request's approve/reject
+   * keeps its exact current success/throw shape.
+   *
+   * Consumer surfaces that must render "this expired" honestly to a human
+   * (a bot button press, a CLI approve/reject command) call this instead of
+   * `decide()` directly.
+   */
+  decideChecked(id: string, input: ApprovalDecisionInput, now: Date = new Date()): ApprovalDecideResult {
+    const expired = this.expiredResultFor(id, now);
+    if (expired) return expired;
+    return this.decide(id, input);
+  }
+
+  /** Returns the expired-outcome shape for `id` iff its TTL has already
+   *  elapsed by `now`, else `undefined`. A request already decided by a REAL
+   *  (non-TTL) channel is not "expired" here — that stays
+   *  `APR_ALREADY_DECIDED` via the normal `decide()` path. */
+  private expiredResultFor(id: string, now: Date): ApprovalDecideExpiredResult | undefined {
+    const existingDecision = this.decisionsById.get(id);
+    if (existingDecision) {
+      if (existingDecision.channel !== 'ttl-expire') return undefined;
+      const expiresAt = this.requestsById.get(id)?.expiresAt ?? existingDecision.decidedAt;
+      return { outcome: 'expired', requestId: id, expiresAt };
+    }
+
+    const request = this.requestsById.get(id);
+    if (request && Date.parse(request.expiresAt) <= now.getTime()) {
+      return { outcome: 'expired', requestId: id, expiresAt: request.expiresAt };
+    }
+    return undefined;
   }
 
   /** Shared settle path for decide/expire/checkForExternalDecisions. */

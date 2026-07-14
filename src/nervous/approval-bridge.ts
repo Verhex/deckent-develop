@@ -219,3 +219,47 @@ export function toNervousNotification(request: ApprovalRequest): NervousNotifica
     groupKey: request.scopeId,
   };
 }
+
+// ─── Direction 3: sweep-then-list — nervous-status pending read path ─────────
+// EXPIRE-SWEEP wiring (Task-1's `ApprovalStore.sweepExpired()`): the nervous
+// approval bridge is the nervous-status surface's own entry point into the
+// runtime-wide ApprovalBroker, so this is the correct attach point for a
+// sweep-before-read hook — an overdue nervous-sourced request must never be
+// reported pending here without first having been given the chance to close.
+
+/** Narrow store surface this read path depends on — satisfied structurally by a
+ *  real `ApprovalStore` (core/approval-store.ts) or a test fake, mirroring
+ *  `NervousApprovalBrokerLike`'s narrow-surface pattern above. */
+export interface NervousApprovalStoreLike {
+  sweepExpired(now?: Date): string[];
+  load(): { pending: ReadonlyArray<{ request: ApprovalRequest }> };
+}
+
+const DEFAULT_ON_SWEEP_ERROR = (error: unknown): void => {
+  console.error('[nervous/approval-bridge] sweepExpired failed:', error);
+};
+
+/**
+ * List broker-pending, nervous-sourced requests projected as `NervousNotification`s
+ * — the nervous-status pending read path. Sweeps `store` FIRST (fail-soft: a
+ * throwing store is routed to `onSweepError` and never blocks this read) so a
+ * TTL-overdue request gets its honest ttl-expire closure written before nervous
+ * status ever reads it, instead of drifting stale until some other reader
+ * happens to sweep it.
+ */
+export function listNervousPendingFromStore(
+  store: NervousApprovalStoreLike,
+  onSweepError: (error: unknown) => void = DEFAULT_ON_SWEEP_ERROR,
+): NervousNotification[] {
+  try {
+    store.sweepExpired();
+  } catch (error) {
+    onSweepError(error);
+  }
+  const notifications: NervousNotification[] = [];
+  for (const entry of store.load().pending) {
+    const notification = toNervousNotification(entry.request);
+    if (notification) notifications.push(notification);
+  }
+  return notifications;
+}

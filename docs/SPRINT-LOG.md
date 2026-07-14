@@ -10692,3 +10692,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 435-003: Run proposal ve do entegrasyonunu doğrula (DONE)
 
 ---
+## Sprint 437 — sprint-437
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-14
+**Duration:** 3156s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 7 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 3155570ms |
+
+### Tasks
+
+- 437-001: EXPIRE-SWEEP çekirdek API — okuma-anı süpürme ve dürüst kapanış kaydı (DONE)
+- 437-002: Okuma-yolu sweep wiring — CLI status ve nervous status ve bot-polling feed (DONE)
+- 437-003: NOTIFY-DEDUP kalıcı bildirim-state modülü ve relay wiring (GO_WITH_TECH_DEBT)
+- 437-004: Dürüst expired-yanıt ve i18n mesaj anahtarları (GO_WITH_TECH_DEBT)
+- 437-005: Hermetik entegrasyon test paketi — expired/geçerli/karar-verilmiş ve dedup-restart senaryoları (DONE)
+
+---

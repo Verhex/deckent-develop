@@ -24,8 +24,9 @@
 // (`expiresAt`, `channel`, `decision`) — no new schema is invented:
 //   pending  — no decision file yet, and `now < request.expiresAt`
 //   expired  — no decision file yet, and `now >= request.expiresAt`
-//              (overdue, not yet swept by `ApprovalBroker.expire()`), OR a
-//              decision file exists with `channel === 'ttl-expire'` (swept)
+//              (overdue, not yet swept by `sweepExpired()` / `ApprovalBroker.
+//              expire()`), OR a decision file exists with `channel ===
+//              'ttl-expire'` (swept)
 //   approved — decision file exists, `channel !== 'ttl-expire'`, and
 //              `decision === 'allow'`
 //   denied   — decision file exists, `channel !== 'ttl-expire'`, and
@@ -323,6 +324,71 @@ export class ApprovalStore {
     this.atomicWriteJson(this.decisionFilePath(id), decision);
     this.index();
     return decision;
+  }
+
+  // ─── sweepExpired (read-time TTL sweep) ──────────────────────────────────
+
+  /**
+   * Read-time TTL sweep: re-scan the store and write an HONEST closure decision
+   * for every OVERDUE-yet-undecided request (categorized `expired` with a `null`
+   * decision — its `expiresAt <= now` and no decision file yet). Each decision is
+   * written atomically at the broker-compatible `<id>.decision.json` path and
+   * mirrors the broker's own `expire()` shape — `channel: 'ttl-expire'`,
+   * `decidedBy: 'system'`, `decision` = the request's `defaultAction` — plus the
+   * additive, optional `closureReason: 'expired'` honest-closure marker
+   * (approval-contract.ts). `reason` is left at its `''` default: this mechanism
+   * layer stamps a STRUCTURED marker, never a hardcoded user-facing string.
+   *
+   * Unlike {@link ApprovalBroker.expire}, which only sees requests submitted
+   * through its own in-memory map, this is disk-driven — it closes overdue
+   * requests regardless of which process submitted them.
+   *
+   * Cross-process safe by construction:
+   *  • Atomic tmp+rename write — a concurrent reader never sees a torn decision.
+   *  • Idempotent — the leading re-scan skips any id already decided (by this
+   *    call, a sibling store/broker, or a `deckent approve` CLI), so a repeat
+   *    call never double-decides and returns `[]` once everything is closed.
+   *  • Race-tolerant — if a sibling process wins the write for the same id (or
+   *    `storeDir` vanishes mid-write), the rename/ENOENT error is swallowed and
+   *    that id is simply skipped, never thrown.
+   *
+   * NEVER deletes a request file — deletion is exclusively {@link prune}'s job
+   * (aged, already-decided entries). A sweep only ever WRITES a closure decision,
+   * preserving the honest-closure audit trail.
+   *
+   * Returns the ids this call actually closed (empty if nothing was overdue) so a
+   * caller — NOTIFY-DEDUP cleanup, status reporting, {@link ApprovalExpiryDriver}
+   * — can react to exactly what just closed. Re-indexes the in-memory snapshot
+   * after any write, so a subsequent {@link load}/{@link prune} sees the closures.
+   */
+  sweepExpired(now: Date = new Date()): string[] {
+    this.index(now);
+    const swept: string[] = [];
+    for (const entry of this.snapshot.expired) {
+      if (entry.decision) continue; // already swept/decided — idempotent skip
+      const id = entry.request.id;
+      const result = validateApprovalDecision({
+        requestId: id,
+        decision: entry.request.defaultAction,
+        decidedBy: 'system',
+        channel: 'ttl-expire',
+        decidedAt: now.toISOString(),
+        closureReason: 'expired',
+      });
+      // Built from already-validated request fields — cannot fail; fail-safe skip.
+      if (!result.ok) continue;
+      try {
+        this.atomicWriteJson(this.decisionFilePath(id), result.value);
+        swept.push(id);
+      } catch {
+        // Concurrent-sweep race (rename/ENOENT/EPERM) or storeDir removed
+        // mid-write: a sibling process wrote the same honest closure, or the dir
+        // vanished. Never fatal to a sweep — skip this id (a sibling's sweep
+        // reports it instead); the atomic write left the target untorn either way.
+      }
+    }
+    if (swept.length > 0) this.index(now);
+    return swept;
   }
 
   // ─── prune ──────────────────────────────────────────────────────────────

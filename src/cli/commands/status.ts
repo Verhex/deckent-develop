@@ -11,7 +11,7 @@ import { getCurrentSprintId } from '../../monitor/sprint-state.js';
 import { formatStatus, resolveOutputMode } from '../../core/output-formatter.js';
 import { eventBus } from '../../orchestra/event-bus.js';
 import { StatusRenderer } from '../helpers/status-renderer.js';
-import { readPendingApprovals, type PendingApproval } from '../../core/pending-approvals.js';
+import { readPendingApprovals, sweepRuntimeApprovals, type PendingApproval } from '../../core/pending-approvals.js';
 import { hideCursor, showCursor, clearScreen } from '../helpers/ansi.js';
 
 interface StatusOpts {
@@ -311,6 +311,13 @@ export function buildWorkerCommsSection(root: string, lang: string): string | nu
  * never has to guess what to run. Returns null when nothing is parked.
  */
 export function buildPendingApprovalsSection(root: string, lang: string): string | null {
+  // EXPIRE-SWEEP wiring (Task-1's ApprovalStore.sweepExpired()): sweep the
+  // runtime-wide approval store before the pending list is read, so a
+  // TTL-overdue entry never surfaces as pending here. readPendingApprovals()
+  // already sweeps internally (it is the shared hub every surface reads
+  // through) — this call is redundant-but-harmless (idempotent, fail-soft)
+  // and makes the wiring visible at this named call site too.
+  sweepRuntimeApprovals(root);
   const pending = readPendingApprovals(root);
   if (pending.length === 0) return null;
   const lines: string[] = [getMessage('status.pending_approvals.header', lang, { count: String(pending.length) })];
@@ -330,6 +337,7 @@ export function buildPendingApprovalsSection(root: string, lang: string): string
  * special-case which branch produced it (born-688 contract).
  */
 export function buildNoActiveStatusJson(root: string): { active: false; pendingApprovals: PendingApproval[] } {
+  sweepRuntimeApprovals(root); // see buildPendingApprovalsSection — same redundant-but-harmless sweep
   return {
     active: false,
     pendingApprovals: readPendingApprovals(root),

@@ -10,6 +10,9 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-437-001 | Tech debt from 437-001: EXPIRE-SWEEP çekirdek API implemented across the 3 in-sc | normal | sprint-437 | resolved |
+| debt-437-003 | Tech debt from 437-003: New src/core/approval-notify-dedup.ts: ApprovalNotifyDed | normal | sprint-437 | resolved |
+| debt-437-004 | Tech debt from 437-004: Implemented the honest-expired-decide contract entirely  | normal | sprint-437 | resolved |
 | debt-434-001 | Tech debt from 434-001: packed-install job hardened, scope-limited to .github/wo | normal | sprint-434 | resolved |
 | debt-432-004 | Tech debt from 432-004: Audit: finalizeSprint has exactly ONE call site inside s | normal | sprint-432 | resolved |
 | debt-431-001 | Tech debt from 431-001: Mirrors scripts/lint-no-spawnsync.mjs 1:1: pure exported | normal | sprint-431 | resolved |

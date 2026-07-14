@@ -1,5 +1,15 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-437 Learnings
+- Sprint sprint-437 Learnings: ## Sprint sprint-437 Learnings
+- NOTIFY-DEDUP kalıcı bildirim-state modülü ve relay wiring: GO_WITH_TECH_DEBT — New src/core/approval-notify-dedup.ts: ApprovalNotifyDedup class persists notified request-ids to <storeDir>/.notified.j
+- Dürüst expired-yanıt ve i18n mesaj anahtarları: GO_WITH_TECH_DEBT — Implemented the honest-expired-decide contract entirely additively, decide() itself is byte-for-byte unchanged so the 6+
+
+## Gains
+- 437-001 — EXPIRE-SWEEP çekirdek API — okuma-anı süpürme ve dürüst kapanış kaydı — EXPIRE-SWEEP çekirdek API implemented across the 3 in-scope core files.
+- 437-002 — Okuma-yolu sweep wiring — CLI status ve nervous status ve bot-polling feed — Wired Task-1's ApprovalStore.sweepExpired() into the 3 named read paths, fail-soft, zero signatur...
+- 437-005 — Hermetik entegrasyon test paketi — expired/geçerli/karar-verilmiş ve dedup-restart senaryoları — 3 hermetik entegrasyon test dosyası yazıldı, dört senaryo ailesinin tamamı yeşil (23 yeni test): ...
+
 ## Sprint sprint-435 Learnings
 - Sprint sprint-435 Learnings: ## Sprint sprint-435 Learnings
 

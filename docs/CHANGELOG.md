@@ -9,6 +9,22 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint437] - 2026-07-14
+
+### Added
+
+- EXPIRE-SWEEP çekirdek API — okuma-anı süpürme ve dürüst kapanış kaydı
+- Okuma-yolu sweep wiring — CLI status ve nervous status ve bot-polling feed
+- Hermetik entegrasyon test paketi — expired/geçerli/karar-verilmiş ve dedup-restart senaryoları
+
+### Changed
+
+- NOTIFY-DEDUP kalıcı bildirim-state modülü ve relay wiring (completed with tech debt)
+- Dürüst expired-yanıt ve i18n mesaj anahtarları (completed with tech debt)
+
+
+_Tasks: 7 total, 7 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint435] - 2026-07-13
 
 ### Added

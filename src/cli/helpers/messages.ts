@@ -2463,6 +2463,13 @@ const MESSAGES: MessageMap = {
     en: 'Approval requested for {tool} — tap Approve/Reject on the message above; nothing has run yet.',
     tr: '{tool} için onay istendi — yukarıdaki mesajda Onayla/Reddet butonuna bas; henüz hiçbir şey çalışmadı.',
   },
+  // ApprovalBroker.decideChecked() 'expired' outcome (born-437-004) — a bot-button
+  // press or CLI approve/reject on a request whose TTL already elapsed. No decision
+  // is recorded for this outcome; the user is told honestly instead of silence.
+  'approval.decide.expired': {
+    en: 'This approval request expired at {expiresAt} — no action was taken.',
+    tr: 'Bu onay isteğinin süresi {expiresAt} tarihinde doldu — herhangi bir işlem yapılmadı.',
+  },
 
   // ─── capability: screenshot ──────────────────────────────────────────
   'cap.screenshot.title': {

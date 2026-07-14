@@ -52,6 +52,16 @@ const approvalPolicySchema = z.enum(['auto-approve', 'notify', 'require-approval
  */
 const approvalActionSchema = z.enum(['allow', 'deny', 'defer', 'escalate']);
 
+/**
+ * Additive honest-closure marker — the machine-readable reason a decision was
+ * produced by a SYSTEM-driven closure rather than a human/policy choice. Today the
+ * only such closure is a TTL sweep (`'expired'`); the enum is the extension point
+ * for future system closures. Carried as an OPTIONAL field on ApprovalDecision so
+ * every human/policy decision and every pre-existing (older-format) decision file
+ * — which omit it — still validate unchanged.
+ */
+const closureReasonSchema = z.enum(['expired']);
+
 /** Project-wide ISO 8601 UTC convention (`new Date().toISOString()` output). */
 const isoDateTimeSchema = z.string().datetime();
 
@@ -106,6 +116,11 @@ export const approvalDecisionSchema = z
     channel: z.string().min(1),
     decidedAt: isoDateTimeSchema,
     reason: z.string().default(''),
+    /** Optional structured marker for a system-driven closure (e.g. a TTL sweep
+     *  writes `'expired'`). Absent on human/policy decisions and on older-format
+     *  decision files — never `.default()`ed, so it is only ever present when a
+     *  system closure explicitly stamped it. See {@link closureReasonSchema}. */
+    closureReason: closureReasonSchema.optional(),
   })
   .strict();
 
@@ -120,12 +135,14 @@ export type ApprovalScope = z.infer<typeof approvalScopeSchema>;
 export type ApprovalRisk = z.infer<typeof approvalRiskSchema>;
 export type ApprovalPolicy = z.infer<typeof approvalPolicySchema>;
 export type ApprovalAction = z.infer<typeof approvalActionSchema>;
+export type ClosureReason = z.infer<typeof closureReasonSchema>;
 
 export const ALL_REQUESTER_ROLES = requesterRoleSchema.options;
 export const ALL_APPROVAL_SCOPES = approvalScopeSchema.options;
 export const ALL_APPROVAL_RISKS = approvalRiskSchema.options;
 export const ALL_APPROVAL_POLICIES = approvalPolicySchema.options;
 export const ALL_APPROVAL_ACTIONS = approvalActionSchema.options;
+export const ALL_CLOSURE_REASONS = closureReasonSchema.options;
 
 // ─── Validators (non-throwing, discriminated result) ─────────────────────────
 

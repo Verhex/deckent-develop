@@ -9,6 +9,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { NERVOUS_PENDING_FILE } from './constants.js';
+import { ApprovalStore } from './approval-store.js';
 
 export interface PendingApproval {
   /** Which gate parked this approval. */
@@ -83,6 +84,50 @@ function readAutonomous(projectRoot: string): PendingApproval[] {
   }
 }
 
+// ─── Runtime-wide sweep hook (EXPIRE-SWEEP wiring) ───────────────────────────
+// `readPendingApprovals` is the acknowledged single source of truth every
+// pending-approval surface (`deckent status`, `status --follow`, the dashboard,
+// MCP) reads through — so it is the natural attach point for Task-1's
+// `ApprovalStore.sweepExpired()` disk sweep, even though that sweep targets a
+// SEPARATE store (`.deckent/approvals`, the runtime-wide ApprovalBroker/
+// ApprovalStore, ADR-G-020) from this hub's own nervous/autonomous files. The
+// sweep never filters or reshapes THIS function's return value — no CLI command
+// exists today to accept/reject a runtime-wide entry from this hub's parked
+// list (`deckent nervous accept` resolves against the nervous IPC queue only),
+// so fabricating a merged entry here would show an operator a command that does
+// nothing. The sweep is a fail-soft side effect that keeps the runtime store's
+// OTHER consumers (dashboard `/api/approvals`, the relay, the bot-poll watcher)
+// honest by writing overdue closures on every status/pending read.
+
+/** Narrow sweep-only surface this hook depends on — satisfied structurally by a
+ *  real `ApprovalStore` or a test fake that throws to prove fail-soft. */
+export interface RuntimeApprovalSweepStore {
+  sweepExpired(now?: Date): string[];
+}
+
+function defaultRuntimeApprovalStore(projectRoot: string): RuntimeApprovalSweepStore {
+  return new ApprovalStore(projectRoot);
+}
+
+/**
+ * Sweep the runtime-wide ApprovalStore before a pending-approval read. Fail-soft:
+ * a throwing/broken store is logged via `onSweepError` and swallowed — it must
+ * never block `deckent status`, `deckent watch`, or the dashboard from reading
+ * the durable hub below.
+ */
+export function sweepRuntimeApprovals(
+  projectRoot: string,
+  storeFactory: (root: string) => RuntimeApprovalSweepStore = defaultRuntimeApprovalStore,
+  onSweepError: (error: unknown) => void = (error) =>
+    console.error('[pending-approvals] runtime sweep failed:', error),
+): void {
+  try {
+    storeFactory(projectRoot).sweepExpired();
+  } catch (error) {
+    onSweepError(error);
+  }
+}
+
 /**
  * All currently-parked approvals across surfaces — nervous (`deckent nervous
  * accept/reject`) AND autonomous (`deckent autonomous approve/reject`) — merged
@@ -90,6 +135,7 @@ function readAutonomous(projectRoot: string): PendingApproval[] {
  * dashboard, MCP) shows the SAME unified list with the correct per-kind command.
  */
 export function readPendingApprovals(projectRoot: string): PendingApproval[] {
+  sweepRuntimeApprovals(projectRoot);
   return [...readNervous(projectRoot), ...readAutonomous(projectRoot)];
 }
 

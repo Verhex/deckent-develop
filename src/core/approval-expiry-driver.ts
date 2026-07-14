@@ -1,8 +1,11 @@
 // ─── ApprovalExpiryDriver — TTL sweep + retention prune (APR-EXPIRY-DRIVER) ──
-// Wires ApprovalBroker.expire() (TTL sweep of overdue pending requests) and
-// ApprovalStore.prune() (retention cleanup of already-decided entries) behind
-// a single lifecycle-safe periodic driver. Neither method is otherwise called
-// by production code — this module is the first (and only) caller.
+// Wires the approval TTL sweep + retention prune behind a single lifecycle-safe
+// periodic driver. Each tick() runs, in order: ApprovalBroker.expire() (in-memory
+// TTL close of requests THIS process submitted, resolving their local awaiters),
+// ApprovalStore.sweepExpired() (the AUTHORITATIVE disk sweep — closes every
+// overdue request on disk regardless of submitting process, the cross-process
+// case broker.expire() cannot see), then ApprovalStore.prune() (retention cleanup
+// of already-decided entries). This module is the first production caller of all.
 //
 // ADR-G-013 (Graceful Shutdown & Lifecycle): the periodic interval MUST NOT
 // pin the coordinator process alive on its own — `start()` unref's the timer,
@@ -34,9 +37,10 @@ export interface ApprovalExpiryDriverOptions {
 
 /**
  * Lifecycle-safe periodic sweeper: every `intervalMs`, `tick()` runs
- * `broker.expire()` (TTL sweep) then `store.prune()` (retention cleanup).
- * `start()`/`stop()` are idempotent; `tick()` is exposed directly for tests
- * and for callers that want to force an immediate sweep.
+ * `broker.expire()` (in-memory TTL sweep) then `store.sweepExpired()` (disk TTL
+ * sweep) then `store.prune()` (retention cleanup). `start()`/`stop()` are
+ * idempotent; `tick()` is exposed directly for tests and for callers that want
+ * to force an immediate sweep.
  */
 export class ApprovalExpiryDriver {
   private readonly broker: ApprovalBroker;
@@ -58,23 +62,30 @@ export class ApprovalExpiryDriver {
 
   /**
    * Run a single sweep: TTL-expire due pending requests, then prune decided
-   * entries older than `pruneOlderThanMs`. Fail-soft — any thrown error is
-   * routed to `onTickError` and swallowed; the driver never dies from a
+   * entries older than `pruneOlderThanMs`. Returns the ids closed by the disk
+   * sweep this tick (empty on a no-op or failed tick). Fail-soft — any thrown
+   * error is routed to `onTickError` and swallowed; the driver never dies from a
    * single bad tick.
    *
-   * `store.index(now)` runs between the two — `broker.expire()` writes its
-   * ttl-expire decision files directly to disk (the store has no in-memory
-   * awareness of a sibling broker instance), so the store's snapshot must be
-   * re-scanned before `prune()` can see and act on what was just expired.
+   * Order is deliberate. `broker.expire()` runs FIRST: it TTL-closes requests
+   * this process submitted in-memory and resolves their local awaiters, checking
+   * only its own in-memory decision map — so it must write before the disk sweep
+   * re-scans, else the sweep would re-close an already-closed id. `store
+   * .sweepExpired()` then runs the AUTHORITATIVE disk sweep — it closes every
+   * overdue request on disk regardless of which process submitted it (the
+   * cross-process case `broker.expire()` cannot see) and re-indexes the store, so
+   * `prune()` below acts on a fresh snapshot (no separate `store.index()` needed).
    */
-  tick(): void {
+  tick(): string[] {
     try {
       const now = this.clock();
       this.broker.expire(now);
-      this.store.index(now);
+      const swept = this.store.sweepExpired(now);
       this.store.prune(new Date(now.getTime() - this.pruneOlderThanMs));
+      return swept;
     } catch (error) {
       this.onTickError(error);
+      return [];
     }
   }
 
