@@ -9,8 +9,8 @@ import { createDefaultStats } from './agent-types.js';
 import type { ActivationRule } from './routing-types.js';
 import { createDefaultActivationConfig } from './routing-types.js';
 import { readJsonSafe, debugLog } from './utils.js';
-import { capabilityVectorSchema } from './routing3/capability-vector.js';
-import type { CapabilityVector } from './routing3/capability-vector.js';
+import { capabilityVectorSchema } from './routing/capability-vector.js';
+import type { CapabilityVector } from './routing/capability-vector.js';
 
 // ─── Builtin Fallback (371-001 CATALOG-MATERIALIZE) ─────────────────────────
 //

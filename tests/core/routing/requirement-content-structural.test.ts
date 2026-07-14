@@ -1,4 +1,4 @@
-// tests/core/routing3/requirement-content-structural.test.ts
+// tests/core/routing/requirement-content-structural.test.ts
 //
 // Sprint-445 Task 445-006 — RequirementVector `produceContentStructural`
 // (the governance/deterministic-mode content backbone). Table-driven per
@@ -14,8 +14,8 @@ import {
   produceContentStructural,
   requirementContentSchema,
   type RequirementVocabularySource,
-} from '../../../src/core/routing3/requirement-vector.js';
-import { DEFAULT_ROUTING_V3_CONFIG } from '../../../src/core/routing3/config.js';
+} from '../../../src/core/routing/requirement-vector.js';
+import { DEFAULT_ROUTING_V3_CONFIG } from '../../../src/core/routing/config.js';
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 

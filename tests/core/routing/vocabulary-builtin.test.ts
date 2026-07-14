@@ -7,13 +7,13 @@ import {
   isDeliverableType,
   getWorkTypeDef,
   parseSubtype,
-} from '../../../src/core/routing3/vocabulary-builtin.js';
+} from '../../../src/core/routing/vocabulary-builtin.js';
 import {
   InvalidWorkTypeError,
   InvalidSubtypeError,
-} from '../../../src/core/routing3/types.js';
+} from '../../../src/core/routing/types.js';
 import { DeckentError } from '../../../src/core/errors.js';
-import type { WorkType, DeliverableType } from '../../../src/core/routing3/types.js';
+import type { WorkType, DeliverableType } from '../../../src/core/routing/types.js';
 
 // The exact closed sets the spec §1a/§1c commit to. Kept local so a drift in
 // the vocabulary is caught here rather than tautologically re-derived.

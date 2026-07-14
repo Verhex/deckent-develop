@@ -69,6 +69,8 @@ export interface RouteOptions {
     Promise<ReadonlyMap<string, { score: number; evidence: string[] }>>;
   /** ADR-G-006 force-*: bypasses ranking, NEVER the verifier. */
   forceAgentId?: string;
+  /** Fresh-eyes exclusion (FIX-path reroute): these agents are not candidates. */
+  excludeAgentIds?: readonly string[];
   /** Max skills attached to the decision (V2 convention: 3). */
   maxSkills?: number;
   /** Requirement override (planner may pre-produce vectors; else derived from task). */
@@ -113,8 +115,15 @@ export async function routeTaskV3(
   const provenance: 'deterministic' | 'ai' = options.contentFit ? 'ai' : 'deterministic';
   const workType = parseSubtype(requirement.content.workType).parent;
 
-  // 2 · Eliminate.
-  const { survivors, eliminated } = eliminate(requirement, catalog.agents);
+  // 2 · Eliminate (fresh-eyes exclusions drop out first, story-visible).
+  const excluded = new Set(options.excludeAgentIds ?? []);
+  const candidatePool = excluded.size > 0
+    ? catalog.agents.filter((a) => !excluded.has(a.agentId))
+    : catalog.agents;
+  const { survivors, eliminated } = eliminate(requirement, candidatePool);
+  for (const id of excluded) {
+    eliminated.push({ entityId: id, kind: 'agent', reason: 'policy-denied', detail: 'fresh-eyes exclusion (FIX reroute)' });
+  }
 
   // 3 · Content fit (injected AI in Slice-2, deterministic scorer otherwise).
   const contentScores = new Map<string, { score: number; evidence: string[] }>();

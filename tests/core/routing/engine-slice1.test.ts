@@ -9,35 +9,35 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { eliminate } from '../../../src/core/routing3/stage-eliminate.js';
-import type { AgentCandidate } from '../../../src/core/routing3/stage-eliminate.js';
-import { scoreContentDeterministic, PROFICIENCY_SCORE } from '../../../src/core/routing3/axis-content.js';
-import { scorePositional } from '../../../src/core/routing3/axis-positional.js';
-import { scoreNumerical, NEUTRAL, CELL_MIN_USES } from '../../../src/core/routing3/axis-numerical.js';
-import { rank, calibrateConfidence, TIE_EPSILON } from '../../../src/core/routing3/stage-rank.js';
+import { eliminate } from '../../../src/core/routing/stage-eliminate.js';
+import type { AgentCandidate } from '../../../src/core/routing/stage-eliminate.js';
+import { scoreContentDeterministic, PROFICIENCY_SCORE } from '../../../src/core/routing/axis-content.js';
+import { scorePositional } from '../../../src/core/routing/axis-positional.js';
+import { scoreNumerical, NEUTRAL, CELL_MIN_USES } from '../../../src/core/routing/axis-numerical.js';
+import { rank, calibrateConfidence, TIE_EPSILON } from '../../../src/core/routing/stage-rank.js';
 import {
   verify,
   enforceAntiTemp,
   contentStructuralConflict,
   CatalogGapError,
-} from '../../../src/core/routing3/verifier.js';
-import { loadPolicyPacks, PROJECT_POLICY_PACK_RELATIVE_PATH } from '../../../src/core/routing3/policy-pack.js';
-import { buildStory } from '../../../src/core/routing3/decision-story.js';
+} from '../../../src/core/routing/verifier.js';
+import { loadPolicyPacks, PROJECT_POLICY_PACK_RELATIVE_PATH } from '../../../src/core/routing/policy-pack.js';
+import { buildStory } from '../../../src/core/routing/decision-story.js';
 import {
   appendDecision,
   readSprintJournal,
   replayDecision,
   hashConfig,
   JournalReplayMismatchError,
-} from '../../../src/core/routing3/journal.js';
-import { routeTaskV3 } from '../../../src/core/routing3/route-task-v3.js';
-import type { RouteCatalog, RoutableTask } from '../../../src/core/routing3/route-task-v3.js';
-import { matchSpace } from '../../../src/core/routing3/capability-vector.js';
-import type { CapabilityVector } from '../../../src/core/routing3/capability-vector.js';
-import type { RequirementVector } from '../../../src/core/routing3/requirement-vector.js';
-import { DEFAULT_ROUTING_V3_CONFIG } from '../../../src/core/routing3/config.js';
-import { BUILTIN_DOMAINS } from '../../../src/core/routing3/vocabulary-builtin.js';
-import type { RoutingDecisionV3, JournalEntryV3 } from '../../../src/core/routing3/decision-types.js';
+} from '../../../src/core/routing/journal.js';
+import { routeTaskV3 } from '../../../src/core/routing/route-task-v3.js';
+import type { RouteCatalog, RoutableTask } from '../../../src/core/routing/route-task-v3.js';
+import { matchSpace } from '../../../src/core/routing/capability-vector.js';
+import type { CapabilityVector } from '../../../src/core/routing/capability-vector.js';
+import type { RequirementVector } from '../../../src/core/routing/requirement-vector.js';
+import { DEFAULT_ROUTING_V3_CONFIG } from '../../../src/core/routing/config.js';
+import { BUILTIN_DOMAINS } from '../../../src/core/routing/vocabulary-builtin.js';
+import type { RoutingDecisionV3, JournalEntryV3 } from '../../../src/core/routing/decision-types.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -172,13 +172,18 @@ describe('stage-1 elimination', () => {
     expect(eliminate(reviewReq, [grantedBuilder]).survivors).toHaveLength(1);
   });
 
-  it('deliverable coverage: declared list must cover; code-test implicit for writers', () => {
+  it('deliverable mismatch is SOFT (positional), never a hard elimination (Slice-2 amendment)', () => {
+    // A manifest-writing build task must not produce a false catalog gap just
+    // because no builder enumerates 'manifest' — coverage lowers the
+    // positional score instead of eliminating.
     const docAgent = agent('doc-only', cap({ deliverables: ['doc'] }));
     const r = req({ deliverables: [{ type: 'code-src', ratio: 0.6 }, { type: 'code-test', ratio: 0.4 }] });
-    expect(eliminate(r, [docAgent]).eliminated[0]).toMatchObject({ reason: 'deliverable-uncovered' });
+    expect(eliminate(r, [docAgent]).survivors).toHaveLength(1);
 
     const srcAgent = agent('src-only', cap({ deliverables: ['code-src'] }));
-    expect(eliminate(r, [srcAgent]).survivors).toHaveLength(1); // code-test implicit (writer)
+    const covered = scorePositional(r, matchSpace(srcAgent.capabilities), { knownDomainIds: KNOWN_DOMAINS });
+    const uncovered = scorePositional(r, matchSpace(docAgent.capabilities), { knownDomainIds: KNOWN_DOMAINS });
+    expect(covered.score).toBeGreaterThan(uncovered.score);
   });
 });
 
@@ -526,6 +531,6 @@ describe('decision story', () => {
     });
     expect(story.summary).toContain('Escalated to Brain');
     expect(story.steps.every((s) => s.line.length <= 80)).toBe(true);
-    expect(story.steps.at(-1)?.messageKey).toBe('routing3.story.escalated');
+    expect(story.steps.at(-1)?.messageKey).toBe('routing.story.escalated');
   });
 });

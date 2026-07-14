@@ -2660,7 +2660,7 @@ export async function runFixPhase(
           const { OutcomeTracker } = await import('./outcome-tracker.js');
           const fixTracker = new OutcomeTracker(projectRoot);
           const fixStack = detectProjectStack(projectRoot);
-          const adapter = new MidSprintAdapter(fixPool, fixSkills, fixTracker, fixStack, config);
+          const adapter = new MidSprintAdapter(fixPool, fixSkills, fixTracker, fixStack, config, projectRoot);
           const fixResultsMap = buildResultsMap(results);
 
           for (const fixTask of fixTasks) {
@@ -2668,7 +2668,7 @@ export async function runFixPhase(
               // Find the original failed task's result via O(1) Map lookup
               const originalResult = fixResultsMap.get(fixTask.fixForTaskId);
               if (originalResult) {
-                const rerouteResult = adapter.shouldReroute(fixTask, originalResult);
+                const rerouteResult = await adapter.shouldReroute(fixTask, originalResult);
                 if (rerouteResult.should && rerouteResult.newDecision) {
                   adapter.applyReroute(fixTask, rerouteResult.newDecision);
                   // Persist rerouted task

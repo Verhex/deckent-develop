@@ -1,4 +1,4 @@
-// tests/core/routing3/slice0-smoke.test.ts
+// tests/core/routing/slice0-smoke.test.ts
 //
 // Sprint-445 Task 445-026 — slice-0 integration smoke: the hermetic tmpdir
 // end-to-end gate named in the task's goCriteria (fixture project +
@@ -22,10 +22,10 @@ import { join } from 'node:path';
 
 import { syncAgentCapabilities } from '../../../src/cli/commands/sync.js';
 import { AgentPoolManager } from '../../../src/core/agent-pool.js';
-import { validateCapabilities, type CapabilityVector } from '../../../src/core/routing3/capability-vector.js';
-import { runVocabularyDoctor } from '../../../src/core/routing3/vocabulary-doctor.js';
-import { loadVocabulary, type VocabularyRegistry } from '../../../src/core/routing3/vocabulary.js';
-import { BUILTIN_DOMAINS } from '../../../src/core/routing3/vocabulary-builtin.js';
+import { validateCapabilities, type CapabilityVector } from '../../../src/core/routing/capability-vector.js';
+import { runVocabularyDoctor } from '../../../src/core/routing/vocabulary-doctor.js';
+import { loadVocabulary, type VocabularyRegistry } from '../../../src/core/routing/vocabulary.js';
+import { BUILTIN_DOMAINS } from '../../../src/core/routing/vocabulary-builtin.js';
 import {
   producePositional,
   produceNumerical,
@@ -33,8 +33,8 @@ import {
   requirementVectorSchema,
   type RequirementVector,
   type RequirementVocabularySource,
-} from '../../../src/core/routing3/requirement-vector.js';
-import { DEFAULT_ROUTING_V3_CONFIG } from '../../../src/core/routing3/config.js';
+} from '../../../src/core/routing/requirement-vector.js';
+import { DEFAULT_ROUTING_V3_CONFIG } from '../../../src/core/routing/config.js';
 import { TaskStatus, type Task } from '../../../src/core/task-types.js';
 
 const FIXTURE_AGENT_ID = 'slice0-smoke-fixture-agent';

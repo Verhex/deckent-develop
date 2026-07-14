@@ -21,10 +21,6 @@ import { buildWorkerPrompt } from './task-builder.js';
 import { enrichResultCost, enrichResultTokenUsage, resolveAgentPrompt, resolveSkillPrompts } from './result-collector.js';
 import { eventBus } from './event-bus.js';
 import { TASKS_DIR } from '../core/constants.js';
-import { AgentPoolManager } from '../core/agent-pool.js';
-import { SkillPoolManager } from '../core/skill-pool.js';
-import { detectProjectStack } from '../core/stack-detector.js';
-import { routeTaskV2 } from '../core/routing-engine.js';
 import type { UserOverride } from '../core/routing-types.js';
 import { debugLog, readJsonSafe } from '../core/utils.js';
 import { normalizeTaskResultShape } from '../core/task-result-schema.js';
@@ -200,11 +196,6 @@ export async function runTaskMode(
   try {
     const routingVersion = config.routing_engine ?? 'v2';
     if (routingVersion === 'v2') {
-      const agentPool = new AgentPoolManager(projectRoot);
-      const pool = agentPool.loadAgents();
-      const projectStack = detectProjectStack(projectRoot);
-      const skillPool = new SkillPoolManager(projectRoot);
-      const skills = skillPool.loadSkills();
 
       const overrides: UserOverride[] = [];
       if (task.forceAgent || task.forceSkills || task.excludeSkills || task.excludeAgent) {
@@ -218,21 +209,12 @@ export async function runTaskMode(
         });
       }
 
-      const decision = routeTaskV2(task, pool, skills, {
-        projectStack,
-        overrides,
-        learningData: [],
-        config: { ...config.routing_config, agentMinScore: config.agent_min_score },
-        // ADR-075 (343-007): thread the skill→agent affinity flag. Default-off →
-        // option is false → byte-identical routing (engine already guards on it).
-        skillAgentAffinity: config.routing?.skill_agent_affinity ?? false,
-        sprintId: '',
-        taskId: task.id,
-        projectRoot,
-      });
-
-      task.assignedAgent = decision.agentId ?? 'generic';
-      task.assignedSkills = decision.skillIds;
+      // ROUTING-V3 (S3 cut-over): the V2 engine is retired — single-task
+      // routing goes through the vector pipeline (structural content, no LLM).
+      const { routeSingleTaskV3 } = await import('./routing-plan-adapter.js');
+      const v3 = await routeSingleTaskV3(task, projectRoot);
+      task.assignedAgent = v3.agentId;
+      task.assignedSkills = v3.skillIds;
     }
   } catch (routingErr) {
     debugLog('task-mode:routing', `V2 routing failed, using generic fallback: ${routingErr}`);

@@ -1,4 +1,4 @@
-// tests/core/routing3/requirement-numerical.test.ts
+// tests/core/routing/requirement-numerical.test.ts
 //
 // Sprint-445 Task 445-005 — RequirementVector `produceNumerical`.
 // Table-driven per goCriteria: size-tier thresholds (mirroring
@@ -8,13 +8,13 @@
 
 import { describe, it, expect } from 'vitest';
 import { TaskStatus, type Task, type TaskEffort } from '../../../src/core/task-types.js';
-import type { DomainDef } from '../../../src/core/routing3/types.js';
-import { BUILTIN_DOMAINS } from '../../../src/core/routing3/vocabulary-builtin.js';
+import type { DomainDef } from '../../../src/core/routing/types.js';
+import { BUILTIN_DOMAINS } from '../../../src/core/routing/vocabulary-builtin.js';
 import {
   produceNumerical,
   requirementNumericalSchema,
   type RequirementVocabularySource,
-} from '../../../src/core/routing3/requirement-vector.js';
+} from '../../../src/core/routing/requirement-vector.js';
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 

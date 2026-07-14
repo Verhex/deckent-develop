@@ -9,12 +9,12 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { routeTaskV3 } from '../../../src/core/routing3/route-task-v3.js';
-import type { RouteCatalog, RoutableTask } from '../../../src/core/routing3/route-task-v3.js';
-import type { AgentCandidate } from '../../../src/core/routing3/stage-eliminate.js';
-import { validateCapabilities } from '../../../src/core/routing3/capability-vector.js';
-import { BUILTIN_DOMAINS } from '../../../src/core/routing3/vocabulary-builtin.js';
-import { DEFAULT_ROUTING_V3_CONFIG } from '../../../src/core/routing3/config.js';
+import { routeTaskV3 } from '../../../src/core/routing/route-task-v3.js';
+import type { RouteCatalog, RoutableTask } from '../../../src/core/routing/route-task-v3.js';
+import type { AgentCandidate } from '../../../src/core/routing/stage-eliminate.js';
+import { validateCapabilities } from '../../../src/core/routing/capability-vector.js';
+import { BUILTIN_DOMAINS } from '../../../src/core/routing/vocabulary-builtin.js';
+import { DEFAULT_ROUTING_V3_CONFIG } from '../../../src/core/routing/config.js';
 
 const PROJECT_ROOT = resolve(__dirname, '../../..');
 const BUILTIN_AGENTS_DIR = join(PROJECT_ROOT, 'src', 'core', 'builtins', 'agents');

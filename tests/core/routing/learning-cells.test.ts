@@ -1,4 +1,4 @@
-// tests/core/routing3/learning-cells.test.ts
+// tests/core/routing/learning-cells.test.ts
 //
 // Sprint-446 Task 446-012 — learning-cells sidecar module. Hermetic: every
 // fixture project lives under a throwaway os.tmpdir() sandbox created per
@@ -18,8 +18,8 @@ import {
   CELLS_RELATIVE_PATH,
   RECENT_KEYS_RING_CAP,
   type RecordOutcomeInput,
-} from '../../../src/core/routing3/learning-cells.js';
-import { InvalidWorkTypeError } from '../../../src/core/routing3/types.js';
+} from '../../../src/core/routing/learning-cells.js';
+import { InvalidWorkTypeError } from '../../../src/core/routing/types.js';
 
 const sandboxes: string[] = [];
 

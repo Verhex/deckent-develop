@@ -26,8 +26,8 @@ import { join, resolve } from 'node:path';
 import {
   SKILL_PROFILE_VERSION,
   validateSkillProfile,
-} from '../../../src/core/routing3/capability-vector.js';
-import type { SkillProfile } from '../../../src/core/routing3/capability-vector.js';
+} from '../../../src/core/routing/capability-vector.js';
+import type { SkillProfile } from '../../../src/core/routing/capability-vector.js';
 
 const REAL_SKILLS_DIR = resolve(__dirname, '../../../src/core/builtins/skills');
 const DEFAULT_ENTRYPOINT = 'SKILL.md';
@@ -576,7 +576,7 @@ const BUILTIN_SKILL_PROFILES: Readonly<Record<string, SkillProfile>> = {
 
 // ─── Sweep tests over the real builtin skills tree (read-only) ──────────────────────────────
 
-describe('routing3 builtin skill profiles (sprint-445/445-020)', () => {
+describe('routing builtin skill profiles (sprint-445/445-020)', () => {
   const realIds = listSkillIds(REAL_SKILLS_DIR);
 
   it('enumerates every real builtin skill directory (sanity: sweep is not scanning an empty/wrong tree)', () => {

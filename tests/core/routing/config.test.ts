@@ -1,4 +1,4 @@
-// tests/core/routing3/config.test.ts
+// tests/core/routing/config.test.ts
 // Sprint 445 Task 445-010 — routing_v3 config schema + 3-layer merge.
 // Hermetic: no gitignored state, no disk I/O, no spawn.
 
@@ -10,7 +10,7 @@ import {
   RoutingV3WeightsSumError,
   validateRoutingV3Config,
   resolveRoutingV3Config,
-} from '../../../src/core/routing3/config.js';
+} from '../../../src/core/routing/config.js';
 import { DeckentError } from '../../../src/core/errors.js';
 import type { DeckentConfig, RoutingV3Config } from '../../../src/core/config-types.js';
 

@@ -1483,6 +1483,32 @@ export async function finalizeSprint(
           qualityScore,
           routingVersion: 'v2',
         });
+
+        // ROUTING-V3 learning cells (Slice-2): tasks routed by V3 also feed
+        // the workType×domain×agent cell ledger — PER-TASK DNA by contract
+        // (the tasks[0] class cannot recur), ghost-gated at the source.
+        const v3Meta = (task as unknown as { routingMeta?: { routingVersion?: string; workType?: string } }).routingMeta;
+        if (v3Meta?.routingVersion === 'v3' && task.assignedAgent && evaluation !== TaskEvaluation.DEFERRED) {
+          try {
+            const { recordOutcome: recordCell } = await import('../core/routing/learning-cells.js');
+            const { producePositional } = await import('../core/routing/requirement-vector.js');
+            const { loadVocabulary } = await import('../core/routing/vocabulary.js');
+            const vocabulary = await loadVocabulary(projectRoot);
+            const positional = producePositional(task, { domains: vocabulary.domains });
+            const dominantDomain = [...positional.domains].sort((a, b) => b.weight - a.weight)[0]?.id ?? 'core-runtime';
+            recordCell(projectRoot, {
+              taskId: task.id,
+              sprintId: sprint.id,
+              workType: (v3Meta.workType ?? 'build') as import('../core/routing/types.js').WorkType,
+              domain: dominantDomain,
+              agentId: task.assignedAgent,
+              verdict: evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
+              quality: qualityScore ?? 50,
+            });
+          } catch (e) {
+            debugLog('finalizeSprint:routing-cells', e);
+          }
+        }
       }
       debugLog('finalizeSprint:routing-outcomes', `Recorded ${sprint.tasks.length} routing outcomes to learnings.json`);
     }

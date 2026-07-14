@@ -8,7 +8,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { syncAgentCapabilities } from '../../src/cli/commands/sync.js';
-import { validateCapabilities } from '../../src/core/routing3/capability-vector.js';
+import { validateCapabilities } from '../../src/core/routing/capability-vector.js';
 
 let root: string;
 

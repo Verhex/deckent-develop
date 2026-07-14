@@ -4,8 +4,8 @@ import {
   capabilityVectorSchema,
   validateCapabilities,
   hasTestCapability,
-} from '../../../src/core/routing3/capability-vector.js';
-import type { CapabilityVector } from '../../../src/core/routing3/capability-vector.js';
+} from '../../../src/core/routing/capability-vector.js';
+import type { CapabilityVector } from '../../../src/core/routing/capability-vector.js';
 
 // A full, spec-faithful valid example (§2b canonical shape).
 function validExample(): CapabilityVector {

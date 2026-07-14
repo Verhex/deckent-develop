@@ -11,7 +11,7 @@ import { syncBuiltinAgentManifests } from '../../core/agent-manifest-sync.js';
 import type { AgentManifestSyncReport } from '../../core/agent-manifest-sync.js';
 import type { AgentPromptSyncReport } from '../../core/agent-prompt-sync.js';
 import { migrateManifestV2toV3 } from '../../core/manifest-migrator.js';
-import { BUILTIN_DOMAINS } from '../../core/routing3/vocabulary-builtin.js';
+import { BUILTIN_DOMAINS } from '../../core/routing/vocabulary-builtin.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';

@@ -243,10 +243,10 @@ export function registerAgent(program: Command): void {
         const root = resolveProjectRoot();
         const lang = getLanguage();
         const { AgentPoolManager } = await import('../../core/agent-pool.js');
-        const { loadVocabulary } = await import('../../core/routing3/vocabulary.js');
-        const { lintCatalog } = await import('../../core/routing3/agent-lint.js');
-        const { resolveRoutingV3Config } = await import('../../core/routing3/config.js');
-        const { validateCapabilities } = await import('../../core/routing3/capability-vector.js');
+        const { loadVocabulary } = await import('../../core/routing/vocabulary.js');
+        const { lintCatalog } = await import('../../core/routing/agent-lint.js');
+        const { resolveRoutingV3Config } = await import('../../core/routing/config.js');
+        const { validateCapabilities } = await import('../../core/routing/capability-vector.js');
         type LintCandidate = Parameters<typeof lintCatalog>[0][number];
 
         const pool = new AgentPoolManager(root).loadAgents();

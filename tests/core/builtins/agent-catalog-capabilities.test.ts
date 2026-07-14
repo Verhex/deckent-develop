@@ -18,9 +18,9 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { validateCapabilities } from '../../../src/core/routing3/capability-vector.js';
-import type { CapabilityVector, WorkTypeEntry } from '../../../src/core/routing3/capability-vector.js';
-import { isDomainId } from '../../../src/core/routing3/vocabulary-builtin.js';
+import { validateCapabilities } from '../../../src/core/routing/capability-vector.js';
+import type { CapabilityVector, WorkTypeEntry } from '../../../src/core/routing/capability-vector.js';
+import { isDomainId } from '../../../src/core/routing/vocabulary-builtin.js';
 
 const PROJECT_ROOT = resolve(__dirname, '../../..');
 const BUILTINS_DIR = resolve(PROJECT_ROOT, 'src/core/builtins/agents');

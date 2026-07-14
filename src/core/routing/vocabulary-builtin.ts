@@ -115,7 +115,7 @@ export const DELIVERABLE_TYPES: readonly DeliverableType[] = [
 // (user/org-defined) on top of this at runtime — this module owns ONLY the
 // product-shipped base. Every pathPatterns entry below is grounded in a real
 // path that exists in THIS repo (verified by grep at authoring time; pinned
-// by tests/core/routing3/vocabulary-domains.test.ts against a fixture list),
+// by tests/core/routing/vocabulary-domains.test.ts against a fixture list),
 // plus generic patterns so the same builtin base is useful in foreign
 // projects that do not share deckent's own layout.
 export const BUILTIN_DOMAINS: readonly DomainDef[] = [

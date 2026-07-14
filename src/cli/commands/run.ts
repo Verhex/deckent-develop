@@ -44,10 +44,6 @@ function sleep(ms: number): Promise<void> {
 }
 
 import { readJsonSafe, debugLog } from '../../core/utils.js';
-import { AgentPoolManager } from '../../core/agent-pool.js';
-import { SkillPoolManager } from '../../core/skill-pool.js';
-import { detectProjectStack } from '../../core/stack-detector.js';
-import { routeTaskV2 } from '../../core/routing-engine.js';
 import type { UserOverride } from '../../core/routing-types.js';
 import { normalizeTaskResultShape } from '../../core/task-result-schema.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
@@ -299,11 +295,6 @@ export function registerRun(program: Command): void {
       try {
         const routingVersion = cfg?.routing_engine ?? 'v2';
         if (routingVersion === 'v2') {
-          const agentPool = new AgentPoolManager(root);
-          const pool = agentPool.loadAgents();
-          const projectStack = detectProjectStack(root);
-          const skillPool = new SkillPoolManager(root);
-          const skills = skillPool.loadSkills();
 
           const overrides: UserOverride[] = [];
           if (task.forceAgent || task.forceSkills || task.excludeSkills || task.excludeAgent) {
@@ -317,21 +308,11 @@ export function registerRun(program: Command): void {
             });
           }
 
-          const decision = routeTaskV2(task, pool, skills, {
-            projectStack,
-            overrides,
-            learningData: [],
-            config: cfg ? { ...cfg.routing_config, agentMinScore: cfg.agent_min_score } : undefined,
-            // ADR-075 (343-007): thread the skill→agent affinity flag. Default-off →
-            // option is false → byte-identical routing (engine already guards on it).
-            skillAgentAffinity: cfg?.routing?.skill_agent_affinity ?? false,
-            sprintId: '',
-            taskId: task.id,
-            projectRoot: root,
-          });
-
-          task.assignedAgent = decision.agentId ?? 'generic';
-          task.assignedSkills = decision.skillIds;
+          // ROUTING-V3 (S3 cut-over): vector pipeline, structural content.
+          const { routeSingleTaskV3 } = await import('../../orchestra/routing-plan-adapter.js');
+          const v3 = await routeSingleTaskV3(task, root);
+          task.assignedAgent = v3.agentId;
+          task.assignedSkills = v3.skillIds;
         }
       } catch (routingErr) {
         debugLog('run:routing', `V2 routing failed, using generic fallback: ${routingErr}`);

@@ -89,20 +89,13 @@ export function eliminate(
       continue;
     }
 
-    // 4 · Deliverable coverage: when the candidate DECLARES a deliverable list,
-    //     every requirement deliverable must be covered. An empty declaration
-    //     means "undeclared" (no constraint), never "covers nothing".
-    if (cap.positional.deliverables.length > 0) {
-      const covered = new Set(cap.positional.deliverables);
-      const missing = requirement.positional.deliverables
-        .filter((d) => d.ratio > 0 && !covered.has(d.type) && !isImplicitDeliverable(cap, d.type))
-        .map((d) => d.type);
-      if (missing.length > 0) {
-        eliminated.push(out(candidate.agentId, 'deliverable-uncovered',
-          `deliverables not covered: ${missing.join(', ')}`));
-        continue;
-      }
-    }
+    // NOTE (Slice-2 amendment): deliverable coverage is deliberately NOT a
+    // hard filter. A declared deliverable list is an identity signal ("what I
+    // typically produce"), not an exhaustive refusal — hard-eliminating on it
+    // produced false catalog-gaps (a manifest-writing build task eliminated
+    // every builder because none enumerated 'manifest'). Coverage is scored
+    // SOFTLY on the positional axis (axis-positional.ts); the genuinely
+    // disqualifying constraints remain the three filters above.
 
     survivors.push(candidate);
   }
@@ -122,9 +115,9 @@ function hasExplicitGrant(cap: CapabilityVector, workType: string): boolean {
 
 /**
  * Universal test capability (Alperen decision, taxonomy §4): every
- * Write-authorized agent carries implicit code-test competence — code-test is
- * never a coverage gap for a writer.
+ * Write-authorized agent carries implicit code-test competence. Consumed by
+ * the positional coverage scorer's callers; kept exported for lint/doctor use.
  */
-function isImplicitDeliverable(cap: CapabilityVector, type: string): boolean {
+export function isImplicitDeliverable(cap: CapabilityVector, type: string): boolean {
   return type === 'code-test' && cap.positional.writeAuthority;
 }

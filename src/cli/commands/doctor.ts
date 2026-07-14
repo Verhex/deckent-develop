@@ -55,7 +55,7 @@ import {
 import { detectEnvironment } from '../../core/environment.js';
 import { loadDeckSecrets, validateDeckFile, KNOWN_DECK_KEYS } from '../../core/deck-file.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
-import { runVocabularyDoctor, type VocabularyDoctorReport } from '../../core/routing3/vocabulary-doctor.js';
+import { runVocabularyDoctor, type VocabularyDoctorReport } from '../../core/routing/vocabulary-doctor.js';
 
 export function isRunningInWSL(): boolean {
   // Check WSL environment variable (set by WSL2 interop)

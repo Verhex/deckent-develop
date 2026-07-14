@@ -1,10 +1,10 @@
-// tests/core/routing3/vocabulary-doctor.test.ts
+// tests/core/routing/vocabulary-doctor.test.ts
 //
 // Sprint-445 Task 445-021 — vocabulary doctor checks (layer shadowing, dead
 // pathPatterns, duplicate aliases, domains missing a description). Hermetic:
 // every fixture lives under a throwaway os.tmpdir() sandbox created per test
 // and removed in afterEach — same pattern as
-// tests/core/routing3/vocabulary-loader.test.ts (CUSTOM Test Hermeticity).
+// tests/core/routing/vocabulary-loader.test.ts (CUSTOM Test Hermeticity).
 //
 // Design note: BUILTIN_DOMAINS (vocabulary-builtin.ts) is always merged in by
 // loadVocabulary and is NOT injectable, so a truly "all four categories
@@ -19,10 +19,10 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { runVocabularyDoctor } from '../../../src/core/routing3/vocabulary-doctor.js';
-import { BUILTIN_DOMAINS } from '../../../src/core/routing3/vocabulary-builtin.js';
+import { runVocabularyDoctor } from '../../../src/core/routing/vocabulary-doctor.js';
+import { BUILTIN_DOMAINS } from '../../../src/core/routing/vocabulary-builtin.js';
 import { formatVocabularyDoctorLines } from '../../../src/cli/commands/doctor.js';
-import type { VocabularyDoctorReport } from '../../../src/core/routing3/vocabulary-doctor.js';
+import type { VocabularyDoctorReport } from '../../../src/core/routing/vocabulary-doctor.js';
 
 const sandboxes: string[] = [];
 

@@ -6,8 +6,6 @@
 import type { Task, TaskResult, EvaluationResult } from '../core/task-types.js';
 import type { AgentPool } from '../core/agent-types.js';
 import type { SkillDefinition } from '../core/skill-types.js';
-import type { RoutingDecision, UserOverride, TaskDNA } from '../core/routing-types.js';
-import { routeTaskV2, type RoutingOptions } from '../core/routing-engine.js';
 import { enforceModelTierGuard } from '../core/model-tier-guard.js';
 import { getModelProvider } from '../core/model-equivalence.js';
 import { modelRegistry } from '../core/model-registry.js';
@@ -21,10 +19,18 @@ import { spawn } from 'node:child_process';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
+/** V3-mapped reroute decision surface (legacy confidence tiers preserved). */
+export interface RerouteDecision {
+  agentId: string;
+  skillIds: string[];
+  agentConfidence: 'high' | 'medium' | 'low';
+  skillConfidence: 'high' | 'medium' | 'low';
+}
+
 export interface RerouteResult {
   should: boolean;
   reason: string;
-  newDecision?: RoutingDecision;
+  newDecision?: RerouteDecision;
 }
 
 // ─── Rate-Limit Failover ─────────────────────────────────────────────────────
@@ -113,25 +119,20 @@ export type { OverflowResolution as RateLimitFailoverResolution };
 // ─── MidSprintAdapter ───────────────────────────────────────────────────────
 
 export class MidSprintAdapter {
-  private readonly agentPool: AgentPool;
-  private readonly skillPool: Map<string, SkillDefinition>;
-  private readonly outcomeTracker: OutcomeTracker;
-  private readonly projectStack: { language: string; framework: string; dependencies: string[] } | null;
+  private readonly projectRoot: string;
   private readonly rerouteAttempts = new Map<string, number>(); // taskId → attempt count
   private readonly maxReroutesPerTask: number;
   private readonly rerouteOnTechDebt: boolean;
 
   constructor(
-    agentPool: AgentPool,
-    skillPool: Map<string, SkillDefinition>,
-    outcomeTracker: OutcomeTracker,
-    projectStack?: { language: string; framework: string; dependencies: string[] } | null,
+    _agentPool: AgentPool,
+    _skillPool: Map<string, SkillDefinition>,
+    _outcomeTracker: OutcomeTracker,
+    _projectStack?: { language: string; framework: string; dependencies: string[] } | null,
     config?: Pick<ResolvedConfig, 'max_reroutes' | 'reroute_on_tech_debt'>,
+    projectRoot?: string,
   ) {
-    this.agentPool = agentPool;
-    this.skillPool = skillPool;
-    this.outcomeTracker = outcomeTracker;
-    this.projectStack = projectStack ?? null;
+    this.projectRoot = projectRoot ?? process.cwd();
     this.maxReroutesPerTask = config?.max_reroutes ?? 3;
     this.rerouteOnTechDebt = config?.reroute_on_tech_debt ?? false;
   }
@@ -139,7 +140,7 @@ export class MidSprintAdapter {
   /**
    * Check if rerouting is advisable for a failed task.
    */
-  shouldReroute(task: Task, result: TaskResult): RerouteResult {
+  async shouldReroute(task: Task, result: TaskResult): Promise<RerouteResult> {
     // Reroute NO_GO tasks, and optionally GO_WITH_TECH_DEBT tasks
     if (result.selfAssessment === 'GO_WITH_TECH_DEBT' && !this.rerouteOnTechDebt) {
       return { should: false, reason: 'Task has tech debt but reroute_on_tech_debt is disabled' };
@@ -155,7 +156,7 @@ export class MidSprintAdapter {
     }
 
     // Attempt reroute with failed agent/skills excluded
-    const newDecision = this.suggestReroute(task);
+    const newDecision = await this.suggestReroute(task);
     if (!newDecision) {
       return { should: false, reason: 'No alternative routing found' };
     }
@@ -196,48 +197,36 @@ export class MidSprintAdapter {
    * Suggest an alternative routing for a failed task.
    * Excludes the previously failed agent and skills.
    */
-  suggestReroute(task: Task): RoutingDecision | null {
+  async suggestReroute(task: Task): Promise<RerouteDecision | null> {
     try {
-      // Build exclusions from failed assignment
-      const overrides: UserOverride[] = [];
-
-      const excludeAgents: string[] = [];
-      const excludeSkills: string[] = [];
-
-      // Exclude the failed agent
+      // Fresh-eyes exclusions (ADR-G-006 FIX-path semantics, V3-native):
+      // the failed agent never re-wins its own retry.
+      const excludeAgentIds: string[] = [];
       if (task.assignedAgent && task.assignedAgent !== 'generic') {
-        excludeAgents.push(task.assignedAgent);
+        excludeAgentIds.push(task.assignedAgent);
       }
+      if (task.excludeAgent) excludeAgentIds.push(...task.excludeAgent);
 
-      // Exclude failed skills
-      if (task.assignedSkills && task.assignedSkills.length > 0) {
-        excludeSkills.push(...task.assignedSkills);
-      }
-
-      // Also include any existing user overrides
-      if (task.excludeSkills) excludeSkills.push(...task.excludeSkills);
-      if (task.excludeAgent) excludeAgents.push(...task.excludeAgent);
-
-      overrides.push({
-        source: 'task-directive',
-        excludeAgents,
-        excludeSkills,
-        priority: 3,
+      const { routeTasksV3ForPlan } = await import('./routing-plan-adapter.js');
+      const { resolveRoutingV3Config } = await import('../core/routing/config.js');
+      const probe = { ...task } as Task; // never mutate the live task on a probe
+      const v3Config = resolveRoutingV3Config(null, {});
+      const result = await routeTasksV3ForPlan([probe], this.projectRoot, v3Config, {
+        journal: false,
+        excludeAgentIds,
       });
-
-      // Get learning bonuses for this task's DNA
-      const routingMeta = task.routingMeta;
-      const learningData = routingMeta?.taskDNA
-        ? this.outcomeTracker.calculateBonuses(routingMeta.taskDNA as TaskDNA)
-        : [];
-
-      const options: RoutingOptions = {
-        projectStack: this.projectStack,
-        overrides,
-        learningData,
+      void result;
+      if (!probe.assignedAgent) return null;
+      const meta = (probe as unknown as { routingMeta?: { confidence?: number } }).routingMeta;
+      const confidence = meta?.confidence ?? 0;
+      return {
+        agentId: probe.assignedAgent,
+        skillIds: probe.assignedSkills ?? [],
+        // V3 confidence is calibrated 0-1; map to the legacy tiers the
+        // shouldReroute gate consumes.
+        agentConfidence: confidence >= 0.75 ? 'high' : confidence >= 0.6 ? 'medium' : 'low',
+        skillConfidence: (probe.assignedSkills?.length ?? 0) > 0 ? 'medium' : 'low',
       };
-
-      return routeTaskV2(task, this.agentPool, this.skillPool, options);
     } catch (err) {
       debugLog('mid-sprint-adapter:reroute', err);
       return null;
@@ -265,13 +254,12 @@ export class MidSprintAdapter {
   /**
    * Apply a reroute decision to a task (mutates task in place).
    */
-  applyReroute(task: Task, decision: RoutingDecision): void {
-    task.assignedAgent = decision.agentId ?? 'generic';
+  applyReroute(task: Task, decision: RerouteDecision): void {
+    task.assignedAgent = decision.agentId;
     task.assignedSkills = decision.skillIds;
     task.routingMeta = {
-      taskDNA: decision.taskDNA,
       confidence: decision.agentConfidence,
-      routingVersion: 'v2',
+      routingVersion: 'v2', // field union widens to 'v3' at the type-level cut (S3 wave-4)
     };
 
     // MODEL-GUARD: re-routing must NOT leave a code-development task on an

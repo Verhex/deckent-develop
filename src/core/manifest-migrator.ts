@@ -5,8 +5,8 @@
 import type { AgentDefinition } from './agent-types.js';
 import type { SkillDefinition } from './skill-types.js';
 import { migrateV1AgentToActivation, migrateV1SkillToActivation } from './activation-engine.js';
-import type { DomainDef, Proficiency, WorkType, DeliverableType } from './routing3/types.js';
-import { CAPABILITIES_VERSION, type CapabilityVector } from './routing3/capability-vector.js';
+import type { DomainDef, Proficiency, WorkType, DeliverableType } from './routing/types.js';
+import { CAPABILITIES_VERSION, type CapabilityVector } from './routing/capability-vector.js';
 import { inferTierFromId } from './model-registry.js';
 
 /**
@@ -135,7 +135,7 @@ const BUILTIN_AGENT_DOMAINS_V2: Readonly<Record<string, string>> = {
 // V2 `AgentDomain` → routing3 domain-registry id (spec §1b builtin-base ids in
 // vocabulary-builtin.ts). 'test' maps to the CI domain (ci-guardian's home);
 // there is no dedicated test-domain in routing3 (test is a deliverable/capability).
-const AGENT_DOMAIN_TO_ROUTING3: Readonly<Record<string, string>> = {
+const AGENT_DOMAIN_TO_ROUTING: Readonly<Record<string, string>> = {
   cli: 'cli/terminal',
   react: 'frontend',
   system: 'core/runtime',
@@ -303,11 +303,11 @@ export function migrateManifestV2toV3(
       ? m.domain
       : BUILTIN_AGENT_DOMAINS_V2[manifestId];
     if (rawAgentDomain) {
-      const routing3Domain = AGENT_DOMAIN_TO_ROUTING3[rawAgentDomain];
-      if (routing3Domain) {
-        mergeProficiency(domainProf, routing3Domain, 'primary');
+      const routingDomain = AGENT_DOMAIN_TO_ROUTING[rawAgentDomain];
+      if (routingDomain) {
+        mergeProficiency(domainProf, routingDomain, 'primary');
       } else {
-        issues.push({ code: 'unknown-domain', message: `V2 agent domain '${rawAgentDomain}' has no routing3 mapping`, manifestId });
+        issues.push({ code: 'unknown-domain', message: `V2 agent domain '${rawAgentDomain}' has no routing-domain mapping`, manifestId });
       }
     }
 

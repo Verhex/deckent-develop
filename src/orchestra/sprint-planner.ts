@@ -107,11 +107,9 @@ import { detectDeadlocks } from '../monitor/auditor.js';
 
 // ─── Agent Pool & Selection ──────────────────────────────────────
 import { AgentPoolManager } from '../core/agent-pool.js';
-import { routeTaskV2, resolveEffortTier } from '../core/routing-engine.js';
-import type { UserOverride } from '../core/routing-types.js';
+import { resolveEffortTier } from '../core/routing-engine.js';
 import {
   InMemoryAgentSelectionSink,
-  recordAgentSelection,
   summarizeAgentDistribution,
 } from '../core/routing-affinity-observability.js';
 
@@ -708,117 +706,63 @@ export async function planSprint(
     const affinitySink = new InMemoryAgentSelectionSink();
     const skillAgentAffinity = config.routing?.skill_agent_affinity ?? false;
 
-    for (const task of tasks) {
-      try {
-        const overrides: UserOverride[] = [];
-        if (task.forceAgent || task.forceSkills || task.excludeSkills || task.excludeAgent) {
-          overrides.push({
-            source: 'task-directive',
-            forceAgent: task.forceAgent,
-            forceSkills: task.forceSkills,
-            excludeSkills: task.excludeSkills,
-            excludeAgents: task.excludeAgent,
-            priority: 3,
-          });
-        }
+    // ─── ROUTING-V3 branch (Slice-2 integration; default OFF until Slice-3) ──
+    // When routing_v3.enabled, every task routes through the vector pipeline:
+    // one LLM batch enriches the content axis, matching stays deterministic,
+    // escalations/catalog-gaps surface on the plan (decision-5 — never silent).
+    // The V2 loop below remains byte-identical production behavior otherwise.
+    // S3 CUT-OVER: V3 is THE routing engine — unconditional. The V2 loop and
+    // its enabled-gate are gone (Alperen 2026-07-15: "v2'yi tamamen kaldır").
+    {
+      const { routeTasksV3ForPlan } = await import('./routing-plan-adapter.js');
+      const { resolveRoutingV3Config } = await import('../core/routing/config.js');
+      const v3Config = resolveRoutingV3Config(null, config as Parameters<typeof resolveRoutingV3Config>[1]);
 
-        const decision = routeTaskV2(task, pool, skillsV2, {
-          projectStack: projectStackV2,
-          overrides,
-          learningData,
-          config: { ...config.routing_config, agentMinScore: config.agent_min_score },
-          // ADR-075 (343-007): thread the skill→agent affinity flag. Default-off →
-          // option is false → byte-identical routing (engine already guards on it).
-          skillAgentAffinity,
-          sprintId,
-          taskId: task.id,
-          projectRoot,
-        });
+      // One-shot completion over the same provider machinery the AI planner
+      // uses (governance mode = no completion → structural content).
+      const completeFn =
+        v3Config.governanceMode === 'ai'
+          ? async (prompt: string): Promise<string> => {
+              const { spawnSync: spawn } = await import('node:child_process');
+              const { resolveAdapter, buildPlannerSpawnArgs } = await import('./planner.js');
+              const adapter = resolveAdapter(undefined, 'sonnet');
+              const cmd = buildPlannerSpawnArgs(adapter, prompt, 'sonnet');
+              const run = spawn(cmd.command, cmd.args, { encoding: 'utf-8', timeout: 120_000 });
+              if (run.status !== 0 || !run.stdout) {
+                throw new Error(`content-batch completion failed (provider=${adapter.name}, status=${run.status})`);
+              }
+              return run.stdout;
+            }
+          : undefined;
 
-        task.assignedAgent = decision.agentId ?? 'generic';
-        task.assignedSkills = decision.skillIds;
+      const v3Result = await routeTasksV3ForPlan(tasks, projectRoot, v3Config, {
+        ...(completeFn ? { complete: completeFn } : {}),
+        sprintId,
+      });
 
-        // Routing-balance observability — the affinity reasoning line is emitted
-        // only for the WINNING agent that actually received the bonus, so its
-        // presence is a faithful per-task "affinity influenced this choice" signal.
-        recordAgentSelection(affinitySink, {
-          taskId: task.id,
-          agentId: task.assignedAgent,
-          affinityApplied: decision.reasoning.some((r) => r.includes('skill-affinity:')),
-        });
-        task.routingMeta = {
-          taskDNA: decision.taskDNA,
-          confidence: decision.agentConfidence,
-          routingVersion: 'v2',
-          ...(decision.overrideWarnings && decision.overrideWarnings.length > 0
-            ? { overrideWarnings: decision.overrideWarnings }
-            : {}),
-        };
+      for (const esc of v3Result.escalations) {
+        const line =
+          `${esc.taskId} escalated (${esc.reason}): ${esc.detail}` +
+          (esc.candidates.length > 0
+            ? ` — candidates: ${esc.candidates.map((c) => `${c.agentId}@${c.finalScore.toFixed(2)}`).join(', ')}`
+            : '');
+        debugLog('planSprint:routing-v3-escalation', line);
+        void notify('phase-change', sprintId, '[Brain] routing-v3:escalation', line);
+      }
+      for (const fb of v3Result.contentFallbacks) {
+        debugLog('planSprint:routing-v3', `content fallback for ${fb.taskId}: ${fb.reason}`);
+      }
 
-        if (decision.overrideWarnings && decision.overrideWarnings.length > 0) {
-          for (const w of decision.overrideWarnings) {
-            debugLog('planSprint:override-warning', `[${task.id}] ${w}`);
-          }
-        }
-
-        // Persist decision trail via DecisionLogger — only for v2 routing with meaningful steps
-        try {
-          const { DecisionLogger, filterMeaningfulSteps } = await import('./decision-logger.js');
-          const decisionLogger = new DecisionLogger(projectRoot);
-          const allEntries = decision.reasoning.map((r, i) => ({
-            step: i + 1,
-            name: `routing-step-${i + 1}`,
-            input: {
-              taskId: task.id,
-              title: task.title,
-              scope: task.scope.directories,
-              intent: decision.taskDNA.intent.primary,
-            } as Record<string, unknown>,
-            output: {
-              agent: decision.agentId ?? 'generic',
-              skills: decision.skillIds,
-              confidence: decision.agentConfidence,
-            } as Record<string, unknown>,
-            durationMs: 0,
-            reasoning: r,
-          }));
-          const meaningful = filterMeaningfulSteps(allEntries);
-          // Only write log if there are meaningful steps
-          if (meaningful.length > 0) {
-            decisionLogger.log(sprintId, task.id, meaningful);
-          }
-        } catch (logErr) {
-          debugLog('planSprint:decision-trail', logErr);
-        }
-
-        debugLog(
-          'planSprint:routing-v2',
-          `Task ${task.id} → agent=${task.assignedAgent}, skills=[${task.assignedSkills.join(', ')}], ` +
-          `confidence=${decision.agentConfidence}, intent=${decision.taskDNA.intent.primary}`,
+      const unassigned = tasks.filter((t) => !t.assignedAgent);
+      if (unassigned.length > 0) {
+        throw new BrainError(
+          `ROUTING-V3 catalog gap: ${unassigned.map((t) => t.id).join(', ')} have no capable agent. ` +
+            `Run \`deckent agent lint\` for the gap map; author/widen a capability or adjust the tasks. ` +
+            `(Honest gap — the V2 fallback chain is retired.)`,
         );
-        // Observability: surface routeTaskV2's skill scoring rationale (why these
-        // skills won / whether the floor fired) so the live plan path is debuggable
-        // without re-deriving it in isolation. Dev-only (DECKENT_DEBUG).
-        debugLog(
-          'planSprint:routing-v2-skills',
-          `Task ${task.id} skill reasoning: ` +
-          decision.reasoning
-            .filter(r => /skill|floor|budget|bonus|threshold|mismatch|excluded/i.test(r))
-            .join(' | '),
-        );
-      } catch (taskErr) {
-        // born-641 (2026-07-11): this swallow hid a total plan-time routing
-        // collapse for ~10 days (secure-coding manifest TypeError killed V2
-        // routing for EVERY task; assignments silently degraded to the
-        // spawn-time path). A routing failure must stay non-fatal, but it must
-        // be OPERATOR-VISIBLE, not debug-only.
-        console.warn(
-          `[deckent] WARN: V2 routing failed for task ${task.id} — assignment falls back ` +
-          `(agent quality degraded). Cause: ${taskErr instanceof Error ? taskErr.message : String(taskErr)}`,
-        );
-        debugLog('planSprint:routing-v2', `V2 routing failed for task ${task.id}: ${taskErr}`);
       }
     }
+
 
     // ADR-075 routing-balance gate (343-007): surface the agent-distribution
     // snapshot (counts per agent + % affinity-influenced) for the dogfood

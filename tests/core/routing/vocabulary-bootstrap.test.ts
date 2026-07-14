@@ -1,4 +1,4 @@
-// tests/core/routing3/vocabulary-bootstrap.test.ts
+// tests/core/routing/vocabulary-bootstrap.test.ts
 //
 // Sprint-445 Task 445-022 — vocabulary bootstrap generator. Hermetic: every
 // fixture project lives under a throwaway os.tmpdir() sandbox created per
@@ -13,10 +13,10 @@ import { join } from 'node:path';
 import {
   bootstrapProjectVocabulary,
   writeVocabulary,
-} from '../../../src/core/routing3/vocabulary-bootstrap.js';
-import { PROJECT_VOCABULARY_RELATIVE_PATH } from '../../../src/core/routing3/vocabulary.js';
+} from '../../../src/core/routing/vocabulary-bootstrap.js';
+import { PROJECT_VOCABULARY_RELATIVE_PATH } from '../../../src/core/routing/vocabulary.js';
 import type { ProjectStack } from '../../../src/core/skill-types.js';
-import type { DomainDef } from '../../../src/core/routing3/types.js';
+import type { DomainDef } from '../../../src/core/routing/types.js';
 
 const sandboxes: string[] = [];
 

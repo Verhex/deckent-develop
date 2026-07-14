@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { recordOutcome, readCellsSnapshot } from '../../../src/core/routing3/learning-cells.js';
+import { recordOutcome, readCellsSnapshot } from '../../../src/core/routing/learning-cells.js';
 
 function withTmpRoot(fn: (root: string) => void): void {
   const root = mkdtempSync(join(tmpdir(), 'r3-ghost-'));

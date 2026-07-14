@@ -1,4 +1,4 @@
-// tests/core/routing3/vocabulary-loader.test.ts
+// tests/core/routing/vocabulary-loader.test.ts
 //
 // Sprint-445 Task 445-003 — vocabulary 3-layer registry loader. Hermetic:
 // every layer file lives under a throwaway os.tmpdir() sandbox created per
@@ -13,8 +13,8 @@ import {
   loadVocabulary,
   PROJECT_VOCABULARY_RELATIVE_PATH,
   VocabularyLayerParseError,
-} from '../../../src/core/routing3/vocabulary.js';
-import { BUILTIN_DOMAINS } from '../../../src/core/routing3/vocabulary-builtin.js';
+} from '../../../src/core/routing/vocabulary.js';
+import { BUILTIN_DOMAINS } from '../../../src/core/routing/vocabulary-builtin.js';
 
 const sandboxes: string[] = [];
 

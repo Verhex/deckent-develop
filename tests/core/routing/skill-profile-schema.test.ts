@@ -6,8 +6,8 @@ import {
   skillProfileSchema,
   validateSkillProfile,
   matchSpace,
-} from '../../../src/core/routing3/capability-vector.js';
-import type { CapabilityVector, SkillProfile } from '../../../src/core/routing3/capability-vector.js';
+} from '../../../src/core/routing/capability-vector.js';
+import type { CapabilityVector, SkillProfile } from '../../../src/core/routing/capability-vector.js';
 
 // A full, spec-faithful valid SkillProfile example (§2b: "skills share the matching
 // space" — workTypes+domains+expertise+deliverables, no writeAuthority/role).

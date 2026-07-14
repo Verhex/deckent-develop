@@ -1,4 +1,4 @@
-// tests/core/routing3/foundation-roundtrip.test.ts
+// tests/core/routing/foundation-roundtrip.test.ts
 //
 // Sprint-445 Task 445-024 — end-to-end foundation proof on a tmpdir fixture
 // project. Every prior routing3 Slice-0 task (445-003 vocabulary, 445-004/
@@ -21,8 +21,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TaskStatus, type Task } from '../../../src/core/task-types.js';
-import { loadVocabulary, type VocabularyRegistry } from '../../../src/core/routing3/vocabulary.js';
-import { BUILTIN_DOMAINS } from '../../../src/core/routing3/vocabulary-builtin.js';
+import { loadVocabulary, type VocabularyRegistry } from '../../../src/core/routing/vocabulary.js';
+import { BUILTIN_DOMAINS } from '../../../src/core/routing/vocabulary-builtin.js';
 import {
   producePositional,
   produceNumerical,
@@ -30,11 +30,11 @@ import {
   requirementVectorSchema,
   type RequirementVector,
   type RequirementVocabularySource,
-} from '../../../src/core/routing3/requirement-vector.js';
-import { resolveRoutingV3Config, DEFAULT_ROUTING_V3_CONFIG } from '../../../src/core/routing3/config.js';
+} from '../../../src/core/routing/requirement-vector.js';
+import { resolveRoutingV3Config, DEFAULT_ROUTING_V3_CONFIG } from '../../../src/core/routing/config.js';
 import { migrateManifestV2toV3 } from '../../../src/core/manifest-migrator.js';
 import { createAgentDefinition } from '../../../src/core/agent-types.js';
-import { validateCapabilities, type CapabilityVector } from '../../../src/core/routing3/capability-vector.js';
+import { validateCapabilities, type CapabilityVector } from '../../../src/core/routing/capability-vector.js';
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 

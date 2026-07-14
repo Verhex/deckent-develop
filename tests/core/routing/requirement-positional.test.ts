@@ -1,4 +1,4 @@
-// tests/core/routing3/requirement-positional.test.ts
+// tests/core/routing/requirement-positional.test.ts
 //
 // Sprint-445 Task 445-004 — RequirementVector schema + `producePositional`.
 // Table-driven per goCriteria: tests-only / mixed-src+tests / docs / workflow
@@ -7,13 +7,13 @@
 
 import { describe, it, expect } from 'vitest';
 import { TaskStatus, type Task } from '../../../src/core/task-types.js';
-import type { DomainDef } from '../../../src/core/routing3/types.js';
-import { BUILTIN_DOMAINS } from '../../../src/core/routing3/vocabulary-builtin.js';
+import type { DomainDef } from '../../../src/core/routing/types.js';
+import { BUILTIN_DOMAINS } from '../../../src/core/routing/vocabulary-builtin.js';
 import {
   producePositional,
   requirementPositionalSchema,
   type RequirementVocabularySource,
-} from '../../../src/core/routing3/requirement-vector.js';
+} from '../../../src/core/routing/requirement-vector.js';
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 

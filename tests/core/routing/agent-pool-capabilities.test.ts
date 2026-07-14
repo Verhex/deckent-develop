@@ -36,7 +36,7 @@ import { routeTaskV2 } from '../../../src/core/routing-engine.js';
 import type { SkillDefinition } from '../../../src/core/skill-types.js';
 import { createSkillDefinition } from '../../../src/core/skill-types.js';
 import type { ActivationConfig } from '../../../src/core/routing-types.js';
-import type { CapabilityVector } from '../../../src/core/routing3/capability-vector.js';
+import type { CapabilityVector } from '../../../src/core/routing/capability-vector.js';
 
 const ROOT = '/test/project';
 

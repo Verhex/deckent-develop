@@ -17,7 +17,7 @@ import { loadApprovalRules } from './approval-rules-load.js';
 // cycle is init-safe — each side references the other's bindings only inside
 // function bodies (routing3's top-level code builds zod schemas only), never at
 // module-initialization time.
-import { resolveRoutingV3Config } from './routing3/config.js';
+import { resolveRoutingV3Config } from './routing/config.js';
 import { normalizeGlobalScopePlatform, resolveGlobalScopePaths } from './global-scope-resolver.js';
 import type { GlobalScopeEnv } from './global-scope-resolver.js';
 import type {

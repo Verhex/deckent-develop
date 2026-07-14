@@ -52,14 +52,14 @@ export function buildStory(trace: StoryTrace): DecisionStory {
   steps.push({
     stage: 'vectorize',
     line: clip(`req: ${trace.workType} × [${trace.domains.join(',')}]`),
-    messageKey: 'routing3.story.vectorize',
+    messageKey: 'routing.story.vectorize',
     detail: { workType: trace.workType, domains: trace.domains, provenance: trace.provenance },
   });
 
   steps.push({
     stage: 'eliminate',
     line: clip(`candidates ${trace.candidateCount} → ${trace.candidateCount - trace.eliminated.length} (${trace.eliminated.length} out)`),
-    messageKey: 'routing3.story.eliminate',
+    messageKey: 'routing.story.eliminate',
     detail: { total: trace.candidateCount, eliminated: trace.eliminated.length },
   });
 
@@ -67,7 +67,7 @@ export function buildStory(trace: StoryTrace): DecisionStory {
     steps.push({
       stage: 'verify',
       line: clip(`verifier dropped ${trace.verifierDrops.length}: ${trace.verifierDrops.map((d) => d.agentId).join(',')}`),
-      messageKey: 'routing3.story.verifierDrops',
+      messageKey: 'routing.story.verifierDrops',
       detail: {
         drops: trace.verifierDrops.map((d) => ({
           agentId: d.agentId,
@@ -83,7 +83,7 @@ export function buildStory(trace: StoryTrace): DecisionStory {
     steps.push({
       stage: 'rank',
       line: clip(`top ${trace.winner.agentId} ${trace.winner.finalScore.toFixed(2)}${trace.runnerUp ? ` (next ${trace.runnerUp.agentId} ${trace.runnerUp.finalScore.toFixed(2)})` : ''}`),
-      messageKey: 'routing3.story.rank',
+      messageKey: 'routing.story.rank',
       detail: {
         winner: trace.winner.agentId,
         finalScore: trace.winner.finalScore,
@@ -101,7 +101,7 @@ export function buildStory(trace: StoryTrace): DecisionStory {
   steps.push({
     stage: 'decide',
     line: clip(decideLine),
-    messageKey: trace.escalation ? 'routing3.story.escalated' : 'routing3.story.decided',
+    messageKey: trace.escalation ? 'routing.story.escalated' : 'routing.story.decided',
     detail: {
       escalation: trace.escalation?.reason ?? null,
       confidence: trace.confidence,

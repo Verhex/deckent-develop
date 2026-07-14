@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { needsMigration, isV2Manifest, migrateAgentManifest, migrateSkillManifest, migrateManifestV2toV3 } from '../../src/core/manifest-migrator.js';
 import { createAgentDefinition } from '../../src/core/agent-types.js';
 import { createSkillDefinition } from '../../src/core/skill-types.js';
-import { validateCapabilities } from '../../src/core/routing3/capability-vector.js';
-import { BUILTIN_DOMAINS } from '../../src/core/routing3/vocabulary-builtin.js';
+import { validateCapabilities } from '../../src/core/routing/capability-vector.js';
+import { BUILTIN_DOMAINS } from '../../src/core/routing/vocabulary-builtin.js';
 
 describe('manifest-migrator', () => {
   describe('needsMigration', () => {

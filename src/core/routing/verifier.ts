@@ -114,24 +114,10 @@ export function verify(
     violations.push({ code: 'CONTENT_STRUCTURAL_CONFLICT', detail: conflict });
   }
 
-  // Deliverable coverage re-assert (mirror of stage-1 rule 4).
-  if (cap.positional.deliverables.length > 0) {
-    const covered = new Set(cap.positional.deliverables);
-    const missing = requirement.positional.deliverables
-      .filter(
-        (d) =>
-          d.ratio > 0 &&
-          !covered.has(d.type) &&
-          !(d.type === 'code-test' && cap.positional.writeAuthority),
-      )
-      .map((d) => d.type);
-    if (missing.length > 0) {
-      violations.push({
-        code: 'DELIVERABLE_UNCOVERED',
-        detail: `deliverables not covered: ${missing.join(', ')} (${candidate.agentId})`,
-      });
-    }
-  }
+  // NOTE (Slice-2 amendment): deliverable coverage is NOT re-asserted as a
+  // violation — see stage-eliminate.ts. It remains a soft positional-axis
+  // signal; the DELIVERABLE_UNCOVERED code stays in the type for journal
+  // compatibility but is no longer produced here.
 
   // Policy-pack enforcement (matching rules only; violations carry policy id).
   let policyEscalate = false;

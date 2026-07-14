@@ -314,7 +314,7 @@ export interface WorkerOutputContractConfig {
 
 /** RoutingEngineV3 axis-weight distribution (spec §2, `.analysis/routing-v3-secenek-b-detay-2026-07-14.md`).
  *  `content` + `positional` + `numerical` MUST sum to 1.0 — enforced by
- *  `resolveRoutingV3Config`/`validateRoutingV3Config` (core/routing3/config.ts), not here (this
+ *  `resolveRoutingV3Config`/`validateRoutingV3Config` (core/routing/config.ts), not here (this
  *  file has no runtime validation, types only). */
 export interface RoutingV3Weights {
   /** Content-fit axis weight — LLM semantic match against the closed work-type/domain vocabulary. */
@@ -335,7 +335,7 @@ export type RoutingV3GovernanceMode = 'ai' | 'deterministic';
  *
  * Unlike {@link NervousSystemConfig} above (whose mirrored zod schema lives in `core/config.ts`,
  * `NERVOUS_SYSTEM_SCHEMA`), this schema's zod mirror + `DEFAULT_ROUTING_V3_CONFIG` (the ONE place
- * defaults live) + weights-sum validation live in `core/routing3/config.ts`
+ * defaults live) + weights-sum validation live in `core/routing/config.ts`
  * (`ROUTING_V3_SCHEMA` / `resolveRoutingV3Config`) — `routing_v3` is exclusively consumed by the
  * routing3 subsystem, so its schema stays scoped there instead of growing `config.ts` (out of this
  * task's write scope). `loadConfig`/`mergeConfigs` (config.ts) do NOT yet assign this field onto
@@ -1004,7 +1004,7 @@ export interface DeckentConfig {
   // ─── Routing Engine v3 (Sprint 445 Slice-0 foundation) ───────────────
   /** RoutingEngineV3 vector-selection config — raw project-config override shape (mirrors
    *  `timeout?: Partial<TimeoutConfig>`). Resolve via `resolveRoutingV3Config()`
-   *  (core/routing3/config.ts), not by reading this field directly — it is a partial user
+   *  (core/routing/config.ts), not by reading this field directly — it is a partial user
    *  override, not the defaulted/validated shape. Default: enabled=false. @see RoutingV3Config */
   routing_v3?: Partial<RoutingV3Config>;
 
@@ -1520,7 +1520,7 @@ export interface ResolvedConfig {
   /** Fully-resolved RoutingEngineV3 config (Sprint 445 Slice-0). NOTE: type-only pass-through
    *  today — `loadConfig`/`mergeConfigs` (config.ts) do not yet assign this field in their
    *  resolved-object literal (same caveat as `computer_use`/`worker_output_contract` above; out of
-   *  this task's write scope). Call `resolveRoutingV3Config()` (core/routing3/config.ts) directly
+   *  this task's write scope). Call `resolveRoutingV3Config()` (core/routing/config.ts) directly
    *  until that follow-up wiring task lands. @see RoutingV3Config */
   routing_v3?: RoutingV3Config;
   /** Doc-tracking options (passed through from DeckentConfig, ADR-090). */
