@@ -7,6 +7,8 @@ import { DECKENT_FILE, DECKENT_DIR, CLAUDE_FILE, AGENTS_FILE, BRAIN_DIR, SPRINTS
 import { ensureDeckentImport, debugLog } from '../../core/utils.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { syncBuiltinAgentPrompts } from '../../core/agent-prompt-sync.js';
+import { syncBuiltinAgentManifests } from '../../core/agent-manifest-sync.js';
+import type { AgentManifestSyncReport } from '../../core/agent-manifest-sync.js';
 import type { AgentPromptSyncReport } from '../../core/agent-prompt-sync.js';
 import { migrateManifestV2toV3 } from '../../core/manifest-migrator.js';
 import { BUILTIN_DOMAINS } from '../../core/routing3/vocabulary-builtin.js';
@@ -656,6 +658,7 @@ export function registerSync(program: Command): void {
         adaptersSynced?: string[];
         adapterErrors?: AdapterSyncError[];
         agentPromptSync?: AgentPromptSyncReport;
+        agentManifestSync?: AgentManifestSyncReport;
         agentCapabilitiesSync?: AgentCapabilitiesSyncReport;
         gitChanges?: SyncResult | null;
         warnings?: string[];
@@ -706,6 +709,27 @@ export function registerSync(program: Command): void {
           }
           for (const conflict of promptSyncReport.conflicts) {
             print(`Warning: agent prompt "${conflict.agentId}" kept as local edit (${conflict.reason})`);
+          }
+        }
+
+        // --- Builtin agent.json -> shadow three-way sync (446, ROUTING-V3 Slice-1) ---
+        // ORDER CONTRACT: three-way manifest sync runs BEFORE the capabilities
+        // migrator — provenance-proven shadows adopt the new builtin content
+        // (real capability blocks) first, so the migrator below only fills
+        // provisional blocks for shadows that STILL lack capabilities
+        // (kept-local edits). Never both on the same shadow in one run.
+        const manifestSyncReport = syncBuiltinAgentManifests(root, { dryRun: opts.dryRun });
+        output.agentManifestSync = manifestSyncReport;
+
+        if (!opts.json) {
+          for (const id of manifestSyncReport.created) {
+            print(`${opts.dryRun ? '[dry-run] ' : ''}Agent manifest created: .deckent/agents/${id}/agent.json`);
+          }
+          for (const id of manifestSyncReport.updated) {
+            print(`${opts.dryRun ? '[dry-run] ' : ''}Agent manifest updated: .deckent/agents/${id}/agent.json`);
+          }
+          for (const conflict of manifestSyncReport.conflicts) {
+            print(`Warning: agent manifest "${conflict.agentId}" kept as local edit (${conflict.reason})`);
           }
         }
 

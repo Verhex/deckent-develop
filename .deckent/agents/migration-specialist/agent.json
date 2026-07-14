@@ -73,28 +73,53 @@
         {
           "type": "migrate",
           "proficiency": "primary"
+        },
+        {
+          "type": "refactor",
+          "proficiency": "able"
+        },
+        {
+          "type": "analyze",
+          "proficiency": "able"
+        },
+        {
+          "type": "build",
+          "proficiency": "able"
         }
       ],
       "expertise": [
-        "framework-migration",
-        "version-upgrade",
-        "breaking-changes",
-        "backward-compatibility",
-        "codemods"
+        "framework and library version upgrades",
+        "breaking-change taxonomy and management",
+        "codemod generation (jscodeshift, ts-morph)",
+        "backward-compatibility shims and dual-read adapters",
+        "incremental strangler-fig migration strategy",
+        "rollback planning for code and data"
       ],
-      "personaSlices": []
+      "personaSlices": [
+        "default",
+        "migration",
+        "refactor",
+        "architecture"
+      ]
     },
     "positional": {
       "domains": [
         {
-          "id": "core/runtime",
-          "proficiency": "primary"
+          "id": "data",
+          "proficiency": "secondary"
+        },
+        {
+          "id": "build/release",
+          "proficiency": "secondary"
         }
       ],
       "surfaces": [],
       "writeAuthority": true,
       "role": "implementer",
       "deliverables": [
+        "code-src",
+        "code-test",
+        "script",
         "migration"
       ]
     },

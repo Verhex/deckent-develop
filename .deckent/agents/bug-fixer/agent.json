@@ -69,21 +69,29 @@
         {
           "type": "fix",
           "proficiency": "primary"
+        },
+        {
+          "type": "build",
+          "proficiency": "able"
         }
       ],
       "expertise": [
-        "debugging",
-        "root-cause-analysis",
-        "regression-testing",
-        "error-handling"
+        "root-cause analysis over symptom-patching",
+        "minimal, targeted fixes that preserve adjacent behavior",
+        "regression-test authoring that pins the corrected behavior"
       ],
-      "personaSlices": []
+      "personaSlices": [
+        "bugfix",
+        "performance",
+        "security",
+        "default"
+      ]
     },
     "positional": {
       "domains": [
         {
-          "id": "core/runtime",
-          "proficiency": "primary"
+          "id": "*",
+          "proficiency": "able"
         }
       ],
       "surfaces": [],

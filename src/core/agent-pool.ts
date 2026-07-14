@@ -20,11 +20,26 @@ import type { CapabilityVector } from './routing3/capability-vector.js';
 // than having the sync step / seedBuiltins materialize agent.json files).
 
 /**
+ * Test-only override for the builtin agents directory (446-022): lets the
+ * builtin-fallback mechanism be exercised against a tmpdir fixture tree
+ * instead of depending on which REAL builtin agents happen to be
+ * manifest-less (a repo-state coupling that broke twice — 445-019, 446).
+ * Production never sets this; `null` restores the module-relative default.
+ */
+let builtinAgentsDirOverrideForTests: string | null = null;
+
+/** @internal test hook — see builtinAgentsDirOverrideForTests. */
+export function __setBuiltinAgentsDirForTests(dir: string | null): void {
+  builtinAgentsDirOverrideForTests = dir;
+}
+
+/**
  * Resolve the builtin agents directory relative to THIS module's own file
  * location (src/core/agent-pool.ts or dist/core/agent-pool.js — builtins/ is
  * a direct sibling either way, copied to dist/ by scripts/copy-assets.mjs).
  */
 function resolveBuiltinAgentsDir(): string {
+  if (builtinAgentsDirOverrideForTests !== null) return builtinAgentsDirOverrideForTests;
   const moduleDir = path.dirname(fileURLToPath(import.meta.url));
   return path.join(moduleDir, 'builtins', 'agents');
 }
@@ -661,16 +676,24 @@ export class AgentPoolManager {
       }
       if (!Array.isArray(files)) continue;
 
-      // Only the "PROMPT.md with no agent.json anywhere" gap is this task's
-      // actual scope (369-003's 3 new agents) — see skill-pool.ts's identical
-      // fallback for the full rationale (a builtin shipping its own
-      // agent.json belongs in .deckent/agents/<id>/ via the normal override
-      // path; trusting arbitrary builtin agent.json content verbatim is
-      // unneeded generality this task's goCriteria never requires).
-      if (files.some((f) => f.name === AGENT_FILENAME)) continue;
-      if (!files.some((f) => f.name === PROMPT_MD_FILENAME)) continue;
-
-      const raw = synthesizeAgentDefinition(entry.name, path.join(entryDir, PROMPT_MD_FILENAME));
+      // Capabilities-era (446, V3 Slice-1): builtins may ship their OWN
+      // agent.json (445 authored real capability blocks on every builtin).
+      // The builtin manifest is the DEFAULT layer of the D-004 pattern —
+      // loaded here when no .deckent override exists (`pool.has` above keeps
+      // override precedence). The historical synthesis path stays for
+      // manifest-less builtin dirs (PROMPT.md only).
+      let raw: Record<string, unknown> | null = null;
+      if (files.some((f) => f.name === AGENT_FILENAME)) {
+        raw = readJsonSafe<Record<string, unknown>>(path.join(entryDir, AGENT_FILENAME));
+        if (raw && typeof raw === 'object') {
+          // Builtin-tree manifests are ours; still validated below like any manifest.
+          raw['source'] = 'builtin';
+        }
+      } else if (files.some((f) => f.name === PROMPT_MD_FILENAME)) {
+        raw = synthesizeAgentDefinition(entry.name, path.join(entryDir, PROMPT_MD_FILENAME));
+      } else {
+        continue;
+      }
       if (!raw) continue;
       const validation = AgentPoolManager.validateAgentDefinition(raw);
       if (!validation.valid) {

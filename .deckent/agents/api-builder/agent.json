@@ -68,7 +68,16 @@
   "capabilities": {
     "capabilitiesVersion": 3,
     "content": {
-      "workTypes": [],
+      "workTypes": [
+        {
+          "type": "build",
+          "proficiency": "primary"
+        },
+        {
+          "type": "document",
+          "proficiency": "secondary"
+        }
+      ],
       "expertise": [
         "rest-api",
         "http",
@@ -76,22 +85,29 @@
         "error-handling",
         "openapi"
       ],
-      "personaSlices": []
+      "personaSlices": [
+        "implementation",
+        "documentation",
+        "security"
+      ]
     },
     "positional": {
       "domains": [
         {
-          "id": "frontend",
+          "id": "api",
           "proficiency": "primary"
         }
       ],
       "surfaces": [
-        "dashboard",
-        "frontend"
+        "api"
       ],
       "writeAuthority": true,
       "role": "implementer",
-      "deliverables": []
+      "deliverables": [
+        "code-src",
+        "code-test",
+        "doc"
+      ]
     },
     "numerical": {
       "preferredModel": "sonnet",

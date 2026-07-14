@@ -76,12 +76,20 @@
     "content": {
       "workTypes": [
         {
-          "type": "build",
-          "proficiency": "never"
+          "type": "review",
+          "proficiency": "primary"
         },
         {
           "type": "configure",
-          "proficiency": "primary"
+          "proficiency": "secondary"
+        },
+        {
+          "type": "analyze",
+          "proficiency": "able"
+        },
+        {
+          "type": "build",
+          "proficiency": "never"
         }
       ],
       "expertise": [
@@ -91,7 +99,12 @@
         "build-verification",
         "github-actions"
       ],
-      "personaSlices": []
+      "personaSlices": [
+        "devops",
+        "bugfix",
+        "config",
+        "default"
+      ]
     },
     "positional": {
       "domains": [
@@ -102,9 +115,10 @@
       ],
       "surfaces": [],
       "writeAuthority": true,
-      "role": "implementer",
+      "role": "reviewer",
       "deliverables": [
-        "config"
+        "config",
+        "doc"
       ]
     },
     "numerical": {

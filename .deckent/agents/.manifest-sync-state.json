@@ -1,0 +1,44 @@
+{
+  "_meta": {
+    "generatedBy": "agent-manifest-sync.ts",
+    "schemaVersion": 1
+  },
+  "agents": {
+    "api-designer": {
+      "builtinHash": "09271232f69e71a141c2e45a4f3dc2309c9c3423",
+      "syncedAt": "2026-07-14T21:20:57.189Z"
+    },
+    "architect": {
+      "builtinHash": "bcb70c1f5d848c30cb651ace8c724138d412e9b7",
+      "syncedAt": "2026-07-14T21:20:57.189Z"
+    },
+    "architecture-planner": {
+      "builtinHash": "2e38d5b50aa54fa5ae2fbfcde49ff457e556d0ec",
+      "syncedAt": "2026-07-14T21:20:57.189Z"
+    },
+    "data-engineer": {
+      "builtinHash": "a0b7bf5560d2146efdcb58f44a7daa5f4c446269",
+      "syncedAt": "2026-07-14T21:20:57.189Z"
+    },
+    "i18n-specialist": {
+      "builtinHash": "09e52245ff1e3e3eb16d4029854476f9ce202ee8",
+      "syncedAt": "2026-07-14T21:20:57.189Z"
+    },
+    "implementer": {
+      "builtinHash": "0078692acee71f5d10bb2973d5cc37f87669d61c",
+      "syncedAt": "2026-07-14T21:20:57.189Z"
+    },
+    "observability-engineer": {
+      "builtinHash": "3403bf5cb78c079b0d5aba0cc937ee1293f46777",
+      "syncedAt": "2026-07-14T21:20:57.189Z"
+    },
+    "refactorer": {
+      "builtinHash": "f9ceb2a5059117e32b2d241ad4b7640b83b0e8d7",
+      "syncedAt": "2026-07-14T21:20:57.189Z"
+    },
+    "terminal-ux-engineer": {
+      "builtinHash": "0c382bbb00cfc1bacb34710a7487fb348ca6c7fc",
+      "syncedAt": "2026-07-14T21:20:57.189Z"
+    }
+  }
+}

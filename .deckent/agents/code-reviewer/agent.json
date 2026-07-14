@@ -63,12 +63,12 @@
     "content": {
       "workTypes": [
         {
-          "type": "refactor",
-          "proficiency": "secondary"
-        },
-        {
           "type": "review",
           "proficiency": "primary"
+        },
+        {
+          "type": "refactor",
+          "proficiency": "able"
         }
       ],
       "expertise": [
@@ -77,21 +77,24 @@
         "best-practices",
         "design-patterns"
       ],
-      "personaSlices": []
+      "personaSlices": [
+        "refactor",
+        "bugfix",
+        "security"
+      ]
     },
     "positional": {
       "domains": [
         {
-          "id": "core/runtime",
-          "proficiency": "primary"
+          "id": "*",
+          "proficiency": "able"
         }
       ],
       "surfaces": [],
       "writeAuthority": false,
-      "role": "reviewer",
+      "role": "code-reviewer",
       "deliverables": [
-        "code-src",
-        "code-test"
+        "doc"
       ]
     },
     "numerical": {

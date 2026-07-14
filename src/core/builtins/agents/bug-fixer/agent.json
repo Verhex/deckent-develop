@@ -19,22 +19,41 @@
     "capabilitiesVersion": 3,
     "content": {
       "workTypes": [
-        { "type": "fix", "proficiency": "primary" },
-        { "type": "build", "proficiency": "secondary" }
+        {
+          "type": "fix",
+          "proficiency": "primary"
+        },
+        {
+          "type": "build",
+          "proficiency": "able"
+        }
       ],
       "expertise": [
         "root-cause analysis over symptom-patching",
         "minimal, targeted fixes that preserve adjacent behavior",
         "regression-test authoring that pins the corrected behavior"
       ],
-      "personaSlices": ["bugfix", "performance", "security", "default"]
+      "personaSlices": [
+        "bugfix",
+        "performance",
+        "security",
+        "default"
+      ]
     },
     "positional": {
-      "domains": [{ "id": "*", "proficiency": "able" }],
+      "domains": [
+        {
+          "id": "*",
+          "proficiency": "able"
+        }
+      ],
       "surfaces": [],
       "writeAuthority": true,
       "role": "implementer",
-      "deliverables": ["code-src", "code-test"]
+      "deliverables": [
+        "code-src",
+        "code-test"
+      ]
     },
     "numerical": {
       "preferredModel": "opus",

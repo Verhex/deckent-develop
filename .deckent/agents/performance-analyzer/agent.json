@@ -69,6 +69,10 @@
         {
           "type": "analyze",
           "proficiency": "primary"
+        },
+        {
+          "type": "fix",
+          "proficiency": "able"
         }
       ],
       "expertise": [
@@ -78,23 +82,32 @@
         "memory-management",
         "caching"
       ],
-      "personaSlices": []
+      "personaSlices": [
+        "default",
+        "performance",
+        "bugfix",
+        "architecture"
+      ]
     },
     "positional": {
       "domains": [
         {
           "id": "core/runtime",
           "proficiency": "primary"
-        },
-        {
-          "id": "performance",
-          "proficiency": "primary"
         }
       ],
-      "surfaces": [],
+      "surfaces": [
+        "api",
+        "cli",
+        "dashboard",
+        "frontend"
+      ],
       "writeAuthority": true,
       "role": "implementer",
-      "deliverables": []
+      "deliverables": [
+        "code-src",
+        "doc"
+      ]
     },
     "numerical": {
       "preferredModel": "opus",

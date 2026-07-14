@@ -99,7 +99,7 @@
         },
         {
           "type": "document",
-          "proficiency": "secondary"
+          "proficiency": "primary"
         }
       ],
       "expertise": [
@@ -119,6 +119,14 @@
     },
     "positional": {
       "domains": [
+        {
+          "id": "orchestration",
+          "proficiency": "primary"
+        },
+        {
+          "id": "agents-catalog",
+          "proficiency": "secondary"
+        },
         {
           "id": "*",
           "proficiency": "able"

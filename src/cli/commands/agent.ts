@@ -233,6 +233,91 @@ export async function shouldProceedAgentDelete(
 export function registerAgent(program: Command): void {
   const agentCmd = program.command('agent').description('Manage agent pool');
 
+  // ─── agent lint (ROUTING-V3 Slice-1, 446) ────────────────────────
+  agentCmd
+    .command('lint')
+    .description('Lint the agent catalog: reachability, coverage gaps, capability overlaps (V3)')
+    .option('--json', 'Output as JSON')
+    .action(async (opts: { json?: boolean }) => {
+      try {
+        const root = resolveProjectRoot();
+        const lang = getLanguage();
+        const { AgentPoolManager } = await import('../../core/agent-pool.js');
+        const { loadVocabulary } = await import('../../core/routing3/vocabulary.js');
+        const { lintCatalog } = await import('../../core/routing3/agent-lint.js');
+        const { resolveRoutingV3Config } = await import('../../core/routing3/config.js');
+        const { validateCapabilities } = await import('../../core/routing3/capability-vector.js');
+        type LintCandidate = Parameters<typeof lintCatalog>[0][number];
+
+        const pool = new AgentPoolManager(root).loadAgents();
+        const candidates: LintCandidate[] = [];
+        const withoutCapabilities: string[] = [];
+        for (const agent of pool.values()) {
+          const caps = (agent as unknown as Record<string, unknown>)['capabilities'];
+          const validation = caps ? validateCapabilities(caps) : null;
+          if (!validation?.ok) {
+            withoutCapabilities.push(agent.id);
+            continue;
+          }
+          candidates.push({
+            agentId: agent.id,
+            capabilities: validation.value,
+            source: agent.source === 'learned' ? 'learned' : agent.source === 'user' ? 'user' : 'builtin',
+          });
+        }
+
+        const vocabulary = await loadVocabulary(root);
+        const config = resolveRoutingV3Config(null, {});
+        const report = lintCatalog(candidates, vocabulary.domains, config);
+
+        if (opts.json) {
+          print(JSON.stringify({ ...report, withoutCapabilities }, null, 2));
+        } else {
+          print(getMessage('agent.lint.header', lang, {
+            agents: String(candidates.length),
+            cells: String(report.sweep.cells),
+          }));
+          if (withoutCapabilities.length > 0) {
+            print(getMessage('agent.lint.no_capabilities', lang, {
+              count: String(withoutCapabilities.length),
+              ids: withoutCapabilities.join(', '),
+            }));
+          }
+          for (const u of report.unreachable) {
+            const detail = u.nearestMiss
+              ? `${u.nearestMiss.workType}×${u.nearestMiss.domain} (−${u.nearestMiss.gapToWinner.toFixed(2)} vs ${u.nearestMiss.winner})`
+              : (u.alwaysEliminated ?? '-');
+            print(getMessage('agent.lint.unreachable', lang, { agentId: u.agentId, detail }));
+          }
+          for (const g of report.gaps) {
+            print(getMessage('agent.lint.gap', lang, {
+              workType: g.workType,
+              domain: g.domain,
+              reasons: g.reasons.join(', '),
+            }));
+          }
+          for (const o of report.overlaps) {
+            print(getMessage('agent.lint.overlap', lang, {
+              a: o.a,
+              b: o.b,
+              pct: (o.similarity * 100).toFixed(0),
+            }));
+          }
+          if (report.unreachable.length === 0 && report.gaps.length === 0) {
+            print(getMessage('agent.lint.clean', lang));
+          }
+        }
+
+        // CI-usable ratchet: coverage gaps are catalog errors (exit 1).
+        if (report.gaps.length > 0) {
+          process.exitCode = 1;
+        }
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
   // ─── agent list ─────────────────────────────────────────────────
   agentCmd
     .command('list')

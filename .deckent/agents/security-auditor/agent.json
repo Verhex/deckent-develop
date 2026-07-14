@@ -75,7 +75,15 @@
     "content": {
       "workTypes": [
         {
-          "type": "document",
+          "type": "review",
+          "proficiency": "primary"
+        },
+        {
+          "type": "analyze",
+          "proficiency": "secondary"
+        },
+        {
+          "type": "build",
           "proficiency": "never"
         }
       ],
@@ -85,7 +93,12 @@
         "encryption",
         "vulnerability-assessment"
       ],
-      "personaSlices": []
+      "personaSlices": [
+        "default",
+        "security",
+        "architecture",
+        "implementation"
+      ]
     },
     "positional": {
       "domains": [
@@ -96,8 +109,10 @@
       ],
       "surfaces": [],
       "writeAuthority": true,
-      "role": "implementer",
-      "deliverables": []
+      "role": "reviewer",
+      "deliverables": [
+        "doc"
+      ]
     },
     "numerical": {
       "preferredModel": "opus",

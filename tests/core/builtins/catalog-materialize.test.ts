@@ -268,26 +268,26 @@ describe('371-001 CATALOG-MATERIALIZE: builtin fallback makes the 6 new items po
       expect(resolution.source).not.toBe('prompt-md-builtin');
     });
 
-    it('an initialized project (config.json present) sees the manifest-less builtins via the fallback', () => {
-      // Only builtins with SKILL.md/PROMPT.md but NO manifest.json/agent.json anywhere
-      // go through the fallback. A builtin that already ships its own
-      // manifest.json/agent.json (e.g. 'refactorer', 'api-builder') is deliberately
-      // excluded here — see _loadBuiltinFallback's comment for why (avoids trusting
-      // arbitrary builtin manifest content verbatim).
-      //
-      // Karar-turu builtins-merge (2026-07-11, 9a7991d0): 'api-design' and
-      // 'i18n-quality' gained real builtin manifest.json files, moving them into the
-      // manifest-bearing class alongside 'refactorer'/'api-builder' — so they are now
-      // expected to be EXCLUDED from the fallback (they reach the pool via
-      // sync/materialize instead). 'observability' stays manifest-less until born-646
-      // and keeps proving the skill-side fallback still works.
+    it('an initialized project (config.json present) sees the FULL builtin agent catalog via the fallback', () => {
+      // Capabilities-era contract (446, V3 Slice-1): the builtin agent tree is
+      // the DEFAULT layer of the D-004 pattern — manifest-BEARING builtins
+      // (refactorer, api-builder, and the 445-materialized api-designer/
+      // i18n-specialist/observability-engineer) load from their own builtin
+      // agent.json when no .deckent override exists; manifest-less builtin
+      // dirs still go through PROMPT.md synthesis. A zero-config initialized
+      // project therefore sees the WHOLE shipped agent catalog.
+      // Skill-side behavior is UNCHANGED this slice: manifest-bearing builtin
+      // skills stay excluded from the skill fallback (they arrive via
+      // sync/materialize); 'observability' remains manifest-less (born-646)
+      // and keeps proving the skill-side synthesis path.
       const agents = new AgentPoolManager(initializedRoot).loadAgents();
       const skills = new SkillPoolManager(initializedRoot).loadSkills();
       expect(agents.has('api-designer')).toBe(true);
+      expect(agents.has('refactorer')).toBe(true);
+      expect(agents.get('refactorer')?.source).toBe('builtin');
       expect(skills.has('observability')).toBe(true);
       expect(skills.has('api-design')).toBe(false);
       expect(skills.has('i18n-quality')).toBe(false);
-      expect(agents.has('refactorer')).toBe(false);
       expect(skills.has('api-builder')).toBe(false);
 
       const resolution = getAgentPrompt('api-designer', initializedRoot);

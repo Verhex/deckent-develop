@@ -1,413 +1,378 @@
-# DIRECTIVES — ROUTING-V3 SLICE-0: FOUNDATION (vocabulary + vector schemas + capabilities v3 + migrator)
+# DIRECTIVES — ROUTING-V3 SLICE-1: DETERMINISTIC ENGINE (match-pipeline + verifier + cells + story/journal + lint)
 
 ## Goal
-First of 4 slices building RoutingEngineV3 (spec: `.analysis/routing-v3-design-spec-2026-07-14.md`,
-detail: `.analysis/routing-v3-secenek-b-detay-2026-07-14.md` — read BOTH first; they are binding).
-Slice-0 delivers the FOUNDATION: the structured vocabulary (closed work-type core [8] + open 3-layer
-domain registry + deliverable types), the RequirementVector/CapabilityVector zod schemas, deterministic
-vector producers (positional + numerical + structural-content), the agent.json-v3 `capabilities` field,
-a v2→v3 manifest migrator, capabilities authored for all 21 builtin agents and builtin skills, the
-routing3 config schema, vocabulary doctor checks, and the ADR-G-006 today-clause amendment draft.
-V2 routing keeps running UNCHANGED this sprint: manifests DUAL-CARRY (activation.rules stays alongside
-new capabilities until Slice-3 cut-over). Nothing in this slice may alter a live routing decision.
+Second of 4 slices (spec: `.analysis/routing-v3-design-spec-2026-07-14.md` + detail:
+`.analysis/routing-v3-secenek-b-detay-2026-07-14.md` — read BOTH first; binding). Slice-1 delivers the
+COMPLETE deterministic engine: `routeTaskV3` runs end-to-end in governance mode (elimination →
+[pluggable AI slot, filled in Slice-2] → verifier → weighted ranking → decision+story+journal), with
+policy-packs, learning-cells, replayable journal, Brain-escalation surface, `deckent agent lint`, the
+agent.json three-way sync (Slice-0 left 12 shadows provisional), and the 3 manifest-less builtins
+materialized. V2 keeps routing production UNCHANGED (`routing_v3.enabled` stays false; no production
+call site switches — that is Slice-3). Slice-0 foundations are in `src/core/routing3/` — REUSE them;
+re-inventing a schema or table that exists there is a defect.
 
 ## 🔒 BINDING (every task)
-- Write ONLY to your own Files list · real `.deckent/`, `.brain/`, `.tasks/` are READ-ONLY (tests use tmpdir)
+- Write ONLY to your own Files list · real `.deckent/`, `.brain/`, `.tasks/` READ-ONLY (tests use tmpdir)
   · no git stash/reset · `npm run build` FORBIDDEN · notes ONE STRING · self-assessment HONEST.
-- No string-throw (typed-error family). No report/summary markdown outside `.analysis/`.
-- Tests hermetic (tmpdir, async spawn, no spawnSync). `tsc` alone is NOT proof — behavior tests required.
-- Zero-hardcode (ADR-G-036): no model names or flow literals in code paths; vocabulary/config are the SSOT.
-- i18n-FIRST: any user-facing CLI string goes through getMessage (en+tr), never hardcoded.
-- Word-inference bans are LAW: the token "test" and agent display-names in prose must NEVER influence
-  any classification output — pin with negative tests where relevant.
-- V2 routing behavior MUST NOT change this sprint: routing-engine.ts / intent-classifier.ts are OUT of scope.
+- No string-throw (typed DeckentError family). No report/summary markdown outside `.analysis/`.
+- Tests hermetic (tmpdir, async spawn, no spawnSync). `tsc` alone is NOT proof.
+- Zero-hardcode (ADR-G-036): no model names/flow literals in code paths; vocabulary/config/registry SSOT.
+- i18n-FIRST for user-facing CLI strings (getMessage en+tr). Model-surface strings EN.
+- Word-inference bans are LAW ('test' token, agent display-names in prose) — pin where relevant.
+- V2 routing behavior MUST NOT change: routing-engine.ts / intent-classifier.ts OUT of scope.
+- Deterministic stages are PURE functions of (vectors, config, cells-snapshot): same inputs → same
+  outputs, replayable. No Date.now()/randomness inside decision math.
 
-## Task 1: routing3 core types and vocabulary builtin work-type core
-- Files: src/core/routing3/types.ts, src/core/routing3/vocabulary-builtin.ts, tests/core/routing3/vocabulary-builtin.test.ts
+## Task 1: decision types and journal schema
+- Files: src/core/routing3/decision-types.ts, tests/core/routing3/decision-types.test.ts
 - Scope: src/core/routing3/, tests/core/routing3/
 - Dependencies: none
 ### Description
-Create `src/core/routing3/` with `types.ts`: WorkType union ('build'|'fix'|'refactor'|'document'|'review'|
-'configure'|'migrate'|'analyze'), WorkTypeDef {type, contract (one-sentence), dodSignature, examples[]},
-Proficiency ('primary'|'secondary'|'able'|'never'), DeliverableType union ('code-src'|'code-test'|'doc'|
-'config'|'workflow'|'manifest'|'script'|'migration'|'asset'), DomainDef {id, aliases[], pathPatterns[],
-stackMarkers[], description, surfaces[], exclusiveRoles[]}, plus typed errors (extend the existing
-DeckentError family — read src/core/errors.ts for the pattern). `vocabulary-builtin.ts`: the 8 WorkTypeDef
-entries exactly per spec §1a (build/fix/refactor/document/review/configure/migrate/analyze with their
-contracts and DoD signatures) and the 9 deliverable types. Subtype grammar: `parent:subtype` string form
-with a parseSubtype() helper (rollup = parent). NO domain entries in this task (Task 2).
+Typed core for the pipeline: `RoutingDecisionV3` {agentId, skillIds, personaSlices, modelPreference,
+effortClass, axisScores {content, positional, numerical}, finalScore, confidence (calibrated 0-1),
+provenance ('deterministic'|'ai'), story: DecisionStory, escalation?: BrainEscalation} — frozen/readonly.
+`DecisionStory` {summary, steps: [{stage, outcome, detail}], eliminated: [{agentId, reason}]}.
+`BrainEscalation` {reason: 'tie'|'low-confidence'|'catalog-gap'|'conflict', candidates: [{agentId,
+finalScore, axisScores}], evidence}. `JournalEntryV3` (zod, schemaVersion:1) capturing task-id, both
+vectors, per-candidate stage outcomes, final decision, config-snapshot hash — sufficient for replay
+WITHOUT re-running any AI call. All zod-validated; no mutable leaks (pin Object.isFrozen).
 ### goNogo
-- goCriteria: all 8 work-types carry contract+dodSignature+examples; parseSubtype handles 'review:compliance' → parent 'review'; npx vitest run tests/core/routing3/vocabulary-builtin.test.ts green; npx tsc --noEmit clean.
-- nogo: a 'test' work-type appearing anywhere NO_GO; open-ended work-type union NO_GO.
+- goCriteria: schemas round-trip; frozen-decision pin; journal entry captures enough for replay (assert field presence table-driven); vitest green; tsc clean.
+- nogo: any Date.now()/randomness in types/factories NO_GO.
 
-## Task 2: vocabulary builtin base domain registry and deliverable evidence map
-- Files: src/core/routing3/vocabulary-builtin.ts, tests/core/routing3/vocabulary-domains.test.ts
+## Task 2: stage-1 elimination
+- Files: src/core/routing3/stage-eliminate.ts, tests/core/routing3/stage-eliminate.test.ts
 - Scope: src/core/routing3/, tests/core/routing3/
 - Dependencies: Task 1
 ### Description
-Extend vocabulary-builtin.ts with the builtin base DOMAIN registry (~14 DomainDef entries per spec §1b:
-api, frontend, cli-terminal, core-runtime, orchestration, data, security, i18n, a11y, devops-ci, docs,
-build-release, agents-catalog, connectors-messaging). Each domain: real pathPatterns grounded in THIS
-repo's layout (grep src/ to verify each pattern matches something) plus generic patterns for foreign
-projects; aliases include Turkish forms where natural; description written for LLM consumption (content
-axis). Also: DELIVERABLE_EVIDENCE map — file-path → DeliverableType classifier (extension + path rules:
-tests/ or *.test.* → code-test, docs/ or *.md → doc, .github/workflows → workflow, agent.json/skill
-manifests → manifest, migrations → migration, scripts/ → script, config files → config, src/* → code-src).
-Pure functions, no fs access.
+`eliminate(requirement, candidates) → {survivors, eliminated: [{agentId, reason(typed enum)}]}`. Hard
+filters, in documented order: needsWrite ∧ ¬writeAuthority → OUT · requirement workType marked
+proficiency 'never' on the candidate → OUT · role contradiction (review-workType ↔ writeAuthority-only
+implementer role and vice versa; derive from capabilities.positional.role) → OUT · deliverable ⊄
+candidate deliverables (when candidate declares a non-empty deliverables list) → OUT. Pure; every
+elimination carries the typed reason (feeds DecisionStory). This is the generalization of V2's
+write-denied HARD-exclude — pin that specific case (construction requirement + deniedTools Write agent).
 ### goNogo
-- goCriteria: every domain has ≥1 pathPattern verified to match a real path in this repo (assert in test against a fixture list); classifyDeliverable covers all 9 types with table-driven tests; vitest green; tsc clean.
-- nogo: domain table living anywhere except vocabulary-builtin NO_GO; fs access in pure classifiers NO_GO.
+- goCriteria: each filter table-driven both directions; elimination reasons asserted; the V2 write-denied parity pin green; vitest green; tsc clean.
+- nogo: any bonus/score math in this stage NO_GO (elimination is binary).
 
-## Task 3: vocabulary 3-layer registry loader
-- Files: src/core/routing3/vocabulary.ts, tests/core/routing3/vocabulary-loader.test.ts
+## Task 3: content-axis deterministic scorer
+- Files: src/core/routing3/axis-content.ts, tests/core/routing3/axis-content.test.ts
+- Scope: src/core/routing3/, tests/core/routing3/
+- Dependencies: Task 1
+### Description
+`scoreContentDeterministic(requirement, capability) → {score 0-1, evidence}` for governance mode and as
+the AI-stage cross-check baseline (Slice-2). Mapping: requirement.workType vs capability proficiency —
+primary→1.0, secondary→0.7, able→0.4 (constants from ONE exported table, not scattered literals);
+subtype rolls up to parent. When requirement.content provenance is 'structural' with null semantic
+fields, expertise/personaSlices contribute NOTHING (no prose matching in deterministic mode — the
+word-inference bans hold by construction; pin with paired inputs). Skills scored through the same
+matchSpace normalizer (Slice-0 Task-8 export).
+### goNogo
+- goCriteria: proficiency table pinned; structural-null contributes zero prose signal (paired pin); agent and skill scored via one code path; vitest green; tsc clean.
+- nogo: keyword matching against title/description text NO_GO.
+
+## Task 4: positional-axis scorer
+- Files: src/core/routing3/axis-positional.ts, tests/core/routing3/axis-positional.test.ts
+- Scope: src/core/routing3/, tests/core/routing3/
+- Dependencies: Task 1
+### Description
+`scorePositional(requirement, capability) → {score 0-1, evidence}`: weighted domain overlap
+(requirement domain weights × capability domain proficiency; '*' wildcard counts as 'able'-level,
+never outranking an explicit domain owner — pin), surface overlap, deliverable coverage ratio.
+Deterministic, vocabulary-driven (domain ids resolved against the loaded vocabulary; unknown-domain
+in a capability → typed issue surfaced, not silently zero).
+### goNogo
+- goCriteria: explicit-domain-owner beats wildcard pin; unknown-domain surfaces typed issue; overlap math table-driven; vitest green; tsc clean.
+- nogo: silent-zero on unknown domain NO_GO.
+
+## Task 5: numerical-axis scorer
+- Files: src/core/routing3/axis-numerical.ts, tests/core/routing3/axis-numerical.test.ts
+- Scope: src/core/routing3/, tests/core/routing3/
+- Dependencies: Task 1
+### Description
+`scoreNumerical(requirement, capability, cellStats) → {score 0-1, evidence}`: outcome-cell success
+contribution (cell = workType×domain×agent from learning-cells snapshot; missing cell = neutral 0.5,
+NEVER a penalty for new agents — the Slice-0 §8 anti-cold-start note), size↔capacity fit, costTier
+alignment with requirement effort/risk class, modelPreference validity checked against model-registry
+ids at score time (zero-hardcode: no model literals here). Per ADR-G-006 tomorrow-clause the axis
+carries cost/latency/risk hooks: latency/provider-health inputs are typed OPTIONAL fields consumed
+when present (S2+ wires live values) — absent inputs = neutral, never fabricated.
+### goNogo
+- goCriteria: cold-start-neutral pin; cell contribution table-driven; optional latency/health inputs neutral-when-absent pinned; no model-name literals (grep-pin in test); vitest green; tsc clean.
+- nogo: hardcoded model/provider names NO_GO.
+
+## Task 6: weighted ranking with calibrated confidence and tie detection
+- Files: src/core/routing3/stage-rank.ts, tests/core/routing3/stage-rank.test.ts
+- Scope: src/core/routing3/, tests/core/routing3/
+- Dependencies: Task 3, Task 4, Task 5
+### Description
+`rank(scored, config) → {ordered, top, confidence, indecision?: 'tie'|'low-confidence'}` — finalScore =
+weighted sum with config weights (routing_v3.weights, already validated sum=1.0); confidence CALIBRATED:
+function of top-vs-runner-up gap AND absolute top score (document the formula; it must be monotonic in
+both — property-test with fast-check-style manual cases, no new deps). Tie = gap under configured
+epsilon; low-confidence = top under routing_v3.confidenceFloor. Both produce indecision (→ Brain
+escalation downstream, decision-5). Deterministic total order: equal finalScore breaks by explicit
+documented key (higher content-axis, then agentId lexicographic LAST-resort — never silent).
+### goNogo
+- goCriteria: weight-config respected (override changes order, pinned); monotonicity cases green; tie and floor both yield indecision; deterministic order pin (same input twice → identical array); vitest green; tsc clean.
+- nogo: undocumented tie-break NO_GO.
+
+## Task 7: verifier cross-checks
+- Files: src/core/routing3/verifier.ts, tests/core/routing3/verifier.test.ts
 - Scope: src/core/routing3/, tests/core/routing3/
 - Dependencies: Task 1, Task 2
 ### Description
-`loadVocabulary(projectRoot, opts?)`: merge builtin-base < org-overlay (path from opts, absent-tolerant)
-< project (`.deckent/routing/vocabulary.json`). Zod-validate each layer (schema in this module); higher
-layer wins on duplicate domain id; produce a MergeReport {layerCounts, shadowed[], invalid[]} — shadowing
-is reported, never silent. Unknown fields rejected loudly (zod strict). Missing project file = builtin-only
-(zero-config path works). Result object frozen (no mutable leak). Typed errors for malformed layers;
-one bad layer does NOT abort the merge (skip + report, fail-soft with visibility).
+`verify(requirement, candidate, context) → VerifierVerdict {pass | typed violations[]}`. Checks:
+content-claim vs structural evidence conflict (e.g. proposed workType 'document' while deliverables
+are 100% code-src → CONTENT_STRUCTURAL_CONFLICT — the LLM-cannot-bypass gate for Slice-2, but built
+and tested NOW on deterministic inputs) · deliverable⊆capability re-assert · writeAuthority re-assert
+(defense-in-depth: verifier NEVER trusts that elimination ran) · forceAgent path: force bypasses
+RANKING but every verifier authority check still applies, force+violation → warning verdict requiring
+confirmation (ADR-G-006 force-* semantics preserved).
 ### goNogo
-- goCriteria: hermetic tmpdir tests for all three layers + shadowing + malformed-layer fail-soft + frozen result; vitest green; tsc clean.
-- nogo: silent shadowing NO_GO; mutable registry leak NO_GO.
+- goCriteria: each check both directions; force-bypass-ranking-not-verifier pin; defense-in-depth pin (unfiltered candidate still caught); vitest green; tsc clean.
+- nogo: verifier trusting upstream stages NO_GO.
 
-## Task 4: requirement-vector schema and positional producer
-- Files: src/core/routing3/requirement-vector.ts, tests/core/routing3/requirement-positional.test.ts
-- Scope: src/core/routing3/, tests/core/routing3/
-- Dependencies: Task 3
-### Description
-RequirementVector type + zod per spec §2a (content/positional/numerical). Implement
-`producePositional(task, vocabulary)`: domains from scope.directories+filesWrite matched against
-vocabulary pathPatterns (weight = share of matching writes; evidence field names the matched pattern);
-deliverables via classifyDeliverable ratios; needsWrite from filesWrite non-empty; surfaces from domain
-defs; language detection reuse — read src/core/routing-engine.ts detectHeuristicLanguage for the existing
-heuristic and REUSE it via import if exported or lift a copy into routing3 with a provenance comment
-(do NOT modify routing-engine.ts). Deterministic, pure, fs-free.
-### goNogo
-- goCriteria: table-driven tests incl. a task writing tests/ only (deliverables 100% code-test), a mixed src+tests task, a docs task, a .github/workflows task; agent display-names present in title/description provably do NOT affect positional output (negative pin); vitest green; tsc clean.
-- nogo: touching routing-engine.ts NO_GO; prose text influencing positional axis NO_GO.
-
-## Task 5: requirement-vector numerical producer
-- Files: src/core/routing3/requirement-vector.ts, tests/core/routing3/requirement-numerical.test.ts
-- Scope: src/core/routing3/, tests/core/routing3/
-- Dependencies: Task 4
-### Description
-`produceNumerical(task)`: fileCount/moduleCount from scope (module = top-level src subdir),
-estimatedSize tiering (trivial/small/medium/large/epic — mirror the thresholds used by the V2
-intent-classifier complexity block; read it, copy thresholds with a source comment, do not import it),
-effortClass passthrough from task if present else 'normal', riskClass heuristic: 'high' when filesWrite
-touches config/migration/security-domain paths (vocabulary-driven, not hardcoded path literals),
-else 'low'|'medium' by size. Pure, deterministic.
-### goNogo
-- goCriteria: threshold table-driven tests; riskClass derives from vocabulary domain match not string literals (pin: renaming a security pathPattern in a fixture vocabulary changes riskClass); vitest green; tsc clean.
-- nogo: hardcoded path literals for risk NO_GO.
-
-## Task 6: structural content producer (governance-mode backbone)
-- Files: src/core/routing3/requirement-vector.ts, tests/core/routing3/requirement-content-structural.test.ts
-- Scope: src/core/routing3/, tests/core/routing3/
-- Dependencies: Task 4, Task 5
-### Description
-`produceContentStructural(task, positional)`: workType from STRUCTURAL evidence only — deliverable
-dominance (doc→document, config→configure, migration→migrate, workflow→configure), review/analyze
-detectable only via zero-filesWrite + read-heavy scope (analyze) — otherwise workType='build' with
-provenance:'structural' and calibratedConfidence LOW (constant from config, not magic number).
-semanticTags/summary left null at this provenance (LLM fills them in Slice-2; null is a VALID modeled
-state here, not a stub — governance mode ships on exactly this producer). HARD negative guarantees
-(the two word-inference bans): the token 'test' anywhere in title/description MUST NOT alter output;
-an agent display-name in prose MUST NOT alter output — both pinned with paired-input tests
-(same task ± the token → identical vectors).
-### goNogo
-- goCriteria: paired-input negative pins for 'test' token and agent-name token both green; deliverable-dominance table tests; provenance+confidence fields asserted; vitest green; tsc clean.
-- nogo: any keyword table over prose in this producer NO_GO.
-
-## Task 7: capability-vector schema for agents
-- Files: src/core/routing3/capability-vector.ts, tests/core/routing3/capability-schema.test.ts
-- Scope: src/core/routing3/, tests/core/routing3/
-- Dependencies: Task 1
-### Description
-agent.json-v3 `capabilities` zod schema per spec §2b: capabilitiesVersion:3; content {workTypes:
-[{type, proficiency}], expertise: string[], personaSlices: string[]}; positional {domains:
-[{id|'*', proficiency}], surfaces[], writeAuthority: boolean, role, deliverables: DeliverableType[]};
-numerical {preferredModel?: string (validated against model-registry ids at LOAD time, never literal-
-checked here — zero-hardcode), costTier, maxParallel}. Explicit rule: outcome-stats NEVER in manifest
-(schema rejects a stats key inside capabilities). Universal test-capability rule as a helper:
-`hasTestCapability(cap) = cap.positional.writeAuthority === true` (Alperen decision — no test workType,
-no test field). validateCapabilities() returns typed issues list (for lint/doctor reuse).
-### goNogo
-- goCriteria: schema round-trips a full valid example; rejects stats-in-manifest, unknown workType, proficiency typos; hasTestCapability pinned both ways; vitest green; tsc clean.
-- nogo: a 'test' entry in workTypes accepted by schema NO_GO.
-
-## Task 8: capability profile schema for skills
-- Files: src/core/routing3/capability-vector.ts, tests/core/routing3/skill-profile-schema.test.ts
+## Task 8: ownership invariant and catalog-gap surfacing
+- Files: src/core/routing3/verifier.ts, tests/core/routing3/ownership-invariant.test.ts
 - Scope: src/core/routing3/, tests/core/routing3/
 - Dependencies: Task 7
 ### Description
-SkillProfile variant of the capability schema (skills share the matching space per the vectorial
-directive): {profileVersion:3, workTypes[], domains[], expertise[], deliverables[]} — no writeAuthority/
-role (skills are knowledge, not actors); tokenCost passthrough field. validateSkillProfile() with typed
-issues. Export a shared `matchSpace(agentCap | skillProfile)` normalizer returning the common axes shape
-the future pipeline consumes (one matching space, per directive).
+Extend verifier module: `assertOwnership(requirement, catalog) `— zero surviving candidates after
+elimination+verify → typed `CatalogGapError` carrying {workType, domains, eliminatedSummary} (NEVER a
+silent fallback — replaces V2's AGENT_FALLBACK_CHAIN class). Anti-temp invariant: a `source:'learned'`
+temp agent may win ONLY when no builtin candidate survives with finalScore within the configured
+epsilon — Sprint-205 guarantee re-expressed vectorially, pinned with a builtin-vs-temp fixture pair.
 ### goNogo
-- goCriteria: schema tests + matchSpace returns identical shape for agent and skill inputs (structural pin); vitest green; tsc clean.
-- nogo: divergent axis shapes between agent and skill NO_GO.
+- goCriteria: CatalogGapError carries actionable payload (asserted); anti-temp vector pin green (temp loses to comparable builtin, wins when genuinely alone); vitest green; tsc clean.
+- nogo: any fallback-chain reimplementation NO_GO.
 
-## Task 9: v2 to v3 manifest migrator
-- Files: src/core/routing3/manifest-migrator.ts, tests/core/routing3/manifest-migrator.test.ts
+## Task 9: policy-pack schema and 3-layer loader
+- Files: src/core/routing3/policy-pack.ts, tests/core/routing3/policy-pack.test.ts
 - Scope: src/core/routing3/, tests/core/routing3/
-- Dependencies: Task 7, Task 8
-### Description
-`migrateManifestV2toV3(manifest, vocabulary)`: map activation.rules intent.primary scores → workTypes
-proficiency (10→primary, 7-9→secondary, 5-6→able; V2 intents map: implementation→build, bugfix→fix,
-refactor→refactor, documentation→document, security→domain 'security' NOT a workType (+review secondary
-for auditor roles), devops→domain 'devops-ci' + configure, migration→migrate, design/architecture→
-analyze+build-secondary, performance→analyze + domain, config→configure); domains from V2 domain fields +
-BUILTIN_AGENT_DOMAINS knowledge (read agent-pool.ts, copy the mapping data with provenance comment,
-do not import agent-pool); writeAuthority from deniedTools; result marked `provisional: true`.
-Exclusions map to 'never' proficiencies. Deterministic; collects per-manifest typed issues, never throws
-on a single bad manifest.
-### goNogo
-- goCriteria: fixture migrations for refactorer (refactor-only → refactor:primary, no build), implementer (build:primary), security-auditor (review:primary + security domain), doc-writer excludes → never entries; provisional flag always set; vitest green; tsc clean.
-- nogo: importing agent-pool.ts NO_GO; a migrator that throws on one bad manifest NO_GO.
-
-## Task 10: routing3 config schema and 3-layer merge
-- Files: src/core/config-types.ts, src/core/routing3/config.ts, tests/core/routing3/config.test.ts
-- Scope: src/core/, tests/core/routing3/
 - Dependencies: Task 1
 ### Description
-`routing_v3` config block: {enabled:false (cut-over flips in Slice-3), weights {content:0.5, positional:0.3,
-numerical:0.2}, confidenceFloor, governanceMode:'ai'|'deterministic', topK, structuralConfidence} — extend
-config-types with zod schema following the existing V1-Pick/nervous_system pattern (read config-types.ts
-first); defaults in ONE place; routing3/config.ts resolves via the existing 3-layer config merge
-(src/core/config.ts). Weights must sum to 1.0 (validated, typed error otherwise).
+PolicyPack zod schema: rules of shape {id, description, when {workTypes?, domains?, riskClass?},
+require {roles? , agentAllowlist?, denyAgents?, minConfidence?, escalate?: boolean}} — declarative,
+no code execution. 3-layer load (builtin-none < org < project `.deckent/routing/policy-pack.json`)
+reusing the vocabulary loader's merge/shadowing-report pattern (read vocabulary.ts first; share
+helpers if cleanly extractable, do NOT copy-paste the merge). Typed validation issues; absent files
+= empty pack (zero-config clean).
 ### goNogo
-- goCriteria: schema+merge tests (project overrides org overrides default); weights-sum validation pinned; enabled defaults FALSE; vitest green; tsc clean.
-- nogo: defaults duplicated in two places NO_GO.
+- goCriteria: schema round-trip + rejection cases; 3-layer merge + shadowing report; absent-file clean; vitest green; tsc clean.
+- nogo: executable/eval-style policy conditions NO_GO.
 
-## Task 11: sync wire for capabilities migration (dual-carry)
-- Files: src/cli/commands/sync.ts, tests/cli/sync-capabilities-migrate.test.ts
-- Scope: src/cli/, src/core/routing3/, tests/cli/
-- Dependencies: Task 9
-### Description
-Extend `deckent sync` (adapter phase, alongside the 444 agent-prompt-sync): for each builtin agent
-manifest LACKING `capabilities`, run the migrator and write the v3 block ALONGSIDE activation.rules
-(dual-carry; nothing removed), marked provisional. Manifests already carrying capabilities are untouched
-(byte-stable). Report extends the existing sync report (migrated / already-v3 / issues). Hermetic tmpdir
-tests only — the real repo tree is re-synced HOST-SIDE by Brain post-sprint.
-Smoke: node dist/cli/entry.js sync --adapters-only → exit 0 and report lists migrated counts.
-### goNogo
-- goCriteria: dual-carry proven (activation.rules byte-identical after write); already-v3 byte-stability pinned; report structure asserted; hermetic; vitest green; tsc clean.
-- nogo: removing or reordering activation.rules NO_GO; writing real .deckent NO_GO.
-
-## Task 12: agent-pool additive load of capabilities
-- Files: src/core/agent-pool.ts, tests/core/routing3/agent-pool-capabilities.test.ts
-- Scope: src/core/, tests/core/routing3/
-- Dependencies: Task 7
-### Description
-AgentDefinition gains optional `capabilities` (typed via capability-vector schema); loadAgents parses+
-validates it when present (invalid capabilities → recorded via the existing _recordInvalidManifest
-channel as a WARNING, agent still loads on its V2 fields — additive, born-590 visibility pattern).
-ZERO change to any V2 scoring path: routeTaskV2 output must be bit-identical with and without
-capabilities present (pin this with a routing test on a fixture pool). Surgical diff.
-### goNogo
-- goCriteria: V2-decision-identical pin (same task, pool ± capabilities → same RoutingDecision) green; invalid-capabilities visible-skip warning pinned; existing agent-pool suite untouched and green; tsc clean.
-- nogo: any V2 scoring behavior change NO_GO.
-
-## Task 13: builtin capabilities authoring — construction family
-- Files: src/core/builtins/agents/implementer/agent.json, src/core/builtins/agents/refactorer/agent.json, src/core/builtins/agents/bug-fixer/agent.json
-- Scope: src/core/builtins/agents/
-- Dependencies: Task 7, Task 11
-### Description
-Author REAL (non-provisional) `capabilities` v3 blocks for implementer (build:primary, fix:secondary,
-domains '*':able, writeAuthority true, deliverables code-src+code-test), refactorer (refactor:primary,
-review:able, NO build entry beyond 'never'? — express the F3 spec: build MUST be 'never' so the old
-catch-all can never return), bug-fixer (fix:primary, build:secondary). Keep activation.rules untouched
-(dual-carry). Ground every entry in the agent's PROMPT.md persona (read it) — capabilities must not
-promise what the persona does not deliver. Validate with the Task-7 validator (import in a spec test is
-NOT in your files — run `npx vitest run tests/core/routing3/` which includes schema tests, plus
-tests/core/builtins/ catalog conventions).
-### goNogo
-- goCriteria: all 3 manifests valid per validateCapabilities; refactorer carries build:never (pin via catalog test run); npx vitest run tests/core/builtins/ green; tsc clean.
-- nogo: provisional:true on these hand-authored blocks NO_GO; activation.rules diff NO_GO.
-
-## Task 14: builtin capabilities authoring — architecture and review family
-- Files: src/core/builtins/agents/architect/agent.json, src/core/builtins/agents/architecture-planner/agent.json, src/core/builtins/agents/code-reviewer/agent.json
-- Scope: src/core/builtins/agents/
-- Dependencies: Task 7, Task 11
-### Description
-Same contract as Task 13 for: architect (analyze:primary, review:secondary, build:never — Write-forbidden
-advisor per its deniedTools; writeAuthority false), architecture-planner (analyze:primary, document:
-secondary), code-reviewer (review:primary, refactor:able, writeAuthority per its manifest reality).
-Persona-grounded; dual-carry; validator green.
-### goNogo
-- goCriteria: 3 valid manifests; architect writeAuthority=false pinned; vitest tests/core/builtins/ green; tsc clean.
-- nogo: capabilities contradicting deniedTools NO_GO.
-
-## Task 15: builtin capabilities authoring — surface builders family
-- Files: src/core/builtins/agents/api-builder/agent.json, src/core/builtins/agents/api-designer/agent.json, src/core/builtins/agents/frontend-designer/agent.json
-- Scope: src/core/builtins/agents/
-- Dependencies: Task 7, Task 11
-### Description
-Same contract: api-builder (build:primary, domains api:primary, surfaces api), api-designer
-(analyze:primary + document:secondary, domains api — designer not builder), frontend-designer
-(build:primary, domains frontend:primary, deliverables incl. asset). Persona-grounded; dual-carry.
-### goNogo
-- goCriteria: 3 valid manifests; api-builder vs api-designer builder/advisor distinction expressed in workTypes; vitest tests/core/builtins/ green; tsc clean.
-- nogo: identical capability blocks for builder vs designer NO_GO.
-
-## Task 16: builtin capabilities authoring — audit family
-- Files: src/core/builtins/agents/security-auditor/agent.json, src/core/builtins/agents/accessibility-auditor/agent.json, src/core/builtins/agents/performance-analyzer/agent.json
-- Scope: src/core/builtins/agents/
-- Dependencies: Task 7, Task 11
-### Description
-Same contract: security-auditor (review:primary, analyze:secondary, domains security:primary, role
-reviewer), accessibility-auditor (review:primary, domains a11y:primary — today unreachable via keywords;
-capabilities make it reachable via domain evidence), performance-analyzer (analyze:primary, domains
-core-runtime + performance-relevant surfaces, fix:able). Persona-grounded; dual-carry.
-### goNogo
-- goCriteria: 3 valid manifests; auditors carry review-role semantics (build:never); vitest tests/core/builtins/ green; tsc clean.
-- nogo: an auditor with build:primary NO_GO.
-
-## Task 17: builtin capabilities authoring — pipeline and integration family
-- Files: src/core/builtins/agents/devops-engineer/agent.json, src/core/builtins/agents/ci-guardian/agent.json, src/core/builtins/agents/integration-engineer/agent.json
-- Scope: src/core/builtins/agents/
-- Dependencies: Task 7, Task 11
-### Description
-Same contract: devops-engineer (configure:primary, build:secondary, domains devops-ci:primary) vs
-ci-guardian (configure:primary scoped to CI + review:secondary, domains devops-ci — differentiate the
-10↔10 twins: ci-guardian = pipeline guard + verification, devops-engineer = infra construction; the
-capability blocks MUST differ meaningfully), integration-engineer (build:primary, domains
-connectors-messaging:primary + api:secondary). Persona-grounded; dual-carry.
-### goNogo
-- goCriteria: 3 valid manifests; devops-engineer and ci-guardian blocks differ in ≥2 axes (pin); vitest tests/core/builtins/ green; tsc clean.
-- nogo: twin manifests remaining twins NO_GO.
-
-## Task 18: builtin capabilities authoring — content and platform family
-- Files: src/core/builtins/agents/doc-writer/agent.json, src/core/builtins/agents/i18n-specialist/agent.json, src/core/builtins/agents/terminal-ux-engineer/agent.json
-- Scope: src/core/builtins/agents/
-- Dependencies: Task 7, Task 11
-### Description
-Same contract: doc-writer (document:primary, domains docs:primary, deliverables doc), i18n-specialist
-(build:secondary + review:secondary, domains i18n:primary — the probe-misroute class dies via domain
-evidence), terminal-ux-engineer (build:primary, domains cli-terminal:primary). Persona-grounded; dual-carry.
-### goNogo
-- goCriteria: 3 valid manifests; i18n-specialist domain i18n:primary present; vitest tests/core/builtins/ green; tsc clean.
-- nogo: i18n expressed as keywords instead of domain NO_GO.
-
-## Task 19: builtin capabilities authoring — data and remaining family
-- Files: src/core/builtins/agents/data-engineer/agent.json, src/core/builtins/agents/migration-specialist/agent.json, src/core/builtins/agents/observability-engineer/agent.json
-- Scope: src/core/builtins/agents/
-- Dependencies: Task 7, Task 11
-### Description
-Same contract: data-engineer (build:primary, domains data:primary), migration-specialist
-(migrate:primary, domains data:secondary), observability-engineer (build:secondary + analyze:primary,
-domains devops-ci + core-runtime). Persona-grounded; dual-carry. If any remaining builtin agent
-directory exists that Tasks 13-19 did not cover, list it in your result notes — do NOT author it.
-### goNogo
-- goCriteria: 3 valid manifests; coverage gap list honest in notes; vitest tests/core/builtins/ green; tsc clean.
-- nogo: authoring an uncovered agent outside Files NO_GO.
-
-## Task 20: builtin skill profiles authoring
-- Files: src/core/builtins/skills/, tests/core/routing3/skill-profiles-builtin.test.ts
-- Scope: src/core/builtins/skills/, tests/core/routing3/
-- Dependencies: Task 8
-### Description
-Author SkillProfile v3 blocks for every builtin skill manifest (read src/core/builtins/skills/ to
-enumerate; add `profile` field alongside existing fields — dual-carry, nothing removed). Ground each in
-the skill's SKILL.md content; a skill whose content file is missing/empty gets NO profile and is listed
-in a GHOST_SKILLS export consumed later by learning-cell rejection (the api-design ghost class from the
-corpus — profiles must not fabricate competence). Test sweeps all skill manifests: every profile valid
-per validateSkillProfile, ghosts listed not profiled.
-### goNogo
-- goCriteria: sweep test green over the real builtin skills tree (read-only); ghost list non-fabrication pinned (a contentless fixture skill → ghost, not profile); tsc clean.
-- nogo: profiling a contentless skill NO_GO.
-
-## Task 21: vocabulary doctor checks
-- Files: src/cli/commands/doctor.ts, src/core/routing3/vocabulary-doctor.ts, tests/core/routing3/vocabulary-doctor.test.ts
-- Scope: src/cli/, src/core/routing3/, tests/core/routing3/
-- Dependencies: Task 3
-### Description
-`vocabulary-doctor.ts`: checks — layer shadowing report, dead pathPatterns (match nothing under
-projectRoot), duplicate aliases across domains, domains with no description (LLM axis needs it).
-Wire into `deckent doctor` output section (i18n messages en+tr via getMessage). Read-only on the real
-tree; hermetic tests on tmpdir fixtures.
-Smoke: node dist/cli/entry.js doctor → exit 0 and a Vocabulary section renders.
-### goNogo
-- goCriteria: each check behavior-tested (fixture with shadowed domain, dead pattern, dup alias); doctor section i18n-clean (no hardcoded user-facing strings — pin by asserting getMessage keys exist in en+tr); vitest green; tsc clean.
-- nogo: hardcoded user-facing strings NO_GO.
-
-## Task 22: vocabulary bootstrap generator from project analysis
-- Files: src/core/routing3/vocabulary-bootstrap.ts, tests/core/routing3/vocabulary-bootstrap.test.ts
+## Task 10: policy enforcement in verifier
+- Files: src/core/routing3/verifier.ts, tests/core/routing3/policy-enforcement.test.ts
 - Scope: src/core/routing3/, tests/core/routing3/
-- Dependencies: Task 3
+- Dependencies: Task 7, Task 9
 ### Description
-`bootstrapProjectVocabulary(projectRoot, stack)`: derive project-layer DomainDef candidates from the
-detected stack (read src/core/ for the existing detectProjectStack surface and consume its OUTPUT type —
-do not reimplement detection) + top-level src/ directory map (each substantial src subdir absent from
-builtin domains → candidate domain with derived pathPatterns). Returns candidates + rationale; WRITING
-`.deckent/routing/vocabulary.json` happens only through an explicit writeVocabulary(projectRoot, defs)
-that refuses to overwrite an existing file with user edits (byte-compare against last-generated marker —
-follow the agent-prompt-sync three-way precedent). Real bootstrap run is HOST-SIDE by Brain post-sprint.
+Wire policy-packs into verify(): matching rules (when-clause vs requirement) apply their require-clause
+— role restriction, allow/deny lists, minConfidence override, escalate:true forces Brain escalation
+regardless of score. Violations are typed with the policy id (auditable story). Enterprise example
+fixtures: "security-domain → only role reviewer" and "config deliverable on high-risk → escalate".
 ### goNogo
-- goCriteria: tmpdir project fixture → sensible candidates (src/nervous → 'nervous' candidate domain); overwrite-protection all three branches behavior-tested; vitest green; tsc clean.
-- nogo: silent overwrite of user-edited vocabulary NO_GO; writing real .deckent NO_GO.
+- goCriteria: both example fixtures behavior-tested; policy violation carries policy id into verdict; non-matching rules inert (pin); vitest green; tsc clean.
+- nogo: policy silently reordering instead of verdict/escalation NO_GO.
 
-## Task 23: ADR-G-006 today-clause amendment draft
-- Files: docs/adr/adr-g-006-amendment-v3-2026-07-14.md
-- Scope: docs/adr/
+## Task 11: learning-cells sidecar module
+- Files: src/core/routing3/learning-cells.ts, tests/core/routing3/learning-cells.test.ts
+- Scope: src/core/routing3/, tests/core/routing3/
 - Dependencies: none
 ### Description
-Draft the amendment document updating ADR-G-006's TODAY clause from routeTaskV2 multi-signal scoring to
-RoutingEngineV3 vector-selection (per the design spec): what today becomes (3-axis vectors, 5-stage
-hybrid pipeline, vocabulary registry, capabilities SSOT), what is PRESERVED verbatim (diversity guards
-≤60%/≥4-distinct as V3-journal checks · FIX fresh-eyes rotation semantics · force-* override semantics ·
-anti-temp invariant · honest-empty), what the tomorrow clause becomes (learned weight-tuning, provider-
-health axis activation, embedding prefilter default-on at catalog scale). Cite the evidence corpus paths
-and Alperen approval dates. Follow ADR-G-019 authoring standard (today+tomorrow, transparent intent).
-DB insertion is done HOST-SIDE by Brain post-sprint (workers never touch .brain).
+Cell store `.deckent/stats/routing-cells.json` (schema: {schemaVersion, cells: {"<workType>|<domain>|
+<agentId>": {uses, successes, qualitySum, lastSprint}}}): `readCellsSnapshot(projectRoot)` (frozen),
+`recordOutcome(projectRoot, {workType, domain, agentId, verdict, quality, sprintId})` single-writer
+tmp+rename atomic, idempotent per (taskId, sprintId) via a bounded recent-keys ring (follow
+sprint-finalizer's recentSprints idempotency precedent — read it). Per-task DNA by CONTRACT: the
+API takes the task's OWN vector fields; nothing here reads tasks[0] (kills the K4 bug class in the
+new path). Tests tmpdir-hermetic.
 ### goNogo
-- goCriteria: document complete per ADR-G-019 structure; preserved-guards section names all five; lint:link clean for cited paths.
-- nogo: touching .brain/memory.db NO_GO; altering the original ADR text file if any NO_GO.
+- goCriteria: atomicity (tmp+rename asserted), idempotency pin, frozen snapshot pin; vitest green; tsc clean.
+- nogo: writing real .deckent NO_GO; any cross-task DNA sharing in the API NO_GO.
 
-## Task 24: schema round-trip integration test
-- Files: tests/core/routing3/foundation-roundtrip.test.ts
+## Task 12: ghost rejection and cell-quality gate
+- Files: src/core/routing3/learning-cells.ts, tests/core/routing3/ghost-rejection.test.ts
+- Scope: src/core/routing3/, tests/core/routing3/
+- Dependencies: Task 11
+### Description
+recordOutcome consults the Slice-0 GHOST_SKILLS export (skill-profiles task) and a content-existence
+probe (agent PROMPT.md non-empty) — outcomes attributed to ghost entities are REJECTED with a typed,
+counted reason (visible in a `rejectedOutcomes` ledger section, never silent — the api-design
+phantom-100% class dies at the source). Quality values clamped to [0,100]; malformed outcome →
+typed reject, store untouched.
+### goNogo
+- goCriteria: ghost outcome rejected+counted (fixture ghost); clamp + malformed-reject pins; store byte-stable on rejected writes; vitest green; tsc clean.
+- nogo: silent drop of a rejected outcome NO_GO.
+
+## Task 13: decision-story builder
+- Files: src/core/routing3/decision-story.ts, tests/core/routing3/decision-story.test.ts
+- Scope: src/core/routing3/, tests/core/routing3/
+- Dependencies: Task 1, Task 2, Task 6
+### Description
+`buildStory(pipelineTrace) → DecisionStory`: human-readable WHY — one summary sentence (winner + the
+decisive axis), ordered stage steps, eliminated list with reasons, indecision/escalation explanation.
+Structured fields (message-KEY + params, not baked prose) so CLI/desktop render via i18n (en+tr keys
+added to messages.ts for the CLI-facing renderer `renderStoryLines(story, lang)`); model-surface
+serialization stays EN. WORKER-LIVE-LOG contract honored: ≤80-char short-form line per step +
+detail payload (MASTER-PLAN #582 consumer-ready).
+### goNogo
+- goCriteria: story from a full fixture trace asserted (summary + steps + eliminated); short-form ≤80-char pin; en+tr keys exist (pin); vitest green; tsc clean.
+- nogo: hardcoded user-facing prose in renderer NO_GO.
+
+## Task 14: journal v3 writer reader and replay
+- Files: src/core/routing3/journal.ts, tests/core/routing3/journal-replay.test.ts
+- Scope: src/core/routing3/, tests/core/routing3/
+- Dependencies: Task 1
+### Description
+Append-only JSONL `.deckent/routing/decisions-v3/<sprint>.jsonl`: `appendDecision(projectRoot, entry)`,
+`readSprintJournal`, and `replayDecision(entry, catalogSnapshot) → RoutingDecisionV3` — re-derives the
+decision from the journal's recorded vectors + config-hash WITHOUT any AI call and asserts equality
+with the recorded outcome (the spec §5 determinism proof lives here). Corrupted line → typed skip
+with position report (fail-soft visible), never aborts the read.
+### goNogo
+- goCriteria: replay-equality pin on fixture entries; corrupted-line visible-skip; append-only (no rewrite) asserted; vitest green; tsc clean.
+- nogo: replay needing an LLM call NO_GO.
+
+## Task 15: routeTaskV3 orchestrator (deterministic end-to-end)
+- Files: src/core/routing3/route-task-v3.ts, tests/core/routing3/route-task-v3.test.ts
+- Scope: src/core/routing3/, tests/core/routing3/
+- Dependencies: Task 2, Task 6, Task 8, Task 10, Task 13, Task 14
+### Description
+`routeTaskV3(task, catalog, options) → RoutingDecisionV3`: produce vectors (Slice-0 producers; content
+via structural producer in deterministic mode) → eliminate → [contentFit slot: `options.contentFit?`
+async injectable, ABSENT in this slice = deterministic scorer] → verify (+policy) → rank → decision
+(story+journal append via options.journal). Indecision/catalog-gap/policy-escalate → decision carries
+`escalation` (typed; the Brain-consumption wire is Slice-2). governanceMode 'deterministic' path is
+COMPLETE and honest (provenance:'deterministic', confidence never inflated). Skill+persona-slice
+selection inside the SAME pipeline run (matchSpace) — one decision object carries all three
+(vectorial-directive: agent-skill-persona together).
+### goNogo
+- goCriteria: tmpdir e2e — real Slice-0 builtin catalog fixture: build-requirement→implementer; refactor→refactorer; docs→doc-writer; i18n-domain→i18n-specialist candidacy visible in ordered list; gap-fixture→CatalogGapError; escalation fixture carries typed payload; journal written+replayable; vitest green; tsc clean.
+- nogo: production call sites switched NO_GO (enabled stays false); silent fallback anywhere NO_GO.
+
+## Task 16: agent lint reachability sweep
+- Files: src/core/routing3/agent-lint.ts, tests/core/routing3/agent-lint-reachability.test.ts
+- Scope: src/core/routing3/, tests/core/routing3/
+- Dependencies: Task 15
+### Description
+`lintCatalog(catalog, vocabulary) → LintReport`: synthetic requirement sweep (every workType × every
+vocabulary domain × writeAuthority variants) through the REAL deterministic pipeline (eliminate+rank,
+no AI) → per-agent reachability (never-selected agents flagged with the nearest-miss reason),
+per-cell coverage gaps (workType×domain with zero capable agents — the ownership-invariant author-time
+lens). Pure over inputs; no fs.
+### goNogo
+- goCriteria: fixture catalog with a deliberately unreachable agent flagged with nearest-miss; gap cells enumerated; sweep deterministic (twice → identical); vitest green; tsc clean.
+- nogo: sweep bypassing the real pipeline (reimplemented scoring) NO_GO.
+
+## Task 17: agent lint overlap map and CLI wire
+- Files: src/core/routing3/agent-lint.ts, src/cli/commands/agent.ts, tests/cli/agent-lint-cli.test.ts
+- Scope: src/core/routing3/, src/cli/, tests/cli/
+- Dependencies: Task 16
+### Description
+Overlap analysis: pairwise capability-vector similarity (shared workType-proficiency × domain overlap)
+→ pairs above threshold reported ("you overlap X 87% — differentiate or merge"; the ci-guardian↔
+devops-engineer twin-lens, custom-agent author guidance per 66/100 criticism). Wire `deckent agent lint`
+subcommand (i18n en+tr, JSON mode passthrough): loads real catalog+vocabulary, prints reachability +
+gaps + overlaps, exit 1 on gap-cells (CI-usable ratchet), exit 0 otherwise.
+Smoke: node dist/cli/entry.js agent lint → exit 0 on the shipped catalog and a rendered report.
+### goNogo
+- goCriteria: overlap fixture pair reported with percentage; CLI hermetic test (tmpdir project) asserting sections + exit codes both ways; i18n keys pinned; vitest green; tsc clean.
+- nogo: hardcoded user-facing strings NO_GO.
+
+## Task 18: manifest three-way sync module
+- Files: src/core/agent-manifest-sync.ts, tests/core/agent-manifest-sync.test.ts
+- Scope: src/core/, tests/core/
+- Dependencies: none
+### Description
+agent.json counterpart of 444's agent-prompt-sync (READ src/core/agent-prompt-sync.ts FIRST and mirror
+its contract exactly): builtin agent.json → `.deckent/agents/<id>/agent.json` shadow with three-way
+protection (byte-equal-to-baseline → update; locally-edited → keep + typed conflict; missing → create),
+state in `.deckent/agents/.manifest-sync-state.json` (same schema shape as .prompt-sync-state.json,
+sha1 of last-synced builtin content). Structured report {updated, keptLocal, created, conflicts}.
+Slice-0 left 12 provisional shadows — this module is their mechanism-path resolution (real run is
+HOST-SIDE by Brain post-sprint).
+### goNogo
+- goCriteria: all three branches hermetically behavior-tested; never-silent-overwrite pin; state-file round-trip; report asserted; vitest green; tsc clean.
+- nogo: inventing a divergent state-file schema when prompt-sync's fits NO_GO; writing real .deckent NO_GO.
+
+## Task 19: manifest sync CLI wire
+- Files: src/cli/commands/sync.ts, tests/cli/sync-manifest-threeway.test.ts
+- Scope: src/cli/, tests/cli/
+- Dependencies: Task 18
+### Description
+Wire agent-manifest-sync into `deckent sync` adapter phase AFTER prompt-sync, REPLACING the Slice-0
+provisional-migrator call for shadows whose builtin already carries real capabilities (order: three-way
+manifest sync first; migrator now only fills capabilities for manifests STILL lacking them post-sync —
+adjust the 445-011 wire accordingly, dry-run purity preserved). Report lines i18n. Hermetic tests
+incl. the ordering contract and dry-run byte-stability.
+Smoke: node dist/cli/entry.js sync --adapters-only → exit 0, three-way report before migrator report.
+### goNogo
+- goCriteria: ordering contract pinned (three-way before migrator; migrator skips real-capabilities manifests); dry-run writes nothing (pin); hermetic; vitest green; tsc clean.
+- nogo: double-processing a shadow by both paths NO_GO.
+
+## Task 20: materialize the three manifest-less builtins
+- Files: src/core/builtins/agents/observability-engineer/agent.json, src/core/builtins/agents/api-designer/agent.json, src/core/builtins/agents/i18n-specialist/agent.json
+- Scope: src/core/builtins/agents/
+- Dependencies: none
+### Description
+Author full agent.json (manifestVersion 2 + REAL capabilities v3, non-provisional) for the last three
+manifest-less builtins, persona-grounded from their PROMPT.md: observability-engineer (analyze:primary,
+build:secondary, domains devops-ci+core-runtime), api-designer (analyze:primary, document:secondary,
+domains api — designer not builder), i18n-specialist (build:secondary, review:secondary, domains
+i18n:primary). Activation block: valid-but-inert V2 rules (empty rules array, minScore 5) so V2
+behavior is UNCHANGED (they were never V2-selectable via keywords; pin stays true). NOTE: catalog-
+materialize re-aim is Task 21's job — expect ITS suite red until Task 21 lands; your gate is the
+builtins+routing3 suites.
+### goNogo
+- goCriteria: 3 valid manifests (validateCapabilities); V2-inert activation (empty rules); the capabilities catalog-convention suite green (run: npx vitest run tests/core/builtins/ — read-only run, no test edits); tsc clean.
+- nogo: V2-scoreable activation rules NO_GO.
+
+## Task 21: catalog-materialize re-aim with injectable builtin dir
+- Files: src/core/agent-pool.ts, src/core/skill-pool.ts, tests/core/builtins/catalog-materialize.test.ts
+- Scope: src/core/, tests/core/builtins/
+- Dependencies: Task 20
+### Description
+The 445-019 conflict's structural fix: give AgentPoolManager (and SkillPoolManager if it shares the
+pattern) an optional `builtinDirOverride` (constructor opts or module-level test hook — pick the
+smallest surgical surface; production default UNCHANGED) so the builtin-fallback path is testable with
+a tmpdir fixture builtin tree. Re-aim catalog-materialize: fallback assertions run against a synthetic
+manifest-less fixture agent in the injected dir (the mechanism keeps a real test); the 3 newly
+materialized agents' assertions flip to manifest-loaded expectations (pool-visible, source builtin,
+prompt via shadow/builtin file precedence as-is). getAgentPrompt's builtin fallback covered via the
+same injection if applicable.
+### goNogo
+- goCriteria: catalog-materialize green WITH Task-20 manifests present; fallback mechanism still genuinely tested (synthetic fixture, injected dir); production default-path untouched (pin: no override → same dir as before); full tests/core/builtins/ green; tsc clean.
+- nogo: deleting the fallback test instead of re-aiming NO_GO.
+
+## Task 22: corpus fixture data and harness
+- Files: tests/core/routing3/fixtures/corpus-cases.json, tests/core/routing3/corpus-harness.test.ts
 - Scope: tests/core/routing3/
-- Dependencies: Task 3, Task 6, Task 9, Task 10
+- Dependencies: Task 15
 ### Description
-End-to-end foundation proof on a tmpdir fixture project: build vocabulary (3 layers) → produce
-RequirementVector (positional+numerical+structural content) for 6 representative task shapes (mirror the
-probe battery: impl-generic, refactor-worded [pin: structural producer immune to the word], docs, CI
-workflow, i18n, tests-only) → migrate a v2 fixture manifest → validate all against zod schemas →
-assert the two word-inference bans hold through the FULL pipeline (not just unit level).
+Encode the evidence corpus as data: from `.analysis/routing-v3-appendix-misroute-corpus-2026-07-14.md`
+(25 cases) + the 443 natural-experiment shape + the 12-probe battery + 445-016/445-024 — each case
+{id, title, description, scope, expected {workTypeOneOf?, domainIncludes?, agentOneOf? | pending:
+'ai-stage'}, source}. Harness runs deterministic routeTaskV3 on every non-pending case against the
+REAL builtin catalog (read-only) + builtin vocabulary; pending cases asserted as EXPLICITLY pending
+(count pinned so Slice-2 must burn them down consciously). The natural-experiment class MUST pass
+deterministically NOW (agent-name-in-title has no channel into vectors).
 ### goNogo
-- goCriteria: all 6 shapes produce schema-valid vectors with expected positional domains; full-pipeline negative pins green; npx vitest run tests/core/routing3/ fully green; npx tsc --noEmit clean.
-- nogo: any routing3 suite red NO_GO.
+- goCriteria: ≥25 encoded cases; natural-experiment paired-cases green deterministically; pending-count pinned with reasons; harness green; tsc clean.
+- nogo: weakening a case's expectation to pass NO_GO — mark pending with reason instead.
 
-## Task 25: foundation catalog conventions guard
-- Files: tests/core/builtins/agent-catalog-capabilities.test.ts
-- Scope: tests/core/builtins/
-- Dependencies: Task 13, Task 14, Task 15, Task 16, Task 17, Task 18, Task 19
+## Task 23: slice-1 deterministic e2e and replay gate
+- Files: tests/core/routing3/slice1-e2e.test.ts
+- Scope: tests/core/routing3/
+- Dependencies: Task 15, Task 17, Task 19, Task 22
 ### Description
-New catalog convention suite: EVERY builtin agent manifest carries a valid capabilities block (real,
-not provisional); refactorer build:never; architect writeAuthority:false; auditors build:never;
-ci-guardian↔devops-engineer differ in ≥2 axes; every declared domain id exists in builtin vocabulary
-(referential integrity); activation.rules still present everywhere (dual-carry guard — Slice-3 removes
-them, not before). This suite is the drift-gate for capability authoring quality.
+Final integration gate, tmpdir-hermetic: fixture project (catalog copy + vocabulary + policy-pack with
+one escalating rule) → routeTaskV3 across 8 requirement shapes → decisions + stories + journal; then
+(1) replay every journal entry → equality; (2) lintCatalog over the same fixture → no gaps; (3) policy
+escalation fixture surfaces BrainEscalation; (4) V2-unchanged guard: run routing-implementer-era +
+routing-impl-builtin + agent-impl-balance suites yourself and report counts (no modifications);
+(5) npx tsc --noEmit clean; (6) full tests/core/routing3/ green. Counts in notes.
 ### goNogo
-- goCriteria: suite green against the real builtins tree (read-only); referential-integrity check demonstrably fails on a fixture with an unknown domain id; tsc clean.
-- nogo: weakening any Task-13..19 pin to pass NO_GO.
-
-## Task 26: slice-0 integration smoke and regression sweep
-- Files: tests/core/routing3/slice0-smoke.test.ts
-- Scope: tests/core/routing3/, tests/core/
-- Dependencies: Task 11, Task 12, Task 21, Task 22, Task 24, Task 25
-### Description
-Final gate: (1) V2-unchanged proof — run the existing routing pins (tests/core/routing-implementer-era.test.ts
-tests/core/routing-impl-builtin.test.ts tests/core/agent-impl-balance.test.ts) and assert green via your
-own run (do not modify them); (2) hermetic tmpdir end-to-end: fixture project + sync-migrate → agent-pool
-loads capabilities → vectors produce → doctor vocabulary section clean; (3) npx tsc --noEmit clean;
-(4) full tests/core/routing3/ green. Report exact counts in notes.
-### goNogo
-- goCriteria: all four gates green with counts in notes; zero modifications to V2 test files.
-- nogo: any V2 routing pin red NO_GO; modifying V2 pins to pass NO_GO.
+- goCriteria: all six gates green with counts; zero V2-pin modifications.
+- nogo: any V2 routing pin red NO_GO.

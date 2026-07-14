@@ -66,8 +66,14 @@
     "capabilitiesVersion": 3,
     "content": {
       "workTypes": [
-        { "type": "analyze", "proficiency": "primary" },
-        { "type": "fix", "proficiency": "able" }
+        {
+          "type": "analyze",
+          "proficiency": "primary"
+        },
+        {
+          "type": "fix",
+          "proficiency": "able"
+        }
       ],
       "expertise": [
         "performance",
@@ -85,7 +91,10 @@
     },
     "positional": {
       "domains": [
-        { "id": "core/runtime", "proficiency": "secondary" }
+        {
+          "id": "core/runtime",
+          "proficiency": "primary"
+        }
       ],
       "surfaces": [
         "api",

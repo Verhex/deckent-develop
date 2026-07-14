@@ -72,12 +72,16 @@
     "content": {
       "workTypes": [
         {
+          "type": "document",
+          "proficiency": "primary"
+        },
+        {
           "type": "build",
           "proficiency": "never"
         },
         {
-          "type": "document",
-          "proficiency": "primary"
+          "type": "refactor",
+          "proficiency": "never"
         }
       ],
       "expertise": [
@@ -87,7 +91,12 @@
         "readme",
         "changelog"
       ],
-      "personaSlices": []
+      "personaSlices": [
+        "documentation",
+        "bugfix",
+        "security",
+        "default"
+      ]
     },
     "positional": {
       "domains": [

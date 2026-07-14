@@ -19,22 +19,40 @@
     "capabilitiesVersion": 3,
     "content": {
       "workTypes": [
-        { "type": "build", "proficiency": "primary" },
-        { "type": "fix", "proficiency": "secondary" }
+        {
+          "type": "build",
+          "proficiency": "primary"
+        },
+        {
+          "type": "fix",
+          "proficiency": "able"
+        }
       ],
       "expertise": [
         "feature construction from a spec",
         "following the codebase's existing pattern",
         "wiring new behavior into an existing surface"
       ],
-      "personaSlices": ["implementation", "bugfix", "default"]
+      "personaSlices": [
+        "implementation",
+        "bugfix",
+        "default"
+      ]
     },
     "positional": {
-      "domains": [{ "id": "*", "proficiency": "able" }],
+      "domains": [
+        {
+          "id": "*",
+          "proficiency": "able"
+        }
+      ],
       "surfaces": [],
       "writeAuthority": true,
       "role": "implementer",
-      "deliverables": ["code-src", "code-test"]
+      "deliverables": [
+        "code-src",
+        "code-test"
+      ]
     },
     "numerical": {
       "preferredModel": "sonnet",

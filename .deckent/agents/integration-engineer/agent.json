@@ -82,7 +82,16 @@
   "capabilities": {
     "capabilitiesVersion": 3,
     "content": {
-      "workTypes": [],
+      "workTypes": [
+        {
+          "type": "build",
+          "proficiency": "primary"
+        },
+        {
+          "type": "fix",
+          "proficiency": "secondary"
+        }
+      ],
       "expertise": [
         "external-integrations",
         "http-adapters",
@@ -90,14 +99,33 @@
         "secret-handling",
         "retry-policies"
       ],
-      "personaSlices": []
+      "personaSlices": [
+        "default",
+        "implementation",
+        "security",
+        "bugfix"
+      ]
     },
     "positional": {
-      "domains": [],
-      "surfaces": [],
+      "domains": [
+        {
+          "id": "connectors/messaging",
+          "proficiency": "primary"
+        },
+        {
+          "id": "api",
+          "proficiency": "secondary"
+        }
+      ],
+      "surfaces": [
+        "api"
+      ],
       "writeAuthority": true,
       "role": "implementer",
-      "deliverables": []
+      "deliverables": [
+        "code-src",
+        "code-test"
+      ]
     },
     "numerical": {
       "preferredModel": "sonnet",

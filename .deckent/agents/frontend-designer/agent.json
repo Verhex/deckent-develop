@@ -88,10 +88,6 @@
       "workTypes": [
         {
           "type": "build",
-          "proficiency": "secondary"
-        },
-        {
-          "type": "analyze",
           "proficiency": "primary"
         }
       ],
@@ -103,7 +99,10 @@
         "accessibility",
         "design-systems"
       ],
-      "personaSlices": []
+      "personaSlices": [
+        "implementation",
+        "design"
+      ]
     },
     "positional": {
       "domains": [
@@ -113,14 +112,15 @@
         }
       ],
       "surfaces": [
-        "dashboard",
-        "frontend"
+        "frontend",
+        "dashboard"
       ],
       "writeAuthority": true,
       "role": "implementer",
       "deliverables": [
         "code-src",
-        "code-test"
+        "code-test",
+        "asset"
       ]
     },
     "numerical": {

@@ -86,12 +86,20 @@
     "content": {
       "workTypes": [
         {
-          "type": "document",
-          "proficiency": "never"
-        },
-        {
           "type": "configure",
           "proficiency": "primary"
+        },
+        {
+          "type": "build",
+          "proficiency": "secondary"
+        },
+        {
+          "type": "fix",
+          "proficiency": "able"
+        },
+        {
+          "type": "review",
+          "proficiency": "never"
         }
       ],
       "expertise": [
@@ -102,7 +110,12 @@
         "monitoring",
         "github-actions"
       ],
-      "personaSlices": []
+      "personaSlices": [
+        "devops",
+        "security",
+        "config",
+        "default"
+      ]
     },
     "positional": {
       "domains": [
@@ -115,7 +128,10 @@
       "writeAuthority": true,
       "role": "implementer",
       "deliverables": [
-        "config"
+        "config",
+        "workflow",
+        "script",
+        "code-src"
       ]
     },
     "numerical": {

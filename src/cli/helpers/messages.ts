@@ -678,6 +678,31 @@ const MESSAGES: MessageMap = {
     en: 'Aborted — agent \'{name}\' not deleted. Pass --force to skip this prompt.',
     tr: 'İptal edildi — \'{name}\' agent\'ı silinmedi. Bu onayı atlamak için --force kullanın.',
   },
+  // ─── agent lint (ROUTING-V3 Slice-1, 446) ────────────────────────────
+  'agent.lint.header': {
+    en: 'Agent catalog lint (V3 capabilities) — {agents} agents × {cells} sweep cells',
+    tr: 'Agent katalog lint\'i (V3 capabilities) — {agents} agent × {cells} tarama-hücresi',
+  },
+  'agent.lint.no_capabilities': {
+    en: '{count} agent(s) carry no capabilities block (excluded from the sweep): {ids}',
+    tr: '{count} agent capabilities bloğu taşımıyor (taramaya girmedi): {ids}',
+  },
+  'agent.lint.unreachable': {
+    en: 'UNREACHABLE: {agentId} — never wins a sweep cell. Nearest miss: {detail}',
+    tr: 'ERİŞİLEMEZ: {agentId} — hiçbir tarama-hücresini kazanamıyor. En yakın kaçış: {detail}',
+  },
+  'agent.lint.gap': {
+    en: 'GAP: {workType} × {domain} — no capable agent ({reasons})',
+    tr: 'BOŞLUK: {workType} × {domain} — yetkin agent yok ({reasons})',
+  },
+  'agent.lint.overlap': {
+    en: 'OVERLAP: {a} <-> {b} — {pct}% capability similarity (differentiate or merge)',
+    tr: 'ÖRTÜŞME: {a} <-> {b} — %{pct} yetkinlik-benzerliği (ayrıştırın ya da birleştirin)',
+  },
+  'agent.lint.clean': {
+    en: 'Catalog clean: every agent reachable, no coverage gaps.',
+    tr: 'Katalog temiz: tüm agent\'lar erişilebilir, kapsama boşluğu yok.',
+  },
   // ─── checkpoint command (MSG-003, §4G) ───────────────────────────────
   'checkpoint.list_empty': {
     en: 'No checkpoints found.',

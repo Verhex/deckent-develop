@@ -83,7 +83,7 @@
           "proficiency": "primary"
         },
         {
-          "type": "analyze",
+          "type": "build",
           "proficiency": "never"
         }
       ],
@@ -95,26 +95,28 @@
         "keyboard-navigation",
         "color-contrast"
       ],
-      "personaSlices": []
+      "personaSlices": [
+        "default",
+        "bugfix",
+        "implementation",
+        "design"
+      ]
     },
     "positional": {
       "domains": [
         {
-          "id": "frontend",
+          "id": "a11y",
           "proficiency": "primary"
-        },
-        {
-          "id": "performance",
-          "proficiency": "never"
         }
       ],
       "surfaces": [
-        "dashboard",
         "frontend"
       ],
       "writeAuthority": false,
       "role": "reviewer",
-      "deliverables": []
+      "deliverables": [
+        "doc"
+      ]
     },
     "numerical": {
       "preferredModel": "sonnet",

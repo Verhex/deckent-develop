@@ -75,10 +75,22 @@
     "capabilitiesVersion": 3,
     "content": {
       "workTypes": [
-        { "type": "configure", "proficiency": "primary" },
-        { "type": "review", "proficiency": "secondary" },
-        { "type": "analyze", "proficiency": "able" },
-        { "type": "build", "proficiency": "never" }
+        {
+          "type": "review",
+          "proficiency": "primary"
+        },
+        {
+          "type": "configure",
+          "proficiency": "secondary"
+        },
+        {
+          "type": "analyze",
+          "proficiency": "able"
+        },
+        {
+          "type": "build",
+          "proficiency": "never"
+        }
       ],
       "expertise": [
         "ci-cd",
@@ -87,14 +99,27 @@
         "build-verification",
         "github-actions"
       ],
-      "personaSlices": ["devops", "bugfix", "config", "default"]
+      "personaSlices": [
+        "devops",
+        "bugfix",
+        "config",
+        "default"
+      ]
     },
     "positional": {
-      "domains": [{ "id": "devops/ci", "proficiency": "primary" }],
+      "domains": [
+        {
+          "id": "devops/ci",
+          "proficiency": "primary"
+        }
+      ],
       "surfaces": [],
       "writeAuthority": true,
       "role": "reviewer",
-      "deliverables": ["config", "doc"]
+      "deliverables": [
+        "config",
+        "doc"
+      ]
     },
     "numerical": {
       "preferredModel": "sonnet",
