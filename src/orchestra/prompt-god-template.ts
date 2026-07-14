@@ -1691,7 +1691,8 @@ Check the project's TOOLS.md or package.json scripts to find the right commands.
    ${buildTestCommandLine(verifyCommands, targetedTestPaths)}
    ${buildPreExistingFailuresNote(preExistingFailures)}${buildExitPathTestHint(task)}
 
-If BOTH pass → selfAssessment = "DONE"
+If BOTH pass AND every goCriteria checklist item (Result & Self-Assessment section below) is genuinely satisfied → selfAssessment = "DONE"
+If BOTH pass but any checklist item is unmet or only partially evidenced → selfAssessment = "GO_WITH_TECH_DEBT" with the gap named in notes
 If minor issues remain → selfAssessment = "GO_WITH_TECH_DEBT" with details in notes
 If Bash tool is unavailable → report in notes, selfAssessment = "GO_WITH_TECH_DEBT"
 If targeted tests fail after 3 attempts → selfAssessment = "NO_GO" with error details

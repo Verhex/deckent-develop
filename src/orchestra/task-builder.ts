@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { DeckentError } from '../core/errors.js';
 import { existsSync, readdirSync, readFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import type {
   Task, TaskScope, GoNoGoCriteria, ModelType, TaskEffort, TaskPriority,
   PlannerTask, ProviderName, TaskResult,
@@ -13,6 +13,7 @@ import { TaskStatus, ALL_MODELS, PROVIDER_MODEL_MAP } from '../core/types.js';
 import { VALID_PROVIDERS_ALL } from '../core/config.js';
 import { isAdapterProvider } from './sprint-utils.js';
 import { detectTaskType } from './rubric-registry.js';
+import { lintWorkerPromptContract } from './prompt-lint.js';
 import { rubricTypeToKind } from '../core/work-model.js';
 import { modelRegistry, ensureOllamaModelRegistered } from '../core/model-registry.js';
 import type { TaskDNA } from '../core/routing-types.js';
@@ -1787,6 +1788,30 @@ export function buildWorkerPrompt(
 
   // Single accurate token estimate from the actual assembled prompt.
   task.estimatedTokens = artifact.metadata.estimatedTokens;
+
+  // PCOMP-6 D2 (MASTER-PLAN 573): spawn-time prompt-contract linter —
+  // WARN-ONLY rollout (Alperen 2026-07-14: warn → ölçüm → fail-closed).
+  // Findings never mutate the prompt and never block the spawn; they are
+  // logged to stderr (debug) and appended fail-soft to a measurement ledger
+  // so the false-positive rate can be measured before any gating flip.
+  try {
+    const findings = lintWorkerPromptContract(task, trackedFiles);
+    if (findings.length > 0) {
+      for (const f of findings) {
+        debugLog('prompt-lint', `[${f.check}] task=${f.taskId}: ${f.detail}`);
+      }
+      const ledger = join(projectRoot, '.deckent', 'runtime', 'prompt-lint.jsonl');
+      mkdirSync(dirname(ledger), { recursive: true });
+      appendFileSync(
+        ledger,
+        findings.map((f) => JSON.stringify(f)).join('\n') + '\n',
+        'utf-8',
+      );
+    }
+  } catch (e) {
+    // Measurement must never break spawning.
+    debugLog('prompt-lint', `ledger append failed (fail-soft): ${e instanceof Error ? e.message : String(e)}`);
+  }
 
   return artifact.prompt;
 }
