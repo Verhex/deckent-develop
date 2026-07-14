@@ -52,6 +52,8 @@
 | adr-g-036 | Zero-Hardcode Model & Flow Values (Parametric-Only) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-444 Learnings** (sprint-444): ## Sprint sprint-444 Learnings
+- F3 routing pins move to the implementer era: GO_WITH_TECH_DEBT — All 4 target files ...
 - **Sprint sprint-443 Learnings** (sprint-443): ## Sprint sprint-443 Learnings
 - U4 persona-guidance parser and slice selector: GO_WITH_TECH_DEBT — parseGuidanceSect...
 - **Sprint sprint-442 Learnings** (sprint-442): ## Sprint sprint-442 Learnings
@@ -74,11 +76,9 @@
 - 435-001 — Planner derleme sınırlarını sağlamlaştır — born-691 + born-692 s...
 - **Sprint sprint-434 Learnings** (sprint-434): ## Sprint sprint-434 Learnings
 - Packed-install retry-hardening: GO_WITH_TECH_DEBT — packed-install job hardened, sco...
-- **Sprint sprint-433 Learnings** (sprint-433): ## Sprint sprint-433 Learnings
-- STATUS-JSON-CONTRACT CLI düzeltmesini uygula: GO_WITH_TECH_DEBT — Fixed both no-acti...
 
 ## Active Technical Debt
-- [NORMAL] Tech debt from 443-001-xfix: Investigated the cross-dependency hypothesis first 
+- [HIGH] Tech debt from 443-001-xfix: Investigated the cross-dependency hypothesis first 
 - [CRITICAL] Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso
 
 ## Active Patterns
@@ -151,4 +151,4 @@
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 
-_Total entries: 1374 | Generated: 2026-07-14_
+_Total entries: 1380 | Generated: 2026-07-14_

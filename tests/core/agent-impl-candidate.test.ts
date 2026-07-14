@@ -38,14 +38,18 @@ function makeBuiltinAgent(
   });
 }
 
-describe('Sprint 204 Task 204-003 — built-in implementation intent candidacy', () => {
+// Sprint 204 Task 204-003 origin; Sprint 444 F3 era: the implementation floor
+// moved onto the `implementer` builtin's own manifest, refactorer was DROPPED
+// from the injection map (refactor-only by spec), and only architect's
+// secondary candidacy (6) is still injected at load time.
+describe('built-in implementation intent candidacy (implementer era)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  // ─── 1. refactorer gets implementation@7 ────────────────────────────────────
+  // ─── 1. refactorer is refactor-only: NO injected candidacy ──────────────────
 
-  it('adds implementation intent rule at score 7 to refactorer', () => {
+  it('does not add an implementation rule to refactorer (dropped from the map)', () => {
     const refactorer = makeBuiltinAgent('refactorer', {
       rules: [{ when: { 'intent.primary': 'refactor' }, score: 10 }],
       exclude: [],
@@ -53,13 +57,12 @@ describe('Sprint 204 Task 204-003 — built-in implementation intent candidacy',
     });
 
     const changed = applyBuiltinImplementationRules(refactorer);
-    expect(changed).toBe(true);
+    expect(changed).toBe(false);
 
     const implRule = refactorer.activation?.rules.find(
       (r) => r.when['intent.primary'] === 'implementation',
     );
-    expect(implRule).toBeDefined();
-    expect(implRule?.score).toBe(7);
+    expect(implRule).toBeUndefined();
   });
 
   // ─── 2. architect gets implementation@6 ─────────────────────────────────────
@@ -101,7 +104,7 @@ describe('Sprint 204 Task 204-003 — built-in implementation intent candidacy',
     expect(designRule?.score).toBe(8);
   });
 
-  // ─── 4. existing rules are preserved (refactorer refactor@10) ───────────────
+  // ─── 4. refactorer's own refactor@10 rule is untouched by the no-op ─────────
 
   it('preserves refactorer existing refactor intent rule (no clobber)', () => {
     const refactorer = makeBuiltinAgent('refactorer', {
@@ -117,22 +120,23 @@ describe('Sprint 204 Task 204-003 — built-in implementation intent candidacy',
     );
     expect(refactorRule).toBeDefined();
     expect(refactorRule?.score).toBe(10);
+    expect(refactorer.activation!.rules).toHaveLength(1);
   });
 
-  // ─── 5. idempotent: re-applying never duplicates ────────────────────────────
+  // ─── 5. idempotent: re-applying never duplicates (architect) ────────────────
 
   it('does not duplicate implementation rule on repeated application (idempotent)', () => {
-    const refactorer = makeBuiltinAgent('refactorer', {
-      rules: [{ when: { 'intent.primary': 'refactor' }, score: 10 }],
+    const architect = makeBuiltinAgent('architect', {
+      rules: [{ when: { 'intent.primary': 'design' }, score: 8 }],
       exclude: [],
       minScore: 5,
     });
 
-    applyBuiltinImplementationRules(refactorer);
-    const changedAgain = applyBuiltinImplementationRules(refactorer);
+    applyBuiltinImplementationRules(architect);
+    const changedAgain = applyBuiltinImplementationRules(architect);
     expect(changedAgain).toBe(false);
 
-    const implRules = refactorer.activation!.rules.filter(
+    const implRules = architect.activation!.rules.filter(
       (r) => r.when['intent.primary'] === 'implementation',
     );
     expect(implRules).toHaveLength(1);
@@ -179,16 +183,17 @@ describe('Sprint 204 Task 204-003 — built-in implementation intent candidacy',
 
   // ─── 8. constant map shape sanity ───────────────────────────────────────────
 
-  it('exposes a BUILTIN_IMPLEMENTATION_INTENT_RULES map covering refactorer + architect', () => {
-    expect(BUILTIN_IMPLEMENTATION_INTENT_RULES.refactorer?.score).toBe(7);
+  it('exposes a BUILTIN_IMPLEMENTATION_INTENT_RULES map covering only architect', () => {
+    expect(BUILTIN_IMPLEMENTATION_INTENT_RULES.refactorer).toBeUndefined();
     expect(BUILTIN_IMPLEMENTATION_INTENT_RULES.architect?.score).toBe(6);
+    expect(Object.keys(BUILTIN_IMPLEMENTATION_INTENT_RULES)).toEqual(['architect']);
   });
 
   // ─── 9. wiring: loadAgents applies the rule end-to-end ──────────────────────
 
-  it('loadAgents wires the rule for refactorer loaded from .deckent/agents/', () => {
-    const refactorer = makeBuiltinAgent('refactorer', {
-      rules: [{ when: { 'intent.primary': 'refactor' }, score: 10 }],
+  it('loadAgents wires the rule for architect loaded from .deckent/agents/', () => {
+    const architect = makeBuiltinAgent('architect', {
+      rules: [{ when: { 'intent.primary': 'design' }, score: 8 }],
       exclude: [],
       minScore: 5,
     });
@@ -197,37 +202,37 @@ describe('Sprint 204 Task 204-003 — built-in implementation intent candidacy',
       const s = String(p);
       return s.includes('.deckent/agents') && !s.includes('.tasks');
     });
-    vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('refactorer')] as unknown as fs.Dirent[]);
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(refactorer));
+    vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('architect')] as unknown as fs.Dirent[]);
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(architect));
 
     const manager = new AgentPoolManager(ROOT);
     const pool = manager.loadAgents();
-    const loaded = pool.get('refactorer');
+    const loaded = pool.get('architect');
 
     expect(loaded).toBeDefined();
     const implRule = loaded?.activation?.rules.find(
       (r) => r.when['intent.primary'] === 'implementation',
     );
-    expect(implRule?.score).toBe(7);
+    expect(implRule?.score).toBe(6);
   });
 
   // ─── 10. agents without activation gain a config + rule ─────────────────────
 
   it('initializes activation config when missing (manifestVersion=1 built-in)', () => {
-    const legacyRefactorer = createAgentDefinition({
-      id: 'refactorer',
-      name: 'Refactorer',
+    const legacyArchitect = createAgentDefinition({
+      id: 'architect',
+      name: 'Architect',
       source: 'builtin',
       manifestVersion: 1,
     });
-    expect(legacyRefactorer.activation).toBeUndefined();
+    expect(legacyArchitect.activation).toBeUndefined();
 
-    const changed = applyBuiltinImplementationRules(legacyRefactorer);
+    const changed = applyBuiltinImplementationRules(legacyArchitect);
     expect(changed).toBe(true);
 
-    const implRule = legacyRefactorer.activation?.rules.find(
+    const implRule = legacyArchitect.activation?.rules.find(
       (r) => r.when['intent.primary'] === 'implementation',
     );
-    expect(implRule?.score).toBe(7);
+    expect(implRule?.score).toBe(6);
   });
 });

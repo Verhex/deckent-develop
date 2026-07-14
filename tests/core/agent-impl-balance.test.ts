@@ -7,12 +7,13 @@ import { routeTaskV2, DOMAIN_MATCH_BONUS } from '../../src/core/routing-engine.j
 import type { AgentDefinition, AgentPool } from '../../src/core/agent-types.js';
 import { createAgentDefinition } from '../../src/core/agent-types.js';
 
-// Sprint 209 — Task 209-003
-// Domain-aware implementation score balance verification.
-// Confirms the combined 209-001 (intent classifier) + 209-002 (domain-match bonus)
-// + existing impl@7 scores create balanced routing:
-//   - Domain-specialized agents beat refactorer for their domain.
-//   - Refactorer/architect remain the winners for generic implementation tasks.
+// Sprint 209 — Task 209-003 (domain-aware implementation score balance),
+// re-aimed for the implementer era (Sprint 444 F3): the implementation floor
+// now lives on the `implementer` builtin's own manifest (implementation@7);
+// refactorer is refactor-only and receives NO injected candidacy. The balance
+// guarantees survive with the new owner:
+//   - Domain-specialized agents beat the impl floor for their domain.
+//   - Implementer is the winner for generic implementation tasks.
 //   - Sprint 205 fix (built-in beats temp-react) is preserved.
 
 function makeAgent(id: string, overrides: Partial<AgentDefinition>): AgentDefinition {
@@ -25,7 +26,8 @@ function makePool(...agents: AgentDefinition[]): AgentPool {
 }
 
 // Agents with activation rules matching their on-disk agent.json.
-// applyBuiltinImplementationRules adds the impl candidacy rule at load time.
+// applyBuiltinImplementationRules mirrors load-time behavior (no-op for
+// refactorer in the implementer era; architect still gains impl@6).
 
 function makeRefactorer(): AgentDefinition {
   const agent = makeAgent('refactorer', {
@@ -38,6 +40,19 @@ function makeRefactorer(): AgentDefinition {
   });
   applyBuiltinImplementationRules(agent);
   return agent;
+}
+
+// Mirrors src/core/builtins/agents/implementer/agent.json — the floor lives
+// on the manifest itself, no load-time injection involved.
+function makeImplementer(): AgentDefinition {
+  return makeAgent('implementer', {
+    source: 'builtin',
+    activation: {
+      rules: [{ when: { 'intent.primary': 'implementation' }, score: 7 }],
+      exclude: [],
+      minScore: 5,
+    },
+  });
 }
 
 function makeArchitect(): AgentDefinition {
@@ -89,32 +104,30 @@ const tempReact = makeAgent('temp-react-ts-specialist', {
   },
 });
 
-describe('agent impl balance — domain-aware routing (Sprint 209 / 209-003)', () => {
-  it('applyBuiltinImplementationRules injects impl candidacy matching constant score', () => {
-    const agent = makeAgent('refactorer', {
-      source: 'builtin',
-      activation: {
-        rules: [{ when: { 'intent.primary': 'refactor' }, score: 10 }],
-        exclude: [],
-        minScore: 5,
-      },
-    });
+// The floor score implementer's manifest carries (see makeImplementer) — the
+// same 7 that used to be injected into refactorer pre-444.
+const IMPL_FLOOR_SCORE = 7;
 
-    const applied = applyBuiltinImplementationRules(agent);
-    expect(applied).toBe(true);
-
-    const implRule = agent.activation?.rules.find(
+describe('agent impl balance — domain-aware routing (implementer era)', () => {
+  it('refactorer gets no injected candidacy; architect injection matches the constant', () => {
+    const refactorer = makeRefactorer();
+    const refactorerImplRule = refactorer.activation?.rules.find(
       (r) => r.when['intent.primary'] === 'implementation',
     );
-    expect(implRule).toBeDefined();
-    expect(implRule!.score).toBe(BUILTIN_IMPLEMENTATION_INTENT_RULES['refactorer']!.score);
-    // Score beats temp-react-ts-specialist (impl@6) for generic tasks.
-    expect(implRule!.score).toBeGreaterThan(6);
+    expect(refactorerImplRule).toBeUndefined();
+
+    const architect = makeArchitect();
+    const architectImplRule = architect.activation?.rules.find(
+      (r) => r.when['intent.primary'] === 'implementation',
+    );
+    expect(architectImplRule).toBeDefined();
+    expect(architectImplRule!.score).toBe(BUILTIN_IMPLEMENTATION_INTENT_RULES['architect']!.score);
+
+    // The manifest-carried floor still beats temp-react-ts-specialist (impl@6).
+    expect(IMPL_FLOOR_SCORE).toBeGreaterThan(6);
   });
 
-  it('generic implementation task → refactorer wins, temp-react does not', () => {
-    const refactorer = makeRefactorer();
-
+  it('generic implementation task → implementer wins, refactorer and temp-react do not', () => {
     const decision = routeTaskV2(
       {
         title: 'Add config normalizer utility',
@@ -127,20 +140,19 @@ describe('agent impl balance — domain-aware routing (Sprint 209 / 209-003)', (
           filesWrite: ['src/core/config-normalizer.ts'],
         },
       },
-      makePool(refactorer, tempReact),
+      makePool(makeImplementer(), makeRefactorer(), tempReact),
       new Map(),
     );
 
     expect(decision.taskDNA.intent.primary).toBe('implementation');
-    expect(decision.agentId).toBe('refactorer');
+    expect(decision.agentId).toBe('implementer');
+    expect(decision.agentId).not.toBe('refactorer');
     expect(decision.agentId).not.toBe('temp-react-ts-specialist');
-    // refactorer impl score (7 from constant) beats temp-react impl@6.
+    // implementer impl score (7 from its manifest) beats temp-react impl@6.
     expect(decision.agentScore).toBeGreaterThan(6);
   });
 
-  it('api task (src/api/) → api-builder wins over refactorer via domain-match bonus', () => {
-    const refactorer = makeRefactorer();
-
+  it('api task (src/api/) → api-builder wins over implementer via domain-match bonus', () => {
     const decision = routeTaskV2(
       {
         title: '209-007 — Dashboard API endpoint canlı veri parite',
@@ -153,22 +165,18 @@ describe('agent impl balance — domain-aware routing (Sprint 209 / 209-003)', (
           filesWrite: ['src/api/server.ts'],
         },
       },
-      makePool(refactorer, apiBuilder),
+      makePool(makeImplementer(), apiBuilder),
       new Map(),
     );
 
-    // api-builder: 8 (domain rule) + 3 (domain-match bonus) = 11
-    // refactorer:  BUILTIN_IMPLEMENTATION_INTENT_RULES score (7) + 0 bonus
+    // api-builder:  8 (domain rule) + 3 (domain-match bonus) = 11
+    // implementer:  7 (manifest floor) + 0 bonus
     expect(decision.agentId).toBe('api-builder');
     expect(decision.agentScore).toBeGreaterThanOrEqual(8 + DOMAIN_MATCH_BONUS);
-    expect(decision.agentScore).toBeGreaterThan(
-      BUILTIN_IMPLEMENTATION_INTENT_RULES['refactorer']!.score,
-    );
+    expect(decision.agentScore).toBeGreaterThan(IMPL_FLOOR_SCORE);
   });
 
-  it('security task → security-auditor wins over refactorer via intent + domain bonus', () => {
-    const refactorer = makeRefactorer();
-
+  it('security task → security-auditor wins over implementer via intent + domain bonus', () => {
     const decision = routeTaskV2(
       {
         title: 'Tighten API auth boundary',
@@ -179,21 +187,16 @@ describe('agent impl balance — domain-aware routing (Sprint 209 / 209-003)', (
           filesWrite: ['src/auth/boundary.ts'],
         },
       },
-      makePool(refactorer, securityAuditor),
+      makePool(makeImplementer(), securityAuditor),
       new Map(),
     );
 
     expect(decision.agentId).toBe('security-auditor');
     // security-auditor: 10 (security intent) + 3 (domain bonus via auth path) = 13
-    expect(decision.agentScore).toBeGreaterThan(
-      BUILTIN_IMPLEMENTATION_INTENT_RULES['refactorer']!.score,
-    );
+    expect(decision.agentScore).toBeGreaterThan(IMPL_FLOOR_SCORE);
   });
 
-  it('domain balance: api-builder wins api task even when full pool includes refactorer + temp-react', () => {
-    const refactorer = makeRefactorer();
-    const architect = makeArchitect();
-
+  it('domain balance: api-builder wins api task even when full pool includes implementer + refactorer + temp-react', () => {
     const decision = routeTaskV2(
       {
         title: 'Add REST endpoint for agent listing',
@@ -206,12 +209,13 @@ describe('agent impl balance — domain-aware routing (Sprint 209 / 209-003)', (
           filesWrite: ['src/api/agents-endpoint.ts'],
         },
       },
-      makePool(refactorer, architect, apiBuilder, tempReact),
+      makePool(makeImplementer(), makeRefactorer(), makeArchitect(), apiBuilder, tempReact),
       new Map(),
     );
 
     expect(decision.agentId).toBe('api-builder');
     // With full competitive pool, domain-match bonus ensures api-builder wins.
+    expect(decision.agentId).not.toBe('implementer');
     expect(decision.agentId).not.toBe('refactorer');
     expect(decision.agentId).not.toBe('temp-react-ts-specialist');
   });

@@ -1,5 +1,17 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-444 Learnings
+- Sprint sprint-444 Learnings: ## Sprint sprint-444 Learnings
+- F3 routing pins move to the implementer era: GO_WITH_TECH_DEBT — All 4 target files pass (32/32) and npx tsc --noEmit is clean. routing-impl-builtin.test.ts (fully hermetic) is hard-pin
+- F4 sync EISDIR reproduce and fix: GO_WITH_TECH_DEBT — Root cause: ensureDeckentImport() in src/core/utils.ts:263 (readFileSync on the target path) crashes with EISDIR when th
+- F4 three-way builtin to shadow prompt-file sync: GO_WITH_TECH_DEBT — New src/core/agent-prompt-sync.ts::syncBuiltinAgentPrompts(root, {dryRun}) implements the three-way builtin->shadow PROM
+
+## Gains
+- 444-001 — F3 neutral implementer builtin agent — Created the neutral 'implementer' builtin agent (2 new files, exact write-scope match).
+- 444-002 — F3 refactorer demotion to refactor-only — Removed the `{ when: { intent.primary: 'implementation' }, score: 7 }` activation rule from refac...
+- 444-006 — U4-026 guidance-mode integration e2e — Delivered the cascade-skipped sprint-443 Task-26 contract as a real e2e suite (tests/orchestra/u4...
+- 444-007 — mini-sprint integration and routing smoke — New tests/core/routing-implementer-era.test.ts (5 tests, exact write-scope match).
+
 ## Sprint sprint-443 Learnings
 - Sprint sprint-443 Learnings: ## Sprint sprint-443 Learnings
 - U4 persona-guidance parser and slice selector: GO_WITH_TECH_DEBT — parseGuidanceSections/selectGuidanceSlice implemented in src/core/persona-guidance.ts (pure, no I/O), mirroring extractM

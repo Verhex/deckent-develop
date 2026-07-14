@@ -7,6 +7,18 @@
 // refactorer) wins 75-100% of tasks. Relies on domain-match bonus (ADR-072/073,
 // Sprint 209) and intent-based routing. Also validates the 212-008
 // skill→agent affinity signal added to activation-engine.ts.
+//
+// 444-003 note: Sprint 444 moved the generic-implementation floor from
+// refactorer(7) to a new `implementer` builtin(7) — see
+// tests/core/routing-impl-builtin.test.ts for the hermetic routing-math pin.
+// The 444 follow-up landed host-side: the refactorer shadow manifest is
+// refactor-only, `.deckent/agents/implementer/` is materialized, and
+// refactorer was dropped from agent-pool.ts's
+// BUILTIN_IMPLEMENTATION_INTENT_RULES — so the 5 "Generic Implementation"
+// tasks below resolve to `implementer` against the LIVE pool. Tests 1/2
+// (distinct-count / no-agent-over-60%) are agent-name-agnostic so they hold
+// unchanged either way; the SKILL_AGENT_MAP generalist-exclusion checks
+// (tests 5/6) cover 'implementer' as the generalist floor.
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { fileURLToPath } from 'node:url';
@@ -275,6 +287,9 @@ describe('routing diversity guard (Sprint 212-009)', () => {
     expect(getSkillAgentAffinityBonus('doc-writer', ['documentation-writer'])).toBe(SKILL_AGENT_AFFINITY_BONUS);
     // refactorer is NOT in the map (generalist — base scoring only)
     expect(getSkillAgentAffinityBonus('refactorer', ['frontend-design', 'security-specialist', 'api-builder'])).toBe(0);
+    // 444-003: implementer (the new implementation-intent floor, replacing
+    // refactorer's retired catch-all) is likewise a generalist — no skill affinity.
+    expect(getSkillAgentAffinityBonus('implementer', ['frontend-design', 'security-specialist', 'api-builder'])).toBe(0);
   });
 
   // Test 6: SKILL_AGENT_MAP contains all four directive-specified agent clusters
@@ -288,6 +303,9 @@ describe('routing diversity guard (Sprint 212-009)', () => {
     expect(mapValues).not.toContain('refactorer');
     expect(mapValues).not.toContain('bug-fixer');
     expect(mapValues).not.toContain('code-reviewer');
+    // 444-003: implementer inherits refactorer's old generalist floor role —
+    // it must not appear as a skill-affinity target either.
+    expect(mapValues).not.toContain('implementer');
   });
 
   // Test 7: 215-016 — frontend-design and react-specialist give zero affinity to architecture-planner

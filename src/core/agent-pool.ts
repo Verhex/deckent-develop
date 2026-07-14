@@ -119,36 +119,34 @@ function synthesizeAgentDefinition(id: string, promptMdPath: string): Record<str
 
 // ─── Built-in Implementation Intent Candidacy (Sprint 204 Task 204-003) ──────
 //
-// Built-in agent.json files do not declare `intent.primary: "implementation"`
-// activation rules — so every "implementation" task historically fell to the
-// scope-blind temp-react-ts-specialist (impl@6). Refactorer and architect are
-// the natural built-in homes for general code implementation; we inject
-// mid-tier implementation candidacy at load time so they out-rank the
-// scope-blind temp agent via tie-break + learning bonus, without touching the
-// individual agent.json files (which live outside this task's write scope).
+// Origin: built-in agent.json files declared no `intent.primary: "implementation"`
+// activation rules, so every "implementation" task fell to the scope-blind
+// temp-react-ts-specialist (impl@6); this load-time injection made refactorer(7)
+// and architect(6) viable candidates without touching the manifests.
 //
-// Scores are intentionally moderate (refactorer 7, architect 6) so that:
-//   - Existing intent matches still dominate (refactor@10, design@8).
-//   - For pure implementation tasks, built-ins beat temp-react-ts-specialist (6)
-//     via the agent's primary candidacy score plus learning/synergy bonuses.
+// Implementer era (Sprint 444 F3): the implementation floor now lives on the
+// `implementer` builtin's OWN manifest (implementation@7) — refactorer is
+// refactor-only by spec ("activates ONLY on intent=refactor") and was dropped
+// from this map so a live-loaded pool cannot re-inject the retired candidacy.
+// Only architect's secondary candidacy (6) remains injected here.
 //
-// Domain balance (Sprint 209 Task 209-002+003):
-//   Domain-specialized agents beat refactorer@7 via getDomainMatchBonus (+3):
-//     api-builder: 8 (domain rule) + 3 (bonus) = 11 > refactorer@7
-//     security-auditor: 10 (security intent) + 3 (bonus) = 13 > refactorer@7
-//   Refactorer remains the correct winner for generic (non-domain) impl tasks.
+// Domain balance (Sprint 209 Task 209-002+003) is unchanged:
+//   Domain-specialized agents beat the impl floor via getDomainMatchBonus (+3):
+//     api-builder: 8 (domain rule) + 3 (bonus) = 11 > implementer@7
+//     security-auditor: 10 (security intent) + 3 (bonus) = 13 > implementer@7
+//   Implementer is the correct winner for generic (non-domain) impl tasks;
+//   temp agents (6) still lose to it — the Sprint-205 anti-temp guarantee.
 export const BUILTIN_IMPLEMENTATION_INTENT_RULES: Readonly<
   Record<string, { score: number; name: string }>
 > = {
-  refactorer: { score: 7, name: 'implementation-candidate' },
   architect: { score: 6, name: 'implementation-candidate' },
 };
 
 /**
  * Inject a mid-tier `intent.primary === "implementation"` activation rule into
- * known built-in agents (refactorer, architect) so they become viable
- * candidates for generic implementation tasks. Idempotent: re-applying does
- * not duplicate the rule. Returns true when the agent was modified.
+ * known built-in agents (architect) so they become viable candidates for
+ * generic implementation tasks. Idempotent: re-applying does not duplicate
+ * the rule. Returns true when the agent was modified.
  */
 export function applyBuiltinImplementationRules(agent: AgentDefinition): boolean {
   const ruleSpec = BUILTIN_IMPLEMENTATION_INTENT_RULES[agent.id];

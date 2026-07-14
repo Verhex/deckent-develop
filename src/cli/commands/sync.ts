@@ -5,6 +5,8 @@ import type { Command } from 'commander';
 import { DECKENT_FILE, CLAUDE_FILE, AGENTS_FILE, BRAIN_DIR, SPRINTS_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { ensureDeckentImport, debugLog } from '../../core/utils.js';
 import { MemoryStore } from '../../core/memory-store.js';
+import { syncBuiltinAgentPrompts } from '../../core/agent-prompt-sync.js';
+import type { AgentPromptSyncReport } from '../../core/agent-prompt-sync.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
@@ -27,6 +29,22 @@ export interface SyncResult {
   added: string[];
   deleted: string[];
   renamed: string[];
+}
+
+/**
+ * A single adapter-file sync failure, typed and non-throwing.
+ * Collected per-entry so one bad entry (e.g. a path that is a directory,
+ * not a file) cannot abort the whole adapter sweep.
+ */
+export interface AdapterSyncError {
+  label: string;
+  file: string;
+  reason: string;
+}
+
+export interface AdapterSyncReport {
+  synced: string[];
+  errors: AdapterSyncError[];
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -191,6 +209,39 @@ export function truncateFileList(files: string[]): string {
 }
 
 /**
+ * Whether `path` currently exists as a directory. Any stat failure (path
+ * missing, or an unstubbed mock in tests) is treated as "not a directory" so
+ * the caller falls through to its normal (pre-existing) behavior.
+ */
+function isDirectoryPath(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Non-throwing wrapper around `ensureDeckentImport`. Guards against a
+ * directory occupying the expected file path (e.g. `.cursor/rules` is a
+ * directory of `.mdc` files in real-world Cursor projects, not a single
+ * file — the live EISDIR repro) and against any other read/write failure,
+ * returning a typed error instead of letting either kind abort the caller's
+ * sweep.
+ */
+function applyDeckentImport(filePath: string, label: string): AdapterSyncError | null {
+  if (isDirectoryPath(filePath)) {
+    return { label, file: filePath, reason: 'Path exists as a directory, expected a file' };
+  }
+  try {
+    ensureDeckentImport(filePath);
+    return null;
+  } catch (e) {
+    return { label, file: filePath, reason: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
  * B) Tolerant MEMORY.md section replacement.
  * Replaces a named section without depending on brittle regex lookaheads.
  */
@@ -336,10 +387,14 @@ export function runSync(root: string): SyncResult | null {
 /**
  * Sync GEMINI.md — ensure @DECKENT.md reference.
  */
-export function syncGeminiAdapter(root: string, dryRun = false): boolean {
+export function syncGeminiAdapter(root: string, dryRun = false, onError?: (err: AdapterSyncError) => void): boolean {
   const filePath = join(root, GEMINI_FILE);
   if (!dryRun) {
-    ensureDeckentImport(filePath);
+    const err = applyDeckentImport(filePath, 'GEMINI.md');
+    if (err) {
+      onError?.(err);
+      return false;
+    }
   }
   return true;
 }
@@ -347,7 +402,7 @@ export function syncGeminiAdapter(root: string, dryRun = false): boolean {
 /**
  * Sync .cursor/rules — ensure @DECKENT.md reference, creating dir if needed.
  */
-export function syncCursorAdapter(root: string, dryRun = false): boolean {
+export function syncCursorAdapter(root: string, dryRun = false, onError?: (err: AdapterSyncError) => void): boolean {
   const dirPath = join(root, CURSOR_RULES_DIR);
   if (!existsSync(dirPath)) {
     if (dryRun) return true; // would create
@@ -358,7 +413,11 @@ export function syncCursorAdapter(root: string, dryRun = false): boolean {
     }
   }
   if (!dryRun) {
-    ensureDeckentImport(join(root, CURSOR_RULES_FILE));
+    const err = applyDeckentImport(join(root, CURSOR_RULES_FILE), '.cursor/rules');
+    if (err) {
+      onError?.(err);
+      return false;
+    }
   }
   return true;
 }
@@ -367,13 +426,17 @@ export function syncCursorAdapter(root: string, dryRun = false): boolean {
  * Sync Codex config: creates .codex/AGENTS.md with @DECKENT.md reference
  * if .codex/ directory exists. Format mirrors AGENTS.md pattern.
  */
-export function syncCodexAdapter(root: string, dryRun = false): boolean {
+export function syncCodexAdapter(root: string, dryRun = false, onError?: (err: AdapterSyncError) => void): boolean {
   const codexDir = join(root, CODEX_DIR);
   if (!existsSync(codexDir)) {
     return false; // .codex/ not present — skip silently
   }
   if (!dryRun) {
-    ensureDeckentImport(join(root, CODEX_AGENTS_FILE));
+    const err = applyDeckentImport(join(root, CODEX_AGENTS_FILE), '.codex/AGENTS.md');
+    if (err) {
+      onError?.(err);
+      return false;
+    }
   }
   return true;
 }
@@ -408,9 +471,23 @@ export function buildProviderSyncMap(root: string, dryRun = false): Record<strin
 
 /**
  * Sync adapter files: CLAUDE.md, AGENTS.md, GEMINI.md, .cursor/rules, .codex/AGENTS.md
+ * Per-entry failures (e.g. a path that is a directory, not a file) are typed,
+ * collected, and never abort the sweep — see `syncAdapterFilesWithReport`.
  */
 export function syncAdapterFiles(root: string, dryRun = false): string[] {
+  return syncAdapterFilesWithReport(root, dryRun).synced;
+}
+
+/**
+ * Same sweep as `syncAdapterFiles`, but returns which entries failed and why
+ * instead of silently dropping that information. Never throws: a directory
+ * occupying an adapter file's path (the live EISDIR repro) or any other
+ * read/write failure becomes a typed `AdapterSyncError`, not an aborted sweep.
+ */
+export function syncAdapterFilesWithReport(root: string, dryRun = false): AdapterSyncReport {
   const synced: string[] = [];
+  const errors: AdapterSyncError[] = [];
+  const collect = (err: AdapterSyncError) => errors.push(err);
 
   // Core adapter files always synced
   const coreFiles = [
@@ -420,27 +497,31 @@ export function syncAdapterFiles(root: string, dryRun = false): string[] {
 
   for (const { file, label } of coreFiles) {
     if (!dryRun) {
-      ensureDeckentImport(join(root, file));
+      const err = applyDeckentImport(join(root, file), label);
+      if (err) {
+        collect(err);
+        continue;
+      }
     }
     synced.push(label);
   }
 
   // GEMINI.md
-  if (syncGeminiAdapter(root, dryRun)) {
+  if (syncGeminiAdapter(root, dryRun, collect)) {
     synced.push('GEMINI.md');
   }
 
   // .cursor/rules — create dir if needed
-  if (syncCursorAdapter(root, dryRun)) {
+  if (syncCursorAdapter(root, dryRun, collect)) {
     synced.push('.cursor/rules');
   }
 
   // .codex/AGENTS.md — only if .codex/ dir exists
-  if (syncCodexAdapter(root, dryRun)) {
+  if (syncCodexAdapter(root, dryRun, collect)) {
     synced.push('.codex/AGENTS.md');
   }
 
-  return synced;
+  return { synced, errors };
 }
 
 // ─── Command Registration ───────────────────────────────────────────
@@ -458,6 +539,8 @@ export function registerSync(program: Command): void {
 
       const output: {
         adaptersSynced?: string[];
+        adapterErrors?: AdapterSyncError[];
+        agentPromptSync?: AgentPromptSyncReport;
         gitChanges?: SyncResult | null;
         warnings?: string[];
       } = {};
@@ -476,15 +559,37 @@ export function registerSync(program: Command): void {
           return;
         }
 
-        const synced = syncAdapterFiles(root, opts.dryRun);
-        output.adaptersSynced = synced;
+        const adapterReport = syncAdapterFilesWithReport(root, opts.dryRun);
+        output.adaptersSynced = adapterReport.synced;
+        if (adapterReport.errors.length > 0) {
+          output.adapterErrors = adapterReport.errors;
+        }
 
         if (!opts.json) {
-          for (const label of synced) {
+          for (const label of adapterReport.synced) {
             print(`${opts.dryRun ? '[dry-run] ' : ''}${label} synced → @DECKENT.md ensured`);
+          }
+          for (const err of adapterReport.errors) {
+            print(`Warning: ${err.label} skipped (${err.file}) — ${err.reason}`);
           }
           if (!opts.dryRun) {
             print('Sync complete. Existing file contents preserved.');
+          }
+        }
+
+        // --- Builtin agent PROMPT.md -> .deckent/agents/<id>/ shadow sync (444-005) ---
+        const promptSyncReport = syncBuiltinAgentPrompts(root, { dryRun: opts.dryRun });
+        output.agentPromptSync = promptSyncReport;
+
+        if (!opts.json) {
+          for (const id of promptSyncReport.created) {
+            print(`${opts.dryRun ? '[dry-run] ' : ''}Agent prompt created: .deckent/agents/${id}/PROMPT.md`);
+          }
+          for (const id of promptSyncReport.updated) {
+            print(`${opts.dryRun ? '[dry-run] ' : ''}Agent prompt updated: .deckent/agents/${id}/PROMPT.md`);
+          }
+          for (const conflict of promptSyncReport.conflicts) {
+            print(`Warning: agent prompt "${conflict.agentId}" kept as local edit (${conflict.reason})`);
           }
         }
       }

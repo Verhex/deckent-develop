@@ -9,6 +9,19 @@
 // `routing-multisignal.test.ts` already validates the math against fakes;
 // this file proves the on-disk `.deckent/agents/*` activation rules + the
 // path-extracted domain map agree with that math after a real load.
+//
+// 444-003 note: Sprint 444 moved the generic-implementation floor from
+// refactorer(7) to a new `implementer` builtin(7) — see
+// tests/core/routing-impl-builtin.test.ts for the hermetic routing-math pin
+// on that transition. The 444 follow-up landed host-side: the
+// `.deckent/agents/refactorer/agent.json` shadow mirrors the refactor-only
+// manifest, `.deckent/agents/implementer/` is materialized, and refactorer
+// was dropped from agent-pool.ts's BUILTIN_IMPLEMENTATION_INTENT_RULES — so
+// against the LIVE pool the 'generic-core' case resolves to `implementer`.
+// The assertions still accept either FLOOR_AGENT (deliberately name-agnostic
+// across the transition) while pinning the guard that actually matters here:
+// no DOMAIN task ever falls back to the generic floor, whichever agent
+// currently holds it.
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { fileURLToPath } from 'node:url';
@@ -24,12 +37,24 @@ const PROJECT_ROOT = resolve(__dirname, '..', '..');
 interface LiveTask {
   label: string;
   expected: string;
+  /**
+   * When set, the per-task routing test accepts ANY of these agentIds instead
+   * of a single exact match on `expected` (444-003: generic-core's floor
+   * agent is mid-transition between refactorer and implementer — see file
+   * header note). `expected` is still used as the "primary"/documentation
+   * label and as the FLOOR_AGENTS set for the diversity assertion below.
+   */
+  acceptable?: string[];
   task: {
     title: string;
     description: string;
     scope: { directories: string[]; filesRead: string[]; filesWrite: string[] };
   };
 }
+
+// 444-003: agents that can legitimately hold the generic-implementation floor
+// right now — see file header note for why this is a set, not a single id.
+const FLOOR_AGENTS = ['refactorer', 'implementer'];
 
 // Five canonical scope patterns. Descriptions are picked so intent classifier
 // keyword scoring stays inside the bucket each agent owns — e.g. the database/migration
@@ -79,7 +104,11 @@ const TASKS: LiveTask[] = [
   },
   {
     label: 'generic-core',
-    expected: 'refactorer',
+    expected: 'implementer',
+    // 444-003: accept the current live-pool winner (refactorer, via the
+    // not-yet-synced .deckent/agents shadow) alongside the target-state
+    // winner (implementer) — see file header note.
+    acceptable: FLOOR_AGENTS,
     task: {
       title: 'Add number formatter helper',
       description: 'Add a small formatter function that produces thousand-separated strings for byte counts.',
@@ -104,16 +133,23 @@ describe('routing live diversity (Sprint 210 / 210-004)', () => {
   });
 
   for (const tc of TASKS) {
-    it(`${tc.label} task → ${tc.expected}`, () => {
+    it(`${tc.label} task → ${tc.acceptable ? tc.acceptable.join('|') : tc.expected}`, () => {
       const decision = routeTaskV2(tc.task, pool, new Map());
-      expect(
-        decision.agentId,
-        `routing trace for ${tc.label}:\n${decision.reasoning.join('\n')}`,
-      ).toBe(tc.expected);
+      if (tc.acceptable) {
+        expect(
+          tc.acceptable,
+          `routing trace for ${tc.label}:\n${decision.reasoning.join('\n')}`,
+        ).toContain(decision.agentId);
+      } else {
+        expect(
+          decision.agentId,
+          `routing trace for ${tc.label}:\n${decision.reasoning.join('\n')}`,
+        ).toBe(tc.expected);
+      }
     });
   }
 
-  it('five diverse tasks pick at least three distinct agents and refactorer dominates none of the domain cases', () => {
+  it('five diverse tasks pick at least three distinct agents and the generic-implementation floor dominates none of the domain cases', () => {
     const selections = TASKS.map(tc => {
       const d = routeTaskV2(tc.task, pool, new Map());
       return { label: tc.label, agentId: d.agentId };
@@ -122,9 +158,11 @@ describe('routing live diversity (Sprint 210 / 210-004)', () => {
     const distinct = new Set(selections.map(s => s.agentId));
     expect(distinct.size, `distinct agents across 5 tasks: ${JSON.stringify(selections)}`).toBeGreaterThanOrEqual(3);
 
-    // The Sprint 208 imbalance was "everything → refactorer". Verify refactorer
-    // wins exactly the generic-core slot — no domain task falls back to it.
-    const refactorerWins = selections.filter(s => s.agentId === 'refactorer');
-    expect(refactorerWins.map(s => s.label)).toEqual(['generic-core']);
+    // The Sprint 208 imbalance was "everything → refactorer". Verify the
+    // generic-implementation floor (refactorer today, implementer once
+    // 444-003's live-pool follow-up lands — see FLOOR_AGENTS) wins exactly
+    // the generic-core slot — no domain task falls back to it.
+    const floorWins = selections.filter(s => FLOOR_AGENTS.includes(s.agentId));
+    expect(floorWins.map(s => s.label)).toEqual(['generic-core']);
   });
 });

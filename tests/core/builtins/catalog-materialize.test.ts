@@ -54,6 +54,13 @@ describe('371-001 CATALOG-MATERIALIZE: builtin fallback makes the 6 new items po
       tmpRoot = mkdtempSync(join(tmpdir(), 'deckent-catalog-materialize-live-'));
       cpSync(join(PROJECT_ROOT, '.deckent', 'skills'), join(tmpRoot, '.deckent', 'skills'), { recursive: true });
       cpSync(join(PROJECT_ROOT, '.deckent', 'agents'), join(tmpRoot, '.deckent', 'agents'), { recursive: true });
+      // This suite pins the BUILTIN FALLBACK path — it must hold even after the
+      // agent-prompt-sync command (444-005) materializes .deckent/agents/<id>/
+      // shadows for these agents in the real repo tree. Strip any copied shadow
+      // so the probed ids are genuinely shadow-less inside the fixture.
+      for (const id of NEW_AGENTS) {
+        rmSync(join(tmpRoot, '.deckent', 'agents', id), { recursive: true, force: true });
+      }
       writeFileSync(join(tmpRoot, '.deckent', 'config.json'), '{}', 'utf8');
       livePoolSkills = new SkillPoolManager(tmpRoot).loadSkills();
       livePoolAgents = new AgentPoolManager(tmpRoot).loadAgents();

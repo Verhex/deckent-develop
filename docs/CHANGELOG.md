@@ -9,6 +9,24 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint444] - 2026-07-14
+
+### Added
+
+- F3 neutral implementer builtin agent
+- F3 refactorer demotion to refactor-only
+- U4-026 guidance-mode integration e2e
+- mini-sprint integration and routing smoke
+
+### Changed
+
+- F3 routing pins move to the implementer era (completed with tech debt)
+- F4 sync EISDIR reproduce and fix (completed with tech debt)
+- F4 three-way builtin to shadow prompt-file sync (completed with tech debt)
+
+
+_Tasks: 7 total, 7 done, 3 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint443] - 2026-07-14
 
 ### Added

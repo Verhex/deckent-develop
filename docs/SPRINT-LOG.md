@@ -10890,3 +10890,31 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 443-026: U4 integration — flag-on compose e2e plus shadow-sync verification (NO_GO)
 
 ---
+## Sprint 444 — sprint-444
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-14
+**Duration:** 1386s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 7 |
+| Tech Debt | 3 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1386297ms |
+
+### Tasks
+
+- 444-001: F3 neutral implementer builtin agent (DONE)
+- 444-002: F3 refactorer demotion to refactor-only (DONE)
+- 444-003: F3 routing pins move to the implementer era (GO_WITH_TECH_DEBT)
+- 444-004: F4 sync EISDIR reproduce and fix (GO_WITH_TECH_DEBT)
+- 444-005: F4 three-way builtin to shadow prompt-file sync (GO_WITH_TECH_DEBT)
+- 444-006: U4-026 guidance-mode integration e2e (DONE)
+- 444-007: mini-sprint integration and routing smoke (DONE)
+
+---

@@ -4,13 +4,16 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-443-001-xfix | Tech debt from 443-001-xfix: Investigated the cross-dependency hypothesis first  | normal | sprint-443 | active |
+| debt-443-001-xfix | Tech debt from 443-001-xfix: Investigated the cross-dependency hypothesis first  | high | sprint-443 | active |
 | debt-433-001-fix | Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso | critical | sprint-433 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-444-003 | Tech debt from 444-003: All 4 target files pass (32/32) and npx tsc --noEmit is  | normal | sprint-444 | resolved |
+| debt-444-004 | Tech debt from 444-004: Root cause: ensureDeckentImport() in src/core/utils.ts:2 | normal | sprint-444 | resolved |
+| debt-444-005 | Tech debt from 444-005: New src/core/agent-prompt-sync.ts::syncBuiltinAgentPromp | normal | sprint-444 | resolved |
 | debt-443-001 | Tech debt from 443-001: parseGuidanceSections/selectGuidanceSlice implemented in | normal | sprint-443 | resolved |
 | debt-443-002 | Tech debt from 443-002: Added prompt.persona_render?: 'full' | 'guidance' to Pro | normal | sprint-443 | resolved |
 | debt-443-009 | Tech debt from 443-009: Appended a '## Guidance Slices' section to the end of sr | normal | sprint-443 | resolved |
