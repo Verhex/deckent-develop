@@ -249,6 +249,9 @@ export const DEFAULT_TERMINAL_CONFIG: TerminalConfig = {
 export const DEFAULT_PROMPT_CONFIG: Required<PromptConfig> = {
   adr_min_relevance: 0.3,
   adr_render: 'full',
+  // ADR-G-027 sanctioned condensed+pointer shape for persona content. Default
+  // 'full' keeps worker prompts byte-identical to pre-U4 behavior.
+  persona_render: 'full',
   // F3.1: stabilize the claude system-prompt prefix for cache reuse (git-status &
   // other per-machine sections move to the first user message). Verified via
   // real-binary smoke; opt-out with `false`.
@@ -1098,6 +1101,14 @@ export function validateConfig(config: DeckentConfig): string[] {
     if (!validAdrRender.includes(config.prompt.adr_render)) {
       errors.push(
         `Invalid value '${config.prompt.adr_render}' for field 'prompt.adr_render'. Valid: ${validAdrRender.join(', ')}.`,
+      );
+    }
+  }
+  if (config.prompt?.persona_render !== undefined) {
+    const validPersonaRender = ['full', 'guidance'];
+    if (!validPersonaRender.includes(config.prompt.persona_render)) {
+      errors.push(
+        `Invalid value '${config.prompt.persona_render}' for field 'prompt.persona_render'. Valid: ${validPersonaRender.join(', ')}.`,
       );
     }
   }

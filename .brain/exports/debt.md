@@ -4,12 +4,18 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-443-001-xfix | Tech debt from 443-001-xfix: Investigated the cross-dependency hypothesis first  | normal | sprint-443 | active |
 | debt-433-001-fix | Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso | critical | sprint-433 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-443-001 | Tech debt from 443-001: parseGuidanceSections/selectGuidanceSlice implemented in | normal | sprint-443 | resolved |
+| debt-443-002 | Tech debt from 443-002: Added prompt.persona_render?: 'full' | 'guidance' to Pro | normal | sprint-443 | resolved |
+| debt-443-009 | Tech debt from 443-009: Appended a '## Guidance Slices' section to the end of sr | normal | sprint-443 | resolved |
+| debt-443-018 | Tech debt from 443-018: Appended '## Guidance Slices' at end of PROMPT.md with 4 | normal | sprint-443 | resolved |
+| debt-443-025 | Tech debt from 443-025: Appended a '## Guidance Slices' heading to the end of PR | normal | sprint-443 | resolved |
 | debt-442-001 | Tech debt from 442-001: Rehydrate event-fold query surface added to src/orchestr | normal | sprint-442 | resolved |
 | debt-442-002 | Tech debt from 442-002: Legacy dual-read fallback filled in at getFlow's typed-m | normal | sprint-442 | resolved |
 | debt-437-001 | Tech debt from 437-001: EXPIRE-SWEEP çekirdek API implemented across the 3 in-sc | normal | sprint-437 | resolved |

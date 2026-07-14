@@ -122,3 +122,33 @@ describe('metadata hygiene round-trip (G2)', () => {
     expect(parsed?.description).not.toContain('1cd42609');
   });
 });
+
+describe('U4-F2 — the goNogo block cannot pollute intent (sprint-443 refactorer-catchall root)', () => {
+  const scope = {
+    directories: ['src/core/builtins/agents/api-builder/'],
+    filesRead: [],
+    filesWrite: ['src/core/builtins/agents/api-builder/PROMPT.md'],
+  };
+  // The REAL task-443-007 transport shape: prose + folded '### goNogo' section.
+  const desc = [
+    'Same contract as Task 6 for api-builder.',
+    'Smoke: node scripts/validate-guidance.mjs src/core/builtins/agents/api-builder → exit 0.',
+    '### goNogo',
+    '- goCriteria: `npx tsc --noEmit` passes; the targeted test file(s) for the modules you changed pass; validator exit 0; default slice present; each slice 5-15 lines; existing body unchanged above the new heading.',
+    '- nogo: any deletion or rewrite of existing body text NO_GO.',
+  ].join('\n');
+
+  it('the real 443-007 shape now classifies documentation (was implementation via goNogo wording)', () => {
+    const dna = classifyIntent({ title: 'U4 guidance content — api-builder', description: desc, scope });
+    expect(dna.intent.primary).toBe('documentation');
+  });
+
+  it('prose mentioning goNogo INLINE (no section heading) is untouched', () => {
+    const dna = classifyIntent({
+      title: 'CI pipeline fix',
+      description: 'update .github/workflows deploy job for docker build; goNogo criteria stay strict',
+      scope: { directories: ['.github/'], filesRead: [], filesWrite: ['.github/workflows/ci.yml'] },
+    });
+    expect(dna.intent.primary).toBe('devops');
+  });
+});

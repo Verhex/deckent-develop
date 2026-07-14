@@ -62,6 +62,30 @@ const SCOPE_INTENT_SIGNALS: Array<{ pattern: RegExp; intent: IntentType; weight:
 // ─── Main API ───────────────────────────────────────────────────────────────
 
 /**
+ * U4-F2 (sprint-443): the classifier reads PROSE ONLY. parseStructuredDirectives
+ * folds the '### goNogo' section into the description transport (dual-carry with
+ * the structured goNogo field, which downstream extractGoNogo consumers read) —
+ * its mechanical wording ('validator exit 0', 'tests green') polluted intent:
+ * live replay evidence — the real 443 content tasks flipped
+ * documentation(0.55) → implementation(0.56) on exactly this block, sending 21/26
+ * tasks to the refactorer catch-all. The transport is untouched; only the
+ * classifier's view is cleaned (same fix-family as U1-G2 metadata hygiene).
+ */
+function stripGoNogoSection(description: string): string {
+  const headingIdx = description.search(/^###\s*goNogo\s*$/im);
+  if (headingIdx === -1) return description;
+  // Section runs from the heading LINE to the next markdown heading (levels 1-3)
+  // or end-of-text. The scan for the next heading starts after the heading line's
+  // newline — not one character in — so the heading can never match itself.
+  const lineEnd = description.indexOf('\n', headingIdx);
+  if (lineEnd === -1) return description.slice(0, headingIdx);
+  const rest = description.slice(lineEnd + 1);
+  const next = rest.search(/^#{1,3}\s/m);
+  if (next === -1) return description.slice(0, headingIdx);
+  return description.slice(0, headingIdx) + rest.slice(next);
+}
+
+/**
  * Classify a task into a TaskDNA structure.
  * Combines text analysis with scope analysis for accurate intent detection.
  */
@@ -70,7 +94,7 @@ export function classifyIntent(task: {
   description: string;
   scope: TaskScope;
 }): TaskDNA {
-  const text = `${task.title} ${task.description}`.toLowerCase();
+  const text = `${task.title} ${stripGoNogoSection(task.description)}`.toLowerCase();
   const scope = task.scope;
 
   const scopeAnalysis = analyzeWriteScope(scope);

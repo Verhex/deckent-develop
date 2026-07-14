@@ -165,9 +165,13 @@ describe('AGSK-2 dilim-2: integration-engineer + terminal-ux-engineer catalog', 
             expect(values).toContain(spec.expectedDomain);
           });
 
-          it('PROMPT.md stays within the 4KB rubric cap and covers its rubric theme', () => {
+          it('PROMPT.md core body stays within the 4KB rubric cap and covers its rubric theme', () => {
+            // U4 amendment (sprint-443, same as agent-catalog-agsk6): the rubric cap
+            // guards the CORE persona body — the additive '## Guidance Slices' section
+            // ships as ONE slice in guidance render, so it is exempt from the cap.
             const content = readPrompt(dir, spec.id);
-            const byteLength = Buffer.byteLength(content, 'utf8');
+            const coreBody = content.split(/^## Guidance Slices$/m)[0]!.trimEnd();
+            const byteLength = Buffer.byteLength(coreBody, 'utf8');
             expect(byteLength).toBeLessThanOrEqual(MAX_PROMPT_BYTES);
             expect(byteLength).toBeGreaterThan(100);
             expect(content).toContain(spec.promptKeyword);

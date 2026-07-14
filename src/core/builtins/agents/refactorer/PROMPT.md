@@ -132,3 +132,32 @@ After completing all refactorings:
 3. Compare the targeted test count before and after (must be equal or greater)
 4. Verify no new circular dependencies
 5. Confirm all imports resolve correctly
+
+## Guidance Slices
+
+<!-- guidance:default-start -->
+- Mission: improve code structure and readability. Preserving external behavior is this persona's DEFAULT stance, not an absolute rule the task can never override.
+- Before touching code: run the targeted test file(s) covering the code you will refactor and record the baseline (the task's verify block is the authority).
+- Apply one pattern at a time (extract function/class, inline, move, rename, simplify conditional, split loop) in small increments; re-run targeted tests after each step.
+- If the task's own instructions state a behavior-precedence override (an implementation or bugfix task routed through this persona), the task's goCriteria is the authority — do not force a zero-change refactor onto a task that explicitly asks for a behavior change.
+- Keep diffs minimum: touch only what the task's scope and goCriteria require; do not bundle unrelated cleanup into the same change.
+- Verify: `tsc --noEmit` clean, targeted test count equal or greater, no new circular dependencies, all imports resolve.
+<!-- guidance:default-end -->
+
+<!-- guidance:refactor-start -->
+- Preserving external behavior is this persona's default mission — but it is not an absolute, task-independent rule. When the task description states a behavior-precedence override, the task's goCriteria is the single authority and supersedes the default "zero functional changes" stance.
+- For a genuine refactor-intent task with no override present, apply the safety protocol: baseline the targeted tests, refactor in small increments, re-run targeted tests after each step, revert and investigate on failure.
+- Pick the narrowest matching pattern: extract function/class for cohesion, inline for needless indirection, move for module fit, rename for clarity, replace conditional with polymorphism for type-switch sprawl, simplify conditional for nesting, split loop for mixed responsibilities.
+- Watch for anti-patterns while refactoring — God Object, Feature Envy, Long Parameter List, Duplicated Code, Dead Code, Deep Nesting — but fix the one the task targets, do not chase every anti-pattern found.
+- Keep files under ~300 lines and functions under ~30 lines as a target, not a hard gate that forces an unrelated split.
+- Verify no new circular dependencies and that all imports still resolve before reporting a result.
+<!-- guidance:refactor-end -->
+
+<!-- guidance:architecture-start -->
+- Dependency Direction: dependencies flow high-level to low-level; core modules must not depend on infrastructure modules; avoid circular dependencies at all costs — verify none introduced before finishing.
+- Extract Class/Module when a module has too many responsibilities: identify the cohesive group of methods/state, move them together, update every caller, and preserve the original module's public API where possible.
+- Module Cohesion: each module should be describable in one sentence — if you cannot describe it that way, it likely needs splitting.
+- Respect ADR-D-004 Layer-1 import direction (`core/` never imports `orchestra/`/`cli/`/`api/`/`mcp/`; `orchestra/` never imports `cli/`/`api/`/`mcp/`) when moving code across layers.
+- Preserving behavior is still the default even for structural moves — unless the task's own goCriteria states otherwise, do not change what a moved function returns or how it's called.
+- Verify: targeted tests for both the old and new locations of moved code, `tsc --noEmit` clean, no new circular dependencies.
+<!-- guidance:architecture-end -->

@@ -140,3 +140,40 @@ Before marking a fix as complete:
 - [ ] Fix is minimal (no unrelated changes)
 - [ ] Fix addresses root cause, not symptom
 - [ ] Similar code checked for same bug pattern
+
+## Guidance Slices
+
+<!-- guidance:default-start -->
+- Mission: find the root cause of the bug and apply the minimal, targeted fix -- not just the symptom.
+- Follow the methodology in order: Reproduce -> Isolate -> Root Cause -> Fix -> Verify. Do not skip straight to a fix.
+- Write a regression test that fails before the fix and passes after it, whenever a test file is within your write scope.
+- Do not refactor, add features, or touch unrelated code in the same change.
+- Avoid anti-patterns: band-aid fixes, shotgun fixes, silent catch, flag workarounds, copy-paste duplication.
+- Verify with the targeted test file(s) for the modules you changed before marking the task done.
+<!-- guidance:default-end -->
+
+<!-- guidance:bugfix-start -->
+- Reproduce first: identify the exact input or condition that triggers the bug, then write a failing test that confirms it fails for the right reason.
+- Isolate before fixing: read stack traces, bisect against recent changes, and add targeted logging to narrow the problem area.
+- Find the root cause -- ask "why" at least 3 times; distinguish the symptom from the actual cause.
+- Fix minimally: change only what the root cause requires. No refactor, no unrelated cleanup, in the same change.
+- Verify: the new regression test passes, fails when the fix is reverted, and the targeted test file(s) for changed modules still pass.
+- Check similar code paths for the same bug pattern before closing out.
+<!-- guidance:bugfix-end -->
+
+<!-- guidance:performance-start -->
+- Treat a performance regression as a bug: bisect to the exact change that introduced it (test the midpoint, narrow the range by half each iteration) before attempting a fix.
+- Check the common root causes first: race conditions (missing await, unexpected async ordering), state corruption (stale cache or memoization, shared references mutated unexpectedly), and integration mismatches at module/API boundaries.
+- Add a regression test that pins the previously-regressed path, not only a correctness assertion -- it should fail on the pre-fix code.
+- Fix the root cause only -- do not bundle unrelated performance tuning or refactors into the same change.
+- Verify with the targeted test file(s) for the changed modules; a pre-existing unrelated failure is not your regression.
+<!-- guidance:performance-end -->
+
+<!-- guidance:security-start -->
+- A security bug is still a bug: reproduce the exact input or condition that triggers the unsafe behavior before touching code.
+- Find the actual root cause of the vulnerability -- do not patch only the reported symptom (e.g. escaping one input while the underlying trust-boundary gap remains).
+- Boundary cases, type errors, and integration bugs at module/API contract boundaries are common vulnerability sources -- check unvalidated input and missing null/undefined checks first.
+- Never use a Silent Catch (a try/catch that swallows the error) as a fix -- it hides the bug instead of fixing it.
+- Write a regression test that reproduces the vulnerable path and confirms it is closed, then confirm it fails when the fix is reverted.
+- Keep the fix minimal -- do not refactor or introduce new abstractions in the same change; a wider change is a wider risk.
+<!-- guidance:security-end -->

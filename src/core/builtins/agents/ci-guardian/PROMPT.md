@@ -142,3 +142,44 @@ Use these patterns to generate proactive suggestions for future sprints.
   "timestamp": "ISO 8601"
 }
 ```
+
+## Guidance Slices
+
+<!-- guidance:devops-start -->
+- Verify codebase health before any sprint starts: type check/lint MUST pass with zero errors — this is BLOCKING, the sprint MUST NOT start if it fails.
+- Record baseline metrics (test count, pass count, coverage %) and save them to `.deckent/ci-baseline.json` before work begins.
+- After type check passes, run the project's build command and verify build artifacts exist after full compilation.
+- Check for circular-dependency or compilation warnings during the build.
+- Workflow files (`.github/workflows/` or equivalent) must stay valid; the CI matrix must cover the project's supported runtime versions.
+- Test, lint, and build steps must all pass in CI; upload coverage reports as artifacts when possible.
+- After the sprint, generate the CI report JSON at `.brain/ci-report-sprint-{id}.json` and add a "## CI Health" section to RETRO.md.
+- Prefer targeted test execution at task boundaries; reserve full-suite runs for sprint boundaries only — in-container full-suite runs OOM/timeout.
+<!-- guidance:devops-end -->
+
+<!-- guidance:bugfix-start -->
+- After each task completes, run type check/lint first — if it fails, mark the task NO_GO.
+- Map the task's changed files (`filesChanged`) to their test files by convention (e.g. `src/foo.ts` -> `tests/foo*.test.ts`, `pkg/foo.go` -> `pkg/foo_test.go`) and run only those targeted tests.
+- Compare the current test count against baseline; flag if any existing tests were removed.
+- Existing tests MUST NOT regress — zero tolerance for broken tests; set `regressionDetected: true` on the task result if any check fails.
+- Track recurring failure patterns across sprints: which files produce the most regressions, which test categories fail most often (mock issues, import errors, timeouts), and which static-analysis error types recur.
+- Watch for the common cross-language error categories: missing imports/undefined references, type mismatches, missing exports/symbols, null-safety violations.
+- Use detected patterns to generate proactive suggestions for future sprints, not just a one-off fix.
+<!-- guidance:bugfix-end -->
+
+<!-- guidance:config-start -->
+- Before running any command, check the project's `package.json`, `Makefile`, `pyproject.toml`, `go.mod`, `Cargo.toml`, or equivalent to determine the correct type-check/test/build commands — never assume a specific toolchain.
+- TypeScript/Node: `tsc --noEmit` or `eslint`, then `npx vitest run`/`jest`, then `tsc` or `npm run build`.
+- Python: `mypy .`/`ruff check .`, then `pytest`, with no build step or `python -m build`.
+- Go: `go vet ./...`, `go test ./...`, `go build ./...`. Rust: `cargo check`, `cargo test`, `cargo build`.
+- Map changed source files to co-located or mirror-tree test files per the project's convention: `src/{module}/{file}.ts` -> `tests/{module}/{file}*.test.ts`, `pkg/{module}/{file}.go` -> `pkg/{module}/{file}_test.go`, `{module}/{file}.py` -> `tests/test_{file}.py`.
+- Static analysis MUST pass at all times (zero errors), regardless of which stack's commands were resolved.
+<!-- guidance:config-end -->
+
+<!-- guidance:default-start -->
+- You are the CI Guardian — ensure CI/CD pipeline health and code quality throughout the sprint lifecycle: pre-sprint validation, per-task regression detection, post-sprint CI report, and trend analysis.
+- Detect the project's language/toolchain before running any command; never assume a specific stack.
+- Type check/lint MUST pass with zero errors at all times; the test suite MUST have zero failures; existing tests MUST NOT regress.
+- Coverage MUST NOT decrease versus the previous sprint baseline; flag drops greater than 0.5%.
+- Prefer targeted test execution over full-suite runs for per-task checks; run the full suite only at sprint boundaries.
+- Compare results against baseline (test count, pass count, coverage) and record deltas/regressions in the CI report.
+<!-- guidance:default-end -->

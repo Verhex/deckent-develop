@@ -9,6 +9,36 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint443] - 2026-07-14
+
+### Added
+
+- U4 compose guidance mode in buildAgentBlock
+- U4 goCriteria repeat-merge in the god template
+- U4 prompt cost measurement harness
+- U4 guidance content — accessibility-auditor
+- U4 guidance content — api-builder
+- U4 guidance content — api-designer
+- U4 guidance content — architecture-planner
+- U4 guidance content — ci-guardian
+- U4 guidance content — code-reviewer
+- U4 guidance content — data-engineer
+
+### Changed
+
+- U4 persona-guidance parser and slice selector (completed with tech debt)
+- U4 config knob prompt.persona_render (completed with tech debt)
+- U4 guidance content — architect (completed with tech debt)
+- U4 guidance content — i18n-specialist (completed with tech debt)
+- U4 guidance content — terminal-ux-engineer (completed with tech debt)
+
+### Fixed
+
+- U4 guidance content — bug-fixer
+
+
+_Tasks: 29 total, 28 done, 6 tech debt, 1 no-go_
+
 ## [invalid-version-sprint442] - 2026-07-14
 
 ### Added

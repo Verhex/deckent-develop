@@ -10843,3 +10843,50 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 442-004: Entegrasyon ve regresyon dogrulamasi run-flow aileleri ile tsc (DONE)
 
 ---
+## Sprint 443 — sprint-443
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-14
+**Duration:** 2641s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 29 |
+| Completed | 28 |
+| Tech Debt | 6 |
+| No-Go | 1 |
+| Coverage | NaN% |
+| Duration | 2641213ms |
+
+### Tasks
+
+- 443-001: U4 persona-guidance parser and slice selector (GO_WITH_TECH_DEBT)
+- 443-002: U4 config knob prompt.persona_render (GO_WITH_TECH_DEBT)
+- 443-003: U4 compose guidance mode in buildAgentBlock (DONE)
+- 443-004: U4 goCriteria repeat-merge in the god template (DONE)
+- 443-005: U4 prompt cost measurement harness (DONE)
+- 443-006: U4 guidance content — accessibility-auditor (DONE)
+- 443-007: U4 guidance content — api-builder (DONE)
+- 443-008: U4 guidance content — api-designer (DONE)
+- 443-009: U4 guidance content — architect (GO_WITH_TECH_DEBT)
+- 443-010: U4 guidance content — architecture-planner (DONE)
+- 443-011: U4 guidance content — bug-fixer (DONE)
+- 443-012: U4 guidance content — ci-guardian (DONE)
+- 443-013: U4 guidance content — code-reviewer (DONE)
+- 443-014: U4 guidance content — data-engineer (DONE)
+- 443-015: U4 guidance content — devops-engineer (DONE)
+- 443-016: U4 guidance content — doc-writer (DONE)
+- 443-017: U4 guidance content — frontend-designer (DONE)
+- 443-018: U4 guidance content — i18n-specialist (GO_WITH_TECH_DEBT)
+- 443-019: U4 guidance content — integration-engineer (DONE)
+- 443-020: U4 guidance content — migration-specialist (DONE)
+- 443-021: U4 guidance content — observability-engineer (DONE)
+- 443-022: U4 guidance content — performance-analyzer (DONE)
+- 443-023: U4 guidance content — refactorer (DONE)
+- 443-024: U4 guidance content — security-auditor (DONE)
+- 443-025: U4 guidance content — terminal-ux-engineer (GO_WITH_TECH_DEBT)
+- 443-026: U4 integration — flag-on compose e2e plus shadow-sync verification (NO_GO)
+
+---

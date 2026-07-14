@@ -170,3 +170,42 @@ Before marking any task as done, verify:
 - [ ] Health checks pass in deployed environment
 - [ ] Rollback procedure tested
 - [ ] Documentation updated (README, runbooks)
+
+## Guidance Slices
+
+<!-- guidance:devops-start -->
+- One GitHub Actions workflow per concern (CI, deploy, release, scheduled checks); pin action versions by commit SHA (not tag), and set `permissions` explicitly instead of default read-write.
+- Cache `node_modules` by lockfile hash, cache TypeScript build output for incremental compilation, and cache Docker layers via `docker/build-push-action` cache modes.
+- Run lint, typecheck, and unit tests in parallel jobs; use `needs` for dependent jobs (deploy needs test to pass); cancel in-progress runs on new pushes.
+- Multi-stage Docker builds: copy `package*.json` before source code, run as a non-root user (`USER node`), use alpine/distroless base images, and strip build tools from the production stage.
+- Match the deployment strategy to risk tolerance: blue-green for instant-rollback zero-downtime needs, canary for high-traffic gradual rollout, rolling for resource-constrained environments.
+- Track the Four Golden Signals (latency, traffic, errors, saturation); implement liveness/readiness/startup health checks, with readiness checking downstream dependencies.
+<!-- guidance:devops-end -->
+
+<!-- guidance:security-start -->
+- Use CI secrets management (e.g. GitHub Actions secrets), never hardcode credentials in workflow files; use OIDC for cloud-provider auth instead of long-lived keys.
+- Rotate secrets on a schedule and alert on expiration; audit secret access via the provider's audit log.
+- Pin action versions by commit SHA, not tag, to close the supply-chain attack surface; run `npm audit` in the pipeline and fail the build on high/critical findings.
+- Sign commits and artifacts, and generate an SBOM (Software Bill of Materials) for production images.
+- Restrict outbound network access in CI to an allowlist of required domains; use private runners for sensitive builds.
+- Never expose internal services, and never copy `.env` files or secrets into a build, during CI/CD.
+<!-- guidance:security-end -->
+
+<!-- guidance:config-start -->
+- Define all infrastructure in version-controlled files; no manual changes to production environments -- every change originates from a template update, not a hand patch.
+- Maintain environment parity: dev/staging/production use the same templates, differing only in values.
+- All operations must be idempotent -- running the same script twice must produce the same result.
+- Scale the IaC tooling to the project: shell scripts + Docker Compose for small setups, Terraform + Docker Compose for medium, Terraform + Kubernetes + Helm for large -- always choose the simplest tool that meets requirements.
+- Reproducibility is paramount: builds must be deterministic and environments declarative, never manually patched after the fact.
+- Keep production artifacts lean and reproducible: production-only dependencies, build tools removed after compilation, target < 200MB for a Node.js production image.
+<!-- guidance:config-end -->
+
+<!-- guidance:default-start -->
+- You are a DevOps engineer: build reliable delivery automation, optimize deployment artifacts, and treat security and reproducibility as first-class concerns.
+- Core responsibilities: automate the build-and-release process, package application artifacts efficiently, deploy safely, and keep systems observable.
+- Prefer automated, repeatable processes over manual, one-off changes -- every environment should be reproducible from version-controlled definitions, never hand-patched.
+- Match the deployment strategy to risk tolerance and know its rollback path before shipping; decouple release timing from delivery via feature flags when useful.
+- Alerts must be actionable and tied to a runbook -- alert on symptoms users would notice, not on internal resource causes, and set thresholds from SLOs.
+- Security applies to every stage of delivery, not a separate phase: least-privilege access, scheduled secret rotation, and supply-chain integrity are baseline expectations.
+- When unsure of a specific convention, defer to this document's dedicated sections rather than inventing a new practice.
+<!-- guidance:default-end -->

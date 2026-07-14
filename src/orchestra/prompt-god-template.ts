@@ -10,6 +10,7 @@ import { join } from 'path';
 import type { Task, TaskScope } from '../core/task-types.js';
 import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
+import { personaCoreBody, selectGuidanceSlice } from '../core/persona-guidance.js';
 import { evaluateScopeGate } from '../core/scope-gate.js';
 import { mirrorTestPath } from '../core/task-builder-scope.js';
 import type { ToolAllowlistResult } from '../core/tool-allowlist.js';
@@ -182,6 +183,20 @@ export interface SprintContext {
    * computed allowlist is out of this task's write scope (a tracked follow-up).
    */
   toolAllowlist?: ToolAllowlistResult;
+  /**
+   * Persona render mode for the agent block (ADR-G-027 U4 — task 443-003).
+   *
+   * Mirrors `config.prompt.persona_render` (`src/core/config-types.ts`). 'guidance':
+   * {@link buildAgentBlock} renders the task's intent-matched {@link selectGuidanceSlice}
+   * slice + a `[full persona: <path>]` pointer instead of the full PROMPT.md body — an
+   * agent whose PROMPT.md carries no guidance markers at all still falls back to the
+   * full body (no content ever dropped from the render, per ADR-G-027 no-truncation).
+   * `undefined`/'full' (the default until a caller wires the config flag through) →
+   * full body, byte-identical to the pre-443-003 output. Threading `config.prompt.
+   * persona_render` into this field at the task-builder call site is a tracked
+   * follow-up (U4 integration task); this compiler only needs to OBEY the value.
+   */
+  personaRenderMode?: 'full' | 'guidance';
   /**
    * Leading-T0 cache reorder (Sprint 330 330-019 — provider-agnostic prompt cache).
    *
@@ -412,7 +427,10 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
   const scopeWarnings: string[] = [];
 
   // ── 1. Agent Block ──────────────────────────────────────────────────
-  const agentBlock = buildAgentBlock(agentId, ctx.agentPrompt);
+  const agentBlock = buildAgentBlock(agentId, ctx.agentPrompt, {
+    mode: ctx.personaRenderMode,
+    intent: getTaskPrimaryIntent(task),
+  });
 
   // ── 2. Skill Block ──────────────────────────────────────────────────
   // F2 (Sprint 182 PQ-2): full skill content, no truncation, no effort-based clipping.
@@ -510,12 +528,52 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
 
 // ─── Agent Block Builder ───────────────────────────────────────────────
 
-function buildAgentBlock(agentId: string, agentPrompt?: string): string {
+/**
+ * Canonical (shadow-of-builtin) PROMPT.md location for an agent (ADR-G-027 "one
+ * pointer away" contract — mirrors agent-pool.ts's `getAgentPrompt` resolution
+ * precedence step 1 / temp-agent-generator.ts's `promptMdPath`). Kept as a bare
+ * relative-path literal (no fs access, no projectRoot) so {@link buildAgentBlock}
+ * stays pure and deterministic per (agent, intent).
+ */
+function agentPromptPointerPath(agentId: string): string {
+  return `.deckent/agents/${agentId}/PROMPT.md`;
+}
+
+function buildAgentBlock(
+  agentId: string,
+  agentPrompt?: string,
+  opts?: { mode?: 'full' | 'guidance'; intent?: string },
+): string {
   if (!agentPrompt) return '';
   // The task itself is rendered later under the "## Your Task" header; do not
   // emit a dangling "=== Task ===" header here (it would sit above the Skills/
   // ADR blocks with no body and mislead the worker about where the task is).
-  return `=== Agent: ${agentId} ===\n${agentPrompt}`;
+  const identityLine = `=== Agent: ${agentId} ===`;
+
+  // U4 (443-003): 'guidance' mode renders a focused, intent-matched slice +
+  // pointer instead of the full body (ADR-G-027 sanctioned condensed+pointer
+  // shape). Default/'full' mode — and any agent whose PROMPT.md carries no
+  // guidance markers at all (source 'full-body') — renders the CORE body.
+  if (opts?.mode === 'guidance') {
+    const { slice, source } = selectGuidanceSlice(agentPrompt, opts.intent ?? 'unknown');
+    if (source !== 'full-body') {
+      const pointer = `[full persona: ${agentPromptPointerPath(agentId)} — read it if this slice is not enough]`;
+      return `${identityLine}\n${slice}\n${pointer}`;
+    }
+  }
+
+  // F1 (sprint-443 blast-radius fix): the full/fallback render ships the CORE body —
+  // guidance blocks are distilled COPIES of the body, so rendering the raw post-U4 file
+  // here duplicated them into EVERY prompt (+2-3.5KB each) while the default flag was
+  // still 'full', silently reversing U4's cost goal. A marker-free PROMPT.md passes
+  // through personaCoreBody untouched → byte-identical legacy render. When something
+  // WAS stripped, the pointer keeps the full source one pointer away (ADR-G-027).
+  const coreBody = personaCoreBody(agentPrompt);
+  if (coreBody !== agentPrompt) {
+    const pointer = `[full persona: ${agentPromptPointerPath(agentId)} — read it if you need the guidance appendix]`;
+    return `${identityLine}\n${coreBody}\n${pointer}`;
+  }
+  return `${identityLine}\n${agentPrompt}`;
 }
 
 // ─── Skill Block Builder ───────────────────────────────────────────────
@@ -1382,6 +1440,18 @@ export function buildVerifyPrecedenceNote(verificationMode: 'targeted' | 'doc' =
 }
 
 /**
+ * Task's primary routing intent (`routingMeta.taskDNA.intent.primary`), or
+ * `undefined` when unset/missing. `taskDNA` is typed `unknown` on `Task`
+ * (routing-engine's internal shape), so this is the single cast site shared by
+ * every reader — {@link buildBehaviorPrecedenceNote} and {@link buildAgentBlock}'s
+ * guidance-mode intent lookup (443-003) both go through this helper instead of
+ * duplicating the cast.
+ */
+function getTaskPrimaryIntent(task: Pick<Task, 'routingMeta'>): string | undefined {
+  return (task.routingMeta?.taskDNA as { intent?: { primary?: string } } | undefined)?.intent?.primary;
+}
+
+/**
  * G2b behavior-precedence override note (prompt-gate G-series). A CONDITIONAL runtime
  * mitigation for the case the plan-time gate WARNs but does not block: a preserve-behavior
  * persona (refactorer, "zero functional changes" mandate) still landed on a behavior-changing
@@ -1397,7 +1467,7 @@ export function buildBehaviorPrecedenceNote(
   task: Pick<Task, 'assignedAgent' | 'routingMeta' | 'scope'>,
 ): string {
   if (task.assignedAgent !== 'refactorer') return '';
-  const intent = (task.routingMeta?.taskDNA as { intent?: { primary?: string } } | undefined)?.intent?.primary;
+  const intent = getTaskPrimaryIntent(task);
   if (!intent || intent === 'refactor' || intent === 'unknown' || intent === 'documentation') return '';
   // PCOMP-6 D3 (sprint-440 + 440-001's honest NO_GO): post-Sprint-148 there is
   // NO 'testing' primary intent (ADR-G-023 — tests/** work classifies as
@@ -1427,6 +1497,43 @@ export function buildDodBlock(goNogo?: { goCriteria?: string; noGoCriteria?: str
   if (!goNogo?.goCriteria) return '';
   const noGo = goNogo.noGoCriteria ? `\nNO-GO if: ${goNogo.noGoCriteria}` : '';
   return `\n## Definition of Done (goCriteria — your work is judged against this)\n${goNogo.goCriteria}${noGo}\n`;
+}
+
+/**
+ * Reserved `### goNogo` sub-block heading (443-004 U4 goCriteria repeat-merge).
+ *
+ * Mirrors directives-builder.ts's own `GO_NOGO_HEADING_RE` / `buildTaskBlock` writer
+ * (`### goNogo\n- goCriteria: …\n- nogo: …`, appended at the END of a directive task's
+ * description) — kept as a LOCAL, self-contained constant here (no cross-file import)
+ * since this task's write scope is this file only. `assertNoHeadingCollision` already
+ * treats this heading as RESERVED (throws DECKENT_E074 if user-authored description
+ * content contains it), so matching it here is an unambiguous "system-written" signal,
+ * never coincidental prose.
+ */
+const GO_NOGO_DESCRIPTION_HEADING_RE = /^\s*###\s+goNogo\s*$/im;
+
+/**
+ * Strip the redundant `### goNogo` sub-block from `task.description` (443-004 U4).
+ *
+ * `sprint-planner.ts` threads `task.description` straight from the DIRECTIVES source
+ * WITHOUT stripping this sub-block, so the SAME goCriteria/noGoCriteria text that
+ * `sprint-utils.ts#extractGoNogoCriteria` already parsed into `task.goNogo` (rendered
+ * a few lines below by {@link buildDodBlock}, the authoritative GO/NO-GO section) was
+ * echoing a second time as raw description text right above it — A5's "GO/NO-GO
+ * section" repeat site.
+ *
+ * Gated on `goCriteria` being truthy: only strips when {@link buildDodBlock} is
+ * GUARANTEED to render the authoritative section immediately below, so the content is
+ * provably preserved, not cut (ADR-G-027 no-truncation). No heading found, or
+ * `goCriteria` unset (nothing else would show the block's content) → `description`
+ * returned unchanged, byte-for-byte — the default for every task not authored via the
+ * `### goNogo` spec-template.
+ */
+export function dedupeDescriptionGoNogoEcho(description: string, goCriteria?: string): string {
+  if (!goCriteria) return description;
+  const match = GO_NOGO_DESCRIPTION_HEADING_RE.exec(description);
+  if (!match) return description;
+  return description.slice(0, match.index).trimEnd();
 }
 
 /**
@@ -1615,6 +1722,11 @@ function renderSegments(input: RenderInput): PromptSegment[] {
   const idempotencyBlock = emitIdempotency
     ? `\n## Idempotency Key\n${idempotencyKey}\nUse this key for external API calls (Idempotency-Key header) to make retries safe.`
     : '';
+  // 443-004 (U4 goCriteria repeat-merge): strip the redundant "### goNogo" echo BEFORE
+  // interpolation — `dodBlock` above renders the SAME goCriteria/noGoCriteria text a
+  // few lines below as the authoritative GO/NO-GO section, so keeping both would repeat
+  // every unique criterion a 3rd time in this single segment.
+  const taskDescription = dedupeDescriptionGoNogoEcho(task.description, task.goNogo?.goCriteria);
   // The global worker-contract preamble (T0) and the per-task body (T2) are split
   // at the existing blank-line boundary: joined with SEGMENT_SEPARATOR they are
   // byte-identical to the former single block, but the split lets the T0 contract
@@ -1624,7 +1736,7 @@ See .deckent/workspace/WORKER-GUIDE.md for heartbeat format, result format, and 
   push('T2', 'task', `## Your Task
 ${task.id}: ${task.title}
 
-${task.description}
+${taskDescription}
 
 - Model: ${task.model}
 - Effort: ${effort}

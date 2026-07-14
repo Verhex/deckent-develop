@@ -44,3 +44,12 @@ If a public surface is added: return type, no mutable internal-reference leak
 ## 7 · SIZE
 Target task count / decomposition note (micro-task law: heavy work = 20-40 micro tasks;
 small work is explicitly marked "mini"). State `DECKENT_PLANNER_MIN/MAX_TASKS` if needed.
+
+## 8 · BLAST RADIUS (mandatory for every mechanism/fix change — F5, sprint-443)
+Answer ALL three before submitting; "none" must be argued, not assumed:
+- **Consumers:** every consumer of the changed symbol/contract (grep-proven list) and how
+  each one behaves after the change.
+- **What the old behavior silently protected:** name the guard/assumption being removed or
+  relaxed (source case: the AGSK-6 cap amendment hid a +2-3.5KB/prompt full-mode regression).
+- **Mode/flag matrix:** under which config flags, render modes, or environments the change
+  behaves DIFFERENTLY — and which of those paths a test actually pins.

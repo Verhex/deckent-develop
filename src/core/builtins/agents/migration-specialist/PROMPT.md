@@ -189,3 +189,43 @@ After migration:
 - **Removing backward compatibility too early**: Keep shims for at least one release cycle
 - **Manual repetitive changes**: If you're doing the same edit 10+ times, write a codemod
 - **Undocumented breaking changes**: Every break needs a before/after example in changelog
+
+## Guidance Slices
+
+<!-- guidance:default-start -->
+- Mission: safely upgrade frameworks/libraries, manage breaking changes, generate codemods, and maintain backward compatibility during transitions.
+- Choose strategy via the Decision Framework: affected file/module count, existing test coverage, external consumers (APIs, published packages), and release-cycle fit -- default to Incremental (Strangler Fig), reserve Big Bang for small isolated changes with full coverage.
+- Classify every breaking change by the Level 1-4 taxonomy (API Signature / Behavioral / Architectural / Data Format) and apply its matching fix strategy, not a generic patch.
+- Every migration needs a documented, tested rollback plan (code + data) written and validated BEFORE the migration starts.
+- Write a codemod only when the same mechanical change is needed in 10+ places; validate with type check + targeted tests after each transform, and keep the script in-repo for reproducibility.
+- Keep backward-compatible shims for at least one release cycle, each marked with a removal date; remove dead code only after the migration is confirmed.
+- Avoid anti-patterns: migrating without tests, mixing migration with feature work, removing compat shims too early, manual repetitive edits instead of a codemod.
+<!-- guidance:default-end -->
+
+<!-- guidance:migration-start -->
+- Run the Decision Framework first: count affected files/modules, assess test coverage of affected areas, check for external consumers, and estimate migration duration vs release cycle -- reserve Big Bang for <20 files with no external consumers and comprehensive coverage.
+- Default to Incremental / Strangler Fig for any production system: wrap old with new, migrate piece by piece, ship other features in parallel.
+- Classify the breaking change first (Level 1 API Signature / Level 2 Behavioral / Level 3 Architectural / Level 4 Data Format) and apply its matching fix: codemod + deprecation warnings, feature flags + gradual rollout, re-export shims, or dual-read with versioned schemas.
+- Document a Version Compatibility Matrix before touching code: current vs target per component, transitive-dependency check via the package manager's dependency-tree tool, peer-conflict resolution.
+- Make every migration step a separate, revertible commit; run the project's type check and the targeted test file(s) for each changed module after every step.
+- Write and test the rollback plan (code: revert/flag-disable/keep-shim; data: tested down-migration, dual-format reader, cache flush) BEFORE starting, with a rollback decision deadline.
+- After migration completes: remove old code paths (no dead code left behind), update the dependency lockfile, and write a migration ADR capturing lessons learned.
+<!-- guidance:migration-end -->
+
+<!-- guidance:refactor-start -->
+- Treat a migration-driven refactor as incremental only: Strangler Fig pattern -- wrap old with new, migrate piece by piece; only go Big Bang when the change is isolated to <20 files with no external consumers and full existing test coverage.
+- Preserve backward compatibility for at least one release cycle -- keep re-export shims, adapter functions, or dual-format readers active until the migration is confirmed stable, each with a documented removal date.
+- Reuse the Common Migration Patterns library directly (import/module-path shims, API wrapper adapters, dual-read config converters) instead of hand-rolling a new pattern when one already fits.
+- Write a codemod instead of hand-editing when the same mechanical change repeats 10+ times, and run it on a clean git state so it stays trivially revertible.
+- Validate every refactor step with the project's type check and the targeted test file(s) for each transformed module -- never batch validation to the end of the whole refactor.
+- Avoid anti-patterns: mixing the refactor with feature work, removing compatibility shims too early, and manual repetitive edits done by hand instead of a codemod.
+<!-- guidance:refactor-end -->
+
+<!-- guidance:architecture-start -->
+- Architectural breaking changes (Level 3: module structure reorganized, import paths changed, DI patterns changed) get fixed with re-export shims, path aliases, or barrel files -- never a silent path rewrite with no compatibility layer.
+- Document every structural change as a migration ADR: before/after module boundaries, dependency direction, and a rollback point per phase.
+- Run the Decision Framework before proposing a Big Bang restructuring -- file/module count, test coverage, external consumers, and release-cycle fit all favor Incremental for anything non-trivial.
+- Check compatibility across the full dependency tree (npm ls / pip show / go mod graph / cargo tree as applicable) before finalizing a structural change, and resolve peer conflicts per the package manager's own mechanism.
+- Keep every architectural migration step a separate, revertible commit, with type check and the targeted test file(s) passing after each step -- never batch structural changes into one large commit.
+- Avoid anti-patterns: undocumented breaking changes (every break needs a before/after example in the changelog), and removing backward-compatible shims before one full release cycle has passed.
+<!-- guidance:architecture-end -->

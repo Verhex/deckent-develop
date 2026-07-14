@@ -70,3 +70,55 @@ When adding or changing a user-facing string:
 2. Route dynamic content through `vars` interpolation -- never concatenate around it
 3. Confirm the mechanism module renders it via an injected parameter, not inline copy
 4. Run the translation-parity test before marking done
+
+## Guidance Slices
+
+<!-- guidance:default-start -->
+- Every user-visible string is a `getMessage(key, lang, vars?)` lookup -- never a literal inside
+  a mechanism/render/controller module.
+- English is the fallback default; the resolution chain always lands on a real value (requested
+  locale -> English -> the key itself), never an empty string.
+- Interpolate `{varName}` placeholders with a single regex pass over the resolved template --
+  never string-concatenate translated fragments around a value.
+- A message key added for one locale without every other supported locale filled in is an
+  incomplete change -- the translation-parity test exists to catch exactly this gap.
+- Verify with the targeted test file(s) for the modules you changed before marking the task done.
+<!-- guidance:default-end -->
+
+<!-- guidance:implementation-start -->
+- Add the new key to the shared message table for EVERY supported locale in the same change --
+  landing English only and deferring the rest is the most common i18n defect.
+- Mechanism modules (TUI/render/controller) take the rendered label as a caller-injected
+  parameter; they never author copy inline, even for a "temporary" string.
+- Route any dynamic value through `vars` interpolation rather than building the sentence by
+  concatenation -- word order and pluralization differ per language.
+- If the string is count-aware, bake the plural rule into each locale's own template instead of
+  appending a count onto a singular noun.
+- Run the translation-parity test after adding the key, before considering the string done.
+<!-- guidance:implementation-end -->
+
+<!-- guidance:refactor-start -->
+- Treat any hardcoded literal found inside a mechanism/render/controller module as unconditional
+  technical debt -- extract it to the shared message table under a new or existing key.
+- Preserve the exact rendered text for the default locale while extracting -- a refactor must not
+  silently change the visible copy.
+- After extraction, the mechanism module receives the label as an injected parameter; it must
+  not still branch on `lang` or embed copy inline anywhere in the call chain.
+- Check for a second source of truth: a per-feature string map that reinvents lookup/fallback
+  instead of routing through the one shared message table.
+- Re-run the translation-parity test and the targeted test file(s) for the refactored module to
+  confirm zero behavior change.
+<!-- guidance:refactor-end -->
+
+<!-- guidance:bugfix-start -->
+- Reproduce first: identify the exact locale, key, and interpolation input that triggers the
+  defect before touching the message table or lookup code.
+- Common root causes: a key missing for one locale (parity gap), a malformed locale code not
+  normalized to the default, or a plural/interpolation template built by string concatenation.
+- A missing variable must render visibly (`{varName}` left in place) -- if it is silently dropped
+  to an empty string, that is the bug, not acceptable fallback behavior.
+- Fix the root cause in the shared message table or lookup chain -- do not patch a single
+  call-site with a local hardcoded workaround.
+- Verify the translation-parity test and the targeted test file(s) for the changed module(s)
+  both pass before marking done.
+<!-- guidance:bugfix-end -->

@@ -1,5 +1,25 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-443 Learnings
+- Sprint sprint-443 Learnings: ## Sprint sprint-443 Learnings
+- U4 persona-guidance parser and slice selector: GO_WITH_TECH_DEBT — parseGuidanceSections/selectGuidanceSlice implemented in src/core/persona-guidance.ts (pure, no I/O), mirroring extractM
+- U4 config knob prompt.persona_render: GO_WITH_TECH_DEBT — Added prompt.persona_render?: 'full' | 'guidance' to PromptConfig (config-types.ts), mirroring the existing adr_render k
+- U4 guidance content — architect: GO_WITH_TECH_DEBT — Appended a '## Guidance Slices' section to the end of src/core/builtins/agents/architect/PROMPT.md using the marker gram
+- U4 guidance content — i18n-specialist: GO_WITH_TECH_DEBT — Appended '## Guidance Slices' at end of PROMPT.md with 4 marker-delimited slices (default, implementation, refactor, bug
+- U4 guidance content — terminal-ux-engineer: GO_WITH_TECH_DEBT — Appended a '## Guidance Slices' heading to the end of PROMPT.md with 4 marker-wrapped slices (Task-1 grammar: <!-- guida
+- U4 integration — flag-on compose e2e plus shadow-sync verification: NO_GO — Cascade-skipped (SCHED6-EFF persist-before-commit executor): dependency 443-008 ended NO_GO/MANUAL_REVIEW, so this depen
+
+## Gains
+- 443-003 — U4 compose guidance mode in buildAgentBlock — buildAgentBlock now takes an additive optional 3rd param opts:{mode,intent} (private, single call...
+- 443-004 — U4 goCriteria repeat-merge in the god template — Repeat-site map (in .plan): (1) task-description echo of the raw '### goNogo' sub-block that dire...
+- 443-005 — U4 prompt cost measurement harness — Wrote scripts/measure-prompt-cost.mjs (my only write-scope file).
+- 443-006 — U4 guidance content — accessibility-auditor — Appended a '## Guidance Slices' heading to the end of PROMPT.md with 4 marker-wrapped slices (Tas...
+- 443-007 — U4 guidance content — api-builder — Added a '## Guidance Slices' heading at the end of src/core/builtins/agents/api-builder/PROMPT.md...
+- 443-008 — U4 guidance content — api-designer — Implemented per this task's own contract: appended a '## Guidance Slices' heading with 3 intent s...
+- 443-010 — U4 guidance content — architecture-planner — Appended a '## Guidance Slices' heading at the end of PROMPT.md with 4 marker-wrapped slices (des...
+- 443-011 — U4 guidance content — bug-fixer — Appended a '## Guidance Slices' heading at the end of bug-fixer/PROMPT.md with 4 marker-wrapped s...
+- …and 12 more delivered
+
 ## Sprint sprint-442 Learnings
 - Sprint sprint-442 Learnings: ## Sprint sprint-442 Learnings
 - Rehydrate event-fold sorgu-yuzeyi getFlow ve listFlows: GO_WITH_TECH_DEBT — Rehydrate event-fold query surface added to src/orchestra/run-flow-coordinator.ts.
