@@ -17,6 +17,7 @@ import { modelRegistry } from '../core/model-registry.js';
 import { debugLog } from '../core/utils.js';
 import type { TaskScope } from '../core/task-types.js';
 import { getProviderForModel } from '../core/task-types.js';
+import { buildAdrConstraintsPlannerBlock } from '../core/adr-constraints.js';
 import {
   stripPhantomScope,
   expandScopeWithAffectedTests,
@@ -234,6 +235,7 @@ KURALLAR:
 - Her görev için scope (directories + filesWrite) belirle
 - Her görev için GO/NO-GO kriterleri yaz
 
+${buildAdrConstraintsPlannerBlock()}
 MODEL SEÇİM KRİTERLERİ (HER GÖREV İÇİN DOĞRU MODELİ SEÇ):
 - **opus**: Karmaşık mimari değişiklik, birden fazla modüle dokunan görevler, yeni pattern/abstraction oluşturan işler, cross-cutting concern'ler (yeni CLI+MCP+API birlikte), test + implementasyon birlikte gereken büyük feature'lar
 - **sonnet**: Standart CRUD işlemleri, tek dosya/modül değişikliği, mevcut pattern'i takip eden yeni dosya ekleme, template/config güncellemesi, dokümantasyon yazımı, basit API endpoint ekleme, UI component ekleme (mevcut pattern ile)
@@ -667,6 +669,7 @@ GÖREV BÖLME KURALLARI:
 3. Login page UI (React component, form, redirect logic)
 4. Integration tests (E2E auth flow, token validation tests)
 
+${buildAdrConstraintsPlannerBlock()}
 MODEL SEÇİM KRİTERLERİ:
 - **opus**: Karmaşık mimari, çoklu modül, yeni pattern/abstraction
 - **sonnet**: Standart implementasyon, tek modül, mevcut pattern takip

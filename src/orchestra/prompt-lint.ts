@@ -26,8 +26,10 @@
 import type { Task } from '../core/types.js';
 import { resolveTargetedTestPaths } from './prompt-god-template.js';
 import { NARROW_SKILL_DOMAIN_SIGNALS } from './prompt-token-optimizer.js';
+import { ADR_CONSTRAINTS } from '../core/adr-constraints.js';
 
 export type PromptLintCheckId =
+  | 'adr-constraint-violation'
   | 'mentioned-file-outside-write-authority'
   | 'criteria-test-unresolved'
   | 'behavior-precedence-suspect'
@@ -201,11 +203,32 @@ function checkUnverifiedWritePaths(task: Task, trackedFiles?: readonly string[])
  * clock, no environment — `trackedFiles` is the caller's `git ls-files`
  * snapshot (the same one buildWorkerPrompt already threads to the template).
  */
+/** W7 (D4.5 — ADR-G-019 Amendment): a task whose text/criteria matches an
+ *  accepted-ADR machine constraint is contradiction-at-birth: it should have
+ *  died in the planner (which now sees the same table); catching it here means
+ *  the left-shift leaked and MUST be measured. */
+function checkAdrConstraints(task: Task): PromptLintFinding[] {
+  const text = `${taskText(task)}\n${criteriaText(task)}`;
+  const findings: PromptLintFinding[] = [];
+  for (const c of ADR_CONSTRAINTS) {
+    if (c.forbiddenPattern.test(text)) {
+      findings.push({
+        check: 'adr-constraint-violation',
+        level: 'warn',
+        taskId: task.id,
+        detail: `[${c.adrId}] task ${c.message}`,
+      });
+    }
+  }
+  return findings;
+}
+
 export function lintWorkerPromptContract(
   task: Task,
   trackedFiles?: readonly string[],
 ): PromptLintFinding[] {
   return [
+    ...checkAdrConstraints(task),
     ...checkMentionedWriteAuthority(task),
     ...checkCriteriaTestsResolved(task, trackedFiles),
     ...checkBehaviorPrecedence(task),
