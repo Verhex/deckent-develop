@@ -11,6 +11,7 @@ import type { Task, TaskScope } from '../core/task-types.js';
 import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
 import { evaluateScopeGate } from '../core/scope-gate.js';
+import { mirrorTestPath } from '../core/task-builder-scope.js';
 import type { ToolAllowlistResult } from '../core/tool-allowlist.js';
 import { sanitizeScope } from './scope-sanitizer.js';
 import { truncateAtParagraph, inferTaskDomains, logInjectionAudit } from './task-builder.js';
@@ -155,6 +156,8 @@ export interface SprintContext {
    * text, byte-identical to the pre-427-012 prompt.
    */
   verifyCommands?: ResolvedVerifyCommands;
+  /** PCOMP-6 D1a: plan-time-resolved exact targeted-test set (resolveTargetedTestPaths). */
+  targetedTestPaths?: readonly string[];
   /**
    * Task-scoped worker tool allowlist (born-664 / 559, task 427-014 ALLOW-WIRE).
    *
@@ -476,6 +479,8 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
     preExistingFailures: ctx.preExistingFailures,
     toolInventory: ctx.toolInventory,
     verifyCommands: ctx.verifyCommands,
+    // PCOMP-6 D1a: exact targeted-test set — pure (trackedFiles is ctx-injected).
+    targetedTestPaths: resolveTargetedTestPaths(task, ctx.trackedFiles),
     toolAllowlist: ctx.toolAllowlist,
   });
 
@@ -1342,6 +1347,8 @@ interface RenderInput {
   toolInventory?: string;
   /** Stack-resolved check/test commands (born-670b WIRE-VERIFY); undefined → legacy generic-examples text. */
   verifyCommands?: ResolvedVerifyCommands;
+  /** PCOMP-6 D1a: exact targeted-test set threaded from buildTaskPromptSegmented. */
+  targetedTestPaths?: readonly string[];
   /** Task-scoped tool allowlist (born-664 / 559 ALLOW-WIRE); undefined → no tool-allowlist block. */
   toolAllowlist?: ToolAllowlistResult;
 }
@@ -1495,15 +1502,67 @@ export function buildCheckCommandLine(verifyCommands?: ResolvedVerifyCommands): 
  * Undefined/absent → the legacy single-example line, byte-identical to the
  * pre-427-012 prompt.
  */
-export function buildTestCommandLine(verifyCommands?: ResolvedVerifyCommands): string {
+export function buildTestCommandLine(
+  verifyCommands?: ResolvedVerifyCommands,
+  targetedTestPaths?: readonly string[],
+): string {
+  // PCOMP-6 D1a: when the plan-time resolver produced an EXACT targeted set,
+  // print it verbatim — the single highest-frequency prompt defect in the
+  // 430-438 corpus was this line shipping as a placeholder in 31/31 prompts,
+  // leaving the worker to guess (and under-run) its own verification.
+  if (verifyCommands?.test && targetedTestPaths && targetedTestPaths.length > 0) {
+    return (
+      `Run: \`${verifyCommands.test} ${targetedTestPaths.join(' ')}\` — this exact targeted set ` +
+      '(changed-module tests + mirror tests + goCriteria-named families, resolved at plan time). ' +
+      'If you changed a file NOT covered by this set, append its test file to the same command. ' +
+      'Do NOT run the test command bare/unscoped (that is the Full test suite).'
+    );
+  }
   if (verifyCommands?.test) {
     return `Run: \`${verifyCommands.test} <path-to-the-test-file(s)-you-changed>\` — this project's resolved test command, scoped to your changed file(s) — do NOT run it bare/unscoped (that is the Full test suite).`;
   }
   return 'Example: `npx vitest run tests/orchestra/my-module.test.ts` — do NOT run the Full test suite (`npx vitest run` without args).';
 }
 
+/**
+ * PCOMP-6 D1a — resolve the EXACT targeted-test set for a task, purely from
+ * plan-time data (no I/O; `trackedFiles` is the caller-injected `git ls-files`
+ * snapshot, same source `buildScopeBlock` already uses):
+ *   1. test files already in `scope.filesWrite` (the task authors/edits them);
+ *   2. mirror tests of the task's src/ write-targets — only when they actually
+ *      exist in `trackedFiles` (never invent a path);
+ *   3. `tests/**` paths NAMED in goCriteria/noGoCriteria — the "task-required
+ *      regression families" the external model called out; kept even without
+ *      trackedFiles confirmation when explicitly named with a .test/.spec ext.
+ * Unique + sorted + capped (overflow keeps the head — deterministic).
+ */
+export function resolveTargetedTestPaths(
+  task: Task,
+  trackedFiles?: readonly string[],
+  cap = 12,
+): string[] {
+  const tracked = trackedFiles && trackedFiles.length > 0 ? new Set(trackedFiles) : undefined;
+  const out = new Set<string>();
+
+  const filesWrite = task.scope?.filesWrite ?? [];
+  for (const f of filesWrite) {
+    if (/(^|\/)tests\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f)) out.add(f);
+  }
+  for (const f of filesWrite) {
+    const mirror = mirrorTestPath(f);
+    if (mirror && tracked?.has(mirror)) out.add(mirror);
+  }
+  const criteriaText = `${task.goNogo?.goCriteria ?? ''}\n${task.goNogo?.noGoCriteria ?? ''}`;
+  for (const m of criteriaText.matchAll(/tests\/[\w\-/.]+?\.(?:test|spec)\.[cm]?[jt]sx?/g)) {
+    const p = m[0];
+    if (!tracked || tracked.has(p)) out.add(p);
+  }
+
+  return [...out].sort().slice(0, cap);
+}
+
 function renderSegments(input: RenderInput): PromptSegment[] {
-  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, task, effort, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory, verifyCommands, toolAllowlist } = input;
+  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, task, effort, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory, verifyCommands, toolAllowlist, targetedTestPaths } = input;
 
   // Tier-tagged assembly (Sprint 330 330-019). Push order below IS the default
   // production order — `buildTaskPromptSegmented` joins these contents with
@@ -1629,7 +1688,7 @@ Check the project's TOOLS.md or package.json scripts to find the right commands.
 1. **Type check / static analysis** — fix ALL errors (max 3 attempts)
    ${buildCheckCommandLine(verifyCommands)}
 2. **TARGETED test file(s) only** — run ONLY the test file(s) that cover the module(s) you changed (max 3 attempts)
-   ${buildTestCommandLine(verifyCommands)}
+   ${buildTestCommandLine(verifyCommands, targetedTestPaths)}
    ${buildPreExistingFailuresNote(preExistingFailures)}${buildExitPathTestHint(task)}
 
 If BOTH pass → selfAssessment = "DONE"

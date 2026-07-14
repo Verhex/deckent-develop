@@ -178,8 +178,9 @@ function sourceImportNeedles(source: string): string[] {
   ];
 }
 
-/** Mirror-test path for a source file, or undefined when it is not an src/*.ts source. */
-function mirrorTestPath(source: string): string | undefined {
+/** Mirror-test path for a source file, or undefined when it is not an src/*.ts source.
+ *  Exported for PCOMP-6 D1a: prompt-god-template's exact targeted-test resolution. */
+export function mirrorTestPath(source: string): string | undefined {
   if (!source.startsWith('src/') || !SOURCE_EXT_RE.test(source)) return undefined;
   return 'tests/' + source.slice('src/'.length).replace(SOURCE_EXT_RE, '.test.ts');
 }
