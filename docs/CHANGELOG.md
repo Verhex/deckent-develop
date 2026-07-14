@@ -9,6 +9,16 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint440] - 2026-07-14
+
+### Added
+
+- Intent-classifier implementation-keyword temizligi ve test-dosyasi tie-break kurali
+- Routing-engine refactorer catch-all guard ve ci-guardian test-domain bonusu
+
+
+_Tasks: 4 total, 2 done, 0 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint439] - 2026-07-14
 
 ### Added

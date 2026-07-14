@@ -68,10 +68,13 @@ describe('W2 criteria-test-unresolved', () => {
 });
 
 describe('W3 behavior-precedence-suspect', () => {
-  it('flags refactorer+implementation intent when the text claims additive-only', () => {
+  it('flags refactorer+implementation intent when the text claims additive-only (src-writing task)', () => {
     const t = makeTask({
       assignedAgent: 'refactorer',
       description: 'Additive-only contract alanlari ekle; mevcut davranış değişmez.',
+      // D3 (sprint-440): an ALL-test write scope suppresses the block itself,
+      // so W3 only fires for scopes that include non-test writes.
+      scope: { directories: [], filesRead: [], filesWrite: ['src/core/contract.ts'] },
       routingMeta: { taskDNA: { intent: { primary: 'implementation' } } } as never,
     });
     expect(lintWorkerPromptContract(t).some((x) => x.check === 'behavior-precedence-suspect')).toBe(true);

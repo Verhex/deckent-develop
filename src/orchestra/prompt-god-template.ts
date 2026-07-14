@@ -1393,10 +1393,23 @@ export function buildVerifyPrecedenceNote(verificationMode: 'targeted' | 'doc' =
  * so the vast majority of prompts (and the prompt-protected-set golden) are unchanged.
  * G2b is a symptom-mitigation; the root fix is G3 (operation-class → persona routing).
  */
-export function buildBehaviorPrecedenceNote(task: Pick<Task, 'assignedAgent' | 'routingMeta'>): string {
+export function buildBehaviorPrecedenceNote(
+  task: Pick<Task, 'assignedAgent' | 'routingMeta' | 'scope'>,
+): string {
   if (task.assignedAgent !== 'refactorer') return '';
   const intent = (task.routingMeta?.taskDNA as { intent?: { primary?: string } } | undefined)?.intent?.primary;
   if (!intent || intent === 'refactor' || intent === 'unknown' || intent === 'documentation') return '';
+  // PCOMP-6 D3 (sprint-440 + 440-001's honest NO_GO): post-Sprint-148 there is
+  // NO 'testing' primary intent (ADR-G-023 — tests/** work classifies as
+  // 'implementation' + a test-coverage TAG), so pure test-authorship tasks
+  // were told "this task CHANGES external behavior" — the 19/19 corpus class.
+  // A task whose ENTIRE write scope is test files is behavior-PRESERVING by
+  // construction: suppress the override instead of relitigating the intent.
+  const filesWrite = task.scope?.filesWrite ?? [];
+  const allTests =
+    filesWrite.length > 0 &&
+    filesWrite.every((f) => /(^|\/)tests?\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f));
+  if (allTests) return '';
   return `\n> Behavior-precedence (this task overrides your persona): this task CHANGES external behavior — it is a ${intent} task, not a refactor. Your persona's "zero functional changes / preserve behavior" mandate is SUSPENDED for THIS task: implement the behavior change the goCriteria asks for (do not preserve the current/buggy behavior). The task's goCriteria is the authority.`;
 }
 

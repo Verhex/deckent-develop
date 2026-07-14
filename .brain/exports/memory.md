@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-440 Learnings
+- Sprint sprint-440 Learnings: ## Sprint sprint-440 Learnings
+- Yeni hermetik birim-testler test-yazarligi ve implementation senaryolari: NO_GO — Cascade-skipped (SCHED6-EFF persist-before-commit executor): dependency 440-001 ended NO_GO/MANUAL_REVIEW, so this depen
+- Regresyon dogrulamasi mevcut intent-routing-prompt test aileleri ve tsc: NO_GO — Cascade-skipped (SCHED6-EFF persist-before-commit executor): dependency 440-001 ended NO_GO/MANUAL_REVIEW, so this depen
+
+## Gains
+- 440-001 — Intent-classifier implementation-keyword temizligi ve test-dosyasi tie-break kurali — Part 1 DONE and verified: removed 'test'/'spec'/'coverage'/'vitest' from INTENT_KEYWORDS.implemen...
+- 440-002 — Routing-engine refactorer catch-all guard ve ci-guardian test-domain bonusu — Both surgical changes landed in src/core/routing-engine.ts only (no manifest edits, no new persona).
+
 ## Sprint sprint-439 Learnings
 - Sprint sprint-439 Learnings: ## Sprint sprint-439 Learnings
 - Rehydrate katmanı — event-fold ve legacy dual-read ile KNOWN_CONSUMERS pini: NO_GO — Cascade-skipped (SCHED6-EFF persist-before-commit executor): dependency 439-001 ended NO_GO/MANUAL_REVIEW, so this depen

@@ -113,10 +113,17 @@ function checkBehaviorPrecedence(task: Task): PromptLintFinding[] {
   // buildBehaviorPrecedenceNote access pattern.
   const dna = task.routingMeta?.taskDNA as { intent?: { primary?: string } } | undefined;
   const intent = dna?.intent?.primary;
+  // Mirror buildBehaviorPrecedenceNote's D3 suppression (sprint-440): an
+  // all-test write scope means the block will NOT render — no finding.
+  const fw = task.scope?.filesWrite ?? [];
+  const allTests =
+    fw.length > 0 &&
+    fw.every((f) => /(^|\/)tests?\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f));
   const willRender =
     task.assignedAgent === 'refactorer' &&
     intent !== undefined &&
-    !['refactor', 'unknown', 'documentation'].includes(intent);
+    !['refactor', 'unknown', 'documentation'].includes(intent) &&
+    !allTests;
   if (!willRender) return [];
   const text = `${taskText(task)}\n${criteriaText(task)}`;
   if (!NON_BEHAVIOR_SIGNAL_RE.test(text)) return [];

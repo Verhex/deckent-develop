@@ -10768,3 +10768,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 439-004: Koordinatör hermetik test ailesi ve RunFlow regresyon doğrulaması (NO_GO)
 
 ---
+## Sprint 440 — sprint-440
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-14
+**Duration:** 853s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | NaN% |
+| Duration | 853219ms |
+
+### Tasks
+
+- 440-001: Intent-classifier implementation-keyword temizligi ve test-dosyasi tie-break kurali (DONE)
+- 440-002: Routing-engine refactorer catch-all guard ve ci-guardian test-domain bonusu (DONE)
+- 440-003: Yeni hermetik birim-testler test-yazarligi ve implementation senaryolari (NO_GO)
+- 440-004: Regresyon dogrulamasi mevcut intent-routing-prompt test aileleri ve tsc (NO_GO)
+
+---

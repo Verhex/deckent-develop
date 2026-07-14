@@ -24,7 +24,7 @@ const INTENT_KEYWORDS: Record<IntentType, string[]> = {
   config: ['config', 'setting', 'env', 'environment', 'option', 'flag', 'parameter'],
   migration: ['migrate', 'migration', 'upgrade', 'version', 'schema', 'transform', 'convert'],
   architecture: ['architecture', 'adr', 'design pattern', 'roadmap', 'system design', 'module structure', 'dependency graph'],
-  implementation: ['implement', 'add', 'create', 'build', 'feature', 'endpoint', 'command', 'module', 'function', 'adaptive', 'timeout', 'estimator', 'engine', 'validator', 'test', 'spec', 'coverage', 'vitest', 'types'],
+  implementation: ['implement', 'add', 'create', 'build', 'feature', 'endpoint', 'command', 'module', 'function', 'adaptive', 'timeout', 'estimator', 'engine', 'validator', 'types'],
   unknown: [],
 };
 

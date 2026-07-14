@@ -52,6 +52,8 @@
 | adr-g-036 | Zero-Hardcode Model & Flow Values (Parametric-Only) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-440 Learnings** (sprint-440): ## Sprint sprint-440 Learnings
+- Yeni hermetik birim-testler test-yazarligi ve implementation senaryolari: NO_GO — Ca...
 - **Sprint sprint-439 Learnings** (sprint-439): ## Sprint sprint-439 Learnings
 - Rehydrate katmanı — event-fold ve legacy dual-read ile KNOWN_CONSUMERS pini: NO_GO —...
 - **Sprint sprint-438 Learnings** (sprint-438): ## Sprint sprint-438 Learnings
@@ -76,8 +78,6 @@
 
 ## Gains
 - 430-001 — Scheduler-shadow retention config şeması (config-types.ts + conf...
-- **Sprint sprint-429 Learnings** (sprint-429): ## Sprint sprint-429 Learnings
-- N677 — directives-builder delimiter-güvenliği: GO_WITH_TECH_DEBT — born-677 root cau...
 
 ## Active Technical Debt
 - [CRITICAL] Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso
@@ -149,5 +149,6 @@
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 1352 | Generated: 2026-07-14_
+_Total entries: 1356 | Generated: 2026-07-14_

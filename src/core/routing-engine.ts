@@ -360,6 +360,47 @@ export function getTestOwnershipBonus(agentId: string, testDominant: boolean): n
   return testDominant && TEST_OWNERSHIP_AGENTS.has(agentId) ? TEST_OWNERSHIP_BONUS : 0;
 }
 
+// ─── CI-GUARDIAN TEST-DOMAIN BONUS (Sprint 440 Task 440-002) ───────────────
+//
+// getTestOwnershipBonus (above) only grants ci-guardian/bug-fixer a bonus when
+// a task is BOTH test-write-majority AND carries a fix/sweep/regression-
+// flavored title (isTestDominantTask requires both — see
+// tests/core/testing-intent-ownership.test.ts: "Write unit tests for auth
+// module" with testWriteRatio=1 is deliberately NOT test-dominant, since it
+// has no fix-verb). A plain test-authoring task (no fix/sweep wording) with a
+// test-majority write scope still has zero domain signal for ci-guardian — it
+// competes on activation alone, where its own manifest hard-excludes
+// intent.primary==='implementation' (the only intent 'test work' can classify
+// as post-Sprint-148). This adds a narrower, ci-guardian-only domain-match
+// bonus — parallel to DOMAIN_MATCH_BONUS/getDomainMatchBonus above, same
+// magnitude — gated purely on the two structural TaskDNA fields already used
+// elsewhere in this file (intent.primary string value + scope.testWriteRatio),
+// with no text-pattern requirement. Like surfaceBonus/testBonus, it also
+// contributes to the exclude-bypass so it is reachable for the exact
+// combination it targets, not dead code sitting behind ci-guardian's own
+// exclude rule.
+
+/** Bonus magnitude — sized equal to DOMAIN_MATCH_BONUS (a domain-match-family
+ *  signal, not the stronger TEST_OWNERSHIP_BONUS bypass-strength signal). */
+export const CI_GUARDIAN_TEST_DOMAIN_BONUS = DOMAIN_MATCH_BONUS;
+
+/**
+ * ci-guardian-only domain bonus: CI_GUARDIAN_TEST_DOMAIN_BONUS when the task's
+ * classified intent is 'implementation' (the only intent test-flavored work
+ * can carry — Sprint 148 retired a standalone 'testing' IntentType) AND the
+ * majority of its write scope is test files (scope.testWriteRatio ≥
+ * TEST_DOMINANT_WRITE_RATIO_THRESHOLD). Unlike isTestDominantTask /
+ * getTestOwnershipBonus, this does NOT require a fix/sweep-flavored title —
+ * it is a structural (scope-shape) signal, not a text-pattern one, so it also
+ * covers plain test-authoring tasks. Any agent other than 'ci-guardian' → 0.
+ */
+export function getCiGuardianTestDomainBonus(agentId: string, taskDNA: TaskDNA): number {
+  if (agentId !== 'ci-guardian') return 0;
+  const testIntent = taskDNA.intent.primary === 'implementation';
+  const testMajorityWrites = taskDNA.scope.testWriteRatio >= TEST_DOMINANT_WRITE_RATIO_THRESHOLD;
+  return testIntent && testMajorityWrites ? CI_GUARDIAN_TEST_DOMAIN_BONUS : 0;
+}
+
 // ─── EFFORT TIERING — task-tipi→effort (born-636-K2, COST-K2) ─────────────
 //
 // `task.effort` existed but nothing derived it from the task's TYPE — every
@@ -1332,7 +1373,10 @@ function selectBestAgent(
     // born-594 — test-dominant ownership bonus; bypasses excludes the same way
     // surfaceBonus does (see the two bypass branches below).
     const testBonus = getTestOwnershipBonus(id, testDominant);
-    const bypassBonus = surfaceBonus + testBonus;
+    // Sprint 440 Task 440-002 — ci-guardian test-domain bonus (see
+    // getCiGuardianTestDomainBonus above); bypasses excludes the same way.
+    const ciGuardianTestDomainBonus = getCiGuardianTestDomainBonus(id, taskDNA);
+    const bypassBonus = surfaceBonus + testBonus + ciGuardianTestDomainBonus;
     // born-622 (402-003): true only when an exclude rule was actually bypassed
     // below — NOT "bypassBonus > 0" alone (a non-excluded agent can carry a
     // nonzero surface/test bonus without ever needing to bypass anything).
@@ -1344,7 +1388,9 @@ function selectBestAgent(
         reasoning.push(
           testBonus > 0
             ? `Agent '${id}' test-ownership exclude bypass (override)`
-            : `Agent '${id}' surface exclude bypass (user-surface owner)`,
+            : surfaceBonus > 0
+              ? `Agent '${id}' surface exclude bypass (user-surface owner)`
+              : `Agent '${id}' test-domain exclude bypass (override)`,
         );
       } else {
         reasoning.push(`Agent '${id}' excluded by override`);
@@ -1360,7 +1406,39 @@ function selectBestAgent(
     const affinityCtx: SkillAffinityContext | undefined = skillAgentAffinity
       ? { agentId: id, assignedSkills, enabled: true }
       : undefined;
-    const result = evaluateActivation(aliasedTaskDNA, activation, affinityCtx);
+
+    // Sprint 440 Task 440-002 — a test-dominant task (testDominant, born-594's
+    // "effective intent='testing'") must not let refactorer win purely on its
+    // generic 'implementation' catch-all activation rule (agent.json, score 7):
+    // test work has no standalone IntentType (Sprint 148) and always
+    // classifies as 'implementation', so without this guard the catch-all
+    // fires for every test-dominant task too, competing unfairly against the
+    // curated test-owners' bypass bonus above. Scoped to refactorer + this
+    // exact combination only, via a scoring-only taskDNA variant for THIS
+    // evaluateActivation call alone (neither `taskDNA` nor `aliasedTaskDNA` is
+    // mutated) — refactorer's real (non-test-dominant) 'implementation'
+    // activation, and its 'refactor'-intent activation, are both untouched.
+    const suppressRefactorerTestCatchAll =
+      id === 'refactorer' && testDominant && taskDNA.intent.primary === 'implementation';
+    const activationTaskDNA: TaskDNA = suppressRefactorerTestCatchAll
+      ? {
+          ...aliasedTaskDNA,
+          intent: {
+            ...aliasedTaskDNA.intent,
+            primary: 'unknown',
+            // Strip 'implementation' from secondary too — evaluateActivation's
+            // via-secondary 50%-credit path would otherwise partially re-grant
+            // the very catch-all this guard suppresses.
+            secondary: aliasedTaskDNA.intent.secondary.filter((i) => i !== 'implementation'),
+          },
+        }
+      : aliasedTaskDNA;
+    const result = evaluateActivation(activationTaskDNA, activation, affinityCtx);
+    if (suppressRefactorerTestCatchAll) {
+      reasoning.push(
+        `Agent '${id}' implementation catch-all suppressed (test-dominant task; ci-guardian/bug-fixer ownership applies instead)`,
+      );
+    }
 
     if (result.excluded) {
       if (bypassBonus > 0) {
@@ -1368,7 +1446,9 @@ function selectBestAgent(
         reasoning.push(
           testBonus > 0
             ? `Agent '${id}' test-ownership exclude bypass: ${result.excludeReason}`
-            : `Agent '${id}' surface exclude bypass: ${result.excludeReason}`,
+            : surfaceBonus > 0
+              ? `Agent '${id}' surface exclude bypass: ${result.excludeReason}`
+              : `Agent '${id}' test-domain exclude bypass: ${result.excludeReason}`,
         );
       } else {
         reasoning.push(`Agent '${id}' excluded: ${result.excludeReason}`);
@@ -1392,6 +1472,9 @@ function selectBestAgent(
     }
     if (testBonus > 0) {
       reasoning.push(`Agent '${id}' test-ownership bonus: +${testBonus} (test-dominant task, testWriteRatio=${taskDNA.scope.testWriteRatio})`);
+    }
+    if (ciGuardianTestDomainBonus > 0) {
+      reasoning.push(`Agent '${id}' test-domain bonus: +${ciGuardianTestDomainBonus} (test-intent + test-majority filesWrite, testWriteRatio=${taskDNA.scope.testWriteRatio})`);
     }
 
     // PCOMP-W5: role-mismatch signal — a review/analyst persona on an implement
@@ -1417,7 +1500,7 @@ function selectBestAgent(
       reasoning.push(`Agent '${id}' language-mismatch penalty: ${langPenalty} (taskLanguage=${taskLanguage}, agentLanguage=${agentLanguage})`);
     }
 
-    const finalScore = result.score + bonus + domainBonus + surfaceBonus + testBonus + rolePenalty + kindBonus + langPenalty;
+    const finalScore = result.score + bonus + domainBonus + surfaceBonus + testBonus + ciGuardianTestDomainBonus + rolePenalty + kindBonus + langPenalty;
 
     // born-622 (402-003): harvest the journal candidate from the intermediate
     // values already computed above — no second scoring pass.
@@ -1430,6 +1513,7 @@ function selectBestAgent(
         domainBonus,
         surfaceBonus,
         testBonus,
+        ciGuardianTestDomainBonus,
         rolePenalty,
         kindBonus,
         langPenalty,
@@ -1440,7 +1524,7 @@ function selectBestAgent(
     if (finalScore >= cfg.agentMinScore) {
       candidates.push({
         id,
-        rawScore: result.score + domainBonus + surfaceBonus + testBonus + rolePenalty + kindBonus + langPenalty,
+        rawScore: result.score + domainBonus + surfaceBonus + testBonus + ciGuardianTestDomainBonus + rolePenalty + kindBonus + langPenalty,
         learningBonus: bonus,
         finalScore,
         matchedRules: result.matchedRules,
