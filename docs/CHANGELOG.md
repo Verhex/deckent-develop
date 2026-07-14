@@ -9,6 +9,21 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [invalid-version-sprint442] - 2026-07-14
+
+### Added
+
+- Hermetik coordinator test-ailesi alti senaryo
+- Entegrasyon ve regresyon dogrulamasi run-flow aileleri ile tsc
+
+### Changed
+
+- Rehydrate event-fold sorgu-yuzeyi getFlow ve listFlows (completed with tech debt)
+- Legacy dual-read fallback ile snapshot ve run-handle sentetik-context (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint441] - 2026-07-14
 
 ### Added

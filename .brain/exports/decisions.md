@@ -3275,6 +3275,50 @@ deckent **observes** user ADRs (UG/UP) and **adheres** to them at every layer (w
 - **Born work-items:** ADR-AUTHORING-STD (this doc §4), ADR-LAYER (install-wiring), POLICY-ENGINE-EVAL, **ADR-VALIDATOR-HARDEN** (lint:adr → hard-validate class-metadata + today/tomorrow standard), **TAXONOMY-READPATH** (map `adr_class`/`scope`/`immutable`/… in `rowToEntry` + `upsert` → real class-aware recall), **ADR-SELECTOR-MIGRATE** (`adr-selector.ts` legacy-flat ids → class-aware `adr-g/d-NNN` scheme).
 - **Direction:** `.analysis/adr-governance-redesign-plan.md`, `.analysis/hermes-vs-deckent-direction-decisions.md`, memory `feedback_adr_documents_today_and_tomorrow` · `feedback_governance_aligns_with_direction_pivot`.
 
+---
+
+## Amendment — 2026-07-14: Machine-Readable Constraints & Enforcement Ladder (PCOMP-6 D4.5)
+
+**Trigger:** Sprint-440 live case (task 440-001): a Brain-authored spec demanded a change that
+violated accepted ADR-G-023; the contradiction was caught at the MOST EXPENSIVE point in the
+chain — a mid-sprint worker NO_GO — because (a) the planner never sees ADRs (zero-config
+planner prompt carries no decisions block), (b) no spawn-time check compares a task's demands
+against accepted constraints, and (c) the spec-author's ADR recall was ad-hoc. Alperen's
+methodology decision (karar, 2026-07-14): shift contradiction detection LEFT — defence in
+depth (type/lint → planner → gate → worker), with the worker NO_GO demoted to a measured,
+rarely-triggered last-resort fuse.
+
+### Decision (Today)
+
+1. **Enforcement ladder.** Every ADR's header `Enforcement:` field names its strongest level:
+   `type` (encoded in the type system — violation cannot compile) > `lint` (a ratchet/linter
+   fails the build) > `test` (a pinned test fails) > `advisory` (prose only). New ADRs SHOULD
+   be born at `lint` or stronger where feasible; the count of advisory-only ADRs is a
+   measurable debt (ratchet direction: down).
+2. **Machine-readable constraints.** High-value ADRs additionally carry machine-readable
+   constraint records. Canonical home today: `src/core/adr-constraints.ts` — one record per
+   constraint `{adrId, plannerSummary, forbiddenPattern, message}`, kept in sync with the ADR
+   prose (a governance test pins that every record's adrId exists and is accepted).
+3. **Three consumers, one source.** The constraint table feeds:
+   (a) **planner prompts** — both `buildPlanPrompt` and the zero-config
+       `buildZeroConfigPlanPrompt` render a compact "Bağlayıcı ADR-kısıtları" block from
+       `plannerSummary` lines, so contradicting tasks die before they are born;
+   (b) **prompt-lint W7** (`adr-constraint-violation`) — spawn-time scan of each task's
+       title/description/goCriteria against `forbiddenPattern` (warn-only until the linter's
+       evidence-gated fail-closed flip);
+   (c) the existing **worker ADR injection** — unchanged, now explicitly the LAST line of
+       defence rather than the first.
+4. **Principle.** A worker NO_GO caused by an ADR contradiction is a measured incident
+   (prompt-lint ledger), not a success story.
+
+### Intent / Roadmap (Tomorrow)
+
+- Move constraint records into the DB ADR schema (structured column on `type='adr'` rows);
+  generate `adr-constraints.ts` from it (single source becomes the DB, per DB-first law).
+- Planner-side relevance selection via `adr-selector` (today: all constraint summaries — the
+  table is deliberately small; revisit when it grows past ~10 records).
+- W7 joins the linter's fail-closed flip when the warn-mode false-positive measurement clears.
+
 
 ---
 

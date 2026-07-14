@@ -10,6 +10,8 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-442-001 | Tech debt from 442-001: Rehydrate event-fold query surface added to src/orchestr | normal | sprint-442 | resolved |
+| debt-442-002 | Tech debt from 442-002: Legacy dual-read fallback filled in at getFlow's typed-m | normal | sprint-442 | resolved |
 | debt-437-001 | Tech debt from 437-001: EXPIRE-SWEEP çekirdek API implemented across the 3 in-sc | normal | sprint-437 | resolved |
 | debt-437-003 | Tech debt from 437-003: New src/core/approval-notify-dedup.ts: ApprovalNotifyDed | normal | sprint-437 | resolved |
 | debt-437-004 | Tech debt from 437-004: Implemented the honest-expired-decide contract entirely  | normal | sprint-437 | resolved |

@@ -1,5 +1,16 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-442 Learnings
+- Sprint sprint-442 Learnings: ## Sprint sprint-442 Learnings
+- Rehydrate event-fold sorgu-yuzeyi getFlow ve listFlows: GO_WITH_TECH_DEBT — Rehydrate event-fold query surface added to src/orchestra/run-flow-coordinator.ts.
+
+What changed (single file, additive 
+- Legacy dual-read fallback ile snapshot ve run-handle sentetik-context: GO_WITH_TECH_DEBT — Legacy dual-read fallback filled in at getFlow's typed-miss seam in src/orchestra/run-flow-coordinator.ts (the only file
+
+## Gains
+- 442-003 — Hermetik coordinator test-ailesi alti senaryo — Created tests/orchestra/run-flow-coordinator.test.ts reusing the EXISTING run-flow-coordinator-ha...
+- 442-004 — Entegrasyon ve regresyon dogrulamasi run-flow aileleri ile tsc — Closing integration gate for the run-flow-coordinator train — no code changes were needed, both v...
+
 ## Sprint sprint-441 Learnings
 - Sprint sprint-441 Learnings: ## Sprint sprint-441 Learnings
 - SKILL-RETRIEVAL çift-eşik entegrasyon testleri ve regresyon-yeşili kanıtı: NO_GO — Cascade-skipped (SCHED6-EFF persist-before-commit executor): dependency 441-002 ended NO_GO/MANUAL_REVIEW, so this depen

@@ -52,14 +52,24 @@
 // coordinator that reads this log is the next one"). The governance allowlist
 // pin in tests/orchestra/run-flow-reducer.test.ts is added by the sibling
 // rehydrate slice (439-002), whose write scope includes that test — it is
-// deliberately NOT touched here. The public query surface (getFlow / listFlows
-// with legacy dual-read) is likewise that slice's additive layer on top of the
-// private event-fold below.
+// deliberately NOT touched here. The public query surface (getFlow / listFlows)
+// lands HERE (442-001) as the additive layer on top of the private event-fold
+// below: getFlow's memory-hit -> durable-event-fold priority chain, and
+// listFlows over the store's listFlowIds. The follow-on slice (442-002) fills
+// in the remaining legacy dual-read at the typed FlowNotFoundError miss seam:
+// when neither memory nor an events.jsonl resolves a flowId, getFlow now also
+// consults the two pre-unification stores (core/run-flow-store.ts's
+// loadApprovedSnapshot / loadRunHandle) and derives a synthetic RunFlowContext
+// from whichever record(s) exist, so a flow that predates the unified event
+// log still resolves. Both legacy stores absent -> the typed FlowNotFoundError
+// still fires. Read-only against those stores — StoredApprovedSnapshot /
+// StoredRunHandleRecord's on-disk shape is untouched.
 
 import {
   RUN_FLOW_EVENT_SCHEMA_VERSION,
   createInitialRunFlowContext,
   RunFlowTransitionError,
+  type ApprovedPlanSnapshot,
   type PlanPreview,
   type RunFlowContext,
   type RunFlowEvent,
@@ -70,7 +80,13 @@ import {
 } from '../core/run-flow-contract.js';
 import type { ActorContext } from '../core/work-model.js';
 import { reduceRunFlow } from './run-flow-reducer.js';
-import { appendFlowEvent, readFlowEvents } from '../core/run-flow-store.js';
+import {
+  appendFlowEvent,
+  readFlowEvents,
+  listFlowIds,
+  loadApprovedSnapshot,
+  loadRunHandle,
+} from '../core/run-flow-store.js';
 
 // ═══ Typed error taxonomy ══════════════════════════════════════════════════
 
@@ -121,6 +137,27 @@ export class AppendFailedError extends RunFlowCoordinatorError {
     this.name = 'AppendFailedError';
     this.flowId = flowId;
     this.eventType = eventType;
+  }
+}
+
+/**
+ * Raised by {@link RunFlowCoordinator.getFlow} when a flowId resolves to NOTHING
+ * along the FULL query priority chain: no live in-memory context, no durable
+ * `<flowId>.events.jsonl` to rehydrate from, AND neither legacy store
+ * (`loadApprovedSnapshot` / `loadRunHandle`) has a record either — i.e. this
+ * flowId has never left any durable trace under this coordinator's root. An
+ * unknown flowId is NEVER answered with a silent INITIAL context.
+ */
+export class FlowNotFoundError extends RunFlowCoordinatorError {
+  public readonly flowId: string;
+
+  constructor(flowId: string) {
+    super(
+      `run-flow-coordinator: no flow found for id '${flowId}' ` +
+        `(no live in-memory state, no durable event log, and no legacy approved-snapshot/run-handle record to rehydrate from)`,
+    );
+    this.name = 'FlowNotFoundError';
+    this.flowId = flowId;
   }
 }
 
@@ -202,6 +239,29 @@ export interface RunFlowCoordinator {
   recordRunStarted(cmd: RecordRunStartedCommand): RunFlowCommandResult;
   /** DETACHED_RUNNING -> COMPLETED. Emits RUN_COMPLETED. */
   recordCompletion(cmd: RecordCompletionCommand): RunFlowCommandResult;
+
+  /**
+   * Query surface — resolve a flow's current derived context along the priority
+   * chain memory-hit -> durable-event-fold -> legacy dual-read. A memory-hit
+   * returns the live in-memory context; a memory-miss with a non-empty
+   * `<flowId>.events.jsonl` rehydrates by folding that durable event log
+   * (byte-identical to the context a memory-hit would return, because that
+   * context WAS built by reducing those same events); a memory-miss with no
+   * event log falls back to the two legacy stores (`loadApprovedSnapshot` /
+   * `loadRunHandle`) and derives a synthetic context from whichever record(s)
+   * exist. Throws {@link FlowNotFoundError} when NONE of the three sources has
+   * anything for this flowId, or a typed fold error ({@link InvalidTransitionError}
+   * / {@link RunFlowCoordinatorError}) if a persisted log no longer reduces cleanly.
+   */
+  getFlow(flowId: string): RunFlowContext;
+
+  /**
+   * Enumerate every flowId that has durable state under this coordinator's root,
+   * deduped and sorted (delegates to the store's `listFlowIds`). Includes flows
+   * whose only durable trace is a legacy snapshot/handle log — the same set the
+   * legacy dual-read in {@link getFlow} resolves.
+   */
+  listFlows(): string[];
 }
 
 /** Mutable per-flow cache entry — the SAME object reference stays in the map, so
@@ -261,6 +321,66 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
     const state: FlowState = { context, commandIds };
     flows.set(flowId, state);
     return state;
+  }
+
+  /**
+   * The legacy dual-read fallback (442-002) for {@link getFlow}'s typed-miss
+   * seam: a flow that predates the unified `<flowId>.events.jsonl` log left its
+   * trail in the two PRE-EXISTING stores instead — an approved-plan snapshot
+   * log (`loadApprovedSnapshot`) and/or a run-handle log (`loadRunHandle`).
+   * Read-only against both (`StoredApprovedSnapshot`/`StoredRunHandleRecord`'s
+   * on-disk shape is never touched) — this derives a best-known
+   * `RunFlowContext` from whichever record(s) exist, it does not replay events.
+   * Returns `undefined` when NEITHER store has anything, so the caller can fall
+   * through to the typed {@link FlowNotFoundError}. Deliberately NOT cached into
+   * the `flows` map — this is a query-only fallback, not a new
+   * `ensureFlowLoaded`-style rehydration path (command application against a
+   * legacy-only flow is out of this seam's scope).
+   *
+   * State choice mirrors the reducer's own transition targets so the synthetic
+   * context stays a value the reducer could plausibly have produced:
+   *  - a run-handle record exists -> a start attempt is the most-advanced known
+   *    fact -> `DETACHED_RUNNING` (mirrors RUN_STARTED's STARTING -> DETACHED_RUNNING),
+   *    carrying `handle` from the record. Whether it went on to COMPLETED/FAILED
+   *    is unknowable from these two stores alone (that only lives in
+   *    events.jsonl, which this branch has already established is absent/empty).
+   *  - otherwise only a snapshot record exists -> `APPROVED` (mirrors
+   *    APPROVAL_GRANTED's AWAITING_APPROVAL -> APPROVED).
+   */
+  function deriveLegacyContext(flowId: string): RunFlowContext | undefined {
+    const snapshot = loadApprovedSnapshot(root, flowId);
+    const handleRecord = loadRunHandle(root, flowId);
+    if (snapshot === undefined && handleRecord === undefined) return undefined;
+
+    const approvedSnapshot: ApprovedPlanSnapshot | undefined =
+      snapshot === undefined
+        ? undefined
+        : {
+            flowId: snapshot.flowId,
+            revision: snapshot.revision,
+            planDigest: snapshot.planDigest,
+            approvedBy: snapshot.approvedBy,
+            approvedAt: snapshot.approvedAt,
+          };
+
+    if (handleRecord !== undefined) {
+      return {
+        state: 'DETACHED_RUNNING',
+        flowId,
+        ...(approvedSnapshot !== undefined ? { approvedSnapshot } : {}),
+        handle: handleRecord.handle,
+        updatedAt: handleRecord.startedAt,
+      };
+    }
+
+    // Only a snapshot record — `approvedSnapshot` is defined here (the
+    // both-undefined case already returned above).
+    return {
+      state: 'APPROVED',
+      flowId,
+      approvedSnapshot: approvedSnapshot!,
+      updatedAt: snapshot!.approvedAt,
+    };
   }
 
   /** Stamp the shared envelope (schemaVersion / flowId / timestamp / optional
@@ -380,6 +500,41 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
           ...(summary !== undefined ? { summary } : {}),
         }),
       ]);
+    },
+
+    getFlow(flowId) {
+      // Priority chain (design doc "Net Öneri"): memory cache -> durable
+      // event-fold -> legacy dual-read.
+      // 1) memory-hit — the live in-memory context wins, no disk touch.
+      const cached = flows.get(flowId);
+      if (cached !== undefined) return cached.context;
+
+      // 2) memory-miss — rehydrate ONLY if a foldable durable log exists. The guard
+      //    is "has events" (`.length > 0`), not raw file presence, so an empty/torn
+      //    log routes to the next branch rather than resolving to INITIAL. The
+      //    fold itself (INITIAL context -> sequence-ordered reduce, typed fold
+      //    errors, cache-on-load) is `ensureFlowLoaded`'s job, reused verbatim so
+      //    the rehydrated context is identical to what a memory-hit would return.
+      if (readFlowEvents(root, flowId).length > 0) {
+        return ensureFlowLoaded(flowId).context;
+      }
+
+      // 3) memory-miss + no event log — legacy dual-read (442-002): a flow that
+      //    predates the unified event log left its trail in the snapshot/handle
+      //    stores instead. `deriveLegacyContext` consults both, read-only, and
+      //    returns a synthetic context if either has a record for this flowId.
+      const legacyContext = deriveLegacyContext(flowId);
+      if (legacyContext !== undefined) return legacyContext;
+
+      // 4) NONE of the three sources has anything — honest typed miss, never a
+      //    silent INITIAL context.
+      throw new FlowNotFoundError(flowId);
+    },
+
+    listFlows() {
+      // Every flowId with any durable trace (events, snapshot, or handle log) under
+      // this coordinator's root — deduped + cross-platform-sorted by the store.
+      return listFlowIds(root);
     },
   };
 }

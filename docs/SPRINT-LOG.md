@@ -10818,3 +10818,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 441-004: SKILL-RETRIEVAL çift-eşik entegrasyon testleri ve regresyon-yeşili kanıtı (NO_GO)
 
 ---
+## Sprint 442 — sprint-442
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-14
+**Duration:** 1922s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1922338ms |
+
+### Tasks
+
+- 442-001: Rehydrate event-fold sorgu-yuzeyi getFlow ve listFlows (GO_WITH_TECH_DEBT)
+- 442-002: Legacy dual-read fallback ile snapshot ve run-handle sentetik-context (GO_WITH_TECH_DEBT)
+- 442-003: Hermetik coordinator test-ailesi alti senaryo (DONE)
+- 442-004: Entegrasyon ve regresyon dogrulamasi run-flow aileleri ile tsc (DONE)
+
+---
