@@ -6,6 +6,7 @@ import type { TaskDNA, IntentType } from '../core/routing-types.js';
 import type { SkillDefinition } from '../core/skill-types.js';
 import { evaluateActivation } from '../core/activation-engine.js';
 import { debugLog } from '../core/utils.js';
+import { containsWord } from '../core/word-match.js';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -41,11 +42,7 @@ const INTENT_SKILL_AFFINITY: Record<IntentType, string[]> = {
  * `typescript`. Callers already lowercase their inputs; the `i` flag + regex-escaping
  * keep the helper correct even if that ever changes.
  */
-function containsWord(text: string, term: string): boolean {
-  if (!term) return false;
-  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`, 'i').test(text);
-}
+// U1-G1: tek-kaynak motor core/word-match'e taşındı (classifier ile paylaşımlı).
 
 // ─── Core Functions ───────────────────────────────────────────────────────────
 

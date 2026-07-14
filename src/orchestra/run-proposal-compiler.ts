@@ -83,13 +83,7 @@ function describeActor(proposal: RunProposal): string {
   return actor.role ? `${actor.id} (${actor.role})` : actor.id;
 }
 
-function traceabilityLine(proposal: RunProposal): string {
-  return (
-    `RunProposal metadata — flowId=${proposal.flowId}, revision=${proposal.revision}, ` +
-    `tenant=${proposal.tenant}, project=${proposal.project}, actor=${describeActor(proposal)}, ` +
-    `origin=${proposal.origin}.`
-  );
-}
+// U1-G2: traceabilityLine kaldırıldı — traceability artık DirectiveBuildTask.meta alanında taşınır (desc'e gömme yasak).
 
 /**
  * Production planner: delegates to the SAME AI/structured planner core
@@ -160,7 +154,17 @@ function toDirectiveTask(task: PlannerTask, proposal: RunProposal): DirectiveBui
   }
   return {
     title: canonicalTaskTitle(task.title),
-    desc: `${task.description}\n\n${traceabilityLine(proposal)}\n\nReason: ${task.reason}`,
+    // U1-G2 (PCOMP-8): traceability is METADATA, not content — embedding it in
+    // desc poisoned intent classification ('cd' matched the flowId hex, A1-İz#2).
+    // It now travels in the structured `meta` field; desc stays pure content.
+    desc: `${task.description}\n\nReason: ${task.reason}`,
+    meta: {
+      flowId: proposal.flowId,
+      revision: String(proposal.revision),
+      tenant: proposal.tenant,
+      actor: describeActor(proposal),
+      origin: proposal.origin,
+    },
     files: [...task.scope.filesWrite],
     scope: [...task.scope.directories],
     deps: task.dependencies.map(canonicalTaskTitle),

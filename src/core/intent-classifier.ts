@@ -2,6 +2,7 @@
 // Layer 1: Classify task intent from scope/description into TaskDNA.
 // Replaces the broken detectTaskType() with weighted, multi-signal analysis.
 
+import { containsWord } from './word-match.js';
 import type { TaskScope } from './task-types.js';
 import type { TaskDNA, IntentType, SubIntentType, OperationType, TaskSize } from './routing-types.js';
 
@@ -116,7 +117,9 @@ export function detectPrimaryIntent(
     if (intent === 'unknown') continue;
     let score = 0;
     for (const kw of keywords) {
-      if (text.includes(kw)) score += 2;
+      // U1-G1 (PCOMP-8): word-boundary matching — raw includes() let 'ci'
+      // match inside "içindeki" and 'cd' inside a flowId hex (A1-İz#2).
+      if (containsWord(text, kw)) score += 2;
     }
     if (score > 0) scores.push({ intent: intent as IntentType, score });
   }
@@ -244,7 +247,32 @@ export function detectPrimaryIntent(
     confidence = Math.min(0.95, 0.3 + ratio * 0.5 + top.score * 0.03);
   }
 
-  return { intent: top.intent, confidence: Math.round(confidence * 100) / 100 };
+  const rounded = Math.round(confidence * 100) / 100;
+  // U1-G1c (PCOMP-8): STRUCTURAL demotion for 'documentation' — a task whose
+  // write targets are majority CODE files is not a documentation task no matter
+  // what its prose says (word-boundary matching removed the substring noise
+  // that used to inflate 'implementation' and mask this: real fixture — codex
+  // CLI-adapter work with one docs/ file classified as documentation). Doc
+  // stays primary only when doc-writes dominate (symmetric to the
+  // testWriteRatio signal at the scope layer).
+  if (top.intent === 'documentation') {
+    const writes = scope.filesWrite;
+    if (writes.length > 0) {
+      const docWrites = writes.filter(f => /(^|\/)docs?\//.test(f) || /\.(md|mdx|rst|txt)$/i.test(f)).length;
+      if (docWrites / writes.length < 0.5) {
+      return { intent: 'implementation', confidence: rounded };
+      }
+    }
+  }
+  // U1-G1b (PCOMP-8): a LOW-CONFIDENCE specialist intent must not steer persona
+  // routing — sprint-442's whole misroute chain started with a weak specialist
+  // classification. Generic intents stay as-is (implementation is the safe
+  // default the rest of the pipeline is calibrated for); specialists demote.
+  const GENERIC_INTENTS = new Set(['implementation', 'refactor', 'unknown', 'bugfix']);
+  if (rounded < 0.5 && !GENERIC_INTENTS.has(top.intent)) {
+    return { intent: 'implementation', confidence: rounded };
+  }
+  return { intent: top.intent, confidence: rounded };
 }
 
 // ─── Secondary Intents ──────────────────────────────────────────────────────
@@ -264,7 +292,7 @@ export function detectSecondaryIntents(
 
   // If task touches docs but primary isn't documentation
   if (primary !== 'documentation') {
-    const hasDocKeywords = INTENT_KEYWORDS.documentation.some(kw => text.includes(kw));
+    const hasDocKeywords = INTENT_KEYWORDS.documentation.some(kw => containsWord(text, kw));
     const hasDocScope = scope.directories.some(d => d.includes('doc'));
     if (hasDocKeywords || hasDocScope) {
       secondary.push('documentation');
@@ -273,13 +301,13 @@ export function detectSecondaryIntents(
 
   // If task mentions security but primary isn't security
   if (primary !== 'security') {
-    const hasSecKeywords = INTENT_KEYWORDS.security.some(kw => text.includes(kw));
+    const hasSecKeywords = INTENT_KEYWORDS.security.some(kw => containsWord(text, kw));
     if (hasSecKeywords) secondary.push('security');
   }
 
   // If task mentions config/migration but primary isn't those
   if (primary !== 'config' && primary !== 'migration') {
-    const hasConfigKeywords = INTENT_KEYWORDS.config.some(kw => text.includes(kw));
+    const hasConfigKeywords = INTENT_KEYWORDS.config.some(kw => containsWord(text, kw));
     if (hasConfigKeywords) secondary.push('config');
   }
 
@@ -339,7 +367,7 @@ export function detectOperations(
   for (const [op, keywords] of Object.entries(OPERATION_KEYWORDS)) {
     let score = 0;
     for (const kw of keywords) {
-      if (text.includes(kw)) score++;
+      if (containsWord(text, kw)) score++; // U1-G1: word-boundary (bkz. yukarı)
     }
     if (score > 0) opScores.set(op as OperationType, score);
   }

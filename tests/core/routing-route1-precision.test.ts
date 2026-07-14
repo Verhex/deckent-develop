@@ -246,7 +246,10 @@ describe('ROUTE-1 — capstone: dual-perspective end-to-end', () => {
     const d = routeTaskV2(
       { title: 'update API documentation',
         description: 'write and update the api endpoint documentation guide',
-        scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/x.ts'] },
+        // U1-G1c: a PURE documentation sweep writes doc files — the old
+        // `src/api/x.ts` write-target contradicted the fixture's own intent
+        // (a task writing majority code is structurally NOT documentation).
+        scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/README.md'] },
         type: 'documentation' },
       docPool, emptySkillPool,
     );

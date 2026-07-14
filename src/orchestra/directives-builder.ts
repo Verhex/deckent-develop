@@ -33,6 +33,10 @@ export interface DirectiveBuildTask {
   skills?: string[];
   goCriteria: string[];
   nogo: string[];
+  /** U1-G2 (PCOMP-8): traceability METADATA (flowId/revision/actor…) — written as
+   *  its own `- Meta:` line, NEVER merged into desc (desc feeds intent
+   *  classification; a flowId hex once matched the 'cd' devops keyword). */
+  meta?: Record<string, string>;
 }
 
 export interface DirectiveBuildIntent {
@@ -201,6 +205,13 @@ function buildTaskBlock(task: DirectiveBuildTask, seq: number): string[] {
     lines.push(`- Skills: ${task.skills.length > 0 ? task.skills.join(', ') : 'none'}`);
   }
   lines.push(`- Files: ${task.files.join(', ')}`);
+  if (task.meta && Object.keys(task.meta).length > 0) {
+    // U1-G2: metadata as a dedicated line — readers keep it OUT of content flows.
+    const metaStr = Object.entries(task.meta)
+      .map(([k, v]) => `${k}=${escapeListItem(String(v), ';')}`)
+      .join('; ');
+    lines.push(`- Meta: ${metaStr}`);
+  }
   lines.push(`- Scope: ${task.scope.map(normalizeScopeDir).join(', ')}`);
   lines.push(`- Dependencies: ${task.deps.length > 0 ? task.deps.join(', ') : 'none'}`);
   lines.push('### Description');
@@ -289,5 +300,6 @@ export function reconstructBuildTask(parsed: ParsedDirectiveTask): DirectiveBuil
     skills: parsed.forceSkills,
     goCriteria,
     nogo,
+    ...(parsed.meta ? { meta: parsed.meta } : {}),
   };
 }

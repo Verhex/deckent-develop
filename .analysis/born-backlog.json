@@ -3271,5 +3271,14 @@
   "source": "PCOMP-6 korpus-toplama gozlemi (2026-07-14); denetim/audit-korpusu kaybi",
   "spec": "Iz: spawn->worker-exit->finalize zincirinde .prompt-<id> dosyasinin yasam-dongusunu logla; silen yolu bul; arsive-tasi davranisini TUM prompt'lar icin garanti et (retention-politikasiyla).",
   "master_plan_row": 573
+ },
+ {
+  "born_id": 701,
+  "priority": "P1",
+  "status": "OPEN",
+  "title": "HERMETICITY-IHLALI: tests/scripts/scripts.test.ts GERCEK package.json'a 'invalid-version' fixture'i yaziyor ve (muhtemelen paralel-fork yarisinda) restore edemiyor — working-tree'de package.json TEK-SATIRA ezildi (142→1); repo sansla temiz kaldi",
+  "source": "canli-vaka 2026-07-14 (PCOMP-8/U1 genis-regresyonunda DECKENT_VERSION='invalid-version' yakalandi; git checkout ile restore)",
+  "spec": "Testi tmpdir-fixture'a tasi (karpathy CUSTOM hermeticity: proje-koku YAZILMAZ); restore-pattern'li testler paralel-fork'ta yarisir — kural: gercek-dosya mutasyonu YASAK, kopya-uzerinde test. Ilgili tum scripts-testleri tara.",
+  "master_plan_row": null
  }
 ]

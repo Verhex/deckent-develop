@@ -143,16 +143,21 @@ describe('compileRunProposalIntent — injected fake planner (hermetic, no real 
     expect(serialized).not.toMatch(/TODO: define/);
   });
 
-  it('folds RunProposal traceability + planner reason into each task description', () => {
+  it('U1-G2: traceability travels in the meta field — NEVER in the description (reason stays)', () => {
+    // Pre-U1 this test pinned the OPPOSITE: flowId folded into desc. That
+    // embedding poisoned intent classification ('cd' matched a flowId hex,
+    // A1-İz#2 / sprint-442 misroute) and is now forbidden.
     const proposal = makeProposal({ flowId: 'flow-429-2', revision: 3 });
     const fakePlanner: RunProposalPlanner = () => makeRealMultiTaskPlan();
 
     const intent = compileRunProposalIntent(proposal, fakePlanner);
 
     for (const task of intent.tasks) {
-      expect(task.desc).toContain('flow-429-2');
-      expect(task.desc).toContain('revision=3');
+      expect(task.desc).not.toContain('flow-429-2');
+      expect(task.desc).not.toContain('RunProposal metadata');
       expect(task.desc).toContain('Reason:');
+      expect(task.meta?.flowId).toBe('flow-429-2');
+      expect(task.meta?.revision).toBe('3');
     }
   });
 

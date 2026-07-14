@@ -197,6 +197,8 @@ export interface ParsedDirectiveTask {
   modelEffort?: string;
   /** Tier-1 Proof-of-Function smoke (216-004): real-binary command + expected output, split on `→`. */
   smoke?: { command: string; expect: string };
+  /** U1-G2: parsed `- Meta:` line (flowId/revision/…) — content-dışı taşınır. */
+  meta?: Record<string, string>;
 }
 
 /**
@@ -1207,12 +1209,35 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     // when present. Falls back to the full block when no heading is found, so
     // legacy DIRECTIVES.md files keep their old description=block behavior.
     const descHeadingIdx = lines.findIndex(l => /^\s*###\s+Description\b/i.test(l));
-    const description = descHeadingIdx >= 0
+    // U1-G2: capture the structured `- Meta:` line (key=value; '\;'-escaped) BEFORE
+    // stripping it out of the description flow — round-trip keeps metadata as data.
+    let parsedMeta: Record<string, string> | undefined;
+    const metaLine = lines.find(l => /^\s*-\s*Meta:\s/i.test(l));
+    if (metaLine) {
+      parsedMeta = {};
+      const body = metaLine.replace(/^\s*-\s*Meta:\s*/i, '');
+      for (const pair of splitEscapedPairs(body)) {
+        const eq = pair.indexOf('=');
+        if (eq > 0) parsedMeta[pair.slice(0, eq).trim()] = pair.slice(eq + 1).trim();
+      }
+      if (Object.keys(parsedMeta).length === 0) parsedMeta = undefined;
+    }
+    const rawDescription = descHeadingIdx >= 0
       ? lines.slice(descHeadingIdx + 1).join('\n').trim()
       : block.trim();
+    // U1-G2 (PCOMP-8): metadata is NEVER content. Strip (a) the structured
+    // `- Meta:` line (new writer) and (b) the legacy embedded traceability
+    // sentence ("RunProposal metadata — flowId=…") from description — a flowId
+    // hex inside desc once matched the 'cd' devops keyword and misrouted an
+    // entire sprint (A1-İz#2, sprint-442).
+    const description = rawDescription
+      .split('\n')
+      .filter(l => !/^\s*-\s*Meta:\s/i.test(l) && !/^\s*RunProposal metadata\s+—/.test(l.trim()))
+      .join('\n')
+      .trim();
 
     const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
-    tasks.push({ title, description, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority, authMode: parsedAuthMode, backend: parsedBackend, modelEffort: parsedModelEffort, smoke: extractSmoke(block) });
+    tasks.push({ title, description, meta: parsedMeta, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority, authMode: parsedAuthMode, backend: parsedBackend, modelEffort: parsedModelEffort, smoke: extractSmoke(block) });
   }
   return tasks;
 }
@@ -2043,4 +2068,19 @@ export function inferFixMode(result: TaskResult): 'verify-only' | 'amend' | 're-
   }
 
   return 'amend';
+}
+
+
+/** U1-G2: split a `- Meta:` body on top-level ';' honoring the writer's '\;' escapes. */
+function splitEscapedPairs(body: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i]!;
+    if (ch === '\\' && body[i + 1] === ';') { cur += ';'; i++; continue; }
+    if (ch === ';') { out.push(cur.trim()); cur = ''; continue; }
+    cur += ch;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out;
 }

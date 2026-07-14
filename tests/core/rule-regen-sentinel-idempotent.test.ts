@@ -23,7 +23,9 @@ describe('replaceSentinel — idempotent replace between AUTO markers', () => {
     const before = '## Active ADR Constraints\n<!-- AUTO-START -->\nold content\n<!-- AUTO-END -->\n';
     const after = replaceSentinel(before, 'new content');
 
-    expect(after).toContain('<!-- AUTO-START -->\nnew content\n<!-- AUTO-END -->');
+    // U1 (memory-reform b-kararı): her üretimde AUTO-START'ı tek-satır AUTOGEN
+    // damgası izler (kaynak .claude/rules — elle düzenleme ezilir uyarısı).
+    expect(after).toMatch(/<!-- AUTO-START -->\n<!-- AUTOGEN:[^\n]*-->\nnew content\n<!-- AUTO-END -->/);
     expect(after).not.toContain('old content');
   });
 
