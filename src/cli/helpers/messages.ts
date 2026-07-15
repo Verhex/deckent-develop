@@ -1347,6 +1347,17 @@ const MESSAGES: MessageMap = {
     en: 'MCP servers are configured but the external MCP client is disabled. Set "mcp_client_enabled": true in .deckent/config.json to connect them.',
     tr: 'MCP sunucuları yapılandırılmış ama harici MCP istemcisi kapalı. Bağlanmak için .deckent/config.json içinde "mcp_client_enabled": true ayarlayın.',
   },
+  // born-697 (SURF-3 approval last-mile) — visible closure line for a terminal
+  // approve/deny. Param-free of `{result}` (the worker runs cross-process async,
+  // so no result is known at decision time) — only the request `{summary}`.
+  'approval.terminal.approved': {
+    en: '✅ Approved — {summary}',
+    tr: '✅ Onaylandı — {summary}',
+  },
+  'approval.terminal.rejected': {
+    en: '✖ Rejected — {summary}',
+    tr: '✖ Reddedildi — {summary}',
+  },
   // REPL-575 K5 — localized tool confirm-prompt summaries (injected into
   // chat-tool-exec via ToolExecLabels; the mechanism module stays string-free).
   'tool.confirm_write': {

@@ -117,6 +117,10 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     busySteerQueued: t('tui.busy_steer_queued'),
     busySteerIdle: t('tui.busy_steer_idle'),
     busySteerEmpty: t('tui.busy_steer_empty'),
+    // born-697 (SURF-3 approval last-mile) — visible closure line for a
+    // terminal approve/deny ({summary} substituted by app.tsx's onClosure).
+    approvalApproved: t('approval.terminal.approved'),
+    approvalRejected: t('approval.terminal.rejected'),
   };
 }
 

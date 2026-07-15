@@ -131,8 +131,31 @@ describe('ApprovalRelay — channel-decide resumes broker + cross-broadcasts', (
     expect(crossBroadcast).toMatchObject({
       kind: 'cross-decided',
       decision,
-      message: 'channel-a kanalında karar verildi',
+      // born-697 D3 — the message is now a neutral English DEFAULT (was a
+      // hardcoded-Turkish "… kanalında karar verildi" i18n violation).
+      message: 'decision made on channel channel-a',
     });
+  });
+
+  it('uses an injected formatCrossDecided builder (string-free, i18n-first — born-697 D3)', async () => {
+    const localizedBroker = new ApprovalBroker(projectRoot, { storeDir: join(projectRoot, 'approvals-fmt') });
+    const localizedRelay = new ApprovalRelay(
+      localizedBroker,
+      undefined,
+      (d) => `[${d.channel}] ${d.decision === 'allow' ? 'ONAYLANDI' : 'REDDEDİLDİ'}`,
+    );
+    const a = makeFakeChannel();
+    const b = makeFakeChannel();
+    localizedRelay.attachChannel('channel-a', a.channel);
+    localizedRelay.attachChannel('channel-b', b.channel);
+
+    const req = localizedBroker.submit(buildRequest('apr-relay-fmt-1'));
+    const waiting = localizedBroker.awaitDecision(req.id);
+    a.decide({ requestId: req.id, decision: 'allow', decidedBy: 'alperen', decidedAt: '2026-07-01T21:05:00.000Z' });
+    await waiting;
+
+    expect(b.sent[1]).toMatchObject({ kind: 'cross-decided', message: '[channel-a] ONAYLANDI' });
+    localizedRelay.dispose();
   });
 });
 

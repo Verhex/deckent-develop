@@ -120,7 +120,21 @@ export class ApprovalRelay extends EventEmitter {
    *   re-notifying every channel. Omit to preserve today's undeduped
    *   behavior (every 'pending' event dispatches).
    */
-  constructor(broker: ApprovalBroker, dedup?: ApprovalNotifyDedup) {
+  /**
+   * @param formatCrossDecided Builds the human-readable `message` on a
+   *   `cross-decided` event (born-697 / D3). This is a core mechanism module,
+   *   so the string is INJECTED (i18n-first) with a neutral English default
+   *   rather than hardcoded — the previous inline `"… kanalında karar verildi"`
+   *   was a hardcoded-Turkish violation that surfaced verbatim on the Telegram
+   *   cross-broadcast card. A localized caller passes its own `getMessage`-backed
+   *   builder.
+   */
+  constructor(
+    broker: ApprovalBroker,
+    dedup?: ApprovalNotifyDedup,
+    private readonly formatCrossDecided: (decision: ApprovalDecision) => string =
+      (decision) => `decision made on channel ${decision.channel}`,
+  ) {
     super();
     this.broker = broker;
     this.handlePending = (request) => {
@@ -139,7 +153,7 @@ export class ApprovalRelay extends EventEmitter {
         kind: 'cross-decided',
         request,
         decision,
-        message: `${decision.channel} kanalında karar verildi`,
+        message: this.formatCrossDecided(decision),
       });
     };
     this.broker.on('pending', this.handlePending);

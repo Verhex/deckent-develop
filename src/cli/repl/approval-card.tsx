@@ -192,6 +192,13 @@ export interface ApprovalCardProps {
   /** Seam-injected decide callback — mirrors `ApprovalBroker.decide`'s second
    *  argument shape. Pass `broker.decide.bind(broker)` in production. */
   onDecide: (id: string, input: ApprovalDecisionInput) => void;
+  /** born-697 (SURF-3 approval last-mile) — called once per resolved request
+   *  right AFTER its decision is sent, so the caller can render a visible
+   *  closure line ("✅ Approved — …" / "✖ Rejected — …"). Without it, a terminal
+   *  approve/deny silently retired the card with no confirmation. Optional —
+   *  omitting it keeps every existing caller/test byte-identical. Fires per
+   *  request in the approve-all cascade too. */
+  onClosure?: (request: ApprovalRequest, decision: 'allow' | 'deny') => void;
   /** Stamped on every decision this card produces (`ApprovalDecision.decidedBy`). */
   decidedBy: string;
   /** Stamped on every decision this card produces (`ApprovalDecision.channel`). */
@@ -209,7 +216,7 @@ export interface ApprovalCardProps {
 // ─── ApprovalCard ───────────────────────────────────────────────────────────
 
 export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
-  const { events, onDecide, decidedBy, channel, labels, isActive: mutexActive = true } = props;
+  const { events, onDecide, onClosure, decidedBy, channel, labels, isActive: mutexActive = true } = props;
   const [head, setHead] = useState<ApprovalCardHead | null>(null);
   const [expanded, setExpanded] = useState(false);
   const queueRef = useRef<ApprovalCardQueue | null>(null);
@@ -235,6 +242,11 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
 
   const sendDecision = (request: ApprovalRequest, decision: 'allow' | 'deny'): void => {
     onDecide(request.id, { decision, decidedBy, channel, decidedAt: new Date().toISOString(), reason: '' });
+    // born-697 — visible closure on the SAME channel that decided. The relay
+    // deliberately excludes the deciding channel from `cross-decided`
+    // (approval-relay.ts), so without this the terminal never reflected its own
+    // decision; the card just vanished.
+    onClosure?.(request, decision);
   };
 
   useInput((input) => {

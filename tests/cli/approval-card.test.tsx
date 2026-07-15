@@ -24,6 +24,8 @@ import {
   mapApprovalKey,
   type ApprovalCardQueue,
 } from '../../src/cli/repl/approval-card.js';
+import { formatApprovalClosure } from '../../src/cli/repl/app.js';
+import { getMessage } from '../../src/cli/helpers/messages.js';
 import { validateApprovalRequest, type ApprovalRequest } from '../../src/core/approval-contract.js';
 import type { ApprovalStreamEvent } from '../../src/core/approval-eventstream.js';
 
@@ -237,5 +239,37 @@ describe('mapApprovalKey — y/n/a/d key mapping', () => {
 
   it.each(['x', '', 'q', '1', ''])('unmapped key %j is a no-op (null)', (input) => {
     expect(mapApprovalKey(input)).toBeNull();
+  });
+});
+
+// ─── born-697 (SURF-3 approval last-mile) — visible closure line ─────────────
+
+describe('formatApprovalClosure — visible terminal closure line (born-697)', () => {
+  it('approve → the approved template with {summary} interpolated', () => {
+    const line = formatApprovalClosure('allow', 'rm -rf ./build', {
+      approvalApproved: '✅ Onaylandı — {summary}',
+      approvalRejected: '✖ Reddedildi — {summary}',
+    });
+    expect(line).toBe('✅ Onaylandı — rm -rf ./build');
+  });
+
+  it('deny → the rejected template with {summary} interpolated', () => {
+    const line = formatApprovalClosure('deny', 'drop table users', {
+      approvalApproved: '✅ Onaylandı — {summary}',
+      approvalRejected: '✖ Reddedildi — {summary}',
+    });
+    expect(line).toBe('✖ Reddedildi — drop table users');
+  });
+
+  it('falls back to the English default when labels are absent (i18n-unwired path)', () => {
+    expect(formatApprovalClosure('allow', 'do it', {})).toBe('✅ Approved — do it');
+    expect(formatApprovalClosure('deny', 'do it', {})).toBe('✖ Rejected — do it');
+  });
+
+  it('resolves the approval.terminal.* keys in en + tr with {summary} interpolation', () => {
+    expect(getMessage('approval.terminal.approved', 'en', { summary: 'X' })).toBe('✅ Approved — X');
+    expect(getMessage('approval.terminal.approved', 'tr', { summary: 'X' })).toBe('✅ Onaylandı — X');
+    expect(getMessage('approval.terminal.rejected', 'en', { summary: 'Y' })).toBe('✖ Rejected — Y');
+    expect(getMessage('approval.terminal.rejected', 'tr', { summary: 'Y' })).toBe('✖ Reddedildi — Y');
   });
 });

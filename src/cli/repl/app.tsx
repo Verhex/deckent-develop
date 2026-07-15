@@ -449,6 +449,24 @@ export const DEFAULT_APPROVAL_CARD_LABELS: ApprovalCardLabels = {
   } satisfies Record<ApprovalRisk, string>,
 };
 
+/**
+ * born-697 (SURF-3 approval last-mile) — build the visible transcript line for a
+ * terminal approve/deny. Pure + exported so it is testable without mounting Ink
+ * (same "pull decision logic out of the component" seam as confirmKeyToAnswer /
+ * buildSegmentTurns). `{summary}` is interpolated from the request; the templates
+ * carry English fallbacks until run.tsx wires the approval.terminal.* keys.
+ */
+export function formatApprovalClosure(
+  decision: 'allow' | 'deny',
+  summary: string,
+  labels: Pick<ReplLabels, 'approvalApproved' | 'approvalRejected'>,
+): string {
+  const template = decision === 'allow'
+    ? (labels.approvalApproved ?? '✅ Approved — {summary}')
+    : (labels.approvalRejected ?? '✖ Rejected — {summary}');
+  return template.replace('{summary}', summary);
+}
+
 /** Sentinel used only to reserve dual-stream "approval wants space" priority
  * below — never rendered (filtered out before the footer maps to <Text>). */
 const DUAL_STREAM_APPROVAL_PLACEHOLDER = '\u0000dual-stream-approval-placeholder';
@@ -669,6 +687,14 @@ export interface ReplLabels {
    * optional, English fallback until a messages round wires a real i18n key
    * (tui.switch_busy) through run.tsx (same seam precedent as `turnError` above). */
   switchBusy?: string; // "cannot switch {kind} while a turn is in progress — wait for it to finish, or /interrupt first"
+  /** born-697 (SURF-3 approval last-mile) — the visible closure line pushed to
+   * the transcript when the user decides an approval on the terminal. `{summary}`
+   * is the request summary (i18n template, same precedent as `turnError`).
+   * Without these, a terminal approve/deny silently retired the card with no
+   * confirmation of what was decided. Optional, English fallback until run.tsx
+   * wires the approval.terminal.* keys. */
+  approvalApproved?: string; // "✅ Approved — {summary}"
+  approvalRejected?: string; // "✖ Rejected — {summary}"
 }
 
 /**
@@ -1650,6 +1676,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         <ApprovalCard
           events={approvalEvents.current}
           onDecide={approvalChannel.decide}
+          onClosure={(request, decision) => {
+            // born-697 — reflect the terminal's OWN decision as a visible
+            // transcript line (the relay excludes the deciding channel from
+            // cross-decided, so nothing else would).
+            pushTurn('seg', formatApprovalClosure(decision, request.summary, labels));
+          }}
           decidedBy="terminal"
           channel="terminal"
           labels={approvalLabels ?? DEFAULT_APPROVAL_CARD_LABELS}
