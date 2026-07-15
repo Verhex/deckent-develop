@@ -2746,6 +2746,16 @@ const MESSAGES: MessageMap = {
   'tui.inbox_state_failed': { en: 'failed', tr: 'başarısız' },
   'tui.inbox_state_cancelled': { en: 'cancelled', tr: 'iptal edildi' },
   'tui.inbox_state_blocked': { en: 'blocked', tr: 'engellendi' },
+  // SURF-3 multi-flow-inbox D2 — `/runs <n>` single-flow detail.
+  'tui.inbox_detail_header': { en: 'Run {id} · {state}', tr: 'Koşu {id} · {state}' },
+  'tui.inbox_detail_id': { en: '  id: {id}', tr: '  id: {id}' },
+  'tui.inbox_detail_intent': { en: '  intent: {intent}', tr: '  hedef: {intent}' },
+  'tui.inbox_detail_progress': { en: '  progress: {done}/{total}', tr: '  ilerleme: {done}/{total}' },
+  'tui.inbox_detail_started': { en: '  started: {started}', tr: '  başladı: {started}' },
+  'tui.inbox_not_found': {
+    en: 'No run #{arg} — `/runs` lists them',
+    tr: '#{arg} numaralı koşu yok — listelemek için `/runs`',
+  },
   'tui.resume_picker_header': { en: 'Recent sessions', tr: 'Son oturumlar' },
   'tui.resume_picker_hint': {
     en: 'Tip: /resume <number> to continue a session',

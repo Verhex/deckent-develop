@@ -897,10 +897,11 @@ export interface ReplAppProps {
   onSwitch: (sel: Partial<ActiveSelection>) => ActiveSelection & { switchError?: string };
   /** Set the agentic approval mode (suggest / auto-edit / full-auto). */
   onApprovalMode: (mode: 'suggest' | 'auto-edit' | 'full-auto') => void;
-  /** SURF-3 multi-flow-inbox — returns the rendered `/runs` inbox block (a
-   *  read-only list of concurrent run-flows). Injected by run.tsx (which owns
-   *  projectRoot + i18n); absent → `/runs` falls through as a normal turn. */
-  runInboxProvider?: () => string;
+  /** SURF-3 multi-flow-inbox — renders the `/runs` command for the raw slash
+   *  line: the list (bare `/runs`) or one flow's detail (`/runs <n>`). Injected
+   *  by run.tsx (which owns projectRoot + i18n); absent → `/runs` falls through
+   *  as a normal turn. */
+  runInboxProvider?: (input: string) => string;
   /** Optional chat-memory adapter — persists turns and powers /resume. */
   memory?: ChatMemoryAdapter;
   /** Active chat session id (new turns append here; /resume switches it). */
@@ -1463,9 +1464,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       // silently degrades to a chat turn on either engine. Absent provider
       // (flag/wire off) → falls through as a normal turn.
       if (/^\/runs(?:\s+.*)?$/i.test(trimmed) && runInboxProvider) {
-        // D1 ignores any trailing args (selection is D2) — always shows the list.
+        // Bare `/runs` → the list; `/runs <n>` → that flow's detail (D2).
         pushTurn('user', trimmed);
-        pushTurn('bg', runInboxProvider());
+        pushTurn('bg', runInboxProvider(trimmed));
         return;
       }
       // 358-006: /resume picker (session-resume.ts pickSession) merged with the

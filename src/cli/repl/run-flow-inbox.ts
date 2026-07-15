@@ -120,6 +120,19 @@ export interface InboxLabels {
   empty: string;
   /** Per-state short badge (RunFlowState → label). */
   stateLabels: Readonly<Record<RunFlowState, string>>;
+  // ── D2 (selection / detail) ──
+  /** Detail header, e.g. "Run {id} · {state}" ({id} = short id). */
+  detailHeader: string;
+  /** Full-id line, e.g. "  id: {id}". */
+  detailFullId: string;
+  /** Intent line (omitted when the flow carries none), e.g. "  intent: {intent}". */
+  detailIntent: string;
+  /** Progress line (omitted until finished), e.g. "  progress: {done}/{total}". */
+  detailProgress: string;
+  /** Started-at line (omitted when unknown), e.g. "  started: {started}". */
+  detailStarted: string;
+  /** Shown for `/runs <n>` when n is out of range, e.g. "No run #{arg} — `/runs` lists them". */
+  notFound: string;
 }
 
 /** English-default inbox labels (string-free component; the caller injects a
@@ -142,6 +155,12 @@ export const DEFAULT_INBOX_LABELS: InboxLabels = {
     CANCELLED: 'cancelled',
     BLOCKED: 'blocked',
   },
+  detailHeader: 'Run {id} · {state}',
+  detailFullId: '  id: {id}',
+  detailIntent: '  intent: {intent}',
+  detailProgress: '  progress: {done}/{total}',
+  detailStarted: '  started: {started}',
+  notFound: 'No run #{arg} — `/runs` lists them',
 };
 
 const SHORT_ID_LEN = 8;
@@ -169,9 +188,61 @@ export function buildInboxLines(rows: readonly InboxRow[], labels: InboxLabels):
   return lines;
 }
 
-/** Convenience: collect + render for `<root>`, returning the transcript block. */
-export function renderInbox(root: string, labels: InboxLabels, opts: CollectInboxOptions = {}): string {
-  return buildInboxLines(collectInboxRows(root, opts), labels).join('\n');
+// ─── D2 — selection / detail ─────────────────────────────────────────────────
+
+/** What `/runs [arg]` resolves to against the current row list. Pure — mirrors
+ *  session-resume's `resolveResumeInput` numbered-pick shape. */
+export type InboxSelection =
+  | { readonly kind: 'list' }
+  | { readonly kind: 'detail'; readonly row: InboxRow }
+  | { readonly kind: 'not-found'; readonly arg: string };
+
+/**
+ * Resolve a `/runs` argument against `rows` (the SAME list `/runs` just showed —
+ * collectInboxRows is deterministic, so the numbering stays aligned):
+ *  - empty / whitespace → the list;
+ *  - a valid 1-based index → that row's detail;
+ *  - a numeric-but-out-of-range index → not-found (honest, never a silent list);
+ *  - anything non-numeric → the list (a stray arg shows the list, not an error).
+ */
+export function resolveInboxSelection(arg: string, rows: readonly InboxRow[]): InboxSelection {
+  const trimmed = arg.trim();
+  if (trimmed.length === 0) return { kind: 'list' };
+  if (!/^\d+$/.test(trimmed)) return { kind: 'list' };
+  const n = Number.parseInt(trimmed, 10);
+  const row = rows[n - 1];
+  if (n < 1 || row === undefined) return { kind: 'not-found', arg: trimmed };
+  return { kind: 'detail', row };
+}
+
+/** Render one flow's detail block (D2). Pure + string-free. Field lines are
+ *  omitted when their datum is absent (a bare do-flow shows id + state only). */
+export function buildInboxDetailLines(row: InboxRow, labels: InboxLabels): string[] {
+  const shortId = row.flowId.slice(0, SHORT_ID_LEN);
+  const state = labels.stateLabels[row.state] ?? row.state;
+  const lines = [labels.detailHeader.replace('{id}', shortId).replace('{state}', state)];
+  lines.push(labels.detailFullId.replace('{id}', row.flowId));
+  if (row.intentSummary) lines.push(labels.detailIntent.replace('{intent}', row.intentSummary));
+  if (row.done !== undefined && row.total !== undefined) {
+    lines.push(labels.detailProgress.replace('{done}', String(row.done)).replace('{total}', String(row.total)));
+  }
+  if (row.updatedAt) lines.push(labels.detailStarted.replace('{started}', row.updatedAt));
+  return lines;
+}
+
+/**
+ * The `/runs [arg]` command entry point (D1 list + D2 detail): collect the rows
+ * once, then render the list, one flow's detail, or an honest not-found — all
+ * from the same deterministic snapshot so `/runs <n>` selects exactly the row
+ * `/runs` numbered. `input` is the raw slash line (`/runs` or `/runs 2`).
+ */
+export function renderRunsCommand(root: string, input: string, labels: InboxLabels, opts: CollectInboxOptions = {}): string {
+  const rows = collectInboxRows(root, opts);
+  const arg = input.replace(/^\s*\/runs\b/i, '');
+  const selection = resolveInboxSelection(arg, rows);
+  if (selection.kind === 'detail') return buildInboxDetailLines(selection.row, labels).join('\n');
+  if (selection.kind === 'not-found') return labels.notFound.replace('{arg}', selection.arg);
+  return buildInboxLines(rows, labels).join('\n');
 }
 
 /**
@@ -198,5 +269,11 @@ export function buildInboxLabels(t: (key: string) => string): InboxLabels {
       CANCELLED: t('tui.inbox_state_cancelled'),
       BLOCKED: t('tui.inbox_state_blocked'),
     },
+    detailHeader: t('tui.inbox_detail_header'),
+    detailFullId: t('tui.inbox_detail_id'),
+    detailIntent: t('tui.inbox_detail_intent'),
+    detailProgress: t('tui.inbox_detail_progress'),
+    detailStarted: t('tui.inbox_detail_started'),
+    notFound: t('tui.inbox_not_found'),
   };
 }

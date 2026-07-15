@@ -14,6 +14,9 @@ import {
   collectInboxRows,
   buildInboxLines,
   buildInboxLabels,
+  resolveInboxSelection,
+  buildInboxDetailLines,
+  renderRunsCommand,
   DEFAULT_INBOX_LABELS,
   MAX_INBOX_ROWS,
   type InboxRow,
@@ -173,11 +176,88 @@ describe('buildInboxLines — pure render (string-free, SURF-3)', () => {
   });
 });
 
+describe('resolveInboxSelection — /runs <n> numbered pick (D2)', () => {
+  const rows: InboxRow[] = [
+    { flowId: 'flow-a', state: 'COMPLETED' },
+    { flowId: 'flow-b', state: 'DETACHED_RUNNING' },
+  ];
+
+  it('bare / whitespace arg → list', () => {
+    expect(resolveInboxSelection('', rows)).toEqual({ kind: 'list' });
+    expect(resolveInboxSelection('   ', rows)).toEqual({ kind: 'list' });
+  });
+
+  it('a valid 1-based index → that row detail', () => {
+    expect(resolveInboxSelection('1', rows)).toEqual({ kind: 'detail', row: rows[0] });
+    expect(resolveInboxSelection(' 2 ', rows)).toEqual({ kind: 'detail', row: rows[1] });
+  });
+
+  it('out-of-range / zero → not-found (honest, never a silent list)', () => {
+    expect(resolveInboxSelection('3', rows)).toEqual({ kind: 'not-found', arg: '3' });
+    expect(resolveInboxSelection('0', rows)).toEqual({ kind: 'not-found', arg: '0' });
+  });
+
+  it('a non-numeric arg → list (a stray arg is not an error)', () => {
+    expect(resolveInboxSelection('foo', rows)).toEqual({ kind: 'list' });
+  });
+});
+
+describe('buildInboxDetailLines — single-flow detail (D2)', () => {
+  const labels = DEFAULT_INBOX_LABELS;
+
+  it('renders header + full id + intent + progress + started when all present', () => {
+    const row: InboxRow = {
+      flowId: '9c3d577a-5c24-45c6-86e2-abcdef012345', state: 'COMPLETED',
+      intentSummary: 'add auth', done: 3, total: 4, updatedAt: '2026-07-15T10:00:00.000Z', revision: 1,
+    };
+    expect(buildInboxDetailLines(row, labels)).toEqual([
+      'Run 9c3d577a · completed',
+      '  id: 9c3d577a-5c24-45c6-86e2-abcdef012345',
+      '  intent: add auth',
+      '  progress: 3/4',
+      '  started: 2026-07-15T10:00:00.000Z',
+    ]);
+  });
+
+  it('omits absent fields — a bare do-flow shows id + state only', () => {
+    const row: InboxRow = { flowId: 'do-flow-bare-01', state: 'DETACHED_RUNNING' };
+    expect(buildInboxDetailLines(row, labels)).toEqual([
+      'Run do-flow- · running',
+      '  id: do-flow-bare-01',
+    ]);
+  });
+});
+
+describe('renderRunsCommand — /runs entry point (D1 list + D2 detail)', () => {
+  let root: string;
+  beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'runs-cmd-')); _resetRunFlowCoordinatorsForTests(); });
+  afterEach(() => { _resetRunFlowCoordinatorsForTests(); rmSync(root, { recursive: true, force: true }); });
+
+  it('bare /runs → the list; /runs <n> → that flow detail; /runs <bad> → not-found', () => {
+    proposedFlow(root, 'flow-only', 'the intent');
+    const labels = DEFAULT_INBOX_LABELS;
+
+    const list = renderRunsCommand(root, '/runs', labels);
+    expect(list).toContain(labels.header);
+    expect(list).toContain('the intent');
+
+    const detail = renderRunsCommand(root, '/runs 1', labels);
+    expect(detail).toContain('  id: flow-only');
+    expect(detail).toContain('  intent: the intent');
+
+    expect(renderRunsCommand(root, '/runs 9', labels)).toBe('No run #9 — `/runs` lists them');
+  });
+
+  it('empty project → the empty notice for a bare /runs', () => {
+    expect(renderRunsCommand(root, '/runs', DEFAULT_INBOX_LABELS)).toBe(DEFAULT_INBOX_LABELS.empty);
+  });
+});
+
 describe('buildInboxLabels — i18n (SURF-3)', () => {
   it('resolves every label in en + tr (en !== tr), covering all states', () => {
     const en = buildInboxLabels((k) => getMessage(k, 'en'));
     const tr = buildInboxLabels((k) => getMessage(k, 'tr'));
-    for (const key of ['header', 'hint', 'empty'] as const) {
+    for (const key of ['header', 'hint', 'empty', 'detailIntent', 'detailProgress', 'detailStarted', 'notFound'] as const) {
       expect(en[key].length).toBeGreaterThan(0);
       expect(tr[key].length).toBeGreaterThan(0);
       expect(en[key]).not.toBe(tr[key]);

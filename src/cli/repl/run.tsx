@@ -21,7 +21,7 @@ import { createNativeEngine, resolveCostCeilingUsd } from './native-agent-bridge
 import { createRunFlowController, type RunFlowController, type RunFlowControllerDeps } from './run-flow-controller.js';
 import { buildPlanPreviewCardLabels } from './plan-preview-card.js';
 import type { RunFlowMountLabels } from './app.js';
-import { renderInbox, buildInboxLabels } from './run-flow-inbox.js';
+import { renderRunsCommand, buildInboxLabels } from './run-flow-inbox.js';
 import type { ResolvedConfig } from '../../core/types.js';
 import { buildTurnRecorder } from './trace-wire.js';
 import { composeSystemPrompt } from '../../agent/identity.js';
@@ -1014,7 +1014,7 @@ export async function runInkRepl(
       lang={lang}
       labels={buildReplLabels(t)}
       approvalLabels={buildApprovalLabels(t)}
-      runInboxProvider={() => renderInbox(process.cwd(), buildInboxLabels(t))}
+      runInboxProvider={(input) => renderRunsCommand(process.cwd(), input, buildInboxLabels(t))}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
       registerToolSink={(sink) => { toolSink = sink; }}
       {...(nativeEngine ? { nativeEngine } : {})}

@@ -57,7 +57,7 @@ import { McpClientBroker } from '../../mcp-client/broker.js';
 // registry class is a distinct type used only to compose the `/mcp` bridge.
 import { McpToolRegistry as McpClientToolRegistry } from '../../mcp-client/registry.js';
 import { dispatchMcpSlash, isMcpClientEnabled, planMcpConnect, type ReplMcpBridge } from '../repl/mcp-bridge.js';
-import { renderInbox, buildInboxLabels } from '../repl/run-flow-inbox.js';
+import { renderRunsCommand, buildInboxLabels } from '../repl/run-flow-inbox.js';
 import { loadConfig } from '../../core/config.js';
 // Sprint 380 T-380-014 — type-only (chat-session.ts already imports FROM this
 // file; this reverse edge is erased at compile time, so there is no runtime
@@ -966,9 +966,9 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     // loop handles it too and it never degrades to a chat turn. Cross-process
     // disk scan; root injectable for hermetic tests (defaults to cwd).
     if (/^\/runs(?:\s+.*)?$/i.test(line)) {
-      // D1 ignores any trailing args (selection is D2) — always shows the list.
+      // Bare `/runs` → the list; `/runs <n>` → that flow's detail (D2).
       const inboxRoot = opts.projectRoot ?? process.cwd();
-      output(renderInbox(inboxRoot, buildInboxLabels((k) => getMessage(k, lang))));
+      output(renderRunsCommand(inboxRoot, line, buildInboxLabels((k) => getMessage(k, lang))));
       transcript.push({ role: 'user', content: line });
       continue;
     }
