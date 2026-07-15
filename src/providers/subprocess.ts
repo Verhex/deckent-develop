@@ -462,6 +462,15 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
         }
       });
       child.stdout.on('error', () => { /* stream error never breaks the worker */ });
+      // MOAT-2 (ADR-G-013): a flowing Readable holds its OWN event-loop ref that
+      // lives until stdout EOF (≈ worker exit) — so piping stdout for the tee
+      // would re-pin the coordinator loop past `.result` (the exact linger the
+      // `child.unref()` below fixes for the child handle). Unref the stream too:
+      // an unref'd stream still delivers 'data' while the EXECUTE result-poll
+      // timer keeps the loop alive, but never anchors it on its own (same
+      // rationale as hbInterval.unref). Without this, live_trace-on subprocess
+      // sprints would linger after completion.
+      (child.stdout as unknown as { unref?: () => void }).unref?.();
     }
     // BUG-26: DON'T close logFd here — keep open until child exits
     // On Windows the cmd.exe wrapper child inherits the FD; closing it before inherit causes empty logs

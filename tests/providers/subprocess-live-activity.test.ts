@@ -19,9 +19,16 @@ const TOOL_USE = JSON.stringify({ type: 'assistant', message: { content: [{ type
 const RESULT = JSON.stringify({ type: 'result', usage: { input_tokens: 3, output_tokens: 2 } });
 
 function mockChild(stdoutLines: string[]) {
+  let stdout: (Readable & { unref: ReturnType<typeof vi.fn> }) | null = null;
+  if (stdoutLines.length) {
+    stdout = Readable.from(stdoutLines.map((l) => `${l}\n`)) as Readable & { unref: ReturnType<typeof vi.fn> };
+    // Real child.stdout is a Socket (has unref); a Readable does not — add a spy
+    // so the MOAT-2 stream-unref assertion can verify it is called (ADR-G-013).
+    stdout.unref = vi.fn();
+  }
   const child = {
     stdin: { write: vi.fn(), end: vi.fn() },
-    stdout: stdoutLines.length ? Readable.from(stdoutLines.map((l) => `${l}\n`)) : null,
+    stdout,
     once: vi.fn(),
     on: vi.fn(),
     kill: vi.fn(),
@@ -108,5 +115,15 @@ describe('SubprocessSpawnBackend — live activity (SURF-3 S2)', () => {
     const spawnImpl = vi.fn().mockReturnValue(mockChild([]));
     expect(() => backend(spawnImpl).spawn('t3', 'opus' as never, 'p', { projectDir: root, liveTraceEnabled: true }))
       .not.toThrow();
+  });
+
+  it('flag ON: the piped stdout is UNREF\'d so it never re-pins the coordinator loop (MOAT-2, ADR-G-013)', () => {
+    // A flowing Readable holds its own loop-ref until EOF; without unref, a
+    // worker lingering after .result would re-anchor the coordinator loop —
+    // exactly the linger the child.unref() fixes for the child handle.
+    const child = mockChild([TOOL_USE]);
+    const spawnImpl = vi.fn().mockReturnValue(child);
+    backend(spawnImpl).spawn('t4', 'opus' as never, 'p', { projectDir: root, liveTraceEnabled: true });
+    expect(child.stdout!.unref).toHaveBeenCalledTimes(1);
   });
 });
