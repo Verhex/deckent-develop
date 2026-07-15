@@ -64,7 +64,7 @@ describe('createToolExecDispatcher — symlink scope-escape (born-536)', () => {
     const d = createToolExecDispatcher({ cwd: dir, confirm: async () => true });
     const res = await d.dispatch('deckent_write_file', { path: 'inside-link.txt', content: 'after' });
 
-    expect(res).toContain('yazıldı');
+    expect(res).toContain('wrote');
     expect(readFileSync(join(dir, 'real-sub', 'target.txt'), 'utf-8')).toBe('after');
   });
 
@@ -72,7 +72,7 @@ describe('createToolExecDispatcher — symlink scope-escape (born-536)', () => {
     const d = createToolExecDispatcher({ cwd: dir, confirm: async () => true });
     const res = await d.dispatch('deckent_write_file', { path: 'brand-new.md', content: 'hello' });
 
-    expect(res).toContain('yazıldı');
+    expect(res).toContain('wrote');
     expect(readFileSync(join(dir, 'brand-new.md'), 'utf-8')).toBe('hello');
   });
 });

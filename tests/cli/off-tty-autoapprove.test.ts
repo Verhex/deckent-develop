@@ -83,14 +83,14 @@ describe('off-TTY confirm gate wired into createToolExecDispatcher (born-550)', 
   it('--auto-approve: write proceeds exactly like the old blanket-approve behavior', async () => {
     const d = dispatcherFor(['--auto-approve']);
     const res = await d.dispatch('deckent_write_file', { path: 'ok.md', content: 'merhaba' });
-    expect(res).toContain('yazıldı');
+    expect(res).toContain('wrote');
     expect(readFileSync(join(dir, 'ok.md'), 'utf-8')).toBe('merhaba');
   });
 
   it('--yes: write proceeds exactly like the old blanket-approve behavior', async () => {
     const d = dispatcherFor(['--yes']);
     const res = await d.dispatch('deckent_write_file', { path: 'ok2.md', content: 'selam' });
-    expect(res).toContain('yazıldı');
+    expect(res).toContain('wrote');
     expect(readFileSync(join(dir, 'ok2.md'), 'utf-8')).toBe('selam');
   });
 

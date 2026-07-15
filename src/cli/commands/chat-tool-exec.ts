@@ -26,6 +26,28 @@ const SIDE_EFFECTING: ReadonlySet<string> = new Set([
   'deckent_bash',
 ]);
 
+/**
+ * User-facing confirm-prompt summaries (REPL-575 K5). This mechanism module is
+ * string-free per CLAUDE.md i18n-FIRST: the interactive caller (run.tsx /
+ * entry.ts) injects a localized set resolved via getMessage; headless callers
+ * (worker-runner) omit it and get these English defaults. Each is a builder so
+ * the path/char-count/command interpolate at the callsite's language.
+ */
+export interface ToolExecLabels {
+  /** Summary shown before a deckent_write_file, e.g. "Write file: x.ts (12 chars)". */
+  writeSummary: (path: string, chars: number) => string;
+  /** Summary shown before a deckent_edit_file, e.g. "Edit file: x.ts". */
+  editSummary: (path: string) => string;
+  /** Summary shown before a deckent_bash, e.g. "Run command: npm test". */
+  bashSummary: (cmd: string) => string;
+}
+
+export const DEFAULT_TOOL_EXEC_LABELS: ToolExecLabels = {
+  writeSummary: (path, chars) => `Write file: ${path} (${chars} chars)`,
+  editSummary: (path) => `Edit file: ${path}`,
+  bashSummary: (cmd) => `Run command: ${cmd}`,
+};
+
 export interface ToolExecOptions {
   /** Tool'ların çözümleneceği kök dizin. Default `process.cwd()`. A function is
    * resolved per-dispatch so the REPL's /cd (process.chdir) is followed live. */
@@ -36,6 +58,11 @@ export interface ToolExecOptions {
    * gerçek interaktif onayı (agentic-confirm) buraya enjekte eder.
    */
   confirm?: (summary: string, toolName: string) => Promise<boolean>;
+  /**
+   * Localized confirm-prompt summaries (REPL-575 K5). Absent → English
+   * DEFAULT_TOOL_EXEC_LABELS. Partial override is merged over the defaults.
+   */
+  labels?: Partial<ToolExecLabels>;
   /** bash için spawn enjeksiyonu (test hermetik). Default node:child_process.spawn. */
   bashRun?: (cmd: string, cwd: string) => Promise<string>;
   /**
@@ -46,15 +73,15 @@ export interface ToolExecOptions {
   bashTimeoutMs?: number;
 }
 
-/** İnsan-okur özet — onay prompt'unda gösterilir. */
-function summarize(name: string, args: Record<string, unknown>): string {
+/** İnsan-okur özet — onay prompt'unda gösterilir. Label'lar caller'dan (i18n). */
+function summarize(name: string, args: Record<string, unknown>, labels: ToolExecLabels): string {
   switch (name) {
     case 'deckent_write_file':
-      return `Dosya yaz: ${String(args['path'] ?? '?')} (${String(args['content'] ?? '').length} karakter)`;
+      return labels.writeSummary(String(args['path'] ?? '?'), String(args['content'] ?? '').length);
     case 'deckent_edit_file':
-      return `Dosya düzenle: ${String(args['path'] ?? '?')}`;
+      return labels.editSummary(String(args['path'] ?? '?'));
     case 'deckent_bash':
-      return `Komut çalıştır: ${String(args['cmd'] ?? args['command'] ?? '?')}`;
+      return labels.bashSummary(String(args['cmd'] ?? args['command'] ?? '?'));
     default:
       return name;
   }
@@ -233,6 +260,7 @@ export function resolveRealPathLenient(absPath: string): string {
 export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDispatcher {
   const resolveCwd = (): string => (typeof opts.cwd === 'function' ? opts.cwd() : (opts.cwd ?? process.cwd()));
   const confirm = opts.confirm ?? (async () => true);
+  const labels: ToolExecLabels = { ...DEFAULT_TOOL_EXEC_LABELS, ...opts.labels };
   const bashRun = opts.bashRun ?? ((cmd: string, cwd: string) => defaultBashRun(cmd, cwd, { timeoutMs: opts.bashTimeoutMs }));
 
   // cwd dışına çıkışı engelle (path traversal). Geçerli mutlak yolu döner;
@@ -274,7 +302,7 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
     async dispatch(name, args) {
       try {
         if (SIDE_EFFECTING.has(name)) {
-          const approved = await confirm(summarize(name, args), name);
+          const approved = await confirm(summarize(name, args, labels), name);
           // Distinct machine-marker for denial — MUST differ from the success
           // returns ("[deckent] yazıldı/düzenlendi"), otherwise the REPL cannot
           // tell a blocked write from a completed one (REPL-TOOL-DEBT-2). The UI
@@ -282,41 +310,49 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
           if (!approved) return `[deckent-denied] ${name}`;
         }
 
+        // NOTE (REPL-575 K5): the `[mcp-error]`/`[deckent]` results below are
+        // PROTOCOL strings fed back to the model as tool_result (and matched by
+        // the `[mcp-error]`/`[deckent-denied]` markers in native-tool-registry.ts
+        // / run.tsx — the marker is the contract, the detail is diagnostic).
+        // They are English-canonical, not a localization surface — the previous
+        // Turkish detail was a hardcoded-TR violation that showed Turkish to an
+        // English user. Only the user-facing confirm summary above is localized
+        // (via injected labels).
         switch (name) {
           case 'deckent_read_file': {
             const abs = inScope(String(args['path'] ?? ''));
-            if (!abs) return `[mcp-error] deckent_read_file: yol scope dışı veya geçersiz`;
-            if (!existsSync(abs)) return `[mcp-error] deckent_read_file: dosya yok: ${args['path']}`;
+            if (!abs) return `[mcp-error] deckent_read_file: path out of scope or invalid`;
+            if (!existsSync(abs)) return `[mcp-error] deckent_read_file: file not found: ${args['path']}`;
             return readFileSync(abs, 'utf-8');
           }
           case 'deckent_write_file': {
             const abs = inScope(String(args['path'] ?? ''));
-            if (!abs) return `[mcp-error] deckent_write_file: yol scope dışı veya geçersiz`;
+            if (!abs) return `[mcp-error] deckent_write_file: path out of scope or invalid`;
             mkdirSync(dirname(abs), { recursive: true });
             writeFileSync(abs, String(args['content'] ?? ''), 'utf-8');
-            return `[deckent] yazıldı: ${args['path']}`;
+            return `[deckent] wrote: ${args['path']}`;
           }
           case 'deckent_edit_file': {
             const abs = inScope(String(args['path'] ?? ''));
-            if (!abs) return `[mcp-error] deckent_edit_file: yol scope dışı veya geçersiz`;
-            if (!existsSync(abs)) return `[mcp-error] deckent_edit_file: dosya yok: ${args['path']}`;
+            if (!abs) return `[mcp-error] deckent_edit_file: path out of scope or invalid`;
+            if (!existsSync(abs)) return `[mcp-error] deckent_edit_file: file not found: ${args['path']}`;
             const before = readFileSync(abs, 'utf-8');
             const oldStr = String(args['old'] ?? '');
             const newStr = String(args['new'] ?? '');
-            if (oldStr.length === 0) return `[mcp-error] deckent_edit_file: old boş olamaz`;
+            if (oldStr.length === 0) return `[mcp-error] deckent_edit_file: old must not be empty`;
             const occurrences = countOccurrences(before, oldStr);
-            if (occurrences === 0) return `[mcp-error] deckent_edit_file: eşleşme yok`;
+            if (occurrences === 0) return `[mcp-error] deckent_edit_file: no match`;
             const replaceAll = args['replaceAll'] === true || args['replace_all'] === true;
             if (occurrences > 1 && !replaceAll) {
-              return `[mcp-error] deckent_edit_file: old birden çok yerde eşleşiyor (${occurrences}) — old'u tekil eşleşecek şekilde daraltın ya da replaceAll:true kullanın`;
+              return `[mcp-error] deckent_edit_file: old matches multiple locations (${occurrences}) — narrow old to a unique match or pass replaceAll:true`;
             }
             const after = replaceAll ? before.split(oldStr).join(newStr) : before.replace(oldStr, newStr);
             writeFileSync(abs, after, 'utf-8');
-            return `[deckent] düzenlendi: ${args['path']}`;
+            return `[deckent] edited: ${args['path']}`;
           }
           case 'deckent_bash': {
             const cmd = String(args['cmd'] ?? args['command'] ?? '');
-            if (cmd.length === 0) return `[mcp-error] deckent_bash: boş komut`;
+            if (cmd.length === 0) return `[mcp-error] deckent_bash: empty command`;
             return await bashRun(cmd, resolveCwd());
           }
           default:

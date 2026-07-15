@@ -31,6 +31,7 @@ import { createPermissionStore } from '../commands/chat-permissions.js';
 import { classifyTool } from './tool-permissions.js';
 import { buildSlashRegistry } from '../commands/chat-slash-registry.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { buildToolExecLabels } from '../helpers/tool-exec-labels.js';
 import { loadConfig } from '../../core/config.js';
 import { createSwitchableProvider, type ActiveSelection } from './provider-switch.js';
 import { createRunStateFeed } from '../helpers/run-state-feed.js';
@@ -747,7 +748,8 @@ export async function runInkRepl(
   };
 
   const cliDispatcher = createCliToolDispatcher();
-  const execDispatcher = createToolExecDispatcher({ cwd: () => process.cwd(), confirm: askConfirm });
+  // REPL-575 K5 — localized confirm-prompt summaries (i18n-FIRST).
+  const execDispatcher = createToolExecDispatcher({ cwd: () => process.cwd(), confirm: askConfirm, labels: buildToolExecLabels(lang) });
 
   // Tool/change block sink: after a side-effecting tool completes, emit a
   // localized ToolInfo so the App renders a claude-code-style change block.

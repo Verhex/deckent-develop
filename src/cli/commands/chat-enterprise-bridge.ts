@@ -54,10 +54,30 @@ function resolveEntryPath(): string {
 }
 
 /**
+ * Per-command spawn-kill budget (ms). REPL-575 K4: the sibling
+ * chat-tool-bridge.ts got a finite timeout (born-516) but this bridge did not —
+ * a genuinely-hung subprocess (never emits `close`/`error`) froze the whole
+ * `/audit` REPL turn forever, since the outer `for await` loop awaits this
+ * promise. `audit` is a provider-backed gate documented to run 30-60s+ (mirrors
+ * chat-tool-bridge's audit tier); the rest fall back to the default. The budget
+ * is finite either way — never removed.
+ */
+const DEFAULT_ENTERPRISE_TIMEOUT_MS = 30_000;
+const ENTERPRISE_TIMEOUT_MS_BY_COMMAND: Readonly<Record<string, number>> = {
+  audit: 180_000,
+};
+
+/** Resolve the spawn-kill budget (ms) for a resolved CLI argv, keyed off its first token. */
+export function resolveEnterpriseTimeoutMs(cliArgs: readonly string[]): number {
+  const cmd = cliArgs[0];
+  return (cmd !== undefined ? ENTERPRISE_TIMEOUT_MS_BY_COMMAND[cmd] : undefined) ?? DEFAULT_ENTERPRISE_TIMEOUT_MS;
+}
+
+/**
  * Exported (was module-private) purely so tests/cli/spawn-error-listener.test.ts
  * can exercise the real spawn implementation directly — mirrors the
  * already-exported `defaultPersistentSpawn` in chat-session.ts for the
- * identical testing need. No behavior change.
+ * identical testing need.
  */
 export function defaultSpawnFn(args: string[]): Promise<string> {
   return new Promise<string>((resolve) => {
@@ -71,8 +91,20 @@ export function defaultSpawnFn(args: string[]): Promise<string> {
     const settle = (value: string): void => {
       if (settled) return;
       settled = true;
+      clearTimeout(timer);
       resolve(value);
     };
+    // REPL-575 K4 — finite budget: if a subcommand runs past its class budget
+    // (an unexpectedly slow or auth-blocked gate that never closes), kill it and
+    // surface a tagged notice instead of freezing the turn forever. Keeps this
+    // bridge's never-reject contract (returns a `[enterprise-error]` string),
+    // unlike chat-tool-bridge which rejects.
+    const timeoutMs = resolveEnterpriseTimeoutMs(args);
+    const timer = setTimeout(() => {
+      if (settled) return;
+      try { child.kill('SIGKILL'); } catch { /* already gone */ }
+      settle(`[enterprise-error] timed out after ${timeoutMs / 1000}s`);
+    }, timeoutMs);
     child.stdout?.setEncoding('utf-8');
     child.stderr?.setEncoding('utf-8');
     child.stdout?.on('data', (chunk: string) => { out += chunk; });

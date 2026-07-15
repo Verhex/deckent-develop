@@ -1341,6 +1341,20 @@ const MESSAGES: MessageMap = {
     en: 'MCP servers are configured but the external MCP client is disabled. Set "mcp_client_enabled": true in .deckent/config.json to connect them.',
     tr: 'MCP sunucuları yapılandırılmış ama harici MCP istemcisi kapalı. Bağlanmak için .deckent/config.json içinde "mcp_client_enabled": true ayarlayın.',
   },
+  // REPL-575 K5 — localized tool confirm-prompt summaries (injected into
+  // chat-tool-exec via ToolExecLabels; the mechanism module stays string-free).
+  'tool.confirm_write': {
+    en: 'Write file: {path} ({chars} chars)',
+    tr: 'Dosya yaz: {path} ({chars} karakter)',
+  },
+  'tool.confirm_edit': {
+    en: 'Edit file: {path}',
+    tr: 'Dosya düzenle: {path}',
+  },
+  'tool.confirm_bash': {
+    en: 'Run command: {cmd}',
+    tr: 'Komut çalıştır: {cmd}',
+  },
   'chat.slash_unknown_subaction': {
     en: '{command}: unknown subaction "{sub}". See /help for usage.',
     tr: '{command}: bilinmeyen alt-aksiyon "{sub}". Kullanım için /help.',

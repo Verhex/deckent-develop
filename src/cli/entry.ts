@@ -33,6 +33,7 @@ import { createSpinner } from './commands/chat-spinner.js';
 import { renderBanner } from './commands/chat-banner.js';
 import { createCliToolDispatcher } from './commands/chat-tool-bridge.js';
 import { createToolExecDispatcher } from './commands/chat-tool-exec.js';
+import { buildToolExecLabels } from './helpers/tool-exec-labels.js';
 import { createPermissionStore } from './commands/chat-permissions.js';
 import { slashCompleter, buildSlashRegistry } from './commands/chat-slash-registry.js';
 import { slashMenuOnKeypress, renderSlashMenu, filterSlashCommands } from './commands/chat-slash-menu.js';
@@ -857,6 +858,8 @@ export async function launchDefaultRepl(): Promise<void> {
   const offTtyAutoApprove = shouldAutoApproveOffTty(process.argv.slice(2));
   const execDispatcher = createToolExecDispatcher({
     cwd: process.cwd(),
+    // REPL-575 K5 — localized confirm-prompt summaries (i18n-FIRST).
+    labels: buildToolExecLabels(getLangFromConfig(process.cwd())),
     confirm: isTty ? askConfirm : async () => offTtyAutoApprove,
   });
   const EXEC_TOOLS = new Set([
