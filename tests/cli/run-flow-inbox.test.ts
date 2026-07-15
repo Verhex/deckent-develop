@@ -20,6 +20,7 @@ import {
 } from '../../src/cli/repl/run-flow-inbox.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
 import { getRunFlowCoordinator, _resetRunFlowCoordinatorsForTests } from '../../src/orchestra/run-flow-coordinator-registry.js';
+import { saveApprovedSnapshot, saveRunHandle } from '../../src/core/run-flow-store.js';
 import type { RunProposal, PlanPreview } from '../../src/core/run-flow-contract.js';
 
 function proposal(flowId: string, intent: string, revision = 1): RunProposal {
@@ -34,6 +35,26 @@ function proposedFlow(root: string, flowId: string, intent: string): void {
   const c = getRunFlowCoordinator(root);
   c.proposeFlow({ proposal: proposal(flowId, intent) });
   c.recordPreview({ preview: preview(flowId) });
+}
+
+/**
+ * Simulate a REAL concurrent `deckent do` flow: another process wrote the
+ * snapshot + handle stores directly (NO events.jsonl, NO proposeFlow), so a
+ * fresh coordinator resolves it via deriveLegacyContext — snapshot+handle →
+ * DETACHED_RUNNING, NO proposal → NO intentSummary → bare short-id. This is the
+ * headline case the proposeFlow-based fixtures never exercise.
+ */
+function doFlowOnDisk(root: string, flowId: string, startedAt: string): void {
+  const sprint = { id: flowId, tasks: [], directives: '', createdAt: startedAt } as never;
+  saveApprovedSnapshot(root, {
+    flowId, revision: 1, planDigest: 'd-1',
+    approvedBy: { id: 'u' }, approvedAt: startedAt, sprint,
+  });
+  saveRunHandle(root, {
+    flowId, revision: 1, planDigest: 'd-1',
+    handle: { flowId, jobId: `j-${flowId}`, logRef: 'log' },
+    startedAt,
+  });
 }
 
 /** Write a jobs-dir terminal record correlated to a flowId. */
@@ -94,6 +115,36 @@ describe('collectInboxRows — cross-process store-scan + jobs-dir join (SURF-3)
     proposedFlow(root, 'flow-1', 'one');
     proposedFlow(root, 'flow-2', 'two');
     expect(collectInboxRows(root, { limit: 1 })).toHaveLength(1);
+  });
+
+  // ── HEADLINE CASE — a real concurrent `deckent do` flow (snapshot-only, no
+  //    events.jsonl): a FRESH coordinator must disk-fold it via deriveLegacyContext.
+  it('lists a snapshot-only do-flow (cache-miss, disk-fold) as DETACHED_RUNNING with a bare short-id', () => {
+    doFlowOnDisk(root, 'do-flow-live-01', '2026-07-15T10:00:00.000Z');
+    _resetRunFlowCoordinatorsForTests(); // force getFlow through the disk-fold branch, not the cache
+    const rows = collectInboxRows(root);
+    expect(rows).toHaveLength(1);
+    // deriveLegacyContext: snapshot+handle → DETACHED_RUNNING, NO proposal.
+    expect(rows[0]).toMatchObject({ flowId: 'do-flow-live-01', state: 'DETACHED_RUNNING' });
+    expect(rows[0]!.intentSummary).toBeUndefined(); // bare short-id, no intent (G1)
+  });
+
+  it('a snapshot-only do-flow that finished shows COMPLETED via the jobs-dir override (disk-fold path)', () => {
+    doFlowOnDisk(root, 'do-flow-done-02', '2026-07-15T11:00:00.000Z');
+    writeJob(root, 'do-flow-done-02', 'COMPLETE', 5, 5);
+    _resetRunFlowCoordinatorsForTests();
+    const rows = collectInboxRows(root);
+    // store says DETACHED_RUNNING (deriveLegacyContext) but the jobs-dir override wins.
+    expect(rows[0]).toMatchObject({ flowId: 'do-flow-done-02', state: 'COMPLETED', done: 5, total: 5 });
+    expect(rows[0]!.intentSummary).toBeUndefined();
+  });
+
+  it('renders a bare do-flow row with no intent (short-id + state only)', () => {
+    doFlowOnDisk(root, 'do-flow-render-03', '2026-07-15T12:00:00.000Z');
+    _resetRunFlowCoordinatorsForTests();
+    const lines = buildInboxLines(collectInboxRows(root), DEFAULT_INBOX_LABELS);
+    // short-id + running badge, NO trailing intent text.
+    expect(lines[1]).toBe('  1. do-flow- · running');
   });
 });
 
