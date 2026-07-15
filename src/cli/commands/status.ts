@@ -318,6 +318,12 @@ export function buildPendingApprovalsSection(root: string, lang: string): string
   // through) — this call is redundant-but-harmless (idempotent, fail-soft)
   // and makes the wiring visible at this named call site too.
   sweepRuntimeApprovals(root);
+  // born-698c: same read-path pattern for detached-run deaths — a flow whose
+  // run process died without finalizing gets an honest RUN_FAILED closure
+  // the moment ANY surface reads status (never a silent limbo).
+  void import('../../orchestra/run-flow-death-sweep.js')
+    .then(({ sweepDeadDetachedRuns }) => sweepDeadDetachedRuns(root))
+    .catch(() => { /* fail-soft: status must render even if the sweep cannot run */ });
   const pending = readPendingApprovals(root);
   if (pending.length === 0) return null;
   const lines: string[] = [getMessage('status.pending_approvals.header', lang, { count: String(pending.length) })];

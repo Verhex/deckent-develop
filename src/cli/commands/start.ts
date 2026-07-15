@@ -348,6 +348,8 @@ export function registerStart(program: Command): void {
             planDigest: expectedPlanDigest,
             handle,
             startedAt: new Date().toISOString(),
+            // born-698c: liveness anchor — the child IS the run process.
+            pid: process.pid,
           });
 
           const bootstrap = await bootstrapProviders(config);
@@ -355,19 +357,36 @@ export function registerStart(program: Command): void {
             projectRoot: root,
             webhook: resolveWebhookBootstrapOption(config),
           });
-          const sprintResult = await runSprint(root, config, {
-            connector: bootstrap.connector,
-            autoApprove: opts.autoApprove === true,
-            acknowledgeScopePaths: opts.forceScope === true,
-            acknowledgePromptGate: opts.forcePromptGate === true,
-            sandboxMode: opts.sandboxMode,
-            timeoutMs: opts.timeout ? parseInt(opts.timeout, 10) : undefined,
-            preplannedSprint: approvedSnapshot!.sprint,
-            // SURF-0.2 (Task 432-002): the --flow-id value received above reaches
-            // runSprint as-is via this already-extracted `flowId` const -- no new
-            // id generation, no env fallback.
-            flowId,
-          });
+          let sprintResult;
+          try {
+            sprintResult = await runSprint(root, config, {
+              connector: bootstrap.connector,
+              autoApprove: opts.autoApprove === true,
+              acknowledgeScopePaths: opts.forceScope === true,
+              acknowledgePromptGate: opts.forcePromptGate === true,
+              sandboxMode: opts.sandboxMode,
+              timeoutMs: opts.timeout ? parseInt(opts.timeout, 10) : undefined,
+              preplannedSprint: approvedSnapshot!.sprint,
+              // SURF-0.2 (Task 432-002): the --flow-id value received above reaches
+              // runSprint as-is via this already-extracted `flowId` const -- no new
+              // id generation, no env fallback.
+              flowId,
+            });
+          } catch (err) {
+            // born-698b: a catchable child death writes its OWN honest closure —
+            // the flow never sits in DETACHED_RUNNING limbo behind a crash the
+            // parent already stopped watching. (SIGKILL-class deaths are covered
+            // by the read-path death-sweep, born-698c.)
+            try {
+              const { getRunFlowCoordinator } = await import('../../orchestra/run-flow-coordinator-registry.js');
+              getRunFlowCoordinator(root).recordRunFailure({
+                flowId,
+                error: `run crashed before completion: ${err instanceof Error ? err.message : String(err)}`,
+                commandId: `child-crash-${flowId}`,
+              });
+            } catch { /* closure is best-effort — the original error is what matters */ }
+            throw err;
+          }
           print(formatSprintSummary(sprintResult));
           return;
         }

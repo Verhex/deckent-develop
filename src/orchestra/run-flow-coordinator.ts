@@ -200,6 +200,13 @@ export interface RecordRunStartedCommand {
   readonly commandId?: string;
 }
 
+export interface RecordRunFailureCommand {
+  flowId: string;
+  /** Honest failure narrative ("process died without completion (pid 123 not alive)"). */
+  error: string;
+  commandId?: string;
+}
+
 export interface RecordCompletionCommand {
   readonly flowId: string;
   readonly summary?: string;
@@ -243,6 +250,9 @@ export interface RunFlowCoordinator {
   recordRunStarted(cmd: RecordRunStartedCommand): RunFlowCommandResult;
   /** DETACHED_RUNNING -> COMPLETED. Emits RUN_COMPLETED. */
   recordCompletion(cmd: RecordCompletionCommand): RunFlowCommandResult;
+  /** STARTING/DETACHED_RUNNING -> FAILED. Emits RUN_FAILED (born-698b/c:
+   *  the honest closure for a run that died without completing). */
+  recordRunFailure(cmd: RecordRunFailureCommand): RunFlowCommandResult;
 
   /**
    * Query surface — resolve a flow's current derived context along the priority
@@ -512,6 +522,13 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
           type: 'RUN_COMPLETED',
           ...(summary !== undefined ? { summary } : {}),
         }),
+      ]);
+    },
+
+    recordRunFailure(cmd) {
+      const { flowId, error, commandId } = cmd;
+      return runCommand(flowId, commandId, () => [
+        buildEvent(flowId, commandId, { type: 'RUN_FAILED', error }),
       ]);
     },
 

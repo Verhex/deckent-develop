@@ -82,6 +82,9 @@ export interface StoredRunHandleRecord {
   readonly planDigest: string;
   readonly handle: RunHandle;
   readonly startedAt: string;
+  /** born-698c: the run process's OWN pid (child persists its handle — born-681),
+   *  so the death-sweep can probe liveness. Absent on pre-698 records. */
+  readonly pid?: number;
 }
 
 // ─── Path helpers ────────────────────────────────────────────────────────
