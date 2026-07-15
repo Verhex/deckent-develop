@@ -169,6 +169,27 @@ export function loadApprovedSnapshot(root: string, flowId: string): StoredApprov
   return records.length > 0 ? records[records.length - 1] : undefined;
 }
 
+// ─── Public API — planned sprints (SURF-1c durability) ─────────────────
+
+/** Path for a flow's captured planned-Sprint records. */
+function plannedSprintLogPath(root: string, flowId: string): string {
+  return join(storeDir(root), `${flowId}.plan.jsonl`);
+}
+
+/** Persist the exact planned Sprint captured at preview time (SURF-1c): the
+ *  approve step needs it to build a StoredApprovedSnapshot, and it must
+ *  survive a process restart — the pre-1c in-memory FlowRecord lost it.
+ *  Appends (a re-planned revision keeps history, mirror of snapshots). */
+export function savePlannedSprint(root: string, flowId: string, record: { revision: number; sprint: unknown }): void {
+  appendJsonlRecord(plannedSprintLogPath(root, flowId), { flowId, ...record });
+}
+
+/** Load the MOST RECENT planned Sprint for `flowId`, or undefined. */
+export function loadPlannedSprint(root: string, flowId: string): { flowId: string; revision: number; sprint: unknown } | undefined {
+  const records = readJsonlRecords<{ flowId: string; revision: number; sprint: unknown }>(plannedSprintLogPath(root, flowId));
+  return records.length > 0 ? records[records.length - 1] : undefined;
+}
+
 // ─── Public API — run handles (double-start idempotency) ───────────────
 
 /** Persist a durable record of an actual start attempt for `record.flowId`.

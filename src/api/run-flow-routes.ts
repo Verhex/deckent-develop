@@ -59,20 +59,21 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { getRunFlowCoordinator, _resetRunFlowCoordinatorsForTests } from '../orchestra/run-flow-coordinator-registry.js';
+import { FlowNotFoundError, InvalidTransitionError } from '../orchestra/run-flow-coordinator.js';
+import { savePlannedSprint, loadPlannedSprint } from '../core/run-flow-store.js';
+import { publishRunFlowEvent } from './run-flow-event-stream.js';
 import { basename } from 'node:path';
 import { z } from 'zod';
 import { loadConfig } from '../core/config.js';
 import type { ResolvedConfig, Sprint, SprintSizeRecommendation } from '../core/types.js';
 import {
-  RUN_FLOW_EVENT_SCHEMA_VERSION,
   RunFlowTransitionError,
-  createInitialRunFlowContext,
   type PlanPreview,
   type RunFlowContext,
   type RunProposal,
 } from '../core/run-flow-contract.js';
 import { saveApprovedSnapshot, type StoredApprovedSnapshot } from '../core/run-flow-store.js';
-import { reduceRunFlow } from '../orchestra/run-flow-reducer.js';
 import { compileRunProposal, type RunProposalPlanner } from '../orchestra/run-proposal-compiler.js';
 import { generatePlanPreview } from '../orchestra/plan-preview-service.js';
 import { readContext } from '../orchestra/brain.js';
@@ -100,19 +101,20 @@ const DecisionSchema = z.object({
 
 // ─── In-process flow state ──────────────────────────────────────────────
 
-interface FlowRecord {
-  context: RunFlowContext;
-  /** The exact planned Sprint captured at proposal time — needed to build a
-   *  StoredApprovedSnapshot on approve() (core/run-flow-store.ts's stored
-   *  shape is richer than the reducer's own ApprovedPlanSnapshot). */
-  plannedSprint: Sprint;
+// SURF-1c: the module-level FlowRecord Map is DEAD. The per-root
+// RunFlowCoordinator (durable event-log + rehydrate + command-idempotency)
+// is the single authority; the planned Sprint rides the durable store
+// (savePlannedSprint / loadPlannedSprint) so an approve after a process
+// restart still builds its StoredApprovedSnapshot.
+
+/** Resolve the shared coordinator for this root, wired to the SSE publisher. */
+function coordinatorFor(projectRoot: string) {
+  return getRunFlowCoordinator(projectRoot, { onEvent: publishRunFlowEvent });
 }
 
-const flowStore = new Map<string, FlowRecord>();
-
-/** Test-only seam — clears all in-process flow state between tests. */
+/** Test-only seam — drops every cached coordinator (fresh durable fold next call). */
 export function _resetRunFlowRoutesState(): void {
-  flowStore.clear();
+  _resetRunFlowCoordinatorsForTests();
 }
 
 /**
@@ -158,15 +160,20 @@ function defaultRecommendation(config: ResolvedConfig): SprintSizeRecommendation
  *  contract as missions-route.ts's findApprovalEntry-adjacent checks):
  *  a caller outside the flow's tenant (and not role==='admin') gets
  *  `undefined`, indistinguishable from a genuinely unknown flowId. */
-function lookupFlow(flowId: string, req: IncomingMessage): FlowRecord | undefined {
-  const record = flowStore.get(flowId);
-  if (!record) return undefined;
+function lookupFlow(flowId: string, req: IncomingMessage, projectRoot: string): RunFlowContext | undefined {
+  let context: RunFlowContext;
+  try {
+    context = coordinatorFor(projectRoot).getFlow(flowId);
+  } catch (err) {
+    if (err instanceof FlowNotFoundError) return undefined;
+    throw err;
+  }
   const principal = deriveRequestPrincipal(req);
   const callerTenant = principal.tenantId ?? 'local';
   const isAdmin = principal.role === 'admin';
-  const flowTenant = record.context.proposal?.tenant ?? 'local';
+  const flowTenant = context.proposal?.tenant ?? 'local';
   if (!isAdmin && flowTenant !== callerTenant) return undefined;
-  return record;
+  return context;
 }
 
 // ─── POST /api/run-flow/propose ─────────────────────────────────────────
@@ -199,21 +206,7 @@ async function handlePropose(
     intentSummary: parsed.data.intentSummary.trim(),
   };
 
-  let context: RunFlowContext = createInitialRunFlowContext();
-  context = reduceRunFlow(context, {
-    schemaVersion: RUN_FLOW_EVENT_SCHEMA_VERSION,
-    flowId,
-    timestamp: new Date().toISOString(),
-    type: 'PROPOSAL_SUBMITTED',
-    proposal,
-  });
-  context = reduceRunFlow(context, {
-    schemaVersion: RUN_FLOW_EVENT_SCHEMA_VERSION,
-    flowId,
-    timestamp: new Date().toISOString(),
-    type: 'PREVIEW_STARTED',
-    revision,
-  });
+  const coordinator = coordinatorFor(projectRoot);
 
   let plannedSprint: Sprint;
   let preview: PlanPreview;
@@ -243,40 +236,38 @@ async function handlePropose(
     return true;
   }
 
-  context = reduceRunFlow(context, {
-    schemaVersion: RUN_FLOW_EVENT_SCHEMA_VERSION,
-    flowId,
-    timestamp: new Date().toISOString(),
-    type: 'PREVIEW_READY',
-    preview,
-  });
+  // Durable command chain: PROPOSAL_SUBMITTED + PREVIEW_STARTED, then the
+  // captured plan (restart-safe), then PREVIEW_READY — each event appended
+  // to <flowId>.events.jsonl BEFORE it is visible anywhere.
+  coordinator.proposeFlow({ proposal, commandId: `propose-${flowId}-r${revision}` });
+  savePlannedSprint(projectRoot, flowId, { revision, sprint: plannedSprint });
+  const result = coordinator.recordPreview({ preview, commandId: `preview-${flowId}-r${revision}` });
 
-  flowStore.set(flowId, { context, plannedSprint });
-  sendJson(res, context, 201);
+  sendJson(res, result.context, 201);
   return true;
 }
 
 // ─── GET /api/run-flow/:flowId ──────────────────────────────────────────
 
-function handleFlowStateGet(res: ServerResponse, flowId: string, req: IncomingMessage): boolean {
-  const record = lookupFlow(flowId, req);
-  if (!record) {
+function handleFlowStateGet(res: ServerResponse, flowId: string, req: IncomingMessage, projectRoot: string): boolean {
+  const context = lookupFlow(flowId, req, projectRoot);
+  if (!context) {
     sendError(res, 404, 'Flow not found');
     return true;
   }
-  sendJson(res, record.context);
+  sendJson(res, context);
   return true;
 }
 
 // ─── GET /api/run-flow/:flowId/preview ──────────────────────────────────
 
-function handlePreviewGet(res: ServerResponse, flowId: string, req: IncomingMessage): boolean {
-  const record = lookupFlow(flowId, req);
-  if (!record || !record.context.preview) {
+function handlePreviewGet(res: ServerResponse, flowId: string, req: IncomingMessage, projectRoot: string): boolean {
+  const context = lookupFlow(flowId, req, projectRoot);
+  if (!context || !context.preview) {
     sendError(res, 404, 'Flow not found');
     return true;
   }
-  sendJson(res, record.context.preview);
+  sendJson(res, context.preview);
   return true;
 }
 
@@ -295,62 +286,66 @@ function handleDecision(
     return true;
   }
 
-  const record = lookupFlow(flowId, req);
-  if (!record) {
+  const existing = lookupFlow(flowId, req, projectRoot);
+  if (!existing) {
     sendError(res, 404, 'Flow not found');
     return true;
   }
 
   const principal = deriveRequestPrincipal(req);
-  const timestamp = new Date().toISOString();
-  let context = record.context;
+  const coordinator = coordinatorFor(projectRoot);
+  let context: RunFlowContext;
 
   try {
     if (parsed.data.decision === 'approve') {
-      const { preview } = context;
+      const { preview } = existing;
       if (!preview) {
         sendError(res, 409, 'run-flow: no live preview to approve');
         return true;
       }
-      context = reduceRunFlow(context, {
-        schemaVersion: RUN_FLOW_EVENT_SCHEMA_VERSION,
+      const result = coordinator.grantApproval({
         flowId,
-        timestamp,
-        type: 'APPROVAL_GRANTED',
         revision: preview.revision,
         planDigest: preview.planDigest,
         approvedBy: { id: principal.id, ...(principal.role ? { role: principal.role } : {}) },
+        commandId: `approve-${flowId}-r${preview.revision}`,
       });
+      context = result.context;
       if (context.state === 'APPROVED' && context.approvedSnapshot) {
+        // The captured plan is durable (savePlannedSprint at preview time) —
+        // an approve AFTER a process restart still snapshots correctly.
+        const planned = loadPlannedSprint(projectRoot, flowId);
+        if (!planned) {
+          sendError(res, 409, 'run-flow: planned sprint record missing for this flow');
+          return true;
+        }
         const stored: StoredApprovedSnapshot = {
           flowId,
           revision: context.approvedSnapshot.revision,
           planDigest: context.approvedSnapshot.planDigest,
           approvedBy: context.approvedSnapshot.approvedBy,
           approvedAt: context.approvedSnapshot.approvedAt,
-          sprint: record.plannedSprint,
+          sprint: planned.sprint as Sprint,
         };
         saveApprovedSnapshot(projectRoot, stored);
       }
     } else {
-      context = reduceRunFlow(context, {
-        schemaVersion: RUN_FLOW_EVENT_SCHEMA_VERSION,
+      const result = coordinator.rejectApproval({
         flowId,
-        timestamp,
-        type: 'APPROVAL_REJECTED',
-        revision: context.preview?.revision ?? context.proposal?.revision ?? 1,
+        revision: existing.preview?.revision ?? existing.proposal?.revision ?? 1,
         ...(parsed.data.reason !== undefined ? { reason: parsed.data.reason } : {}),
+        commandId: `reject-${flowId}-r${existing.preview?.revision ?? 1}`,
       });
+      context = result.context;
     }
   } catch (err) {
-    if (err instanceof RunFlowTransitionError) {
+    if (err instanceof RunFlowTransitionError || err instanceof InvalidTransitionError) {
       sendError(res, 409, err.message);
       return true;
     }
     throw err;
   }
 
-  flowStore.set(flowId, { context, plannedSprint: record.plannedSprint });
   sendJson(res, context);
   return true;
 }
@@ -394,10 +389,10 @@ export async function registerRunFlowRoutes(
   }
 
   if (segments.length === 1 && method === 'GET') {
-    return handleFlowStateGet(res, flowId, req);
+    return handleFlowStateGet(res, flowId, req, projectRoot);
   }
   if (segments.length === 2 && segments[1] === 'preview' && method === 'GET') {
-    return handlePreviewGet(res, flowId, req);
+    return handlePreviewGet(res, flowId, req, projectRoot);
   }
   if (segments.length === 2 && segments[1] === 'decision' && method === 'POST') {
     return handleDecision(res, projectRoot, flowId, body, req);

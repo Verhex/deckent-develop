@@ -220,6 +220,10 @@ export interface RunFlowCoordinatorDeps {
   /** Seam for tests — production default is `() => new Date().toISOString()`. The reducer
    *  never reads a clock, so the coordinator supplies each event's timestamp here. */
   readonly now?: () => string;
+  /** SURF-1c: fired after every SUCCESSFUL append+reduce (the durable event is
+   *  already on disk). Fail-soft — a throwing listener never breaks the command;
+   *  the API layer wires this to the run-flow SSE publisher. */
+  readonly onEvent?: (event: RunFlowEvent) => void;
 }
 
 export interface RunFlowCoordinator {
@@ -436,6 +440,15 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
         throw new AppendFailedError(flowId, event.type, err);
       }
       context = next;
+      // SURF-1c: live-publish AFTER the durable append (fail-soft — a bad
+      // listener can never break the command or the durable record).
+      if (deps.onEvent) {
+        try {
+          deps.onEvent({ ...event, sequence });
+        } catch {
+          // listener errors are the listener's problem, never the flow's
+        }
+      }
     }
 
     // Commit to the in-memory map only AFTER every append succeeded.
