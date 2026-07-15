@@ -1,7 +1,7 @@
 // ─── ROUTING-V3 plan-time adapter (Slice-2 integration) ──────────────────────
-// Hand-coded (Brain 2026-07-15). Bridges the sprint-planner to routeTaskV3
-// behind `routing_v3.enabled` (default FALSE — V2 stays production until the
-// Slice-3 cut-over). One LLM batch enriches every task's content axis
+// Hand-coded (Brain 2026-07-15). Bridges the sprint-planner to routeTaskV3.
+// S3 cut-over (2026-07-15): the planner calls this unconditionally — it IS the
+// production routing path; the V2 engine was removed. One LLM batch enriches every task's content axis
 // (content-llm.ts); matching/verification stays deterministic; escalations
 // and catalog gaps are RETURNED for the plan surface (decision-5: the Brain —
 // and the plan preview in front of Alperen — decides; nothing silent).

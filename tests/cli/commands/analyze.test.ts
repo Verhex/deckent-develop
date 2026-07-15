@@ -10,6 +10,7 @@ vi.mock('../../../src/core/analyzer.js', () => ({
 
 vi.mock('../../../src/cli/helpers/output.js', () => ({
   print: vi.fn(),
+  printError: vi.fn(),
   formatTable: vi.fn((headers: string[], rows: string[][]) => {
     return [headers.join('|'), ...rows.map(r => r.join('|'))].join('\n');
   }),
@@ -19,9 +20,22 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn().mockReturnValue('/mock/root'),
 }));
 
+// ROUTING-V3 vocabulary bootstrap boundary — the write side (real project I/O)
+// is unit-tested in tests/core/routing/vocabulary-bootstrap.test.ts; here we
+// assert the CLI ACTION WIRING (flag → bootstrap+write → i18n print / error).
+vi.mock('../../../src/core/routing/vocabulary-bootstrap.js', () => ({
+  bootstrapProjectVocabulary: vi.fn(),
+  writeVocabulary: vi.fn(),
+}));
+
+vi.mock('../../../src/core/stack-detector.js', () => ({
+  detectProjectStack: vi.fn().mockReturnValue({ language: 'typescript' }),
+}));
+
 import { analyzeProject } from '../../../src/core/analyzer.js';
-import { print, formatTable } from '../../../src/cli/helpers/output.js';
+import { print, printError, formatTable } from '../../../src/cli/helpers/output.js';
 import { resolveProjectRoot } from '../../../src/cli/helpers/process.js';
+import { bootstrapProjectVocabulary, writeVocabulary } from '../../../src/core/routing/vocabulary-bootstrap.js';
 import { registerAnalyze, formatAnalysisResult } from '../../../src/cli/commands/analyze.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -118,6 +132,52 @@ describe('registerAnalyze', () => {
       const call = vi.mocked(print).mock.calls[0][0];
       expect(call).toContain('\n');
       expect(call).toContain('  ');
+    });
+  });
+
+  describe('vocabulary bootstrap (--bootstrap-vocabulary)', () => {
+    beforeEach(() => {
+      vi.mocked(bootstrapProjectVocabulary).mockReturnValue({
+        candidates: [{ domain: 'payments' }, { domain: 'billing' }],
+      } as unknown as ReturnType<typeof bootstrapProjectVocabulary>);
+      vi.mocked(writeVocabulary).mockReturnValue({
+        status: 'written',
+        path: '/mock/root/.deckent/routing/vocabulary.json',
+      } as unknown as ReturnType<typeof writeVocabulary>);
+    });
+
+    it('registers the --bootstrap-vocabulary flag', () => {
+      const program = new Command();
+      registerAnalyze(program);
+      const cmd = program.commands.find(c => c.name() === 'analyze');
+      const opt = cmd?.options.find(o => o.long === '--bootstrap-vocabulary');
+      expect(opt).toBeDefined();
+    });
+
+    it('does NOT bootstrap when the flag is absent', async () => {
+      await runCommand(['analyze']);
+      expect(bootstrapProjectVocabulary).not.toHaveBeenCalled();
+      expect(writeVocabulary).not.toHaveBeenCalled();
+    });
+
+    it('flag → bootstrap derives candidates and writes the vocabulary layer', async () => {
+      await runCommand(['analyze', '--bootstrap-vocabulary']);
+      expect(bootstrapProjectVocabulary).toHaveBeenCalledWith('/mock/root', { language: 'typescript' });
+      // the derived domains (not the candidate objects) are what get persisted
+      expect(writeVocabulary).toHaveBeenCalledWith('/mock/root', ['payments', 'billing']);
+      // a status line is printed (i18n analyze.vocabulary_bootstrap runs real)
+      expect(print).toHaveBeenCalled();
+    });
+
+    it('a bootstrap failure surfaces via printError and sets a non-zero exit code', async () => {
+      vi.mocked(writeVocabulary).mockImplementationOnce(() => {
+        throw new Error('vocabulary.json is user-owned (three-way overwrite guard)');
+      });
+      process.exitCode = 0;
+      await runCommand(['analyze', '--bootstrap-vocabulary']);
+      expect(printError).toHaveBeenCalled();
+      expect(process.exitCode).toBe(1);
+      process.exitCode = 0; // restore so a failed assertion here can't poison the runner
     });
   });
 

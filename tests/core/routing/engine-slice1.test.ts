@@ -483,7 +483,7 @@ describe('journal v3 + replay', () => {
       appendDecision(root, entry);
 
       // corrupt a second line
-      const file = join(root, '.deckent', 'routing', 'decisions-v3', 'sprint-test.jsonl');
+      const file = join(root, '.deckent', 'routing', 'decisions', 'sprint-test.jsonl');
       writeFileSync(file, `${readFileSync(file, 'utf8')}{broken\n`, 'utf8');
 
       const read = readSprintJournal(root, 'sprint-test');

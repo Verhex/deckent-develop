@@ -138,7 +138,7 @@ describe('ROUTING-TEK-OTORİTE — spawn-fallback decision journal (tagged, fail
     routeSprintTasks(tasks, config, allProviders, { projectRoot, sprintId });
 
     // No override → no spawn-fallback record. The V3 plan-time journal
-    // (decisions-v3) is the sole routing record.
+    // (.deckent/routing/decisions) is the sole routing record.
     const filePath = routingDecisionJournalPath(projectRoot, sprintId);
     expect(existsSync(filePath)).toBe(false);
   });

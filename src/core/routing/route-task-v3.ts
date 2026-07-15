@@ -5,7 +5,8 @@
 // skills and persona-slice ride ONE pipeline run (vectorial directive:
 // agent-skill-persona together). Indecision / catalog-gap / policy-escalate
 // produce a typed BrainEscalation (decision-5); NOTHING here silently falls
-// back. Production call sites stay on V2 until Slice-3 (routing_v3.enabled).
+// back. S3 cut-over (2026-07-15): this IS the production routing engine —
+// the planner calls it unconditionally; the V2 engine was removed.
 
 import type { RoutingV3Config } from '../config-types.js';
 import type { RequirementVector } from './requirement-vector.js';

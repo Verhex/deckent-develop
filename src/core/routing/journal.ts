@@ -13,7 +13,9 @@ import { journalEntryV3Schema } from './decision-types.js';
 import type { JournalEntryV3 } from './decision-types.js';
 import type { RoutingV3Config } from '../config-types.js';
 
-export const JOURNAL_V3_DIR = path.join('.deckent', 'routing', 'decisions-v3');
+// S3 cut-over: V3 is the only routing engine, so the journal dir drops its
+// `-v3` disambiguation suffix — `.deckent/routing/decisions` is canonical.
+export const JOURNAL_V3_DIR = path.join('.deckent', 'routing', 'decisions');
 
 /** sha1 over the resolved config — replay refuses silently drifted config. */
 export function hashConfig(config: RoutingV3Config): string {
