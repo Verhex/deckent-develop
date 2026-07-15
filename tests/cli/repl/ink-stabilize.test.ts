@@ -78,7 +78,15 @@ describe('createStreamSegmenter — fence / flush guards (F11-016)', () => {
     expect(segs.length).toBeGreaterThanOrEqual(1);
     const blockSegs = segs.filter((seg) => seg.kind === 'block');
     expect(blockSegs.length).toBeGreaterThanOrEqual(1);
-    // After the guard fires, mode resets to prose; subsequent lines emit as prose
+    // REPL-575 K7 — the force-flush STAYS in code mode (the fence is still open),
+    // so a line fed WITHOUT a closing ``` is still code, NOT prose. This used to
+    // assert the bug (mode reset to prose → the line emitted as prose); the old
+    // behavior meant the block's real closing ``` was then misread as a new
+    // fence-open and the rest of the reply was swallowed.
+    s.feed('still inside the unclosed block\n');
+    expect(segs.some((seg) => seg.kind === 'line' && seg.markdown === 'still inside the unclosed block')).toBe(false);
+    // The REAL closing fence closes the block; prose after it emits as prose.
+    s.feed('```\n');
     s.feed('after fence\n');
     const proseAfter = segs.filter((seg) => seg.kind === 'line' && seg.markdown === 'after fence');
     expect(proseAfter).toHaveLength(1);

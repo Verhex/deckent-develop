@@ -1296,6 +1296,12 @@ const MESSAGES: MessageMap = {
     en: 'switch failed — "{detail}" has no native tool-use transport; valid: claude, openai, ollama, deepseek, qwen, glm',
     tr: 'geçiş başarısız — "{detail}" için native tool-use transport yok; geçerli: claude, openai, ollama, deepseek, qwen, glm',
   },
+  // REPL-575 K6 — an unrecognized non-claude model id refused instead of shipped
+  // at the Anthropic transport with a false 'switched' report.
+  'native.switch.unknown-model': {
+    en: 'switch failed — unknown model "{detail}": not a recognized claude model (try opus/sonnet/haiku/fable, or switch provider first)',
+    tr: 'geçiş başarısız — bilinmeyen model "{detail}": tanınan bir claude modeli değil (opus/sonnet/haiku/fable deneyin ya da önce sağlayıcı değiştirin)',
+  },
   // native-transport.ts:247 produces errorCode 'no-transport' when detectTransport
   // finds nothing configured at all — this key was missing, so localizeNativeError
   // (run.tsx) fell back to the raw (Turkish-hardcoded, provider-detect.ts) reason

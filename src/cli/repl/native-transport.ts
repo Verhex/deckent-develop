@@ -29,7 +29,8 @@ export interface ResolvedProvider {
 export interface ProviderError {
   error: string;
   /** Stable id for the failure class so the view can localize:
-   *  'missing-api-key' | 'missing-ollama-host' | 'unsupported-native-provider' | 'no-transport'. */
+   *  'missing-api-key' | 'missing-ollama-host' | 'unsupported-native-provider' |
+   *  'unknown-model' | 'no-transport'. */
   errorCode?: string;
   /** Machine detail for the message (e.g. the key/env var name(s) to set). */
   detail?: string;
@@ -84,18 +85,43 @@ export function inferNativeProviderForModel(model: string): string | null {
   return null;
 }
 
+/** Affirmatively claude-shaped id (starts with a known Anthropic family token) —
+ *  distinct from `inferProviderFromId`, whose unknown-id fallback is 'claude'
+ *  and therefore CANNOT tell a real claude id from an unrecognized vendor id
+ *  (REPL-575 K6). */
+function isClaudeShapedId(id: string): boolean {
+  return /^(claude|opus|sonnet|haiku|fable)/.test(id.toLowerCase().trim());
+}
+
+/** Result of resolving a claude wire model: either an API-pinned id, or a signal
+ *  that the requested id is not a resolvable claude model (so the switch must be
+ *  refused instead of shipped at the Anthropic transport). */
+type ClaudeWireResult = { apiId: string } | { unresolved: string };
+
 /** Map a claude model id/alias ('fable', 'opus', …) onto its API-pinned wire id
- *  ('claude-fable-5'). Unknown ids resolve parametrically; a non-claude-shaped
- *  id falls back to the anthropic default (the 2026-07-07 incident shipped
- *  `qwen3.6:27b` straight at the anthropic transport). */
-function resolveClaudeWireModel(model: string | null): string {
+ *  ('claude-fable-5'). A registry-known id must belong to the claude provider; a
+ *  claude-SHAPED id unknown to the registry passes through parametrically
+ *  (forward-compat for a brand-new claude model). Everything else — a
+ *  registry-known FOREIGN model (`deepseek-chat`, whose provider is 'deepseek')
+ *  or an unknown non-claude-shaped id (`mistral-large`) — is REFUSED. Both used
+ *  to slip through: `modelRegistry.resolve` happily returns a deepseek model's
+ *  apiId, and `inferProviderFromId`'s 'claude' fallback treated any unknown id as
+ *  claude — so `/model deepseek-chat` reported a false 'switched' and then
+ *  shipped straight at the Anthropic API (the 2026-07-07 incident class,
+ *  REPL-575 K6). */
+function resolveClaudeWireModel(model: string | null): ClaudeWireResult {
   const candidate = model ?? DEFAULT_MODEL['anthropic-api'];
-  if (inferProviderFromId(candidate) !== 'claude') return DEFAULT_MODEL['anthropic-api'];
-  try {
-    return modelRegistry.resolve(candidate, { register: false }).apiId;
-  } catch {
-    return candidate;
+  const known = modelRegistry.get(candidate);
+  if (known) {
+    return known.provider === 'claude' ? { apiId: known.apiId } : { unresolved: candidate };
   }
+  // Unknown to the registry: only an affirmatively claude-shaped id may pass
+  // through parametrically. A non-claude-shaped unknown id (inferProviderFromId
+  // would default it to 'claude') is refused.
+  if (isClaudeShapedId(candidate)) {
+    return { apiId: modelRegistry.resolve(candidate, { register: false }).apiId };
+  }
+  return { unresolved: candidate };
 }
 
 /**
@@ -126,9 +152,20 @@ export function resolveNativeSelection(
       };
     }
     const configModel = config.native_model && inferProviderFromId(config.native_model) === 'claude' ? config.native_model : null;
+    const wire = resolveClaudeWireModel(sel.model ?? configModel);
+    if ('unresolved' in wire) {
+      // REPL-575 K6 — refuse an unrecognized non-claude model instead of
+      // shipping it at the Anthropic transport with a false 'switched' report.
+      return {
+        error: `unknown model "${wire.unresolved}" — not a recognized claude model (use e.g. opus/sonnet/haiku/fable, or switch provider first)`,
+        errorCode: 'unknown-model',
+        detail: wire.unresolved,
+        provider: 'claude',
+      };
+    }
     return {
       adapter: createAnthropicAdapter({ apiKey }),
-      model: resolveClaudeWireModel(sel.model ?? configModel),
+      model: wire.apiId,
       providerName: 'claude',
     };
   }

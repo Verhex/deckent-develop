@@ -59,6 +59,28 @@ describe('resolveNativeSelection — claude', () => {
     ok(r);
     expect(r.model.startsWith('claude')).toBe(true);
   });
+
+  // REPL-575 K6 — an explicit `/model <foreign-id>` whose provider does not
+  // infer to anything (deepseek-chat has no colon, no gpt/gemini prefix) keeps
+  // the provider on claude; inferProviderFromId's 'claude' fallback used to let
+  // it ship at the Anthropic API with a false 'switched' report. It must now be
+  // REFUSED with a switchError, not resolved.
+  it('refuses an unrecognized non-claude model id instead of shipping it (errorCode unknown-model)', () => {
+    const r = resolveNativeSelection(
+      { provider: 'claude', model: 'deepseek-chat' },
+      { env: { ANTHROPIC_API_KEY: 'k' }, config: {} },
+    );
+    expect(r).toMatchObject({ errorCode: 'unknown-model', provider: 'claude', detail: 'deepseek-chat' });
+  });
+
+  it('still passes through a claude-SHAPED id unknown to the registry (forward-compat for new claude models)', () => {
+    const r = resolveNativeSelection(
+      { provider: 'claude', model: 'claude-future-9' },
+      { env: { ANTHROPIC_API_KEY: 'k' }, config: {} },
+    );
+    ok(r);
+    expect(r.model).toBe('claude-future-9');
+  });
 });
 
 describe('resolveNativeSelection — ollama / vendors / unsupported', () => {

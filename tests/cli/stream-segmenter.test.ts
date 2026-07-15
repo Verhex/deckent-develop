@@ -83,4 +83,40 @@ describe('createStreamSegmenter', () => {
     expect(seg).toHaveLength(1);
     expect(seg[0]!.kind).toBe('block');
   });
+
+  // REPL-575 K7 — after a mid-fence force-flush the segmenter used to reset to
+  // 'prose', so the block's REAL closing ``` was misread as a NEW fence-open and
+  // every following line was swallowed as code. It must stay in 'code' mode so
+  // the real close closes the block and subsequent prose renders as prose.
+  it('after a force-flush the REAL closing fence closes the block and prose after it is NOT swallowed', () => {
+    const { seg, emit } = collect();
+    const s = createStreamSegmenter(emit);
+    s.feed('```py\n');
+    for (let i = 0; i < 250; i++) s.feed(`row ${i}\n`);     // trips the cap mid-fence
+    const afterCap = seg.length;
+    expect(afterCap).toBeGreaterThan(0);                    // chunk flushed mid-stream
+    s.feed('```\n');                                        // the REAL closing fence
+    s.feed('Here is the explanation after the code.\n');    // ordinary prose
+    s.feed('A second prose line.\n');
+    // The two prose lines emit as prose 'line' segments — NOT swallowed into a
+    // runaway code block.
+    const proseLines = seg.filter((x) => x.kind === 'line').map((x) => x.markdown);
+    expect(proseLines).toContain('Here is the explanation after the code.');
+    expect(proseLines).toContain('A second prose line.');
+  });
+
+  it('every force-flushed chunk of a giant block is a balanced fenced block (opens + closes)', () => {
+    const { seg, emit } = collect();
+    const s = createStreamSegmenter(emit);
+    s.feed('```rust\n');
+    for (let i = 0; i < 250; i++) s.feed(`let x${i} = ${i};\n`);
+    s.feed('```\n');                                        // real close
+    const blocks = seg.filter((x) => x.kind === 'block');
+    expect(blocks.length).toBeGreaterThanOrEqual(2);         // split across the cap
+    for (const b of blocks) {
+      const fences = (b.markdown.match(/^\s*```/gm) ?? []).length;
+      expect(fences % 2).toBe(0);                            // balanced open+close
+      expect(b.markdown.startsWith('```rust')).toBe(true);   // language preserved
+    }
+  });
 });

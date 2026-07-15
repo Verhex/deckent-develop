@@ -75,9 +75,19 @@ export function createStreamSegmenter(emit: (seg: Segment) => void): StreamSegme
     if (mode === 'code') {
       block.push(line);
       if (isFenceLine(line)) { emit({ kind: 'block', markdown: block.join('\n') }); block = []; mode = 'prose'; return; }
-      // Runaway/unclosed fence: bound the silent buffer so the rest of the reply
-      // is not swallowed until turn-end. Flush what we have and resume prose.
-      if (fenceGuard(block)) { emit({ kind: 'block', markdown: block.join('\n') }); block = []; mode = 'prose'; }
+      // Runaway/unclosed fence: bound the silent buffer so a long block is
+      // readable in chunks instead of frozen until turn-end. STAY in code mode —
+      // the fence is still open (REPL-575 K7): the previous code reset mode to
+      // 'prose' here, so the block's REAL closing ``` was then misread as a NEW
+      // fence-open and the rest of the reply was swallowed as code. Emit this
+      // chunk as a self-contained fenced block (synthesize a closing fence) and
+      // reopen the continuation with the same opening fence, so every rendered
+      // chunk is balanced AND the real close still closes the block normally.
+      if (fenceGuard(block)) {
+        const openingFence = block[0] ?? '```';
+        emit({ kind: 'block', markdown: [...block, '```'].join('\n') });
+        block = [openingFence];
+      }
       return;
     }
     if (mode === 'table') {
