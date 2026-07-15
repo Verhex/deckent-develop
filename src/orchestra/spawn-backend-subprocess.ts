@@ -51,6 +51,14 @@ export interface StreamCaptureOptions {
    * never breaks capture (fail-safe, mirroring `writeLogEvent`).
    */
   onEvent?: (event: StreamLogEvent, seq: number) => void;
+  /**
+   * SURF-3 S3 — when `false`, DON'T append to `logPath` (still normalize + tap
+   * `onEvent`). The docker `docker logs -f` follow reads a stream whose `.log`
+   * is ALREADY written authoritatively post-exit (writeNormalizedDockerLog), so
+   * writing here too would double the log. Activity-only follow passes `false`;
+   * the subprocess capture (which OWNS its `.log`) keeps the default `true`.
+   */
+  writeLog?: boolean;
 }
 
 /** Outcome of a {@link captureStreamToLog} run. */
@@ -87,7 +95,7 @@ export async function captureStreamToLog(
   stream: Readable,
   opts: StreamCaptureOptions,
 ): Promise<StreamCaptureResult> {
-  const { logPath, provider, startSeq = 1, onEvent } = opts;
+  const { logPath, provider, startSeq = 1, onEvent, writeLog = true } = opts;
 
   let seq = startSeq;
   let eventsWritten = 0;
@@ -104,7 +112,7 @@ export async function captureStreamToLog(
     if (line.trim() === '') continue;
 
     const event = normalizeStreamEvent(line, provider);
-    writeLogEvent(logPath, event, seq);
+    if (writeLog) writeLogEvent(logPath, event, seq);
 
     if (event.type === 'usage') finalUsage = event;
 

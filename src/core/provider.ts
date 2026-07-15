@@ -56,6 +56,17 @@ export interface ProviderSpawnOptions {
    * env-scrub + `env` reinject flow byte-for-byte unchanged.
    */
   deckBroker?: DeckBroker;
+  /**
+   * SURF-3 Claude-CLI rich-stream (S2/S3): emit per-tool live ACTIVITY from the
+   * worker's Claude-CLI stream-json to the `WORKER→*:ACTIVITY` channel while it
+   * runs. `liveTraceEnabled` is the resolved `live_trace.enabled` flag (read
+   * from config in the COORDINATOR process, not the worker's disk-cache) — when
+   * false the whole tap is a zero-cost no-op. `sprintId` scopes the emitted
+   * events (falls back to `getCurrentSprintId` when absent). Both backends
+   * (docker follow / subprocess capture) honor these; other providers ignore.
+   */
+  liveTraceEnabled?: boolean;
+  sprintId?: string;
 }
 
 // ─── Provider Worker Info ────────────────────────────────────────────

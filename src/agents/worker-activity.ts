@@ -109,6 +109,32 @@ export function logEventToActivity(ev: StreamLogEvent, taskId: string, workerId?
   return null;
 }
 
+/** Context a backend threads into the shared activity tap (SURF-3 S2/S3). */
+export interface ActivityTapContext {
+  projectRoot: string;
+  taskId: string;
+  workerId?: string;
+  /** Resolved `live_trace.enabled` — false makes the tap a zero-cost no-op. */
+  enabled: boolean;
+  sprintId?: string;
+}
+
+/**
+ * Build the shared `onEvent` closure both backends drive (S2 subprocess capture
+ * + S3 docker `docker logs -f` follow): map each normalized Claude-CLI stream
+ * event to a per-tool activity line and emit it. A single call site for the
+ * `logEventToActivity → emitWorkerActivity` chain so the two wires stay
+ * identical. Fully fail-soft (emitWorkerActivity swallows its own errors); the
+ * capture/follow loops additionally wrap `onEvent` so nothing here can break
+ * the worker runtime.
+ */
+export function makeActivityOnEvent(ctx: ActivityTapContext): (event: StreamLogEvent) => void {
+  return (event: StreamLogEvent): void => {
+    const activity = logEventToActivity(event, ctx.taskId, ctx.workerId);
+    if (activity) emitWorkerActivity(ctx.projectRoot, ctx.enabled, activity, ctx.sprintId);
+  };
+}
+
 /**
  * Emit one worker-activity event onto the sprint event stream. Fail-soft and
  * cheap when disabled — callers pass the resolved `live_trace.enabled` flag

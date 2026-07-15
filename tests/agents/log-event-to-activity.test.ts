@@ -5,9 +5,27 @@
 // pure map that turns the tool events into a per-tool ACTIVITY line, extracting
 // the tool name + primary arg. Fully hermetic — no I/O, fixture lines only.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync, mkdirSync, readFileSync, existsSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { normalizeStreamEvent } from '../../src/core/log-event.js';
-import { logEventToActivity } from '../../src/agents/worker-activity.js';
+import { logEventToActivity, makeActivityOnEvent } from '../../src/agents/worker-activity.js';
+import { CHANNELS } from '../../src/core/event-stream.js';
+
+function readActivity(root: string, sprintId: string): Array<Record<string, unknown>> {
+  const dir = join(root, '.deckent', 'recently-works');
+  if (!existsSync(dir)) return [];
+  const out: Array<Record<string, unknown>> = [];
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith('.jsonl')) continue;
+    for (const line of readFileSync(join(dir, name), 'utf-8').split('\n')) {
+      if (line.trim()) out.push(JSON.parse(line) as Record<string, unknown>);
+    }
+  }
+  void sprintId; // per-test tmpdir isolates this sprint; filter by channel only.
+  return out.filter((e) => e['channel'] === CHANNELS.ACTIVITY);
+}
 
 /** Real Claude-Code SDK envelope shapes (NDJSON lines from --output-format stream-json). */
 const TOOL_USE_SDK = JSON.stringify({
@@ -85,5 +103,44 @@ describe('logEventToActivity — non-tool events → null (not a per-tool line)'
   it('workerId is omitted when not supplied', () => {
     const a = logEventToActivity(normalizeStreamEvent(TOOL_USE_SDK, 'claude'), 't1');
     expect(a).not.toHaveProperty('workerId');
+  });
+});
+
+describe('makeActivityOnEvent — shared S2/S3 onEvent closure (real emission)', () => {
+  let root: string;
+  const sprintId = 'sprint-s23';
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'act-tap-'));
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+  });
+  afterEach(() => { rmSync(root, { recursive: true, force: true }); });
+
+  it('flag ON: a tool_use event lands as a "🔧 …" line on the ACTIVITY channel', () => {
+    const onEvent = makeActivityOnEvent({ projectRoot: root, taskId: 't1', workerId: 'w1', enabled: true, sprintId });
+    onEvent(normalizeStreamEvent(TOOL_USE_SDK, 'claude'));
+
+    const activity = readActivity(root, sprintId);
+    expect(activity).toHaveLength(1);
+    const payload = activity[0]!['payload'] as Record<string, unknown>;
+    expect(payload['kind']).toBe('tool');
+    expect(payload['line']).toBe('🔧 Edit(src/x.ts)');
+    expect(payload['taskId']).toBe('t1');
+  });
+
+  it('flag ON: a non-tool event (usage) emits NOTHING', () => {
+    const onEvent = makeActivityOnEvent({ projectRoot: root, taskId: 't1', enabled: true, sprintId });
+    onEvent(normalizeStreamEvent(RESULT_USAGE, 'claude'));
+    expect(readActivity(root, sprintId)).toHaveLength(0);
+  });
+
+  it('flag OFF: zero-cost no-op — nothing written', () => {
+    const onEvent = makeActivityOnEvent({ projectRoot: root, taskId: 't1', enabled: false, sprintId });
+    onEvent(normalizeStreamEvent(TOOL_USE_SDK, 'claude'));
+    expect(readActivity(root, sprintId)).toHaveLength(0);
+  });
+
+  it('a pathological event shape never escapes the closure (fail-soft invariant)', () => {
+    const onEvent = makeActivityOnEvent({ projectRoot: root, taskId: 't', enabled: true, sprintId });
+    expect(() => onEvent({ type: 'tool_use', content: undefined } as never)).not.toThrow();
   });
 });
