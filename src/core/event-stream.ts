@@ -99,6 +99,10 @@ export const CHANNELS = {
   LOAD_REPORT_WRITTEN: 'AUDITOR→BRAIN:LOAD_REPORT_WRITTEN',
 
   // Broadcast
+  // WORKER-LIVE-LOG (#582, SURF-1c): live worker activity — ≤80-char line +
+  // detail payload per emission; consumed by status --follow, deckent_watch,
+  // the terminal feed and the Desktop console. Flag-gated (live_trace.enabled).
+  ACTIVITY: 'WORKER→*:ACTIVITY',
   METRIC_EMITTED: 'BRAIN→*:METRIC_EMITTED',
   FIX_REQUEST: 'BRAIN→WORKER:FIX_REQUEST',
   SPRINT_PHASE_CHANGE: 'BRAIN→*:SPRINT_PHASE_CHANGE',

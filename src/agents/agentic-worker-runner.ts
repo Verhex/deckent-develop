@@ -25,6 +25,7 @@
 //   3. `maxIterations` reached → filesChanged>0 → GO_WITH_TECH_DEBT; else NO_GO.
 //   4. Ollama API error / unreachable → NO_GO + reason.
 
+import { emitWorkerActivity } from './worker-activity.js';
 import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -394,6 +395,14 @@ function createProgressEmitter(
     if (!enabled) return;
     seq += 1;
     const event: WltProgressEvent = { ts: new Date().toISOString(), step, detail, seq };
+    // WORKER-LIVE-LOG (#582): each step is also a live activity row on the
+    // sprint event stream (same flag; fail-soft inside the emitter).
+    emitWorkerActivity(projectRoot, enabled, {
+      taskId,
+      line: `${step}: ${detail}`,
+      kind: 'step',
+      detail: { step, seq },
+    });
     try {
       const tasksDir = ensureTasksDir(projectRoot);
       appendFileSync(

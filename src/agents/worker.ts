@@ -26,6 +26,7 @@ import { TASKS_DIR } from '../core/constants.js';
 import { ErrorRegistry } from '../core/errors.js';
 import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-enforcer.js';
 import { writeEvent, getCurrentSprintId, CHANNELS } from '../orchestra/event-stream.js';
+import { emitWorkerActivity } from './worker-activity.js';
 import { atomicWriteFileSync as _atomicWrite } from './worker-lifecycle.js';
 import { SharedMemory } from '../orchestra/shared-memory.js';
 export type { SharedMemoryEntry } from '../orchestra/shared-memory.js';
@@ -366,7 +367,46 @@ export function writeHeartbeat(projectRoot: string, heartbeat: Heartbeat, sprint
       phase: heartbeat.status,
       state: heartbeat.currentAction,
     });
+    // WORKER-LIVE-LOG (#582): every heartbeat is also a live short-form
+    // activity row (status + current action + files-changed) — the "what is
+    // the worker doing RIGHT NOW" feed. Same flag as the progress stream.
+    emitWorkerActivity(
+      projectRoot,
+      isLiveTraceEnabled(projectRoot),
+      {
+        taskId: heartbeat.taskId,
+        ...(heartbeat.workerId ? { workerId: heartbeat.workerId } : {}),
+        line: `${heartbeat.status}${heartbeat.currentAction ? ` — ${heartbeat.currentAction}` : ''}`,
+        kind: 'status',
+        detail: {
+          sequence: heartbeat.sequence,
+          filesChangedCount: heartbeat.filesChangedCount ?? 0,
+          ...(heartbeat.currentFile ? { currentFile: heartbeat.currentFile } : {}),
+        },
+      },
+      sid,
+    );
   }
+}
+
+// live_trace flag, read once per process (workers are per-task processes; a
+// mid-task config flip applying on the NEXT task is the intended semantics).
+let liveTraceEnabledCache: boolean | null = null;
+function isLiveTraceEnabled(projectRoot: string): boolean {
+  if (liveTraceEnabledCache !== null) return liveTraceEnabledCache;
+  try {
+    const raw = readFileSync(join(projectRoot, '.deckent', 'config.json'), 'utf-8');
+    const parsed = JSON.parse(raw) as { live_trace?: { enabled?: boolean } };
+    liveTraceEnabledCache = parsed.live_trace?.enabled === true;
+  } catch {
+    liveTraceEnabledCache = false;
+  }
+  return liveTraceEnabledCache;
+}
+
+/** @internal test seam — reset the per-process live_trace flag cache. */
+export function __resetLiveTraceCacheForTests(): void {
+  liveTraceEnabledCache = null;
 }
 
 /**
