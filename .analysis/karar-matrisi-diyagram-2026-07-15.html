@@ -1,0 +1,386 @@
+<title>Deckent — Karar Sebep→Sonuç Haritası</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --bg: #f5f8f8;
+  --surface: #ffffff;
+  --surface-2: #eaf1f1;
+  --ink: #1c2b2f;
+  --muted: #5c7076;
+  --line: #d4e0e0;
+  --accent: #0f766e;
+  --accent-soft: #0f766e1a;
+  --done: #15803d;
+  --done-soft: #15803d14;
+  --partial: #b45309;
+  --partial-soft: #b4530914;
+  --open: #64748b;
+  --open-soft: #64748b14;
+  --lock: #b91c1c;
+  --lock-soft: #b91c1c12;
+  --mono: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1417;
+    --surface: #131c20;
+    --surface-2: #182428;
+    --ink: #d7e3e6;
+    --muted: #7d949a;
+    --line: #24343a;
+    --accent: #2dd4bf;
+    --accent-soft: #2dd4bf1a;
+    --done: #4ade80;
+    --done-soft: #4ade8014;
+    --partial: #fbbf24;
+    --partial-soft: #fbbf2414;
+    --open: #94a3b8;
+    --open-soft: #94a3b814;
+    --lock: #f87171;
+    --lock-soft: #f8717114;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1417; --surface: #131c20; --surface-2: #182428; --ink: #d7e3e6;
+  --muted: #7d949a; --line: #24343a; --accent: #2dd4bf; --accent-soft: #2dd4bf1a;
+  --done: #4ade80; --done-soft: #4ade8014; --partial: #fbbf24; --partial-soft: #fbbf2414;
+  --open: #94a3b8; --open-soft: #94a3b814; --lock: #f87171; --lock-soft: #f8717114;
+}
+:root[data-theme="light"] {
+  --bg: #f5f8f8; --surface: #ffffff; --surface-2: #eaf1f1; --ink: #1c2b2f;
+  --muted: #5c7076; --line: #d4e0e0; --accent: #0f766e; --accent-soft: #0f766e1a;
+  --done: #15803d; --done-soft: #15803d14; --partial: #b45309; --partial-soft: #b4530914;
+  --open: #64748b; --open-soft: #64748b14; --lock: #b91c1c; --lock-soft: #b91c1c12;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px; line-height: 1.55; margin: 0;
+  padding: 40px 20px 80px;
+}
+.wrap { max-width: 1100px; margin: 0 auto; }
+header.masthead { margin-bottom: 36px; }
+.eyebrow {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: 8px;
+}
+h1 { font-size: 30px; line-height: 1.15; margin: 0 0 10px; text-wrap: balance; font-weight: 750; }
+.sub { color: var(--muted); max-width: 68ch; margin: 0; }
+h2 {
+  font-size: 19px; margin: 44px 0 6px; font-weight: 700;
+  padding-top: 22px; border-top: 1px solid var(--line);
+}
+h2 .tag { font-family: var(--mono); font-size: 12px; color: var(--accent); margin-right: 8px; }
+.h2-note { color: var(--muted); font-size: 13.5px; margin: 0 0 16px; max-width: 78ch; }
+
+/* ── chips ── */
+.chip {
+  display: inline-block; font-family: var(--mono); font-size: 11px;
+  padding: 1px 8px; border-radius: 3px; white-space: nowrap; vertical-align: middle;
+}
+.chip.done    { color: var(--done);    background: var(--done-soft);    border: 1px solid color-mix(in srgb, var(--done) 35%, transparent); }
+.chip.partial { color: var(--partial); background: var(--partial-soft); border: 1px solid color-mix(in srgb, var(--partial) 35%, transparent); }
+.chip.open    { color: var(--open);    background: var(--open-soft);    border: 1px solid color-mix(in srgb, var(--open) 35%, transparent); }
+.chip.lock    { color: var(--lock);    background: var(--lock-soft);    border: 1px solid color-mix(in srgb, var(--lock) 35%, transparent); }
+.chip.new     { color: var(--accent);  background: var(--accent-soft);  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+.id { font-family: var(--mono); font-size: 12.5px; color: var(--accent); }
+
+/* ── causal spine ── */
+.band {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 16px 18px;
+}
+.band-label {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+}
+.nodes { display: flex; flex-wrap: wrap; gap: 10px; }
+.node {
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px;
+  padding: 9px 12px; flex: 1 1 220px; min-width: 200px;
+}
+.node b { display: block; font-size: 13.5px; margin-bottom: 2px; }
+.node small { color: var(--muted); font-size: 12px; display: block; line-height: 1.45; }
+.node.hot { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: var(--accent-soft); }
+.connector {
+  display: flex; align-items: center; gap: 10px; margin: 6px 0 6px 28px;
+  font-family: var(--mono); font-size: 12px; color: var(--muted);
+}
+.connector::before { content: "▼"; color: var(--accent); font-size: 11px; }
+
+/* ── SURF pipeline ── */
+.pipe-scroll { overflow-x: auto; padding-bottom: 6px; }
+.pipe { display: flex; align-items: stretch; gap: 0; min-width: 900px; }
+.stage {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+  padding: 10px 12px; width: 150px; flex: 0 0 auto;
+}
+.stage b { font-family: var(--mono); font-size: 12.5px; display: block; }
+.stage span { font-size: 12px; color: var(--muted); display: block; margin: 3px 0 6px; line-height: 1.4; }
+.stage.st-done { border-top: 3px solid var(--done); }
+.stage.st-partial { border-top: 3px solid var(--partial); }
+.stage.st-open { border-top: 3px solid var(--open); }
+.pipe-arrow {
+  flex: 0 0 auto; display: flex; align-items: center; padding: 0 6px;
+  color: var(--accent); font-family: var(--mono); font-size: 14px;
+}
+
+/* ── formula ── */
+.formula {
+  background: var(--lock-soft); border: 1px solid color-mix(in srgb, var(--lock) 30%, transparent);
+  border-radius: 8px; padding: 16px 18px; font-family: var(--mono); font-size: 13.5px;
+  overflow-x: auto; white-space: nowrap;
+}
+.formula .op { color: var(--muted); padding: 0 6px; }
+.formula .ok { color: var(--done); }
+.formula .pend { color: var(--lock); }
+
+/* ── tables ── */
+.tbl-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 860px; font-size: 13px; }
+th {
+  text-align: left; font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted); font-weight: 600;
+  padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--surface-2);
+}
+td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.5; }
+tr:last-child td { border-bottom: none; }
+td.k { font-weight: 650; min-width: 190px; }
+td .why { color: var(--muted); }
+details { margin: 14px 0; }
+summary {
+  cursor: pointer; font-weight: 650; font-size: 15px; padding: 10px 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  list-style-position: inside;
+}
+summary:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+details[open] summary { border-radius: 8px 8px 0 0; border-bottom: none; }
+details[open] .tbl-scroll { border-radius: 0 0 8px 8px; }
+details .tbl-scroll { border-top: none; }
+summary .count { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-left: 8px; }
+
+/* ── target panel ── */
+.target {
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent-soft); border-radius: 10px; padding: 20px 22px; margin-top: 16px;
+}
+.target h3 { margin: 0 0 8px; font-size: 17px; }
+.target p { margin: 6px 0; max-width: 80ch; }
+ul.tight { margin: 8px 0; padding-left: 22px; }
+ul.tight li { margin: 4px 0; }
+.warn-list { color: var(--muted); font-size: 13.5px; max-width: 82ch; }
+.warn-list li { margin: 6px 0; }
+footer { margin-top: 48px; color: var(--muted); font-size: 12.5px; font-family: var(--mono); }
+@media (prefers-reduced-motion: no-preference) {
+  details .tbl-scroll { animation: fade 0.18s ease-out; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+}
+</style>
+
+<div class="wrap">
+<header class="masthead">
+  <div class="eyebrow">deckent · karar-arkeolojisi · 2026-07-15</div>
+  <h1>Karar Sebep→Sonuç Haritası</h1>
+  <p class="sub">Hermes-analizinden (2026-06-29) bugünkü VS Code→deckent-native hedefine uzanan karar-zinciri:
+  hangi kanıt hangi kararı doğurdu, hangi karar neyi öldürdü. Kaynak: <span class="id">docs/MASTER-PLAN.md</span> (SSOT) +
+  full-spectrum + blueprint + shell-research + routing-v3 dosyaları; ayrıntılı matris:
+  <span class="id">.analysis/karar-sebep-sonuc-matrisi-2026-07-15.md</span></p>
+</header>
+
+<h2><span class="tag">§1</span>Nedensel omurga</h2>
+<p class="h2-note">Beş katman: analiz → stratejik karar → tren/program → kilit → hedef. Her katman bir alttakini doğurdu.</p>
+
+<div class="band">
+  <div class="band-label">Analizler (kanıt-üreticiler)</div>
+  <div class="nodes">
+    <div class="node"><b>Hermes-vs-Deckent</b><small>06-29 · çekirdek derin, ürün-yüzeyi dağınık — "340+ sprint sistem-genişliği üretti, ürün-şekli değil"</small></div>
+    <div class="node"><b>beta-blocker-sweep</b><small>07-11 · 9 kanıtlı BLOCKER</small></div>
+    <div class="node"><b>full-spectrum</b><small>07-13 · "Desktop product-consumer seviyesinde boş"; 13 karar-gündemi</small></div>
+    <div class="node"><b>routing system-debug</b><small>07-14 · 22 yama/3,5 ay; 8 hata-sınıfının 7'si nüks; 443-doğal-deneyi</small></div>
+  </div>
+</div>
+<div class="connector">analiz kanıtı → Alperen-onaylı karar</div>
+<div class="band">
+  <div class="band-label">Stratejik kararlar</div>
+  <div class="nodes">
+    <div class="node"><b>PIVOT (Tur-1)</b><small>Terminal=ana-yüzey · Dashboard=yalnız-izleme · Chat→Desktop(Electron) → North Star + W0-W4</small></div>
+    <div class="node"><b>GOAL-v3</b><small>07-10 · kuzey-yıldızı = v1.0.0-beta npm</small></div>
+    <div class="node"><b>KARAR-TURU-3</b><small>07-11 · üç tren: RC→TERM→SCHED</small></div>
+    <div class="node"><b>KARAR-TURU-4</b><small>07-13 · Desktop+Terminal TAM-KAPSAM, geliştirme İKİSİNDEN; #1 beta=B (72h soak — tek analist-sapması)</small></div>
+    <div class="node"><b>Şikayet-kararları</b><small>"sprint basıyor"→510 · "kan ağlayan prompt"→573/580 · "sürekli yama"→581-V3 · "işçi napıyor?"→582 · 446-kaskadı→el-kodlama</small></div>
+  </div>
+</div>
+<div class="connector">karar → yürütme-treni / program</div>
+<div class="band">
+  <div class="band-label">Trenler &amp; programlar</div>
+  <div class="nodes">
+    <div class="node"><b>543 RC-treni</b> <span class="chip done">✅ tamam</span><small>publish teknik-zinciri</small></div>
+    <div class="node"><b>544 TERM-RUNFLOW</b> <span class="chip done">✅ 7 dilim</span><small>hibrit RunProposal; saf-A/B reddedildi</small></div>
+    <div class="node"><b>527 SCHED-reducer</b> <span class="chip done">✅ 8 dilim</span><small>kademeli-strangler</small></div>
+    <div class="node"><b>573/580 PCOMP-6/8</b> <span class="chip partial">🟡 ana ✅</span><small>derlenen-prompt + lint; fail-closed flip bekliyor</small></div>
+    <div class="node"><b>581 ROUTING-V3</b> <span class="chip done">✅ çekirdek</span><small>vektörel-3D; V2 −18.495 satır silindi; ADR-G-006 today=V3</small></div>
+    <div class="node hot"><b>566 SURF-treni</b> <span class="chip partial">🟡 0-3 ilerledi</span><small>8 dilim, contract-first — aşağıdaki hat</small></div>
+  </div>
+</div>
+
+<h2><span class="tag">§2</span>SURF-hattı (566)</h2>
+<p class="h2-note">Sıra-değişmezleri: SURF-0/1 bitmeden Desktop Console state yazamaz (sağlandı ✅) · SURF-5 bitmeden dashboard-write kalkmaz (SURF-7 en-son).</p>
+<div class="pipe-scroll"><div class="pipe">
+  <div class="stage st-done"><b>SURF-0</b><span>truth-receipt — flowId zinciri; elle-inject öldü</span><span class="chip done">✅</span></div>
+  <div class="pipe-arrow">→</div>
+  <div class="stage st-done"><b>SURF-1</b><span>durable coordinator — module-Map öldü; replay</span><span class="chip done">✅</span></div>
+  <div class="pipe-arrow">→</div>
+  <div class="stage st-done"><b>SURF-2</b><span>API parity/security — query-token MAJOR-fix; kalan: resume/retry</span><span class="chip done">✅ ana</span></div>
+  <div class="pipe-arrow">→</div>
+  <div class="stage st-partial"><b>SURF-3</b><span>terminal full-client — ⚡Live ✅; kalan: inbox · 697 · evidence · 575 · CLI-akış</span><span class="chip partial">🟡</span></div>
+  <div class="pipe-arrow">→</div>
+  <div class="stage st-open"><b>SURF-4</b><span>Desktop design-foundation — tokens/Console/Chat/Approval/History</span><span class="chip open">⬜</span></div>
+  <div class="pipe-arrow">→</div>
+  <div class="stage st-open"><b>SURF-5</b><span>Desktop real-workflow — packaged; gerçek-task Desktop-only</span><span class="chip open">⬜</span></div>
+  <div class="pipe-arrow">→</div>
+  <div class="stage st-open"><b>SURF-6</b><span>cross-surface dogfood — 5-task × iki yüzey + WSL</span><span class="chip open">⬜</span></div>
+  <div class="pipe-arrow">→</div>
+  <div class="stage st-open"><b>SURF-7</b><span>dashboard cutover — write-controls ölür</span><span class="chip open">⬜</span></div>
+</div></div>
+
+<h2><span class="tag">§3</span>Publish-kilidi (535)</h2>
+<p class="h2-note">Teknik-zincir hazır; tek gerçek kapı SURF-4/5/6 (= 536 Desktop-onayının kapanış-tanımı, "shell-boot yetmez").</p>
+<div class="formula">
+  535 publish <span class="op">=</span>
+  <span class="ok">543-RC ✅</span><span class="op">∧</span>
+  <span class="ok">561-karar ✅</span><span class="op">∧</span>
+  <span class="pend">🔒 536-Desktop-onayı (=SURF-4/5/6 parity)</span><span class="op">∧</span>
+  <span class="pend">🔒 npmjs trusted-publisher (Alperen)</span><span class="op">∧</span>
+  <span class="pend">72h xplat/daemon soak</span>
+</div>
+
+<h2><span class="tag">§4</span>Yeni hedef — 583 NATIVE-DEV-ENV <span class="chip new">🧭 07-15</span></h2>
+<div class="target">
+  <h3>VS Code'dan çıkış → deckent app + deckent terminal</h3>
+  <p><b>Direktif (Alperen):</b> SURF bitince terminal+desktop işleri <b>tasarım dahil</b> bitirilir; SURF-sonrası ilk hedef
+  geliştirme ortamının deckent-native yüzeylere taşınması. Yasa-1 dual-lens: "deckent'ten geliştirme" aynı zamanda
+  son-kullanıcı ürün-yeteneğidir (solo → enterprise).</p>
+  <ul class="tight">
+    <li><b>İlk teslimat:</b> gap-analizi — VS Code yetenekleri ↔ deckent-native karşılıkları (ilk-taslak matris §5'te hazır).</li>
+    <li><b>Tasarım-turu:</b> terminal+desktop tasarımı design-then-approve (DESK-2 deseni, Alperen-onaylı).</li>
+    <li><b>Kabul:</b> SURF-6 sonrası ardışık 5 gerçek geliştirme-günü VS Code açılmadan; pürüzler born'lanır (511-deseni).</li>
+    <li><b>İlişki:</b> 583 publish'i bloklamaz, publish 583'ü bloklamaz — 536-onay/soak ile paralel yürüyebilir. CHAT-IDE(64) önceliği 583 lehine düşer.</li>
+  </ul>
+</div>
+
+<h2><span class="tag">§5</span>VS Code ↔ deckent-native gap-matrisi (ilk-taslak)</h2>
+<div class="tbl-scroll"><table>
+  <thead><tr><th>VS Code'un verdiği</th><th>deckent-native karşılığı</th><th>Durum</th><th>Boşluk / karar</th></tr></thead>
+  <tbody>
+    <tr><td class="k">El-ile kod düzenleme</td><td>Ajan-eliyle değişiklik (Brain/worker); insan = yönlendiren/onaylayan</td><td><span class="chip done">✅ çekirdek</span></td><td><b>Tasarım-kararı:</b> editör yapılmaz mı? Hafif görüntüleme+diff yeterli mi — Alperen tasarım-turunda</td></tr>
+    <tr><td class="k">Diff / code-review</td><td>GAP-4 DIFF-API + Desktop diff/eval/history + terminal result-evidence</td><td><span class="chip open">⬜</span></td><td>SURF-5 + SURF-3 result-evidence</td></tr>
+    <tr><td class="k">Dosya-gezinme / arama</td><td><span class="id">@path</span> fuzzy (508) + 29-tool read-yüzeyi (509)</td><td><span class="chip partial">🟡</span></td><td>508 öne alınmalı (SURF-3-komşusu)</td></tr>
+    <tr><td class="k">Entegre terminal / shell</td><td>PTY = Expert-Console organı (ADR-G-029, daemon'da hazır)</td><td><span class="chip done">✅</span></td><td>Desktop panel-yerleşimi SURF-4 tasarımı</td></tr>
+    <tr><td class="k">Git yüzeyi</td><td>Bugün CC/CLI; deckent-native commit-onay akışı + result-evidence</td><td><span class="chip partial">🟡 kısmi</span></td><td>Tasarım-turu maddesi (onay-akışıyla bütünleşik)</td></tr>
+    <tr><td class="k">Canlı çalışma-izleme</td><td>582 ACTIVITY + <span class="id">status --follow</span> ⚡Live + Desktop-console</td><td><span class="chip partial">🟡 temel ✅</span></td><td>SURF-3/4 tüketicileri</td></tr>
+    <tr><td class="k">Çoklu-iş yönetimi</td><td>Multi-flow inbox (SURF-3) + Desktop History</td><td><span class="chip open">⬜</span></td><td>SURF-3 gövdesi</td></tr>
+    <tr><td class="k">Onay / karar UX</td><td>APR-ailesi + born-697 son-mil + Desktop Approval-ekranı</td><td><span class="chip partial">🟡</span></td><td>SURF-3/4</td></tr>
+    <tr><td class="k">AI-asistan (CC)</td><td>deckent terminal native-agent (29-tool) + Claude-CLI zengin-akış (stream-json)</td><td><span class="chip partial">🟡</span></td><td>SURF-3 "Claude-CLI zengin-akış" = geçişin köprüsü</td></tr>
+    <tr><td class="k">IDE-eklentileri</td><td>CHAT-IDE (64) ikincilleşir — ana-yüzey artık deckent</td><td><span class="chip partial">🟡 1-3 ✅</span></td><td>Öncelik 583 lehine düşer</td></tr>
+  </tbody>
+</table></div>
+
+<h2><span class="tag">§6</span>Karar-matrisi (domain-gruplu, açılır)</h2>
+<p class="h2-note">Her satır: karar → sebep (kanıt) → sonuç (doğurduğu / öldürdüğü). Tam metin: <span class="id">karar-sebep-sonuc-matrisi-2026-07-15.md §2</span></p>
+
+<details open>
+<summary>S — Strateji / yüzey-hiyerarşisi <span class="count">5 karar</span></summary>
+<div class="tbl-scroll"><table>
+  <thead><tr><th>Karar</th><th>Sebep</th><th>Sonuç / etki</th><th>Durum</th></tr></thead>
+  <tbody>
+    <tr><td class="k">Terminal = ana-yüzey <span class="id">ADR-G-034</span></td><td class="why">Hermes: çekirdek derin, ürün-yüzeyi dağınık; canlı-approval yok, trace unwired</td><td>W1 product-loop + TERM-ailesi doğdu; dashboard düştü; "tam-kontrol + yormayan" sözleşmesi</td><td><span class="chip done">✅ yön</span></td></tr>
+    <tr><td class="k">Dashboard = yalnız izleme <span class="id">ADR-G-033</span></td><td class="why">Kontrol-merkezi olursa yüzey-otoritesi bölünür</td><td>Dashboard-write ölüm-fermanı (SURF-7'de infaz); gold-accent dashboard'a</td><td><span class="chip done">✅ karar</span></td></tr>
+    <tr><td class="k">Chat → Desktop (Electron) <span class="id">ADR-G-033</span></td><td class="why">Karar-veren üçüncü yüzey gerekli; chat dashboard'da yaşayamaz</td><td>496 + 536 doğdu; publish-kilidi Desktop'a bağlandı</td><td><span class="chip done">✅</span></td></tr>
+    <tr><td class="k">KT-4: iki-yüzey TAM-KAPSAM</td><td class="why">"Desktop'tan geliştiriliyor" DOĞRULANAMADI; tek flow-service'in iki client'ı</td><td>SURF-treni; 536 = SURF-4/5/6-parity; ordering-invariant'lar</td><td><span class="chip partial">🟡</span></td></tr>
+    <tr><td class="k">🧭 07-15: VS Code → native</td><td class="why">Alperen-direktifi; Yasa-1 dual-lens</td><td><b>583 NATIVE-DEV-ENV</b> doğdu; tasarım-dahil bitirme; SURF-6 kalıcılaşır</td><td><span class="chip new">⬜ yeni</span></td></tr>
+  </tbody>
+</table></div>
+</details>
+
+<details>
+<summary>R — Yayın zinciri <span class="count">5 karar</span></summary>
+<div class="tbl-scroll"><table>
+  <thead><tr><th>Karar</th><th>Sebep</th><th>Sonuç / etki</th><th>Durum</th></tr></thead>
+  <tbody>
+    <tr><td class="k">GOAL-v3: beta-npm kuzey-yıldızı</td><td class="why">SSOT-reconcile sonrası tek mercek ihtiyacı</td><td>Faz-0→4; 535 PUBLISH-GATE; "511+510+492/493 yine de şart" uyarısı</td><td><span class="chip partial">🟡</span></td></tr>
+    <tr><td class="k">KT-3: RC→TERM→SCHED</td><td class="why">9 kanıtlı BLOCKER (sweep)</td><td>Üç tren ✅; publish RC + 🔒536'ya bağlandı</td><td><span class="chip done">✅</span></td></tr>
+    <tr><td class="k">KT-4 #1: beta=B (72h soak)</td><td class="why">Analist A önerdi; Alperen tek-sapma ile B — her-ortam yasası kanıt ister</td><td>Soak-penceresi eklendi; acele-yayın öldü</td><td><span class="chip done">✅ karar</span></td></tr>
+    <tr><td class="k">Publish-kilit formülü</td><td class="why">"Desktop bitmeden publish olmaz" (07-11)</td><td>Desktop kritik-yola girdi → SURF-4/5/6 publish-öncesi fiilen zorunlu</td><td><span class="chip lock">🔒 açık</span></td></tr>
+    <tr><td class="k">KT-4 #6=C: Community GA + Ent-Preview</td><td class="why">Enterprise enforcement parçalı — yalanla GA olmaz</td><td>570 ENT-TRUTH-0; paid-boundary=governance/audit-depth</td><td><span class="chip open">⬜</span></td></tr>
+  </tbody>
+</table></div>
+</details>
+
+<details>
+<summary>T — Terminal zinciri <span class="count">7 karar</span></summary>
+<div class="tbl-scroll"><table>
+  <thead><tr><th>Karar</th><th>Sebep</th><th>Sonuç / etki</th><th>Durum</th></tr></thead>
+  <tbody>
+    <tr><td class="k">Golden-flow + canlı-footer <span class="id">40·43</span></td><td class="why">Pivotun ilk somut kanıtı</td><td>NL→plan→approve→run→evaluate + 5-soru footer; 511 yapıtaşları</td><td><span class="chip done">✅</span></td></tr>
+    <tr><td class="k">463: unwired-düzeltme + KURAL</td><td class="why">Alperen canlı-testte yakaladı ("footer göremedim")</td><td><b>"teslim ≠ kablolu"</b> merceği doğdu → 541/492 yöntemleri</td><td><span class="chip done">✅</span></td></tr>
+    <tr><td class="k">511 TERM-DEV-LOOP kabul</td><td class="why">Parçalar ✅ ama entegre deneyim hiç kullanılmamış</td><td>🏁 sprint-430: tek <span class="id">deckent do</span> → 4/4 DONE, elle CLI yok</td><td><span class="chip done">✅</span></td></tr>
+    <tr><td class="k">544: hibrit RunProposal</td><td class="why">541-gap: golden-flow REPL'e bağsız; queue üreticisiz</td><td>Öldürdü: sync-stdio-start · DIRECTIVES-swap · exit-code-evaluate; Desktop aynı servisi tüketecek</td><td><span class="chip done">✅</span></td></tr>
+    <tr><td class="k">509: 6→29 tool yüzeyi</td><td class="why">Dispatch her şeyi destekliyordu; modele reklam eksikti</td><td>16r/7w/6d katalog + arg-aware gate; review→confirm güvenlik-fix</td><td><span class="chip done">✅</span></td></tr>
+    <tr><td class="k">575: REPL-118 = SURF-3 kapısı</td><td class="why">118 bulgu (2 P0); hiçbiri testlerce yakalanmıyor</td><td>Full-client öncesi fix-triyajı zorunlu; "testler yeşil" güvencesi çürük</td><td><span class="chip open">⬜</span></td></tr>
+    <tr><td class="k">582 WORKER-LIVE-LOG</td><td class="why">"İşçi anlık napıyor görmezsem güzel arayüz veremem"</td><td>ACTIVITY-kanalı (ikinci mekanizma YASAK); ⚡Live ✅; Desktop-tüketici SURF-4'e</td><td><span class="chip partial">🟡 temel ✅</span></td></tr>
+  </tbody>
+</table></div>
+</details>
+
+<details>
+<summary>D — Desktop zinciri <span class="count">5 karar</span></summary>
+<div class="tbl-scroll"><table>
+  <thead><tr><th>Karar</th><th>Sebep</th><th>Sonuç / etki</th><th>Durum</th></tr></thead>
+  <tbody>
+    <tr><td class="k">Electron; Tauri ELENDİ</td><td class="why">Node-çekirdek yeniden yazılamaz → Rust-sidecar; WebKitGTK terminal-yükünde zayıf (Yasa-2); kategori-kanıt: CC/Cursor/Wave Electron, AFFiNE geri döndü</td><td>Electron ≥41 (hedef 43) + electron-vite/builder sabit; şasi-tartışması kapandı</td><td><span class="chip done">✅</span></td></tr>
+    <tr><td class="k">İnce-kabuk + Node-daemon (c)</td><td class="why">better-sqlite3/node-pty Electron-ABI rebuild-cehennemi belgeli</td><td>ABI-sınıfı öldü; <b>WSL = connection-profile</b>; PTY-paneli bedava; tek çekirdek-process</td><td><span class="chip done">✅ karar</span></td></tr>
+    <tr><td class="k">496 DESK-1 iskelet</td><td class="why">ADR-G-033'ün somutlaşması</td><td><span class="id">src/desktop/</span> ~2.590 satır (daemon-lifecycle/security/IPC); renderer=pre-daemon makinesi</td><td><span class="chip partial">🟡 B1-B3 ✅</span></td></tr>
+    <tr><td class="k">536 DESK-2: reuse ÜRÜN DEĞİL</td><td class="why">Alperen netleştirmesi (07-10)</td><td>Blueprint kararlı: Console-adı · studio-dark+teal · 12 ekran + 12 GAP · persona/ERP · IPC=UI-grade-only</td><td><span class="chip open">⬜ inşa</span></td></tr>
+    <tr><td class="k">536-kapanış = SURF-4/5/6 parity</td><td class="why">Desktop'un kanıtı workflow'dur, pencere değil ("shell-boot yetmez")</td><td>Publish-kilidinin fiili anahtarı SURF-4/5/6 oldu</td><td><span class="chip open">⬜</span></td></tr>
+  </tbody>
+</table></div>
+</details>
+
+<details>
+<summary>F — Çekirdek akış (RunFlow / SURF) <span class="count">5 karar</span></summary>
+<div class="tbl-scroll"><table>
+  <thead><tr><th>Karar</th><th>Sebep</th><th>Sonuç / etki</th><th>Durum</th></tr></thead>
+  <tbody>
+    <tr><td class="k">SURF-0 truth-receipt</td><td class="why">flowId zinciri kanıtsız; elle-inject mümkündü</td><td>Gerçek-binary receipt; elle-inject öldü; ders: dist-smoke = post-sprint CC-adımı</td><td><span class="chip done">✅</span></td></tr>
+    <tr><td class="k">SURF-1 durable coordinator</td><td class="why">module-Map restart/multi-instance truth olamaz</td><td>Per-root registry + durable event-log + replay + idempotency; Map öldü</td><td><span class="chip done">✅</span></td></tr>
+    <tr><td class="k">SURF-2 API parity/security</td><td class="why">SSE query-token RunFlow'u kapsamıyordu → Desktop live-flow NO-GO riski</td><td>GET/HEAD-only MAJOR-fix + allowlist; list/start/cancel; Last-Event-ID backfill; tenant-negatifler</td><td><span class="chip done">✅ ana</span></td></tr>
+    <tr><td class="k">SURF-3 terminal full-client</td><td class="why">"Tam-kontrol" sözü tek-flow'la tutmaz</td><td>⚡Live ✅; kalan: inbox · 697 · evidence · 575-triyaj · Claude-CLI-akış</td><td><span class="chip partial">🟡</span></td></tr>
+    <tr><td class="k">Ordering-invariant'lar</td><td class="why">"İkinci-implementation yok" + "capability kaybı yok"</td><td>SURF-4/5 önü açıldı (0/1 ✅); SURF-7 en-sona sabit</td><td><span class="chip done">✅ (1)</span></td></tr>
+  </tbody>
+</table></div>
+</details>
+
+<details>
+<summary>Q — Kalite-programları (prompt / routing) <span class="count">4 karar</span></summary>
+<div class="tbl-scroll"><table>
+  <thead><tr><th>Karar</th><th>Sebep</th><th>Sonuç / etki</th><th>Durum</th></tr></thead>
+  <tbody>
+    <tr><td class="k">573 PCOMP-6 derlenen-prompt</td><td class="why">"Kan ağlayan" mekanizma; kalite 75/100; dış-analiz P1-P5</td><td>D1a→D5 + ADR-sol-shift ✅; fail-closed flip Alperen'de</td><td><span class="chip partial">🟡 ana ✅</span></td></tr>
+    <tr><td class="k">580 PCOMP-8 devrim-turu</td><td class="why">Implementer-era çöküşü + "sabotaj mı" hesap-sorusu</td><td>443/444 ✅; U5/F4-kuyruk (shadow-merge = Alperen)</td><td><span class="chip partial">🟡</span></td></tr>
+    <tr><td class="k">581 ROUTING-V3 + V2-silme</td><td class="why">22 yama/3,5 ay; 7/8 sınıf nüks; 20 özdeş görev→4 rota; öğrenme açık-devre</td><td>Vektörel-3D 5-aşama hat; V2 −18.495 satır; test-engineer dirilmez; Brain-eskalasyon</td><td><span class="chip done">✅ çekirdek</span></td></tr>
+    <tr><td class="k">EL-KODLAMA modu</td><td class="why">sprint-446 kaskad-patlaması (18-görev ölümü) + kesin-talimat</td><td>V3 S1-S3 + SURF-1c/2/3 el-kodlandı; ders: "Task N"-referansları enjeksiyonla güvenilmez</td><td><span class="chip done">✅ aktif</span></td></tr>
+  </tbody>
+</table></div>
+</details>
+
+<h2><span class="tag">§7</span>Doğruluk-uyarıları</h2>
+<ul class="warn-list">
+  <li><b>Emoji-lag:</b> tabloda 582 🔴 görünür ama narrative "TEMEL ✅"; gerçek durum = en-son-tarihli Not-anlatısı.</li>
+  <li><b>ADR-095</b> (terminal-pivot) hâlâ PROPOSED-taslak; yön North Star + ADR-G-034 üzerinden işletiliyor.</li>
+  <li><b>REPL-118 raporu (07-08)</b> kısmen bayat olabilir — 509 slash-drift kümesini kısmen kapatmış olabilir; triyaj güncel-HEAD cross-check ile başlar.</li>
+  <li><b>KARAR-TURU-1/2 etiketi yoktur;</b> Tur-1 (pivot) ve Tur-2 (GOAL-v3) kronolojik çıkarımdır.</li>
+</ul>
+
+<footer>deckent · karar-sebep-sonuc-matrisi-2026-07-15.md eşlikçisi · MASTER-PLAN satır-583 NATIVE-DEV-ENV kaydı aynı gün işlendi</footer>
+</div>
