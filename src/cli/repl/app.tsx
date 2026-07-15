@@ -794,13 +794,30 @@ export async function runNativeTurnLoop(
     output: (text: string) => void;
     onTurnStats: (stats: { elapsedMs: number; tokens?: number }) => void;
     onTurnError: (message: string) => void;
+    /**
+     * REPL-575 K3 — chat persistence for the native engine. Called once per
+     * completed turn with the user's input line and the assistant text that was
+     * streamed to the screen. Absent → no persistence (byte-identical to the
+     * pre-K3 loop). Without this the default engine never wrote turns to
+     * memory.db, so `/resume` showed nothing for the just-had conversation.
+     */
+    persistTurn?: (userInput: string, assistantText: string) => void;
   },
   now: () => number = Date.now,
 ): Promise<void> {
   for await (const line of lines) {
     const startMs = now();
+    // Accumulate the streamed assistant text so the completed turn can be
+    // persisted (what the user saw == what /resume replays). A turn that only
+    // ran tools with no visible text yields '' — still persist the user line so
+    // the session is recoverable.
+    let assistantText = '';
+    const captureOutput = cbs.persistTurn
+      ? (text: string) => { assistantText += text; cbs.output(text); }
+      : cbs.output;
     try {
-      await engine(line, { output: cbs.output, onTurnEnd: measuredOnTurnEnd(startMs, now, cbs.onTurnStats) });
+      await engine(line, { output: captureOutput, onTurnEnd: measuredOnTurnEnd(startMs, now, cbs.onTurnStats) });
+      cbs.persistTurn?.(line, assistantText);
     } catch (err) {
       cbs.onTurnError(err instanceof Error ? err.message : String(err));
     }
@@ -1054,6 +1071,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // directly; decision lines re-render via pushTurn).
   const recentSessions = useRef<SessionRecord[] | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>(sessionId);
+  // Mirror activeSessionId into a ref: the native turn-loop lives in a useEffect
+  // whose deps intentionally exclude activeSessionId (re-running it would restart
+  // the loop), so its persist callback (REPL-575 K3) must read the CURRENT
+  // session through this ref, not the stale closure value.
+  const activeSessionIdRef = useRef<string | undefined>(sessionId);
   const busyCtl = useRef<BusyControlsState>(initialBusyControlsState());
 
   // APP-APPROVAL-WIRE (355-011) seam state — inert unless approvalsEnabled AND
@@ -1283,6 +1305,22 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           finalizeReply();
           pushTurn('seg', formatTurnErrorLine(message, labels.turnError));
         },
+        // REPL-575 K3 — persist native turns so /resume can replay them. The
+        // legacy engine (else-branch below) already passes memory/sessionId to
+        // runChatNativeLoop; the native path dropped every turn on the floor.
+        // Uses activeSessionIdRef so a mid-session /resume switch re-targets the
+        // right session. Best-effort: a memory write failure must not kill the
+        // turn loop.
+        ...(memory ? {
+          persistTurn: (userInput: string, assistantText: string) => {
+            const target = activeSessionIdRef.current ?? sessionId;
+            if (!target) return;
+            try {
+              memory.appendChatTurn(target, 'user', userInput);
+              if (assistantText.length > 0) memory.appendChatTurn(target, 'assistant', assistantText);
+            } catch { /* persistence is best-effort — never break the loop */ }
+          },
+        } : {}),
       }).then(() => exit()).catch(() => exit());
     } else {
       void runChatNativeLoop({
@@ -1407,6 +1445,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             pushTurn('seg', decision.line);
           } else {
             setActiveSessionId(decision.sessionId);
+            activeSessionIdRef.current = decision.sessionId;
             if (decision.forwardToLoop) {
               // Chat-session pick: hand the RESOLVED id to the loop so its real
               // transcript/session-switch machinery runs (behavior-merge — the

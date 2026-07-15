@@ -651,8 +651,11 @@ export async function runInkRepl(
 
   const perms = createPermissionStore(process.cwd());
 
-  // Chat persistence + /resume. Open the project's memory.db so every turn is
-  // saved and /resume can list/load prior sessions. Best-effort: a DB-open
+  // Chat persistence + /resume. Open the project's memory.db so completed turns
+  // are saved and /resume can list/load prior sessions — BOTH engines persist:
+  // the legacy loop via runChatNativeLoop(memory,...) and the native engine via
+  // runNativeTurnLoop's persistTurn hook (REPL-575 K3; before that the native
+  // default path saved nothing and /resume was empty). Best-effort: a DB-open
   // failure (e.g. read-only fs) must not block the REPL, so we degrade to a
   // no-memory session. sessionId is fresh per launch; /resume switches it.
   let memory: MemoryStore | undefined;
@@ -799,13 +802,26 @@ export async function runInkRepl(
     } else {
       let mcpBridge: import('./native-tool-registry.js').NativeMcpBridge | undefined;
       try {
-        const { McpClientBroker } = await import('../../mcp-client/broker.js');
-        const { McpToolRegistry } = await import('../../mcp-client/registry.js');
-        const { buildMcpBridge } = await import('../commands/chat-mcp-bridge.js');
-        mcpClientBroker = new McpClientBroker({});
-        const bridge = buildMcpBridge({ broker: mcpClientBroker, registry: new McpToolRegistry(), projectRoot: process.cwd() });
-        const connected = await bridge.loadAndConnectAll();
-        if (connected.length > 0) mcpBridge = bridge as unknown as import('./native-tool-registry.js').NativeMcpBridge;
+        // 387-013 MCP-CLIENT-GATE wired for real (REPL-575 K1, 2026-07-15):
+        // the external MCP client is opt-in — absent/false means NO auto-connect
+        // at boot (server presence alone no longer opens external processes).
+        // With servers configured but the flag off, say so honestly instead of
+        // silently dropping the tools.
+        const { isMcpClientEnabled } = await import('./mcp-bridge.js');
+        if (isMcpClientEnabled(cfg as { mcp_client_enabled?: boolean })) {
+          const { McpClientBroker } = await import('../../mcp-client/broker.js');
+          const { McpToolRegistry } = await import('../../mcp-client/registry.js');
+          const { buildMcpBridge } = await import('../commands/chat-mcp-bridge.js');
+          mcpClientBroker = new McpClientBroker({});
+          const bridge = buildMcpBridge({ broker: mcpClientBroker, registry: new McpToolRegistry(), projectRoot: process.cwd() });
+          const connected = await bridge.loadAndConnectAll();
+          if (connected.length > 0) mcpBridge = bridge as unknown as import('./native-tool-registry.js').NativeMcpBridge;
+        } else {
+          const { loadMcpServers } = await import('../../mcp-client/config.js');
+          if (Object.keys(loadMcpServers(process.cwd())).length > 0) {
+            process.stdout.write(`${getMessage('chat.mcp_client_disabled', lang)}\n`);
+          }
+        }
       } catch { /* MCP optional — REPL stays usable */ }
 
       // Mutable backend the engine reads per turn (via the getters below).

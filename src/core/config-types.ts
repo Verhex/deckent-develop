@@ -1001,6 +1001,18 @@ export interface DeckentConfig {
   /** Worker-runner ordered progress-stream (ADR-G-025 §4). @see LiveTraceConfig */
   live_trace?: LiveTraceConfig;
 
+  // ─── External MCP client (REPL `/mcp` + native tool surface) ─────────
+  /**
+   * Opt-in gate for the REPL's EXTERNAL MCP client (387-013 MCP-CLIENT-GATE,
+   * wired for real 2026-07-15 / REPL-575 K1). Only an explicit `true` connects
+   * configured MCP servers (`.mcp.json` / `.mcp.local.json` / `~/.deckent/mcp.json`)
+   * at native-REPL boot or on `/mcp` in the legacy loop; absent/`false` = no
+   * external MCP surface — with an honest disabled-notice when servers ARE
+   * configured. Truth-table lives in `isMcpClientEnabled()`
+   * (src/cli/repl/mcp-bridge.ts).
+   */
+  mcp_client_enabled?: boolean;
+
   // ─── Routing Engine v3 (Sprint 445 Slice-0 foundation) ───────────────
   /** RoutingEngineV3 vector-selection config — raw project-config override shape (mirrors
    *  `timeout?: Partial<TimeoutConfig>`). Resolve via `resolveRoutingV3Config()`
@@ -1517,6 +1529,8 @@ export interface ResolvedConfig {
   training_trace?: DeckentConfig['training_trace'];
   /** Worker-runner ordered progress-stream (passed through from DeckentConfig, ADR-G-025 §4). */
   live_trace?: DeckentConfig['live_trace'];
+  /** External MCP client opt-in (passed through from DeckentConfig; 387-013 wired 2026-07-15). */
+  mcp_client_enabled?: boolean;
   /** Fully-resolved RoutingEngineV3 config (Sprint 445 Slice-0). NOTE: type-only pass-through
    *  today — `loadConfig`/`mergeConfigs` (config.ts) do not yet assign this field in their
    *  resolved-object literal (same caveat as `computer_use`/`worker_output_contract` above; out of

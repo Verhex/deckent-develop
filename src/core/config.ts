@@ -1884,6 +1884,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     deck_broker: config.deck_broker,
     training_trace: config.training_trace,
     live_trace: config.live_trace,
+    mcp_client_enabled: config.mcp_client_enabled,
     // Sprint 369-005/008 follow-up (born-464 pattern): TOOL-CU + V1-strict-report
     // flag blocks — declared on the type in 369, wired here by CC hand-fix.
     computer_use: config.computer_use,
@@ -2638,6 +2639,7 @@ export function mergeConfigs(
     deck_broker: config.deck_broker,
     training_trace: config.training_trace,
     live_trace: config.live_trace,
+    mcp_client_enabled: config.mcp_client_enabled,
     // Sprint 369-005/008 follow-up (born-464 pattern) — see loadConfig twin above.
     computer_use: config.computer_use,
     worker_output_contract: config.worker_output_contract,

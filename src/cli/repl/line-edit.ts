@@ -7,6 +7,7 @@
 
 import type { Key } from 'node:readline';
 import { applyCursorEdit, moveCursor, toBuffer, type CursorState } from './cursor-model.js';
+import { normalizePasted } from './input-history.js';
 
 /** Editable input-line state (pure). */
 export interface InputState {
@@ -100,9 +101,18 @@ export function editInput(state: InputState, key: Key): EditResult {
       // Printable sequence (incl. pasted text — comes as a multi-char `sequence`).
       const ch = key.sequence;
       if (ch === undefined || ch.length === 0) return { state };
-      // Drop control bytes (e.g. lone ESC, unknown CSI) — only insert printables.
+      // Control byte at the HEAD = terminal key-sequence noise (lone ESC,
+      // unmapped CSI like \x1b[1;5C) — drop the chunk WHOLE; sanitizing it
+      // would splice its printable tail ("[1;5C") into the buffer.
       if (ch.charCodeAt(0) < 0x20 && ch !== '\t') return { state };
-      const text = ch === '\t' ? '  ' : ch; // tab → two spaces (no completer here)
+      // Printable-headed chunk = paste content — sanitize THROUGHOUT, not just
+      // position 0 (REPL-575 K2): a paste like "go run main.go\x1b[2J…" used to
+      // splice embedded ANSI bytes raw into the buffer and the terminal would
+      // interpret them on render (escape-injection). normalizePasted keeps
+      // \t/\n, folds CR/CRLF, strips C0+DEL.
+      const cleaned = normalizePasted(ch);
+      if (cleaned.length === 0) return { state };
+      const text = cleaned === '\t' ? '  ' : cleaned; // tab → two spaces (no completer here)
       return { state: { buffer: buffer.slice(0, cursor) + text + buffer.slice(cursor), cursor: cursor + text.length } };
     }
   }

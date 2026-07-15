@@ -14,32 +14,26 @@
 // not on `mcp_client_enabled`) and calls `dispatchMcpSlash` for every `/mcp`
 // line — this dispatch core has a real production caller.
 //
-// `initReplMcpBridge()` / `isMcpClientEnabled()`, however, do NOT — this
-// composition root and its `mcp_client_enabled` flag are UNWIRED dead code as
-// of 387-013 (MCP-CLIENT-GATE, confirmed by three independent audit passes:
-// `docs/audits/last-standing-2026-06/*`). Neither production entry point
-// consults them:
-//   * `run.tsx` (native-agent default path, ADR-G-034/376-003) constructs its
-//     own `McpClientBroker` + `buildMcpBridge` inline and calls
-//     `loadAndConnectAll()` UNCONDITIONALLY on every launch — it never imports
-//     `isMcpClientEnabled` or `initReplMcpBridge`.
-//   * `chat-native.ts` (legacy loop) also constructs its own bridge inline,
-//     gated on MCP-server presence (`loadMcpServers(...).length > 0`) — again
-//     never consulting this flag.
-// Net effect: setting `mcp_client_enabled` anywhere in config has NO effect on
-// a live REPL session today, in either engine. `mcp_client_enabled` is also
-// not declared in `DeckentConfig`/`core/config.ts` or any `docs/` reference —
-// this module's own doc-comments were the only place implying it is a real,
-// consulted opt-in control. Closing this gap for real (wiring `run.tsx` /
-// `chat-native.ts` to consult the flag, or deleting the dead exports together
-// with their dedicated test `tests/cli/repl/mcp-bridge.test.ts`) needs a task
-// scoped to touch those files; 387-013's write-scope covers only this file, so
-// the functions below are kept (signatures/behavior unchanged, tests intact)
-// but must not be read as an active gate — see `tests/cli/mcp-client-gate.test.ts`
-// for an executable regression-guard on this exact fact.
+// `isMcpClientEnabled()` IS now the live gate (387-013 recorded it as unwired
+// dead code; wired for real 2026-07-15, REPL-575 K1 — the review finding was
+// "unconditional MCP auto-connect"). Both production entry points consult it:
+//   * `run.tsx` (native-agent default path, ADR-G-034/376-003) checks
+//     `isMcpClientEnabled(cfg)` BEFORE building broker/bridge — flag off means
+//     no auto-connect at boot; servers-configured-but-off prints the honest
+//     `chat.mcp_client_disabled` hint.
+//   * `chat-native.ts` (legacy loop) requires server presence AND the flag
+//     before building the `/mcp` bridge; servers-but-off answers `/mcp` with
+//     the same disabled-notice.
+// `mcp_client_enabled` is declared in `DeckentConfig` + `ResolvedConfig`
+// (core/config-types.ts) and passed through both resolved-literals in
+// core/config.ts (born-464 flag-drop pattern honored).
+// `initReplMcpBridge()` (the composition root below) remains caller-less —
+// run.tsx keeps its inline construction because it must retain the broker
+// reference for disposal; the gate function is the shared truth-table.
+// `tests/cli/mcp-client-gate.test.ts` pins the WIRED state (it previously
+// pinned the unwired state so drift required a conscious update — it did).
 //
-// GATING (as designed, NOT currently wired to any caller) — opt-in,
-// backward-safe:
+// GATING — opt-in, backward-safe:
 //   * Gated behind a default-OFF `mcp_client_enabled` flag. Flag absent/false
 //     → `initReplMcpBridge` returns `null` and the REPL behaves exactly as
 //     before (no broker, no external surface).
@@ -66,12 +60,10 @@ import { getMessage } from '../helpers/messages.js';
 export type ReplMcpBridge = ReturnType<typeof buildMcpBridge>;
 
 /**
- * Minimal config shape `initReplMcpBridge`/`isMcpClientEnabled` read. The full
- * `DeckentConfig` does NOT declare `mcp_client_enabled` (387-013: confirmed 0
- * grep matches in `core/config.ts` and `docs/`) — it is an as-designed opt-in
- * flag that no production caller has ever wired up (see the module header for
- * the two bypass sites). Kept structural so this file stays decoupled from
- * `DeckentConfig` if/when a future task wires it in for real.
+ * Minimal config shape `initReplMcpBridge`/`isMcpClientEnabled` read.
+ * `mcp_client_enabled` is declared on `DeckentConfig`/`ResolvedConfig`
+ * (core/config-types.ts, wired 2026-07-15 REPL-575 K1); this stays structural
+ * so the gate keeps working for any caller that hands it a partial config.
  */
 export interface ReplMcpConfigLike {
   mcp_client_enabled?: boolean;
@@ -97,22 +89,21 @@ export interface InitReplMcpBridgeOptions {
 }
 
 /**
- * As-designed truth-table for the `mcp_client_enabled` flag: only an explicit
- * `true` opts in — `undefined`/`false`/any other value is off. NOT currently
- * consulted by any production entry point (see module header, 387-013) — this
- * function is correct in isolation but has no effect on a live REPL session.
+ * Truth-table for the `mcp_client_enabled` flag: only an explicit `true` opts
+ * in — `undefined`/`false`/any other value is off. LIVE gate since 2026-07-15
+ * (REPL-575 K1): consulted by `run.tsx` (native boot) and `chat-native.ts`
+ * (legacy `/mcp`) — see module header.
  */
 export function isMcpClientEnabled(config: ReplMcpConfigLike | undefined): boolean {
   return config?.mcp_client_enabled === true;
 }
 
 /**
- * Build a REPL MCP bridge gated on `mcp_client_enabled`, else `null`. This is
- * the composition root the flag was designed to gate — but as of 387-013
- * neither `run.tsx` nor `chat-native.ts` calls it (both build their own bridge
- * inline, unconditionally / server-presence-gated respectively). Kept for a
- * future wiring task; do not treat a caller's use of this function as
- * evidence the flag is live elsewhere.
+ * Build a REPL MCP bridge gated on `mcp_client_enabled`, else `null`. This
+ * composition root itself still has no production caller (`run.tsx` /
+ * `chat-native.ts` build their bridges inline — run.tsx must keep the broker
+ * reference for disposal) — but both consult `isMcpClientEnabled` above, so
+ * the FLAG is live even though this convenience wrapper is not (REPL-575 K1).
  *
  * Returning `null` (rather than an inert bridge) lets a caller cleanly skip
  * all external-MCP surfaces (the `/mcp` slash, tool listing, dispatch) when the

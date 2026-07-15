@@ -18,9 +18,11 @@
 //   8) loop /mcp call + reject confirm → cancelled output, REPL alive
 //   9) loop /mcp + null inject         → honest chat.mcp_not_wired             (server-yok→honest)
 //  10) loop /mcp + empty tmpdir root   → honest chat.mcp_not_wired             (real discovery)
+//  11) loop /mcp + server, flag OFF    → honest chat.mcp_client_disabled       (387-013 gate, REPL-575 K1)
+//  12) loop /mcp + server, flag ON     → gate opens (neither notice)           (opt-in path)
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -280,6 +282,63 @@ describe('runChatNativeLoop — /mcp server-discovery fall-through (tmpdir)', ()
     });
 
     expect(output).toHaveBeenCalledWith(getMessage('chat.mcp_not_wired', 'en'));
+    expect(sendSpy).not.toHaveBeenCalled();
+  });
+
+  // ── 387-013 MCP-CLIENT-GATE wired (REPL-575 K1) ──────────────────────────
+  // Server presence alone must no longer build the external client: the
+  // opt-in `mcp_client_enabled` flag gates it, and servers-but-off gets the
+  // honest disabled-notice (not the misleading "not wired" fall-through).
+
+  it('server configured but mcp_client_enabled absent → honest disabled-notice, no bridge', async () => {
+    const { adapter, sendSpy } = idleProvider();
+    const { dispatcher } = fakeDispatcher();
+    const output = vi.fn();
+    writeFileSync(
+      join(root, '.mcp.json'),
+      JSON.stringify({ mcpServers: { fake: { command: '/nonexistent-deckent-test-binary' } } }),
+    );
+
+    await runChatNativeLoop({
+      provider: adapter,
+      dispatcher,
+      input: lines('/mcp'),
+      output,
+      projectRoot: root,
+      // no mcpBridge injection → discovery finds the server, gate finds no flag
+    });
+
+    expect(output).toHaveBeenCalledWith(getMessage('chat.mcp_client_disabled', 'en'));
+    expect(sendSpy).not.toHaveBeenCalled();
+  });
+
+  it('server configured and mcp_client_enabled true → gate opens (neither notice is shown)', async () => {
+    const { adapter, sendSpy } = idleProvider();
+    const { dispatcher } = fakeDispatcher();
+    const output = vi.fn();
+    writeFileSync(
+      join(root, '.mcp.json'),
+      JSON.stringify({ mcpServers: { fake: { command: '/nonexistent-deckent-test-binary' } } }),
+    );
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    writeFileSync(
+      join(root, '.deckent', 'config.json'),
+      JSON.stringify({ mcp_client_enabled: true }),
+    );
+
+    await runChatNativeLoop({
+      provider: adapter,
+      dispatcher,
+      input: lines('/mcp'),
+      output,
+      projectRoot: root,
+      // bridge is built for real; the fake server's connect fails soft inside
+      // loadAndConnectAll (nonexistent binary), so this stays hermetic — the
+      // assertion is only that the GATE opened (no notice short-circuit).
+    });
+
+    expect(output).not.toHaveBeenCalledWith(getMessage('chat.mcp_client_disabled', 'en'));
+    expect(output).not.toHaveBeenCalledWith(getMessage('chat.mcp_not_wired', 'en'));
     expect(sendSpy).not.toHaveBeenCalled();
   });
 });

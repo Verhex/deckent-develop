@@ -86,6 +86,32 @@ describe('editInput — line editing (T-224-019 v2)', () => {
     const r = editInput(EMPTY_INPUT, { name: 'escape', sequence: '\x1b', ctrl: false } as Key);
     expect(r.state).toEqual(EMPTY_INPUT);
   });
+
+  // REPL-575 K2 — escape-injection: control bytes EMBEDDED in a paste whose
+  // first char is printable used to reach the buffer raw and get interpreted
+  // by the terminal on render. The whole sequence must be sanitized.
+  it('strips embedded ANSI/control bytes from a paste (escape-injection)', () => {
+    const r = editInput(EMPTY_INPUT, ch('go run main.go\x1b[2J\x1b[31mFAKE'));
+    expect(r.state.buffer).toBe('go run main.go[2J[31mFAKE');
+    expect(r.state.buffer).not.toContain('\x1b');
+    expect(r.state.cursor).toBe(r.state.buffer.length);
+  });
+
+  it('drops a printable-headed paste that normalizes to nothing (DEL + control tail)', () => {
+    // \x7f (DEL) passes the head-guard (≥ 0x20) but normalizePasted strips it.
+    const r = editInput(EMPTY_INPUT, { name: undefined, sequence: '\x7f\x1b', ctrl: false } as unknown as Key);
+    expect(r.state).toEqual(EMPTY_INPUT);
+  });
+
+  it('still drops control-HEADED chunks whole (unmapped CSI stays out of the buffer)', () => {
+    const r = editInput(EMPTY_INPUT, { name: undefined, sequence: '\x1b[1;5C', ctrl: false } as unknown as Key);
+    expect(r.state).toEqual(EMPTY_INPUT);
+  });
+
+  it('keeps unicode + interior tab intact while sanitizing', () => {
+    const r = editInput(EMPTY_INPUT, ch('naïve\t🚀\x1bZ'));
+    expect(r.state.buffer).toBe('naïve\t🚀Z');
+  });
 });
 
 describe('InputHistory — navigation (T-224-019 v2)', () => {

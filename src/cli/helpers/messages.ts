@@ -1337,6 +1337,10 @@ const MESSAGES: MessageMap = {
     en: 'The external MCP client is not wired into the REPL yet — it is on the roadmap (F9 phase 2). Use `claude mcp add deckent -- npx deckent-mcp` to reach deckent tools from a host CLI.',
     tr: 'Harici MCP istemcisi REPL\'e henüz bağlı değil — yol haritasında (F9 faz 2). Deckent araçlarına host CLI üzerinden erişmek için: `claude mcp add deckent -- npx deckent-mcp`.',
   },
+  'chat.mcp_client_disabled': {
+    en: 'MCP servers are configured but the external MCP client is disabled. Set "mcp_client_enabled": true in .deckent/config.json to connect them.',
+    tr: 'MCP sunucuları yapılandırılmış ama harici MCP istemcisi kapalı. Bağlanmak için .deckent/config.json içinde "mcp_client_enabled": true ayarlayın.',
+  },
   'chat.slash_unknown_subaction': {
     en: '{command}: unknown subaction "{sub}". See /help for usage.',
     tr: '{command}: bilinmeyen alt-aksiyon "{sub}". Kullanım için /help.',

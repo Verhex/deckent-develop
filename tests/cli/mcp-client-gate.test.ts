@@ -1,21 +1,21 @@
-// 387-013 MCP-CLIENT-GATE — mcp_client_enabled ölü-gate: wire ya da kaldır (P2).
+// 387-013 MCP-CLIENT-GATE — mcp_client_enabled: WIRED (REPL-575 K1, 2026-07-15).
 //
-// Investigation (see src/cli/repl/mcp-bridge.ts module header for the full
-// write-up): `isMcpClientEnabled`/`initReplMcpBridge` are correct in isolation
-// but have ZERO production callers — neither `run.tsx` (native-agent default
-// path) nor `chat-native.ts` (legacy loop) ever consults `mcp_client_enabled`;
-// both build their own MCP broker/bridge inline instead. The flag is also
-// absent from `DeckentConfig`/`core/config.ts` and from every `docs/reference`
-// page — so it was never a real, documented config knob either.
+// History: 387-013 found `isMcpClientEnabled`/`initReplMcpBridge` correct in
+// isolation but with ZERO production callers — `run.tsx` auto-connected MCP
+// servers UNCONDITIONALLY at native boot and `chat-native.ts` gated only on
+// server presence. This file then pinned that unwired state so wiring required
+// a conscious test update. That update is this one: the 2026-07-08 REPL review
+// flagged the unconditional auto-connect as a security finding (arbitrary
+// external processes on plain `deckent` launch), and REPL-575 K1 wired the
+// gate for real.
 //
-// This file has two jobs:
+// This file's two jobs now:
 //   1) Re-confirm the gate's own truth-table + composition behavior in
-//      isolation (this module's boundary — NOT a claim about production).
-//   2) Lock the current "unwired" state in as an executable, CI-visible fact
-//      (source-scan regression-guard) instead of a silent landmine. If a
-//      future task wires `run.tsx`/`chat-native.ts` to the flag for real, this
-//      guard breaks — forcing a conscious update rather than a silent drift
-//      back to "documented but dead."
+//      isolation (this module's boundary).
+//   2) Pin the WIRED state (source-scan regression-guard): schema declaration,
+//      resolved-literal pass-through (born-464 flag-drop pattern), docs entry,
+//      and both entry points consulting the gate — so the auto-connect hole
+//      cannot silently reopen.
 //
 // Hermetic: (1) uses tmpdir + a duck-typed fake broker, no MCP subprocess/
 // network; (2) reads only committed repo source (not gitignored state) for
@@ -109,32 +109,37 @@ describe('mcp_client_enabled gate — isolated behavior (387-013)', () => {
   });
 });
 
-describe('mcp_client_enabled — config-schema + docs (387-013 goCriteria OR-branch)', () => {
-  it('is not declared anywhere in core/config.ts (DeckentConfig schema)', () => {
+describe('mcp_client_enabled — config-schema + docs (387-013 → wired, REPL-575 K1)', () => {
+  it('is declared in the config schema and passed through the resolved-literals (born-464 pattern)', () => {
+    const types = readFileSync(join(ROOT, 'src', 'core', 'config-types.ts'), 'utf-8');
+    expect(types).toMatch(/mcp_client_enabled\?: boolean/);
     const src = readFileSync(join(ROOT, 'src', 'core', 'config.ts'), 'utf-8');
-    expect(src).not.toMatch(/mcp_client_enabled/);
+    // Both resolved-object literals must carry the flag or loadConfig drops it.
+    const passThroughs = src.match(/mcp_client_enabled: config\.mcp_client_enabled/g) ?? [];
+    expect(passThroughs.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('is not documented as a supported option in any docs/reference page', () => {
+  it('is documented as a supported option in docs/reference', () => {
     const referenceDir = join(ROOT, 'docs', 'reference');
     const files = listFilesRecursive(referenceDir, (n) => n.endsWith('.md'));
     const hits = files.filter((f) => readFileSync(f, 'utf-8').includes('mcp_client_enabled'));
-    expect(hits).toEqual([]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
   });
 });
 
-describe('mcp_client_enabled — production-wiring regression guard (387-013)', () => {
-  // These two files are the confirmed bypass sites (see mcp-bridge.ts module
-  // header). This test does NOT assert the flag should stay unwired forever —
-  // it asserts today's known state so drift back to "silently misleading" is
-  // impossible without a failing test forcing an explicit decision.
-  it('run.tsx (native-agent default REPL path) does not consult the gate', () => {
+describe('mcp_client_enabled — production-wiring regression guard (387-013 → wired, REPL-575 K1)', () => {
+  // 387-013 originally pinned these two files as UNWIRED bypass sites so that
+  // wiring the flag required a conscious test update — it did (2026-07-15).
+  // The guard now pins the WIRED state: both production entry points must keep
+  // consulting the gate, so the auto-connect security hole cannot silently
+  // reopen.
+  it('run.tsx (native-agent default REPL path) consults the gate', () => {
     const src = readFileSync(join(ROOT, 'src', 'cli', 'repl', 'run.tsx'), 'utf-8');
-    expect(src).not.toMatch(/isMcpClientEnabled|initReplMcpBridge|mcp_client_enabled/);
+    expect(src).toMatch(/isMcpClientEnabled/);
   });
 
-  it('chat-native.ts (legacy REPL loop) does not consult the gate', () => {
+  it('chat-native.ts (legacy REPL loop) consults the gate', () => {
     const src = readFileSync(join(ROOT, 'src', 'cli', 'commands', 'chat-native.ts'), 'utf-8');
-    expect(src).not.toMatch(/isMcpClientEnabled|initReplMcpBridge|mcp_client_enabled/);
+    expect(src).toMatch(/isMcpClientEnabled/);
   });
 });

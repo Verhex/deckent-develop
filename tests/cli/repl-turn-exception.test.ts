@@ -110,6 +110,91 @@ describe('runNativeTurnLoop — per-turn exception isolation (387-003)', () => {
   });
 });
 
+describe('runNativeTurnLoop — chat persistence (REPL-575 K3)', () => {
+  it('persists each completed turn with the user line + streamed assistant text', async () => {
+    const engine: ReplEngine = vi.fn(async (line: string, cbs) => {
+      cbs.output(`echo: ${line}`);
+      cbs.onTurnEnd({ inputTokens: 1, outputTokens: 2 });
+    });
+    const persistTurn = vi.fn();
+
+    await runNativeTurnLoop(
+      linesOf('hello', 'world'),
+      engine,
+      { output: () => {}, onTurnStats: () => {}, onTurnError: () => {}, persistTurn },
+    );
+
+    expect(persistTurn).toHaveBeenCalledTimes(2);
+    expect(persistTurn).toHaveBeenNthCalledWith(1, 'hello', 'echo: hello');
+    expect(persistTurn).toHaveBeenNthCalledWith(2, 'world', 'echo: world');
+  });
+
+  it('accumulates multi-chunk streamed output into one assistant string', async () => {
+    const engine: ReplEngine = vi.fn(async (_line: string, cbs) => {
+      cbs.output('par');
+      cbs.output('tial ');
+      cbs.output('reply');
+    });
+    const persistTurn = vi.fn();
+
+    await runNativeTurnLoop(
+      linesOf('q'),
+      engine,
+      { output: () => {}, onTurnStats: () => {}, onTurnError: () => {}, persistTurn },
+    );
+
+    expect(persistTurn).toHaveBeenCalledWith('q', 'partial reply');
+  });
+
+  it('a tools-only turn (no visible text) still persists the user line with empty assistant text', async () => {
+    const engine: ReplEngine = vi.fn(async (_line: string, cbs) => {
+      cbs.onTurnEnd({ inputTokens: 5, outputTokens: 0 });
+    });
+    const persistTurn = vi.fn();
+
+    await runNativeTurnLoop(
+      linesOf('do the thing'),
+      engine,
+      { output: () => {}, onTurnStats: () => {}, onTurnError: () => {}, persistTurn },
+    );
+
+    expect(persistTurn).toHaveBeenCalledWith('do the thing', '');
+  });
+
+  it('does NOT persist a turn that threw (nothing half-written)', async () => {
+    const engine: ReplEngine = vi.fn(async (line: string, cbs) => {
+      if (line === 'boom') throw new Error('exploded');
+      cbs.output('ok');
+    });
+    const persistTurn = vi.fn();
+    const onTurnError = vi.fn();
+
+    await runNativeTurnLoop(
+      linesOf('boom', 'fine'),
+      engine,
+      { output: () => {}, onTurnStats: () => {}, onTurnError, persistTurn },
+    );
+
+    // Only the successful second turn is persisted; the crashed one is not.
+    expect(persistTurn).toHaveBeenCalledTimes(1);
+    expect(persistTurn).toHaveBeenCalledWith('fine', 'ok');
+    expect(onTurnError).toHaveBeenCalledWith('exploded');
+  });
+
+  it('still delivers output to the display sink when persistTurn is wired', async () => {
+    const engine: ReplEngine = vi.fn(async (_line: string, cbs) => { cbs.output('visible'); });
+    const output = vi.fn();
+
+    await runNativeTurnLoop(
+      linesOf('x'),
+      engine,
+      { output, onTurnStats: () => {}, onTurnError: () => {}, persistTurn: () => {} },
+    );
+
+    expect(output).toHaveBeenCalledWith('visible');
+  });
+});
+
 describe('formatTurnErrorLine — visible-error i18n fallback (387-003)', () => {
   it('falls back to the English default template with the message substituted', () => {
     expect(formatTurnErrorLine('kaboom')).toBe('⚠ turn failed: kaboom');

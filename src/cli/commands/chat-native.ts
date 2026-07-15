@@ -57,7 +57,8 @@ import { McpClientBroker } from '../../mcp-client/broker.js';
 // registry class is a distinct type used only to compose the `/mcp` bridge.
 import { McpToolRegistry as McpClientToolRegistry } from '../../mcp-client/registry.js';
 import { loadMcpServers } from '../../mcp-client/config.js';
-import { dispatchMcpSlash, type ReplMcpBridge } from '../repl/mcp-bridge.js';
+import { dispatchMcpSlash, isMcpClientEnabled, type ReplMcpBridge } from '../repl/mcp-bridge.js';
+import { loadConfig } from '../../core/config.js';
 // Sprint 380 T-380-014 — type-only (chat-session.ts already imports FROM this
 // file; this reverse edge is erased at compile time, so there is no runtime
 // cycle). Used only to duck-type-check `/clear`'s provider — see below.
@@ -708,6 +709,10 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
   // (cheap) discovery so a no-server session never re-probes every `/mcp`.
   let liveMcpBridge: ReplMcpBridge | null = null;
   let liveMcpBridgeBuilt = false;
+  // 387-013 MCP-CLIENT-GATE (REPL-575 K1): servers configured but the opt-in
+  // flag is off — remembered so `/mcp` answers with the honest disabled-notice
+  // instead of the misleading "not wired" fall-through.
+  let liveMcpDisabledByFlag = false;
   // Sprint 223 T-223-004 — chat-layout wire. emitLayout suppresses empty
   // strings (messageSeparator returns '' on non-TTY) so callers see only
   // meaningful chrome. Default-off so existing HTTP/test callers keep their
@@ -862,14 +867,16 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     }
     // Sprint 280 T-280-004 — `/mcp` external-MCP-client wire (G1). The bridge
     // (buildMcpBridge + McpClientBroker) shipped in Sprint 229 but had zero REPL
-    // callers; this is the live wire. Config-gated on server-discovery: `/mcp`
-    // routes to the broker ONLY when ≥1 MCP server is configured
-    // (loadMcpServers: .mcp.json / .mcp.local.json / ~/.deckent/mcp.json) OR a
-    // bridge was injected (tests/entry). With NO server configured the block
-    // does NOT intercept — `/mcp` falls through to the slash registry's existing
-    // honest notice (behaviour preserved, `chat.mcp_not_wired`). Fail-safe:
-    // discovery + bridge construction are wrapped so a `/mcp` line never crashes
-    // the REPL; dispatchMcpSlash itself never throws.
+    // callers; this is the live wire. DOUBLE-gated (387-013 wired, REPL-575 K1):
+    // `/mcp` routes to the broker ONLY when ≥1 MCP server is configured
+    // (loadMcpServers: .mcp.json / .mcp.local.json / ~/.deckent/mcp.json) AND
+    // `mcp_client_enabled` is explicitly true — OR a bridge was injected
+    // (tests/entry). Servers-but-flag-off answers `chat.mcp_client_disabled`;
+    // with NO server configured the block does NOT intercept — `/mcp` falls
+    // through to the slash registry's existing honest notice
+    // (`chat.mcp_not_wired`). Fail-safe: discovery + bridge construction are
+    // wrapped so a `/mcp` line never crashes the REPL; dispatchMcpSlash itself
+    // never throws.
     if (line === '/mcp' || line.startsWith('/mcp ')) {
       const mcpRoot = opts.projectRoot ?? process.cwd();
       let bridge: ReplMcpBridge | null;
@@ -887,14 +894,27 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
             configured = false;
           }
           if (configured) {
+            // 387-013 MCP-CLIENT-GATE wired (REPL-575 K1): server presence
+            // alone no longer builds the external client — `mcp_client_enabled`
+            // must be explicitly true. Fail-closed: a config read error = off.
+            let clientEnabled = false;
             try {
-              liveMcpBridge = buildMcpBridge({
-                broker: new McpClientBroker(),
-                registry: new McpClientToolRegistry(),
-                projectRoot: mcpRoot,
-              });
+              clientEnabled = isMcpClientEnabled(await loadConfig(mcpRoot));
             } catch {
-              liveMcpBridge = null;
+              clientEnabled = false;
+            }
+            if (!clientEnabled) {
+              liveMcpDisabledByFlag = true;
+            } else {
+              try {
+                liveMcpBridge = buildMcpBridge({
+                  broker: new McpClientBroker(),
+                  registry: new McpClientToolRegistry(),
+                  projectRoot: mcpRoot,
+                });
+              } catch {
+                liveMcpBridge = null;
+              }
             }
           }
         }
@@ -913,6 +933,17 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
         transcript.push({ role: 'assistant', content: mcpText });
         memStore?.appendChatTurn(sessionId, 'user', line);
         memStore?.appendChatTurn(sessionId, 'assistant', mcpText);
+        continue;
+      }
+      if (liveMcpDisabledByFlag && opts.mcpBridge === undefined) {
+        // Servers ARE configured but the opt-in flag is off — the "not wired"
+        // fall-through would be dishonest here; say exactly what to enable.
+        const notice = getMessage('chat.mcp_client_disabled', lang);
+        output(notice);
+        transcript.push({ role: 'user', content: line });
+        transcript.push({ role: 'assistant', content: notice });
+        memStore?.appendChatTurn(sessionId, 'user', line);
+        memStore?.appendChatTurn(sessionId, 'assistant', notice);
         continue;
       }
       // bridge === null → no MCP server configured. Fall through to the slash

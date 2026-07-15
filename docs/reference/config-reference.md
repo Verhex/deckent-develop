@@ -65,6 +65,7 @@ These fields sit at the root of `.deckent/config.json`:
 | `worker_provider` | `ProviderName` | `"claude"` | Default provider for worker tasks. |
 | `fallback_provider` | `ProviderName` | -- | Fallback provider when primary fails. |
 | `last_sprint_id` | `string` | -- | Last sprint ID. Managed by Brain. Do not edit manually. |
+| `mcp_client_enabled` | `boolean` | `false` | Opt-in gate for the REPL's external MCP client. Only an explicit `true` connects configured MCP servers (`.mcp.json`, `.mcp.local.json`, `~/.deckent/mcp.json`) at REPL boot / on `/mcp`. Absent or `false` = no external MCP surface; when servers are configured but the flag is off, the REPL prints an honest disabled-notice. |
 
 ### Minimal Valid Config
 
