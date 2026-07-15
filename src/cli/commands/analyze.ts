@@ -1,7 +1,10 @@
 import type { Command } from 'commander';
 import type { ProjectAnalysis } from '../../core/types.js';
 import { analyzeProject } from '../../core/analyzer.js';
-import { print } from '../helpers/output.js';
+import { bootstrapProjectVocabulary, writeVocabulary } from '../../core/routing/vocabulary-bootstrap.js';
+import { detectProjectStack } from '../../core/stack-detector.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
+import { print, printError } from '../helpers/output.js';
 import { formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 
@@ -28,7 +31,8 @@ export function registerAnalyze(program: Command): void {
     .alias('analyze-project')
     .description('Analyze project stack, size, and recommended methodology')
     .option('--json', 'Output raw JSON')
-    .action((opts: { json?: boolean }) => {
+    .option('--bootstrap-vocabulary', 'Derive and write the project routing-vocabulary layer (.deckent/routing/vocabulary.json)')
+    .action(async (opts: { json?: boolean; bootstrapVocabulary?: boolean }) => {
       let root: string;
       try {
         root = resolveProjectRoot();
@@ -40,6 +44,25 @@ export function registerAnalyze(program: Command): void {
         print(JSON.stringify(result, null, 2));
       } else {
         print(formatAnalysisResult(result));
+      }
+
+      // ROUTING-V3: project-layer domain bootstrap (SURF-era CLI wire — closes
+      // the vocabulary-bootstrap orphan). Overwrite-protected inside
+      // writeVocabulary (three-way precedent); explicit opt-in flag.
+      if (opts.bootstrapVocabulary) {
+        const lang = getLanguage();
+        try {
+          const bootstrap = bootstrapProjectVocabulary(root, detectProjectStack(root));
+          const written = writeVocabulary(root, bootstrap.candidates.map((c) => c.domain));
+          print(getMessage('analyze.vocabulary_bootstrap', lang, {
+            count: String(bootstrap.candidates.length),
+            status: written.status,
+            path: written.path ?? '-',
+          }));
+        } catch (error) {
+          printError(error);
+          process.exitCode = 1;
+        }
       }
     });
 }

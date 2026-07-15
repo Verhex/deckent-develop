@@ -312,3 +312,6 @@ Teşhis: run-flow SSE (`/api/run-flow/:id/events`) auth-arkasında ama allowlist
 
 ## SURF-3 İLK-PARÇA: status --follow ACTIVITY-TÜKETİCİSİ ✅ (2026-07-15, el)
 StatusRenderer'a **⚡ Live activity** bölümü (Section 3.5): sprint-event-JSONL'inin son-64KB'lik kuyruk-taraması → task-başına EN-SON ACTIVITY-satırı (torn-line-toleranslı, maxTasks-kapaklı, fail-soft). `status --follow` zaten her event'te redraw ediyor → canlı-akış otomatik. Alperen'in #582 döngüsü UÇTAN-UCA kapandı: worker-heartbeat → ACTIVITY-kanalı → terminal-canlı-satırı. Pinler 3/3; cli-ailesi yeşil. KALAN (SURF-3): terminal multi-flow-inbox · born-697 approval kanal-wiring · result-evidence · REPL-575 bulgu-triyajı · Claude-CLI tool-by-tool zengin-akış.
+
+## V3-KUYRUK: vocabulary-bootstrap CLI-WIRE ✅ + coordinator UN-ORPHAN doğrulaması (2026-07-15, el)
+`deckent analyze --bootstrap-vocabulary` — proje-domain-katmanını türetip yazar (overwrite-korumalı writeVocabulary; i18n en+tr; gerçek-binary smoke: "11 project domain(s) derived — updated"). Orphan-pinleri: vocabulary-bootstrap kapandı (statik-import; tarayıcı dinamik-import'u saymıyor — öğrenildi) + run-flow-coordinator D5-pini planlandığı gibi 1c'de un-orphan oldu → düşürüldü (86→84). cli+governance aileleri 485-dosya/7149-test yeşil.

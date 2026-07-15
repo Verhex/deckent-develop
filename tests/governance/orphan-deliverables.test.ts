@@ -428,7 +428,6 @@ const KNOWN_ORPHANS = [
   // consumers (terminal controller + API routes) are the SURF-1c driver-
   // migration slice — deliberately frozen mid-train (Alperen, 2026-07-14:
   // SURF dondu, PCOMP-6 öncelik). Un-orphans when SURF-1c wires it.
-  'src/orchestra/run-flow-coordinator.ts',
   'src/agents/auditor.ts',
   'src/agents/cross-sprint-analyzer.ts',
   'src/agents/http-agentic-worker.ts',
@@ -479,8 +478,6 @@ const KNOWN_ORPHANS = [
   'src/core/notification-providers/slack.ts',
   'src/core/provider-capabilities.ts',
   'src/core/rate-limiter.ts',
-  // S3 rename artifact: vocabulary-bootstrap's CLI wire (analyze/init) is SURF-era follow-up work.
-  'src/core/routing/vocabulary-bootstrap.ts',
   'src/core/skill-registry.ts',
   'src/core/spawn-safety.ts',
   'src/core/state-paths.ts',
@@ -525,7 +522,7 @@ const KNOWN_ORPHANS = [
 
 describe('KNOWN_ORPHANS allowlist sanity', () => {
   it('has the expected count and only well-formed src/**/*.ts(x) entries', () => {
-    expect(KNOWN_ORPHANS.length).toBe(86); // 86->85: plan-preview-card TERM4B mount'uyla kapandi (sprint-426)
+    expect(KNOWN_ORPHANS.length).toBe(84); // 86->84: agent-selector V2-kesimle silindi + vocabulary-bootstrap analyze --bootstrap-vocabulary ile kapandi (SURF-era)
     for (const entry of KNOWN_ORPHANS) {
       expect(entry.startsWith('src/')).toBe(true);
       expect(entry.endsWith('.ts') || entry.endsWith('.tsx')).toBe(true);

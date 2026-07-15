@@ -678,6 +678,10 @@ const MESSAGES: MessageMap = {
     en: 'Aborted — agent \'{name}\' not deleted. Pass --force to skip this prompt.',
     tr: 'İptal edildi — \'{name}\' agent\'ı silinmedi. Bu onayı atlamak için --force kullanın.',
   },
+  'analyze.vocabulary_bootstrap': {
+    en: 'Routing vocabulary bootstrap: {count} project domain(s) derived — {status} ({path})',
+    tr: 'Routing sözlük-bootstrap: {count} proje-domain\'i türetildi — {status} ({path})',
+  },
   // ─── agent lint (ROUTING-V3 Slice-1, 446) ────────────────────────────
   'agent.lint.header': {
     en: 'Agent catalog lint (V3 capabilities) — {agents} agents × {cells} sweep cells',
