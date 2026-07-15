@@ -14,24 +14,26 @@
 // not on `mcp_client_enabled`) and calls `dispatchMcpSlash` for every `/mcp`
 // line — this dispatch core has a real production caller.
 //
-// `isMcpClientEnabled()` IS now the live gate (387-013 recorded it as unwired
-// dead code; wired for real 2026-07-15, REPL-575 K1 — the review finding was
-// "unconditional MCP auto-connect"). Both production entry points consult it:
-//   * `run.tsx` (native-agent default path, ADR-G-034/376-003) checks
-//     `isMcpClientEnabled(cfg)` BEFORE building broker/bridge — flag off means
-//     no auto-connect at boot; servers-configured-but-off prints the honest
-//     `chat.mcp_client_disabled` hint.
-//   * `chat-native.ts` (legacy loop) requires server presence AND the flag
-//     before building the `/mcp` bridge; servers-but-off answers `/mcp` with
-//     the same disabled-notice.
+// `planMcpConnect()` IS now the live gate (387-013 recorded `isMcpClientEnabled`
+// as unwired dead code; wired for real 2026-07-15, REPL-575 K1 — the review
+// finding was "unconditional MCP auto-connect"). The gate is a SMART-SPLIT
+// (K1-C, Alperen-chosen): the operator's OWN scopes (user `~/.deckent/mcp.json`
+// + gitignored `.mcp.local.json`) always connect; a git-tracked project
+// `.mcp.json` (travels with a cloned repo) is opt-in behind `mcp_client_enabled`.
+// Both production entry points consult it:
+//   * `run.tsx` (native-agent default path, ADR-G-034/376-003) calls
+//     `planMcpConnect(cwd, isMcpClientEnabled(cfg))` before building the bridge;
+//     `notice` prints the honest `chat.mcp_client_disabled` hint when a project
+//     `.mcp.json` was skipped.
+//   * `chat-native.ts` (legacy loop) uses the same plan before building the
+//     `/mcp` bridge; a skipped project scope answers `/mcp` with that notice.
 // `mcp_client_enabled` is declared in `DeckentConfig` + `ResolvedConfig`
 // (core/config-types.ts) and passed through both resolved-literals in
 // core/config.ts (born-464 flag-drop pattern honored).
 // `initReplMcpBridge()` (the composition root below) remains caller-less —
 // run.tsx keeps its inline construction because it must retain the broker
-// reference for disposal; the gate function is the shared truth-table.
-// `tests/cli/mcp-client-gate.test.ts` pins the WIRED state (it previously
-// pinned the unwired state so drift required a conscious update — it did).
+// reference for disposal; `planMcpConnect`/`isMcpClientEnabled` are the shared
+// gate. `tests/cli/mcp-client-gate.test.ts` pins the WIRED state.
 //
 // GATING — opt-in, backward-safe:
 //   * Gated behind a default-OFF `mcp_client_enabled` flag. Flag absent/false
@@ -54,6 +56,7 @@ import {
   type BridgeBrokerLike,
   type McpConfirmFn,
 } from '../commands/chat-mcp-bridge.js';
+import { loadMcpServers } from '../../mcp-client/config.js';
 import { getMessage } from '../helpers/messages.js';
 
 /** The live REPL-shaped MCP surface returned by `buildMcpBridge`. */
@@ -96,6 +99,40 @@ export interface InitReplMcpBridgeOptions {
  */
 export function isMcpClientEnabled(config: ReplMcpConfigLike | undefined): boolean {
   return config?.mcp_client_enabled === true;
+}
+
+/** The MCP connect decision under the smart-split gate. */
+export interface McpConnectPlan {
+  /** Build the bridge and connect servers this launch. */
+  connect: boolean;
+  /** Pass to `buildMcpBridge` — include the git-tracked project `.mcp.json`. */
+  includeProjectScope: boolean;
+  /** Show the honest disabled-notice: git-tracked project servers exist but the
+   *  flag is off, so they were skipped (the operator can opt in). */
+  notice: boolean;
+}
+
+/**
+ * Decide the MCP connect plan under the smart-split gate (REPL-575 K1-C).
+ *
+ * The operator's OWN scopes — user `~/.deckent/mcp.json` (global, you placed it)
+ * and gitignored personal `.mcp.local.json` — are trusted and ALWAYS connect.
+ * A git-tracked project `.mcp.json` travels with the repo (a clone you may not
+ * have authored) and connects only when `mcp_client_enabled` is explicitly true.
+ * When such project-scoped servers are skipped, `notice` is set so the REPL says
+ * so honestly instead of silently dropping them.
+ */
+export function planMcpConnect(root: string, clientEnabled: boolean): McpConnectPlan {
+  const trustedKeys = new Set(Object.keys(loadMcpServers(root, { includeProjectScope: false })));
+  const allKeys = Object.keys(loadMcpServers(root));
+  const hasTrusted = trustedKeys.size > 0;
+  // A server reachable ONLY with the project scope (not shadowed by a trusted one).
+  const hasProjectOnly = allKeys.some((k) => !trustedKeys.has(k));
+  return {
+    connect: hasTrusted || (clientEnabled && hasProjectOnly),
+    includeProjectScope: clientEnabled,
+    notice: hasProjectOnly && !clientEnabled,
+  };
 }
 
 /**

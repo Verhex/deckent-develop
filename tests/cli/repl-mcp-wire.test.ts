@@ -18,8 +18,9 @@
 //   8) loop /mcp call + reject confirm → cancelled output, REPL alive
 //   9) loop /mcp + null inject         → honest chat.mcp_not_wired             (server-yok→honest)
 //  10) loop /mcp + empty tmpdir root   → honest chat.mcp_not_wired             (real discovery)
-//  11) loop /mcp + server, flag OFF    → honest chat.mcp_client_disabled       (387-013 gate, REPL-575 K1)
-//  12) loop /mcp + server, flag ON     → gate opens (neither notice)           (opt-in path)
+//  11) loop /mcp + trusted local scope → connects with NO flag                 (smart-split K1-C)
+//  12) loop /mcp + project scope, OFF  → honest chat.mcp_client_disabled       (387-013 gate)
+//  13) loop /mcp + project scope, ON   → gate opens (neither notice)           (opt-in path)
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -285,12 +286,37 @@ describe('runChatNativeLoop — /mcp server-discovery fall-through (tmpdir)', ()
     expect(sendSpy).not.toHaveBeenCalled();
   });
 
-  // ── 387-013 MCP-CLIENT-GATE wired (REPL-575 K1) ──────────────────────────
-  // Server presence alone must no longer build the external client: the
-  // opt-in `mcp_client_enabled` flag gates it, and servers-but-off gets the
-  // honest disabled-notice (not the misleading "not wired" fall-through).
+  // ── 387-013 MCP-CLIENT-GATE wired — smart-split (REPL-575 K1-C) ───────────
+  // The operator's OWN servers (gitignored .mcp.local.json here; ~/.deckent
+  // /mcp.json in real use) always connect; a git-tracked project .mcp.json (a
+  // cloned repo's) is opt-in behind `mcp_client_enabled`. A skipped project
+  // scope gets the honest disabled-notice, not the misleading "not wired".
 
-  it('server configured but mcp_client_enabled absent → honest disabled-notice, no bridge', async () => {
+  it('trusted .mcp.local.json → connects with NO flag, no disabled-notice', async () => {
+    const { adapter, sendSpy } = idleProvider();
+    const { dispatcher } = fakeDispatcher();
+    const output = vi.fn();
+    writeFileSync(
+      join(root, '.mcp.local.json'),
+      JSON.stringify({ mcpServers: { mine: { command: '/nonexistent-deckent-test-binary' } } }),
+    );
+
+    await runChatNativeLoop({
+      provider: adapter,
+      dispatcher,
+      input: lines('/mcp'),
+      output,
+      projectRoot: root,
+      // no flag → the operator's OWN server still connects (smart-split);
+      // connect fails soft (nonexistent binary) but the gate opened.
+    });
+
+    expect(output).not.toHaveBeenCalledWith(getMessage('chat.mcp_client_disabled', 'en'));
+    expect(output).not.toHaveBeenCalledWith(getMessage('chat.mcp_not_wired', 'en'));
+    expect(sendSpy).not.toHaveBeenCalled();
+  });
+
+  it('git-tracked .mcp.json (project scope) but mcp_client_enabled absent → honest disabled-notice, no bridge', async () => {
     const { adapter, sendSpy } = idleProvider();
     const { dispatcher } = fakeDispatcher();
     const output = vi.fn();
@@ -312,7 +338,7 @@ describe('runChatNativeLoop — /mcp server-discovery fall-through (tmpdir)', ()
     expect(sendSpy).not.toHaveBeenCalled();
   });
 
-  it('server configured and mcp_client_enabled true → gate opens (neither notice is shown)', async () => {
+  it('git-tracked .mcp.json and mcp_client_enabled true → gate opens (neither notice is shown)', async () => {
     const { adapter, sendSpy } = idleProvider();
     const { dispatcher } = fakeDispatcher();
     const output = vi.fn();

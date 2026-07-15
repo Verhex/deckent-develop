@@ -94,4 +94,34 @@ describe('loadMcpServers', () => {
     expect(result).toHaveProperty('project-only');
     expect(result).toHaveProperty('local-only');
   });
+
+  it('includeProjectScope:false drops the git-tracked project scope, keeps user + local (REPL-575 K1-C)', () => {
+    mkdirSync(join(tmpHome, '.deckent'), { recursive: true });
+    writeFileSync(
+      join(tmpHome, '.deckent', 'mcp.json'),
+      JSON.stringify({ 'user-only': { transport: 'stdio', command: 'user-cmd' } }),
+      'utf-8',
+    );
+    writeFileSync(
+      join(tmpRoot, '.mcp.json'),
+      JSON.stringify({ 'project-only': { transport: 'stdio', command: 'project-cmd' } }),
+      'utf-8',
+    );
+    writeFileSync(
+      join(tmpRoot, '.mcp.local.json'),
+      JSON.stringify({ 'local-only': { transport: 'stdio', command: 'local-cmd' } }),
+      'utf-8',
+    );
+
+    const trusted = loadMcpServers(tmpRoot, { includeProjectScope: false });
+    // The operator's own scopes remain…
+    expect(trusted).toHaveProperty('user-only');
+    expect(trusted).toHaveProperty('local-only');
+    // …but the git-tracked project scope is gone.
+    expect(trusted).not.toHaveProperty('project-only');
+
+    // Default (and explicit true) still include every scope — backward-safe.
+    expect(loadMcpServers(tmpRoot)).toHaveProperty('project-only');
+    expect(loadMcpServers(tmpRoot, { includeProjectScope: true })).toHaveProperty('project-only');
+  });
 });

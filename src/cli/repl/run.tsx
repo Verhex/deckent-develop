@@ -804,25 +804,24 @@ export async function runInkRepl(
     } else {
       let mcpBridge: import('./native-tool-registry.js').NativeMcpBridge | undefined;
       try {
-        // 387-013 MCP-CLIENT-GATE wired for real (REPL-575 K1, 2026-07-15):
-        // the external MCP client is opt-in — absent/false means NO auto-connect
-        // at boot (server presence alone no longer opens external processes).
-        // With servers configured but the flag off, say so honestly instead of
-        // silently dropping the tools.
-        const { isMcpClientEnabled } = await import('./mcp-bridge.js');
-        if (isMcpClientEnabled(cfg as { mcp_client_enabled?: boolean })) {
+        // 387-013 MCP-CLIENT-GATE wired for real (REPL-575 K1-C smart-split,
+        // 2026-07-15): the operator's OWN servers (~/.deckent/mcp.json + gitignored
+        // .mcp.local.json) always connect; a git-tracked project .mcp.json (from a
+        // cloned repo) is opt-in behind mcp_client_enabled. A skipped project scope
+        // prints an honest notice instead of silently dropping the tools.
+        const { isMcpClientEnabled, planMcpConnect } = await import('./mcp-bridge.js');
+        const plan = planMcpConnect(process.cwd(), isMcpClientEnabled(cfg as { mcp_client_enabled?: boolean }));
+        if (plan.connect) {
           const { McpClientBroker } = await import('../../mcp-client/broker.js');
           const { McpToolRegistry } = await import('../../mcp-client/registry.js');
           const { buildMcpBridge } = await import('../commands/chat-mcp-bridge.js');
           mcpClientBroker = new McpClientBroker({});
-          const bridge = buildMcpBridge({ broker: mcpClientBroker, registry: new McpToolRegistry(), projectRoot: process.cwd() });
+          const bridge = buildMcpBridge({ broker: mcpClientBroker, registry: new McpToolRegistry(), projectRoot: process.cwd(), includeProjectScope: plan.includeProjectScope });
           const connected = await bridge.loadAndConnectAll();
           if (connected.length > 0) mcpBridge = bridge as unknown as import('./native-tool-registry.js').NativeMcpBridge;
-        } else {
-          const { loadMcpServers } = await import('../../mcp-client/config.js');
-          if (Object.keys(loadMcpServers(process.cwd())).length > 0) {
-            process.stdout.write(`${getMessage('chat.mcp_client_disabled', lang)}\n`);
-          }
+        }
+        if (plan.notice) {
+          process.stdout.write(`${getMessage('chat.mcp_client_disabled', lang)}\n`);
         }
       } catch { /* MCP optional — REPL stays usable */ }
 

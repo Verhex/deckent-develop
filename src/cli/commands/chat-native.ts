@@ -56,8 +56,7 @@ import { McpClientBroker } from '../../mcp-client/broker.js';
 // interface (the in-process deckent_* tool registry); the external-MCP client
 // registry class is a distinct type used only to compose the `/mcp` bridge.
 import { McpToolRegistry as McpClientToolRegistry } from '../../mcp-client/registry.js';
-import { loadMcpServers } from '../../mcp-client/config.js';
-import { dispatchMcpSlash, isMcpClientEnabled, type ReplMcpBridge } from '../repl/mcp-bridge.js';
+import { dispatchMcpSlash, isMcpClientEnabled, planMcpConnect, type ReplMcpBridge } from '../repl/mcp-bridge.js';
 import { loadConfig } from '../../core/config.js';
 // Sprint 380 T-380-014 — type-only (chat-session.ts already imports FROM this
 // file; this reverse edge is erased at compile time, so there is no runtime
@@ -887,36 +886,35 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       } else {
         if (!liveMcpBridgeBuilt) {
           liveMcpBridgeBuilt = true;
-          let configured = false;
+          // 387-013 MCP-CLIENT-GATE wired (REPL-575 K1-C smart-split): the
+          // operator's own scopes (user + gitignored local) always connect; a
+          // git-tracked project .mcp.json is opt-in behind `mcp_client_enabled`.
+          // Fail-closed: a config read error = off.
+          let clientEnabled = false;
           try {
-            configured = Object.keys(loadMcpServers(mcpRoot)).length > 0;
+            clientEnabled = isMcpClientEnabled(await loadConfig(mcpRoot));
           } catch {
-            configured = false;
+            clientEnabled = false;
           }
-          if (configured) {
-            // 387-013 MCP-CLIENT-GATE wired (REPL-575 K1): server presence
-            // alone no longer builds the external client — `mcp_client_enabled`
-            // must be explicitly true. Fail-closed: a config read error = off.
-            let clientEnabled = false;
+          let plan: ReturnType<typeof planMcpConnect> = { connect: false, includeProjectScope: clientEnabled, notice: false };
+          try {
+            plan = planMcpConnect(mcpRoot, clientEnabled);
+          } catch {
+            plan = { connect: false, includeProjectScope: clientEnabled, notice: false };
+          }
+          if (plan.connect) {
             try {
-              clientEnabled = isMcpClientEnabled(await loadConfig(mcpRoot));
+              liveMcpBridge = buildMcpBridge({
+                broker: new McpClientBroker(),
+                registry: new McpClientToolRegistry(),
+                projectRoot: mcpRoot,
+                includeProjectScope: plan.includeProjectScope,
+              });
             } catch {
-              clientEnabled = false;
-            }
-            if (!clientEnabled) {
-              liveMcpDisabledByFlag = true;
-            } else {
-              try {
-                liveMcpBridge = buildMcpBridge({
-                  broker: new McpClientBroker(),
-                  registry: new McpClientToolRegistry(),
-                  projectRoot: mcpRoot,
-                });
-              } catch {
-                liveMcpBridge = null;
-              }
+              liveMcpBridge = null;
             }
           }
+          if (plan.notice) liveMcpDisabledByFlag = true;
         }
         bridge = liveMcpBridge;
       }

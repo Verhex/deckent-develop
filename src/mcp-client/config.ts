@@ -34,12 +34,29 @@ function readMcpJson(filePath: string): McpServersMap {
  *
  * Secrets in env/headers values are resolved via .deck interpolation (AS-2).
  */
-export function loadMcpServers(root: string): McpServersMap {
+export interface LoadMcpServersOptions {
+  /**
+   * Include the git-tracked project scope (`<root>/.mcp.json`). REPL-575 K1-C
+   * smart-split: the operator's OWN scopes (user `~/.deckent/mcp.json` + gitignored
+   * personal `.mcp.local.json`) are always trusted, but a git-tracked `.mcp.json`
+   * travels with the repo (a clone you didn't author) and is opt-in behind
+   * `mcp_client_enabled`. Default `true` — every non-REPL caller sees all scopes,
+   * exactly as before. Set `false` to load only the trusted scopes.
+   */
+  includeProjectScope?: boolean;
+}
+
+export function loadMcpServers(root: string, opts: LoadMcpServersOptions = {}): McpServersMap {
   const user = readMcpJson(join(homedir(), '.deckent', 'mcp.json'));
   const project = readMcpJson(join(root, '.mcp.json'));
   const local = readMcpJson(join(root, '.mcp.local.json'));
 
-  const merged: McpServersMap = { ...user, ...project, ...local };
+  // Precedence local > project > user (ADR-004). When project scope is excluded
+  // (smart-split, flag off) the git-tracked map drops out entirely, keeping the
+  // operator's own user+local servers.
+  const merged: McpServersMap = opts.includeProjectScope === false
+    ? { ...user, ...local }
+    : { ...user, ...project, ...local };
 
   return interpolateConfig(merged, root);
 }

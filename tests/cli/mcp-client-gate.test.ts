@@ -133,13 +133,15 @@ describe('mcp_client_enabled — production-wiring regression guard (387-013 →
   // The guard now pins the WIRED state: both production entry points must keep
   // consulting the gate, so the auto-connect security hole cannot silently
   // reopen.
-  it('run.tsx (native-agent default REPL path) consults the gate', () => {
+  it('run.tsx (native-agent default REPL path) consults the smart-split gate', () => {
     const src = readFileSync(join(ROOT, 'src', 'cli', 'repl', 'run.tsx'), 'utf-8');
     expect(src).toMatch(/isMcpClientEnabled/);
+    expect(src).toMatch(/planMcpConnect/);
   });
 
-  it('chat-native.ts (legacy REPL loop) consults the gate', () => {
+  it('chat-native.ts (legacy REPL loop) consults the smart-split gate', () => {
     const src = readFileSync(join(ROOT, 'src', 'cli', 'commands', 'chat-native.ts'), 'utf-8');
     expect(src).toMatch(/isMcpClientEnabled/);
+    expect(src).toMatch(/planMcpConnect/);
   });
 });

@@ -83,6 +83,13 @@ export interface McpBridgeOptions {
   registry: McpToolRegistry;
   /** Project root for event-stream audit writes. */
   projectRoot: string;
+  /**
+   * Include the git-tracked project `.mcp.json` scope when `loadAndConnectAll`
+   * discovers servers (REPL-575 K1-C smart-split). Default `true` — passed
+   * `false` by the REPL gate when `mcp_client_enabled` is off, so only the
+   * operator's own trusted scopes (user + gitignored local) connect.
+   */
+  includeProjectScope?: boolean;
   /** Sprint id for audit; defaults to `'repl'` when no sprint is active. */
   sprintId?: string;
   /**
@@ -213,6 +220,7 @@ export function buildMcpBridge(opts: McpBridgeOptions): {
   loadAndConnectAll(): Promise<string[]>;
 } {
   const { broker, registry, projectRoot, sprintId } = opts;
+  const includeProjectScope = opts.includeProjectScope ?? true;
   const audit =
     opts.audit ??
     ((record: McpAuditRecord): void => {
@@ -247,7 +255,7 @@ export function buildMcpBridge(opts: McpBridgeOptions): {
     },
 
     async loadAndConnectAll(): Promise<string[]> {
-      const servers = loadMcpServers(projectRoot);
+      const servers = loadMcpServers(projectRoot, { includeProjectScope });
       const connected: string[] = [];
       for (const [name, def] of Object.entries(servers)) {
         try {
