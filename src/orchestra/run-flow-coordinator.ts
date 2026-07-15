@@ -200,6 +200,13 @@ export interface RecordRunStartedCommand {
   readonly commandId?: string;
 }
 
+export interface AbortFlowCommand {
+  flowId: string;
+  /** Human/system cancellation narrative (surfaced verbatim on the context). */
+  reason?: string;
+  commandId?: string;
+}
+
 export interface RecordRunFailureCommand {
   flowId: string;
   /** Honest failure narrative ("process died without completion (pid 123 not alive)"). */
@@ -253,6 +260,8 @@ export interface RunFlowCoordinator {
   /** STARTING/DETACHED_RUNNING -> FAILED. Emits RUN_FAILED (born-698b/c:
    *  the honest closure for a run that died without completing). */
   recordRunFailure(cmd: RecordRunFailureCommand): RunFlowCommandResult;
+  /** Any non-terminal state -> CANCELLED. Emits FLOW_ABORTED (SURF-2 cancel). */
+  abortFlow(cmd: AbortFlowCommand): RunFlowCommandResult;
 
   /**
    * Query surface — resolve a flow's current derived context along the priority
@@ -529,6 +538,13 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
       const { flowId, error, commandId } = cmd;
       return runCommand(flowId, commandId, () => [
         buildEvent(flowId, commandId, { type: 'RUN_FAILED', error }),
+      ]);
+    },
+
+    abortFlow(cmd) {
+      const { flowId, reason, commandId } = cmd;
+      return runCommand(flowId, commandId, () => [
+        buildEvent(flowId, commandId, { type: 'FLOW_ABORTED', ...(reason !== undefined ? { reason } : {}) }),
       ]);
     },
 

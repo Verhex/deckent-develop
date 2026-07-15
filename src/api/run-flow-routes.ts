@@ -448,6 +448,55 @@ function handleStart(
   }
 }
 
+// ─── POST /api/run-flow/:flowId/cancel (SURF-2 parity) ──────────────────
+
+const CancelSchema = z.object({ reason: z.string().max(2000).optional() }).strict();
+
+/** Any non-terminal flow → CANCELLED (durable FLOW_ABORTED). NOTE: cancelling
+ *  a DETACHED_RUNNING flow closes the FLOW record; the detached sprint
+ *  process itself is owned by the sprint lifecycle (deckent kill) — the
+ *  response says so explicitly rather than pretending to reap the process. */
+function handleCancel(
+  res: ServerResponse,
+  projectRoot: string,
+  flowId: string,
+  body: unknown,
+  req: IncomingMessage,
+): boolean {
+  const parsed = CancelSchema.safeParse(body ?? {});
+  if (!parsed.success) {
+    sendError(res, 400, parsed.error.message);
+    return true;
+  }
+  const existing = lookupFlow(flowId, req, projectRoot);
+  if (!existing) {
+    sendError(res, 404, 'Flow not found');
+    return true;
+  }
+  const principal = deriveRequestPrincipal(req);
+  try {
+    const result = coordinatorFor(projectRoot).abortFlow({
+      flowId,
+      reason: parsed.data.reason ?? `cancelled via API by ${principal.id}`,
+      commandId: `cancel-${flowId}-${existing.state}`,
+    });
+    const wasRunning = existing.state === 'DETACHED_RUNNING' || existing.state === 'STARTING';
+    sendJson(res, {
+      context: result.context,
+      ...(wasRunning
+        ? { note: 'flow record closed; the detached sprint process is governed by the sprint lifecycle (deckent kill), not this endpoint' }
+        : {}),
+    });
+    return true;
+  } catch (err) {
+    if (err instanceof RunFlowTransitionError || err instanceof InvalidTransitionError) {
+      sendError(res, 409, err.message);
+      return true;
+    }
+    throw err;
+  }
+}
+
 // ─── Dispatch ────────────────────────────────────────────────────────────
 
 /**
@@ -500,6 +549,9 @@ export async function registerRunFlowRoutes(
   }
   if (segments.length === 2 && segments[1] === 'start' && method === 'POST') {
     return handleStart(res, projectRoot, flowId, req);
+  }
+  if (segments.length === 2 && segments[1] === 'cancel' && method === 'POST') {
+    return handleCancel(res, projectRoot, flowId, body, req);
   }
 
   return false;

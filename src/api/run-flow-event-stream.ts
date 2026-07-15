@@ -26,6 +26,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { loadConfig } from '../core/config.js';
 import type { RunFlowEvent } from '../core/run-flow-contract.js';
+import { readFlowEvents } from '../core/run-flow-store.js';
 
 const RUN_FLOW_STREAM_DISABLED_MESSAGE =
   'run-flow event-stream is disabled — set terminal.run_flow_v2: true in .deckent/config.json to enable /api/run-flow/:flowId/events';
@@ -108,7 +109,10 @@ export function _resetRunFlowEventStreamState(): void {
  * type/... preserved verbatim — "versioned-event şekli korunur").
  */
 export function formatRunFlowEventFrame(event: RunFlowEvent): string {
-  return `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
+  // SURF-2: the durable sequence rides the SSE `id:` line, so EventSource's
+  // native Last-Event-ID reconnect carries the replay cursor for free.
+  const idLine = typeof event.sequence === 'number' ? `id: ${event.sequence}\n` : '';
+  return `${idLine}event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
 }
 
 // ─── HTTP handler ────────────────────────────────────────────────────────
@@ -123,6 +127,7 @@ export function handleRunFlowEventStream(
   res: ServerResponse,
   flowId: string,
   allowedOrigin: string,
+  projectRoot?: string,
 ): () => void {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -132,13 +137,58 @@ export function handleRunFlowEventStream(
   });
   res.write('retry: 3000\n\n');
 
-  const unsubscribe = subscribeRunFlowEvents(flowId, (event) => {
+  // ── SURF-2 replay-cursor: `?after=N` or the EventSource-native
+  //    Last-Event-ID header selects the durable backfill start. Race-closed:
+  //    subscribe FIRST (live events buffer), then backfill from the durable
+  //    log, then flush any buffered live event newer than the backfill tail.
+  const afterParam = (() => {
+    try {
+      const q = new URL(req.url ?? '', 'http://localhost').searchParams.get('after');
+      if (q !== null) return Number.parseInt(q, 10);
+    } catch { /* fall through */ }
+    const header = req.headers['last-event-id'];
+    if (typeof header === 'string') return Number.parseInt(header, 10);
+    return null;
+  })();
+  const afterSequence = afterParam !== null && Number.isFinite(afterParam) && afterParam >= 0 ? afterParam : null;
+
+  let backfilling = afterSequence !== null && projectRoot !== undefined;
+  let backfillTail = afterSequence ?? 0;
+  const liveBuffer: RunFlowEvent[] = [];
+
+  const writeFrame = (event: RunFlowEvent): void => {
     try {
       res.write(formatRunFlowEventFrame(event));
     } catch {
       // client gone — req.on('close') below tears the subscription down
     }
+  };
+
+  const unsubscribe = subscribeRunFlowEvents(flowId, (event) => {
+    if (backfilling) {
+      liveBuffer.push(event);
+      return;
+    }
+    writeFrame(event);
   });
+
+  if (backfilling && projectRoot !== undefined && afterSequence !== null) {
+    try {
+      const backlog = readFlowEvents(projectRoot, flowId, { afterSequence });
+      for (const event of backlog) {
+        writeFrame(event);
+        if (typeof event.sequence === 'number' && event.sequence > backfillTail) backfillTail = event.sequence;
+      }
+    } catch {
+      // durable read failure degrades to live-only — never kills the stream
+    }
+    backfilling = false;
+    for (const buffered of liveBuffer) {
+      if (typeof buffered.sequence === 'number' && buffered.sequence <= backfillTail) continue; // already replayed
+      writeFrame(buffered);
+    }
+    liveBuffer.length = 0;
+  }
 
   let closed = false;
   function cleanup(): void {
@@ -196,6 +246,6 @@ export async function registerRunFlowEventStreamRoute(
     return true;
   }
 
-  handleRunFlowEventStream(req, res, flowId, allowedOrigin);
+  handleRunFlowEventStream(req, res, flowId, allowedOrigin, projectRoot);
   return true;
 }
