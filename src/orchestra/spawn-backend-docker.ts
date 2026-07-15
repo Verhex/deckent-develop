@@ -35,6 +35,8 @@ import type { SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
 import { SpawnBackendError, checkLethalGuard } from './spawn-backend.js';
 import { getDefaultProviderName } from './sprint-utils.js';
 import { installGitGuard, buildDockerGitGuardArgs, buildGitGuardDir, CONTAINER_GIT_PATH } from './git-worker-guard.js';
+import { captureStreamToLog } from './spawn-backend-subprocess.js';
+import { makeActivityOnEvent, type ActivityTapContext } from '../agents/worker-activity.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
@@ -642,6 +644,50 @@ export function getProviderBinaryForModel(model: ModelType): string {
     return 'claude';
   }
   return 'claude';
+}
+
+// ─── SURF-3 S3 — live tool-by-tool activity from `docker logs -f` ─────────────
+
+/** Injectable spawn for {@link followContainerActivity} (tests pass a fake). */
+export type FollowSpawnFn = typeof nodeSpawn;
+
+/**
+ * Start a `docker logs -f <container>` follow child and stream its output
+ * through the activity tap: each Claude-CLI stream-json line → per-tool
+ * `WORKER→*:ACTIVITY` (SURF-3 S3). ADDITIVE + ACTIVITY-ONLY — the authoritative
+ * `.log` is still written post-exit by writeNormalizedDockerLog, so
+ * captureStreamToLog runs with `writeLog:false` (no double-write). When
+ * `ctx.enabled` is false it is a zero-cost no-op. Fully fail-soft: a spawn/read
+ * error only loses live activity, never touches the container or the .result.
+ * Returns a stop() the caller invokes on container exit.
+ *
+ * The `docker logs -f` SPAWN itself is a thin shim (the real-docker path is the
+ * honest verification gap); the activity mapping is exercised via
+ * captureStreamToLog + a fake stream in tests.
+ */
+export function followContainerActivity(
+  containerName: string,
+  provider: string,
+  ctx: ActivityTapContext,
+  spawnFn: FollowSpawnFn = nodeSpawn,
+): () => void {
+  if (!ctx.enabled) return () => { /* flag off — no follow */ };
+  let child: ReturnType<FollowSpawnFn> | undefined;
+  try {
+    child = spawnFn('docker', ['logs', '-f', containerName], { stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch {
+    return () => { /* spawn failed — activity is best-effort */ };
+  }
+  child.once('error', () => { /* never let a follow error escape */ });
+  if (child.stdout) {
+    void captureStreamToLog(child.stdout, {
+      logPath: '', // unused: writeLog:false skips the .log append (post-exit writer is authoritative)
+      provider,
+      writeLog: false,
+      onEvent: makeActivityOnEvent(ctx),
+    }).catch(() => { /* fail-soft: capture errors never break the worker */ });
+  }
+  return () => { try { child?.kill(); } catch { /* already exited */ } };
 }
 
 /**
@@ -1886,8 +1932,19 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Sprint 170 P0-5: .hb is now on disk — heartbeat is authoritative, race window closed
     markActive(taskId);
 
+    // SURF-3 S3 — live tool-by-tool activity context (flag-gated; a no-op when
+    // live_trace is off). Coordinator-process config is the source of truth
+    // (opts.liveTraceEnabled), NOT the worker's disk-cache.
+    const liveCtx: ActivityTapContext = {
+      projectRoot: dir,
+      taskId,
+      workerId: `docker-${taskId}`,
+      enabled: opts?.liveTraceEnabled === true,
+      ...(opts?.sprintId ? { sprintId: opts.sprintId } : {}),
+    };
+
     // Set up container monitoring (async, fire-and-forget)
-    this.monitorContainer(taskId, containerName, tasksDir, model, dir, distFingerprintBefore);
+    this.monitorContainer(taskId, containerName, tasksDir, model, dir, distFingerprintBefore, liveCtx);
   }
 
   /**
@@ -2313,14 +2370,22 @@ export class DockerSpawnBackend implements SpawnBackend {
     model: string,
     projectDir: string,
     distFingerprintBefore: DistFingerprint | null,
+    liveCtx?: ActivityTapContext,
   ): void {
     const child = nodeSpawn('docker', ['wait', containerName], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
+    // SURF-3 S3 — start the live activity follow WHILE the container runs
+    // (a no-op when live_trace is off); stop it once the container exits below.
+    const stopFollow = liveCtx
+      ? followContainerActivity(containerName, getProviderBinaryForModel(model), liveCtx)
+      : (): void => { /* no ctx — no follow */ };
+
     child.stdout?.on('data', async (data: Buffer) => {
       const exitCode = parseInt(data.toString().trim(), 10);
       debugLog('docker-backend:exit', `taskId=${taskId} exitCode=${exitCode}`);
+      stopFollow(); // container exited — the `docker logs -f` follow can end.
 
       // Sprint 139: fsync .result from host side before reading
       // Container's fsync_file trap may have run, but belt-and-suspenders from host

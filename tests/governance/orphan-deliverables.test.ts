@@ -510,7 +510,9 @@ const KNOWN_ORPHANS = [
   'src/orchestra/reconciler.ts',
   'src/orchestra/result-assembler.ts',
   'src/orchestra/spawn-backend-mock.ts',
-  'src/orchestra/spawn-backend-subprocess.ts',
+  // spawn-backend-subprocess.ts is NO LONGER an orphan: SURF-3 S3 gave
+  // captureStreamToLog its first production caller (followContainerActivity in
+  // spawn-backend-docker.ts drives the `docker logs -f` live activity tap).
   'src/orchestra/task-analyzer.ts',
   'src/orchestra/timeout-watcher.ts',
   'src/orchestra/worker.ts',
@@ -522,7 +524,7 @@ const KNOWN_ORPHANS = [
 
 describe('KNOWN_ORPHANS allowlist sanity', () => {
   it('has the expected count and only well-formed src/**/*.ts(x) entries', () => {
-    expect(KNOWN_ORPHANS.length).toBe(84); // 86->84: agent-selector V2-kesimle silindi + vocabulary-bootstrap analyze --bootstrap-vocabulary ile kapandi (SURF-era)
+    expect(KNOWN_ORPHANS.length).toBe(83); // 86->84: agent-selector V2-kesimle silindi + vocabulary-bootstrap analyze --bootstrap-vocabulary ile kapandi (SURF-era); 84->83: spawn-backend-subprocess captureStreamToLog SURF-3 S3 followContainerActivity ile kapandi
     for (const entry of KNOWN_ORPHANS) {
       expect(entry.startsWith('src/')).toBe(true);
       expect(entry.endsWith('.ts') || entry.endsWith('.tsx')).toBe(true);

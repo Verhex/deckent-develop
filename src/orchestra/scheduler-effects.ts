@@ -325,6 +325,9 @@ export async function executeSpawnTask(
       reasoningEffort,
       excludeDynamicPromptSections,
       taskTimeoutSeconds,
+      // SURF-3 S2/S3 — live tool-by-tool activity (flag-gated; no-op when off).
+      liveTraceEnabled: config?.live_trace?.enabled === true,
+      sprintId: task.sprintId,
     });
   } else if (!isTmuxProvider(taskProvider)) {
     const adapter = getProviderAdapterForTask(taskProvider);
