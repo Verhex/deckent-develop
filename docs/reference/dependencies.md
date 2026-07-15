@@ -21,6 +21,7 @@ For the full history and amendment log, see [ADR-D-005](../adr/adr-d-005-depende
 | `react` | `^19.2.7` | Ink REPL + web dashboard | ADR-081 (REPL) / ADR-080 (Dashboard) |
 | `react-dom` | `^19.2.7` | Web dashboard render | ADR-080: Dashboard God-Level |
 | `cli-highlight` | `^2.1.11` | REPL syntax highlighting | ADR-081 / ADR-083: sub-feature of Native Agentic REPL — REPL UX syntax coloring; governed by the REPL ADR family |
+| `ink-testing-library` *(dev-only)* | `^4.0.0` | Render + drive Ink REPL components in tests (mount, read frames, simulate keypress via stdin) — closes the "Ink components are manual-verify-only" gap (Alperen-authorized 2026-07-16). | ADR-081 / ADR-083: test tooling for the Native Agentic REPL — same REPL ADR family as `ink` |
 | `discord.js` *(optional)* | `^14.26.3` | Discord connector (lazy/optional) | ADR-016: External Messaging Connectors |
 | `nodemailer` *(optional)* | `^6.9.14` | Email connector (SMTP outbound) | ADR-016: External Messaging Connectors |
 | `openai` *(optional)* | `^4.103.0` | OpenAI voice connector (Whisper transcription + TTS) | ADR-016: External Messaging Connectors |
