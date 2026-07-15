@@ -47,11 +47,13 @@ function proposedFlow(root: string, flowId: string, intent: string): void {
  * DETACHED_RUNNING, NO proposal → NO intentSummary → bare short-id. This is the
  * headline case the proposeFlow-based fixtures never exercise.
  */
-function doFlowOnDisk(root: string, flowId: string, startedAt: string): void {
+function doFlowOnDisk(root: string, flowId: string, startedAt: string, intent?: string): void {
   const sprint = { id: flowId, tasks: [], directives: '', createdAt: startedAt } as never;
   saveApprovedSnapshot(root, {
     flowId, revision: 1, planDigest: 'd-1',
     approvedBy: { id: 'u' }, approvedAt: startedAt, sprint,
+    // G1 durable-fix: a do-flow that persisted its proposal carries intentSummary.
+    ...(intent !== undefined ? { proposal: proposal(flowId, intent) } : {}),
   });
   saveRunHandle(root, {
     flowId, revision: 1, planDigest: 'd-1',
@@ -148,6 +150,18 @@ describe('collectInboxRows — cross-process store-scan + jobs-dir join (SURF-3)
     const lines = buildInboxLines(collectInboxRows(root), DEFAULT_INBOX_LABELS);
     // short-id + running badge, NO trailing intent text.
     expect(lines[1]).toBe('  1. do-flow- · running');
+  });
+
+  // G1 durable-fix — a do-flow that persisted its proposal (snapshot.proposal)
+  // reads back with its intentSummary via deriveLegacyContext, so the inbox
+  // shows the goal instead of a bare UUID (no events.jsonl, disk-fold path).
+  it('a do-flow with a persisted proposal shows its intentSummary (not a bare UUID)', () => {
+    doFlowOnDisk(root, 'do-flow-intent-04', '2026-07-15T13:00:00.000Z', 'add rate limiting');
+    _resetRunFlowCoordinatorsForTests();
+    const rows = collectInboxRows(root);
+    expect(rows[0]).toMatchObject({ flowId: 'do-flow-intent-04', state: 'DETACHED_RUNNING', intentSummary: 'add rate limiting' });
+    const lines = buildInboxLines(rows, DEFAULT_INBOX_LABELS);
+    expect(lines[1]).toBe('  1. do-flow- · running add rate limiting');
   });
 });
 

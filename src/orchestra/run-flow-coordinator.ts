@@ -386,11 +386,17 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
             approvedAt: snapshot.approvedAt,
           };
 
+    // G1 durable-fix (SURF-3): surface the persisted proposal (intentSummary) so
+    // a do-flow (which never wrote events.jsonl) reads back with its NL goal
+    // instead of a bare flowId. Absent on legacy snapshots → no proposal, as before.
+    const proposal = snapshot?.proposal;
+
     if (handleRecord !== undefined) {
       return {
         state: 'DETACHED_RUNNING',
         flowId,
         ...(approvedSnapshot !== undefined ? { approvedSnapshot } : {}),
+        ...(proposal !== undefined ? { proposal } : {}),
         handle: handleRecord.handle,
         updatedAt: handleRecord.startedAt,
       };
@@ -402,6 +408,7 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
       state: 'APPROVED',
       flowId,
       approvedSnapshot: approvedSnapshot!,
+      ...(proposal !== undefined ? { proposal } : {}),
       updatedAt: snapshot!.approvedAt,
     };
   }

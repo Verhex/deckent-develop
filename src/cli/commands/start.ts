@@ -387,6 +387,22 @@ export function registerStart(program: Command): void {
             } catch { /* closure is best-effort — the original error is what matters */ }
             throw err;
           }
+          // G2 durable-fix (SURF-3): the successful run writes its OWN durable
+          // RUN_COMPLETED closure so the flow leaves DETACHED_RUNNING in the
+          // event-log (symmetric to the born-698b crash-closure above). For an
+          // API-origin flow whose events.jsonl is at DETACHED_RUNNING this folds
+          // cleanly to COMPLETED; for a do-origin flow (empty events.jsonl) the
+          // reduce throws and the best-effort wrap swallows it (harmless no-op) —
+          // that path stays covered by the read-side deriveLegacyContext + inbox
+          // jobs-dir join until the do→coordinator migration (deferred).
+          try {
+            const { getRunFlowCoordinator } = await import('../../orchestra/run-flow-coordinator-registry.js');
+            getRunFlowCoordinator(root).recordCompletion({
+              flowId,
+              summary: `run ${sprintResult.id} completed`,
+              commandId: `child-complete-${flowId}`,
+            });
+          } catch { /* closure is best-effort — a folding error must never fail the run */ }
           print(formatSprintSummary(sprintResult));
           return;
         }

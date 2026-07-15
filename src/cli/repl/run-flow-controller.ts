@@ -279,6 +279,10 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
       approvedBy: approvedSnapshot.approvedBy,
       approvedAt: approvedSnapshot.approvedAt,
       sprint: plannedSprint,
+      // G1 durable-fix (SURF-3): persist the proposal so the inbox's legacy-read
+      // path can show intentSummary instead of a bare flowId (the controller
+      // never writes events.jsonl, so this snapshot is the only durable trail).
+      ...(context.proposal ? { proposal: context.proposal } : {}),
     };
     saveApprovedSnapshot(deps.root, stored);
 

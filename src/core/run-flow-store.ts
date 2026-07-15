@@ -48,7 +48,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { RUNTIME_DIR } from './constants.js';
-import type { RunFlowEvent } from './run-flow-contract.js';
+import type { RunFlowEvent, RunProposal } from './run-flow-contract.js';
 import type { Sprint } from './types.js';
 import type { ActorContext } from './work-model.js';
 // RunHandle is duck-typed against core/run-flow-contract.ts but deliberately
@@ -72,6 +72,12 @@ export interface StoredApprovedSnapshot {
   /** The exact planned Sprint (task list) captured at preview time — this is
    *  what lets a start-path consume instead of re-plan. */
   readonly sprint: Sprint;
+  /** The originating proposal (G1 durable-fix, SURF-3): a `deckent do` flow uses
+   *  the in-memory controller, which never writes `events.jsonl` — so its
+   *  intentSummary was lost and the inbox showed a bare UUID. Persisting the
+   *  proposal here (additive/optional — legacy snapshots lack it) lets
+   *  `deriveLegacyContext` surface `proposal.intentSummary` on the read path. */
+  readonly proposal?: RunProposal;
 }
 
 /** Durable record of an actual start attempt for a flow — the idempotency

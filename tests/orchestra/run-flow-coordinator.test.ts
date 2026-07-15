@@ -326,4 +326,35 @@ describe('RunFlowCoordinator — hermetic scenario family (442-003)', () => {
       expect(coordinator.getFlow(flowId).state).toBe('COMPLETED');
     });
   });
+
+  // ── 7. do-origin empty-fold coupling (G2) ────────────────────────────
+  // A `do`-origin flow runs entirely through the in-memory REPL controller, so
+  // the coordinator's `<flowId>.events.jsonl` is EMPTY — `ensureFlowLoaded`
+  // folds it to INITIAL. `recordCompletion` then reduces RUN_COMPLETED against
+  // INITIAL, which the reducer legitimately rejects (no prior RUN_STARTED). This
+  // is exactly why `start.ts` wraps the closure-folding `recordCompletion` call
+  // in a best-effort try/catch: for a do-origin run the throw is EXPECTED and a
+  // completion-log failure must never fail the run itself.
+  describe('do-origin empty-fold coupling', () => {
+    it('recordCompletion on a flow with an empty event log throws InvalidTransitionError and appends nothing', () => {
+      const flowId = generateFlowId('do-origin');
+      const coordinator = createRunFlowCoordinator({ root, now: makeClock() });
+
+      // Precondition: no durable events (mirrors a do-origin flow whose trail
+      // lives only in the in-memory controller, never in the coordinator log).
+      expect(readFlowEvents(root, flowId)).toHaveLength(0);
+
+      expect(() =>
+        coordinator.recordCompletion({
+          flowId,
+          summary: 'run completed',
+          commandId: `child-complete-${flowId}`,
+        }),
+      ).toThrow(InvalidTransitionError);
+
+      // reduce-first guard: the rejected command must not have appended anything,
+      // so the durable log stays exactly as empty as it started.
+      expect(readFlowEvents(root, flowId)).toHaveLength(0);
+    });
+  });
 });
