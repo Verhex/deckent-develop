@@ -1,4 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   runChatNativeLoop,
@@ -79,6 +82,30 @@ describe('runChatNativeLoop — slash-registry wire (T-222-005)', () => {
     expect(helpText).toContain('/status');
     // /help is a meta command — no transcript turns recorded.
     expect(transcript).toEqual([]);
+  });
+
+  it('/runs (SURF-3 inbox) renders the read-only list and does NOT call the provider', async () => {
+    const { adapter, sendSpy } = queuedProvider([]);
+    const { dispatcher, dispatchSpy } = fakeDispatcher();
+    const output = vi.fn();
+    const root = mkdtempSync(join(tmpdir(), 'inbox-loop-'));
+
+    const transcript = await runChatNativeLoop(baseOpts({
+      provider: adapter,
+      dispatcher,
+      input: lines('/runs'),
+      output,
+      projectRoot: root,
+    }));
+
+    // Provider + dispatcher untouched — the inbox is a pure read-only scan.
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(dispatchSpy).not.toHaveBeenCalled();
+    // Empty project → the honest empty notice (default en).
+    expect(output).toHaveBeenCalledTimes(1);
+    expect(output.mock.calls[0]![0]).toContain('No runs yet');
+    expect(transcript).toEqual([{ role: 'user', content: '/runs' }]);
+    rmSync(root, { recursive: true, force: true });
   });
 
   it('/status dispatches deckent_status through the MCP dispatcher (NOT provider)', async () => {

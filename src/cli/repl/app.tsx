@@ -897,6 +897,10 @@ export interface ReplAppProps {
   onSwitch: (sel: Partial<ActiveSelection>) => ActiveSelection & { switchError?: string };
   /** Set the agentic approval mode (suggest / auto-edit / full-auto). */
   onApprovalMode: (mode: 'suggest' | 'auto-edit' | 'full-auto') => void;
+  /** SURF-3 multi-flow-inbox — returns the rendered `/runs` inbox block (a
+   *  read-only list of concurrent run-flows). Injected by run.tsx (which owns
+   *  projectRoot + i18n); absent → `/runs` falls through as a normal turn. */
+  runInboxProvider?: () => string;
   /** Optional chat-memory adapter — persists turns and powers /resume. */
   memory?: ChatMemoryAdapter;
   /** Active chat session id (new turns append here; /resume switches it). */
@@ -1043,7 +1047,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, registerRunFlowResultSink } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, registerRunFlowResultSink, runInboxProvider } = props;
   const { exit } = useApp();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
@@ -1451,6 +1455,17 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           busyCtl.current = r.state;
           pushTurn('seg', renderBusyDecision(r.decision, labels));
         }
+        return;
+      }
+      // SURF-3 multi-flow-inbox — `/runs` read-only list of concurrent run-flows
+      // (cross-process disk scan). Handled here on the native path; the legacy
+      // loop has its own `/runs` branch (chat-native.ts), so the command never
+      // silently degrades to a chat turn on either engine. Absent provider
+      // (flag/wire off) → falls through as a normal turn.
+      if (/^\/runs(?:\s+.*)?$/i.test(trimmed) && runInboxProvider) {
+        // D1 ignores any trailing args (selection is D2) — always shows the list.
+        pushTurn('user', trimmed);
+        pushTurn('bg', runInboxProvider());
         return;
       }
       // 358-006: /resume picker (session-resume.ts pickSession) merged with the

@@ -71,9 +71,14 @@ describe('resolveMenuSubmit — live catalog (buildSlashRegistry) integration', 
     expect(resolveMenuSubmit('/term', matches, 0)).toBe('/term');
   });
 
-  it('/run stays uncatalogued (reserved for a future first-class command) → buffer submits', () => {
+  it('/run now prefix-matches the SURF-3 /runs inbox → Enter autocompletes to /runs', () => {
+    // `/run` is still not a first-class command of its own, but it is a prefix of
+    // the new `/runs` inbox (SURF-3), so the menu surfaces `/runs` as the sole
+    // candidate and Enter picks it — standard prefix-autocomplete, same as typing
+    // `/re` → `/resume`. (A future literal `/run` command would sort ahead of it.)
     const matches = filterSlashCommands(live, '/run');
     expect(matches.some((c) => c.name === '/run')).toBe(false);
-    expect(resolveMenuSubmit('/run', matches, 0)).toBe('/run');
+    expect(matches.some((c) => c.name === '/runs')).toBe(true);
+    expect(resolveMenuSubmit('/run', matches, 0)).toBe('/runs');
   });
 });

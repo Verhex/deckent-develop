@@ -228,6 +228,13 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     desc: 'Önceki sohbet oturumunu sürdür (örn: /resume 1)',
   },
   {
+    // SURF-3 multi-flow-inbox — meta-command handled BEFORE the registry by both
+    // engines (app.tsx native `/runs` branch + chat-native.ts legacy loop), a
+    // read-only cross-process list of concurrent run-flows.
+    name: '/runs',
+    desc: 'Eşzamanlı koşuların listesi (salt-okuma)',
+  },
+  {
     name: '/sync',
     desc: 'Agent/skill manifest + routing senkronize et (onay ister)',
     agenticTool: 'deckent_sync',

@@ -212,7 +212,12 @@ export function parseRunCompletionRecord(raw: string, fallbackJobId: string): Ru
 /** Default one-shot scan: reads every `*.json` file in `dir` and parses the
  *  terminal ones. Tolerant end-to-end — a missing dir, an unreadable file, or
  *  a corrupt file all degrade to "skip that entry", never a throw. */
-function defaultScan(dir: string): RunCompletionInfo[] {
+/** One-shot read of every TERMINAL (COMPLETE/FAILED) job record in `dir`.
+ *  Exported for reuse by the run-flow inbox (SURF-3 multi-flow-inbox) — the
+ *  jobs-dir is the cross-process execution truth (RUNNING jobs parse to null,
+ *  so this returns only finished ones). Tolerant: a missing dir / unreadable
+ *  file / corrupt json is skipped, never thrown. */
+export function scanJobRecords(dir: string): RunCompletionInfo[] {
   if (!existsSync(dir)) return [];
 
   let files: string[];
@@ -260,7 +265,7 @@ export function createRunCompletionWatch(
   handlers: RunCompletionWatchHandlers,
   opts: RunCompletionWatchOptions = {},
 ): RunCompletionWatchHandle {
-  const scan = opts.scan ?? defaultScan;
+  const scan = opts.scan ?? scanJobRecords;
   const pollIntervalMs = opts.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
   // TERM5-WATCH (sprint-427 task 3): opt-in flowId filter — `undefined` when
   // the caller doesn't supply one, which keeps the guard below always-false

@@ -2725,6 +2725,27 @@ const MESSAGES: MessageMap = {
   // from tui.resume_list_header/tui.resume_hint/etc. above — those serve the
   // OLDER loop-side /resume in chat-native.ts/chat-resume.ts, a different feature
   // with different placeholders ({session} vs {arg}); Task 387-001) ────────────
+  // SURF-3 multi-flow-inbox — read-only `/runs` list of concurrent run-flows.
+  'tui.inbox_header': { en: 'Active runs', tr: 'Aktif koşular' },
+  'tui.inbox_hint': {
+    en: 'Tip: `deckent status <id>` follows one',
+    tr: 'İpucu: birini izlemek için `deckent status <id>`',
+  },
+  'tui.inbox_empty': {
+    en: 'No runs yet — start one with `deckent do "<goal>"`',
+    tr: 'Henüz koşu yok — başlatmak için `deckent do "<hedef>"`',
+  },
+  'tui.inbox_state_collecting': { en: 'collecting', tr: 'toplanıyor' },
+  'tui.inbox_state_proposed': { en: 'proposed', tr: 'önerildi' },
+  'tui.inbox_state_previewing': { en: 'previewing', tr: 'önizleme' },
+  'tui.inbox_state_awaiting_approval': { en: 'awaiting approval', tr: 'onay bekliyor' },
+  'tui.inbox_state_approved': { en: 'approved', tr: 'onaylandı' },
+  'tui.inbox_state_starting': { en: 'starting', tr: 'başlıyor' },
+  'tui.inbox_state_running': { en: 'running', tr: 'çalışıyor' },
+  'tui.inbox_state_completed': { en: 'completed', tr: 'tamamlandı' },
+  'tui.inbox_state_failed': { en: 'failed', tr: 'başarısız' },
+  'tui.inbox_state_cancelled': { en: 'cancelled', tr: 'iptal edildi' },
+  'tui.inbox_state_blocked': { en: 'blocked', tr: 'engellendi' },
   'tui.resume_picker_header': { en: 'Recent sessions', tr: 'Son oturumlar' },
   'tui.resume_picker_hint': {
     en: 'Tip: /resume <number> to continue a session',
