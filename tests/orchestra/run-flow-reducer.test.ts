@@ -431,6 +431,10 @@ describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-s
       // Sprint-4 dilim (426-002): app.tsx mounts the card + derives PlanPreview
       // from the controller context — the designed live-mount consumer.
       'cli/repl/app.tsx',
+      // SURF-3 multi-flow-inbox D1: the read-only `/runs` list imports the
+      // RunFlowState type (contract) to render/badge each flow's state — a
+      // designed read-only consumer (no reducer/store mutation).
+      'cli/repl/run-flow-inbox.ts',
       // born-671 (sprint-427, 427-020): run-flow-store.ts moved cli/repl/ ->
       // core/ (Layer-0, freely importable) — these two start entrypoints
       // reading it directly used to be an mcp<->cli ADR-D-004 C3 violation
