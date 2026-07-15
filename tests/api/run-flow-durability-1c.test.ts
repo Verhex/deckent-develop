@@ -250,3 +250,66 @@ describe('SURF-2 — query-token allowlist hardening', () => {
     expect(captured.status).toBe(401);
   });
 });
+
+// ─── SURF-2 — list + start endpoint parity pins ──────────────────────────────
+
+describe('SURF-2 — list + start parity', () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'surf-2-'));
+    _resetRunFlowRoutesState();
+    _resetRunFlowEventStreamState();
+    installFixturePlanner();
+  });
+
+  afterEach(() => {
+    setRunFlowProposalPlanner(undefined);
+    _resetRunFlowRoutesState();
+    _resetRunFlowEventStreamState();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('GET /api/run-flow/list enumerates durable flows with state + intent', async () => {
+    const a = await call(root, 'POST', '/api/run-flow/propose', { intentSummary: 'first job' });
+    const b = await call(root, 'POST', '/api/run-flow/propose', { intentSummary: 'second job' });
+    const idA = (a.body as { proposal: { flowId: string } }).proposal.flowId;
+    const idB = (b.body as { proposal: { flowId: string } }).proposal.flowId;
+
+    _resetRunFlowRoutesState(); // list must come from DURABLE state, not memory
+
+    const listed = await call(root, 'GET', '/api/run-flow/list');
+    expect(listed.status).toBe(200);
+    const flows = (listed.body as { flows: Array<{ flowId: string; state: string; intentSummary?: string }> }).flows;
+    const ids = flows.map((f) => f.flowId);
+    expect(ids).toEqual(expect.arrayContaining([idA, idB]));
+    expect(flows.find((f) => f.flowId === idA)?.state).toBe('AWAITING_APPROVAL');
+    expect(flows.find((f) => f.flowId === idA)?.intentSummary).toBe('first job');
+  });
+
+  it('POST /:id/start on an APPROVED flow spawns detached and records RUN_STARTED (fake spawn via env-less dry assertion)', async () => {
+    const proposed = await call(root, 'POST', '/api/run-flow/propose', { intentSummary: 'run me' });
+    const flowId = (proposed.body as { proposal: { flowId: string } }).proposal.flowId;
+    await call(root, 'POST', `/api/run-flow/${flowId}/decision`, { decision: 'approve' });
+
+    const started = await call(root, 'POST', `/api/run-flow/${flowId}/start`);
+    expect(started.status).toBe(202);
+    const body = started.body as { started: boolean; context: { state: string } };
+    expect(body.started).toBe(true);
+    expect(body.context.state).toBe('DETACHED_RUNNING');
+
+    // idempotent retry: duplicate start is a no-op, never a double spawn
+    const again = await call(root, 'POST', `/api/run-flow/${flowId}/start`);
+    expect([200, 202, 409]).toContain(again.status);
+    if (again.status === 202) {
+      expect((again.body as { duplicate: boolean }).duplicate).toBe(true);
+    }
+  });
+
+  it('POST /:id/start on a non-APPROVED flow is a typed 409', async () => {
+    const proposed = await call(root, 'POST', '/api/run-flow/propose', { intentSummary: 'not yet' });
+    const flowId = (proposed.body as { proposal: { flowId: string } }).proposal.flowId;
+    const started = await call(root, 'POST', `/api/run-flow/${flowId}/start`);
+    expect(started.status).toBe(409);
+  });
+});

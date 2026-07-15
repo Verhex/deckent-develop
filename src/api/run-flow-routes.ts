@@ -61,7 +61,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { getRunFlowCoordinator, _resetRunFlowCoordinatorsForTests } from '../orchestra/run-flow-coordinator-registry.js';
 import { FlowNotFoundError, InvalidTransitionError } from '../orchestra/run-flow-coordinator.js';
-import { savePlannedSprint, loadPlannedSprint } from '../core/run-flow-store.js';
+import { savePlannedSprint, loadPlannedSprint, loadRunHandle } from '../core/run-flow-store.js';
+import { startApprovedRun, RunJobError } from '../orchestra/run-job-service.js';
+import { spawnDetachedDeckent } from '../cli/helpers/detached-start.js';
+import type { RunHandle } from '../core/run-flow-contract.js';
 import { publishRunFlowEvent } from './run-flow-event-stream.js';
 import { basename } from 'node:path';
 import { z } from 'zod';
@@ -350,6 +353,101 @@ function handleDecision(
   return true;
 }
 
+// ─── GET /api/run-flow (list — SURF-2 parity) ───────────────────────────
+
+function handleFlowList(res: ServerResponse, req: IncomingMessage, projectRoot: string): boolean {
+  const coordinator = coordinatorFor(projectRoot);
+  const summaries: Array<{ flowId: string; state: string; intentSummary?: string; revision?: number }> = [];
+  for (const flowId of coordinator.listFlows()) {
+    const context = lookupFlow(flowId, req, projectRoot); // tenant-guarded — non-visible flows are simply absent
+    if (!context) continue;
+    summaries.push({
+      flowId,
+      state: context.state,
+      ...(context.proposal?.intentSummary ? { intentSummary: context.proposal.intentSummary } : {}),
+      ...(context.preview?.revision !== undefined ? { revision: context.preview.revision } : {}),
+    });
+  }
+  sendJson(res, { flows: summaries });
+  return true;
+}
+
+// ─── POST /api/run-flow/:flowId/start (SURF-2 parity) ───────────────────
+
+/** Mirrors the terminal controller's startApproved: START_REQUESTED via the
+ *  coordinator, detached spawn through the SAME CLI-args closure, RUN_STARTED
+ *  recorded — child stays the single handle-writer (born-681). */
+function handleStart(
+  res: ServerResponse,
+  projectRoot: string,
+  flowId: string,
+  req: IncomingMessage,
+): boolean {
+  const existing = lookupFlow(flowId, req, projectRoot);
+  if (!existing) {
+    sendError(res, 404, 'Flow not found');
+    return true;
+  }
+  const snapshot = existing.approvedSnapshot;
+  if (existing.state !== 'APPROVED' || !snapshot) {
+    sendError(res, 409, `run-flow: flow is ${existing.state}, not APPROVED`);
+    return true;
+  }
+
+  const coordinator = coordinatorFor(projectRoot);
+  try {
+    coordinator.requestStart({
+      flowId,
+      revision: snapshot.revision,
+      planDigest: snapshot.planDigest,
+      commandId: `start-${flowId}-r${snapshot.revision}`,
+    });
+
+    const planned = loadPlannedSprint(projectRoot, flowId);
+    if (!planned) {
+      sendError(res, 409, 'run-flow: planned sprint record missing for this flow');
+      return true;
+    }
+    const stored: StoredApprovedSnapshot = {
+      flowId,
+      revision: snapshot.revision,
+      planDigest: snapshot.planDigest,
+      approvedBy: snapshot.approvedBy,
+      approvedAt: snapshot.approvedAt,
+      sprint: planned.sprint as Sprint,
+    };
+
+    const existingRunHandle = loadRunHandle(projectRoot, flowId);
+    const result = startApprovedRun({
+      flowId,
+      expectedRevision: snapshot.revision,
+      expectedPlanDigest: snapshot.planDigest,
+      approvedSnapshot: stored,
+      ...(existingRunHandle ? { existingRunHandle } : {}),
+      spawnStart: (_sprint, fid): RunHandle => {
+        const spawned = spawnDetachedDeckent(
+          ['start', '--flow-id', fid, '--revision', String(snapshot.revision), '--plan-digest', snapshot.planDigest],
+          { projectRoot, flowId: fid },
+        );
+        return { flowId: fid, jobId: `flow-${fid}-r${snapshot.revision}`, logRef: spawned.logPath };
+      },
+    });
+
+    const final = coordinator.recordRunStarted({
+      handle: result.handle,
+      commandId: `run-started-${flowId}-r${snapshot.revision}`,
+    });
+    sendJson(res, { started: result.status === 'started', duplicate: result.status === 'noop-duplicate', context: final.context }, 202);
+    return true;
+  } catch (err) {
+    if (err instanceof RunJobError || err instanceof RunFlowTransitionError || err instanceof InvalidTransitionError) {
+      sendError(res, 409, err.message);
+      return true;
+    }
+    throw err;
+  }
+}
+
 // ─── Dispatch ────────────────────────────────────────────────────────────
 
 /**
@@ -381,6 +479,9 @@ export async function registerRunFlowRoutes(
   if (method === 'POST' && segments.length === 1 && segments[0] === 'propose') {
     return handlePropose(res, projectRoot, config, body, req);
   }
+  if (method === 'GET' && segments.length === 1 && segments[0] === 'list') {
+    return handleFlowList(res, req, projectRoot);
+  }
 
   const flowId = decodeURIComponent(segments[0]!);
   if (!FLOW_ID_RE.test(flowId)) {
@@ -396,6 +497,9 @@ export async function registerRunFlowRoutes(
   }
   if (segments.length === 2 && segments[1] === 'decision' && method === 'POST') {
     return handleDecision(res, projectRoot, flowId, body, req);
+  }
+  if (segments.length === 2 && segments[1] === 'start' && method === 'POST') {
+    return handleStart(res, projectRoot, flowId, req);
   }
 
   return false;

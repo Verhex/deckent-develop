@@ -86,7 +86,7 @@ export type RunJobErrorCode =
   | 'RUN_JOB_DIGEST_MISMATCH'
   | 'RUN_JOB_STALE_HANDLE_CONFLICT';
 
-abstract class RunJobError extends Error {
+export abstract class RunJobError extends Error {
   abstract readonly code: RunJobErrorCode;
   public readonly flowId: string;
 
