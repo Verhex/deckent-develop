@@ -240,7 +240,11 @@ export function bearerAuthMiddleware(config: AuthConfig) {
     // Query-token fallback for transports that cannot set headers (SSE).
     // Only the paths the server explicitly opted in (e.g. /api/events) are
     // eligible, and the same constant-time compare is reused.
-    if (headerResult === 'missing' && queryTokenEligible(path)) {
+    // SURF-2 hardening: query-tokens are honored for GET/HEAD ONLY — a token
+    // in a URL can land in access logs/referrers, acceptable for read-only
+    // streams (EventSource is GET by construction) but NEVER for mutations.
+    const queryTokenMethodOk = req.method === 'GET' || req.method === 'HEAD';
+    if (headerResult === 'missing' && queryTokenMethodOk && queryTokenEligible(path)) {
       const queryToken = extractTokenFromQuery(url);
       if (queryToken !== null) {
         const expected = hashToken(activeToken);

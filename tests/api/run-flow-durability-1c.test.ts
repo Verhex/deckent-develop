@@ -179,3 +179,74 @@ describe('SURF-1c — single-authority durability', () => {
     expect([200, 409]).toContain(second.status);
   });
 });
+
+// ─── SURF-2 — SSE query-token allowlist + GET-only hardening pins ────────────
+// (appended here to reuse the suite's hermetic fixtures; the auth middleware
+// itself is exercised through bearerAuthMiddleware directly.)
+
+import { bearerAuthMiddleware } from '../../src/api/auth.js';
+
+describe('SURF-2 — query-token allowlist hardening', () => {
+  const TOKEN = 'secret-token-123';
+
+  function middleware() {
+    return bearerAuthMiddleware({
+      configToken: TOKEN,
+      exemptPaths: [],
+      queryTokenPaths: [],
+      queryTokenPrefixes: ['/api/run-flow/'],
+    });
+  }
+
+  function fakeAuthRes(): { status: number; res: ServerResponse } {
+    const captured = { status: 0 };
+    const res = {
+      writeHead(status: number) { captured.status = status; return this; },
+      end() { /* noop */ },
+    } as unknown as ServerResponse;
+    return { get status() { return captured.status; }, res } as never;
+  }
+
+  function reqFor(method: string, url: string): IncomingMessage {
+    return { method, url, headers: {}, socket: { remoteAddress: '203.0.113.7' } } as unknown as IncomingMessage;
+  }
+
+  it('GET run-flow SSE with correct ?token= authenticates (EventSource lane)', () => {
+    const auth = middleware();
+    const { res } = fakeAuthRes() as never as { res: ServerResponse };
+    expect(auth(reqFor('GET', `/api/run-flow/abc/events?token=${TOKEN}`), res)).toBe(true);
+  });
+
+  it('GET with WRONG ?token= is 403 (constant-time mismatch shape)', () => {
+    const auth = middleware();
+    const captured = { status: 0 };
+    const res = {
+      writeHead(status: number) { captured.status = status; return this; },
+      end() { /* noop */ },
+    } as unknown as ServerResponse;
+    expect(auth(reqFor('GET', '/api/run-flow/abc/events?token=WRONG'), res)).toBe(false);
+    expect(captured.status).toBe(403);
+  });
+
+  it('POST can NEVER authenticate via query-token — even on an allowlisted prefix', () => {
+    const auth = middleware();
+    const captured = { status: 0 };
+    const res = {
+      writeHead(status: number) { captured.status = status; return this; },
+      end() { /* noop */ },
+    } as unknown as ServerResponse;
+    expect(auth(reqFor('POST', `/api/run-flow/abc/decision?token=${TOKEN}`), res)).toBe(false);
+    expect(captured.status).toBe(401); // missing header, query-token ineligible for mutations
+  });
+
+  it('non-allowlisted path gets no query-token lane at all', () => {
+    const auth = middleware();
+    const captured = { status: 0 };
+    const res = {
+      writeHead(status: number) { captured.status = status; return this; },
+      end() { /* noop */ },
+    } as unknown as ServerResponse;
+    expect(auth(reqFor('GET', `/api/agents?token=${TOKEN}`), res)).toBe(false);
+    expect(captured.status).toBe(401);
+  });
+});

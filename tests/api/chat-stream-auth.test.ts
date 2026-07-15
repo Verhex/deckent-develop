@@ -54,7 +54,7 @@ const SERVE_QUERY_TOKEN_PATHS = ['/api/events', '/api/chat/stream'];
  * exercised (no localhost auto-inject), exactly matching live behaviour.
  */
 function fakeReq(url: string, headers: Record<string, string> = {}): IncomingMessage {
-  return { url, headers, socket: {} } as unknown as IncomingMessage;
+  return { method: 'GET', url, headers, socket: {} } as unknown as IncomingMessage;
 }
 
 interface ResCapture {

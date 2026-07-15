@@ -1889,7 +1889,12 @@ export function createHttpServer(
     // dynamic segment, so it cannot be an exact entry. The PREFIX form (trailing
     // slash) grants the same query-token fallback to the sub-resource while the
     // `/api/workers` LIST endpoint stays exact-match-only (behavior unchanged).
-    queryTokenPrefixes: ['/api/workers/'],
+    // SURF-2: run-flow SSE (`/api/run-flow/:flowId/events`) is EventSource-
+    // consumed (Desktop console / terminal follow) — headerless by nature.
+    // The PREFIX also covers the read-only GETs (:flowId, /preview); the
+    // query-token fallback itself is GET/HEAD-only (auth.ts hardening), so
+    // POST decision/propose can never authenticate via a URL token.
+    queryTokenPrefixes: ['/api/workers/', '/api/run-flow/'],
     ...(resolvedOidc ? { oidc: resolvedOidc } : {}),
   });
 

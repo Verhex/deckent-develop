@@ -71,6 +71,7 @@ function fakeReq(
   remoteAddress?: string,
 ): http.IncomingMessage {
   return {
+    method: 'GET', // SURF-2: query-token lane is GET/HEAD-only
     headers: authHeader ? { authorization: authHeader } : {},
     url,
     ...(remoteAddress ? { socket: { remoteAddress } } : {}),

@@ -67,7 +67,7 @@ const SERVE_QUERY_TOKEN_PATHS = liveQueryTokenPaths();
  * gate (no localhost auto-inject), exactly matching the live 401 behaviour.
  */
 function fakeReq(url: string, headers: Record<string, string> = {}): IncomingMessage {
-  return { url, headers, socket: {} } as unknown as IncomingMessage;
+  return { method: 'GET', url, headers, socket: {} } as unknown as IncomingMessage;
 }
 
 interface ResCapture {

@@ -136,7 +136,7 @@ const SERVE_QUERY_TOKEN_PATHS = ['/api/events', '/api/chat/stream'];
 const SERVE_QUERY_TOKEN_PREFIXES = ['/api/workers/'];
 
 function fakeReq(url: string, headers: Record<string, string> = {}): IncomingMessage {
-  return { url, headers, socket: {} } as unknown as IncomingMessage;
+  return { method: 'GET', url, headers, socket: {} } as unknown as IncomingMessage;
 }
 
 function runGate(
