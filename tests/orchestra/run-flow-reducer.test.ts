@@ -412,6 +412,8 @@ describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-s
       // whole slice exists to create (CC pin-sync; 439-002's own scope carried
       // this pin but ended NO_GO — the coordinator itself landed via 439-001).
       'orchestra/run-flow-coordinator.ts',
+  // born-698c: the death-sweep reads run handles (pid liveness) — designed consumer.
+  'orchestra/run-flow-death-sweep.ts',
       // SURF-1a (sprint-438): the durable event-log lives in the store, so the
       // store now imports the contract's RunFlowEvent type to append/read
       // sequenced events — the designed persistence consumer, not a leak.
