@@ -19,6 +19,9 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { tmpdir } from 'node:os';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { loadApprovedSnapshot } from '../../src/core/run-flow-store.js';
 
 // 429-001 (born-678): compiler artık scaffold üretmez — AI/provider SINIRI olan
 // callZeroConfigPlanner mock'lanır (do-real-plan.test.ts emsali); canned tek-task
@@ -264,6 +267,39 @@ describe('createRunFlowController — trajectory (propose -> preview -> approve/
     expect(approved.approvedSnapshot?.approvedBy).toEqual({ id: 'alperen' });
     expect(approved.handle).toBeUndefined();
     expect(controller.getContext().state).toBe('APPROVED');
+  });
+
+  it('startApproved persists the proposal into the durable snapshot — REAL controller write path (G1)', async () => {
+    // Unlike the inbox read-side test (which seeds the snapshot directly), this
+    // drives the ACTUAL controller — proposeRun -> approve -> startApproved — and
+    // asserts on what landed ON DISK. It is the write side the read-side test
+    // structurally cannot prove: if startApproved ever stopped persisting
+    // context.proposal, this fails while the seeded test would still pass.
+    const root = mkdtempSync(join(tmpdir(), 'runflow-g1-'));
+    try {
+      const intent = 'Fix the flaky retry test';
+      const controller = createRunFlowController({
+        ...makeControllerDeps(),
+        root,
+        // Inject a fake spawn so startApproved never launches a real child.
+        spawnStart: (_sprint, fid) => ({ flowId: fid, jobId: `test-job-${fid}`, logRef: 'test-log' }),
+      });
+      await controller.proposeRun(intent);
+      controller.approve({ id: 'alperen' });
+      // startApproved is an optional interface member (427-005 seam); the concrete
+      // controller always defines it, so assert-present matches this file's style.
+      const started = controller.startApproved!();
+      expect(started.state).toBe('DETACHED_RUNNING');
+
+      // G1's whole point: a do-flow's ONLY durable trail is this snapshot (the
+      // in-process controller never writes events.jsonl), so it must carry the
+      // proposal for the inbox legacy-read to show intentSummary, not a bare UUID.
+      const persisted = loadApprovedSnapshot(root, 'flow-1');
+      expect(persisted).toBeDefined();
+      expect(persisted?.proposal?.intentSummary).toBe(intent);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('reject() -> CANCELLED', async () => {
