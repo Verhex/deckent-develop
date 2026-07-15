@@ -9,6 +9,7 @@ import {
   existsSync,
   openSync,
   closeSync,
+  writeSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import type { ModelType } from '../core/types.js';
@@ -19,6 +20,8 @@ import { TASKS_DIR } from '../core/constants.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { resolveReasoningEffort } from '../core/reasoning-effort.js';
 import { debugLog } from '../core/utils.js';
+import { normalizeStreamEvent } from '../core/log-event.js';
+import { makeActivityOnEvent } from '../agents/worker-activity.js';
 import type { ProviderDefinition } from '../core/config-types.js';
 import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
 import { scrubCrossProviderEnv } from './provider.js';
@@ -153,6 +156,16 @@ export interface SubprocessProviderConfig {
    * the provider emits no usage envelope and extraction falls back to estimation.
    */
   readonly usageEmitArgs?: readonly string[];
+  /**
+   * SURF-3 S2 — args that make this CLI emit a per-tool STREAM (NDJSON, one
+   * event per line) instead of the single `usageEmitArgs` envelope, so the
+   * subprocess backend can tap live tool-by-tool activity. Used ONLY when
+   * `live_trace.enabled` is on (else `usageEmitArgs` keeps today's byte-stable
+   * single-envelope path). Claude: `['--output-format','stream-json','--verbose']`
+   * (the `result` line still carries usage — extractUsage scans lines, unchanged).
+   * Omitted → this provider has no live-stream mode (no behavior change).
+   */
+  readonly liveStreamArgs?: readonly string[];
 }
 
 /**
@@ -208,6 +221,9 @@ export const CLAUDE_SUBPROCESS_CONFIG: SubprocessProviderConfig = {
   // cache_read_input_tokens,cache_creation_input_tokens}}`) on stdout so
   // ClaudeAdapter.extractUsage can capture real token counts from the worker log.
   usageEmitArgs: ['--output-format', 'json'],
+  // SURF-3 S2 — stream-json + --verbose for live tool-by-tool activity (only
+  // when live_trace.enabled). The final `result` line still carries usage.
+  liveStreamArgs: ['--output-format', 'stream-json', '--verbose'],
 };
 
 // ─── SubprocessWorkerEntry ────────────────────────────────────────────
@@ -315,8 +331,13 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     // unit-tested buildArgs shape stay byte-stable. Configs without usageEmitArgs
     // (custom/codex) spawn exactly as before.
     const baseArgs = this.providerConfig.buildArgs(model, opts);
-    const args = this.providerConfig.usageEmitArgs
-      ? [...baseArgs, ...this.providerConfig.usageEmitArgs]
+    // SURF-3 S2 — live tool-by-tool activity (flag-gated). When on AND this
+    // provider declares `liveStreamArgs`, swap the single-envelope usage args for
+    // the stream-json args so stdout carries per-tool events; else byte-stable.
+    const liveActivity = opts?.liveTraceEnabled === true && this.providerConfig.liveStreamArgs !== undefined;
+    const emitArgs = liveActivity ? this.providerConfig.liveStreamArgs : this.providerConfig.usageEmitArgs;
+    const args = emitArgs
+      ? [...baseArgs, ...emitArgs]
       : baseArgs;
     // SPAWN-1 (DEP0190 + ADR-006): cross-platform shell-free invocation. On win32 this
     // routes through `cmd.exe /c <cli> <args…>` (shell:false) so the .cmd/.ps1 wrapper is
@@ -399,15 +420,49 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     // group-signal semantics for `process.kill`, and `detached` means something
     // different there (new console, not new process group) — win32 keeps today's
     // single-pid behavior unchanged (see signalProcessGroup's win32 branch).
+    // SURF-3 S2 — in live mode, PIPE stdout to JS so it can be teed (raw → the
+    // .log, unchanged format + usage path) AND parsed for per-tool activity;
+    // stderr still goes straight to logFd. Off (the default), stdout+stderr both
+    // FD-redirect exactly as before (byte-identical, no JS read).
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
-      stdio: ['pipe', logFd, logFd],
+      stdio: liveActivity ? ['pipe', 'pipe', logFd] : ['pipe', logFd, logFd],
       env: childEnv,
       shell: inv.shell,
       detached: this.platform !== 'win32',
     };
 
     const child = this.spawnImpl(inv.command, inv.args, spawnOpts);
+
+    // SURF-3 S2 — tee stdout: append each raw chunk to the .log (preserving the
+    // raw stream-json format extractUsage already scans line-by-line) AND emit a
+    // per-tool ACTIVITY line for every complete NDJSON line. Fail-soft: a bad
+    // line / failed emit never breaks the worker; a write error degrades to
+    // activity-only. Only runs when liveActivity (stdout is piped then).
+    if (liveActivity && child.stdout) {
+      const onActivity = makeActivityOnEvent({
+        projectRoot: dir,
+        taskId,
+        workerId: `subprocess-${taskId}`,
+        enabled: true, // liveActivity already gates on opts.liveTraceEnabled
+        ...(opts?.sprintId ? { sprintId: opts.sprintId } : {}),
+      });
+      const provider = this.name;
+      let lineBuf = '';
+      child.stdout.on('data', (chunk: Buffer) => {
+        try { writeSync(logFd, chunk); } catch { /* raw-log write best-effort */ }
+        lineBuf += chunk.toString('utf-8');
+        let nl: number;
+        while ((nl = lineBuf.indexOf('\n')) !== -1) {
+          const line = lineBuf.slice(0, nl);
+          lineBuf = lineBuf.slice(nl + 1);
+          if (line.trim()) {
+            try { onActivity(normalizeStreamEvent(line, provider)); } catch { /* fail-soft */ }
+          }
+        }
+      });
+      child.stdout.on('error', () => { /* stream error never breaks the worker */ });
+    }
     // BUG-26: DON'T close logFd here — keep open until child exits
     // On Windows the cmd.exe wrapper child inherits the FD; closing it before inherit causes empty logs
 
