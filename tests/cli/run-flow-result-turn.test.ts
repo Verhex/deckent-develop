@@ -29,6 +29,9 @@ import {
   buildRunFlowResultEvent,
   buildRunFlowResultLabels,
   wireRunFlowResultWatch,
+  formatTaskEvidenceLine,
+  verdictIcon,
+  MAX_EVIDENCE_TASKS,
   type RunFlowResultLabels,
 } from '../../src/cli/repl/run.js';
 import { drainRunFlowResultTurns } from '../../src/cli/repl/app.js';
@@ -47,6 +50,9 @@ import { getMessage } from '../../src/cli/helpers/messages.js';
 const LABELS: RunFlowResultLabels = {
   completed: 'Run {flowId} completed — {done}/{total} DONE · {techDebt} TECH_DEBT · {noGo} NO_GO',
   failed: 'Run {flowId} failed: {error}',
+  evidenceFiles: ' — {files} files · +{added}/-{removed}',
+  evidenceTests: ' · tests {mark}{coverage}',
+  evidenceMore: '  … {n} more',
 };
 
 function writeJob(dir: string, fileName: string, content: unknown): void {
@@ -111,9 +117,89 @@ describe('buildRunFlowResultEvent', () => {
     const trLabels: RunFlowResultLabels = {
       completed: 'Run {flowId} tamamlandı — {done}/{total} DONE',
       failed: '{flowId} başarısız: {error}',
+      evidenceFiles: ' — {files} dosya · +{added}/-{removed}',
+      evidenceTests: ' · test {mark}{coverage}',
+      evidenceMore: '  … {n} daha',
     };
     const info: RunCompletionInfo = { jobId: 'job-5', status: 'COMPLETE', flowId: 'flow-5', totalTasks: 1, done: 1, techDebt: 0, noGo: 0 };
     expect(buildRunFlowResultEvent(info, trLabels).summary).toBe('Run flow-5 tamamlandı — 1/1 DONE');
+  });
+
+  // ─── SURF-3 result-evidence — per-task evidence block ─────────────────────
+
+  it('appends per-task evidence lines below the aggregate header', () => {
+    const info: RunCompletionInfo = {
+      jobId: 'job-e', status: 'COMPLETE', flowId: 'flow-e',
+      totalTasks: 2, done: 1, techDebt: 1, noGo: 0,
+      tasks: [
+        { taskId: 't1', title: 'Add auth', evaluation: 'DONE', selfAssessment: 'DONE', filesChanged: 3, linesAdded: 45, linesRemoved: 12, testsPassed: true, coverage: 87 },
+        { taskId: 't2', title: 'Refactor', evaluation: 'GO_WITH_TECH_DEBT', selfAssessment: 'GO_WITH_TECH_DEBT', filesChanged: 1, linesAdded: 8, linesRemoved: 3, testsPassed: true, coverage: 0 },
+      ],
+    };
+    const out = buildRunFlowResultEvent(info, LABELS).summary.split('\n');
+    expect(out[0]).toBe('Run flow-e completed — 1/2 DONE · 1 TECH_DEBT · 0 NO_GO');
+    expect(out[1]).toBe('  ✅ t1 Add auth — 3 files · +45/-12 · tests ✓ 87%');
+    expect(out[2]).toBe('  ⚠ t2 Refactor — 1 files · +8/-3 · tests ✓');
+  });
+
+  it('a bare NO_GO task with no files/tests stays a clean one-liner (no "0 files")', () => {
+    const info: RunCompletionInfo = {
+      jobId: 'job-n', status: 'COMPLETE', flowId: 'flow-n', totalTasks: 1, done: 0, techDebt: 0, noGo: 1,
+      tasks: [{ taskId: 't9', title: 'Migrate', evaluation: 'NO_GO', selfAssessment: 'NO_GO', filesChanged: 0, linesAdded: 0, linesRemoved: 0, testsPassed: false, coverage: 0 }],
+    };
+    const out = buildRunFlowResultEvent(info, LABELS).summary.split('\n');
+    expect(out[1]).toBe('  ❌ t9 Migrate');
+  });
+
+  it('caps the evidence block at MAX_EVIDENCE_TASKS and adds a "… N more" footer', () => {
+    const tasks = Array.from({ length: MAX_EVIDENCE_TASKS + 3 }, (_, i) => ({
+      taskId: `t${i}`, title: `Task ${i}`, evaluation: 'DONE', selfAssessment: 'DONE',
+      filesChanged: 1, linesAdded: 1, linesRemoved: 0, testsPassed: false, coverage: 0,
+    }));
+    const info: RunCompletionInfo = { jobId: 'job-c', status: 'COMPLETE', flowId: 'flow-c', totalTasks: tasks.length, done: tasks.length, techDebt: 0, noGo: 0, tasks };
+    const out = buildRunFlowResultEvent(info, LABELS).summary.split('\n');
+    // header + MAX task lines + 1 footer
+    expect(out).toHaveLength(1 + MAX_EVIDENCE_TASKS + 1);
+    expect(out[out.length - 1]).toBe('  … 3 more');
+  });
+
+  it('a COMPLETE info with no tasks (legacy job) is header-only — byte-identical to pre-evidence', () => {
+    const info: RunCompletionInfo = { jobId: 'job-l', status: 'COMPLETE', flowId: 'flow-l', totalTasks: 2, done: 2, techDebt: 0, noGo: 0 };
+    expect(buildRunFlowResultEvent(info, LABELS).summary).toBe('Run flow-l completed — 2/2 DONE · 0 TECH_DEBT · 0 NO_GO');
+  });
+
+  it('a FAILED info stays single-line even if it somehow carried tasks', () => {
+    const info: RunCompletionInfo = {
+      jobId: 'job-f', status: 'FAILED', flowId: 'flow-f', error: 'boom',
+      tasks: [{ taskId: 't1', title: 'x', evaluation: 'DONE', selfAssessment: 'DONE', filesChanged: 1, linesAdded: 1, linesRemoved: 0, testsPassed: true, coverage: 0 }],
+    };
+    expect(buildRunFlowResultEvent(info, LABELS).summary).toBe('Run flow-f failed: boom');
+  });
+});
+
+describe('formatTaskEvidenceLine + verdictIcon (pure — SURF-3 result-evidence)', () => {
+  it('maps each verdict to its icon', () => {
+    expect(verdictIcon('DONE')).toBe('✅');
+    expect(verdictIcon('GO_WITH_TECH_DEBT')).toBe('⚠');
+    expect(verdictIcon('NO_GO')).toBe('❌');
+    expect(verdictIcon('WHATEVER')).toBe('•');
+  });
+
+  it('omits coverage when zero but still shows the test mark', () => {
+    const line = formatTaskEvidenceLine(
+      { taskId: 't', title: 'T', evaluation: 'DONE', selfAssessment: 'DONE', filesChanged: 2, linesAdded: 5, linesRemoved: 1, testsPassed: true, coverage: 0 },
+      LABELS,
+    );
+    expect(line).toBe('  ✅ t T — 2 files · +5/-1 · tests ✓');
+  });
+
+  it('shows a failing test mark', () => {
+    const line = formatTaskEvidenceLine(
+      { taskId: 't', title: '', evaluation: 'NO_GO', selfAssessment: 'NO_GO', filesChanged: 0, linesAdded: 0, linesRemoved: 0, testsPassed: false, coverage: 40 },
+      LABELS,
+    );
+    // coverage>0 forces the test segment even when testsPassed is false.
+    expect(line).toBe('  ❌ t · tests ✗ 40%');
   });
 });
 
@@ -124,7 +210,7 @@ describe('buildRunFlowResultLabels', () => {
     const en = buildRunFlowResultLabels((k) => getMessage(k, 'en'));
     const tr = buildRunFlowResultLabels((k) => getMessage(k, 'tr'));
 
-    for (const key of ['completed', 'failed'] as const) {
+    for (const key of ['completed', 'failed', 'evidenceFiles', 'evidenceTests', 'evidenceMore'] as const) {
       expect(en[key].length).toBeGreaterThan(0);
       expect(tr[key].length).toBeGreaterThan(0);
       expect(en[key]).not.toBe(tr[key]);

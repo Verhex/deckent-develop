@@ -35,6 +35,21 @@ import { join } from 'node:path';
  *  to report yet and is filtered out before it ever reaches the fired-set. */
 export type RunCompletionStatus = 'COMPLETE' | 'FAILED';
 
+/** One evaluated task's evidence, read from the job's `completionRecord.taskSummary`
+ *  (SURF-3 result-evidence). Language-neutral — run.tsx renders it via i18n. */
+export interface RunTaskEvidence {
+  readonly taskId: string;
+  readonly title: string;
+  /** Brain verdict: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO' (kept as the raw string). */
+  readonly evaluation: string;
+  readonly selfAssessment: string;
+  readonly filesChanged: number;
+  readonly linesAdded: number;
+  readonly linesRemoved: number;
+  readonly testsPassed: boolean;
+  readonly coverage: number;
+}
+
 /** Structured, language-neutral summary of one finished detached run — the
  *  caller (run.tsx's `buildBgTurnEvent`) turns this into a `ChatTurnBgEvent`. */
 export interface RunCompletionInfo {
@@ -51,6 +66,9 @@ export interface RunCompletionInfo {
    *  `completionRecord.flowId` when present on disk (427-001's additive
    *  field); `undefined` for every legacy job record. */
   readonly flowId?: string;
+  /** Per-task evidence (SURF-3 result-evidence) — from `completionRecord.taskSummary`.
+   *  `undefined`/empty for a FAILED run (no rich record written) or a legacy job. */
+  readonly tasks?: readonly RunTaskEvidence[];
 }
 
 export interface RunCompletionWatchHandlers {
@@ -108,12 +126,34 @@ interface RawJobRecord {
     techDebt?: unknown;
     noGo?: unknown;
   };
-  /** Additive field (427-001, TERM5-FIN). Only `flowId` is read here — the
-   *  same tolerant "local, permissive shape" precedent run-state-feed.ts's
-   *  own `RawCompletionRecord` follows, not an import of the writer's type
-   *  (ADR-D-004 C2/C3). */
+  /** Additive field (427-001, TERM5-FIN). `flowId` + `taskSummary` (SURF-3
+   *  result-evidence) are read here — the same tolerant "local, permissive
+   *  shape" precedent run-state-feed.ts's own `RawCompletionRecord` follows,
+   *  not an import of the writer's type (ADR-D-004 C2/C3). */
   completionRecord?: {
     flowId?: unknown;
+    taskSummary?: unknown;
+  };
+}
+
+/** Tolerant parse of one `completionRecord.taskSummary` entry — every field is
+ *  defended so a legacy/partial record degrades to a low-detail evidence line
+ *  rather than throwing. */
+function parseTaskEvidence(entry: unknown): RunTaskEvidence | null {
+  if (typeof entry !== 'object' || entry === null) return null;
+  const e = entry as Record<string, unknown>;
+  const taskId = firstNonEmptyString(e['taskId']);
+  if (!taskId) return null;
+  return {
+    taskId,
+    title: firstNonEmptyString(e['title']) ?? '',
+    evaluation: firstNonEmptyString(e['evaluation']) ?? '',
+    selfAssessment: firstNonEmptyString(e['selfAssessment']) ?? '',
+    filesChanged: numberOrUndefined(e['filesChanged']) ?? 0,
+    linesAdded: numberOrUndefined(e['linesAdded']) ?? 0,
+    linesRemoved: numberOrUndefined(e['linesRemoved']) ?? 0,
+    testsPassed: e['testsPassed'] === true,
+    coverage: numberOrUndefined(e['coverage']) ?? 0,
   };
 }
 
@@ -150,6 +190,11 @@ export function parseRunCompletionRecord(raw: string, fallbackJobId: string): Ru
   const jobId = firstNonEmptyString(job.jobId, job.sprintId) ?? fallbackJobId;
   const metrics = job.metrics;
 
+  const rawTaskSummary = job.completionRecord?.taskSummary;
+  const tasks = Array.isArray(rawTaskSummary)
+    ? rawTaskSummary.map(parseTaskEvidence).filter((t): t is RunTaskEvidence => t !== null)
+    : [];
+
   return {
     jobId,
     sprintId: firstNonEmptyString(job.sprintId),
@@ -160,6 +205,7 @@ export function parseRunCompletionRecord(raw: string, fallbackJobId: string): Ru
     noGo: numberOrUndefined(metrics?.noGo),
     error: firstNonEmptyString(job.error),
     flowId: firstNonEmptyString(job.completionRecord?.flowId),
+    ...(tasks.length > 0 ? { tasks } : {}),
   };
 }
 

@@ -83,6 +83,49 @@ describe('parseRunCompletionRecord — flowId (TERM5-WATCH, sprint-427 task 3)',
     expect(parseRunCompletionRecord(raw, 'sprint-1')?.flowId).toBeUndefined();
   });
 
+  // ─── SURF-3 result-evidence — completionRecord.taskSummary parsing ─────────
+
+  it('parses completionRecord.taskSummary into per-task evidence', () => {
+    const raw = JSON.stringify({
+      status: 'COMPLETE', sprintId: 'sprint-e',
+      completionRecord: {
+        flowId: 'flow-e',
+        taskSummary: [
+          { taskId: 't1', title: 'Add auth', evaluation: 'DONE', selfAssessment: 'DONE', filesChanged: 3, linesAdded: 45, linesRemoved: 12, testsPassed: true, coverage: 87 },
+        ],
+      },
+    });
+    const info = parseRunCompletionRecord(raw, 'sprint-e');
+    expect(info?.tasks).toEqual([
+      { taskId: 't1', title: 'Add auth', evaluation: 'DONE', selfAssessment: 'DONE', filesChanged: 3, linesAdded: 45, linesRemoved: 12, testsPassed: true, coverage: 87 },
+    ]);
+  });
+
+  it('a legacy job with no taskSummary parses without a tasks key (byte-identical)', () => {
+    const raw = JSON.stringify({ status: 'COMPLETE', sprintId: 'sprint-l', completionRecord: { flowId: 'flow-l' } });
+    const info = parseRunCompletionRecord(raw, 'sprint-l');
+    expect(info?.tasks).toBeUndefined();
+    expect('tasks' in (info ?? {})).toBe(false);
+  });
+
+  it('tolerates a partial/garbage taskSummary entry — drops the bad one, keeps the good', () => {
+    const raw = JSON.stringify({
+      status: 'COMPLETE', sprintId: 'sprint-p',
+      completionRecord: {
+        taskSummary: [
+          null,
+          { title: 'no id — dropped' },
+          { taskId: 't2', filesChanged: 'not-a-number', testsPassed: 'yes' },
+        ],
+      },
+    });
+    const info = parseRunCompletionRecord(raw, 'sprint-p');
+    // null + id-less entries dropped; the id-bearing one survives with defended defaults.
+    expect(info?.tasks).toEqual([
+      { taskId: 't2', title: '', evaluation: '', selfAssessment: '', filesChanged: 0, linesAdded: 0, linesRemoved: 0, testsPassed: false, coverage: 0 },
+    ]);
+  });
+
   it('pre-existing sprint-finalizer.ts / job-runner.ts shapes still parse identically (no flowId key added when absent)', () => {
     // Bit-eş guard for the two pre-427-003 fixture shapes already pinned in
     // bg-turns-producer.test.ts — toEqual treats an `undefined`-valued key

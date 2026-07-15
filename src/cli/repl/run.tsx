@@ -49,6 +49,7 @@ import {
   createRunCompletionWatch,
   type RunCompletionInfo,
   type RunCompletionWatchHandle,
+  type RunTaskEvidence,
 } from './run-completion-watch.js';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
@@ -175,13 +176,61 @@ export function buildRunFlowMountLabels(t: (key: string) => string): RunFlowMoun
 export interface RunFlowResultLabels {
   completed: string; // "Run {flowId} completed — {done}/{total} DONE · {techDebt} TECH_DEBT · {noGo} NO_GO"
   failed: string;     // "Run {flowId} failed: {error}"
+  /** SURF-3 result-evidence — per-task evidence detail, e.g. " — {files} files · +{added}/-{removed}". */
+  evidenceFiles: string;
+  /** SURF-3 result-evidence — test detail appended to a task line, e.g. " · tests {mark}{coverage}". */
+  evidenceTests: string;
+  /** SURF-3 result-evidence — truncation footer when more tasks than the cap, e.g. "  … {n} more". */
+  evidenceMore: string;
 }
 
 export function buildRunFlowResultLabels(t: (key: string) => string): RunFlowResultLabels {
   return {
     completed: t('runFlow.result.completed'),
     failed: t('runFlow.result.failed'),
+    evidenceFiles: t('runFlow.result.evidence_files'),
+    evidenceTests: t('runFlow.result.evidence_tests'),
+    evidenceMore: t('runFlow.result.evidence_more'),
   };
+}
+
+/** Cap on per-task evidence lines in the terminal result-turn — a 20-40-task
+ *  run (the sprint law) must not flood the transcript; the rest collapse into a
+ *  "… N more" footer (same discipline as sprint-summary-rich's 5-file cap). */
+export const MAX_EVIDENCE_TASKS = 12;
+
+/** DONE → ✅ · GO_WITH_TECH_DEBT → ⚠ · NO_GO → ❌ · anything else → •. */
+export function verdictIcon(evaluation: string): string {
+  switch (evaluation) {
+    case 'DONE': return '✅';
+    case 'GO_WITH_TECH_DEBT': return '⚠';
+    case 'NO_GO': return '❌';
+    default: return '•';
+  }
+}
+
+/**
+ * SURF-3 result-evidence — build ONE per-task evidence line. Pure + exported so
+ * it is testable without the watch/render plumbing. Shows the verdict icon +
+ * taskId + title, then appends file/test detail ONLY when there is something to
+ * show (a bare NO_GO with no files/tests stays a clean one-liner, not
+ * "0 files · +0/-0"). `{coverage}` is omitted when zero.
+ */
+export function formatTaskEvidenceLine(task: RunTaskEvidence, labels: RunFlowResultLabels): string {
+  const base = `  ${verdictIcon(task.evaluation)} ${task.taskId}${task.title ? ` ${task.title}` : ''}`;
+  let detail = '';
+  if (task.filesChanged > 0) {
+    detail += labels.evidenceFiles
+      .replace('{files}', String(task.filesChanged))
+      .replace('{added}', String(task.linesAdded))
+      .replace('{removed}', String(task.linesRemoved));
+  }
+  if (task.testsPassed || task.coverage > 0) {
+    detail += labels.evidenceTests
+      .replace('{mark}', task.testsPassed ? '✓' : '✗')
+      .replace('{coverage}', task.coverage > 0 ? ` ${task.coverage}%` : '');
+  }
+  return base + detail;
 }
 
 /**
@@ -203,15 +252,24 @@ export function buildRunFlowResultEvent(info: RunCompletionInfo, labels: RunFlow
   const done = info.done ?? 0;
   const techDebt = info.techDebt ?? 0;
   const noGo = info.noGo ?? 0;
-  return {
-    source,
-    summary: labels.completed
-      .replace('{flowId}', flowId)
-      .replace('{done}', String(done))
-      .replace('{total}', String(total))
-      .replace('{techDebt}', String(techDebt))
-      .replace('{noGo}', String(noGo)),
-  };
+  const header = labels.completed
+    .replace('{flowId}', flowId)
+    .replace('{done}', String(done))
+    .replace('{total}', String(total))
+    .replace('{techDebt}', String(techDebt))
+    .replace('{noGo}', String(noGo));
+  // SURF-3 result-evidence — append per-task evidence lines below the aggregate
+  // header when the job carried a rich taskSummary (a FAILED run / legacy job
+  // has none → header-only, byte-identical to the pre-evidence result-turn).
+  const tasks = info.tasks ?? [];
+  const lines = [header];
+  for (const task of tasks.slice(0, MAX_EVIDENCE_TASKS)) {
+    lines.push(formatTaskEvidenceLine(task, labels));
+  }
+  if (tasks.length > MAX_EVIDENCE_TASKS) {
+    lines.push(labels.evidenceMore.replace('{n}', String(tasks.length - MAX_EVIDENCE_TASKS)));
+  }
+  return { source, summary: lines.join('\n') };
 }
 
 /**

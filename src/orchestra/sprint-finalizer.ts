@@ -1014,12 +1014,23 @@ export interface CompletionVerdictSummary {
 
 /** One evaluated task's summary — a flat array entry, distinct from the
  *  existing keyed `evaluations` record (a future result-turn renderer wants
- *  an ordered list, not a map). */
+ *  an ordered list, not a map). SURF-3 result-evidence (born-697 successor):
+ *  the file/test evidence fields carry the same numbers the keyed `evaluations`
+ *  map already holds, so the terminal result-turn can render per-task evidence
+ *  without re-reading N `.tasks/*.result` files — the job file (already watched)
+ *  is enough. Additive: legacy job files lack these and parse to `undefined`. */
 export interface CompletionTaskSummary {
   taskId: string;
   title: string;
   evaluation: TaskEvaluation;
   selfAssessment: string;
+  /** Count of files this task changed (not the list — the terminal wants density). */
+  filesChanged: number;
+  linesAdded: number;
+  linesRemoved: number;
+  testsPassed: boolean;
+  /** Test coverage percent (0 when the task ran no tests / reported none). */
+  coverage: number;
 }
 
 export interface SprintCompletionRecord {
@@ -1052,6 +1063,11 @@ export function buildSprintCompletionRecord(
       title: task?.title ?? '',
       evaluation,
       selfAssessment: result?.selfAssessment ?? evaluation,
+      filesChanged: result?.filesChanged?.length ?? 0,
+      linesAdded: result?.linesAdded ?? 0,
+      linesRemoved: result?.linesRemoved ?? 0,
+      testsPassed: result?.testsPassed ?? false,
+      coverage: result?.coverage ?? 0,
     });
 
     if (evaluation === TaskEvaluation.NO_GO) verdictSummary.noGo += 1;

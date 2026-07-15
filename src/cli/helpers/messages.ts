@@ -223,6 +223,19 @@ const MESSAGES: MessageMap = {
     en: 'Run {flowId} failed: {error}',
     tr: 'Run {flowId} başarısız: {error}',
   },
+  // SURF-3 result-evidence — per-task evidence lines below the aggregate header.
+  'runFlow.result.evidence_files': {
+    en: ' — {files} files · +{added}/-{removed}',
+    tr: ' — {files} dosya · +{added}/-{removed}',
+  },
+  'runFlow.result.evidence_tests': {
+    en: ' · tests {mark}{coverage}',
+    tr: ' · test {mark}{coverage}',
+  },
+  'runFlow.result.evidence_more': {
+    en: '  … {n} more',
+    tr: '  … {n} daha',
+  },
 
   // ─── status command ─────────────────────────────────────────────────
   'status.no_active_sprint': {

@@ -32,8 +32,13 @@ function mkSprint(tasks: Array<{ id: string; title: string }>): Sprint {
   };
 }
 
-/** A structurally-valid TaskResult; only `selfAssessment` matters for the record. */
-function mkResult(taskId: string, selfAssessment: TaskResult['selfAssessment']): TaskResult {
+/** A structurally-valid TaskResult. `evidence` overrides the file/test fields
+ *  the SURF-3 result-evidence record now carries (default: none). */
+function mkResult(
+  taskId: string,
+  selfAssessment: TaskResult['selfAssessment'],
+  evidence: Partial<Pick<TaskResult, 'filesChanged' | 'linesAdded' | 'linesRemoved' | 'testsPassed' | 'coverage'>> = {},
+): TaskResult {
   return {
     taskId,
     workerId: `w-${taskId}`,
@@ -44,6 +49,7 @@ function mkResult(taskId: string, selfAssessment: TaskResult['selfAssessment']):
     coverage: 0,
     selfAssessment,
     notes: '',
+    ...evidence,
   };
 }
 
@@ -111,9 +117,25 @@ describe('buildSprintCompletionRecord — TERM5-FIN rich completion-record', () 
     const record = buildSprintCompletionRecord(sprint, evaluations, resultsMap);
 
     expect(record.taskSummary).toEqual([
-      { taskId: '427-001', title: 'TERM5-FIN', evaluation: TaskEvaluation.DONE, selfAssessment: 'DONE' },
-      { taskId: '427-002', title: 'TERM5-FEED', evaluation: TaskEvaluation.GO_WITH_TECH_DEBT, selfAssessment: 'GO_WITH_TECH_DEBT' },
+      { taskId: '427-001', title: 'TERM5-FIN', evaluation: TaskEvaluation.DONE, selfAssessment: 'DONE', filesChanged: 0, linesAdded: 0, linesRemoved: 0, testsPassed: true, coverage: 0 },
+      { taskId: '427-002', title: 'TERM5-FEED', evaluation: TaskEvaluation.GO_WITH_TECH_DEBT, selfAssessment: 'GO_WITH_TECH_DEBT', filesChanged: 0, linesAdded: 0, linesRemoved: 0, testsPassed: true, coverage: 0 },
     ]);
+  });
+
+  it('carries per-task file/test evidence from the result map (SURF-3 result-evidence)', () => {
+    const sprint = mkSprint([{ id: '427-001', title: 'Add auth' }]);
+    const evaluations = new Map<string, TaskEvaluation>([['427-001', TaskEvaluation.DONE]]);
+    const resultsMap = new Map<string, TaskResult>([
+      ['427-001', mkResult('427-001', 'DONE', {
+        filesChanged: ['a.ts', 'b.ts', 'c.ts'], linesAdded: 45, linesRemoved: 12, testsPassed: true, coverage: 87,
+      })],
+    ]);
+
+    const record = buildSprintCompletionRecord(sprint, evaluations, resultsMap);
+
+    expect(record.taskSummary[0]).toMatchObject({
+      taskId: '427-001', filesChanged: 3, linesAdded: 45, linesRemoved: 12, testsPassed: true, coverage: 87,
+    });
   });
 
   it('falls back to the evaluation string when no result is present for a task (never throws)', () => {
@@ -124,7 +146,7 @@ describe('buildSprintCompletionRecord — TERM5-FIN rich completion-record', () 
     const record = buildSprintCompletionRecord(sprint, evaluations, resultsMap);
 
     expect(record.taskSummary).toEqual([
-      { taskId: '427-005', title: 'Untracked', evaluation: TaskEvaluation.NO_GO, selfAssessment: 'NO_GO' },
+      { taskId: '427-005', title: 'Untracked', evaluation: TaskEvaluation.NO_GO, selfAssessment: 'NO_GO', filesChanged: 0, linesAdded: 0, linesRemoved: 0, testsPassed: false, coverage: 0 },
     ]);
     expect(record.verdictSummary).toEqual({ done: 0, techDebt: 0, noGo: 1 });
   });

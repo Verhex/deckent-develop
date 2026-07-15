@@ -319,7 +319,10 @@ describe('term-flow composition-gate — full chain in ONE fixture (TERM-6, 428-
           source: 'flow-tf-1',
           events: [{
             source: 'flow-tf-1',
-            summary: 'Run flow-tf-1 completed — 1/2 DONE · 1 TECH_DEBT · 0 NO_GO',
+            // SURF-3 result-evidence — the aggregate header now carries per-task
+            // evidence lines from completionRecord.taskSummary (bare here: the
+            // fixture tasks report no files/tests, so it's icon + id + title).
+            summary: 'Run flow-tf-1 completed — 1/2 DONE · 1 TECH_DEBT · 0 NO_GO\n  ✅ 001-001 Export module A\n  ⚠ 001-002 Export module B',
           }],
         },
       ]);
