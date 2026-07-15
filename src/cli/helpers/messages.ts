@@ -2756,6 +2756,11 @@ const MESSAGES: MessageMap = {
     en: 'No run #{arg} — `/runs` lists them',
     tr: '#{arg} numaralı koşu yok — listelemek için `/runs`',
   },
+  // SURF-3 multi-flow-inbox D3a — live `/runs --follow` card footer.
+  'tui.inbox_follow_hint': {
+    en: '⟳ live · Esc to close',
+    tr: '⟳ canlı · kapatmak için Esc',
+  },
   'tui.resume_picker_header': { en: 'Recent sessions', tr: 'Son oturumlar' },
   'tui.resume_picker_hint': {
     en: 'Tip: /resume <number> to continue a session',

@@ -45,6 +45,7 @@ import { planSprint, readContext } from '../../src/orchestra/brain.js';
 import {
   deriveRunFlowPreview,
   resolveRunFlowCardActive,
+  resolveInboxCardActive,
   formatRunFlowOutcomeLine,
   DEFAULT_RUN_FLOW_MOUNT_LABELS,
 } from '../../src/cli/repl/app.js';
@@ -155,6 +156,30 @@ describe('resolveRunFlowCardActive', () => {
 
   it('an ApprovalCard approval is pending (confirm modal closed): card defers', () => {
     expect(resolveRunFlowCardActive(false, true)).toBe(false);
+  });
+});
+
+// ─── app.tsx — resolveInboxCardActive (SURF-3 D3a) ─────────────────────────
+
+describe('resolveInboxCardActive — live /runs --follow card is the lowest-priority stdin consumer', () => {
+  it('idle (no confirm, no approval, no plan-preview): the inbox card may own stdin', () => {
+    expect(resolveInboxCardActive(false, false, false)).toBe(true);
+  });
+
+  it('defers to the confirm modal', () => {
+    expect(resolveInboxCardActive(true, false, false)).toBe(false);
+  });
+
+  it('defers to a pending ApprovalCard', () => {
+    expect(resolveInboxCardActive(false, true, false)).toBe(false);
+  });
+
+  it('defers to a pending PlanPreviewCard (runFlowPending)', () => {
+    expect(resolveInboxCardActive(false, false, true)).toBe(false);
+  });
+
+  it('defers when several higher-priority consumers are active at once', () => {
+    expect(resolveInboxCardActive(true, true, true)).toBe(false);
   });
 });
 

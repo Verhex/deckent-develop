@@ -40,6 +40,7 @@ import type { ApprovalTerminalChannel } from './approval-terminal-channel.js';
 import type { ApprovalStreamEvent } from '../../core/approval-eventstream.js';
 import type { ApprovalRisk } from '../../core/approval-contract.js';
 import { PlanPreviewCard, type PlanPreviewCardLabels } from './plan-preview-card.js';
+import { InboxCard } from './inbox-card.js';
 import type { RunFlowContext, PlanPreview } from '../../core/run-flow-contract.js';
 import type { RunFlowController } from './run-flow-controller.js';
 
@@ -568,6 +569,15 @@ export function resolveRunFlowCardActive(confirmOpen: boolean, approvalPending: 
   return !confirmOpen && !approvalPending;
 }
 
+/** Whether the live InboxCard (SURF-3 D3a `/runs --follow`) may own stdin this
+ *  render. It is the LOWEST-priority consumer — a view-only follow surface that
+ *  defers to the confirm modal, a pending ApprovalCard, AND a pending
+ *  PlanPreviewCard (runFlowPending). Same JSX-AND precedence pattern as
+ *  resolveRunFlowCardActive; resolveStdinOwner's 3-key return is NOT extended. */
+export function resolveInboxCardActive(confirmOpen: boolean, approvalPending: boolean, runFlowPending: boolean): boolean {
+  return !confirmOpen && !approvalPending && !runFlowPending;
+}
+
 /** Localized labels for the approve/reject/error lines pushed to the
  *  transcript after a PlanPreviewCard decision (buildRunFlowMountLabels, run.tsx).
  *  `started`/`error` are `{jobId}`/`{error}` templates (same convention as
@@ -902,6 +912,12 @@ export interface ReplAppProps {
    *  by run.tsx (which owns projectRoot + i18n); absent → `/runs` falls through
    *  as a normal turn. */
   runInboxProvider?: (input: string) => string;
+  /** SURF-3 D3a — returns the CURRENT rendered inbox lines for the live
+   *  `/runs --follow` card (polled on an interval). Injected by run.tsx. Absent
+   *  → `--follow` falls back to the static list. */
+  inboxFollowFeed?: () => string[];
+  /** Localized footer hint for the live inbox card ("⟳ live · Esc to close"). */
+  inboxFollowHint?: string;
   /** Optional chat-memory adapter — persists turns and powers /resume. */
   memory?: ChatMemoryAdapter;
   /** Active chat session id (new turns append here; /resume switches it). */
@@ -1048,7 +1064,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, registerRunFlowResultSink, runInboxProvider } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxFollowHint } = props;
   const { exit } = useApp();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
@@ -1131,6 +1147,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // the registerToolSink effect below, right after a completed tool call.
   const [runFlowPreview, setRunFlowPreview] = useState<PlanPreview | null>(null);
   const runFlowPending = runFlowPreview !== null;
+  // SURF-3 D3a — the live `/runs --follow` inbox card is open (view-only,
+  // Esc-close). Only mountable when a feed was injected (flag/wire on).
+  const [inboxOpen, setInboxOpen] = useState(false);
 
   // 360-009: turn objects are built BEFORE setTurns so every updater stays
   // pure (append-only) — React may re-invoke an updater, and the previous
@@ -1463,6 +1482,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       // loop has its own `/runs` branch (chat-native.ts), so the command never
       // silently degrades to a chat turn on either engine. Absent provider
       // (flag/wire off) → falls through as a normal turn.
+      // SURF-3 D3a — `/runs --follow` (or `-f`) opens the live, self-refreshing
+      // inbox card (view-only, Esc-close). Only when a feed was injected; else it
+      // falls through to the static list below.
+      if (/^\/runs\s+(?:--follow|-f)\s*$/i.test(trimmed) && inboxFollowFeed) {
+        pushTurn('user', trimmed);
+        setInboxOpen(true);
+        return;
+      }
       if (/^\/runs(?:\s+.*)?$/i.test(trimmed) && runInboxProvider) {
         // Bare `/runs` → the list; `/runs <n>` → that flow's detail (D2).
         pushTurn('user', trimmed);
@@ -1720,6 +1747,20 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         />
       )}
 
+      {/* SURF-3 D3a: the live `/runs --follow` inbox card — inert unless a feed
+          was injected AND `/runs --follow` opened it. Rendered LAST among the
+          cards so it defers to the confirm modal / ApprovalCard / PlanPreviewCard
+          for stdin (resolveInboxCardActive), and owns stdin only for Esc. */}
+      {inboxFollowFeed && (
+        <InboxCard
+          open={inboxOpen}
+          feed={inboxFollowFeed}
+          followHint={inboxFollowHint ?? '⟳ live · Esc to close'}
+          onClose={() => setInboxOpen(false)}
+          isActive={resolveInboxCardActive(stdinOwner.confirmActive, approvalPending, runFlowPending)}
+        />
+      )}
+
       {/* REPL-SURFACE-WIRE (354-001): mode indicator + live-footer — both
           inert unless replSurfaceEnabled (flag-off render stays byte-identical
           to the pre-354-001 App). Footer lines pass through resolveFooterLines
@@ -1746,7 +1787,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         // a fourth stdin consumer — `runFlowPending` is always false when
         // runFlowController is absent (the flag-off default), so this AND is a
         // no-op then (`x && !false === x`, byte-identical to the pre-426-002 prop).
-        active={stdinOwner.inputBarActive && !runFlowPending}
+        // SURF-3 D3a: the live `/runs --follow` card is a fifth consumer —
+        // typing is suspended while it is up (Esc closes it), same no-op-when-off
+        // property (`inboxOpen` is false until `--follow`).
+        active={stdinOwner.inputBarActive && !runFlowPending && !inboxOpen}
         onSubmit={handleSubmit}
         onInterrupt={() => exit()}
         onClear={clearScreen}
