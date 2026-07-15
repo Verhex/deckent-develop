@@ -13,7 +13,7 @@
 //   - Terminal width responsive — ASCII fallback below 60 cols
 //   - Cost color: <50% green, 50-80% yellow, >80% red
 
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync, openSync, readSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
 import { DASHBOARD_FILE, TASKS_DIR, DECKENT_DIR } from '../../core/constants.js';
 import { readPendingApprovals } from '../../core/pending-approvals.js';
@@ -35,6 +35,43 @@ interface SprintConfig {
   sprint_started_at?: string;
   max_workers?: number;
   sprint_hard_timeout?: number;
+}
+
+/** WORKER-LIVE-LOG (#582): latest ACTIVITY line per task, tail-scanned from
+ *  the sprint's event JSONL. Cheap (last ~64KB only) — the renderer redraws on
+ *  every event, so this must never read the whole file. */
+export interface LiveActivityRow {
+  taskId: string;
+  line: string;
+  kind: string;
+}
+
+export function readLatestActivity(projectRoot: string, sprintId: string, maxTasks = 5): LiveActivityRow[] {
+  try {
+    const file = join(projectRoot, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
+    if (!existsSync(file)) return [];
+    const { size } = statSync(file);
+    const start = Math.max(0, size - 64 * 1024);
+    const fd = openSync(file, 'r');
+    const buf = Buffer.alloc(size - start);
+    readSync(fd, buf, 0, buf.length, start);
+    closeSync(fd);
+    const latest = new Map<string, LiveActivityRow>();
+    for (const raw of buf.toString('utf-8').split('\n')) {
+      const line = raw.trim();
+      if (line === '' || !line.includes('WORKER→*:ACTIVITY')) continue;
+      try {
+        const ev = JSON.parse(line) as { channel?: string; payload?: { taskId?: string; line?: string; kind?: string } };
+        if (ev.channel !== 'WORKER→*:ACTIVITY') continue;
+        const taskId = ev.payload?.taskId;
+        if (!taskId || !ev.payload?.line) continue;
+        latest.set(taskId, { taskId, line: ev.payload.line, kind: ev.payload.kind ?? 'status' });
+      } catch { /* torn/partial tail line — skip */ }
+    }
+    return [...latest.values()].slice(-maxTasks);
+  } catch {
+    return [];
+  }
 }
 
 export interface RecentEvent {
@@ -255,6 +292,18 @@ export class StatusRenderer {
       lines.push(bl('👷 Active Workers: none'));
     }
     lines.push(SEP);
+
+    // ── Section 3.5: Live Activity (WORKER-LIVE-LOG #582) ──
+    // The "what is each worker doing RIGHT NOW" feed — latest ACTIVITY line
+    // per task (flag-gated at the emitter; absent events render nothing).
+    const activity = readLatestActivity(this.config.projectRoot, sprintId);
+    if (activity.length > 0) {
+      lines.push(bl(`⚡ Live activity:`));
+      for (const row of activity) {
+        lines.push(bl(`   ${row.taskId}: ${row.line}`));
+      }
+      lines.push(SEP);
+    }
 
     // ── Section 4: Recent Events ──
     if (events.length > 0) {
