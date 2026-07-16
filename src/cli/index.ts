@@ -24,6 +24,7 @@ import { registerWeb } from './commands/web.js';
 import { registerSync } from './commands/sync.js';
 import { registerWatch } from './commands/watch.js';
 import { registerRun } from './commands/run.js';
+import { registerRuns } from './commands/runs.js';
 import { registerProcess } from './commands/process.js';
 import { registerTestRun } from './commands/test-run.js';
 import { registerAgent } from './commands/agent.js';
@@ -124,6 +125,7 @@ export function buildProgram(): Command {
   registerSync(program);
   registerWatch(program);
   registerRun(program);
+  registerRuns(program);
   registerProcess(program);
   registerTestRun(program);
   registerAgent(program);

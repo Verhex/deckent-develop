@@ -156,7 +156,7 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   entry('checkpoint', 'Run', 'Değiştir', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_checkpoint']),
   entry('resume', 'Run', 'Çalıştır', 'orchestra', ['cli', 'repl']),
   entry('interrogate', 'Run', 'Oku', 'orchestra', ['repl']),
-  entry('runs', 'Run', 'Oku', 'orchestra', ['repl']),
+  entry('runs', 'Run', 'Oku', 'orchestra', ['cli', 'repl']), // F-3: CLI parity for the /runs inbox; --close-stale --yes writes durable closures
   entry('cancel', 'Run', 'Değiştir', 'cli', ['repl']),
 
   // ─── Memory ──────────────────────────────────────────────────────────────

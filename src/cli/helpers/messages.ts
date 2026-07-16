@@ -2765,6 +2765,46 @@ const MESSAGES: MessageMap = {
     en: '↑↓ browse · Esc back · ⟳ live',
     tr: '↑↓ gez · Esc geri · ⟳ canlı',
   },
+  // F-3 read-only liveness — row marks + detail lines for live-claiming flows.
+  'tui.inbox_liveness_dead': { en: 'process died', tr: 'süreç öldü' },
+  'tui.inbox_liveness_unknown': { en: 'unverified', tr: 'doğrulanamadı' },
+  'tui.inbox_detail_liveness_dead': {
+    en: '  liveness: process died (pid {pid})',
+    tr: '  canlılık: süreç öldü (pid {pid})',
+  },
+  'tui.inbox_detail_liveness_unknown': {
+    en: '  liveness: unverified — the run predates pid tracking',
+    tr: '  canlılık: doğrulanamadı — koşu pid takibinden eski',
+  },
+  // F-3 `deckent runs --close-stale` — operator stale-run sweep output.
+  'runs.close_stale.none': {
+    en: 'No stale runs — every live-claiming flow is verified alive or already closed.',
+    tr: 'Bayat koşu yok — canlı görünen her akış ya doğrulandı ya da zaten kapalı.',
+  },
+  'runs.close_stale.dry_header': {
+    en: 'Stale runs that would be closed ({count}):',
+    tr: 'Kapatılacak bayat koşular ({count}):',
+  },
+  'runs.close_stale.dry_hint': {
+    en: 'Dry-run — nothing was written. Run `deckent runs --close-stale --yes` to close them.',
+    tr: 'Ön-izleme — hiçbir şey yazılmadı. Kapatmak için `deckent runs --close-stale --yes` çalıştır.',
+  },
+  'runs.close_stale.apply_header': {
+    en: 'Closed {count} stale run(s):',
+    tr: '{count} bayat koşu kapatıldı:',
+  },
+  'runs.close_stale.entry_dead': {
+    en: 'process died (pid {pid}) → failed',
+    tr: 'süreç öldü (pid {pid}) → başarısız',
+  },
+  'runs.close_stale.entry_dead_cancelled': {
+    en: 'process died (pid {pid}), legacy record → cancelled',
+    tr: 'süreç öldü (pid {pid}), eski kayıt → iptal',
+  },
+  'runs.close_stale.entry_unverifiable': {
+    en: 'unverifiable (no pid recorded) → cancelled',
+    tr: 'doğrulanamaz (pid kaydı yok) → iptal',
+  },
   'tui.resume_picker_header': { en: 'Recent sessions', tr: 'Son oturumlar' },
   'tui.resume_picker_hint': {
     en: 'Tip: /resume <number> to continue a session',

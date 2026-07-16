@@ -54,7 +54,7 @@ function proposedFlow(root: string, flowId: string, intent: string): void {
  * DETACHED_RUNNING, NO proposal → NO intentSummary → bare short-id. This is the
  * headline case the proposeFlow-based fixtures never exercise.
  */
-function doFlowOnDisk(root: string, flowId: string, startedAt: string, intent?: string): void {
+function doFlowOnDisk(root: string, flowId: string, startedAt: string, intent?: string, pid?: number): void {
   const sprint = { id: flowId, tasks: [], directives: '', createdAt: startedAt } as never;
   saveApprovedSnapshot(root, {
     flowId, revision: 1, planDigest: 'd-1',
@@ -66,7 +66,22 @@ function doFlowOnDisk(root: string, flowId: string, startedAt: string, intent?: 
     flowId, revision: 1, planDigest: 'd-1',
     handle: { flowId, jobId: `j-${flowId}`, logRef: 'log' },
     startedAt,
+    // F-3: a post-698 handle records the run process's own pid.
+    ...(pid !== undefined ? { pid } : {}),
   });
+}
+
+/** A pid that provably no longer exists (mirror of the death-sweep test's
+ *  fixture): probe high pids for one where kill(pid, 0) throws ESRCH. */
+function deadPid(): number {
+  for (let pid = 999_999; pid > 990_000; pid--) {
+    try {
+      process.kill(pid, 0);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ESRCH') return pid;
+    }
+  }
+  throw new Error('no dead pid found in probe range');
 }
 
 /** Write a jobs-dir terminal record correlated to a flowId. */
@@ -155,8 +170,9 @@ describe('collectInboxRows — cross-process store-scan + jobs-dir join (SURF-3)
     doFlowOnDisk(root, 'do-flow-render-03', '2026-07-15T12:00:00.000Z');
     _resetRunFlowCoordinatorsForTests();
     const lines = buildInboxLines(collectInboxRows(root), DEFAULT_INBOX_LABELS);
-    // short-id + running badge, NO trailing intent text.
-    expect(lines[1]).toBe('  1. do-flow- · running');
+    // short-id + running badge, NO trailing intent text. The pid-less handle
+    // earns the honest F-3 unverified mark.
+    expect(lines[1]).toBe('  1. do-flow- · running (unverified)');
   });
 
   // G1 durable-fix — a do-flow that persisted its proposal (snapshot.proposal)
@@ -168,7 +184,72 @@ describe('collectInboxRows — cross-process store-scan + jobs-dir join (SURF-3)
     const rows = collectInboxRows(root);
     expect(rows[0]).toMatchObject({ flowId: 'do-flow-intent-04', state: 'DETACHED_RUNNING', intentSummary: 'add rate limiting' });
     const lines = buildInboxLines(rows, DEFAULT_INBOX_LABELS);
-    expect(lines[1]).toBe('  1. do-flow- · running add rate limiting');
+    // (unverified) = F-3 mark: this fixture's handle carries no pid.
+    expect(lines[1]).toBe('  1. do-flow- · running (unverified) add rate limiting');
+  });
+});
+
+// ─── F-3 — read-only liveness derivation (display-honesty, zero writes) ──────
+
+describe('collectInboxRows — read-only liveness derivation (F-3)', () => {
+  let root: string;
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'inbox-live-'));
+    _resetRunFlowCoordinatorsForTests();
+  });
+  afterEach(() => {
+    _resetRunFlowCoordinatorsForTests();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('a dead recorded pid shows FAILED + liveness dead — WITHOUT writing any store (pure reader)', () => {
+    const pid = deadPid();
+    doFlowOnDisk(root, 'flow-dead-pid', '2026-07-16T10:00:00.000Z', undefined, pid);
+    _resetRunFlowCoordinatorsForTests();
+    const rows = collectInboxRows(root);
+    expect(rows[0]).toMatchObject({ flowId: 'flow-dead-pid', state: 'FAILED', liveness: 'dead', pid });
+    // PURE READER pin: the durable state is untouched — a fresh coordinator
+    // still derives DETACHED_RUNNING (closure is the write paths' job).
+    _resetRunFlowCoordinatorsForTests();
+    expect(getRunFlowCoordinator(root).getFlow('flow-dead-pid').state).toBe('DETACHED_RUNNING');
+  });
+
+  it('an alive recorded pid stays running with NO liveness mark (verified alive)', () => {
+    doFlowOnDisk(root, 'flow-alive-pid', '2026-07-16T10:00:00.000Z', undefined, process.pid);
+    _resetRunFlowCoordinatorsForTests();
+    const rows = collectInboxRows(root);
+    expect(rows[0]).toMatchObject({ flowId: 'flow-alive-pid', state: 'DETACHED_RUNNING', pid: process.pid });
+    expect(rows[0]!.liveness).toBeUndefined();
+  });
+
+  it('a pid-less legacy handle (pre-698) marks liveness unknown, state unchanged', () => {
+    doFlowOnDisk(root, 'flow-legacy-01', '2026-07-16T10:00:00.000Z');
+    _resetRunFlowCoordinatorsForTests();
+    const rows = collectInboxRows(root);
+    expect(rows[0]).toMatchObject({ flowId: 'flow-legacy-01', state: 'DETACHED_RUNNING', liveness: 'unknown' });
+    expect(rows[0]!.pid).toBeUndefined();
+  });
+
+  it('a terminal jobs-dir record is never probed (jobs truth wins, no liveness field)', () => {
+    doFlowOnDisk(root, 'flow-done-01', '2026-07-16T10:00:00.000Z', undefined, deadPid());
+    writeJob(root, 'flow-done-01', 'COMPLETE', 2, 2);
+    _resetRunFlowCoordinatorsForTests();
+    const rows = collectInboxRows(root);
+    expect(rows[0]).toMatchObject({ flowId: 'flow-done-01', state: 'COMPLETED', done: 2, total: 2 });
+    expect(rows[0]!.liveness).toBeUndefined();
+  });
+
+  it('renders the liveness marks in the row body and the detail lines', () => {
+    const dead: InboxRow = { flowId: 'aaaaaaaa-dead', state: 'FAILED', liveness: 'dead', pid: 4242 };
+    const unknown: InboxRow = { flowId: 'bbbbbbbb-unkn', state: 'DETACHED_RUNNING', liveness: 'unknown' };
+    const lines = buildInboxLines([dead, unknown], DEFAULT_INBOX_LABELS);
+    expect(lines[1]).toBe('  1. aaaaaaaa · failed (process died)');
+    expect(lines[2]).toBe('  2. bbbbbbbb · running (unverified)');
+
+    expect(buildInboxDetailLines(dead, DEFAULT_INBOX_LABELS)).toContain('  liveness: process died (pid 4242)');
+    expect(buildInboxDetailLines(unknown, DEFAULT_INBOX_LABELS)).toContain(
+      '  liveness: unverified — the run predates pid tracking',
+    );
   });
 });
 
@@ -278,7 +359,7 @@ describe('buildInboxLabels — i18n (SURF-3)', () => {
   it('resolves every label in en + tr (en !== tr), covering all states', () => {
     const en = buildInboxLabels((k) => getMessage(k, 'en'));
     const tr = buildInboxLabels((k) => getMessage(k, 'tr'));
-    for (const key of ['header', 'hint', 'empty', 'detailIntent', 'detailProgress', 'detailStarted', 'notFound', 'followNavHint', 'followDetailHint'] as const) {
+    for (const key of ['header', 'hint', 'empty', 'detailIntent', 'detailProgress', 'detailStarted', 'notFound', 'followNavHint', 'followDetailHint', 'livenessDead', 'livenessUnknown', 'detailLivenessDead', 'detailLivenessUnknown'] as const) {
       expect(en[key].length).toBeGreaterThan(0);
       expect(tr[key].length).toBeGreaterThan(0);
       expect(en[key]).not.toBe(tr[key]);

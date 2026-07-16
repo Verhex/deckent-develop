@@ -27,10 +27,26 @@
 // crash-write keeps its last durable state (likely DETACHED_RUNNING) until a
 // write-path sweep closes it. Accepted for a read-only list; making the inbox a
 // writer would break the read-only contract of this slice.
+//
+// LIVENESS DERIVATION (F-3, display-honesty): staying a pure reader does NOT
+// mean repeating an unverified claim. For a row still claiming a live process
+// (STARTING/DETACHED_RUNNING, no terminal jobs-dir record) the collect probes
+// the recorded run pid READ-ONLY (`isPidAlive` — zero store writes):
+//   * pid recorded + gone  → shown as FAILED with a "process died" mark (the
+//     durable RUN_FAILED lands on the next write-path sweep; display agrees
+//     with what that sweep will record).
+//   * handle predates pid tracking (pre-698) → the "running" claim is
+//     unverifiable → shown with an "unverified" mark, state untouched.
+//   * pid recorded + alive → "running" is now VERIFIED, no mark.
+// Durable closure stays on the write paths (`deckent status` read-path sweep,
+// `deckent runs --close-stale`). Known limit (same as the sweep): a recycled
+// pid reads as alive.
 
 import { join } from 'node:path';
 import { getRunFlowCoordinator } from '../../orchestra/run-flow-coordinator-registry.js';
 import { scanJobRecords } from './run-completion-watch.js';
+import { loadRunHandle } from '../../core/run-flow-store.js';
+import { isPidAlive } from '../../core/pid-liveness.js';
 import type { RunFlowState } from '../../core/run-flow-contract.js';
 
 /** One inbox row — language-neutral; `buildInboxLines` renders it via labels. */
@@ -44,6 +60,28 @@ export interface InboxRow {
   /** Execution metrics when the run finished (from the jobs-dir join). */
   readonly done?: number;
   readonly total?: number;
+  /** Read-only liveness verdict for a live-claiming row with no terminal
+   *  jobs-dir record (F-3): 'dead' = the recorded run pid is gone (state is
+   *  remapped to FAILED); 'unknown' = the run handle predates pid tracking, so
+   *  the "running" claim is unverifiable. Absent = verified alive, terminal,
+   *  or no start recorded. */
+  readonly liveness?: 'dead' | 'unknown';
+  /** The recorded run pid, when the handle carries one (detail-view datum). */
+  readonly pid?: number;
+}
+
+/** Flow states that claim a live external process (mirror of the death-sweep's
+ *  LIVE_RUN_STATES — the set a liveness probe is meaningful for). */
+const LIVE_CLAIM_STATES: ReadonlySet<RunFlowState> = new Set(['STARTING', 'DETACHED_RUNNING']);
+
+/** Read-only pid probe for one live-claiming flow (F-3) — never writes any
+ *  store. No handle record → no start was recorded, nothing to judge (empty). */
+function probeRowLiveness(root: string, flowId: string): { liveness?: 'dead' | 'unknown'; pid?: number } {
+  const handleRecord = loadRunHandle(root, flowId);
+  if (handleRecord === undefined) return {};
+  const pid = handleRecord.pid;
+  if (typeof pid !== 'number') return { liveness: 'unknown' };
+  return isPidAlive(pid) ? { pid } : { liveness: 'dead', pid };
 }
 
 /** Cap on inbox rows — a machine with a long run history must not flood the
@@ -93,9 +131,18 @@ export function collectInboxRows(root: string, opts: CollectInboxOptions = {}): 
       continue; // torn/corrupt trace — skip this flow, never crash the list
     }
     const terminal = terminalByFlow.get(flowId);
+    // F-3: probe liveness only when the flow still CLAIMS a live process and
+    // the jobs-dir join has no terminal truth to override it with.
+    const live = terminal === undefined && LIVE_CLAIM_STATES.has(context.state)
+      ? probeRowLiveness(root, flowId)
+      : {};
     const row: InboxRow = {
       flowId,
-      state: terminal ? jobStatusToState(terminal.status) : context.state,
+      state: terminal
+        ? jobStatusToState(terminal.status)
+        : live.liveness === 'dead' ? 'FAILED' : context.state,
+      ...(live.liveness !== undefined ? { liveness: live.liveness } : {}),
+      ...(live.pid !== undefined ? { pid: live.pid } : {}),
       ...(context.proposal?.intentSummary ? { intentSummary: context.proposal.intentSummary } : {}),
       ...(context.proposal?.revision !== undefined ? { revision: context.proposal.revision } : {}),
       ...(context.updatedAt ? { updatedAt: context.updatedAt } : {}),
@@ -138,6 +185,15 @@ export interface InboxLabels {
   followNavHint: string;
   /** DETAIL-mode footer, e.g. "↑↓ browse · Esc back · ⟳ live". */
   followDetailHint: string;
+  // ── F-3 (read-only liveness) — row marks + detail lines ──
+  /** Row mark when the recorded run process is gone, e.g. "process died". */
+  livenessDead: string;
+  /** Row mark when liveness is unverifiable (pre-pid record), e.g. "unverified". */
+  livenessUnknown: string;
+  /** Detail line for a dead run, e.g. "  liveness: process died (pid {pid})". */
+  detailLivenessDead: string;
+  /** Detail line for an unverifiable run, e.g. "  liveness: unverified — the run predates pid tracking". */
+  detailLivenessUnknown: string;
 }
 
 /** English-default inbox labels (string-free component; the caller injects a
@@ -168,6 +224,10 @@ export const DEFAULT_INBOX_LABELS: InboxLabels = {
   notFound: 'No run #{arg} — `/runs` lists them',
   followNavHint: '↑↓ select · ↵ open · Esc close · ⟳ live',
   followDetailHint: '↑↓ browse · Esc back · ⟳ live',
+  livenessDead: 'process died',
+  livenessUnknown: 'unverified',
+  detailLivenessDead: '  liveness: process died (pid {pid})',
+  detailLivenessUnknown: '  liveness: unverified — the run predates pid tracking',
 };
 
 const SHORT_ID_LEN = 8;
@@ -178,9 +238,13 @@ const SHORT_ID_LEN = 8;
 export function formatInboxRowBody(row: InboxRow, index: number, labels: InboxLabels): string {
   const shortId = row.flowId.slice(0, SHORT_ID_LEN);
   const state = labels.stateLabels[row.state] ?? row.state;
+  const liveness =
+    row.liveness === 'dead' ? ` (${labels.livenessDead})`
+    : row.liveness === 'unknown' ? ` (${labels.livenessUnknown})`
+    : '';
   const intent = row.intentSummary ? ` ${row.intentSummary}` : '';
   const metrics = row.done !== undefined && row.total !== undefined ? ` (${row.done}/${row.total})` : '';
-  return `${index + 1}. ${shortId} · ${state}${metrics}${intent}`;
+  return `${index + 1}. ${shortId} · ${state}${liveness}${metrics}${intent}`;
 }
 
 /** Render one transcript row: two-space indent + the shared body. */
@@ -240,6 +304,8 @@ export function buildInboxDetailLines(row: InboxRow, labels: InboxLabels): strin
   if (row.done !== undefined && row.total !== undefined) {
     lines.push(labels.detailProgress.replace('{done}', String(row.done)).replace('{total}', String(row.total)));
   }
+  if (row.liveness === 'dead') lines.push(labels.detailLivenessDead.replace('{pid}', String(row.pid ?? '?')));
+  if (row.liveness === 'unknown') lines.push(labels.detailLivenessUnknown);
   if (row.updatedAt) lines.push(labels.detailStarted.replace('{started}', row.updatedAt));
   return lines;
 }
@@ -291,6 +357,10 @@ export function buildInboxLabels(t: (key: string) => string): InboxLabels {
     notFound: t('tui.inbox_not_found'),
     followNavHint: t('tui.inbox_follow_nav_hint'),
     followDetailHint: t('tui.inbox_follow_detail_hint'),
+    livenessDead: t('tui.inbox_liveness_dead'),
+    livenessUnknown: t('tui.inbox_liveness_unknown'),
+    detailLivenessDead: t('tui.inbox_detail_liveness_dead'),
+    detailLivenessUnknown: t('tui.inbox_detail_liveness_unknown'),
   };
 }
 
