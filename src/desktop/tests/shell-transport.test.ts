@@ -59,6 +59,22 @@ describe('api-client (D4-3)', () => {
     expect(calls[0]!.url).toBe('http://127.0.0.1:4317/api/approvals');
   });
 
+  it('decideApproval POSTs the broker decision endpoint with the server schema body (SURF-5)', async () => {
+    const { fetchFn, calls } = makeFetch(200, { ok: true });
+    const client = createApiClient(SESSION, fetchFn);
+    await client.decideApproval('appr-1', 'allow');
+    await client.decideApproval('appr-2', 'deny', 'not in scope');
+    expect(calls[0]!.url).toBe('http://127.0.0.1:4317/api/approvals/appr-1/decision');
+    expect(JSON.parse(String(calls[0]!.init?.body))).toEqual({ decision: 'allow' });
+    expect(JSON.parse(String(calls[1]!.init?.body))).toEqual({ decision: 'deny', reason: 'not in scope' });
+  });
+
+  it('decideApproval 403 surfaces as ApiError(403) — the approval.api_decide flag-off signal (SURF-5)', async () => {
+    const { fetchFn } = makeFetch(403, { error: 'approval.api_decide is disabled' });
+    const client = createApiClient(SESSION, fetchFn);
+    await expect(client.decideApproval('appr-1', 'allow')).rejects.toMatchObject({ name: 'ApiError', status: 403 });
+  });
+
   it('buildEventsUrl carries ?token= (EventSource cannot set headers) and ?after= (replay cursor)', () => {
     const url = new URL(buildEventsUrl(SESSION, 'flow-9', 42));
     expect(url.pathname).toBe('/api/run-flow/flow-9/events');

@@ -86,6 +86,11 @@ describe('parseRunCompletionRecord', () => {
       techDebt: 0,
       noGo: 0,
       error: undefined,
+      // F-3b (ef6e6285): the record's own narrative fields ride along for the
+      // human-readable /runs detail — absent-in-record folds to undefined.
+      flowId: undefined,
+      summary: 'Sprint sprint-406 tamamlandı ...',
+      completedAt: undefined,
     });
   });
 
@@ -107,6 +112,10 @@ describe('parseRunCompletionRecord', () => {
       techDebt: undefined,
       noGo: undefined,
       error: 'Sprint failed at phase EXECUTE: worker crashed',
+      // F-3b (ef6e6285): narrative fields from the record itself.
+      flowId: undefined,
+      summary: undefined,
+      completedAt: '2026-07-11T00:01:00.000Z',
     });
   });
 

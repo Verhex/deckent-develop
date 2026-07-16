@@ -12,13 +12,13 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { createHashRouter, Navigate, NavLink, Outlet, RouterProvider } from 'react-router';
-import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, createApiClient, type DaemonApiClient, type FlowSummary, type RunFlowEventPayload } from './api-client.js';
 import { buildCourseGeometry } from './course.js';
 import { useShellStore } from './session-store.js';
 import { FLOW_STATE_MESSAGE_KEYS } from '../../shared/desktop-messages.js';
 
-const MSG = {
+export const MSG = {
   navConsole: 'desktop.shell.nav.console',
   navChat: 'desktop.shell.nav.chat',
   navApproval: 'desktop.shell.nav.approval',
@@ -37,6 +37,20 @@ const MSG = {
   approvalEmpty: 'desktop.shell.approval.empty',
   historyTitle: 'desktop.shell.history.title',
   chatEyebrow: 'desktop.shell.chat.eyebrow',
+  // SURF-5 — real workflow organs
+  orderPlaceholder: 'desktop.shell.console.order_placeholder',
+  orderSubmit: 'desktop.shell.console.order_submit',
+  orderFailed: 'desktop.shell.order_failed',
+  previewTitle: 'desktop.shell.preview.title',
+  previewMeta: 'desktop.shell.preview.meta',
+  telegraphTitle: 'desktop.shell.telegraph.title',
+  telegraphStop: 'desktop.shell.telegraph.stop',
+  telegraphSlow: 'desktop.shell.telegraph.slow',
+  telegraphFull: 'desktop.shell.telegraph.full',
+  consoleCancel: 'desktop.shell.console.cancel',
+  approvalAllow: 'desktop.shell.approval.allow',
+  approvalDeny: 'desktop.shell.approval.deny',
+  approvalDecideOff: 'desktop.shell.approval.decide_off',
 } as const;
 
 function useT(): (key: string, vars?: Record<string, string>) => string {
@@ -132,6 +146,163 @@ function CourseStrip({ events }: { events: readonly RunFlowEventPayload[] }): Re
   );
 }
 
+// ─── SURF-5 — «Emir» (propose) + preview + «Telgraf» (decision) organs ──────
+
+interface PlanPreviewData {
+  revision: number;
+  planDigest: string;
+  gateResult: string;
+  policyDecision: string;
+  taskSummaries: Array<Record<string, unknown>>;
+}
+
+function OrderForm({ api, onProposed }: { api: DaemonApiClient; onProposed: (flowId: string) => void }): React.JSX.Element {
+  const t = useT();
+  const queryClient = useQueryClient();
+  const [goal, setGoal] = useState('');
+  const propose = useMutation({
+    mutationFn: (intentSummary: string) => api.propose(intentSummary),
+    onSuccess: (result) => {
+      setGoal('');
+      void queryClient.invalidateQueries({ queryKey: ['run-flow', 'list'] });
+      const flowId = typeof result['flowId'] === 'string' ? (result['flowId'] as string) : null;
+      if (flowId) onProposed(flowId);
+    },
+  });
+  return (
+    <form
+      className="order-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const trimmed = goal.trim();
+        if (trimmed.length > 0 && !propose.isPending) propose.mutate(trimmed);
+      }}
+    >
+      <input
+        id="order-input"
+        type="text"
+        value={goal}
+        placeholder={t(MSG.orderPlaceholder)}
+        onChange={(event) => setGoal(event.target.value)}
+        disabled={propose.isPending}
+      />
+      <button type="submit" disabled={propose.isPending || goal.trim().length === 0}>
+        {t(MSG.orderSubmit)}
+      </button>
+      {propose.error ? <p className="shell-notice">{t(MSG.orderFailed)}</p> : null}
+    </form>
+  );
+}
+
+/** Flow states where the plan preview is the live object of attention. */
+export const SHELL_PREVIEW_STATES = new Set(['PROPOSAL_READY', 'PREVIEWING', 'AWAITING_APPROVAL', 'APPROVED']);
+
+function PreviewPanel({ api, flowId }: { api: DaemonApiClient; flowId: string }): React.JSX.Element | null {
+  const t = useT();
+  const preview = useQuery({
+    queryKey: ['run-flow', flowId, 'preview'],
+    queryFn: () => api.getPreview(flowId) as Promise<Record<string, unknown>>,
+    retry: false,
+  });
+  if (preview.isPending || preview.error) return null; // pre-preview states have nothing yet — honest silence
+  const data = preview.data as unknown as PlanPreviewData;
+  const tasks = Array.isArray(data.taskSummaries) ? data.taskSummaries : [];
+  return (
+    <section className="preview-panel" data-testid="preview-panel">
+      <p className="view-eyebrow">{t(MSG.previewTitle)}</p>
+      <ol>
+        {tasks.map((task, index) => (
+          <li key={index}>{typeof task['title'] === 'string' ? (task['title'] as string) : JSON.stringify(task).slice(0, 80)}</li>
+        ))}
+      </ol>
+      <p className="preview-meta">
+        {t(MSG.previewMeta, {
+          gate: String(data.gateResult ?? '?'),
+          policy: String(data.policyDecision ?? '?'),
+          digest: String(data.planDigest ?? '').slice(0, 12),
+        })}
+      </p>
+    </section>
+  );
+}
+
+/**
+ * «Telgraf» — the D4-0 approval signature as the product control. Three real
+ * positions mapped to the real contract: STOP = reject · SLOW AHEAD =
+ * approve (armed, not started) · FULL AHEAD = approve + start. Snap
+ * semantics: one pull, no intermediate state (D4-0 motion principle).
+ */
+function Telegraph({ api, flow }: { api: DaemonApiClient; flow: FlowSummary }): React.JSX.Element | null {
+  const t = useT();
+  const queryClient = useQueryClient();
+  const preview = useQuery({
+    queryKey: ['run-flow', flow.flowId, 'preview'],
+    queryFn: () => api.getPreview(flow.flowId) as Promise<Record<string, unknown>>,
+    retry: false,
+  });
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ['run-flow', 'list'] });
+    void queryClient.invalidateQueries({ queryKey: ['run-flow', flow.flowId, 'preview'] });
+  };
+  const pull = useMutation({
+    mutationFn: async (position: 'stop' | 'slow' | 'full') => {
+      if (position === 'stop') {
+        await api.decide(flow.flowId, 'reject');
+        return;
+      }
+      await api.decide(flow.flowId, 'approve');
+      if (position === 'full') {
+        const data = preview.data as unknown as PlanPreviewData | undefined;
+        if (!data) throw new ApiError(409, 'no live preview to start from');
+        await api.start(flow.flowId, data.revision, data.planDigest);
+      }
+    },
+    onSuccess: refresh,
+    onError: refresh, // the daemon's verdict is the truth — re-read it either way
+  });
+
+  const startFromApproved = useMutation({
+    mutationFn: async () => {
+      const data = preview.data as unknown as PlanPreviewData | undefined;
+      if (!data) throw new ApiError(409, 'no live preview to start from');
+      await api.start(flow.flowId, data.revision, data.planDigest);
+    },
+    onSuccess: refresh,
+    onError: refresh,
+  });
+
+  const awaiting = flow.state === 'AWAITING_APPROVAL';
+  const approved = flow.state === 'APPROVED';
+  if (!awaiting && !approved) return null;
+
+  const startOnly = approved;
+  const busy = pull.isPending || startFromApproved.isPending;
+
+  return (
+    <section className="telegraph-bar" data-testid="telegraph">
+      <span className="view-eyebrow">{t(MSG.telegraphTitle)}</span>
+      {!startOnly && (
+        <>
+          <button type="button" className="tg tg--stop" disabled={busy} onClick={() => pull.mutate('stop')}>
+            {t(MSG.telegraphStop)}
+          </button>
+          <button type="button" className="tg tg--slow" disabled={busy} onClick={() => pull.mutate('slow')}>
+            {t(MSG.telegraphSlow)}
+          </button>
+        </>
+      )}
+      <button
+        type="button"
+        className="tg tg--full"
+        disabled={busy || preview.isPending}
+        onClick={() => (startOnly ? startFromApproved.mutate() : pull.mutate('full'))}
+      >
+        {t(MSG.telegraphFull)}
+      </button>
+    </section>
+  );
+}
+
 // ─── Console — the bridge (done-criterion view) ──────────────────────────────
 
 function useFlows(api: DaemonApiClient | null) {
@@ -144,6 +315,10 @@ function useFlows(api: DaemonApiClient | null) {
   });
 }
 
+/** Flow states the cancel affordance is honest for (server: any non-terminal).
+ *  Drift-gated against core RUN_FLOW_TERMINAL_STATES in shell-design.test.ts. */
+export const SHELL_TERMINAL_STATES = new Set(['COMPLETED', 'FAILED', 'CANCELLED', 'BLOCKED']);
+
 function ConsoleView(): React.JSX.Element {
   const t = useT();
   const api = useApi();
@@ -152,6 +327,12 @@ function ConsoleView(): React.JSX.Element {
   const flows: FlowSummary[] = flowsQuery.data?.flows ?? [];
   const [selected, setSelected] = useState<string | null>(null);
   const activeFlowId = selected ?? flows[0]?.flowId ?? null;
+  const activeFlow = flows.find((flow) => flow.flowId === activeFlowId) ?? null;
+
+  const cancel = useMutation({
+    mutationFn: (flowId: string) => api!.cancel(flowId),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['run-flow', 'list'] }),
+  });
 
   const eventsKey = ['run-flow', activeFlowId, 'events'] as const;
   useEffect(() => {
@@ -178,6 +359,7 @@ function ConsoleView(): React.JSX.Element {
 
   return (
     <div className="console">
+      {api && <OrderForm api={api} onProposed={(flowId) => setSelected(flowId)} />}
       <CourseStrip events={events} />
       {flows.length === 0 ? (
         <p className="shell-muted">{t(MSG.flowsEmpty)}</p>
@@ -197,6 +379,18 @@ function ConsoleView(): React.JSX.Element {
             </li>
           ))}
         </ul>
+      )}
+      {api && activeFlow && SHELL_PREVIEW_STATES.has(activeFlow.state) && <PreviewPanel api={api} flowId={activeFlow.flowId} />}
+      {api && activeFlow && <Telegraph api={api} flow={activeFlow} />}
+      {api && activeFlow && !SHELL_TERMINAL_STATES.has(activeFlow.state) && (
+        <button
+          type="button"
+          className="flow-cancel"
+          disabled={cancel.isPending}
+          onClick={() => cancel.mutate(activeFlow.flowId)}
+        >
+          {t(MSG.consoleCancel)}
+        </button>
       )}
       {activeFlowId !== null && (
         <section className="event-feed" aria-live="polite">
@@ -221,11 +415,26 @@ function ConsoleView(): React.JSX.Element {
 function ApprovalView(): React.JSX.Element {
   const t = useT();
   const api = useApi();
+  const queryClient = useQueryClient();
   const approvals = useQuery({
     queryKey: ['approvals'],
     enabled: api !== null,
     queryFn: () => api!.getApprovals(),
     refetchInterval: 5_000, // poll — the broker has NO SSE endpoint (approved decision #3)
+  });
+  // SURF-5 — decide is flag-gated server-side (`approval.api_decide`): a 403
+  // means the daemon refuses remote decisions; say THAT, not a generic error.
+  const [flagOff, setFlagOff] = useState(false);
+  const decide = useMutation({
+    mutationFn: ({ id, decision }: { id: string; decision: 'allow' | 'deny' }) => api!.decideApproval(id, decision),
+    onSuccess: () => {
+      setFlagOff(false);
+      void queryClient.invalidateQueries({ queryKey: ['approvals'] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 403) setFlagOff(true);
+      void queryClient.invalidateQueries({ queryKey: ['approvals'] });
+    },
   });
 
   if (approvals.isPending) return <p className="shell-muted">{t(MSG.loading)}</p>;
@@ -235,6 +444,8 @@ function ApprovalView(): React.JSX.Element {
     <div>
       <p className="view-eyebrow">{t(MSG.approvalTitle)}</p>
       <h1 className="view-title">{t(MSG.approvalsPending, { count: String(pending.length) })}</h1>
+      {flagOff && <p className="shell-notice">{t(MSG.approvalDecideOff)}</p>}
+      {decide.error && !flagOff ? <p className="shell-notice">{t(MSG.loadError)}</p> : null}
       {pending.length === 0 ? (
         <p className="shell-muted">{t(MSG.approvalEmpty)}</p>
       ) : (
@@ -244,6 +455,24 @@ function ApprovalView(): React.JSX.Element {
               <span className="order-lamp" aria-hidden="true" />
               <code>{entry.id.slice(0, 8)}</code>
               <span className="order-title">{typeof entry.title === 'string' ? entry.title : ''}</span>
+              <span className="order-actions">
+                <button
+                  type="button"
+                  className="tg tg--slow"
+                  disabled={decide.isPending}
+                  onClick={() => decide.mutate({ id: entry.id, decision: 'allow' })}
+                >
+                  {t(MSG.approvalAllow)}
+                </button>
+                <button
+                  type="button"
+                  className="tg tg--stop"
+                  disabled={decide.isPending}
+                  onClick={() => decide.mutate({ id: entry.id, decision: 'deny' })}
+                >
+                  {t(MSG.approvalDeny)}
+                </button>
+              </span>
             </li>
           ))}
         </ul>

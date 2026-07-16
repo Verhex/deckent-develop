@@ -58,6 +58,7 @@ coverage/
 src/desktop/node_modules
 src/desktop/out/
 src/desktop/release/
+src/desktop/dist-app/
 src/desktop/*.tsbuildinfo
 # Identity provider runtime DB (ADR-092) — local state, like .brain/memory.db
 .deckent/identity.db

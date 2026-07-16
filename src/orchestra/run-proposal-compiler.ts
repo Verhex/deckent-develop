@@ -37,7 +37,7 @@ import type { DeckentConfig, PlannerResult, PlannerTask } from '../core/types.js
 import type { ResolvedConfig } from '../core/config-types.js';
 import { resolveBrainModel } from '../core/config.js';
 import { buildDirectives, type DirectiveBuildIntent, type DirectiveBuildTask } from './directives-builder.js';
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { callZeroConfigPlanner, resolvePlanTimeoutMs } from './planner.js';
 
 export interface RunProposalCompileResult {
@@ -106,18 +106,47 @@ function describeActor(proposal: RunProposal): string {
 /** F-1: ground the zero-config planner in the REAL tracked file tree — a
  *  planner that cannot see the repo invents paths (the sparse-project
  *  path-sprawl class: bare "README.md", fictional "tests/x"). Fail-soft: no
- *  git / not a repo → empty tree, and the prompt engages its greenfield
- *  guidance instead. Same process.cwd() + `git ls-files` precedent as
- *  planner.ts's U2 output-contract completion — a fast local read, not the
- *  spawnSync freeze-class F-2 removed (that was the minutes-long LLM call). */
-function readTrackedFileTree(): string[] {
-  try {
-    const ls = spawnSync('git', ['ls-files'], { encoding: 'utf-8', cwd: process.cwd() });
-    if (ls.status !== 0 || !ls.stdout) return [];
-    return ls.stdout.trim().split('\n').filter((line) => line.length > 0);
-  } catch {
-    return [];
-  }
+ *  git / not a repo / slow git → empty tree, and the prompt engages its
+ *  greenfield guidance instead. Async spawn (SURF-5 hardening of the F-1
+ *  original): the daemon serves /api/run-flow/propose on this path, so even a
+ *  fast `git ls-files` must not block the event loop — same F-2 discipline as
+ *  the planner LLM calls, with a SIGTERM deadline against a hung git. */
+function readTrackedFileTree(timeoutMs = 10_000): Promise<string[]> {
+  return new Promise((resolve) => {
+    let stdout = '';
+    let done = false;
+    const finish = (lines: string[]): void => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve(lines);
+    };
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn('git', ['ls-files'], { cwd: process.cwd(), stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch {
+      resolve([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      try {
+        child.kill('SIGTERM');
+      } catch { /* already gone */ }
+      finish([]);
+    }, timeoutMs);
+    child.stdout?.setEncoding('utf-8');
+    child.stdout?.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    child.on('error', () => finish([]));
+    child.on('close', (code) => {
+      if (code !== 0 || stdout.length === 0) {
+        finish([]);
+        return;
+      }
+      finish(stdout.trim().split('\n').filter((line) => line.length > 0));
+    });
+  });
 }
 
 async function defaultRunProposalPlanner(proposal: RunProposal, config?: RunProposalPlannerConfig): Promise<PlannerResult> {
@@ -127,7 +156,7 @@ async function defaultRunProposalPlanner(proposal: RunProposal, config?: RunProp
   // path uses (resolvePlanTimeoutMs — brain_plan_timeout_ms honored here too).
   // F-1: the real tracked file tree grounds the planner (no more blind planning).
   const result = await callZeroConfigPlanner(
-    description, resolveBrainModel(config), proposal.project, readTrackedFileTree(), undefined,
+    description, resolveBrainModel(config), proposal.project, await readTrackedFileTree(), undefined,
     resolvePlanTimeoutMs(config as { brain_plan_timeout_ms?: number; ai_planner_timeout?: number } | undefined),
   );
   if (!result) {

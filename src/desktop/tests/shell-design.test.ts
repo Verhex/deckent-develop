@@ -8,6 +8,8 @@ import { describe, it, expect } from 'vitest';
 import { buildCourseGeometry } from '../src/renderer/shell/course.js';
 import { FLOW_STATE_MESSAGE_KEYS, DESKTOP_MESSAGE_KEYS } from '../src/shared/desktop-messages.js';
 import { buildInboxLabels } from '../../cli/repl/run-flow-inbox.js';
+import { RUN_FLOW_TERMINAL_STATES } from '../../core/run-flow-contract.js';
+import { MSG, SHELL_TERMINAL_STATES, SHELL_PREVIEW_STATES } from '../src/renderer/shell/Shell.js';
 import type { RunFlowEventPayload } from '../src/renderer/shell/api-client.js';
 
 function event(type: string, sequence: number): RunFlowEventPayload {
@@ -69,6 +71,28 @@ describe('FLOW_STATE_MESSAGE_KEYS — terminal-vocabulary drift-gate (D4-4)', ()
     const served = new Set<string>(DESKTOP_MESSAGE_KEYS);
     for (const key of Object.values(FLOW_STATE_MESSAGE_KEYS)) {
       expect(served.has(key), key).toBe(true);
+    }
+  });
+});
+
+// ─── SURF-5 — real-workflow organ pins ───────────────────────────────────────
+
+describe('Shell MSG — every shell string is a served bridge key (SURF-5)', () => {
+  it('no MSG value bypasses DESKTOP_MESSAGE_KEYS (the D4-2 drift class, shell edition)', () => {
+    const served = new Set<string>(DESKTOP_MESSAGE_KEYS);
+    const rogue = Object.entries(MSG).filter(([, key]) => !served.has(key));
+    expect(rogue).toEqual([]);
+  });
+});
+
+describe('Shell state sets — contract drift-gates (SURF-5)', () => {
+  it('SHELL_TERMINAL_STATES agrees EXACTLY with core RUN_FLOW_TERMINAL_STATES', () => {
+    expect([...SHELL_TERMINAL_STATES].sort()).toEqual([...RUN_FLOW_TERMINAL_STATES].sort());
+  });
+
+  it('SHELL_PREVIEW_STATES are all live (non-terminal) states', () => {
+    for (const state of SHELL_PREVIEW_STATES) {
+      expect(RUN_FLOW_TERMINAL_STATES.has(state as never), state).toBe(false);
     }
   });
 });

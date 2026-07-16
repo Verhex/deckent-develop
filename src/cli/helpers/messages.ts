@@ -3654,6 +3654,32 @@ const MESSAGES: MessageMap = {
   'desktop.shell.approval.empty': { en: 'No pending orders.', tr: 'Bekleyen emir yok.' },
   'desktop.shell.history.title': { en: 'Voyage ledger', tr: 'Sefer kayıtları' },
   'desktop.shell.chat.eyebrow': { en: 'Watch radio', tr: 'Vardiya telsizi' },
+  // SURF-5 — real-workflow organs: «Emir» (propose) + preview + «Telgraf».
+  'desktop.shell.console.order_placeholder': {
+    en: 'State the goal — a new course order for the crew…',
+    tr: 'Hedefi yazın — mürettebata yeni bir rota emri…',
+  },
+  'desktop.shell.console.order_submit': { en: 'Issue order', tr: 'Emri ver' },
+  'desktop.shell.order_failed': {
+    en: 'The order could not be planned. Check the daemon log and retry.',
+    tr: 'Emir planlanamadı. Daemon günlüğünü kontrol edip yeniden deneyin.',
+  },
+  'desktop.shell.preview.title': { en: 'Planned course', tr: 'Planlanan rota' },
+  'desktop.shell.preview.meta': {
+    en: 'Gate: {gate} · Policy: {policy} · Digest: {digest}',
+    tr: 'Kapı: {gate} · Politika: {policy} · Özet: {digest}',
+  },
+  'desktop.shell.telegraph.title': { en: 'Engine telegraph', tr: 'Makine telgrafı' },
+  'desktop.shell.telegraph.stop': { en: 'STOP', tr: 'DUR' },
+  'desktop.shell.telegraph.slow': { en: 'SLOW AHEAD', tr: 'AĞIR YOL' },
+  'desktop.shell.telegraph.full': { en: 'FULL AHEAD', tr: 'TAM YOL' },
+  'desktop.shell.console.cancel': { en: 'Abort voyage', tr: 'Seferi iptal et' },
+  'desktop.shell.approval.allow': { en: 'Allow', tr: 'İzin ver' },
+  'desktop.shell.approval.deny': { en: 'Deny', tr: 'Reddet' },
+  'desktop.shell.approval.decide_off': {
+    en: 'Remote decisions are disabled on this daemon (approval.api_decide) — decide from the terminal.',
+    tr: 'Bu daemonda uzaktan karar kapalı (approval.api_decide) — kararı terminalden verin.',
+  },
   // D4-1 «Köprüüstü» — watch (vardiya) theme system.
   'desktop.theme.title': { en: 'Watch', tr: 'Vardiya' },
   'desktop.theme.watch.day-watch': { en: 'Day watch', tr: 'Gündüz seyri' },

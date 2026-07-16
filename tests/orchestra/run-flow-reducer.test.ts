@@ -451,6 +451,10 @@ describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-s
       // API-yüzeyi tüketicileri, sızıntı değil.
       'api/run-flow-routes.ts',
       'api/run-flow-event-stream.ts',
+      // SURF-5: the Desktop shell drift-gate imports RUN_FLOW_TERMINAL_STATES
+      // (contract constant, read-only) to pin SHELL_TERMINAL_STATES against the
+      // core truth — a designed test-side consumer, no reducer/store mutation.
+      'desktop/tests/shell-design.test.ts',
     ];
     expect(offenders.filter((o) => !KNOWN_CONSUMERS.includes(o))).toEqual([]);
   });

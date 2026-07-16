@@ -97,6 +97,9 @@ export interface DaemonApiClient {
   openEvents(flowId: string, onEvent: (event: RunFlowEventPayload) => void, opts?: OpenEventsOptions): () => void;
   // ── ApprovalBroker contract (separate, poll-based) ──
   getApprovals(): Promise<ApprovalsResponse>;
+  /** SURF-5 — decide a pending approval. Flag-gated server-side
+   *  (`approval.api_decide`): a 403 means the flag is off (surface it). */
+  decideApproval(id: string, decision: 'allow' | 'deny', reason?: string): Promise<Record<string, unknown>>;
 }
 
 export function createApiClient(session: DaemonSession, fetchFn?: FetchLike): DaemonApiClient {
@@ -171,5 +174,10 @@ export function createApiClient(session: DaemonSession, fetchFn?: FetchLike): Da
     },
 
     getApprovals: () => request<ApprovalsResponse>('GET', '/api/approvals'),
+    decideApproval: (id, decision, reason) =>
+      request('POST', `/api/approvals/${encodeURIComponent(id)}/decision`, {
+        decision,
+        ...(reason !== undefined ? { reason } : {}),
+      }),
   };
 }

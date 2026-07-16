@@ -357,4 +357,72 @@ describe('RunFlowCoordinator — hermetic scenario family (442-003)', () => {
       expect(readFlowEvents(root, flowId)).toHaveLength(0);
     });
   });
+
+  // ── 8. Cross-process freshness (SURF-5) ────────────────────────────────
+  // The API daemon's coordinator caches a flow at DETACHED_RUNNING while the
+  // DETACHED RUN CHILD (a separate process — here: a second coordinator on
+  // the same root, which is exactly what start.ts G2/born-698b instantiates)
+  // appends the RUN_COMPLETED closure. Pre-fix the daemon (a) served
+  // DETACHED_RUNNING forever and (b) could fold a command on the stale
+  // context and append AFTER the terminal closure, corrupting the log.
+  describe('cross-process freshness probe', () => {
+    function driveToDetachedRunning(coordinator: RunFlowCoordinator, flowId: string): void {
+      coordinator.proposeFlow({ proposal: makeRunProposal({ flowId, revision: DEFAULT_REVISION }) });
+      coordinator.recordPreview({ preview: makePlanPreview({ flowId, revision: DEFAULT_REVISION, planDigest: DEFAULT_PLAN_DIGEST }) });
+      coordinator.grantApproval({
+        flowId,
+        revision: DEFAULT_REVISION,
+        planDigest: DEFAULT_PLAN_DIGEST,
+        approvedBy: { id: `approver-${flowId}` },
+      });
+      coordinator.requestStart({ flowId, revision: DEFAULT_REVISION, planDigest: DEFAULT_PLAN_DIGEST });
+      coordinator.recordRunStarted({ handle: { flowId, jobId: `job-${flowId}`, logRef: `log-${flowId}` } });
+    }
+
+    it("a child-process closure becomes visible to the daemon's cached getFlow AND re-publishes the delta to onEvent", () => {
+      const flowId = generateFlowId('xproc');
+      const daemonEvents: string[] = [];
+      const daemon = createRunFlowCoordinator({
+        root,
+        now: makeClock(),
+        onEvent: (event) => daemonEvents.push(`${event.type}#${event.sequence ?? '?'}`),
+      });
+      driveToDetachedRunning(daemon, flowId);
+      expect(daemon.getFlow(flowId).state).toBe('DETACHED_RUNNING');
+      const publishedBeforeClosure = daemonEvents.length;
+
+      // The child writes its OWN closure from another process (start.ts G2).
+      const child = createRunFlowCoordinator({ root, now: makeClock('2026-07-13T01:00:00.000Z') });
+      child.recordCompletion({ flowId, summary: 'run done', commandId: `child-complete-${flowId}` });
+
+      // Daemon cache-hit now re-folds from disk (live flow + longer log)...
+      expect(daemon.getFlow(flowId).state).toBe('COMPLETED');
+      // ...and the delta event reaches the daemon's live listeners exactly once,
+      // carrying its store-assigned sequence (the SSE `id:` contract).
+      const delta = daemonEvents.slice(publishedBeforeClosure);
+      expect(delta).toHaveLength(1);
+      expect(delta[0]).toMatch(/^RUN_COMPLETED#\d+$/);
+
+      // Terminal contexts are immutable — a repeat read stays COMPLETED and
+      // publishes nothing further.
+      expect(daemon.getFlow(flowId).state).toBe('COMPLETED');
+      expect(daemonEvents.slice(publishedBeforeClosure)).toHaveLength(1);
+    });
+
+    it('a command folded after a child closure is rejected typed — never appended after the terminal event', () => {
+      const flowId = generateFlowId('xproc-guard');
+      const daemon = createRunFlowCoordinator({ root, now: makeClock() });
+      driveToDetachedRunning(daemon, flowId);
+
+      const child = createRunFlowCoordinator({ root, now: makeClock('2026-07-13T01:00:00.000Z') });
+      child.recordRunFailure({ flowId, error: 'child crashed', commandId: `child-crash-${flowId}` });
+
+      const logLengthAfterClosure = readFlowEvents(root, flowId).length;
+      // Pre-fix this folded on the stale DETACHED_RUNNING cache and appended
+      // FLOW_ABORTED after RUN_FAILED — a log that no longer folds cleanly.
+      expect(() => daemon.abortFlow({ flowId, reason: 'user cancel' })).toThrow(InvalidTransitionError);
+      expect(readFlowEvents(root, flowId)).toHaveLength(logLengthAfterClosure);
+      expect(daemon.getFlow(flowId).state).toBe('FAILED');
+    });
+  });
 });

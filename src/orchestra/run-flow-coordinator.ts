@@ -68,6 +68,7 @@
 import {
   RUN_FLOW_EVENT_SCHEMA_VERSION,
   createInitialRunFlowContext,
+  isTerminalRunFlowState,
   RunFlowTransitionError,
   type ApprovedPlanSnapshot,
   type PlanPreview,
@@ -292,6 +293,13 @@ export interface RunFlowCoordinator {
 interface FlowState {
   context: RunFlowContext;
   readonly commandIds: Set<string>;
+  /** SURF-5 — how many durable log events this cached context reflects. The
+   *  cross-process freshness probe compares this against the on-disk log so a
+   *  closure appended by ANOTHER process (the detached run child writing its
+   *  own RUN_COMPLETED/RUN_FAILED, start.ts born-698b/G2) becomes visible to a
+   *  long-lived reader (the API daemon) instead of leaving the flow cached in
+   *  DETACHED_RUNNING limbo forever. */
+  foldedCount: number;
 }
 
 /** Plain `Omit` collapses `RunFlowEvent`'s discriminated union to its common-key
@@ -312,19 +320,18 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
   const flows = new Map<string, FlowState>();
 
   /**
-   * Load (or lazily reconstruct) a flow's in-memory state. On a cache miss the
-   * flow is rehydrated by FOLDING its durable event log through the reducer —
-   * this is what makes both the derived context AND the commandId dedup set
-   * survive a process restart. A brand-new flow (empty log) folds to the
-   * INITIAL context with an empty command set.
+   * Fold the durable event log into a fresh FlowState and cache it. When
+   * `publishFrom` is given (a cross-process staleness re-fold), every event at
+   * index >= publishFrom is a DELTA this process has never seen — it is
+   * re-published through `deps.onEvent` (fail-soft) so live observers (the
+   * daemon's SSE fan-out) receive closures written by another process (the
+   * detached run child) without waiting for a reconnect-backfill.
    */
-  function ensureFlowLoaded(flowId: string): FlowState {
-    const cached = flows.get(flowId);
-    if (cached !== undefined) return cached;
-
+  function foldFromDisk(flowId: string, publishFrom?: number): FlowState {
     let context = createInitialRunFlowContext();
     const commandIds = new Set<string>();
-    for (const event of readFlowEvents(root, flowId)) {
+    const events = readFlowEvents(root, flowId);
+    for (const event of events) {
       try {
         context = reduceRunFlow(context, event);
       } catch (err) {
@@ -341,9 +348,43 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
       if (event.commandId !== undefined) commandIds.add(event.commandId);
     }
 
-    const state: FlowState = { context, commandIds };
+    const state: FlowState = { context, commandIds, foldedCount: events.length };
     flows.set(flowId, state);
+
+    if (publishFrom !== undefined && deps.onEvent) {
+      for (const event of events.slice(publishFrom)) {
+        try {
+          deps.onEvent(event); // persisted lines carry their store-assigned sequence
+        } catch {
+          // listener errors are the listener's problem, never the flow's
+        }
+      }
+    }
     return state;
+  }
+
+  /**
+   * Load (or lazily reconstruct) a flow's in-memory state. On a cache miss the
+   * flow is rehydrated by FOLDING its durable event log through the reducer —
+   * this is what makes both the derived context AND the commandId dedup set
+   * survive a process restart. A brand-new flow (empty log) folds to the
+   * INITIAL context with an empty command set.
+   *
+   * SURF-5 cross-process freshness: a cache HIT on a LIVE (non-terminal) flow
+   * verifies the cache still matches the durable log length — the detached run
+   * child appends its own RUN_COMPLETED/RUN_FAILED closure (start.ts G2 /
+   * born-698b) from another process, and without this probe a long-lived
+   * daemon would (a) serve DETACHED_RUNNING forever and (b) accept a command
+   * folded on the stale context, appending an event AFTER a terminal closure
+   * and corrupting the log. Terminal contexts are immutable by reducer
+   * contract, so they skip the disk touch entirely.
+   */
+  function ensureFlowLoaded(flowId: string): FlowState {
+    const cached = flows.get(flowId);
+    if (cached === undefined) return foldFromDisk(flowId);
+    if (isTerminalRunFlowState(cached.context.state)) return cached;
+    if (readFlowEvents(root, flowId).length <= cached.foldedCount) return cached;
+    return foldFromDisk(flowId, cached.foldedCount);
   }
 
   /**
@@ -451,6 +492,7 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
 
     let context = flow.context;
     let sequence = 0;
+    let appended = 0;
     for (const event of buildEvents(context)) {
       let next: RunFlowContext;
       try {
@@ -465,6 +507,7 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
       } catch (err) {
         throw new AppendFailedError(flowId, event.type, err);
       }
+      appended += 1;
       context = next;
       // SURF-1c: live-publish AFTER the durable append (fail-soft — a bad
       // listener can never break the command or the durable record).
@@ -479,6 +522,7 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
 
     // Commit to the in-memory map only AFTER every append succeeded.
     flow.context = context;
+    flow.foldedCount += appended;
     if (commandId !== undefined) flow.commandIds.add(commandId);
     return { applied: true, context, sequence };
   }
@@ -558,17 +602,16 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
     getFlow(flowId) {
       // Priority chain (design doc "Net Öneri"): memory cache -> durable
       // event-fold -> legacy dual-read.
-      // 1) memory-hit — the live in-memory context wins, no disk touch.
-      const cached = flows.get(flowId);
-      if (cached !== undefined) return cached.context;
-
+      // 1) memory-hit — via ensureFlowLoaded, whose SURF-5 freshness probe
+      //    re-folds a LIVE flow when another process appended behind the cache
+      //    (terminal contexts stay zero-disk-touch).
       // 2) memory-miss — rehydrate ONLY if a foldable durable log exists. The guard
       //    is "has events" (`.length > 0`), not raw file presence, so an empty/torn
       //    log routes to the next branch rather than resolving to INITIAL. The
       //    fold itself (INITIAL context -> sequence-ordered reduce, typed fold
       //    errors, cache-on-load) is `ensureFlowLoaded`'s job, reused verbatim so
       //    the rehydrated context is identical to what a memory-hit would return.
-      if (readFlowEvents(root, flowId).length > 0) {
+      if (flows.has(flowId) || readFlowEvents(root, flowId).length > 0) {
         return ensureFlowLoaded(flowId).context;
       }
 

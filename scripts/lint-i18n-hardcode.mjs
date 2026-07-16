@@ -229,6 +229,14 @@ const ALLOWLIST = [
   { file: 'src/desktop/src/main/security.ts', contains: '[security] blocked <webview> attach attempt', reason: DEBT_REASON },
   { file: 'src/desktop/src/main/security.ts', contains: '[security] denied permission request', reason: DEBT_REASON },
   { file: 'src/desktop/src/main/security.ts', contains: '[security] denied permission check', reason: DEBT_REASON },
+  // D4-1 preferences-store — same [module]-diagnostic class as the
+  // connection-profile-store trio above (its literal template, new file).
+  { file: 'src/desktop/src/main/preferences-store.ts', contains: '[preferences-store] read failed for', reason: DEBT_REASON },
+  { file: 'src/desktop/src/main/preferences-store.ts', contains: '[preferences-store] ${filePath} is not valid JSON', reason: DEBT_REASON },
+  { file: 'src/desktop/src/main/preferences-store.ts', contains: '[preferences-store] ${filePath} failed schema/version', reason: DEBT_REASON },
+  // D4-3 serve bootstrap (born-680 twin fix) — daemon-stderr developer
+  // diagnostic on a fail-soft provider bootstrap, never end-user UI text.
+  { file: 'src/cli/commands/serve.ts', contains: '[serve] provider bootstrap skipped', reason: DEBT_REASON },
 ];
 
 const allowed = (hit) =>

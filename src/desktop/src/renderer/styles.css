@@ -567,6 +567,93 @@ select:focus-visible {
 .ledger code { font-family: var(--dk-font-data); font-size: 12px; color: var(--dk-s-brass); }
 .ledger .flow-intent { flex: 1; }
 
+/* ── SURF-5 — real-workflow organs ─────────────────────────────────────── */
+
+/* «Emir» — the order line at the top of the bridge */
+.order-form { display: flex; gap: var(--space-3); max-width: 720px; margin-bottom: var(--space-5); }
+.order-form input {
+  flex: 1;
+  font-family: var(--dk-font-body);
+  font-size: 14px;
+  color: var(--dk-c-input-text);
+  background: var(--dk-c-input-bg);
+  border: 1px solid var(--dk-c-input-border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+}
+.order-form input:focus-visible { outline: 2px solid var(--dk-s-focus-ring); outline-offset: 1px; }
+.order-form button {
+  font-family: var(--dk-font-data);
+  font-size: 12.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dk-c-btn-text);
+  background: var(--dk-c-btn-bg);
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+}
+.order-form button:disabled { opacity: 0.45; cursor: default; }
+
+/* Planned course — the preview card */
+.preview-panel {
+  max-width: 720px;
+  background: var(--dk-c-card-bg);
+  border: 1px solid var(--dk-c-card-border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  margin-top: var(--space-5);
+}
+.preview-panel ol { margin: var(--space-2) 0; padding-left: 1.4em; font-size: 13.5px; display: grid; gap: var(--space-1); }
+.preview-meta { font-family: var(--dk-font-data); font-size: 12px; color: var(--dk-s-text-muted); margin: 0; }
+
+/* «Telgraf» — the decision handles (brass instrument bar) */
+.telegraph-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 720px;
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--dk-c-card-bg);
+  border: 1px solid var(--dk-s-brass);
+  border-radius: var(--radius);
+}
+.telegraph-bar .view-eyebrow { margin: 0 var(--space-2) 0 0; }
+.tg {
+  font-family: var(--dk-font-data);
+  font-size: 12.5px;
+  letter-spacing: 0.1em;
+  background: transparent;
+  border: 1.5px solid;
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+}
+.tg:disabled { opacity: 0.45; cursor: default; }
+.tg:focus-visible { outline: 2px solid var(--dk-s-focus-ring); outline-offset: 1px; }
+.tg--stop { color: var(--dk-s-abort); border-color: var(--dk-s-abort); }
+.tg--slow { color: var(--dk-s-caution); border-color: var(--dk-s-caution); }
+.tg--full { color: var(--dk-s-go); border-color: var(--dk-s-go); }
+
+/* Abort voyage — quiet destructive affordance, never competing with the telegraph */
+.flow-cancel {
+  margin-top: var(--space-3);
+  font-family: var(--dk-font-data);
+  font-size: 12px;
+  color: var(--dk-s-abort);
+  background: none;
+  border: none;
+  text-decoration: underline dashed;
+  cursor: pointer;
+  padding: 0;
+}
+.flow-cancel:disabled { opacity: 0.45; cursor: default; }
+
+/* Approval — decide actions on order cards */
+.order-actions { display: flex; gap: var(--space-2); margin-left: auto; }
+
 /* Chat — designed honest empty state (watch radio) */
 .radio-empty {
   max-width: 460px;

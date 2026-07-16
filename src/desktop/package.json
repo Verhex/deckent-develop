@@ -5,11 +5,20 @@
   "description": "deckent desktop shell (DESK-1, ADR-G-033) — thin Electron client over the system-Node `deckent serve` daemon. Never published to npm; distributed as its own signed artifact (Phase 4).",
   "type": "module",
   "main": "out/main/index.js",
+  "author": "deckent",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "bootstrap:electron": "node node_modules/electron/install.js"
+    "bootstrap:electron": "node node_modules/electron/install.js",
+    "package:linux": "electron-builder --linux dir"
+  },
+  "build": {
+    "appId": "dev.deckent.desktop",
+    "productName": "Deckent Desktop",
+    "directories": { "output": "dist-app" },
+    "files": ["out/**", "package.json"],
+    "linux": { "target": "dir", "category": "Development" }
   },
   "devDependencies": {
     "@playwright/test": "^1.54.0",
