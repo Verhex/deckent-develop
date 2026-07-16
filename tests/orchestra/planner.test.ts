@@ -202,6 +202,13 @@ describe('buildPlanPrompt', () => {
     const prompt = buildPlanPrompt(emptyCtx, makeRecommendation(), 'test');
     expect(prompt).toContain('RULES:');
   });
+
+  it('F-1: carries the shared FILE PATH RULES contract (same block as the zero-config prompt)', () => {
+    const prompt = buildPlanPrompt(makeContext(), makeRecommendation(), 'test');
+    expect(prompt).toContain('FILE PATH RULES:');
+    expect(prompt).toContain('directory-qualified');
+    expect(prompt).toContain('NEVER a bare filename');
+  });
 });
 
 describe('parsePlannerResponse', () => {

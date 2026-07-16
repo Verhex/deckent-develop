@@ -47,8 +47,10 @@ describe('scope-sanitizer — born-675 multi-dot basename preservation', () => {
     expect(result.warnings[0]).toContain('init.ts');
   });
 
-  it('existing genuine-drop behavior preserved: single-dot bare names still drop', () => {
-    const result = sanitizeScope(['init.ts', 'README.md', 'src/core/config.ts']);
+  it('existing genuine-drop behavior preserved: single-dot bare SOURCE names still drop', () => {
+    // F-1: README.md moved out of this fixture — it is now a preserved
+    // well-known root file (sparse-project carve-out), not a genuine drop.
+    const result = sanitizeScope(['init.ts', 'helper.js', 'src/core/config.ts']);
     expect(result.filesWrite).toEqual(['src/core/config.ts']);
     expect(result.warnings.length).toBe(2);
   });

@@ -193,6 +193,8 @@ RULES:
 - Define scope (directories + filesWrite) for each task
 - Write GO/NO-GO criteria for each task
 
+${FILE_PATH_RULES}
+
 ${buildAdrConstraintsPlannerBlock()}
 MODEL SELECTION CRITERIA (CHOOSE THE RIGHT MODEL FOR EACH TASK):
 - **opus**: Complex architecture changes, tasks touching multiple modules, new patterns/abstractions, cross-cutting concerns, large features requiring test + implementation together
@@ -620,6 +622,28 @@ function zeroConfigTaskRange(): { min: number; max: number } {
  * the former TR/EN fork had drifted — the ADR-constraints block existed only in
  * the TR branch while production defaulted to TR. One source, no fork.
  */
+// ─── F-1 — planner file-path contract (ONE source for BOTH prompts) ──────────
+// The path-sprawl class: a planner that is blind to the repo (or ungoverned on
+// path shape) invents bare/nonexistent paths ("README.md", "tests/x"). Rule 5
+// of the scope sanitizer silently drops bare filenames, and the SAN-1
+// prompt-gate lint escalates every such drop to a plan-time BLOCK — the user
+// then hits a gate error they never caused. This block makes the rules
+// explicit to the model; scope-sanitizer.ts's WELL_KNOWN_ROOT_FILES carve-out
+// is the deterministic backstop for the root-file class when a model still
+// disobeys.
+const FILE_PATH_RULES = `FILE PATH RULES:
+- Every scope.filesWrite / scope.filesRead entry MUST be repo-relative AND directory-qualified (e.g. "src/auth/login.ts" — NEVER a bare filename like "login.ts")
+- Exception: well-known root files (README.md, LICENSE, CHANGELOG.md, CONTRIBUTING.md) may be written by their bare name
+- scope.filesRead may ONLY list files that actually exist (see the file tree when provided) — never claim a file you have not seen
+- Creating NEW files is allowed and normal — put each one under a directory-qualified path
+- Never use absolute paths, "~" or ".." segments`;
+
+/** F-1: sparse/greenfield guidance — shown INSTEAD of a file tree when the
+ *  project has no visible tracked files. Deliberately avoids the literal
+ *  "FILE TREE" label: callers pin that label's absence for an empty tree. */
+const GREENFIELD_NOTE = `PROJECT STATE: greenfield — no tracked files are visible yet.
+Choose conventional directories for new files (src/, tests/, docs/); every path still needs its directory prefix.`;
+
 export function buildZeroConfigPlanPrompt(
   description: string,
   projectName: string,
@@ -627,7 +651,7 @@ export function buildZeroConfigPlanPrompt(
 ): string {
   const treeSection = fileTree.length > 0
     ? `\nFILE TREE (first ${Math.min(fileTree.length, 50)}):\n${fileTree.slice(0, 50).join('\n')}`
-    : '';
+    : `\n${GREENFIELD_NOTE}`;
 
   return `You are a software project orchestrator. A user requested a feature in natural language.
 Split this request into ${zeroConfigTaskRange().min}-${zeroConfigTaskRange().max} independent, parallel-executable tasks.
@@ -644,6 +668,8 @@ TASK SPLITTING RULES:
 - A task's "title" MUST NOT contain a comma (,) character — rephrase with "and"/a dash instead
 - Write GO/NO-GO criteria for each task
 - The last task MUST be an integration/test task
+
+${FILE_PATH_RULES}
 
 EXAMPLE SPLIT:
 "Add login page with Google OAuth" →

@@ -174,22 +174,52 @@ describe('sanitizeScope Rule-5 trackedRootFiles-aware (sprint-397 evidence: 011/
     expect(result.filesWrite).not.toContain('config.json');
   });
 
-  it('exact-match only — a similarly named but untracked file still drops', () => {
+  it('F-1: a lowercase readme.md is preserved too (well-known root file, case-insensitive)', () => {
+    // Pre-F-1 this pinned the exact-match drop; the well-known-root-file
+    // carve-out is deliberately case-insensitive (creating "readme.md" is a
+    // legitimate ecosystem convention, not a typo of the tracked README.md).
     const result = sanitizeScope(['readme.md', 'src/core/config.ts'], TRACKED);
-    // "readme.md" (lowercase) is not an exact match for tracked "README.md"
-    expect(result.filesWrite).toEqual(['src/core/config.ts']);
-    expect(result.warnings.length).toBe(1);
+    expect(result.filesWrite).toEqual(['readme.md', 'src/core/config.ts']);
+    expect(result.warnings).toEqual([]);
   });
 
-  it('backward-compat: omitting trackedRootFiles behaves exactly as before (all existing tests unaffected)', () => {
+  it('backward-compat: omitting trackedRootFiles ≡ empty set (identical results)', () => {
     const withoutTracked = sanitizeScope(['README.md', 'init.ts', 'src/core/config.ts']);
     const withEmptyTracked = sanitizeScope(
       ['README.md', 'init.ts', 'src/core/config.ts'],
       new Set(),
     );
     expect(withoutTracked).toEqual(withEmptyTracked);
-    expect(withoutTracked.filesWrite).toEqual(['src/core/config.ts']);
-    expect(withoutTracked.warnings.length).toBe(2);
+    // F-1: README.md now survives via the well-known-root-file carve-out;
+    // init.ts still warns+drops (a genuinely unqualified source file).
+    expect(withoutTracked.filesWrite).toEqual(['README.md', 'src/core/config.ts']);
+    expect(withoutTracked.warnings.length).toBe(1);
+    expect(withoutTracked.warnings[0]).toContain('init.ts');
+  });
+
+  // ─── F-1 — well-known root-file carve-out (sparse-project path-sprawl) ─────
+  describe('F-1: WELL_KNOWN_ROOT_FILES carve-out', () => {
+    it('preserves untracked root doc files by bare name (README-TR.md, LICENSE, CHANGELOG.md)', () => {
+      const result = sanitizeScope(['README-TR.md', 'LICENSE', 'CHANGELOG.md', 'src/a.ts'], new Set());
+      expect(result.filesWrite).toEqual(['README-TR.md', 'LICENSE', 'CHANGELOG.md', 'src/a.ts']);
+      expect(result.warnings).toEqual([]);
+    });
+
+    it('a genuinely unqualified source file still warns + drops', () => {
+      const result = sanitizeScope(['init.ts'], new Set());
+      expect(result.filesWrite).toEqual([]);
+      expect(result.warnings.length).toBe(1);
+    });
+
+    it('GLOBAL_PROTECTED still wins — bare package.json is dropped, never preserved', () => {
+      const result = sanitizeScope(['package.json', 'src/a.ts'], new Set());
+      expect(result.filesWrite).toEqual(['src/a.ts']);
+    });
+
+    it('a directory-qualified readme path is untouched by the carve-out (normal Rule-5 bypass)', () => {
+      const result = sanitizeScope(['docs/README.md'], new Set());
+      expect(result.filesWrite).toEqual(['docs/README.md']);
+    });
   });
 
   it('Windows backslash path behavior unchanged regardless of trackedRootFiles', () => {

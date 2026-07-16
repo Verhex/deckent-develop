@@ -284,6 +284,23 @@ describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(c
 
     expect(spy.mock.calls[0]?.[1]).toBe('opus');
   });
+
+  it('F-1: grounds the planner with the REAL tracked file tree (no more blind planning)', async () => {
+    // This test process runs at the repo root, so `git ls-files` returns the
+    // real tracked set — the 4th argument must be a non-empty file list
+    // containing a known tracked file (hermetic: tracked state exists on a
+    // fresh checkout; nothing gitignored is read).
+    const proposal = makeProposal({ flowId: 'flow-f1-tree' });
+    const spy = vi.mocked(callZeroConfigPlanner);
+    spy.mockClear();
+
+    await expect(compileRunProposalIntent(proposal)).rejects.toThrow(RunProposalPlanError);
+
+    const tree = spy.mock.calls[0]?.[3];
+    expect(Array.isArray(tree)).toBe(true);
+    expect((tree as string[]).length).toBeGreaterThan(0);
+    expect(tree as string[]).toContain('package.json');
+  });
 });
 
 // ─── 6. Pin the two planner-prompt rules (435-002) that back run-proposal-compiler's ──

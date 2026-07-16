@@ -37,6 +37,7 @@ import type { DeckentConfig, PlannerResult, PlannerTask } from '../core/types.js
 import type { ResolvedConfig } from '../core/config-types.js';
 import { resolveBrainModel } from '../core/config.js';
 import { buildDirectives, type DirectiveBuildIntent, type DirectiveBuildTask } from './directives-builder.js';
+import { spawnSync } from 'node:child_process';
 import { callZeroConfigPlanner, resolvePlanTimeoutMs } from './planner.js';
 
 export interface RunProposalCompileResult {
@@ -102,13 +103,31 @@ function describeActor(proposal: RunProposal): string {
  * behavior is reproduced exactly. Do not default `config` to `createDefaultConfig()`: that
  * resolves `mode: 'performance'` -> `brain_model: 'opus'`, a silent regression.
  */
+/** F-1: ground the zero-config planner in the REAL tracked file tree — a
+ *  planner that cannot see the repo invents paths (the sparse-project
+ *  path-sprawl class: bare "README.md", fictional "tests/x"). Fail-soft: no
+ *  git / not a repo → empty tree, and the prompt engages its greenfield
+ *  guidance instead. Same process.cwd() + `git ls-files` precedent as
+ *  planner.ts's U2 output-contract completion — a fast local read, not the
+ *  spawnSync freeze-class F-2 removed (that was the minutes-long LLM call). */
+function readTrackedFileTree(): string[] {
+  try {
+    const ls = spawnSync('git', ['ls-files'], { encoding: 'utf-8', cwd: process.cwd() });
+    if (ls.status !== 0 || !ls.stdout) return [];
+    return ls.stdout.trim().split('\n').filter((line) => line.length > 0);
+  } catch {
+    return [];
+  }
+}
+
 async function defaultRunProposalPlanner(proposal: RunProposal, config?: RunProposalPlannerConfig): Promise<PlannerResult> {
   const description = proposal.intentSummary.trim();
   // F-2: async planner call (event loop stays free — `deckent do` can render
   // its planning heartbeat) + the SAME config-resolved timeout every planning
   // path uses (resolvePlanTimeoutMs — brain_plan_timeout_ms honored here too).
+  // F-1: the real tracked file tree grounds the planner (no more blind planning).
   const result = await callZeroConfigPlanner(
-    description, resolveBrainModel(config), proposal.project, [], undefined,
+    description, resolveBrainModel(config), proposal.project, readTrackedFileTree(), undefined,
     resolvePlanTimeoutMs(config as { brain_plan_timeout_ms?: number; ai_planner_timeout?: number } | undefined),
   );
   if (!result) {

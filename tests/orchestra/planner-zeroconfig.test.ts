@@ -188,9 +188,21 @@ describe('buildZeroConfigPlanPrompt', () => {
     expect(prompt).toContain('first 50');
   });
 
-  it('works without file tree', () => {
+  it('works without file tree — engages the greenfield guidance instead (F-1)', () => {
     const prompt = buildZeroConfigPlanPrompt('Add feature', 'app');
     expect(prompt).not.toContain('FILE TREE');
+    expect(prompt).toContain('PROJECT STATE: greenfield');
+    expect(prompt).toContain('src/, tests/, docs/');
+  });
+
+  // ─── F-1 — file-path contract (sparse-project path-sprawl fix) ────────────
+  it('F-1: carries the FILE PATH RULES contract (directory-qualified paths, no invented reads)', () => {
+    const prompt = buildZeroConfigPlanPrompt('Add feature', 'app');
+    expect(prompt).toContain('FILE PATH RULES:');
+    expect(prompt).toContain('directory-qualified');
+    expect(prompt).toContain('NEVER a bare filename');
+    expect(prompt).toContain('never claim a file you have not seen');
+    expect(prompt).toContain('README.md, LICENSE, CHANGELOG.md, CONTRIBUTING.md');
   });
 
   it('includes task splitting parallelism rules', () => {

@@ -75,6 +75,24 @@ const GLOBAL_PROTECTED = new Set([
   'pnpm-lock.yaml',
 ]);
 
+/** F-1: root-DWELLING doc files a plan may legitimately CREATE in a repo that
+ *  does not have them yet — a bare "README.md" in a sparse/new project is not
+ *  an unqualified path, it IS the correct root location, but `trackedRootFiles`
+ *  cannot vouch for a file that is not tracked yet. Bare names matching this
+ *  predicate are preserved by Rule 5 instead of dropped (which SAN-1 would
+ *  otherwise escalate to a plan-time BLOCK — the sparse-project path-sprawl
+ *  class). GLOBAL_PROTECTED still wins via Rule 6 (package.json et al). */
+const WELL_KNOWN_ROOT_FILES = new Set([
+  'license', 'license.md', 'license.txt',
+  'changelog.md', 'contributing.md', 'code_of_conduct.md',
+  'security.md', 'notice', 'notice.md',
+]);
+
+function isWellKnownRootFile(path: string): boolean {
+  const lower = path.toLowerCase();
+  return WELL_KNOWN_ROOT_FILES.has(lower) || /^readme(-[a-z0-9]+)?\.(md|rst|txt)$/.test(lower);
+}
+
 /**
  * Sanitize a filesWrite array by removing invalid, dangerous, or noisy paths.
  *
@@ -153,6 +171,11 @@ export function sanitizeScope(
       } else if (trackedRootFiles?.has(path)) {
         // Known git-tracked root file (exact match) — preserve (sprint-397
         // evidence: README.md / README-TR.md / .secrets-baseline silently dropped)
+      } else if (isWellKnownRootFile(path)) {
+        // F-1: a root-dwelling doc file the plan legitimately CREATES (not
+        // tracked yet, so trackedRootFiles cannot vouch) — preserve silently,
+        // no warning: SAN-1 treats every sanitizeScope warning as a plan-time
+        // BLOCK (same rationale as the multi-dot branch below).
       } else if (hasMultiDotBasename(path)) {
         // Compound-name file (soul.default.md, a.b.c.ts) that lost its directory
         // prefix upstream — preserve (born-675: silent-drop of a real file).

@@ -20,13 +20,12 @@ describe('scope-sanitizer', () => {
     expect(result.warnings[0]).toContain('init.ts');
   });
 
-  it('backward-compat: no trackedRootFiles arg → unqualified root file still dropped', () => {
-    // Sprint-397 evidence file, but called the old (single-arg) way — must behave
-    // identically to before trackedRootFiles existed.
+  it('F-1: a bare well-known root file (README.md) is preserved even WITHOUT trackedRootFiles', () => {
+    // Pre-F-1 this pinned the drop; the sparse-project path-sprawl fix makes a
+    // root-dwelling doc file a legitimate CREATE target (SAN-1 no longer blocks).
     const result = sanitizeScope(['README.md', 'src/core/config.ts']);
-    expect(result.filesWrite).toEqual(['src/core/config.ts']);
-    expect(result.warnings.length).toBe(1);
-    expect(result.warnings[0]).toContain('README.md');
+    expect(result.filesWrite).toEqual(['README.md', 'src/core/config.ts']);
+    expect(result.warnings).toEqual([]);
   });
 
   it('removes global protected files like config.json', () => {
