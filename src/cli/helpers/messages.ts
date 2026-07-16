@@ -2776,6 +2776,18 @@ const MESSAGES: MessageMap = {
     en: '  liveness: unverified — the run predates pid tracking',
     tr: '  canlılık: doğrulanamadı — koşu pid takibinden eski',
   },
+  // F-3b rich detail — human-readable `/runs <n>` + `deckent runs <n>`.
+  'tui.inbox_detail_origin': { en: '  origin: {origin}', tr: '  kaynak: {origin}' },
+  'tui.inbox_detail_tasks': { en: '  tasks: {count}', tr: '  görev: {count}' },
+  'tui.inbox_detail_updated': { en: '  updated: {time}', tr: '  güncellendi: {time}' },
+  'tui.inbox_detail_closed': { en: '  closed: {time}', tr: '  kapandı: {time}' },
+  'tui.inbox_detail_duration': { en: '  duration: {duration}', tr: '  süre: {duration}' },
+  'tui.inbox_detail_summary': { en: '  summary: {summary}', tr: '  özet: {summary}' },
+  'tui.inbox_detail_reason': { en: '  reason: {reason}', tr: '  neden: {reason}' },
+  'tui.inbox_time_just_now': { en: 'just now', tr: 'az önce' },
+  'tui.inbox_time_minutes_ago': { en: '{n} min ago', tr: '{n} dk önce' },
+  'tui.inbox_time_hours_ago': { en: '{n} h ago', tr: '{n} sa önce' },
+  'tui.inbox_time_days_ago': { en: '{n} d ago', tr: '{n} gün önce' },
   // F-3 `deckent runs --close-stale` — operator stale-run sweep output.
   'runs.close_stale.none': {
     en: 'No stale runs — every live-claiming flow is verified alive or already closed.',

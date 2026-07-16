@@ -25,9 +25,15 @@ import {
   reduceInboxNav,
   formatInboxRowBody,
   EMPTY_INBOX_NAV,
+  // F-3b — rich human-readable detail
+  formatInboxTimestamp,
+  formatInboxDuration,
+  collectRunDetail,
+  buildRunDetailLines,
   type InboxRow,
   type InboxNavState,
 } from '../../src/cli/repl/run-flow-inbox.js';
+import { sweepStaleRuns } from '../../src/orchestra/run-flow-death-sweep.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
 import { getRunFlowCoordinator, _resetRunFlowCoordinatorsForTests } from '../../src/orchestra/run-flow-coordinator-registry.js';
 import { saveApprovedSnapshot, saveRunHandle } from '../../src/core/run-flow-store.js';
@@ -85,12 +91,15 @@ function deadPid(): number {
 }
 
 /** Write a jobs-dir terminal record correlated to a flowId. */
-function writeJob(root: string, flowId: string, status: 'COMPLETE' | 'FAILED', done = 0, total = 0): void {
+function writeJob(
+  root: string, flowId: string, status: 'COMPLETE' | 'FAILED', done = 0, total = 0,
+  extra: { completedAt?: string; summary?: string } = {},
+): void {
   const jobsDir = join(root, '.deckent', 'runtime', 'jobs');
   mkdirSync(jobsDir, { recursive: true });
   writeFileSync(
     join(jobsDir, `${flowId}.json`),
-    JSON.stringify({ status, sprintId: flowId, metrics: { totalTasks: total, done, techDebt: 0, noGo: 0 }, completionRecord: { flowId } }),
+    JSON.stringify({ status, sprintId: flowId, metrics: { totalTasks: total, done, techDebt: 0, noGo: 0 }, completionRecord: { flowId }, ...extra }),
   );
 }
 
@@ -304,20 +313,23 @@ describe('resolveInboxSelection — /runs <n> numbered pick (D2)', () => {
   });
 });
 
-describe('buildInboxDetailLines — single-flow detail (D2)', () => {
+describe('buildInboxDetailLines — compact single-flow detail (D2 + F-3b relabel)', () => {
   const labels = DEFAULT_INBOX_LABELS;
+  const NOW = new Date('2026-07-16T10:00:00.000Z').getTime();
 
-  it('renders header + full id + intent + progress + started when all present', () => {
+  it('renders header + full id + intent + progress + honestly-labeled updated line', () => {
     const row: InboxRow = {
       flowId: '9c3d577a-5c24-45c6-86e2-abcdef012345', state: 'COMPLETED',
       intentSummary: 'add auth', done: 3, total: 4, updatedAt: '2026-07-15T10:00:00.000Z', revision: 1,
     };
-    expect(buildInboxDetailLines(row, labels)).toEqual([
+    // F-3b mislabel fix: updatedAt is the LAST transition, so the compact view
+    // labels it "updated" (never "started") and humanizes the timestamp.
+    expect(buildInboxDetailLines(row, labels, NOW)).toEqual([
       'Run 9c3d577a · completed',
       '  id: 9c3d577a-5c24-45c6-86e2-abcdef012345',
       '  intent: add auth',
       '  progress: 3/4',
-      '  started: 2026-07-15T10:00:00.000Z',
+      labels.detailUpdated.replace('{time}', formatInboxTimestamp('2026-07-15T10:00:00.000Z', labels, NOW)),
     ]);
   });
 
@@ -327,6 +339,139 @@ describe('buildInboxDetailLines — single-flow detail (D2)', () => {
       'Run do-flow- · running',
       '  id: do-flow-bare-01',
     ]);
+  });
+});
+
+// ─── F-3b — human-readable timestamps, duration, rich detail ─────────────────
+
+describe('formatInboxTimestamp — local absolute + localized relative age (F-3b)', () => {
+  const labels = DEFAULT_INBOX_LABELS;
+
+  it('renders "YYYY-MM-DD HH:mm (relative)" for each age tier', () => {
+    const base = new Date('2026-07-16T10:00:00.000Z').getTime();
+    const at = (msAgo: number) => new Date(base - msAgo).toISOString();
+    expect(formatInboxTimestamp(at(10_000), labels, base)).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} \(just now\)$/);
+    expect(formatInboxTimestamp(at(5 * 60_000), labels, base)).toMatch(/\(5 min ago\)$/);
+    expect(formatInboxTimestamp(at(3 * 3_600_000), labels, base)).toMatch(/\(3 h ago\)$/);
+    expect(formatInboxTimestamp(at(2 * 86_400_000), labels, base)).toMatch(/\(2 d ago\)$/);
+  });
+
+  it('a future stamp gets the absolute part only (no relative claim)', () => {
+    const base = new Date('2026-07-16T10:00:00.000Z').getTime();
+    expect(formatInboxTimestamp(new Date(base + 60_000).toISOString(), labels, base)).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+  });
+
+  it('an unparsable stamp is returned verbatim (honest, never throws)', () => {
+    expect(formatInboxTimestamp('not-a-date', labels, 0)).toBe('not-a-date');
+  });
+});
+
+describe('formatInboxDuration — language-free elapsed (F-3b)', () => {
+  it('renders m:ss under an hour and h:mm:ss above', () => {
+    expect(formatInboxDuration('2026-07-16T10:00:00.000Z', '2026-07-16T10:02:13.000Z')).toBe('2:13');
+    expect(formatInboxDuration('2026-07-16T10:00:00.000Z', '2026-07-16T11:05:09.000Z')).toBe('1:05:09');
+  });
+
+  it('is undefined for unparsable or negative intervals', () => {
+    expect(formatInboxDuration('bad', '2026-07-16T10:00:00.000Z')).toBeUndefined();
+    expect(formatInboxDuration('2026-07-16T10:00:00.000Z', '2026-07-16T09:00:00.000Z')).toBeUndefined();
+  });
+});
+
+describe('collectRunDetail + buildRunDetailLines — rich `/runs <n>` view (F-3b)', () => {
+  let root: string;
+  const NOW = new Date('2026-07-16T12:00:00.000Z').getTime();
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'inbox-detail-'));
+    _resetRunFlowCoordinatorsForTests();
+  });
+  afterEach(() => {
+    _resetRunFlowCoordinatorsForTests();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('a finished do-flow shows origin, REAL start (never updatedAt), closed + duration + progress', () => {
+    doFlowOnDisk(root, 'rich-done-01', '2026-07-16T09:00:00.000Z', 'ship the feature');
+    writeJob(root, 'rich-done-01', 'COMPLETE', 4, 4);
+    _resetRunFlowCoordinatorsForTests();
+
+    const rows = collectInboxRows(root);
+    const detail = collectRunDetail(root, rows[0]!);
+    expect(detail.startedAt).toBe('2026-07-16T09:00:00.000Z'); // the run handle's start
+    expect(detail.origin).toBe('api'); // the test proposal fixture's origin
+    expect(detail.tasksTotal).toBe(0); // captured Sprint has no tasks in this fixture
+
+    const lines = buildRunDetailLines(detail, DEFAULT_INBOX_LABELS, NOW);
+    expect(lines).toContain('  intent: ship the feature');
+    expect(lines).toContain('  origin: api');
+    expect(lines).toContain('  progress: 4/4');
+    expect(lines).toContain(
+      DEFAULT_INBOX_LABELS.detailStarted.replace(
+        '{started}', formatInboxTimestamp('2026-07-16T09:00:00.000Z', DEFAULT_INBOX_LABELS, NOW)),
+    );
+  });
+
+  it('a sweep-closed legacy flow shows real start, a "closed" label and the operator narrative — the exact view Alperen flagged', () => {
+    doFlowOnDisk(root, 'rich-swept-02', '2026-07-14T08:33:00.000Z');
+    _resetRunFlowCoordinatorsForTests();
+    sweepStaleRuns(root, { apply: true });
+    _resetRunFlowCoordinatorsForTests();
+
+    const rows = collectInboxRows(root);
+    expect(rows[0]!.state).toBe('CANCELLED');
+    const detail = collectRunDetail(root, rows[0]!);
+    const lines = buildRunDetailLines(detail, DEFAULT_INBOX_LABELS, NOW);
+
+    // REAL start (2026-07-14 from the handle) — NOT the abort stamp.
+    expect(lines.find((l) => l.startsWith('  started:'))).toContain(
+      formatInboxTimestamp('2026-07-14T08:33:00.000Z', DEFAULT_INBOX_LABELS, NOW).slice(0, 16),
+    );
+    // Terminal flow → its updatedAt renders under "closed", never "started".
+    expect(lines.some((l) => l.startsWith('  closed:'))).toBe(true);
+    // The durable abort narrative surfaces as the reason line.
+    expect(lines.find((l) => l.startsWith('  reason:'))).toContain('closed by operator stale-run sweep');
+    // No duration — a sweep-closure span is not a runtime.
+    expect(lines.some((l) => l.startsWith('  duration:'))).toBe(false);
+  });
+
+  it('duration renders only for COMPLETED (honest runtime)', () => {
+    const row: InboxRow = {
+      flowId: 'dur-1', state: 'COMPLETED', done: 1, total: 1, updatedAt: '2026-07-16T09:02:13.000Z',
+    };
+    const lines = buildRunDetailLines(
+      { row, startedAt: '2026-07-16T09:00:00.000Z' }, DEFAULT_INBOX_LABELS, NOW,
+    );
+    expect(lines).toContain('  duration: 2:13');
+  });
+
+  it('a jobs record with completedAt + summary drives closed, REAL duration and the summary line', () => {
+    doFlowOnDisk(root, 'rich-job-03', '2026-07-16T09:00:00.000Z', 'deploy it');
+    writeJob(root, 'rich-job-03', 'COMPLETE', 4, 4, {
+      completedAt: '2026-07-16T09:32:02.000Z',
+      summary: 'Sprint done (32m 2s) — 4/4 tasks',
+    });
+    _resetRunFlowCoordinatorsForTests();
+
+    const rows = collectInboxRows(root);
+    expect(rows[0]).toMatchObject({ completedAt: '2026-07-16T09:32:02.000Z', summary: 'Sprint done (32m 2s) — 4/4 tasks' });
+
+    const lines = buildRunDetailLines(collectRunDetail(root, rows[0]!), DEFAULT_INBOX_LABELS, NOW);
+    expect(lines.find((l) => l.startsWith('  closed:'))).toContain(
+      formatInboxTimestamp('2026-07-16T09:32:02.000Z', DEFAULT_INBOX_LABELS, NOW),
+    );
+    expect(lines).toContain('  duration: 32:02');
+    expect(lines).toContain('  summary: Sprint done (32m 2s) — 4/4 tasks');
+  });
+
+  it('a legacy jobs record WITHOUT completedAt never shows a bogus 0:00 duration (updatedAt recycles startedAt)', () => {
+    doFlowOnDisk(root, 'rich-nodur-04', '2026-07-16T09:00:00.000Z');
+    writeJob(root, 'rich-nodur-04', 'COMPLETE', 2, 4);
+    _resetRunFlowCoordinatorsForTests();
+
+    const rows = collectInboxRows(root);
+    const lines = buildRunDetailLines(collectRunDetail(root, rows[0]!), DEFAULT_INBOX_LABELS, NOW);
+    expect(lines.some((l) => l.startsWith('  duration:'))).toBe(false);
+    expect(lines.some((l) => l.startsWith('  closed:'))).toBe(false); // completion time genuinely unknown
   });
 });
 
@@ -359,7 +504,7 @@ describe('buildInboxLabels — i18n (SURF-3)', () => {
   it('resolves every label in en + tr (en !== tr), covering all states', () => {
     const en = buildInboxLabels((k) => getMessage(k, 'en'));
     const tr = buildInboxLabels((k) => getMessage(k, 'tr'));
-    for (const key of ['header', 'hint', 'empty', 'detailIntent', 'detailProgress', 'detailStarted', 'notFound', 'followNavHint', 'followDetailHint', 'livenessDead', 'livenessUnknown', 'detailLivenessDead', 'detailLivenessUnknown'] as const) {
+    for (const key of ['header', 'hint', 'empty', 'detailIntent', 'detailProgress', 'detailStarted', 'notFound', 'followNavHint', 'followDetailHint', 'livenessDead', 'livenessUnknown', 'detailLivenessDead', 'detailLivenessUnknown', 'detailOrigin', 'detailTasks', 'detailUpdated', 'detailClosed', 'detailDuration', 'detailSummary', 'detailReason', 'timeJustNow', 'timeMinutesAgo', 'timeHoursAgo', 'timeDaysAgo'] as const) {
       expect(en[key].length).toBeGreaterThan(0);
       expect(tr[key].length).toBeGreaterThan(0);
       expect(en[key]).not.toBe(tr[key]);

@@ -10,7 +10,10 @@
 
 import { join } from 'node:path';
 import type { Command } from 'commander';
-import { collectInboxRows, buildInboxLines, buildInboxLabels } from '../repl/run-flow-inbox.js';
+import {
+  collectInboxRows, buildInboxLines, buildInboxLabels,
+  resolveInboxSelection, collectRunDetail, buildRunDetailLines,
+} from '../repl/run-flow-inbox.js';
 import { scanJobRecords } from '../repl/run-completion-watch.js';
 import { sweepStaleRuns } from '../../orchestra/run-flow-death-sweep.js';
 import type { StaleRunSweepReport } from '../../orchestra/run-flow-death-sweep.js';
@@ -56,12 +59,15 @@ export function registerRuns(program: Command): void {
   program
     .command('runs')
     .description('List run-flows (the multi-flow inbox) — cross-process, read-only')
+    .argument('[n]', 'Show run #n in rich detail (the number from the list)')
     .option('--close-stale', 'Classify stale runs (dead process / unverifiable record); dry-run unless --yes')
     .option('--yes', 'With --close-stale: durably close the stale runs (failed/cancelled)')
-    .action((opts: { closeStale?: boolean; yes?: boolean }) => {
+    .action((n: string | undefined, opts: { closeStale?: boolean; yes?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);
       try {
+        const labels = buildInboxLabels((key) => getMessage(key, lang));
+
         if (opts.closeStale) {
           const report = sweepStaleRuns(root, {
             apply: opts.yes === true,
@@ -70,10 +76,27 @@ export function registerRuns(program: Command): void {
           for (const line of buildCloseStaleLines(report, lang)) print(line);
           print('');
         }
+
+        const rows = collectInboxRows(root);
+
+        // `deckent runs <n>` — rich single-run detail, same numbering as the
+        // list (parity with the REPL's `/runs <n>`).
+        if (n !== undefined && !opts.closeStale) {
+          const selection = resolveInboxSelection(n, rows);
+          if (selection.kind === 'detail') {
+            for (const line of buildRunDetailLines(collectRunDetail(root, selection.row), labels)) print(line);
+            return;
+          }
+          if (selection.kind === 'not-found') {
+            print(labels.notFound.replace('{arg}', selection.arg));
+            return;
+          }
+          // non-numeric arg falls through to the list, mirroring the REPL
+        }
+
         // Always end with the (post-sweep) inbox, so the user sees the honest
         // current list — the same rows the REPL's `/runs` renders.
-        const labels = buildInboxLabels((key) => getMessage(key, lang));
-        for (const line of buildInboxLines(collectInboxRows(root), labels)) print(line);
+        for (const line of buildInboxLines(rows, labels)) print(line);
       } catch (error) {
         printError(error);
         process.exitCode = 1;

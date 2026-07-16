@@ -103,6 +103,22 @@ describe('deckent runs — CLI inbox + --close-stale (F-3)', () => {
     expect(out).toContain('No stale runs');
   });
 
+  it('`runs <n>` prints the rich detail — real start from the handle, humanized (F-3b)', async () => {
+    legacyDoFlow('c1b050ab-71aa-48b0-bd20-c2810eb6eafb');
+    const out = await run(['1']);
+    expect(out).toContain('Run c1b050ab · running (unverified)');
+    expect(out).toContain('  id: c1b050ab-71aa-48b0-bd20-c2810eb6eafb');
+    expect(out).toContain('liveness: unverified');
+    // real start (the handle's startedAt), humanized "YYYY-MM-DD HH:mm (…)"
+    expect(out).toMatch(/ {2}started: \d{4}-\d{2}-\d{2} \d{2}:\d{2} \(/);
+  });
+
+  it('`runs <out-of-range>` prints the honest not-found', async () => {
+    legacyDoFlow('c1b050ab-71aa-48b0-bd20-c2810eb6eafb');
+    const out = await run(['9']);
+    expect(out).toContain('No run #9');
+  });
+
   it('a flow whose jobs-dir record is terminal is NEVER offered for closure (execution truth wins)', async () => {
     legacyDoFlow('11e0d0ab-71aa-48b0-bd20-c2810eb6eafb');
     const jobsDir = join(root, '.deckent', 'runtime', 'jobs');

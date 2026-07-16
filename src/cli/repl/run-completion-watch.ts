@@ -69,6 +69,10 @@ export interface RunCompletionInfo {
   /** Per-task evidence (SURF-3 result-evidence) — from `completionRecord.taskSummary`.
    *  `undefined`/empty for a FAILED run (no rich record written) or a legacy job. */
   readonly tasks?: readonly RunTaskEvidence[];
+  /** Completion wall-clock stamp from the job record (F-3b rich detail). */
+  readonly completedAt?: string;
+  /** The job's own human-readable outcome summary (F-3b rich detail). */
+  readonly summary?: string;
 }
 
 export interface RunCompletionWatchHandlers {
@@ -120,6 +124,8 @@ interface RawJobRecord {
   sprintId?: unknown;
   status?: unknown;
   error?: unknown;
+  completedAt?: unknown;
+  summary?: unknown;
   metrics?: {
     totalTasks?: unknown;
     done?: unknown;
@@ -206,6 +212,8 @@ export function parseRunCompletionRecord(raw: string, fallbackJobId: string): Ru
     error: firstNonEmptyString(job.error),
     flowId: firstNonEmptyString(job.completionRecord?.flowId),
     ...(tasks.length > 0 ? { tasks } : {}),
+    ...(firstNonEmptyString(job.completedAt) !== undefined ? { completedAt: firstNonEmptyString(job.completedAt) } : {}),
+    ...(firstNonEmptyString(job.summary) !== undefined ? { summary: firstNonEmptyString(job.summary) } : {}),
   };
 }
 

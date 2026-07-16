@@ -45,8 +45,9 @@
 import { join } from 'node:path';
 import { getRunFlowCoordinator } from '../../orchestra/run-flow-coordinator-registry.js';
 import { scanJobRecords } from './run-completion-watch.js';
-import { loadRunHandle } from '../../core/run-flow-store.js';
+import { loadRunHandle, loadApprovedSnapshot, readFlowEvents } from '../../core/run-flow-store.js';
 import { isPidAlive } from '../../core/pid-liveness.js';
+import { isTerminalRunFlowState } from '../../core/run-flow-contract.js';
 import type { RunFlowState } from '../../core/run-flow-contract.js';
 
 /** One inbox row — language-neutral; `buildInboxLines` renders it via labels. */
@@ -60,6 +61,10 @@ export interface InboxRow {
   /** Execution metrics when the run finished (from the jobs-dir join). */
   readonly done?: number;
   readonly total?: number;
+  /** Completion wall-clock stamp from the jobs-dir join (F-3b). */
+  readonly completedAt?: string;
+  /** The job's own human outcome summary from the jobs-dir join (F-3b). */
+  readonly summary?: string;
   /** Read-only liveness verdict for a live-claiming row with no terminal
    *  jobs-dir record (F-3): 'dead' = the recorded run pid is gone (state is
    *  remapped to FAILED); 'unknown' = the run handle predates pid tracking, so
@@ -114,10 +119,15 @@ export function collectInboxRows(root: string, opts: CollectInboxOptions = {}): 
 
   // jobs-dir terminal states, keyed by flowId (a job without a flowId can't be
   // correlated to a store flow, so it's ignored here).
-  const terminalByFlow = new Map<string, { status: 'COMPLETE' | 'FAILED'; done?: number; total?: number }>();
+  const terminalByFlow = new Map<string, {
+    status: 'COMPLETE' | 'FAILED'; done?: number; total?: number; completedAt?: string; summary?: string;
+  }>();
   for (const job of scanJobRecords(jobsDir)) {
     if (job.flowId) {
-      terminalByFlow.set(job.flowId, { status: job.status, done: job.done, total: job.totalTasks });
+      terminalByFlow.set(job.flowId, {
+        status: job.status, done: job.done, total: job.totalTasks,
+        completedAt: job.completedAt, summary: job.summary,
+      });
     }
   }
 
@@ -148,6 +158,8 @@ export function collectInboxRows(root: string, opts: CollectInboxOptions = {}): 
       ...(context.updatedAt ? { updatedAt: context.updatedAt } : {}),
       ...(terminal?.done !== undefined ? { done: terminal.done } : {}),
       ...(terminal?.total !== undefined ? { total: terminal.total } : {}),
+      ...(terminal?.completedAt !== undefined ? { completedAt: terminal.completedAt } : {}),
+      ...(terminal?.summary !== undefined ? { summary: terminal.summary } : {}),
     };
     rows.push(row);
   }
@@ -194,6 +206,26 @@ export interface InboxLabels {
   detailLivenessDead: string;
   /** Detail line for an unverifiable run, e.g. "  liveness: unverified — the run predates pid tracking". */
   detailLivenessUnknown: string;
+  // ── F-3b (human-readable detail) — rich fields + relative time ──
+  /** Origin line, e.g. "  origin: {origin}" (do / api). */
+  detailOrigin: string;
+  /** Planned-task-count line (shown when no progress yet), e.g. "  tasks: {count}". */
+  detailTasks: string;
+  /** Last-update line for a NON-terminal flow, e.g. "  updated: {time}". */
+  detailUpdated: string;
+  /** Closure-time line for a terminal flow, e.g. "  closed: {time}". */
+  detailClosed: string;
+  /** Runtime line (COMPLETED only — honest runtime), e.g. "  duration: {duration}". */
+  detailDuration: string;
+  /** The job's own human outcome summary, e.g. "  summary: {summary}". */
+  detailSummary: string;
+  /** Closure-narrative line, e.g. "  reason: {reason}". */
+  detailReason: string;
+  /** Relative-age fragments for formatInboxTimestamp. */
+  timeJustNow: string;
+  timeMinutesAgo: string;
+  timeHoursAgo: string;
+  timeDaysAgo: string;
 }
 
 /** English-default inbox labels (string-free component; the caller injects a
@@ -228,6 +260,17 @@ export const DEFAULT_INBOX_LABELS: InboxLabels = {
   livenessUnknown: 'unverified',
   detailLivenessDead: '  liveness: process died (pid {pid})',
   detailLivenessUnknown: '  liveness: unverified — the run predates pid tracking',
+  detailOrigin: '  origin: {origin}',
+  detailTasks: '  tasks: {count}',
+  detailUpdated: '  updated: {time}',
+  detailClosed: '  closed: {time}',
+  detailDuration: '  duration: {duration}',
+  detailSummary: '  summary: {summary}',
+  detailReason: '  reason: {reason}',
+  timeJustNow: 'just now',
+  timeMinutesAgo: '{n} min ago',
+  timeHoursAgo: '{n} h ago',
+  timeDaysAgo: '{n} d ago',
 };
 
 const SHORT_ID_LEN = 8;
@@ -235,16 +278,23 @@ const SHORT_ID_LEN = 8;
 /** Render one row's BODY (no leading indent): "{n}. {shortId} · {state}{metrics}{intent}".
  *  Exported so the InboxCard (D3b) prepends its OWN focus gutter (❯ / spaces)
  *  around the identical body the transcript path renders — one source of truth. */
-export function formatInboxRowBody(row: InboxRow, index: number, labels: InboxLabels): string {
-  const shortId = row.flowId.slice(0, SHORT_ID_LEN);
+/** The row/header state text: state label + the F-3 liveness mark when present,
+ *  e.g. "running (unverified)" — ONE source for the list row and both detail
+ *  headers, so no surface ever shows a bare unqualified claim. */
+function formatStateWithLiveness(row: InboxRow, labels: InboxLabels): string {
   const state = labels.stateLabels[row.state] ?? row.state;
-  const liveness =
+  const mark =
     row.liveness === 'dead' ? ` (${labels.livenessDead})`
     : row.liveness === 'unknown' ? ` (${labels.livenessUnknown})`
     : '';
+  return `${state}${mark}`;
+}
+
+export function formatInboxRowBody(row: InboxRow, index: number, labels: InboxLabels): string {
+  const shortId = row.flowId.slice(0, SHORT_ID_LEN);
   const intent = row.intentSummary ? ` ${row.intentSummary}` : '';
   const metrics = row.done !== undefined && row.total !== undefined ? ` (${row.done}/${row.total})` : '';
-  return `${index + 1}. ${shortId} · ${state}${liveness}${metrics}${intent}`;
+  return `${index + 1}. ${shortId} · ${formatStateWithLiveness(row, labels)}${metrics}${intent}`;
 }
 
 /** Render one transcript row: two-space indent + the shared body. */
@@ -293,12 +343,53 @@ export function resolveInboxSelection(arg: string, rows: readonly InboxRow[]): I
   return { kind: 'detail', row };
 }
 
-/** Render one flow's detail block (D2). Pure + string-free. Field lines are
- *  omitted when their datum is absent (a bare do-flow shows id + state only). */
-export function buildInboxDetailLines(row: InboxRow, labels: InboxLabels): string[] {
+// ─── F-3b — human-readable timestamps + duration (pure, injectable now) ─────
+
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+
+const MINUTE_MS = 60_000;
+
+/**
+ * Format an ISO timestamp as LOCAL "YYYY-MM-DD HH:mm" plus a localized
+ * relative-age suffix, e.g. "2026-07-14 11:23 (2 d ago)". Pure given `now`;
+ * an unparsable stamp is returned verbatim (honest, never throws), and a
+ * future stamp gets no relative claim.
+ */
+export function formatInboxTimestamp(iso: string, labels: InboxLabels, now: number = Date.now()): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const abs = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const diffMin = Math.floor((now - d.getTime()) / MINUTE_MS);
+  if (diffMin < 0) return abs;
+  const rel =
+    diffMin < 1 ? labels.timeJustNow
+    : diffMin < 60 ? labels.timeMinutesAgo.replace('{n}', String(diffMin))
+    : diffMin < 24 * 60 ? labels.timeHoursAgo.replace('{n}', String(Math.floor(diffMin / 60)))
+    : labels.timeDaysAgo.replace('{n}', String(Math.floor(diffMin / (24 * 60))));
+  return `${abs} (${rel})`;
+}
+
+/** Language-free elapsed time between two ISO stamps: "m:ss" or "h:mm:ss".
+ *  Undefined when either stamp is unparsable or the interval is negative. */
+export function formatInboxDuration(fromIso: string, toIso: string): string | undefined {
+  const from = new Date(fromIso).getTime();
+  const to = new Date(toIso).getTime();
+  if (Number.isNaN(from) || Number.isNaN(to) || to < from) return undefined;
+  const totalSec = Math.floor((to - from) / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return h > 0 ? `${h}:${pad2(m)}:${pad2(s)}` : `${m}:${pad2(s)}`;
+}
+
+/** Render one flow's COMPACT detail block (the live `/runs --follow` card —
+ *  space-constrained). Pure + string-free. Field lines are omitted when their
+ *  datum is absent. `row.updatedAt` is honestly labeled "updated" (it is the
+ *  LAST transition, not the start — the F-3b mislabel fix); the transcript's
+ *  rich view (`buildRunDetailLines`) carries the real start/close split. */
+export function buildInboxDetailLines(row: InboxRow, labels: InboxLabels, now: number = Date.now()): string[] {
   const shortId = row.flowId.slice(0, SHORT_ID_LEN);
-  const state = labels.stateLabels[row.state] ?? row.state;
-  const lines = [labels.detailHeader.replace('{id}', shortId).replace('{state}', state)];
+  const lines = [labels.detailHeader.replace('{id}', shortId).replace('{state}', formatStateWithLiveness(row, labels))];
   lines.push(labels.detailFullId.replace('{id}', row.flowId));
   if (row.intentSummary) lines.push(labels.detailIntent.replace('{intent}', row.intentSummary));
   if (row.done !== undefined && row.total !== undefined) {
@@ -306,7 +397,108 @@ export function buildInboxDetailLines(row: InboxRow, labels: InboxLabels): strin
   }
   if (row.liveness === 'dead') lines.push(labels.detailLivenessDead.replace('{pid}', String(row.pid ?? '?')));
   if (row.liveness === 'unknown') lines.push(labels.detailLivenessUnknown);
-  if (row.updatedAt) lines.push(labels.detailStarted.replace('{started}', row.updatedAt));
+  if (row.updatedAt) lines.push(labels.detailUpdated.replace('{time}', formatInboxTimestamp(row.updatedAt, labels, now)));
+  return lines;
+}
+
+// ─── F-3b — rich run detail (`/runs <n>` + `deckent runs <n>`) ───────────────
+
+/** Everything the rich detail view knows about one run — gathered read-only
+ *  from the same cross-process stores the inbox already scans. */
+export interface InboxRunDetail {
+  readonly row: InboxRow;
+  /** proposal.origin when the flow carries one (context first, snapshot fallback). */
+  readonly origin?: string;
+  /** Planned task count from the approved snapshot's captured Sprint. */
+  readonly tasksTotal?: number;
+  /** REAL start (the run handle's startedAt) — NOT the row's updatedAt. */
+  readonly startedAt?: string;
+  /** Closure narrative: the last durable RUN_FAILED.error / FLOW_ABORTED.reason /
+   *  APPROVAL_REJECTED.reason, else the folded context's failureReason. */
+  readonly reason?: string;
+}
+
+/** Gather the rich detail for one row — read-only, fail-soft (a torn store
+ *  never breaks the view; whatever was readable is shown). */
+export function collectRunDetail(root: string, row: InboxRow): InboxRunDetail {
+  let origin: string | undefined;
+  let tasksTotal: number | undefined;
+  let startedAt: string | undefined;
+  let reason: string | undefined;
+  try {
+    const snapshot = loadApprovedSnapshot(root, row.flowId);
+    if (snapshot !== undefined) {
+      const tasks = (snapshot.sprint as { tasks?: unknown } | undefined)?.tasks;
+      if (Array.isArray(tasks)) tasksTotal = tasks.length;
+      origin = snapshot.proposal?.origin;
+    }
+
+    startedAt = loadRunHandle(root, row.flowId)?.startedAt;
+
+    // Closure narrative — the durable event log carries the rich text (the
+    // folded context flattens FLOW_ABORTED's reason to a bare 'aborted').
+    for (const event of [...readFlowEvents(root, row.flowId)].reverse()) {
+      if (event.type === 'RUN_FAILED') { reason = event.error; break; }
+      if (event.type === 'FLOW_ABORTED' && event.reason !== undefined) { reason = event.reason; break; }
+      if (event.type === 'APPROVAL_REJECTED' && event.reason !== undefined) { reason = event.reason; break; }
+    }
+
+    const context = getRunFlowCoordinator(root).getFlow(row.flowId);
+    origin = context.proposal?.origin ?? origin;
+    reason = reason ?? context.failureReason;
+  } catch {
+    // fail-soft: render whatever was gathered before the bad read
+  }
+  return {
+    row,
+    ...(origin !== undefined ? { origin } : {}),
+    ...(tasksTotal !== undefined ? { tasksTotal } : {}),
+    ...(startedAt !== undefined ? { startedAt } : {}),
+    ...(reason !== undefined ? { reason } : {}),
+  };
+}
+
+/**
+ * Render the RICH detail block (F-3b — the transcript `/runs <n>` and the CLI
+ * `deckent runs <n>`). Pure + string-free; every line is omitted when its
+ * datum is absent. Honesty rules: `started` is the run handle's real start
+ * (never updatedAt); a terminal flow's updatedAt renders as `closed`, a live
+ * one as `updated`; `duration` only for COMPLETED (a sweep-closure time span
+ * is not a runtime).
+ */
+export function buildRunDetailLines(detail: InboxRunDetail, labels: InboxLabels, now: number = Date.now()): string[] {
+  const { row } = detail;
+  const shortId = row.flowId.slice(0, SHORT_ID_LEN);
+  const terminal = isTerminalRunFlowState(row.state);
+
+  const lines = [labels.detailHeader.replace('{id}', shortId).replace('{state}', formatStateWithLiveness(row, labels))];
+  lines.push(labels.detailFullId.replace('{id}', row.flowId));
+  if (row.intentSummary) lines.push(labels.detailIntent.replace('{intent}', row.intentSummary));
+  if (detail.origin) lines.push(labels.detailOrigin.replace('{origin}', detail.origin));
+  if (row.done !== undefined && row.total !== undefined) {
+    lines.push(labels.detailProgress.replace('{done}', String(row.done)).replace('{total}', String(row.total)));
+  } else if (detail.tasksTotal !== undefined) {
+    lines.push(labels.detailTasks.replace('{count}', String(detail.tasksTotal)));
+  }
+  if (row.liveness === 'dead') lines.push(labels.detailLivenessDead.replace('{pid}', String(row.pid ?? '?')));
+  if (row.liveness === 'unknown') lines.push(labels.detailLivenessUnknown);
+  if (detail.startedAt) {
+    lines.push(labels.detailStarted.replace('{started}', formatInboxTimestamp(detail.startedAt, labels, now)));
+  }
+  // Closure stamp: the jobs record's completedAt is the execution truth; a
+  // store-side updatedAt is only shown when it says something the start line
+  // does not (a legacy DETACHED_RUNNING context recycles startedAt here).
+  const closedAt = row.completedAt ?? (row.updatedAt !== detail.startedAt ? row.updatedAt : undefined);
+  if (closedAt) {
+    const template = terminal ? labels.detailClosed : labels.detailUpdated;
+    lines.push(template.replace('{time}', formatInboxTimestamp(closedAt, labels, now)));
+  }
+  if (row.state === 'COMPLETED' && detail.startedAt && closedAt) {
+    const duration = formatInboxDuration(detail.startedAt, closedAt);
+    if (duration !== undefined) lines.push(labels.detailDuration.replace('{duration}', duration));
+  }
+  if (row.summary) lines.push(labels.detailSummary.replace('{summary}', row.summary));
+  if (detail.reason) lines.push(labels.detailReason.replace('{reason}', detail.reason));
   return lines;
 }
 
@@ -320,7 +512,9 @@ export function renderRunsCommand(root: string, input: string, labels: InboxLabe
   const rows = collectInboxRows(root, opts);
   const arg = input.replace(/^\s*\/runs\b/i, '');
   const selection = resolveInboxSelection(arg, rows);
-  if (selection.kind === 'detail') return buildInboxDetailLines(selection.row, labels).join('\n');
+  if (selection.kind === 'detail') {
+    return buildRunDetailLines(collectRunDetail(root, selection.row), labels).join('\n');
+  }
   if (selection.kind === 'not-found') return labels.notFound.replace('{arg}', selection.arg);
   return buildInboxLines(rows, labels).join('\n');
 }
@@ -361,6 +555,17 @@ export function buildInboxLabels(t: (key: string) => string): InboxLabels {
     livenessUnknown: t('tui.inbox_liveness_unknown'),
     detailLivenessDead: t('tui.inbox_detail_liveness_dead'),
     detailLivenessUnknown: t('tui.inbox_detail_liveness_unknown'),
+    detailOrigin: t('tui.inbox_detail_origin'),
+    detailTasks: t('tui.inbox_detail_tasks'),
+    detailUpdated: t('tui.inbox_detail_updated'),
+    detailClosed: t('tui.inbox_detail_closed'),
+    detailDuration: t('tui.inbox_detail_duration'),
+    detailSummary: t('tui.inbox_detail_summary'),
+    detailReason: t('tui.inbox_detail_reason'),
+    timeJustNow: t('tui.inbox_time_just_now'),
+    timeMinutesAgo: t('tui.inbox_time_minutes_ago'),
+    timeHoursAgo: t('tui.inbox_time_hours_ago'),
+    timeDaysAgo: t('tui.inbox_time_days_ago'),
   };
 }
 
