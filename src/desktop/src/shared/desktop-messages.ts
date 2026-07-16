@@ -15,6 +15,19 @@
  */
 
 export const DESKTOP_MESSAGE_KEYS = [
+  // ── D4-4: the terminal's state vocabulary, served to the shell VERBATIM
+  //    (true reuse of tui.inbox_state_* — the /runs inbox's own labels) ──
+  'tui.inbox_state_collecting',
+  'tui.inbox_state_proposed',
+  'tui.inbox_state_previewing',
+  'tui.inbox_state_awaiting_approval',
+  'tui.inbox_state_approved',
+  'tui.inbox_state_starting',
+  'tui.inbox_state_running',
+  'tui.inbox_state_completed',
+  'tui.inbox_state_failed',
+  'tui.inbox_state_cancelled',
+  'tui.inbox_state_blocked',
   // ── tray / menu / window / updates (pre-D4-2 canonical set) ──
   'desktop.tray.open',
   'desktop.tray.quit',
@@ -84,6 +97,12 @@ export const DESKTOP_MESSAGE_KEYS = [
   'desktop.shell.approvals_pending',
   'desktop.shell.chat_coming',
   'desktop.shell.load_error',
+  'desktop.shell.console.course',
+  'desktop.shell.console.log',
+  'desktop.shell.approval.title',
+  'desktop.shell.approval.empty',
+  'desktop.shell.history.title',
+  'desktop.shell.chat.eyebrow',
   // ── D4-1 «Köprüüstü» watch (vardiya) theme system ──
   'desktop.theme.title',
   'desktop.theme.watch.day-watch',
@@ -92,3 +111,24 @@ export const DESKTOP_MESSAGE_KEYS = [
 ] as const;
 
 export type DesktopMessageKey = (typeof DESKTOP_MESSAGE_KEYS)[number];
+
+/**
+ * D4-4 — RunFlow state → served label key. The Desktop shows the SAME
+ * localized state words the terminal's `/runs` inbox shows (buildInboxLabels,
+ * src/cli/repl/run-flow-inbox.ts) — one vocabulary, two surfaces. A
+ * drift-gate test (desktop-i18n.test.ts) asserts this map agrees with the
+ * terminal's own mapping.
+ */
+export const FLOW_STATE_MESSAGE_KEYS = {
+  COLLECTING: 'tui.inbox_state_collecting',
+  PROPOSAL_READY: 'tui.inbox_state_proposed',
+  PREVIEWING: 'tui.inbox_state_previewing',
+  AWAITING_APPROVAL: 'tui.inbox_state_awaiting_approval',
+  APPROVED: 'tui.inbox_state_approved',
+  STARTING: 'tui.inbox_state_starting',
+  DETACHED_RUNNING: 'tui.inbox_state_running',
+  COMPLETED: 'tui.inbox_state_completed',
+  FAILED: 'tui.inbox_state_failed',
+  CANCELLED: 'tui.inbox_state_cancelled',
+  BLOCKED: 'tui.inbox_state_blocked',
+} as const satisfies Record<string, DesktopMessageKey>;

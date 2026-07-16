@@ -3647,6 +3647,13 @@ const MESSAGES: MessageMap = {
     en: 'Could not reach the daemon. Check the connection and retry.',
     tr: 'Daemona ulaşılamadı. Bağlantıyı kontrol edip yeniden deneyin.',
   },
+  // D4-4 — «Köprüüstü» four-shell design.
+  'desktop.shell.console.course': { en: 'Course', tr: 'Rota' },
+  'desktop.shell.console.log': { en: "Ship's log", tr: 'Seyir defteri' },
+  'desktop.shell.approval.title': { en: 'Pending orders', tr: 'Bekleyen emirler' },
+  'desktop.shell.approval.empty': { en: 'No pending orders.', tr: 'Bekleyen emir yok.' },
+  'desktop.shell.history.title': { en: 'Voyage ledger', tr: 'Sefer kayıtları' },
+  'desktop.shell.chat.eyebrow': { en: 'Watch radio', tr: 'Vardiya telsizi' },
   // D4-1 «Köprüüstü» — watch (vardiya) theme system.
   'desktop.theme.title': { en: 'Watch', tr: 'Vardiya' },
   'desktop.theme.watch.day-watch': { en: 'Day watch', tr: 'Gündüz seyri' },

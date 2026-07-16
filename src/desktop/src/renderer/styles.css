@@ -1,4 +1,64 @@
 /**
+ * D4-4 — «Köprüüstü» typography, self-hosted (CSP 'self'; bundled woff2,
+ * latin + latin-ext so Turkish renders): Bricolage Grotesque (display),
+ * Hanken Grotesk (body), Geist Mono (data). All three OFL-licensed.
+ */
+/* Bricolage Grotesque — latin-ext (30736B, OFL) */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./fonts/bricolage-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* Bricolage Grotesque — latin (76888B, OFL) */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./fonts/bricolage-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* Hanken Grotesk — latin-ext (19588B, OFL) */
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./fonts/hanken-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* Hanken Grotesk — latin (34704B, OFL) */
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./fonts/hanken-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* Geist Mono — latin-ext (14696B, OFL) */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('./fonts/geistmono-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* Geist Mono — latin (23128B, OFL) */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('./fonts/geistmono-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/**
  * D4-1 («Köprüüstü»): ALL color comes from the three-layer watch tokens
  * (`--dk-p-*` / `--dk-s-*` / `--dk-c-*`), which theme-runtime.ts sets on
  * <html> synchronously at entry (main.ts) — before first paint — from the
@@ -26,6 +86,10 @@
   --space-8: 32px;
   --radius: 8px;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /* D4-4 «Köprüüstü» type roles (D4-0 pairing, self-hosted above) */
+  --dk-font-display: 'Bricolage Grotesque', var(--font-sans);
+  --dk-font-body: 'Hanken Grotesk', var(--font-sans);
+  --dk-font-data: 'Geist Mono', ui-monospace, 'Cascadia Mono', monospace;
 }
 
 /* D4-1 — visible keyboard focus, watch-aware (a11y floor). */
@@ -139,7 +203,7 @@ body {
 }
 
 body {
-  font-family: var(--font-sans);
+  font-family: var(--dk-font-body);
   background: var(--color-bg);
   color: var(--color-fg);
   font-size: 14px;
@@ -163,6 +227,7 @@ body {
 }
 
 h1 {
+  font-family: var(--dk-font-display);
   font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -395,3 +460,119 @@ select:focus-visible {
   gap: var(--space-2);
   flex-wrap: wrap;
 }
+
+/* ── D4-4 — «Köprüüstü» four-shell design ── */
+#app:has(> .shell) { padding: 0; align-items: stretch; justify-content: stretch; }
+
+.shell-nav a { font-family: var(--dk-font-display); font-size: 14px; letter-spacing: 0.01em; }
+.shell-origin { font-family: var(--dk-font-data); font-size: 11px; }
+
+.view-eyebrow {
+  font-family: var(--dk-font-data);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--dk-s-brass);
+  margin: 0 0 var(--space-2);
+}
+
+.view-title {
+  font-family: var(--dk-font-display);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--space-4);
+}
+
+/* Console — «Rota» course strip (the D4-0 signature interaction) */
+.course-strip {
+  background: var(--dk-s-surface);
+  border: 1px solid var(--dk-s-border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4) var(--space-2);
+  margin-bottom: var(--space-6);
+}
+.course-strip svg { width: 100%; height: 96px; display: block; overflow: visible; }
+.course-line {
+  fill: none;
+  stroke: var(--dk-s-accent);
+  stroke-width: 2;
+  stroke-dasharray: 8 6;
+}
+.course-line--underway { animation: dk-sail 2.4s linear infinite; }
+@keyframes dk-sail { to { stroke-dashoffset: -28; } }
+@media (prefers-reduced-motion: reduce) { .course-line--underway { animation: none; } }
+.course-fix { fill: var(--dk-s-surface); stroke: var(--dk-s-text); stroke-width: 1.5; }
+.course-fix--done { fill: var(--dk-s-text); }
+.course-fix-label { font-family: var(--dk-font-data); font-size: 8.5px; fill: var(--dk-s-text-muted); letter-spacing: 0.04em; }
+.course-vessel { fill: var(--dk-s-accent); }
+
+/* state pill — the terminal's own vocabulary, worn as a chart badge */
+.state-pill {
+  font-family: var(--dk-font-data);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--dk-s-border);
+  color: var(--dk-s-text-muted);
+  white-space: nowrap;
+}
+.state-pill--underway { color: var(--dk-s-accent); border-color: var(--dk-s-accent); }
+.state-pill--go { color: var(--dk-s-go); border-color: var(--dk-s-go); }
+.state-pill--abort { color: var(--dk-s-abort); border-color: var(--dk-s-abort); }
+
+.flow-row { display: flex; align-items: baseline; gap: var(--space-3); }
+.flow-row code { font-family: var(--dk-font-data); font-size: 12px; color: var(--dk-s-brass); }
+.flow-row .flow-intent { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Console — seyir defteri (ship's log) feed */
+.event-feed h2 { font-family: var(--dk-font-data); }
+.event-feed ol { font-family: var(--dk-font-data); font-size: 12.5px; }
+.event-feed li { display: flex; gap: var(--space-3); padding: 3px 0; border-bottom: 1px dashed var(--dk-s-border); }
+.event-feed li:last-child { border-bottom: none; }
+.event-feed .log-seq { color: var(--dk-s-brass); min-width: 2.5ch; text-align: right; }
+.event-feed .log-time { color: var(--dk-s-text-muted); margin-left: auto; }
+
+/* Approval — telegraph order cards */
+.order-list { list-style: none; padding: 0; display: grid; gap: var(--space-3); max-width: 640px; }
+.order-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  background: var(--dk-c-card-bg);
+  border: 1px solid var(--dk-c-card-border);
+  border-left: 4px solid var(--dk-s-caution);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+}
+.order-lamp {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--dk-s-caution);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--dk-s-caution) 60%, transparent);
+  flex: none;
+}
+.order-card code { font-family: var(--dk-font-data); font-size: 12px; color: var(--dk-s-brass); }
+.order-title { flex: 1; }
+
+/* History — voyage ledger */
+.ledger { list-style: none; padding: 0; max-width: 720px; }
+.ledger li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-1);
+  border-bottom: 1px solid var(--dk-s-border);
+}
+.ledger code { font-family: var(--dk-font-data); font-size: 12px; color: var(--dk-s-brass); }
+.ledger .flow-intent { flex: 1; }
+
+/* Chat — designed honest empty state (watch radio) */
+.radio-empty {
+  max-width: 460px;
+  margin: 10vh auto 0;
+  text-align: center;
+  color: var(--dk-s-text-muted);
+}
+.radio-empty .view-eyebrow { text-align: center; }
+.radio-empty h2 { font-family: var(--dk-font-display); font-size: 20px; color: var(--dk-s-text); margin: 0 0 var(--space-2); }
