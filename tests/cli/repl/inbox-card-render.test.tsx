@@ -72,6 +72,34 @@ describe('InboxCard — focus navigation (D3b)', () => {
     expect(lastFrame() ?? '').toContain('❯ 2. flow-bbb'); // wrapped to last
   });
 
+  it('the focus cursor stays glued to its run across a live-refresh REORDER (D-2 headline)', async () => {
+    // Mutable feed — the card polls it; a reorder must NOT jump the highlight.
+    let rows: InboxRow[] = [
+      { flowId: 'run-A', state: 'DETACHED_RUNNING', intentSummary: 'A' },
+      { flowId: 'run-B', state: 'DETACHED_RUNNING', intentSummary: 'B' },
+      { flowId: 'run-C', state: 'DETACHED_RUNNING', intentSummary: 'C' },
+    ];
+    const { lastFrame, stdin } = render(
+      <InboxCard open feed={() => rows} labels={DEFAULT_INBOX_LABELS} onClose={() => {}} pollMs={20} />,
+    );
+    await tick();
+    stdin.write(DOWN); // focus run-B (index 1)
+    await tick(80);
+    expect(lastFrame() ?? '').toContain('❯ 2. run-B');
+
+    // Live-refresh: run-B finishes and jumps to the top (newest-first reorder).
+    rows = [
+      { flowId: 'run-B', state: 'COMPLETED', intentSummary: 'B' },
+      { flowId: 'run-A', state: 'DETACHED_RUNNING', intentSummary: 'A' },
+      { flowId: 'run-C', state: 'DETACHED_RUNNING', intentSummary: 'C' },
+    ];
+    await tick(140); // let several 20ms poll ticks fire → realign picks up the reorder
+
+    const frame = lastFrame() ?? '';
+    expect(frame).toContain('❯ 1. run-B'); // cursor FOLLOWED run-B to its new index
+    expect(frame).not.toContain('❯ 2. run-A'); // it did NOT stick to the old index-2 slot
+  });
+
   it('↵ opens the focused run detail in-card (list hidden)', async () => {
     const { lastFrame, stdin } = render(CARD());
     await tick();
