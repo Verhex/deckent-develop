@@ -21,7 +21,7 @@ import { createNativeEngine, resolveCostCeilingUsd } from './native-agent-bridge
 import { createRunFlowController, type RunFlowController, type RunFlowControllerDeps } from './run-flow-controller.js';
 import { buildPlanPreviewCardLabels } from './plan-preview-card.js';
 import type { RunFlowMountLabels } from './app.js';
-import { renderRunsCommand, buildInboxLabels, buildInboxLines, collectInboxRows } from './run-flow-inbox.js';
+import { renderRunsCommand, buildInboxLabels, collectInboxRows } from './run-flow-inbox.js';
 import type { ResolvedConfig } from '../../core/types.js';
 import { buildTurnRecorder } from './trace-wire.js';
 import { composeSystemPrompt } from '../../agent/identity.js';
@@ -1015,8 +1015,8 @@ export async function runInkRepl(
       labels={buildReplLabels(t)}
       approvalLabels={buildApprovalLabels(t)}
       runInboxProvider={(input) => renderRunsCommand(process.cwd(), input, buildInboxLabels(t))}
-      inboxFollowFeed={() => buildInboxLines(collectInboxRows(process.cwd()), buildInboxLabels(t))}
-      inboxFollowHint={t('tui.inbox_follow_hint')}
+      inboxFollowFeed={() => collectInboxRows(process.cwd())}
+      inboxLabels={buildInboxLabels(t)}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
       registerToolSink={(sink) => { toolSink = sink; }}
       {...(nativeEngine ? { nativeEngine } : {})}

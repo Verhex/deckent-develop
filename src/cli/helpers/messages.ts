@@ -2756,10 +2756,14 @@ const MESSAGES: MessageMap = {
     en: 'No run #{arg} — `/runs` lists them',
     tr: '#{arg} numaralı koşu yok — listelemek için `/runs`',
   },
-  // SURF-3 multi-flow-inbox D3a — live `/runs --follow` card footer.
-  'tui.inbox_follow_hint': {
-    en: '⟳ live · Esc to close',
-    tr: '⟳ canlı · kapatmak için Esc',
+  // SURF-3 multi-flow-inbox D3b — live `/runs --follow` card footers (list + detail).
+  'tui.inbox_follow_nav_hint': {
+    en: '↑↓ select · ↵ open · Esc close · ⟳ live',
+    tr: '↑↓ seç · ↵ aç · Esc kapat · ⟳ canlı',
+  },
+  'tui.inbox_follow_detail_hint': {
+    en: '↑↓ browse · Esc back · ⟳ live',
+    tr: '↑↓ gez · Esc geri · ⟳ canlı',
   },
   'tui.resume_picker_header': { en: 'Recent sessions', tr: 'Son oturumlar' },
   'tui.resume_picker_hint': {

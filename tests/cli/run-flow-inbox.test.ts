@@ -19,7 +19,14 @@ import {
   renderRunsCommand,
   DEFAULT_INBOX_LABELS,
   MAX_INBOX_ROWS,
+  // D3b — in-card focus-nav pure logic
+  mapInboxKey,
+  realignInboxSelection,
+  reduceInboxNav,
+  formatInboxRowBody,
+  EMPTY_INBOX_NAV,
   type InboxRow,
+  type InboxNavState,
 } from '../../src/cli/repl/run-flow-inbox.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
 import { getRunFlowCoordinator, _resetRunFlowCoordinatorsForTests } from '../../src/orchestra/run-flow-coordinator-registry.js';
@@ -271,7 +278,7 @@ describe('buildInboxLabels — i18n (SURF-3)', () => {
   it('resolves every label in en + tr (en !== tr), covering all states', () => {
     const en = buildInboxLabels((k) => getMessage(k, 'en'));
     const tr = buildInboxLabels((k) => getMessage(k, 'tr'));
-    for (const key of ['header', 'hint', 'empty', 'detailIntent', 'detailProgress', 'detailStarted', 'notFound'] as const) {
+    for (const key of ['header', 'hint', 'empty', 'detailIntent', 'detailProgress', 'detailStarted', 'notFound', 'followNavHint', 'followDetailHint'] as const) {
       expect(en[key].length).toBeGreaterThan(0);
       expect(tr[key].length).toBeGreaterThan(0);
       expect(en[key]).not.toBe(tr[key]);
@@ -283,5 +290,92 @@ describe('buildInboxLabels — i18n (SURF-3)', () => {
     }
     expect(en.stateLabels.COMPLETED).toBe('completed');
     expect(tr.stateLabels.COMPLETED).toBe('tamamlandı');
+  });
+});
+
+// ─── D3b — in-card focus navigation (pure logic, Ink-free) ───────────────────
+
+describe('formatInboxRowBody — shared row body (no leading indent)', () => {
+  const labels = DEFAULT_INBOX_LABELS;
+
+  it('renders the SAME body buildInboxLines indents by two spaces (one source of truth)', () => {
+    const row: InboxRow = { flowId: '9c3d577a-xyz', state: 'COMPLETED', intentSummary: 'add auth', done: 3, total: 4 };
+    const body = formatInboxRowBody(row, 0, labels);
+    expect(body).toBe('1. 9c3d577a · completed (3/4) add auth');
+    // the transcript path is exactly the body plus a two-space gutter
+    expect(buildInboxLines([row], labels)[1]).toBe(`  ${body}`);
+  });
+});
+
+describe('mapInboxKey — pure keypress → nav action (D3b)', () => {
+  it('maps ↑↓ / Enter / Esc to their actions', () => {
+    expect(mapInboxKey('', { upArrow: true })).toBe('up');
+    expect(mapInboxKey('', { downArrow: true })).toBe('down');
+    expect(mapInboxKey('', { return: true })).toBe('open');
+    expect(mapInboxKey('', { escape: true })).toBe('close');
+  });
+
+  it('any unmapped key is a no-op (never an implicit move/decision)', () => {
+    expect(mapInboxKey('x', {})).toBeNull();
+    expect(mapInboxKey('j', {})).toBeNull();
+    expect(mapInboxKey(' ', {})).toBeNull();
+  });
+});
+
+describe('realignInboxSelection — highlight survives live-refresh reorders (D3b)', () => {
+  const rows: InboxRow[] = [
+    { flowId: 'flow-a', state: 'COMPLETED' },
+    { flowId: 'flow-b', state: 'DETACHED_RUNNING' },
+  ];
+
+  it('keeps a still-present selection unchanged (even after a reorder)', () => {
+    expect(realignInboxSelection('flow-b', rows)).toBe('flow-b');
+    // reordered list: flow-b is still there → selection unchanged, NOT snapped to [0]
+    expect(realignInboxSelection('flow-b', [rows[1]!, rows[0]!])).toBe('flow-b');
+  });
+
+  it('falls back to the first row when the selection is null or vanished', () => {
+    expect(realignInboxSelection(null, rows)).toBe('flow-a');
+    expect(realignInboxSelection('flow-gone', rows)).toBe('flow-a');
+  });
+
+  it('is null for an empty list', () => {
+    expect(realignInboxSelection('anything', [])).toBeNull();
+    expect(realignInboxSelection(null, [])).toBeNull();
+  });
+});
+
+describe('reduceInboxNav — selection + detail reducer (D3b)', () => {
+  const rows: InboxRow[] = [
+    { flowId: 'a', state: 'COMPLETED' },
+    { flowId: 'b', state: 'DETACHED_RUNNING' },
+    { flowId: 'c', state: 'APPROVED' },
+  ];
+  const listAt = (flowId: string | null): InboxNavState => ({ selectedFlowId: flowId, detailOpen: false });
+
+  it('↓ moves to the next row, ↑ to the previous — both wrap', () => {
+    expect(reduceInboxNav(listAt('a'), 'down', rows).selectedFlowId).toBe('b');
+    expect(reduceInboxNav(listAt('c'), 'down', rows).selectedFlowId).toBe('a'); // wrap
+    expect(reduceInboxNav(listAt('a'), 'up', rows).selectedFlowId).toBe('c'); // wrap
+  });
+
+  it('↵ opens the focused row detail (realigning a null selection to the first row)', () => {
+    expect(reduceInboxNav(listAt('b'), 'open', rows)).toEqual({ selectedFlowId: 'b', detailOpen: true });
+    expect(reduceInboxNav(EMPTY_INBOX_NAV, 'open', rows)).toEqual({ selectedFlowId: 'a', detailOpen: true });
+  });
+
+  it('Esc collapses an open detail; from the list it is a no-op (caller closes the card)', () => {
+    expect(reduceInboxNav({ selectedFlowId: 'b', detailOpen: true }, 'close', rows)).toEqual({ selectedFlowId: 'b', detailOpen: false });
+    expect(reduceInboxNav(listAt('b'), 'close', rows)).toEqual(listAt('b')); // unchanged
+  });
+
+  it('↑↓ still move the cursor while a detail is open (browse detail-by-detail)', () => {
+    const next = reduceInboxNav({ selectedFlowId: 'b', detailOpen: true }, 'down', rows);
+    expect(next).toEqual({ selectedFlowId: 'c', detailOpen: true });
+  });
+
+  it('an empty list nulls the selection and cannot open a detail', () => {
+    expect(reduceInboxNav(listAt('a'), 'down', [])).toEqual({ selectedFlowId: null, detailOpen: false });
+    expect(reduceInboxNav(EMPTY_INBOX_NAV, 'open', [])).toEqual(EMPTY_INBOX_NAV);
   });
 });

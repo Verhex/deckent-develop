@@ -41,6 +41,7 @@ import type { ApprovalStreamEvent } from '../../core/approval-eventstream.js';
 import type { ApprovalRisk } from '../../core/approval-contract.js';
 import { PlanPreviewCard, type PlanPreviewCardLabels } from './plan-preview-card.js';
 import { InboxCard } from './inbox-card.js';
+import type { InboxRow, InboxLabels } from './run-flow-inbox.js';
 import type { RunFlowContext, PlanPreview } from '../../core/run-flow-contract.js';
 import type { RunFlowController } from './run-flow-controller.js';
 
@@ -912,12 +913,14 @@ export interface ReplAppProps {
    *  by run.tsx (which owns projectRoot + i18n); absent → `/runs` falls through
    *  as a normal turn. */
   runInboxProvider?: (input: string) => string;
-  /** SURF-3 D3a — returns the CURRENT rendered inbox lines for the live
-   *  `/runs --follow` card (polled on an interval). Injected by run.tsx. Absent
-   *  → `--follow` falls back to the static list. */
-  inboxFollowFeed?: () => string[];
-  /** Localized footer hint for the live inbox card ("⟳ live · Esc to close"). */
-  inboxFollowHint?: string;
+  /** SURF-3 D3a/D3b — returns the CURRENT structured rows for the live
+   *  `/runs --follow` card (polled on an interval; the card renders + highlights
+   *  them itself). Injected by run.tsx. Absent → `--follow` falls back to the
+   *  static list. */
+  inboxFollowFeed?: () => InboxRow[];
+  /** SURF-3 D3b — localized labels for the live inbox card (row/detail render +
+   *  nav footers). Injected by run.tsx; absent → English DEFAULT_INBOX_LABELS. */
+  inboxLabels?: InboxLabels;
   /** Optional chat-memory adapter — persists turns and powers /resume. */
   memory?: ChatMemoryAdapter;
   /** Active chat session id (new turns append here; /resume switches it). */
@@ -1064,7 +1067,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxFollowHint } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels } = props;
   const { exit } = useApp();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
@@ -1755,7 +1758,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         <InboxCard
           open={inboxOpen}
           feed={inboxFollowFeed}
-          followHint={inboxFollowHint ?? '⟳ live · Esc to close'}
+          labels={inboxLabels}
           onClose={() => setInboxOpen(false)}
           isActive={resolveInboxCardActive(stdinOwner.confirmActive, approvalPending, runFlowPending)}
         />

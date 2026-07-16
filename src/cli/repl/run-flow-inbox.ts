@@ -133,6 +133,11 @@ export interface InboxLabels {
   detailStarted: string;
   /** Shown for `/runs <n>` when n is out of range, e.g. "No run #{arg} — `/runs` lists them". */
   notFound: string;
+  // ── D3b (in-card focus-nav) — the live card's interactive footer hints ──
+  /** LIST-mode footer, e.g. "↑↓ select · ↵ open · Esc close · ⟳ live". */
+  followNavHint: string;
+  /** DETAIL-mode footer, e.g. "↑↓ browse · Esc back · ⟳ live". */
+  followDetailHint: string;
 }
 
 /** English-default inbox labels (string-free component; the caller injects a
@@ -161,17 +166,26 @@ export const DEFAULT_INBOX_LABELS: InboxLabels = {
   detailProgress: '  progress: {done}/{total}',
   detailStarted: '  started: {started}',
   notFound: 'No run #{arg} — `/runs` lists them',
+  followNavHint: '↑↓ select · ↵ open · Esc close · ⟳ live',
+  followDetailHint: '↑↓ browse · Esc back · ⟳ live',
 };
 
 const SHORT_ID_LEN = 8;
 
-/** Render one row: "  {n}. {icon-less} {shortId} {state} — {intent}{metrics}". */
-function formatRow(row: InboxRow, index: number, labels: InboxLabels): string {
+/** Render one row's BODY (no leading indent): "{n}. {shortId} · {state}{metrics}{intent}".
+ *  Exported so the InboxCard (D3b) prepends its OWN focus gutter (❯ / spaces)
+ *  around the identical body the transcript path renders — one source of truth. */
+export function formatInboxRowBody(row: InboxRow, index: number, labels: InboxLabels): string {
   const shortId = row.flowId.slice(0, SHORT_ID_LEN);
   const state = labels.stateLabels[row.state] ?? row.state;
   const intent = row.intentSummary ? ` ${row.intentSummary}` : '';
   const metrics = row.done !== undefined && row.total !== undefined ? ` (${row.done}/${row.total})` : '';
-  return `  ${index + 1}. ${shortId} · ${state}${metrics}${intent}`;
+  return `${index + 1}. ${shortId} · ${state}${metrics}${intent}`;
+}
+
+/** Render one transcript row: two-space indent + the shared body. */
+function formatRow(row: InboxRow, index: number, labels: InboxLabels): string {
+  return `  ${formatInboxRowBody(row, index, labels)}`;
 }
 
 /**
@@ -275,5 +289,78 @@ export function buildInboxLabels(t: (key: string) => string): InboxLabels {
     detailProgress: t('tui.inbox_detail_progress'),
     detailStarted: t('tui.inbox_detail_started'),
     notFound: t('tui.inbox_not_found'),
+    followNavHint: t('tui.inbox_follow_nav_hint'),
+    followDetailHint: t('tui.inbox_follow_detail_hint'),
   };
+}
+
+// ─── D3b — in-card focus navigation (pure, Ink-free — unit-testable) ─────────
+//
+// The live `/runs --follow` card (inbox-card.tsx) gains ↑↓ selection + ↵ detail.
+// All the navigation LOGIC lives here (framework-free) so it's unit-testable
+// without ink-testing-library, mirroring onboarding-ui's mapOnboardingKey and
+// app.tsx's createConfirmQueue split. The card is the thin render + stdin shell.
+
+/** Structural subset of Ink's `Key` — only the flags the inbox nav consumes
+ *  (mirrors OnboardingKeyFlags in onboarding-ui.ts). */
+export interface InboxKeyFlags {
+  upArrow?: boolean;
+  downArrow?: boolean;
+  return?: boolean;
+  escape?: boolean;
+}
+
+/** A focus-nav action, or null for an unmapped key (never an implicit move). */
+export type InboxNavAction = 'up' | 'down' | 'open' | 'close';
+
+/** Map a keypress to a nav action. ↑/↓ move the cursor, Enter opens the focused
+ *  row's detail, Esc closes (detail first, then the card — the card resolves the
+ *  card-close). Any other key is a no-op. Mirrors mapOnboardingKey's shape. */
+export function mapInboxKey(_input: string, key: InboxKeyFlags): InboxNavAction | null {
+  if (key.escape === true) return 'close';
+  if (key.upArrow === true) return 'up';
+  if (key.downArrow === true) return 'down';
+  if (key.return === true) return 'open';
+  return null;
+}
+
+/** In-card selection state: which flow is focused (by STABLE id, not index — the
+ *  list re-sorts newest-first every poll, so an index would drift under the
+ *  cursor) and whether its detail block is expanded. */
+export interface InboxNavState {
+  readonly selectedFlowId: string | null;
+  readonly detailOpen: boolean;
+}
+
+export const EMPTY_INBOX_NAV: InboxNavState = { selectedFlowId: null, detailOpen: false };
+
+/** Re-derive the focused flow after a poll: keep the current selection if it's
+ *  still present, else fall back to the first row (or null when empty). Keeps the
+ *  highlight glued to a run across live-refresh reorders. */
+export function realignInboxSelection(selectedFlowId: string | null, rows: readonly InboxRow[]): string | null {
+  if (selectedFlowId !== null && rows.some((r) => r.flowId === selectedFlowId)) return selectedFlowId;
+  return rows[0]?.flowId ?? null;
+}
+
+/** Advance the nav state for one action against the CURRENT rows. Pure — the
+ *  caller (InboxCard) owns React state + the onClose side effect: a `close` while
+ *  the LIST is showing is a no-op here (the caller reads that as "close card").
+ *  up/down wrap (like the slash-menu) and work in detail view too (browse
+ *  detail-by-detail). */
+export function reduceInboxNav(state: InboxNavState, action: InboxNavAction, rows: readonly InboxRow[]): InboxNavState {
+  if (action === 'open') {
+    // Realign first so opening always targets a live row (rows[0] when nothing
+    // was focused yet); an empty list has nothing to open.
+    const current = realignInboxSelection(state.selectedFlowId, rows);
+    return current !== null ? { selectedFlowId: current, detailOpen: true } : state;
+  }
+  if (action === 'close') {
+    return state.detailOpen ? { ...state, detailOpen: false } : state;
+  }
+  const n = rows.length;
+  if (n === 0) return { ...state, selectedFlowId: null };
+  const current = realignInboxSelection(state.selectedFlowId, rows);
+  const idx = Math.max(0, rows.findIndex((r) => r.flowId === current));
+  const nextIdx = action === 'up' ? (idx - 1 + n) % n : (idx + 1) % n;
+  return { ...state, selectedFlowId: rows[nextIdx]!.flowId };
 }
