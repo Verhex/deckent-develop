@@ -31,7 +31,7 @@ If a public surface is added: return type, no mutable internal-reference leak
 - Mandatory: targeted test scenarios that prove the behavior (by name) AND/OR
   a real-binary run command + its expected output.
 - Task-ID references: if a seam is left to another task, spell out the FULL task definition
-  ("Task-2 fills it" is forbidden — "<in-plan title> fills it under this contract: …").
+  ("Task-2 fills it" is forbidden — "`<in-plan title>` fills it under this contract: …").
 
 ## 6 · PROHIBITIONS (fixed block — goes into every spec verbatim)
 - Do NOT produce report/summary/verification markdown files (proof = tests + run output).

@@ -35,6 +35,10 @@ export default defineConfig({
     'directives/**',
     'analysis/**',
     'archive/**',
+    // Nested archives under published sections (e.g. adr/archive/ — superseded
+    // ADR drafts with same-dir links to their now-parent-dir live versions).
+    // `archive/**` only catches top-level; this catches every depth.
+    '**/archive/**',
     'release/**',
     'development/**',
     'architecture/**',
