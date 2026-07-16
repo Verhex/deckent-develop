@@ -3552,6 +3552,11 @@ const MESSAGES: MessageMap = {
     tr: 'Güncellemeleri Denetle',
   },
   'desktop.menu.help': { en: 'Help', tr: 'Yardım' },
+  // D4-1 «Köprüüstü» — watch (vardiya) theme system.
+  'desktop.theme.title': { en: 'Watch', tr: 'Vardiya' },
+  'desktop.theme.watch.day-watch': { en: 'Day watch', tr: 'Gündüz seyri' },
+  'desktop.theme.watch.night-watch': { en: 'Night watch', tr: 'Gece seyri' },
+  'desktop.theme.watch.open-sea': { en: 'Open sea', tr: 'Açık deniz' },
 };
 
 /**

@@ -10,6 +10,7 @@
  * first; the gate fails the build on drift.
  */
 import { z } from 'zod';
+import type { DesktopPreferences, DesktopPreferencesInput } from './theme-tokens';
 
 /** Where the target daemon lives — the 4-kind matrix is schema-complete from
  * day one (Law #2); `wsl`/`ssh`/`container` render an honest
@@ -83,6 +84,12 @@ export interface DeckentDesktopApi {
     openExternal(url: string): Promise<void>;
     /** Resolved UI strings for the renderer (i18n lives repo-side). */
     getStrings(): Promise<Record<string, string>>;
+  };
+  preferences: {
+    /** D4-1 — watch (theme) choice + custom token overrides, persisted by
+     *  the main-process preferences store (restart-persist done-criterion). */
+    get(): Promise<DesktopPreferences>;
+    set(input: DesktopPreferencesInput): Promise<DesktopPreferences>;
   };
   window: {
     minimize(): void;

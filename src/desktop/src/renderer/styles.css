@@ -1,13 +1,23 @@
+/**
+ * D4-1 («Köprüüstü»): ALL color comes from the three-layer watch tokens
+ * (`--dk-p-*` / `--dk-s-*` / `--dk-c-*`), which theme-runtime.ts sets on
+ * <html> synchronously at entry (main.ts) — before first paint — from the
+ * SSOT in ../shared/theme-tokens.ts. No hex lives in this file; the legacy
+ * `--color-*` names below are ALIASES into the semantic layer so the existing
+ * pre-daemon screens follow every watch switch without a rewrite (their
+ * visual redesign is D4-4). The OS `prefers-color-scheme` block is gone on
+ * purpose: the watch (persisted preference) is the single theme authority.
+ */
 :root {
   color-scheme: light dark;
-  --color-bg: #ffffff;
-  --color-bg-elevated: #f5f5f7;
-  --color-fg: #1c1c1e;
-  --color-fg-muted: #6e6e73;
-  --color-border: #d2d2d7;
-  --color-accent: #0a66c2;
-  --color-accent-fg: #ffffff;
-  --color-danger: #c0392b;
+  --color-bg: var(--dk-s-bg);
+  --color-bg-elevated: var(--dk-s-surface);
+  --color-fg: var(--dk-s-text);
+  --color-fg-muted: var(--dk-s-text-muted);
+  --color-border: var(--dk-s-border);
+  --color-accent: var(--dk-s-accent);
+  --color-accent-fg: var(--dk-s-accent-text);
+  --color-danger: var(--dk-s-abort);
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -18,17 +28,35 @@
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #1c1c1e;
-    --color-bg-elevated: #2c2c2e;
-    --color-fg: #f5f5f7;
-    --color-fg-muted: #9a9a9e;
-    --color-border: #3a3a3c;
-    --color-accent: #4da3ff;
-    --color-accent-fg: #0b1520;
-    --color-danger: #ff6b5e;
-  }
+/* D4-1 — visible keyboard focus, watch-aware (a11y floor). */
+:focus-visible {
+  outline: 2px solid var(--dk-s-focus-ring);
+  outline-offset: 2px;
+}
+
+/* D4-1 — watch (theme) switcher in the picker header. */
+.screen-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.watch-switcher {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.watch-switcher select {
+  background: var(--dk-c-input-bg);
+  color: var(--dk-c-input-text);
+  border: 1px solid var(--dk-c-input-border);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
 }
 
 * {

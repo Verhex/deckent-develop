@@ -29,6 +29,10 @@ declare global {
       openExternal(url: string): Promise<void>;
       getStrings(): Promise<Record<string, string>>;
     };
+    preferences: {
+      get(): Promise<unknown>;
+      set(input: unknown): Promise<unknown>;
+    };
     window: {
       minimize(): void;
       maximize(): void;

@@ -18,6 +18,7 @@ import type {
   DaemonStatusEvent,
   DeckentDesktopApi,
 } from '../shared/desktop-api.js';
+import type { DesktopPreferences } from '../shared/theme-tokens.js';
 
 const CHANNELS = {
   connectionList: 'connection.list',
@@ -32,6 +33,8 @@ const CHANNELS = {
   appGetVersion: 'app.getVersion',
   appOpenExternal: 'app.openExternal',
   appGetStrings: 'app.getStrings',
+  preferencesGet: 'preferences.get',
+  preferencesSet: 'preferences.set',
 } as const;
 
 function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
@@ -60,6 +63,10 @@ const api = {
     getVersion: () => invoke<string>(CHANNELS.appGetVersion),
     openExternal: (url) => invoke<void>(CHANNELS.appOpenExternal, url),
     getStrings: () => invoke<Record<string, string>>(CHANNELS.appGetStrings),
+  },
+  preferences: {
+    get: () => invoke<DesktopPreferences>(CHANNELS.preferencesGet),
+    set: (input) => invoke<DesktopPreferences>(CHANNELS.preferencesSet, input),
   },
   window: {
     minimize: () => {

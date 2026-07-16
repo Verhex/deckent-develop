@@ -93,10 +93,25 @@ function makeProfile(projectPath: string, overrides: Partial<ConnectionProfile> 
   };
 }
 
+/** D4-1 — hermetic preferences store double (tmpdir would also work, but the
+ *  tiering suite only cares that the channel reaches the store). */
+function makePreferencesStore(): RegisterIpcHandlersDeps['preferencesStore'] {
+  let current = { version: 1 as const, watch: 'day-watch' as const, customTokens: {} };
+  return {
+    filePath: '/tmp/fake-preferences.json',
+    get: vi.fn(() => ({ preferences: current, corrupted: false })),
+    set: vi.fn((input) => {
+      current = { ...current, ...input };
+      return current;
+    }),
+  };
+}
+
 function makeDeps(overrides: Partial<RegisterIpcHandlersDeps> = {}): RegisterIpcHandlersDeps {
   const { window } = makeWindowWithFrameUrl(LOCAL_URL);
   return {
     profileStore: makeProfileStore(),
+    preferencesStore: makePreferencesStore(),
     getWindows: () => [window] as never,
     getWindowForProfile: () => window as never,
     isLocalRendererUrl: isLocalRendererUrlFixture,
@@ -176,12 +191,30 @@ describe('connection.* channel tiering (born-600/601)', () => {
     await expect(invokeHandler('connection.list', makeEvent(mainFrame))).rejects.toThrow(/untrusted sender/);
   });
 
-  it.each(CONNECTION_CHANNELS)('gates "%s" behind the local-renderer tier', async (channel) => {
+  // D4-1: preferences.* joins the stricter tier — a connected daemon page must
+  // not be able to read or mutate local user preferences.
+  it.each([...CONNECTION_CHANNELS, 'preferences.get', 'preferences.set'] as const)('gates "%s" behind the local-renderer tier', async (channel) => {
     const { window, mainFrame } = makeWindowWithFrameUrl(REMOTE_URL);
     const deps = makeDeps({ getWindows: () => [window] as never, getWindowForProfile: () => window as never });
     registerIpcHandlers(deps);
 
     await expect(invokeHandler(channel, makeEvent(mainFrame), 'some-id')).rejects.toThrow(/untrusted sender/);
+  });
+
+  // D4-1 — functional pins for the preferences channels themselves.
+  it('preferences.get returns the store record; preferences.set validates at the trust boundary', async () => {
+    const { window, mainFrame } = makeWindowWithFrameUrl(LOCAL_URL);
+    const deps = makeDeps({ getWindows: () => [window] as never, getWindowForProfile: () => window as never });
+    registerIpcHandlers(deps);
+
+    await expect(invokeHandler('preferences.get', makeEvent(mainFrame))).resolves.toMatchObject({ watch: 'day-watch' });
+
+    await expect(invokeHandler('preferences.set', makeEvent(mainFrame), { watch: 'night-watch' })).resolves.toMatchObject({ watch: 'night-watch' });
+    expect(deps.preferencesStore.set).toHaveBeenCalledWith({ watch: 'night-watch' });
+
+    // schema bites BEFORE the store: unknown watch never reaches disk
+    await expect(invokeHandler('preferences.set', makeEvent(mainFrame), { watch: 'dog-watch' })).rejects.toThrow();
+    expect(deps.preferencesStore.set).toHaveBeenCalledTimes(1);
   });
 });
 

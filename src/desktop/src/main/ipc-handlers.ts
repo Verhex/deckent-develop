@@ -47,6 +47,8 @@ import type {
   DaemonStatusEvent,
 } from '../shared/desktop-api.js';
 import type { ConnectionProfileInput, ConnectionProfileStore } from './connection-profile-store.js';
+import type { PreferencesStore } from './preferences-store.js';
+import { desktopPreferencesSchema, type DesktopPreferencesInput } from '../shared/theme-tokens.js';
 import {
   decideConnectionAction,
   pollHealth,
@@ -73,6 +75,8 @@ const CHANNELS = {
   appGetVersion: 'app.getVersion',
   appOpenExternal: 'app.openExternal',
   appGetStrings: 'app.getStrings',
+  preferencesGet: 'preferences.get',
+  preferencesSet: 'preferences.set',
 } as const;
 
 /** Full connect flow this app owns end to end (spawn+poll path only — adopt is
@@ -81,6 +85,8 @@ const DEFAULT_CONNECT_HEALTH_TIMEOUT_MS = 15_000;
 
 export interface RegisterIpcHandlersDeps {
   profileStore: ConnectionProfileStore;
+  /** D4-1 — watch/theme preferences persistence (preferences.get/set channels). */
+  preferencesStore: PreferencesStore;
   /** Every BrowserWindow this app currently owns — the sender-frame trust source of
    * truth. Any of these windows' mainFrame is a trusted sender for any channel. */
   getWindows(): Iterable<BrowserWindow>;
@@ -290,6 +296,18 @@ export function registerIpcHandlers(deps: RegisterIpcHandlersDeps): void {
 
   guardedLocalHandle(CHANNELS.connectionConnect, deps, (_event, id) => {
     return handleConnect(requireString(id, 'id'), deps);
+  });
+
+  // D4-1 — preferences (watch/theme). Local-renderer tier: only the app's own
+  // pre-daemon UI ever reads/writes them (post-connect the window shows the
+  // daemon's page, which must not be able to mutate local user preferences).
+  guardedLocalHandle(CHANNELS.preferencesGet, deps, () => deps.preferencesStore.get().preferences);
+
+  guardedLocalHandle(CHANNELS.preferencesSet, deps, (_event, input) => {
+    // Validate the PARTIAL shape at the trust boundary (store.set re-validates
+    // the merged record): unknown watch names / bad hex never reach disk.
+    const partial = desktopPreferencesSchema.partial().omit({ version: true }).parse(input ?? {});
+    return deps.preferencesStore.set(partial as DesktopPreferencesInput);
   });
 
   guardedLocalHandle(CHANNELS.connectionDisconnect, deps, (_event, id) => {

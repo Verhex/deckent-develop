@@ -39,6 +39,11 @@ const DESKTOP_MESSAGE_KEYS = [
   'desktop.update.restart_to_apply',
   'desktop.update.check_for_updates',
   'desktop.menu.help',
+  // D4-1 «Köprüüstü» — watch (vardiya) theme system.
+  'desktop.theme.title',
+  'desktop.theme.watch.day-watch',
+  'desktop.theme.watch.night-watch',
+  'desktop.theme.watch.open-sea',
 ] as const;
 
 export type DesktopMessageKey = (typeof DESKTOP_MESSAGE_KEYS)[number];

@@ -23,6 +23,8 @@ import {
   type ConnectResult,
   type DeckentDesktopApi,
 } from '../shared/desktop-api.js';
+import { DEFAULT_PREFERENCES, WATCH_NAMES, type DesktopPreferences, type WatchName } from '../shared/theme-tokens.js';
+import { applyWatch } from './theme-runtime.js';
 
 declare global {
   interface Window {
@@ -44,6 +46,13 @@ const MSG = {
   connectingAdopting: 'connecting.adopting',
   connectingHealthCheck: 'connecting.health_check',
   connectingRetry: 'connecting.retry',
+  // D4-1 theme keys use the FULL `desktop.*` form so the IPC-fetched map
+  // (getDesktopStrings keys them fully) resolves them TODAY — the short-form
+  // legacy keys above are D4-2's unification debt, not extended here.
+  themeTitle: 'desktop.theme.title',
+  themeWatchDayWatch: 'desktop.theme.watch.day-watch',
+  themeWatchNightWatch: 'desktop.theme.watch.night-watch',
+  themeWatchOpenSea: 'desktop.theme.watch.open-sea',
   errorNodeNotFound: 'error.node_not_found',
   errorDeckentNotFound: 'error.deckent_not_found',
   errorPortConflict: 'error.port_conflict',
@@ -90,6 +99,10 @@ const FALLBACK_STRINGS: Record<string, string> = {
   [MSG.connectingAdopting]: 'Connecting to existing daemon…',
   [MSG.connectingHealthCheck]: 'Checking daemon health…',
   [MSG.connectingRetry]: 'Retry',
+  [MSG.themeTitle]: 'Watch',
+  [MSG.themeWatchDayWatch]: 'Day watch',
+  [MSG.themeWatchNightWatch]: 'Night watch',
+  [MSG.themeWatchOpenSea]: 'Open sea',
   [MSG.errorNodeNotFound]: 'Node.js was not found on the target.',
   [MSG.errorDeckentNotFound]: 'deckent was not found on the target.',
   [MSG.errorPortConflict]: 'Port {port} is already in use.',
@@ -193,6 +206,9 @@ type Screen =
 interface RenderContext {
   api: DeckentDesktopApi | null;
   strings: Record<string, string>;
+  /** D4-1 — the live watch/theme preferences (mutated in place on switch so
+   *  every later screen render sees the current choice). */
+  preferences: DesktopPreferences;
   navigate: (screen: Screen) => void;
 }
 
@@ -219,25 +235,76 @@ export async function bootstrap(root: HTMLElement | null): Promise<void> {
   if (!root) return;
   const api = getDeckentApi();
   const strings = await loadStrings(api);
+  const preferences = await loadPreferences(api);
+  // Re-apply the persisted watch over main.ts's synchronous default
+  // (restart-persist done-criterion; same idempotent runtime path).
+  applyWatch(document.documentElement, preferences);
 
   let cleanup: Cleanup | null = null;
 
   const navigate = (screen: Screen): void => {
     cleanup?.();
     clearNode(root);
-    cleanup = renderScreen(root, { api, strings, navigate }, screen);
+    cleanup = renderScreen(root, { api, strings, preferences, navigate }, screen);
   };
 
   navigate({ kind: 'profilePicker' });
 }
 
+/** Persisted watch/theme preferences; browser-preview (no bridge) and any IPC
+ *  failure degrade to defaults — the UI must render either way. */
+async function loadPreferences(api: DeckentDesktopApi | null): Promise<DesktopPreferences> {
+  if (!api) return DEFAULT_PREFERENCES;
+  try {
+    return await api.preferences.get();
+  } catch {
+    return DEFAULT_PREFERENCES;
+  }
+}
+
 // --- ProfilePicker -----------------------------------------------------
+
+const WATCH_LABEL_KEYS: Record<WatchName, string> = {
+  'day-watch': MSG.themeWatchDayWatch,
+  'night-watch': MSG.themeWatchNightWatch,
+  'open-sea': MSG.themeWatchOpenSea,
+};
+
+/** D4-1 — the watch (theme) selector: applies instantly through the theme
+ *  runtime and persists over IPC (fire-and-forget; a persist failure never
+ *  blocks the visual switch — the store read at next boot simply lags). */
+function renderWatchSwitcher(ctx: RenderContext): HTMLElement {
+  const select = el('select', { attrs: { id: 'watch-select', 'aria-label': t(ctx.strings, MSG.themeTitle) } });
+  for (const watch of WATCH_NAMES) {
+    const option = el('option', { text: t(ctx.strings, WATCH_LABEL_KEYS[watch]), attrs: { value: watch } });
+    if (watch === ctx.preferences.watch) option.setAttribute('selected', '');
+    select.append(option);
+  }
+  select.addEventListener('change', () => {
+    const watch = select.value as WatchName;
+    ctx.preferences.watch = watch;
+    applyWatch(document.documentElement, ctx.preferences);
+    void ctx.api?.preferences.set({ watch }).catch(() => {
+      // Visual switch already happened; persistence is best-effort here and
+      // honest at next boot (defaults/last-persisted win). No UI interruption.
+    });
+  });
+  return el('div', { className: 'watch-switcher' }, [
+    el('label', { text: t(ctx.strings, MSG.themeTitle), attrs: { for: 'watch-select' } }),
+    select,
+  ]);
+}
 
 function renderProfilePicker(root: HTMLElement, ctx: RenderContext): Cleanup {
   let disposed = false;
 
   const container = el('div', { className: 'screen screen--profile-picker' });
-  container.append(el('h1', { text: t(ctx.strings, MSG.connectionListTitle) }));
+  container.append(
+    el('div', { className: 'screen-header' }, [
+      el('h1', { text: t(ctx.strings, MSG.connectionListTitle) }),
+      renderWatchSwitcher(ctx),
+    ]),
+  );
 
   if (!ctx.api) {
     container.append(el('p', { className: 'notice', text: t(ctx.strings, MSG.appBrowserFallbackNotice) }));

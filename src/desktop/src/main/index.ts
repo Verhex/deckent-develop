@@ -31,6 +31,7 @@ import { resolveDesktopLanguage } from './i18n.js';
 import { installSecurityLockdown } from './security.js';
 import { registerIpcHandlers } from './ipc-handlers.js';
 import { createConnectionProfileStore } from './connection-profile-store.js';
+import { createPreferencesStore } from './preferences-store.js';
 import {
   createWindow,
   getAllWindows,
@@ -92,11 +93,13 @@ if (!gotSingleInstanceLock) {
     });
 
     const profileStore = createConnectionProfileStore();
+    const preferencesStore = createPreferencesStore();
 
     createWindow(INITIAL_WINDOW_ID);
 
     registerIpcHandlers({
       profileStore,
+      preferencesStore,
       getWindows: () => getAllWindows().values(),
       getWindowForProfile,
       // born-597 channel-tiering güvenlik-katmanının ZORUNLU köprüsü: bu alan
