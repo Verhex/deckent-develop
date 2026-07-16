@@ -125,10 +125,34 @@ function hardenSession(target: Session, deps: SecurityPolicyDeps): void {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': ["default-src 'self'"],
+        'Content-Security-Policy': [buildLocalRendererCsp(deps.getActiveDaemonOrigins())],
       },
     });
   });
+}
+
+/**
+ * D4-3 (approved SURF-4 decision #2) — the local renderer's CSP: everything
+ * stays 'self'-only EXCEPT `connect-src`, which the shell's own
+ * fetch/EventSource transport needs.
+ *
+ * Loopback port-wildcards are ALWAYS allowed: a document's CSP is fixed at
+ * load time, but the shell connects to a daemon chosen AFTER load — and the
+ * connect flow itself already hard-rejects every non-loopback plain-http
+ * target (born-600, LOCAL_CONNECT_HOSTS in ipc-handlers.ts), so
+ * `http://127.0.0.1:* http://localhost:* http://[::1]:*` is exactly the
+ * enforceable boundary, not a loosening. Non-loopback origins (a future
+ * https/ssh-tunnel remote) additionally join dynamically and take effect on
+ * the next document load. Exported for the unit pin (shell-transport.test.ts).
+ */
+export function buildLocalRendererCsp(daemonOrigins: readonly string[]): string {
+  // NOTE: Chromium rejects a bracketed-IPv6 host-source with a port wildcard
+  // (`http://[::1]:*`) as invalid — an ::1 daemon therefore joins via its
+  // exact dynamic origin below instead of a wildcard.
+  const loopback = ['http://127.0.0.1:*', 'http://localhost:*'];
+  const dynamic = daemonOrigins.filter((origin) => !loopback.some((l) => origin.startsWith(l.slice(0, l.length - 1))));
+  const connectSources = ["'self'", ...loopback, ...dynamic];
+  return `default-src 'self'; connect-src ${connectSources.join(' ')}`;
 }
 
 /**

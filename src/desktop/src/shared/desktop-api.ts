@@ -61,6 +61,22 @@ export interface DaemonStatusEvent {
 export type ConnectResult = { ok: true; url: string } | { ok: false; errorKey: string; errorVars?: Record<string, string> };
 
 /**
+ * D4-3 — the live daemon session the renderer's OWN transport uses (approved
+ * SURF-4 decision #2: the renderer consumes the daemon's tokened HTTP API
+ * directly via fetch/EventSource; IPC stays UI-grade). `apiToken` is the
+ * daemon handshake's api token — mutations send it as a Bearer header, SSE
+ * appends `?token=` (the server's documented EventSource fallback). Pushed on
+ * `daemon.session` after a successful connect and pull-able via
+ * `session.get()` (renderer reloads). Cleared on disconnect (null).
+ */
+export interface DaemonSession {
+  profileId: string;
+  /** Daemon origin, e.g. `http://127.0.0.1:4317`. */
+  url: string;
+  apiToken?: string;
+}
+
+/**
  * The ONLY surface the renderer can reach into main/Node with
  * (`window.deckentDesktop`). Keep it UI-grade: anything substantive goes
  * through the daemon's tokened HTTP/WS API instead.
@@ -77,6 +93,13 @@ export interface DeckentDesktopApi {
   daemon: {
     /** Subscribe to push status updates; returns an unsubscribe. */
     onStatus(cb: (event: DaemonStatusEvent) => void): () => void;
+    /** D4-3 — push of the live daemon session after a successful connect
+     *  (null push on disconnect); returns an unsubscribe. */
+    onSession(cb: (session: DaemonSession | null) => void): () => void;
+  };
+  session: {
+    /** D4-3 — the current daemon session (renderer reload/pull path). */
+    get(): Promise<DaemonSession | null>;
   };
   app: {
     getVersion(): Promise<string>;

@@ -15,6 +15,7 @@ import type { IpcRendererEvent } from 'electron';
 import type {
   ConnectionProfile,
   ConnectResult,
+  DaemonSession,
   DaemonStatusEvent,
   DeckentDesktopApi,
 } from '../shared/desktop-api.js';
@@ -27,6 +28,8 @@ const CHANNELS = {
   connectionConnect: 'connection.connect',
   connectionDisconnect: 'connection.disconnect',
   daemonStatus: 'daemon.status',
+  daemonSession: 'daemon.session',
+  sessionGet: 'session.get',
   windowMinimize: 'window.minimize',
   windowMaximize: 'window.maximize',
   windowClose: 'window.close',
@@ -58,6 +61,16 @@ const api = {
         ipcRenderer.removeListener(CHANNELS.daemonStatus, listener);
       };
     },
+    onSession: (cb) => {
+      const listener = (_event: IpcRendererEvent, session: DaemonSession | null) => cb(session);
+      ipcRenderer.on(CHANNELS.daemonSession, listener);
+      return () => {
+        ipcRenderer.removeListener(CHANNELS.daemonSession, listener);
+      };
+    },
+  },
+  session: {
+    get: () => invoke<DaemonSession | null>(CHANNELS.sessionGet),
   },
   app: {
     getVersion: () => invoke<string>(CHANNELS.appGetVersion),

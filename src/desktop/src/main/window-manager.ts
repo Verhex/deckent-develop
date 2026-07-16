@@ -215,6 +215,22 @@ export function claimWindowForProfile(profileId: string): void {
  * yükleme") — this function never loads anything but an http(s) URL,
  * regardless of what a future caller passes.
  */
+/**
+ * D4-3 — register `profileId`'s live daemon origin WITHOUT navigating the
+ * window: the renderer stays on the local shell and talks to the daemon over
+ * its own fetch/EventSource (security.ts extends the CSP `connect-src` to
+ * exactly these origins). This is the product connect path now; the
+ * loadURL-swap below (`connectWindow`) remains only as the explicit
+ * "open the legacy dashboard" escape until SURF-7 retires it.
+ */
+export function markDaemonActive(profileId: string, daemonUrl: string): void {
+  const parsed = new URL(daemonUrl);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`markDaemonActive: refusing non-http(s) daemonUrl scheme "${parsed.protocol}"`);
+  }
+  activeDaemonOrigins.set(profileId, parsed.origin);
+}
+
 export function connectWindow(profileId: string, daemonUrl: string): void {
   const window = windows.get(profileId);
   if (!window || window.isDestroyed()) {

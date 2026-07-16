@@ -72,6 +72,18 @@ export const DESKTOP_MESSAGE_KEYS = [
   // daemon-lifecycle push errorKey'leri (D4-2'de öksüz-anahtar olarak yakalandı)
   'desktop.daemon.spawn_failed',
   'desktop.daemon.health_timeout',
+  // ── D4-3 post-connect app shell ──
+  'desktop.shell.nav.console',
+  'desktop.shell.nav.chat',
+  'desktop.shell.nav.approval',
+  'desktop.shell.nav.history',
+  'desktop.shell.connected_to',
+  'desktop.shell.flows_empty',
+  'desktop.shell.flag_run_flow_off',
+  'desktop.shell.live_events',
+  'desktop.shell.approvals_pending',
+  'desktop.shell.chat_coming',
+  'desktop.shell.load_error',
   // ── D4-1 «Köprüüstü» watch (vardiya) theme system ──
   'desktop.theme.title',
   'desktop.theme.watch.day-watch',

@@ -23,6 +23,12 @@ For the full history and amendment log, see [ADR-D-005](../adr/adr-d-005-depende
 | `cli-highlight` | `^2.1.11` | REPL syntax highlighting | ADR-081 / ADR-083: sub-feature of Native Agentic REPL — REPL UX syntax coloring; governed by the REPL ADR family |
 | `ink-testing-library` *(dev-only)* | `^4.0.0` | Render + drive Ink REPL components in tests (mount, read frames, simulate keypress via stdin) — closes the "Ink components are manual-verify-only" gap (Alperen-authorized 2026-07-16). | ADR-081 / ADR-083: test tooling for the Native Agentic REPL — same REPL ADR family as `ink` |
 | `discord.js` *(optional)* | `^14.26.3` | Discord connector (lazy/optional) | ADR-016: External Messaging Connectors |
+| `react` *(desktop sub-pkg)* | `19.2.7` (exact) | Desktop shell component model (SURF-4 D4-3) | SURF-4 onaylı-yığın (Alperen 2026-07-16, `docs/analysis/surf4-desktop-foundation-plan-2026-07-16.md` §2) — Context7-doğrulanmış stabil-major |
+| `react-dom` *(desktop sub-pkg)* | `19.2.7` (exact) | Desktop shell render | SURF-4 onaylı-yığın §2 |
+| `react-router` *(desktop sub-pkg)* | `7.9.4` (exact) | HashRouter — Electron `file://` güvenli 4-view routing | SURF-4 onaylı-yığın §2 |
+| `@tanstack/react-query` *(desktop sub-pkg)* | `5.90.3` (exact) | Server-state: RunFlow REST cache + SSE→cache canlı-besleme | SURF-4 onaylı-yığın §2 |
+| `zustand` *(desktop sub-pkg)* | `5.0.14` (exact) | Hafif UI-state (session/tema/nav) | SURF-4 D4-0 kilidi (Alperen-onaylı 2026-07-16) |
+| `react-aria-components` *(desktop sub-pkg)* | `1.19.0` (exact) | Erişilebilir davranış-primitifleri — style-free (Köprüüstü dilini kısıtlamaz), yerleşik TR-dahil i18n | SURF-4 D4-0 kilidi (6-aday karşılaştırmasıyla, Alperen-onaylı 2026-07-16) |
 | `nodemailer` *(optional)* | `^6.9.14` | Email connector (SMTP outbound) | ADR-016: External Messaging Connectors |
 | `openai` *(optional)* | `^4.103.0` | OpenAI voice connector (Whisper transcription + TTS) | ADR-016: External Messaging Connectors |
 

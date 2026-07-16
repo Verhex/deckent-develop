@@ -23,6 +23,10 @@ declare global {
     };
     daemon: {
       onStatus(cb: (event: unknown) => void): () => void;
+      onSession(cb: (session: unknown) => void): () => void;
+    };
+    session: {
+      get(): Promise<unknown>;
     };
     app: {
       getVersion(): Promise<string>;

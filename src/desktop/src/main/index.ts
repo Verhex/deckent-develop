@@ -37,7 +37,7 @@ import {
   getAllWindows,
   getWindowForProfile,
   claimWindowForProfile,
-  connectWindow,
+  markDaemonActive,
   resetWindowToLocalRenderer,
   registerOwnedDaemon,
   unregisterOwnedDaemon,
@@ -108,12 +108,13 @@ if (!gotSingleInstanceLock) {
       // komple kilitlenir (2026-07-10 Codex cross-check'inin yakaladığı canlı vaka).
       isLocalRendererUrl,
       onConnected: (profileId, daemonUrl, _tokens) => {
-        // _tokens (api/terminal) intentionally dropped here: no consumer exists yet
-        // (terminal-panel/auth storage is a future feature, not this hardening task's
-        // scope) — threading it into window-manager now would be unused state, not a
-        // hardening change.
+        // D4-3: the window is NOT handed over to the daemon's dashboard
+        // anymore — the local React shell stays mounted and consumes the
+        // daemon over its own HTTP/SSE (ipc-handlers pushes the tokened
+        // DaemonSession right after this callback). markDaemonActive only
+        // registers the origin for the CSP connect-src + navigation allowlist.
         claimWindowForProfile(profileId);
-        connectWindow(profileId, daemonUrl);
+        markDaemonActive(profileId, daemonUrl);
       },
       onDaemonSpawned: (profileId, pid, orphanShutdownOnQuit) => {
         registerOwnedDaemon(profileId, pid, orphanShutdownOnQuit);

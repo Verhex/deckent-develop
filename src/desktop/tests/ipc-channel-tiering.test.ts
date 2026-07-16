@@ -193,7 +193,8 @@ describe('connection.* channel tiering (born-600/601)', () => {
 
   // D4-1: preferences.* joins the stricter tier — a connected daemon page must
   // not be able to read or mutate local user preferences.
-  it.each([...CONNECTION_CHANNELS, 'preferences.get', 'preferences.set'] as const)('gates "%s" behind the local-renderer tier', async (channel) => {
+  // D4-3: session.get too — it carries the daemon api token.
+  it.each([...CONNECTION_CHANNELS, 'preferences.get', 'preferences.set', 'session.get'] as const)('gates "%s" behind the local-renderer tier', async (channel) => {
     const { window, mainFrame } = makeWindowWithFrameUrl(REMOTE_URL);
     const deps = makeDeps({ getWindows: () => [window] as never, getWindowForProfile: () => window as never });
     registerIpcHandlers(deps);

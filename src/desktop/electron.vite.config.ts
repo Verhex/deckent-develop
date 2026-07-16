@@ -17,6 +17,7 @@
  * build time; no dependency on the repo's dist/ tree.
  */
 import { defineConfig } from 'electron-vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   main: {
@@ -41,6 +42,8 @@ export default defineConfig({
   },
   renderer: {
     root: 'src/renderer',
+    // D4-3: the post-connect shell is React 19 (approved stack) — JSX transform.
+    plugins: [react()],
     build: {
       outDir: 'out/renderer',
       rollupOptions: {

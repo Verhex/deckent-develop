@@ -3620,6 +3620,33 @@ const MESSAGES: MessageMap = {
     en: 'The daemon did not respond in time.',
     tr: 'Daemon zamanında yanıt vermedi.',
   },
+  // D4-3 — post-connect app shell (Console/Chat/Approval/History).
+  'desktop.shell.nav.console': { en: 'Console', tr: 'Konsol' },
+  'desktop.shell.nav.chat': { en: 'Chat', tr: 'Sohbet' },
+  'desktop.shell.nav.approval': { en: 'Approvals', tr: 'Onaylar' },
+  'desktop.shell.nav.history': { en: 'History', tr: 'Geçmiş' },
+  'desktop.shell.connected_to': { en: 'Connected: {origin}', tr: 'Bağlı: {origin}' },
+  'desktop.shell.flows_empty': {
+    en: 'No flows yet — start one with `deckent do "<goal>"`.',
+    tr: 'Henüz akış yok — `deckent do "<hedef>"` ile başlatın.',
+  },
+  'desktop.shell.flag_run_flow_off': {
+    en: 'This daemon has terminal.run_flow_v2 disabled — the Console needs it enabled.',
+    tr: 'Bu daemonda terminal.run_flow_v2 kapalı — Konsol için açık olması gerekir.',
+  },
+  'desktop.shell.live_events': { en: 'Live events', tr: 'Canlı olaylar' },
+  'desktop.shell.approvals_pending': {
+    en: '{count} pending approval(s)',
+    tr: '{count} bekleyen onay',
+  },
+  'desktop.shell.chat_coming': {
+    en: 'Chat arrives with the real-workflow slice (SURF-5).',
+    tr: 'Sohbet, gerçek-iş-akışı dilimiyle (SURF-5) geliyor.',
+  },
+  'desktop.shell.load_error': {
+    en: 'Could not reach the daemon. Check the connection and retry.',
+    tr: 'Daemona ulaşılamadı. Bağlantıyı kontrol edip yeniden deneyin.',
+  },
   // D4-1 «Köprüüstü» — watch (vardiya) theme system.
   'desktop.theme.title': { en: 'Watch', tr: 'Vardiya' },
   'desktop.theme.watch.day-watch': { en: 'Day watch', tr: 'Gündüz seyri' },

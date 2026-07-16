@@ -49,6 +49,12 @@ import type {
 import type { ConnectionProfileInput, ConnectionProfileStore } from './connection-profile-store.js';
 import type { PreferencesStore } from './preferences-store.js';
 import { desktopPreferencesSchema, type DesktopPreferencesInput } from '../shared/theme-tokens.js';
+import type { DaemonSession } from '../shared/desktop-api.js';
+
+/** D4-3 — the live renderer-transport sessions (profileId → session). Set on
+ *  a successful connect, cleared on disconnect; `session.get` serves the
+ *  renderer's reload/pull path. Module-level like the profile→window maps. */
+const activeSessions = new Map<string, DaemonSession>();
 import {
   decideConnectionAction,
   pollHealth,
@@ -69,6 +75,8 @@ const CHANNELS = {
   connectionConnect: 'connection.connect',
   connectionDisconnect: 'connection.disconnect',
   daemonStatus: 'daemon.status',
+  daemonSession: 'daemon.session',
+  sessionGet: 'session.get',
   windowMinimize: 'window.minimize',
   windowMaximize: 'window.maximize',
   windowClose: 'window.close',
@@ -213,14 +221,21 @@ function isLocalConnectHost(host: string): boolean {
  * between that check and this one. The spawn path has no such mismatch risk: this module
  * itself just commanded `deckent serve --port profile.port`, so profile's fields ARE the
  * source of truth there. */
+/** D4-3: a bare IPv6 literal must be bracketed in a URL (`http://[::1]:4317/`)
+ *  — the unbracketed form is not a parseable URL, which the new-session
+ *  `new URL(url)` derivation (and markDaemonActive) would throw on. */
+function urlHost(host: string): string {
+  return host.includes(':') && !host.startsWith('[') ? `[${host}]` : host;
+}
+
 function resolveConnectUrl(action: ConnectionAction, profile: ConnectionProfile): string {
   if (action === 'adopt') {
     const meta = readServeDaemonMeta(profile.projectPath);
     if (meta) {
-      return `http://${meta.host}:${meta.port}/`;
+      return `http://${urlHost(meta.host)}:${meta.port}/`;
     }
   }
-  return `http://${profile.host}:${profile.port}/`;
+  return `http://${urlHost(profile.host)}:${profile.port}/`;
 }
 
 async function handleConnect(profileId: string, deps: RegisterIpcHandlersDeps): Promise<ConnectResult> {
@@ -271,12 +286,24 @@ async function handleConnect(profileId: string, deps: RegisterIpcHandlersDeps): 
   const url = resolveConnectUrl(action, profile);
   pushStatus('connected');
   deps.onConnected?.(profileId, url, tokens);
+  // D4-3 — hand the renderer its OWN transport session (approved decision #2:
+  // the renderer consumes the daemon's tokened HTTP API directly; the old
+  // loadURL-swap to the daemon's dashboard is no longer the product path).
+  const session: DaemonSession = {
+    profileId,
+    url: new URL(url).origin,
+    ...(tokens.apiToken !== undefined ? { apiToken: tokens.apiToken } : {}),
+  };
+  activeSessions.set(profileId, session);
+  deps.getWindowForProfile(profileId)?.webContents.send(CHANNELS.daemonSession, session);
   return { ok: true, url };
 }
 
 function handleDisconnect(profileId: string, deps: RegisterIpcHandlersDeps): void {
   deps.onDisconnected?.(profileId);
+  activeSessions.delete(profileId);
   const win = deps.getWindowForProfile(profileId);
+  win?.webContents.send(CHANNELS.daemonSession, null);
   const event: DaemonStatusEvent = { profileId, status: 'idle' };
   win?.webContents.send(CHANNELS.daemonStatus, event);
 }
@@ -296,6 +323,13 @@ export function registerIpcHandlers(deps: RegisterIpcHandlersDeps): void {
 
   guardedLocalHandle(CHANNELS.connectionConnect, deps, (_event, id) => {
     return handleConnect(requireString(id, 'id'), deps);
+  });
+
+  // D4-3 — session pull (renderer reload path). Local-renderer tier: the
+  // session carries the api token; only the app's own UI may read it.
+  guardedLocalHandle(CHANNELS.sessionGet, deps, () => {
+    for (const session of activeSessions.values()) return session; // single-window today
+    return null;
   });
 
   // D4-1 — preferences (watch/theme). Local-renderer tier: only the app's own

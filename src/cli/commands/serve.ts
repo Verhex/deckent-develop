@@ -8,6 +8,8 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import { getDashboardStaticDir } from '../helpers/dashboard-dir.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { loadConfig } from '../../core/config.js';
+import { bootstrapProviders } from '../../core/provider.js';
 
 /** Extended MIME types for static file serving (superset of server.ts defaults) */
 export const EXTENDED_MIME_TYPES: Record<string, string> = {
@@ -114,6 +116,21 @@ export function registerServe(program: Command): void {
         print('Ensure Vite dev server is running: npm run dev (in src/dashboard/)');
         print('');
       }
+
+      // D4-3 (born-680'in API-ikizi): /api/run-flow/propose planner-core'a
+      // iner (compileRunProposal → callZeroConfigPlanner → resolveAdapter) —
+      // provider bootstrap'ı olmayan bir serve-daemon'da her propose
+      // "No providers registered" 502'siyle ölüyordu. do.ts/start.ts'in AYNI
+      // bootstrap-konvansiyonu; fail-soft (fire-and-forget): provider'sız bir
+      // ortamda API-only mod aynen çalışmaya devam eder, propose dürüst hata verir.
+      void (async () => {
+        try {
+          const config = await loadConfig(root);
+          await bootstrapProviders(config);
+        } catch (err) {
+          process.stderr.write(`[serve] provider bootstrap skipped: ${err instanceof Error ? err.message : String(err)}\n`);
+        }
+      })();
 
       const api = createHttpServer(root, {
         port,

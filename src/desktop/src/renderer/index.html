@@ -3,9 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- D4-3: connect-src allows the LOOPBACK port-wildcards — the document's
+         CSP is fixed at load time but the daemon is chosen after load, and the
+         connect flow already hard-rejects every non-loopback plain-http target
+         (born-600) — so loopback-only IS the enforced boundary. Keep in sync
+         with security.ts buildLocalRendererCsp (the header twin). -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:*; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <title>Deckent</title>
     <link rel="stylesheet" href="./styles.css" />

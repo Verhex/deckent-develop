@@ -21,8 +21,10 @@ import {
   type ConnectionKind,
   type ConnectionProfile,
   type ConnectResult,
+  type DaemonSession,
   type DeckentDesktopApi,
 } from '../shared/desktop-api.js';
+import { mountShell } from './shell/mount.js';
 import { DEFAULT_PREFERENCES, WATCH_NAMES, type DesktopPreferences, type WatchName } from '../shared/theme-tokens.js';
 import { applyWatch } from './theme-runtime.js';
 import { buildFallbackStrings } from './i18n-fallback.js';
@@ -150,7 +152,9 @@ async function loadStrings(api: DeckentDesktopApi | null): Promise<Record<string
 type Screen =
   | { kind: 'profilePicker' }
   | { kind: 'connecting'; profileId: string }
-  | { kind: 'daemonError'; profileId: string; errorKey: string; errorVars?: Record<string, string> };
+  | { kind: 'daemonError'; profileId: string; errorKey: string; errorVars?: Record<string, string> }
+  // D4-3 — the post-connect React shell (Console/Chat/Approval/History).
+  | { kind: 'shell'; session: DaemonSession };
 
 interface RenderContext {
   api: DeckentDesktopApi | null;
@@ -175,6 +179,9 @@ function renderScreen(root: HTMLElement, ctx: RenderContext, screen: Screen): Cl
       return renderConnecting(root, ctx, screen.profileId);
     case 'daemonError':
       return renderDaemonError(root, ctx, screen.profileId, screen.errorKey, screen.errorVars);
+    case 'shell':
+      // D4-3 — hand the cleared container to React; unmount on navigate-away.
+      return mountShell(root, { session: screen.session, strings: ctx.strings });
     default:
       return assertNever(screen);
   }
@@ -197,7 +204,25 @@ export async function bootstrap(root: HTMLElement | null): Promise<void> {
     cleanup = renderScreen(root, { api, strings, preferences, navigate }, screen);
   };
 
-  navigate({ kind: 'profilePicker' });
+  // D4-3 — the daemon session drives the shell: a push (connect succeeded)
+  // mounts it, a null push (disconnect) returns to the picker, and a reload
+  // mid-session resumes straight into the shell via the pull path.
+  api?.daemon.onSession((session) => {
+    navigate(session ? { kind: 'shell', session } : { kind: 'profilePicker' });
+  });
+  const existingSession = await loadSession(api);
+  navigate(existingSession ? { kind: 'shell', session: existingSession } : { kind: 'profilePicker' });
+}
+
+/** Pull the current session (renderer reload path) — bridge-absent/IPC
+ *  failure degrade to null (picker renders, honest and non-blocking). */
+async function loadSession(api: DeckentDesktopApi | null): Promise<DaemonSession | null> {
+  if (!api) return null;
+  try {
+    return await api.session.get();
+  } catch {
+    return null;
+  }
 }
 
 /** Persisted watch/theme preferences; browser-preview (no bridge) and any IPC
