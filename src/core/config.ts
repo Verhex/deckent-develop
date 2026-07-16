@@ -1079,17 +1079,15 @@ export function validateConfig(config: DeckentConfig): string[] {
   }
 
   // ─── Routing behaviour flags validation (T6) ───────────────────────
-  if (config.routing !== undefined) {
-    if (typeof config.routing !== 'object' || config.routing === null || Array.isArray(config.routing)) {
-      errors.push('routing must be an object');
-    } else {
-      if (config.routing.skill_agent_affinity !== undefined && typeof config.routing.skill_agent_affinity !== 'boolean') {
-        errors.push('routing.skill_agent_affinity must be a boolean');
-      }
-      if (config.routing.agent_cache !== undefined && typeof config.routing.agent_cache !== 'boolean') {
-        errors.push('routing.agent_cache must be a boolean');
-      }
-    }
+  // Only the block SHAPE is validated. The individual tuning flags carry no
+  // dedicated type-check: skill_agent_affinity/agent_cache validation was
+  // removed with those dead flags (S3 cut-over); `effort_tiering` is an opt-in
+  // boolean read defensively (`?? false`) at its single call site.
+  if (
+    config.routing !== undefined &&
+    (typeof config.routing !== 'object' || config.routing === null || Array.isArray(config.routing))
+  ) {
+    errors.push('routing must be an object');
   }
 
   // ─── Prompt config validation (Sprint 182 PQ-5 / F7) ────────────────

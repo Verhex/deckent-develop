@@ -7,8 +7,10 @@
 // `routing_v3` is exclusively consumed by the routing3 subsystem (see the doc
 // comment on `RoutingV3Config` in config-types.ts for the full rationale).
 //
-// Nothing here alters a live routing decision (Slice-0 constraint) — this is
-// schema + merge plumbing only; `enabled` defaults to `false` until Slice-3.
+// Post-S3 cut-over (2026-07-15): V3 is the only routing engine and the planner
+// runs it unconditionally, so `enabled` is a VESTIGIAL no-op — kept as an
+// optional, ignored key (not in the defaults) purely so a pre-cut-over config
+// that still sets it validates against the strict schema instead of hard-failing.
 
 import { z } from 'zod';
 import { deepMerge } from '../config.js';
@@ -32,7 +34,9 @@ export const ROUTING_V3_GOVERNANCE_MODE_SCHEMA = z.enum(['ai', 'deterministic'])
 /** Mirrors {@link RoutingV3Config}. */
 export const ROUTING_V3_SCHEMA = z
   .object({
-    enabled: z.boolean(),
+    // Vestigial no-op (S3 cut-over): optional so a pre-cut-over config that
+    // still sets it validates; `.strict()` below is intact for every other key.
+    enabled: z.boolean().optional(),
     weights: ROUTING_V3_WEIGHTS_SCHEMA,
     confidenceFloor: z.number().min(0).max(1),
     governanceMode: ROUTING_V3_GOVERNANCE_MODE_SCHEMA,
@@ -47,10 +51,11 @@ export const ROUTING_V3_SCHEMA = z
  * Single source of truth for `routing_v3` defaults. Do NOT duplicate any of
  * these values elsewhere (e.g. config.ts's `createDefaultConfig`) — Task
  * 445-010's nogo is explicit: defaults duplicated in two places is a NO_GO.
- * `enabled: false` — the RoutingEngineV3 cut-over flips this in Slice-3.
+ * `enabled` is intentionally absent — it is a vestigial no-op post-S3 cut-over
+ * (V3 routing is unconditional); the field stays optional on the schema only
+ * for back-compat with pre-cut-over configs that still set it.
  */
 export const DEFAULT_ROUTING_V3_CONFIG: RoutingV3Config = {
-  enabled: false,
   weights: { content: 0.5, positional: 0.3, numerical: 0.2 },
   // Placeholder thresholds — unconsumed by any runtime code this slice (no
   // spec value exists yet for these three; Slice-2/3 calibrate them

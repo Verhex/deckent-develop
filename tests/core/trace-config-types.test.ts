@@ -2,7 +2,7 @@
 //
 // Sprint 356, Task 356-012 TRACE-CONFIG-TYPES — type registration for the
 // "night-landed" flags: training_trace, live_trace, repl_surface(+approvals/
-// bg_turns), tool_surface, deck_broker, routing.kindAffinity/languagePenalty,
+// bg_turns), tool_surface, deck_broker, routing (effort_tiering),
 // approval.api_decide, rollback. These blocks already have a real consumer on
 // disk (duck-typed or caller-resolved) but had no typed home on DeckentConfig/
 // ResolvedConfig before this task.
@@ -169,37 +169,6 @@ describe('DeckentConfig — rollback', () => {
   });
 });
 
-// ─── routing.kindAffinity / routing.languagePenalty ───────────────────────────
-
-describe('DeckentConfig — routing.kindAffinity / routing.languagePenalty', () => {
-  it('accepts kindAffinity alongside the existing skill_agent_affinity/agent_cache flags', () => {
-    const config: Partial<DeckentConfig> = {
-      routing: { skill_agent_affinity: true, agent_cache: false, kindAffinity: true },
-    };
-    expect(config.routing?.skill_agent_affinity).toBe(true);
-    expect(config.routing?.kindAffinity).toBe(true);
-  });
-
-  it('accepts languagePenalty', () => {
-    const config: Partial<DeckentConfig> = { routing: { languagePenalty: true } };
-    expect(config.routing?.languagePenalty).toBe(true);
-  });
-
-  it('kindAffinity/languagePenalty are undefined on an empty routing block (default-off)', () => {
-    const config: Partial<DeckentConfig> = { routing: {} };
-    expect(config.routing?.kindAffinity).toBeUndefined();
-    expect(config.routing?.languagePenalty).toBeUndefined();
-  });
-
-  it('ResolvedConfig.routing is the same type as DeckentConfig.routing (type-alias passthrough)', () => {
-    const resolved: Partial<ResolvedConfig> = {
-      routing: { kindAffinity: true, languagePenalty: true },
-    };
-    expect(resolved.routing?.kindAffinity).toBe(true);
-    expect(resolved.routing?.languagePenalty).toBe(true);
-  });
-});
-
 // ─── approval.api_decide ───────────────────────────────────────────────────────
 
 describe('DeckentConfig — approval.api_decide', () => {
@@ -239,7 +208,7 @@ describe('validateConfig — new night-landed blocks are tolerated (no behavior 
     config.repl_surface = { enabled: true, approvals: true, bg_turns: true };
     config.deck_broker = { enabled: true };
     config.rollback = { enabled: true };
-    config.routing = { kindAffinity: true, languagePenalty: true };
+    config.routing = { effort_tiering: true };
     config.approval = { api_decide: true };
     expect(() => validateConfig(config)).not.toThrow();
   });

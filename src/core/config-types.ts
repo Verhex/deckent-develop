@@ -338,17 +338,19 @@ export type RoutingV3GovernanceMode = 'ai' | 'deterministic';
  * defaults live) + weights-sum validation live in `core/routing/config.ts`
  * (`ROUTING_V3_SCHEMA` / `resolveRoutingV3Config`) — `routing_v3` is exclusively consumed by the
  * routing3 subsystem, so its schema stays scoped there instead of growing `config.ts` (out of this
- * task's write scope). `loadConfig`/`mergeConfigs` (config.ts) do NOT yet assign this field onto
- * their resolved-object literal — same "type-only pass-through, wiring is a follow-up task" caveat
- * as `computer_use`/`worker_output_contract` below; call `resolveRoutingV3Config()` directly until
- * that follow-up lands.
+ * task's write scope). `loadConfig`/`mergeConfigs` (config.ts) assign this field via
+ * `resolveRoutingV3Config(null, config)` (config.ts:1855/2608), so `resolved.routing_v3` is
+ * populated on the real runtime path.
  *
- * Default: `enabled: false` — the RoutingEngineV3 cut-over flips this in Slice-3. Nothing in
- * Slice-0/1/2 may alter a live routing decision.
+ * `enabled` is VESTIGIAL post-S3 cut-over (2026-07-15): the planner runs V3 unconditionally
+ * (sprint-planner.ts — no enabled-gate), so nothing reads this flag. It is retained as an
+ * optional, ignored key purely so a pre-cut-over config that still sets it validates against the
+ * strict schema instead of hard-failing at load (back-compat).
  */
 export interface RoutingV3Config {
-  /** Master switch for RoutingEngineV3 vector-based agent/skill selection (default: false). */
-  enabled: boolean;
+  /** VESTIGIAL no-op — V3 routing is unconditional (S3 cut-over). Retained optional for
+   *  back-compat: an old config that sets it still validates; nothing consumes it. */
+  enabled?: boolean;
   /** Axis weight distribution — MUST sum to 1.0 (default: content 0.5, positional 0.3, numerical 0.2). */
   weights: RoutingV3Weights;
   /** Minimum composite confidence required to accept a vector-routing decision before falling
@@ -910,32 +912,17 @@ export interface DeckentConfig {
   /** Routing engine version. Only 'v2' (intent-based, `routeTaskV2`) exists — V1
    *  (keyword-based) was removed by ROUTE-V1-PURGE (ADR-G-006). Default: 'v2'. */
   routing_engine?: 'v2';
-  /** Routing behaviour tuning flags (all default-off, opt-in). */
+  /** Routing behaviour tuning flags (all default-off, opt-in). `effort_tiering` is the sole
+   *  surviving flag — skill_agent_affinity/agent_cache/kindAffinity/languagePenalty were removed
+   *  with the V2 routing engine (S3 cut-over 2026-07-15); their consumer (core/routing-engine.ts)
+   *  is gone and V3 folds those signals into its capability/requirement vectors. A pre-cut-over
+   *  config that still carries them is harmless: `routing` is not strict-validated, so unknown
+   *  JSON keys pass through untouched (config.ts whole-object passthrough). */
   routing?: {
-    /** Prefer agents that have a history of success with the selected skills (default: false). */
-    skill_agent_affinity?: boolean;
     /** born-636-K2 (407-003 + CC son-mil): task-type→effort tiering (documentation/config
      *  → 'low' · security/migration/audit → 'high'); explicit `Effort:` hint always wins.
      *  Default-off = byte-identical planning. */
     effort_tiering?: boolean;
-    /** Cache agent selection across tasks in the same sprint to reduce routing overhead (default: false). */
-    agent_cache?: boolean;
-    /**
-     * Enable kind-affinity bonus (PCOMP-W5C, Sprint 352-008). Default-off.
-     * When true, the 'refactorer' agent gets a bonus on a 'refactor'-kind task
-     * and a penalty on a 'code-development'-kind task (`RoutingOptions.kindAffinity`,
-     * core/routing-engine.ts). Flag-off is byte-identical to pre-352-008 routing.
-     */
-    kindAffinity?: boolean;
-    /**
-     * Enable task/agent-prompt language-mismatch penalty (WM-7, Sprint 355-008).
-     * Default-off. When true, a confident TR/EN mismatch between the task text
-     * and the agent's persona text costs a small routing penalty
-     * (`RoutingOptions.languagePenalty`, core/routing-engine.ts). Mirrors the
-     * kindAffinity additive-tiebreaker pattern — never exclusionary. Flag-off
-     * is byte-identical to pre-355-008 routing.
-     */
-    languagePenalty?: boolean;
   };
   /** Delay in ms before cleanup deletes .tasks/ files. Default: 180000 (180s). Set 0 for immediate. */
   cleanup_delay_ms?: number;

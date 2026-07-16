@@ -440,22 +440,14 @@ export async function planSprint(
       typecheck: wm7Stack?.commands?.typecheck,
     };
 
-    // born-636-K2 (COST-K2): routing.effort_tiering config-flag, default-off.
-    // docImpact: DeckentConfig.routing (config-types.ts) needs a matching
-    // `effort_tiering?: boolean` field (sibling of skill_agent_affinity/
-    // kindAffinity/languagePenalty) + config.ts loadConfig/mergeConfigs
-    // pass-through (the born-464 "tip + iki-resolver" pattern) — both files
-    // are out of this task's write scope. `config.routing` itself IS already
-    // typed + already passed through on the real `loadConfig()` runtime path
-    // (config.ts:1699 `routing: config.routing`, a whole-object passthrough
-    // that does not strip unrecognized JSON keys — only TS's static view of
-    // the field is incomplete), so this flag genuinely works end-to-end
-    // through that path today; the structural cast below is how it's read
-    // until the type/roundtrip-guard follow-up lands. Known gap (disk-verified,
-    // pre-existing, unrelated to this diff): `mergeConfigs()` does not pass
-    // `routing` through AT ALL (only `loadConfig` does) — configs built via
-    // `mergeConfigs()` (many hermetic tests) never see ANY `routing.*` flag,
-    // including the three that already ship. See .result notes.
+    // born-636-K2 (COST-K2): routing.effort_tiering config-flag, default-off —
+    // the sole surviving routing tuning flag (skill_agent_affinity/kindAffinity/
+    // languagePenalty were removed with the V2 engine, S3 cut-over). It is typed
+    // on DeckentConfig.routing (config-types.ts) and read directly below.
+    // Known gap (disk-verified, pre-existing, unrelated to this diff):
+    // `mergeConfigs()` does not pass `routing` through AT ALL (only `loadConfig`
+    // does) — configs built via `mergeConfigs()` (many hermetic tests) never see
+    // ANY `routing.*` flag, including effort_tiering. See sprint notes.
     const effortTieringEnabled = config.routing?.effort_tiering ?? false;
 
     for (const src of directiveSources) {
@@ -694,13 +686,13 @@ export async function planSprint(
     // selections so the affinity distribution can be measured BEFORE the flag
     // is defaulted on. In-memory, non-blocking, never throws.
 
-    // ─── ROUTING-V3 branch (Slice-2 integration; default OFF until Slice-3) ──
-    // When routing_v3.enabled, every task routes through the vector pipeline:
-    // one LLM batch enriches the content axis, matching stays deterministic,
-    // escalations/catalog-gaps surface on the plan (decision-5 — never silent).
-    // The V2 loop below remains byte-identical production behavior otherwise.
-    // S3 CUT-OVER: V3 is THE routing engine — unconditional. The V2 loop and
-    // its enabled-gate are gone (Alperen 2026-07-15: "v2'yi tamamen kaldır").
+    // ─── ROUTING-V3 (S3 cut-over 2026-07-15: V3 is THE routing engine) ──────
+    // Every task routes through the vector pipeline UNCONDITIONALLY — the V2
+    // loop and its `routing_v3.enabled` gate are gone (Alperen: "v2'yi tamamen
+    // kaldır"). One LLM batch enriches the content axis, matching stays
+    // deterministic, escalations/catalog-gaps surface on the plan (decision-5
+    // — never silent). `resolveRoutingV3Config` still supplies weights/topK/
+    // governanceMode; only the removed `enabled` flag no longer gates anything.
     {
       const { routeTasksV3ForPlan } = await import('./routing-plan-adapter.js');
       const { resolveRoutingV3Config } = await import('../core/routing/config.js');

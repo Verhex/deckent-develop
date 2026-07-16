@@ -15,8 +15,8 @@ import { DeckentError } from '../../../src/core/errors.js';
 import type { DeckentConfig, RoutingV3Config } from '../../../src/core/config-types.js';
 
 describe('DEFAULT_ROUTING_V3_CONFIG', () => {
-  it('defaults enabled to false (cut-over flips in Slice-3)', () => {
-    expect(DEFAULT_ROUTING_V3_CONFIG.enabled).toBe(false);
+  it('does NOT carry `enabled` in defaults — vestigial no-op post-S3 cut-over (V3 is unconditional)', () => {
+    expect(DEFAULT_ROUTING_V3_CONFIG.enabled).toBeUndefined();
   });
 
   it('default weights sum to 1.0 (content 0.5, positional 0.3, numerical 0.2)', () => {

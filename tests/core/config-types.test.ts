@@ -192,7 +192,10 @@ describe('DeckentConfig — retry_transient_failures (T5)', () => {
   });
 });
 
-// ─── T6: routing.skill_agent_affinity + routing.agent_cache ──────────────────
+// ─── T6 (S3 cut-over): routing tuning flags — effort_tiering is the sole survivor ──
+// skill_agent_affinity/agent_cache/kindAffinity/languagePenalty were removed with
+// the V2 routing engine; their per-flag boolean validation went with them. Only the
+// block SHAPE is still validated (`routing must be an object`).
 
 describe('DeckentConfig — routing (T6)', () => {
   it('routing is optional and undefined when not set', () => {
@@ -200,33 +203,19 @@ describe('DeckentConfig — routing (T6)', () => {
     expect(config.routing).toBeUndefined();
   });
 
-  it('accepts routing with skill_agent_affinity: true', () => {
-    const config: Partial<DeckentConfig> = { routing: { skill_agent_affinity: true } };
-    expect(config.routing?.skill_agent_affinity).toBe(true);
+  it('accepts routing with effort_tiering: true', () => {
+    const config: Partial<DeckentConfig> = { routing: { effort_tiering: true } };
+    expect(config.routing?.effort_tiering).toBe(true);
   });
 
-  it('accepts routing with agent_cache: false', () => {
-    const config: Partial<DeckentConfig> = { routing: { agent_cache: false } };
-    expect(config.routing?.agent_cache).toBe(false);
-  });
-
-  it('accepts routing with both flags set', () => {
-    const config: Partial<DeckentConfig> = {
-      routing: { skill_agent_affinity: false, agent_cache: true },
-    };
-    expect(config.routing?.skill_agent_affinity).toBe(false);
-    expect(config.routing?.agent_cache).toBe(true);
-  });
-
-  it('accepts routing as empty object (all flags default-off)', () => {
+  it('accepts routing as empty object (effort_tiering default-off)', () => {
     const config: Partial<DeckentConfig> = { routing: {} };
-    expect(config.routing?.skill_agent_affinity).toBeUndefined();
-    expect(config.routing?.agent_cache).toBeUndefined();
+    expect(config.routing?.effort_tiering).toBeUndefined();
   });
 
   it('ResolvedConfig accepts routing block', () => {
-    const resolved: Partial<ResolvedConfig> = { routing: { skill_agent_affinity: true } };
-    expect(resolved.routing?.skill_agent_affinity).toBe(true);
+    const resolved: Partial<ResolvedConfig> = { routing: { effort_tiering: true } };
+    expect(resolved.routing?.effort_tiering).toBe(true);
   });
 
   it('validateConfig throws when routing is not an object', () => {
@@ -242,35 +231,9 @@ describe('DeckentConfig — routing (T6)', () => {
     }
   });
 
-  it('validateConfig throws when routing.skill_agent_affinity is not a boolean', () => {
-    const config = createDefaultConfig();
-    (config as Record<string, unknown>)['routing'] = { skill_agent_affinity: 'yes' };
-    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
-    try {
-      validateConfig(config);
-    } catch (e) {
-      expect((e as ConfigValidationError).errors).toContainEqual(
-        expect.stringContaining('routing.skill_agent_affinity must be a boolean'),
-      );
-    }
-  });
-
-  it('validateConfig throws when routing.agent_cache is not a boolean', () => {
-    const config = createDefaultConfig();
-    (config as Record<string, unknown>)['routing'] = { agent_cache: 1 };
-    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
-    try {
-      validateConfig(config);
-    } catch (e) {
-      expect((e as ConfigValidationError).errors).toContainEqual(
-        expect.stringContaining('routing.agent_cache must be a boolean'),
-      );
-    }
-  });
-
   it('validateConfig accepts valid routing block without errors', () => {
     const config = createDefaultConfig();
-    config.routing = { skill_agent_affinity: true, agent_cache: false };
+    config.routing = { effort_tiering: true };
     expect(() => validateConfig(config)).not.toThrow();
   });
 
