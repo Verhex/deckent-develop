@@ -9,44 +9,11 @@
  * Electron runtime.
  */
 import { getLanguage, getMessage } from '../../../cli/helpers/messages.js';
+// D4-2: the served-key list is SHARED with the renderer (its English fallback
+// map derives from the same SSOT) — single list, no drift.
+import { DESKTOP_MESSAGE_KEYS, type DesktopMessageKey } from '../shared/desktop-messages.js';
 
-/** The desktop.* keys this module resolves — see messages.ts for the en/tr pairs. */
-const DESKTOP_MESSAGE_KEYS = [
-  'desktop.tray.open',
-  'desktop.tray.quit',
-  'desktop.tray.tooltip',
-  'desktop.connection.add_title',
-  'desktop.connection.kind.local',
-  'desktop.connection.kind.wsl',
-  'desktop.connection.kind.ssh',
-  'desktop.connection.kind.container',
-  'desktop.connection.kind_not_yet_supported',
-  'desktop.connection.connect_button',
-  'desktop.connection.delete_confirm',
-  'desktop.connecting.spawning',
-  'desktop.connecting.adopting',
-  'desktop.connecting.health_check',
-  'desktop.connecting.retry',
-  'desktop.error.node_not_found',
-  'desktop.error.deckent_not_found',
-  'desktop.error.port_conflict',
-  'desktop.error.daemon_crashed',
-  'desktop.error.health_timeout',
-  'desktop.error.view_logs',
-  'desktop.window.minimize_to_tray_hint',
-  'desktop.update.available',
-  'desktop.update.downloading',
-  'desktop.update.restart_to_apply',
-  'desktop.update.check_for_updates',
-  'desktop.menu.help',
-  // D4-1 «Köprüüstü» — watch (vardiya) theme system.
-  'desktop.theme.title',
-  'desktop.theme.watch.day-watch',
-  'desktop.theme.watch.night-watch',
-  'desktop.theme.watch.open-sea',
-] as const;
-
-export type DesktopMessageKey = (typeof DESKTOP_MESSAGE_KEYS)[number];
+export type { DesktopMessageKey };
 
 let currentLanguage: string | undefined;
 

@@ -1,0 +1,82 @@
+/**
+ * D4-2 (SURF-4) — the SINGLE list of `desktop.*` i18n keys the Desktop app
+ * uses, shared by BOTH sides of the string bridge:
+ *
+ *   main   — i18n.ts resolves them via the repo SSOT (src/cli/helpers/
+ *            messages.ts) and serves the flat map over `app.getStrings()`;
+ *   renderer — app.ts's MSG map may ONLY reference keys from this list
+ *            (pinned by tests/desktop-i18n.test.ts), and its English
+ *            fallback map is DERIVED from the same SSOT (i18n-fallback.ts)
+ *            — zero renderer-local user-facing literals (D4-2 done-criterion).
+ *
+ * Adding a renderer string = add the en/tr pair to messages.ts under
+ * `desktop.*`, add the key here, reference it from MSG. The completeness
+ * test fails if any step is skipped.
+ */
+
+export const DESKTOP_MESSAGE_KEYS = [
+  // ── tray / menu / window / updates (pre-D4-2 canonical set) ──
+  'desktop.tray.open',
+  'desktop.tray.quit',
+  'desktop.tray.tooltip',
+  'desktop.window.minimize_to_tray_hint',
+  'desktop.update.available',
+  'desktop.update.downloading',
+  'desktop.update.restart_to_apply',
+  'desktop.update.check_for_updates',
+  'desktop.menu.help',
+  // ── connection screens (canonical) ──
+  'desktop.connection.add_title',
+  'desktop.connection.kind.local',
+  'desktop.connection.kind.wsl',
+  'desktop.connection.kind.ssh',
+  'desktop.connection.kind.container',
+  'desktop.connection.kind_not_yet_supported',
+  'desktop.connection.connect_button',
+  'desktop.connection.delete_confirm',
+  'desktop.connecting.spawning',
+  'desktop.connecting.adopting',
+  'desktop.connecting.health_check',
+  'desktop.connecting.retry',
+  'desktop.error.node_not_found',
+  'desktop.error.deckent_not_found',
+  'desktop.error.port_conflict',
+  'desktop.error.daemon_crashed',
+  'desktop.error.health_timeout',
+  'desktop.error.view_logs',
+  // ── D4-2: former renderer-local supplementary copy, promoted to the SSOT ──
+  'desktop.app.browser_fallback_notice',
+  'desktop.connection.list_title',
+  'desktop.connection.list_loading',
+  'desktop.connection.empty_state',
+  'desktop.connection.list_error',
+  'desktop.connection.field_label',
+  'desktop.connection.field_kind',
+  'desktop.connection.field_project_path',
+  'desktop.connection.field_host',
+  'desktop.connection.field_port',
+  'desktop.connection.field_auto_start',
+  'desktop.connection.field_orphan_shutdown',
+  'desktop.connection.submit_button',
+  'desktop.connection.delete_button',
+  'desktop.connection.validation_required',
+  'desktop.connection.validation_port',
+  'desktop.connection.add_error',
+  'desktop.connection.remove_error',
+  'desktop.connecting.title',
+  'desktop.connecting.idle',
+  'desktop.connecting.connected',
+  'desktop.error.title',
+  'desktop.error.unknown',
+  'desktop.error.back_button',
+  // daemon-lifecycle push errorKey'leri (D4-2'de öksüz-anahtar olarak yakalandı)
+  'desktop.daemon.spawn_failed',
+  'desktop.daemon.health_timeout',
+  // ── D4-1 «Köprüüstü» watch (vardiya) theme system ──
+  'desktop.theme.title',
+  'desktop.theme.watch.day-watch',
+  'desktop.theme.watch.night-watch',
+  'desktop.theme.watch.open-sea',
+] as const;
+
+export type DesktopMessageKey = (typeof DESKTOP_MESSAGE_KEYS)[number];

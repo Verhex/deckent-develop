@@ -3552,6 +3552,74 @@ const MESSAGES: MessageMap = {
     tr: 'Güncellemeleri Denetle',
   },
   'desktop.menu.help': { en: 'Help', tr: 'Yardım' },
+  // D4-2 — former renderer-local supplementary copy, promoted to this SSOT
+  // (src/desktop/src/shared/desktop-messages.ts lists the served keys).
+  'desktop.app.browser_fallback_notice': {
+    en: 'Desktop bridge unavailable — running in browser preview mode.',
+    tr: 'Masaüstü köprüsü kullanılamıyor — tarayıcı önizleme kipinde çalışıyor.',
+  },
+  'desktop.connection.list_title': { en: 'Connections', tr: 'Bağlantılar' },
+  'desktop.connection.list_loading': { en: 'Loading…', tr: 'Yükleniyor…' },
+  'desktop.connection.empty_state': {
+    en: 'No saved connections yet. Add one below to get started.',
+    tr: 'Kayıtlı bağlantı yok. Başlamak için aşağıdan bir tane ekleyin.',
+  },
+  'desktop.connection.list_error': {
+    en: 'Could not load saved connections.',
+    tr: 'Kayıtlı bağlantılar yüklenemedi.',
+  },
+  'desktop.connection.field_label': { en: 'Name', tr: 'Ad' },
+  'desktop.connection.field_kind': { en: 'Kind', tr: 'Tür' },
+  'desktop.connection.field_project_path': { en: 'Project path', tr: 'Proje yolu' },
+  'desktop.connection.field_host': { en: 'Host', tr: 'Sunucu' },
+  'desktop.connection.field_port': { en: 'Port', tr: 'Port' },
+  'desktop.connection.field_auto_start': {
+    en: "Start the daemon automatically if it isn't running",
+    tr: 'Daemon çalışmıyorsa otomatik başlat',
+  },
+  'desktop.connection.field_orphan_shutdown': {
+    en: 'Stop this daemon on quit (only if this app started it)',
+    tr: "Çıkışta bu daemon'u durdur (yalnız bu uygulama başlattıysa)",
+  },
+  'desktop.connection.submit_button': { en: 'Save connection', tr: 'Bağlantıyı kaydet' },
+  'desktop.connection.delete_button': { en: 'Delete', tr: 'Sil' },
+  'desktop.connection.validation_required': {
+    en: 'This field is required.',
+    tr: 'Bu alan zorunludur.',
+  },
+  'desktop.connection.validation_port': {
+    en: 'Enter a port between 1 and 65535.',
+    tr: '1 ile 65535 arasında bir port girin.',
+  },
+  'desktop.connection.add_error': {
+    en: 'Could not save this connection.',
+    tr: 'Bağlantı kaydedilemedi.',
+  },
+  'desktop.connection.remove_error': {
+    en: 'Could not delete this connection.',
+    tr: 'Bağlantı silinemedi.',
+  },
+  'desktop.connecting.title': { en: 'Connecting', tr: 'Bağlanılıyor' },
+  'desktop.connecting.idle': { en: 'Preparing…', tr: 'Hazırlanıyor…' },
+  'desktop.connecting.connected': {
+    en: 'Connected — loading dashboard…',
+    tr: 'Bağlandı — panel yükleniyor…',
+  },
+  'desktop.error.title': { en: 'Connection failed', tr: 'Bağlantı başarısız' },
+  'desktop.error.unknown': {
+    en: 'Something went wrong while connecting.',
+    tr: 'Bağlanırken bir sorun oluştu.',
+  },
+  'desktop.error.back_button': { en: 'Back to connections', tr: 'Bağlantılara dön' },
+  // D4-2 — daemon-lifecycle errorKey'leri (öksüzdüler: renderer ham-anahtar basıyordu).
+  'desktop.daemon.spawn_failed': {
+    en: 'Could not start the daemon: {message}',
+    tr: 'Daemon başlatılamadı: {message}',
+  },
+  'desktop.daemon.health_timeout': {
+    en: 'The daemon did not respond in time.',
+    tr: 'Daemon zamanında yanıt vermedi.',
+  },
   // D4-1 «Köprüüstü» — watch (vardiya) theme system.
   'desktop.theme.title': { en: 'Watch', tr: 'Vardiya' },
   'desktop.theme.watch.day-watch': { en: 'Day watch', tr: 'Gündüz seyri' },

@@ -5,16 +5,16 @@
  * a daemon handshake succeeds, the MAIN process swaps this window's
  * loadURL() to the daemon's own http origin (see electron.vite.config.ts).
  *
- * i18n: every user-facing string flows through `t()` against a map merged
- * from `window.deckentDesktop.app.getStrings()` (IPC, `desktop.*` keys from
- * src/cli/helpers/messages.ts) over `FALLBACK_STRINGS` (English). When
- * `window.deckentDesktop` is absent (plain-browser test run), FALLBACK_STRINGS
- * is used verbatim — screens still render, per task spec ("don't hide").
- *
- * Canonical keys (blueprint §3e, owned by src/cli/helpers/messages.ts /
- * born-496 §392-005 — not yet landed as of this writing) are marked below;
- * the rest are renderer-local supplementary copy pending promotion to
- * messages.ts (see .result docImpact note).
+ * i18n (D4-2): every user-facing string flows through `t()` against a map
+ * merged from `window.deckentDesktop.app.getStrings()` (IPC, full `desktop.*`
+ * keys from src/cli/helpers/messages.ts — the ONE catalog) over an English
+ * fallback map DERIVED from that same catalog at bundle time
+ * (./i18n-fallback.ts). When the bridge is absent (plain-browser preview),
+ * the derived fallback renders — screens still show, per the original spec
+ * ("don't hide") — and there is ZERO renderer-local user-facing literal.
+ * MSG values are the FULL keys (the pre-D4-2 short forms never matched the
+ * IPC map — the silent drift this slice closed) and every entry must appear
+ * in shared/desktop-messages.ts (pinned by tests/desktop-i18n.test.ts).
  */
 import {
   CONNECTION_KINDS,
@@ -25,6 +25,7 @@ import {
 } from '../shared/desktop-api.js';
 import { DEFAULT_PREFERENCES, WATCH_NAMES, type DesktopPreferences, type WatchName } from '../shared/theme-tokens.js';
 import { applyWatch } from './theme-runtime.js';
+import { buildFallbackStrings } from './i18n-fallback.js';
 
 declare global {
   interface Window {
@@ -32,108 +33,56 @@ declare global {
   }
 }
 
-const MSG = {
-  // --- canonical (blueprint §3e / messages.ts desktop.*) ---
-  connectionAddTitle: 'connection.add_title',
-  connectionKindLocal: 'connection.kind.local',
-  connectionKindWsl: 'connection.kind.wsl',
-  connectionKindSsh: 'connection.kind.ssh',
-  connectionKindContainer: 'connection.kind.container',
-  connectionKindNotYetSupported: 'connection.kind_not_yet_supported',
-  connectionConnectButton: 'connection.connect_button',
-  connectionDeleteConfirm: 'connection.delete_confirm',
-  connectingSpawning: 'connecting.spawning',
-  connectingAdopting: 'connecting.adopting',
-  connectingHealthCheck: 'connecting.health_check',
-  connectingRetry: 'connecting.retry',
-  // D4-1 theme keys use the FULL `desktop.*` form so the IPC-fetched map
-  // (getDesktopStrings keys them fully) resolves them TODAY — the short-form
-  // legacy keys above are D4-2's unification debt, not extended here.
+export const MSG = {
+  connectionAddTitle: 'desktop.connection.add_title',
+  connectionKindLocal: 'desktop.connection.kind.local',
+  connectionKindWsl: 'desktop.connection.kind.wsl',
+  connectionKindSsh: 'desktop.connection.kind.ssh',
+  connectionKindContainer: 'desktop.connection.kind.container',
+  connectionKindNotYetSupported: 'desktop.connection.kind_not_yet_supported',
+  connectionConnectButton: 'desktop.connection.connect_button',
+  connectionDeleteConfirm: 'desktop.connection.delete_confirm',
+  connectingSpawning: 'desktop.connecting.spawning',
+  connectingAdopting: 'desktop.connecting.adopting',
+  connectingHealthCheck: 'desktop.connecting.health_check',
+  connectingRetry: 'desktop.connecting.retry',
   themeTitle: 'desktop.theme.title',
   themeWatchDayWatch: 'desktop.theme.watch.day-watch',
   themeWatchNightWatch: 'desktop.theme.watch.night-watch',
   themeWatchOpenSea: 'desktop.theme.watch.open-sea',
-  errorNodeNotFound: 'error.node_not_found',
-  errorDeckentNotFound: 'error.deckent_not_found',
-  errorPortConflict: 'error.port_conflict',
-  errorDaemonCrashed: 'error.daemon_crashed',
-  errorHealthTimeout: 'error.health_timeout',
-  errorViewLogs: 'error.view_logs',
-  // --- renderer-local supplementary (not yet in messages.ts) ---
-  appBrowserFallbackNotice: 'app.browser_fallback_notice',
-  connectionListTitle: 'connection.list_title',
-  connectionListLoading: 'connection.list_loading',
-  connectionEmptyState: 'connection.empty_state',
-  connectionListError: 'connection.list_error',
-  connectionFieldLabel: 'connection.field_label',
-  connectionFieldKind: 'connection.field_kind',
-  connectionFieldProjectPath: 'connection.field_project_path',
-  connectionFieldHost: 'connection.field_host',
-  connectionFieldPort: 'connection.field_port',
-  connectionFieldAutoStart: 'connection.field_auto_start',
-  connectionFieldOrphanShutdown: 'connection.field_orphan_shutdown',
-  connectionSubmitButton: 'connection.submit_button',
-  connectionDeleteButton: 'connection.delete_button',
-  connectionValidationRequired: 'connection.validation_required',
-  connectionValidationPort: 'connection.validation_port',
-  connectionAddError: 'connection.add_error',
-  connectionRemoveError: 'connection.remove_error',
-  connectingTitle: 'connecting.title',
-  connectingIdle: 'connecting.idle',
-  connectingConnected: 'connecting.connected',
-  errorTitle: 'error.title',
-  errorUnknown: 'error.unknown',
-  errorBackButton: 'error.back_button',
+  errorNodeNotFound: 'desktop.error.node_not_found',
+  errorDeckentNotFound: 'desktop.error.deckent_not_found',
+  errorPortConflict: 'desktop.error.port_conflict',
+  errorDaemonCrashed: 'desktop.error.daemon_crashed',
+  errorHealthTimeout: 'desktop.error.health_timeout',
+  errorViewLogs: 'desktop.error.view_logs',
+  appBrowserFallbackNotice: 'desktop.app.browser_fallback_notice',
+  connectionListTitle: 'desktop.connection.list_title',
+  connectionListLoading: 'desktop.connection.list_loading',
+  connectionEmptyState: 'desktop.connection.empty_state',
+  connectionListError: 'desktop.connection.list_error',
+  connectionFieldLabel: 'desktop.connection.field_label',
+  connectionFieldKind: 'desktop.connection.field_kind',
+  connectionFieldProjectPath: 'desktop.connection.field_project_path',
+  connectionFieldHost: 'desktop.connection.field_host',
+  connectionFieldPort: 'desktop.connection.field_port',
+  connectionFieldAutoStart: 'desktop.connection.field_auto_start',
+  connectionFieldOrphanShutdown: 'desktop.connection.field_orphan_shutdown',
+  connectionSubmitButton: 'desktop.connection.submit_button',
+  connectionDeleteButton: 'desktop.connection.delete_button',
+  connectionValidationRequired: 'desktop.connection.validation_required',
+  connectionValidationPort: 'desktop.connection.validation_port',
+  connectionAddError: 'desktop.connection.add_error',
+  connectionRemoveError: 'desktop.connection.remove_error',
+  connectingTitle: 'desktop.connecting.title',
+  connectingIdle: 'desktop.connecting.idle',
+  connectingConnected: 'desktop.connecting.connected',
+  errorTitle: 'desktop.error.title',
+  errorUnknown: 'desktop.error.unknown',
+  errorBackButton: 'desktop.error.back_button',
 } as const;
 
-const FALLBACK_STRINGS: Record<string, string> = {
-  [MSG.connectionAddTitle]: 'Add connection',
-  [MSG.connectionKindLocal]: 'Local',
-  [MSG.connectionKindWsl]: 'WSL',
-  [MSG.connectionKindSsh]: 'SSH',
-  [MSG.connectionKindContainer]: 'Container',
-  [MSG.connectionKindNotYetSupported]: 'Not yet supported — coming in a future release.',
-  [MSG.connectionConnectButton]: 'Connect',
-  [MSG.connectionDeleteConfirm]: 'Delete this connection? This cannot be undone.',
-  [MSG.connectingSpawning]: 'Starting daemon…',
-  [MSG.connectingAdopting]: 'Connecting to existing daemon…',
-  [MSG.connectingHealthCheck]: 'Checking daemon health…',
-  [MSG.connectingRetry]: 'Retry',
-  [MSG.themeTitle]: 'Watch',
-  [MSG.themeWatchDayWatch]: 'Day watch',
-  [MSG.themeWatchNightWatch]: 'Night watch',
-  [MSG.themeWatchOpenSea]: 'Open sea',
-  [MSG.errorNodeNotFound]: 'Node.js was not found on the target.',
-  [MSG.errorDeckentNotFound]: 'deckent was not found on the target.',
-  [MSG.errorPortConflict]: 'Port {port} is already in use.',
-  [MSG.errorDaemonCrashed]: 'The daemon process crashed unexpectedly.',
-  [MSG.errorHealthTimeout]: 'The daemon did not respond in time.',
-  [MSG.errorViewLogs]: 'View logs',
-  [MSG.appBrowserFallbackNotice]: 'Desktop bridge unavailable — running in browser preview mode.',
-  [MSG.connectionListTitle]: 'Connections',
-  [MSG.connectionListLoading]: 'Loading…',
-  [MSG.connectionEmptyState]: 'No saved connections yet. Add one below to get started.',
-  [MSG.connectionListError]: 'Could not load saved connections.',
-  [MSG.connectionFieldLabel]: 'Name',
-  [MSG.connectionFieldKind]: 'Kind',
-  [MSG.connectionFieldProjectPath]: 'Project path',
-  [MSG.connectionFieldHost]: 'Host',
-  [MSG.connectionFieldPort]: 'Port',
-  [MSG.connectionFieldAutoStart]: "Start the daemon automatically if it isn't running",
-  [MSG.connectionFieldOrphanShutdown]: 'Stop this daemon on quit (only if this app started it)',
-  [MSG.connectionSubmitButton]: 'Save connection',
-  [MSG.connectionDeleteButton]: 'Delete',
-  [MSG.connectionValidationRequired]: 'This field is required.',
-  [MSG.connectionValidationPort]: 'Enter a port between 1 and 65535.',
-  [MSG.connectionAddError]: 'Could not save this connection.',
-  [MSG.connectionRemoveError]: 'Could not delete this connection.',
-  [MSG.connectingTitle]: 'Connecting',
-  [MSG.connectingIdle]: 'Preparing…',
-  [MSG.connectingConnected]: 'Connected — loading dashboard…',
-  [MSG.errorTitle]: 'Connection failed',
-  [MSG.errorUnknown]: 'Something went wrong while connecting.',
-  [MSG.errorBackButton]: 'Back to connections',
-};
+const FALLBACK_STRINGS: Record<string, string> = buildFallbackStrings();
 
 const KIND_LABEL_KEYS: Record<ConnectionKind, string> = {
   local: MSG.connectionKindLocal,
