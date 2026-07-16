@@ -2,22 +2,24 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
+// F-2: node:child_process stays mocked so the fail-soft `git ls-files`
+// normalization step never runs real git; planner calls inject PlannerSpawnFn.
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
+  spawn: vi.fn(),
 }));
 
-import { spawnSync } from 'node:child_process';
 import {
   buildPlanPrompt,
   buildZeroConfigPlanPrompt,
   callZeroConfigPlanner,
   buildZeroConfigFallbackPlan,
+  type PlannerSpawnFn,
+  type PlannerSpawnOutcome,
 } from '../../src/orchestra/planner.js';
 import type { BrainContext, SprintSizeRecommendation, Task, ModelType } from '../../src/core/types.js';
 import { BRAIN_PLAN_TIMEOUT_MS } from '../../src/core/constants.js';
 import type { ProviderAdapter } from '../../src/core/provider.js';
-
-const mockedSpawnSync = vi.mocked(spawnSync);
 
 // ─── Mock ProviderAdapter ─────────────────────────────────────────────────
 function makeMockAdapter(): ProviderAdapter {
@@ -200,142 +202,73 @@ describe('buildZeroConfigPlanPrompt', () => {
 // ═══ callZeroConfigPlanner ════════════════════════════════════════════
 
 describe('callZeroConfigPlanner', () => {
-  it('returns parsed result when AI call succeeds with 4 tasks', () => {
-    mockedSpawnSync.mockReturnValue({
-      status: 0,
-      stdout: makeValidPlannerJSON(4),
-      stderr: '',
-      pid: 1,
-      signal: null,
-      output: [],
-    } as never);
+  // F-2: the planner call is async with an injectable PlannerSpawnFn — the
+  // spawnSync freeze-class died; these fakes are hermetic and record calls.
+  function makeSpawnFn(outcome: Partial<PlannerSpawnOutcome> = {}) {
+    const calls: Array<{ command: string; args: string[]; timeoutMs: number }> = [];
+    const fn: PlannerSpawnFn = async (command, args, opts) => {
+      calls.push({ command, args: [...args], timeoutMs: opts.timeoutMs });
+      return { status: 0, signal: null, stdout: makeValidPlannerJSON(3), stderr: '', ...outcome };
+    };
+    return { fn, calls };
+  }
 
-    const result = callZeroConfigPlanner('Add login page', 'sonnet', 'my-app', [], mockAdapter);
+  it('returns parsed result when AI call succeeds with 4 tasks', async () => {
+    const { fn } = makeSpawnFn({ stdout: makeValidPlannerJSON(4) });
+    const result = await callZeroConfigPlanner('Add login page', 'sonnet', 'my-app', [], mockAdapter, undefined, fn);
     expect(result).not.toBeNull();
     expect(result!.tasks).toHaveLength(4);
     expect(result!.reasoning).toBe('Zero-config split plan');
   });
 
-  it('returns 3 tasks for a simple feature', () => {
-    mockedSpawnSync.mockReturnValue({
-      status: 0,
-      stdout: makeValidPlannerJSON(3),
-      stderr: '',
-      pid: 1,
-      signal: null,
-      output: [],
-    } as never);
-
-    const result = callZeroConfigPlanner('Fix the bug', 'sonnet', 'app', [], mockAdapter);
+  it('returns 3 tasks for a simple feature', async () => {
+    const { fn } = makeSpawnFn();
+    const result = await callZeroConfigPlanner('Fix the bug', 'sonnet', 'app', [], mockAdapter, undefined, fn);
     expect(result).not.toBeNull();
     expect(result!.tasks).toHaveLength(3);
   });
 
-  it('returns null when AI call fails (non-zero exit)', () => {
-    mockedSpawnSync.mockReturnValue({
-      status: 1,
-      stdout: '',
-      stderr: 'error',
-      pid: 1,
-      signal: null,
-      output: [],
-    } as never);
-
-    const result = callZeroConfigPlanner('Add feature', 'sonnet', 'app', [], mockAdapter);
-    expect(result).toBeNull();
+  it('returns null when AI call fails (non-zero exit)', async () => {
+    const { fn } = makeSpawnFn({ status: 1, stdout: '', stderr: 'error' });
+    await expect(callZeroConfigPlanner('Add feature', 'sonnet', 'app', [], mockAdapter, undefined, fn)).resolves.toBeNull();
   });
 
-  it('returns null when stdout is empty', () => {
-    mockedSpawnSync.mockReturnValue({
-      status: 0,
-      stdout: '',
-      stderr: '',
-      pid: 1,
-      signal: null,
-      output: [],
-    } as never);
-
-    const result = callZeroConfigPlanner('Add feature', 'sonnet', 'app', [], mockAdapter);
-    expect(result).toBeNull();
+  it('returns null when stdout is empty', async () => {
+    const { fn } = makeSpawnFn({ status: 0, stdout: '' });
+    await expect(callZeroConfigPlanner('Add feature', 'sonnet', 'app', [], mockAdapter, undefined, fn)).resolves.toBeNull();
   });
 
-  it('returns null when AI returns invalid JSON', () => {
-    mockedSpawnSync.mockReturnValue({
-      status: 0,
-      stdout: 'not valid json',
-      stderr: '',
-      pid: 1,
-      signal: null,
-      output: [],
-    } as never);
-
-    const result = callZeroConfigPlanner('Add feature', 'sonnet', 'app', [], mockAdapter);
-    expect(result).toBeNull();
+  it('returns null when AI returns invalid JSON (even after the U2 retry)', async () => {
+    const { fn, calls } = makeSpawnFn({ status: 0, stdout: 'not valid json' });
+    await expect(callZeroConfigPlanner('Add feature', 'sonnet', 'app', [], mockAdapter, undefined, fn)).resolves.toBeNull();
+    expect(calls).toHaveLength(2); // initial + one schema-feedback retry
   });
 
-  it('passes model parameter to spawnSync', () => {
-    mockedSpawnSync.mockReturnValue({
-      status: 0,
-      stdout: makeValidPlannerJSON(3),
-      stderr: '',
-      pid: 1,
-      signal: null,
-      output: [],
-    } as never);
-
-    callZeroConfigPlanner('Add feature', 'opus', 'app', [], mockAdapter);
-
-    const args = mockedSpawnSync.mock.calls[0]![1] as string[];
+  it('passes model parameter to the planner spawn', async () => {
+    const { fn, calls } = makeSpawnFn();
+    await callZeroConfigPlanner('Add feature', 'opus', 'app', [], mockAdapter, undefined, fn);
+    const args = calls[0]!.args;
     const modelIdx = args.indexOf('--model');
     expect(args[modelIdx + 1]).toBe('opus');
   });
 
-  it('calls spawnSync with correct timeout', () => {
-    mockedSpawnSync.mockReturnValue({
-      status: 0,
-      stdout: makeValidPlannerJSON(3),
-      stderr: '',
-      pid: 1,
-      signal: null,
-      output: [],
-    } as never);
-
-    callZeroConfigPlanner('Add feature', 'sonnet', 'app', [], mockAdapter);
-
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      'claude',
-      expect.any(Array),
-      expect.objectContaining({ timeout: BRAIN_PLAN_TIMEOUT_MS }),
-    );
+  it('spawns with the correct timeout', async () => {
+    const { fn, calls } = makeSpawnFn();
+    await callZeroConfigPlanner('Add feature', 'sonnet', 'app', [], mockAdapter, undefined, fn);
+    expect(calls[0]!.command).toBe('claude');
+    expect(calls[0]!.timeoutMs).toBe(BRAIN_PLAN_TIMEOUT_MS);
   });
 
-  it('passes file tree context to the prompt', () => {
-    mockedSpawnSync.mockReturnValue({
-      status: 0,
-      stdout: makeValidPlannerJSON(3),
-      stderr: '',
-      pid: 1,
-      signal: null,
-      output: [],
-    } as never);
-
-    callZeroConfigPlanner('Add feature', 'sonnet', 'app', ['src/auth.ts', 'src/api.ts'], mockAdapter);
-
-    const promptArg = (mockedSpawnSync.mock.calls[0]![1] as string[])[1]!;
+  it('passes file tree context to the prompt', async () => {
+    const { fn, calls } = makeSpawnFn();
+    await callZeroConfigPlanner('Add feature', 'sonnet', 'app', ['src/auth.ts', 'src/api.ts'], mockAdapter, undefined, fn);
+    const promptArg = calls[0]!.args[1]!;
     expect(promptArg).toContain('src/auth.ts');
   });
 
-  it('handles valid 5-task response', () => {
-    mockedSpawnSync.mockReturnValue({
-      status: 0,
-      stdout: makeValidPlannerJSON(5),
-      stderr: '',
-      pid: 1,
-      signal: null,
-      output: [],
-    } as never);
-
-    const result = callZeroConfigPlanner('Complex feature', 'opus', 'app', [], mockAdapter);
+  it('handles valid 5-task response', async () => {
+    const { fn } = makeSpawnFn({ stdout: makeValidPlannerJSON(5) });
+    const result = await callZeroConfigPlanner('Complex feature', 'opus', 'app', [], mockAdapter, undefined, fn);
     expect(result).not.toBeNull();
     expect(result!.tasks).toHaveLength(5);
   });

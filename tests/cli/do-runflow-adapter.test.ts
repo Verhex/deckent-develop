@@ -28,6 +28,9 @@ import { join } from 'node:path';
 // callZeroConfigPlanner mock'lanır (do-real-plan.test.ts emsali); canned tek-task
 // GERÇEK-şekilli plan döner, böylece propose-yolu hermetik kalır.
 vi.mock('../../src/orchestra/planner.js', () => ({
+  // F-2: do.ts's planning heartbeat resolves its notice-timeout through this
+  // (single-source with the real spawn); a constant is enough hermetically.
+  resolvePlanTimeoutMs: vi.fn(() => 900_000),
   callZeroConfigPlanner: vi.fn(() => ({
     reasoning: 'canned single-task plan (hermetic planner boundary)',
     tasks: [{

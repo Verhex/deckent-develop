@@ -77,7 +77,7 @@ function sortScope(task: DirectiveBuildTask): DirectiveBuildTask {
 // ─── Case A: empty scope.filesWrite -> typed error naming the OFFENDING task ──
 
 describe('compileRunProposalIntent — empty scope.filesWrite (born-691 regression lock)', () => {
-  it('throws RunProposalPlanError naming the offending task\'s original title, not the valid sibling\'s', () => {
+  it('throws RunProposalPlanError naming the offending task\'s original title, not the valid sibling\'s', async () => {
     const proposal = makeProposal({ flowId: 'flow-435-empty-files' });
     const validTask = makePlannerTask({ title: 'Valid backend task' });
     const emptyFilesTask = makePlannerTask({
@@ -92,7 +92,7 @@ describe('compileRunProposalIntent — empty scope.filesWrite (born-691 regressi
 
     let caught: unknown;
     try {
-      compileRunProposalIntent(proposal, fakePlanner);
+      await compileRunProposalIntent(proposal, fakePlanner);
     } catch (e) {
       caught = e;
     }
@@ -107,7 +107,7 @@ describe('compileRunProposalIntent — empty scope.filesWrite (born-691 regressi
     expect(err.message).not.toContain('Valid backend task');
   });
 
-  it('treats a whitespace-only filesWrite entry as empty (no blank-string escape hatch)', () => {
+  it('treats a whitespace-only filesWrite entry as empty (no blank-string escape hatch)', async () => {
     const proposal = makeProposal({ flowId: 'flow-435-blank-file' });
     const blankFileTask = makePlannerTask({
       title: 'Whitespace-only write target',
@@ -118,16 +118,16 @@ describe('compileRunProposalIntent — empty scope.filesWrite (born-691 regressi
       tasks: [blankFileTask],
     });
 
-    expect(() => compileRunProposalIntent(proposal, fakePlanner)).toThrow(RunProposalPlanError);
+    await expect(compileRunProposalIntent(proposal, fakePlanner)).rejects.toThrow(RunProposalPlanError);
     try {
-      compileRunProposalIntent(proposal, fakePlanner);
+      await compileRunProposalIntent(proposal, fakePlanner);
     } catch (e) {
       expect(e).toBeInstanceOf(RunProposalPlanError);
       expect((e as Error).message).toContain('"Whitespace-only write target"');
     }
   });
 
-  it('compileRunProposal (markdown entrypoint) surfaces the same typed error for an empty-filesWrite task', () => {
+  it('compileRunProposal (markdown entrypoint) surfaces the same typed error for an empty-filesWrite task', async () => {
     const proposal = makeProposal({ flowId: 'flow-435-empty-files-md' });
     const emptyFilesTask = makePlannerTask({
       title: 'No write target',
@@ -135,7 +135,7 @@ describe('compileRunProposalIntent — empty scope.filesWrite (born-691 regressi
     });
     const fakePlanner: RunProposalPlanner = () => ({ reasoning: 'r', tasks: [emptyFilesTask] });
 
-    expect(() => compileRunProposal(proposal, fakePlanner)).toThrow(RunProposalPlanError);
+    await expect(compileRunProposal(proposal, fakePlanner)).rejects.toThrow(RunProposalPlanError);
   });
 });
 
@@ -161,11 +161,11 @@ describe('compileRunProposalIntent/compileRunProposal — comma-bearing title + 
     };
   }
 
-  it('compiles successfully and canonicalizes the title + dependency ref to the IDENTICAL sanitized string', () => {
+  it('compiles successfully and canonicalizes the title + dependency ref to the IDENTICAL sanitized string', async () => {
     const proposal = makeProposal({ flowId: 'flow-435-comma-title' });
     const fakePlanner: RunProposalPlanner = () => makeCommaTitlePlan();
 
-    const intent = compileRunProposalIntent(proposal, fakePlanner);
+    const intent = await compileRunProposalIntent(proposal, fakePlanner);
 
     expect(intent.tasks).toHaveLength(2);
     // Comma folded to ' - ', never rejected, never left verbatim.
@@ -176,11 +176,11 @@ describe('compileRunProposalIntent/compileRunProposal — comma-bearing title + 
     expect(intent.tasks[1]!.deps).toEqual([intent.tasks[0]!.title]);
   });
 
-  it('round-trips the sanitized title and dependency reference through the REAL DIRECTIVES parser', () => {
+  it('round-trips the sanitized title and dependency reference through the REAL DIRECTIVES parser', async () => {
     const proposal = makeProposal({ flowId: 'flow-435-comma-title-roundtrip' });
     const fakePlanner: RunProposalPlanner = () => makeCommaTitlePlan();
 
-    const { directivesMarkdown, intent } = compileRunProposal(proposal, fakePlanner);
+    const { directivesMarkdown, intent } = await compileRunProposal(proposal, fakePlanner);
 
     // The heading and the Dependencies: line both carry the canonicalized title —
     // a stray ',' in either would have fractured directives-builder's own

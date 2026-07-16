@@ -65,6 +65,7 @@ vi.mock('../../src/monitor/auditor.js', () => ({
 }));
 
 vi.mock('../../src/orchestra/planner.js', () => ({
+  resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
   callBrainPlannerWithReason: vi.fn().mockReturnValue({ ok: false, reason: 'no_providers', message: 'no providers' }),
   callBrainPlanner: vi.fn().mockReturnValue(null),
 }));

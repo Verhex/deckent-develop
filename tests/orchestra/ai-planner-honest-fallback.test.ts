@@ -64,6 +64,7 @@ vi.mock('../../src/monitor/auditor.js', () => ({
 }));
 
 vi.mock('../../src/orchestra/planner.js', () => ({
+  resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
   // Sprint 224 task 224-001 — sprint-planner uses `callBrainPlannerWithReason` for
   // honest-fallback. Default = honest spawn_failed discriminant; each test overrides.
   callBrainPlannerWithReason: vi.fn().mockReturnValue({

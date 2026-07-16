@@ -2951,6 +2951,15 @@ const MESSAGES: MessageMap = {
     en: 'Dry-run complete — nothing was started. Re-run with --run to execute this plan.',
     tr: 'Dry-run tamamlandı — hiçbir şey başlatılmadı. Bu planı çalıştırmak için --run ile tekrar çalıştırın.',
   },
+  // F-2 — planning-phase heartbeat (the propose/plan step is a real LLM call).
+  'do.planning_started': {
+    en: '⏳ Planning with the LLM… (timeout: {timeoutMin} min — tune with brain_plan_timeout_ms)',
+    tr: '⏳ Plan LLM ile hazırlanıyor… (zaman-aşımı: {timeoutMin} dk — brain_plan_timeout_ms ile ayarlanır)',
+  },
+  'do.planning_progress': {
+    en: '⏳ Planning… {elapsed}s',
+    tr: '⏳ Planlanıyor… {elapsed}s',
+  },
   'do.gate_blocked': {
     en: 'Prompt gate: {count} blocking finding(s) — run NOT started (the detached child would die at PLAN with the same verdict). Fix the plan or re-run with an adjusted goal.',
     tr: 'Prompt-gate: {count} engelleyici bulgu — koşu BAŞLATILMADI (detached-child PLAN fazında aynı kararla ölecekti). Planı düzeltin ya da hedefi ayarlayıp yeniden deneyin.',

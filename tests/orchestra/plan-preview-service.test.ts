@@ -240,8 +240,8 @@ const fakeSingleTaskPlanner: RunProposalPlanner = () => ({
 });
 
 describe('compileRunProposal (builder-adapter round-trip)', () => {
-  it('produces DIRECTIVES markdown that parseStructuredDirectives reads back losslessly', () => {
-    const { directivesMarkdown } = compileRunProposal(proposal(), fakeSingleTaskPlanner);
+  it('produces DIRECTIVES markdown that parseStructuredDirectives reads back losslessly', async () => {
+    const { directivesMarkdown } = await compileRunProposal(proposal(), fakeSingleTaskPlanner);
 
     const parsed = parseStructuredDirectives(directivesMarkdown);
     expect(parsed).toHaveLength(1);
@@ -254,8 +254,8 @@ describe('compileRunProposal (builder-adapter round-trip)', () => {
     expect(parsed[0]!.scope.directories.length).toBeGreaterThan(0);
   });
 
-  it('carries flowId/tenant/project/actor/origin on the `- Meta:` line — never inside the description (U1-G2)', () => {
-    const { directivesMarkdown } = compileRunProposal(proposal({ flowId: 'flow-42', tenant: 'acme', project: 'widgets' }), fakeSingleTaskPlanner);
+  it('carries flowId/tenant/project/actor/origin on the `- Meta:` line — never inside the description (U1-G2)', async () => {
+    const { directivesMarkdown } = await compileRunProposal(proposal({ flowId: 'flow-42', tenant: 'acme', project: 'widgets' }), fakeSingleTaskPlanner);
 
     // No information loss: every traceability field survives into the markdown…
     expect(directivesMarkdown).toContain('flow-42');
@@ -271,8 +271,8 @@ describe('compileRunProposal (builder-adapter round-trip)', () => {
     expect(parsed[0]!.meta?.project).toBe('widgets');
   });
 
-  it('is deterministic — same RunProposal ⇒ byte-identical markdown', () => {
+  it('is deterministic — same RunProposal ⇒ byte-identical markdown', async () => {
     const p = proposal();
-    expect(compileRunProposal(p, fakeSingleTaskPlanner).directivesMarkdown).toBe(compileRunProposal(p, fakeSingleTaskPlanner).directivesMarkdown);
+    expect((await compileRunProposal(p, fakeSingleTaskPlanner)).directivesMarkdown).toBe((await compileRunProposal(p, fakeSingleTaskPlanner)).directivesMarkdown);
   });
 });

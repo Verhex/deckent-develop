@@ -25,6 +25,7 @@ import {
   callBrainPlanner,
   callZeroConfigPlanner,
   buildPriorityContextBlock,
+  type PlannerSpawnFn,
 } from '../../src/orchestra/planner.js';
 import {
   parseStructuredDirectives,
@@ -33,7 +34,7 @@ import {
 import { providerRegistry } from '../../src/core/provider.js';
 import { BRAIN_PLAN_TIMEOUT_MS } from '../../src/core/constants.js';
 
-const mockedSpawnSync = vi.mocked(spawnSync);
+void vi.mocked(spawnSync); // module stays mocked (fail-soft git ls-files); planner calls inject PlannerSpawnFn
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -115,64 +116,51 @@ beforeEach(() => {
 // ═══ A) AI Planner Timeout Configurable ═══════════════════════════════
 
 describe('A) AI Planner Timeout Configurable', () => {
-  it('uses custom timeout when provided', () => {
+  // F-2: the planner spawn is async + injectable — timeout assertions read the
+  // recorded PlannerSpawnFn call instead of a spawnSync mock.
+  function makeSpawnFn() {
+    const calls: Array<{ command: string; timeoutMs: number }> = [];
+    const fn: PlannerSpawnFn = async (command, _args, opts) => {
+      calls.push({ command, timeoutMs: opts.timeoutMs });
+      return { status: 0, signal: null, stdout: validPlannerJSON, stderr: '' };
+    };
+    return { fn, calls };
+  }
+
+  it('uses custom timeout when provided', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
-    callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, 120_000);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, 120_000, undefined, fn);
 
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      'mock-cli',
-      expect.any(Array),
-      expect.objectContaining({ timeout: 120_000 }),
-    );
+    expect(calls[0]).toMatchObject({ command: 'mock-cli', timeoutMs: 120_000 });
   });
 
-  it('defaults to BRAIN_PLAN_TIMEOUT_MS when no timeout provided', () => {
+  it('defaults to BRAIN_PLAN_TIMEOUT_MS when no timeout provided', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
-    callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, undefined, undefined, fn);
 
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      'mock-cli',
-      expect.any(Array),
-      expect.objectContaining({ timeout: BRAIN_PLAN_TIMEOUT_MS }),
-    );
+    expect(calls[0]).toMatchObject({ command: 'mock-cli', timeoutMs: BRAIN_PLAN_TIMEOUT_MS });
   });
 
-  it('callZeroConfigPlanner uses custom timeout', () => {
+  it('callZeroConfigPlanner uses custom timeout', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
-    callZeroConfigPlanner('Add login', 'sonnet', 'test', [], adapter, 90_000);
+    await callZeroConfigPlanner('Add login', 'sonnet', 'test', [], adapter, 90_000, fn);
 
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      'mock-cli',
-      expect.any(Array),
-      expect.objectContaining({ timeout: 90_000 }),
-    );
+    expect(calls[0]).toMatchObject({ command: 'mock-cli', timeoutMs: 90_000 });
   });
 
-  it('callZeroConfigPlanner defaults to BRAIN_PLAN_TIMEOUT_MS', () => {
+  it('callZeroConfigPlanner defaults to BRAIN_PLAN_TIMEOUT_MS', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
-    callZeroConfigPlanner('Add login', 'sonnet', 'test', [], adapter);
+    await callZeroConfigPlanner('Add login', 'sonnet', 'test', [], adapter, undefined, fn);
 
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      'mock-cli',
-      expect.any(Array),
-      expect.objectContaining({ timeout: BRAIN_PLAN_TIMEOUT_MS }),
-    );
+    expect(calls[0]).toMatchObject({ command: 'mock-cli', timeoutMs: BRAIN_PLAN_TIMEOUT_MS });
   });
 
   it('ResolvedConfig accepts ai_planner_timeout field without type error', () => {

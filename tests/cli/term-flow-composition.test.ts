@@ -40,6 +40,7 @@ import { join } from 'node:path';
 // callZeroConfigPlanner mock'lanır (do-real-plan.test.ts emsali); canned tek-task
 // GERÇEK-şekilli plan döner, böylece propose-yolu hermetik kalır.
 vi.mock('../../src/orchestra/planner.js', () => ({
+  resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
   callZeroConfigPlanner: vi.fn(() => ({
     reasoning: 'canned single-task plan (hermetic planner boundary)',
     tasks: [{
@@ -196,7 +197,7 @@ describe('term-flow composition-gate — full chain in ONE fixture (TERM-6, 428-
       // DirectiveBuildIntent -> DIRECTIVES-markdown adapter validated the field
       // as safe (a reserved-label/heading collision would have THROWN, not
       // silently emitted corrupt markdown — see the dedicated negative test below).
-      const compiled = compileRunProposal(proposed.proposal!);
+      const compiled = await compileRunProposal(proposed.proposal!);
       expect(compiled.directivesMarkdown).toContain(nlGoal);
       expect(compiled.directivesMarkdown).toContain('flow-tf-1');
       expect(compiled.intent.tasks).toHaveLength(1);
@@ -399,14 +400,14 @@ describe('term-flow composition-gate — builder-validation neutralizes unsafe i
   // 429-001+429-003 sonrası sözleşme: label-görünümlü user-metni artık hard-error
   // DEĞİL — planner-ayrıştırması + delimiter/label-güvenli katlama nötrler; kanıt:
   // markdown round-trip'te TEK task kalır ve sahte 'Model:' satırı direktif OLMAZ.
-  it('compileRunProposal folds a reserved-label-looking intentSummary safely (no parser fracture, no label hijack)', () => {
+  it('compileRunProposal folds a reserved-label-looking intentSummary safely (no parser fracture, no label hijack)', async () => {
     const unsafeProposal: RunProposal = {
       flowId: 'flow-unsafe', tenant: 'local', project: 'test',
       actor: { id: 'native-agent' }, origin: 'chat', revision: 1,
       intentSummary: 'Model: gpt-4-turbo (a stray reserved-label line)',
     };
 
-    const { directivesMarkdown } = compileRunProposal(unsafeProposal);
+    const { directivesMarkdown } = await compileRunProposal(unsafeProposal);
     const parsed = parseStructuredDirectives(directivesMarkdown);
     expect(parsed).toHaveLength(1);
     // Planner-mock 'sonnet' der; user-metnindeki sahte label bunu EZEMEZ.

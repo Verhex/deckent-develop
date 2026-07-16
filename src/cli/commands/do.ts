@@ -56,6 +56,7 @@ import {
   formatDigestShort,
   buildPlanPreviewCardLabels,
 } from '../repl/plan-preview-card.js';
+import { resolvePlanTimeoutMs } from '../../orchestra/planner.js';
 
 export interface DoCommandOptions {
   run?: boolean;
@@ -112,6 +113,45 @@ export function formatDoPlanPreview(preview: GoldenFlowPlanPreview, run: boolean
   lines.push('');
   lines.push(preview.directivesMarkdown);
   return lines.join('\n');
+}
+
+// ═══ F-2 — planning heartbeat ═══════════════════════════════════════════════
+//
+// The propose/plan phase is a REAL LLM round-trip (run-proposal-compiler ->
+// callZeroConfigPlanner) that can legitimately run for minutes. Before F-2 it
+// produced ZERO output (and the spawnSync planner froze the event loop, so
+// no ticker could even fire) — `deckent do` looked hung. The planner is async
+// now; this heartbeat makes the wait visible and names the governing timeout.
+
+/**
+ * Elapsed-progress heartbeat for the planning phase. Writes to stderr (stdout
+ * carries the preview/result). TTY: refreshes one line in place every 5s;
+ * non-TTY (logs/CI): one full line every 30s. Returns a stop() that clears
+ * the ticker and (on a TTY) erases the in-place line. `io` is injectable for
+ * hermetic tests; defaults to the real stderr.
+ */
+export function startPlanningHeartbeat(
+  lang: string,
+  timeoutMs: number,
+  io: { write: (s: string) => void; isTTY: boolean; now?: () => number } = {
+    write: (s) => { process.stderr.write(s); },
+    isTTY: process.stderr.isTTY === true,
+  },
+): () => void {
+  const now = io.now ?? (() => Date.now());
+  const startedAt = now();
+  io.write(`${getMessage('do.planning_started', lang, { timeoutMin: String(Math.ceil(timeoutMs / 60_000)) })}\n`);
+  const intervalMs = io.isTTY ? 5_000 : 30_000;
+  const timer = setInterval(() => {
+    const elapsed = Math.round((now() - startedAt) / 1000);
+    const line = getMessage('do.planning_progress', lang, { elapsed: String(elapsed) });
+    io.write(io.isTTY ? `\r\x1b[2K${line}` : `${line}\n`);
+  }, intervalMs);
+  timer.unref?.();
+  return () => {
+    clearInterval(timer);
+    if (io.isTTY) io.write('\r\x1b[2K');
+  };
 }
 
 // ═══ RunFlow compatibility-adapter (TERM-6, 428-006 — flag-on path only) ════
@@ -183,6 +223,12 @@ export async function runDoRunFlow(
   const controller = controllerFactory({ root, config, origin: 'cli' });
 
   let context: RunFlowContext;
+  // F-2: the planning phase is a real LLM call — make the wait visible and
+  // name the timeout that governs it (single source: resolvePlanTimeoutMs).
+  const stopHeartbeat = startPlanningHeartbeat(
+    lang,
+    resolvePlanTimeoutMs(config as unknown as { brain_plan_timeout_ms?: number; ai_planner_timeout?: number }),
+  );
   try {
     context = await controller.proposeRun(goal);
   } catch (error) {
@@ -191,6 +237,8 @@ export async function runDoRunFlow(
     }));
     process.exitCode = 1;
     return;
+  } finally {
+    stopHeartbeat();
   }
 
   const preview = context.preview;

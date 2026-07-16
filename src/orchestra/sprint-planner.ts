@@ -55,7 +55,7 @@ import { detectTaskType } from './rubric-registry.js';
 import { SkillPoolManager } from '../core/skill-pool.js';
 
 // ─── Planner ─────────────────────────────────────────────────────
-import { callBrainPlanner, callBrainPlannerWithReason } from './planner.js';
+import { callBrainPlanner, callBrainPlannerWithReason, resolvePlanTimeoutMs } from './planner.js';
 import type { PlannerCallResult, PlannerFailureReason } from './planner.js';
 
 /**
@@ -71,7 +71,7 @@ import type { PlannerCallResult, PlannerFailureReason } from './planner.js';
  */
 function resolveCallBrainPlanner(): (
   ...args: Parameters<typeof callBrainPlannerWithReason>
-) => PlannerCallResult {
+) => PlannerCallResult | Promise<PlannerCallResult> {
   let withReasonFn: typeof callBrainPlannerWithReason | undefined;
   try {
     withReasonFn = callBrainPlannerWithReason;
@@ -81,9 +81,11 @@ function resolveCallBrainPlanner(): (
   if (typeof withReasonFn === 'function') {
     return withReasonFn;
   }
-  return (...args): PlannerCallResult => {
+  return async (...args): Promise<PlannerCallResult> => {
     try {
-      const r = callBrainPlanner(...args);
+      // F-2: callBrainPlanner is async now; await also tolerates a legacy
+      // SYNC mock returning a plain PlannerResult/null.
+      const r = await callBrainPlanner(...args);
       if (r) return { ok: true, data: r };
       return {
         ok: false,
@@ -341,15 +343,15 @@ export async function planSprint(
     }
 
     // brain_plan_timeout_ms: optional ResolvedConfig override (Sprint 224 — task
-     // 224-001). Read via index-access so we do not need to extend config-types
-     // until a follow-up sprint formalises the field. Defaults to BRAIN_PLAN_TIMEOUT_MS.
-    const planTimeout =
-      (config as unknown as { brain_plan_timeout_ms?: number }).brain_plan_timeout_ms
-      ?? config.ai_planner_timeout
-      ?? undefined;
+    // 224-001). Resolution lives in planner.ts's resolvePlanTimeoutMs (F-2:
+    // single source shared with the run-proposal compiler and `deckent do`'s
+    // planning notice).
+    const planTimeout = resolvePlanTimeoutMs(
+      config as unknown as { brain_plan_timeout_ms?: number; ai_planner_timeout?: number },
+    );
 
     const plannerCallFn = resolveCallBrainPlanner();
-    const callResult: PlannerCallResult = plannerCallFn(
+    const callResult: PlannerCallResult = await plannerCallFn(
       context,
       recommendation,
       brainModel,

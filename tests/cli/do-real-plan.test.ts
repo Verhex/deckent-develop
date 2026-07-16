@@ -57,6 +57,7 @@ vi.mock('../../src/orchestra/brain.js', () => ({
 // (instead of the compiler itself) keeps compileRunProposalIntent/
 // compileRunProposal/buildDirectives genuinely REAL and unmocked.
 vi.mock('../../src/orchestra/planner.js', () => ({
+  resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
   callZeroConfigPlanner: vi.fn(),
 }));
 

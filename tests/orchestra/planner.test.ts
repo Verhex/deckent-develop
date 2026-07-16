@@ -4,11 +4,14 @@ import type { ProviderAdapter } from '../../src/core/provider.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
+// F-2: the planner's LLM calls are async now (injectable PlannerSpawnFn seam —
+// the spawnSync freeze-class died). node:child_process stays mocked so the
+// fail-soft `git ls-files` normalization step never runs real git in tests.
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
+  spawn: vi.fn(),
 }));
 
-import { spawnSync } from 'node:child_process';
 import {
   buildPlanPrompt,
   parsePlannerResponse,
@@ -19,12 +22,24 @@ import {
   buildZeroConfigPlanPrompt,
   resolveAdapter,
   normalizePlannerDependencies,
+  type PlannerSpawnFn,
+  type PlannerSpawnOutcome,
 } from '../../src/orchestra/planner.js';
 import { providerRegistry } from '../../src/core/provider.js';
 import { BRAIN_PLAN_TIMEOUT_MS } from '../../src/core/constants.js';
 import { modelRegistry } from '../../src/core/model-registry.js';
 
-const mockedSpawnSync = vi.mocked(spawnSync);
+/** Hermetic PlannerSpawnFn fake: records every call, returns the canned
+ *  outcome (per-call overrides supported for the retry path). */
+function makeSpawnFn(outcome: Partial<PlannerSpawnOutcome> = {}, perCall?: Array<Partial<PlannerSpawnOutcome>>) {
+  const calls: Array<{ command: string; args: string[]; timeoutMs: number }> = [];
+  const fn: PlannerSpawnFn = async (command, args, opts) => {
+    const idx = calls.length;
+    calls.push({ command, args: [...args], timeoutMs: opts.timeoutMs });
+    return { status: 0, signal: null, stdout: validPlannerJSON, stderr: '', ...(perCall?.[idx] ?? outcome) };
+  };
+  return { fn, calls };
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -377,112 +392,98 @@ describe('buildPlannerSpawnArgs', () => {
 // ═══ Provider Decoupling — callBrainPlanner ═════════════════════════
 
 describe('callBrainPlanner with adapter', () => {
-  it('uses adapter to determine CLI command', () => {
+  it('uses adapter to determine CLI command', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
-    callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'test', adapter);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'test', adapter, undefined, undefined, fn);
 
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      'mock-cli',
-      expect.arrayContaining(['-p', expect.any(String), '--model', 'claude-opus-4-8', '--output-format', 'json']),
-      expect.objectContaining({ encoding: 'utf-8', timeout: BRAIN_PLAN_TIMEOUT_MS }),
-    );
+    expect(calls[0]!.command).toBe('mock-cli');
+    expect(calls[0]!.args).toEqual(expect.arrayContaining(['-p', expect.any(String), '--model', 'claude-opus-4-8', '--output-format', 'json']));
+    expect(calls[0]!.timeoutMs).toBe(BRAIN_PLAN_TIMEOUT_MS);
   });
 
-  it('uses codex adapter CLI binary when codex adapter provided', () => {
+  it('uses codex adapter CLI binary when codex adapter provided', async () => {
     const adapter = makeCodexAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
-    callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, undefined, undefined, fn);
 
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      'codex',
-      expect.arrayContaining(['--model', modelRegistry.resolveApiId('sonnet')]),
-      expect.any(Object),
-    );
+    expect(calls[0]!.command).toBe('codex');
+    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--model', modelRegistry.resolveApiId('sonnet')]));
   });
 
-  it('falls back to registry default when no adapter passed', () => {
+  it('falls back to registry default when no adapter passed', async () => {
     const adapter = makeMockAdapter({ name: 'registry-default' });
     providerRegistry.registerProvider(adapter, true);
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
-    callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'test');
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'test', undefined, undefined, undefined, fn);
 
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      'mock-cli',
-      expect.arrayContaining(['--model', 'claude-opus-4-8']),
-      expect.any(Object),
-    );
+    expect(calls[0]!.command).toBe('mock-cli');
+    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--model', 'claude-opus-4-8']));
   });
 
-  it('throws when registry is empty and no adapter provided (no silent fallback)', () => {
-    expect(() => {
-      callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'test');
-    }).toThrow(/No providers registered/);
+  it('rejects when registry is empty and no adapter provided (no silent fallback)', async () => {
+    await expect(
+      callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'test'),
+    ).rejects.toThrow(/No providers registered/);
   });
 
-  it('returns parsed result when adapter-based call succeeds', () => {
+  it('returns parsed result when adapter-based call succeeds', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn } = makeSpawnFn();
 
-    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter);
+    const result = await callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, undefined, undefined, fn);
     expect(result).not.toBeNull();
     expect(result!.tasks).toHaveLength(1);
     expect(result!.tasks[0]!.title).toBe('Build feature');
   });
 
-  it('returns null when adapter-based call fails (non-zero exit)', () => {
+  it('returns null when adapter-based call fails (non-zero exit)', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 1, stdout: '', stderr: 'error', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn } = makeSpawnFn({ status: 1, stdout: '', stderr: 'error' });
 
-    expect(callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'test', adapter)).toBeNull();
+    await expect(
+      callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'test', adapter, undefined, undefined, fn),
+    ).resolves.toBeNull();
   });
 
-  it('returns null on empty stdout', () => {
+  it('returns null on empty stdout', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn } = makeSpawnFn({ status: 0, stdout: '' });
 
-    expect(callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter)).toBeNull();
+    await expect(
+      callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, undefined, undefined, fn),
+    ).resolves.toBeNull();
   });
 
-  it('uses adapter with buildPlannerCommand for callBrainPlanner', () => {
+  it('returns null when the spawn times out (SIGTERM at the deadline)', async () => {
+    const adapter = makeMockAdapter();
+    const { fn } = makeSpawnFn({ status: null, signal: 'SIGTERM', stdout: '' });
+
+    await expect(
+      callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, undefined, undefined, fn),
+    ).resolves.toBeNull();
+  });
+
+  it('uses adapter with buildPlannerCommand for callBrainPlanner', async () => {
     const adapter = makeAdapterWithPlannerCommand();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
-    callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'test', adapter);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'test', adapter, undefined, undefined, fn);
 
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      'custom-ai',
-      expect.arrayContaining(['--prompt', expect.any(String), '--model', 'opus', '--json']),
-      expect.any(Object),
-    );
+    expect(calls[0]!.command).toBe('custom-ai');
+    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--prompt', expect.any(String), '--model', 'opus', '--json']));
   });
 
-  it('passes model parameter correctly', () => {
+  it('passes model parameter correctly', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
-    callBrainPlanner(makeContext(), makeRecommendation(), 'haiku', 'test', adapter);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'haiku', 'test', adapter, undefined, undefined, fn);
 
-    const args = mockedSpawnSync.mock.calls[0]![1] as string[];
+    const args = calls[0]!.args;
     const modelIdx = args.indexOf('--model');
     // Sprint 238 İŞ5: planner passes the real apiId, not the alias.
     expect(args[modelIdx + 1]).toBe('claude-haiku-4-5-20251001');
@@ -492,85 +493,82 @@ describe('callBrainPlanner with adapter', () => {
 // ═══ Provider Decoupling — callZeroConfigPlanner ════════════════════
 
 describe('callZeroConfigPlanner', () => {
-  it('throws when no adapter and empty registry (no silent fallback)', () => {
-    expect(() => {
-      callZeroConfigPlanner('Add login page', 'sonnet', 'test-project');
-    }).toThrow(/No providers registered/);
+  it('rejects when no adapter and empty registry (no silent fallback)', async () => {
+    await expect(
+      callZeroConfigPlanner('Add login page', 'sonnet', 'test-project'),
+    ).rejects.toThrow(/No providers registered/);
   });
 
-  it('uses adapter CLI when adapter provided', () => {
+  it('uses adapter CLI when adapter provided', async () => {
     const adapter = makeCodexAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
-    callZeroConfigPlanner('Add login page', 'sonnet', 'test-project', [], adapter);
+    await callZeroConfigPlanner('Add login page', 'sonnet', 'test-project', [], adapter, undefined, fn);
 
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      'codex',
-      expect.arrayContaining(['--model', modelRegistry.resolveApiId('sonnet')]),
-      expect.any(Object),
-    );
+    expect(calls[0]!.command).toBe('codex');
+    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--model', modelRegistry.resolveApiId('sonnet')]));
   });
 
-  it('uses registry default when no adapter passed but registry has provider', () => {
+  it('uses registry default when no adapter passed but registry has provider', async () => {
     const adapter = makeCodexAdapter({ name: 'codex-default' });
     providerRegistry.registerProvider(adapter, true);
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
-    callZeroConfigPlanner('Add login page', 'opus', 'test-project');
+    await callZeroConfigPlanner('Add login page', 'opus', 'test-project', [], undefined, undefined, fn);
 
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      'codex',
-      expect.arrayContaining(['--model', 'claude-opus-4-8']),
-      expect.any(Object),
-    );
+    expect(calls[0]!.command).toBe('codex');
+    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--model', 'claude-opus-4-8']));
   });
 
-  it('returns parsed result on success', () => {
+  it('returns parsed result on success', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn } = makeSpawnFn();
 
-    const result = callZeroConfigPlanner('Add login page', 'sonnet', 'test-project', [], adapter);
+    const result = await callZeroConfigPlanner('Add login page', 'sonnet', 'test-project', [], adapter, undefined, fn);
     expect(result).not.toBeNull();
     expect(result!.tasks).toHaveLength(1);
   });
 
-  it('returns null on failure', () => {
+  it('returns null on failure', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 1, stdout: '', stderr: 'fail', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn } = makeSpawnFn({ status: 1, stdout: '', stderr: 'fail' });
 
-    expect(callZeroConfigPlanner('Add login page', 'sonnet', 'test-project', [], adapter)).toBeNull();
+    await expect(
+      callZeroConfigPlanner('Add login page', 'sonnet', 'test-project', [], adapter, undefined, fn),
+    ).resolves.toBeNull();
   });
 
-  it('returns null on empty stdout', () => {
+  it('returns null on empty stdout', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn } = makeSpawnFn({ status: 0, stdout: '' });
 
-    expect(callZeroConfigPlanner('Add login page', 'sonnet', 'test-project', [], adapter)).toBeNull();
+    await expect(
+      callZeroConfigPlanner('Add login page', 'sonnet', 'test-project', [], adapter, undefined, fn),
+    ).resolves.toBeNull();
   });
 
-  it('uses adapter with buildPlannerCommand for zero-config', () => {
+  it('uses adapter with buildPlannerCommand for zero-config', async () => {
     const adapter = makeAdapterWithPlannerCommand();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
-    callZeroConfigPlanner('Add feature', 'opus', 'test-project', [], adapter);
+    await callZeroConfigPlanner('Add feature', 'opus', 'test-project', [], adapter, undefined, fn);
 
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      'custom-ai',
-      expect.arrayContaining(['--prompt', expect.any(String), '--model', 'opus', '--json']),
-      expect.any(Object),
-    );
+    expect(calls[0]!.command).toBe('custom-ai');
+    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--prompt', expect.any(String), '--model', 'opus', '--json']));
+  });
+
+  it('retries ONCE with a schema-feedback prompt when the first response is unparseable (U2)', async () => {
+    const adapter = makeMockAdapter();
+    const { fn, calls } = makeSpawnFn({}, [
+      { status: 0, stdout: 'not json at all' },
+      { status: 0, stdout: validPlannerJSON },
+    ]);
+
+    const result = await callZeroConfigPlanner('Add login page', 'sonnet', 'test-project', [], adapter, undefined, fn);
+
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.args.join(' ')).toContain('YOUR PREVIOUS RESPONSE WAS INVALID');
+    expect(result).not.toBeNull();
   });
 });
 
@@ -622,80 +620,53 @@ describe('buildZeroConfigPlanPrompt', () => {
 // ═══ AI Planner Timeout Configurable ════════════════════════════════
 
 describe('callBrainPlanner — configurable timeout', () => {
-  it('uses default BRAIN_PLAN_TIMEOUT_MS when no timeout provided', () => {
+  it('uses default BRAIN_PLAN_TIMEOUT_MS when no timeout provided', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
-    callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, undefined, undefined, fn);
 
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.any(Array),
-      expect.objectContaining({ timeout: BRAIN_PLAN_TIMEOUT_MS }),
-    );
+    expect(calls[0]!.timeoutMs).toBe(BRAIN_PLAN_TIMEOUT_MS);
   });
 
-  it('uses custom timeout when provided (config.ai_planner_timeout)', () => {
+  it('uses custom timeout when provided (config.ai_planner_timeout)', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
     const customTimeout = 120_000;
-    callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, customTimeout);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, customTimeout, undefined, fn);
 
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.any(Array),
-      expect.objectContaining({ timeout: customTimeout }),
-    );
+    expect(calls[0]!.timeoutMs).toBe(customTimeout);
   });
 
-  it('custom timeout overrides the default BRAIN_PLAN_TIMEOUT_MS', () => {
+  it('custom timeout overrides the default BRAIN_PLAN_TIMEOUT_MS', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
     const shortTimeout = 5_000;
-    callBrainPlanner(makeContext(), makeRecommendation(), 'haiku', 'test', adapter, shortTimeout);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'haiku', 'test', adapter, shortTimeout, undefined, fn);
 
-    const callOptions = mockedSpawnSync.mock.calls[0]![2] as { timeout: number };
-    expect(callOptions.timeout).toBe(shortTimeout);
-    expect(callOptions.timeout).not.toBe(BRAIN_PLAN_TIMEOUT_MS);
+    expect(calls[0]!.timeoutMs).toBe(shortTimeout);
+    expect(calls[0]!.timeoutMs).not.toBe(BRAIN_PLAN_TIMEOUT_MS);
   });
 
-  it('callZeroConfigPlanner uses custom timeout when provided', () => {
+  it('callZeroConfigPlanner uses custom timeout when provided', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
     const customTimeout = 90_000;
-    callZeroConfigPlanner('Add feature', 'sonnet', 'test-project', [], adapter, customTimeout);
+    await callZeroConfigPlanner('Add feature', 'sonnet', 'test-project', [], adapter, customTimeout, fn);
 
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.any(Array),
-      expect.objectContaining({ timeout: customTimeout }),
-    );
+    expect(calls[0]!.timeoutMs).toBe(customTimeout);
   });
 
-  it('callZeroConfigPlanner uses default timeout when none provided', () => {
+  it('callZeroConfigPlanner uses default timeout when none provided', async () => {
     const adapter = makeMockAdapter();
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
-    } as never);
+    const { fn, calls } = makeSpawnFn();
 
-    callZeroConfigPlanner('Add feature', 'sonnet', 'test-project', [], adapter);
+    await callZeroConfigPlanner('Add feature', 'sonnet', 'test-project', [], adapter, undefined, fn);
 
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.any(Array),
-      expect.objectContaining({ timeout: BRAIN_PLAN_TIMEOUT_MS }),
-    );
+    expect(calls[0]!.timeoutMs).toBe(BRAIN_PLAN_TIMEOUT_MS);
   });
 });
 

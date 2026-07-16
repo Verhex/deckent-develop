@@ -76,6 +76,7 @@ vi.mock('../../src/monitor/auditor.js', () => ({
 // failed, mode=ai/auto would surface this 'AI Planned Task' WITHOUT a provider —
 // the assertions below catch exactly that.
 vi.mock('../../src/orchestra/planner.js', () => ({
+  resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
   callBrainPlannerWithReason: vi.fn().mockReturnValue({
     ok: true,
     data: {

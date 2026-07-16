@@ -13,7 +13,7 @@
 //     planner core (not silently reduced to a scaffold) — proven WITHOUT ever
 //     spawning a subprocess: this test file imports no provider-registration
 //     module, so the global providerRegistry is empty and resolveAdapter()
-//     throws before any spawnSync — a typed RunProposalPlanError, fast and
+//     throws before any spawn — a typed RunProposalPlanError, fast and
 //     100% hermetic.
 //
 // No `vi.mock('node:child_process', ...)` anywhere in this file — a real
@@ -113,11 +113,11 @@ function makeRealMultiTaskPlan(): PlannerResult {
 // ─── 1. Injected fake planner -> real multi-task plan, zero TODO placeholders ──
 
 describe('compileRunProposalIntent — injected fake planner (hermetic, no real AI call)', () => {
-  it('maps a real multi-task PlannerResult into a real multi-task DirectiveBuildIntent', () => {
+  it('maps a real multi-task PlannerResult into a real multi-task DirectiveBuildIntent', async () => {
     const proposal = makeProposal();
     const fakePlanner: RunProposalPlanner = () => makeRealMultiTaskPlan();
 
-    const intent = compileRunProposalIntent(proposal, fakePlanner);
+    const intent = await compileRunProposalIntent(proposal, fakePlanner);
 
     expect(intent.tasks).toHaveLength(3);
     expect(intent.tasks.map((t) => t.title)).toEqual([
@@ -143,14 +143,14 @@ describe('compileRunProposalIntent — injected fake planner (hermetic, no real 
     expect(serialized).not.toMatch(/TODO: define/);
   });
 
-  it('U1-G2: traceability travels in the meta field — NEVER in the description (reason stays)', () => {
+  it('U1-G2: traceability travels in the meta field — NEVER in the description (reason stays)', async () => {
     // Pre-U1 this test pinned the OPPOSITE: flowId folded into desc. That
     // embedding poisoned intent classification ('cd' matched a flowId hex,
     // A1-İz#2 / sprint-442 misroute) and is now forbidden.
     const proposal = makeProposal({ flowId: 'flow-429-2', revision: 3 });
     const fakePlanner: RunProposalPlanner = () => makeRealMultiTaskPlan();
 
-    const intent = compileRunProposalIntent(proposal, fakePlanner);
+    const intent = await compileRunProposalIntent(proposal, fakePlanner);
 
     for (const task of intent.tasks) {
       expect(task.desc).not.toContain('flow-429-2');
@@ -161,11 +161,11 @@ describe('compileRunProposalIntent — injected fake planner (hermetic, no real 
     }
   });
 
-  it('compileRunProposal round-trips the fake-planner plan through the UNCHANGED directives-builder', () => {
+  it('compileRunProposal round-trips the fake-planner plan through the UNCHANGED directives-builder', async () => {
     const proposal = makeProposal();
     const fakePlanner: RunProposalPlanner = () => makeRealMultiTaskPlan();
 
-    const { directivesMarkdown, intent } = compileRunProposal(proposal, fakePlanner);
+    const { directivesMarkdown, intent } = await compileRunProposal(proposal, fakePlanner);
 
     expect(directivesMarkdown).toContain('## Task 1: Backend export endpoints');
     expect(directivesMarkdown).toContain('## Task 2: Export UI button');
@@ -179,13 +179,13 @@ describe('compileRunProposalIntent — injected fake planner (hermetic, no real 
 // ─── 2 & 3. Planner failure -> typed RunProposalPlanError, never a scaffold ────
 
 describe('compileRunProposalIntent — planner failure is typed, never a silent scaffold', () => {
-  it('throws RunProposalPlanError (not a scaffold) when the injected planner returns zero tasks', () => {
+  it('throws RunProposalPlanError (not a scaffold) when the injected planner returns zero tasks', async () => {
     const proposal = makeProposal();
     const emptyPlanner: RunProposalPlanner = () => ({ tasks: [], reasoning: 'nothing to plan' });
 
     let caught: unknown;
     try {
-      compileRunProposalIntent(proposal, emptyPlanner);
+      await compileRunProposalIntent(proposal, emptyPlanner);
     } catch (e) {
       caught = e;
     }
@@ -194,15 +194,15 @@ describe('compileRunProposalIntent — planner failure is typed, never a silent 
     expect((caught as RunProposalPlanError).flowId).toBe(proposal.flowId);
   });
 
-  it('throws RunProposalPlanError (not a scaffold) when the injected planner itself throws', () => {
+  it('throws RunProposalPlanError (not a scaffold) when the injected planner itself throws', async () => {
     const proposal = makeProposal();
     const throwingPlanner: RunProposalPlanner = () => {
       throw new Error('simulated provider timeout');
     };
 
-    expect(() => compileRunProposalIntent(proposal, throwingPlanner)).toThrow(RunProposalPlanError);
+    await expect(compileRunProposalIntent(proposal, throwingPlanner)).rejects.toThrow(RunProposalPlanError);
     try {
-      compileRunProposalIntent(proposal, throwingPlanner);
+      await compileRunProposalIntent(proposal, throwingPlanner);
     } catch (e) {
       expect(e).toBeInstanceOf(RunProposalPlanError);
       expect((e as Error).message).toContain('simulated provider timeout');
@@ -210,11 +210,11 @@ describe('compileRunProposalIntent — planner failure is typed, never a silent 
     }
   });
 
-  it('compileRunProposal (markdown entrypoint) surfaces the same typed error, not partial markdown', () => {
+  it('compileRunProposal (markdown entrypoint) surfaces the same typed error, not partial markdown', async () => {
     const proposal = makeProposal();
     const emptyPlanner: RunProposalPlanner = () => ({ tasks: [], reasoning: 'nothing to plan' });
 
-    expect(() => compileRunProposal(proposal, emptyPlanner)).toThrow(RunProposalPlanError);
+    await expect(compileRunProposal(proposal, emptyPlanner)).rejects.toThrow(RunProposalPlanError);
   });
 });
 
@@ -225,12 +225,12 @@ describe('compileRunProposalIntent — production default is wired to the real p
     'with NO planner injected, and no provider registered in this hermetic test process, ' +
       'throws RunProposalPlanError instead of silently degrading to a scaffold — proving the ' +
       'default path is really the AI/structured planner core (buildPlanNlIntent is never revived)',
-    () => {
+    async () => {
       const proposal = makeProposal({ flowId: 'flow-429-default' });
 
       let caught: unknown;
       try {
-        compileRunProposalIntent(proposal);
+        await compileRunProposalIntent(proposal);
       } catch (e) {
         caught = e;
       }
@@ -252,35 +252,35 @@ describe('compileRunProposalIntent — production default is wired to the real p
 // the spy's recorded call, then let the same RunProposalPlanError surface.
 
 describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(config)', () => {
-  it("passes the balanced-mode fallback 'sonnet' when no config is given (regression-guard for the former hardcoded literal)", () => {
+  it("passes the balanced-mode fallback 'sonnet' when no config is given (regression-guard for the former hardcoded literal)", async () => {
     const proposal = makeProposal({ flowId: 'flow-431-no-config' });
     const spy = vi.mocked(callZeroConfigPlanner);
     spy.mockClear();
 
-    expect(() => compileRunProposalIntent(proposal)).toThrow(RunProposalPlanError);
+    await expect(compileRunProposalIntent(proposal)).rejects.toThrow(RunProposalPlanError);
 
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy.mock.calls[0]?.[1]).toBe('sonnet');
   });
 
-  it("passes 'sonnet' for an economic-mode config (economic.brain_model = 'sonnet')", () => {
+  it("passes 'sonnet' for an economic-mode config (economic.brain_model = 'sonnet')", async () => {
     const proposal = makeProposal({ flowId: 'flow-431-economic' });
     const spy = vi.mocked(callZeroConfigPlanner);
     spy.mockClear();
 
     const config: DeckentConfig = { mode: 'economic', modes: DEFAULT_MODES };
-    expect(() => compileRunProposalIntent(proposal, undefined, config)).toThrow(RunProposalPlanError);
+    await expect(compileRunProposalIntent(proposal, undefined, config)).rejects.toThrow(RunProposalPlanError);
 
     expect(spy.mock.calls[0]?.[1]).toBe('sonnet');
   });
 
-  it("passes 'opus' for a performance-mode config (performance.brain_model = 'opus')", () => {
+  it("passes 'opus' for a performance-mode config (performance.brain_model = 'opus')", async () => {
     const proposal = makeProposal({ flowId: 'flow-431-performance' });
     const spy = vi.mocked(callZeroConfigPlanner);
     spy.mockClear();
 
     const config: DeckentConfig = { mode: 'performance', modes: DEFAULT_MODES };
-    expect(() => compileRunProposalIntent(proposal, undefined, config)).toThrow(RunProposalPlanError);
+    await expect(compileRunProposalIntent(proposal, undefined, config)).rejects.toThrow(RunProposalPlanError);
 
     expect(spy.mock.calls[0]?.[1]).toBe('opus');
   });

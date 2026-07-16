@@ -199,7 +199,7 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
     // born-690: forward the live config so the planner seam resolves the real
     // brain model (resolveBrainModel) instead of the balanced-mode fallback —
     // omitting it spawned the DEFAULT provider with a foreign model name.
-    const compiled = compileRunProposal(proposal, undefined, deps.config);
+    const compiled = await compileRunProposal(proposal, undefined, deps.config);
     const brainContext = { ...readContext(deps.root), directives: compiled.directivesMarkdown };
     const recommendation = deps.recommendation ?? defaultRecommendation(deps.config);
     const result = await generatePlanPreview(deps.root, deps.config, brainContext, recommendation, {

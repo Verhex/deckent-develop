@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { buildPlanPrompt, parsePlannerResponse, callBrainPlanner } from '../../src/orchestra/planner.js';
+import { buildPlanPrompt, parsePlannerResponse, callBrainPlanner, type PlannerSpawnFn, type PlannerSpawnOutcome } from '../../src/orchestra/planner.js';
 import type { BrainContext, SprintSizeRecommendation, ModelType } from '../../src/core/types.js';
 import { BRAIN_PLAN_MAX_CONTEXT_LINES } from '../../src/core/constants.js';
 import type { ProviderAdapter } from '../../src/core/provider.js';
@@ -538,164 +538,76 @@ describe('parsePlannerResponse', () => {
 describe('callBrainPlanner', () => {
   const adapter = makeMockAdapter();
 
+  // F-2: the planner spawn is async + injectable (PlannerSpawnFn) — the
+  // spawnSync freeze-class died. Each fake returns a canned outcome and
+  // records its calls.
+  function makeSpawnFn(outcome: Partial<PlannerSpawnOutcome> = {}) {
+    const calls: Array<{ command: string; args: string[]; timeoutMs: number }> = [];
+    const fn: PlannerSpawnFn = async (command, args, opts) => {
+      calls.push({ command, args: [...args], timeoutMs: opts.timeoutMs });
+      return { status: 0, signal: null, stdout: makeValidPlannerJSON(), stderr: '', ...outcome };
+    };
+    return { fn, calls };
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('returns null when spawnSync returns non-zero exit status', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 1,
-      stdout: '',
-      stderr: 'error occurred',
-      pid: 123,
-      output: [],
-      signal: null,
-    } as ReturnType<typeof spawnSync>);
-
-    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter);
-    expect(result).toBeNull();
+  it('returns null when the spawn exits non-zero', async () => {
+    const { fn } = makeSpawnFn({ status: 1, stdout: '', stderr: 'error occurred' });
+    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
   });
 
-  it('returns null when spawnSync stdout is empty', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: '',
-      stderr: '',
-      pid: 123,
-      output: [],
-      signal: null,
-    } as ReturnType<typeof spawnSync>);
-
-    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter);
-    expect(result).toBeNull();
+  it('returns null when stdout is empty', async () => {
+    const { fn } = makeSpawnFn({ status: 0, stdout: '' });
+    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
   });
 
-  it('returns null when spawnSync stdout is null', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: null,
-      stderr: '',
-      pid: 123,
-      output: [],
-      signal: null,
-    } as unknown as ReturnType<typeof spawnSync>);
-
-    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter);
-    expect(result).toBeNull();
+  it('returns null when stdout is null-ish', async () => {
+    const { fn } = makeSpawnFn({ status: 0, stdout: null as unknown as string });
+    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
   });
 
-  it('returns null on timeout (status null, signal SIGTERM)', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: null,
-      stdout: null,
-      stderr: '',
-      pid: 123,
-      output: [],
-      signal: 'SIGTERM',
-    } as unknown as ReturnType<typeof spawnSync>);
-
-    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'proj', adapter);
-    expect(result).toBeNull();
+  it('returns null on timeout (status null, signal SIGTERM)', async () => {
+    const { fn } = makeSpawnFn({ status: null, stdout: '', signal: 'SIGTERM' });
+    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
   });
 
-  it('returns null when stdout is malformed JSON', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: 'not valid json',
-      stderr: '',
-      pid: 123,
-      output: [],
-      signal: null,
-    } as ReturnType<typeof spawnSync>);
-
-    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter);
-    expect(result).toBeNull();
+  it('returns null when stdout is malformed JSON', async () => {
+    const { fn } = makeSpawnFn({ status: 0, stdout: 'not valid json' });
+    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
   });
 
-  it('returns null when stdout has valid JSON but fails Zod validation', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: JSON.stringify({ tasks: [], reasoning: 'empty' }),
-      stderr: '',
-      pid: 123,
-      output: [],
-      signal: null,
-    } as ReturnType<typeof spawnSync>);
-
-    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter);
-    expect(result).toBeNull();
+  it('returns null when stdout has valid JSON but fails Zod validation', async () => {
+    const { fn } = makeSpawnFn({ status: 0, stdout: JSON.stringify({ tasks: [], reasoning: 'empty' }) });
+    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
   });
 
-  it('returns PlannerResult on valid stdout', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: makeValidPlannerJSON(),
-      stderr: '',
-      pid: 123,
-      output: [],
-      signal: null,
-    } as ReturnType<typeof spawnSync>);
-
-    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter);
+  it('returns PlannerResult on valid stdout', async () => {
+    const { fn } = makeSpawnFn();
+    const result = await callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter, undefined, undefined, fn);
     expect(result).not.toBeNull();
     expect(result!.tasks).toHaveLength(1);
   });
 
-  it('calls spawnSync with correct claude command', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: makeValidPlannerJSON(),
-      stderr: '',
-      pid: 123,
-      output: [],
-      signal: null,
-    } as ReturnType<typeof spawnSync>);
-
-    callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'proj', adapter);
-
-    expect(spawnSync).toHaveBeenCalledWith(
-      'claude',
-      expect.arrayContaining(['-p', expect.any(String), '--model', 'opus']),
-      expect.objectContaining({ encoding: 'utf-8' }),
-    );
+  it('spawns the correct claude command', async () => {
+    const { fn, calls } = makeSpawnFn();
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'proj', adapter, undefined, undefined, fn);
+    expect(calls[0]!.command).toBe('claude');
+    expect(calls[0]!.args).toEqual(expect.arrayContaining(['-p', expect.any(String), '--model', 'opus']));
   });
 
-  it('calls spawnSync with output-format json flag', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: makeValidPlannerJSON(),
-      stderr: '',
-      pid: 123,
-      output: [],
-      signal: null,
-    } as ReturnType<typeof spawnSync>);
-
-    callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter);
-
-    expect(spawnSync).toHaveBeenCalledWith(
-      'claude',
-      expect.arrayContaining(['--output-format', 'json']),
-      expect.any(Object),
-    );
+  it('spawns with the output-format json flag', async () => {
+    const { fn, calls } = makeSpawnFn();
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter, undefined, undefined, fn);
+    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--output-format', 'json']));
   });
 
-  it('passes timeout option to spawnSync', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: makeValidPlannerJSON(),
-      stderr: '',
-      pid: 123,
-      output: [],
-      signal: null,
-    } as ReturnType<typeof spawnSync>);
-
-    callBrainPlanner(makeContext(), makeRecommendation(), 'haiku', 'proj', adapter);
-
-    expect(spawnSync).toHaveBeenCalledWith(
-      'claude',
-      expect.any(Array),
-      expect.objectContaining({ timeout: expect.any(Number) }),
-    );
+  it('passes a timeout to the spawn', async () => {
+    const { fn, calls } = makeSpawnFn();
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'haiku', 'proj', adapter, undefined, undefined, fn);
+    expect(calls[0]!.timeoutMs).toEqual(expect.any(Number));
   });
 });
 

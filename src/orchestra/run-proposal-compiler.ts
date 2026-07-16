@@ -37,7 +37,7 @@ import type { DeckentConfig, PlannerResult, PlannerTask } from '../core/types.js
 import type { ResolvedConfig } from '../core/config-types.js';
 import { resolveBrainModel } from '../core/config.js';
 import { buildDirectives, type DirectiveBuildIntent, type DirectiveBuildTask } from './directives-builder.js';
-import { callZeroConfigPlanner } from './planner.js';
+import { callZeroConfigPlanner, resolvePlanTimeoutMs } from './planner.js';
 
 export interface RunProposalCompileResult {
   readonly intent: DirectiveBuildIntent;
@@ -59,7 +59,7 @@ export type RunProposalPlannerConfig = Partial<DeckentConfig> | Partial<Resolved
 export type RunProposalPlanner = (
   proposal: RunProposal,
   config?: RunProposalPlannerConfig,
-) => PlannerResult;
+) => PlannerResult | Promise<PlannerResult>;
 
 /**
  * Thrown when NL -> plan compilation fails to produce a real, usable plan —
@@ -102,9 +102,15 @@ function describeActor(proposal: RunProposal): string {
  * behavior is reproduced exactly. Do not default `config` to `createDefaultConfig()`: that
  * resolves `mode: 'performance'` -> `brain_model: 'opus'`, a silent regression.
  */
-function defaultRunProposalPlanner(proposal: RunProposal, config?: RunProposalPlannerConfig): PlannerResult {
+async function defaultRunProposalPlanner(proposal: RunProposal, config?: RunProposalPlannerConfig): Promise<PlannerResult> {
   const description = proposal.intentSummary.trim();
-  const result = callZeroConfigPlanner(description, resolveBrainModel(config), proposal.project);
+  // F-2: async planner call (event loop stays free — `deckent do` can render
+  // its planning heartbeat) + the SAME config-resolved timeout every planning
+  // path uses (resolvePlanTimeoutMs — brain_plan_timeout_ms honored here too).
+  const result = await callZeroConfigPlanner(
+    description, resolveBrainModel(config), proposal.project, [], undefined,
+    resolvePlanTimeoutMs(config as { brain_plan_timeout_ms?: number; ai_planner_timeout?: number } | undefined),
+  );
   if (!result) {
     throw new RunProposalPlanError(
       proposal.flowId,
@@ -186,14 +192,16 @@ function toDirectiveTask(task: PlannerTask, proposal: RunProposal): DirectiveBui
  * (Task 431-003) is forwarded to `planner` untouched, driving
  * `resolveBrainModel(config)` in the production default.
  */
-export function compileRunProposalIntent(
+export async function compileRunProposalIntent(
   proposal: RunProposal,
   planner: RunProposalPlanner = defaultRunProposalPlanner,
   config?: RunProposalPlannerConfig,
-): DirectiveBuildIntent {
+): Promise<DirectiveBuildIntent> {
   let plan: PlannerResult;
   try {
-    plan = planner(proposal, config);
+    // F-2: the seam accepts sync AND async planners — await tolerates both,
+    // so every existing hermetic fake planner stays assignable unchanged.
+    plan = await planner(proposal, config);
   } catch (e) {
     if (e instanceof RunProposalPlanError) throw e;
     throw new RunProposalPlanError(
@@ -224,12 +232,12 @@ export function compileRunProposalIntent(
  * DIRECTIVES.md or any other file itself; that stays the caller's job. The
  * optional `config` (Task 431-003) is forwarded to `compileRunProposalIntent`.
  */
-export function compileRunProposal(
+export async function compileRunProposal(
   proposal: RunProposal,
   planner: RunProposalPlanner = defaultRunProposalPlanner,
   config?: RunProposalPlannerConfig,
-): RunProposalCompileResult {
-  const intent = compileRunProposalIntent(proposal, planner, config);
+): Promise<RunProposalCompileResult> {
+  const intent = await compileRunProposalIntent(proposal, planner, config);
   let directivesMarkdown: string;
   try {
     directivesMarkdown = buildDirectives(intent);

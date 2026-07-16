@@ -1,6 +1,5 @@
 // ─── Node Builtins ─────────────────────────────────────────────────
-import { spawnSync } from 'node:child_process';
-import type { SpawnSyncReturns } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -404,7 +403,83 @@ export type PlannerCallResult =
  *   Injects GECMIS SONUCLAR / past results block into the AI planner prompt so the
  *   planner avoids historically poor agent+skill combinations.
  */
-export function callBrainPlannerWithReason(
+// ─── F-2 — async planner spawn (the spawnSync freeze-class fix) ──────────────
+//
+// The planner's LLM calls used `spawnSync`, which blocks the WHOLE event loop
+// for the entire provider round-trip (up to brain_plan_timeout_ms — 15 min by
+// default): no progress line can render, Ctrl-C degrades, and `deckent do`
+// looks hung. This seam replaces it with an async spawn carrying the SAME
+// observable semantics (SIGTERM on timeout, status/stdout/stderr surface),
+// injectable for hermetic tests (model-auto-detect's `spawnFn` precedent).
+
+export interface PlannerSpawnOutcome {
+  status: number | null;
+  signal: NodeJS.Signals | null;
+  stdout: string;
+  stderr: string;
+  /** Populated when the process could not be spawned at all (e.g. ENOENT). */
+  error?: Error;
+}
+
+export type PlannerSpawnFn = (
+  command: string,
+  args: readonly string[],
+  opts: { timeoutMs: number },
+) => Promise<PlannerSpawnOutcome>;
+
+/** Default planner spawn: async child_process.spawn + SIGTERM at `timeoutMs`
+ *  (mirrors spawnSync's timeout contract — a timed-out run resolves with
+ *  `signal: 'SIGTERM'`). Never rejects; spawn-level failures surface as
+ *  `error` so callers keep their single mapping path. */
+export const defaultPlannerSpawn: PlannerSpawnFn = (command, args, opts) =>
+  new Promise((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    let child;
+    try {
+      child = spawn(command, [...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (e) {
+      resolve({ status: null, signal: null, stdout, stderr, error: e as Error });
+      return;
+    }
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        child.kill('SIGTERM');
+      } catch {
+        // already gone — close will resolve
+      }
+    }, opts.timeoutMs);
+    timer.unref?.();
+    child.stdout?.setEncoding('utf-8');
+    child.stderr?.setEncoding('utf-8');
+    child.stdout?.on('data', (d: string) => { stdout += d; });
+    child.stderr?.on('data', (d: string) => { stderr += d; });
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      resolve({ status: null, signal: null, stdout, stderr, error: err });
+    });
+    child.on('close', (code, signal) => {
+      clearTimeout(timer);
+      // A kill we issued at the deadline is a timeout even if the OS reports
+      // the signal differently — keep spawnSync's SIGTERM contract.
+      resolve({ status: code, signal: timedOut ? 'SIGTERM' : signal, stdout, stderr });
+    });
+  });
+
+/** ONE source for the effective planner timeout: config `brain_plan_timeout_ms`
+ *  (Sprint 224 contract) → legacy `ai_planner_timeout` → BRAIN_PLAN_TIMEOUT_MS.
+ *  Used by sprint-planner (ai-mode), the run-proposal compiler (zero-config)
+ *  and `deckent do`'s planning notice — so the number the user SEES is the
+ *  number that actually governs the spawn. */
+export function resolvePlanTimeoutMs(
+  config?: { brain_plan_timeout_ms?: number; ai_planner_timeout?: number },
+): number {
+  return config?.brain_plan_timeout_ms ?? config?.ai_planner_timeout ?? BRAIN_PLAN_TIMEOUT_MS;
+}
+
+export async function callBrainPlannerWithReason(
   context: BrainContext,
   recommendation: SprintSizeRecommendation,
   model: ModelType,
@@ -412,7 +487,8 @@ export function callBrainPlannerWithReason(
   adapter?: ProviderAdapter,
   timeout?: number,
   worstCombinations?: string,
-): PlannerCallResult {
+  spawnFn: PlannerSpawnFn = defaultPlannerSpawn,
+): Promise<PlannerCallResult> {
   const prompt = buildPlanPrompt(context, recommendation, projectName, undefined, worstCombinations);
 
   // resolveAdapter throws ProviderError when registry is empty or provider missing.
@@ -443,24 +519,10 @@ export function callBrainPlannerWithReason(
 
   const effectiveTimeout = timeout ?? BRAIN_PLAN_TIMEOUT_MS;
 
-  let result: SpawnSyncReturns<string>;
-  try {
-    result = spawnSync(cmdInfo.command, cmdInfo.args, {
-      encoding: 'utf-8',
-      timeout: effectiveTimeout,
-    });
-  } catch (e) {
-    const detail = e instanceof Error ? e.message : String(e);
-    return {
-      ok: false,
-      reason: 'spawn_failed',
-      message: `spawnSync threw for provider=${resolved.name}: ${detail}`,
-    };
-  }
+  const result = await spawnFn(cmdInfo.command, cmdInfo.args, { timeoutMs: effectiveTimeout });
 
-  // SIGTERM signal from spawnSync indicates the process was killed at the
-  // configured timeout. Surface as `timeout` so the caller can suggest
-  // raising brain_plan_timeout_ms.
+  // SIGTERM indicates the process was killed at the configured timeout.
+  // Surface as `timeout` so the caller can suggest raising brain_plan_timeout_ms.
   if (result.signal === 'SIGTERM') {
     return {
       ok: false,
@@ -475,7 +537,7 @@ export function callBrainPlannerWithReason(
     return {
       ok: false,
       reason: 'spawn_failed',
-      message: `spawnSync error for provider=${resolved.name}: ${result.error.message}`,
+      message: `spawn error for provider=${resolved.name}: ${result.error.message}`,
     };
   }
 
@@ -516,7 +578,7 @@ export function callBrainPlannerWithReason(
  * behavior — see `tests/orchestra/planner.test.ts` "throws when registry is empty"),
  * because `no_providers` was originally a thrown ProviderError, not a null return.
  */
-export function callBrainPlanner(
+export async function callBrainPlanner(
   context: BrainContext,
   recommendation: SprintSizeRecommendation,
   model: ModelType,
@@ -524,9 +586,10 @@ export function callBrainPlanner(
   adapter?: ProviderAdapter,
   timeout?: number,
   worstCombinations?: string,
-): PlannerResult | null {
-  const result = callBrainPlannerWithReason(
-    context, recommendation, model, projectName, adapter, timeout, worstCombinations,
+  spawnFn?: PlannerSpawnFn,
+): Promise<PlannerResult | null> {
+  const result = await callBrainPlannerWithReason(
+    context, recommendation, model, projectName, adapter, timeout, worstCombinations, spawnFn,
   );
   if (result.ok) return result.data;
   if (result.reason === 'no_providers') {
@@ -624,22 +687,21 @@ OUTPUT FORMAT (JSON ONLY, nothing else):
  * @param adapter  Optional ProviderAdapter. If omitted, uses ProviderRegistry.getDefault().
  *                 Throws if no provider is available (no silent fallback).
  */
-export function callZeroConfigPlanner(
+export async function callZeroConfigPlanner(
   description: string,
   model: ModelType,
   projectName: string,
   fileTree: string[] = [],
   adapter?: ProviderAdapter,
   timeout?: number,
-): PlannerResult | null {
+  spawnFn: PlannerSpawnFn = defaultPlannerSpawn,
+): Promise<PlannerResult | null> {
   const prompt = buildZeroConfigPlanPrompt(description, projectName, fileTree);
   const resolved = resolveAdapter(adapter, model);
   const { command, args } = buildPlannerSpawnArgs(resolved, prompt, model);
+  const timeoutMs = timeout ?? BRAIN_PLAN_TIMEOUT_MS;
 
-  const result = spawnSync(command, args, {
-    encoding: 'utf-8',
-    timeout: timeout ?? BRAIN_PLAN_TIMEOUT_MS,
-  });
+  const result = await spawnFn(command, args, { timeoutMs });
 
   if (result.status !== 0 || !result.stdout) return null;
   let parsed = parsePlannerResponse(result.stdout, resolved);
@@ -651,7 +713,7 @@ export function callZeroConfigPlanner(
   if (!parsed) {
     const retryPrompt = `${prompt}\n\nYOUR PREVIOUS RESPONSE WAS INVALID (schema/JSON error). Respond again with ONLY the requested JSON schema and no other text.`;
     const { command: c2, args: a2 } = buildPlannerSpawnArgs(resolved, retryPrompt, model);
-    const retry = spawnSync(c2, a2, { encoding: 'utf-8', timeout: timeout ?? BRAIN_PLAN_TIMEOUT_MS });
+    const retry = await spawnFn(c2, a2, { timeoutMs });
     if (retry.status === 0 && retry.stdout) parsed = parsePlannerResponse(retry.stdout, resolved);
   }
   if (!parsed) return null;
