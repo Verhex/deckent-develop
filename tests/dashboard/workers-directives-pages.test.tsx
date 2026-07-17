@@ -182,24 +182,17 @@ describe("WorkersPage — live worker grid", () => {
     expect(screen.getByText(en["worker.no_workers"])).toBeTruthy();
   });
 
-  it("kill button posts to /api/kill/:id and triggers an immediate refresh", async () => {
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("renders NO kill button for executing workers and never POSTs /api/kill", async () => {
     h.mockSseState = AGENTS_STATE;
-    fetchRoutes["POST /api/kill/w-1"] = { ok: true };
     renderWithI18n(<WorkersPage />);
 
-    // only the EXECUTING worker (w-1) renders a kill button
-    const killBtn = screen.getByText(en["dashboard.kill"]).closest("button");
-    expect(killBtn).toBeTruthy();
-    await act(async () => {
-      fireEvent.click(killBtn!);
-    });
-
-    expect(confirm).toHaveBeenCalled();
+    // w-1 is EXECUTING — pre-cutover it carried the kill control; now none exists
+    expect(screen.queryByText(en["dashboard.kill"])).toBeNull();
     const killCall = fetchSpy.mock.calls.find(
-      ([url, init]) => String(url) === "/api/kill/w-1" && init?.method === "POST",
+      ([url, init]) => String(url).startsWith("/api/kill") && init?.method === "POST",
     );
-    expect(killCall).toBeTruthy();
-    expect(h.refreshSpy).toHaveBeenCalled();
+    expect(killCall).toBeUndefined();
   });
 
   it("falls back to polling /api/status via useLiveData when SSE has no data", () => {
@@ -215,63 +208,56 @@ describe("WorkersPage — live worker grid", () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-describe("DirectivesPage — load / edit / save", () => {
+// SURF-7 (ADR-G-033): read-only cutover pin
+describe("DirectivesPage — read-only viewer (SURF-7)", () => {
   const DIRECTIVES_MD = "# DIRECTIVES — Sprint 270\n\n## Task 1: A\n\n## Task 2: B\n";
 
-  it("loads DIRECTIVES.md from GET /api/directives into the editor", async () => {
+  it("loads DIRECTIVES.md from GET /api/directives into the read-only pre view", async () => {
     fetchRoutes["GET /api/directives"] = { content: DIRECTIVES_MD };
     renderWithI18n(<DirectivesPage />);
 
     await waitFor(() => {
-      const textarea = screen.getByTestId("directives-page-textarea") as HTMLTextAreaElement;
-      expect(textarea.value).toBe(DIRECTIVES_MD);
+      expect(screen.getByTestId("directives-page-view").textContent).toBe(DIRECTIVES_MD);
     });
     expect(screen.queryByTestId("directives-load-warning")).toBeNull();
+    expect(screen.getByTestId("readonly-notice")).toBeTruthy();
   });
 
-  it("saves edited content via POST /api/directives and confirms with the task count", async () => {
+  it("has NO textarea, NO save button, and never POSTs /api/directives", async () => {
     fetchRoutes["GET /api/directives"] = { content: DIRECTIVES_MD };
-    fetchRoutes["POST /api/directives"] = { ok: true };
     renderWithI18n(<DirectivesPage />);
 
     await waitFor(() => {
-      expect((screen.getByTestId("directives-page-textarea") as HTMLTextAreaElement).value).toBe(DIRECTIVES_MD);
+      expect(screen.getByTestId("directives-page-view")).toBeTruthy();
     });
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("directives-page-save-btn"));
-    });
-
+    expect(screen.queryByTestId("directives-page-textarea")).toBeNull();
+    expect(screen.queryByTestId("directives-page-save-btn")).toBeNull();
+    expect(document.querySelector("textarea")).toBeNull();
     const saveCall = fetchSpy.mock.calls.find(
       ([url, init]) => String(url) === "/api/directives" && init?.method === "POST",
     );
-    expect(saveCall).toBeTruthy();
-    expect(JSON.parse((saveCall![1] as { body: string }).body)).toEqual({ content: DIRECTIVES_MD });
-    // DIRECTIVES_MD contains 2 "## Task " headings → interpolated saved message
-    expect(screen.getByTestId("directives-page-saved").textContent).toContain("2");
+    expect(saveCall).toBeUndefined();
   });
 
-  it("shows the load warning when the read endpoint is unavailable but stays editable", async () => {
+  it("still shows the load warning when the read endpoint is unavailable", async () => {
     // no GET route registered → 404 → load fails
     renderWithI18n(<DirectivesPage />);
 
     await waitFor(() => {
       expect(screen.getByTestId("directives-load-warning")).toBeTruthy();
     });
-    const textarea = screen.getByTestId("directives-page-textarea") as HTMLTextAreaElement;
-    expect(textarea.disabled).toBe(false);
-    fireEvent.change(textarea, { target: { value: "## Task 1: compose" } });
-    expect((screen.getByTestId("directives-page-save-btn") as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByTestId("directives-page-textarea")).toBeNull();
+    expect(screen.queryByTestId("directives-page-view")).toBeNull();
   });
 
-  it("disables save and warns while the content is empty", async () => {
+  it("warns while the content is empty (observable fact, no save affordance)", async () => {
     fetchRoutes["GET /api/directives"] = { content: "" };
     renderWithI18n(<DirectivesPage />);
 
     await waitFor(() => {
       expect(screen.getByTestId("directives-page-empty-warning")).toBeTruthy();
     });
-    expect((screen.getByTestId("directives-page-save-btn") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByTestId("directives-page-save-btn")).toBeNull();
   });
 });
 
@@ -338,22 +324,19 @@ describe("NervousPage — live data wire (one-shot → use-live-data)", () => {
     expect(screen.getByTestId("approval-p1")).toBeTruthy();
   });
 
-  it("accept posts the approval and immediately refreshes both live streams", async () => {
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("renders NO accept button and never POSTs /api/nervous/accept", async () => {
     h.liveDataMap["/api/nervous/status"] = STATUS;
     h.liveDataMap["/api/nervous/pending"] = PENDING;
-    fetchRoutes["POST /api/nervous/accept/p1"] = { ok: true };
     renderWithI18n(<NervousPage />);
 
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("accept-p1"));
-    });
-
+    expect(screen.queryByTestId("accept-p1")).toBeNull();
+    expect(screen.queryByTestId("reject-p1")).toBeNull();
+    expect(screen.getByTestId("readonly-notice")).toBeTruthy();
     const acceptCall = fetchSpy.mock.calls.find(
-      ([url, init]) => String(url) === "/api/nervous/accept/p1" && init?.method === "POST",
+      ([url, init]) => String(url).startsWith("/api/nervous/accept") && init?.method === "POST",
     );
-    expect(acceptCall).toBeTruthy();
-    // refetchPending + refetchStatus both map to useLiveData.refresh
-    expect(h.refreshSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(acceptCall).toBeUndefined();
   });
 });
 

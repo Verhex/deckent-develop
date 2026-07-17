@@ -665,6 +665,18 @@ export const en = {
   'mission.item.status.done': 'Done',
   'mission.item.status.debt': 'Tech debt',
   'mission.item.status.failed': 'Failed',
+
+  // SURF-7 — authority cutover (ADR-G-033): the dashboard observes; every
+  // control action names its terminal/Desktop equivalent instead of a button.
+  'readonly.control_moved': 'The dashboard observes — control actions live in the terminal and the Desktop app.',
+  'readonly.hint.sprint': 'deckent do "<goal>"  ·  deckent kill <worker>  ·  deckent cleanup',
+  'readonly.hint.decide': 'deckent runs <n> --approve [--start]  ·  deckent runs <n> --reject',
+  'readonly.hint.nervous': 'deckent nervous  (accept / reject from the terminal)',
+  'readonly.hint.autonomous': 'deckent autonomous  (approve / reject from the terminal)',
+  'readonly.hint.config': 'deckent config  ·  .deckent/config.json',
+  'readonly.hint.directives': 'DIRECTIVES.md (editor)  ·  deckent do "<goal>"',
+  'readonly.hint.chat': 'deckent  (terminal chat)  ·  Desktop app → Chat',
+  'readonly.hint.enterprise': 'Enterprise management moves to the Desktop app (management plane).',
 } as const;
 
 export type TranslationKey = keyof typeof en;

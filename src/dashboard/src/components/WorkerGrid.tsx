@@ -4,7 +4,6 @@ import type { DashboardState } from "../types/index.js";
 
 interface WorkerGridProps {
   onSelect: (taskId: string) => void;
-  onKill: (id: string) => void;
 }
 
 /**
@@ -13,7 +12,7 @@ interface WorkerGridProps {
  * SSE push events are handled at the DashboardPage level; this component uses REST polling
  * as the worker-grid source of truth (3s interval for fast spawn/done visibility).
  */
-export function WorkerGrid({ onSelect, onKill }: WorkerGridProps) {
+export function WorkerGrid({ onSelect }: WorkerGridProps) {
   const { data, isStale, status } = useLiveData<DashboardState>("/api/status", {
     pollIntervalMs: 3000,
   });
@@ -25,7 +24,7 @@ export function WorkerGrid({ onSelect, onKill }: WorkerGridProps) {
       {isStale && status === "reconnecting" && (
         <p className="text-xs text-yellow-400 mb-2 font-mono">⚠ reconnecting…</p>
       )}
-      <WorkerCardGrid agents={workers} onSelect={onSelect} onKill={onKill} />
+      <WorkerCardGrid agents={workers} onSelect={onSelect} />
     </div>
   );
 }

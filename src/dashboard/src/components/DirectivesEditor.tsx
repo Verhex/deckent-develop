@@ -1,20 +1,22 @@
-import { useState, useEffect, useCallback } from "react";
-import { Save, FileText, AlertTriangle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { FileText, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Button } from "./ui/button";
-import { Textarea } from "./ui/textarea";
-import { fetchJson, postJson } from "../lib/api";
+import { ReadOnlyNotice } from "./ReadOnlyNotice";
+import { fetchJson } from "../lib/api";
 
 interface DirectivesEditorProps {
   onContentChange?: (content: string, hasContent: boolean) => void;
 }
 
+/**
+ * SURF-7 (ADR-G-033 authority cutover): the DIRECTIVES *editor* became a
+ * read-only *viewer* — the dashboard observes; DIRECTIVES.md is edited from
+ * the terminal/editor and `deckent do` derives plans from natural language.
+ * The empty-warning stays: an empty DIRECTIVES is an observable fact.
+ */
 export function DirectivesEditor({ onContentChange }: DirectivesEditorProps) {
   const [content, setContent] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     fetchJson<{ content: string }>("/api/directives")
@@ -22,7 +24,7 @@ export function DirectivesEditor({ onContentChange }: DirectivesEditorProps) {
         setContent(res.content ?? "");
       })
       .catch(() => {
-        // start with empty editor on fetch failure
+        // honest empty view on fetch failure
       })
       .finally(() => setIsLoading(false));
   }, []);
@@ -31,21 +33,6 @@ export function DirectivesEditor({ onContentChange }: DirectivesEditorProps) {
     onContentChange?.(content, content.trim().length > 0);
   }, [content, onContentChange]);
 
-  const handleSave = useCallback(async () => {
-    if (!content.trim()) return;
-    setIsSaving(true);
-    setError("");
-    setSaved(false);
-    try {
-      await postJson("/api/directives", { content });
-      setSaved(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsSaving(false);
-    }
-  }, [content]);
-
   const isEmpty = !content.trim();
 
   return (
@@ -53,20 +40,11 @@ export function DirectivesEditor({ onContentChange }: DirectivesEditorProps) {
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="flex items-center gap-2 text-zinc-100">
           <FileText className="h-5 w-5 text-brand-300" />
-          DIRECTIVES Editor
+          DIRECTIVES
         </CardTitle>
-        <Button
-          onClick={handleSave}
-          disabled={isSaving || isEmpty}
-          size="sm"
-          className="transition-all duration-200"
-          data-testid="directives-save-btn"
-        >
-          <Save className="mr-2 h-4 w-4" />
-          {isSaving ? "Saving…" : "Save"}
-        </Button>
       </CardHeader>
       <CardContent className="space-y-3">
+        <ReadOnlyNotice hintKey="readonly.hint.directives" />
         {isEmpty && !isLoading && (
           <div
             className="flex items-center gap-2 rounded-md border border-amber-700/40 bg-amber-900/30 px-3 py-2 text-sm text-amber-400"
@@ -76,29 +54,14 @@ export function DirectivesEditor({ onContentChange }: DirectivesEditorProps) {
             <span>DIRECTIVES content is empty — add content before starting a sprint.</span>
           </div>
         )}
-        {error && (
-          <p className="text-sm text-red-400" data-testid="directives-error">{error}</p>
+        {!isEmpty && (
+          <pre
+            data-testid="directives-view"
+            className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md border border-zinc-800 bg-zinc-950/60 p-3 font-mono text-xs text-zinc-300"
+          >
+            {content}
+          </pre>
         )}
-        {saved && (
-          <p className="text-sm text-green-400" data-testid="directives-saved">DIRECTIVES saved.</p>
-        )}
-        <Textarea
-          value={content}
-          onChange={(e) => { setContent(e.target.value); setSaved(false); }}
-          placeholder={"# DIRECTIVES — Sprint NNN: Sprint Title\n\n## Goal: ...\n\n## Task 1: ..."}
-          rows={16}
-          disabled={isLoading}
-          className="resize-y font-mono text-sm"
-          data-testid="directives-editor-textarea"
-          aria-label="DIRECTIVES editor"
-        />
-        <p className="text-xs text-zinc-500">
-          {isEmpty ? (
-            <span className="text-amber-500">⚠ Sprint start is disabled — add DIRECTIVES content first.</span>
-          ) : (
-            <span>{content.split("\n").length} lines · ready</span>
-          )}
-        </p>
       </CardContent>
     </Card>
   );

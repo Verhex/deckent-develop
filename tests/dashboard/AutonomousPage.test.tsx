@@ -71,20 +71,16 @@ describe("AutonomousPage — W6-W7 Autonomous Engine UI", () => {
     expect(screen.getByText("db.migrate")).toBeTruthy();
   });
 
-  it("calls postJson for approve and refetches", async () => {
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("renders NO approve/reject buttons; readonly notice present; no postJson", () => {
     mockDataMap["/api/autonomous/pending"] = PENDING;
     renderPage();
-    await act(async () => { fireEvent.click(screen.getByTestId("approve-trig-1")); });
-    expect(postJson).toHaveBeenCalledWith("/api/autonomous/approve/trig-1");
-    expect(mockRefetch).toHaveBeenCalled();
-  });
-
-  it("calls postJson for reject and refetches", async () => {
-    mockDataMap["/api/autonomous/pending"] = PENDING;
-    renderPage();
-    await act(async () => { fireEvent.click(screen.getByTestId("reject-trig-2")); });
-    expect(postJson).toHaveBeenCalledWith("/api/autonomous/reject/trig-2");
-    expect(mockRefetch).toHaveBeenCalled();
+    expect(screen.queryByTestId("approve-trig-1")).toBeNull();
+    expect(screen.queryByTestId("reject-trig-1")).toBeNull();
+    expect(screen.queryByTestId("approve-trig-2")).toBeNull();
+    expect(screen.queryByTestId("reject-trig-2")).toBeNull();
+    expect(screen.getByTestId("readonly-notice")).toBeTruthy();
+    expect(postJson).not.toHaveBeenCalled();
   });
 
   it("shows the empty state when no pending approvals", () => {

@@ -667,4 +667,16 @@ export const tr: Record<TranslationKey, string> = {
   'mission.item.status.done': 'Tamamlandı',
   'mission.item.status.debt': 'Teknik borç',
   'mission.item.status.failed': 'Başarısız',
+
+  // SURF-7 — yetki devri (ADR-G-033): dashboard gözlemler; her kontrol
+  // işlemi buton yerine terminal/Desktop eşdeğerini söyler.
+  'readonly.control_moved': 'Dashboard gözlemler — kontrol işlemleri terminalde ve Desktop uygulamasında.',
+  'readonly.hint.sprint': 'deckent do "<hedef>"  ·  deckent kill <worker>  ·  deckent cleanup',
+  'readonly.hint.decide': 'deckent runs <n> --approve [--start]  ·  deckent runs <n> --reject',
+  'readonly.hint.nervous': 'deckent nervous  (kabul / red terminalden)',
+  'readonly.hint.autonomous': 'deckent autonomous  (onay / red terminalden)',
+  'readonly.hint.config': 'deckent config  ·  .deckent/config.json',
+  'readonly.hint.directives': 'DIRECTIVES.md (editör)  ·  deckent do "<hedef>"',
+  'readonly.hint.chat': 'deckent  (terminal sohbeti)  ·  Desktop uygulaması → Chat',
+  'readonly.hint.enterprise': 'Enterprise yönetimi Desktop uygulamasına taşınıyor (yönetim düzlemi).',
 };

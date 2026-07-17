@@ -26,12 +26,15 @@ describe("DirectivesEditor — file and exports", () => {
   });
 });
 
-describe("DirectivesEditor — content render", () => {
-  it("renders Textarea for editing DIRECTIVES content", () => {
+// SURF-7 (ADR-G-033): read-only cutover pin
+describe("DirectivesEditor — read-only viewer render", () => {
+  it("renders the DIRECTIVES content in a read-only pre (no Textarea)", () => {
     const content = src();
-    expect(content).toContain("Textarea");
-    expect(content).toContain("directives-editor-textarea");
+    expect(content).toContain('data-testid="directives-view"');
+    expect(content).toContain("<pre");
     expect(content).toContain("DIRECTIVES");
+    expect(content).not.toContain("Textarea");
+    expect(content).not.toContain("directives-editor-textarea");
   });
 
   it("loads content from GET /api/directives via fetchJson", () => {
@@ -39,36 +42,28 @@ describe("DirectivesEditor — content render", () => {
     expect(content).toContain("/api/directives");
     expect(content).toContain("fetchJson");
   });
+
+  it("renders the readonly notice with the directives hint", () => {
+    const content = src();
+    expect(content).toContain("ReadOnlyNotice");
+    expect(content).toContain("readonly.hint.directives");
+  });
 });
 
-describe("DirectivesEditor — edit", () => {
-  it("has onChange handler that updates editor content state", () => {
+// SURF-7 (ADR-G-033): read-only cutover pin
+describe("DirectivesEditor — no mutation wiring", () => {
+  it("has NO save button and never POSTs /api/directives", () => {
     const content = src();
-    // setContent called from onChange
+    expect(content).not.toContain("postJson");
+    expect(content).not.toContain("handleSave");
+    expect(content).not.toContain("directives-save-btn");
+  });
+
+  it("has NO onChange edit path — content state only comes from the fetch", () => {
+    const content = src();
+    expect(content).not.toContain("onChange={");
     expect(content).toContain("setContent");
-    expect(content).toContain("onChange");
-  });
-
-  it("tracks loading and saved state for UX feedback", () => {
-    const content = src();
     expect(content).toContain("isLoading");
-    expect(content).toContain("setSaved");
-  });
-});
-
-describe("DirectivesEditor — save", () => {
-  it("save button calls POST /api/directives via postJson", () => {
-    const content = src();
-    expect(content).toContain("postJson");
-    expect(content).toContain("/api/directives");
-    expect(content).toContain("handleSave");
-  });
-
-  it("save button has data-testid and shows saving indicator", () => {
-    const content = src();
-    expect(content).toContain("directives-save-btn");
-    expect(content).toContain("Saving");
-    expect(content).toContain("Save");
   });
 });
 
@@ -79,22 +74,13 @@ describe("DirectivesEditor — empty content guard", () => {
     expect(content).toContain("content.trim()");
   });
 
-  it("disables save button when content is empty", () => {
-    const content = src();
-    // disabled prop is set based on isEmpty
-    expect(content).toContain("disabled={isSaving || isEmpty}");
-  });
-
-  it("shows warning banner and footer message when empty", () => {
+  it("shows the empty warning banner when content is empty", () => {
     const content = src();
     expect(content).toContain("directives-empty-warning");
     expect(content).toContain("empty");
-    expect(content).toContain("disabled");
-    // footer warning text
-    expect(content).toContain("Sprint start is disabled");
   });
 
-  it("exposes onContentChange callback for parent start-button integration", () => {
+  it("exposes onContentChange callback for parent integration", () => {
     const content = src();
     expect(content).toContain("onContentChange");
     expect(content).toContain("hasContent");

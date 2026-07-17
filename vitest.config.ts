@@ -5,6 +5,10 @@ export default defineConfig({
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     exclude: ['tests/dashboard/**', 'node_modules'],
     testTimeout: 10000,
+    // SURF-7: endpoint-behavior specs run with the orchestration-control
+    // ratchet open (env twin of the default-off api.control_mutations flag);
+    // the gate's real default is pinned by control-mutation-ratchet.test.ts.
+    setupFiles: ['./tests/setup-control-mutations.ts'],
     // CI-CD stability (Sprint 214): the Coverage job ran on a 2-core GitHub
     // runner; after all tests PASS, every fork serialises v8 coverage data back
     // to the main process at teardown. With unbounded forks competing for 2

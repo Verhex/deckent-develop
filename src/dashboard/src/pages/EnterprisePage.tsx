@@ -6,6 +6,7 @@ import type { TranslationKey } from "../i18n/en";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import { Badge } from "../components/ui/badge";
+import { ReadOnlyNotice } from "../components/ReadOnlyNotice";
 import { SkeletonTable } from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
 import { Building2, Shield, FileText, Gauge, AlertTriangle, Plus, Pencil, Trash2, X, Save, Loader2, ScrollText } from "lucide-react";
@@ -123,10 +124,15 @@ export default function EnterprisePage() {
   const [rateMutationError, setRateMutationError] = useState<string | null>(null);
   const [rateConfirmDeleteId, setRateConfirmDeleteId] = useState<string | null>(null);
 
-  // Admin-only management: OIDC admins or the local static-token owner (full
-  // access). Non-admin OIDC roles see the read-only view (buttons hidden); the
-  // server enforces the same rule with a 403 regardless of the UI.
-  const canManage = identity?.role === "admin" || identity?.mode === "static";
+  // SURF-7 (ADR-G-033 authority cutover, Alperen 2026-07-17 "tam sıfır"):
+  // the dashboard is observability-only — tenant/RBAC/rate CRUD is force-OFF
+  // for EVERY role. The management plane's client moves to the Desktop app
+  // (ADR-G-033 amendment); the /api/enterprise/* write endpoints keep their
+  // own admin gate server-side for that future client. The `canManage`
+  // plumbing (and its per-control conditions below) is kept so the Desktop-era
+  // read-only/notice split stays greppable — it just never turns on here.
+  const canManage = false;
+  void identity;
 
   // Shared mutation helper (fetch + bearer auth + JSON error surface). Used by
   // the Tenant, RBAC, and Rate CRUD flows so the auth/error block lives once.
@@ -369,6 +375,8 @@ export default function EnterprisePage() {
           )}
         </div>
       </div>
+
+      <ReadOnlyNotice hintKey="readonly.hint.enterprise" />
 
       {dedupedAlerts.length > 0 && (
         <div className="space-y-2" data-testid="enterprise-alerts">

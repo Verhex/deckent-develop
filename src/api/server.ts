@@ -486,6 +486,60 @@ function isApprovalApiDecideEnabled(projectRoot: string): boolean {
   return (approvalBlock as Record<string, unknown>)['api_decide'] === true;
 }
 
+// ─── SURF-7 — orchestration-control mutation ratchet (ADR-G-033 cutover) ─────
+//
+// The dashboard is observability-only ("the dashboard explains"): the HTTP
+// mutation endpoints that used to power its control buttons sit behind ONE
+// default-off capability flag, `api.control_mutations` — the exact
+// `approval.api_decide` pattern. Flag off (default) ⇒ honest 403 naming the
+// equivalent surfaces (terminal CLI / Desktop) and the emergency re-enable
+// key (the SURF-7 rollback clause). Monitoring GETs are NEVER gated;
+// enterprise management-plane writes keep their own admin gate (their client
+// moves to the Desktop app — ADR-G-033 amendment); /api/run-flow/* has its
+// own SURF-2 contract and is not governed here; /api/rpc (VS Code extension)
+// is untouched.
+
+/** `api.control_mutations` activation flag — raw-config read, default-off
+ *  (absent block/key or non-boolean ⇒ disabled), mirroring
+ *  {@link isApprovalApiDecideEnabled}. `DECKENT_CONTROL_MUTATIONS=1` is the
+ *  env twin (same precedent as `DECKENT_API_AUTH_DISABLED`): the test-suite
+ *  runs endpoint-behavior specs with the gate open, and an operator can flip
+ *  it without editing config in an emergency. */
+function isControlMutationApiEnabled(projectRoot: string): boolean {
+  if (process.env['DECKENT_CONTROL_MUTATIONS'] === '1') return true;
+  const raw = readJsonSafe<Record<string, unknown>>(join(projectRoot, PROJECT_CONFIG_PATH));
+  const apiBlock = raw?.['api'];
+  if (!apiBlock || typeof apiBlock !== 'object') return false;
+  return (apiBlock as Record<string, unknown>)['control_mutations'] === true;
+}
+
+/** The (method,url) pairs the SURF-7 ratchet governs — the dashboard's former
+ *  control surface. `/api/chat/stream` is a GET that MUTATES (it drives the
+ *  agent), so it is governed despite its method. */
+export function isGatedControlMutation(method: string, url: string): boolean {
+  if (method === 'GET') return url === '/api/chat/stream' || url.startsWith('/api/chat/stream?');
+  if (method !== 'POST') return false;
+  if (
+    url === '/api/start' || url === '/api/plan' || url === '/api/cleanup'
+    || url === '/api/set-directives' || url === '/api/directives'
+    || url === '/api/config' || url === '/api/chat'
+  ) return true;
+  if (url === '/api/kill/all' || url.startsWith('/api/kill/')) return true;
+  if (
+    url.startsWith('/api/nervous/accept/') || url.startsWith('/api/nervous/reject/')
+    || url.startsWith('/api/nervous/recommendations/dismiss/')
+  ) return true;
+  if (url.startsWith('/api/autonomous/approve/') || url.startsWith('/api/autonomous/reject/')) return true;
+  return false;
+}
+
+/** The honest refusal every gated endpoint answers while the flag is off. */
+export const CONTROL_MUTATION_DISABLED_MESSAGE =
+  'Orchestration-control mutations over HTTP are disabled (ADR-G-033: the dashboard observes; '
+  + 'control lives in the terminal and the Desktop app — e.g. `deckent do` / `deckent runs <n> --approve` / '
+  + '`deckent kill` / `deckent cleanup` / `deckent config`). '
+  + 'Emergency re-enable: set api.control_mutations: true in .deckent/config.json.';
+
 /** Serialize a store entry for the API — strips `rawArgsRef` (an internal
  *  pointer into the out-of-band raw-args store) so the response carries
  *  `maskedArgs` only. The raw value itself is never a field on the contract
@@ -680,6 +734,14 @@ async function handleRequest(
   // Auth check for all API routes (health endpoint exempt, handled by bearerAuthMiddleware)
   if (url.startsWith('/api/') && authMiddleware) {
     if (!authMiddleware(req, res)) return;
+  }
+
+  // SURF-7 authority-cutover: orchestration-control mutations are terminal/
+  // Desktop territory — over HTTP they answer an honest 403 unless the
+  // emergency flag re-enables them (see isGatedControlMutation).
+  if (isGatedControlMutation(method, url) && !isControlMutationApiEnabled(projectRoot)) {
+    sendError(res, 403, CONTROL_MUTATION_DISABLED_MESSAGE);
+    return;
   }
 
   // ─── Health endpoint (always accessible, no auth) ──────────

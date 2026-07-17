@@ -35,20 +35,18 @@ describe("dashboard/pages — ConfigPage", () => {
     expect(content).toContain("category:");
   });
 
-  it("has Reset to Default button per field", () => {
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("has NO Reset to Default button per field", () => {
     const content = readFileSync(CONFIG_PAGE_PATH, "utf-8");
-    expect(content).toContain("handleResetField");
-    expect(content).toContain("Reset");
-    expect(content).toContain("RotateCcw");
-    expect(content).toContain('data-testid={`reset-${field.key}`}');
+    expect(content).not.toContain("handleResetField");
+    expect(content).not.toContain('data-testid={`reset-${field.key}`}');
   });
 
-  it("shows validation/save feedback messages", () => {
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("has NO save feedback message surface", () => {
     const content = readFileSync(CONFIG_PAGE_PATH, "utf-8");
-    expect(content).toContain("saveMsg");
-    expect(content).toContain("bg-green-900/30");
-    expect(content).toContain("bg-red-900/30");
-    expect(content).toContain('data-testid="save-message"');
+    expect(content).not.toContain("saveMsg");
+    expect(content).not.toContain('data-testid="save-message"');
   });
 
   it("has tooltip/description for each field using Info icon", () => {
@@ -72,17 +70,22 @@ describe("dashboard/pages — ConfigPage", () => {
     expect(content).toContain("config.default_value");
   });
 
-  it("uses POST /api/config to save", () => {
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("never POSTs /api/config — reads only, with the readonly notice", () => {
     const content = readFileSync(CONFIG_PAGE_PATH, "utf-8");
-    expect(content).toContain("postJson");
-    expect(content).toContain('"/api/config"');
+    expect(content).not.toContain("postJson");
+    expect(content).toContain("ReadOnlyNotice");
+    expect(content).toContain("readonly.hint.config");
   });
 
-  it("tracks dirty state per field", () => {
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("renders every input disabled with no dirty tracking and no onChange", () => {
     const content = readFileSync(CONFIG_PAGE_PATH, "utf-8");
-    expect(content).toContain("dirty");
-    expect(content).toContain("setDirty");
-    expect(content).toContain("isModified");
+    expect(content).not.toContain("setDirty");
+    expect(content).not.toContain("isModified");
+    expect(content).not.toContain("onChange");
+    // each of the four input types carries the disabled prop
+    expect(content).toContain("disabled");
   });
 
   it("includes all expected config keys", () => {

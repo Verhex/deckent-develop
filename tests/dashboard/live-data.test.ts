@@ -113,10 +113,12 @@ describe("dashboard/live-data — WorkerCard", () => {
     expect(content).toContain("agent.taskId");
   });
 
-  it("has kill button with Skull icon", () => {
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("has NO kill button — worker termination left the dashboard", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("Skull");
-    expect(content).toContain('t("dashboard.kill")');
+    expect(content).not.toContain("Skull");
+    expect(content).not.toContain('t("dashboard.kill")');
+    expect(content).not.toContain("onKill");
   });
 
   it("has detail button", () => {

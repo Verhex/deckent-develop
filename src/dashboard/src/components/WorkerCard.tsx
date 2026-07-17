@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Skull, Gem, Zap, Leaf, Bot, Cpu, FileCode2, Activity, Clock, type LucideIcon } from "lucide-react";
+import { Gem, Zap, Leaf, Bot, Cpu, FileCode2, Activity, Clock, type LucideIcon } from "lucide-react";
 import type { AgentInfo } from "../types";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { TranslatorProp } from "../i18n/types";
@@ -106,7 +106,6 @@ function relativeTime(isoDate: string | undefined, t: TranslatorProp): string {
 interface WorkerCardProps {
   agent: AgentInfo;
   onClick: () => void;
-  onKill: (id: string) => void;
 }
 
 const LIVE_LOG_TAIL = 5;
@@ -156,7 +155,7 @@ function useLiveLogTail(taskId: string | undefined, enabled: boolean): string[] 
   return lines;
 }
 
-export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
+export function WorkerCard({ agent, onClick }: WorkerCardProps) {
   const { t } = useTranslation();
   const statusBar = STATUS_BAR[agent.status] ?? "bg-zinc-600";
   const badgeVariant = STATUS_BADGE[agent.status] ?? "secondary";
@@ -250,21 +249,9 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
           <span className={`inline-block h-2 w-2 rounded-full ${statusDot}`} data-testid="worker-status-dot" />
           <Badge variant={badgeVariant}>{agent.status}</Badge>
         </div>
+        {/* SURF-7 (ADR-G-033): the per-worker Kill button is gone — the
+            dashboard observes; `deckent kill <worker>` is the control path. */}
         <div className="flex items-center gap-2">
-          {agent.status === "EXECUTING" && (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={(e) => {
-                e.stopPropagation();
-                onKill(agent.id);
-              }}
-            >
-              <Skull className="mr-1 h-3 w-3" />
-              {t("dashboard.kill")}
-            </Button>
-          )}
           <Button
             variant="outline"
             size="sm"
@@ -285,10 +272,9 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
 interface WorkerCardGridProps {
   agents: AgentInfo[];
   onSelect: (taskId: string) => void;
-  onKill: (id: string) => void;
 }
 
-export function WorkerCardGrid({ agents, onSelect, onKill }: WorkerCardGridProps) {
+export function WorkerCardGrid({ agents, onSelect }: WorkerCardGridProps) {
   const { t } = useTranslation();
   if (agents.length === 0) {
     return (
@@ -307,7 +293,6 @@ export function WorkerCardGrid({ agents, onSelect, onKill }: WorkerCardGridProps
           key={agent.id}
           agent={agent}
           onClick={() => onSelect(agent.taskId ?? agent.id)}
-          onKill={onKill}
         />
       ))}
     </div>

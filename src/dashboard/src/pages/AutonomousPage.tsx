@@ -1,11 +1,10 @@
-import { useState } from "react";
 import { useApi } from "../hooks/useApi";
-import { postJson } from "../lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { SkeletonCard } from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
-import { Zap, ListTodo, Cpu, Clock, Check, X } from "lucide-react";
+import { ReadOnlyNotice } from "../components/ReadOnlyNotice";
+import { Zap, ListTodo, Cpu, Clock } from "lucide-react";
 import { useTranslation } from "../i18n/LanguageProvider";
 
 interface PendingApproval {
@@ -64,22 +63,10 @@ export default function AutonomousPage() {
   const { data: backlog, loading: backlogLoading, error: backlogError } =
     useApi<BacklogEntry[]>("/api/autonomous/backlog", { pollIntervalMs: AUTONOMOUS_POLL_MS });
 
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [actioning, setActioning] = useState<string | null>(null);
-
-  async function resolve(kind: "approve" | "reject", triggerId: string) {
-    setActioning(triggerId);
-    setActionError(null);
-    try {
-      await postJson(`/api/autonomous/${kind}/${triggerId}`);
-      refetchPending();
-      refetchStatus();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setActioning(null);
-    }
-  }
+  // SURF-7 (ADR-G-033): approve/reject moved to the terminal
+  // (`deckent autonomous`) — the page observes; the polls keep the lists live.
+  void refetchStatus;
+  void refetchPending;
 
   const summary = status?.backlogSummary;
 
@@ -97,9 +84,7 @@ export default function AutonomousPage() {
         )}
       </div>
 
-      {actionError && (
-        <p className="text-red-400 text-sm" data-testid="action-error">{t("autonomous.error")}: {actionError}</p>
-      )}
+      <ReadOnlyNotice hintKey="readonly.hint.autonomous" />
 
       {/* Backlog Summary */}
       <Card className="bg-zinc-900 border-zinc-800">
@@ -154,26 +139,8 @@ export default function AutonomousPage() {
                     </div>
                     <p className="text-xs text-zinc-600">{p.triggerId} · {p.requestedBy} · {p.enqueuedAt}</p>
                   </div>
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      data-testid={`approve-${p.triggerId}`}
-                      onClick={() => void resolve("approve", p.triggerId)}
-                      disabled={actioning === p.triggerId}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-green-900/60 text-green-300 hover:bg-green-900 disabled:opacity-50 transition-colors"
-                    >
-                      <Check className="w-3 h-3" />
-                      {t("autonomous.approve_button")}
-                    </button>
-                    <button
-                      data-testid={`reject-${p.triggerId}`}
-                      onClick={() => void resolve("reject", p.triggerId)}
-                      disabled={actioning === p.triggerId}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-red-900/60 text-red-300 hover:bg-red-900 disabled:opacity-50 transition-colors"
-                    >
-                      <X className="w-3 h-3" />
-                      {t("autonomous.reject_button")}
-                    </button>
-                  </div>
+                  {/* SURF-7: approve/reject buttons removed — decide from the
+                      terminal (`deckent autonomous`); the poll reflects it. */}
                 </div>
               ))}
             </div>

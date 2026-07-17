@@ -68,6 +68,10 @@ export async function startTestServer(
   if (opts.seed) {
     applySeed(projectRoot, opts.seed);
   }
+  // SURF-7 note: the orchestration-control ratchet is opened suite-wide via
+  // DECKENT_CONTROL_MUTATIONS=1 (tests/setup-control-mutations.ts), NOT here —
+  // writing a config file from this helper would break "config absent → 404"
+  // pins. The default-OFF posture is pinned by control-mutation-ratchet.test.ts.
 
   const envBefore = process.env['DECKENT_API_AUTH_DISABLED'];
   const tokenEnvBefore = process.env['DECKENT_API_TOKEN'];

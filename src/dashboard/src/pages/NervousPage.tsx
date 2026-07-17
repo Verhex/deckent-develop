@@ -1,11 +1,10 @@
-import { useState } from "react";
 import { useApi } from "../hooks/useApi";
-import { postJson } from "../lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { SkeletonCard } from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
-import { Brain, ShieldAlert, Check, X, Activity, Inbox, Lightbulb } from "lucide-react";
+import { ReadOnlyNotice } from "../components/ReadOnlyNotice";
+import { Brain, ShieldAlert, Activity, Inbox, Lightbulb } from "lucide-react";
 import { useTranslation } from "../i18n/LanguageProvider";
 
 interface PendingApproval {
@@ -66,49 +65,11 @@ export default function NervousPage() {
   const { data: recommendations, loading: recsLoading, error: recsError, refetch: refetchRecs } =
     useApi<NervousRecommendation[]>("/api/nervous/recommendations", { pollIntervalMs: NERVOUS_POLL_MS });
 
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [actioning, setActioning] = useState<string | null>(null);
-
-  async function handleAccept(id: string) {
-    setActioning(id);
-    setActionError(null);
-    try {
-      await postJson(`/api/nervous/accept/${id}`);
-      refetchPending();
-      refetchStatus();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setActioning(null);
-    }
-  }
-
-  async function handleReject(id: string) {
-    setActioning(id);
-    setActionError(null);
-    try {
-      await postJson(`/api/nervous/reject/${id}`);
-      refetchPending();
-      refetchStatus();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setActioning(null);
-    }
-  }
-
-  async function handleDismiss(id: string) {
-    setActioning(id);
-    setActionError(null);
-    try {
-      await postJson(`/api/nervous/recommendations/dismiss/${id}`);
-      refetchRecs();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setActioning(null);
-    }
-  }
+  // SURF-7 (ADR-G-033): accept/reject/dismiss moved to the terminal
+  // (`deckent nervous`) — the page observes; the polls keep the lists live.
+  void refetchStatus;
+  void refetchPending;
+  void refetchRecs;
 
   return (
     <div className="space-y-6" data-testid="nervous-page">
@@ -124,9 +85,7 @@ export default function NervousPage() {
         )}
       </div>
 
-      {actionError && (
-        <p className="text-red-400 text-sm" data-testid="action-error">{t('nervous.error')}: {actionError}</p>
-      )}
+      <ReadOnlyNotice hintKey="readonly.hint.nervous" />
 
       {/* Detector Status */}
       <Card className="bg-zinc-900 border-zinc-800">
@@ -200,26 +159,8 @@ export default function NervousPage() {
                     <p className="text-sm text-zinc-400 mb-1">{approval.description}</p>
                     <p className="text-xs text-zinc-600">detector: {approval.detector} · {approval.createdAt}</p>
                   </div>
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      data-testid={`accept-${approval.id}`}
-                      onClick={() => void handleAccept(approval.id)}
-                      disabled={actioning === approval.id}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-green-900/60 text-green-300 hover:bg-green-900 disabled:opacity-50 transition-colors"
-                    >
-                      <Check className="w-3 h-3" />
-                      {t('nervous.accept_button')}
-                    </button>
-                    <button
-                      data-testid={`reject-${approval.id}`}
-                      onClick={() => void handleReject(approval.id)}
-                      disabled={actioning === approval.id}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-red-900/60 text-red-300 hover:bg-red-900 disabled:opacity-50 transition-colors"
-                    >
-                      <X className="w-3 h-3" />
-                      {t('nervous.reject_button')}
-                    </button>
-                  </div>
+                  {/* SURF-7: accept/reject buttons removed — decide from the
+                      terminal (`deckent nervous`); the poll reflects it here. */}
                 </div>
               ))}
             </div>
@@ -266,17 +207,7 @@ export default function NervousPage() {
                       {summary && <p className="text-sm text-zinc-400 mb-1 truncate">{summary}</p>}
                       <p className="text-xs text-zinc-600">{rec.id} · {rec.createdAt}</p>
                     </div>
-                    <div className="flex gap-2 shrink-0">
-                      <button
-                        data-testid={`dismiss-${rec.id}`}
-                        onClick={() => void handleDismiss(rec.id)}
-                        disabled={actioning === rec.id}
-                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-zinc-800 text-zinc-300 hover:bg-zinc-700 disabled:opacity-50 transition-colors"
-                      >
-                        <X className="w-3 h-3" />
-                        {t('nervous.dismiss_button')}
-                      </button>
-                    </div>
+                    {/* SURF-7: dismiss moved to the terminal (`deckent nervous`). */}
                   </div>
                 );
               })}

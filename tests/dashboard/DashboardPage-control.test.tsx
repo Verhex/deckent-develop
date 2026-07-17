@@ -62,35 +62,37 @@ describe("DashboardPage — worker grid", () => {
     expect(content).toContain("AgentDetail");
   });
 
-  it("passes onKill callback for worker termination", () => {
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("passes NO onKill callback — worker termination left the dashboard", () => {
     const content = src();
-    expect(content).toContain("onKill={handleKill}");
-    expect(content).toContain("handleKill");
-    expect(content).toContain("/api/kill/");
+    expect(content).not.toContain("onKill");
+    expect(content).not.toContain("handleKill");
+    expect(content).not.toContain("/api/kill/");
   });
 });
 
-describe("DashboardPage — start sprint flow", () => {
-  it("has New Sprint button that opens modal", () => {
+// SURF-7 (ADR-G-033): read-only cutover pin
+describe("DashboardPage — read-only control surface", () => {
+  it("has NO New Sprint modal wiring", () => {
     const content = src();
-    expect(content).toContain("setModalOpen(true)");
-    expect(content).toContain("dashboard.new_sprint");
-    expect(content).toContain("NewSprintModal");
+    expect(content).not.toContain("NewSprintModal");
+    expect(content).not.toContain("setModalOpen");
+    expect(content).not.toContain("modalOpen");
   });
 
-  it("passes open and onOpenChange to NewSprintModal", () => {
+  it("has NO cleanup / kill-all buttons in any phase", () => {
     const content = src();
-    expect(content).toContain("open={modalOpen}");
-    expect(content).toContain("onOpenChange={setModalOpen}");
+    expect(content).not.toContain("showKillAll");
+    expect(content).not.toContain("showCleanup");
+    expect(content).not.toContain("kill-all-btn");
+    expect(content).not.toContain("cleanup-btn");
   });
 
-  it("cleanup and kill-all buttons are conditionally shown based on phase", () => {
+  it("renders the ReadOnlyNotice with the sprint hint instead", () => {
     const content = src();
-    expect(content).toContain("showKillAll");
-    expect(content).toContain("showCleanup");
-    // Kill-all shown during EXECUTE or FIX phase
-    expect(content).toContain("EXECUTE");
-    expect(content).toContain("FIX");
+    expect(content).toContain("ReadOnlyNotice");
+    expect(content).toContain("readonly.hint.sprint");
+    expect(content).toMatch(/from\s+["']\.\.\/components\/ReadOnlyNotice["']/);
   });
 });
 

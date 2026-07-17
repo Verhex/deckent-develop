@@ -81,32 +81,18 @@ describe("NervousPage — F7-009 Nervous System UI (215-015)", () => {
     expect(screen.getByText("scope-expansion")).toBeTruthy();
   });
 
-  it("calls postJson for accept action and refetches", async () => {
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("renders NO accept/reject buttons and the readonly notice instead", () => {
     mockDataMap["/api/nervous/pending"] = PENDING_APPROVALS;
     mockDataMap["/api/nervous/status"] = NERVOUS_STATUS;
     renderPage();
 
-    const acceptBtn = screen.getByTestId("accept-n1");
-    await act(async () => {
-      fireEvent.click(acceptBtn);
-    });
-
-    expect(postJson).toHaveBeenCalledWith("/api/nervous/accept/n1");
-    expect(mockRefetch).toHaveBeenCalled();
-  });
-
-  it("calls postJson for reject action and refetches", async () => {
-    mockDataMap["/api/nervous/pending"] = PENDING_APPROVALS;
-    mockDataMap["/api/nervous/status"] = NERVOUS_STATUS;
-    renderPage();
-
-    const rejectBtn = screen.getByTestId("reject-n2");
-    await act(async () => {
-      fireEvent.click(rejectBtn);
-    });
-
-    expect(postJson).toHaveBeenCalledWith("/api/nervous/reject/n2");
-    expect(mockRefetch).toHaveBeenCalled();
+    expect(screen.queryByTestId("accept-n1")).toBeNull();
+    expect(screen.queryByTestId("reject-n1")).toBeNull();
+    expect(screen.queryByTestId("accept-n2")).toBeNull();
+    expect(screen.queryByTestId("reject-n2")).toBeNull();
+    expect(screen.getByTestId("readonly-notice")).toBeTruthy();
+    expect(postJson).not.toHaveBeenCalled();
   });
 
   it("shows empty state when no pending approvals", () => {

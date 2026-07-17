@@ -1,10 +1,25 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { fetchJson, postJson } from '../lib/api';
+import { fetchJson } from '../lib/api';
 import { en } from './en';
 import { tr } from './tr';
 import type { TranslationKey } from './en';
 
 type Language = 'en' | 'tr';
+
+/** SURF-7: the dashboard's UI language is a CLIENT preference (localStorage),
+ *  not a project-config write — flipping the viewer's language must never
+ *  mutate `.deckent/config.json` (that was a wrong-layer write the authority
+ *  cutover removed). The project config remains the first-boot DEFAULT. */
+const LANG_STORAGE_KEY = 'deckent.dashboard.lang';
+
+function readStoredLang(): Language | null {
+  try {
+    const stored = window.localStorage.getItem(LANG_STORAGE_KEY);
+    return stored === 'tr' || stored === 'en' ? stored : null;
+  } catch {
+    return null; // storage unavailable (privacy mode) — fall back to config
+  }
+}
 
 interface LanguageContextValue {
   lang: Language;
@@ -21,11 +36,12 @@ const LanguageContext = createContext<LanguageContextValue>({
 });
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Language>('en');
+  const [lang, setLangState] = useState<Language>(() => readStoredLang() ?? 'en');
 
   useEffect(() => {
-    // Load language from config API (canonical token-aware client — a raw
-    // fetch here was the last un-migrated caller and 401'd on served builds)
+    // No stored client preference → the project config's language is the
+    // first-boot default (read-only; the canonical token-aware client).
+    if (readStoredLang() !== null) return;
     fetchJson<{ language?: string }>('/api/config')
       .then((config) => {
         if (config?.language === 'tr') setLangState('tr');
@@ -35,8 +51,11 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   const setLang = useCallback((newLang: Language) => {
     setLangState(newLang);
-    // Persist to config
-    postJson('/api/config', { language: newLang }).catch(() => {});
+    try {
+      window.localStorage.setItem(LANG_STORAGE_KEY, newLang);
+    } catch {
+      // storage unavailable — the choice lives for this session only
+    }
   }, []);
 
   const t = useCallback(

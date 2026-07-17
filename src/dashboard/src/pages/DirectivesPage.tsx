@@ -1,34 +1,21 @@
-import { useCallback, useEffect, useState } from "react";
-import { Save, FileText, AlertTriangle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { FileText, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { Textarea } from "../components/ui/textarea";
+import { ReadOnlyNotice } from "../components/ReadOnlyNotice";
 import { useTranslation } from "../i18n/LanguageProvider";
-import { fetchJson, postJson } from "../lib/api";
-
-/** Count "## Task N:" headings — the saved-confirmation surfaces how many
- *  tasks the directives describe (same heading contract as the planner). */
-function countTasks(content: string): number {
-  return (content.match(/^## Task /gm) ?? []).length;
-}
+import { fetchJson } from "../lib/api";
 
 /**
- * Directives page (Sprint 269 Task 269-002) — DIRECTIVES.md as a first-class
- * route: load via GET /api/directives, edit, save via POST /api/directives
- * (the set-directives write path the NewSprintModal/DirectivesEditor flow uses).
- *
- * i18n-clean page version of components/DirectivesEditor.tsx — all user-facing
- * strings come from the en/tr dictionaries. When the read endpoint is
- * unavailable the page stays usable for composing (warning shown, save active).
+ * Directives page — SURF-7 (ADR-G-033 authority cutover): DIRECTIVES.md as a
+ * first-class READ-ONLY route. The dashboard observes the file; editing lives
+ * in the terminal/editor (the POST /api/directives write path is behind the
+ * default-off `api.control_mutations` ratchet server-side).
  */
 export default function DirectivesPage() {
   const { t } = useTranslation();
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [savedTasks, setSavedTasks] = useState<number | null>(null);
 
   useEffect(() => {
     fetchJson<{ content: string }>("/api/directives")
@@ -36,26 +23,10 @@ export default function DirectivesPage() {
         setContent(res.content ?? "");
       })
       .catch(() => {
-        // read endpoint unavailable — keep the editor usable for composing
         setLoadFailed(true);
       })
       .finally(() => setIsLoading(false));
   }, []);
-
-  const handleSave = useCallback(async () => {
-    if (!content.trim()) return;
-    setIsSaving(true);
-    setError("");
-    setSavedTasks(null);
-    try {
-      await postJson("/api/directives", { content });
-      setSavedTasks(countTasks(content));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsSaving(false);
-    }
-  }, [content]);
 
   const isEmpty = !content.trim();
 
@@ -70,15 +41,7 @@ export default function DirectivesPage() {
           </h1>
           <p className="mt-1 text-sm text-zinc-400">{t("directives.subtitle")}</p>
         </div>
-        <Button
-          onClick={handleSave}
-          disabled={isSaving || isEmpty}
-          className="transition-all duration-200"
-          data-testid="directives-page-save-btn"
-        >
-          <Save className="mr-2 h-4 w-4" />
-          {isSaving ? t("directives.saving") : t("directives.save")}
-        </Button>
+        <ReadOnlyNotice hintKey="readonly.hint.directives" />
       </div>
 
       <Card className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50">
@@ -101,24 +64,14 @@ export default function DirectivesPage() {
               <span>{t("directives.empty_warning")}</span>
             </div>
           )}
-          {error && (
-            <p className="text-sm text-red-400" data-testid="directives-page-error">{error}</p>
+          {!isEmpty && (
+            <pre
+              data-testid="directives-page-view"
+              className="max-h-[70vh] overflow-auto whitespace-pre-wrap rounded-md border border-zinc-800 bg-zinc-950/60 p-3 font-mono text-sm text-zinc-300"
+            >
+              {content}
+            </pre>
           )}
-          {savedTasks !== null && (
-            <p className="text-sm text-green-400" data-testid="directives-page-saved">
-              {t("directives.saved", { n: savedTasks })}
-            </p>
-          )}
-          <Textarea
-            value={content}
-            onChange={(e) => { setContent(e.target.value); setSavedTasks(null); }}
-            placeholder={"# DIRECTIVES — Sprint NNN: Sprint Title\n\n## Goal: ...\n\n## Task 1: ..."}
-            rows={24}
-            disabled={isLoading}
-            className="resize-y font-mono text-sm"
-            data-testid="directives-page-textarea"
-            aria-label={t("nav.directives")}
-          />
         </CardContent>
       </Card>
     </div>

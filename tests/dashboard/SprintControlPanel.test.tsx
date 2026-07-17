@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import React from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, cleanup } from "@testing-library/react";
 import { LanguageProvider } from "../../src/dashboard/src/i18n/LanguageProvider";
 import { SprintControlPanel } from "../../src/dashboard/src/components/SprintControlPanel";
 import { postJson } from "../../src/dashboard/src/lib/api";
@@ -125,40 +125,32 @@ describe("SprintControlPanel", () => {
     expect(grid).toBeTruthy();
   });
 
-  it("shows kill-all button during EXECUTE phase", () => {
-    const state = makeState({
-      sprint: { id: "sprint-210", number: 210, phase: "EXECUTE", status: "running" },
-    });
-    vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
-    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("renders NO kill-all/cleanup buttons in ANY phase", () => {
+    for (const phase of ["PLAN", "SPAWN", "EXECUTE", "EVALUATE", "FIX", "RETRO", "CLEANUP"]) {
+      const state = makeState({
+        sprint: { id: "sprint-210", number: 210, phase, status: "running" },
+      });
+      vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
+      vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
 
-    renderWithProviders(<SprintControlPanel />);
+      renderWithProviders(<SprintControlPanel />);
 
-    expect(screen.getByTestId("kill-all-btn")).toBeTruthy();
+      expect(screen.queryByTestId("kill-all-btn")).toBeNull();
+      expect(screen.queryByTestId("cleanup-btn")).toBeNull();
+      cleanup();
+    }
   });
 
-  it("shows kill-all button during FIX phase", () => {
-    const state = makeState({
-      sprint: { id: "sprint-210", number: 210, phase: "FIX", status: "running" },
-    });
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("shows the readonly notice when a sprint is active", () => {
+    const state = makeState();
     vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
     vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
 
     renderWithProviders(<SprintControlPanel />);
 
-    expect(screen.getByTestId("kill-all-btn")).toBeTruthy();
-  });
-
-  it("hides kill-all button during non-execute phases", () => {
-    const state = makeState({
-      sprint: { id: "sprint-210", number: 210, phase: "PLAN", status: "running" },
-    });
-    vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
-    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
-
-    renderWithProviders(<SprintControlPanel />);
-
-    expect(screen.queryByTestId("kill-all-btn")).toBeNull();
+    expect(screen.getByTestId("readonly-notice")).toBeTruthy();
   });
 
   it("shows progress card with done/total counts when total > 0", () => {
@@ -195,22 +187,17 @@ describe("SprintControlPanel", () => {
     expect(screen.getByText("sprint-api")).toBeTruthy();
   });
 
-  it("surfaces an error when kill-all fails instead of swallowing it (R6)", async () => {
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("never calls postJson — the panel has no mutation wiring", () => {
     const state = makeState({
       sprint: { id: "sprint-err", number: 211, phase: "EXECUTE", status: "running" },
     });
     vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
     vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
-    vi.mocked(postJson).mockRejectedValueOnce(new Error("HTTP 500"));
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
 
     renderWithProviders(<SprintControlPanel />);
-    // Pre-fix the catch was `// silent` — the failed kill produced no DOM signal.
-    expect(screen.queryByTestId("sprint-control-error")).toBeNull();
-    fireEvent.click(screen.getByTestId("kill-all-btn"));
 
-    await waitFor(() => expect(screen.getByTestId("sprint-control-error")).toBeTruthy());
-    expect(screen.getByTestId("sprint-control-error").textContent).toContain("Failed to stop");
-    confirmSpy.mockRestore();
+    expect(screen.queryByTestId("sprint-control-error")).toBeNull();
+    expect(postJson).not.toHaveBeenCalled();
   });
 });

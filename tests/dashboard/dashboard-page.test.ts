@@ -35,16 +35,15 @@ describe("dashboard page — DashboardPage.tsx", () => {
     const content = readFileSync(filePath, "utf-8");
     expect(content).toContain("WorkerCardGrid");
     expect(content).toContain("AgentDetail");
-    expect(content).toContain("onKill");
     expect(content).toContain("onSelect");
   });
 
-  it("has Kill button with POST /api/kill/:workerId", () => {
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("has NO kill wiring — no /api/kill POST, no postJson, no onKill prop", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("Kill");
-    expect(content).toContain("/api/kill/");
-    expect(content).toContain("postJson");
-    expect(content).toContain("confirm");
+    expect(content).not.toContain("/api/kill/");
+    expect(content).not.toContain("postJson");
+    expect(content).not.toContain("onKill");
   });
 
   it("has progress bar with done, active, pending segments", () => {
@@ -65,11 +64,13 @@ describe("dashboard page — DashboardPage.tsx", () => {
     expect(content).toContain("ALERT_VARIANT");
   });
 
-  it("has new sprint button that opens modal", () => {
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("has NO new-sprint modal — the readonly notice replaces all control", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("dashboard.new_sprint");
-    expect(content).toContain("setModalOpen(true)");
-    expect(content).toContain("NewSprintModal");
+    expect(content).not.toContain("NewSprintModal");
+    expect(content).not.toContain("setModalOpen");
+    expect(content).toContain("ReadOnlyNotice");
+    expect(content).toContain("readonly.hint.sprint");
   });
 
   it("uses dark theme classes", () => {
@@ -94,65 +95,12 @@ describe("dashboard page — DashboardPage.tsx", () => {
   });
 });
 
-describe("dashboard page — NewSprintModal.tsx", () => {
+// SURF-7 (ADR-G-033): read-only cutover pin
+describe("dashboard page — NewSprintModal.tsx removed", () => {
   const filePath = join(DASHBOARD_DIR, "src/components/NewSprintModal.tsx");
 
-  it("file exists", () => {
-    expect(existsSync(filePath)).toBe(true);
-  });
-
-  it("implements multi-step modal flow", () => {
-    const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("directives");
-    expect(content).toContain("planning");
-    expect(content).toContain("review");
-    expect(content).toContain("starting");
-    expect(content).toContain("done");
-    expect(content).toContain("error");
-  });
-
-  it("has textarea for directive content", () => {
-    const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("Textarea");
-    expect(content).toContain("directives");
-  });
-
-  it("calls POST /api/set-directives", () => {
-    const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("/api/set-directives");
-    expect(content).toContain("content: directives");
-  });
-
-  it("calls POST /api/plan and shows plan", () => {
-    const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("/api/plan");
-    expect(content).toContain("plan.tasks");
-  });
-
-  it("calls POST /api/start on confirm", () => {
-    const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("/api/start");
-    expect(content).toContain("modal.confirm_start");
-  });
-
-  it("shows task count from set-directives response", () => {
-    const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("taskCount");
-  });
-
-  it("has error handling with try-again", () => {
-    const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("modal.try_again");
-    expect(content).toContain("error");
-  });
-
-  it("uses Dialog component", () => {
-    const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("Dialog");
-    expect(content).toContain("DialogContent");
-    expect(content).toContain("DialogHeader");
-    expect(content).toContain("DialogTitle");
-    expect(content).toContain("DialogFooter");
+  it("component file no longer exists — sprints start from the terminal/Desktop", () => {
+    expect(existsSync(filePath)).toBe(false);
   });
 });
 

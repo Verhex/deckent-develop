@@ -84,32 +84,18 @@ describe("NervousPage — real data fetch paths (218-006)", () => {
     expect(screen.getByText("scope-expansion")).toBeTruthy();
   });
 
-  it("calls postJson for accept action and refetches (accept)", async () => {
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("renders NO accept/reject buttons; readonly notice present; no postJson", () => {
     mockDataMap["/api/nervous/pending"] = PENDING;
     mockDataMap["/api/nervous/status"] = STATUS;
     renderPage();
 
-    const acceptBtn = screen.getByTestId("accept-p1");
-    await act(async () => {
-      fireEvent.click(acceptBtn);
-    });
-
-    expect(postJson).toHaveBeenCalledWith("/api/nervous/accept/p1");
-    expect(mockRefetch).toHaveBeenCalled();
-  });
-
-  it("calls postJson for reject action and refetches (reject)", async () => {
-    mockDataMap["/api/nervous/pending"] = PENDING;
-    mockDataMap["/api/nervous/status"] = STATUS;
-    renderPage();
-
-    const rejectBtn = screen.getByTestId("reject-p2");
-    await act(async () => {
-      fireEvent.click(rejectBtn);
-    });
-
-    expect(postJson).toHaveBeenCalledWith("/api/nervous/reject/p2");
-    expect(mockRefetch).toHaveBeenCalled();
+    expect(screen.queryByTestId("accept-p1")).toBeNull();
+    expect(screen.queryByTestId("reject-p1")).toBeNull();
+    expect(screen.queryByTestId("accept-p2")).toBeNull();
+    expect(screen.queryByTestId("reject-p2")).toBeNull();
+    expect(screen.getByTestId("readonly-notice")).toBeTruthy();
+    expect(postJson).not.toHaveBeenCalled();
   });
 
   it("shows empty state when no pending approvals (boş state)", () => {
@@ -179,19 +165,17 @@ describe("NervousPage — Brain inbox (recommendations)", () => {
     expect(screen.getByText("COMMIT_PUSH")).toBeTruthy();
   });
 
-  it("dismiss button calls the dismiss endpoint and refetches", async () => {
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("renders NO dismiss buttons on recommendations; no postJson fires", () => {
     mockDataMap["/api/nervous/pending"] = [];
     mockDataMap["/api/nervous/status"] = STATUS;
     mockDataMap["/api/nervous/recommendations"] = RECOMMENDATIONS;
     renderPage();
 
-    const dismissBtn = screen.getByTestId("dismiss-rec-aaaaaaaaaa11");
-    await act(async () => {
-      fireEvent.click(dismissBtn);
-    });
-
-    expect(postJson).toHaveBeenCalledWith("/api/nervous/recommendations/dismiss/rec-aaaaaaaaaa11");
-    expect(mockRefetch).toHaveBeenCalled();
+    expect(screen.queryByTestId("dismiss-rec-aaaaaaaaaa11")).toBeNull();
+    expect(screen.queryByTestId("dismiss-rec-bbbbbbbbbb22")).toBeNull();
+    expect(screen.getByTestId("readonly-notice")).toBeTruthy();
+    expect(postJson).not.toHaveBeenCalled();
   });
 
   it("shows empty state when no open recommendations", () => {

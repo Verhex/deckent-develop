@@ -64,10 +64,10 @@ describe("WorkerGrid — callbacks passed to WorkerCardGrid", () => {
     expect(content).toContain("onSelect={onSelect}");
   });
 
-  it("accepts and passes onKill callback for worker termination", () => {
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("accepts NO onKill callback — worker termination left the dashboard", () => {
     const content = src();
-    expect(content).toContain("onKill");
-    expect(content).toContain("onKill={onKill}");
+    expect(content).not.toContain("onKill");
   });
 });
 

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { Users, MessageSquare, ArrowRightLeft, Cpu } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import { WorkerCardGrid } from "../components/WorkerCard";
@@ -8,7 +8,6 @@ import { Sheet, SheetContent } from "../components/ui/sheet";
 import { useSSE } from "../hooks/useSSE";
 import { useLiveData } from "../lib/use-live-data";
 import { useTranslation } from "../i18n/LanguageProvider";
-import { postJson } from "../lib/api";
 import EmptyState from "../components/EmptyState";
 import type { DashboardState, AgentInfo } from "../types";
 
@@ -129,7 +128,7 @@ function WorkerResourceSummary({ agents }: WorkerCommsPanelProps) {
 export default function WorkersPage() {
   const { t } = useTranslation();
   const sseState = useSSE("/api/events");
-  const { data: polledState, refresh } = useLiveData<DashboardState>("/api/status", {
+  const { data: polledState } = useLiveData<DashboardState>("/api/status", {
     enabled: !sseState,
     pollIntervalMs: 5000,
   });
@@ -139,19 +138,6 @@ export default function WorkersPage() {
   const state = sseState ?? polledState;
   const agents = state?.agents ?? [];
   const executing = agents.filter((a) => a.status === "EXECUTING").length;
-
-  const handleKill = useCallback(
-    async (agentId: string) => {
-      if (!confirm(`${t("dashboard.confirm_kill_worker")} ${agentId}?`)) return;
-      try {
-        await postJson(`/api/kill/${agentId}`);
-        refresh();
-      } catch {
-        // error handled silently — next poll/SSE tick reconciles the grid
-      }
-    },
-    [refresh, t],
-  );
 
   return (
     <div className="space-y-6" data-testid="workers-page">
@@ -175,14 +161,14 @@ export default function WorkersPage() {
       </div>
 
       {/* Live worker grid — WorkerCard renders id, task, status, heartbeat age,
-          provider bar + model badge, and the kill button for EXECUTING workers. */}
+          provider bar + model badge. SURF-7: the kill button is gone — the
+          dashboard observes (`deckent kill <worker>` is the control path). */}
       <WorkerCardGrid
         agents={agents}
         onSelect={(taskId) => {
           setSelectedAgent(taskId);
           setSelectedLogTaskId(taskId);
         }}
-        onKill={handleKill}
       />
 
       {/* Worker Log Panel — live SSE log stream for the selected worker */}

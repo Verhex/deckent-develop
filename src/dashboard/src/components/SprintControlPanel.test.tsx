@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import React from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, cleanup } from "@testing-library/react";
 import { LanguageProvider } from "../i18n/LanguageProvider";
 import { SprintControlPanel } from "./SprintControlPanel";
 import type { DashboardState, AgentInfo } from "../types";
@@ -125,40 +125,32 @@ describe("SprintControlPanel", () => {
     expect(grid).toBeTruthy();
   });
 
-  it("shows kill-all button during EXECUTE phase", () => {
-    const state = makeState({
-      sprint: { id: "sprint-210", number: 210, phase: "EXECUTE", status: "running" },
-    });
-    vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
-    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("renders NO kill-all/cleanup buttons in ANY phase", () => {
+    for (const phase of ["PLAN", "SPAWN", "EXECUTE", "EVALUATE", "FIX", "RETRO", "CLEANUP"]) {
+      const state = makeState({
+        sprint: { id: "sprint-210", number: 210, phase, status: "running" },
+      });
+      vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
+      vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
 
-    renderWithProviders(<SprintControlPanel />);
+      renderWithProviders(<SprintControlPanel />);
 
-    expect(screen.getByTestId("kill-all-btn")).toBeTruthy();
+      expect(screen.queryByTestId("kill-all-btn")).toBeNull();
+      expect(screen.queryByTestId("cleanup-btn")).toBeNull();
+      cleanup();
+    }
   });
 
-  it("shows kill-all button during FIX phase", () => {
-    const state = makeState({
-      sprint: { id: "sprint-210", number: 210, phase: "FIX", status: "running" },
-    });
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("shows the readonly notice when a sprint is active", () => {
+    const state = makeState();
     vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
     vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
 
     renderWithProviders(<SprintControlPanel />);
 
-    expect(screen.getByTestId("kill-all-btn")).toBeTruthy();
-  });
-
-  it("hides kill-all button during non-execute phases", () => {
-    const state = makeState({
-      sprint: { id: "sprint-210", number: 210, phase: "PLAN", status: "running" },
-    });
-    vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
-    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
-
-    renderWithProviders(<SprintControlPanel />);
-
-    expect(screen.queryByTestId("kill-all-btn")).toBeNull();
+    expect(screen.getByTestId("readonly-notice")).toBeTruthy();
   });
 
   it("shows progress card with done/total counts when total > 0", () => {
@@ -219,88 +211,14 @@ describe("SprintControlPanel", () => {
     expect(badge.textContent).toBe("UNKNOWN_PHASE");
   });
 
-  it("handleKillAll: confirms, posts and refetches when accepted", async () => {
-    const refetch = vi.fn();
+  // SURF-7 (ADR-G-033): read-only cutover pin
+  it("never calls postJson — the panel has no mutation wiring", () => {
     const state = makeState();
     vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
-    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch });
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
 
     renderWithProviders(<SprintControlPanel />);
-    fireEvent.click(screen.getByTestId("kill-all-btn"));
-
-    await waitFor(() => {
-      expect(postJson).toHaveBeenCalledWith("/api/kill/all");
-      expect(refetch).toHaveBeenCalled();
-    });
-
-    confirmSpy.mockRestore();
-  });
-
-  it("handleKillAll: cancels and does NOT post when user declines confirm", () => {
-    const refetch = vi.fn();
-    const state = makeState();
-    vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
-    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch });
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
-
-    renderWithProviders(<SprintControlPanel />);
-    fireEvent.click(screen.getByTestId("kill-all-btn"));
 
     expect(postJson).not.toHaveBeenCalled();
-    expect(refetch).not.toHaveBeenCalled();
-    confirmSpy.mockRestore();
-  });
-
-  it("handleKillAll: swallows postJson error without throwing", async () => {
-    const refetch = vi.fn();
-    const state = makeState();
-    vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
-    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch });
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-    vi.mocked(postJson).mockRejectedValueOnce(new Error("network down"));
-
-    renderWithProviders(<SprintControlPanel />);
-    fireEvent.click(screen.getByTestId("kill-all-btn"));
-
-    await waitFor(() => {
-      expect(postJson).toHaveBeenCalledWith("/api/kill/all");
-    });
-    // refetch is skipped on error; loading flag clears via finally
-    expect(refetch).not.toHaveBeenCalled();
-
-    confirmSpy.mockRestore();
-  });
-
-  it("handleCleanup: confirms, posts /api/cleanup and refetches", async () => {
-    const refetch = vi.fn();
-    const state = makeState();
-    vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
-    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch });
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-
-    renderWithProviders(<SprintControlPanel />);
-    fireEvent.click(screen.getByTestId("cleanup-btn"));
-
-    await waitFor(() => {
-      expect(postJson).toHaveBeenCalledWith("/api/cleanup");
-      expect(refetch).toHaveBeenCalled();
-    });
-
-    confirmSpy.mockRestore();
-  });
-
-  it("handleCleanup: cancel path does not call postJson", () => {
-    const refetch = vi.fn();
-    const state = makeState();
-    vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
-    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch });
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
-
-    renderWithProviders(<SprintControlPanel />);
-    fireEvent.click(screen.getByTestId("cleanup-btn"));
-
-    expect(postJson).not.toHaveBeenCalled();
-    confirmSpy.mockRestore();
   });
 });

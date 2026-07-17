@@ -1,21 +1,20 @@
-import { useState, useEffect, useCallback } from "react";
-import { Activity, AlertTriangle, Info, XOctagon, Plus, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Activity, AlertTriangle, Info, XOctagon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
-import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
 import { WorkerCardGrid } from "../components/WorkerCard";
-import { NewSprintModal } from "../components/NewSprintModal";
 import { AgentDetail } from "../components/AgentDetail";
 import { ActivityFeed } from "../components/ActivityFeed";
 import { SprintPhaseTimeline } from "../components/SprintPhaseTimeline";
 import { SkeletonCard } from "../components/Skeleton";
+import { ReadOnlyNotice } from "../components/ReadOnlyNotice";
 import { Sheet, SheetContent } from "../components/ui/sheet";
 import { useSSEWithLiveEvents } from "../hooks/useSSE";
 import type { LiveActivityEntry } from "../lib/use-live-data";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { TranslatorProp } from "../i18n/types";
-import { fetchJson, postJson, ApiError } from "../lib/api";
+import { fetchJson } from "../lib/api";
 import type { DashboardState, Alert } from "../types";
 import { useLiveData } from "../lib/use-live-data";
 import { DirectivesEditor } from "../components/DirectivesEditor";
@@ -25,9 +24,8 @@ import { KpiCard } from "../components/KpiCard";
 interface WelcomeScreenProps {
   lastSprintId?: string;
   lastSprintMetrics?: Record<string, string>;
-  onNewSprint: () => void;
 }
-function WelcomeScreen({ lastSprintId, lastSprintMetrics, onNewSprint }: WelcomeScreenProps) {
+function WelcomeScreen({ lastSprintId, lastSprintMetrics }: WelcomeScreenProps) {
   const { t } = useTranslation();
   return (
     <Card className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50">
@@ -36,10 +34,9 @@ function WelcomeScreen({ lastSprintId, lastSprintMetrics, onNewSprint }: Welcome
         <h2 className="text-2xl font-bold text-zinc-100">deckent</h2>
         <p className="text-zinc-400 text-center">{t("welcome.no_sprint")}</p>
         <p className="text-zinc-500 text-sm text-center">{t("welcome.start_hint")}</p>
-        <Button onClick={onNewSprint} className="mt-2 transition-all duration-200">
-          <Plus className="mr-2 h-4 w-4" />
-          {t("dashboard.new_sprint")}
-        </Button>
+        {/* SURF-7: the New Sprint modal is gone — runs start from the
+            terminal (`deckent do`) or the Desktop app. */}
+        <ReadOnlyNotice hintKey="readonly.hint.sprint" className="mt-2" />
         {lastSprintId && (
           <div className="mt-2 text-center space-y-1">
             <p className="text-xs text-zinc-500">
@@ -195,10 +192,7 @@ export default function DashboardPage() {
   const [fallbackState, setFallbackState] = useState<DashboardState | null>(null);
   const [noSprint, setNoSprint] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const [isCleanupLoading, setIsCleanupLoading] = useState(false);
-  const [isKillAllLoading, setIsKillAllLoading] = useState(false);
 
   useEffect(() => {
     if (!sseState) {
@@ -218,54 +212,6 @@ export default function DashboardPage() {
   }, [sseState]);
 
   const state = sseState ?? polledState ?? fallbackState;
-
-  const handleCleanup = useCallback(async () => {
-    if (!confirm(t('dashboard.confirm_cleanup'))) return;
-    setIsCleanupLoading(true);
-    try {
-      await postJson('/api/cleanup');
-      if (!sseState) {
-        fetchJson<DashboardState>('/api/status')
-          .then(setFallbackState)
-          .catch(() => {});
-      }
-    } catch {
-      // error handled silently
-    } finally {
-      setIsCleanupLoading(false);
-    }
-  }, [sseState, t]);
-
-  const handleKillAll = useCallback(async () => {
-    if (!confirm(t('dashboard.confirm_kill'))) return;
-    setIsKillAllLoading(true);
-    try {
-      await postJson('/api/kill/all');
-      if (!sseState) {
-        fetchJson<DashboardState>('/api/status')
-          .then(setFallbackState)
-          .catch(() => {});
-      }
-    } catch {
-      // error handled silently
-    } finally {
-      setIsKillAllLoading(false);
-    }
-  }, [sseState, t]);
-
-  const handleKill = useCallback(async (agentId: string) => {
-    if (!confirm(`${t('dashboard.confirm_kill_worker')} ${agentId}?`)) return;
-    try {
-      await postJson(`/api/kill/${agentId}`);
-      if (!sseState) {
-        fetchJson<DashboardState>("/api/status")
-          .then(setFallbackState)
-          .catch(() => {});
-      }
-    } catch {
-      // error handled silently
-    }
-  }, [sseState]);
 
   const agents = state?.agents ?? [];
   // Tame alert-spam (repeated stale-md etc.): collapse identical level+message,
@@ -289,12 +235,11 @@ export default function DashboardPage() {
   const pending = total - done - active - blocked;
 
   const phase = state?.sprint?.phase;
-  const showKillAll = phase === 'EXECUTE' || phase === 'FIX';
-  const showCleanup = !state || phase === 'COMPLETE';
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header — SURF-7 (ADR-G-033): Cleanup / Kill All / New Sprint buttons
+          are gone; the dashboard observes and names the terminal equivalents. */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-extrabold tracking-[-0.03em] text-zinc-100">
@@ -304,34 +249,7 @@ export default function DashboardPage() {
             {state?.sprint ? t("dashboard.subtitle", { n: agents.length }) : t("welcome.start_hint")}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {showCleanup && (
-            <Button
-              variant="outline"
-              onClick={handleCleanup}
-              disabled={isCleanupLoading}
-              className="transition-all duration-200"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              {t("dashboard.cleanup")}
-            </Button>
-          )}
-          {showKillAll && (
-            <Button
-              variant="destructive"
-              onClick={handleKillAll}
-              disabled={isKillAllLoading}
-              className="transition-all duration-200"
-            >
-              <XOctagon className="mr-2 h-4 w-4" />
-              {t("dashboard.kill_all")}
-            </Button>
-          )}
-          <Button onClick={() => setModalOpen(true)} className="transition-all duration-200">
-            <Plus className="mr-2 h-4 w-4" />
-            {t("dashboard.new_sprint")}
-          </Button>
-        </div>
+        <ReadOnlyNotice hintKey="readonly.hint.sprint" />
       </div>
 
       {/* Stat row — 4 prominent metrics (mockup §2) */}
@@ -362,7 +280,6 @@ export default function DashboardPage() {
         <WelcomeScreen
           lastSprintId={state?.lastSprint?.id}
           lastSprintMetrics={state?.lastSprint?.metrics}
-          onNewSprint={() => setModalOpen(true)}
         />
       )}
 
@@ -451,7 +368,6 @@ export default function DashboardPage() {
           <WorkerCardGrid
             agents={agents}
             onSelect={(taskId) => setSelectedAgent(taskId)}
-            onKill={handleKill}
           />
         </div>
 
@@ -512,8 +428,8 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* New Sprint Modal */}
-      <NewSprintModal open={modalOpen} onOpenChange={setModalOpen} />
+      {/* SURF-7: the New Sprint modal is gone — runs start from the terminal
+          (`deckent do`) or the Desktop app (ADR-G-033 authority cutover). */}
 
       {/* Agent Detail Sheet */}
       <Sheet

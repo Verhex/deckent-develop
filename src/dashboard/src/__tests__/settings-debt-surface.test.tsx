@@ -44,7 +44,8 @@ describe("settings-debt-surface — route and nav wiring", () => {
 
   it("SettingsPage uses useTranslation and useTheme — settings-set-roundtrip contract", () => {
     const src = settingsSrc();
-    // Language persistence goes through LanguageProvider.setLang → postJson('/api/config')
+    // SURF-7 (ADR-G-033): language is a CLIENT preference — LanguageProvider.setLang
+    // writes localStorage ('deckent.dashboard.lang'); it never POSTs /api/config.
     expect(src).toContain("useTranslation");
     expect(src).toContain("setLang");
     // Theme is applied via ThemeProvider.setTheme

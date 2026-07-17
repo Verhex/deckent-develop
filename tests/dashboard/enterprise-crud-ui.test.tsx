@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
-// EnterprisePage RBAC + Rate-limit CRUD UI — DASH-D3.
+// EnterprisePage RBAC + Rate-limit — SURF-7 (ADR-G-033) read-only cutover:
+// even admin identity sees NO CRUD controls (canManage is force-false).
 // Mirrors EnterprisePage.test.tsx: mocks useApi for data and useAuth for the
-// admin/viewer gate. Hermetic — no network, no gitignored state; fetch is mocked.
+// identity. Hermetic — no network, no gitignored state; fetch is mocked.
 
 import React from "react";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
@@ -82,16 +83,22 @@ function renderPage() {
   );
 }
 
-describe("EnterprisePage — RBAC role CRUD (DASH-D3)", () => {
-  it("admin identity → 'New role' create button is visible in RBAC tab", () => {
+// SURF-7 (ADR-G-033): read-only cutover pin
+describe("EnterprisePage — RBAC read-only (SURF-7)", () => {
+  it("admin identity → NO create/edit/delete controls; readonly notice + matrix render", () => {
     mockIdentity = ADMIN;
     mockDataMap["/api/enterprise/rbac"] = RBAC;
     renderPage();
     fireEvent.click(screen.getByTestId("tab-rbac"));
 
-    expect(screen.getByTestId("rbac-create-btn")).toBeTruthy();
-    expect(screen.getByTestId("rbac-edit-admin")).toBeTruthy();
-    expect(screen.getByTestId("rbac-delete-admin")).toBeTruthy();
+    // Even admin sees no mutation controls — canManage is force-false.
+    expect(screen.queryByTestId("rbac-create-btn")).toBeNull();
+    expect(screen.queryByTestId("rbac-edit-admin")).toBeNull();
+    expect(screen.queryByTestId("rbac-delete-admin")).toBeNull();
+    expect(screen.queryByTestId("rbac-form")).toBeNull();
+    // Read view stays: notice + role matrix.
+    expect(screen.getByTestId("readonly-notice")).toBeTruthy();
+    expect(screen.getByTestId("rbac-matrix")).toBeTruthy();
   });
 
   it("viewer identity → create/edit/delete actions hidden in RBAC tab", () => {
@@ -105,7 +112,7 @@ describe("EnterprisePage — RBAC role CRUD (DASH-D3)", () => {
     expect(screen.queryByTestId("rbac-delete-admin")).toBeNull();
   });
 
-  it("create submit POSTs role + permissions to /api/enterprise/rbac", async () => {
+  it("admin identity → no enterprise mutation fetch can fire from the RBAC tab", async () => {
     mockIdentity = ADMIN;
     mockDataMap["/api/enterprise/rbac"] = RBAC;
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
@@ -113,50 +120,30 @@ describe("EnterprisePage — RBAC role CRUD (DASH-D3)", () => {
 
     renderPage();
     fireEvent.click(screen.getByTestId("tab-rbac"));
-    fireEvent.click(screen.getByTestId("rbac-create-btn"));
 
-    fireEvent.change(screen.getByTestId("rbac-form-role"), { target: { value: "auditor" } });
-    fireEvent.change(screen.getByTestId("rbac-form-permissions"), { target: { value: "read, write" } });
-    fireEvent.click(screen.getByTestId("rbac-form-submit"));
-
-    await waitFor(() => expect(findCall(fetchMock, "/api/enterprise/rbac", "POST")).toBeTruthy());
-    const call = findCall(fetchMock, "/api/enterprise/rbac", "POST")!;
-    const [path, opts] = call;
-    expect(path).toBe("/api/enterprise/rbac");
-    expect(JSON.parse(opts.body)).toEqual({ role: "auditor", permissions: ["read", "write"] });
-    expect(opts.headers["Authorization"]).toBe("Bearer tkn");
-    await waitFor(() => expect(mockRefetch).toHaveBeenCalled());
-  });
-
-  it("edit submit PUTs permissions to /api/enterprise/rbac/:role", async () => {
-    mockIdentity = ADMIN;
-    mockDataMap["/api/enterprise/rbac"] = RBAC;
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
-    vi.stubGlobal("fetch", fetchMock);
-
-    renderPage();
-    fireEvent.click(screen.getByTestId("tab-rbac"));
-    fireEvent.click(screen.getByTestId("rbac-edit-operator"));
-    fireEvent.change(screen.getByTestId("rbac-form-permissions"), { target: { value: "read" } });
-    fireEvent.click(screen.getByTestId("rbac-form-submit"));
-
-    await waitFor(() => expect(findCall(fetchMock, "/api/enterprise/rbac/operator", "PUT")).toBeTruthy());
-    const [path, opts] = findCall(fetchMock, "/api/enterprise/rbac/operator", "PUT")!;
-    expect(path).toBe("/api/enterprise/rbac/operator");
-    expect(JSON.parse(opts.body)).toEqual({ permissions: ["read"] });
+    await waitFor(() => expect(screen.getByTestId("rbac-matrix")).toBeTruthy());
+    expect(findCall(fetchMock, "/api/enterprise/rbac", "POST")).toBeUndefined();
+    expect(findCall(fetchMock, "/api/enterprise/rbac", "PUT")).toBeUndefined();
+    expect(findCall(fetchMock, "/api/enterprise/rbac", "DELETE")).toBeUndefined();
+    expect(mockRefetch).not.toHaveBeenCalled();
   });
 });
 
-describe("EnterprisePage — Rate-limit rule CRUD (DASH-D3)", () => {
-  it("admin identity → 'New rate rule' create button + row actions visible", () => {
+// SURF-7 (ADR-G-033): read-only cutover pin
+describe("EnterprisePage — Rate-limit read-only (SURF-7)", () => {
+  it("admin identity → NO create/edit/delete controls; rate status still renders", () => {
     mockIdentity = ADMIN;
     mockDataMap["/api/enterprise/rate"] = RATE;
     renderPage();
     fireEvent.click(screen.getByTestId("tab-rate"));
 
-    expect(screen.getByTestId("rate-create-btn")).toBeTruthy();
-    expect(screen.getByTestId("rate-edit-/api/sprints")).toBeTruthy();
-    expect(screen.getByTestId("rate-delete-/api/sprints")).toBeTruthy();
+    expect(screen.queryByTestId("rate-create-btn")).toBeNull();
+    expect(screen.queryByTestId("rate-edit-/api/sprints")).toBeNull();
+    expect(screen.queryByTestId("rate-delete-/api/sprints")).toBeNull();
+    expect(screen.queryByTestId("rate-form")).toBeNull();
+    // Read view stays: notice + rate status list.
+    expect(screen.getByTestId("readonly-notice")).toBeTruthy();
+    expect(screen.getByTestId("rate-status")).toBeTruthy();
   });
 
   it("viewer identity → create/edit/delete actions hidden in Rate tab", () => {
@@ -170,7 +157,7 @@ describe("EnterprisePage — Rate-limit rule CRUD (DASH-D3)", () => {
     expect(screen.queryByTestId("rate-delete-/api/sprints")).toBeNull();
   });
 
-  it("create submit POSTs id + endpoint + limit to /api/enterprise/rate", async () => {
+  it("admin identity → no enterprise mutation fetch can fire from the Rate tab", async () => {
     mockIdentity = ADMIN;
     mockDataMap["/api/enterprise/rate"] = RATE;
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
@@ -178,38 +165,11 @@ describe("EnterprisePage — Rate-limit rule CRUD (DASH-D3)", () => {
 
     renderPage();
     fireEvent.click(screen.getByTestId("tab-rate"));
-    fireEvent.click(screen.getByTestId("rate-create-btn"));
 
-    fireEvent.change(screen.getByTestId("rate-form-id"), { target: { value: "api-retro" } });
-    fireEvent.change(screen.getByTestId("rate-form-endpoint"), { target: { value: "/api/retro" } });
-    fireEvent.change(screen.getByTestId("rate-form-limit"), { target: { value: "25" } });
-    fireEvent.click(screen.getByTestId("rate-form-submit"));
-
-    await waitFor(() => expect(findCall(fetchMock, "/api/enterprise/rate", "POST")).toBeTruthy());
-    const [path, opts] = findCall(fetchMock, "/api/enterprise/rate", "POST")!;
-    expect(path).toBe("/api/enterprise/rate");
-    expect(JSON.parse(opts.body)).toEqual({ id: "api-retro", endpoint: "/api/retro", limit: 25 });
-    expect(opts.headers["Authorization"]).toBe("Bearer tkn");
-    await waitFor(() => expect(mockRefetch).toHaveBeenCalled());
-  });
-
-  it("invalid (non-positive) limit surfaces a validation error and does not fetch", async () => {
-    mockIdentity = ADMIN;
-    mockDataMap["/api/enterprise/rate"] = RATE;
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
-    vi.stubGlobal("fetch", fetchMock);
-
-    renderPage();
-    fireEvent.click(screen.getByTestId("tab-rate"));
-    fireEvent.click(screen.getByTestId("rate-create-btn"));
-    fireEvent.change(screen.getByTestId("rate-form-id"), { target: { value: "bad" } });
-    fireEvent.change(screen.getByTestId("rate-form-endpoint"), { target: { value: "/api/bad" } });
-    fireEvent.change(screen.getByTestId("rate-form-limit"), { target: { value: "0" } });
-    fireEvent.click(screen.getByTestId("rate-form-submit"));
-
-    await waitFor(() => expect(screen.getByTestId("rate-mutation-error")).toBeTruthy());
-    // Client-side validation blocks the mutation — no enterprise rate POST fires
-    // (unrelated bootstrap GETs may still occur, so assert on the rate path only).
+    await waitFor(() => expect(screen.getByTestId("rate-status")).toBeTruthy());
     expect(findCall(fetchMock, "/api/enterprise/rate", "POST")).toBeUndefined();
+    expect(findCall(fetchMock, "/api/enterprise/rate", "PUT")).toBeUndefined();
+    expect(findCall(fetchMock, "/api/enterprise/rate", "DELETE")).toBeUndefined();
+    expect(mockRefetch).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Save, RotateCcw, Info, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import { Info, CheckCircle, XCircle, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Select } from "../components/ui/select";
@@ -7,7 +7,8 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Separator } from "../components/ui/separator";
 import { SkeletonCard } from "../components/Skeleton";
-import { fetchJson, postJson } from "../lib/api";
+import { ReadOnlyNotice } from "../components/ReadOnlyNotice";
+import { fetchJson } from "../lib/api";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { TranslationKey } from "../i18n/en";
 
@@ -173,30 +174,9 @@ function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
   return current;
 }
 
-function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): Record<string, unknown> {
-  const result = { ...obj };
-  const parts = path.split(".");
-  if (parts.length === 1) {
-    result[parts[0]!] = value;
-    return result;
-  }
-  const parent = parts[0]!;
-  const rest = parts.slice(1).join(".");
-  const existing = (result[parent] as Record<string, unknown>) ?? {};
-  result[parent] = setNestedValue({ ...existing }, rest, value);
-  return result;
-}
-
 function formatValue(value: unknown): string {
   if (value === null || value === undefined) return "";
   return String(value);
-}
-
-function parseFieldValue(value: string, type: FieldType): unknown {
-  if (value === "" || value === "null") return null;
-  if (type === "boolean") return value === "true";
-  if (type === "number") return Number(value);
-  return value;
 }
 
 // ─── Component ────────────────────────────────────────────────────
@@ -207,9 +187,8 @@ export default function ConfigPage() {
   const [defaults, setDefaults] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [dirty, setDirty] = useState<Set<string>>(new Set());
+  // SURF-7 (ADR-G-033): the config editor became a read-only viewer — edits
+  // happen via `deckent config` / .deckent/config.json; no save state remains.
 
   const fieldT = (field: ConfigFieldMeta, suffix: 'label' | 'desc') => {
     const key = `config.field.${field.key.replace(/\./g, '_')}.${suffix}` as TranslationKey;
@@ -254,40 +233,6 @@ export default function ConfigPage() {
     loadDoctor();
   }, [loadData, loadDoctor]);
 
-  function handleChange(field: ConfigFieldMeta, rawValue: string) {
-    const value = parseFieldValue(rawValue, field.type);
-    setConfig((prev) => setNestedValue(prev, field.key, value));
-    setDirty((prev) => new Set(prev).add(field.key));
-    setSaveMsg(null);
-  }
-
-  function handleResetField(field: ConfigFieldMeta) {
-    const defaultVal = getNestedValue(defaults, field.key) ?? field.defaultValue;
-    setConfig((prev) => setNestedValue(prev, field.key, defaultVal));
-    setDirty((prev) => new Set(prev).add(field.key));
-    setSaveMsg(null);
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    setSaveMsg(null);
-    try {
-      const result = await postJson<Record<string, unknown>>("/api/config", config);
-      setConfig(result);
-      setDirty(new Set());
-      setSaveMsg({ type: "success", text: t('config.save_success') });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : t('config.error');
-      setSaveMsg({ type: "error", text: msg });
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function isModified(key: string): boolean {
-    return dirty.has(key);
-  }
-
   function isDefault(field: ConfigFieldMeta): boolean {
     const current = getNestedValue(config, field.key);
     const def = getNestedValue(defaults, field.key) ?? field.defaultValue;
@@ -313,10 +258,7 @@ export default function ConfigPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{t('config.title')}</h1>
-        <Button onClick={handleSave} disabled={saving || dirty.size === 0} className="gap-2">
-          <Save className="h-4 w-4" />
-          {saving ? t('config.saving') : t('config.save')}
-        </Button>
+        <ReadOnlyNotice hintKey="readonly.hint.config" />
       </div>
 
       {/* System Health */}
@@ -377,19 +319,6 @@ export default function ConfigPage() {
 
       <Separator />
 
-      {saveMsg && (
-        <div
-          className={`rounded-md px-3 py-2 text-sm ${
-            saveMsg.type === "success"
-              ? "bg-green-900/30 text-green-400"
-              : "bg-red-900/30 text-red-400"
-          }`}
-          data-testid="save-message"
-        >
-          {saveMsg.text}
-        </div>
-      )}
-
       {CATEGORIES.map((category) => {
         const fields = CONFIG_FIELDS.filter((f) => f.category === category);
         if (fields.length === 0) return null;
@@ -409,7 +338,6 @@ export default function ConfigPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 {fields.map((field) => {
                   const currentValue = getNestedValue(config, field.key);
-                  const modified = isModified(field.key);
                   const isDefault_ = isDefault(field);
 
                   return (
@@ -417,7 +345,6 @@ export default function ConfigPage() {
                       <div className="flex items-center gap-1.5">
                         <Label htmlFor={`config-${field.key}`} className="text-sm">
                           {fieldT(field, 'label')}
-                          {modified && <span className="ml-1 text-yellow-400 text-xs">*</span>}
                         </Label>
                         <span className="group relative cursor-help" title={fieldT(field, 'desc')}>
                           <Info className="h-3.5 w-3.5 text-muted-foreground" />
@@ -425,13 +352,10 @@ export default function ConfigPage() {
                       </div>
 
                       <div className="flex gap-2">
+                        {/* SURF-7: every field renders disabled — read-only
+                            projection of the live config, no save path. */}
                         {field.type === "select" && (
-                          <Select
-                            id={`config-${field.key}`}
-                            value={formatValue(currentValue)}
-                            onChange={(e) => handleChange(field, e.target.value)}
-                            disabled={isPlanned}
-                          >
+                          <Select id={`config-${field.key}`} value={formatValue(currentValue)} disabled>
                             <option value="">{t('config.none' as TranslationKey)}</option>
                             {field.options?.map((opt) => (
                               <option key={opt} value={opt}>{opt}</option>
@@ -443,8 +367,7 @@ export default function ConfigPage() {
                           <Select
                             id={`config-${field.key}`}
                             value={currentValue === true ? "true" : currentValue === false ? "false" : ""}
-                            onChange={(e) => handleChange(field, e.target.value)}
-                            disabled={isPlanned}
+                            disabled
                           >
                             <option value="">{t('config.none' as TranslationKey)}</option>
                             <option value="true">{t('config.true' as TranslationKey)}</option>
@@ -457,8 +380,7 @@ export default function ConfigPage() {
                             id={`config-${field.key}`}
                             type="number"
                             value={currentValue !== null && currentValue !== undefined ? String(currentValue) : ""}
-                            onChange={(e) => handleChange(field, e.target.value)}
-                            disabled={isPlanned}
+                            disabled
                           />
                         )}
 
@@ -467,24 +389,9 @@ export default function ConfigPage() {
                             id={`config-${field.key}`}
                             type="text"
                             value={formatValue(currentValue)}
-                            onChange={(e) => handleChange(field, e.target.value)}
                             placeholder={fieldT(field, 'desc')}
-                            disabled={isPlanned}
+                            disabled
                           />
-                        )}
-
-                        {!isDefault_ && !isPlanned && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="shrink-0 gap-1 text-xs"
-                            onClick={() => handleResetField(field)}
-                            title={t('config.reset_to_default' as TranslationKey, { value: formatValue(field.defaultValue) || "null" })}
-                            data-testid={`reset-${field.key}`}
-                          >
-                            <RotateCcw className="h-3 w-3" />
-                            {t('config.reset_field')}
-                          </Button>
                         )}
                       </div>
 
@@ -505,14 +412,6 @@ export default function ConfigPage() {
         );
       })}
 
-      <Separator />
-
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving || dirty.size === 0} className="gap-2">
-          <Save className="h-4 w-4" />
-          {saving ? t('config.saving') : t('config.save_changes')}
-        </Button>
-      </div>
     </div>
   );
 }
