@@ -21,12 +21,54 @@ import { DeckentError } from '../../core/errors.js';
 
 // ─── 583/N2 — pure-Node file walkers for the silent READ tools ───────────────
 
-/** Depth-capped DFS over project files; skips node_modules/.git; the visitor
- *  returns false to stop the whole walk (cap reached). Tolerant: unreadable
- *  dirs are skipped, never thrown. Exported for the REPL's `@`-path candidate
- *  lister (TERM-AT-REF 583/N2b — run.tsx wires it into at-ref.ts's
- *  createCachedPathLister); the read tools below keep using it unchanged. */
-export function walkProjectFiles(rootAbs: string, visit: (fileAbs: string) => boolean, depth = 0): boolean {
+/** Near-universal generated/vendored directory names skipped by default, so a
+ *  file search never drowns in build output (Alperen canlı-bulgu 2026-07-17:
+ *  `@cost` returned `dist/…` duplicates of every `src/…` hit). `.git` +
+ *  `node_modules` are always in here; the rest is the JS/TS/Python baseline.
+ *  Per-project ignores come from {@link readIgnoredDirs} (root `.gitignore`),
+ *  matching what VS Code's own file picker shows. */
+export const BASELINE_IGNORED_DIRS: ReadonlySet<string> = new Set([
+  'node_modules', '.git', '.hg', '.svn',
+  'dist', 'build', 'out', 'coverage', '.nyc_output',
+  '.next', '.nuxt', '.svelte-kit', '.turbo', '.cache',
+  '__pycache__', '.venv', 'venv',
+]);
+
+/**
+ * The directory names to skip while walking `rootAbs` — the {@link
+ * BASELINE_IGNORED_DIRS} plus every UNAMBIGUOUS directory-basename ignore in
+ * the project's root `.gitignore` (bare name or trailing `/`, no glob chars,
+ * no embedded slash, not a negation). Deliberately NOT a full gitignore
+ * engine — a sync one-file read (no subprocess, F-2-safe on the interactive
+ * @-menu path), tolerant of a missing/garbled file (baseline only).
+ */
+export function readIgnoredDirs(rootAbs: string): Set<string> {
+  const dirs = new Set(BASELINE_IGNORED_DIRS);
+  try {
+    const gi = readFileSync(join(rootAbs, '.gitignore'), 'utf-8');
+    for (const raw of gi.split('\n')) {
+      const line = raw.trim();
+      if (line === '' || line.startsWith('#') || line.startsWith('!')) continue;
+      const stripped = line.startsWith('/') ? line.slice(1) : line;
+      const name = stripped.endsWith('/') ? stripped.slice(0, -1) : stripped;
+      if (name === '' || /[*?[\]]/.test(name) || name.includes('/')) continue;
+      dirs.add(name);
+    }
+  } catch {
+    /* no readable .gitignore — the baseline stands */
+  }
+  return dirs;
+}
+
+/** Depth-capped DFS over project files; skips `ignore` directory basenames
+ *  (default {@link BASELINE_IGNORED_DIRS}); the visitor returns false to stop
+ *  the whole walk. Tolerant: unreadable dirs are skipped, never thrown. */
+export function walkProjectFiles(
+  rootAbs: string,
+  visit: (fileAbs: string) => boolean,
+  ignore: ReadonlySet<string> = BASELINE_IGNORED_DIRS,
+  depth = 0,
+): boolean {
   if (depth > 12) return true;
   let entries: import('node:fs').Dirent[];
   try {
@@ -35,10 +77,10 @@ export function walkProjectFiles(rootAbs: string, visit: (fileAbs: string) => bo
     return true;
   }
   for (const entry of entries) {
-    if (entry.name === 'node_modules' || entry.name === '.git') continue;
+    if (ignore.has(entry.name)) continue;
     const abs = join(rootAbs, entry.name);
     if (entry.isDirectory()) {
-      if (!walkProjectFiles(abs, visit, depth + 1)) return false;
+      if (!walkProjectFiles(abs, visit, ignore, depth + 1)) return false;
     } else if (entry.isFile()) {
       if (!visit(abs)) return false;
     }
@@ -387,6 +429,7 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
             if (!startAbs) return `[mcp-error] deckent_grep: path out of scope or invalid`;
             const hits: string[] = [];
             let capped = false;
+            const grepIgnore = readIgnoredDirs(resolveCwd());
             walkProjectFiles(startAbs, (fileAbs) => {
               if (hits.length >= 200) { capped = true; return false; }
               let text: string;
@@ -398,7 +441,7 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
                 if (re.test(fileLines[i]!)) hits.push(`${rel}:${i + 1}:${fileLines[i]!.slice(0, 300)}`);
               }
               return true;
-            });
+            }, grepIgnore);
             if (hits.length === 0) return '[deckent] no matches';
             return hits.join('\n') + (capped ? '\n[deckent] truncated (200 hits cap)' : '');
           }
@@ -411,12 +454,13 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
             const re = globToRegExp(pattern);
             const matched: string[] = [];
             let capped = false;
+            const globIgnore = readIgnoredDirs(resolveCwd());
             walkProjectFiles(startAbs, (fileAbs) => {
               if (matched.length >= 500) { capped = true; return false; }
               const rel = relative(startAbs, fileAbs).split(sep).join('/');
               if (re.test(rel)) matched.push(rel);
               return true;
-            });
+            }, globIgnore);
             if (matched.length === 0) return '[deckent] no matches';
             return matched.join('\n') + (capped ? '\n[deckent] truncated (500 matches cap)' : '');
           }

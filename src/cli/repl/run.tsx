@@ -28,7 +28,7 @@ import { buildTurnRecorder } from './trace-wire.js';
 import { composeSystemPrompt } from '../../agent/identity.js';
 import type { ChatProviderAdapter } from '../commands/chat-native.js';
 import { createCliToolDispatcher, cliArgsFor } from '../commands/chat-tool-bridge.js';
-import { createToolExecDispatcher, walkProjectFiles, resolveRealPathLenient } from '../commands/chat-tool-exec.js';
+import { createToolExecDispatcher, walkProjectFiles, readIgnoredDirs, resolveRealPathLenient } from '../commands/chat-tool-exec.js';
 import { createCachedPathLister, isScopedRelPath } from './at-ref.js';
 import { createPermissionStore } from '../commands/chat-permissions.js';
 import { classifyTool } from './tool-permissions.js';
@@ -1028,11 +1028,16 @@ export async function runInkRepl(
   const altScreen = process.env['DECKENT_ALTSCREEN'] === '1';
   if (altScreen) process.stdout.write('\x1b[?1049h\x1b[2J\x1b[H');
 
-  // TERM-AT-REF (583/N2b): `@`-menu candidates (cached walkProjectFiles lister,
-  // ~2000-entry cap, small TTL) + the scope-guarded reader for `@path` prompt
-  // expansion. Both follow the LIVE cwd so `/cd` retargets them, same seam as
-  // the exec dispatcher's `cwd: () => process.cwd()` above.
-  const atRefPathProvider = createCachedPathLister(walkProjectFiles, () => process.cwd());
+  // TERM-AT-REF (583/N2b): `@`-menu candidates (cached lister, large cap, small
+  // TTL) + the scope-guarded reader for `@path` prompt expansion. Both follow
+  // the LIVE cwd so `/cd` retargets them, same seam as the exec dispatcher's
+  // `cwd: () => process.cwd()` above. The walk skips generated/ignored dirs
+  // (readIgnoredDirs = baseline ∪ root .gitignore) so the menu shows real
+  // project files, not `dist/…` duplicates (Alperen canlı-bulgu 2026-07-17).
+  const atRefPathProvider = createCachedPathLister(
+    (root, visit) => walkProjectFiles(root, visit, readIgnoredDirs(root)),
+    () => process.cwd(),
+  );
   const atRefReader = createScopedAtRefReader(() => process.cwd());
 
   const { unmount, waitUntilExit } = render(

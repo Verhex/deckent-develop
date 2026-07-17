@@ -95,15 +95,6 @@ export function expandAtRefs(
   return { prompt: `${text}\n\n${blocks.join('\n\n')}`, refs };
 }
 
-/** `query` is a subsequence of `target` (both already lowercased). */
-function isSubsequence(query: string, target: string): boolean {
-  let qi = 0;
-  for (let ti = 0; ti < target.length && qi < query.length; ti++) {
-    if (target[ti] === query[qi]) qi++;
-  }
-  return qi === query.length;
-}
-
 /** Basename of a candidate path (trailing `/` of a dir entry stripped first). */
 function basenameOf(path: string): string {
   const clean = path.endsWith('/') ? path.slice(0, -1) : path;
@@ -113,27 +104,33 @@ function basenameOf(path: string): string {
 
 /**
  * Fuzzy-order path candidates for the `@` menu. Case-insensitive tiers:
- * basename-prefix (best) → full-path prefix → substring → subsequence;
- * ties break on shorter path, then plain lexicographic (deterministic —
- * deliberately not locale-dependent localeCompare). Empty query → the first
+ * basename-prefix (best) → basename-substring → path-prefix → path-substring;
+ * ties: non-hidden root first, then shorter path, then plain lexicographic
+ * (deterministic — deliberately not localeCompare). Empty query → the first
  * `limit` candidates as provided. Pure — pinned by tests/cli/at-ref.test.ts.
  */
 export function filterAtPaths(candidates: readonly string[], query: string, limit = 8): string[] {
   const q = query.toLowerCase();
   if (q.length === 0) return candidates.slice(0, limit);
-  const scored: Array<{ path: string; score: number }> = [];
+  // Alperen canlı-bulgusu (2026-07-17, `@cost`): the loose subsequence tier
+  // matched 'c…o…s…t' across long archive paths and drowned the list in
+  // noise — DROPPED. Substring tiers only, basename-weighted; hidden/meta
+  // roots (.analysis/.brain/…) lose ties to real source paths.
+  const scored: Array<{ path: string; score: number; dot: number }> = [];
   for (const candidate of candidates) {
     const lc = candidate.toLowerCase();
+    const base = basenameOf(lc);
     let score: number;
-    if (basenameOf(lc).startsWith(q)) score = 0;
-    else if (lc.startsWith(q)) score = 1;
-    else if (lc.includes(q)) score = 2;
-    else if (isSubsequence(q, lc)) score = 3;
+    if (base.startsWith(q)) score = 0;
+    else if (base.includes(q)) score = 1;
+    else if (lc.startsWith(q)) score = 2;
+    else if (lc.includes(q)) score = 3;
     else continue;
-    scored.push({ path: candidate, score });
+    scored.push({ path: candidate, score, dot: lc.startsWith('.') ? 1 : 0 });
   }
   scored.sort((a, b) =>
     a.score - b.score
+    || a.dot - b.dot
     || a.path.length - b.path.length
     || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   return scored.slice(0, limit).map((s) => s.path);
@@ -222,7 +219,10 @@ export function createCachedPathLister(
   resolveRoot: () => string,
   opts: PathListerOptions = {},
 ): (prefix: string) => string[] {
-  const cap = opts.cap ?? 2000;
+  // Alperen canlı-bulgusu: deckent-dev 30k+ dosya — 2000-cap DFS-sırasıyla
+  // (.analysis/.brain önce) doluyordu ve gerçek kaynak dosyaları listeye
+  // hiç giremiyordu. 40k = mevcut repo + pay; bellek ~birkaç MB string.
+  const cap = opts.cap ?? 40_000;
   const ttlMs = opts.ttlMs ?? 15_000;
   const now = opts.now ?? Date.now;
   let cache: { at: number; root: string; entries: string[] } | null = null;

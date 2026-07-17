@@ -127,14 +127,31 @@ describe('filterAtPaths — fuzzy ordering', () => {
     expect(filterAtPaths(candidates, '', 3)).toEqual(candidates.slice(0, 3));
   });
 
-  it('ranks basename-prefix above path-prefix above substring above subsequence', () => {
+  it('ranks basename-prefix > basename-substring > path-prefix > path-substring (subsequence DROPPED)', () => {
     const list = ['a/zzz-input.ts', 'input-bar.ts', 'inp/other.ts', 'x/i-n-p-u-t.ts'];
     expect(filterAtPaths(list, 'inp')).toEqual([
       'input-bar.ts',    // basename prefix (tier 0)
-      'inp/other.ts',    // full-path prefix (tier 1)
-      'a/zzz-input.ts',  // substring (tier 2)
-      'x/i-n-p-u-t.ts',  // subsequence (tier 3)
+      'a/zzz-input.ts',  // basename substring 'zzz-INPut.ts' (tier 1)
+      'inp/other.ts',    // full-path prefix 'INP/other.ts' (tier 2)
+      // 'x/i-n-p-u-t.ts' — subsequence-only match: EXCLUDED (Alperen live-fix)
     ]);
+  });
+
+  it("Alperen live-fix (@cost): the file NAMED cost-config.json wins; subsequence noise is gone", () => {
+    // the exact class from the `@cost` report — long archive paths that only
+    // matched c…o…s…t as a subsequence must NOT drown a real basename hit.
+    const list = [
+      '.analysis/deckent-marathon-loop-state.md',      // subsequence c-o-s-t only → excluded now
+      '.brain/archive/docs/core-memory/user_language.md', // subsequence → excluded
+      '.deckent/cost-config.json',                     // basename prefix → tier 0
+      'src/core/cost-config-loader.ts',                // basename prefix → tier 0
+    ];
+    const out = filterAtPaths(list, 'cost');
+    expect(out).toContain('.deckent/cost-config.json');
+    expect(out).toContain('src/core/cost-config-loader.ts');
+    expect(out).not.toContain('.analysis/deckent-marathon-loop-state.md');
+    // non-hidden source path outranks the hidden `.deckent/` one on the tie
+    expect(out[0]).toBe('src/core/cost-config-loader.ts');
   });
 
   it('is case-insensitive and excludes non-matches', () => {
