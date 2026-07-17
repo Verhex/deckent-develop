@@ -23,8 +23,10 @@ import { DeckentError } from '../../core/errors.js';
 
 /** Depth-capped DFS over project files; skips node_modules/.git; the visitor
  *  returns false to stop the whole walk (cap reached). Tolerant: unreadable
- *  dirs are skipped, never thrown. */
-function walkProjectFiles(rootAbs: string, visit: (fileAbs: string) => boolean, depth = 0): boolean {
+ *  dirs are skipped, never thrown. Exported for the REPL's `@`-path candidate
+ *  lister (TERM-AT-REF 583/N2b — run.tsx wires it into at-ref.ts's
+ *  createCachedPathLister); the read tools below keep using it unchanged. */
+export function walkProjectFiles(rootAbs: string, visit: (fileAbs: string) => boolean, depth = 0): boolean {
   if (depth > 12) return true;
   let entries: import('node:fs').Dirent[];
   try {

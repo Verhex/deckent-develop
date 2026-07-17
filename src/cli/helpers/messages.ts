@@ -1189,6 +1189,11 @@ const MESSAGES: MessageMap = {
     en: '↑↓ move · Enter select · Tab complete · Esc close',
     tr: '↑↓ gez · Enter seç · Tab tamamla · Esc kapat',
   },
+  // TERM-AT-REF (583/N2b) — hint under the InputBar's `@` path menu.
+  'tui.atref_menu_hint': {
+    en: '↑↓ move · Tab/Enter insert path · Esc close',
+    tr: '↑↓ gez · Tab/Enter yolu ekle · Esc kapat',
+  },
   'tui.switched': {
     en: 'switched to',
     tr: 'geçildi',

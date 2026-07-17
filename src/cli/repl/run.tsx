@@ -28,7 +28,8 @@ import { buildTurnRecorder } from './trace-wire.js';
 import { composeSystemPrompt } from '../../agent/identity.js';
 import type { ChatProviderAdapter } from '../commands/chat-native.js';
 import { createCliToolDispatcher, cliArgsFor } from '../commands/chat-tool-bridge.js';
-import { createToolExecDispatcher } from '../commands/chat-tool-exec.js';
+import { createToolExecDispatcher, walkProjectFiles, resolveRealPathLenient } from '../commands/chat-tool-exec.js';
+import { createCachedPathLister, isScopedRelPath } from './at-ref.js';
 import { createPermissionStore } from '../commands/chat-permissions.js';
 import { classifyTool } from './tool-permissions.js';
 import { buildSlashRegistry } from '../commands/chat-slash-registry.js';
@@ -53,8 +54,8 @@ import {
   type RunCompletionWatchHandle,
   type RunTaskEvidence,
 } from './run-completion-watch.js';
-import { join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { join, resolve, relative, isAbsolute } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 import { createLocalRpcTransport, buildReplRpcHandlers, runRpcDebugCommand } from './rpc-client.js';
 import { probeSubscriptionLimits } from '../../core/limit-preflight.js';
 
@@ -124,6 +125,40 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     // terminal approve/deny ({summary} substituted by app.tsx's onClosure).
     approvalApproved: t('approval.terminal.approved'),
     approvalRejected: t('approval.terminal.rejected'),
+    // TERM-AT-REF (583/N2b) — hint under the InputBar's `@` path menu.
+    atMenuHint: t('tui.atref_menu_hint'),
+  };
+}
+
+/**
+ * TERM-AT-REF (583/N2b) — scope-guarded reader for `@path` prompt expansion
+ * (app.tsx's submit-boundary expandAtRefs seam). Mirrors chat-tool-exec.ts's
+ * `inScope` guard exactly: the pure textual gate first (isScopedRelPath,
+ * at-ref.ts — rejects absolute paths and `..` climbs on every platform), then
+ * the textual relative() check against the LIVE cwd (`resolveCwd` is a
+ * function so `/cd` is followed, same seam as ToolExecOptions.cwd), then the
+ * symlink-aware real-path comparison (resolveRealPathLenient — a symlink
+ * inside cwd pointing outside it must not leak content, born-536 precedent).
+ * Returns `null` — never throws — for anything unreadable/out-of-scope/binary:
+ * expandAtRefs turns that into an honest `[@ref] … unreadable` prompt note.
+ * Exported + cwd-injectable so tests exercise it hermetically (tmpdir).
+ */
+export function createScopedAtRefReader(resolveCwd: () => string): (rel: string) => string | null {
+  return (rel) => {
+    try {
+      if (!isScopedRelPath(rel)) return null;
+      const cwd = resolveCwd();
+      const abs = resolve(cwd, rel);
+      const relCheck = relative(cwd, abs);
+      if (relCheck === '' || relCheck.startsWith('..') || isAbsolute(relCheck)) return null;
+      const realRel = relative(resolveRealPathLenient(cwd), resolveRealPathLenient(abs));
+      if (realRel === '' || realRel.startsWith('..') || isAbsolute(realRel)) return null;
+      const text = readFileSync(abs, 'utf-8');
+      if (text.includes('\u0000')) return null; // binary — never inject into a prompt
+      return text;
+    } catch {
+      return null; // missing file / fs error → honest "unreadable" note upstream
+    }
   };
 }
 
@@ -993,6 +1028,13 @@ export async function runInkRepl(
   const altScreen = process.env['DECKENT_ALTSCREEN'] === '1';
   if (altScreen) process.stdout.write('\x1b[?1049h\x1b[2J\x1b[H');
 
+  // TERM-AT-REF (583/N2b): `@`-menu candidates (cached walkProjectFiles lister,
+  // ~2000-entry cap, small TTL) + the scope-guarded reader for `@path` prompt
+  // expansion. Both follow the LIVE cwd so `/cd` retargets them, same seam as
+  // the exec dispatcher's `cwd: () => process.cwd()` above.
+  const atRefPathProvider = createCachedPathLister(walkProjectFiles, () => process.cwd());
+  const atRefReader = createScopedAtRefReader(() => process.cwd());
+
   const { unmount, waitUntilExit } = render(
     <ReplErrorBoundary label={t('tui.render_error')}>
     <ReplApp
@@ -1021,6 +1063,8 @@ export async function runInkRepl(
       inboxDecide={(flowId, verb) => executeInboxDecision(process.cwd(), flowId, verb, lang)}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
       registerToolSink={(sink) => { toolSink = sink; }}
+      atRefPathProvider={atRefPathProvider}
+      atRefReader={atRefReader}
       {...(nativeEngine ? { nativeEngine } : {})}
       replSurfaceEnabled={replSurfaceEnabled}
       {...(stateFeed ? { stateFeed } : {})}

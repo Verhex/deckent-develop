@@ -16,6 +16,7 @@ import { editInput, EMPTY_INPUT, InputHistory, type InputState } from './line-ed
 import { appendHistory, HistoryNavigator, loadHistory } from './input-history.js';
 import { filterSlashCommands } from '../commands/chat-slash-menu.js';
 import type { SlashRegistry, SlashCommand } from '../commands/chat-slash-registry.js';
+import { activeAtQuery, filterAtPaths, completeAtToken, type ActiveAtToken } from './at-ref.js';
 
 const TEAL = '#4DB8A4';
 const GOLD = '#C4A855';
@@ -37,6 +38,16 @@ export interface InputBarProps {
    * Injectable for tests (tmpdir); defaults to `process.cwd()` — the real
    * REPL's project root — when the caller (app.tsx) doesn't override it. */
   historyProjectRoot?: string;
+  /** TERM-AT-REF (583/N2b) — project-path candidates for the `@` fuzzy menu.
+   * Called with the query typed after `@`; returns rel-path candidates (the
+   * component fuzzy-orders them via filterAtPaths). Injected by the caller
+   * (run.tsx's cached walkProjectFiles lister) — string-free mechanism rule:
+   * this component never imports a cli/commands internal. Absent → typing
+   * `@` never opens a menu (render byte-identical). */
+  pathProvider?: (prefix: string) => string[];
+  /** Localized hint under the `@` menu — same injected-labels route as
+   * `menuHint` (tui.atref_menu_hint via run.tsx). */
+  atMenuHint?: string;
 }
 
 /** Persistent (disk-backed), prefix-filtered history for one InputBar instance. */
@@ -74,6 +85,24 @@ export function recordHistoryEntry(projectRoot: string, controller: HistoryContr
 function slashMenuMatches(registry: SlashRegistry | undefined, buffer: string): SlashCommand[] {
   if (!registry || !buffer.startsWith('/') || buffer.includes(' ')) return [];
   return filterSlashCommands(registry, buffer);
+}
+
+/** TERM-AT-REF (583/N2b) — the `@` menu's open-state resolution (mirrors
+ * slashMenuMatches's role for `/`). Open when a provider is wired, the cursor
+ * sits inside an `@` token on a word boundary (activeAtQuery — emails/`@@`
+ * never open), the token was not Esc-dismissed (`dismissedStart` is the
+ * dismissed token's `@` index), and the fuzzy filter finds ≥1 candidate.
+ * Pure — regression-tested without mounting Ink (tests/cli/at-ref.test.ts). */
+export function atMenuMatches(
+  provider: ((prefix: string) => string[]) | undefined,
+  state: InputState,
+  dismissedStart: number | null,
+): { token: ActiveAtToken; matches: string[] } | null {
+  if (!provider) return null;
+  const token = activeAtQuery(state.buffer, state.cursor);
+  if (!token || token.start === dismissedStart) return null;
+  const matches = filterAtPaths(provider(token.query), token.query);
+  return matches.length > 0 ? { token, matches } : null;
 }
 
 /** Enter-decision while the slash menu is open. filterSlashCommands keeps the
@@ -172,14 +201,18 @@ function CaretText({ state }: { state: InputState }): ReactElement {
 }
 
 export function InputBar(props: InputBarProps): ReactElement {
-  const { active, onSubmit, onInterrupt, onClear, slashRegistry, menuHint } = props;
+  const { active, onSubmit, onInterrupt, onClear, slashRegistry, menuHint, pathProvider, atMenuHint } = props;
   const projectRoot = props.historyProjectRoot ?? process.cwd();
   const [state, setState] = useState<InputState>(EMPTY_INPUT);
   const [menuSel, setMenuSel] = useState(0);
   const [search, setSearch] = useState<{ q: string; idx: number } | null>(null);
+  // TERM-AT-REF: `@` index of an Esc-dismissed token — the menu stays closed
+  // for THAT token only; a new `@` (different index) reopens it.
+  const [atDismissed, setAtDismissed] = useState<number | null>(null);
   const stateRef = useRef<InputState>(EMPTY_INPUT);
   const menuSelRef = useRef(0);
   const searchRef = useRef<{ q: string; idx: number } | null>(null);
+  const atDismissedRef = useRef<number | null>(null);
   const history = useRef(new InputHistory()); // Ctrl-R search only — HistoryNavigator has no search()
   const persistentHistoryRef = useRef<HistoryController | null>(null);
   if (persistentHistoryRef.current === null) persistentHistoryRef.current = createHistoryController(projectRoot);
@@ -187,6 +220,7 @@ export function InputBar(props: InputBarProps): ReactElement {
   const set = (s: InputState): void => { stateRef.current = s; setState(s); };
   const setSel = (n: number): void => { menuSelRef.current = n; setMenuSel(n); };
   const setSearchBoth = (s: { q: string; idx: number } | null): void => { searchRef.current = s; setSearch(s); };
+  const setAtDismissedBoth = (n: number | null): void => { atDismissedRef.current = n; setAtDismissed(n); };
 
   useInput((input, key) => {
     if (process.env['DECKENT_INK_DEBUG'] === '1') {
@@ -225,8 +259,29 @@ export function InputBar(props: InputBarProps): ReactElement {
       if (key.downArrow) { setSel((sel + 1) % n); return; }
       if (key.escape) { set(EMPTY_INPUT); setSel(0); return; }
       if (key.tab) { const name = matches[sel]?.name ?? ''; set({ buffer: name + ' ', cursor: name.length + 1 }); setSel(0); return; }
-      if (key.return) { onSubmit(resolveMenuSubmit(stateRef.current.buffer, matches, sel)); set(EMPTY_INPUT); setSel(0); return; }
+      if (key.return) { onSubmit(resolveMenuSubmit(stateRef.current.buffer, matches, sel)); set(EMPTY_INPUT); setSel(0); setAtDismissedBoth(null); return; }
       // any other key falls through to editInput → re-filters; reset selection
+    }
+
+    // ── TERM-AT-REF (583/N2b): interactive `@` path menu — mirrors the slash
+    // block above (nav keys intercepted ONLY while it is open; Enter completes
+    // the token instead of submitting, and is never stolen when closed).
+    if (matches.length === 0) {
+      const at = atMenuMatches(pathProvider, stateRef.current, atDismissedRef.current);
+      if (at) {
+        const n = at.matches.length;
+        const sel = ((menuSelRef.current % n) + n) % n;
+        if (key.upArrow) { setSel((sel - 1 + n) % n); return; }
+        if (key.downArrow) { setSel((sel + 1) % n); return; }
+        if (key.escape) { setAtDismissedBoth(at.token.start); setSel(0); return; } // close, keep buffer
+        if (key.tab || key.return) {
+          const chosen = at.matches[sel] ?? '';
+          set(completeAtToken(stateRef.current.buffer, stateRef.current.cursor, at.token.start, chosen));
+          setSel(0); setAtDismissedBoth(null);
+          return;
+        }
+        // any other key falls through to editInput → re-filters; selection resets below
+      }
     }
 
     // A batched chunk that contains a newline (a real lone Enter keystroke is
@@ -241,6 +296,7 @@ export function InputBar(props: InputBarProps): ReactElement {
         recordHistoryEntry(projectRoot, persistentHistory, result.line);
         onSubmit(result.line);
         set(EMPTY_INPUT);
+        setAtDismissedBoth(null);
       } else {
         set(EMPTY_INPUT); // chunk was purely \r/\n bytes → no submit, no history pollution
       }
@@ -248,7 +304,7 @@ export function InputBar(props: InputBarProps): ReactElement {
     }
 
     const res = editInput(stateRef.current, inkToKey(input, key));
-    if (res.signal === 'int') { onInterrupt(); set(EMPTY_INPUT); return; }
+    if (res.signal === 'int') { onInterrupt(); set(EMPTY_INPUT); setAtDismissedBoth(null); return; }
     if (res.signal === 'eof') { onInterrupt(); return; }
     if (res.history) {
       set(resolveHistoryNav(persistentHistory.navigator, res.history, stateRef.current.buffer));
@@ -259,14 +315,27 @@ export function InputBar(props: InputBarProps): ReactElement {
       recordHistoryEntry(projectRoot, persistentHistory, res.submit);
       onSubmit(res.submit);
       set(EMPTY_INPUT);
+      setAtDismissedBoth(null);
       return;
     }
     set(res.state);
     setSel(0); // buffer changed → re-filter from the top
+    // TERM-AT-REF: an Esc-dismissal only pins THAT token — once the cursor's
+    // active `@` token no longer starts at the dismissed index (token deleted,
+    // or moved to another word), clear it so a fresh `@` reopens the menu.
+    if (atDismissedRef.current !== null
+        && activeAtQuery(res.state.buffer, res.state.cursor)?.start !== atDismissedRef.current) {
+      setAtDismissedBoth(null);
+    }
   }, { isActive: active });
 
   const matches = search ? [] : slashMenuMatches(slashRegistry, state.buffer);
   const sel = matches.length > 0 ? ((menuSel % matches.length) + matches.length) % matches.length : 0;
+
+  // TERM-AT-REF: the `@` path menu — mutually exclusive with the slash menu
+  // (same open-state resolution the key handler uses, so render == behavior).
+  const atOpen = search || matches.length > 0 ? null : atMenuMatches(pathProvider, state, atDismissed);
+  const atSel = atOpen ? ((menuSel % atOpen.matches.length) + atOpen.matches.length) % atOpen.matches.length : 0;
 
   // Reverse-search line (Ctrl-R): current match shown live as you refine the query.
   const searchHits = search ? history.current.search(search.q) : [];
@@ -306,6 +375,19 @@ export function InputBar(props: InputBarProps): ReactElement {
           </Box>
         );
       })()}
+      {/* TERM-AT-REF: the `@` path menu — filterAtPaths already caps at 8 rows
+          (== the slash menu's WINDOW), so no scroll window is needed here. */}
+      {atOpen && (
+        <Box flexDirection="column" marginBottom={0}>
+          {atOpen.matches.map((p, i) => (
+            <Text key={p}>
+              <Text color={i === atSel ? GOLD : TEAL}>{i === atSel ? '❯ ' : '  '}</Text>
+              <Text color={i === atSel ? GOLD : undefined} bold={i === atSel}>{p}</Text>
+            </Text>
+          ))}
+          {atMenuHint ? <Text dimColor>{`  ${atMenuHint}`}</Text> : null}
+        </Box>
+      )}
       <Box borderStyle="round" borderColor={TEAL} paddingX={1}>
         <Text color={TEAL}>{'› '}</Text>
         <CaretText state={state} />

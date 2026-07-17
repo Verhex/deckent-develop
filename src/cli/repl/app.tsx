@@ -18,6 +18,7 @@ import {
 } from '../commands/chat-native.js';
 import { renderMarkdown } from '../commands/chat-render.js';
 import { InputBar } from './input-bar.js';
+import { expandAtRefs } from './at-ref.js';
 import { resolveSlash, type SlashRegistry } from '../commands/chat-slash-registry.js';
 import type { ChatMode } from '../commands/chat-mode.js';
 import type { ReplEngine } from './native-agent-bridge.js';
@@ -706,6 +707,9 @@ export interface ReplLabels {
    * wires the approval.terminal.* keys. */
   approvalApproved?: string; // "✅ Approved — {summary}"
   approvalRejected?: string; // "✖ Rejected — {summary}"
+  /** TERM-AT-REF (583/N2b) — localized hint under the InputBar's `@` path
+   * menu (tui.atref_menu_hint; same injected-labels route as `menuHint`). */
+  atMenuHint?: string;
 }
 
 /**
@@ -984,6 +988,18 @@ export interface ReplAppProps {
    * reached, byte-identical to the pre-427-006 render.
    */
   registerRunFlowResultSink?: (enqueue: (event: ChatTurnBgEvent) => void) => void;
+  /** TERM-AT-REF (583/N2b) — project-path candidates for the InputBar's `@`
+   * fuzzy menu. Injected by run.tsx (cached walkProjectFiles lister, capped
+   * ~2000 entries); absent → typing `@` never opens a menu (render
+   * byte-identical to the pre-583/N2b App). */
+  atRefPathProvider?: (prefix: string) => string[];
+  /** TERM-AT-REF (583/N2b) — scope-guarded project-file reader (rel path →
+   * content, `null` = missing/binary/out-of-scope) used to expand `@path`
+   * tokens into the OUTBOUND prompt at the submit boundary (expandAtRefs,
+   * at-ref.ts). Injected by run.tsx (createScopedAtRefReader — resolves under
+   * the live cwd, rejects escapes incl. symlinks); absent → submitted lines
+   * pass through byte-identical. */
+  atRefReader?: (rel: string) => string | null;
 }
 
 type ApprovalMode = 'suggest' | 'auto-edit' | 'full-auto';
@@ -1071,7 +1087,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader } = props;
   const { exit } = useApp();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
@@ -1304,7 +1320,15 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           // second code path to keep in sync.
           busyCtl.current = markBusy();
           if (replSurfaceEnabled) bgQueue.current!.userTurnActive = true;
-          yield line;
+          // TERM-AT-REF (583/N2b): expand `@path` tokens at the submit boundary —
+          // the transcript above (pushTurn) keeps the RAW typed line; only the
+          // OUTBOUND prompt carries the injected file contents (expandAtRefs:
+          // ≤5 refs, 32KB/file cap, extras/unreadables noted in the prompt).
+          // Slash lines are never expanded — they are commands, not chat prompts
+          // (e.g. a forwarded `/resume <id>` must reach the loop verbatim).
+          // Both engines (nativeEngine + runChatNativeLoop) consume THIS
+          // iterator, so one seam covers both.
+          yield atRefReader && !line.startsWith('/') ? expandAtRefs(line, atRefReader).prompt : line;
           finalizeReply(); // turn finished streaming → close it out
           // 358-006: turn-end steer drain (busy-controls markIdle) — the SAME
           // "never mid-turn" contract as the ChatTurnQueue drain below: notes
@@ -1804,6 +1828,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         onClear={clearScreen}
         slashRegistry={slashRegistry}
         menuHint={labels.menuHint}
+        // TERM-AT-REF (583/N2b): `@` path menu — inert (menu never opens)
+        // unless run.tsx injects a provider; hint via the same labels route.
+        pathProvider={atRefPathProvider}
+        atMenuHint={labels.atMenuHint}
       />
 
       <Box>
