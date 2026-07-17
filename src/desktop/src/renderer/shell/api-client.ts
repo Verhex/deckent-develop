@@ -57,6 +57,38 @@ export interface ApprovalsResponse {
   denied: ApprovalEntry[];
 }
 
+/**
+ * SURF-kuyruk-E fix: the server serializes each approval as
+ * `{category, request: {id, summary, createdAt, …}, decision}` (NESTED) while
+ * the shell renders flat `{id, title}` — with an always-empty pending list
+ * this mismatch stayed invisible until the first REAL pending request hit the
+ * view (the deferred decide-UI smoke caught it live). Normalize at the client
+ * boundary; tolerant of an already-flat shape so the contract can converge.
+ * Exported pure — pinned by shell-transport.test.ts.
+ */
+export function normalizeApprovalEntry(raw: unknown): ApprovalEntry {
+  const outer = (raw ?? {}) as Record<string, unknown>;
+  const req = (outer['request'] ?? {}) as Record<string, unknown>;
+  const id = typeof req['id'] === 'string' ? req['id'] : typeof outer['id'] === 'string' ? outer['id'] : '';
+  const title = typeof req['summary'] === 'string' ? req['summary']
+    : typeof outer['title'] === 'string' ? outer['title'] : undefined;
+  const createdAt = typeof req['createdAt'] === 'string' ? req['createdAt']
+    : typeof outer['createdAt'] === 'string' ? outer['createdAt'] : undefined;
+  return {
+    ...outer,
+    id,
+    ...(title !== undefined ? { title } : {}),
+    ...(createdAt !== undefined ? { createdAt } : {}),
+  };
+}
+
+function normalizeApprovalsResponse(raw: unknown): ApprovalsResponse {
+  const body = (raw ?? {}) as Record<string, unknown>;
+  const list = (key: string): ApprovalEntry[] =>
+    Array.isArray(body[key]) ? (body[key] as unknown[]).map(normalizeApprovalEntry) : [];
+  return { pending: list('pending'), approved: list('approved'), denied: list('denied') };
+}
+
 /** One durable RunFlow event as the SSE `data:` payload carries it. */
 export interface RunFlowEventPayload {
   type: string;
@@ -173,7 +205,7 @@ export function createApiClient(session: DaemonSession, fetchFn?: FetchLike): Da
       };
     },
 
-    getApprovals: () => request<ApprovalsResponse>('GET', '/api/approvals'),
+    getApprovals: () => request<unknown>('GET', '/api/approvals').then(normalizeApprovalsResponse),
     decideApproval: (id, decision, reason) =>
       request('POST', `/api/approvals/${encodeURIComponent(id)}/decision`, {
         decision,

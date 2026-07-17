@@ -2848,6 +2848,10 @@ const MESSAGES: MessageMap = {
     en: '--reason is only valid with --reject.',
     tr: '--reason yalnız --reject ile kullanılır.',
   },
+  'runs.decide.gate_warn': {
+    en: 'Warning: the plan gate is FAIL ({n} blocking finding(s)) — the run will refuse at start unless overridden.',
+    tr: 'Uyarı: plan kapısı FAIL ({n} blocker) — koşu, override edilmedikçe start anında reddedecek.',
+  },
   'runs.decide.needs_row': {
     en: 'Decision flags need a run number: deckent runs <n> --approve | --reject | --start',
     tr: 'Karar bayrakları koşu numarası ister: deckent runs <n> --approve | --reject | --start',
@@ -3703,6 +3707,12 @@ const MESSAGES: MessageMap = {
   'desktop.shell.preview.meta': {
     en: 'Gate: {gate} · Policy: {policy} · Digest: {digest}',
     tr: 'Kapı: {gate} · Politika: {policy} · Özet: {digest}',
+  },
+  // SURF-6 kuyruk-D — gate-fail visibility: the blocking findings surface in
+  // the preview instead of hiding behind a bare 'Gate: fail' summary line.
+  'desktop.shell.preview.gate_findings': {
+    en: 'Gate blockers ({n}):',
+    tr: 'Kapı blockerları ({n}):',
   },
   'desktop.shell.telegraph.title': { en: 'Engine telegraph', tr: 'Makine telgrafı' },
   'desktop.shell.telegraph.stop': { en: 'STOP', tr: 'DUR' },

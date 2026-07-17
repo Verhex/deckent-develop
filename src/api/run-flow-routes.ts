@@ -72,10 +72,12 @@ import { loadConfig } from '../core/config.js';
 import type { ResolvedConfig, Sprint, SprintSizeRecommendation } from '../core/types.js';
 import {
   RunFlowTransitionError,
+  isTerminalRunFlowState,
   type PlanPreview,
   type RunFlowContext,
   type RunProposal,
 } from '../core/run-flow-contract.js';
+import { readTerminalJobClosures } from '../core/run-jobs-read.js';
 import { compileRunProposal, type RunProposalPlanner } from '../orchestra/run-proposal-compiler.js';
 import { generatePlanPreview } from '../orchestra/plan-preview-service.js';
 import { readContext } from '../orchestra/brain.js';
@@ -175,6 +177,25 @@ function lookupFlow(flowId: string, req: IncomingMessage, projectRoot: string): 
   const isAdmin = principal.role === 'admin';
   const flowTenant = context.proposal?.tenant ?? 'local';
   if (!isAdmin && flowTenant !== callerTenant) return undefined;
+
+  // SURF-6 kuyruk — jobs-join (the CLI inbox's F-3 join, API edition): a
+  // do-origin flow has no durable event log (Slice-3 deferral), so its folded
+  // context claims DETACHED_RUNNING forever even after the sprint finished.
+  // The jobs-dir execution truth wins for DISPLAY: a terminal job record
+  // upgrades the non-terminal context in the RESPONSE only — read-only, the
+  // durable log stays the single transition authority (nothing is appended;
+  // decide/start paths also see the honest state and refuse phantom decides).
+  if (!isTerminalRunFlowState(context.state)) {
+    const closure = readTerminalJobClosures(projectRoot).get(flowId);
+    if (closure !== undefined) {
+      context = {
+        ...context,
+        state: closure.state,
+        ...(closure.error !== undefined ? { failureReason: closure.error } : {}),
+        ...(closure.completedAt !== undefined ? { updatedAt: closure.completedAt } : {}),
+      };
+    }
+  }
   return context;
 }
 

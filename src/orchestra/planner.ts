@@ -636,7 +636,8 @@ const FILE_PATH_RULES = `FILE PATH RULES:
 - Exception: well-known root files (README.md, LICENSE, CHANGELOG.md, CONTRIBUTING.md) may be written by their bare name
 - scope.filesRead may ONLY list files that actually exist (see the file tree when provided) — never claim a file you have not seen
 - Creating NEW files is allowed and normal — put each one under a directory-qualified path
-- Never use absolute paths, "~" or ".." segments`;
+- Never use absolute paths, "~" or ".." segments
+- Every file path mentioned in goNogo.goCriteria/noGoCriteria MUST also appear in that task's scope.filesWrite or scope.directories — a criterion referencing an unwritable file fails the prompt gate (scope-satisfiability)`;
 
 /** F-1: sparse/greenfield guidance — shown INSTEAD of a file tree when the
  *  project has no visible tracked files. Deliberately avoids the literal

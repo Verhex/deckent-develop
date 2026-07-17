@@ -259,8 +259,12 @@ await waitFor('Leg A closure lands in the jobs record (CLI shows completed)', as
 }, 300_000, 3000);
 console.log('  [evidence] legA durable events (expected [] — Slice-3 deferral):',
   JSON.stringify(store.readFlowEvents(proj, legA).map((e) => e.type)));
-console.log('  [known-gap] daemon-side state for the do-origin flow (no jobs-join on the API yet):',
-  JSON.stringify((await api(`/api/run-flow/${legA}`)).body?.state));
+// SURF-6 kuyruk-B: the API jobs-join upgrades the do-origin phantom to the
+// honest execution truth (was a [known-gap] log before the fix).
+await waitFor('daemon-side jobs-join shows the do-origin closure honestly', async () => {
+  const state = (await api(`/api/run-flow/${legA}`)).body?.state;
+  return state === 'COMPLETED' || state === 'FAILED';
+}, 30_000, 2000);
 
 // digest parity: CLI detail ≡ daemon full-state ≡ durable snapshot (a do-origin
 // flow has no durable live PREVIEW — the snapshot is its digest truth, served

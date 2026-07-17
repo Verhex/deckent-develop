@@ -4798,6 +4798,17 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 - **Born work-items:** **DASH** (serve-token-inject · routing chart · control-panel surfacing · onboarding view — from old 072/073/076 side-items) · **DASH-EMOJI-FIX** (2 residual ⚠ → lucide-react) · **DESK-1** (Desktop app) — all to MASTER-PLAN. (The old Chat/Dashboard product-sprint items — chat-HOLLOW · duplicate-sidebar · alert-spam · enterprise read→write — are largely resolved; see Consequences.)
 - **Direction:** `.analysis/adr-review-crosswalk.md` (rows 080/078/082/083), `.analysis/hermes-vs-deckent-direction-decisions.md`, memory `project_hermes_deckent_direction_2026_06` · `feedback_dashboard_no_emoji_lucide` · `feedback_governance_aligns_with_direction_pivot`.
 
+---
+
+## Amendment (2026-07-17 — SURF-7 authority cutover; Alperen-approved)
+
+1. **Dashboard is PERMANENTLY observability-only.** The Tomorrow item "Enterprise read → write (V2 management-plane)" moves OFF the dashboard: the enterprise management plane's client is the **Desktop app**. The dashboard tenant/RBAC/rate CRUD UI was removed (SURF-7, commit 0551ac82); the /api/enterprise/* write endpoints stay server-side behind their own admin gates for that future client.
+2. **Chat leaves the dashboard entirely.** Instead of the "at most a read-only conversation view" option, ChatPage is an honest signpost; primary chat surfaces are the native terminal (ADR-G-034) and the Desktop app. POST /api/chat and the write-performing GET /api/chat/stream sit behind the control-mutation ratchet.
+3. **Orchestration-control mutations over HTTP are default-OFF.** `api.control_mutations` (default false; env twin DECKENT_CONTROL_MUTATIONS) governs start/plan/kill/cleanup/set-directives/directives/config-POST/chat(+stream) and the nervous/autonomous decision endpoints; while off they answer an honest 403 naming the terminal/Desktop equivalents. Emergency rollback = flipping the flag. /api/run-flow/* (SURF-2 contract), /api/enterprise/*, auth and /api/rpc are OUTSIDE this ratchet. Monitoring GETs are never gated.
+4. **Vision anchor (Alperen, 2026-07-17):** the Desktop app is the comprehensive single-product management surface ("Claude Code desktop / Claude Desktop class — projects, flows, integrations, settings, enterprise area, process states in ONE product"); the native terminal keeps the full-control primary-surface role (ADR-G-034); the dashboard explains.
+
+Rationale: SURF-3→6 delivered the full run-flow lifecycle on terminal+Desktop with real-binary proof (cross-surface handoff included), satisfying the "mutating controls die when the equivalent client exists" clause. One-click kill/cleanup buttons were additionally an approval-discipline risk class. Evidence: scripts/surf7-readonly-smoke.mjs 27/27 · dashboard 1209/1209 · api 985/985. Full proposal text: docs/analysis/adr-g-033-amendment-2026-07-17.md.
+
 
 ---
 

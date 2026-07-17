@@ -42,12 +42,10 @@ export const tr: Record<TranslationKey, string> = {
   'dashboard.model': 'Model',
   'dashboard.status': 'Durum',
   'dashboard.action': 'Eylem',
-  'dashboard.kill': 'Durdur',
   'dashboard.done': 'tamamlandı',
   'dashboard.running': 'çalışıyor',
   'dashboard.queued': 'kuyrukta',
   'dashboard.failed': 'başarısız',
-  'dashboard.new_sprint': 'Yeni Sprint',
   'dashboard.subtitle': 'Canlı sprint orkestrasyonu · {{n}} worker',
   'dashboard.stat_active_sprint': 'Aktif sprint',
   'dashboard.stat_tasks_complete': 'Tamamlanan',
@@ -55,16 +53,10 @@ export const tr: Record<TranslationKey, string> = {
   'dashboard.stat_phase': 'Mevcut faz',
   'dashboard.lifecycle': 'Sprint yaşam döngüsü',
   'dashboard.workers_label': "Worker'lar",
-  'dashboard.cleanup': 'Temizle',
-  'dashboard.kill_all': 'Tümünü Durdur',
-  'dashboard.confirm_cleanup': 'Sprint dosyalarını arşivle?',
-  'dashboard.confirm_kill': "Tüm worker'ları durdur?",
-  'dashboard.kill_failed': "Worker durdurulamadı — hâlâ çalışıyor olabilir.",
-  'dashboard.cleanup_failed': 'Temizlik başarısız — sprint dosyaları arşivlenmedi.',
   'dashboard.phase_timeline': 'Sprint Fazları',
 
   // Workers Page
-  'workers.subtitle': 'Canlı worker tablosu — durum, heartbeat yaşı, durdurma kontrolü',
+  'workers.subtitle': 'Canlı worker tablosu — durum, heartbeat yaşı',
   'workers.comms_no_handoffs_title': 'Worker aktarımı yok',
   'workers.comms_no_handoffs_desc': "Tamamlanan worker'lar ve paylaşılan bağlam burada görünecek.",
   'workers.comms_completed_count_one': '{{n}} tamamlanan worker',
@@ -72,12 +64,9 @@ export const tr: Record<TranslationKey, string> = {
   'workers.comms_no_completed': 'Bu sprintte tamamlanan aktarım yok.',
 
   // Directives Page
-  'directives.subtitle': 'DIRECTIVES.md görüntüle ve düzenle — sprint hedefleri ve görevler',
-  'directives.load_warning': "DIRECTIVES.md sunucudan yüklenemedi (okuma endpoint'i mevcut değil). Yine de içerik yazıp kaydedebilirsiniz.",
-  'directives.save': 'Kaydet',
-  'directives.saving': 'Kaydediliyor…',
-  'directives.saved': 'DIRECTIVES kaydedildi ({{n}} görev).',
-  'directives.empty_warning': 'DIRECTIVES içeriği boş — kaydetmeden önce içerik ekleyin.',
+  'directives.subtitle': 'DIRECTIVES.md görüntüle — sprint hedefleri ve görevler (düzenleme terminal/editörden)',
+  'directives.load_warning': "DIRECTIVES.md sunucudan yüklenemedi (okuma endpoint'i mevcut değil).",
+  'directives.empty_warning': 'DIRECTIVES içeriği boş — sprint başlatmadan önce (terminal/editörden) içerik ekleyin.',
 
   // Settings Page
   'settings.title': 'Ayarlar & Sağlık',
@@ -112,11 +101,6 @@ export const tr: Record<TranslationKey, string> = {
 
   // Config Page
   'config.title': 'Yapılandırma',
-  'config.save': 'Kaydet',
-  'config.saving': 'Kaydediliyor...',
-  'config.saved': 'Yapılandırma kaydedildi.',
-  'config.error': 'Yapılandırma kaydedilemedi.',
-  'config.reset': 'Varsayılanlara Sıfırla',
   'config.category.provider': 'Sağlayıcı',
   'config.category.sprint': 'Sprint',
   'config.category.memory': 'Bellek',
@@ -164,7 +148,7 @@ export const tr: Record<TranslationKey, string> = {
 
   // Welcome Screen
   'welcome.no_sprint': 'Aktif sprint yok.',
-  'welcome.start_hint': 'Başlamak için Yeni Sprint butonunu kullanın.',
+  'welcome.start_hint': 'Koşuyu terminalden başlatın: deckent do "<hedef>" — veya Desktop uygulamasından.',
   'welcome.last_sprint': 'Son sprint',
 
   // Dashboard additional
@@ -174,7 +158,6 @@ export const tr: Record<TranslationKey, string> = {
   'dashboard.active': 'Aktif',
   'dashboard.pending': 'Bekliyor',
   'dashboard.violations': 'ihlal',
-  'dashboard.confirm_kill_worker': "Worker'ı durdur",
 
   // History additional
   'history.all_sprints': 'Tüm Sprintler',
@@ -197,25 +180,11 @@ export const tr: Record<TranslationKey, string> = {
   'history.no_history_desc': "Tamamlanan sprintler burada görünecek. İlk sprinti başlatmak için `deckent start` çalıştırın.",
 
   // Config additional
-  'config.save_changes': 'Değişiklikleri Kaydet',
   'config.loading': 'Yapılandırma yükleniyor...',
-  'config.reset_field': 'Sıfırla',
-  'config.save_success': 'Yapılandırma başarıyla kaydedildi.',
   'config.doctor_ok': 'Tüm zorunlu kontroller geçti',
   'config.doctor_fail': 'Bazı zorunlu kontroller başarısız oldu',
   'config.required': 'zorunlu',
 
-  // New Sprint Modal
-  'modal.directives_hint': 'Sprint direktiflerini aşağıya girin. Her "## Task" bloğu bir görevi tanımlar.',
-  'modal.plan_sprint': 'Run Planla (sprint)',
-  'modal.planning': 'Sprint planlanıyor...',
-  'modal.review_tasks_parsed': 'görev ayrıştırıldı. Sprint',
-  'modal.review_planned_with': 'planlandı,',
-  'modal.review_tasks_suffix': 'görev:',
-  'modal.confirm_start': 'Onayla ve Başlat',
-  'modal.starting': 'Sprint başlatılıyor...',
-  'modal.success': 'Sprint başarıyla başlatıldı!',
-  'modal.try_again': 'Tekrar Dene',
 
   // Agent Detail
   'agent.worker': 'Worker',
@@ -352,7 +321,6 @@ export const tr: Record<TranslationKey, string> = {
   'common.hours_ago': '{{n}}sa önce',
 
   // Config additional
-  'config.reset_to_default': 'Varsayılana sıfırla: {{value}}',
   'config.default_value': '(varsayılan: {{value}})',
 
   // Modal
@@ -435,19 +403,6 @@ export const tr: Record<TranslationKey, string> = {
 
   // Chat Page
   'nav.chat': 'Sohbet',
-  'chat.title': 'Deckent ile Sohbet',
-  'chat.input_placeholder': 'Bir mesaj yazın...',
-  'chat.send': 'Gönder',
-  'chat.empty': 'Deckent ile bir sohbet başlatın.',
-  'chat.error_response': 'Yanıt alınamadı. Lütfen tekrar deneyin.',
-  'chat.notifications': 'Bildirimler',
-  'chat.no_notifications': 'Henüz bildirim yok.',
-  'chat.task_context': 'Görev Bağlamı',
-  'chat.no_active_sprint': 'Aktif sprint yok.',
-  'chat.sprint': 'Sprint',
-  'chat.phase': 'Faz',
-  'chat.progress': 'İlerleme',
-  'chat.active_tasks': 'Aktif Görevler',
 
   // Common
   'common.loading': 'Yükleniyor...',

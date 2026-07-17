@@ -112,7 +112,8 @@ describe('RUN-SURFACE-TEXT (378-002) — dashboard i18n bridged keys (en+tr, key
     'dashboard.sprint_status',
     'dashboard.sprint_id',
     'status.title',
-    'modal.plan_sprint',
+    // SURF-7 kuyruk: 'modal.plan_sprint' pruned with the NewSprintModal
+    // (authority cutover) — the dashboard no longer plans sprints.
   ];
   // 'dashboard.sprint_id' used the English loanword "Sprint ID" verbatim in the
   // Turkish UI pre-change (an ID label, not a sentence) — its bridge is

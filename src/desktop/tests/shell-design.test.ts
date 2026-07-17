@@ -9,7 +9,7 @@ import { buildCourseGeometry } from '../src/renderer/shell/course.js';
 import { FLOW_STATE_MESSAGE_KEYS, DESKTOP_MESSAGE_KEYS } from '../src/shared/desktop-messages.js';
 import { buildInboxLabels } from '../../cli/repl/run-flow-inbox.js';
 import { RUN_FLOW_TERMINAL_STATES } from '../../core/run-flow-contract.js';
-import { MSG, SHELL_TERMINAL_STATES, SHELL_PREVIEW_STATES, foldEventIntoLedger } from '../src/renderer/shell/Shell.js';
+import { MSG, SHELL_TERMINAL_STATES, SHELL_PREVIEW_STATES, foldEventIntoLedger, formatShellTimestamp } from '../src/renderer/shell/Shell.js';
 import type { RunFlowEventPayload } from '../src/renderer/shell/api-client.js';
 
 function event(type: string, sequence: number): RunFlowEventPayload {
@@ -95,6 +95,23 @@ describe('foldEventIntoLedger — SSE reconnect dedupe (SURF-6)', () => {
   it('a sequence-less frame (legacy/live-only) always appends — dedupe never drops real data', () => {
     const legacy = { type: 'X', flowId: 'f', timestamp: 't' } as RunFlowEventPayload;
     expect(foldEventIntoLedger([legacy], legacy)).toHaveLength(2);
+  });
+});
+
+describe('formatShellTimestamp — terminal-parity humanize (SURF-5 kuyruk)', () => {
+  const L = { justNow: 'just now', minutesAgo: '{n} min ago', hoursAgo: '{n} h ago', daysAgo: '{n} d ago' };
+  const now = new Date('2026-07-17T12:00:00.000Z').getTime();
+
+  it('renders local absolute + relative age from the shared vocabulary', () => {
+    expect(formatShellTimestamp('2026-07-17T11:58:30.000Z', now, L)).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} \(1 min ago\)$/);
+    expect(formatShellTimestamp('2026-07-17T11:59:40.000Z', now, L)).toContain('(just now)');
+    expect(formatShellTimestamp('2026-07-17T09:00:00.000Z', now, L)).toContain('(3 h ago)');
+    expect(formatShellTimestamp('2026-07-14T12:00:00.000Z', now, L)).toContain('(3 d ago)');
+  });
+
+  it('future stamps show only the absolute; garbage echoes back honestly', () => {
+    expect(formatShellTimestamp('2026-07-17T13:00:00.000Z', now, L)).not.toContain('(');
+    expect(formatShellTimestamp('not-a-date', now, L)).toBe('not-a-date');
   });
 });
 

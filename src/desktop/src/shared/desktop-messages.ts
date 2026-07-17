@@ -28,6 +28,11 @@ export const DESKTOP_MESSAGE_KEYS = [
   'tui.inbox_state_failed',
   'tui.inbox_state_cancelled',
   'tui.inbox_state_blocked',
+  // SURF-5 kuyruk — zaman-humanize: shared relative-age vocabulary (formatShellTimestamp)
+  'tui.inbox_time_just_now',
+  'tui.inbox_time_minutes_ago',
+  'tui.inbox_time_hours_ago',
+  'tui.inbox_time_days_ago',
   // ── tray / menu / window / updates (pre-D4-2 canonical set) ──
   'desktop.tray.open',
   'desktop.tray.quit',
@@ -109,6 +114,7 @@ export const DESKTOP_MESSAGE_KEYS = [
   'desktop.shell.order_failed',
   'desktop.shell.preview.title',
   'desktop.shell.preview.meta',
+  'desktop.shell.preview.gate_findings',
   'desktop.shell.telegraph.title',
   'desktop.shell.telegraph.stop',
   'desktop.shell.telegraph.slow',

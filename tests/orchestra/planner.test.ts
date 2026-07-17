@@ -208,6 +208,8 @@ describe('buildPlanPrompt', () => {
     expect(prompt).toContain('FILE PATH RULES:');
     expect(prompt).toContain('directory-qualified');
     expect(prompt).toContain('NEVER a bare filename');
+    // SURF-6 kuyruk-D: goCriteria↔scope consistency (shared block — both prompts)
+    expect(prompt).toContain('goNogo.goCriteria/noGoCriteria MUST also appear');
   });
 });
 

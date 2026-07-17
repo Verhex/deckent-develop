@@ -203,6 +203,10 @@ describe('buildZeroConfigPlanPrompt', () => {
     expect(prompt).toContain('NEVER a bare filename');
     expect(prompt).toContain('never claim a file you have not seen');
     expect(prompt).toContain('README.md, LICENSE, CHANGELOG.md, CONTRIBUTING.md');
+    // SURF-6 kuyruk-D: goCriteria↔scope consistency rule (the youtube-plan
+    // real-claude dogfood's gate-blocker class — planner must be told upfront)
+    expect(prompt).toContain('goNogo.goCriteria/noGoCriteria MUST also appear');
+    expect(prompt).toContain('scope-satisfiability');
   });
 
   it('includes task splitting parallelism rules', () => {

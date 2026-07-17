@@ -1166,6 +1166,10 @@ async function handleRequest(
         pending: snapshot.pending.map((e) => serializeApprovalEntry('pending', e)),
         approved: snapshot.approved.map((e) => serializeApprovalEntry('approved', e)),
         denied: snapshot.denied.map((e) => serializeApprovalEntry('denied', e)),
+        // SURF-kuyruk-E: a TTL-swept approval is an observable fact — the
+        // expired category was invisible here (the expiry chaos-leg smoke
+        // caught the omission live). Additive field; monitoring never gated.
+        expired: snapshot.expired.map((e) => serializeApprovalEntry('expired', e)),
       });
       return;
     }

@@ -187,8 +187,9 @@ describe("WorkersPage — live worker grid", () => {
     h.mockSseState = AGENTS_STATE;
     renderWithI18n(<WorkersPage />);
 
-    // w-1 is EXECUTING — pre-cutover it carried the kill control; now none exists
-    expect(screen.queryByText(en["dashboard.kill"])).toBeNull();
+    // w-1 is EXECUTING — pre-cutover it carried the kill control; now none
+    // exists (the dashboard.kill i18n key itself was pruned with the cutover)
+    expect(screen.queryByText("Kill")).toBeNull();
     const killCall = fetchSpy.mock.calls.find(
       ([url, init]) => String(url).startsWith("/api/kill") && init?.method === "POST",
     );

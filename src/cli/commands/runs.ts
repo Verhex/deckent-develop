@@ -58,6 +58,10 @@ export function executeInboxDecision(
         revision: String(context.approvedSnapshot?.revision ?? context.preview?.revision ?? '?'),
         digest: (context.approvedSnapshot?.planDigest ?? context.preview?.planDigest ?? '').slice(0, 12),
       });
+      // SURF-6 kuyruk-D — the in-card outcome line carries the gate warning too
+      if (context.preview?.gateResult === 'fail') {
+        approvedLine = `${getMessage('runs.decide.gate_warn', lang, { n: String(context.preview.gateFindings?.length ?? 0) })} · ${approvedLine}`;
+      }
       if (verb === 'approve') return approvedLine;
     }
 
@@ -114,6 +118,12 @@ export function resolveDecideTarget(
 function runDecide(root: string, flowId: string, flags: DecideFlags, lang: string, labels: InboxLabels): void {
   if (flags.approve) {
     const context = decideRunFlow(root, flowId, { decision: 'approve', actor: CLI_OPERATOR_ACTOR });
+    // SURF-6 kuyruk-D — gate-fail visibility: an approve on a gate-FAIL plan
+    // is legal (policy=needs-approval) but the run will refuse at start; the
+    // operator hears it NOW, not from a post-mortem crash narrative.
+    if (context.preview?.gateResult === 'fail') {
+      print(getMessage('runs.decide.gate_warn', lang, { n: String(context.preview.gateFindings?.length ?? 0) }));
+    }
     const snapshot = context.approvedSnapshot;
     print(getMessage('runs.decide.approved', lang, {
       revision: String(snapshot?.revision ?? context.preview?.revision ?? '?'),

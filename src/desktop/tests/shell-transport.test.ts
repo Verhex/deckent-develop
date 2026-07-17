@@ -6,7 +6,7 @@
 //     active daemon origins while everything else stays 'self'.
 
 import { describe, it, expect, vi } from 'vitest';
-import { ApiError, buildEventsUrl, createApiClient } from '../src/renderer/shell/api-client.js';
+import { ApiError, buildEventsUrl, createApiClient, normalizeApprovalEntry } from '../src/renderer/shell/api-client.js';
 import { buildLocalRendererCsp } from '../src/main/security.js';
 import type { DaemonSession } from '../src/shared/desktop-api.js';
 
@@ -125,6 +125,25 @@ describe('api-client (D4-3)', () => {
     const error = await client.propose('x').catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).message).toContain('502');
+  });
+});
+
+describe('normalizeApprovalEntry — nested-server → flat-shell (SURF-kuyruk-E)', () => {
+  it('flattens the server\'s {category, request:{id, summary, createdAt}} shape (the latent view-crash class)', () => {
+    const entry = normalizeApprovalEntry({
+      category: 'pending',
+      request: { id: 'apr-1', summary: 'Worker asks: run X', createdAt: '2026-07-17T10:00:00.000Z', risk: 'high' },
+      decision: null,
+    });
+    expect(entry.id).toBe('apr-1');
+    expect(entry.title).toBe('Worker asks: run X');
+    expect(entry.createdAt).toBe('2026-07-17T10:00:00.000Z');
+  });
+
+  it('tolerates an already-flat entry and garbage (honest empty id, never a throw)', () => {
+    expect(normalizeApprovalEntry({ id: 'flat-1', title: 'T' })).toMatchObject({ id: 'flat-1', title: 'T' });
+    expect(normalizeApprovalEntry(null).id).toBe('');
+    expect(normalizeApprovalEntry({ request: 42 }).id).toBe('');
   });
 });
 

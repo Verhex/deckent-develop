@@ -223,6 +223,19 @@ describe('deckent runs — CLI inbox + --close-stale (F-3)', () => {
     }
   });
 
+  it('SURF-6 kuyruk-D: approving a gate-FAIL plan prints the honest gate warning first', async () => {
+    const flowId = 'ffff0001-71aa-48b0-bd20-c2810eb6eafb';
+    appendProposalToCompletionChain({
+      root, flowId, through: 'PREVIEW_READY',
+      preview: { gateResult: 'fail', gateFindings: ['[SAN-1] scope-satisfiability: docs/X.md not writable', '[SAN-1] second finding'] },
+    });
+    savePlannedSprint(root, flowId, { revision: 1, sprint: { id: `sprint-${flowId}`, tasks: [] } });
+
+    const out = await run(['ffff0001', '--approve']);
+    expect(out).toContain('Warning: the plan gate is FAIL (2 blocking finding(s))');
+    expect(out).toContain('Approved — revision 1');
+  });
+
   it('executeInboxDecision (REPL-card glue): approve/reject return the localized outcome line', () => {
     awaitingApprovalFlow('bbbb0001-71aa-48b0-bd20-c2810eb6eafb');
     expect(executeInboxDecision(root, 'bbbb0001-71aa-48b0-bd20-c2810eb6eafb', 'approve', 'en'))

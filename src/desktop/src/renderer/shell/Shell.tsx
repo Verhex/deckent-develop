@@ -38,11 +38,17 @@ export const MSG = {
   historyTitle: 'desktop.shell.history.title',
   chatEyebrow: 'desktop.shell.chat.eyebrow',
   // SURF-5 — real workflow organs
+  // SURF-5 kuyruk — zaman-humanize: the terminal inbox's shared time vocabulary.
+  timeJustNow: 'tui.inbox_time_just_now',
+  timeMinutesAgo: 'tui.inbox_time_minutes_ago',
+  timeHoursAgo: 'tui.inbox_time_hours_ago',
+  timeDaysAgo: 'tui.inbox_time_days_ago',
   orderPlaceholder: 'desktop.shell.console.order_placeholder',
   orderSubmit: 'desktop.shell.console.order_submit',
   orderFailed: 'desktop.shell.order_failed',
   previewTitle: 'desktop.shell.preview.title',
   previewMeta: 'desktop.shell.preview.meta',
+  previewGateFindings: 'desktop.shell.preview.gate_findings',
   telegraphTitle: 'desktop.shell.telegraph.title',
   telegraphStop: 'desktop.shell.telegraph.stop',
   telegraphSlow: 'desktop.shell.telegraph.slow',
@@ -154,6 +160,8 @@ interface PlanPreviewData {
   gateResult: string;
   policyDecision: string;
   taskSummaries: Array<Record<string, unknown>>;
+  /** Present when the prompt gate blocked — SURF-6 kuyruk-D surfaces these. */
+  gateFindings?: string[];
 }
 
 function OrderForm({ api, onProposed }: { api: DaemonApiClient; onProposed: (flowId: string) => void }): React.JSX.Element {
@@ -197,6 +205,38 @@ function OrderForm({ api, onProposed }: { api: DaemonApiClient; onProposed: (flo
 /** Flow states where the plan preview is the live object of attention. */
 export const SHELL_PREVIEW_STATES = new Set(['PROPOSAL_READY', 'PREVIEWING', 'AWAITING_APPROVAL', 'APPROVED']);
 
+/** Relative-age label set for {@link formatShellTimestamp} — filled from the
+ *  SAME tui.inbox_time_* bridge keys the terminal inbox uses. */
+export interface ShellTimeLabels {
+  justNow: string;
+  minutesAgo: string;
+  hoursAgo: string;
+  daysAgo: string;
+}
+
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+const MINUTE_MS = 60_000;
+
+/**
+ * Ship's-log timestamp (SURF-5 kuyruk — zaman-humanize): the terminal inbox's
+ * EXACT humanize contract (formatInboxTimestamp parity) — local
+ * `YYYY-MM-DD HH:mm` plus a relative age from the same shared vocabulary.
+ * Pure + injectable-now; unparsable input echoes back honestly.
+ */
+export function formatShellTimestamp(iso: string, now: number, labels: ShellTimeLabels): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const abs = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const diffMin = Math.floor((now - d.getTime()) / MINUTE_MS);
+  if (diffMin < 0) return abs;
+  const rel =
+    diffMin < 1 ? labels.justNow
+    : diffMin < 60 ? labels.minutesAgo.replace('{n}', String(diffMin))
+    : diffMin < 24 * 60 ? labels.hoursAgo.replace('{n}', String(Math.floor(diffMin / 60)))
+    : labels.daysAgo.replace('{n}', String(Math.floor(diffMin / (24 * 60))));
+  return `${abs} (${rel})`;
+}
+
 /**
  * Fold one SSE frame into the ledger — dedupe-by-sequence (SURF-6): an
  * EventSource reconnect (daemon restart) replays the durable backfill, and a
@@ -237,6 +277,19 @@ function PreviewPanel({ api, flowId }: { api: DaemonApiClient; flowId: string })
           digest: String(data.planDigest ?? '').slice(0, 12),
         })}
       </p>
+      {/* SURF-6 kuyruk-D — gate-fail visibility: the blocking findings render
+          here instead of hiding behind the bare 'Gate: fail' summary (the
+          youtube-plan real-claude dogfood's exact blind spot). */}
+      {data.gateResult === 'fail' && Array.isArray(data.gateFindings) && data.gateFindings.length > 0 && (
+        <div className="gate-findings" data-testid="gate-findings">
+          <p>{t(MSG.previewGateFindings, { n: String(data.gateFindings.length) })}</p>
+          <ul>
+            {data.gateFindings.map((finding, index) => (
+              <li key={index}>{String(finding)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }
@@ -415,7 +468,15 @@ function ConsoleView(): React.JSX.Element {
               <li key={`${event.sequence ?? index}-${event.type}`}>
                 <span className="log-seq">{event.sequence ?? '·'}</span>
                 <span>{event.type}</span>
-                <span className="log-time">{event.timestamp}</span>
+                {/* humanized local time (terminal-parity); the raw ISO stays on hover */}
+                <span className="log-time" title={event.timestamp}>
+                  {formatShellTimestamp(event.timestamp, Date.now(), {
+                    justNow: t(MSG.timeJustNow),
+                    minutesAgo: t(MSG.timeMinutesAgo),
+                    hoursAgo: t(MSG.timeHoursAgo),
+                    daysAgo: t(MSG.timeDaysAgo),
+                  })}
+                </span>
               </li>
             ))}
           </ol>

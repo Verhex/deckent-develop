@@ -156,4 +156,4 @@
 - Violation pattern: file_outside_scope
 - Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 1391 | Generated: 2026-07-14_
+_Total entries: 1394 | Generated: 2026-07-17_

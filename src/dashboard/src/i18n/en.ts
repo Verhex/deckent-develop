@@ -40,12 +40,10 @@ export const en = {
   'dashboard.model': 'Model',
   'dashboard.status': 'Status',
   'dashboard.action': 'Action',
-  'dashboard.kill': 'Kill',
   'dashboard.done': 'done',
   'dashboard.running': 'running',
   'dashboard.queued': 'queued',
   'dashboard.failed': 'failed',
-  'dashboard.new_sprint': 'New Sprint',
   'dashboard.subtitle': 'Live sprint orchestration · {{n}} workers',
   'dashboard.stat_active_sprint': 'Active sprint',
   'dashboard.stat_tasks_complete': 'Tasks complete',
@@ -53,16 +51,10 @@ export const en = {
   'dashboard.stat_phase': 'Current phase',
   'dashboard.lifecycle': 'Sprint lifecycle',
   'dashboard.workers_label': 'Workers',
-  'dashboard.cleanup': 'Cleanup',
-  'dashboard.kill_all': 'Kill All',
-  'dashboard.confirm_cleanup': 'Archive sprint files?',
-  'dashboard.confirm_kill': 'Stop all workers?',
-  'dashboard.kill_failed': 'Failed to stop worker(s) — they may still be running.',
-  'dashboard.cleanup_failed': 'Cleanup failed — sprint files were not archived.',
   'dashboard.phase_timeline': 'Sprint Phases',
 
   // Workers Page
-  'workers.subtitle': 'Live worker grid — status, heartbeat age, kill control',
+  'workers.subtitle': 'Live worker grid — status, heartbeat age',
   'workers.comms_no_handoffs_title': 'No worker handoffs',
   'workers.comms_no_handoffs_desc': 'Completed workers and shared context will appear here.',
   'workers.comms_completed_count_one': '{{n}} completed worker',
@@ -70,12 +62,9 @@ export const en = {
   'workers.comms_no_completed': 'No completed handoffs in this sprint.',
 
   // Directives Page
-  'directives.subtitle': 'View and edit DIRECTIVES.md — sprint goals and tasks',
-  'directives.load_warning': 'Could not load DIRECTIVES.md from the server (read endpoint unavailable). You can still compose and save.',
-  'directives.save': 'Save',
-  'directives.saving': 'Saving…',
-  'directives.saved': 'DIRECTIVES saved ({{n}} tasks).',
-  'directives.empty_warning': 'DIRECTIVES content is empty — add content before saving.',
+  'directives.subtitle': 'View DIRECTIVES.md — sprint goals and tasks (edited from the terminal/editor)',
+  'directives.load_warning': 'Could not load DIRECTIVES.md from the server (read endpoint unavailable).',
+  'directives.empty_warning': 'DIRECTIVES content is empty — add content (terminal/editor) before starting a sprint.',
 
   // Settings Page
   'settings.title': 'Settings & Health',
@@ -110,11 +99,6 @@ export const en = {
 
   // Config Page
   'config.title': 'Configuration',
-  'config.save': 'Save',
-  'config.saving': 'Saving...',
-  'config.saved': 'Configuration saved.',
-  'config.error': 'Failed to save configuration.',
-  'config.reset': 'Reset to Defaults',
   'config.category.provider': 'Provider',
   'config.category.sprint': 'Sprint',
   'config.category.memory': 'Memory',
@@ -162,7 +146,7 @@ export const en = {
 
   // Welcome Screen
   'welcome.no_sprint': 'No active sprint.',
-  'welcome.start_hint': 'Use the New Sprint button to begin.',
+  'welcome.start_hint': 'Start a run from the terminal: deckent do "<goal>" — or from the Desktop app.',
   'welcome.last_sprint': 'Last sprint',
 
   // Dashboard additional
@@ -172,7 +156,6 @@ export const en = {
   'dashboard.active': 'Active',
   'dashboard.pending': 'Pending',
   'dashboard.violations': 'violations',
-  'dashboard.confirm_kill_worker': 'Kill worker',
 
   // History additional
   'history.all_sprints': 'All Sprints',
@@ -195,25 +178,11 @@ export const en = {
   'history.no_history_desc': 'Completed sprints will appear here. Run `deckent start` to begin your first sprint.',
 
   // Config additional
-  'config.save_changes': 'Save Changes',
   'config.loading': 'Loading configuration...',
-  'config.reset_field': 'Reset',
-  'config.save_success': 'Configuration saved successfully.',
   'config.doctor_ok': 'All required checks passed',
   'config.doctor_fail': 'Some required checks failed',
   'config.required': 'required',
 
-  // New Sprint Modal
-  'modal.directives_hint': 'Enter sprint directives below. Each "## Task" block defines a task.',
-  'modal.plan_sprint': 'Plan Run (sprint)',
-  'modal.planning': 'Planning sprint...',
-  'modal.review_tasks_parsed': 'task(s) parsed. Sprint',
-  'modal.review_planned_with': 'planned with',
-  'modal.review_tasks_suffix': 'task(s):',
-  'modal.confirm_start': 'Confirm & Start',
-  'modal.starting': 'Starting sprint...',
-  'modal.success': 'Sprint started successfully!',
-  'modal.try_again': 'Try Again',
 
   // Agent Detail
   'agent.worker': 'Worker',
@@ -350,7 +319,6 @@ export const en = {
   'common.hours_ago': '{{n}}h ago',
 
   // Config additional
-  'config.reset_to_default': 'Reset to default: {{value}}',
   'config.default_value': '(default: {{value}})',
 
   // Modal
@@ -433,19 +401,6 @@ export const en = {
 
   // Chat Page
   'nav.chat': 'Chat',
-  'chat.title': 'Chat with Deckent',
-  'chat.input_placeholder': 'Type a message...',
-  'chat.send': 'Send',
-  'chat.empty': 'Start a conversation with Deckent.',
-  'chat.error_response': 'Failed to get a response. Please try again.',
-  'chat.notifications': 'Notifications',
-  'chat.no_notifications': 'No notifications yet.',
-  'chat.task_context': 'Task Context',
-  'chat.no_active_sprint': 'No active sprint.',
-  'chat.sprint': 'Sprint',
-  'chat.phase': 'Phase',
-  'chat.progress': 'Progress',
-  'chat.active_tasks': 'Active Tasks',
 
   // Common
   'common.loading': 'Loading...',
