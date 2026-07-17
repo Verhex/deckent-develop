@@ -11,15 +11,18 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { registerRuns } from '../../../src/cli/commands/runs.js';
+import { registerRuns, executeInboxDecision } from '../../../src/cli/commands/runs.js';
 import { getRunFlowCoordinator, _resetRunFlowCoordinatorsForTests } from '../../../src/orchestra/run-flow-coordinator-registry.js';
-import { saveApprovedSnapshot, saveRunHandle } from '../../../src/core/run-flow-store.js';
+import { saveApprovedSnapshot, saveRunHandle, savePlannedSprint } from '../../../src/core/run-flow-store.js';
+import { appendProposalToCompletionChain } from '../../orchestra/run-flow-coordinator-harness.js';
 
 const ORIG_CWD = process.cwd();
 
 let root: string;
 let stdout: string[];
+let stderr: string[];
 let stdoutSpy: { mockRestore(): void };
+let stderrSpy: { mockRestore(): void };
 
 /** A real pre-698 legacy `do` flow: snapshot + pid-less handle, no event log. */
 function legacyDoFlow(flowId: string): void {
@@ -54,17 +57,25 @@ describe('deckent runs — CLI inbox + --close-stale (F-3)', () => {
     process.chdir(root);
     _resetRunFlowCoordinatorsForTests();
     stdout = [];
+    stderr = [];
     stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((d) => {
       stdout.push(String(d));
+      return true;
+    });
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation((d) => {
+      stderr.push(String(d));
       return true;
     });
   });
 
   afterEach(() => {
     stdoutSpy?.mockRestore();
+    stderrSpy?.mockRestore();
     process.chdir(ORIG_CWD);
     _resetRunFlowCoordinatorsForTests();
     rmSync(root, { recursive: true, force: true });
+    // decide-refusal paths set a non-zero exitCode — never leak it into vitest
+    process.exitCode = 0;
   });
 
   it('bare `runs` on an empty project prints the empty notice', async () => {
@@ -117,6 +128,116 @@ describe('deckent runs — CLI inbox + --close-stale (F-3)', () => {
     legacyDoFlow('c1b050ab-71aa-48b0-bd20-c2810eb6eafb');
     const out = await run(['9']);
     expect(out).toContain('No run #9');
+  });
+
+  // ─── SURF-6 — `runs <n> --approve|--reject|--start` (cross-surface decide) ──
+
+  /** A flow durably at AWAITING_APPROVAL (real event log via the store) whose
+   *  planned sprint is persisted — exactly what a Desktop propose leaves on
+   *  disk for the terminal operator to decide on. */
+  function awaitingApprovalFlow(flowId: string): void {
+    appendProposalToCompletionChain({ root, flowId, through: 'PREVIEW_READY' });
+    savePlannedSprint(root, flowId, {
+      revision: 1,
+      sprint: { id: `sprint-${flowId}`, tasks: [] },
+    });
+  }
+
+  it('`runs <n> --approve` approves the Desktop-proposed flow and shows the daemon-truth detail', async () => {
+    awaitingApprovalFlow('aaaa0001-71aa-48b0-bd20-c2810eb6eafb');
+    const out = await run(['1', '--approve']);
+    expect(out).toContain('Approved — revision 1 · digest digest-harne');
+    expect(out).toContain('· approved'); // the epilogue detail re-reads the durable store
+    _resetRunFlowCoordinatorsForTests();
+    expect(getRunFlowCoordinator(root).getFlow('aaaa0001-71aa-48b0-bd20-c2810eb6eafb').state).toBe('APPROVED');
+  });
+
+  it('`runs <n> --reject --reason` cancels durably and echoes the reason', async () => {
+    awaitingApprovalFlow('aaaa0002-71aa-48b0-bd20-c2810eb6eafb');
+    const out = await run(['1', '--reject', '--reason', 'not in scope']);
+    expect(out).toContain('Rejected — not in scope');
+    expect(out).toContain('· cancelled');
+    _resetRunFlowCoordinatorsForTests();
+    expect(getRunFlowCoordinator(root).getFlow('aaaa0002-71aa-48b0-bd20-c2810eb6eafb').state).toBe('CANCELLED');
+  });
+
+  it('`--approve --reject` together is an honest flag-conflict error', async () => {
+    awaitingApprovalFlow('aaaa0003-71aa-48b0-bd20-c2810eb6eafb');
+    await run(['1', '--approve', '--reject']);
+    expect(stderr.join('')).toContain('--approve and --reject are mutually exclusive');
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('`--reason` without `--reject` is refused', async () => {
+    awaitingApprovalFlow('aaaa0004-71aa-48b0-bd20-c2810eb6eafb');
+    await run(['1', '--reason', 'why']);
+    expect(stderr.join('')).toContain('--reason is only valid with --reject');
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('decide flags without a run number are refused with the usage hint', async () => {
+    await run(['--approve']);
+    expect(stderr.join('')).toContain('Decision flags need a run number');
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('decide flags with an out-of-range number print the honest not-found', async () => {
+    awaitingApprovalFlow('aaaa0005-71aa-48b0-bd20-c2810eb6eafb');
+    await run(['9', '--approve']);
+    expect(stderr.join('')).toContain('No run #9');
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('`--approve` on a flow with no live preview fails honestly via the shared service', async () => {
+    // legacy snapshot+handle flow (no event log → no preview to approve)
+    legacyDoFlow('aaaa0006-71aa-48b0-bd20-c2810eb6eafb');
+    await run(['1', '--approve']);
+    expect(stderr.join('')).toContain('no live preview to approve');
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('`runs <flowId-prefix>` (no decide flag) shows the rich DETAIL too — the handoff handle works read-only', async () => {
+    awaitingApprovalFlow('eeee0001-71aa-48b0-bd20-c2810eb6eafb');
+    const out = await run(['eeee0001']);
+    expect(out).toContain('  id: eeee0001-71aa-48b0-bd20-c2810eb6eafb');
+    expect(out).toContain('digest: digest-harness');
+  });
+
+  it('decide accepts a unique flowId PREFIX (stable cross-surface handle; row numbers shift on re-sort)', async () => {
+    awaitingApprovalFlow('cccc0001-71aa-48b0-bd20-c2810eb6eafb');
+    const out = await run(['cccc0001', '--approve']);
+    expect(out).toContain('Approved — revision 1');
+    _resetRunFlowCoordinatorsForTests();
+    expect(getRunFlowCoordinator(root).getFlow('cccc0001-71aa-48b0-bd20-c2810eb6eafb').state).toBe('APPROVED');
+  });
+
+  it('an AMBIGUOUS flowId prefix is an honest not-found, never a guess', async () => {
+    awaitingApprovalFlow('dddd0001-71aa-48b0-bd20-c2810eb6eafb');
+    awaitingApprovalFlow('dddd0002-71aa-48b0-bd20-c2810eb6eafb');
+    await run(['dddd', '--approve']);
+    expect(stderr.join('')).toContain('No run #dddd');
+    expect(process.exitCode).toBe(1);
+    _resetRunFlowCoordinatorsForTests();
+    for (const id of ['dddd0001-71aa-48b0-bd20-c2810eb6eafb', 'dddd0002-71aa-48b0-bd20-c2810eb6eafb']) {
+      expect(getRunFlowCoordinator(root).getFlow(id).state).toBe('AWAITING_APPROVAL');
+    }
+  });
+
+  it('executeInboxDecision (REPL-card glue): approve/reject return the localized outcome line', () => {
+    awaitingApprovalFlow('bbbb0001-71aa-48b0-bd20-c2810eb6eafb');
+    expect(executeInboxDecision(root, 'bbbb0001-71aa-48b0-bd20-c2810eb6eafb', 'approve', 'en'))
+      .toBe('Approved — revision 1 · digest digest-harne');
+    _resetRunFlowCoordinatorsForTests();
+
+    awaitingApprovalFlow('bbbb0002-71aa-48b0-bd20-c2810eb6eafb');
+    expect(executeInboxDecision(root, 'bbbb0002-71aa-48b0-bd20-c2810eb6eafb', 'reject', 'en')).toBe('Rejected.');
+  });
+
+  it('executeInboxDecision NEVER throws — a refusal comes back as an honest Error: line', () => {
+    legacyDoFlow('bbbb0003-71aa-48b0-bd20-c2810eb6eafb'); // no live preview
+    const line = executeInboxDecision(root, 'bbbb0003-71aa-48b0-bd20-c2810eb6eafb', 'approve', 'en');
+    expect(line).toContain('Error:');
+    expect(line).toContain('no live preview to approve');
   });
 
   it('a flow whose jobs-dir record is terminal is NEVER offered for closure (execution truth wins)', async () => {

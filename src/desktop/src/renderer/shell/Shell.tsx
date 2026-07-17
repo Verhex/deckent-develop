@@ -197,6 +197,21 @@ function OrderForm({ api, onProposed }: { api: DaemonApiClient; onProposed: (flo
 /** Flow states where the plan preview is the live object of attention. */
 export const SHELL_PREVIEW_STATES = new Set(['PROPOSAL_READY', 'PREVIEWING', 'AWAITING_APPROVAL', 'APPROVED']);
 
+/**
+ * Fold one SSE frame into the ledger — dedupe-by-sequence (SURF-6): an
+ * EventSource reconnect (daemon restart) replays the durable backfill, and a
+ * frame whose sequence the ledger already holds must fold to a no-op, never a
+ * duplicate row. Defense in depth with the server's Last-Event-ID-first
+ * cursor. Exported pure — pinned by shell-design.test.ts.
+ */
+export function foldEventIntoLedger(
+  prev: RunFlowEventPayload[],
+  event: RunFlowEventPayload,
+): RunFlowEventPayload[] {
+  if (event.sequence !== undefined && prev.some((e) => e.sequence === event.sequence)) return prev;
+  return [...prev, event];
+}
+
 function PreviewPanel({ api, flowId }: { api: DaemonApiClient; flowId: string }): React.JSX.Element | null {
   const t = useT();
   const preview = useQuery({
@@ -338,7 +353,7 @@ function ConsoleView(): React.JSX.Element {
   useEffect(() => {
     if (!api || !activeFlowId) return;
     const close = api.openEvents(activeFlowId, (event) => {
-      queryClient.setQueryData<RunFlowEventPayload[]>(eventsKey, (old) => [...(old ?? []), event]);
+      queryClient.setQueryData<RunFlowEventPayload[]>(eventsKey, (old) => foldEventIntoLedger(old ?? [], event));
       void queryClient.invalidateQueries({ queryKey: ['run-flow', 'list'] });
     }, { afterSequence: 0 });
     return close;

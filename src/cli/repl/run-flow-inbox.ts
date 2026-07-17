@@ -197,6 +197,11 @@ export interface InboxLabels {
   followNavHint: string;
   /** DETAIL-mode footer, e.g. "↑↓ browse · Esc back · ⟳ live". */
   followDetailHint: string;
+  // ── SURF-6 (in-card decision) — detail-view decision-key hints ──
+  /** Hint under an AWAITING_APPROVAL detail, e.g. "a approve · f full ahead · r reject". */
+  decideHintAwaiting: string;
+  /** Hint under an APPROVED detail, e.g. "s start". */
+  decideHintApproved: string;
   // ── F-3 (read-only liveness) — row marks + detail lines ──
   /** Row mark when the recorded run process is gone, e.g. "process died". */
   livenessDead: string;
@@ -221,6 +226,9 @@ export interface InboxLabels {
   detailSummary: string;
   /** Closure-narrative line, e.g. "  reason: {reason}". */
   detailReason: string;
+  /** Plan-digest line (SURF-6 cross-surface parity — the SAME content hash the
+   *  Desktop preview shows), e.g. "  digest: {digest}". */
+  detailDigest: string;
   /** Relative-age fragments for formatInboxTimestamp. */
   timeJustNow: string;
   timeMinutesAgo: string;
@@ -256,6 +264,8 @@ export const DEFAULT_INBOX_LABELS: InboxLabels = {
   notFound: 'No run #{arg} — `/runs` lists them',
   followNavHint: '↑↓ select · ↵ open · Esc close · ⟳ live',
   followDetailHint: '↑↓ browse · Esc back · ⟳ live',
+  decideHintAwaiting: 'a approve · f full ahead · r reject',
+  decideHintApproved: 's start',
   livenessDead: 'process died',
   livenessUnknown: 'unverified',
   detailLivenessDead: '  liveness: process died (pid {pid})',
@@ -267,6 +277,7 @@ export const DEFAULT_INBOX_LABELS: InboxLabels = {
   detailDuration: '  duration: {duration}',
   detailSummary: '  summary: {summary}',
   detailReason: '  reason: {reason}',
+  detailDigest: '  digest: {digest}',
   timeJustNow: 'just now',
   timeMinutesAgo: '{n} min ago',
   timeHoursAgo: '{n} h ago',
@@ -416,6 +427,10 @@ export interface InboxRunDetail {
   /** Closure narrative: the last durable RUN_FAILED.error / FLOW_ABORTED.reason /
    *  APPROVAL_REJECTED.reason, else the folded context's failureReason. */
   readonly reason?: string;
+  /** The plan's content hash (approved snapshot first, live preview fallback) —
+   *  the SAME digest the Desktop preview panel shows, so a cross-surface
+   *  operator can verify both surfaces describe the identical plan (SURF-6). */
+  readonly planDigest?: string;
 }
 
 /** Gather the rich detail for one row — read-only, fail-soft (a torn store
@@ -425,12 +440,14 @@ export function collectRunDetail(root: string, row: InboxRow): InboxRunDetail {
   let tasksTotal: number | undefined;
   let startedAt: string | undefined;
   let reason: string | undefined;
+  let planDigest: string | undefined;
   try {
     const snapshot = loadApprovedSnapshot(root, row.flowId);
     if (snapshot !== undefined) {
       const tasks = (snapshot.sprint as { tasks?: unknown } | undefined)?.tasks;
       if (Array.isArray(tasks)) tasksTotal = tasks.length;
       origin = snapshot.proposal?.origin;
+      planDigest = snapshot.planDigest;
     }
 
     startedAt = loadRunHandle(root, row.flowId)?.startedAt;
@@ -446,6 +463,7 @@ export function collectRunDetail(root: string, row: InboxRow): InboxRunDetail {
     const context = getRunFlowCoordinator(root).getFlow(row.flowId);
     origin = context.proposal?.origin ?? origin;
     reason = reason ?? context.failureReason;
+    planDigest = context.approvedSnapshot?.planDigest ?? context.preview?.planDigest ?? planDigest;
   } catch {
     // fail-soft: render whatever was gathered before the bad read
   }
@@ -455,6 +473,7 @@ export function collectRunDetail(root: string, row: InboxRow): InboxRunDetail {
     ...(tasksTotal !== undefined ? { tasksTotal } : {}),
     ...(startedAt !== undefined ? { startedAt } : {}),
     ...(reason !== undefined ? { reason } : {}),
+    ...(planDigest !== undefined ? { planDigest } : {}),
   };
 }
 
@@ -499,6 +518,7 @@ export function buildRunDetailLines(detail: InboxRunDetail, labels: InboxLabels,
   }
   if (row.summary) lines.push(labels.detailSummary.replace('{summary}', row.summary));
   if (detail.reason) lines.push(labels.detailReason.replace('{reason}', detail.reason));
+  if (detail.planDigest) lines.push(labels.detailDigest.replace('{digest}', detail.planDigest));
   return lines;
 }
 
@@ -551,6 +571,8 @@ export function buildInboxLabels(t: (key: string) => string): InboxLabels {
     notFound: t('tui.inbox_not_found'),
     followNavHint: t('tui.inbox_follow_nav_hint'),
     followDetailHint: t('tui.inbox_follow_detail_hint'),
+    decideHintAwaiting: t('tui.inbox_decide_hint_awaiting'),
+    decideHintApproved: t('tui.inbox_decide_hint_approved'),
     livenessDead: t('tui.inbox_liveness_dead'),
     livenessUnknown: t('tui.inbox_liveness_unknown'),
     detailLivenessDead: t('tui.inbox_detail_liveness_dead'),
@@ -562,6 +584,7 @@ export function buildInboxLabels(t: (key: string) => string): InboxLabels {
     detailDuration: t('tui.inbox_detail_duration'),
     detailSummary: t('tui.inbox_detail_summary'),
     detailReason: t('tui.inbox_detail_reason'),
+    detailDigest: t('tui.inbox_detail_digest'),
     timeJustNow: t('tui.inbox_time_just_now'),
     timeMinutesAgo: t('tui.inbox_time_minutes_ago'),
     timeHoursAgo: t('tui.inbox_time_hours_ago'),
@@ -638,4 +661,36 @@ export function reduceInboxNav(state: InboxNavState, action: InboxNavAction, row
   const idx = Math.max(0, rows.findIndex((r) => r.flowId === current));
   const nextIdx = action === 'up' ? (idx - 1 + n) % n : (idx + 1) % n;
   return { ...state, selectedFlowId: rows[nextIdx]!.flowId };
+}
+
+// ─── SURF-6 — in-card decision (pure gating + key map, Ink-free) ─────────────
+//
+// The detail view gains the Desktop Telegraph's exact verbs from the keyboard:
+// reject=STOP, approve=SLOW AHEAD, full-ahead=approve+start=FULL AHEAD (and a
+// bare start for an already-APPROVED flow). The card only exposes the keys —
+// execution is an injected callback (run.tsx wires the shared
+// orchestra/run-flow-decision-service.ts), and the durable store remains the
+// only transition authority: this derivation is DISPLAY/gating truth, the
+// service re-validates every verb against the folded flow.
+
+/** A decision verb the detail card can issue for the focused run. */
+export type InboxDecisionVerb = 'approve' | 'reject' | 'full-ahead' | 'start';
+
+/** Which verbs the focused row currently offers (empty = the decision keys are
+ *  inert — e.g. a running or terminal flow). */
+export function decidableInboxVerbs(row: InboxRow): readonly InboxDecisionVerb[] {
+  if (row.state === 'AWAITING_APPROVAL') return ['approve', 'full-ahead', 'reject'];
+  if (row.state === 'APPROVED') return ['start'];
+  return [];
+}
+
+/** Map a plain character to a decision verb (`a`pprove / `f`ull-ahead /
+ *  `r`eject / `s`tart) — or null for every other key. Deliberately disjoint
+ *  from mapInboxKey's nav flags so the two maps can never fight over a key. */
+export function mapInboxDecisionKey(input: string): InboxDecisionVerb | null {
+  if (input === 'a') return 'approve';
+  if (input === 'f') return 'full-ahead';
+  if (input === 'r') return 'reject';
+  if (input === 's') return 'start';
+  return null;
 }

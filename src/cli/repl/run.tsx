@@ -22,6 +22,7 @@ import { createRunFlowController, type RunFlowController, type RunFlowController
 import { buildPlanPreviewCardLabels } from './plan-preview-card.js';
 import type { RunFlowMountLabels } from './app.js';
 import { renderRunsCommand, buildInboxLabels, collectInboxRows } from './run-flow-inbox.js';
+import { executeInboxDecision } from '../commands/runs.js';
 import type { ResolvedConfig } from '../../core/types.js';
 import { buildTurnRecorder } from './trace-wire.js';
 import { composeSystemPrompt } from '../../agent/identity.js';
@@ -1017,6 +1018,7 @@ export async function runInkRepl(
       runInboxProvider={(input) => renderRunsCommand(process.cwd(), input, buildInboxLabels(t))}
       inboxFollowFeed={() => collectInboxRows(process.cwd())}
       inboxLabels={buildInboxLabels(t)}
+      inboxDecide={(flowId, verb) => executeInboxDecision(process.cwd(), flowId, verb, lang)}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
       registerToolSink={(sink) => { toolSink = sink; }}
       {...(nativeEngine ? { nativeEngine } : {})}

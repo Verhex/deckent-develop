@@ -14,6 +14,7 @@ import {
   matchRunFlowEventStream,
   isValidRunFlowId,
   formatRunFlowEventFrame,
+  resolveReplayCursor,
   publishRunFlowEvent,
   subscribeRunFlowEvents,
   _resetRunFlowEventStreamState,
@@ -56,6 +57,17 @@ describe('run-flow-event-stream route helpers', () => {
     expect(isValidRunFlowId('a.b')).toBe(false);
     expect(isValidRunFlowId('a/b')).toBe(false);
     expect(isValidRunFlowId('')).toBe(false);
+  });
+
+  it('resolveReplayCursor: Last-Event-ID header WINS over the frozen ?after= URL cursor (SURF-6 reconnect-dedupe)', () => {
+    // reconnect: original URL still says after=0, but the browser reports the
+    // newest received id — the header must win or the backfill replays as dupes
+    expect(resolveReplayCursor('6', '/api/run-flow/f/events?after=0')).toBe(6);
+    // first subscribe: no header → the URL cursor applies
+    expect(resolveReplayCursor(undefined, '/api/run-flow/f/events?after=3')).toBe(3);
+    // garbage header falls back to the URL; garbage everywhere → null (no backfill)
+    expect(resolveReplayCursor('not-a-number', '/api/run-flow/f/events?after=2')).toBe(2);
+    expect(resolveReplayCursor('', '/api/run-flow/f/events')).toBeNull();
   });
 
   it('formatRunFlowEventFrame emits a named SSE event field and preserves the versioned shape', () => {

@@ -115,6 +115,31 @@ export function formatRunFlowEventFrame(event: RunFlowEvent): string {
   return `${idLine}event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
 }
 
+/**
+ * Resolve the durable replay cursor for one stream request — **Last-Event-ID
+ * FIRST** (SURF-6): on an EventSource reconnect the browser re-uses the
+ * ORIGINAL URL (whose `?after=` froze at subscribe time) and sends the newest
+ * received id in this header. The header is strictly newer knowledge from the
+ * same client, so it must win — otherwise every reconnect (e.g. a daemon
+ * restart) replays the whole backfill as duplicate frames, which the
+ * cross-surface smoke's restart leg caught live. `?after=` remains the
+ * first-subscribe cursor; null ⇒ no backfill requested.
+ */
+export function resolveReplayCursor(
+  lastEventIdHeader: string | string[] | undefined,
+  url: string | undefined,
+): number | null {
+  if (typeof lastEventIdHeader === 'string' && lastEventIdHeader.trim() !== '') {
+    const fromHeader = Number.parseInt(lastEventIdHeader, 10);
+    if (Number.isFinite(fromHeader)) return fromHeader;
+  }
+  try {
+    const q = new URL(url ?? '', 'http://localhost').searchParams.get('after');
+    if (q !== null) return Number.parseInt(q, 10);
+  } catch { /* fall through */ }
+  return null;
+}
+
 // ─── HTTP handler ────────────────────────────────────────────────────────
 
 /**
@@ -141,15 +166,7 @@ export function handleRunFlowEventStream(
   //    Last-Event-ID header selects the durable backfill start. Race-closed:
   //    subscribe FIRST (live events buffer), then backfill from the durable
   //    log, then flush any buffered live event newer than the backfill tail.
-  const afterParam = (() => {
-    try {
-      const q = new URL(req.url ?? '', 'http://localhost').searchParams.get('after');
-      if (q !== null) return Number.parseInt(q, 10);
-    } catch { /* fall through */ }
-    const header = req.headers['last-event-id'];
-    if (typeof header === 'string') return Number.parseInt(header, 10);
-    return null;
-  })();
+  const afterParam = resolveReplayCursor(req.headers['last-event-id'], req.url);
   const afterSequence = afterParam !== null && Number.isFinite(afterParam) && afterParam >= 0 ? afterParam : null;
 
   let backfilling = afterSequence !== null && projectRoot !== undefined;

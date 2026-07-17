@@ -24,7 +24,7 @@
 
 import { Box, Text, useInput } from 'ink';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
-import type { InboxRow, InboxLabels, InboxNavState } from './run-flow-inbox.js';
+import type { InboxRow, InboxLabels, InboxNavState, InboxDecisionVerb } from './run-flow-inbox.js';
 import {
   DEFAULT_INBOX_LABELS,
   EMPTY_INBOX_NAV,
@@ -33,6 +33,8 @@ import {
   mapInboxKey,
   reduceInboxNav,
   realignInboxSelection,
+  decidableInboxVerbs,
+  mapInboxDecisionKey,
 } from './run-flow-inbox.js';
 
 /** Focus-highlight color for the selected row — the GOLD the slash-menu uses for
@@ -59,12 +61,20 @@ export interface InboxCardProps {
   isActive?: boolean;
   /** Poll cadence (ms). Default 1000 — same as the live-footer stateFeed. */
   pollMs?: number;
+  /** SURF-6 in-card decision executor (run.tsx wires the shared decision
+   *  service). Returns the honest one-line outcome (success OR refusal) shown
+   *  under the detail; the next poll shows the durable state itself. When
+   *  absent, the decision keys are inert (view-only card, D3b behavior). */
+  onDecide?: (flowId: string, verb: InboxDecisionVerb) => string;
 }
 
 export function InboxCard(props: InboxCardProps): ReactElement | null {
-  const { open, feed, labels = DEFAULT_INBOX_LABELS, onClose, isActive: mutexActive = true, pollMs = 1000 } = props;
+  const { open, feed, labels = DEFAULT_INBOX_LABELS, onClose, isActive: mutexActive = true, pollMs = 1000, onDecide } = props;
   const [rows, setRows] = useState<InboxRow[]>([]);
   const [nav, setNav] = useState<InboxNavState>(EMPTY_INBOX_NAV);
+  // SURF-6: the last decision outcome line (honest success/refusal) — cleared
+  // on any nav action so a stale verdict never sits under a different run.
+  const [decideNotice, setDecideNotice] = useState<string | null>(null);
   // Refs mirror the state so the useInput callback (a stable closure) always
   // reads the LATEST rows/nav — the menuSelRef pattern from input-bar.tsx.
   const rowsRef = useRef<InboxRow[]>([]);
@@ -90,10 +100,22 @@ export function InboxCard(props: InboxCardProps): ReactElement | null {
 
   useInput((input, key) => {
     const action = mapInboxKey(input, key);
-    if (!action) return;
-    // Esc on the LIST closes the card; Esc on a detail collapses it (reducer).
-    if (action === 'close' && !navRef.current.detailOpen) { onClose(); return; }
-    setNavBoth(reduceInboxNav(navRef.current, action, rowsRef.current));
+    if (action) {
+      // Esc on the LIST closes the card; Esc on a detail collapses it (reducer).
+      if (action === 'close' && !navRef.current.detailOpen) { onClose(); return; }
+      setDecideNotice(null);
+      setNavBoth(reduceInboxNav(navRef.current, action, rowsRef.current));
+      return;
+    }
+    // SURF-6: decision keys — DETAIL view only (the operator has the run's
+    // facts in front of them), and only for verbs the focused row offers.
+    if (!onDecide || !navRef.current.detailOpen) return;
+    const verb = mapInboxDecisionKey(input);
+    if (!verb) return;
+    const focusedId = realignInboxSelection(navRef.current.selectedFlowId, rowsRef.current);
+    const row = rowsRef.current.find((r) => r.flowId === focusedId);
+    if (!row || !decidableInboxVerbs(row).includes(verb)) return;
+    setDecideNotice(onDecide(row.flowId, verb));
   }, { isActive: open && mutexActive });
 
   if (!open) return null;
@@ -101,13 +123,17 @@ export function InboxCard(props: InboxCardProps): ReactElement | null {
   const selectedFlowId = realignInboxSelection(nav.selectedFlowId, rows);
   const selectedRow = rows.find((r) => r.flowId === selectedFlowId);
 
-  // ── Detail view — the focused run's detail block + a back hint. ──
+  // ── Detail view — the focused run's detail block + decision keys + hints. ──
   if (nav.detailOpen && selectedRow) {
+    const verbs = onDecide ? decidableInboxVerbs(selectedRow) : [];
     return (
       <Box flexDirection="column" borderStyle="round" borderColor={SELECTED_COLOR} paddingX={1}>
         {buildInboxDetailLines(selectedRow, labels).map((line, i) => (
           <Text key={`detail-${i}-${line}`}>{line}</Text>
         ))}
+        {decideNotice !== null && <Text>{decideNotice}</Text>}
+        {verbs.includes('approve') && <Text dimColor>{labels.decideHintAwaiting}</Text>}
+        {verbs.includes('start') && !verbs.includes('approve') && <Text dimColor>{labels.decideHintApproved}</Text>}
         <Text dimColor>{labels.followDetailHint}</Text>
       </Box>
     );

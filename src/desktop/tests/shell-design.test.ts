@@ -9,7 +9,7 @@ import { buildCourseGeometry } from '../src/renderer/shell/course.js';
 import { FLOW_STATE_MESSAGE_KEYS, DESKTOP_MESSAGE_KEYS } from '../src/shared/desktop-messages.js';
 import { buildInboxLabels } from '../../cli/repl/run-flow-inbox.js';
 import { RUN_FLOW_TERMINAL_STATES } from '../../core/run-flow-contract.js';
-import { MSG, SHELL_TERMINAL_STATES, SHELL_PREVIEW_STATES } from '../src/renderer/shell/Shell.js';
+import { MSG, SHELL_TERMINAL_STATES, SHELL_PREVIEW_STATES, foldEventIntoLedger } from '../src/renderer/shell/Shell.js';
 import type { RunFlowEventPayload } from '../src/renderer/shell/api-client.js';
 
 function event(type: string, sequence: number): RunFlowEventPayload {
@@ -82,6 +82,19 @@ describe('Shell MSG — every shell string is a served bridge key (SURF-5)', () 
     const served = new Set<string>(DESKTOP_MESSAGE_KEYS);
     const rogue = Object.entries(MSG).filter(([, key]) => !served.has(key));
     expect(rogue).toEqual([]);
+  });
+});
+
+describe('foldEventIntoLedger — SSE reconnect dedupe (SURF-6)', () => {
+  it('a replayed frame (same sequence) folds to a NO-OP — the exact daemon-restart duplicate class', () => {
+    const ledger = [event('PROPOSAL_SUBMITTED', 1), event('PREVIEW_READY', 2)];
+    expect(foldEventIntoLedger(ledger, event('PREVIEW_READY', 2))).toBe(ledger);
+    expect(foldEventIntoLedger(ledger, event('APPROVAL_GRANTED', 3))).toHaveLength(3);
+  });
+
+  it('a sequence-less frame (legacy/live-only) always appends — dedupe never drops real data', () => {
+    const legacy = { type: 'X', flowId: 'f', timestamp: 't' } as RunFlowEventPayload;
+    expect(foldEventIntoLedger([legacy], legacy)).toHaveLength(2);
   });
 });
 

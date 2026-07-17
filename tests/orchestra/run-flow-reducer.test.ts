@@ -455,6 +455,11 @@ describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-s
       // (contract constant, read-only) to pin SHELL_TERMINAL_STATES against the
       // core truth — a designed test-side consumer, no reducer/store mutation.
       'desktop/tests/shell-design.test.ts',
+      // SURF-6: the ONE shared decide/start use-case (approve→snapshot-persist,
+      // start→spawn) extracted from api/run-flow-routes.ts so the API, the CLI
+      // (`deckent runs --approve`) and the REPL card all call the SAME sequence
+      // — the designed store consumer that replaced the route-local glue.
+      'orchestra/run-flow-decision-service.ts',
     ];
     expect(offenders.filter((o) => !KNOWN_CONSUMERS.includes(o))).toEqual([]);
   });

@@ -41,7 +41,7 @@ import type { ApprovalStreamEvent } from '../../core/approval-eventstream.js';
 import type { ApprovalRisk } from '../../core/approval-contract.js';
 import { PlanPreviewCard, type PlanPreviewCardLabels } from './plan-preview-card.js';
 import { InboxCard } from './inbox-card.js';
-import type { InboxRow, InboxLabels } from './run-flow-inbox.js';
+import type { InboxRow, InboxLabels, InboxDecisionVerb } from './run-flow-inbox.js';
 import type { RunFlowContext, PlanPreview } from '../../core/run-flow-contract.js';
 import type { RunFlowController } from './run-flow-controller.js';
 
@@ -921,6 +921,10 @@ export interface ReplAppProps {
   /** SURF-3 D3b — localized labels for the live inbox card (row/detail render +
    *  nav footers). Injected by run.tsx; absent → English DEFAULT_INBOX_LABELS. */
   inboxLabels?: InboxLabels;
+  /** SURF-6 — in-card decision executor for the live inbox card (approve /
+   *  full-ahead / reject / start on the focused run's detail). Injected by
+   *  run.tsx (shared decision service); absent → decision keys are inert. */
+  inboxDecide?: (flowId: string, verb: InboxDecisionVerb) => string;
   /** Optional chat-memory adapter — persists turns and powers /resume. */
   memory?: ChatMemoryAdapter;
   /** Active chat session id (new turns append here; /resume switches it). */
@@ -1067,7 +1071,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide } = props;
   const { exit } = useApp();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
@@ -1761,6 +1765,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           labels={inboxLabels}
           onClose={() => setInboxOpen(false)}
           isActive={resolveInboxCardActive(stdinOwner.confirmActive, approvalPending, runFlowPending)}
+          {...(inboxDecide ? { onDecide: inboxDecide } : {})}
         />
       )}
 

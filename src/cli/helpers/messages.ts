@@ -2784,6 +2784,14 @@ const MESSAGES: MessageMap = {
   'tui.inbox_detail_duration': { en: '  duration: {duration}', tr: '  süre: {duration}' },
   'tui.inbox_detail_summary': { en: '  summary: {summary}', tr: '  özet: {summary}' },
   'tui.inbox_detail_reason': { en: '  reason: {reason}', tr: '  neden: {reason}' },
+  // SURF-6 — cross-surface parity: the SAME content hash the Desktop preview shows.
+  'tui.inbox_detail_digest': { en: '  digest: {digest}', tr: '  plan-imzası: {digest}' },
+  // SURF-6 — in-card decision keys (Telegraph vocabulary: STOP/SLOW AHEAD/FULL AHEAD).
+  'tui.inbox_decide_hint_awaiting': {
+    en: 'a approve · f full ahead · r reject',
+    tr: 'a onayla (ağır yol) · f tam yol · r reddet (dur)',
+  },
+  'tui.inbox_decide_hint_approved': { en: 's start', tr: 's başlat' },
   'tui.inbox_time_just_now': { en: 'just now', tr: 'az önce' },
   'tui.inbox_time_minutes_ago': { en: '{n} min ago', tr: '{n} dk önce' },
   'tui.inbox_time_hours_ago': { en: '{n} h ago', tr: '{n} sa önce' },
@@ -2816,6 +2824,33 @@ const MESSAGES: MessageMap = {
   'runs.close_stale.entry_unverifiable': {
     en: 'unverifiable (no pid recorded) → cancelled',
     tr: 'doğrulanamaz (pid kaydı yok) → iptal',
+  },
+  // SURF-6 `deckent runs <n> --approve|--reject|--start` — cross-surface decide.
+  'runs.decide.approved': {
+    en: 'Approved — revision {revision} · digest {digest}',
+    tr: 'Onaylandı — revizyon {revision} · özet {digest}',
+  },
+  'runs.decide.rejected': { en: 'Rejected.', tr: 'Reddedildi.' },
+  'runs.decide.rejected_reason': { en: 'Rejected — {reason}', tr: 'Reddedildi — {reason}' },
+  'runs.decide.started': {
+    en: 'Run started (detached) — job {jobId}',
+    tr: 'Koşu başlatıldı (arka planda) — iş {jobId}',
+  },
+  'runs.decide.start_duplicate': {
+    en: 'Already started — idempotent, nothing was spawned again.',
+    tr: 'Zaten başlatılmış — idempotent, yeniden başlatılmadı.',
+  },
+  'runs.decide.flag_conflict': {
+    en: '--approve and --reject are mutually exclusive.',
+    tr: '--approve ile --reject birlikte kullanılamaz.',
+  },
+  'runs.decide.reason_without_reject': {
+    en: '--reason is only valid with --reject.',
+    tr: '--reason yalnız --reject ile kullanılır.',
+  },
+  'runs.decide.needs_row': {
+    en: 'Decision flags need a run number: deckent runs <n> --approve | --reject | --start',
+    tr: 'Karar bayrakları koşu numarası ister: deckent runs <n> --approve | --reject | --start',
   },
   'tui.resume_picker_header': { en: 'Recent sessions', tr: 'Son oturumlar' },
   'tui.resume_picker_hint': {

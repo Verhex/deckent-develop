@@ -30,6 +30,9 @@ import {
   formatInboxDuration,
   collectRunDetail,
   buildRunDetailLines,
+  // SURF-6 — in-card decision gating
+  decidableInboxVerbs,
+  mapInboxDecisionKey,
   type InboxRow,
   type InboxNavState,
 } from '../../src/cli/repl/run-flow-inbox.js';
@@ -405,6 +408,8 @@ describe('collectRunDetail + buildRunDetailLines — rich `/runs <n>` view (F-3b
     expect(lines).toContain('  intent: ship the feature');
     expect(lines).toContain('  origin: api');
     expect(lines).toContain('  progress: 4/4');
+    // SURF-6 parity line: the FULL plan digest (the same hash Desktop shows).
+    expect(lines).toContain('  digest: d-1');
     expect(lines).toContain(
       DEFAULT_INBOX_LABELS.detailStarted.replace(
         '{started}', formatInboxTimestamp('2026-07-16T09:00:00.000Z', DEFAULT_INBOX_LABELS, NOW)),
@@ -504,7 +509,7 @@ describe('buildInboxLabels — i18n (SURF-3)', () => {
   it('resolves every label in en + tr (en !== tr), covering all states', () => {
     const en = buildInboxLabels((k) => getMessage(k, 'en'));
     const tr = buildInboxLabels((k) => getMessage(k, 'tr'));
-    for (const key of ['header', 'hint', 'empty', 'detailIntent', 'detailProgress', 'detailStarted', 'notFound', 'followNavHint', 'followDetailHint', 'livenessDead', 'livenessUnknown', 'detailLivenessDead', 'detailLivenessUnknown', 'detailOrigin', 'detailTasks', 'detailUpdated', 'detailClosed', 'detailDuration', 'detailSummary', 'detailReason', 'timeJustNow', 'timeMinutesAgo', 'timeHoursAgo', 'timeDaysAgo'] as const) {
+    for (const key of ['header', 'hint', 'empty', 'detailIntent', 'detailProgress', 'detailStarted', 'notFound', 'followNavHint', 'followDetailHint', 'livenessDead', 'livenessUnknown', 'detailLivenessDead', 'detailLivenessUnknown', 'detailOrigin', 'detailTasks', 'detailUpdated', 'detailClosed', 'detailDuration', 'detailSummary', 'detailReason', 'detailDigest', 'timeJustNow', 'timeMinutesAgo', 'timeHoursAgo', 'timeDaysAgo'] as const) {
       expect(en[key].length).toBeGreaterThan(0);
       expect(tr[key].length).toBeGreaterThan(0);
       expect(en[key]).not.toBe(tr[key]);
@@ -603,5 +608,28 @@ describe('reduceInboxNav — selection + detail reducer (D3b)', () => {
   it('an empty list nulls the selection and cannot open a detail', () => {
     expect(reduceInboxNav(listAt('a'), 'down', [])).toEqual({ selectedFlowId: null, detailOpen: false });
     expect(reduceInboxNav(EMPTY_INBOX_NAV, 'open', [])).toEqual(EMPTY_INBOX_NAV);
+  });
+});
+
+describe('decidableInboxVerbs + mapInboxDecisionKey — in-card decision gating (SURF-6)', () => {
+  const rowIn = (state: InboxRow['state']): InboxRow => ({ flowId: 'f', state });
+
+  it('AWAITING_APPROVAL offers the three Telegraph verbs; APPROVED offers only start', () => {
+    expect(decidableInboxVerbs(rowIn('AWAITING_APPROVAL'))).toEqual(['approve', 'full-ahead', 'reject']);
+    expect(decidableInboxVerbs(rowIn('APPROVED'))).toEqual(['start']);
+  });
+
+  it('every other state offers NOTHING (running/terminal flows are not decidable)', () => {
+    for (const state of ['COLLECTING', 'PROPOSAL_READY', 'PREVIEWING', 'STARTING', 'DETACHED_RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED', 'BLOCKED'] as const) {
+      expect(decidableInboxVerbs(rowIn(state)), state).toEqual([]);
+    }
+  });
+
+  it('maps exactly a/f/r/s — every other key is null (disjoint from the nav map)', () => {
+    expect(mapInboxDecisionKey('a')).toBe('approve');
+    expect(mapInboxDecisionKey('f')).toBe('full-ahead');
+    expect(mapInboxDecisionKey('r')).toBe('reject');
+    expect(mapInboxDecisionKey('s')).toBe('start');
+    for (const other of ['A', 'x', 'q', '1', '', ' ']) expect(mapInboxDecisionKey(other), other).toBeNull();
   });
 });

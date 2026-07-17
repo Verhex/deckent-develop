@@ -14,15 +14,142 @@ import {
   collectInboxRows, buildInboxLines, buildInboxLabels,
   resolveInboxSelection, collectRunDetail, buildRunDetailLines,
 } from '../repl/run-flow-inbox.js';
+import type { InboxLabels, InboxDecisionVerb, InboxRow } from '../repl/run-flow-inbox.js';
 import { scanJobRecords } from '../repl/run-completion-watch.js';
 import { sweepStaleRuns } from '../../orchestra/run-flow-death-sweep.js';
 import type { StaleRunSweepReport } from '../../orchestra/run-flow-death-sweep.js';
+import { decideRunFlow, startRunFlow } from '../../orchestra/run-flow-decision-service.js';
+import { getRunFlowCoordinator } from '../../orchestra/run-flow-coordinator-registry.js';
+import { buildFlowStartSpawn } from '../helpers/detached-start.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 
 const SHORT_ID_LEN = 8;
+
+/** Actor identity for decisions issued via `deckent runs` (parity with the
+ *  REPL's `{id:'repl-user'}` and do's `{id:'cli-non-interactive'}`). */
+const CLI_OPERATOR_ACTOR = { id: 'cli-operator' } as const;
+
+/**
+ * SURF-6 REPL-card glue: execute ONE in-card decision verb through the shared
+ * decision service and return the honest one-line outcome (localized) — the
+ * InboxCard renders it under the detail; refusals come back as lines too,
+ * never as throws (the card must not crash the REPL).
+ */
+export function executeInboxDecision(
+  root: string,
+  flowId: string,
+  verb: InboxDecisionVerb,
+  lang: string,
+  actor: { readonly id: string } = { id: 'repl-user' },
+): string {
+  try {
+    if (verb === 'reject') {
+      decideRunFlow(root, flowId, { decision: 'reject', actor });
+      return getMessage('runs.decide.rejected', lang);
+    }
+
+    let approvedLine: string | undefined;
+    if (verb === 'approve' || verb === 'full-ahead') {
+      const context = decideRunFlow(root, flowId, { decision: 'approve', actor });
+      approvedLine = getMessage('runs.decide.approved', lang, {
+        revision: String(context.approvedSnapshot?.revision ?? context.preview?.revision ?? '?'),
+        digest: (context.approvedSnapshot?.planDigest ?? context.preview?.planDigest ?? '').slice(0, 12),
+      });
+      if (verb === 'approve') return approvedLine;
+    }
+
+    // 'start' or the full-ahead tail — same spawn builder as the API route.
+    const snapshot = getRunFlowCoordinator(root).getFlow(flowId).approvedSnapshot;
+    const result = startRunFlow(root, flowId, {
+      spawnStart: buildFlowStartSpawn(root, snapshot?.revision ?? 0, snapshot?.planDigest ?? ''),
+    });
+    const startLine = result.status === 'started'
+      ? getMessage('runs.decide.started', lang, { jobId: result.context.handle?.jobId ?? `flow-${flowId}` })
+      : getMessage('runs.decide.start_duplicate', lang);
+    return approvedLine !== undefined ? `${approvedLine} · ${startLine}` : startLine;
+  } catch (error) {
+    return `Error: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+interface DecideFlags {
+  readonly approve?: boolean;
+  readonly reject?: boolean;
+  readonly reason?: string;
+  readonly start?: boolean;
+}
+
+/**
+ * Resolve a decide target by row NUMBER or by unique flowId PREFIX
+ * (`deckent runs bbbb2222 --reject`). Row numbers shift whenever the list
+ * re-sorts (a fresh decision reorders it — a real cross-invocation hazard the
+ * SURF-6 smoke caught live), while the flowId is the stable handle the other
+ * surface (Desktop) actually displays. An ambiguous prefix is an honest
+ * not-found, never a guess.
+ */
+export function resolveDecideTarget(
+  arg: string | undefined,
+  rows: readonly InboxRow[],
+): { kind: 'row'; row: InboxRow } | { kind: 'not-found'; arg: string } | { kind: 'missing' } {
+  if (arg === undefined) return { kind: 'missing' };
+  const selection = resolveInboxSelection(arg, rows);
+  if (selection.kind === 'detail') return { kind: 'row', row: selection.row };
+  const matches = rows.filter((r) => r.flowId.startsWith(arg));
+  if (matches.length === 1) return { kind: 'row', row: matches[0]! };
+  return { kind: 'not-found', arg };
+}
+
+/**
+ * `deckent runs <n> --approve [--start] | --reject [--reason] | --start` —
+ * the Desktop Telegraph's exact verbs from the terminal (SURF-6 Desktop→
+ * Terminal handoff): reject=STOP, approve=SLOW AHEAD, approve+start=FULL
+ * AHEAD. All writes go through the ONE shared decision service; deterministic
+ * commandIds make a same-revision decision from another surface converge
+ * idempotently instead of racing. Prints the refreshed detail afterwards so
+ * the operator sees the daemon-truth, not the intent.
+ */
+function runDecide(root: string, flowId: string, flags: DecideFlags, lang: string, labels: InboxLabels): void {
+  if (flags.approve) {
+    const context = decideRunFlow(root, flowId, { decision: 'approve', actor: CLI_OPERATOR_ACTOR });
+    const snapshot = context.approvedSnapshot;
+    print(getMessage('runs.decide.approved', lang, {
+      revision: String(snapshot?.revision ?? context.preview?.revision ?? '?'),
+      digest: (snapshot?.planDigest ?? context.preview?.planDigest ?? '').slice(0, 12),
+    }));
+  } else if (flags.reject) {
+    decideRunFlow(root, flowId, {
+      decision: 'reject',
+      ...(flags.reason !== undefined ? { reason: flags.reason } : {}),
+      actor: CLI_OPERATOR_ACTOR,
+    });
+    print(flags.reason !== undefined
+      ? getMessage('runs.decide.rejected_reason', lang, { reason: flags.reason })
+      : getMessage('runs.decide.rejected', lang));
+  }
+
+  if (flags.start && !flags.reject) {
+    const snapshot = getRunFlowCoordinator(root).getFlow(flowId).approvedSnapshot;
+    // A missing snapshot falls through to the service, which refuses with the
+    // honest `not APPROVED` message — same wording the API answers with.
+    const result = startRunFlow(root, flowId, {
+      spawnStart: buildFlowStartSpawn(root, snapshot?.revision ?? 0, snapshot?.planDigest ?? ''),
+    });
+    print(result.status === 'started'
+      ? getMessage('runs.decide.started', lang, { jobId: result.context.handle?.jobId ?? `flow-${flowId}` })
+      : getMessage('runs.decide.start_duplicate', lang));
+  }
+
+  // Daemon-truth epilogue: re-collect and show the run as it now durably is.
+  print('');
+  const rows = collectInboxRows(root);
+  const row = rows.find((r) => r.flowId === flowId);
+  if (row) {
+    for (const line of buildRunDetailLines(collectRunDetail(root, row), labels)) print(line);
+  }
+}
 
 /** flowIds whose execution truth is already terminal in the jobs-dir — the
  *  SAME join collectInboxRows displays, handed to the sweep so a provably
@@ -58,15 +185,45 @@ export function buildCloseStaleLines(report: StaleRunSweepReport, lang: string):
 export function registerRuns(program: Command): void {
   program
     .command('runs')
-    .description('List run-flows (the multi-flow inbox) — cross-process, read-only')
-    .argument('[n]', 'Show run #n in rich detail (the number from the list)')
+    .description('List run-flows (the multi-flow inbox) — plus per-run decide: --approve/--reject/--start')
+    .argument('[n]', 'Run to target: the list number, or (for decide flags) a unique flowId prefix')
     .option('--close-stale', 'Classify stale runs (dead process / unverifiable record); dry-run unless --yes')
     .option('--yes', 'With --close-stale: durably close the stale runs (failed/cancelled)')
-    .action((n: string | undefined, opts: { closeStale?: boolean; yes?: boolean }) => {
+    .option('--approve', 'Approve run #n (SLOW AHEAD; add --start for FULL AHEAD)')
+    .option('--reject', 'Reject run #n (STOP)')
+    .option('--reason <text>', 'Reason recorded with --reject')
+    .option('--start', 'Start the approved run #n as a detached background run')
+    .action((n: string | undefined, opts: { closeStale?: boolean; yes?: boolean } & DecideFlags) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);
       try {
         const labels = buildInboxLabels((key) => getMessage(key, lang));
+
+        const wantsDecide = opts.approve === true || opts.reject === true || opts.start === true;
+        if (wantsDecide || opts.reason !== undefined) {
+          if (opts.approve && opts.reject) {
+            printError(new Error(getMessage('runs.decide.flag_conflict', lang)));
+            process.exitCode = 1;
+            return;
+          }
+          if (opts.reason !== undefined && !opts.reject) {
+            printError(new Error(getMessage('runs.decide.reason_without_reject', lang)));
+            process.exitCode = 1;
+            return;
+          }
+          const target = resolveDecideTarget(n, collectInboxRows(root));
+          if (target.kind !== 'row') {
+            printError(new Error(
+              target.kind === 'not-found'
+                ? labels.notFound.replace('{arg}', target.arg)
+                : getMessage('runs.decide.needs_row', lang),
+            ));
+            process.exitCode = 1;
+            return;
+          }
+          runDecide(root, target.row.flowId, opts, lang, labels);
+          return;
+        }
 
         if (opts.closeStale) {
           const report = sweepStaleRuns(root, {
@@ -80,7 +237,8 @@ export function registerRuns(program: Command): void {
         const rows = collectInboxRows(root);
 
         // `deckent runs <n>` — rich single-run detail, same numbering as the
-        // list (parity with the REPL's `/runs <n>`).
+        // list (parity with the REPL's `/runs <n>`); SURF-6: a unique flowId
+        // PREFIX works too (the stable handle a cross-surface handoff carries).
         if (n !== undefined && !opts.closeStale) {
           const selection = resolveInboxSelection(n, rows);
           if (selection.kind === 'detail') {
@@ -91,7 +249,12 @@ export function registerRuns(program: Command): void {
             print(labels.notFound.replace('{arg}', selection.arg));
             return;
           }
-          // non-numeric arg falls through to the list, mirroring the REPL
+          const target = resolveDecideTarget(n, rows);
+          if (target.kind === 'row') {
+            for (const line of buildRunDetailLines(collectRunDetail(root, target.row), labels)) print(line);
+            return;
+          }
+          // unmatched non-numeric arg falls through to the list, mirroring the REPL
         }
 
         // Always end with the (post-sweep) inbox, so the user sees the honest

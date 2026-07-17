@@ -61,10 +61,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { getRunFlowCoordinator, _resetRunFlowCoordinatorsForTests } from '../orchestra/run-flow-coordinator-registry.js';
 import { FlowNotFoundError, InvalidTransitionError } from '../orchestra/run-flow-coordinator.js';
-import { savePlannedSprint, loadPlannedSprint, loadRunHandle } from '../core/run-flow-store.js';
-import { startApprovedRun, RunJobError } from '../orchestra/run-job-service.js';
-import { spawnDetachedDeckent } from '../cli/helpers/detached-start.js';
-import type { RunHandle } from '../core/run-flow-contract.js';
+import { savePlannedSprint } from '../core/run-flow-store.js';
+import { RunJobError } from '../orchestra/run-job-service.js';
+import { decideRunFlow, startRunFlow, RunFlowDecisionError } from '../orchestra/run-flow-decision-service.js';
+import { buildFlowStartSpawn } from '../cli/helpers/detached-start.js';
 import { publishRunFlowEvent } from './run-flow-event-stream.js';
 import { basename } from 'node:path';
 import { z } from 'zod';
@@ -76,7 +76,6 @@ import {
   type RunFlowContext,
   type RunProposal,
 } from '../core/run-flow-contract.js';
-import { saveApprovedSnapshot, type StoredApprovedSnapshot } from '../core/run-flow-store.js';
 import { compileRunProposal, type RunProposalPlanner } from '../orchestra/run-proposal-compiler.js';
 import { generatePlanPreview } from '../orchestra/plan-preview-service.js';
 import { readContext } from '../orchestra/brain.js';
@@ -296,53 +295,22 @@ function handleDecision(
   }
 
   const principal = deriveRequestPrincipal(req);
-  const coordinator = coordinatorFor(projectRoot);
   let context: RunFlowContext;
 
   try {
-    if (parsed.data.decision === 'approve') {
-      const { preview } = existing;
-      if (!preview) {
-        sendError(res, 409, 'run-flow: no live preview to approve');
-        return true;
-      }
-      const result = coordinator.grantApproval({
-        flowId,
-        revision: preview.revision,
-        planDigest: preview.planDigest,
-        approvedBy: { id: principal.id, ...(principal.role ? { role: principal.role } : {}) },
-        commandId: `approve-${flowId}-r${preview.revision}`,
-      });
-      context = result.context;
-      if (context.state === 'APPROVED' && context.approvedSnapshot) {
-        // The captured plan is durable (savePlannedSprint at preview time) —
-        // an approve AFTER a process restart still snapshots correctly.
-        const planned = loadPlannedSprint(projectRoot, flowId);
-        if (!planned) {
-          sendError(res, 409, 'run-flow: planned sprint record missing for this flow');
-          return true;
-        }
-        const stored: StoredApprovedSnapshot = {
-          flowId,
-          revision: context.approvedSnapshot.revision,
-          planDigest: context.approvedSnapshot.planDigest,
-          approvedBy: context.approvedSnapshot.approvedBy,
-          approvedAt: context.approvedSnapshot.approvedAt,
-          sprint: planned.sprint as Sprint,
-        };
-        saveApprovedSnapshot(projectRoot, stored);
-      }
-    } else {
-      const result = coordinator.rejectApproval({
-        flowId,
-        revision: existing.preview?.revision ?? existing.proposal?.revision ?? 1,
-        ...(parsed.data.reason !== undefined ? { reason: parsed.data.reason } : {}),
-        commandId: `reject-${flowId}-r${existing.preview?.revision ?? 1}`,
-      });
-      context = result.context;
-    }
+    // The decide sequence itself lives in orchestra/run-flow-decision-service.ts
+    // — shared verbatim with the CLI/REPL surfaces (no second implementation).
+    context = decideRunFlow(projectRoot, flowId, {
+      decision: parsed.data.decision,
+      ...(parsed.data.reason !== undefined ? { reason: parsed.data.reason } : {}),
+      actor: { id: principal.id, ...(principal.role ? { role: principal.role } : {}) },
+    });
   } catch (err) {
-    if (err instanceof RunFlowTransitionError || err instanceof InvalidTransitionError) {
+    if (
+      err instanceof RunFlowDecisionError ||
+      err instanceof RunFlowTransitionError ||
+      err instanceof InvalidTransitionError
+    ) {
       sendError(res, 409, err.message);
       return true;
     }
@@ -394,53 +362,21 @@ function handleStart(
     return true;
   }
 
-  const coordinator = coordinatorFor(projectRoot);
   try {
-    coordinator.requestStart({
-      flowId,
-      revision: snapshot.revision,
-      planDigest: snapshot.planDigest,
-      commandId: `start-${flowId}-r${snapshot.revision}`,
+    // START_REQUESTED → spawn → RUN_STARTED lives in the shared decision
+    // service; the argv shape comes from the ONE builder both surfaces use.
+    const result = startRunFlow(projectRoot, flowId, {
+      spawnStart: buildFlowStartSpawn(projectRoot, snapshot.revision, snapshot.planDigest),
     });
-
-    const planned = loadPlannedSprint(projectRoot, flowId);
-    if (!planned) {
-      sendError(res, 409, 'run-flow: planned sprint record missing for this flow');
-      return true;
-    }
-    const stored: StoredApprovedSnapshot = {
-      flowId,
-      revision: snapshot.revision,
-      planDigest: snapshot.planDigest,
-      approvedBy: snapshot.approvedBy,
-      approvedAt: snapshot.approvedAt,
-      sprint: planned.sprint as Sprint,
-    };
-
-    const existingRunHandle = loadRunHandle(projectRoot, flowId);
-    const result = startApprovedRun({
-      flowId,
-      expectedRevision: snapshot.revision,
-      expectedPlanDigest: snapshot.planDigest,
-      approvedSnapshot: stored,
-      ...(existingRunHandle ? { existingRunHandle } : {}),
-      spawnStart: (_sprint, fid): RunHandle => {
-        const spawned = spawnDetachedDeckent(
-          ['start', '--flow-id', fid, '--revision', String(snapshot.revision), '--plan-digest', snapshot.planDigest],
-          { projectRoot, flowId: fid },
-        );
-        return { flowId: fid, jobId: `flow-${fid}-r${snapshot.revision}`, logRef: spawned.logPath };
-      },
-    });
-
-    const final = coordinator.recordRunStarted({
-      handle: result.handle,
-      commandId: `run-started-${flowId}-r${snapshot.revision}`,
-    });
-    sendJson(res, { started: result.status === 'started', duplicate: result.status === 'noop-duplicate', context: final.context }, 202);
+    sendJson(res, { started: result.status === 'started', duplicate: result.status === 'noop-duplicate', context: result.context }, 202);
     return true;
   } catch (err) {
-    if (err instanceof RunJobError || err instanceof RunFlowTransitionError || err instanceof InvalidTransitionError) {
+    if (
+      err instanceof RunJobError ||
+      err instanceof RunFlowTransitionError ||
+      err instanceof InvalidTransitionError ||
+      err instanceof RunFlowDecisionError
+    ) {
       sendError(res, 409, err.message);
       return true;
     }

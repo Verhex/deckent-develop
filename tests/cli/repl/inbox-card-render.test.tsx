@@ -151,3 +151,103 @@ describe('InboxCard — two-level Esc + mutex (D3a/D3b)', () => {
 
   void React;
 });
+
+// ─── SURF-6 — in-card decision keys (Telegraph verbs from the detail view) ───
+
+const DECIDE_ROWS: InboxRow[] = [
+  { flowId: 'flow-await-1', state: 'AWAITING_APPROVAL', intentSummary: 'ship it' },
+  { flowId: 'flow-approved-2', state: 'APPROVED', intentSummary: 'go' },
+  { flowId: 'flow-running-3', state: 'DETACHED_RUNNING', intentSummary: 'busy' },
+];
+
+const DECIDE_CARD = (extra: Record<string, unknown> = {}): React.ReactElement => (
+  <InboxCard open feed={() => DECIDE_ROWS} labels={DEFAULT_INBOX_LABELS} onClose={() => {}} pollMs={100000} {...extra} />
+);
+
+describe('InboxCard — in-card decision (SURF-6)', () => {
+  it('decision keys are INERT in the list view (detail-only verbs)', async () => {
+    const onDecide = vi.fn().mockReturnValue('never');
+    const { stdin } = render(DECIDE_CARD({ onDecide }));
+    await tick();
+    stdin.write('a');
+    await tick(80);
+    expect(onDecide).not.toHaveBeenCalled();
+  });
+
+  it('AWAITING_APPROVAL detail shows the decide hint; `a` fires approve and renders the outcome line', async () => {
+    const onDecide = vi.fn().mockReturnValue('Approved — revision 1 · digest d-1');
+    const { lastFrame, stdin } = render(DECIDE_CARD({ onDecide }));
+    await tick();
+    stdin.write(ENTER); // open detail on row 0 (AWAITING_APPROVAL)
+    await tick(80);
+    expect(lastFrame() ?? '').toContain(DEFAULT_INBOX_LABELS.decideHintAwaiting);
+    stdin.write('a');
+    await tick(80);
+    expect(onDecide).toHaveBeenCalledWith('flow-await-1', 'approve');
+    expect(lastFrame() ?? '').toContain('Approved — revision 1 · digest d-1');
+  });
+
+  it('verbs are state-gated: `s` is inert on AWAITING_APPROVAL, `a` is inert on APPROVED, `s` starts an APPROVED run', async () => {
+    const onDecide = vi.fn().mockReturnValue('Run started (detached) — job j-1');
+    const { lastFrame, stdin } = render(DECIDE_CARD({ onDecide }));
+    await tick();
+    stdin.write(ENTER); // detail: row 0 AWAITING_APPROVAL
+    await tick(80);
+    stdin.write('s'); // not offered here
+    await tick(80);
+    expect(onDecide).not.toHaveBeenCalled();
+
+    stdin.write(ESC); // back to list
+    await tick(80);
+    stdin.write(DOWN); // focus row 1 (APPROVED)
+    await tick(80);
+    stdin.write(ENTER);
+    await tick(80);
+    expect(lastFrame() ?? '').toContain(DEFAULT_INBOX_LABELS.decideHintApproved);
+    stdin.write('a'); // not offered on APPROVED
+    await tick(80);
+    expect(onDecide).not.toHaveBeenCalled();
+    stdin.write('s');
+    await tick(80);
+    expect(onDecide).toHaveBeenCalledWith('flow-approved-2', 'start');
+    expect(lastFrame() ?? '').toContain('Run started (detached) — job j-1');
+  });
+
+  it('a RUNNING detail offers no verbs and no hint; without onDecide the keys stay inert (D3b compat)', async () => {
+    // running row, WITH onDecide: no hint, keys inert
+    const onDecide = vi.fn();
+    const withDecide = render(DECIDE_CARD({ onDecide }));
+    await tick();
+    withDecide.stdin.write(DOWN); await tick(80);
+    withDecide.stdin.write(DOWN); await tick(80); // focus row 2 (DETACHED_RUNNING)
+    withDecide.stdin.write(ENTER); await tick(80);
+    expect(withDecide.lastFrame() ?? '').not.toContain(DEFAULT_INBOX_LABELS.decideHintAwaiting);
+    withDecide.stdin.write('r'); await tick(80);
+    expect(onDecide).not.toHaveBeenCalled();
+
+    // no onDecide at all: an AWAITING_APPROVAL detail renders WITHOUT the hint
+    const bare = render(DECIDE_CARD());
+    await tick();
+    bare.stdin.write(ENTER);
+    await tick(80);
+    expect(bare.lastFrame() ?? '').not.toContain(DEFAULT_INBOX_LABELS.decideHintAwaiting);
+  });
+
+  it('the outcome notice clears on navigation (never sits under a different run)', async () => {
+    const onDecide = vi.fn().mockReturnValue('Rejected.');
+    const { lastFrame, stdin } = render(DECIDE_CARD({ onDecide }));
+    await tick();
+    stdin.write(ENTER);
+    await tick(80);
+    stdin.write('r');
+    await tick(80);
+    expect(lastFrame() ?? '').toContain('Rejected.');
+    stdin.write(ESC); // back to list — notice must clear
+    await tick(80);
+    stdin.write(DOWN);
+    await tick(80);
+    stdin.write(ENTER); // a different run's detail
+    await tick(80);
+    expect(lastFrame() ?? '').not.toContain('Rejected.');
+  });
+});

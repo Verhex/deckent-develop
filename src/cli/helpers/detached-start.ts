@@ -140,3 +140,25 @@ export function spawnDetachedDeckent(
 
   return { pid: child.pid ?? null, logPath, flowId: opts.flowId ?? null };
 }
+
+/**
+ * The ONE authoring point for the detached flow-start argv shape
+ * (`start --flow-id <id> --revision <r> --plan-digest <d>`) — both surfaces
+ * that start an approved flow (the API's start route and the CLI's
+ * `deckent runs <n> --start`) build their `spawnStart` closure here, so the
+ * argv contract cannot drift between them. Returns the closure
+ * orchestra/run-flow-decision-service.ts's startRunFlow() consumes.
+ */
+export function buildFlowStartSpawn(
+  projectRoot: string,
+  revision: number,
+  planDigest: string,
+): (sprint: unknown, flowId: string) => { flowId: string; jobId: string; logRef: string } {
+  return (_sprint, flowId) => {
+    const spawned = spawnDetachedDeckent(
+      ['start', '--flow-id', flowId, '--revision', String(revision), '--plan-digest', planDigest],
+      { projectRoot, flowId },
+    );
+    return { flowId, jobId: `flow-${flowId}-r${revision}`, logRef: spawned.logPath };
+  };
+}
