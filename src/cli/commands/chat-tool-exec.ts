@@ -13,11 +13,52 @@
 //   • dispatch ASLA throw etmez — hata/iptal `[mcp-error]`/`[deckent]` string'i
 //     olarak döner (loop bunu tool_result olarak modele geri besler).
 
-import { writeFileSync, readFileSync, existsSync, mkdirSync, lstatSync, readlinkSync } from 'node:fs';
-import { resolve, relative, isAbsolute, dirname, sep, parse } from 'node:path';
+import { writeFileSync, readFileSync, existsSync, mkdirSync, lstatSync, readlinkSync, readdirSync } from 'node:fs';
+import { resolve, relative, isAbsolute, dirname, sep, parse, join } from 'node:path';
 import { spawn } from 'node:child_process';
 import type { McpToolDispatcher } from './chat-native.js';
 import { DeckentError } from '../../core/errors.js';
+
+// ─── 583/N2 — pure-Node file walkers for the silent READ tools ───────────────
+
+/** Depth-capped DFS over project files; skips node_modules/.git; the visitor
+ *  returns false to stop the whole walk (cap reached). Tolerant: unreadable
+ *  dirs are skipped, never thrown. */
+function walkProjectFiles(rootAbs: string, visit: (fileAbs: string) => boolean, depth = 0): boolean {
+  if (depth > 12) return true;
+  let entries: import('node:fs').Dirent[];
+  try {
+    entries = readdirSync(rootAbs, { withFileTypes: true });
+  } catch {
+    return true;
+  }
+  for (const entry of entries) {
+    if (entry.name === 'node_modules' || entry.name === '.git') continue;
+    const abs = join(rootAbs, entry.name);
+    if (entry.isDirectory()) {
+      if (!walkProjectFiles(abs, visit, depth + 1)) return false;
+    } else if (entry.isFile()) {
+      if (!visit(abs)) return false;
+    }
+  }
+  return true;
+}
+
+/** Minimal glob → RegExp: `**` = any path segment run, `*` = within-segment,
+ *  `?` = single char. Anchored full-match on the '/'-joined relative path. */
+function globToRegExp(pattern: string): RegExp {
+  // Placeholder pass: later `*`/`?` rewrites must never touch the regex
+  // fragments an earlier pass PRODUCED (the classic glob-translation bug).
+  const escaped = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*\*\//g, '\u0001')
+    .replace(/\*\*/g, '\u0002')
+    .replace(/\*/g, '[^/]*')
+    .replace(/\?/g, '[^/]')
+    .replace(/\u0001/g, '(?:.*/)?')
+    .replace(/\u0002/g, '.*');
+  return new RegExp(`^${escaped}$`);
+}
 
 /** Yan-etkili (onay gerektiren) tool adları. read salt-okunur → onaysız. */
 const SIDE_EFFECTING: ReadonlySet<string> = new Set([
@@ -319,6 +360,64 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
         // English user. Only the user-facing confirm summary above is localized
         // (via injected labels).
         switch (name) {
+          // ─── 583/N2 — silent READ surface (list/grep/glob) ──────────────
+          // Pure-Node walkers (no external grep/find — cross-platform, Yasa-2),
+          // hard caps with EXPLICIT truncation notes, node_modules/.git skipped.
+          case 'deckent_list_dir': {
+            const lsTarget = String(args['path'] ?? '.');
+            const abs = lsTarget === '.' || lsTarget === '' ? resolveCwd() : inScope(lsTarget);
+            if (!abs) return `[mcp-error] deckent_list_dir: path out of scope or invalid`;
+            if (!existsSync(abs)) return `[mcp-error] deckent_list_dir: not found: ${args['path'] ?? '.'}`;
+            const entries = readdirSync(abs, { withFileTypes: true })
+              .filter((e) => e.name !== 'node_modules' && e.name !== '.git')
+              .sort((a, b) => a.name.localeCompare(b.name));
+            const lines = entries.slice(0, 500).map((e) => (e.isDirectory() ? `${e.name}/` : e.name));
+            const note = entries.length > 500 ? `\n[deckent] truncated (${entries.length} entries, showing 500)` : '';
+            return lines.length > 0 ? lines.join('\n') + note : '[deckent] empty directory';
+          }
+          case 'deckent_grep': {
+            const pattern = String(args['pattern'] ?? '');
+            if (pattern.length === 0) return `[mcp-error] deckent_grep: empty pattern`;
+            let re: RegExp;
+            try { re = new RegExp(pattern); } catch { return `[mcp-error] deckent_grep: invalid regex: ${pattern}`; }
+            const grepTarget = String(args['path'] ?? '.');
+            const startAbs = grepTarget === '.' || grepTarget === '' ? resolveCwd() : inScope(grepTarget);
+            if (!startAbs) return `[mcp-error] deckent_grep: path out of scope or invalid`;
+            const hits: string[] = [];
+            let capped = false;
+            walkProjectFiles(startAbs, (fileAbs) => {
+              if (hits.length >= 200) { capped = true; return false; }
+              let text: string;
+              try { text = readFileSync(fileAbs, 'utf-8'); } catch { return true; }
+              if (text.length > 1_000_000 || text.includes('\u0000')) return true; // big/binary skip
+              const rel = relative(startAbs, fileAbs) || fileAbs;
+              const fileLines = text.split('\n');
+              for (let i = 0; i < fileLines.length && hits.length < 200; i++) {
+                if (re.test(fileLines[i]!)) hits.push(`${rel}:${i + 1}:${fileLines[i]!.slice(0, 300)}`);
+              }
+              return true;
+            });
+            if (hits.length === 0) return '[deckent] no matches';
+            return hits.join('\n') + (capped ? '\n[deckent] truncated (200 hits cap)' : '');
+          }
+          case 'deckent_glob': {
+            const pattern = String(args['pattern'] ?? '');
+            if (pattern.length === 0) return `[mcp-error] deckent_glob: empty pattern`;
+            const globTarget = String(args['path'] ?? '.');
+            const startAbs = globTarget === '.' || globTarget === '' ? resolveCwd() : inScope(globTarget);
+            if (!startAbs) return `[mcp-error] deckent_glob: path out of scope or invalid`;
+            const re = globToRegExp(pattern);
+            const matched: string[] = [];
+            let capped = false;
+            walkProjectFiles(startAbs, (fileAbs) => {
+              if (matched.length >= 500) { capped = true; return false; }
+              const rel = relative(startAbs, fileAbs).split(sep).join('/');
+              if (re.test(rel)) matched.push(rel);
+              return true;
+            });
+            if (matched.length === 0) return '[deckent] no matches';
+            return matched.join('\n') + (capped ? '\n[deckent] truncated (500 matches cap)' : '');
+          }
           case 'deckent_read_file': {
             const abs = inScope(String(args['path'] ?? ''));
             if (!abs) return `[mcp-error] deckent_read_file: path out of scope or invalid`;

@@ -158,6 +158,10 @@ const EXEC_SIDE_EFFECTING: ReadonlySet<string> = new Set([
 /** A minimal JSON-schema for each tool's args (provider tool_use input_schema). */
 const SCHEMAS: Record<string, Record<string, unknown>> = {
   deckent_read_file: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+  // 583/N2 — silent READ surface (list/grep/glob): pure-Node, capped, scope-guarded.
+  deckent_list_dir: { type: 'object', properties: { path: { type: 'string' } } },
+  deckent_grep: { type: 'object', properties: { pattern: { type: 'string' }, path: { type: 'string' } }, required: ['pattern'] },
+  deckent_glob: { type: 'object', properties: { pattern: { type: 'string' }, path: { type: 'string' } }, required: ['pattern'] },
   deckent_write_file: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] },
   deckent_edit_file: { type: 'object', properties: { path: { type: 'string' }, old: { type: 'string' }, new: { type: 'string' } }, required: ['path', 'old', 'new'] },
   deckent_bash: { type: 'object', properties: { cmd: { type: 'string' } }, required: ['cmd'] },
@@ -165,6 +169,9 @@ const SCHEMAS: Record<string, Record<string, unknown>> = {
 
 const DESCRIPTIONS: Record<string, string> = {
   deckent_read_file: 'Read a file within the project (returns its content).',
+  deckent_list_dir: 'List a directory within the project (dirs suffixed with /).',
+  deckent_grep: 'Search project files with a JS regex; returns path:line:text hits (capped).',
+  deckent_glob: 'Find project files matching a glob pattern (** / * / ?), capped.',
   deckent_write_file: 'Write content to a file within the project.',
   deckent_edit_file: 'Replace a substring in a file within the project.',
   deckent_bash: 'Run a shell command in the project directory.',
@@ -558,7 +565,7 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
 
   // Exec tools — NO confirm injected (single gate = AgentSession permission engine).
   const exec = createToolExecDispatcher({ cwd: opts.cwd });
-  for (const name of ['deckent_read_file', 'deckent_write_file', 'deckent_edit_file', 'deckent_bash'] as const) {
+  for (const name of ['deckent_read_file', 'deckent_list_dir', 'deckent_grep', 'deckent_glob', 'deckent_write_file', 'deckent_edit_file', 'deckent_bash'] as const) {
     registry.register(defineFromDispatcher(name, DESCRIPTIONS[name]!, SCHEMAS[name]!, execToolTier(name), exec));
   }
 
