@@ -64,6 +64,7 @@ import { FlowNotFoundError, InvalidTransitionError } from '../orchestra/run-flow
 import { savePlannedSprint } from '../core/run-flow-store.js';
 import { RunJobError } from '../orchestra/run-job-service.js';
 import { decideRunFlow, startRunFlow, RunFlowDecisionError } from '../orchestra/run-flow-decision-service.js';
+import { computeRunDiff } from '../orchestra/run-diff-service.js';
 import { buildFlowStartSpawn } from '../cli/helpers/detached-start.js';
 import { publishRunFlowEvent } from './run-flow-event-stream.js';
 import { basename } from 'node:path';
@@ -497,6 +498,18 @@ export async function registerRunFlowRoutes(
 
   if (segments.length === 1 && method === 'GET') {
     return handleFlowStateGet(res, flowId, req, projectRoot);
+  }
+  if (segments.length === 2 && segments[1] === 'diff' && method === 'GET') {
+    // 583/N1 (GAP-4): the run's real footprint as a unified diff — the SAME
+    // shared service the terminal's `runs --diff` prints. Tenant-guarded read.
+    const flowId = segments[0]!;
+    const context = lookupFlow(flowId, req, projectRoot);
+    if (!context) {
+      sendError(res, 404, 'Flow not found');
+      return true;
+    }
+    sendJson(res, await computeRunDiff(projectRoot, flowId));
+    return true;
   }
   if (segments.length === 2 && segments[1] === 'preview' && method === 'GET') {
     return handlePreviewGet(res, flowId, req, projectRoot);

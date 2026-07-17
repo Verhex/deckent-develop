@@ -29,6 +29,7 @@ import { prepareZeroConfig, cleanupZeroConfig } from './quick-start.js';
 import { isSprintLocked } from '../../core/multi-ide.js';
 import { detectOrphan, archiveOrphan, listPidFiles } from '../../orchestra/sprint-pid-manager.js';
 import { createSandboxBackend } from '../../orchestra/spawn-backend.js';
+import { captureGitBase } from '../../orchestra/run-diff-service.js';
 import { loadApprovedSnapshot, loadRunHandle, saveRunHandle } from '../../core/run-flow-store.js';
 import {
   startApprovedRun,
@@ -342,6 +343,10 @@ export function registerStart(program: Command): void {
           // over a theoretical crash-mid-sprint retry (a later re-invocation
           // with the same flowId+digest sees this handle and no-ops instead
           // of double-starting).
+          // 583/N1: the diff base — captured BEFORE any worker writes a file,
+          // so `runs --diff` shows exactly this run's footprint. Fail-soft
+          // (non-git project → absent field → honest no-base fallback).
+          const gitBase = await captureGitBase(root);
           saveRunHandle(root, {
             flowId,
             revision: expectedRevision,
@@ -350,6 +355,7 @@ export function registerStart(program: Command): void {
             startedAt: new Date().toISOString(),
             // born-698c: liveness anchor — the child IS the run process.
             pid: process.pid,
+            ...(gitBase !== undefined ? { gitBase } : {}),
           });
 
           const bootstrap = await bootstrapProviders(config);

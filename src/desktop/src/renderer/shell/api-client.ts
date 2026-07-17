@@ -115,12 +115,28 @@ export function buildEventsUrl(session: DaemonSession, flowId: string, afterSequ
   return url.toString();
 }
 
+/** 583/N1 — the run's unified-diff footprint (shared run-diff-service shape). */
+export interface RunDiffFilePayload {
+  path: string;
+  status: string;
+  text: string;
+  truncated: boolean;
+}
+export interface RunDiffPayload {
+  base: string | null;
+  files: RunDiffFilePayload[];
+  truncated: boolean;
+  note?: 'no-base' | 'not-a-git-repo';
+}
+
 export interface DaemonApiClient {
   readonly session: DaemonSession;
   // ── RunFlow contract ──
   listFlows(): Promise<FlowListResponse>;
   getFlow(flowId: string): Promise<Record<string, unknown>>;
   getPreview(flowId: string): Promise<Record<string, unknown>>;
+  /** 583/N1 — the run's real footprint as a unified diff (GAP-4). */
+  getRunDiff(flowId: string): Promise<RunDiffPayload>;
   propose(intentSummary: string): Promise<Record<string, unknown>>;
   decide(flowId: string, decision: 'approve' | 'reject', reason?: string): Promise<Record<string, unknown>>;
   start(flowId: string, revision: number, planDigest: string): Promise<Record<string, unknown>>;
@@ -205,6 +221,8 @@ export function createApiClient(session: DaemonSession, fetchFn?: FetchLike): Da
       };
     },
 
+    // 583/N1 — the run's unified-diff footprint (same shared service the CLI prints)
+    getRunDiff: (flowId: string) => request<RunDiffPayload>('GET', `/api/run-flow/${encodeURIComponent(flowId)}/diff`),
     getApprovals: () => request<unknown>('GET', '/api/approvals').then(normalizeApprovalsResponse),
     decideApproval: (id, decision, reason) =>
       request('POST', `/api/approvals/${encodeURIComponent(id)}/decision`, {

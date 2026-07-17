@@ -460,6 +460,9 @@ describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-s
       // (`deckent runs --approve`) and the REPL card all call the SAME sequence
       // — the designed store consumer that replaced the route-local glue.
       'orchestra/run-flow-decision-service.ts',
+      // 583/N1: the ONE diff producer — reads the run handle's gitBase (the
+      // start commit) to diff the run's real footprint; read-only consumer.
+      'orchestra/run-diff-service.ts',
     ];
     expect(offenders.filter((o) => !KNOWN_CONSUMERS.includes(o))).toEqual([]);
   });

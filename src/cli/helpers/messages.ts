@@ -2848,6 +2848,18 @@ const MESSAGES: MessageMap = {
     en: '--reason is only valid with --reject.',
     tr: '--reason yalnız --reject ile kullanılır.',
   },
+  // 583/N1 — `deckent runs <n> --diff`: the run's real footprint, line-level.
+  'runs.diff.header': {
+    en: 'Diff — {n} file(s), base {base}',
+    tr: 'Diff — {n} dosya, taban {base}',
+  },
+  'runs.diff.empty': { en: 'No changes in this run\'s footprint.', tr: 'Bu koşunun ayak izinde değişiklik yok.' },
+  'runs.diff.no_base': {
+    en: 'Note: no recorded start commit (pre-N1 run) — showing the working tree vs HEAD.',
+    tr: 'Not: kayıtlı başlangıç-commit\'i yok (N1-öncesi koşu) — çalışma ağacı HEAD\'e karşı gösteriliyor.',
+  },
+  'runs.diff.not_git': { en: 'This project is not a git repository — no diff available.', tr: 'Bu proje bir git deposu değil — diff üretilemiyor.' },
+  'runs.diff.truncated': { en: '… diff truncated (size cap).', tr: '… diff kırpıldı (boyut sınırı).' },
   'runs.decide.gate_warn': {
     en: 'Warning: the plan gate is FAIL ({n} blocking finding(s)) — the run will refuse at start unless overridden.',
     tr: 'Uyarı: plan kapısı FAIL ({n} blocker) — koşu, override edilmedikçe start anında reddedecek.',
@@ -3714,6 +3726,15 @@ const MESSAGES: MessageMap = {
     en: 'Gate blockers ({n}):',
     tr: 'Kapı blockerları ({n}):',
   },
+  // 583/N1 — the run's line-level footprint in the Console (GAP-4 closes).
+  'desktop.shell.diff.title': { en: 'Changes ({n} files)', tr: 'Değişiklikler ({n} dosya)' },
+  'desktop.shell.diff.empty': { en: 'No changes in this run\'s footprint.', tr: 'Bu koşunun ayak izinde değişiklik yok.' },
+  'desktop.shell.diff.no_base': {
+    en: 'No recorded start commit — showing the working tree vs HEAD.',
+    tr: 'Kayıtlı başlangıç-commit\'i yok — çalışma ağacı HEAD\'e karşı gösteriliyor.',
+  },
+  'desktop.shell.diff.not_git': { en: 'Not a git repository — no diff available.', tr: 'Git deposu değil — diff üretilemiyor.' },
+  'desktop.shell.diff.truncated': { en: '… truncated (size cap).', tr: '… kırpıldı (boyut sınırı).' },
   'desktop.shell.telegraph.title': { en: 'Engine telegraph', tr: 'Makine telgrafı' },
   'desktop.shell.telegraph.stop': { en: 'STOP', tr: 'DUR' },
   'desktop.shell.telegraph.slow': { en: 'SLOW AHEAD', tr: 'AĞIR YOL' },

@@ -236,6 +236,36 @@ describe('deckent runs — CLI inbox + --close-stale (F-3)', () => {
     expect(out).toContain('Approved — revision 1');
   });
 
+  it('583/N1: `runs <prefix> --diff` prints the run\'s unified footprint from the recorded base', async () => {
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const gexec = promisify(execFile);
+    await gexec('git', ['init', '-q'], { cwd: root });
+    await gexec('git', ['config', 'user.email', 't@t'], { cwd: root });
+    await gexec('git', ['config', 'user.name', 't'], { cwd: root });
+    writeFileSync(join(root, 'hello.txt'), 'one\n');
+    await gexec('git', ['add', '.'], { cwd: root });
+    await gexec('git', ['commit', '-q', '-m', 'base'], { cwd: root });
+    const base = (await gexec('git', ['rev-parse', 'HEAD'], { cwd: root })).stdout.trim();
+
+    saveRunHandle(root, {
+      flowId: 'dddd9999-71aa-48b0-bd20-c2810eb6eafb', revision: 1, planDigest: 'd-1',
+      handle: { flowId: 'dddd9999-71aa-48b0-bd20-c2810eb6eafb', jobId: 'j', logRef: 'l' },
+      startedAt: '2026-07-17T10:00:00.000Z', gitBase: base,
+    });
+    saveApprovedSnapshot(root, {
+      flowId: 'dddd9999-71aa-48b0-bd20-c2810eb6eafb', revision: 1, planDigest: 'd-1',
+      approvedBy: { id: 'u' }, approvedAt: '2026-07-17T10:00:00.000Z',
+      sprint: { id: 's', tasks: [] } as never,
+    });
+    writeFileSync(join(root, 'hello.txt'), 'one\ntwo\n');
+
+    const out = await run(['dddd9999', '--diff']);
+    expect(out).toContain('Diff — 1 file(s)');
+    expect(out).toContain(`base ${base.slice(0, 12)}`);
+    expect(out).toContain('+two');
+  });
+
   it('executeInboxDecision (REPL-card glue): approve/reject return the localized outcome line', () => {
     awaitingApprovalFlow('bbbb0001-71aa-48b0-bd20-c2810eb6eafb');
     expect(executeInboxDecision(root, 'bbbb0001-71aa-48b0-bd20-c2810eb6eafb', 'approve', 'en'))

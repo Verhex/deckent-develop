@@ -19,6 +19,7 @@ import { scanJobRecords } from '../repl/run-completion-watch.js';
 import { sweepStaleRuns } from '../../orchestra/run-flow-death-sweep.js';
 import type { StaleRunSweepReport } from '../../orchestra/run-flow-death-sweep.js';
 import { decideRunFlow, startRunFlow } from '../../orchestra/run-flow-decision-service.js';
+import { computeRunDiff } from '../../orchestra/run-diff-service.js';
 import { getRunFlowCoordinator } from '../../orchestra/run-flow-coordinator-registry.js';
 import { buildFlowStartSpawn } from '../helpers/detached-start.js';
 import { print, printError } from '../helpers/output.js';
@@ -203,11 +204,42 @@ export function registerRuns(program: Command): void {
     .option('--reject', 'Reject run #n (STOP)')
     .option('--reason <text>', 'Reason recorded with --reject')
     .option('--start', 'Start the approved run #n as a detached background run')
-    .action((n: string | undefined, opts: { closeStale?: boolean; yes?: boolean } & DecideFlags) => {
+    .option('--diff', "Show run #n's real footprint as a unified diff (583/N1)")
+    .action(async (n: string | undefined, opts: { closeStale?: boolean; yes?: boolean; diff?: boolean } & DecideFlags) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);
       try {
         const labels = buildInboxLabels((key) => getMessage(key, lang));
+
+        // 583/N1 — `runs <n|prefix> --diff`: line-level footprint via the ONE
+        // shared diff service (same output the Desktop diff panel renders).
+        if (opts.diff === true) {
+          const target = resolveDecideTarget(n, collectInboxRows(root));
+          if (target.kind !== 'row') {
+            printError(new Error(
+              target.kind === 'not-found'
+                ? labels.notFound.replace('{arg}', target.arg)
+                : getMessage('runs.decide.needs_row', lang),
+            ));
+            process.exitCode = 1;
+            return;
+          }
+          const diff = await computeRunDiff(root, target.row.flowId);
+          if (diff.note === 'not-a-git-repo') { print(getMessage('runs.diff.not_git', lang)); return; }
+          if (diff.note === 'no-base') print(getMessage('runs.diff.no_base', lang));
+          if (diff.files.length === 0) { print(getMessage('runs.diff.empty', lang)); return; }
+          print(getMessage('runs.diff.header', lang, {
+            n: String(diff.files.length),
+            base: diff.base?.slice(0, 12) ?? 'HEAD',
+          }));
+          for (const file of diff.files) {
+            print('');
+            print(file.text.endsWith('\n') ? file.text.slice(0, -1) : file.text);
+            if (file.truncated) print(getMessage('runs.diff.truncated', lang));
+          }
+          if (diff.truncated) print(getMessage('runs.diff.truncated', lang));
+          return;
+        }
 
         const wantsDecide = opts.approve === true || opts.reject === true || opts.start === true;
         if (wantsDecide || opts.reason !== undefined) {

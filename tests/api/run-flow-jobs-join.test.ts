@@ -131,6 +131,21 @@ describe('API jobs-join — phantom-running becomes honest (E2E real server)', (
   });
 });
 
+describe('GET /api/run-flow/:flowId/diff (583/N1) — shared diff-service over HTTP', () => {
+  it('answers the honest not-a-git-repo shape on a bare test root (tenant-guarded 200)', async () => {
+    handle = await startTestServer({ disableAuth: true, seed: { config: { terminal: { run_flow_v2: true } } } });
+    const flowId = 'eeee4444-join-4000-8000-000000000004';
+    legacyDoFlow(handle.projectRoot, flowId);
+
+    const res = await fetch(`${handle.baseUrl}/api/run-flow/${flowId}/diff`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ base: null, files: [], truncated: false, note: 'not-a-git-repo' });
+
+    const missing = await fetch(`${handle.baseUrl}/api/run-flow/unknown-flow/diff`);
+    expect(missing.status).toBe(404);
+  });
+});
+
 describe('decide honesty on a jobs-closed phantom', () => {
   it('approve on a jobs-COMPLETED do-origin flow refuses (no live preview / not awaiting)', () => {
     const flowId = 'cccc3333-join-4000-8000-000000000003';

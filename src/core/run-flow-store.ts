@@ -91,6 +91,10 @@ export interface StoredRunHandleRecord {
   /** born-698c: the run process's OWN pid (child persists its handle — born-681),
    *  so the death-sweep can probe liveness. Absent on pre-698 records. */
   readonly pid?: number;
+  /** 583/N1: the commit the run started from (`git rev-parse HEAD` at start) —
+   *  the diff base run-diff-service diffs against. Absent on pre-N1 records
+   *  and in non-git projects (diff falls back to HEAD with an honest note). */
+  readonly gitBase?: string;
 }
 
 // ─── Path helpers ────────────────────────────────────────────────────────

@@ -607,6 +607,12 @@ select:focus-visible {
 }
 .preview-panel ol { margin: var(--space-2) 0; padding-left: 1.4em; font-size: 13.5px; display: grid; gap: var(--space-1); }
 .preview-meta { font-family: var(--dk-font-data); font-size: 12px; color: var(--dk-s-text-muted); margin: 0; }
+/* 583/N1 — diff panel: collapsible per-file unified diff, data-face */
+.diff-panel { margin-top: 12px; }
+.diff-file { border: 1px solid var(--dk-s-border); border-radius: 4px; margin-bottom: 6px; }
+.diff-file summary { padding: 6px 10px; cursor: pointer; font-family: var(--dk-font-data); font-size: 12px; color: var(--dk-s-text); }
+.diff-file pre { margin: 0; padding: 8px 10px; overflow-x: auto; font-family: var(--dk-font-data); font-size: 12px; line-height: 1.5; color: var(--dk-s-text-muted); border-top: 1px solid var(--dk-s-border); white-space: pre; }
+
 /* SURF-6 kuyruk-D — gate-fail blocker list: caution-toned, data-face */
 .gate-findings { margin-top: 8px; padding: 8px 10px; border-left: 2px solid var(--dk-s-caution); }
 .gate-findings p { margin: 0 0 4px; font-family: var(--dk-font-data); font-size: 12px; color: var(--dk-s-caution); }

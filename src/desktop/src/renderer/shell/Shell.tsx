@@ -49,6 +49,11 @@ export const MSG = {
   previewTitle: 'desktop.shell.preview.title',
   previewMeta: 'desktop.shell.preview.meta',
   previewGateFindings: 'desktop.shell.preview.gate_findings',
+  diffTitle: 'desktop.shell.diff.title',
+  diffEmpty: 'desktop.shell.diff.empty',
+  diffNoBase: 'desktop.shell.diff.no_base',
+  diffNotGit: 'desktop.shell.diff.not_git',
+  diffTruncated: 'desktop.shell.diff.truncated',
   telegraphTitle: 'desktop.shell.telegraph.title',
   telegraphStop: 'desktop.shell.telegraph.stop',
   telegraphSlow: 'desktop.shell.telegraph.slow',
@@ -295,6 +300,44 @@ function PreviewPanel({ api, flowId }: { api: DaemonApiClient; flowId: string })
 }
 
 /**
+ * 583/N1 (GAP-4) — the run's line-level footprint, rendered once the flow is
+ * terminal. Same shared diff-service the CLI's `runs --diff` prints — the
+ * cross-surface review answer to "what did the run actually change?". Honest
+ * silence while the run is live (the footprint is still moving).
+ */
+function DiffPanel({ api, flowId }: { api: DaemonApiClient; flowId: string }): React.JSX.Element | null {
+  const t = useT();
+  const diff = useQuery({
+    queryKey: ['run-flow', flowId, 'diff'],
+    queryFn: () => api.getRunDiff(flowId),
+    retry: false,
+  });
+  if (diff.isPending || diff.error) return null;
+  const data = diff.data;
+  if (data.note === 'not-a-git-repo') return <p className="shell-muted">{t(MSG.diffNotGit)}</p>;
+  return (
+    <section className="diff-panel" data-testid="diff-panel">
+      <p className="view-eyebrow">{t(MSG.diffTitle, { n: String(data.files.length) })}</p>
+      {data.note === 'no-base' && <p className="shell-muted">{t(MSG.diffNoBase)}</p>}
+      {data.files.length === 0 ? (
+        <p className="shell-muted">{t(MSG.diffEmpty)}</p>
+      ) : (
+        data.files.map((file) => (
+          <details key={file.path} className="diff-file">
+            <summary>
+              <code>{file.path}</code> <span className="shell-muted">{file.status}</span>
+            </summary>
+            <pre>{file.text}</pre>
+            {file.truncated && <p className="shell-muted">{t(MSG.diffTruncated)}</p>}
+          </details>
+        ))
+      )}
+      {data.truncated && <p className="shell-muted">{t(MSG.diffTruncated)}</p>}
+    </section>
+  );
+}
+
+/**
  * «Telgraf» — the D4-0 approval signature as the product control. Three real
  * positions mapped to the real contract: STOP = reject · SLOW AHEAD =
  * approve (armed, not started) · FULL AHEAD = approve + start. Snap
@@ -449,6 +492,8 @@ function ConsoleView(): React.JSX.Element {
         </ul>
       )}
       {api && activeFlow && SHELL_PREVIEW_STATES.has(activeFlow.state) && <PreviewPanel api={api} flowId={activeFlow.flowId} />}
+      {/* 583/N1: once the voyage closed, show what it actually changed */}
+      {api && activeFlow && SHELL_TERMINAL_STATES.has(activeFlow.state) && <DiffPanel api={api} flowId={activeFlow.flowId} />}
       {api && activeFlow && <Telegraph api={api} flow={activeFlow} />}
       {api && activeFlow && !SHELL_TERMINAL_STATES.has(activeFlow.state) && (
         <button
