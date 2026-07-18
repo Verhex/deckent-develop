@@ -14,12 +14,15 @@
  * surfaces. All text via the shared strings map; zero shell literals.
  */
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { createHashRouter, Navigate, NavLink, Outlet, RouterProvider } from 'react-router';
+import { createHashRouter, Navigate, NavLink, Outlet, RouterProvider, useNavigate } from 'react-router';
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, createApiClient, type DaemonApiClient, type FlowSummary, type RunFlowEventPayload } from './api-client.js';
 import { buildCourseGeometry } from './course.js';
 import { useShellStore } from './session-store.js';
 import { FLOW_STATE_MESSAGE_KEYS } from '../../shared/desktop-messages.js';
+// 588/F1 — faz-şeridi kelime-kaynağı: sprint-yaşamdöngüsünün KENDİ enum'u
+// (core/sprint-types — run-flow-contract emsalindeki gibi doğrudan tüketim).
+import { SprintPhase } from '../../../../core/sprint-types.js';
 
 export const MSG = {
   navConsole: 'desktop.shell.nav.console',
@@ -34,6 +37,12 @@ export const MSG = {
   navChanges: 'desktop.shell.nav.changes',
   runsGoal: 'desktop.shell.runs.goal',
   runsRevision: 'desktop.shell.runs.revision',
+  // 588/F1 «Köprü»
+  bridgePhase: 'desktop.shell.bridge.phase_label',
+  bridgeWorkers: 'desktop.shell.bridge.workers_title',
+  bridgeFiles: 'desktop.shell.bridge.files_title',
+  bridgeNoSprint: 'desktop.shell.bridge.no_sprint',
+  bridgeHbAge: 'desktop.shell.bridge.hb_age',
   connectedTo: 'desktop.shell.connected_to',
   flowsEmpty: 'desktop.shell.flows_empty',
   flagRunFlowOff: 'desktop.shell.flag_run_flow_off',
@@ -450,6 +459,98 @@ function useFlows(api: DaemonApiClient | null) {
  *  Drift-gated against core RUN_FLOW_TERMINAL_STATES in shell-design.test.ts. */
 export const SHELL_TERMINAL_STATES = new Set(['COMPLETED', 'FAILED', 'CANCELLED', 'BLOCKED']);
 
+// ─── «Köprü» operasyon-paneli (588/F1, plan §2.1) — Console'un dönüşümü ─────
+// "deckent şu an napıyor": faz-şeridi + canlı worker-kartları + hareketteki
+// dosyalar. Veri = /api/sprint/live (2s poll; SSE'ye evrim 586'da).
+
+const BRIDGE_PHASES: readonly string[] = [
+  SprintPhase.PLAN, SprintPhase.SPAWN, SprintPhase.EXECUTE, SprintPhase.EVALUATE,
+  SprintPhase.FIX, SprintPhase.RETRO, SprintPhase.DECAY, SprintPhase.COMPLETE,
+];
+
+function BridgePanel({ api }: { api: DaemonApiClient }): React.JSX.Element | null {
+  const t = useT();
+  const navigate = useNavigate();
+  const liveQuery = useQuery({
+    queryKey: ['sprint', 'live'],
+    queryFn: () => api.getSprintLive(),
+    refetchInterval: 2_000,
+  });
+  const snap = liveQuery.data;
+  if (!snap) return null;
+  if (!snap.active) {
+    return <p className="shell-muted bridge__idle">{t(MSG.bridgeNoSprint)}</p>;
+  }
+  const filesInMotion = new Map<string, string[]>();
+  for (const worker of snap.workers) {
+    for (const file of worker.filesWrite) {
+      const holders = filesInMotion.get(file) ?? [];
+      holders.push(worker.taskId);
+      filesInMotion.set(file, holders);
+    }
+  }
+  return (
+    <section className="bridge">
+      <div className="bridge__phase-strip" aria-label={t(MSG.bridgePhase)}>
+        <span className="shell-muted">{t(MSG.bridgePhase)}:</span>
+        {BRIDGE_PHASES.map((phase) => (
+          <span key={phase} className={phase === snap.phase ? 'bridge__phase bridge__phase--active' : 'bridge__phase'}>
+            {phase}
+          </span>
+        ))}
+        {snap.phase !== null && !BRIDGE_PHASES.includes(snap.phase) && (
+          <span className="bridge__phase bridge__phase--active">{snap.phase}</span>
+        )}
+        {snap.sprintId !== null && <code className="bridge__sprint-id">{snap.sprintId}</code>}
+      </div>
+      <p className="view-eyebrow">{t(MSG.bridgeWorkers)}</p>
+      <div className="bridge__workers">
+        {snap.workers.map((worker) => (
+          <button
+            key={worker.taskId}
+            type="button"
+            className="bridge__card"
+            onClick={() => void navigate(`/workers/${encodeURIComponent(worker.taskId)}`)}
+          >
+            <span className="bridge__card-head">
+              <code>{worker.taskId}</code>
+              <span className="bridge__card-status">{worker.hb?.status ?? worker.status}</span>
+            </span>
+            <span className="bridge__card-title">{worker.title}</span>
+            {(worker.agent !== undefined || worker.model !== undefined) && (
+              <span className="bridge__card-meta">
+                {worker.agent ?? ''}{worker.agent !== undefined && worker.model !== undefined ? ' · ' : ''}{worker.model ?? ''}
+              </span>
+            )}
+            {worker.hb?.currentAction !== undefined && (
+              <span className="bridge__card-action">{worker.hb.currentAction}</span>
+            )}
+            <span className="bridge__card-foot">
+              {worker.hb !== undefined && (
+                <span>{t(MSG.bridgeHbAge, { n: String(Math.round(worker.hb.ageMs / 1000)) })}</span>
+              )}
+              {worker.hb?.filesChangedCount !== undefined && <span>· {worker.hb.filesChangedCount}f</span>}
+            </span>
+          </button>
+        ))}
+      </div>
+      {filesInMotion.size > 0 && (
+        <details className="bridge__files">
+          <summary>{t(MSG.bridgeFiles)} ({filesInMotion.size})</summary>
+          <ul>
+            {[...filesInMotion.entries()].map(([file, holders]) => (
+              <li key={file} className={holders.length > 1 ? 'bridge__file bridge__file--conflict' : 'bridge__file'}>
+                <code>{file}</code>
+                <span className="shell-muted"> — {holders.join(', ')}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
+  );
+}
+
 function ConsoleView(): React.JSX.Element {
   const t = useT();
   const api = useApi();
@@ -490,6 +591,7 @@ function ConsoleView(): React.JSX.Element {
 
   return (
     <div className="console">
+      {api && <BridgePanel api={api} />}
       {api && <OrderForm api={api} onProposed={(flowId) => setSelected(flowId)} />}
       <CourseStrip events={events} />
       {flows.length === 0 ? (
@@ -710,6 +812,19 @@ function TelsizRoute(): React.JSX.Element {
   );
 }
 
+// ─── Worker-Penceresi (588/F1) — lazy route ─────────────────────────────────
+
+const WorkerView = lazy(() => import('./WorkerView.js'));
+
+function WorkerRoute(): React.JSX.Element {
+  const t = useT();
+  return (
+    <Suspense fallback={<p className="shell-muted">{t(MSG.loading)}</p>}>
+      <WorkerView />
+    </Suspense>
+  );
+}
+
 // ─── «Changes» (588/F0) — lazy route (same react-aria isolation rule) ────────
 
 const Changes = lazy(() => import('./Changes.js'));
@@ -742,6 +857,7 @@ export function Shell({ queryClient }: { queryClient: QueryClient }): React.JSX.
             { path: 'history', element: <HistoryView /> },
             { path: 'terminal', element: <EngineRoomRoute /> },
             { path: 'changes', element: <ChangesRoute /> },
+            { path: 'workers/:taskId', element: <WorkerRoute /> },
           ],
         },
       ]),

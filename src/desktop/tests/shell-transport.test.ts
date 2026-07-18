@@ -6,7 +6,7 @@
 //     active daemon origins while everything else stays 'self'.
 
 import { describe, it, expect, vi } from 'vitest';
-import { ApiError, buildChatStreamUrl, buildEventsUrl, createApiClient, normalizeApprovalEntry } from '../src/renderer/shell/api-client.js';
+import { ApiError, buildChatStreamUrl, buildEventsUrl, buildWorkerLogUrl, createApiClient, normalizeApprovalEntry } from '../src/renderer/shell/api-client.js';
 import { buildLocalRendererCsp } from '../src/main/security.js';
 import type { DaemonSession } from '../src/shared/desktop-api.js';
 
@@ -144,6 +144,48 @@ describe('normalizeApprovalEntry — nested-server → flat-shell (SURF-kuyruk-E
     expect(normalizeApprovalEntry({ id: 'flat-1', title: 'T' })).toMatchObject({ id: 'flat-1', title: 'T' });
     expect(normalizeApprovalEntry(null).id).toBe('');
     expect(normalizeApprovalEntry({ request: 42 }).id).toBe('');
+  });
+});
+
+describe('api-client sprint-live contract (588/F1 «Köprü»)', () => {
+  it('getSprintLive/getSprintTask hit the monitoring reads with the bearer', async () => {
+    const { fetchFn, calls } = makeFetch(200, { workers: [], locks: [], active: false, sprintId: null, phase: null, generatedAt: 't' });
+    const client = createApiClient(SESSION, fetchFn);
+    await client.getSprintLive();
+    await client.getSprintTask('001 a').catch(() => {});
+    expect(calls[0]!.url).toBe('http://127.0.0.1:4317/api/sprint/live');
+    expect(calls[1]!.url).toBe('http://127.0.0.1:4317/api/sprint/task/001%20a');
+    expect((calls[0]!.init?.headers as Record<string, string>)['Authorization']).toBe('Bearer tok-123');
+  });
+
+  it('buildWorkerLogUrl → /logs/stream with render=human + query-token (the /api/workers/ allowlist prefix)', () => {
+    const url = new URL(buildWorkerLogUrl(SESSION, 'task-9'));
+    expect(url.pathname).toBe('/api/workers/task-9/logs/stream');
+    expect(url.searchParams.get('render')).toBe('human');
+    expect(url.searchParams.get('token')).toBe('tok-123');
+  });
+
+  it('openWorkerLog routes NAMED log_line frames to onLine and log_unavailable honestly', () => {
+    const listeners = new Map<string, (e: { data: string }) => void>();
+    class FakeES {
+      static last: FakeES | null = null;
+      closed = false;
+      constructor(public url: string) { FakeES.last = this; }
+      addEventListener(type: string, cb: (e: { data: string }) => void) { listeners.set(type, cb); }
+      close() { this.closed = true; }
+    }
+    const client = createApiClient(SESSION, makeFetch(200, {}).fetchFn);
+    const seen: string[] = [];
+    const close = client.openWorkerLog('t1', {
+      onLine: (line) => seen.push(line),
+      onUnavailable: () => seen.push('<unavailable>'),
+    }, { EventSourceImpl: FakeES as unknown as typeof EventSource });
+    listeners.get('log_line')!({ data: JSON.stringify({ type: 'log_line', taskId: 't1', ts: 'x', line: '[tool] Read a.ts' }) });
+    listeners.get('log_line')!({ data: 'torn{' }); // skipped
+    listeners.get('log_unavailable')!({ data: JSON.stringify({ type: 'log_unavailable', taskId: 't1', ts: 'x' }) });
+    expect(seen).toEqual(['[tool] Read a.ts', '<unavailable>']);
+    close();
+    expect(FakeES.last!.closed).toBe(true);
   });
 });
 

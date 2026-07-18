@@ -115,6 +115,55 @@ export function buildEventsUrl(session: DaemonSession, flowId: string, afterSequ
   return url.toString();
 }
 
+/** 588/F1 «Köprü» — /api/sprint/* payload shapes (sprint-live-service). */
+export interface SprintLiveWorkerPayload {
+  taskId: string;
+  title: string;
+  status: string;
+  agent?: string;
+  model?: string;
+  filesWrite: string[];
+  hb?: {
+    status: string;
+    currentAction?: string;
+    currentFile?: string;
+    filesChangedCount?: number;
+    sequence?: number;
+    ageMs: number;
+  };
+}
+export interface SprintLiveSnapshotPayload {
+  sprintId: string | null;
+  phase: string | null;
+  workers: SprintLiveWorkerPayload[];
+  locks: Array<{ name: string; ageMs: number }>;
+  active: boolean;
+  generatedAt: string;
+}
+export interface SprintTaskDetailPayload {
+  taskId: string;
+  task: Record<string, unknown> | null;
+  plan: { text: string; truncated: boolean } | null;
+  result: Record<string, unknown> | null;
+  hb: SprintLiveWorkerPayload['hb'] | null;
+}
+
+/** F1 — the worker live-log SSE URL (`/api/workers/` prefix is on the
+ *  query-token allowlist; `render=human` = the readable `[type] summary`
+ *  projection). Exported pure — unit-pinned. */
+export function buildWorkerLogUrl(session: DaemonSession, taskId: string): string {
+  const url = new URL(`/api/workers/${encodeURIComponent(taskId)}/logs/stream`, session.url);
+  url.searchParams.set('render', 'human');
+  if (session.apiToken) url.searchParams.set('token', session.apiToken);
+  return url.toString();
+}
+
+export interface WorkerLogHandlers {
+  onLine(line: string): void;
+  /** The task has no .log yet — an honest state, not an error. */
+  onUnavailable(): void;
+}
+
 /** A1 «Changes» — /api/git/* payload shapes (git-workflow-service contract). */
 export interface GitStatusPayload {
   note?: 'not-a-git-repo';
@@ -218,6 +267,11 @@ export interface DaemonApiClient {
   /** SURF-5 — decide a pending approval. Flag-gated server-side
    *  (`approval.api_decide`): a 403 means the flag is off (surface it). */
   decideApproval(id: string, decision: 'allow' | 'deny', reason?: string): Promise<Record<string, unknown>>;
+  // ── Sprint-live contract (588/F1 «Köprü» — /api/sprint/*) ──
+  getSprintLive(): Promise<SprintLiveSnapshotPayload>;
+  getSprintTask(taskId: string): Promise<SprintTaskDetailPayload>;
+  /** Worker canlı-log SSE (named events log_line/log_unavailable). Returns close(). */
+  openWorkerLog(taskId: string, handlers: WorkerLogHandlers, opts?: { EventSourceImpl?: typeof EventSource }): () => void;
   // ── Git contract (A1 «Changes» — /api/git/*, N4-servisin HTTP-yüzü) ──
   getGitStatus(): Promise<GitStatusPayload>;
   getGitDiff(opts?: { staged?: boolean }): Promise<GitDiffPayload>;
@@ -350,6 +404,26 @@ export function createApiClient(session: DaemonSession, fetchFn?: FetchLike): Da
         decision,
         ...(reason !== undefined ? { reason } : {}),
       }),
+
+    // ── Sprint-live contract (588/F1 «Köprü») ──
+    getSprintLive: () => request<SprintLiveSnapshotPayload>('GET', '/api/sprint/live'),
+    getSprintTask: (taskId) =>
+      request<SprintTaskDetailPayload>('GET', `/api/sprint/task/${encodeURIComponent(taskId)}`),
+    openWorkerLog: (taskId, handlers, opts = {}) => {
+      const Impl = opts.EventSourceImpl ?? EventSource;
+      const source = new Impl(buildWorkerLogUrl(session, taskId));
+      const onLine = (raw: MessageEvent): void => {
+        try {
+          const event = JSON.parse(String(raw.data)) as { line?: unknown };
+          if (typeof event.line === 'string') handlers.onLine(event.line);
+        } catch { /* torn frame — skipped, never fatal */ }
+      };
+      source.addEventListener('log_line', onLine);
+      source.addEventListener('log_unavailable', () => handlers.onUnavailable());
+      return () => {
+        source.close();
+      };
+    },
 
     // ── Git contract (A1 «Changes») ──
     getGitStatus: () => request<GitStatusPayload>('GET', '/api/git/status'),

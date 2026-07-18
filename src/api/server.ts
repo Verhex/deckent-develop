@@ -39,6 +39,8 @@ import {
   buildCommitProposal,
   buildRunCommitProposal,
 } from '../orchestra/git-workflow-service.js';
+// 588/F1 «Köprü» — the live-sprint read-model (sprint-live-service, plan §3).
+import { readSprintLive, readSprintTaskDetail, SPRINT_TASK_ID_RE } from '../orchestra/sprint-live-service.js';
 import { loadConfig, createDefaultConfig, validatePartialConfig, ConfigValidationError } from '../core/config.js';
 import { readWorkerLog } from '../agents/worker.js';
 import { AgentPoolManager } from '../core/agent-pool.js';
@@ -1203,6 +1205,25 @@ async function handleRequest(
       const directivesPath = join(projectRoot, DIRECTIVES_FILE);
       const content = existsSync(directivesPath) ? readFileSync(directivesPath, 'utf-8') : '';
       sendJson(res, { content });
+      return;
+    }
+
+    // ─── /api/sprint/* — 588/F1 «Köprü» canlı-okumaları (plan §2.1/§2.2) ───
+    // Monitoring reads — never gated (SURF-7 rule). One read-model, one face.
+    if (method === 'GET' && url === '/api/sprint/live') {
+      sendJson(res, readSprintLive(projectRoot));
+      return;
+    }
+    if (method === 'GET' && url.startsWith('/api/sprint/task/')) {
+      const rawId = url.slice('/api/sprint/task/'.length);
+      let taskId: string;
+      try { taskId = decodeURIComponent(rawId); } catch { taskId = rawId; }
+      const detail = readSprintTaskDetail(projectRoot, taskId);
+      if (detail === null) {
+        sendError(res, SPRINT_TASK_ID_RE.test(taskId) ? 404 : 403, 'task not found');
+        return;
+      }
+      sendJson(res, detail);
       return;
     }
 
