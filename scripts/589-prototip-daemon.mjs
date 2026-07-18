@@ -33,13 +33,40 @@ for (let i = 0; i < 60; i++) {
   await sleep(250);
 }
 
+// Mini statik-sunucu: prototipler http://localhost'tan açılır (file://-zahmeti
+// ve Windows-tarayıcı yol-çevirisi yok; CORS-origin'i de loopback olur).
+import { createServer } from 'node:http';
+import { readFileSync } from 'node:fs';
+const VIEW_PORT = PORT + 1;
+const PAGES = {
+  '/nova': join(repoRoot, 'docs/analysis/589-prototip-A-nova.html'),
+  '/pulse': join(repoRoot, 'docs/analysis/589-prototip-B-pulse.html'),
+};
+createServer((req, res) => {
+  const path = (req.url || '/').split('#')[0].split('?')[0];
+  const file = PAGES[path];
+  if (!file) { res.writeHead(302, { Location: '/nova' }); res.end(); return; }
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.end(readFileSync(file, 'utf-8'));
+}).listen(VIEW_PORT, '127.0.0.1');
+
 const hash = `#port=${PORT}&token=${TOKEN}`;
+const urlA = `http://127.0.0.1:${VIEW_PORT}/nova${hash}`;
+const urlB = `http://127.0.0.1:${VIEW_PORT}/pulse${hash}`;
 console.log('\n🛰  Prototip-daemon hazır — http://127.0.0.1:' + PORT);
 console.log('\nTarayıcıda aç (ikisini de — yan yana sekmelerde):');
-console.log(`  A «NOVA»  : file://${repoRoot}/docs/analysis/589-prototip-A-nova.html${hash}`);
-console.log(`  B «PULSE» : file://${repoRoot}/docs/analysis/589-prototip-B-pulse.html${hash}`);
-console.log('\nCanlı-his için bir sprint başlat (ayrı terminal):  deckent do "<küçük iş>"  (ya da Desktop/REPL\'den)');
+console.log('  A «NOVA»  : ' + urlA);
+console.log('  B «PULSE» : ' + urlB);
+console.log('\nCanlı-his için bir sprint başlat (ayrı terminal):  deckent do "<küçük iş>"');
 console.log('Kapatmak: Ctrl+C\n');
+
+// WSL→Windows varsayılan-tarayıcıda otomatik-aç (başarısızsa sessiz — URL'ler yukarıda).
+if (process.env.WSL_DISTRO_NAME) {
+  for (const u of [urlA, urlB]) {
+    try { spawn('cmd.exe', ['/c', 'start', '', u], { stdio: 'ignore', detached: true }).unref(); } catch { /* elle-aç */ }
+    await sleep(400);
+  }
+}
 
 process.on('SIGINT', () => { try { daemon.kill('SIGTERM'); } catch { /* ölü */ } process.exit(0); });
 process.on('SIGTERM', () => { try { daemon.kill('SIGTERM'); } catch { /* ölü */ } process.exit(0); });
