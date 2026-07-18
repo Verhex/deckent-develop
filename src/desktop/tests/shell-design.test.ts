@@ -84,7 +84,7 @@ describe('Shell MSG — every shell string is a served bridge key (SURF-5)', () 
     expect(rogue).toEqual([]);
   });
 
-  it.each(['EngineRoom.tsx', 'Telsiz.tsx'])(
+  it.each(['EngineRoom.tsx', 'Telsiz.tsx', 'Changes.tsx'])(
     "%s's MSG keys are all served too (lazy modules pull xterm/react-aria, so they are source-scanned, never imported node-side)",
     async (file) => {
       const { readFileSync } = await import('node:fs');

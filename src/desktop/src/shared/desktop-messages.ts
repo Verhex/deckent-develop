@@ -100,6 +100,22 @@ export const DESKTOP_MESSAGE_KEYS = [
   'desktop.shell.flag_run_flow_off',
   'desktop.shell.live_events',
   'desktop.shell.approvals_pending',
+  // 588/F0 — ray-grupları + «Changes» (CLI runs.commit.* sözlüğü ortak-kelime
+  // kuralıyla yeniden-kullanılır — aynı akışın aynı kelimeleri, iki yüzey).
+  'desktop.shell.nav.group_voyage',
+  'desktop.shell.nav.group_work',
+  'desktop.shell.nav.changes',
+  'desktop.shell.changes.commit',
+  'desktop.shell.changes.gate_off',
+  'desktop.shell.runs.goal',
+  'desktop.shell.runs.gate',
+  'desktop.shell.runs.tasks',
+  'desktop.shell.runs.revision',
+  'runs.commit.header',
+  'runs.commit.suggested',
+  'runs.commit.clean',
+  'runs.commit.not_git',
+  'runs.commit.done',
   // DT-1 «Telsiz» — chat_coming retired (the radio is REAL now); radio.* below.
   'desktop.shell.radio.empty_hint',
   'desktop.shell.radio.placeholder',

@@ -797,3 +797,72 @@ select:focus-visible {
   outline: 2px solid var(--dk-s-focus-ring);
   outline-offset: 2px;
 }
+
+/* Ray-grupları (588/F0) */
+.shell-nav__group {
+  margin-top: var(--space-3);
+  padding: 0 var(--space-3);
+  font-family: var(--dk-font-data);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dk-s-text-muted);
+}
+.shell-nav__group:first-child { margin-top: 0; }
+
+/* «Changes» (588/F0) — incele→mühürle */
+.changes { max-width: 860px; }
+.changes__header { font-size: 15px; margin: var(--space-2) 0; }
+.changes__files { list-style: none; padding: 0; display: grid; gap: var(--space-1); font-size: 13px; }
+.changes__files code { color: var(--dk-s-brass); }
+.changes__counts { margin-left: var(--space-2); color: var(--dk-s-text-muted); font-family: var(--dk-font-data); font-size: 12px; }
+.changes__form { display: grid; gap: var(--space-2); margin: var(--space-3) 0; }
+.changes__message {
+  width: 100%;
+  font-family: var(--dk-font-data);
+  font-size: 13px;
+  color: var(--dk-s-text);
+  background: var(--dk-s-surface);
+  border: 1px solid var(--dk-s-border);
+  border-radius: 4px;
+  padding: var(--space-2);
+  resize: vertical;
+}
+.changes__seal { justify-self: start; }
+.changes__sealed { color: var(--dk-s-go); font-family: var(--dk-font-data); }
+.changes__diff summary { cursor: pointer; color: var(--dk-s-text-muted); font-size: 13px; }
+.changes__diff pre {
+  overflow-x: auto;
+  font-family: var(--dk-font-data);
+  font-size: 12px;
+  background: var(--dk-s-surface);
+  border: 1px solid var(--dk-s-border);
+  border-radius: 4px;
+  padding: var(--space-3);
+  max-height: 420px;
+  overflow-y: auto;
+}
+.changes__message:focus-visible, .changes__seal[data-focus-visible] {
+  outline: 2px solid var(--dk-s-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Runs liste+detay (588/F0b) */
+.ledger__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  text-align: left;
+  background: var(--dk-c-card-bg);
+  border: 1px solid var(--dk-c-card-border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  color: var(--dk-s-text);
+  font: inherit;
+  cursor: pointer;
+}
+.ledger__row--active { border-color: var(--dk-s-accent); }
+.ledger__row code { color: var(--dk-s-brass); }
+.run-detail { margin-top: var(--space-4); border-top: 1px solid var(--dk-s-border); padding-top: var(--space-3); }
+.run-detail__meta { font-size: 13px; }

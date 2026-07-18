@@ -20,10 +20,10 @@
  * react-aria stays out of that graph). The transcript FOLD is pure and
  * exported for hermetic pins (radioSend/radioChunk/radioDone/radioError).
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Form, Input, TextField } from 'react-aria-components';
 import { ApiError, type DaemonApiClient, createApiClient } from './api-client.js';
-import { radioSend, radioChunk, radioDone, radioError } from './radio-fold.js';
+import { radioSend, radioChunk, radioDone, radioError, parseRadio, serializeRadio } from './radio-fold.js';
 import { useShellStore } from './session-store.js';
 
 export const MSG = {
@@ -63,6 +63,24 @@ export default function Telsiz(): React.JSX.Element {
 
   if (session && apiRef.current?.session !== session) apiRef.current = createApiClient(session);
   const api = apiRef.current;
+
+  // 588/F0c — kalıcı-telsiz: profil-anahtarlı localStorage. Hydrate BİR KEZ
+  // (boş-store'a), her değişimde yaz; pending-satırlar persist edilmez
+  // (parseRadio düşürür — ölü stream'i sürdürüyormuş gibi yapmak yalan olur).
+  const storageKey = session ? `deckent.radio.${session.profileId}` : null;
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (storageKey === null || hydratedRef.current) return;
+    hydratedRef.current = true;
+    if (useShellStore.getState().radioMessages.length === 0) {
+      const restored = parseRadio(window.localStorage.getItem(storageKey));
+      if (restored.length > 0) setMessages(() => restored);
+    }
+  }, [storageKey, setMessages]);
+  useEffect(() => {
+    if (storageKey === null) return;
+    window.localStorage.setItem(storageKey, serializeRadio(messages));
+  }, [storageKey, messages]);
 
   const transmit = (text: string): void => {
     if (!api || busy) return;

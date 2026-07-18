@@ -61,3 +61,37 @@ describe('radio-fold — stream frames land', () => {
     expect(errored[errored.length - 1]).toEqual({ role: 'deckent', text: 'late failure', failed: true });
   });
 });
+
+describe('radio-fold — 588/F0c persistence (profil-anahtarlı localStorage)', () => {
+  it('round-trips a settled transcript; a pending line is DROPPED on parse (a reload cannot resume a dead stream)', async () => {
+    const { serializeRadio, parseRadio } = await import('../src/renderer/shell/radio-fold.js');
+    const list = [
+      { role: 'operator' as const, text: 'q' },
+      { role: 'deckent' as const, text: 'a' },
+      { role: 'deckent' as const, text: 'half', pending: true },
+    ];
+    const restored = parseRadio(serializeRadio(list));
+    expect(restored).toEqual([
+      { role: 'operator', text: 'q' },
+      { role: 'deckent', text: 'a' },
+    ]);
+  });
+
+  it('garbage / null / wrong-shapes parse to [] (tolerant, never a throw); failed-flag survives', async () => {
+    const { parseRadio, serializeRadio } = await import('../src/renderer/shell/radio-fold.js');
+    expect(parseRadio(null)).toEqual([]);
+    expect(parseRadio('not-json{')).toEqual([]);
+    expect(parseRadio('{"a":1}')).toEqual([]);
+    expect(parseRadio(JSON.stringify([{ role: 'ghost', text: 'x' }, 42]))).toEqual([]);
+    const failed = parseRadio(serializeRadio([{ role: 'deckent', text: 'boom', failed: true }]));
+    expect(failed).toEqual([{ role: 'deckent', text: 'boom', failed: true }]);
+  });
+
+  it('serialize caps at RADIO_PERSIST_CAP (a transcript is working memory, not an archive)', async () => {
+    const { serializeRadio, parseRadio, RADIO_PERSIST_CAP } = await import('../src/renderer/shell/radio-fold.js');
+    const long = Array.from({ length: RADIO_PERSIST_CAP + 50 }, (_v, i) => ({ role: 'operator' as const, text: `m${i}` }));
+    const restored = parseRadio(serializeRadio(long));
+    expect(restored).toHaveLength(RADIO_PERSIST_CAP);
+    expect(restored[0]!.text).toBe('m50'); // en-eskiler düşer
+  });
+});

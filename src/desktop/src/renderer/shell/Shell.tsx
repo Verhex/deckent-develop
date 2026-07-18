@@ -28,6 +28,12 @@ export const MSG = {
   navHistory: 'desktop.shell.nav.history',
   // 583/N3 «Makine Dairesi»
   navTerminal: 'desktop.shell.nav.terminal',
+  // 588/F0 — sol-ray grupları + Changes
+  navGroupVoyage: 'desktop.shell.nav.group_voyage',
+  navGroupWork: 'desktop.shell.nav.group_work',
+  navChanges: 'desktop.shell.nav.changes',
+  runsGoal: 'desktop.shell.runs.goal',
+  runsRevision: 'desktop.shell.runs.revision',
   connectedTo: 'desktop.shell.connected_to',
   flowsEmpty: 'desktop.shell.flows_empty',
   flagRunFlowOff: 'desktop.shell.flag_run_flow_off',
@@ -109,11 +115,16 @@ function ShellLayout(): React.JSX.Element {
   return (
     <div className="shell">
       <nav className="shell-nav" aria-label={t(MSG.navConsole)}>
+        {/* 588/F0 — ray-grupları (plan §2, IA): SEYİR = günlük-akış,
+            ÇALIŞMA = el-işi yüzeyleri. Yalnız GERÇEK görünümler listelenir. */}
+        <span className="shell-nav__group">{t(MSG.navGroupVoyage)}</span>
         <NavLink to="/console">{t(MSG.navConsole)}</NavLink>
-        <NavLink to="/chat">{t(MSG.navChat)}</NavLink>
-        <NavLink to="/approval">{t(MSG.navApproval)}</NavLink>
         <NavLink to="/history">{t(MSG.navHistory)}</NavLink>
+        <NavLink to="/approval">{t(MSG.navApproval)}</NavLink>
+        <span className="shell-nav__group">{t(MSG.navGroupWork)}</span>
+        <NavLink to="/chat">{t(MSG.navChat)}</NavLink>
         <NavLink to="/terminal">{t(MSG.navTerminal)}</NavLink>
+        <NavLink to="/changes">{t(MSG.navChanges)}</NavLink>
         <span className="shell-origin">{session ? t(MSG.connectedTo, { origin: session.url }) : ''}</span>
       </nav>
       <main className="shell-view">
@@ -617,12 +628,17 @@ function HistoryView(): React.JSX.Element {
   const t = useT();
   const api = useApi();
   const flowsQuery = useFlows(api);
+  // 588/F0b — Runs liste+detay: "History'de sadece kod var" biter. Satır-tık
+  // → detay (hedef · durum · revizyon + Plan-önizleme + Diff — mevcut
+  // paneller yeniden-kullanılır; karar-izi/retro sekmeleri F2'de derinleşir).
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   if (flowsQuery.isPending) return <p className="shell-muted">{t(MSG.loading)}</p>;
   if (flowsQuery.error instanceof ApiError && flowsQuery.error.status === 404) {
     return <p className="shell-notice">{t(MSG.flagRunFlowOff)}</p>;
   }
   if (flowsQuery.error) return <p className="shell-notice">{t(MSG.loadError)}</p>;
   const flows = flowsQuery.data?.flows ?? [];
+  const selected = flows.find((flow) => flow.flowId === selectedId) ?? null;
   return (
     <div>
       <p className="view-eyebrow">{t(MSG.historyTitle)}</p>
@@ -632,12 +648,33 @@ function HistoryView(): React.JSX.Element {
         <ul className="ledger">
           {flows.map((flow) => (
             <li key={flow.flowId}>
-              <code>{flow.flowId.slice(0, 8)}</code>
-              <span className="flow-intent">{flow.intentSummary ?? ''}</span>
-              <StatePill state={flow.state} />
+              <button
+                type="button"
+                className={flow.flowId === selectedId ? 'ledger__row ledger__row--active' : 'ledger__row'}
+                onClick={() => setSelectedId(flow.flowId === selectedId ? null : flow.flowId)}
+              >
+                <code>{flow.flowId.slice(0, 8)}</code>
+                <span className="flow-intent">{flow.intentSummary ?? ''}</span>
+                <StatePill state={flow.state} />
+              </button>
             </li>
           ))}
         </ul>
+      )}
+      {api && selected && (
+        <section className="run-detail">
+          <p className="run-detail__meta">
+            {selected.intentSummary !== undefined && (
+              <>
+                <span className="shell-muted">{t(MSG.runsGoal)}:</span> {selected.intentSummary}{' · '}
+              </>
+            )}
+            {selected.revision !== undefined && <>{t(MSG.runsRevision, { r: String(selected.revision) })}{' · '}</>}
+            <StatePill state={selected.state} />
+          </p>
+          <PreviewPanel api={api} flowId={selected.flowId} />
+          <DiffPanel api={api} flowId={selected.flowId} />
+        </section>
       )}
     </div>
   );
@@ -673,6 +710,19 @@ function TelsizRoute(): React.JSX.Element {
   );
 }
 
+// ─── «Changes» (588/F0) — lazy route (same react-aria isolation rule) ────────
+
+const Changes = lazy(() => import('./Changes.js'));
+
+function ChangesRoute(): React.JSX.Element {
+  const t = useT();
+  return (
+    <Suspense fallback={<p className="shell-muted">{t(MSG.loading)}</p>}>
+      <Changes />
+    </Suspense>
+  );
+}
+
 // ─── Router ──────────────────────────────────────────────────────────────────
 // Created INSIDE the component (not at module scope): createHashRouter touches
 // `document` at construction, and node-env tests import this module DOM-free.
@@ -691,6 +741,7 @@ export function Shell({ queryClient }: { queryClient: QueryClient }): React.JSX.
             { path: 'approval', element: <ApprovalView /> },
             { path: 'history', element: <HistoryView /> },
             { path: 'terminal', element: <EngineRoomRoute /> },
+            { path: 'changes', element: <ChangesRoute /> },
           ],
         },
       ]),

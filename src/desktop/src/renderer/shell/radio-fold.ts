@@ -42,3 +42,32 @@ export function radioError(list: readonly RadioMessage[], message: string): Radi
   return [...list.slice(0, -1), { role: 'deckent', text: message, failed: true }];
 }
 
+
+// ─── 588/F0c — kalıcı-telsiz (profil-anahtarlı localStorage) ────────────────
+
+/** Persist cap — a transcript is a working memory, not an archive. */
+export const RADIO_PERSIST_CAP = 400;
+
+export function serializeRadio(list: readonly RadioMessage[]): string {
+  return JSON.stringify(list.slice(-RADIO_PERSIST_CAP));
+}
+
+/** Tolerant parse: garbage → []; a persisted `pending` line is DROPPED —
+ *  a reload cannot resume a dead stream, pretending otherwise would lie. */
+export function parseRadio(raw: string | null): RadioMessage[] {
+  if (raw === null || raw.length === 0) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const out: RadioMessage[] = [];
+    for (const entry of parsed) {
+      const m = entry as { role?: unknown; text?: unknown; failed?: unknown; pending?: unknown };
+      if ((m.role === 'operator' || m.role === 'deckent') && typeof m.text === 'string' && m.pending !== true) {
+        out.push({ role: m.role, text: m.text, ...(m.failed === true ? { failed: true } : {}) });
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}

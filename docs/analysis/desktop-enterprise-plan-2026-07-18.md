@@ -1,5 +1,7 @@
 # Desktop Enterprise-Grade Plan — «deckent şu an napıyor?» (KABUL Gün-1 · P7, Alperen-yönü)
 
+> **✅ ONAYLI — SSOT (Alperen 2026-07-18):** plan-SSOT kabul · KABUL-içi kapsam **F0+F1** · «Köprü» **Console'u dönüştürür** (ayrı-görünüm değil). MASTER-PLAN treni: **588 DESKTOP-ENT**.
+
 **Tetik (Alperen):** *"Sprint durumu, dosya-akışı, deckent şu an napıyor — yok. History'de sadece kod
 var. Worker'ları görebileceğim detaylı pencere yok. `.deckent` altında desktopta gösterilebilir
 milyon tane özellik var. Geliştirmeden önce enterprise-grade app nasıl olur, DETAYLI planla; sonra
