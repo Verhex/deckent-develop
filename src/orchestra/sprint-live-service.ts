@@ -122,9 +122,17 @@ export function readSprintLive(root: string, now = Date.now()): SprintLiveSnapsh
   workers.sort((a, b) => (a.taskId < b.taskId ? -1 : a.taskId > b.taskId ? 1 : 0));
 
   // Phase — the SAME file `deckent status` reads (one truth, another face).
-  const state = readJsonTolerant<{ sprint?: { id?: unknown; phase?: unknown } }>(join(root, SPRINT_STATE_FILE));
-  const sprintId = typeof state?.sprint?.id === 'string' ? state.sprint.id : null;
-  const phase = typeof state?.sprint?.phase === 'string' ? state.sprint.phase : null;
+  // KABUL P9 (canlı-koşuda yakalandı): the file's REAL shape is FLAT
+  // ({sprintId, phase, status, startedAt}); the nested {sprint:{id,phase}}
+  // variant is read as a fallback so both generations resolve.
+  const state = readJsonTolerant<{
+    sprintId?: unknown; phase?: unknown;
+    sprint?: { id?: unknown; phase?: unknown };
+  }>(join(root, SPRINT_STATE_FILE));
+  const sprintId = typeof state?.sprintId === 'string' ? state.sprintId
+    : typeof state?.sprint?.id === 'string' ? state.sprint.id : null;
+  const phase = typeof state?.phase === 'string' ? state.phase
+    : typeof state?.sprint?.phase === 'string' ? state.sprint.phase : null;
 
   const locks: Array<{ name: string; ageMs: number }> = [];
   const locksDir = join(root, LOCKS_DIR);

@@ -77,8 +77,10 @@ describe('readSprintLive — the «Köprü» snapshot', () => {
     seedTask('001');
     writeFileSync(join(root, '.deckent-tmp'), ''); // noise — ignored
     mkdirSync(join(root, '.deckent'), { recursive: true });
+    // P9 gerçek-şekil pini: dosya DÜZ yazılıyor ({sprintId, phase, ...}) —
+    // canlı sprint-447 koşusundan birebir; iç-içe eski-şekil ayrı pinde.
     writeFileSync(join(root, '.deckent', 'sprint-state.json'), JSON.stringify({
-      sprint: { id: 'sprint-447', phase: 'EXECUTE' },
+      sprintId: 'sprint-447', phase: 'EXECUTE', status: 'ACTIVE', startedAt: '2026-07-18T09:44:03.910Z',
     }), 'utf-8');
     mkdirSync(join(root, '.locks'), { recursive: true });
     writeFileSync(join(root, '.locks', 'src__a.ts.lock'), 'w-1', 'utf-8');
@@ -89,6 +91,17 @@ describe('readSprintLive — the «Köprü» snapshot', () => {
     expect(snap.locks).toHaveLength(1);
     expect(snap.locks[0]!.name).toBe('src__a.ts.lock');
     expect(snap.locks[0]!.ageMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('P9: the legacy NESTED sprint-state shape still resolves (both generations read)', () => {
+    seedTask('001');
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    writeFileSync(join(root, '.deckent', 'sprint-state.json'), JSON.stringify({
+      sprint: { id: 'sprint-old', phase: 'PLAN' },
+    }), 'utf-8');
+    const snap = readSprintLive(root, NOW);
+    expect(snap.sprintId).toBe('sprint-old');
+    expect(snap.phase).toBe('PLAN');
   });
 
   it('garbage task-json is skipped, garbage hb degrades to absent hb, torn state → null phase (tolerance)', () => {
