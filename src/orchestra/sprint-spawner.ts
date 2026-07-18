@@ -24,7 +24,7 @@ import { TASKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 
 // ─── Core — config ────────────────────────────────────────────────
-import { resolveEffectiveWorkers } from '../core/config.js';
+import { resolveEffectiveWorkers, resolveLiveTraceEnabled } from '../core/config.js';
 
 // ─── Token Quota (Sprint 202 Task 202-004 — computeBackoff wire) ──
 // `token_throttle_ms` (config.ts default 500) is the inter-worker pacing floor;
@@ -809,8 +809,10 @@ export async function spawnWorkers(
         reasoningEffort,
         excludeDynamicPromptSections,
         taskTimeoutSeconds,
-        // SURF-3 S2/S3 — live tool-by-tool activity (flag-gated; no-op when off).
-        liveTraceEnabled: config.live_trace?.enabled === true,
+        // SURF-3 S2/S3 — live tool-by-tool activity (flag-gated; no-op when
+        // off). 583/N5: env-twin aware — an interactive-origin coordinator
+        // (DECKENT_LIVE_TRACE=1) streams live without a global config flip.
+        liveTraceEnabled: resolveLiveTraceEnabled(config),
         sprintId: task.sprintId,
       });
     } else if (!isTmuxProvider(taskProvider)) {

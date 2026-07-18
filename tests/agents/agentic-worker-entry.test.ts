@@ -41,6 +41,7 @@ import type {
   AgenticRunnerOptions,
   AgenticRunnerResult,
 } from '../../src/agents/agentic-worker-runner.js';
+import { LIVE_TRACE_ENV } from '../../src/core/config.js';
 
 // ─── Test helpers ───────────────────────────────────────────────────────────
 
@@ -388,5 +389,82 @@ describe('runWorkerEntry / computeNumstat — T-234-002 .result completeness', (
     );
     expect(result.testsPassed).toBe(true);
     expect(result.coverage).toBeNull();
+  });
+});
+
+// ─── 583/N5 TRACE-FLIP: runnerOpts.liveTrace is now FILLED ──────────────────
+//
+// Before N5 the AgenticRunnerOptions.liveTrace field existed but NO caller
+// filled it — the runner's ordered progress-stream was permanently off no
+// matter what the config said (the broken link the N5 kanıt-koşusu found).
+// These pins hold the fill: disk config + env twin, resolved per process.
+
+describe('runWorkerEntry — liveTrace fill (583/N5)', () => {
+  let projectDir: string;
+  let savedEnv: string | undefined;
+
+  beforeEach(() => {
+    projectDir = mkdtempSync(join(tmpdir(), 'agentic-entry-livetrace-'));
+    savedEnv = process.env[LIVE_TRACE_ENV];
+    delete process.env[LIVE_TRACE_ENV];
+  });
+
+  afterEach(() => {
+    rmSync(projectDir, { recursive: true, force: true });
+    if (savedEnv === undefined) delete process.env[LIVE_TRACE_ENV];
+    else process.env[LIVE_TRACE_ENV] = savedEnv;
+  });
+
+  function capturingRunner(): {
+    runner: (opts: AgenticRunnerOptions) => Promise<AgenticRunnerResult>;
+    captured: () => AgenticRunnerOptions | null;
+  } {
+    let opts: AgenticRunnerOptions | null = null;
+    return {
+      runner: async (o: AgenticRunnerOptions) => {
+        opts = o;
+        return {
+          taskId: o.taskId,
+          filesChanged: [],
+          testsPassed: undefined,
+          selfAssessment: 'DONE',
+          notes: 'ok',
+          iterations: 1,
+          terminationReason: 'task_done',
+        };
+      },
+      captured: () => opts,
+    };
+  }
+
+  it('no env + no config file → liveTrace filled { enabled: false } (headless default pinned)', async () => {
+    const taskId = 'n5-lt-off';
+    seedTaskJson(projectDir, taskId);
+    const { runner, captured } = capturingRunner();
+    await runWorkerEntry([taskId, 'm', 'http://localhost:1'], projectDir, { runner });
+    expect(captured()?.liveTrace).toEqual({ enabled: false });
+  });
+
+  it('DECKENT_LIVE_TRACE=1 (inherited from an interactive coordinator) → { enabled: true }', async () => {
+    const taskId = 'n5-lt-env';
+    seedTaskJson(projectDir, taskId);
+    process.env[LIVE_TRACE_ENV] = '1';
+    const { runner, captured } = capturingRunner();
+    await runWorkerEntry([taskId, 'm', 'http://localhost:1'], projectDir, { runner });
+    expect(captured()?.liveTrace).toEqual({ enabled: true });
+  });
+
+  it('no env + .deckent/config.json { live_trace: { enabled: true } } → { enabled: true } (disk opt-in respected)', async () => {
+    const taskId = 'n5-lt-disk';
+    seedTaskJson(projectDir, taskId);
+    mkdirSync(join(projectDir, '.deckent'), { recursive: true });
+    writeFileSync(
+      join(projectDir, '.deckent', 'config.json'),
+      JSON.stringify({ live_trace: { enabled: true } }),
+      'utf-8',
+    );
+    const { runner, captured } = capturingRunner();
+    await runWorkerEntry([taskId, 'm', 'http://localhost:1'], projectDir, { runner });
+    expect(captured()?.liveTrace).toEqual({ enabled: true });
   });
 });

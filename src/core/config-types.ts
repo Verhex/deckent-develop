@@ -223,7 +223,11 @@ export interface TrainingTraceConfig {
  *  WORKER-LIVE-TRACE). Opt-in — absent block = disabled; flag-off performs ZERO fs I/O.
  *  @see AgenticRunnerOptions.liveTrace (agents/agentic-worker-runner.ts). */
 export interface LiveTraceConfig {
-  /** Enable the worker progress-stream (default: false). */
+  /** Enable the worker progress-stream (default: false — but see the env twin:
+   *  `DECKENT_LIVE_TRACE=1` forces it ON for one process tree, which is how
+   *  interactive-origin runs stream live while headless/CI fleets stay
+   *  zero-cost; 583/N5. Resolve via `resolveLiveTraceEnabled` (config.ts),
+   *  never by reading this field directly). */
   enabled?: boolean;
 }
 

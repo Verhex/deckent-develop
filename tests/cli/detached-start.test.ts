@@ -4,9 +4,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   spawnDetachedDeckent,
+  buildFlowStartSpawn,
   type DetachedSpawnFn,
   type DetachedChildHandle,
 } from '../../src/cli/helpers/detached-start.js';
+import { LIVE_TRACE_ENV } from '../../src/core/config.js';
 import {
   createCliToolDispatcher,
   isDetachedCommandClass,
@@ -96,6 +98,68 @@ describe('spawnDetachedDeckent — detached-start.ts', () => {
     } finally {
       cwdSpy.mockRestore();
     }
+  });
+
+  // ── 583/N5 TRACE-FLIP: interactive-origin env twin ────────────────────────
+
+  it('liveTrace: true → child env carries DECKENT_LIVE_TRACE=1 (interactive-origin marker)', () => {
+    const { handle } = fakeChild(7);
+    const spawnFn = vi.fn().mockReturnValue(handle) as unknown as DetachedSpawnFn;
+
+    spawnDetachedDeckent(['start'], { projectRoot, spawnFn, liveTrace: true });
+
+    const [, , options] = (spawnFn as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(options.env[LIVE_TRACE_ENV]).toBe('1');
+  });
+
+  it('liveTrace omitted → env twin ABSENT (programmatic default pinned: SDK/MCP spawns stay off)', () => {
+    const { handle } = fakeChild(7);
+    const spawnFn = vi.fn().mockReturnValue(handle) as unknown as DetachedSpawnFn;
+    // Hygiene: the parent process itself must not leak the twin into this pin.
+    const saved = process.env[LIVE_TRACE_ENV];
+    delete process.env[LIVE_TRACE_ENV];
+    try {
+      spawnDetachedDeckent(['start'], { projectRoot, spawnFn });
+      const [, , options] = (spawnFn as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(LIVE_TRACE_ENV in options.env).toBe(false);
+    } finally {
+      if (saved !== undefined) process.env[LIVE_TRACE_ENV] = saved;
+    }
+  });
+});
+
+// ─── buildFlowStartSpawn — the ONE flow-start authoring point ───────────────
+
+describe('buildFlowStartSpawn — argv contract + interactive live-trace (583/N5)', () => {
+  let projectRoot: string;
+
+  beforeEach(() => {
+    projectRoot = mkdtempSync(join(tmpdir(), 'deckent-flow-start-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  it('spawns the canonical start argv, carries the live-trace twin, and returns the flow/job handle', () => {
+    const unref = vi.fn();
+    const spawnFn = vi.fn().mockReturnValue({ pid: 11, unref }) as unknown as DetachedSpawnFn;
+
+    const spawnStart = buildFlowStartSpawn(projectRoot, 3, 'digest-abc', spawnFn);
+    const handle = spawnStart(null, 'flow-xyz');
+
+    const [command, args, options] = (spawnFn as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(command).toBe(process.execPath);
+    expect(args.slice(1)).toEqual([
+      'start', '--flow-id', 'flow-xyz', '--revision', '3', '--plan-digest', 'digest-abc',
+    ]);
+    // Flow-start IS the human seal — every spawn built here streams live.
+    expect(options.env[LIVE_TRACE_ENV]).toBe('1');
+    expect(handle).toEqual({
+      flowId: 'flow-xyz',
+      jobId: 'flow-flow-xyz-r3',
+      logRef: expect.stringMatching(/recently-works[/\\]start-flow-xyz-\d+\.log$/),
+    });
   });
 });
 

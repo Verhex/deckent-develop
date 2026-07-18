@@ -1286,6 +1286,29 @@ export function resolveApprovalConfig(
   };
 }
 
+/** Env twin forcing `live_trace.enabled` ON for one process tree (583/N5) —
+ *  interactive launch-sites (detached-start.ts) export it to the coordinator
+ *  child; workers inherit it. Same `=1`-only contract as
+ *  `DECKENT_CONTROL_MUTATIONS` (api/server.ts). */
+export const LIVE_TRACE_ENV = 'DECKENT_LIVE_TRACE';
+
+/**
+ * Resolve the effective `live_trace.enabled` flag (583/N5 TRACE-FLIP) — the
+ * ONE gate every producer reads (sprint-spawner / scheduler-effects spawn
+ * opts, worker.ts heartbeat tap, agentic-worker-entry progress stream).
+ * `DECKENT_LIVE_TRACE=1` in the process env wins first — interactive-origin
+ * runs (REPL card `s`, `deckent runs --start`, desktop/API start) stream live
+ * without flipping the GLOBAL config default, so headless/CI fleets keep the
+ * zero-cost no-op tap (worker-activity.ts). Falls back to the config block;
+ * absent = off, exactly as before N5.
+ */
+export function resolveLiveTraceEnabled(
+  config?: { live_trace?: { enabled?: boolean } } | null,
+): boolean {
+  if (process.env[LIVE_TRACE_ENV] === '1') return true;
+  return config?.live_trace?.enabled === true;
+}
+
 // ─── File Reading ────────────────────────────────────────────────────
 
 async function readJsonFile<T>(filePath: string): Promise<T | null> {

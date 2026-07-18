@@ -34,6 +34,7 @@ import { join } from 'node:path';
 import type { Task, ResolvedConfig, TaskResult } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
 import { TASKS_DIR } from '../core/constants.js';
+import { resolveLiveTraceEnabled } from '../core/config.js';
 import { debugLog } from '../core/utils.js';
 
 import {
@@ -325,8 +326,10 @@ export async function executeSpawnTask(
       reasoningEffort,
       excludeDynamicPromptSections,
       taskTimeoutSeconds,
-      // SURF-3 S2/S3 — live tool-by-tool activity (flag-gated; no-op when off).
-      liveTraceEnabled: config?.live_trace?.enabled === true,
+      // SURF-3 S2/S3 — live tool-by-tool activity (flag-gated; no-op when
+      // off). 583/N5: env-twin aware — an interactive-origin coordinator
+      // (DECKENT_LIVE_TRACE=1) streams live without a global config flip.
+      liveTraceEnabled: resolveLiveTraceEnabled(config),
       sprintId: task.sprintId,
     });
   } else if (!isTmuxProvider(taskProvider)) {

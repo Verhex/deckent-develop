@@ -38,6 +38,7 @@ import {
 } from './agentic-worker-runner.js';
 import { setupWorkerApprovalGateFromEnv } from './worker-approval-env.js';
 import { normalizeUsage } from '../core/token-usage.js';
+import { resolveLiveTraceEnabled } from '../core/config.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -401,6 +402,21 @@ export async function runWorkerEntry(
     projectRoot: projectDir,
   };
   if (deps.fetchImpl) runnerOpts.fetchImpl = deps.fetchImpl;
+
+  // 583/N5: resolve live_trace for THIS worker process — the runner's ordered
+  // progress-stream was never fed before (the option existed but no caller
+  // filled it, so the emitter stayed permanently off). Same disk-read pattern
+  // as the task json above; env twin (DECKENT_LIVE_TRACE=1, inherited from an
+  // interactive-origin coordinator) wins inside resolveLiveTraceEnabled.
+  let liveTraceCfg: { live_trace?: { enabled?: boolean } } | undefined;
+  try {
+    liveTraceCfg = JSON.parse(
+      readFileSync(join(projectDir, '.deckent', 'config.json'), 'utf-8'),
+    ) as { live_trace?: { enabled?: boolean } };
+  } catch {
+    liveTraceCfg = undefined;
+  }
+  runnerOpts.liveTrace = { enabled: resolveLiveTraceEnabled(liveTraceCfg) };
 
   // born-611: approval-gate env-kontratı (orchestrator `approval.gate_enabled`
   // iken DECKENT_APPROVAL_GATE enjekte eder; yokken sıfır-ayakizi — gate kurulmaz).

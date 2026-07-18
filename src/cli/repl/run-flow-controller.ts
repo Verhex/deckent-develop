@@ -302,7 +302,8 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
         '--revision', String(stored.revision),
         '--plan-digest', stored.planDigest,
       ];
-      const spawned = spawnDetachedDeckent(cliArgs, { projectRoot: deps.root, flowId: fid });
+      // 583/N5: the REPL /run flow is a human decision surface — stream live.
+      const spawned = spawnDetachedDeckent(cliArgs, { projectRoot: deps.root, flowId: fid, liveTrace: true });
       return { flowId: fid, jobId: `flow-${fid}-r${stored.revision}`, logRef: spawned.logPath };
     });
 

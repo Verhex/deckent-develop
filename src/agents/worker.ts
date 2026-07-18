@@ -23,6 +23,7 @@ import type {
   TaskScope,
 } from '../core/types.js';
 import { TASKS_DIR } from '../core/constants.js';
+import { resolveLiveTraceEnabled } from '../core/config.js';
 import { ErrorRegistry } from '../core/errors.js';
 import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-enforcer.js';
 import { writeEvent, getCurrentSprintId, CHANNELS } from '../orchestra/event-stream.js';
@@ -391,15 +392,18 @@ export function writeHeartbeat(projectRoot: string, heartbeat: Heartbeat, sprint
 
 // live_trace flag, read once per process (workers are per-task processes; a
 // mid-task config flip applying on the NEXT task is the intended semantics).
+// 583/N5: env-twin aware via resolveLiveTraceEnabled — a worker spawned under
+// an interactive-origin coordinator inherits DECKENT_LIVE_TRACE=1 and streams
+// even when the disk config keeps the global default off.
 let liveTraceEnabledCache: boolean | null = null;
 function isLiveTraceEnabled(projectRoot: string): boolean {
   if (liveTraceEnabledCache !== null) return liveTraceEnabledCache;
   try {
     const raw = readFileSync(join(projectRoot, '.deckent', 'config.json'), 'utf-8');
     const parsed = JSON.parse(raw) as { live_trace?: { enabled?: boolean } };
-    liveTraceEnabledCache = parsed.live_trace?.enabled === true;
+    liveTraceEnabledCache = resolveLiveTraceEnabled(parsed);
   } catch {
-    liveTraceEnabledCache = false;
+    liveTraceEnabledCache = resolveLiveTraceEnabled(undefined);
   }
   return liveTraceEnabledCache;
 }

@@ -26,6 +26,7 @@ import { openSync, closeSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { RECENT_WORKS_DIR } from '../../core/constants.js';
+import { LIVE_TRACE_ENV } from '../../core/config.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,17 @@ export interface SpawnDetachedOptions {
    * unchanged.
    */
   flowId?: string;
+  /**
+   * 583/N5 TRACE-FLIP: mark this spawn interactive-origin — the child env gets
+   * `DECKENT_LIVE_TRACE=1`, so the coordinator (and every worker it spawns)
+   * resolves `live_trace.enabled` ON via resolveLiveTraceEnabled (config.ts)
+   * WITHOUT a global config flip. Set by the human decision surfaces (REPL
+   * card `s` / `deckent runs --start` / desktop-API start via
+   * buildFlowStartSpawn, the REPL /run flow, REPL chat dispatch); deliberately
+   * NOT set by programmatic callers (SDK client, MCP start tool) so
+   * headless/automation runs keep the zero-cost no-op tap.
+   */
+  liveTrace?: boolean;
 }
 
 export interface DetachedSpawnResult {
@@ -127,7 +139,11 @@ export function spawnDetachedDeckent(
       detached: true,
       stdio: ['ignore', logFd, logFd],
       cwd: projectRoot,
-      env: { ...process.env },
+      // 583/N5: interactive-origin spawns export the live-trace env twin to
+      // the child tree (see SpawnDetachedOptions.liveTrace).
+      env: opts.liveTrace === true
+        ? { ...process.env, [LIVE_TRACE_ENV]: '1' }
+        : { ...process.env },
       windowsHide: true,
     });
   } finally {
@@ -148,16 +164,23 @@ export function spawnDetachedDeckent(
  * `deckent runs <n> --start`) build their `spawnStart` closure here, so the
  * argv contract cannot drift between them. Returns the closure
  * orchestra/run-flow-decision-service.ts's startRunFlow() consumes.
+ *
+ * 583/N5: flow-start IS the human seal (an approved run being launched from a
+ * decision surface — REPL card `s`, `deckent runs --start`, desktop/API
+ * start), so every spawn built here is interactive-origin by construction and
+ * carries `liveTrace: true` — the run streams live worker activity.
+ * `spawnFn` is the hermetic test seam (same idiom as SpawnDetachedOptions).
  */
 export function buildFlowStartSpawn(
   projectRoot: string,
   revision: number,
   planDigest: string,
+  spawnFn?: DetachedSpawnFn,
 ): (sprint: unknown, flowId: string) => { flowId: string; jobId: string; logRef: string } {
   return (_sprint, flowId) => {
     const spawned = spawnDetachedDeckent(
       ['start', '--flow-id', flowId, '--revision', String(revision), '--plan-digest', planDigest],
-      { projectRoot, flowId },
+      { projectRoot, flowId, liveTrace: true, ...(spawnFn ? { spawnFn } : {}) },
     );
     return { flowId, jobId: `flow-${flowId}-r${revision}`, logRef: spawned.logPath };
   };

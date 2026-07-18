@@ -432,7 +432,9 @@ export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): Mc
       }
       if (isDetachedCommandClass(cliArgs)) {
         try {
-          const result = spawnDetachedFn(cliArgs, { projectRoot: opts.projectRoot });
+          // 583/N5: REPL-chat-origin start/run/process-submit are interactive —
+          // the detached child streams live worker activity (env twin).
+          const result = spawnDetachedFn(cliArgs, { projectRoot: opts.projectRoot, liveTrace: true });
           return formatDetachedStartMessage(cliArgs, result, labels);
         } catch (err) {
           if (isPermissionDeniedError(err)) return `[deckent-denied] ${name}: ${permissionDeniedLabel}`;
