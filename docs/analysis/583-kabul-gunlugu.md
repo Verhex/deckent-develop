@@ -28,7 +28,7 @@
 ### Gün-1 egzersiz-listesi (gerçek işin içinde dokunulacaklar)
 - [ ] Desktop: bağlan/spawn → Console «Rota» canlı-akış → bir koşu başlat (Emir) → Telgraf-karar
 - [ ] **Telsiz**: gerçek soru-cevap (canlı model-cevabı smoke'ta kanıtlı — görsel ilk-temas bugün)
-- [ ] **Makine-Dairesi**: shell + deckent + bir AI-tool oturumu; sekme-klavyesi (ok-tuşları)
+- [x] **Makine-Dairesi**: ✅ GÖRSEL-KANIT DÜŞTÜ (Alperen canlı, 11:5x): terminaller Electron-ekranında görünüyor + çalışıyor — N3'ün bekleyen kanıtı + P5-fix canlı-doğrulandı (token-preflight geçti ki soket bağlandı)
 - [ ] Terminal REPL: `@path` + slash-menü + inbox-kartı (a/f/r/s) + onay-kartı gerçek işte
 - [ ] `runs <n> --diff` → **DiffPanel** aynı koşuda (iki yüzey aynı ayak-izi)
 - [ ] Koşu-sonu `runs <n> --commit` VEYA chat'ten `git_add/commit` onay-kartıyla (N4 iki bacak)
