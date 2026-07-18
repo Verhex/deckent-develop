@@ -3908,6 +3908,8 @@ const MESSAGES: MessageMap = {
   'desktop.nova.order.dismiss': { en: 'dismiss', tr: 'vazgeç' },
   'desktop.nova.order.started': { en: 'run started — the core is waking.', tr: 'koşu başladı — çekirdek uyanıyor.' },
   'desktop.nova.order.failed': { en: 'order failed', tr: 'emir başarısız' },
+  'desktop.nova.river.tool': { en: 'tool', tr: 'araç' },
+  'desktop.nova.focus.empty': { en: 'no narrative yet — the worker is thinking…', tr: 'henüz anlatı yok — worker düşünüyor…' },
 
   'desktop.theme.watch.day-watch': { en: 'Day watch', tr: 'Gündüz seyri' },
   'desktop.theme.watch.night-watch': { en: 'Night watch', tr: 'Gece seyri' },

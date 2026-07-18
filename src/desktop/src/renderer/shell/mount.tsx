@@ -23,7 +23,13 @@ const UI_KEY = 'deckent.ui';
 
 function RootSwitch({ queryClient }: { queryClient: QueryClient }): React.JSX.Element {
   const [ui, setUi] = useState<string>(() => localStorage.getItem(UI_KEY) ?? 'nova');
-  const flip = (next: string): void => { localStorage.setItem(UI_KEY, next); setUi(next); };
+  const flip = (next: string): void => {
+    // P17: iki kabuk TEK hash'i paylaşır — geçişte hedef-kök'e sıfırla,
+    // yoksa karşı-router bilinmeyen-rotada 404-hata-sayfasına düşer.
+    location.hash = next === 'classic' ? '#/console' : '#/command';
+    localStorage.setItem(UI_KEY, next);
+    setUi(next);
+  };
   if (ui === 'classic') {
     return (
       <>

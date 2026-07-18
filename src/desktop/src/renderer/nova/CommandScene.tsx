@@ -20,6 +20,7 @@ import {
 } from '../shell/api-client.js';
 import { useShellStore } from '../shell/session-store.js';
 import { humanizeLogLine } from '../shell/log-humanize.js';
+import { projectRiverLine } from './river-projection.js';
 import { semanticVarName } from '../shell/xterm-theme.js';
 import {
   phaseArcFraction, orbitSegments, hitOrbitIndex,
@@ -36,6 +37,8 @@ export const MSG = {
   deckent: 'desktop.nova.river.deckent',
   cmdPlaceholder: 'desktop.nova.cmd.placeholder',
   cmdHint: 'desktop.nova.cmd.hint',
+  riverTool: 'desktop.nova.river.tool',
+  focusEmpty: 'desktop.nova.focus.empty',
   orderSent: 'desktop.nova.order.sent',
   orderPreviewing: 'desktop.nova.order.previewing',
   orderPreviewTitle: 'desktop.nova.order.preview_title',
@@ -73,6 +76,8 @@ export default function CommandScene(): React.JSX.Element {
   const [selected, setSelected] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [offline, setOffline] = useState(false);
+  // P18: seçili-worker yan-paneli için son-satır kuyruğu (worker-başına 6).
+  const [workerTail, setWorkerTail] = useState<Map<string, string[]>>(new Map());
 
   // Kalıcı sahne-durumu (render-dışı): nabızlar, kıvılcımlar, osiloskop.
   const pulses = useRef(new Map<string, PulseState>());
@@ -117,12 +122,21 @@ export default function CommandScene(): React.JSX.Element {
     if (!api || feeds.current.has(worker.taskId)) return;
     const close = api.openWorkerLog(worker.taskId, {
       onLine: (raw) => {
-        const line = humanizeLogLine(raw);
-        const index = (snapRef.current?.workers ?? []).findIndex((w) => w.taskId === worker.taskId);
-        pushRiver({ src: worker.taskId, text: line, tone: 'worker', colorIndex: Math.max(0, index) });
+        // P16: nabız/kıvılcım HER satırda atar (canlılık); nehre yalnız
+        // insan-projeksiyonundan geçen satır girer (gürültü düşer).
         const p = pulses.current.get(worker.taskId) ?? { level: 0, lastSeq: -1 };
         pulses.current.set(worker.taskId, pulseOnLine(p));
         sparks.current.push({ taskId: worker.taskId, t: 0 });
+        const projected = projectRiverLine(humanizeLogLine(raw), { tool: t(MSG.riverTool) });
+        if (projected.kind === 'drop') return;
+        const index = (snapRef.current?.workers ?? []).findIndex((w) => w.taskId === worker.taskId);
+        pushRiver({ src: worker.taskId, text: projected.text, tone: 'worker', colorIndex: Math.max(0, index) });
+        setWorkerTail((current) => {
+          const next = new Map(current);
+          const tail = [...(next.get(worker.taskId) ?? []), projected.text].slice(-6);
+          next.set(worker.taskId, tail);
+          return next;
+        });
       },
       onUnavailable: () => { /* dürüst-boş: satır gelmeden sahne zaten nefes-modunda */ },
     });
@@ -285,6 +299,15 @@ export default function CommandScene(): React.JSX.Element {
         ctx.fillText(segment.taskId, lx, ly);
         ctx.fillStyle = muted; ctx.font = `${8.5 * dp}px "Geist Mono", monospace`;
         ctx.fillText(worker.hb ? `${Math.round(worker.hb.ageMs / 1000)}s` : worker.status, lx, ly + 12 * dp);
+        // P18: segment-altı CANLI-EYLEM — sahne artık ne yapıldığını anlatır.
+        const action = worker.hb?.currentAction;
+        if (action !== undefined && action.length > 0) {
+          const short = action.length > 34 ? `${action.slice(0, 33)}…` : action;
+          ctx.fillStyle = ink; ctx.globalAlpha = 0.75;
+          ctx.font = `${8 * dp}px "Geist Mono", monospace`;
+          ctx.fillText(short, lx, ly + 24 * dp);
+          ctx.globalAlpha = 1;
+        }
       });
       // kıvılcımlar → nehir-ağzı
       const mouthY = h - 176 * dp;
@@ -338,6 +361,25 @@ export default function CommandScene(): React.JSX.Element {
         {!snap?.active && (
           <p className="nova-scene__idle mono">{offline ? t(MSG.offline) : t(MSG.idle)}</p>
         )}
+        {selected !== null && (() => {
+          const worker = (snapRef.current?.workers ?? []).find((w) => w.taskId === selected);
+          const tail = workerTail.get(selected) ?? [];
+          return (
+            <aside className="nova-focus" aria-label={selected}>
+              <h3 className="mono">{selected}</h3>
+              <p className="nova-focus__meta mono">
+                {worker?.agent ?? ''}{worker?.model ? ` · ${worker.model}` : ''}{worker?.hb ? ` · ${worker.hb.status}` : ''}
+              </p>
+              {tail.length === 0 ? (
+                <p className="nova-focus__empty mono">{t(MSG.focusEmpty)}</p>
+              ) : (
+                <ol className="nova-focus__tail">
+                  {tail.map((line, index) => <li key={`${index}-${line.slice(0, 10)}`}>{line}</li>)}
+                </ol>
+              )}
+            </aside>
+          );
+        })()}
         {order && (
           <aside className="nova-order" role="dialog" aria-label={t(MSG.orderPreviewTitle)}>
             <h3 className="mono">{t(MSG.orderPreviewTitle)}</h3>

@@ -216,6 +216,8 @@ export const DESKTOP_MESSAGE_KEYS = [
   'desktop.nova.order.dismiss',
   'desktop.nova.order.started',
   'desktop.nova.order.failed',
+  'desktop.nova.river.tool',
+  'desktop.nova.focus.empty',
   'desktop.theme.watch.day-watch',
   'desktop.theme.watch.night-watch',
   'desktop.theme.watch.open-sea',
