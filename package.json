@@ -1,1 +1,143 @@
-{"name":"deckent","version":"invalid-version","description":"AI agent orchestration system — your AI development team, orchestrated.","type":"module","bin":{"deckent":"./dist/cli/entry.js","deckent-mcp":"./dist/mcp/server.js"},"main":"./dist/index.js","types":"./dist/index.d.ts","exports":{".":{"import":"./dist/index.js","types":"./dist/index.d.ts"},"./sdk":{"import":"./dist/sdk/index.js","types":"./dist/sdk/index.d.ts"}},"scripts":{"build":"npm run clean && tsc && node scripts/copy-assets.mjs","dev":"tsc --watch","test":"vitest run","test:watch":"vitest","test:coverage":"vitest run --coverage","test:ci-sim":"node scripts/test-ci-sim.mjs","test:e2e-surfaces":"node scripts/test-e2e-surfaces.mjs","verify:rt-latency":"node scripts/rt-latency-verify.mjs","verify:repl-tools":"node scripts/ink-pty-tool-verify.mjs","verify:native-repl":"node scripts/ink-pty-native-verify.mjs","extract:traces":"node scripts/extract-traces.mjs","test:dashboard":"vitest run --config vitest.dashboard.config.ts","build:dashboard":"node scripts/build-dashboard.mjs","build:all":"npm run clean && tsc && node scripts/copy-assets.mjs && npm run build:dashboard","lint":"tsc --noEmit && tsc --noEmit -p src/dashboard && npm run lint:gates","tsc:dashboard":"tsc --noEmit -p src/dashboard","install:all":"npm ci && npm ci --prefix src/dashboard && npm ci --prefix src/desktop","lint:adr":"node scripts/adr-validator.mjs","lint:errors":"node scripts/check-error-handling.mjs","lint:link":"node scripts/lint-links.mjs","lint:spawnsync":"node scripts/lint-no-spawnsync.mjs","lint:model-literal":"node scripts/lint-no-model-literal.mjs","lint:parity":"node scripts/lint-cli-mcp-parity.mjs","lint:i18n":"node scripts/lint-i18n-hardcode.mjs","lint:identity":"node scripts/lint-identity-md.mjs","lint:shims":"node scripts/lint-layer-shims.mjs","lint:hermetic":"node scripts/lint-test-hermeticity.mjs","lint:gitignore":"node scripts/verify-gitignore.mjs","lint:routing":"node scripts/routing-distribution.mjs --ci","lint:desktop-api-sync":"node scripts/lint-desktop-api-sync.mjs","lint:manifests":"node scripts/lint-manifests.mjs","lint:builtins-drift":"node scripts/builtins-drift-check.mjs --check","lint:gates":"node scripts/lint-cli-mcp-parity.mjs && node scripts/lint-i18n-hardcode.mjs && node scripts/lint-layer-shims.mjs && node scripts/lint-test-hermeticity.mjs && node scripts/verify-gitignore.mjs && node scripts/routing-distribution.mjs --ci && node scripts/lint-desktop-api-sync.mjs && node scripts/lint-manifests.mjs","clean":"node scripts/clean.mjs","ci:rebuild-native":"npm rebuild better-sqlite3 --ignore-scripts=false","fix:bin":"node scripts/copy-assets.mjs --fix-bin-only","validate:publish":"node scripts/validate-publish.mjs","release":"npm run docs:stats:check && npm run docs:ref:check && npm run lint:identity && npm run build:all && npm run validate:publish","docs:generate-cli":"npx tsx scripts/generate-cli-docs.ts","docs:ref":"node scripts/gen-reference-docs.mjs --write","docs:ref:check":"node scripts/gen-reference-docs.mjs --check","docs:stats":"node scripts/update-readme-stats.mjs --write","docs:stats:check":"node scripts/update-readme-stats.mjs --check","prepublishOnly":"npm run docs:stats:check && npm run docs:ref:check && npm run lint:identity && npm run build","tsc:desktop":"tsc --noEmit -p src/desktop","build:desktop":"npm run build --prefix src/desktop","dev:desktop":"npm run dev --prefix src/desktop","test:desktop":"vitest run --config vitest.desktop.config.ts","verify:affected":"node scripts/ccverify-affected.mjs"},"keywords":["ai","agent","orchestration","claude","cli","agents","skills","marketplace","analytics"],"author":"Alperen @ Verhex","license":"MIT","repository":{"type":"git","url":"https://github.com/VerhexIO/deckent.git"},"bugs":{"url":"https://github.com/VerhexIO/deckent/issues"},"homepage":"https://deckent.ai","dependencies":{"@lydell/node-pty":"^1.2.0-beta.12","@modelcontextprotocol/sdk":"^1.27.1","@noble/ed25519":"^2.3.0","@noble/hashes":"^1.8.0","better-sqlite3":"^12.10.0","cli-highlight":"^2.1.11","commander":"^13.0.0","grammy":"^1.44.0","ink":"^7.0.5","react":"^19.2.7","react-dom":"^19.2.7","ws":"^8.18.0","zod":"^3.25.0"},"engines":{"node":">=24.0.0"},"files":["dist","bin","assets","README.md","LICENSE"],"publishConfig":{"access":"public"},"optionalDependencies":{"discord.js":"^14.26.3","nodemailer":"^9.0.3","openai":"^4.103.0"},"overrides":{"undici":"6.27.0"},"devDependencies":{"@testing-library/jest-dom":"^6.9.1","@testing-library/react":"^16.3.2","@types/better-sqlite3":"^7.6.13","@types/node":"^25.5.0","@types/react":"^19.2.16","@types/ws":"^8.5.14","@vitest/coverage-v8":"^3.0.0","happy-dom":"^20.8.4","ink-testing-library":"^4.0.0","typescript":"^5.7.0","vitest":"^3.0.0"}}
+{
+  "name": "deckent",
+  "version": "1.0.0-beta.1",
+  "description": "AI agent orchestration system — your AI development team, orchestrated.",
+  "type": "module",
+  "bin": {
+    "deckent": "./dist/cli/entry.js",
+    "deckent-mcp": "./dist/mcp/server.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./sdk": {
+      "import": "./dist/sdk/index.js",
+      "types": "./dist/sdk/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "npm run clean && tsc && node scripts/copy-assets.mjs",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ci-sim": "node scripts/test-ci-sim.mjs",
+    "test:e2e-surfaces": "node scripts/test-e2e-surfaces.mjs",
+    "verify:rt-latency": "node scripts/rt-latency-verify.mjs",
+    "verify:repl-tools": "node scripts/ink-pty-tool-verify.mjs",
+    "verify:native-repl": "node scripts/ink-pty-native-verify.mjs",
+    "extract:traces": "node scripts/extract-traces.mjs",
+    "test:dashboard": "vitest run --config vitest.dashboard.config.ts",
+    "build:dashboard": "node scripts/build-dashboard.mjs",
+    "build:all": "npm run clean && tsc && node scripts/copy-assets.mjs && npm run build:dashboard",
+    "lint": "tsc --noEmit && tsc --noEmit -p src/dashboard && npm run lint:gates",
+    "tsc:dashboard": "tsc --noEmit -p src/dashboard",
+    "install:all": "npm ci && npm ci --prefix src/dashboard && npm ci --prefix src/desktop",
+    "lint:adr": "node scripts/adr-validator.mjs",
+    "lint:errors": "node scripts/check-error-handling.mjs",
+    "lint:link": "node scripts/lint-links.mjs",
+    "lint:spawnsync": "node scripts/lint-no-spawnsync.mjs",
+    "lint:model-literal": "node scripts/lint-no-model-literal.mjs",
+    "lint:parity": "node scripts/lint-cli-mcp-parity.mjs",
+    "lint:i18n": "node scripts/lint-i18n-hardcode.mjs",
+    "lint:identity": "node scripts/lint-identity-md.mjs",
+    "lint:shims": "node scripts/lint-layer-shims.mjs",
+    "lint:hermetic": "node scripts/lint-test-hermeticity.mjs",
+    "lint:gitignore": "node scripts/verify-gitignore.mjs",
+    "lint:routing": "node scripts/routing-distribution.mjs --ci",
+    "lint:desktop-api-sync": "node scripts/lint-desktop-api-sync.mjs",
+    "lint:manifests": "node scripts/lint-manifests.mjs",
+    "lint:builtins-drift": "node scripts/builtins-drift-check.mjs --check",
+    "lint:gates": "node scripts/lint-cli-mcp-parity.mjs && node scripts/lint-i18n-hardcode.mjs && node scripts/lint-layer-shims.mjs && node scripts/lint-test-hermeticity.mjs && node scripts/verify-gitignore.mjs && node scripts/routing-distribution.mjs --ci && node scripts/lint-desktop-api-sync.mjs && node scripts/lint-manifests.mjs",
+    "clean": "node scripts/clean.mjs",
+    "ci:rebuild-native": "npm rebuild better-sqlite3 --ignore-scripts=false",
+    "fix:bin": "node scripts/copy-assets.mjs --fix-bin-only",
+    "validate:publish": "node scripts/validate-publish.mjs",
+    "release": "npm run docs:stats:check && npm run docs:ref:check && npm run lint:identity && npm run build:all && npm run validate:publish",
+    "docs:generate-cli": "npx tsx scripts/generate-cli-docs.ts",
+    "docs:ref": "node scripts/gen-reference-docs.mjs --write",
+    "docs:ref:check": "node scripts/gen-reference-docs.mjs --check",
+    "docs:stats": "node scripts/update-readme-stats.mjs --write",
+    "docs:stats:check": "node scripts/update-readme-stats.mjs --check",
+    "prepublishOnly": "npm run docs:stats:check && npm run docs:ref:check && npm run lint:identity && npm run build",
+    "tsc:desktop": "tsc --noEmit -p src/desktop",
+    "build:desktop": "npm run build --prefix src/desktop",
+    "dev:desktop": "npm run dev --prefix src/desktop",
+    "test:desktop": "vitest run --config vitest.desktop.config.ts",
+    "verify:affected": "node scripts/ccverify-affected.mjs"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "orchestration",
+    "claude",
+    "cli",
+    "agents",
+    "skills",
+    "marketplace",
+    "analytics"
+  ],
+  "author": "Alperen @ Verhex",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VerhexIO/deckent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/VerhexIO/deckent/issues"
+  },
+  "homepage": "https://deckent.ai",
+  "dependencies": {
+    "@lydell/node-pty": "^1.2.0-beta.12",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@noble/ed25519": "^2.3.0",
+    "@noble/hashes": "^1.8.0",
+    "better-sqlite3": "^12.10.0",
+    "cli-highlight": "^2.1.11",
+    "commander": "^13.0.0",
+    "grammy": "^1.44.0",
+    "ink": "^7.0.5",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "ws": "^8.18.0",
+    "zod": "^3.25.0"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "assets",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "optionalDependencies": {
+    "discord.js": "^14.26.3",
+    "nodemailer": "^9.0.3",
+    "openai": "^4.103.0"
+  },
+  "overrides": {
+    "undici": "6.27.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.16",
+    "@types/ws": "^8.5.14",
+    "@vitest/coverage-v8": "^3.0.0",
+    "happy-dom": "^20.8.4",
+    "ink-testing-library": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

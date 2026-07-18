@@ -9,6 +9,22 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint448] - 2026-07-18
+
+### Added
+
+- Envanterlerden Türkçe kısa özet-notu md dosyasını derle
+- Özet-notu bütünlük doğrulaması ve link-lint entegrasyon kontrolü
+
+### Fixed
+
+- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: Investigated the cross-dependency hypothesis first (443-…
+- Kök .analysis dizininde bugünkü md dosyalarını keşfet ve envanter JSON üret
+- Alt dizinlerdeki (a6-sinav-u1 ve u4-olcum) bugünkü md dosyalarını keşfet ve envanter JSON üret
+
+
+_Tasks: 8 total, 8 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint447] - 2026-07-18
 
 ### Added
