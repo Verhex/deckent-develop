@@ -21,6 +21,9 @@
  * DOM-free, and xterm (+its css) must never evaluate there.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+// DT-2 (583 tasarım-turu): the D4-0-locked a11y library, worn for real — the
+// session tabs get arrow-key roving tabindex + focus-visible for free.
+import { Button, Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -274,46 +277,39 @@ export default function EngineRoom(): React.JSX.Element {
       {sessions.length === 0 ? (
         <p className="shell-muted">{t(MSG.sessionsEmpty)}</p>
       ) : (
-        <div className="engine-room__tabs" role="tablist">
-          {sessions.map((session) => (
-            <span
-              key={session.id}
-              className={
-                session.id === activeId ? 'engine-room__tab engine-room__tab--active' : 'engine-room__tab'
-              }
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={session.id === activeId}
-                onClick={() => setActiveId(session.id)}
-              >
+        <Tabs
+          className="engine-room__tabs-root"
+          selectedKey={activeId ?? undefined}
+          onSelectionChange={(key) => setActiveId(String(key))}
+        >
+          <TabList aria-label={t(MSG.title)} className="engine-room__tabs" items={sessions}>
+            {(session) => (
+              <Tab id={session.id} className="engine-room__tab">
                 <code>{session.id.slice(0, 8)}</code> {session.kind}
                 {session.status === 'exited'
                   ? ` · ${t(MSG.exited, { code: String(session.exitCode ?? 0) })}`
                   : ''}
-              </button>
-              <button
-                type="button"
-                aria-label={t(MSG.closeSession)}
-                title={t(MSG.closeSession)}
-                onClick={() => void closeSession(session.id)}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-      {activeId !== null && (
-        <div className="engine-room__pane-wrap">
-          {link !== 'open' && (
-            <p className="shell-muted engine-room__link">
-              {t(link === 'connecting' ? MSG.connecting : MSG.reconnecting)}
-            </p>
+                <Button
+                  className="engine-room__close"
+                  aria-label={t(MSG.closeSession)}
+                  onPress={() => void closeSession(session.id)}
+                >
+                  ×
+                </Button>
+              </Tab>
+            )}
+          </TabList>
+          {activeId !== null && (
+            <TabPanel id={activeId} className="engine-room__pane-wrap">
+              {link !== 'open' && (
+                <p className="shell-muted engine-room__link">
+                  {t(link === 'connecting' ? MSG.connecting : MSG.reconnecting)}
+                </p>
+              )}
+              <div ref={paneRef} className="engine-room__pane" data-terminal={activeId} />
+            </TabPanel>
           )}
-          <div ref={paneRef} className="engine-room__pane" data-terminal={activeId} />
-        </div>
+        </Tabs>
       )}
     </div>
   );

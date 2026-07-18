@@ -165,6 +165,10 @@ describe('spawnDaemon', () => {
       stdio: 'ignore',
     });
     expect((opts as { env: Record<string, string> }).env.DECKENT_API_TOKEN).toBe(result.apiToken);
+    // DT-1 «Telsiz»: a Desktop-SPAWNED daemon is the operator's own control
+    // plane — the SURF-7 control-mutation ratchet opens via its env twin
+    // (global default stays OFF; adopted daemons keep their own setting).
+    expect((opts as { env: Record<string, string> }).env.DECKENT_CONTROL_MUTATIONS).toBe('1');
     expect(capturedChild!.unref).toHaveBeenCalledTimes(1);
   });
 

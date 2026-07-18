@@ -33,7 +33,6 @@ export const MSG = {
   flagRunFlowOff: 'desktop.shell.flag_run_flow_off',
   liveEvents: 'desktop.shell.live_events',
   approvalsPending: 'desktop.shell.approvals_pending',
-  chatComing: 'desktop.shell.chat_coming',
   loading: 'desktop.connection.list_loading',
   loadError: 'desktop.shell.load_error',
   courseTitle: 'desktop.shell.console.course',
@@ -41,7 +40,6 @@ export const MSG = {
   approvalTitle: 'desktop.shell.approval.title',
   approvalEmpty: 'desktop.shell.approval.empty',
   historyTitle: 'desktop.shell.history.title',
-  chatEyebrow: 'desktop.shell.chat.eyebrow',
   // SURF-5 — real workflow organs
   // SURF-5 kuyruk — zaman-humanize: the terminal inbox's shared time vocabulary.
   timeJustNow: 'tui.inbox_time_just_now',
@@ -137,10 +135,15 @@ function CourseStrip({ events }: { events: readonly RunFlowEventPayload[] }): Re
   return (
     <section className="course-strip" aria-label={t(MSG.courseTitle)}>
       <p className="view-eyebrow">{t(MSG.courseTitle)}</p>
-      <svg viewBox={`0 0 ${COURSE_W} ${COURSE_H}`} preserveAspectRatio="none" aria-hidden="true">
+      {/* DT-3 (583 tasarım-turu): the D4-0 signature completed — hovering a
+          position fix reveals ITS event record (type · raw ISO, the same
+          on-hover-ISO convention the ship's-log rows use). The svg therefore
+          stops being aria-hidden and names itself. */}
+      <svg viewBox={`0 0 ${COURSE_W} ${COURSE_H}`} preserveAspectRatio="none" role="img" aria-label={t(MSG.courseTitle)}>
         <path className={geometry.underway ? 'course-line course-line--underway' : 'course-line'} d={geometry.pathD} />
         {geometry.fixes.map((fix, index) => (
           <g key={`${fix.sequence ?? index}-${fix.type}`}>
+            <title>{`${fix.type} · ${fix.timestamp}`}</title>
             <circle
               className={index < geometry.fixes.length - 1 || !geometry.underway ? 'course-fix course-fix--done' : 'course-fix'}
               cx={fix.x}
@@ -608,18 +611,6 @@ function ApprovalView(): React.JSX.Element {
   );
 }
 
-// ─── Chat — designed honest empty state («vardiya telsizi») ─────────────────
-
-function ChatView(): React.JSX.Element {
-  const t = useT();
-  return (
-    <div className="radio-empty">
-      <p className="view-eyebrow">{t(MSG.chatEyebrow)}</p>
-      <h2>{t(MSG.chatComing)}</h2>
-    </div>
-  );
-}
-
 // ─── History — the voyage ledger ─────────────────────────────────────────────
 
 function HistoryView(): React.JSX.Element {
@@ -668,6 +659,20 @@ function EngineRoomRoute(): React.JSX.Element {
   );
 }
 
+// ─── «Telsiz» (DT-1, 583 tasarım-turu) — lazy route ──────────────────────────
+// Same lazy rule: react-aria-components stays out of the node-env test graph.
+
+const Telsiz = lazy(() => import('./Telsiz.js'));
+
+function TelsizRoute(): React.JSX.Element {
+  const t = useT();
+  return (
+    <Suspense fallback={<p className="shell-muted">{t(MSG.loading)}</p>}>
+      <Telsiz />
+    </Suspense>
+  );
+}
+
 // ─── Router ──────────────────────────────────────────────────────────────────
 // Created INSIDE the component (not at module scope): createHashRouter touches
 // `document` at construction, and node-env tests import this module DOM-free.
@@ -682,7 +687,7 @@ export function Shell({ queryClient }: { queryClient: QueryClient }): React.JSX.
           children: [
             { index: true, element: <Navigate to="/console" replace /> },
             { path: 'console', element: <ConsoleView /> },
-            { path: 'chat', element: <ChatView /> },
+            { path: 'chat', element: <TelsizRoute /> },
             { path: 'approval', element: <ApprovalView /> },
             { path: 'history', element: <HistoryView /> },
             { path: 'terminal', element: <EngineRoomRoute /> },

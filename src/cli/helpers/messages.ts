@@ -3750,6 +3750,23 @@ const MESSAGES: MessageMap = {
   'desktop.shell.approval.empty': { en: 'No pending orders.', tr: 'Bekleyen emir yok.' },
   'desktop.shell.history.title': { en: 'Voyage ledger', tr: 'Sefer kayıtları' },
   'desktop.shell.chat.eyebrow': { en: 'Watch radio', tr: 'Vardiya telsizi' },
+  // DT-1 «Telsiz» (583 tasarım-turu) — the Desktop's real chat.
+  'desktop.shell.radio.empty_hint': {
+    en: 'The watch radio is open — ask deckent anything about this project.',
+    tr: 'Vardiya telsizi açık — deckent\'e bu projeyle ilgili her şeyi sorabilirsiniz.',
+  },
+  'desktop.shell.radio.placeholder': { en: 'Transmit a message…', tr: 'Mesaj geçin…' },
+  'desktop.shell.radio.send': { en: 'Transmit', tr: 'Gönder' },
+  'desktop.shell.radio.role_operator': { en: 'bridge', tr: 'köprü' },
+  'desktop.shell.radio.role_deckent': { en: 'deckent', tr: 'deckent' },
+  'desktop.shell.radio.gate_off': {
+    en: 'Remote chat is disabled on this daemon (api.control_mutations) — Desktop-spawned daemons enable it automatically; for an adopted daemon, enable the flag on its side.',
+    tr: 'Bu daemonda uzaktan sohbet kapalı (api.control_mutations) — Desktop\'ın başlattığı daemonlarda otomatik açıktır; devralınan daemon için bayrağı daemon tarafında açın.',
+  },
+  'desktop.shell.radio.failed': {
+    en: 'transmission failed: {message}',
+    tr: 'iletim başarısız: {message}',
+  },
   // SURF-5 — real-workflow organs: «Emir» (propose) + preview + «Telgraf».
   'desktop.shell.console.order_placeholder': {
     en: 'State the goal — a new course order for the crew…',

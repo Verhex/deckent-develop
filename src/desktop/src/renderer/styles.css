@@ -685,26 +685,32 @@ select:focus-visible {
   flex-wrap: wrap;
   margin-bottom: var(--space-3);
 }
+/* DT-2: tabs are react-aria <Tab> elements — selection/focus ride data-attrs. */
+.engine-room__tabs-root { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .engine-room__tabs { display: flex; gap: var(--space-1); flex-wrap: wrap; margin-bottom: var(--space-2); }
 .engine-room__tab {
   display: inline-flex;
   align-items: center;
+  gap: var(--space-1);
   border: 1px solid var(--dk-s-border);
   border-radius: 4px;
   background: var(--dk-s-surface);
-}
-.engine-room__tab--active { border-color: var(--dk-s-accent); }
-.engine-room__tab button {
   font-family: var(--dk-font-data);
   font-size: 12px;
   color: var(--dk-s-text);
-  background: none;
-  border: none;
   cursor: pointer;
   padding: var(--space-1) var(--space-2);
 }
-.engine-room__tab button + button { color: var(--dk-s-text-muted); padding-left: 0; }
+.engine-room__tab[data-selected] { border-color: var(--dk-s-accent); }
 .engine-room__tab code { color: var(--dk-s-brass); }
+.engine-room__close {
+  background: none;
+  border: none;
+  color: var(--dk-s-text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+}
 .engine-room__pane-wrap {
   position: relative;
   flex: 1;
@@ -722,4 +728,57 @@ select:focus-visible {
   z-index: 1;
   font-size: 12px;
   margin: 0;
+}
+
+/* «Telsiz» (DT-1, 583 tasarım-turu) — the watch radio, sade satır-blokları
+   (balonsuz — aşırı-temalaştırma yasak guardrail'i). Tokens only. */
+.radio { display: flex; flex-direction: column; height: 100%; min-height: 0; max-width: 760px; }
+.radio__hint { margin-top: var(--space-2); }
+.radio__transcript {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0 var(--space-3);
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+}
+.radio__line { display: grid; grid-template-columns: 84px 1fr; gap: var(--space-2); font-size: 14px; }
+.radio__role { font-family: var(--dk-font-data); font-size: 12px; padding-top: 2px; }
+.radio__line--operator .radio__role { color: var(--dk-s-brass); }
+.radio__line--deckent .radio__role { color: var(--dk-s-accent); }
+.radio__line--failed .radio__text { color: var(--dk-s-abort); }
+.radio__text { white-space: pre-wrap; color: var(--dk-s-text); overflow-wrap: anywhere; }
+.radio__carrier { color: var(--dk-s-accent); animation: dk-carrier 1s steps(2) infinite; }
+@keyframes dk-carrier { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .radio__carrier { animation: none; } }
+.radio__form { display: flex; gap: var(--space-2); }
+.radio__field { flex: 1; display: flex; }
+.radio__input {
+  width: 100%;
+  font-family: var(--dk-font-data);
+  font-size: 14px;
+  color: var(--dk-s-text);
+  background: var(--dk-s-surface);
+  border: 1px solid var(--dk-s-border);
+  border-radius: 4px;
+  padding: var(--space-2);
+}
+.radio__input::placeholder { color: var(--dk-s-text-muted); }
+
+/* DT-4 — «süzülme, sıçrama değil»: views/panels ARRIVE (~240ms ease-out);
+   reduced-motion turns every glide off (D4-0 motion principle #1 + #4). */
+@keyframes dk-arrive { from { opacity: 0; transform: translateY(4px); } }
+.shell-view > * { animation: dk-arrive 240ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .shell-view > * { animation: none; } }
+
+/* DT-2 — shared focus-visible ring for react-aria components (the D4-1
+   `focus-ring` token finally worn on interactive machinery). */
+.engine-room__tab[data-focus-visible],
+.engine-room__close[data-focus-visible],
+.radio__send[data-focus-visible],
+.radio__input:focus-visible {
+  outline: 2px solid var(--dk-s-focus-ring);
+  outline-offset: 2px;
 }

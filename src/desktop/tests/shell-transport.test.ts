@@ -6,7 +6,7 @@
 //     active daemon origins while everything else stays 'self'.
 
 import { describe, it, expect, vi } from 'vitest';
-import { ApiError, buildEventsUrl, createApiClient, normalizeApprovalEntry } from '../src/renderer/shell/api-client.js';
+import { ApiError, buildChatStreamUrl, buildEventsUrl, createApiClient, normalizeApprovalEntry } from '../src/renderer/shell/api-client.js';
 import { buildLocalRendererCsp } from '../src/main/security.js';
 import type { DaemonSession } from '../src/shared/desktop-api.js';
 
@@ -144,6 +144,85 @@ describe('normalizeApprovalEntry — nested-server → flat-shell (SURF-kuyruk-E
     expect(normalizeApprovalEntry({ id: 'flat-1', title: 'T' })).toMatchObject({ id: 'flat-1', title: 'T' });
     expect(normalizeApprovalEntry(null).id).toBe('');
     expect(normalizeApprovalEntry({ request: 42 }).id).toBe('');
+  });
+});
+
+describe('api-client chat contract (DT-1 «Telsiz» — /api/chat + SSE stream)', () => {
+  /** Minimal fake EventSource capturing the constructed URL + handler seams. */
+  class FakeEventSource {
+    static last: FakeEventSource | null = null;
+    url: string;
+    closed = false;
+    onmessage: ((e: { data: string }) => void) | null = null;
+    onerror: (() => void) | null = null;
+    constructor(url: string) {
+      this.url = url;
+      FakeEventSource.last = this;
+    }
+    close(): void { this.closed = true; }
+    emit(frame: unknown): void { this.onmessage?.({ data: JSON.stringify(frame) }); }
+  }
+
+  it('buildChatStreamUrl carries message + query-token (EventSource cannot set headers)', () => {
+    const url = new URL(buildChatStreamUrl(SESSION, 'hello watch'));
+    expect(url.pathname).toBe('/api/chat/stream');
+    expect(url.searchParams.get('message')).toBe('hello watch');
+    expect(url.searchParams.get('token')).toBe('tok-123');
+  });
+
+  it('sendChat POSTs {message} with the bearer and unwraps {reply}', async () => {
+    const { fetchFn, calls } = makeFetch(200, { reply: 'aye' });
+    const client = createApiClient(SESSION, fetchFn);
+    expect(await client.sendChat('status?')).toBe('aye');
+    expect(calls[0]!.url).toBe('http://127.0.0.1:4317/api/chat');
+    expect(JSON.parse(String(calls[0]!.init?.body))).toEqual({ message: 'status?' });
+    expect((calls[0]!.init?.headers as Record<string, string>)['Authorization']).toBe('Bearer tok-123');
+  });
+
+  it('openChatStream routes chunk* → done and SELF-CLOSES on the terminal frame', () => {
+    const client = createApiClient(SESSION, makeFetch(200, {}).fetchFn);
+    const seen: string[] = [];
+    client.openChatStream('q', {
+      onChunk: (t) => seen.push(`chunk:${t}`),
+      onDone: (r) => seen.push(`done:${r}`),
+      onError: (m) => seen.push(`error:${m}`),
+    }, { EventSourceImpl: FakeEventSource as unknown as typeof EventSource });
+    const source = FakeEventSource.last!;
+    source.emit({ type: 'chunk', text: 'He' });
+    source.emit({ type: 'chunk', text: 'llo' });
+    source.emit({ type: 'done', reply: 'Hello' });
+    expect(seen).toEqual(['chunk:He', 'chunk:llo', 'done:Hello']);
+    expect(source.closed).toBe(true);
+  });
+
+  it('a server error frame (e.g. no adapter configured) terminates honestly; torn frames are skipped', () => {
+    const client = createApiClient(SESSION, makeFetch(200, {}).fetchFn);
+    const seen: string[] = [];
+    client.openChatStream('q', {
+      onChunk: () => seen.push('chunk'),
+      onDone: () => seen.push('done'),
+      onError: (m) => seen.push(`error:${m}`),
+    }, { EventSourceImpl: FakeEventSource as unknown as typeof EventSource });
+    const source = FakeEventSource.last!;
+    source.onmessage?.({ data: 'not-json{' }); // torn — skipped
+    source.emit({ type: 'error', message: 'chat-stream: no adapter configured' });
+    expect(seen).toEqual(['error:chat-stream: no adapter configured']);
+    expect(source.closed).toBe(true);
+  });
+
+  it('a transport drop BEFORE any terminal frame surfaces as `stream disconnected`; after close it is silent', () => {
+    const client = createApiClient(SESSION, makeFetch(200, {}).fetchFn);
+    const seen: string[] = [];
+    client.openChatStream('q', {
+      onChunk: () => {},
+      onDone: () => seen.push('done'),
+      onError: (m) => seen.push(`error:${m}`),
+    }, { EventSourceImpl: FakeEventSource as unknown as typeof EventSource });
+    const source = FakeEventSource.last!;
+    source.onerror?.();
+    expect(seen).toEqual(['error:stream disconnected']);
+    source.onerror?.(); // post-close transport noise — no second callback
+    expect(seen).toEqual(['error:stream disconnected']);
   });
 });
 

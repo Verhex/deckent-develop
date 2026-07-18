@@ -143,7 +143,13 @@ export function spawnDaemon(profile: ConnectionProfile, deps: DaemonLifecycleDep
     // EPIPE — crashing exactly the daemon orphanShutdownOnQuit:false is meant
     // to keep alive. Log capture, if ever wanted, must be a file redirect.
     stdio: 'ignore',
-    env: { ...process.env, DECKENT_API_TOKEN: apiToken },
+    // DT-1 «Telsiz» (583 tasarım-turu): a daemon the Desktop ITSELF spawns is
+    // the operator's own control plane — the SURF-7 control-mutation ratchet
+    // opens via its env twin (same N5 pattern: global default stays OFF; the
+    // interactive owner flips it for its own tree). An ADOPTED daemon keeps
+    // whatever its operator configured — the Telsiz shows an honest
+    // precondition band when the gate answers 403.
+    env: { ...process.env, DECKENT_API_TOKEN: apiToken, DECKENT_CONTROL_MUTATIONS: '1' },
   });
   child.unref();
 

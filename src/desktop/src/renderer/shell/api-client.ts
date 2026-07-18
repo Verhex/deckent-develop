@@ -115,6 +115,30 @@ export function buildEventsUrl(session: DaemonSession, flowId: string, afterSequ
   return url.toString();
 }
 
+/** DT-1 «Telsiz» — the chat-stream SSE URL (`/api/chat/stream` is on the
+ *  server's query-token allowlist, same EventSource-cannot-set-headers
+ *  rationale as buildEventsUrl). Exported pure — unit-pinned. */
+export function buildChatStreamUrl(session: DaemonSession, message: string): string {
+  const url = new URL('/api/chat/stream', session.url);
+  url.searchParams.set('message', message);
+  if (session.apiToken) url.searchParams.set('token', session.apiToken);
+  return url.toString();
+}
+
+/** DT-1 — one frame of the chat stream (server's ChatStreamEvent contract:
+ *  `chunk`* then exactly one terminal `done`/`error`). */
+export type ChatStreamFrame =
+  | { type: 'chunk'; text: string }
+  | { type: 'done'; reply: string }
+  | { type: 'error'; message: string };
+
+export interface ChatStreamHandlers {
+  onChunk(text: string): void;
+  onDone(reply: string): void;
+  /** Terminal error — includes the server's honest `no adapter configured`. */
+  onError(message: string): void;
+}
+
 /** 583/N1 — the run's unified-diff footprint (shared run-diff-service shape). */
 export interface RunDiffFilePayload {
   path: string;
@@ -172,6 +196,12 @@ export interface DaemonApiClient {
   /** SURF-5 — decide a pending approval. Flag-gated server-side
    *  (`approval.api_decide`): a 403 means the flag is off (surface it). */
   decideApproval(id: string, decision: 'allow' | 'deny', reason?: string): Promise<Record<string, unknown>>;
+  // ── Chat contract (DT-1 «Telsiz» — /api/chat + /api/chat/stream SSE) ──
+  /** Single-reply chat (non-streaming fallback). Gate-off daemons answer 403. */
+  sendChat(message: string): Promise<string>;
+  /** Streaming chat: `chunk`* then one `done`/`error`; returns close(). The
+   *  stream self-closes on either terminal frame. */
+  openChatStream(message: string, handlers: ChatStreamHandlers, opts?: { EventSourceImpl?: typeof EventSource }): () => void;
   // ── Terminal contract (583/N3 «Makine Dairesi», ADR-G-029) ──
   /** Daemon capability read (`terminalEnabled` — loopback callers only). */
   getStatus(): Promise<DaemonStatusPayload>;
@@ -293,6 +323,36 @@ export function createApiClient(session: DaemonSession, fetchFn?: FetchLike): Da
         ...(reason !== undefined ? { reason } : {}),
       }),
 
+    // ── Chat contract (DT-1 «Telsiz») ──
+    sendChat: (message) =>
+      request<{ reply: string }>('POST', '/api/chat', { message }).then((r) => r.reply),
+    openChatStream: (message, handlers, opts = {}) => {
+      const Impl = opts.EventSourceImpl ?? EventSource;
+      const source = new Impl(buildChatStreamUrl(session, message));
+      let closed = false;
+      const close = (): void => {
+        if (!closed) { closed = true; source.close(); }
+      };
+      // Chat frames are UNNAMED SSE events (`data:` only) — plain onmessage,
+      // unlike the run-flow stream's named-event listeners.
+      source.onmessage = (raw: MessageEvent) => {
+        let frame: ChatStreamFrame;
+        try {
+          frame = JSON.parse(String(raw.data)) as ChatStreamFrame;
+        } catch {
+          return; // torn frame — never fatal to the stream
+        }
+        if (frame.type === 'chunk' && typeof frame.text === 'string') handlers.onChunk(frame.text);
+        else if (frame.type === 'done') { close(); handlers.onDone(typeof frame.reply === 'string' ? frame.reply : ''); }
+        else if (frame.type === 'error') { close(); handlers.onError(typeof frame.message === 'string' ? frame.message : 'error'); }
+      };
+      source.onerror = () => {
+        // The server ends the stream after the terminal frame — a post-close
+        // transport error is expected noise; a PRE-terminal drop is honest-failed.
+        if (!closed) { close(); handlers.onError('stream disconnected'); }
+      };
+      return close;
+    },
     // ── Terminal contract (583/N3 «Makine Dairesi», ADR-G-029) ──
     getStatus: () => request<DaemonStatusPayload>('GET', '/api/status'),
     getTerminalToken: () =>
