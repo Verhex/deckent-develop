@@ -4,10 +4,10 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-445-013-fix | Tech debt from 445-013-fix: REAL (non-provisional) v3 capabilities blocks for th | normal | sprint-445 | active |
-| debt-445-014-fix | Timeout-partial from 445-014-fix: worker killed mid-execution, work accepted | normal | sprint-445 | active |
-| debt-445-015-fix | Tech debt from 445-015-fix: ROOT CAUSE of the original 445-015 NO_GO ('rubric to | normal | sprint-445 | active |
-| debt-445-017-fix | Tech debt from 445-017-fix: No new edit was made this round -- 445-017's prior a | normal | sprint-445 | active |
+| debt-445-013-fix | Tech debt from 445-013-fix: REAL (non-provisional) v3 capabilities blocks for th | high | sprint-445 | active |
+| debt-445-014-fix | Timeout-partial from 445-014-fix: worker killed mid-execution, work accepted | high | sprint-445 | active |
+| debt-445-015-fix | Tech debt from 445-015-fix: ROOT CAUSE of the original 445-015 NO_GO ('rubric to | high | sprint-445 | active |
+| debt-445-017-fix | Tech debt from 445-017-fix: No new edit was made this round -- 445-017's prior a | high | sprint-445 | active |
 | debt-443-001-xfix | Tech debt from 443-001-xfix: Investigated the cross-dependency hypothesis first  | critical | sprint-443 | active |
 | debt-433-001-fix | Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso | critical | sprint-433 | active |
 

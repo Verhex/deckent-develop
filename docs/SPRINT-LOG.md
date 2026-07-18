@@ -10965,3 +10965,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 445-026: slice-0 integration smoke and regression sweep (DONE)
 
 ---
+## Sprint 447 — sprint-447
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-18
+**Duration:** 1277s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 10 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 4 |
+| Coverage | NaN% |
+| Duration | 1276745ms |
+
+### Tasks
+
+- 447-001: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: Investigated the cross-dependency hypothesis first (443-… (NO_GO)
+- 447-002: Hermetic memory-store test coverage for core SQLite paths (DONE)
+- 447-003: Routing-engine regression battery from the v3 design spec (DONE)
+- 447-004: Real-binary CLI smoke harness for status and doctor (DONE)
+- 447-005: Integration run with coverage report and honest evaluation (NO_GO)
+
+---

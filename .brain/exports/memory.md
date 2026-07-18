@@ -1,5 +1,15 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-447 Learnings
+- Sprint sprint-447 Learnings: ## Sprint sprint-447 Learnings
+- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: Investigated the cross-dependency hypothesis first (443-…: NO_GO — This is the 3rd pass at debt-443-001-xfix (443-001 -> 443-001-xfix -> 447-001), same restricted scope each time (read/wr
+- Integration run with coverage report and honest evaluation: NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=false diff [].
+
+## Gains
+- 447-002 — Hermetic memory-store test coverage for core SQLite paths — Created tests/core/memory-store.hermetic.test.ts covering the four named MemoryStore SQLite paths...
+- 447-003 — Routing-engine regression battery from the v3 design spec — Wrote tests/core/routing-engine.regression.test.ts (13 tests, 3 describe blocks) deriving regress...
+- 447-004 — Real-binary CLI smoke harness for status and doctor — Created tests/e2e/cli-smoke.e2e.test.ts — spawns the real built dist/cli/entry.js binary asynchro...
+
 ## Sprint sprint-445 Learnings
 - Sprint sprint-445 Learnings: ## Sprint sprint-445 Learnings
 - builtin capabilities authoring — construction family: GO_WITH_TECH_DEBT — Authored REAL (non-provisional) capabilities v3 blocks on the 3 construction-family builtin manifests, additive to (neve

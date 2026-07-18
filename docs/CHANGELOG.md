@@ -9,6 +9,17 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint447] - 2026-07-18
+
+### Added
+
+- Hermetic memory-store test coverage for core SQLite paths
+- Routing-engine regression battery from the v3 design spec
+- Real-binary CLI smoke harness for status and doctor
+
+
+_Tasks: 10 total, 6 done, 0 tech debt, 4 no-go_
+
 ## [1.0.0-beta.1-sprint445] - 2026-07-14
 
 ### Added

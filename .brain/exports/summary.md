@@ -52,6 +52,8 @@
 | adr-g-036 | Zero-Hardcode Model & Flow Values (Parametric-Only) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-447 Learnings** (sprint-447): ## Sprint sprint-447 Learnings
+- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: Investigated the cross-depende...
 - **Sprint sprint-445 Learnings** (sprint-445): ## Sprint sprint-445 Learnings
 - builtin capabilities authoring — construction family: GO_WITH_TECH_DEBT — Authored R...
 - **Sprint sprint-444 Learnings** (sprint-444): ## Sprint sprint-444 Learnings
@@ -72,16 +74,12 @@
 - 438-001 — RunFlow contract additive alanlar — commandId ve sequence — Adde...
 - **Sprint sprint-437 Learnings** (sprint-437): ## Sprint sprint-437 Learnings
 - NOTIFY-DEDUP kalıcı bildirim-state modülü ve relay wiring: GO_WITH_TECH_DEBT — New s...
-- **Sprint sprint-435 Learnings** (sprint-435): ## Sprint sprint-435 Learnings
-
-## Gains
-- 435-001 — Planner derleme sınırlarını sağlamlaştır — born-691 + born-692 s...
 
 ## Active Technical Debt
-- [NORMAL] Tech debt from 445-013-fix: REAL (non-provisional) v3 capabilities blocks for th
-- [NORMAL] Timeout-partial from 445-014-fix: worker killed mid-execution, work accepted
-- [NORMAL] Tech debt from 445-015-fix: ROOT CAUSE of the original 445-015 NO_GO ('rubric to
-- [NORMAL] Tech debt from 445-017-fix: No new edit was made this round -- 445-017's prior a
+- [HIGH] Tech debt from 445-013-fix: REAL (non-provisional) v3 capabilities blocks for th
+- [HIGH] Timeout-partial from 445-014-fix: worker killed mid-execution, work accepted
+- [HIGH] Tech debt from 445-015-fix: ROOT CAUSE of the original 445-015 NO_GO ('rubric to
+- [HIGH] Tech debt from 445-017-fix: No new edit was made this round -- 445-017's prior a
 - [CRITICAL] Tech debt from 443-001-xfix: Investigated the cross-dependency hypothesis first 
 - [CRITICAL] Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso
 
@@ -156,4 +154,4 @@
 - Violation pattern: file_outside_scope
 - Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 1394 | Generated: 2026-07-17_
+_Total entries: 1520 | Generated: 2026-07-18_
