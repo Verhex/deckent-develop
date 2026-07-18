@@ -43,6 +43,8 @@ export const MSG = {
   bridgeFiles: 'desktop.shell.bridge.files_title',
   bridgeNoSprint: 'desktop.shell.bridge.no_sprint',
   bridgeHbAge: 'desktop.shell.bridge.hb_age',
+  pastFlows: 'desktop.shell.bridge.past_flows',
+  pastFlowsMore: 'desktop.shell.bridge.past_flows_more',
   connectedTo: 'desktop.shell.connected_to',
   flowsEmpty: 'desktop.shell.flows_empty',
   flagRunFlowOff: 'desktop.shell.flag_run_flow_off',
@@ -557,8 +559,16 @@ function ConsoleView(): React.JSX.Element {
   const queryClient = useQueryClient();
   const flowsQuery = useFlows(api);
   const flows: FlowSummary[] = flowsQuery.data?.flows ?? [];
+  // P10 (Alperen canlı-feedback): "en son başlattığım araya karışıyor; çok
+  // fazla eski iş Köprü'yü boğuyor". CANLI (non-terminal) akışlar ÜSTTE ve
+  // varsayılan-seçim onlardan; geçmiş katlanır-bölümde, 8-cap'li (tamamı
+  // Koşular'da). Liste-payload'ı zaman-damgası taşımıyor → yeni≈sonda
+  // varsayımıyla ters-sıra; kalıcı-fix (updatedAt alanı) F2'ye kayıtlı.
+  const liveFlows = flows.filter((flow) => !SHELL_TERMINAL_STATES.has(flow.state)).reverse();
+  const pastFlows = flows.filter((flow) => SHELL_TERMINAL_STATES.has(flow.state)).reverse();
+  const PAST_CAP = 8;
   const [selected, setSelected] = useState<string | null>(null);
-  const activeFlowId = selected ?? flows[0]?.flowId ?? null;
+  const activeFlowId = selected ?? liveFlows[0]?.flowId ?? pastFlows[0]?.flowId ?? null;
   const activeFlow = flows.find((flow) => flow.flowId === activeFlowId) ?? null;
 
   const cancel = useMutation({
@@ -597,21 +607,48 @@ function ConsoleView(): React.JSX.Element {
       {flows.length === 0 ? (
         <p className="shell-muted">{t(MSG.flowsEmpty)}</p>
       ) : (
-        <ul className="flow-list">
-          {flows.map((flow) => (
-            <li key={flow.flowId}>
-              <button
-                type="button"
-                className={flow.flowId === activeFlowId ? 'flow-row flow-row--active' : 'flow-row'}
-                onClick={() => setSelected(flow.flowId)}
-              >
-                <code>{flow.flowId.slice(0, 8)}</code>
-                <span className="flow-intent">{flow.intentSummary ?? ''}</span>
-                <StatePill state={flow.state} />
-              </button>
-            </li>
-          ))}
-        </ul>
+        <>
+          {liveFlows.length > 0 && (
+            <ul className="flow-list">
+              {liveFlows.map((flow) => (
+                <li key={flow.flowId}>
+                  <button
+                    type="button"
+                    className={flow.flowId === activeFlowId ? 'flow-row flow-row--active' : 'flow-row'}
+                    onClick={() => setSelected(flow.flowId)}
+                  >
+                    <code>{flow.flowId.slice(0, 8)}</code>
+                    <span className="flow-intent">{flow.intentSummary ?? ''}</span>
+                    <StatePill state={flow.state} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {pastFlows.length > 0 && (
+            <details className="flow-past">
+              <summary>{t(MSG.pastFlows, { n: String(pastFlows.length) })}</summary>
+              <ul className="flow-list">
+                {pastFlows.slice(0, PAST_CAP).map((flow) => (
+                  <li key={flow.flowId}>
+                    <button
+                      type="button"
+                      className={flow.flowId === activeFlowId ? 'flow-row flow-row--active' : 'flow-row'}
+                      onClick={() => setSelected(flow.flowId)}
+                    >
+                      <code>{flow.flowId.slice(0, 8)}</code>
+                      <span className="flow-intent">{flow.intentSummary ?? ''}</span>
+                      <StatePill state={flow.state} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {pastFlows.length > PAST_CAP && (
+                <p className="shell-muted">{t(MSG.pastFlowsMore, { n: String(pastFlows.length - PAST_CAP) })}</p>
+              )}
+            </details>
+          )}
+        </>
       )}
       {api && activeFlow && SHELL_PREVIEW_STATES.has(activeFlow.state) && <PreviewPanel api={api} flowId={activeFlow.flowId} />}
       {/* 583/N1: once the voyage closed, show what it actually changed */}

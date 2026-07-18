@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 import { createApiClient, type DaemonApiClient, type SprintTaskDetailPayload } from './api-client.js';
+import { humanizeLogLine, humanizeResult } from './log-humanize.js';
 import { useShellStore } from './session-store.js';
 
 export const MSG = {
@@ -25,6 +26,11 @@ export const MSG = {
   tabPlan: 'desktop.shell.worker.tab_plan',
   tabResult: 'desktop.shell.worker.tab_result',
   logUnavailable: 'desktop.shell.worker.log_unavailable',
+  streamOn: 'desktop.shell.worker.stream_on',
+  streamDown: 'desktop.shell.worker.stream_down',
+  filesChanged: 'desktop.shell.worker.files_changed',
+  notes: 'desktop.shell.worker.notes',
+  raw: 'desktop.shell.worker.raw',
   goal: 'desktop.shell.runs.goal',
   goCriteria: 'desktop.shell.worker.go_criteria',
   scope: 'desktop.shell.worker.scope',
@@ -62,6 +68,7 @@ export default function WorkerView(): React.JSX.Element {
   const [boot, setBoot] = useState<'loading' | 'missing' | 'error' | 'ready'>('loading');
   const [lines, setLines] = useState<string[]>([]);
   const [logMissing, setLogMissing] = useState(false);
+  const [streamDown, setStreamDown] = useState(false);
   const liveEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -82,12 +89,16 @@ export default function WorkerView(): React.JSX.Element {
     const close = api.openWorkerLog(taskId, {
       onLine: (line) => {
         setLogMissing(false);
+        setStreamDown(false);
+        // P12b: sunucu-projeksiyonundan kaçan zarf-JSON'ları burada kazılır.
+        const human = humanizeLogLine(line);
         setLines((current) => {
-          const next = [...current, line];
+          const next = [...current, human];
           return next.length > LIVE_LINE_CAP ? next.slice(next.length - LIVE_LINE_CAP) : next;
         });
       },
       onUnavailable: () => setLogMissing(true),
+      onError: () => setStreamDown(true),
     });
     return close;
   }, [api, taskId]);
@@ -130,6 +141,12 @@ export default function WorkerView(): React.JSX.Element {
           <Tab id="result" className="worker__tab">{t(MSG.tabResult)}</Tab>
         </TabList>
         <TabPanel id="live" className="worker__panel">
+          {/* P12: akış-durumu HER ZAMAN görünür — sessiz-boş yasak. */}
+          <p className="worker__stream-state shell-muted">
+            {streamDown
+              ? t(MSG.streamDown)
+              : t(MSG.streamOn, { n: String(lines.length) })}
+          </p>
           {logMissing && lines.length === 0 ? (
             <p className="shell-muted">{t(MSG.logUnavailable)}</p>
           ) : (
@@ -172,14 +189,40 @@ export default function WorkerView(): React.JSX.Element {
           )}
         </TabPanel>
         <TabPanel id="result" className="worker__panel">
-          {result ? (
-            <>
-              {typeof result['selfAssessment'] === 'string' && (
-                <p><span className="shell-muted">{t(MSG.assessment)}:</span> <strong>{result['selfAssessment']}</strong></p>
-              )}
-              <pre className="worker__text">{JSON.stringify(result, null, 2)}</pre>
-            </>
-          ) : (
+          {result ? (() => {
+            // P11: ham-JSON app'te anlamsız — insan-okur alanlar önde, ham
+            // yalnız katlanır «raw»da (uzman-erişimi, default-kapalı).
+            const human = humanizeResult(result);
+            return (
+              <>
+                {human.selfAssessment !== undefined && (
+                  <p><span className="shell-muted">{t(MSG.assessment)}:</span> <strong>{human.selfAssessment}</strong></p>
+                )}
+                {human.notes !== undefined && (
+                  <>
+                    <p className="shell-muted">{t(MSG.notes)}</p>
+                    <pre className="worker__text">{human.notes}</pre>
+                  </>
+                )}
+                {human.filesChanged.length > 0 && (
+                  <>
+                    <p className="shell-muted">
+                      {t(MSG.filesChanged, { n: String(human.filesChanged.length) })}
+                      {human.linesAdded !== undefined && ` · +${human.linesAdded}`}
+                      {human.linesRemoved !== undefined && ` −${human.linesRemoved}`}
+                    </p>
+                    <ul className="worker__scope">
+                      {human.filesChanged.map((file) => <li key={file}><code>{file}</code></li>)}
+                    </ul>
+                  </>
+                )}
+                <details className="worker__raw">
+                  <summary>{t(MSG.raw)}</summary>
+                  <pre className="worker__text">{JSON.stringify(result, null, 2)}</pre>
+                </details>
+              </>
+            );
+          })() : (
             <p className="shell-muted">{t(MSG.noResult)}</p>
           )}
         </TabPanel>

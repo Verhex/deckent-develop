@@ -3842,6 +3842,16 @@ const MESSAGES: MessageMap = {
   'desktop.shell.worker.no_plan': { en: 'No .plan written yet.', tr: 'Henüz .plan yazılmadı.' },
   'desktop.shell.worker.no_result': { en: 'No result yet.', tr: 'Henüz sonuç yok.' },
   'desktop.shell.worker.assessment': { en: 'Self-assessment', tr: 'Öz-değerlendirme' },
+  'desktop.shell.bridge.past_flows': { en: 'Past voyages ({n})', tr: 'Geçmiş seferler ({n})' },
+  'desktop.shell.bridge.past_flows_more': { en: '… {n} more in Runs.', tr: '… {n} tanesi daha Koşular\'da.' },
+  'desktop.shell.worker.stream_on': { en: 'stream live · {n} line(s)', tr: 'akış canlı · {n} satır' },
+  'desktop.shell.worker.stream_down': {
+    en: 'stream disconnected — retrying…',
+    tr: 'akış koptu — yeniden deneniyor…',
+  },
+  'desktop.shell.worker.files_changed': { en: 'Files changed ({n})', tr: 'Değişen dosyalar ({n})' },
+  'desktop.shell.worker.notes': { en: 'Notes', tr: 'Notlar' },
+  'desktop.shell.worker.raw': { en: 'raw', tr: 'ham' },
   'desktop.shell.worker.not_found': { en: 'Task not found (it may be archived).', tr: 'Görev bulunamadı (arşivlenmiş olabilir).' },
   // KABUL Gün-1 A2 — Runs detay-sayfası kelimeleri.
   'desktop.shell.runs.goal': { en: 'Goal', tr: 'Hedef' },

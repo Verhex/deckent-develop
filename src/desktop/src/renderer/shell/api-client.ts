@@ -162,6 +162,8 @@ export interface WorkerLogHandlers {
   onLine(line: string): void;
   /** The task has no .log yet — an honest state, not an error. */
   onUnavailable(): void;
+  /** P12: transport failure (CSP/CORS/network) — surfaced, never silent-empty. */
+  onError?(): void;
 }
 
 /** A1 «Changes» — /api/git/* payload shapes (git-workflow-service contract). */
@@ -420,6 +422,8 @@ export function createApiClient(session: DaemonSession, fetchFn?: FetchLike): Da
       };
       source.addEventListener('log_line', onLine);
       source.addEventListener('log_unavailable', () => handlers.onUnavailable());
+      // P12: sessiz-boş yasak — taşıma-hatası görünür duruma düşer.
+      source.onerror = () => handlers.onError?.();
       return () => {
         source.close();
       };

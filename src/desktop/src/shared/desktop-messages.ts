@@ -118,6 +118,13 @@ export const DESKTOP_MESSAGE_KEYS = [
   'desktop.shell.worker.no_result',
   'desktop.shell.worker.assessment',
   'desktop.shell.worker.not_found',
+  'desktop.shell.bridge.past_flows',
+  'desktop.shell.bridge.past_flows_more',
+  'desktop.shell.worker.stream_on',
+  'desktop.shell.worker.stream_down',
+  'desktop.shell.worker.files_changed',
+  'desktop.shell.worker.notes',
+  'desktop.shell.worker.raw',
   // 588/F0 — ray-grupları + «Changes» (CLI runs.commit.* sözlüğü ortak-kelime
   // kuralıyla yeniden-kullanılır — aynı akışın aynı kelimeleri, iki yüzey).
   'desktop.shell.nav.group_voyage',

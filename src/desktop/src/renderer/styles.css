@@ -919,3 +919,11 @@ select:focus-visible {
 .worker__live { min-height: 240px; max-height: 100%; overflow-y: auto; }
 .worker__scope { list-style: none; padding: 0; display: grid; gap: 2px; font-size: 13px; }
 .worker__scope code { color: var(--dk-s-brass); }
+
+/* P10 — geçmiş-seferler katlanır; P12 — akış-durum satırı */
+.flow-past { margin-top: var(--space-3); font-size: 13px; }
+.flow-past summary { cursor: pointer; color: var(--dk-s-text-muted); }
+.flow-past ul { margin-top: var(--space-2); }
+.worker__stream-state { font-family: var(--dk-font-data); font-size: 11px; margin: 0 0 var(--space-1); }
+.worker__raw { font-size: 12px; }
+.worker__raw summary { cursor: pointer; color: var(--dk-s-text-muted); }
