@@ -49,6 +49,7 @@ export const MSG = {
   connectingHealthCheck: 'desktop.connecting.health_check',
   connectingRetry: 'desktop.connecting.retry',
   themeTitle: 'desktop.theme.title',
+  themeWatchNova: 'desktop.theme.watch.nova',
   themeWatchDayWatch: 'desktop.theme.watch.day-watch',
   themeWatchNightWatch: 'desktop.theme.watch.night-watch',
   themeWatchOpenSea: 'desktop.theme.watch.open-sea',
@@ -239,6 +240,7 @@ async function loadPreferences(api: DeckentDesktopApi | null): Promise<DesktopPr
 // --- ProfilePicker -----------------------------------------------------
 
 const WATCH_LABEL_KEYS: Record<WatchName, string> = {
+  nova: MSG.themeWatchNova,
   'day-watch': MSG.themeWatchDayWatch,
   'night-watch': MSG.themeWatchNightWatch,
   'open-sea': MSG.themeWatchOpenSea,

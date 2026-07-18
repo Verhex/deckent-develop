@@ -27,13 +27,13 @@ function makeFakeRoot(): ThemeTargetElement & {
 }
 
 describe('applyWatch (D4-1)', () => {
-  it('defaults to day-watch: stamps data-theme and materializes all three layers', () => {
+  it('defaults to NOVA (589-seçimi): stamps data-theme and materializes all three layers', () => {
     const root = makeFakeRoot();
     const applied = applyWatch(root);
-    expect(applied.watch).toBe('day-watch');
-    expect(root.attrs.get('data-theme')).toBe('day-watch');
-    expect(root.vars.get('--dk-p-magenta')).toBe('#BD4278');
-    expect(root.vars.get('--dk-s-accent')).toBe('var(--dk-p-magenta)');
+    expect(applied.watch).toBe('nova');
+    expect(root.attrs.get('data-theme')).toBe('nova');
+    expect(root.vars.get('--dk-p-magenta')).toBe('#BD4278'); // primitifler her-watch'ta materyalize
+    expect(root.vars.get('--dk-s-accent')).toBe('var(--dk-p-novaGlow)'); // NOVA-ışıması
     expect(root.vars.get('--dk-c-btn-bg')).toBe('var(--dk-s-accent)');
   });
 

@@ -34,16 +34,29 @@ import { z } from 'zod';
 
 /** Theme ids are language-neutral mechanism slugs; user-facing labels come
  *  from i18n (`desktop.theme.watch.*` keys in src/cli/helpers/messages.ts). */
-export const WATCH_NAMES = ['day-watch', 'night-watch', 'open-sea'] as const;
+/** 589-REBORN (Alperen-seçimi «NOVA»): tek-koyu Jarvis-kimliği BİRİNCİL;
+ *  eski vardiyalar motor-mirası olarak kalır (mimarî korunur, anayasa E1). */
+export const WATCH_NAMES = ['nova', 'day-watch', 'night-watch', 'open-sea'] as const;
 export type WatchName = (typeof WATCH_NAMES)[number];
 
-export const DEFAULT_WATCH: WatchName = 'day-watch';
+export const DEFAULT_WATCH: WatchName = 'nova';
 
 // ─── Layer 1 — primitives (chart-world ink values) ──────────────────────────
 
 /** Raw palette. Names come from the nautical-chart world of the approved
  *  direction; every semantic token must resolve to one of these. */
 export const PRIMITIVES = {
+  // ── NOVA (589 tek-kimlik: derin-uzay + ışıma) ──
+  novaDeep: '#04080D',
+  novaRaised: '#0A141D',
+  novaLine: '#14242F',
+  novaText: '#D7E7EE',
+  novaTextMuted: '#6E8A98',
+  novaGlow: '#38D3FF',
+  novaGlowDeep: '#04202B',
+  novaAmber: '#E8B34C',
+  novaGo: '#43E39A',
+  novaAbort: '#FF6B5E',
   // paper & land
   buff: '#F2EDDC',
   buffRaised: '#FBF8EC',
@@ -114,6 +127,20 @@ export type WatchDefinition = Record<SemanticTokenName, PrimitiveName>;
  *  is pure indirection, which is what makes the runtime switch cheap and the
  *  validator able to reason about every pairing. */
 export const WATCHES: Record<WatchName, WatchDefinition> = {
+  nova: {
+    bg: 'novaDeep',
+    surface: 'novaRaised',
+    border: 'novaLine',
+    text: 'novaText',
+    'text-muted': 'novaTextMuted',
+    accent: 'novaGlow',
+    'accent-text': 'novaGlowDeep',
+    brass: 'novaAmber',
+    go: 'novaGo',
+    caution: 'novaAmber',
+    abort: 'novaAbort',
+    'focus-ring': 'novaGlow',
+  },
   'day-watch': {
     bg: 'buff',
     surface: 'buffRaised',

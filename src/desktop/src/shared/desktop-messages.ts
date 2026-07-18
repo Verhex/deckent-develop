@@ -194,6 +194,7 @@ export const DESKTOP_MESSAGE_KEYS = [
   'desktop.shell.term.exited',
   // ── D4-1 «Köprüüstü» watch (vardiya) theme system ──
   'desktop.theme.title',
+  'desktop.theme.watch.nova',
   'desktop.theme.watch.day-watch',
   'desktop.theme.watch.night-watch',
   'desktop.theme.watch.open-sea',
