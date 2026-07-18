@@ -25,6 +25,7 @@ import {
   type DeckentDesktopApi,
 } from '../shared/desktop-api.js';
 import { mountShell } from './shell/mount.js';
+import { parseDevHashSession } from './shell/dev-hash-session.js';
 import { DEFAULT_PREFERENCES, WATCH_NAMES, type DesktopPreferences, type WatchName } from '../shared/theme-tokens.js';
 import { applyWatch } from './theme-runtime.js';
 import { buildFallbackStrings } from './i18n-fallback.js';
@@ -191,6 +192,9 @@ function renderScreen(root: HTMLElement, ctx: RenderContext, screen: Screen): Cl
 export async function bootstrap(root: HTMLElement | null): Promise<void> {
   if (!root) return;
   const api = getDeckentApi();
+  // Eye-loop dev fallback: capture BEFORE NovaShell's router rewrites the
+  // hash to '#/command'. Bridge present → hash ignored (packaged path).
+  const devSession = api === null ? parseDevHashSession(location.hash) : null;
   const strings = await loadStrings(api);
   const preferences = await loadPreferences(api);
   // Re-apply the persisted watch over main.ts's synchronous default
@@ -211,7 +215,7 @@ export async function bootstrap(root: HTMLElement | null): Promise<void> {
   api?.daemon.onSession((session) => {
     navigate(session ? { kind: 'shell', session } : { kind: 'profilePicker' });
   });
-  const existingSession = await loadSession(api);
+  const existingSession = (await loadSession(api)) ?? devSession;
   navigate(existingSession ? { kind: 'shell', session: existingSession } : { kind: 'profilePicker' });
 }
 

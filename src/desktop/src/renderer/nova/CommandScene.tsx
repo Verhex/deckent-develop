@@ -21,6 +21,7 @@ import {
 import { useShellStore } from '../shell/session-store.js';
 import { humanizeLogLine } from '../shell/log-humanize.js';
 import { projectRiverLine } from './river-projection.js';
+import { deriveSceneState } from './scene-state.js';
 import { semanticVarName } from '../shell/xterm-theme.js';
 import {
   phaseArcFraction, orbitSegments, hitOrbitIndex,
@@ -76,6 +77,7 @@ export default function CommandScene(): React.JSX.Element {
   const [selected, setSelected] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [offline, setOffline] = useState(false);
+  const [chatStreaming, setChatStreaming] = useState(false);
   // P18: seçili-worker yan-paneli için son-satır kuyruğu (worker-başına 6).
   const [workerTail, setWorkerTail] = useState<Map<string, string[]>>(new Map());
 
@@ -158,6 +160,18 @@ export default function CommandScene(): React.JSX.Element {
   const [order, setOrder] = useState<OrderCard | null>(null);
   const orderCloseRef = useRef<(() => void) | null>(null);
 
+  // P19 — sahne durum-makinesi: idle/READY görünürlüğünün TEK otoritesi
+  // (DOM-overlay + canvas merkez-etiketi ikisi de buradan okur).
+  const scene = deriveSceneState({
+    offline,
+    sprintActive: snap?.active === true,
+    draftNonEmpty: draft.trim().length > 0,
+    order: order?.state ?? null,
+    chatStreaming,
+  });
+  const sceneRef = useRef(scene);
+  sceneRef.current = scene;
+
   const sendOrder = async (message: string): Promise<void> => {
     if (!api) return;
     pushRiver({ src: t(MSG.you), text: `⌁ ${message}`, tone: 'me', colorIndex: 0 });
@@ -215,10 +229,17 @@ export default function CommandScene(): React.JSX.Element {
     setDraft('');
     pushRiver({ src: t(MSG.you), text: message, tone: 'me', colorIndex: 0 });
     let buffer = '';
+    setChatStreaming(true);
     api.openChatStream(message, {
       onChunk: (chunk) => { buffer += chunk; },
-      onDone: (reply) => pushRiver({ src: t(MSG.deckent), text: (reply || buffer).slice(0, 240), tone: 'deckent', colorIndex: 0 }),
-      onError: (err) => pushRiver({ src: t(MSG.deckent), text: `⚠ ${err}`, tone: 'deckent', colorIndex: 0 }),
+      onDone: (reply) => {
+        setChatStreaming(false);
+        pushRiver({ src: t(MSG.deckent), text: (reply || buffer).slice(0, 240), tone: 'deckent', colorIndex: 0 });
+      },
+      onError: (err) => {
+        setChatStreaming(false);
+        pushRiver({ src: t(MSG.deckent), text: `⚠ ${err}`, tone: 'deckent', colorIndex: 0 });
+      },
     });
   };
 
@@ -269,8 +290,13 @@ export default function CommandScene(): React.JSX.Element {
         ctx.beginPath(); ctx.arc(cx, cy, coreR + 9 * dp, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
         ctx.strokeStyle = accent; ctx.lineWidth = 3 * dp; ctx.lineCap = 'round'; ctx.stroke();
       }
-      ctx.fillStyle = ink; ctx.font = `${11 * dp}px "Geist Mono", monospace`; ctx.textAlign = 'center';
-      ctx.fillText(live?.phase ?? (alive ? '…' : t(MSG.ready)), cx, cy + 4 * dp);
+      ctx.textAlign = 'center';
+      const centerLabel = sceneRef.current.visibility.centerLabel;
+      if (centerLabel !== 'none') {
+        ctx.fillStyle = ink; ctx.font = `${11 * dp}px "Geist Mono", monospace`;
+        const label = centerLabel === 'phase' ? (live?.phase ?? '…') : centerLabel === 'ellipsis' ? '…' : t(MSG.ready);
+        ctx.fillText(label, cx, cy + 4 * dp);
+      }
       if (live?.sprintId) {
         ctx.fillStyle = muted; ctx.font = `${8.5 * dp}px "Geist Mono", monospace`;
         ctx.fillText(live.sprintId, cx, cy + 18 * dp);
@@ -288,7 +314,9 @@ export default function CommandScene(): React.JSX.Element {
         const wobble = (10 * Math.sin(tick / 50 + index)) * dp;
         ctx.beginPath(); ctx.arc(cx, cy, R + wobble, segment.a0, segment.a1);
         ctx.strokeStyle = color; ctx.globalAlpha = 0.3 + 0.65 * p.level;
-        ctx.lineWidth = (5 + 9 * p.level) * dp; ctx.lineCap = 'round'; ctx.stroke(); ctx.globalAlpha = 1;
+        ctx.shadowColor = color; ctx.shadowBlur = (4 + 8 * p.level) * dp;
+        ctx.lineWidth = (5 + 9 * p.level) * dp; ctx.lineCap = 'round'; ctx.stroke();
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
         if (selRef.current === segment.taskId) {
           ctx.beginPath(); ctx.arc(cx, cy, R + wobble, segment.a0, segment.a1);
           ctx.strokeStyle = ink; ctx.globalAlpha = 0.55; ctx.lineWidth = 1.2 * dp; ctx.stroke(); ctx.globalAlpha = 1;
@@ -333,7 +361,9 @@ export default function CommandScene(): React.JSX.Element {
         i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       });
       ctx.strokeStyle = accent; ctx.globalAlpha = sel ? 0.85 : 0.3;
-      ctx.lineWidth = 1.4 * dp; ctx.stroke(); ctx.globalAlpha = 1;
+      ctx.shadowColor = accent; ctx.shadowBlur = 12 * dp;
+      ctx.lineWidth = 1.4 * dp; ctx.stroke();
+      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
 
       if (!reduced) frameId = requestAnimationFrame(draw);
     };
@@ -354,12 +384,12 @@ export default function CommandScene(): React.JSX.Element {
   };
 
   return (
-    <div className="nova-scene">
+    <div className="nova-scene" data-phase={snap?.phase ?? ''}>
       {/* Sahne-bölgesi: canvas KENDİ bölgesinde — nehir/komuta ASLA üstüne binmez (flex-kolon). */}
       <div className="nova-scene__stage">
         <canvas ref={canvasRef} className="nova-scene__canvas" onClick={onCanvasClick} />
-        {!snap?.active && (
-          <p className="nova-scene__idle mono">{offline ? t(MSG.offline) : t(MSG.idle)}</p>
+        {scene.visibility.idleLine !== 'hidden' && (
+          <p className="nova-scene__idle mono">{scene.visibility.idleLine === 'offline' ? t(MSG.offline) : t(MSG.idle)}</p>
         )}
         {selected !== null && (() => {
           const worker = (snapRef.current?.workers ?? []).find((w) => w.taskId === selected);

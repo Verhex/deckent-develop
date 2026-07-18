@@ -259,6 +259,16 @@ export function buildCssVariables(
   for (const [component, semantic] of Object.entries(COMPONENT_TOKENS)) {
     out[`${CSS_VAR_PREFIX.component}${component}`] = `var(${CSS_VAR_PREFIX.semantic}${semantic})`;
   }
+  // Accent as an "R, G, B" triplet so CSS can layer literal glow alphas on the
+  // token base — rgba(var(--dk-s-accent-rgb), .14) — without raw hex in rules.
+  // A custom accent override that isn't plain hex falls back to the watch's
+  // primitive so the key exists for every watch (pinned key-set invariant).
+  const accentOverride = customTokens.accent;
+  const accentHex = accentOverride !== undefined && HEX_RE.test(accentOverride)
+    ? accentOverride
+    : PRIMITIVES[definition.accent];
+  const [r, g, b] = hexChannels(accentHex);
+  out[`${CSS_VAR_PREFIX.semantic}accent-rgb`] = `${r}, ${g}, ${b}`;
   return out;
 }
 
@@ -270,16 +280,37 @@ export interface TokenValidationIssue {
   problem: string;
 }
 
-/** WCAG relative luminance (sRGB). */
-function luminance(hex: string): number {
+/** `#RGB`/`#RRGGBB` → [r, g, b] 0-255 (shorthand expanded). */
+function hexChannels(hex: string): [number, number, number] {
   const h = hex.length === 4
     ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
     : hex;
-  const channel = (i: number): number => {
-    const c = parseInt(h.slice(i, i + 2), 16) / 255;
+  return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+}
+
+/** WCAG relative luminance (sRGB). */
+function luminance(hex: string): number {
+  const [r, g, b] = hexChannels(hex);
+  const channel = (v: number): number => {
+    const c = v / 255;
     return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
   };
-  return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+/**
+ * Alpha-composite `fgHex` at `alpha` over an opaque `bgHex` and return the
+ * resulting opaque hex. This is what the eye actually sees for translucent
+ * text — feed the result to contrastRatio() for EFFECTIVE contrast (the
+ * nova-scene legibility gate measures breathe-min opacity this way).
+ */
+export function compositeOver(fgHex: string, bgHex: string, alpha: number): string {
+  const a = Math.min(1, Math.max(0, alpha));
+  const [fr, fgc, fb] = hexChannels(fgHex);
+  const [br, bgc, bb] = hexChannels(bgHex);
+  const mix = (f: number, b: number): string =>
+    Math.round(a * f + (1 - a) * b).toString(16).padStart(2, '0');
+  return `#${mix(fr, br)}${mix(fgc, bgc)}${mix(fb, bb)}`;
 }
 
 /** WCAG contrast ratio between two hex colors. */
