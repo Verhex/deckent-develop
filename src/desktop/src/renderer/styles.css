@@ -123,44 +123,59 @@
   font: inherit;
 }
 
-/* ── D4-3 — post-connect shell (structural; D4-4 designs the views) ── */
+/* ── D4-3 shell — KABUL Gün-1 P6 (Alperen-kararı): navigasyon SOL-RAY,
+   üst-bar değil ("solda menü olmalı üstte değil") — kapsamlı tek-ürün
+   vizyonunun iskeleti; ray bölüm-büyümesine (ihtiyaç-analizi) hazır. ── */
 .shell {
   display: flex;
-  flex-direction: column;
-  min-height: 100vh;
+  flex-direction: row;
+  height: 100vh;
   width: 100%;
+  overflow: hidden;
 }
 
 .shell-nav {
   display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-6);
-  border-bottom: 1px solid var(--dk-s-border);
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 216px;
+  flex-shrink: 0;
+  padding: var(--space-4) var(--space-3);
+  border-right: 1px solid var(--dk-s-border);
   background: var(--dk-s-surface);
+  overflow-y: auto;
 }
 
 .shell-nav a {
+  display: block;
   color: var(--dk-s-text-muted);
   text-decoration: none;
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius);
 }
+
+.shell-nav a:hover { color: var(--dk-s-text); }
 
 .shell-nav a.active {
   color: var(--dk-s-accent);
   font-weight: 600;
+  background: var(--dk-c-card-bg);
 }
 
 .shell-origin {
-  margin-left: auto;
-  font-size: 12px;
+  margin-top: auto;
+  padding: var(--space-2) var(--space-3) 0;
+  font-size: 11px;
   color: var(--dk-s-text-muted);
+  overflow-wrap: anywhere;
+  border-top: 1px solid var(--dk-s-border);
 }
 
 .shell-view {
   flex: 1;
   padding: var(--space-6);
+  overflow-y: auto;
+  min-width: 0;
 }
 
 .shell-muted { color: var(--dk-s-text-muted); }

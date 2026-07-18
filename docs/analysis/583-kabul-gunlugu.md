@@ -26,7 +26,7 @@
   **Telsiz** (DT-1) · **canlı-worker-akışı** (N5) · Tabs-klavye (DT-2) · süzülme+Rota-hover (DT-3/4)
 
 ### Gün-1 egzersiz-listesi (gerçek işin içinde dokunulacaklar)
-- [ ] Desktop: bağlan/spawn → Console «Rota» canlı-akış → bir koşu başlat (Emir) → Telgraf-karar
+- [ ] Desktop: bağlan/spawn ✓ (yeni-daemon doğdu) → Console «Rota» canlı-akış → bir koşu başlat (Emir) → Telgraf-karar
 - [ ] **Telsiz**: gerçek soru-cevap (canlı model-cevabı smoke'ta kanıtlı — görsel ilk-temas bugün)
 - [x] **Makine-Dairesi**: ✅ GÖRSEL-KANIT DÜŞTÜ (Alperen canlı, 11:5x): terminaller Electron-ekranında görünüyor + çalışıyor — N3'ün bekleyen kanıtı + P5-fix canlı-doğrulandı (token-preflight geçti ki soket bağlandı)
 - [ ] Terminal REPL: `@path` + slash-menü + inbox-kartı (a/f/r/s) + onay-kartı gerçek işte
@@ -41,7 +41,8 @@
 | P2 | 🟡 | Daemon-CORS | "Could not reach the daemon": ACAO `sendJson`'da DEFAULT_PORT'a **hardcode** (origin-duyarsız; kanun-10 ihlali) + closure-route'larda (run-flow/terminal) **hiç yok** → dev-renderer (5173) tüm okumalarda bloklu | ✅ FIX aynı-gün: tek-yetkili `resolveCorsOrigin` + `applyLoopbackCors` (loopback-any-port + paketli `Origin: null` yansır; loopback-dışı asla; Vary: Origin); eski-yanlışın 3 pini yeni-doğruya çevrildi + 5 yeni pin |
 | P3 | 🟡 | Desktop-CSP | react-aria'nın (DT-2 kilitli-lib) runtime inline-style'ları `style-src` tarafından bloklu — paketliyi de etkiliyordu (a11y-duyurucu sessiz) | ✅ FIX aynı-gün: `style-src 'self' 'unsafe-inline'` (script-kilidi aynen; pinli). **Alt-bulgu:** index.html META-ikizi "keep in sync" YORUMUNA rağmen drift'liydi — ws:// kaynakları da yoktu (N3-soketini paketlide bloklayacaktı, denenmeden yakalandı); meta eşitlendi + senkron artık PİNLİ |
 | P5 | 🟡 | Daemon-CORS | Makine-Dairesi token-isteğinin CORS-**preflight'ı** (kimliksiz OPTIONS, spec-gereği) closure'daki token-gate'e düşüp 401 yiyordu — Engine Room dev-renderer'dan token'ı hiç isteyemiyordu (log'dan yakalandı) | ✅ FIX aynı-gün: `/api/terminal/*` OPTIONS → erken-204 (hiçbir şey vermez; gerçek-metod gate'te kalır) + pin; canlı-doğrulama = Alperen'in "terminaller görünüyor" teyidi |
-| P4 | 🟡 | Desktop (Alperen canlı-bulgu) | "Engine-Room/Chat'te sekme değişince kaldığım yerden devam etmiyor" — route-unmount yerel-state'i siliyordu | ✅ FIX aynı-gün: Telsiz-transkripti + Makine-Dairesi sekme-seçimi zustand-store'a taşındı (görünüme dönüş = kaldığın yer; PTY içeriği inv#4 replay'iyle zaten dönüyor). Derin keep-alive (xterm scroll-pozisyonu) → aday-born, gün-sonu kararı |
+| P6 | 🟡 | Desktop (ürün-derinlik, Alperen canlı) | "Çok yetersiz/detaysız — kişiler TÜM işlerini bu yüzeyde yürütemez; basit VE gelişmiş olsun; menü SOLDA olsun" | ✅ aynı-gün: (a) sol-ray uygulandı (hot-reload'la canlı); (b) **ihtiyaç-analizi çıkarıldı** `docs/analysis/desktop-ihtiyac-analizi-2026-07-18.md` — 14 iş-ailesi envanteri (5✅·5🟡·6🔴... 4✅+5🟡+5🔴), sol-ray IA, A-seti (KABUL-içi 4 ince-dilim) + B-seti (DESK-DEPTH-1..6 satır-adayları); fazlama Alperen-kararında |
+| P4 | 🟡 | Desktop (Alperen canlı-bulgu) | "Engine-Room/Chat'te sekme değişince kaldığım yerden devam etmiyor" — route-unmount yerel-state'i siliyordu | ✅ FIX aynı-gün: Telsiz-transkripti + Makine-Dairesi sekme-seçimi zustand-store'a taşındı (görünüme dönüş = kaldığın yer; PTY içeriği inv#4 replay'iyle zaten dönüyor). Derin keep-alive (xterm scroll-pozisyonu) → aday-born, gün-sonu kararı. **Canlı-doğrulandı** (Alperen: "başka yere dönünce hâlâ açık, ok") |
 
 ### Gün-sonu özeti
 *(gün kapanırken doldurulur: dokunulan-yüzeyler · pürüz-sayısı · fallback-olayı var mı · Gün-2'ye devir)*
