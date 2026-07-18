@@ -80,6 +80,25 @@ describe('per-request CORS on the wire (Day-1 blank-fetch class)', () => {
     expect(res.headers.get('access-control-allow-origin')).toBe('http://localhost:5173');
   });
 
+  it('pürüz-5: an UNAUTHENTICATED preflight to closure-served /api/terminal/* answers 204 (never the token-gate 401)', async () => {
+    api = createHttpServer(tmpRoot, { port: 0, autoGenerateToken: true });
+    const base = `http://127.0.0.1:${await port(api)}`;
+    const res = await fetch(`${base}/api/terminal/token`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'http://localhost:5173',
+        'Access-Control-Request-Method': 'GET',
+        'Access-Control-Request-Headers': 'authorization',
+      },
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get('access-control-allow-origin')).toBe('http://localhost:5173');
+    expect(res.headers.get('access-control-allow-headers')).toContain('Authorization');
+    // the preflight GRANTS nothing — the real method still hits the gate:
+    const real = await fetch(`${base}/api/terminal/sessions`, { headers: { Origin: 'http://localhost:5173' } });
+    expect(real.status).toBe(401);
+  });
+
   it('the packaged renderer (`Origin: null`) reflects; a non-loopback origin gets NOTHING', async () => {
     api = createHttpServer(tmpRoot, { port: 0, autoGenerateToken: true });
     const base = `http://127.0.0.1:${await port(api)}`;

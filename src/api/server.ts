@@ -2321,6 +2321,21 @@ export function createHttpServer(
       // handleRequest/sendJson below) inherits a correct ACAO.
       applyLoopbackCors(req, res);
 
+      // KABUL Gün-1 pürüz-5 — closure-served /api/terminal/* intercepts ALL
+      // methods, so a browser CORS PREFLIGHT (OPTIONS carries NO bearer by
+      // spec) was falling into the token-gated block and dying 401 — the
+      // Engine Room could never even ASK for its token from the dev renderer.
+      // Answer preflights here, before any auth gate: a 204 grants nothing
+      // (the real GET/POST/DELETE still hits the gates below).
+      if (method === 'OPTIONS' && urlPath.startsWith('/api/terminal/')) {
+        res.writeHead(204, {
+          'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        });
+        res.end();
+        return;
+      }
+
       // ─── N3 (583) — Desktop terminal-token delivery ─
       // ADR-G-029 inv#2 SECOND delivery channel (amendment 2026-07-18): a
       // loopback-only GET returning the terminal token to a caller that
