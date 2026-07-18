@@ -45,6 +45,11 @@
 | P7 | 🟡 | Desktop (yön, Alperen canlı) | "Sprint-durumu/dosya-akışı/『deckent şu an napıyor』yok; worker-detay-penceresi yok; History sadece-kod; .deckent'te milyon gösterilebilir özellik var — GELİŞTİRMEDEN ÖNCE enterprise-app'i DETAYLI planla" | ✅ aynı-gün: A1-implementasyonu duraklatıldı (sunucu-yüzü `/api/git/*` bitmiş+10-pin yeşil hâliyle indirildi) → **disk-envanteri** (retro-203·debt-222·memory-290·adr-47·agents-stats·hb·locks·shadow·lint…) → **`docs/analysis/desktop-enterprise-plan-2026-07-18.md`**: 12-ekran spec (Köprü-Operasyon-Merkezi + Worker-Penceresi dahil) · veri→ekran eşleme-tablosu · 4-yeni-587-servisi · F0-F5 fazlama · kabul-cümlesi; onay Alperen'de |
 | P4 | 🟡 | Desktop (Alperen canlı-bulgu) | "Engine-Room/Chat'te sekme değişince kaldığım yerden devam etmiyor" — route-unmount yerel-state'i siliyordu | ✅ FIX aynı-gün: Telsiz-transkripti + Makine-Dairesi sekme-seçimi zustand-store'a taşındı (görünüme dönüş = kaldığın yer; PTY içeriği inv#4 replay'iyle zaten dönüyor). Derin keep-alive (xterm scroll-pozisyonu) → aday-born, gün-sonu kararı. **Canlı-doğrulandı** (Alperen: "başka yere dönünce hâlâ açık, ok") |
 
+### F0+F1 teslimi (P7-planının KABUL-içi kapsamı) — TAMAM, el-testi bekliyor
+Plan-onayı sonrası aynı-gün: **F0** (Changes+ray-grupları+Runs-detay+Telsiz-kalıcılık) + **F1**
+(«Köprü» operasyon-merkezi + Worker-Penceresi + sprint-live-service). Test-planı:
+**`docs/analysis/588-test-plani-2026-07-18.md`** (T1-T18) — Alperen koşacak, feedback'le kapanacak.
+
 ### Gün-sonu özeti
 *(gün kapanırken doldurulur: dokunulan-yüzeyler · pürüz-sayısı · fallback-olayı var mı · Gün-2'ye devir)*
 
