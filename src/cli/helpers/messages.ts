@@ -3751,6 +3751,34 @@ const MESSAGES: MessageMap = {
     en: 'Remote decisions are disabled on this daemon (approval.api_decide) — decide from the terminal.',
     tr: 'Bu daemonda uzaktan karar kapalı (approval.api_decide) — kararı terminalden verin.',
   },
+  // 583/N3 «Makine Dairesi» — the Desktop PTY panel (ADR-G-029 secondary surface).
+  'desktop.shell.nav.terminal': { en: 'Engine Room', tr: 'Makine Dairesi' },
+  'desktop.shell.term.title': { en: 'Engine room', tr: 'Makine dairesi' },
+  'desktop.shell.term.new_session': { en: 'New session:', tr: 'Yeni oturum:' },
+  'desktop.shell.term.kind_shell': { en: 'Shell', tr: 'Shell' },
+  'desktop.shell.term.kind_deckent': { en: 'deckent', tr: 'deckent' },
+  'desktop.shell.term.kind_claude': { en: 'Claude', tr: 'Claude' },
+  'desktop.shell.term.kind_gemini': { en: 'Gemini', tr: 'Gemini' },
+  'desktop.shell.term.kind_codex': { en: 'Codex', tr: 'Codex' },
+  'desktop.shell.term.close_session': { en: 'Close session', tr: 'Oturumu kapat' },
+  'desktop.shell.term.connecting': { en: 'Connecting…', tr: 'Bağlanıyor…' },
+  'desktop.shell.term.reconnecting': {
+    en: 'Connection lost — reconnecting…',
+    tr: 'Bağlantı koptu — yeniden bağlanılıyor…',
+  },
+  'desktop.shell.term.disabled': {
+    en: 'This daemon\'s terminal surface is off (non-local bind or --no-terminal) — start the daemon locally to open the engine room.',
+    tr: 'Bu daemonun terminal yüzeyi kapalı (yerel-dışı bind veya --no-terminal) — makine dairesini açmak için daemonu yerelde başlatın.',
+  },
+  'desktop.shell.term.shell_kind_off': {
+    en: 'Plain shell sessions are disabled by config (terminal.allowShellKind) — deckent/AI sessions stay available.',
+    tr: 'Düz shell oturumları config ile kapalı (terminal.allowShellKind) — deckent/AI oturumları açık.',
+  },
+  'desktop.shell.term.sessions_empty': {
+    en: 'No live sessions — open one below deck.',
+    tr: 'Canlı oturum yok — güverte altında bir tane açın.',
+  },
+  'desktop.shell.term.exited': { en: 'exited ({code})', tr: 'kapandı ({code})' },
   // D4-1 «Köprüüstü» — watch (vardiya) theme system.
   'desktop.theme.title': { en: 'Watch', tr: 'Vardiya' },
   'desktop.theme.watch.day-watch': { en: 'Day watch', tr: 'Gündüz seyri' },

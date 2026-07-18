@@ -147,12 +147,51 @@ describe('normalizeApprovalEntry — nested-server → flat-shell (SURF-kuyruk-E
   });
 });
 
+describe('api-client terminal contract (583/N3 «Makine Dairesi», ADR-G-029)', () => {
+  it('getTerminalToken exchanges the API bearer at /api/terminal/token and unwraps { token }', async () => {
+    const { fetchFn, calls } = makeFetch(200, { token: 'term-secret' });
+    const client = createApiClient(SESSION, fetchFn);
+    const token = await client.getTerminalToken();
+    expect(token).toBe('term-secret');
+    expect(calls[0]!.url).toBe('http://127.0.0.1:4317/api/terminal/token');
+    expect((calls[0]!.init?.headers as Record<string, string>)['Authorization']).toBe('Bearer tok-123');
+  });
+
+  it('session CRUD authenticates with the TERMINAL bearer, never the API token (the two secrets stay disjoint)', async () => {
+    const { fetchFn, calls } = makeFetch(200, []);
+    const client = createApiClient(SESSION, fetchFn);
+    await client.listTerminalSessions('term-secret');
+    expect(calls[0]!.url).toBe('http://127.0.0.1:4317/api/terminal/sessions');
+    expect((calls[0]!.init?.headers as Record<string, string>)['Authorization']).toBe('Bearer term-secret');
+  });
+
+  it('createTerminalSession POSTs the kind/tool body; killTerminalSession DELETEs by id', async () => {
+    const { fetchFn, calls } = makeFetch(200, { id: 's-1', kind: 'ai', tenantId: 'local', createdAt: '', status: 'running' });
+    const client = createApiClient(SESSION, fetchFn);
+    await client.createTerminalSession('term-secret', { kind: 'ai', tool: 'claude' });
+    await client.killTerminalSession('term-secret', 's 1');
+    expect(calls[0]!.init?.method).toBe('POST');
+    expect(JSON.parse(String(calls[0]!.init?.body))).toEqual({ kind: 'ai', tool: 'claude' });
+    expect(calls[1]!.init?.method).toBe('DELETE');
+    expect(calls[1]!.url).toBe('http://127.0.0.1:4317/api/terminal/sessions/s%201');
+  });
+
+  it('getStatus reads the daemon capability payload (terminalEnabled precondition)', async () => {
+    const { fetchFn, calls } = makeFetch(200, { terminalEnabled: false });
+    const client = createApiClient(SESSION, fetchFn);
+    const status = await client.getStatus();
+    expect(status.terminalEnabled).toBe(false);
+    expect(calls[0]!.url).toBe('http://127.0.0.1:4317/api/status');
+  });
+});
+
 describe('buildLocalRendererCsp (D4-3 — approved transport decision)', () => {
-  it('always allows the loopback port-wildcards (the connect flow enforces loopback-only)', () => {
+  it('always allows the loopback port-wildcards, http AND ws (583/N3 — the terminal WebSocket)', () => {
     // NOT [::1]: Chromium rejects a bracketed-IPv6 wildcard source — an ::1
     // daemon joins via its exact dynamic origin instead (see builder note).
+    // ws sources are EXPLICIT — CSP3's http→ws scheme matching is not relied on.
     expect(buildLocalRendererCsp([])).toBe(
-      "default-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:*",
+      "default-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*",
     );
   });
 
@@ -164,8 +203,9 @@ describe('buildLocalRendererCsp (D4-3 — approved transport decision)', () => {
     expect(csp).not.toContain('unsafe');
   });
 
-  it('a future non-loopback (https/tunnel) origin joins dynamically', () => {
+  it('a future non-loopback (https/tunnel) origin joins dynamically WITH its wss twin (583/N3)', () => {
     const csp = buildLocalRendererCsp(['https://daemon.example:8443']);
     expect(csp).toContain('https://daemon.example:8443');
+    expect(csp).toContain('wss://daemon.example:8443');
   });
 });

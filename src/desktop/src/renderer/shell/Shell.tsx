@@ -1,16 +1,19 @@
 /**
- * D4-3 shell + D4-4 «Köprüüstü» design of the four views.
+ * D4-3 shell + D4-4 «Köprüüstü» design of the four views — plus 583/N3's
+ * fifth: «Makine Dairesi» (Engine Room), the real PTY surface.
  *
  * Console = the bridge: the selected flow's life is drawn as a COURSE LINE
  * (D4-0's signature interaction «Rota» — every durable event a position fix,
  * the vessel at "now", the dashed line sails while underway) above the ship's
  * log (live SSE feed). Approval = pending telegraph orders (poll broker).
  * History = the voyage ledger. Chat = a designed, honest watch-radio empty
- * state until SURF-5. State words are the TERMINAL's own vocabulary
+ * state until SURF-5. Engine Room = below deck, hands on the machinery
+ * (EngineRoom.tsx — React.lazy so xterm never evaluates in node-env tests).
+ * State words are the TERMINAL's own vocabulary
  * (FLOW_STATE_MESSAGE_KEYS → tui.inbox_state_*) — one vocabulary, two
  * surfaces. All text via the shared strings map; zero shell literals.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { createHashRouter, Navigate, NavLink, Outlet, RouterProvider } from 'react-router';
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, createApiClient, type DaemonApiClient, type FlowSummary, type RunFlowEventPayload } from './api-client.js';
@@ -23,6 +26,8 @@ export const MSG = {
   navChat: 'desktop.shell.nav.chat',
   navApproval: 'desktop.shell.nav.approval',
   navHistory: 'desktop.shell.nav.history',
+  // 583/N3 «Makine Dairesi»
+  navTerminal: 'desktop.shell.nav.terminal',
   connectedTo: 'desktop.shell.connected_to',
   flowsEmpty: 'desktop.shell.flows_empty',
   flagRunFlowOff: 'desktop.shell.flag_run_flow_off',
@@ -110,6 +115,7 @@ function ShellLayout(): React.JSX.Element {
         <NavLink to="/chat">{t(MSG.navChat)}</NavLink>
         <NavLink to="/approval">{t(MSG.navApproval)}</NavLink>
         <NavLink to="/history">{t(MSG.navHistory)}</NavLink>
+        <NavLink to="/terminal">{t(MSG.navTerminal)}</NavLink>
         <span className="shell-origin">{session ? t(MSG.connectedTo, { origin: session.url }) : ''}</span>
       </nav>
       <main className="shell-view">
@@ -646,6 +652,22 @@ function HistoryView(): React.JSX.Element {
   );
 }
 
+// ─── «Makine Dairesi» (583/N3) — lazy route ──────────────────────────────────
+// React.lazy keeps xterm (+ its css side-effect import) OUT of this module's
+// evaluation graph: node-env tests import Shell.tsx DOM-free, and the
+// machinery only loads when the operator actually goes below deck.
+
+const EngineRoom = lazy(() => import('./EngineRoom.js'));
+
+function EngineRoomRoute(): React.JSX.Element {
+  const t = useT();
+  return (
+    <Suspense fallback={<p className="shell-muted">{t(MSG.loading)}</p>}>
+      <EngineRoom />
+    </Suspense>
+  );
+}
+
 // ─── Router ──────────────────────────────────────────────────────────────────
 // Created INSIDE the component (not at module scope): createHashRouter touches
 // `document` at construction, and node-env tests import this module DOM-free.
@@ -663,6 +685,7 @@ export function Shell({ queryClient }: { queryClient: QueryClient }): React.JSX.
             { path: 'chat', element: <ChatView /> },
             { path: 'approval', element: <ApprovalView /> },
             { path: 'history', element: <HistoryView /> },
+            { path: 'terminal', element: <EngineRoomRoute /> },
           ],
         },
       ]),

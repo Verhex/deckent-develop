@@ -149,9 +149,18 @@ export function buildLocalRendererCsp(daemonOrigins: readonly string[]): string 
   // NOTE: Chromium rejects a bracketed-IPv6 host-source with a port wildcard
   // (`http://[::1]:*`) as invalid — an ::1 daemon therefore joins via its
   // exact dynamic origin below instead of a wildcard.
-  const loopback = ['http://127.0.0.1:*', 'http://localhost:*'];
+  //
+  // 583/N3 «Makine Dairesi»: the terminal panel opens a renderer-owned
+  // WebSocket to the daemon (`/api/terminal/ws`), so the ws-scheme loopback
+  // wildcards are listed EXPLICITLY — CSP3's http→ws scheme matching is not
+  // relied upon (explicit sources are guaranteed + self-documenting). Each
+  // dynamic origin gets its ws twin derived the same way (http→ws, https→wss).
+  const loopback = ['http://127.0.0.1:*', 'http://localhost:*', 'ws://127.0.0.1:*', 'ws://localhost:*'];
   const dynamic = daemonOrigins.filter((origin) => !loopback.some((l) => origin.startsWith(l.slice(0, l.length - 1))));
-  const connectSources = ["'self'", ...loopback, ...dynamic];
+  const dynamicWs = dynamic
+    .filter((origin) => origin.startsWith('http'))
+    .map((origin) => origin.replace(/^http/, 'ws'));
+  const connectSources = ["'self'", ...loopback, ...dynamic, ...dynamicWs];
   return `default-src 'self'; connect-src ${connectSources.join(' ')}`;
 }
 

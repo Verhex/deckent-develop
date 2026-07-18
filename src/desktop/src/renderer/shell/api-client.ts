@@ -129,6 +129,30 @@ export interface RunDiffPayload {
   note?: 'no-base' | 'not-a-git-repo';
 }
 
+/** 583/N3 — daemon capability read the «Makine Dairesi» precondition uses.
+ *  `/api/status` includes `terminalEnabled` for loopback callers only. */
+export interface DaemonStatusPayload {
+  terminalEnabled?: boolean;
+  [key: string]: unknown;
+}
+
+/** 583/N3 — one PTY session as the daemon lists it (terminal/types.ts SessionMeta). */
+export interface TerminalSessionMeta {
+  id: string;
+  kind: 'ai' | 'deckent' | 'shell';
+  tenantId: string;
+  createdAt: string;
+  status: 'running' | 'exited';
+  exitCode?: number;
+}
+
+export interface CreateTerminalSessionInput {
+  kind: 'ai' | 'deckent' | 'shell';
+  /** AI tool for kind==='ai' (server allowlist: claude/gemini/codex). */
+  tool?: 'claude' | 'gemini' | 'codex';
+  args?: string[];
+}
+
 export interface DaemonApiClient {
   readonly session: DaemonSession;
   // ── RunFlow contract ──
@@ -148,6 +172,17 @@ export interface DaemonApiClient {
   /** SURF-5 — decide a pending approval. Flag-gated server-side
    *  (`approval.api_decide`): a 403 means the flag is off (surface it). */
   decideApproval(id: string, decision: 'allow' | 'deny', reason?: string): Promise<Record<string, unknown>>;
+  // ── Terminal contract (583/N3 «Makine Dairesi», ADR-G-029) ──
+  /** Daemon capability read (`terminalEnabled` — loopback callers only). */
+  getStatus(): Promise<DaemonStatusPayload>;
+  /** inv#2b bootstrap: exchange the API bearer for the TERMINAL token
+   *  (loopback-only endpoint; 404 = terminal disabled, surface it). */
+  getTerminalToken(): Promise<string>;
+  /** Session CRUD — gated by the TERMINAL bearer, so each call takes the
+   *  token obtained above (explicit — the two secrets never blur). */
+  listTerminalSessions(terminalToken: string): Promise<TerminalSessionMeta[]>;
+  createTerminalSession(terminalToken: string, input: CreateTerminalSessionInput): Promise<TerminalSessionMeta>;
+  killTerminalSession(terminalToken: string, sessionId: string): Promise<void>;
 }
 
 export function createApiClient(session: DaemonSession, fetchFn?: FetchLike): DaemonApiClient {
@@ -164,6 +199,34 @@ export function createApiClient(session: DaemonSession, fetchFn?: FetchLike): Da
     const response = await doFetch(new URL(path, session.url).toString(), {
       method,
       headers: headers(body !== undefined),
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+    if (!response.ok) {
+      let detail = '';
+      try {
+        detail = (await response.text()).slice(0, 300);
+      } catch {
+        // body unavailable — status alone is the honest signal
+      }
+      throw new ApiError(response.status, `${method} ${path} → ${response.status}${detail ? `: ${detail}` : ''}`);
+    }
+    return (await response.json()) as T;
+  }
+
+  /** 583/N3 — same shape as `request`, but authenticated with the TERMINAL
+   *  bearer (ADR-G-029: the session routes deliberately refuse the API token;
+   *  the two secrets never share a code path here either). */
+  async function terminalRequest<T>(
+    method: 'GET' | 'POST' | 'DELETE',
+    path: string,
+    terminalToken: string,
+    body?: unknown,
+  ): Promise<T> {
+    const h: Record<string, string> = { Authorization: `Bearer ${terminalToken}` };
+    if (body !== undefined) h['Content-Type'] = 'application/json';
+    const response = await doFetch(new URL(path, session.url).toString(), {
+      method,
+      headers: h,
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
     if (!response.ok) {
@@ -229,5 +292,21 @@ export function createApiClient(session: DaemonSession, fetchFn?: FetchLike): Da
         decision,
         ...(reason !== undefined ? { reason } : {}),
       }),
+
+    // ── Terminal contract (583/N3 «Makine Dairesi», ADR-G-029) ──
+    getStatus: () => request<DaemonStatusPayload>('GET', '/api/status'),
+    getTerminalToken: () =>
+      request<{ token: string }>('GET', '/api/terminal/token').then((r) => r.token),
+    listTerminalSessions: (terminalToken) =>
+      terminalRequest<TerminalSessionMeta[]>('GET', '/api/terminal/sessions', terminalToken),
+    createTerminalSession: (terminalToken, input) =>
+      terminalRequest<TerminalSessionMeta>('POST', '/api/terminal/sessions', terminalToken, input),
+    killTerminalSession: async (terminalToken, sessionId) => {
+      await terminalRequest<unknown>(
+        'DELETE',
+        `/api/terminal/sessions/${encodeURIComponent(sessionId)}`,
+        terminalToken,
+      );
+    },
   };
 }

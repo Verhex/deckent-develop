@@ -83,6 +83,16 @@ describe('Shell MSG — every shell string is a served bridge key (SURF-5)', () 
     const rogue = Object.entries(MSG).filter(([, key]) => !served.has(key));
     expect(rogue).toEqual([]);
   });
+
+  it("EngineRoom's MSG keys are all served too (583/N3 — source scan; the module itself pulls xterm, so it is never imported node-side)", async () => {
+    const { readFileSync } = await import('node:fs');
+    const source = readFileSync(new URL('../src/renderer/shell/EngineRoom.tsx', import.meta.url), 'utf-8');
+    const served = new Set<string>(DESKTOP_MESSAGE_KEYS);
+    const referenced = [...source.matchAll(/'((?:desktop|tui)\.[\w.]+)'/g)].map((m) => m[1] as string);
+    expect(referenced.length).toBeGreaterThan(0);
+    const rogue = referenced.filter((key) => !served.has(key));
+    expect(rogue).toEqual([]);
+  });
 });
 
 describe('foldEventIntoLedger — SSE reconnect dedupe (SURF-6)', () => {

@@ -48,10 +48,20 @@ A self-contained terminal subsystem under `src/api/terminal/`, wired by `src/api
     Violating this is a direct RCE vector — the invariant must never be relaxed.
   </inv>
   <inv id="2" name="token delivery">
-    Per-server-start token, injected into index.html ONLY for 127.0.0.1/::1
-    callers (window.__DECKENT_TERMINAL_TOKEN__), presented via
-    Sec-WebSocket-Protocol: deckent.<token> — never via query string, cookie, or
-    a plain HTTP Authorization header on the WS upgrade.
+    Per-server-start token, delivered over exactly TWO bootstrap channels:
+    (a) injected into index.html ONLY for 127.0.0.1/::1 callers
+    (window.__DECKENT_TERMINAL_TOKEN__) — the browser-dashboard channel; or
+    (b) [amendment 2026-07-18, 583/N3 Desktop-PTY, Alperen-approved] a
+    loopback-only `GET /api/terminal/token` response gated by a VALID API
+    bearer verified with the constant-time comparator INDEPENDENTLY of
+    DECKENT_API_AUTH_DISABLED (fail-CLOSED — no API token configured ⇒ 401;
+    response is Cache-Control: no-store; denials/handouts audit-recorded) —
+    the Desktop-renderer channel (it never loads the daemon's index.html).
+    Non-loopback callers are always refused on both channels; remote/enterprise
+    clients use the OIDC/JWKS path (inv#5), never a bootstrap channel. On the
+    wire the token is presented via Sec-WebSocket-Protocol: deckent.<token> —
+    never via query string, cookie, or a plain HTTP Authorization header on
+    the WS upgrade.
   </inv>
   <inv id="3" name="structured-audit-only">
     Clause-1 (STRUCTURAL — always enforced): Raw PTY output (ANSI sequences,

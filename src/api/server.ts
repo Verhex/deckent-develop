@@ -24,7 +24,7 @@ import { readJsonSafe } from '../core/utils.js';
 import { deepMerge } from '../core/config.js';
 import { MemoryStore } from '../core/memory-store.js';
 import { watchDashboard } from './watcher.js';
-import { bearerAuthMiddleware, isLocalhostRequest, resolveAuthToken } from './auth.js';
+import { bearerAuthMiddleware, isLocalhostRequest, resolveAuthToken, verifyBearerToken } from './auth.js';
 import { injectApiTokenIntoHtml, isLoopbackRemote } from './middleware/token.js';
 import { parseSprintLog } from '../cli/commands/history.js';
 import { runDoctorChecks } from '../cli/commands/doctor.js';
@@ -2280,6 +2280,60 @@ export function createHttpServer(
       const rawUrl = req.url ?? '/';
       const urlPath = rawUrl.split('?')[0] ?? '/';
       const method = req.method ?? 'GET';
+
+      // ─── N3 (583) — Desktop terminal-token delivery ─
+      // ADR-G-029 inv#2 SECOND delivery channel (amendment 2026-07-18): a
+      // loopback-only GET returning the terminal token to a caller that
+      // presents a VALID **API** bearer — verified here DIRECTLY with the
+      // constant-time comparator, NEVER via authMiddleware, so the
+      // DECKENT_API_AUTH_DISABLED bypass can never open a path to the shell
+      // (inv#1 rationale — fail-CLOSED: no API token configured → always 401).
+      // The Desktop renderer (which never loads the daemon's index.html, so
+      // the inv#2 bootstrap-inject can't reach it) calls this and then
+      // presents the token via Sec-WebSocket-Protocol exactly as before.
+      // Must precede the terminal-token-gated block below — same /api/terminal/
+      // prefix, different (API) bearer.
+      if (method === 'GET' && urlPath === '/api/terminal/token') {
+        if (!terminalMgr || !terminalAudit || terminalToken === undefined) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'terminal disabled' }));
+          return;
+        }
+        if (!isLoopbackRemote(req.socket.remoteAddress ?? '')) {
+          // Remote/enterprise clients use the OIDC/JWKS path (inv#5) — this
+          // bootstrap channel is loopback-only by construction, like the
+          // index.html inject it complements.
+          terminalAudit.record({
+            action: 'auth.deny',
+            tenantId: 'local',
+            detail: 'http GET /api/terminal/token (non-loopback)',
+            at: new Date().toISOString(),
+          });
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'terminal token bootstrap is loopback-only' }));
+          return;
+        }
+        if (!finalToken || verifyBearerToken(req, finalToken) !== 'ok') {
+          terminalAudit.record({
+            action: 'auth.deny',
+            tenantId: 'local',
+            detail: 'http GET /api/terminal/token (api-bearer)',
+            at: new Date().toISOString(),
+          });
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Unauthorized' }));
+          return;
+        }
+        terminalAudit.record({
+          action: 'auth.ok',
+          tenantId: 'local',
+          detail: 'http GET /api/terminal/token',
+          at: new Date().toISOString(),
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        res.end(JSON.stringify({ token: terminalToken }));
+        return;
+      }
 
       // ─── Terminal routes (bypass-independent auth, spec §1c.2) ─
       if (terminalMgr && terminalAuth && terminalAudit && rawUrl.startsWith('/api/terminal/')) {

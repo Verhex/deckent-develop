@@ -34,6 +34,8 @@
   },
   "dependencies": {
     "@tanstack/react-query": "5.90.3",
+    "@xterm/addon-fit": "0.10.0",
+    "@xterm/xterm": "5.5.0",
     "react": "19.2.7",
     "react-aria-components": "1.19.0",
     "react-dom": "19.2.7",

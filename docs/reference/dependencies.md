@@ -29,6 +29,8 @@ For the full history and amendment log, see [ADR-D-005](../adr/adr-d-005-depende
 | `@tanstack/react-query` *(desktop sub-pkg)* | `5.90.3` (exact) | Server-state: RunFlow REST cache + SSE→cache canlı-besleme | SURF-4 onaylı-yığın §2 |
 | `zustand` *(desktop sub-pkg)* | `5.0.14` (exact) | Hafif UI-state (session/tema/nav) | SURF-4 D4-0 kilidi (Alperen-onaylı 2026-07-16) |
 | `react-aria-components` *(desktop sub-pkg)* | `1.19.0` (exact) | Erişilebilir davranış-primitifleri — style-free (Köprüüstü dilini kısıtlamaz), yerleşik TR-dahil i18n | SURF-4 D4-0 kilidi (6-aday karşılaştırmasıyla, Alperen-onaylı 2026-07-16) |
+| `@xterm/xterm` *(desktop sub-pkg)* | `5.5.0` (exact) | «Makine Dairesi» PTY-paneli — dashboard'da vetted AYNI sürüm; React.lazy chunk'ında (ana-bundle'a girmez) | 583/N3 (Alperen-onaylı 2026-07-18); ADR-G-029 |
+| `@xterm/addon-fit` *(desktop sub-pkg)* | `0.10.0` (exact) | xterm boyut-uydurma eklentisi (ResizeObserver→fit→resize-frame) | 583/N3 (Alperen-onaylı 2026-07-18); ADR-G-029 |
 | `nodemailer` *(optional)* | `^6.9.14` | Email connector (SMTP outbound) | ADR-016: External Messaging Connectors |
 | `openai` *(optional)* | `^4.103.0` | OpenAI voice connector (Whisper transcription + TTS) | ADR-016: External Messaging Connectors |
 
