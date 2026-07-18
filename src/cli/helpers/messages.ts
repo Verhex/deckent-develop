@@ -3720,7 +3720,7 @@ const MESSAGES: MessageMap = {
   'desktop.shell.nav.console': { en: 'Console', tr: 'Konsol' },
   'desktop.shell.nav.chat': { en: 'Chat', tr: 'Sohbet' },
   'desktop.shell.nav.approval': { en: 'Approvals', tr: 'Onaylar' },
-  'desktop.shell.nav.history': { en: 'History', tr: 'Geçmiş' },
+  'desktop.shell.nav.history': { en: 'Runs', tr: 'Koşular' },
   'desktop.shell.connected_to': { en: 'Connected: {origin}', tr: 'Bağlı: {origin}' },
   'desktop.shell.flows_empty': {
     en: 'No flows yet — start one with `deckent do "<goal>"`.',
@@ -3810,6 +3810,20 @@ const MESSAGES: MessageMap = {
   },
   // 583/N3 «Makine Dairesi» — the Desktop PTY panel (ADR-G-029 secondary surface).
   'desktop.shell.nav.terminal': { en: 'Engine Room', tr: 'Makine Dairesi' },
+  // KABUL Gün-1 A1/A4 — sol-ray grupları + «Changes» görünümü.
+  'desktop.shell.nav.group_voyage': { en: 'Voyage', tr: 'Seyir' },
+  'desktop.shell.nav.group_work': { en: 'Work', tr: 'Çalışma' },
+  'desktop.shell.nav.changes': { en: 'Changes', tr: 'Değişiklikler' },
+  'desktop.shell.changes.commit': { en: 'Commit', tr: 'Commit' },
+  'desktop.shell.changes.gate_off': {
+    en: 'Remote commit is disabled on this daemon (api.control_mutations) — Desktop-spawned daemons enable it automatically; use `deckent runs <n> --commit` in the terminal otherwise.',
+    tr: 'Bu daemonda uzaktan commit kapalı (api.control_mutations) — Desktop\'ın başlattığı daemonlarda otomatik açıktır; aksi hâlde terminalden `deckent runs <n> --commit` kullanın.',
+  },
+  // KABUL Gün-1 A2 — Runs detay-sayfası kelimeleri.
+  'desktop.shell.runs.goal': { en: 'Goal', tr: 'Hedef' },
+  'desktop.shell.runs.gate': { en: 'Plan gate', tr: 'Plan kapısı' },
+  'desktop.shell.runs.tasks': { en: '{done}/{total} tasks', tr: '{done}/{total} görev' },
+  'desktop.shell.runs.revision': { en: 'Revision {r}', tr: 'Revizyon {r}' },
   'desktop.shell.term.title': { en: 'Engine room', tr: 'Makine dairesi' },
   'desktop.shell.term.new_session': { en: 'New session:', tr: 'Yeni oturum:' },
   'desktop.shell.term.kind_shell': { en: 'Shell', tr: 'Shell' },

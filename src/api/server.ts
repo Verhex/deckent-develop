@@ -29,6 +29,16 @@ import { injectApiTokenIntoHtml, isLoopbackRemote } from './middleware/token.js'
 import { parseSprintLog } from '../cli/commands/history.js';
 import { runDoctorChecks } from '../cli/commands/doctor.js';
 import { killWorker, killAllWorkers } from '../orchestra/tmux.js';
+// KABUL Gün-1 A1 «Changes» — the N4 git surface's HTTP face (587-deseni: the
+// ONE service, now three consumers: CLI + chat tools + Desktop).
+import {
+  gitWorkflowStatus,
+  gitWorkflowDiff,
+  gitWorkflowAdd,
+  gitWorkflowCommit,
+  buildCommitProposal,
+  buildRunCommitProposal,
+} from '../orchestra/git-workflow-service.js';
 import { loadConfig, createDefaultConfig, validatePartialConfig, ConfigValidationError } from '../core/config.js';
 import { readWorkerLog } from '../agents/worker.js';
 import { AgentPoolManager } from '../core/agent-pool.js';
@@ -555,6 +565,12 @@ export function isGatedControlMutation(method: string, url: string): boolean {
     url === '/api/start' || url === '/api/plan' || url === '/api/cleanup'
     || url === '/api/set-directives' || url === '/api/directives'
     || url === '/api/config' || url === '/api/chat'
+    // KABUL Gün-1 A1 «Changes»: an HTTP git-commit is a control mutation
+    // (the human seal must come from an operator surface — Desktop carries
+    // the env twin for its own spawned daemons; adopted daemons keep their
+    // flag). The /api/git/* GETs (status/diff/proposal) are monitoring
+    // reads and stay ungated per the SURF-7 rule.
+    || url === '/api/git/commit'
   ) return true;
   if (url === '/api/kill/all' || url.startsWith('/api/kill/')) return true;
   if (
@@ -1190,6 +1206,29 @@ async function handleRequest(
       return;
     }
 
+    // ─── /api/git/* — KABUL Gün-1 A1 «Changes» (N4-servisin HTTP-yüzü) ───
+    // GETs are monitoring reads (never gated); POST /api/git/commit is a
+    // control mutation (isGatedControlMutation) AND stages+commits in one
+    // sealed step — the exact runs-- commit semantics, Desktop-bacağı.
+    if (method === 'GET' && url === '/api/git/status') {
+      sendJson(res, await gitWorkflowStatus(projectRoot));
+      return;
+    }
+    if (method === 'GET' && (url === '/api/git/diff' || url.startsWith('/api/git/diff?'))) {
+      const staged = url.includes('staged=1') || url.includes('staged=true');
+      sendJson(res, await gitWorkflowDiff(projectRoot, { staged }));
+      return;
+    }
+    if (method === 'GET' && (url === '/api/git/proposal' || url.startsWith('/api/git/proposal?'))) {
+      const qIdx = url.indexOf('?');
+      const params = qIdx >= 0 ? new URLSearchParams(url.slice(qIdx + 1)) : new URLSearchParams();
+      const flowId = params.get('flowId');
+      const proposal = flowId !== null && flowId.length > 0
+        ? await buildRunCommitProposal(projectRoot, flowId, params.get('intent') ?? undefined)
+        : await buildCommitProposal(projectRoot);
+      sendJson(res, proposal);
+      return;
+    }
     // GET /api/approvals — pending/approved/denied buckets, maskedArgs-only
     // (356-002, ADR-G-033/ADR-G-020). Never flag-gated — dashboard monitoring
     // stays always-on regardless of `approval.api_decide`.
@@ -1249,6 +1288,29 @@ async function handleRequest(
       } else {
         sendError(res, 400, 'Invalid JSON body');
       }
+      return;
+    }
+
+    // POST /api/git/commit — A1 «Changes» (control-mutation-gated above):
+    // stage-everything + commit in ONE sealed step (runs --commit semantics).
+    if (url === '/api/git/commit') {
+      const input = body as { message?: unknown };
+      const message = typeof input?.message === 'string' ? input.message : '';
+      if (message.trim().length === 0) {
+        sendError(res, 400, 'commit message required');
+        return;
+      }
+      const added = await gitWorkflowAdd(projectRoot);
+      if (!added.ok) {
+        sendError(res, added.note === 'not-a-git-repo' ? 409 : 500, added.error ?? added.note ?? 'git add failed');
+        return;
+      }
+      const committed = await gitWorkflowCommit(projectRoot, message);
+      if (!committed.ok) {
+        sendError(res, 500, committed.error ?? 'git commit failed');
+        return;
+      }
+      sendJson(res, { ok: true, sha: committed.sha ?? null, staged: added.staged });
       return;
     }
 

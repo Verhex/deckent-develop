@@ -115,6 +115,28 @@ export function buildEventsUrl(session: DaemonSession, flowId: string, afterSequ
   return url.toString();
 }
 
+/** A1 «Changes» — /api/git/* payload shapes (git-workflow-service contract). */
+export interface GitStatusPayload {
+  note?: 'not-a-git-repo';
+  branch?: string;
+  ahead?: number;
+  behind?: number;
+  entries: Array<{ path: string; code: string }>;
+  clean: boolean;
+}
+export interface GitDiffPayload {
+  note?: 'not-a-git-repo';
+  text: string;
+  truncated: boolean;
+}
+export interface GitProposalPayload {
+  note?: 'not-a-git-repo' | 'clean';
+  files: Array<{ path: string; insertions: number; deletions: number }>;
+  insertions: number;
+  deletions: number;
+  suggestedMessage: string;
+}
+
 /** DT-1 «Telsiz» — the chat-stream SSE URL (`/api/chat/stream` is on the
  *  server's query-token allowlist, same EventSource-cannot-set-headers
  *  rationale as buildEventsUrl). Exported pure — unit-pinned. */
@@ -196,6 +218,12 @@ export interface DaemonApiClient {
   /** SURF-5 — decide a pending approval. Flag-gated server-side
    *  (`approval.api_decide`): a 403 means the flag is off (surface it). */
   decideApproval(id: string, decision: 'allow' | 'deny', reason?: string): Promise<Record<string, unknown>>;
+  // ── Git contract (A1 «Changes» — /api/git/*, N4-servisin HTTP-yüzü) ──
+  getGitStatus(): Promise<GitStatusPayload>;
+  getGitDiff(opts?: { staged?: boolean }): Promise<GitDiffPayload>;
+  getGitProposal(opts?: { flowId?: string; intent?: string }): Promise<GitProposalPayload>;
+  /** Control-mutation (403 = gate off — surface it honestly). Stage-all+commit. */
+  commitGit(message: string): Promise<{ ok: boolean; sha: string | null; staged: number }>;
   // ── Chat contract (DT-1 «Telsiz» — /api/chat + /api/chat/stream SSE) ──
   /** Single-reply chat (non-streaming fallback). Gate-off daemons answer 403. */
   sendChat(message: string): Promise<string>;
@@ -322,6 +350,20 @@ export function createApiClient(session: DaemonSession, fetchFn?: FetchLike): Da
         decision,
         ...(reason !== undefined ? { reason } : {}),
       }),
+
+    // ── Git contract (A1 «Changes») ──
+    getGitStatus: () => request<GitStatusPayload>('GET', '/api/git/status'),
+    getGitDiff: (opts = {}) =>
+      request<GitDiffPayload>('GET', opts.staged === true ? '/api/git/diff?staged=1' : '/api/git/diff'),
+    getGitProposal: (opts = {}) => {
+      const params = new URLSearchParams();
+      if (opts.flowId !== undefined) params.set('flowId', opts.flowId);
+      if (opts.intent !== undefined) params.set('intent', opts.intent);
+      const qs = params.toString();
+      return request<GitProposalPayload>('GET', qs.length > 0 ? `/api/git/proposal?${qs}` : '/api/git/proposal');
+    },
+    commitGit: (message) =>
+      request<{ ok: boolean; sha: string | null; staged: number }>('POST', '/api/git/commit', { message }),
 
     // ── Chat contract (DT-1 «Telsiz») ──
     sendChat: (message) =>
