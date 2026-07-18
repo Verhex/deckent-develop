@@ -1390,6 +1390,15 @@ const MESSAGES: MessageMap = {
     en: 'Run command: {cmd}',
     tr: 'Komut çalıştır: {cmd}',
   },
+  // 583/N4 — git confirm summaries (add/commit = the human seal, KARAR-2).
+  'tool.confirm_git_add': {
+    en: 'Stage changes: {paths}',
+    tr: 'Değişiklikleri stage et: {paths}',
+  },
+  'tool.confirm_git_commit': {
+    en: 'Commit: {subject}',
+    tr: 'Commit: {subject}',
+  },
   'chat.slash_unknown_subaction': {
     en: '{command}: unknown subaction "{sub}". See /help for usage.',
     tr: '{command}: bilinmeyen alt-aksiyon "{sub}". Kullanım için /help.',
@@ -2865,6 +2874,37 @@ const MESSAGES: MessageMap = {
   },
   'runs.diff.not_git': { en: 'This project is not a git repository — no diff available.', tr: 'Bu proje bir git deposu değil — diff üretilemiyor.' },
   'runs.diff.truncated': { en: '… diff truncated (size cap).', tr: '… diff kırpıldı (boyut sınırı).' },
+  // 583/N4 — the post-run incele→commit flow (`runs <n> --commit`, KARAR-2).
+  'runs.commit.not_terminal': {
+    en: 'Run {id} is {state} — commit is a post-run step (wait for a terminal state).',
+    tr: 'Koşu {id} {state} durumunda — commit koşu-sonu adımıdır (terminal durumu bekleyin).',
+  },
+  'runs.commit.not_git': {
+    en: 'This project is not a git repository — nothing to commit.',
+    tr: 'Bu proje bir git deposu değil — commit edilecek bir şey yok.',
+  },
+  'runs.commit.clean': {
+    en: 'Working tree clean — nothing to commit.',
+    tr: 'Çalışma ağacı temiz — commit edilecek değişiklik yok.',
+  },
+  'runs.commit.header': {
+    en: 'Commit proposal — {n} file(s), +{ins} −{del}:',
+    tr: 'Commit önerisi — {n} dosya, +{ins} −{del}:',
+  },
+  'runs.commit.suggested': { en: 'Message:', tr: 'Mesaj:' },
+  'runs.commit.prompt': { en: 'Commit? [y/N] ', tr: 'Commit edilsin mi? [y/N] ' },
+  'runs.commit.aborted': {
+    en: 'Commit aborted — nothing was staged or committed.',
+    tr: 'Commit iptal edildi — hiçbir şey stage edilmedi, commit atılmadı.',
+  },
+  'runs.commit.noninteractive': {
+    en: 'Non-interactive session — pass --yes to commit (and --message to set the message).',
+    tr: 'Etkileşimsiz oturum — commit için --yes verin (mesajı --message ile belirleyin).',
+  },
+  'runs.commit.staged': { en: 'Staged {n} file(s).', tr: '{n} dosya stage edildi.' },
+  'runs.commit.done': { en: 'Committed {sha}.', tr: 'Commit edildi: {sha}.' },
+  'runs.commit.add_failed': { en: 'git add failed: {error}', tr: 'git add başarısız: {error}' },
+  'runs.commit.commit_failed': { en: 'git commit failed: {error}', tr: 'git commit başarısız: {error}' },
   'runs.decide.gate_warn': {
     en: 'Warning: the plan gate is FAIL ({n} blocking finding(s)) — the run will refuse at start unless overridden.',
     tr: 'Uyarı: plan kapısı FAIL ({n} blocker) — koşu, override edilmedikçe start anında reddedecek.',

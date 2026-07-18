@@ -149,10 +149,14 @@ const LEGACY_TIER: Record<'read' | 'confirm' | 'always', ToolPermissionTier> = {
 
 // Exec tools that have side-effects — classified as 'confirm' regardless of
 // classifyTool result (which doesn't know about these tool names and returns 'read').
+// 583/N4: git_add/git_commit join the confirm tier (KARAR-2 — the human seal);
+// git_status/log/diff stay silent (read-only).
 const EXEC_SIDE_EFFECTING: ReadonlySet<string> = new Set([
   'deckent_write_file',
   'deckent_edit_file',
   'deckent_bash',
+  'deckent_git_add',
+  'deckent_git_commit',
 ]);
 
 /** A minimal JSON-schema for each tool's args (provider tool_use input_schema). */
@@ -165,6 +169,12 @@ const SCHEMAS: Record<string, Record<string, unknown>> = {
   deckent_write_file: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] },
   deckent_edit_file: { type: 'object', properties: { path: { type: 'string' }, old: { type: 'string' }, new: { type: 'string' } }, required: ['path', 'old', 'new'] },
   deckent_bash: { type: 'object', properties: { cmd: { type: 'string' } }, required: ['cmd'] },
+  // 583/N4 — git surface (status/log/diff silent, add/commit confirm).
+  deckent_git_status: { type: 'object', properties: {} },
+  deckent_git_log: { type: 'object', properties: { limit: { type: 'number' } } },
+  deckent_git_diff: { type: 'object', properties: { staged: { type: 'boolean' } } },
+  deckent_git_add: { type: 'object', properties: { paths: { type: 'array', items: { type: 'string' } } } },
+  deckent_git_commit: { type: 'object', properties: { message: { type: 'string' } }, required: ['message'] },
 };
 
 const DESCRIPTIONS: Record<string, string> = {
@@ -175,6 +185,11 @@ const DESCRIPTIONS: Record<string, string> = {
   deckent_write_file: 'Write content to a file within the project.',
   deckent_edit_file: 'Replace a substring in a file within the project.',
   deckent_bash: 'Run a shell command in the project directory.',
+  deckent_git_status: 'Git working-tree status (branch, ahead/behind, changed files).',
+  deckent_git_log: 'Recent git commits (sha, subject, author, date; capped).',
+  deckent_git_diff: 'Working-tree diff for review (pass staged:true for the staged set; capped).',
+  deckent_git_add: 'Stage changes for commit (all changes, or explicit paths).',
+  deckent_git_commit: 'Create a git commit from the staged changes with the given message.',
 };
 
 function toolResultFrom(output: string): ToolResult {
@@ -565,7 +580,7 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
 
   // Exec tools — NO confirm injected (single gate = AgentSession permission engine).
   const exec = createToolExecDispatcher({ cwd: opts.cwd });
-  for (const name of ['deckent_read_file', 'deckent_list_dir', 'deckent_grep', 'deckent_glob', 'deckent_write_file', 'deckent_edit_file', 'deckent_bash'] as const) {
+  for (const name of ['deckent_read_file', 'deckent_list_dir', 'deckent_grep', 'deckent_glob', 'deckent_write_file', 'deckent_edit_file', 'deckent_bash', 'deckent_git_status', 'deckent_git_log', 'deckent_git_diff', 'deckent_git_add', 'deckent_git_commit'] as const) {
     registry.register(defineFromDispatcher(name, DESCRIPTIONS[name]!, SCHEMAS[name]!, execToolTier(name), exec));
   }
 

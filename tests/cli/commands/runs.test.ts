@@ -10,6 +10,7 @@ import { Command } from 'commander';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawn } from 'node:child_process';
 
 import { registerRuns, executeInboxDecision } from '../../../src/cli/commands/runs.js';
 import { getRunFlowCoordinator, _resetRunFlowCoordinatorsForTests } from '../../../src/orchestra/run-flow-coordinator-registry.js';
@@ -302,5 +303,101 @@ describe('deckent runs — CLI inbox + --close-stale (F-3)', () => {
     _resetRunFlowCoordinatorsForTests();
     // durable store untouched — the jobs record is the display truth, not a closure licence
     expect(getRunFlowCoordinator(root).getFlow('11e0d0ab-71aa-48b0-bd20-c2810eb6eafb').state).toBe('DETACHED_RUNNING');
+  });
+
+  // ─── 583/N4 — `runs <n> --commit`: the post-run incele→commit flow ────────
+
+  /** Async git helper (spawnSync FORBIDDEN — hermeticity rule). */
+  function gitRun(cwd: string, args: string[]): Promise<{ code: number; stdout: string }> {
+    return new Promise((resolve) => {
+      const child = spawn('git', args, { cwd, stdio: ['ignore', 'pipe', 'ignore'] });
+      let out = '';
+      child.stdout?.on('data', (d: Buffer) => { out += String(d); });
+      child.on('error', () => resolve({ code: -1, stdout: out }));
+      child.on('close', (code) => resolve({ code: code ?? -1, stdout: out }));
+    });
+  }
+
+  async function initGitWithBaseline(): Promise<void> {
+    expect((await gitRun(root, ['init', '--quiet', '-b', 'main'])).code).toBe(0);
+    await gitRun(root, ['config', '--local', 'core.hooksPath', '/dev/null']);
+    await gitRun(root, ['config', '--local', 'commit.gpgsign', 'false']);
+    // Repo-local identity — the service commits with the plain process env.
+    await gitRun(root, ['config', '--local', 'user.name', 'test']);
+    await gitRun(root, ['config', '--local', 'user.email', 'test@example.com']);
+    // Real projects gitignore deckent's runtime dirs (deckent init writes
+    // this) — without it the harness's own store files (.deckent/…) would
+    // count as untracked changes and poison the clean/1-file expectations.
+    writeFileSync(join(root, '.gitignore'), '.deckent/\n.tasks/\n.brain/\n', 'utf-8');
+    writeFileSync(join(root, 'base.txt'), 'baseline\n', 'utf-8');
+    await gitRun(root, ['add', 'base.txt', '.gitignore']);
+    expect((await gitRun(root, ['commit', '--quiet', '--no-gpg-sign', '-m', 'baseline'])).code).toBe(0);
+  }
+
+  /** A COMPLETED (terminal) flow with a proposal-borne intent. */
+  function completedFlow(flowId: string, intentSummary: string): void {
+    appendProposalToCompletionChain({ root, flowId, proposal: { intentSummary } });
+  }
+
+  it('`--commit` on a non-terminal run is refused honestly (commit is a post-run step)', async () => {
+    await initGitWithBaseline();
+    legacyDoFlow('cccc0001-71aa-48b0-bd20-c2810eb6eafb'); // phantom-running, no closure
+    await run(['cccc0001', '--commit']);
+    expect(stderr.join('')).toContain('commit is a post-run step');
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('`--commit` with a clean tree says so and commits nothing', async () => {
+    await initGitWithBaseline();
+    completedFlow('dddd0001-71aa-48b0-bd20-c2810eb6eafb', 'add auth');
+    const out = await run(['dddd0001', '--commit']);
+    expect(out).toContain('Working tree clean');
+  });
+
+  it('`--commit --yes` shows the proposal and lands a REAL commit (intent subject + deckent-run trailer)', async () => {
+    await initGitWithBaseline();
+    const flowId = 'eeee0001-71aa-48b0-bd20-c2810eb6eafb';
+    completedFlow(flowId, 'add auth flow');
+    writeFileSync(join(root, 'auth.ts'), 'export const auth = 1;\n', 'utf-8');
+
+    const out = await run(['eeee0001', '--commit', '--yes']);
+    expect(out).toContain('Commit proposal — 1 file(s)');
+    expect(out).toContain('auth.ts');
+    expect(out).toContain('add auth flow');
+    expect(out).toMatch(/Committed [0-9a-f]{7,}\./);
+
+    const subject = await gitRun(root, ['log', '-n1', '--pretty=%s']);
+    expect(subject.stdout.trim()).toBe('add auth flow');
+    const body = await gitRun(root, ['log', '-n1', '--pretty=%b']);
+    expect(body.stdout).toContain(`deckent-run: ${flowId}`);
+  });
+
+  it('`--commit --yes --message` overrides the suggested message', async () => {
+    await initGitWithBaseline();
+    completedFlow('abab0001-71aa-48b0-bd20-c2810eb6eafb', 'ignored intent');
+    writeFileSync(join(root, 'x.txt'), 'x\n', 'utf-8');
+
+    await run(['abab0001', '--commit', '--yes', '--message', 'chore: custom seal']);
+    const subject = await gitRun(root, ['log', '-n1', '--pretty=%s']);
+    expect(subject.stdout.trim()).toBe('chore: custom seal');
+  });
+
+  it('non-interactive without --yes prints the hint and touches NOTHING (no stage, no commit)', async () => {
+    await initGitWithBaseline();
+    completedFlow('baba0001-71aa-48b0-bd20-c2810eb6eafb', 'goal');
+    writeFileSync(join(root, 'y.txt'), 'y\n', 'utf-8');
+
+    const out = await run(['baba0001', '--commit']); // vitest stdin has no TTY
+    expect(out).toContain('--yes');
+    const staged = await gitRun(root, ['diff', '--staged', '--name-only']);
+    expect(staged.stdout.trim()).toBe('');
+    const subject = await gitRun(root, ['log', '-n1', '--pretty=%s']);
+    expect(subject.stdout.trim()).toBe('baseline');
+  });
+
+  it('`--commit` outside a git repository answers honestly', async () => {
+    completedFlow('caca0001-71aa-48b0-bd20-c2810eb6eafb', 'goal');
+    const out = await run(['caca0001', '--commit']);
+    expect(out).toContain('not a git repository');
   });
 });

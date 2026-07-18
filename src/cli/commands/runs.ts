@@ -20,6 +20,8 @@ import { sweepStaleRuns } from '../../orchestra/run-flow-death-sweep.js';
 import type { StaleRunSweepReport } from '../../orchestra/run-flow-death-sweep.js';
 import { decideRunFlow, startRunFlow } from '../../orchestra/run-flow-decision-service.js';
 import { computeRunDiff } from '../../orchestra/run-diff-service.js';
+import { buildRunCommitProposal, gitWorkflowAdd, gitWorkflowCommit } from '../../orchestra/git-workflow-service.js';
+import { isRowTerminal } from '../repl/run-flow-inbox.js';
 import { getRunFlowCoordinator } from '../../orchestra/run-flow-coordinator-registry.js';
 import { buildFlowStartSpawn } from '../helpers/detached-start.js';
 import { print, printError } from '../helpers/output.js';
@@ -205,7 +207,9 @@ export function registerRuns(program: Command): void {
     .option('--reason <text>', 'Reason recorded with --reject')
     .option('--start', 'Start the approved run #n as a detached background run')
     .option('--diff', "Show run #n's real footprint as a unified diff (583/N1)")
-    .action(async (n: string | undefined, opts: { closeStale?: boolean; yes?: boolean; diff?: boolean } & DecideFlags) => {
+    .option('--commit', "Review-then-commit run #n's changes (583/N4; shows the proposal, prompts unless --yes)")
+    .option('--message <text>', 'With --commit: use this commit message instead of the suggested one')
+    .action(async (n: string | undefined, opts: { closeStale?: boolean; yes?: boolean; diff?: boolean; commit?: boolean; message?: string } & DecideFlags) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);
       try {
@@ -238,6 +242,80 @@ export function registerRuns(program: Command): void {
             if (file.truncated) print(getMessage('runs.diff.truncated', lang));
           }
           if (diff.truncated) print(getMessage('runs.diff.truncated', lang));
+          return;
+        }
+
+        // 583/N4 — `runs <n|prefix> --commit`: the post-run incele→commit flow
+        // (KARAR-2). Shows the run-footprint proposal (same gitBase feet as
+        // --diff), a deterministic suggested message, then asks for the human
+        // seal (y/N; --yes skips, --message overrides). NEVER pushes.
+        if (opts.commit === true) {
+          const target = resolveDecideTarget(n, collectInboxRows(root));
+          if (target.kind !== 'row') {
+            printError(new Error(
+              target.kind === 'not-found'
+                ? labels.notFound.replace('{arg}', target.arg)
+                : getMessage('runs.decide.needs_row', lang),
+            ));
+            process.exitCode = 1;
+            return;
+          }
+          const row = target.row;
+          // Post-run only: a mid-run commit would seal a moving target
+          // (jobs-join-aware — see isRowTerminal).
+          if (!isRowTerminal(row)) {
+            printError(new Error(getMessage('runs.commit.not_terminal', lang, {
+              id: row.flowId.slice(0, SHORT_ID_LEN),
+              state: row.state,
+            })));
+            process.exitCode = 1;
+            return;
+          }
+          const proposal = await buildRunCommitProposal(root, row.flowId, row.intentSummary);
+          if (proposal.note === 'not-a-git-repo') { print(getMessage('runs.commit.not_git', lang)); return; }
+          if (proposal.note === 'clean') { print(getMessage('runs.commit.clean', lang)); return; }
+          print(getMessage('runs.commit.header', lang, {
+            n: String(proposal.files.length),
+            ins: String(proposal.insertions),
+            del: String(proposal.deletions),
+          }));
+          for (const file of proposal.files) {
+            print(`  ${file.path} (+${file.insertions} −${file.deletions})`);
+          }
+          const message = opts.message ?? proposal.suggestedMessage;
+          print('');
+          print(getMessage('runs.commit.suggested', lang));
+          for (const line of message.split('\n')) print(`  ${line}`);
+          if (opts.yes !== true) {
+            if (!process.stdin.isTTY) {
+              print(getMessage('runs.commit.noninteractive', lang));
+              return;
+            }
+            const { createInterface } = await import('node:readline/promises');
+            const rl = createInterface({ input: process.stdin, output: process.stdout });
+            let confirmed = false;
+            try {
+              const answer = (await rl.question(getMessage('runs.commit.prompt', lang))).trim().toLowerCase();
+              confirmed = answer === 'y' || answer === 'yes';
+            } finally {
+              rl.close();
+            }
+            if (!confirmed) { print(getMessage('runs.commit.aborted', lang)); return; }
+          }
+          const added = await gitWorkflowAdd(root);
+          if (!added.ok) {
+            printError(new Error(getMessage('runs.commit.add_failed', lang, { error: added.error ?? '?' })));
+            process.exitCode = 1;
+            return;
+          }
+          print(getMessage('runs.commit.staged', lang, { n: String(added.staged) }));
+          const committed = await gitWorkflowCommit(root, message);
+          if (!committed.ok) {
+            printError(new Error(getMessage('runs.commit.commit_failed', lang, { error: committed.error ?? '?' })));
+            process.exitCode = 1;
+            return;
+          }
+          print(getMessage('runs.commit.done', lang, { sha: committed.sha ?? '?' }));
           return;
         }
 

@@ -18,6 +18,17 @@ import { resolve, relative, isAbsolute, dirname, sep, parse, join } from 'node:p
 import { spawn } from 'node:child_process';
 import type { McpToolDispatcher } from './chat-native.js';
 import { DeckentError } from '../../core/errors.js';
+// 583/N4 — the ONE git surface (orchestra use-case service; cli→orchestra is
+// the allowed direction, ADR-D-004 C3). Both this dispatcher and `runs
+// --commit` consume it — no second git implementation.
+import {
+  gitWorkflowStatus,
+  gitWorkflowLog,
+  gitWorkflowDiff,
+  gitWorkflowAdd,
+  gitWorkflowCommit,
+  GIT_DIFF_TEXT_CAP,
+} from '../../orchestra/git-workflow-service.js';
 
 // ─── 583/N2 — pure-Node file walkers for the silent READ tools ───────────────
 
@@ -104,11 +115,15 @@ function globToRegExp(pattern: string): RegExp {
   return new RegExp(`^${escaped}$`);
 }
 
-/** Yan-etkili (onay gerektiren) tool adları. read salt-okunur → onaysız. */
+/** Yan-etkili (onay gerektiren) tool adları. read salt-okunur → onaysız.
+ *  583/N4: git_add/git_commit = confirm (KARAR-2 — commit insan-mührüdür);
+ *  git_status/log/diff salt-okunur → silent. */
 const SIDE_EFFECTING: ReadonlySet<string> = new Set([
   'deckent_write_file',
   'deckent_edit_file',
   'deckent_bash',
+  'deckent_git_add',
+  'deckent_git_commit',
 ]);
 
 /**
@@ -125,12 +140,18 @@ export interface ToolExecLabels {
   editSummary: (path: string) => string;
   /** Summary shown before a deckent_bash, e.g. "Run command: npm test". */
   bashSummary: (cmd: string) => string;
+  /** 583/N4 — summary before a deckent_git_add, e.g. "Stage changes: all" / "…: 3 path(s)". */
+  gitAddSummary: (pathsDesc: string) => string;
+  /** 583/N4 — summary before a deckent_git_commit (message's first line). */
+  gitCommitSummary: (subject: string) => string;
 }
 
 export const DEFAULT_TOOL_EXEC_LABELS: ToolExecLabels = {
   writeSummary: (path, chars) => `Write file: ${path} (${chars} chars)`,
   editSummary: (path) => `Edit file: ${path}`,
   bashSummary: (cmd) => `Run command: ${cmd}`,
+  gitAddSummary: (pathsDesc) => `Stage changes: ${pathsDesc}`,
+  gitCommitSummary: (subject) => `Commit: ${subject}`,
 };
 
 export interface ToolExecOptions {
@@ -167,6 +188,12 @@ function summarize(name: string, args: Record<string, unknown>, labels: ToolExec
       return labels.editSummary(String(args['path'] ?? '?'));
     case 'deckent_bash':
       return labels.bashSummary(String(args['cmd'] ?? args['command'] ?? '?'));
+    case 'deckent_git_add': {
+      const paths = Array.isArray(args['paths']) ? (args['paths'] as unknown[]) : [];
+      return labels.gitAddSummary(paths.length > 0 ? `${paths.length} path(s)` : 'all');
+    }
+    case 'deckent_git_commit':
+      return labels.gitCommitSummary(String(args['message'] ?? '?').split('\n')[0] ?? '?');
     default:
       return name;
   }
@@ -341,6 +368,11 @@ export function resolveRealPathLenient(absPath: string): string {
  *   • deckent_write_file {path, content}   → dosya yaz (onaylı)
  *   • deckent_edit_file  {path, old, new}  → metin değiştir (onaylı)
  *   • deckent_bash       {cmd}             → komut çalıştır (onaylı)
+ *   • deckent_git_status {}                → çalışma-ağacı durumu (onaysız, 583/N4)
+ *   • deckent_git_log    {limit?}          → son commit'ler (onaysız, 583/N4)
+ *   • deckent_git_diff   {staged?}         → inceleme-diff'i (onaysız, 583/N4)
+ *   • deckent_git_add    {paths?}          → stage (onaylı, 583/N4)
+ *   • deckent_git_commit {message}         → commit — insan-mührü (onaylı, 583/N4)
  */
 export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDispatcher {
   const resolveCwd = (): string => (typeof opts.cwd === 'function' ? opts.cwd() : (opts.cwd ?? process.cwd()));
@@ -499,6 +531,59 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
             const cmd = String(args['cmd'] ?? args['command'] ?? '');
             if (cmd.length === 0) return `[mcp-error] deckent_bash: empty command`;
             return await bashRun(cmd, resolveCwd());
+          }
+          // ─── 583/N4 — git surface (KARAR-2: status/log/diff silent, ─────
+          // add/commit confirm-gated above via SIDE_EFFECTING). All five ride
+          // orchestra/git-workflow-service.ts — async spawn + SIGTERM (F-2),
+          // array-args (ADR-G-002), not-a-git-repo answered honestly.
+          case 'deckent_git_status': {
+            const status = await gitWorkflowStatus(resolveCwd());
+            if (status.note === 'not-a-git-repo') return `[mcp-error] deckent_git_status: not a git repository`;
+            const head = `[deckent] branch ${status.branch ?? '(detached)'}`
+              + `${status.ahead !== undefined ? ` +${status.ahead}` : ''}`
+              + `${status.behind !== undefined ? ` -${status.behind}` : ''}`;
+            if (status.clean) return `${head} · clean`;
+            return [head, ...status.entries.map((e) => `${e.code} ${e.path}`)].join('\n');
+          }
+          case 'deckent_git_log': {
+            const rawLimit = Number(args['limit']);
+            const log = await gitWorkflowLog(resolveCwd(), Number.isFinite(rawLimit) ? rawLimit : undefined);
+            if (!Array.isArray(log)) return `[mcp-error] deckent_git_log: not a git repository`;
+            if (log.length === 0) return `[deckent] git log: no commits yet`;
+            return log.map((c) => `${c.sha} ${c.subject} (${c.author}, ${c.date})`).join('\n');
+          }
+          case 'deckent_git_diff': {
+            const diff = await gitWorkflowDiff(resolveCwd(), { staged: args['staged'] === true });
+            if (diff.note === 'not-a-git-repo') return `[mcp-error] deckent_git_diff: not a git repository`;
+            if (diff.text.length === 0) return `[deckent] git diff: empty`;
+            return diff.truncated
+              ? `${diff.text}\n[deckent] git diff: truncated at ${GIT_DIFF_TEXT_CAP} chars`
+              : diff.text;
+          }
+          case 'deckent_git_add': {
+            const rawPaths = Array.isArray(args['paths'])
+              ? (args['paths'] as unknown[]).map((p) => String(p))
+              : undefined;
+            if (rawPaths !== undefined) {
+              for (const p of rawPaths) {
+                // Same scope line as write_file: a path outside the project is
+                // never handed to git (host-repo protection works with the
+                // service's `-- .` pathspec, this guards explicit paths).
+                if (!inScope(p)) return `[mcp-error] deckent_git_add: path out of scope or invalid: ${p}`;
+              }
+            }
+            const added = await gitWorkflowAdd(resolveCwd(), rawPaths);
+            if (added.note === 'not-a-git-repo') return `[mcp-error] deckent_git_add: not a git repository`;
+            if (!added.ok) return `[mcp-error] deckent_git_add: ${added.error ?? 'failed'}`;
+            return `[deckent] staged ${added.staged} file(s)`;
+          }
+          case 'deckent_git_commit': {
+            const message = String(args['message'] ?? '');
+            if (message.trim().length === 0) return `[mcp-error] deckent_git_commit: empty message`;
+            const committed = await gitWorkflowCommit(resolveCwd(), message);
+            if (committed.note === 'not-a-git-repo') return `[mcp-error] deckent_git_commit: not a git repository`;
+            if (!committed.ok) return `[mcp-error] deckent_git_commit: ${committed.error ?? 'failed'}`;
+            return `[deckent] committed ${committed.sha ?? '(sha unavailable)'}`;
           }
           default:
             return `[mcp-error] unknown tool: ${name}`;

@@ -24,4 +24,13 @@ describe('buildToolExecLabels — localized tool confirm summaries (REPL-575 K5)
     const l = buildToolExecLabels('de');
     expect(l.editSummary('a')).toBe('Edit file: a');
   });
+
+  it('583/N4 — git confirm summaries resolve in en AND tr (the human-seal prompts)', () => {
+    const en = buildToolExecLabels('en');
+    expect(en.gitAddSummary('all')).toBe('Stage changes: all');
+    expect(en.gitCommitSummary('feat: x')).toBe('Commit: feat: x');
+    const tr = buildToolExecLabels('tr');
+    expect(tr.gitAddSummary('3 path(s)')).toBe('Değişiklikleri stage et: 3 path(s)');
+    expect(tr.gitCommitSummary('feat: x')).toBe('Commit: feat: x');
+  });
 });

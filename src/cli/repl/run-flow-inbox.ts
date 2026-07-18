@@ -694,3 +694,11 @@ export function mapInboxDecisionKey(input: string): InboxDecisionVerb | null {
   if (input === 's') return 'start';
   return null;
 }
+
+/** 583/N4 — jobs-join-aware terminal test for a row: the durable state OR a
+ *  jobs-dir closure (`completedAt`) counts — a stored-state lag (the
+ *  phantom-DETACHED_RUNNING class) never blocks a post-run step whose
+ *  execution truth is already on disk. The `runs <n> --commit` gate uses this. */
+export function isRowTerminal(row: InboxRow): boolean {
+  return isTerminalRunFlowState(row.state) || row.completedAt !== undefined;
+}

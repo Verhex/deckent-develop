@@ -17,5 +17,8 @@ export function buildToolExecLabels(lang: string): ToolExecLabels {
     writeSummary: (path, chars) => getMessage('tool.confirm_write', lang, { path, chars: String(chars) }),
     editSummary: (path) => getMessage('tool.confirm_edit', lang, { path }),
     bashSummary: (cmd) => getMessage('tool.confirm_bash', lang, { cmd }),
+    // 583/N4 — git confirm summaries (add/commit are the human seal).
+    gitAddSummary: (pathsDesc) => getMessage('tool.confirm_git_add', lang, { paths: pathsDesc }),
+    gitCommitSummary: (subject) => getMessage('tool.confirm_git_commit', lang, { subject }),
   };
 }
