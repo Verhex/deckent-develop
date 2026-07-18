@@ -7,12 +7,22 @@
  */
 import { create } from 'zustand';
 import type { DaemonSession } from '../../shared/desktop-api.js';
+import type { RadioMessage } from './radio-fold.js';
 
 export interface ShellState {
   session: DaemonSession | null;
   strings: Record<string, string>;
   setSession(session: DaemonSession | null): void;
   setStrings(strings: Record<string, string>): void;
+  // KABUL Gün-1 pürüz-4 (Alperen canlı-bulgu): route-değişimi lazy-view'ları
+  // unmount eder — Telsiz-transkripti ve Makine-Dairesi sekme-seçimi YEREL
+  // state'te kalınca siliniyordu ("kaldığım yerden devam etmiyor"). İkisi de
+  // store'da yaşar: görünüme dönünce kaldığın yerden (PTY içeriği zaten
+  // sunucu-taraflı ring-buffer replay'iyle geri gelir, inv#4).
+  radioMessages: readonly RadioMessage[];
+  setRadioMessages(update: (list: readonly RadioMessage[]) => readonly RadioMessage[]): void;
+  engineActiveId: string | null;
+  setEngineActiveId(id: string | null): void;
 }
 
 export const useShellStore = create<ShellState>((set) => ({
@@ -20,4 +30,8 @@ export const useShellStore = create<ShellState>((set) => ({
   strings: {},
   setSession: (session) => set({ session }),
   setStrings: (strings) => set({ strings }),
+  radioMessages: [],
+  setRadioMessages: (update) => set((s) => ({ radioMessages: update(s.radioMessages) })),
+  engineActiveId: null,
+  setEngineActiveId: (engineActiveId) => set({ engineActiveId }),
 }));

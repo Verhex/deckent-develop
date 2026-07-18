@@ -130,8 +130,13 @@ describe('Security Headers', () => {
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
-      const res = await request(api, '/api/status');
-      expect(res.headers['access-control-allow-origin']).toBeDefined();
+      // KABUL Gün-1 pürüz-2: ACAO artık origin-YANSITMALI (tek yetkili:
+      // resolveCorsOrigin). Origin'siz (same-origin/curl) istek header almaz —
+      // eski hardcoded-default-port değeri origin-duyarsız bir yanılsamaydı.
+      const bare = await request(api, '/api/status');
+      expect(bare.headers['access-control-allow-origin']).toBeUndefined();
+      const reflected = await request(api, '/api/status', 'GET', undefined, { Origin: 'http://localhost:5173' });
+      expect(reflected.headers['access-control-allow-origin']).toBe('http://localhost:5173');
       stderrSpy.mockRestore();
     });
 

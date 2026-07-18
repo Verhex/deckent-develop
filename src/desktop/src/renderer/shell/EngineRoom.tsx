@@ -108,7 +108,9 @@ export default function EngineRoom(): React.JSX.Element {
   const [boot, setBoot] = useState<BootState>('loading');
   const [terminalToken, setTerminalToken] = useState<string | null>(null);
   const [sessions, setSessions] = useState<TerminalSessionMeta[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  // pürüz-4: sekme-seçimi store'da yaşar — görünüme dönünce aynı oturum.
+  const activeId = useShellStore((s) => s.engineActiveId);
+  const setActiveId = useShellStore((s) => s.setEngineActiveId);
   const [link, setLink] = useState<LinkState>('connecting');
   const [shellKindOff, setShellKindOff] = useState(false);
 
@@ -138,7 +140,10 @@ export default function EngineRoom(): React.JSX.Element {
         setTerminalToken(token);
         const list = await refreshSessions(api, token);
         if (cancelled) return;
-        setActiveId((current) => current ?? list.find((s) => s.status === 'running')?.id ?? null);
+        // pürüz-4: store'daki önceki seçim (görünüme dönüş) korunur; yoksa
+        // ilk koşan oturum seçilir.
+        const current = useShellStore.getState().engineActiveId;
+        setActiveId(current ?? list.find((s) => s.status === 'running')?.id ?? null);
         setBoot('ready');
       } catch (err) {
         if (cancelled) return;
@@ -244,9 +249,10 @@ export default function EngineRoom(): React.JSX.Element {
     try {
       await api.killTerminalSession(terminalToken, sessionId);
       const list = await refreshSessions(api, terminalToken);
-      setActiveId((current) =>
-        current === sessionId ? (list.find((s) => s.status === 'running')?.id ?? null) : current,
-      );
+      const current = useShellStore.getState().engineActiveId;
+      if (current === sessionId) {
+        setActiveId(list.find((s) => s.status === 'running')?.id ?? null);
+      }
     } catch {
       setBoot('error');
     }

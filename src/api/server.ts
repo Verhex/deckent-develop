@@ -269,14 +269,46 @@ function getRunningJob(): ActiveJob | undefined {
 
 // ─── Helpers ─────────────────────────────────────────────────────
 
+// KABUL Gün-1 pürüz-2 (2026-07-18): ACAO used to be HARDCODED to
+// `http://localhost:${DEFAULT_PORT}` here — origin-INSENSITIVE, so the
+// Desktop dev-renderer (localhost:5173) was CORS-blocked on every JSON read,
+// and closure-served routes (run-flow, terminal) carried no ACAO at all.
+// The header now comes from ONE per-request loopback-reflecting setHeader at
+// the top of the server listener (see `applyLoopbackCors`); writeHead merges
+// setHeader'd values, so every response path inherits it.
 function sendJson(res: ServerResponse, data: unknown, status = 200): void {
   const body = JSON.stringify(data);
   res.writeHead(status, {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': `http://localhost:${DEFAULT_PORT}`,
     ...SECURITY_HEADERS,
   });
   res.end(body);
+}
+
+/**
+ * Reflect a LOOPBACK browser origin (any port — the Desktop dev-renderer on
+ * localhost:5173, the served dashboard on its own port) plus the packaged
+ * Electron renderer's `Origin: null` (a `file://` document is an opaque
+ * origin). Every /api surface already requires its own bearer/query token —
+ * CORS origin-pinning to one fixed port protected nothing and broke the
+ * renderer-owned-transport decision (D4-3). Non-loopback origins get NO
+ * header, exactly as before. Exported for the api-family pin.
+ */
+export function resolveCorsOrigin(originHeader: string | undefined): string | null {
+  const origin = originHeader ?? '';
+  if (origin === 'null') return 'null';
+  if (/^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\]):\d+$/.test(origin)) return origin;
+  return null;
+}
+
+function applyLoopbackCors(req: IncomingMessage, res: ServerResponse): void {
+  const reflected = resolveCorsOrigin(
+    Array.isArray(req.headers['origin']) ? req.headers['origin'][0] : req.headers['origin'],
+  );
+  if (reflected !== null) {
+    res.setHeader('Access-Control-Allow-Origin', reflected);
+    res.setHeader('Vary', 'Origin');
+  }
 }
 
 function sendError(res: ServerResponse, status: number, message: string): void {
@@ -709,9 +741,11 @@ async function handleRequest(
   }
 
   const origin = req.headers['origin'] ?? '';
-  // Strict CORS: only localhost/127.0.0.1 with explicit port — wildcard never allowed
-  const isAllowedOrigin = /^http:\/\/(?:localhost|127\.0\.0\.1):\d+$/.test(origin);
-  const allowedOrigin = isAllowedOrigin ? origin : `http://localhost:${DEFAULT_PORT}`;
+  // Strict CORS, ONE authority (pürüz-2): loopback origins any-port + the
+  // packaged renderer's `Origin: null` reflect; anything else never does.
+  const reflectedOrigin = resolveCorsOrigin(Array.isArray(origin) ? origin[0] : origin);
+  const isAllowedOrigin = reflectedOrigin !== null;
+  const allowedOrigin = reflectedOrigin ?? `http://localhost:${DEFAULT_PORT}`;
 
   // CORS preflight
   if (method === 'OPTIONS') {
@@ -2280,6 +2314,12 @@ export function createHttpServer(
       const rawUrl = req.url ?? '/';
       const urlPath = rawUrl.split('?')[0] ?? '/';
       const method = req.method ?? 'GET';
+
+      // KABUL Gün-1 pürüz-2 — the ONE per-request CORS point: loopback
+      // origins (+ packaged file://'s `Origin: null`) are reflected via
+      // setHeader so EVERY response path (closure routes here AND
+      // handleRequest/sendJson below) inherits a correct ACAO.
+      applyLoopbackCors(req, res);
 
       // ─── N3 (583) — Desktop terminal-token delivery ─
       // ADR-G-029 inv#2 SECOND delivery channel (amendment 2026-07-18): a

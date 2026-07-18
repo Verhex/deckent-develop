@@ -125,7 +125,12 @@ function hardenSession(target: Session, deps: SecurityPolicyDeps): void {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': [buildLocalRendererCsp(deps.getActiveDaemonOrigins())],
+        'Content-Security-Policy': [buildLocalRendererCsp(deps.getActiveDaemonOrigins(), {
+          // Dev-only (electron-vite sets ELECTRON_RENDERER_URL): the react
+          // preamble is inline — see the builder's KABUL pürüz-1 note. A
+          // packaged build has no such env → production CSP unchanged.
+          allowDevInlineScript: process.env['ELECTRON_RENDERER_URL'] !== undefined,
+        })],
       },
     });
   });
@@ -145,7 +150,23 @@ function hardenSession(target: Session, deps: SecurityPolicyDeps): void {
  * https/ssh-tunnel remote) additionally join dynamically and take effect on
  * the next document load. Exported for the unit pin (shell-transport.test.ts).
  */
-export function buildLocalRendererCsp(daemonOrigins: readonly string[]): string {
+export function buildLocalRendererCsp(
+  daemonOrigins: readonly string[],
+  opts: {
+    /**
+     * KABUL Gün-1 pürüz-1 (2026-07-18, kök-neden): in DEV, electron-vite
+     * serves the renderer over http and @vitejs/plugin-react injects an
+     * INLINE react-refresh preamble `<script>` into index.html — the strict
+     * `default-src 'self'` blocked it, the preamble check then threw
+     * ("can't detect preamble") before ANY render → the July-17 blank
+     * window. This flag (set ONLY when `ELECTRON_RENDERER_URL` is present,
+     * i.e. the electron-vite dev server) adds a dev-scoped
+     * `script-src 'self' 'unsafe-inline'`. A PACKAGED build never sets it —
+     * production CSP stays byte-identical (pinned).
+     */
+    allowDevInlineScript?: boolean;
+  } = {},
+): string {
   // NOTE: Chromium rejects a bracketed-IPv6 host-source with a port wildcard
   // (`http://[::1]:*`) as invalid — an ::1 daemon therefore joins via its
   // exact dynamic origin below instead of a wildcard.
@@ -161,7 +182,16 @@ export function buildLocalRendererCsp(daemonOrigins: readonly string[]): string 
     .filter((origin) => origin.startsWith('http'))
     .map((origin) => origin.replace(/^http/, 'ws'));
   const connectSources = ["'self'", ...loopback, ...dynamic, ...dynamicWs];
-  return `default-src 'self'; connect-src ${connectSources.join(' ')}`;
+  const devScriptSrc = opts.allowDevInlineScript === true
+    ? "; script-src 'self' 'unsafe-inline'"
+    : '';
+  // KABUL Gün-1 pürüz-3: react-aria-components (DT-2, the LOCKED a11y lib)
+  // applies inline styles at runtime (visually-hidden announcer / focus
+  // machinery) — `default-src 'self'` silenced it in BOTH dev and packaged.
+  // Inline STYLE is not an execution vector; scripts stay locked exactly as
+  // before (packaged: no script-src loosening at all — pinned).
+  const styleSrc = "; style-src 'self' 'unsafe-inline'";
+  return `default-src 'self'; connect-src ${connectSources.join(' ')}${styleSrc}${devScriptSrc}`;
 }
 
 /**

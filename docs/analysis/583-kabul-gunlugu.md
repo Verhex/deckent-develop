@@ -37,7 +37,10 @@
 ### Pürüz-kaydı — Gün-1
 | # | Şiddet | Yüzey | Ne oldu | Karar/born |
 |---|---|---|---|---|
-| — | | | *(henüz kayıt yok — pürüzü chat'e yaz, CC anında işler)* | |
+| P1 | 🔴 | Desktop (dev) | **Boş pencere** (17-Tem "göremiyorum"un kendisi). Kök-neden: sıkı header-CSP dev'de vite/plugin-react'in inline-preamble'ını blokladı → "can't detect preamble" → hiç render yok | ✅ FIX aynı-gün: `buildLocalRendererCsp` dev-only `script-src 'unsafe-inline'` (`ELECTRON_RENDERER_URL` sinyali; paketli-CSP bayt-aynı, pinli) |
+| P2 | 🟡 | Daemon-CORS | "Could not reach the daemon": ACAO `sendJson`'da DEFAULT_PORT'a **hardcode** (origin-duyarsız; kanun-10 ihlali) + closure-route'larda (run-flow/terminal) **hiç yok** → dev-renderer (5173) tüm okumalarda bloklu | ✅ FIX aynı-gün: tek-yetkili `resolveCorsOrigin` + `applyLoopbackCors` (loopback-any-port + paketli `Origin: null` yansır; loopback-dışı asla; Vary: Origin); eski-yanlışın 3 pini yeni-doğruya çevrildi + 5 yeni pin |
+| P3 | 🟡 | Desktop-CSP | react-aria'nın (DT-2 kilitli-lib) runtime inline-style'ları `style-src` tarafından bloklu — paketliyi de etkiliyordu (a11y-duyurucu sessiz) | ✅ FIX aynı-gün: `style-src 'self' 'unsafe-inline'` (script-kilidi aynen; pinli). **Alt-bulgu:** index.html META-ikizi "keep in sync" YORUMUNA rağmen drift'liydi — ws:// kaynakları da yoktu (N3-soketini paketlide bloklayacaktı, denenmeden yakalandı); meta eşitlendi + senkron artık PİNLİ |
+| P4 | 🟡 | Desktop (Alperen canlı-bulgu) | "Engine-Room/Chat'te sekme değişince kaldığım yerden devam etmiyor" — route-unmount yerel-state'i siliyordu | ✅ FIX aynı-gün: Telsiz-transkripti + Makine-Dairesi sekme-seçimi zustand-store'a taşındı (görünüme dönüş = kaldığın yer; PTY içeriği inv#4 replay'iyle zaten dönüyor). Derin keep-alive (xterm scroll-pozisyonu) → aday-born, gün-sonu kararı |
 
 ### Gün-sonu özeti
 *(gün kapanırken doldurulur: dokunulan-yüzeyler · pürüz-sayısı · fallback-olayı var mı · Gün-2'ye devir)*

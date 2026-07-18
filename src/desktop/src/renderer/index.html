@@ -7,10 +7,14 @@
          CSP is fixed at load time but the daemon is chosen after load, and the
          connect flow already hard-rejects every non-loopback plain-http target
          (born-600) — so loopback-only IS the enforced boundary. Keep in sync
-         with security.ts buildLocalRendererCsp (the header twin). -->
+         with security.ts buildLocalRendererCsp (the header twin) — the sync is
+         now PINNED by tests/shell-transport.test.ts (KABUL Gün-1: the comment
+         alone drifted — this meta was missing ws:// for the N3 terminal socket
+         and style-src 'unsafe-inline' for react-aria, silently re-blocking
+         what the header allowed; two CSPs intersect, strictest wins). -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:*; object-src 'none'; base-uri 'self'; form-action 'self'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <title>Deckent</title>
     <link rel="stylesheet" href="./styles.css" />

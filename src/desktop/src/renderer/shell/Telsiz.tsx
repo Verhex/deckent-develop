@@ -23,7 +23,7 @@
 import { useRef, useState } from 'react';
 import { Button, Form, Input, TextField } from 'react-aria-components';
 import { ApiError, type DaemonApiClient, createApiClient } from './api-client.js';
-import { radioSend, radioChunk, radioDone, radioError, type RadioMessage } from './radio-fold.js';
+import { radioSend, radioChunk, radioDone, radioError } from './radio-fold.js';
 import { useShellStore } from './session-store.js';
 
 export const MSG = {
@@ -53,7 +53,9 @@ export default function Telsiz(): React.JSX.Element {
   const t = useT();
   const session = useShellStore((s) => s.session);
   const apiRef = useRef<DaemonApiClient | null>(null);
-  const [messages, setMessages] = useState<RadioMessage[]>([]);
+  // pürüz-4: transkript store'da yaşar — route-değişimi silmez.
+  const messages = useShellStore((s) => s.radioMessages);
+  const setMessages = useShellStore((s) => s.setRadioMessages);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [gateOff, setGateOff] = useState(false);

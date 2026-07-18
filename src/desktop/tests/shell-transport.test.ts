@@ -270,7 +270,7 @@ describe('buildLocalRendererCsp (D4-3 — approved transport decision)', () => {
     // daemon joins via its exact dynamic origin instead (see builder note).
     // ws sources are EXPLICIT — CSP3's http→ws scheme matching is not relied on.
     expect(buildLocalRendererCsp([])).toBe(
-      "default-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*",
+      "default-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*; style-src 'self' 'unsafe-inline'",
     );
   });
 
@@ -279,12 +279,39 @@ describe('buildLocalRendererCsp (D4-3 — approved transport decision)', () => {
     expect(csp).not.toContain('http://127.0.0.1:4317');
     // everything else inherits default-src 'self' — no script/style loosening
     expect(csp).not.toContain('script-src');
-    expect(csp).not.toContain('unsafe');
   });
 
   it('a future non-loopback (https/tunnel) origin joins dynamically WITH its wss twin (583/N3)', () => {
     const csp = buildLocalRendererCsp(['https://daemon.example:8443']);
     expect(csp).toContain('https://daemon.example:8443');
     expect(csp).toContain('wss://daemon.example:8443');
+  });
+
+  // ── KABUL Gün-1 pürüz-1: dev-preamble CSP fix (blank-window root cause) ──
+
+  it('DEV (allowDevInlineScript): script-src gains unsafe-inline so the vite react-preamble can run', () => {
+    const csp = buildLocalRendererCsp([], { allowDevInlineScript: true });
+    expect(csp).toContain("script-src 'self' 'unsafe-inline'");
+    // everything else stays exactly as the default-mode string
+    expect(csp.startsWith("default-src 'self'; connect-src 'self' http://127.0.0.1:*")).toBe(true);
+  });
+
+  it("PACKAGED (default): scripts stay fully locked (no script-src loosening); style-src alone carries unsafe-inline (pürüz-3 — react-aria's runtime inline styles)", () => {
+    const csp = buildLocalRendererCsp([]);
+    expect(csp).not.toContain('script-src');
+    expect(csp).toContain("style-src 'self' 'unsafe-inline'");
+  });
+
+  it('the index.html META twin stays in sync (KABUL Gün-1: the comment alone drifted — ws + style were silently re-blocked)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const html = readFileSync(new URL('../src/renderer/index.html', import.meta.url), 'utf-8');
+    const meta = /content="([^"]+)"/.exec(html.split('Content-Security-Policy')[1] ?? '')?.[1] ?? '';
+    // The header's capabilities the meta must never intersect away:
+    expect(meta).toContain('ws://127.0.0.1:*');
+    expect(meta).toContain('ws://localhost:*');
+    expect(meta).toContain("style-src 'self' 'unsafe-inline'");
+    // …and the locks the meta must keep:
+    expect(meta).toContain("script-src 'self'");
+    expect(meta).not.toContain("script-src 'self' 'unsafe-inline'");
   });
 });

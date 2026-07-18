@@ -312,12 +312,13 @@ describe('CORS edge cases', () => {
       req.end();
     });
 
-    // Non-localhost origins get the default localhost CORS header (not reflected)
-    expect(res['access-control-allow-origin']).toMatch(/^http:\/\/(localhost|127\.0\.0\.1)/);
-    expect(res['access-control-allow-origin']).not.toBe('https://evil.example.com');
+    // KABUL Gün-1 pürüz-2: a non-loopback origin now gets NO ACAO header at
+    // all (resolveCorsOrigin). The old "default localhost value" was
+    // origin-insensitive noise — never a grant, never a refusal.
+    expect(res['access-control-allow-origin']).toBeUndefined();
   });
 
-  it('missing origin header uses default localhost CORS', async () => {
+  it('missing origin header gets no CORS header (same-origin/CLI callers need none)', async () => {
     api = await startServer();
     const addr = api.server.address() as { port: number };
 
@@ -330,7 +331,8 @@ describe('CORS edge cases', () => {
       req.end();
     });
 
-    expect(res['access-control-allow-origin']).toMatch(/^http:\/\/(localhost|127\.0\.0\.1)/);
+    // pürüz-2 (same rationale as above): no Origin → no ACAO.
+    expect(res['access-control-allow-origin']).toBeUndefined();
   });
 
   it('OPTIONS preflight with non-localhost origin returns 403 CORS reject', async () => {
