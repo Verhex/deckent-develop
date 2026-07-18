@@ -942,26 +942,33 @@ select:focus-visible {
 .nova-rail__origin { margin-top:auto; writing-mode:vertical-rl; font-size:9px; color:var(--dk-s-text-muted); letter-spacing:.08em; }
 .nova-view { flex:1; min-width:0; position:relative; overflow:hidden; }
 .nova-muted { color: var(--dk-s-text-muted); padding: 16px; }
-/* Komuta-sahnesi */
-.nova-scene { position:absolute; inset:0; }
+/* Komuta-sahnesi — KABUL-bulgusu fix: mutlak-yığın yerine FLEX-KOLON
+   (canvas-bölge / nehir / komuta) → üst-üste binme İMKÂNSIZ. */
+.nova-scene { position:absolute; inset:0; display:flex; flex-direction:column; }
+.nova-scene__stage { position:relative; flex:1; min-height:0; }
 .nova-scene__canvas { position:absolute; inset:0; width:100%; height:100%; cursor:pointer; }
-.nova-scene__idle { position:absolute; left:50%; top:26%; transform:translateX(-50%);
+.nova-scene__idle { position:absolute; left:50%; top:24%; transform:translateX(-50%);
   color:var(--dk-s-text-muted); font-size:11px; letter-spacing:.24em; text-transform:uppercase;
-  animation: nova-breathe 4s ease-in-out infinite; pointer-events:none; }
+  animation: nova-breathe 4s ease-in-out infinite; pointer-events:none; white-space:nowrap; }
 @keyframes nova-breathe { 0%,100%{opacity:.35;} 50%{opacity:.8;} }
-.nova-river { position:absolute; left:50%; transform:translateX(-50%); bottom:96px;
-  width:min(860px,92%); max-height:196px; overflow:hidden; list-style:none; padding:0; margin:0;
-  display:flex; flex-direction:column; mask-image:linear-gradient(0deg, black 78%, transparent); pointer-events:none; }
-.nova-river__row { display:flex; gap:10px; padding:1.5px 10px; font-size:11.5px; animation: nova-arr .45s ease-out; }
-@keyframes nova-arr { from { opacity:0; transform:translateY(8px);} }
-.nova-river__src { min-width:72px; color:var(--dk-s-text-muted); font-size:11px; }
+.nova-river { flex-shrink:0; height:168px; width:min(880px,94%); margin:0 auto;
+  overflow:hidden; list-style:none; padding:4px 0; display:flex; flex-direction:column;
+  mask-image:linear-gradient(0deg, black 82%, transparent); pointer-events:none; }
+.nova-river__row { display:flex; gap:12px; padding:2px 12px; font-size:12.5px; line-height:1.65;
+  animation: nova-arr .4s ease-out; align-items:baseline; }
+@keyframes nova-arr { from { opacity:0; transform:translateY(6px);} }
+.nova-river__src { flex:0 0 84px; color:var(--dk-s-text-muted); font-size:11px; text-align:right; }
 .nova-river__row[data-ci="1"] .nova-river__src { color:#7be8ff; } .nova-river__row[data-ci="2"] .nova-river__src { color:var(--dk-s-go); }
 .nova-river__row[data-ci="3"] .nova-river__src { color:var(--dk-s-caution); } .nova-river__row[data-ci="4"] .nova-river__src { color:#c792ea; }
 .nova-river__row[data-ci="0"] .nova-river__src { color:var(--dk-s-accent); } .nova-river__row[data-ci="5"] .nova-river__src { color:#ff9e64; }
-.nova-river__txt { color:var(--dk-s-text); opacity:.86; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nova-river__txt { color:var(--dk-s-text); opacity:.88; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  font-family: var(--dk-font-body); }
+.nova-river__row--deckent { font-size:13.5px; }
 .nova-river__row--deckent .nova-river__src, .nova-river__row--deckent .nova-river__txt { color:var(--dk-s-accent); opacity:1; }
+.nova-river__row--me { font-size:13px; }
 .nova-river__row--me .nova-river__src { color:var(--dk-s-caution); }
-.nova-cmd { position:absolute; left:50%; transform:translateX(-50%); bottom:22px; width:min(740px,88%); }
+.nova-river__row--me .nova-river__txt { color:var(--dk-s-text); opacity:1; }
+.nova-cmd { flex-shrink:0; width:min(760px,90%); margin:6px auto 18px; }
 .nova-cmd__input { width:100%; background:rgba(10,20,29,.85); color:var(--dk-s-text);
   border:1px solid rgba(56,211,255,.35); border-radius:999px; outline:none; font-size:14px; padding:13px 22px;
   box-shadow:0 0 0 1px rgba(56,211,255,.08), 0 0 34px rgba(56,211,255,.14); transition: box-shadow .3s, border-color .3s; }
@@ -982,3 +989,22 @@ select:focus-visible {
 .ui-flip { position:fixed; right:14px; bottom:14px; z-index:50; cursor:pointer;
   background:var(--dk-s-surface); color:var(--dk-s-accent); border:1px solid var(--dk-s-accent);
   border-radius:999px; font-size:11px; padding:7px 14px; box-shadow:0 0 24px rgba(56,211,255,.18); }
+
+
+/* Emir-kartı — sahne-diyaloğu (R2-dilim-1) */
+.nova-order { position:absolute; right:22px; top:22px; width:min(340px,42%);
+  background:rgba(10,20,29,.92); border:1px solid var(--dk-s-accent); border-radius:10px;
+  padding:14px 16px; box-shadow:0 0 44px rgba(56,211,255,.18); backdrop-filter:blur(6px);
+  animation: nova-arr .3s ease-out; }
+.nova-order h3 { font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--dk-s-accent); margin:0 0 8px; }
+.nova-order__wait { color:var(--dk-s-text-muted); font-size:11px; animation:nova-breathe 2.4s ease-in-out infinite; }
+.nova-order__summary { list-style:none; padding:0; margin:0 0 10px; display:grid; gap:3px; font-size:12.5px; color:var(--dk-s-text); }
+.nova-order__gate { color:var(--dk-s-abort); font-size:11px; margin:0 0 8px; }
+.nova-order__actions { display:flex; gap:8px; }
+.nova-order__go { flex:1; cursor:pointer; font-size:12px; letter-spacing:.08em; padding:9px 0;
+  background:rgba(56,211,255,.14); color:var(--dk-s-accent); border:1px solid var(--dk-s-accent); border-radius:7px; }
+.nova-order__go:hover { background:rgba(56,211,255,.24); }
+.nova-order__go:disabled { opacity:.5; cursor:default; }
+.nova-order__dismiss { cursor:pointer; font-size:12px; padding:9px 12px;
+  background:none; color:var(--dk-s-text-muted); border:1px solid var(--dk-s-border); border-radius:7px; }

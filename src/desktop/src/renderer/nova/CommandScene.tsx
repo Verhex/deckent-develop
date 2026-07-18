@@ -36,6 +36,14 @@ export const MSG = {
   deckent: 'desktop.nova.river.deckent',
   cmdPlaceholder: 'desktop.nova.cmd.placeholder',
   cmdHint: 'desktop.nova.cmd.hint',
+  orderSent: 'desktop.nova.order.sent',
+  orderPreviewing: 'desktop.nova.order.previewing',
+  orderPreviewTitle: 'desktop.nova.order.preview_title',
+  orderGateFail: 'desktop.nova.order.gate_fail',
+  orderFullAhead: 'desktop.nova.order.full_ahead',
+  orderDismiss: 'desktop.nova.order.dismiss',
+  orderStarted: 'desktop.nova.order.started',
+  orderFailed: 'desktop.nova.order.failed',
 } as const;
 
 function useT(): (key: string) => string {
@@ -121,6 +129,70 @@ export default function CommandScene(): React.JSX.Element {
     feeds.current.set(worker.taskId, close);
   }
   useEffect(() => () => { for (const close of feeds.current.values()) close(); }, []);
+
+  // ── EMİR-akışı (R2-dilim-1, öne-çekildi: "order başlamıyor" bulgusu) ──
+  // Ctrl+Enter → propose → flow-eventleri → PREVIEW_READY'de sahne-diyalog
+  // kartı → TAM-YOL (approve+start) → koşu; sahne sprint-live'dan uyanır.
+  interface OrderCard {
+    flowId: string;
+    state: 'previewing' | 'ready' | 'starting';
+    revision?: number;
+    planDigest?: string;
+    summary: string[];
+    gateFail?: boolean;
+  }
+  const [order, setOrder] = useState<OrderCard | null>(null);
+  const orderCloseRef = useRef<(() => void) | null>(null);
+
+  const sendOrder = async (message: string): Promise<void> => {
+    if (!api) return;
+    pushRiver({ src: t(MSG.you), text: `⌁ ${message}`, tone: 'me', colorIndex: 0 });
+    pushRiver({ src: t(MSG.deckent), text: t(MSG.orderSent), tone: 'deckent', colorIndex: 0 });
+    try {
+      const proposed = await api.propose(message) as { flowId?: string };
+      const flowId = typeof proposed.flowId === 'string' ? proposed.flowId : null;
+      if (flowId === null) throw new Error('flowId yok');
+      setOrder({ flowId, state: 'previewing', summary: [] });
+      orderCloseRef.current?.();
+      orderCloseRef.current = api.openEvents(flowId, (event) => {
+        if (event.type === 'PREVIEW_READY') {
+          void api.getPreview(flowId).then((preview) => {
+            const p = preview as { revision?: number; planDigest?: string; summaryLines?: unknown; gateResult?: string };
+            setOrder((current) => current && current.flowId === flowId ? {
+              ...current,
+              state: 'ready',
+              ...(typeof p.revision === 'number' ? { revision: p.revision } : {}),
+              ...(typeof p.planDigest === 'string' ? { planDigest: p.planDigest } : {}),
+              summary: Array.isArray(p.summaryLines) ? (p.summaryLines as unknown[]).filter((l): l is string => typeof l === 'string').slice(0, 4) : [],
+              gateFail: p.gateResult === 'fail',
+            } : current);
+          }).catch(() => {});
+        }
+        if (event.type === 'RUN_STARTED') {
+          pushRiver({ src: t(MSG.deckent), text: t(MSG.orderStarted), tone: 'deckent', colorIndex: 0 });
+          setOrder(null);
+          orderCloseRef.current?.(); orderCloseRef.current = null;
+        }
+      });
+    } catch (err) {
+      pushRiver({ src: t(MSG.deckent), text: `⚠ ${t(MSG.orderFailed)}: ${err instanceof Error ? err.message : String(err)}`, tone: 'deckent', colorIndex: 0 });
+    }
+  };
+
+  const fullAhead = async (): Promise<void> => {
+    if (!api || !order || order.state !== 'ready') return;
+    setOrder({ ...order, state: 'starting' });
+    try {
+      await api.decide(order.flowId, 'approve');
+      await api.start(order.flowId, order.revision ?? 1, order.planDigest ?? '');
+      // RUN_STARTED eventi kartı kapatır; olmazsa 8sn-emniyet:
+      setTimeout(() => setOrder((current) => (current?.flowId === order.flowId ? null : current)), 8_000);
+    } catch (err) {
+      pushRiver({ src: t(MSG.deckent), text: `⚠ ${t(MSG.orderFailed)}: ${err instanceof Error ? err.message : String(err)}`, tone: 'deckent', colorIndex: 0 });
+      setOrder(null);
+    }
+  };
+  useEffect(() => () => { orderCloseRef.current?.(); }, []);
 
   // ── komuta: gerçek chat-stream ──
   const transmit = (): void => {
@@ -260,10 +332,36 @@ export default function CommandScene(): React.JSX.Element {
 
   return (
     <div className="nova-scene">
-      <canvas ref={canvasRef} className="nova-scene__canvas" onClick={onCanvasClick} />
-      {!snap?.active && (
-        <p className="nova-scene__idle mono">{offline ? t(MSG.offline) : t(MSG.idle)}</p>
-      )}
+      {/* Sahne-bölgesi: canvas KENDİ bölgesinde — nehir/komuta ASLA üstüne binmez (flex-kolon). */}
+      <div className="nova-scene__stage">
+        <canvas ref={canvasRef} className="nova-scene__canvas" onClick={onCanvasClick} />
+        {!snap?.active && (
+          <p className="nova-scene__idle mono">{offline ? t(MSG.offline) : t(MSG.idle)}</p>
+        )}
+        {order && (
+          <aside className="nova-order" role="dialog" aria-label={t(MSG.orderPreviewTitle)}>
+            <h3 className="mono">{t(MSG.orderPreviewTitle)}</h3>
+            {order.state === 'previewing' ? (
+              <p className="nova-order__wait mono">{t(MSG.orderPreviewing)}</p>
+            ) : (
+              <>
+                <ul className="nova-order__summary">
+                  {order.summary.map((line) => <li key={line}>{line}</li>)}
+                </ul>
+                {order.gateFail === true && <p className="nova-order__gate mono">{t(MSG.orderGateFail)}</p>}
+                <div className="nova-order__actions">
+                  <button type="button" className="nova-order__go mono" disabled={order.state === 'starting'} onClick={() => void fullAhead()}>
+                    {t(MSG.orderFullAhead)}
+                  </button>
+                  <button type="button" className="nova-order__dismiss mono" onClick={() => { orderCloseRef.current?.(); setOrder(null); }}>
+                    {t(MSG.orderDismiss)}
+                  </button>
+                </div>
+              </>
+            )}
+          </aside>
+        )}
+      </div>
       <ol className="nova-river" aria-live="polite">
         {river.map((row, index) => (
           <li key={`${row.src}-${index}-${row.text.slice(0, 12)}`} className={`nova-river__row nova-river__row--${row.tone}`} data-ci={row.colorIndex % 6}>
@@ -280,6 +378,14 @@ export default function CommandScene(): React.JSX.Element {
           className="nova-cmd__input mono"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            // Ctrl/Cmd+Enter = EMİR (RunFlow); Enter = konuşma.
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+              e.preventDefault();
+              const message = draft.trim();
+              if (message.length > 0) { setDraft(''); void sendOrder(message); }
+            }
+          }}
           placeholder={t(MSG.cmdPlaceholder)}
           aria-label={t(MSG.cmdPlaceholder)}
           autoComplete="off"
