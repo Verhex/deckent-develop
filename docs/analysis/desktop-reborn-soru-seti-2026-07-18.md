@@ -165,3 +165,40 @@ cleanup · retro-görüntüle · config-yaz · git-mühür · run(tek-task)
 ---
 *Cevaplama: chat'ten 4'lü-turlarla (CC soru-kartları) ya da bu dosyaya işaretle. Her cevap
 dokümana işlenir; tamamlanınca «tasarım-anayasası» bölümü doğar ve SSOT olur.*
+
+
+---
+
+# ✅ TASARIM-ANAYASASI (20/20 cevaplandı — Alperen 2026-07-18; SSOT)
+
+## Kimlik
+- **Metafor: SAF-JARVIS (HUD)** — deniz-metaforu görselden TAMAMEN emekli (dalga yalnız teknik-osiloskop olarak yaşar)
+- **Canlılık: nefes-alan HUD** — boşta sakin-ambient; koşuda sahne UYANIR
+- **Renk: koyu TEK-kimlik + ışıma-accent** (accent-ailesi prototip-turunda birlikte seçilir); vardiya-sistemi emekli → tema=yoğunluk-varyantları
+- **Adlar: Jarvis-nötr** — Komuta · Akışlar · Onaylar · Terminal · Değişiklikler · Bellek · Insights · Ayarlar (i18n yeni-kök; Köprüüstü-adları emekli)
+
+## Bilgi-mimarisi
+- **Ana-sahne: KOMUTA-MERKEZİ** — konuşma+orkestra BİRLEŞİK (ayrı chat-sekmesi ölür)
+- **Gezinme: Cmd/Ctrl+K birincil + ince ikon-ray** (5-8 sahne)
+- **Fiiller: TÜMÜ çift-yol** — konuşma-emri + yüzey-düğmesi (start/plan/kill/pause/checkpoint/cleanup/config/mühür…); tehlikeliler çift-onay+mandal — "desktoptan yapamadığım" cümlesi ölür
+- **v1-set (8 sahne):** Komuta + Akışlar + Onaylar + Değişiklikler + Terminal + Ayarlar + **Bellek + Insights**
+
+## Sahne (Komuta-merkezi görselleştirmesi)
+- **Worker-temsili: RADIAL-ÇEKİRDEK + OSİLOSKOP melezi** — merkez sprint-halkası (faz+nabız); worker'lar yörünge-segmentleri (ışıma=aktivite, sarı=bayat); seçili-worker osiloskop-izi
+- **Telemetri: sahne-içi doğuş → nehir** (satır segmentten doğar, nehre süzülür)
+- **Faz: ambient-ışık-tonu + çekirdek-halka** (faz sahneyi YAŞAR)
+- **Worker-izin-kartı: sahne-diyaloğu** (orkestra durmadan karar)
+- **Ses: v1 YOK; v2 opsiyonel default-kapalı**
+
+## Konuşma
+- **TAM-REPL-parite:** 29-bridge + exec-araçları + onay-kartları + @dosya + slash — native-REPL motorunun GUI'si
+
+## Teknik
+- **Kapsam: görünüm-katmanı SIFIRDAN; motor korunur** (SSE/servisler/kontratlar/i18n-köprüsü/token-mimarisi = motor; eski Shell tamamı emekli)
+- **Transport: SSE-birincil BİRLEŞİK /api/live** (586 öne çekilir; poll ölür)
+- **Render: Canvas-sahne + DOM-UI hibrit** (60fps; yüzlerce-worker ölçeği — Yasa-2)
+- **Doğrulama: GERÇEK-VERİ prototipi** (koşan-daemon'a bağlı; statik-mock YASAK)
+
+## Süreç
+- **Tren: 589 «DESKTOP-REBORN»**; 588 DONDU (yamalama-yasağı); **KABUL askıda** — REBORN-v1 çıkınca gerçek-ürünle yeniden başlar
+- **Ritim: ANAYASA (bu) → 2 ZIT-YÖN gerçek-veri prototipi → Alperen-seçimi → v1-build** (her dilim anayasaya-karşı; yama yok, beğenilmeyen çöpe)

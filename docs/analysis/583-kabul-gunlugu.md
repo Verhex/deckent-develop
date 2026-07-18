@@ -62,7 +62,11 @@ Plan-onayı sonrası aynı-gün: **F0** (Changes+ray-grupları+Runs-detay+Telsiz
 
 ---
 
-## Gün-2 — ·bekliyor·
+> **⏸ KABUL ASKIYA ALINDI (2026-07-18, Alperen P14-kararı):** yamalama-prensibi reddedildi →
+> 589 DESKTOP-REBORN baştan-tasarımı. Gün-1'in hasadı: **14 pürüz** (7 aynı-gün-fixli 🔧, 2 canlı-doğrulama ✅,
+> P8 fix-adayı, P13/P14 yön-eskalasyonu→ANAYASA). Sayaç REBORN-v1 çıkınca sıfırdan başlar — gerçek-ürünle.
+
+## Gün-2 — ·bekliyor· (REBORN-v1-sonrası)
 ## Gün-3 — ·bekliyor·
 ## Gün-4 — ·bekliyor·
 ## Gün-5 — ·bekliyor·
