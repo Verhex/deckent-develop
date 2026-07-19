@@ -1422,6 +1422,9 @@ export function createDefaultConfig(): DeckentConfig {
     // Dependency pipeline enabled — see DeckentConfig.dependency_pipeline_enabled
     // (config-types.ts) for the full history/rollback note. Default true.
     dependency_pipeline_enabled: true,
+    // Debt pre-flight revalidation at PLAN time (Dogfood-449 B5) — see
+    // DeckentConfig.debt_preflight_enabled for rationale/rollback. Default true.
+    debt_preflight_enabled: true,
     // Sprint checkpoint interval: how many terminal tasks before writing a checkpoint
     sprint_checkpoint_interval: 5,
     // Sprint 202 Task 202-004 — pre-spawn pacing in ms (computeBackoff floor).
@@ -1843,6 +1846,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     cleanup_delay_ms: config.cleanup_delay_ms,
     // Dependency pipeline (Sprint 156: default true; user/project config can override)
     dependency_pipeline_enabled: config.dependency_pipeline_enabled ?? true,
+    // Debt pre-flight revalidation (Dogfood-449 B5: default true; fail-open design)
+    debt_preflight_enabled: config.debt_preflight_enabled ?? true,
     // Pre-sprint full-vitest baseline (Sprint 255: default FALSE — the full suite
     // blocks sprint start; opt-in only). Speeds sprint start dramatically.
     pre_sprint_tests: config.pre_sprint_tests ?? false,

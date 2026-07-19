@@ -39,6 +39,7 @@ import { getNextSprintId, readJsonSafe, debugLog } from '../core/utils.js';
 import { resolveBrainPlanningMode } from '../core/config.js';
 import { isUnconditionalRule } from './rule-evolver.js';
 import { resolveDebt } from './debt-manager.js';
+import { preflightCriticalDebt } from './debt-preflight.js';
 
 // ─── Sprint Utilities ─────────────────────────────────────────────
 import { readFileSafe, extractGoNogoCriteria, isAdapterProvider } from './sprint-utils.js';
@@ -287,8 +288,41 @@ export async function planSprint(
   let plannerResult: PlannerResult | null = null;
   let usedMode: string = 'structured';
 
+  // Dogfood-449 B5: pre-flight revalidation of CRITICAL debt BEFORE dispatch.
+  // A debt note that asserts completion and whose own evidence commands re-run
+  // green host-side is already resolved in the tree — auto-close it instead of
+  // spawning a no-op fix worker (sprint-449 burned 3 sonnet-high workers per
+  // run on such debts; debt-433-001-fix had been re-dispatched for 15 sprints).
+  // Fail-open by design: any red/timeout/error keeps the debt dispatched, with
+  // the pre-flight outcome appended to the fix task so the worker starts from
+  // fresh signal instead of the stale note dump.
+  let debtForInjection = context.debt;
+  if (config.debt_preflight_enabled !== false && !options?.dryRun) {
+    try {
+      const preflight = await preflightCriticalDebt(projectRoot, context.debt);
+      if (preflight.items.length > 0) {
+        for (const verifiedId of preflight.verifiedIds) {
+          resolveDebt(projectRoot, verifiedId, sprintId);
+        }
+        debtForInjection = context.debt.map(d => {
+          if (preflight.verifiedIds.has(d.id)) return { ...d, resolved: true };
+          const annotation = preflight.annotations.get(d.id);
+          return annotation ? { ...d, description: `${d.description}\n\n${annotation}` } : d;
+        });
+        const redCount = preflight.items.filter(i => i.verdict === 'evidence-red').length;
+        void notify(
+          'phase-change', sprintId,
+          '[Brain] debt-preflight',
+          `Pre-flight revalidated ${preflight.items.length} CRITICAL debt(s): ${preflight.verifiedIds.size} auto-closed (completion claim + evidence commands green), ${redCount} confirmed-real (evidence red), rest dispatched unchanged.`,
+        );
+      }
+    } catch (e) {
+      debugLog('planSprint:debtPreflight', e); // fail-open — dispatch as before
+    }
+  }
+
   // CRITICAL debt -> priority fix tasks (Sprint 179 W1-1)
-  const injected = injectCriticalDebtTasks(context.debt, sprintId, defaultModel, seq, initialStatus);
+  const injected = injectCriticalDebtTasks(debtForInjection, sprintId, defaultModel, seq, initialStatus);
   tasks.push(...injected.tasks);
   seq = injected.nextSeq;
 

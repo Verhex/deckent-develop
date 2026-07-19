@@ -864,6 +864,17 @@ export interface DeckentConfig {
    * Rollback: set `dependency_pipeline_enabled: false` in `.deckent/config.json`.
    */
   dependency_pipeline_enabled?: boolean;
+  /**
+   * Dogfood-449 B5 — pre-flight revalidation of CRITICAL debt at PLAN time.
+   * When true (default), debt notes that assert completion AND carry
+   * allowlisted evidence commands (`npx tsc --noEmit`, `npm run lint`,
+   * `npx vitest run <paths>`) get those commands re-run host-side before a
+   * fix task is dispatched; all-green ⇒ the debt auto-resolves instead of
+   * spawning a no-op worker (sprint-449: 3 such workers per run, one debt
+   * re-dispatched 15 sprints). Fail-open: any red/timeout/error keeps the
+   * debt dispatched. Rollback: set `debt_preflight_enabled: false`.
+   */
+  debt_preflight_enabled?: boolean;
   /** Retry tasks that failed due to transient errors (network blip, timeout). Default: false (opt-in). */
   retry_transient_failures?: boolean;
   /** Enable fix phase after initial execution (default: true) */
@@ -1486,6 +1497,9 @@ export interface ResolvedConfig {
    *  for the full history/rollback note). Always populated by `loadConfig`/
    *  `mergeConfigs` — optional here only for literal-construction convenience. */
   dependency_pipeline_enabled?: boolean;
+  /** Pre-flight revalidation of CRITICAL debt at PLAN time (Dogfood-449 B5).
+   *  Resolved default: **true** — see {@link DeckentConfig.debt_preflight_enabled}. */
+  debt_preflight_enabled?: boolean;
   /** How many terminal tasks (DONE/NO_GO) must complete before a checkpoint is written.
    * Lower values → more frequent checkpoints → safer for long sprints.
    * Default: 5. Sprint 139 override: 3. */

@@ -130,6 +130,7 @@
 | `ai_planner_timeout` | `number` | — | AI planner subprocess timeout (ms). |
 | `human_checkpoints` | `string[]` | `[]` | Insan onayi gereken fazlar: `'plan'`, `'evaluate'`, `'fix'`. Bos = tam otonom. |
 | `dependency_pipeline_enabled` | `boolean` | `true` | ADR-045 wave-based execution. `true` = Kahn algoritmasiyla topological wave spawning, cascade-on-NO_GO, unblock-on-DONE. `false` = Brain manuel wave yonetimi (ADR-047 fallback). Varsayilan `true`; deckent-dev dahil tum projeler `true` (Sprint 156; deckent-dev flip 2026-06-10). |
+| `debt_preflight_enabled` | `boolean` | `true` | Dogfood-449 B5: PLAN oncesi CRITICAL debt on-kontrolu. Tamamlanma-iddiasi + allowlist kanit-komutu (`npx tsc --noEmit` / `npm run lint` / `npx vitest run <yol>`) tasiyan debt notunun komutlari host-side yeniden kosulur; hepsi yesilse debt otomatik kapanir (no-op fix worker dogmaz), kirmizi/bayat-yol/timeout debt'i sevkte tutar (fail-open). Kapatmak icin `false`. |
 
 ---
 
