@@ -291,6 +291,15 @@ export function coverageOptional(task: Task, result?: { filesChanged?: string[];
   // regardless of which agent runs it, breaking the "every sprint a different mask"
   // spurious-NO_GO cycle where 206 refactorer tasks were NO_GO but bug-fixer DONE.
   if (result) {
+    // Dogfood-449 B6: an explicit EMPTY filesChanged array is the worker's honest
+    // declaration that nothing changed (e.g. a debt task verified already-resolved).
+    // With no new code surface to cover, a missing coverage number is vacuous — not
+    // a quality failure. Requiring it schema-NO_GO'd two honest DONE results in
+    // sprint-449 (449-001/003) before the isVerificationTask fast-path could even
+    // run, triggering a spurious FIX cascade. A missing (non-array) filesChanged
+    // still fails validateResultSchema separately, so this never masks a sloppy
+    // result; a wrong "nothing changed" claim is the Auditor's git-diff domain.
+    if (Array.isArray(result.filesChanged) && result.filesChanged.length === 0) return true;
     const wroteTests = result.filesChanged?.some(f => f.includes('.test.') || f.includes('.spec.')) ?? false;
     if (wroteTests) return true;
     // WM-7: deckent's coverage scoring is vitest/v8-only. For a non-JS/TS code

@@ -112,3 +112,56 @@ describe('evaluateWithRubric() — schema enforcement', () => {
     expect(evalResult.decision).toBe('DONE');
   });
 });
+
+// ─── Dogfood-449 B6: empty-filesChanged coverage exemption ──────────
+// Live case 449-001/003: an implementer debt task honestly verified the debt
+// already-resolved and reported filesChanged: [] with no coverage/testsPassed.
+// The schema pre-check forced NO_GO totalScore:0 before the verification
+// fast-path could run, triggering a spurious FIX cascade.
+
+describe('validateResultSchema() — B6 empty-filesChanged exemption (dogfood-449)', () => {
+  it('tolerates missing coverage + testsPassed when the result explicitly changed nothing', () => {
+    const result = makeResult({
+      filesChanged: [],
+      coverage: undefined as unknown as number,
+      testsPassed: undefined as unknown as boolean,
+    });
+    const check = validateResultSchema(result, makeTask({ assignedAgent: 'implementer' }));
+    expect(check.valid).toBe(true);
+    expect(check.missingFields).toEqual([]);
+  });
+
+  it('still requires coverage for a non-empty source-only change (153/154 guard preserved)', () => {
+    const result = makeResult({ coverage: undefined as unknown as number });
+    const check = validateResultSchema(result, makeTask({ assignedAgent: 'implementer' }));
+    expect(check.valid).toBe(false);
+    expect(check.missingFields).toContain('coverage');
+  });
+
+  it('does NOT exempt when filesChanged is missing entirely — the declaration must be an explicit empty array', () => {
+    const result = makeResult({
+      filesChanged: undefined as unknown as string[],
+      coverage: undefined as unknown as number,
+    });
+    const check = validateResultSchema(result, makeTask({ assignedAgent: 'implementer' }));
+    expect(check.valid).toBe(false);
+    expect(check.missingFields).toContain('filesChanged');
+    expect(check.missingFields).toContain('coverage');
+  });
+
+  it('evaluateWithRubric no longer schema-NO_GOs the sprint-449-shaped honest result', () => {
+    const task = makeTask({ assignedAgent: 'implementer' });
+    const result = makeResult({
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+      coverage: undefined as unknown as number,
+      testsPassed: undefined as unknown as boolean,
+      notes: 'Debt already resolved by host-side sync — verified, no changes needed.',
+    });
+    const evalResult = evaluateWithRubric(result, task);
+    const hasSchemaScore = evalResult.rubricScores.some(s => s.criterion === 'schema_validation');
+    expect(hasSchemaScore).toBe(false);
+    expect(evalResult.totalScore).toBeGreaterThan(0);
+  });
+});
