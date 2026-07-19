@@ -329,6 +329,33 @@ function dominantDeliverable(deliverables: RequirementPositional['deliverables']
   return best?.type;
 }
 
+// Dogfood-450 (450-006 canlı-misroute): verification-work structural signature.
+// A task whose ONLY deliverable is a doc but whose READ-side scope is dominated
+// by test locations is *running/verifying existing work and reporting on it* —
+// that is 'review' (ci-guardian/code-reviewer territory, ADR-079), not
+// 'document' (authoring documentation). "Doğrulama işleri doküman işi değildir"
+// (Alperen, 2026-07-19). Evidence is PATHS ONLY — directories + filesRead, never
+// prose — so the spec §3 word-inference bans hold by construction: the token
+// 'test' in a title/description still cannot alter the output; a tests/ path
+// segment in the declared scope can, and should.
+const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/i;
+const TEST_DIR_RE = /(^|\/)(tests?|__tests__|e2e)(\/|$)/i;
+/** Read-side test-location share at/above which a doc-only writer is 'review'. */
+const REVIEW_TEST_SHARE_MIN = 0.5;
+
+function isTestLocation(p: string): boolean {
+  const norm = p.replace(/\\/g, '/');
+  return TEST_FILE_RE.test(norm) || TEST_DIR_RE.test(norm);
+}
+
+/** Share of the task's read-side scope entries (directories + filesRead) that
+ *  are test locations. Zero entries → 0 (no signal, never fires). */
+function testReadShare(task: Task): number {
+  const reads = [...(task.scope.directories ?? []), ...(task.scope.filesRead ?? [])];
+  if (reads.length === 0) return 0;
+  return reads.filter(isTestLocation).length / reads.length;
+}
+
 /** Derive `workType` from STRUCTURAL evidence only (scope + deliverable ratios). */
 function deriveStructuralWorkType(task: Task, positional: RequirementPositional): WorkType {
   if (!positional.needsWrite) {
@@ -340,6 +367,9 @@ function deriveStructuralWorkType(task: Task, positional: RequirementPositional)
   }
   const dominant = dominantDeliverable(positional.deliverables);
   if (dominant === undefined) return 'build';
+  // Doc-only writer over a test-dominated read scope → verification report,
+  // not documentation authorship (see the block comment above TEST_FILE_RE).
+  if (dominant === 'doc' && testReadShare(task) >= REVIEW_TEST_SHARE_MIN) return 'review';
   return DELIVERABLE_WORK_TYPE.get(dominant) ?? 'build';
 }
 

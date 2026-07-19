@@ -256,7 +256,13 @@ export const BUILTIN_DOMAINS: readonly DomainDef[] = [
     description:
       'User-facing message catalogs, translation keys, and language-switching flows that ' +
       'localize output for different audiences.',
-    surfaces: ['cli', 'frontend'],
+    // Dogfood-450 (450-004 canlı-misroute): i18n is LOCATION-NEUTRAL — the
+    // surface comes from where the strings live (src/cli/** co-matches
+    // cli/terminal → 'cli'; src/dashboard/** co-matches the frontend domain →
+    // 'frontend'). Declaring surfaces here leaked 'frontend' into pure-CLI
+    // message work and pushed frontend-designer past terminal-ux-engineer/
+    // implementer on a CLI i18n flip task.
+    surfaces: [],
     exclusiveRoles: [],
   },
   {

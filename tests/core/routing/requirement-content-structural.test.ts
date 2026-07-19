@@ -184,3 +184,79 @@ describe('produceContentStructural — schema conformance + purity', () => {
     expect(produceContentStructural(task, positional)).toEqual(produceContentStructural(task, positional));
   });
 });
+
+// ─── Dogfood-450 (450-006): verification-report structural signature ────────
+// A doc-only writer over a test-dominated read scope is RUNNING/verifying
+// existing work and reporting on it → 'review', never 'document'
+// ("doğrulama işleri doküman işi değildir" — Alperen, 2026-07-19). Evidence is
+// paths only (directories + filesRead); the prose bans stay intact.
+
+describe('produceContentStructural — doc-writer over test-dominated reads → review', () => {
+  it('the live 450-006 shape (proof .md + 4/7 test directories) → review', () => {
+    const content = contentFor({
+      directories: ['tests/cli/', 'tests/mcp/', 'tests/e2e/', 'src/cli/helpers/', 'dist/cli/', '.analysis/', 'tests/cli/helpers/'],
+      filesRead: [],
+      filesWrite: ['.analysis/run-rename-dilim3-smoke-proof.md'],
+    });
+    expect(content.workType).toBe('review');
+  });
+
+  it('doc writer over docs-only reads stays document (share 0)', () => {
+    const content = contentFor({
+      directories: ['docs/', 'docs/reference/'],
+      filesRead: ['docs/index.md'],
+      filesWrite: ['docs/guide.md'],
+    });
+    expect(content.workType).toBe('document');
+  });
+
+  it('below the 0.5 share threshold stays document; at exactly 0.5 flips to review', () => {
+    const below = contentFor({
+      directories: ['tests/cli/', 'docs/', 'docs/reference/'],
+      filesRead: [],
+      filesWrite: ['docs/proof.md'],
+    });
+    expect(below.workType).toBe('document'); // 1/3 ≈ 0.33
+    const at = contentFor({
+      directories: ['tests/cli/', 'docs/'],
+      filesRead: [],
+      filesWrite: ['docs/proof.md'],
+    });
+    expect(at.workType).toBe('review'); // 1/2 = 0.5 (>= threshold)
+  });
+
+  it('test FILES in filesRead count as test locations (no directories needed)', () => {
+    const content = contentFor({
+      directories: [],
+      filesRead: ['tests/a.test.ts', 'src/mod/b.spec.tsx', 'src/mod/impl.ts'],
+      filesWrite: ['.analysis/verify-report.md'],
+    });
+    expect(content.workType).toBe('review'); // 2/3 ≈ 0.67
+  });
+
+  it('e2e/ and __tests__/ segments are test locations', () => {
+    const content = contentFor({
+      directories: ['e2e/', 'packages/x/__tests__/'],
+      filesRead: [],
+      filesWrite: ['.analysis/verify-report.md'],
+    });
+    expect(content.workType).toBe('review');
+  });
+
+  it('code-test dominant deliverable is untouched by the rule (stays build)', () => {
+    const content = contentFor({
+      directories: ['tests/cli/'],
+      filesRead: [],
+      filesWrite: ['tests/cli/new-thing.test.ts'],
+    });
+    expect(content.workType).toBe('build');
+  });
+
+  it("prose ban still holds: the token 'test'/'verify' in title cannot flip a docs-only task", () => {
+    const content = contentFor(
+      { directories: ['docs/'], filesRead: [], filesWrite: ['docs/guide.md'] },
+      { title: 'Verify and test the documentation thoroughly', description: 'test test verify smoke' },
+    );
+    expect(content.workType).toBe('document');
+  });
+});
