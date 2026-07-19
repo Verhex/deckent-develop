@@ -6,7 +6,7 @@
 // project and asserts on the actual stdout the two commands produce.
 //
 //   T1: `deckent status` (fresh project, no active sprint) → real
-//       "No active sprint" text from the standalone-status branch.
+//       "No active run (sprint)" text from the standalone-status branch.
 //   T2: `deckent doctor --json` → real, well-formed DoctorResult JSON —
 //       structural guarantees that hold on every host (providers always has
 //       4 entries; our fixture's `.deckent/` makes the Workspace check pass).
@@ -21,7 +21,7 @@
 //     failure.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, existsSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,6 +35,20 @@ const REPO_ROOT = resolve(dirname(__filename), '..', '..');
 const ENTRY = resolve(REPO_ROOT, 'dist', 'cli', 'entry.js');
 
 const DIST_ABSENT = !existsSync(ENTRY);
+
+/** True when the compiled output for a source file is older than the source itself
+ *  (mirrors tests/cli/run-rename-smoke.test.ts's isDistStale — same build-artifact-timing gap). */
+function isDistStale(srcRelPath: string, distRelPath: string): boolean {
+  const srcPath = join(REPO_ROOT, srcRelPath);
+  const distPath = join(REPO_ROOT, distRelPath);
+  if (!existsSync(srcPath) || !existsSync(distPath)) return true;
+  return statSync(distPath).mtimeMs < statSync(srcPath).mtimeMs;
+}
+
+const MESSAGES_STALE = isDistStale(
+  'src/cli/helpers/messages.ts',
+  'dist/cli/helpers/messages.js',
+);
 
 // ─── Async CLI spawn helper (no spawnSync — ADR-D-002) ────────────────────────
 
@@ -120,8 +134,8 @@ describe.skipIf(DIST_ABSENT)(
 
     // ── T1: `deckent status` — fresh project, no active sprint ──────────────
 
-    it(
-      'T1: `deckent status` on a fresh project prints the real "no active sprint" message',
+    it.skipIf(MESSAGES_STALE)(
+      'T1: `deckent status` on a fresh project prints the real "no active run (sprint)" message',
       async () => {
         const result = await runCli(['status'], root, env, 15_000, track);
 
@@ -129,11 +143,20 @@ describe.skipIf(DIST_ABSENT)(
           result.exitCode,
           `status exited abnormally — stderr:\n${result.stderr}`,
         ).toBe(0);
-        expect(result.stdout).toContain('No active sprint');
+        expect(result.stdout).toContain('No active run (sprint)');
         expect(result.stdout).toContain('deckent start');
       },
       20_000,
     );
+
+    if (MESSAGES_STALE) {
+      it.skip(
+        'SKIP: dist/cli/helpers/messages.js predates src/cli/helpers/messages.ts ' +
+        '(450-004 status.no_active_sprint "run (sprint)" bridge) — needs a host-side ' +
+        '`npm run build` (workers may not run it mid-sprint; see WORKER-GUIDE.md)',
+        () => { /* intentionally skipped — see file header comment */ },
+      );
+    }
 
     // ── T2: `deckent doctor --json` — real DoctorResult JSON ─────────────────
 

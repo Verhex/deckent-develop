@@ -34,7 +34,7 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
 
 vi.mock('../../../src/cli/helpers/messages.js', () => ({
   getMessage: vi.fn().mockImplementation((key: string) => {
-    if (key === 'status.no_active_sprint') return 'No active sprint.';
+    if (key === 'status.no_active_sprint') return 'No active run (sprint).';
     if (key === 'status.dashboard_read_failed') return 'Dashboard read failed.';
     return key;
   }),

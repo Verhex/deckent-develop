@@ -494,7 +494,7 @@ describe('status command', () => {
   it('prints message when no dashboard', async () => {
     vi.mocked(existsSync).mockReturnValue(false);
     await runCommand(registerStatus, ['status']);
-    expect(stdout()).toContain('No active sprint');
+    expect(stdout()).toContain('No active run (sprint)');
   });
 
   it('handles corrupt dashboard file', async () => {

@@ -29,12 +29,12 @@ const MESSAGES: MessageMap = {
     en: '{taskCount} tasks running',
   },
   'status.sprint_active': {
-    tr: 'Sprint {sprintId} aktif',
-    en: 'Sprint {sprintId} active',
+    tr: 'Run {sprintId} (sprint) aktif',
+    en: 'Run {sprintId} (sprint) active',
   },
   'status.no_sprint': {
-    tr: 'Aktif sprint yok',
-    en: 'No active sprint',
+    tr: 'Aktif run (sprint) yok',
+    en: 'No active run (sprint)',
   },
 
   // ─── catalog network policy (SEC-04, task 418-003) ────────────────────
@@ -239,8 +239,8 @@ const MESSAGES: MessageMap = {
 
   // ─── status command ─────────────────────────────────────────────────
   'status.no_active_sprint': {
-    en: 'No active sprint. Run `deckent start` first.',
-    tr: 'Aktif sprint yok. Önce `deckent start` çalıştırın.',
+    en: 'No active run (sprint). Run `deckent start` first.',
+    tr: 'Aktif run (sprint) yok. Önce `deckent start` çalıştırın.',
   },
   'status.pending_approvals.header': {
     en: '⏳ Pending approvals: {count} — act in the run terminal or the dashboard:',

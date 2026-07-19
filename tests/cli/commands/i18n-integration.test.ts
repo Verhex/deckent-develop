@@ -137,7 +137,7 @@ describe('getMessage — plan command keys', () => {
 describe('getMessage — status command keys', () => {
   it('returns English no_active_sprint for lang=en', () => {
     const msg = getMessage('status.no_active_sprint', 'en');
-    expect(msg).toContain('No active sprint');
+    expect(msg).toContain('No active run (sprint)');
     expect(msg).toContain('deckent start');
   });
 
@@ -428,10 +428,10 @@ describe('status command — i18n integration', () => {
   });
   afterEach(() => { process.exitCode = undefined; });
 
-  it('shows "No active sprint" English message when dashboard missing and config has lang=en', async () => {
+  it('shows "No active run (sprint)" English message when dashboard missing and config has lang=en', async () => {
     vi.mocked(existsSync).mockReturnValue(false);
     await runStatusCommand(['status']);
-    expect(print).toHaveBeenCalledWith(expect.stringContaining('No active sprint'));
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('No active run (sprint)'));
   });
 
   it('shows Turkish "no active sprint" when config has lang=tr', async () => {
@@ -447,7 +447,7 @@ describe('status command — i18n integration', () => {
     });
     await runStatusCommand(['status']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
-    expect(calls.some(m => m.includes('Aktif sprint yok'))).toBe(true);
+    expect(calls.some(m => m.includes('Aktif run (sprint) yok'))).toBe(true);
   });
 
   it('shows "Failed to read dashboard file." in English when parse fails and lang=en', async () => {

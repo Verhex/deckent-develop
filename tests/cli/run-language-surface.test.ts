@@ -144,13 +144,13 @@ describe('RUN-SURFACE-TEXT (378-002) — curated scope-note: intentionally NOT b
     expect(getMessage('hint.COMPLETE', 'en')).toContain('Sprint complete');
   });
 
-  it('status.sprint_active stays "Sprint {sprintId} active" verbatim — tests/cli/helpers/messages.test.ts hard-asserts an EXACT match on this template (both interpolated and raw-placeholder forms), out of write scope', () => {
-    expect(getMessage('status.sprint_active', 'en', { sprintId: 'sprint-042' })).toBe('Sprint sprint-042 active');
-    expect(getMessage('status.sprint_active', 'en', {})).toBe('Sprint {sprintId} active');
+  it('status.sprint_active is now bridged to "Run {sprintId} (sprint) active" (450-004 RUN-RENAME dilim-3) — tests/cli/helpers/messages.test.ts was updated in the same atomic change', () => {
+    expect(getMessage('status.sprint_active', 'en', { sprintId: 'sprint-042' })).toBe('Run sprint-042 (sprint) active');
+    expect(getMessage('status.sprint_active', 'en', {})).toBe('Run {sprintId} (sprint) active');
   });
 
-  it('status.no_active_sprint stays "No active sprint" verbatim — tests/cli/commands/i18n-integration.test.ts hard-asserts this via a real (unmocked) status-command run (out of write scope)', () => {
-    expect(getMessage('status.no_active_sprint', 'en')).toContain('No active sprint');
+  it('status.no_active_sprint is now bridged to "No active run (sprint)" (450-004 RUN-RENAME dilim-3) — tests/cli/commands/i18n-integration.test.ts was updated in the same atomic change', () => {
+    expect(getMessage('status.no_active_sprint', 'en')).toContain('No active run (sprint)');
   });
 
   it('formatHumanStatus non-COMPLETE header stays "Sprint <N>" verbatim — tests/cli/helpers/human-status.test.ts hard-asserts this (out of write scope)', () => {

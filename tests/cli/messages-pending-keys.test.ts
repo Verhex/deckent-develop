@@ -86,8 +86,10 @@ describe('health.* keys: added as genuine en+tr pairs (Task 15 sole-authority ad
 
 describe('getMessage fallback behavior: unaffected by the new health.* keys (no collision)', () => {
   it('a pre-existing, unrelated key still resolves exactly as before', () => {
-    expect(getMessage('status.no_sprint', 'en')).toBe('No active sprint');
-    expect(getMessage('status.no_sprint', 'tr')).toBe('Aktif sprint yok');
+    // Literal updated by 450-004 (RUN-RENAME dilim-3, status.no_sprint bridged to "run (sprint)"
+    // wording) — the key itself is still unaffected by the health.* addition, only its text changed.
+    expect(getMessage('status.no_sprint', 'en')).toBe('No active run (sprint)');
+    expect(getMessage('status.no_sprint', 'tr')).toBe('Aktif run (sprint) yok');
   });
 
   it('a genuinely unknown key still echoes the key itself (fallback contract intact)', () => {

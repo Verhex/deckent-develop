@@ -89,7 +89,7 @@ describe('status command (isolated)', () => {
   it('shows no active sprint message when dashboard and tasks do not exist', async () => {
     vi.mocked(existsSync).mockReturnValue(false);
     await runCommand(['status']);
-    expect(print).toHaveBeenCalledWith(expect.stringContaining('No active sprint'));
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('No active run (sprint)'));
   });
 
   it('(A) shows standalone status from task files when no dashboard', async () => {
@@ -141,7 +141,7 @@ describe('status command (isolated)', () => {
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));
     vi.mocked(isDashboardOrphaned).mockReturnValueOnce(true);
     await runCommand(['status']);
-    expect(print).toHaveBeenCalledWith(expect.stringContaining('No active sprint'));
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('No active run (sprint)'));
     expect(formatHumanStatus).not.toHaveBeenCalled();
   });
 

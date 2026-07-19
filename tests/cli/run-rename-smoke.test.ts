@@ -19,18 +19,18 @@
 //     comparison (the same class of guard this codebase already uses for
 //     DIST_ABSENT) so it enforces for real the moment dist/ catches up, instead of
 //     silently asserting stale/wrong text.
-//   - `status` has TWO pre-existing, intentionally-unbridged bare "sprint" surfaces
-//     (the no-active-run message, and the live-ACTIVE-dashboard header). Both are
-//     documented exceptions from an earlier task
-//     (tests/cli/run-language-surface.test.ts, 378-002 RUN-SURFACE-TEXT), kept
-//     verbatim because two OTHER out-of-write-scope suites hard-assert the exact
-//     legacy pattern: tests/cli/commands/i18n-integration.test.ts:139-140 asserts
-//     "No active sprint" verbatim, and tests/cli/helpers/human-status.test.ts:150-152
-//     asserts a bare "Sprint <N>" header verbatim (e.g. "Sprint 040" — the number is
-//     fixture-specific, the bare-"Sprint"-no-"Run"-bridge shape is the hard-asserted
-//     part). They are NOT a 449-008 regression — this file asserts the real current
-//     text and names the owning suites, rather than overclaiming "sprint only ever
-//     appears as an alias".
+//   - `status` had TWO pre-existing, intentionally-unbridged bare "sprint" surfaces
+//     (the no-active-run message, and the live-ACTIVE-dashboard header). As of 450-004
+//     (RUN-RENAME dilim-3) the no-active-run message is bridged to "No active run
+//     (sprint)." — tests/cli/commands/i18n-integration.test.ts and
+//     tests/cli/run-language-surface.test.ts were updated in the same atomic change.
+//     The ONE surface still bare is the live-ACTIVE-dashboard header, a DIFFERENT
+//     rename-surface owned by tests/cli/helpers/human-status.test.ts:150-152, which
+//     hard-asserts a bare "Sprint <N>" header verbatim (e.g. "Sprint 040" — the number
+//     is fixture-specific, the bare-"Sprint"-no-"Run"-bridge shape is the
+//     hard-asserted part; not one of the 3 keys 450-004 flips). Not a 449-008
+//     regression — this file asserts the real current text and names the owning
+//     suite, rather than overclaiming "sprint only ever appears as an alias".
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, statSync } from 'node:fs';
@@ -59,6 +59,11 @@ function isDistStale(srcRelPath: string, distRelPath: string): boolean {
 const HISTORY_HEADER_STALE = isDistStale(
   'src/cli/commands/history.ts',
   'dist/cli/commands/history.js',
+);
+
+const MESSAGES_STALE = isDistStale(
+  'src/cli/helpers/messages.ts',
+  'dist/cli/helpers/messages.js',
 );
 
 // ─── Async CLI spawn helper (no spawnSync — ADR-D-002) ─────────────────────
@@ -284,20 +289,29 @@ describe.skipIf(DIST_ABSENT)(
         expect(parsed.sprint.number).toBe(375);
       }, 20_000);
 
-      it(
-        'fresh project (no active run): real text is "No active sprint. Run `deckent start` first." — ' +
-        'documented pre-existing exception (tests/cli/commands/i18n-integration.test.ts hard-asserts ' +
-        '"No active sprint" verbatim; not a 449-008 regression)',
+      it.skipIf(MESSAGES_STALE)(
+        'fresh project (no active run): real text is "No active run (sprint). Run `deckent start` first." — ' +
+        'bridged by 450-004 (RUN-RENAME dilim-3); tests/cli/commands/i18n-integration.test.ts was ' +
+        'updated in the same atomic change',
         async () => {
           const root = project(makeBareProject);
           const result = await runCli(['status'], root, env, 15_000, track);
 
           expect(result.exitCode, `stderr:\n${result.stderr}`).toBe(0);
-          expect(result.stdout).toContain('No active sprint');
+          expect(result.stdout).toContain('No active run (sprint)');
           expect(result.stdout).toContain('Run `deckent start`');
         },
         20_000,
       );
+
+      if (MESSAGES_STALE) {
+        it.skip(
+          'SKIP: dist/cli/helpers/messages.js predates src/cli/helpers/messages.ts ' +
+          '(450-004 status.no_active_sprint "run (sprint)" bridge) — needs a host-side ' +
+          '`npm run build` (workers may not run it mid-sprint; see WORKER-GUIDE.md)',
+          () => { /* intentionally skipped — see file header comment */ },
+        );
+      }
 
       it(
         'a live ACTIVE run header is real, current, bare "Sprint 999" — documented pre-existing ' +

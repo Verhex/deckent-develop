@@ -173,7 +173,7 @@ describe('deckent status --json — no-active-run contract (433-002 / born-688)'
 
     expect(result.timedOut).toBe(false);
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain('No active sprint. Run `deckent start` first.');
+    expect(result.stdout).toContain('No active run (sprint). Run `deckent start` first.');
     expect(() => JSON.parse(result.stdout.trim())).toThrow();
   }, 15000);
 
@@ -184,7 +184,7 @@ describe('deckent status --json — no-active-run contract (433-002 / born-688)'
 
     expect(result.timedOut).toBe(false);
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain('No active sprint. Run `deckent start` first.');
+    expect(result.stdout).toContain('No active run (sprint). Run `deckent start` first.');
     expect(result.stdout).toContain('Pending approvals: 1');
     expect(result.stdout).toContain('deckent nervous accept appr-1');
     expect(() => JSON.parse(result.stdout.trim())).toThrow();

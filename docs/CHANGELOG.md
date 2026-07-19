@@ -9,6 +9,26 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint450] - 2026-07-19
+
+### Added
+
+- Slice-3 pre-flip ground-truth inventory of pinned literals and exclusion guard
+- Atomic flip of last 3 locked status keys with co-owned pinning tests
+- MASTER-PLAN 510-D3 row update with slice-3 closure summary
+
+### Changed
+
+- Integration verification with vitest sweep and real-binary status smoke (completed with tech debt)
+
+### Fixed
+
+- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: REAL (non-provisional) v3 capabilities blocks for the co…
+- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: No new edit was made this round -- 445-017's prior addit…
+
+
+_Tasks: 6 total, 6 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint449] - 2026-07-18
 
 ### Added

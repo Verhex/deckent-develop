@@ -74,11 +74,11 @@ describe('getMessage', () => {
     });
 
     it('returns English for status.no_sprint in en', () => {
-      expect(getMessage('status.no_sprint', 'en')).toBe('No active sprint');
+      expect(getMessage('status.no_sprint', 'en')).toBe('No active run (sprint)');
     });
 
     it('returns Turkish for status.no_sprint in tr', () => {
-      expect(getMessage('status.no_sprint', 'tr')).toBe('Aktif sprint yok');
+      expect(getMessage('status.no_sprint', 'tr')).toBe('Aktif run (sprint) yok');
     });
 
     it('returns English for attach.no_active_session in en', () => {
@@ -113,7 +113,7 @@ describe('getMessage', () => {
 
     it('interpolates {sprintId} in status.sprint_active', () => {
       const result = getMessage('status.sprint_active', 'en', { sprintId: 'sprint-042' });
-      expect(result).toBe('Sprint sprint-042 active');
+      expect(result).toBe('Run sprint-042 (sprint) active');
     });
 
     it('interpolates {taskId} in kill.worker_killed', () => {
@@ -147,7 +147,7 @@ describe('getMessage', () => {
 
     it('handles extra vars that do not match any placeholder', () => {
       const result = getMessage('status.no_sprint', 'en', { extra: 'ignored' });
-      expect(result).toBe('No active sprint');
+      expect(result).toBe('No active run (sprint)');
     });
   });
 });
@@ -425,11 +425,11 @@ describe('doctor command messages', () => {
 
 describe('status extended messages', () => {
   it('status.no_active_sprint has proper English text', () => {
-    expect(getMessage('status.no_active_sprint', 'en')).toContain('No active sprint');
+    expect(getMessage('status.no_active_sprint', 'en')).toContain('No active run (sprint)');
   });
 
   it('status.no_active_sprint has proper Turkish text', () => {
-    expect(getMessage('status.no_active_sprint', 'tr')).toContain('Aktif sprint yok');
+    expect(getMessage('status.no_active_sprint', 'tr')).toContain('Aktif run (sprint) yok');
   });
 
   it('status.dashboard_read_failed English mentions Failed', () => {
@@ -587,7 +587,7 @@ describe('Edge cases', () => {
 
   it('getMessage with null-value vars keeps placeholder', () => {
     const result = getMessage('status.sprint_active', 'en', {});
-    expect(result).toBe('Sprint {sprintId} active');
+    expect(result).toBe('Run {sprintId} (sprint) active');
   });
 
   it('getMessage for attach.no_active_session in tr', () => {
