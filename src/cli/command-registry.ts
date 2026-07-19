@@ -114,7 +114,7 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   // here — the registry⊇commands invariant test enforces it.
   entry('plan-nl', 'Run', 'Oku', 'orchestra', ['cli']), // dry-run preview by default; --write mutates DIRECTIVES
   entry('connect', 'Core', 'Oku', 'core', ['cli']),     // diagnostic wizard, no mutation
-  entry('do', 'Run', 'Çalıştır', 'orchestra', ['cli']), // golden-flow; default dry-run, --run executes
+  entry('do', 'Run', 'Çalıştır', 'orchestra', ['cli', 'repl']), // golden-flow; default dry-run, --run executes. 'repl': 452-002 /do slash (RunFlow chain via app.tsx)
   entry('archive-debt', 'Core', 'Oku', 'orchestra', ['cli']),
   entry('dashboard', 'Core', 'Oku', 'monitor', ['cli']),
   entry('sync', 'Core', 'Değiştir', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_sync']),
