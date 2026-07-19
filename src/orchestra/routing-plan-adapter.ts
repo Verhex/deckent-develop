@@ -16,6 +16,7 @@ import type { CellStat } from '../core/routing/axis-numerical.js';
 import { producePositional, produceNumerical } from '../core/routing/requirement-vector.js';
 import { produceContentBatchLLM } from '../core/routing/content-llm.js';
 import type { CompleteFn } from '../core/routing/content-llm.js';
+import { makeCompleteTieJudge } from '../core/routing/tie-judge.js';
 import { routeTaskV3 } from '../core/routing/route-task-v3.js';
 import type { RouteCatalog } from '../core/routing/route-task-v3.js';
 import { CatalogGapError } from '../core/routing/verifier.js';
@@ -140,6 +141,9 @@ export async function routeTasksV3ForPlan(
         ...(requirement ? { requirement } : {}),
         ...(task.forceAgent ? { forceAgentId: task.forceAgent } : {}),
         ...(options.excludeAgentIds ? { excludeAgentIds: options.excludeAgentIds } : {}),
+        // K3 (581): ε-tie yargıcı — content-LLM'in aynı complete-seam'i üzerinden;
+        // seam yoksa (deterministik/test ortamı) engine fail-open top-1 kalır.
+        ...(options.complete ? { tieJudge: makeCompleteTieJudge(options.complete) } : {}),
       });
 
       task.assignedAgent = decision.agentId;

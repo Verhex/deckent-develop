@@ -21,6 +21,8 @@ import type { AgentCandidate } from './stage-eliminate.js';
 import { scoreContentDeterministic, PROFICIENCY_SCORE } from './axis-content.js';
 import { scorePositional } from './axis-positional.js';
 import { scoreNumerical, hasWarmCells, NEUTRAL } from './axis-numerical.js';
+import type { TieJudgeFn } from './tie-judge.js';
+import { debugLog } from '../utils.js';
 import type { CellStat } from './axis-numerical.js';
 import { rank, TIE_EPSILON } from './stage-rank.js';
 import { verify, enforceAntiTemp, CatalogGapError } from './verifier.js';
@@ -74,6 +76,9 @@ export interface RouteOptions {
   excludeAgentIds?: readonly string[];
   /** Max skills attached to the decision (V2 convention: 3). */
   maxSkills?: number;
+  /** K3 (581): ε-tie yargıç-seam'i — yalnız governanceMode 'ai' + gerçek tie'da
+   *  çağrılır; null/eksik/hatalı her durumda deterministik top-1 kalır. */
+  tieJudge?: TieJudgeFn;
   /** Requirement override (planner may pre-produce vectors; else derived from task). */
   requirement?: RequirementVector;
 }
@@ -251,24 +256,57 @@ export async function routeTaskV3(
     escalation = buildEscalation('low-confidence', ordered, { confidence, floor: effectiveFloor });
   }
 
+  // 7b · K3 TIE-JUDGE (581-kalibrasyon hibriti, Alperen-onaylı): YALNIZ gerçek
+  // ε-tie'da, governanceMode 'ai' + yargıç-seam varken, tie-kümesi LLM'e
+  // seçtirilir. Kazanan öne alınır ve provenance 'ai' olur; tie-eskalasyonu
+  // journal'da KALIR (tie gerçeği silinmez — çözüm provenance'tan okunur).
+  // Her hata-modu FAIL-OPEN: deterministik top-1 aynen kalır. Low-confidence'a
+  // asla karışmaz (K2 kararı: kalan belirsizlik content-doygunluk dilimine).
+  let judgedTop = top;
+  let judgedProvenance = provenance;
+  if (
+    escalation?.reason === 'tie' &&
+    config.governanceMode === 'ai' &&
+    options.tieJudge &&
+    !options.forceAgentId
+  ) {
+    const tieSet = ordered.filter((c) => top.finalScore - c.finalScore < TIE_EPSILON);
+    if (tieSet.length >= 2) {
+      try {
+        const caps = new Map(catalog.agents.map((a) => [a.agentId, a.capabilities]));
+        const verdict = await options.tieJudge(requirement, tieSet, caps);
+        const pick = verdict && tieSet.find((c) => c.agentId === verdict.agentId);
+        if (pick && pick.agentId !== top.agentId) {
+          ordered = [pick, ...ordered.filter((c) => c.agentId !== pick.agentId)];
+          judgedTop = pick;
+          judgedProvenance = 'ai';
+        } else if (pick) {
+          judgedProvenance = 'ai'; // yargıç deterministik top-1'i onayladı
+        }
+      } catch (e) {
+        debugLog('routeTaskV3:tieJudge', e); // fail-open
+      }
+    }
+  }
+
   // 8 · Skills + persona-slice in the same run.
   const skillIds = selectSkills(requirement, catalog, options.maxSkills ?? 3);
-  const personaSlices = selectPersonaSlices(workType, top.agentId, catalog);
+  const personaSlices = selectPersonaSlices(workType, judgedTop.agentId, catalog);
 
   // 9 · Story + final decision.
-  const winnerCapability = catalog.agents.find((a) => a.agentId === top.agentId)!.capabilities;
-  const story = buildStory(storyTrace(task, requirement, catalog, eliminated, verifierDrops, ordered, confidence, ranking.indecision, escalation, provenance));
+  const winnerCapability = catalog.agents.find((a) => a.agentId === judgedTop.agentId)!.capabilities;
+  const story = buildStory(storyTrace(task, requirement, catalog, eliminated, verifierDrops, ordered, confidence, ranking.indecision, escalation, judgedProvenance));
 
   return finalizeDecision({
-    agentId: top.agentId,
+    agentId: judgedTop.agentId,
     skillIds,
     personaSlices,
     modelPreference: winnerCapability.numerical.preferredModel ?? null,
     effortClass: requirement.numerical.effortClass,
-    axisScores: top.axisScores,
-    finalScore: top.finalScore,
+    axisScores: judgedTop.axisScores,
+    finalScore: judgedTop.finalScore,
     confidence,
-    provenance,
+    provenance: judgedProvenance,
     story,
     ranked: ordered,
     escalation,
