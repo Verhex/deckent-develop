@@ -229,6 +229,55 @@ describe('preflightCriticalDebt()', () => {
   });
 });
 
+// ─── planSprint wiring — dryRun regression (sprint-450 canlı-dersi) ─
+// generatePlanPreview HER ZAMAN dryRun:true çağırır ve run_flow_v2'de o plan
+// exact-snapshot olarak koşturulur — preflight dryRun'da da KOŞMALI. Spawn'sız
+// pin: kanıt-yolu tmp-root'ta yok → stale-evidence annotation'ı injected
+// fix-task açıklamasına düşer (hiçbir komut doğmadan preflight'ın çalıştığının
+// kanıtı).
+
+describe('planSprint wiring — preflight runs under dryRun:true', () => {
+  it('stale-evidence annotation reaches the injected fix task in a dryRun plan', async () => {
+    const { mkdirSync, rmSync, writeFileSync } = await import('node:fs');
+    const root = join(tmpdir(), `preflight-dryrun-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(join(root, '.brain'), { recursive: true });
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    writeFileSync(join(root, '.deckent', 'config.json'), JSON.stringify({ mode: 'max_plan', modes: {} }), 'utf8');
+    try {
+      const { planSprint } = await import('../../src/orchestra/sprint-planner.js');
+      const config = {
+        mode: 'max_plan',
+        activeModeConfig: {
+          max_workers: 4, brain_model: 'opus', default_model: 'sonnet',
+          haiku_allowed: false, brain_planning: 'structured',
+        },
+        modes: {},
+        language: 'en', projectName: 'test-project', projectRoot: root,
+        version: '1.0.0',
+      } as any;
+      const context = {
+        directives: '## Task 1: Simple fix\n- Scope: src/core/\n',
+        memory: '', retro: '', patterns: '', decisions: '', existingTasks: [],
+        projectState: { gitStatus: '', fileTree: [] },
+        debt: [makeDebt({
+          id: 'debt-dryrun-pin',
+          description: 'Re-verified correct — npx vitest run tests/does/not/exist.test.ts was green.',
+        })],
+      } as any;
+      const sprint = await planSprint(root, config, context,
+        { size: 'full', maxWorkers: 4, modelConstraint: null, reason: 'test' } as any,
+        { mode: 'structured', dryRun: true });
+      const fixTask = sprint.tasks.find(t => t.isPriorityFix);
+      expect(fixTask).toBeDefined();
+      expect(fixTask!.description).toContain('RE-POINT');
+      expect(fixTask!.description).toContain('tests/does/not/exist.test.ts');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 // ─── defaultCommandRunner (real async spawn, hermetic) ──────────────
 
 describe('defaultCommandRunner()', () => {

@@ -296,8 +296,14 @@ export async function planSprint(
   // Fail-open by design: any red/timeout/error keeps the debt dispatched, with
   // the pre-flight outcome appended to the fix task so the worker starts from
   // fresh signal instead of the stale note dump.
+  // NOT (sprint-450 canlı-dersi): dryRun'a BAKMA. generatePlanPreview her zaman
+  // dryRun:true çağırır (yalnız task-DOSYASI yazım-guard'ı) ve run_flow_v2'de
+  // exact-snapshot start bu planı OLDUĞU GİBİ koşturur — dryRun-guard'ı B5'i
+  // tüm do-akışında kapatıyordu. Preflight kapaması kanıt-temelli ve idempotent
+  // (komutlar ŞİMDİ yeşilse debt ağaçta zaten çözülmüş) — önizlemede koşması da
+  // dürüstlüktür: gösterilen plan = başlatılacak plan.
   let debtForInjection = context.debt;
-  if (config.debt_preflight_enabled !== false && !options?.dryRun) {
+  if (config.debt_preflight_enabled !== false) {
     try {
       const preflight = await preflightCriticalDebt(projectRoot, context.debt);
       if (preflight.items.length > 0) {
