@@ -447,6 +447,27 @@ describe('BrainError', () => {
     expect(err.phase).toBeUndefined();
     expect(err instanceof Error).toBe(true);
   });
+
+  it('carries planner proof when planning fails before Sprint persistence', () => {
+    const plannerProof = {
+      version: 1 as const,
+      requestedMode: 'ai' as const,
+      actualMode: 'failed' as const,
+      resolutionReason: 'model-failure' as const,
+      directiveOverrideKinds: [],
+      call: {
+        attempted: true,
+        succeeded: false,
+        requestedProvider: 'claude' as const,
+        resolvedProvider: 'claude' as const,
+        requestedModel: 'opus' as const,
+        resolvedModel: 'opus' as const,
+        failureReason: 'spawn_failed',
+      },
+    };
+    const err = new BrainError('planner failed', SprintPhase.PLAN, plannerProof);
+    expect(err.plannerProof).toBe(plannerProof);
+  });
 });
 
 describe('isStaleTaskFile', () => {

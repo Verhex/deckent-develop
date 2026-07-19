@@ -1782,6 +1782,22 @@ export async function runEvaluatePhase(
         ) {
           try {
             const xvResult = await runCrossVerify(projectRoot, task, result, evaluation, resolvedConfig);
+            if (xvResult.outcome === 'unavailable') {
+              try {
+                const sidXv = getCurrentSprintId(projectRoot) ?? sprint.id;
+                writeEvent(
+                  projectRoot, sidXv, 'brain', 'auditor',
+                  'BRAIN→AUDITOR:CROSS_VERIFY_UNAVAILABLE',
+                  {
+                    taskId: task.id,
+                    reason: xvResult.skippedReason,
+                    evidencePersisted: xvResult.evidencePersisted ?? false,
+                    evaluation: toAuditDecision(evaluation),
+                    timestamp: new Date().toISOString(),
+                  },
+                );
+              } catch (e) { debugLog('runEvaluatePhase:crossVerify-unavailable-event', e); }
+            }
             if (xvResult.ran && xvResult.refuted) {
               try {
                 const sidXv = getCurrentSprintId(projectRoot) ?? sprint.id;
@@ -1793,6 +1809,8 @@ export async function runEvaluatePhase(
                   {
                     taskId: task.id,
                     verifier: xvResult.advisory?.verifier,
+                    verifierModel: xvResult.advisory?.verifierModel,
+                    evidencePersisted: xvResult.evidencePersisted ?? false,
                     reason: xvResult.advisory?.reason,
                     evaluation: toAuditDecision(evaluation),
                     enforced: xvResult.blocked,

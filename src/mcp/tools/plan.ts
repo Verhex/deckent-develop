@@ -5,7 +5,7 @@ import { readContext } from '../../orchestra/brain.js';
 import { generatePlanPreview } from '../../orchestra/plan-preview-service.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import { debugLog } from '../../core/utils.js';
-import type { BrainPlanningMode, SprintSizeRecommendation } from '../../core/types.js';
+import type { BrainPlanningMode, PlannerProof, SprintSizeRecommendation } from '../../core/types.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatPlanResponse, wrapResponse } from '../helpers/format.js';
 
@@ -115,6 +115,7 @@ export function registerPlanTool(server: McpServer): void {
         },
         reasoning: sprint.reasoning,
         planningMode: sprint.planningMode,
+        plannerProof: sprint.plannerProof,
         waveBreakdown,
         modelDistribution,
         riskAssessment,
@@ -141,8 +142,14 @@ export function registerPlanTool(server: McpServer): void {
       };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        const plannerProof = err instanceof Error
+          ? (err as Error & { plannerProof?: PlannerProof }).plannerProof
+          : undefined;
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: `Failed to plan sprint: ${message}` }) }],
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({ error: true, message: `Failed to plan sprint: ${message}`, plannerProof }),
+          }],
           isError: true,
         };
       }

@@ -68,6 +68,10 @@ const MESSAGES: MessageMap = {
     en: 'Planning mode: {mode}',
     tr: 'Planlama modu: {mode}',
   },
+  'planning.proof': {
+    en: 'Planner proof: requested={requested} · actual={actual} · model-call={call} · reason={reason}',
+    tr: 'Planner kanıtı: istenen={requested} · gerçekleşen={actual} · model-çağrısı={call} · neden={reason}',
+  },
   'start.workers_info': {
     en: 'Workers: {count} | Brain model: {model}',
     tr: 'Worker sayısı: {count} | Brain modeli: {model}',
@@ -3223,6 +3227,10 @@ const MESSAGES: MessageMap = {
     en: 'OK — usage is within safe limits.',
     tr: 'OK — kullanım güvenli sınırlar içinde.',
   },
+  'limits.verdict_unknown': {
+    en: 'UNKNOWN — live limit evidence is unavailable.',
+    tr: 'BİLİNMİYOR — canlı limit kanıtına ulaşılamıyor.',
+  },
   'limits.verdict_warn': {
     en: 'WARNING — {window} usage at {pct}% is approaching the limit.',
     tr: 'UYARI — {window} kullanımı %{pct} ile limite yaklaşıyor.',
@@ -3250,6 +3258,10 @@ const MESSAGES: MessageMap = {
   'limits.start_gate_warn': {
     en: '[limit-gate] Warning: {window} usage at {pct}% — proceeding.',
     tr: '[limit-gate] Uyarı: {window} kullanımı %{pct} — devam ediliyor.',
+  },
+  'limits.start_gate_unknown': {
+    en: '[limit-gate] Limit state is unknown — advisory policy is proceeding without a live signal.',
+    tr: '[limit-gate] Limit durumu bilinmiyor — advisory policy canlı sinyal olmadan devam ediyor.',
   },
 
   // ─── openrouter-probe command (OPENROUTER-LIVE-PREP, Sprint 365 Task 365-004) ─

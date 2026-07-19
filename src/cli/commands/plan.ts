@@ -10,7 +10,7 @@ import {
 import { collectOverrideWarnings } from '../../orchestra/sprint-planner.js';
 import { generatePlanPreview } from '../../orchestra/plan-preview-service.js';
 import type { SprintSizeRecommendation } from '../../core/types.js';
-import type { BrainPlanningMode } from '../../core/types.js';
+import type { BrainPlanningMode, PlannerProof } from '../../core/types.js';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { promptConfirm } from '../helpers/prompt.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -100,10 +100,11 @@ export function registerPlan(program: Command): void {
       forcePromptGate?: boolean;
     }) => {
       const root = resolveProjectRoot();
+      let lang = 'en';
 
       try {
         const config = await loadConfig(root);
-        const lang = config.language ?? 'en';
+        lang = config.language ?? 'en';
 
         // PLAN-W1 Bug 2: --yes is the non-interactive auto-approve switch. It must
         // never block on a prompt — treat it like --no-confirm for the interactive
@@ -255,6 +256,16 @@ export function registerPlan(program: Command): void {
         if (sprint.planningMode) {
           print(getMessage('plan.planning_mode', lang, { mode: sprint.planningMode }));
         }
+        if (sprint.plannerProof) {
+          print(getMessage('planning.proof', lang, {
+            requested: sprint.plannerProof.requestedMode,
+            actual: sprint.plannerProof.actualMode,
+            call: sprint.plannerProof.call.attempted
+              ? (sprint.plannerProof.call.succeeded ? 'succeeded' : 'failed')
+              : 'not-attempted',
+            reason: sprint.plannerProof.resolutionReason,
+          }));
+        }
 
         if (recommendation.size !== 'full') {
           print(getMessage('plan.note_sprint_size', lang, {
@@ -286,6 +297,19 @@ export function registerPlan(program: Command): void {
         }
       } catch (error) {
         printError(error);
+        const plannerProof = error instanceof Error
+          ? (error as Error & { plannerProof?: PlannerProof }).plannerProof
+          : undefined;
+        if (plannerProof) {
+          print(getMessage('planning.proof', lang, {
+            requested: plannerProof.requestedMode,
+            actual: plannerProof.actualMode,
+            call: plannerProof.call.attempted
+              ? (plannerProof.call.succeeded ? 'succeeded' : 'failed')
+              : 'not-attempted',
+            reason: plannerProof.resolutionReason,
+          }));
+        }
         process.exitCode = 1;
       }
     });

@@ -93,7 +93,9 @@ function writeResultFile(taskId: string, result: TaskResult): void {
   );
 }
 
-function readResultFile(taskId: string): TaskResult & { crossVerify?: { verifier: string; verdict: string; reason: string } } {
+function readResultFile(taskId: string): TaskResult & {
+  crossVerify?: { outcome: string; verifier?: string; verifierModel?: string; verdict?: string; reason: string };
+} {
   return JSON.parse(
     readFileSync(join(root, TASKS_DIR, `task-${taskId}.result`), 'utf-8'),
   );
@@ -122,6 +124,7 @@ describe('runCrossVerify — config gate', () => {
       { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
     );
     expect(res.ran).toBe(false);
+    expect(res.outcome).toBe('disabled');
     expect(res.skippedReason).toBe('disabled');
     expect(res.refuted).toBe(false);
     expect(calls.length).toBe(0);
@@ -135,6 +138,7 @@ describe('runCrossVerify — config gate', () => {
       { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
     );
     expect(res.ran).toBe(false);
+    expect(res.outcome).toBe('disabled');
     expect(res.skippedReason).toBe('disabled');
     expect(calls.length).toBe(0);
   });
@@ -149,6 +153,7 @@ describe('runCrossVerify — evaluation gate', () => {
       { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
     );
     expect(res.ran).toBe(false);
+    expect(res.outcome).toBe('not-applicable');
     expect(res.skippedReason).toBe('not-passing');
     expect(calls.length).toBe(0);
   });
@@ -164,6 +169,7 @@ describe('runCrossVerify — dispatch + advisory write', () => {
       { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
     );
     expect(res.ran).toBe(true);
+    expect(res.outcome).toBe('confirmed');
     expect(res.refuted).toBe(false);
     expect(res.advisory?.verdict).toBe('confirmed');
     expect(res.advisory?.verifier).toBe('codex'); // different from claude task provider
@@ -171,10 +177,12 @@ describe('runCrossVerify — dispatch + advisory write', () => {
     expect(calls.length).toBe(1);
     expect(calls[0]!.prompt).toMatch(/REFUTE/i);
     expect(calls[0]!.verifierProvider).toBe('codex');
+    expect(calls[0]!.verifierModel).toBe('gpt-4.1');
     // advisory persisted to .result, original fields preserved
     const persisted = readResultFile('276-001');
     expect(persisted.crossVerify?.verdict).toBe('confirmed');
     expect(persisted.crossVerify?.verifier).toBe('codex');
+    expect(persisted.crossVerify?.verifierModel).toBe('gpt-4.1');
     expect(persisted.selfAssessment).toBe('DONE');
   });
 
@@ -187,6 +195,7 @@ describe('runCrossVerify — dispatch + advisory write', () => {
       { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
     );
     expect(res.ran).toBe(true);
+    expect(res.outcome).toBe('refuted');
     expect(res.refuted).toBe(true);
     // Default (enforce_refuted unset) → advisory-only: blocked is false (323-004).
     expect(res.blocked).toBe(false);
@@ -207,6 +216,7 @@ describe('runCrossVerify — dispatch + advisory write', () => {
       { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
     );
     expect(res.ran).toBe(true);
+    expect(res.outcome).toBe('unclear');
     expect(res.refuted).toBe(false);
     expect(res.advisory?.verdict).toBe('unclear');
   });
@@ -259,6 +269,7 @@ describe('runCrossVerify — REFUTED enforcement (323-004 / A18)', () => {
 
 describe('runCrossVerify — honest-skip paths', () => {
   it('single provider (no different provider) → honest-skip, spawn never called', async () => {
+    writeResultFile('276-001', makeResult());
     const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED ok');
     const res = await runCrossVerify(
       root, makeTask(), makeResult(), TaskEvaluation.DONE,
@@ -266,8 +277,14 @@ describe('runCrossVerify — honest-skip paths', () => {
       { availableProviders: ['claude'], spawnVerifier: fn }, // only the task's own provider
     );
     expect(res.ran).toBe(false);
+    expect(res.outcome).toBe('unavailable');
     expect(res.skippedReason).toMatch(/no second provider/i);
+    expect(res.evidencePersisted).toBe(true);
     expect(calls.length).toBe(0);
+    expect(readResultFile('276-001').crossVerify).toEqual({
+      outcome: 'unavailable',
+      reason: 'no second provider available; honest-skip',
+    });
   });
 
   it('low-stakes task with high_stakes_only=true (default) → skip, spawn never called', async () => {
@@ -278,6 +295,7 @@ describe('runCrossVerify — honest-skip paths', () => {
       { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
     );
     expect(res.ran).toBe(false);
+    expect(res.outcome).toBe('not-applicable');
     expect(res.skippedReason).toMatch(/not high-stakes/i);
     expect(calls.length).toBe(0);
   });
@@ -297,7 +315,7 @@ describe('runCrossVerify — honest-skip paths', () => {
 });
 
 describe('runCrossVerify — fail-safe + verifier selection', () => {
-  it('spawn throws → does NOT throw, skip "spawn-error", .result left intact', async () => {
+  it('spawn throws → does NOT throw, records explicit unavailable evidence', async () => {
     writeResultFile('276-001', makeResult());
     const fn: SpawnVerifierFn = vi.fn(async () => { throw new Error('verifier boom'); });
     const res = await runCrossVerify(
@@ -306,12 +324,30 @@ describe('runCrossVerify — fail-safe + verifier selection', () => {
       { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
     );
     expect(res.ran).toBe(false);
+    expect(res.outcome).toBe('unavailable');
     expect(res.skippedReason).toBe('spawn-error');
+    expect(res.evidencePersisted).toBe(true);
     expect(res.refuted).toBe(false);
-    // .result must not have been corrupted or annotated.
+    // Original result remains intact and the non-result is durable/auditable.
     const persisted = readResultFile('276-001');
-    expect(persisted.crossVerify).toBeUndefined();
+    expect(persisted.crossVerify).toEqual({
+      outcome: 'unavailable',
+      verifier: 'codex',
+      verifierModel: 'gpt-4.1',
+      reason: 'spawn-error',
+    });
     expect(persisted.selfAssessment).toBe('DONE');
+  });
+
+  it('reports evidencePersisted=false when the canonical result is missing', async () => {
+    const fn: SpawnVerifierFn = vi.fn(async () => { throw new Error('verifier boom'); });
+    const res = await runCrossVerify(
+      root, makeTask(), makeResult(), TaskEvaluation.DONE,
+      makeConfig({ enabled: true }),
+      { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
+    );
+    expect(res.outcome).toBe('unavailable');
+    expect(res.evidencePersisted).toBe(false);
   });
 
   it('verifier_priority config is respected when several providers qualify', async () => {
@@ -324,5 +360,25 @@ describe('runCrossVerify — fail-safe + verifier selection', () => {
     expect(res.ran).toBe(true);
     expect(res.advisory?.verifier).toBe('gemini'); // first in priority among available ≠ claude
     expect(calls[0]!.verifierProvider).toBe('gemini');
+    expect(calls[0]!.verifierModel).toBe('gemini-2.5-flash');
+  });
+
+  it('rejects an explicit verifier model owned by a different provider before spawn', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED should not run');
+    const res = await runCrossVerify(
+      root, makeTask(), makeResult(), TaskEvaluation.DONE,
+      makeConfig({ enabled: true }),
+      { availableProviders: TWO_PROVIDERS, spawnVerifier: fn, verifierModel: 'opus' },
+    );
+
+    expect(res.outcome).toBe('unavailable');
+    expect(res.skippedReason).toMatch(/belongs to claude, not codex/);
+    expect(calls).toHaveLength(0);
+    expect(readResultFile('276-001').crossVerify).toMatchObject({
+      outcome: 'unavailable',
+      verifier: 'codex',
+      reason: expect.stringContaining('model-resolution-error'),
+    });
   });
 });

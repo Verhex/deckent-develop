@@ -499,7 +499,14 @@ export function registerStartTool(server: McpServer): void {
           ? `Run failed at phase ${error.phase ?? 'unknown'}: ${error.message}`
           : error instanceof Error ? error.message : String(error);
 
-        const errData = { error: true, success: false, message };
+        const errData = {
+          error: true,
+          success: false,
+          message,
+          ...(error instanceof BrainError && error.plannerProof
+            ? { plannerProof: error.plannerProof }
+            : {}),
+        };
         const errSummary = formatErrorResponse({ message });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(errData, errSummary)) }],

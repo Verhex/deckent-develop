@@ -487,6 +487,24 @@ export interface BrainAnswer {
 }
 
 // ─── TaskResult ──────────────────────────────────────────────────────
+export type CrossVerifyVerdict = 'confirmed' | 'refuted' | 'unclear';
+
+/** Durable cross-provider verification evidence appended by the orchestrator. */
+export type CrossVerifyEvidence =
+  | {
+      outcome: CrossVerifyVerdict;
+      verifier: ProviderName;
+      verifierModel: string;
+      verdict: CrossVerifyVerdict;
+      reason: string;
+    }
+  | {
+      outcome: 'unavailable';
+      verifier?: ProviderName;
+      verifierModel?: string;
+      reason: string;
+    };
+
 export interface TaskResult {
   /** born-610: set by cascadeSkipDeadBlocked — this task was NEVER dispatched;
    *  its NO_GO is a synthetic skip (dead upstream), not a worker failure.
@@ -533,6 +551,8 @@ export interface TaskResult {
   };
   /** Brain's final evaluation decision for this task */
   evaluationDecision?: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
+  /** Cross-provider verification truth; absent means not requested or legacy result. */
+  crossVerify?: CrossVerifyEvidence;
 }
 
 // ─── TaskPlan ────────────────────────────────────────────────────────

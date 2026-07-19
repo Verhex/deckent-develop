@@ -23,7 +23,7 @@ import type {
   ResolvedConfig,
   BrainContext, SprintSizeRecommendation,
   BrainPlanningMode, PlannerResult, ProviderName,
-  ModelType, TaskEffort,
+  ModelType, TaskEffort, PlannerProof, PlannerProofResolutionReason,
 } from '../core/types.js';
 
 import {
@@ -260,7 +260,15 @@ export async function planSprint(
   // top-level `config.brain_planning` overrides the mode preset — reading
   // `config.activeModeConfig.brain_planning` directly here would silently
   // ignore the top-level user override (the original bug).
-  let planMode = options?.mode ?? resolveBrainPlanningMode(config);
+  const requestedPlanMode = options?.mode ?? resolveBrainPlanningMode(config);
+  let planMode = requestedPlanMode;
+  let plannerResolutionReason: PlannerProofResolutionReason =
+    requestedPlanMode === 'structured' ? 'requested-structured' : 'model-success';
+  let plannerCallAttempted = false;
+  let plannerCallSucceeded = false;
+  let plannerResolvedProvider: ProviderName | null = null;
+  let plannerResolvedModel: ModelType | null = null;
+  let plannerFailureReason: string | null = null;
   const initialStatus = options?.asDraft ? TaskStatus.DRAFT : TaskStatus.PENDING;
 
   // Sprint 238 İŞ1 (+ 429-007 PLNR2): Per-task `- Provider:`/`- Model:`/`- Agent:`/
@@ -272,6 +280,30 @@ export async function planSprint(
   // `[]` for an explicit "Skills: none" — still truthy in JS, so no `!== undefined`
   // check is needed here.
   const parsedDirectives = parseStructuredDirectives(context.directives);
+  const directiveOverrideKinds = Array.from(new Set(parsedDirectives.flatMap((task) => {
+    const kinds: Array<'provider' | 'model' | 'agent' | 'skills'> = [];
+    if (task.provider) kinds.push('provider');
+    if (task.forceModel) kinds.push('model');
+    if (task.forceAgent) kinds.push('agent');
+    if (task.forceSkills) kinds.push('skills');
+    return kinds;
+  })));
+  const buildPlannerProof = (actualMode: PlannerProof['actualMode']): PlannerProof => ({
+    version: 1,
+    requestedMode: requestedPlanMode,
+    actualMode,
+    resolutionReason: plannerResolutionReason,
+    directiveOverrideKinds,
+    call: {
+      attempted: plannerCallAttempted,
+      succeeded: plannerCallSucceeded,
+      requestedProvider: config.brain_provider ?? null,
+      resolvedProvider: plannerResolvedProvider,
+      requestedModel: config.activeModeConfig.brain_model ?? null,
+      resolvedModel: plannerResolvedModel,
+      failureReason: plannerFailureReason,
+    },
+  });
   if (planMode !== 'structured' && parsedDirectives.some(t => t.provider || t.forceModel || t.forceAgent || t.forceSkills)) {
     if (planMode === 'ai') {
       void notify(
@@ -281,12 +313,13 @@ export async function planSprint(
       );
     }
     planMode = 'structured';
+    plannerResolutionReason = 'directive-routing-override';
   }
 
   const tasks: Task[] = [];
   let seq = 1;
   let plannerResult: PlannerResult | null = null;
-  let usedMode: string = 'structured';
+  let usedMode: PlannerProof['actualMode'] = 'structured';
 
   // Dogfood-449 B5: pre-flight revalidation of CRITICAL debt BEFORE dispatch.
   // A debt note that asserts completion and whose own evidence commands re-run
@@ -370,6 +403,8 @@ export async function planSprint(
       undefined, config.activeModeConfig.brain_model,
       undefined, brainProviderName,
     );
+    plannerResolvedProvider = brainProviderName ?? null;
+    plannerResolvedModel = brainModel;
 
     // Fetch worst agent+skill combinations from OutcomeTracker to inject into planner prompt
     let worstCombinations: string | undefined;
@@ -391,6 +426,7 @@ export async function planSprint(
     );
 
     const plannerCallFn = resolveCallBrainPlanner();
+    plannerCallAttempted = true;
     const callResult: PlannerCallResult = await plannerCallFn(
       context,
       recommendation,
@@ -402,6 +438,7 @@ export async function planSprint(
     );
 
     if (callResult.ok) {
+      plannerCallSucceeded = true;
       plannerResult = callResult.data;
       const directiveTaskCount = parsedDirectives.length;
       if (planMode === 'auto' && directiveTaskCount > 0 && plannerResult.tasks.length < directiveTaskCount) {
@@ -412,6 +449,7 @@ export async function planSprint(
         );
         plannerResult = null;
         usedMode = 'fallback';
+        plannerResolutionReason = 'task-count-low-fallback';
       } else if (planMode === 'auto' && directiveTaskCount > 0 && plannerResult.tasks.length > directiveTaskCount * 2) {
         void notify(
           'progress', sprintId,
@@ -420,8 +458,10 @@ export async function planSprint(
         );
         plannerResult = null;
         usedMode = 'fallback';
+        plannerResolutionReason = 'task-count-high-fallback';
       } else {
         usedMode = 'ai';
+        plannerResolutionReason = 'model-success';
         for (const pt of plannerResult.tasks) {
           tasks.push(createTask(
             plannerTaskToParams(pt, sprintId, defaultModel, initialStatus),
@@ -430,6 +470,8 @@ export async function planSprint(
         }
       }
     } else if (planMode === 'ai') {
+      plannerFailureReason = callResult.reason;
+      plannerResolutionReason = 'model-failure';
       // Strict ai-mode: surface the actual failure reason + message so the user
       // sees *why* (spawn_failed / timeout / parse_failed / no_providers / …)
       // instead of a generic "failed" message. structured moda düşülmedi (mode=ai).
@@ -437,8 +479,10 @@ export async function planSprint(
         `AI planner failed (provider=${brainProviderName ?? 'unknown'}, reason=${callResult.reason}). ` +
         `${callResult.message} structured moda düşülmedi (mode=ai).`,
         SprintPhase.PLAN,
+        buildPlannerProof('failed'),
       );
     } else {
+      plannerFailureReason = callResult.reason;
       // auto mode + AI failure: surface via notify so operator/MCP/AI can see it.
       void notify(
         'phase-change', sprintId,
@@ -446,6 +490,7 @@ export async function planSprint(
         `AI planner failed (provider=${brainProviderName ?? 'unknown'}, reason=${callResult.reason}): ${callResult.message} — falling back to structured mode.`,
       );
       usedMode = 'fallback';
+      plannerResolutionReason = 'model-failure-fallback';
     }
   }
 
@@ -883,6 +928,8 @@ export async function planSprint(
     }
   }
 
+  const plannerProof = buildPlannerProof(usedMode);
+
   return {
     id: sprintId,
     number: parseInt(sprintId.replace('sprint-', ''), 10),
@@ -892,6 +939,7 @@ export async function planSprint(
     workers: tasks.map(t => `w-${t.id}`),
     reasoning: plannerResult?.reasoning,
     planningMode: usedMode,
+    plannerProof,
     promptGate,
   };
 }

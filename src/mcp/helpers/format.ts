@@ -2,6 +2,8 @@
 // Each formatter produces a concise, readable summary string from raw response data.
 // MCP tool responses include both `data` (JSON) and `summary` (human-readable).
 
+import type { PlannerProof } from '../../core/sprint-types.js';
+
 export interface StatusData {
   sprint?: { id?: string; phase?: string; startedAt?: string };
   progress?: { done?: number; active?: number; total?: number; blocked?: number };
@@ -19,6 +21,7 @@ export interface PlanData {
   recommendation?: { size?: string; maxWorkers?: number; reason?: string };
   riskAssessment?: string;
   planningMode?: string;
+  plannerProof?: PlannerProof;
   waveBreakdown?: Record<string, number>;
 }
 

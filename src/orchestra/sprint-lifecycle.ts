@@ -20,7 +20,7 @@ import {
 
 // ─── Core (type imports) ───────────────────────────────────────────
 import type {
-  Sprint, Task,
+  Sprint, Task, PlannerProof,
 } from '../core/types.js';
 
 import {
@@ -71,10 +71,13 @@ import { clearHooks } from '../core/plugin-hooks.js';
 
 export class BrainError extends Error {
   public readonly phase?: SprintPhase;
-  constructor(message: string, phase?: SprintPhase) {
+  /** Optional machine-readable proof for failures before a Sprint can be persisted. */
+  public readonly plannerProof?: PlannerProof;
+  constructor(message: string, phase?: SprintPhase, plannerProof?: PlannerProof) {
     super(message);
     this.name = 'BrainError';
     this.phase = phase;
+    this.plannerProof = plannerProof;
   }
 }
 

@@ -1,7 +1,7 @@
 // ─── Sprint Domain Types ────────────────────────────────────────────────────
 // Split from types.ts — Sprint lifecycle, metrics, debt, memory, and brain context
 
-import type { Task, TaskEvaluation, ModelType } from './task-types.js';
+import type { Task, TaskEvaluation, ModelType, ProviderName } from './task-types.js';
 import type { PromptGateResult } from './prompt-gate-types.js';
 
 // ─── Sprint System ──────────────────────────────────────────────────
@@ -29,6 +29,33 @@ export enum SprintStatus {
   ABORTED = 'ABORTED',
 }
 
+export type PlannerProofResolutionReason =
+  | 'requested-structured'
+  | 'directive-routing-override'
+  | 'model-success'
+  | 'model-failure'
+  | 'model-failure-fallback'
+  | 'task-count-low-fallback'
+  | 'task-count-high-fallback';
+
+/** Immutable evidence of the planner path that produced a sprint. */
+export interface PlannerProof {
+  readonly version: 1;
+  readonly requestedMode: 'ai' | 'structured' | 'auto';
+  readonly actualMode: 'ai' | 'structured' | 'fallback' | 'failed';
+  readonly resolutionReason: PlannerProofResolutionReason;
+  readonly directiveOverrideKinds: readonly ('provider' | 'model' | 'agent' | 'skills')[];
+  readonly call: {
+    readonly attempted: boolean;
+    readonly succeeded: boolean;
+    readonly requestedProvider: ProviderName | null;
+    readonly resolvedProvider: ProviderName | null;
+    readonly requestedModel: ModelType | null;
+    readonly resolvedModel: ModelType | null;
+    readonly failureReason: string | null;
+  };
+}
+
 export interface Sprint {
   id: string;
   number: number;
@@ -41,6 +68,8 @@ export interface Sprint {
   completedAt?: string;
   reasoning?: string;
   planningMode?: string;
+  /** Requested-vs-actual planner provenance; persisted with sprint state/checkpoints. */
+  plannerProof?: PlannerProof;
   /** True if a rollback was triggered during this sprint (all tasks NO_GO) */
   rolledBack?: boolean;
   /** Human-readable rollback result message */

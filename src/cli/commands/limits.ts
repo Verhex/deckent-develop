@@ -6,7 +6,7 @@
 //
 // (b) Start-gate logic (`checkStartLimitGate`) — evaluates the same probe
 // against config-driven `limit_gate.{enabled,session_max_pct,weekly_max_pct}`
-// thresholds and returns a block/warn/ok verdict with a `--force-limits`
+// thresholds and returns a block/warn/ok/unknown verdict with a `--force-limits`
 // bypass path. NOT YET WIRED into `deckent start`: src/cli/commands/start.ts
 // and src/core/config.ts/config-types.ts (needed to thread `limit_gate`
 // through loadConfig/mergeConfigs onto ResolvedConfig — see the
@@ -92,7 +92,12 @@ export interface WindowedLimitGateResult {
   readonly reason: string;
 }
 
-const VERDICT_RANK: Readonly<Record<LimitGateVerdict, number>> = { ok: 0, warn: 1, block: 2 };
+const VERDICT_RANK: Readonly<Record<LimitGateVerdict, number>> = {
+  unknown: -1,
+  ok: 0,
+  warn: 1,
+  block: 2,
+};
 
 function verdictForPct(pct: number, thresholds: LimitGateThresholds): LimitGateVerdict {
   if (pct >= thresholds.blockPct) return 'block';
@@ -120,10 +125,10 @@ export function resolveLimitGateThresholds(
 
 /**
  * Evaluate a probe against per-window (session vs weekly) config thresholds.
- * Fails OPEN ('ok') when the probe is unavailable, mirroring
- * core/limit-preflight.ts#evaluateLimitGate — a CLI text-format drift must
- * never block a sprint. The worst verdict across session/week(all models)/
- * week(Fable, if present) wins.
+ * Returns 'unknown' when the probe is unavailable, mirroring
+ * core/limit-preflight.ts#evaluateLimitGate. Enforcement remains a caller
+ * policy decision, but missing evidence is never represented as 'ok'. The
+ * worst verdict across session/week(all models)/week(Fable, if present) wins.
  */
 export function evaluateWindowedLimitGate(
   probe: SubscriptionLimitResult,
@@ -131,11 +136,11 @@ export function evaluateWindowedLimitGate(
 ): WindowedLimitGateResult {
   if (probe.unavailable) {
     return {
-      verdict: 'ok',
+      verdict: 'unknown',
       window: null,
       pct: null,
       resetAt: null,
-      reason: `limit probe unavailable (${probe.reason}) — proceeding without a limit signal`,
+      reason: `limit probe unavailable (${probe.reason}) — limit state is unknown`,
     };
   }
 
@@ -255,6 +260,15 @@ export async function checkStartLimitGate(
     return { blocked: false, bypassed: false, verdict: 'warn', message };
   }
 
+  if (result.verdict === 'unknown') {
+    return {
+      blocked: false,
+      bypassed: false,
+      verdict: 'unknown',
+      message: getMessage('limits.start_gate_unknown', lang),
+    };
+  }
+
   return { blocked: false, bypassed: false, verdict: 'ok', message: null };
 }
 
@@ -300,6 +314,8 @@ export async function runLimitsCommand(
 
   if (probe.unavailable) {
     print(getMessage('limits.unavailable', lang, { reason: probe.reason }));
+    print(getMessage('limits.verdict_unknown', lang));
+    print(gateConfig.enabled ? getMessage('limits.gate_enabled', lang) : getMessage('limits.gate_disabled', lang));
     return;
   }
 

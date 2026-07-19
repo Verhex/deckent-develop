@@ -25,16 +25,19 @@
 // and tests (which inject `spawnVerifier`) never load them.
 
 import { join } from 'node:path';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 
 import { TaskEvaluation } from '../core/types.js';
-import type { Task, TaskResult, ProviderName } from '../core/types.js';
+import type { Task, TaskResult, ProviderName, CrossVerifyEvidence } from '../core/types.js';
 import type { ResolvedConfig } from '../core/types.js';
 import { TASKS_DIR } from '../core/constants.js';
+import { DeckentError } from '../core/errors.js';
 import { debugLog } from '../core/utils.js';
 import { providerRegistry } from '../core/provider.js';
+import { modelRegistry } from '../core/model-registry.js';
 import { decideCrossVerify } from '../core/cross-verify.js';
 import { getDefaultProviderName } from './sprint-utils.js';
+import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
 import {
   buildRefutePrompt,
   parseRefuteVerdict,
@@ -50,14 +53,27 @@ import {
 export interface CrossVerifyAdvisory {
   /** Provider that performed the adversarial verification. */
   verifier: ProviderName;
+  /** Provider-native model that actually performed the verification. */
+  verifierModel: string;
   /** Verdict the verifier reached: refuted | confirmed | unclear. */
   verdict: RefuteVerdict['verdict'];
   /** Reason / evidence text extracted from the verifier's VERDICT line. */
   reason: string;
 }
 
+/** Stable truth state for a cross-verification attempt. */
+export type CrossVerifyOutcome =
+  | 'disabled'
+  | 'not-applicable'
+  | 'unavailable'
+  | 'confirmed'
+  | 'refuted'
+  | 'unclear';
+
 /** Outcome of {@link runCrossVerify}. */
 export interface CrossVerifyRunResult {
+  /** Machine-readable truth state; never infer availability from `ran`. */
+  outcome: CrossVerifyOutcome;
   /** True when a verifier was actually dispatched and produced a verdict. */
   ran: boolean;
   /** When `ran` is false, a short diagnostic explaining why it was skipped. */
@@ -74,6 +90,8 @@ export interface CrossVerifyRunResult {
    * advisory-only (enforce_refuted off, the default) or skipped.
    */
   blocked: boolean;
+  /** Whether the evidence was durably merged into the canonical task result. */
+  evidencePersisted?: boolean;
 }
 
 /** Input passed to a {@link SpawnVerifierFn}. */
@@ -107,7 +125,7 @@ export interface RunCrossVerifyOptions {
   availableProviders?: readonly ProviderName[];
   /** Injectable verifier spawn. Default = {@link defaultSpawnVerifier}. */
   spawnVerifier?: SpawnVerifierFn;
-  /** Verifier model override. Default = the original task's model. */
+  /** Verifier model override. Default = capability-tier equivalent on the target provider. */
   verifierModel?: string;
   /** Verifier timeout budget in ms (short by design). Default 120_000. */
   timeoutMs?: number;
@@ -115,6 +133,24 @@ export interface RunCrossVerifyOptions {
 
 /** Default short timeout for the adversarial verifier (2 minutes). */
 export const CROSS_VERIFY_TIMEOUT_MS = 120_000;
+
+function resolveVerifierModel(
+  taskModel: string,
+  verifierProvider: ProviderName,
+  override?: string,
+): string {
+  if (override) {
+    const definition = modelRegistry.getOrThrow(override);
+    if (definition.provider !== verifierProvider) {
+      throw new DeckentError(
+        'DECKENT_E004',
+        `verifier model ${override} belongs to ${definition.provider}, not ${verifierProvider}`,
+      );
+    }
+    return definition.id;
+  }
+  return modelRegistry.getEquivalent(taskModel, verifierProvider);
+}
 
 // ─── Default real spawn (production path; never exercised by hermetic tests) ──
 
@@ -154,27 +190,29 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
 // ─── Advisory write ────────────────────────────────────────────────────────────
 
 /**
- * Best-effort: merge a `crossVerify` advisory field into the task's `.result` on disk,
+ * Best-effort: merge a `crossVerify` evidence field into the task's `.result` on disk,
  * preserving every existing field (selfAssessment, brainEvaluation, …). No-op + debugLog
  * on any I/O error so a missing/unwritable `.result` never aborts the runner.
  */
-function writeAdvisoryToResult(
+function writeEvidenceToResult(
   projectRoot: string,
   taskId: string,
-  advisory: CrossVerifyAdvisory,
-): void {
+  evidence: CrossVerifyEvidence,
+): boolean {
   try {
     const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
     if (!existsSync(resultPath)) {
-      debugLog('runCrossVerify:writeAdvisory', `no .result for task=${taskId}`);
-      return;
+      debugLog('runCrossVerify:writeEvidence', `no .result for task=${taskId}`);
+      return false;
     }
     const raw = readFileSync(resultPath, 'utf-8');
-    const parsed = JSON.parse(raw) as TaskResult & { crossVerify?: CrossVerifyAdvisory };
-    parsed.crossVerify = advisory;
-    writeFileSync(resultPath, JSON.stringify(parsed, null, 2) + '\n', 'utf-8');
+    const parsed = JSON.parse(raw) as TaskResult;
+    parsed.crossVerify = evidence;
+    atomicWriteFileSync(resultPath, JSON.stringify(parsed, null, 2) + '\n');
+    return true;
   } catch (e) {
-    debugLog('runCrossVerify:writeAdvisory', e);
+    debugLog('runCrossVerify:writeEvidence', e);
+    return false;
   }
 }
 
@@ -203,21 +241,27 @@ export async function runCrossVerify(
   config: ResolvedConfig | undefined,
   opts: RunCrossVerifyOptions = {},
 ): Promise<CrossVerifyRunResult> {
-  const skip = (reason: string): CrossVerifyRunResult => ({
+  const skip = (
+    reason: string,
+    outcome: Extract<CrossVerifyOutcome, 'disabled' | 'not-applicable' | 'unavailable'>,
+    evidencePersisted?: boolean,
+  ): CrossVerifyRunResult => ({
+    outcome,
     ran: false,
     skippedReason: reason,
     refuted: false,
     blocked: false,
+    evidencePersisted,
   });
 
   // Guard 1 — config-gated default-OFF.
   if (config?.cross_verify?.enabled !== true) {
-    return skip('disabled');
+    return skip('disabled', 'disabled');
   }
 
   // Guard 2 — only verify passing tasks.
   if (evaluation !== TaskEvaluation.DONE && evaluation !== TaskEvaluation.GO_WITH_TECH_DEBT) {
-    return skip('not-passing');
+    return skip('not-passing', 'not-applicable');
   }
 
   try {
@@ -238,12 +282,36 @@ export async function runCrossVerify(
     if (!decision.shouldVerify || !decision.verifierProvider) {
       // Honest-skip — log explicitly, never a silent success.
       debugLog('runCrossVerify:skip', `task=${task.id} ${decision.reason}`);
-      return skip(decision.reason);
+      const outcome = decision.reasonCode === 'no-second-provider'
+        ? 'unavailable'
+        : 'not-applicable';
+      if (outcome === 'unavailable') {
+        const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
+          outcome,
+          reason: decision.reason,
+        });
+        return skip(decision.reason, outcome, evidencePersisted);
+      }
+      return skip(decision.reason, outcome);
     }
 
     const verifierProvider = decision.verifierProvider;
     const prompt = buildRefutePrompt(task, result, { verifier: verifierProvider });
     const spawnVerifier = opts.spawnVerifier ?? defaultSpawnVerifier;
+
+    let verifierModel: string;
+    try {
+      verifierModel = resolveVerifierModel(task.model, verifierProvider, opts.verifierModel);
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e);
+      debugLog('runCrossVerify:model-resolution-error', detail);
+      const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
+        outcome: 'unavailable',
+        verifier: verifierProvider,
+        reason: `model-resolution-error: ${detail}`,
+      });
+      return skip(`model-resolution-error: ${detail}`, 'unavailable', evidencePersisted);
+    }
 
     let output: string;
     try {
@@ -252,14 +320,20 @@ export async function runCrossVerify(
         task,
         result,
         verifierProvider,
-        verifierModel: opts.verifierModel ?? task.model,
+        verifierModel,
         prompt,
         timeoutMs: opts.timeoutMs ?? CROSS_VERIFY_TIMEOUT_MS,
       });
     } catch (e) {
-      // Spawn failure must never affect the host evaluation.
+      // Spawn failure must never masquerade as a successful/no-op verification.
       debugLog('runCrossVerify:spawn-error', e);
-      return skip('spawn-error');
+      const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
+        outcome: 'unavailable',
+        verifier: verifierProvider,
+        verifierModel,
+        reason: 'spawn-error',
+      });
+      return skip('spawn-error', 'unavailable', evidencePersisted);
     }
 
     const verdict = parseRefuteVerdict(output);
@@ -270,19 +344,26 @@ export async function runCrossVerify(
     const blocked = refuted && xv.enforce_refuted === true;
     const advisory: CrossVerifyAdvisory = {
       verifier: verifierProvider,
+      verifierModel,
       verdict: verdict.verdict,
       reason: verdict.reason,
     };
-    writeAdvisoryToResult(projectRoot, task.id, advisory);
+    const outcome = verdict.verdict;
+    const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, { ...advisory, outcome });
 
     debugLog(
       'runCrossVerify:done',
       `task=${task.id} verifier=${verifierProvider} verdict=${verdict.verdict} blocked=${blocked}`,
     );
-    return { ran: true, advisory, refuted, blocked };
+    return { outcome, ran: true, advisory, refuted, blocked, evidencePersisted };
   } catch (e) {
     // Defensive: any unexpected fault degrades to a skip — never throws.
-    debugLog('runCrossVerify:fault', e);
-    return skip('error');
+    const detail = e instanceof Error ? e.message : String(e);
+    debugLog('runCrossVerify:fault', detail);
+    const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
+      outcome: 'unavailable',
+      reason: `unexpected-error: ${detail}`,
+    });
+    return skip(`unexpected-error: ${detail}`, 'unavailable', evidencePersisted);
   }
 }

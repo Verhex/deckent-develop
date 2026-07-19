@@ -285,6 +285,18 @@ describe('Sprint 224 / Task 224-001 — AI planner discriminant honest-fallback'
     expect(caught!.message).toMatch(/reason=spawn_failed/);
     expect(caught!.message).toMatch(/CLI not found/);
     expect(caught!.message).toMatch(/structured moda düşülmedi/);
+    expect((caught as BrainError).plannerProof).toMatchObject({
+      version: 1,
+      requestedMode: 'ai',
+      actualMode: 'failed',
+      resolutionReason: 'model-failure',
+      call: {
+        attempted: true,
+        succeeded: false,
+        resolvedProvider: 'claude',
+        failureReason: 'spawn_failed',
+      },
+    });
   });
 
   it('mode=auto + reason=parse_failed → structured fallback succeeds (honest fallback via notify, not console.error)', async () => {
@@ -308,6 +320,17 @@ describe('Sprint 224 / Task 224-001 — AI planner discriminant honest-fallback'
     // (planningMode='fallback' + tasks planned), the channel changed.
     expect(sprint.planningMode).toBe('fallback');
     expect(sprint.tasks.length).toBeGreaterThan(0);
+    expect(sprint.plannerProof).toMatchObject({
+      version: 1,
+      requestedMode: 'auto',
+      actualMode: 'fallback',
+      resolutionReason: 'model-failure-fallback',
+      call: {
+        attempted: true,
+        succeeded: false,
+        failureReason: 'parse_failed',
+      },
+    });
   });
 
   it('mode=ai + reason=no_providers → throws BrainError with reason=no_providers (registry empty)', async () => {
@@ -327,6 +350,12 @@ describe('Sprint 224 / Task 224-001 — AI planner discriminant honest-fallback'
     expect(caught).toBeInstanceOf(BrainError);
     expect(caught!.message).toMatch(/reason=no_providers/);
     expect(caught!.message).toMatch(/Provider registry empty/);
+    expect((caught as BrainError).plannerProof).toMatchObject({
+      requestedMode: 'ai',
+      actualMode: 'failed',
+      resolutionReason: 'model-failure',
+      call: { attempted: true, succeeded: false, failureReason: 'no_providers' },
+    });
   });
 
   it('mode=ai + ok=true (success path) → uses data.tasks, planningMode=ai, no warning emitted', async () => {
@@ -342,6 +371,12 @@ describe('Sprint 224 / Task 224-001 — AI planner discriminant honest-fallback'
     );
 
     expect(sprint.planningMode).toBe('ai');
+    expect(sprint.plannerProof).toMatchObject({
+      requestedMode: 'ai',
+      actualMode: 'ai',
+      resolutionReason: 'model-success',
+      call: { attempted: true, succeeded: true, failureReason: null },
+    });
     expect(sprint.tasks.some((t) => t.title === 'AI Planned Task')).toBe(true);
     const messages = errorSpy.mock.calls.map((c) => String(c[0]));
     expect(messages.find((m) => m.includes('AI planner failed'))).toBeUndefined();

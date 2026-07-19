@@ -279,9 +279,9 @@ describe('evaluateLimitGate', () => {
     expect(result.reason).toContain('session');
   });
 
-  it('fails open (ok) when the probe is unavailable — never blocks on a CLI format drift', () => {
+  it('returns unknown when the probe is unavailable — never fabricates a healthy state', () => {
     const result = evaluateLimitGate({ unavailable: true, reason: 'CLI output changed', raw: '' });
-    expect(result.verdict).toBe('ok');
+    expect(result.verdict).toBe('unknown');
     expect(result.reason).toContain('unavailable');
   });
 
@@ -367,9 +367,9 @@ describe('evaluateLimitGateByWindow', () => {
     expect(result.reason).toContain('week (Fable)');
   });
 
-  it('fails open (ok) when the probe is unavailable', () => {
+  it('returns unknown when the probe is unavailable', () => {
     const result = evaluateLimitGateByWindow({ unavailable: true, reason: 'CLI output changed', raw: '' });
-    expect(result.verdict).toBe('ok');
+    expect(result.verdict).toBe('unknown');
     expect(result.reason).toContain('unavailable');
   });
 

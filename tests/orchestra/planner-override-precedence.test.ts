@@ -281,6 +281,13 @@ describe('Sprint 238 İŞ1 — per-task provider/model override precedence', () 
     expect(t!.model).toBe('qwen3.6:27b');
     // AI-only task must be absent — proves the AI planner output was bypassed.
     expect(sprint.tasks.some((x) => x.title === 'AI Planned Task')).toBe(false);
+    expect(sprint.plannerProof).toMatchObject({
+      requestedMode: 'ai',
+      actualMode: 'structured',
+      resolutionReason: 'directive-routing-override',
+      directiveOverrideKinds: ['provider', 'model'],
+      call: { attempted: false, succeeded: false, failureReason: null },
+    });
   });
 
   it('mode=auto + ollama override → honored exactly', async () => {

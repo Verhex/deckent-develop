@@ -10,8 +10,9 @@
 // Fail-honest by design: the CLI's plain-text format is not a stable
 // contract, so any missing/unparseable required line resolves to
 // `{ unavailable: true, reason }` — never throws. evaluateLimitGate mirrors
-// that: an unavailable probe fails OPEN ('ok') rather than blocking a sprint
-// on a CLI text-format drift.
+// that: an unavailable probe resolves to the explicit 'unknown' verdict. Policy
+// callers may still proceed in advisory mode, but missing evidence is never
+// misrepresented as a healthy ('ok') limit state.
 //
 // `reason` fields below are English diagnostic/log strings, not rendered UI
 // labels — this is a core/ mechanism module, not a CLI/TUI presentation
@@ -56,7 +57,7 @@ export interface SubscriptionLimitUnavailable {
 
 export type SubscriptionLimitResult = SubscriptionLimitProbe | SubscriptionLimitUnavailable;
 
-export type LimitGateVerdict = 'ok' | 'warn' | 'block';
+export type LimitGateVerdict = 'unknown' | 'ok' | 'warn' | 'block';
 
 export interface LimitGateResult {
   readonly verdict: LimitGateVerdict;
@@ -296,8 +297,10 @@ export async function probeSubscriptionLimits(
  * week (all models) / week (Fable, if present) windows — whichever window is
  * closest to its cap is the binding constraint.
  *
- * An unavailable probe fails OPEN ('ok'): this is a preflight advisory, not
- * a hard authority gate, so a CLI text-format drift must not block a sprint.
+ * An unavailable probe returns 'unknown'. This evaluator reports evidence; it
+ * does not choose whether an advisory/enforced policy may proceed without that
+ * evidence. Keeping policy separate prevents a missing signal from becoming a
+ * fabricated 'ok' verdict.
  */
 export function evaluateLimitGate(
   probe: SubscriptionLimitResult,
@@ -305,8 +308,8 @@ export function evaluateLimitGate(
 ): LimitGateResult {
   if (probe.unavailable) {
     return {
-      verdict: 'ok',
-      reason: `limit probe unavailable (${probe.reason}) — proceeding without a limit signal`,
+      verdict: 'unknown',
+      reason: `limit probe unavailable (${probe.reason}) — limit state is unknown`,
     };
   }
 
@@ -399,7 +402,12 @@ export function resolveWindowedLimitGateThresholds(
   };
 }
 
-const WINDOWED_VERDICT_RANK: Readonly<Record<LimitGateVerdict, number>> = { ok: 0, warn: 1, block: 2 };
+const WINDOWED_VERDICT_RANK: Readonly<Record<LimitGateVerdict, number>> = {
+  unknown: -1,
+  ok: 0,
+  warn: 1,
+  block: 2,
+};
 
 function verdictForWindow(pct: number, thresholds: LimitGateThresholds): LimitGateVerdict {
   if (pct >= thresholds.blockPct) return 'block';
@@ -417,7 +425,7 @@ function verdictForWindow(pct: number, thresholds: LimitGateThresholds): LimitGa
  * 72% trips its own tighter warn floor, a case the single-shared-threshold
  * evaluator cannot express.
  *
- * Fails open ('ok') when the probe is unavailable, mirroring
+ * Returns 'unknown' when the probe is unavailable, mirroring
  * `evaluateLimitGate`. Defaults to `resolveWindowedLimitGateThresholds()`
  * (no overrides) — i.e. the pre-362-004 `min(70, block)` behavior — when no
  * thresholds are passed.
@@ -428,8 +436,8 @@ export function evaluateLimitGateByWindow(
 ): LimitGateResult {
   if (probe.unavailable) {
     return {
-      verdict: 'ok',
-      reason: `limit probe unavailable (${probe.reason}) — proceeding without a limit signal`,
+      verdict: 'unknown',
+      reason: `limit probe unavailable (${probe.reason}) — limit state is unknown`,
     };
   }
 

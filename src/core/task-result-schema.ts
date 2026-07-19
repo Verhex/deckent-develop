@@ -20,6 +20,24 @@ export const TASK_RESULT_SCHEMA_VERSION = '1.0';
 
 /** The three worker self-assessment verdicts (shared with legacy SelfAssessment). */
 const selfAssessmentSchema = z.enum(['DONE', 'GO_WITH_TECH_DEBT', 'NO_GO']);
+const crossVerifyVerdictSchema = z.enum(['confirmed', 'refuted', 'unclear']);
+
+/** Downstream orchestrator evidence; additive and absent before cross-verification. */
+export const crossVerifyEvidenceSchema = z.union([
+  z.object({
+    outcome: crossVerifyVerdictSchema,
+    verifier: z.string().min(1),
+    verifierModel: z.string().min(1),
+    verdict: crossVerifyVerdictSchema,
+    reason: z.string(),
+  }),
+  z.object({
+    outcome: z.literal('unavailable'),
+    verifier: z.string().min(1).optional(),
+    verifierModel: z.string().min(1).optional(),
+    reason: z.string(),
+  }),
+]);
 
 /** A single git-derived file change (orchestrator-authoritative, §1.2 work output). */
 const fileChangeSchema = z.object({
@@ -155,6 +173,7 @@ export const taskResultSchema = z.object({
   rubricScores: z.record(z.string(), z.number()).nullable().default(null),
   totalScore: z.number().nullable().default(null),
   honestGate: honestGateSchema.default({ flagged: false, violation: null }),
+  crossVerify: crossVerifyEvidenceSchema.optional(),
 
   // comms (optional)
   handoffNotes: z.string().nullable().default(null),

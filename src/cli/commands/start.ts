@@ -269,10 +269,11 @@ export function registerStart(program: Command): void {
 
       // ─── Sandbox State ───────────────────────────────────────────
       let sandboxState: SandboxState | null = null;
+      let lang = 'en';
 
       try {
         const config = await loadConfig(root);
-        const lang = config.language;
+        lang = config.language;
 
         // ─── TERM-FLOW-UNIFY Sprint-4 (426-001): approved-snapshot-consuming
         // start ────────────────────────────────────────────────────────────
@@ -578,6 +579,16 @@ export function registerStart(program: Command): void {
           if (sprint.planningMode) {
             print(getMessage('start.planning_mode', lang, { mode: sprint.planningMode }));
           }
+          if (sprint.plannerProof) {
+            print(getMessage('planning.proof', lang, {
+              requested: sprint.plannerProof.requestedMode,
+              actual: sprint.plannerProof.actualMode,
+              call: sprint.plannerProof.call.attempted
+                ? (sprint.plannerProof.call.succeeded ? 'succeeded' : 'failed')
+                : 'not-attempted',
+              reason: sprint.plannerProof.resolutionReason,
+            }));
+          }
           print(getMessage('start.workers_info', lang, {
             count: String(sprint.tasks.length),
             model: config.activeModeConfig.brain_model,
@@ -744,6 +755,16 @@ export function registerStart(program: Command): void {
       } catch (error) {
         if (error instanceof BrainError) {
           printError(new Error(`Sprint failed at phase ${error.phase ?? 'unknown'}: ${error.message}`));
+          if (error.plannerProof) {
+            print(getMessage('planning.proof', lang, {
+              requested: error.plannerProof.requestedMode,
+              actual: error.plannerProof.actualMode,
+              call: error.plannerProof.call.attempted
+                ? (error.plannerProof.call.succeeded ? 'succeeded' : 'failed')
+                : 'not-attempted',
+              reason: error.plannerProof.resolutionReason,
+            }));
+          }
         } else {
           printError(error);
         }

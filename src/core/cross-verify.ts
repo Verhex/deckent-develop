@@ -143,6 +143,8 @@ export interface CrossVerifyDecision {
   verifierProvider?: ProviderName;
   /** Human-readable diagnostic explaining the decision. */
   reason: string;
+  /** Stable machine-readable reason; callers must not classify by parsing `reason`. */
+  reasonCode: 'selected' | 'not-high-stakes' | 'no-second-provider';
 }
 
 /** Inputs to {@link decideCrossVerify}. */
@@ -175,7 +177,11 @@ export function decideCrossVerify(input: CrossVerifyDecisionInput): CrossVerifyD
   const highStakes = isHighStakesTask(input.task);
 
   if (highStakesOnly && !highStakes) {
-    return { shouldVerify: false, reason: 'task is not high-stakes; cross-verify skipped' };
+    return {
+      shouldVerify: false,
+      reason: 'task is not high-stakes; cross-verify skipped',
+      reasonCode: 'not-high-stakes',
+    };
   }
 
   const verifierProvider = selectVerifierProvider(
@@ -185,12 +191,17 @@ export function decideCrossVerify(input: CrossVerifyDecisionInput): CrossVerifyD
   );
 
   if (verifierProvider === null) {
-    return { shouldVerify: false, reason: 'no second provider available; honest-skip' };
+    return {
+      shouldVerify: false,
+      reason: 'no second provider available; honest-skip',
+      reasonCode: 'no-second-provider',
+    };
   }
 
   return {
     shouldVerify: true,
     verifierProvider,
+    reasonCode: 'selected',
     reason: highStakes
       ? `high-stakes task → adversarial cross-verify via ${verifierProvider}`
       : `cross-verify via ${verifierProvider}`,

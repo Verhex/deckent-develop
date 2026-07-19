@@ -95,6 +95,31 @@ describe('task-result-schema (Worker Output Contract spine)', () => {
     expect(TASK_RESULT_SCHEMA_VERSION).toBe('1.0');
   });
 
+  it('preserves provider-native cross-verify evidence through canonical validation', () => {
+    const crossVerify = {
+      outcome: 'confirmed',
+      verifier: 'codex',
+      verifierModel: 'gpt-4.1',
+      verdict: 'confirmed',
+      reason: 'independent checks passed',
+    };
+    const res = validateTaskResult({ ...validResult(), crossVerify });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.crossVerify).toEqual(crossVerify);
+  });
+
+  it('preserves unavailable cross-verify evidence without fabricating a verifier', () => {
+    const crossVerify = {
+      outcome: 'unavailable',
+      reason: 'no-second-provider',
+    };
+    const res = validateTaskResult({ ...validResult(), crossVerify });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.crossVerify).toEqual(crossVerify);
+  });
+
   it('rejects an unknown selfAssessment verdict (enum-guarded)', () => {
     const res = validateTaskResult({ ...validResult(), selfAssessment: 'MAYBE' });
     expect(res.ok).toBe(false);

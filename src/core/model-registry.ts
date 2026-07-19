@@ -463,7 +463,7 @@ export class ModelRegistry {
     );
   }
 
-  getEquivalent(modelId: string, targetProvider: RegistryProviderName): string {
+  getEquivalent(modelId: string, targetProvider: RegistryProviderNameExt): string {
     const source = this.getOrThrow(modelId);
     // Same provider — return same model
     if (source.provider === targetProvider) {

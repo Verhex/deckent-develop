@@ -73,6 +73,22 @@ function makeDefaultMocks(overrides: Partial<{
     tasks: tasks.map((t) => ({ ...t, scope: { directories: [] }, status: 'PENDING', description: '', effort: 'normal' })),
     reasoning: 'AI-generated plan',
     planningMode: overrides.mode ?? 'auto',
+    plannerProof: {
+      version: 1,
+      requestedMode: overrides.mode ?? 'auto',
+      actualMode: overrides.mode === 'structured' ? 'structured' : 'ai',
+      resolutionReason: overrides.mode === 'structured' ? 'requested-structured' : 'model-success',
+      directiveOverrideKinds: [],
+      call: {
+        attempted: overrides.mode !== 'structured',
+        succeeded: overrides.mode !== 'structured',
+        requestedProvider: null,
+        resolvedProvider: overrides.mode === 'structured' ? null : 'claude',
+        requestedModel: 'opus',
+        resolvedModel: overrides.mode === 'structured' ? null : 'opus',
+        failureReason: null,
+      },
+    },
   } as any);
 }
 
@@ -388,6 +404,12 @@ describe('registerPlanTool', () => {
       expect(content.sprintId).toBe('sprint-001');
       expect(content.sprintNumber).toBe(1);
       expect(content.planningMode).toBe('structured');
+      expect(content.plannerProof).toMatchObject({
+        requestedMode: 'structured',
+        actualMode: 'structured',
+        resolutionReason: 'requested-structured',
+        call: { attempted: false, succeeded: false },
+      });
     });
   });
 
@@ -409,6 +431,35 @@ describe('registerPlanTool', () => {
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.error).toBe(true);
       expect(parsed.message).toContain('DIRECTIVES.md missing or empty');
+    });
+
+    it('preserves planner proof from a pre-Sprint planning failure', async () => {
+      const server = makeServer();
+      registerPlanTool(server as any);
+      makeDefaultMocks();
+      const plannerProof = {
+        version: 1,
+        requestedMode: 'ai',
+        actualMode: 'failed',
+        resolutionReason: 'model-failure',
+        directiveOverrideKinds: [],
+        call: {
+          attempted: true,
+          succeeded: false,
+          requestedProvider: 'claude',
+          resolvedProvider: 'claude',
+          requestedModel: 'opus',
+          resolvedModel: 'opus',
+          failureReason: 'spawn_failed',
+        },
+      };
+      const err = Object.assign(new Error('planner spawn failed'), { plannerProof });
+      mockPlanSprint.mockRejectedValue(err);
+
+      const result = await server.callTool('deckent_plan', { mode: 'ai' });
+      const parsed = JSON.parse(result.content[0].text);
+      expect(result.isError).toBe(true);
+      expect(parsed.plannerProof).toEqual(plannerProof);
     });
 
     it('returns isError when loadConfig fails', async () => {

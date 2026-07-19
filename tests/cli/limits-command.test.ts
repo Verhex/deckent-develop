@@ -173,9 +173,9 @@ describe('evaluateWindowedLimitGate', () => {
     expect(result.window).toBe('week (Fable)');
   });
 
-  it('fails open (ok) when the probe is unavailable, regardless of config', () => {
+  it('returns unknown when the probe is unavailable, regardless of config', () => {
     const result = evaluateWindowedLimitGate(UNAVAILABLE_PROBE, { enabled: true, session_max_pct: 1 });
-    expect(result.verdict).toBe('ok');
+    expect(result.verdict).toBe('unknown');
     expect(result.reason).toContain('unavailable');
   });
 });
@@ -223,6 +223,16 @@ describe('checkStartLimitGate', () => {
     expect(result.blocked).toBe(false);
     expect(result.verdict).toBe('warn');
     expect(result.message).toContain('Warning');
+  });
+
+  it('surfaces an unavailable probe as unknown without silently claiming ok', async () => {
+    writeProjectConfig({ limit_gate: { enabled: true } });
+    mockedProbe.mockResolvedValue(UNAVAILABLE_PROBE);
+    const result = await checkStartLimitGate(root, 'en');
+    expect(result.blocked).toBe(false);
+    expect(result.bypassed).toBe(false);
+    expect(result.verdict).toBe('unknown');
+    expect(result.message).toContain('unknown');
   });
 
   it('renders the Turkish start_gate_blocked message when lang=tr', async () => {
@@ -275,6 +285,7 @@ describe('runLimitsCommand', () => {
     const parsed = JSON.parse(printed);
     expect(parsed.unavailable).toBe(true);
     expect(parsed.sessionPct).toBeNull();
+    expect(parsed.verdict).toBe('unknown');
     expect(process.exitCode).not.toBe(1);
   });
 
@@ -289,6 +300,17 @@ describe('runLimitsCommand', () => {
     expect(printed).toContain('Window');
     expect(printed).toContain('33%');
     expect(printed).toContain('12%');
+  });
+
+  it('renders UNKNOWN in table mode when live evidence is unavailable', async () => {
+    mockedProbe.mockResolvedValue(UNAVAILABLE_PROBE);
+    const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    await runLimitsCommand({});
+    const printed = writeSpy.mock.calls.map((c) => String(c[0])).join('');
+    writeSpy.mockRestore();
+
+    expect(printed).toContain('UNKNOWN');
+    expect(printed).not.toContain('usage is within safe limits');
   });
 
   it('sets process.exitCode = 1 on a block verdict (table mode)', async () => {
