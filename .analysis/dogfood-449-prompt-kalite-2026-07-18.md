@@ -44,3 +44,9 @@
 2. **B5 debt-önkontrol:** debt-sevki öncesi debt'in kanıt-komutunu (varsa test/lint) host-side koştur; yeşilse debt'i otomatik-kapat, task üretme.
 3. **B1 do-akışı çıkışı:** scope-gate reddi PLAN'da patlamak yerine `do` önizlemesine taşınsın + `do --force-scope` geçişi.
 4. **510 dilim-3:** kilitli 3 key + kilitleyen 4 test tek-task'ta birlikte scope'lanır.
+
+## 6. Kapanış — B6+B5+B1 ✅ CC-el (2026-07-19, Alperen "öneri kabul edildi devam")
+- **B6:** `src/orchestra/rubric-registry.ts` `coverageOptional` → açık-boş `filesChanged` dizisi = "hiçbir şey değişmedi" beyanı ⇒ coverage+testsPassed şema-şartı düşer (eksik-`filesChanged` hâlâ ayrı şema-hatası — muafiyet tembel-sonucu maskelemez). +4 pin `tests/orchestra/evaluator-schema.test.ts`; 449-şekilli sonuç artık şema-NO_GO değil.
+- **B5:** YENİ `src/orchestra/debt-preflight.ts` + `planSprint` bağlantısı + `debt_preflight_enabled` config (default-true). Konjonktif kapama: tamamlanma-iddiası + allowlist-komutlar (tsc/lint/vitest, shell:false) hepsi-yeşil → auto-resolve; kırmızı → "debt REAL, şu komuttan başla" annotation'ı; kanıt-yolu-diskte-yok → `stale-evidence` "RE-POINT" (445-013/017'nin `tests/core/routing3/` vakası). Koşum-memo: aynı komut sprint-önkontrolünde 1× koşar. **Canlı read-only kanıt:** 433-001-fix (15-sprint zombi) → verified-resolved; 445-çifti → stale-evidence. 19 pin.
+- **B1:** `run-flow-controller.proposeRun` scope-gate aynası (`PlanPreview.scopeGateResult/scopeGateMessage/scopeGateOverridden`, CAS-nötr) + `do --force-scope` (ön-kapı reddi `do.scope_gate_blocked` i18n'iyle; child-argv'ye `--force-scope`; dry-run önizlemede FAIL + çıkış-yolu görünür). 8 pin + gerçek-binary `do --help` smoke.
+- Bekleyen: B4 (planner-belirsizliği, ROUTING-V3/PCOMP malzemesi) · B8 (build-ban motor-zorlaması) · B7/B9/B10 (izleme).
