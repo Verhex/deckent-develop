@@ -63,6 +63,9 @@ export interface DoCommandOptions {
   /** TERM-6 (428-006) — non-interactive approval for the RunFlow path
    *  (terminal.run_flow_v2). Ignored on the flag-off golden-flow path. */
   yes?: boolean;
+  /** Dogfood-449 B1 — forwarded to the detached child as `--force-scope` AND
+   *  acknowledged in the front-door scope-gate mirror. RunFlow path only. */
+  forceScope?: boolean;
 }
 
 /** Outcome of spawning `deckent start` for real. */
@@ -195,6 +198,16 @@ export function formatRunFlowDoPreview(preview: PlanPreview, run: boolean, lang:
   if (preview.gateResult === 'fail' && preview.gateFindings?.length) {
     for (const finding of preview.gateFindings) lines.push(`  ! ${finding}`);
   }
+  // Dogfood-449 B1: scope-gate aynası da önizlemede görünür — dry-run'da bile
+  // operatör, --run'ın neden öleceğini/`--force-scope` gerektireceğini görsün.
+  if (preview.scopeGateResult === 'fail') {
+    lines.push(getMessage('do.scope_gate_preview_fail', lang));
+    if (preview.scopeGateMessage) {
+      for (const line of preview.scopeGateMessage.split('\n')) lines.push(`  ! ${line}`);
+    }
+  } else if (preview.scopeGateOverridden) {
+    lines.push(getMessage('do.scope_gate_overridden', lang));
+  }
   lines.push(`${labels.digestLabel} ${formatDigestShort(preview.planDigest)}`);
   return lines.join('\n');
 }
@@ -211,7 +224,7 @@ export async function runDoRunFlow(
   root: string,
   config: ResolvedConfig,
   goal: string,
-  opts: { run: boolean; yes: boolean },
+  opts: { run: boolean; yes: boolean; forceScope?: boolean },
   deps: DoSeamDeps,
 ): Promise<void> {
   const lang = config.language;
@@ -220,7 +233,12 @@ export async function runDoRunFlow(
   // 'No providers registered' ile düşer (test-yolu planner'ı mock'lar, etkilenmez).
   await bootstrapProviders(config);
   const controllerFactory = deps.createRunFlowController ?? createRunFlowControllerImpl;
-  const controller = controllerFactory({ root, config, origin: 'cli' });
+  const controller = controllerFactory({
+    root, config, origin: 'cli',
+    // Dogfood-449 B1: consent flows into the controller — gate-ayna acknowledge
+    // + child'a `--force-scope` argv'si (bkz. RunFlowControllerDeps.forceScope).
+    ...(opts.forceScope === true ? { forceScope: true } : {}),
+  });
 
   let context: RunFlowContext;
   // F-2: the planning phase is a real LLM call — make the wait visible and
@@ -273,6 +291,18 @@ export async function runDoRunFlow(
     controller.reject('prompt-gate-block');
     printError(getMessage('do.gate_blocked', lang, {
       count: String(preview.gateFindings?.length ?? 0),
+    }));
+    process.exitCode = 1;
+    return;
+  }
+
+  // Dogfood-449 B1 — born-698a'nın scope-ikizi: child'ın PLAN fazı pre-spawn
+  // scope-gate'inde de FAIL-CLOSED. Ön-kapı aynı kararı burada verir; çıkış
+  // yolu artık var: `--force-scope` hem bu aynayı hem child'ı geçirir.
+  if (preview.scopeGateResult === 'fail') {
+    controller.reject('scope-gate-block');
+    printError(getMessage('do.scope_gate_blocked', lang, {
+      message: preview.scopeGateMessage ?? '',
     }));
     process.exitCode = 1;
     return;
@@ -378,6 +408,7 @@ export function registerDo(program: Command, deps: DoSeamDeps = {}): void {
     .description('Golden-flow: turn a goal into a sprint plan (dry-run preview by default; --run to actually start it)')
     .option('--run', 'Approve and start the sprint for real (default is a dry-run preview only)')
     .option('--yes', 'Non-interactive approval when RunFlow (terminal.run_flow_v2) is enabled — required together with --run to actually start; otherwise an honest reject (no interactive prompt)')
+    .option('--force-scope', 'Bypass the pre-spawn scope gate (front-door mirror AND the detached child) — same consent as `deckent start --force-scope`')
     .action(async (goal: string, opts: DoCommandOptions) => {
       const trimmedGoal = goal.trim();
       if (!trimmedGoal) {
@@ -396,7 +427,7 @@ export function registerDo(program: Command, deps: DoSeamDeps = {}): void {
         // this is the ONLY flag check (mirrors start.ts's exact convention)
         // and structurally cannot fall through to the golden-flow branch below.
         if (config.terminal?.run_flow_v2 === true) {
-          await runDoRunFlow(root, config, trimmedGoal, { run, yes: !!opts.yes }, deps);
+          await runDoRunFlow(root, config, trimmedGoal, { run, yes: !!opts.yes, forceScope: !!opts.forceScope }, deps);
           return;
         }
 

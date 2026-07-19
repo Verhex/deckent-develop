@@ -44,6 +44,15 @@ import {
 import type { ActorContext, RequestOrigin } from '../../core/work-model.js';
 import type { BrainPlanningMode, ResolvedConfig, Sprint, SprintSizeRecommendation } from '../../core/types.js';
 import { reduceRunFlow } from '../../orchestra/run-flow-reducer.js';
+// Dogfood-449 B1 — front-door mirror of the child's PLAN-phase scope gate
+// (born-698a's scope twin; see proposeRun below). ASYNC spawn on purpose:
+// the spawnSync ratchet (lint-no-spawnsync) exists because sync probes froze
+// the Brain event loop (R8/ADR-087) — same discipline as run-proposal-compiler's
+// readTrackedFileTree, which this helper mirrors with a cwd parameter.
+import { spawn } from 'node:child_process';
+import { evaluateScopeGate } from '../../core/scope-gate.js';
+import type { RunFlowGateResult } from '../../core/run-flow-contract.js';
+import { debugLog } from '../../core/utils.js';
 import { compileRunProposal } from '../../orchestra/run-proposal-compiler.js';
 import { generatePlanPreview } from '../../orchestra/plan-preview-service.js';
 import { readContext } from '../../orchestra/brain.js';
@@ -85,6 +94,14 @@ export interface RunFlowControllerDeps {
    * inject a fake so no real sprint is ever spawned.
    */
   spawnStart?: (sprint: Sprint, flowId: string) => RunHandle;
+  /**
+   * Dogfood-449 B1 — operator's `--force-scope` consent. Two effects, both
+   * mirroring `deckent start`: (a) proposeRun's front-door scope-gate mirror
+   * acknowledges write-suspects instead of failing the preview, (b) the
+   * default spawnStart forwards `--force-scope` to the detached child so the
+   * child's own PLAN-phase gate makes the SAME decision. Default: false.
+   */
+  forceScope?: boolean;
 }
 
 export interface RunFlowController {
@@ -152,6 +169,47 @@ function defaultRecommendation(config: ResolvedConfig): SprintSizeRecommendation
   };
 }
 
+/**
+ * Dogfood-449 B1 — async `git ls-files` for the front-door scope-gate mirror.
+ * Mirrors run-proposal-compiler's readTrackedFileTree (SURF-5 discipline: even
+ * a fast git call must not block the event loop — the spawnSync ratchet is the
+ * enforcement of that lesson), parameterized by cwd. Fail-soft: no git / not a
+ * repo / timeout → [] and the caller keeps the gate mirror 'skipped'.
+ */
+function listTrackedFiles(root: string, timeoutMs = 10_000): Promise<string[]> {
+  return new Promise((resolve) => {
+    let stdout = '';
+    let done = false;
+    const finish = (lines: string[]): void => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve(lines);
+    };
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn('git', ['ls-files'], { cwd: root, stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch {
+      resolve([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      try { child.kill('SIGTERM'); } catch { /* already gone */ }
+      finish([]);
+    }, timeoutMs);
+    child.stdout?.setEncoding('utf-8');
+    child.stdout?.on('data', (chunk: string) => { stdout += chunk; });
+    child.on('error', () => finish([]));
+    child.on('close', (code) => {
+      if (code !== 0 || stdout.length === 0) {
+        finish([]);
+        return;
+      }
+      finish(stdout.trim().split('\n').filter((line) => line.length > 0));
+    });
+  });
+}
+
 export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowController {
   let context: RunFlowContext = createInitialRunFlowContext();
   const nowFn = deps.now ?? (() => new Date().toISOString());
@@ -207,6 +265,36 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
     });
     plannedSprint = result.sprint;
 
+    // Dogfood-449 B1 — born-698a'nın scope-ikizi: detached-child'ın PLAN fazı
+    // pre-spawn scope-gate'inde FAIL-CLOSED; ön-kapı aynı kararı BURADA verir,
+    // yoksa onay "başlatıldı" basar ve koşu PLAN'da sessizce ölür (dogfood-449:
+    // 3 ölü-koşu, ölüm yalnız .deckent/recently-works/ logunda). Girdiler
+    // sprint-controller'ın gate-çağrısıyla birebir (git ls-files +
+    // resolveSuggestions:true); git koşamazsa 'skipped' — child gibi fail-OPEN.
+    let scopeGateResult: RunFlowGateResult = 'skipped';
+    let scopeGateMessage: string | undefined;
+    let scopeGateOverridden = false;
+    try {
+      const trackedFiles = await listTrackedFiles(deps.root);
+      if (trackedFiles.length > 0) {
+        const scopeGate = evaluateScopeGate({
+          tasks: result.sprint.tasks.map(t => ({ id: t.id, scope: t.scope ?? {} })),
+          trackedFiles,
+          acknowledgeScopePaths: deps.forceScope === true,
+          resolveSuggestions: true,
+        });
+        if (scopeGate.ok) {
+          scopeGateResult = 'pass';
+          scopeGateOverridden = scopeGate.overrideApplied === true;
+        } else {
+          scopeGateResult = 'fail';
+          scopeGateMessage = scopeGate.message;
+        }
+      }
+    } catch (err) {
+      debugLog('runFlowController:scopeGateMirror', err); // fail-open — child decides
+    }
+
     const preview: PlanPreview = {
       flowId,
       revision,
@@ -216,6 +304,10 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
       gateResult: result.gateResult,
       // born-684: gate-fail nedeni onay-yüzeyine taşınır (digest-dışı additive).
       ...(result.gateFindings.length > 0 ? { gateFindings: result.gateFindings } : {}),
+      // Dogfood-449 B1: scope-gate aynası da digest-dışı additive alanlardır.
+      scopeGateResult,
+      ...(scopeGateMessage !== undefined ? { scopeGateMessage } : {}),
+      ...(scopeGateOverridden ? { scopeGateOverridden: true } : {}),
     };
 
     context = reduceRunFlow(context, {
@@ -302,6 +394,10 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
         '--revision', String(stored.revision),
         '--plan-digest', stored.planDigest,
       ];
+      // Dogfood-449 B1: the operator's --force-scope consent must reach the
+      // child that actually runs PLAN's scope gate — consent at the front
+      // door, enforcement in the child (`start` already understands the flag).
+      if (deps.forceScope === true) cliArgs.push('--force-scope');
       // 583/N5: the REPL /run flow is a human decision surface — stream live.
       const spawned = spawnDetachedDeckent(cliArgs, { projectRoot: deps.root, flowId: fid, liveTrace: true });
       return { flowId: fid, jobId: `flow-${fid}-r${stored.revision}`, logRef: spawned.logPath };

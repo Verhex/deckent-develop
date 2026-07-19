@@ -97,6 +97,19 @@ export interface PlanPreview {
    *  körce verilmesin. Kısa insan-okur satırlar ("BLOCK 431-002 · g6-...: msg");
    *  planDigest payload'ına DAHİL DEĞİL (additive, CAS-nötr). */
   readonly gateFindings?: readonly string[];
+  /**
+   * Dogfood-449 B1 (born-698a'nın scope-ikizi): detached-child'ın PLAN fazı
+   * pre-spawn SCOPE gate'inde de FAIL-CLOSED — ön-kapı aynı kararı burada
+   * aynalar ki onay, sessizce ölecek bir koşuyu başlatamasın (dogfood-449'da
+   * 3 ölü-koşu; ölüm yalnız .deckent/recently-works/ logunda görünüyordu).
+   * 'skipped' = gate koşamadı (git yok) — child ile aynı şekilde fail-open.
+   * planDigest payload'ına DAHİL DEĞİL (additive, CAS-nötr).
+   */
+  readonly scopeGateResult?: RunFlowGateResult;
+  /** Gate'in kendi blok mesajı (verbatim) — yalnız scopeGateResult 'fail' iken. */
+  readonly scopeGateMessage?: string;
+  /** True: write-suspect'ler vardı ama --force-scope ile bilinçli geçildi. */
+  readonly scopeGateOverridden?: boolean;
 }
 
 /**

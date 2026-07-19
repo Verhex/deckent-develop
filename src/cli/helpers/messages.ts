@@ -3076,6 +3076,18 @@ const MESSAGES: MessageMap = {
     en: 'Prompt gate: {count} blocking finding(s) — run NOT started (the detached child would die at PLAN with the same verdict). Fix the plan or re-run with an adjusted goal.',
     tr: 'Prompt-gate: {count} engelleyici bulgu — koşu BAŞLATILMADI (detached-child PLAN fazında aynı kararla ölecekti). Planı düzeltin ya da hedefi ayarlayıp yeniden deneyin.',
   },
+  'do.scope_gate_blocked': {
+    en: 'Scope gate: run NOT started (the detached child would die at PLAN with the same verdict). Fix the write paths, or acknowledge intentional new paths with --force-scope.\n{message}',
+    tr: 'Scope-gate: koşu BAŞLATILMADI (detached-child PLAN fazında aynı kararla ölecekti). Yazma-yollarını düzeltin ya da bilinçli yeni-yolları --force-scope ile onaylayın.\n{message}',
+  },
+  'do.scope_gate_preview_fail': {
+    en: 'Scope gate: FAIL — --run would NOT start (fix the write paths or pass --force-scope):',
+    tr: 'Scope-gate: FAIL — --run BAŞLAMAZ (yazma-yollarını düzeltin ya da --force-scope geçin):',
+  },
+  'do.scope_gate_overridden': {
+    en: 'Scope gate: suspect write path(s) acknowledged via --force-scope — the child will spawn anyway.',
+    tr: 'Scope-gate: şüpheli yazma-yol(lar)ı --force-scope ile bilinçli geçildi — child yine de doğacak.',
+  },
   'do.cancelled': {
     en: 'Cancelled at stage "{stage}" ({reason}). Nothing was started.',
     tr: '"{stage}" aşamasında iptal edildi ({reason}). Hiçbir şey başlatılmadı.',

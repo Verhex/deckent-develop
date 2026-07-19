@@ -79,9 +79,11 @@ describe('T6E — buildProgram() composition (disk truth, full ~70-command progr
     }
   });
 
-  it('"do" keeps exactly its pre-existing options — --run and --yes, no new flag', () => {
+  it('"do" keeps exactly its known options — --run, --yes, --force-scope (B1), no other flag', () => {
+    // --force-scope added by Dogfood-449 B1 (scope-gate front-door exit) — the
+    // pin's intent stays: no ACCIDENTAL RunFlow-variant flags creep in.
     const cmd = program.commands.find((c) => c.name() === 'do')!;
-    expect(cmd.options.map((o) => o.long).sort()).toEqual(['--run', '--yes'].sort());
+    expect(cmd.options.map((o) => o.long).sort()).toEqual(['--force-scope', '--run', '--yes'].sort());
   });
 
   it('"plan-nl" keeps exactly its pre-existing options — --write, no new flag', () => {
