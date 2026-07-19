@@ -52,6 +52,8 @@
 | adr-g-036 | Zero-Hardcode Model & Flow Values (Parametric-Only) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-452 Learnings** (sprint-452): ## Sprint sprint-452 Learnings
+- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: ROOT-CAUSE FINDING (read first...
 - **Sprint sprint-451 Learnings** (sprint-451): ## Sprint sprint-451 Learnings
 - Wire builtins drift-check into the validate-publish gate: GO_WITH_TECH_DEBT — Found ...
 - **Sprint sprint-450 Learnings** (sprint-450): ## Sprint sprint-450 Learnings
@@ -72,12 +74,9 @@
 - U4 persona-guidance parser and slice selector: GO_WITH_TECH_DEBT — parseGuidanceSect...
 - **Sprint sprint-442 Learnings** (sprint-442): ## Sprint sprint-442 Learnings
 - Rehydrate event-fold sorgu-yuzeyi getFlow ve listFlows: GO_WITH_TECH_DEBT — Rehydrat...
-- **Sprint sprint-441 Learnings** (sprint-441): ## Sprint sprint-441 Learnings
-- SKILL-RETRIEVAL çift-eşik entegrasyon testleri ve regresyon-yeşili kanıtı: NO_GO — C...
 
 ## Active Technical Debt
-- [CRITICAL] Tech debt from 449-005-xfix: ROOT-CAUSE FINDING (read first): the premise that 4
-- [CRITICAL] Tech debt from 449-008-fix: Scope note: this task's write authority is ONLY test
+_No active technical debt._
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -150,4 +149,4 @@
 - Violation pattern: file_outside_scope
 - Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 1585 | Generated: 2026-07-19_
+_Total entries: 1590 | Generated: 2026-07-19_

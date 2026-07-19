@@ -11098,3 +11098,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 451-004: Hermetic gate tests and real-binary publish-gate proof (DONE)
 
 ---
+## Sprint 452 — sprint-452
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-19
+**Duration:** 2965s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2965347ms |
+
+### Tasks
+
+- 452-001: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: ROOT-CAUSE FINDING (read first): the premise that 449-00… (GO_WITH_TECH_DEBT)
+- 452-002: REPL /do slash-command wired to shared RunFlow chain (541) (DONE)
+- 452-003: Plan-preview scope-gate label parity for CLI and REPL card (B1) (DONE)
+- 452-004: Delimiter-safe goal compile layer for born-677 semicolon flow (544) (DONE)
+- 452-005: TERM-slice integration verify and real-binary dry-run proof (GO_WITH_TECH_DEBT)
+
+---

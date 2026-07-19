@@ -4,18 +4,20 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-449-005-xfix | Tech debt from 449-005-xfix: ROOT-CAUSE FINDING (read first): the premise that 4 | critical | sprint-449 | active |
-| debt-449-008-fix | Tech debt from 449-008-fix: Scope note: this task's write authority is ONLY test | critical | sprint-449 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-452-001 | Tech debt from 452-001: RETRY of a task whose previous attempt (docker-452-001)  | normal | sprint-452 | resolved |
+| debt-452-005 | Tech debt from 452-005: 4/5 goCriteria items fully evidenced: tsc clean; all tas | normal | sprint-452 | resolved |
 | debt-451-001 | Tech debt from 451-001: Found that a builtins-drift gate already existed (checkB | normal | sprint-451 | resolved |
 | debt-451-002 | Tech debt from 451-002: Measured `npm run lint:builtins-drift` wall-clock over 3 | normal | sprint-451 | resolved |
 | debt-450-006 | Tech debt from 450-006: 6/7 goCriteria items fully evidenced GREEN: tsc --noEmit | normal | sprint-450 | resolved |
 | debt-449-005 | Tech debt from 449-005: MAJOR PLANNING FINDING (read this first): a full-repo gr | normal | sprint-449 | resolved |
 | debt-449-006 | Tech debt from 449-006: Converted all user-facing 'sprint' prose in the 5 in-sco | normal | sprint-449 | resolved |
+| debt-449-005-xfix | Tech debt from 449-005-xfix: ROOT-CAUSE FINDING (read first): the premise that 4 | critical | sprint-449 | resolved |
+| debt-449-008-fix | Tech debt from 449-008-fix: Scope note: this task's write authority is ONLY test | critical | sprint-449 | resolved |
 | debt-445-011 | Tech debt from 445-011: Added syncAgentCapabilities(root, dryRun) to src/cli/com | normal | sprint-445 | resolved |
 | debt-445-016 | Tech debt from 445-016: Authored REAL (non-provisional) capabilitiesVersion:3 `c | normal | sprint-445 | resolved |
 | debt-445-021 | Tech debt from 445-021: Implemented runVocabularyDoctor() in src/core/routing3/v | normal | sprint-445 | resolved |

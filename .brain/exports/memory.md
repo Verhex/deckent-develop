@@ -1,5 +1,15 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-452 Learnings
+- Sprint sprint-452 Learnings: ## Sprint sprint-452 Learnings
+- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: ROOT-CAUSE FINDING (read first): the premise that 449-00…: GO_WITH_TECH_DEBT — RETRY of a task whose previous attempt (docker-452-001) was OOM-killed/force-stopped before writing a real result (only 
+- TERM-slice integration verify and real-binary dry-run proof: GO_WITH_TECH_DEBT — 4/5 goCriteria items fully evidenced: tsc clean; all task-1/2/3 test files green in one vitest run; tests/cli/term-slice
+
+## Gains
+- 452-002 — REPL /do slash-command wired to shared RunFlow chain (541) — REPL /do slash wired to the SHARED RunFlow chain — no second controller, run-flow-controller.ts u...
+- 452-003 — Plan-preview scope-gate label parity for CLI and REPL card (B1) — Naming note: the task brief's 'formatDoPlanPreview' does not take a PlanPreview (it's the golden-...
+- 452-004 — Delimiter-safe goal compile layer for born-677 semicolon flow (544) — born-677 goal-flow slice: intent.goal (RunProposal.intentSummary embedded into DirectiveBuildInte...
+
 ## Sprint sprint-451 Learnings
 - Sprint sprint-451 Learnings: ## Sprint sprint-451 Learnings
 - Wire builtins drift-check into the validate-publish gate: GO_WITH_TECH_DEBT — Found that a builtins-drift gate already existed (checkBuiltinsDrift) but was wired via safeExec('npm run --silent lint:

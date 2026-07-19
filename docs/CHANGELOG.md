@@ -9,6 +9,22 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint452] - 2026-07-19
+
+### Added
+
+- REPL /do slash-command wired to shared RunFlow chain (541)
+- Plan-preview scope-gate label parity for CLI and REPL card (B1)
+- Delimiter-safe goal compile layer for born-677 semicolon flow (544)
+
+### Changed
+
+- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: ROOT-CAUSE FINDING (read first): the premise that 449-00… (completed with tech debt)
+- TERM-slice integration verify and real-binary dry-run proof (completed with tech debt)
+
+
+_Tasks: 5 total, 5 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint451] - 2026-07-19
 
 ### Added
