@@ -52,6 +52,12 @@
 | adr-g-036 | Zero-Hardcode Model & Flow Values (Parametric-Only) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-449 Learnings** (sprint-449): ## Sprint sprint-449 Learnings
+- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: REAL (non-provisional) v3 capa...
+- **Sprint sprint-448 Learnings** (sprint-448): ## Sprint sprint-448 Learnings
+
+## Gains
+- 448-001 — Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: Investigat...
 - **Sprint sprint-447 Learnings** (sprint-447): ## Sprint sprint-447 Learnings
 - Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: Investigated the cross-depende...
 - **Sprint sprint-445 Learnings** (sprint-445): ## Sprint sprint-445 Learnings
@@ -68,19 +74,12 @@
 - Yeni hermetik birim-testler test-yazarligi ve implementation senaryolari: NO_GO — Ca...
 - **Sprint sprint-439 Learnings** (sprint-439): ## Sprint sprint-439 Learnings
 - Rehydrate katmanı — event-fold ve legacy dual-read ile KNOWN_CONSUMERS pini: NO_GO —...
-- **Sprint sprint-438 Learnings** (sprint-438): ## Sprint sprint-438 Learnings
-
-## Gains
-- 438-001 — RunFlow contract additive alanlar — commandId ve sequence — Adde...
-- **Sprint sprint-437 Learnings** (sprint-437): ## Sprint sprint-437 Learnings
-- NOTIFY-DEDUP kalıcı bildirim-state modülü ve relay wiring: GO_WITH_TECH_DEBT — New s...
 
 ## Active Technical Debt
-- [HIGH] Tech debt from 445-013-fix: REAL (non-provisional) v3 capabilities blocks for th
-- [HIGH] Timeout-partial from 445-014-fix: worker killed mid-execution, work accepted
-- [HIGH] Tech debt from 445-015-fix: ROOT CAUSE of the original 445-015 NO_GO ('rubric to
-- [HIGH] Tech debt from 445-017-fix: No new edit was made this round -- 445-017's prior a
-- [CRITICAL] Tech debt from 443-001-xfix: Investigated the cross-dependency hypothesis first 
+- [NORMAL] Tech debt from 449-005-xfix: ROOT-CAUSE FINDING (read first): the premise that 4
+- [NORMAL] Tech debt from 449-008-fix: Scope note: this task's write authority is ONLY test
+- [CRITICAL] Tech debt from 445-013-fix: REAL (non-provisional) v3 capabilities blocks for th
+- [CRITICAL] Tech debt from 445-017-fix: No new edit was made this round -- 445-017's prior a
 - [CRITICAL] Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso
 
 ## Active Patterns
@@ -154,4 +153,4 @@
 - Violation pattern: file_outside_scope
 - Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 1520 | Generated: 2026-07-18_
+_Total entries: 1576 | Generated: 2026-07-18_

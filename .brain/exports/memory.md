@@ -1,5 +1,32 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-449 Learnings
+- Sprint sprint-449 Learnings: ## Sprint sprint-449 Learnings
+- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: REAL (non-provisional) v3 capabilities blocks for the co…: NO_GO — Debt was: prior task 445-013 (GO_WITH_TECH_DEBT) reported that the full tests/core/builtins/ dir had 2 reds in agent-cat
+- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: No new edit was made this round -- 445-017's prior addit…: NO_GO — No new edit made -- and none was needed this round, because the blocker the prior round (445-017 / this fix-chain) repor
+- CLI inline-string revizyonu — sprint→run ve messages.ts göçü: GO_WITH_TECH_DEBT — MAJOR PLANNING FINDING (read this first): a full-repo grep before editing found that a prior sprint (378-002, RUN-SURFAC
+- Entegrasyon doğrulaması — test + lint:i18n + gerçek-binary smoke: GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=false diff [].
+
+## Gains
+- 449-002 — Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: ROOT CAUSE of the original 445-015 NO_GO ('rubric total … — Re-verified FRESH against current disk state (repo has moved on since the carried-forward notes i...
+- 449-004 — Envanter-keşif — kullanıcıya-görünen sprint literal taraması — Envanter tamamlandı: .analysis/run-rename-dilim2-inventory.md (2468 satır, ~470KB).
+- 449-006 — MCP tool açıklamaları sprint→run revizyonu — Converted all user-facing 'sprint' prose in the 5 in-scope MCP files to 'run' terminology per .an...
+- 449-007 — Docs kullanıcı-yüzeyi sprint→run revizyonu — Completed docs user-interface sprint→run terminology update.
+
+## Sprint sprint-448 Learnings
+- Sprint sprint-448 Learnings: ## Sprint sprint-448 Learnings
+
+## Gains
+- 448-001 — Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: Investigated the cross-dependency hypothesis first (443-… — This is a priority-fix task (fixForTaskId: 443-001-xfix) for the debt flagged in 443-001-xfix's G...
+- 448-002 — Kök .analysis dizininde bugünkü md dosyalarını keşfet ve envanter JSON üret — Inventory generation complete.
+- 448-003 — Alt dizinlerdeki (a6-sinav-u1 ve u4-olcum) bugünkü md dosyalarını keşfet ve envanter JSON üret — Successfully scanned .analysis/a6-sinav-u1/ and .analysis/u4-olcum/ recursively.
+- 448-004 — Envanterlerden Türkçe kısa özet-notu md dosyasını derle — İki envanter JSON'u (inventory-root-2026-07-18.json ve inventory-subdirs-2026-07-18.json) okundu;...
+- 448-005 — Özet-notu bütünlük doğrulaması ve link-lint entegrasyon kontrolü — 4 kontrol kalemi TAM kapsamlı çalıştırıldı, hepsi kanıt satırlarıyla verify-2026-07-18.md'ye yazı...
+- Out-of-band Changes: ## Out-of-band Changes
+- 3 commit(s) since Sprint #448
+- Modified: docs/CHANGELOG.md, docs/MASTER-PLAN.md, docs/analysis/583-kabul-gunlugu.md, package.json, src/desktop/src/renderer/app.ts, src/desktop/src/renderer/nova/CommandScene.tsx, src/desktop/src/renderer/styles.css, src/desktop/src/shared/theme-tokens.ts
+- New: scripts/nova-tasarim-loop.mjs, src/desktop/src/renderer/nova/scene-state.ts, src/desktop/src/renderer/shell/dev-hash-session.ts, src/desktop/tests/dev-hash-session.test.ts, src/desktop/tests/nova-contrast.test.ts, src/desktop/tests/nova-scene-state.test.ts
+
 ## Sprint sprint-447 Learnings
 - Sprint sprint-447 Learnings: ## Sprint sprint-447 Learnings
 - Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: Investigated the cross-dependency hypothesis first (443-…: NO_GO — This is the 3rd pass at debt-443-001-xfix (443-001 -> 443-001-xfix -> 447-001), same restricted scope each time (read/wr

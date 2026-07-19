@@ -4,20 +4,23 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-445-013-fix | Tech debt from 445-013-fix: REAL (non-provisional) v3 capabilities blocks for th | high | sprint-445 | active |
-| debt-445-014-fix | Timeout-partial from 445-014-fix: worker killed mid-execution, work accepted | high | sprint-445 | active |
-| debt-445-015-fix | Tech debt from 445-015-fix: ROOT CAUSE of the original 445-015 NO_GO ('rubric to | high | sprint-445 | active |
-| debt-445-017-fix | Tech debt from 445-017-fix: No new edit was made this round -- 445-017's prior a | high | sprint-445 | active |
-| debt-443-001-xfix | Tech debt from 443-001-xfix: Investigated the cross-dependency hypothesis first  | critical | sprint-443 | active |
+| debt-449-005-xfix | Tech debt from 449-005-xfix: ROOT-CAUSE FINDING (read first): the premise that 4 | normal | sprint-449 | active |
+| debt-449-008-fix | Tech debt from 449-008-fix: Scope note: this task's write authority is ONLY test | normal | sprint-449 | active |
+| debt-445-013-fix | Tech debt from 445-013-fix: REAL (non-provisional) v3 capabilities blocks for th | critical | sprint-445 | active |
+| debt-445-017-fix | Tech debt from 445-017-fix: No new edit was made this round -- 445-017's prior a | critical | sprint-445 | active |
 | debt-433-001-fix | Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso | critical | sprint-433 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-449-005 | Tech debt from 449-005: MAJOR PLANNING FINDING (read this first): a full-repo gr | normal | sprint-449 | resolved |
+| debt-449-006 | Tech debt from 449-006: Converted all user-facing 'sprint' prose in the 5 in-sco | normal | sprint-449 | resolved |
 | debt-445-011 | Tech debt from 445-011: Added syncAgentCapabilities(root, dryRun) to src/cli/com | normal | sprint-445 | resolved |
 | debt-445-016 | Tech debt from 445-016: Authored REAL (non-provisional) capabilitiesVersion:3 `c | normal | sprint-445 | resolved |
 | debt-445-021 | Tech debt from 445-021: Implemented runVocabularyDoctor() in src/core/routing3/v | normal | sprint-445 | resolved |
+| debt-445-014-fix | Timeout-partial from 445-014-fix: worker killed mid-execution, work accepted | critical | sprint-445 | resolved |
+| debt-445-015-fix | Tech debt from 445-015-fix: ROOT CAUSE of the original 445-015 NO_GO ('rubric to | critical | sprint-445 | resolved |
 | debt-444-003 | Tech debt from 444-003: All 4 target files pass (32/32) and npx tsc --noEmit is  | normal | sprint-444 | resolved |
 | debt-444-004 | Tech debt from 444-004: Root cause: ensureDeckentImport() in src/core/utils.ts:2 | normal | sprint-444 | resolved |
 | debt-444-005 | Tech debt from 444-005: New src/core/agent-prompt-sync.ts::syncBuiltinAgentPromp | normal | sprint-444 | resolved |
@@ -26,6 +29,7 @@
 | debt-443-009 | Tech debt from 443-009: Appended a '## Guidance Slices' section to the end of sr | normal | sprint-443 | resolved |
 | debt-443-018 | Tech debt from 443-018: Appended '## Guidance Slices' at end of PROMPT.md with 4 | normal | sprint-443 | resolved |
 | debt-443-025 | Tech debt from 443-025: Appended a '## Guidance Slices' heading to the end of PR | normal | sprint-443 | resolved |
+| debt-443-001-xfix | Tech debt from 443-001-xfix: Investigated the cross-dependency hypothesis first  | critical | sprint-443 | resolved |
 | debt-442-001 | Tech debt from 442-001: Rehydrate event-fold query surface added to src/orchestr | normal | sprint-442 | resolved |
 | debt-442-002 | Tech debt from 442-002: Legacy dual-read fallback filled in at getFlow's typed-m | normal | sprint-442 | resolved |
 | debt-437-001 | Tech debt from 437-001: EXPIRE-SWEEP çekirdek API implemented across the 3 in-sc | normal | sprint-437 | resolved |

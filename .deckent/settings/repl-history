@@ -44,3 +44,22 @@ deckentin son 24 saatte kazanımları neler hangi özellikleri fixledik neleri d
 1
 /resume 1
 /model fable
+/resume 7
+/run --follow
+/runs --follow
+deckent terminal neler yapabiliyor analiz et.
+/exit
+/runs f58f5611
+/runs 7
+/runs 8
+/term control
+/approve full-auto
+Terminalde akışı analiz eder misin token token mi cevaplıyorsun kullanıcı deneyimi olarak deckent nedir
+Tmm bana uzun bir deneme outputu ver tablo akış renk herşey olsun analiz edelim.
+T7 VE T10< da bozulmalar var.
+Akış deneme
+Deckent terminal çok yavaş yani basit işlerde yazdığım anda yanıt dönmüyor sebep nedir ? bu bir claude code katmanı değildi native terminal olarak tasarlamıştık.
+Kapsamlı çözümü master-plan.md dokümanına ekle orada işplanına dahil edelim.
+kod geliştiriyoruz o iş bitsin sonrasında güncelleyeceğim master plan dokümanını
+TEST
+deneme

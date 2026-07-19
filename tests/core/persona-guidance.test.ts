@@ -172,6 +172,62 @@ describe('parseGuidanceSections', () => {
     ).toBe(true);
   });
 
+  it('drops all sections and reports every pair when THREE intents mutually interleave', () => {
+    // A-start B-start C-start A-end B-end C-end — generalizes the two-key case above; the
+    // intruder check must not be a pairwise special-case, it must hold for any marker count.
+    const md = [
+      '<!-- guidance:security-start -->',
+      'a',
+      '<!-- guidance:config-start -->',
+      'b',
+      '<!-- guidance:performance-start -->',
+      'c',
+      '<!-- guidance:security-end -->',
+      'd',
+      '<!-- guidance:config-end -->',
+      'e',
+      '<!-- guidance:performance-end -->',
+    ].join('\n');
+
+    const result = parseGuidanceSections(md);
+
+    expect(result.sections.size).toBe(0);
+    expect(result.issues).toHaveLength(3);
+    expect(result.issues.some(i => i.includes('intent "security"') && i.includes('"config"'))).toBe(true);
+    expect(result.issues.some(i => i.includes('intent "config"') && i.includes('"performance"'))).toBe(true);
+    expect(result.issues.some(i => i.includes('intent "performance"') && i.includes('"security"'))).toBe(true);
+  });
+
+  it('drops only the entangled sections in a chained interleave, keeping none of A-D corrupted', () => {
+    // A-start B-start A-end C-start B-end D-start C-end D-end — each key overlaps only its
+    // immediate neighbor, never all four at once; every one of the four is still entangled
+    // with at least one neighbor, so none may survive with corrupted (raw-marker) content.
+    const md = [
+      '<!-- guidance:security-start -->',
+      'a',
+      '<!-- guidance:config-start -->',
+      'b',
+      '<!-- guidance:security-end -->',
+      'c',
+      '<!-- guidance:performance-start -->',
+      'd',
+      '<!-- guidance:config-end -->',
+      'e',
+      '<!-- guidance:design-start -->',
+      'f',
+      '<!-- guidance:performance-end -->',
+      'g',
+      '<!-- guidance:design-end -->',
+    ].join('\n');
+
+    const result = parseGuidanceSections(md);
+
+    expect(result.sections.size).toBe(0);
+    for (const key of ['security', 'config', 'performance', 'design']) {
+      expect(result.issues.some(i => i.includes(`intent "${key}"`))).toBe(true);
+    }
+  });
+
   it('handles empty and non-string-ish input without throwing', () => {
     expect(() => parseGuidanceSections('')).not.toThrow();
     const result = parseGuidanceSections('');

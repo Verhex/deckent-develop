@@ -77,6 +77,15 @@ src/desktop/*.tsbuildinfo
 .deckent/usage/
 .deckent/cache/
 .deckent/traces/
+# do-flow runtime state + serve tokens (dogfood-449) — tokens never committed
+.deckent/runtime/api-token
+.deckent/runtime/terminal-token
+.deckent/runtime/run-flow-store/
+.deckent/runtime/prompt-lint.jsonl
+.deckent/runtime/archive/
+.deckent/pause-state.json
+# eye-loop isolated daemon workspace inside desktop sub-package (590)
+src/desktop/.deckent/
 .deckent/training/
 .deckent/sprint-*-baseline.json
 .deckent/metrics.jsonl

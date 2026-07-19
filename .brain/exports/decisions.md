@@ -1917,7 +1917,7 @@ DECK-WORKER-ISOLATION subprocess half:
 
 # ADR-G-006: Routing & Selection (Learned Model/Effort + Agent/Skill)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=RoutingEngineV3 (3-axis vector-selection: RequirementVector×CapabilityVector, 5-stage hybrid pipeline [eliminate → content-fit → verify → rank → decide], vocabulary registry, agent.json-v3 capabilities SSOT, policy packs, learning cells, replayable decisions-v3 journal; V2 engine REMOVED at the S3 cut, 2026-07-15) → tomorrow=learned weight-tuning + provider-health/latency axis activation + embedding-prefilter default-on at catalog scale
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=RoutingEngineV3 (3-axis vector-selection: RequirementVector×CapabilityVector, 5-stage hybrid pipeline [eliminate → content-fit → verify → rank → decide], vocabulary registry, agent.json-v3 capabilities SSOT, policy packs, learning cells, replayable decisions journal; V2 engine REMOVED at the S3 cut, 2026-07-15) → tomorrow=learned weight-tuning + provider-health/latency axis activation + embedding-prefilter default-on at catalog scale
 
 **Status:** accepted (V3 LIVE — today-clause amended at the S3 cut; V2 fully removed) · **Date:** 2026-06-30 (rev 2026-07-15) · **Absorbs:** ADR-015 (TaskRouter 6-level) + ADR-028 (Decision-Engine V1→V2→V3) + ADR-072 (Routing Balance multi-signal) + ADR-073 (Routing Live Validation + FIX-prompt) + ADR-075 Part-B (skill→agent affinity)
 **Crosswalk:** 015 (+028+072+073+075B) → ADR-G-006
@@ -4310,7 +4310,7 @@ A self-contained terminal subsystem under `src/api/terminal/`, wired by `src/api
     (a) injected into index.html ONLY for 127.0.0.1/::1 callers
     (window.__DECKENT_TERMINAL_TOKEN__) — the browser-dashboard channel; or
     (b) [amendment 2026-07-18, 583/N3 Desktop-PTY, Alperen-approved] a
-    loopback-only GET /api/terminal/token response gated by a VALID API
+    loopback-only `GET /api/terminal/token` response gated by a VALID API
     bearer verified with the constant-time comparator INDEPENDENTLY of
     DECKENT_API_AUTH_DISABLED (fail-CLOSED — no API token configured ⇒ 401;
     response is Cache-Control: no-store; denials/handouts audit-recorded) —
@@ -4807,17 +4807,6 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
   - **ADR-G-016** (Product Vision) / **ADR-G-010** (Output, Terminal-UX & Brand) — god-level / no-MVP bar; no-emoji + lucide-react + shared theme tokens.
 - **Born work-items:** **DASH** (serve-token-inject · routing chart · control-panel surfacing · onboarding view — from old 072/073/076 side-items) · **DASH-EMOJI-FIX** (2 residual ⚠ → lucide-react) · **DESK-1** (Desktop app) — all to MASTER-PLAN. (The old Chat/Dashboard product-sprint items — chat-HOLLOW · duplicate-sidebar · alert-spam · enterprise read→write — are largely resolved; see Consequences.)
 - **Direction:** `.analysis/adr-review-crosswalk.md` (rows 080/078/082/083), `.analysis/hermes-vs-deckent-direction-decisions.md`, memory `project_hermes_deckent_direction_2026_06` · `feedback_dashboard_no_emoji_lucide` · `feedback_governance_aligns_with_direction_pivot`.
-
----
-
-## Amendment (2026-07-17 — SURF-7 authority cutover; Alperen-approved)
-
-1. **Dashboard is PERMANENTLY observability-only.** The Tomorrow item "Enterprise read → write (V2 management-plane)" moves OFF the dashboard: the enterprise management plane's client is the **Desktop app**. The dashboard tenant/RBAC/rate CRUD UI was removed (SURF-7, commit 0551ac82); the /api/enterprise/* write endpoints stay server-side behind their own admin gates for that future client.
-2. **Chat leaves the dashboard entirely.** Instead of the "at most a read-only conversation view" option, ChatPage is an honest signpost; primary chat surfaces are the native terminal (ADR-G-034) and the Desktop app. POST /api/chat and the write-performing GET /api/chat/stream sit behind the control-mutation ratchet.
-3. **Orchestration-control mutations over HTTP are default-OFF.** `api.control_mutations` (default false; env twin DECKENT_CONTROL_MUTATIONS) governs start/plan/kill/cleanup/set-directives/directives/config-POST/chat(+stream) and the nervous/autonomous decision endpoints; while off they answer an honest 403 naming the terminal/Desktop equivalents. Emergency rollback = flipping the flag. /api/run-flow/* (SURF-2 contract), /api/enterprise/*, auth and /api/rpc are OUTSIDE this ratchet. Monitoring GETs are never gated.
-4. **Vision anchor (Alperen, 2026-07-17):** the Desktop app is the comprehensive single-product management surface ("Claude Code desktop / Claude Desktop class — projects, flows, integrations, settings, enterprise area, process states in ONE product"); the native terminal keeps the full-control primary-surface role (ADR-G-034); the dashboard explains.
-
-Rationale: SURF-3→6 delivered the full run-flow lifecycle on terminal+Desktop with real-binary proof (cross-surface handoff included), satisfying the "mutating controls die when the equivalent client exists" clause. One-click kill/cleanup buttons were additionally an approval-discipline risk class. Evidence: scripts/surf7-readonly-smoke.mjs 27/27 · dashboard 1209/1209 · api 985/985. Full proposal text: docs/analysis/adr-g-033-amendment-2026-07-17.md.
 
 
 ---

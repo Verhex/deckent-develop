@@ -10991,3 +10991,58 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 447-005: Integration run with coverage report and honest evaluation (NO_GO)
 
 ---
+## Sprint 448 — sprint-448
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-18
+**Duration:** 723s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 722540ms |
+
+### Tasks
+
+- 448-001: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: Investigated the cross-dependency hypothesis first (443-… (DONE)
+- 448-002: Kök .analysis dizininde bugünkü md dosyalarını keşfet ve envanter JSON üret (DONE)
+- 448-003: Alt dizinlerdeki (a6-sinav-u1 ve u4-olcum) bugünkü md dosyalarını keşfet ve envanter JSON üret (DONE)
+- 448-004: Envanterlerden Türkçe kısa özet-notu md dosyasını derle (DONE)
+- 448-005: Özet-notu bütünlük doğrulaması ve link-lint entegrasyon kontrolü (DONE)
+
+---
+## Sprint 449 — sprint-449
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-18
+**Duration:** 6586s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 14 |
+| Completed | 10 |
+| Tech Debt | 4 |
+| No-Go | 4 |
+| Coverage | NaN% |
+| Duration | 6586411ms |
+
+### Tasks
+
+- 449-001: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: REAL (non-provisional) v3 capabilities blocks for the co… (NO_GO)
+- 449-002: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: ROOT CAUSE of the original 445-015 NO_GO ('rubric total … (DONE)
+- 449-003: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: No new edit was made this round -- 445-017's prior addit… (NO_GO)
+- 449-004: Envanter-keşif — kullanıcıya-görünen sprint literal taraması (DONE)
+- 449-005: CLI inline-string revizyonu — sprint→run ve messages.ts göçü (GO_WITH_TECH_DEBT)
+- 449-006: MCP tool açıklamaları sprint→run revizyonu (DONE)
+- 449-007: Docs kullanıcı-yüzeyi sprint→run revizyonu (DONE)
+- 449-008: Entegrasyon doğrulaması — test + lint:i18n + gerçek-binary smoke (GO_WITH_TECH_DEBT)
+
+---

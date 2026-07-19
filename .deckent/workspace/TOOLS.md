@@ -142,6 +142,7 @@ _Total: 38 MCP tools_
 | `retro-parser` | deckent retro-parser |
 | `review` | deckent review |
 | `run` | deckent run |
+| `runs` | deckent runs |
 | `serve` | deckent serve |
 | `set-directives` | deckent set-directives |
 | `skill` | deckent skill |
@@ -158,4 +159,4 @@ _Total: 38 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 101 CLI command modules_
+_Total: 102 CLI command modules_
