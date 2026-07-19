@@ -368,6 +368,12 @@ export interface RoutingV3Config {
   /** Minimum structural-evidence confidence (positional axis) required to treat a deliverable-type
    *  match as trustworthy (0-1, default: 0.7). */
   structuralConfidence: number;
+  /** K1 (581-kalibrasyon, 2026-07-19): drop decision-wide signal-free numerical
+   *  components (cold cells / absent live signals) from the axis mean instead of
+   *  neutral-flattening every candidate — the 65-decision analysis measured
+   *  numerical spread 0.051 vs content 0.368 and a 71% low-confidence rate.
+   *  Default: true. Rollback: `signalGatedNumerical: false`. */
+  signalGatedNumerical: boolean;
 }
 
 // ─── Cost Guard Config ───────────────────────────────────────────────

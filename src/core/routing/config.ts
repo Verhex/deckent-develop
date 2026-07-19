@@ -42,6 +42,7 @@ export const ROUTING_V3_SCHEMA = z
     governanceMode: ROUTING_V3_GOVERNANCE_MODE_SCHEMA,
     topK: z.number().int().positive(),
     structuralConfidence: z.number().min(0).max(1),
+    signalGatedNumerical: z.boolean(),
   })
   .strict();
 
@@ -66,6 +67,10 @@ export const DEFAULT_ROUTING_V3_CONFIG: RoutingV3Config = {
   governanceMode: 'ai',
   topK: 5,
   structuralConfidence: 0.7,
+  // K1 — 581-kalibrasyon (Alperen-onaylı 2026-07-19): numerical axis drops
+  // decision-wide signal-free components (cold cells / absent live) from its
+  // mean instead of neutral-flattening. Rollback: `signalGatedNumerical: false`.
+  signalGatedNumerical: true,
 };
 
 const WEIGHTS_SUM_EPSILON = 1e-9;

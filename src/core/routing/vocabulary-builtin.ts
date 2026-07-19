@@ -269,7 +269,12 @@ export const BUILTIN_DOMAINS: readonly DomainDef[] = [
     id: 'a11y',
     aliases: ['accessibility', 'erişilebilirlik', 'wcag'],
     pathPatterns: [
-      '**/accessibility-*/**',
+      // K1-yan-bulgusu (581, B12-ailesi): eski '**/accessibility-*/**' deseni
+      // AGENT-KATALOG dizinini yakalıyordu (src/core/builtins/agents/
+      // accessibility-auditor/ → a11y domain'i sızdı, natural-experiment
+      // kardeşini tek başına farklı rotaya soktu). Katalog-ağacı feature-iş
+      // sahası değildir — kesin-segment konvansiyonu (**/i18n/** emsali).
+      '**/accessibility/**',
       '**/*a11y*',
       '**/aria-*',
       'src/a11y/**',

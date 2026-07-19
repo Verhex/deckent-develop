@@ -20,7 +20,7 @@ import { eliminate } from './stage-eliminate.js';
 import type { AgentCandidate } from './stage-eliminate.js';
 import { scoreContentDeterministic, PROFICIENCY_SCORE } from './axis-content.js';
 import { scorePositional } from './axis-positional.js';
-import { scoreNumerical, NEUTRAL } from './axis-numerical.js';
+import { scoreNumerical, hasWarmCells, NEUTRAL } from './axis-numerical.js';
 import type { CellStat } from './axis-numerical.js';
 import { rank, TIE_EPSILON } from './stage-rank.js';
 import { verify, enforceAntiTemp, CatalogGapError } from './verifier.js';
@@ -173,11 +173,45 @@ export async function routeTaskV3(
 
   // 6 · Score remaining axes + rank.
   const cells = options.cells ?? new Map<string, CellStat>();
+  // K1 (581-kalibrasyon): decision-level signal gate — see NumericalActiveComponents.
+  // `live` is structurally absent at this call site until S2 wires
+  // providerHealth/latencyScore; when it does, this gate must read those inputs.
+  const signalGate = config.signalGatedNumerical !== false
+    ? {
+        cells: verified.some((c) => hasWarmCells(requirement, c.agentId, cells)),
+        live: false,
+      }
+    : undefined;
+  // K1 replay-ölçüm dersi (65-karar, ilk varyant REDDEDİLDİ): ölü bileşenleri
+  // yalnız eksen-ORTALAMASINDAN düşürmek tier-bileşeninin sesini 3×'e çıkarıp
+  // "yüksek-effort → premium-ajan" baskınlığı üretti (25 sahte-flip). Onaylı
+  // tasarım AĞIRLIK-renormalizasyonu: numerical'ın ağırlığı sinyal-kesriyle
+  // (aktif-bileşen/3) küçülür, serbest kalan ağırlık content/positional'a
+  // MEVCUT ORANLARIYLA dağılır — tier'ın mutlak sesi legacy ile birebir kalır,
+  // ayrıştıran eksenler güçlenir. signalGate kapalıyken weights aynen geçer.
+  let effectiveConfig = config;
+  if (signalGate) {
+    const activeParts = 1 + (signalGate.cells ? 1 : 0) + (signalGate.live ? 1 : 0); // tier hep aktif
+    const signalFraction = activeParts / 3;
+    if (signalFraction < 1) {
+      const { weights } = config;
+      const released = weights.numerical * (1 - signalFraction);
+      const denom = weights.content + weights.positional;
+      effectiveConfig = {
+        ...config,
+        weights: {
+          content: weights.content + released * (weights.content / denom),
+          positional: weights.positional + released * (weights.positional / denom),
+          numerical: weights.numerical * signalFraction,
+        },
+      };
+    }
+  }
   const rankInputs = verified.map((candidate) => {
     const positional = scorePositional(requirement, matchSpace(candidate.capabilities), {
       knownDomainIds: catalog.vocabulary.knownDomainIds,
     });
-    const numerical = scoreNumerical(requirement, candidate.agentId, candidate.capabilities, { cells });
+    const numerical = scoreNumerical(requirement, candidate.agentId, candidate.capabilities, { cells }, signalGate);
     const content = contentScores.get(candidate.agentId) ?? withNeutralEvidence('missing content score');
     const axisScores: AxisScores = {
       content: { score: content.score, evidence: content.evidence },
@@ -187,7 +221,7 @@ export async function routeTaskV3(
     return { agentId: candidate.agentId, axisScores };
   });
 
-  const ranking = rank(rankInputs, config);
+  const ranking = rank(rankInputs, effectiveConfig);
   const sourceOf = (agentId: string): AgentCandidate['source'] | undefined =>
     catalog.agents.find((a) => a.agentId === agentId)?.source;
   let ordered: ScoredCandidate[] = enforceAntiTemp(ranking.ordered, sourceOf, TIE_EPSILON);

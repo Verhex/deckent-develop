@@ -238,6 +238,31 @@ describe('numerical axis', () => {
     expect(present.score).toBeGreaterThan(absent.score);
     expect(absent.evidence.join(' ')).toContain('absent → neutral');
   });
+
+  // ─── K1 — 581-kalibrasyon: signal-gated component mean ────────────────────
+  describe('K1 signal-gated numerical (581 calibration)', () => {
+    it('legacy (no `active`) = 3-component neutral-filled mean; gated = pure tier signal', () => {
+      const gated = scoreNumerical(
+        req({}), 'builder', builder.capabilities, { cells: new Map() },
+        { cells: false, live: false },
+      );
+      const legacy = scoreNumerical(req({}), 'builder', builder.capabilities, { cells: new Map() });
+      // gated drops both dead components → score IS the tier component; legacy
+      // dilutes the same tier value with two neutrals: (0.5 + tier + 0.5)/3.
+      expect(legacy.score).toBeCloseTo((NEUTRAL + gated.score + NEUTRAL) / 3, 10);
+      expect(gated.evidence.join(' ')).toContain('signal-gated K1');
+    });
+
+    it('a warm cell keeps the cells component in the mean — real failures now WEIGH (no neutral dilution)', () => {
+      const cells = new Map([[`build|core-runtime|builder`, { uses: CELL_MIN_USES, successes: 0, qualitySum: 0 }]]);
+      const gatedWarm = scoreNumerical(req({}), 'builder', builder.capabilities, { cells }, { cells: true, live: false });
+      const gatedCold = scoreNumerical(req({}), 'builder', builder.capabilities, { cells: new Map() }, { cells: false, live: false });
+      // warm 0% success-rate drags the mean below the pure-tier score — the
+      // whole point of K1: real signal weighs, dead-neutral no longer pads it.
+      expect(gatedWarm.score).toBeLessThan(gatedCold.score);
+      expect(gatedWarm.evidence.join(' ')).toContain('cells build');
+    });
+  });
 });
 
 // ─── ranking ─────────────────────────────────────────────────────────────────

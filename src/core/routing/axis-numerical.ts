@@ -32,6 +32,37 @@ export interface NumericalInputs {
   latencyScore?: number;
 }
 
+/**
+ * K1 — 581-kalibrasyon (2026-07-19, 65-karar analizi): decision-level component
+ * availability. A component with NO real signal for ANY candidate in the
+ * decision is DROPPED from the numerical mean instead of flattening every
+ * candidate toward NEUTRAL — dead-neutral cells+live diluted the one live
+ * component (costTier) to a spread of 0.051 (vs content 0.368) and drove the
+ * 71% low-confidence rate. Decision-level on purpose: the SAME component set
+ * applies to every candidate, so comparability is preserved. `cells`/`live`
+ * true = the component carries signal somewhere in this decision and stays.
+ */
+export interface NumericalActiveComponents {
+  cells: boolean;
+  live: boolean;
+}
+
+/** True when this agent has a warm (≥{@link CELL_MIN_USES}) cell total over the
+ *  requirement's domains — the caller ORs this across candidates to decide
+ *  whether the cells component carries any signal for the decision. */
+export function hasWarmCells(
+  requirement: RequirementVector,
+  agentId: string,
+  cells: ReadonlyMap<string, CellStat>,
+): boolean {
+  const workType = parseSubtype(requirement.content.workType).parent;
+  let uses = 0;
+  for (const d of requirement.positional.domains) {
+    uses += cells.get(`${workType}|${d.id}|${agentId}`)?.uses ?? 0;
+  }
+  return uses >= CELL_MIN_USES;
+}
+
 /** Cost-tier alignment: effort/risk class → preferred tier neighborhood. */
 const TIER_ORDER = ['economy', 'standard', 'premium', 'premium_plus'] as const;
 
@@ -58,6 +89,9 @@ export function scoreNumerical(
   agentId: string,
   capability: CapabilityVector,
   inputs: NumericalInputs,
+  // K1: absent → legacy behavior (all three components, neutral-filled) —
+  // existing callers/tests stay bit-identical unless the caller opts in.
+  active?: NumericalActiveComponents,
 ): AxisScore {
   const evidence: string[] = [];
   const workType = parseSubtype(requirement.content.workType).parent;
@@ -94,6 +128,13 @@ export function scoreNumerical(
   const liveComponent = live.length > 0 ? live.reduce((a, b) => a + b, 0) / live.length : NEUTRAL;
   evidence.push(live.length > 0 ? `live signals ${liveComponent.toFixed(2)}` : 'live signals absent → neutral');
 
-  const score = (cellComponent + tierComponent + liveComponent) / 3;
+  // ── Compose (K1: signal-gated mean; legacy mean when `active` absent) ──
+  const parts: number[] = [tierComponent]; // tier always carries signal
+  if (!active || active.cells) parts.push(cellComponent);
+  else evidence.push('cells: no warm cell for ANY candidate → component dropped (signal-gated K1)');
+  if (!active || active.live) parts.push(liveComponent);
+  else evidence.push('live: absent for the decision → component dropped (signal-gated K1)');
+
+  const score = parts.reduce((a, b) => a + b, 0) / parts.length;
   return { score, evidence };
 }
