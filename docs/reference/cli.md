@@ -18,23 +18,23 @@ deckent <command> [options]
 - [`deckent onboard`](#onboard) — Run the interactive onboarding wizard
 - [`deckent upgrade`](#upgrade) — Self-update deckent to the latest version via npm
 
-### Sprint Workflow
+### Run Workflow
 
-- [`deckent start [description]`](#start) — Start a new sprint
-- [`deckent plan`](#plan) — Plan the next sprint without executing it
-- [`deckent test`](#test) — Run a test sprint — no retro, no memory update, no decay
-- [`deckent finalize`](#finalize) — Finalize a sprint: update MEMORY
-- [`deckent cleanup`](#cleanup) — Clean up after a sprint
-- [`deckent review`](#review) — Review sprint tasks with evaluations
-- [`deckent retro`](#retro) — Show the latest sprint retrospective from 
-- [`deckent explain`](#explain) — Explain what the last sprint did in human-friendly language
+- [`deckent start [description]`](#start) — Start a new run
+- [`deckent plan`](#plan) — Plan the next run without executing it
+- [`deckent test`](#test) — Execute a test run — no retro, no memory update, no decay
+- [`deckent finalize`](#finalize) — Finalize a run: update MEMORY
+- [`deckent cleanup`](#cleanup) — Clean up after a run
+- [`deckent review`](#review) — Review run tasks with evaluations
+- [`deckent retro`](#retro) — Show the latest run retrospective from 
+- [`deckent explain`](#explain) — Explain what the last run did in human-friendly language
 
 ### Monitoring
 
-- [`deckent status`](#status) — Show the current sprint dashboard
+- [`deckent status`](#status) — Show the current run dashboard
 - [`deckent watch`](#watch) — Open a live tmux split view: dashboard pane + worker panes
 - [`deckent dashboard`](#dashboard) — Show a terminal dashboard with auto-refresh (CLI rendering, no browser)
-- [`deckent history`](#history) — Show sprint history from 
+- [`deckent history`](#history) — Show run history from 
 - [`deckent usage`](#usage) — Show usage metrics (model calls, token counts, estimated cost for API mode)
 - [`deckent analyze`](#analyze) — Analyze project stack, size, and recommended methodology
 
@@ -43,7 +43,7 @@ deckent <command> [options]
 - [`deckent spawn <taskId>`](#spawn) — Manually spawn a tmux worker for a specific task ID
 - [`deckent kill <taskId>`](#kill) — Kill a running worker by task ID
 - [`deckent attach`](#attach) — Attach to the active tmux orchestra session
-- [`deckent run <description>`](#run) — Run a single one-shot task without a sprint cycle
+- [`deckent run <description>`](#run) — Run a single one-shot task without a run cycle
 - [`deckent sync`](#sync) — Sync adapter files (CLAUDE
 
 ### Configuration
@@ -69,7 +69,7 @@ deckent <command> [options]
 
 ### Analytics
 
-- [`deckent kpi`](#kpi) — Show KPI scorecard for the current or a specific sprint
+- [`deckent kpi`](#kpi) — Show KPI scorecard for the current or a specific run
 
 ### Connectors & Integrations
 
@@ -128,7 +128,7 @@ deckent init -y --no-image
 
 ## `onboard`
 
-Run the interactive onboarding wizard. Guides new users through provider setup, project configuration, and first-sprint preparation.
+Run the interactive onboarding wizard. Guides new users through provider setup, project configuration, and first-run preparation.
 
 **Usage:** `deckent onboard`
 
@@ -168,11 +168,11 @@ deckent upgrade --check
 
 ---
 
-# Sprint Workflow
+# Run Workflow
 
 ## `start [description]`
 
-Start a new sprint. Optionally pass a one-line description for zero-config mode — Deckent creates a temporary DIRECTIVES.md and starts immediately.
+Start a new run. Optionally pass a one-line description for zero-config mode — Deckent creates a temporary DIRECTIVES.md and starts immediately.
 
 **Usage:** `deckent start [description]`
 
@@ -183,10 +183,10 @@ Start a new sprint. Optionally pass a one-line description for zero-config mode 
 | `--auto-approve` | Auto-approve worker actions (--dangerously-skip-permissions) |
 | `--sandbox-mode` | Run in sandbox mode (git stash + restore) |
 | `--sandbox` | Use sandbox spawn backend (memory-cap + path-jail isolation, no Docker required) |
-| `--dry-run` | Plan sprint without spawning workers |
+| `--dry-run` | Plan run without spawning workers |
 | `--force` | Skip doctor pre-flight checks |
-| `--watch` | Automatically open watch mode after sprint spawns workers |
-| `--timeout <ms>` | Sprint timeout in milliseconds _(default: 30 minutes)_ |
+| `--watch` | Automatically open watch mode after run spawns workers |
+| `--timeout <ms>` | Run timeout in milliseconds _(default: 30 minutes)_ |
 | `--force-directives` | Override existing DIRECTIVES.md in zero-config mode |
 
 **Examples:**
@@ -203,7 +203,7 @@ deckent start "Fix login bug" --timeout 600000
 
 ## `plan`
 
-Plan the next sprint without executing it. Reads DIRECTIVES.md, checks usage, and generates task files in .tasks/. Prompts for confirmation before writing.
+Plan the next run without executing it. Reads DIRECTIVES.md, checks usage, and generates task files in .tasks/. Prompts for confirmation before writing.
 
 **Usage:** `deckent plan`
 
@@ -231,7 +231,7 @@ deckent plan --dry-run
 
 ## `test`
 
-Run a test sprint — no retro, no memory update, no decay. Useful for validating DIRECTIVES.md before committing to a full sprint.
+Execute a test run — no retro, no memory update, no decay. Useful for validating DIRECTIVES.md before committing to a full run.
 
 **Usage:** `deckent test`
 
@@ -240,7 +240,7 @@ Run a test sprint — no retro, no memory update, no decay. Useful for validatin
 | Flag | Description |
 |------|-------------|
 | `--keep` | Skip cleanup — leave task files in place after test |
-| `--timeout <ms>` | Maximum sprint duration in milliseconds _(default: `300000`)_ |
+| `--timeout <ms>` | Maximum run duration in milliseconds _(default: `300000`)_ |
 
 **Examples:**
 
@@ -254,7 +254,7 @@ deckent test --timeout 60000
 
 ## `finalize`
 
-Finalize a sprint: upsert the sprint's `retro` and `memory` entries in `memory.db`, refresh managed-docs (`.deckent/workspace/IDENTITY.md`, `CLAUDE.md`, …), regenerate `.brain/exports/*.md` snapshots, update config metadata, and optionally run memory decay.
+Finalize a run: upsert the run's `retro` and `memory` entries in `memory.db`, refresh managed-docs (`.deckent/workspace/IDENTITY.md`, `CLAUDE.md`, …), regenerate `.brain/exports/*.md` snapshots, update config metadata, and optionally run memory decay.
 
 **Usage:** `deckent finalize`
 
@@ -276,7 +276,7 @@ deckent finalize --skip-decay
 
 ## `cleanup`
 
-Clean up after a sprint. Removes task files, heartbeat files, and lock files. Optionally runs memory decay.
+Clean up after a run. Removes task files, heartbeat files, and lock files. Optionally runs memory decay.
 
 **Usage:** `deckent cleanup`
 
@@ -297,7 +297,7 @@ deckent cleanup --decay
 
 ## `review`
 
-Review sprint tasks with evaluations. Shows task results, self-assessments, and lets you approve or reject outcomes.
+Review run tasks with evaluations. Shows task results, self-assessments, and lets you approve or reject outcomes.
 
 **Usage:** `deckent review`
 
@@ -320,7 +320,7 @@ deckent review --json
 
 ## `retro`
 
-Show the latest sprint retrospective from .brain/RETRO.md.
+Show the latest run retrospective from .brain/RETRO.md.
 
 **Usage:** `deckent retro`
 
@@ -329,7 +329,7 @@ Show the latest sprint retrospective from .brain/RETRO.md.
 | Flag | Description |
 |------|-------------|
 | `--raw` | Show raw RETRO.md content without formatting |
-| `--compare` | Show delta comparison with previous sprint |
+| `--compare` | Show delta comparison with previous run |
 
 **Examples:**
 
@@ -342,7 +342,7 @@ deckent retro --compare
 
 ## `explain`
 
-Explain what the last sprint did in human-friendly language. Reads sprint logs, task results, and retro to produce a plain-English summary.
+Explain what the last run did in human-friendly language. Reads run logs, task results, and retro to produce a plain-English summary.
 
 **Usage:** `deckent explain`
 
@@ -358,7 +358,7 @@ deckent explain
 
 ## `status`
 
-Show the current sprint dashboard. Displays worker status, task progress, and phase information.
+Show the current run dashboard. Displays worker status, task progress, and phase information.
 
 **Usage:** `deckent status`
 
@@ -426,7 +426,7 @@ deckent dashboard --interval 5000
 
 ## `history`
 
-Show sprint history from .brain/sprints/. Displays a table of sprints with task counts, coverage, and duration.
+Show run history from .brain/sprints/. Displays a table of runs with task counts, coverage, and duration.
 
 **Usage:** `deckent history`
 
@@ -457,13 +457,13 @@ Show usage metrics (model calls, token counts, estimated cost for API mode).
 | Flag | Description |
 |------|-------------|
 | `--json` | Output as JSON |
-| `--sprint <id>` | Filter by sprint ID |
+| `--sprint <id>` | Filter by run ID |
 
 **Examples:**
 
 ```bash
 deckent usage
-deckent usage --sprint sprint-042
+deckent usage --sprint run-042
 deckent usage --json
 ```
 
@@ -536,7 +536,7 @@ deckent attach
 
 ## `run <description>`
 
-Run a single one-shot task without a sprint cycle. Creates a minimal task, spawns one worker, waits for the result.
+Run a single one-shot task without a run cycle. Creates a minimal task, spawns one worker, waits for the result.
 
 **Usage:** `deckent run <description>`
 
@@ -564,7 +564,7 @@ deckent run "Refactor auth module" --model-effort high --verbose
 
 ## `sync`
 
-Sync adapter files (CLAUDE.md, AGENTS.md) and detect out-of-band changes since the last sprint.
+Sync adapter files (CLAUDE.md, AGENTS.md) and detect out-of-band changes since the last run.
 
 **Usage:** `deckent sync`
 
@@ -1019,7 +1019,7 @@ deckent web --dev
 
 ## `kpi`
 
-Show the KPI scorecard for the current (or a specific) sprint. Displays pass/fail status for each registered KPI definition against actual sprint metrics.
+Show the KPI scorecard for the current (or a specific) run. Displays pass/fail status for each registered KPI definition against actual run metrics.
 
 **Usage:** `deckent kpi`
 
@@ -1027,9 +1027,9 @@ Show the KPI scorecard for the current (or a specific) sprint. Displays pass/fai
 
 | Flag | Description |
 |------|-------------|
-| `--sprint <id>` | Sprint ID to score _(defaults to the current sprint)_ |
-| `--trend <kpiId>` | Show trend series for a specific KPI across sprints |
-| `-n, --n <count>` | Number of sprints to include in the trend _(default: `10`)_ |
+| `--sprint <id>` | Run ID to score _(defaults to the current run)_ |
+| `--trend <kpiId>` | Show trend series for a specific KPI across runs |
+| `-n, --n <count>` | Number of runs to include in the trend _(default: `10`)_ |
 | `--json` | Output raw JSON |
 
 **Examples:**

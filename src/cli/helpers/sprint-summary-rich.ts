@@ -254,7 +254,7 @@ function renderNextSteps(evaluations: Map<string, string>, sprint: RichSprintInp
   }
 
   if (debt > 0) {
-    items.push(`Resolve ${debt} tech debt item(s) in next sprint`);
+    items.push(`Resolve ${debt} tech debt item(s) in next run`);
   }
 
   const coverage = sprint.metrics?.coveragePercent ?? 0;

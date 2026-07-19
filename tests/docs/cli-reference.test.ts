@@ -27,7 +27,7 @@ describe('docs/reference/cli.md', () => {
 
   it('documents all expected command categories', () => {
     expect(content).toContain('Project Setup');
-    expect(content).toContain('Sprint Workflow');
+    expect(content).toContain('Run Workflow');
     expect(content).toContain('Monitoring');
     expect(content).toContain('Workers & Tasks');
     expect(content).toContain('Configuration');

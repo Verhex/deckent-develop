@@ -341,7 +341,7 @@ describe('registerStartTool', () => {
 
       expect(result.isError).toBe(true);
       expect(parsed.success).toBe(false);
-      expect(parsed.message).toContain('Sprint already running');
+      expect(parsed.message).toContain('Run already running');
     });
 
     it('force=true bypasses the fake live lock — sandbox-scoped, not real-repo-dependent', async () => {

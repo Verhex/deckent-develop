@@ -351,9 +351,10 @@ export function buildNoActiveStatusJson(root: string): { active: false; pendingA
 }
 
 export function registerStatus(program: Command): void {
+  const registerLang = getLangFromRoot(resolveProjectRoot());
   program
     .command('status')
-    .description('Show the current sprint dashboard')
+    .description(getMessage('status.desc', registerLang))
     .option('--watch', 'Auto-refresh every 2 seconds')
     .option('-f, --follow', 'Follow mode: snapshot + live event tail')
     .option('--json', 'Output raw JSON instead of formatted dashboard')
@@ -417,12 +418,12 @@ export function registerStatus(program: Command): void {
       if (opts.graph) {
         const sprintId = getCurrentSprintId(root);
         if (!sprintId) {
-          output('No active sprint found — cannot display dependency graph.');
+          output(getMessage('status.graph_no_active_run', lang));
           return;
         }
         const mmd = loadDepGraphForSprint(root, sprintId);
         if (!mmd) {
-          output(`No dependency graph found for ${sprintId}.\nRun a sprint with dependencies to generate the graph.`);
+          output(getMessage('status.graph_not_found', lang, { id: sprintId }));
           return;
         }
         output(`\n--- Dependency Graph (${sprintId}) ---\n`);

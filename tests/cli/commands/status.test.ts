@@ -352,13 +352,13 @@ describe('status --graph flag (Task 139-031)', () => {
     );
   });
 
-  it('prints "no active sprint" when getCurrentSprintId returns null', async () => {
+  it('prints "no active run" when getCurrentSprintId returns null', async () => {
     vi.mocked(getCurrentSprintId).mockReturnValue(null);
     vi.mocked(existsSync).mockReturnValue(false);
 
     await runCommand(['status', '--graph']);
     expect(vi.mocked(print)).toHaveBeenCalledWith(
-      expect.stringContaining('No active sprint'),
+      expect.stringContaining('No active run'),
     );
   });
 

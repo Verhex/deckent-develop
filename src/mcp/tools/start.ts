@@ -52,18 +52,18 @@ export function registerStartTool(server: McpServer): void {
   server.registerTool(
     'deckent_start',
     {
-      title: 'Start Sprint',
-      description: 'Start a full sprint in the background. Runs the complete lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP. Pre-spawn cost gate (Sprint 189 T-008): if the estimated sprint cost exceeds cost_limits.sprint_max_usd (.deckent/cost-config.json), the tool returns COST_GATE_EXCEEDED — override with acknowledgeCost=true (or force=true to skip the gate entirely). Returns immediately with a jobId — the sprint continues asynchronously. Use deckent_status to monitor progress and deckent_review to evaluate results. Prerequisite: deckent_init + deckent_set_directives must have been run.',
+      title: 'Start Run',
+      description: 'Start a full run in the background. Runs the complete lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP. Pre-spawn cost gate: if the estimated run cost exceeds cost_limits.sprint_max_usd (.deckent/cost-config.json), the tool returns COST_GATE_EXCEEDED — override with acknowledgeCost=true (or force=true to skip the gate entirely). Returns immediately with a jobId — the run continues asynchronously. Use deckent_status to monitor progress and deckent_review to evaluate results. Prerequisite: deckent_init + deckent_set_directives must have been run.',
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         autoApprove: z.boolean().optional().default(false).describe('Auto-approve worker tool calls with --dangerously-skip-permissions. CLI default is false; set true only when the caller has confirmed the run is safe (CLI/MCP parity — ADR-022-V2).'),
         acknowledgeCost: z.boolean().optional().default(false).describe('Bypass the pre-spawn cost gate when the realistic estimate exceeds cost_limits.sprint_max_usd. The caller must explicitly acknowledge the over-budget run; otherwise deckent_start returns COST_GATE_EXCEEDED. Equivalent to CLI --force from the cost-gate perspective.'),
-        acknowledgeScopePaths: z.boolean().optional().default(false).describe('Bypass the pre-spawn SCOPE gate (Dimension B). By default a sprint is blocked before spawn when a task\'s filesWrite path does not exist and looks like a typo/wrong-directory (the sprint-380 orphan-file mode). Set true to allow such paths as intentional new files. Equivalent to CLI --force-scope; independent of acknowledgeCost/force.'),
-        acknowledgePromptGate: z.boolean().optional().default(false).describe('Bypass the plan-time G-series prompt gate BLOCK (persona-capability / decision-space / scope-contract findings — born-628). By default a sprint halts at PLAN when a task\'s finalized (persona × intent) fit fails a hard lint. Set true to allow such tasks to spawn anyway. Equivalent to CLI --force-prompt-gate; independent of acknowledgeCost/force/acknowledgeScopePaths.'),
-        dryRun: z.boolean().optional().default(false).describe('Plan the sprint without spawning workers. Returns the planned tasks list so you can review before committing. No workers are started, no files are changed.'),
+        acknowledgeScopePaths: z.boolean().optional().default(false).describe('Bypass the pre-spawn SCOPE gate (Dimension B). By default a run is blocked before spawn when a task\'s filesWrite path does not exist and looks like a typo/wrong-directory (an orphan-file mode). Set true to allow such paths as intentional new files. Equivalent to CLI --force-scope; independent of acknowledgeCost/force.'),
+        acknowledgePromptGate: z.boolean().optional().default(false).describe('Bypass the plan-time G-series prompt gate BLOCK (persona-capability / decision-space / scope-contract findings — born-628). By default a run halts at PLAN when a task\'s finalized (persona × intent) fit fails a hard lint. Set true to allow such tasks to spawn anyway. Equivalent to CLI --force-prompt-gate; independent of acknowledgeCost/force/acknowledgeScopePaths.'),
+        dryRun: z.boolean().optional().default(false).describe('Plan the run without spawning workers. Returns the planned tasks list so you can review before committing. No workers are started, no files are changed.'),
         force: z.boolean().optional().default(false).describe('Skip pre-flight checks AND the cost gate. Use only when the environment is known-ready and the cost has been verified out-of-band. Equivalent to CLI --force.'),
-        timeout: z.number().int().positive().optional().describe('Sprint maximum duration in milliseconds (default: 30 minutes = 1800000). Sprint is marked TIMEOUT if workers do not complete within this window.'),
-        sandbox: z.boolean().optional().default(false).describe('Run sprint in sandbox mode: stashes local git changes before spawning and restores them after the sprint completes. Safe experimentation — no permanent changes on failure.'),
+        timeout: z.number().int().positive().optional().describe('Run maximum duration in milliseconds (default: 30 minutes = 1800000). Run is marked TIMEOUT if workers do not complete within this window.'),
+        sandbox: z.boolean().optional().default(false).describe('Run in sandbox mode: stashes local git changes before spawning and restores them after the run completes. Safe experimentation — no permanent changes on failure.'),
         flowId: z.string().optional().describe('TERM-FLOW-UNIFY (426-001): consume an approved RunFlow snapshot instead of planning fresh — requires revision, planDigest and config.terminal.run_flow_v2=true. Must be supplied together with revision + planDigest.'),
         revision: z.number().int().optional().describe('RunFlow proposal revision to CAS-verify against the approved snapshot (used with flowId).'),
         planDigest: z.string().optional().describe('RunFlow planDigest to CAS-verify against the approved snapshot (used with flowId).'),
@@ -198,7 +198,7 @@ export function registerStartTool(server: McpServer): void {
             status: status === 'noop-duplicate' ? 'ALREADY_RUNNING' : 'RUNNING',
             message: status === 'noop-duplicate'
               ? `Run ${flowId} (revision ${revision}) was already started as job ${handle.jobId} — no-op.`
-              : 'Sprint started in background from an approved RunFlow snapshot (no re-plan). Use deckent_status to track progress.',
+              : 'Run started in background from an approved RunFlow snapshot (no re-plan). Use deckent_status to track progress.',
             activeWorkers: 0,
             queuedTasks: 0,
           };
@@ -229,7 +229,7 @@ export function registerStartTool(server: McpServer): void {
             const errData = {
               error: true,
               success: false,
-              message: `Sprint already running (PID ${lockInfo.pid}, env: ${lockInfo.env}, sprint: ${lockInfo.sprintId}, started: ${lockInfo.acquiredAt}). Use force=true to override.`,
+              message: `Run already running (PID ${lockInfo.pid}, env: ${lockInfo.env}, run: ${lockInfo.sprintId}, started: ${lockInfo.acquiredAt}). Use force=true to override.`,
             };
             const errSummary = formatErrorResponse({ message: errData.message });
             return {
@@ -476,7 +476,7 @@ export function registerStartTool(server: McpServer): void {
           success: true,
           jobId,
           status: 'RUNNING',
-          message: 'Sprint started in background. Use deckent_status to track progress.',
+          message: 'Run started in background. Use deckent_status to track progress.',
           activeWorkers: 0,
           queuedTasks: 0,
           estimatedDuration: sprintEstimate
@@ -496,7 +496,7 @@ export function registerStartTool(server: McpServer): void {
         };
       } catch (error) {
         const message = error instanceof BrainError
-          ? `Sprint failed at phase ${error.phase ?? 'unknown'}: ${error.message}`
+          ? `Run failed at phase ${error.phase ?? 'unknown'}: ${error.message}`
           : error instanceof Error ? error.message : String(error);
 
         const errData = { error: true, success: false, message };

@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "Deckent"
   text: "AI Agent Orchestration"
-  tagline: Your AI development team, orchestrated. Run multi-agent sprints with Brain, Workers, and Auditor — all from the CLI.
+  tagline: Your AI development team, orchestrated. Run multi-agent runs with Brain, Workers, and Auditor — all from the CLI.
   image:
     src: /logo.svg
     alt: Deckent
@@ -19,7 +19,7 @@ hero:
 features:
   - icon: 🧠
     title: Brain Orchestrator
-    details: Intelligent sprint planning with AI task decomposition. Brain coordinates all agents and evaluates results with GO/NO-GO/TECH-DEBT verdicts.
+    details: Intelligent run planning with AI task decomposition. Brain coordinates all agents and evaluates results with GO/NO-GO/TECH-DEBT verdicts.
   - icon: ⚡
     title: Parallel Workers
     details: Multiple worker agents execute tasks concurrently within scoped boundaries. Each worker stays in its lane — enforced by the Auditor.
@@ -44,7 +44,7 @@ features:
 - [Getting Started](guide/getting-started.md)
 - [Installation](guide/installation.md)
 - [Quickstart](guide/quickstart.md)
-- [First Sprint](guide/first-sprint.md)
+- [First Run](guide/first-sprint.md)
 - [Concepts](guide/concepts.md)
 - [Autonomous Engine](guide/autonomous-engine.md)
 - [Multi-Provider Fleet](guide/multi-provider-fleet.md)
@@ -74,17 +74,17 @@ features:
 - [Agent & Skill Architecture](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/agent-skill-architecture.md)
 - [Authority Matrix](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/authority-matrix.md)
 - [Memory System](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/memory-system.md)
-- [Sprint Lifecycle](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/sprint-lifecycle.md)
+- [Run Lifecycle](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/sprint-lifecycle.md)
 - [ADR Index](adr-index.md)
 
 ### Cookbook
 
 - [Cookbook Index](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/index.md)
-- [First Sprint](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/01-first-sprint.md)
+- [First Run](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/01-first-sprint.md)
 - [Multi-Provider Fleet](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/02-multi-provider-fleet.md)
 - [Memory Recall](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/03-memory-recall.md)
 - [Autonomous Mode](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/04-autonomous-mode.md)
-- [Recover a Stuck Sprint](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/09-recover-stuck-sprint.md)
+- [Recover a Stuck Run](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/09-recover-stuck-sprint.md)
 
 ### Features
 

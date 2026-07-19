@@ -439,6 +439,58 @@ describe('status extended messages', () => {
   it('status.dashboard_read_failed Turkish mentions okunamadı', () => {
     expect(getMessage('status.dashboard_read_failed', 'tr')).toContain('okunamadı');
   });
+
+  it('status.desc mentions run dashboard in both languages', () => {
+    expect(getMessage('status.desc', 'en')).toContain('run dashboard');
+    expect(getMessage('status.desc', 'tr')).toContain('run');
+  });
+
+  it('status.graph_no_active_run mentions run (not sprint) in both languages', () => {
+    expect(getMessage('status.graph_no_active_run', 'en')).toContain('No active run');
+    expect(getMessage('status.graph_no_active_run', 'tr')).toContain('Aktif run');
+  });
+
+  it('status.graph_not_found interpolates {id} and mentions run in both languages', () => {
+    const en = getMessage('status.graph_not_found', 'en', { id: 'sprint-139' });
+    expect(en).toContain('sprint-139');
+    expect(en).toContain('run');
+    const tr = getMessage('status.graph_not_found', 'tr', { id: 'sprint-139' });
+    expect(tr).toContain('sprint-139');
+    expect(tr).toContain('run');
+  });
+});
+
+// ─── history command messages ─────────────────────────────────────────────────
+
+describe('history command messages', () => {
+  it('history.desc mentions run history in both languages', () => {
+    expect(getMessage('history.desc', 'en')).toBe('Show run history');
+    expect(getMessage('history.desc', 'tr')).toContain('Run geçmişi');
+  });
+
+  it('history.opt_last mentions runs in both languages', () => {
+    expect(getMessage('history.opt_last', 'en')).toContain('runs');
+    expect(getMessage('history.opt_last', 'tr')).toContain('run');
+  });
+
+  it('history.opt_trend mentions runs in both languages', () => {
+    expect(getMessage('history.opt_trend', 'en')).toContain('runs');
+    expect(getMessage('history.opt_trend', 'tr')).toContain('run');
+  });
+
+  it('history.trend_header interpolates {n} in both languages', () => {
+    expect(getMessage('history.trend_header', 'en', { n: '5' })).toBe('--- Trend (last 5 runs) ---');
+    expect(getMessage('history.trend_header', 'tr', { n: '5' })).toContain('5 run');
+  });
+});
+
+// ─── desktop bridge messages ───────────────────────────────────────────────────
+
+describe('desktop bridge messages', () => {
+  it('desktop.shell.bridge.no_sprint mentions run (not sprint) in both languages', () => {
+    expect(getMessage('desktop.shell.bridge.no_sprint', 'en')).toContain('No live run');
+    expect(getMessage('desktop.shell.bridge.no_sprint', 'tr')).toContain('Canlı run yok');
+  });
 });
 
 // ─── init command messages ────────────────────────────────────────────────────

@@ -303,8 +303,8 @@ export function registerStatusTool(server: McpServer): void {
   server.registerTool(
     'deckent_status',
     {
-      title: 'Sprint Status',
-      description: 'Get the current sprint dashboard status. Returns: agents (active worker list with task assignments), progress (done/total counts + progress bar + ETA), alerts (stale workers, boundary violations, lock issues), job (background job state: RUNNING/COMPLETE/FAILED + sprintId + metrics), agentAssignments (which agent handles which tasks), skillAssignments (which skills are active). Call repeatedly to poll progress. No prerequisite — safe to call anytime.',
+      title: 'Run Status',
+      description: 'Get the current run dashboard status. Returns: agents (active worker list with task assignments), progress (done/total counts + progress bar + ETA), alerts (stale workers, boundary violations, lock issues), job (background job state: RUNNING/COMPLETE/FAILED + sprintId + metrics), agentAssignments (which agent handles which tasks), skillAssignments (which skills are active). Call repeatedly to poll progress. No prerequisite — safe to call anytime.',
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         json: z.boolean().optional().default(false).describe('Return raw JSON data without the human-readable summary wrapper. Useful for programmatic consumption.'),
@@ -328,7 +328,7 @@ export function registerStatusTool(server: McpServer): void {
           const completedData = {
             active: false,
             completed: true,
-            message: `Sprint ${canonicalSprintId ?? latestJob.sprintId ?? ''} completed.`,
+            message: `Run ${canonicalSprintId ?? latestJob.sprintId ?? ''} completed.`,
             sprintId: canonicalSprintId ?? latestJob.sprintId,
             completedAt: latestJob.completedAt,
             job: latestJob,
@@ -346,7 +346,7 @@ export function registerStatusTool(server: McpServer): void {
         }
         const noSprintData = {
           active: false,
-          message: 'No active sprint.',
+          message: 'No active run.',
           sprintId: canonicalSprintId,
           job: latestJob,
         };

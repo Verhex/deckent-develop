@@ -28,7 +28,7 @@ export class RichSprintSummary {
   renderResultsSection(data: SprintSummaryData): string {
     const { sprint, evaluations } = data;
     const lines: string[] = [];
-    lines.push(`=== RESULTS === Sprint ${sprint.number} (${sprint.id})`);
+    lines.push(`=== RESULTS === Run ${sprint.number} (${sprint.id})`);
     lines.push('');
 
     let done = 0;

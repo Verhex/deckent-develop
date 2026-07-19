@@ -9,6 +9,26 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint449] - 2026-07-18
+
+### Added
+
+- Envanter-keşif — kullanıcıya-görünen sprint literal taraması
+- MCP tool açıklamaları sprint→run revizyonu
+- Docs kullanıcı-yüzeyi sprint→run revizyonu
+
+### Changed
+
+- CLI inline-string revizyonu — sprint→run ve messages.ts göçü (completed with tech debt)
+- Entegrasyon doğrulaması — test + lint:i18n + gerçek-binary smoke (completed with tech debt)
+
+### Fixed
+
+- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: ROOT CAUSE of the original 445-015 NO_GO ('rubric total …
+
+
+_Tasks: 14 total, 10 done, 4 tech debt, 4 no-go_
+
 ## [1.0.0-beta.1-sprint448] - 2026-07-18
 
 ### Added

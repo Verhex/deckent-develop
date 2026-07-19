@@ -47,7 +47,7 @@ describe('history command (isolated)', () => {
     registerHistory(program);
     const cmd = program.commands.find(c => c.name() === 'history');
     expect(cmd).toBeDefined();
-    expect(cmd!.description()).toContain('sprint history');
+    expect(cmd!.description()).toContain('run history');
   });
 
   it('shows message when sprints dir does not exist', async () => {

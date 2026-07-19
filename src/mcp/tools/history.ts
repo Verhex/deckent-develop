@@ -29,11 +29,11 @@ export function registerHistoryTool(server: McpServer): void {
   server.registerTool(
     'deckent_history',
     {
-      title: 'Sprint History',
-      description: 'Read archived sprint log files from .brain/sprints/. Returns the last N sprint markdown logs sorted by sprint ID, plus a trend analysis (improving/declining/stable) based on task completion rates across sprints. Use to understand long-term project health, compare sprint performance, or review past decisions. Each sprint log contains task outcomes, model usage, and learning notes.',
+      title: 'Run History',
+      description: 'Read archived run log files from .brain/sprints/. Returns the last N run markdown logs sorted by run ID, plus a trend analysis (improving/declining/stable) based on task completion rates across runs. Use to understand long-term project health, compare run performance, or review past decisions. Each run log contains task outcomes, model usage, and learning notes.',
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        last: z.number().min(1).max(50).optional().default(5).describe('Number of most recent sprints to return (1-50, default: 5). Sprints are sorted by sprint ID ascending.'),
+        last: z.number().min(1).max(50).optional().default(5).describe('Number of most recent runs to return (1-50, default: 5). Runs are sorted by sprint ID ascending.'),
         json: z.boolean().optional().default(false).describe('Return raw JSON data without the human-readable summary wrapper. Useful for programmatic consumption or piping to other tools.'),
       }),
     },
@@ -77,7 +77,7 @@ export function registerHistoryTool(server: McpServer): void {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: `Failed to read sprint history: ${message}` }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: `Failed to read run history: ${message}` }) }],
           isError: true,
         };
       }

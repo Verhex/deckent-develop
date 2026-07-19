@@ -570,7 +570,7 @@ describe('history command', () => {
     );
     await runCommand(registerHistory, ['history']);
     const out = stdout();
-    expect(out).toContain('Sprint');
+    expect(out).toContain('Run');
     expect(out).toContain('Tasks');
     expect(out).toContain('Done');
     expect(out).toContain('No-Go%');

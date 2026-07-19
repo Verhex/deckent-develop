@@ -254,6 +254,18 @@ const MESSAGES: MessageMap = {
     en: 'Failed to read dashboard file.',
     tr: 'Dashboard dosyası okunamadı.',
   },
+  'status.desc': {
+    en: 'Show the current run dashboard',
+    tr: 'Güncel run dashboard\'ını göster',
+  },
+  'status.graph_no_active_run': {
+    en: 'No active run found — cannot display dependency graph.',
+    tr: 'Aktif run bulunamadı — bağımlılık grafiği gösterilemiyor.',
+  },
+  'status.graph_not_found': {
+    en: 'No dependency graph found for {id}.\nStart a run with dependencies to generate the graph.',
+    tr: '{id} için bağımlılık grafiği bulunamadı.\nGrafiği oluşturmak için bağımlılıkları olan bir run başlatın.',
+  },
   'status.worker_comms.header': {
     en: '--- Worker Comms ---',
     tr: '--- Worker İletişim ---',
@@ -2340,6 +2352,10 @@ const MESSAGES: MessageMap = {
   'features.total': { en: 'Total: {count} features', tr: 'Toplam: {count} özellik' },
   'history.no_history': { en: 'No run history found.', tr: 'Run geçmişi bulunamadı.' },
   'history.no_match': { en: 'No matching run history found.', tr: 'Eşleşen run geçmişi bulunamadı.' },
+  'history.desc': { en: 'Show run history', tr: 'Run geçmişini göster' },
+  'history.opt_last': { en: 'Show only last N runs', tr: 'Yalnızca son N run\'ı göster' },
+  'history.opt_trend': { en: 'Show success rate/coverage trend analysis for last 5 runs', tr: 'Son 5 run için başarı oranı/kapsam trend analizini göster' },
+  'history.trend_header': { en: '--- Trend (last {n} runs) ---', tr: '--- Trend (son {n} run) ---' },
   'config.set': { en: 'Set {key} = {value}', tr: '{key} = {value} olarak ayarlandı' },
   'config.invalid': { en: 'Invalid config: {errors}', tr: 'Geçersiz yapılandırma: {errors}' },
   'config.key_not_found': { en: 'Key not found: {key}', tr: 'Anahtar bulunamadı: {key}' },
@@ -3824,8 +3840,8 @@ const MESSAGES: MessageMap = {
   'desktop.shell.bridge.workers_title': { en: 'Workers', tr: 'Worker\'lar' },
   'desktop.shell.bridge.files_title': { en: 'Files in motion', tr: 'Hareketteki dosyalar' },
   'desktop.shell.bridge.no_sprint': {
-    en: 'No live sprint — issue an order below to set sail.',
-    tr: 'Canlı sprint yok — yelken açmak için aşağıdan emir verin.',
+    en: 'No live run — issue an order below to set sail.',
+    tr: 'Canlı run yok — yelken açmak için aşağıdan emir verin.',
   },
   'desktop.shell.bridge.hb_age': { en: '{n}s', tr: '{n}sn' },
   'desktop.shell.worker.back': { en: '← Bridge', tr: '← Köprü' },

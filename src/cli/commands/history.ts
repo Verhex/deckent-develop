@@ -178,7 +178,7 @@ function parsePercentValue(str: string): number | null {
  * Returns empty string if fewer than 2 records are provided.
  * Shows success rate and coverage deltas with directional arrows (↑/↓/→).
  */
-export function buildTrendAnalysis(records: SprintRecord[]): string {
+export function buildTrendAnalysis(records: SprintRecord[], lang = 'en'): string {
   if (records.length < 2) return '';
 
   const window = records.slice(-5); // use last 5 records (window = 5)
@@ -194,7 +194,7 @@ export function buildTrendAnalysis(records: SprintRecord[]): string {
   const successDelta = firstSuccess !== null && lastSuccess !== null ? lastSuccess - firstSuccess : null;
   const covDelta = firstCov !== null && lastCov !== null ? lastCov - firstCov : null;
 
-  const lines: string[] = [`--- Trend (last ${count} sprints) ---`];
+  const lines: string[] = [getMessage('history.trend_header', lang, { n: String(count) })];
 
   if (successDelta !== null) {
     const arrow = successDelta > 0 ? '↑' : successDelta < 0 ? '↓' : '→';
@@ -220,14 +220,15 @@ interface HistoryOpts {
 }
 
 export function registerHistory(program: Command): void {
+  const registerLang = detectLang(resolveProjectRoot());
   program
     .command('history')
-    .description('Show sprint history')
+    .description(getMessage('history.desc', registerLang))
     .option('--agent <name>', 'Filter by agent name')
     .option('--skill <name>', 'Filter by skill name')
     .option('--json', 'Output as JSON')
-    .option('--last <n>', 'Show only last N sprints')
-    .option('--trend', 'Show success rate/coverage trend analysis for last 5 sprints')
+    .option('--last <n>', getMessage('history.opt_last', registerLang))
+    .option('--trend', getMessage('history.opt_trend', registerLang))
     .action((opts: HistoryOpts) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);
@@ -300,12 +301,12 @@ export function registerHistory(program: Command): void {
         return;
       }
 
-      const headers = ['Sprint', 'Tasks', 'Done', 'Debt', 'No-Go', 'No-Go%', 'Success%', 'Coverage', 'Duration', 'Files', 'Tokens', 'Calls', 'Agents', 'Skills'];
+      const headers = ['Run', 'Tasks', 'Done', 'Debt', 'No-Go', 'No-Go%', 'Success%', 'Coverage', 'Duration', 'Files', 'Tokens', 'Calls', 'Agents', 'Skills'];
       const rows = records.map((r) => [r.sprint, r.tasks, r.completed, r.techDebt, r.noGo, r.noGoRate, r.successRate, r.coverage, r.duration, r.filesChanged, r.tokens, r.calls, r.agents, r.skills]);
       print(formatTable(headers, rows));
 
       if (opts.trend) {
-        const trend = buildTrendAnalysis(records);
+        const trend = buildTrendAnalysis(records, lang);
         if (trend) print(trend);
       }
     });

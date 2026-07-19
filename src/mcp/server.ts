@@ -16,38 +16,38 @@ import { getLanguage } from '../cli/helpers/messages.js';
 import { loadConfig } from '../core/config.js';
 
 export const DECKENT_MCP_INSTRUCTIONS = `
-Deckent is an AI agent orchestration CLI that runs multi-agent sprints inside your project.
+Deckent is an AI agent orchestration CLI that runs multi-agent runs inside your project.
 
 ## Workflow
 init → set_directives → plan → start → status → review → retro → cleanup
 
-## Sprint Lifecycle
+## Run Lifecycle
 PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
 ## Tools (47)
 - deckent_init: Initialize Deckent in the current project directory
-- deckent_set_directives: Write sprint goals and task definitions to DIRECTIVES.md
+- deckent_set_directives: Write run goals and task definitions to DIRECTIVES.md
 - deckent_plan: Generate task plan from DIRECTIVES (mode: ai/structured/auto)
-- deckent_start: Spawn workers and begin sprint execution (pre-spawn cost gate active — over-budget runs return COST_GATE_EXCEEDED unless acknowledgeCost=true)
-- deckent_status: Show live sprint progress, agent activity, and alerts
-- deckent_review: Evaluate sprint results — returns GO/NO_GO/GO_WITH_TECH_DEBT
-- deckent_retro: Read the retrospective and learnings from the last sprint
-- deckent_history: Show sprint history with agent/skill performance stats
+- deckent_start: Spawn workers and begin run execution (pre-spawn cost gate active — over-budget runs return COST_GATE_EXCEEDED unless acknowledgeCost=true)
+- deckent_status: Show live run progress, agent activity, and alerts
+- deckent_review: Evaluate run results — returns GO/NO_GO/GO_WITH_TECH_DEBT
+- deckent_retro: Read the retrospective and learnings from the last run
+- deckent_history: Show run history with agent/skill performance stats
 - deckent_doctor: Run health checks (config, locks, memory budget)
 - deckent_analyze_project: Detect project stack, frameworks, and tech context
 - deckent_sync: Sync agent/skill manifests and update routing rules
 - deckent_config: Read or set Deckent configuration values
-- deckent_run: Run a single task directly without a full sprint
-- deckent_kill: Kill a running sprint or specific worker agent
-- deckent_cleanup: Archive task files and release all locks after a sprint
+- deckent_run: Run a single task directly without a full run
+- deckent_kill: Kill a running run or specific worker agent
+- deckent_cleanup: Archive task files and release all locks after a run
 - deckent_help: Show runtime capabilities, project status, and usage guide
 - deckent_agent_list: List registered agents (built-in and temp)
 - deckent_skill_list: List registered skills with manifest info
 - deckent_checkpoint: Approve or reject a checkpoint gate
-- deckent_docs: Sprint lifecycle document management (add/remove/list)
-- deckent_explain: Explain sprint history and results
-- deckent_memory_query: Search project memory across all sources (ADR, sprint, debt, pattern)
-- deckent_watch: Subscribe to live sprint event stream via MCP logging notifications (backfill + push)
+- deckent_docs: Run lifecycle document management (add/remove/list)
+- deckent_explain: Explain run history and results
+- deckent_memory_query: Search project memory across all sources (ADR, run, debt, pattern)
+- deckent_watch: Subscribe to live run event stream via MCP logging notifications (backfill + push)
 - deckent_nervous_subscribe: Subscribe to Nervous System notifications
 - deckent_nervous_accept: Accept a pending nervous notification
 - deckent_nervous_reject: Reject a pending nervous notification
@@ -55,12 +55,12 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 - deckent_nervous_config: Read/set Nervous System authority mode and overrides
 - deckent_feature_query: Query feature manifest by category (active/lightly_used/dormant/dead/all)
 - deckent_truth: Feature truth-chain report (code/wired/enabled/proof per feature) — read-only
-- deckent_audit: Run Brain Self-Audit Gate for a sprint (tsc, vitest, honesty checks) — read-only
-- deckent_recover: Recover a crashed or stuck sprint (clean orphan IPC dirs, stale locks, archive tasks) — destructive
+- deckent_audit: Run Brain Self-Audit Gate for a run (tsc, vitest, honesty checks) — read-only
+- deckent_recover: Recover a crashed or stuck run (clean orphan IPC dirs, stale locks, archive tasks) — destructive
 - deckent_models: List and refresh model catalog (live fetch from models.dev with 24h cache + bundled fallback)
 - deckent_autonomous: Autonomous engine control surface (status/start/stop/backlog list-add-approve-reject, cron support)
 - deckent_process: Process-mode execution surface (submit an ExecutionRequest → policy-gated auto-run or park; status/result by executionId — ERP / business automation)
-- deckent_usage: Show token/limit consumption from Claude Code transcripts (model table or sprint task breakdown + cache-gate)
+- deckent_usage: Show token/limit consumption from Claude Code transcripts (model table or run task breakdown + cache-gate)
 - deckent_cost: Show cost config: budget limits, per-model pricing (input/output per MTok), and today's spend from the resource log
 - deckent_agent_manage: Manage the agent pool: add/remove/promote agents (CLI parity)
 - deckent_skill_manage: Manage the skill pool: add/remove + marketplace list (CLI parity)
@@ -71,21 +71,21 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 - deckent_nervous_undo: Plan an undo for the last accepted nervous suggestion (honest-unsupported when unavailable)
 - deckent_autonomous_approve: Approve an approval-required autonomous backlog entry
 - deckent_autonomous_reject: Reject an approval-required autonomous backlog entry
-- deckent_kpi: Show the KPI scorecard for a sprint — returns { sprintId, kpis } with cost, token, cache, retry, completion, and quality metrics
+- deckent_kpi: Show the KPI scorecard for a run — returns { sprintId, kpis } with cost, token, cache, retry, completion, and quality metrics
 
 ## Resources (8)
-- deckent://dashboard — Live sprint dashboard (agents, phases, alerts)
+- deckent://dashboard — Live run dashboard (agents, phases, alerts)
 - deckent://directives — Current DIRECTIVES.md content
-- deckent://memory — Brain memory (exports/memory.md) — sprint learnings
+- deckent://memory — Brain memory (exports/memory.md) — run learnings
 - deckent://debt — Technical debt register (exports/debt.md)
 - deckent://config — Current resolved configuration
-- deckent://retro — Last sprint retrospective (DB-first, exported)
+- deckent://retro — Last run retrospective (DB-first, exported)
 - deckent://tasks — Active task list with status
 - deckent://agents — Registered agent pool with stats
 
 ## DIRECTIVES Format
 \`\`\`markdown
-# DIRECTIVES — Sprint NNN: Title
+# DIRECTIVES — Run NNN: Title
 
 ## Task 1: Feature Name
 - Model: sonnet
@@ -108,7 +108,7 @@ What to implement and why.
 - provider: claude | codex | gemini
 
 ## Error Recovery
-Sprint stuck → deckent_kill → deckent_cleanup → deckent_doctor
+Run stuck → deckent_kill → deckent_cleanup → deckent_doctor
 Config issue → deckent_config read → deckent_config set key value
 `.trim();
 

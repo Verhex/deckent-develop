@@ -117,7 +117,7 @@ describe('registerStatusTool', () => {
       const server = createMockServer();
       registerStatusTool(server as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
       const config = server.tools.get('deckent_status')!.config as { title: string };
-      expect(config.title).toBe('Sprint Status');
+      expect(config.title).toBe('Run Status');
     });
 
     it('registers tool with description mentioning dashboard', async () => {
@@ -138,7 +138,7 @@ describe('registerStatusTool', () => {
       const result = await tool.handler({});
       const parsed = JSON.parse(result.content[0]!.text);
       expect(parsed.active).toBe(false);
-      expect(parsed.message).toMatch(/no active sprint/i);
+      expect(parsed.message).toMatch(/no active (run|sprint)/i);
     });
 
     it('reads and parses dashboard file when it exists', async () => {
@@ -378,7 +378,7 @@ describe('registerHistoryTool', () => {
       const server = createMockServer();
       registerHistoryTool(server as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
       const config = server.tools.get('deckent_history')!.config as { title: string };
-      expect(config.title).toBe('Sprint History');
+      expect(config.title).toBe('Run History');
     });
 
     it('registers tool with inputSchema containing last parameter', async () => {

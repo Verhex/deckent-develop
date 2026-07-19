@@ -1,6 +1,6 @@
 # CLI Command Inventory
 
-> Complete inventory of all Deckent CLI commands. Last updated Sprint 346.
+> Complete inventory of all Deckent CLI commands. Last updated Run 346.
 > **Total:** 57+ top-level commands + subcommands
 
 ## Quick Reference
@@ -8,17 +8,17 @@
 | # | Command | Description | MCP Tool |
 |---|---------|-------------|----------|
 | 1 | `init` | Initialize a new Deckent project | `deckent_init` |
-| 2 | `start` | Start a new sprint | `deckent_start` |
-| 3 | `plan` | Plan sprint without executing | `deckent_plan` |
-| 4 | `status` | Show current sprint dashboard | `deckent_status` |
+| 2 | `start` | Start a new run | `deckent_start` |
+| 3 | `plan` | Plan run without executing | `deckent_plan` |
+| 4 | `status` | Show current run dashboard | `deckent_status` |
 | 5 | `attach` | Attach to tmux orchestra session | — |
 | 6 | `spawn` | Manually spawn worker for task | — |
 | 7 | `kill` | Kill a running worker | `deckent_kill` |
-| 8 | `retro` | Show sprint retrospective | `deckent_retro` |
-| 9 | `cleanup` | Clean up after a sprint | `deckent_cleanup` |
+| 8 | `retro` | Show run retrospective | `deckent_retro` |
+| 9 | `cleanup` | Clean up after a run | `deckent_cleanup` |
 | 10 | `doctor` | Check system dependencies and health | `deckent_doctor` |
 | 11 | `config` | Show/modify project configuration | `deckent_config` |
-| 12 | `history` | Show sprint history | `deckent_history` |
+| 12 | `history` | Show run history | `deckent_history` |
 | 13 | `plugin` | Manage plugins | — |
 | 14 | `upgrade` | Self-update deckent | — |
 | 15 | `onboard` | Run onboarding wizard | — |
@@ -30,13 +30,13 @@
 | 21 | `sync` | Sync adapter files | `deckent_sync` |
 | 22 | `watch` | Live tmux split view | — |
 | 23 | `run` | Run a single one-shot task | `deckent_run` |
-| 24 | `test` | Run a test sprint (no retro) | — |
+| 24 | `test` | Execute a test run (no retro) | — |
 | 25 | `agent` | Manage agent pool | `deckent_agent_list` |
 | 26 | `skill` | Manage skill pool | `deckent_skill_list` |
-| 27 | `review` | Review sprint tasks with evaluations | `deckent_review` |
-| 28 | `finalize` | Finalize a sprint (update MEMORY) | — |
-| 29 | `explain` | Explain what the last sprint did | `deckent_explain` |
-| 30 | `set-directives` | Write sprint goals to DIRECTIVES.md | `deckent_set_directives` |
+| 27 | `review` | Review run tasks with evaluations | `deckent_review` |
+| 28 | `finalize` | Finalize a run (update MEMORY) | — |
+| 29 | `explain` | Explain what the last run did | `deckent_explain` |
+| 30 | `set-directives` | Write run goals to DIRECTIVES.md | `deckent_set_directives` |
 | 31 | `heartbeat` | Run proactive heartbeat tasks | — |
 | 32 | `checkpoint` | Manage human checkpoints | `deckent_checkpoint` |
 | 33 | `docs` | Manage user-defined documents | `deckent_docs` |
@@ -45,13 +45,13 @@
 | 36 | `recall` | Search project memory | `deckent_memory_query` |
 | 37 | `remember` | Store a note in project memory | — |
 | 38 | `memory` | Memory V2 management | — |
-| 39 | `resume` | Resume sprint from checkpoint | — |
+| 39 | `resume` | Resume run from checkpoint | — |
 | 40 | `nervous` | Nervous System dashboard | — |
 | — | `config nervous` | Configure nervous mode settings (subcommand of config) | — |
 | 42 | `mode` | Get/set deckent_style | — |
 | 43 | `features` | List feature flags and capabilities | — |
 | 44 | `audit` | Run Self-Audit Gate, audit-chain query/compliance/forward | `deckent_audit` |
-| 45 | `recover` | Recover from crashed/stuck sprint | — |
+| 45 | `recover` | Recover from crashed/stuck run | — |
 | 46 | `models` | Browse and manage model catalog (list/refresh/tier) | `deckent_models` |
 | 47 | `autonomous` | Autonomous runtime loop, backlog, approvals | `deckent_autonomous` |
 | 48 | `resources` | Show worker resource usage (CPU, memory, I/O) — live snapshot or historical analysis | — |
@@ -60,11 +60,11 @@
 | 51 | `audit-verify` | Verify the audit HMAC chain (tamper-evident audit log) | — |
 | 52 | `flow` | Manage scheduled flows (F3 process mode) | — |
 | 53 | `rbac` | Role-based access control — check permissions and manage roles | — |
-| 54 | `evolve` | Evolution analysis — cross-sprint trends and prompt suggestions | — |
+| 54 | `evolve` | Evolution analysis — cross-run trends and prompt suggestions | — |
 | 55 | `bot` | Manage external bot connectors (Discord, Telegram) | — |
 | 56 | `mcp` | Manage MCP servers (Claude-parity add/list/remove/get) | — |
 | 57 | `gateway` | Manage the connector gateway daemon (listen/start/stop/status/pair) | — |
-| 58 | `kpi` | Show the KPI scorecard for the current or a specific sprint | — |
+| 58 | `kpi` | Show the KPI scorecard for the current or a specific run | — |
 | 59 | `image` | Worker Docker image management (build subcommand) | — |
 | 60 | `process` | Process-mode execution surface — submit tasks and poll status | — |
 | 61 | `autonomous-mission` | Manage autonomous v2 missions (create-list/create-goal/list) | — |
@@ -142,21 +142,21 @@ deckent upgrade --beta
 
 ---
 
-## Sprint Workflow
+## Run Workflow
 
 ### `deckent start [description]`
 
-Start a new sprint (optionally with a one-line description for zero-config mode).
+Start a new run (optionally with a one-line description for zero-config mode).
 
 | Option | Description |
 |--------|-------------|
 | `--auto-approve` | Auto-approve worker actions (--dangerously-skip-permissions) |
 | `--sandbox-mode` | Run in sandbox mode (git stash + restore) |
 | `--sandbox` | Use sandbox spawn backend (memory-cap + path-jail isolation, no Docker required) |
-| `--dry-run` | Plan sprint without spawning workers |
+| `--dry-run` | Plan run without spawning workers |
 | `--force` | Skip doctor pre-flight checks |
-| `--watch` | Automatically open watch mode after sprint spawns workers |
-| `--timeout <ms>` | Sprint timeout in milliseconds (default: 30 minutes) |
+| `--watch` | Automatically open watch mode after run spawns workers |
+| `--timeout <ms>` | Run timeout in milliseconds (default: 30 minutes) |
 | `--force-directives` | Override existing DIRECTIVES.md in zero-config mode |
 
 **Example:**
@@ -172,7 +172,7 @@ deckent start --dry-run --sandbox-mode
 
 ### `deckent plan`
 
-Plan a sprint without executing it.
+Plan a run without executing it.
 
 | Option | Description |
 |--------|-------------|
@@ -195,12 +195,12 @@ deckent plan --dry-run
 
 ### `deckent test`
 
-Run a test sprint (no retro, no memory update, no decay).
+Execute a test run (no retro, no memory update, no decay).
 
 | Option | Description |
 |--------|-------------|
 | `--keep` | Skip cleanup — leave task files in place |
-| `--timeout <ms>` | Maximum sprint duration in milliseconds |
+| `--timeout <ms>` | Maximum run duration in milliseconds |
 | `--directives <file>` | Path to a custom directives file (overrides DIRECTIVES.md) |
 | `--sandbox` | Stash working tree changes before running, restore after (git stash) |
 | `--model <model>` | Force all tasks to use a specific model |
@@ -221,7 +221,7 @@ Finalize a sprint: upsert the sprint's `retro` and `memory` entries in `memory.d
 
 | Option | Description |
 |--------|-------------|
-| `--sprint <id>` | Specific sprint ID to finalize (e.g. sprint-063) |
+| `--sprint <id>` | Specific run ID to finalize (e.g. sprint-063) |
 | `--skip-decay` | Skip memory/debt decay phase |
 | `--skip-hooks` | Skip plugin afterSprint hooks |
 | `--force` | Force finalize even if tasks are still in-progress |
@@ -365,10 +365,10 @@ Show the latest sprint retrospective.
 | Option | Description |
 |--------|-------------|
 | `--raw` | Show raw RETRO.md content without formatting |
-| `--compare` | Show delta comparison with previous sprint |
+| `--compare` | Show delta comparison with previous run |
 | `--json` | Output results as JSON |
 | `--perf` | Show agent/skill performance tables |
-| `--trend [n]` | Show success rate trend across last N sprints (default: 5) |
+| `--trend [n]` | Show success rate trend across last N runs (default: 5) |
 
 **Example:**
 ```bash
@@ -386,7 +386,7 @@ Explain what the last sprint did in human-friendly language.
 
 | Option | Description |
 |--------|-------------|
-| `--sprint <id>` | Show a specific sprint by ID (e.g. 042) |
+| `--sprint <id>` | Show a specific run by ID (e.g. 042) |
 | `--task <taskId>` | Show routing decision log for a specific task |
 | `--json` | Output results as JSON |
 | `--verbose` | Show all learnings and full task details |
@@ -411,7 +411,7 @@ Show sprint history.
 | `--agent <name>` | Filter by agent name |
 | `--skill <name>` | Filter by skill name |
 | `--json` | Output as JSON |
-| `--last <n>` | Show only last N sprints |
+| `--last <n>` | Show only last N runs |
 | `--trend` | Show success rate/coverage trend analysis |
 
 **Example:**
@@ -450,7 +450,7 @@ Check system dependencies and health.
 | `--profile` | Show system profile information |
 | `--legacy` | Use legacy output format |
 | `--json` | Output results as JSON |
-| `--pre-flight` | Run pre-flight health check before sprint spawn |
+| `--pre-flight` | Run pre-flight health check before run spawn |
 | `--providers` | Show detailed provider diagnostics (binary, version, auth) for Claude/Codex/Gemini |
 | `--memory` | Show host RAM detection (/proc/meminfo first, os.totalmem fallback) and suggested max_workers |
 | `--ram-experiment` | Show 6-worker × 2g RAM scenario verdict (Safe/Risky) based on current config and host RAM |
@@ -519,7 +519,7 @@ Run Brain Self-Audit Gate for a sprint (tsc + vitest + honesty + observability),
 | Option | Description |
 |--------|-------------|
 | `--json` | Output raw JSON only |
-| `--sprint <id>` | Sprint ID for the `query`/`compliance`/`forward`/`retention` subcommands (default: `sprint-001`) |
+| `--sprint <id>` | Run ID for the `query`/`compliance`/`forward`/`retention` subcommands (default: `sprint-001`) |
 | `--url <url>` | `forward`: POST audit records to an HTTP(S) SIEM endpoint (takes precedence over `--syslog` and `--out`) |
 | `--syslog <host[:port]>` | `forward`: send audit records to a syslog collector, RFC 5424 (takes precedence over `--out`; default port `514`) |
 | `--syslog-protocol <protocol>` | `forward`: syslog wire protocol — `udp`\|`tcp` (default: `udp`) |
@@ -578,7 +578,7 @@ Show transcript-based token and limit usage accounting (real ground-truth ledger
 
 | Option | Description |
 |--------|-------------|
-| `--sprint <N>` | Show per-task breakdown for a specific sprint (task name, model, calls, output tokens, cache write, bootstrap cache write, $-cost). Default: 7-day rolling window aggregated by model. |
+| `--sprint <N>` | Show per-task breakdown for a specific run (task name, model, calls, output tokens, cache write, bootstrap cache write, $-cost). Default: 7-day rolling window aggregated by model. |
 | `--since <ISO>` | Start date for usage window (ISO 8601 format, e.g. `2026-06-01`). Default: 7 days ago. |
 | `--until <ISO>` | End date for usage window (ISO 8601 format). Default: today. |
 | `--json` | Output raw JSON (array of usage records) for integration with monitoring tools. |
@@ -920,7 +920,7 @@ Search project memory — ADRs, sprint learnings, patterns, debt.
 |--------|-------------|
 | `-t, --type <types>` | Filter by type (comma-separated: adr,memory,sprint,debt,pattern) |
 | `-n, --limit <n>` | Max results |
-| `--sprint-min <n>` | Minimum sprint number |
+| `--sprint-min <n>` | Minimum run number |
 | `-m, --mode <mode>` | FTS5 token join mode: or (default) \| and |
 | `--json` | Output results as JSON |
 
@@ -987,7 +987,7 @@ Manage agent pool.
 |------------|-------------|
 | `agent list` | List all agents (`--json`) |
 | `agent create <name>` | Create a custom agent (`--model`, `--triggers`, `--prompt`, `--description`) |
-| `agent stats <name>` | Show sprint-by-sprint performance (`--json`) |
+| `agent stats <name>` | Show run-by-run performance (`--json`) |
 | `agent enable <name>` | Enable an agent |
 | `agent disable <name>` | Disable an agent |
 | `agent delete <name>` | Delete an agent from the pool |
@@ -1045,7 +1045,7 @@ Evolution analysis — inspect cross-sprint agent/skill performance trends and s
 
 | Subcommand | Description |
 |------------|-------------|
-| `evolve report` | Show cross-sprint agent/skill trend report (`-n/--sprints <n>`, `--json`) |
+| `evolve report` | Show cross-run agent/skill trend report (`-n/--sprints <n>`, `--json`) |
 
 **Example:**
 ```bash
@@ -1098,7 +1098,7 @@ Manage user-defined documents (managed-docs system).
 | `docs remove <path>` | Remove a document |
 | `docs list` | List all managed documents |
 | `docs update <path>` | Update rules (`--add-auto`, `--add-protect`, `--remove-auto`, `--max-lines`) |
-| `docs run` | Run managed doc updates without a sprint (`--no-cache`) |
+| `docs run` | Run managed doc updates without a run (`--no-cache`) |
 
 **Example:**
 ```bash
@@ -1270,7 +1270,7 @@ Report tech-debt status and archive resolved debt items from memory.db.
 | Option | Description |
 |--------|-------------|
 | `--count` | Show only the open/resolved counts |
-| `--before <sprint>` | Also report resolved items originating before this sprint ID |
+| `--before <sprint>` | Also report resolved items originating before this run ID |
 
 **Example:**
 ```bash
@@ -1432,7 +1432,7 @@ Show transcript-based token and limit usage accounting from the REPL.
 
 | Option | Description |
 |--------|-------------|
-| `--sprint <N>` | Show per-task breakdown for a specific sprint. Default: 7-day rolling window aggregated by model. |
+| `--sprint <N>` | Show per-task breakdown for a specific run. Default: 7-day rolling window aggregated by model. |
 | `--since <ISO>` | Start date for usage window (ISO 8601 format). Default: 7 days ago. |
 | `--until <ISO>` | End date for usage window (ISO 8601 format). Default: today. |
 
@@ -1530,9 +1530,9 @@ Show the KPI scorecard for the current (or a specific) sprint. Displays pass/fai
 
 | Option | Description |
 |--------|-------------|
-| `--sprint <id>` | Sprint ID to score (defaults to the current sprint) |
-| `--trend <kpiId>` | Show trend series for a specific KPI across sprints |
-| `-n, --n <count>` | Number of sprints to include in the trend (default: 10) |
+| `--sprint <id>` | Run ID to score (defaults to the current run) |
+| `--trend <kpiId>` | Show trend series for a specific KPI across runs |
+| `-n, --n <count>` | Number of runs to include in the trend (default: 10) |
 | `--json` | Output raw JSON |
 
 **Example:**
@@ -1733,4 +1733,4 @@ deckent autonomous-mission list --json
 
 ---
 
-_Updated: 2026-06-28 | Sprint 346 | Deckent v1.0.0-beta.1_
+_Updated: 2026-06-28 | Run 346 | Deckent v1.0.0-beta.1_

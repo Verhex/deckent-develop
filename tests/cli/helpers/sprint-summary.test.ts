@@ -48,7 +48,7 @@ describe('RichSprintSummary', () => {
   describe('renderResultsSection', () => {
     it('includes sprint id and number', () => {
       const output = summary.renderResultsSection(makeData());
-      expect(output).toContain('Sprint 10');
+      expect(output).toContain('Run 10');
       expect(output).toContain('sprint-010');
     });
 
