@@ -52,6 +52,8 @@
 | adr-g-036 | Zero-Hardcode Model & Flow Values (Parametric-Only) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-451 Learnings** (sprint-451): ## Sprint sprint-451 Learnings
+- Wire builtins drift-check into the validate-publish gate: GO_WITH_TECH_DEBT — Found ...
 - **Sprint sprint-450 Learnings** (sprint-450): ## Sprint sprint-450 Learnings
 - Integration verification with vitest sweep and real-binary status smoke: GO_WITH_TEC...
 - **Sprint sprint-449 Learnings** (sprint-449): ## Sprint sprint-449 Learnings
@@ -72,13 +74,10 @@
 - Rehydrate event-fold sorgu-yuzeyi getFlow ve listFlows: GO_WITH_TECH_DEBT — Rehydrat...
 - **Sprint sprint-441 Learnings** (sprint-441): ## Sprint sprint-441 Learnings
 - SKILL-RETRIEVAL çift-eşik entegrasyon testleri ve regresyon-yeşili kanıtı: NO_GO — C...
-- **Sprint sprint-440 Learnings** (sprint-440): ## Sprint sprint-440 Learnings
-- Yeni hermetik birim-testler test-yazarligi ve implementation senaryolari: NO_GO — Ca...
 
 ## Active Technical Debt
-- [HIGH] Tech debt from 449-005-xfix: ROOT-CAUSE FINDING (read first): the premise that 4
-- [HIGH] Tech debt from 449-008-fix: Scope note: this task's write authority is ONLY test
-- [CRITICAL] Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso
+- [CRITICAL] Tech debt from 449-005-xfix: ROOT-CAUSE FINDING (read first): the premise that 4
+- [CRITICAL] Tech debt from 449-008-fix: Scope note: this task's write authority is ONLY test
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -151,4 +150,4 @@
 - Violation pattern: file_outside_scope
 - Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 1580 | Generated: 2026-07-19_
+_Total entries: 1585 | Generated: 2026-07-19_

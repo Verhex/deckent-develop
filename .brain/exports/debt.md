@@ -4,14 +4,15 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-449-005-xfix | Tech debt from 449-005-xfix: ROOT-CAUSE FINDING (read first): the premise that 4 | high | sprint-449 | active |
-| debt-449-008-fix | Tech debt from 449-008-fix: Scope note: this task's write authority is ONLY test | high | sprint-449 | active |
-| debt-433-001-fix | Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso | critical | sprint-433 | active |
+| debt-449-005-xfix | Tech debt from 449-005-xfix: ROOT-CAUSE FINDING (read first): the premise that 4 | critical | sprint-449 | active |
+| debt-449-008-fix | Tech debt from 449-008-fix: Scope note: this task's write authority is ONLY test | critical | sprint-449 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-451-001 | Tech debt from 451-001: Found that a builtins-drift gate already existed (checkB | normal | sprint-451 | resolved |
+| debt-451-002 | Tech debt from 451-002: Measured `npm run lint:builtins-drift` wall-clock over 3 | normal | sprint-451 | resolved |
 | debt-450-006 | Tech debt from 450-006: 6/7 goCriteria items fully evidenced GREEN: tsc --noEmit | normal | sprint-450 | resolved |
 | debt-449-005 | Tech debt from 449-005: MAJOR PLANNING FINDING (read this first): a full-repo gr | normal | sprint-449 | resolved |
 | debt-449-006 | Tech debt from 449-006: Converted all user-facing 'sprint' prose in the 5 in-sco | normal | sprint-449 | resolved |
@@ -37,6 +38,7 @@
 | debt-437-003 | Tech debt from 437-003: New src/core/approval-notify-dedup.ts: ApprovalNotifyDed | normal | sprint-437 | resolved |
 | debt-437-004 | Tech debt from 437-004: Implemented the honest-expired-decide contract entirely  | normal | sprint-437 | resolved |
 | debt-434-001 | Tech debt from 434-001: packed-install job hardened, scope-limited to .github/wo | normal | sprint-434 | resolved |
+| debt-433-001-fix | Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso | critical | sprint-433 | resolved |
 | debt-432-004 | Tech debt from 432-004: Audit: finalizeSprint has exactly ONE call site inside s | normal | sprint-432 | resolved |
 | debt-431-001 | Tech debt from 431-001: Mirrors scripts/lint-no-spawnsync.mjs 1:1: pure exported | normal | sprint-431 | resolved |
 | debt-429-003 | Tech debt from 429-003: born-677 root cause: buildTaskBlock() joined goCriteria/ | normal | sprint-429 | resolved |

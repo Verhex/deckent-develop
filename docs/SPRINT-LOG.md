@@ -11073,3 +11073,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 450-006: Integration verification with vitest sweep and real-binary status smoke (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 451 — sprint-451
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-19
+**Duration:** 643s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 643019ms |
+
+### Tasks
+
+- 451-001: Wire builtins drift-check into the validate-publish gate (GO_WITH_TECH_DEBT)
+- 451-002: Measure lint:builtins-drift runtime and apply the lint:gates decision (GO_WITH_TECH_DEBT)
+- 451-003: Document the builtins drift publish gate in reference docs and CHANGELOG (DONE)
+- 451-004: Hermetic gate tests and real-binary publish-gate proof (DONE)
+
+---

@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-451 Learnings
+- Sprint sprint-451 Learnings: ## Sprint sprint-451 Learnings
+- Wire builtins drift-check into the validate-publish gate: GO_WITH_TECH_DEBT — Found that a builtins-drift gate already existed (checkBuiltinsDrift) but was wired via safeExec('npm run --silent lint:
+- Measure lint:builtins-drift runtime and apply the lint:gates decision: GO_WITH_TECH_DEBT — Measured `npm run lint:builtins-drift` wall-clock over 3 sequential runs (Node process spawn per run via npm run; date +
+
+## Gains
+- 451-003 — Document the builtins drift publish gate in reference docs and CHANGELOG — Created comprehensive reference documentation for builtins drift publish gate.
+- 451-004 — Hermetic gate tests and real-binary publish-gate proof — Implemented per plan (.tasks/task-451-004.plan).
+
 ## Sprint sprint-450 Learnings
 - Sprint sprint-450 Learnings: ## Sprint sprint-450 Learnings
 - Integration verification with vitest sweep and real-binary status smoke: GO_WITH_TECH_DEBT — 6/7 goCriteria items fully evidenced GREEN: tsc --noEmit clean; all 10 actually-touched test files pass (340 passed/4 sk
