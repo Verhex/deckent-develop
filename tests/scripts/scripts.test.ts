@@ -1,13 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '../../');
 const SCRIPTS_DIR = path.join(PROJECT_ROOT, 'scripts');
-const TMP_TEST_DIR = path.join(PROJECT_ROOT, '.tmp-script-tests');
+// HERMETICITY (dogfood-450 canlı-olay #2 — the 'invalid-version' minifier):
+// this dir used to live at PROJECT_ROOT/.tmp-script-tests; a killed run left
+// junk in the repo root. All test scratch now lives under os.tmpdir().
+const TMP_TEST_DIR = path.join(os.tmpdir(), `deckent-script-tests-${process.pid}`);
 
 const isWindows = process.platform === 'win32';
 
@@ -22,9 +26,10 @@ function runScriptAsync(
   scriptName: string,
   args: string[] = [],
   timeoutMs = 60000,
+  scriptsDir: string = SCRIPTS_DIR,
 ): Promise<{ success: boolean; output: string; error?: string }> {
   return new Promise((resolve) => {
-    const scriptPath = path.join(SCRIPTS_DIR, scriptName);
+    const scriptPath = path.join(scriptsDir, scriptName);
     const child = spawn('bash', [scriptPath, ...args], {
       cwd: PROJECT_ROOT,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -114,21 +119,27 @@ describe.skipIf(isWindows)('OSS Scripts', () => {
     });
 
     it('should fail if version format is invalid', async () => {
-      // Create a temp package.json with invalid version
-      const tmpPkgPath = path.join(TMP_TEST_DIR, 'package.json');
+      // HERMETIC REWRITE (dogfood-450 canlı-olay #2): the old version of this
+      // test wrote a MINIFIED, version:'invalid-version' package.json into the
+      // REAL project root and restored it afterwards (not even in a finally).
+      // A vitest-worker hard-kill inside that window (the chronic
+      // "Timeout calling onTaskUpdate" flake) left the corruption behind — it
+      // reached a commit once (f2232791) and poisoned two ci-sim runs with
+      // 12-13 downstream version-assert failures each. verify-publish.sh
+      // resolves PROJECT_ROOT from its own script location, so run a COPY of
+      // the script from a tmp root that carries the corrupted package.json —
+      // the real project root is never written, under any failure mode.
+      const tmpRoot = path.join(TMP_TEST_DIR, 'invalid-version-root');
+      fs.mkdirSync(path.join(tmpRoot, 'scripts'), { recursive: true });
       const pkgData = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf-8'));
       pkgData.version = 'invalid-version';
-      fs.writeFileSync(tmpPkgPath, JSON.stringify(pkgData));
+      fs.writeFileSync(path.join(tmpRoot, 'package.json'), JSON.stringify(pkgData, null, 2) + '\n');
+      fs.copyFileSync(
+        path.join(SCRIPTS_DIR, 'verify-publish.sh'),
+        path.join(tmpRoot, 'scripts', 'verify-publish.sh'),
+      );
 
-      // Copy to project root temporarily
-      const origPath = path.join(PROJECT_ROOT, 'package.json');
-      const backup = fs.readFileSync(origPath);
-      fs.writeFileSync(origPath, JSON.stringify(pkgData));
-
-      const result = await runScriptAsync('verify-publish.sh', []);
-
-      // Restore backup
-      fs.writeFileSync(origPath, backup);
+      const result = await runScriptAsync('verify-publish.sh', [], 60000, path.join(tmpRoot, 'scripts'));
 
       expect(result.success).toBe(false);
       expect(result.output).toContain('Invalid version format');
