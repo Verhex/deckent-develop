@@ -86,6 +86,78 @@ describe('evaluateScopeGate', () => {
     expect(res.verdicts[0]!.classification).toBe('new-plausible');
   });
 
+  it('does NOT flag a mirror-named NEW test whose task also owns the matching source (449-006 live case)', () => {
+    // tests/cli/commands/history.test.ts exists; a NEW tests/mcp/tools/history.test.ts
+    // is parallel suite naming, not a wrong directory, WHEN the same task also writes
+    // src/mcp/tools/history.ts (the module's own test) — the wrong-dir rule killed the
+    // RUN-RENAME dilim-2 run twice (flow-a7e3c2d2/2f42f845) on exactly this shape.
+    const res = evaluateScopeGate({
+      tasks: [task('t1', ['src/mcp/tools/history.ts', 'tests/mcp/tools/history.test.ts'])],
+      trackedFiles: [
+        ...TRACKED,
+        'src/mcp/tools/history.ts',
+        'tests/cli/commands/history.test.ts',
+        'tests/mcp/tools/other.test.ts',
+      ],
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.verdicts.map(v => v.classification)).toEqual(['confirmed', 'new-plausible']);
+  });
+
+  it('KEEPS the wrong-dir block for a mirror-named test with NO matching source in the task (397-007 shape)', () => {
+    // The task writes an unrelated source file — a test name matching nothing the task
+    // owns is the wrong-directory-reference shape; the auto-replace repair must survive.
+    const res = evaluateScopeGate({
+      tasks: [task('t1', ['src/core/config.ts', 'tests/mcp/tools/history.test.ts'])],
+      trackedFiles: [...TRACKED, 'tests/cli/commands/history.test.ts', 'tests/mcp/tools/other.test.ts'],
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it('KEEPS the wrong-dir block for a mirror-named test whose parent directory is untracked', () => {
+    // The test-basename exemption requires a tracked parent dir — an untracked dir
+    // flows through the invented-dir rules unchanged (thin ancestor here ⇒ suspect).
+    const res = evaluateScopeGate({
+      tasks: [task('t1', ['src/mcp/tools/history.ts', 'tests/imaginary/history.test.ts'])],
+      trackedFiles: [...TRACKED, 'src/mcp/tools/history.ts', 'tests/cli/commands/history.test.ts'],
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it('KEEPS the 573/518 wrong-dir block for source-module basenames even with a tracked parent', () => {
+    // src/orchestra/ is tracked, yet worker.ts belongs to src/agents/ — the test-file
+    // exemption must NOT leak onto source modules.
+    const res = evaluateScopeGate({
+      tasks: [task('t1', ['src/orchestra/worker.ts'])],
+      trackedFiles: TRACKED,
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it('treats a glob scope pattern matching tracked files as confirmed (flow-63aedcaf live case)', () => {
+    // Planner sometimes emits pattern scopes; a glob spanning real content is a
+    // scope declaration, not a typo — it must not block the run post-approval.
+    const res = evaluateScopeGate({
+      tasks: [task('t1', ['src/core/**/*.ts', 'tests/core/*.test.ts'])],
+      trackedFiles: TRACKED,
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.verdicts.map(v => v.classification)).toEqual(['confirmed', 'confirmed']);
+    expect(res.verdicts[0]!.reason).toContain('scope pattern matching');
+  });
+
+  it('still BLOCKS a glob pattern that matches no tracked file (wrong-directory pattern)', () => {
+    const res = evaluateScopeGate({
+      tasks: [task('t1', ['src/nonexistent/**/*.ts'])],
+      trackedFiles: TRACKED,
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.suspects[0]!.reason).toContain('matches no tracked file');
+  });
+
   it('flags a write into a fully invented directory as suspect (no suggestion)', () => {
     const res = evaluateScopeGate({
       tasks: [task('t1', ['src/nonexistent-dir/brand-new-thing.ts'])],

@@ -165,6 +165,68 @@ const COMMON_BASENAMES = new Set([
   'readme.md', '__init__.py', 'mod.rs', 'lib.rs',
 ]);
 
+/**
+ * Test/spec basenames legitimately recur ACROSS suites (`tests/cli/commands/history.test.ts`
+ * and a new `tests/mcp/tools/history.test.ts` are parallel naming, not a wrong
+ * directory) — live RUN-RENAME dilim-2 false-positive (flow-a7e3c2d2, 449-006):
+ * the wrong-dir rule killed the run twice for a legitimate new mirror-named test.
+ * Guards keeping the 397-007 auto-replace repair alive (that historical typo was
+ * ALSO a .test.ts): the exemption needs BOTH (a) a tracked parent directory and
+ * (b) TASK-LOCAL evidence — the same task also writes/reads a SOURCE module whose
+ * stem matches the test name (writing src/mcp/tools/history.ts makes a new
+ * history.test.ts the module's own test; a test name matching nothing the task
+ * owns is exactly the wrong-dir-reference shape). Source-module basenames
+ * (worker.ts) keep the full 573/518 protection: this predicate matches test
+ * files only.
+ */
+const RECURRING_TEST_BASENAME_RE = /\.(test|spec)\.[cm]?[jt]sx?$/i;
+function isRecurringTestBasename(b: string): boolean {
+  return RECURRING_TEST_BASENAME_RE.test(b);
+}
+
+/** Does the task's own scope contain a non-test source file whose stem matches this test basename? */
+function taskOwnsMatchingSource(testBasename: string, taskPaths: readonly string[]): boolean {
+  const stem = testBasename.replace(RECURRING_TEST_BASENAME_RE, '').toLowerCase();
+  return taskPaths.some(p => {
+    const b = basename(p);
+    if (isRecurringTestBasename(b)) return false;
+    return b.toLowerCase().replace(/\.[cm]?[jt]sx?$/, '') === stem;
+  });
+}
+
+// ─── glob-aware scope entries (live RUN-RENAME dilim-2, flow-63aedcaf) ──────
+// The planner sometimes emits PATTERN scopes (`src/cli/commands/**/*.ts`) instead
+// of concrete paths; treating the pattern as a literal path made every entry an
+// invented-dir suspect and killed the run post-approval. A glob that matches ≥1
+// tracked file is a scope pattern over existing content — not a typo. A glob that
+// matches NOTHING keeps blocking (that is exactly a wrong-directory pattern).
+
+const GLOB_MAGIC_RE = /[*?[]/;
+
+/** Minimal path-glob → RegExp: `**` spans directories, `*`/`?` stay within one segment. */
+function globToRegExp(glob: string): RegExp {
+  let out = '';
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i]!;
+    if (c === '*') {
+      if (glob[i + 1] === '*') {
+        i++;
+        if (glob[i + 1] === '/') { i++; out += '(?:.*/)?'; }
+        else out += '.*';
+      } else {
+        out += '[^/]*';
+      }
+    } else if (c === '?') {
+      out += '[^/]';
+    } else if ('\\^$.|+()[]{}'.includes(c)) {
+      out += `\\${c}`;
+    } else {
+      out += c;
+    }
+  }
+  return new RegExp(`^${out}$`);
+}
+
 function basename(p: string): string {
   const i = p.lastIndexOf('/');
   return i >= 0 ? p.slice(i + 1) : p;
@@ -308,13 +370,32 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
   const plannedWrites = new Set<string>();
   for (const t of tasks) for (const w of t.scope.filesWrite ?? []) plannedWrites.add(w);
 
-  const classify = (taskId: string, path: string, role: 'write' | 'read'): ScopePathVerdict => {
+  const classify = (taskId: string, path: string, role: 'write' | 'read', taskPaths: readonly string[]): ScopePathVerdict => {
     if (tracked.has(path) || (role === 'read' && plannedWrites.has(path))) {
       return { taskId, path, role, classification: 'confirmed', reason: 'exists in the repo' };
     }
+    if (GLOB_MAGIC_RE.test(path)) {
+      const re = globToRegExp(path);
+      const matchCount = trackedFiles.reduce((n, f) => (re.test(f) ? n + 1 : n), 0);
+      if (matchCount > 0) {
+        return {
+          taskId, path, role,
+          classification: 'confirmed',
+          reason: `scope pattern matching ${matchCount} tracked file(s)`,
+        };
+      }
+      return {
+        taskId, path, role,
+        classification: 'suspect',
+        reason: 'glob pattern matches no tracked file — likely a wrong-directory pattern',
+      };
+    }
     const b = basename(path);
     const siblings = byBasename.get(b);
-    if (siblings && siblings.length > 0 && !COMMON_BASENAMES.has(b.toLowerCase())) {
+    const testMirrorInTrackedDir = isRecurringTestBasename(b)
+      && trackedDirs.has(dirname(path))
+      && taskOwnsMatchingSource(b, taskPaths);
+    if (siblings && siblings.length > 0 && !COMMON_BASENAMES.has(b.toLowerCase()) && !testMirrorInTrackedDir) {
       const suggestion = pickClosest(path, siblings);
       return {
         taskId, path, role,
@@ -371,8 +452,9 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
 
   const verdicts: ScopePathVerdict[] = [];
   for (const t of tasks) {
-    for (const w of t.scope.filesWrite ?? []) verdicts.push(classify(t.id, w, 'write'));
-    for (const r of t.scope.filesRead ?? []) verdicts.push(classify(t.id, r, 'read'));
+    const taskPaths = [...(t.scope.filesWrite ?? []), ...(t.scope.filesRead ?? [])];
+    for (const w of t.scope.filesWrite ?? []) verdicts.push(classify(t.id, w, 'write', taskPaths));
+    for (const r of t.scope.filesRead ?? []) verdicts.push(classify(t.id, r, 'read', taskPaths));
   }
 
   const writeSuspects = verdicts.filter(v => v.role === 'write' && v.classification === 'suspect');
