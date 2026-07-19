@@ -615,6 +615,80 @@ export function formatRunFlowOutcomeLine(outcome: RunFlowOutcome, labels: RunFlo
   }
 }
 
+/** Localized labels for the two NON-run edges of the REPL `/do <goal>` slash
+ *  (452-002 REPL-DO-SLASH-WIRE). `flagOff` = terminal.run_flow_v2 off (no
+ *  controller mounted); `usage` = bare `/do` with no goal. Injected by run.tsx's
+ *  `buildDoSlashLabels(t)`; absent → DEFAULT_DO_SLASH_LABELS (English). The RUN
+ *  edge carries no string of its own — it reuses the shared RunFlow chain
+ *  (proposeRun → deriveRunFlowPreview → PlanPreviewCard), so this component
+ *  stays string-free per the i18n-FIRST caller-injects-labels rule. */
+export interface DoSlashLabels {
+  flagOff: string;
+  usage: string;
+}
+
+export const DEFAULT_DO_SLASH_LABELS: DoSlashLabels = {
+  flagOff: '/do requires the RunFlow surface — enable terminal.run_flow_v2 in .deckent/config.json.',
+  usage: 'usage: /do <goal> — describe what to plan and run.',
+};
+
+/** Dependency-injected effect seam for the REPL `/do <goal>` slash (452-002),
+ *  extracted from handleSubmit so the wiring is unit-testable without mounting
+ *  Ink (ink-testing-library is not a project dependency — same pure-helper
+ *  extraction precedent as deriveRunFlowPreview/formatRunFlowOutcomeLine above,
+ *  cited verbatim by app-surface-wire.test.tsx). */
+export interface ReplDoSlashDeps {
+  /** The SESSION's single RunFlowController (run.tsx `wireRunFlowMount`, boot-
+   *  time) when terminal.run_flow_v2 is on; undefined → flag-off notice, no
+   *  fs/planner side effect at all. */
+  controller: RunFlowController | undefined;
+  labels: DoSlashLabels;
+  /** Push an informational transcript line (app.tsx → pushTurn('seg', …)). */
+  emit: (text: string) => void;
+  /** Sync the PlanPreviewCard from the controller's post-propose context — the
+   *  SAME `setRunFlowPreview(deriveRunFlowPreview(ctx))` seam the native
+   *  `deckent_propose_run` tool feeds (registerToolSink effect below). This one
+   *  line is where `/do` joins the shared machinery: downstream PlanPreviewCard +
+   *  handleRunFlowApprove/Reject is literally the same code the tool path uses. */
+  setPreview: (preview: PlanPreview | null) => void;
+  /** Report a controller error as a transcript line (formatRunFlowOutcomeLine). */
+  reportError: (message: string) => void;
+}
+
+/**
+ * Drive the REPL `/do <goal>` command through the SAME RunFlow chain CLI
+ * `deckent do` and the native `deckent_propose_run` tool use — never a second
+ * controller/approval implementation. Flag-off (no controller) → honest i18n
+ * notice with ZERO fs/planner side effects. Empty goal → usage hint, guarded
+ * BEFORE `proposeRun` so a bare `/do` never trips the controller's own
+ * non-empty-string throw. Otherwise: proposeRun(goal) → deriveRunFlowPreview →
+ * setPreview (→ PlanPreviewCard → approve/reject, all shared).
+ *
+ * Single-flow-per-instance (run-flow-controller.ts header: "COLLECTING →
+ * PROPOSAL_READY is a one-way door"): a second `/do`, or a `/do` after the LLM
+ * already proposed this session, surfaces the reducer's RunFlowTransitionError
+ * through `reportError` rather than crashing the REPL — an Ink input callback
+ * must never throw. That limit is inherited from the mandated controller reuse,
+ * not introduced here.
+ */
+export async function runReplDoSlash(goal: string, deps: ReplDoSlashDeps): Promise<void> {
+  if (!deps.controller) {
+    deps.emit(deps.labels.flagOff);
+    return;
+  }
+  const trimmed = goal.trim();
+  if (trimmed.length === 0) {
+    deps.emit(deps.labels.usage);
+    return;
+  }
+  try {
+    const ctx = await deps.controller.proposeRun(trimmed);
+    deps.setPreview(deriveRunFlowPreview(ctx));
+  } catch (err) {
+    deps.reportError(err instanceof Error ? err.message : String(err));
+  }
+}
+
 /**
  * Tap one ApprovalTerminalChannel event stream: forwards every event to its
  * single downstream consumer (ApprovalCard's own `events` prop) UNCHANGED,
@@ -979,6 +1053,11 @@ export interface ReplAppProps {
    * defaults to DEFAULT_RUN_FLOW_MOUNT_LABELS (English) until run.tsx's
    * buildRunFlowMountLabels(t) supplies real en/tr labels. */
   runFlowMountLabels?: RunFlowMountLabels;
+  /** 452-002 — labels for the `/do <goal>` slash's two non-run edges (flag-off
+   * notice + bare-usage hint). Injected by run.tsx's buildDoSlashLabels(t);
+   * absent → DEFAULT_DO_SLASH_LABELS (English). The run edge reuses
+   * `runFlowController` (no new string). */
+  doSlashLabels?: DoSlashLabels;
   /**
    * TERM5-UI (sprint-427, task 6) — registers the sink run.tsx's
    * `wireRunFlowResultWatch` feeds a flowId-correlated, already-localized
@@ -1087,7 +1166,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader } = props;
   const { exit } = useApp();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
@@ -1617,6 +1696,28 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         pushTurn('seg', `${labels.approvalSet}: ${mode}`);
       }
       else { pushTurn('seg', `${labels.approvalUsage} (${approval})`); }
+      return;
+    }
+    // /do <goal> (452-002 REPL-DO-SLASH-WIRE) — drives the SAME RunFlow chain the
+    // native `deckent_propose_run` tool uses via the session's ONE
+    // `runFlowController` (run.tsx wireRunFlowMount). Flag-off (controller
+    // undefined) → honest i18n notice, zero fs/planner side effects; the run edge
+    // reuses setRunFlowPreview(deriveRunFlowPreview(ctx)) — the exact seam the
+    // registerToolSink effect feeds — so preview → approval is identical to the
+    // tool path. Handled here (not via resolveSlash/native-bridge) like /model,
+    // /cd, /term: its catalog entry carries no agenticTool, so resolveSlash
+    // returns 'none' and it would otherwise fall through to a chat turn.
+    const doMatch = trimmed.match(/^\/do(?:\s+(.+))?$/i);
+    if (doMatch) {
+      pushTurn('user', trimmed);
+      await runReplDoSlash(doMatch[1] ?? '', {
+        controller: runFlowController,
+        labels: doSlashLabels ?? DEFAULT_DO_SLASH_LABELS,
+        emit: (text) => pushTurn('seg', text),
+        setPreview: setRunFlowPreview,
+        reportError: (message) =>
+          pushTurn('bg', formatRunFlowOutcomeLine({ kind: 'error', message }, runFlowMountLabels ?? DEFAULT_RUN_FLOW_MOUNT_LABELS)),
+      });
       return;
     }
     // NATIVE-SLASH-BRIDGE (387-002) — see resolveNativeSlash's doc comment

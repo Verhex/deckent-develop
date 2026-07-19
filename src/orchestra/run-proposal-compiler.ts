@@ -186,6 +186,32 @@ function canonicalTaskTitle(title: string): string {
 }
 
 /**
+ * born-677 goal-flow slice: directives-builder's `buildDirectives` applies exactly one guard
+ * to `DirectiveBuildIntent.goal` — `assertNoHeadingCollision`, which throws if the goal text
+ * contains a line matching a "## Task N:"/"## Görev N:" heading or a "### Description"/
+ * "### goNogo" section heading (both line-anchored). Those two patterns are private to
+ * directives-builder.ts, so they are mirrored here rather than exported, keeping the fix
+ * entirely inside this compile layer (directives-builder.ts stays untouched).
+ *
+ * A raw NL goal that happens to quote/describe such a line (plausible free-form user text —
+ * e.g. a goal that pastes a previous plan) must not crash proposal compilation, the same
+ * born-677 class directives-builder already closed for goCriteria/nogo items via reversible
+ * escaping (escapeListItem/unescapeListItem). A zero-width space inserted right before the
+ * colliding "##"/"###" marker breaks the line-start anchor without changing how the text
+ * reads — invisible in any renderer, and nothing parses `## Goal` back into structured data
+ * (buildDirectives' own header: goal/title are "purely cosmetic — discarded by
+ * parseStructuredDirectives"), so there is no reader to reverse this insertion for.
+ * Every OTHER goal — including the full born-677 delimiter corpus (';', '"', backtick,
+ * newline, '&&', mixed) — never matches either pattern, so this is byte-for-byte identity
+ * for them.
+ */
+const GOAL_HEADING_COLLISION_RE = /^(\s*)(##\s+(?:G[öo]rev|Task)\s+\d+[^:]*:|###\s+(?:Description|goNogo)\b)/gim;
+
+function escapeGoalHeadingCollisions(goal: string): string {
+  return goal.replace(GOAL_HEADING_COLLISION_RE, (_match, indent: string, heading: string) => `${indent}​${heading}`);
+}
+
+/**
  * Map one real, AI-decomposed `PlannerTask` to a `DirectiveBuildTask` — no TODO
  * placeholders. Enforces two compiler-boundary invariants BEFORE the intent can reach
  * the (unchanged) directives-builder, so a bare `DeckentError` never leaks from that
@@ -269,7 +295,7 @@ export async function compileRunProposalIntent(
 
   return {
     title: `RunProposal ${proposal.flowId}`,
-    goal: proposal.intentSummary.trim(),
+    goal: escapeGoalHeadingCollisions(proposal.intentSummary.trim()),
     tasks: plan.tasks.map((task) => toDirectiveTask(task, proposal)),
   };
 }

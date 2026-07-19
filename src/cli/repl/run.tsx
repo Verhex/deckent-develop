@@ -20,7 +20,7 @@ import { buildNativeToolRegistry, resolveToolSurfaceOptions, resolveRunFlowEnabl
 import { createNativeEngine, resolveCostCeilingUsd } from './native-agent-bridge.js';
 import { createRunFlowController, type RunFlowController, type RunFlowControllerDeps } from './run-flow-controller.js';
 import { buildPlanPreviewCardLabels } from './plan-preview-card.js';
-import type { RunFlowMountLabels } from './app.js';
+import type { RunFlowMountLabels, DoSlashLabels } from './app.js';
 import { renderRunsCommand, buildInboxLabels, collectInboxRows } from './run-flow-inbox.js';
 import { executeInboxDecision } from '../commands/runs.js';
 import type { ResolvedConfig } from '../../core/types.js';
@@ -197,6 +197,22 @@ export function buildRunFlowMountLabels(t: (key: string) => string): RunFlowMoun
     started: t('runFlow.mount.started'),
     rejected: t('runFlow.mount.rejected'),
     error: t('runFlow.mount.error'),
+  };
+}
+
+/**
+ * 452-002 (REPL-DO-SLASH-WIRE) — real en/tr labels for the two NON-run edges of
+ * the `/do <goal>` slash: the `terminal.run_flow_v2` flag-off notice and the
+ * bare-usage hint, sourced from messages.ts's `do.slash_*` keys — same
+ * "pull labels out of the render call" precedent as {@link buildRunFlowMountLabels}
+ * above. Passed to <ReplApp> UNCONDITIONALLY (flag state independent) so the
+ * flag-off message is localized even when no controller is mounted; the run edge
+ * needs no string (it reuses the shared RunFlow controller/preview chain).
+ */
+export function buildDoSlashLabels(t: (key: string) => string): DoSlashLabels {
+  return {
+    flagOff: t('do.slash_flag_off'),
+    usage: t('do.slash_usage'),
   };
 }
 
@@ -1062,6 +1078,7 @@ export async function runInkRepl(
       lang={lang}
       labels={buildReplLabels(t)}
       approvalLabels={buildApprovalLabels(t)}
+      doSlashLabels={buildDoSlashLabels(t)}
       runInboxProvider={(input) => renderRunsCommand(process.cwd(), input, buildInboxLabels(t))}
       inboxFollowFeed={() => collectInboxRows(process.cwd())}
       inboxLabels={buildInboxLabels(t)}

@@ -130,6 +130,16 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     agenticArgs: { mode: 'auto' },
   },
   {
+    // Meta-command (452-002 REPL-DO-SLASH-WIRE): `/do <goal>` is handled directly
+    // in repl/app.tsx's handleSubmit (runReplDoSlash) BEFORE the registry — it
+    // drives the shared RunFlow controller (proposeRun → plan-preview → approval)
+    // under terminal.run_flow_v2, or prints an honest flag-off notice. Listed here
+    // (no agenticTool, like /model and /cd) for /help + Tab-complete visibility;
+    // resolveSlash falls through to { action: 'none' } so the app.tsx branch owns it.
+    name: '/do',
+    desc: 'Bir hedefi planla ve çalıştır (örn: /do sağlık ucu ekle) — terminal.run_flow_v2',
+  },
+  {
     name: '/sprint',
     desc: 'Sprint geçmişini göster',
     agenticTool: 'deckent_history',

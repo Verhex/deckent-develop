@@ -534,6 +534,55 @@ describe('init command messages', () => {
   });
 });
 
+// ─── /do slash messages (452-002 REPL-DO-SLASH-WIRE) ─────────────────────────
+
+describe('do slash messages', () => {
+  it('do.slash_flag_off names terminal.run_flow_v2 in both languages', () => {
+    expect(getMessage('do.slash_flag_off', 'en')).toContain('terminal.run_flow_v2');
+    expect(getMessage('do.slash_flag_off', 'tr')).toContain('terminal.run_flow_v2');
+  });
+
+  it('do.slash_usage mentions /do in both languages', () => {
+    expect(getMessage('do.slash_usage', 'en')).toContain('/do');
+    expect(getMessage('do.slash_usage', 'tr')).toContain('/do');
+  });
+
+  it('both keys resolve (not the raw key) and en differs from tr', () => {
+    for (const key of ['do.slash_flag_off', 'do.slash_usage']) {
+      const en = getMessage(key, 'en');
+      const tr = getMessage(key, 'tr');
+      expect(en).not.toBe(key);
+      expect(tr).not.toBe(key);
+      expect(en).not.toBe(tr);
+    }
+  });
+});
+
+// ─── runFlow.planPreview.scopeGate.* (452-003 — plan-preview scope-gate label
+// parity) — shared verbatim by formatScopeGateLines (plan-preview-card.tsx)
+// between the REPL card and the CLI's formatRunFlowDoPreview. ────────────────
+
+describe('runFlow.planPreview.scopeGate.* (452-003)', () => {
+  it('scopeGate.fail resolves and literally contains "Scope gate: FAIL" in en (pins tests/cli/run-flow-scope-mirror.test.ts\'s pre-existing substring check)', () => {
+    expect(getMessage('runFlow.planPreview.scopeGate.fail', 'en')).toContain('Scope gate: FAIL');
+  });
+
+  it('scopeGate.overridden mentions --force-scope in both languages', () => {
+    expect(getMessage('runFlow.planPreview.scopeGate.overridden', 'en')).toContain('--force-scope');
+    expect(getMessage('runFlow.planPreview.scopeGate.overridden', 'tr')).toContain('--force-scope');
+  });
+
+  it('both keys resolve (not the raw key) and en differs from tr', () => {
+    for (const key of ['runFlow.planPreview.scopeGate.fail', 'runFlow.planPreview.scopeGate.overridden']) {
+      const en = getMessage(key, 'en');
+      const tr = getMessage(key, 'tr');
+      expect(en).not.toBe(key);
+      expect(tr).not.toBe(key);
+      expect(en).not.toBe(tr);
+    }
+  });
+});
+
 // ─── getLanguage empty string edge cases ─────────────────────────────────────
 
 describe('getLanguage empty string config', () => {

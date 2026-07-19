@@ -81,6 +81,18 @@ export interface PlanPreviewCardLabels {
   hint: string;
   detailsHeading: string;
   noTasks: string;
+  /**
+   * Dogfood-449 B1 / 452-003 — scope-gate mirror verdict (child's pre-spawn
+   * SCOPE gate, distinct from `gateLabels.fail`'s prompt-gate). Optional,
+   * mirroring `PlanPreview.scopeGateResult` itself being optional/additive
+   * (run-flow-contract.ts) — `buildPlanPreviewCardLabels` below always sets
+   * it; a caller supplying a labels object built another way (e.g. a static
+   * pre-wiring fallback) may omit it, in which case `formatScopeGateLines`
+   * still renders the real gate message, just without a verdict header.
+   */
+  scopeGateFailLabel?: string;
+  /** Shown when the gate passed only because --force-scope acknowledged a suspect. Optional — see scopeGateFailLabel. */
+  scopeGateOverriddenLabel?: string;
 }
 
 /** Builds real en/tr labels from messages.ts's `runFlow.planPreview.*` keys. */
@@ -101,7 +113,37 @@ export function buildPlanPreviewCardLabels(lang: string): PlanPreviewCardLabels 
     hint: getMessage('runFlow.planPreview.hint', lang),
     detailsHeading: getMessage('runFlow.planPreview.detailsHeading', lang),
     noTasks: getMessage('runFlow.planPreview.noTasks', lang),
+    scopeGateFailLabel: getMessage('runFlow.planPreview.scopeGate.fail', lang),
+    scopeGateOverriddenLabel: getMessage('runFlow.planPreview.scopeGate.overridden', lang),
   };
+}
+
+// ─── Scope-gate rendering (Dogfood-449 B1 / 452-003) ───────────────────────
+
+/**
+ * Renders the scope-gate mirror as verbatim lines — the SAME function the
+ * REPL card and the CLI (`formatRunFlowDoPreview`, do.ts) both call, so the
+ * two surfaces can never diverge on this verdict (born-698a/449 precedent:
+ * a silent CLI/REPL mismatch here is exactly how a dead run stayed hidden).
+ * 'fail': a verdict header + the real gate message split into lines, never
+ * re-worded — the gate's own message is the source of truth. Else, when the
+ * gate only passed because --force-scope acknowledged a suspect: a one-line
+ * notice. Otherwise (pass/skipped, not overridden): no lines.
+ */
+export function formatScopeGateLines(
+  preview: Pick<PlanPreview, 'scopeGateResult' | 'scopeGateMessage' | 'scopeGateOverridden'>,
+  labels: Pick<PlanPreviewCardLabels, 'scopeGateFailLabel' | 'scopeGateOverriddenLabel'>,
+): string[] {
+  if (preview.scopeGateResult === 'fail') {
+    const lines: string[] = [];
+    if (labels.scopeGateFailLabel) lines.push(labels.scopeGateFailLabel);
+    if (preview.scopeGateMessage) {
+      for (const line of preview.scopeGateMessage.split('\n')) lines.push(`  ! ${line}`);
+    }
+    return lines;
+  }
+  if (preview.scopeGateOverridden && labels.scopeGateOverriddenLabel) return [labels.scopeGateOverriddenLabel];
+  return [];
 }
 
 // ─── Props ──────────────────────────────────────────────────────────────────
@@ -164,6 +206,9 @@ export function PlanPreviewCard(props: PlanPreviewCardProps): ReactElement | nul
         <Text>{'  '}</Text>
         <Text color={policyColor} bold>{labels.policyLabels[preview.policyDecision]}</Text>
       </Box>
+      {formatScopeGateLines(preview, labels).map((line, i) => (
+        <Text key={`sg-${i}`} color={preview.scopeGateResult === 'fail' ? GATE_COLORS.fail : undefined}>{line}</Text>
+      ))}
       <Text dimColor>{`${labels.digestLabel} ${formatDigestShort(preview.planDigest)}`}</Text>
       {expanded && (
         <Box flexDirection="column" marginTop={1}>

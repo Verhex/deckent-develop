@@ -195,6 +195,17 @@ const MESSAGES: MessageMap = {
     en: '(no tasks)',
     tr: '(görev yok)',
   },
+  // Dogfood-449 B1 / 452-003 — scope-gate mirror verdict, shared verbatim by
+  // formatScopeGateLines (plan-preview-card.tsx) between the REPL card AND
+  // the CLI (do.ts's formatRunFlowDoPreview) — the two must never diverge.
+  'runFlow.planPreview.scopeGate.fail': {
+    en: 'Scope gate: FAIL',
+    tr: 'Scope-gate: BAŞARISIZ',
+  },
+  'runFlow.planPreview.scopeGate.overridden': {
+    en: 'Scope gate: overridden via --force-scope — the child will spawn anyway.',
+    tr: 'Scope-gate: --force-scope ile bilinçli geçildi — child yine de doğacak.',
+  },
 
   // ─── run-flow REPL mount outcomes (TERM-FLOW-UNIFY Sprint-4 mount, 426-002) ─
   // Pushed as a 'bg' transcript line after approve→start / reject on the
@@ -3080,14 +3091,10 @@ const MESSAGES: MessageMap = {
     en: 'Scope gate: run NOT started (the detached child would die at PLAN with the same verdict). Fix the write paths, or acknowledge intentional new paths with --force-scope.\n{message}',
     tr: 'Scope-gate: koşu BAŞLATILMADI (detached-child PLAN fazında aynı kararla ölecekti). Yazma-yollarını düzeltin ya da bilinçli yeni-yolları --force-scope ile onaylayın.\n{message}',
   },
-  'do.scope_gate_preview_fail': {
-    en: 'Scope gate: FAIL — --run would NOT start (fix the write paths or pass --force-scope):',
-    tr: 'Scope-gate: FAIL — --run BAŞLAMAZ (yazma-yollarını düzeltin ya da --force-scope geçin):',
-  },
-  'do.scope_gate_overridden': {
-    en: 'Scope gate: suspect write path(s) acknowledged via --force-scope — the child will spawn anyway.',
-    tr: 'Scope-gate: şüpheli yazma-yol(lar)ı --force-scope ile bilinçli geçildi — child yine de doğacak.',
-  },
+  // do.scope_gate_preview_fail / do.scope_gate_overridden (the preview-only
+  // renderings) were retired by 452-003 — the preview verdict text now comes
+  // from runFlow.planPreview.scopeGate.* (see above), shared verbatim with
+  // the REPL card via formatScopeGateLines (plan-preview-card.tsx).
   'do.cancelled': {
     en: 'Cancelled at stage "{stage}" ({reason}). Nothing was started.',
     tr: '"{stage}" aşamasında iptal edildi ({reason}). Hiçbir şey başlatılmadı.',
@@ -3098,6 +3105,21 @@ const MESSAGES: MessageMap = {
   },
   'do.outcome_success': { en: 'success', tr: 'başarılı' },
   'do.outcome_failure': { en: 'failure', tr: 'başarısız' },
+
+  // ─── REPL `/do <goal>` slash (452-002 REPL-DO-SLASH-WIRE) — the two NON-run
+  // edges of the terminal.run_flow_v2 gate. Flag-ON drives the SAME RunFlow
+  // preview→approval chain the native `deckent_propose_run` tool and CLI
+  // `deckent do` use (no new controller); only these off/usage notices are
+  // string-surfaces owned here (mechanism modules stay string-free — run.tsx's
+  // buildDoSlashLabels resolves these via getMessage, English default). ───────
+  'do.slash_flag_off': {
+    en: '/do requires the RunFlow surface — enable terminal.run_flow_v2 in .deckent/config.json.',
+    tr: '/do için RunFlow yüzeyi gerekir — .deckent/config.json içinde terminal.run_flow_v2 açın.',
+  },
+  'do.slash_usage': {
+    en: 'usage: /do <goal> — describe what to plan and run (e.g. /do add a health endpoint).',
+    tr: 'kullanım: /do <hedef> — planlanıp çalıştırılacak işi yazın (örn. /do sağlık ucu ekle).',
+  },
 
   // ─── `deckent doctor --fix` (keys added by Task 356-015; wired into
   // formatDoctorFixLines() by Task 367-006, closing the standing

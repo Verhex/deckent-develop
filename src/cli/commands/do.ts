@@ -55,6 +55,7 @@ import {
   formatTaskSummaryLine,
   formatDigestShort,
   buildPlanPreviewCardLabels,
+  formatScopeGateLines,
 } from '../repl/plan-preview-card.js';
 import { resolvePlanTimeoutMs } from '../../orchestra/planner.js';
 
@@ -198,16 +199,10 @@ export function formatRunFlowDoPreview(preview: PlanPreview, run: boolean, lang:
   if (preview.gateResult === 'fail' && preview.gateFindings?.length) {
     for (const finding of preview.gateFindings) lines.push(`  ! ${finding}`);
   }
-  // Dogfood-449 B1: scope-gate aynası da önizlemede görünür — dry-run'da bile
-  // operatör, --run'ın neden öleceğini/`--force-scope` gerektireceğini görsün.
-  if (preview.scopeGateResult === 'fail') {
-    lines.push(getMessage('do.scope_gate_preview_fail', lang));
-    if (preview.scopeGateMessage) {
-      for (const line of preview.scopeGateMessage.split('\n')) lines.push(`  ! ${line}`);
-    }
-  } else if (preview.scopeGateOverridden) {
-    lines.push(getMessage('do.scope_gate_overridden', lang));
-  }
+  // Dogfood-449 B1 / 452-003: scope-gate aynası artık plan-preview-card.tsx'in
+  // PAYLAŞILAN pure helper'ından geçer — CLI ve REPL kartı AYNI metni üretir
+  // (CLI↔REPL parity; dry-run'da bile operatör --run'ın neden öleceğini görsün).
+  lines.push(...formatScopeGateLines(preview, labels));
   lines.push(`${labels.digestLabel} ${formatDigestShort(preview.planDigest)}`);
   return lines.join('\n');
 }
