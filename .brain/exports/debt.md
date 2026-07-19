@@ -4,23 +4,24 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-449-005-xfix | Tech debt from 449-005-xfix: ROOT-CAUSE FINDING (read first): the premise that 4 | normal | sprint-449 | active |
-| debt-449-008-fix | Tech debt from 449-008-fix: Scope note: this task's write authority is ONLY test | normal | sprint-449 | active |
-| debt-445-013-fix | Tech debt from 445-013-fix: REAL (non-provisional) v3 capabilities blocks for th | critical | sprint-445 | active |
-| debt-445-017-fix | Tech debt from 445-017-fix: No new edit was made this round -- 445-017's prior a | critical | sprint-445 | active |
+| debt-449-005-xfix | Tech debt from 449-005-xfix: ROOT-CAUSE FINDING (read first): the premise that 4 | high | sprint-449 | active |
+| debt-449-008-fix | Tech debt from 449-008-fix: Scope note: this task's write authority is ONLY test | high | sprint-449 | active |
 | debt-433-001-fix | Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso | critical | sprint-433 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-450-006 | Tech debt from 450-006: 6/7 goCriteria items fully evidenced GREEN: tsc --noEmit | normal | sprint-450 | resolved |
 | debt-449-005 | Tech debt from 449-005: MAJOR PLANNING FINDING (read this first): a full-repo gr | normal | sprint-449 | resolved |
 | debt-449-006 | Tech debt from 449-006: Converted all user-facing 'sprint' prose in the 5 in-sco | normal | sprint-449 | resolved |
 | debt-445-011 | Tech debt from 445-011: Added syncAgentCapabilities(root, dryRun) to src/cli/com | normal | sprint-445 | resolved |
 | debt-445-016 | Tech debt from 445-016: Authored REAL (non-provisional) capabilitiesVersion:3 `c | normal | sprint-445 | resolved |
 | debt-445-021 | Tech debt from 445-021: Implemented runVocabularyDoctor() in src/core/routing3/v | normal | sprint-445 | resolved |
+| debt-445-013-fix | Tech debt from 445-013-fix: REAL (non-provisional) v3 capabilities blocks for th | critical | sprint-445 | resolved |
 | debt-445-014-fix | Timeout-partial from 445-014-fix: worker killed mid-execution, work accepted | critical | sprint-445 | resolved |
 | debt-445-015-fix | Tech debt from 445-015-fix: ROOT CAUSE of the original 445-015 NO_GO ('rubric to | critical | sprint-445 | resolved |
+| debt-445-017-fix | Tech debt from 445-017-fix: No new edit was made this round -- 445-017's prior a | critical | sprint-445 | resolved |
 | debt-444-003 | Tech debt from 444-003: All 4 target files pass (32/32) and npx tsc --noEmit is  | normal | sprint-444 | resolved |
 | debt-444-004 | Tech debt from 444-004: Root cause: ensureDeckentImport() in src/core/utils.ts:2 | normal | sprint-444 | resolved |
 | debt-444-005 | Tech debt from 444-005: New src/core/agent-prompt-sync.ts::syncBuiltinAgentPromp | normal | sprint-444 | resolved |

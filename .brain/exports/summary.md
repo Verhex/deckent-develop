@@ -52,6 +52,8 @@
 | adr-g-036 | Zero-Hardcode Model & Flow Values (Parametric-Only) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-450 Learnings** (sprint-450): ## Sprint sprint-450 Learnings
+- Integration verification with vitest sweep and real-binary status smoke: GO_WITH_TEC...
 - **Sprint sprint-449 Learnings** (sprint-449): ## Sprint sprint-449 Learnings
 - Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: REAL (non-provisional) v3 capa...
 - **Sprint sprint-448 Learnings** (sprint-448): ## Sprint sprint-448 Learnings
@@ -72,14 +74,10 @@
 - SKILL-RETRIEVAL çift-eşik entegrasyon testleri ve regresyon-yeşili kanıtı: NO_GO — C...
 - **Sprint sprint-440 Learnings** (sprint-440): ## Sprint sprint-440 Learnings
 - Yeni hermetik birim-testler test-yazarligi ve implementation senaryolari: NO_GO — Ca...
-- **Sprint sprint-439 Learnings** (sprint-439): ## Sprint sprint-439 Learnings
-- Rehydrate katmanı — event-fold ve legacy dual-read ile KNOWN_CONSUMERS pini: NO_GO —...
 
 ## Active Technical Debt
-- [NORMAL] Tech debt from 449-005-xfix: ROOT-CAUSE FINDING (read first): the premise that 4
-- [NORMAL] Tech debt from 449-008-fix: Scope note: this task's write authority is ONLY test
-- [CRITICAL] Tech debt from 445-013-fix: REAL (non-provisional) v3 capabilities blocks for th
-- [CRITICAL] Tech debt from 445-017-fix: No new edit was made this round -- 445-017's prior a
+- [HIGH] Tech debt from 449-005-xfix: ROOT-CAUSE FINDING (read first): the premise that 4
+- [HIGH] Tech debt from 449-008-fix: Scope note: this task's write authority is ONLY test
 - [CRITICAL] Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso
 
 ## Active Patterns
@@ -153,4 +151,4 @@
 - Violation pattern: file_outside_scope
 - Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 1576 | Generated: 2026-07-18_
+_Total entries: 1580 | Generated: 2026-07-19_

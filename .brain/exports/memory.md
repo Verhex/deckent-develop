@@ -1,5 +1,16 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-450 Learnings
+- Sprint sprint-450 Learnings: ## Sprint sprint-450 Learnings
+- Integration verification with vitest sweep and real-binary status smoke: GO_WITH_TECH_DEBT — 6/7 goCriteria items fully evidenced GREEN: tsc --noEmit clean; all 10 actually-touched test files pass (340 passed/4 sk
+
+## Gains
+- 450-001 — Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: REAL (non-provisional) v3 capabilities blocks for the co… — Debt is already resolved — no code change was needed or made.
+- 450-002 — Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: No new edit was made this round -- 445-017's prior addit… — Re-verified from a fresh container, not trusting the carried-forward round-notes (the prior attem...
+- 450-003 — Slice-3 pre-flip ground-truth inventory of pinned literals and exclusion guard — npx tsc --noEmit temiz (0 hata).
+- 450-004 — Atomic flip of last 3 locked status keys with co-owned pinning tests — Atomic flip of the 3 locked status keys, built directly on 450-003's grep-verified inventory (.an...
+- 450-005 — MASTER-PLAN 510-D3 row update with slice-3 closure summary — ✅ Durum updated: 🟡→✅ · Tarih updated: 2026-07-11→2026-07-19 · D3 completion summary added with t...
+
 ## Sprint sprint-449 Learnings
 - Sprint sprint-449 Learnings: ## Sprint sprint-449 Learnings
 - Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: REAL (non-provisional) v3 capabilities blocks for the co…: NO_GO — Debt was: prior task 445-013 (GO_WITH_TECH_DEBT) reported that the full tests/core/builtins/ dir had 2 reds in agent-cat
