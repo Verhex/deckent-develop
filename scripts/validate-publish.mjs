@@ -466,18 +466,36 @@ export function checkLinkLint(cmdResult) {
 // below). Wired into the CLI print/exit-code path only (runCli + entry block).
 
 /**
- * @param {{ exitCode: number, stdout?: string }} cmdResult
+ * Async-spawn wrapper around `node scripts/builtins-drift-check.mjs --check` (see runCli).
+ * Exit 0 = baseline-green (no new drift beyond the pinned baseline). Non-zero = new drift
+ * or a scan/missing-baseline error. builtins-drift-check.mjs writes its actionable FAIL
+ * detail — the drifted-key list plus the exact re-pin command
+ * (`node scripts/builtins-drift-check.mjs --write`) — to STDERR, so both streams are
+ * relayed into the gate message; an execSync-style stdout-only capture would silently
+ * drop that detail.
+ * @param {{ exitCode: number, stdout?: string, stderr?: string }} cmdResult
  * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string }}
  */
 export function checkBuiltinsDrift(cmdResult) {
   const ok = cmdResult?.exitCode === 0;
+  const stdout = (cmdResult?.stdout ?? '').trim();
+  const stderr = (cmdResult?.stderr ?? '').trim();
+
+  if (ok) {
+    return {
+      gate: 'builtins_drift',
+      ok: true,
+      severity: 'info',
+      message: `[drift-gate] baseline-green — ${stdout || 'builtins-drift-check --check exited 0'}`,
+    };
+  }
+
+  const detail = [stderr, stdout].filter(Boolean).join(' | ') || `exited ${cmdResult?.exitCode} with no output`;
   return {
     gate: 'builtins_drift',
-    ok,
-    severity: ok ? 'info' : 'error',
-    message: ok
-      ? 'npm run lint:builtins-drift exited 0'
-      : `npm run lint:builtins-drift exited ${cmdResult?.exitCode}: ${(cmdResult?.stdout ?? '').slice(0, 200)}`,
+    ok: false,
+    severity: 'error',
+    message: `[drift-gate] builtins-drift-check --check exited ${cmdResult?.exitCode} — ${detail.slice(0, 2000)}`,
   };
 }
 
@@ -805,9 +823,12 @@ export function runReadinessGates(input) {
 
 /**
  * Execute a shell command and capture exit code + stdout. Never throws. Retained
- * (sync execSync, not spawnSync) for adr_lint/link_lint/builtins_drift — those are
- * plain `npm run` invocations with no output-format fragility; only the pack call
- * (PUB-01) needed the async-spawn + JSON rewrite below.
+ * (sync execSync, not spawnSync) for adr_lint/link_lint — those are plain `npm run`
+ * invocations with no output-format fragility. The pack call (PUB-01) and the
+ * builtins-drift gate (below) both need spawnAsync instead: the pack call for its
+ * JSON rewrite, the drift gate because execSync's error path only exposes
+ * `err.stdout` — it drops `err.stderr`, which is exactly where
+ * builtins-drift-check.mjs writes its actionable FAIL detail.
  * @param {string} cmd
  * @param {string} cwd
  * @returns {{ exitCode: number, stdout: string }}
@@ -886,7 +907,11 @@ export async function runCli(projectRoot) {
   const parsedPack = parsePackJson(packResult.stdout);
   const adrResult = safeExec('npm run --silent lint:adr', root);
   const linkResult = safeExec('npm run --silent lint:link', root);
-  const builtinsDriftResult = safeExec('npm run --silent lint:builtins-drift', root);
+  const builtinsDriftResult = await spawnAsync(
+    process.execPath,
+    [join(SCRIPT_DIR, 'builtins-drift-check.mjs'), '--check'],
+    root,
+  );
 
   const result = runReadinessGates({
     packOutput: parsedPack,
@@ -966,8 +991,19 @@ if (entryArg.endsWith('validate-publish.mjs')) {
     }
   }
 
+  // Named gate step: builtins-drift-check --check (async spawn, see runCli). Always printed —
+  // unlike the FAIL-only diagnostics below — so a baseline-green run has a visible drift-gate
+  // line, not just silence.
+  const driftCheck = result.builtinsDriftCheck;
+  const driftTag = driftCheck.ok
+    ? '\x1b[32mPASS\x1b[0m'
+    : driftCheck.severity === 'warning'
+      ? '\x1b[33mWARN\x1b[0m'
+      : '\x1b[31mFAIL\x1b[0m';
+  console.log(`  [${driftTag}] ${driftCheck.gate}: ${driftCheck.message}`);
+
   const criticalFiles = checkCriticalFilesInTarball(result.packOutput, result.pkg);
-  const extraChecks = [criticalFiles, result.categoryBaselineCheck, result.builtinsDriftCheck];
+  const extraChecks = [criticalFiles, result.categoryBaselineCheck];
   for (const check of extraChecks) {
     if (!check.ok) {
       console.log(`  [\x1b[31mFAIL\x1b[0m] ${check.gate}: ${check.message}`);
@@ -978,7 +1014,7 @@ if (entryArg.endsWith('validate-publish.mjs')) {
     `\n  Summary: ${result.summary.passed} passed, ${result.summary.failed} failed, ${result.summary.warnings} warnings`,
   );
 
-  const allOk = result.ok && extraChecks.every((c) => c.ok);
+  const allOk = result.ok && extraChecks.every((c) => c.ok) && driftCheck.ok;
   console.log(allOk ? '\n  Beta launch READY.\n' : '\n  Beta launch BLOCKED — fix gates above.\n');
 
   process.exit(allOk ? 0 : 1);

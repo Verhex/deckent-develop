@@ -9,6 +9,21 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint451] - 2026-07-19
+
+### Added
+
+- Document the builtins drift publish gate in reference docs and CHANGELOG
+- Hermetic gate tests and real-binary publish-gate proof
+
+### Changed
+
+- Wire builtins drift-check into the validate-publish gate (completed with tech debt)
+- Measure lint:builtins-drift runtime and apply the lint:gates decision (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint450] - 2026-07-19
 
 ### Added
