@@ -760,8 +760,27 @@ export async function planSprint(
                 child.stderr?.on('data', (d: Buffer) => { err += d.toString(); });
                 child.on('error', rejectPromise);
                 child.on('close', (code: number | null) => {
-                  if (code === 0 && out) resolvePromise(out);
-                  else rejectPromise(new BrainError(`content-batch completion failed (provider=${adapter.name}, code=${code}): ${err.slice(0, 200)}`));
+                  if (code === 0 && out) {
+                    // 581-B16 (root-cause, 2026-07-19): the provider CLI's
+                    // `--output-format json` wraps the answer in an envelope
+                    // `{"type":"result","result":"<escaped JSON string>"}`. The
+                    // raw envelope was resolved verbatim, so BOTH consumers of
+                    // this completeFn silently died on every call: the routing
+                    // content-batch (`parseContentBatchResponse`'s
+                    // indexOf('[')…lastIndexOf(']') sliced escaped `\"`s → JSON
+                    // parse fail → structural fallback for 100% of tasks) AND
+                    // the K3 tie-judge (`parseTieJudgeVerdict`'s `{…}` match
+                    // grabbed the envelope, parsed OK, but `.agentId` was
+                    // undefined → null → fail-open → never fired). Unwrap here,
+                    // ONE point, exactly as parsePlannerResponse does via
+                    // adapter.parseAgentResponse — revives both at once.
+                    const unwrapped = typeof adapter.parseAgentResponse === 'function'
+                      ? adapter.parseAgentResponse(out)
+                      : out;
+                    resolvePromise(unwrapped);
+                  } else {
+                    rejectPromise(new BrainError(`content-batch completion failed (provider=${adapter.name}, code=${code}): ${err.slice(0, 200)}`));
+                  }
                 });
               });
             }
