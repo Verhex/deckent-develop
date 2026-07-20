@@ -333,10 +333,51 @@ describe('OpenRouterProvider — ProviderAdapter contract shape', () => {
     expect(typeof provider.kill).toBe('function');
     expect(typeof provider.listWorkers).toBe('function');
     expect(typeof provider.buildCommand).toBe('function');
+    expect(typeof provider.buildPlannerInvocation).toBe('function');
     expect(provider.listWorkers()).toEqual([]);
     expect(provider.buildCommand('anthropic/claude-3.7-sonnet' as never, '/tmp/prompt.txt')).toMatch(
       /openrouter/,
     );
+  });
+
+  it('executes planner calls as single-attempt http + in-process requests', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, {
+      model: 'anthropic/claude-3.7-sonnet',
+      choices: [{ message: { content: '{"tasks":[],"reasoning":"proof"}' } }],
+    }));
+    const provider = makeProvider({ fetchImpl });
+    const invocation = provider.buildPlannerInvocation(
+      'plan this repository',
+      'anthropic/claude-3.7-sonnet',
+    );
+
+    expect(invocation).toMatchObject({
+      calledProvider: 'openrouter',
+      calledModel: 'anthropic/claude-3.7-sonnet',
+      transport: 'http',
+      executionBackend: 'in-process',
+    });
+    await expect(invocation.execute({ timeoutMs: 1234 })).resolves.toMatchObject({
+      status: 0,
+      stdout: '{"tasks":[],"reasoning":"proof"}',
+    });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    const body = JSON.parse(fetchImpl.mock.calls[0]![1].body as string);
+    expect(body).toMatchObject({
+      model: 'anthropic/claude-3.7-sonnet',
+      messages: [{ role: 'user', content: 'plan this repository' }],
+    });
+  });
+
+  it('does not retry an ambiguous planner network failure', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new Error('ambiguous transport failure'));
+    const provider = makeProvider({ fetchImpl });
+    const invocation = provider.buildPlannerInvocation('plan', 'openai/gpt-4o');
+
+    const outcome = await invocation.execute({ timeoutMs: 1234 });
+    expect(outcome.status).toBeNull();
+    expect(outcome.error).toBeInstanceOf(ProviderError);
+    expect(fetchImpl).toHaveBeenCalledOnce();
   });
 
   it('is constructible via the createOpenRouterAdapter factory', () => {

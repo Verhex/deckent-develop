@@ -136,6 +136,27 @@ export interface ProviderPlannerCommand {
   executionBackend?: 'host-subprocess' | 'docker' | 'tmux' | 'in-process' | 'unknown';
 }
 
+export interface ProviderPlannerInvocationOutcome {
+  readonly status: number | null;
+  readonly signal: NodeJS.Signals | null;
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly error?: Error;
+}
+
+/**
+ * Provider-native planner execution. HTTP/API adapters use this seam instead
+ * of fabricating a shell command; identity is declared before execute() so the
+ * caller can durably persist dispatch intent before the provider side effect.
+ */
+export interface ProviderPlannerInvocation {
+  readonly calledProvider: string;
+  readonly calledModel: string;
+  readonly transport: 'http' | 'local-runtime';
+  readonly executionBackend: 'in-process';
+  execute(options: { readonly timeoutMs: number }): Promise<ProviderPlannerInvocationOutcome>;
+}
+
 // ─── ProviderAdapter Interface ───────────────────────────────────────
 /**
  * ProviderAdapter — abstract interface for AI provider backends.
@@ -194,6 +215,9 @@ export interface ProviderAdapter {
    * @returns command (CLI binary) and args array
    */
   buildPlannerCommand?(prompt: string, model: ModelType): ProviderPlannerCommand;
+
+  /** Direct HTTP/local planner call; mutually preferred over buildPlannerCommand. */
+  buildPlannerInvocation?(prompt: string, model: ModelType): ProviderPlannerInvocation;
 
   /**
    * Optional: rich availability diagnostic — returns binary/version/auth detail

@@ -34,6 +34,7 @@ import type {
   ProviderAdapter,
   ProviderSpawnOptions,
   ProviderAvailabilityDetail,
+  ProviderPlannerInvocation,
 } from '../core/provider.js';
 import { ProviderError, buildCliInvocation } from '../core/provider.js';
 import { TASKS_DIR } from '../core/constants.js';
@@ -207,6 +208,16 @@ export class OpenRouterProvider implements ProviderAdapter {
     model: string,
     opts?: ChatCompletionOptions,
   ): Promise<ChatCompletionResult> {
+    return this.sendWithPolicy(messages, model, opts, this.timeoutMs, MAX_ATTEMPTS);
+  }
+
+  private async sendWithPolicy(
+    messages: ChatMessage[],
+    model: string,
+    opts: ChatCompletionOptions | undefined,
+    timeoutMs: number,
+    maxAttempts: number,
+  ): Promise<ChatCompletionResult> {
     if (typeof model !== 'string' || model.trim().length === 0) {
       throw new ProviderError('openrouter send() requires a non-empty model id', this.name);
     }
@@ -235,7 +246,9 @@ export class OpenRouterProvider implements ProviderAdapter {
       body: JSON.stringify(body),
     };
 
-    const res = await this.requestWithRetry(`${this.baseURL}/chat/completions`, init);
+    const res = await this.requestWithRetry(
+      `${this.baseURL}/chat/completions`, init, timeoutMs, maxAttempts,
+    );
 
     if (!res.ok) {
       const text = await safeText(res);
@@ -289,21 +302,26 @@ export class OpenRouterProvider implements ProviderAdapter {
    * - Network/timeout error → retried once, then a wrapped `ProviderError`
    *   is thrown (never a silent empty result).
    */
-  private async requestWithRetry(url: string, init: RequestInit): Promise<Response> {
+  private async requestWithRetry(
+    url: string,
+    init: RequestInit,
+    timeoutMs = this.timeoutMs,
+    maxAttempts = MAX_ATTEMPTS,
+  ): Promise<Response> {
     let lastNetworkError: unknown;
     let lastResponse: Response | undefined;
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const res = await this.fetchWithTimeout(url, init, this.timeoutMs);
+        const res = await this.fetchWithTimeout(url, init, timeoutMs);
         lastResponse = res;
         if (res.ok) return res;
-        if (res.status >= 500 && attempt < MAX_ATTEMPTS) continue; // transient — retry once
+        if (res.status >= 500 && attempt < maxAttempts) continue;
         return res; // 4xx, or 5xx retries exhausted — caller inspects + throws
       } catch (err) {
         lastNetworkError = err;
         lastResponse = undefined;
-        if (attempt >= MAX_ATTEMPTS) break;
+        if (attempt >= maxAttempts) break;
         // network/timeout error on a non-final attempt → retry once
       }
     }
@@ -533,6 +551,39 @@ export class OpenRouterProvider implements ProviderAdapter {
 
   buildCommand(model: ModelType, _promptPath: string): string {
     return `# openrouter HTTP adapter — POST ${this.baseURL}/chat/completions (model=${String(model)})`;
+  }
+
+  buildPlannerInvocation(prompt: string, model: ModelType): ProviderPlannerInvocation {
+    return {
+      calledProvider: this.name,
+      calledModel: String(model),
+      transport: 'http',
+      executionBackend: 'in-process',
+      execute: async ({ timeoutMs }) => {
+        try {
+          // Planner calls are deliberately single-attempt. After an ambiguous
+          // network failure there is no provider-backed idempotency proof, so a
+          // retry could double-spend. Schema feedback retries happen only after
+          // a definitive successful response and are controlled by planner.ts.
+          const result = await this.sendWithPolicy(
+            [{ role: 'user', content: prompt }],
+            String(model),
+            undefined,
+            timeoutMs,
+            1,
+          );
+          return { status: 0, signal: null, stdout: result.content, stderr: '' };
+        } catch (error) {
+          return {
+            status: null,
+            signal: null,
+            stdout: '',
+            stderr: '',
+            error: error instanceof Error ? error : new Error(String(error)),
+          };
+        }
+      },
+    };
   }
 }
 
