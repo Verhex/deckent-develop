@@ -3,9 +3,11 @@ import {
   ProviderRegistry,
   ProviderUnavailableError,
   resolveProviderWithFallback,
+  orderedRoleProviders,
 } from '../../src/core/provider.js';
 import type { FallbackResult, ProviderAdapter } from '../../src/core/provider.js';
 import type { ModelType, ProviderName } from '../../src/core/types.js';
+import type { ResolvedConfig } from '../../src/core/config-types.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -13,7 +15,7 @@ function makeAdapter(
   name: string,
   opts: { available?: boolean; models?: ModelType[] } = {},
 ): ProviderAdapter {
-  const { available = true, models = ['opus', 'sonnet', 'haiku'] } = opts;
+  const { available = true, models = ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'] } = opts;
   return {
     name,
     supportedModels: models,
@@ -41,13 +43,13 @@ describe('resolveProviderWithFallback', () => {
 
     const result = await resolveProviderWithFallback(
       'claude' as ProviderName,
-      'opus' as ModelType,
+      'claude-opus-4-8' as ModelType,
       {},
       registry,
     );
 
     expect(result.provider).toBe('claude');
-    expect(result.model).toBe('opus');
+    expect(result.model).toBe('claude-opus-4-8');
     expect(result.wasOriginal).toBe(true);
     expect(result.reason).toContain('available');
   });
@@ -57,12 +59,12 @@ describe('resolveProviderWithFallback', () => {
 
     const result = await resolveProviderWithFallback(
       'claude' as ProviderName,
-      'sonnet' as ModelType,
+      'claude-sonnet-5' as ModelType,
       { fallback_provider: 'codex' as ProviderName },
       registry,
     );
 
-    expect(result.model).toBe('sonnet');
+    expect(result.model).toBe('claude-sonnet-5');
     expect(result.wasOriginal).toBe(true);
   });
 
@@ -74,7 +76,7 @@ describe('resolveProviderWithFallback', () => {
 
     const result = await resolveProviderWithFallback(
       'claude' as ProviderName,
-      'opus' as ModelType,
+      'claude-opus-4-8' as ModelType,
       { fallback_provider: 'codex' as ProviderName },
       registry,
     );
@@ -90,13 +92,13 @@ describe('resolveProviderWithFallback', () => {
 
     const result = await resolveProviderWithFallback(
       'claude' as ProviderName,
-      'opus' as ModelType,
+      'claude-opus-4-8' as ModelType,
       { fallback_provider: 'codex' as ProviderName },
       registry,
     );
 
     // opus (premium tier on claude) -> gpt-5 (premium tier on codex)
-    expect(result.model).toBe('gpt-5');
+    expect(result.model).toBe('gpt-5.5');
   });
 
   it('remaps standard-tier model correctly on fallback', async () => {
@@ -105,7 +107,7 @@ describe('resolveProviderWithFallback', () => {
 
     const result = await resolveProviderWithFallback(
       'claude' as ProviderName,
-      'sonnet' as ModelType,
+      'claude-sonnet-5' as ModelType,
       { fallback_provider: 'codex' as ProviderName },
       registry,
     );
@@ -120,7 +122,7 @@ describe('resolveProviderWithFallback', () => {
 
     const result = await resolveProviderWithFallback(
       'claude' as ProviderName,
-      'haiku' as ModelType,
+      'claude-haiku-4-5-20251001' as ModelType,
       { fallback_provider: 'codex' as ProviderName },
       registry,
     );
@@ -137,7 +139,7 @@ describe('resolveProviderWithFallback', () => {
     await expect(
       resolveProviderWithFallback(
         'claude' as ProviderName,
-        'opus' as ModelType,
+        'claude-opus-4-8' as ModelType,
         {},
         registry,
       ),
@@ -150,7 +152,7 @@ describe('resolveProviderWithFallback', () => {
     await expect(
       resolveProviderWithFallback(
         'claude' as ProviderName,
-        'opus' as ModelType,
+        'claude-opus-4-8' as ModelType,
         {},
         registry,
       ),
@@ -164,7 +166,7 @@ describe('resolveProviderWithFallback', () => {
 
     const result = await resolveProviderWithFallback(
       'claude' as ProviderName,
-      'opus' as ModelType,
+      'claude-opus-4-8' as ModelType,
       { fallback_provider: 'codex' as ProviderName },
       registry,
     );
@@ -182,7 +184,7 @@ describe('resolveProviderWithFallback', () => {
     await expect(
       resolveProviderWithFallback(
         'claude' as ProviderName,
-        'opus' as ModelType,
+        'claude-opus-4-8' as ModelType,
         { fallback_provider: 'codex' as ProviderName },
         registry,
       ),
@@ -196,7 +198,7 @@ describe('resolveProviderWithFallback', () => {
     await expect(
       resolveProviderWithFallback(
         'claude' as ProviderName,
-        'opus' as ModelType,
+        'claude-opus-4-8' as ModelType,
         { fallback_provider: 'codex' as ProviderName },
         registry,
       ),
@@ -211,7 +213,7 @@ describe('resolveProviderWithFallback', () => {
     await expect(
       resolveProviderWithFallback(
         'claude' as ProviderName,
-        'opus' as ModelType,
+        'claude-opus-4-8' as ModelType,
         { fallback_provider: 'gemini' as ProviderName },
         registry,
       ),
@@ -224,7 +226,7 @@ describe('resolveProviderWithFallback', () => {
     await expect(
       resolveProviderWithFallback(
         'claude' as ProviderName,
-        'opus' as ModelType,
+        'claude-opus-4-8' as ModelType,
         { fallback_provider: 'gemini' as ProviderName },
         registry,
       ),
@@ -238,7 +240,7 @@ describe('resolveProviderWithFallback', () => {
 
     const result: FallbackResult = await resolveProviderWithFallback(
       'claude' as ProviderName,
-      'opus' as ModelType,
+      'claude-opus-4-8' as ModelType,
       {},
       registry,
     );
@@ -257,7 +259,7 @@ describe('resolveProviderWithFallback', () => {
 
     const result: FallbackResult = await resolveProviderWithFallback(
       'claude' as ProviderName,
-      'opus' as ModelType,
+      'claude-opus-4-8' as ModelType,
       { fallback_provider: 'codex' as ProviderName },
       registry,
     );
@@ -279,11 +281,142 @@ describe('resolveProviderWithFallback', () => {
 
     await resolveProviderWithFallback(
       'claude' as ProviderName,
-      'opus' as ModelType,
+      'claude-opus-4-8' as ModelType,
       { fallback_provider: 'codex' as ProviderName },
       registry,
     );
 
     expect(codexAdapter.isAvailable).not.toHaveBeenCalled();
+  });
+});
+
+// ─── orderedRoleProviders (454-007) — configured order, NEVER registry order ──
+
+type OrderConfig = Pick<
+  ResolvedConfig,
+  'brain_provider' | 'worker_provider' | 'fallback_provider' | 'providers' | 'provider_fallback'
+>;
+
+describe('orderedRoleProviders', () => {
+  it('resolves the brain primary from brain_provider', () => {
+    const order = orderedRoleProviders('brain', { brain_provider: 'codex' as ProviderName } as OrderConfig);
+    expect(order.primary).toBe('codex');
+    expect(order.role).toBe('brain');
+  });
+
+  it('resolves the worker primary from worker_provider', () => {
+    const order = orderedRoleProviders('worker', { worker_provider: 'gemini' as ProviderName } as OrderConfig);
+    expect(order.primary).toBe('gemini');
+  });
+
+  it('auditor primary defaults to brain_provider (brain-family) when no auditor_provider set', () => {
+    const order = orderedRoleProviders('auditor', { brain_provider: 'codex' as ProviderName } as OrderConfig);
+    expect(order.primary).toBe('codex');
+  });
+
+  it('auditor primary honors provider_fallback.auditor_provider over brain_provider', () => {
+    const order = orderedRoleProviders('auditor', {
+      brain_provider: 'codex' as ProviderName,
+      provider_fallback: { auditor_provider: 'gemini' as ProviderName },
+    } as OrderConfig);
+    expect(order.primary).toBe('gemini');
+  });
+
+  it('defaults the primary to claude when nothing is configured', () => {
+    const order = orderedRoleProviders('brain', {} as OrderConfig);
+    expect(order.primary).toBe('claude');
+  });
+
+  it('grouped providers.brain wins over legacy brain_provider for the primary', () => {
+    const order = orderedRoleProviders('brain', {
+      brain_provider: 'codex' as ProviderName,
+      providers: { brain: 'gemini' as ProviderName },
+    } as OrderConfig);
+    expect(order.primary).toBe('gemini');
+  });
+
+  it('uses the per-role fallback chain in its configured order', () => {
+    const order = orderedRoleProviders('worker', {
+      worker_provider: 'claude' as ProviderName,
+      provider_fallback: { worker: ['gemini', 'codex'] as ProviderName[], global: ['codex'] as ProviderName[] },
+    } as OrderConfig);
+    // per-role chain beats the global chain, in the exact authored order
+    expect(order.fallbacks).toEqual(['gemini', 'codex']);
+  });
+
+  it('falls back to the global chain when no per-role chain is present', () => {
+    const order = orderedRoleProviders('brain', {
+      brain_provider: 'claude' as ProviderName,
+      provider_fallback: { global: ['codex', 'gemini'] as ProviderName[] },
+    } as OrderConfig);
+    expect(order.fallbacks).toEqual(['codex', 'gemini']);
+  });
+
+  it('preserves OpenRouter as a first-class fallback and auditor primary', () => {
+    const order = orderedRoleProviders('brain', {
+      brain_provider: 'claude' as ProviderName,
+      provider_fallback: { global: ['openrouter', 'codex'] as ProviderName[] },
+    } as OrderConfig);
+    expect(order.fallbacks).toEqual(['openrouter', 'codex']);
+    expect(orderedRoleProviders('auditor', {
+      provider_fallback: { auditor_provider: 'openrouter' as ProviderName },
+    } as OrderConfig).primary).toBe('openrouter');
+  });
+
+  it('falls back to the legacy single fallback_provider when no chain is configured', () => {
+    const order = orderedRoleProviders('brain', {
+      brain_provider: 'claude' as ProviderName,
+      fallback_provider: 'codex' as ProviderName,
+    } as OrderConfig);
+    expect(order.fallbacks).toEqual(['codex']);
+  });
+
+  it('strips the primary out of the fallback chain and de-dups, preserving order', () => {
+    const order = orderedRoleProviders('brain', {
+      brain_provider: 'claude' as ProviderName,
+      provider_fallback: { global: ['claude', 'codex', 'codex', 'gemini'] as ProviderName[] },
+    } as OrderConfig);
+    // primary 'claude' removed; duplicate 'codex' collapsed; order kept
+    expect(order.fallbacks).toEqual(['codex', 'gemini']);
+  });
+
+  it('CONFIGURED order is authoritative — reversing the config reverses the chain', () => {
+    const forward = orderedRoleProviders('brain', {
+      brain_provider: 'claude' as ProviderName,
+      provider_fallback: { global: ['codex', 'gemini'] as ProviderName[] },
+    } as OrderConfig);
+    const reversed = orderedRoleProviders('brain', {
+      brain_provider: 'claude' as ProviderName,
+      provider_fallback: { global: ['gemini', 'codex'] as ProviderName[] },
+    } as OrderConfig);
+    expect(forward.fallbacks).toEqual(['codex', 'gemini']);
+    expect(reversed.fallbacks).toEqual(['gemini', 'codex']);
+  });
+
+  it('defaults unattended to true; honors an explicit false', () => {
+    expect(orderedRoleProviders('brain', {} as OrderConfig).unattended).toBe(true);
+    const attended = orderedRoleProviders('brain', {
+      provider_fallback: { unattended: false },
+    } as OrderConfig);
+    expect(attended.unattended).toBe(false);
+  });
+
+  it('returns an empty fallback chain when nothing is configured', () => {
+    expect(orderedRoleProviders('worker', {} as OrderConfig).fallbacks).toEqual([]);
+  });
+
+  it('fails loudly instead of iterating a string fallback chain character by character', () => {
+    expect(() => orderedRoleProviders('brain', {
+      provider_fallback: { global: 'codex' } as unknown as OrderConfig['provider_fallback'],
+    } as OrderConfig)).toThrow('provider_fallback.global must be an array');
+  });
+
+  it('fails loudly when an untyped caller bypasses config validation', () => {
+    expect(() => orderedRoleProviders('auditor', {
+      provider_fallback: { auditor_provider: 'not-a-provider' } as unknown as OrderConfig['provider_fallback'],
+    } as OrderConfig)).toThrow('provider_fallback.auditor_provider contains unsupported provider');
+    expect(() => orderedRoleProviders('worker', {
+      provider_fallback: { unattended: 'yes' } as unknown as OrderConfig['provider_fallback'],
+    } as OrderConfig)).toThrow('provider_fallback.unattended must be a boolean');
   });
 });
