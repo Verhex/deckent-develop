@@ -95,7 +95,8 @@ function readGoal(mission: Mission): string {
  * Drive ONE step of the goal-loop. The scheduler runs the work-items; this fn
  * advances rounds at the boundary where all items have settled.
  *
- * - open (pending/running) item present → `'waiting'` (no-op; scheduler still working).
+ * - open (pending/running/parked) item present → `'waiting'` (no-op; scheduler
+ *   is working or owner reconciliation is required).
  * - else `author` produces next work-items → enqueue them → `'authored'`.
  * - else `accept` true  → mission `completed` → `'accepted'`.
  * - else (no new work, not accepted) → mission `failed` → `'exhausted'`.
@@ -110,7 +111,7 @@ export async function advanceGoalMission(
   if (!mission) throw new Error(`goal mission not found: ${missionId}`);
 
   const all = store.listItems(missionId);
-  const open = all.filter((i) => i.status === 'pending' || i.status === 'running');
+  const open = all.filter((i) => i.status === 'pending' || i.status === 'running' || i.status === 'parked');
   if (open.length > 0) return 'waiting';
 
   const goal = readGoal(mission);

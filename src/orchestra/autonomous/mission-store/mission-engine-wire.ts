@@ -137,9 +137,9 @@ export async function runV2Engine(
     store.migrate();
     // B11 crash-recovery wire (ADR-043): a previous engine run that crashed or was
     // killed mid-dispatch leaves work_items stuck in 'running' (claimed but never
-    // settled) — they would orphan forever, never re-dispatched. recover() resets
-    // those rows to 'pending' at boot so this run picks them back up. Idempotent and
-    // narrow: only touches status='running' rows; a clean boot is a no-op.
+    // settled). Blind redrive could duplicate a provider side effect, so recover()
+    // parks those rows for owner reconciliation. Idempotent and narrow: only
+    // touches status='running' rows; a clean boot is a no-op.
     store.recover();
     // Boot: import the legacy backlog into a `legacy` mission (no-op if missions exist).
     migrateBacklogJson(projectRoot, store);
@@ -246,14 +246,31 @@ const GOAL_DRAIN_BOUND = 100_000;
 async function runGoalDrivenEngine(opts: GoalDrivenEngineOpts): Promise<MissionSchedulerSummary> {
   const { store, dispatch, poolSize, intervalMs, onMissionSettled, goalDeps, signal } = opts;
   const maxIterations = opts.maxIterations ?? Infinity;
-  const finalized = new Set<string>();
+  // A durably failed goal is terminal. Seed it as finalized so a clean engine
+  // restart does not re-deliver the same settlement. This is at-most-once
+  // restart containment, not a substitute for a delivery receipt/fence across
+  // a crash between the status write and the external notification.
+  const finalized = new Set<string>(
+    store.listMissions()
+      .filter((mission) => mission.kind === 'goal' && mission.status === 'failed')
+      .map((mission) => mission.id),
+  );
   let dispatched = 0;
   let iterations = 0;
 
-  // The scheduler must not deliver goal-mission settlements (round-based ownership
-  // belongs to the goal-driver); list/sprint missions still settle + notify here.
+  // The scheduler must not deliver successful goal-round settlements (round-based
+  // ownership belongs to the goal-driver). A dependency-reconciliation failure is
+  // terminal, however, so deliver it once in this engine run and finalize the goal.
+  // List/sprint missions continue to settle + notify here.
   const schedOnSettled = (mission: Mission): void => {
-    if (mission.kind !== 'goal') onMissionSettled(mission);
+    if (mission.kind === 'goal') {
+      if (mission.status === 'failed' && !finalized.has(mission.id)) {
+        finalized.add(mission.id);
+        onMissionSettled(mission);
+      }
+      return;
+    }
+    onMissionSettled(mission);
   };
 
   for (;;) {
@@ -265,8 +282,15 @@ async function runGoalDrivenEngine(opts: GoalDrivenEngineOpts): Promise<MissionS
     let authoredAny = false;
     for (const mission of store.listMissions()) {
       if (mission.kind !== 'goal' || finalized.has(mission.id) || mission.status === 'cancelled') continue;
+      if (mission.status === 'failed') {
+        finalized.add(mission.id);
+        onMissionSettled(mission);
+        continue;
+      }
       const items = store.listItems(mission.id);
-      if (items.some((i) => i.status === 'pending' || i.status === 'running')) continue; // round in flight
+      if (items.some((i) => i.status === 'pending' || i.status === 'running' || i.status === 'parked')) {
+        continue; // round in flight or recovery reconciliation required
+      }
       const outcome = await advanceGoalMission(store, mission.id, goalDeps);
       if (outcome === 'authored') {
         authoredAny = true;

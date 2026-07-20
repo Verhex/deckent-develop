@@ -19,14 +19,16 @@ describe('SqliteMissionStore — schema', () => {
     store.close();
   });
 
-  it('recover() resets orphaned running work_items to pending', () => {
+  it('recover() parks orphaned running work_items with reconciliation evidence', () => {
     const root = sandbox();
     const store = new SqliteMissionStore(root);
     store.migrate();
     store.__rawExec("INSERT INTO missions(id,kind,status,tenant,title,render_as,created_at,updated_at) VALUES('m1','goal','active','local','t','goal','t','t')");
     store.__rawExec("INSERT INTO work_items(id,mission_id,kind,status,render_as,policy,created_at,updated_at) VALUES('w1','m1','task','running','task','auto','t','t')");
     store.recover();
-    expect(store.__rawGet("SELECT status FROM work_items WHERE id='w1'").status).toBe('pending');
+    const row = store.__rawGet("SELECT status,last_result FROM work_items WHERE id='w1'");
+    expect(row.status).toBe('parked');
+    expect(JSON.parse(row.last_result).reason).toContain('RECOVERY_RECONCILIATION_REQUIRED');
     store.close();
   });
 });

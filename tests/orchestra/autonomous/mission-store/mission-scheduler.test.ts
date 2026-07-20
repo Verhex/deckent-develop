@@ -111,3 +111,65 @@ describe('runMissionScheduler — robustness', () => {
     s.close();
   });
 });
+
+describe('runMissionScheduler — dependency safety', () => {
+  it('never dispatches a dependent before its prerequisite is done, even with poolSize > 1', async () => {
+    const s = storeWith('dep-order', 0);
+    s.enqueueItem({ id: 'a', missionId: 'dep-order', kind: 'task' });
+    s.enqueueItem({ id: 'b', missionId: 'dep-order', kind: 'task', dependsOn: ['a'] });
+    const events: string[] = [];
+    const dispatch: DispatchFn = async (item) => {
+      events.push(`start:${item.id}`);
+      if (item.id === 'a') await new Promise((resolve) => setTimeout(resolve, 5));
+      events.push(`done:${item.id}`);
+      return { ok: true };
+    };
+
+    const summary = await runMissionScheduler(s, dispatch, { poolSize: 4, intervalMs: 1, maxIterations: 100 });
+
+    expect(events).toEqual(['start:a', 'done:a', 'start:b', 'done:b']);
+    expect(summary.dispatched).toBe(2);
+    expect(s.getMission('dep-order')!.status).toBe('completed');
+    s.close();
+  });
+
+  it('propagates upstream failure transitively without dispatching downstream items', async () => {
+    const s = storeWith('dep-fail', 0);
+    s.enqueueItem({ id: 'a', missionId: 'dep-fail', kind: 'task' });
+    s.enqueueItem({ id: 'b', missionId: 'dep-fail', kind: 'task', dependsOn: ['a'] });
+    s.enqueueItem({ id: 'c', missionId: 'dep-fail', kind: 'task', dependsOn: ['b'] });
+    const calls: string[] = [];
+
+    await runMissionScheduler(s, async (item) => {
+      calls.push(item.id);
+      return { ok: false, reason: 'upstream failed' };
+    }, { poolSize: 3, intervalMs: 1, maxIterations: 100 });
+
+    expect(calls).toEqual(['a']);
+    const byId = new Map(s.listItems('dep-fail').map((item) => [item.id, item]));
+    expect(byId.get('b')!.status).toBe('blocked');
+    expect(byId.get('b')!.lastResult?.reason).toBe('DEPENDENCY_FAILED: a');
+    expect(byId.get('c')!.status).toBe('blocked');
+    expect(byId.get('c')!.lastResult?.reason).toBe('DEPENDENCY_FAILED: b');
+    expect(s.getMission('dep-fail')!.status).toBe('failed');
+    s.close();
+  });
+
+  it('fails a cycle and settles the mission without invoking dispatch', async () => {
+    const s = storeWith('dep-cycle', 0);
+    s.enqueueItem({ id: 'a', missionId: 'dep-cycle', kind: 'task', dependsOn: ['b'] });
+    s.enqueueItem({ id: 'b', missionId: 'dep-cycle', kind: 'task', dependsOn: ['a'] });
+    let calls = 0;
+
+    const summary = await runMissionScheduler(s, async () => {
+      calls++;
+      return { ok: true };
+    }, { poolSize: 2, intervalMs: 1, maxIterations: 100 });
+
+    expect(calls).toBe(0);
+    expect(summary.dispatched).toBe(0);
+    expect(s.listItems('dep-cycle').every((item) => item.status === 'failed')).toBe(true);
+    expect(s.getMission('dep-cycle')!.status).toBe('failed');
+    s.close();
+  });
+});

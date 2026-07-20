@@ -153,6 +153,26 @@ describe('advanceGoalMission', () => {
     store.close();
   });
 
+  it('is a no-op (waiting) while recovered work is parked for owner reconciliation', async () => {
+    const store = newStore();
+    createGoalMission(store, { id: 'g-parked', title: 'Parked', goal: 'g' });
+    store.enqueueItem({ id: 'g-parked-open', missionId: 'g-parked', kind: 'task' });
+    store.updateItemStatus('g-parked-open', 'parked', {
+      ok: false,
+      reason: 'RECOVERY_RECONCILIATION_REQUIRED',
+    });
+
+    const author = vi.fn(async (): Promise<NewWorkItem[]> => []);
+    const accept = vi.fn(async () => true);
+
+    await expect(advanceGoalMission(store, 'g-parked', { author, accept })).resolves.toBe('waiting');
+    expect(author).not.toHaveBeenCalled();
+    expect(accept).not.toHaveBeenCalled();
+    expect(store.getMission('g-parked')!.status).toBe('pending');
+
+    store.close();
+  });
+
   it('trips the maxRounds guard → exhausted/failed without authoring', async () => {
     const store = newStore();
     createGoalMission(store, { id: 'g-max', title: 'Max', goal: 'g' });

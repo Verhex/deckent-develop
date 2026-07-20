@@ -35,8 +35,8 @@ const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeou
 function checkMissionComplete(store: MissionStore, missionId: string, opts: MissionSchedulerOptions): void {
   const items = store.listItems(missionId);
   if (items.length === 0) return;
-  if (items.some((i) => i.status !== 'done' && i.status !== 'failed')) return; // still active
-  const failed = items.some((i) => i.status === 'failed');
+  if (items.some((i) => i.status !== 'done' && i.status !== 'failed' && i.status !== 'blocked')) return; // still active
+  const failed = items.some((i) => i.status === 'failed' || i.status === 'blocked');
   store.updateMissionStatus(missionId, failed ? 'failed' : 'completed',
     { ok: !failed, reason: failed ? 'one or more items failed' : 'all items done' });
   store.setMissionProgress(missionId, { done: items.filter((i) => i.status === 'done').length, total: items.length });
@@ -67,6 +67,13 @@ export async function runMissionScheduler(
       await Promise.allSettled(inFlight); return { iterations, dispatched, reason: 'max_iterations' };
     }
     iterations++;
+
+    // Dependency reconciliation precedes every claim wave. Invalid/cyclic or
+    // failed-upstream items become terminal without dispatch; settle their
+    // missions even when this tick performs zero provider work.
+    for (const missionId of store.reconcilePendingDependencies()) {
+      try { checkMissionComplete(store, missionId, opts); } catch { /* fail-safe */ }
+    }
 
     // serial claim up to free slots — atomic, race-free
     let claimedThisTick = 0;

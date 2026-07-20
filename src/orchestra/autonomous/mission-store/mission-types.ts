@@ -4,7 +4,7 @@ export type MissionStatus = 'pending' | 'active' | 'completed' | 'failed' | 'can
 export type MissionRenderAs = 'checklist' | 'goal';
 
 export type WorkItemKind = 'task' | 'sprint' | 'capability' | 'process';
-export type WorkItemStatus = 'pending' | 'running' | 'done' | 'failed' | 'parked';
+export type WorkItemStatus = 'pending' | 'running' | 'done' | 'failed' | 'blocked' | 'parked';
 export type WorkItemRenderAs = 'task' | 'sprint' | 'workflow' | 'action';
 export type WorkItemPolicy = 'auto' | 'approval-required' | 'risk-tagged';
 
@@ -57,6 +57,9 @@ export interface MissionStore {
   updateMissionStatus(id: string, status: MissionStatus, result?: ResultLike): void;
   setMissionProgress(id: string, progress: Progress): void;
   enqueueItem(item: NewWorkItem): WorkItem;
+  /** Fail invalid/cyclic/failed-upstream pending dependency chains durably.
+   * Returns mission ids whose item status changed during reconciliation. */
+  reconcilePendingDependencies(): string[];
   queryDue(opts?: { tenant?: string; limit?: number }): WorkItem[];
   claimItem(id: string, by: string): boolean;
   updateItemStatus(id: string, status: WorkItemStatus, result?: ResultLike): void;

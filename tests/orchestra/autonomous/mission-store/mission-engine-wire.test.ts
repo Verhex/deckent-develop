@@ -80,14 +80,14 @@ describe('runV2Engine', () => {
     expect(store.listItems('m1').every((i) => i.status === 'done')).toBe(true);
   });
 
-  it('boot recover() rescues orphaned running work-items left by a prior crash (B11 wire)', async () => {
+  it('boot recover() parks an orphaned running item instead of risking duplicate side effects', async () => {
     const r = root();
     const store = openStore(r);
     store.createMission({ id: 'mR', kind: 'list', title: 'Recover', renderAs: 'checklist' });
     store.enqueueItem({ id: 'mR-0', missionId: 'mR', kind: 'task', spec: { description: 'orphaned' } });
-    // Simulate a prior crash: the item was claimed ('running') but the engine died
-    // before settling it. queryDue() returns only 'pending' rows, so WITHOUT a boot
-    // recover() this orphan is never re-dispatched — it stays 'running' forever.
+    // Simulate a prior crash after claim. The provider side effect may already
+    // have happened, so automatically returning this row to pending would risk
+    // executing it twice.
     expect(store.claimItem('mR-0', 'dead-worker')).toBe(true);
     expect(store.listItems('mR')[0]!.status).toBe('running');
 
@@ -101,10 +101,38 @@ describe('runV2Engine', () => {
 
     await runV2Engine(r, cfg({ engine: 'v2' }), deps);
 
-    // Post-fix: boot recover() flips the orphan back to 'pending' → it is dispatched
-    // and settles. Pre-fix (no recover wire) runTask never sees it and it stays 'running'.
-    expect(seen).toContain('orphaned');
-    expect(store.listItems('mR')[0]!.status).not.toBe('running');
+    const recovered = store.listItems('mR')[0]!;
+    expect(seen).toEqual([]);
+    expect(recovered.status).toBe('parked');
+    expect(recovered.lastResult?.reason).toContain('RECOVERY_RECONCILIATION_REQUIRED');
+  });
+
+  it('does not author, accept, or dispatch a goal whose recovered attempt is parked', async () => {
+    const r = root();
+    const store = openStore(r);
+    createGoalMission(store, { id: 'gR', title: 'Recovered goal', goal: 'do not duplicate' });
+    store.enqueueItem({ id: 'gR-0', missionId: 'gR', kind: 'task', spec: { description: 'uncertain effect' } });
+    expect(store.claimItem('gR-0', 'dead-worker')).toBe(true);
+
+    const runTask = vi.fn(async (): Promise<{ ok: boolean }> => ({ ok: true }));
+    const planner = vi.fn(async (): Promise<NewWorkItem[]> => []);
+    const accepter = vi.fn(async () => true);
+
+    const summary = await runV2Engine(r, cfg({ engine: 'v2' }), {
+      runTask,
+      runSprint: async () => undefined,
+      goalDeps: buildGoalDeps({ planner, accepter }),
+      store,
+      maxIterations: BOUNDED,
+    });
+
+    expect(summary.reason).toBe('drained');
+    expect(summary.dispatched).toBe(0);
+    expect(runTask).not.toHaveBeenCalled();
+    expect(planner).not.toHaveBeenCalled();
+    expect(accepter).not.toHaveBeenCalled();
+    expect(store.listItems('gR')[0]!.status).toBe('parked');
+    expect(store.getMission('gR')!.status).toBe('pending');
   });
 
   it('marks a mission failed when an injected runTask reports ok:false', async () => {
@@ -289,6 +317,34 @@ describe('runV2Engine — goal-driven (Type-2)', () => {
     expect(mission.status).toBe('failed');
     expect(mission.lastResult).toEqual({ ok: false, reason: 'goal not reached, no further work' });
     expect(accepter).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not re-deliver a dependency-failed goal on a clean restart', async () => {
+    const r = root();
+    const store = openStore(r);
+    createGoalMission(store, { id: 'gD', title: 'Goal Dependency', goal: 'ordered', deliverTo: 'dana' });
+    store.enqueueItem({ id: 'gD-a', missionId: 'gD', kind: 'task', dependsOn: ['gD-b'] });
+    store.enqueueItem({ id: 'gD-b', missionId: 'gD', kind: 'task', dependsOn: ['gD-a'] });
+
+    const payloads: MissionNotifyPayload[] = [];
+    const deps: RunV2EngineDeps = {
+      runTask: async () => ({ ok: true }),
+      runSprint: async () => undefined,
+      notify: (payload) => { payloads.push(payload); },
+      goalDeps: buildGoalDeps({
+        planner: async () => [],
+        accepter: async () => false,
+      }),
+      store,
+      maxIterations: BOUNDED,
+    };
+
+    await runV2Engine(r, cfg({ engine: 'v2' }), deps);
+    expect(store.getMission('gD')!.status).toBe('failed');
+    expect(payloads.filter((payload) => payload.to === 'dana')).toHaveLength(1);
+
+    await runV2Engine(r, cfg({ engine: 'v2' }), deps);
+    expect(payloads.filter((payload) => payload.to === 'dana')).toHaveLength(1);
   });
 
   it('still drives plain list missions when goalDeps is present (no regression)', async () => {

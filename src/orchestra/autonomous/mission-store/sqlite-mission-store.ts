@@ -35,7 +35,13 @@ export class SqliteMissionStore implements MissionStore {
   }
   migrate(): void { this.db.exec(SCHEMA); }
   recover(): void {
-    this.db.prepare("UPDATE work_items SET status='pending', claimed_at=NULL, claimed_by=NULL WHERE status='running'").run();
+    const result = JSON.stringify({
+      ok: false,
+      reason: 'RECOVERY_RECONCILIATION_REQUIRED: prior running attempt has no terminal dispatch evidence; automatic redrive refused',
+    });
+    this.db.prepare(`UPDATE work_items SET status='parked', last_result=@result,
+      claimed_at=NULL, claimed_by=NULL, updated_at=@ts WHERE status='running'`)
+      .run({ result, ts: this.now() });
   }
   close(): void { this.db.close(); }
 
@@ -107,19 +113,116 @@ export class SqliteMissionStore implements MissionStore {
     });
     return this.rowToItem(this.db.prepare('SELECT * FROM work_items WHERE id=?').get(item.id));
   }
+  reconcilePendingDependencies(): string[] {
+    const transaction = this.db.transaction((): string[] => {
+      const changedMissions = new Set<string>();
+      const missionRows = this.db.prepare(
+        "SELECT DISTINCT mission_id FROM work_items WHERE status='pending' ORDER BY mission_id",
+      ).all() as Array<{ mission_id: string }>;
+
+      for (const { mission_id: missionId } of missionRows) {
+        const items = (this.db.prepare('SELECT * FROM work_items WHERE mission_id=? ORDER BY created_at')
+          .all(missionId) as any[]).map(this.rowToItem);
+        const byId = new Map(items.map((item) => [item.id, item]));
+        const pendingIds = new Set(items.filter((item) => item.status === 'pending').map((item) => item.id));
+        const failures = new Map<string, { status: 'failed' | 'blocked'; reason: string }>();
+
+        for (const id of pendingIds) {
+          const item = byId.get(id)!;
+          const missing = item.dependsOn.filter((dependencyId) => !byId.has(dependencyId));
+          if (missing.length > 0) {
+            failures.set(id, { status: 'failed', reason: `DEPENDENCY_NOT_FOUND: ${missing.sort().join(', ')}` });
+          }
+        }
+
+        // Detect every cycle among still-pending nodes. Forward references are
+        // valid once present; only a back-edge in the mission-local graph fails.
+        const visitState = new Map<string, 'visiting' | 'visited'>();
+        const stack: string[] = [];
+        const cycleIds = new Set<string>();
+        const visit = (id: string): void => {
+          const state = visitState.get(id);
+          if (state === 'visited') return;
+          if (state === 'visiting') {
+            const start = stack.lastIndexOf(id);
+            for (const cycleId of stack.slice(start)) cycleIds.add(cycleId);
+            return;
+          }
+          visitState.set(id, 'visiting');
+          stack.push(id);
+          for (const dependencyId of byId.get(id)?.dependsOn ?? []) {
+            if (pendingIds.has(dependencyId)) visit(dependencyId);
+          }
+          stack.pop();
+          visitState.set(id, 'visited');
+        };
+        for (const id of pendingIds) visit(id);
+        if (cycleIds.size > 0) {
+          const cycle = [...cycleIds].sort().join(', ');
+          for (const id of cycleIds) failures.set(id, { status: 'failed', reason: `DEPENDENCY_CYCLE: ${cycle}` });
+        }
+
+        // Propagate direct and transitive upstream failure in-memory before one
+        // durable write pass, so A→B→C fails fully in the same reconciliation.
+        let added = true;
+        while (added) {
+          added = false;
+          for (const id of pendingIds) {
+            if (failures.has(id)) continue;
+            const failedDependency = byId.get(id)!.dependsOn.find((dependencyId) => {
+              const dependency = byId.get(dependencyId);
+              return dependency?.status === 'failed' || dependency?.status === 'blocked' || failures.has(dependencyId);
+            });
+            if (failedDependency) {
+              failures.set(id, { status: 'blocked', reason: `DEPENDENCY_FAILED: ${failedDependency}` });
+              added = true;
+            }
+          }
+        }
+
+        for (const [id, failure] of failures) {
+          const { status, reason } = failure;
+          const result = JSON.stringify({ ok: false, reason });
+          const info = this.db.prepare(`UPDATE work_items SET status=@status, last_result=@result,
+            claimed_at=NULL, claimed_by=NULL, updated_at=@ts WHERE id=@id AND status='pending'`)
+            .run({ id, status, result, ts: this.now() });
+          if (info.changes === 1) changedMissions.add(missionId);
+        }
+      }
+      return [...changedMissions];
+    });
+    return transaction.immediate();
+  }
   queryDue(opts?: { tenant?: string; limit?: number }): WorkItem[] {
-    // pending items whose mission matches the optional tenant, ordered by creation.
+    // Only mission-local dependency-success items are eligible. Missing,
+    // failed, running, parked or pending dependencies keep the item out.
     const args: unknown[] = [];
-    let sql = `SELECT wi.* FROM work_items wi JOIN missions m ON m.id = wi.mission_id WHERE wi.status='pending'`;
+    let sql = `SELECT wi.* FROM work_items wi JOIN missions m ON m.id = wi.mission_id
+      WHERE wi.status='pending' AND m.status IN ('pending','active') AND NOT EXISTS (
+        SELECT 1 FROM json_each(COALESCE(wi.depends_on, '[]')) dep
+        LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=wi.mission_id
+        WHERE upstream.id IS NULL OR upstream.status<>'done'
+      )`;
     if (opts?.tenant) { sql += ' AND m.tenant=?'; args.push(opts.tenant); }
     sql += ' ORDER BY wi.created_at';
     if (opts?.limit && opts.limit > 0) { sql += ' LIMIT ?'; args.push(opts.limit); }
     return (this.db.prepare(sql).all(...args) as any[]).map(this.rowToItem);
   }
   claimItem(id: string, by: string): boolean {
-    const info = this.db.prepare(`UPDATE work_items SET status='running', claimed_at=@ts, claimed_by=@by, updated_at=@ts
-      WHERE id=@id AND status='pending'`).run({ id, by, ts: this.now() });
-    return info.changes === 1;
+    const transaction = this.db.transaction((): boolean => {
+      const info = this.db.prepare(`UPDATE work_items AS target
+        SET status='running', claimed_at=@ts, claimed_by=@by, updated_at=@ts
+        WHERE id=@id AND status='pending' AND EXISTS (
+          SELECT 1 FROM missions mission
+          WHERE mission.id=target.mission_id AND mission.status IN ('pending','active')
+        ) AND NOT EXISTS (
+          SELECT 1 FROM json_each(COALESCE(target.depends_on, '[]')) dep
+          LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=target.mission_id
+          WHERE upstream.id IS NULL OR upstream.status<>'done'
+        )`).run({ id, by, ts: this.now() });
+      return info.changes === 1;
+    });
+    return transaction.immediate();
   }
   updateItemStatus(id: string, status: WorkItemStatus, result?: ResultLike): void {
     this.db.prepare('UPDATE work_items SET status=?, last_result=COALESCE(?, last_result), updated_at=? WHERE id=?')
