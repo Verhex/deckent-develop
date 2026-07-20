@@ -661,6 +661,277 @@ export function getTasksForResume(
   };
 }
 
+// ─── Durable Interrupted-Worker Reset (455-001, resume CLI surface) ──
+
+/**
+ * Durable-evidence check: does a task carry a VALID terminal `.result` on disk?
+ * A `.result` that exists, parses, and carries one of the canonical terminal
+ * self-assessments is treated as a genuine terminal outcome. In particular,
+ * timeout/partial-work markers are NOT terminal and remain resumable. Used by
+ * the resume CLI to decide
+ * which interrupted active workers are truly complete (never respawn) vs. those
+ * that crashed mid-flight (reset to PENDING).
+ */
+export function hasValidResult(projectRoot: string, taskId: string): boolean {
+  const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
+  if (!existsSync(resultPath)) return false;
+  try {
+    const parsed = JSON.parse(readFileSync(resultPath, 'utf-8')) as { taskId?: unknown; selfAssessment?: unknown };
+    return parsed.taskId === taskId && (parsed.selfAssessment === 'DONE'
+      || parsed.selfAssessment === 'GO_WITH_TECH_DEBT'
+      || parsed.selfAssessment === 'NO_GO');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Derive the exact set of UNFINISHED task IDs a resume must cover, from durable
+ * on-disk evidence alone — the single source of truth shared by `deckent resume
+ * --dry-run` (report-only) and the real resume (report + respawn), so the two
+ * can never disagree on which tasks are resumable.
+ *
+ * Resumable = `pendingTasks` (never-started) ∪ activeWorkers WITHOUT a valid
+ * terminal `.result` (crashed mid-flight). Active workers that DID write a valid
+ * `.result` before the crash are complete and excluded — never respawned, no
+ * duplicate execution. Order is deterministic: pending (checkpoint order) first,
+ * then interrupted active workers; deduped.
+ */
+export function deriveResumableTaskIds(
+  projectRoot: string,
+  checkpoint: Pick<SprintCheckpoint, 'pendingTasks' | 'activeWorkers' | 'taskStates'>,
+): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  const consider = (id: string): void => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    if (hasValidResult(projectRoot, id)) return;
+    const task = readJsonSafe<Task>(join(projectRoot, TASKS_DIR, `task-${id}.json`));
+    if (!task) return;
+    const resumableStatus = task.status === TaskStatus.DRAFT
+      || task.status === TaskStatus.PENDING
+      || task.status === TaskStatus.CLAIMED
+      || task.status === TaskStatus.EXECUTING
+      || (task.status === TaskStatus.PAUSED
+        && existsSync(join(projectRoot, TASKS_DIR, `task-${id}.paused`)));
+    if (resumableStatus) ids.push(id);
+  };
+
+  const staleActiveIds = new Set(
+    detectStaleWorkers(projectRoot, checkpoint as SprintCheckpoint).map(worker => worker.taskId),
+  );
+  const pendingIds = new Set(checkpoint.pendingTasks ?? []);
+  if (checkpoint.taskStates && checkpoint.taskStates.length > 0) {
+    for (const state of checkpoint.taskStates) {
+      if (pendingIds.has(state.id) || staleActiveIds.has(state.id) || state.status === TaskStatus.PAUSED) {
+        consider(state.id);
+      }
+    }
+  } else {
+    for (const id of checkpoint.pendingTasks ?? []) consider(id);
+    for (const worker of checkpoint.activeWorkers ?? []) {
+      if (staleActiveIds.has(worker.taskId)) consider(worker.taskId);
+    }
+  }
+  return ids;
+}
+
+/** Outcome of {@link resetInterruptedWorkersToPending}. */
+export interface InterruptedResetResult {
+  /** Task IDs reset from an interrupted-active state to PENDING. */
+  resetIds: string[];
+  /** The (possibly-rewritten) checkpoint reflecting the moved buckets. */
+  checkpoint: SprintCheckpoint;
+  /** True only when every task reset and the checkpoint commit succeeded. */
+  committed: boolean;
+  /** Durable reset failure. Callers must abort before spawning when present. */
+  error?: string;
+}
+
+/**
+ * Reset interrupted active workers to PENDING as DURABLE recovery evidence —
+ * WITHOUT touching {@link restoreSprintFromCheckpoint}'s NO_GO/MRR classification
+ * (that path is pinned by out-of-scope recovery tests and stays byte-identical).
+ *
+ * For each `activeWorker` in the checkpoint that has NO valid terminal `.result`
+ * (via {@link hasValidResult}) and whose persisted `task-*.json` is still in an
+ * interrupted-active state (EXECUTING|CLAIMED):
+ *   1. flip its `task.json` status → PENDING (atomic tmp+rename), and
+ *   2. move its id from `activeWorkers` → `pendingTasks` (appended, preserving
+ *      the existing pending order) and set its v2 `taskStates` entry → PENDING.
+ * The rewritten checkpoint is persisted atomically (tmp → rename) to the same
+ * file, reusing writeCheckpoint's crash-safe pattern.
+ *
+ * Contracts:
+ *   - Workers WITH a valid `.result` are left untouched — never respawned, no
+ *     duplicate execution.
+ *   - PAUSED tasks / `.paused` markers are preserved (skipped); restore's
+ *     born-562 unpause owns them.
+ *   - `completedTasks` and every unrelated field stay byte-identical.
+ *   - Fail-soft: a single task's I/O failure skips only that task.
+ *
+ * NOTE (455-001): this makes the on-disk recovery evidence honest at the resume
+ * CLI surface. Actually re-dispatching a reset PENDING task through SPAWN/EXECUTE
+ * additionally requires the sprint-controller resume-evaluate path to reach SPAWN
+ * (today it jumps to EVALUATE and marks leftover PENDING tasks DEFERRED) — that
+ * wiring lives outside this task's write scope.
+ */
+export function resetInterruptedWorkersToPending(
+  projectRoot: string,
+  checkpoint: SprintCheckpoint,
+  resumableIds: readonly string[] = deriveResumableTaskIds(projectRoot, checkpoint),
+): InterruptedResetResult {
+  const resetIds: string[] = [];
+  const selected = new Set(resumableIds);
+
+  for (const taskId of resumableIds) {
+    if (hasValidResult(projectRoot, taskId)) {
+      return {
+        resetIds,
+        checkpoint,
+        committed: false,
+        error: `Task ${taskId} became terminal while resume was preparing`,
+      };
+    }
+    const taskPath = join(projectRoot, TASKS_DIR, `task-${taskId}.json`);
+    const t = readJsonSafe<Task>(taskPath);
+    if (!t) {
+      return {
+        resetIds,
+        checkpoint,
+        committed: false,
+        error: `Durable task file is missing or unreadable for ${taskId}`,
+      };
+    }
+
+    t.status = TaskStatus.PENDING;
+    delete t.assignedWorker;
+    try {
+      const tmp = `${taskPath}.tmp`;
+      writeFileSync(tmp, JSON.stringify(t, null, 2), 'utf-8');
+      renameSync(tmp, taskPath);
+    } catch (e) {
+      debugLog('resetInterruptedWorkersToPending:writeTask', e);
+      return {
+        resetIds,
+        checkpoint,
+        committed: false,
+        error: `Failed to persist PENDING state for ${taskId}: ${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
+    resetIds.push(taskId);
+  }
+
+  if (resetIds.length === 0) return { resetIds, checkpoint, committed: true };
+
+  const existingPending = checkpoint.pendingTasks ?? [];
+  const updated: SprintCheckpoint = {
+    ...checkpoint,
+    pendingTasks: [
+      ...existingPending.filter(id => !selected.has(id)),
+      ...resetIds.filter(id => !existingPending.includes(id)),
+    ],
+    activeWorkers: (checkpoint.activeWorkers ?? []).filter(w => !selected.has(w.taskId)),
+  };
+  if (updated.taskStates) {
+    updated.taskStates = updated.taskStates.map(s =>
+      selected.has(s.id) ? { ...s, status: TaskStatus.PENDING } : s,
+    );
+  }
+  if (updated.remainingQueue) {
+    updated.remainingQueue = [
+      ...updated.remainingQueue.filter(id => !selected.has(id)),
+      ...resetIds,
+    ];
+  }
+
+  // Persist the rewritten checkpoint atomically (tmp → rename), same crash-safe
+  // pattern as writeCheckpoint. task.json flips above are already durable; if the
+  // checkpoint rewrite fails we still return `updated` so the caller's derived
+  // state reflects the reset.
+  try {
+    const filePath = checkpointPath(projectRoot, checkpoint.sprintId);
+    const tmpPath = `${filePath}.tmp`;
+    writeFileSync(tmpPath, JSON.stringify(updated, null, 2), 'utf-8');
+    try {
+      renameSync(tmpPath, filePath);
+    } catch (renameErr) {
+      try { if (existsSync(tmpPath)) unlinkSync(tmpPath); } catch { /* ignore */ }
+      throw renameErr;
+    }
+  } catch (e) {
+    debugLog('resetInterruptedWorkersToPending:writeCheckpoint', e);
+    return {
+      resetIds,
+      checkpoint,
+      committed: false,
+      error: `Failed to commit resume checkpoint: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+
+  for (const taskId of resetIds) {
+    const pausedMarker = join(projectRoot, TASKS_DIR, `task-${taskId}.paused`);
+    try { if (existsSync(pausedMarker)) unlinkSync(pausedMarker); } catch (e) {
+      debugLog('resetInterruptedWorkersToPending:unlinkPaused', e);
+    }
+  }
+
+  return { resetIds, checkpoint: updated, committed: true };
+}
+
+/**
+ * Rebuild a preplanned sprint from the checkpoint's durable task universe.
+ * Selected resumable tasks enter PENDING; canonical terminal results remain
+ * terminal so the normal SPAWN path cannot execute them a second time.
+ */
+export function buildPreplannedResumeSprint(
+  projectRoot: string,
+  checkpoint: SprintCheckpoint,
+  resumableIds: readonly string[],
+): Sprint {
+  const orderedIds = checkpoint.taskStates?.map(state => state.id) ?? [
+    ...checkpoint.completedTasks,
+    ...checkpoint.pendingTasks,
+    ...checkpoint.activeWorkers.map(worker => worker.taskId),
+  ];
+  const uniqueIds = [...new Set(orderedIds)];
+  const resumable = new Set(resumableIds);
+  const tasks = uniqueIds.map(taskId => {
+    const taskPath = join(projectRoot, TASKS_DIR, `task-${taskId}.json`);
+    const task = readJsonSafe<Task>(taskPath);
+    if (!task) throw new Error(`Durable task file is missing or unreadable for ${taskId}`);
+
+    if (resumable.has(taskId)) {
+      task.status = TaskStatus.PENDING;
+      delete task.assignedWorker;
+      return task;
+    }
+
+    const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
+    const result = readJsonSafe<TaskResult>(resultPath);
+    if (result?.selfAssessment === 'DONE' || result?.selfAssessment === 'GO_WITH_TECH_DEBT') {
+      task.status = TaskStatus.DONE;
+    } else if (result?.selfAssessment === 'NO_GO') {
+      task.status = TaskStatus.NO_GO;
+    }
+    return task;
+  });
+  const sprintNumber = Number.parseInt(checkpoint.sprintId.replace(/^sprint-/, ''), 10);
+  if (!Number.isSafeInteger(sprintNumber)) {
+    throw new Error(`Invalid checkpoint sprint id: ${checkpoint.sprintId}`);
+  }
+  return {
+    id: checkpoint.sprintId,
+    number: sprintNumber,
+    status: SprintStatus.PLANNING,
+    phase: SprintPhase.PLAN,
+    tasks,
+    workers: [],
+    startedAt: checkpoint.timestamp,
+  };
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 function isTerminalStatus(status: TaskStatus): boolean {

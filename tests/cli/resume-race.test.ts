@@ -26,7 +26,7 @@ import { tmpdir } from 'node:os';
 // ─── Mocks (spawn/config/output seams only — fs stays real) ──────────
 
 vi.mock('../../src/orchestra/brain.js', () => ({
-  runSprint: vi.fn().mockResolvedValue(undefined),
+  runSprint: vi.fn().mockResolvedValue({ id: 'sprint-267', status: 'COMPLETE', tasks: [] }),
 }));
 
 // resume.ts dynamically imports tmux.js to kill stale workers — never
@@ -93,6 +93,9 @@ function writeCheckpointFixture(opts: FixtureOpts): void {
     JSON.stringify(checkpoint, null, 2),
     'utf-8',
   );
+  for (const taskId of opts.completedTasks ?? []) writeTaskJson(taskId, 'DONE');
+  for (const taskId of opts.pendingTasks ?? []) writeTaskJson(taskId, 'PENDING');
+  for (const taskId of opts.activeWorkerTaskIds ?? []) writeTaskJson(taskId, 'EXECUTING');
 }
 
 /** Write a stale heartbeat: both the JSON timestamp AND the file mtime are
@@ -230,7 +233,7 @@ describe('resume — RESUME-RACE stale worker-artifact reset', () => {
     vi.mocked(runSprint).mockImplementationOnce((async () => {
       hbExistsAtSpawn = existsSync(hbPath);
       partialExistsAtSpawn = existsSync(partialPath);
-      return undefined;
+      return { id: SPRINT_ID, status: 'COMPLETE', tasks: [] };
     }) as unknown as typeof runSprint);
 
     await runResume();
@@ -281,5 +284,72 @@ describe('resume — RESUME-RACE stale worker-artifact reset', () => {
     // Nothing was created for the pending task either.
     expect(existsSync(join(root, '.tasks', 'task-267-010.hb'))).toBe(false);
     expect(existsSync(join(root, '.tasks', 'task-267-010.partial-result'))).toBe(false);
+  });
+});
+
+// ─── 455-001: interrupted active worker → PENDING (durable recovery truth) ──
+
+function writeTaskJson(taskId: string, status: string): string {
+  const p = join(root, '.tasks', `task-${taskId}.json`);
+  writeFileSync(
+    p,
+    JSON.stringify({ id: taskId, status, sprintId: SPRINT_ID, scope: { filesRead: [], filesWrite: [], directories: [] } }, null, 2),
+    'utf-8',
+  );
+  return p;
+}
+function readCheckpointFile(): { pendingTasks: string[]; activeWorkers: { taskId: string }[] } {
+  return JSON.parse(readFileSync(join(root, '.deckent', `${SPRINT_ID}-checkpoint.json`), 'utf-8'));
+}
+function taskStatusOnDisk(taskId: string): string {
+  return (JSON.parse(readFileSync(join(root, '.tasks', `task-${taskId}.json`), 'utf-8')) as { status: string }).status;
+}
+
+describe('resume — interrupted active worker durable reset (455-001)', () => {
+  it('resets the interrupted worker to PENDING but never the one that completed during the crash', async () => {
+    writeCheckpointFixture({ activeWorkerTaskIds: ['267-002', '267-004'] });
+    writeTaskJson('267-002', 'EXECUTING'); // crashed mid-flight (no .result)
+    writeTaskJson('267-004', 'EXECUTING');
+    writeResult('267-004');                // completed just before the crash
+
+    await runResume();
+
+    // Interrupted → reset to PENDING (durable), moved active→pending.
+    expect(taskStatusOnDisk('267-002')).toBe('PENDING');
+    // Completed → untouched, never respawned (no duplicate execution).
+    expect(taskStatusOnDisk('267-004')).toBe('EXECUTING');
+
+    const cp = readCheckpointFile();
+    expect(cp.pendingTasks).toContain('267-002');
+    expect(cp.activeWorkers.map(w => w.taskId)).toEqual(['267-004']);
+    expect(runSprint).toHaveBeenCalledOnce();
+  });
+
+  it('dry-run resets nothing — task.json and checkpoint are byte-identical, no spawn', async () => {
+    writeCheckpointFixture({ activeWorkerTaskIds: ['267-002'] });
+    writeTaskJson('267-002', 'EXECUTING');
+    const cpBefore = readFileSync(join(root, '.deckent', `${SPRINT_ID}-checkpoint.json`), 'utf-8');
+    const taskBefore = readFileSync(join(root, '.tasks', 'task-267-002.json'), 'utf-8');
+
+    await runResume(['--dry-run']);
+
+    expect(readFileSync(join(root, '.tasks', 'task-267-002.json'), 'utf-8')).toBe(taskBefore);
+    expect(readFileSync(join(root, '.deckent', `${SPRINT_ID}-checkpoint.json`), 'utf-8')).toBe(cpBefore);
+    expect(runSprint).not.toHaveBeenCalled();
+  });
+
+  it('resumes a PAUSED task only when its durable pause marker exists', async () => {
+    writeCheckpointFixture({ activeWorkerTaskIds: ['267-002'], pendingTasks: ['267-050'] });
+    writeTaskJson('267-002', 'EXECUTING');
+    writeTaskJson('267-050', 'PAUSED');
+    writeFileSync(join(root, '.tasks', 'task-267-050.paused'), JSON.stringify({ taskId: '267-050', previousStatus: 'PENDING' }), 'utf-8');
+
+    await runResume();
+
+    // Interrupted active worker reset…
+    expect(taskStatusOnDisk('267-002')).toBe('PENDING');
+    // …and an explicitly paused pending task is safely re-queued.
+    expect(taskStatusOnDisk('267-050')).toBe('PENDING');
+    expect(existsSync(join(root, '.tasks', 'task-267-050.paused'))).toBe(false);
   });
 });

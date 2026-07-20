@@ -3,7 +3,7 @@
 // Sprint 139 Task 030: dep graph resume restore tests added.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdirSync, rmSync, existsSync } from 'node:fs';
+import { mkdirSync, rmSync, existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -14,6 +14,9 @@ import {
   getResumableTasks,
   restoreDepGraph,
   persistDependencyGraph,
+  resetInterruptedWorkersToPending,
+  deriveResumableTaskIds,
+  hasValidResult,
 } from '../../src/orchestra/sprint-checkpoint.js';
 import type { SprintCheckpoint } from '../../src/orchestra/sprint-checkpoint.js';
 import { SprintPhase, SprintStatus, TaskStatus } from '../../src/core/types.js';
@@ -398,6 +401,147 @@ describe('restoreDepGraph (Task 030)', () => {
     // No depgraph files exist
     const restored = restoreDepGraph(root, written!);
     expect(restored).toBeNull();
+    rmSync(root, { recursive: true, force: true });
+  });
+});
+
+// ═══ 455-001: Durable interrupted-worker reset + resumable-set derivation ═══
+
+describe('resetInterruptedWorkersToPending + deriveResumableTaskIds (455-001)', () => {
+  const SID = 'sprint-455';
+
+  function setupRoot(): string {
+    const root = join(tmpdir(), `deckent-reset-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    return root;
+  }
+  function writeTaskJson(root: string, id: string, status: TaskStatus): void {
+    writeFileSync(
+      join(root, '.tasks', `task-${id}.json`),
+      JSON.stringify({ id, status, sprintId: SID, scope: { filesRead: [], filesWrite: [], directories: [] } }, null, 2),
+      'utf-8',
+    );
+  }
+  function statusOf(root: string, id: string): string {
+    return (JSON.parse(readFileSync(join(root, '.tasks', `task-${id}.json`), 'utf-8')) as { status: string }).status;
+  }
+  function writeResultFile(root: string, id: string, selfAssessment: string | undefined = 'DONE'): void {
+    writeFileSync(join(root, '.tasks', `task-${id}.result`), JSON.stringify({ taskId: id, selfAssessment }), 'utf-8');
+  }
+  function activeWorker(id: string) {
+    return { workerId: `w-${id}`, taskId: id, status: 'EXECUTING' as const, spawnedAt: new Date().toISOString() };
+  }
+  function writeCp(root: string, cp: SprintCheckpoint): void {
+    writeFileSync(join(root, '.deckent', `${SID}-checkpoint.json`), JSON.stringify(cp, null, 2), 'utf-8');
+  }
+  function baseCp(overrides: Partial<SprintCheckpoint>): SprintCheckpoint {
+    return {
+      sprintId: SID, checkpointNumber: 1, timestamp: new Date().toISOString(),
+      completedTasks: [], pendingTasks: [], activeWorkers: [],
+      brainPhase: SprintPhase.EXECUTE, eventStreamOffset: 0, ...overrides,
+    };
+  }
+
+  it('resets an interrupted EXECUTING worker (no .result) to PENDING and moves it active→pending', () => {
+    const root = setupRoot();
+    writeTaskJson(root, '455-001', TaskStatus.EXECUTING);
+    const cp = baseCp({ activeWorkers: [activeWorker('455-001')] });
+    writeCp(root, cp);
+
+    const { resetIds, checkpoint } = resetInterruptedWorkersToPending(root, cp);
+
+    expect(resetIds).toEqual(['455-001']);
+    expect(statusOf(root, '455-001')).toBe(TaskStatus.PENDING);
+    expect(checkpoint.pendingTasks).toContain('455-001');
+    expect(checkpoint.activeWorkers.map(w => w.taskId)).not.toContain('455-001');
+    // Persisted checkpoint (atomic rewrite) reflects the move.
+    const persisted = readCheckpoint(root, SID)!;
+    expect(persisted.pendingTasks).toContain('455-001');
+    expect(persisted.activeWorkers).toHaveLength(0);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('NEVER touches a worker that has a valid .result (completed during crash)', () => {
+    const root = setupRoot();
+    writeTaskJson(root, '455-002', TaskStatus.EXECUTING);
+    writeResultFile(root, '455-002', 'DONE');
+    const cp = baseCp({ activeWorkers: [activeWorker('455-002')] });
+    writeCp(root, cp);
+
+    const { resetIds, checkpoint } = resetInterruptedWorkersToPending(root, cp);
+
+    expect(resetIds).toEqual([]);
+    expect(statusOf(root, '455-002')).toBe(TaskStatus.EXECUTING); // untouched
+    expect(checkpoint.activeWorkers.map(w => w.taskId)).toContain('455-002');
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('re-queues a PAUSED task only when its durable pause marker exists', () => {
+    const root = setupRoot();
+    writeTaskJson(root, '455-003', TaskStatus.PAUSED);
+    writeFileSync(join(root, '.tasks', 'task-455-003.paused'), JSON.stringify({ taskId: '455-003', previousStatus: 'PENDING' }), 'utf-8');
+    const cp = baseCp({ activeWorkers: [activeWorker('455-003')] });
+    writeCp(root, cp);
+
+    const { resetIds } = resetInterruptedWorkersToPending(root, cp);
+
+    expect(resetIds).toEqual(['455-003']);
+    expect(statusOf(root, '455-003')).toBe(TaskStatus.PENDING);
+    expect(existsSync(join(root, '.tasks', 'task-455-003.paused'))).toBe(false);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('updates the v2 taskStates entry to PENDING when present', () => {
+    const root = setupRoot();
+    writeTaskJson(root, '455-004', TaskStatus.CLAIMED);
+    const cp = baseCp({
+      activeWorkers: [activeWorker('455-004')],
+      schemaVersion: 2,
+      taskStates: [{ id: '455-004', status: TaskStatus.CLAIMED }],
+      remainingQueue: [],
+    });
+    writeCp(root, cp);
+
+    const { checkpoint } = resetInterruptedWorkersToPending(root, cp);
+
+    expect(checkpoint.taskStates?.find(s => s.id === '455-004')?.status).toBe(TaskStatus.PENDING);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('deriveResumableTaskIds = pending ∪ interrupted-active, excluding completed', () => {
+    const root = setupRoot();
+    writeTaskJson(root, '455-010', TaskStatus.EXECUTING);
+    writeTaskJson(root, '455-011', TaskStatus.EXECUTING);
+    writeTaskJson(root, '455-020', TaskStatus.PENDING);
+    writeResultFile(root, '455-010', 'DONE');   // active but completed → excluded
+    // 455-011 active, no result → included; 455-020 pending → included
+    const cp = baseCp({
+      pendingTasks: ['455-020'],
+      activeWorkers: [activeWorker('455-010'), activeWorker('455-011')],
+    });
+
+    const ids = deriveResumableTaskIds(root, cp);
+
+    expect(ids).toEqual(['455-020', '455-011']);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('hasValidResult requires matching taskId and a canonical terminal assessment', () => {
+    const root = setupRoot();
+    writeResultFile(root, '455-030', 'DONE');
+    writeFileSync(join(root, '.tasks', 'task-455-031.result'), '{ not json', 'utf-8');
+    // Raw result missing selfAssessment (helper's default would fabricate one).
+    writeFileSync(join(root, '.tasks', 'task-455-032.result'), JSON.stringify({ taskId: '455-032' }), 'utf-8');
+    writeFileSync(join(root, '.tasks', 'task-455-033.result'), JSON.stringify({ taskId: 'other', selfAssessment: 'DONE' }), 'utf-8');
+    writeFileSync(join(root, '.tasks', 'task-455-034.result'), JSON.stringify({ taskId: '455-034', selfAssessment: 'TIMEOUT_WITH_WORK' }), 'utf-8');
+
+    expect(hasValidResult(root, '455-030')).toBe(true);
+    expect(hasValidResult(root, '455-031')).toBe(false);
+    expect(hasValidResult(root, '455-032')).toBe(false);
+    expect(hasValidResult(root, '455-033')).toBe(false);
+    expect(hasValidResult(root, '455-034')).toBe(false);
+    expect(hasValidResult(root, '455-099')).toBe(false); // no file
     rmSync(root, { recursive: true, force: true });
   });
 });

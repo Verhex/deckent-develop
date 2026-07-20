@@ -226,17 +226,16 @@ export function restoreFromSnapshot(
     return { restoredFiles: [], success: false, error: `Snapshot not found: ${snapshotPath}` };
   }
 
-  // Verify hash if hash file exists
-  if (existsSync(hashPath)) {
-    const hashContent = readFileSync(hashPath, 'utf-8').trim();
-    const expectedHash = hashContent.split(/\s+/)[0] ?? '';
-    if (!verifySnapshot(snapshotPath, expectedHash)) {
-      return { restoredFiles: [], success: false, error: 'Snapshot hash verification failed — file may be corrupted' };
-    }
+  // A restore without a durable integrity sidecar is unauthenticated input.
+  // Fail closed before creating `.tasks/` or invoking tar.
+  if (!existsSync(hashPath)) {
+    return { restoredFiles: [], success: false, error: `Snapshot hash sidecar not found: ${hashPath}` };
   }
-
-  const tasksDir = join(projectRoot, '.tasks');
-  mkdirSync(tasksDir, { recursive: true });
+  const hashContent = readFileSync(hashPath, 'utf-8').trim();
+  const expectedHash = hashContent.split(/\s+/)[0] ?? '';
+  if (!/^[a-f0-9]{64}$/i.test(expectedHash) || !verifySnapshot(snapshotPath, expectedHash)) {
+    return { restoredFiles: [], success: false, error: 'Snapshot hash verification failed — file may be corrupted' };
+  }
 
   // List files in archive
   const listResult = spawnSync('tar', ['-tzf', snapshotPath], {
@@ -249,6 +248,15 @@ export function restoreFromSnapshot(
   }
 
   const archivedFiles = listResult.stdout.trim().split('\n').filter(f => f.length > 0);
+  const unsafeEntry = archivedFiles.find(file =>
+    file.startsWith('/') || file.includes('..') || file.includes('/') || file.includes('\\'),
+  );
+  if (unsafeEntry) {
+    return { restoredFiles: [], success: false, error: `Unsafe snapshot entry rejected: ${unsafeEntry}` };
+  }
+
+  const tasksDir = join(projectRoot, '.tasks');
+  mkdirSync(tasksDir, { recursive: true });
 
   // Extract to .tasks/
   const extractResult = spawnSync('tar', [

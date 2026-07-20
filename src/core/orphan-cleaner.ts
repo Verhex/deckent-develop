@@ -27,6 +27,9 @@ const ACTIVE_STATUSES = new Set([
   'DRAFT', 'PENDING', 'CLAIMED', 'EXECUTING', 'TESTING', 'DOCUMENTING', 'PAUSED',
 ]);
 
+/** Only explicit terminal proof is archive-eligible. Unknown is preserved. */
+const TERMINAL_STATUSES = new Set(['DONE', 'NO_GO']);
+
 /** Stale lock threshold: 5 minutes */
 const STALE_LOCK_AGE_MS = 5 * 60 * 1000;
 
@@ -78,6 +81,98 @@ function sprintNumberFromFilename(filename: string): string | null {
   return match?.[1] ?? null;
 }
 
+// ─── Sprint-Scoped Task-File Classification (shared) ────────────────
+
+/** Read-only classification of a sprint's on-disk task files. */
+export interface SprintFileClassification {
+  /** Files belonging to terminal tasks — eligible for archive. */
+  archivedFiles: string[];
+  /** Files belonging to active (ACTIVE_STATUSES) tasks — preserved. */
+  preservedFiles: string[];
+  /** taskId → files, terminal only (drives the archive mutation). */
+  archiveGroups: Map<string, string[]>;
+}
+
+/**
+ * Classify a sprint's task files into archive-eligible vs preserved, WITHOUT
+ * mutating anything. Sprint-scoped by the `task-<sprintNum>-` filename prefix,
+ * so it never touches another sprint's files. Active tasks (PENDING — incl.
+ * pending fix tasks — EXECUTING, PAUSED, …) are preserved; only an explicit
+ * terminal status (DONE/NO_GO) is archive-eligible. Missing/malformed/unknown
+ * status is preserved because absence of terminal proof is not completion.
+ *
+ * Pure read-only (readdir/stat/read only) — the single source of truth shared by
+ * `postFinalizeCleanup` (which then mutates) and `previewFinalizeCleanup` (which
+ * only reports), so the dry-run preview and the real archive can never disagree.
+ *
+ * @returns classification, or `null` when the sprintId has no extractable number.
+ */
+export function classifySprintTaskFiles(
+  projectRoot: string,
+  sprintId: string,
+): SprintFileClassification | null {
+  const sprintNum = extractSprintNumber(sprintId);
+  if (!sprintNum) return null;
+
+  const result: SprintFileClassification = {
+    archivedFiles: [],
+    preservedFiles: [],
+    archiveGroups: new Map(),
+  };
+
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  if (!existsSync(tasksDir)) return result;
+
+  const prefix = `task-${sprintNum}-`;
+  const allFiles = readdirSync(tasksDir).filter(f => f.startsWith(prefix));
+
+  // Group files by the COMPLETE task ID. Task IDs may carry one or more
+  // `-fix` suffixes (`task-144-001-fix-fix`). Grouping with the old
+  // `/^(task-\d+-\d+)/` prefix collapsed every fix/xfix artifact into the base
+  // task and could archive a PENDING fix merely because its base task was DONE.
+  // Artifact filenames use the first `.` as the task-id/extension boundary;
+  // task IDs themselves never contain dots.
+  const taskGroups = new Map<string, string[]>();
+  for (const file of allFiles) {
+    const extensionBoundary = file.indexOf('.');
+    if (extensionBoundary <= 0) continue;
+    const taskId = file.slice(0, extensionBoundary);
+    if (!/^task-\d+-\d+(?:-(?:fix|xfix))*$/.test(taskId)) continue;
+    const group = taskGroups.get(taskId) ?? [];
+    group.push(file);
+    taskGroups.set(taskId, group);
+  }
+
+  for (const [taskId, files] of taskGroups) {
+    const jsonPath = join(tasksDir, `${taskId}.json`);
+    const status = existsSync(jsonPath) ? readTaskStatus(jsonPath) : null;
+    if (!status || ACTIVE_STATUSES.has(status) || !TERMINAL_STATUSES.has(status)) {
+      result.preservedFiles.push(...files);
+      continue;
+    }
+    // Explicit terminal proof → archive-eligible.
+    result.archivedFiles.push(...files);
+    result.archiveGroups.set(taskId, files);
+  }
+
+  return result;
+}
+
+/**
+ * Read-only preview of what {@link postFinalizeCleanup} WOULD archive/preserve
+ * for a sprint — no filesystem mutation, no lock clearing, no subprocess. Used
+ * by `deckent recover --dry-run` so the preview reports the requested sprint's
+ * exact archive/preserve set (the same set the real archive would move).
+ */
+export function previewFinalizeCleanup(
+  projectRoot: string,
+  sprintId: string,
+): { archivedFiles: string[]; preservedFiles: string[] } {
+  const cls = classifySprintTaskFiles(projectRoot, sprintId);
+  if (!cls) return { archivedFiles: [], preservedFiles: [] };
+  return { archivedFiles: cls.archivedFiles, preservedFiles: cls.preservedFiles };
+}
+
 // ─── Post-Finalize Cleanup ──────────────────────────────────────────
 
 /**
@@ -92,6 +187,7 @@ function sprintNumberFromFilename(filename: string): string | null {
 export function postFinalizeCleanup(
   projectRoot: string,
   sprintId: string,
+  opts: { cleanStaleLocks?: boolean } = {},
 ): PostFinalizeReport {
   const report: PostFinalizeReport = {
     archivedFiles: [],
@@ -99,8 +195,8 @@ export function postFinalizeCleanup(
     staleLocksCleaned: 0,
   };
 
-  const sprintNum = extractSprintNumber(sprintId);
-  if (!sprintNum) {
+  const cls = classifySprintTaskFiles(projectRoot, sprintId);
+  if (!cls) {
     debugLog('orphan-cleaner:postFinalize', `Cannot extract sprint number from ${sprintId}`);
     return report;
   }
@@ -108,36 +204,16 @@ export function postFinalizeCleanup(
   const tasksDir = join(projectRoot, TASKS_DIR);
   if (!existsSync(tasksDir)) return report;
 
-  const prefix = `task-${sprintNum}-`;
-  const allFiles = readdirSync(tasksDir).filter(f => f.startsWith(prefix));
+  // Preserve active tasks (classification is the shared source of truth).
+  report.preservedFiles.push(...cls.preservedFiles);
+  for (const taskId of cls.archiveGroups.keys()) {
+    debugLog('orphan-cleaner:postFinalize', `Archiving terminal task ${taskId}`);
+  }
 
-  // Archive task files (if any)
-  if (allFiles.length > 0) {
-    // Group files by task ID
-    const taskGroups = new Map<string, string[]>();
-    for (const file of allFiles) {
-      const idMatch = file.match(/^(task-\d+-\d+)/);
-      if (idMatch?.[1]) {
-        const group = taskGroups.get(idMatch[1]) ?? [];
-        group.push(file);
-        taskGroups.set(idMatch[1], group);
-      }
-    }
-
+  // Archive terminal task files (if any)
+  if (cls.archiveGroups.size > 0) {
     const archiveDir = join(projectRoot, TASKS_DIR, 'archive', sprintId);
-
-    for (const [taskId, files] of taskGroups) {
-      const jsonPath = join(tasksDir, `${taskId}.json`);
-      const status = existsSync(jsonPath) ? readTaskStatus(jsonPath) : null;
-
-      if (status && ACTIVE_STATUSES.has(status)) {
-        // Active — preserve
-        report.preservedFiles.push(...files);
-        debugLog('orphan-cleaner:postFinalize', `Preserving active task ${taskId} (status=${status})`);
-        continue;
-      }
-
-      // Terminal or unknown → archive
+    for (const files of cls.archiveGroups.values()) {
       mkdirSync(archiveDir, { recursive: true });
       for (const file of files) {
         try {
@@ -153,14 +229,18 @@ export function postFinalizeCleanup(
     }
   }
 
-  // Clean stale locks (>5min) — always runs regardless of task files
-  try {
-    report.staleLocksCleaned = clearStaleLocks(projectRoot, STALE_LOCK_AGE_MS);
-    if (report.staleLocksCleaned > 0) {
-      debugLog('orphan-cleaner:postFinalize', `Cleaned ${report.staleLocksCleaned} stale locks`);
+  // Normal finalization keeps its historical stale-lock cleanup. A targeted
+  // recovery command passes `cleanStaleLocks:false`: a sprint-scoped action
+  // must never delete another sprint's lock merely because it is old.
+  if (opts.cleanStaleLocks !== false) {
+    try {
+      report.staleLocksCleaned = clearStaleLocks(projectRoot, STALE_LOCK_AGE_MS);
+      if (report.staleLocksCleaned > 0) {
+        debugLog('orphan-cleaner:postFinalize', `Cleaned ${report.staleLocksCleaned} stale locks`);
+      }
+    } catch (e) {
+      debugLog('orphan-cleaner:postFinalize', `Stale lock cleanup failed: ${e}`);
     }
-  } catch (e) {
-    debugLog('orphan-cleaner:postFinalize', `Stale lock cleanup failed: ${e}`);
   }
 
   debugLog('orphan-cleaner:postFinalize',

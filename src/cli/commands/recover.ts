@@ -1,19 +1,21 @@
-import { existsSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 import type { Command } from 'commander';
-import { cleanOrphanIpcDirs } from '../../core/orphan-cleaner.js';
-import { clearStaleLocks, clearStaleSpawnLocks } from '../../core/file-lock.js';
-import { postFinalizeCleanup } from '../../core/orphan-cleaner.js';
+import { postFinalizeCleanup, previewFinalizeCleanup } from '../../core/orphan-cleaner.js';
 import { runSelfAuditGate } from '../../orchestra/sprint-finalizer.js';
-import { restoreFromSnapshot } from '../../orchestra/task-restoration.js';
-import { TASKS_DIR, LOCKS_DIR } from '../../core/constants.js';
+import { createPreArchiveSnapshot, restoreFromSnapshot, verifySnapshot } from '../../orchestra/task-restoration.js';
+import { cleanupCheckpointFiles } from '../../orchestra/sprint-checkpoint.js';
+import { clearPid } from '../../orchestra/sprint-pid-manager.js';
+import { readSprintState, clearSprintState } from '../../orchestra/sprint-utils.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
 
-/** 5 minutes — same as orphan-cleaner STALE_LOCK_AGE_MS */
-const STALE_LOCK_AGE_MS = 5 * 60 * 1000;
+function assertCanonicalSprintId(sprintId: string): void {
+  if (!/^sprint-\d+$/.test(sprintId)) {
+    throw new Error(`Invalid sprint id: ${sprintId}`);
+  }
+}
 
 export interface RecoveryReport {
   audit: { overallGate: 'PASS' | 'GATE_FAILURE' | 'SKIPPED' };
@@ -30,6 +32,7 @@ async function runRecovery(
   opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean },
   lang: string,
 ): Promise<RecoveryReport> {
+  assertCanonicalSprintId(sprintId);
   const report: RecoveryReport = {
     audit: { overallGate: 'SKIPPED' },
     orphanIpcDirs: [],
@@ -39,7 +42,38 @@ async function runRecovery(
     taskFilesPreserved: 0,
   };
 
-  // Step 1: Run audit (unless skipped)
+  // ─── Dry-run: READ-ONLY preview — zero audit/subprocess, zero bytes ──────
+  // No runSelfAuditGate (spawns tsc/vitest), no createPreArchiveSnapshot
+  // (spawns tar), no fs mutation. Reports the requested sprint's EXACT
+  // archive/preserve set (previewFinalizeCleanup shares postFinalizeCleanup's
+  // sprint-scoped classifier). Targeted recovery deliberately does NOT inspect
+  // or clean repo-global IPC/lock state.
+  if (opts.dryRun) {
+    // Sprint-scoped, not a blanket count of every sprint's files.
+    const preview = previewFinalizeCleanup(root, sprintId);
+    report.taskFilesArchived = preview.archivedFiles.length;
+    report.taskFilesPreserved = preview.preservedFiles.length;
+
+    return report;
+  }
+
+  // ─── Real recovery (mutating) ────────────────────────────────────────────
+  // Step 1: establish and verify the rollback anchor BEFORE any audit/cleanup
+  // side effect. A target with task artefacts may never proceed without it.
+  const preview = previewFinalizeCleanup(root, sprintId);
+  const targetFileCount = preview.archivedFiles.length + preview.preservedFiles.length;
+  let snapshotOk = targetFileCount === 0;
+  if (targetFileCount > 0) {
+    const snapshot = createPreArchiveSnapshot(root, sprintId);
+    snapshotOk = snapshot !== null &&
+      existsSync(snapshot.hashPath) &&
+      verifySnapshot(snapshot.snapshotPath, snapshot.hash);
+    if (!snapshotOk) {
+      throw new Error(getMessage('recover.snapshot_required', lang, { sprintId }));
+    }
+  }
+
+  // Step 2: Run audit (unless skipped)
   if (!opts.skipAudit) {
     try {
       const auditResult = await runSelfAuditGate(sprintId, root);
@@ -49,69 +83,35 @@ async function runRecovery(
     }
   }
 
-  if (opts.dryRun) {
-    // Preview: count IPC dirs that would be cleaned (list without deleting)
-    const deckentDir = join(root, '.deckent');
-    if (existsSync(deckentDir)) {
-      const ipcPattern = /^sprint-\d+-ipc$/;
-      report.orphanIpcDirs = readdirSync(deckentDir).filter(e => ipcPattern.test(e));
-    }
-
-    const locksDir = join(root, LOCKS_DIR);
-    if (existsSync(locksDir)) {
-      const now = Date.now();
-      const lockFiles = readdirSync(locksDir).filter(f => f.endsWith('.lock'));
-      for (const f of lockFiles) {
-        try {
-          const st = statSync(join(locksDir, f));
-          if (now - st.mtimeMs > STALE_LOCK_AGE_MS) report.staleLocksCleaned++;
-        } catch { /* skip */ }
-      }
-      const spawnLockFiles = readdirSync(locksDir).filter(f => f.endsWith('.spawnlock'));
-      for (const f of spawnLockFiles) {
-        try {
-          const st = statSync(join(locksDir, f));
-          if (now - st.mtimeMs > STALE_LOCK_AGE_MS) report.staleSpawnLocksCleaned++;
-        } catch { /* skip */ }
-      }
-    }
-
-    const tasksDir = join(root, TASKS_DIR);
-    if (existsSync(tasksDir)) {
-      report.taskFilesArchived = readdirSync(tasksDir).filter(
-        f => f.endsWith('.json') || f.endsWith('.result') || f.endsWith('.hb'),
-      ).length;
-    }
-
-    return report;
+  // Step 3: Archive terminal task files. PENDING (incl. pending fix) and other
+  // active tasks are preserved as independent ids by the shared classifier.
+  const cleanupResult = postFinalizeCleanup(root, sprintId, { cleanStaleLocks: false });
+  report.taskFilesArchived = cleanupResult.archivedFiles.length;
+  report.taskFilesPreserved = cleanupResult.preservedFiles.length;
+  if (report.taskFilesArchived !== preview.archivedFiles.length) {
+    throw new Error(getMessage('recover.archive_incomplete', lang, {
+      expected: String(preview.archivedFiles.length),
+      actual: String(report.taskFilesArchived),
+    }));
   }
 
-  // Step 2: Clean orphan IPC directories (dead PID check)
-  try {
-    report.orphanIpcDirs = cleanOrphanIpcDirs(root, { checkLivePid: true });
-  } catch (e) {
-    print(getMessage('recover.warn_ipc_cleanup_failed', lang, { error: String(e) }));
-  }
-
-  // Step 3: Clear stale locks (.lock and .spawnlock)
-  try {
-    report.staleLocksCleaned = clearStaleLocks(root, STALE_LOCK_AGE_MS);
-  } catch (e) {
-    print(getMessage('recover.warn_lock_cleanup_failed', lang, { error: String(e) }));
-  }
-  try {
-    report.staleSpawnLocksCleaned = clearStaleSpawnLocks(root, STALE_LOCK_AGE_MS);
-  } catch (e) {
-    print(getMessage('recover.warn_spawn_lock_cleanup_failed', lang, { error: String(e) }));
-  }
-
-  // Step 4: Archive terminal task files
-  try {
-    const cleanupResult = postFinalizeCleanup(root, sprintId);
-    report.taskFilesArchived = cleanupResult.archivedFiles.length;
-    report.taskFilesPreserved = cleanupResult.preservedFiles.length;
-  } catch (e) {
-    print(getMessage('recover.warn_task_archive_failed', lang, { error: String(e) }));
+  // Step 4: Clear ONLY the target sprint's stale checkpoint/PID/state metadata,
+  // now that the archive evidence is durable. Each helper is sprint-scoped by
+  // construction (filename / sprintId match) — no broad `.tasks` delete, and no
+  // other sprint's metadata is touched. sprint-state is cleared only when it
+  // still names THIS sprint (never clobbers a different active sprint).
+  //
+  // Guard: only clear once the evidence is genuinely durable — a snapshot was
+  // written, OR nothing was archived (no rollback anchor is needed). If files
+  // WERE archived but the snapshot failed, the checkpoint/PID/state are retained
+  // so the operator keeps a recovery handle instead of losing the anchor.
+  if (snapshotOk || report.taskFilesArchived === 0) {
+    try { cleanupCheckpointFiles(root, sprintId); } catch { /* best-effort */ }
+    try { clearPid(root, sprintId); } catch { /* best-effort */ }
+    try {
+      const st = readSprintState(root);
+      if (st && st.sprintId === sprintId) clearSprintState(root);
+    } catch { /* best-effort */ }
   }
 
   return report;
@@ -131,6 +131,17 @@ export function registerRecover(program: Command): void {
       const lang = detectLang(root);
 
       try {
+        assertCanonicalSprintId(sprintId);
+        if (opts.dryRun && opts.restoreTasks) {
+          throw new Error(getMessage('recover.dry_run_restore_conflict', lang));
+        }
+        if (!opts.dryRun && opts.json && !opts.force) {
+          throw new Error(getMessage('recover.json_requires_force', lang));
+        }
+        if (opts.restoreTasks && !opts.force) {
+          throw new Error(getMessage('recover.restore_requires_force', lang));
+        }
+
         // born-562: rollback path — restore the pre-archive snapshot (createPreArchiveSnapshot
         // writes it in CLEANUP, but nothing consumed it until now). Mutually exclusive with the
         // forward-cleanup flow; returns before any archive/cleanup runs.

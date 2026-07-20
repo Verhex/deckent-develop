@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import {
   postFinalizeCleanup,
   preflightOrphanCleanup,
+  previewFinalizeCleanup,
 } from '../../src/core/orphan-cleaner.js';
 
 function createTestRoot(): string {
@@ -129,13 +130,14 @@ describe('postFinalizeCleanup', () => {
     expect(report.archivedFiles.length).toBe(0);
   });
 
-  it('should archive tasks with unknown status (missing .json)', () => {
-    // Only .hb file, no .json — unknown status → archive
+  it('preserves tasks with unknown status (missing .json)', () => {
+    // Only .hb file, no .json — no terminal proof, so preserve.
     writeTaskHb(testRoot, 'task-144-005');
 
     const report = postFinalizeCleanup(testRoot, 'sprint-144');
 
-    expect(report.archivedFiles.length).toBe(1);
+    expect(report.archivedFiles.length).toBe(0);
+    expect(report.preservedFiles).toContain('task-144-005.hb');
   });
 });
 
@@ -229,5 +231,78 @@ describe('preflightOrphanCleanup', () => {
     expect(report.cleanedSprintIds).toContain('sprint-142');
     expect(report.cleanedSprintIds).toContain('sprint-143');
     expect(existsSync(join(testRoot, '.tasks', 'task-144-001.json'))).toBe(true);
+  });
+});
+
+// ─── previewFinalizeCleanup (455-001 — read-only recover dry-run) ───
+
+describe('previewFinalizeCleanup', () => {
+  let testRoot: string;
+
+  beforeEach(() => { testRoot = createTestRoot(); });
+  afterEach(() => { rmSync(testRoot, { recursive: true, force: true }); });
+
+  it('reports terminal files as archived + active as preserved, deleting NOTHING', () => {
+    writeTaskJson(testRoot, 'task-144-001', 'DONE');
+    writeTaskResult(testRoot, 'task-144-001');
+    writeTaskJson(testRoot, 'task-144-002', 'PENDING');
+
+    const preview = previewFinalizeCleanup(testRoot, 'sprint-144');
+
+    expect(preview.archivedFiles).toContain('task-144-001.json');
+    expect(preview.archivedFiles).toContain('task-144-001.result');
+    expect(preview.preservedFiles).toContain('task-144-002.json');
+    // Pure preview — every file still on disk.
+    expect(existsSync(join(testRoot, '.tasks', 'task-144-001.json'))).toBe(true);
+    expect(existsSync(join(testRoot, '.tasks', 'task-144-001.result'))).toBe(true);
+    expect(existsSync(join(testRoot, '.tasks', 'task-144-002.json'))).toBe(true);
+  });
+
+  it('is sprint-scoped — never reports another sprint\'s files', () => {
+    writeTaskJson(testRoot, 'task-144-001', 'DONE');
+    writeTaskJson(testRoot, 'task-143-001', 'DONE');
+
+    const preview = previewFinalizeCleanup(testRoot, 'sprint-144');
+
+    expect(preview.archivedFiles).toContain('task-144-001.json');
+    expect(preview.archivedFiles.some(f => f.startsWith('task-143'))).toBe(false);
+    expect(preview.preservedFiles.some(f => f.startsWith('task-143'))).toBe(false);
+  });
+
+  it('preserves a pending fix task as an independent id (not archived)', () => {
+    writeTaskJson(testRoot, 'task-144-005', 'PENDING'); // a pending fix task
+    const preview = previewFinalizeCleanup(testRoot, 'sprint-144');
+    expect(preview.preservedFiles).toContain('task-144-005.json');
+    expect(preview.archivedFiles).not.toContain('task-144-005.json');
+  });
+
+  it('classifies xfix and chained fix artifacts as independent task ids', () => {
+    writeTaskJson(testRoot, 'task-144-005', 'DONE');
+    writeTaskJson(testRoot, 'task-144-005-xfix', 'PENDING');
+    writeTaskJson(testRoot, 'task-144-005-xfix-fix', 'NO_GO');
+
+    const preview = previewFinalizeCleanup(testRoot, 'sprint-144');
+
+    expect(preview.archivedFiles).toContain('task-144-005.json');
+    expect(preview.preservedFiles).toContain('task-144-005-xfix.json');
+    expect(preview.archivedFiles).toContain('task-144-005-xfix-fix.json');
+  });
+
+  it('reports the SAME set postFinalizeCleanup actually archives/preserves', () => {
+    writeTaskJson(testRoot, 'task-144-001', 'DONE');
+    writeTaskResult(testRoot, 'task-144-001');
+    writeTaskJson(testRoot, 'task-144-002', 'PENDING');
+
+    const preview = previewFinalizeCleanup(testRoot, 'sprint-144');
+    const real = postFinalizeCleanup(testRoot, 'sprint-144'); // mutates AFTER preview captured
+
+    expect(new Set(real.archivedFiles)).toEqual(new Set(preview.archivedFiles));
+    expect(new Set(real.preservedFiles)).toEqual(new Set(preview.preservedFiles));
+  });
+
+  it('returns empty sets for an unextractable sprintId', () => {
+    const preview = previewFinalizeCleanup(testRoot, 'bad-id');
+    expect(preview.archivedFiles).toEqual([]);
+    expect(preview.preservedFiles).toEqual([]);
   });
 });

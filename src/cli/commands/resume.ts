@@ -3,7 +3,7 @@
 // MVP: reads checkpoint, respawns pending tasks, skips completed ones.
 // Sprint 140+ will add mid-worker resume and heartbeat daemon integration.
 
-import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
@@ -12,10 +12,18 @@ import { runSprint } from '../../orchestra/brain.js';
 import {
   readCheckpoint, hasCheckpoint,
   detectStaleWorkers,
+  deriveResumableTaskIds,
+  resetInterruptedWorkersToPending,
+  hasValidResult,
+  buildPreplannedResumeSprint,
 } from '../../orchestra/sprint-checkpoint.js';
+import { clearSprintState, readSprintState } from '../../orchestra/sprint-utils.js';
+import { SprintStatus } from '../../core/types.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { DECKENT_DIR, SPRINT_STATE_FILE, TASKS_DIR } from '../../core/constants.js';
+import { DECKENT_DIR, TASKS_DIR } from '../../core/constants.js';
+import { getMessage } from '../helpers/messages.js';
+import { detectLang } from '../helpers/i18n.js';
 
 // ─── Register ───────────────────────────────────────────────────────
 
@@ -28,66 +36,79 @@ export function registerResume(program: Command): void {
     .option('--root <path>', 'Project root directory (defaults to cwd)')
     .action(async (sprintId: string, opts: { autoApprove: boolean; dryRun: boolean; root?: string }) => {
       const projectRoot = opts.root ?? resolveProjectRoot();
+      const lang = detectLang(projectRoot);
+
+      if (!/^sprint-\d+$/.test(sprintId)) {
+        printError(getMessage('resume.invalid_sprint_id', lang, { sprintId }));
+        process.exit(1);
+      }
 
       // Validate checkpoint exists
       if (!hasCheckpoint(projectRoot, sprintId)) {
-        printError(`No checkpoint found for sprint "${sprintId}".`);
-        printError(`Run "deckent status" to see available sprints.`);
+        printError(getMessage('resume.checkpoint_missing', lang, { sprintId }));
+        printError(getMessage('resume.status_hint', lang));
         process.exit(1);
       }
 
       const checkpoint = readCheckpoint(projectRoot, sprintId);
       if (!checkpoint) {
-        printError(`Checkpoint for sprint "${sprintId}" is malformed or unreadable.`);
+        printError(getMessage('resume.checkpoint_unreadable', lang, { sprintId }));
         process.exit(1);
       }
 
-      print(`\nResuming sprint ${checkpoint.sprintId} from checkpoint #${checkpoint.checkpointNumber}`);
-      print(`  Written: ${checkpoint.timestamp}`);
-      print(`  Phase:   ${checkpoint.brainPhase}`);
-      print(`  Completed tasks: ${checkpoint.completedTasks.length}`);
-      print(`  Pending tasks:   ${checkpoint.pendingTasks.length}`);
-      print(`  Active workers:  ${checkpoint.activeWorkers.length}`);
+      print(getMessage('resume.header', lang, {
+        sprintId: checkpoint.sprintId,
+        checkpoint: String(checkpoint.checkpointNumber),
+      }));
+      print(getMessage('resume.summary', lang, {
+        timestamp: checkpoint.timestamp,
+        phase: String(checkpoint.brainPhase),
+        completed: String(checkpoint.completedTasks.length),
+        pending: String(checkpoint.pendingTasks.length),
+        active: String(checkpoint.activeWorkers.length),
+      }));
 
       // Detect stale heartbeats (>5min) among active workers
       const staleWorkers = detectStaleWorkers(projectRoot, checkpoint);
       if (staleWorkers.length > 0) {
-        print(`\n  ⚠ Stale workers detected: ${staleWorkers.length}`);
+        print(getMessage('resume.stale_header', lang, { count: String(staleWorkers.length) }));
         for (const sw of staleWorkers) {
           const ageMin = Math.round(sw.ageMs / 60_000);
-          print(`    - ${sw.workerId} (task ${sw.taskId}): ${sw.reason}, age ${ageMin}min`);
+          print(getMessage('resume.stale_item', lang, {
+            workerId: sw.workerId,
+            taskId: sw.taskId,
+            reason: sw.reason,
+            age: String(ageMin),
+          }));
         }
-        print('  Stale workers will be killed and their tasks respawned.');
+        print(getMessage('resume.stale_action', lang));
       }
 
-      // Check which "active" workers actually completed (wrote .result before crash)
-      const completedDuringCrash: string[] = [];
-      for (const worker of checkpoint.activeWorkers) {
-        const resultPath = join(projectRoot, TASKS_DIR, `task-${worker.taskId}.result`);
-        if (existsSync(resultPath)) {
-          completedDuringCrash.push(worker.taskId);
-        }
-      }
+      // Which "active" workers actually completed (wrote a VALID .result before
+      // the crash)? Those are terminal — reported, never respawned.
+      const completedDuringCrash = checkpoint.activeWorkers
+        .map(w => w.taskId)
+        .filter(taskId => hasValidResult(projectRoot, taskId));
       if (completedDuringCrash.length > 0) {
-        print(`\n  ✓ Tasks completed before crash: ${completedDuringCrash.join(', ')}`);
+        print(getMessage('resume.crash_completed', lang, { taskIds: completedDuringCrash.join(', ') }));
       }
 
-      // Calculate actual resumable count
-      const allCompletedIds = new Set([
-        ...checkpoint.completedTasks,
-        ...completedDuringCrash,
-      ]);
-      const resumableCount = checkpoint.pendingTasks.length +
-        staleWorkers.filter(w => !allCompletedIds.has(w.taskId)).length;
+      // Single source of truth for the resumable set — identical for --dry-run
+      // and real resume (parity by construction). Excludes completed workers.
+      const resumableIds = deriveResumableTaskIds(projectRoot, checkpoint);
+      const resumableCount = resumableIds.length;
 
       if (opts.dryRun) {
-        print(`\n[dry-run] Would resume ${resumableCount} tasks. No workers spawned.`);
+        print(getMessage('resume.dry_run', lang, {
+          count: String(resumableCount),
+          taskIds: resumableIds.join(', ') || getMessage('resume.none', lang),
+        }));
         return;
       }
 
-      if (resumableCount === 0 && checkpoint.pendingTasks.length === 0) {
-        print('\nAll tasks already completed — nothing to resume.');
-        print(`Run "deckent retro" to see the sprint retrospective.`);
+      if (resumableCount === 0) {
+        print(getMessage('resume.nothing', lang));
+        print(getMessage('resume.retro_hint', lang));
         return;
       }
 
@@ -96,13 +117,13 @@ export function registerResume(program: Command): void {
       try {
         config = await loadConfig(projectRoot);
       } catch (e) {
-        printError(`Failed to load config: ${e instanceof Error ? e.message : String(e)}`);
+        printError(getMessage('resume.config_failed', lang, { error: e instanceof Error ? e.message : String(e) }));
         process.exit(1);
       }
 
       // Kill stale workers before respawn
       if (staleWorkers.length > 0) {
-        print('\nKilling stale workers...');
+        print(getMessage('resume.stale_killing', lang));
         for (const sw of staleWorkers) {
           try {
             // Try tmux kill first, then spawn backend kill
@@ -112,6 +133,22 @@ export function registerResume(program: Command): void {
             // Worker may already be dead (SIGKILL scenario) — expected
           }
         }
+      }
+
+      // Commit the exact dry-run set before deleting any forensic artefact.
+      // A task write or checkpoint rename failure is a hard HOLD: spawning from
+      // partially committed durable state would make duplicate execution possible.
+      const reset = resetInterruptedWorkersToPending(projectRoot, checkpoint, resumableIds);
+      if (!reset.committed) {
+        printError(getMessage('resume.commit_failed', lang, { error: reset.error ?? 'unknown' }));
+        process.exit(1);
+      }
+      const resumeCheckpoint = reset.checkpoint;
+      if (reset.resetIds.length > 0) {
+        print(getMessage('resume.reset_tasks', lang, {
+          count: String(reset.resetIds.length),
+          taskIds: reset.resetIds.join(', '),
+        }));
       }
 
       // ─── RESUME-RACE fix (Sprint 268 — live bug from sprint-267 recovery) ──
@@ -136,10 +173,7 @@ export function registerResume(program: Command): void {
       // masking real spawn failures. Tasks with a `.result` on disk are
       // completed — their artifacts are left untouched. The --dry-run path
       // returns earlier, so dry-run never deletes anything.
-      const respawnCandidateIds = new Set<string>([
-        ...checkpoint.pendingTasks,
-        ...checkpoint.activeWorkers.map(w => w.taskId),
-      ]);
+      const respawnCandidateIds = new Set<string>(resumableIds);
       let resetArtifacts = 0;
       for (const taskId of respawnCandidateIds) {
         const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
@@ -154,56 +188,56 @@ export function registerResume(program: Command): void {
             unlinkSync(stalePath);
             resetArtifacts++;
           } catch {
-            // Fail-soft: an unremovable artifact must not abort resume —
-            // worst case the collector falls back to pre-fix behavior.
+            printError(getMessage('resume.artifact_cleanup_failed', lang, { path: stalePath }));
+            process.exit(1);
           }
         }
       }
       if (resetArtifacts > 0) {
-        print(`  Reset ${resetArtifacts} stale worker artifact(s) (.hb / .partial-result).`);
+        print(getMessage('resume.reset_artifacts', lang, { count: String(resetArtifacts) }));
       }
 
-      print(`\nSpawning ${resumableCount} pending tasks...\n`);
+      print(getMessage('resume.spawning', lang, { count: String(resumableCount) }));
 
-      // ─── Write sprint-state.json so runSprint skips completed tasks ───
-      // runSprint has an internal state-recovery path: if sprint-state.json
-      // exists with a sprintId, it calls restoreSprintFromCheckpoint, rebuilds
-      // the sprint from checkpoint (completed tasks have status=DONE on disk),
-      // and takes action 'resume-evaluate' — jumping to EVALUATE phase and
-      // skipping PLAN/SPAWN/EXECUTE. Without this write, runSprint starts
-      // fresh from DIRECTIVES, re-plans and re-runs all tasks including done ones.
-      const allTaskIds = [
-        ...checkpoint.completedTasks,
-        ...checkpoint.pendingTasks,
-        ...checkpoint.activeWorkers.map(w => w.taskId),
-      ];
+      let preplannedSprint;
       try {
-        mkdirSync(join(projectRoot, DECKENT_DIR), { recursive: true });
-        writeFileSync(
-          join(projectRoot, SPRINT_STATE_FILE),
-          JSON.stringify({
-            sprintId: checkpoint.sprintId,
-            phase: checkpoint.brainPhase,
-            status: 'ACTIVE',
-            startedAt: checkpoint.timestamp,
-            updatedAt: new Date().toISOString(),
-            taskIds: allTaskIds,
-          }, null, 2),
-          'utf-8',
-        );
+        preplannedSprint = buildPreplannedResumeSprint(projectRoot, resumeCheckpoint, resumableIds);
       } catch (e) {
-        // Fail-soft: state recovery is best-effort; runSprint will still run
-        printError(`Warning: Failed to write sprint state for resume: ${e instanceof Error ? e.message : String(e)}`);
+        printError(getMessage('resume.preplanned_failed', lang, { error: e instanceof Error ? e.message : String(e) }));
+        process.exit(1);
+      }
+
+      // An old state file for this sprint triggers controller's legacy
+      // resume-evaluate branch, which intentionally skips SPAWN/EXECUTE. Remove
+      // only the target sprint's stale state and verify the removal. A different
+      // sprint is an active ownership conflict and must HOLD.
+      const existingState = readSprintState(projectRoot);
+      if (existingState && existingState.sprintId !== checkpoint.sprintId) {
+        printError(getMessage('resume.other_sprint_active', lang, { sprintId: existingState.sprintId }));
+        process.exit(1);
+      }
+      if (existingState?.sprintId === checkpoint.sprintId) {
+        clearSprintState(projectRoot);
+        if (readSprintState(projectRoot)?.sprintId === checkpoint.sprintId) {
+          printError(getMessage('resume.state_clear_failed', lang, { sprintId: checkpoint.sprintId }));
+          process.exit(1);
+        }
       }
 
       try {
-        await runSprint(projectRoot, config, {
+        const resumed = await runSprint(projectRoot, config, {
           autoApprove: opts.autoApprove,
+          preplannedSprint,
         });
-        print('\nSprint resumed and completed.');
-        print('Run "deckent retro" to see the retrospective.');
+        if (resumed.status !== SprintStatus.COMPLETE) {
+          printError(getMessage('resume.not_complete', lang, { status: String(resumed.status) }));
+          process.exitCode = 1;
+          return;
+        }
+        print(getMessage('resume.completed', lang));
+        print(getMessage('resume.retro_hint', lang));
       } catch (e) {
-        printError(`Sprint resume failed: ${e instanceof Error ? e.message : String(e)}`);
+        printError(getMessage('resume.failed', lang, { error: e instanceof Error ? e.message : String(e) }));
         process.exit(1);
       }
     });

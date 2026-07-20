@@ -12,10 +12,22 @@ vi.mock('../../../src/orchestra/brain.js', () => ({
   runSprint: (...args: unknown[]) => mockRunSprint(...args),
 }));
 
+const mockResetInterrupted = vi.fn();
+const mockBuildPreplanned = vi.fn();
 vi.mock('../../../src/orchestra/sprint-checkpoint.js', () => ({
   hasCheckpoint: (...args: unknown[]) => mockHasCheckpoint(...args),
   readCheckpoint: (...args: unknown[]) => mockReadCheckpoint(...args),
   detectStaleWorkers: (...args: unknown[]) => mockDetectStaleWorkers(...args),
+  // Parity helper: unfinished = pending ∪ active-without-valid-result. The mock
+  // mirrors that shape (no .result on disk in these unit fixtures → all active
+  // count as interrupted) so dry-run and real derive an identical set.
+  deriveResumableTaskIds: (_root: unknown, cp: { pendingTasks?: string[]; activeWorkers?: { taskId: string }[] }) => [
+    ...(cp?.pendingTasks ?? []),
+    ...(cp?.activeWorkers ?? []).map(w => w.taskId),
+  ],
+  resetInterruptedWorkersToPending: (...args: unknown[]) => mockResetInterrupted(...args),
+  buildPreplannedResumeSprint: (...args: unknown[]) => mockBuildPreplanned(...args),
+  hasValidResult: () => false,
 }));
 
 vi.mock('../../../src/core/config.js', () => ({
@@ -85,7 +97,7 @@ async function runCommand(args: string[]): Promise<void> {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-describe('deckent resume CLI — completed-task list passed to runSprint', () => {
+describe('deckent resume CLI — preplanned exactly-once handoff', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.exitCode = undefined;
@@ -94,79 +106,57 @@ describe('deckent resume CLI — completed-task list passed to runSprint', () =>
     mockReadCheckpoint.mockReturnValue(FAKE_CHECKPOINT);
     mockDetectStaleWorkers.mockReturnValue([]);
     mockLoadConfig.mockResolvedValue({ deckent_style: 'sprint' });
-    mockRunSprint.mockResolvedValue({ id: 'sprint-321', tasks: [], status: 'COMPLETED' });
+    mockRunSprint.mockResolvedValue({ id: 'sprint-321', tasks: [], status: 'COMPLETE' });
     mockExistsSync.mockReturnValue(false);
     mockMkdirSync.mockReturnValue(undefined);
     mockWriteFileSync.mockReturnValue(undefined);
-  });
-
-  it('writes sprint-state.json with checkpoint sprintId before calling runSprint', async () => {
-    await runCommand(['sprint-321']);
-
-    // Find the writeFileSync call for sprint-state.json
-    const stateWriteCall = mockWriteFileSync.mock.calls.find(
-      (call) => typeof call[0] === 'string' && (call[0] as string).includes('sprint-state.json'),
-    );
-    expect(stateWriteCall, 'sprint-state.json must be written before runSprint').toBeDefined();
-
-    const written = JSON.parse(stateWriteCall![1] as string);
-    expect(written.sprintId).toBe('sprint-321');
-  });
-
-  it('includes all completedTask IDs in the sprint-state.json taskIds', async () => {
-    await runCommand(['sprint-321']);
-
-    const stateWriteCall = mockWriteFileSync.mock.calls.find(
-      (call) => typeof call[0] === 'string' && (call[0] as string).includes('sprint-state.json'),
-    );
-    const written = JSON.parse(stateWriteCall![1] as string);
-
-    // All completed task IDs must be in taskIds
-    expect(written.taskIds).toContain('321-001');
-    expect(written.taskIds).toContain('321-002');
-  });
-
-  it('includes all pendingTask IDs in the sprint-state.json taskIds', async () => {
-    await runCommand(['sprint-321']);
-
-    const stateWriteCall = mockWriteFileSync.mock.calls.find(
-      (call) => typeof call[0] === 'string' && (call[0] as string).includes('sprint-state.json'),
-    );
-    const written = JSON.parse(stateWriteCall![1] as string);
-
-    expect(written.taskIds).toContain('321-003');
-  });
-
-  it('includes all activeWorker taskIds in the sprint-state.json taskIds', async () => {
-    await runCommand(['sprint-321']);
-
-    const stateWriteCall = mockWriteFileSync.mock.calls.find(
-      (call) => typeof call[0] === 'string' && (call[0] as string).includes('sprint-state.json'),
-    );
-    const written = JSON.parse(stateWriteCall![1] as string);
-
-    expect(written.taskIds).toContain('321-004');
-  });
-
-  it('sprint-state.json is written before runSprint is called', async () => {
-    const callOrder: string[] = [];
-    mockWriteFileSync.mockImplementation((path: unknown) => {
-      if (typeof path === 'string' && path.includes('sprint-state.json')) {
-        callOrder.push('writeFileSync:sprint-state');
-      }
+    mockResetInterrupted.mockImplementation((_root: unknown, cp: unknown) => ({
+      resetIds: ['321-003', '321-004'], checkpoint: cp, committed: true,
+    }));
+    mockBuildPreplanned.mockReturnValue({
+      id: 'sprint-321', number: 321, status: 'PLANNING', phase: 'PLAN', tasks: [], workers: [],
     });
-    mockRunSprint.mockImplementation(async () => {
-      callOrder.push('runSprint');
-      return { id: 'sprint-321', tasks: [], status: 'COMPLETED' };
-    });
+  });
 
+  it('does not write sprint-state.json and invokes the normal path with a preplanned sprint', async () => {
     await runCommand(['sprint-321']);
 
-    const stateWriteIdx = callOrder.indexOf('writeFileSync:sprint-state');
-    const runSprintIdx = callOrder.indexOf('runSprint');
-    expect(stateWriteIdx).toBeGreaterThanOrEqual(0);
-    expect(runSprintIdx).toBeGreaterThanOrEqual(0);
-    expect(stateWriteIdx).toBeLessThan(runSprintIdx);
+    const stateWriteCall = mockWriteFileSync.mock.calls.find(
+      (call) => typeof call[0] === 'string' && (call[0] as string).includes('sprint-state.json'),
+    );
+    expect(stateWriteCall).toBeUndefined();
+    expect(mockRunSprint).toHaveBeenCalledWith(
+      '/fake/project',
+      { deckent_style: 'sprint' },
+      expect.objectContaining({ preplannedSprint: expect.objectContaining({ id: 'sprint-321' }) }),
+    );
+  });
+
+  it('builds the preplanned sprint from the full checkpoint and exact resumable ids', async () => {
+    await runCommand(['sprint-321']);
+    expect(mockBuildPreplanned).toHaveBeenCalledWith(
+      '/fake/project', FAKE_CHECKPOINT, ['321-003', '321-004'],
+    );
+  });
+
+  it('commits the same ids reported by dry-run before building or spawning', async () => {
+    await runCommand(['sprint-321']);
+    expect(mockResetInterrupted).toHaveBeenCalledWith(
+      '/fake/project', FAKE_CHECKPOINT, ['321-003', '321-004'],
+    );
+  });
+
+  it('HOLDs before build/spawn when the checkpoint commit fails', async () => {
+    mockResetInterrupted.mockReturnValue({
+      resetIds: [], checkpoint: FAKE_CHECKPOINT, committed: false, error: 'rename failed',
+    });
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+    await expect(runCommand(['sprint-321'])).rejects.toThrow('process.exit called');
+    expect(mockBuildPreplanned).not.toHaveBeenCalled();
+    expect(mockRunSprint).not.toHaveBeenCalled();
+    mockExit.mockRestore();
   });
 
   it('exits early on dry-run without writing sprint-state.json or calling runSprint', async () => {
@@ -204,29 +194,10 @@ describe('deckent resume CLI — completed-task list passed to runSprint', () =>
     mockExit.mockRestore();
   });
 
-  it('sprint-state.json taskIds contains union of all three task buckets with no duplicates avoided', async () => {
-    const checkpointWithOverlap = {
-      ...FAKE_CHECKPOINT,
-      completedTasks: ['321-001', '321-002'],
-      pendingTasks: ['321-003'],
-      activeWorkers: [
-        { workerId: 'w-321-004', taskId: '321-004', status: 'EXECUTING', spawnedAt: '2026-06-24T00:00:00.000Z' },
-      ],
-    };
-    mockReadCheckpoint.mockReturnValue(checkpointWithOverlap);
-
+  it('does not claim completion when controller returns PAUSED', async () => {
+    mockRunSprint.mockResolvedValue({ id: 'sprint-321', tasks: [], status: 'PAUSED' });
     await runCommand(['sprint-321']);
-
-    const stateWriteCall = mockWriteFileSync.mock.calls.find(
-      (call) => typeof call[0] === 'string' && (call[0] as string).includes('sprint-state.json'),
-    );
-    const written = JSON.parse(stateWriteCall![1] as string);
-
-    // All four task IDs must be present
-    expect(written.taskIds).toHaveLength(4);
-    expect(written.taskIds).toContain('321-001');
-    expect(written.taskIds).toContain('321-002');
-    expect(written.taskIds).toContain('321-003');
-    expect(written.taskIds).toContain('321-004');
+    expect(process.exitCode).toBe(1);
+    expect(mockPrintError).toHaveBeenCalledWith(expect.stringContaining('PAUSED'));
   });
 });
