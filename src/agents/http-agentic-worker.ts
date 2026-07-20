@@ -644,11 +644,29 @@ async function buildRealSend(
   provider: string,
 ): Promise<HttpAgenticSend> {
   const { OpenAICompatibleAdapter } = await import('../providers/openai-compatible.js');
+  // Row 477: vendor extensions (e.g. OpenRouter's `reasoning`) arrive as JSON in
+  // an env var rather than argv — the spawn path shells out through a cmd.exe
+  // wrapper on win32, and quoting JSON through a shell is not portable. Malformed
+  // JSON is IGNORED rather than fatal: a bad extension knob must never take down a
+  // worker that would otherwise run correctly (it degrades to the provider default).
+  let extraBody: Record<string, unknown> | undefined;
+  const rawExtraBody = process.env['DECKENT_HTTP_EXTRA_BODY'];
+  if (rawExtraBody) {
+    try {
+      const parsed: unknown = JSON.parse(rawExtraBody);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        extraBody = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // ignored — fall through to provider defaults
+    }
+  }
   const adapter = new OpenAICompatibleAdapter({
     name: provider,
     baseURL,
     apiKeyEnv,
     models: [model],
+    ...(extraBody ? { extraBody } : {}),
   });
   return async (messages, m, o) => {
     const res = await adapter.send(

@@ -130,13 +130,28 @@ export function isTmuxProvider(providerName: ProviderName): boolean {
  * provider name here. Keep the list tight — only providers that genuinely
  * cannot tolerate a container/tmux backend belong here.
  *
- * @returns true for `'ollama'`, `'codex'`, `'gemini'`; false for `'claude'`
+ * OPENROUTER-PROVIDER (row 477): `'openrouter'` is exactly the extension case
+ * described above — it reaches OpenRouter over wire-identical OpenAI
+ * `/chat/completions` and its `spawn()` launches the SAME `http-agentic-worker`
+ * entry as `OpenAICompatibleAdapter.spawn()` (providers/openrouter.ts). The
+ * operative criterion is host-only + owns-its-spawn, NOT literal locality:
+ * OpenRouter's credential is resolved host-side from `.deck` and injected into
+ * the child's env only, so it can never survive containerization, and the
+ * docker backend would degrade the task to the `claude` CLI — the precise
+ * failure this predicate exists to prevent. Adding it here fixes BOTH consumer
+ * meanings at once: the spawn sites prefer `adapter.spawn()` over the backend,
+ * and `model-selector.ts`'s forceModel path stops running dynamic OpenRouter
+ * model ids through the static availability/equivalence lookup (which throws
+ * `E_UNKNOWN_MODEL`, since those ids are catalog-driven, not statically listed).
+ *
+ * @returns true for `'ollama'`, `'codex'`, `'gemini'`, `'openrouter'`; false for `'claude'`
  * @internal
  */
 export function isAdapterProvider(providerName: ProviderName): boolean {
   return providerName === 'ollama'
     || providerName === 'codex'
-    || providerName === 'gemini';
+    || providerName === 'gemini'
+    || providerName === 'openrouter';
 }
 
 

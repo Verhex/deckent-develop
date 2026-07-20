@@ -16,8 +16,8 @@
 //     yolo` (auto-approve all tools; `plan` is read-only and cannot write),
 //     `--skip-trust` (trust workspace headlessly), `-o/--output-format json`.
 //
-// The deckent-facing model alias is mapped to its wire `apiId` (e.g. gpt-5→gpt-5.5,
-// opus→claude-opus-4-8) at the call site, NOT here — keeps the spec model-agnostic.
+// The call site supplies the already-validated exact provider API ID. Explicit
+// compatibility migration happens before runtime command construction.
 
 /** Placeholder in `baseArgs` replaced by `"$(cat <promptPath>)"` for inline prompts. */
 export const PROMPT_CAT_TOKEN = '{PROMPT_CAT}';
@@ -65,6 +65,8 @@ export interface ProviderCommandSpec {
    * when the caller opts in via `excludeDynamicPromptSections`.
    */
   excludeDynamicPromptSectionsFlag: string | null;
+  /** Whether stdout exposes per-call measured usage before the final response. */
+  liveUsage: 'incremental' | 'final-only' | 'none';
 }
 
 /**
@@ -97,13 +99,14 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
     oauthHomeDir: '.claude',
     reasoningEffortArgs: (level) => ['--effort', level], // low|medium|high|xhigh|max
     excludeDynamicPromptSectionsFlag: '--exclude-dynamic-system-prompt-sections',
+    liveUsage: 'incremental',
   },
   codex: {
     binary: 'codex',
-    // `--json` makes `codex exec` emit JSONL events incl. `token_count` / `turn.completed`
-    // usage → captured to `.log` → CodexAdapter.extractUsage sums the REAL per-task usage
-    // (incl. cached_input + reasoning). Mirrors the host adapter's CODEX_USAGE_EMIT_ARGS;
-    // without it the docker codex path fell back to the heuristic.
+    // `--json` emits a final/cumulative usage event. It is retained for post-run
+    // billing evidence, but is NOT a proven incremental stream contract: current
+    // `turn.completed` events have no stable call identity and classic
+    // `token_count.info.total_token_usage` is cumulative. Live caps fail closed.
     baseArgs: ['exec', '--skip-git-repo-check', '--json'],
     modelFlag: '--model',
     // Container is the external sandbox → bypass codex's internal sandbox+approvals.
@@ -113,6 +116,7 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
     oauthHomeDir: '.codex',
     reasoningEffortArgs: (level) => ['-c', `model_reasoning_effort=${level}`], // minimal|low|medium|high
     excludeDynamicPromptSectionsFlag: null, // codex CLI has no equivalent flag
+    liveUsage: 'final-only',
   },
   gemini: {
     binary: 'gemini',
@@ -126,6 +130,7 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
     oauthHomeDir: '.gemini',
     reasoningEffortArgs: null, // gemini CLI has no reasoning-effort knob
     excludeDynamicPromptSectionsFlag: null, // gemini CLI has no equivalent flag
+    liveUsage: 'final-only',
   },
 };
 

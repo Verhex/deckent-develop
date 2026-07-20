@@ -344,3 +344,108 @@ describe('OpenRouterProvider — ProviderAdapter contract shape', () => {
     expect(provider).toBeInstanceOf(OpenRouterProvider);
   });
 });
+
+// ─── reasoning extension (OPENROUTER-PROVIDER, row 477) ───────────────
+//
+// OpenRouter's `reasoning` field is DEFAULT-ON at the API level and was measured
+// (2026-07-20) at ~85% of response cost: an identical evaluator verdict took
+// 20.7s with reasoning on vs 3.1s with `{ enabled: false }`, 233 vs 0 reasoning
+// tokens, same NO_GO judgement. These tests pin BOTH directions — that the field
+// is sent when configured, and that an unconfigured adapter stays byte-identical
+// to the pre-row-477 request (no accidental behavior change for existing users).
+
+describe('OpenRouterProvider — reasoning extension (row 477)', () => {
+  it('omits `reasoning` entirely when unconfigured (byte-identical to pre-477 body)', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse(200, { choices: [{ message: { content: 'ok' } }] }),
+    );
+    const provider = makeProvider({ fetchImpl });
+
+    await provider.send([{ role: 'user', content: 'hi' }], 'some/model:free');
+
+    const [, init] = fetchImpl.mock.calls[0]!;
+    const body = JSON.parse(init.body as string);
+    expect('reasoning' in body).toBe(false);
+  });
+
+  it('sends the configured `reasoning` object verbatim', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse(200, { choices: [{ message: { content: 'ok' } }] }),
+    );
+    const provider = makeProvider({ fetchImpl, reasoning: { enabled: false } });
+
+    await provider.send([{ role: 'user', content: 'hi' }], 'some/model:free');
+
+    const [, init] = fetchImpl.mock.calls[0]!;
+    const body = JSON.parse(init.body as string);
+    // Verbatim: Deckent does not reshape OpenRouter's own contract.
+    expect(body.reasoning).toEqual({ enabled: false });
+    // The canonical fields must be untouched by the extension.
+    expect(body.model).toBe('some/model:free');
+    expect(body.stream).toBe(false);
+  });
+
+  it('forwards reasoning to a spawned worker via ENV, never argv (win32-safe)', () => {
+    const spawnImpl = vi.fn().mockReturnValue({
+      pid: 4242,
+      on: vi.fn(),
+      once: vi.fn(),
+      unref: vi.fn(),
+      kill: vi.fn(),
+    });
+    const provider = makeProvider({
+      spawnImpl,
+      reasoning: { enabled: false },
+      projectDir: process.cwd(),
+      workerEntryPath: '/fake/worker-entry.js',
+    });
+
+    provider.spawn('t-477', 'some/model:free' as never, 'prompt');
+
+    expect(spawnImpl).toHaveBeenCalledTimes(1);
+    const [, args, spawnOpts] = spawnImpl.mock.calls[0]!;
+    // JSON must NOT ride on argv — it would have to survive a cmd.exe wrapper.
+    expect(args.join(' ')).not.toContain('reasoning');
+    expect(spawnOpts.env['DECKENT_HTTP_EXTRA_BODY']).toBe(
+      JSON.stringify({ reasoning: { enabled: false } }),
+    );
+  });
+
+  it('sets no extra-body env when reasoning is unconfigured', () => {
+    const spawnImpl = vi.fn().mockReturnValue({
+      pid: 4243, on: vi.fn(), once: vi.fn(), unref: vi.fn(), kill: vi.fn(),
+    });
+    const provider = makeProvider({
+      spawnImpl,
+      projectDir: process.cwd(),
+      workerEntryPath: '/fake/worker-entry.js',
+    });
+
+    provider.spawn('t-477-b', 'some/model:free' as never, 'prompt');
+
+    const [, , spawnOpts] = spawnImpl.mock.calls[0]!;
+    expect(spawnOpts.env['DECKENT_HTTP_EXTRA_BODY']).toBeUndefined();
+  });
+});
+
+// ─── error-in-200 envelope (K5 root-cause, row 477) — host-side send() twin ───
+
+describe('OpenRouterProvider — error-in-200 envelope (K5)', () => {
+  it('throws ProviderError with the embedded upstream cause instead of empty content', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, {
+      error: { message: 'Upstream error from Nvidia: ResourceExhausted', code: 502 },
+    }));
+    const provider = makeProvider({ fetchImpl });
+    await expect(
+      provider.send([{ role: 'user', content: 'hi' }], 'some/model:free'),
+    ).rejects.toThrowError(/error-in-200 envelope: Upstream error from Nvidia: ResourceExhausted \(code 502\)/);
+  });
+
+  it('throws on 200 with no choices at all', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { id: 'gen-y' }));
+    const provider = makeProvider({ fetchImpl });
+    await expect(
+      provider.send([{ role: 'user', content: 'hi' }], 'some/model:free'),
+    ).rejects.toThrowError(/error-in-200 envelope: response has no choices/);
+  });
+});

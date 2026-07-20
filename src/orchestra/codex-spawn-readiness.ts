@@ -7,7 +7,7 @@
 //       ca-certificates present — codex's Rust TLS client needs the system
 //       root CA store)? If not, the caller must fall back to the subprocess
 //       backend for codex tasks.
-//   (c) what evidence proves the real spawn path passes the gpt-5.5/gpt-5
+//   (c) what evidence proves the real spawn path passes the canonical gpt-5.5
 //       model param and structured-output flag correctly?
 //
 // This module produces a SUGGESTION for the route/plan side — it never
@@ -196,9 +196,9 @@ export async function checkCodexDockerReadiness(
 // ─── Model-arg evidence (no spawn) ────────────────────────────────────────
 
 export interface CodexModelArgEvidence {
-  /** deckent-facing model id, e.g. 'gpt-5'. */
+  /** Canonical provider API model ID, e.g. 'gpt-5.5'. */
   model: OpenAIModel;
-  /** Wire model id actually sent to the CLI (modelRegistry apiId), e.g. 'gpt-5.5'. */
+  /** Wire model ID actually sent to the CLI; identical to `model`. */
   wireModel: string;
   /** Real `CodexAdapter.buildCommand()` output — proves the --model param mapping. */
   spawnCommand: string;
@@ -241,7 +241,7 @@ export interface AssessCodexSpawnReadinessOptions {
   dockerSpawnImpl?: SpawnImpl;
   dockerImage?: string;
   env?: NodeJS.ProcessEnv;
-  /** Models to generate arg evidence for — default: the codex premium model (gpt-5). */
+  /** Models to generate arg evidence for — default: the canonical Codex premium model. */
   models?: OpenAIModel[];
   projectDir?: string;
 }
@@ -254,7 +254,7 @@ export interface AssessCodexSpawnReadinessOptions {
 export async function assessCodexSpawnReadiness(
   opts?: AssessCodexSpawnReadinessOptions,
 ): Promise<CodexSpawnReadinessReport> {
-  const models = opts?.models ?? (['gpt-5'] as OpenAIModel[]);
+  const models = opts?.models ?? (['gpt-5.5'] as OpenAIModel[]);
 
   const [host, docker] = await Promise.all([
     checkCodexHostReadiness({

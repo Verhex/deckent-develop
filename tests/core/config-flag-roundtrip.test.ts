@@ -110,9 +110,19 @@ const ROUND_TRIP_BLOCKS: RoundTripCase[] = [
   { name: 'cost_guard', block: { enabled: true, max_limit_cost_usd: 42.5 } },
   { name: 'gate', block: { max_tech_debt_ratio: 0.4, verify_delta_downgrade: true, enforce_adr_compliance: true } },
   { name: 'resource_monitor', block: { enabled: true, interval_ms: 2500, log_path: '.deckent/settings/resource-log.jsonl' } },
+  // OPENROUTER-PROVIDER (row 477): joined the round-trip set when `openrouter`
+  // was wired onto ResolvedConfig. Before that wiring it was declared on the
+  // bootstrap param type only, so `config.openrouter` was ALWAYS undefined on
+  // the live path and `provider.ts:1421` never registered the adapter — the
+  // exact born-464 shape this file exists to prevent.
+  { name: 'openrouter', block: { enabled: true } },
+  // XVERIFY-TOOL (S1): cross_verify joined when its twin passthroughs were wired
+  // (it had been a pinned born-464 gap — declared on the types since 358-014 but
+  // silently dropped on the live path, leaving runCrossVerify config-unreachable).
+  { name: 'cross_verify', block: { enabled: true, high_stakes_only: false, verifier_priority: ['codex', 'claude'], enforce_refuted: false } },
 ];
 
-describe('config flag round-trip — 9 opt-in blocks through the REAL loadConfig disk path', () => {
+describe('config flag round-trip — 11 opt-in blocks through the REAL loadConfig disk path', () => {
   for (const { name, block } of ROUND_TRIP_BLOCKS) {
     it(`${name}: config.json → loadConfig → field returns AS-IS`, async () => {
       writeProjectConfig(projectRoot, { [name]: block });
@@ -121,7 +131,7 @@ describe('config flag round-trip — 9 opt-in blocks through the REAL loadConfig
     });
   }
 
-  it('all 9 blocks round-trip together from a single config.json', async () => {
+  it('all 11 blocks round-trip together from a single config.json', async () => {
     const combined = Object.fromEntries(ROUND_TRIP_BLOCKS.map(({ name, block }) => [name, block]));
     writeProjectConfig(projectRoot, combined);
     const resolved = (await loadConfig(projectRoot)) as unknown as Record<string, unknown>;
@@ -253,7 +263,7 @@ describe('type-vs-live field parity — mechanical guard against future flag-dro
     const sourceText = readFileSync(configTypesPath, 'utf-8');
     const declaredBlocks = extractResolvedConfigBlockFields(sourceText);
 
-    // Sanity: the extractor must find (at least) the 9 blocks this file
+    // Sanity: the extractor must find (at least) the 11 blocks this file
     // already proves round-trip in Part 1 — if it finds fewer, the AST
     // classification itself has regressed and the guard below is vacuous.
     for (const { name } of ROUND_TRIP_BLOCKS) {
@@ -284,8 +294,10 @@ describe('type-vs-live field parity — mechanical guard against future flag-dro
     // This assertion pins the set EXACTLY: it fails loudly both when a NEW
     // field regresses (the set grows) and when one of these four is fixed
     // (the set shrinks — update this list, don't just relax the assertion).
+    // XVERIFY-TOOL (S1): `cross_verify` left this list — wired through both twin
+    // literals so the adversarial-verification feature is finally reachable from
+    // a real config file (it had been declared-but-dropped since 358-014).
     const KNOWN_PRE_EXISTING_GAPS = [
-      'cross_verify',
       'doc_tracking',
       'observability',
       'rollback',

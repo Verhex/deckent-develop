@@ -12,6 +12,9 @@ import {
 } from './constants.js';
 import { readJsonSafeAsync, debugLog } from './utils.js';
 import { needsMigration, migrateConfig, removeDuplicateKeys } from './config-migration.js';
+import { canonicalizeProviderConfigAliases } from './provider-config-canonicalizer.js';
+import { canonicalizeModelConfigAliases } from './model-config-canonicalizer.js';
+import { modelRegistry } from './model-registry.js';
 import { loadApprovalRules } from './approval-rules-load.js';
 // Import cycle note: routing3/config.ts imports deepMerge from THIS module. The
 // cycle is init-safe — each side references the other's bindings only inside
@@ -433,8 +436,23 @@ export const VALID_PROVIDERS: readonly ProviderName[] = Object.keys(PROVIDER_MOD
  *
  * Used by validateConfig() below — the existing VALID_PROVIDERS list is kept
  * untouched for any caller that consumes it as a typed `ProviderName[]`.
+ *
+ * OPENROUTER-PROVIDER (row 477): `'openrouter'` joins for the same reason. This
+ * constant also gates DIRECTIVES parsing — `task-builder.ts:1138-1148` checks
+ * membership and SILENTLY drops an unknown `- Provider:` value, after which a
+ * provider-less `resolveCanonicalModelIdentity` throws
+ * `E_MODEL_PROVIDER_UNVERIFIED`. So a missing entry here does not merely fail
+ * validation, it makes the provider unaddressable from a directive.
  */
-export const VALID_PROVIDERS_ALL: readonly string[] = [...VALID_PROVIDERS, 'ollama'];
+export const VALID_PROVIDERS_ALL: readonly string[] = [...VALID_PROVIDERS, 'ollama', 'openrouter'];
+
+function requireDefaultModel(provider: ProviderName, tier: ModelStrategy['brain_tier']): ModelType {
+  const model = modelRegistry.getByProviderAndTier(provider, tier);
+  if (!model) {
+    throw new Error(`No canonical default model for provider=${provider}, tier=${tier}`);
+  }
+  return model.id;
+}
 
 /**
  * Default mode definitions derived from MODE_PRESETS (single source of truth).
@@ -446,29 +464,29 @@ export const VALID_PROVIDERS_ALL: readonly string[] = [...VALID_PROVIDERS, 'olla
 export const DEFAULT_MODES: Record<string, PlanModeConfig> = {
   performance: {
     max_workers: MODE_PRESETS['performance']!.max_workers,
-    brain_model: 'opus',
-    default_model: 'opus',
+    brain_model: requireDefaultModel('claude', 'premium'),
+    default_model: requireDefaultModel('claude', 'premium'),
     haiku_allowed: true,
     brain_planning: 'auto',
   },
   balanced: {
     max_workers: MODE_PRESETS['balanced']!.max_workers,
-    brain_model: 'sonnet',
-    default_model: 'opus',
+    brain_model: requireDefaultModel('claude', 'standard'),
+    default_model: requireDefaultModel('claude', 'premium'),
     haiku_allowed: true,
     brain_planning: 'auto',
   },
   economic: {
     max_workers: MODE_PRESETS['economic']!.max_workers,
-    brain_model: 'sonnet',
-    default_model: 'sonnet',
+    brain_model: requireDefaultModel('claude', 'standard'),
+    default_model: requireDefaultModel('claude', 'standard'),
     haiku_allowed: false,
     brain_planning: 'auto',
   },
   api: {
     max_workers: MODE_PRESETS['api']!.max_workers,
-    brain_model: 'opus',
-    default_model: 'sonnet',
+    brain_model: requireDefaultModel('claude', 'premium'),
+    default_model: requireDefaultModel('claude', 'standard'),
     haiku_allowed: true,
     budget_per_sprint: 5.0,
     requires: 'ANTHROPIC_API_KEY',
@@ -527,6 +545,15 @@ export class ConfigValidationError extends Error {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Project the canonical grouped provider block onto legacy runtime readers. */
+function projectCanonicalProviderFields(config: DeckentConfig): void {
+  if (!config.providers) return;
+  if (config.providers.brain) config.brain_provider = config.providers.brain;
+  if (config.providers.worker) config.worker_provider = config.providers.worker;
+  if (config.providers.fallback) config.fallback_provider = config.providers.fallback;
+  if (config.providers.overrides) config.provider_overrides = config.providers.overrides;
 }
 
 /**
@@ -686,6 +713,55 @@ export function validateConfig(config: DeckentConfig): string[] {
   if (config.fallback_provider !== undefined &&
       !VALID_PROVIDERS_ALL.includes(config.fallback_provider)) {
     errors.push(`Invalid value '${config.fallback_provider}' for field 'fallback_provider'. Valid: ${VALID_PROVIDERS_ALL.join(', ')}`);
+  }
+
+  // Role-aware fallback is a dispatch-safety policy, so malformed shapes and
+  // misspelled keys must fail at the config boundary. In particular, accepting
+  // a string here would let a downstream `for ... of` iterate provider-name
+  // characters as individual fallback candidates.
+  if (config.provider_fallback !== undefined) {
+    const providerFallback: unknown = config.provider_fallback;
+    if (!isPlainObject(providerFallback)) {
+      errors.push('provider_fallback must be an object');
+    } else {
+      const allowedKeys = new Set([
+        'global',
+        'brain',
+        'worker',
+        'auditor',
+        'auditor_provider',
+        'unattended',
+      ]);
+      for (const key of Object.keys(providerFallback)) {
+        if (!allowedKeys.has(key)) {
+          errors.push(`Unknown field 'provider_fallback.${key}'`);
+        }
+      }
+
+      for (const role of ['global', 'brain', 'worker', 'auditor'] as const) {
+        const chain = providerFallback[role];
+        if (chain === undefined) continue;
+        if (!Array.isArray(chain)) {
+          errors.push(`provider_fallback.${role} must be an array of providers`);
+          continue;
+        }
+        for (const candidate of chain) {
+          if (typeof candidate !== 'string' || !VALID_PROVIDERS_ALL.includes(candidate)) {
+            errors.push(`Invalid provider '${String(candidate)}' in provider_fallback.${role}. Valid: ${VALID_PROVIDERS_ALL.join(', ')}`);
+          }
+        }
+      }
+
+      const auditorProvider = providerFallback['auditor_provider'];
+      if (auditorProvider !== undefined &&
+          (typeof auditorProvider !== 'string' || !VALID_PROVIDERS_ALL.includes(auditorProvider))) {
+        errors.push(`Invalid value '${String(auditorProvider)}' for field 'provider_fallback.auditor_provider'. Valid: ${VALID_PROVIDERS_ALL.join(', ')}`);
+      }
+      if (providerFallback['unattended'] !== undefined &&
+          typeof providerFallback['unattended'] !== 'boolean') {
+        errors.push('provider_fallback.unattended must be a boolean');
+      }
+    }
   }
 
   if (config.provider_overrides !== undefined) {
@@ -1626,9 +1702,17 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
 
   let config = createDefaultConfig();
 
-  const globalConfig = await readJsonFile<Partial<DeckentConfig>>(resolveGlobalConfigReadPath());
-  if (globalConfig) {
-    config = deepMerge(config, globalConfig);
+  const rawGlobalConfig = await readJsonFile<Partial<DeckentConfig>>(resolveGlobalConfigReadPath());
+  if (rawGlobalConfig) {
+    const { config: providerCanonicalGlobalConfig } = canonicalizeProviderConfigAliases(
+      rawGlobalConfig as Record<string, unknown>,
+      'global',
+    );
+    const { config: canonicalGlobalConfig } = canonicalizeModelConfigAliases(
+      providerCanonicalGlobalConfig,
+      'global',
+    );
+    config = deepMerge(config, canonicalGlobalConfig as Partial<DeckentConfig>);
   }
 
   const projectConfigPath = join(root, PROJECT_CONFIG_PATH);
@@ -1655,13 +1739,23 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
   }
 
   if (projectConfig) {
-    // Sprint 150: Remove duplicate keys before merge (Decision 3+4)
+    const rawProjectConfig = projectConfig as Record<string, unknown>;
+    const providerCanonicalization = canonicalizeProviderConfigAliases(rawProjectConfig, 'project');
+    const modelCanonicalization = canonicalizeModelConfigAliases(providerCanonicalization.config, 'project');
+    projectConfig = modelCanonicalization.config as Partial<DeckentConfig>;
+
+    // Preserve the unrelated spawn_backend/claude_backend compatibility rule.
     removeDuplicateKeys(projectConfig as Record<string, unknown>);
 
     config = deepMerge(config, projectConfig);
 
-    // Auto-migrate: if the project config file is missing fields, update it on disk (non-fatal)
-    if (existsSync(projectConfigPath) && needsMigration(projectConfig as Record<string, unknown>)) {
+    // Compatibility aliases must be persisted, not repeatedly normalized only
+    // in memory. Provider conflicts have already failed above and are never
+    // swallowed by the legacy non-fatal migration path.
+    if (
+      existsSync(projectConfigPath)
+      && (providerCanonicalization.changes.length > 0 || modelCanonicalization.changes.length > 0 || needsMigration(rawProjectConfig))
+    ) {
       try {
         migrateConfig(projectConfigPath);
       } catch {
@@ -1687,12 +1781,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
   // Runtime-only projection. Must run BEFORE env var overrides so env vars win.
   // (Sprint 150 Decision 4 — grouped `providers` is canonical in JSON; flat
   //  fields stay available at runtime for backward compatibility.)
-  if (config.providers) {
-    if (config.providers.brain) config.brain_provider = config.providers.brain;
-    if (config.providers.worker) config.worker_provider = config.providers.worker;
-    if (config.providers.fallback) config.fallback_provider = config.providers.fallback;
-    if (config.providers.overrides) config.provider_overrides = config.providers.overrides;
-  }
+  projectCanonicalProviderFields(config);
 
   // ─── Env var overrides ─────────────────────────────────────────────
   // Env vars override grouped→flat projection above.
@@ -1785,6 +1874,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     brain_provider: config.brain_provider,
     worker_provider: config.worker_provider,
     fallback_provider: config.fallback_provider,
+    provider_overrides: config.provider_overrides,
     // F1-012 — carry grouped `providers` (incl. config-driven `registry`) so
     // bootstrapProviders can register config-declared providers. Routing fields
     // are already flattened above; this preserves `registry` for the registry loop.
@@ -1823,7 +1913,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // `coverage_threshold` is honored over the default aspirational of 90
     // pre-populated by `createDefaultConfig`.
     ...resolveCoverageGates({
-      ...(globalConfig ?? {}),
+      ...(rawGlobalConfig ?? {}),
       ...(projectConfig ?? {}),
     }),
     max_reroutes: config.max_reroutes ?? 3,
@@ -1908,6 +1998,24 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     plugins: config.plugins,
     tool_surface: { ...(config.tool_surface ?? {}), enabled: config.tool_surface?.enabled ?? true },
     deck_broker: config.deck_broker,
+    // ROLE-AWARE-PROVIDER-FALLBACK (row 607): declared on DeckentConfig +
+    // ResolvedConfig but never wired here — the born-464 shape, caught by
+    // `config-flag-roundtrip.test.ts`'s type-vs-live parity guard. Same
+    // twin-literal rule as `openrouter` below applies.
+    provider_fallback: config.provider_fallback,
+    // XVERIFY-TOOL (S1): cross_verify was a pinned born-464 gap since 358-014 —
+    // declared on both config types, never passed through, so `runCrossVerify`'s
+    // `enabled !== true` guard could NEVER pass from a real config file and the
+    // whole adversarial-verification feature was config-unreachable. Wired now
+    // because the xverify advisory tool builds on it. Absent block → undefined →
+    // disabled (behavior unchanged for every existing config).
+    cross_verify: config.cross_verify,
+    // OPENROUTER-PROVIDER (row 477): opt-in flag passthrough. Absent → undefined
+    // → `bootstrapProviders` skips registration entirely (default-OFF preserved).
+    // The `loadConfig` / `mergeConfigs` resolved-config literals are hand-synced
+    // TWINS — this field must appear in BOTH. Dropping either reintroduces
+    // born-464 (declared on the type, silently undefined on the live path).
+    openrouter: config.openrouter,
     training_trace: config.training_trace,
     live_trace: config.live_trace,
     mcp_client_enabled: config.mcp_client_enabled,
@@ -2553,11 +2661,29 @@ export function mergeConfigs(
   let config = createDefaultConfig();
 
   if (globalConfig) {
-    config = deepMerge(config, globalConfig);
+    const { config: providerCanonicalGlobalConfig } = canonicalizeProviderConfigAliases(
+      globalConfig as Record<string, unknown>,
+      'global',
+    );
+    const { config: canonicalGlobalConfig } = canonicalizeModelConfigAliases(
+      providerCanonicalGlobalConfig,
+      'global',
+    );
+    config = deepMerge(config, canonicalGlobalConfig as Partial<DeckentConfig>);
   }
   if (projectConfig) {
-    config = deepMerge(config, projectConfig);
+    const { config: providerCanonicalProjectConfig } = canonicalizeProviderConfigAliases(
+      projectConfig as Record<string, unknown>,
+      'project',
+    );
+    const { config: canonicalProjectConfig } = canonicalizeModelConfigAliases(
+      providerCanonicalProjectConfig,
+      'project',
+    );
+    config = deepMerge(config, canonicalProjectConfig as Partial<DeckentConfig>);
   }
+
+  projectCanonicalProviderFields(config);
 
   // Resolve legacy mode aliases so 'max_plan' → 'performance' etc.
   config.mode = resolveMode(config.mode) as PlanMode;
@@ -2600,6 +2726,10 @@ export function mergeConfigs(
     skills: config.skills,
     // F1-012 — pass grouped `providers` (incl. config-driven `registry`) through.
     providers: config.providers,
+    brain_provider: config.brain_provider,
+    worker_provider: config.worker_provider,
+    fallback_provider: config.fallback_provider,
+    provider_overrides: config.provider_overrides,
     // Sprint 220 Task 220-001 — optional native REPL provider override.
     chat_provider: (config as DeckentConfigWithChatProvider).chat_provider,
     // Sprint 179 W2-4: see resolveCoverageGates docstring for split semantics.
@@ -2663,6 +2793,24 @@ export function mergeConfigs(
     plugins: config.plugins,
     tool_surface: { ...(config.tool_surface ?? {}), enabled: config.tool_surface?.enabled ?? true },
     deck_broker: config.deck_broker,
+    // ROLE-AWARE-PROVIDER-FALLBACK (row 607): declared on DeckentConfig +
+    // ResolvedConfig but never wired here — the born-464 shape, caught by
+    // `config-flag-roundtrip.test.ts`'s type-vs-live parity guard. Same
+    // twin-literal rule as `openrouter` below applies.
+    provider_fallback: config.provider_fallback,
+    // XVERIFY-TOOL (S1): cross_verify was a pinned born-464 gap since 358-014 —
+    // declared on both config types, never passed through, so `runCrossVerify`'s
+    // `enabled !== true` guard could NEVER pass from a real config file and the
+    // whole adversarial-verification feature was config-unreachable. Wired now
+    // because the xverify advisory tool builds on it. Absent block → undefined →
+    // disabled (behavior unchanged for every existing config).
+    cross_verify: config.cross_verify,
+    // OPENROUTER-PROVIDER (row 477): opt-in flag passthrough. Absent → undefined
+    // → `bootstrapProviders` skips registration entirely (default-OFF preserved).
+    // The `loadConfig` / `mergeConfigs` resolved-config literals are hand-synced
+    // TWINS — this field must appear in BOTH. Dropping either reintroduces
+    // born-464 (declared on the type, silently undefined on the live path).
+    openrouter: config.openrouter,
     training_trace: config.training_trace,
     live_trace: config.live_trace,
     mcp_client_enabled: config.mcp_client_enabled,
@@ -2674,4 +2822,3 @@ export function mergeConfigs(
   };
   return merged;
 }
-

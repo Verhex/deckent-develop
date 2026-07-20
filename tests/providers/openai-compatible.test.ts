@@ -252,3 +252,113 @@ describe('OpenAICompatibleAdapter spawn-mode (F1-013 agentic HTTP worker)', () =
     expect(adapter.listWorkers()).toEqual([]);
   });
 });
+
+// ─── extraBody vendor-extension seam (OPENROUTER-PROVIDER, row 477) ───
+//
+// The OpenAI wire schema is a BASE that gateways extend (OpenRouter adds
+// `reasoning`). `extraBody` is the seam for those fields. The security-relevant
+// property is CONTAINMENT: an extension may add keys but must never be able to
+// overwrite the canonical request fields — otherwise a config value could
+// silently retarget the model or flip streaming.
+
+describe('OpenAICompatibleAdapter — extraBody containment (row 477)', () => {
+  const KEY_ENV = 'TEST_PROVIDER_KEY';
+  let prevKey: string | undefined;
+
+  beforeEach(() => {
+    prevKey = process.env[KEY_ENV];
+    process.env[KEY_ENV] = 'k-477';
+  });
+  afterEach(() => {
+    if (prevKey === undefined) delete process.env[KEY_ENV];
+    else process.env[KEY_ENV] = prevKey;
+  });
+
+  function adapterWithExtra(fetchImpl: typeof fetch, extraBody: Record<string, unknown>) {
+    return new OpenAICompatibleAdapter({
+      name: 'test-provider',
+      baseURL: 'https://api.example.com/v1',
+      apiKeyEnv: KEY_ENV,
+      models: ['test-model-a'],
+      fetchImpl,
+      extraBody,
+    });
+  }
+
+  it('merges extension fields into the request body', async () => {
+    const captured: CapturedRequest[] = [];
+    const adapter = adapterWithExtra(mockFetchOk({ choices: [{ message: { content: 'ok' } }] }, captured), { reasoning: { enabled: false } });
+
+    await adapter.send(MESSAGES, 'test-model-a');
+
+    const body = JSON.parse(captured[0]!.body);
+    expect(body.reasoning).toEqual({ enabled: false });
+  });
+
+  it('CANNOT overwrite model / messages / stream', async () => {
+    const captured: CapturedRequest[] = [];
+    const adapter = adapterWithExtra(mockFetchOk({ choices: [{ message: { content: 'ok' } }] }, captured), {
+      model: 'hijacked-model',
+      stream: true,
+      messages: [{ role: 'user', content: 'hijacked' }],
+    });
+
+    await adapter.send(MESSAGES, 'test-model-a');
+
+    const body = JSON.parse(captured[0]!.body);
+    expect(body.model).toBe('test-model-a');
+    expect(body.stream).toBe(false);
+    expect(body.messages).toEqual(MESSAGES);
+  });
+
+  it('leaves the body byte-identical when no extraBody is configured', async () => {
+    const captured: CapturedRequest[] = [];
+    const adapter = new OpenAICompatibleAdapter({
+      name: 'test-provider',
+      baseURL: 'https://api.example.com/v1',
+      apiKeyEnv: KEY_ENV,
+      models: ['test-model-a'],
+      fetchImpl: mockFetchOk({ choices: [{ message: { content: 'ok' } }] }, captured),
+    });
+
+    await adapter.send(MESSAGES, 'test-model-a');
+
+    const body = JSON.parse(captured[0]!.body);
+    expect(Object.keys(body).sort()).toEqual(['messages', 'model', 'stream']);
+  });
+});
+
+// ─── error-in-200 envelope (K5 root-cause, row 477) ───────────────────
+//
+// Caught live 2026-07-20: OpenRouter returned HTTP 200 whose body was
+// `{"error":{"message":"Upstream error from Nvidia: ResourceExhausted ...","code":502}}`
+// with NO `choices`. `content ?? ''` coerced it into a "successful" empty turn,
+// so the agentic worker terminated first-turn with a misleading "no tool calls"
+// NO_GO and zero usage — silently, in under a second. These tests pin the
+// honest-failure contract for both degenerate shapes.
+
+describe('OpenAICompatibleAdapter — error-in-200 envelope (K5)', () => {
+  const KEY_ENV = 'TEST_PROVIDER_KEY';
+  let prevKey: string | undefined;
+  beforeEach(() => { prevKey = process.env[KEY_ENV]; process.env[KEY_ENV] = 'k-k5'; });
+  afterEach(() => {
+    if (prevKey === undefined) delete process.env[KEY_ENV];
+    else process.env[KEY_ENV] = prevKey;
+  });
+
+  it('throws ProviderError carrying the embedded error, never an empty success', async () => {
+    const adapter = makeAdapter(mockFetchOk({
+      error: { message: 'Upstream error from Nvidia: ResourceExhausted: Worker local total request limit reached (33/32)', code: 502 },
+    }));
+    await expect(adapter.send(MESSAGES, 'test-model-a')).rejects.toThrowError(
+      /error-in-200 envelope: Upstream error from Nvidia.*\(code 502\)/,
+    );
+  });
+
+  it('throws on a 200 with missing/empty choices (no error field either)', async () => {
+    const adapter = makeAdapter(mockFetchOk({ id: 'gen-x', choices: [] }));
+    await expect(adapter.send(MESSAGES, 'test-model-a')).rejects.toThrowError(
+      /error-in-200 envelope: response has no choices/,
+    );
+  });
+});

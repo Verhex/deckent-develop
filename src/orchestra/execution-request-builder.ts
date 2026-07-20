@@ -23,7 +23,7 @@ import type {
   ResolvedConfig,
   GoNoGoCriteria,
 } from '../core/types.js';
-import { TaskStatus } from '../core/types.js';
+import { TaskStatus, ALL_PROVIDER_NAMES } from '../core/types.js';
 import type {
   ExecutionRequest,
   ExecutionContext,
@@ -36,6 +36,9 @@ import type {
   ExecutionBudget,
 } from '../core/work-model.js';
 import { rubricTypeToKind } from '../core/work-model.js';
+import { resolveCanonicalModelIdentity } from '../core/model-registry.js';
+import type { RegistryProviderName } from '../core/model-registry.js';
+import { DeckentError } from '../core/errors.js';
 import { detectTaskType } from './rubric-registry.js';
 
 const DEFAULT_GONOGO: GoNoGoCriteria = {
@@ -82,6 +85,57 @@ export function inferRequirements(scope: TaskScope): RequirementProfile {
     capabilities.push('fs-write');
   }
   return { capabilities, resources: [] };
+}
+
+// ─── Canonical model-identity boundary (453-001) ────────────────────────────
+// Shared by the CLI `deckent run` and MCP `deckent_run` one-shot entry points so
+// both resolve + validate the authored model IDENTICALLY, before any Task JSON
+// write or worker spawn. This replaces the frozen `ALL_MODELS` enum check that
+// used to live in each surface.
+
+/** Provider ownership values the canonical registry recognizes. An explicit
+ *  provider outside this set is rejected loudly rather than silently trusted
+ *  (guards the "unknown provider is guessed" NO-GO for unseen parametric IDs).
+ *
+ *  OPENROUTER-PROVIDER (row 477): DERIVED from `ALL_PROVIDER_NAMES` (core/types.ts)
+ *  instead of repeating the provider literals a fifth time. The duplicate list is
+ *  what silently rejected `--provider openrouter` at this boundary even after the
+ *  ProviderName/RegistryProviderName unions were widened — a hand-maintained copy
+ *  of a set that already exists at runtime is the zero-hardcode failure this
+ *  project bans. Adding a provider now updates one place. */
+const KNOWN_PROVIDERS: readonly RegistryProviderName[] =
+  ALL_PROVIDER_NAMES as readonly RegistryProviderName[];
+
+export interface ResolvedModelIdentity {
+  /** Exact provider API model ID, byte-for-byte as authored (never alias-mapped). */
+  model: string;
+  /** Canonical provider that owns the model. */
+  provider: RegistryProviderName;
+}
+
+/**
+ * Resolve + validate a one-shot model selection through the canonical registry
+ * BEFORE any Task JSON write or worker spawn — the single boundary the CLI and
+ * MCP entry points share, so both fail identically:
+ *   - a known ID infers its owning provider from the registry;
+ *   - an unseen versioned ID is accepted only with an explicit, known provider and
+ *     is registered parametrically (first-class for downstream route/spawn/cost);
+ *   - a legacy alias, an unknown ID without a provider, and a provider/model
+ *     mismatch each throw a {@link DeckentError} (fail-before-disk).
+ * The returned {@link ResolvedModelIdentity.model} equals the authored ID exactly.
+ */
+export function resolveExecutionModelIdentity(
+  model: string,
+  provider?: string,
+): ResolvedModelIdentity {
+  if (provider !== undefined && !KNOWN_PROVIDERS.includes(provider as RegistryProviderName)) {
+    throw new DeckentError('E_PROVIDER_UNKNOWN', `Unknown provider: ${provider}`);
+  }
+  const def = resolveCanonicalModelIdentity(model, {
+    provider: provider as RegistryProviderName | undefined,
+    registerParametric: true,
+  });
+  return { model: def.id, provider: def.provider };
 }
 
 /**
@@ -134,16 +188,24 @@ export function buildExecutionRequest(input: ExecutionRequestInput): ExecutionRe
 /**
  * Convert an {@link ExecutionRequest} into a single-task {@link Task} ready to
  * write + spawn. Preserves the `run-*` id contract (caller supplies it) and sets
- * the canonical `task.type` (WM-2b gap for single-task paths). Defaults model to
- * 'sonnet' only as a last resort; provider is left as resolved (may be undefined
- * → spawn resolves from model).
+ * the canonical `task.type` (WM-2b gap for single-task paths). The model MUST be
+ * resolved upstream (via {@link resolveExecutionModelIdentity} / the config
+ * default resolver) — a missing model throws rather than silently defaulting to
+ * an alias, so no alias can ever reach Task JSON. Provider is left as resolved
+ * (may be undefined → spawn resolves from model).
  */
 export function resolveToTask(req: ExecutionRequest, taskId: string): Task {
+  if (!req.model) {
+    throw new DeckentError(
+      'E_MODEL_ID_INVALID',
+      'ExecutionRequest.model must be resolved before resolveToTask (no silent alias default)',
+    );
+  }
   return {
     id: taskId,
     title: req.description.slice(0, 80),
     description: req.description,
-    model: (req.model ?? 'sonnet') as ModelType,
+    model: req.model as ModelType,
     effort: req.effort ?? 'normal',
     priority: req.priority ?? 'NORMAL',
     reason: 'One-shot run command',
@@ -159,5 +221,6 @@ export function resolveToTask(req: ExecutionRequest, taskId: string): Task {
     assignedAgent: req.agentId ?? 'generic',
     assignedSkills: req.skillIds ?? [],
     actor: req.actor,
+    budget: req.budget,
   } as Task;
 }

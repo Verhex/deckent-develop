@@ -72,6 +72,10 @@ const MESSAGES: MessageMap = {
     en: 'Planner proof: requested={requested} · actual={actual} · model-call={call} · reason={reason}',
     tr: 'Planner kanıtı: istenen={requested} · gerçekleşen={actual} · model-çağrısı={call} · neden={reason}',
   },
+  'planning.receipt_ref': {
+    en: 'Invocation receipt: {invocationId} · tenant={tenantId} · project={projectId}',
+    tr: 'Çağrı makbuzu: {invocationId} · tenant={tenantId} · project={projectId}',
+  },
   'start.workers_info': {
     en: 'Workers: {count} | Brain model: {model}',
     tr: 'Worker sayısı: {count} | Brain modeli: {model}',
@@ -109,6 +113,128 @@ const MESSAGES: MessageMap = {
     tr: "Not: 'run start|status|retro|history', üst-düzey 'deckent start|status|retro|history' "
       + "komutlarının takma adıdır — davranış ve işleyici birebir aynıdır. "
       + "'sprint' terimi 'run' olarak yeniden adlandırılıyor.",
+  },
+
+  // ─── run command — canonical model boundary (453-001) ────────────────
+  'run.opt_model': {
+    en: 'Model to use — an exact provider model ID (e.g. claude-sonnet-5, gpt-5.6-sol). '
+      + 'Omit to use the configured default. Moving/legacy aliases (sonnet/opus/haiku/gpt-5/gpt-5.6) are rejected.',
+    tr: 'Kullanılacak model — tam sağlayıcı model kimliği (örn. claude-sonnet-5, gpt-5.6-sol). '
+      + 'Yapılandırılmış varsayılanı kullanmak için boş bırakın. Hareketli/eski takma adlar (sonnet/opus/haiku/gpt-5/gpt-5.6) reddedilir.',
+  },
+  // `{providers}` interpolated from `ALL_PROVIDER_NAMES` — see the note above
+  // `run.model_err.provider_unverified` (OPENROUTER-PROVIDER, row 477).
+  'run.opt_provider': {
+    en: 'Explicit provider ownership ({providers}) — required to register an '
+      + 'unseen versioned model ID; validated against the canonical registry.',
+    tr: 'Açık sağlayıcı sahipliği ({providers}) — görülmemiş sürümlü bir model '
+      + 'kimliğini kaydetmek için gereklidir; kanonik registry\'ye karşı doğrulanır.',
+  },
+  'run.model_err.invalid_id': {
+    en: 'Cannot use model "{model}": the model ID is empty or malformed.',
+    tr: '"{model}" modeli kullanılamıyor: model kimliği boş veya hatalı biçimlendirilmiş.',
+  },
+  'run.model_err.legacy_alias': {
+    en: 'Cannot use model "{model}": it is a legacy alias — use the exact provider model ID '
+      + '(e.g. claude-sonnet-5) instead.',
+    tr: '"{model}" modeli kullanılamıyor: bu eski bir takma addır — bunun yerine tam sağlayıcı '
+      + 'model kimliğini (örn. claude-sonnet-5) kullanın.',
+  },
+  'run.model_err.provider_mismatch': {
+    en: 'Cannot use model "{model}" with provider "{provider}": the model is owned by a '
+      + 'different provider.',
+    tr: '"{model}" modeli "{provider}" sağlayıcısıyla kullanılamıyor: model farklı bir '
+      + 'sağlayıcıya ait.',
+  },
+  // OPENROUTER-PROVIDER (row 477): the provider list is INTERPOLATED (`{providers}`),
+  // never spelled out in the message text. These two strings hardcoded
+  // "claude|codex|gemini|ollama", so adding a provider left the user reading a list
+  // that no longer matched what the CLI accepted. Callers pass the runtime set
+  // (`ALL_PROVIDER_NAMES`) — zero-hardcode, and both languages stay correct for free.
+  'run.model_err.provider_unverified': {
+    en: 'Cannot use model "{model}": it is unknown — pass --provider <{providers}> '
+      + 'to register it explicitly.',
+    tr: '"{model}" modeli kullanılamıyor: bilinmiyor — açıkça kaydetmek için '
+      + '--provider <{providers}> geçin.',
+  },
+  'run.model_err.unknown_provider': {
+    en: 'Unknown provider "{provider}" — valid providers: {providers}.',
+    tr: 'Bilinmeyen sağlayıcı "{provider}" — geçerli sağlayıcılar: {providers}.',
+  },
+  // Row 477: E_MODEL_PRICING_UNVERIFIED previously fell into the generic
+  // provider_unverified message, which tells the user to "pass --provider" they
+  // already passed — misleading. The real remedy is refreshing the verified
+  // pricing inventory.
+  // ─── xverify — session-level adversarial cross-verification (XVERIFY-TOOL) ──
+  'xverify.cmd_desc': {
+    en: 'Dispatch an adversarial verifier on a DIFFERENT provider to try to refute a claim about finished work (advisory — never blocks)',
+    tr: 'Bitmiş bir iş hakkındaki iddiayı çürütmeyi denemesi için FARKLI bir sağlayıcıda hakem çalıştır (tavsiye niteliğinde — asla bloke etmez)',
+  },
+  'xverify.opt_author': {
+    en: 'Provider that authored the claimed work ({providers}) — the verifier must differ. Required.',
+    tr: 'İddia edilen işi yapan sağlayıcı ({providers}) — hakem farklı olmak zorundadır. Zorunlu.',
+  },
+  'xverify.opt_verifier': {
+    en: 'Explicit verifier provider (optional; must differ from --author; default: cross_verify.verifier_priority)',
+    tr: 'Açık hakem sağlayıcısı (opsiyonel; --author ile aynı olamaz; varsayılan: cross_verify.verifier_priority)',
+  },
+  'xverify.opt_verifier_model': {
+    en: 'Explicit verifier model id (canonical provider API id, e.g. gpt-5.6-sol) — bypasses tier-equivalence resolution',
+    tr: 'Açık hakem model kimliği (kanonik sağlayıcı API id, örn. gpt-5.6-sol) — tier-eşdeğerlik çözümlemesini atlar',
+  },
+  'xverify.opt_diff': {
+    en: 'Attach `git diff HEAD` as evidence context for the verifier',
+    tr: 'Hakeme kanıt bağlamı olarak `git diff HEAD` çıktısını ekle',
+  },
+  'xverify.opt_files': {
+    en: 'Comma-separated list of files the claim says were changed',
+    tr: 'İddianın değiştirildiğini söylediği dosyaların virgülle ayrılmış listesi',
+  },
+  'xverify.opt_timeout': {
+    en: 'Verifier timeout in milliseconds (default: 300000)',
+    tr: 'Hakem zaman aşımı, milisaniye (varsayılan: 300000)',
+  },
+  'xverify.opt_json': {
+    en: 'Machine-readable JSON output (for the MCP twin / session-to-session use)',
+    tr: 'Makine-okunur JSON çıktısı (MCP eşi / oturumlar-arası kullanım için)',
+  },
+  'xverify.err.author_required': {
+    en: '--author is required and must be one of: {providers}. The verifier is chosen to DIFFER from it.',
+    tr: '--author zorunludur ve şunlardan biri olmalıdır: {providers}. Hakem ondan FARKLI seçilir.',
+  },
+  'xverify.err.unknown_verifier': {
+    en: 'Unknown verifier "{provider}" — valid providers: {providers}.',
+    tr: 'Bilinmeyen hakem "{provider}" — geçerli sağlayıcılar: {providers}.',
+  },
+  'xverify.err.self_verify': {
+    en: 'Verifier must differ from --author ("{provider}") — self-verification defeats the purpose of an independent second opinion.',
+    tr: 'Hakem --author ("{provider}") ile aynı olamaz — öz-doğrulama bağımsız ikinci görüşün amacını boşa çıkarır.',
+  },
+  'xverify.dispatching': {
+    en: 'Dispatching adversarial verifier (author: {author}, priority: {priority})…',
+    tr: 'Hakem gönderiliyor (iddia sahibi: {author}, öncelik: {priority})…',
+  },
+  'xverify.verdict': {
+    en: 'Verdict: {verdict} (verifier: {verifier}) — advisory report: {report}',
+    tr: 'Karar: {verdict} (hakem: {verifier}) — tavsiye raporu: {report}',
+  },
+  // Worker-facing prompt fragments (deliberately EN-only content, keyed for
+  // single-source maintenance — the VERIFIER reads these, not the operator).
+  'xverify.go_criteria': {
+    en: 'The claim is accurate: every stated behavior is verifiable in the actual working tree (run git diff / read the files). End with a VERDICT line.',
+    tr: 'İddia doğrudur: belirtilen her davranış gerçek çalışma ağacında doğrulanabilir (git diff çalıştır / dosyaları oku). VERDICT satırıyla bitir.',
+  },
+  'xverify.nogo_criteria': {
+    en: 'Any stated behavior that the actual code contradicts, or that cannot be evidenced from the working tree.',
+    tr: 'Gerçek kodun yalanladığı veya çalışma ağacından kanıtlanamayan herhangi bir iddia edilen davranış.',
+  },
+  'run.model_err.pricing_unverified': {
+    en: 'Cannot use model "{model}": its OpenRouter pricing is unverified. '
+      + 'Run `deckent openrouter-probe` to refresh the verified free-model inventory, '
+      + 'or supply explicit pricing for a paid model.',
+    tr: '"{model}" modeli kullanılamıyor: OpenRouter fiyatlandırması doğrulanmamış. '
+      + 'Doğrulanmış ücretsiz-model envanterini yenilemek için `deckent openrouter-probe` çalıştırın '
+      + 'veya ücretli bir model için açık fiyatlandırma sağlayın.',
   },
 
   // ─── plan command ───────────────────────────────────────────────────
@@ -2352,6 +2478,38 @@ const MESSAGES: MessageMap = {
   'recover.complete': { en: '\n  ✓ Recovery complete. Run {sprintId} is ready for restart.\n', tr: '\n  ✓ Kurtarma tamamlandı. {sprintId} run\'ı yeniden başlatmaya hazır.\n' },
   'recover.restore_success': { en: '  ✓ Restored {count} task file(s) from the {sprintId} pre-archive snapshot (rollback).', tr: '  ✓ {sprintId} pre-archive snapshot\'ından {count} task dosyası geri yüklendi (rollback).' },
   'recover.restore_failed': { en: '  Restore failed for {sprintId}: {error}', tr: '  {sprintId} için geri-yükleme başarısız: {error}' },
+  'recover.snapshot_required': { en: 'Recovery stopped: a verified snapshot for {sprintId} could not be created.', tr: 'Kurtarma durduruldu: {sprintId} için doğrulanmış snapshot oluşturulamadı.' },
+  'recover.dry_run_restore_conflict': { en: '--dry-run and --restore-tasks cannot be combined; no action was taken.', tr: '--dry-run ve --restore-tasks birlikte kullanılamaz; hiçbir işlem yapılmadı.' },
+  'recover.json_requires_force': { en: 'Mutating JSON recovery requires explicit --force.', tr: 'Değişiklik yapan JSON kurtarma açıkça --force gerektirir.' },
+  'recover.restore_requires_force': { en: 'Snapshot restoration requires explicit --force.', tr: 'Snapshot geri yükleme açıkça --force gerektirir.' },
+  'recover.archive_incomplete': { en: 'Recovery stopped: archive evidence is incomplete (expected {expected}, archived {actual}).', tr: 'Kurtarma durduruldu: arşiv kanıtı eksik (beklenen {expected}, arşivlenen {actual}).' },
+  'resume.invalid_sprint_id': { en: 'Invalid run id: {sprintId}', tr: 'Geçersiz run kimliği: {sprintId}' },
+  'resume.checkpoint_missing': { en: 'No checkpoint found for run "{sprintId}".', tr: '"{sprintId}" run\'ı için checkpoint bulunamadı.' },
+  'resume.status_hint': { en: 'Run "deckent status" to see available runs.', tr: 'Kullanılabilir run\'ları görmek için "deckent status" çalıştırın.' },
+  'resume.checkpoint_unreadable': { en: 'Checkpoint for run "{sprintId}" is malformed or unreadable.', tr: '"{sprintId}" run\'ının checkpoint\'i bozuk veya okunamıyor.' },
+  'resume.header': { en: '\nResuming run {sprintId} from checkpoint #{checkpoint}', tr: '\n{sprintId} run\'ı checkpoint #{checkpoint} üzerinden sürdürülüyor' },
+  'resume.summary': { en: '  Written: {timestamp}\n  Phase: {phase}\n  Completed tasks: {completed}\n  Pending tasks: {pending}\n  Active workers: {active}', tr: '  Yazım: {timestamp}\n  Faz: {phase}\n  Tamamlanan görev: {completed}\n  Bekleyen görev: {pending}\n  Aktif worker: {active}' },
+  'resume.stale_header': { en: '\n  ⚠ Stale workers detected: {count}', tr: '\n  ⚠ Bayat worker tespit edildi: {count}' },
+  'resume.stale_item': { en: '    - {workerId} (task {taskId}): {reason}, age {age}min', tr: '    - {workerId} (görev {taskId}): {reason}, yaş {age}dk' },
+  'resume.stale_action': { en: '  Proven-stale workers will be stopped and their tasks resumed.', tr: '  Bayatlığı kanıtlanan worker\'lar durdurulacak ve görevleri sürdürülecek.' },
+  'resume.crash_completed': { en: '\n  ✓ Tasks completed before crash: {taskIds}', tr: '\n  ✓ Çökmeden önce tamamlanan görevler: {taskIds}' },
+  'resume.dry_run': { en: '\n[dry-run] Would resume {count} task(s): {taskIds}. No workers spawned.', tr: '\n[dry-run] {count} görev sürdürülecek: {taskIds}. Worker başlatılmadı.' },
+  'resume.none': { en: '(none)', tr: '(yok)' },
+  'resume.nothing': { en: '\nAll tasks already completed or are not proven safe to resume.', tr: '\nTüm görevler tamamlanmış veya sürdürmenin güvenli olduğu kanıtlanmamış.' },
+  'resume.retro_hint': { en: 'Run "deckent retro" to see the retrospective.', tr: 'Retrospektifi görmek için "deckent retro" çalıştırın.' },
+  'resume.config_failed': { en: 'Failed to load config: {error}', tr: 'Config yüklenemedi: {error}' },
+  'resume.stale_killing': { en: '\nStopping proven-stale workers...', tr: '\nBayatlığı kanıtlanan worker\'lar durduruluyor...' },
+  'resume.commit_failed': { en: 'Resume HOLD: durable state could not be committed: {error}', tr: 'Resume HOLD: durable durum commit edilemedi: {error}' },
+  'resume.reset_tasks': { en: '  Reset {count} task(s) to PENDING: {taskIds}.', tr: '  {count} görev PENDING durumuna alındı: {taskIds}.' },
+  'resume.artifact_cleanup_failed': { en: 'Resume HOLD: stale artifact could not be removed: {path}', tr: 'Resume HOLD: bayat artefact kaldırılamadı: {path}' },
+  'resume.reset_artifacts': { en: '  Reset {count} stale worker artifact(s).', tr: '  {count} bayat worker artefact\'ı sıfırlandı.' },
+  'resume.spawning': { en: '\nSpawning {count} pending task(s)...\n', tr: '\n{count} bekleyen görev başlatılıyor...\n' },
+  'resume.preplanned_failed': { en: 'Resume HOLD: preplanned run could not be rebuilt: {error}', tr: 'Resume HOLD: preplanned run yeniden oluşturulamadı: {error}' },
+  'resume.other_sprint_active': { en: 'Resume HOLD: another run owns the runtime state: {sprintId}', tr: 'Resume HOLD: runtime durumu başka bir run\'a ait: {sprintId}' },
+  'resume.state_clear_failed': { en: 'Resume HOLD: stale state for {sprintId} could not be cleared.', tr: 'Resume HOLD: {sprintId} için bayat durum temizlenemedi.' },
+  'resume.not_complete': { en: 'Run resumed but did not complete (status: {status}).', tr: 'Run sürdürüldü ancak tamamlanmadı (durum: {status}).' },
+  'resume.completed': { en: '\nRun resumed and completed.', tr: '\nRun sürdürüldü ve tamamlandı.' },
+  'resume.failed': { en: 'Run resume failed: {error}', tr: 'Run sürdürme başarısız: {error}' },
   'features.manifest_not_found': { en: 'features-manifest.json not found. Run `node scripts/sync-manifest.mjs` to generate.', tr: 'features-manifest.json bulunamadı. Oluşturmak için `node scripts/sync-manifest.mjs` çalıştırın.' },
   'features.feature_not_found': { en: 'feature "{name}" not found.', tr: '"{name}" özelliği bulunamadı.' },
   'features.invalid_category': { en: 'invalid category "{name}". Valid: {valid}', tr: 'geçersiz kategori "{name}". Geçerli: {valid}' },
@@ -2373,6 +2531,10 @@ const MESSAGES: MessageMap = {
   'history.trend_header': { en: '--- Trend (last {n} runs) ---', tr: '--- Trend (son {n} run) ---' },
   'config.set': { en: 'Set {key} = {value}', tr: '{key} = {value} olarak ayarlandı' },
   'config.invalid': { en: 'Invalid config: {errors}', tr: 'Geçersiz yapılandırma: {errors}' },
+  'config.provider_alias_conflict': {
+    en: 'Conflicting provider settings in the {layer} config: {flatKey}={flatValue} differs from {groupedKey}={groupedValue}. Remove one definition or make both values equal.',
+    tr: '{layer} yapılandırmasında çakışan provider ayarları var: {flatKey}={flatValue}, {groupedKey}={groupedValue} değerinden farklı. Tanımlardan birini kaldırın veya iki değeri eşitleyin.',
+  },
   'config.key_not_found': { en: 'Key not found: {key}', tr: 'Anahtar bulunamadı: {key}' },
   'config.exported': { en: 'Config exported to {path}', tr: 'Yapılandırma {path} dosyasına dışa aktarıldı' },
   'config.imported': { en: 'Config imported from {path}', tr: 'Yapılandırma {path} dosyasından içe aktarıldı' },

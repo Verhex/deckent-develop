@@ -11,6 +11,7 @@ export * from './task-types.js';
 export * from './config-types.js';
 export * from './monitoring-types.js';
 export * from './sprint-types.js';
+export * from './invocation-receipt.js';
 
 // ─── Ollama Provider Types (Sprint 190 W-F F-11) ────────────────────────────
 // Additive type surface for the local-LLM provider. Full ProviderName widening
@@ -21,15 +22,19 @@ export * from './sprint-types.js';
 /** Ollama-served model identifiers (curated subset, registry holds full apiId). */
 export type OllamaModel = 'qwen-coder-32b' | 'qwen-coder-7b' | 'llama-3-8b' | 'llama-3.2-3b';
 
-/** Extended provider name that includes the local Ollama provider. */
-export type ProviderNameExt = 'claude' | 'codex' | 'gemini' | 'ollama';
+/** Extended provider name — includes local Ollama and the OpenRouter HTTP
+ *  gateway. Hand-mirrored with `ProviderName` (core/task-types.ts) and
+ *  `RegistryProviderName` (core/model-registry-types.ts). */
+export type ProviderNameExt = 'claude' | 'codex' | 'gemini' | 'ollama' | 'openrouter';
 
-/** Runtime list of every provider Deckent knows about, including local Ollama. */
+/** Runtime list of every provider Deckent knows about, including local Ollama
+ *  and OpenRouter (OPENROUTER-PROVIDER, row 477). */
 export const ALL_PROVIDER_NAMES: readonly ProviderNameExt[] = [
   'claude',
   'codex',
   'gemini',
   'ollama',
+  'openrouter',
 ] as const;
 
 // ─── Worker Output Contract — Result spine (Sprint 326 326-001) ──────────────

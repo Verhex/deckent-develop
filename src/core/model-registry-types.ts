@@ -4,22 +4,15 @@
 // every type here, so existing importers of these types from
 // `./model-registry.js` keep working unchanged.
 
-/** Provider name — defined here to avoid circular import with task-types.ts.
- *
- *  NOTE (Sprint 190 W-F F-11): The local Ollama provider is registered with
- *  a literal `'ollama'` runtime value but kept out of this static type union
- *  because widening it cascades a compile error into task-types.ts
- *  (`getProviderForModel` returns `ProviderName` which is currently 'claude' |
- *  'codex' | 'gemini'). Until task-types.ts gets the matching widen (out of
- *  scope for task 190-009), Ollama model definitions use a `provider` cast
- *  and callers that want Ollama-aware queries pass `'ollama' as RegistryProviderName`.
- *  The runtime catalog still serves Ollama models correctly via
- *  `getByProvider('ollama' as RegistryProviderName)`.
- */
-export type RegistryProviderName = 'claude' | 'codex' | 'gemini';
+/** Provider ownership is part of the canonical runtime model identity.
+ *  `'openrouter'` joined in OPENROUTER-PROVIDER (row 477) so OpenRouter model
+ *  ids can be registered at all — `ModelDefinition.provider` is typed to this
+ *  union, so without it no OpenRouter model could enter the registry and
+ *  `isModelAvailable(*, 'openrouter')` was structurally always false. */
+export type RegistryProviderName = 'claude' | 'codex' | 'gemini' | 'ollama' | 'openrouter';
 
-/** Extended provider name including local providers — runtime helper. */
-export type RegistryProviderNameExt = RegistryProviderName | 'ollama';
+/** Backward-compatible name retained for consumers; no longer a wider type. */
+export type RegistryProviderNameExt = RegistryProviderName;
 
 export type ModelTier = 'economy' | 'standard' | 'premium' | 'premium_plus';
 
@@ -45,6 +38,10 @@ export interface ModelDefinition {
   tier: ModelTier;
   contextWindow: number;
   costPerMillion: ModelCost;
+  /** Opaque immutable source reference for parametric pricing. Bundled catalog
+   *  entries are governed by their catalog snapshot; dynamic OpenRouter entries
+   *  require this field before registration. */
+  pricingEvidenceRef?: string;
   capabilities: ModelCapabilities;
   status: ModelStatus;
   maxOutputTokens?: number;
@@ -60,19 +57,22 @@ export interface ModelDefinition {
  * being rejected. Supplying any field overrides the inferred/default value.
  */
 export interface ParametricResolveOptions {
-  /** Force the provider instead of inferring it from the id. */
+  /** Explicit provider ownership when the API ID is not unambiguously namespaced. */
   provider?: RegistryProviderName;
   /** Force the tier instead of inferring it from the id. */
   tier?: ModelTier;
-  /** Wire / API model id sent to the provider (defaults to the logical id). */
+  /** @deprecated Canonical identity requires this to equal `id`. */
   apiId?: string;
   /** Context window in tokens (default 200_000). */
   contextWindow?: number;
-  /** Cost per million tokens (default { input: 0, output: 0 }). */
+  /** Cost per million tokens. Dynamic OpenRouter entries require this together
+   *  with `pricingEvidenceRef`; other providers retain the legacy zero default. */
   costPerMillion?: ModelCost;
+  /** Opaque pricing source reference required for dynamic OpenRouter entries. */
+  pricingEvidenceRef?: string;
   /** Capability flags (defaults: streaming+toolUse true, rest false). */
   capabilities?: Partial<ModelCapabilities>;
-  /** Lifecycle status (default 'ga'). */
+  /** Lifecycle status (default 'preview' for an unlisted parametric model). */
   status?: ModelStatus;
   /** Optional max output tokens. */
   maxOutputTokens?: number;

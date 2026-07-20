@@ -40,44 +40,11 @@ for (const _tier of ['premium', 'standard', 'economy', 'premium_plus'] as ModelT
 }
 export const MODEL_TIERS: Record<ModelTier, string[]> = _tiersObj;
 
-// ─── Provider → Model Mapping — derived from ModelRegistry ─────────────────
-const _providerModels = Object.fromEntries(
-  modelRegistry.getAllProviders().map(p => [
-    p,
-    modelRegistry.getByProvider(p).map(m => m.id) as readonly MultiProviderModelType[],
-  ]),
-);
-const PROVIDER_MODELS: Record<ProviderName, readonly MultiProviderModelType[]> = {
-  claude: _providerModels['claude'] ?? [],
-  codex: _providerModels['codex'] ?? [],
-  gemini: _providerModels['gemini'] ?? [],
-  // Ollama models are registered lazily by providers/ollama.ts; the key is
-  // populated once that adapter loads. Empty array is a safe default for
-  // cross-provider equivalence (no equivalent model found → fallback chain).
-  ollama: _providerModels['ollama'] ?? [],
-};
-
-// ─── Tier → Provider → Model Lookup — derived from ModelRegistry ───────────
-const TIER_PROVIDER_MAP: Record<ModelTier, Partial<Record<ProviderName, MultiProviderModelType>>> = {
-  premium: {
-    claude: 'opus',
-    codex: 'gpt-5',
-    gemini: 'gemini-2.5-pro',
-  },
-  standard: {
-    claude: 'sonnet',
-    codex: 'gpt-4.1',
-    gemini: 'gemini-2.5-flash',
-  },
-  economy: {
-    claude: 'haiku',
-    codex: 'gpt-5-mini',
-    gemini: 'gemini-2.0-flash',
-  },
-  premium_plus: {
-    // premium_plus tier — falls back to premium in getEquivalentModel()
-  },
-};
+// Provider → model and tier → provider → model lookups are NO LONGER static
+// alias tables. Every resolution below reads the live ModelRegistry so the only
+// values ever returned are exact registered API IDs (id === apiId). Reading the
+// registry at call time (rather than snapshotting at module load) also avoids the
+// circular-import TDZ hazard that forced MODEL_TIERS to be lazy.
 
 // ─── Functions ──────────────────────────────────────────────────────────────
 
@@ -93,44 +60,31 @@ export function getModelTier(model: MultiProviderModelType): ModelTier {
 }
 
 /**
- * Returns the equivalent model for a target provider.
- * Delegates to ModelRegistry.getEquivalent().
- * Same-provider returns the same model.
+ * Returns the equivalent model for a target provider as an exact registered API
+ * ID (id === apiId). Delegates entirely to ModelRegistry.getEquivalent():
+ *   - same provider → the same model id,
+ *   - otherwise the ga model matching the source tier (or the next lower tier),
+ *   - throws E_UNKNOWN_MODEL for an unregistered source and E_NO_EQUIVALENT_MODEL
+ *     when the target provider offers no compatible model (fail loudly — never a
+ *     silent Claude-reference default).
  */
 export function getEquivalentModel(
   model: MultiProviderModelType,
   targetProvider: ProviderName,
 ): MultiProviderModelType {
-  // Same-provider: return same model
-  if (isModelAvailable(model, targetProvider)) {
-    return model;
-  }
-
-  const tier = getModelTier(model);
-  const equivalent = TIER_PROVIDER_MAP[tier][targetProvider];
-
-  if (equivalent) {
-    return equivalent;
-  }
-
-  // Fallback: premium_plus has no dedicated entries per provider, fall back to premium
-  if (tier === 'premium_plus') {
-    const premiumEquiv = TIER_PROVIDER_MAP.premium[targetProvider];
-    if (premiumEquiv) return premiumEquiv;
-  }
-
-  // Should not reach here with valid inputs
-  throw new DeckentError('E_NO_EQUIVALENT_MODEL', `No equivalent model for ${model} on provider ${targetProvider}`);
+  return modelRegistry.getEquivalent(model, targetProvider);
 }
 
 /**
- * Returns true if the given model belongs to the given provider.
+ * Returns true if the given model is a registered model owned by the given
+ * provider. Reads the live registry (so dynamically-registered tags count) and
+ * never matches a legacy alias — an alias is not a registered id.
  */
 export function isModelAvailable(
   model: MultiProviderModelType,
   provider: ProviderName,
 ): boolean {
-  return (PROVIDER_MODELS[provider] as readonly string[]).includes(model);
+  return modelRegistry.get(model)?.provider === provider;
 }
 
 /**
@@ -152,23 +106,26 @@ export function getModelsInTier(tier: ModelTier): readonly string[] {
 }
 
 /**
- * Returns all models for a given provider.
+ * Returns all registered model IDs for a given provider, read live from the
+ * registry (exact API IDs, id === apiId).
  */
 export function getProviderModels(provider: ProviderName): readonly MultiProviderModelType[] {
-  return PROVIDER_MODELS[provider];
+  return modelRegistry.getByProvider(provider).map(m => m.id);
 }
 
 /**
- * Returns the recommended model for a given provider and tier.
- * This is the single source of truth for tier→model resolution,
- * eliminating duplicate tier maps in provider adapters.
+ * Returns the recommended model (exact registered API ID) for a given provider
+ * and tier, read live from the registry — the single source of truth for
+ * tier→model resolution, eliminating duplicate tier maps in provider adapters.
  *
- * Falls back to the premium tier if the requested tier has no entry.
- * Returns undefined only if no mapping exists at all.
+ * Falls back to the provider's premium ga model if the requested tier has no ga
+ * entry (e.g. premium_plus on a provider whose flagship is still preview).
+ * Returns undefined only when the provider offers no ga model at all.
  */
 export function getModelForProviderTier(
   provider: ProviderName,
   tier: ModelTier,
 ): MultiProviderModelType | undefined {
-  return TIER_PROVIDER_MAP[tier]?.[provider] ?? TIER_PROVIDER_MAP.premium?.[provider];
+  return modelRegistry.getByProviderAndTier(provider, tier)?.id
+    ?? modelRegistry.getByProviderAndTier(provider, 'premium')?.id;
 }

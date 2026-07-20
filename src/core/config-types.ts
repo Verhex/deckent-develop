@@ -290,6 +290,43 @@ export interface DeckBrokerConfig {
   enabled?: boolean;
 }
 
+/** OpenRouter provider registration (OPENROUTER-PROVIDER, row 477). Opt-in —
+ *  absent block/`enabled` = `bootstrapProviders` never registers the adapter and
+ *  bootstrap output is byte-for-byte identical to the pre-flag behavior.
+ *  Registration is further gated on `$DECK:OPENROUTER_API_KEY` resolving via the
+ *  adapter's own `isAvailable()` (`providers/openrouter.ts`) — flag-on + key
+ *  absent is skipped with an honest reason, never registered broken. */
+export interface OpenRouterConfig {
+  /** Register the OpenRouter adapter in `bootstrapProviders` (default: false). */
+  enabled?: boolean;
+  /**
+   * OpenRouter `reasoning` request field, forwarded verbatim to
+   * `/chat/completions` (row 477). OpenRouter-specific: it is NOT part of the
+   * OpenAI base schema, so it travels through the adapter's `extraBody` seam.
+   *
+   * Why this is worth configuring: reasoning is DEFAULT-ON at the API level and
+   * measured (2026-07-20) at ~85% of the response cost — an identical
+   * evaluator verdict took 20.7s with reasoning on vs 3.1s with
+   * `{ enabled: false }`, with 233 vs 0 reasoning tokens and no loss of
+   * judgement quality on that probe. For orchestration throughput (20 req/min
+   * cap) that difference dominates.
+   *
+   * Absent → nothing is sent and OpenRouter's own default applies (reasoning ON).
+   * Shape is intentionally open (`enabled` / `effort` / `max_tokens` / `exclude`)
+   * because OpenRouter owns this contract, not Deckent.
+   */
+  reasoning?: {
+    /** false → disable reasoning entirely (fastest, measured 6.7x on the probe). */
+    enabled?: boolean;
+    /** Reasoning depth when enabled. */
+    effort?: 'low' | 'medium' | 'high';
+    /** Upper bound on reasoning tokens. */
+    max_tokens?: number;
+    /** Keep reasoning server-side but omit it from the response. */
+    exclude?: boolean;
+  };
+}
+
 /** Flag-gated NO_GO file-revert at EVALUATE time (ROLLBACK-DECIDE, born-427,
  *  ADR-D-006). Opt-in — absent block/`enabled` = no revert (pre-existing
  *  behavior). Distinct from `rollback_policy` (legacy sprint-level
@@ -526,6 +563,36 @@ export interface BotAgentConfig {
 export type ProviderAdapterKind = 'claude' | 'codex' | 'gemini' | 'ollama' | 'openai-compatible';
 
 /**
+ * Role-aware provider fallback policy (454-007) — the config surface for the
+ * shared role-aware resolution contract (`core/role-invocation-resolver.ts`).
+ * It is threaded through `mergeConfigs`/`loadConfig` and validated fail-loud;
+ * `orderedRoleProviders` (core/provider.ts) honors the ORDER given (configured
+ * order beats provider registration order). Production role consumers remain a
+ * separate wiring boundary.
+ */
+export interface ProviderFallbackPolicyConfig {
+  /** Ordered global fallback chain — applies to every role UNLESS a per-role
+   *  chain below overrides it. Config order is authoritative; it is never
+   *  re-sorted by provider registration order. */
+  global?: ProviderName[];
+  /** Per-role ordered fallback chain for the Brain role (planning). */
+  brain?: ProviderName[];
+  /** Per-role ordered fallback chain for the Worker role (execution). */
+  worker?: ProviderName[];
+  /** Per-role ordered fallback chain for the Auditor role (audit-evaluation) —
+   *  gives the Auditor a first-class policy surface, not a brain-inherited one. */
+  auditor?: ProviderName[];
+  /** Configured PRIMARY provider for the Auditor role. The Auditor is
+   *  brain-family, so this defaults to `brain_provider` when unset; Brain and
+   *  Worker primaries stay on `brain_provider` / `worker_provider`. */
+  auditor_provider?: ProviderName;
+  /** Unattended/autonomous execution (default: true). When true, a candidate
+   *  whose reachability/limit evidence is unknown/stale/unavailable is never
+   *  treated as reachable — the load-bearing safety rule of the resolver. */
+  unattended?: boolean;
+}
+
+/**
  * A single config-driven provider definition (F1-012, zero-hardcode).
  * Declared under `config.providers.registry`; bootstrap registers each entry
  * generically so adding a provider needs NO source change.
@@ -621,13 +688,17 @@ export interface DeckentConfig {
   worker_provider?: ProviderName;
   /** Fallback when primary provider unavailable */
   fallback_provider?: ProviderName;
+  /** Role-aware provider fallback policy (454-007) — ordered role/global
+   *  fallback chains + per-role primary + unattended gate. @see ProviderFallbackPolicyConfig */
+  provider_fallback?: ProviderFallbackPolicyConfig;
   /** Per-task-type provider overrides */
   provider_overrides?: Record<string, ProviderName>;
   /** Tier-based model selection strategy. Merged with mode preset defaults.
    *  Partial — unset fields fall back to the active mode preset. */
   model_strategy?: Partial<ModelStrategy>;
-  /** Grouped provider config (alternative to flat brain_provider/worker_provider).
-   *  Both formats supported — grouped takes precedence when both present. */
+  /** Canonical provider config. Legacy flat aliases are promoted per authored
+   *  config layer; equal dual definitions are deduplicated and conflicting dual
+   *  definitions fail loudly instead of applying implicit precedence. */
   providers?: {
     brain?: ProviderName;
     worker?: ProviderName;
@@ -642,6 +713,9 @@ export interface DeckentConfig {
   /** Host-side `DeckBroker` credential minting (DECKBROKER-WIRE, 354-006).
    *  @see DeckBrokerConfig */
   deck_broker?: DeckBrokerConfig;
+  /** OpenRouter provider registration (OPENROUTER-PROVIDER, row 477).
+   *  @see OpenRouterConfig */
+  openrouter?: OpenRouterConfig;
   /** Auto-select cheapest capable provider (default: false) */
   cost_optimization?: boolean;
   /** Claude execution backend: 'tmux' (default), 'subprocess' (headless), 'mcp' (future) */
@@ -1415,12 +1489,19 @@ export interface ResolvedConfig {
   worker_provider?: ProviderName;
   /** Fallback when primary provider unavailable */
   fallback_provider?: ProviderName;
+  /** Role-aware provider fallback policy (454-007), validated and passed
+   *  through from project config. @see ProviderFallbackPolicyConfig */
+  provider_fallback?: ProviderFallbackPolicyConfig;
+  /** Per-task provider overrides resolved from grouped or legacy config. */
+  provider_overrides?: Record<string, ProviderName>;
   /** Grouped provider config pass-through (F1-012). Routing fields are already
    *  flattened into brain_provider/worker_provider/fallback_provider above; this
    *  carries `registry` (config-driven provider definitions) to bootstrap. */
   providers?: DeckentConfig['providers'];
   /** Host-side `DeckBroker` credential minting (passed through from DeckentConfig, 354-006). */
   deck_broker?: DeckentConfig['deck_broker'];
+  /** OpenRouter provider registration (passed through from DeckentConfig, row 477). */
+  openrouter?: DeckentConfig['openrouter'];
   // Memory
   memory_budget?: number;
   decay_after_sprints?: number;

@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import type { ModelType, ProviderName } from './types.js';
-import type { ResolvedConfig, ProviderDefinition } from './config-types.js';
+import { ALL_PROVIDER_NAMES, type ModelType, type ProviderName } from './types.js';
+import type { ResolvedConfig, ProviderDefinition, OpenRouterConfig } from './config-types.js';
+import type { InvocationRole } from './invocation-receipt.js';
 import { PROVIDER_MODEL_MAP } from './task-types.js';
 import { getEquivalentModel } from './model-equivalence.js';
 import { Connector } from './session-interface.js';
@@ -9,6 +10,8 @@ import { detectAndRegisterModels, type DetectResult, type DetectAndRegisterOptio
 import { modelRegistry as globalModelRegistry, type ModelRegistry } from './model-registry.js';
 import type { TokenUsage } from './token-usage.js';
 import { DeckBroker } from './deck-broker.js';
+import type { ExecutionBudget } from './work-model.js';
+import type { LiveUsageBudgetSupport } from './live-execution-budget.js';
 
 // ─── Provider Spawn Options ──────────────────────────────────────────
 export interface ProviderSpawnOptions {
@@ -67,6 +70,8 @@ export interface ProviderSpawnOptions {
    */
   liveTraceEnabled?: boolean;
   sprintId?: string;
+  /** Owner-supplied hard ceilings; enforced only from host-observed measured usage. */
+  executionBudget?: ExecutionBudget;
 }
 
 // ─── Provider Worker Info ────────────────────────────────────────────
@@ -116,6 +121,21 @@ export interface ProviderAvailabilityDetail {
   hints: string[];
 }
 
+/**
+ * Provider-owned planner command description. `calledModel` is the exact model
+ * identifier encoded in `args` (or an HTTP body), never the Deckent alias.
+ * Metadata is optional only for third-party/backward-compatible adapters;
+ * the planner normalizer extracts and verifies it from the wire arguments.
+ */
+export interface ProviderPlannerCommand {
+  command: string;
+  args: string[];
+  calledProvider?: string;
+  calledModel?: string;
+  transport?: 'cli' | 'http' | 'local-runtime';
+  executionBackend?: 'host-subprocess' | 'docker' | 'tmux' | 'in-process' | 'unknown';
+}
+
 // ─── ProviderAdapter Interface ───────────────────────────────────────
 /**
  * ProviderAdapter — abstract interface for AI provider backends.
@@ -127,6 +147,9 @@ export interface ProviderAdapter {
 
   /** Models this provider supports */
   readonly supportedModels: readonly ModelType[];
+
+  /** Absent means budgeted in-flight execution is unsupported and must fail before spawn. */
+  readonly liveUsageBudgetSupport?: LiveUsageBudgetSupport;
 
   /**
    * Spawn a worker for the given task.
@@ -170,7 +193,7 @@ export interface ProviderAdapter {
    * @param model   Model to use
    * @returns command (CLI binary) and args array
    */
-  buildPlannerCommand?(prompt: string, model: ModelType): { command: string; args: string[] };
+  buildPlannerCommand?(prompt: string, model: ModelType): ProviderPlannerCommand;
 
   /**
    * Optional: rich availability diagnostic — returns binary/version/auth detail
@@ -794,6 +817,107 @@ export async function resolveProviderWithFallback(
   };
 }
 
+// ─── Role-Aware Fallback Order (configured order — NEVER registry order) ─────
+
+/**
+ * The ordered provider chain for a role, derived from config ONLY.
+ *
+ * `primary` is tried first, then each of `fallbacks` in order — this order is
+ * the CONFIGURED order and is authoritative. It is deliberately NOT derived
+ * from provider registration order, so a fallback never "selects the first
+ * registered provider". Feeds the pure `role-invocation-resolver.ts` contract.
+ */
+export interface RoleProviderOrder {
+  readonly role: InvocationRole;
+  readonly primary: ProviderName;
+  /** Ordered fallback providers (primary removed + de-duped), config order preserved. */
+  readonly fallbacks: ProviderName[];
+  /** Unattended/autonomous execution gate (default true). */
+  readonly unattended: boolean;
+}
+
+function assertRoleFallbackChain(value: unknown, path: string): asserts value is ProviderName[] | undefined {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) {
+    throw new TypeError(`${path} must be an array of supported provider names`);
+  }
+  for (const candidate of value) {
+    if (typeof candidate !== 'string' ||
+        !(ALL_PROVIDER_NAMES as readonly string[]).includes(candidate)) {
+      throw new TypeError(`${path} contains unsupported provider '${String(candidate)}'`);
+    }
+  }
+}
+
+/**
+ * Build the configured provider order for a role.
+ *
+ * Primary resolution (per role):
+ *   - worker  → `providers.worker` ?? `worker_provider` ?? 'claude'
+ *   - auditor → `provider_fallback.auditor_provider` ?? `providers.brain` ??
+ *               `brain_provider` ?? 'claude'  (Auditor is brain-family)
+ *   - brain   → `providers.brain` ?? `brain_provider` ?? 'claude'
+ *
+ * Fallback chain precedence: per-role chain (`provider_fallback.<role>`) →
+ * global chain (`provider_fallback.global`) → legacy single `fallback_provider`.
+ * The primary is stripped from the chain and duplicates are removed, preserving
+ * the CONFIGURED order. Reads no registry — pure over config.
+ */
+export function orderedRoleProviders(
+  role: InvocationRole,
+  config: Pick<
+    ResolvedConfig,
+    'brain_provider' | 'worker_provider' | 'fallback_provider' | 'providers' | 'provider_fallback'
+  >,
+): RoleProviderOrder {
+  const pf = config.provider_fallback;
+
+  if (pf !== undefined && (typeof pf !== 'object' || pf === null || Array.isArray(pf))) {
+    throw new TypeError('provider_fallback must be an object');
+  }
+
+  const roleChainValue: unknown = pf?.[role];
+  const globalChainValue: unknown = pf?.global;
+  assertRoleFallbackChain(roleChainValue, `provider_fallback.${role}`);
+  assertRoleFallbackChain(globalChainValue, 'provider_fallback.global');
+  if (pf?.unattended !== undefined && typeof pf.unattended !== 'boolean') {
+    throw new TypeError('provider_fallback.unattended must be a boolean');
+  }
+  if (pf?.auditor_provider !== undefined &&
+      !(ALL_PROVIDER_NAMES as readonly string[]).includes(pf.auditor_provider)) {
+    throw new TypeError(`provider_fallback.auditor_provider contains unsupported provider '${String(pf.auditor_provider)}'`);
+  }
+
+  const primary: ProviderName =
+    role === 'worker'
+      ? config.providers?.worker ?? config.worker_provider ?? 'claude'
+      : role === 'auditor'
+        ? pf?.auditor_provider ?? config.providers?.brain ?? config.brain_provider ?? 'claude'
+        : config.providers?.brain ?? config.brain_provider ?? 'claude';
+
+  const roleChain = roleChainValue;
+  const chain: ProviderName[] =
+    roleChain && roleChain.length > 0
+      ? roleChain
+      : globalChainValue && globalChainValue.length > 0
+        ? globalChainValue
+        : config.fallback_provider
+          ? [config.fallback_provider]
+          : [];
+
+  // Strip the primary and de-dup, preserving configured order — the primary is
+  // always tried first, so a chain must never re-try it.
+  const seen = new Set<ProviderName>([primary]);
+  const fallbacks: ProviderName[] = [];
+  for (const candidate of chain) {
+    if (seen.has(candidate)) continue;
+    seen.add(candidate);
+    fallbacks.push(candidate);
+  }
+
+  return { role, primary, fallbacks, unattended: pf?.unattended ?? true };
+}
+
 // ─── .deck Secret Application ───────────────────────────────────────
 
 /**
@@ -1158,12 +1282,16 @@ export async function bootstrapProviders(
      * Bedrock block below: flag-on + key present → registered; flag-on + key
      * absent → skipped with an honest reason (fail-honest log), never
      * silently registered broken. Unset/false (default) → this block never
-     * runs; bootstrap behavior is byte-for-byte unchanged. Not yet on
-     * `ResolvedConfig` — a caller must pass this explicitly (see
-     * `deck_broker` precedent above); real `.deckent/config.json` wiring is
-     * a tracked follow-up.
+     * runs; bootstrap behavior is byte-for-byte unchanged.
+     *
+     * WIRED (row 477, 2026-07-20): this is no longer a caller-supplied extra —
+     * `openrouter` now lives on `ResolvedConfig` and reaches every one of the 14
+     * `bootstrapProviders` call sites automatically. The type is therefore
+     * DERIVED from the config type rather than restated inline, so a new field
+     * (e.g. `reasoning`) cannot silently fail to reach bootstrap the way the
+     * whole block previously did.
      */
-    openrouter?: { enabled?: boolean };
+    openrouter?: OpenRouterConfig;
   },
   projectRoot?: string,
   registry: ProviderRegistry = providerRegistry,
@@ -1198,8 +1326,16 @@ export async function bootstrapProviders(
   const registered: ProviderName[] = [];
   const skipped: { name: ProviderName; reason: string }[] = [];
 
-  // Adapter factory map — lazy imports to avoid pulling in all providers at startup
-  const adapterFactories: Record<ProviderName, () => Promise<ProviderAdapter>> = {
+  // Adapter factory map — lazy imports to avoid pulling in all providers at startup.
+  // PARTIAL by contract (OPENROUTER-PROVIDER, row 477): this map is driven by
+  // `detectAvailableProviders()`, which probes only the auto-detectable providers
+  // (claude/codex/gemini CLIs + the local Ollama HTTP endpoint). `openrouter` is
+  // deliberately NOT auto-detected — a third-party gateway holding a paid API key
+  // must never register itself implicitly; it is opt-in through the
+  // `config.openrouter.enabled` block below. The `if (factory)` guard in the loop
+  // already handles a missing entry, so `Partial` states that intent in the type
+  // instead of forcing a dead factory that `detected` can never reach.
+  const adapterFactories: Partial<Record<ProviderName, () => Promise<ProviderAdapter>>> = {
     claude: async () => {
       const { createClaudeAdapter } = await import('../providers/claude.js');
       return createClaudeAdapter(root);
@@ -1333,7 +1469,14 @@ export async function bootstrapProviders(
   if (config.openrouter?.enabled && !registry.hasProvider('openrouter')) {
     try {
       const { createOpenRouterAdapter } = await import('../providers/openrouter.js');
-      const openrouterAdapter = createOpenRouterAdapter(root);
+      // Row 477: forward `config.openrouter.reasoning` so both the host-side
+      // `send()` path and the spawned agentic worker honor it. Absent → the
+      // field is never sent and OpenRouter's default (reasoning ON) applies.
+      const openrouterAdapter = createOpenRouterAdapter(root, {
+        ...(config.openrouter?.reasoning !== undefined
+          ? { reasoning: config.openrouter.reasoning as Record<string, unknown> }
+          : {}),
+      });
       if (await openrouterAdapter.isAvailable()) {
         registry.registerProvider(openrouterAdapter);
         registered.push('openrouter' as ProviderName);

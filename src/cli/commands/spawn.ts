@@ -16,8 +16,12 @@ import { resolveAgentPrompt, resolveSkillPrompts } from '../../orchestra/sprint-
 import { SpawnBackendFactory } from '../../orchestra/spawn-backend.js';
 import { isAdapterProvider, getProviderAdapterForTask } from '../../orchestra/sprint-utils.js';
 import { ensureOllamaModelRegistered } from '../../core/model-registry.js';
+import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
 import { resolveReasoningEffort } from '../../core/reasoning-effort.js';
 import { normalizeTaskResultShape } from '../../core/task-result-schema.js';
+import type { ExecutionBudget } from '../../core/work-model.js';
+import { assertLiveUsageBudgetSupport } from '../../core/live-execution-budget.js';
+import { resolveTaskExecutionBudget } from '../../orchestra/runtime-budget-monitor.js';
 
 /**
  * Build a comma-separated allowedTools string from a task's scope.
@@ -51,8 +55,10 @@ export async function spawnWorkerMultiProvider(
   model: string,
   prompt: string,
   root: string,
-  opts: { autoApprove?: boolean; allowedTools?: string; spawnBackend?: string; dockerImage?: string; dockerTimeout?: number; provider?: string; modelEffort?: string },
+  opts: { autoApprove?: boolean; allowedTools?: string; spawnBackend?: string; dockerImage?: string; dockerTimeout?: number; provider?: string; modelEffort?: string; executionBudget?: ExecutionBudget },
 ): Promise<{ backend: string; provider: ProviderName }> {
+  const executionBudget = resolveTaskExecutionBudget(root, taskId, opts.executionBudget);
+
   // Resolve provider from registry. Dynamic ollama tags (e.g. qwen3.6:27b) are not in
   // the static registry at process start — the sprint path calls ensureOllamaModelRegistered
   // at plan-time, but the autonomous kind=task path and deckent run do not. When the caller
@@ -62,6 +68,16 @@ export async function spawnWorkerMultiProvider(
   // still throw (real-bug signal preserved).
   if (opts.provider === 'ollama') {
     ensureOllamaModelRegistered(model);
+  }
+  // OPENROUTER-PROVIDER (row 477): same on-demand registration contract as the
+  // ollama branch above — OpenRouter ids are catalog-driven, never in the static
+  // registry, so `getProviderForModel` below would throw UnknownModelError first.
+  // Shared seam with run.ts/MCP-run/autonomous (`registerOpenRouterModelFromCache`):
+  // registers from the VERIFIED probe cache only. Cache miss → no registration →
+  // downstream lookup fails honestly; an unprobed model must never be silently
+  // priced as free (remedy: `deckent openrouter-probe`).
+  if (opts.provider === 'openrouter') {
+    registerOpenRouterModelFromCache(root, model);
   }
   const provider = getProviderForModel(model as ModelType);
 
@@ -84,8 +100,28 @@ export async function spawnWorkerMultiProvider(
   // catalog are rejected with ProviderError. The race is deterministic: without await,
   // spawn() executes in the same tick as the unresolved refresh promise.
   if (isAdapterProvider(provider)) {
-    const adapter = getProviderAdapterForTask(provider);
+    let adapter = getProviderAdapterForTask(provider);
+    // OPENROUTER-PROVIDER (row 477): lazy re-bootstrap, mirroring
+    // sprint-spawner.ts's `wantsHostAdapter && !adapterRouted` recovery. Unlike the
+    // sprint path, `deckent run` / autonomous kind=task never call
+    // `bootstrapProviders` at all, so the registry is EMPTY here and every
+    // host-adapter provider silently fell through to the docker backend — which
+    // then honest-fails ("no ProviderCommandSpec"). Registering on demand is what
+    // makes `--provider openrouter` (and `--provider ollama`) actually reach its
+    // adapter from this entry point. Idempotent + best-effort: on fault we keep
+    // null and fall through to the pre-existing backend path.
+    if (!adapter) {
+      try {
+        const { bootstrapProviders } = await import('../../core/provider.js');
+        const cfg = await loadConfig(root);
+        await bootstrapProviders(cfg, root);
+        adapter = getProviderAdapterForTask(provider);
+      } catch {
+        // keep null — fall through to the backend path below
+      }
+    }
     if (adapter) {
+      assertLiveUsageBudgetSupport(executionBudget, adapter.liveUsageBudgetSupport, adapter.name);
       const refresh = (adapter as { refreshSupportedModels?: () => Promise<void> }).refreshSupportedModels;
       if (typeof refresh === 'function') {
         await refresh.call(adapter);
@@ -95,6 +131,7 @@ export async function spawnWorkerMultiProvider(
         autoApprove: opts.autoApprove ?? false,
         projectDir: root,
         reasoningEffort,
+        executionBudget,
       });
       return { backend: 'host-adapter', provider };
     }
@@ -114,12 +151,14 @@ export async function spawnWorkerMultiProvider(
       projectDir: root,
       allowedTools: opts.allowedTools,
       reasoningEffort,
+      executionBudget,
     });
     return { backend: backend.name, provider };
   }
 
   // No config override → provider-based fallback
   if (provider === 'claude') {
+    assertLiveUsageBudgetSupport(executionBudget, undefined, 'tmux');
     ensureSession();
     spawnWorker(taskId, model as ModelType, prompt, root, {
       autoApprove: opts.autoApprove ?? false,
@@ -139,6 +178,7 @@ export async function spawnWorkerMultiProvider(
     projectDir: root,
     allowedTools: opts.allowedTools,
     reasoningEffort,
+    executionBudget,
   });
   return { backend: 'subprocess', provider };
 }
@@ -241,6 +281,14 @@ export function registerSpawn(program: Command): void {
           // F1-RE (268-003): forward the task's reasoning-depth override so the
           // manual spawn path emits the provider flag like the sprint path does.
           modelEffort: task.modelEffort,
+          executionBudget: task.budget,
+          // OPENROUTER-PROVIDER (row 477): forward the task's OWN provider. Without
+          // it the on-demand registration branches in spawnWorkerMultiProvider
+          // (`opts.provider === 'ollama' | 'openrouter'`) never fired on this path,
+          // so `deckent spawn <taskId>` threw UnknownModelError for any dynamic id
+          // — ollama tags included. Unlike `deckent run`, this path never calls
+          // `resolveExecutionModelIdentity`, so nothing else registers the model here.
+          provider: task.provider,
         });
 
         print(getMessage('spawn.worker_spawned', lang, { taskId, model: task.model }));

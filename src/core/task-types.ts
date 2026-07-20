@@ -3,15 +3,25 @@
 // Model data is now delegated to ModelRegistry (single source of truth).
 
 import { modelRegistry, registerCodexParityModels } from './model-registry.js';
-import type { TaskKind, ActorContext } from './work-model.js';
+import type { TaskKind, ActorContext, ExecutionBudget } from './work-model.js';
+import type { ProviderBillingEvidence } from './provider-billing-evidence.js';
 
 // ─── Models ──────────────────────────────────────────────────────────
 
 /** Claude-family model identifiers */
-export type ClaudeModel = 'opus' | 'sonnet' | 'haiku';
+export type ClaudeModel = 'claude-fable-5' | 'claude-opus-4-8' | 'claude-sonnet-5' | 'claude-haiku-4-5-20251001';
 
 /** OpenAI / Codex model identifiers */
-export type OpenAIModel = 'gpt-5' | 'gpt-5-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 'o3' | 'o4-mini';
+export type OpenAIModel =
+  | 'gpt-5.5'
+  | 'gpt-5.6-sol'
+  | 'gpt-5.6-terra'
+  | 'gpt-5.6-luna'
+  | 'gpt-5-mini'
+  | 'gpt-4.1'
+  | 'gpt-4.1-mini'
+  | 'o3'
+  | 'o4-mini';
 
 /** Gemini model identifiers */
 export type GeminiModel = 'gemini-2.5-pro' | 'gemini-2.5-flash' | 'gemini-2.0-flash' | 'gemini-3.1-pro-preview';
@@ -34,8 +44,18 @@ export type ModelType = ClaudeModel | OpenAIModel | GeminiModel | (string & {});
  * Prior to this widening, `worker_provider=ollama` passed config validation
  * but `getProviderAdapterForTask('ollama')` returned null → silent Claude
  * fallback. See ADR-017 (provider adapter pattern) and provider.ts:detectOllama.
+ *
+ * OPENROUTER-PROVIDER (row 477): widened again to include `'openrouter'`. Before
+ * this, `providers/openrouter.ts` was registered via `'openrouter' as ProviderName`
+ * casts (provider.ts:1427/1430/1435) and no OpenRouter model could be added to the
+ * model registry at all (`ModelDefinition.provider` is `RegistryProviderName`), so
+ * `- Provider: openrouter` was silently dropped at directive-parse time
+ * (task-builder.ts:1138-1148, `VALID_PROVIDERS_ALL` miss) and every lookup
+ * `isModelAvailable(*, 'openrouter')` returned false. Keep this union in sync with
+ * `ProviderNameExt` (core/types.ts) and `RegistryProviderName`
+ * (core/model-registry-types.ts) — they are hand-mirrored.
  */
-export type ProviderName = 'claude' | 'codex' | 'gemini' | 'ollama';
+export type ProviderName = 'claude' | 'codex' | 'gemini' | 'ollama' | 'openrouter';
 
 /**
  * Mapping from each provider to its supported model list.
@@ -94,23 +114,27 @@ export function getAllKnownModelIds(): readonly string[] {
 }
 
 /**
- * Mapping from internal model aliases to actual provider API model IDs.
- * Derived from ModelRegistry.
+ * Canonical model identity map. Keys and values are intentionally identical;
+ * retained temporarily for source compatibility while consumers move to the
+ * direct API ID.
  */
 export const MODEL_API_IDS: Record<string, string> = Object.fromEntries(
   modelRegistry.getAllModels().map(m => [m.id, m.apiId]),
 );
 
 /**
- * Resolve the actual provider API model ID from an internal alias.
- * Delegates to ModelRegistry.
+ * Validate and return a canonical provider API model ID unchanged.
  * @throws {UnknownModelError} if model is not recognized
  */
 export function resolveApiModelId(model: ModelType): string {
   if (!modelRegistry.has(model)) {
     throw new UnknownModelError(model);
   }
-  return modelRegistry.resolveApiId(model);
+  const apiId = modelRegistry.resolveApiId(model);
+  if (apiId !== model) {
+    throw new UnknownModelError(model);
+  }
+  return model;
 }
 
 /** Error thrown when a model is not recognized */
@@ -360,6 +384,8 @@ export interface Task {
   };
   /** Requesting actor — threaded from ExecutionRequest for downstream RBAC seam (data only, no enforcement). */
   actor?: ActorContext;
+  /** Durable per-task token/USD ceiling propagated from ExecutionRequest. */
+  budget?: ExecutionBudget;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -537,6 +563,8 @@ export interface TaskResult {
    * task-types ↔ cost-calculator import cycle; structurally equals `ResultCost`.
    */
   cost?: { usd: number; currency: string; pricingSource: string; isLocal: boolean };
+  /** Provider-final billing total and per-model evidence; authoritative over local repricing. */
+  providerBilling?: ProviderBillingEvidence;
   /**
    * Worker self-reported rubric scores.
    * @deprecated Sprint 146: Worker self-report removed — use Quality Assessor dimensions

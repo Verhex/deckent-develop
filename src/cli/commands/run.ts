@@ -2,20 +2,25 @@ import { existsSync, mkdirSync, writeFileSync, unlinkSync, createReadStream, wat
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { ModelType, TaskResult } from '../../core/types.js';
-import { TaskStatus, ALL_MODELS } from '../../core/types.js';
+import { TaskStatus, ALL_PROVIDER_NAMES } from '../../core/types.js';
 import { TASKS_DIR } from '../../core/constants.js';
+import { DeckentError } from '../../core/errors.js';
 import { buildWorkerPrompt } from '../../orchestra/brain.js';
 import { resolveAgentPrompt, resolveSkillPrompts } from '../../orchestra/sprint-controller.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { spawnWorkerMultiProvider } from './spawn.js';
-import { loadConfig } from '../../core/config.js';
-import { buildExecutionRequest, resolveToTask } from '../../orchestra/execution-request-builder.js';
+import { loadConfig, resolveDefaultModel } from '../../core/config.js';
+import { buildExecutionRequest, resolveToTask, resolveExecutionModelIdentity } from '../../orchestra/execution-request-builder.js';
+import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
 export interface RunCommandOpts {
   model?: string;
+  /** 453-001: explicit provider ownership (`--provider`) for an unseen versioned
+   *  model ID; validated against the canonical registry before Task JSON / spawn. */
+  provider?: string;
   /** F1-RE (268-003): native model reasoning-effort level (`--model-effort`). */
   modelEffort?: string;
   scope?: string;
@@ -51,6 +56,46 @@ import { getMessage, getLanguage } from '../helpers/messages.js';
 let _runTaskCounter = 0;
 export function createRunTaskId(): string {
   return `run-${Date.now()}-${_runTaskCounter++}`;
+}
+
+/**
+ * 453-001: map a canonical model-resolution failure to a localized, actionable
+ * CLI message. The registry throws a {@link DeckentError} whose `code` identifies
+ * the exact failure mode; unknown codes fall back to the generic "unknown model"
+ * guidance so the CLI never leaks a raw error code to the user.
+ */
+export function formatModelError(
+  err: unknown,
+  model: string,
+  provider: string | undefined,
+  lang: string,
+): string {
+  const code = err instanceof DeckentError ? err.code : '';
+  // `providers` is interpolated from the runtime set so the guidance can never
+  // drift from what the CLI actually accepts (OPENROUTER-PROVIDER, row 477 —
+  // these messages previously hardcoded "claude|codex|gemini|ollama").
+  const vars = {
+    model,
+    provider: provider ?? '',
+    providers: ALL_PROVIDER_NAMES.join(', '),
+  };
+  switch (code) {
+    case 'E_MODEL_ID_INVALID':
+      return getMessage('run.model_err.invalid_id', lang, vars);
+    case 'E_LEGACY_MODEL_ALIAS':
+      return getMessage('run.model_err.legacy_alias', lang, vars);
+    case 'E_MODEL_PROVIDER_MISMATCH':
+      return getMessage('run.model_err.provider_mismatch', lang, vars);
+    case 'E_PROVIDER_UNKNOWN':
+      return getMessage('run.model_err.unknown_provider', lang, vars);
+    // Row 477: distinct from provider_unverified — the user DID pass a provider;
+    // what is missing is verified pricing (remedy: `deckent openrouter-probe`).
+    case 'E_MODEL_PRICING_UNVERIFIED':
+      return getMessage('run.model_err.pricing_unverified', lang, vars);
+    case 'E_MODEL_PROVIDER_UNVERIFIED':
+    default:
+      return getMessage('run.model_err.provider_unverified', lang, vars);
+  }
 }
 
 /**
@@ -240,7 +285,8 @@ export function registerRun(program: Command): void {
     .command('run')
     .argument('<description>')
     .description('Run a single one-shot task without a sprint cycle')
-    .option('--model <model>', `Model to use (default: sonnet). Options: ${ALL_MODELS.join(', ')}`, 'sonnet')
+    .option('--model <model>', getMessage('run.opt_model', getLanguage(undefined)))
+    .option('--provider <name>', getMessage('run.opt_provider', getLanguage(undefined), { providers: ALL_PROVIDER_NAMES.join('|') }))
     .option('--model-effort <level>', 'Native model reasoning-effort (claude: low|medium|high|xhigh|max, codex: minimal|low|medium|high). Opt-in; unsupported/invalid levels are ignored')
     .option('--scope <dir>', 'Worker scope directory (default: ./)', './')
     .option('--timeout <ms>', 'Maximum wait time in milliseconds (default: 300000)', '300000')
@@ -249,7 +295,6 @@ export function registerRun(program: Command): void {
     .option('--verbose', 'Stream worker log output to stdout in real-time')
     .action(async (description: string, opts: RunCommandOpts) => {
       const root = resolveProjectRoot();
-      const model = (opts.model ?? 'sonnet') as ModelType;
       const scopeDir = opts.scope ?? './';
       const timeoutMs = opts.timeout ? parseInt(opts.timeout, 10) : 300_000;
       const keepFiles = opts.keep ?? false;
@@ -260,25 +305,48 @@ export function registerRun(program: Command): void {
       const autoApprove = opts.autoApprove === true;
       const verbose = opts.verbose ?? false;
 
-      if (!(ALL_MODELS as readonly string[]).includes(model)) {
-        printError(new Error(`Invalid model: ${model}. Must be one of: ${ALL_MODELS.join(', ')}`));
-        process.exitCode = 1;
-        return;
-      }
-
       if (isNaN(timeoutMs) || timeoutMs <= 0) {
         printError(new Error(`Invalid timeout value: ${opts.timeout}`));
         process.exitCode = 1;
         return;
       }
 
+      // 453-001: resolve + validate the model through the canonical registry
+      // BEFORE any task-file write or spawn. An omitted --model resolves from the
+      // loaded config's canonical default-model resolver (never a literal alias);
+      // an explicit --provider registers an unseen versioned ID parametrically.
+      // Legacy aliases, unknown-without-provider, and provider/model mismatch all
+      // fail loudly here (fail-before-disk).
+      const cfg = await loadConfig(root).catch(() => undefined);
+      const lang = getLanguage(cfg?.language);
+      const requestedModel = opts.model ?? resolveDefaultModel(cfg);
+      // Row 477: an OpenRouter id must be pre-registered from the verified probe
+      // cache BEFORE identity resolution — the parametric path enforces the
+      // pricing-evidence gate and is deliberately disk-free, so without this the
+      // gate throws for probe-verified ids too (found live 2026-07-20: the gate
+      // landed wired only into the later spawn path, breaking this proven flow).
+      // Cache miss → no-op → the gate still fails honestly for unprobed models.
+      if (opts.provider === 'openrouter') {
+        registerOpenRouterModelFromCache(root, requestedModel);
+      }
+      let identity: ReturnType<typeof resolveExecutionModelIdentity>;
+      try {
+        identity = resolveExecutionModelIdentity(requestedModel, opts.provider);
+      } catch (err) {
+        printError(new Error(formatModelError(err, requestedModel, opts.provider, lang)));
+        process.exitCode = 1;
+        return;
+      }
+      const model = identity.model;
+
       const taskId = createRunTaskId();
       // WM-1: unify on the canonical ExecutionRequest contract — sets task.type
-      // (TaskKind) + resolves provider from config + tags origin='cli'.
-      const cfg = await loadConfig(root).catch(() => undefined);
+      // (TaskKind) + carries the resolved exact model ID + owning provider through
+      // to Task JSON and spawn + tags origin='cli'.
       const execReq = buildExecutionRequest({
         description,
-        model: model as ModelType,
+        model,
+        provider: identity.provider,
         // F1-RE (268-003): forward --model-effort into the canonical request so
         // task.modelEffort is set (resolveToTask) and spawn emits the flag.
         modelEffort: opts.modelEffort,

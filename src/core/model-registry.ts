@@ -28,6 +28,75 @@ export type {
   ParametricResolveOptions,
 } from './model-registry-types.js';
 
+/**
+ * Compatibility metadata for explicit config/active-work migration only.
+ * Normal registry lookup never consumes this table and therefore never turns
+ * an authored legacy alias into a different wire model silently.
+ */
+export const LEGACY_MODEL_ALIASES = Object.freeze({
+  fable: 'claude-fable-5',
+  opus: 'claude-opus-4-8',
+  sonnet: 'claude-sonnet-5',
+  haiku: 'claude-haiku-4-5-20251001',
+  'gpt-5': 'gpt-5.5',
+  'gpt-5.6': 'gpt-5.6-sol',
+} as const);
+
+export type LegacyModelAlias = keyof typeof LEGACY_MODEL_ALIASES;
+
+export function getLegacyModelMigration(id: string): string | undefined {
+  return LEGACY_MODEL_ALIASES[id as LegacyModelAlias];
+}
+
+export interface CanonicalModelResolutionOptions {
+  provider?: RegistryProviderNameExt;
+  registerParametric?: boolean;
+}
+
+/**
+ * Resolve an authored runtime model identity without compatibility remapping.
+ * An unseen API ID is accepted only with explicit provider ownership.
+ */
+export function resolveCanonicalModelIdentity(
+  apiId: string,
+  options: CanonicalModelResolutionOptions = {},
+): ModelDefinition {
+  if (!apiId || apiId !== apiId.trim()) {
+    throw new DeckentError('E_MODEL_ID_INVALID', 'E_MODEL_ID_INVALID');
+  }
+  if (getLegacyModelMigration(apiId)) {
+    throw new DeckentError('E_LEGACY_MODEL_ALIAS', 'E_LEGACY_MODEL_ALIAS');
+  }
+
+  const existing = modelRegistry.get(apiId);
+  if (existing) {
+    if (options.provider !== undefined && existing.provider !== options.provider) {
+      throw new DeckentError('E_MODEL_PROVIDER_MISMATCH', 'E_MODEL_PROVIDER_MISMATCH');
+    }
+    return existing;
+  }
+
+  if (!options.provider) {
+    throw new DeckentError('E_MODEL_PROVIDER_UNVERIFIED', 'E_MODEL_PROVIDER_UNVERIFIED');
+  }
+
+  const definition = buildParametricModel(apiId, {
+    provider: options.provider,
+    register: false,
+  });
+  if (options.registerParametric === true) modelRegistry.register(definition);
+  return definition;
+}
+
+function assertCanonicalModelDefinition(definition: ModelDefinition): void {
+  if (!definition.id || definition.id !== definition.apiId) {
+    throw new DeckentError(
+      'E_MODEL_IDENTITY_MISMATCH',
+      `Model identity must use the provider API ID unchanged: id=${definition.id}, apiId=${definition.apiId}`,
+    );
+  }
+}
+
 // ─── Built-in Model Catalog ────────────────────────────────────────────────
 // Bundled snapshot = offline last-resort fallback. models.dev catalog is the
 // live source of truth; apiId values here must be kept current at build time.
@@ -38,7 +107,7 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
     // Claude Fable 5 — Anthropic's most capable widely released model (GA 2026-06-09).
     // Free on Pro/Max/Team subscriptions through 2026-06-22; reverts to $10/$50 paid after.
     // 1M context (Opus 4.7 tokenizer), adaptive thinking always-on, no extended thinking.
-    id: 'fable',
+    id: 'claude-fable-5',
     apiId: 'claude-fable-5',
     provider: 'claude',
     tier: 'premium_plus',
@@ -49,7 +118,7 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
     maxOutputTokens: 128_000,
   },
   {
-    id: 'opus',
+    id: 'claude-opus-4-8',
     apiId: 'claude-opus-4-8',
     provider: 'claude',
     tier: 'premium',
@@ -66,7 +135,7 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
     maxOutputTokens: 128_000,
   },
   {
-    id: 'sonnet',
+    id: 'claude-sonnet-5',
     apiId: 'claude-sonnet-5',
     provider: 'claude',
     tier: 'standard',
@@ -77,7 +146,7 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
     maxOutputTokens: 128_000,
   },
   {
-    id: 'haiku',
+    id: 'claude-haiku-4-5-20251001',
     apiId: 'claude-haiku-4-5-20251001',
     provider: 'claude',
     tier: 'economy',
@@ -99,9 +168,7 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
     // Haiku 4.5 = 64K). Evidence-referenced.
     maxOutputTokens: 64_000,
   },
-  // OpenAI (6) — see also CODEX_PARITY_MODELS below (gpt-5.5, opt-in, kept
-  // out of this array on purpose so the hardcoded builtin-count invariant
-  // asserted by tests/core/model-registry*.test.ts is not disturbed)
+  // OpenAI (6) — canonical provider API IDs only.
   {
     id: 'o3',
     apiId: 'o3',
@@ -113,21 +180,15 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
     status: 'ga',
   },
   {
-    id: 'gpt-5',
-    // Sprint 248 (Provider Parity): the deckent-facing id stays `gpt-5` (premium
-    // codex slot — preserves the builtin-count invariant + tier maps), but the
-    // wire model is `gpt-5.5`. LEGACY ALIAS-SLOT (2026-07-11, Alperen): first-class
-    // `gpt-5.5` + the gpt-5.6 family are now registered at codex module-load via
-    // `registerCodexParityModels()` (see providers/codex.ts) — new work should
-    // address models by their real ids; this entry remains only so existing
-    // configs/task-JSONs that say `gpt-5` keep working.
+    id: 'gpt-5.5',
     apiId: 'gpt-5.5',
     provider: 'codex',
     tier: 'premium',
-    contextWindow: 1_000_000,
-    costPerMillion: { input: 5, output: 15 },
-    capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: false },
+    contextWindow: 1_050_000,
+    costPerMillion: { input: 5, output: 30 },
+    capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: true },
     status: 'ga',
+    maxOutputTokens: 128_000,
   },
   {
     id: 'gpt-4.1',
@@ -219,51 +280,16 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
 // `BUILTIN_MODELS` on purpose so the 13-model / 3-provider invariant holds.
 export { OLLAMA_BUILTIN_MODELS } from './ollama-models.js';
 
-// ─── Codex Parity Models (opt-in, Sprint 360 task 360-004) ────────────────
-// `gpt-5.5` is the real OpenAI/Codex model id that Codex CLI already speaks on
-// the wire (the existing `id: 'gpt-5'` entry above sends `apiId: 'gpt-5.5'` as
-// a ChatGPT-subscription auth shim, Sprint 248 — that entry is untouched).
-// This is the first-class, feed-verified catalog record for `gpt-5.5` itself.
-// Kept OUT of BUILTIN_MODELS on purpose, mirroring OLLAMA_BUILTIN_MODELS
-// above: several tests hardcode the BUILTIN_MODELS / modelRegistry builtin
-// count, so growing that array is a breaking change outside this mechanism's
-// control. Call `registerCodexParityModels()` (defined near
-// `registerOllamaModels()` below, same opt-in pattern) to make `gpt-5.5`
-// first-class on a registry.
-// Values verified 2026-07-02 against the live LiteLLM feed
-// (raw.githubusercontent.com/BerriAI/litellm/main/litellm/model_prices_and_context_window_backup.json),
-// key "gpt-5.5" (litellm_provider: openai, mode: chat) — see
-// pricing-data-baseline.json providers.openai.models["gpt-5.5"] for the full
-// per-token pricing record and cited evidence.
+// ─── Codex parity family ──────────────────────────────────────────────────
+// These canonical API IDs extend the offline catalog beyond the 14 core
+// entries. They are loaded by every ModelRegistry, so validation does not
+// depend on importing a provider module for its side effects.
 export const CODEX_PARITY_MODELS: readonly ModelDefinition[] = [
-  {
-    id: 'gpt-5.5',
-    apiId: 'gpt-5.5',
-    provider: 'codex',
-    tier: 'premium',
-    contextWindow: 1_050_000,
-    costPerMillion: { input: 5, output: 30 },
-    capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: true },
-    status: 'ga',
-    maxOutputTokens: 128_000,
-  },
-  // gpt-5.6 family (Alperen, 2026-07-11). Values verified against the live
-  // LiteLLM feed same-day (keys "gpt-5.6" / "gpt-5.6-sol" / "gpt-5.6-terra" /
-  // "gpt-5.6-luna", litellm_provider: openai, mode: chat, ctx 1,050,000,
-  // max_output 128k, supports_reasoning true for all four).
+  // Pinned gpt-5.6 family. Official OpenAI guidance identifies bare `gpt-5.6`
+  // as a moving alias to `gpt-5.6-sol`; it is migration-only above, never a
+  // canonical runtime identity.
   // `gpt-5.6-sol` is the designated cross-verify counterpart for comprehensive
   // analyses (XVER-1 Anthropic↔OpenAI çapraz-doğrulama).
-  {
-    id: 'gpt-5.6',
-    apiId: 'gpt-5.6',
-    provider: 'codex',
-    tier: 'premium',
-    contextWindow: 1_050_000,
-    costPerMillion: { input: 5, output: 30 },
-    capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: true },
-    status: 'ga',
-    maxOutputTokens: 128_000,
-  },
   {
     id: 'gpt-5.6-sol',
     apiId: 'gpt-5.6-sol',
@@ -299,6 +325,11 @@ export const CODEX_PARITY_MODELS: readonly ModelDefinition[] = [
   },
 ] as const;
 
+export const CANONICAL_MODELS: readonly ModelDefinition[] = [
+  ...BUILTIN_MODELS,
+  ...CODEX_PARITY_MODELS,
+] as const;
+
 // ─── Tier ordering for comparison ──────────────────────────────────────────
 
 const TIER_ORDER: Record<ModelTier, number> = {
@@ -316,17 +347,10 @@ const TIER_ORDER: Record<ModelTier, number> = {
 // resolution — provider + tier are derived parametrically from the id, with
 // every field overridable via ParametricResolveOptions.
 
-/** Infer the provider from a model id using common naming conventions.
- *  Falls back to 'claude' (the project default provider) when no pattern matches. */
-export function inferProviderFromId(id: string): RegistryProviderNameExt {
-  const lid = id.toLowerCase().trim();
-  if (
-    lid.startsWith('claude') ||
-    lid.startsWith('opus') ||
-    lid.startsWith('sonnet') ||
-    lid.startsWith('haiku') ||
-    lid.startsWith('fable')
-  ) {
+/** Diagnostic namespace inference. An unknown namespace has no authority. */
+export function inferProviderFromId(id: string): RegistryProviderNameExt | undefined {
+  const lid = id.trim().toLowerCase();
+  if (lid.startsWith('claude-')) {
     return 'claude';
   }
   if (lid.startsWith('gemini') || lid.startsWith('google')) {
@@ -340,7 +364,7 @@ export function inferProviderFromId(id: string): RegistryProviderNameExt {
     // `name:tag` shape (e.g. `qwen3:8b`) is the Ollama local-tag convention.
     return 'ollama';
   }
-  return 'claude';
+  return undefined;
 }
 
 /** Infer the capability tier from a model id using common naming conventions.
@@ -376,10 +400,45 @@ export function buildParametricModel(
   id: string,
   opts: ParametricResolveOptions = {},
 ): ModelDefinition {
-  const provider = opts.provider ?? (inferProviderFromId(id) as RegistryProviderName);
+  if (!id || id !== id.trim()) {
+    throw new DeckentError('E_MODEL_ID_INVALID', 'Model API ID must be a non-empty, exact string');
+  }
+  if (opts.apiId !== undefined && opts.apiId !== id) {
+    throw new DeckentError(
+      'E_MODEL_IDENTITY_MISMATCH',
+      `Parametric model identity cannot remap ${id} to ${opts.apiId}`,
+    );
+  }
+  const provider = opts.provider ?? inferProviderFromId(id);
+  if (!provider) {
+    throw new DeckentError(
+      'E_MODEL_PROVIDER_UNVERIFIED',
+      `Provider ownership is required for model API ID: ${id}`,
+    );
+  }
+  if (provider === 'openrouter') {
+    const suppliedCost = opts.costPerMillion;
+    const validSuppliedCost = suppliedCost !== undefined
+      && Number.isFinite(suppliedCost.input)
+      && Number.isFinite(suppliedCost.output)
+      && suppliedCost.input >= 0
+      && suppliedCost.output >= 0;
+    const verifiedFreeId = id.endsWith(':free');
+    const evidenceRef = opts.pricingEvidenceRef;
+    if (!validSuppliedCost
+      || typeof evidenceRef !== 'string'
+      || evidenceRef.length === 0
+      || evidenceRef !== evidenceRef.trim()
+      || (!verifiedFreeId && suppliedCost.input === 0 && suppliedCost.output === 0)) {
+      throw new DeckentError(
+        'E_MODEL_PRICING_UNVERIFIED',
+        `OpenRouter pricing evidence is required for model API ID: ${id}`,
+      );
+    }
+  }
   const def: ModelDefinition = {
     id,
-    apiId: opts.apiId ?? id,
+    apiId: id,
     provider,
     tier: opts.tier ?? inferTierFromId(id),
     contextWindow: opts.contextWindow ?? 200_000,
@@ -391,10 +450,21 @@ export function buildParametricModel(
       codeExecution: opts.capabilities?.codeExecution ?? false,
       reasoning: opts.capabilities?.reasoning ?? false,
     },
-    status: opts.status ?? 'ga',
+    // OPENROUTER-PROVIDER (row 477): OpenRouter ids default to 'ga', not 'preview'.
+    // `getByProviderAndTier` filters to status==='ga', so a 'preview' entry registers
+    // successfully yet stays INVISIBLE to tier resolution — registered-but-unroutable,
+    // the silent-failure shape this row set out to remove. For claude/codex/gemini a
+    // parametric id genuinely IS an unverified guess (hence 'preview'), but an
+    // OpenRouter id is only ever reachable when the operator named it explicitly AND
+    // the gateway serves it verbatim (id === apiId), so 'ga' is the honest default.
+    // An explicit `opts.status` still wins.
+    status: opts.status ?? (provider === 'openrouter' ? 'ga' : 'preview'),
   };
   if (opts.maxOutputTokens !== undefined) {
     def.maxOutputTokens = opts.maxOutputTokens;
+  }
+  if (opts.pricingEvidenceRef !== undefined) {
+    def.pricingEvidenceRef = opts.pricingEvidenceRef;
   }
   return def;
 }
@@ -404,8 +474,9 @@ export function buildParametricModel(
 export class ModelRegistry {
   private models = new Map<string, ModelDefinition>();
 
-  constructor(builtins: readonly ModelDefinition[] = BUILTIN_MODELS) {
+  constructor(builtins: readonly ModelDefinition[] = CANONICAL_MODELS) {
     for (const model of builtins) {
+      assertCanonicalModelDefinition(model);
       this.models.set(model.id, model);
     }
   }
@@ -504,6 +575,7 @@ export class ModelRegistry {
   }
 
   register(definition: ModelDefinition): void {
+    assertCanonicalModelDefinition(definition);
     this.models.set(definition.id, definition);
   }
 
@@ -514,6 +586,7 @@ export class ModelRegistry {
   /** Replace all current entries with the supplied catalog (atomic swap).
    *  Used by bootstrapFromCatalog() after a successful remote/cache fetch. */
   loadFromCatalog(definitions: readonly ModelDefinition[]): void {
+    for (const def of definitions) assertCanonicalModelDefinition(def);
     this.models.clear();
     for (const def of definitions) {
       this.models.set(def.id, def);
@@ -524,6 +597,7 @@ export class ModelRegistry {
    *  Bundled entries that share an id with the catalog are replaced; the rest
    *  remain available as a safety net. */
   mergeFromCatalog(definitions: readonly ModelDefinition[]): void {
+    for (const def of definitions) assertCanonicalModelDefinition(def);
     for (const def of definitions) {
       this.models.set(def.id, def);
     }
@@ -599,13 +673,98 @@ export function ensureOllamaModelRegistered(
   registry.register({
     id: tag,
     apiId: tag,
-    provider: 'ollama' as unknown as RegistryProviderName,
+    provider: 'ollama',
     tier: 'standard',
     contextWindow: 32_768,
     costPerMillion: { input: 0, output: 0 },
     capabilities: { streaming: true, toolUse: true, vision: false, codeExecution: false, reasoning: false },
     status: 'ga',
   });
+}
+
+/** Per-model facts a caller can supply when registering an OpenRouter id.
+ *  Every omitted field except paid-model pricing has a `:free`-safe default;
+ *  see {@link ensureOpenRouterModelRegistered}. */
+export interface OpenRouterModelFacts {
+  /** Real context window for this id (e.g. 1_000_000 for nemotron-3-ultra).
+   *  The `openrouter-probe` cache (`.deckent/settings/openrouter-models.json`)
+   *  carries the true value per model. Default: conservative 128_000. */
+  contextWindow?: number;
+  /** Routing tier. Default: `'standard'` — same choice as the Ollama helper. */
+  tier?: ModelTier;
+  /** Cost per million tokens. Exact `:free` ids default to `{0,0}`; every
+   *  other id requires explicit finite, non-negative pricing. */
+  costPerMillion?: { input: number; output: number };
+  /** Opaque fresh pricing-source reference. Required for paid and free models. */
+  pricingEvidenceRef?: string;
+  /** Whether the model emits reasoning tokens (nemotron-3 does, by default ON
+   *  at the API level). Default: false. */
+  reasoning?: boolean;
+}
+
+// OPENROUTER-PROVIDER (row 477) — the OpenRouter twin of
+// `ensureOllamaModelRegistered` above, and the fix for this integration's ROOT
+// CAUSE: `providers/openrouter.ts` registers NO models, so every
+// `isModelAvailable(*, 'openrouter')` was structurally false and
+// `getProviderForModel(<openrouter id>)` threw `UnknownModelError` at plan time,
+// long before the adapter could run.
+//
+// Two registry landmines are deliberately defused here, both by passing values
+// EXPLICITLY rather than letting the registry infer them:
+//   1. `provider: 'openrouter'` is explicit because `inferProviderFromId`
+//      (this file) classifies ANY id containing ':' as `'ollama'` — and every
+//      free OpenRouter id ends in `:free` (`nvidia/…-a55b:free` would be read
+//      as an Ollama tag). Never let this id reach provider inference.
+//   2. `status: 'ga'` is explicit because `buildParametricModel` defaults to
+//      `'preview'`, while `getByProviderAndTier` filters to `status === 'ga'`
+//      — a `preview` entry would register successfully yet stay invisible to
+//      tier resolution.
+//
+// `id === apiId === the OpenRouter model id VERBATIM` (e.g.
+// `nvidia/nemotron-3-ultra-550b-a55b:free`), matching row 608's canonical-API-id
+// rule: no Deckent-side alias is minted for OpenRouter models.
+//
+// COST GATE: the `{0,0}` default is accepted ONLY for ids ending exactly in
+// `:free`. A paid/unknown id without explicit pricing fails before registry
+// mutation, so no caller can accidentally present unknown spend as free.
+//
+// Idempotent, like the Ollama helper.
+export function ensureOpenRouterModelRegistered(
+  modelId: string,
+  facts: OpenRouterModelFacts = {},
+  registry: ModelRegistry = modelRegistry,
+): void {
+  if (!modelId) return;
+  const existing = registry.get(modelId);
+  if (existing) {
+    if (existing.provider === 'openrouter' &&
+      (typeof existing.pricingEvidenceRef !== 'string'
+        || existing.pricingEvidenceRef.length === 0
+        || (!modelId.endsWith(':free')
+          && existing.costPerMillion.input === 0 && existing.costPerMillion.output === 0))) {
+      throw new DeckentError(
+        'E_MODEL_PRICING_UNVERIFIED',
+        `OpenRouter pricing evidence is required for non-free model API ID: ${modelId}`,
+      );
+    }
+    return;
+  }
+  registry.register(buildParametricModel(modelId, {
+    provider: 'openrouter',
+    tier: facts.tier ?? 'standard',
+    contextWindow: facts.contextWindow ?? 128_000,
+    costPerMillion: facts.costPerMillion ?? { input: 0, output: 0 },
+    pricingEvidenceRef: facts.pricingEvidenceRef,
+    capabilities: {
+      streaming: true,
+      toolUse: true,
+      vision: false,
+      codeExecution: false,
+      reasoning: facts.reasoning ?? false,
+    },
+    status: 'ga',
+    register: false,
+  }));
 }
 
 // ─── Catalog Bootstrap (Sprint 190 W-F F-6/F-7) ────────────────────────────

@@ -50,14 +50,17 @@ import { atomicWriteFileSync } from '../../agents/worker-lifecycle.js';
 import type { BacklogEntry } from '../../orchestra/autonomous/backlog-types.js';
 import { runTaskMode } from '../../orchestra/task-mode-runner.js';
 import { runSprint as runSprintLifecycle } from '../../orchestra/sprint-controller.js';
-import { waitForRunResult } from './run.js';
+import { waitForRunResult, formatModelError } from './run.js';
+import { resolveExecutionModelIdentity } from '../../orchestra/execution-request-builder.js';
+import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
 import { isV2Engine, runV2Engine } from '../../orchestra/autonomous/mission-store/mission-engine-wire.js';
 import { buildGoalDeps, type GoalAdvanceDeps } from '../../orchestra/autonomous/mission-store/goal-mission.js';
 import type { NewWorkItem, WorkItem } from '../../orchestra/autonomous/mission-store/mission-types.js';
-import { loadConfig } from '../../core/config.js';
+import { loadConfig, resolveDefaultModel } from '../../core/config.js';
 import { PROJECT_CONFIG_PATH, RECENT_WORKS_DIR } from '../../core/constants.js';
 import { bootstrapProviders } from '../../core/provider.js';
-import type { ModelType } from '../../core/types.js';
+import type { ModelType, ResolvedConfig } from '../../core/types.js';
+import { ALL_PROVIDER_NAMES } from '../../core/types.js';
 import { loadReactiveMap } from '../../orchestra/autonomous/reactive/reactive-map.js';
 import { makeReactiveIngester } from '../../orchestra/autonomous/reactive/reactive-ingester.js';
 import { makeNervousReactiveSource } from '../../orchestra/autonomous/reactive/nervous-reactive-source.js';
@@ -321,6 +324,35 @@ function realPlannerComplete(model: string): LlmComplete {
   };
 }
 
+/**
+ * 454-003: resolve + validate the planner/JIT model through the canonical
+ * registry — the SAME boundary CLI `deckent run` / MCP `deckent_run` enforce
+ * (453-001) — before the autonomous loop starts or a plan is generated. An
+ * omitted `override` resolves from the loaded config's canonical default-model
+ * resolver (never a literal alias like 'sonnet', which the model registry does
+ * not recognize as a key and would otherwise reach the provider CLI unresolved).
+ * A legacy alias, an unknown ID without a provider, or a provider/model
+ * mismatch throws a friendly, localized error before any spawn.
+ */
+function resolvePlannerModelIdentity(
+  config: ResolvedConfig,
+  lang: string,
+  override?: string,
+  provider?: string,
+): string {
+  const requested = override ?? resolveDefaultModel(config);
+  // Row 477: pre-register a probe-verified OpenRouter id before the pure
+  // identity boundary — same seam as CLI/MCP run (see run.ts).
+  if (provider === 'openrouter') {
+    registerOpenRouterModelFromCache(config.projectRoot, requested);
+  }
+  try {
+    return resolveExecutionModelIdentity(requested, provider).model;
+  } catch (err) {
+    throw new Error(formatModelError(err, requested, provider, lang));
+  }
+}
+
 // ─── Type-2 goal-loop bindings (live planner + accepter) ───────────────
 
 /**
@@ -418,7 +450,8 @@ function parseGoalAccepted(raw: string): boolean {
 
 /**
  * Build the live Type-2 goal-loop bindings from an injected LLM completion. The
- * production wire passes `realPlannerComplete('sonnet')`; tests pass a fake. The
+ * production wire passes `realPlannerComplete(resolvePlannerModelIdentity(...))`
+ * (canonical configured default); tests pass a fake. The
  * `planner` decomposes the goal (given prior work) into the next work-items — an
  * empty batch signals "goal reached" so the loop evaluates the `accepter`, which
  * asks the same LLM whether the goal is reached. {@link buildGoalDeps} adapts these
@@ -538,8 +571,10 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
         // Type-2 goal-driver: real planner + acceptance evaluator (same provider as
         // the JIT planner). Without this, idle `kind='goal'` missions never advance —
         // author/accept stays inert (the live wiring-gap this closes). buildGoalDeps
-        // carries the maxRounds infinite-loop guard.
-        goalDeps: buildLiveGoalDeps(realPlannerComplete('sonnet')),
+        // carries the maxRounds infinite-loop guard. 454-003: the model is the
+        // canonical configured default, resolved + validated before the loop starts
+        // — never the 'sonnet' alias literal.
+        goalDeps: buildLiveGoalDeps(realPlannerComplete(resolvePlannerModelIdentity(resolvedConfig, lang))),
         signal: controllerV2.signal,
         ...(maxIterationsV2 !== undefined ? { maxIterations: maxIterationsV2 } : {}),
         lang,
@@ -606,7 +641,9 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     resultTimeoutMs: (resolvedConfig.autonomous as Record<string, unknown> | undefined)?.result_timeout_ms as number | undefined,
     // Task 8: goal-planner Phase 2 — dispatched `planned` entries get JIT detail
     // generated by the real provider before they run (title-only fallback on failure).
-    jitComplete: realPlannerComplete('sonnet'),
+    // 454-003: canonical configured default, resolved + validated before the loop
+    // starts — never the 'sonnet' alias literal.
+    jitComplete: realPlannerComplete(resolvePlannerModelIdentity(resolvedConfig, lang)),
     // CORE-UNIFORMITY (slice 1): live Brain+Auditor+CrossVerify flow on the autonomous
     // terminal (channel 1) + ENT-3 audit JSONL for AI operators (channel 2).
     flow: makeAutonomousFlowReporter(root, lang),
@@ -1081,16 +1118,20 @@ export function registerAutonomous(program: Command): void {
     .option('--from <ref>', 'Artifact reference: file or file#section (seed open checklist items)')
     .option('--policy <policy>', 'Default per-item policy', 'auto')
     .option('--max-items <n>', 'Max items (default 30)')
-    .option('--model <model>', 'Planner model override')
+    .option('--model <model>', getMessage('run.opt_model', getLanguage(undefined)))
+    .option('--provider <name>', getMessage('run.opt_provider', getLanguage(undefined), { providers: ALL_PROVIDER_NAMES.join('|') }))
     .option('--dry-run', 'Generate + print but do not write')
     .option('--root <path>', 'Project root override')
     .option('--lang <code>', 'Language override (en|tr)')
-    .action(async (goal: string, o: { from?: string; policy?: string; maxItems?: string; model?: string; dryRun?: boolean; root?: string; lang?: string }) => {
+    .action(async (goal: string, o: { from?: string; policy?: string; maxItems?: string; model?: string; provider?: string; dryRun?: boolean; root?: string; lang?: string }) => {
       try {
         const root = o.root ?? resolveProjectRoot();
         const config = await loadConfig(root);
         await bootstrapProviders(config);
-        const model = o.model ?? 'sonnet';
+        // 454-003: resolve + validate through the canonical registry — a bare
+        // --model alias (e.g. 'sonnet') is rejected with a localized error
+        // rather than silently reaching the planner CLI unresolved.
+        const model = resolvePlannerModelIdentity(config, getLanguage(o.lang), o.model, o.provider);
         await handlePlan({
           goal, root, from: o.from, policy: o.policy,
           maxItems: o.maxItems ? parseInt(o.maxItems, 10) : undefined,

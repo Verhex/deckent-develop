@@ -68,6 +68,10 @@ const OPENROUTER_API_KEY_ENV = 'OPENROUTER_API_KEY';
 /** The canonical `$DECK:` reference a user configures — surfaced in error messages only. */
 const OPENROUTER_DECK_REF = `$DECK:${OPENROUTER_API_KEY_ENV}`;
 
+/** Env var carrying JSON vendor-extension fields to the spawned agentic worker
+ *  (row 477). Shared contract with `agents/http-agentic-worker.ts`. */
+export const HTTP_EXTRA_BODY_ENV = 'DECKENT_HTTP_EXTRA_BODY';
+
 /**
  * Representative, informational model list — OpenRouter's real catalog is large
  * and changes independently of this codebase, so `send()` does NOT gate on this
@@ -113,6 +117,17 @@ export interface OpenRouterConfig {
    * writes to `process.env` — neither does this adapter, anywhere.
    */
   loadSecretsImpl?: (projectRoot: string) => Record<string, string>;
+  /**
+   * OpenRouter `reasoning` request field (row 477), forwarded verbatim on BOTH
+   * paths: `send()` merges it into the request body, and `spawn()` hands it to
+   * the agentic worker so a spawned run behaves identically to a host-side call.
+   *
+   * Sourced from `config.openrouter.reasoning` at bootstrap. Absent → the field
+   * is never sent and OpenRouter's own default applies (reasoning ON, measured
+   * at ~85% of response cost — see the config-types doc for the 20.7s→3.1s
+   * measurement).
+   */
+  reasoning?: Record<string, unknown>;
   /** Project root used by `spawn()` for `.tasks/` heartbeat + log files. Defaults to `process.cwd()`. */
   projectDir?: string;
   /** Override the compiled agentic-worker entry path (tests stub it). */
@@ -157,6 +172,8 @@ export class OpenRouterProvider implements ProviderAdapter {
   private readonly defaultTimeoutMs: number;
   private readonly platform: NodeJS.Platform;
   private readonly workers = new Map<string, OpenRouterWorkerEntry>();
+  /** OpenRouter `reasoning` field applied to send() bodies and forwarded to spawn(). */
+  private readonly reasoning: Record<string, unknown> | undefined;
 
   constructor(projectRoot: string, opts: OpenRouterConfig = {}) {
     this.projectRoot = projectRoot;
@@ -171,6 +188,7 @@ export class OpenRouterProvider implements ProviderAdapter {
     this.spawnImpl = opts.spawnImpl ?? nodeSpawn;
     this.defaultTimeoutMs = opts.defaultTimeoutMs ?? 0;
     this.platform = opts.platform ?? process.platform;
+    this.reasoning = opts.reasoning;
   }
 
   // ─── send() — primary HTTP entry ────────────────────────────────────
@@ -200,6 +218,9 @@ export class OpenRouterProvider implements ProviderAdapter {
       messages,
       stream: false,
     };
+    // Row 477: OpenRouter-only extension, sent only when configured. Placed
+    // before the per-call options so an explicit option always wins.
+    if (this.reasoning !== undefined) body['reasoning'] = this.reasoning;
     if (opts?.temperature !== undefined) body['temperature'] = opts.temperature;
     if (opts?.maxTokens !== undefined) body['max_tokens'] = opts.maxTokens;
     if (opts?.stop !== undefined) body['stop'] = opts.stop;
@@ -225,6 +246,23 @@ export class OpenRouterProvider implements ProviderAdapter {
     }
 
     const json = (await res.json()) as OpenRouterChatCompletionResponse;
+    // Row 477 / K5 root-cause: OpenRouter wraps some upstream failures in an
+    // HTTP-200 envelope — body is `{"error":{...}}` with NO `choices` (caught
+    // live 2026-07-20: `Upstream error from Nvidia: ResourceExhausted ... (33/32)`
+    // arrived as status 200). `requestWithRetry` cannot see it (it gates on HTTP
+    // status), and `content ?? ''` silently coerced it into a "successful" empty
+    // turn — the agentic worker then terminated first-turn with a misleading
+    // "no tool calls" NO_GO and zero usage. Fail honestly with the REAL cause.
+    const embeddedError = (json as { error?: { message?: string; code?: number | string } })?.error;
+    if (embeddedError !== undefined || !Array.isArray(json?.choices) || json.choices.length === 0) {
+      const detail = embeddedError
+        ? `${embeddedError.message ?? 'unknown upstream error'}${embeddedError.code !== undefined ? ` (code ${embeddedError.code})` : ''}`
+        : 'response has no choices';
+      throw new ProviderError(
+        `openrouter /chat/completions returned an error-in-200 envelope: ${detail}`,
+        this.name,
+      );
+    }
     const content = json?.choices?.[0]?.message?.content ?? '';
     const result: ChatCompletionResult = { content };
 
@@ -415,6 +453,16 @@ export class OpenRouterProvider implements ProviderAdapter {
         ...process.env,
         ...(opts?.env ?? {}),
         [OPENROUTER_API_KEY_ENV]: apiKey,
+        // Row 477: forward the OpenRouter `reasoning` extension to the spawned
+        // agentic worker so a spawned run matches a host-side `send()` call.
+        // Carried as ENV, not argv, on purpose: the value is JSON and the spawn
+        // path goes through `buildCliInvocation`, which uses a cmd.exe wrapper on
+        // win32 — quoting JSON through a shell is exactly the cross-platform
+        // breakage Law #2 forbids. Env also keeps the argv contract (shared with
+        // codex/gemini/openai-compat workers) completely unchanged.
+        ...(this.reasoning !== undefined
+          ? { [HTTP_EXTRA_BODY_ENV]: JSON.stringify({ reasoning: this.reasoning }) }
+          : {}),
       },
       shell: inv.shell,
     };

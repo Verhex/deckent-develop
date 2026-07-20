@@ -133,6 +133,7 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   entry('usage', 'Core', 'Oku', 'api', ['cli', 'mcp', 'repl'], ['deckent_usage']),
   entry('limits', 'Core', 'Oku', 'core', ['cli']),          // 361-002 subscription limit-probe
   entry('openrouter-probe', 'Core', 'Oku', 'core', ['cli']), // 366-003 canlı-probe (key'siz dürüst-unavailable)
+  entry('xverify', 'Core', 'Oku', 'orchestra', ['cli', 'mcp'], ['deckent_xverify']), // XVERIFY-TOOL oturumlar-arası advisory hakem
   entry('kpi', 'Core', 'Oku', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_kpi']),
   entry('image', 'Core', 'Değiştir', 'core', ['cli']),
   entry('help-info', 'Core', 'Oku', 'cli', ['cli', 'mcp', 'repl'], ['deckent_help']),

@@ -55,6 +55,30 @@ const PROVIDER_CAPABILITIES: Record<ProviderName, ProviderCapability> = {
     maxContextTokens: 32_000,
     costPerMillionTokens: { input: 0, output: 0 },
   },
+  // OPENROUTER-PROVIDER (row 477): OpenRouter is a META-PROVIDER — it fronts
+  // hundreds of third-party models whose capabilities differ wildly, so NO
+  // single row here is true for all of them. These values are deliberately
+  // CONSERVATIVE for the surface Deckent actually routes today (the zero-cost
+  // `:free` inventory probed by `openrouter-probe`); per-model truth lives in
+  // ModelRegistry, same contract as the `ollama` row above.
+  //   - vision/codeExecution false: `:free` text-only models are the routed
+  //     set; some OpenRouter models DO have vision — do not read this as a
+  //     platform limit.
+  //   - maxContextTokens 128k: the SMALLEST context in the probed `:free`
+  //     inventory, not the largest (nemotron-3-ultra is 1M). Conservative on
+  //     purpose so a capability gate never over-promises; the real per-model
+  //     window comes from the registry entry.
+  //   - cost 0: TRUE ONLY for `:free` ids. If a PAID OpenRouter model is ever
+  //     routed, this row becomes a lie and cost must come from the pricing
+  //     layer (cost-config / pricing-updater already fetch OpenRouter prices).
+  openrouter: {
+    streaming: true,
+    toolUse: true,
+    vision: false,
+    codeExecution: false,
+    maxContextTokens: 128_000,
+    costPerMillionTokens: { input: 0, output: 0 },
+  },
 };
 
 // ─── Valid provider names (for runtime validation) ──────────────────────────

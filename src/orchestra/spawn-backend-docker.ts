@@ -21,7 +21,8 @@ import { TASKS_DIR } from '../core/constants.js';
 import { DECK_FILE_NAME } from '../core/deck-file.js';
 import { debugLog } from '../core/utils.js';
 import { DeckentError } from '../core/errors.js';
-import { normalizeStreamEvent, writeLogEvent } from '../core/log-event.js';
+import { normalizeStreamEvent, writeLogEvent, type StreamLogEvent } from '../core/log-event.js';
+import { assertLiveUsageBudgetSupport, hasLiveUsageCeiling } from '../core/live-execution-budget.js';
 import {
   acquireSpawnLocks,
   releaseAllSpawnLocks,
@@ -37,6 +38,12 @@ import { getDefaultProviderName } from './sprint-utils.js';
 import { installGitGuard, buildDockerGitGuardArgs, buildGitGuardDir, CONTAINER_GIT_PATH } from './git-worker-guard.js';
 import { captureStreamToLog } from './spawn-backend-subprocess.js';
 import { makeActivityOnEvent, type ActivityTapContext } from '../agents/worker-activity.js';
+import { extractProviderBillingEvidence } from '../core/provider-billing-evidence.js';
+import {
+  createRuntimeBudgetMonitor,
+  readRuntimeBudgetStop,
+  resolveTaskExecutionBudget,
+} from './runtime-budget-monitor.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
@@ -49,6 +56,94 @@ const DEFAULT_GRACEFUL_TIMEOUT_SECONDS = 15;
 // (heartbeat-monitor.ts) derives `deckent-w-<taskId>` from the SAME constant the
 // backend uses to `docker run --name` / `docker wait` — no drifting duplicate.
 export const CONTAINER_PREFIX = 'deckent-w-';
+
+const PROVIDER_AUTH_FILES: Readonly<Record<string, readonly { file: string; required: boolean }[]>> = {
+  claude: [{ file: '.credentials.json', required: true }],
+  codex: [{ file: 'auth.json', required: true }],
+  gemini: [
+    { file: 'gemini-credentials.json', required: true },
+    { file: 'google_accounts.json', required: false },
+  ],
+};
+
+export interface ProviderAuthIsolation {
+  mountArgs: string[];
+  bootstrapLines: string[];
+  credentialCount: number;
+  missingRequiredFiles: string[];
+}
+
+export interface GeminiAuthSelectionBootstrap {
+  selectedType: string;
+  bootstrapLines: string[];
+}
+
+/**
+ * Copy only Gemini's selected auth mechanism into the private worker HOME.
+ * The full settings.json is intentionally not mounted because it may grow MCP,
+ * tool, plugin, trust, or IDE configuration unrelated to the worker task.
+ */
+export function buildGeminiAuthSelectionBootstrap(
+  home: string,
+  readText: (path: string) => string = (path) => readFileSync(path, 'utf-8'),
+): GeminiAuthSelectionBootstrap | null {
+  try {
+    const parsed = JSON.parse(readText(join(home, '.gemini', 'settings.json'))) as {
+      security?: { auth?: { selectedType?: unknown } };
+    };
+    const selectedType = parsed.security?.auth?.selectedType;
+    if (typeof selectedType !== 'string' || !/^[a-zA-Z0-9._-]{1,64}$/.test(selectedType)) return null;
+    const minimalSettings = JSON.stringify({ security: { auth: { selectedType } } });
+    return {
+      selectedType,
+      bootstrapLines: [
+        `printf '%s\\n' '${minimalSettings}' > "$HOME/.gemini/settings.json" || exit 78`,
+        'chmod 600 "$HOME/.gemini/settings.json" || exit 78',
+      ],
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Mount only provider credential files, never the host provider home. Full
+ * homes contain MCP servers, skills, plugins, transcripts, and global rules;
+ * mounting them made a scoped worker inherit a large unrelated context surface.
+ */
+export function buildProviderAuthIsolation(
+  home: string,
+  provider: string,
+  oauthHomeDir: string | undefined,
+  useApiOnly: boolean,
+  fileExists: (path: string) => boolean = existsSync,
+): ProviderAuthIsolation {
+  if (useApiOnly || !oauthHomeDir) {
+    return { mountArgs: [], bootstrapLines: [], credentialCount: 0, missingRequiredFiles: [] };
+  }
+  const mountArgs: string[] = [];
+  const bootstrapLines: string[] = [];
+  const missingRequiredFiles: string[] = [];
+  let credentialCount = 0;
+  for (const entry of PROVIDER_AUTH_FILES[provider] ?? []) {
+    const { file } = entry;
+    const hostPath = join(home, oauthHomeDir, file);
+    if (!fileExists(hostPath)) {
+      if (entry.required) missingRequiredFiles.push(file);
+      continue;
+    }
+    const source = `/run/deckent-auth-${provider}-${file.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const destination = `$HOME/${oauthHomeDir}/${file}`;
+    // `--mount` handles Windows drive-letter colons correctly; legacy `-v
+    // C:\\...:/target:ro` is ambiguous on native Windows Docker clients.
+    mountArgs.push('--mount', `type=bind,src=${hostPath},dst=${source},readonly`);
+    bootstrapLines.push(`mkdir -p "$HOME/${oauthHomeDir}" || exit 78`);
+    bootstrapLines.push(`cp "${source}" "${destination}" || exit 78`);
+    bootstrapLines.push(`chmod 600 "${destination}" || exit 78`);
+    credentialCount += 1;
+  }
+  return { mountArgs, bootstrapLines, credentialCount, missingRequiredFiles };
+}
 
 /**
  * born-468 (WRAPPER-HB-GATE): the in-container wrapper's own heartbeat tick
@@ -227,6 +322,56 @@ export function buildScopedDiffPathspec(scopeFilesWrite: readonly string[]): str
     .join(' ');
 }
 
+/** Delimiter between a path and its baseline hash in the scope-baseline manifest. */
+export const SCOPE_BASELINE_DELIM = '\t';
+
+/**
+ * 455-003 (TIMEOUT-BASELINE-TRUTH): capture a task-start CONTENT baseline for the
+ * scoped files so the container EXIT-trap can tell THIS worker's partial work
+ * apart from files that were ALREADY dirty when the task started — a previous
+ * task's leftover, an operator's local edit, or (the born-667b sibling case) a
+ * concurrent worker mid-edit whose changes leak through the shared bind-mount.
+ *
+ * born-667b narrowed the diff to `scope.filesWrite` (sibling isolation across
+ * DIFFERENT files); this closes the remaining hole: a file that IS in scope but
+ * was dirty BEFORE the worker started would still have produced a false
+ * TIMEOUT_WITH_WORK. The fix is a per-file content fingerprint captured at spawn.
+ *
+ * For each scoped entry that exists on disk at spawn, records
+ * `<path>\t<gitHashObject>` — the SAME `git hash-object` blob id the in-container
+ * trap recomputes at exit (git is present in both places; hash-object is
+ * read-only and NOT on the worker git-guard denylist). A file that does not yet
+ * exist is omitted (no entry ⇒ "created by the worker" at exit ⇒ counted as work,
+ * so genuine new task-local work stays recoverable).
+ *
+ * Never throws — a per-file failure just omits that file (fail-open ⇒ at worst
+ * that one file is counted, the pre-455-003 behavior). Exported for unit tests
+ * (real-git repo). Returns '' when nothing could be baselined (⇒ the trap falls
+ * through to its unfiltered legacy behavior).
+ */
+export function computeScopeBaselineManifest(dir: string, scopeFilesWrite: readonly string[]): string {
+  const lines: string[] = [];
+  for (const raw of scopeFilesWrite) {
+    const rel = typeof raw === 'string' ? raw.trim() : '';
+    if (!rel) continue;
+    let abs: string;
+    try { abs = resolve(dir, rel); } catch { continue; }
+    if (!existsSync(abs)) continue;
+    try {
+      const res = spawnSync('git', ['hash-object', '--', rel], {
+        cwd: dir, encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      const hash = (res.stdout ?? '').trim();
+      if (res.status === 0 && /^[0-9a-f]{40,64}$/.test(hash)) {
+        lines.push(`${rel}${SCOPE_BASELINE_DELIM}${hash}`);
+      }
+    } catch (e) {
+      debugLog('docker-backend:scope-baseline', e);
+    }
+  }
+  return lines.length ? lines.join('\n') + '\n' : '';
+}
+
 /**
  * Build the container EXIT-trap shell function (`on_exit`). Extracted from the
  * inline `spawn()` body so it is unit-testable. Behavior:
@@ -275,6 +420,9 @@ export function buildOnExitTrap(taskId: string, model: string, scopeFilesWrite?:
     // every path) — prefer CLAUDE_EXIT captured right after the worker command,
     // so TIMEOUT_WITH_WORK and signal_info see the REAL worker exit code.
     '  local exit_code=${CLAUDE_EXIT:-$?}',
+    // 455-003: default BASEFILE so an unset var never errors (2-arg legacy trap
+    // and any caller that does not export a scope-baseline manifest).
+    '  BASEFILE="${BASEFILE:-}"',
     // If .result already exists (worker wrote it normally), just fsync and exit
     '  if [ -f "$RFILE" ]; then',
     '    fsync_file "$RFILE"',
@@ -306,6 +454,30 @@ export function buildOnExitTrap(taskId: string, model: string, scopeFilesWrite?:
     // honest when a worker produced only new files before dying.
     // born-667b: scoped to scope.filesWrite when provided — see buildScopedDiffPathspec.
     changedFilesLine,
+    // 455-003 (TIMEOUT-BASELINE-TRUTH): subtract files whose CURRENT content is
+    // byte-identical to the task-start baseline (BASEFILE manifest, computed by
+    // computeScopeBaselineManifest at spawn). A scoped file that was ALREADY dirty
+    // when the worker started — a previous task's leftover, an operator's local
+    // edit, or a sibling worker's leak through the shared bind-mount — is NOT this
+    // worker's partial work and must never produce a false TIMEOUT_WITH_WORK. A
+    // file whose hash CHANGED since baseline (further edited) or that has no
+    // baseline entry (newly created) is kept, so genuine task-local work stays
+    // recoverable. No BASEFILE (2-arg legacy / no manifest) ⇒ unfiltered, exactly
+    // as before this task. `git hash-object` is read-only + not git-guard-denied.
+    '  if [ -n "$BASEFILE" ] && [ -f "$BASEFILE" ] && [ -n "$changed_files" ]; then',
+    '    baseline_filtered=""',
+    '    while IFS= read -r bf; do',
+    '      [ -z "$bf" ] && continue',
+    '      bf_cur=$(git hash-object "$bf" 2>/dev/null || echo __MISSING__)',
+    '      bf_base=$(awk -F "\\t" -v p="$bf" \'$1==p{print $2; exit}\' "$BASEFILE" 2>/dev/null || true)',
+    '      if [ -n "$bf_base" ] && [ "$bf_base" = "$bf_cur" ]; then continue; fi',
+    '      baseline_filtered="$baseline_filtered$bf',
+    '"',
+    '    done <<BASEEOF',
+    '$changed_files',
+    'BASEEOF',
+    '    changed_files=$(printf \'%s\' "$baseline_filtered" | sed \'/^$/d\')',
+    '  fi',
     '  if [ -n "$changed_files" ] && [ "$exit_code" -ne 0 ]; then',
     // Build JSON array from changed files using pure POSIX sh (no jq dependency)
     '    local json_array="["',
@@ -342,7 +514,12 @@ export function buildOnExitTrap(taskId: string, model: string, scopeFilesWrite?:
     '    [ -n "$changed_files" ] && work_present=true',
     '    local diff_stat=""',
     // born-667b: scoped to scope.filesWrite when provided — see buildScopedDiffPathspec.
+    // 455-003: gate the shortstat on the (baseline-filtered) changed_files so a
+    // pre-existing-dirty file removed by the baseline filter can never leak back
+    // into diffStat while workPresent is already false.
+    '    if [ -n "$changed_files" ]; then',
     diffStatLine,
+    '    fi',
     '    local hb_status="unknown"',
     '    local hb_seq=0',
     '    if [ -f "$HBFILE" ]; then',
@@ -385,9 +562,139 @@ export const DOCKER_ERROR_CODES = {
   PORT_COLLISION: 'DECKENT_E082',
   RESOURCE_LIMIT: 'DECKENT_E083',
   UNKNOWN: 'DECKENT_E084',
+  // 455-003 (DOCKER-PREFLIGHT-TRUTH): distinct pre-spawn failure classes. These
+  // MUST never collapse into IMAGE_NOT_FOUND — a down/forbidden daemon or an
+  // absent docker binary is a fundamentally different operator remedy than a
+  // missing image, and reporting one as the other sends the operator to the
+  // wrong fix (rebuild an image when the real problem is `sudo`/`dockerd`).
+  DAEMON_UNAVAILABLE: 'DECKENT_E085', // docker CLI present, daemon not reachable (socket down / dockerd stopped)
+  DAEMON_PERMISSION: 'DECKENT_E086', // docker CLI present, daemon reachable, but the socket is permission-denied
+  DOCKER_ABSENT: 'DECKENT_E087',     // docker binary itself is not on PATH (spawn ENOENT / status 127)
+  IMAGE_CLI_MISSING: 'DECKENT_E088', // image present, but the provider's CLI binary was not baked into it
 } as const;
 
 export type DockerErrorCode = (typeof DOCKER_ERROR_CODES)[keyof typeof DOCKER_ERROR_CODES];
+
+/** Distinct pre-spawn Docker failure classes (455-003). */
+export type DockerPreflightCode =
+  | typeof DOCKER_ERROR_CODES.DOCKER_ABSENT
+  | typeof DOCKER_ERROR_CODES.DAEMON_PERMISSION
+  | typeof DOCKER_ERROR_CODES.DAEMON_UNAVAILABLE;
+
+/** Structured verdict of a Docker daemon preflight probe. `null` ⇒ daemon healthy. */
+export interface DockerPreflightFailure {
+  code: DockerPreflightCode;
+  message: string;
+  /** Raw probe evidence (trimmed stderr / spawn-error text) that justified the code. */
+  evidence: string;
+}
+
+/**
+ * 455-003 (DOCKER-PREFLIGHT-TRUTH): classify the result of a `docker info` (or
+ * `docker images`) probe into a DISTINCT daemon/permission/absent failure — or
+ * `null` when the daemon is healthy. Pure function — exported for unit tests.
+ *
+ * Separation of concerns vs {@link classifyDockerError}: that classifier reasons
+ * about a container that already tried to start (image-missing, port-collision,
+ * resource-limit). THIS classifier reasons about whether we can talk to the
+ * Docker daemon AT ALL, before any image lookup — so a permission-denied socket
+ * or a stopped daemon is never mis-reported as "image not ready".
+ *
+ * Discrimination (matched against real docker CLI phrasing):
+ *  - DOCKER_ABSENT      — the spawn itself failed (ENOENT) or exited 127: the
+ *    `docker` binary is not installed / not on PATH.
+ *  - DAEMON_PERMISSION  — "permission denied" while dialing the socket
+ *    (`dial unix /var/run/docker.sock: connect: permission denied`,
+ *    `Got permission denied while trying to connect to the Docker daemon socket`).
+ *  - DAEMON_UNAVAILABLE — daemon unreachable for any other reason
+ *    ("Cannot connect to the Docker daemon", "Is the docker daemon running?").
+ *
+ * A permission-denied string is checked BEFORE the generic can't-connect string
+ * because docker emits BOTH together ("...connect: permission denied. ... Is the
+ * docker daemon running?") and permission is the more actionable, specific cause.
+ */
+export function classifyDockerPreflight(probe: {
+  status: number | null;
+  stderr: string | null | undefined;
+  spawnError?: Error | { code?: string } | null;
+}): DockerPreflightFailure | null {
+  const stderr = (probe.stderr ?? '').trim();
+  const s = stderr.toLowerCase();
+
+  // 1) docker binary absent — the spawn never reached a daemon at all.
+  const spawnErrCode = (probe.spawnError as { code?: string } | undefined)?.code;
+  if (
+    probe.spawnError != null ||
+    spawnErrCode === 'ENOENT' ||
+    probe.status === 127 ||
+    s.includes('command not found') ||
+    s.includes('executable file not found') ||
+    s.includes('no such file or directory')
+  ) {
+    return {
+      code: DOCKER_ERROR_CODES.DOCKER_ABSENT,
+      message: `${DOCKER_ERROR_CODES.DOCKER_ABSENT}: docker binary not found on PATH (install Docker / add it to PATH)`,
+      evidence: stderr || spawnErrCode || 'spawn failed (ENOENT)',
+    };
+  }
+
+  // Daemon healthy — nothing to report (status 0 with no error).
+  if (probe.status === 0) return null;
+
+  // 2) permission denied on the docker socket (checked before generic connect).
+  if (
+    s.includes('permission denied') ||
+    s.includes('got permission denied') ||
+    s.includes('dial unix') && s.includes('connect: permission denied')
+  ) {
+    return {
+      code: DOCKER_ERROR_CODES.DAEMON_PERMISSION,
+      message: `${DOCKER_ERROR_CODES.DAEMON_PERMISSION}: permission denied talking to the Docker daemon socket (add the user to the docker group or run with sufficient privileges)`,
+      evidence: stderr,
+    };
+  }
+
+  // 3) daemon unreachable / not running.
+  if (
+    s.includes('cannot connect to the docker daemon') ||
+    s.includes('is the docker daemon running') ||
+    s.includes('docker daemon is not running') ||
+    s.includes('error during connect')
+  ) {
+    return {
+      code: DOCKER_ERROR_CODES.DAEMON_UNAVAILABLE,
+      message: `${DOCKER_ERROR_CODES.DAEMON_UNAVAILABLE}: cannot connect to the Docker daemon (is dockerd running?)`,
+      evidence: stderr,
+    };
+  }
+
+  // Non-zero status with an unrecognized reason: still a daemon-unavailable class
+  // (we could not confirm a healthy daemon) — honest fail, never image-missing.
+  return {
+    code: DOCKER_ERROR_CODES.DAEMON_UNAVAILABLE,
+    message: `${DOCKER_ERROR_CODES.DAEMON_UNAVAILABLE}: docker daemon probe failed (status=${probe.status ?? 'null'})`,
+    evidence: stderr || `status=${probe.status ?? 'null'}`,
+  };
+}
+
+/**
+ * 455-003: run the `docker info` daemon preflight synchronously and classify it.
+ * Returns `null` when the daemon is healthy. Kept as a thin seam (spawnSync +
+ * {@link classifyDockerPreflight}) so the pure classifier stays unit-testable
+ * without a real docker. Exported for the backend's own use + tests.
+ */
+export function probeDockerDaemon(): DockerPreflightFailure | null {
+  const probe = spawnSync('docker', ['info'], {
+    encoding: 'utf-8',
+    timeout: 5_000,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  return classifyDockerPreflight({
+    status: probe.status,
+    stderr: probe.stderr,
+    spawnError: probe.error ?? null,
+  });
+}
 
 // Sprint 194 T-004 (W-M M-2): tell V8 inside the worker container to size its
 // max old-space heap as a percentage of the container's memory cgroup, rather
@@ -443,12 +750,16 @@ export function patchResultUsageFromEnvelope(
     if (!existsSync(resultPath)) return;
     const r = JSON.parse(readFileSync(resultPath, 'utf-8')) as {
       tokenUsage?: { provider?: string; model?: string };
+      providerBilling?: unknown;
     };
     r.tokenUsage = {
       ...usage,
       provider: usage.provider ?? r.tokenUsage?.provider,
       model: r.tokenUsage?.model ?? usage.model ?? model,
     };
+    const provider = getProviderBinaryForModel(model);
+    const billing = extractProviderBillingEvidence(provider, logContent);
+    if (billing) r.providerBilling = billing;
     writeFileSync(resultPath, JSON.stringify(r, null, 2), 'utf-8');
   } catch (e) {
     debugLog('docker-backend:usage-patch', e);
@@ -643,6 +954,24 @@ export function getProviderBinaryForModel(model: ModelType): string {
     debugLog('docker-backend:ollama-misroute', warning);
     return 'claude';
   }
+  if (provider === 'openrouter') {
+    // OPENROUTER-PROVIDER (row 477): same honest-fail contract as the ollama branch
+    // above — `isAdapterProvider('openrouter')` is true, so reaching this function
+    // means host-adapter routing was missed. The container has no path to the
+    // `.deck`-resolved OpenRouter credential, so a "fallback" here is not a degraded
+    // OpenRouter run — it is a CLAUDE run wearing an OpenRouter label. Warn loudly
+    // rather than let that pass as an openrouter result.
+    // (In practice the ProviderCommandSpec guard rejects earlier and louder; this is
+    // defense-in-depth so the two providers behave symmetrically.)
+    const warning = `[deckent:spawn-backend-docker] OpenRouter provider routed to Docker backend for model "${model}" — `
+      + 'host adapter routing missed this task (sprint-spawner.ts isAdapterProvider). '
+      + 'Falling back to "claude" CLI to avoid mid-sprint crash, but the spawn is INCORRECT. '
+      + 'Investigate: providerRegistry must have an OpenRouterProvider registered '
+      + '(config.openrouter.enabled + $DECK:OPENROUTER_API_KEY) and isAdapterProvider(\'openrouter\') must return true.';
+    console.warn(warning);
+    debugLog('docker-backend:openrouter-misroute', warning);
+    return 'claude';
+  }
   return 'claude';
 }
 
@@ -670,8 +999,9 @@ export function followContainerActivity(
   provider: string,
   ctx: ActivityTapContext,
   spawnFn: FollowSpawnFn = nodeSpawn,
+  eventTap?: (event: StreamLogEvent) => void,
 ): () => void {
-  if (!ctx.enabled) return () => { /* flag off — no follow */ };
+  if (!ctx.enabled && !eventTap) return () => { /* no observer needs the stream */ };
   let child: ReturnType<FollowSpawnFn> | undefined;
   try {
     child = spawnFn('docker', ['logs', '-f', containerName], { stdio: ['ignore', 'pipe', 'ignore'] });
@@ -680,11 +1010,15 @@ export function followContainerActivity(
   }
   child.once('error', () => { /* never let a follow error escape */ });
   if (child.stdout) {
+    const activityTap = ctx.enabled ? makeActivityOnEvent(ctx) : undefined;
     void captureStreamToLog(child.stdout, {
       logPath: '', // unused: writeLog:false skips the .log append (post-exit writer is authoritative)
       provider,
       writeLog: false,
-      onEvent: makeActivityOnEvent(ctx),
+      onEvent: (event) => {
+        activityTap?.(event);
+        eventTap?.(event);
+      },
     }).catch(() => { /* fail-soft: capture errors never break the worker */ });
   }
   return () => { try { child?.kill(); } catch { /* already exited */ } };
@@ -1394,6 +1728,23 @@ export class DockerSpawnBackend implements SpawnBackend {
     // it while tmux/subprocess enforced it: a lethal actionId could spawn here.
     checkLethalGuard(opts?.actionId, this.name);
     const dir = opts?.projectDir ?? this.projectDir;
+    const executionBudget = resolveTaskExecutionBudget(dir, taskId, opts?.executionBudget);
+    if (typeof executionBudget?.maxUsd === 'number') {
+      assertLiveUsageBudgetSupport(executionBudget, undefined, this.name);
+    }
+    if (hasLiveUsageCeiling(executionBudget)) {
+      const provider = getProviderForModel(model);
+      const spec = getProviderCommandSpec(provider);
+      if (spec?.liveUsage !== 'incremental') {
+        throw new SpawnBackendError(
+          `Docker provider "${provider}" does not expose incremental measured usage; live execution budget cannot be enforced. Spawn blocked before provider work.`,
+          this.name,
+        );
+      }
+    }
+    const resolvedOpts = executionBudget === opts?.executionBudget
+      ? opts
+      : { ...opts, executionBudget };
     // Adaptive timeout: prefer per-task override from brainEstimateTimeout(),
     // fall back to constructor value, then DEFAULT_TIMEOUT_SECONDS
     const effectiveTimeout = opts?.taskTimeoutSeconds ?? this.timeoutSeconds;
@@ -1419,7 +1770,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     // the file scope for the next worker. monitorContainer's exit handler
     // is what releases on the happy path.
     try {
-      this.runSpawn(taskId, model, prompt, opts, dir, effectiveTimeout, tasksDir);
+      this.runSpawn(taskId, model, prompt, resolvedOpts, dir, effectiveTimeout, tasksDir);
     } catch (err) {
       clearPending(taskId);
       try { releaseAllSpawnLocks(dir, taskId); } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
@@ -1442,18 +1793,52 @@ export class DockerSpawnBackend implements SpawnBackend {
     // is the lean default. (Re-used downstream for the ProviderCommandSpec lookup.)
     const provider = modelRegistry.get(model)?.provider ?? getDefaultProviderName();
 
+    // 455-003 (DOCKER-PREFLIGHT-TRUTH): daemon preflight BEFORE the image lookup.
+    // A stopped/forbidden daemon (or an absent docker binary) makes `docker images
+    // -q` return empty stdout too — the pre-455-003 code then threw the SAME
+    // "image not ready" error, mis-reporting a daemon/permission problem as a
+    // missing image and sending the operator to rebuild an image that was never
+    // the issue. Classify the daemon reachability first so daemon-permission /
+    // daemon-unavailable / docker-absent surface as their OWN distinct codes with
+    // evidence, never collapsed into IMAGE_NOT_FOUND.
+    const daemonPreflight = probeDockerDaemon();
+    if (daemonPreflight) {
+      throw new SpawnBackendError(
+        `${daemonPreflight.message} (task ${taskId}, provider '${provider}', evidence: ${daemonPreflight.evidence})`,
+        'docker',
+      );
+    }
+
     // Guard: verify Docker image exists before attempting spawn.
     const imageCheck = spawnSync('docker', ['images', '-q', this.image], {
       encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
     });
+    // Defensive re-check: if the image query ITSELF reports a daemon/permission/
+    // absent failure (the daemon could drop between the preflight and here), honor
+    // that distinct classification rather than falling through to image-missing.
+    if (imageCheck.error || (imageCheck.status !== null && imageCheck.status !== 0)) {
+      const pf = classifyDockerPreflight({
+        status: imageCheck.status,
+        stderr: imageCheck.stderr,
+        spawnError: imageCheck.error ?? null,
+      });
+      if (pf) {
+        throw new SpawnBackendError(
+          `${pf.message} (task ${taskId}, provider '${provider}', evidence: ${pf.evidence})`,
+          'docker',
+        );
+      }
+    }
     if (!imageCheck.stdout?.trim()) {
-      // Provider-aware honest-fail: a codex/gemini worker whose CLI is not in the
-      // image must receive its OWN build-arg rebuild command — never a silent
-      // claude fallback that would run the wrong CLI (Yasa #2 + the ADR-076
-      // auth-precedence lesson). claude → lean default image (no build-arg).
+      // Distinct IMAGE-MISSING failure (daemon already confirmed healthy above):
+      // the image TAG does not exist locally — a genuinely different remedy than a
+      // missing provider-CLI (E088 below) or an unreachable daemon (E085/E086).
+      // Provider-aware rebuild command: codex/gemini need their build-arg, claude
+      // is the lean default image (Yasa #2 + the ADR-076 auth-precedence lesson).
       throw new SpawnBackendError(
-        `Docker image '${this.image}' not ready for provider '${provider}' — `
-        + `the requested provider's CLI is not in the image. `
+        `${DOCKER_ERROR_CODES.IMAGE_NOT_FOUND}: Docker image '${this.image}' not found locally for provider '${provider}' `
+        + `(task ${taskId}) — the image tag does not exist on this host. This is an IMAGE-MISSING failure, `
+        + `distinct from an unreachable daemon or a missing provider CLI. `
         + `Build it with: ${workerImageBuildCmdForProvider(this.image, provider)}`,
         'docker',
       );
@@ -1533,8 +1918,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       && !probeProviderCliPresentInImage(this.image, providerBinary)
     ) {
       throw new SpawnBackendError(
-        `Docker image '${this.image}' does not have the '${providerBinary}' CLI installed for provider `
-        + `'${provider}' (task ${taskId}) — the image exists but was built without it. `
+        `${DOCKER_ERROR_CODES.IMAGE_CLI_MISSING}: Docker image '${this.image}' does not have the '${providerBinary}' CLI `
+        + `installed for provider '${provider}' (task ${taskId}) — the image EXISTS but was built without it. `
+        + `This is a CLI-MISSING failure, distinct from a missing image or an unreachable daemon. `
         + `Rebuild with: ${workerImageBuildCmdForProvider(this.image, provider)} `
         + `— or route this task to the subprocess backend instead by adding `
         + `\`- Backend: subprocess\` to its directive.`,
@@ -1623,6 +2009,61 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Claude CLI needs a writable HOME for config + cache.
     const containerHome = '/tmp/deckent-home';
 
+    // Per-task auth mode override (Sprint 193+). Subscription workers receive
+    // only credential files; global provider homes/settings/MCP/skills never
+    // enter the container.
+    const taskAuthMode = this.readTaskAuthMode(dir, taskId);
+    const useApiOnly = taskAuthMode === 'api';
+    // OPENROUTER-PROVIDER (row 477): `BASE_PROVIDER_CREDENTIAL_ENV` intentionally
+    // does NOT cover every ProviderName — it is the ADR-076 cross-leak/scrub map of
+    // providers whose credential travels through `process.env`. `ollama` (local, no
+    // key) and `openrouter` are both absent BY DESIGN: OpenRouter's key is read from
+    // `.deck` host-side and injected only into its own spawned child's env, never
+    // into this process's `process.env` (`applyDeckSecretsToEnv` has no OpenRouter
+    // branch), so there is nothing here to leak or scrub. Adding an entry to satisfy
+    // the compiler would encode a credential path that does not exist. The lookup is
+    // typed as possibly-absent instead; the `!providerCredentialEnv` guard below
+    // already handles that case and is the pre-existing behavior for `ollama`.
+    const providerCredentialEnv: string | undefined =
+      (BASE_PROVIDER_CREDENTIAL_ENV as Record<string, string | undefined>)[provider];
+    if (useApiOnly && (!providerCredentialEnv || !process.env[providerCredentialEnv])) {
+      throw new SpawnBackendError(
+        `Task ${taskId} declares "Auth: api" but ${providerCredentialEnv ?? 'the provider credential env'} ` +
+        `for ${providerBinary} is not set. ` +
+        `Either set the env var or change the task to "Auth: subscription".`,
+        'docker',
+      );
+    }
+    const providerAuth = buildProviderAuthIsolation(
+      home,
+      providerBinary,
+      // `ProviderCommandSpec.oauthHomeDir` is `string | null` (null = provider has
+      // no host OAuth home to isolate — true for key-only providers); the helper
+      // takes `string | undefined`. Both spell "nothing to mount", so normalize.
+      // Surfaced by the row-477 ProviderName widening, but pre-existing.
+      spec.oauthHomeDir ?? undefined,
+      useApiOnly,
+    );
+    if (!useApiOnly && spec.oauthHomeDir && providerAuth.missingRequiredFiles.length > 0) {
+      throw new SpawnBackendError(
+        `Required isolated ${providerBinary} credential file(s) are unavailable for task ${taskId}: ` +
+        `${providerAuth.missingRequiredFiles.join(', ')}. ` +
+        `refusing to mount the full host provider home.`,
+        'docker',
+      );
+    }
+    if (!useApiOnly && providerBinary === 'gemini') {
+      const geminiAuthSelection = buildGeminiAuthSelectionBootstrap(home);
+      if (!geminiAuthSelection) {
+        throw new SpawnBackendError(
+          `Gemini subscription auth selection is unavailable for task ${taskId}; ` +
+          `refusing to mount the full host provider settings.`,
+          'docker',
+        );
+      }
+      providerAuth.bootstrapLines.push(...geminiAuthSelection.bootstrapLines);
+    }
+
     // Write worker script to .tasks/ — avoids shell quoting issues with allowedTools parentheses
     const scriptFileName = `.worker-${taskId}.sh`;
     const scriptHostPath = join(tasksDir, scriptFileName);
@@ -1640,7 +2081,14 @@ export class DockerSpawnBackend implements SpawnBackend {
     // work-present signal to THIS task's own scope.filesWrite — see
     // buildOnExitTrap's doc comment for why an unfiltered diff false-positives
     // on concurrent sibling workers (TT550 phantom-vakası).
-    const onExitFn = buildOnExitTrap(taskId, model, this.readTaskFilesWrite(dir, taskId));
+    const scopeFilesWrite = this.readTaskFilesWrite(dir, taskId);
+    const onExitFn = buildOnExitTrap(taskId, model, scopeFilesWrite);
+
+    // 455-003 (TIMEOUT-BASELINE-TRUTH): the container path of the task-start
+    // content baseline manifest (written host-side below, before `docker run`).
+    // buildOnExitTrap reads $BASEFILE to subtract pre-existing / sibling dirt from
+    // the TIMEOUT_WITH_WORK / workPresent signal.
+    const baselineContainerPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.scope-baseline`;
 
     // Sprint 151: .partial-result path — intermediate checkpoint for OOM kill recovery
     const partialResultPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.partial-result`;
@@ -1652,6 +2100,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       `RFILE="${resultPath}"`,
       `HBFILE="${hbContainerPath}"`,
       `PRFILE="${partialResultPath}"`,
+      `BASEFILE="${baselineContainerPath}"`,
       // POSIX-portable fsync: copy file to itself via dd conv=fsync
       // This forces OS buffer cache → disk. Survives SIGKILL after return.
       'fsync_file() { [ -f "$1" ] && dd if="$1" of="$1.fsync" bs=4096 conv=fsync 2>/dev/null && mv "$1.fsync" "$1" 2>/dev/null; }',
@@ -1660,6 +2109,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       // Ensure session-env exists (Claude CLI requires it)
       `mkdir -p "${containerHome}/.claude" 2>/dev/null || true`,
       `touch "${containerHome}/.claude/session-env" 2>/dev/null || true`,
+      ...providerAuth.bootstrapLines,
       // Sprint 151: Write .partial-result BEFORE Claude CLI starts — OOM kill safety net.
       // If container is SIGKILL'd (OOM), this file survives on the shared volume.
       // Host-side monitorContainer promotes it to .result with NO_GO_PARTIAL assessment.
@@ -1706,25 +2156,11 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     const containerName = `${CONTAINER_PREFIX}${taskId}`;
 
-    // Per-task auth mode override (Sprint 193+: feedback_container_auth_precedence wire).
-    // task.authMode === 'api' → skip ~/.claude mount, REQUIRE ANTHROPIC_API_KEY in env.
-    // Anything else (undefined/'subscription') → default subscription behavior.
-    const taskAuthMode = this.readTaskAuthMode(dir, taskId);
-    const useApiOnly = taskAuthMode === 'api';
-
     // F1-LIM faz-2a (Sprint 272): kind-based memory limit — opt-in override.
     // Falls back to constructor memoryLimit/memorySwap when kind not configured.
     const kindLimits = this.resolveKindMemoryLimits(dir, taskId);
     const effectiveMemory = kindLimits?.memory ?? this.memoryLimit;
     const effectiveSwap = kindLimits?.swap ?? this.memorySwap;
-    if (useApiOnly && !process.env.ANTHROPIC_API_KEY) {
-      throw new SpawnBackendError(
-        `Task ${taskId} declares "Auth: api" but ANTHROPIC_API_KEY is not set in env. ` +
-        `Either set the env var or change the task to "Auth: subscription".`,
-        'docker',
-      );
-    }
-
     // DECK-WORKER-ISOLATION (ADR-G-005): hide the project's `.deck` secret file
     // from the worker. The project root is bind-mounted read-write at /workspace,
     // so `.deck` would otherwise be worker-readable. Overlay an empty read-only
@@ -1773,21 +2209,10 @@ export class DockerSpawnBackend implements SpawnBackend {
       '-v', `${tasksDir}:${CONTAINER_WORKSPACE}/${TASKS_DIR}`,
       // .locks/ mounted read-write (file locking)
       '-v', `${join(dir, '.locks')}:${CONTAINER_WORKSPACE}/.locks`,
-      // PSL-1/P2 (Sprint 252): provider-aware OAuth/session mount. Each provider's
-      // host session dir (claude `.claude`, codex `.codex`, gemini `.gemini` from
-      // spec.oauthHomeDir) mounts into the container so the CLI authenticates via
-      // its host OAuth/subscription session — this is what lets codex/gemini run
-      // LIVE in docker, not just claude. Skipped in api-only mode (env key instead)
-      // or when the host dir does not exist. (Was: claude-only mount.)
-      ...(useApiOnly || !spec.oauthHomeDir
-        ? []
-        : [
-            '-v', `${join(home, spec.oauthHomeDir)}:${containerHome}/${spec.oauthHomeDir}`,
-            // claude additionally keeps a top-level ~/.claude.json config file
-            ...(spec.oauthHomeDir === '.claude' && existsSync(join(home, '.claude.json'))
-              ? ['-v', `${join(home, '.claude.json')}:${containerHome}/.claude.json`]
-              : []),
-          ]),
+      // Auth-only isolation: never mount the complete host provider home. The
+      // worker script copies read-only credential mounts into its private tmpfs
+      // HOME before invoking the provider CLI.
+      ...providerAuth.mountArgs,
       // Working directory
       '-w', CONTAINER_WORKSPACE,
     ];
@@ -1831,7 +2256,10 @@ export class DockerSpawnBackend implements SpawnBackend {
     //   Tier-1 timeout → the exact mass-synthetic-NO_GO that killed Sprint 213
     //   (ADR-076). Forward it ONLY in api mode (useApiOnly; the throw above already
     //   requires the key to be present for that branch).
-    // - codex → OPENAI_API_KEY only; gemini → GOOGLE_API_KEY only. The previous
+    // - codex API mode → OPENAI_API_KEY only; gemini API mode → GOOGLE_API_KEY
+    //   only. Subscription mode uses the isolated OAuth credential files above
+    //   and MUST NOT inherit an API key that changes billing/auth precedence.
+    //   The previous
     //   blanket `providerBinary !== 'claude'` guard forwarded BOTH OPENAI and
     //   GOOGLE to ANY non-claude worker, so a codex worker leaked GOOGLE_API_KEY
     //   and a gemini worker leaked OPENAI_API_KEY whenever a dev had several
@@ -1847,8 +2275,8 @@ export class DockerSpawnBackend implements SpawnBackend {
     // the shared BASE_PROVIDER_CREDENTIAL_ENV map (providers/cross-provider-keys.ts)
     // — the SAME single source of truth the subprocess backend's scrub set derives
     // from, so the two allowlists can never drift. Behaviour is byte-for-byte the
-    // prior explicit literals: claude forwards ANTHROPIC_API_KEY ONLY in api mode
-    // (ADR-076), codex forwards OPENAI_API_KEY only, gemini GOOGLE_API_KEY only.
+    // prior explicit literals while applying the auth-mode gate uniformly:
+    // claude/codex/gemini forward their own credential env ONLY in api mode.
     const claudeKeyEnv = BASE_PROVIDER_CREDENTIAL_ENV.claude;
     const codexKeyEnv = BASE_PROVIDER_CREDENTIAL_ENV.codex;
     const geminiKeyEnv = BASE_PROVIDER_CREDENTIAL_ENV.gemini;
@@ -1856,9 +2284,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       if (useApiOnly && process.env[claudeKeyEnv]) {
         dockerArgs.push('-e', `${claudeKeyEnv}=${process.env[claudeKeyEnv]}`);
       }
-    } else if (providerBinary === 'codex' && process.env[codexKeyEnv]) {
+    } else if (providerBinary === 'codex' && useApiOnly && process.env[codexKeyEnv]) {
       dockerArgs.push('-e', `${codexKeyEnv}=${process.env[codexKeyEnv]}`);
-    } else if (providerBinary === 'gemini' && process.env[geminiKeyEnv]) {
+    } else if (providerBinary === 'gemini' && useApiOnly && process.env[geminiKeyEnv]) {
       dockerArgs.push('-e', `${geminiKeyEnv}=${process.env[geminiKeyEnv]}`);
     }
     if (process.env.DECKENT_DEBUG) {
@@ -1875,6 +2303,20 @@ export class DockerSpawnBackend implements SpawnBackend {
     // right moment (this is the last host-side checkpoint before the container gains write
     // access to the mounted project root).
     const distFingerprintBefore = computeDistFingerprint(join(dir, 'dist'));
+
+    // 455-003 (TIMEOUT-BASELINE-TRUTH): capture the task-start CONTENT baseline of
+    // this task's scoped files — SAME host-side checkpoint as the dist snapshot,
+    // the last moment before the container can write to the shared bind-mount. The
+    // in-container EXIT-trap reads it via $BASEFILE to subtract pre-existing /
+    // sibling dirt from the TIMEOUT_WITH_WORK / workPresent signal. Fail-soft: a
+    // write error only loses the baseline (trap degrades to its unfiltered legacy
+    // behavior), never blocks the spawn.
+    try {
+      const baselineManifest = computeScopeBaselineManifest(dir, scopeFilesWrite);
+      writeFileSync(join(tasksDir, `task-${taskId}.scope-baseline`), baselineManifest, 'utf-8');
+    } catch (e) {
+      debugLog('docker-backend:scope-baseline-write', e);
+    }
 
     // Sprint 163 T-002: retry spawn with health check.
     // Each attempt: docker run + 3s wait + docker inspect. If inspect reports
@@ -1944,7 +2386,16 @@ export class DockerSpawnBackend implements SpawnBackend {
     };
 
     // Set up container monitoring (async, fire-and-forget)
-    this.monitorContainer(taskId, containerName, tasksDir, model, dir, distFingerprintBefore, liveCtx);
+    this.monitorContainer(
+      taskId,
+      containerName,
+      tasksDir,
+      model,
+      dir,
+      distFingerprintBefore,
+      liveCtx,
+      opts?.executionBudget,
+    );
   }
 
   /**
@@ -2107,6 +2558,26 @@ export class DockerSpawnBackend implements SpawnBackend {
     if (ms <= 0) return;
     const seconds = (ms / 1000).toFixed(3);
     spawnSync('sleep', [seconds], { timeout: ms + 2_000 });
+  }
+
+  /**
+   * Stop for a budget breach without removing the container or releasing locks.
+   * `monitorContainer` exclusively owns final log capture, evidence settlement,
+   * removal and lock release after `docker wait` observes the exit.
+   */
+  private stopContainerForBudget(taskId: string): void {
+    const containerName = `${CONTAINER_PREFIX}${taskId}`;
+    const grace = this.gracefulTimeoutSeconds;
+    const stopped = spawnSync('docker', ['stop', `--time=${grace}`, containerName], {
+      encoding: 'utf-8',
+      timeout: (grace + 5) * 1000,
+    });
+    if (stopped.status !== 0) {
+      spawnSync('docker', ['kill', '--signal=SIGTERM', containerName], {
+        encoding: 'utf-8',
+        timeout: 10_000,
+      });
+    }
   }
 
   /**
@@ -2371,6 +2842,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     projectDir: string,
     distFingerprintBefore: DistFingerprint | null,
     liveCtx?: ActivityTapContext,
+    executionBudget?: import('../core/work-model.js').ExecutionBudget,
   ): void {
     const child = nodeSpawn('docker', ['wait', containerName], {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -2378,8 +2850,25 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     // SURF-3 S3 — start the live activity follow WHILE the container runs
     // (a no-op when live_trace is off); stop it once the container exits below.
+    const budgetMonitor = createRuntimeBudgetMonitor({
+      projectRoot: projectDir,
+      taskId,
+      backend: this.name,
+      budget: executionBudget,
+      onStop: () => {
+        queueMicrotask(() => {
+          try { this.stopContainerForBudget(taskId); } catch (e) { debugLog('docker-backend:budget-stop', e); }
+        });
+      },
+    });
     const stopFollow = liveCtx
-      ? followContainerActivity(containerName, getProviderBinaryForModel(model), liveCtx)
+      ? followContainerActivity(
+          containerName,
+          getProviderBinaryForModel(model),
+          liveCtx,
+          nodeSpawn,
+          budgetMonitor ? event => budgetMonitor.observe(event) : undefined,
+        )
       : (): void => { /* no ctx — no follow */ };
 
     child.stdout?.on('data', async (data: Buffer) => {
@@ -2410,7 +2899,10 @@ export class DockerSpawnBackend implements SpawnBackend {
             const raw = readFileSync(resultPath, 'utf-8');
             // safe: result files written by writeResult with TaskResult shape
             const result = JSON.parse(raw) as { selfAssessment?: string };
-            if (result.selfAssessment === 'DONE' || result.selfAssessment === 'GO_WITH_TECH_DEBT') {
+            if (
+              !readRuntimeBudgetStop(projectDir, taskId)
+              && (result.selfAssessment === 'DONE' || result.selfAssessment === 'GO_WITH_TECH_DEBT')
+            ) {
               hbStatus = 'DONE';
               hbExitCode = 0;
               debugLog('docker-backend:reconcile', `taskId=${taskId} exitCode=${exitCode} but .result=${result.selfAssessment} → HB DONE`);
@@ -2571,6 +3063,12 @@ export class DockerSpawnBackend implements SpawnBackend {
           // of the previous raw dump, which those readers always saw as zero
           // events (no `ts`/`seq`/`content` LogEvent shape on a raw CLI line).
           const logProviderBinary = getProviderBinaryForModel(model);
+          if (budgetMonitor) {
+            for (const line of logContent.split(/\r?\n/)) {
+              if (!line.trim()) continue;
+              try { budgetMonitor.observe(normalizeStreamEvent(line, logProviderBinary)); } catch { /* marker/stop already handled */ }
+            }
+          }
           writeNormalizedDockerLog(logPath, logContent, logProviderBinary);
           // Patch the .result with REAL token usage parsed from the CLI envelope in the
           // captured container stdout — at the SOURCE, sidestepping the orchestrator
@@ -2585,6 +3083,7 @@ export class DockerSpawnBackend implements SpawnBackend {
           patchResultUsageFromEnvelope(tasksDir, taskId, model, logContent);
         }
       } catch (e) { debugLog('docker-backend:log-extract', e); }
+      try { budgetMonitor?.settle(); } catch (e) { debugLog('docker-backend:budget-settle', e); }
 
       // Cleanup container
       try {
@@ -2605,6 +3104,15 @@ export class DockerSpawnBackend implements SpawnBackend {
       } catch (e) { debugLog('docker-backend:spawn-lock-stale-release', e); }
 
       this.containers.delete(taskId);
+
+      // 455-003: the container has exited, so the in-container EXIT-trap has
+      // already consumed $BASEFILE (the task-start scope baseline). Remove it —
+      // it is a per-spawn transient with no post-exit value, and unlike the
+      // .prompt/.worker forensic tmpfiles below it carries no debugging signal.
+      try {
+        const baselinePath = join(tasksDir, `task-${taskId}.scope-baseline`);
+        if (existsSync(baselinePath)) unlinkSync(baselinePath);
+      } catch (e) { debugLog('docker-backend:scope-baseline-cleanup', e); }
 
       // Sprint 156 Task 4: .prompt-*.txt AND .worker-*.sh tmpfiles persist until sprint cleanup.
       // Both are archived together by archivePromptFiles() during sprint cleanup phase.

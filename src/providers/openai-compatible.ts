@@ -130,6 +130,22 @@ export interface OpenAICompatibleConfig {
    * without a real spawn. Defaults to `process.platform`.
    */
   platform?: NodeJS.Platform;
+  /**
+   * Vendor extension fields merged into every `/chat/completions` body
+   * (OPENROUTER-PROVIDER, row 477).
+   *
+   * The OpenAI wire schema is a BASE that gateways extend — OpenRouter adds
+   * `reasoning`, others add their own knobs. Without this seam each extension
+   * would need either a bespoke adapter subclass or a new typed field on
+   * `ChatCompletionOptions` (which every provider would then carry but ignore).
+   *
+   * Merged UNDER the canonical fields, so it can never overwrite `model`,
+   * `messages`, `stream`, or an explicit per-call option — a config typo
+   * degrades to an ignored key, it cannot corrupt the request.
+   *
+   * Absent (the default) → the body is byte-identical to the pre-row-477 shape.
+   */
+  extraBody?: Record<string, unknown>;
 }
 
 // ─── Adapter ─────────────────────────────────────────────────────────
@@ -146,6 +162,7 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
   private readonly spawnImpl: typeof nodeSpawn;
   private readonly defaultTimeoutMs: number;
   private readonly platform: NodeJS.Platform;
+  private readonly extraBody: Record<string, unknown>;
   private readonly workers = new Map<string, HttpWorkerEntry>();
 
   constructor(config: OpenAICompatibleConfig) {
@@ -160,6 +177,7 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
     this.spawnImpl = config.spawnImpl ?? nodeSpawn;
     this.defaultTimeoutMs = config.defaultTimeoutMs ?? 0;
     this.platform = config.platform ?? process.platform;
+    this.extraBody = config.extraBody ?? {};
   }
 
   // ─── send() — primary HTTP entry ────────────────────────────────────
@@ -188,6 +206,10 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
     }
 
     const body: Record<string, unknown> = {
+      // Vendor extensions FIRST so the canonical fields below always win — an
+      // `extraBody` entry can add a knob but never hijack model/messages/stream
+      // or an explicit per-call option (row 477).
+      ...this.extraBody,
       model,
       messages,
       stream: false,
@@ -221,7 +243,24 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
       choices?: Array<{ message?: { content?: string; tool_calls?: unknown } }>;
       usage?: { prompt_tokens?: number; completion_tokens?: number };
       model?: string;
+      error?: { message?: string; code?: number | string };
     };
+    // Row 477 / K5 root-cause: OpenAI-compatible gateways (OpenRouter proven
+    // live 2026-07-20) can wrap upstream failures in an HTTP-200 envelope whose
+    // body is `{"error":{...}}` with no `choices`. `content ?? ''` silently
+    // coerced that into a "successful" empty turn — the agentic worker then
+    // ended first-turn with a misleading "no tool calls" NO_GO and zero usage.
+    // Surface the REAL cause instead; the worker already reports thrown
+    // ProviderErrors honestly ("Provider /chat/completions failed: ...").
+    if (json?.error !== undefined || !Array.isArray(json?.choices) || json.choices.length === 0) {
+      const detail = json?.error
+        ? `${json.error.message ?? 'unknown upstream error'}${json.error.code !== undefined ? ` (code ${json.error.code})` : ''}`
+        : 'response has no choices';
+      throw new ProviderError(
+        `${this.name} /chat/completions returned an error-in-200 envelope: ${detail}`,
+        this.name,
+      );
+    }
     const content = json?.choices?.[0]?.message?.content ?? '';
     const result: ChatCompletionResult = { content };
     if (json?.usage) {

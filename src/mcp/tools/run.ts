@@ -3,13 +3,13 @@ import { join } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { TASKS_DIR } from '../../core/constants.js';
-import { ALL_MODELS } from '../../core/types.js';
 import type { ModelType } from '../../core/types.js';
 import { writeJobState } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
-import { loadConfig } from '../../core/config.js';
+import { loadConfig, resolveDefaultModel } from '../../core/config.js';
 import { spawnWorkerMultiProvider } from '../../cli/commands/spawn.js';
-import { buildExecutionRequest, resolveToTask } from '../../orchestra/execution-request-builder.js';
+import { buildExecutionRequest, resolveToTask, resolveExecutionModelIdentity } from '../../orchestra/execution-request-builder.js';
+import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
 import { buildWorkerPrompt } from '../../orchestra/brain.js';
 import { resolveAgentPrompt, resolveSkillPrompts } from '../../orchestra/sprint-controller.js';
 import type { UserOverride } from '../../core/routing-types.js';
@@ -28,7 +28,8 @@ export function registerRunTool(server: McpServer): void {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         description: z.string().describe('Clear description of what the worker should do. Be specific: include file paths, expected outcome, and any constraints.'),
-        model: z.enum(ALL_MODELS as unknown as readonly [string, ...string[]]).optional().default('sonnet').describe('AI model to use. Supports all providers (Claude, OpenAI, Gemini). Default: sonnet'),
+        model: z.string().optional().describe('AI model to use — an exact provider model ID (e.g. claude-sonnet-5, gpt-5.6-sol). Resolved through the canonical registry: known IDs infer their provider; moving/legacy aliases (sonnet/opus/haiku/gpt-5/gpt-5.6) are rejected. Omit to use the configured default-model.'),
+        provider: z.string().optional().describe('Explicit provider ownership (claude|codex|gemini|ollama). Required to register an unseen versioned model ID; for a known model it is validated against the registry and a mismatch fails loudly.'),
         modelEffort: z.string().optional().describe('Native model reasoning-effort level, mirrors CLI --model-effort (claude: low|medium|high|xhigh|max, codex: minimal|low|medium|high). Opt-in: validated per-provider at spawn time; invalid or unsupported levels are silently ignored and the provider CLI default applies.'),
         scope: z.string().optional().describe('Comma-separated directory paths the worker may modify (e.g. "src/,tests/"). Defaults to "src/" if omitted.'),
         timeoutMs: z.number().optional().describe('Maximum wait window in milliseconds for the background result watcher, mirrors CLI --timeout. Default: 300000.'),
@@ -36,7 +37,7 @@ export function registerRunTool(server: McpServer): void {
         autoApprove: z.boolean().optional().default(true).describe('Auto-approve worker tool calls with --dangerously-skip-permissions. Deckent standard: workers MUST have full write permissions.'),
       }),
     },
-    async ({ description, model, modelEffort, scope, timeoutMs, keep, autoApprove }) => {
+    async ({ description, model, modelEffort, scope, timeoutMs, keep, autoApprove, provider }) => {
       const root = process.cwd();
 
       try {
@@ -57,9 +58,27 @@ export function registerRunTool(server: McpServer): void {
         // (TaskKind), resolves provider from config (not hardcoded 'claude'), tags
         // origin='mcp', and spawns through the one provider-aware primitive.
         const cfg = await loadConfig(root);
+
+        // 453-001: resolve + validate the model through the canonical registry
+        // BEFORE writing the Task JSON or spawning — identical boundary to CLI
+        // `deckent run`. An omitted model resolves from the loaded config's
+        // canonical default-model resolver (never a literal alias); an explicit
+        // provider registers an unseen versioned ID parametrically. Legacy
+        // aliases, unknown-without-provider, and provider/model mismatch throw
+        // here and surface as an isError response (fail-before-disk/spawn).
+        const requestedModel = model ?? resolveDefaultModel(cfg);
+        // Row 477: pre-register a probe-verified OpenRouter id before the pure
+        // identity boundary — same seam as CLI `deckent run` (see run.ts); the
+        // parametric pricing-evidence gate has no disk access of its own.
+        if (provider === 'openrouter') {
+          registerOpenRouterModelFromCache(root, requestedModel);
+        }
+        const identity = resolveExecutionModelIdentity(requestedModel, provider);
+
         const execReq = buildExecutionRequest({
           description,
-          model: model as ModelType,
+          model: identity.model,
+          provider: identity.provider,
           // C-MCP-parite (269-004): forward --model-effort equivalent into the
           // canonical request so task.modelEffort is set (resolveToTask) and spawn
           // emits the provider flag — same wire as CLI `deckent run` (268-003).
@@ -106,7 +125,7 @@ export function registerRunTool(server: McpServer): void {
         const agentPrompt = await resolveAgentPrompt(root, task);
         const skillPrompts = await resolveSkillPrompts(root, task);
         const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, root);
-        const { backend } = await spawnWorkerMultiProvider(taskId, model as ModelType, prompt, root, {
+        const { backend } = await spawnWorkerMultiProvider(taskId, identity.model as ModelType, prompt, root, {
           autoApprove,
           spawnBackend: cfg.spawn_backend,
           dockerImage: cfg.docker_image,
@@ -146,7 +165,7 @@ export function registerRunTool(server: McpServer): void {
           jobId,
           taskId,
           status: 'RUNNING',
-          model,
+          model: identity.model,
           modelEffort: task.modelEffort,
           timeoutMs: effectiveTimeoutMs,
           keep: keepFiles,

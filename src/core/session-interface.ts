@@ -16,6 +16,14 @@ const AUTH_ENV_VARS: Record<ProviderName, string | null> = {
   gemini: 'GOOGLE_API_KEY',
   // Ollama is local — no API key concept; reachability is the only "auth".
   ollama: null,
+  // OPENROUTER-PROVIDER (row 477): null NOT because auth is absent, but because
+  // this map means "process.env variable that carries the credential" and
+  // OpenRouter has none by design — `OpenRouterProvider.resolveApiKey()` reads
+  // `$DECK:OPENROUTER_API_KEY` from the `.deck` file host-side and injects it
+  // into the spawned child's env only, never this process's `process.env`
+  // (providers/openrouter.ts secret-resolution contract). A non-null entry here
+  // would make health checks probe an env var that is intentionally never set.
+  openrouter: null,
 };
 
 /** Health check result for a single provider */

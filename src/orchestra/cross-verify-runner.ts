@@ -169,6 +169,59 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
   const { spawnWorkerMultiProvider } = await import('../cli/commands/spawn.js');
   const { pollForResultFile } = await import('./sprint-phases.js');
 
+  // OPENROUTER-PROVIDER (row 477) — closes the "live multi-provider capture"
+  // gap this function's doc-comment has flagged since Sprint 276.
+  //
+  // Host-HTTP workers (`agents/http-agentic-worker.ts`, used by openrouter /
+  // openai-compat / ollama) do NOT receive the prompt as a spawn argument — their
+  // adapters take `_prompt` and ignore it — they read it from
+  // `.tasks/task-<id>.json` (`prompt: taskJson.description`). Without that file
+  // the worker aborts immediately with `failed to read task json: ENOENT` and
+  // writes a NO_GO, so EVERY HTTP-provider verifier resolved to 'unclear' —
+  // verified live 2026-07-20 with an openrouter verifier. The adversarial prompt
+  // never reached the model at all; this was infrastructure, not model quality.
+  //
+  // Writing the task JSON before spawn makes the prompt reachable on BOTH worker
+  // families (tmux/claude reads the argument, HTTP reads this file). Best-effort:
+  // an unwritable `.tasks/` must not abort verification — the existing
+  // empty-result → `unclear` path stays the honest fallback.
+  try {
+    const { writeFileSync, mkdirSync, existsSync: exists } = await import('node:fs');
+    const tasksDir = join(input.projectRoot, TASKS_DIR);
+    if (!exists(tasksDir)) mkdirSync(tasksDir, { recursive: true });
+    const verifierTaskJson = {
+      id: verifierTaskId,
+      title: `Adversarial cross-verify of ${input.task.id}`,
+      // The adversarial prompt IS the work for a verifier — carried in
+      // `description` because that is the field the HTTP worker turns into its
+      // prompt.
+      description: input.prompt,
+      model: input.verifierModel,
+      provider: input.verifierProvider,
+      effort: 'normal',
+      priority: 'HIGH',
+      reason: 'cross-verify adversarial verification',
+      // Read-only by construction: a verifier judges, it must never edit the
+      // work it is judging. Empty `filesWrite` is the scope contract for that.
+      scope: { directories: ['.'], filesRead: input.task.scope?.filesRead ?? [], filesWrite: [] },
+      dependencies: [],
+      goNogo: {
+        goCriteria: 'Emit a VERDICT line stating whether the original result is refuted, with a rationale.',
+        noGoCriteria: 'No VERDICT line emitted.',
+        techDebtAcceptable: 'none',
+      },
+      status: 'PENDING',
+      createdAt: new Date().toISOString(),
+    };
+    writeFileSync(
+      join(tasksDir, `task-${verifierTaskId}.json`),
+      JSON.stringify(verifierTaskJson, null, 2),
+      'utf-8',
+    );
+  } catch (err) {
+    debugLog('cross-verify:verifier-task-json-write-failed', String(err));
+  }
+
   await spawnWorkerMultiProvider(
     verifierTaskId,
     input.verifierModel,
@@ -184,7 +237,38 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
   );
   // The verifier worker is instructed to end with a VERDICT line; a deckent worker
   // surfaces that in its `.result` notes. Empty when the worker never wrote a result.
-  return verifierResult?.notes ?? '';
+  const notes = verifierResult?.notes ?? '';
+  if (notes.trim().length > 0) return notes;
+
+  // XVERIFY-TOOL log-fallback — the OTHER half of the Sprint-276 "live
+  // multi-provider capture" gap (the HTTP-worker half was the task-JSON write
+  // above). Host-CLI verifier workers (codex/gemini/claude) stream their final
+  // agent message into `.tasks/task-<id>.log` but never write a `.result` file
+  // for this spawn shape — proven live 2026-07-20: a codex verifier ran the full
+  // verification (tests + lint) and emitted `VERDICT: CONFIRMED ...` into the
+  // log, yet the outcome resolved to 'unclear' because notes stayed empty. The
+  // raw log tail is a valid verdict source: `parseRefuteVerdict` scans for the
+  // LAST `VERDICT:` line, and the NDJSON wrapping does not defeat that match.
+  // Best-effort + capped: an unreadable/absent log keeps the honest '' →
+  // 'unclear' path.
+  try {
+    const logPath = join(input.projectRoot, TASKS_DIR, `task-${verifierTaskId}.log`);
+    if (existsSync(logPath)) {
+      const raw = readFileSync(logPath, 'utf-8');
+      // Return ONLY the LAST VERDICT line, never the whole log: the adversarial
+      // prompt itself contains `VERDICT: REFUTED <reason>` as a FORMAT EXAMPLE,
+      // and `parseRefuteVerdict` checks REFUTED_RE first — feeding a log that
+      // echoes the prompt would turn every run into a false REFUTED. The final
+      // agent message always comes after any prompt echo, so last-match wins.
+      // Stops at a literal backslash (NDJSON logs carry `\n` as two chars) or
+      // a closing quote, so escaped-JSON wrapping cannot bleed into the reason.
+      const matches = raw.match(/VERDICT:\s*(?:REFUTED|CONFIRMED|UNCLEAR)[^"\\\n]*/g);
+      if (matches && matches.length > 0) return matches[matches.length - 1]!;
+    }
+  } catch (err) {
+    debugLog('cross-verify:log-fallback-read-failed', String(err));
+  }
+  return '';
 }
 
 // ─── Advisory write ────────────────────────────────────────────────────────────

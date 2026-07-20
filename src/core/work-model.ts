@@ -118,7 +118,16 @@ export type InteractionMode = 'batch' | 'interactive' | 'streaming';
 /** Cost/resource ceiling for a request (enterprise cost-control). */
 export interface ExecutionBudget {
   maxUsd?: number;
+  /** Aggregate measured tokens, including prompt-cache reads and writes. */
   maxTokens?: number;
+  /** Maximum number of distinct provider model calls/turns. */
+  maxTurns?: number;
+  maxInputTokens?: number;
+  maxOutputTokens?: number;
+  maxCacheReadTokens?: number;
+  maxCacheCreationTokens?: number;
+  /** Maximum measured context presented to any single provider call. */
+  maxContextTokens?: number;
 }
 
 /** Risk class — DERIVED from requirements + capabilityTarget (never stored). */

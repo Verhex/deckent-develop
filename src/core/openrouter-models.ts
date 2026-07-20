@@ -10,16 +10,18 @@
 // caller (a host-side CC run, never a worker) must know the probe did not complete,
 // so it never persists a fabricated or silently-truncated "free model" inventory.
 
-import { existsSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { SETTINGS_DIR } from './constants.js';
+import { ensureOpenRouterModelRegistered } from './model-registry.js';
 
 // ─── Injectable fetch seam ────────────────────────────────────────────────────
 
 export type FetchFn = typeof globalThis.fetch;
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
+export const OPENROUTER_FREE_CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
 
 /** Root-relative path (under `<projectRoot>/`) to the persisted free-model cache. */
 export const FREE_MODEL_CACHE_FILE = join(SETTINGS_DIR, 'openrouter-models.json');
@@ -28,6 +30,7 @@ export const FREE_MODEL_CACHE_FILE = join(SETTINGS_DIR, 'openrouter-models.json'
 
 interface OpenRouterPricing {
   prompt?: string | number;
+  completion?: string | number;
   [key: string]: unknown;
 }
 
@@ -66,24 +69,24 @@ export interface OpenRouterFreeModel {
   id: string;
   context: number;
   modality: string;
+  pricing: { prompt: 0; completion: 0 };
 }
 
 // ─── Filtering ────────────────────────────────────────────────────────────────
 
-function parsePromptPrice(raw: string | number | undefined): number {
+function parsePrice(raw: string | number | undefined): number {
   if (raw === undefined || raw === null) return NaN;
   const n = typeof raw === 'number' ? raw : parseFloat(raw);
   return n;
 }
 
-/** A model qualifies only when BOTH hold: the id carries the `:free` suffix AND
- *  the prompt price parses to exactly 0. Either signal alone is not trusted —
- *  a `:free`-suffixed id with a non-zero parsed price is excluded rather than
- *  silently accepted. */
+/** A model qualifies only when the exact free suffix and both token prices agree. */
 function isFreeModel(entry: OpenRouterModelEntry): boolean {
   if (typeof entry.id !== 'string' || !entry.id.endsWith(':free')) return false;
-  const price = parsePromptPrice(entry.pricing?.prompt);
-  return Number.isFinite(price) && price === 0;
+  const prompt = parsePrice(entry.pricing?.prompt);
+  const completion = parsePrice(entry.pricing?.completion);
+  return Number.isFinite(prompt) && prompt === 0
+    && Number.isFinite(completion) && completion === 0;
 }
 
 function toFreeModel(entry: OpenRouterModelEntry): OpenRouterFreeModel {
@@ -91,6 +94,7 @@ function toFreeModel(entry: OpenRouterModelEntry): OpenRouterFreeModel {
     id: entry.id,
     context: typeof entry.context_length === 'number' ? entry.context_length : 0,
     modality: entry.architecture?.modality ?? 'unknown',
+    pricing: { prompt: 0, completion: 0 },
   };
 }
 
@@ -145,8 +149,32 @@ export async function fetchOpenRouterModels(fetchImpl: FetchFn = globalThis.fetc
 
 /** On-disk shape of `.deckent/settings/openrouter-models.json`. */
 export interface FreeModelCache {
+  schemaVersion: 1;
+  source: typeof OPENROUTER_MODELS_URL;
   generatedAt: string;
+  expiresAt: string;
   models: OpenRouterFreeModel[];
+  payloadHash: string;
+}
+
+interface FreeModelCachePayload extends Omit<FreeModelCache, 'payloadHash'> {}
+
+function cachePayloadHash(payload: FreeModelCachePayload): string {
+  return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+}
+
+function isCanonicalIso(value: string): boolean {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && new Date(parsed).toISOString() === value;
+}
+
+function isVerifiedFreeModel(value: unknown): value is OpenRouterFreeModel {
+  if (typeof value !== 'object' || value === null) return false;
+  const model = value as Partial<OpenRouterFreeModel>;
+  return typeof model.id === 'string' && model.id.endsWith(':free')
+    && typeof model.context === 'number' && Number.isFinite(model.context) && model.context >= 0
+    && typeof model.modality === 'string' && model.modality.length > 0
+    && model.pricing?.prompt === 0 && model.pricing.completion === 0;
 }
 
 /**
@@ -156,12 +184,28 @@ export interface FreeModelCache {
  * state. `generatedAt` is stamped fresh on every call, so re-running the probe
  * never silently reuses a stale timestamp.
  */
-export function writeFreeModelCache(root: string, list: OpenRouterFreeModel[]): FreeModelCache {
+export function writeFreeModelCache(
+  root: string,
+  list: OpenRouterFreeModel[],
+  options: { now?: Date; ttlMs?: number } = {},
+): FreeModelCache {
+  if (!list.every(isVerifiedFreeModel)) {
+    throw new OpenRouterProbeError('OpenRouter free-model cache contains unverified pricing');
+  }
   const filePath = join(root, FREE_MODEL_CACHE_FILE);
-  const cache: FreeModelCache = {
-    generatedAt: new Date().toISOString(),
+  const now = options.now ?? new Date();
+  const ttlMs = options.ttlMs ?? OPENROUTER_FREE_CACHE_TTL_MS;
+  if (!Number.isFinite(ttlMs) || ttlMs <= 0) {
+    throw new OpenRouterProbeError('OpenRouter free-model cache TTL must be positive');
+  }
+  const payload: FreeModelCachePayload = {
+    schemaVersion: 1,
+    source: OPENROUTER_MODELS_URL,
+    generatedAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + ttlMs).toISOString(),
     models: list,
   };
+  const cache: FreeModelCache = { ...payload, payloadHash: cachePayloadHash(payload) };
 
   const dir = dirname(filePath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -179,4 +223,105 @@ export function writeFreeModelCache(root: string, list: OpenRouterFreeModel[]): 
   }
 
   return cache;
+}
+
+// ─── Cache read ───────────────────────────────────────────────────────────────
+
+/**
+ * Read the `:free` inventory previously written by `openrouter-probe`
+ * (OPENROUTER-PROVIDER, row 477). Until this existed the cache was write-only —
+ * the probe persisted it and nothing ever consumed it.
+ *
+ * SOFT by contract, unlike {@link fetchOpenRouterModels}: a missing, unreadable,
+ * or malformed cache returns `undefined` rather than throwing. The distinction is
+ * deliberate — a failed live probe means "the operator asked for fresh data and
+ * did not get it" (loud), whereas an absent cache simply means "the probe has not
+ * run here yet" (normal on a fresh checkout, and callers have a default).
+ */
+export function readFreeModelCache(root: string): FreeModelCache | undefined {
+  const filePath = join(root, FREE_MODEL_CACHE_FILE);
+  if (!existsSync(filePath)) return undefined;
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, 'utf-8')) as unknown;
+    if (typeof parsed !== 'object' || parsed === null) return undefined;
+    const cache = parsed as Partial<FreeModelCache>;
+    if (cache.schemaVersion !== 1 || cache.source !== OPENROUTER_MODELS_URL
+      || typeof cache.generatedAt !== 'string' || !isCanonicalIso(cache.generatedAt)
+      || typeof cache.expiresAt !== 'string' || !isCanonicalIso(cache.expiresAt)
+      || Date.parse(cache.expiresAt) <= Date.parse(cache.generatedAt)
+      || !Array.isArray(cache.models) || !cache.models.every(isVerifiedFreeModel)
+      || typeof cache.payloadHash !== 'string') return undefined;
+    const payload: FreeModelCachePayload = {
+      schemaVersion: 1,
+      source: OPENROUTER_MODELS_URL,
+      generatedAt: cache.generatedAt,
+      expiresAt: cache.expiresAt,
+      models: cache.models,
+    };
+    if (cachePayloadHash(payload) !== cache.payloadHash) return undefined;
+    return { ...payload, payloadHash: cache.payloadHash };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Look one model id up in the on-disk `:free` inventory. Returns `undefined` when
+ * the cache is absent or does not carry that id — callers fall back to their own
+ * conservative defaults (see `ensureOpenRouterModelRegistered`), so a stale or
+ * missing cache degrades context-window accuracy, never correctness.
+ */
+export interface VerifiedOpenRouterFreeModel extends OpenRouterFreeModel {
+  pricingEvidenceRef: string;
+  fetchedAt: string;
+  expiresAt: string;
+}
+
+export function lookupFreeModel(
+  root: string,
+  modelId: string,
+  at: Date = new Date(),
+): VerifiedOpenRouterFreeModel | undefined {
+  const cache = readFreeModelCache(root);
+  if (!cache || at.getTime() < Date.parse(cache.generatedAt)
+    || at.getTime() >= Date.parse(cache.expiresAt)) return undefined;
+  const model = cache.models.find((item) => item.id === modelId);
+  if (!model) return undefined;
+  return {
+    ...model,
+    pricingEvidenceRef: `openrouter-model-pricing:${cache.payloadHash}`,
+    fetchedAt: cache.generatedAt,
+    expiresAt: cache.expiresAt,
+  };
+}
+
+/**
+ * Register `modelId` in the model registry from the verified probe cache, when
+ * the cache carries it (OPENROUTER-PROVIDER, row 477).
+ *
+ * The ONE shared pre-registration seam for every surface that resolves an
+ * OpenRouter model identity BEFORE spawn — `deckent run`, the MCP run tool, and
+ * the autonomous planner all call `resolveExecutionModelIdentity`, whose
+ * parametric path enforces the pricing-evidence gate (`E_MODEL_PRICING_UNVERIFIED`)
+ * and has no disk access of its own (it is deliberately pure). Without this
+ * call-first seam, every one of those surfaces throws for an id the probe has
+ * already verified — the exact breakage found live on 2026-07-20 when the gate
+ * landed wired only into the spawn path.
+ *
+ * Returns true when the id was registered (or already present), false when the
+ * cache is absent/expired or does not carry the id — the caller lets the
+ * downstream gate fail honestly in that case (an unprobed model must NOT be
+ * silently priced as free; the remedy is `deckent openrouter-probe`).
+ */
+export function registerOpenRouterModelFromCache(root: string, modelId: string): boolean {
+  const cached = lookupFreeModel(root, modelId);
+  if (!cached) return false;
+  // Deferred import shape not needed: model-registry has no import back into
+  // this module (comment-only reference), so this static import cannot cycle.
+  ensureOpenRouterModelRegistered(modelId, {
+    contextWindow: cached.context,
+    costPerMillion: { input: cached.pricing.prompt, output: cached.pricing.completion },
+    pricingEvidenceRef: cached.pricingEvidenceRef,
+  });
+  return true;
 }
