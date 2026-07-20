@@ -14,6 +14,47 @@ import { z } from 'zod';
 /** Contract version stamped on every ApprovalRequest. Bump on a breaking shape change. */
 export const APPROVAL_CONTRACT_VERSION = '1.0';
 
+const WINDOWS_RESERVED_DEVICE_RE = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
+
+/**
+ * Read/lookup compatibility for already-persisted v1 ids. The v1 contract
+ * accepted any non-empty string; this schema preserves records that are safe
+ * as one filename component (including historical uppercase/Unicode ids)
+ * without reopening traversal or cross-platform device-name hazards.
+ * New writes MUST use {@link approvalIdSchema} instead.
+ */
+export const approvalLookupIdSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .refine(
+    (id) => id !== '.'
+      && id !== '..'
+      && !/[<>:"/\\|?*\u0000-\u001f]/.test(id)
+      && !/[. ]$/.test(id),
+    'must be a path-safe cross-platform filename component',
+  )
+  .refine(
+    (id) => !WINDOWS_RESERVED_DEVICE_RE.test(id),
+    'must not use a Windows reserved device name',
+  );
+
+/**
+ * Cross-platform opaque identifier used as the approval store filename key.
+ * Lowercase ASCII avoids case-fold/Unicode-normalization collisions across
+ * POSIX, macOS and Windows; path separators, trailing dots and device names
+ * are structurally impossible.
+ */
+export const approvalIdSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9_-])?$/, 'must be a lowercase ASCII opaque id')
+  .refine(
+    (id) => !WINDOWS_RESERVED_DEVICE_RE.test(id),
+    'must not use a Windows reserved device name',
+  );
+
 // ─── Component schemas ───────────────────────────────────────────────────────
 
 /** Who is asking for approval — the Deckent actor kind (5 values). */
@@ -67,9 +108,7 @@ const isoDateTimeSchema = z.string().datetime();
 
 // ─── ApprovalRequest ──────────────────────────────────────────────────────────
 
-export const approvalRequestSchema = z
-  .object({
-    id: z.string().min(1),
+const approvalRequestShape = {
     version: z.literal(APPROVAL_CONTRACT_VERSION).default(APPROVAL_CONTRACT_VERSION),
     requester: requesterSchema,
     /** Short, human-readable one-liner (e.g. for a terminal approval card). */
@@ -89,9 +128,10 @@ export const approvalRequestSchema = z
     maskedArgs: z.record(z.string(), z.unknown()).nullable().default(null),
     /** Opaque pointer to the raw args held out-of-band — never the raw value itself. */
     rawArgsRef: z.string().min(1).nullable().default(null),
-  })
-  .strict()
-  .superRefine((val, ctx) => {
+};
+
+function buildApprovalRequestSchema(idSchema: z.ZodType<string>) {
+  return z.object({ id: idSchema, ...approvalRequestShape }).strict().superRefine((val, ctx) => {
     if (Date.parse(val.expiresAt) <= Date.parse(val.createdAt)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -100,15 +140,20 @@ export const approvalRequestSchema = z
       });
     }
   });
+}
+
+/** Canonical new-write schema. */
+export const approvalRequestSchema = buildApprovalRequestSchema(approvalIdSchema);
+
+/** Safe v1 persisted-reader schema; never use to authorize a new request id. */
+const storedApprovalRequestSchema = buildApprovalRequestSchema(approvalLookupIdSchema);
 
 /** The canonical approval-request type — inferred from {@link approvalRequestSchema}. */
 export type ApprovalRequest = z.infer<typeof approvalRequestSchema>;
 
 // ─── ApprovalDecision ─────────────────────────────────────────────────────────
 
-export const approvalDecisionSchema = z
-  .object({
-    requestId: z.string().min(1),
+const approvalDecisionShape = {
     decision: approvalActionSchema,
     decidedBy: z.string().min(1),
     /** Which surface resolved it (terminal/dashboard/api/slack/...). Free-form —
@@ -121,11 +166,42 @@ export const approvalDecisionSchema = z
      *  decision files — never `.default()`ed, so it is only ever present when a
      *  system closure explicitly stamped it. See {@link closureReasonSchema}. */
     closureReason: closureReasonSchema.optional(),
-  })
-  .strict();
+};
+
+function buildApprovalDecisionSchema(idSchema: z.ZodType<string>) {
+  return z.object({ requestId: idSchema, ...approvalDecisionShape }).strict();
+}
+
+/** Canonical new-write schema. */
+export const approvalDecisionSchema = buildApprovalDecisionSchema(approvalIdSchema);
+
+/** Safe v1 persisted-reader schema; only valid when bound to a durable request. */
+const storedApprovalDecisionSchema = buildApprovalDecisionSchema(approvalLookupIdSchema);
 
 /** The canonical approval-decision type — inferred from {@link approvalDecisionSchema}. */
 export type ApprovalDecision = z.infer<typeof approvalDecisionSchema>;
+
+/** Permanent retirement evidence. The embedded decision remains available to
+ * restart/external waiters after active request/decision files are pruned. */
+export const approvalTombstoneSchema = z
+  .object({
+    version: z.literal(1),
+    id: approvalLookupIdSchema,
+    retiredAt: isoDateTimeSchema,
+    decision: storedApprovalDecisionSchema,
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.id !== value.decision.requestId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['decision', 'requestId'],
+        message: 'must match tombstone id',
+      });
+    }
+  });
+
+export type ApprovalTombstone = z.infer<typeof approvalTombstoneSchema>;
 
 // ─── Derived types + enum value-arrays (for downstream consumers) ───────────
 
@@ -181,6 +257,14 @@ export function validateApprovalRequest(obj: unknown): ValidateApprovalRequestRe
   return { ok: false, missingFields, errors };
 }
 
+/** Read an existing v1 record without permitting its legacy id on new writes. */
+export function validateStoredApprovalRequest(obj: unknown): ValidateApprovalRequestResult {
+  const parsed = storedApprovalRequestSchema.safeParse(obj);
+  if (parsed.success) return { ok: true, value: parsed.data };
+  const { missingFields, errors } = collectIssues(parsed.error.issues);
+  return { ok: false, missingFields, errors };
+}
+
 /** Type guard — true iff `obj` validates against {@link approvalRequestSchema}. */
 export function isApprovalRequest(obj: unknown): obj is ApprovalRequest {
   return approvalRequestSchema.safeParse(obj).success;
@@ -200,6 +284,14 @@ export type ValidateApprovalDecisionResult = ValidateApprovalDecisionOk | Valida
 /** Validate an unknown object against {@link approvalDecisionSchema}. Never throws. */
 export function validateApprovalDecision(obj: unknown): ValidateApprovalDecisionResult {
   const parsed = approvalDecisionSchema.safeParse(obj);
+  if (parsed.success) return { ok: true, value: parsed.data };
+  const { missingFields, errors } = collectIssues(parsed.error.issues);
+  return { ok: false, missingFields, errors };
+}
+
+/** Read/settle a v1 decision only after its durable request has been found. */
+export function validateStoredApprovalDecision(obj: unknown): ValidateApprovalDecisionResult {
+  const parsed = storedApprovalDecisionSchema.safeParse(obj);
   if (parsed.success) return { ok: true, value: parsed.data };
   const { missingFields, errors } = collectIssues(parsed.error.issues);
   return { ok: false, missingFields, errors };

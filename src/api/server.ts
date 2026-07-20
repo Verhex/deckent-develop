@@ -86,6 +86,7 @@ import { createOutputCollector, type OutputCollector } from '../core/output-coll
 import { reconcileStatusResponse } from './status-reconcile.js';
 import { ApprovalStore, type ApprovalStoreEntry, type ApprovalStoreCategory } from '../core/approval-store.js';
 import { ApprovalBroker, ApprovalBrokerError } from '../core/approval-broker.js';
+import { approvalLookupIdSchema } from '../core/approval-contract.js';
 import { ApprovalExpiryDriver } from '../core/approval-expiry-driver.js';
 import { rpcRequestSchema, dispatchRpcRequest, type RpcHandler, type RpcHandlerMap } from '../core/term-rpc.js';
 import { probeSubscriptionLimits, type SpawnImpl } from '../core/limit-preflight.js';
@@ -224,11 +225,16 @@ const ApprovalDecisionBodySchema = z.object({
   decision: z.enum(['allow', 'deny', 'defer', 'escalate']),
   reason: z.string().max(2000).optional(),
 }).strict();
-/** Approval id path segment guard. `ApprovalStore`/`ApprovalBroker` join `id`
- *  straight into a store-dir filename with no sanitization of their own, so a
- *  client-supplied id MUST be validated here before it ever reaches those
- *  modules (path-traversal defense-in-depth, 356-002). */
-const APPROVAL_ID_RE = /^[a-zA-Z0-9_-]+$/;
+/** Canonical core lookup contract: accepts new lowercase ids plus path-safe
+ * persisted v1 ids, while rejecting traversal/device-name hazards. */
+function parseApprovalLookupId(segment: string): string | undefined {
+  try {
+    const id = decodeURIComponent(segment);
+    return approvalLookupIdSchema.safeParse(id).success ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 // ─── Chat-Stream Adapter Hook (Sprint 219 T-219-007) ────────────
 // Tests inject a deterministic ChatProviderAdapter via setChatStreamAdapter;
@@ -1277,8 +1283,8 @@ async function handleRequest(
     // GET /api/approvals/:id — single entry detail. maskedArgs-only; raw
     // args are NEVER resolved (resolveRawArgs is never called from here).
     if (url.startsWith('/api/approvals/')) {
-      const id = url.slice('/api/approvals/'.length);
-      if (!id || !APPROVAL_ID_RE.test(id)) {
+      const id = parseApprovalLookupId(url.slice('/api/approvals/'.length));
+      if (!id) {
         sendError(res, 400, 'Invalid approval id');
         return;
       }
@@ -1628,8 +1634,8 @@ async function handleRequest(
     // 403. GET /api/approvals[/…] above are NEVER gated by this flag — only
     // the mutation is.
     if (url.startsWith('/api/approvals/') && url.endsWith('/decision')) {
-      const id = url.slice('/api/approvals/'.length, -'/decision'.length);
-      if (!id || !APPROVAL_ID_RE.test(id)) {
+      const id = parseApprovalLookupId(url.slice('/api/approvals/'.length, -'/decision'.length));
+      if (!id) {
         sendError(res, 400, 'Invalid approval id');
         return;
       }

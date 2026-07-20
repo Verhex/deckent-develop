@@ -15,36 +15,38 @@
 //    poll/watch seam that discovers such externally-written decisions and
 //    settles them exactly like a local `decide()` call — same event, same
 //    awaiter resolution.
-//  • Atomic writes — every persisted file goes through tmp-write + `renameSync`
-//    (POSIX/NTFS atomic metadata op), so a crash mid-write never leaves a torn
-//    request/decision file for a reader to trip over (same pattern as
-//    core/file-lock.ts and core/credentials-per-project.ts).
+//  • Atomic first-writer-wins writes — every persisted file is fully written to
+//    a temp file, then published with a non-replacing hard-link create. A crash
+//    never exposes a torn target and a concurrent decision can never be silently
+//    overwritten by a later process.
 //  • Worker-suspend/resume + channel-relays (turning a pending approval into an
 //    actual blocked worker + a Slack/Telegram/dashboard prompt) is APR-2 —
 //    explicitly out of scope here. This module is the broker core: store +
 //    event + promise-resume only.
 
 import { EventEmitter } from 'node:events';
-import { randomUUID } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
   readFileSync,
   readdirSync,
-  renameSync,
   unlinkSync,
-  writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { DECKENT_DIR } from './constants.js';
+import { createJsonFileFirstWriterWins } from './approval-file-cas.js';
 import {
+  approvalLookupIdSchema,
+  approvalTombstoneSchema,
   approvalRequestSchema,
   approvalDecisionSchema,
   validateApprovalRequest,
-  validateApprovalDecision,
+  validateStoredApprovalRequest,
+  validateStoredApprovalDecision,
   type ApprovalRequest,
   type ApprovalDecision,
+  type ApprovalTombstone,
 } from './approval-contract.js';
 
 // ─── Input types (derived from the contract — never redeclared) ─────────────
@@ -94,6 +96,7 @@ export type ApprovalBrokerErrorCode =
   | 'APR_INVALID_REQUEST'
   | 'APR_DUPLICATE_ID'
   | 'APR_INVALID_DECISION'
+  | 'APR_UNKNOWN_REQUEST'
   | 'APR_ALREADY_DECIDED';
 
 export class ApprovalBrokerError extends Error {
@@ -143,6 +146,7 @@ export class ApprovalBroker extends EventEmitter {
   /** Decision filenames already settled by THIS instance — dedupe key for the
    *  poll seam so a re-scan never re-emits/re-resolves the same decision. */
   private readonly seenDecisionFiles = new Set<string>();
+  private readonly seenTombstoneFiles = new Set<string>();
 
   constructor(
     projectRoot: string,
@@ -151,13 +155,14 @@ export class ApprovalBroker extends EventEmitter {
     super();
     this.storeDir = opts.storeDir ?? join(projectRoot, DECKENT_DIR, 'approvals');
     this.ensureStoreDir();
+    this.hydrateFromDisk();
   }
 
   // ─── Store paths ────────────────────────────────────────────────────────
 
   private ensureStoreDir(): void {
     if (!existsSync(this.storeDir)) {
-      mkdirSync(this.storeDir, { recursive: true });
+      mkdirSync(this.storeDir, { recursive: true, mode: 0o700 });
     }
   }
 
@@ -169,23 +174,78 @@ export class ApprovalBroker extends EventEmitter {
     return join(this.storeDir, `${id}.decision.json`);
   }
 
-  /** Atomic write: temp file (unique-suffixed, so concurrent writers in the
-   *  same process never collide on the tmp name) + `renameSync` onto the real
-   *  path. On rename failure the tmp file is best-effort removed and the error
-   *  rethrown — the destination file is left exactly as it was (never torn). */
-  private atomicWriteJson(filePath: string, data: unknown): void {
-    this.ensureStoreDir();
-    const tmpPath = `${filePath}.${randomUUID()}.tmp`;
-    writeFileSync(tmpPath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
+  private tombstoneFilePath(id: string): string {
+    return join(this.storeDir, `${id}.tombstone.json`);
+  }
+
+  private readTombstoneFromDisk(id: string): ApprovalTombstone | undefined {
+    if (!approvalLookupIdSchema.safeParse(id).success) return undefined;
     try {
-      renameSync(tmpPath, filePath);
-    } catch (err) {
+      const result = approvalTombstoneSchema.safeParse(
+        JSON.parse(readFileSync(this.tombstoneFilePath(id), 'utf-8')),
+      );
+      return result.success && result.data.id === id ? result.data : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private readRequestFromDisk(id: string): ApprovalRequest | undefined {
+    if (!approvalLookupIdSchema.safeParse(id).success) return undefined;
+    if (this.readTombstoneFromDisk(id)) return undefined;
+    try {
+      const result = validateStoredApprovalRequest(JSON.parse(readFileSync(this.requestFilePath(id), 'utf-8')));
+      return result.ok && result.value.id === id ? result.value : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Rebuild validated request/decision state from canonical on-disk paths. */
+  private hydrateFromDisk(): void {
+    let files: string[];
+    try {
+      files = readdirSync(this.storeDir);
+    } catch {
+      return;
+    }
+
+    for (const file of files) {
+      if (!file.endsWith('.tombstone.json')) continue;
       try {
-        unlinkSync(tmpPath);
+        const result = approvalTombstoneSchema.safeParse(JSON.parse(readFileSync(join(this.storeDir, file), 'utf-8')));
+        if (!result.success || file !== `${result.data.id}.tombstone.json`) continue;
+        this.seenTombstoneFiles.add(file);
+        this.decisionsById.set(result.data.id, result.data.decision);
       } catch {
-        // Best-effort cleanup — the rename error below is what the caller needs.
+        // Tolerant reader: malformed tombstones are not terminal authority.
       }
-      throw err;
+    }
+
+    for (const file of files) {
+      if (!file.endsWith('.request.json')) continue;
+      try {
+        const result = validateStoredApprovalRequest(JSON.parse(readFileSync(join(this.storeDir, file), 'utf-8')));
+        if (!result.ok || file !== `${result.value.id}.request.json`) continue;
+        if (this.readTombstoneFromDisk(result.value.id)) continue;
+        this.requestsById.set(result.value.id, result.value);
+      } catch {
+        // Tolerant reader: a malformed/external partial is not runtime authority.
+      }
+    }
+
+    for (const file of files) {
+      if (!file.endsWith('.decision.json')) continue;
+      try {
+        const result = validateStoredApprovalDecision(JSON.parse(readFileSync(join(this.storeDir, file), 'utf-8')));
+        if (!result.ok || file !== `${result.value.requestId}.decision.json`) continue;
+        if (this.readTombstoneFromDisk(result.value.requestId)) continue;
+        if (!this.requestsById.has(result.value.requestId)) continue;
+        this.seenDecisionFiles.add(file);
+        this.decisionsById.set(result.value.requestId, result.value);
+      } catch {
+        // Tolerant reader: retry on the next fresh instance/poll.
+      }
     }
   }
 
@@ -206,10 +266,12 @@ export class ApprovalBroker extends EventEmitter {
       );
     }
     const value = result.value;
-    if (this.requestsById.has(value.id)) {
+    if (this.requestsById.has(value.id)
+      || existsSync(this.tombstoneFilePath(value.id))
+      || existsSync(this.decisionFilePath(value.id))
+      || !createJsonFileFirstWriterWins(this.requestFilePath(value.id), value)) {
       throw new ApprovalBrokerError(`duplicate approval request id: ${value.id}`, 'APR_DUPLICATE_ID');
     }
-    this.atomicWriteJson(this.requestFilePath(value.id), value);
     this.requestsById.set(value.id, value);
     this.emit('pending', value);
     return value;
@@ -224,6 +286,7 @@ export class ApprovalBroker extends EventEmitter {
    * or {@link ApprovalBroker.checkForExternalDecisions} resumes.
    */
   awaitDecision(id: string): Promise<ApprovalDecision> {
+    this.checkForExternalDecisions();
     const settled = this.decisionsById.get(id);
     if (settled) return Promise.resolve(settled);
     return new Promise((resolve) => {
@@ -243,14 +306,26 @@ export class ApprovalBroker extends EventEmitter {
     if (this.decisionsById.has(id)) {
       throw new ApprovalBrokerError(`approval request already decided: ${id}`, 'APR_ALREADY_DECIDED');
     }
-    const result = validateApprovalDecision({ ...input, requestId: id });
+    const result = validateStoredApprovalDecision({ ...input, requestId: id });
     if (!result.ok) {
       throw new ApprovalBrokerError(
         `invalid ApprovalDecision: ${result.errors.join('; ')}`,
         'APR_INVALID_DECISION',
       );
     }
-    return this.settleDecision(result.value, { persist: true });
+    const request = this.readRequestFromDisk(id);
+    if (!request) {
+      throw new ApprovalBrokerError(`approval request not found or retired: ${id}`, 'APR_UNKNOWN_REQUEST');
+    }
+    this.requestsById.set(id, request);
+    try {
+      return this.settleDecision(result.value, { persist: true });
+    } catch (error) {
+      if (error instanceof ApprovalBrokerError && error.code === 'APR_ALREADY_DECIDED') {
+        this.checkForExternalDecisions();
+      }
+      throw error;
+    }
   }
 
   /**
@@ -296,8 +371,18 @@ export class ApprovalBroker extends EventEmitter {
 
   /** Shared settle path for decide/expire/checkForExternalDecisions. */
   private settleDecision(decision: ApprovalDecision, opts: { persist: boolean }): ApprovalDecision {
-    if (opts.persist) {
-      this.atomicWriteJson(this.decisionFilePath(decision.requestId), decision);
+    if (opts.persist && !createJsonFileFirstWriterWins(this.decisionFilePath(decision.requestId), decision)) {
+      throw new ApprovalBrokerError(
+        `approval request already decided: ${decision.requestId}`,
+        'APR_ALREADY_DECIDED',
+      );
+    }
+    if (opts.persist && existsSync(this.tombstoneFilePath(decision.requestId))) {
+      try { unlinkSync(this.decisionFilePath(decision.requestId)); } catch { /* prune may have won cleanup */ }
+      throw new ApprovalBrokerError(
+        `approval request not found or retired: ${decision.requestId}`,
+        'APR_UNKNOWN_REQUEST',
+      );
     }
     this.seenDecisionFiles.add(`${decision.requestId}.decision.json`);
     this.decisionsById.set(decision.requestId, decision);
@@ -327,7 +412,7 @@ export class ApprovalBroker extends EventEmitter {
       if (this.decisionsById.has(id)) continue;
       if (Date.parse(request.expiresAt) > nowMs) continue;
 
-      const result = validateApprovalDecision({
+      const result = validateStoredApprovalDecision({
         requestId: id,
         decision: request.defaultAction,
         decidedBy: 'system',
@@ -337,7 +422,15 @@ export class ApprovalBroker extends EventEmitter {
       });
       // Constructed from already-validated fields — cannot fail; fail-safe skip if it ever does.
       if (!result.ok) continue;
-      produced.push(this.settleDecision(result.value, { persist: true }));
+      try {
+        produced.push(this.settleDecision(result.value, { persist: true }));
+      } catch (error) {
+        if (error instanceof ApprovalBrokerError && error.code === 'APR_ALREADY_DECIDED') {
+          this.checkForExternalDecisions();
+          continue;
+        }
+        throw error;
+      }
     }
     return produced;
   }
@@ -374,14 +467,32 @@ export class ApprovalBroker extends EventEmitter {
     this.ensureStoreDir();
     let files: string[];
     try {
-      files = readdirSync(this.storeDir).filter((f) => f.endsWith('.decision.json'));
+      files = readdirSync(this.storeDir);
     } catch {
       return [];
     }
 
     const discovered: ApprovalDecision[] = [];
     for (const file of files) {
-      if (this.seenDecisionFiles.has(file)) continue;
+      if (!file.endsWith('.tombstone.json') || this.seenTombstoneFiles.has(file)) continue;
+      let raw: unknown;
+      try {
+        raw = JSON.parse(readFileSync(join(this.storeDir, file), 'utf-8'));
+      } catch {
+        continue;
+      }
+      const result = approvalTombstoneSchema.safeParse(raw);
+      if (!result.success || file !== `${result.data.id}.tombstone.json`) {
+        this.seenTombstoneFiles.add(file);
+        continue;
+      }
+      this.seenTombstoneFiles.add(file);
+      if (this.decisionsById.has(result.data.id)) continue;
+      discovered.push(this.settleDecision(result.data.decision, { persist: false }));
+    }
+
+    for (const file of files) {
+      if (!file.endsWith('.decision.json') || this.seenDecisionFiles.has(file)) continue;
 
       let raw: unknown;
       try {
@@ -391,7 +502,7 @@ export class ApprovalBroker extends EventEmitter {
         continue;
       }
 
-      const result = validateApprovalDecision(raw);
+      const result = validateStoredApprovalDecision(raw);
       if (!result.ok) {
         // Permanently malformed foreign file — mark seen so it never retry-loops.
         this.seenDecisionFiles.add(file);
@@ -399,6 +510,16 @@ export class ApprovalBroker extends EventEmitter {
       }
 
       const decision = result.value;
+      if (file !== `${decision.requestId}.decision.json`) {
+        this.seenDecisionFiles.add(file);
+        continue;
+      }
+      const request = this.readRequestFromDisk(decision.requestId);
+      if (!request) {
+        this.seenDecisionFiles.add(file);
+        continue;
+      }
+      this.requestsById.set(request.id, request);
       if (this.decisionsById.has(decision.requestId)) {
         this.seenDecisionFiles.add(file);
         continue;

@@ -4,10 +4,14 @@
 // round-trip losslessness, and the rawArgs-exclusion guarantee (APR-4).
 import { describe, it, expect } from 'vitest';
 import {
+  approvalLookupIdSchema,
+  approvalTombstoneSchema,
   approvalRequestSchema,
   approvalDecisionSchema,
   validateApprovalRequest,
   validateApprovalDecision,
+  validateStoredApprovalRequest,
+  validateStoredApprovalDecision,
   isApprovalRequest,
   isApprovalDecision,
   APPROVAL_CONTRACT_VERSION,
@@ -85,6 +89,39 @@ describe('approval-contract — enum shape (spec counts)', () => {
 });
 
 describe('approval-contract — ApprovalRequest', () => {
+  it('accepts only bounded lowercase-ASCII opaque ids', () => {
+    for (const id of ['a', 'apr-350-004-001', `a${'b'.repeat(127)}`]) {
+      expect(validateApprovalRequest({ ...validRequest(), id }).ok).toBe(true);
+    }
+
+    for (const id of [
+      '../escape',
+      'path/escape',
+      'path\\escape',
+      '.hidden',
+      'trailing.',
+      'Uppercase',
+      'unicodé',
+      'con',
+      'con.json',
+      'com1.log',
+      `a${'b'.repeat(128)}`,
+    ]) {
+      expect(validateApprovalRequest({ ...validRequest(), id }).ok, id).toBe(false);
+    }
+  });
+
+  it('reads path-safe legacy v1 ids without authorizing them for new writes', () => {
+    for (const id of ['APR-LEGACY-1', 'önceki-kayıt']) {
+      expect(validateApprovalRequest({ ...validRequest(), id }).ok, id).toBe(false);
+      expect(validateStoredApprovalRequest({ ...validRequest(), id }).ok, id).toBe(true);
+      expect(approvalLookupIdSchema.safeParse(id).success, id).toBe(true);
+    }
+    for (const id of ['../escape', 'path/escape', 'path\\escape', 'con', 'trail.']) {
+      expect(validateStoredApprovalRequest({ ...validRequest(), id }).ok, id).toBe(false);
+    }
+  });
+
   it('rejects an empty object and lists every required field as missing', () => {
     const res = validateApprovalRequest({});
     expect(res.ok).toBe(false);
@@ -253,6 +290,36 @@ describe('approval-contract — ApprovalRequest', () => {
 });
 
 describe('approval-contract — ApprovalDecision', () => {
+  it('applies the same cross-platform opaque-id contract to requestId', () => {
+    for (const requestId of ['../escape', 'path/escape', 'path\\escape', 'APR-UPPER', 'nul', 'lpt9.txt', 'x.']) {
+      expect(validateApprovalDecision({ ...validDecision(), requestId }).ok, requestId).toBe(false);
+    }
+  });
+
+  it('reads a legacy decision id only through the persisted compatibility validator', () => {
+    const legacy = { ...validDecision(), requestId: 'APR-LEGACY-1' };
+    expect(validateApprovalDecision(legacy).ok).toBe(false);
+    expect(validateStoredApprovalDecision(legacy).ok).toBe(true);
+  });
+
+  it('requires tombstone id and embedded winner requestId to match', () => {
+    const valid = approvalTombstoneSchema.safeParse({
+      version: 1,
+      id: 'apr-retired',
+      retiredAt: EXPIRES_AT,
+      decision: { ...validDecision(), requestId: 'apr-retired' },
+    });
+    expect(valid.success).toBe(true);
+
+    const mismatched = approvalTombstoneSchema.safeParse({
+      version: 1,
+      id: 'apr-retired',
+      retiredAt: EXPIRES_AT,
+      decision: { ...validDecision(), requestId: 'apr-other' },
+    });
+    expect(mismatched.success).toBe(false);
+  });
+
   it('rejects an empty object and lists every required field as missing', () => {
     const res = validateApprovalDecision({});
     expect(res.ok).toBe(false);

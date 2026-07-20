@@ -11,7 +11,7 @@ import {
   ApprovalStoreError,
   type ApprovalStoreSnapshot,
 } from '../../src/core/approval-store.js';
-import { ApprovalBroker } from '../../src/core/approval-broker.js';
+import { ApprovalBroker, ApprovalBrokerError } from '../../src/core/approval-broker.js';
 import type { ApprovalRequestInput } from '../../src/core/approval-broker.js';
 import type { ApprovalDecision, ApprovalRequest } from '../../src/core/approval-contract.js';
 
@@ -314,6 +314,34 @@ describe('ApprovalStore.transition', () => {
     }
   });
 
+  it('two stale store instances preserve the first terminal decision', () => {
+    const req = broker.submit(buildRequest('apr-trans-race'));
+    const storeA = new ApprovalStore(projectRoot, { storeDir });
+    const storeB = new ApprovalStore(projectRoot, { storeDir });
+    storeA.index(FIXED_NOW);
+    storeB.index(FIXED_NOW);
+
+    const winner = storeA.transition(req.id, 'approved', {
+      decision: 'allow', decidedBy: 'first', channel: 'terminal', decidedAt: FIXED_NOW.toISOString(),
+    });
+
+    expect(() => storeB.transition(req.id, 'denied', {
+      decision: 'deny', decidedBy: 'second', channel: 'dashboard', decidedAt: FIXED_NOW.toISOString(),
+    })).toThrow(ApprovalStoreError);
+    try {
+      storeB.transition(req.id, 'denied', {
+        decision: 'deny', decidedBy: 'second', channel: 'dashboard', decidedAt: FIXED_NOW.toISOString(),
+      });
+    } catch (error) {
+      expect((error as ApprovalStoreError).code).toBe('APR_STORE_ALREADY_TERMINAL');
+    }
+
+    const durable = JSON.parse(readFileSync(join(storeDir, `${req.id}.decision.json`), 'utf-8'));
+    expect(durable).toEqual(winner);
+    expect(idsOf(storeB.load().approved)).toEqual([req.id]);
+    expect(storeB.load().denied).toEqual([]);
+  });
+
   it('rejects an invalid decision payload', () => {
     const req = broker.submit(buildRequest('apr-trans-invalid'));
     const store = new ApprovalStore(projectRoot, { storeDir });
@@ -331,9 +359,9 @@ describe('ApprovalStore.transition', () => {
 // ─── prune ────────────────────────────────────────────────────────────────────
 
 describe('ApprovalStore.prune', () => {
-  it('removes both files for a decided entry older than the cutoff', () => {
+  it('retires an old decision with a permanent tombstone before removing its files', () => {
     const req = broker.submit(buildRequest('apr-prune-old'));
-    broker.decide(req.id, { decision: 'allow', decidedBy: 'a', channel: 'cli', decidedAt: '2026-06-01T00:00:00.000Z' });
+    const decision = broker.decide(req.id, { decision: 'allow', decidedBy: 'a', channel: 'cli', decidedAt: '2026-06-01T00:00:00.000Z' });
 
     const store = new ApprovalStore(projectRoot, { storeDir });
     store.index(FIXED_NOW);
@@ -342,7 +370,91 @@ describe('ApprovalStore.prune', () => {
     expect(pruned).toEqual([req.id]);
     expect(existsSync(join(storeDir, `${req.id}.request.json`))).toBe(false);
     expect(existsSync(join(storeDir, `${req.id}.decision.json`))).toBe(false);
+    expect(existsSync(join(storeDir, `${req.id}.tombstone.json`))).toBe(true);
     expect(store.load().approved).toEqual([]);
+
+    expect(() => broker.submit(buildRequest(req.id))).toThrowError(ApprovalBrokerError);
+
+    // Even if physical cleanup was partial or stale files reappeared, the
+    // tombstone remains the logical authority and the record stays retired.
+    writeFileSync(join(storeDir, `${req.id}.request.json`), JSON.stringify(req), 'utf-8');
+    writeFileSync(join(storeDir, `${req.id}.decision.json`), JSON.stringify(decision), 'utf-8');
+    expect(ApprovalStore.load(storeDir, FIXED_NOW)).toEqual({ pending: [], approved: [], denied: [], expired: [] });
+  });
+
+  it('prevents a stale broker/store snapshot from resurrecting a pruned id', () => {
+    const req = broker.submit(buildRequest('apr-prune-stale'));
+    const staleBroker = new ApprovalBroker(projectRoot, { storeDir });
+    const staleStore = new ApprovalStore(projectRoot, { storeDir });
+
+    broker.decide(req.id, { decision: 'allow', decidedBy: 'a', channel: 'cli', decidedAt: '2026-06-01T00:00:00.000Z' });
+    const pruningStore = new ApprovalStore(projectRoot, { storeDir });
+    expect(pruningStore.prune(new Date('2026-06-15T00:00:00.000Z'))).toEqual([req.id]);
+
+    try {
+      staleBroker.decide(req.id, { decision: 'deny', decidedBy: 'b', channel: 'cli', decidedAt: FIXED_NOW.toISOString() });
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApprovalBrokerError);
+      expect((error as ApprovalBrokerError).code).toBe('APR_UNKNOWN_REQUEST');
+    }
+
+    try {
+      staleStore.transition(req.id, 'denied', {
+        decision: 'deny', decidedBy: 'b', channel: 'cli', decidedAt: FIXED_NOW.toISOString(),
+      });
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApprovalStoreError);
+      expect((error as ApprovalStoreError).code).toBe('APR_STORE_UNKNOWN_ID');
+    }
+
+    expect(existsSync(join(storeDir, `${req.id}.decision.json`))).toBe(false);
+    expect(existsSync(join(storeDir, `${req.id}.tombstone.json`))).toBe(true);
+  });
+
+  it('hydrates a pruned tombstone winner for existing and restart waiters', async () => {
+    const req = broker.submit(buildRequest('apr-retention-race'));
+    const waitingBroker = new ApprovalBroker(projectRoot, { storeDir });
+    const waiting = waitingBroker.awaitDecision(req.id);
+
+    const decidingStore = new ApprovalStore(projectRoot, { storeDir });
+    const winner = decidingStore.transition(req.id, 'approved', {
+      decision: 'allow',
+      decidedBy: 'operator',
+      channel: 'terminal',
+      decidedAt: '2026-06-01T00:00:00.000Z',
+    });
+    const pruningStore = new ApprovalStore(projectRoot, { storeDir });
+    expect(pruningStore.prune(new Date('2026-06-15T00:00:00.000Z'))).toEqual([req.id]);
+
+    expect(waitingBroker.checkForExternalDecisions()).toEqual([winner]);
+    await expect(waiting).resolves.toEqual(winner);
+    expect(waitingBroker.list('pending')).toEqual([]);
+    expect(waitingBroker.list('decided')).toEqual([req]);
+
+    const restarted = new ApprovalBroker(projectRoot, { storeDir });
+    expect(restarted.list('all')).toEqual([]);
+    await expect(restarted.awaitDecision(req.id)).resolves.toEqual(winner);
+  });
+
+  it('fails loud and preserves active files when an invalid tombstone occupies the id', () => {
+    const req = broker.submit(buildRequest('apr-prune-conflict'));
+    broker.decide(req.id, {
+      decision: 'allow', decidedBy: 'a', channel: 'cli', decidedAt: '2026-06-01T00:00:00.000Z',
+    });
+    writeFileSync(join(storeDir, `${req.id}.tombstone.json`), JSON.stringify({ invalid: true }), 'utf-8');
+
+    const store = new ApprovalStore(projectRoot, { storeDir });
+    try {
+      store.prune(new Date('2026-06-15T00:00:00.000Z'));
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApprovalStoreError);
+      expect((error as ApprovalStoreError).code).toBe('APR_STORE_RETIREMENT_CONFLICT');
+    }
+    expect(existsSync(join(storeDir, `${req.id}.request.json`))).toBe(true);
+    expect(existsSync(join(storeDir, `${req.id}.decision.json`))).toBe(true);
   });
 
   it('leaves a decided entry newer than the cutoff untouched', () => {

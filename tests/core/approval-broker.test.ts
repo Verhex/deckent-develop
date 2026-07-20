@@ -5,18 +5,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // node:fs is mocked only to give the "atomic write" test control over a single
-// renameSync call; every other export passes through to the real implementation
+// linkSync call; every other export passes through to the real implementation
 // (see tests/core/host-detector.test.ts comment — vi.spyOn(fs, ...) throws under
 // Node's native ESM loader, vi.mock is this project's supported pattern).
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return {
     ...actual,
-    renameSync: vi.fn(actual.renameSync),
+    linkSync: vi.fn(actual.linkSync),
   };
 });
 
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, readdirSync, renameSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, readFileSync, writeFileSync, readdirSync, linkSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -30,7 +30,7 @@ import {
   type ApprovalDecision,
 } from '../../src/core/approval-contract.js';
 
-const mockedRenameSync = vi.mocked(renameSync);
+const mockedLinkSync = vi.mocked(linkSync);
 
 const CREATED_AT = '2026-07-01T21:00:00.000Z';
 const FIXED_NOW = new Date('2026-07-01T21:05:00.000Z');
@@ -84,6 +84,10 @@ describe('ApprovalBroker.submit', () => {
 
     const onDisk = JSON.parse(readFileSync(join(storeDir, 'apr-1.request.json'), 'utf-8'));
     expect(onDisk).toEqual(req);
+    if (process.platform !== 'win32') {
+      expect(statSync(storeDir).mode & 0o777).toBe(0o700);
+      expect(statSync(join(storeDir, 'apr-1.request.json')).mode & 0o777).toBe(0o600);
+    }
 
     // No leftover tmp artifacts after a clean write.
     const leftoverTmp = readdirSync(storeDir).filter((f) => f.endsWith('.tmp'));
@@ -114,23 +118,51 @@ describe('ApprovalBroker.submit', () => {
       expect((err as ApprovalBrokerError).code).toBe('APR_DUPLICATE_ID');
     }
   });
+
+  it('rejects path-traversal ids before any store write', () => {
+    try {
+      broker.submit(buildRequest('../escape'));
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApprovalBrokerError);
+      expect((error as ApprovalBrokerError).code).toBe('APR_INVALID_REQUEST');
+    }
+    expect(existsSync(join(projectRoot, 'escape.request.json'))).toBe(false);
+    expect(readdirSync(storeDir)).toEqual([]);
+  });
+
+  it('rejects the same request id from a fresh broker without overwriting the first request', () => {
+    const first = broker.submit(buildRequest('apr-cross-process-request', { summary: 'first request' }));
+    const brokerB = new ApprovalBroker(projectRoot, { storeDir });
+
+    expect(() => brokerB.submit(buildRequest('apr-cross-process-request', { summary: 'second request' })))
+      .toThrow(ApprovalBrokerError);
+    try {
+      brokerB.submit(buildRequest('apr-cross-process-request', { summary: 'second request' }));
+    } catch (error) {
+      expect((error as ApprovalBrokerError).code).toBe('APR_DUPLICATE_ID');
+    }
+
+    const durable = JSON.parse(readFileSync(join(storeDir, 'apr-cross-process-request.request.json'), 'utf-8'));
+    expect(durable).toEqual(first);
+  });
 });
 
 // ─── atomic write ─────────────────────────────────────────────────────────────
 
 describe('ApprovalBroker — atomic write', () => {
-  it('cleans up the tmp file and leaves no partial request file when rename fails', () => {
-    mockedRenameSync.mockImplementationOnce(() => {
-      throw new Error('simulated rename failure');
+  it('cleans up the tmp file and leaves no partial request file when publish fails', () => {
+    mockedLinkSync.mockImplementationOnce(() => {
+      throw new Error('simulated link failure');
     });
 
-    expect(() => broker.submit(buildRequest('apr-atomic'))).toThrow('simulated rename failure');
+    expect(() => broker.submit(buildRequest('apr-atomic'))).toThrow('simulated link failure');
 
     const files = readdirSync(storeDir);
     expect(files.some((f) => f.startsWith('apr-atomic.request.json'))).toBe(false);
     expect(files.some((f) => f.endsWith('.tmp'))).toBe(false);
 
-    // The mock's base implementation still delegates to the real renameSync,
+    // The mock's base implementation still delegates to the real linkSync,
     // so a subsequent submit succeeds normally.
     const req = broker.submit(buildRequest('apr-atomic'));
     expect(req.id).toBe('apr-atomic');
@@ -140,6 +172,22 @@ describe('ApprovalBroker — atomic write', () => {
 // ─── decide + awaitDecision ───────────────────────────────────────────────────
 
 describe('ApprovalBroker.decide / awaitDecision', () => {
+  it('rejects a decision without a durable request', () => {
+    try {
+      broker.decide('apr-unknown', {
+        decision: 'allow',
+        decidedBy: 'alperen',
+        channel: 'terminal',
+        decidedAt: FIXED_NOW.toISOString(),
+      });
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApprovalBrokerError);
+      expect((error as ApprovalBrokerError).code).toBe('APR_UNKNOWN_REQUEST');
+    }
+    expect(existsSync(join(storeDir, 'apr-unknown.decision.json'))).toBe(false);
+  });
+
   it('resolves the awaiting promise and emits decided', async () => {
     const req = broker.submit(buildRequest('apr-decide-1'));
     const waiting = broker.awaitDecision(req.id);
@@ -194,6 +242,64 @@ describe('ApprovalBroker.decide / awaitDecision', () => {
     }
   });
 
+  it('a fresh broker cannot overwrite the durable winner and hydrates it for waiters', async () => {
+    const req = broker.submit(buildRequest('apr-decision-race'));
+    const brokerB = new ApprovalBroker(projectRoot, { storeDir });
+    const waitingB = brokerB.awaitDecision(req.id);
+
+    const winner = broker.decide(req.id, {
+      decision: 'allow', decidedBy: 'first', channel: 'terminal', decidedAt: FIXED_NOW.toISOString(),
+    });
+
+    expect(() => brokerB.decide(req.id, {
+      decision: 'deny', decidedBy: 'second', channel: 'dashboard', decidedAt: FIXED_NOW.toISOString(),
+    })).toThrow(ApprovalBrokerError);
+    try {
+      brokerB.decide(req.id, {
+        decision: 'deny', decidedBy: 'second', channel: 'dashboard', decidedAt: FIXED_NOW.toISOString(),
+      });
+    } catch (error) {
+      expect((error as ApprovalBrokerError).code).toBe('APR_ALREADY_DECIDED');
+    }
+
+    await expect(waitingB).resolves.toEqual(winner);
+    const durable = JSON.parse(readFileSync(join(storeDir, `${req.id}.decision.json`), 'utf-8'));
+    expect(durable).toEqual(winner);
+  });
+
+  it('hydrates durable requests and decisions on process restart', async () => {
+    const pending = broker.submit(buildRequest('apr-restart-pending'));
+    const decided = broker.submit(buildRequest('apr-restart-decided'));
+    const decision = broker.decide(decided.id, {
+      decision: 'deny', decidedBy: 'first', channel: 'terminal', decidedAt: FIXED_NOW.toISOString(),
+    });
+
+    const restarted = new ApprovalBroker(projectRoot, { storeDir });
+    expect(restarted.list('pending')).toEqual([pending]);
+    expect(restarted.list('decided')).toEqual([decided]);
+    await expect(restarted.awaitDecision(decided.id)).resolves.toEqual(decision);
+  });
+
+  it('hydrates and decides a path-safe legacy v1 request without permitting a new legacy submit', async () => {
+    const legacy = {
+      ...buildRequest('apr-placeholder'),
+      id: 'APR-LEGACY-1',
+      version: '1.0',
+      maskedArgs: null,
+      rawArgsRef: null,
+    };
+    writeFileSync(join(storeDir, 'APR-LEGACY-1.request.json'), JSON.stringify(legacy), 'utf-8');
+
+    const restarted = new ApprovalBroker(projectRoot, { storeDir });
+    expect(restarted.list('pending')).toEqual([legacy]);
+    expect(() => restarted.submit(buildRequest('APR-LEGACY-2'))).toThrowError(ApprovalBrokerError);
+
+    const decision = restarted.decide(legacy.id, {
+      decision: 'allow', decidedBy: 'operator', channel: 'terminal', decidedAt: FIXED_NOW.toISOString(),
+    });
+    await expect(new ApprovalBroker(projectRoot, { storeDir }).awaitDecision(legacy.id)).resolves.toEqual(decision);
+  });
+
   it('rejects an invalid decision (unknown decision value)', () => {
     const req = broker.submit(buildRequest('apr-decide-4'));
     expect(() =>
@@ -243,6 +349,26 @@ describe('ApprovalBroker.expire', () => {
 
     const produced = broker.expire(new Date('2026-07-01T21:20:00.000Z'));
     expect(produced).toEqual([]);
+  });
+
+  it('expires a hydrated path-safe legacy v1 request with the same lifecycle semantics', () => {
+    const legacy = {
+      ...buildRequest('apr-placeholder'),
+      id: 'APR-LEGACY-TTL',
+      version: '1.0',
+      maskedArgs: null,
+      rawArgsRef: null,
+    };
+    writeFileSync(join(storeDir, 'APR-LEGACY-TTL.request.json'), JSON.stringify(legacy), 'utf-8');
+
+    const restarted = new ApprovalBroker(projectRoot, { storeDir });
+    const produced = restarted.expire(new Date('2026-07-01T21:20:00.000Z'));
+    expect(produced).toHaveLength(1);
+    expect(produced[0]).toMatchObject({
+      requestId: legacy.id,
+      decision: legacy.defaultAction,
+      channel: 'ttl-expire',
+    });
   });
 });
 
@@ -320,6 +446,7 @@ describe('ApprovalBroker.checkForExternalDecisions — second-process-decide sim
   });
 
   it('does not mark a torn (invalid JSON) decision file as seen — retries once the write completes', () => {
+    broker.submit(buildRequest('apr-torn'));
     const path = join(storeDir, 'apr-torn.decision.json');
     writeFileSync(path, '{"requestId": "apr-torn", "decision":', 'utf-8'); // torn mid-write JSON
 
@@ -336,6 +463,22 @@ describe('ApprovalBroker.checkForExternalDecisions — second-process-decide sim
     writeFileSync(path, JSON.stringify(full), 'utf-8');
 
     expect(broker.checkForExternalDecisions()).toEqual([full]);
+  });
+
+  it('ignores a valid decision published under a non-canonical filename', () => {
+    const req = broker.submit(buildRequest('apr-canonical-file'));
+    const decision: ApprovalDecision = {
+      requestId: req.id,
+      decision: 'allow',
+      decidedBy: 'x',
+      channel: 'cli',
+      decidedAt: FIXED_NOW.toISOString(),
+      reason: '',
+    };
+    writeFileSync(join(storeDir, 'wrong.decision.json'), JSON.stringify(decision), 'utf-8');
+
+    expect(broker.checkForExternalDecisions()).toEqual([]);
+    expect(broker.list('pending')).toEqual([req]);
   });
 });
 

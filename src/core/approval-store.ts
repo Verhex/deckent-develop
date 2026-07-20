@@ -8,9 +8,8 @@
 //   • one file per request:  `<id>.request.json`  → ApprovalRequest
 //   • one file per decision: `<id>.decision.json` → ApprovalDecision
 //     (both validated against approval-contract.ts, never redefined here)
-//   • atomic write = tmp file (`${filePath}.${randomUUID()}.tmp`) +
-//     `writeFileSync` + `renameSync`, best-effort `unlinkSync` of the tmp file
-//     on rename failure (approval-broker.ts `atomicWriteJson`)
+//   • atomic write = fully-written temp + non-replacing hard-link create
+//     (`approval-file-cas.ts`); a later process can never overwrite the winner
 //   • a TTL-swept decision is written with `channel: 'ttl-expire'`,
 //     `decidedBy: 'system'` (approval-broker.ts `expire()`)
 //
@@ -32,23 +31,22 @@
 //   denied   — decision file exists, `channel !== 'ttl-expire'`, and
 //              `decision !== 'allow'` (deny / defer / escalate)
 
-import { randomUUID } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
   readFileSync,
   readdirSync,
-  renameSync,
   unlinkSync,
-  writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { DECKENT_DIR } from './constants.js';
+import { createJsonFileFirstWriterWins } from './approval-file-cas.js';
 import {
   approvalDecisionSchema,
-  validateApprovalRequest,
-  validateApprovalDecision,
+  approvalTombstoneSchema,
+  validateStoredApprovalRequest,
+  validateStoredApprovalDecision,
   type ApprovalRequest,
   type ApprovalDecision,
 } from './approval-contract.js';
@@ -94,7 +92,8 @@ export type ApprovalStoreErrorCode =
   | 'APR_STORE_UNKNOWN_ID'
   | 'APR_STORE_ALREADY_TERMINAL'
   | 'APR_STORE_INVALID_DECISION'
-  | 'APR_STORE_CATEGORY_MISMATCH';
+  | 'APR_STORE_CATEGORY_MISMATCH'
+  | 'APR_STORE_RETIREMENT_CONFLICT';
 
 export class ApprovalStoreError extends Error {
   constructor(
@@ -155,18 +154,29 @@ function scanStoreDir(dir: string, now: Date): ApprovalStoreSnapshot {
 
   const requestsById = new Map<string, ApprovalRequest>();
   const decisionsById = new Map<string, ApprovalDecision>();
+  const retiredIds = new Set<string>();
+
+  for (const file of files) {
+    if (!file.endsWith('.tombstone.json')) continue;
+    const parsed = approvalTombstoneSchema.safeParse(readJson(join(dir, file)));
+    if (parsed.success && file === `${parsed.data.id}.tombstone.json`) retiredIds.add(parsed.data.id);
+  }
 
   for (const file of files) {
     if (file.endsWith('.request.json')) {
       const parsed = readJson(join(dir, file));
       if (parsed === undefined) continue;
-      const result = validateApprovalRequest(parsed);
-      if (result.ok) requestsById.set(result.value.id, result.value);
+      const result = validateStoredApprovalRequest(parsed);
+      if (result.ok
+        && file === `${result.value.id}.request.json`
+        && !retiredIds.has(result.value.id)) requestsById.set(result.value.id, result.value);
     } else if (file.endsWith('.decision.json')) {
       const parsed = readJson(join(dir, file));
       if (parsed === undefined) continue;
-      const result = validateApprovalDecision(parsed);
-      if (result.ok) decisionsById.set(result.value.requestId, result.value);
+      const result = validateStoredApprovalDecision(parsed);
+      if (result.ok
+        && file === `${result.value.requestId}.decision.json`
+        && !retiredIds.has(result.value.requestId)) decisionsById.set(result.value.requestId, result.value);
     }
   }
 
@@ -228,7 +238,7 @@ export class ApprovalStore {
 
   private ensureStoreDir(): void {
     if (!existsSync(this.storeDir)) {
-      mkdirSync(this.storeDir, { recursive: true });
+      mkdirSync(this.storeDir, { recursive: true, mode: 0o700 });
     }
   }
 
@@ -240,24 +250,8 @@ export class ApprovalStore {
     return join(this.storeDir, `${id}.decision.json`);
   }
 
-  /** Atomic write — identical tmp+rename pattern to approval-broker.ts
-   *  `atomicWriteJson` (cited at module top), so a crash mid-write never
-   *  leaves a torn file, and a concurrent broker sharing `storeDir` never
-   *  observes a half-written decision. */
-  private atomicWriteJson(filePath: string, data: unknown): void {
-    this.ensureStoreDir();
-    const tmpPath = `${filePath}.${randomUUID()}.tmp`;
-    writeFileSync(tmpPath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
-    try {
-      renameSync(tmpPath, filePath);
-    } catch (err) {
-      try {
-        unlinkSync(tmpPath);
-      } catch {
-        // Best-effort cleanup — the rename error below is what the caller needs.
-      }
-      throw err;
-    }
+  private tombstoneFilePath(id: string): string {
+    return join(this.storeDir, `${id}.tombstone.json`);
   }
 
   // ─── load / index (restart-survive) ────────────────────────────────────
@@ -314,14 +308,22 @@ export class ApprovalStore {
       throw new ApprovalStoreError(`request already decided: ${id}`, 'APR_STORE_ALREADY_TERMINAL');
     }
 
-    const result = validateApprovalDecision({ ...input, requestId: id });
+    const result = validateStoredApprovalDecision({ ...input, requestId: id });
     if (!result.ok) {
       throw new ApprovalStoreError(`invalid ApprovalDecision: ${result.errors.join('; ')}`, 'APR_STORE_INVALID_DECISION');
     }
     const decision = result.value;
     assertCategoryConsistency(to, decision);
 
-    this.atomicWriteJson(this.decisionFilePath(id), decision);
+    if (!createJsonFileFirstWriterWins(this.decisionFilePath(id), decision)) {
+      this.index();
+      throw new ApprovalStoreError(`request already decided: ${id}`, 'APR_STORE_ALREADY_TERMINAL');
+    }
+    if (existsSync(this.tombstoneFilePath(id))) {
+      try { unlinkSync(this.decisionFilePath(id)); } catch { /* prune may have won cleanup */ }
+      this.index();
+      throw new ApprovalStoreError(`request retired before decision commit: ${id}`, 'APR_STORE_UNKNOWN_ID');
+    }
     this.index();
     return decision;
   }
@@ -344,13 +346,13 @@ export class ApprovalStore {
    * requests regardless of which process submitted them.
    *
    * Cross-process safe by construction:
-   *  • Atomic tmp+rename write — a concurrent reader never sees a torn decision.
+   *  • Atomic first-writer-wins publish — a concurrent reader never sees a
+   *    torn decision and a sibling can never overwrite the winner.
    *  • Idempotent — the leading re-scan skips any id already decided (by this
    *    call, a sibling store/broker, or a `deckent approve` CLI), so a repeat
    *    call never double-decides and returns `[]` once everything is closed.
-   *  • Race-tolerant — if a sibling process wins the write for the same id (or
-   *    `storeDir` vanishes mid-write), the rename/ENOENT error is swallowed and
-   *    that id is simply skipped, never thrown.
+   *  • Race-tolerant — if a sibling process wins the write for the same id,
+   *    this instance records no closure and re-indexes the durable winner.
    *
    * NEVER deletes a request file — deletion is exclusively {@link prune}'s job
    * (aged, already-decided entries). A sweep only ever WRITES a closure decision,
@@ -364,10 +366,11 @@ export class ApprovalStore {
   sweepExpired(now: Date = new Date()): string[] {
     this.index(now);
     const swept: string[] = [];
+    let attempted = false;
     for (const entry of this.snapshot.expired) {
       if (entry.decision) continue; // already swept/decided — idempotent skip
       const id = entry.request.id;
-      const result = validateApprovalDecision({
+      const result = validateStoredApprovalDecision({
         requestId: id,
         decision: entry.request.defaultAction,
         decidedBy: 'system',
@@ -377,25 +380,30 @@ export class ApprovalStore {
       });
       // Built from already-validated request fields — cannot fail; fail-safe skip.
       if (!result.ok) continue;
-      try {
-        this.atomicWriteJson(this.decisionFilePath(id), result.value);
+      attempted = true;
+      if (createJsonFileFirstWriterWins(this.decisionFilePath(id), result.value)) {
+        if (existsSync(this.tombstoneFilePath(id))) {
+          try { unlinkSync(this.decisionFilePath(id)); } catch { /* prune may have won cleanup */ }
+          continue;
+        }
         swept.push(id);
-      } catch {
-        // Concurrent-sweep race (rename/ENOENT/EPERM) or storeDir removed
-        // mid-write: a sibling process wrote the same honest closure, or the dir
-        // vanished. Never fatal to a sweep — skip this id (a sibling's sweep
-        // reports it instead); the atomic write left the target untorn either way.
       }
     }
-    if (swept.length > 0) this.index(now);
+    if (attempted) this.index(now);
     return swept;
   }
 
   // ─── prune ──────────────────────────────────────────────────────────────
 
   /**
-   * Delete the on-disk request+decision file pair for every decided entry
-   * (`approved` / `denied` / swept `expired`) whose `decision.decidedAt` is
+   * Retire every decided entry older than the cutoff with a permanent,
+   * first-writer-wins tombstone, then best-effort remove its request+decision
+   * file pair. The tombstone is the logical deletion authority: it prevents ID
+   * reuse and makes partial physical cleanup fail-closed instead of resurrecting
+   * a pending request or re-binding a stale decision.
+   *
+   * For every decided entry (`approved` / `denied` / swept `expired`) whose
+   * `decision.decidedAt` is
    * older than `olderThan`. `pending` entries and unswept-`expired` entries
    * (no decision yet) are NEVER pruned regardless of age. Best-effort file
    * removal (a file already gone is not an error). Returns the pruned ids.
@@ -408,6 +416,24 @@ export class ApprovalStore {
         const decidedAt = entry.decision?.decidedAt;
         if (!decidedAt || Date.parse(decidedAt) >= cutoffMs) continue;
         const id = entry.request.id;
+        const tombstone = {
+          version: 1,
+          id,
+          retiredAt: new Date().toISOString(),
+          decision: entry.decision,
+        } as const;
+        const created = createJsonFileFirstWriterWins(this.tombstoneFilePath(id), tombstone);
+        if (!created) {
+          const existing = approvalTombstoneSchema.safeParse(readJson(this.tombstoneFilePath(id)));
+          if (!existing.success
+            || existing.data.id !== id
+            || JSON.stringify(existing.data.decision) !== JSON.stringify(entry.decision)) {
+            throw new ApprovalStoreError(
+              `retirement tombstone conflict for id: ${id}`,
+              'APR_STORE_RETIREMENT_CONFLICT',
+            );
+          }
+        }
         for (const path of [this.requestFilePath(id), this.decisionFilePath(id)]) {
           try {
             unlinkSync(path);

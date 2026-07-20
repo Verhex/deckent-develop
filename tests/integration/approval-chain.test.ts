@@ -340,10 +340,19 @@ describe('Invariant — restart-survive: a brand-new store instance recovers ful
     const staticSnapshot = ApprovalStore.load(storeDir, new Date('2026-07-01T21:25:00.000Z'));
     expect(staticSnapshot.expired.map((e) => e.request.id)).toEqual(['apr-inv-restart-ttl']);
 
-    // Contrast: the BROKER itself is NOT restart-survive over requests — only
-    // the STORE recovers full state purely from disk. A brand-new broker
-    // instance starts with an empty in-memory index regardless of disk state.
+    // The broker also hydrates validated canonical request/decision state so
+    // a fresh process cannot forget a winner or strand an existing waiter.
     const restartedBroker = new ApprovalBroker(projectRoot, { storeDir });
-    expect(restartedBroker.list('all')).toEqual([]);
+    expect(restartedBroker.list('all').map((request) => request.id).sort()).toEqual([
+      approved.id,
+      denied.id,
+      pending.id,
+      'apr-inv-restart-ttl',
+    ].sort());
+    expect(restartedBroker.list('decided').map((request) => request.id).sort()).toEqual([
+      approved.id,
+      denied.id,
+      'apr-inv-restart-ttl',
+    ].sort());
   });
 });

@@ -122,6 +122,15 @@ describe('/api/approvals', () => {
       expect(body.request).not.toHaveProperty('rawArgsRef');
     });
 
+    it('uses the core lookup schema for dotted canonical ids', async () => {
+      const broker = new ApprovalBroker(handle!.projectRoot);
+      broker.submit(buildRequest('apr.detail-2'));
+
+      const res = await call(handle!, '/api/approvals/apr.detail-2');
+      expect(res.status).toBe(200);
+      expect(res.json<{ request: { id: string } }>().request.id).toBe('apr.detail-2');
+    });
+
     it('404s for an unknown id', async () => {
       const res = await call(handle!, '/api/approvals/does-not-exist');
       expect(res.status).toBe(404);
@@ -171,6 +180,28 @@ describe('/api/approvals', () => {
       const listRes = await call(handle!, '/api/approvals');
       const listBody = listRes.json<{ approved: Array<{ request: { id: string } }> }>();
       expect(listBody.approved.map((e) => e.request.id)).toContain('apr-flagon-1');
+    });
+
+    it('can resolve a path-safe legacy v1 id through the shared lookup contract', async () => {
+      enableApiDecide(handle!.projectRoot);
+      const broker = new ApprovalBroker(handle!.projectRoot);
+      const legacy = {
+        ...buildRequest('apr-placeholder'),
+        id: 'APR-LEGACY-API',
+        version: '1.0',
+      };
+      writeFileSync(
+        join(handle!.projectRoot, '.deckent', 'approvals', 'APR-LEGACY-API.request.json'),
+        JSON.stringify(legacy),
+      );
+
+      const res = await call(handle!, '/api/approvals/APR-LEGACY-API/decision', {
+        method: 'POST',
+        body: JSON.stringify({ decision: 'allow' }),
+      });
+      expect(res.status).toBe(200);
+      expect(res.json<{ decision: { requestId: string } }>().decision.requestId).toBe('APR-LEGACY-API');
+      expect(broker.checkForExternalDecisions()).toHaveLength(1);
     });
 
     it('400s on an invalid decision body', async () => {

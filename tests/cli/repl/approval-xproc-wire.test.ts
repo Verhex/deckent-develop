@@ -109,10 +109,9 @@ describe('wireApprovalCrossProcess — cross-process pending → terminal-channe
     expect(event.kind).toBe('pending');
     if (event.kind === 'pending') expect(event.request).toEqual(req);
 
-    // Proof of "no double write": .emit() never touches broker.requestsById
-    // (unlike .submit(), which both persists AND registers it there) — the
-    // foreign request never became a LOCAL request of this broker instance.
-    expect(localBroker.list('all')).toEqual([]);
+    // Startup hydration registers the validated durable request locally, while
+    // the watch emits the pending event without attempting a second write.
+    expect(localBroker.list('all')).toEqual([req]);
     expect(readdirSync(storeDir).filter((f) => f === `${req.id}.request.json`)).toHaveLength(1);
 
     handle!.dispose();
