@@ -1220,6 +1220,126 @@ export function enrichEvaluationWithCategory(
   };
 }
 
+// ─── Recovered-Result Durable-Evidence Reconstruction (455-002) ─────
+// safeRubricReconcile's fault-armor (sprint-phases.ts, born-484/369-001) used
+// to collapse ANY evaluateWithRubric() fault — including a fully honest
+// worker DONE+tests result whose rubric computation simply could not run
+// (e.g. a restart-recovered `.result` hitting an edge the primary rubric
+// path doesn't defend against) — into a hardcoded `totalScore: 0` capped at
+// GO_WITH_TECH_DEBT/NO_GO. That fake zero then flowed verbatim into
+// buildBrainEvaluationReason as "rubric total 0 → …", indistinguishable
+// from an ACTUAL scored zero, and threw away the worker's durable evidence
+// (testsPassed, selfAssessment, coverage, scope) entirely.
+//
+// Missing rubric evidence is UNKNOWN, not zero. This reconstructs a real
+// score from the always-computable durable criteria — the same
+// scoreCorrectness/scoreTestCoverage/scoreScopeCompliance/scoreDocumentation
+// scorers DEFAULT_RUBRIC uses, which read only `result` and `task.scope` and
+// never touch whatever rubric-registry/task-type lookup faulted — then
+// applies the SAME concrete-failure vetoes evaluateWithRubric /
+// reconcileRubricNoGo already enforce (schema violation, worker self-NO_GO,
+// testsPassed=false, scope violation), so a genuine failure can never be
+// salvaged. A clean DONE requires the worker's own DONE claim AND EVERY
+// durable criterion individually clearing its own bar — not merely a
+// weighted-average pass, since one strong signal (e.g. tests) could
+// otherwise paper over another being essentially absent (e.g. no notes at
+// all). Anything short of that "sufficient durable acceptance evidence"
+// honestly lands on GO_WITH_TECH_DEBT rather than a fabricated pass — never
+// a numeric-zero fabrication either.
+export function reconstructFromDurableEvidence(
+  result: TaskResult,
+  task: Task,
+  faultReason: string,
+): EvaluationResult {
+  let schemaCheck: ResultSchemaValidation;
+  try {
+    schemaCheck = validateResultSchema(result, task);
+  } catch (e) {
+    schemaCheck = { valid: false, missingFields: [], reason: `schema check unavailable: ${String(e)}` };
+  }
+
+  const scoreOne = (name: string, fn: () => RubricScore): RubricScore => {
+    try {
+      return fn();
+    } catch (e) {
+      debugLog('reconstructFromDurableEvidence:criterionFault', `${name}: ${String(e)}`);
+      return { criterion: name, score: 0, passed: false, reason: `criterion unavailable: ${String(e)}` };
+    }
+  };
+
+  const correctness = scoreOne('correctness', () => scoreCorrectness(result));
+  const coverage = scoreOne('test_coverage', () => scoreTestCoverage(result));
+  const scope = scoreOne('scope_compliance', () => scoreScopeCompliance(result, task));
+  const documentation = scoreOne('documentation', () => scoreDocumentation(result));
+
+  const weightOf = (name: string): number =>
+    DEFAULT_RUBRIC.criteria.find(c => c.name === name)?.weight ?? 0;
+  const totalScore = Math.round(
+    (correctness.score * weightOf('correctness') +
+      coverage.score * weightOf('test_coverage') +
+      scope.score * weightOf('scope_compliance') +
+      documentation.score * weightOf('documentation')) * 100,
+  ) / 100;
+
+  let decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
+  let veto: string | null = null;
+
+  if (!schemaCheck.valid) {
+    decision = 'NO_GO';
+    veto = `schema_violation:${schemaCheck.missingFields.join(',') || schemaCheck.reason}`;
+  } else if (result.selfAssessment === 'NO_GO') {
+    decision = 'NO_GO';
+    veto = 'worker_self_no_go';
+  } else if (result.testsPassed === false) {
+    decision = 'NO_GO';
+    veto = 'concrete_test_failed';
+  } else if (!scope.passed) {
+    decision = 'NO_GO';
+    veto = 'concrete_scope_violation';
+  } else if (
+    totalScore >= DEFAULT_RUBRIC.passingScore &&
+    correctness.passed && coverage.passed && scope.passed && documentation.passed
+  ) {
+    // Sufficient durable acceptance evidence for a candidate DONE — every
+    // criterion individually clears its bar, not just the weighted total —
+    // still capped at the worker's own ceiling (EVAL-DEBT-CEILING parity: a
+    // GO_WITH_TECH_DEBT self-claim is never silently upgraded).
+    decision = result.selfAssessment === 'DONE' ? 'DONE' : 'GO_WITH_TECH_DEBT';
+  } else if (totalScore >= DEFAULT_RUBRIC.passingScore * 0.7) {
+    decision = 'GO_WITH_TECH_DEBT';
+  } else {
+    decision = 'NO_GO';
+    veto = 'durable_score_below_threshold';
+  }
+
+  // Explicit decision provenance: worker claim, recovered evidence, rubric
+  // availability, veto, reconciliation path, and final verdict — all in one
+  // auditable record (persisted to the evaluation audit ledger by the
+  // existing writeTaskEvaluationAudit wire, so it survives a Brain restart).
+  const provenance: RubricScore = {
+    criterion: 'recovery_provenance',
+    score: totalScore,
+    passed: decision !== 'NO_GO',
+    reason:
+      `worker claim=${String(result.selfAssessment)}; ` +
+      `recovered evidence=testsPassed:${String(result.testsPassed)},coverage:${String(result.coverage)},` +
+      `filesChanged:${(result.filesChanged ?? []).length}; ` +
+      `rubric availability=unavailable (${faultReason}); ` +
+      `veto=${veto ?? 'none'}; ` +
+      `reconciliation=durable-evidence-reconstruction; ` +
+      `final verdict=${decision}`,
+  };
+
+  const evaluation: EvaluationResult = {
+    decision,
+    totalScore,
+    rubricScores: [correctness, coverage, scope, documentation, provenance],
+    retryCount: 0,
+  };
+
+  return decision === 'NO_GO' ? enrichEvaluationWithCategory(evaluation, result, task) : evaluation;
+}
+
 // ─── TECH_DEBT Downgrade Layer (Honest Assessment Calibration v2) ────
 
 /**

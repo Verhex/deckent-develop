@@ -106,7 +106,7 @@ import { showSplashIfEnabled } from '../cli/helpers/splash.js';
 import { calculateMetrics } from './sprint-reporter.js';
 
 // ─── Rubric-Based Evaluation ─────────────────────────────────────
-import { evaluateWithRubric, reconcileEvaluationSpuriousNoGo, applyTechDebtDowngrade } from './result-evaluator.js';
+import { evaluateWithRubric, reconcileEvaluationSpuriousNoGo, applyTechDebtDowngrade, reconstructFromDurableEvidence } from './result-evaluator.js';
 
 // ─── Honest Result Gate (Sprint 165 Task 1 — Bug X Fix) ─────────
 // Single canonical honesty boundary. Applied before evaluateWithRubric
@@ -233,9 +233,7 @@ function toTaskEvaluation(evalResult: EvaluationResult): TaskEvaluation {
  * array-shaped `notes` → TypeError in isVerificationTask) used to escape
  * whichever per-task loop called it — the EVALUATE loop closed a sprint
  * "0/0" while every worker had delivered. A single malformed result must
- * never truncate the loop it's evaluated in: fall back to an HONEST verdict
- * (worker NO_GO stays NO_GO, anything else caps at GO_WITH_TECH_DEBT — never
- * a fabricated DONE) and surface the fault as an auditor event.
+ * never truncate the loop it's evaluated in.
  *
  * 369-001 RUBRIC-ARMOR-COMPLETE: single source for every `evaluateWithRubric`
  * call site in this module (main EVALUATE, extension-hit late-result,
@@ -243,8 +241,21 @@ function toTaskEvaluation(evalResult: EvaluationResult): TaskEvaluation {
  * POSTFIX-PENDING-SCAN re-eval) — previously only the main EVALUATE site had
  * this armor; the other five had bare calls that could still truncate their
  * loop on the same class of fault.
+ *
+ * 455-002: the fallback used to hardcode `totalScore: 0` and cap the verdict
+ * at GO_WITH_TECH_DEBT regardless of the worker's actual evidence — turning a
+ * genuinely honest DONE+tests result into a fabricated "rubric total 0"
+ * reason (missing rubric evidence is UNKNOWN, never a scored zero). It now
+ * delegates to `reconstructFromDurableEvidence`, which re-derives a real
+ * score from the durable, always-computable criteria (correctness/
+ * test_coverage/scope_compliance/documentation) and applies the same
+ * concrete-failure vetoes the primary rubric path enforces (schema
+ * violation, worker self-NO_GO, testsPassed=false, scope violation) — a
+ * clean DONE is possible, but only when durable evidence actually earns it.
+ *
+ * @internal Exported for unit testing of the fault-recovery path.
  */
-async function safeRubricReconcile(
+export async function safeRubricReconcile(
   projectRoot: string,
   sprintIdFallback: string,
   task: Task,
@@ -256,6 +267,7 @@ async function safeRubricReconcile(
   } catch (rubricErr) {
     const msg = rubricErr instanceof Error ? rubricErr.message : String(rubricErr);
     debugLog('safeRubricReconcile:fault', `task=${task.id} — ${msg}`);
+    const reconstruction = reconstructFromDurableEvidence(result, task, msg);
     try {
       const sidFault = getCurrentSprintId(projectRoot) ?? sprintIdFallback;
       writeEvent(
@@ -265,24 +277,18 @@ async function safeRubricReconcile(
           taskId: task.id,
           error: msg,
           selfAssessment: result.selfAssessment,
-          fallbackDecision: result.selfAssessment === 'NO_GO' ? 'NO_GO' : 'GO_WITH_TECH_DEBT',
+          fallbackDecision: reconstruction.decision,
+          reconstructedTotalScore: reconstruction.totalScore,
           timestamp: new Date().toISOString(),
         },
       );
     } catch (e) { debugLog('safeRubricReconcile:fault-event', e); }
-    const faultNote = `[evaluation-fault fallback] rubric threw: ${msg}`;
+    const faultNote =
+      `[evaluation-fault recovery] rubric evaluation threw (${msg}) — reconstructed from durable ` +
+      `evidence (worker claim=${String(result.selfAssessment)}, testsPassed=${String(result.testsPassed)}) ` +
+      `→ ${reconstruction.decision}`;
     result.notes = result.notes ? `${result.notes}\n${faultNote}` : faultNote;
-    return {
-      decision: result.selfAssessment === 'NO_GO' ? 'NO_GO' : 'GO_WITH_TECH_DEBT',
-      totalScore: 0,
-      rubricScores: [{
-        criterion: 'evaluation-fault',
-        score: 0,
-        passed: false,
-        reason: `rubric evaluation threw (${msg}) — honest fallback from worker selfAssessment`,
-      }],
-      retryCount: 0,
-    };
+    return reconstruction;
   }
 }
 

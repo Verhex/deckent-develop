@@ -17,14 +17,27 @@
 // (d) all other result fields are preserved byte-for-byte; (e) the enrichment
 // is non-blocking / fail-soft; (f) the NO_GO veto-cause derivation still works.
 
-import { afterEach, beforeEach, describe, it, expect } from 'vitest';
+// 455-002: partial mock of result-evaluator.js so `evaluateWithRubric` can be
+// forced to throw per-test (simulating a restart-recovered/malformed result
+// hitting an edge the primary rubric path doesn't defend against), while
+// every other export (notably `reconstructFromDurableEvidence`, used by
+// safeRubricReconcile's fault-fallback) stays the real implementation. The
+// existing persistBrainVerdict tests above never call evaluateWithRubric, so
+// this mock is inert for them.
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+vi.mock('../../src/orchestra/result-evaluator.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/orchestra/result-evaluator.js')>();
+  return { ...actual, evaluateWithRubric: vi.fn() };
+});
+
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { persistBrainVerdict } from '../../src/orchestra/sprint-phases.js';
-import { TaskEvaluation } from '../../src/core/task-types.js';
-import type { TaskResult } from '../../src/core/task-types.js';
+import { persistBrainVerdict, safeRubricReconcile } from '../../src/orchestra/sprint-phases.js';
+import { evaluateWithRubric } from '../../src/orchestra/result-evaluator.js';
+import { TaskEvaluation, TaskStatus } from '../../src/core/task-types.js';
+import type { Task, TaskResult } from '../../src/core/task-types.js';
 
 let root: string;
 
@@ -178,5 +191,151 @@ describe('persistBrainVerdict — fix-result brainEvaluation consistency (MF-5)'
     const after = readResult(fixId);
     expect(after.brainEvaluation).toBe('NO_GO');
     expect(after.brainEvaluationReason).toContain('(cause: concrete_test_failed)');
+  });
+});
+
+// ═══ 455-002 — safeRubricReconcile durable-evidence fault recovery ═══
+//
+// safeRubricReconcile's fault-fallback (the "recovery path" for a thrown
+// evaluateWithRubric) used to collapse ANY fault into a hardcoded
+// totalScore:0 capped at GO_WITH_TECH_DEBT/NO_GO — discarding a genuinely
+// honest worker DONE+tests result and fabricating a "rubric total 0" reason.
+// It now reconstructs from durable evidence via reconstructFromDurableEvidence.
+// These tests exercise safeRubricReconcile directly (exported for this
+// purpose) with evaluateWithRubric mocked to throw — the exact shape a
+// restart-recovered or otherwise malformed `.result` can trigger.
+
+describe('safeRubricReconcile — durable-evidence fault recovery (455-002)', () => {
+  afterEach(() => {
+    vi.mocked(evaluateWithRubric).mockReset();
+  });
+
+  function makeTask(overrides: Partial<Task> = {}): Task {
+    return {
+      id: '455-002-safe',
+      title: 'safeRubricReconcile fixture',
+      description: 'desc',
+      model: 'sonnet',
+      effort: 'normal',
+      priority: 'NORMAL',
+      reason: 'test',
+      scope: {
+        directories: ['src/orchestra/'],
+        filesRead: [],
+        filesWrite: ['src/orchestra/result-evaluator.ts'],
+      },
+      dependencies: [],
+      goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
+      status: TaskStatus.EXECUTING,
+      ...overrides,
+    } as Task;
+  }
+
+  const richNotes =
+    'Implemented the change end-to-end, ran the targeted test suite, and confirmed ' +
+    'tsc --noEmit is clean. Coverage instrumented via vitest; all scoped files touched ' +
+    'are within the declared write list.';
+
+  function makeTaskResult(overrides: Partial<TaskResult> = {}): TaskResult {
+    return {
+      taskId: '455-002-safe',
+      workerId: 'w-455-002-safe',
+      filesChanged: ['src/orchestra/result-evaluator.ts'],
+      linesAdded: 30,
+      linesRemoved: 4,
+      testsPassed: true,
+      coverage: 92,
+      selfAssessment: 'DONE',
+      notes: richNotes,
+      ...overrides,
+    };
+  }
+
+  it('a thrown evaluateWithRubric no longer collapses a valid DONE+tests result to a fabricated rubric total 0', async () => {
+    vi.mocked(evaluateWithRubric).mockImplementation(() => {
+      throw new TypeError('restart-recovered result hit an unguarded edge');
+    });
+
+    const task = makeTask();
+    const result = makeTaskResult();
+    const evaluation = await safeRubricReconcile(root, 'sprint-455', task, result);
+
+    // The old fallback ALWAYS returned totalScore:0 — durable reconstruction
+    // must produce a real, non-zero, evidence-derived score.
+    expect(evaluation.totalScore).toBeGreaterThan(0);
+    expect(evaluation.decision).toBe('DONE');
+    expect(evaluation.rubricScores.some(s => s.criterion === 'recovery_provenance')).toBe(true);
+    // No generic "evaluation-fault" placeholder criterion — every criterion
+    // is a real, scored durable-evidence entry.
+    expect(evaluation.rubricScores.some(s => s.criterion === 'evaluation-fault')).toBe(false);
+  });
+
+  it('thin durable evidence on a thrown evaluation → honest GO_WITH_TECH_DEBT, not a fabricated zero and not NO_GO', async () => {
+    vi.mocked(evaluateWithRubric).mockImplementation(() => {
+      throw new Error('boom');
+    });
+
+    const task = makeTask();
+    const result = makeTaskResult({ notes: '' });
+    const evaluation = await safeRubricReconcile(root, 'sprint-455', task, result);
+
+    expect(evaluation.decision).toBe('GO_WITH_TECH_DEBT');
+    expect(evaluation.totalScore).toBeGreaterThan(0);
+  });
+
+  it('a concrete test failure still forces NO_GO even when rubric evaluation throws', async () => {
+    vi.mocked(evaluateWithRubric).mockImplementation(() => {
+      throw new Error('boom');
+    });
+
+    const task = makeTask();
+    const result = makeTaskResult({ testsPassed: false });
+    const evaluation = await safeRubricReconcile(root, 'sprint-455', task, result);
+
+    expect(evaluation.decision).toBe('NO_GO');
+  });
+
+  it('worker self-NO_GO still forces NO_GO even when rubric evaluation throws', async () => {
+    vi.mocked(evaluateWithRubric).mockImplementation(() => {
+      throw new Error('boom');
+    });
+
+    const task = makeTask();
+    const result = makeTaskResult({ selfAssessment: 'NO_GO' });
+    const evaluation = await safeRubricReconcile(root, 'sprint-455', task, result);
+
+    expect(evaluation.decision).toBe('NO_GO');
+  });
+
+  it('appends an [evaluation-fault recovery] note documenting the reconstructed decision', async () => {
+    vi.mocked(evaluateWithRubric).mockImplementation(() => {
+      throw new Error('registry unavailable');
+    });
+
+    const task = makeTask();
+    const result = makeTaskResult();
+    const evaluation = await safeRubricReconcile(root, 'sprint-455', task, result);
+
+    expect(result.notes).toContain('[evaluation-fault recovery]');
+    expect(result.notes).toContain('registry unavailable');
+    expect(result.notes).toContain(evaluation.decision);
+  });
+
+  it('a healthy evaluateWithRubric call is returned unchanged — the durable-evidence path is fault-only', async () => {
+    const passingEvaluation = {
+      decision: 'DONE' as const,
+      totalScore: 95,
+      rubricScores: [{ criterion: 'correctness', score: 95, passed: true, reason: 'ok' }],
+      retryCount: 0,
+    };
+    vi.mocked(evaluateWithRubric).mockReturnValue(passingEvaluation);
+
+    const task = makeTask();
+    const result = makeTaskResult();
+    const evaluation = await safeRubricReconcile(root, 'sprint-455', task, result);
+
+    expect(evaluation.decision).toBe('DONE');
+    expect(evaluation.totalScore).toBe(95);
+    expect(evaluation.rubricScores).toEqual(passingEvaluation.rubricScores);
   });
 });

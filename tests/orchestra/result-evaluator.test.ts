@@ -17,6 +17,7 @@ import {
   validateTokenUsage,
   classifyFailure,
   decideCascadeAction,
+  reconstructFromDurableEvidence,
 } from '../../src/orchestra/result-evaluator.js';
 import type {
   FailureContext,
@@ -1316,5 +1317,154 @@ describe('decideCascadeAction (cross-dep cascade logic)', () => {
     const ctx: FailureContext = { exitCode: 137 };
     const decision = decideCascadeAction('task-xyz', ctx);
     expect(decision.reason).toContain('task-xyz');
+  });
+});
+
+// ─── reconstructFromDurableEvidence() (455-002) ──────────────────────
+// safeRubricReconcile's fault-fallback used to collapse ANY evaluateWithRubric
+// fault into a hardcoded totalScore:0 capped at GO_WITH_TECH_DEBT/NO_GO,
+// discarding a genuinely honest worker DONE+tests result. This reconstructs
+// a real score from the durable criteria instead — see result-evaluator.ts
+// for the full rationale.
+
+describe('reconstructFromDurableEvidence (455-002 — recovered-result durable-evidence reconstruction)', () => {
+  const richNotes =
+    'Implemented the change end-to-end, ran the targeted test suite, and confirmed ' +
+    'tsc --noEmit is clean. Coverage instrumented via vitest; all scoped files touched ' +
+    'are within the declared write list.';
+
+  function codeTask(overrides: Partial<Task> = {}): Task {
+    return {
+      id: '455-002-durable',
+      title: 'Durable evidence fixture',
+      description: 'desc',
+      model: 'sonnet',
+      effort: 'normal',
+      priority: 'NORMAL',
+      reason: 'test',
+      scope: {
+        directories: ['src/orchestra/'],
+        filesRead: [],
+        filesWrite: ['src/orchestra/result-evaluator.ts'],
+      },
+      dependencies: [],
+      goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
+      status: TaskStatus.EXECUTING,
+      ...overrides,
+    };
+  }
+
+  function codeResult(overrides: Partial<TaskResult> = {}): TaskResult {
+    return {
+      taskId: '455-002-durable',
+      workerId: 'w-455-002-durable',
+      filesChanged: ['src/orchestra/result-evaluator.ts'],
+      linesAdded: 30,
+      linesRemoved: 4,
+      testsPassed: true,
+      coverage: 92,
+      selfAssessment: 'DONE',
+      notes: richNotes,
+      ...overrides,
+    };
+  }
+
+  it('never returns a fabricated numeric-zero score — totalScore is a real weighted grade', () => {
+    const evaluation = reconstructFromDurableEvidence(codeResult(), codeTask(), 'rubric registry threw');
+    expect(evaluation.totalScore).toBeGreaterThan(0);
+    expect(Number.isFinite(evaluation.totalScore)).toBe(true);
+  });
+
+  it('rich durable evidence (DONE claim + tests passed + in-scope + detailed notes) → DONE, not capped at tech-debt', () => {
+    // This is the exact bug: a valid worker DONE+tests result used to be
+    // downgraded to GO_WITH_TECH_DEBT (or worse) purely because the rubric
+    // computation was unavailable. With SUFFICIENT durable acceptance
+    // evidence, DONE must be reachable again.
+    const evaluation = reconstructFromDurableEvidence(codeResult(), codeTask(), 'rubric registry threw');
+    expect(evaluation.decision).toBe('DONE');
+  });
+
+  it('thin/absent notes → GO_WITH_TECH_DEBT (insufficient durable evidence for a clean DONE, never NO_GO)', () => {
+    const evaluation = reconstructFromDurableEvidence(
+      codeResult({ notes: '' }),
+      codeTask(),
+      'rubric registry threw',
+    );
+    expect(evaluation.decision).toBe('GO_WITH_TECH_DEBT');
+    expect(evaluation.totalScore).toBeGreaterThan(0);
+  });
+
+  it('concrete test failure vetoes NO_GO — never salvaged by a good score elsewhere', () => {
+    const evaluation = reconstructFromDurableEvidence(
+      codeResult({ testsPassed: false }),
+      codeTask(),
+      'rubric registry threw',
+    );
+    expect(evaluation.decision).toBe('NO_GO');
+    const provenance = evaluation.rubricScores.find(s => s.criterion === 'recovery_provenance');
+    expect(provenance?.reason).toContain('veto=concrete_test_failed');
+  });
+
+  it('worker self-NO_GO is preserved — worker priority over any reconstructed score', () => {
+    const evaluation = reconstructFromDurableEvidence(
+      codeResult({ selfAssessment: 'NO_GO' }),
+      codeTask(),
+      'rubric registry threw',
+    );
+    expect(evaluation.decision).toBe('NO_GO');
+    const provenance = evaluation.rubricScores.find(s => s.criterion === 'recovery_provenance');
+    expect(provenance?.reason).toContain('veto=worker_self_no_go');
+  });
+
+  it('a scope violation (files outside task.scope) is a concrete veto → NO_GO', () => {
+    const evaluation = reconstructFromDurableEvidence(
+      codeResult({ filesChanged: ['src/some-other-dir/unexpected.ts'] }),
+      codeTask(),
+      'rubric registry threw',
+    );
+    expect(evaluation.decision).toBe('NO_GO');
+    const provenance = evaluation.rubricScores.find(s => s.criterion === 'recovery_provenance');
+    expect(provenance?.reason).toContain('veto=concrete_scope_violation');
+  });
+
+  it('a schema-invalid recovered result (missing selfAssessment) is NO_GO, not a fabricated pass', () => {
+    const evaluation = reconstructFromDurableEvidence(
+      codeResult({ selfAssessment: undefined as unknown as TaskResult['selfAssessment'] }),
+      codeTask(),
+      'rubric registry threw',
+    );
+    expect(evaluation.decision).toBe('NO_GO');
+    const provenance = evaluation.rubricScores.find(s => s.criterion === 'recovery_provenance');
+    expect(provenance?.reason).toContain('schema_violation');
+  });
+
+  it('writes explicit decision provenance: worker claim, recovered evidence, rubric availability, veto, reconciliation, final verdict', () => {
+    const evaluation = reconstructFromDurableEvidence(codeResult(), codeTask(), 'getRubric threw: boom');
+    const provenance = evaluation.rubricScores.find(s => s.criterion === 'recovery_provenance');
+    expect(provenance).toBeDefined();
+    expect(provenance?.reason).toContain('worker claim=DONE');
+    expect(provenance?.reason).toContain('recovered evidence=testsPassed:true');
+    expect(provenance?.reason).toContain('rubric availability=unavailable (getRubric threw: boom)');
+    expect(provenance?.reason).toContain('veto=none');
+    expect(provenance?.reason).toContain('reconciliation=durable-evidence-reconstruction');
+    expect(provenance?.reason).toContain('final verdict=DONE');
+  });
+
+  it('is deterministic — the same (result, task) reconstructs to the same decision and totalScore', () => {
+    const result = codeResult();
+    const task = codeTask();
+    const first = reconstructFromDurableEvidence(result, task, 'boom');
+    const second = reconstructFromDurableEvidence(result, task, 'boom');
+    expect(second.decision).toBe(first.decision);
+    expect(second.totalScore).toBe(first.totalScore);
+  });
+
+  it('a GO_WITH_TECH_DEBT worker self-claim is never upgraded to DONE even with strong durable evidence (EVAL-DEBT-CEILING parity)', () => {
+    const evaluation = reconstructFromDurableEvidence(
+      codeResult({ selfAssessment: 'GO_WITH_TECH_DEBT' }),
+      codeTask(),
+      'rubric registry threw',
+    );
+    expect(evaluation.decision).toBe('GO_WITH_TECH_DEBT');
   });
 });
