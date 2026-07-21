@@ -24,19 +24,23 @@ import type {
 
 // ─── Canonical Types (spec §2) ──────────────────────────────────────────────
 
+/** Runtime + type-level SSOT for the fundamental nature of a unit of work. */
+export const TASK_KINDS = [
+  'code-development',
+  'test',
+  'documentation',
+  'audit',
+  'security',
+  'refactor',
+  'devops',
+  'config',
+  'design',
+  'data',
+  'generic',
+] as const;
+
 /** The fundamental nature of a unit of work. ONE taxonomy; subsystems map from it. */
-export type TaskKind =
-  | 'code-development'
-  | 'test'
-  | 'documentation'
-  | 'audit'
-  | 'security'
-  | 'refactor'
-  | 'devops'
-  | 'config'
-  | 'design'
-  | 'data'
-  | 'generic';
+export type TaskKind = typeof TASK_KINDS[number];
 
 /** Hybrid two-axis axis 1 — WHAT domain the work targets. */
 export type WorkDomain = 'code-repo' | 'erp' | 'messaging' | 'web' | 'data-pipeline' | 'generic';

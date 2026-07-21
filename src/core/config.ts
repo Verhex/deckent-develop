@@ -42,6 +42,7 @@ import { MODE_PRESETS } from './mode-presets.js';
 import type { ModelStrategy } from './mode-presets.js';
 import { metric } from './observability.js';
 import { interpolateConfig } from './deck-interpolation.js';
+import { assertExecutionBudgetPolicyConfig } from './execution-budget-policy.js';
 
 /**
  * Local intersection alias for `token_throttle_ms` — the pre-spawn quota gate
@@ -761,6 +762,14 @@ export function validateConfig(config: DeckentConfig): string[] {
           typeof providerFallback['unattended'] !== 'boolean') {
         errors.push('provider_fallback.unattended must be a boolean');
       }
+    }
+  }
+
+  if (config.execution_budget !== undefined) {
+    try {
+      assertExecutionBudgetPolicyConfig(config.execution_budget);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -2003,6 +2012,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // `config-flag-roundtrip.test.ts`'s type-vs-live parity guard. Same
     // twin-literal rule as `openrouter` below applies.
     provider_fallback: config.provider_fallback,
+    execution_budget: config.execution_budget,
     // XVERIFY-TOOL (S1): cross_verify was a pinned born-464 gap since 358-014 —
     // declared on both config types, never passed through, so `runCrossVerify`'s
     // `enabled !== true` guard could NEVER pass from a real config file and the
@@ -2798,6 +2808,7 @@ export function mergeConfigs(
     // `config-flag-roundtrip.test.ts`'s type-vs-live parity guard. Same
     // twin-literal rule as `openrouter` below applies.
     provider_fallback: config.provider_fallback,
+    execution_budget: config.execution_budget,
     // XVERIFY-TOOL (S1): cross_verify was a pinned born-464 gap since 358-014 —
     // declared on both config types, never passed through, so `runCrossVerify`'s
     // `enabled !== true` guard could NEVER pass from a real config file and the

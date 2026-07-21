@@ -11,6 +11,7 @@ import type { BotCapabilitiesConfig } from '../connectors/capabilities/types.js'
 import type { ApprovalPolicyRule } from './approval-policy.js';
 import type { ToolRiskLevel } from './tool-registry.js';
 import type { ComputerUseConfig } from './computer-use-contract.js';
+import type { ExecutionBudget, TaskKind } from './work-model.js';
 
 // ─── Timeout Configuration ──────────────────────────────────────────
 export interface TimeoutConfig {
@@ -592,6 +593,25 @@ export interface ProviderFallbackPolicyConfig {
   unattended?: boolean;
 }
 
+export type ExecutionBudgetRole = 'brain' | 'worker' | 'auditor';
+
+export interface ExecutionBudgetRolePolicyConfig {
+  /** Role-wide owner ceiling. A task-kind profile replaces it when present. */
+  default?: ExecutionBudget;
+  /** Canonical TaskKind override; no model/provider aliases are accepted here. */
+  by_task_kind?: Partial<Record<TaskKind, ExecutionBudget>>;
+}
+
+/** Owner policy that produces remote invocation budgets before side effects. */
+export interface ExecutionBudgetPolicyConfig {
+  roles: Partial<Record<ExecutionBudgetRole, ExecutionBudgetRolePolicyConfig>>;
+  /** Missing block defaults to the safe `hold` behavior. Reroute order is owner-authored. */
+  unmetered_backend?: {
+    action: 'hold' | 'reroute-or-hold';
+    ordered_backends?: Array<'docker' | 'subprocess' | 'tmux'>;
+  };
+}
+
 /**
  * A single config-driven provider definition (F1-012, zero-hardcode).
  * Declared under `config.providers.registry`; bootstrap registers each entry
@@ -691,6 +711,8 @@ export interface DeckentConfig {
   /** Role-aware provider fallback policy (454-007) — ordered role/global
    *  fallback chains + per-role primary + unattended gate. @see ProviderFallbackPolicyConfig */
   provider_fallback?: ProviderFallbackPolicyConfig;
+  /** Parametric role/task-kind remote execution budget producer. */
+  execution_budget?: ExecutionBudgetPolicyConfig;
   /** Per-task-type provider overrides */
   provider_overrides?: Record<string, ProviderName>;
   /** Tier-based model selection strategy. Merged with mode preset defaults.
@@ -1492,6 +1514,8 @@ export interface ResolvedConfig {
   /** Role-aware provider fallback policy (454-007), validated and passed
    *  through from project config. @see ProviderFallbackPolicyConfig */
   provider_fallback?: ProviderFallbackPolicyConfig;
+  /** Resolved owner policy; numerical defaults are never fabricated. */
+  execution_budget?: ExecutionBudgetPolicyConfig;
   /** Per-task provider overrides resolved from grouped or legacy config. */
   provider_overrides?: Record<string, ProviderName>;
   /** Grouped provider config pass-through (F1-012). Routing fields are already
