@@ -45,8 +45,9 @@ import { makeActivityOnEvent, type ActivityTapContext } from '../agents/worker-a
 import { extractProviderBillingEvidence } from '../core/provider-billing-evidence.js';
 import {
   createRuntimeBudgetMonitor,
-  readRuntimeBudgetStop,
+  readRuntimeBudgetExhaustion,
   resolveTaskExecutionBudget,
+  type RuntimeBudgetStopEvidence,
 } from './runtime-budget-monitor.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────
@@ -81,6 +82,23 @@ export interface ProviderAuthIsolation {
 export interface GeminiAuthSelectionBootstrap {
   selectedType: string;
   bootstrapLines: string[];
+}
+
+/** Attribute a non-zero Docker exit using host-owned budget evidence before
+ * falling back to the necessarily ambiguous exit-code heuristic. */
+export function describeDockerPartialResultTermination(
+  exitCode: number,
+  budgetStop: RuntimeBudgetStopEvidence | null,
+): string {
+  if (budgetStop) {
+    const reason = budgetStop.decision.reasons.join('; ') || 'execution budget exceeded';
+    return `Runtime budget circuit breaker stopped the worker (exitCode=${exitCode}): ${reason}. Partial-result promoted by host monitor. attemptId=${budgetStop.attemptId}; evidenceSource=${budgetStop.evidenceSource ?? 'stop-marker'}.`;
+  }
+  if (exitCode === 137) {
+    return 'Container OOM-killed (exit 137, SIGKILL). Partial-result promoted by host monitor. No .result was written by worker.';
+  }
+  const signalInfo = exitCode > 128 ? ` signal=${exitCode - 128}` : '';
+  return `Container killed (exitCode=${exitCode}${signalInfo}). Partial-result promoted by host monitor.`;
 }
 
 export function buildProviderPrivateHomeBootstrap(
@@ -3119,6 +3137,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       // Sprint 139: fsync .result from host side before reading
       // Container's fsync_file trap may have run, but belt-and-suspenders from host
       const resultPath = join(tasksDir, `task-${taskId}.result`);
+      const runtimeBudgetExhaustion = exitCode === 0
+        ? null
+        : readRuntimeBudgetExhaustion(projectDir, taskId);
       try {
         if (existsSync(resultPath)) {
           const fd = openSync(resultPath, 'r');
@@ -3140,7 +3161,7 @@ export class DockerSpawnBackend implements SpawnBackend {
             // safe: result files written by writeResult with TaskResult shape
             const result = JSON.parse(raw) as { selfAssessment?: string };
             if (
-              !readRuntimeBudgetStop(projectDir, taskId)
+              !runtimeBudgetExhaustion
               && (result.selfAssessment === 'DONE' || result.selfAssessment === 'GO_WITH_TECH_DEBT')
             ) {
               hbStatus = 'DONE';
@@ -3197,12 +3218,12 @@ export class DockerSpawnBackend implements SpawnBackend {
         try {
           const partialRaw = readFileSync(partialPath, 'utf-8');
           const partial = JSON.parse(partialRaw) as Record<string, unknown>;
-          // Enrich with exit code and signal info
-          const signalInfo = exitCode > 128 ? ` signal=${exitCode - 128}` : '';
-          const isOom = exitCode === 137;
-          partial.notes = isOom
-            ? `Container OOM-killed (exit 137, SIGKILL). Partial-result promoted by host monitor. No .result was written by worker.`
-            : `Container killed (exitCode=${exitCode}${signalInfo}). Partial-result promoted by host monitor.`;
+          // A budget circuit breaker may terminate with the same exit code as
+          // an OOM. Durable host evidence outranks that ambiguous heuristic.
+          partial.notes = describeDockerPartialResultTermination(
+            exitCode,
+            runtimeBudgetExhaustion,
+          );
           partial.exitCode = exitCode;
           partial.selfAssessment = 'NO_GO';
           const enrichedResult = JSON.stringify(partial);
