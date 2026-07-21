@@ -357,16 +357,86 @@ describe('OpenRouterProvider — ProviderAdapter contract shape', () => {
       transport: 'http',
       executionBackend: 'in-process',
     });
-    await expect(invocation.execute({ timeoutMs: 1234 })).resolves.toMatchObject({
+    const outcome = await invocation.execute({ timeoutMs: 1234 });
+    expect(outcome).toMatchObject({
       status: 0,
       stdout: '{"tasks":[],"reasoning":"proof"}',
     });
+    expect(outcome).not.toHaveProperty('usage');
+    expect(outcome).not.toHaveProperty('usageEnvelopeDigestRef');
     expect(fetchImpl).toHaveBeenCalledOnce();
     const body = JSON.parse(fetchImpl.mock.calls[0]![1].body as string);
     expect(body).toMatchObject({
       model: 'anthropic/claude-3.7-sonnet',
       messages: [{ role: 'user', content: 'plan this repository' }],
     });
+  });
+
+  it('carries rich provider usage and an opaque deterministic envelope digest', async () => {
+    const usage = {
+      prompt_tokens: 1024,
+      completion_tokens: 512,
+      total_tokens: 1536,
+      prompt_tokens_details: { cached_tokens: 256 },
+      completion_tokens_details: { reasoning_tokens: 128 },
+    };
+    const response = (completionTokens = 512) => jsonResponse(200, {
+      model: 'anthropic/claude-3.7-sonnet',
+      choices: [{ message: { content: '{"tasks":[],"reasoning":"proof"}' } }],
+      usage: { ...usage, completion_tokens: completionTokens },
+    });
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(response())
+      .mockResolvedValueOnce(response())
+      .mockResolvedValueOnce(response(513));
+    const provider = makeProvider({ fetchImpl });
+
+    const first = await provider.buildPlannerInvocation(
+      'plan this repository', 'anthropic/claude-3.7-sonnet',
+    ).execute({ timeoutMs: 1234 });
+    const replay = await provider.buildPlannerInvocation(
+      'plan this repository', 'anthropic/claude-3.7-sonnet',
+    ).execute({ timeoutMs: 1234 });
+    const changed = await provider.buildPlannerInvocation(
+      'plan this repository', 'anthropic/claude-3.7-sonnet',
+    ).execute({ timeoutMs: 1234 });
+
+    expect(first.usage).toEqual({
+      inputTokens: 1024,
+      outputTokens: 512,
+      cacheReadTokens: 256,
+      cacheCreationTokens: 0,
+      reasoningTokens: 128,
+      totalTokens: 1536,
+      source: 'provider-adapter',
+    });
+    expect(first.usageEnvelopeDigestRef).toMatch(/^provider-usage-envelope:[a-f0-9]{64}$/u);
+    // This is deliberately a value digest, not unique call evidence or a settlement key.
+    expect(replay.usageEnvelopeDigestRef).toBe(first.usageEnvelopeDigestRef);
+    expect(changed.usageEnvelopeDigestRef).not.toBe(first.usageEnvelopeDigestRef);
+    expect(first.usageEnvelopeDigestRef).not.toContain('plan this repository');
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([
+    [{ prompt_tokens: 100 }],
+    [{ completion_tokens: 50 }],
+    [{ prompt_tokens: 100, completion_tokens: '50' }],
+    [{ prompt_tokens: -1, completion_tokens: 50 }],
+  ])('keeps partial or malformed provider usage unknown: %j', async (usage) => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, {
+      model: 'anthropic/claude-3.7-sonnet',
+      choices: [{ message: { content: '{"tasks":[],"reasoning":"proof"}' } }],
+      usage,
+    }));
+    const provider = makeProvider({ fetchImpl });
+
+    const outcome = await provider.buildPlannerInvocation(
+      'plan this repository', 'anthropic/claude-3.7-sonnet',
+    ).execute({ timeoutMs: 1234 });
+
+    expect(outcome).not.toHaveProperty('usage');
+    expect(outcome).not.toHaveProperty('usageEnvelopeDigestRef');
   });
 
   it('does not retry an ambiguous planner network failure', async () => {

@@ -142,6 +142,14 @@ export interface ProviderPlannerInvocationOutcome {
   readonly stdout: string;
   readonly stderr: string;
   readonly error?: Error;
+  /** Provider-reported usage only; absent means unknown, never zero. */
+  readonly usage?: TokenUsage;
+  /**
+   * Content digest of the provider/model/usage envelope. This is not scoped call evidence,
+   * an idempotency key, or settlement authority; a host-owned receipt must bind it to those
+   * identities before consumption can be settled.
+   */
+  readonly usageEnvelopeDigestRef?: string;
 }
 
 /**

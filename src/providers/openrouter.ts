@@ -25,6 +25,7 @@ import {
   type ChildProcess,
   type SpawnOptions as NodeSpawnOptions,
 } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { writeFileSync, mkdirSync, existsSync, openSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -217,7 +218,7 @@ export class OpenRouterProvider implements ProviderAdapter {
     opts: ChatCompletionOptions | undefined,
     timeoutMs: number,
     maxAttempts: number,
-  ): Promise<ChatCompletionResult> {
+  ): Promise<OpenRouterCompletionResult> {
     if (typeof model !== 'string' || model.trim().length === 0) {
       throw new ProviderError('openrouter send() requires a non-empty model id', this.name);
     }
@@ -277,11 +278,18 @@ export class OpenRouterProvider implements ProviderAdapter {
       );
     }
     const content = json?.choices?.[0]?.message?.content ?? '';
-    const result: ChatCompletionResult = { content };
+    const result: OpenRouterCompletionResult = { content };
 
     const usage = parseOpenRouterUsage(json);
     if (usage) {
       result.usage = { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens };
+      result.providerUsage = usage;
+      result.usageEnvelopeDigestRef = plannerUsageEnvelopeDigestRef(
+        this.name,
+        model,
+        typeof json.model === 'string' ? json.model : null,
+        usage,
+      );
     }
     if (typeof json?.model === 'string') {
       result.model = json.model;
@@ -572,7 +580,18 @@ export class OpenRouterProvider implements ProviderAdapter {
             timeoutMs,
             1,
           );
-          return { status: 0, signal: null, stdout: result.content, stderr: '' };
+          return {
+            status: 0,
+            signal: null,
+            stdout: result.content,
+            stderr: '',
+            ...(result.providerUsage && result.usageEnvelopeDigestRef
+              ? {
+                  usage: result.providerUsage,
+                  usageEnvelopeDigestRef: result.usageEnvelopeDigestRef,
+                }
+              : {}),
+          };
         } catch (error) {
           return {
             status: null,
@@ -601,6 +620,13 @@ interface OpenRouterChatCompletionResponse {
   model?: string;
   choices?: Array<{ message?: { content?: string; tool_calls?: unknown } }>;
   usage?: OpenRouterUsagePayload;
+}
+
+interface OpenRouterCompletionResult extends ChatCompletionResult {
+  /** Full provider-reported usage retained for native planner accounting. */
+  providerUsage?: TokenUsage;
+  /** Secret-free content digest of provider/model identity plus normalized usage. */
+  usageEnvelopeDigestRef?: string;
 }
 
 // ─── Module-level helpers ────────────────────────────────────────────
@@ -636,14 +662,39 @@ function readNum(obj: Record<string, unknown> | undefined, key: string): number 
   return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined;
 }
 
+function plannerUsageEnvelopeDigestRef(
+  provider: string,
+  requestedModel: string,
+  upstreamModel: string | null,
+  usage: TokenUsage,
+): string {
+  const payload = JSON.stringify({
+    provider,
+    requestedModel,
+    upstreamModel,
+    usage: {
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      cacheReadTokens: usage.cacheReadTokens,
+      cacheCreationTokens: usage.cacheCreationTokens,
+      cacheWriteTokens: usage.cacheWriteTokens ?? null,
+      reasoningTokens: usage.reasoningTokens ?? null,
+      totalTokens: usage.totalTokens,
+      source: usage.source,
+    },
+  });
+  return `provider-usage-envelope:${createHash('sha256').update(payload).digest('hex')}`;
+}
+
 /**
  * Map one parsed OpenRouter `/chat/completions` payload's `usage` block into
  * the canonical {@link TokenUsage} shape. `prompt_tokens_details.cached_tokens`
  * → cacheReadTokens, `completion_tokens_details.reasoning_tokens` →
  * reasoningTokens (OpenRouter's real, documented usage-detail fields — the
  * same shape `tests/providers/openrouter-usage.test.ts` already pins for
- * `OpenAICompatibleAdapter`). Returns `null` when no real token numbers are
- * present (absent `usage`, or an empty `usage: {}`).
+ * `OpenAICompatibleAdapter`). Both core token dimensions are required: a partial
+ * provider report remains unknown rather than fabricating the missing dimension
+ * as zero.
  */
 function parseOpenRouterUsage(payload: unknown): TokenUsage | null {
   const obj = asObject(payload);
@@ -653,15 +704,15 @@ function parseOpenRouterUsage(payload: unknown): TokenUsage | null {
 
   const promptTokens = readNum(usage, 'prompt_tokens');
   const completionTokens = readNum(usage, 'completion_tokens');
-  if (promptTokens === undefined && completionTokens === undefined) return null;
+  if (promptTokens === undefined || completionTokens === undefined) return null;
 
   const cacheReadTokens = readNum(asObject(usage['prompt_tokens_details']), 'cached_tokens') ?? 0;
   const reasoningTokens = readNum(asObject(usage['completion_tokens_details']), 'reasoning_tokens');
   const totalTokens = readNum(usage, 'total_tokens');
 
   return normalizeUsage({
-    inputTokens: promptTokens ?? 0,
-    outputTokens: completionTokens ?? 0,
+    inputTokens: promptTokens,
+    outputTokens: completionTokens,
     cacheReadTokens,
     ...(reasoningTokens !== undefined ? { reasoningTokens } : {}),
     ...(totalTokens !== undefined ? { totalTokens } : {}),
