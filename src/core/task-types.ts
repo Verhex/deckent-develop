@@ -283,6 +283,24 @@ export interface GoNoGoCriteria {
   techDebtAcceptable: string;
 }
 
+/**
+ * Immutable plan-time provenance for the worker budget carried by `Task.budget`.
+ * This is a policy snapshot, not an executable permit: final provider/model/auth/
+ * backend reachability and live limit evidence are bound later by host admission.
+ */
+export interface TaskExecutionBudgetPolicySnapshot {
+  readonly state: 'allow' | 'hold';
+  readonly role: 'worker';
+  readonly taskKind?: TaskKind;
+  readonly resolvedProvider: ProviderName | 'unknown';
+  readonly executionCostClass: 'remote' | 'local';
+  readonly profileRef: string;
+  readonly policyDigest?: string;
+  readonly reasonCode?: 'budget-policy-missing' | 'role-profile-missing';
+  /** The pre-policy request, retained because a request may narrow but never widen owner authority. */
+  readonly requestedBudget?: Readonly<ExecutionBudget>;
+}
+
 // ─── Task ────────────────────────────────────────────────────────────
 export interface Task {
   id: string;
@@ -386,6 +404,8 @@ export interface Task {
   actor?: ActorContext;
   /** Durable per-task token/USD ceiling propagated from ExecutionRequest. */
   budget?: ExecutionBudget;
+  /** Plan-time owner-policy provenance for `budget`; never an execution permit. */
+  budgetPolicy?: TaskExecutionBudgetPolicySnapshot;
   createdAt?: string;
   updatedAt?: string;
 }

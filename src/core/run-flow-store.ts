@@ -51,6 +51,7 @@ import { RUNTIME_DIR } from './constants.js';
 import type { RunFlowEvent, RunProposal } from './run-flow-contract.js';
 import type { Sprint } from './types.js';
 import type { ActorContext } from './work-model.js';
+import type { ExecutionPlanDigestContext } from './execution-plan-digest.js';
 // RunHandle is duck-typed against core/run-flow-contract.ts but deliberately
 // imported from run-job-service.ts, NOT the contract file itself — see that
 // module's RunHandle doc comment (tests/orchestra/run-flow-reducer.test.ts's
@@ -67,6 +68,9 @@ export interface StoredApprovedSnapshot {
   readonly flowId: string;
   readonly revision: number;
   readonly planDigest: string;
+  /** Absent means an explicitly legacy v1 compatibility snapshot. */
+  readonly planDigestVersion?: number;
+  readonly planDigestContext?: ExecutionPlanDigestContext;
   readonly approvedBy: ActorContext;
   readonly approvedAt: string;
   /** The exact planned Sprint (task list) captured at preview time — this is
@@ -193,14 +197,49 @@ function plannedSprintLogPath(root: string, flowId: string): string {
  *  approve step needs it to build a StoredApprovedSnapshot, and it must
  *  survive a process restart — the pre-1c in-memory FlowRecord lost it.
  *  Appends (a re-planned revision keeps history, mirror of snapshots). */
-export function savePlannedSprint(root: string, flowId: string, record: { revision: number; sprint: unknown }): void {
+export interface StoredPlannedSprint {
+  readonly flowId: string;
+  readonly revision: number;
+  readonly sprint: unknown;
+  /** Absent on legacy v1 records. */
+  readonly planDigest?: string;
+  readonly planDigestVersion?: number;
+  readonly planDigestContext?: ExecutionPlanDigestContext;
+}
+
+export function savePlannedSprint(
+  root: string,
+  flowId: string,
+  record: Omit<StoredPlannedSprint, 'flowId'>,
+): void {
   appendJsonlRecord(plannedSprintLogPath(root, flowId), { flowId, ...record });
 }
 
-/** Load the MOST RECENT planned Sprint for `flowId`, or undefined. */
-export function loadPlannedSprint(root: string, flowId: string): { flowId: string; revision: number; sprint: unknown } | undefined {
-  const records = readJsonlRecords<{ flowId: string; revision: number; sprint: unknown }>(plannedSprintLogPath(root, flowId));
-  return records.length > 0 ? records[records.length - 1] : undefined;
+/**
+ * Load a planned Sprint. With a query, v2 records require an exact
+ * revision+digest+version match; legacy v1 records are revision-addressed and
+ * are never reinterpreted as v2. Without a query this preserves the historical
+ * latest-record read API for diagnostics/backward-compatible callers.
+ */
+export function loadPlannedSprint(
+  root: string,
+  flowId: string,
+  query?: { revision: number; planDigest: string; planDigestVersion?: number },
+): StoredPlannedSprint | undefined {
+  const records = readJsonlRecords<StoredPlannedSprint>(plannedSprintLogPath(root, flowId));
+  if (!query) return records.length > 0 ? records[records.length - 1] : undefined;
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    const record = records[index]!;
+    if (record.revision !== query.revision) continue;
+    if (query.planDigestVersion === undefined) {
+      if (record.planDigestVersion === undefined) return record;
+      continue;
+    }
+    if (record.planDigestVersion === query.planDigestVersion && record.planDigest === query.planDigest) {
+      return record;
+    }
+  }
+  return undefined;
 }
 
 // ─── Public API — run handles (double-start idempotency) ───────────────

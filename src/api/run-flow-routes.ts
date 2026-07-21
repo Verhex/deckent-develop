@@ -248,6 +248,8 @@ async function handlePropose(
       flowId,
       revision,
       planDigest: result.planDigest,
+      planDigestVersion: result.planDigestVersion,
+      planDigestContext: result.planDigestContext,
       taskSummaries: result.taskSummaries,
       policyDecision: result.policyDecision,
       gateResult: result.gateResult,
@@ -264,7 +266,13 @@ async function handlePropose(
   // captured plan (restart-safe), then PREVIEW_READY — each event appended
   // to <flowId>.events.jsonl BEFORE it is visible anywhere.
   coordinator.proposeFlow({ proposal, commandId: `propose-${flowId}-r${revision}` });
-  savePlannedSprint(projectRoot, flowId, { revision, sprint: plannedSprint });
+  savePlannedSprint(projectRoot, flowId, {
+    revision,
+    sprint: plannedSprint,
+    planDigest: preview.planDigest,
+    ...(preview.planDigestVersion !== undefined ? { planDigestVersion: preview.planDigestVersion } : {}),
+    ...(preview.planDigestContext !== undefined ? { planDigestContext: preview.planDigestContext } : {}),
+  });
   const result = coordinator.recordPreview({ preview, commandId: `preview-${flowId}-r${revision}` });
 
   sendJson(res, result.context, 201);

@@ -61,6 +61,7 @@ import { readContext } from '../../orchestra/brain.js';
 // run-job-service.ts, it imports their exported API (task write-scope boundary).
 import { saveApprovedSnapshot, loadRunHandle, type StoredApprovedSnapshot } from '../../core/run-flow-store.js';
 import { startApprovedRun, type RunHandle } from '../../orchestra/run-job-service.js';
+import type { ExecutionPlanDigestContext } from '../../core/execution-plan-digest.js';
 import { spawnDetachedDeckent } from '../helpers/detached-start.js';
 // TERM5-CTRL (sprint-427, task 5) — the SAME completion-notification shape
 // run.tsx already receives from `createRunCompletionWatch`'s `onComplete`
@@ -220,6 +221,8 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
   // ApprovedPlanSnapshot — see run-flow-store.ts's file header). PlanPreview
   // itself carries no task list, only summaries.
   let plannedSprint: Sprint | undefined;
+  let plannedDigestVersion: number | undefined;
+  let plannedDigestContext: ExecutionPlanDigestContext | undefined;
 
   async function proposeRun(intentSummary: string): Promise<RunFlowContext> {
     const trimmed = intentSummary.trim();
@@ -264,6 +267,8 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
       mode: deps.mode ?? 'structured',
     });
     plannedSprint = result.sprint;
+    plannedDigestVersion = result.planDigestVersion;
+    plannedDigestContext = result.planDigestContext;
 
     // Dogfood-449 B1 — born-698a'nın scope-ikizi: detached-child'ın PLAN fazı
     // pre-spawn scope-gate'inde FAIL-CLOSED; ön-kapı aynı kararı BURADA verir,
@@ -299,6 +304,8 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
       flowId,
       revision,
       planDigest: result.planDigest,
+      planDigestVersion: result.planDigestVersion,
+      planDigestContext: result.planDigestContext,
       taskSummaries: result.taskSummaries,
       policyDecision: result.policyDecision,
       gateResult: result.gateResult,
@@ -368,6 +375,8 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
       flowId,
       revision: approvedSnapshot.revision,
       planDigest: approvedSnapshot.planDigest,
+      ...(plannedDigestVersion !== undefined ? { planDigestVersion: plannedDigestVersion } : {}),
+      ...(plannedDigestContext !== undefined ? { planDigestContext: plannedDigestContext } : {}),
       approvedBy: approvedSnapshot.approvedBy,
       approvedAt: approvedSnapshot.approvedAt,
       sprint: plannedSprint,

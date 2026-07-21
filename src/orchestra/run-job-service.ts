@@ -41,6 +41,11 @@
 
 import type { ActorContext } from '../core/work-model.js';
 import type { Sprint } from '../core/types.js';
+import {
+  computeExecutionPlanDigest,
+  EXECUTION_PLAN_DIGEST_VERSION,
+  type ExecutionPlanDigestContext,
+} from '../core/execution-plan-digest.js';
 
 // ─── RunHandle (duck-typed vs. core/run-flow-contract.ts, NOT imported) ───
 //
@@ -66,6 +71,9 @@ export interface ApprovedRunSnapshotInput {
   readonly flowId: string;
   readonly revision: number;
   readonly planDigest: string;
+  /** Absent is the explicit legacy-v1 compatibility path. */
+  readonly planDigestVersion?: number;
+  readonly planDigestContext?: ExecutionPlanDigestContext;
   readonly approvedBy: ActorContext;
   readonly approvedAt: string;
   readonly sprint: Sprint;
@@ -204,6 +212,25 @@ export function startApprovedRun(deps: StartApprovedRunDeps): StartApprovedRunRe
       approvedSnapshot.revision,
       approvedSnapshot.planDigest,
     );
+  }
+
+  // V2 binds the opaque CAS string to the exact stored Sprint. Legacy records
+  // (version absent) retain the explicit v1 compatibility path; a versioned
+  // record can never downgrade to that path by omitting its context.
+  if (approvedSnapshot.planDigestVersion !== undefined) {
+    const actualDigest = approvedSnapshot.planDigestVersion === EXECUTION_PLAN_DIGEST_VERSION
+      && approvedSnapshot.planDigestContext
+      ? computeExecutionPlanDigest(approvedSnapshot.sprint, approvedSnapshot.planDigestContext).digest
+      : 'invalid-versioned-plan-digest-metadata';
+    if (actualDigest !== approvedSnapshot.planDigest) {
+      throw new RunJobDigestMismatchError(
+        flowId,
+        expectedRevision,
+        approvedSnapshot.planDigest,
+        approvedSnapshot.revision,
+        actualDigest,
+      );
+    }
   }
 
   if (existingRunHandle) {

@@ -89,6 +89,10 @@ export interface PlanPreview {
   readonly flowId: string;
   readonly revision: number;
   readonly planDigest: string;
+  /** Absent means the legacy title/summary-only v1 digest. */
+  readonly planDigestVersion?: number;
+  /** Canonical non-task inputs needed to verify a v2 stored Sprint. */
+  readonly planDigestContext?: import('./execution-plan-digest.js').ExecutionPlanDigestContext;
   readonly taskSummaries: readonly RunFlowTaskSummary[];
   readonly policyDecision: RunFlowPolicyDecision;
   readonly gateResult: RunFlowGateResult;

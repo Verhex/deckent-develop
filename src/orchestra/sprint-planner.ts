@@ -125,6 +125,7 @@ import { createTask, extractScopeFromDirective, parseStructuredDirectives, plann
 import { evaluatePromptGate } from './prompt-gate.js';
 import type { PromptGateResult } from '../core/prompt-gate-types.js';
 import type { InvocationReceiptRef } from '../core/invocation-receipt.js';
+import { applyWorkerExecutionBudgetPolicy } from '../core/execution-plan-digest.js';
 
 // ─── BrainError ──────────────────────────────────────────────────
 import { BrainError } from './sprint-lifecycle.js';
@@ -937,6 +938,12 @@ export async function planSprint(
   } catch (poolErr) {
     debugLog('planSprint:routing-v2', `V2 routing pool loading failed: ${poolErr}`);
   }
+
+  // Owner-policy budget snapshot: run at the shared dry-run/persist boundary so
+  // the approved preview and written task JSON carry the exact same ceilings.
+  // This is deliberately NOT an executable permit; final live provider/model/
+  // auth/backend + reachability/limit evidence are bound at host dispatch.
+  applyWorkerExecutionBudgetPolicy(tasks, config.execution_budget, config.worker_provider);
 
   // Write task files (skip in dry-run mode)
   if (!options?.dryRun) {

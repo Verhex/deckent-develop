@@ -20,16 +20,18 @@
 // preview is a real, potentially billable provider call. Preview receipts use
 // a unique attempt identity, so they cannot replay-block the later real plan.
 //
-// `planDigest` deliberately excludes `sprint.id`/`task.id` (those depend on
-// `getNextSprintId`'s filesystem-counter state, not on DIRECTIVES content)
-// — only `taskSummaries`/`gateResult`/`policyDecision` (all pure functions
-// of the planned tasks + prompt-gate outcome) are hashed, so identical
-// DIRECTIVES always produce an identical digest regardless of how many
-// prior sprints exist on disk.
+// `planDigest` deliberately excludes counter-derived sprint/task identities
+// and timestamps, but binds the complete execution projection (routing,
+// budget-policy, scope, dependencies, acceptance and prompt-gate state).
 
-import { createHash } from 'node:crypto';
 import { planSprint } from './brain.js';
-import { canonicalJson } from '../core/audit-writer.js';
+import { readAuthMode } from '../core/config.js';
+import {
+  buildExecutionPlanDigestContext,
+  computeExecutionPlanDigest,
+  type ExecutionPlanDigestContext,
+  EXECUTION_PLAN_DIGEST_VERSION,
+} from '../core/execution-plan-digest.js';
 import type {
   BrainContext, BrainPlanningMode, ResolvedConfig, Sprint, SprintSizeRecommendation,
 } from '../core/types.js';
@@ -45,8 +47,10 @@ export interface PlanPreviewOptions {
 export interface PlanPreviewResult {
   /** The real planned sprint (tasks, reasoning, planningMode, promptGate) — never persisted here. */
   readonly sprint: Sprint;
-  /** sha256(canonicalJson({taskSummaries, gateResult, policyDecision})), hex-encoded. */
+  /** sha256 of the versioned, canonical execution projection. */
   readonly planDigest: string;
+  readonly planDigestVersion: typeof EXECUTION_PLAN_DIGEST_VERSION;
+  readonly planDigestContext: ExecutionPlanDigestContext;
   readonly taskSummaries: readonly RunFlowTaskSummary[];
   readonly gateResult: RunFlowGateResult;
   readonly policyDecision: RunFlowPolicyDecision;
@@ -75,15 +79,6 @@ function computePolicyDecision(gateResult: RunFlowGateResult): RunFlowPolicyDeci
   return gateResult === 'fail' ? 'needs-approval' : 'allow';
 }
 
-function computePlanDigest(
-  taskSummaries: readonly RunFlowTaskSummary[],
-  gateResult: RunFlowGateResult,
-  policyDecision: RunFlowPolicyDecision,
-): string {
-  const payload = { taskSummaries, gateResult, policyDecision };
-  return createHash('sha256').update(canonicalJson(payload)).digest('hex');
-}
-
 /**
  * Generate a read-only plan preview from the real plan-generation core. This
  * is the ONLY plan-preview code path — CLI `plan` (--dry-run branch) and MCP
@@ -105,7 +100,17 @@ export async function generatePlanPreview(
   const taskSummaries = computeTaskSummaries(sprint);
   const gateResult = computeGateResult(sprint);
   const policyDecision = computePolicyDecision(gateResult);
-  const planDigest = computePlanDigest(taskSummaries, gateResult, policyDecision);
+  const planDigestContext = buildExecutionPlanDigestContext(config, await readAuthMode(root));
+  const digest = computeExecutionPlanDigest(sprint, planDigestContext);
 
-  return { sprint, planDigest, taskSummaries, gateResult, policyDecision, gateFindings: computeGateFindings(sprint) };
+  return {
+    sprint,
+    planDigest: digest.digest,
+    planDigestVersion: digest.version,
+    planDigestContext,
+    taskSummaries,
+    gateResult,
+    policyDecision,
+    gateFindings: computeGateFindings(sprint),
+  };
 }

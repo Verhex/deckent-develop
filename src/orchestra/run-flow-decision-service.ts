@@ -34,12 +34,18 @@ import { startApprovedRun } from './run-job-service.js';
 import type { RunFlowContext, RunHandle } from '../core/run-flow-contract.js';
 import type { ActorContext } from '../core/work-model.js';
 import type { Sprint } from '../core/types.js';
+import {
+  computeExecutionPlanDigest,
+  EXECUTION_PLAN_DIGEST_VERSION,
+} from '../core/execution-plan-digest.js';
+import type { PlanPreview } from '../core/run-flow-contract.js';
 
 // ─── Typed refusals (surfaces map these to 409 / an honest CLI line) ─────────
 
 export type RunFlowDecisionRefusalCode =
   | 'NO_LIVE_PREVIEW'
   | 'PLANNED_SPRINT_MISSING'
+  | 'PLANNED_SPRINT_DIGEST_MISMATCH'
   | 'NOT_APPROVED';
 
 /** A refusal that is a state-of-the-world fact, not a transition bug —
@@ -65,6 +71,37 @@ export interface DecideRunFlowInput {
   readonly actor: ActorContext;
 }
 
+function loadAndVerifyPlannedSprint(
+  projectRoot: string,
+  flowId: string,
+  preview: Pick<PlanPreview, 'revision' | 'planDigest' | 'planDigestVersion' | 'planDigestContext'>,
+): NonNullable<ReturnType<typeof loadPlannedSprint>> {
+  const planned = loadPlannedSprint(projectRoot, flowId, {
+    revision: preview.revision,
+    planDigest: preview.planDigest,
+    ...(preview.planDigestVersion !== undefined ? { planDigestVersion: preview.planDigestVersion } : {}),
+  });
+  if (!planned) {
+    throw new RunFlowDecisionError(
+      'PLANNED_SPRINT_MISSING',
+      'run-flow: exact planned sprint record missing for this revision/digest',
+    );
+  }
+  if (preview.planDigestVersion !== undefined) {
+    const context = planned.planDigestContext;
+    const actual = preview.planDigestVersion === EXECUTION_PLAN_DIGEST_VERSION && context
+      ? computeExecutionPlanDigest(planned.sprint as Sprint, context).digest
+      : 'invalid-versioned-plan-digest-metadata';
+    if (actual !== preview.planDigest || planned.planDigest !== preview.planDigest) {
+      throw new RunFlowDecisionError(
+        'PLANNED_SPRINT_DIGEST_MISMATCH',
+        `run-flow: planned sprint content digest mismatch (expected=${preview.planDigest}, actual=${actual})`,
+      );
+    }
+  }
+  return planned;
+}
+
 /**
  * Apply an approval decision to a flow. Approve additionally persists the
  * durable ApprovedPlanSnapshot (from the plan captured at preview time), so an
@@ -88,6 +125,8 @@ export function decideRunFlow(
     if (!preview) {
       throw new RunFlowDecisionError('NO_LIVE_PREVIEW', 'run-flow: no live preview to approve');
     }
+    // Verify the durable exact snapshot BEFORE emitting APPROVAL_GRANTED.
+    const planned = loadAndVerifyPlannedSprint(projectRoot, flowId, preview);
     const result = coordinator.grantApproval({
       flowId,
       revision: preview.revision,
@@ -99,17 +138,12 @@ export function decideRunFlow(
     if (context.state === 'APPROVED' && context.approvedSnapshot) {
       // The captured plan is durable (savePlannedSprint at preview time) —
       // an approve AFTER a process restart still snapshots correctly.
-      const planned = loadPlannedSprint(projectRoot, flowId);
-      if (!planned) {
-        throw new RunFlowDecisionError(
-          'PLANNED_SPRINT_MISSING',
-          'run-flow: planned sprint record missing for this flow',
-        );
-      }
       const stored: StoredApprovedSnapshot = {
         flowId,
         revision: context.approvedSnapshot.revision,
         planDigest: context.approvedSnapshot.planDigest,
+        ...(preview.planDigestVersion !== undefined ? { planDigestVersion: preview.planDigestVersion } : {}),
+        ...(planned.planDigestContext !== undefined ? { planDigestContext: planned.planDigestContext } : {}),
         approvedBy: context.approvedSnapshot.approvedBy,
         approvedAt: context.approvedSnapshot.approvedAt,
         sprint: planned.sprint as Sprint,
@@ -161,24 +195,30 @@ export function startRunFlow(
     throw new RunFlowDecisionError('NOT_APPROVED', `run-flow: flow is ${existing.state}, not APPROVED`);
   }
 
+  const planned = loadAndVerifyPlannedSprint(projectRoot, flowId, {
+    revision: snapshot.revision,
+    planDigest: snapshot.planDigest,
+    ...(existing.preview?.planDigestVersion !== undefined
+      ? { planDigestVersion: existing.preview.planDigestVersion }
+      : {}),
+    ...(existing.preview?.planDigestContext !== undefined
+      ? { planDigestContext: existing.preview.planDigestContext }
+      : {}),
+  });
   coordinator.requestStart({
     flowId,
     revision: snapshot.revision,
     planDigest: snapshot.planDigest,
     commandId: `start-${flowId}-r${snapshot.revision}`,
   });
-
-  const planned = loadPlannedSprint(projectRoot, flowId);
-  if (!planned) {
-    throw new RunFlowDecisionError(
-      'PLANNED_SPRINT_MISSING',
-      'run-flow: planned sprint record missing for this flow',
-    );
-  }
   const stored: StoredApprovedSnapshot = {
     flowId,
     revision: snapshot.revision,
     planDigest: snapshot.planDigest,
+    ...(existing.preview?.planDigestVersion !== undefined
+      ? { planDigestVersion: existing.preview.planDigestVersion }
+      : {}),
+    ...(planned.planDigestContext !== undefined ? { planDigestContext: planned.planDigestContext } : {}),
     approvedBy: snapshot.approvedBy,
     approvedAt: snapshot.approvedAt,
     sprint: planned.sprint as Sprint,
