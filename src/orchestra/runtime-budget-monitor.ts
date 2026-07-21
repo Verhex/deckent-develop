@@ -35,6 +35,8 @@ export interface RuntimeBudgetStopEvidence {
   budget: ExecutionBudget;
   decision: LiveBudgetDecision;
   stoppedAt: string;
+  /** Stop marker is primary; terminal usage is the durable corruption fallback. */
+  evidenceSource?: 'stop-marker' | 'terminal-usage-fallback';
 }
 
 export interface RuntimeBudgetUsageEvidence {
@@ -146,7 +148,7 @@ export function resolveTaskExecutionBudget(
     budget = validateBudget(record?.budget);
   }
   if (budget) {
-    const priorStop = readRuntimeBudgetStop(projectRoot, taskId);
+    const priorStop = readRuntimeBudgetExhaustion(projectRoot, taskId);
     if (priorStop?.budgetFingerprint === budgetFingerprint(budget)) {
       throw new Error(`Task ${taskId} already exhausted its runtime budget in attempt ${priorStop.attemptId}. Spawn blocked before provider work.`);
     }
@@ -259,6 +261,35 @@ export function readRuntimeBudgetUsage(
   }
 }
 
+/**
+ * Read durable exhaustion without making the stop marker a single point of
+ * failure. A terminal host-owned usage snapshot whose decision is exactly
+ * `exceeded` proves the same fact; unmeasurable/non-terminal evidence never
+ * becomes an exhaustion claim.
+ */
+export function readRuntimeBudgetExhaustion(
+  projectRoot: string,
+  taskId: string,
+): RuntimeBudgetStopEvidence | null {
+  const marker = readRuntimeBudgetStop(projectRoot, taskId);
+  if (marker) return { ...marker, evidenceSource: 'stop-marker' };
+  const usage = readRuntimeBudgetUsage(projectRoot, taskId);
+  if (!usage?.terminal || usage.decision.state !== 'exceeded') return null;
+  return {
+    version: 2,
+    projectId: usage.projectId,
+    taskId: usage.taskId,
+    attemptId: usage.attemptId,
+    budgetFingerprint: usage.budgetFingerprint,
+    backend: usage.backend,
+    state: 'exceeded',
+    budget: usage.budget,
+    decision: usage.decision,
+    stoppedAt: usage.updatedAt,
+    evidenceSource: 'terminal-usage-fallback',
+  };
+}
+
 export async function waitForTerminalRuntimeBudgetUsage(
   projectRoot: string,
   taskId: string,
@@ -296,7 +327,7 @@ export class RuntimeBudgetMonitor {
   }) {
     this.projectId = projectId(input.projectRoot);
     this.budgetFingerprint = budgetFingerprint(input.budget);
-    const previousStop = readRuntimeBudgetStop(input.projectRoot, input.taskId);
+    const previousStop = readRuntimeBudgetExhaustion(input.projectRoot, input.taskId);
     if (previousStop?.budgetFingerprint === this.budgetFingerprint) {
       throw new Error(`Task ${input.taskId} already exhausted its runtime budget in attempt ${previousStop.attemptId}. Spawn blocked before provider work.`);
     }
@@ -400,7 +431,7 @@ export function applyRuntimeBudgetStopToResult(
   taskId: string,
   result: TaskResult,
 ): RuntimeBudgetStopEvidence | null {
-  const evidence = readRuntimeBudgetStop(projectRoot, taskId);
+  const evidence = readRuntimeBudgetExhaustion(projectRoot, taskId);
   if (!evidence) return null;
   result.selfAssessment = 'NO_GO';
   result.testsPassed = false;
