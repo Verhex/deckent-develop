@@ -6,7 +6,7 @@
 import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
 import type { SpawnOptionsWithoutStdio } from 'node:child_process';
 import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSync, fsyncSync, closeSync, readdirSync, renameSync, rmdirSync, chmodSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { homedir, totalmem } from 'node:os';
 import type { ModelType } from '../core/types.js';
@@ -51,6 +51,7 @@ const DEFAULT_IMAGE = 'deckent-worker:latest';
 /** @deprecated Use adaptive timeout via brainEstimateTimeout() + SpawnBackendOptions.taskTimeoutSeconds instead. Kept for backward compat fallback. */
 const DEFAULT_TIMEOUT_SECONDS = 1200; // 20 minutes
 const CONTAINER_WORKSPACE = '/workspace';
+const CONTAINER_GIT_COMMON_DIR = '/run/deckent-git/common';
 const DEFAULT_GRACEFUL_TIMEOUT_SECONDS = 15;
 // Exported as the SSOT container-name prefix so the host-liveness probe
 // (heartbeat-monitor.ts) derives `deckent-w-<taskId>` from the SAME constant the
@@ -76,6 +77,87 @@ export interface ProviderAuthIsolation {
 export interface GeminiAuthSelectionBootstrap {
   selectedType: string;
   bootstrapLines: string[];
+}
+
+export function buildProviderPrivateHomeBootstrap(
+  containerHome: string,
+  providerBinary: string,
+): string[] {
+  return providerBinary === 'claude'
+    ? [`mkdir -p "${containerHome}/.claude/session-env" || exit 78`]
+    : [];
+}
+
+export interface DockerGitIsolation {
+  available: boolean;
+  mountArgs: string[];
+  envArgs: string[];
+  hostCommonDir?: string;
+  containerGitDir?: string;
+}
+
+function readGitPointer(dotGitPath: string): string {
+  const pointer = readFileSync(dotGitPath, 'utf-8').trim();
+  const match = /^gitdir:\s*(.+)$/i.exec(pointer);
+  if (!match?.[1]) {
+    throw new Error(`Malformed Git worktree pointer at ${dotGitPath}`);
+  }
+  return match[1].trim();
+}
+
+/**
+ * Build a read-only Git metadata view for Docker workers.
+ *
+ * A linked worktree's `.git` is a file containing an absolute host path. That
+ * path does not exist in a Linux container (and is meaningless for a Windows
+ * host path), so mounting only the worktree at `/workspace` breaks even
+ * read-only `git status`. Explicit Git environment paths avoid host-path
+ * leakage while preserving the common-dir/worktree-dir relationship.
+ */
+export function buildDockerGitIsolation(projectDir: string): DockerGitIsolation {
+  const projectRoot = resolve(projectDir);
+  const dotGitPath = join(projectRoot, '.git');
+  if (!existsSync(dotGitPath)) {
+    return { available: false, mountArgs: [], envArgs: [] };
+  }
+
+  let hostGitDir: string;
+  let linkedWorktree = false;
+  if (existsSync(join(dotGitPath, 'HEAD'))) {
+    hostGitDir = dotGitPath;
+  } else {
+    linkedWorktree = true;
+    const pointer = readGitPointer(dotGitPath);
+    hostGitDir = resolve(isAbsolute(pointer) ? pointer : resolve(projectRoot, pointer));
+  }
+
+  const commonDirPointer = join(hostGitDir, 'commondir');
+  const hostCommonDir = linkedWorktree && existsSync(commonDirPointer)
+    ? resolve(hostGitDir, readFileSync(commonDirPointer, 'utf-8').trim())
+    : hostGitDir;
+  const relativeGitDir = relative(hostCommonDir, hostGitDir);
+  if (relativeGitDir === '..' || relativeGitDir.startsWith(`..${sep}`) || isAbsolute(relativeGitDir)) {
+    throw new Error(`Git worktree directory ${hostGitDir} escapes common directory ${hostCommonDir}`);
+  }
+  const containerRelativeGitDir = relativeGitDir.split(sep).join('/');
+  const containerGitDir = containerRelativeGitDir
+    ? `${CONTAINER_GIT_COMMON_DIR}/${containerRelativeGitDir}`
+    : CONTAINER_GIT_COMMON_DIR;
+
+  return {
+    available: true,
+    mountArgs: [
+      '--mount', `type=bind,src=${dotGitPath},dst=${CONTAINER_WORKSPACE}/.git,readonly`,
+      '--mount', `type=bind,src=${hostCommonDir},dst=${CONTAINER_GIT_COMMON_DIR},readonly`,
+    ],
+    envArgs: [
+      '-e', `GIT_WORK_TREE=${CONTAINER_WORKSPACE}`,
+      '-e', `GIT_COMMON_DIR=${CONTAINER_GIT_COMMON_DIR}`,
+      '-e', `GIT_DIR=${containerGitDir}`,
+    ],
+    hostCommonDir,
+    containerGitDir,
+  };
 }
 
 /**
@@ -1687,7 +1769,12 @@ export class DockerSpawnBackend implements SpawnBackend {
   private readonly memorySwap: string;
   private readonly kindMemoryLimits: Record<string, string>;
   private readonly verifyProviderCliInImage: boolean;
-  private readonly containers = new Map<string, { containerId: string; model: string }>(); // taskId → container info
+  private readonly containers = new Map<string, {
+    containerId: string;
+    model: string;
+    projectDir: string;
+    tasksDir: string;
+  }>(); // taskId → effective execution context
 
   constructor(projectDir: string, opts?: { image?: string; timeoutSeconds?: number; gracefulTimeoutSeconds?: number; memoryLimit?: string; memorySwap?: string; kindMemoryLimits?: Record<string, string>; verifyProviderCliInImage?: boolean }) {
     this.projectDir = resolve(projectDir);
@@ -1745,6 +1832,15 @@ export class DockerSpawnBackend implements SpawnBackend {
     const resolvedOpts = executionBudget === opts?.executionBudget
       ? opts
       : { ...opts, executionBudget };
+    let gitIsolation: DockerGitIsolation;
+    try {
+      gitIsolation = buildDockerGitIsolation(dir);
+    } catch (error) {
+      throw new SpawnBackendError(
+        `Cannot construct a read-only Docker Git view for task ${taskId}: ${error instanceof Error ? error.message : String(error)}`,
+        this.name,
+      );
+    }
     // Adaptive timeout: prefer per-task override from brainEstimateTimeout(),
     // fall back to constructor value, then DEFAULT_TIMEOUT_SECONDS
     const effectiveTimeout = opts?.taskTimeoutSeconds ?? this.timeoutSeconds;
@@ -1770,7 +1866,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     // the file scope for the next worker. monitorContainer's exit handler
     // is what releases on the happy path.
     try {
-      this.runSpawn(taskId, model, prompt, resolvedOpts, dir, effectiveTimeout, tasksDir);
+      this.runSpawn(taskId, model, prompt, resolvedOpts, dir, effectiveTimeout, tasksDir, gitIsolation);
     } catch (err) {
       clearPending(taskId);
       try { releaseAllSpawnLocks(dir, taskId); } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
@@ -1786,6 +1882,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     dir: string,
     effectiveTimeout: number,
     tasksDir: string,
+    gitIsolation: DockerGitIsolation,
   ): void {
     // F1-005 (Sprint 332): resolve this worker's provider up-front so the image
     // readiness honest-fail below can name the EXACT provider-aware rebuild
@@ -2106,9 +2203,10 @@ export class DockerSpawnBackend implements SpawnBackend {
       'fsync_file() { [ -f "$1" ] && dd if="$1" of="$1.fsync" bs=4096 conv=fsync 2>/dev/null && mv "$1.fsync" "$1" 2>/dev/null; }',
       // Sprint 145: git-diff-aware EXIT trap function
       onExitFn,
-      // Ensure session-env exists (Claude CLI requires it)
-      `mkdir -p "${containerHome}/.claude" 2>/dev/null || true`,
-      `touch "${containerHome}/.claude/session-env" 2>/dev/null || true`,
+      // Claude CLI stores per-session state below session-env/<session-id>.
+      // This must be a directory inside the task-private tmpfs HOME. Creating a
+      // file here caused ENOTDIR and made workers appear logged out/broken.
+      ...buildProviderPrivateHomeBootstrap(containerHome, providerBinary),
       ...providerAuth.bootstrapLines,
       // Sprint 151: Write .partial-result BEFORE Claude CLI starts — OOM kill safety net.
       // If container is SIGKILL'd (OOM), this file survives on the shared volume.
@@ -2196,6 +2294,11 @@ export class DockerSpawnBackend implements SpawnBackend {
       '--tmpfs', `${containerHome}:size=100m,uid=${uid},gid=${gid}`,
       // Project mounted read-write — workers need to create/edit files in scope
       '-v', `${dir}:${CONTAINER_WORKSPACE}`,
+      // Git metadata is control-plane state, not worker output. Overlay the
+      // worktree's .git entry read-only and expose the common/worktree metadata
+      // through container-native paths so linked worktrees work on every host.
+      ...gitIsolation.mountArgs,
+      ...gitIsolation.envArgs,
       // born-644 (428-012 BUILD-VIOLATION-GUARD, B542): read-only dist/ overlay —
       // mechanical "no build in worker" enforcement (nested mount, shadows only
       // /workspace/dist as read-only; see buildDistReadOnlyMountArgs).
@@ -2345,7 +2448,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     }
 
     const { containerId, instantExitSuccess } = spawnOutcome;
-    this.containers.set(taskId, { containerId, model });
+    this.containers.set(taskId, { containerId, model, projectDir: dir, tasksDir });
     debugLog(
       'docker-backend:spawn-ok',
       `taskId=${taskId} containerId=${containerId.slice(0, 12)} instantExit=${instantExitSuccess}`,
@@ -2580,6 +2683,15 @@ export class DockerSpawnBackend implements SpawnBackend {
     }
   }
 
+  private resolveExecutionContext(taskId: string): { projectDir: string; tasksDir: string } {
+    const execution = this.containers.get(taskId);
+    const projectDir = execution?.projectDir ?? this.projectDir;
+    return {
+      projectDir,
+      tasksDir: execution?.tasksDir ?? join(projectDir, TASKS_DIR),
+    };
+  }
+
   /**
    * Gracefully stop a running worker container.
    *
@@ -2594,6 +2706,7 @@ export class DockerSpawnBackend implements SpawnBackend {
    * the SIGTERM trap has already fsync'd .result to disk.
    */
   kill(taskId: string): void {
+    const { projectDir, tasksDir } = this.resolveExecutionContext(taskId);
     const containerName = `${CONTAINER_PREFIX}${taskId}`;
     const grace = this.gracefulTimeoutSeconds;
     debugLog('docker-backend:kill', `taskId=${taskId} (graceful stop --time=${grace})`);
@@ -2613,7 +2726,7 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     // Sprint 149: Poll for .result file after stop (max 5s, 500ms intervals)
     // Gives EXIT trap time to write result after SIGTERM
-    const resultPath = join(this.projectDir, TASKS_DIR, `task-${taskId}.result`);
+    const resultPath = join(tasksDir, `task-${taskId}.result`);
     if (!existsSync(resultPath)) {
       for (let i = 0; i < 10; i++) {
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
@@ -2622,7 +2735,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     }
 
     // Post-stop verification: ensure .result was persisted to disk
-    this.verifyResultAfterStop(taskId);
+    this.verifyResultAfterStop(taskId, tasksDir);
 
     try {
       spawnSync('docker', ['rm', '-f', containerName], { encoding: 'utf-8', timeout: 10_000 });
@@ -2630,7 +2743,7 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     // Sprint 156 Task 10: forced shutdown — release any spawn locks left over
     try {
-      const released = releaseAllSpawnLocks(this.projectDir, taskId);
+      const released = releaseAllSpawnLocks(projectDir, taskId);
       if (released > 0) debugLog('docker-backend:spawn-lock', `taskId=${taskId} released ${released} spawn lock(s) on kill`);
     } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
 
@@ -2642,8 +2755,8 @@ export class DockerSpawnBackend implements SpawnBackend {
    * If the file exists, fsync it from host side as belt-and-suspenders.
    * If missing, log a warning (monitorContainer EXIT trap should have written fallback).
    */
-  private verifyResultAfterStop(taskId: string): void {
-    const resultPath = join(this.projectDir, TASKS_DIR, `task-${taskId}.result`);
+  private verifyResultAfterStop(taskId: string, tasksDir: string): void {
+    const resultPath = join(tasksDir, `task-${taskId}.result`);
     try {
       if (existsSync(resultPath)) {
         // Belt-and-suspenders: fsync from host side to ensure container writes are flushed
@@ -3092,7 +3205,7 @@ export class DockerSpawnBackend implements SpawnBackend {
 
       // Sprint 156 Task 10: release every spawn lock owned by this task
       try {
-        const released = releaseAllSpawnLocks(this.projectDir, taskId);
+        const released = releaseAllSpawnLocks(projectDir, taskId);
         if (released > 0) debugLog('docker-backend:spawn-lock', `taskId=${taskId} released ${released} spawn lock(s) on exit`);
       } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
 
@@ -3100,7 +3213,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       // catches any spawnlock missed by releaseAllSpawnLocks (e.g. corrupted file,
       // partial unlink). Both helpers are idempotent and cheap when no locks remain.
       try {
-        releaseStaleSpawnLocksForTask(this.projectDir, taskId);
+        releaseStaleSpawnLocksForTask(projectDir, taskId);
       } catch (e) { debugLog('docker-backend:spawn-lock-stale-release', e); }
 
       this.containers.delete(taskId);
@@ -3123,6 +3236,8 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     child.on('error', (err) => {
       debugLog('docker-backend:monitor-error', `taskId=${taskId} ${err.message}`);
+      try { releaseAllSpawnLocks(projectDir, taskId); } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
+      try { releaseStaleSpawnLocksForTask(projectDir, taskId); } catch (e) { debugLog('docker-backend:spawn-lock-stale-release', e); }
       this.containers.delete(taskId);
     });
   }
