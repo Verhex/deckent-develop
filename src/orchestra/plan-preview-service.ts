@@ -11,11 +11,14 @@
 // routed through here too) and derives a content-addressed `planDigest` from
 // its result.
 //
-// READ-ONLY by construction, not just by convention: `PlanPreviewOptions`
+// DOMAIN-STATE READ-ONLY by construction, not just by convention: `PlanPreviewOptions`
 // has no `dryRun`/`asDraft` field at all — there is nothing a caller could
 // pass to make this service write a task file. `planSprint` is always
 // invoked with `dryRun: true` (sprint-planner.ts's own write-guard), so
-// `.tasks/task-*.json` is never touched from this path.
+// `.tasks/task-*.json` is never touched from this path. Append-only operational
+// evidence (InvocationReceipt/audit ledger) is still persisted because an AI
+// preview is a real, potentially billable provider call. Preview receipts use
+// a unique attempt identity, so they cannot replay-block the later real plan.
 //
 // `planDigest` deliberately excludes `sprint.id`/`task.id` (those depend on
 // `getNextSprintId`'s filesystem-counter state, not on DIRECTIVES content)

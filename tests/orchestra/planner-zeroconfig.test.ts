@@ -25,12 +25,12 @@ import type { ProviderAdapter } from '../../src/core/provider.js';
 function makeMockAdapter(): ProviderAdapter {
   return {
     name: 'claude',
-    supportedModels: ['opus', 'sonnet', 'haiku'] as readonly ModelType[],
+    supportedModels: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'] as readonly ModelType[],
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
     isAvailable: vi.fn().mockResolvedValue(true),
-    buildCommand: vi.fn().mockReturnValue('claude --model sonnet /dev/null'),
+    buildCommand: vi.fn().mockReturnValue('claude --model claude-sonnet-5 /dev/null'),
     buildPlannerCommand: (prompt: string, model: ModelType) => ({
       command: 'claude',
       args: ['-p', prompt, '--model', model, '--output-format', 'json'],
@@ -70,7 +70,7 @@ function makeValidPlannerJSON(taskCount: number): string {
   const tasks = Array.from({ length: taskCount }, (_, i) => ({
     title: `Task ${i + 1}`,
     description: `Description ${i + 1}`,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: `Standard task ${i + 1}`,
@@ -158,9 +158,9 @@ describe('buildZeroConfigPlanPrompt', () => {
 
   it('includes model selection criteria', () => {
     const prompt = buildZeroConfigPlanPrompt('Add feature', 'app');
-    expect(prompt).toContain('opus');
-    expect(prompt).toContain('sonnet');
-    expect(prompt).toContain('haiku');
+    expect(prompt).toContain('claude-opus-4-8');
+    expect(prompt).toContain('claude-sonnet-5');
+    expect(prompt).toContain('claude-haiku-4-5-20251001');
   });
 
   it('includes example task splitting for login/OAuth scenario', () => {
@@ -231,7 +231,7 @@ describe('callZeroConfigPlanner', () => {
 
   it('returns parsed result when AI call succeeds with 4 tasks', async () => {
     const { fn } = makeSpawnFn({ stdout: makeValidPlannerJSON(4) });
-    const result = await callZeroConfigPlanner('Add login page', 'sonnet', 'my-app', [], mockAdapter, undefined, fn);
+    const result = await callZeroConfigPlanner('Add login page', 'claude-sonnet-5', 'my-app', [], mockAdapter, undefined, fn);
     expect(result).not.toBeNull();
     expect(result!.tasks).toHaveLength(4);
     expect(result!.reasoning).toBe('Zero-config split plan');
@@ -239,52 +239,52 @@ describe('callZeroConfigPlanner', () => {
 
   it('returns 3 tasks for a simple feature', async () => {
     const { fn } = makeSpawnFn();
-    const result = await callZeroConfigPlanner('Fix the bug', 'sonnet', 'app', [], mockAdapter, undefined, fn);
+    const result = await callZeroConfigPlanner('Fix the bug', 'claude-sonnet-5', 'app', [], mockAdapter, undefined, fn);
     expect(result).not.toBeNull();
     expect(result!.tasks).toHaveLength(3);
   });
 
   it('returns null when AI call fails (non-zero exit)', async () => {
     const { fn } = makeSpawnFn({ status: 1, stdout: '', stderr: 'error' });
-    await expect(callZeroConfigPlanner('Add feature', 'sonnet', 'app', [], mockAdapter, undefined, fn)).resolves.toBeNull();
+    await expect(callZeroConfigPlanner('Add feature', 'claude-sonnet-5', 'app', [], mockAdapter, undefined, fn)).resolves.toBeNull();
   });
 
   it('returns null when stdout is empty', async () => {
     const { fn } = makeSpawnFn({ status: 0, stdout: '' });
-    await expect(callZeroConfigPlanner('Add feature', 'sonnet', 'app', [], mockAdapter, undefined, fn)).resolves.toBeNull();
+    await expect(callZeroConfigPlanner('Add feature', 'claude-sonnet-5', 'app', [], mockAdapter, undefined, fn)).resolves.toBeNull();
   });
 
   it('returns null when AI returns invalid JSON (even after the U2 retry)', async () => {
     const { fn, calls } = makeSpawnFn({ status: 0, stdout: 'not valid json' });
-    await expect(callZeroConfigPlanner('Add feature', 'sonnet', 'app', [], mockAdapter, undefined, fn)).resolves.toBeNull();
+    await expect(callZeroConfigPlanner('Add feature', 'claude-sonnet-5', 'app', [], mockAdapter, undefined, fn)).resolves.toBeNull();
     expect(calls).toHaveLength(2); // initial + one schema-feedback retry
   });
 
   it('passes model parameter to the planner spawn', async () => {
     const { fn, calls } = makeSpawnFn();
-    await callZeroConfigPlanner('Add feature', 'opus', 'app', [], mockAdapter, undefined, fn);
+    await callZeroConfigPlanner('Add feature', 'claude-opus-4-8', 'app', [], mockAdapter, undefined, fn);
     const args = calls[0]!.args;
     const modelIdx = args.indexOf('--model');
-    expect(args[modelIdx + 1]).toBe('opus');
+    expect(args[modelIdx + 1]).toBe('claude-opus-4-8');
   });
 
   it('spawns with the correct timeout', async () => {
     const { fn, calls } = makeSpawnFn();
-    await callZeroConfigPlanner('Add feature', 'sonnet', 'app', [], mockAdapter, undefined, fn);
+    await callZeroConfigPlanner('Add feature', 'claude-sonnet-5', 'app', [], mockAdapter, undefined, fn);
     expect(calls[0]!.command).toBe('claude');
     expect(calls[0]!.timeoutMs).toBe(BRAIN_PLAN_TIMEOUT_MS);
   });
 
   it('passes file tree context to the prompt', async () => {
     const { fn, calls } = makeSpawnFn();
-    await callZeroConfigPlanner('Add feature', 'sonnet', 'app', ['src/auth.ts', 'src/api.ts'], mockAdapter, undefined, fn);
+    await callZeroConfigPlanner('Add feature', 'claude-sonnet-5', 'app', ['src/auth.ts', 'src/api.ts'], mockAdapter, undefined, fn);
     const promptArg = calls[0]!.args[1]!;
     expect(promptArg).toContain('src/auth.ts');
   });
 
   it('handles valid 5-task response', async () => {
     const { fn } = makeSpawnFn({ stdout: makeValidPlannerJSON(5) });
-    const result = await callZeroConfigPlanner('Complex feature', 'opus', 'app', [], mockAdapter, undefined, fn);
+    const result = await callZeroConfigPlanner('Complex feature', 'claude-opus-4-8', 'app', [], mockAdapter, undefined, fn);
     expect(result).not.toBeNull();
     expect(result!.tasks).toHaveLength(5);
   });
@@ -316,9 +316,9 @@ describe('buildZeroConfigFallbackPlan', () => {
     expect(plan.tasks[0]!.description).toHaveLength(100);
   });
 
-  it('uses sonnet model as default', () => {
+  it('uses the canonical balanced Brain model as default', () => {
     const plan = buildZeroConfigFallbackPlan('Add feature');
-    expect(plan.tasks[0]!.model).toBe('sonnet');
+    expect(plan.tasks[0]!.model).toBe('claude-sonnet-5');
   });
 
   it('sets scope.directories to src/', () => {

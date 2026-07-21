@@ -64,13 +64,13 @@ function makeRecommendation(overrides: Partial<SprintSizeRecommendation> = {}): 
 
 function makeMockAdapter(overrides: Partial<ProviderAdapter> = {}): ProviderAdapter {
   return {
-    name: 'mock-provider',
-    supportedModels: ['opus', 'sonnet', 'haiku'] as readonly ModelType[],
+    name: 'claude',
+    supportedModels: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'] as readonly ModelType[],
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
     isAvailable: vi.fn().mockResolvedValue(true),
-    buildCommand: vi.fn().mockReturnValue('mock-cli -p - --model sonnet < /dev/null'),
+    buildCommand: vi.fn().mockReturnValue('mock-cli -p - --model claude-sonnet-5 < /dev/null'),
     ...overrides,
   };
 }
@@ -80,8 +80,8 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     mode: 'pro_plan',
     activeModeConfig: {
       max_workers: 4,
-      brain_model: 'sonnet',
-      default_model: 'sonnet',
+      brain_model: 'claude-sonnet-5',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: true,
     },
     modes: {} as ResolvedConfig['modes'],
@@ -97,7 +97,7 @@ const validPlannerJSON = JSON.stringify({
   tasks: [{
     title: 'Build feature',
     description: 'Build the feature',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'Standard task',
@@ -131,7 +131,7 @@ describe('A) AI Planner Timeout Configurable', () => {
     const adapter = makeMockAdapter();
     const { fn, calls } = makeSpawnFn();
 
-    await callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, 120_000, undefined, fn);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'claude-sonnet-5', 'test', adapter, 120_000, undefined, fn);
 
     expect(calls[0]).toMatchObject({ command: 'mock-cli', timeoutMs: 120_000 });
   });
@@ -140,7 +140,7 @@ describe('A) AI Planner Timeout Configurable', () => {
     const adapter = makeMockAdapter();
     const { fn, calls } = makeSpawnFn();
 
-    await callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, undefined, undefined, fn);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'claude-sonnet-5', 'test', adapter, undefined, undefined, fn);
 
     expect(calls[0]).toMatchObject({ command: 'mock-cli', timeoutMs: BRAIN_PLAN_TIMEOUT_MS });
   });
@@ -149,7 +149,7 @@ describe('A) AI Planner Timeout Configurable', () => {
     const adapter = makeMockAdapter();
     const { fn, calls } = makeSpawnFn();
 
-    await callZeroConfigPlanner('Add login', 'sonnet', 'test', [], adapter, 90_000, fn);
+    await callZeroConfigPlanner('Add login', 'claude-sonnet-5', 'test', [], adapter, 90_000, fn);
 
     expect(calls[0]).toMatchObject({ command: 'mock-cli', timeoutMs: 90_000 });
   });
@@ -158,7 +158,7 @@ describe('A) AI Planner Timeout Configurable', () => {
     const adapter = makeMockAdapter();
     const { fn, calls } = makeSpawnFn();
 
-    await callZeroConfigPlanner('Add login', 'sonnet', 'test', [], adapter, undefined, fn);
+    await callZeroConfigPlanner('Add login', 'claude-sonnet-5', 'test', [], adapter, undefined, fn);
 
     expect(calls[0]).toMatchObject({ command: 'mock-cli', timeoutMs: BRAIN_PLAN_TIMEOUT_MS });
   });
@@ -201,10 +201,10 @@ describe('B) Structured Parser Bullet/Prose fallback', () => {
   });
 
   it('parseBulletOrNumberedTasks extracts Model/Effort from sub-lines', () => {
-    const content = `- Task: Implement API endpoint\n  Model: opus\n  Effort: high`;
+    const content = `- Task: Implement API endpoint\n  Model: claude-opus-4-8\n  Effort: high`;
     const tasks = parseBulletOrNumberedTasks(content);
     expect(tasks.length).toBe(1);
-    expect(tasks[0]!.forceModel).toBe('opus');
+    expect(tasks[0]!.forceModel).toBe('claude-opus-4-8');
     expect(tasks[0]!.forceEffort).toBe('high');
   });
 });

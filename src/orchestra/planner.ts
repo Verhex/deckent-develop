@@ -1,5 +1,6 @@
 // ─── Node Builtins ─────────────────────────────────────────────────
 import { spawn, spawnSync } from 'node:child_process';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -8,14 +9,37 @@ import { z } from 'zod';
 import type {
   BrainContext, SprintSizeRecommendation, PlannerResult, ModelType,
 } from '../core/types.js';
-import { ALL_MODELS } from '../core/types.js';
+import { ALL_PROVIDER_NAMES } from '../core/types.js';
 import { BRAIN_PLAN_TIMEOUT_MS, BRAIN_PLAN_MAX_CONTEXT_LINES } from '../core/constants.js';
-import type { ProviderAdapter } from '../core/provider.js';
+import type {
+  ProviderAdapter,
+  ProviderPlannerCommand,
+  ProviderPlannerInvocation,
+} from '../core/provider.js';
 import { providerRegistry, ProviderError } from '../core/provider.js';
-import { modelRegistry } from '../core/model-registry.js';
+import {
+  getLegacyModelMigration,
+  inferProviderFromId,
+  modelRegistry,
+  resolveCanonicalModelIdentity,
+} from '../core/model-registry.js';
+import type { RegistryProviderNameExt } from '../core/model-registry.js';
+import type { RoleInvocationResolution } from '../core/role-invocation-resolver.js';
+import { resolveBrainModel } from '../core/config.js';
 import { debugLog } from '../core/utils.js';
 import type { TaskScope } from '../core/task-types.js';
 import { getProviderForModel } from '../core/task-types.js';
+import {
+  INVOCATION_RECEIPT_SCHEMA_VERSION,
+  type InvocationAuthMode,
+  type InvocationEvent,
+  type InvocationExecutionBackend,
+  type InvocationReceipt,
+  type InvocationReceiptLedger,
+  type InvocationReceiptRef,
+  type InvocationReasonCode,
+  type InvocationTransport,
+} from '../core/invocation-receipt.js';
 import { buildAdrConstraintsPlannerBlock } from '../core/adr-constraints.js';
 import {
   stripPhantomScope,
@@ -29,14 +53,11 @@ import {
 import { resolveDependencyRef, isPlanSlotId } from './task-builder.js';
 import { normalizePlannerResult } from './planner-normalize.js';
 
-// ─── Model enum values for Zod schemas ───────────────────────────────────
-const MODEL_ENUM_VALUES = ALL_MODELS as unknown as [string, ...string[]];
-
 // ─── Zod Schemas ──────────────────────────────────────────────────
 const PlannerTaskSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
-  model: z.enum(MODEL_ENUM_VALUES),
+  model: z.string().min(1).refine((model) => getLegacyModelMigration(model) === undefined, 'E_LEGACY_MODEL_ALIAS'),
   effort: z.enum(['low', 'normal', 'high']),
   priority: z.enum(['CRITICAL', 'HIGH', 'NORMAL', 'LOW']),
   reason: z.string(),
@@ -128,6 +149,75 @@ export function buildPriorityContextBlock(
 
 // ─── buildPlanPrompt ──────────────────────────────────────────────
 
+export interface PlannerTaskModelPolicy {
+  readonly defaultModel: ModelType;
+  readonly allowedModels: readonly ModelType[];
+}
+
+/**
+ * Build the model vocabulary exposed to the planning model from one concrete
+ * worker-provider namespace. The prompt never contains Deckent family aliases;
+ * every choice is an exact registry/API identity. A runtime-registered model
+ * participates automatically, so versioned/provider-specific IDs remain
+ * parametric instead of being frozen into prompt text.
+ */
+export function createPlannerTaskModelPolicy(
+  defaultModel: ModelType,
+  provider?: string,
+): PlannerTaskModelPolicy {
+  const authoredProvider = modelRegistry.get(defaultModel)?.provider ?? inferProviderFromId(defaultModel);
+  const targetProvider = provider ?? authoredProvider;
+  if (!targetProvider) {
+    throw new ProviderError(`E_MODEL_PROVIDER_UNVERIFIED: ${defaultModel}`, 'planner');
+  }
+  const authoredDefinition = resolveCanonicalModelIdentity(defaultModel, {
+    ...(authoredProvider ? { provider: authoredProvider as RegistryProviderNameExt } : {}),
+    registerParametric: true,
+  });
+  const resolvedDefaultModel = authoredDefinition.provider === targetProvider
+    ? authoredDefinition.id
+    : modelRegistry.getEquivalent(authoredDefinition.id, targetProvider as RegistryProviderNameExt);
+  const defaultDefinition = resolveCanonicalModelIdentity(resolvedDefaultModel, {
+    provider: targetProvider as RegistryProviderNameExt,
+    registerParametric: true,
+  });
+  const allowedModels = modelRegistry.getAllModels()
+    .filter((candidate) => candidate.provider === defaultDefinition.provider && candidate.status === 'ga')
+    .sort((left, right) => left.tier.localeCompare(right.tier) || left.id.localeCompare(right.id))
+    .map((candidate) => candidate.id as ModelType);
+  const canonicalDefaultModel = defaultDefinition.id as ModelType;
+  if (!allowedModels.includes(canonicalDefaultModel)) allowedModels.push(canonicalDefaultModel);
+  return { defaultModel: canonicalDefaultModel, allowedModels };
+}
+
+function resolvePlannerTaskModelPolicy(
+  policy?: PlannerTaskModelPolicy,
+): PlannerTaskModelPolicy {
+  const candidate = policy ?? createPlannerTaskModelPolicy(resolveBrainModel(undefined));
+  const allowedModels = [...new Set(candidate.allowedModels)];
+  if (!allowedModels.includes(candidate.defaultModel)) allowedModels.push(candidate.defaultModel);
+  const defaultProvider = modelRegistry.get(candidate.defaultModel)?.provider
+    ?? inferProviderFromId(candidate.defaultModel);
+  if (!defaultProvider) {
+    throw new ProviderError(`E_MODEL_PROVIDER_UNVERIFIED: ${candidate.defaultModel}`, 'planner');
+  }
+  for (const model of allowedModels) {
+    const provider = modelRegistry.get(model)?.provider ?? inferProviderFromId(model) ?? defaultProvider;
+    resolveCanonicalModelIdentity(model, {
+      provider,
+      registerParametric: true,
+    });
+  }
+  return { defaultModel: candidate.defaultModel, allowedModels };
+}
+
+function renderPlannerModelPolicy(policy: PlannerTaskModelPolicy): string {
+  return policy.allowedModels.map((model) => {
+    const tier = modelRegistry.get(model)?.tier ?? 'standard';
+    return `- **${model}** (${tier}): use this exact API ID when that capability/cost tier fits the task`;
+  }).join('\n');
+}
+
 /**
  * @internal Used only within orchestra/ — builds the AI planner prompt.
  * Not part of the public API surface.
@@ -143,6 +233,7 @@ export function buildPlanPrompt(
   projectName: string,
   zeroConfigDescription?: string,
   worstCombinations?: string,
+  modelPolicy?: PlannerTaskModelPolicy,
 ): string {
   const criticalDebt = context.debt.filter(d => d.priority === 'CRITICAL' && !d.resolved);
   const critDebtText = criticalDebt.length > 0
@@ -183,6 +274,9 @@ export function buildPlanPrompt(
     ? `\nPAST RESULTS (combinations to avoid):\n${worstCombinations}`
     : '';
 
+  const effectiveModelPolicy = resolvePlannerTaskModelPolicy(modelPolicy);
+  const modelSelection = renderPlannerModelPolicy(effectiveModelPolicy);
+
   return `You are a software project orchestrator. Analyze the given directives and create a structured task plan.
 
 RULES:
@@ -196,10 +290,9 @@ RULES:
 ${FILE_PATH_RULES}
 
 ${buildAdrConstraintsPlannerBlock()}
-MODEL SELECTION CRITERIA (CHOOSE THE RIGHT MODEL FOR EACH TASK):
-- **opus**: Complex architecture changes, tasks touching multiple modules, new patterns/abstractions, cross-cutting concerns, large features requiring test + implementation together
-- **sonnet**: Standard CRUD operations, single file/module changes, adding new files following existing patterns, template/config updates, documentation, simple API endpoints, UI components (following existing patterns)
-- **haiku**: Trivial tasks only — rename, typo fix, file copy, .gitignore line addition, placeholder file creation, single-line config change
+MODEL SELECTION CRITERIA (CHOOSE ONE EXACT API ID FOR EACH TASK):
+${modelSelection}
+- Never emit a family alias such as opus, sonnet, haiku, gpt-5, or gpt-5.6
 - Explain the model selection in the "reason" field (why this model, how complex)
 
 CONTEXT:
@@ -211,7 +304,7 @@ OUTPUT FORMAT (JSON ONLY, nothing else):
     {
       "title": "...",
       "description": "...",
-      "model": "sonnet|opus|haiku",
+      "model": "${effectiveModelPolicy.defaultModel}",
       "effort": "low|normal|high",
       "priority": "CRITICAL|HIGH|NORMAL|LOW",
       "reason": "Why this model/effort",
@@ -287,6 +380,13 @@ export function parsePlannerResponse(raw: string, adapter?: ProviderAdapter): Pl
       debugLog('parsePlannerResponse:validation', result.error);
       return null;
     }
+    for (const task of result.data.tasks) {
+      const provider = modelRegistry.get(task.model)?.provider ?? inferProviderFromId(task.model);
+      resolveCanonicalModelIdentity(task.model, {
+        ...(provider ? { provider } : {}),
+        registerParametric: false,
+      });
+    }
     return result.data as PlannerResult;
   } catch (e) {
     debugLog('parsePlannerResponse:parse', e);
@@ -302,14 +402,126 @@ export function parsePlannerResponse(raw: string, adapter?: ProviderAdapter): Pl
  * Otherwise extracts CLI binary from adapter.buildCommand() and builds
  * generic args (first token as command, standard flags).
  */
+export interface PlannerSpawnSpec {
+  readonly command: string;
+  readonly args: string[];
+  readonly calledProvider: string;
+  readonly calledModel: string;
+  readonly transport: 'cli' | 'http' | 'local-runtime';
+  readonly executionBackend: 'host-subprocess' | 'docker' | 'tmux' | 'in-process' | 'unknown';
+}
+
+function extractWireModel(command: ProviderPlannerCommand): string | null {
+  for (const flag of ['--model', '-m']) {
+    const index = command.args.indexOf(flag);
+    if (index >= 0 && command.args[index + 1]) return command.args[index + 1]!;
+  }
+  for (const flag of ['-d', '--data', '--data-binary']) {
+    const index = command.args.indexOf(flag);
+    const value = index >= 0 ? command.args[index + 1] : undefined;
+    if (!value?.startsWith('{')) continue;
+    try {
+      const parsed = JSON.parse(value) as { model?: unknown };
+      if (typeof parsed.model === 'string' && parsed.model) return parsed.model;
+    } catch {
+      // The provider may use a non-JSON request body; fail loudly below.
+    }
+  }
+  return null;
+}
+
+function canonicalProviderFromAdapter(adapter: ProviderAdapter): string {
+  for (const provider of ALL_PROVIDER_NAMES) {
+    if (adapter.name === provider || adapter.name.startsWith(`${provider}-`)) return provider;
+  }
+  return adapter.name;
+}
+
+function normalizePlannerCommand(
+  adapter: ProviderAdapter,
+  command: ProviderPlannerCommand,
+  expectedModel: ModelType,
+): PlannerSpawnSpec {
+  const wireModel = extractWireModel(command);
+  if (!wireModel) {
+    throw new ProviderError(
+      `Provider "${adapter.name}" planner command omitted an exact wire model`,
+      adapter.name,
+    );
+  }
+  if (command.calledModel && command.calledModel !== wireModel) {
+    throw new ProviderError(
+      `Provider "${adapter.name}" planner metadata does not match its wire model`,
+      adapter.name,
+    );
+  }
+  if (wireModel !== expectedModel) {
+    throw new ProviderError(
+      `Provider "${adapter.name}" planner wire model differs from the resolved model`,
+      adapter.name,
+    );
+  }
+  const calledProvider = canonicalProviderFromAdapter(adapter);
+  if (command.calledProvider && command.calledProvider !== calledProvider) {
+    throw new ProviderError(
+      `Provider "${adapter.name}" planner metadata does not match its adapter identity`,
+      adapter.name,
+    );
+  }
+  resolveCanonicalModelIdentity(wireModel, {
+    provider: calledProvider as RegistryProviderNameExt,
+    registerParametric: false,
+  });
+  return {
+    command: command.command,
+    args: command.args,
+    calledProvider,
+    calledModel: wireModel,
+    transport: command.transport ?? 'cli',
+    executionBackend: command.executionBackend ?? 'host-subprocess',
+  };
+}
+
+function normalizeNativePlannerInvocation(
+  adapter: ProviderAdapter,
+  invocation: ProviderPlannerInvocation,
+  expectedModel: ModelType,
+): PlannerSpawnSpec {
+  const calledProvider = canonicalProviderFromAdapter(adapter);
+  if (invocation.calledProvider !== calledProvider) {
+    throw new ProviderError(
+      `Provider "${adapter.name}" native planner metadata does not match its adapter identity`,
+      adapter.name,
+    );
+  }
+  if (invocation.calledModel !== expectedModel) {
+    throw new ProviderError(
+      `Provider "${adapter.name}" native planner model differs from the resolved model`,
+      adapter.name,
+    );
+  }
+  resolveCanonicalModelIdentity(invocation.calledModel, {
+    provider: calledProvider as RegistryProviderNameExt,
+    registerParametric: false,
+  });
+  return {
+    command: `[native:${calledProvider}]`,
+    args: [],
+    calledProvider,
+    calledModel: invocation.calledModel,
+    transport: invocation.transport,
+    executionBackend: invocation.executionBackend,
+  };
+}
+
 export function buildPlannerSpawnArgs(
   adapter: ProviderAdapter,
   prompt: string,
   model: ModelType,
-): { command: string; args: string[] } {
+): PlannerSpawnSpec {
   // Delegate to adapter if it provides its own planner command builder
   if (typeof adapter.buildPlannerCommand === 'function') {
-    return adapter.buildPlannerCommand(prompt, model);
+    return normalizePlannerCommand(adapter, adapter.buildPlannerCommand(prompt, model), model);
   }
 
   // Generic fallback: extract CLI binary from adapter.buildCommand()
@@ -323,10 +535,14 @@ export function buildPlannerSpawnArgs(
   // (no 4-6/4-8 confusion), matching the worker-spawn fix (Sprint 237). Falls back
   // to the raw model for unregistered tags (ollama) / custom CLIs.
   const apiId = modelRegistry.get(model)?.apiId ?? model;
-  return {
+  return normalizePlannerCommand(adapter, {
     command: firstToken,
     args: ['-p', prompt, '--model', apiId, '--output-format', 'json'],
-  };
+    calledProvider: canonicalProviderFromAdapter(adapter),
+    calledModel: apiId,
+    transport: 'cli',
+    executionBackend: 'host-subprocess',
+  }, model);
 }
 
 /**
@@ -370,7 +586,9 @@ export type PlannerFailureReason =
   | 'timeout'
   | 'parse_failed'
   | 'validation_failed'
-  | 'no_providers';
+  | 'no_providers'
+  | 'receipt_failed'
+  | 'receipt_replay_blocked';
 
 /**
  * Discriminated union returned by `callBrainPlanner`. Replaces the legacy
@@ -380,8 +598,159 @@ export type PlannerFailureReason =
  * See [[feedback_ai_planner_silent_fallback]].
  */
 export type PlannerCallResult =
-  | { ok: true; data: PlannerResult }
-  | { ok: false; reason: PlannerFailureReason; message: string };
+  | { ok: true; data: PlannerResult; receiptRef?: InvocationReceiptRef }
+  | { ok: false; reason: PlannerFailureReason; message: string; receiptRef?: InvocationReceiptRef };
+
+export interface PlannerReceiptContext {
+  readonly tenantId: string;
+  readonly projectRoot: string;
+  readonly runId: string;
+  readonly taskId?: string | null;
+  readonly configuredProvider?: string | null;
+  readonly requestedProvider?: string | null;
+  readonly configuredModel?: string | null;
+  readonly requestedModel?: string | null;
+  readonly authMode?: InvocationAuthMode;
+  readonly accountRefHash?: string | null;
+  readonly idempotencyKey?: string;
+  readonly invocationId?: string;
+  readonly callId?: string;
+  readonly store?: InvocationReceiptLedger;
+  readonly now?: () => string;
+  readonly idFactory?: () => string;
+  /** Evidence-backed role admission decision. Without it the receipt records
+   *  router selection only and MUST NOT synthesize a fallback claim. */
+  readonly resolution?: Pick<
+    RoleInvocationResolution,
+    'configured' | 'resolved' | 'fallbackChain' | 'reachability' | 'limits'
+  >;
+}
+
+interface PlannerReceiptFacts {
+  readonly resolvedProvider: string | null;
+  readonly resolvedModel: string | null;
+  readonly calledProvider: string | null;
+  readonly calledModel: string | null;
+  readonly transport: InvocationTransport;
+  readonly executionBackend: InvocationExecutionBackend;
+  readonly missingReason: InvocationReasonCode;
+}
+
+interface PlannerReceiptSession {
+  readonly store: InvocationReceiptLedger;
+  readonly ownedStore: boolean;
+  readonly ref: InvocationReceiptRef;
+  readonly created: boolean;
+  append(event: Omit<InvocationEvent, 'eventId'>): void;
+  close(): void;
+}
+
+function deterministicInvocationId(context: PlannerReceiptContext): string {
+  const seed = [context.tenantId, context.runId, context.taskId ?? '', 'brain', 'sprint-planning'].join('\u0000');
+  return `inv-${createHash('sha256').update(seed).digest('hex').slice(0, 32)}`;
+}
+
+async function beginPlannerReceipt(
+  context: PlannerReceiptContext,
+  facts: PlannerReceiptFacts,
+): Promise<PlannerReceiptSession> {
+  let store = context.store;
+  let ownedStore = false;
+  if (!store) {
+    const { InvocationReceiptStore } = await import('../core/invocation-receipt-store.js');
+    store = new InvocationReceiptStore(context.projectRoot);
+    ownedStore = true;
+  }
+  const now = context.now ?? (() => new Date().toISOString());
+  const idFactory = context.idFactory ?? randomUUID;
+  const invocationId = context.invocationId ?? deterministicInvocationId(context);
+  const callId = context.callId ?? `${invocationId}:call-1`;
+  const resolution = context.resolution;
+  if (resolution && resolution.resolved.provider !== null
+    && (resolution.resolved.provider !== facts.resolvedProvider
+      || resolution.resolved.model !== facts.resolvedModel)) {
+    if (ownedStore) store.close();
+    throw new ProviderError('E_INVOCATION_RESOLUTION_IDENTITY_MISMATCH', 'planner');
+  }
+  const missingSelection = (source: 'config' | 'router' | 'wire') => ({
+    provider: null,
+    model: null,
+    source,
+    reasonCode: facts.missingReason,
+  } as const);
+  const receipt: InvocationReceipt = {
+    schemaVersion: INVOCATION_RECEIPT_SCHEMA_VERSION,
+    invocationId,
+    idempotencyKey: context.idempotencyKey ?? `${context.runId}:brain:sprint-planning:1`,
+    tenantId: context.tenantId,
+    projectId: store.projectId,
+    runId: context.runId,
+    taskId: context.taskId ?? null,
+    callId,
+    role: 'brain',
+    purpose: 'sprint-planning',
+    configured: resolution?.configured ?? (context.configuredProvider || context.configuredModel
+      ? {
+          provider: context.configuredProvider ?? null,
+          model: context.configuredModel ?? null,
+          source: 'config',
+          reasonCode: 'none',
+        }
+      : missingSelection('config')),
+    requested: context.requestedProvider || context.requestedModel
+      ? {
+          provider: context.requestedProvider ?? null,
+          model: context.requestedModel ?? null,
+          source: 'config',
+          reasonCode: 'none',
+        }
+      : missingSelection('config'),
+    resolved: resolution?.resolved ?? (facts.resolvedProvider || facts.resolvedModel
+      ? {
+          provider: facts.resolvedProvider,
+          model: facts.resolvedModel,
+          source: 'router',
+          reasonCode: 'none',
+        }
+      : missingSelection('router')),
+    called: facts.calledProvider || facts.calledModel
+      ? {
+          provider: facts.calledProvider,
+          model: facts.calledModel,
+          source: 'wire',
+          reasonCode: 'none',
+        }
+      : missingSelection('wire'),
+    backend: { transport: facts.transport, executionBackend: facts.executionBackend },
+    auth: { mode: context.authMode ?? 'unknown', accountRefHash: context.accountRefHash ?? null },
+    fallbackChain: resolution?.fallbackChain ?? [],
+    reachability: resolution?.reachability ?? { state: 'unknown', evidenceRef: null },
+    limits: resolution?.limits ?? { state: 'unknown', evidenceRefs: [] },
+    createdAt: now(),
+  };
+  try {
+    const declaration = store.declare(receipt);
+    return {
+      store,
+      ownedStore,
+      ref: declaration.ref,
+      created: declaration.created,
+      append: (event) => {
+        store!.append(declaration.ref, invocationId, { ...event, eventId: idFactory() } as InvocationEvent);
+      },
+      close: () => {
+        if (ownedStore) store!.close();
+      },
+    };
+  } catch (error) {
+    if (ownedStore) store.close();
+    throw error;
+  }
+}
+
+function receiptFailure(message: string, receiptRef?: InvocationReceiptRef): PlannerCallResult {
+  return { ok: false, reason: 'receipt_failed', message, receiptRef };
+}
 
 /**
  * @internal Used only within orchestra/ — invokes the AI planner subprocess and
@@ -490,8 +859,48 @@ export async function callBrainPlannerWithReason(
   timeout?: number,
   worstCombinations?: string,
   spawnFn: PlannerSpawnFn = defaultPlannerSpawn,
+  receiptContext?: PlannerReceiptContext,
+  modelPolicy?: PlannerTaskModelPolicy,
 ): Promise<PlannerCallResult> {
-  const prompt = buildPlanPrompt(context, recommendation, projectName, undefined, worstCombinations);
+  const effectiveModelPolicy = resolvePlannerTaskModelPolicy(
+    modelPolicy ?? createPlannerTaskModelPolicy(model),
+  );
+  const prompt = buildPlanPrompt(
+    context, recommendation, projectName, undefined, worstCombinations, effectiveModelPolicy,
+  );
+
+  const rejectedBeforeDispatch = async (
+    facts: PlannerReceiptFacts,
+    reason: PlannerFailureReason,
+    reasonCode: InvocationReasonCode,
+    message: string,
+  ): Promise<PlannerCallResult> => {
+    if (!receiptContext) return { ok: false, reason, message };
+    let receipt: PlannerReceiptSession;
+    try {
+      receipt = await beginPlannerReceipt(receiptContext, facts);
+    } catch {
+      return receiptFailure('INVOCATION_RECEIPT_DECLARE_FAILED');
+    }
+    if (!receipt.created) {
+      receipt.close();
+      return {
+        ok: false,
+        reason: 'receipt_replay_blocked',
+        message: 'INVOCATION_RECEIPT_DUPLICATE_DISPATCH_BLOCKED',
+        receiptRef: receipt.ref,
+      };
+    }
+    try {
+      receipt.append({ type: 'dispatch_rejected', payload: { reasonCode } });
+      receipt.append({ type: 'consumer_settled', payload: { outcome: 'rejected', reasonCode } });
+      return { ok: false, reason, message, receiptRef: receipt.ref };
+    } catch {
+      return receiptFailure('INVOCATION_RECEIPT_EVENT_WRITE_FAILED', receipt.ref);
+    } finally {
+      receipt.close();
+    }
+  };
 
   // resolveAdapter throws ProviderError when registry is empty or provider missing.
   // Surface as `no_providers` reason so the caller does not silently fall back.
@@ -500,72 +909,225 @@ export async function callBrainPlannerWithReason(
     resolved = resolveAdapter(adapter, model);
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
-    return {
-      ok: false,
-      reason: 'no_providers',
-      message: `Provider registry empty or missing requested provider: ${detail}`,
-    };
+    return rejectedBeforeDispatch(
+      {
+        resolvedProvider: null,
+        resolvedModel: null,
+        calledProvider: null,
+        calledModel: null,
+        transport: 'cli',
+        executionBackend: 'host-subprocess',
+        missingReason: 'no_provider',
+      },
+      'no_providers',
+      'no_provider',
+      `Provider registry empty or missing requested provider: ${detail}`,
+    );
   }
 
-  let cmdInfo: { command: string; args: string[] };
+  let cmdInfo: PlannerSpawnSpec;
+  let nativeInvocation: ProviderPlannerInvocation | undefined;
   try {
-    cmdInfo = buildPlannerSpawnArgs(resolved, prompt, model);
+    nativeInvocation = resolved.buildPlannerInvocation?.(prompt, model);
+    cmdInfo = nativeInvocation
+      ? normalizeNativePlannerInvocation(resolved, nativeInvocation, model)
+      : buildPlannerSpawnArgs(resolved, prompt, model);
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
-    return {
-      ok: false,
-      reason: 'spawn_failed',
-      message: `Could not build planner command for provider=${resolved.name}: ${detail}`,
-    };
+    return rejectedBeforeDispatch(
+      {
+        resolvedProvider: canonicalProviderFromAdapter(resolved),
+        resolvedModel: model,
+        calledProvider: null,
+        calledModel: null,
+        transport: 'cli',
+        executionBackend: 'host-subprocess',
+        missingReason: 'command_build_failed',
+      },
+      'spawn_failed',
+      'command_build_failed',
+      `Could not build planner command for provider=${resolved.name}: ${detail}`,
+    );
   }
 
   const effectiveTimeout = timeout ?? BRAIN_PLAN_TIMEOUT_MS;
+  let receipt: PlannerReceiptSession | undefined;
+  if (receiptContext) {
+    try {
+      receipt = await beginPlannerReceipt(receiptContext, {
+        resolvedProvider: canonicalProviderFromAdapter(resolved),
+        resolvedModel: model,
+        calledProvider: cmdInfo.calledProvider,
+        calledModel: cmdInfo.calledModel,
+        transport: cmdInfo.transport,
+        executionBackend: cmdInfo.executionBackend,
+        missingReason: 'none',
+      });
+    } catch {
+      return receiptFailure('INVOCATION_RECEIPT_DECLARE_FAILED');
+    }
+    if (!receipt.created) {
+      receipt.close();
+      return {
+        ok: false,
+        reason: 'receipt_replay_blocked',
+        message: 'INVOCATION_RECEIPT_DUPLICATE_DISPATCH_BLOCKED',
+        receiptRef: receipt.ref,
+      };
+    }
+    try {
+      receipt.append({ type: 'dispatch_started', payload: { attempt: 1 } });
+    } catch {
+      const receiptRef = receipt.ref;
+      receipt.close();
+      return receiptFailure('INVOCATION_RECEIPT_PRE_DISPATCH_WRITE_FAILED', receiptRef);
+    }
+  }
 
-  const result = await spawnFn(cmdInfo.command, cmdInfo.args, { timeoutMs: effectiveTimeout });
+  const finish = (
+    events: Array<Omit<InvocationEvent, 'eventId'>>,
+    result: PlannerCallResult,
+  ): PlannerCallResult => {
+    if (!receipt) return result;
+    try {
+      for (const event of events) receipt.append(event);
+      return { ...result, receiptRef: receipt.ref };
+    } catch {
+      return receiptFailure('INVOCATION_RECEIPT_SETTLEMENT_WRITE_FAILED', receipt.ref);
+    } finally {
+      receipt.close();
+    }
+  };
+
+  const startedAt = Date.now();
+  let result: PlannerSpawnOutcome;
+  try {
+    result = nativeInvocation
+      ? await nativeInvocation.execute({ timeoutMs: effectiveTimeout })
+      : await spawnFn(cmdInfo.command, cmdInfo.args, { timeoutMs: effectiveTimeout });
+  } catch (error) {
+    result = {
+      status: null,
+      signal: null,
+      stdout: '',
+      stderr: '',
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
+  }
+  const durationMs = Math.max(0, Date.now() - startedAt);
 
   // SIGTERM indicates the process was killed at the configured timeout.
   // Surface as `timeout` so the caller can suggest raising brain_plan_timeout_ms.
   if (result.signal === 'SIGTERM') {
-    return {
-      ok: false,
-      reason: 'timeout',
-      message:
+    return finish(
+      [
+        {
+          type: 'transport_settled',
+          payload: { outcome: 'timeout', exitCode: result.status, signal: result.signal, reasonCode: 'timeout', durationMs },
+        },
+        { type: 'consumer_settled', payload: { outcome: 'rejected', reasonCode: 'timeout' } },
+      ],
+      {
+        ok: false,
+        reason: 'timeout',
+        message:
         `Subscription spawn timed out after ${effectiveTimeout}ms (provider=${resolved.name}). ` +
         `Consider raising brain_plan_timeout_ms in config or passing a larger timeout.`,
-    };
+      },
+    );
   }
 
   if (result.error) {
-    return {
-      ok: false,
-      reason: 'spawn_failed',
-      message: `spawn error for provider=${resolved.name}: ${result.error.message}`,
-    };
+    return finish(
+      [
+        {
+          type: 'transport_settled',
+          payload: { outcome: 'failed', exitCode: null, signal: null, reasonCode: 'spawn_error', durationMs },
+        },
+        { type: 'consumer_settled', payload: { outcome: 'rejected', reasonCode: 'spawn_error' } },
+      ],
+      {
+        ok: false,
+        reason: 'spawn_failed',
+        message: `spawn error for provider=${resolved.name}: ${result.error.message}`,
+      },
+    );
   }
 
   if (result.status !== 0 || !result.stdout) {
     const stderr = (result.stderr ?? '').toString().slice(0, 500);
-    return {
-      ok: false,
-      reason: 'spawn_failed',
-      message:
+    const reasonCode: InvocationReasonCode = result.status !== 0 ? 'nonzero_exit' : 'empty_output';
+    return finish(
+      [
+        {
+          type: 'transport_settled',
+          payload: { outcome: 'failed', exitCode: result.status, signal: result.signal, reasonCode, durationMs },
+        },
+        { type: 'consumer_settled', payload: { outcome: 'rejected', reasonCode } },
+      ],
+      {
+        ok: false,
+        reason: 'spawn_failed',
+        message:
         `provider=${resolved.name} exited with status=${result.status ?? 'null'}, ` +
         `stdout=${result.stdout ? `${result.stdout.length} bytes` : 'empty'}, stderr=${stderr}`,
-    };
+      },
+    );
   }
 
   const parsed = parsePlannerResponse(result.stdout, resolved);
   if (!parsed) {
     const snippet = result.stdout.slice(0, 200).replace(/\n/g, ' ');
-    return {
-      ok: false,
-      reason: 'parse_failed',
-      message:
+    return finish(
+      [
+        {
+          type: 'transport_settled',
+          payload: { outcome: 'succeeded', exitCode: 0, signal: null, reasonCode: 'none', durationMs },
+        },
+        { type: 'consumer_settled', payload: { outcome: 'rejected', reasonCode: 'parse_failed' } },
+      ],
+      {
+        ok: false,
+        reason: 'parse_failed',
+        message:
         `provider=${resolved.name} returned unparseable output (length=${result.stdout.length}): ${snippet}`,
-    };
+      },
+    );
   }
 
-  return { ok: true, data: parsed };
+  const disallowedModel = parsed.tasks.find(
+    (task) => !effectiveModelPolicy.allowedModels.includes(task.model),
+  );
+  if (disallowedModel) {
+    return finish(
+      [
+        {
+          type: 'transport_settled',
+          payload: { outcome: 'succeeded', exitCode: 0, signal: null, reasonCode: 'none', durationMs },
+        },
+        { type: 'consumer_settled', payload: { outcome: 'rejected', reasonCode: 'validation_failed' } },
+      ],
+      {
+        ok: false,
+        reason: 'validation_failed',
+        message: `provider=${resolved.name} returned model outside the allowed worker policy: ${disallowedModel.model}`,
+      },
+    );
+  }
+
+  return finish(
+    [
+      {
+        type: 'transport_settled',
+        payload: { outcome: 'succeeded', exitCode: 0, signal: null, reasonCode: 'none', durationMs },
+      },
+      {
+        type: 'consumer_settled',
+        payload: { outcome: 'accepted', reasonCode: 'none' },
+      },
+    ],
+    { ok: true, data: parsed },
+  );
 }
 
 /**
@@ -589,9 +1151,13 @@ export async function callBrainPlanner(
   timeout?: number,
   worstCombinations?: string,
   spawnFn?: PlannerSpawnFn,
+  receiptContext?: PlannerReceiptContext,
+  modelPolicy?: PlannerTaskModelPolicy,
 ): Promise<PlannerResult | null> {
   const result = await callBrainPlannerWithReason(
     context, recommendation, model, projectName, adapter, timeout, worstCombinations, spawnFn,
+    receiptContext,
+    modelPolicy,
   );
   if (result.ok) return result.data;
   if (result.reason === 'no_providers') {
@@ -649,10 +1215,14 @@ export function buildZeroConfigPlanPrompt(
   description: string,
   projectName: string,
   fileTree: string[] = [],
+  modelPolicy?: PlannerTaskModelPolicy,
 ): string {
   const treeSection = fileTree.length > 0
     ? `\nFILE TREE (first ${Math.min(fileTree.length, 50)}):\n${fileTree.slice(0, 50).join('\n')}`
     : `\n${GREENFIELD_NOTE}`;
+
+  const effectiveModelPolicy = resolvePlannerTaskModelPolicy(modelPolicy);
+  const modelSelection = renderPlannerModelPolicy(effectiveModelPolicy);
 
   return `You are a software project orchestrator. A user requested a feature in natural language.
 Split this request into ${zeroConfigTaskRange().min}-${zeroConfigTaskRange().max} independent, parallel-executable tasks.
@@ -680,10 +1250,9 @@ EXAMPLE SPLIT:
 4. Integration tests (E2E auth flow, token validation tests)
 
 ${buildAdrConstraintsPlannerBlock()}
-MODEL SELECTION:
-- **opus**: Complex architecture, multiple modules, new patterns/abstractions
-- **sonnet**: Standard implementation, single module, follows existing patterns
-- **haiku**: Trivial tasks only — rename, typo fix, placeholder creation
+MODEL SELECTION (EXACT API IDs ONLY):
+${modelSelection}
+- Never emit a family alias such as opus, sonnet, haiku, gpt-5, or gpt-5.6
 
 OUTPUT FORMAT (JSON ONLY, nothing else):
 {
@@ -691,7 +1260,7 @@ OUTPUT FORMAT (JSON ONLY, nothing else):
     {
       "title": "...",
       "description": "...",
-      "model": "sonnet|opus|haiku",
+      "model": "${effectiveModelPolicy.defaultModel}",
       "effort": "low|normal|high",
       "priority": "CRITICAL|HIGH|NORMAL|LOW",
       "reason": "Why this model/effort",
@@ -722,28 +1291,182 @@ export async function callZeroConfigPlanner(
   adapter?: ProviderAdapter,
   timeout?: number,
   spawnFn: PlannerSpawnFn = defaultPlannerSpawn,
+  receiptContext?: PlannerReceiptContext,
+  taskModelPolicy?: PlannerTaskModelPolicy,
 ): Promise<PlannerResult | null> {
-  const prompt = buildZeroConfigPlanPrompt(description, projectName, fileTree);
+  const modelPolicy = resolvePlannerTaskModelPolicy(
+    taskModelPolicy ?? createPlannerTaskModelPolicy(model),
+  );
+  const prompt = buildZeroConfigPlanPrompt(description, projectName, fileTree, modelPolicy);
   const resolved = resolveAdapter(adapter, model);
-  const { command, args } = buildPlannerSpawnArgs(resolved, prompt, model);
   const timeoutMs = timeout ?? BRAIN_PLAN_TIMEOUT_MS;
+  interface ZeroConfigAttempt {
+    readonly outcome: PlannerSpawnOutcome;
+    readonly receipt?: PlannerReceiptSession;
+    readonly durationMs: number;
+  }
+  const contextForAttempt = (attempt: number): PlannerReceiptContext | undefined => {
+    if (!receiptContext || attempt === 1) return receiptContext;
+    const baseInvocationId = receiptContext.invocationId ?? deterministicInvocationId(receiptContext);
+    const invocationId = `${baseInvocationId}:schema-retry-${attempt}`;
+    return {
+      ...receiptContext,
+      invocationId,
+      idempotencyKey: `${receiptContext.idempotencyKey ?? `${receiptContext.runId}:brain:sprint-planning:1`}:schema-retry-${attempt}`,
+      callId: `${invocationId}:call-1`,
+    };
+  };
+  const invoke = async (plannerPrompt: string, attempt: number): Promise<ZeroConfigAttempt> => {
+    let nativeInvocation: ProviderPlannerInvocation | undefined;
+    let spec: PlannerSpawnSpec;
+    try {
+      nativeInvocation = resolved.buildPlannerInvocation?.(plannerPrompt, model);
+      spec = nativeInvocation
+        ? normalizeNativePlannerInvocation(resolved, nativeInvocation, model)
+        : buildPlannerSpawnArgs(resolved, plannerPrompt, model);
+    } catch (error) {
+      return {
+        outcome: {
+          status: null, signal: null, stdout: '', stderr: '',
+          error: error instanceof Error ? error : new Error(String(error)),
+        },
+        durationMs: 0,
+      };
+    }
+    let receipt: PlannerReceiptSession | undefined;
+    const attemptContext = contextForAttempt(attempt);
+    if (attemptContext) {
+      try {
+        receipt = await beginPlannerReceipt(attemptContext, {
+          resolvedProvider: canonicalProviderFromAdapter(resolved),
+          resolvedModel: model,
+          calledProvider: spec.calledProvider,
+          calledModel: spec.calledModel,
+          transport: spec.transport,
+          executionBackend: spec.executionBackend,
+          missingReason: 'none',
+        });
+        if (!receipt.created) {
+          receipt.close();
+          return {
+            outcome: {
+              status: null, signal: null, stdout: '', stderr: '',
+              error: new Error('INVOCATION_RECEIPT_DUPLICATE_DISPATCH_BLOCKED'),
+            },
+            durationMs: 0,
+          };
+        }
+        receipt.append({ type: 'dispatch_started', payload: { attempt } });
+      } catch (error) {
+        receipt?.close();
+        return {
+          outcome: {
+            status: null, signal: null, stdout: '', stderr: '',
+            error: error instanceof Error ? error : new Error(String(error)),
+          },
+          durationMs: 0,
+        };
+      }
+    }
+    const startedAt = Date.now();
+    try {
+      const outcome = nativeInvocation
+        ? await nativeInvocation.execute({ timeoutMs })
+        : await spawnFn(spec.command, spec.args, { timeoutMs });
+      return {
+        outcome, receipt, durationMs: Math.max(0, Date.now() - startedAt),
+      };
+    } catch (error) {
+      return {
+        outcome: {
+          status: null, signal: null, stdout: '', stderr: '',
+          error: error instanceof Error ? error : new Error(String(error)),
+        },
+        receipt,
+        durationMs: Math.max(0, Date.now() - startedAt),
+      };
+    }
+  };
 
-  const result = await spawnFn(command, args, { timeoutMs });
+  const settle = (
+    attempt: ZeroConfigAttempt,
+    consumerOutcome: 'accepted' | 'rejected',
+    consumerReason: InvocationReasonCode,
+  ): boolean => {
+    if (!attempt.receipt) return true;
+    const { outcome } = attempt;
+    const transportOutcome = outcome.signal === 'SIGTERM'
+      ? 'timeout'
+      : outcome.error || outcome.status !== 0 || !outcome.stdout
+        ? 'failed'
+        : 'succeeded';
+    const transportReason: InvocationReasonCode = outcome.signal === 'SIGTERM'
+      ? 'timeout'
+      : outcome.error
+        ? 'spawn_error'
+        : outcome.status !== 0
+          ? 'nonzero_exit'
+          : !outcome.stdout
+            ? 'empty_output'
+            : 'none';
+    try {
+      attempt.receipt.append({
+        type: 'transport_settled',
+        payload: {
+          outcome: transportOutcome,
+          exitCode: outcome.status,
+          signal: outcome.signal,
+          reasonCode: transportReason,
+          durationMs: attempt.durationMs,
+        },
+      });
+      attempt.receipt.append({
+        type: 'consumer_settled',
+        payload: { outcome: consumerOutcome, reasonCode: consumerReason },
+      });
+      return true;
+    } catch {
+      return false;
+    } finally {
+      attempt.receipt.close();
+    }
+  };
 
-  if (result.status !== 0 || !result.stdout) return null;
+  const firstAttempt = await invoke(prompt, 1);
+  const result = firstAttempt.outcome;
+
+  if (result.status !== 0 || !result.stdout) {
+    settle(firstAttempt, 'rejected', result.signal === 'SIGTERM' ? 'timeout' : result.error ? 'spawn_error' : result.status !== 0 ? 'nonzero_exit' : 'empty_output');
+    return null;
+  }
   let parsed = parsePlannerResponse(result.stdout, resolved);
+  let acceptedAttempt = firstAttempt;
 
   // U2 (PCOMP-8): single schema-feedback retry — a nondeterministic model
   // occasionally returns unparseable/invalid JSON; one corrective round-trip
   // with the violation named beats silently returning null (which upstream
   // reads as "provider unavailable").
   if (!parsed) {
+    if (!settle(firstAttempt, 'rejected', 'parse_failed')) return null;
     const retryPrompt = `${prompt}\n\nYOUR PREVIOUS RESPONSE WAS INVALID (schema/JSON error). Respond again with ONLY the requested JSON schema and no other text.`;
-    const { command: c2, args: a2 } = buildPlannerSpawnArgs(resolved, retryPrompt, model);
-    const retry = await spawnFn(c2, a2, { timeoutMs });
+    const retryAttempt = await invoke(retryPrompt, 2);
+    const retry = retryAttempt.outcome;
     if (retry.status === 0 && retry.stdout) parsed = parsePlannerResponse(retry.stdout, resolved);
+    if (!parsed) {
+      settle(retryAttempt, 'rejected', retry.status === 0 && retry.stdout ? 'parse_failed' : retry.signal === 'SIGTERM' ? 'timeout' : retry.error ? 'spawn_error' : retry.status !== 0 ? 'nonzero_exit' : 'empty_output');
+      return null;
+    }
+    if (parsed.tasks.some((task) => !modelPolicy.allowedModels.includes(task.model))) {
+      settle(retryAttempt, 'rejected', 'validation_failed');
+      return null;
+    }
+    acceptedAttempt = retryAttempt;
+  } else {
+    if (parsed.tasks.some((task) => !modelPolicy.allowedModels.includes(task.model))) {
+      settle(firstAttempt, 'rejected', 'validation_failed');
+      return null;
+    }
   }
-  if (!parsed) return null;
 
   // U2 output-contract completion (deterministic): filesRead mentioned+import
   // completion + mirror-test create-if-missing. Fail-soft I/O — a completion
@@ -759,6 +1482,8 @@ export async function callZeroConfigPlanner(
       });
     }
   } catch { /* normalization is best-effort; linter W-checks remain witnesses */ }
+
+  if (!settle(acceptedAttempt, 'accepted', 'none')) return null;
   return parsed;
 }
 
@@ -873,12 +1598,15 @@ export function auditPlanGroundTruth(
  * Produces a single task that wraps the full description.
  */
 export function buildZeroConfigFallbackPlan(description: string): PlannerResult {
+  const fallbackModelId = resolveBrainModel(undefined);
+  const fallbackModel = modelRegistry.get(fallbackModelId);
+  if (!fallbackModel) throw new ProviderError('E_MODEL_FALLBACK_UNSATISFIED', 'E_MODEL_FALLBACK_UNSATISFIED');
   return {
     tasks: [
       {
         title: description.slice(0, 80),
         description,
-        model: 'sonnet',
+        model: fallbackModel.id,
         effort: 'normal',
         priority: 'NORMAL',
         reason: 'Zero-config fallback: single task wrapping the full description',

@@ -50,7 +50,7 @@ function makePlannerTask(overrides: Partial<PlannerTask> = {}): PlannerTask {
   return {
     title: 'Backend export endpoints',
     description: 'Add POST /export/csv and /export/json handlers.',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'Single-module CRUD change, follows existing route pattern.',

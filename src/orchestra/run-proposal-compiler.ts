@@ -35,10 +35,14 @@
 import type { RunProposal } from '../core/run-flow-contract.js';
 import type { DeckentConfig, PlannerResult, PlannerTask } from '../core/types.js';
 import type { ResolvedConfig } from '../core/config-types.js';
-import { resolveBrainModel } from '../core/config.js';
+import { readAuthMode, resolveBrainModel, resolveDefaultModel } from '../core/config.js';
 import { buildDirectives, type DirectiveBuildIntent, type DirectiveBuildTask } from './directives-builder.js';
 import { spawn } from 'node:child_process';
-import { callZeroConfigPlanner, resolvePlanTimeoutMs } from './planner.js';
+import {
+  callZeroConfigPlanner,
+  createPlannerTaskModelPolicy,
+  resolvePlanTimeoutMs,
+} from './planner.js';
 
 export interface RunProposalCompileResult {
   readonly intent: DirectiveBuildIntent;
@@ -151,13 +155,32 @@ function readTrackedFileTree(timeoutMs = 10_000): Promise<string[]> {
 
 async function defaultRunProposalPlanner(proposal: RunProposal, config?: RunProposalPlannerConfig): Promise<PlannerResult> {
   const description = proposal.intentSummary.trim();
+  const projectRoot = process.cwd();
+  const brainModel = resolveBrainModel(config);
+  const configuredProvider = config?.brain_provider ?? null;
+  const taskModelPolicy = createPlannerTaskModelPolicy(
+    resolveDefaultModel(config),
+    config?.worker_provider,
+  );
   // F-2: async planner call (event loop stays free — `deckent do` can render
   // its planning heartbeat) + the SAME config-resolved timeout every planning
   // path uses (resolvePlanTimeoutMs — brain_plan_timeout_ms honored here too).
   // F-1: the real tracked file tree grounds the planner (no more blind planning).
   const result = await callZeroConfigPlanner(
-    description, resolveBrainModel(config), proposal.project, await readTrackedFileTree(), undefined,
+    description, brainModel, proposal.project, await readTrackedFileTree(), undefined,
     resolvePlanTimeoutMs(config as { brain_plan_timeout_ms?: number; ai_planner_timeout?: number } | undefined),
+    undefined,
+    {
+      tenantId: proposal.tenant,
+      projectRoot,
+      runId: `${proposal.flowId}:revision:${proposal.revision}`,
+      configuredProvider,
+      requestedProvider: configuredProvider,
+      configuredModel: brainModel,
+      requestedModel: brainModel,
+      authMode: await readAuthMode(projectRoot),
+    },
+    taskModelPolicy,
   );
   if (!result) {
     throw new RunProposalPlanError(

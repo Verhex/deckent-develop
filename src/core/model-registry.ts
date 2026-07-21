@@ -350,6 +350,12 @@ const TIER_ORDER: Record<ModelTier, number> = {
 /** Diagnostic namespace inference. An unknown namespace has no authority. */
 export function inferProviderFromId(id: string): RegistryProviderNameExt | undefined {
   const lid = id.trim().toLowerCase();
+  // OpenRouter's canonical API IDs are vendor/model paths. Preserve the full
+  // wire identity verbatim; the slash namespace is ownership evidence for the
+  // OpenRouter gateway, never an invitation to strip the vendor prefix.
+  if (lid.includes('/')) {
+    return 'openrouter';
+  }
   if (lid.startsWith('claude-')) {
     return 'claude';
   }

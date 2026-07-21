@@ -152,7 +152,7 @@ describe('Mode-Aware Routing', () => {
       const config = makeConfig({ deckent_style: 'task' });
       const ctx: TaskModeContext = {
         description: 'Emit event test',
-        model: 'haiku',
+        model: 'claude-haiku-4-5-20251001',
         projectRoot: testRoot,
       };
 
@@ -163,7 +163,7 @@ describe('Mode-Aware Routing', () => {
         expect.objectContaining({
           type: 'TASK_MODE_START',
           style: 'task',
-          model: 'haiku',
+          model: 'claude-haiku-4-5-20251001',
         }),
       );
     });
@@ -195,7 +195,7 @@ describe('Mode-Aware Routing', () => {
       expect(spawnWorkerMultiProvider).toHaveBeenCalledTimes(1);
       expect(spawnWorkerMultiProvider).toHaveBeenCalledWith(
         expect.stringMatching(/^run-test-/),
-        'sonnet', // default model
+        'claude-opus-4-8', // canonical default model
         'mock-prompt',
         testRoot,
         expect.objectContaining({ autoApprove: false }),
@@ -215,7 +215,7 @@ describe('Mode-Aware Routing', () => {
       const config = makeConfig({ deckent_style: 'task' });
       const ctx: TaskModeContext = {
         description: 'Event payload check',
-        model: 'opus',
+        model: 'claude-opus-4-8',
         projectRoot: testRoot,
       };
 
@@ -228,7 +228,7 @@ describe('Mode-Aware Routing', () => {
           taskId: expect.stringMatching(/^run-test-/),
           style: 'task',
           description: 'Event payload check',
-          model: 'opus',
+          model: 'claude-opus-4-8',
           timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
         }),
       );
@@ -245,7 +245,7 @@ describe('Mode-Aware Routing', () => {
       const ctx: TaskModeContext = {
         description: 'Scoped task',
         scope: { directories: ['src/core/'], filesWrite: ['src/core/config.ts'] },
-        model: 'opus',
+        model: 'claude-opus-4-8',
         autoApprove: true,
         projectRoot: testRoot,
       };
@@ -254,7 +254,7 @@ describe('Mode-Aware Routing', () => {
 
       expect(spawnWorkerMultiProvider).toHaveBeenCalledWith(
         expect.any(String),
-        'opus',
+        'claude-opus-4-8',
         'mock-prompt',
         testRoot,
         expect.objectContaining({

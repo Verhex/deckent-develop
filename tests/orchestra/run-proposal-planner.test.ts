@@ -64,7 +64,7 @@ function makePlannerTask(overrides: Partial<PlannerTask> = {}): PlannerTask {
   return {
     title: 'Backend export endpoints',
     description: 'Add POST /export/csv and /export/json handlers.',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'Single-module CRUD change, follows existing route pattern.',
@@ -252,7 +252,7 @@ describe('compileRunProposalIntent — production default is wired to the real p
 // the spy's recorded call, then let the same RunProposalPlanError surface.
 
 describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(config)', () => {
-  it("passes the balanced-mode fallback 'sonnet' when no config is given (regression-guard for the former hardcoded literal)", async () => {
+  it("passes the balanced-mode canonical 'claude-sonnet-5' when no config is given", async () => {
     const proposal = makeProposal({ flowId: 'flow-431-no-config' });
     const spy = vi.mocked(callZeroConfigPlanner);
     spy.mockClear();
@@ -260,10 +260,10 @@ describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(c
     await expect(compileRunProposalIntent(proposal)).rejects.toThrow(RunProposalPlanError);
 
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy.mock.calls[0]?.[1]).toBe('sonnet');
+    expect(spy.mock.calls[0]?.[1]).toBe('claude-sonnet-5');
   });
 
-  it("passes 'sonnet' for an economic-mode config (economic.brain_model = 'sonnet')", async () => {
+  it("passes 'claude-sonnet-5' for an economic-mode config", async () => {
     const proposal = makeProposal({ flowId: 'flow-431-economic' });
     const spy = vi.mocked(callZeroConfigPlanner);
     spy.mockClear();
@@ -271,10 +271,10 @@ describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(c
     const config: DeckentConfig = { mode: 'economic', modes: DEFAULT_MODES };
     await expect(compileRunProposalIntent(proposal, undefined, config)).rejects.toThrow(RunProposalPlanError);
 
-    expect(spy.mock.calls[0]?.[1]).toBe('sonnet');
+    expect(spy.mock.calls[0]?.[1]).toBe('claude-sonnet-5');
   });
 
-  it("passes 'opus' for a performance-mode config (performance.brain_model = 'opus')", async () => {
+  it("passes 'claude-opus-4-8' for a performance-mode config", async () => {
     const proposal = makeProposal({ flowId: 'flow-431-performance' });
     const spy = vi.mocked(callZeroConfigPlanner);
     spy.mockClear();
@@ -282,7 +282,27 @@ describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(c
     const config: DeckentConfig = { mode: 'performance', modes: DEFAULT_MODES };
     await expect(compileRunProposalIntent(proposal, undefined, config)).rejects.toThrow(RunProposalPlanError);
 
-    expect(spy.mock.calls[0]?.[1]).toBe('opus');
+    expect(spy.mock.calls[0]?.[1]).toBe('claude-opus-4-8');
+  });
+
+  it('keeps the Brain invocation model separate from the configured Worker task-model policy', async () => {
+    const proposal = makeProposal({ flowId: 'flow-role-split' });
+    const spy = vi.mocked(callZeroConfigPlanner);
+    spy.mockClear();
+
+    const config: DeckentConfig = {
+      mode: 'balanced',
+      modes: DEFAULT_MODES,
+      brain_provider: 'claude',
+      worker_provider: 'codex',
+    };
+    await expect(compileRunProposalIntent(proposal, undefined, config)).rejects.toThrow(RunProposalPlanError);
+
+    expect(spy.mock.calls[0]?.[1]).toBe('claude-sonnet-5');
+    expect(spy.mock.calls[0]?.[8]).toMatchObject({ defaultModel: 'gpt-5.5' });
+    expect(spy.mock.calls[0]?.[8]?.allowedModels).toEqual(
+      expect.arrayContaining(['gpt-5.5', 'gpt-5.6-sol']),
+    );
   });
 
   it('F-1: grounds the planner with the REAL tracked file tree (no more blind planning)', async () => {

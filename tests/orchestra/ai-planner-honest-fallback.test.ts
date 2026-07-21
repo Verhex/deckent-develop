@@ -65,6 +65,10 @@ vi.mock('../../src/monitor/auditor.js', () => ({
 
 vi.mock('../../src/orchestra/planner.js', () => ({
   resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
+  createPlannerTaskModelPolicy: vi.fn((model: string, provider?: string) => ({
+    defaultModel: provider === 'codex' ? 'gpt-5.5' : model,
+    allowedModels: provider === 'codex' ? ['gpt-5.5'] : [model],
+  })),
   // Sprint 224 task 224-001 — sprint-planner uses `callBrainPlannerWithReason` for
   // honest-fallback. Default = honest spawn_failed discriminant; each test overrides.
   callBrainPlannerWithReason: vi.fn().mockReturnValue({
@@ -82,7 +86,7 @@ vi.mock('../../src/orchestra/planner.js', () => ({
 const providerFixtures = vi.hoisted(() => {
   const claudeAdapter = {
     name: 'claude' as const,
-    buildCommand: () => 'claude --model opus /dev/null',
+    buildCommand: () => 'claude --model claude-opus-4-8 /dev/null',
     isAvailable: async () => true,
   };
   const ollamaAdapter = {
@@ -144,7 +148,7 @@ vi.mock('../../src/orchestra/model-selector.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/orchestra/model-selector.js')>();
   return {
     ...actual,
-    resolveTaskModel: vi.fn().mockReturnValue('sonnet'),
+    resolveTaskModel: vi.fn().mockReturnValue('claude-sonnet-5'),
   };
 });
 
@@ -186,8 +190,8 @@ function makeConfig(brainProvider?: 'claude' | 'ollama'): ResolvedConfig {
     mode: 'max_plan',
     activeModeConfig: {
       max_workers: 4,
-      brain_model: 'opus',
-      default_model: 'sonnet',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: false,
       brain_planning: 'auto',
     },
@@ -225,7 +229,7 @@ const validAiPlannerResult = {
     {
       title: 'AI Planned Task',
       description: 'From AI',
-      model: 'sonnet' as const,
+      model: 'claude-sonnet-5' as const,
       effort: 'normal' as const,
       priority: 'NORMAL' as const,
       reason: 'AI decided',
@@ -359,7 +363,13 @@ describe('Sprint 224 / Task 224-001 — AI planner discriminant honest-fallback'
   });
 
   it('mode=ai + ok=true (success path) → uses data.tasks, planningMode=ai, no warning emitted', async () => {
-    mockedCallBrainPlanner.mockReturnValue(okResult);
+    const receiptRef = {
+      schemaVersion: 1 as const,
+      invocationId: 'inv-planner-proof',
+      tenantId: 'local',
+      projectId: 'project-proof',
+    };
+    mockedCallBrainPlanner.mockReturnValue({ ...okResult, receiptRef });
     const config = makeConfig('claude');
 
     const sprint = await planSprint(
@@ -375,11 +385,29 @@ describe('Sprint 224 / Task 224-001 — AI planner discriminant honest-fallback'
       requestedMode: 'ai',
       actualMode: 'ai',
       resolutionReason: 'model-success',
-      call: { attempted: true, succeeded: true, failureReason: null },
+      call: { attempted: true, succeeded: true, failureReason: null, receiptRef },
     });
     expect(sprint.tasks.some((t) => t.title === 'AI Planned Task')).toBe(true);
     const messages = errorSpy.mock.calls.map((c) => String(c[0]));
     expect(messages.find((m) => m.includes('AI planner failed'))).toBeUndefined();
+  });
+
+  it('gives each dry-run a durable but execution-distinct receipt identity', async () => {
+    mockedCallBrainPlanner.mockReturnValue(okResult);
+    const config = makeConfig('claude');
+
+    await planSprint(ROOT, config, makeContext(''), recommendation, { mode: 'ai', dryRun: true });
+    await planSprint(ROOT, config, makeContext(''), recommendation, { mode: 'ai', dryRun: true });
+
+    const first = mockedCallBrainPlanner.mock.calls[0]![8];
+    const second = mockedCallBrainPlanner.mock.calls[1]![8];
+    expect(first).toMatchObject({ runId: 'sprint-224' });
+    expect(second).toMatchObject({ runId: 'sprint-224' });
+    expect(first?.invocationId).toMatch(/^inv-preview-/);
+    expect(second?.invocationId).toMatch(/^inv-preview-/);
+    expect(first?.invocationId).not.toBe(second?.invocationId);
+    expect(first?.idempotencyKey).toContain(':preview:');
+    expect(second?.idempotencyKey).toContain(':preview:');
   });
 
   it('subscription-spawn: callBrainPlanner receives the brain_provider-resolved adapter (no hardcoded default)', async () => {

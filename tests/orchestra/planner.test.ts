@@ -20,6 +20,7 @@ import {
   buildZeroConfigFallbackPlan,
   buildPlannerSpawnArgs,
   buildZeroConfigPlanPrompt,
+  createPlannerTaskModelPolicy,
   resolveAdapter,
   normalizePlannerDependencies,
   type PlannerSpawnFn,
@@ -71,8 +72,8 @@ function makeRecommendation(overrides: Partial<SprintSizeRecommendation> = {}): 
 
 function makeMockAdapter(overrides: Partial<ProviderAdapter> = {}): ProviderAdapter {
   return {
-    name: 'mock-provider',
-    supportedModels: ['opus', 'sonnet', 'haiku'] as readonly ModelType[],
+    name: 'claude',
+    supportedModels: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'] as readonly ModelType[],
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
@@ -102,7 +103,7 @@ function makeCodexAdapter(overrides: Partial<ProviderAdapter> = {}): ProviderAda
 function makeAdapterWithPlannerCommand(overrides: Partial<ProviderAdapter> = {}): ProviderAdapter {
   return {
     ...makeMockAdapter(),
-    name: 'custom-planner-provider',
+    name: 'claude',
     buildPlannerCommand: vi.fn().mockImplementation(
       (prompt: string, model: ModelType) => ({
         command: 'custom-ai',
@@ -118,7 +119,7 @@ const validPlannerJSON = JSON.stringify({
     {
       title: 'Build feature',
       description: 'Build the feature',
-      model: 'sonnet',
+      model: 'claude-sonnet-5',
       effort: 'normal',
       priority: 'NORMAL',
       reason: 'Standard task',
@@ -245,7 +246,7 @@ describe('parsePlannerResponse', () => {
   it('returns null for invalid model value', () => {
     const bad = JSON.stringify({
       tasks: [{
-        title: 'X', description: 'Y', model: 'gpt4', effort: 'normal',
+        title: 'X', description: 'Y', model: 'unowned-model', effort: 'normal',
         priority: 'NORMAL', reason: 'R', scope: { directories: [], filesRead: [], filesWrite: [] },
         dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
       }],
@@ -260,7 +261,7 @@ describe('parsePlannerResponse', () => {
   });
 
   it('validates all model values', () => {
-    for (const model of ['opus', 'sonnet', 'haiku']) {
+    for (const model of ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001']) {
       const json = JSON.stringify({
         tasks: [{
           title: 'T', description: 'D', model, effort: 'normal',
@@ -299,7 +300,7 @@ describe('resolveAdapter', () => {
   // ─── born-690: model-aware resolution ──────────────────────────────
   // The default provider and the requested model are independent axes.
   // With brain_provider=codex the registry default became codex, and the
-  // planner spawned `codex exec --model sonnet` → hard 400. resolveAdapter
+  // planner spawned `codex exec --model claude-sonnet-5` → hard 400. resolveAdapter
   // must prefer the adapter that OWNS the model.
 
   it('born-690: prefers the model-owning provider over the registry default', () => {
@@ -307,8 +308,8 @@ describe('resolveAdapter', () => {
     const claude = makeMockAdapter({ name: 'claude' });
     providerRegistry.registerProvider(codex, true); // codex is DEFAULT
     providerRegistry.registerProvider(claude);
-    // 'sonnet' is registry-owned by claude → claude adapter wins, not the default
-    expect(resolveAdapter(undefined, 'sonnet')).toBe(claude);
+    // 'claude-sonnet-5' is registry-owned by claude → claude adapter wins, not the default
+    expect(resolveAdapter(undefined, 'claude-sonnet-5')).toBe(claude);
   });
 
   it('born-690: falls back to registry default for models unknown to the model registry', () => {
@@ -320,15 +321,15 @@ describe('resolveAdapter', () => {
   it('born-690: falls back to registry default when the owning provider is not registered', () => {
     const codex = makeCodexAdapter();
     providerRegistry.registerProvider(codex, true);
-    // 'sonnet' is owned by claude, but claude is not registered → default (codex)
-    expect(resolveAdapter(undefined, 'sonnet')).toBe(codex);
+    // 'claude-sonnet-5' is owned by claude, but claude is not registered → default (codex)
+    expect(resolveAdapter(undefined, 'claude-sonnet-5')).toBe(codex);
   });
 
   it('born-690: an explicitly provided adapter still wins over model-aware resolution', () => {
     const codex = makeCodexAdapter();
     const claude = makeMockAdapter({ name: 'claude' });
     providerRegistry.registerProvider(claude, true);
-    expect(resolveAdapter(codex, 'sonnet')).toBe(codex);
+    expect(resolveAdapter(codex, 'claude-sonnet-5')).toBe(codex);
   });
 });
 
@@ -337,40 +338,40 @@ describe('resolveAdapter', () => {
 describe('buildPlannerSpawnArgs', () => {
   it('extracts CLI binary from adapter.buildCommand()', () => {
     const adapter = makeMockAdapter();
-    const result = buildPlannerSpawnArgs(adapter, 'test prompt', 'opus');
+    const result = buildPlannerSpawnArgs(adapter, 'test prompt', 'claude-opus-4-8');
     expect(result.command).toBe('mock-cli');
   });
 
   it('builds generic args when adapter lacks buildPlannerCommand', () => {
     const adapter = makeMockAdapter();
-    const result = buildPlannerSpawnArgs(adapter, 'my prompt', 'sonnet');
+    const result = buildPlannerSpawnArgs(adapter, 'my prompt', 'claude-sonnet-5');
     // Sprint 238 İŞ5: planner passes the real apiId (live from the registry), not the alias.
-    expect(result.args).toEqual(['-p', 'my prompt', '--model', modelRegistry.resolveApiId('sonnet'), '--output-format', 'json']);
+    expect(result.args).toEqual(['-p', 'my prompt', '--model', modelRegistry.resolveApiId('claude-sonnet-5'), '--output-format', 'json']);
   });
 
   it('extracts "codex" from codex adapter buildCommand', () => {
     const adapter = makeCodexAdapter();
-    const result = buildPlannerSpawnArgs(adapter, 'test', 'opus');
+    const result = buildPlannerSpawnArgs(adapter, 'test', 'gpt-5.5');
     expect(result.command).toBe('codex');
   });
 
   it('calls adapter.buildCommand to extract binary name', () => {
     const adapter = makeMockAdapter();
-    buildPlannerSpawnArgs(adapter, 'test', 'haiku');
-    expect(adapter.buildCommand).toHaveBeenCalledWith('haiku', '/dev/null');
+    buildPlannerSpawnArgs(adapter, 'test', 'claude-haiku-4-5-20251001');
+    expect(adapter.buildCommand).toHaveBeenCalledWith('claude-haiku-4-5-20251001', '/dev/null');
   });
 
   it('delegates to adapter.buildPlannerCommand() when available', () => {
     const adapter = makeAdapterWithPlannerCommand();
-    const result = buildPlannerSpawnArgs(adapter, 'my prompt', 'opus');
+    const result = buildPlannerSpawnArgs(adapter, 'my prompt', 'claude-opus-4-8');
     expect(result.command).toBe('custom-ai');
-    expect(result.args).toEqual(['--prompt', 'my prompt', '--model', 'opus', '--json']);
-    expect(adapter.buildPlannerCommand).toHaveBeenCalledWith('my prompt', 'opus');
+    expect(result.args).toEqual(['--prompt', 'my prompt', '--model', 'claude-opus-4-8', '--json']);
+    expect(adapter.buildPlannerCommand).toHaveBeenCalledWith('my prompt', 'claude-opus-4-8');
   });
 
   it('does NOT call buildCommand when buildPlannerCommand is available', () => {
     const adapter = makeAdapterWithPlannerCommand();
-    buildPlannerSpawnArgs(adapter, 'test', 'sonnet');
+    buildPlannerSpawnArgs(adapter, 'test', 'claude-sonnet-5');
     expect(adapter.buildCommand).not.toHaveBeenCalled();
   });
 
@@ -390,11 +391,83 @@ describe('buildPlannerSpawnArgs', () => {
     expect(result.args).not.toContain('--output-format');
   });
 
+  it('prefers a provider-native planner invocation over subprocess command construction', async () => {
+    const execute = vi.fn().mockResolvedValue({
+      status: 0,
+      signal: null,
+      stdout: validPlannerJSON.replace('claude-sonnet-5', 'gpt-5.5'),
+      stderr: '',
+    });
+    const adapter = makeCodexAdapter({
+      buildPlannerInvocation: vi.fn(() => ({
+        calledProvider: 'codex',
+        calledModel: 'gpt-5.5',
+        transport: 'http',
+        executionBackend: 'in-process',
+        execute,
+      })),
+      buildPlannerCommand: vi.fn(() => { throw new Error('must not build a subprocess command'); }),
+    });
+    const spawnFn: PlannerSpawnFn = vi.fn(async () => {
+      throw new Error('must not spawn');
+    });
+
+    const result = await callBrainPlanner(
+      makeContext(), makeRecommendation(), 'gpt-5.5', 'test', adapter, 1234, undefined, spawnFn,
+    );
+
+    expect(result?.tasks[0]?.model).toBe('gpt-5.5');
+    expect(execute).toHaveBeenCalledWith({ timeoutMs: 1234 });
+    expect(spawnFn).not.toHaveBeenCalled();
+    expect(adapter.buildPlannerCommand).not.toHaveBeenCalled();
+  });
+
+  it('fails loudly when provider metadata disagrees with the wire model or adapter identity', () => {
+    const wrongModel = makeCodexAdapter({
+      buildPlannerCommand: () => ({
+        command: 'codex', args: ['exec', '--model', 'wire-model'],
+        calledProvider: 'codex', calledModel: 'different-model',
+      }),
+    });
+    expect(() => buildPlannerSpawnArgs(wrongModel, 'test', 'gpt-5.5')).toThrow(/wire model/);
+
+    const wrongProvider = makeCodexAdapter({
+      buildPlannerCommand: () => ({
+        command: 'codex', args: ['exec', '--model', 'gpt-5.5'],
+        calledProvider: 'gemini', calledModel: 'gpt-5.5',
+      }),
+    });
+    expect(() => buildPlannerSpawnArgs(wrongProvider, 'test', 'gpt-5.5')).toThrow(/adapter identity/);
+
+    const silentRemap = makeCodexAdapter({
+      buildPlannerCommand: () => ({
+        command: 'codex', args: ['exec', '--model', 'gpt-5.6-sol'],
+        calledProvider: 'codex', calledModel: 'gpt-5.6-sol',
+      }),
+    });
+    expect(() => buildPlannerSpawnArgs(silentRemap, 'test', 'gpt-5.5')).toThrow(/resolved model/);
+  });
+
+  it('maps the task default into the configured worker provider namespace', () => {
+    const policy = createPlannerTaskModelPolicy('claude-opus-4-8', 'codex');
+    expect(policy.defaultModel).toBe('gpt-5.5');
+    expect(policy.allowedModels.length).toBeGreaterThan(0);
+    expect(policy.allowedModels.every((model) => modelRegistry.get(model)?.provider === 'codex')).toBe(true);
+  });
+
+  it('registers an explicitly authorized versioned API model for downstream DIRECTIVES parsing', () => {
+    const apiId = 'claude-versioned-policy-test-2026-07-20';
+    const policy = createPlannerTaskModelPolicy(apiId, 'claude');
+    expect(policy.defaultModel).toBe(apiId);
+    expect(policy.allowedModels).toContain(apiId);
+    expect(modelRegistry.get(apiId)).toMatchObject({ id: apiId, apiId, provider: 'claude' });
+  });
+
   it('throws when adapter.buildCommand returns empty string', () => {
     const adapter = makeMockAdapter({
       buildCommand: vi.fn().mockReturnValue(''),
     });
-    expect(() => buildPlannerSpawnArgs(adapter, 'test', 'opus')).toThrow(/empty buildCommand/);
+    expect(() => buildPlannerSpawnArgs(adapter, 'test', 'claude-opus-4-8')).toThrow(/empty buildCommand/);
   });
 });
 
@@ -405,7 +478,7 @@ describe('callBrainPlanner with adapter', () => {
     const adapter = makeMockAdapter();
     const { fn, calls } = makeSpawnFn();
 
-    await callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'test', adapter, undefined, undefined, fn);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'claude-opus-4-8', 'test', adapter, undefined, undefined, fn);
 
     expect(calls[0]!.command).toBe('mock-cli');
     expect(calls[0]!.args).toEqual(expect.arrayContaining(['-p', expect.any(String), '--model', 'claude-opus-4-8', '--output-format', 'json']));
@@ -416,18 +489,18 @@ describe('callBrainPlanner with adapter', () => {
     const adapter = makeCodexAdapter();
     const { fn, calls } = makeSpawnFn();
 
-    await callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, undefined, undefined, fn);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'gpt-5.5', 'test', adapter, undefined, undefined, fn);
 
     expect(calls[0]!.command).toBe('codex');
-    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--model', modelRegistry.resolveApiId('sonnet')]));
+    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--model', modelRegistry.resolveApiId('gpt-5.5')]));
   });
 
   it('falls back to registry default when no adapter passed', async () => {
-    const adapter = makeMockAdapter({ name: 'registry-default' });
+    const adapter = makeMockAdapter({ name: 'claude' });
     providerRegistry.registerProvider(adapter, true);
     const { fn, calls } = makeSpawnFn();
 
-    await callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'test', undefined, undefined, undefined, fn);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'claude-opus-4-8', 'test', undefined, undefined, undefined, fn);
 
     expect(calls[0]!.command).toBe('mock-cli');
     expect(calls[0]!.args).toEqual(expect.arrayContaining(['--model', 'claude-opus-4-8']));
@@ -435,7 +508,7 @@ describe('callBrainPlanner with adapter', () => {
 
   it('rejects when registry is empty and no adapter provided (no silent fallback)', async () => {
     await expect(
-      callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'test'),
+      callBrainPlanner(makeContext(), makeRecommendation(), 'claude-opus-4-8', 'test'),
     ).rejects.toThrow(/No providers registered/);
   });
 
@@ -443,7 +516,7 @@ describe('callBrainPlanner with adapter', () => {
     const adapter = makeMockAdapter();
     const { fn } = makeSpawnFn();
 
-    const result = await callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, undefined, undefined, fn);
+    const result = await callBrainPlanner(makeContext(), makeRecommendation(), 'claude-sonnet-5', 'test', adapter, undefined, undefined, fn);
     expect(result).not.toBeNull();
     expect(result!.tasks).toHaveLength(1);
     expect(result!.tasks[0]!.title).toBe('Build feature');
@@ -454,7 +527,7 @@ describe('callBrainPlanner with adapter', () => {
     const { fn } = makeSpawnFn({ status: 1, stdout: '', stderr: 'error' });
 
     await expect(
-      callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'test', adapter, undefined, undefined, fn),
+      callBrainPlanner(makeContext(), makeRecommendation(), 'claude-opus-4-8', 'test', adapter, undefined, undefined, fn),
     ).resolves.toBeNull();
   });
 
@@ -463,7 +536,7 @@ describe('callBrainPlanner with adapter', () => {
     const { fn } = makeSpawnFn({ status: 0, stdout: '' });
 
     await expect(
-      callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, undefined, undefined, fn),
+      callBrainPlanner(makeContext(), makeRecommendation(), 'claude-sonnet-5', 'test', adapter, undefined, undefined, fn),
     ).resolves.toBeNull();
   });
 
@@ -472,7 +545,7 @@ describe('callBrainPlanner with adapter', () => {
     const { fn } = makeSpawnFn({ status: null, signal: 'SIGTERM', stdout: '' });
 
     await expect(
-      callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, undefined, undefined, fn),
+      callBrainPlanner(makeContext(), makeRecommendation(), 'claude-sonnet-5', 'test', adapter, undefined, undefined, fn),
     ).resolves.toBeNull();
   });
 
@@ -480,17 +553,17 @@ describe('callBrainPlanner with adapter', () => {
     const adapter = makeAdapterWithPlannerCommand();
     const { fn, calls } = makeSpawnFn();
 
-    await callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'test', adapter, undefined, undefined, fn);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'claude-opus-4-8', 'test', adapter, undefined, undefined, fn);
 
     expect(calls[0]!.command).toBe('custom-ai');
-    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--prompt', expect.any(String), '--model', 'opus', '--json']));
+    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--prompt', expect.any(String), '--model', 'claude-opus-4-8', '--json']));
   });
 
   it('passes model parameter correctly', async () => {
     const adapter = makeMockAdapter();
     const { fn, calls } = makeSpawnFn();
 
-    await callBrainPlanner(makeContext(), makeRecommendation(), 'haiku', 'test', adapter, undefined, undefined, fn);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'claude-haiku-4-5-20251001', 'test', adapter, undefined, undefined, fn);
 
     const args = calls[0]!.args;
     const modelIdx = args.indexOf('--model');
@@ -504,7 +577,7 @@ describe('callBrainPlanner with adapter', () => {
 describe('callZeroConfigPlanner', () => {
   it('rejects when no adapter and empty registry (no silent fallback)', async () => {
     await expect(
-      callZeroConfigPlanner('Add login page', 'sonnet', 'test-project'),
+      callZeroConfigPlanner('Add login page', 'claude-sonnet-5', 'test-project'),
     ).rejects.toThrow(/No providers registered/);
   });
 
@@ -512,28 +585,28 @@ describe('callZeroConfigPlanner', () => {
     const adapter = makeCodexAdapter();
     const { fn, calls } = makeSpawnFn();
 
-    await callZeroConfigPlanner('Add login page', 'sonnet', 'test-project', [], adapter, undefined, fn);
+    await callZeroConfigPlanner('Add login page', 'gpt-5.5', 'test-project', [], adapter, undefined, fn);
 
     expect(calls[0]!.command).toBe('codex');
-    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--model', modelRegistry.resolveApiId('sonnet')]));
+    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--model', modelRegistry.resolveApiId('gpt-5.5')]));
   });
 
   it('uses registry default when no adapter passed but registry has provider', async () => {
-    const adapter = makeCodexAdapter({ name: 'codex-default' });
+    const adapter = makeCodexAdapter({ name: 'codex' });
     providerRegistry.registerProvider(adapter, true);
     const { fn, calls } = makeSpawnFn();
 
-    await callZeroConfigPlanner('Add login page', 'opus', 'test-project', [], undefined, undefined, fn);
+    await callZeroConfigPlanner('Add login page', 'gpt-5.5', 'test-project', [], undefined, undefined, fn);
 
     expect(calls[0]!.command).toBe('codex');
-    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--model', 'claude-opus-4-8']));
+    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--model', 'gpt-5.5']));
   });
 
   it('returns parsed result on success', async () => {
     const adapter = makeMockAdapter();
     const { fn } = makeSpawnFn();
 
-    const result = await callZeroConfigPlanner('Add login page', 'sonnet', 'test-project', [], adapter, undefined, fn);
+    const result = await callZeroConfigPlanner('Add login page', 'claude-sonnet-5', 'test-project', [], adapter, undefined, fn);
     expect(result).not.toBeNull();
     expect(result!.tasks).toHaveLength(1);
   });
@@ -543,7 +616,7 @@ describe('callZeroConfigPlanner', () => {
     const { fn } = makeSpawnFn({ status: 1, stdout: '', stderr: 'fail' });
 
     await expect(
-      callZeroConfigPlanner('Add login page', 'sonnet', 'test-project', [], adapter, undefined, fn),
+      callZeroConfigPlanner('Add login page', 'claude-sonnet-5', 'test-project', [], adapter, undefined, fn),
     ).resolves.toBeNull();
   });
 
@@ -552,7 +625,7 @@ describe('callZeroConfigPlanner', () => {
     const { fn } = makeSpawnFn({ status: 0, stdout: '' });
 
     await expect(
-      callZeroConfigPlanner('Add login page', 'sonnet', 'test-project', [], adapter, undefined, fn),
+      callZeroConfigPlanner('Add login page', 'claude-sonnet-5', 'test-project', [], adapter, undefined, fn),
     ).resolves.toBeNull();
   });
 
@@ -560,10 +633,10 @@ describe('callZeroConfigPlanner', () => {
     const adapter = makeAdapterWithPlannerCommand();
     const { fn, calls } = makeSpawnFn();
 
-    await callZeroConfigPlanner('Add feature', 'opus', 'test-project', [], adapter, undefined, fn);
+    await callZeroConfigPlanner('Add feature', 'claude-opus-4-8', 'test-project', [], adapter, undefined, fn);
 
     expect(calls[0]!.command).toBe('custom-ai');
-    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--prompt', expect.any(String), '--model', 'opus', '--json']));
+    expect(calls[0]!.args).toEqual(expect.arrayContaining(['--prompt', expect.any(String), '--model', 'claude-opus-4-8', '--json']));
   });
 
   it('retries ONCE with a schema-feedback prompt when the first response is unparseable (U2)', async () => {
@@ -573,7 +646,7 @@ describe('callZeroConfigPlanner', () => {
       { status: 0, stdout: validPlannerJSON },
     ]);
 
-    const result = await callZeroConfigPlanner('Add login page', 'sonnet', 'test-project', [], adapter, undefined, fn);
+    const result = await callZeroConfigPlanner('Add login page', 'claude-sonnet-5', 'test-project', [], adapter, undefined, fn);
 
     expect(calls).toHaveLength(2);
     expect(calls[1]!.args.join(' ')).toContain('YOUR PREVIOUS RESPONSE WAS INVALID');
@@ -588,7 +661,7 @@ describe('buildZeroConfigFallbackPlan', () => {
     const result = buildZeroConfigFallbackPlan('Add dark mode');
     expect(result.tasks).toHaveLength(1);
     expect(result.tasks[0]!.title).toBe('Add dark mode');
-    expect(result.tasks[0]!.model).toBe('sonnet');
+    expect(result.tasks[0]!.model).toBe('claude-sonnet-5');
     expect(result.reasoning).toContain('Zero-config fallback');
   });
 
@@ -633,7 +706,7 @@ describe('callBrainPlanner — configurable timeout', () => {
     const adapter = makeMockAdapter();
     const { fn, calls } = makeSpawnFn();
 
-    await callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, undefined, undefined, fn);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'claude-sonnet-5', 'test', adapter, undefined, undefined, fn);
 
     expect(calls[0]!.timeoutMs).toBe(BRAIN_PLAN_TIMEOUT_MS);
   });
@@ -643,7 +716,7 @@ describe('callBrainPlanner — configurable timeout', () => {
     const { fn, calls } = makeSpawnFn();
 
     const customTimeout = 120_000;
-    await callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, customTimeout, undefined, fn);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'claude-sonnet-5', 'test', adapter, customTimeout, undefined, fn);
 
     expect(calls[0]!.timeoutMs).toBe(customTimeout);
   });
@@ -653,7 +726,7 @@ describe('callBrainPlanner — configurable timeout', () => {
     const { fn, calls } = makeSpawnFn();
 
     const shortTimeout = 5_000;
-    await callBrainPlanner(makeContext(), makeRecommendation(), 'haiku', 'test', adapter, shortTimeout, undefined, fn);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'claude-haiku-4-5-20251001', 'test', adapter, shortTimeout, undefined, fn);
 
     expect(calls[0]!.timeoutMs).toBe(shortTimeout);
     expect(calls[0]!.timeoutMs).not.toBe(BRAIN_PLAN_TIMEOUT_MS);
@@ -664,7 +737,7 @@ describe('callBrainPlanner — configurable timeout', () => {
     const { fn, calls } = makeSpawnFn();
 
     const customTimeout = 90_000;
-    await callZeroConfigPlanner('Add feature', 'sonnet', 'test-project', [], adapter, customTimeout, fn);
+    await callZeroConfigPlanner('Add feature', 'claude-sonnet-5', 'test-project', [], adapter, customTimeout, fn);
 
     expect(calls[0]!.timeoutMs).toBe(customTimeout);
   });
@@ -673,7 +746,7 @@ describe('callBrainPlanner — configurable timeout', () => {
     const adapter = makeMockAdapter();
     const { fn, calls } = makeSpawnFn();
 
-    await callZeroConfigPlanner('Add feature', 'sonnet', 'test-project', [], adapter, undefined, fn);
+    await callZeroConfigPlanner('Add feature', 'claude-sonnet-5', 'test-project', [], adapter, undefined, fn);
 
     expect(calls[0]!.timeoutMs).toBe(BRAIN_PLAN_TIMEOUT_MS);
   });
@@ -700,7 +773,7 @@ describe('planner.ts provider decoupling — zero hardcoded claude', () => {
 
   it('adapter with buildPlannerCommand produces non-Claude-shaped args', () => {
     const adapter = makeAdapterWithPlannerCommand();
-    const result = buildPlannerSpawnArgs(adapter, 'test prompt', 'opus');
+    const result = buildPlannerSpawnArgs(adapter, 'test prompt', 'claude-opus-4-8');
     expect(result.args).not.toContain('--output-format');
     expect(result.command).not.toBe('claude');
   });

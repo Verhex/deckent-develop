@@ -10,6 +10,7 @@ import {
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 
 // ─── Core (value imports — enums used at runtime) ──────────────────
 import {
@@ -36,14 +37,14 @@ import { MemoryStore } from '../core/memory-store.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { getNextSprintId, readJsonSafe, debugLog } from '../core/utils.js';
-import { resolveBrainPlanningMode } from '../core/config.js';
+import { readAuthMode, resolveBrainPlanningMode } from '../core/config.js';
 import { isUnconditionalRule } from './rule-evolver.js';
 import { resolveDebt } from './debt-manager.js';
 import { preflightCriticalDebt } from './debt-preflight.js';
 
 // ─── Sprint Utilities ─────────────────────────────────────────────
-import { readFileSafe, extractGoNogoCriteria, isAdapterProvider } from './sprint-utils.js';
-import { modelRegistry, ensureOllamaModelRegistered } from '../core/model-registry.js';
+import { readFileSafe, extractGoNogoCriteria } from './sprint-utils.js';
+import { resolveCanonicalModelIdentity } from '../core/model-registry.js';
 
 // ─── Core — provider abstraction ──────────────────────────────────
 import type { ProviderAdapter } from '../core/provider.js';
@@ -56,7 +57,12 @@ import { detectTaskType } from './rubric-registry.js';
 import { SkillPoolManager } from '../core/skill-pool.js';
 
 // ─── Planner ─────────────────────────────────────────────────────
-import { callBrainPlanner, callBrainPlannerWithReason, resolvePlanTimeoutMs } from './planner.js';
+import {
+  callBrainPlanner,
+  callBrainPlannerWithReason,
+  createPlannerTaskModelPolicy,
+  resolvePlanTimeoutMs,
+} from './planner.js';
 import type { PlannerCallResult, PlannerFailureReason } from './planner.js';
 
 /**
@@ -118,6 +124,7 @@ import { resolveTaskModel, parsePatterns, deduplicatePatterns } from './model-se
 import { createTask, extractScopeFromDirective, parseStructuredDirectives, plannerTaskToParams, normalizeStructuredTaskDependencies } from './task-builder.js';
 import { evaluatePromptGate } from './prompt-gate.js';
 import type { PromptGateResult } from '../core/prompt-gate-types.js';
+import type { InvocationReceiptRef } from '../core/invocation-receipt.js';
 
 // ─── BrainError ──────────────────────────────────────────────────
 import { BrainError } from './sprint-lifecycle.js';
@@ -255,7 +262,11 @@ export async function planSprint(
   // routing inside the pool try-block, attached to the returned Sprint below.
   let promptGate: PromptGateResult | undefined;
   emitProgress({ phase: 'PLAN', root: projectRoot });
-  const defaultModel = recommendation.modelConstraint ?? config.activeModeConfig.default_model;
+  const plannerTaskModelPolicy = createPlannerTaskModelPolicy(
+    recommendation.modelConstraint ?? config.activeModeConfig.default_model,
+    config.worker_provider,
+  );
+  const defaultModel = plannerTaskModelPolicy.defaultModel;
   // 429-006 (PLNR1): resolve through resolveBrainPlanningMode so an explicit
   // top-level `config.brain_planning` overrides the mode preset — reading
   // `config.activeModeConfig.brain_planning` directly here would silently
@@ -269,6 +280,7 @@ export async function planSprint(
   let plannerResolvedProvider: ProviderName | null = null;
   let plannerResolvedModel: ModelType | null = null;
   let plannerFailureReason: string | null = null;
+  let plannerReceiptRef: InvocationReceiptRef | null = null;
   const initialStatus = options?.asDraft ? TaskStatus.DRAFT : TaskStatus.PENDING;
 
   // Sprint 238 İŞ1 (+ 429-007 PLNR2): Per-task `- Provider:`/`- Model:`/`- Agent:`/
@@ -302,6 +314,7 @@ export async function planSprint(
       requestedModel: config.activeModeConfig.brain_model ?? null,
       resolvedModel: plannerResolvedModel,
       failureReason: plannerFailureReason,
+      receiptRef: plannerReceiptRef,
     },
   });
   if (planMode !== 'structured' && parsedDirectives.some(t => t.provider || t.forceModel || t.forceAgent || t.forceSkills)) {
@@ -426,6 +439,14 @@ export async function planSprint(
     );
 
     const plannerCallFn = resolveCallBrainPlanner();
+    const plannerAuthMode = await readAuthMode(projectRoot);
+    // Preview calls are real, billable model invocations and therefore still
+    // receive durable audit receipts. They must not share the execution
+    // invocation's deterministic idempotency identity, though: dry-run writes
+    // no sprint/task state, so the subsequent real plan reuses the sprint id.
+    // A per-preview attempt identity preserves audit truth without poisoning
+    // the later execution dispatch as a duplicate replay.
+    const previewAttemptId = options?.dryRun ? randomUUID() : null;
     plannerCallAttempted = true;
     const callResult: PlannerCallResult = await plannerCallFn(
       context,
@@ -435,7 +456,26 @@ export async function planSprint(
       brainAdapter,
       planTimeout,
       worstCombinations,
+      undefined,
+      {
+        tenantId: 'local',
+        projectRoot,
+        runId: sprintId,
+        taskId: null,
+        configuredProvider: config.brain_provider ?? null,
+        requestedProvider: config.brain_provider ?? null,
+        configuredModel: config.activeModeConfig.brain_model ?? null,
+        requestedModel: config.activeModeConfig.brain_model ?? null,
+        authMode: plannerAuthMode,
+        ...(previewAttemptId ? {
+          invocationId: `inv-preview-${previewAttemptId}`,
+          idempotencyKey: `${sprintId}:brain:sprint-planning:preview:${previewAttemptId}`,
+          callId: `inv-preview-${previewAttemptId}:call-1`,
+        } : {}),
+      },
+      plannerTaskModelPolicy,
     );
+    plannerReceiptRef = callResult.receiptRef ?? null;
 
     if (callResult.ok) {
       plannerCallSucceeded = true;
@@ -538,11 +578,11 @@ export async function planSprint(
     const effortTieringEnabled = config.routing?.effort_tiering ?? false;
 
     for (const src of directiveSources) {
-      // Sprint 236: register locally-pulled ollama tags BEFORE model resolution
-      // (resolveTaskModel → registry lookups) so a `- Model: <tag>` not in the
-      // static catalog doesn't throw "Unknown model". Adapter-providers only.
-      if (src.provider && isAdapterProvider(src.provider) && src.forceModel && !modelRegistry.has(src.forceModel)) {
-        ensureOllamaModelRegistered(src.forceModel);
+      if (src.forceModel) {
+        resolveCanonicalModelIdentity(src.forceModel, {
+          ...(src.provider ? { provider: src.provider } : {}),
+          registerParametric: true,
+        });
       }
 
       // born-479 (362-002 MODEL-DROP-FIX): a `- Model:` directive is a
@@ -567,14 +607,6 @@ export async function planSprint(
       let resolvedModel: ModelType;
       if (src.forceModel) {
         resolvedModel = src.forceModel;
-        const isAdapterPassthrough = !!(src.provider && isAdapterProvider(src.provider));
-        if (!isAdapterPassthrough && !modelRegistry.has(src.forceModel)) {
-          void notify(
-            'progress', sprintId,
-            '[Brain] plan:model-override-unknown',
-            `Directive "- Model: ${src.forceModel}" for task "${src.title}" is not in the model catalog — preserving the override as-is (no silent fallback). Verify the model id.`,
-          );
-        }
       } else {
         resolvedModel = recommendation.modelConstraint ??
           resolveTaskModel(src.title, src.description, src.scope, config, parsedPatterns, undefined, undefined, src.provider);
