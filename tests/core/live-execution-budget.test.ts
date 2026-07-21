@@ -151,4 +151,37 @@ describe('LiveExecutionBudgetGuard', () => {
       'test-executor',
     )).toThrow('Spawn blocked before provider work');
   });
+
+  it('rejects missing, empty, and unknown remote budgets before dispatch', () => {
+    expect(() => assertLiveUsageBudgetSupport(
+      undefined,
+      'measured-stream',
+      'remote-test',
+    )).toThrow('Remote execution budget is required');
+    expect(() => assertLiveUsageBudgetSupport(
+      {},
+      'measured-stream',
+      'remote-test',
+    )).toThrow('at least one explicit ceiling');
+    expect(() => assertLiveUsageBudgetSupport(
+      { maxTurns: 2, typoLimit: 1 } as never,
+      'measured-stream',
+      'remote-test',
+    )).toThrow('Unknown execution budget field "typoLimit"');
+  });
+
+  it('allows budgetless execution only for an explicitly local executor', () => {
+    expect(() => assertLiveUsageBudgetSupport(
+      undefined,
+      undefined,
+      'ollama',
+      'local',
+    )).not.toThrow();
+    expect(() => assertLiveUsageBudgetSupport(
+      { maxTurns: 2 },
+      undefined,
+      'ollama',
+      'local',
+    )).toThrow('does not declare that capability');
+  });
 });

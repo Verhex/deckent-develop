@@ -22,7 +22,11 @@ import { DECK_FILE_NAME } from '../core/deck-file.js';
 import { debugLog } from '../core/utils.js';
 import { DeckentError } from '../core/errors.js';
 import { normalizeStreamEvent, writeLogEvent, type StreamLogEvent } from '../core/log-event.js';
-import { assertLiveUsageBudgetSupport, hasLiveUsageCeiling } from '../core/live-execution-budget.js';
+import {
+  assertExecutionBudgetShape,
+  assertLiveUsageBudgetSupport,
+  hasLiveUsageCeiling,
+} from '../core/live-execution-budget.js';
 import {
   acquireSpawnLocks,
   releaseAllSpawnLocks,
@@ -1760,6 +1764,7 @@ export function captureDockerLogs(
 
 export class DockerSpawnBackend implements SpawnBackend {
   readonly name = 'docker';
+  readonly liveUsageBudgetSupport = 'measured-stream' as const;
 
   private readonly projectDir: string;
   private readonly image: string;
@@ -1816,6 +1821,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     checkLethalGuard(opts?.actionId, this.name);
     const dir = opts?.projectDir ?? this.projectDir;
     const executionBudget = resolveTaskExecutionBudget(dir, taskId, opts?.executionBudget);
+    assertExecutionBudgetShape(executionBudget, this.name);
     if (typeof executionBudget?.maxUsd === 'number') {
       assertLiveUsageBudgetSupport(executionBudget, undefined, this.name);
     }

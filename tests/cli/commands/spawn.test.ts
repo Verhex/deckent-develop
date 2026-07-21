@@ -332,6 +332,32 @@ describe('spawnWorkerMultiProvider', () => {
     vi.mocked(spawnWorker).mockImplementation(() => {});
   });
 
+  it('blocks a budgetless remote worker before creating a backend or session', async () => {
+    await expect(spawnWorkerMultiProvider(
+      'budgetless-remote',
+      'gpt-4.1',
+      'prompt',
+      '/root',
+      {},
+    )).rejects.toThrow('Remote execution budget is required');
+    expect(SpawnBackendFactory.create).not.toHaveBeenCalled();
+    expect(ensureSession).not.toHaveBeenCalled();
+    expect(spawnWorker).not.toHaveBeenCalled();
+  });
+
+  it('blocks a budgeted remote worker when its backend cannot meter live usage', async () => {
+    const backend = { spawn: vi.fn(), kill: vi.fn(), list: vi.fn(), name: 'subprocess' };
+    vi.mocked(SpawnBackendFactory.create).mockReturnValue(backend as never);
+    await expect(spawnWorkerMultiProvider(
+      'unmetered-remote',
+      'gpt-4.1',
+      'prompt',
+      '/root',
+      { executionBudget: { maxTurns: 2 } },
+    )).rejects.toThrow('does not declare that capability');
+    expect(backend.spawn).not.toHaveBeenCalled();
+  });
+
   it('returns tmux backend and claude provider for Claude models', async () => {
     const result = await spawnWorkerMultiProvider('001', 'sonnet', 'prompt', '/root', {});
     expect(result.backend).toBe('tmux');

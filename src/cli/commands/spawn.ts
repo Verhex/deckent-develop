@@ -20,7 +20,10 @@ import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.j
 import { resolveReasoningEffort } from '../../core/reasoning-effort.js';
 import { normalizeTaskResultShape } from '../../core/task-result-schema.js';
 import type { ExecutionBudget } from '../../core/work-model.js';
-import { assertLiveUsageBudgetSupport } from '../../core/live-execution-budget.js';
+import {
+  assertExecutionBudgetShape,
+  assertLiveUsageBudgetSupport,
+} from '../../core/live-execution-budget.js';
 import { resolveTaskExecutionBudget } from '../../orchestra/runtime-budget-monitor.js';
 
 /**
@@ -80,6 +83,13 @@ export async function spawnWorkerMultiProvider(
     registerOpenRouterModelFromCache(root, model);
   }
   const provider = getProviderForModel(model as ModelType);
+  // Admission happens before provider bootstrap/session/backend creation. A
+  // budgetless remote one-shot must produce exactly zero external side effects.
+  assertExecutionBudgetShape(
+    executionBudget,
+    provider,
+    provider === 'ollama' ? 'local' : 'remote',
+  );
 
   // F1-RE (268-003): resolve the model reasoning-effort ONCE for the resolved
   // provider — same SSOT + opt-in semantics as the sprint path
@@ -121,7 +131,12 @@ export async function spawnWorkerMultiProvider(
       }
     }
     if (adapter) {
-      assertLiveUsageBudgetSupport(executionBudget, adapter.liveUsageBudgetSupport, adapter.name);
+      assertLiveUsageBudgetSupport(
+        executionBudget,
+        adapter.liveUsageBudgetSupport,
+        adapter.name,
+        adapter.executionCostClass,
+      );
       const refresh = (adapter as { refreshSupportedModels?: () => Promise<void> }).refreshSupportedModels;
       if (typeof refresh === 'function') {
         await refresh.call(adapter);
@@ -146,6 +161,11 @@ export async function spawnWorkerMultiProvider(
       dockerImage: opts.dockerImage,
       dockerTimeoutSeconds: opts.dockerTimeout,
     });
+    assertLiveUsageBudgetSupport(
+      executionBudget,
+      backend.liveUsageBudgetSupport,
+      backend.name,
+    );
     backend.spawn(taskId, model as ModelType, prompt, {
       autoApprove: opts.autoApprove ?? false,
       projectDir: root,
@@ -173,6 +193,11 @@ export async function spawnWorkerMultiProvider(
     backend: 'subprocess',
     projectDir: root,
   });
+  assertLiveUsageBudgetSupport(
+    executionBudget,
+    backend.liveUsageBudgetSupport,
+    backend.name,
+  );
   backend.spawn(taskId, model as ModelType, prompt, {
     autoApprove: opts.autoApprove ?? false,
     projectDir: root,

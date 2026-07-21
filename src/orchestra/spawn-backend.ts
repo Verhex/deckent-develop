@@ -13,6 +13,11 @@ import { modelRegistry } from '../core/model-registry.js';
 import { getProviderCommandSpec } from '../core/provider-command-spec.js';
 import { resolveReasoningEffort } from '../core/reasoning-effort.js';
 import { getDefaultProviderName } from './sprint-utils.js';
+import {
+  assertLiveUsageBudgetSupport,
+  type LiveUsageBudgetSupport,
+} from '../core/live-execution-budget.js';
+import { resolveTaskExecutionBudget } from './runtime-budget-monitor.js';
 
 export type { SandboxOptions };
 export { SandboxSpawnBackend };
@@ -31,6 +36,7 @@ export { SandboxSpawnBackend };
 export interface SpawnBackend {
   /** Human-readable backend name (e.g. 'tmux', 'subprocess') */
   readonly name: string;
+  readonly liveUsageBudgetSupport?: LiveUsageBudgetSupport;
 
   /**
    * Spawn a worker process for the given task.
@@ -132,6 +138,7 @@ export function checkLethalGuard(actionId: string | undefined, backendName: stri
  */
 export class TmuxBackend implements SpawnBackend {
   readonly name = 'tmux';
+  readonly liveUsageBudgetSupport = undefined;
 
   private readonly projectDir: string;
 
@@ -141,6 +148,9 @@ export class TmuxBackend implements SpawnBackend {
 
   spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void {
     checkLethalGuard(opts?.actionId, this.name);
+    const dir = opts?.projectDir ?? this.projectDir;
+    const executionBudget = resolveTaskExecutionBudget(dir, taskId, opts?.executionBudget);
+    assertLiveUsageBudgetSupport(executionBudget, this.liveUsageBudgetSupport, this.name);
     // Sprint 168 C0e Cross-Backend Contract: tmpfiles persist until sprint cleanup,
     // archived together by archivePromptFiles() during sprint cleanup phase.
     // (Same as Docker backend spawn-backend-docker.ts:941-942 — Sprint 156 Task 4.)
@@ -149,7 +159,6 @@ export class TmuxBackend implements SpawnBackend {
     // active-worker selective filter in claude.ts._cleanupOrphanedPromptFiles
     // DOES protect them. Only the taskId-less Auditor prompt keeps the legacy
     // hex-only name — see ADR-048 Consequences (Negative) for the history.
-    const dir = opts?.projectDir ?? this.projectDir;
     ensureSession();
     tmuxSpawnWorker(taskId, model, prompt, dir, {
       allowedTools: opts?.allowedTools,
@@ -291,6 +300,7 @@ function resolveSubprocessProviderConfig(provider: string): SubprocessProviderCo
  */
 export class SubprocessBackend implements SpawnBackend {
   readonly name = 'subprocess';
+  readonly liveUsageBudgetSupport = undefined;
 
   private readonly projectDir: string;
   private readonly timeoutMs: number;
@@ -387,6 +397,7 @@ export class SubprocessBackend implements SpawnBackend {
  */
 export class SandboxBackend implements SpawnBackend {
   readonly name = 'claude-sandbox';
+  readonly liveUsageBudgetSupport = undefined;
 
   private readonly inner: SandboxSpawnBackend;
 

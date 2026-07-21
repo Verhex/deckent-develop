@@ -165,12 +165,59 @@ export function hasLiveUsageCeiling(budget: ExecutionBudget | undefined): boolea
 
 export type LiveUsageBudgetSupport = 'measured-stream';
 
+const EXECUTION_BUDGET_FIELDS = new Set<keyof ExecutionBudget>([
+  'maxUsd',
+  'maxTokens',
+  'maxTurns',
+  'maxInputTokens',
+  'maxOutputTokens',
+  'maxCacheReadTokens',
+  'maxCacheCreationTokens',
+  'maxContextTokens',
+]);
+
+/**
+ * Validate the owner-supplied execution budget at the last pre-dispatch
+ * boundary. Runtime objects may originate in JSON, so TypeScript's structural
+ * type is not evidence that unknown keys or empty objects were rejected.
+ */
+export function assertExecutionBudgetShape(
+  budget: ExecutionBudget | undefined,
+  executor: string,
+  executionCostClass: 'remote' | 'local' = 'remote',
+): asserts budget is ExecutionBudget {
+  if (executionCostClass === 'local' && budget === undefined) return;
+  if (budget === undefined) {
+    throw new Error(
+      `Remote execution budget is required for executor "${executor}". Spawn blocked before provider work.`,
+    );
+  }
+  if (budget === null || typeof budget !== 'object' || Array.isArray(budget)) {
+    throw new Error('Execution budget must be an object. Spawn blocked before provider work.');
+  }
+  const entries = Object.entries(budget as Record<string, unknown>);
+  if (entries.length === 0) {
+    throw new Error('Execution budget must contain at least one explicit ceiling. Spawn blocked before provider work.');
+  }
+  for (const [field, value] of entries) {
+    if (!EXECUTION_BUDGET_FIELDS.has(field as keyof ExecutionBudget)) {
+      throw new Error(`Unknown execution budget field "${field}". Spawn blocked before provider work.`);
+    }
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+      throw new Error(`Execution budget ${field} must be a non-negative finite number. Spawn blocked before provider work.`);
+    }
+  }
+}
+
 /** Budgeted work must fail before dispatch when the backend cannot meter live usage. */
 export function assertLiveUsageBudgetSupport(
   budget: ExecutionBudget | undefined,
   support: LiveUsageBudgetSupport | undefined,
   executor: string,
+  executionCostClass: 'remote' | 'local' = 'remote',
 ): void {
+  assertExecutionBudgetShape(budget, executor, executionCostClass);
+  if (executionCostClass === 'local' && budget === undefined) return;
   if (typeof budget?.maxUsd === 'number') {
     throw new Error(
       `Live USD budget enforcement requires an immutable pricing snapshot and incremental measured usage; executor "${executor}" does not provide that contract. Spawn blocked before provider work. Use measured token/cache/turn ceilings until live USD accrual is available.`,

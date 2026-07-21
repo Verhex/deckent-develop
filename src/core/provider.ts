@@ -181,6 +181,13 @@ export interface ProviderAdapter {
   readonly liveUsageBudgetSupport?: LiveUsageBudgetSupport;
 
   /**
+   * Economic execution class used by the mandatory admission gate. Missing is
+   * deliberately treated as `remote`: a new provider must opt in explicitly
+   * before it may run without a monetary/token budget.
+   */
+  readonly executionCostClass?: 'remote' | 'local';
+
+  /**
    * Spawn a worker for the given task.
    * @param taskId  Unique task identifier
    * @param model   Model to use

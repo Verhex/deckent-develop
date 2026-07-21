@@ -178,6 +178,7 @@ export interface HealthGateResult {
  */
 export class OllamaAdapter implements ProviderAdapter {
   readonly name = 'ollama';
+  readonly executionCostClass = 'local' as const;
   // `OllamaModel` runs alongside the existing ModelType union but is not yet
   // a member of it (task-types.ts widening is out of scope — see model-registry).
   // The cast is structural-only; at runtime these are plain string ids.

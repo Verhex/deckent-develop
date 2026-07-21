@@ -22,6 +22,7 @@ import { TASKS_DIR } from '../core/constants.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { debugLog } from '../core/utils.js';
+import { assertLiveUsageBudgetSupport } from '../core/live-execution-budget.js';
 
 // ─── Core — config ────────────────────────────────────────────────
 import { resolveEffectiveWorkers, resolveLiveTraceEnabled } from '../core/config.js';
@@ -777,6 +778,12 @@ export async function spawnWorkers(
       if (typeof refresh === 'function') {
         await refresh.call(adapterRouted);
       }
+      assertLiveUsageBudgetSupport(
+        task.budget,
+        adapterRouted.liveUsageBudgetSupport,
+        adapterRouted.name,
+        adapterRouted.executionCostClass,
+      );
       adapterRouted.spawn(task.id, model, prompt, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
@@ -784,6 +791,7 @@ export async function spawnWorkers(
         reasoningEffort,
         excludeDynamicPromptSections,
         taskTimeoutSeconds,
+        executionBudget: task.budget,
         env: buildWorkerApprovalGateEnv(config.approval?.gate_enabled === true, task.sprintId, task.id),
       });
     } else if (wantsHostAdapter) {
@@ -802,6 +810,11 @@ export async function spawnWorkers(
       } catch (e) { debugLog('spawnWorkers:honestFailWrite', e); }
       continue;
     } else if (effectiveBackend) {
+      assertLiveUsageBudgetSupport(
+        task.budget,
+        effectiveBackend.liveUsageBudgetSupport,
+        effectiveBackend.name,
+      );
       effectiveBackend.spawn(task.id, model, prompt, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
@@ -809,6 +822,7 @@ export async function spawnWorkers(
         reasoningEffort,
         excludeDynamicPromptSections,
         taskTimeoutSeconds,
+        executionBudget: task.budget,
         // SURF-3 S2/S3 — live tool-by-tool activity (flag-gated; no-op when
         // off). 583/N5: env-twin aware — an interactive-origin coordinator
         // (DECKENT_LIVE_TRACE=1) streams live without a global config flip.
@@ -818,14 +832,22 @@ export async function spawnWorkers(
     } else if (!isTmuxProvider(taskProvider)) {
       const adapter = getProviderAdapterForTask(taskProvider);
       if (adapter) {
+        assertLiveUsageBudgetSupport(
+          task.budget,
+          adapter.liveUsageBudgetSupport,
+          adapter.name,
+          adapter.executionCostClass,
+        );
         adapter.spawn(task.id, model, prompt, {
           allowedTools,
           autoApprove: spawnOpts?.autoApprove ?? false,
           projectDir: projectRoot,
+          executionBudget: task.budget,
           env: buildWorkerApprovalGateEnv(config.approval?.gate_enabled === true, task.sprintId, task.id),
         });
       }
     } else {
+      assertLiveUsageBudgetSupport(task.budget, undefined, 'tmux');
       spawnWorker(task.id, model, prompt, projectRoot, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
