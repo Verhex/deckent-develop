@@ -1,175 +1,173 @@
 #!/usr/bin/env node
-// test-ci-sim.mjs — clean-state CI reproducer (Sprint 215 Task 215-002).
-//
-// Problem: green-local ≠ green-CI when tests accidentally read gitignored local
-// state (.deckent/config.json, .brain/memory.db, ~/.deckent fixtures, etc.).
-// This script hides that state in a tmp suffix, runs `CI=1 vitest run`, then
-// ALWAYS restores the state via try/finally — even when vitest throws.
-//
-// Usage:
-//   node scripts/test-ci-sim.mjs                 # full run, restore on exit
-//   node scripts/test-ci-sim.mjs --dry-run       # stash + restore, skip vitest
-//   node scripts/test-ci-sim.mjs --keep-stash    # leave stash dirs for inspection
-//   node scripts/test-ci-sim.mjs -- <vitest args># pass-through args after `--`
-//
-// Exit codes: 0 = vitest passed, 1 = vitest failed, 2 = stash/restore error.
+// Clean-state CI reproducer. It never hides or renames live project state: the
+// current tracked + selected-untracked source snapshot runs in a disposable Git worktree.
 
-import { spawn } from 'node:child_process';
-import { existsSync, renameSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import {
+  acquireCiCapacity,
+  disposeCiWorkspace,
+  materializeCiWorkspace,
+  pinCiWorkspace,
+  reapStaleCiWorkspaces,
+  releaseCiCapacity,
+  spawnCiVitest,
+  terminateOwnedChild,
+} from './ci-sim-workspace.mjs';
 
 const REPO_ROOT = process.env.CI_SIM_ROOT
   ? resolve(process.env.CI_SIM_ROOT)
   : resolve(fileURLToPath(import.meta.url), '..', '..');
 
-// Paths that may carry gitignored local state — hidden during the simulated CI run.
-// Stash ONLY gitignored local state — what a fresh CI checkout genuinely
-// lacks. `.brain/memory.db` is gitignored (rebuilt from exports); `.brain/
-// exports/*` are git-TRACKED and PRESENT in CI, so hiding all of `.brain`
-// over-reports false non-hermetic failures (tests reading committed exports).
-// `.deckent/config.json` is gitignored. Mirror real CI, not more.
-export const DEFAULT_STASH_TARGETS = ['.deckent/config.json', '.brain/memory.db'];
-
 /**
- * Rename each existing target to `${target}${suffix}`.
- * Returns the list of {from, to} entries actually stashed (skips missing paths).
+ * Materialize a stable dirty-source snapshot, execute Vitest there, then remove
+ * only the disposable worktree. Injectable seams keep process tests hermetic.
  */
-export function stashPaths(targets, suffix, rootDir = REPO_ROOT) {
-  const stashed = [];
-  for (const target of targets) {
-    const from = resolve(rootDir, target);
-    if (!existsSync(from)) continue;
-    const to = `${from}${suffix}`;
-    renameSync(from, to);
-    stashed.push({ from, to });
-  }
-  return stashed;
-}
-
-/**
- * Restore stashed entries in REVERSE order. Each restore is independently
- * try/catch'd so one failure does not block the remaining restores.
- * Returns {restored, errors} so the caller can log + exit non-zero if needed.
- */
-export function restorePaths(stashed) {
-  const errors = [];
-  const restored = [];
-  for (let i = stashed.length - 1; i >= 0; i--) {
-    const entry = stashed[i];
-    try {
-      if (existsSync(entry.to)) {
-        // A test may have RECREATED entry.from (e.g. the suite writes
-        // .brain/memory.db + exports during the run). renameSync(stash →
-        // .brain) then fails with ENOTEMPTY and strands the real state in the
-        // stash — a data-loss trap (Sprint 215 nearly lost 6MB memory.db +
-        // 6068 archive files this way). The stash is the source of truth, so
-        // discard any test-recreated path first, then restore the stash.
-        if (existsSync(entry.from)) {
-          rmSync(entry.from, { recursive: true, force: true });
-        }
-        renameSync(entry.to, entry.from);
-        restored.push(entry.from);
-      }
-    } catch (err) {
-      errors.push({ path: entry.from, error: err instanceof Error ? err.message : String(err) });
-    }
-  }
-  return { restored, errors };
-}
-
-/**
- * Async spawn of `npx vitest run <args>` with CI=1 in env. Long-running
- * subprocesses MUST be async (DIRECTIVES Sprint 215 hermeticity rule —
- * spawnSync blocks the worker loop). Returns { code, signal }.
- */
-export function runVitest(extraArgs = [], opts = {}) {
-  const sleepMs = parseInt(process.env.CI_SIM_RUNNER_SLEEP_MS ?? '0', 10);
-  if (sleepMs > 0) {
-    return new Promise((r) => setTimeout(() => r({ code: 0, signal: null }), sleepMs));
-  }
-  const env = { ...process.env, CI: '1', ...(opts.env ?? {}) };
-  const cwd = opts.cwd ?? REPO_ROOT;
-  const stdio = opts.stdio ?? 'inherit';
-  return new Promise((resolveP, rejectP) => {
-    const child = spawn('npx', ['vitest', 'run', ...extraArgs], { env, cwd, stdio });
-    child.once('error', rejectP);
-    child.once('exit', (code, signal) => resolveP({ code: code ?? 1, signal }));
-  });
-}
-
-/**
- * Orchestrate: stash → run → restore (always, via try/finally).
- * Injectable runner makes this unit-testable without spawning real vitest.
- */
-export async function runCiSim(opts = {}) {
-  const targets = opts.targets ?? DEFAULT_STASH_TARGETS;
-  const rootDir = opts.rootDir ?? REPO_ROOT;
-  const suffix = opts.suffix ?? `.cisim-stash-${Date.now()}`;
-  const runner = opts.runner ?? runVitest;
-  const keepStash = opts.keepStash ?? false;
-
-  let stashed = [];
-  let runOutcome = { code: 2, signal: null, error: null };
-
+export async function runCiSim(options = {}) {
+  const rootDir = options.rootDir ?? REPO_ROOT;
+  const createWorkspace = options.createWorkspace ?? materializeCiWorkspace;
+  const disposeWorkspace = options.disposeWorkspace ?? disposeCiWorkspace;
+  const runner = options.runner ?? spawnCiVitest;
+  const acquireCapacity = options.acquireCapacity ?? acquireCiCapacity;
+  const releaseCapacity = options.releaseCapacity ?? releaseCiCapacity;
+  const reapWorkspaces = options.reapWorkspaces ?? reapStaleCiWorkspaces;
+  const pinWorkspace = options.pinWorkspace ?? pinCiWorkspace;
+  let workspace;
+  let lease;
+  let outcome = { code: 2, signal: null, error: null };
   try {
-    stashed = stashPaths(targets, suffix, rootDir);
-    opts.onStash?.(stashed);
-    if (opts.dryRun) {
-      runOutcome = { code: 0, signal: null, skipped: true };
+    lease = await acquireCapacity();
+    await reapWorkspaces(rootDir);
+    workspace = await createWorkspace(rootDir, {
+      includeUntracked: options.includeUntracked ?? [],
+      protectedPaths: options.protectedPaths ?? [],
+      vitestArgs: options.vitestArgs ?? [],
+      dryRun: options.dryRun ?? false,
+    });
+    workspace.capacityPath = lease?.path;
+    options.onWorkspace?.(workspace);
+    if (options.dryRun) {
+      outcome = { code: 0, signal: null, skipped: true };
     } else {
-      try {
-        runOutcome = await runner(opts.vitestArgs ?? [], { cwd: rootDir, env: { CI: '1' } });
-      } catch (err) {
-        runOutcome = { code: 2, signal: null, error: err instanceof Error ? err.message : String(err) };
-      }
+      const execution = await runner(workspace, options.vitestArgs ?? [], {
+        stdio: options.stdio ?? 'inherit',
+        onChild: options.onChild,
+      });
+      outcome = await (execution?.outcome ?? execution);
     }
+  } catch (error) {
+    outcome = {
+      code: 2,
+      signal: null,
+      error: error instanceof Error ? error.message : String(error),
+    };
   } finally {
-    // Always restore — even when stashing itself partially failed or runner threw.
-    if (!keepStash) {
-      const restoreResult = restorePaths(stashed);
-      runOutcome.restored = restoreResult.restored;
-      runOutcome.restoreErrors = restoreResult.errors;
-    } else {
-      runOutcome.stashed = stashed.map((s) => s.to);
+    if (workspace && !options.keepWorkspace) {
+      try {
+        const cleanupErrors = await disposeWorkspace(workspace);
+        outcome.cleanupErrors = cleanupErrors;
+        if (cleanupErrors.length > 0) outcome.code = 2;
+      } catch (error) {
+        outcome.cleanupErrors = [error instanceof Error ? error.message : String(error)];
+        outcome.code = 2;
+      }
+    } else if (workspace) {
+      try { await pinWorkspace(workspace); } catch (error) {
+        outcome.cleanupErrors = [error instanceof Error ? error.message : String(error)];
+        outcome.code = 2;
+      }
+      outcome.workspaceDir = workspace.workspaceDir;
+    }
+    try { await releaseCapacity(lease); } catch (error) {
+      outcome.cleanupErrors = [
+        ...(outcome.cleanupErrors ?? []),
+        error instanceof Error ? error.message : String(error),
+      ];
+      outcome.code = 2;
     }
   }
-
-  return runOutcome;
+  if (workspace) {
+    outcome.snapshotRef = workspace.snapshotRef;
+    outcome.receipt = workspace.receipt;
+  }
+  return outcome;
 }
 
-function parseArgs(argv) {
-  const opts = { dryRun: false, keepStash: false, vitestArgs: [] };
+export function parseArgs(argv) {
+  const parsed = { dryRun: false, keepWorkspace: false, includeUntracked: [], vitestArgs: [] };
   const args = argv.slice(2);
-  const dashDash = args.indexOf('--');
-  const head = dashDash >= 0 ? args.slice(0, dashDash) : args;
-  const tail = dashDash >= 0 ? args.slice(dashDash + 1) : [];
-  for (const a of head) {
-    if (a === '--dry-run') opts.dryRun = true;
-    else if (a === '--keep-stash') opts.keepStash = true;
+  const separator = args.indexOf('--');
+  const flags = separator >= 0 ? args.slice(0, separator) : args;
+  parsed.vitestArgs = separator >= 0 ? args.slice(separator + 1) : [];
+  for (let index = 0; index < flags.length; index += 1) {
+    const flag = flags[index];
+    if (flag === '--dry-run') parsed.dryRun = true;
+    else if (flag === '--keep-workspace' || flag === '--keep-stash') parsed.keepWorkspace = true;
+    else if (flag === '--include-untracked') {
+      const path = flags[index + 1];
+      if (!path) throw new Error('E_CI_SIM_INCLUDE_UNTRACKED_VALUE');
+      parsed.includeUntracked.push(path);
+      index += 1;
+    } else if (flag.startsWith('--include-untracked=')) {
+      parsed.includeUntracked.push(flag.slice('--include-untracked='.length));
+    } else throw new Error(`E_CI_SIM_UNKNOWN_FLAG:${flag}`);
   }
-  opts.vitestArgs = tail;
-  return opts;
+  return parsed;
 }
 
-const invokedDirectly = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+const invokedDirectly = process.argv[1]
+  && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+
 if (invokedDirectly) {
-  const opts = parseArgs(process.argv);
-  let stashedForSignal = [];
-  const signalHandler = (sig) => {
-    process.stderr.write(`[ci-sim] received ${sig}, restoring stash...\n`);
-    restorePaths(stashedForSignal);
-    process.exit(2);
+  const args = parseArgs(process.argv);
+  let activeChild;
+  let interruptedBy = null;
+  let termination = Promise.resolve();
+  const signalHandler = (signal) => {
+    if (interruptedBy) return;
+    interruptedBy = signal;
+    process.stderr.write(`[ci-sim] received ${signal}; stopping isolated test process...\n`);
+    termination = terminateOwnedChild(activeChild);
   };
-  process.on('SIGINT', signalHandler);
-  process.on('SIGTERM', signalHandler);
-  process.stderr.write(`[ci-sim] stashing local state: ${DEFAULT_STASH_TARGETS.join(', ')}\n`);
-  const result = await runCiSim({ ...opts, onStash: (s) => { stashedForSignal = s; } });
-  process.off('SIGINT', signalHandler);
-  process.off('SIGTERM', signalHandler);
-  if (result.restoreErrors?.length) {
-    process.stderr.write(`[ci-sim] WARN restore errors: ${JSON.stringify(result.restoreErrors)}\n`);
+  const signals = process.platform === 'win32'
+    ? ['SIGINT', 'SIGBREAK']
+    : ['SIGINT', 'SIGTERM', 'SIGHUP'];
+  for (const signal of signals) process.on(signal, signalHandler);
+
+  process.stderr.write('[ci-sim] materializing isolated dirty-source snapshot...\n');
+  const result = await runCiSim({
+    ...args,
+    onWorkspace: workspace => {
+      process.stderr.write(`[ci-sim] workspace-ready snapshot=${workspace.snapshotRef}`
+        + ` tracked=${workspace.preview?.trackedCount ?? 0}`
+        + ` untracked=${workspace.preview?.untrackedCount ?? 0}\n`);
+      const skipped = workspace.preview?.skippedTracked ?? [];
+      const omitted = workspace.preview?.omittedUntracked ?? [];
+      if (skipped.length > 0) {
+        process.stderr.write(`[ci-sim] protected tracked paths skipped=${JSON.stringify(skipped)}\n`);
+      }
+      if (omitted.length > 0) {
+        process.stderr.write(`[ci-sim] WARNING untracked paths omitted=${JSON.stringify(omitted)}`
+          + ' (use --include-untracked <path> to include)\n');
+      }
+    },
+    onChild: child => {
+      activeChild = child;
+      if (interruptedBy) termination = terminateOwnedChild(activeChild);
+    },
+  });
+  await termination;
+  for (const signal of signals) process.off(signal, signalHandler);
+
+  if (result.snapshotRef) process.stderr.write(`[ci-sim] snapshot=${result.snapshotRef}\n`);
+  if (result.receipt) process.stderr.write(`[ci-sim] receipt=${JSON.stringify(result.receipt)}\n`);
+  if (result.workspaceDir) process.stderr.write(`[ci-sim] kept workspace=${result.workspaceDir}\n`);
+  if (result.error) process.stderr.write(`[ci-sim] ERROR ${result.error}\n`);
+  if (result.cleanupErrors?.length) {
+    process.stderr.write(`[ci-sim] cleanup errors=${JSON.stringify(result.cleanupErrors)}\n`);
   }
-  process.stderr.write(`[ci-sim] vitest exit code=${result.code}\n`);
-  process.exit(result.code);
+  const exitCode = interruptedBy ? 2 : result.code;
+  process.stderr.write(`[ci-sim] vitest exit code=${exitCode}\n`);
+  process.exitCode = exitCode;
 }
