@@ -197,6 +197,12 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
     const { writeFileSync, mkdirSync, existsSync: exists } = await import('node:fs');
     const tasksDir = join(input.projectRoot, TASKS_DIR);
     if (!exists(tasksDir)) mkdirSync(tasksDir, { recursive: true });
+    const authoredReadFiles = input.task.scope?.filesRead ?? [];
+    const verifierFilesRead = [...new Set(
+      (authoredReadFiles.length > 0 ? authoredReadFiles : (input.result.filesChanged ?? []))
+        .map(path => path.trim())
+        .filter(path => path.length > 0),
+    )];
     const verifierTaskJson = {
       id: verifierTaskId,
       title: `Adversarial cross-verify of ${input.task.id}`,
@@ -211,7 +217,11 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
       reason: 'cross-verify adversarial verification',
       // Read-only by construction: a verifier judges, it must never edit the
       // work it is judging. Empty `filesWrite` is the scope contract for that.
-      scope: { directories: ['.'], filesRead: input.task.scope?.filesRead ?? [], filesWrite: [] },
+      // Never grant the legacy directory-write fallback. The exact authored
+      // read list wins; filesChanged is only a fallback when no read contract
+      // exists. Docker Write/Edit therefore remains `.tasks/`-only even when
+      // the evidence list is empty.
+      scope: { directories: [], filesRead: verifierFilesRead, filesWrite: [] },
       dependencies: [],
       goNogo: {
         goCriteria: 'Emit a VERDICT line stating whether the original result is refuted, with a rationale.',
@@ -256,7 +266,15 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
   // The verifier worker is instructed to end with a VERDICT line; a deckent worker
   // surfaces that in its `.result` notes. Empty when the worker never wrote a result.
   const notes = verifierResult?.notes ?? '';
-  if (notes.trim().length > 0) return notes;
+  const lastNoteLine = notes.trim().split(/\r?\n/)
+    .filter(line => line.trim().length > 0)
+    .at(-1)?.trim() ?? '';
+  // A wrapper-generated EXIT_WITHOUT_RESULT note is non-empty but is not a
+  // verifier verdict. Accept notes only when their final non-empty line is the
+  // terminal protocol line; otherwise continue to the provider log fallback.
+  if (/^VERDICT:\s*(?:REFUTED|CONFIRMED|UNCLEAR)\s+.+$/i.test(lastNoteLine)) {
+    return lastNoteLine;
+  }
 
   // XVERIFY-TOOL log-fallback — the OTHER half of the Sprint-276 "live
   // multi-provider capture" gap (the HTTP-worker half was the task-JSON write

@@ -186,7 +186,15 @@ describe('runCrossVerify — evaluation gate', () => {
 
 describe('runCrossVerify — dispatch + advisory write', () => {
   it('default path writes audit budget provenance and forwards Docker execution options', async () => {
-    const task = makeTask({ provider: 'codex', model: 'gpt-5.6-sol' });
+    const task = makeTask({
+      provider: 'codex',
+      model: 'gpt-5.6-sol',
+      scope: {
+        directories: ['src/core/'],
+        filesRead: ['src/core/auth.ts', 'src/core/auth.ts'],
+        filesWrite: ['src/core/auth.ts'],
+      },
+    });
     const res = await runCrossVerify(
       root, task, makeResult(), TaskEvaluation.DONE,
       makeConfig({ enabled: true }, { docker_image: 'deckent-worker:test', docker_timeout: 321 }),
@@ -215,6 +223,47 @@ describe('runCrossVerify — dispatch + advisory write', () => {
       type: 'audit',
       backend: 'docker',
       budget: { maxCacheReadTokens: 1_000_000, maxTurns: 12 },
+      scope: {
+        directories: [],
+        filesRead: ['src/core/auth.ts'],
+        filesWrite: [],
+      },
+    });
+  });
+
+  it('ignores wrapper marker notes and recovers the terminal verdict from the provider log', async () => {
+    defaultSpawnMocks.spawnWorkerMultiProvider.mockImplementationOnce(async (taskId, _model, _prompt, projectRoot) => {
+      writeFileSync(
+        join(projectRoot, TASKS_DIR, `task-${taskId}.log`),
+        [
+          'prompt example: VERDICT: REFUTED placeholder',
+          'bounded evidence was insufficient',
+          'VERDICT: UNCLEAR exact receipt was not present',
+        ].join('\n'),
+        'utf-8',
+      );
+      return { backend: 'docker', provider: 'claude' };
+    });
+    defaultSpawnMocks.pollForResultFile.mockResolvedValueOnce({
+      notes: 'Worker exited without writing result. EXIT_WITHOUT_RESULT marker.',
+    });
+
+    const res = await runCrossVerify(
+      root,
+      makeTask({ provider: 'codex', model: 'gpt-5.6-sol' }),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true }),
+      { availableProviders: ['codex', 'claude'], verifierModel: 'claude-fable-5' },
+    );
+
+    expect(res).toMatchObject({
+      ran: true,
+      outcome: 'unclear',
+      advisory: {
+        verdict: 'unclear',
+        reason: 'exact receipt was not present',
+      },
     });
   });
 

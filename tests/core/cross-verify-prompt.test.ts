@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildRefutePrompt,
+  CROSS_VERIFY_PROMPT_MAX_CHARS,
   parseRefuteVerdict,
   type RefutePromptTask,
   type RefutePromptResult,
@@ -12,6 +13,9 @@ import {
 const baseTask: RefutePromptTask = {
   title: 'Harden JWT authentication flow',
   description: 'Add CSRF protection and validate JWT signatures before accepting requests.',
+  scope: {
+    filesRead: ['src/auth/middleware.ts', 'tests/auth/middleware.test.ts'],
+  },
   goNogo: {
     goCriteria: 'CSRF token is validated; JWT signature verified; tests pass',
     noGoCriteria: 'Any auth bypass possible; tests skipped; no signature check',
@@ -62,6 +66,7 @@ describe('cross-verify-prompt · buildRefutePrompt', () => {
     const prompt = buildRefutePrompt(baseTask, baseResult);
     expect(prompt).toMatch(/VERDICT:\s*REFUTED/);
     expect(prompt).toMatch(/VERDICT:\s*CONFIRMED/);
+    expect(prompt).toMatch(/VERDICT:\s*UNCLEAR/);
   });
 
   it('labels the verifier provider when opts.verifier is provided', () => {
@@ -82,8 +87,56 @@ describe('cross-verify-prompt · buildRefutePrompt', () => {
 
   it('handles an empty filesChanged array with a readable placeholder', () => {
     const result: RefutePromptResult = { ...baseResult, filesChanged: [] };
-    const prompt = buildRefutePrompt(baseTask, result);
+    const prompt = buildRefutePrompt({ ...baseTask, scope: { filesRead: [] } }, result);
     expect(prompt).toContain('(none reported)');
+  });
+
+  it('uses exact authored read files, dedupes them, and excludes self-reported extras', () => {
+    const task: RefutePromptTask = {
+      ...baseTask,
+      scope: { filesRead: ['src/auth/middleware.ts', ' src/auth/middleware.ts '] },
+    };
+    const prompt = buildRefutePrompt(task, {
+      ...baseResult,
+      filesChanged: ['src/outside-authority.ts'],
+    });
+
+    expect(prompt.match(/src\/auth\/middleware\.ts/g)).toHaveLength(1);
+    expect(prompt).not.toContain('src/outside-authority.ts');
+  });
+
+  it('renders a finite criteria-only protocol without repository-wide or repeated verification triggers', () => {
+    const prompt = buildRefutePrompt(baseTask, baseResult);
+
+    expect(prompt).toContain('Judge ONLY the written GO/NO-GO criteria');
+    expect(prompt).toContain('ONE batched read-only evidence pass');
+    expect(prompt).toContain('at most ONE additional targeted verification command');
+    expect(prompt).toContain('After a VERDICT line, perform no');
+    expect(prompt).toContain('Do not use a full-file Read tool');
+    expect(prompt).not.toContain('Probe for hidden failures');
+    expect(prompt).not.toContain('Security vulnerabilities');
+  });
+
+  it('dedupes repeated claim text and stays deterministic under the hard prompt ceiling', () => {
+    const repeated = 'same evidence '.repeat(5_000);
+    const task: RefutePromptTask = {
+      ...baseTask,
+      description: repeated,
+      scope: { filesRead: Array.from({ length: 80 }, (_, i) => `src/repeated-${i}.ts`) },
+      goNogo: {
+        ...baseTask.goNogo,
+        goCriteria: repeated,
+        noGoCriteria: repeated,
+      },
+    };
+    const result: RefutePromptResult = { ...baseResult, notes: repeated };
+
+    const first = buildRefutePrompt(task, result);
+    const second = buildRefutePrompt(task, result);
+    expect(first).toBe(second);
+    expect(first.length).toBeLessThanOrEqual(CROSS_VERIFY_PROMPT_MAX_CHARS);
+    expect(first).toContain('HOST-TRUNCATED');
+    expect(first).toContain('(same as task description or none)');
   });
 });
 
@@ -104,6 +157,14 @@ describe('cross-verify-prompt · parseRefuteVerdict', () => {
     );
     expect(result.verdict).toBe('confirmed');
     expect(result.reason).toContain('CSRF token validated');
+  });
+
+  it('parses an explicit UNCLEAR verdict as a terminal honest result', () => {
+    const result = parseRefuteVerdict(
+      'Bounded evidence did not contain the required receipt.\nVERDICT: UNCLEAR receipt evidence was not in scope',
+    );
+    expect(result.verdict).toBe('unclear');
+    expect(result.reason).toBe('receipt evidence was not in scope');
   });
 
   it('is case-insensitive for the VERDICT keyword and status', () => {
@@ -142,5 +203,13 @@ describe('cross-verify-prompt · parseRefuteVerdict', () => {
     const result = parseRefuteVerdict('No verdict here, just some prose output from the model.');
     expect(result.verdict).toBe('unclear');
     expect(result.reason).toContain('output excerpt');
+  });
+
+  it('requires the verdict to be the last non-empty line', () => {
+    const result = parseRefuteVerdict(
+      'VERDICT: CONFIRMED evidence looked good\nI kept working after the verdict.',
+    );
+    expect(result.verdict).toBe('unclear');
+    expect(result.reason).toMatch(/no VERDICT line/i);
   });
 });
