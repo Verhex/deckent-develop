@@ -1066,6 +1066,86 @@ export function getProviderBinaryForModel(model: ModelType): string {
 /** Injectable spawn for {@link followContainerActivity} (tests pass a fake). */
 export type FollowSpawnFn = typeof nodeSpawn;
 
+export interface DockerBudgetTerminationEvidence {
+  containerName: string;
+  escalation: 'docker-stop' | 'sigterm' | 'sigkill';
+  terminationConfirmed: true;
+}
+
+export interface DockerSyncCommandResult {
+  status: number | null;
+  stdout?: string | null;
+  stderr?: string | null;
+  error?: Error;
+}
+
+export type DockerSyncCommand = (
+  command: string,
+  args: string[],
+  options: { encoding: 'utf-8'; timeout: number; stdio?: ['pipe', 'pipe', 'pipe'] },
+) => DockerSyncCommandResult;
+
+const runDockerSync: DockerSyncCommand = (command, args, options) => {
+  const result = spawnSync(command, args, options);
+  return {
+    status: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    ...(result.error ? { error: result.error } : {}),
+  };
+};
+
+/**
+ * Bounded fail-closed container termination used by the budget circuit
+ * breaker. A successful Docker CLI exit is not enough: the final authority is
+ * an inspect result proving `.State.Running == false`.
+ */
+export function terminateDockerContainerForBudget(
+  containerName: string,
+  graceSeconds: number,
+  run: DockerSyncCommand = runDockerSync,
+): DockerBudgetTerminationEvidence {
+  const inspectRunning = (): boolean | null => {
+    const result = run(
+      'docker',
+      ['inspect', '--format', '{{.State.Running}}|{{.State.ExitCode}}', containerName],
+      { encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'] },
+    );
+    if (result.status !== 0 || result.error) return null;
+    return parseInspectOutput(result.stdout ?? '')?.running ?? null;
+  };
+  const confirmed = (escalation: DockerBudgetTerminationEvidence['escalation']): DockerBudgetTerminationEvidence | null => (
+    inspectRunning() === false
+      ? { containerName, escalation, terminationConfirmed: true }
+      : null
+  );
+
+  run('docker', ['stop', `--time=${graceSeconds}`, containerName], {
+    encoding: 'utf-8', timeout: (graceSeconds + 5) * 1_000, stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  const stopped = confirmed('docker-stop');
+  if (stopped) return stopped;
+
+  run('docker', ['kill', '--signal=SIGTERM', containerName], {
+    encoding: 'utf-8', timeout: 10_000, stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  run('docker', ['wait', containerName], {
+    encoding: 'utf-8', timeout: (graceSeconds + 2) * 1_000, stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  const terminated = confirmed('sigterm');
+  if (terminated) return terminated;
+
+  run('docker', ['kill', '--signal=SIGKILL', containerName], {
+    encoding: 'utf-8', timeout: 10_000, stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  run('docker', ['wait', containerName], {
+    encoding: 'utf-8', timeout: 10_000, stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  const killed = confirmed('sigkill');
+  if (killed) return killed;
+  throw new Error(`Budget containment could not verify that Docker container "${containerName}" stopped after SIGKILL.`);
+}
+
 /**
  * Start a `docker logs -f <container>` follow child and stream its output
  * through the activity tap: each Claude-CLI stream-json line → per-tool
@@ -1086,15 +1166,32 @@ export function followContainerActivity(
   ctx: ActivityTapContext,
   spawnFn: FollowSpawnFn = nodeSpawn,
   eventTap?: (event: StreamLogEvent) => void,
+  onCriticalFailure?: (error: Error) => void,
 ): () => void {
-  if (!ctx.enabled && !eventTap) return () => { /* no observer needs the stream */ };
+  if (!ctx.enabled && !eventTap && !onCriticalFailure) return () => { /* no observer needs the stream */ };
   let child: ReturnType<FollowSpawnFn> | undefined;
+  let intentionallyStopped = false;
+  let failureReported = false;
+  const reportFailure = (error: Error): void => {
+    if (!onCriticalFailure || intentionallyStopped || failureReported) return;
+    failureReported = true;
+    onCriticalFailure(error);
+  };
   try {
-    child = spawnFn('docker', ['logs', '-f', containerName], { stdio: ['ignore', 'pipe', 'ignore'] });
-  } catch {
-    return () => { /* spawn failed — activity is best-effort */ };
+    child = spawnFn('docker', ['logs', '-f', containerName], {
+      stdio: ['ignore', 'pipe', onCriticalFailure ? 'pipe' : 'ignore'],
+    });
+  } catch (error) {
+    reportFailure(error instanceof Error ? error : new Error(String(error)));
+    return () => { intentionallyStopped = true; };
   }
-  child.once('error', () => { /* never let a follow error escape */ });
+  child.once('error', error => reportFailure(error));
+  child.stderr?.resume(); // critical stderr is piped; always drain to avoid follower backpressure
+  child.once('close', (code, signal) => {
+    if (code !== 0 && code !== null) {
+      reportFailure(new Error(`docker logs follower exited with code=${code} signal=${signal ?? 'none'}`));
+    }
+  });
   if (child.stdout) {
     const activityTap = ctx.enabled ? makeActivityOnEvent(ctx) : undefined;
     void captureStreamToLog(child.stdout, {
@@ -1105,9 +1202,14 @@ export function followContainerActivity(
         activityTap?.(event);
         eventTap?.(event);
       },
-    }).catch(() => { /* fail-soft: capture errors never break the worker */ });
+    }).catch(error => reportFailure(error instanceof Error ? error : new Error(String(error))));
+  } else {
+    reportFailure(new Error('docker logs follower started without a readable stdout stream'));
   }
-  return () => { try { child?.kill(); } catch { /* already exited */ } };
+  return () => {
+    intentionallyStopped = true;
+    try { child?.kill(); } catch { /* already exited */ }
+  };
 }
 
 /**
@@ -2676,17 +2778,7 @@ export class DockerSpawnBackend implements SpawnBackend {
    */
   private stopContainerForBudget(taskId: string): void {
     const containerName = `${CONTAINER_PREFIX}${taskId}`;
-    const grace = this.gracefulTimeoutSeconds;
-    const stopped = spawnSync('docker', ['stop', `--time=${grace}`, containerName], {
-      encoding: 'utf-8',
-      timeout: (grace + 5) * 1000,
-    });
-    if (stopped.status !== 0) {
-      spawnSync('docker', ['kill', '--signal=SIGTERM', containerName], {
-        encoding: 'utf-8',
-        timeout: 10_000,
-      });
-    }
+    terminateDockerContainerForBudget(containerName, this.gracefulTimeoutSeconds);
   }
 
   private resolveExecutionContext(taskId: string): { projectDir: string; tasksDir: string } {
@@ -2969,16 +3061,24 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     // SURF-3 S3 — start the live activity follow WHILE the container runs
     // (a no-op when live_trace is off); stop it once the container exits below.
+    let containmentScheduled = false;
+    const contain = (reason: string): void => {
+      if (containmentScheduled) return;
+      containmentScheduled = true;
+      queueMicrotask(() => {
+        try {
+          this.stopContainerForBudget(taskId);
+        } catch (error) {
+          debugLog('docker-backend:budget-containment', `${reason}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      });
+    };
     const budgetMonitor = createRuntimeBudgetMonitor({
       projectRoot: projectDir,
       taskId,
       backend: this.name,
       budget: executionBudget,
-      onStop: () => {
-        queueMicrotask(() => {
-          try { this.stopContainerForBudget(taskId); } catch (e) { debugLog('docker-backend:budget-stop', e); }
-        });
-      },
+      onStop: () => contain('budget-exceeded'),
     });
     const stopFollow = liveCtx
       ? followContainerActivity(
@@ -2987,11 +3087,32 @@ export class DockerSpawnBackend implements SpawnBackend {
           liveCtx,
           nodeSpawn,
           budgetMonitor ? event => budgetMonitor.observe(event) : undefined,
+          budgetMonitor
+            ? error => {
+                try { budgetMonitor.settle(); } catch (settleError) { debugLog('docker-backend:budget-settle-after-observer-failure', settleError); }
+                contain(`budget-observer-failed: ${error.message}`);
+              }
+            : undefined,
         )
       : (): void => { /* no ctx — no follow */ };
 
+    let waitExitObserved = false;
+    child.once('error', error => {
+      try { budgetMonitor?.settle(); } catch (settleError) { debugLog('docker-backend:budget-settle-after-wait-error', settleError); }
+      contain(`docker-wait-error: ${error.message}`);
+    });
+    child.once('close', (code, signal) => {
+      if (waitExitObserved) return;
+      try { budgetMonitor?.settle(); } catch (settleError) { debugLog('docker-backend:budget-settle-after-wait-close', settleError); }
+      contain(`docker-wait-closed-without-exit-evidence: code=${code ?? 'null'} signal=${signal ?? 'none'}`);
+    });
     child.stdout?.on('data', async (data: Buffer) => {
       const exitCode = parseInt(data.toString().trim(), 10);
+      if (!Number.isFinite(exitCode)) {
+        contain(`docker-wait-malformed-exit-evidence: ${data.toString('utf-8').trim() || '<empty>'}`);
+        return;
+      }
+      waitExitObserved = true;
       debugLog('docker-backend:exit', `taskId=${taskId} exitCode=${exitCode}`);
       stopFollow(); // container exited — the `docker logs -f` follow can end.
 
