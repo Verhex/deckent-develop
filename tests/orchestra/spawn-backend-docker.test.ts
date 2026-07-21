@@ -102,11 +102,10 @@ function installSpawnRouter(): void {
       outcome = successOutcome;
     } else if (cmd === 'docker' && sub === 'inspect') {
       outcome = inspectOutcome;
-    } else if (cmd === 'claude' && sub === '--version') {
-      // A23: spawn-backend-docker now runs authHealthCheck (claude --version) on the
-      // host before spawning a claude container. Model a healthy CLI (non-empty
-      // stdout, exit 0) so the spawn proceeds to docker run.
-      outcome = { stdout: 'claude 1.0.0 (host auth ok)', stderr: '', status: 0 };
+    } else if (cmd === 'claude' && argv.join(' ') === 'auth status --json') {
+      // A23: model a real authenticated status envelope so the strict host
+      // preflight proceeds to docker run without treating CLI presence as auth.
+      outcome = { stdout: '{"loggedIn":true}', stderr: '', status: 0 };
     } else {
       outcome = fallback;
     }

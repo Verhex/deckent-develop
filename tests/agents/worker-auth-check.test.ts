@@ -3,8 +3,8 @@
  *
  * Covers the four contractual cases the directives demand:
  *   (a) Auth not required (env unset) → check skipped, no .result, no event
- *   (b) Auth required AND claude --version succeeds → ok=true, no .result, no event
- *   (c) Auth required AND claude --version fails → ok=false, .result written
+ *   (b) Auth required AND claude auth status reports loggedIn=true → ok=true
+ *   (c) Auth required AND auth-status fails → ok=false, .result written
  *       with AUTH_FAILED notes + selfAssessment NO_GO, AUTH_FAILED audit
  *       event emitted on WORKER→BRAIN:AUTH_FAILED channel
  *   (d) Auth required BUT DECKENT_AUTH_SKIP=1 (test env bypass) → check
@@ -94,13 +94,13 @@ describe('worker.authHealthCheck', () => {
     expect(mockedWriteEvent).not.toHaveBeenCalled();
   });
 
-  it('(b) auth OK → claude --version succeeds → ok=true, no AUTH_FAILED event', () => {
+  it('(b) auth OK → valid loggedIn=true status succeeds without leaking account metadata', () => {
     mockedSpawnSync.mockReturnValue({
       pid: 1,
       status: 0,
       signal: null,
-      output: ['', '1.2.3\n', ''],
-      stdout: '1.2.3\n',
+      output: ['', '{"loggedIn":true,"email":"private@example.test","orgId":"private-org"}\n', ''],
+      stdout: '{"loggedIn":true,"email":"private@example.test","orgId":"private-org"}\n',
       stderr: '',
     } as unknown as ReturnType<typeof spawnSync>);
 
@@ -112,7 +112,7 @@ describe('worker.authHealthCheck', () => {
     expect(result.skipped).toBeUndefined();
     expect(mockedSpawnSync).toHaveBeenCalledWith(
       'claude',
-      ['--version'],
+      ['auth', 'status', '--json'],
       expect.objectContaining({ encoding: 'utf-8', timeout: 5_000 }),
     );
     // No AUTH_FAILED event should be emitted on success
@@ -178,9 +178,7 @@ describe('worker.authHealthCheck', () => {
     expect(mockedWriteEvent).not.toHaveBeenCalled();
   });
 
-  it('(e) auth fail (empty stdout despite exit 0) → still treated as AUTH_FAILED', () => {
-    // Edge case: some auth-loss states cause claude to exit 0 with empty
-    // stdout. We treat empty stdout as a fail signal.
+  it('(e) empty/invalid JSON despite exit 0 is AUTH_FAILED', () => {
     mockedSpawnSync.mockReturnValue({
       pid: 1,
       status: 0,
@@ -199,5 +197,25 @@ describe('worker.authHealthCheck', () => {
       (call) => call[4] === 'WORKER→BRAIN:AUTH_FAILED',
     );
     expect(authEventCall).toBeDefined();
+    expect(result.stderr).toContain('invalid JSON');
+  });
+
+  it('(f) exit 0 with loggedIn=false is AUTH_FAILED', () => {
+    mockedSpawnSync.mockReturnValue({
+      pid: 1,
+      status: 0,
+      signal: null,
+      output: ['', '{"loggedIn":false,"email":"must-not-leak@example.test"}', ''],
+      stdout: '{"loggedIn":false,"email":"must-not-leak@example.test"}',
+      stderr: '',
+    } as unknown as ReturnType<typeof spawnSync>);
+
+    const result = authHealthCheck('/project', '194-001', 'sprint-194', {
+      CLAUDE_AUTH_REQUIRED: '1',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toBe('claude auth status reports loggedIn=false-or-missing');
+    expect(result.stderr).not.toContain('must-not-leak');
   });
 });

@@ -682,7 +682,7 @@ export function emitWorkerQuestion(
 // signal. authHealthCheck() turns auth loss into an honest worker result so
 // Brain treats it as a real NO_GO and the sprint retro can count failures.
 //
-// Activation contract (env-gated, fail-open by default):
+// Activation contract (env-gated, fail-closed when required):
 //   • Skipped entirely unless `CLAUDE_AUTH_REQUIRED=1` — local/tmux/subprocess
 //     backends remain backward-compatible.
 //   • Bypassed when `DECKENT_AUTH_SKIP=1` — for test env / CI where the
@@ -706,7 +706,8 @@ export interface AuthHealthCheckResult {
  *   - When neither `CLAUDE_AUTH_REQUIRED` nor `DECKENT_AUTH_SKIP` indicates we
  *     should check, returns `{ok: true, skipped: true}` without touching disk.
  *   - When `CLAUDE_AUTH_REQUIRED=1` AND `DECKENT_AUTH_SKIP` unset:
- *       runs `claude --version` (5s timeout). If exit != 0 OR stdout empty,
+ *       runs `claude auth status --json` (5s timeout). Only exit 0 + valid
+ *       JSON + `loggedIn === true` is accepted. Every other outcome
  *       writes a real `.result` (selfAssessment NO_GO, notes `AUTH_FAILED: ...`,
  *       filesChanged=[]) AND emits a `WORKER→BRAIN:AUTH_FAILED` event, then
  *       returns `{ok: false, stderr}`. Caller should `process.exit(1)` so Brain
@@ -729,26 +730,40 @@ export function authHealthCheck(
   let stdout = '';
   let stderr = '';
   try {
-    const r = spawnSync('claude', ['--version'], {
+    const r = spawnSync('claude', ['auth', 'status', '--json'], {
       encoding: 'utf-8',
       timeout: 5_000,
       shell: process.platform === 'win32',
     });
     exitCode = r.status;
     stdout = (r.stdout ?? '').trim();
-    stderr = (r.stderr ?? '').trim();
+    stderr = r.error?.message ?? (r.stderr ?? '').trim();
   } catch (err) {
     exitCode = -1;
     stderr = err instanceof Error ? err.message : String(err);
   }
 
-  if (exitCode === 0 && stdout.length > 0) {
-    return { ok: true };
+  let statusDiagnostic = '';
+  if (exitCode === 0) {
+    try {
+      const status = JSON.parse(stdout) as unknown;
+      if (
+        status !== null
+        && typeof status === 'object'
+        && !Array.isArray(status)
+        && (status as Record<string, unknown>).loggedIn === true
+      ) {
+        return { ok: true };
+      }
+      statusDiagnostic = 'claude auth status reports loggedIn=false-or-missing';
+    } catch {
+      statusDiagnostic = 'claude auth status returned invalid JSON';
+    }
   }
 
   const diag = stderr.length > 0
     ? stderr.slice(0, 400)
-    : `claude --version exitCode=${exitCode ?? 'null'} stdout="${stdout.slice(0, 60)}"`;
+    : statusDiagnostic || `claude auth status exitCode=${exitCode ?? 'null'}`;
 
   try {
     const result: TaskResult = {
