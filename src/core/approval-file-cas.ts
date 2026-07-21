@@ -1,5 +1,28 @@
 import { randomUUID } from 'node:crypto';
-import { linkSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  fsyncSync,
+  linkSync,
+  openSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname } from 'node:path';
+
+function flushFile(path: string): void {
+  const fd = openSync(path, 'r');
+  try { fsyncSync(fd); } finally { closeSync(fd); }
+}
+
+function flushPublishedDirectory(filePath: string): void {
+  // POSIX requires the containing directory to be fsynced for a newly linked
+  // name to survive power loss. Windows does not expose directory handles via
+  // Node's openSync; flushFile(filePath) above maps to FlushFileBuffers and is
+  // the strongest portable file-publication primitive available there.
+  if (process.platform === 'win32') return;
+  const fd = openSync(dirname(filePath), 'r');
+  try { fsyncSync(fd); } finally { closeSync(fd); }
+}
 
 /**
  * Publish JSON at `filePath` with first-writer-wins semantics.
@@ -16,16 +39,29 @@ import { linkSync, unlinkSync, writeFileSync } from 'node:fs';
 export function createJsonFileFirstWriterWins(filePath: string, data: unknown): boolean {
   const tmpPath = `${filePath}.${randomUUID()}.tmp`;
   try {
-    writeFileSync(tmpPath, JSON.stringify(data, null, 2) + '\n', {
-      encoding: 'utf-8',
-      flag: 'wx',
-      mode: 0o600,
-    });
+    const tmpFd = openSync(tmpPath, 'wx', 0o600);
+    try {
+      writeFileSync(tmpFd, JSON.stringify(data, null, 2) + '\n', 'utf-8');
+      fsyncSync(tmpFd);
+    } finally {
+      closeSync(tmpFd);
+    }
     try {
       linkSync(tmpPath, filePath);
+      // Never return authority from page-cache publication alone. The final
+      // inode and (where supported) directory entry are durable first.
+      flushFile(filePath);
+      flushPublishedDirectory(filePath);
       return true;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+        // A loser may have observed a winner between link and its durability
+        // flush (or after the winner crashed). Flush the existing authority
+        // before returning it to the caller as a trustworthy prior winner.
+        flushFile(filePath);
+        flushPublishedDirectory(filePath);
+        return false;
+      }
       throw error;
     }
   } finally {
