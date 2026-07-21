@@ -35,6 +35,17 @@ export interface ExecutionPlanDigestResult {
   readonly digest: string;
   /** Deep-frozen, JSON-safe approval envelope used to produce `digest`. */
   readonly projection: Readonly<Record<string, unknown>>;
+  /** Canonical derived HOLDs in stable plan-slot order. */
+  readonly budgetHolds: readonly ExecutionPlanBudgetHold[];
+}
+
+export interface ExecutionPlanBudgetHold {
+  readonly slot: number;
+  readonly title: string;
+  readonly reasonCode: string;
+  readonly profileRef: string;
+  readonly resolvedProvider: string;
+  readonly executionCostClass: 'remote' | 'local';
 }
 
 function cloneJson<T>(value: T): T {
@@ -270,10 +281,24 @@ export function computeExecutionPlanDigest(
 ): ExecutionPlanDigestResult {
   const idToSlot = new Map(sprint.tasks.map((task, index) => [task.id, index + 1] as const));
   const findings = sprint.promptGate?.findings.map(finding => normalizeGateFinding(finding, idToSlot)) ?? [];
+  const taskProjections = sprint.tasks.map((task, index) => buildTaskProjection(task, index + 1, idToSlot, context));
+  const budgetHolds = deepFreeze(taskProjections.flatMap((task): ExecutionPlanBudgetHold[] => {
+    const budget = task.budget as Record<string, unknown>;
+    if (budget.state !== 'hold') return [];
+    const routing = task.routing as Record<string, unknown>;
+    return [{
+      slot: task.slot as number,
+      title: task.title as string,
+      reasonCode: typeof budget.reasonCode === 'string' ? budget.reasonCode : 'unspecified-hold',
+      profileRef: budget.profileRef as string,
+      resolvedProvider: routing.resolvedProvider as string,
+      executionCostClass: budget.executionCostClass as 'remote' | 'local',
+    }];
+  }));
   const projection = deepFreeze({
     version: EXECUTION_PLAN_DIGEST_VERSION,
     context: cloneJson(context),
-    tasks: sprint.tasks.map((task, index) => buildTaskProjection(task, index + 1, idToSlot, context)),
+    tasks: taskProjections,
     promptGate: sprint.promptGate
       ? {
           result: sprint.promptGate.ok ? 'pass' : 'fail',
@@ -286,5 +311,6 @@ export function computeExecutionPlanDigest(
     version: EXECUTION_PLAN_DIGEST_VERSION,
     digest: createHash('sha256').update(canonicalJson(projection)).digest('hex'),
     projection,
+    budgetHolds,
   };
 }

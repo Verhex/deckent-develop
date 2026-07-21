@@ -92,6 +92,7 @@ export interface ExistingRunHandleInput {
 export type RunJobErrorCode =
   | 'RUN_JOB_FLOW_NOT_APPROVED'
   | 'RUN_JOB_DIGEST_MISMATCH'
+  | 'RUN_JOB_BUDGET_HOLD'
   | 'RUN_JOB_STALE_HANDLE_CONFLICT';
 
 export abstract class RunJobError extends Error {
@@ -140,6 +141,32 @@ export class RunJobDigestMismatchError extends RunJobError {
     this.expectedPlanDigest = expectedPlanDigest;
     this.actualRevision = actualRevision;
     this.actualPlanDigest = actualPlanDigest;
+  }
+}
+
+export interface HeldBudgetTask {
+  readonly slot: number;
+  readonly title: string;
+  readonly profileRef: string;
+  readonly reasonCode: string;
+  readonly resolvedProvider: string;
+  readonly executionCostClass: 'remote' | 'local';
+}
+
+/** One or more tasks have no executable owner-budget authority. Approval does
+ *  not override this state; start is refused before any provider side effect. */
+export class RunJobBudgetHoldError extends RunJobError {
+  readonly code = 'RUN_JOB_BUDGET_HOLD' as const;
+  readonly heldTasks: readonly HeldBudgetTask[];
+
+  constructor(flowId: string, heldTasks: readonly HeldBudgetTask[]) {
+    const ordered = [...heldTasks].sort((a, b) => a.slot - b.slot);
+    super(
+      flowId,
+      `run-job-service: execution budget HOLD for ${ordered.map((item) =>
+        `slot-${item.slot} '${item.title}'[${item.reasonCode}:${item.profileRef}]`).join(', ')} — start refused`,
+    );
+    this.heldTasks = Object.freeze(ordered.map(item => Object.freeze({ ...item })));
   }
 }
 
@@ -217,11 +244,13 @@ export function startApprovedRun(deps: StartApprovedRunDeps): StartApprovedRunRe
   // V2 binds the opaque CAS string to the exact stored Sprint. Legacy records
   // (version absent) retain the explicit v1 compatibility path; a versioned
   // record can never downgrade to that path by omitting its context.
+  let versionedBudgetHolds: readonly HeldBudgetTask[] | undefined;
   if (approvedSnapshot.planDigestVersion !== undefined) {
-    const actualDigest = approvedSnapshot.planDigestVersion === EXECUTION_PLAN_DIGEST_VERSION
+    const digestResult = approvedSnapshot.planDigestVersion === EXECUTION_PLAN_DIGEST_VERSION
       && approvedSnapshot.planDigestContext
-      ? computeExecutionPlanDigest(approvedSnapshot.sprint, approvedSnapshot.planDigestContext).digest
-      : 'invalid-versioned-plan-digest-metadata';
+      ? computeExecutionPlanDigest(approvedSnapshot.sprint, approvedSnapshot.planDigestContext)
+      : undefined;
+    const actualDigest = digestResult?.digest ?? 'invalid-versioned-plan-digest-metadata';
     if (actualDigest !== approvedSnapshot.planDigest) {
       throw new RunJobDigestMismatchError(
         flowId,
@@ -231,6 +260,24 @@ export function startApprovedRun(deps: StartApprovedRunDeps): StartApprovedRunRe
         actualDigest,
       );
     }
+    versionedBudgetHolds = digestResult!.budgetHolds;
+  }
+
+  const legacyBudgetHolds = approvedSnapshot.sprint.tasks.flatMap((task, index): HeldBudgetTask[] => {
+    const policy = task.budgetPolicy;
+    if (policy?.state !== 'hold') return [];
+    return [{
+      slot: index + 1,
+      title: task.title,
+      profileRef: policy.profileRef,
+      reasonCode: policy.reasonCode ?? 'unspecified-hold',
+      resolvedProvider: policy.resolvedProvider,
+      executionCostClass: policy.executionCostClass,
+    }];
+  });
+  const heldTasks = versionedBudgetHolds ?? legacyBudgetHolds;
+  if (heldTasks.length > 0) {
+    throw new RunJobBudgetHoldError(flowId, heldTasks);
   }
 
   if (existingRunHandle) {

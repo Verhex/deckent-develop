@@ -13,6 +13,7 @@ import {
   startApprovedRun,
   RunJobFlowNotApprovedError,
   RunJobDigestMismatchError,
+  RunJobBudgetHoldError,
   RunJobStaleHandleConflictError,
   type ApprovedRunSnapshotInput,
   type ExistingRunHandleInput,
@@ -21,6 +22,12 @@ import {
 } from '../../src/orchestra/run-job-service.js';
 import type { Sprint } from '../../src/core/types.js';
 import { SprintPhase, SprintStatus } from '../../src/core/sprint-types.js';
+import { TaskStatus } from '../../src/core/task-types.js';
+import {
+  computeExecutionPlanDigest,
+  EXECUTION_PLAN_DIGEST_VERSION,
+  type ExecutionPlanDigestContext,
+} from '../../src/core/execution-plan-digest.js';
 
 // ─── Fixtures ───────────────────────────────────────────────────────────
 
@@ -125,6 +132,96 @@ describe('startApprovedRun', () => {
     const deps = makeDeps({ expectedRevision: 2 });
     expect(() => startApprovedRun(deps)).toThrow(RunJobDigestMismatchError);
     expect(deps.spawnStart).not.toHaveBeenCalled();
+  });
+
+  it('refuses every budget HOLD before spawnStart and reports held tasks deterministically', () => {
+    const heldSprint = makeSprint();
+    heldSprint.tasks = [
+      {
+        id: '999-020', title: 'B', description: 'B', model: 'claude-sonnet-5', effort: 'normal',
+        priority: 'NORMAL', reason: 'test', scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+        dependencies: [], goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
+        status: TaskStatus.PENDING,
+        budgetPolicy: {
+          state: 'hold', role: 'worker', resolvedProvider: 'claude', executionCostClass: 'remote',
+          profileRef: 'execution_budget.roles.worker.default', reasonCode: 'budget-policy-missing',
+        },
+      },
+      {
+        id: '999-010', title: 'A', description: 'A', model: 'claude-sonnet-5', effort: 'normal',
+        priority: 'NORMAL', reason: 'test', scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+        dependencies: [], goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
+        status: TaskStatus.PENDING,
+        budgetPolicy: {
+          state: 'hold', role: 'worker', resolvedProvider: 'claude', executionCostClass: 'remote',
+          profileRef: 'execution_budget.roles.worker.by_task_kind.documentation', reasonCode: 'role-profile-missing',
+        },
+      },
+    ];
+    const deps = makeDeps({ approvedSnapshot: makeApprovedSnapshot({ sprint: heldSprint }) });
+
+    let caught: unknown;
+    try {
+      startApprovedRun(deps);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(RunJobBudgetHoldError);
+    expect((caught as RunJobBudgetHoldError).heldTasks.map(task => [task.slot, task.title])).toEqual([[1, 'B'], [2, 'A']]);
+    expect(deps.spawnStart).not.toHaveBeenCalled();
+  });
+
+  it('derives v2 HOLD from the canonical projection even when raw task budgetPolicy is absent', () => {
+    const heldSprint = makeSprint();
+    heldSprint.tasks = [{
+      id: '999-001', title: 'Remote', description: 'Remote', model: 'claude-sonnet-5', effort: 'normal',
+      priority: 'NORMAL', reason: 'test', scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+      dependencies: [], goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
+      status: TaskStatus.PENDING, provider: 'claude', type: 'code-development',
+    }];
+    const context = {
+      configuredProvider: 'claude',
+      configuredModel: 'claude-sonnet-5',
+      configuredBackend: 'docker',
+      configuredAuthMode: 'subscription',
+      fallbackProvider: null,
+      fallbackPolicy: null,
+      executionBudgetPolicy: null,
+    } satisfies ExecutionPlanDigestContext;
+    const planDigest = computeExecutionPlanDigest(heldSprint, context).digest;
+    const deps = makeDeps({
+      expectedPlanDigest: planDigest,
+      approvedSnapshot: makeApprovedSnapshot({
+        planDigest,
+        planDigestVersion: EXECUTION_PLAN_DIGEST_VERSION,
+        planDigestContext: context,
+        sprint: heldSprint,
+      }),
+    });
+
+    expect(() => startApprovedRun(deps)).toThrow(RunJobBudgetHoldError);
+    expect(deps.spawnStart).not.toHaveBeenCalled();
+  });
+
+  it('keeps explicit local-exempt and legacy-v1 tasks startable', () => {
+    const allowedSprint = makeSprint();
+    allowedSprint.tasks = [{
+      id: '999-001', title: 'Local', description: 'Local', model: 'qwen3.6:27b', effort: 'normal',
+      priority: 'NORMAL', reason: 'test', scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+      dependencies: [], goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
+      status: TaskStatus.PENDING,
+      budgetPolicy: {
+        state: 'allow', role: 'worker', resolvedProvider: 'ollama', executionCostClass: 'local',
+        profileRef: 'local-exempt', policyDigest: 'a'.repeat(64),
+      },
+    }];
+    const local = makeDeps({ approvedSnapshot: makeApprovedSnapshot({ sprint: allowedSprint }) });
+    expect(startApprovedRun(local).status).toBe('started');
+    expect(local.spawnStart).toHaveBeenCalledTimes(1);
+
+    const legacy = makeDeps();
+    expect(startApprovedRun(legacy).status).toBe('started');
+    expect(legacy.spawnStart).toHaveBeenCalledTimes(1);
   });
 
   it('calls spawnStart exactly once with the approved Sprint and returns status=started', () => {
