@@ -1555,6 +1555,7 @@ export function buildHeartbeatWrapperLoop(taskId: string): string {
 /** Pure scope shape this module needs — subset of `TaskScope` (core/task-types.ts). */
 export interface DockerAllowedToolsScope {
   directories?: readonly string[];
+  filesRead?: readonly string[];
   filesWrite?: readonly string[];
 }
 
@@ -1562,9 +1563,10 @@ export interface DockerAllowedToolsScope {
  * Derive the docker backend's `--allowedTools` string from a task's scope.
  * `filesWrite` present → SOLE write authority (directories excluded — they
  * stay read-only context, reachable only via the unscoped Read/Glob/Grep).
- * `filesWrite` absent → directories become the write-fallback target
- * (mirrors the prompt's own "no explicit Files list — you may write to any
- * file within the directories above" wording). `.tasks/` is always included
+ * An exact `filesRead` list with no `filesWrite` targets is inspection-only:
+ * directories remain read context and Write/Edit is narrowed to `.tasks/`.
+ * When both file lists are absent/empty, directories remain the legacy
+ * write-fallback target. `.tasks/` is always included
  * so the worker can write its own heartbeat/result files — this also means
  * a task with neither directories nor filesWrite still narrows Write/Edit to
  * `.tasks/` only, never falls open to unrestricted Write/Edit (a scope-less
@@ -1573,8 +1575,10 @@ export interface DockerAllowedToolsScope {
  */
 export function buildDockerAllowedTools(scope: DockerAllowedToolsScope): string {
   const directories = normalizeNonEmptyStrings(scope.directories);
+  const filesRead = normalizeNonEmptyStrings(scope.filesRead);
   const filesWrite = normalizeNonEmptyStrings(scope.filesWrite);
-  const writeSource = filesWrite.length > 0 ? filesWrite : directories;
+  const inspectionOnly = filesWrite.length === 0 && filesRead.length > 0;
+  const writeSource = filesWrite.length > 0 ? filesWrite : inspectionOnly ? [] : directories;
   const writeTargets = dedupeTrimmed(['.tasks/', ...writeSource]);
   return `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`;
 }
@@ -2997,7 +3001,7 @@ export class DockerSpawnBackend implements SpawnBackend {
   }
 
   /**
-   * born-471 (ALLOWLIST-SSOT): read `scope.directories` + `scope.filesWrite`
+   * born-471 (ALLOWLIST-SSOT): read `scope.directories` + exact file scopes
    * from `task-<taskId>.json` and derive the `--allowedTools` string via
    * {@link buildDockerAllowedTools}. Falls back to the caller-supplied value
    * when the task JSON is missing/malformed — never blocks a spawn over a
@@ -3008,12 +3012,14 @@ export class DockerSpawnBackend implements SpawnBackend {
     if (!existsSync(taskJsonPath)) return fallback;
     try {
       const raw = readFileSync(taskJsonPath, 'utf-8');
-      const parsed = JSON.parse(raw) as { scope?: { directories?: unknown; filesWrite?: unknown } };
+      const parsed = JSON.parse(raw) as { scope?: { directories?: unknown; filesRead?: unknown; filesWrite?: unknown } };
       const rawDirs = parsed.scope?.directories;
+      const rawReadFiles = parsed.scope?.filesRead;
       const rawFiles = parsed.scope?.filesWrite;
       const directories = Array.isArray(rawDirs) ? rawDirs.filter((d): d is string => typeof d === 'string') : [];
+      const filesRead = Array.isArray(rawReadFiles) ? rawReadFiles.filter((f): f is string => typeof f === 'string') : [];
       const filesWrite = Array.isArray(rawFiles) ? rawFiles.filter((f): f is string => typeof f === 'string') : [];
-      return buildDockerAllowedTools({ directories, filesWrite });
+      return buildDockerAllowedTools({ directories, filesRead, filesWrite });
     } catch (err) {
       debugLog('docker-backend:allowed-tools', `taskId=${taskId} failed to parse task JSON: ${(err as Error).message}`);
       return fallback;

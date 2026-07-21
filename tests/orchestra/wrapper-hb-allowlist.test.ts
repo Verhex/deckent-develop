@@ -78,6 +78,17 @@ describe('buildDockerAllowedTools (born-471 ALLOWLIST-SSOT)', () => {
     expect(result).toBe('Read,Write(.tasks/,src/core/),Edit(.tasks/,src/core/),Bash,Glob,Grep');
   });
 
+  it('exact filesRead with no filesWrite → inspection-only; directories grant no Write/Edit', () => {
+    const result = buildDockerAllowedTools({
+      directories: ['src/core/', 'src/orchestra/'],
+      filesRead: ['src/core/live-execution-budget.ts'],
+      filesWrite: [],
+    });
+    expect(result).toBe('Read,Write(.tasks/),Edit(.tasks/),Bash,Glob,Grep');
+    expect(result).not.toContain('Write(.tasks/,src/core/');
+    expect(result).not.toContain('Edit(.tasks/,src/orchestra/');
+  });
+
   it('neither directories nor filesWrite → narrows to .tasks/ only, never falls open unrestricted', () => {
     expect(buildDockerAllowedTools({ directories: [], filesWrite: [] }))
       .toBe('Read,Write(.tasks/),Edit(.tasks/),Bash,Glob,Grep');
@@ -300,6 +311,7 @@ describe('DockerSpawnBackend.spawn() — allowedTools SSOT integration', () => {
       else if (cmd === 'docker' && sub === 'run') { capturedDockerRunArgs.push([...argv]); stdout = 'container-id-ssot'; }
       else if (cmd === 'docker' && sub === 'inspect') stdout = 'true|0';
       else if (cmd === 'claude' && sub === '--version') stdout = 'claude 1.0.0 (host auth ok)';
+      else if (cmd === 'claude' && sub === 'auth') stdout = JSON.stringify({ loggedIn: true });
       return {
         stdout, stderr: '', status, signal: null, pid: 1, output: ['', stdout, ''],
       } as unknown as ReturnType<typeof spawnSync>;
@@ -329,8 +341,9 @@ describe('DockerSpawnBackend.spawn() — allowedTools SSOT integration', () => {
     const backend = new DockerSpawnBackend(dir);
     // Deliberately pass a WIDE (buggy-shape) opts.allowedTools that includes
     // the read-only directory — the docker backend must NOT use it verbatim.
-    backend.spawn(taskId, 'sonnet' as never, 'prompt', {
+    backend.spawn(taskId, 'claude-sonnet-5', 'prompt', {
       allowedTools: 'Read,Write(.tasks/,docs/adr/,src/orchestra/spawn-backend-docker.ts),Edit(.tasks/,docs/adr/,src/orchestra/spawn-backend-docker.ts),Bash,Glob,Grep',
+      executionBudget: { maxTurns: 1 },
     });
 
     expect(capturedDockerRunArgs.length).toBe(1);
@@ -358,7 +371,10 @@ describe('DockerSpawnBackend.spawn() — allowedTools SSOT integration', () => {
 
     const { DockerSpawnBackend } = await import('../../src/orchestra/spawn-backend-docker.js');
     const backend = new DockerSpawnBackend(dir);
-    backend.spawn(taskId, 'sonnet' as never, 'prompt', { allowedTools: 'Read,Bash' });
+    backend.spawn(taskId, 'claude-sonnet-5', 'prompt', {
+      allowedTools: 'Read,Bash',
+      executionBudget: { maxTurns: 1 },
+    });
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const scriptPath = join(tasksDir, `.worker-${taskId}.sh`);

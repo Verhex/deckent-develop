@@ -273,6 +273,19 @@ const KARPATHY_ESSENCE = `## Karpathy Discipline
 3. **Surgical changes** — stay inside scope.filesWrite; minimum-diff; preserve existing behavior.
 4. **Goal-driven** — map every change to the goCriteria above; assess yourself honestly.`;
 
+/** Read-only counterpart: preserves the discipline without implying source edits. */
+const READ_ONLY_DISCIPLINE_BLOCK = `## Karpathy Discipline (read-only)
+1. **Think before inspecting** — read the scope + operative ADRs, name assumptions, and map evidence to the goCriteria.
+2. **Reuse context** — batch independent reads/checks in one turn and never re-read unchanged content.
+3. **Surgical evidence** — inspect only the exact filesRead targets; do not create or modify project files.
+4. **Goal-driven** — report only evidence you observed; an unproven criterion is never DONE.
+
+## Turn Economy
+Every conversation turn re-sends cached context. Batch the scoped file reads and independent read-only checks in the SAME turn. Reuse an existing .plan; if it is absent, create it once together with the initial heartbeat rather than spending a separate turn. Write the result once after the evidence set is complete.
+
+## Command-Exit Honesty
+Do not pipe an evidentiary command to a pager such as \`tail\` or \`head\`, because that can mask the command's exit status. Capture the original command status and output directly.`;
+
 /**
  * Turn-economy behavioral directive (born-636-K1, Sprint 407 Task 407-002).
  *
@@ -905,6 +918,17 @@ export function buildScopeBlock(
   for (const w of sanitized.warnings) outWarnings.push(w);
   for (const r of sanitized.rejected) outWarnings.push(`Rejected path: ${r}`);
 
+  // Inspection-only tasks carry exact read targets and no project write targets.
+  // Sanitize read paths through the same path contract before rendering them.
+  const sanitizedRead = sanitizeScope(scope.filesRead, trackedRootFiles);
+  for (const w of sanitizedRead.warnings) outWarnings.push(`Read scope: ${w}`);
+  for (const r of sanitizedRead.rejected) outWarnings.push(`Rejected read path: ${r}`);
+  // Presence of an authored read list selects fail-closed inspection mode even
+  // when every entry is rejected by sanitization. Falling back to directory-wide
+  // write authority after a bad read path would turn invalid input into MORE
+  // authority — the opposite of a safe compiler.
+  const isInspectionOnly = sanitized.filesWrite.length === 0 && scope.filesRead.length > 0;
+
   const scopeDirs = scope.directories.length > 0
     ? scope.directories.map(d => `  - ${d}`).join('\n')
     : '  - (no directory restriction)';
@@ -939,6 +963,20 @@ export function buildScopeBlock(
   // (the auditor already whitelists them — this makes the prompt match the audit).
   const tasksExemptionNote =
     `\n\nSeparately, your worker-protocol files under \`.tasks/\` (your \`.plan\`, \`.hb\`, \`.result\`, and a \`.question\` if you escalate) are lifecycle artifacts, NOT project changes — they are always writable and are exempt from this scope audit. Writing them is required and never counts as touching a file outside your scope.`;
+
+  if (isInspectionOnly) {
+    const readFiles = sanitizedRead.filesWrite.length > 0
+      ? sanitizedRead.filesWrite.map(f => `  - ${f}`).join('\n')
+      : '  - (no valid read targets remain after path validation — STOP and report NO_GO)';
+    return `## Scope Rules (inspection-only)
+READ/context directories — navigation context only; they grant no project write authority:
+${scopeDirs}
+
+Exact project files to inspect:
+${readFiles}
+
+PROJECT WRITE authority: NONE. No project source, test, config, documentation, credential, or git-metadata file may be created or modified. A directory above never grants Write/Edit permission.${tasksExemptionNote}`;
+  }
 
   // PCOMP-W1 (single write authority — sprint-348-005 prompt analysis): the old
   // template printed TWO conflicting authorities ("ONLY modify in these
@@ -1690,6 +1728,9 @@ function renderSegments(input: RenderInput): PromptSegment[] {
   // pre-330-019 `sections.join('\n\n')`. The {@link PromptTier} tags drive the
   // optional (default-OFF) leading-T0 cache reorder and the protected-set guard.
   const segments: PromptSegment[] = [];
+  const isInspectionOnlyTask =
+    (task.scope?.filesWrite?.length ?? 0) === 0 &&
+    (task.scope?.filesRead?.length ?? 0) > 0;
   // `kind` is widened to `PromptSegmentKind | string` (the same type PromptSegment.kind
   // already allows) so a task-specific, unregistered kind — e.g. TT555's volatile
   // 'env-probe' — can be emitted without editing the closed PromptSegmentKind registry
@@ -1742,13 +1783,41 @@ ${taskDescription}
 - Effort: ${effort}
 ${dodBlock}${idempotencyBlock}`);
 
+  const requestedBudget = task.budgetPolicy?.requestedBudget;
+  const effectiveBudget = task.budget;
+  const policy = task.budgetPolicy;
+  const executionContract = [
+    '## Plan-Time Execution Contract',
+    `- Task kind: ${task.type ?? 'unknown'}`,
+    `- Requested provider: ${task.provider ?? 'not explicitly requested'}`,
+    `- Requested model override: ${task.forceModel ?? 'not explicitly requested'}`,
+    `- Plan-resolved provider: ${policy?.resolvedProvider ?? task.provider ?? 'unknown — host admission must resolve'}`,
+    `- Plan-resolved model: ${task.model}`,
+    `- Auth override: ${task.authMode ?? 'not explicitly requested — host admission must resolve'}`,
+    `- Backend override: ${task.backend ?? 'not explicitly requested — host admission must resolve'}`,
+    `- Requested budget: ${requestedBudget ? JSON.stringify(requestedBudget) : 'not recorded'}`,
+    `- Effective budget: ${effectiveBudget ? JSON.stringify(effectiveBudget) : 'not recorded'}`,
+    `- Budget policy: ${policy ? JSON.stringify({ state: policy.state, profileRef: policy.profileRef, policyDigest: policy.policyDigest ?? null, executionCostClass: policy.executionCostClass }) : 'not recorded'}`,
+    '',
+    'Called provider/model, live usage, fallback, and receipt identity do not exist at prompt-compilation time. Never invent them. The host runtime finalizer records those values from durable admission/invocation evidence after dispatch.',
+  ].join('\n');
+  push('T2', 'execution-contract', executionContract);
+
   // What to do (embeds task.id in the plan/result paths → volatile T2)
-  push('T2', 'what-to-do', `## What To Do
+  if (isInspectionOnlyTask) {
+    push('T2', 'what-to-do', `## What To Do (inspection-only)
+1. Read the exact filesRead targets and task acceptance criteria before acting.
+2. Reuse .tasks/task-${task.id}.plan when it exists. If absent, create it once together with the initial heartbeat; do not rewrite it in a separate turn.
+3. Batch independent read-only inspection commands. Do not create or modify any project file.
+4. Record evidence for each acceptance criterion, then write .tasks/task-${task.id}.result.`);
+  } else {
+    push('T2', 'what-to-do', `## What To Do
 1. Read the task scope carefully — understand what files you may touch
 2. Write your execution plan to .tasks/task-${task.id}.plan BEFORE coding — outline your approach, files to modify, and expected changes
 3. Write the code changes described above
 4. Doc-impact: if your change makes any doc/ADR text stale, do NOT edit docs outside your write authority — add a \`docImpact:\` line to your .result \`notes\` naming the doc + what became stale (the orchestrator turns these into follow-up tasks). Only edit a doc that is explicitly IN your write list.
 5. Report: write your result file to .tasks/task-${task.id}.result`);
+  }
 
   // Env-probe (TT555 — waste-class d): a one-line host tool inventory probed at
   // sprint start, injected right after "What To Do" so the worker sees which
@@ -1799,7 +1868,13 @@ ${dodBlock}${idempotencyBlock}`);
   // task verifies via targeted tests, which is also the mode whose guidance must
   // take precedence over a persona's conflicting full-suite test-mandate.
   const verificationMode: 'targeted' | 'doc' = isDocOnlyTask ? 'doc' : 'targeted';
-  if (isDocOnlyTask) {
+  if (isInspectionOnlyTask) {
+    push('T0', 'verify-steps', `## VERIFY STEPS (inspection-only)
+This task has no project write authority. Do not run a build, type check, test suite, package-manager command, or other mutation-oriented verification unless the task's written acceptance criteria explicitly name that exact read-only command.
+1. Execute only the task-directed read-only checks needed to prove the Definition of Done.
+2. Cite observed command results and exact file/line evidence in the result notes.
+3. Evaluate the single authoritative Definition of Done above. If any required evidence is missing, report GO_WITH_TECH_DEBT or NO_GO; never infer DONE.`);
+  } else if (isDocOnlyTask) {
     push('T0', 'verify-steps', `## VERIFY STEPS (doc-only task — DO NOT run the test suite)
 This is a Tier-0 documentation task: there is no source code to type-check or test. DO NOT run \`npm test\` / \`vitest\` / the project test suite — it is large, unrelated to your file, slow, and produces spurious failures that do NOT reflect your work.
 1. Read your file back from disk (the path in your scope) and confirm its content satisfies the goCriteria above.
@@ -1834,7 +1909,7 @@ ${buildVerifyPrecedenceNote(verificationMode)}${buildBehaviorPrecedenceNote(task
   // noise that dilutes the one constraint that matters (scope). Skip it for doc-only
   // tasks — the doc/code T0 prefix already diverges (verify-steps), so this adds no
   // new cache split. Every non-doc task keeps the full advisory verbatim.
-  if (!isDocOnlyTask) push('T0', 'npm-advisory', NPM_ADVISORY_BLOCK);
+  if (!isDocOnlyTask && !isInspectionOnlyTask) push('T0', 'npm-advisory', NPM_ADVISORY_BLOCK);
 
   // Smoke note (WP-16) — Tier-1 Proof-of-Function context. Emitted next to the
   // VERIFY STEPS (its natural home) only when the task carries a Smoke: directive.
@@ -1849,7 +1924,8 @@ ${buildVerifyPrecedenceNote(verificationMode)}${buildBehaviorPrecedenceNote(task
 
   // Heartbeat — WP-18 (DASH-RT-1 complement): the worker must keep currentAction
   // fresh so the dashboard shows live progress instead of a stuck "Starting…".
-  push('T2', 'heartbeat', `## Heartbeat
+  push('T2', 'heartbeat', isInspectionOnlyTask ? `## Heartbeat
+Create .tasks/task-${task.id}.hb before inspection with workerId "w-${task.id}", status "EXECUTING". Update it at significant evidence steps with an incremented sequence, UTC ISO timestamp, and a concise read-only currentAction such as "inspecting scoped files" or "writing result".` : `## Heartbeat
 Create .tasks/task-${task.id}.hb BEFORE starting work with workerId "w-${task.id}", status "EXECUTING".
 Update periodically: increment sequence, refresh timestamp via new Date().toISOString() (UTC ISO 8601).
 At EVERY significant step, also update the \`currentAction\` field to a short human-readable phrase (e.g. "planning", "editing src/x.ts", "running targeted tests", "writing result") — this drives the live dashboard view, so a stale currentAction reads as a stuck worker.`);
@@ -1867,7 +1943,7 @@ Field shapes (strict — a wrong shape here breaks the orchestrator's result par
 - \`notes\`: a SINGLE string, never an array or object. For multiple points, join them into ONE string using \`\\n\` newlines — do NOT write \`["point one", "point two"]\` or \`{"a": "..."}\`.
 - \`selfAssessment\`: exactly one of the three string literals \`"DONE"\`, \`"GO_WITH_TECH_DEBT"\`, \`"NO_GO"\` — never an array, never any other value.
 - \`filesChanged\`: an array of file-path strings, e.g. \`["src/foo.ts", "tests/foo.test.ts"]\`.
-${buildDodChecklist(task.goNogo?.goCriteria)}
+${isInspectionOnlyTask ? 'Assess against the single Definition of Done above and attach evidence for every clause; do not repeat or rewrite the criteria.' : buildDodChecklist(task.goNogo?.goCriteria)}
 CRITICAL: never exit without writing the .result file — even on failure, write selfAssessment "NO_GO" with error details. A missing result file stalls the entire sprint.`);
 
   // Karpathy 4-discipline anchor + Turn Economy (born-636-K1) + Pipe-Exit Honesty
@@ -1880,7 +1956,9 @@ CRITICAL: never exit without writing the .result file — even on failure, write
   // out of this task's write scope, so these task-invariant cognitive-anchor blocks
   // share the segment instead. (PIPE_EXIT_BLOCK is separately ≤400-char pinned; the
   // Turn Economy ≤1200 footprint pin measures its own constant and is unaffected.)
-  push('T0', 'karpathy', `${KARPATHY_ESSENCE}\n\n${TURN_ECONOMY_BLOCK}\n\n${PIPE_EXIT_BLOCK}\n\n${ARTIFACT_REUSE_BLOCK}`);
+  push('T0', 'karpathy', isInspectionOnlyTask
+    ? READ_ONLY_DISCIPLINE_BLOCK
+    : `${KARPATHY_ESSENCE}\n\n${TURN_ECONOMY_BLOCK}\n\n${PIPE_EXIT_BLOCK}\n\n${ARTIFACT_REUSE_BLOCK}`);
 
   // Shared Context (Sprint 278 COMM-1 / 278-003) — appended LAST, after every
   // shared/structural section, so this per-spawn-variable block sits in the most

@@ -30,6 +30,8 @@ import { readFileSync, existsSync } from 'node:fs';
 import { TaskEvaluation } from '../core/types.js';
 import type { Task, TaskResult, ProviderName, CrossVerifyEvidence } from '../core/types.js';
 import type { ResolvedConfig } from '../core/types.js';
+import type { ExecutionBudget } from '../core/work-model.js';
+import { resolveExecutionBudgetPolicy } from '../core/execution-budget-policy.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { DeckentError } from '../core/errors.js';
 import { debugLog } from '../core/utils.js';
@@ -107,6 +109,12 @@ export interface SpawnVerifierInput {
   prompt: string;
   /** Short timeout budget in ms for the verifier to produce output. */
   timeoutMs: number;
+  /** Owner-authored auditor ceiling. Undefined is never executable on the default remote path. */
+  executionBudget?: ExecutionBudget;
+  /** Owner-authored metered backend selected for this verification. */
+  spawnBackend?: 'docker' | 'subprocess';
+  dockerImage?: string;
+  dockerTimeout?: number;
 }
 
 /**
@@ -211,6 +219,9 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
         techDebtAcceptable: 'none',
       },
       status: 'PENDING',
+      type: 'audit',
+      ...(input.executionBudget ? { budget: input.executionBudget } : {}),
+      ...(input.spawnBackend ? { backend: input.spawnBackend } : {}),
       createdAt: new Date().toISOString(),
     };
     writeFileSync(
@@ -227,7 +238,14 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
     input.verifierModel,
     input.prompt,
     input.projectRoot,
-    { provider: input.verifierProvider, autoApprove: true },
+    {
+      provider: input.verifierProvider,
+      autoApprove: true,
+      executionBudget: input.executionBudget,
+      spawnBackend: input.spawnBackend,
+      dockerImage: input.dockerImage,
+      dockerTimeout: input.dockerTimeout,
+    },
   );
 
   const verifierResult = await pollForResultFile(
@@ -397,6 +415,41 @@ export async function runCrossVerify(
       return skip(`model-resolution-error: ${detail}`, 'unavailable', evidencePersisted);
     }
 
+    const budgetDecision = resolveExecutionBudgetPolicy({
+      policy: config.execution_budget,
+      role: 'auditor',
+      taskKind: 'audit',
+      executionCostClass: verifierProvider === 'ollama' ? 'local' : 'remote',
+    });
+    if (budgetDecision.state === 'hold') {
+      const reason = `verifier-budget-hold:${budgetDecision.reasonCode}:${budgetDecision.profileRef}`;
+      const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
+        outcome: 'unavailable', verifier: verifierProvider, verifierModel, reason,
+      });
+      return skip(reason, 'unavailable', evidencePersisted);
+    }
+
+    const configuredBackend = config.spawn_backend;
+    // Docker is the only SpawnBackend that currently exposes measured-stream
+    // support. Subprocess/tmux are valid execution backends, but selecting them
+    // for a budgeted verifier would merely defer the same honest HOLD to a later
+    // assertion and surface it as a generic spawn-error.
+    const directMeteredBackend = configuredBackend === 'docker' ? configuredBackend : undefined;
+    const rerouteBackend = config.execution_budget?.unmetered_backend?.action === 'reroute-or-hold'
+      ? config.execution_budget.unmetered_backend.ordered_backends?.find(
+        (backend): backend is 'docker' => backend === 'docker',
+      )
+      : undefined;
+    const spawnBackend = directMeteredBackend ?? rerouteBackend;
+    const needsSpawnBackend = verifierProvider === 'claude' || verifierProvider === 'codex' || verifierProvider === 'gemini';
+    if (needsSpawnBackend && !spawnBackend) {
+      const reason = `verifier-metered-backend-hold:${verifierProvider}-default-backend-is-unmetered`;
+      const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
+        outcome: 'unavailable', verifier: verifierProvider, verifierModel, reason,
+      });
+      return skip(reason, 'unavailable', evidencePersisted);
+    }
+
     let output: string;
     try {
       output = await spawnVerifier({
@@ -407,6 +460,10 @@ export async function runCrossVerify(
         verifierModel,
         prompt,
         timeoutMs: opts.timeoutMs ?? CROSS_VERIFY_TIMEOUT_MS,
+        executionBudget: budgetDecision.budget,
+        spawnBackend,
+        dockerImage: config.docker_image,
+        dockerTimeout: config.docker_timeout,
       });
     } catch (e) {
       // Spawn failure must never masquerade as a successful/no-op verification.

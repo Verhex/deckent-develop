@@ -20,11 +20,25 @@ import { TaskEvaluation, TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskResult, ResolvedConfig, ProviderName, CrossVerifyConfig } from '../../src/core/types.js';
 import { TASKS_DIR } from '../../src/core/constants.js';
 
+const defaultSpawnMocks = vi.hoisted(() => ({
+  spawnWorkerMultiProvider: vi.fn(async () => ({ backend: 'docker', provider: 'claude' })),
+  pollForResultFile: vi.fn(async () => ({ notes: 'VERDICT: CONFIRMED default path' })),
+}));
+
+vi.mock('../../src/cli/commands/spawn.js', () => ({
+  spawnWorkerMultiProvider: defaultSpawnMocks.spawnWorkerMultiProvider,
+}));
+vi.mock('../../src/orchestra/sprint-phases.js', () => ({
+  pollForResultFile: defaultSpawnMocks.pollForResultFile,
+}));
+
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 let root: string;
 
 beforeEach(() => {
+  defaultSpawnMocks.spawnWorkerMultiProvider.mockClear();
+  defaultSpawnMocks.pollForResultFile.mockClear();
   root = mkdtempSync(join(tmpdir(), 'deckent-xverify-'));
   mkdirSync(join(root, TASKS_DIR), { recursive: true });
 });
@@ -39,7 +53,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '276-001',
     title: 'Harden auth token validation',
     description: 'Add JWT signature checks to the login endpoint',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'CRITICAL',
     reason: 'security',
@@ -81,8 +95,19 @@ function makeResult(overrides: Partial<TaskResult> = {}): TaskResult {
   };
 }
 
-function makeConfig(crossVerify?: Partial<CrossVerifyConfig> & { enabled: boolean }): ResolvedConfig {
-  return { cross_verify: crossVerify } as unknown as ResolvedConfig;
+function makeConfig(
+  crossVerify?: Partial<CrossVerifyConfig> & { enabled: boolean },
+  overrides: Partial<ResolvedConfig> = {},
+): ResolvedConfig {
+  return {
+    spawn_backend: 'docker',
+    execution_budget: {
+      roles: { auditor: { default: { maxCacheReadTokens: 1_000_000, maxTurns: 12 } } },
+      unmetered_backend: { action: 'reroute-or-hold', ordered_backends: ['docker', 'subprocess'] },
+    },
+    cross_verify: crossVerify,
+    ...overrides,
+  } as unknown as ResolvedConfig;
 }
 
 function writeResultFile(taskId: string, result: TaskResult): void {
@@ -160,6 +185,39 @@ describe('runCrossVerify — evaluation gate', () => {
 });
 
 describe('runCrossVerify — dispatch + advisory write', () => {
+  it('default path writes audit budget provenance and forwards Docker execution options', async () => {
+    const task = makeTask({ provider: 'codex', model: 'gpt-5.6-sol' });
+    const res = await runCrossVerify(
+      root, task, makeResult(), TaskEvaluation.DONE,
+      makeConfig({ enabled: true }, { docker_image: 'deckent-worker:test', docker_timeout: 321 }),
+      { availableProviders: ['codex', 'claude'], verifierModel: 'claude-fable-5' },
+    );
+
+    expect(res.outcome).toBe('confirmed');
+    expect(defaultSpawnMocks.spawnWorkerMultiProvider).toHaveBeenCalledTimes(1);
+    const call = defaultSpawnMocks.spawnWorkerMultiProvider.mock.calls[0]!;
+    expect(call[1]).toBe('claude-fable-5');
+    expect(call[4]).toMatchObject({
+      provider: 'claude',
+      spawnBackend: 'docker',
+      dockerImage: 'deckent-worker:test',
+      dockerTimeout: 321,
+      executionBudget: { maxCacheReadTokens: 1_000_000, maxTurns: 12 },
+    });
+
+    const verifierTask = JSON.parse(readFileSync(
+      join(root, TASKS_DIR, 'task-276-001-xverify.json'),
+      'utf-8',
+    )) as Record<string, unknown>;
+    expect(verifierTask).toMatchObject({
+      model: 'claude-fable-5',
+      provider: 'claude',
+      type: 'audit',
+      backend: 'docker',
+      budget: { maxCacheReadTokens: 1_000_000, maxTurns: 12 },
+    });
+  });
+
   it('enabled + high-stakes + 2 providers + CONFIRMED → runs, writes advisory, not refuted', async () => {
     writeResultFile('276-001', makeResult());
     const { fn, calls } = makeSpawnSpy('Examined the diff.\nVERDICT: CONFIRMED jwt checks present');
@@ -178,6 +236,8 @@ describe('runCrossVerify — dispatch + advisory write', () => {
     expect(calls[0]!.prompt).toMatch(/REFUTE/i);
     expect(calls[0]!.verifierProvider).toBe('codex');
     expect(calls[0]!.verifierModel).toBe('gpt-4.1');
+    expect(calls[0]!.executionBudget).toEqual({ maxCacheReadTokens: 1_000_000, maxTurns: 12 });
+    expect(calls[0]!.spawnBackend).toBe('docker');
     // advisory persisted to .result, original fields preserved
     const persisted = readResultFile('276-001');
     expect(persisted.crossVerify?.verdict).toBe('confirmed');
@@ -268,6 +328,24 @@ describe('runCrossVerify — REFUTED enforcement (323-004 / A18)', () => {
 });
 
 describe('runCrossVerify — honest-skip paths', () => {
+  it('missing auditor budget policy → durable HOLD before verifier dispatch', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED must not run');
+    const res = await runCrossVerify(
+      root, makeTask(), makeResult(), TaskEvaluation.DONE,
+      makeConfig({ enabled: true }, { execution_budget: undefined }),
+      { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
+    );
+    expect(res.ran).toBe(false);
+    expect(res.outcome).toBe('unavailable');
+    expect(res.skippedReason).toContain('verifier-budget-hold:budget-policy-missing');
+    expect(calls).toHaveLength(0);
+    expect(readResultFile('276-001').crossVerify).toMatchObject({
+      outcome: 'unavailable',
+      reason: expect.stringContaining('verifier-budget-hold:budget-policy-missing'),
+    });
+  });
+
   it('single provider (no different provider) → honest-skip, spawn never called', async () => {
     writeResultFile('276-001', makeResult());
     const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED ok');
@@ -315,6 +393,26 @@ describe('runCrossVerify — honest-skip paths', () => {
 });
 
 describe('runCrossVerify — fail-safe + verifier selection', () => {
+  it('preserves exact API IDs and auditor budget for a Codex-authored Fable verification', async () => {
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED exact API IDs preserved');
+    const task = makeTask({ provider: 'codex', model: 'gpt-5.6-sol' });
+    const res = await runCrossVerify(
+      root, task, makeResult(), TaskEvaluation.DONE,
+      makeConfig({ enabled: true }),
+      {
+        availableProviders: ['codex', 'claude'],
+        spawnVerifier: fn,
+        verifierModel: 'claude-fable-5',
+      },
+    );
+    expect(res.outcome).toBe('confirmed');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.verifierProvider).toBe('claude');
+    expect(calls[0]!.verifierModel).toBe('claude-fable-5');
+    expect(calls[0]!.executionBudget).toEqual({ maxCacheReadTokens: 1_000_000, maxTurns: 12 });
+    expect(calls[0]!.spawnBackend).toBe('docker');
+  });
+
   it('spawn throws → does NOT throw, records explicit unavailable evidence', async () => {
     writeResultFile('276-001', makeResult());
     const fn: SpawnVerifierFn = vi.fn(async () => { throw new Error('verifier boom'); });
@@ -369,7 +467,7 @@ describe('runCrossVerify — fail-safe + verifier selection', () => {
     const res = await runCrossVerify(
       root, makeTask(), makeResult(), TaskEvaluation.DONE,
       makeConfig({ enabled: true }),
-      { availableProviders: TWO_PROVIDERS, spawnVerifier: fn, verifierModel: 'opus' },
+      { availableProviders: TWO_PROVIDERS, spawnVerifier: fn, verifierModel: 'claude-opus-4-8' },
     );
 
     expect(res.outcome).toBe('unavailable');
