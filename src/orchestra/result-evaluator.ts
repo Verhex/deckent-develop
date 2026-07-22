@@ -1246,6 +1246,10 @@ export function enrichEvaluationWithCategory(
 // all). Anything short of that "sufficient durable acceptance evidence"
 // honestly lands on GO_WITH_TECH_DEBT rather than a fabricated pass — never
 // a numeric-zero fabrication either.
+/**
+ * Reconstruct an evaluation from durable task evidence when rubric evaluation faults.
+ * Concrete schema, worker, test, and scope failures remain terminal vetoes.
+ */
 export function reconstructFromDurableEvidence(
   result: TaskResult,
   task: Task,
