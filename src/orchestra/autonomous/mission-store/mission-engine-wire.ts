@@ -15,6 +15,7 @@ import { migrateBacklogJson } from './mission-migrate.js';
 import { runMissionScheduler, type DispatchFn, type MissionSchedulerSummary } from './mission-scheduler.js';
 import { advanceGoalMission, type GoalAdvanceDeps } from './goal-mission.js';
 import { auditMissionLifecycle } from './mission-audit-bridge.js';
+import type { MissionApprovalCoordinatorLike } from './mission-approval-coordinator.js';
 import type { Mission, MissionStore, ResultLike, SettleDetail } from './mission-types.js';
 
 /**
@@ -47,6 +48,12 @@ export interface RunV2EngineDeps {
   signal?: AbortSignal;
   /** UI language for delivery messages. Default 'en'. */
   lang?: string;
+  /**
+   * Runtime-wide durable approval driver. The composition root must build this
+   * from a trusted actor/approval descriptor; the engine never invents identity,
+   * risk, or scope. When absent, approval-required items remain non-claimable.
+   */
+  approvalCoordinator?: MissionApprovalCoordinatorLike;
   /**
    * Type-2 (goal) loop bindings. When present, `runV2Engine` interleaves a
    * goal-driver with the scheduler: idle `kind='goal'` missions are advanced
@@ -185,6 +192,7 @@ export async function runV2Engine(
         intervalMs,
         onMissionSettled,
         goalDeps: deps.goalDeps,
+        ...(deps.approvalCoordinator ? { approvalCoordinator: deps.approvalCoordinator } : {}),
         ...(perTenantPoolSize !== undefined ? { perTenantPoolSize } : {}),
         ...(deps.signal ? { signal: deps.signal } : {}),
         ...(deps.maxIterations !== undefined ? { maxIterations: deps.maxIterations } : {}),
@@ -195,6 +203,7 @@ export async function runV2Engine(
       poolSize,
       intervalMs,
       onMissionSettled,
+      ...(deps.approvalCoordinator ? { approvalCoordinator: deps.approvalCoordinator } : {}),
       ...(perTenantPoolSize !== undefined ? { perTenantPoolSize } : {}),
       ...(deps.signal ? { signal: deps.signal } : {}),
       ...(deps.maxIterations !== undefined ? { maxIterations: deps.maxIterations } : {}),
@@ -212,6 +221,7 @@ interface GoalDrivenEngineOpts {
   intervalMs: number;
   onMissionSettled: (mission: Mission) => void;
   goalDeps: GoalAdvanceDeps;
+  approvalCoordinator?: MissionApprovalCoordinatorLike;
   signal?: AbortSignal;
   maxIterations?: number;
   /** Per-tenant fair-share cap, threaded into each scheduler drain pass. */
@@ -310,6 +320,7 @@ async function runGoalDrivenEngine(opts: GoalDrivenEngineOpts): Promise<MissionS
       intervalMs,
       onMissionSettled: schedOnSettled,
       maxIterations: GOAL_DRAIN_BOUND,
+      ...(opts.approvalCoordinator ? { approvalCoordinator: opts.approvalCoordinator } : {}),
       ...(opts.perTenantPoolSize !== undefined ? { perTenantPoolSize: opts.perTenantPoolSize } : {}),
       ...(signal ? { signal } : {}),
     });

@@ -670,7 +670,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
             provider: ctx.provider,
             ...(ctx.scopeDir ? { scope: { directories: [ctx.scopeDir] } } : {}),
             projectRoot: ctx.projectRoot ?? root,
-            autoApprove: true,
+            autoApprove: false,
           }, taskConfigV2);
           const res = await waitForRunResult(root, taskId, resultTimeoutMs);
           if (!res) return { ok: false, reason: 'task timed out (no result file)' };

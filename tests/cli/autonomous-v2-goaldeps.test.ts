@@ -11,7 +11,11 @@
 
 // Mock the v2 engine wire so handleStart's v2 path is captured WITHOUT running the
 // real MissionScheduler. `...actual` keeps isV2Engine real (handleStart gates on it).
-const { runV2Spy } = vi.hoisted(() => ({ runV2Spy: vi.fn() }));
+const { runV2Spy, runTaskModeSpy, waitForRunResultSpy } = vi.hoisted(() => ({
+  runV2Spy: vi.fn(),
+  runTaskModeSpy: vi.fn().mockResolvedValue({ taskId: 'v2-safe-task' }),
+  waitForRunResultSpy: vi.fn().mockResolvedValue({ selfAssessment: 'DONE', notes: 'ok' }),
+}));
 vi.mock('../../src/orchestra/autonomous/mission-store/mission-engine-wire.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
@@ -21,6 +25,15 @@ vi.mock('../../src/orchestra/autonomous/mission-store/mission-engine-wire.js', a
       return Promise.resolve({ iterations: 0, dispatched: 0, reason: 'drained' });
     },
   };
+});
+
+vi.mock('../../src/orchestra/task-mode-runner.js', () => ({
+  runTaskMode: (...args: unknown[]) => runTaskModeSpy(...args),
+}));
+
+vi.mock('../../src/cli/commands/run.js', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return { ...actual, waitForRunResult: (...args: unknown[]) => waitForRunResultSpy(...args) };
 });
 
 // Mock bootstrapProviders so the ollama HTTP probe does not run in CI (hermetic + fast).
@@ -170,5 +183,38 @@ describe('handleStart — engine=v2 passes live goalDeps to runV2Engine', () => 
     expect(deps.goalDeps).toBeDefined();
     expect(typeof deps.goalDeps!.author).toBe('function');
     expect(typeof deps.goalDeps!.accept).toBe('function');
+  });
+
+  it('runs v2 task work with autoApprove disabled', async () => {
+    const root = mkRoot();
+    const cfgDir = join(root, '.deckent');
+    mkdirSync(cfgDir, { recursive: true });
+    writeFileSync(
+      join(cfgDir, 'config.json'),
+      JSON.stringify({ autonomous: { enabled: true, engine: 'v2' } }, null, 2),
+      'utf-8',
+    );
+    runV2Spy.mockClear();
+    runTaskModeSpy.mockClear();
+    waitForRunResultSpy.mockClear();
+
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    try {
+      await handleStart({ root, lang: 'en', maxIterations: '1' });
+    } finally {
+      stdout.mockRestore();
+    }
+
+    const deps = runV2Spy.mock.calls[0]![2] as {
+      runTask: (ctx: { description: string; projectRoot: string }) => Promise<unknown>;
+    };
+    await deps.runTask({ description: 'safe task', projectRoot: root });
+
+    expect(runTaskModeSpy).toHaveBeenCalledTimes(1);
+    expect(runTaskModeSpy.mock.calls[0]![0]).toMatchObject({
+      description: 'safe task',
+      projectRoot: root,
+      autoApprove: false,
+    });
   });
 });

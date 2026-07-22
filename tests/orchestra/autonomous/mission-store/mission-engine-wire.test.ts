@@ -16,6 +16,9 @@ import {
 } from '../../../../src/orchestra/autonomous/mission-store/goal-mission.js';
 import type { NewWorkItem, WorkItem } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 import type { ResolvedConfig } from '../../../../src/core/config-types.js';
+import { ApprovalBroker } from '../../../../src/core/approval-broker.js';
+import { ApprovalStore } from '../../../../src/core/approval-store.js';
+import { MissionApprovalCoordinator } from '../../../../src/orchestra/autonomous/mission-store/mission-approval-coordinator.js';
 
 // ── tmpdir lifecycle ──────────────────────────────────────────────────
 const dirs: string[] = [];
@@ -56,6 +59,70 @@ describe('isV2Engine', () => {
 });
 
 describe('runV2Engine', () => {
+  it('threads the durable approval coordinator before claim and dispatches only after allow', async () => {
+    const r = root();
+    const store = openStore(r);
+    store.createMission({ id: 'mA', kind: 'list', title: 'Approval', renderAs: 'checklist' });
+    store.enqueueItem({
+      id: 'mA-0',
+      missionId: 'mA',
+      kind: 'task',
+      policy: 'approval-required',
+      spec: { description: 'approved work' },
+    });
+
+    const broker = new ApprovalBroker(r);
+    const decisions = new ApprovalStore(r);
+    const coordinator = new MissionApprovalCoordinator({
+      store,
+      publisher: broker,
+      decisions,
+      requestFactory: (item, mission) => ({
+        requester: { role: 'brain', instanceId: 'wire-test' },
+        summary: 'Run approved test work',
+        details: { workItemId: item.id },
+        scopeId: item.id,
+        scope: 'lifecycle',
+        risk: 'medium',
+        policy: 'require-approval',
+        defaultAction: 'deny',
+        tenantId: mission.tenant,
+        userId: 'wire-test-user',
+        createdAt: '2026-07-22T00:00:00.000Z',
+        expiresAt: '2026-07-23T00:00:00.000Z',
+      }),
+      now: () => new Date('2026-07-22T00:00:00.000Z'),
+    });
+    const runTask = vi.fn(async (): Promise<{ ok: boolean }> => ({ ok: true }));
+    const deps: RunV2EngineDeps = {
+      runTask,
+      runSprint: async () => undefined,
+      approvalCoordinator: coordinator,
+      store,
+      maxIterations: BOUNDED,
+    };
+
+    const held = await runV2Engine(r, cfg({ engine: 'v2' }), deps);
+    expect(held.dispatched).toBe(0);
+    expect(runTask).not.toHaveBeenCalled();
+    expect(store.listItems('mA')[0]!.status).toBe('parked');
+
+    const pending = decisions.index(new Date('2026-07-22T00:00:00.000Z')).pending;
+    expect(pending).toHaveLength(1);
+    broker.decide(pending[0]!.request.id, {
+      decision: 'allow',
+      decidedBy: 'wire-test-user',
+      channel: 'test',
+      decidedAt: '2026-07-22T00:01:00.000Z',
+      reason: 'approved for hermetic test',
+    });
+
+    const allowed = await runV2Engine(r, cfg({ engine: 'v2' }), deps);
+    expect(allowed.dispatched).toBe(1);
+    expect(runTask).toHaveBeenCalledTimes(1);
+    expect(store.listItems('mA')[0]!.status).toBe('done');
+  });
+
   it('opens+migrates the store and drives a list-mission to completion via injected runTask', async () => {
     const r = root();
     const store = openStore(r);
@@ -244,6 +311,30 @@ describe('runV2Engine', () => {
 });
 
 describe('runV2Engine — goal-driven (Type-2)', () => {
+  it('threads the approval coordinator through the goal-driven scheduler drain', async () => {
+    const r = root();
+    const store = openStore(r);
+    createGoalMission(store, { id: 'gApprovalWire', title: 'Goal approval wire', goal: 'prove the seam' });
+    const tick = vi.fn(() => ({
+      parked: 0,
+      published: 0,
+      decided: 0,
+      invalid: 0,
+      changedMissionIds: [],
+    }));
+
+    await runV2Engine(r, cfg({ engine: 'v2' }), {
+      runTask: async () => ({ ok: true }),
+      runSprint: async () => undefined,
+      approvalCoordinator: { tick },
+      goalDeps: buildGoalDeps({ planner: async () => [], accepter: async () => true }),
+      store,
+      maxIterations: BOUNDED,
+    });
+
+    expect(tick).toHaveBeenCalled();
+  });
+
   it('drives a goal mission end-to-end: author→item→scheduler→accept→completed', async () => {
     const r = root();
     const store = openStore(r);
