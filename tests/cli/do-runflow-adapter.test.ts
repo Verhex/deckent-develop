@@ -31,6 +31,10 @@ vi.mock('../../src/orchestra/planner.js', () => ({
   // F-2: do.ts's planning heartbeat resolves its notice-timeout through this
   // (single-source with the real spawn); a constant is enough hermetically.
   resolvePlanTimeoutMs: vi.fn(() => 900_000),
+  createPlannerTaskModelPolicy: vi.fn((defaultModel: string) => ({
+    defaultModel,
+    allowedModels: [defaultModel],
+  })),
   callZeroConfigPlanner: vi.fn(() => ({
     reasoning: 'canned single-task plan (hermetic planner boundary)',
     tasks: [{
@@ -38,14 +42,16 @@ vi.mock('../../src/orchestra/planner.js', () => ({
       description: 'Canned single-task plan for RunFlow tests (429-001 planner-seam).',
       scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/planned.ts'] },
       dependencies: [],
-      model: 'sonnet', effort: 'normal', priority: 'NORMAL', reason: 'canned',
+      model: 'claude-sonnet-5', effort: 'normal', priority: 'NORMAL', reason: 'canned',
       goNogo: { goCriteria: 'The planned change works.', noGoCriteria: 'The planned change breaks.', techDebtAcceptable: '' },
     }],
   })),
 }));
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  readAuthMode: vi.fn().mockResolvedValue('subscription'),
+  resolveDefaultModel: () => 'claude-sonnet-5',
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
 }));
@@ -104,6 +110,7 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
     modes: {} as any,
     language: 'en', projectName: 'test', projectRoot: '/mock/root',
     version: '1.0.0', auto_docs: { tier1: true, tier2: true, tier3: false },
+    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
     ...overrides,
   } as ResolvedConfig;
 }
@@ -121,7 +128,7 @@ function makeBrainContext(): BrainContext {
 
 function makeTask(overrides?: Partial<Task>): Task {
   return {
-    id: '001-001', title: 'Do the thing', description: 'Do the thing well.', model: 'sonnet',
+    id: '001-001', title: 'Do the thing', description: 'Do the thing well.', model: 'claude-sonnet-5',
     effort: 'normal', priority: 'NORMAL', reason: 'test',
     scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
     dependencies: [],

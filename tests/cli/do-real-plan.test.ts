@@ -42,6 +42,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 vi.mock('../../src/core/config.js', () => ({
+  readAuthMode: vi.fn().mockResolvedValue('subscription'),
+  resolveDefaultModel: () => 'claude-sonnet-5',
   resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
@@ -58,6 +60,10 @@ vi.mock('../../src/orchestra/brain.js', () => ({
 // compileRunProposal/buildDirectives genuinely REAL and unmocked.
 vi.mock('../../src/orchestra/planner.js', () => ({
   resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
+  createPlannerTaskModelPolicy: vi.fn((defaultModel: string) => ({
+    defaultModel,
+    allowedModels: [defaultModel],
+  })),
   callZeroConfigPlanner: vi.fn(),
 }));
 
@@ -109,6 +115,7 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
     language: 'en', projectName: 'test', projectRoot: '/mock/root',
     version: '1.0.0', auto_docs: { tier1: true, tier2: true, tier3: false },
     terminal: { run_flow_v2: true } as any,
+    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
     ...overrides,
   } as ResolvedConfig;
 }
