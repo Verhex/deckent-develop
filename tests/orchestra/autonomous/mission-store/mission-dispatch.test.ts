@@ -58,6 +58,28 @@ describe('buildMissionDispatch — task', () => {
     const res = await dispatch(mkItem('task', { description: 'x' }));
     expect(res).toEqual({ ok: false, reason: 'worker exploded' });
   });
+
+  it('forwards an authored execution budget as a request-level narrowing input', async () => {
+    let captured: MissionTaskContext | undefined;
+    const dispatch = buildMissionDispatch(baseDeps({
+      runTask: async (ctx) => { captured = ctx; return { ok: true }; },
+    }));
+    await dispatch(mkItem('task', {
+      description: 'bounded work',
+      budget: { maxTokens: 12_000, maxTurns: 2 },
+    }));
+    expect(captured?.budget).toEqual({ maxTokens: 12_000, maxTurns: 2 });
+  });
+
+  it('does not silently drop malformed budget values before the canonical validator', async () => {
+    let captured: MissionTaskContext | undefined;
+    const dispatch = buildMissionDispatch(baseDeps({
+      runTask: async (ctx) => { captured = ctx; return { ok: false, reason: 'invalid budget' }; },
+    }));
+    const res = await dispatch(mkItem('task', { description: 'bad budget', budget: 'unbounded' }));
+    expect(res).toEqual({ ok: false, reason: 'invalid budget' });
+    expect(captured).toHaveProperty('budget', 'unbounded');
+  });
 });
 
 describe('buildMissionDispatch — sprint', () => {

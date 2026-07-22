@@ -51,6 +51,7 @@ import type { Task, TaskResult } from '../../src/core/types.js';
 function makeTaskConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
   return {
     deckent_style: 'task',
+    execution_budget: { roles: { worker: { default: { maxTokens: 100_000, maxTurns: 10 } } } },
     ...overrides,
   } as unknown as ResolvedConfig;
 }

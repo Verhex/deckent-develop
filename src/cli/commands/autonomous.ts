@@ -880,15 +880,16 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
         // Real task execution: spawn via runTaskMode → wait for the result file →
         // map selfAssessment to the scheduler's ResultLike contract.
         runTask: async (ctx) => {
-          const { taskId } = await runTaskMode({
+          const { taskId, projectRoot, settlementRef } = await runTaskMode({
             description: ctx.description,
             model: ctx.model as ModelType | undefined,
             provider: ctx.provider,
             ...(ctx.scopeDir ? { scope: { directories: [ctx.scopeDir] } } : {}),
             projectRoot: ctx.projectRoot ?? root,
             autoApprove: false,
+            budget: ctx.budget,
           }, taskConfigV2);
-          const res = await waitForRunResult(root, taskId, resultTimeoutMs);
+          const res = await waitForRunResult(projectRoot, taskId, resultTimeoutMs, { settlementRef });
           if (!res) return { ok: false, reason: 'task timed out (no result file)' };
           return { ok: res.selfAssessment !== 'NO_GO', reason: res.notes };
         },

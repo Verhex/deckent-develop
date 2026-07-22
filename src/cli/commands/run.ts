@@ -14,6 +14,11 @@ import { loadConfig, resolveDefaultModel } from '../../core/config.js';
 import { buildExecutionRequest, resolveToTask, resolveExecutionModelIdentity } from '../../orchestra/execution-request-builder.js';
 import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
 import { applyWorkerExecutionBudgetPolicy } from '../../core/execution-plan-digest.js';
+import {
+  assertTaskResultSettlementRef,
+  readTaskResultSettlement,
+  type TaskResultSettlementRefV1,
+} from '../../core/task-result-settlement.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -173,14 +178,27 @@ export async function waitForRunResult(
   projectRoot: string,
   taskId: string,
   timeoutMs: number,
+  opts?: { settlementRef?: TaskResultSettlementRefV1 },
 ): Promise<TaskResult | null> {
   const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
   const tasksDir = join(projectRoot, TASKS_DIR);
+  const settlementRef = opts?.settlementRef;
+  if (settlementRef) assertTaskResultSettlementRef(projectRoot, taskId, settlementRef);
+
+  const readAuthoritativeResult = (): TaskResult | null => {
+    if (settlementRef) {
+      const settlement = readTaskResultSettlement(settlementRef);
+      if (!settlement) return null;
+      const result = normalizeTaskResultShape(settlement.result as unknown as TaskResult);
+      return result?.taskId === taskId ? result : null;
+    }
+    if (!existsSync(resultPath)) return null;
+    return normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
+  };
 
   // Check immediately first
-  if (existsSync(resultPath)) {
-    return normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
-  }
+  const immediate = readAuthoritativeResult();
+  if (immediate) return immediate;
 
   return new Promise<TaskResult | null>((resolve) => {
     let watcher: ReturnType<typeof fsWatch> | null = null;
@@ -199,9 +217,10 @@ export async function waitForRunResult(
     };
 
     const checkResult = (): void => {
-      if (existsSync(resultPath)) {
+      const result = readAuthoritativeResult();
+      if (result) {
         cleanup();
-        resolve(normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath)));
+        resolve(result);
       }
     };
 
@@ -220,6 +239,13 @@ export async function waitForRunResult(
 
     timeoutTimer = setTimeout(() => { cleanup(); resolve(null); }, timeoutMs);
     heartbeatTimer = setInterval(checkHeartbeat, 30_000);
+
+    // A host settlement lives outside the project mount. Polling here is only
+    // transport for an exact immutable receipt, never a time/quiescence guess.
+    if (settlementRef) {
+      fallbackTimer = setInterval(checkResult, 100);
+      return;
+    }
 
     // D) Use fs.watch for instant result detection
     mkdirSync(tasksDir, { recursive: true });
@@ -245,6 +271,7 @@ export async function streamWorkerLog(
   projectRoot: string,
   taskId: string,
   timeoutMs: number,
+  settlementRef?: TaskResultSettlementRefV1,
 ): Promise<void> {
   const logPath = join(projectRoot, TASKS_DIR, `task-${taskId}.log`);
   const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
@@ -274,7 +301,7 @@ export async function streamWorkerLog(
         stream.on('error', resolve);
       });
     }
-    if (existsSync(resultPath)) break;
+    if (settlementRef ? readTaskResultSettlement(settlementRef) !== null : existsSync(resultPath)) break;
     await sleep(pollInterval);
   }
 }
@@ -421,7 +448,7 @@ export function registerRun(program: Command): void {
 
         // Spawn worker via config-aware backend (provider resolved in the request)
         const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, root);
-        const { backend } = await spawnWorkerMultiProvider(taskId, model, prompt, root, {
+        const { backend, settlementRef } = await spawnWorkerMultiProvider(taskId, model, prompt, root, {
           autoApprove,
           spawnBackend: cfg?.spawn_backend,
           dockerImage: cfg?.docker_image,
@@ -440,13 +467,13 @@ export function registerRun(program: Command): void {
         // Stream logs or wait for result
         if (verbose) {
           print('--- Worker output ---');
-          await streamWorkerLog(root, taskId, timeoutMs);
+          await streamWorkerLog(root, taskId, timeoutMs, settlementRef);
           print('--- End of worker output ---');
         }
 
         // Wait for result
         print('Waiting for result...');
-        const result = await waitForRunResult(root, taskId, timeoutMs);
+        const result = await waitForRunResult(root, taskId, timeoutMs, { settlementRef });
 
         if (!result) {
           print('Task timed out without producing a result.');

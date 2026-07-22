@@ -84,6 +84,7 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     brain_provider: 'claude',
     worker_provider: 'claude',
     fallback_provider: 'claude',
+    execution_budget: { roles: { worker: { default: { maxTokens: 100_000, maxTurns: 10 } } } },
     brain_planning: 'structured',
     routing_engine: 'v2',
     ...overrides,

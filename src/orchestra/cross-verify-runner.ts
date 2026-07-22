@@ -40,6 +40,12 @@ import { modelRegistry } from '../core/model-registry.js';
 import { decideCrossVerify } from '../core/cross-verify.js';
 import { getDefaultProviderName } from './sprint-utils.js';
 import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
+import { normalizeTaskResultShape } from '../core/task-result-schema.js';
+import {
+  assertTaskResultSettlementRef,
+  readTaskResultSettlement,
+  type TaskResultSettlementRefV1,
+} from '../core/task-result-settlement.js';
 import {
   buildRefutePrompt,
   parseRefuteVerdict,
@@ -181,6 +187,25 @@ async function waitForTerminalVerifierLog(logPath: string, timeoutMs: number): P
   return null;
 }
 
+async function waitForSettledVerifierResult(
+  projectRoot: string,
+  taskId: string,
+  ref: TaskResultSettlementRefV1,
+  timeoutMs: number,
+): Promise<TaskResult | null> {
+  assertTaskResultSettlementRef(projectRoot, taskId, ref);
+  const deadline = Date.now() + timeoutMs;
+  do {
+    const settlement = readTaskResultSettlement(ref);
+    if (settlement) {
+      return normalizeTaskResultShape(settlement.result as unknown as TaskResult);
+    }
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) return null;
+    await new Promise<void>((resolve) => setTimeout(resolve, Math.min(100, remaining)));
+  } while (true);
+}
+
 function resolveVerifierModel(
   taskModel: string,
   verifierProvider: ProviderName,
@@ -282,7 +307,7 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
     debugLog('cross-verify:verifier-task-json-write-failed', String(err));
   }
 
-  await spawnWorkerMultiProvider(
+  const spawnResult = await spawnWorkerMultiProvider(
     verifierTaskId,
     input.verifierModel,
     input.prompt,
@@ -297,11 +322,18 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
     },
   );
 
-  const verifierResult = await pollForResultFile(
-    input.projectRoot,
-    verifierTaskId,
-    input.timeoutMs,
-  );
+  const verifierResult = spawnResult.settlementRef
+    ? await waitForSettledVerifierResult(
+        input.projectRoot,
+        verifierTaskId,
+        spawnResult.settlementRef,
+        input.timeoutMs,
+      )
+    : await pollForResultFile(
+        input.projectRoot,
+        verifierTaskId,
+        input.timeoutMs,
+      );
   // The verifier worker is instructed to end with a VERDICT line; a deckent worker
   // surfaces that in its `.result` notes. Empty when the worker never wrote a result.
   const notes = verifierResult?.notes ?? '';
@@ -342,6 +374,10 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
         // marker discriminators that would make consumers classify this DONE
         // audit as an unfinished wrapper exit.
         let resultRecovered = false;
+        // Docker's exact host receipt is immutable authority. The terminal log
+        // was captured before that receipt, so it can supply the verifier
+        // protocol verdict, but no consumer may rewrite the settled TaskResult.
+        if (spawnResult.settlementRef) return terminalVerdict;
         try {
           const resultPath = join(input.projectRoot, TASKS_DIR, `task-${verifierTaskId}.result`);
           if (existsSync(resultPath)) {

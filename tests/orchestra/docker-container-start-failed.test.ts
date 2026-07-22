@@ -12,20 +12,25 @@ import type { ChildProcess } from 'node:child_process';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
-vi.mock('node:child_process', () => ({
-  spawnSync: vi.fn(),
-  spawn: vi.fn(() => {
+vi.mock('node:child_process', async () => {
+  const { PassThrough } = await vi.importActual<typeof import('node:stream')>('node:stream');
+  return {
+    spawnSync: vi.fn(),
+    spawn: vi.fn(() => {
     // monitorContainer uses nodeSpawn('docker', ['wait', …]) and listens on
-    // child.stdout. Returning a stub with a never-firing stdout keeps the
+    // child.stdout. Returning live, never-ending streams keeps the
     // monitor parked silently for the duration of the test.
     const stub = {
-      stdout: { on: vi.fn() },
-      stderr: { on: vi.fn() },
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
       on: vi.fn(),
+      once: vi.fn(),
+      kill: vi.fn(),
     };
     return stub as unknown as ChildProcess;
-  }),
-}));
+    }),
+  };
+});
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(() => true),
@@ -48,6 +53,7 @@ vi.mock('../../src/core/utils.js', () => ({
 vi.mock('../../src/core/file-lock.js', () => ({
   acquireSpawnLocks: vi.fn(),
   releaseAllSpawnLocks: vi.fn(() => 0),
+  releaseStaleSpawnLocksForTask: vi.fn(),
   SpawnLockError: class extends Error {},
 }));
 
@@ -64,6 +70,7 @@ import {
 
 const mockSpawnSync = vi.mocked(spawnSync);
 const mockWriteFileSync = vi.mocked(writeFileSync);
+const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -116,9 +123,9 @@ function makeSpawnRouter(handlers: {
     } else if (cmd === 'docker' && sub === 'wait') {
       // monitorContainer fork — not actually used because nodeSpawn handles it
       outcome = fallback;
-    } else if (cmd === 'claude' && sub === '--version') {
-      // A23: host-side authHealthCheck runs claude --version before a claude spawn.
-      outcome = { stdout: 'claude 1.0.0 (host auth ok)', stderr: '', status: 0 };
+    } else if (cmd === 'claude' && sub === 'auth') {
+      // A23: host-side authHealthCheck requires structured auth truth before spawn.
+      outcome = { stdout: JSON.stringify({ loggedIn: true }), stderr: '', status: 0 };
     } else {
       outcome = fallback;
     }
@@ -212,7 +219,7 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
       inspect: [{ stdout: 'true|0', stderr: '', status: 0 }],
     });
 
-    backend.spawn('test-clean', 'sonnet', 'prompt');
+    backend.spawn('test-clean', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
 
     expect(countDockerCalls('run')).toBe(1);
     expect(countDockerCalls('inspect')).toBe(1);
@@ -239,7 +246,7 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
       ],
     });
 
-    backend.spawn('test-retry-ok', 'sonnet', 'prompt');
+    backend.spawn('test-retry-ok', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
 
     expect(countDockerCalls('run')).toBe(2);
     expect(countDockerCalls('inspect')).toBe(2);
@@ -267,7 +274,7 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
       ],
     });
 
-    backend.spawn('test-retry-fail', 'sonnet', 'prompt');
+    backend.spawn('test-retry-fail', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
 
     // Exactly MAX_SPAWN_ATTEMPTS attempts were made
     expect(countDockerCalls('run')).toBe(MAX_SPAWN_ATTEMPTS);
@@ -288,7 +295,7 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
       inspect: [{ stdout: 'false|0', stderr: '', status: 0 }],
     });
 
-    backend.spawn('test-instant', 'sonnet', 'prompt');
+    backend.spawn('test-instant', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
 
     // No retry — instant-exit-success is treated as a clean spawn
     expect(countDockerCalls('run')).toBe(1);

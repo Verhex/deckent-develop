@@ -12,9 +12,12 @@
 
 import { join } from 'node:path';
 import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
-import type { ModelType, ProviderName, Task, TaskResult } from '../core/types.js';
+import type { ModelType, Task, TaskResult } from '../core/types.js';
 import type { ResolvedConfig } from '../core/config-types.js';
-import { buildExecutionRequest, resolveToTask } from './execution-request-builder.js';
+import type { ExecutionBudget } from '../core/work-model.js';
+import { resolveDefaultModel } from '../core/config.js';
+import { applyWorkerExecutionBudgetPolicy } from '../core/execution-plan-digest.js';
+import { buildExecutionRequest, resolveExecutionModelIdentity, resolveToTask } from './execution-request-builder.js';
 import { createRunTaskId } from '../cli/commands/run.js';
 import { spawnWorkerMultiProvider } from '../cli/commands/spawn.js';
 import { buildWorkerPrompt } from './task-builder.js';
@@ -24,6 +27,7 @@ import { TASKS_DIR } from '../core/constants.js';
 import type { UserOverride } from '../core/routing-types.js';
 import { debugLog, readJsonSafe } from '../core/utils.js';
 import { normalizeTaskResultShape } from '../core/task-result-schema.js';
+import type { TaskResultSettlementRefV1 } from '../core/task-result-settlement.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -35,7 +39,8 @@ export interface TaskModeContext {
     directories?: string[];
     filesWrite?: string[];
   };
-  /** Model to use (default: 'sonnet') */
+  /** Model to use (default: config's canonical default-model, resolved via
+   *  {@link resolveDefaultModel} — never a bare alias literal). */
   model?: ModelType;
   /**
    * Provider hint forwarded from the autonomous dispatcher's backlog entry.
@@ -47,6 +52,8 @@ export interface TaskModeContext {
   timeoutMs?: number;
   /** Auto-approve tool calls */
   autoApprove?: boolean;
+  /** Optional request ceiling. Owner config remains authority; this may only narrow it. */
+  budget?: ExecutionBudget;
   /** Project root override */
   projectRoot?: string;
 }
@@ -58,6 +65,10 @@ export interface TaskModeResult {
   backend: string;
   /** Provider used */
   provider: string;
+  /** Effective root used to bind result authority. */
+  projectRoot: string;
+  /** Exact Docker attempt authority; absent for legacy/non-Docker backends. */
+  settlementRef?: TaskResultSettlementRefV1;
 }
 
 // ─── Guard ──────────────────────────────────────────────────────────
@@ -174,8 +185,17 @@ export async function runTaskMode(
   assertTaskMode(config);
 
   const projectRoot = ctx.projectRoot ?? process.cwd();
-  const model: ModelType = ctx.model ?? 'sonnet';
   const scopeDir = ctx.scope?.directories?.[0] ?? '.';
+
+  // 454-003: resolve + validate the model through the canonical registry
+  // BEFORE any Task JSON write or spawn — same boundary CLI `deckent run` /
+  // MCP `deckent_run` enforce (453-001). An omitted ctx.model resolves from
+  // config's canonical default-model resolver (never a literal alias like
+  // 'sonnet'); a legacy alias, an unknown ID without a provider, or a
+  // provider/model mismatch all throw here (fail-before-disk/spawn).
+  const requestedModel = ctx.model ?? resolveDefaultModel(config);
+  const identity = resolveExecutionModelIdentity(requestedModel, ctx.provider);
+  const model = identity.model;
 
   // Build task — WM-1: unify on the canonical ExecutionRequest contract (sets
   // task.type, resolves provider via config, tags origin='autonomous').
@@ -183,14 +203,28 @@ export async function runTaskMode(
   const execReq = buildExecutionRequest({
     description: ctx.description,
     model,
-    provider: ctx.provider as ProviderName | undefined,
+    provider: identity.provider,
     scope: { directories: [scopeDir] },
     projectRoot,
     config,
     autoApprove: ctx.autoApprove ?? false,
     origin: 'autonomous',
+    budget: ctx.budget,
   });
   const task = resolveToTask(execReq, taskId);
+
+  // BUDGET-PRODUCER: every task-mode caller (Goal-v2/process included) binds the
+  // same owner-authored worker policy as planner and `deckent run`. A request is
+  // evidence only and can narrow, never widen, that authority. HOLD before
+  // routing, Task JSON, prompt construction, or provider/backend side effects.
+  const [budgetPolicy] = applyWorkerExecutionBudgetPolicy(
+    [task],
+    config.execution_budget,
+    execReq.provider,
+  );
+  if (budgetPolicy?.state === 'hold') {
+    throw new Error(`EXECUTION_BUDGET_HOLD:${budgetPolicy.reasonCode}:${budgetPolicy.profileRef}`);
+  }
 
   // WM-1b: V2 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
   try {
@@ -246,7 +280,7 @@ export async function runTaskMode(
   }
 
   // Spawn worker — forward provider hint so dynamic ollama tags are pre-registered
-  const { backend, provider } = await spawnWorkerMultiProvider(
+  const { backend, provider, settlementRef } = await spawnWorkerMultiProvider(
     taskId,
     model,
     prompt,
@@ -257,6 +291,7 @@ export async function runTaskMode(
       dockerImage: config.docker_image,
       dockerTimeout: config.docker_timeout,
       provider: execReq.provider,
+      executionBudget: task.budget,
     },
   );
 
@@ -265,7 +300,15 @@ export async function runTaskMode(
   // background (real tokenUsage/cost via result-collector.ts, mirroring the
   // sprint path) so the on-disk .result isn't left at the worker's honest
   // 0/0/0 stub forever. Not awaited — must not delay runTaskMode's return.
-  void watchAndEnrichTaskModeResult(projectRoot, task, ctx.timeoutMs ?? 300_000);
+  if (!settlementRef) {
+    void watchAndEnrichTaskModeResult(projectRoot, task, ctx.timeoutMs ?? 300_000);
+  }
 
-  return { taskId, backend, provider };
+  return {
+    taskId,
+    backend,
+    provider,
+    projectRoot,
+    ...(settlementRef ? { settlementRef } : {}),
+  };
 }

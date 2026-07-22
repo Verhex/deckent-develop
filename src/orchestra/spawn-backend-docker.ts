@@ -17,7 +17,7 @@ import { createClaudeAdapter } from '../providers/claude.js';
 import { createCodexAdapter } from '../providers/codex.js';
 import { createGeminiAdapter } from '../providers/gemini.js';
 import { buildSuggestedImageCmd } from '../core/worker-image-check.js';
-import { TASKS_DIR } from '../core/constants.js';
+import { LOCKS_DIR, TASKS_DIR } from '../core/constants.js';
 import { DECK_FILE_NAME } from '../core/deck-file.js';
 import { debugLog } from '../core/utils.js';
 import { DeckentError } from '../core/errors.js';
@@ -36,6 +36,12 @@ import {
 import { markPending, markActive, clearPending } from '../core/active-workers.js';
 import { authHealthCheck } from '../agents/worker.js';
 import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
+import {
+  createTaskResultSettlement,
+  assertTaskResultSettlementRef,
+  writeTaskResultSettlementAtomic,
+  type TaskResultSettlementRefV1,
+} from '../core/task-result-settlement.js';
 import { BASE_PROVIDER_CREDENTIAL_ENV } from '../providers/cross-provider-keys.js';
 import type { SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
 import { SpawnBackendError, checkLethalGuard } from './spawn-backend.js';
@@ -182,6 +188,58 @@ export function reconcileDockerRuntimeBudgetUsage(
   // providerBilling, when present, remains authoritative and is not fabricated.
   delete result.cost;
   return true;
+}
+
+/** Persist the host's final, content-addressed Docker result receipt. */
+export function persistDockerTaskResultSettlement(
+  projectRoot: string,
+  tasksDir: string,
+  ref: TaskResultSettlementRefV1 | undefined,
+  exitCode: number | null,
+): boolean {
+  if (!ref) return false;
+  assertTaskResultSettlementRef(projectRoot, ref.taskId, ref);
+  const resultPath = join(tasksDir, `task-${ref.taskId}.result`);
+  if (!existsSync(resultPath)) return false;
+  const result = JSON.parse(readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
+  const settlement = createTaskResultSettlement({ ref, exitCode, result });
+  writeTaskResultSettlementAtomic(settlement);
+  return true;
+}
+
+function hasSpawnLocksForTask(projectRoot: string, taskId: string): boolean {
+  const locksDir = join(projectRoot, LOCKS_DIR);
+  if (!existsSync(locksDir)) return false;
+  try {
+    return readdirSync(locksDir)
+      .filter(file => file.endsWith('.spawnlock'))
+      .some(file => {
+        try {
+          const lock = JSON.parse(readFileSync(join(locksDir, file), 'utf-8')) as { taskId?: string };
+          return lock.taskId === taskId;
+        } catch {
+          return false;
+        }
+      });
+  } catch {
+    return true;
+  }
+}
+
+function finalizeDockerHostTerminalResult(
+  projectRoot: string,
+  tasksDir: string,
+  taskId: string,
+  settlementRef: TaskResultSettlementRefV1 | undefined,
+  exitCode: number | null,
+): boolean {
+  clearPending(taskId);
+  releaseAllSpawnLocks(projectRoot, taskId);
+  releaseStaleSpawnLocksForTask(projectRoot, taskId);
+  if (hasSpawnLocksForTask(projectRoot, taskId)) {
+    throw new Error(`Docker host-terminal task ${taskId} still owns spawn locks`);
+  }
+  return persistDockerTaskResultSettlement(projectRoot, tasksDir, settlementRef, exitCode);
 }
 
 function reconcileDockerRuntimeBudgetResultFile(
@@ -2077,6 +2135,9 @@ export class DockerSpawnBackend implements SpawnBackend {
     // it while tmux/subprocess enforced it: a lethal actionId could spawn here.
     checkLethalGuard(opts?.actionId, this.name);
     const dir = opts?.projectDir ?? this.projectDir;
+    if (opts?.settlementRef) {
+      assertTaskResultSettlementRef(dir, taskId, opts.settlementRef);
+    }
     const executionBudget = resolveTaskExecutionBudget(dir, taskId, opts?.executionBudget);
     assertExecutionBudgetShape(executionBudget, this.name);
     if (typeof executionBudget?.maxUsd === 'number') {
@@ -2258,6 +2319,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       try {
         writeFileSync(join(tasksDir, `task-${taskId}.result`), JSON.stringify(honestFail, null, 2), 'utf-8');
       } catch (e) { debugLog('docker-backend:no-spec-honestfail', e); }
+      try {
+        finalizeDockerHostTerminalResult(dir, tasksDir, taskId, opts?.settlementRef, null);
+      } catch (e) { debugLog('docker-backend:no-spec-settlement', e); }
       console.warn(`[deckent:spawn-backend-docker] ${reason}`);
       return;
     }
@@ -2306,6 +2370,9 @@ export class DockerSpawnBackend implements SpawnBackend {
           `[deckent:spawn-backend-docker] claude auth health-check failed for task ${taskId} `
           + `— wrote AUTH_FAILED NO_GO, skipping container spawn`,
         );
+        try {
+          finalizeDockerHostTerminalResult(dir, tasksDir, taskId, opts?.settlementRef, null);
+        } catch (e) { debugLog('docker-backend:auth-settlement', e); }
         return;
       }
     }
@@ -2707,6 +2774,31 @@ export class DockerSpawnBackend implements SpawnBackend {
       try { releaseAllSpawnLocks(dir, taskId); } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
       // Sprint 170 P0-5: spawn failed — clear pending so Set doesn't leak
       clearPending(taskId);
+      const startFailureResult = {
+        taskId,
+        workerId: `docker-host-${taskId}`,
+        filesChanged: [] as string[],
+        linesAdded: 0,
+        linesRemoved: 0,
+        testsPassed: false,
+        selfAssessment: 'NO_GO',
+        notes: `${spawnOutcome.error.code}: ${spawnOutcome.error.message}`,
+        exitCode: spawnOutcome.error.exitCode,
+        tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider, model },
+      };
+      atomicWriteFileSync(
+        join(tasksDir, `task-${taskId}.result`),
+        `${JSON.stringify(startFailureResult, null, 2)}\n`,
+      );
+      try {
+        finalizeDockerHostTerminalResult(
+          dir,
+          tasksDir,
+          taskId,
+          opts?.settlementRef,
+          spawnOutcome.error.exitCode,
+        );
+      } catch (e) { debugLog('docker-backend:start-failure-settlement', e); }
       return;
     }
 
@@ -2761,6 +2853,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       distFingerprintBefore,
       liveCtx,
       opts?.executionBudget,
+      opts?.settlementRef,
     );
   }
 
@@ -3211,6 +3304,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     distFingerprintBefore: DistFingerprint | null,
     liveCtx?: ActivityTapContext,
     executionBudget?: import('../core/work-model.js').ExecutionBudget,
+    settlementRef?: TaskResultSettlementRefV1,
   ): void {
     const child = nodeSpawn('docker', ['wait', containerName], {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -3538,22 +3632,41 @@ export class DockerSpawnBackend implements SpawnBackend {
       }
 
       // Cleanup container
+      let lifecycleSettled = true;
       try {
-        spawnSync('docker', ['rm', '-f', containerName], { encoding: 'utf-8', timeout: 10_000 });
-      } catch (e) { debugLog('docker-backend:cleanup', e); }
+        const removal = spawnSync('docker', ['rm', '-f', containerName], { encoding: 'utf-8', timeout: 10_000 });
+        if (removal.status !== 0) {
+          lifecycleSettled = false;
+          debugLog('docker-backend:cleanup', `container removal failed: ${removal.stderr ?? ''}`);
+        }
+      } catch (e) {
+        lifecycleSettled = false;
+        debugLog('docker-backend:cleanup', e);
+      }
 
       // Sprint 156 Task 10: release every spawn lock owned by this task
       try {
         const released = releaseAllSpawnLocks(projectDir, taskId);
         if (released > 0) debugLog('docker-backend:spawn-lock', `taskId=${taskId} released ${released} spawn lock(s) on exit`);
-      } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
+      } catch (e) {
+        lifecycleSettled = false;
+        debugLog('docker-backend:spawn-lock-release', e);
+      }
 
       // Sprint 168 C0b: defensive sad-path safety net — releaseStaleSpawnLocksForTask
       // catches any spawnlock missed by releaseAllSpawnLocks (e.g. corrupted file,
       // partial unlink). Both helpers are idempotent and cheap when no locks remain.
       try {
         releaseStaleSpawnLocksForTask(projectDir, taskId);
-      } catch (e) { debugLog('docker-backend:spawn-lock-stale-release', e); }
+      } catch (e) {
+        lifecycleSettled = false;
+        debugLog('docker-backend:spawn-lock-stale-release', e);
+      }
+
+      if (hasSpawnLocksForTask(projectDir, taskId)) {
+        lifecycleSettled = false;
+        debugLog('docker-backend:spawn-lock-release', `taskId=${taskId} still owns spawn locks after cleanup`);
+      }
 
       this.containers.delete(taskId);
 
@@ -3564,7 +3677,20 @@ export class DockerSpawnBackend implements SpawnBackend {
       try {
         const baselinePath = join(tasksDir, `task-${taskId}.scope-baseline`);
         if (existsSync(baselinePath)) unlinkSync(baselinePath);
-      } catch (e) { debugLog('docker-backend:scope-baseline-cleanup', e); }
+      } catch (e) {
+        lifecycleSettled = false;
+        debugLog('docker-backend:scope-baseline-cleanup', e);
+      }
+
+      // Last authority action: only a fully reconciled result whose container,
+      // registry, locks and transient baseline are settled earns a receipt.
+      if (lifecycleSettled) {
+        try {
+          persistDockerTaskResultSettlement(projectDir, tasksDir, settlementRef, exitCode);
+        } catch (e) {
+          debugLog('docker-backend:result-settlement', e);
+        }
+      }
 
       // Sprint 156 Task 4: .prompt-*.txt AND .worker-*.sh tmpfiles persist until sprint cleanup.
       // Both are archived together by archivePromptFiles() during sprint cleanup phase.

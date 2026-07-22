@@ -11,6 +11,7 @@
 // (a thrown primitive is caught and reported as `{ ok: false }`), matching the
 // scheduler's contract ("Resolve on completion").
 import type { ResolvedConfig } from '../../../core/config-types.js';
+import type { ExecutionBudget } from '../../../core/work-model.js';
 import type { DispatchFn } from './mission-scheduler.js';
 import type { ResultLike, WorkItem } from './mission-types.js';
 
@@ -21,6 +22,8 @@ export interface MissionTaskContext {
   model?: string;
   provider?: string;
   scopeDir?: string;
+  /** Request-level ceiling only; the owner worker policy remains authority. */
+  budget?: ExecutionBudget;
 }
 
 /** Injected execution primitives. Live wire (cutover) passes the real runTask /
@@ -62,9 +65,13 @@ function buildTaskContext(
   const model = str(spec.model);
   const provider = str(spec.provider);
   const scopeDir = str(spec.scopeDir);
+  const budget = spec.budget;
   if (model) ctx.model = model;
   if (provider) ctx.provider = provider;
   if (scopeDir) ctx.scopeDir = scopeDir;
+  // Preserve malformed authored values so the canonical budget-policy validator
+  // fails loudly; never silently drop a budget request at this adapter boundary.
+  if (budget !== undefined) ctx.budget = budget as ExecutionBudget;
   return ctx;
 }
 

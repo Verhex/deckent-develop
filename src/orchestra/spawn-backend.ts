@@ -18,6 +18,7 @@ import {
   type LiveUsageBudgetSupport,
 } from '../core/live-execution-budget.js';
 import { resolveTaskExecutionBudget } from './runtime-budget-monitor.js';
+import type { TaskResultSettlementRefV1 } from '../core/task-result-settlement.js';
 
 export type { SandboxOptions };
 export { SandboxSpawnBackend };
@@ -93,6 +94,8 @@ export interface SpawnBackendOptions extends ProviderSpawnOptions {
    * `nervous.enabled` is true. Lethal actions throw SpawnBackendError.
    */
   actionId?: string;
+  /** Exact host-owned attempt authority for Docker result finalization. */
+  settlementRef?: TaskResultSettlementRefV1;
 }
 
 // ─── SpawnBackendError ────────────────────────────────────────────────────────

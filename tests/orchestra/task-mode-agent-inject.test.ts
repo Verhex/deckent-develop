@@ -62,6 +62,7 @@ function taskConfig(): ResolvedConfig {
   return {
     deckent_style: 'task',
     spawn_backend: 'subprocess',
+    execution_budget: { roles: { worker: { default: { maxTokens: 100_000, maxTurns: 10 } } } },
   } as unknown as ResolvedConfig;
 }
 

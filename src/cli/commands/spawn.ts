@@ -25,6 +25,13 @@ import {
   assertLiveUsageBudgetSupport,
 } from '../../core/live-execution-budget.js';
 import { resolveTaskExecutionBudget } from '../../orchestra/runtime-budget-monitor.js';
+import {
+  assertTaskResultSettlementRef,
+  createTaskResultSettlementRef,
+  readTaskResultSettlement,
+  writeTaskResultSettlementAttemptAtomic,
+  type TaskResultSettlementRefV1,
+} from '../../core/task-result-settlement.js';
 
 /**
  * Build a comma-separated allowedTools string from a task's scope.
@@ -59,7 +66,7 @@ export async function spawnWorkerMultiProvider(
   prompt: string,
   root: string,
   opts: { autoApprove?: boolean; allowedTools?: string; spawnBackend?: string; dockerImage?: string; dockerTimeout?: number; provider?: string; modelEffort?: string; executionBudget?: ExecutionBudget },
-): Promise<{ backend: string; provider: ProviderName }> {
+): Promise<{ backend: string; provider: ProviderName; settlementRef?: TaskResultSettlementRefV1 }> {
   const executionBudget = resolveTaskExecutionBudget(root, taskId, opts.executionBudget);
 
   // Resolve provider from registry. Dynamic ollama tags (e.g. qwen3.6:27b) are not in
@@ -166,14 +173,27 @@ export async function spawnWorkerMultiProvider(
       backend.liveUsageBudgetSupport,
       backend.name,
     );
+    const settlementRef = backend.name === 'docker'
+      ? createTaskResultSettlementRef(root, taskId)
+      : undefined;
+    if (settlementRef) {
+      // Durable attempt identity precedes backend.spawn, whose Docker path can
+      // run auth checks and start the provider container immediately.
+      writeTaskResultSettlementAttemptAtomic(settlementRef);
+    }
     backend.spawn(taskId, model as ModelType, prompt, {
       autoApprove: opts.autoApprove ?? false,
       projectDir: root,
       allowedTools: opts.allowedTools,
       reasoningEffort,
       executionBudget,
+      settlementRef,
     });
-    return { backend: backend.name, provider };
+    return {
+      backend: backend.name,
+      provider,
+      ...(settlementRef ? { settlementRef } : {}),
+    };
   }
 
   // No config override → provider-based fallback
@@ -245,6 +265,37 @@ export function finalizeTaskStatusFromResult(root: string, taskId: string): Task
   }
 }
 
+/** Finalize a Docker task only from the exact host-owned attempt receipt. */
+export function finalizeTaskStatusFromSettlement(
+  root: string,
+  taskId: string,
+  settlementRef: TaskResultSettlementRefV1,
+): TaskStatus | null {
+  assertTaskResultSettlementRef(root, taskId, settlementRef);
+  const settlement = readTaskResultSettlement(settlementRef);
+  if (!settlement) return null;
+  const result = normalizeTaskResultShape(settlement.result as unknown as TaskResult);
+  if (!result || result.taskId !== taskId) return null;
+
+  const assessment = result.selfAssessment;
+  const status =
+    assessment === 'DONE' || assessment === 'GO_WITH_TECH_DEBT' ? TaskStatus.DONE
+    : assessment === 'NO_GO' ? TaskStatus.NO_GO
+    : null;
+  if (status === null) return null;
+
+  const taskPath = join(root, TASKS_DIR, `task-${taskId}.json`);
+  try {
+    const task = readTask(root, taskId);
+    task.status = status;
+    writeFileSync(taskPath, JSON.stringify(task, null, 2), 'utf-8');
+    return status;
+  } catch (e) {
+    debugLog('spawn:finalizeTaskStatusFromSettlement', e);
+    return null;
+  }
+}
+
 export function registerSpawn(program: Command): void {
   program
     .command('spawn <taskId>')
@@ -297,7 +348,7 @@ export function registerSpawn(program: Command): void {
         // stays alive until the container exits (`docker wait` monitor) — i.e.
         // `deckent spawn` is BLOCKING on docker. tmux/subprocess: fire-and-forget.
         const cfgAny = config as { spawn_backend?: string; docker_image?: string; docker_timeout?: number };
-        const { backend, provider } = await spawnWorkerMultiProvider(taskId, task.model, prompt, root, {
+        const { backend, provider, settlementRef } = await spawnWorkerMultiProvider(taskId, task.model, prompt, root, {
           autoApprove: opts.autoApprove ?? false,
           allowedTools,
           spawnBackend: cfgAny.spawn_backend,
@@ -342,8 +393,11 @@ export function registerSpawn(program: Command): void {
           }
         };
         const tryFinalize = (): boolean => {
-          if (!isNewResult()) return false;
-          const finalized = finalizeTaskStatusFromResult(root, taskId);
+          const finalized = settlementRef
+            ? finalizeTaskStatusFromSettlement(root, taskId, settlementRef)
+            : isNewResult()
+              ? finalizeTaskStatusFromResult(root, taskId)
+              : null;
           if (finalized !== null) {
             print(`  Task status finalized: ${finalized}`);
             return true;
@@ -352,7 +406,17 @@ export function registerSpawn(program: Command): void {
         };
 
         // Blocking backends (docker) may have completed already — finalize now.
-        if (!tryFinalize()) {
+        const finalizedImmediately = tryFinalize();
+        if (!finalizedImmediately && settlementRef) {
+          // The receipt lives in host-global state, outside the worker-mounted
+          // project tree. Poll the exact attempt reference; raw result writes,
+          // stale attempts and heartbeat transitions are deliberately ignored.
+          const deadline = Date.now() + ((cfgAny.docker_timeout ?? 1200) * 1000) + 30_000;
+          const timer = setInterval(() => {
+            if (tryFinalize() || Date.now() >= deadline) clearInterval(timer);
+          }, 100);
+          timer.unref?.();
+        } else if (!finalizedImmediately && !settlementRef) {
           // Fire-and-forget backends: watch for the result WITHOUT keeping the
           // process alive (persistent: false). If the process stays alive anyway
           // (docker's `docker wait` monitor), the watcher fires on completion;

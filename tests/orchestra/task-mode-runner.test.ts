@@ -40,12 +40,18 @@ import { runTaskMode } from '../../src/orchestra/task-mode-runner.js';
 import { spawnWorkerMultiProvider } from '../../src/cli/commands/spawn.js';
 import { buildWorkerPrompt } from '../../src/orchestra/task-builder.js';
 import type { ResolvedConfig } from '../../src/core/config-types.js';
+import type { ExecutionBudget } from '../../src/core/work-model.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function makeTaskConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
   return {
     deckent_style: 'task',
+    execution_budget: {
+      roles: {
+        worker: { default: { maxTokens: 100_000, maxTurns: 10 } },
+      },
+    },
     ...overrides,
   } as unknown as ResolvedConfig;
 }
@@ -144,6 +150,83 @@ describe('runTaskMode — phase-1a gap fixes (E + G)', () => {
     expect(result.taskId).toBeTruthy();
     expect(result.backend).toBe('subprocess');
     expect(result.provider).toBe('claude');
+  });
+
+  it('holds a remote task before Task JSON and spawn when owner budget policy is missing', async () => {
+    const config = makeTaskConfig({ execution_budget: undefined });
+
+    await expect(runTaskMode(
+      { description: 'must not spawn', projectRoot: root, model: 'claude-sonnet-5', provider: 'claude' },
+      config,
+    )).rejects.toThrow('EXECUTION_BUDGET_HOLD:budget-policy-missing:execution_budget.roles.worker');
+
+    expect(existsSync(join(root, '.tasks'))).toBe(false);
+    expect(spawnWorkerMultiProvider).not.toHaveBeenCalled();
+  });
+
+  it('persists and spawns with the same owner budget while request ceilings only narrow it', async () => {
+    const config = makeTaskConfig({
+      execution_budget: {
+        roles: {
+          worker: { default: { maxTokens: 20_000, maxTurns: 8, maxOutputTokens: 4_000 } },
+        },
+      },
+    });
+
+    const result = await runTaskMode({
+      description: 'bounded task',
+      projectRoot: root,
+      model: 'claude-sonnet-5',
+      provider: 'claude',
+      budget: { maxTokens: 50_000, maxTurns: 3, maxInputTokens: 9_000 },
+    }, config);
+
+    const persisted = JSON.parse(readFileSync(
+      join(root, '.tasks', `task-${result.taskId}.json`),
+      'utf-8',
+    )) as { budget: Record<string, number> };
+    expect(persisted.budget).toEqual({
+      maxTokens: 20_000,
+      maxTurns: 3,
+      maxOutputTokens: 4_000,
+      maxInputTokens: 9_000,
+    });
+    const spawnOptions = (spawnWorkerMultiProvider as ReturnType<typeof vi.fn>).mock.calls[0]![4];
+    expect(spawnOptions.executionBudget).toEqual(persisted.budget);
+  });
+
+  it.each([
+    ['empty', {}],
+    ['negative', { maxTurns: -1 }],
+    ['unknown-field', { unlimited: 1 }],
+  ])('rejects a malformed %s request budget before Task JSON and spawn', async (_label, budget) => {
+    await expect(runTaskMode({
+      description: 'invalid budget',
+      projectRoot: root,
+      model: 'claude-sonnet-5',
+      provider: 'claude',
+      budget: budget as unknown as ExecutionBudget,
+    }, makeTaskConfig())).rejects.toThrow();
+
+    expect(existsSync(join(root, '.tasks'))).toBe(false);
+    expect(spawnWorkerMultiProvider).not.toHaveBeenCalled();
+  });
+
+  it('keeps a local Ollama executor policy-exempt without fabricating a ceiling', async () => {
+    const result = await runTaskMode({
+      description: 'local task',
+      projectRoot: root,
+      model: 'qwen-coder-32b',
+      provider: 'ollama',
+    }, makeTaskConfig({ execution_budget: undefined }));
+
+    const persisted = JSON.parse(readFileSync(
+      join(root, '.tasks', `task-${result.taskId}.json`),
+      'utf-8',
+    )) as Record<string, unknown>;
+    expect(persisted).not.toHaveProperty('budget');
+    const spawnOptions = (spawnWorkerMultiProvider as ReturnType<typeof vi.fn>).mock.calls[0]![4];
+    expect(spawnOptions.executionBudget).toBeUndefined();
   });
 
   it('throws when deckent_style is not "task"', async () => {

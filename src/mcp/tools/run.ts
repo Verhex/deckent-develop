@@ -125,7 +125,7 @@ export function registerRunTool(server: McpServer): void {
         const agentPrompt = await resolveAgentPrompt(root, task);
         const skillPrompts = await resolveSkillPrompts(root, task);
         const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, root);
-        const { backend } = await spawnWorkerMultiProvider(taskId, identity.model as ModelType, prompt, root, {
+        const { backend, settlementRef } = await spawnWorkerMultiProvider(taskId, identity.model as ModelType, prompt, root, {
           autoApprove,
           spawnBackend: cfg.spawn_backend,
           dockerImage: cfg.docker_image,
@@ -153,7 +153,7 @@ export function registerRunTool(server: McpServer): void {
         if (!keepFiles) {
           void import('../../cli/commands/run.js')
             .then(async ({ waitForRunResult, cleanupRunTask }) => {
-              const result = await waitForRunResult(root, taskId, effectiveTimeoutMs);
+              const result = await waitForRunResult(root, taskId, effectiveTimeoutMs, { settlementRef });
               if (result) cleanupRunTask(root, taskId);
             })
             .catch((cleanupErr) => {
