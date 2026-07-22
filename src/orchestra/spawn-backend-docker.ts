@@ -38,8 +38,17 @@ import { markPending, markActive, clearPending } from '../core/active-workers.js
 import { authHealthCheck } from '../agents/worker.js';
 import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
 import {
+  claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlement,
+  createTaskResultSettlementRef,
+  DOCKER_ATTEMPT_LABELS,
+  dockerAttemptLabels,
+  dockerContainerNameForTask,
   assertTaskResultSettlementRef,
+  readTaskResultSettlement,
+  writeTaskResultSettlementClosureAtomic,
+  writeTaskResultSettlementDispatchAtomic,
+  writeTaskResultSettlementPreparedAtomic,
   writeTaskResultSettlementAtomic,
   type TaskResultSettlementRefV1,
 } from '../core/task-result-settlement.js';
@@ -205,6 +214,18 @@ export function persistDockerTaskResultSettlement(
   const result = JSON.parse(readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
   const settlement = createTaskResultSettlement({ ref, exitCode, result });
   writeTaskResultSettlementAtomic(settlement);
+  return true;
+}
+
+export function closeDockerTaskResultSettlement(
+  ref: TaskResultSettlementRefV1 | undefined,
+  containerDisposition: 'not-dispatched' | 'stopped-removed' | 'absent-after-exit',
+): boolean {
+  if (!ref || !readTaskResultSettlement(ref)) return false;
+  writeTaskResultSettlementClosureAtomic(ref, {
+    containerDisposition,
+    locksReleased: true,
+  });
   return true;
 }
 
@@ -911,9 +932,53 @@ export const DOCKER_ERROR_CODES = {
   DAEMON_PERMISSION: 'DECKENT_E086', // docker CLI present, daemon reachable, but the socket is permission-denied
   DOCKER_ABSENT: 'DECKENT_E087',     // docker binary itself is not on PATH (spawn ENOENT / status 127)
   IMAGE_CLI_MISSING: 'DECKENT_E088', // image present, but the provider's CLI binary was not baked into it
+  OWNERSHIP_CONFLICT: 'DECKENT_E089', // daemon-global name is owned by a foreign project/task/attempt
+  AUTHORITY_UNAVAILABLE: 'DECKENT_E090', // exact-name ownership could not be proven present or absent
 } as const;
 
 export type DockerErrorCode = (typeof DOCKER_ERROR_CODES)[keyof typeof DOCKER_ERROR_CODES];
+
+interface DockerAttemptIdentity {
+  ref: TaskResultSettlementRefV1;
+  durable: boolean;
+  containerName: string;
+  labels: Readonly<Record<string, string>>;
+}
+
+export interface DockerAuthorityInspection {
+  containerId: string;
+  running: boolean;
+  exitCode: number;
+  labels: Readonly<Record<string, string>>;
+}
+
+type DockerAuthorityProbe =
+  | { state: 'present'; inspection: DockerAuthorityInspection }
+  | { state: 'absent' }
+  | { state: 'unavailable'; evidence: string };
+
+/** Parse the exact ID/state/label projection used for collision decisions. */
+export function parseDockerAuthorityInspectOutput(raw: string): DockerAuthorityInspection | null {
+  const [containerId, runningRaw, exitCodeRaw, managed, project, task, attempt] = raw.trim().split('|');
+  const exitCode = Number(exitCodeRaw);
+  if (
+    !containerId
+    || !/^[a-f0-9]{12,64}$/i.test(containerId)
+    || !['true', 'false'].includes(runningRaw ?? '')
+    || !Number.isInteger(exitCode)
+  ) return null;
+  return {
+    containerId,
+    running: runningRaw === 'true',
+    exitCode,
+    labels: {
+      [DOCKER_ATTEMPT_LABELS.managed]: managed ?? '',
+      [DOCKER_ATTEMPT_LABELS.project]: project ?? '',
+      [DOCKER_ATTEMPT_LABELS.task]: task ?? '',
+      [DOCKER_ATTEMPT_LABELS.attempt]: attempt ?? '',
+    },
+  };
+}
 
 /** Distinct pre-spawn Docker failure classes (455-003). */
 export type DockerPreflightCode =
@@ -1944,7 +2009,7 @@ export const DOCKER_LOG_CAPTURE_CEILING_BYTES = 256 * 1024 * 1024;
 /**
  * Wall-clock cap for reading `docker logs` off an already-exited container (30 s).
  * On timeout the child is killed and the partial capture returned as incomplete so
- * a hung `docker logs` never stalls the downstream `docker rm -f` / lock release.
+ * a hung `docker logs` never stalls the downstream exact-ID `docker rm` / lock release.
  * Deliberately higher than the old spawnSync 10 s — a large (but legitimate) log must
  * not be cut for speed; completeness wins (the whole point of this fix).
  */
@@ -2136,9 +2201,11 @@ export class DockerSpawnBackend implements SpawnBackend {
   private readonly verifyProviderCliInImage: boolean;
   private readonly containers = new Map<string, {
     containerId: string;
+    containerName: string;
     model: string;
     projectDir: string;
     tasksDir: string;
+    settlementRef?: TaskResultSettlementRefV1;
   }>(); // taskId → effective execution context
 
   constructor(projectDir: string, opts?: { image?: string; timeoutSeconds?: number; gracefulTimeoutSeconds?: number; memoryLimit?: string; memorySwap?: string; kindMemoryLimits?: Record<string, string>; verifyProviderCliInImage?: boolean }) {
@@ -2627,7 +2694,18 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     const containerCmd = `sh ${CONTAINER_WORKSPACE}/${TASKS_DIR}/${scriptFileName}`;
 
-    const containerName = `${CONTAINER_PREFIX}${taskId}`;
+    const attemptRef = opts?.settlementRef ?? createTaskResultSettlementRef(dir, taskId);
+    const attemptIdentity: DockerAttemptIdentity = {
+      ref: attemptRef,
+      durable: opts?.settlementRef !== undefined,
+      containerName: dockerContainerNameForTask(dir, taskId),
+      labels: dockerAttemptLabels(attemptRef),
+    };
+    if (attemptIdentity.durable) {
+      claimTaskResultSettlementAttemptAtomic(attemptRef);
+      writeTaskResultSettlementPreparedAtomic(attemptRef, model);
+    }
+    const containerName = attemptIdentity.containerName;
 
     // F1-LIM faz-2a (Sprint 272): kind-based memory limit — opt-in override.
     // Falls back to constructor memoryLimit/memorySwap when kind not configured.
@@ -2657,6 +2735,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     const dockerArgs: string[] = [
       'run', '-d',
       '--name', containerName,
+      ...Object.entries(attemptIdentity.labels).flatMap(([key, value]) => ['--label', `${key}=${value}`]),
       // Run as host user (non-root) — required for --dangerously-skip-permissions
       '--user', `${uid}:${gid}`,
       // HOME must point to a directory that EXISTS in the container
@@ -2800,7 +2879,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Each attempt: docker run + 3s wait + docker inspect. If inspect reports
     // Running=true OR Running=false+ExitCode=0 (instant-exit success), proceed.
     // Otherwise, classify stderr and retry up to MAX_SPAWN_ATTEMPTS.
-    const spawnOutcome = this.runDockerWithRetry(taskId, containerName, dockerArgs);
+    const spawnOutcome = this.runDockerWithRetry(taskId, attemptIdentity, dockerArgs);
 
     if (!spawnOutcome.ok) {
       debugLog('docker-backend:spawn-error', `taskId=${taskId} ${spawnOutcome.error.message}`);
@@ -2844,11 +2923,23 @@ export class DockerSpawnBackend implements SpawnBackend {
           spawnOutcome.error.exitCode,
         );
       } catch (e) { debugLog('docker-backend:start-failure-settlement', e); }
+      if (attemptIdentity.durable) {
+        try {
+          closeDockerTaskResultSettlement(attemptRef, 'not-dispatched');
+        } catch (e) { debugLog('docker-backend:start-failure-closure', e); }
+      }
       return;
     }
 
     const { containerId, instantExitSuccess } = spawnOutcome;
-    this.containers.set(taskId, { containerId, model, projectDir: dir, tasksDir });
+    this.containers.set(taskId, {
+      containerId,
+      containerName,
+      model,
+      projectDir: dir,
+      tasksDir,
+      ...(opts?.settlementRef ? { settlementRef: opts.settlementRef } : {}),
+    });
     debugLog(
       'docker-backend:spawn-ok',
       `taskId=${taskId} containerId=${containerId.slice(0, 12)} instantExit=${instantExitSuccess}`,
@@ -2891,7 +2982,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Set up container monitoring (async, fire-and-forget)
     this.monitorContainer(
       taskId,
-      containerName,
+      containerId,
       tasksDir,
       model,
       dir,
@@ -2912,12 +3003,13 @@ export class DockerSpawnBackend implements SpawnBackend {
    * - `{ ok: true, containerId, instantExitSuccess: true }` — container started and gracefully exited (ExitCode 0)
    * - `{ ok: false, error }` — all attempts failed, error classified into a stable code
    *
-   * Between attempts the previous container is force-removed so the name slot
-   * is free for the next try.
+   * A retry is allowed only when exact-name inspection proves no container was
+   * created. Existing containers are adopted only for the exact attempt labels;
+   * every foreign/different-attempt collision fails closed without removal.
    */
   private runDockerWithRetry(
     taskId: string,
-    containerName: string,
+    identity: DockerAttemptIdentity,
     dockerArgs: string[],
   ): { ok: true; containerId: string; instantExitSuccess: boolean }
     | { ok: false; error: { code: DockerErrorCode; message: string; exitCode: number; stderr: string } } {
@@ -2940,9 +3032,41 @@ export class DockerSpawnBackend implements SpawnBackend {
           'docker-backend:spawn-attempt-fail',
           `taskId=${taskId} attempt=${attempt} status=${result.status} stderr=${lastStderr.trim().slice(0, 200)}`,
         );
-        // Force-remove the (probably non-existent) container in case it was
-        // half-created, then retry.
-        this.forceRemoveContainer(containerName);
+        const authority = this.inspectContainerAuthority(identity.containerName);
+        if (authority.state === 'present') {
+          const existing = authority.inspection;
+          if (this.inspectionMatchesAttempt(existing, identity)) {
+            if (identity.durable) {
+              writeTaskResultSettlementDispatchAtomic(identity.ref, existing.containerId);
+            }
+            return {
+              ok: true,
+              containerId: existing.containerId,
+              instantExitSuccess: !existing.running && existing.exitCode === 0,
+            };
+          }
+          const message = `${DOCKER_ERROR_CODES.OWNERSHIP_CONFLICT}: Docker container name '${identity.containerName}' is owned by a foreign project/task/attempt; refusing removal and redispatch.`;
+          return {
+            ok: false,
+            error: {
+              code: DOCKER_ERROR_CODES.OWNERSHIP_CONFLICT,
+              message,
+              exitCode: result.status ?? -1,
+              stderr: lastStderr,
+            },
+          };
+        }
+        if (authority.state === 'unavailable') {
+          return {
+            ok: false,
+            error: {
+              code: DOCKER_ERROR_CODES.AUTHORITY_UNAVAILABLE,
+              message: `${DOCKER_ERROR_CODES.AUTHORITY_UNAVAILABLE}:${authority.evidence}`,
+              exitCode: result.status ?? -1,
+              stderr: authority.evidence,
+            },
+          };
+        }
         if (attempt < MAX_SPAWN_ATTEMPTS) {
           this.sleepSync(SPAWN_RETRY_DELAY_MS);
         }
@@ -2950,9 +3074,17 @@ export class DockerSpawnBackend implements SpawnBackend {
       }
 
       const containerId = result.stdout?.trim() ?? '';
+      if (identity.durable) {
+        try {
+          writeTaskResultSettlementDispatchAtomic(identity.ref, containerId);
+        } catch (error) {
+          try { terminateDockerContainerForBudget(containerId, this.gracefulTimeoutSeconds); } catch { /* exact ID containment is best-effort here; the original error remains authoritative */ }
+          throw error;
+        }
+      }
 
       // docker run succeeded — now confirm the container is actually alive.
-      const health = this.healthCheckContainer(containerName);
+      const health = this.healthCheckContainer(containerId);
       if (health.healthy) {
         return { ok: true, containerId, instantExitSuccess: false };
       }
@@ -2963,23 +3095,13 @@ export class DockerSpawnBackend implements SpawnBackend {
         return { ok: true, containerId, instantExitSuccess: true };
       }
 
-      // Real container_start_failed: container died with a non-zero exit code.
-      // Pull docker logs to capture stderr for classification before removing.
-      const logResult = spawnSync('docker', ['logs', containerName], {
-        encoding: 'utf-8',
-        timeout: 5_000,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-      lastStderr = `${logResult.stdout ?? ''}${logResult.stderr ?? ''}`;
-      lastExitCode = health.exitCode;
+      // The provider may already have run. A stopped non-zero container belongs
+      // to this exact attempt and is finalized by the monitor; never redrive it.
       debugLog(
         'docker-backend:spawn-health-fail',
-        `taskId=${taskId} attempt=${attempt} exitCode=${lastExitCode} stderr=${lastStderr.trim().slice(0, 200)}`,
+        `taskId=${taskId} attempt=${attempt} exitCode=${health.exitCode} — handing exact container to settlement without redrive`,
       );
-      this.forceRemoveContainer(containerName);
-      if (attempt < MAX_SPAWN_ATTEMPTS) {
-        this.sleepSync(SPAWN_RETRY_DELAY_MS);
-      }
+      return { ok: true, containerId, instantExitSuccess: false };
     }
 
     const classification = classifyDockerError(lastStderr, lastExitCode);
@@ -2992,6 +3114,54 @@ export class DockerSpawnBackend implements SpawnBackend {
         stderr: lastStderr,
       },
     };
+  }
+
+  private inspectContainerAuthority(containerName: string): DockerAuthorityProbe {
+    const format = [
+      '{{.Id}}',
+      '{{.State.Running}}',
+      '{{.State.ExitCode}}',
+      `{{index .Config.Labels "${DOCKER_ATTEMPT_LABELS.managed}"}}`,
+      `{{index .Config.Labels "${DOCKER_ATTEMPT_LABELS.project}"}}`,
+      `{{index .Config.Labels "${DOCKER_ATTEMPT_LABELS.task}"}}`,
+      `{{index .Config.Labels "${DOCKER_ATTEMPT_LABELS.attempt}"}}`,
+    ].join('|');
+    let inspected: ReturnType<typeof spawnSync>;
+    try {
+      inspected = spawnSync(
+        'docker',
+        ['inspect', containerName, '--format', format],
+        { encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'] },
+      );
+    } catch (error) {
+      return {
+        state: 'unavailable',
+        evidence: `inspect-threw:${error instanceof Error ? error.message : String(error)}`.slice(0, 500),
+      };
+    }
+    const stderr = typeof inspected.stderr === 'string' ? inspected.stderr.trim() : '';
+    if (inspected.status !== 0) {
+      if (/\bNo such (?:container|object)\b/i.test(stderr)) return { state: 'absent' };
+      const spawnError = inspected.error instanceof Error ? inspected.error.message : '';
+      const evidence = [
+        `status=${inspected.status ?? 'null'}`,
+        stderr,
+        spawnError,
+      ].filter(Boolean).join(':').slice(0, 500);
+      return { state: 'unavailable', evidence };
+    }
+    const parsed = parseDockerAuthorityInspectOutput(inspected.stdout?.toString() ?? '');
+    if (!parsed) {
+      return { state: 'unavailable', evidence: 'status=0:malformed-inspect-authority-projection' };
+    }
+    return { state: 'present', inspection: parsed };
+  }
+
+  private inspectionMatchesAttempt(
+    inspection: DockerAuthorityInspection,
+    identity: DockerAttemptIdentity,
+  ): boolean {
+    return Object.entries(identity.labels).every(([key, value]) => inspection.labels[key] === value);
   }
 
   /**
@@ -3038,24 +3208,6 @@ export class DockerSpawnBackend implements SpawnBackend {
   }
 
   /**
-   * Sprint 163 T-002 helper: force-remove a container by name. Used between
-   * retry attempts so the container-name slot is free for the next `docker run`.
-   * Errors are swallowed — the next `docker run` will fail loudly if removal
-   * really did not work, and we already log via debugLog.
-   */
-  private forceRemoveContainer(containerName: string): void {
-    try {
-      spawnSync('docker', ['rm', '-f', containerName], {
-        encoding: 'utf-8',
-        timeout: 5_000,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-    } catch (e) {
-      debugLog('docker-backend:force-remove-error', e);
-    }
-  }
-
-  /**
    * Blocking sleep using `spawnSync('sleep', …)` so the retry loop stays
    * synchronous (matches the rest of this file's spawn-time path).
    */
@@ -3071,16 +3223,29 @@ export class DockerSpawnBackend implements SpawnBackend {
    * removal and lock release after `docker wait` observes the exit.
    */
   private stopContainerForBudget(taskId: string): void {
-    const containerName = `${CONTAINER_PREFIX}${taskId}`;
-    terminateDockerContainerForBudget(containerName, this.gracefulTimeoutSeconds);
+    const execution = this.containers.get(taskId);
+    if (!execution) {
+      throw new SpawnBackendError(
+        `No exact Docker container authority is registered for task ${taskId}; refusing name-derived containment.`,
+        this.name,
+      );
+    }
+    terminateDockerContainerForBudget(execution.containerId, this.gracefulTimeoutSeconds);
   }
 
-  private resolveExecutionContext(taskId: string): { projectDir: string; tasksDir: string } {
+  private resolveExecutionContext(taskId: string): { projectDir: string; tasksDir: string; containerId: string } {
     const execution = this.containers.get(taskId);
-    const projectDir = execution?.projectDir ?? this.projectDir;
+    if (!execution) {
+      throw new SpawnBackendError(
+        `No exact Docker container authority is registered for task ${taskId}; refusing name-derived lifecycle mutation.`,
+        this.name,
+      );
+    }
+    const projectDir = execution.projectDir;
     return {
       projectDir,
-      tasksDir: execution?.tasksDir ?? join(projectDir, TASKS_DIR),
+      tasksDir: execution.tasksDir,
+      containerId: execution.containerId,
     };
   }
 
@@ -3098,21 +3263,20 @@ export class DockerSpawnBackend implements SpawnBackend {
    * the SIGTERM trap has already fsync'd .result to disk.
    */
   kill(taskId: string): void {
-    const { projectDir, tasksDir } = this.resolveExecutionContext(taskId);
-    const containerName = `${CONTAINER_PREFIX}${taskId}`;
+    const { projectDir, tasksDir, containerId } = this.resolveExecutionContext(taskId);
     const grace = this.gracefulTimeoutSeconds;
     debugLog('docker-backend:kill', `taskId=${taskId} (graceful stop --time=${grace})`);
 
     try {
       // Graceful: SIGTERM + configurable grace period (Sprint 151: was hardcoded 15s, now configurable)
-      const stopResult = spawnSync('docker', ['stop', `--time=${grace}`, containerName], {
+      const stopResult = spawnSync('docker', ['stop', `--time=${grace}`, containerId], {
         encoding: 'utf-8', timeout: (grace + 5) * 1000, // grace + 5s buffer to avoid race
       });
       if (stopResult.status !== 0) {
         // Fallback: send SIGTERM (not SIGKILL) so EXIT trap can still run
         // Sprint 149: changed from bare `docker kill` (SIGKILL) to --signal=SIGTERM
         debugLog('docker-backend:stop-failed', `Falling back to docker kill --signal=SIGTERM: ${stopResult.stderr?.trim()}`);
-        spawnSync('docker', ['kill', '--signal=SIGTERM', containerName], { encoding: 'utf-8', timeout: 10_000 });
+        spawnSync('docker', ['kill', '--signal=SIGTERM', containerId], { encoding: 'utf-8', timeout: 10_000 });
       }
     } catch (e) { debugLog('docker-backend:kill-error', e); }
 
@@ -3130,7 +3294,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     this.verifyResultAfterStop(taskId, tasksDir);
 
     try {
-      spawnSync('docker', ['rm', '-f', containerName], { encoding: 'utf-8', timeout: 10_000 });
+      spawnSync('docker', ['rm', containerId], { encoding: 'utf-8', timeout: 10_000 });
     } catch (e) { debugLog('docker-backend:rm-error', e); }
 
     // Sprint 156 Task 10: forced shutdown — release any spawn locks left over
@@ -3343,7 +3507,7 @@ export class DockerSpawnBackend implements SpawnBackend {
    */
   private monitorContainer(
     taskId: string,
-    containerName: string,
+    containerId: string,
     tasksDir: string,
     model: string,
     projectDir: string,
@@ -3353,7 +3517,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     settlementRef?: TaskResultSettlementRefV1,
     hostTerminalResultContract?: HostTerminalResultContractV1,
   ): void {
-    const child = nodeSpawn('docker', ['wait', containerName], {
+    const child = nodeSpawn('docker', ['wait', containerId], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
@@ -3380,7 +3544,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     });
     const stopFollow = liveCtx
       ? followContainerActivity(
-          containerName,
+          containerId,
           getProviderBinaryForModel(model),
           liveCtx,
           nodeSpawn,
@@ -3596,11 +3760,11 @@ export class DockerSpawnBackend implements SpawnBackend {
       // 44% of trace corpora at ~1.1 MB and killed the terminal usage envelope (293×
       // cost drift, 413-001). captureDockerLogs streams stdout+stderr with only a
       // 256 MiB honest-marker safety ceiling and surfaces any error/non-zero-exit
-      // instead of swallowing it. AWAITED so the `docker rm -f` below never races the
+      // instead of swallowing it. AWAITED so the exact-ID `docker rm` below never races the
       // reader off the still-existing container. `content` is the SAME pristine string
       // the old path produced, so the two consumers below are byte-for-byte unchanged.
       try {
-        const capture = await captureDockerLogs(containerName);
+        const capture = await captureDockerLogs(containerId);
         const logContent = capture.content;
         if (logContent.trim()) {
           const logPath = join(tasksDir, `task-${taskId}.log`);
@@ -3695,7 +3859,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       // Cleanup container
       let lifecycleSettled = true;
       try {
-        const removal = spawnSync('docker', ['rm', '-f', containerName], { encoding: 'utf-8', timeout: 10_000 });
+        const removal = spawnSync('docker', ['rm', containerId], { encoding: 'utf-8', timeout: 10_000 });
         if (removal.status !== 0) {
           lifecycleSettled = false;
           debugLog('docker-backend:cleanup', `container removal failed: ${removal.stderr ?? ''}`);
@@ -3749,7 +3913,15 @@ export class DockerSpawnBackend implements SpawnBackend {
         try {
           persistDockerTaskResultSettlement(projectDir, tasksDir, settlementRef, exitCode);
         } catch (e) {
+          lifecycleSettled = false;
           debugLog('docker-backend:result-settlement', e);
+        }
+      }
+      if (lifecycleSettled && settlementRef) {
+        try {
+          closeDockerTaskResultSettlement(settlementRef, 'stopped-removed');
+        } catch (e) {
+          debugLog('docker-backend:result-settlement-closure', e);
         }
       }
 

@@ -102,14 +102,16 @@ describe('DockerSpawnBackend effective project context', () => {
     const internal = backend as unknown as {
       containers: Map<string, {
         containerId: string;
+        containerName: string;
         model: string;
         projectDir: string;
         tasksDir: string;
       }>;
-      resolveExecutionContext(taskId: string): { projectDir: string; tasksDir: string };
+      resolveExecutionContext(taskId: string): { projectDir: string; tasksDir: string; containerId: string };
     };
     internal.containers.set('wt-001', {
       containerId: 'container-id',
+      containerName: 'display-only',
       model: 'claude-sonnet-5',
       projectDir: '/linked-worktree',
       tasksDir: '/linked-worktree/.tasks',
@@ -118,10 +120,8 @@ describe('DockerSpawnBackend effective project context', () => {
     expect(internal.resolveExecutionContext('wt-001')).toEqual({
       projectDir: '/linked-worktree',
       tasksDir: '/linked-worktree/.tasks',
+      containerId: 'container-id',
     });
-    expect(internal.resolveExecutionContext('unknown')).toEqual({
-      projectDir: '/main-checkout',
-      tasksDir: '/main-checkout/.tasks',
-    });
+    expect(() => internal.resolveExecutionContext('unknown')).toThrow(/No exact Docker container authority/);
   });
 });

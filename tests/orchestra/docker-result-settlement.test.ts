@@ -4,11 +4,17 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlementRef,
+  listPendingTaskResultSettlementAttempts,
+  readTaskResultSettlementClosure,
   readTaskResultSettlement,
+  writeTaskResultSettlementDispatchAtomic,
+  writeTaskResultSettlementPreparedAtomic,
   writeTaskResultSettlementAttemptAtomic,
 } from '../../src/core/task-result-settlement.js';
 import {
+  closeDockerTaskResultSettlement,
   persistDockerTaskResultSettlement,
   reconcileDockerHostTerminalResultFile,
 } from '../../src/orchestra/spawn-backend-docker.js';
@@ -68,6 +74,30 @@ describe('persistDockerTaskResultSettlement', () => {
     const otherRoot = join(root, '..', 'other');
     mkdirSync(otherRoot, { recursive: true });
     expect(() => persistDockerTaskResultSettlement(otherRoot, tasks, ref, 0)).toThrow(/authority/);
+  });
+
+  it('closes the durable claim only after dispatch, settlement and lifecycle cleanup evidence', () => {
+    const { root, tasks } = fixture();
+    const taskId = 'docker-closed';
+    const ref = createTaskResultSettlementRef(root, taskId);
+    writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
+    writeTaskResultSettlementPreparedAtomic(ref, 'claude-fable-5');
+    writeTaskResultSettlementDispatchAtomic(ref, 'f'.repeat(64));
+    writeFileSync(join(tasks, `task-${taskId}.result`), JSON.stringify({
+      taskId,
+      selfAssessment: 'DONE',
+      testsPassed: true,
+    }), 'utf-8');
+
+    expect(persistDockerTaskResultSettlement(root, tasks, ref, 0)).toBe(true);
+    expect(closeDockerTaskResultSettlement(ref, 'stopped-removed')).toBe(true);
+    expect(readTaskResultSettlementClosure(ref)).toMatchObject({
+      state: 'closed',
+      containerDisposition: 'stopped-removed',
+      locksReleased: true,
+    });
+    expect(listPendingTaskResultSettlementAttempts(root)).toEqual([]);
   });
 });
 

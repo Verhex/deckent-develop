@@ -47,6 +47,25 @@ function spawnResult(over: { stdout?: string; stderr?: string; status?: number |
   };
 }
 
+function seedOwnedContainer(backend: DockerSpawnBackend, taskId: string, containerId: string): void {
+  const internal = backend as unknown as {
+    containers: Map<string, {
+      containerId: string;
+      containerName: string;
+      model: string;
+      projectDir: string;
+      tasksDir: string;
+    }>;
+  };
+  internal.containers.set(taskId, {
+    containerId,
+    containerName: 'display-only',
+    model: 'claude-sonnet-5',
+    projectDir: '/test/project',
+    tasksDir: '/test/project/.tasks',
+  });
+}
+
 // ─── Tests ──────────────────────────────────────────────────────────
 
 describe('DockerSpawnBackend', () => {
@@ -179,6 +198,8 @@ describe('DockerSpawnBackend', () => {
 
   describe('kill', () => {
     it('should use docker stop --time=15 for graceful shutdown', () => {
+      const containerId = 'a'.repeat(64);
+      seedOwnedContainer(backend, '001-001', containerId);
       mockSpawnSync.mockReturnValue({
         stdout: '',
         stderr: '',
@@ -190,20 +211,22 @@ describe('DockerSpawnBackend', () => {
 
       backend.kill('001-001');
 
-      // docker stop --time=15 (graceful, Sprint 139 increase) + docker rm -f (cleanup)
+      // Lifecycle mutations use the exact owned container ID; the display name is not authority.
       expect(mockSpawnSync).toHaveBeenCalledWith(
         'docker',
-        ['stop', '--time=15', 'deckent-w-001-001'],
+        ['stop', '--time=15', containerId],
         expect.objectContaining({ encoding: 'utf-8', timeout: 20000 }),
       );
       expect(mockSpawnSync).toHaveBeenCalledWith(
         'docker',
-        ['rm', '-f', 'deckent-w-001-001'],
+        ['rm', containerId],
         expect.any(Object),
       );
     });
 
     it('should fallback to docker kill when docker stop fails', () => {
+      const containerId = 'b'.repeat(64);
+      seedOwnedContainer(backend, '001-001', containerId);
       // First call (docker stop) fails, second call (docker kill) succeeds, third (docker rm) succeeds
       mockSpawnSync
         .mockReturnValueOnce({
@@ -220,19 +243,20 @@ describe('DockerSpawnBackend', () => {
       // Should call docker stop first, then fallback to docker kill
       expect(mockSpawnSync).toHaveBeenCalledWith(
         'docker',
-        ['stop', '--time=15', 'deckent-w-001-001'],
+        ['stop', '--time=15', containerId],
         expect.objectContaining({ encoding: 'utf-8', timeout: 20000 }),
       );
       // Sprint 149: fallback changed from bare `docker kill` (SIGKILL) to
       // `docker kill --signal=SIGTERM` so the worker trap still runs fsync.
       expect(mockSpawnSync).toHaveBeenCalledWith(
         'docker',
-        ['kill', '--signal=SIGTERM', 'deckent-w-001-001'],
+        ['kill', '--signal=SIGTERM', containerId],
         expect.any(Object),
       );
     });
 
     it('should handle kill errors gracefully', () => {
+      seedOwnedContainer(backend, '001-001', 'c'.repeat(64));
       mockSpawnSync.mockImplementation(() => {
         throw new Error('docker not running');
       });
