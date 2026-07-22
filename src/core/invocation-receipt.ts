@@ -3,7 +3,12 @@ import type { ProviderName } from './task-types.js';
 export const INVOCATION_RECEIPT_SCHEMA_VERSION = 1 as const;
 
 export type InvocationRole = 'brain' | 'worker' | 'auditor';
-export type InvocationPurpose = 'sprint-planning' | 'worker-execution' | 'audit-evaluation';
+export type InvocationPurpose =
+  | 'sprint-planning'
+  | 'goal-authoring'
+  | 'goal-acceptance'
+  | 'worker-execution'
+  | 'audit-evaluation';
 export type InvocationEvidenceState = 'known' | 'unknown' | 'stale' | 'unavailable';
 export type InvocationSelectionSource =
   | 'config'

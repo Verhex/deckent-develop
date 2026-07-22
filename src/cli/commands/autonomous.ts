@@ -57,6 +57,7 @@ import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.j
 import { isV2Engine, runV2Engine } from '../../orchestra/autonomous/mission-store/mission-engine-wire.js';
 import { buildGoalDeps, type GoalAdvanceDeps } from '../../orchestra/autonomous/mission-store/goal-mission.js';
 import {
+  verifyGoalAcceptanceInvocationReceipt,
   workItemEvidenceRef,
   type GoalAcceptanceContractV1,
   type GoalAcceptanceEvaluation,
@@ -90,6 +91,7 @@ import { getSprintStateSnapshot } from '../../orchestra/sprint-state-tracker.js'
 import type { DeckentConfig } from '../../core/types.js';
 import { DeckentError } from '../../core/errors.js';
 import type { InvocationReceiptRef } from '../../core/invocation-receipt.js';
+import { InvocationReceiptStore } from '../../core/invocation-receipt-store.js';
 
 // ─── Filesystem layout helpers ────────────────────────────────────────
 
@@ -626,6 +628,7 @@ function parseAcceptanceObject(raw: string): Record<string, unknown> | null {
 
 function parseGoalAcceptanceEvaluation(
   raw: string,
+  evaluatorRole: 'brain' | 'auditor',
   evaluatorInstanceId: string | null,
   invocationReceiptRef: InvocationReceiptRef | null,
   decidedAt: string,
@@ -660,7 +663,7 @@ function parseGoalAcceptanceEvaluation(
       ? outcome as GoalAcceptanceOutcome
       : 'unknown',
     criteria,
-    evaluator: { role: 'brain', instanceId: evaluatorInstanceId },
+    evaluator: { role: evaluatorRole, instanceId: evaluatorInstanceId },
     invocationReceiptRef,
     decidedAt,
   };
@@ -668,6 +671,7 @@ function parseGoalAcceptanceEvaluation(
 
 export interface LiveGoalAcceptanceCompletion {
   output: string;
+  evaluatorRole: 'brain' | 'auditor';
   evaluatorInstanceId: string;
   invocationReceiptRef: InvocationReceiptRef;
 }
@@ -675,6 +679,7 @@ export interface LiveGoalAcceptanceCompletion {
 export interface LiveGoalDepsOptions {
   /** Row-603 seam: completion + host-owned invocation provenance for this exact evaluator call. */
   acceptanceComplete?: (prompt: string) => Promise<LiveGoalAcceptanceCompletion>;
+  acceptanceReceiptVerifier?: GoalAdvanceDeps['verifyAcceptanceReceipt'];
   now?: () => Date;
 }
 
@@ -715,11 +720,13 @@ export function buildLiveGoalDeps(complete: LlmComplete, opts: LiveGoalDepsOptio
       ? await opts.acceptanceComplete(prompt)
       : {
         output: await complete(prompt),
+        evaluatorRole: 'auditor' as const,
         evaluatorInstanceId: null,
         invocationReceiptRef: null,
       };
     return parseGoalAcceptanceEvaluation(
       completed.output,
+      completed.evaluatorRole,
       completed.evaluatorInstanceId,
       completed.invocationReceiptRef,
       (opts.now ?? (() => new Date()))().toISOString(),
@@ -730,6 +737,9 @@ export function buildLiveGoalDeps(complete: LlmComplete, opts: LiveGoalDepsOptio
     accepter,
     maxRounds: GOAL_MAX_ROUNDS,
     admission: PRODUCTION_V2_ADMISSION,
+    ...(opts.acceptanceReceiptVerifier
+      ? { verifyAcceptanceReceipt: opts.acceptanceReceiptVerifier }
+      : {}),
   });
 }
 
@@ -814,6 +824,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     const maxIterationsV2 = opts.maxIterations !== undefined
       ? Math.max(0, parseInt(opts.maxIterations, 10) || 0)
       : undefined;
+    const invocationReceiptStore = new InvocationReceiptStore(root);
     try {
       const summary = await runV2Engine(root, resolvedConfig, {
         // Real task execution: spawn via runTaskMode → wait for the result file →
@@ -838,7 +849,13 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
         // carries the maxRounds infinite-loop guard. 454-003: the model is the
         // canonical configured default, resolved + validated before the loop starts
         // — never the 'sonnet' alias literal.
-        goalDeps: buildLiveGoalDeps(realPlannerComplete(resolvePlannerModelIdentity(resolvedConfig, lang))),
+        goalDeps: buildLiveGoalDeps(
+          realPlannerComplete(resolvePlannerModelIdentity(resolvedConfig, lang)),
+          {
+            acceptanceReceiptVerifier: (mission, evaluation) =>
+              verifyGoalAcceptanceInvocationReceipt(invocationReceiptStore, mission, evaluation),
+          },
+        ),
         signal: controllerV2.signal,
         ...(maxIterationsV2 !== undefined ? { maxIterations: maxIterationsV2 } : {}),
         lang,
@@ -848,6 +865,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
         reason: summary.reason,
       }));
     } finally {
+      invocationReceiptStore.close();
       process.off('SIGINT', sigintV2);
     }
     return;

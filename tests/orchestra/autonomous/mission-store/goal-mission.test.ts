@@ -117,6 +117,7 @@ describe('advanceGoalMission', () => {
         invocationReceiptRef: receiptRef,
         decidedAt: '2026-07-22T00:05:00.000Z',
       }),
+      verifyAcceptanceReceipt: () => ({ verified: true, errors: [] }),
     });
 
     expect(outcome).toBe('accepted');

@@ -128,6 +128,70 @@ describe('InvocationReceiptStore', () => {
     store.close();
   });
 
+  it('enforces the receipt event FSM and keeps exact terminal replay idempotent', () => {
+    const root = makeRoot();
+    const store = new InvocationReceiptStore(root, { idFactory: () => 'project-a' });
+    const input = receipt(store);
+    store.declare(input);
+    store.append(input, input.invocationId, {
+      eventId: 'event-start', type: 'dispatch_started', payload: { attempt: 1 },
+    });
+    store.append(input, input.invocationId, {
+      eventId: 'event-transport', type: 'transport_settled',
+      payload: { outcome: 'succeeded', exitCode: 0, signal: null, reasonCode: 'none', durationMs: 4 },
+    });
+    const terminal = {
+      eventId: 'event-consumer', type: 'consumer_settled' as const,
+      payload: { outcome: 'accepted' as const, reasonCode: 'none' as const },
+    };
+    const first = store.append(input, input.invocationId, terminal);
+    expect(store.append(input, input.invocationId, terminal)).toEqual(first);
+    expect(() => store.append(input, input.invocationId, {
+      eventId: 'event-after-terminal', type: 'consumer_settled',
+      payload: { outcome: 'rejected', reasonCode: 'validation_failed' },
+    })).toThrowError(expect.objectContaining({ code: 'INVALID_TRANSITION' }));
+    store.close();
+  });
+
+  it('fails closed when a receipt payload or event hash is tampered on disk', () => {
+    const root = makeRoot();
+    const dbPath = join(root, '.deckent', 'runtime', 'invocations.db');
+    let store = new InvocationReceiptStore(root, { dbPath, idFactory: () => 'project-a' });
+    const input = receipt(store);
+    store.declare(input);
+    store.append(input, input.invocationId, {
+      eventId: 'event-1', type: 'dispatch_started', payload: { attempt: 1 },
+    });
+    store.close();
+
+    let raw = new Database(dbPath);
+    raw.exec('DROP TRIGGER invocations_no_update');
+    raw.prepare("UPDATE invocations SET payload_json = replace(payload_json, 'sprint-1', 'sprint-x')").run();
+    raw.close();
+    store = new InvocationReceiptStore(root, { dbPath });
+    expect(() => store.get(input, input.invocationId))
+      .toThrowError(expect.objectContaining({ code: 'INTEGRITY_FAILURE' }));
+    store.close();
+
+    const cleanRoot = makeRoot();
+    const cleanDbPath = join(cleanRoot, '.deckent', 'runtime', 'invocations.db');
+    store = new InvocationReceiptStore(cleanRoot, { dbPath: cleanDbPath, idFactory: () => 'project-b' });
+    const cleanInput = receipt(store);
+    store.declare(cleanInput);
+    store.append(cleanInput, cleanInput.invocationId, {
+      eventId: 'event-1', type: 'dispatch_started', payload: { attempt: 1 },
+    });
+    store.close();
+    raw = new Database(cleanDbPath);
+    raw.exec('DROP TRIGGER invocation_events_no_update');
+    raw.prepare("UPDATE invocation_events SET event_hash = ? WHERE event_id = 'event-1'").run('0'.repeat(64));
+    raw.close();
+    store = new InvocationReceiptStore(cleanRoot, { dbPath: cleanDbPath });
+    expect(() => store.get(cleanInput, cleanInput.invocationId))
+      .toThrowError(expect.objectContaining({ code: 'INTEGRITY_FAILURE' }));
+    store.close();
+  });
+
   it('cannot persist prompt, output, argv, or credentials through the typed receipt contract', () => {
     const root = makeRoot();
     const dbPath = join(root, '.deckent', 'runtime', 'invocations.db');

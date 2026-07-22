@@ -44,11 +44,39 @@ export interface InvocationReceiptStoreOptions {
 
 export class InvocationReceiptStoreError extends Error {
   constructor(
-    readonly code: 'SCOPE_MISMATCH' | 'IDEMPOTENCY_CONFLICT' | 'INVOCATION_NOT_FOUND',
+    readonly code:
+      | 'SCOPE_MISMATCH'
+      | 'IDEMPOTENCY_CONFLICT'
+      | 'INVOCATION_NOT_FOUND'
+      | 'INTEGRITY_FAILURE'
+      | 'INVALID_TRANSITION',
     message: string,
   ) {
     super(message);
     this.name = 'InvocationReceiptStoreError';
+  }
+}
+
+const EVENT_TYPES = new Set<InvocationEvent['type']>([
+  'dispatch_started', 'dispatch_rejected', 'transport_settled', 'consumer_settled',
+]);
+
+function assertEventTransition(
+  previous: InvocationEvent['type'] | null,
+  next: InvocationEvent['type'],
+): void {
+  const allowed = previous === null
+    ? next === 'dispatch_started' || next === 'dispatch_rejected'
+    : previous === 'dispatch_started'
+      ? next === 'transport_settled'
+      : previous === 'dispatch_rejected' || previous === 'transport_settled'
+        ? next === 'consumer_settled'
+        : false;
+  if (!allowed) {
+    throw new InvocationReceiptStoreError(
+      'INVALID_TRANSITION',
+      `Illegal invocation event transition ${previous ?? 'none'} -> ${next}`,
+    );
   }
 }
 
@@ -233,7 +261,7 @@ export class InvocationReceiptStore implements InvocationReceiptLedger {
         idempotency_key: receipt.idempotencyKey,
       }) as InvocationRow | undefined;
       if (existing) {
-        const persisted = JSON.parse(existing.payload_json) as InvocationReceipt;
+        const persisted = this.verifyInvocationRow(existing);
         const retryPayloadHash = sha256(canonicalJson({ ...receipt, createdAt: persisted.createdAt }));
         if (existing.payload_hash !== retryPayloadHash || existing.invocation_id !== receipt.invocationId) {
           throw new InvocationReceiptStoreError(
@@ -279,6 +307,7 @@ export class InvocationReceiptStore implements InvocationReceiptLedger {
       if (!invocation) {
         throw new InvocationReceiptStoreError('INVOCATION_NOT_FOUND', 'Invocation not found in scope');
       }
+      this.verifyInvocationRow(invocation);
       const duplicate = this.selectEvent.get({
         tenant_id: scope.tenantId,
         project_id: scope.projectId,
@@ -291,17 +320,27 @@ export class InvocationReceiptStore implements InvocationReceiptLedger {
             'Invocation event id already exists with different immutable content',
           );
         }
-        return this.eventFromRow(duplicate);
+        const existingEvents = this.verifyEventRows(this.selectEvents.all({
+          tenant_id: scope.tenantId,
+          project_id: scope.projectId,
+          invocation_id: invocationId,
+        }) as EventRow[], invocationId);
+        const verifiedDuplicate = existingEvents.find((stored) => stored.eventId === event.eventId);
+        if (!verifiedDuplicate) {
+          throw new InvocationReceiptStoreError('INTEGRITY_FAILURE', 'Invocation event lookup mismatch');
+        }
+        return verifiedDuplicate;
       }
-      const previous = this.db.prepare(`
-        SELECT sequence, event_hash FROM invocation_events
-        WHERE tenant_id = ? AND project_id = ? AND invocation_id = ?
-        ORDER BY sequence DESC LIMIT 1
-      `).get(scope.tenantId, scope.projectId, invocationId) as
-        { sequence: number; event_hash: string } | undefined;
+      const existingEvents = this.verifyEventRows(this.selectEvents.all({
+        tenant_id: scope.tenantId,
+        project_id: scope.projectId,
+        invocation_id: invocationId,
+      }) as EventRow[], invocationId);
+      const previous = existingEvents.at(-1);
+      assertEventTransition(previous?.type ?? null, event.type);
       const sequence = (previous?.sequence ?? 0) + 1;
       const occurredAt = event.occurredAt ?? this.now();
-      const previousHash = previous?.event_hash ?? null;
+      const previousHash = previous?.hash ?? null;
       const eventHash = sha256(canonicalJson({
         invocationId,
         sequence,
@@ -355,12 +394,12 @@ export class InvocationReceiptStore implements InvocationReceiptLedger {
       invocation_id: invocationId,
     }) as InvocationRow | undefined;
     if (!row) return null;
-    const receipt = JSON.parse(row.payload_json) as InvocationReceipt;
-    const events = (this.selectEvents.all({
+    const receipt = this.verifyInvocationRow(row);
+    const events = this.verifyEventRows(this.selectEvents.all({
       tenant_id: scope.tenantId,
       project_id: scope.projectId,
       invocation_id: invocationId,
-    }) as EventRow[]).map(event => this.eventFromRow(event));
+    }) as EventRow[], invocationId);
     let transportOutcome: InvocationReceiptView['transportOutcome'] = 'not_dispatched';
     let consumerOutcome: InvocationReceiptView['consumerOutcome'] = 'unknown';
     if (events.some(event => event.type === 'dispatch_started')) transportOutcome = 'unknown';
@@ -402,5 +441,68 @@ export class InvocationReceiptStore implements InvocationReceiptLedger {
       previousHash: row.prev_hash,
       hash: row.event_hash,
     };
+  }
+
+  private verifyInvocationRow(row: InvocationRow): InvocationReceipt {
+    if (sha256(row.payload_json) !== row.payload_hash) {
+      throw new InvocationReceiptStoreError('INTEGRITY_FAILURE', 'Invocation receipt payload hash mismatch');
+    }
+    let receipt: InvocationReceipt;
+    try {
+      receipt = JSON.parse(row.payload_json) as InvocationReceipt;
+    } catch {
+      throw new InvocationReceiptStoreError('INTEGRITY_FAILURE', 'Invocation receipt payload is not JSON');
+    }
+    if (receipt.schemaVersion !== INVOCATION_RECEIPT_SCHEMA_VERSION
+      || receipt.invocationId !== row.invocation_id
+      || receipt.tenantId !== row.tenant_id
+      || receipt.projectId !== row.project_id) {
+      throw new InvocationReceiptStoreError('INTEGRITY_FAILURE', 'Invocation receipt envelope mismatch');
+    }
+    return receipt;
+  }
+
+  private verifyEventRows(rows: EventRow[], invocationId: string): StoredInvocationEvent[] {
+    const events: StoredInvocationEvent[] = [];
+    let previousHash: string | null = null;
+    let previousType: InvocationEvent['type'] | null = null;
+    for (const [index, row] of rows.entries()) {
+      if (row.invocation_id !== invocationId || row.sequence !== index + 1
+        || row.prev_hash !== previousHash || !EVENT_TYPES.has(row.event_type)) {
+        throw new InvocationReceiptStoreError('INTEGRITY_FAILURE', 'Invocation event envelope or chain mismatch');
+      }
+      let payload: InvocationEvent['payload'];
+      try {
+        payload = JSON.parse(row.payload_json) as InvocationEvent['payload'];
+      } catch {
+        throw new InvocationReceiptStoreError('INTEGRITY_FAILURE', 'Invocation event payload is not JSON');
+      }
+      const semanticHash = sha256(canonicalJson({ type: row.event_type, payload }));
+      const expectedHash = sha256(canonicalJson({
+        invocationId,
+        sequence: row.sequence,
+        eventId: row.event_id,
+        eventType: row.event_type,
+        occurredAt: row.occurred_at,
+        payloadHash: semanticHash,
+        previousHash,
+      }));
+      if (semanticHash !== row.payload_hash || expectedHash !== row.event_hash) {
+        throw new InvocationReceiptStoreError('INTEGRITY_FAILURE', 'Invocation event hash mismatch');
+      }
+      try {
+        assertEventTransition(previousType, row.event_type);
+      } catch (error) {
+        if (error instanceof InvocationReceiptStoreError) {
+          throw new InvocationReceiptStoreError('INTEGRITY_FAILURE', error.message);
+        }
+        throw error;
+      }
+      const event = this.eventFromRow(row);
+      events.push(event);
+      previousHash = event.hash;
+      previousType = event.type;
+    }
+    return events;
   }
 }

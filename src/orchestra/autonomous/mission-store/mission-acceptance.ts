@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 
-import type { InvocationReceiptRef } from '../../../core/invocation-receipt.js';
+import type {
+  InvocationReceiptLedger,
+  InvocationReceiptRef,
+  InvocationRole,
+} from '../../../core/invocation-receipt.js';
 import type { Mission, WorkItem } from './mission-types.js';
 
 export const GOAL_ACCEPTANCE_SCHEMA_VERSION = 1 as const;
@@ -35,7 +39,7 @@ export interface GoalAcceptanceEvaluation {
     rationale: string;
   }[];
   evaluator: {
-    role: 'brain';
+    role: Extract<InvocationRole, 'brain' | 'auditor'>;
     instanceId: string | null;
   };
   invocationReceiptRef: InvocationReceiptRef | null;
@@ -67,6 +71,8 @@ export interface MissionAcceptanceDecisionV1 {
   }[];
   evaluator: GoalAcceptanceEvaluation['evaluator'];
   invocationReceiptRef: InvocationReceiptRef | null;
+  /** Host-produced cross-ledger validation findings; evaluator output cannot author these. */
+  invocationValidationErrors?: readonly string[];
   decidedAt: string;
   decisionDigest: string;
 }
@@ -204,6 +210,7 @@ export function buildMissionAcceptanceDecision(
   round: number,
   evaluation: GoalAcceptanceEvaluation,
   items: readonly WorkItem[],
+  invocationValidationErrors: readonly string[] = [],
 ): MissionAcceptanceDecisionV1 {
   const available = projectEvidence(items);
   const payload = {
@@ -224,12 +231,78 @@ export function buildMissionAcceptanceDecision(
     })),
     evaluator: evaluation.evaluator,
     invocationReceiptRef: evaluation.invocationReceiptRef,
+    invocationValidationErrors: [...invocationValidationErrors],
     decidedAt: evaluation.decidedAt,
   } as const;
   return { ...payload, decisionDigest: digest(decisionPayload(payload)) };
 }
 
-function validReceiptRef(ref: InvocationReceiptRef | null): boolean {
+export interface GoalAcceptanceReceiptVerification {
+  verified: boolean;
+  errors: readonly string[];
+}
+
+/**
+ * Verify the evaluator claim against the durable InvocationReceipt ledger before
+ * MissionStore can settle an explicit Goal acceptance decision. A shaped ref is
+ * not evidence: the exact receipt must belong to this tenant/project/mission,
+ * describe the same evaluator role, carry complete selection provenance and
+ * have terminal successful transport + consumer settlement.
+ */
+export function verifyGoalAcceptanceInvocationReceipt(
+  ledger: Pick<InvocationReceiptLedger, 'projectId' | 'get'>,
+  mission: Pick<Mission, 'id' | 'tenant'>,
+  evaluation: GoalAcceptanceEvaluation,
+): GoalAcceptanceReceiptVerification {
+  const errors: string[] = [];
+  const ref = evaluation.invocationReceiptRef;
+  if (!validReceiptRef(ref)) {
+    return { verified: false, errors: ['InvocationReceiptRef is missing or invalid'] };
+  }
+  if (ref.tenantId !== mission.tenant) errors.push('invocation receipt tenant mismatch');
+  if (ref.projectId !== ledger.projectId) errors.push('invocation receipt project mismatch');
+  if (errors.length > 0) return { verified: false, errors };
+
+  let view;
+  try {
+    view = ledger.get(ref, ref.invocationId);
+  } catch {
+    return { verified: false, errors: ['invocation receipt ledger integrity failure'] };
+  }
+  if (!view) return { verified: false, errors: ['invocation receipt not found'] };
+  const receipt = view.receipt;
+  if (receipt.tenantId !== ref.tenantId || receipt.projectId !== ref.projectId
+    || receipt.invocationId !== ref.invocationId) {
+    errors.push('invocation receipt identity mismatch');
+  }
+  if (receipt.runId !== mission.id) errors.push('invocation receipt mission mismatch');
+  if (receipt.role !== evaluation.evaluator.role) errors.push('invocation receipt evaluator role mismatch');
+  if (receipt.purpose !== 'goal-acceptance') errors.push('invocation receipt purpose mismatch');
+  for (const [name, selection] of Object.entries({
+    configured: receipt.configured,
+    requested: receipt.requested,
+    resolved: receipt.resolved,
+    called: receipt.called,
+  })) {
+    if (selection.provider === null || selection.model === null) {
+      errors.push(`invocation receipt ${name} provider/model missing`);
+    }
+  }
+  if (receipt.reachability.state !== 'known' || receipt.reachability.evidenceRef === null) {
+    errors.push('invocation receipt reachability is not known');
+  }
+  if (receipt.limits.state !== 'known' || receipt.limits.evidenceRefs.length === 0) {
+    errors.push('invocation receipt limits are not known');
+  }
+  if (view.transportOutcome !== 'succeeded') errors.push('invocation receipt transport is not succeeded');
+  if (view.consumerOutcome !== 'accepted') errors.push('invocation receipt consumer is not accepted');
+  if (Date.parse(receipt.createdAt) > Date.parse(evaluation.decidedAt)) {
+    errors.push('invocation receipt postdates acceptance decision');
+  }
+  return { verified: errors.length === 0, errors };
+}
+
+function validReceiptRef(ref: InvocationReceiptRef | null): ref is InvocationReceiptRef {
   return ref !== null
     && ref.schemaVersion === 1
     && typeof ref.invocationId === 'string' && ref.invocationId.length > 0
@@ -251,7 +324,13 @@ export function validateMissionAcceptanceDecision(
   if (decision.round !== round || !Number.isSafeInteger(decision.round) || decision.round < 0) errors.push('round mismatch');
   if (!['accepted', 'rejected', 'unknown'].includes(decision.outcome)) errors.push('outcome is invalid');
   if (!isIsoDate(decision.decidedAt)) errors.push('decidedAt must be ISO-8601');
-  if (decision.evaluator?.role !== 'brain') errors.push('evaluator role must be brain');
+  if (decision.evaluator?.role !== 'brain' && decision.evaluator?.role !== 'auditor') {
+    errors.push('evaluator role must be brain or auditor');
+  }
+  for (const error of decision.invocationValidationErrors ?? []) {
+    if (typeof error !== 'string' || !error.trim()) errors.push('invocation validation error is invalid');
+    else errors.push(`invocation provenance: ${error}`);
+  }
 
   const claimed = new Map<string, MissionAcceptanceDecisionV1['criteria'][number]>();
   for (const criterion of decision.criteria) {

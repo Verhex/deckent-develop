@@ -12,6 +12,7 @@ import {
   readGoalAcceptanceContract,
   type GoalAcceptanceContractV1,
   type GoalAcceptanceEvaluation,
+  type GoalAcceptanceReceiptVerification,
 } from './mission-acceptance.js';
 
 /** Type-2 (goal) mission specification — "run until the goal is reached". */
@@ -53,6 +54,11 @@ export interface GoalAdvanceDeps {
     items: WorkItem[],
     acceptanceContract?: GoalAcceptanceContractV1,
   ): Promise<boolean | GoalAcceptanceEvaluation>;
+  /** Host-owned cross-ledger receipt verification. Missing fails explicit decisions closed. */
+  verifyAcceptanceReceipt?(
+    mission: Pick<Mission, 'id' | 'tenant'>,
+    evaluation: GoalAcceptanceEvaluation,
+  ): GoalAcceptanceReceiptVerification | Promise<GoalAcceptanceReceiptVerification>;
   /**
    * Infinite-loop guard — maximum cumulative work-items the goal may author
    * before being force-exhausted. Defaults to `Infinity` (rely on `author`
@@ -84,6 +90,7 @@ export interface GoalDeps {
     items: WorkItem[],
     acceptanceContract?: GoalAcceptanceContractV1,
   ): Promise<boolean | GoalAcceptanceEvaluation>;
+  verifyAcceptanceReceipt?: GoalAdvanceDeps['verifyAcceptanceReceipt'];
   /** Infinite-loop guard, forwarded verbatim to {@link advanceGoalMission}. */
   maxRounds?: number;
   /** Runtime capability truth used to reject an unsupported authored batch before enqueue. */
@@ -108,6 +115,7 @@ export function buildGoalDeps(deps: GoalDeps): GoalAdvanceDeps {
       : deps.accepter(goal, items),
     ...(deps.maxRounds !== undefined ? { maxRounds: deps.maxRounds } : {}),
     ...(deps.admission ? { admission: deps.admission } : {}),
+    ...(deps.verifyAcceptanceReceipt ? { verifyAcceptanceReceipt: deps.verifyAcceptanceReceipt } : {}),
   };
 }
 
@@ -210,12 +218,23 @@ export async function advanceGoalMission(
         decidedAt: new Date().toISOString(),
       }
       : accepted;
+    const invocationVerification = evaluation.outcome === 'unknown'
+      ? { verified: false, errors: [] as readonly string[] }
+      : deps.verifyAcceptanceReceipt
+        ? await deps.verifyAcceptanceReceipt(mission, evaluation)
+        : { verified: false, errors: ['invocation receipt verifier unavailable'] };
+    const invocationErrors = evaluation.outcome === 'unknown' || invocationVerification.verified
+      ? []
+      : invocationVerification.errors.length > 0
+        ? invocationVerification.errors
+        : ['invocation receipt verification failed'];
     const decision = buildMissionAcceptanceDecision(
       missionId,
       acceptanceContract,
       all.length,
       evaluation,
       all,
+      invocationErrors,
     );
     const record = store.recordAcceptanceDecision(decision);
     return record.effectiveOutcome === 'accepted' ? 'accepted' : 'exhausted';

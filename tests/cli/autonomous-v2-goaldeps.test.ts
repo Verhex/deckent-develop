@@ -186,6 +186,7 @@ describe('buildLiveGoalDeps — accepter', () => {
               rationale: 'the durable targeted-test result records 27 passing tests',
             }],
           }),
+          evaluatorRole: 'auditor',
           evaluatorInstanceId: 'goal-evaluator-live-1',
           invocationReceiptRef: {
             schemaVersion: 1,
@@ -206,7 +207,7 @@ describe('buildLiveGoalDeps — accepter', () => {
     expect(prompts[0]).toContain('evidenceRef=work-item:targeted-test');
     expect(result).toMatchObject({
       outcome: 'accepted',
-      evaluator: { role: 'brain', instanceId: 'goal-evaluator-live-1' },
+      evaluator: { role: 'auditor', instanceId: 'goal-evaluator-live-1' },
       invocationReceiptRef: { invocationId: 'inv-goal-accept-live-1' },
       decidedAt: '2026-07-22T00:05:00.000Z',
       criteria: [{
