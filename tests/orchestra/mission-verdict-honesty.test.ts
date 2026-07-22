@@ -20,12 +20,21 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteMissionStore } from '../../src/orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import {
-  runV2Engine,
+  runV2Engine as runV2EngineRuntime,
   deriveSettleDetail,
   type RunV2EngineDeps,
 } from '../../src/orchestra/autonomous/mission-store/mission-engine-wire.js';
 import type { MissionTaskContext } from '../../src/orchestra/autonomous/mission-store/mission-dispatch.js';
-import type { ResultLike } from '../../src/orchestra/autonomous/mission-store/mission-types.js';
+import type {
+  MissionDispatchClaim,
+  NewWorkItem,
+  ResultLike,
+  WorkItem,
+} from '../../src/orchestra/autonomous/mission-store/mission-types.js';
+import {
+  PRODUCTION_V2_RUNNER_REGISTRY,
+  admitWorkItemBatch,
+} from '../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
 import type { ResolvedConfig } from '../../src/core/config-types.js';
 
 // ── tmpdir lifecycle ──────────────────────────────────────────────────
@@ -34,6 +43,9 @@ const stores: SqliteMissionStore[] = [];
 function root(): string { const d = mkdtempSync(join(tmpdir(), 'mission-verdict-')); dirs.push(d); return d; }
 function openStore(r: string): SqliteMissionStore {
   const s = new SqliteMissionStore(r); s.migrate(); stores.push(s); return s;
+}
+function enqueueProduction(store: SqliteMissionStore, item: NewWorkItem): WorkItem {
+  return store.enqueueItem(admitWorkItemBatch([item], PRODUCTION_V2_RUNNER_REGISTRY)[0]!);
 }
 afterEach(() => {
   for (const s of stores.splice(0)) { try { s.close(); } catch { /* already closed */ } }
@@ -45,6 +57,80 @@ function cfg(): ResolvedConfig {
 }
 
 const BOUNDED = 100;
+
+/** Verdict mechanics run behind the same explicit hermetic admission seam as the
+ * canonical mission-engine wire tests; production absence remains fail-closed. */
+async function runV2Engine(
+  projectRoot: string,
+  config: ResolvedConfig,
+  deps: RunV2EngineDeps,
+) {
+  const verdictRunTask = deps.runTask;
+  return runV2EngineRuntime(projectRoot, config, {
+    ...deps,
+    workerInvocationCoordinator: {
+      execute: async (input, executeSelected) => {
+        const execution = await executeSelected(Object.freeze({
+          reservationId: `test-verdict-${input.claim.attemptId}`,
+          dispatchEventRef: `provider-limit-reservation-event:${input.claim.attemptId}`,
+          dispatchEventHash: 'a'.repeat(64),
+          provider: 'claude',
+          model: 'claude-fable-5',
+          receiptRef: {
+            schemaVersion: 1 as const,
+            invocationId: `test-verdict-${input.claim.attemptId}`,
+            tenantId: input.mission.tenant,
+            projectId: 'test-project',
+          },
+          backend: {
+            transport: 'cli' as const,
+            executionBackend: 'host-subprocess' as const,
+            endpointRefHash: 'b'.repeat(64),
+          },
+          auth: { mode: 'subscription' as const, accountRefHash: 'c'.repeat(64) },
+        }));
+        return execution.result;
+      },
+    },
+    runAdmittedTask: async (ctx, claim, grant) => ({
+      result: await verdictRunTask(
+        { ...ctx, provider: grant.provider, model: grant.model },
+        claim as MissionDispatchClaim,
+      ),
+      actualCall: {
+        provider: grant.provider,
+        model: grant.model,
+        backend: grant.backend,
+        auth: grant.auth,
+        evidenceRef: 'provider-call:test-mission-verdict',
+      },
+      transportEvent: {
+        eventId: `test-transport-${claim.attemptId}`,
+        type: 'transport_settled',
+        payload: {
+          outcome: 'succeeded',
+          exitCode: 0,
+          signal: null,
+          reasonCode: 'none',
+          durationMs: 1,
+        },
+      },
+      providerSettlementEvent: {
+        eventId: `test-consumed-${claim.attemptId}`,
+        type: 'consumed',
+        occurredAt: claim.claimedAt,
+        fenceTokenHash: claim.fenceTokenHash,
+        evidenceRef: 'provider-usage:test-mission-verdict',
+        actual: [{ windowId: 'tokens-all', unit: 'tokens', amount: 1 }],
+      },
+      consumerEvent: {
+        eventId: `test-consumer-${claim.attemptId}`,
+        type: 'consumer_settled',
+        payload: { outcome: 'accepted', reasonCode: 'none' },
+      },
+    }),
+  });
+}
 
 /** Emulates the exact `ok`/`reason` formula the live composition root uses
  *  (autonomous.ts:535: `ok: res.selfAssessment !== 'NO_GO'`), plus the settleDetail a
@@ -83,8 +169,8 @@ describe('runV2Engine — honest DEBT never counts as mission failure (mission-w
     const r = root();
     const store = openStore(r);
     store.createMission({ id: 'mW1', kind: 'list', title: 'mission-w1-like', renderAs: 'checklist' });
-    store.enqueueItem({ id: 'mW1-item-1', missionId: 'mW1', kind: 'task', spec: { description: 'item-1' } });
-    store.enqueueItem({ id: 'mW1-item-2', missionId: 'mW1', kind: 'task', spec: { description: 'item-2' } });
+    enqueueProduction(store, { id: 'mW1-item-1', missionId: 'mW1', kind: 'task', spec: { description: 'item-1' } });
+    enqueueProduction(store, { id: 'mW1-item-2', missionId: 'mW1', kind: 'task', spec: { description: 'item-2' } });
 
     const deps: RunV2EngineDeps = {
       runTask: fakeRunTaskFor({ 'item-1': 'DONE', 'item-2': 'GO_WITH_TECH_DEBT' }),
@@ -110,7 +196,7 @@ describe('runV2Engine — honest DEBT never counts as mission failure (mission-w
     const r = root();
     const store = openStore(r);
     store.createMission({ id: 'mNG', kind: 'list', title: 'genuine failure', renderAs: 'checklist' });
-    store.enqueueItem({ id: 'mNG-0', missionId: 'mNG', kind: 'task', spec: { description: 'boom' } });
+    enqueueProduction(store, { id: 'mNG-0', missionId: 'mNG', kind: 'task', spec: { description: 'boom' } });
 
     const deps: RunV2EngineDeps = {
       runTask: fakeRunTaskFor({ boom: 'NO_GO' }),
@@ -130,8 +216,8 @@ describe('runV2Engine — honest DEBT never counts as mission failure (mission-w
     const r = root();
     const store = openStore(r);
     store.createMission({ id: 'mMix', kind: 'list', title: 'mixed', renderAs: 'checklist' });
-    store.enqueueItem({ id: 'mMix-ok', missionId: 'mMix', kind: 'task', spec: { description: 'ok-item' } });
-    store.enqueueItem({ id: 'mMix-bad', missionId: 'mMix', kind: 'task', spec: { description: 'bad-item' } });
+    enqueueProduction(store, { id: 'mMix-ok', missionId: 'mMix', kind: 'task', spec: { description: 'ok-item' } });
+    enqueueProduction(store, { id: 'mMix-bad', missionId: 'mMix', kind: 'task', spec: { description: 'bad-item' } });
 
     const deps: RunV2EngineDeps = {
       runTask: fakeRunTaskFor({ 'ok-item': 'DONE', 'bad-item': 'NO_GO' }),
@@ -148,7 +234,7 @@ describe('runV2Engine — honest DEBT never counts as mission failure (mission-w
     const r = root();
     const store = openStore(r);
     store.createMission({ id: 'mLegacy', kind: 'list', title: 'legacy shape', renderAs: 'checklist' });
-    store.enqueueItem({ id: 'mLegacy-0', missionId: 'mLegacy', kind: 'task', spec: { description: 'x' } });
+    enqueueProduction(store, { id: 'mLegacy-0', missionId: 'mLegacy', kind: 'task', spec: { description: 'x' } });
 
     const deps: RunV2EngineDeps = {
       // No settleDetail on the returned ResultLike — mirrors autonomous.ts:535 today.
