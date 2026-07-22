@@ -1,4 +1,5 @@
 // Autonomous v2 — durable mission/work-item model + store/view contracts.
+import type { ApprovalDecision, ApprovalRequest } from '../../../core/approval-contract.js';
 export type MissionKind = 'list' | 'goal';
 export type MissionStatus = 'pending' | 'active' | 'completed' | 'failed' | 'cancelled';
 export type MissionRenderAs = 'checklist' | 'goal';
@@ -7,6 +8,8 @@ export type WorkItemKind = 'task' | 'sprint' | 'capability' | 'process';
 export type WorkItemStatus = 'pending' | 'running' | 'done' | 'failed' | 'blocked' | 'parked';
 export type WorkItemRenderAs = 'task' | 'sprint' | 'workflow' | 'action';
 export type WorkItemPolicy = 'auto' | 'approval-required' | 'risk-tagged';
+export type ApprovalPublishState = 'outbox' | 'published';
+export type WorkItemApprovalState = 'pending' | 'allowed' | 'denied' | 'expired' | 'deferred' | 'escalated';
 
 export interface Progress { done: number; total: number; phase?: string; step?: string; }
 /**
@@ -50,6 +53,24 @@ export interface NewWorkItem {
 export interface NewMissionWorkItem extends NewWorkItem {
   initialStatus?: WorkItemStatus;
 }
+export interface WorkItemApprovalBinding {
+  workItemId: string;
+  missionId: string;
+  requestId: string;
+  request: ApprovalRequest;
+  publishState: ApprovalPublishState;
+  decisionState: WorkItemApprovalState;
+  decision: ApprovalDecision | null;
+  createdAt: string;
+  publishedAt: string | null;
+  decidedAt: string | null;
+  updatedAt: string;
+}
+export interface ApprovalDecisionTransition {
+  missionId: string;
+  workItemId: string;
+  changed: boolean;
+}
 export interface MissionEvent { ts: string; workItemId?: string; type: string; data?: unknown; }
 
 export interface MissionStore {
@@ -64,6 +85,20 @@ export interface MissionStore {
   updateMissionStatus(id: string, status: MissionStatus, result?: ResultLike): void;
   setMissionProgress(id: string, progress: Progress): void;
   enqueueItem(item: NewWorkItem): WorkItem;
+  /** Dependency-ready pending items whose policy requires an approval binding. */
+  listApprovalCandidates(): WorkItem[];
+  /** Atomically park one candidate and persist its canonical approval outbox. */
+  parkItemForApproval(itemId: string, request: ApprovalRequest): WorkItemApprovalBinding | null;
+  /** Durable fail-closed HOLD when no valid ApprovalRequest can be authored. */
+  parkInvalidApprovalCandidate(itemId: string, reason: string): boolean;
+  listApprovalBindings(): WorkItemApprovalBinding[];
+  markApprovalPublished(requestId: string): void;
+  /** Apply a durable broker decision to its parked item idempotently. */
+  applyApprovalDecision(
+    requestId: string,
+    state: Exclude<WorkItemApprovalState, 'pending'>,
+    decision: ApprovalDecision,
+  ): ApprovalDecisionTransition | null;
   /** Fail invalid/cyclic/failed-upstream pending dependency chains durably.
    * Returns mission ids whose item status changed during reconciliation. */
   reconcilePendingDependencies(): string[];

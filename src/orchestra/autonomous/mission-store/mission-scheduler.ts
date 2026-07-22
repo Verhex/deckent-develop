@@ -1,4 +1,5 @@
 import type { MissionStore, WorkItem, Mission, ResultLike } from './mission-types.js';
+import type { MissionApprovalCoordinatorLike } from './mission-approval-coordinator.js';
 
 /** Executes one claimed work item. Injected — composition root wires the real
  *  runTask/runSprint/broker; tests inject a fake. Resolve on completion; a thrown
@@ -21,6 +22,8 @@ export interface MissionSchedulerOptions {
    * (v1-default). A mission's tenant is resolved via `store.getMission`.
    */
   perTenantPoolSize?: number;
+  /** Optional non-blocking approval outbox/decision driver, always before claim. */
+  approvalCoordinator?: MissionApprovalCoordinatorLike;
 }
 
 export interface MissionSchedulerSummary {
@@ -71,7 +74,15 @@ export async function runMissionScheduler(
     // Dependency reconciliation precedes every claim wave. Invalid/cyclic or
     // failed-upstream items become terminal without dispatch; settle their
     // missions even when this tick performs zero provider work.
-    for (const missionId of store.reconcilePendingDependencies()) {
+    const changedMissions = new Set(store.reconcilePendingDependencies());
+    if (opts.approvalCoordinator) {
+      const approval = await opts.approvalCoordinator.tick();
+      for (const missionId of approval.changedMissionIds) changedMissions.add(missionId);
+      // A deny/expiry can block an upstream item; propagate that failure before
+      // this tick's claim wave so downstream work never dispatches in-between.
+      for (const missionId of store.reconcilePendingDependencies()) changedMissions.add(missionId);
+    }
+    for (const missionId of changedMissions) {
       try { checkMissionComplete(store, missionId, opts); } catch { /* fail-safe */ }
     }
 

@@ -172,4 +172,23 @@ describe('runMissionScheduler — dependency safety', () => {
     expect(s.getMission('dep-cycle')!.status).toBe('failed');
     s.close();
   });
+
+  it('never dispatches an approval-required item when no coordinator is composed', async () => {
+    const s = storeWith('approval-hold', 0);
+    s.enqueueItem({
+      id: 'guarded', missionId: 'approval-hold', kind: 'task',
+      policy: 'approval-required', spec: { description: 'must wait' },
+    });
+    const calls: string[] = [];
+
+    const summary = await runMissionScheduler(s, async (item) => {
+      calls.push(item.id);
+      return { ok: true };
+    }, { poolSize: 2, intervalMs: 1, maxIterations: 2 });
+
+    expect(calls).toEqual([]);
+    expect(summary.dispatched).toBe(0);
+    expect(s.listItems('approval-hold')[0]!.status).toBe('pending');
+    s.close();
+  });
 });

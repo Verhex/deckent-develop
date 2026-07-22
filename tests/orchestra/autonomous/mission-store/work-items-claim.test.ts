@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteMissionStore } from '../../../../src/orchestra/autonomous/mission-store/sqlite-mission-store.js';
+import type { ApprovalDecision, ApprovalRequest } from '../../../../src/core/approval-contract.js';
 
 const dirs: string[] = [];
 function freshMission() {
@@ -12,6 +13,23 @@ function freshMission() {
   return s;
 }
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
+
+function request(id: string): ApprovalRequest {
+  return {
+    version: '1.0', id, requester: { role: 'brain', instanceId: 'goal-v2' },
+    summary: 'Approve work item', details: {}, scopeId: 'm', scope: 'lifecycle', risk: 'high',
+    policy: 'require-approval', defaultAction: 'deny', tenantId: 'local', userId: 'owner',
+    createdAt: '2026-07-22T00:00:00.000Z', expiresAt: '2026-07-22T01:00:00.000Z',
+    maskedArgs: null, rawArgsRef: null,
+  };
+}
+
+function decision(requestId: string, action: ApprovalDecision['decision'] = 'allow'): ApprovalDecision {
+  return {
+    requestId, decision: action, decidedBy: 'owner', channel: 'test',
+    decidedAt: '2026-07-22T00:01:00.000Z', reason: 'test',
+  };
+}
 
 describe('WorkItems + atomic claim', () => {
   it('enqueueItem + queryDue returns pending items (limit honored)', () => {
@@ -105,6 +123,57 @@ describe('WorkItems + atomic claim', () => {
     const later = s.listItems('m').find((item) => item.id === 'later-child')!;
     expect(later.status).toBe('blocked');
     expect(later.lastResult?.reason).toBe('DEPENDENCY_FAILED: blocked-child');
+    s.close();
+  });
+
+  it.each(['approval-required', 'risk-tagged'] as const)(
+    'queryDue and claimItem fail-close policy=%s until a durable allow exists',
+    (policy) => {
+      const s = freshMission();
+      const id = `guarded-${policy}`;
+      const req = request(`approval-${policy}`);
+      s.enqueueItem({ id, missionId: 'm', kind: 'task', policy });
+
+      expect(s.queryDue()).toEqual([]);
+      expect(s.claimItem(id, 'bypass')).toBe(false);
+      expect(s.parkItemForApproval(id, req)?.publishState).toBe('outbox');
+
+      // Even an out-of-band status flip cannot bypass the approval binding.
+      s.__rawExec(`UPDATE work_items SET status='pending' WHERE id='${id}'`);
+      expect(s.queryDue()).toEqual([]);
+      expect(s.claimItem(id, 'bypass-after-flip')).toBe(false);
+
+      s.__rawExec(`UPDATE work_items SET status='parked' WHERE id='${id}'`);
+      expect(s.applyApprovalDecision(req.id, 'allowed', decision(req.id))).toMatchObject({ changed: true });
+      expect(s.queryDue().map((item) => item.id)).toEqual([id]);
+      expect(s.claimItem(id, 'scheduler')).toBe(true);
+      expect(s.claimItem(id, 'duplicate')).toBe(false);
+      s.close();
+    },
+  );
+
+  it('keeps policy=auto behavior unchanged and fails closed for an unknown persisted policy', () => {
+    const s = freshMission();
+    s.enqueueItem({ id: 'auto', missionId: 'm', kind: 'task', policy: 'auto' });
+    s.enqueueItem({ id: 'unknown', missionId: 'm', kind: 'task', policy: 'auto' });
+    s.__rawExec("UPDATE work_items SET policy='mystery' WHERE id='unknown'");
+
+    expect(s.queryDue().map((item) => item.id)).toEqual(['auto']);
+    expect(s.claimItem('unknown', 'bypass')).toBe(false);
+    expect(s.claimItem('auto', 'scheduler')).toBe(true);
+    s.close();
+  });
+
+  it('rejects a semantically mismatched decision-state transition', () => {
+    const s = freshMission();
+    const req = request('approval-semantic');
+    s.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });
+    s.parkItemForApproval('guarded', req);
+
+    expect(() => s.applyApprovalDecision(req.id, 'allowed', decision(req.id, 'deny')))
+      .toThrow('MISSION_APPROVAL_DECISION_INVALID');
+    expect(s.listItems('m')[0]!.status).toBe('parked');
+    expect(s.listApprovalBindings()[0]!.decisionState).toBe('pending');
     s.close();
   });
 });

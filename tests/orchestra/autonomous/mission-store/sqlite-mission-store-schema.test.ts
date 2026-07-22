@@ -9,13 +9,14 @@ function sandbox(): string { const d = mkdtempSync(join(tmpdir(), 'mstore-')); d
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
 
 describe('SqliteMissionStore — schema', () => {
-  it('migrate() creates missions + work_items tables (idempotent)', () => {
+  it('migrate() creates mission, work-item, and approval-outbox tables (idempotent)', () => {
     const store = new SqliteMissionStore(sandbox());
     store.migrate();
     store.migrate(); // idempotent — must not throw
     const tables = store.__rawTableNames();
     expect(tables).toContain('missions');
     expect(tables).toContain('work_items');
+    expect(tables).toContain('work_item_approvals');
     store.close();
   });
 

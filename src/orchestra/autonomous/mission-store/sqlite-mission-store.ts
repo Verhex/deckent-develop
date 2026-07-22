@@ -6,8 +6,15 @@ import { DECKENT_DIR } from '../../../core/constants.js';
 import type {
   MissionStore, Mission, NewMission, MissionStatus, Progress, ResultLike,
   WorkItem, NewWorkItem, NewMissionWorkItem, WorkItemStatus,
+  WorkItemApprovalBinding, WorkItemApprovalState, ApprovalDecisionTransition,
 } from './mission-types.js';
 import { assertCanonicalWorkItemKind } from './mission-kind-admission.js';
+import {
+  validateStoredApprovalDecision,
+  validateStoredApprovalRequest,
+  type ApprovalDecision,
+  type ApprovalRequest,
+} from '../../../core/approval-contract.js';
 
 const WORK_ITEM_STATUSES: ReadonlySet<WorkItemStatus> = new Set([
   'pending', 'running', 'done', 'failed', 'blocked', 'parked',
@@ -27,6 +34,19 @@ CREATE TABLE IF NOT EXISTS work_items (
 CREATE INDEX IF NOT EXISTS idx_wi_mission_status ON work_items(mission_id, status);
 CREATE INDEX IF NOT EXISTS idx_wi_status ON work_items(status);
 CREATE INDEX IF NOT EXISTS idx_m_status_tenant ON missions(status, tenant);
+CREATE TABLE IF NOT EXISTS work_item_approvals (
+  work_item_id TEXT PRIMARY KEY REFERENCES work_items(id),
+  request_id TEXT NOT NULL UNIQUE,
+  request_json TEXT NOT NULL,
+  publish_state TEXT NOT NULL CHECK(publish_state IN ('outbox','published')),
+  decision_state TEXT NOT NULL CHECK(decision_state IN ('pending','allowed','denied','expired','deferred','escalated')),
+  decision_json TEXT,
+  created_at TEXT NOT NULL,
+  published_at TEXT,
+  decided_at TEXT,
+  updated_at TEXT NOT NULL );
+CREATE INDEX IF NOT EXISTS idx_wia_publish ON work_item_approvals(publish_state, created_at);
+CREATE INDEX IF NOT EXISTS idx_wia_decision ON work_item_approvals(decision_state, created_at);
 `;
 
 /** Durable mission store (SQLite WAL) — the autonomous-v2 single source of truth. */
@@ -254,6 +274,30 @@ export class SqliteMissionStore implements MissionStore {
     claimedAt: r.claimed_at, claimedBy: r.claimed_by, createdAt: r.created_at, updatedAt: r.updated_at,
     lastResult: this.p<ResultLike>(r.last_result),
   });
+  private rowToApprovalBinding = (r: any): WorkItemApprovalBinding => {
+    const request = validateStoredApprovalRequest(this.p<unknown>(r.request_json));
+    if (!request.ok || request.value.id !== r.request_id) {
+      throw new Error(`MISSION_APPROVAL_CORRUPT: invalid request binding ${String(r.request_id)}`);
+    }
+    const rawDecision = this.p<unknown>(r.decision_json);
+    const decision = rawDecision === null ? null : validateStoredApprovalDecision(rawDecision);
+    if (decision !== null && (!decision.ok || decision.value.requestId !== r.request_id)) {
+      throw new Error(`MISSION_APPROVAL_CORRUPT: invalid decision binding ${String(r.request_id)}`);
+    }
+    return {
+      workItemId: r.work_item_id,
+      missionId: r.mission_id,
+      requestId: r.request_id,
+      request: request.value,
+      publishState: r.publish_state,
+      decisionState: r.decision_state,
+      decision: decision?.value ?? null,
+      createdAt: r.created_at,
+      publishedAt: r.published_at,
+      decidedAt: r.decided_at,
+      updatedAt: r.updated_at,
+    };
+  };
   private defaultRenderAs(kind: NewWorkItem['kind']): WorkItem['renderAs'] {
     return kind === 'sprint' ? 'sprint' : kind === 'process' ? 'workflow' : kind === 'capability' ? 'action' : 'task';
   }
@@ -269,6 +313,148 @@ export class SqliteMissionStore implements MissionStore {
       dependsOn: this.j(item.dependsOn ?? []), trigger: this.j(item.trigger ?? null), ts,
     });
     return this.rowToItem(this.db.prepare('SELECT * FROM work_items WHERE id=?').get(item.id));
+  }
+  listApprovalCandidates(): WorkItem[] {
+    const sql = `SELECT wi.* FROM work_items wi JOIN missions m ON m.id=wi.mission_id
+      LEFT JOIN work_item_approvals approval ON approval.work_item_id=wi.id
+      WHERE wi.status='pending'
+        AND wi.policy IN ('approval-required','risk-tagged')
+        AND m.status IN ('pending','active')
+        AND approval.work_item_id IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM json_each(COALESCE(wi.depends_on, '[]')) dep
+          LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=wi.mission_id
+          WHERE upstream.id IS NULL OR upstream.status<>'done'
+        )
+      ORDER BY wi.created_at`;
+    return (this.db.prepare(sql).all() as any[]).map(this.rowToItem);
+  }
+  parkInvalidApprovalCandidate(itemId: string, reason: string): boolean {
+    const result = JSON.stringify({ ok: false, reason: `APPROVAL_REQUEST_INVALID: ${reason}` });
+    const info = this.db.prepare(`UPDATE work_items AS target SET status='parked', last_result=@result,
+      claimed_at=NULL, claimed_by=NULL, updated_at=@ts
+      WHERE id=@id AND status='pending' AND policy IN ('approval-required','risk-tagged')
+        AND EXISTS (
+          SELECT 1 FROM missions mission
+          WHERE mission.id=target.mission_id AND mission.status IN ('pending','active')
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM json_each(COALESCE(target.depends_on, '[]')) dep
+          LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=target.mission_id
+          WHERE upstream.id IS NULL OR upstream.status<>'done'
+        )`)
+      .run({ id: itemId, result, ts: this.now() });
+    return info.changes === 1;
+  }
+  parkItemForApproval(itemId: string, request: ApprovalRequest): WorkItemApprovalBinding | null {
+    const transaction = this.db.transaction((): WorkItemApprovalBinding | null => {
+      const existing = this.db.prepare(`SELECT approval.*, wi.mission_id FROM work_item_approvals approval
+        JOIN work_items wi ON wi.id=approval.work_item_id WHERE approval.work_item_id=?`).get(itemId);
+      if (existing) {
+        const binding = this.rowToApprovalBinding(existing);
+        if (binding.requestId !== request.id) {
+          throw new Error(`MISSION_APPROVAL_CONFLICT: item ${itemId} already bound to ${binding.requestId}`);
+        }
+        return binding;
+      }
+
+      const ts = this.now();
+      const parked = this.db.prepare(`UPDATE work_items AS target
+        SET status='parked', claimed_at=NULL, claimed_by=NULL, updated_at=@ts
+        WHERE id=@id AND status='pending'
+          AND policy IN ('approval-required','risk-tagged')
+          AND EXISTS (
+            SELECT 1 FROM missions mission
+            WHERE mission.id=target.mission_id AND mission.status IN ('pending','active')
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM json_each(COALESCE(target.depends_on, '[]')) dep
+            LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=target.mission_id
+            WHERE upstream.id IS NULL OR upstream.status<>'done'
+          )`).run({ id: itemId, ts });
+      if (parked.changes !== 1) return null;
+
+      this.db.prepare(`INSERT INTO work_item_approvals(
+        work_item_id,request_id,request_json,publish_state,decision_state,created_at,updated_at
+      ) VALUES(@workItemId,@requestId,@requestJson,'outbox','pending',@ts,@ts)`).run({
+        workItemId: itemId,
+        requestId: request.id,
+        requestJson: JSON.stringify(request),
+        ts,
+      });
+      const row = this.db.prepare(`SELECT approval.*, wi.mission_id FROM work_item_approvals approval
+        JOIN work_items wi ON wi.id=approval.work_item_id WHERE approval.work_item_id=?`).get(itemId);
+      return this.rowToApprovalBinding(row);
+    });
+    try {
+      return transaction.immediate();
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('MISSION_APPROVAL_')) throw error;
+      throw new Error(`MISSION_APPROVAL_CONFLICT: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  listApprovalBindings(): WorkItemApprovalBinding[] {
+    const rows = this.db.prepare(`SELECT approval.*, wi.mission_id FROM work_item_approvals approval
+      JOIN work_items wi ON wi.id=approval.work_item_id ORDER BY approval.created_at`).all() as any[];
+    return rows.map(this.rowToApprovalBinding);
+  }
+  markApprovalPublished(requestId: string): void {
+    this.db.prepare(`UPDATE work_item_approvals SET publish_state='published',
+      published_at=COALESCE(published_at,@ts), updated_at=@ts WHERE request_id=@requestId`)
+      .run({ requestId, ts: this.now() });
+  }
+  applyApprovalDecision(
+    requestId: string,
+    state: Exclude<WorkItemApprovalState, 'pending'>,
+    decision: ApprovalDecision,
+  ): ApprovalDecisionTransition | null {
+    const semanticallyValid = decision.requestId === requestId && (
+      (state === 'allowed' && decision.decision === 'allow' && decision.channel !== 'ttl-expire')
+      || (state === 'denied' && decision.decision === 'deny' && decision.channel !== 'ttl-expire')
+      || (state === 'expired' && decision.channel === 'ttl-expire')
+      || (state === 'deferred' && decision.decision === 'defer' && decision.channel !== 'ttl-expire')
+      || (state === 'escalated' && decision.decision === 'escalate' && decision.channel !== 'ttl-expire')
+    );
+    if (!semanticallyValid) {
+      throw new Error(`MISSION_APPROVAL_DECISION_INVALID: ${requestId} cannot transition to ${state}`);
+    }
+    const transaction = this.db.transaction((): ApprovalDecisionTransition | null => {
+      const row = this.db.prepare(`SELECT approval.*, wi.mission_id FROM work_item_approvals approval
+        JOIN work_items wi ON wi.id=approval.work_item_id WHERE approval.request_id=?`).get(requestId);
+      if (!row) return null;
+      const binding = this.rowToApprovalBinding(row);
+      if (binding.decisionState !== 'pending') {
+        if (binding.decisionState !== state || this.canonical(binding.decision) !== this.canonical(decision)) {
+          throw new Error(`MISSION_APPROVAL_DECISION_CONFLICT: request ${requestId} already settled as ${binding.decisionState}`);
+        }
+        return { missionId: binding.missionId, workItemId: binding.workItemId, changed: false };
+      }
+
+      const ts = this.now();
+      const blocked = state === 'denied' || state === 'expired';
+      const targetStatus = state === 'allowed' ? 'pending' : blocked ? 'blocked' : 'parked';
+      const result = blocked
+        ? JSON.stringify({ ok: false, reason: `APPROVAL_${state.toUpperCase()}: ${requestId}`, approvalDecision: decision })
+        : null;
+      this.db.prepare(`UPDATE work_items SET status=@status,
+        last_result=COALESCE(@result,last_result), claimed_at=NULL, claimed_by=NULL, updated_at=@ts
+        WHERE id=@workItemId AND status IN ('parked','pending')`).run({
+        status: targetStatus,
+        result,
+        ts,
+        workItemId: binding.workItemId,
+      });
+      this.db.prepare(`UPDATE work_item_approvals SET decision_state=@state,
+        decision_json=@decision, decided_at=@decidedAt, updated_at=@ts WHERE request_id=@requestId`).run({
+        state,
+        decision: JSON.stringify(decision),
+        decidedAt: decision.decidedAt,
+        ts,
+        requestId,
+      });
+      return { missionId: binding.missionId, workItemId: binding.workItemId, changed: true };
+    });
+    return transaction.immediate();
   }
   reconcilePendingDependencies(): string[] {
     const transaction = this.db.transaction((): string[] => {
@@ -355,7 +541,15 @@ export class SqliteMissionStore implements MissionStore {
     // failed, running, parked or pending dependencies keep the item out.
     const args: unknown[] = [];
     let sql = `SELECT wi.* FROM work_items wi JOIN missions m ON m.id = wi.mission_id
-      WHERE wi.status='pending' AND m.status IN ('pending','active') AND NOT EXISTS (
+      WHERE wi.status='pending' AND m.status IN ('pending','active')
+      AND (
+        wi.policy='auto' OR (
+          wi.policy IN ('approval-required','risk-tagged') AND EXISTS (
+            SELECT 1 FROM work_item_approvals approval
+            WHERE approval.work_item_id=wi.id AND approval.decision_state='allowed'
+          )
+        )
+      ) AND NOT EXISTS (
         SELECT 1 FROM json_each(COALESCE(wi.depends_on, '[]')) dep
         LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=wi.mission_id
         WHERE upstream.id IS NULL OR upstream.status<>'done'
@@ -372,6 +566,13 @@ export class SqliteMissionStore implements MissionStore {
         WHERE id=@id AND status='pending' AND EXISTS (
           SELECT 1 FROM missions mission
           WHERE mission.id=target.mission_id AND mission.status IN ('pending','active')
+        ) AND (
+          target.policy='auto' OR (
+            target.policy IN ('approval-required','risk-tagged') AND EXISTS (
+              SELECT 1 FROM work_item_approvals approval
+              WHERE approval.work_item_id=target.id AND approval.decision_state='allowed'
+            )
+          )
         ) AND NOT EXISTS (
           SELECT 1 FROM json_each(COALESCE(target.depends_on, '[]')) dep
           LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=target.mission_id
