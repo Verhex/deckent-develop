@@ -20,6 +20,11 @@ const TWO = JSON.stringify({ items: [
   { id: 'b', title: 'B', kind: 'capability', scopeDir: 'src/', summary: 'check b', policy: 'approval-required', trigger: { recurring: '* * * * *' }, capabilityTarget: { capability: 'db.query' } },
 ] });
 
+const V2_TWO = JSON.stringify({ items: [
+  { id: 'a', title: 'A', kind: 'task', scopeDir: 'src/api/', summary: 'do a', policy: 'auto', trigger: 'one-off' },
+  { id: 'b', title: 'B', kind: 'task', scopeDir: 'tests/api/', summary: 'verify b', policy: 'approval-required', trigger: 'one-off' },
+] });
+
 describe('handlePlan', () => {
   it('writes the planned items to the backlog as pending+planned', async () => {
     const r = root();
@@ -42,7 +47,7 @@ describe('handlePlan', () => {
     const r = root();
     const lines: string[] = [];
     await handlePlan({
-      goal: 'finish things', root: r, engine: 'v2', complete: async () => TWO,
+      goal: 'finish things', root: r, engine: 'v2', complete: async () => V2_TWO,
       print: (line) => lines.push(line),
     });
 
@@ -57,12 +62,12 @@ describe('handlePlan', () => {
     expect(items.every((item) => item.id.startsWith(`${missions[0]!.id}-`))).toBe(true);
     expect(items.map((item) => item.policy)).toEqual(['auto', 'approval-required']);
     expect(items[0]!.spec).toMatchObject({
-      title: 'A', summary: 'do a', planned: true, plannerItemId: 'a', scopeDir: 'src/api/',
+      title: 'A', summary: 'do a', description: 'do a', planned: true, plannerItemId: 'a', scopeDir: 'src/api/',
     });
     expect(items[1]!.spec).toMatchObject({
-      capabilityTarget: { capability: 'db.query' }, plannerItemId: 'b',
+      description: 'verify b', plannerItemId: 'b',
     });
-    expect(items[1]!.trigger).toEqual({ type: 'recurring', cron: '* * * * *' });
+    expect(items[1]!.trigger).toEqual({ type: 'one-off' });
     store.close();
     expect(lines.join('\n')).toContain('MissionStore mission');
     expect(readMissionAudit(r)).toHaveLength(1);
@@ -72,7 +77,7 @@ describe('handlePlan', () => {
     const r = root();
     const lines: string[] = [];
     const input = {
-      goal: 'replay safely', root: r, engine: 'v2' as const, complete: async () => TWO,
+      goal: 'replay safely', root: r, engine: 'v2' as const, complete: async () => V2_TWO,
       print: (line: string) => lines.push(line),
     };
     await handlePlan(input);
@@ -92,7 +97,7 @@ describe('handlePlan', () => {
     const r = root();
     await handlePlan({
       goal: 'inspect only', root: r, engine: 'v2', dryRun: true,
-      complete: async () => TWO, print: () => {},
+      complete: async () => V2_TWO, print: () => {},
     });
     expect(existsSync(join(r, '.deckent', 'autonomous', 'autonomous.db'))).toBe(false);
     expect(existsSync(join(r, '.deckent', 'autonomous', 'backlog.json'))).toBe(false);
@@ -100,7 +105,7 @@ describe('handlePlan', () => {
 
   it('persists a changed v2 planner batch as a distinct mission', async () => {
     const r = root();
-    await handlePlan({ goal: 'evolve', root: r, engine: 'v2', complete: async () => TWO, print: () => {} });
+    await handlePlan({ goal: 'evolve', root: r, engine: 'v2', complete: async () => V2_TWO, print: () => {} });
     const changed = JSON.stringify({
       items: [
         { id: 'a', title: 'A2', kind: 'task', scopeDir: 'src/api/', summary: 'do a differently', policy: 'auto', trigger: 'one-off' },
@@ -116,5 +121,14 @@ describe('handlePlan', () => {
     expect(missions.map((mission) => store.listItems(mission.id).length).sort()).toEqual([1, 2]);
     store.close();
     expect(readMissionAudit(r)).toHaveLength(2);
+  });
+
+  it('rejects an unwired v2 kind before creating MissionStore state and localizes the reason', async () => {
+    const r = root();
+    await expect(handlePlan({
+      goal: 'unsupported', root: r, engine: 'v2', lang: 'tr', complete: async () => TWO, print: () => {},
+    })).rejects.toThrow(/kalıcı kayıttan önce reddetti.*CAPABILITY_BROKER_UNWIRED/);
+    expect(existsSync(join(r, '.deckent', 'autonomous', 'autonomous.db'))).toBe(false);
+    expect(existsSync(join(r, '.deckent', 'autonomous', 'backlog.json'))).toBe(false);
   });
 });

@@ -5,6 +5,10 @@ import type {
   WorkItemKind,
   WorkItemPolicy,
 } from './mission-types.js';
+import {
+  assertWorkItemBatchAdmitted,
+  type MissionRuntimeAdmission,
+} from './mission-kind-admission.js';
 
 export interface ListItemSpec {
   id?: string;
@@ -27,7 +31,11 @@ export interface ListMissionSpec {
  * Type-1 list ingestion — creates a `kind='list'` Mission with N work_items from a flat spec.
  * Missing item.id is derived as `${missionId}-${index}`.
  */
-export function createListMission(store: MissionStore, spec: ListMissionSpec): Mission {
+export function createListMission(
+  store: MissionStore,
+  spec: ListMissionSpec,
+  opts: { admission?: MissionRuntimeAdmission } = {},
+): Mission {
   const missionInput = {
     id: spec.id,
     kind: 'list' as const,
@@ -45,5 +53,6 @@ export function createListMission(store: MissionStore, spec: ListMissionSpec): M
       dependsOn: item.dependsOn,
       trigger: item.trigger,
     }));
+  if (opts.admission) assertWorkItemBatchAdmitted(items, opts.admission);
   return store.createMissionWithItems(missionInput, items);
 }

@@ -52,4 +52,11 @@ describe('planGoal', () => {
     await planGoal({ goal: 'g', defaultPolicy: 'approval-required', complete });
     expect(seen).toContain('approval-required');
   });
+  it('declares the runtime-admitted kind set when the execution surface supplies one', async () => {
+    let seen = '';
+    const complete = async (p: string) => { seen = p; return JSON.stringify({ items: [] }); };
+    await planGoal({ goal: 'g', allowedKinds: ['task'], complete });
+    expect(seen).toContain('Runtime-admitted kinds for this plan: task');
+    expect(seen).toContain('Emit ONLY these kinds');
+  });
 });

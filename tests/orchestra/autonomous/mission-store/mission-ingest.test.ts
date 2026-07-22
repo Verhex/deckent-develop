@@ -4,6 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteMissionStore } from '../../../../src/orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import { createListMission } from '../../../../src/orchestra/autonomous/mission-store/mission-ingest.js';
+import { PRODUCTION_V2_ADMISSION } from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
+import type { MissionStore } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
+import { vi } from 'vitest';
 
 const dirs: string[] = [];
 function newStore() {
@@ -193,6 +196,32 @@ describe('createListMission', () => {
     })).toThrow('MISSION_BATCH_CONFLICT');
     expect(store.getMission('replay')!.title).toBe('Original');
     expect(store.listItems('replay')).toHaveLength(1);
+    store.close();
+  });
+
+  it('validates the whole runtime batch before invoking MissionStore persistence', () => {
+    const createMissionWithItems = vi.fn();
+    const store = { createMissionWithItems } as unknown as MissionStore;
+
+    expect(() => createListMission(store, {
+      id: 'runtime-batch',
+      title: 'All or none',
+      items: [
+        { id: 'valid-task', kind: 'task', spec: { description: 'valid' } },
+        { id: 'unwired-capability', kind: 'capability', spec: { capabilityTarget: { capability: 'db.query' } } },
+      ],
+    }, { admission: PRODUCTION_V2_ADMISSION })).toThrow('CAPABILITY_BROKER_UNWIRED');
+    expect(createMissionWithItems).not.toHaveBeenCalled();
+  });
+
+  it('rejects an arbitrary kind cast at the store boundary before a mission is written', () => {
+    const store = newStore();
+    expect(() => createListMission(store, {
+      id: 'unknown-kind',
+      title: 'Unknown',
+      items: [{ id: 'bad', kind: 'deploy' as never }],
+    })).toThrow('UNKNOWN_KIND');
+    expect(store.listMissions()).toEqual([]);
     store.close();
   });
 });

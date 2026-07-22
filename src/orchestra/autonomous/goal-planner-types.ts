@@ -30,6 +30,7 @@ export const PlannedItemSchema = z.object({
 }).strict();
 
 export type PlannedItem = z.infer<typeof PlannedItemSchema>;
+export type PlannedItemKind = PlannedItem['kind'];
 
 /** Injectable LLM completion: prompt in, raw model text out. Mocked in tests;
  *  wired to the provider spawn in the CLI. */

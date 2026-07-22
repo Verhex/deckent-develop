@@ -1,4 +1,9 @@
-import { PlannedItemSchema, type PlannedItem, type LlmComplete } from './goal-planner-types.js';
+import {
+  PlannedItemSchema,
+  type PlannedItem,
+  type PlannedItemKind,
+  type LlmComplete,
+} from './goal-planner-types.js';
 import type { BacklogEntry, BacklogTrigger } from './backlog-types.js';
 
 export interface PlanGoalInput {
@@ -11,6 +16,8 @@ export interface PlanGoalInput {
   maxItems?: number;
   /** Default per-item policy when the model does not upgrade it (e.g. 'approval-required'). */
   defaultPolicy?: string;
+  /** Runtime-admitted kinds, injected by a concrete execution surface. */
+  allowedKinds?: readonly PlannedItemKind[];
   complete: LlmComplete;
 }
 
@@ -25,6 +32,9 @@ export function buildGoalPlanPrompt(input: Omit<PlanGoalInput, 'complete'>): str
   const policyLine = input.defaultPolicy
     ? `\nDefault policy for items is "${input.defaultPolicy}" unless a rule above upgrades it (e.g. destructive → approval-required).`
     : '';
+  const admittedKindsLine = input.allowedKinds && input.allowedKinds.length > 0
+    ? `\nRuntime-admitted kinds for this plan: ${input.allowedKinds.join(', ')}. Emit ONLY these kinds; split larger work into admitted items instead of selecting an unavailable runner.`
+    : '';
   return `You are the Deckent autonomous planner. Decompose the GOAL into a LIGHTWEIGHT backlog — titles + kind + scope only, NO implementation detail (detail is generated later, just in time).
 
 Output STRICT JSON: { "items": PlannedItem[] }. Each PlannedItem:
@@ -38,7 +48,7 @@ Output STRICT JSON: { "items": PlannedItem[] }. Each PlannedItem:
 Rules: single-file/tight change → task; multi-file/multi-module feature → sprint;
 non-code connector op (db.query/erp.read/mail.send/http.get) → capability;
 multi-step workflow/DAG → process; "continuously …" → recurring cron;
-"N agents over X" → fanOut.concurrency=N; destructive/irreversible → approval-required.${policyLine}
+"N agents over X" → fanOut.concurrency=N; destructive/irreversible → approval-required.${policyLine}${admittedKindsLine}
 At most ${input.maxItems ?? DEFAULT_MAX} items. Output ONLY the JSON, no prose.
 
 GOAL: ${input.goal}${seeds}${ctx}`;

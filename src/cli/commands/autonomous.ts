@@ -61,6 +61,12 @@ import { createListMission } from '../../orchestra/autonomous/mission-store/miss
 import { auditMissionLifecycle } from '../../orchestra/autonomous/mission-store/mission-audit-bridge.js';
 import { migrateBacklogJson } from '../../orchestra/autonomous/mission-store/mission-migrate.js';
 import { SqliteMissionStore } from '../../orchestra/autonomous/mission-store/sqlite-mission-store.js';
+import {
+  MissionAdmissionError,
+  PRODUCTION_V2_ADMISSION,
+  assertWorkItemBatchAdmitted,
+  listRuntimeAdmittedKinds,
+} from '../../orchestra/autonomous/mission-store/mission-kind-admission.js';
 import { loadConfig, resolveDefaultModel } from '../../core/config.js';
 import { PROJECT_CONFIG_PATH, RECENT_WORKS_DIR } from '../../core/constants.js';
 import { bootstrapProviders } from '../../core/provider.js';
@@ -259,10 +265,34 @@ export async function handlePlan(opts: AutonomousPlanOptions): Promise<void> {
   const summaryPath = join(root, '.brain', 'exports', 'summary.md');
   const context = existsSync(summaryPath) ? readFileSync(summaryPath, 'utf-8') : undefined;
 
-  const items = await planGoal({ goal: opts.goal, seeds, context, maxItems: opts.maxItems, defaultPolicy: opts.policy, complete: opts.complete });
+  const items = await planGoal({
+    goal: opts.goal,
+    seeds,
+    context,
+    maxItems: opts.maxItems,
+    defaultPolicy: opts.policy,
+    complete: opts.complete,
+    ...(opts.engine === 'v2' ? { allowedKinds: listRuntimeAdmittedKinds(PRODUCTION_V2_ADMISSION) } : {}),
+  });
   if (items.length === 0) {
     out(getMessage('autonomous.plan_empty', lang));
     return;
+  }
+
+  if (opts.engine === 'v2') {
+    try {
+      assertWorkItemBatchAdmitted(plannedItemsToWorkItems(items), PRODUCTION_V2_ADMISSION);
+    } catch (error) {
+      if (error instanceof MissionAdmissionError) {
+        throw new DeckentError('DECKENT_E039', getMessage('autonomous.plan_kind_rejected', lang, {
+          id: error.itemId,
+          kind: error.kind,
+          reason: error.code,
+          allowed: listRuntimeAdmittedKinds(PRODUCTION_V2_ADMISSION).join(', '),
+        }));
+      }
+      throw error;
+    }
   }
 
   out(getMessage('autonomous.plan_header', lang, { count: String(items.length) }));
@@ -296,6 +326,7 @@ export async function handlePlan(opts: AutonomousPlanOptions): Promise<void> {
             kind: item.kind,
             spec: {
               ...snapshot.spec,
+              description: item.summary,
               title: item.title,
               summary: item.summary,
               planned: true,
@@ -306,7 +337,7 @@ export async function handlePlan(opts: AutonomousPlanOptions): Promise<void> {
             trigger: { ...snapshot.trigger },
           };
         }),
-      });
+      }, { admission: PRODUCTION_V2_ADMISSION });
       if (existing) {
         out(getMessage('autonomous.plan_mission_replayed', lang, {
           count: String(items.length),
@@ -445,7 +476,7 @@ function formatWorkItemLines(items: WorkItem[]): string {
  * work so the model can go dry — the signal the goal-loop needs to evaluate
  * acceptance instead of authoring forever.
  */
-function buildGoalNextPrompt(goal: string, priorItems: WorkItem[]): string {
+function buildGoalNextPrompt(goal: string, priorItems: WorkItem[], allowedKinds: readonly string[]): string {
   return `You are the Deckent autonomous GOAL driver. Decide the NEXT batch of work-items that advances the GOAL, given what has ALREADY been done.
 
 GOAL: ${goal}
@@ -455,6 +486,7 @@ ${formatWorkItemLines(priorItems)}
 
 If the GOAL is already fully achieved by the work above, output an EMPTY list: { "items": [] }.
 Otherwise output the NEXT lightweight work-items (titles + kind + scope only, NO implementation detail — detail is generated just-in-time). Do NOT repeat work already done.
+Runtime-admitted kinds: ${allowedKinds.join(', ')}. Emit ONLY these kinds; split larger work into admitted items instead of selecting an unavailable runner.
 
 Output STRICT JSON: { "items": PlannedItem[] }. Each PlannedItem:
 { "id": kebab-slug, "title": short, "kind": "task"|"sprint"|"capability"|"process",
@@ -484,7 +516,12 @@ function plannedItemsToWorkItems(items: PlannedItem[]): NewWorkItem[] {
     id: p.id,
     missionId: '',
     kind: p.kind,
-    spec: { description: p.summary, scopeDir: p.scopeDir },
+    spec: {
+      description: p.summary,
+      scopeDir: p.scopeDir,
+      ...(p.capabilityTarget ? { capabilityTarget: p.capabilityTarget } : {}),
+      ...(p.fanOut ? { fanOut: p.fanOut } : {}),
+    },
     policy: p.policy,
   }));
 }
@@ -522,14 +559,23 @@ function parseGoalAccepted(raw: string): boolean {
  */
 export function buildLiveGoalDeps(complete: LlmComplete): GoalAdvanceDeps {
   const planner = async (goal: string, priorItems: WorkItem[]): Promise<NewWorkItem[]> => {
-    const raw = await complete(buildGoalNextPrompt(goal, priorItems));
+    const raw = await complete(buildGoalNextPrompt(
+      goal,
+      priorItems,
+      listRuntimeAdmittedKinds(PRODUCTION_V2_ADMISSION),
+    ));
     return plannedItemsToWorkItems(parsePlannedItems(raw));
   };
   const accepter = async (goal: string, items: WorkItem[]): Promise<boolean> => {
     const raw = await complete(buildGoalAcceptPrompt(goal, items));
     return parseGoalAccepted(raw);
   };
-  return buildGoalDeps({ planner, accepter, maxRounds: GOAL_MAX_ROUNDS });
+  return buildGoalDeps({
+    planner,
+    accepter,
+    maxRounds: GOAL_MAX_ROUNDS,
+    admission: PRODUCTION_V2_ADMISSION,
+  });
 }
 
 // ─── start ────────────────────────────────────────────────────────────

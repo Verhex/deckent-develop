@@ -1753,6 +1753,10 @@ const MESSAGES: MessageMap = {
     en: 'No new items queued — {skipped} already active in the backlog (pending/running/parked). Wait for them to finish, or remove them first: deckent autonomous backlog remove <id>',
     tr: 'Yeni madde eklenmedi — {skipped} madde backlog\'da zaten aktif (pending/running/parked). Bitmelerini bekle veya önce kaldır: deckent autonomous backlog remove <id>',
   },
+  'autonomous.plan_kind_rejected': {
+    en: 'Goal-v2 rejected item {id} ({kind}) before persistence: {reason}. Live-admitted kinds: {allowed}.',
+    tr: 'Goal-v2, {id} ({kind}) maddesini kalıcı kayıttan önce reddetti: {reason}. Canlı kabul edilen türler: {allowed}.',
+  },
 
   // ─── autonomous backlog subcommand (Task 7) ──────────────────────────
   'autonomous.backlog.added': {

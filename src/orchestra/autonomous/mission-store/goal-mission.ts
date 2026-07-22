@@ -1,6 +1,11 @@
 import type {
   Mission, MissionStore, NewWorkItem, WorkItem,
 } from './mission-types.js';
+import {
+  assertCanonicalWorkItemKind,
+  assertWorkItemBatchAdmitted,
+  type MissionRuntimeAdmission,
+} from './mission-kind-admission.js';
 
 /** Type-2 (goal) mission specification — "run until the goal is reached". */
 export interface GoalMissionSpec {
@@ -35,6 +40,8 @@ export interface GoalAdvanceDeps {
    * eventually returning `[]`).
    */
   maxRounds?: number;
+  /** Runtime capability truth used to reject an unsupported authored batch before enqueue. */
+  admission?: MissionRuntimeAdmission;
 }
 
 /**
@@ -52,6 +59,8 @@ export interface GoalDeps {
   accepter(goal: string, items: WorkItem[]): Promise<boolean>;
   /** Infinite-loop guard, forwarded verbatim to {@link advanceGoalMission}. */
   maxRounds?: number;
+  /** Runtime capability truth used to reject an unsupported authored batch before enqueue. */
+  admission?: MissionRuntimeAdmission;
 }
 
 /**
@@ -67,6 +76,7 @@ export function buildGoalDeps(deps: GoalDeps): GoalAdvanceDeps {
     author: (goal, priorItems) => deps.planner(goal, priorItems),
     accept: (goal, items) => deps.accepter(goal, items),
     ...(deps.maxRounds !== undefined ? { maxRounds: deps.maxRounds } : {}),
+    ...(deps.admission ? { admission: deps.admission } : {}),
   };
 }
 
@@ -129,6 +139,16 @@ export async function advanceGoalMission(
   // Ask the planner for the next batch of work.
   const next = await deps.author(goal, all);
   if (next.length > 0) {
+    try {
+      if (deps.admission) assertWorkItemBatchAdmitted(next, deps.admission);
+      else for (const item of next) assertCanonicalWorkItemKind(item.kind, item.id);
+    } catch (error) {
+      store.updateMissionStatus(missionId, 'failed', {
+        ok: false,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      return 'exhausted';
+    }
     for (const item of next) {
       // Stamp missionId — author cannot know it on round-0 (priorItems is empty).
       store.enqueueItem({ ...item, missionId });

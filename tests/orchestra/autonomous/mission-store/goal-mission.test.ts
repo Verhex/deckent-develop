@@ -9,6 +9,7 @@ import {
   buildGoalDeps,
 } from '../../../../src/orchestra/autonomous/mission-store/goal-mission.js';
 import type { NewWorkItem, WorkItem } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
+import { PRODUCTION_V2_ADMISSION } from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
 
 const dirs: string[] = [];
 function newStore() {
@@ -205,6 +206,30 @@ describe('advanceGoalMission', () => {
 
     await expect(advanceGoalMission(store, 'missing', { author, accept })).rejects.toThrow(/goal mission not found/);
 
+    store.close();
+  });
+
+  it('rejects an unsupported authored batch before any item is enqueued', async () => {
+    const store = newStore();
+    createGoalMission(store, { id: 'g-admission', title: 'Admission', goal: 'g' });
+    const author = vi.fn(async (): Promise<NewWorkItem[]> => [
+      { id: 'first-valid', missionId: '', kind: 'task', spec: { description: 'valid' } },
+      {
+        id: 'second-unwired', missionId: '', kind: 'capability',
+        spec: { capabilityTarget: { capability: 'db.query' } },
+      },
+    ]);
+
+    const outcome = await advanceGoalMission(store, 'g-admission', {
+      author,
+      accept: async () => false,
+      admission: PRODUCTION_V2_ADMISSION,
+    });
+
+    expect(outcome).toBe('exhausted');
+    expect(store.listItems('g-admission')).toEqual([]);
+    expect(store.getMission('g-admission')!.status).toBe('failed');
+    expect(store.getMission('g-admission')!.lastResult?.reason).toContain('CAPABILITY_BROKER_UNWIRED');
     store.close();
   });
 });

@@ -7,6 +7,7 @@ import type {
   MissionStore, Mission, NewMission, MissionStatus, Progress, ResultLike,
   WorkItem, NewWorkItem, NewMissionWorkItem, WorkItemStatus,
 } from './mission-types.js';
+import { assertCanonicalWorkItemKind } from './mission-kind-admission.js';
 
 const WORK_ITEM_STATUSES: ReadonlySet<WorkItemStatus> = new Set([
   'pending', 'running', 'done', 'failed', 'blocked', 'parked',
@@ -97,6 +98,7 @@ export class SqliteMissionStore implements MissionStore {
       if (item.missionId !== m.id) {
         throw new Error(`MISSION_BATCH_INVALID: item ${item.id} belongs to foreign mission ${item.missionId}`);
       }
+      assertCanonicalWorkItemKind(item.kind, item.id);
       const dependencies = item.dependsOn ?? [];
       if (dependencies.some((id) => !id || id !== id.trim())) {
         throw new Error(`MISSION_BATCH_INVALID: item ${item.id} has a non-canonical dependency id`);
@@ -257,6 +259,7 @@ export class SqliteMissionStore implements MissionStore {
   }
 
   enqueueItem(item: NewWorkItem): WorkItem {
+    assertCanonicalWorkItemKind(item.kind, item.id);
     const ts = this.now();
     this.db.prepare(`INSERT INTO work_items(id,mission_id,kind,status,spec,policy,render_as,depends_on,trigger,created_at,updated_at)
       VALUES(@id,@missionId,@kind,'pending',@spec,@policy,@renderAs,@dependsOn,@trigger,@ts,@ts)

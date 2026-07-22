@@ -114,6 +114,7 @@ describe('buildLiveGoalDeps — planner', () => {
     expect(prompts).toHaveLength(1);
     expect(prompts[0]).toContain('ship feature X');
     expect(prompts[0]).toContain('built X core');
+    expect(prompts[0]).toContain('Runtime-admitted kinds: task');
   });
 });
 
