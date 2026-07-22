@@ -89,6 +89,20 @@ export interface MissionClaimFence {
   admissionFence: WorkItemAdmissionFenceV1;
   registry: MissionRunnerRegistryV1;
 }
+/** Host-private authority for one exact running attempt. The raw token is never persisted. */
+export interface MissionDispatchClaim {
+  schemaVersion: 1;
+  workItemId: string;
+  missionId: string;
+  claimedBy: string;
+  claimedAt: string;
+  itemRevision: number;
+  attemptId: string;
+  fenceToken: string;
+  fenceTokenHash: string;
+  claimRegistryRevision: string | null;
+  claimRegistryDigest: string | null;
+}
 export interface MissionEvent { ts: string; workItemId?: string; type: string; data?: unknown; }
 
 export interface MissionStore {
@@ -128,7 +142,17 @@ export interface MissionStore {
   /** Quarantine non-terminal rows that cannot execute under the current registry. */
   reconcileRuntimeAdmission(registry: MissionRunnerRegistryV1, itemId?: string): string[];
   queryDue(opts?: { tenant?: string; limit?: number; registry?: MissionRunnerRegistryV1 }): WorkItem[];
+  /** Atomically claim and return the only authority allowed to settle this running attempt. */
+  claimItemWithAuthority(id: string, by: string, fence?: MissionClaimFence): MissionDispatchClaim | null;
+  /** First-writer-wins settlement for one exact claim; stale/wrong/replayed authority is a no-op. */
+  settleClaimedItem(
+    claim: MissionDispatchClaim,
+    status: Extract<WorkItemStatus, 'done' | 'failed' | 'parked'>,
+    result?: ResultLike,
+  ): boolean;
+  /** Compatibility/admin claim surface. Runtime schedulers must use claimItemWithAuthority. */
   claimItem(id: string, by: string, fence?: MissionClaimFence): boolean;
+  /** Compatibility/admin transition. Runtime schedulers must use settleClaimedItem. */
   updateItemStatus(id: string, status: WorkItemStatus, result?: ResultLike): void;
   listItems(missionId: string): WorkItem[];
 }

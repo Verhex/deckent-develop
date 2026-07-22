@@ -13,7 +13,7 @@
 import type { ResolvedConfig } from '../../../core/config-types.js';
 import type { ExecutionBudget } from '../../../core/work-model.js';
 import type { DispatchFn } from './mission-scheduler.js';
-import type { ResultLike, WorkItem } from './mission-types.js';
+import type { MissionDispatchClaim, ResultLike, WorkItem } from './mission-types.js';
 
 /** Context handed to the injected `runTask`. Built from the work item's `spec`. */
 export interface MissionTaskContext {
@@ -24,6 +24,8 @@ export interface MissionTaskContext {
   scopeDir?: string;
   /** Request-level ceiling only; the owner worker policy remains authority. */
   budget?: ExecutionBudget;
+  /** Exact host-issued attempt authority; provider admission/receipt binds to this identity. */
+  dispatchClaim: MissionDispatchClaim;
 }
 
 /** Injected execution primitives. Live wire (cutover) passes the real runTask /
@@ -57,10 +59,12 @@ function buildTaskContext(
   projectRoot: string,
   spec: Record<string, unknown>,
   fallbackId: string,
+  dispatchClaim: MissionDispatchClaim,
 ): MissionTaskContext {
   const ctx: MissionTaskContext = {
     projectRoot,
     description: str(spec.description) ?? fallbackId,
+    dispatchClaim,
   };
   const model = str(spec.model);
   const provider = str(spec.provider);
@@ -89,11 +93,11 @@ function buildTaskContext(
 export function buildMissionDispatch(deps: MissionDispatchDeps): DispatchFn {
   const { projectRoot, config, runTask, runSprint, runCapability, runProcess } = deps;
 
-  return async (item: WorkItem): Promise<ResultLike> => {
+  return async (item: WorkItem, claim: MissionDispatchClaim): Promise<ResultLike> => {
     const spec = item.spec ?? {};
     try {
       if (item.kind === 'task') {
-        return await runTask(buildTaskContext(projectRoot, spec, item.id));
+        return await runTask(buildTaskContext(projectRoot, spec, item.id, claim));
       }
 
       if (item.kind === 'sprint') {
@@ -131,7 +135,12 @@ export function buildMissionDispatch(deps: MissionDispatchDeps): DispatchFn {
           if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
             return { ok: false, reason: `process step ${i + 1} is not an object` };
           }
-          const ctx = buildTaskContext(projectRoot, raw as Record<string, unknown>, `${item.id}#step${i + 1}`);
+          const ctx = buildTaskContext(
+            projectRoot,
+            raw as Record<string, unknown>,
+            `${item.id}#step${i + 1}`,
+            claim,
+          );
           const res = await runTask(ctx);
           if (!res.ok) {
             return { ok: false, reason: `process step ${i + 1} failed: ${res.reason ?? 'no reason'}` };

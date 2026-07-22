@@ -1,6 +1,12 @@
 import { createHash } from 'node:crypto';
 
-import type { NewWorkItem, ResultLike, WorkItem, WorkItemKind } from './mission-types.js';
+import type {
+  MissionDispatchClaim,
+  NewWorkItem,
+  ResultLike,
+  WorkItem,
+  WorkItemKind,
+} from './mission-types.js';
 
 export const CANONICAL_WORK_ITEM_KINDS = [
   'task',
@@ -39,7 +45,7 @@ export interface WorkItemAdmissionFenceV1 {
   itemDefinitionDigest: string;
 }
 
-export type MissionRuntimeRunner = (item: WorkItem) => Promise<ResultLike>;
+export type MissionRuntimeRunner = (item: WorkItem, claim: MissionDispatchClaim) => Promise<ResultLike>;
 
 export interface BoundMissionRunnerRegistryV1 {
   descriptor: MissionRunnerRegistryV1;
@@ -420,7 +426,10 @@ export function bindMissionRunnerRegistry(
   }
   return Object.freeze({
     descriptor,
-    dispatch: async (item: WorkItem): Promise<ResultLike> => {
+    dispatch: async (item: WorkItem, claim: MissionDispatchClaim): Promise<ResultLike> => {
+      if (claim.workItemId !== item.id || claim.missionId !== item.missionId) {
+        return { ok: false, reason: 'MISSION_DISPATCH_CLAIM_MISMATCH' };
+      }
       try {
         assertWorkItemBatchAdmitted([item], descriptor);
       } catch (error) {
@@ -428,7 +437,7 @@ export function bindMissionRunnerRegistry(
       }
       const handler = handlers[item.kind];
       if (!handler) return { ok: false, reason: `MISSION_RUNNER_BINDING_MISSING: ${item.kind}` };
-      return await handler(item);
+      return await handler(item, claim);
     },
   });
 }

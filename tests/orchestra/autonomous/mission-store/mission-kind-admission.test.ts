@@ -13,6 +13,10 @@ import {
   listRuntimeAdmittedKinds,
   type MissionRuntimeAdmission,
 } from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
+import type {
+  MissionDispatchClaim,
+  WorkItem,
+} from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 
 const allWired: MissionRuntimeAdmission = createMissionRunnerRegistry({
   registryRevision: 'test-all-runners-v1',
@@ -44,6 +48,32 @@ describe('mission kind admission registry', () => {
       task,
       sprint: task,
     })).toThrow('MISSION_RUNNER_BINDING_MISMATCH');
+  });
+
+  it('rejects an item/claim identity mismatch before the bound handler runs', async () => {
+    let called = false;
+    const bound = bindMissionRunnerRegistry(PRODUCTION_V2_RUNNER_REGISTRY, {
+      task: async () => { called = true; return { ok: true }; },
+    });
+    const item = {
+      id: 'task-a', missionId: 'mission-a', kind: 'task', status: 'running',
+      spec: { description: 'bounded' }, policy: 'auto', renderAs: 'task', progress: null,
+      dependsOn: [], trigger: null, claimedAt: null, claimedBy: null, revision: 1,
+      admissionFence: null, claimRegistryRevision: null, claimRegistryDigest: null,
+      createdAt: 't', updatedAt: 't', lastResult: null,
+    } as WorkItem;
+    const claim = {
+      schemaVersion: 1, workItemId: 'other-task', missionId: 'mission-a',
+      claimedBy: 'scheduler', claimedAt: '2026-07-22T00:00:00.000Z', itemRevision: 1,
+      attemptId: 'attempt', fenceToken: 'token', fenceTokenHash: 'hash',
+      claimRegistryRevision: null, claimRegistryDigest: null,
+    } as MissionDispatchClaim;
+
+    await expect(bound.dispatch(item, claim)).resolves.toEqual({
+      ok: false,
+      reason: 'MISSION_DISPATCH_CLAIM_MISMATCH',
+    });
+    expect(called).toBe(false);
   });
 
   it('admits a described task in production and rejects an empty description', () => {

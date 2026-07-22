@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DECKENT_DIR } from '../../../core/constants.js';
@@ -7,7 +8,7 @@ import type {
   MissionStore, Mission, NewMission, MissionStatus, Progress, ResultLike,
   WorkItem, NewWorkItem, NewMissionWorkItem, WorkItemStatus,
   WorkItemApprovalBinding, WorkItemApprovalState, ApprovalDecisionTransition,
-  MissionClaimFence,
+  MissionClaimFence, MissionDispatchClaim,
 } from './mission-types.js';
 import type {
   MissionAcceptanceDecisionRecord,
@@ -63,6 +64,7 @@ CREATE TABLE IF NOT EXISTS work_items (
   progress TEXT, depends_on TEXT, trigger TEXT, claimed_at TEXT, claimed_by TEXT,
   revision INTEGER NOT NULL DEFAULT 0,
   claim_registry_revision TEXT, claim_registry_digest TEXT,
+  claim_attempt_id TEXT, claim_fence_token_hash TEXT,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_result TEXT );
 CREATE INDEX IF NOT EXISTS idx_wi_mission_status ON work_items(mission_id, status);
 CREATE INDEX IF NOT EXISTS idx_wi_status ON work_items(status);
@@ -118,6 +120,8 @@ export class SqliteMissionStore implements MissionStore {
     if (!columns.has('revision')) this.db.exec('ALTER TABLE work_items ADD COLUMN revision INTEGER NOT NULL DEFAULT 0');
     if (!columns.has('claim_registry_revision')) this.db.exec('ALTER TABLE work_items ADD COLUMN claim_registry_revision TEXT');
     if (!columns.has('claim_registry_digest')) this.db.exec('ALTER TABLE work_items ADD COLUMN claim_registry_digest TEXT');
+    if (!columns.has('claim_attempt_id')) this.db.exec('ALTER TABLE work_items ADD COLUMN claim_attempt_id TEXT');
+    if (!columns.has('claim_fence_token_hash')) this.db.exec('ALTER TABLE work_items ADD COLUMN claim_fence_token_hash TEXT');
   }
   recover(): void {
     // Classify an unsupported running row before the generic orphan rule can
@@ -128,12 +132,16 @@ export class SqliteMissionStore implements MissionStore {
       reason: 'RECOVERY_RECONCILIATION_REQUIRED: prior running attempt has no terminal dispatch evidence; automatic redrive refused',
     });
     this.db.prepare(`UPDATE work_items SET status='parked', last_result=@result, revision=revision+1,
-      claimed_at=NULL, claimed_by=NULL, updated_at=@ts WHERE status='running'`)
+      claimed_at=NULL, claimed_by=NULL, claim_attempt_id=NULL, claim_fence_token_hash=NULL,
+      updated_at=@ts WHERE status='running'`)
       .run({ result, ts: this.now() });
   }
   close(): void { this.db.close(); }
 
   private now(): string { return new Date().toISOString(); }
+  private claimTokenHash(token: string): string {
+    return createHash('sha256').update(token, 'utf8').digest('hex');
+  }
   private j(v: unknown): string | null { return v === undefined || v === null ? null : JSON.stringify(v); }
   private p<T>(s: unknown): T | null { return typeof s === 'string' && s.length ? JSON.parse(s) as T : null; }
   private canonical(v: unknown): string {
@@ -165,7 +173,8 @@ export class SqliteMissionStore implements MissionStore {
       }>;
     const changedMissions = new Set<string>();
     const update = this.db.prepare(`UPDATE work_items SET status='failed', last_result=@result, revision=revision+1,
-      claimed_at=NULL, claimed_by=NULL, updated_at=@ts
+      claimed_at=NULL, claimed_by=NULL, claim_attempt_id=NULL, claim_fence_token_hash=NULL,
+      updated_at=@ts
       WHERE id=@id AND status IN ('pending','running','parked') AND kind=@kind`);
 
     for (const row of rows) {
@@ -654,7 +663,8 @@ export class SqliteMissionStore implements MissionStore {
       .all(...(itemId === undefined ? [] : [itemId])) as any[];
     const changedMissions = new Set<string>();
     const update = this.db.prepare(`UPDATE work_items SET status=@status, last_result=@result,
-      claimed_at=NULL, claimed_by=NULL, revision=revision+1, updated_at=@ts
+      claimed_at=NULL, claimed_by=NULL, claim_attempt_id=NULL, claim_fence_token_hash=NULL,
+      revision=revision+1, updated_at=@ts
       WHERE id=@id AND revision=@revision AND status IN ('pending','running','parked')`);
 
     for (const row of rows) {
@@ -729,7 +739,8 @@ export class SqliteMissionStore implements MissionStore {
     const result = JSON.stringify({ ok: false, reason: `APPROVAL_REQUEST_INVALID: ${reason}` });
     const info = this.db.prepare(`UPDATE work_items AS target SET status='parked', last_result=@result,
       revision=revision+1,
-      claimed_at=NULL, claimed_by=NULL, updated_at=@ts
+      claimed_at=NULL, claimed_by=NULL, claim_attempt_id=NULL, claim_fence_token_hash=NULL,
+      updated_at=@ts
       WHERE id=@id AND status='pending' AND policy IN ('approval-required','risk-tagged')
         AND EXISTS (
           SELECT 1 FROM missions mission
@@ -758,7 +769,8 @@ export class SqliteMissionStore implements MissionStore {
 
       const ts = this.now();
       const parked = this.db.prepare(`UPDATE work_items AS target
-        SET status='parked', claimed_at=NULL, claimed_by=NULL, revision=revision+1, updated_at=@ts
+        SET status='parked', claimed_at=NULL, claimed_by=NULL,
+          claim_attempt_id=NULL, claim_fence_token_hash=NULL, revision=revision+1, updated_at=@ts
         WHERE id=@id AND status='pending'
           AND policy IN ('approval-required','risk-tagged')
           AND EXISTS (
@@ -835,7 +847,8 @@ export class SqliteMissionStore implements MissionStore {
         ? JSON.stringify({ ok: false, reason: `APPROVAL_${state.toUpperCase()}: ${requestId}`, approvalDecision: decision })
         : null;
       this.db.prepare(`UPDATE work_items SET status=@status, revision=revision+1,
-        last_result=COALESCE(@result,last_result), claimed_at=NULL, claimed_by=NULL, updated_at=@ts
+        last_result=COALESCE(@result,last_result), claimed_at=NULL, claimed_by=NULL,
+        claim_attempt_id=NULL, claim_fence_token_hash=NULL, updated_at=@ts
         WHERE id=@workItemId AND status IN ('parked','pending')`).run({
         status: targetStatus,
         result,
@@ -927,7 +940,8 @@ export class SqliteMissionStore implements MissionStore {
           const result = JSON.stringify({ ok: false, reason });
           const info = this.db.prepare(`UPDATE work_items SET status=@status, last_result=@result,
             revision=revision+1,
-            claimed_at=NULL, claimed_by=NULL, updated_at=@ts WHERE id=@id AND status='pending'`)
+            claimed_at=NULL, claimed_by=NULL, claim_attempt_id=NULL, claim_fence_token_hash=NULL,
+            updated_at=@ts WHERE id=@id AND status='pending'`)
             .run({ id, status, result, ts: this.now() });
           if (info.changes === 1) changedMissions.add(missionId);
         }
@@ -980,8 +994,15 @@ export class SqliteMissionStore implements MissionStore {
       return false;
     });
   }
-  claimItem(id: string, by: string, fence?: MissionClaimFence): boolean {
-    const transaction = this.db.transaction((): boolean => {
+  claimItemWithAuthority(id: string, by: string, fence?: MissionClaimFence): MissionDispatchClaim | null {
+    if (by.length === 0 || by !== by.trim()) {
+      throw new TypeError('MISSION_DISPATCH_CLAIM_INVALID: claimedBy');
+    }
+    const transaction = this.db.transaction((): MissionDispatchClaim | null => {
+      const claimedAt = this.now();
+      const attemptId = randomUUID();
+      const fenceToken = randomUUID();
+      const fenceTokenHash = this.claimTokenHash(fenceToken);
       if (fence) {
         this.reconcileRuntimeAdmission(fence.registry, id);
         const current = this.selectItem(id);
@@ -989,14 +1010,15 @@ export class SqliteMissionStore implements MissionStore {
           || current.revision !== fence.itemRevision
           || current.admissionFence === null
           || this.canonical(current.admissionFence) !== this.canonical(fence.admissionFence)
-          || !validateWorkItemAdmission(current, current.admissionFence, fence.registry).ok) return false;
+          || !validateWorkItemAdmission(current, current.admissionFence, fence.registry).ok) return null;
         const runtimeKinds = listRuntimeAdmittedKinds(fence.registry);
-        if (runtimeKinds.length === 0) return false;
+        if (runtimeKinds.length === 0) return null;
         const runtimeBindings = Object.fromEntries(runtimeKinds.map((kind, index) => [`runtimeKind${index}`, kind]));
         const runtimeNamed = runtimeKinds.map((_, index) => `@runtimeKind${index}`).join(',');
         const info = this.db.prepare(`UPDATE work_items AS target
           SET status='running', claimed_at=@ts, claimed_by=@by,
             claim_registry_revision=@registryRevision, claim_registry_digest=@registryDigest,
+            claim_attempt_id=@attemptId, claim_fence_token_hash=@fenceTokenHash,
             revision=revision+1, updated_at=@ts
           WHERE id=@id AND status='pending' AND revision=@itemRevision
           AND target.kind IN (${runtimeNamed}) AND EXISTS (
@@ -1025,20 +1047,39 @@ export class SqliteMissionStore implements MissionStore {
           ...runtimeBindings,
           id,
           by,
-          ts: this.now(),
+          ts: claimedAt,
+          attemptId,
+          fenceTokenHash,
           itemRevision: fence.itemRevision,
           registryRevision: fence.admissionFence.registryRevision,
           registryDigest: fence.admissionFence.registryDigest,
           runnerRevision: fence.admissionFence.runnerRevision,
           itemDefinitionDigest: fence.admissionFence.itemDefinitionDigest,
         });
-        return info.changes === 1;
+        if (info.changes !== 1) return null;
+        return {
+          schemaVersion: 1,
+          workItemId: current.id,
+          missionId: current.missionId,
+          claimedBy: by,
+          claimedAt,
+          itemRevision: current.revision + 1,
+          attemptId,
+          fenceToken,
+          fenceTokenHash,
+          claimRegistryRevision: fence.admissionFence.registryRevision,
+          claimRegistryDigest: fence.admissionFence.registryDigest,
+        };
       }
 
       this.reconcileUnsupportedKinds(id);
+      const current = this.selectItem(id);
+      if (!current) return null;
       const info = this.db.prepare(`UPDATE work_items AS target
-        SET status='running', claimed_at=@ts, claimed_by=@by, revision=revision+1, updated_at=@ts
-        WHERE id=@id AND status='pending'
+        SET status='running', claimed_at=@ts, claimed_by=@by,
+          claim_attempt_id=@attemptId, claim_fence_token_hash=@fenceTokenHash,
+          revision=revision+1, updated_at=@ts
+        WHERE id=@id AND status='pending' AND revision=@itemRevision
         AND target.kind IN (${CANONICAL_KIND_NAMED}) AND EXISTS (
           SELECT 1 FROM missions mission
           WHERE mission.id=target.mission_id AND mission.status IN ('pending','active')
@@ -1053,13 +1094,73 @@ export class SqliteMissionStore implements MissionStore {
           SELECT 1 FROM json_each(COALESCE(target.depends_on, '[]')) dep
           LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=target.mission_id
           WHERE upstream.id IS NULL OR upstream.status<>'done'
-        )`).run({ ...CANONICAL_KIND_BINDINGS, id, by, ts: this.now() });
-      return info.changes === 1;
+        )`).run({
+        ...CANONICAL_KIND_BINDINGS,
+        id,
+        by,
+        ts: claimedAt,
+        itemRevision: current.revision,
+        attemptId,
+        fenceTokenHash,
+      });
+      if (info.changes !== 1) return null;
+      return {
+        schemaVersion: 1,
+        workItemId: current.id,
+        missionId: current.missionId,
+        claimedBy: by,
+        claimedAt,
+        itemRevision: current.revision + 1,
+        attemptId,
+        fenceToken,
+        fenceTokenHash,
+        claimRegistryRevision: null,
+        claimRegistryDigest: null,
+      };
     });
     return transaction.immediate();
   }
+
+  settleClaimedItem(
+    claim: MissionDispatchClaim,
+    status: Extract<WorkItemStatus, 'done' | 'failed' | 'parked'>,
+    result?: ResultLike,
+  ): boolean {
+    if (claim.schemaVersion !== 1
+      || claim.workItemId.length === 0
+      || claim.missionId.length === 0
+      || claim.claimedBy.length === 0
+      || claim.attemptId.length === 0
+      || claim.fenceToken.length === 0
+      || claim.fenceTokenHash !== this.claimTokenHash(claim.fenceToken)) return false;
+    const info = this.db.prepare(`UPDATE work_items SET status=@status,
+      last_result=COALESCE(@result,last_result), revision=revision+1,
+      claim_attempt_id=NULL, claim_fence_token_hash=NULL, updated_at=@ts
+      WHERE id=@id AND mission_id=@missionId AND status='running'
+        AND claimed_by=@claimedBy AND claimed_at=@claimedAt AND revision=@itemRevision
+        AND claim_attempt_id=@attemptId AND claim_fence_token_hash=@fenceTokenHash`)
+      .run({
+        id: claim.workItemId,
+        missionId: claim.missionId,
+        claimedBy: claim.claimedBy,
+        claimedAt: claim.claimedAt,
+        itemRevision: claim.itemRevision,
+        attemptId: claim.attemptId,
+        fenceTokenHash: claim.fenceTokenHash,
+        status,
+        result: result ? JSON.stringify(result) : null,
+        ts: this.now(),
+      });
+    return info.changes === 1;
+  }
+
+  claimItem(id: string, by: string, fence?: MissionClaimFence): boolean {
+    return this.claimItemWithAuthority(id, by, fence) !== null;
+  }
+
   updateItemStatus(id: string, status: WorkItemStatus, result?: ResultLike): void {
-    this.db.prepare('UPDATE work_items SET status=?, last_result=COALESCE(?, last_result), revision=revision+1, updated_at=? WHERE id=?')
+    this.db.prepare(`UPDATE work_items SET status=?, last_result=COALESCE(?, last_result),
+      claim_attempt_id=NULL, claim_fence_token_hash=NULL, revision=revision+1, updated_at=? WHERE id=?`)
       .run(status, result ? JSON.stringify(result) : null, this.now(), id);
   }
   listItems(missionId: string): WorkItem[] {

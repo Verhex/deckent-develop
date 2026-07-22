@@ -1,18 +1,38 @@
 import { describe, it, expect } from 'vitest';
 import { buildMissionDispatch, type MissionDispatchDeps, type MissionTaskContext } from '../../../../src/orchestra/autonomous/mission-store/mission-dispatch.js';
-import type { ResultLike, WorkItem, WorkItemKind } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
+import type {
+  MissionDispatchClaim,
+  ResultLike,
+  WorkItem,
+  WorkItemKind,
+} from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 import type { ResolvedConfig } from '../../../../src/core/config-types.js';
 
 // Minimal ResolvedConfig stand-in — the dispatch only forwards it to runSprint,
 // it never reads fields. Cast keeps the test free of the full 700-field shape.
 const CONFIG = {} as ResolvedConfig;
+const CLAIM: MissionDispatchClaim = {
+  schemaVersion: 1,
+  workItemId: 'm-w0',
+  missionId: 'm',
+  claimedBy: 'scheduler',
+  claimedAt: '2026-07-22T00:00:00.000Z',
+  itemRevision: 1,
+  attemptId: 'attempt-1',
+  fenceToken: 'token-1',
+  fenceTokenHash: 'hash-1',
+  claimRegistryRevision: null,
+  claimRegistryDigest: null,
+};
 
 /** Build a WorkItem fixture; only id/kind/spec matter to the dispatch. */
 function mkItem(kind: WorkItemKind, spec: Record<string, unknown> | null = null, id = 'm-w0'): WorkItem {
   return {
     id, missionId: 'm', kind, status: 'running', spec,
     policy: 'auto', renderAs: 'task', progress: null, dependsOn: [], trigger: null,
-    claimedAt: null, claimedBy: null, createdAt: 't', updatedAt: 't', lastResult: null,
+    claimedAt: null, claimedBy: null, revision: 0, admissionFence: null,
+    claimRegistryRevision: null, claimRegistryDigest: null,
+    createdAt: 't', updatedAt: 't', lastResult: null,
   };
 }
 
@@ -33,10 +53,17 @@ describe('buildMissionDispatch — task', () => {
     const dispatch = buildMissionDispatch(baseDeps({
       runTask: async (ctx) => { calls.push(ctx); return { ok: true, reason: 'task done' }; },
     }));
-    const res = await dispatch(mkItem('task', { description: 'do the thing', model: 'opus', provider: 'claude', scopeDir: 'src/x' }));
+    const res = await dispatch(mkItem('task', { description: 'do the thing', model: 'opus', provider: 'claude', scopeDir: 'src/x' }), CLAIM);
     expect(res).toEqual({ ok: true, reason: 'task done' });
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toEqual({ projectRoot: '/proj', description: 'do the thing', model: 'opus', provider: 'claude', scopeDir: 'src/x' });
+    expect(calls[0]).toEqual({
+      projectRoot: '/proj',
+      description: 'do the thing',
+      model: 'opus',
+      provider: 'claude',
+      scopeDir: 'src/x',
+      dispatchClaim: CLAIM,
+    });
   });
 
   it('falls back to item.id as description when spec has none; omits absent optional fields', async () => {
@@ -44,8 +71,8 @@ describe('buildMissionDispatch — task', () => {
     const dispatch = buildMissionDispatch(baseDeps({
       runTask: async (ctx) => { captured = ctx; return { ok: true }; },
     }));
-    await dispatch(mkItem('task', null, 'm-w7'));
-    expect(captured).toEqual({ projectRoot: '/proj', description: 'm-w7' });
+    await dispatch(mkItem('task', null, 'm-w7'), { ...CLAIM, workItemId: 'm-w7' });
+    expect(captured).toEqual({ projectRoot: '/proj', description: 'm-w7', dispatchClaim: { ...CLAIM, workItemId: 'm-w7' } });
     expect(captured).not.toHaveProperty('model');
     expect(captured).not.toHaveProperty('provider');
     expect(captured).not.toHaveProperty('scopeDir');
@@ -55,7 +82,7 @@ describe('buildMissionDispatch — task', () => {
     const dispatch = buildMissionDispatch(baseDeps({
       runTask: async () => { throw new Error('worker exploded'); },
     }));
-    const res = await dispatch(mkItem('task', { description: 'x' }));
+    const res = await dispatch(mkItem('task', { description: 'x' }), CLAIM);
     expect(res).toEqual({ ok: false, reason: 'worker exploded' });
   });
 
@@ -67,7 +94,7 @@ describe('buildMissionDispatch — task', () => {
     await dispatch(mkItem('task', {
       description: 'bounded work',
       budget: { maxTokens: 12_000, maxTurns: 2 },
-    }));
+    }), CLAIM);
     expect(captured?.budget).toEqual({ maxTokens: 12_000, maxTurns: 2 });
   });
 
@@ -76,7 +103,7 @@ describe('buildMissionDispatch — task', () => {
     const dispatch = buildMissionDispatch(baseDeps({
       runTask: async (ctx) => { captured = ctx; return { ok: false, reason: 'invalid budget' }; },
     }));
-    const res = await dispatch(mkItem('task', { description: 'bad budget', budget: 'unbounded' }));
+    const res = await dispatch(mkItem('task', { description: 'bad budget', budget: 'unbounded' }), CLAIM);
     expect(res).toEqual({ ok: false, reason: 'invalid budget' });
     expect(captured).toHaveProperty('budget', 'unbounded');
   });
@@ -88,7 +115,7 @@ describe('buildMissionDispatch — sprint', () => {
     const dispatch = buildMissionDispatch(baseDeps({
       runSprint: async (root, cfg) => { args.push([root, cfg]); return { sprintId: 's-1' }; },
     }));
-    const res = await dispatch(mkItem('sprint'));
+    const res = await dispatch(mkItem('sprint'), CLAIM);
     expect(res).toEqual({ ok: true, reason: 'sprint completed' });
     expect(args).toEqual([['/proj', CONFIG]]);
   });
@@ -97,7 +124,7 @@ describe('buildMissionDispatch — sprint', () => {
     const dispatch = buildMissionDispatch(baseDeps({
       runSprint: async () => { throw new Error('boom'); },
     }));
-    const res = await dispatch(mkItem('sprint'));
+    const res = await dispatch(mkItem('sprint'), CLAIM);
     expect(res).toEqual({ ok: false, reason: 'boom' });
   });
 });
@@ -109,14 +136,14 @@ describe('buildMissionDispatch — capability', () => {
     const dispatch = buildMissionDispatch(baseDeps({
       runCapability: async (t) => { seen.push(t); return { ok: true, reason: 'mail.send fulfilled' }; },
     }));
-    const res = await dispatch(mkItem('capability', { capabilityTarget: target }));
+    const res = await dispatch(mkItem('capability', { capabilityTarget: target }), CLAIM);
     expect(res).toEqual({ ok: true, reason: 'mail.send fulfilled' });
     expect(seen).toEqual([target]);
   });
 
   it('fails with "no capability broker" when runCapability dep is absent', async () => {
     const dispatch = buildMissionDispatch(baseDeps()); // no runCapability
-    const res = await dispatch(mkItem('capability', { capabilityTarget: { capability: 'db.query' } }));
+    const res = await dispatch(mkItem('capability', { capabilityTarget: { capability: 'db.query' } }), CLAIM);
     expect(res).toEqual({ ok: false, reason: 'no capability broker' });
   });
 
@@ -125,7 +152,7 @@ describe('buildMissionDispatch — capability', () => {
     const dispatch = buildMissionDispatch(baseDeps({
       runCapability: async () => { called = true; return { ok: true }; },
     }));
-    const res = await dispatch(mkItem('capability', {}));
+    const res = await dispatch(mkItem('capability', {}), CLAIM);
     expect(res).toEqual({ ok: false, reason: 'capability item has no spec.capabilityTarget' });
     expect(called).toBe(false); // broker never invoked without a target
   });
@@ -140,7 +167,7 @@ describe('buildMissionDispatch — process & unknown', () => {
       runTask: async () => { taskCalled = true; return { ok: true }; },
       runProcess: async (s) => { seen.push(s); return { ok: true, reason: 'process broker done' }; },
     }));
-    const res = await dispatch(mkItem('process', spec));
+    const res = await dispatch(mkItem('process', spec), CLAIM);
     expect(res).toEqual({ ok: true, reason: 'process broker done' });
     expect(seen).toEqual([spec]);
     expect(taskCalled).toBe(false); // broker owns the whole process — no per-step task dispatch
@@ -153,7 +180,7 @@ describe('buildMissionDispatch — process & unknown', () => {
     }));
     const res = await dispatch(mkItem('process', {
       steps: [{ description: 'step-one' }, { description: 'step-two' }, { description: 'step-three' }],
-    }));
+    }), CLAIM);
     expect(res).toEqual({ ok: true, reason: 'process completed (3 steps)' });
     expect(order).toEqual(['step-one', 'step-two', 'step-three']); // sequential, in spec order
   });
@@ -168,7 +195,7 @@ describe('buildMissionDispatch — process & unknown', () => {
     }));
     const res = await dispatch(mkItem('process', {
       steps: [{ description: 'step-one' }, { description: 'step-two' }, { description: 'step-three' }],
-    }));
+    }), CLAIM);
     expect(res).toEqual({ ok: false, reason: 'process step 2 failed: boom' });
     expect(order).toEqual(['step-one', 'step-two']); // step-three never reached
   });
@@ -178,14 +205,14 @@ describe('buildMissionDispatch — process & unknown', () => {
     const dispatch = buildMissionDispatch(baseDeps({
       runTask: async () => { taskCalled = true; return { ok: true }; },
     }));
-    const res = await dispatch(mkItem('process', { description: 'multi-step' })); // no runProcess, no steps
+    const res = await dispatch(mkItem('process', { description: 'multi-step' }), CLAIM); // no runProcess, no steps
     expect(res).toEqual({ ok: false, reason: 'process kind requires a runProcess broker or a non-empty spec.steps[]' });
     expect(taskCalled).toBe(false); // never silently degraded to a single task
   });
 
   it('reports an explicit reason for an unknown (runtime-malformed) kind', async () => {
     const dispatch = buildMissionDispatch(baseDeps());
-    const res: ResultLike = await dispatch(mkItem('bogus' as WorkItemKind));
+    const res: ResultLike = await dispatch(mkItem('bogus' as WorkItemKind), CLAIM);
     expect(res.ok).toBe(false);
     expect(res.reason).toBe('unknown work item kind: bogus');
   });

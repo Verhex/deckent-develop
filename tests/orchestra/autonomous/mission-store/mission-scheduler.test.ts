@@ -9,7 +9,10 @@ import {
   admitWorkItemBatch,
   bindMissionRunnerRegistry,
 } from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
-import type { MissionClaimFence } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
+import type {
+  MissionClaimFence,
+  MissionDispatchClaim,
+} from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 
 const dirs: string[] = [];
 function storeWith(missionId: string, n: number): SqliteMissionStore {
@@ -47,6 +50,29 @@ describe('runMissionScheduler — concurrency', () => {
     expect(calls.size).toBe(6);
     s.close();
   });
+
+  it('passes the exact claim authority to dispatch and settles through that authority', async () => {
+    const s = storeWith('authority', 1);
+    let seen: MissionDispatchClaim | undefined;
+    await runMissionScheduler(s, async (_item, claim) => {
+      seen = claim;
+      return { ok: true, reason: 'settled' };
+    }, { poolSize: 1, intervalMs: 1, maxIterations: 10 });
+
+    expect(seen).toMatchObject({
+      schemaVersion: 1,
+      workItemId: 'authority-w0',
+      missionId: 'authority',
+      claimedBy: 'scheduler',
+    });
+    expect(s.__rawGet(`SELECT status,claim_attempt_id,claim_fence_token_hash
+      FROM work_items WHERE id='authority-w0'`)).toEqual({
+      status: 'done',
+      claim_attempt_id: null,
+      claim_fence_token_hash: null,
+    });
+    s.close();
+  });
 });
 
 describe('runMissionScheduler — mission settlement', () => {
@@ -75,15 +101,34 @@ describe('runMissionScheduler — mission settlement', () => {
 });
 
 describe('runMissionScheduler — robustness', () => {
+  it('does not let a stale dispatch settlement overwrite a concurrent transition', async () => {
+    const s = storeWith('stale-settle', 1);
+    const summary = await runMissionScheduler(s, async (item) => {
+      s.updateItemStatus(item.id, 'pending', { ok: false, reason: 'new authority required' });
+      return { ok: true, reason: 'stale success' };
+    }, { poolSize: 1, intervalMs: 1, maxIterations: 1 });
+
+    expect(summary.dispatched).toBe(1);
+    expect(s.listItems('stale-settle')[0]).toMatchObject({
+      status: 'pending',
+      lastResult: { ok: false, reason: 'new authority required' },
+    });
+    s.close();
+  });
+
   it('does not dispatch or increment dispatched when the query-to-claim row revision turns stale', async () => {
     class RacingStore extends SqliteMissionStore {
       private raced = false;
-      override claimItem(id: string, by: string, fence?: MissionClaimFence): boolean {
+      override claimItemWithAuthority(
+        id: string,
+        by: string,
+        fence?: MissionClaimFence,
+      ): MissionDispatchClaim | null {
         if (fence && !this.raced) {
           this.raced = true;
           this.updateItemStatus(id, 'pending', { ok: false, reason: 'concurrent transition' });
         }
-        return super.claimItem(id, by, fence);
+        return super.claimItemWithAuthority(id, by, fence);
       }
     }
     const d = mkdtempSync(join(tmpdir(), 'sched-race-')); dirs.push(d);

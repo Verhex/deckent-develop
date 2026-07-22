@@ -49,6 +49,8 @@ describe('SqliteMissionStore — schema', () => {
     expect(columns.names).toContain('revision');
     expect(columns.names).toContain('claim_registry_revision');
     expect(columns.names).toContain('claim_registry_digest');
+    expect(columns.names).toContain('claim_attempt_id');
+    expect(columns.names).toContain('claim_fence_token_hash');
     expect(store.__rawGet("SELECT id,revision FROM work_items WHERE id='legacy-task'"))
       .toEqual({ id: 'legacy-task', revision: 0 });
     expect(store.__rawTableNames()).toContain('work_item_admission_fences');

@@ -1,11 +1,17 @@
-import type { MissionStore, WorkItem, Mission, ResultLike } from './mission-types.js';
+import type {
+  MissionDispatchClaim,
+  MissionStore,
+  WorkItem,
+  Mission,
+  ResultLike,
+} from './mission-types.js';
 import type { MissionApprovalCoordinatorLike } from './mission-approval-coordinator.js';
 import type { BoundMissionRunnerRegistryV1 } from './mission-kind-admission.js';
 
 /** Executes one claimed work item. Injected — composition root wires the real
  *  runTask/runSprint/broker; tests inject a fake. Resolve on completion; a thrown
  *  error is caught by the scheduler and recorded as failed. */
-export type DispatchFn = (item: WorkItem) => Promise<ResultLike>;
+export type DispatchFn = (item: WorkItem, claim: MissionDispatchClaim) => Promise<ResultLike>;
 
 export interface MissionSchedulerOptions {
   poolSize: number;
@@ -130,7 +136,8 @@ export async function runMissionScheduler(
             registry: opts.runtimeRegistry.descriptor,
           }
           : undefined;
-        if (!store.claimItem(item.id, 'scheduler', claimFence)) {
+        const claim = store.claimItemWithAuthority(item.id, 'scheduler', claimFence);
+        if (!claim) {
           try { checkMissionComplete(store, item.missionId, opts); } catch { /* fail-safe */ }
           continue; // someone else won / fence changed
         }
@@ -138,9 +145,11 @@ export async function runMissionScheduler(
         dispatched++; claimedThisTick++;
         if (cap !== undefined) perTenantFlight.set(tenant, (perTenantFlight.get(tenant) ?? 0) + 1);
         const p: Promise<void> = Promise.resolve()
-          .then(() => (opts.runtimeRegistry ? opts.runtimeRegistry.dispatch(item) : dispatch(item)))
-          .then((r) => store.updateItemStatus(item.id, r.ok ? 'done' : 'failed', r))
-          .catch((e) => store.updateItemStatus(item.id, 'failed', { ok: false, reason: String((e as Error)?.message ?? e) }))
+          .then(() => (opts.runtimeRegistry ? opts.runtimeRegistry.dispatch(item, claim) : dispatch(item, claim)))
+          .then((r) => { store.settleClaimedItem(claim, r.ok ? 'done' : 'failed', r); })
+          .catch((e) => {
+            store.settleClaimedItem(claim, 'failed', { ok: false, reason: String((e as Error)?.message ?? e) });
+          })
           .finally(() => {
             inFlight.delete(p);
             if (cap !== undefined) perTenantFlight.set(tenant, (perTenantFlight.get(tenant) ?? 1) - 1);

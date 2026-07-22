@@ -60,6 +60,75 @@ describe('WorkItems + atomic claim', () => {
     s.close();
   });
 
+  it('issues one exact dispatch authority and persists only its token hash', () => {
+    const s = freshMission();
+    s.enqueueItem({ id: 'authority', missionId: 'm', kind: 'task' });
+
+    const claims = [0, 1, 2, 3].map((index) => s.claimItemWithAuthority('authority', `caller-${index}`));
+    const winners = claims.filter((claim) => claim !== null);
+    expect(winners).toHaveLength(1);
+    const claim = winners[0]!;
+    expect(claim).toMatchObject({
+      schemaVersion: 1,
+      workItemId: 'authority',
+      missionId: 'm',
+      itemRevision: 1,
+    });
+    const row = s.__rawGet(`SELECT claim_attempt_id,claim_fence_token_hash
+      FROM work_items WHERE id='authority'`);
+    expect(row).toEqual({
+      claim_attempt_id: claim.attemptId,
+      claim_fence_token_hash: claim.fenceTokenHash,
+    });
+    expect(JSON.stringify(row)).not.toContain(claim.fenceToken);
+    s.close();
+  });
+
+  it('settles an exact claim once and rejects wrong, stale, or replayed authority', () => {
+    const s = freshMission();
+    s.enqueueItem({ id: 'settle', missionId: 'm', kind: 'task' });
+    const claim = s.claimItemWithAuthority('settle', 'scheduler')!;
+    const before = s.__rawGet("SELECT status,revision,last_result FROM work_items WHERE id='settle'");
+
+    expect(s.settleClaimedItem({ ...claim, claimedBy: 'other' }, 'done', { ok: true })).toBe(false);
+    expect(s.settleClaimedItem({ ...claim, attemptId: 'other' }, 'done', { ok: true })).toBe(false);
+    expect(s.settleClaimedItem({ ...claim, itemRevision: claim.itemRevision + 1 }, 'done', { ok: true })).toBe(false);
+    expect(s.settleClaimedItem({ ...claim, fenceToken: 'wrong' }, 'done', { ok: true })).toBe(false);
+    expect(s.__rawGet("SELECT status,revision,last_result FROM work_items WHERE id='settle'"))
+      .toEqual(before);
+
+    expect(s.settleClaimedItem(claim, 'done', { ok: true, reason: 'exact' })).toBe(true);
+    expect(s.settleClaimedItem(claim, 'failed', { ok: false, reason: 'replay' })).toBe(false);
+    expect(s.__rawGet(`SELECT status,revision,last_result,claim_attempt_id,claim_fence_token_hash
+      FROM work_items WHERE id='settle'`)).toEqual({
+      status: 'done',
+      revision: claim.itemRevision + 1,
+      last_result: JSON.stringify({ ok: true, reason: 'exact' }),
+      claim_attempt_id: null,
+      claim_fence_token_hash: null,
+    });
+    s.close();
+  });
+
+  it('recovery revokes an orphaned claim so its old authority can never settle', () => {
+    const s = freshMission();
+    s.enqueueItem({ id: 'orphan', missionId: 'm', kind: 'task' });
+    const claim = s.claimItemWithAuthority('orphan', 'dead-worker')!;
+
+    s.recover();
+
+    expect(s.settleClaimedItem(claim, 'done', { ok: true })).toBe(false);
+    expect(s.__rawGet(`SELECT status,claimed_at,claimed_by,claim_attempt_id,claim_fence_token_hash
+      FROM work_items WHERE id='orphan'`)).toEqual({
+      status: 'parked',
+      claimed_at: null,
+      claimed_by: null,
+      claim_attempt_id: null,
+      claim_fence_token_hash: null,
+    });
+    s.close();
+  });
+
   it('claimItem skips an already-running item; updateItemStatus persists result', () => {
     const s = freshMission();
     s.enqueueItem({ id: 'w', missionId: 'm', kind: 'task' });
