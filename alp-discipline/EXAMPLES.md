@@ -24,8 +24,9 @@ Direct interviews were the planned method.
   the declared research question, not a feeling. The researcher stops before collecting
   further, and carries the evidence plus the smallest counter-proposal (add a pharmacy-records
   arm) to the supervisor and the board. The decision stays with them.
-- **Altitude (P4).** Adding the records arm is declared as a *bounded coherent change* to the
-  study design — not slipped in as a silent patch to the sampling section.
+- **Altitude (P4).** Adding the records arm is declared as a *slice* (a bounded, internally
+  complete change) to the study design — not slipped in as a silent patch to the sampling
+  section.
 
 ## 2 — Operations (non-software)
 

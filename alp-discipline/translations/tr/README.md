@@ -30,6 +30,8 @@ koordinatörü, solo kurucu ya da bir AI ajanı. Teknik geçmiş gerektirmez.
 
 ## Dört ilke tek bakışta
 
+*(Tanıtım-özetidir — tek yetkili sıkıştırılmış yüzey [ESSENCE.md](ESSENCE.md)'dir.)*
+
 1. **Önce negatif alanı çiz** — ne *yapmayacağını* adlandır; taşıyıcı sınırları
    ihlal-örneğiyle anladığını kanıtla.
 2. **Genişleme gereksinime verilir, yaklaşıma değil** — yaklaşımını engelleyen sınır işini

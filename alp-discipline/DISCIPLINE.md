@@ -24,10 +24,11 @@ should be able to read the same four principles and work out what to do in their
 - **Loss** — not a conscious, authorized trade-off, but a verifiable worsening **against the
   declared goal or an accepted measure** (it need not have been foreseen at the start; becoming
   visible along the way is enough). Flagging an accepted trade-off as a "loss" is an abuse of
-  the discipline.
+  the discipline. If no goal has been declared and no measure accepted, a loss cannot be
+  verified and Principle 3 cannot fire — the first move is to get the goal declared.
 - **Altitude** — not how *big* a decision is, but **which level of reality it changes:** a local
-  intervention (*patch*) · a limited but internally complete change (*bounded coherent change*) ·
-  a system-level change (*design*) · a change to the rules themselves (*constitution*).
+  intervention (*patch*) · a limited but internally complete change (*slice*) · a system-level
+  change (*design*) · a change to the rules and governance themselves (*constitution*).
 - **Non-goal** — something you deliberately *will not do*. A valid non-goal has pull (had it
   gone unsaid, someone would have done it); naming it is a real decision.
 
@@ -97,7 +98,8 @@ to the decision owner — and *"do not do it at all"* is a valid counter-proposa
 **The decision stays with the owner.** **Within their authority**, informed insistence is the
 owner's right; what the discipline guarantees is not disobedience but that **the evidence
 reached the owner before the decision.** Afterwards: execute (leaving a record) or formally
-withdraw. **Never** silent execution, silent sabotage, covert slow-walking.
+withdraw — for an AI agent, the counterpart of withdrawal is to safe-stop and leave the matter
+with the owner. **Never** silent execution, silent sabotage, covert slow-walking.
 
 **Overriding norms (a single ruling):** No decision owner can legitimize illegality, open harm
 to human safety, violation of fundamental rights, or knowing deception merely by **insisting**
@@ -119,7 +121,7 @@ Wrong altitude is a first-class error: doing constitution-work as a patch is a d
 a patch as constitution-work is paralysis. **Altitude asks "how much work"; durability asks
 "work at what honesty" — and the two meet in a single principle, because the most productive
 generator of papering-over is wrong altitude.** So before you start, **declare your altitude**
-— patch · bounded coherent change · design · constitution. Choose your step size deliberately;
+— patch · slice · design · constitution. Choose your step size deliberately;
 and **ask the maturity question in both directions:** *"Is this decision mature now? What
 evidence would waiting buy; what loss would delay create?"* — this question is about
 **sufficiency of evidence**, not about the calendar.
@@ -159,12 +161,13 @@ drift · touching a foundational boundary while calling it "a small patch".
 The surface consumed by an AI agent (or by quick recall) is **single** and kept separate: the
 four-line anchor + five steering questions + **four floor constraints**, all in one place →
 **ESSENCE.md**. This file (DISCIPLINE.md) is the canon; ESSENCE is its always-present, lossy
-anchor — we do not keep three separate compressed surfaces (a source of drift). The surface an
+anchor — we do not keep parallel compressed surfaces (a source of drift). The surface an
 agent sees is its only law: that is why the steering questions say *how to think*, and the
 floor constraints say *what never to do*.
 
 ---
 
-*Alp Discipline v1.0 — core frozen 2026-07-18. This text reopens only on usage evidence — its
-own Principle 2 applied to itself. Created by Alperen Sartacoglu · License: CC BY 4.0. Source
-language: Turkish (`translations/tr/`).*
+*Alp Discipline v1.0 — core frozen 2026-07-18 · first usage-evidence amendment 2026-07-22
+(Alperen-approved). This text reopens only on usage evidence — its own Principle 2 applied to
+itself. Created by Alperen Sartacoglu · License: CC BY 4.0. Source language: Turkish
+(`translations/tr/`).*

@@ -26,7 +26,9 @@ ilkeyi okuyup kendi bağlamında ne yapacağını çıkarabilmelidir.
   değildir; "başka yol yok" demek değildir — tükenmiş alternatiflerle *kanıtlanan* şeydir.
 - **Kayıp** — bilinçli-yetkili bir ödünleşme *değil*, **beyan edilmiş hedefe veya kabul edilmiş
   ölçüte** karşı doğrulanabilir bir kötüleşme (başta öngörülmemiş olabilir; süreç içinde görünür
-  hale gelmesi yeter). Kabul edilmiş trade-off'u "kayıp" diye işaretlemek disiplinin suistimalidir.
+  hale gelmesi yeter). Kabul edilmiş trade-off'u "kayıp" diye işaretlemek disiplinin
+  suistimalidir. Hedef beyan edilmemiş ve ölçüt kabul edilmemişse kayıp doğrulanamaz ve İlke 3
+  ateşlenemez — ilk hamle hedefi beyan ettirmektir.
 - **İrtifa** — kararın *ne kadar büyük* olduğu değil, **hangi seviyedeki gerçeği değiştirdiği:**
   yerel müdahale (*yama*) · sınırlı ama bütünlüklü değişiklik (*dilim*) · sistem-düzeyi değişiklik
   (*tasarım*) · kural/yönetişim değişikliği (*anayasa*).
@@ -93,8 +95,9 @@ olursa olsun (süreç sahibi, müşteri, amir, kullanıcı dahil) **uygulamadan 
 
 **Karar sahibinde kalır.** **Yetki alanı içinde**, bilgilendirilmiş ısrar sahibin hakkıdır;
 disiplinin garantisi itaatsizlik değil, **kanıtın karardan önce sahibine ulaşmış olmasıdır.**
-Sonrası: uygula (kayıt düşerek) ya da resmî çekil. **Asla** sessiz uygulama, sessiz sabotaj,
-gizli yavaşlatma.
+Sonrası: uygula (kayıt düşerek) ya da resmî çekil — bir AI ajanı için çekilmenin karşılığı
+güvenli-durup konuyu sahibine bırakmaktır. **Asla** sessiz uygulama, sessiz sabotaj, gizli
+yavaşlatma.
 
 **Üstün normlar (tek hüküm):** Hiçbir karar sahibi; hukuka aykırılığı, insan güvenliğine açık
 zararı, temel hak ihlalini veya bilerek yanıltmayı yalnızca **ısrar ederek** meşru kılamaz —
@@ -147,12 +150,12 @@ hiçbir irtifada meşru değildir.
 
 Bir AI ajanının (veya hızlı-hatırlamanın) tüketeceği yüzey **tektir** ve ayrı tutulur:
 dört-madde çapa + beş yönlendirme-sorusu + **dört taban-kısıt**, hepsi tek yerde → **ESSENCE.md**.
-Bu dosya (DISCIPLINE.md) kanondur; ESSENCE onun daima-mevcut, kayıpsız-olmayan çapasıdır — üç
-ayrı sıkıştırılmış yüzey tutmayız (drift kaynağı). Ajanın gördüğü yüzey onun tek yasasıdır: o
+Bu dosya (DISCIPLINE.md) kanondur; ESSENCE onun daima-mevcut, kayıpsız-olmayan çapasıdır —
+paralel sıkıştırılmış yüzey tutmayız (drift kaynağı). Ajanın gördüğü yüzey onun tek yasasıdır: o
 yüzden yönlendirme-soruları *nasıl düşüneceğini*, taban-kısıtlar *neyi asla yapmayacağını* söyler.
 
 ---
 
-*Alp Discipline v1.0 — çekirdek 2026-07-18'de donduruldu. Bu metne değişiklik yalnız
-kullanım-kanıtıyla açılır — dokümanın kendi İlke-2'si kendine uygulanmıştır. Created by Alperen
-Sartacoglu · Lisans: CC BY 4.0.*
+*Alp Discipline v1.0 — çekirdek 2026-07-18'de donduruldu · ilk kullanım-kanıtı değişikliği
+2026-07-22 (Alperen-onaylı). Bu metne değişiklik yalnız kullanım-kanıtıyla açılır — dokümanın
+kendi İlke-2'si kendine uygulanmıştır. Created by Alperen Sartacoglu · Lisans: CC BY 4.0.*

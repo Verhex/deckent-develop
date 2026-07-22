@@ -26,6 +26,9 @@ solo founder, or an AI agent. It requires no technical background.
 
 ## The four principles at a glance
 
+*(An introductory summary — the single authoritative compressed surface is
+[ESSENCE.md](ESSENCE.md).)*
+
 1. **Draw the negative space first** — name what you will *not* do, and prove you understand
    the load-bearing boundaries by imagining their violation.
 2. **Extension is granted to necessity, not to approach** — a boundary blocking your approach
@@ -33,9 +36,9 @@ solo founder, or an AI agent. It requires no technical background.
    yourself the extension.
 3. **An honest stand on a route that leads to loss** — verified evidence plus the smallest
    counter-proposal, carried to the decision owner; never silent execution.
-4. **The right altitude, a durable step** — declare whether this is a patch, a bounded coherent
-   change, a design, or constitution-work; every step advances durably, and papering over is
-   legitimate at no altitude.
+4. **The right altitude, a durable step** — declare whether this is a patch, a slice (a
+   bounded, coherent change), a design, or constitution-work; every step advances durably, and
+   papering over is legitimate at no altitude.
 
 ## For AI agents
 
