@@ -19,6 +19,7 @@ import {
 import { TaskEvaluation, TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskResult, ResolvedConfig, ProviderName, CrossVerifyConfig } from '../../src/core/types.js';
 import { TASKS_DIR } from '../../src/core/constants.js';
+import { ensureOllamaModelRegistered } from '../../src/core/model-registry.js';
 import {
   claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlement,
@@ -667,6 +668,24 @@ describe('runCrossVerify — REFUTED enforcement (323-004 / A18)', () => {
 });
 
 describe('runCrossVerify — honest-skip paths', () => {
+  it('uses catalog local economics for an Ollama verifier without owner remote budget', async () => {
+    writeResultFile('276-001', makeResult());
+    ensureOllamaModelRegistered('qwen3.6:27b');
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED local verifier completed');
+    const res = await runCrossVerify(
+      root, makeTask(), makeResult(), TaskEvaluation.DONE,
+      makeConfig({ enabled: true, high_stakes_only: false }, { execution_budget: undefined }),
+      {
+        availableProviders: ['claude', 'ollama'],
+        verifierModel: 'qwen3.6:27b',
+        spawnVerifier: fn,
+      },
+    );
+    expect(res.outcome).toBe('confirmed');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ verifierProvider: 'ollama', executionBudget: undefined });
+  });
+
   it('missing auditor budget policy → durable HOLD before verifier dispatch', async () => {
     writeResultFile('276-001', makeResult());
     const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED must not run');

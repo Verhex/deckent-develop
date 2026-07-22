@@ -6,6 +6,8 @@ import type {
   ResolvedConfig,
 } from './config-types.js';
 import { resolveExecutionBudgetPolicy } from './execution-budget-policy.js';
+import { resolveProviderExecutionCostClass } from './provider-execution-profile.js';
+import { providerRegistry } from './provider.js';
 import { getProviderForModel } from './task-types.js';
 import type {
   ProviderName,
@@ -95,7 +97,10 @@ function budgetSnapshotFor(
   configuredProvider?: ProviderName | null,
 ): TaskExecutionBudgetPolicySnapshot {
   const resolvedProvider = resolveProvider(task, configuredProvider);
-  const executionCostClass = resolvedProvider === 'ollama' ? 'local' : 'remote';
+  const adapterDeclaration = providerRegistry.hasProvider(resolvedProvider)
+    ? providerRegistry.getProvider(resolvedProvider).executionCostClass
+    : undefined;
+  const executionCostClass = resolveProviderExecutionCostClass(resolvedProvider, adapterDeclaration);
   const requestedBudget = task.budgetPolicy?.requestedBudget ?? task.budget;
   const decision = resolveExecutionBudgetPolicy({
     policy,

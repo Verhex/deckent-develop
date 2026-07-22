@@ -32,6 +32,7 @@ import type { Task, TaskResult, ProviderName, CrossVerifyEvidence } from '../cor
 import type { ResolvedConfig } from '../core/types.js';
 import type { ExecutionBudget } from '../core/work-model.js';
 import { resolveExecutionBudgetPolicy } from '../core/execution-budget-policy.js';
+import { resolveProviderExecutionCostClass } from '../core/provider-execution-profile.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { DeckentError } from '../core/errors.js';
 import { debugLog } from '../core/utils.js';
@@ -567,7 +568,12 @@ export async function runCrossVerify(
       policy: config.execution_budget,
       role: 'auditor',
       taskKind: 'audit',
-      executionCostClass: verifierProvider === 'ollama' ? 'local' : 'remote',
+      executionCostClass: resolveProviderExecutionCostClass(
+        verifierProvider,
+        providerRegistry.hasProvider(verifierProvider)
+          ? providerRegistry.getProvider(verifierProvider).executionCostClass
+          : undefined,
+      ),
     });
     if (budgetDecision.state === 'hold') {
       const reason = `verifier-budget-hold:${budgetDecision.reasonCode}:${budgetDecision.profileRef}`;

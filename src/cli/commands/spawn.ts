@@ -25,6 +25,7 @@ import {
   assertLiveUsageBudgetSupport,
 } from '../../core/live-execution-budget.js';
 import { resolveTaskExecutionBudget } from '../../orchestra/runtime-budget-monitor.js';
+import { resolveProviderExecutionCostClass } from '../../core/provider-execution-profile.js';
 import {
   assertTaskResultSettlementRef,
   createTaskResultSettlementRef,
@@ -90,12 +91,13 @@ export async function spawnWorkerMultiProvider(
     registerOpenRouterModelFromCache(root, model);
   }
   const provider = getProviderForModel(model as ModelType);
+  const registeredAdapter = getProviderAdapterForTask(provider);
   // Admission happens before provider bootstrap/session/backend creation. A
   // budgetless remote one-shot must produce exactly zero external side effects.
   assertExecutionBudgetShape(
     executionBudget,
     provider,
-    provider === 'ollama' ? 'local' : 'remote',
+    resolveProviderExecutionCostClass(provider, registeredAdapter?.executionCostClass),
   );
 
   // F1-RE (268-003): resolve the model reasoning-effort ONCE for the resolved
@@ -148,7 +150,7 @@ export async function spawnWorkerMultiProvider(
         executionBudget,
         adapter.liveUsageBudgetSupport,
         adapter.name,
-        adapter.executionCostClass,
+        resolveProviderExecutionCostClass(provider, adapter.executionCostClass),
       );
       const refresh = (adapter as { refreshSupportedModels?: () => Promise<void> }).refreshSupportedModels;
       if (typeof refresh === 'function') {

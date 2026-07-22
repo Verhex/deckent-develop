@@ -25,6 +25,7 @@ import type {
   ProviderAvailabilityDetail,
 } from '../core/provider.js';
 import { ProviderError, buildCliInvocation, scrubCrossProviderEnv } from '../core/provider.js';
+import { resolveProviderExecutionCostClass } from '../core/provider-execution-profile.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
 import type { ModelTier } from '../core/model-equivalence.js';
@@ -179,7 +180,7 @@ export interface HealthGateResult {
  */
 export class OllamaAdapter implements ProviderAdapter {
   readonly name = 'ollama';
-  readonly executionCostClass = 'local' as const;
+  readonly executionCostClass = resolveProviderExecutionCostClass(this.name);
   // `OllamaModel` runs alongside the existing ModelType union but is not yet
   // a member of it (task-types.ts widening is out of scope — see model-registry).
   // The cast is structural-only; at runtime these are plain string ids.
