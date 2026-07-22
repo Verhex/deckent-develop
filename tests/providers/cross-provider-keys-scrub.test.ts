@@ -38,11 +38,12 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn().mockReturnValue(true),
   openSync: vi.fn().mockReturnValue(3),
   closeSync: vi.fn(),
+  readFileSync: vi.fn().mockReturnValue('{"budget":{"maxTokens":1000000}}'),
 }));
 
 // ─── Fixtures ────────────────────────────────────────────────────────
 
-/** The pre-phase-2 static base scrub set, in canonical map order. */
+/** The current static base scrub set, in canonical order. */
 const BASE_KEYS = [
   'ANTHROPIC_API_KEY',
   'OPENAI_API_KEY',
@@ -50,6 +51,7 @@ const BASE_KEYS = [
   'DEEPSEEK_API_KEY',
   'DASHSCOPE_API_KEY',
   'ZHIPU_API_KEY',
+  'OPENROUTER_API_KEY',
 ];
 
 /** A config-driven openai-compatible provider whose credential is NOT a built-in. */
@@ -60,7 +62,7 @@ const MY_LLM_REGISTRY: readonly ProviderDefinition[] = [
 // ─── (A) resolver — pure, no env / no I/O ─────────────────────────────
 
 describe('F1-014 phase-2 (A): resolveCrossProviderCredentialKeys', () => {
-  it('returns the static base set (no registry) — byte-for-byte the legacy literal set', () => {
+  it('returns the static base set (no registry), including non-ambient OpenRouter auth', () => {
     expect(resolveCrossProviderCredentialKeys()).toEqual(BASE_KEYS);
     expect(resolveCrossProviderCredentialKeys({})).toEqual(BASE_KEYS);
     expect(resolveCrossProviderCredentialKeys({ registry: [] })).toEqual(BASE_KEYS);
@@ -118,6 +120,8 @@ function makeConfig(cliCommand: string, name: string): SubprocessProviderConfig 
     supportedModels: [],
     buildArgs: () => [],
     buildCommandString: () => '',
+    liveStreamArgs: [],
+    liveBudgetEvidenceTrust: 'host-isolated',
   };
 }
 

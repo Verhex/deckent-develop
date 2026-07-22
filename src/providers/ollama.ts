@@ -24,8 +24,9 @@ import type {
   ProviderSpawnOptions,
   ProviderAvailabilityDetail,
 } from '../core/provider.js';
-import { ProviderError, buildCliInvocation } from '../core/provider.js';
+import { ProviderError, buildCliInvocation, scrubCrossProviderEnv } from '../core/provider.js';
 import { TASKS_DIR } from '../core/constants.js';
+import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
 import type { ModelTier } from '../core/model-equivalence.js';
 import {
   modelRegistry,
@@ -219,6 +220,7 @@ export class OllamaAdapter implements ProviderAdapter {
    * without a real spawn. Defaults to `process.platform`.
    */
   private readonly platform: NodeJS.Platform;
+  private readonly credentialEnvKeys: readonly string[];
 
   /**
    * Cache of model ids returned by the live `/api/tags` probe (T-233-002).
@@ -237,6 +239,7 @@ export class OllamaAdapter implements ProviderAdapter {
       workerEntryPath?: string;
       spawnImpl?: typeof spawn;
       platform?: NodeJS.Platform;
+      credentialEnvKeys?: readonly string[];
     },
   ) {
     this.projectDir = projectDir;
@@ -246,6 +249,9 @@ export class OllamaAdapter implements ProviderAdapter {
     this.workerEntryPath = opts?.workerEntryPath ?? DEFAULT_WORKER_ENTRY_PATH;
     this.spawnImpl = opts?.spawnImpl ?? spawn;
     this.platform = opts?.platform ?? process.platform;
+    this.credentialEnvKeys = Object.freeze([
+      ...(opts?.credentialEnvKeys ?? resolveCrossProviderCredentialKeys()),
+    ]);
   }
 
   // ─── spawn() ───────────────────────────────────────────────────────
@@ -295,7 +301,10 @@ export class OllamaAdapter implements ProviderAdapter {
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['ignore', logFd, logFd],
-      env: { ...process.env, ...(opts?.env ?? {}) },
+      env: scrubCrossProviderEnv(
+        { ...process.env, ...(opts?.env ?? {}) },
+        this.credentialEnvKeys,
+      ),
       shell: inv.shell,
     };
 
@@ -799,7 +808,12 @@ function ensureDir(dir: string): void {
  */
 export function createOllamaAdapter(
   projectDir: string,
-  opts?: { defaultTimeoutMs?: number; host?: string; fetchImpl?: typeof fetch },
+  opts?: {
+    defaultTimeoutMs?: number;
+    host?: string;
+    fetchImpl?: typeof fetch;
+    credentialEnvKeys?: readonly string[];
+  },
 ): OllamaAdapter {
   return new OllamaAdapter(projectDir, opts);
 }

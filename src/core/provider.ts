@@ -1360,6 +1360,11 @@ export async function bootstrapProviders(
       ? new DeckBroker(root, { providerRegistry: config.providers?.registry })
       : null;
 
+  const { resolveCrossProviderCredentialKeys } = await import('../providers/cross-provider-keys.js');
+  const credentialEnvKeys = Object.freeze(
+    resolveCrossProviderCredentialKeys({ registry: config.providers?.registry }),
+  );
+
   const detected = await detectAvailableProviders();
 
   const registered: ProviderName[] = [];
@@ -1393,7 +1398,7 @@ export async function bootstrapProviders(
     // to Claude.
     ollama: async () => {
       const { createOllamaAdapter } = await import('../providers/ollama.js');
-      return createOllamaAdapter(root);
+      return createOllamaAdapter(root, { credentialEnvKeys });
     },
   };
 
@@ -1463,12 +1468,13 @@ export async function bootstrapProviders(
       }
       try {
         const adapter = candidate.preset
-          ? OPENAI_COMPAT_PRESETS[candidate.preset]()
+          ? OPENAI_COMPAT_PRESETS[candidate.preset](undefined, credentialEnvKeys)
           : new OpenAICompatibleAdapter({
               name: candidate.name,
               baseURL: candidate.baseURL!,
               apiKeyEnv: candidate.apiKeyEnv,
               models: candidate.models!,
+              credentialEnvKeys,
             });
         registry.registerProvider(adapter);
         registered.push(candidate.name as unknown as ProviderName);
@@ -1512,6 +1518,7 @@ export async function bootstrapProviders(
       // `send()` path and the spawned agentic worker honor it. Absent → the
       // field is never sent and OpenRouter's default (reasoning ON) applies.
       const openrouterAdapter = createOpenRouterAdapter(root, {
+        credentialEnvKeys,
         ...(config.openrouter?.reasoning !== undefined
           ? { reasoning: config.openrouter.reasoning as Record<string, unknown> }
           : {}),
@@ -1567,6 +1574,7 @@ export async function bootstrapProviders(
             baseURL: def.baseUrl,
             apiKeyEnv: def.apiKeyEnv,
             models: def.models,
+            credentialEnvKeys,
           });
         } else {
           // CLI kind (claude/codex/gemini/ollama) — alias a built-in adapter

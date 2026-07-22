@@ -34,11 +34,18 @@ export const BASE_PROVIDER_CREDENTIAL_ENV = {
 
 /**
  * The static base scrub set — every built-in provider's credential env var, in
- * the canonical map order. Equal byte-for-byte to the pre-phase-2 literal set
+ * canonical order. It extends the pre-phase-2 literal set
  * `['ANTHROPIC_API_KEY','OPENAI_API_KEY','GOOGLE_API_KEY','DEEPSEEK_API_KEY',
- * 'DASHSCOPE_API_KEY','ZHIPU_API_KEY']`.
+ * 'DASHSCOPE_API_KEY','ZHIPU_API_KEY']` with host-supplied OpenRouter auth.
  */
-const BASE_CREDENTIAL_KEYS: readonly string[] = Object.values(BASE_PROVIDER_CREDENTIAL_ENV);
+const BASE_CREDENTIAL_KEYS: readonly string[] = [
+  ...Object.values(BASE_PROVIDER_CREDENTIAL_ENV),
+  // OpenRouter resolves `.deck` host-side and intentionally never writes its
+  // key into process.env. A host may still provide the canonical env var, so it
+  // belongs to the scrub set without pretending it is part of the
+  // applyDeckSecretsToEnv provider map above.
+  'OPENROUTER_API_KEY',
+];
 
 /** Options for {@link resolveCrossProviderCredentialKeys}. */
 export interface ResolveCrossProviderKeysOptions {

@@ -37,10 +37,11 @@ import type {
   ProviderAvailabilityDetail,
   ProviderPlannerInvocation,
 } from '../core/provider.js';
-import { ProviderError, buildCliInvocation } from '../core/provider.js';
+import { ProviderError, buildCliInvocation, buildProviderChildEnv } from '../core/provider.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { loadDeckSecrets } from '../core/deck-file.js';
 import { normalizeUsage, type TokenUsage } from '../core/token-usage.js';
+import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
 import type {
   ChatMessage,
   ChatCompletionOptions,
@@ -112,6 +113,8 @@ export interface OpenRouterConfig {
   timeoutMs?: number;
   /** Informational supported-model list (NOT a `send()` gate). See {@link DEFAULT_MODELS}. */
   models?: readonly string[];
+  /** Every provider credential key removed before re-injecting only `OPENROUTER_API_KEY`. */
+  credentialEnvKeys?: readonly string[];
   /**
    * `.deck` secrets loader — the ONLY secret-resolution seam (no `apiKey`
    * bypass field), defaults to the real `loadDeckSecrets`. Tests inject a pure
@@ -173,6 +176,7 @@ export class OpenRouterProvider implements ProviderAdapter {
   private readonly spawnImpl: typeof nodeSpawn;
   private readonly defaultTimeoutMs: number;
   private readonly platform: NodeJS.Platform;
+  private readonly credentialEnvKeys: readonly string[];
   private readonly workers = new Map<string, OpenRouterWorkerEntry>();
   /** OpenRouter `reasoning` field applied to send() bodies and forwarded to spawn(). */
   private readonly reasoning: Record<string, unknown> | undefined;
@@ -191,6 +195,12 @@ export class OpenRouterProvider implements ProviderAdapter {
     this.defaultTimeoutMs = opts.defaultTimeoutMs ?? 0;
     this.platform = opts.platform ?? process.platform;
     this.reasoning = opts.reasoning;
+    this.credentialEnvKeys = Object.freeze([
+      ...new Set([
+        ...(opts.credentialEnvKeys ?? resolveCrossProviderCredentialKeys()),
+        OPENROUTER_API_KEY_ENV,
+      ]),
+    ]);
   }
 
   // ─── send() — primary HTTP entry ────────────────────────────────────
@@ -475,10 +485,11 @@ export class OpenRouterProvider implements ProviderAdapter {
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['ignore', logFd, logFd],
-      env: {
-        ...process.env,
-        ...(opts?.env ?? {}),
-        [OPENROUTER_API_KEY_ENV]: apiKey,
+      env: buildProviderChildEnv(
+        { ...process.env, ...(opts?.env ?? {}) },
+        this.credentialEnvKeys,
+        {
+          [OPENROUTER_API_KEY_ENV]: apiKey,
         // Row 477: forward the OpenRouter `reasoning` extension to the spawned
         // agentic worker so a spawned run matches a host-side `send()` call.
         // Carried as ENV, not argv, on purpose: the value is JSON and the spawn
@@ -489,7 +500,8 @@ export class OpenRouterProvider implements ProviderAdapter {
         ...(this.reasoning !== undefined
           ? { [HTTP_EXTRA_BODY_ENV]: JSON.stringify({ reasoning: this.reasoning }) }
           : {}),
-      },
+        },
+      ),
       shell: inv.shell,
     };
 

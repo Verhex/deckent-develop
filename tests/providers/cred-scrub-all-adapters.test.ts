@@ -21,37 +21,14 @@
  * mixed-provider-fleet gap for those two routes.
  *
  * §A — unit tests for the new central helper (pure, hermetic).
- * §B — SubprocessSpawnBackend integration matrix: ALL SIX built-in provider
+ * §B — SubprocessSpawnBackend integration matrix: every canonical provider
  *      credentials + one config-driven custom credential present in the host
  *      env at once (the worst-case mixed fleet); every provider identity's
  *      spawn must see ONLY its own key.
- * §C — KNOWN GAP, out of this task's write scope. `providers/codex.ts`
- *      (`CodexAdapter.spawn()`), `providers/gemini.ts`
- *      (`buildGeminiSpawnEnv()`), `providers/ollama.ts`
- *      (`OllamaAdapter.spawn()`), `providers/openai-compatible.ts`
- *      (`OpenAICompatibleAdapter.spawn()`), and `providers/openrouter.ts`
- *      (`OpenRouterProvider.spawn()`) each independently build their child env
- *      from `{...process.env}` with NO cross-provider scrub — confirmed by
- *      direct read, NOT fixed by this task (none of those 5 files are in this
- *      task's write scope), and NOT wired through `SubprocessSpawnBackend`
- *      (each implements `ProviderAdapter.spawn()` directly). §C proves this
- *      TODAY for the three adapters with an injectable `spawnImpl` seam
- *      (Ollama/OpenAICompatible/OpenRouter) — hermetic, no real process spawned.
- *      `CodexAdapter`/`GeminiAdapter` have no injectable seam (raw `spawn` from
- *      `node:child_process`); their leak is documented by exact file:line
- *      citation in this header instead of an executable test, to avoid a
- *      brittle full-module mock for marginal proof beyond what's already been
- *      read and confirmed. `orchestra/spawn-backend.ts`'s `TmuxBackend` (the
- *      "tmux-Claude default" the audit names) is outside this task's read AND
- *      write scope entirely — not covered here at all.
- *
- * §C tests intentionally assert the CURRENT (vulnerable) behavior. They are a
- * tracked regression marker for a follow-up task (expanded write scope:
- * providers/codex.ts, providers/gemini.ts, providers/ollama.ts,
- * providers/openai-compatible.ts, providers/openrouter.ts,
- * orchestra/spawn-backend.ts) — NOT a security guarantee. When those adapters
- * adopt `scrubCrossProviderEnv`/`buildProviderChildEnv`, §C must be inverted to
- * assert zero-leak, matching §B's shape.
+ * §C — Ollama/OpenAICompatible/OpenRouter injectable spawn seams now enforce
+ *      the same zero-cross-provider-leak contract as §B. Codex/Gemini remain a
+ *      dependent slice because their files belong to another active session;
+ *      this file makes no claim about those two adapters.
  *
  * Hermetic: node:fs is mocked (no disk I/O), every adapter is constructed with
  * an injected `spawnImpl` (no real process spawned), process.env is
@@ -82,6 +59,7 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn().mockReturnValue(true),
   openSync: vi.fn().mockReturnValue(3),
   closeSync: vi.fn(),
+  readFileSync: vi.fn().mockReturnValue('{"budget":{"maxTokens":1000000}}'),
 }));
 
 // ─── Shared fixtures ───────────────────────────────────────────────────
@@ -94,6 +72,7 @@ const BASE_KEYS = [
   'DEEPSEEK_API_KEY',
   'DASHSCOPE_API_KEY',
   'ZHIPU_API_KEY',
+  'OPENROUTER_API_KEY',
 ] as const;
 
 /** A mock child with the surface every adapter's spawn() touches. */
@@ -193,7 +172,7 @@ describe('§A providers/provider.ts — buildProviderChildEnv', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// §B — SubprocessSpawnBackend: full 6-provider + custom-key mixed fleet
+// §B — SubprocessSpawnBackend: full canonical + custom-key mixed fleet
 // ═══════════════════════════════════════════════════════════════════════
 
 describe('§B SubprocessSpawnBackend — full mixed-provider fleet, zero cross-leak', () => {
@@ -243,7 +222,15 @@ describe('§B SubprocessSpawnBackend — full mixed-provider fleet, zero cross-l
   });
 
   function makeConfig(cliCommand: string, name: string): SubprocessProviderConfig {
-    return { cliCommand, name, supportedModels: [], buildArgs: () => [], buildCommandString: () => '' };
+    return {
+      cliCommand,
+      name,
+      supportedModels: [],
+      buildArgs: () => [],
+      buildCommandString: () => '',
+      liveStreamArgs: [],
+      liveBudgetEvidenceTrust: 'host-isolated',
+    };
   }
 
   function makeBackend(cliCommand: string, name: string): SubprocessSpawnBackend {
@@ -258,7 +245,7 @@ describe('§B SubprocessSpawnBackend — full mixed-provider fleet, zero cross-l
   }
 
   it.each(IDENTITIES)(
-    '$cli worker sees ONLY its own credential ($ownKey) — every other of the 7 present host keys is scrubbed',
+    '$cli worker sees ONLY its own credential ($ownKey) — every other present host key is scrubbed',
     ({ cli, ownKey, ownValue }) => {
       const backend = makeBackend(cli, `${cli}-subprocess`);
       const opts: ProviderSpawnOptions = { env: { [ownKey]: ownValue } };
@@ -306,34 +293,36 @@ describe('§B SubprocessSpawnBackend — full mixed-provider fleet, zero cross-l
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// §C — KNOWN GAP: standalone adapters not yet migrated (out of write scope)
+// §C — Injectable standalone adapters: zero cross-provider credential leak
 // ═══════════════════════════════════════════════════════════════════════
 
-describe('§C KNOWN GAP — standalone adapters still leak (born-518 follow-up required)', () => {
+describe('§C standalone injectable adapters — zero cross-provider leak', () => {
   const projectDir = '/tmp/test-cred-scrub-gap';
+  const ALL_KEYS = [...BASE_KEYS, 'MY_LLM_KEY'] as const;
   let saved: Record<string, string | undefined>;
 
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     saved = {};
-    for (const k of BASE_KEYS) saved[k] = process.env[k];
-    for (const k of BASE_KEYS) process.env[k] = `${k}-HOST`;
+    for (const k of ALL_KEYS) saved[k] = process.env[k];
+    for (const k of ALL_KEYS) process.env[k] = `${k}-HOST`;
   });
 
   afterEach(() => {
     vi.clearAllTimers();
     vi.useRealTimers();
-    for (const k of BASE_KEYS) {
+    for (const k of ALL_KEYS) {
       if (saved[k] === undefined) delete process.env[k];
       else process.env[k] = saved[k];
     }
   });
 
-  it('KNOWN GAP: OllamaAdapter.spawn() child env still inherits every foreign provider secret', () => {
+  it('OllamaAdapter.spawn() removes every canonical and config-driven provider secret', () => {
     const spawnImpl = vi.fn().mockReturnValue(makeMockChild());
     const adapter = new OllamaAdapter(projectDir, {
       spawnImpl: spawnImpl as unknown as typeof import('node:child_process').spawn,
+      credentialEnvKeys: ALL_KEYS,
     });
     const model = adapter.supportedModels[0];
     expect(model, 'OllamaAdapter has no registered model to spawn with').toBeDefined();
@@ -341,15 +330,13 @@ describe('§C KNOWN GAP — standalone adapters still leak (born-518 follow-up r
     adapter.spawn('t-ollama-gap', model, 'prompt');
 
     const env = spawnedEnv(spawnImpl as unknown as MockInstance);
-    // TODO(born-518-followup, out of this task's write scope): ollama.ts:282
-    // must adopt providers/provider.ts's scrubCrossProviderEnv. Today it still
-    // leaks every foreign provider credential — asserted here as evidence.
-    for (const k of BASE_KEYS) {
-      expect(env[k], `expected ${k} to still leak today (pre-fix) — flip this to toBeUndefined() once ollama.ts is migrated`).toBe(`${k}-HOST`);
+    for (const k of ALL_KEYS) {
+      expect(env[k], `Ollama worker must not see provider credential ${k}`).toBeUndefined();
     }
+    expect(env['PATH']).toBe(process.env['PATH']);
   });
 
-  it('KNOWN GAP: OpenAICompatibleAdapter.spawn() child env still inherits every foreign provider secret', () => {
+  it('OpenAICompatibleAdapter.spawn() retains only its own explicitly supplied credential', () => {
     const spawnImpl = vi.fn().mockReturnValue(makeMockChild());
     const adapter = new OpenAICompatibleAdapter({
       name: 'deepseek',
@@ -357,35 +344,38 @@ describe('§C KNOWN GAP — standalone adapters still leak (born-518 follow-up r
       apiKeyEnv: 'DEEPSEEK_API_KEY',
       models: ['deepseek-chat'],
       spawnImpl: spawnImpl as unknown as typeof import('node:child_process').spawn,
+      credentialEnvKeys: ALL_KEYS,
     });
 
     adapter.spawn('t-oaicompat-gap', 'deepseek-chat' as ModelType, 'prompt', { env: { DEEPSEEK_API_KEY: 'ds-OWN' } });
 
     const env = spawnedEnv(spawnImpl as unknown as MockInstance);
-    // TODO(born-518-followup, out of this task's write scope):
-    // openai-compatible.ts:300 must adopt scrubCrossProviderEnv.
-    expect(env['DEEPSEEK_API_KEY']).toBe('ds-OWN'); // own key present, as expected
-    for (const k of BASE_KEYS.filter((k) => k !== 'DEEPSEEK_API_KEY')) {
-      expect(env[k], `expected ${k} to still leak today (pre-fix)`).toBe(`${k}-HOST`);
+    expect(env['DEEPSEEK_API_KEY']).toBe('ds-OWN');
+    for (const k of ALL_KEYS.filter((k) => k !== 'DEEPSEEK_API_KEY')) {
+      expect(env[k], `OpenAI-compatible worker must not see foreign key ${k}`).toBeUndefined();
     }
+    expect(env['PATH']).toBe(process.env['PATH']);
   });
 
-  it('KNOWN GAP: OpenRouterProvider.spawn() child env still inherits every foreign provider secret', () => {
+  it('OpenRouterProvider.spawn() retains only its host-resolved credential', () => {
     const spawnImpl = vi.fn().mockReturnValue(makeMockChild());
     const adapter = new OpenRouterProvider(projectDir, {
       spawnImpl: spawnImpl as unknown as typeof import('node:child_process').spawn,
       loadSecretsImpl: () => ({ OPENROUTER_API_KEY: 'or-OWN' }),
       models: ['test-model'],
+      credentialEnvKeys: ALL_KEYS,
+      reasoning: { effort: 'high' },
     });
 
     adapter.spawn('t-openrouter-gap', 'test-model' as ModelType, 'prompt');
 
     const env = spawnedEnv(spawnImpl as unknown as MockInstance);
-    // TODO(born-518-followup, out of this task's write scope):
-    // openrouter.ts:395-399 must adopt scrubCrossProviderEnv.
-    for (const k of BASE_KEYS) {
-      expect(env[k], `expected ${k} to still leak today (pre-fix)`).toBe(`${k}-HOST`);
+    expect(env['OPENROUTER_API_KEY']).toBe('or-OWN');
+    for (const k of ALL_KEYS.filter((k) => k !== 'OPENROUTER_API_KEY')) {
+      expect(env[k], `OpenRouter worker must not see foreign key ${k}`).toBeUndefined();
     }
+    expect(env['DECKENT_HTTP_EXTRA_BODY']).toBe(JSON.stringify({ reasoning: { effort: 'high' } }));
+    expect(env['PATH']).toBe(process.env['PATH']);
   });
 });
 

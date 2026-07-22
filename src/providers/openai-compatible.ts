@@ -27,9 +27,10 @@ import type {
   ProviderSpawnOptions,
   ProviderAvailabilityDetail,
 } from '../core/provider.js';
-import { ProviderError, buildCliInvocation } from '../core/provider.js';
+import { ProviderError, buildCliInvocation, buildProviderChildEnv } from '../core/provider.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { normalizeUsage, type TokenUsage } from '../core/token-usage.js';
+import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
 
 // ─── Wire types (OpenAI /chat/completions) ───────────────────────────
 
@@ -111,6 +112,8 @@ export interface OpenAICompatibleConfig {
   apiKeyEnv: string;
   /** Supported model ids — used to validate `send()` calls. */
   models: readonly string[];
+  /** Every provider credential key that must be removed before re-injecting only `apiKeyEnv`. */
+  credentialEnvKeys?: readonly string[];
   /** Optional fetch override for tests (defaults to global fetch). */
   fetchImpl?: typeof fetch;
   /**
@@ -163,6 +166,7 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
   private readonly defaultTimeoutMs: number;
   private readonly platform: NodeJS.Platform;
   private readonly extraBody: Record<string, unknown>;
+  private readonly credentialEnvKeys: readonly string[];
   private readonly workers = new Map<string, HttpWorkerEntry>();
 
   constructor(config: OpenAICompatibleConfig) {
@@ -178,6 +182,12 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
     this.defaultTimeoutMs = config.defaultTimeoutMs ?? 0;
     this.platform = config.platform ?? process.platform;
     this.extraBody = config.extraBody ?? {};
+    this.credentialEnvKeys = Object.freeze([
+      ...new Set([
+        ...(config.credentialEnvKeys ?? resolveCrossProviderCredentialKeys()),
+        this.apiKeyEnv,
+      ]),
+    ]);
   }
 
   // ─── send() — primary HTTP entry ────────────────────────────────────
@@ -353,10 +363,16 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
       this.platform,
     );
 
+    const mergedEnv = { ...process.env, ...(opts?.env ?? {}) };
+    const ownCredential = mergedEnv[this.apiKeyEnv];
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['ignore', logFd, logFd],
-      env: { ...process.env, ...(opts?.env ?? {}) },
+      env: buildProviderChildEnv(
+        mergedEnv,
+        this.credentialEnvKeys,
+        ownCredential === undefined ? undefined : { [this.apiKeyEnv]: ownCredential },
+      ),
       shell: inv.shell,
     };
 
@@ -650,14 +666,14 @@ export const OPENAI_COMPAT_PRESET_META = {
  * Wire facts come from {@link OPENAI_COMPAT_PRESET_META}.
  */
 export const OPENAI_COMPAT_PRESETS = {
-  deepseek: (fetchImpl?: typeof fetch): OpenAICompatibleAdapter =>
-    new OpenAICompatibleAdapter({ ...OPENAI_COMPAT_PRESET_META.deepseek, models: [...OPENAI_COMPAT_PRESET_META.deepseek.models], fetchImpl }),
+  deepseek: (fetchImpl?: typeof fetch, credentialEnvKeys?: readonly string[]): OpenAICompatibleAdapter =>
+    new OpenAICompatibleAdapter({ ...OPENAI_COMPAT_PRESET_META.deepseek, models: [...OPENAI_COMPAT_PRESET_META.deepseek.models], fetchImpl, credentialEnvKeys }),
 
-  qwen: (fetchImpl?: typeof fetch): OpenAICompatibleAdapter =>
-    new OpenAICompatibleAdapter({ ...OPENAI_COMPAT_PRESET_META.qwen, models: [...OPENAI_COMPAT_PRESET_META.qwen.models], fetchImpl }),
+  qwen: (fetchImpl?: typeof fetch, credentialEnvKeys?: readonly string[]): OpenAICompatibleAdapter =>
+    new OpenAICompatibleAdapter({ ...OPENAI_COMPAT_PRESET_META.qwen, models: [...OPENAI_COMPAT_PRESET_META.qwen.models], fetchImpl, credentialEnvKeys }),
 
-  glm: (fetchImpl?: typeof fetch): OpenAICompatibleAdapter =>
-    new OpenAICompatibleAdapter({ ...OPENAI_COMPAT_PRESET_META.glm, models: [...OPENAI_COMPAT_PRESET_META.glm.models], fetchImpl }),
+  glm: (fetchImpl?: typeof fetch, credentialEnvKeys?: readonly string[]): OpenAICompatibleAdapter =>
+    new OpenAICompatibleAdapter({ ...OPENAI_COMPAT_PRESET_META.glm, models: [...OPENAI_COMPAT_PRESET_META.glm.models], fetchImpl, credentialEnvKeys }),
 } as const;
 
 export type OpenAICompatPresetName = keyof typeof OPENAI_COMPAT_PRESETS;
