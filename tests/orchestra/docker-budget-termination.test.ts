@@ -251,6 +251,7 @@ describe('Docker budget termination state machine', () => {
       containerName: 'deckent-w-t1',
       escalation: 'docker-stop',
       terminationConfirmed: true,
+      exitCode: 143,
     });
     expect(run.mock.calls.map(call => call[1]?.[0])).toEqual(['stop', 'inspect']);
   });
@@ -263,7 +264,10 @@ describe('Docker budget termination state machine', () => {
       { status: 0, stdout: '143' },
       { status: 0, stdout: 'false|143' },
     ]);
-    expect(terminateDockerContainerForBudget('deckent-w-t2', 3, run).escalation).toBe('sigterm');
+    expect(terminateDockerContainerForBudget('deckent-w-t2', 3, run)).toMatchObject({
+      escalation: 'sigterm',
+      exitCode: 143,
+    });
     expect(run.mock.calls.map(call => call[1]?.join(' '))).toContain('kill --signal=SIGTERM deckent-w-t2');
   });
 
@@ -278,7 +282,10 @@ describe('Docker budget termination state machine', () => {
       { status: 0, stdout: '137' },
       { status: 0, stdout: 'false|137' },
     ]);
-    expect(terminateDockerContainerForBudget('deckent-w-t3', 1, run).escalation).toBe('sigkill');
+    expect(terminateDockerContainerForBudget('deckent-w-t3', 1, run)).toMatchObject({
+      escalation: 'sigkill',
+      exitCode: 137,
+    });
     expect(run.mock.calls.map(call => call[1]?.join(' '))).toContain('kill --signal=SIGKILL deckent-w-t3');
   });
 

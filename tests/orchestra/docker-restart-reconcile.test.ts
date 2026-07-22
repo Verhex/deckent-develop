@@ -120,7 +120,10 @@ function installChildRouter(waitExitCode: number): void {
     const subcommand = String(args?.[0] ?? '');
     const child = new FakeChild();
     if (subcommand === 'wait') {
-      queueMicrotask(() => child.stdout.write(`${waitExitCode}\n`));
+      queueMicrotask(() => {
+        child.stdout.write(`${waitExitCode}\n`);
+        child.emit('close', 0, null);
+      });
       return child as unknown as ChildProcess;
     }
     if (subcommand === 'logs') {

@@ -32,6 +32,7 @@ import { join } from 'node:path';
 // ─── child_process mock (this file only — isolated per vitest module) ──────
 
 let dockerWaitDataCallback: ((data: Buffer) => void) | undefined;
+let dockerWaitCloseCallback: ((code: number | null, signal: NodeJS.Signals | null) => void) | undefined;
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(() => ({ stdout: '', stderr: '', status: 0 })),
@@ -44,7 +45,9 @@ vi.mock('node:child_process', () => ({
       },
       stderr: { on: vi.fn() },
       on: vi.fn(),
-      once: vi.fn(),
+      once: (event: string, cb: (code: number | null, signal: NodeJS.Signals | null) => void) => {
+        if (event === 'close') dockerWaitCloseCallback = cb;
+      },
     };
     return stub as unknown as ChildProcess;
   }),
@@ -64,6 +67,7 @@ const tmpDirs: string[] = [];
 
 afterEach(() => {
   dockerWaitDataCallback = undefined;
+  dockerWaitCloseCallback = undefined;
   vi.restoreAllMocks();
   while (tmpDirs.length) {
     const d = tmpDirs.pop();
@@ -250,7 +254,9 @@ function invokeMonitor(
   );
   // The mocked `docker wait` spawn stub captured the 'data' handler synchronously above.
   expect(dockerWaitDataCallback).toBeDefined();
+  expect(dockerWaitCloseCallback).toBeDefined();
   dockerWaitDataCallback!(Buffer.from('0\n'));
+  dockerWaitCloseCallback!(0, null);
 }
 
 describe('DockerSpawnBackend.monitorContainer — dist-mutation wiring', () => {

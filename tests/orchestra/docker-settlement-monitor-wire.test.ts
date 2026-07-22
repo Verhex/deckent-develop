@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -110,6 +110,24 @@ function installChildRouter(): { waitChild: FakeChild } {
   return { waitChild };
 }
 
+function registerAuthority(
+  backend: DockerSpawnBackend,
+  taskId: string,
+  containerId: string,
+  root: string,
+  tasks: string,
+  ref: TaskResultSettlementRefV1,
+): void {
+  (backend as unknown as { containers: Map<string, unknown> }).containers.set(taskId, {
+    containerId,
+    containerName: `deckent-w-${taskId}`,
+    model: 'claude-fable-5',
+    projectDir: root,
+    tasksDir: tasks,
+    settlementRef: ref,
+  });
+}
+
 afterEach(() => {
   if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
   else process.env.DECKENT_HOME = originalDeckentHome;
@@ -144,6 +162,7 @@ describe('Docker monitor settlement authority wiring', () => {
     });
 
     const backend = new DockerSpawnBackend(root);
+    registerAuthority(backend, taskId, containerId, root, tasks, ref);
     (backend as unknown as MonitorHarness).monitorContainer(
       taskId,
       containerId,
@@ -156,6 +175,7 @@ describe('Docker monitor settlement authority wiring', () => {
       ref,
     );
     waitChild.stdout.write('0\n');
+    waitChild.emit('close', 0, null);
 
     await vi.waitFor(() => {
       expect(readTaskResultSettlementClosure(ref)).toMatchObject({
@@ -166,6 +186,7 @@ describe('Docker monitor settlement authority wiring', () => {
     });
     expect(order).toEqual(['remove', 'locks']);
     expect(readTaskResultSettlement(ref)).toMatchObject({ exitCode: 0 });
+    expect(backend.list()).not.toContain(taskId);
     expect(mockSpawnSync).not.toHaveBeenCalledWith('docker', expect.arrayContaining(['-f']), expect.anything());
   });
 
@@ -180,6 +201,7 @@ describe('Docker monitor settlement authority wiring', () => {
     });
 
     const backend = new DockerSpawnBackend(root);
+    registerAuthority(backend, taskId, containerId, root, tasks, ref);
     (backend as unknown as MonitorHarness).monitorContainer(
       taskId,
       containerId,
@@ -192,9 +214,212 @@ describe('Docker monitor settlement authority wiring', () => {
       ref,
     );
     waitChild.stdout.write('0\n');
+    waitChild.emit('close', 0, null);
 
-    await vi.waitFor(() => expect(mockReleaseAllSpawnLocks).toHaveBeenCalledWith(root, taskId));
+    await vi.waitFor(() => expect(mockSpawnSync).toHaveBeenCalledWith(
+      'docker',
+      ['rm', containerId],
+      expect.anything(),
+    ));
+    expect(mockReleaseAllSpawnLocks).not.toHaveBeenCalled();
+    expect(readTaskResultSettlement(ref)).toBeNull();
+    expect(readTaskResultSettlementClosure(ref)).toBeNull();
+    expect(backend.list()).toContain(taskId);
+  });
+
+  it('preserves registry and locks when monitor lacks settlement authority', async () => {
+    const taskId = 'monitor-missing-settlement-ref';
+    const { root, tasks, ref, containerId } = fixture(taskId);
+    const { waitChild } = installChildRouter();
+    const backend = new DockerSpawnBackend(root);
+    registerAuthority(backend, taskId, containerId, root, tasks, ref);
+
+    (backend as unknown as MonitorHarness).monitorContainer(
+      taskId,
+      containerId,
+      tasks,
+      'claude-fable-5',
+      root,
+      null,
+      undefined,
+      undefined,
+      undefined,
+    );
+    waitChild.stdout.write('0\n');
+    waitChild.emit('close', 0, null);
+
+    await vi.waitFor(() => expect(mockSpawn).toHaveBeenCalledWith(
+      'docker',
+      ['logs', containerId],
+      expect.anything(),
+    ));
+    await Promise.resolve();
+    expect(mockSpawnSync).not.toHaveBeenCalledWith('docker', ['rm', containerId], expect.anything());
+    expect(mockReleaseAllSpawnLocks).not.toHaveBeenCalled();
+    expect(backend.list()).toContain(taskId);
     expect(readTaskResultSettlement(ref)).toBeNull();
     expect(readTaskResultSettlementClosure(ref)).toBeNull();
   });
+
+  it('contains an errored wait by exact ID and finalizes NO_GO exactly once', async () => {
+    const taskId = 'monitor-wait-error';
+    const { root, tasks, ref, containerId } = fixture(taskId);
+    const { waitChild } = installChildRouter();
+    const dockerCommands: string[] = [];
+    mockSpawnSync.mockImplementation((command, args) => {
+      expect(command).toBe('docker');
+      const rendered = args?.join(' ') ?? '';
+      dockerCommands.push(rendered);
+      if (args?.[0] === 'stop') return spawnResult(0);
+      if (args?.[0] === 'inspect') {
+        return { ...spawnResult(0), stdout: 'false|143\n' };
+      }
+      if (args?.[0] === 'rm') return spawnResult(0);
+      throw new Error(`unexpected docker sync command: ${rendered}`);
+    });
+
+    const backend = new DockerSpawnBackend(root);
+    registerAuthority(backend, taskId, containerId, root, tasks, ref);
+    (backend as unknown as MonitorHarness).monitorContainer(
+      taskId,
+      containerId,
+      tasks,
+      'claude-fable-5',
+      root,
+      null,
+      undefined,
+      undefined,
+      ref,
+    );
+    waitChild.emit('error', new Error('daemon stream lost'));
+
+    await vi.waitFor(() => expect(readTaskResultSettlementClosure(ref)).not.toBeNull());
+    expect(readTaskResultSettlement(ref)).toMatchObject({ exitCode: 143 });
+    expect(JSON.parse(readFileSync(join(tasks, `task-${taskId}.result`), 'utf-8')))
+      .toMatchObject({
+        selfAssessment: 'NO_GO',
+        testsPassed: false,
+        notes: expect.stringContaining(`attemptId=${ref.attemptId}`),
+      });
+    expect(dockerCommands.slice(0, 2)).toEqual([
+      `stop --time=15 ${containerId}`,
+      `inspect --format {{.State.Running}}|{{.State.ExitCode}} ${containerId}`,
+    ]);
+    expect(dockerCommands.filter(command => command === `rm ${containerId}`)).toHaveLength(1);
+    expect(backend.list()).not.toContain(taskId);
+
+    waitChild.emit('close', 1, null);
+    await Promise.resolve();
+    expect(dockerCommands.filter(command => command === `rm ${containerId}`)).toHaveLength(1);
+  });
+
+  it('holds registry, locks and receipts when wait-failure containment is unproven', async () => {
+    const taskId = 'monitor-wait-containment-held';
+    const { root, tasks, ref, containerId } = fixture(taskId);
+    const { waitChild } = installChildRouter();
+    mockSpawnSync.mockImplementation((command, args) => {
+      expect(command).toBe('docker');
+      if (args?.[0] === 'inspect') {
+        return { ...spawnResult(0), stdout: 'true|0\n' };
+      }
+      return spawnResult(0);
+    });
+
+    const backend = new DockerSpawnBackend(root);
+    registerAuthority(backend, taskId, containerId, root, tasks, ref);
+    (backend as unknown as MonitorHarness).monitorContainer(
+      taskId,
+      containerId,
+      tasks,
+      'claude-fable-5',
+      root,
+      null,
+      undefined,
+      undefined,
+      ref,
+    );
+    waitChild.emit('error', new Error('docker socket unavailable'));
+    await vi.waitFor(() => expect(mockSpawnSync).toHaveBeenCalledWith(
+      'docker',
+      ['inspect', '--format', '{{.State.Running}}|{{.State.ExitCode}}', containerId],
+      expect.anything(),
+    ));
+
+    expect(mockReleaseAllSpawnLocks).not.toHaveBeenCalled();
+    expect(readTaskResultSettlement(ref)).toBeNull();
+    expect(readTaskResultSettlementClosure(ref)).toBeNull();
+    expect(backend.list()).toContain(taskId);
+    expect(mockSpawnSync).not.toHaveBeenCalledWith('docker', ['rm', containerId], expect.anything());
+  });
+
+  it('buffers split wait output and finalizes the strict complete integer once', async () => {
+    const taskId = 'monitor-wait-split';
+    const { root, tasks, ref, containerId } = fixture(taskId);
+    const { waitChild } = installChildRouter();
+    mockSpawnSync.mockImplementation((command, args) => {
+      expect(command).toBe('docker');
+      if (args?.[0] === 'rm') return spawnResult(0);
+      throw new Error(`unexpected docker sync command: ${args?.join(' ')}`);
+    });
+
+    const backend = new DockerSpawnBackend(root);
+    (backend as unknown as MonitorHarness).monitorContainer(
+      taskId,
+      containerId,
+      tasks,
+      'claude-fable-5',
+      root,
+      null,
+      undefined,
+      undefined,
+      ref,
+    );
+    waitChild.stdout.write('1');
+    waitChild.stdout.write('37\n');
+    waitChild.emit('close', 0, null);
+
+    await vi.waitFor(() => expect(readTaskResultSettlementClosure(ref)).not.toBeNull());
+    expect(readTaskResultSettlement(ref)).toMatchObject({ exitCode: 137 });
+    expect(mockSpawnSync).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['0junk\n', '', '0\n1\n'])(
+    'rejects malformed complete wait evidence %j and contains before settlement',
+    async waitEvidence => {
+      const taskId = `monitor-wait-malformed-${Buffer.from(waitEvidence).toString('hex') || 'empty'}`;
+      const { root, tasks, ref, containerId } = fixture(taskId);
+      const { waitChild } = installChildRouter();
+      mockSpawnSync.mockImplementation((command, args) => {
+        expect(command).toBe('docker');
+        if (args?.[0] === 'stop') return spawnResult(0);
+        if (args?.[0] === 'inspect') return { ...spawnResult(0), stdout: 'false|143\n' };
+        if (args?.[0] === 'rm') return spawnResult(0);
+        throw new Error(`unexpected docker sync command: ${args?.join(' ')}`);
+      });
+
+      const backend = new DockerSpawnBackend(root);
+      registerAuthority(backend, taskId, containerId, root, tasks, ref);
+      (backend as unknown as MonitorHarness).monitorContainer(
+        taskId,
+        containerId,
+        tasks,
+        'claude-fable-5',
+        root,
+        null,
+        undefined,
+        undefined,
+        ref,
+      );
+      if (waitEvidence) waitChild.stdout.write(waitEvidence);
+      waitChild.emit('close', 0, null);
+
+      await vi.waitFor(() => expect(readTaskResultSettlementClosure(ref)).not.toBeNull());
+      expect(readTaskResultSettlement(ref)).toMatchObject({ exitCode: 143 });
+      const result = JSON.parse(
+        readFileSync(join(tasks, `task-${taskId}.result`), 'utf-8'),
+      ) as { selfAssessment: string; notes?: string };
+      expect(result.selfAssessment).toBe('NO_GO');
+      expect(result.notes).toContain('docker wait lost trustworthy terminal evidence');
+    },
+  );
 });

@@ -210,6 +210,8 @@ export function reconcileDockerRuntimeBudgetUsage(
 
 interface DockerRecoveryContainment {
   attemptId: string;
+  reason: 'host-restart-budget-observer-loss' | 'docker-wait-evidence-loss';
+  evidence?: string;
 }
 
 function reconcileDockerRecoveryContainmentResultFile(
@@ -224,8 +226,13 @@ function reconcileDockerRecoveryContainmentResultFile(
   }
   result.selfAssessment = 'NO_GO';
   result.testsPassed = false;
-  const evidence = `Host restart contained a live Docker attempt because its pre-crash budget observer did not survive. attemptId=${recovery.attemptId}.`;
-  if (!result.notes?.includes(`attemptId=${recovery.attemptId}`)) {
+  const evidence = recovery.reason === 'host-restart-budget-observer-loss'
+    ? `Host restart contained a live Docker attempt because its pre-crash budget observer did not survive. attemptId=${recovery.attemptId}.`
+    : `Host contained the exact Docker attempt because docker wait lost trustworthy terminal evidence. attemptId=${recovery.attemptId}.${recovery.evidence ? ` evidence=${recovery.evidence}.` : ''}`;
+  const evidenceMarker = recovery.reason === 'host-restart-budget-observer-loss'
+    ? 'pre-crash budget observer did not survive'
+    : 'docker wait lost trustworthy terminal evidence';
+  if (!result.notes?.includes(evidenceMarker)) {
     result.notes = `${evidence} ${result.notes ?? ''}`.trim();
   }
   atomicWriteFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
@@ -1420,6 +1427,7 @@ export interface DockerBudgetTerminationEvidence {
   containerName: string;
   escalation: 'docker-stop' | 'sigterm' | 'sigkill';
   terminationConfirmed: true;
+  exitCode: number;
 }
 
 export interface DockerSyncCommandResult {
@@ -1455,20 +1463,21 @@ export function terminateDockerContainerForBudget(
   graceSeconds: number,
   run: DockerSyncCommand = runDockerSync,
 ): DockerBudgetTerminationEvidence {
-  const inspectRunning = (): boolean | null => {
+  const inspectState = (): { running: boolean; exitCode: number } | null => {
     const result = run(
       'docker',
       ['inspect', '--format', '{{.State.Running}}|{{.State.ExitCode}}', containerName],
       { encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'] },
     );
     if (result.status !== 0 || result.error) return null;
-    return parseInspectOutput(result.stdout ?? '')?.running ?? null;
+    return parseInspectOutput(result.stdout ?? '');
   };
-  const confirmed = (escalation: DockerBudgetTerminationEvidence['escalation']): DockerBudgetTerminationEvidence | null => (
-    inspectRunning() === false
-      ? { containerName, escalation, terminationConfirmed: true }
-      : null
-  );
+  const confirmed = (escalation: DockerBudgetTerminationEvidence['escalation']): DockerBudgetTerminationEvidence | null => {
+    const state = inspectState();
+    return state && !state.running
+      ? { containerName, escalation, terminationConfirmed: true, exitCode: state.exitCode }
+      : null;
+  };
 
   run('docker', ['stop', `--time=${graceSeconds}`, containerName], {
     encoding: 'utf-8', timeout: (graceSeconds + 5) * 1_000, stdio: ['pipe', 'pipe', 'pipe'],
@@ -2522,7 +2531,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       undefined,
       ref,
       undefined,
-      running ? { attemptId: ref.attemptId } : undefined,
+      running
+        ? { attemptId: ref.attemptId, reason: 'host-restart-budget-observer-loss' }
+        : undefined,
     );
     if (running) {
       terminateDockerContainerForBudget(containerId, this.gracefulTimeoutSeconds);
@@ -3541,22 +3552,6 @@ export class DockerSpawnBackend implements SpawnBackend {
     spawnSync('sleep', [seconds], { timeout: ms + 2_000 });
   }
 
-  /**
-   * Stop for a budget breach without removing the container or releasing locks.
-   * `monitorContainer` exclusively owns final log capture, evidence settlement,
-   * removal and lock release after `docker wait` observes the exit.
-   */
-  private stopContainerForBudget(taskId: string): void {
-    const execution = this.containers.get(taskId);
-    if (!execution) {
-      throw new SpawnBackendError(
-        `No exact Docker container authority is registered for task ${taskId}; refusing name-derived containment.`,
-        this.name,
-      );
-    }
-    terminateDockerContainerForBudget(execution.containerId, this.gracefulTimeoutSeconds);
-  }
-
   private resolveExecutionContext(taskId: string): { projectDir: string; tasksDir: string; containerId: string } {
     const execution = this.containers.get(taskId);
     if (!execution) {
@@ -3848,17 +3843,15 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     // SURF-3 S3 — start the live activity follow WHILE the container runs
     // (a no-op when live_trace is off); stop it once the container exits below.
-    let containmentScheduled = false;
+    let containmentStarted = false;
     const contain = (reason: string): void => {
-      if (containmentScheduled) return;
-      containmentScheduled = true;
-      queueMicrotask(() => {
-        try {
-          this.stopContainerForBudget(taskId);
-        } catch (error) {
-          debugLog('docker-backend:budget-containment', `${reason}: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      });
+      if (containmentStarted) return;
+      containmentStarted = true;
+      try {
+        terminateDockerContainerForBudget(containerId, this.gracefulTimeoutSeconds);
+      } catch (error) {
+        debugLog('docker-backend:budget-containment', `${reason}: ${error instanceof Error ? error.message : String(error)}`);
+      }
     };
     const budgetMonitor = createRuntimeBudgetMonitor({
       projectRoot: projectDir,
@@ -3883,23 +3876,14 @@ export class DockerSpawnBackend implements SpawnBackend {
         )
       : (): void => { /* no ctx — no follow */ };
 
-    let waitExitObserved = false;
-    child.once('error', error => {
-      try { budgetMonitor?.settle(); } catch (settleError) { debugLog('docker-backend:budget-settle-after-wait-error', settleError); }
-      contain(`docker-wait-error: ${error.message}`);
-    });
-    child.once('close', (code, signal) => {
-      if (waitExitObserved) return;
-      try { budgetMonitor?.settle(); } catch (settleError) { debugLog('docker-backend:budget-settle-after-wait-close', settleError); }
-      contain(`docker-wait-closed-without-exit-evidence: code=${code ?? 'null'} signal=${signal ?? 'none'}`);
-    });
-    child.stdout?.on('data', async (data: Buffer) => {
-      const exitCode = parseInt(data.toString().trim(), 10);
-      if (!Number.isFinite(exitCode)) {
-        contain(`docker-wait-malformed-exit-evidence: ${data.toString('utf-8').trim() || '<empty>'}`);
-        return;
-      }
-      waitExitObserved = true;
+    let finalizationStarted = false;
+    let waitFailureHandlingStarted = false;
+    let waitStdout = '';
+    let effectiveRecoveryContainment = recoveryContainment;
+
+    const finalizeObservedExit = async (exitCode: number): Promise<void> => {
+      if (finalizationStarted) return;
+      finalizationStarted = true;
       debugLog('docker-backend:exit', `taskId=${taskId} exitCode=${exitCode}`);
       stopFollow(); // container exited — the `docker logs -f` follow can end.
       try { budgetMonitor?.settle(); } catch (e) { debugLog('docker-backend:budget-settle-before-result', e); }
@@ -4195,13 +4179,21 @@ export class DockerSpawnBackend implements SpawnBackend {
         reconcileDockerRecoveryContainmentResultFile(
           resultPath,
           taskId,
-          recoveryContainment,
+          effectiveRecoveryContainment,
         );
       } catch (e) {
         debugLog('docker-backend:recovery-result-reconcile', e);
         // Keep the stopped container, claim and spawn locks intact. A later
         // coordinator can re-adopt the exact attempt; sealing a receipt after
         // losing the host containment verdict would manufacture success.
+        return;
+      }
+
+      if (!settlementRef) {
+        debugLog(
+          'docker-backend:result-settlement-held',
+          `taskId=${taskId} settlement reference unavailable; preserving container authority and locks`,
+        );
         return;
       }
 
@@ -4218,74 +4210,135 @@ export class DockerSpawnBackend implements SpawnBackend {
         debugLog('docker-backend:cleanup', e);
       }
 
-      // Sprint 156 Task 10: release every spawn lock owned by this task
-      try {
-        const released = releaseAllSpawnLocks(projectDir, taskId);
-        if (released > 0) debugLog('docker-backend:spawn-lock', `taskId=${taskId} released ${released} spawn lock(s) on exit`);
-      } catch (e) {
-        lifecycleSettled = false;
-        debugLog('docker-backend:spawn-lock-release', e);
+      // Container authority must be settled before concurrency authority is
+      // released. If exact-ID removal failed, keep the claim, locks and
+      // registry entry intact for deterministic recovery.
+      if (lifecycleSettled) {
+        try {
+          const released = releaseAllSpawnLocks(projectDir, taskId);
+          if (released > 0) debugLog('docker-backend:spawn-lock', `taskId=${taskId} released ${released} spawn lock(s) on exit`);
+        } catch (e) {
+          lifecycleSettled = false;
+          debugLog('docker-backend:spawn-lock-release', e);
+        }
       }
 
       // Sprint 168 C0b: defensive sad-path safety net — releaseStaleSpawnLocksForTask
       // catches any spawnlock missed by releaseAllSpawnLocks (e.g. corrupted file,
       // partial unlink). Both helpers are idempotent and cheap when no locks remain.
-      try {
-        releaseStaleSpawnLocksForTask(projectDir, taskId);
-      } catch (e) {
-        lifecycleSettled = false;
-        debugLog('docker-backend:spawn-lock-stale-release', e);
+      if (lifecycleSettled) {
+        try {
+          releaseStaleSpawnLocksForTask(projectDir, taskId);
+        } catch (e) {
+          lifecycleSettled = false;
+          debugLog('docker-backend:spawn-lock-stale-release', e);
+        }
       }
 
-      if (hasSpawnLocksForTask(projectDir, taskId)) {
+      if (lifecycleSettled && hasSpawnLocksForTask(projectDir, taskId)) {
         lifecycleSettled = false;
         debugLog('docker-backend:spawn-lock-release', `taskId=${taskId} still owns spawn locks after cleanup`);
       }
-
-      this.containers.delete(taskId);
 
       // 455-003: the container has exited, so the in-container EXIT-trap has
       // already consumed $BASEFILE (the task-start scope baseline). Remove it —
       // it is a per-spawn transient with no post-exit value, and unlike the
       // .prompt/.worker forensic tmpfiles below it carries no debugging signal.
-      try {
-        const baselinePath = join(tasksDir, `task-${taskId}.scope-baseline`);
-        if (existsSync(baselinePath)) unlinkSync(baselinePath);
-      } catch (e) {
-        lifecycleSettled = false;
-        debugLog('docker-backend:scope-baseline-cleanup', e);
+      if (lifecycleSettled) {
+        try {
+          const baselinePath = join(tasksDir, `task-${taskId}.scope-baseline`);
+          if (existsSync(baselinePath)) unlinkSync(baselinePath);
+        } catch (e) {
+          lifecycleSettled = false;
+          debugLog('docker-backend:scope-baseline-cleanup', e);
+        }
       }
 
       // Last authority action: only a fully reconciled result whose container,
       // registry, locks and transient baseline are settled earns a receipt.
       if (lifecycleSettled) {
         try {
-          persistDockerTaskResultSettlement(projectDir, tasksDir, settlementRef, exitCode);
+          if (!persistDockerTaskResultSettlement(projectDir, tasksDir, settlementRef, exitCode)) {
+            lifecycleSettled = false;
+            debugLog('docker-backend:result-settlement', `taskId=${taskId} result receipt was not persisted`);
+          }
         } catch (e) {
           lifecycleSettled = false;
           debugLog('docker-backend:result-settlement', e);
         }
       }
-      if (lifecycleSettled && settlementRef) {
+      if (lifecycleSettled) {
         try {
-          closeDockerTaskResultSettlement(settlementRef, 'stopped-removed');
+          if (!closeDockerTaskResultSettlement(settlementRef, 'stopped-removed')) {
+            lifecycleSettled = false;
+            debugLog('docker-backend:result-settlement-closure', `taskId=${taskId} lifecycle closure was not persisted`);
+          }
         } catch (e) {
+          lifecycleSettled = false;
           debugLog('docker-backend:result-settlement-closure', e);
         }
       }
+
+      if (lifecycleSettled) this.containers.delete(taskId);
 
       // Sprint 156 Task 4: .prompt-*.txt AND .worker-*.sh tmpfiles persist until sprint cleanup.
       // Both are archived together by archivePromptFiles() during sprint cleanup phase.
       // Rationale: worker scripts (.worker-*.sh) contain spawn invocation and env state useful for
       // post-mortem debugging when a container fails mid-execution. Previous behavior deleted them
       // immediately after each container exit, losing forensic value.
-    });
+    };
 
-    child.on('error', (err) => {
-      debugLog('docker-backend:monitor-error', `taskId=${taskId} ${err.message}`);
-      try { releaseAllSpawnLocks(projectDir, taskId); } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
-      try { releaseStaleSpawnLocksForTask(projectDir, taskId); } catch (e) { debugLog('docker-backend:spawn-lock-stale-release', e); }
-      this.containers.delete(taskId);
+    const finalizeWaitFailure = async (reason: string): Promise<void> => {
+      if (waitFailureHandlingStarted || finalizationStarted) return;
+      waitFailureHandlingStarted = true;
+      stopFollow();
+      try { budgetMonitor?.settle(); } catch (settleError) { debugLog('docker-backend:budget-settle-after-wait-failure', settleError); }
+
+      let termination: DockerBudgetTerminationEvidence;
+      try {
+        termination = terminateDockerContainerForBudget(containerId, this.gracefulTimeoutSeconds);
+      } catch (error) {
+        debugLog(
+          'docker-backend:monitor-containment-failed',
+          `taskId=${taskId} ${reason}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        // Exact containment was not proved. Preserve container registry, claim
+        // and locks; no result receipt or closure may be manufactured.
+        return;
+      }
+      if (!settlementRef) {
+        debugLog('docker-backend:monitor-containment-held', `taskId=${taskId} ${reason}: settlement reference unavailable`);
+        return;
+      }
+      effectiveRecoveryContainment = {
+        attemptId: settlementRef.attemptId,
+        reason: 'docker-wait-evidence-loss',
+        evidence: reason.slice(0, 500),
+      };
+      await finalizeObservedExit(termination.exitCode);
+    };
+
+    child.stdout?.on('data', (data: Buffer | string) => {
+      waitStdout += data.toString();
+    });
+    child.once('error', error => {
+      debugLog('docker-backend:monitor-error', `taskId=${taskId} ${error.message}`);
+      void finalizeWaitFailure(`docker-wait-error:${error.message}`);
+    });
+    child.once('close', (code, signal) => {
+      if (finalizationStarted || waitFailureHandlingStarted) return;
+      const rawExitCode = waitStdout.trim();
+      if (/^\d+$/.test(rawExitCode)) {
+        const exitCode = Number(rawExitCode);
+        if (Number.isSafeInteger(exitCode)) {
+          void finalizeObservedExit(exitCode);
+          return;
+        }
+      }
+      const evidence = rawExitCode || '<empty>';
+      void finalizeWaitFailure(
+        `docker-wait-invalid-exit-evidence:${evidence.slice(0, 200)}:code=${code ?? 'null'}:signal=${signal ?? 'none'}`,
+      );
     });
   }
 }
