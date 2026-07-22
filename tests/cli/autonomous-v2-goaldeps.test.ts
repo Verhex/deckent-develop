@@ -393,10 +393,17 @@ describe('handleStart — engine=v2 passes live goalDeps to runV2Engine', () => 
     }
 
     const deps = runV2Spy.mock.calls[0]![2] as {
-      runTask: (
-        ctx: { description: string; projectRoot: string },
-        claim: MissionDispatchClaim,
-      ) => Promise<unknown>;
+      workerInvocationCoordinator: {
+        execute: (
+          input: {
+            mission: Record<string, unknown>;
+            context: { description: string; projectRoot: string };
+            claim: MissionDispatchClaim;
+            isClaimActive: () => boolean;
+          },
+          executor: () => Promise<unknown>,
+        ) => Promise<unknown>;
+      };
     };
     const claim = Object.freeze({
       schemaVersion: 1 as const,
@@ -411,15 +418,26 @@ describe('handleStart — engine=v2 passes live goalDeps to runV2Engine', () => 
       claimRegistryRevision: 'goal-v2-production-v2',
       claimRegistryDigest: 'b'.repeat(64),
     });
-    const result = await deps.runTask({ description: 'safe task', projectRoot: root }, claim);
+    const exactExecutor = vi.fn(async () => { throw new Error('must remain unreachable'); });
+    const result = await deps.workerInvocationCoordinator.execute({
+      mission: {
+        id: 'safe-mission', kind: 'list', status: 'active', tenant: 'local', title: 'safe',
+        spec: null, createdBy: null, deliverTo: null, renderAs: 'checklist', progress: null,
+        createdAt: '2026-07-22T00:00:00.000Z', updatedAt: '2026-07-22T00:00:00.000Z',
+        completedAt: null, lastResult: null,
+      },
+      context: { description: 'safe task', projectRoot: root },
+      claim,
+      isClaimActive: () => true,
+    }, exactExecutor);
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       dispatchDisposition: 'parked',
       reason: 'MISSION_WORKER_INVOCATION_AUTHORITY_UNAVAILABLE',
-      authorityEvidenceRef: `mission-dispatch-claim:${claim.fenceTokenHash}`,
       invocationReceiptRef: null,
     });
+    expect(exactExecutor).not.toHaveBeenCalled();
     expect(runTaskModeSpy).not.toHaveBeenCalled();
     expect(waitForRunResultSpy).not.toHaveBeenCalled();
   });

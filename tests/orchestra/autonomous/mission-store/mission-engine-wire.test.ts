@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { SqliteMissionStore } from '../../../../src/orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import {
   isV2Engine,
-  runV2Engine,
+  runV2Engine as runV2EngineRuntime,
   type RunV2EngineDeps,
 } from '../../../../src/orchestra/autonomous/mission-store/mission-engine-wire.js';
 import type { MissionTaskContext } from '../../../../src/orchestra/autonomous/mission-store/mission-dispatch.js';
@@ -55,6 +55,69 @@ function cfg(autonomous: Record<string, unknown> = {}, maxWorkers: number | 'aut
 // Bounded run so the scheduler drains and returns instead of looping forever.
 const BOUNDED = 100;
 
+/** Mission-mechanics tests use an explicit hermetic coordinator; production absence is fail-closed. */
+async function runV2Engine(
+  projectRoot: string,
+  config: ResolvedConfig,
+  deps: RunV2EngineDeps,
+) {
+  if (deps.workerInvocationCoordinator) return runV2EngineRuntime(projectRoot, config, deps);
+  const legacyRunTask = deps.runTask;
+  return runV2EngineRuntime(projectRoot, config, {
+    ...deps,
+    workerInvocationCoordinator: {
+      execute: async (input, executeSelected) => {
+        const execution = await executeSelected(Object.freeze({
+          reservationId: `test-reservation-${input.claim.attemptId}`,
+          dispatchEventRef: `provider-limit-reservation-event:${input.claim.attemptId}`,
+          dispatchEventHash: 'a'.repeat(64),
+          provider: 'claude', model: 'claude-fable-5',
+          receiptRef: {
+            schemaVersion: 1 as const,
+            invocationId: `test-invocation-${input.claim.attemptId}`,
+            tenantId: input.mission.tenant,
+            projectId: 'test-project',
+          },
+          backend: {
+            transport: 'cli' as const,
+            executionBackend: 'host-subprocess' as const,
+            endpointRefHash: 'b'.repeat(64),
+          },
+          auth: { mode: 'subscription' as const, accountRefHash: 'c'.repeat(64) },
+        }));
+        return execution.result;
+      },
+    },
+    runAdmittedTask: async (ctx, claim, grant) => ({
+      result: await legacyRunTask(
+        { ...ctx, provider: grant.provider, model: grant.model },
+        claim as MissionDispatchClaim,
+      ),
+      actualCall: {
+        provider: grant.provider, model: grant.model, backend: grant.backend,
+        auth: grant.auth, evidenceRef: 'provider-call:test-engine-wire',
+      },
+      transportEvent: {
+        eventId: `test-transport-${claim.attemptId}`,
+        type: 'transport_settled',
+        payload: { outcome: 'succeeded', exitCode: 0, signal: null, reasonCode: 'none', durationMs: 1 },
+      },
+      providerSettlementEvent: {
+        eventId: `test-consumed-${claim.attemptId}`,
+        type: 'consumed', occurredAt: claim.claimedAt,
+        fenceTokenHash: claim.fenceTokenHash,
+        evidenceRef: 'provider-usage:test-engine-wire',
+        actual: [{ windowId: 'tokens-all', unit: 'tokens', amount: 1 }],
+      },
+      consumerEvent: {
+        eventId: `test-consumer-${claim.attemptId}`,
+        type: 'consumer_settled',
+        payload: { outcome: 'accepted', reasonCode: 'none' },
+      },
+    }),
+  });
+}
+
 describe('isV2Engine', () => {
   it('returns true ONLY when autonomous.engine === "v2"', () => {
     expect(isV2Engine(cfg({ engine: 'v2' }))).toBe(true);
@@ -71,6 +134,130 @@ describe('isV2Engine', () => {
 });
 
 describe('runV2Engine', () => {
+  it('passes an active mission claim only through the coordinator exact-executor seam', async () => {
+    const r = root();
+    const store = openStore(r);
+    store.createMission({
+      id: 'mCoordinator', kind: 'list', tenant: 'tenant-wire', title: 'Coordinator', renderAs: 'checklist',
+    });
+    enqueueProduction(store, {
+      id: 'mCoordinator-0', missionId: 'mCoordinator', kind: 'task',
+      spec: { description: 'coordinated work' },
+    });
+    const legacyRunTask = vi.fn(async () => ({ ok: true }));
+    const runAdmittedTask = vi.fn(async (safeCtx, claim, grant) => {
+      expect(safeCtx).not.toHaveProperty('provider');
+      expect(safeCtx).not.toHaveProperty('model');
+      expect(claim).not.toHaveProperty('fenceToken');
+      expect(claim.missionId).toBe('mCoordinator');
+      expect(grant).toMatchObject({ provider: 'claude', model: 'claude-fable-5' });
+      expect(JSON.stringify({ safeCtx, claim, grant })).not.toContain('fence-');
+      return {
+        result: { ok: true },
+        actualCall: {
+          provider: grant.provider, model: grant.model, backend: grant.backend,
+          auth: grant.auth, evidenceRef: 'provider-call:engine-wire-0001',
+        },
+        transportEvent: {
+          eventId: 'transport-wire', type: 'transport_settled' as const,
+          payload: { outcome: 'succeeded' as const, exitCode: 0, signal: null, reasonCode: 'none' as const, durationMs: 1 },
+        },
+        providerSettlementEvent: {
+          eventId: 'usage-wire', type: 'consumed' as const,
+          occurredAt: '2026-07-22T00:00:00.000Z', fenceTokenHash: claim.fenceTokenHash,
+          evidenceRef: 'provider-usage:engine-wire-0001',
+          actual: [{ windowId: 'tokens-all', unit: 'tokens' as const, amount: 1 }],
+        },
+        consumerEvent: {
+          eventId: 'consumer-wire', type: 'consumer_settled' as const,
+          payload: { outcome: 'accepted' as const, reasonCode: 'none' as const },
+        },
+      };
+    });
+    const coordinator = {
+      execute: vi.fn(async (input, executor) => {
+        expect(input.mission).toMatchObject({ id: 'mCoordinator', tenant: 'tenant-wire' });
+        expect(input.isClaimActive()).toBe(true);
+        const execution = await executor(Object.freeze({
+          reservationId: 'reservation-wire',
+          dispatchEventRef: 'provider-limit-reservation-event:wire-0001',
+          dispatchEventHash: 'a'.repeat(64),
+          provider: 'claude', model: 'claude-fable-5',
+          receiptRef: {
+            schemaVersion: 1 as const, invocationId: 'inv-wire',
+            tenantId: 'tenant-wire', projectId: 'project-wire',
+          },
+          backend: {
+            transport: 'cli', executionBackend: 'host-subprocess', endpointRefHash: 'c'.repeat(64),
+          },
+          auth: { mode: 'subscription', accountRefHash: 'd'.repeat(64) },
+        }));
+        return execution.result;
+      }),
+    };
+
+    const summary = await runV2EngineRuntime(r, cfg({ engine: 'v2' }), {
+      runTask: legacyRunTask,
+      runAdmittedTask,
+      workerInvocationCoordinator: coordinator,
+      runSprint: async () => undefined,
+      store,
+      maxIterations: BOUNDED,
+    });
+
+    expect(summary.dispatched).toBe(1);
+    expect(coordinator.execute).toHaveBeenCalledTimes(1);
+    expect(runAdmittedTask).toHaveBeenCalledTimes(1);
+    expect(legacyRunTask).not.toHaveBeenCalled();
+    expect(store.listItems('mCoordinator')[0]!.status).toBe('done');
+  });
+
+  it('parks before coordinator admission when the exact executor is absent', async () => {
+    const r = root();
+    const store = openStore(r);
+    store.createMission({ id: 'mNoExecutor', kind: 'list', title: 'No executor', renderAs: 'checklist' });
+    enqueueProduction(store, {
+      id: 'mNoExecutor-0', missionId: 'mNoExecutor', kind: 'task', spec: { description: 'must hold' },
+    });
+    const coordinator = { execute: vi.fn() };
+    const summary = await runV2Engine(r, cfg({ engine: 'v2' }), {
+      runTask: async () => ({ ok: true }),
+      workerInvocationCoordinator: coordinator,
+      runSprint: async () => undefined,
+      store,
+      maxIterations: BOUNDED,
+    });
+    expect(summary.dispatched).toBe(0);
+    expect(coordinator.execute).not.toHaveBeenCalled();
+    expect(store.listItems('mNoExecutor')[0]).toMatchObject({
+      status: 'parked',
+      lastResult: { reason: 'MISSION_WORKER_INVOCATION_HOLD:exact_executor_unavailable' },
+    });
+  });
+
+  it('fails closed when the Goal-v2 coordinator is absent even if legacy runTask is provider-capable', async () => {
+    const r = root();
+    const store = openStore(r);
+    store.createMission({ id: 'mNoCoordinator', kind: 'list', title: 'No coordinator', renderAs: 'checklist' });
+    enqueueProduction(store, {
+      id: 'mNoCoordinator-0', missionId: 'mNoCoordinator', kind: 'task',
+      spec: { description: 'legacy task must stay unreachable' },
+    });
+    const runTask = vi.fn(async () => ({ ok: true }));
+    const summary = await runV2EngineRuntime(r, cfg({ engine: 'v2' }), {
+      runTask,
+      runSprint: async () => undefined,
+      store,
+      maxIterations: BOUNDED,
+    });
+    expect(summary.dispatched).toBe(0);
+    expect(runTask).not.toHaveBeenCalled();
+    expect(store.listItems('mNoCoordinator')[0]).toMatchObject({
+      status: 'parked',
+      lastResult: { reason: 'MISSION_WORKER_INVOCATION_AUTHORITY_UNAVAILABLE' },
+    });
+  });
+
   it('threads the durable approval coordinator before claim and dispatches only after allow', async () => {
     const r = root();
     const store = openStore(r);

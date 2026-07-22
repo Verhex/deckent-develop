@@ -10,8 +10,10 @@ import {
 } from './provider-limit-admission.js';
 import type {
   ProviderLimitDispatchClaim,
+  ProviderLimitReservationView,
   ProviderLimitSnapshotQuery,
   ProviderLimitStore,
+  StoredProviderLimitReservationEvent,
 } from './provider-limit-store.js';
 import {
   toLimitEvidence,
@@ -74,7 +76,7 @@ export type HostRoleInvocationAdmissionResult =
 
 export class HostRoleInvocationAdmissionError extends Error {
   constructor(
-    readonly code: 'AUTHORITY_UNAVAILABLE' | 'SCOPE_MISMATCH',
+    readonly code: 'AUTHORITY_UNAVAILABLE' | 'SCOPE_MISMATCH' | 'INVALID_EVENT',
     message: string,
   ) {
     super(message);
@@ -290,5 +292,75 @@ export class HostRoleInvocationAdmissionRuntime {
       );
     }
     return claimAdmittedProviderDispatch(this.authorities.limitStore, admission, event);
+  }
+
+  /**
+   * Read the exact reservation through the same host authority boundary used
+   * for admission and settlement. This is intentionally narrower than
+   * exposing the underlying store: replay reconciliation cannot cross a
+   * tenant/project/provider/account scope supplied by another runtime.
+   */
+  getReservation(request: ProviderLimitReservationRequest): ProviderLimitReservationView | null {
+    if (!this.authorities) {
+      throw new HostRoleInvocationAdmissionError(
+        'AUTHORITY_UNAVAILABLE',
+        'Host role invocation authority is unavailable',
+      );
+    }
+    if (request.tenantId !== this.authorities.tenantId
+      || request.projectId !== this.authorities.truthStore.projectId) {
+      throw new HostRoleInvocationAdmissionError(
+        'SCOPE_MISMATCH',
+        'Invocation reservation does not belong to this host authority scope',
+      );
+    }
+    return this.authorities.limitStore.getReservation({
+      tenantId: request.tenantId,
+      projectId: request.projectId,
+      provider: request.provider,
+      accountRefHash: request.accountRefHash,
+      quotaScopeRefHash: request.quotaScopeRefHash,
+      authMode: request.authMode,
+    }, request.reservationId);
+  }
+
+  /**
+   * Settle the exact reservation admitted by this runtime. The private limit
+   * store remains the only event authority; callers cannot substitute a second
+   * store or change tenant/project/account/backend identity at settlement time.
+   */
+  settleDispatch(
+    admission: ProviderLimitAdmissionAllowed,
+    event: ProviderLimitReservationEvent,
+  ): StoredProviderLimitReservationEvent {
+    if (!this.authorities) {
+      throw new HostRoleInvocationAdmissionError(
+        'AUTHORITY_UNAVAILABLE',
+        'Host role invocation authority is unavailable',
+      );
+    }
+    const reservation = admission.reservation;
+    if (reservation.tenantId !== this.authorities.tenantId
+      || reservation.projectId !== this.authorities.truthStore.projectId
+      || event.fenceTokenHash !== reservation.fenceTokenHash) {
+      throw new HostRoleInvocationAdmissionError(
+        'SCOPE_MISMATCH',
+        'Invocation settlement does not belong to this host authority scope',
+      );
+    }
+    if (event.type === 'dispatched') {
+      throw new HostRoleInvocationAdmissionError(
+        'INVALID_EVENT',
+        'Invocation settlement requires a consumed or released event',
+      );
+    }
+    return this.authorities.limitStore.appendReservationEvent({
+      tenantId: reservation.tenantId,
+      projectId: reservation.projectId,
+      provider: reservation.provider,
+      accountRefHash: reservation.accountRefHash,
+      quotaScopeRefHash: reservation.quotaScopeRefHash,
+      authMode: reservation.authMode,
+    }, reservation.reservationId, event);
   }
 }

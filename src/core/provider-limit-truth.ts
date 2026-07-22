@@ -347,8 +347,8 @@ export function assertProviderLimitReservationEvent(event: ProviderLimitReservat
   for (const actual of event.actual ?? []) {
     assertWindowIdentity(actual.windowId);
     assertLimitUnit(actual.unit);
-    if (!Number.isFinite(actual.amount) || actual.amount <= 0) {
-      throw new Error('Actual provider limit usage must be positive');
+    if (!Number.isFinite(actual.amount) || actual.amount < 0) {
+      throw new Error('Actual provider limit usage must be non-negative');
     }
     if (seen.has(actual.windowId)) throw new Error('Duplicate actual provider limit window');
     seen.add(actual.windowId);

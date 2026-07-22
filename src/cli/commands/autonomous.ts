@@ -99,6 +99,7 @@ import type { DeckentConfig } from '../../core/types.js';
 import { DeckentError } from '../../core/errors.js';
 import type { InvocationPurpose, InvocationReceiptRef, InvocationRole } from '../../core/invocation-receipt.js';
 import { InvocationReceiptStore } from '../../core/invocation-receipt-store.js';
+import { MissionWorkerInvocationCoordinator } from '../../orchestra/autonomous/mission-store/mission-worker-invocation-coordinator.js';
 
 // ─── Filesystem layout helpers ────────────────────────────────────────
 
@@ -874,16 +875,17 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     const invocationReceiptStore = new InvocationReceiptStore(root);
     try {
       const summary = await runV2Engine(root, resolvedConfig, {
-        // Provider admission/reservation/receipt authority is not yet injected at
-        // this composition root. Park before Task JSON, prompt, or provider spawn.
-        runTask: async (_ctx, dispatchClaim) => {
-          return {
-            ok: false,
-            dispatchDisposition: 'parked',
-            reason: 'MISSION_WORKER_INVOCATION_AUTHORITY_UNAVAILABLE',
-            authorityEvidenceRef: `mission-dispatch-claim:${dispatchClaim.fenceTokenHash}`,
-            invocationReceiptRef: null,
-          };
+        // The coordinator is the only gate to this exact executor. Production
+        // truth/limit/key/usage authorities and route-lock are not composed yet,
+        // so its null authority parks before this callback, Task JSON, or spawn.
+        workerInvocationCoordinator: new MissionWorkerInvocationCoordinator(null),
+        runTask: async () => ({
+          ok: false,
+          dispatchDisposition: 'parked',
+          reason: 'MISSION_WORKER_INVOCATION_HOLD:exact_executor_unavailable',
+        }),
+        runAdmittedTask: async () => {
+          throw new Error('MISSION_WORKER_EXACT_ROUTE_LOCK_UNAVAILABLE');
         },
         runSprint: (projectRoot) => runSprintLifecycle(projectRoot, sprintConfigV2),
         // Type-2 goal-driver: real planner + acceptance evaluator (same provider as

@@ -170,11 +170,16 @@ export async function runMissionScheduler(
           .then(() => (opts.runtimeRegistry ? opts.runtimeRegistry.dispatch(item, claim) : dispatch(item, claim)))
           .then((r) => {
             const parked = r.dispatchDisposition === 'parked';
+            const reconciliationRequired = r.dispatchDisposition === 'reconciliation-required';
             if (!parked) {
               dispatched++;
               providerDispatchCounted = true;
             }
-            const settled = store.settleClaimedItem(claim, parked ? 'parked' : r.ok ? 'done' : 'failed', r);
+            const settled = store.settleClaimedItem(
+              claim,
+              parked || reconciliationRequired ? 'parked' : r.ok ? 'done' : 'failed',
+              r,
+            );
             if (!settled) fatalError ??= new MissionClaimSettlementError(claim);
           })
           .catch((e) => {

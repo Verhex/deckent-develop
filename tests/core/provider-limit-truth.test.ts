@@ -224,12 +224,17 @@ describe('provider limit truth', () => {
     }), POLICY)).toThrow(/cannot outlive a required window reset/);
   });
 
-  it('requires positive provider usage or termination-backed release evidence', () => {
+  it('accepts measured zero usage but rejects negative usage and unproven release', () => {
     expect(() => assertProviderLimitReservationEvent({
       eventId: 'event-zero', type: 'consumed', occurredAt: T0,
       fenceTokenHash: 'f'.repeat(64), evidenceRef: 'provider-usage:00000001',
       actual: [{ windowId: 'input-tokens', unit: 'tokens', amount: 0 }],
-    })).toThrow(/must be positive/);
+    })).not.toThrow();
+    expect(() => assertProviderLimitReservationEvent({
+      eventId: 'event-negative', type: 'consumed', occurredAt: T0,
+      fenceTokenHash: 'f'.repeat(64), evidenceRef: 'provider-usage:00000002',
+      actual: [{ windowId: 'input-tokens', unit: 'tokens', amount: -1 }],
+    })).toThrow(/must be non-negative/);
     expect(() => assertProviderLimitReservationEvent({
       eventId: 'event-release', type: 'released', occurredAt: T0,
       fenceTokenHash: 'f'.repeat(64), evidenceRef: 'release-event:00000001',

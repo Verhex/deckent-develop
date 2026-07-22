@@ -531,6 +531,10 @@ describe('HostRoleInvocationAdmissionRuntime', () => {
     const { truthStore, limitStore, runtime } = await setup();
     const admission = runtime.admit(request(truthStore));
     if (admission.decision !== 'allow') throw new Error('expected allow');
+    expect(runtime.getReservation(admission.reservation)).toMatchObject({ state: 'admitted' });
+    expect(() => runtime.getReservation({
+      ...admission.reservation, projectId: 'project-b',
+    })).toThrowError(expect.objectContaining({ code: 'SCOPE_MISMATCH' }));
     const event = {
       eventId: 'dispatch-host-role', type: 'dispatched' as const, occurredAt: T1.toISOString(),
       fenceTokenHash: '8'.repeat(64), evidenceRef: 'provider-dispatch:host-role-0001',
@@ -557,6 +561,38 @@ describe('HostRoleInvocationAdmissionRuntime', () => {
       claimed: false,
       existingDispatchEvidenceRef: 'provider-limit-reservation-event:dispatch-host-role',
     });
+    truthStore.close();
+    limitStore.close();
+  });
+
+  it('settles the exact dispatched reservation through the same scoped host authority', async () => {
+    const { truthStore, limitStore, runtime } = await setup();
+    const admission = runtime.admit(request(truthStore));
+    if (admission.decision !== 'allow') throw new Error('expected allow');
+    runtime.claimDispatch(admission, {
+      eventId: 'dispatch-host-settle', type: 'dispatched', occurredAt: T1.toISOString(),
+      fenceTokenHash: admission.reservation.fenceTokenHash,
+      evidenceRef: 'provider-dispatch:host-settle-0001',
+    });
+
+    expect(() => runtime.settleDispatch(admission, {
+      eventId: 'dispatch-host-settle-again', type: 'dispatched', occurredAt: T1.toISOString(),
+      fenceTokenHash: admission.reservation.fenceTokenHash,
+      evidenceRef: 'provider-dispatch:host-settle-0002',
+    })).toThrowError(expect.objectContaining({ code: 'INVALID_EVENT' }));
+    expect(() => runtime.settleDispatch(admission, {
+      eventId: 'consume-host-wrong-fence', type: 'consumed', occurredAt: T1.toISOString(),
+      fenceTokenHash: '7'.repeat(64), evidenceRef: 'provider-usage:host-settle-0001',
+      actual: [{ windowId: 'tokens-all', unit: 'tokens', amount: 0 }],
+    })).toThrowError(expect.objectContaining({ code: 'SCOPE_MISMATCH' }));
+
+    const settled = runtime.settleDispatch(admission, {
+      eventId: 'consume-host-settle', type: 'consumed', occurredAt: T1.toISOString(),
+      fenceTokenHash: admission.reservation.fenceTokenHash,
+      evidenceRef: 'provider-usage:host-settle-0002',
+      actual: [{ windowId: 'tokens-all', unit: 'tokens', amount: 0 }],
+    });
+    expect(settled).toMatchObject({ type: 'consumed', sequence: 2, actual: [{ amount: 0 }] });
     truthStore.close();
     limitStore.close();
   });

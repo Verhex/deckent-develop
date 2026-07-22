@@ -142,6 +142,24 @@ describe('runMissionScheduler — robustness', () => {
     s.close();
   });
 
+  it('counts a granted/ambiguous provider dispatch while parking it for reconciliation', async () => {
+    const s = storeWith('provider-reconcile', 1);
+    const summary = await runMissionScheduler(s, async () => ({
+      ok: false,
+      dispatchDisposition: 'reconciliation-required',
+      reason: 'MISSION_WORKER_INVOCATION_RECONCILIATION_REQUIRED',
+      existingDispatchEvidenceRef: 'provider-limit-reservation-event:reconcile-0001',
+    }), { poolSize: 1, intervalMs: 1, maxIterations: 10 });
+
+    expect(summary.dispatched).toBe(1);
+    expect(s.listItems('provider-reconcile')[0]).toMatchObject({
+      status: 'parked',
+      lastResult: { dispatchDisposition: 'reconciliation-required' },
+    });
+    expect(s.getMission('provider-reconcile')!.status).toBe('pending');
+    s.close();
+  });
+
   it('does not dispatch or increment dispatched when the query-to-claim row revision turns stale', async () => {
     class RacingStore extends SqliteMissionStore {
       private raced = false;

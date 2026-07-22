@@ -33,8 +33,8 @@ export interface ResultLike {
   ok: boolean;
   reason?: string;
   settleDetail?: SettleDetail;
-  /** Host-side HOLD: no provider execution occurred and the item must remain parked. */
-  dispatchDisposition?: 'parked';
+  /** Host HOLD=no provider grant; reconciliation-required=grant/effect may exist. Both park the item. */
+  dispatchDisposition?: 'parked' | 'reconciliation-required';
   [k: string]: unknown;
 }
 

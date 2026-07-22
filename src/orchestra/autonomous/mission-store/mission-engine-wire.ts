@@ -22,6 +22,13 @@ import { advanceGoalMission, type GoalAdvanceDeps } from './goal-mission.js';
 import { auditMissionLifecycle } from './mission-audit-bridge.js';
 import type { MissionApprovalCoordinatorLike } from './mission-approval-coordinator.js';
 import type {
+  MissionWorkerInvocationCoordinatorLike,
+  MissionWorkerInvocationExecution,
+  MissionWorkerInvocationExecutionGrant,
+  MissionWorkerInvocationClaimBinding,
+  MissionWorkerExactExecutionContext,
+} from './mission-worker-invocation-coordinator.js';
+import type {
   Mission,
   MissionDispatchClaim,
   MissionStore,
@@ -46,6 +53,12 @@ export interface RunV2EngineDeps {
   /** kind='task' — run a single worker for the item's description (→ ResultLike). */
   /** Exact claim is host-private and never embedded in MissionTaskContext. */
   runTask: (ctx: MissionTaskContext, claim: MissionDispatchClaim) => Promise<ResultLike>;
+  /** Exact route-locked provider executor + measured terminal evidence bundle. */
+  runAdmittedTask?: (
+    ctx: MissionWorkerExactExecutionContext,
+    claim: MissionWorkerInvocationClaimBinding,
+    grant: Readonly<MissionWorkerInvocationExecutionGrant>,
+  ) => Promise<MissionWorkerInvocationExecution>;
   /** kind='sprint' — run the full sprint lifecycle (success unless it throws). */
   runSprint: (projectRoot: string, config: ResolvedConfig) => Promise<unknown>;
   /** kind='capability' — optional broker; absent → capability items fail clearly. */
@@ -66,6 +79,13 @@ export interface RunV2EngineDeps {
    * risk, or scope. When absent, approval-required items remain non-claimable.
    */
   approvalCoordinator?: MissionApprovalCoordinatorLike;
+  /**
+   * Host-only provider admission/receipt/dispatch/settlement authority. When
+   * present, the exact executor is unreachable until this coordinator returns
+   * a unique provider grant. A null-authority coordinator therefore parks live
+   * production work before Task JSON, prompt, or provider side effects.
+   */
+  workerInvocationCoordinator?: MissionWorkerInvocationCoordinatorLike;
   /**
    * Type-2 (goal) loop bindings. When present, `runV2Engine` interleaves a
    * goal-driver with the scheduler: idle `kind='goal'` missions are advanced
@@ -110,13 +130,56 @@ export function deriveSettleDetail(result: Pick<ResultLike, 'ok' | 'settleDetail
 function withSettleDetail(runTask: RunV2EngineDeps['runTask']): RunV2EngineDeps['runTask'] {
   return async (ctx, claim) => {
     const res = await runTask(ctx, claim);
-    if (res.dispatchDisposition === 'parked') {
+    if (res.dispatchDisposition !== undefined) {
       const held: ResultLike = { ...res };
       delete held.settleDetail;
       return held;
     }
     return { ...res, settleDetail: deriveSettleDetail(res) };
   };
+}
+
+function withWorkerInvocationCoordinator(
+  store: MissionStore,
+  coordinator: MissionWorkerInvocationCoordinatorLike | undefined,
+  runAdmittedTask: RunV2EngineDeps['runAdmittedTask'],
+): RunV2EngineDeps['runTask'] {
+  if (!coordinator) {
+    return withSettleDetail(async () => ({
+      ok: false,
+      dispatchDisposition: 'parked',
+      reason: 'MISSION_WORKER_INVOCATION_AUTHORITY_UNAVAILABLE',
+    }));
+  }
+  return withSettleDetail(async (ctx, claim) => {
+    const mission = store.getMission(claim.missionId);
+    if (!mission) {
+      return {
+        ok: false,
+        dispatchDisposition: 'parked',
+        reason: 'MISSION_WORKER_INVOCATION_HOLD:mission_not_found',
+      };
+    }
+    if (!runAdmittedTask) {
+      return {
+        ok: false,
+        dispatchDisposition: 'parked',
+        reason: 'MISSION_WORKER_INVOCATION_HOLD:exact_executor_unavailable',
+      };
+    }
+    const { provider: _requestedProvider, model: _requestedModel, ...safeContext } = ctx;
+    const { fenceToken: _rawFenceToken, ...claimBinding } = claim;
+    return coordinator.execute({
+      mission,
+      context: ctx,
+      claim,
+      isClaimActive: () => store.isDispatchClaimActive(claim),
+    }, grant => runAdmittedTask(
+      Object.freeze(safeContext),
+      Object.freeze(claimBinding),
+      grant,
+    ));
+  });
 }
 
 /** Resolve a concrete scheduler pool size from config (never < 1). */
@@ -161,7 +224,11 @@ export async function runV2Engine(
     const kindDispatch = buildMissionDispatch({
       projectRoot,
       config,
-      runTask: withSettleDetail(deps.runTask),
+      runTask: withWorkerInvocationCoordinator(
+        store,
+        deps.workerInvocationCoordinator,
+        deps.runAdmittedTask,
+      ),
       runSprint: deps.runSprint,
       ...(deps.runCapability ? { runCapability: deps.runCapability } : {}),
     });
