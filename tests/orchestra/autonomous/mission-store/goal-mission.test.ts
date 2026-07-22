@@ -7,6 +7,7 @@ import {
   createGoalMission,
   advanceGoalMission,
   buildGoalDeps,
+  GoalInvocationHeldError,
 } from '../../../../src/orchestra/autonomous/mission-store/goal-mission.js';
 import type { NewWorkItem, WorkItem } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 import { PRODUCTION_V2_ADMISSION } from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
@@ -23,6 +24,16 @@ function newStore() {
 afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
+
+function invocationHold(reasonCode: 'authority_unavailable' | 'fallback_exhausted' = 'authority_unavailable') {
+  return new GoalInvocationHeldError({
+    schemaVersion: 1,
+    reasonCode,
+    evidenceRefs: [`host-role-admission:${reasonCode}`],
+    invocationReceiptRef: null,
+    heldAt: '2026-07-22T02:00:00.000Z',
+  });
+}
 
 describe('createGoalMission', () => {
   it('creates a kind=goal mission (renderAs goal) with goal + acceptance persisted', () => {
@@ -248,6 +259,64 @@ describe('advanceGoalMission', () => {
     expect(mission.lastResult).toEqual({ ok: false, reason: 'goal not reached, no further work' });
 
     store.close();
+  });
+
+  it('persists a typed author HOLD without exhausting or finalizing the mission', async () => {
+    const store = newStore();
+    createGoalMission(store, { id: 'g-author-hold', title: 'Hold author', goal: 'ship' });
+    const accept = vi.fn(async () => true);
+
+    await expect(advanceGoalMission(store, 'g-author-hold', {
+      author: async () => { throw invocationHold(); },
+      accept,
+    })).resolves.toBe('held');
+
+    const mission = store.getMission('g-author-hold')!;
+    expect(mission.status).toBe('pending');
+    expect(mission.completedAt).toBeNull();
+    expect(mission.lastResult).toEqual({
+      ok: false,
+      reason: 'GOAL_INVOCATION_HOLD:authority_unavailable',
+      goalInvocationHold: {
+        schemaVersion: 1,
+        reasonCode: 'authority_unavailable',
+        evidenceRefs: ['host-role-admission:authority_unavailable'],
+        invocationReceiptRef: null,
+        heldAt: '2026-07-22T02:00:00.000Z',
+      },
+    });
+    expect(accept).not.toHaveBeenCalled();
+    store.close();
+  });
+
+  it('persists a typed accepter HOLD but propagates an ordinary author failure', async () => {
+    const store = newStore();
+    createGoalMission(store, { id: 'g-accept-hold', title: 'Hold accept', goal: 'ship' });
+    await expect(advanceGoalMission(store, 'g-accept-hold', {
+      author: async () => [],
+      accept: async () => { throw invocationHold('fallback_exhausted'); },
+    })).resolves.toBe('held');
+    expect(store.getMission('g-accept-hold')!.status).toBe('pending');
+    expect(store.getMission('g-accept-hold')!.lastResult?.['goalInvocationHold'])
+      .toMatchObject({ reasonCode: 'fallback_exhausted' });
+
+    createGoalMission(store, { id: 'g-programmer-error', title: 'Error', goal: 'ship' });
+    await expect(advanceGoalMission(store, 'g-programmer-error', {
+      author: async () => { throw new Error('parser bug'); },
+      accept: async () => false,
+    })).rejects.toThrow('parser bug');
+    expect(store.getMission('g-programmer-error')!.lastResult).toBeNull();
+    store.close();
+  });
+
+  it('rejects a malformed HOLD before it can change mission state', () => {
+    expect(() => new GoalInvocationHeldError({
+      schemaVersion: 1,
+      reasonCode: 'authority_unavailable',
+      evidenceRefs: ['not-an-evidence-ref'],
+      invocationReceiptRef: null,
+      heldAt: 'not-a-time',
+    })).toThrow('GOAL_INVOCATION_HOLD_INVALID');
   });
 
   it('is a no-op (waiting) while an open work-item is still pending/running', async () => {

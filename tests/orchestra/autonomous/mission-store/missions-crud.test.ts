@@ -41,4 +41,18 @@ describe('Missions CRUD', () => {
     expect(got.lastResult).toEqual({ ok: true, reason: 'done' });
     s.close();
   });
+
+  it('clears a stale terminal timestamp when a round-based goal becomes active again', () => {
+    const s = newStore();
+    s.createMission({ id: 'reactivate', kind: 'goal', title: 'reactivate', renderAs: 'goal' });
+    s.updateMissionStatus('reactivate', 'completed', { ok: true });
+    expect(s.getMission('reactivate')!.completedAt).not.toBeNull();
+    s.updateMissionStatus('reactivate', 'active', { ok: false, reason: 'GOAL_INVOCATION_HOLD:authority_unavailable' });
+    expect(s.getMission('reactivate')).toMatchObject({
+      status: 'active',
+      completedAt: null,
+      lastResult: { ok: false, reason: 'GOAL_INVOCATION_HOLD:authority_unavailable' },
+    });
+    s.close();
+  });
 });

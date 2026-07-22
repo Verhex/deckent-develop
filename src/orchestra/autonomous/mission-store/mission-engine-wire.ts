@@ -242,7 +242,8 @@ const GOAL_DRAIN_BOUND = 100_000;
  *   1. For every LIVE goal mission (`kind='goal'`, not yet settled by the loop,
  *      not cancelled) with no open work-item → `advanceGoalMission`:
  *        - 'authored'           → mark mission active; flag progress made.
- *        - 'accepted'/'exhausted' → record as loop-finalized + deliver settlement.
+   *        - 'held'                 → keep non-terminal with durable authority evidence.
+   *        - 'accepted'/'exhausted' → record as loop-finalized + deliver settlement.
  *   2. Run the scheduler to drain all currently-pending items (goal rounds + any
  *      list/sprint work). Goal-mission settlements are filtered OUT of the
  *      scheduler's delivery — the scheduler's item-based `checkMissionComplete`

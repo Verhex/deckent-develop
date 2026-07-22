@@ -278,7 +278,7 @@ export class SqliteMissionStore implements MissionStore {
     const ts = this.now();
     const completedAt = status === 'completed' || status === 'failed' || status === 'cancelled' ? ts : null;
     this.db.prepare(`UPDATE missions SET status=@status, updated_at=@ts,
-      completed_at=COALESCE(@completedAt, completed_at), last_result=COALESCE(@result, last_result) WHERE id=@id`)
+      completed_at=@completedAt, last_result=COALESCE(@result, last_result) WHERE id=@id`)
       .run({ id, status, ts, completedAt, result: result ? JSON.stringify(result) : null });
   }
   setMissionProgress(id: string, progress: Progress): void {

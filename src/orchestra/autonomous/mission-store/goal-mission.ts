@@ -1,6 +1,7 @@
 import type {
   Mission, MissionStore, NewWorkItem, WorkItem,
 } from './mission-types.js';
+import type { InvocationReceiptRef } from '../../../core/invocation-receipt.js';
 import {
   assertCanonicalWorkItemKind,
   assertWorkItemBatchAdmitted,
@@ -38,7 +39,72 @@ export interface GoalMissionSpec {
  * "open work-item present → no-op" case needs an honest distinct outcome rather
  * than forcing one of the action verbs, so `waiting` is added for that no-op.
  */
-export type GoalAdvanceOutcome = 'authored' | 'accepted' | 'exhausted' | 'waiting';
+export type GoalAdvanceOutcome = 'authored' | 'accepted' | 'exhausted' | 'waiting' | 'held';
+
+export const GOAL_INVOCATION_HOLD_SCHEMA_VERSION = 1 as const;
+
+export type GoalInvocationHoldReason =
+  | 'authority_unavailable'
+  | 'authority_identity_mismatch'
+  | 'authority_failure'
+  | 'fallback_exhausted'
+  | 'reservation_not_executable'
+  | 'store_failure'
+  | 'receipt_unavailable';
+
+const GOAL_INVOCATION_HOLD_REASONS = new Set<GoalInvocationHoldReason>([
+  'authority_unavailable',
+  'authority_identity_mismatch',
+  'authority_failure',
+  'fallback_exhausted',
+  'reservation_not_executable',
+  'store_failure',
+  'receipt_unavailable',
+]);
+
+export interface GoalInvocationHoldV1 {
+  schemaVersion: typeof GOAL_INVOCATION_HOLD_SCHEMA_VERSION;
+  reasonCode: GoalInvocationHoldReason;
+  evidenceRefs: readonly string[];
+  invocationReceiptRef: InvocationReceiptRef | null;
+  heldAt: string;
+}
+
+/** Only this validated host signal may turn an invocation failure into retryable HOLD. */
+export class GoalInvocationHeldError extends Error {
+  constructor(readonly hold: GoalInvocationHoldV1) {
+    super(`GOAL_INVOCATION_HOLD:${hold.reasonCode}`);
+    this.name = 'GoalInvocationHeldError';
+    if (hold.schemaVersion !== GOAL_INVOCATION_HOLD_SCHEMA_VERSION
+      || !GOAL_INVOCATION_HOLD_REASONS.has(hold.reasonCode)
+      || hold.evidenceRefs.length === 0
+      || hold.evidenceRefs.some((ref) => !/^[a-z][a-z0-9-]*:.+$/u.test(ref))
+      || new Set(hold.evidenceRefs).size !== hold.evidenceRefs.length
+      || !Number.isFinite(Date.parse(hold.heldAt))
+      || new Date(hold.heldAt).toISOString() !== hold.heldAt) {
+      throw new TypeError('GOAL_INVOCATION_HOLD_INVALID');
+    }
+    const ref = hold.invocationReceiptRef;
+    if (ref !== null && (ref.schemaVersion !== 1 || !ref.invocationId.trim()
+      || !ref.tenantId.trim() || !ref.projectId.trim())) {
+      throw new TypeError('GOAL_INVOCATION_HOLD_INVALID_RECEIPT_REF');
+    }
+  }
+}
+
+function persistInvocationHold(
+  store: MissionStore,
+  mission: Mission,
+  error: GoalInvocationHeldError,
+): GoalAdvanceOutcome {
+  const status = mission.status === 'pending' ? 'pending' : 'active';
+  store.updateMissionStatus(mission.id, status, {
+    ok: false,
+    reason: error.message,
+    goalInvocationHold: error.hold,
+  });
+  return 'held';
+}
 
 /** Injected dependencies for one goal-loop step. */
 export interface GoalAdvanceDeps {
@@ -183,9 +249,15 @@ export async function advanceGoalMission(
   }
 
   // Ask the planner for the next batch of work.
-  const next = acceptanceContract
-    ? await deps.author(goal, all, acceptanceContract)
-    : await deps.author(goal, all);
+  let next: NewWorkItem[];
+  try {
+    next = acceptanceContract
+      ? await deps.author(goal, all, acceptanceContract)
+      : await deps.author(goal, all);
+  } catch (error) {
+    if (error instanceof GoalInvocationHeldError) return persistInvocationHold(store, mission, error);
+    throw error;
+  }
   if (next.length > 0) {
     try {
       if (deps.admission) assertWorkItemBatchAdmitted(next, deps.admission);
@@ -205,9 +277,15 @@ export async function advanceGoalMission(
   }
 
   // No further work — decide acceptance.
-  const accepted = acceptanceContract
-    ? await deps.accept(goal, all, acceptanceContract)
-    : await deps.accept(goal, all);
+  let accepted: boolean | GoalAcceptanceEvaluation;
+  try {
+    accepted = acceptanceContract
+      ? await deps.accept(goal, all, acceptanceContract)
+      : await deps.accept(goal, all);
+  } catch (error) {
+    if (error instanceof GoalInvocationHeldError) return persistInvocationHold(store, mission, error);
+    throw error;
+  }
   if (acceptanceContract) {
     const evaluation: GoalAcceptanceEvaluation = typeof accepted === 'boolean'
       ? {

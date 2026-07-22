@@ -13,6 +13,7 @@ import type { MissionNotifyPayload } from '../../../../src/orchestra/autonomous/
 import {
   createGoalMission,
   buildGoalDeps,
+  GoalInvocationHeldError,
 } from '../../../../src/orchestra/autonomous/mission-store/goal-mission.js';
 import type { NewWorkItem, WorkItem } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 import type { ResolvedConfig } from '../../../../src/core/config-types.js';
@@ -380,6 +381,55 @@ describe('runV2Engine — goal-driven (Type-2)', () => {
     expect(goalPayloads[0]!.status).toBe('completed');
 
     expect(summary.reason).toBe('drained');
+  });
+
+  it('drains without dispatch/finalize on HOLD, then resumes exactly once after restart', async () => {
+    const r = root();
+    let store = openStore(r);
+    createGoalMission(store, { id: 'gH', title: 'Goal Hold', goal: 'wait for truth', deliverTo: 'owner' });
+    const notify = vi.fn();
+    const runTask = vi.fn(async () => ({ ok: true }));
+    const first = await runV2Engine(r, cfg({ engine: 'v2' }), {
+      runTask,
+      runSprint: async () => undefined,
+      notify,
+      goalDeps: buildGoalDeps({
+        planner: async () => { throw new GoalInvocationHeldError({
+          schemaVersion: 1,
+          reasonCode: 'authority_unavailable',
+          evidenceRefs: ['host-role-admission:authority-unavailable'],
+          invocationReceiptRef: null,
+          heldAt: '2026-07-22T02:00:00.000Z',
+        }); },
+        accepter: async () => false,
+      }),
+      store,
+      maxIterations: BOUNDED,
+    });
+    expect(first).toMatchObject({ reason: 'drained', dispatched: 0 });
+    expect(runTask).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+    expect(store.getMission('gH')).toMatchObject({
+      status: 'pending', completedAt: null,
+      lastResult: { goalInvocationHold: { reasonCode: 'authority_unavailable' } },
+    });
+    store.close();
+
+    store = openStore(r);
+    const accepter = vi.fn(async () => true);
+    const second = await runV2Engine(r, cfg({ engine: 'v2' }), {
+      runTask,
+      runSprint: async () => undefined,
+      notify,
+      goalDeps: buildGoalDeps({ planner: async () => [], accepter }),
+      store,
+      maxIterations: BOUNDED,
+    });
+    expect(second).toMatchObject({ reason: 'drained', dispatched: 0 });
+    expect(accepter).toHaveBeenCalledTimes(1);
+    expect(store.getMission('gH')!.status).toBe('completed');
+    expect(store.getMission('gH')!.completedAt).not.toBeNull();
+    expect(notify).toHaveBeenCalledTimes(1);
   });
 
   it('fails a goal mission when the loop exhausts (author a round, then dry + reject → failed)', async () => {
