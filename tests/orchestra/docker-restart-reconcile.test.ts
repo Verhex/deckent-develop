@@ -22,12 +22,16 @@ import { spawn, spawnSync } from 'node:child_process';
 import { releaseAllSpawnLocks } from '../../src/core/file-lock.js';
 import {
   claimTaskResultSettlementAttemptAtomic,
+  createTaskResultSettlement,
   createTaskResultSettlementRef,
   DOCKER_ATTEMPT_LABELS,
   dockerAttemptLabels,
+  readTaskResultSettlementActiveClaim,
   readTaskResultSettlement,
   readTaskResultSettlementClosure,
   readTaskResultSettlementDispatch,
+  taskResultSettlementPath,
+  writeTaskResultSettlementAtomic,
   writeTaskResultSettlementAttemptAtomic,
   writeTaskResultSettlementDispatchAtomic,
   writeTaskResultSettlementPreparedAtomic,
@@ -139,6 +143,200 @@ beforeEach(() => {
 });
 
 describe('Docker coordinator restart reconciliation', () => {
+  it('adopts and closes a valid pre-lifecycle settlement without rewriting its receipt', async () => {
+    const taskId = 'restart-legacy-settled';
+    const { root, tasks, ref } = fixture(taskId);
+    const result = {
+      taskId,
+      selfAssessment: 'NO_GO',
+      testsPassed: false,
+      markerType: 'EXIT_WITHOUT_RESULT',
+      exitCode: 0,
+    };
+    writeFileSync(join(tasks, `task-${taskId}.json`), JSON.stringify({
+      id: taskId,
+      status: 'PENDING',
+      type: 'audit',
+    }), 'utf-8');
+    writeFileSync(join(tasks, `task-${taskId}.result`), JSON.stringify(result), 'utf-8');
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({ ref, exitCode: 0, result }));
+    const settlementBefore = readFileSync(taskResultSettlementPath(ref), 'utf-8');
+    mockSpawnSync.mockReturnValue(spawnResult(1, '', 'Error: No such container'));
+
+    const backend = new DockerSpawnBackend(root);
+    const report = await backend.reconcilePendingAttempts();
+    const closureBefore = readFileSync(
+      join(taskResultSettlementPath(ref), '..', 'closure.json'),
+      'utf-8',
+    );
+
+    expect(report).toEqual({
+      adopted: [],
+      closedNotDispatched: [],
+      closedAbsentAfterExit: [taskId],
+    });
+    expect(readFileSync(taskResultSettlementPath(ref), 'utf-8')).toBe(settlementBefore);
+    expect(readTaskResultSettlementClosure(ref)).toMatchObject({
+      containerDisposition: 'absent-after-exit',
+      locksReleased: true,
+      evidenceRef: 'legacy-lifecycle-adoption:v1',
+    });
+    expect(JSON.parse(readFileSync(join(tasks, `task-${taskId}.json`), 'utf-8'))).toMatchObject({
+      id: taskId,
+      status: 'NO_GO',
+    });
+    expect(mockSpawnSync.mock.calls.filter(call => ['run', 'stop', 'kill', 'rm'].includes(String(call[1]?.[0]))))
+      .toHaveLength(0);
+
+    mockSpawnSync.mockClear();
+    expect(await backend.reconcilePendingAttempts()).toEqual({
+      adopted: [],
+      closedNotDispatched: [],
+      closedAbsentAfterExit: [],
+    });
+    expect(mockSpawnSync).not.toHaveBeenCalled();
+    expect(readFileSync(taskResultSettlementPath(ref), 'utf-8')).toBe(settlementBefore);
+    expect(readFileSync(join(taskResultSettlementPath(ref), '..', 'closure.json'), 'utf-8'))
+      .toBe(closureBefore);
+  });
+
+  it('resumes an interrupted legacy adoption from the exact existing claim', async () => {
+    const taskId = 'restart-legacy-claimed';
+    const { root, tasks, ref } = fixture(taskId);
+    const result = { taskId, selfAssessment: 'DONE', testsPassed: true };
+    writeFileSync(join(tasks, `task-${taskId}.json`), JSON.stringify({ id: taskId, status: 'EXECUTING' }), 'utf-8');
+    writeFileSync(join(tasks, `task-${taskId}.result`), JSON.stringify(result), 'utf-8');
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({ ref, exitCode: 0, result }));
+    claimTaskResultSettlementAttemptAtomic(ref);
+    mockSpawnSync.mockReturnValue(spawnResult(1, '', 'Error: No such object'));
+
+    const report = await new DockerSpawnBackend(root).reconcilePendingAttempts();
+
+    expect(report.closedAbsentAfterExit).toEqual([taskId]);
+    expect(readTaskResultSettlementClosure(ref)).toMatchObject({
+      containerDisposition: 'absent-after-exit',
+      evidenceRef: 'legacy-lifecycle-adoption:v1',
+    });
+    expect(JSON.parse(readFileSync(join(tasks, `task-${taskId}.json`), 'utf-8'))).toMatchObject({
+      status: 'DONE',
+    });
+  });
+
+  it('does not adopt a legacy settlement while its deterministic container is present', async () => {
+    const taskId = 'restart-legacy-present';
+    const containerId = 'a'.repeat(64);
+    const { root, tasks, ref } = fixture(taskId);
+    const result = { taskId, selfAssessment: 'NO_GO', testsPassed: false };
+    writeFileSync(join(tasks, `task-${taskId}.json`), JSON.stringify({ id: taskId, status: 'PENDING' }), 'utf-8');
+    writeFileSync(join(tasks, `task-${taskId}.result`), JSON.stringify(result), 'utf-8');
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({ ref, exitCode: 1, result }));
+    mockSpawnSync.mockReturnValue(spawnResult(0, authorityProjection(ref, containerId, true, 0)));
+
+    await expect(new DockerSpawnBackend(root).reconcilePendingAttempts())
+      .rejects.toThrow(/legacy-settlement-container-present/);
+
+    expect(readTaskResultSettlementClosure(ref)).toBeNull();
+    expect(readTaskResultSettlementActiveClaim(ref)).toBeNull();
+    expect(JSON.parse(readFileSync(join(tasks, `task-${taskId}.json`), 'utf-8'))).toMatchObject({
+      status: 'PENDING',
+    });
+    expect(mockReleaseAllSpawnLocks).not.toHaveBeenCalled();
+    expect(mockSpawnSync.mock.calls.filter(call => ['run', 'stop', 'kill', 'rm'].includes(String(call[1]?.[0]))))
+      .toHaveLength(0);
+  });
+
+  it('also refuses adoption when only the current project-scoped container name is present', async () => {
+    const taskId = 'restart-current-name-present';
+    const containerId = 'b'.repeat(64);
+    const { root, tasks, ref } = fixture(taskId);
+    const result = { taskId, selfAssessment: 'NO_GO', testsPassed: false };
+    writeFileSync(join(tasks, `task-${taskId}.json`), JSON.stringify({ id: taskId, status: 'PENDING' }), 'utf-8');
+    writeFileSync(join(tasks, `task-${taskId}.result`), JSON.stringify(result), 'utf-8');
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({ ref, exitCode: 1, result }));
+    mockSpawnSync
+      .mockReturnValueOnce(spawnResult(1, '', 'Error: No such container'))
+      .mockReturnValueOnce(spawnResult(0, authorityProjection(ref, containerId, true, 0)));
+
+    await expect(new DockerSpawnBackend(root).reconcilePendingAttempts())
+      .rejects.toThrow(/legacy-settlement-container-present/);
+
+    expect(mockSpawnSync).toHaveBeenCalledTimes(2);
+    expect(readTaskResultSettlementActiveClaim(ref)).toBeNull();
+    expect(readTaskResultSettlementClosure(ref)).toBeNull();
+    expect(mockReleaseAllSpawnLocks).not.toHaveBeenCalled();
+  });
+
+  it('rejects a legacy raw-result mismatch before publishing claim or closure', async () => {
+    const taskId = 'restart-legacy-result-mismatch';
+    const { root, tasks, ref } = fixture(taskId);
+    const settledResult = { taskId, selfAssessment: 'NO_GO', testsPassed: false };
+    writeFileSync(join(tasks, `task-${taskId}.json`), JSON.stringify({ id: taskId, status: 'PENDING' }), 'utf-8');
+    writeFileSync(join(tasks, `task-${taskId}.result`), JSON.stringify({
+      ...settledResult,
+      selfAssessment: 'DONE',
+    }), 'utf-8');
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({
+      ref,
+      exitCode: 0,
+      result: settledResult,
+    }));
+    mockSpawnSync.mockReturnValue(spawnResult(1, '', 'Error: No such container'));
+
+    await expect(new DockerSpawnBackend(root).reconcilePendingAttempts())
+      .rejects.toThrow(/legacy-settlement-result-mismatch/);
+
+    expect(readTaskResultSettlementClosure(ref)).toBeNull();
+    expect(readTaskResultSettlementActiveClaim(ref)).toBeNull();
+    expect(JSON.parse(readFileSync(join(tasks, `task-${taskId}.json`), 'utf-8'))).toMatchObject({
+      status: 'PENDING',
+    });
+    expect(mockReleaseAllSpawnLocks).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when Docker cannot prove a legacy container absent', async () => {
+    const taskId = 'restart-legacy-authority-unavailable';
+    const { root, tasks, ref } = fixture(taskId);
+    const result = { taskId, selfAssessment: 'NO_GO', testsPassed: false };
+    writeFileSync(join(tasks, `task-${taskId}.json`), JSON.stringify({ id: taskId, status: 'PENDING' }), 'utf-8');
+    writeFileSync(join(tasks, `task-${taskId}.result`), JSON.stringify(result), 'utf-8');
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({ ref, exitCode: 1, result }));
+    mockSpawnSync.mockReturnValue(spawnResult(
+      1,
+      '',
+      'permission denied while trying to connect to the Docker daemon socket',
+    ));
+
+    await expect(new DockerSpawnBackend(root).reconcilePendingAttempts())
+      .rejects.toThrow(DOCKER_ERROR_CODES.AUTHORITY_UNAVAILABLE);
+
+    expect(readTaskResultSettlementActiveClaim(ref)).toBeNull();
+    expect(readTaskResultSettlementClosure(ref)).toBeNull();
+    expect(JSON.parse(readFileSync(join(tasks, `task-${taskId}.json`), 'utf-8'))).toMatchObject({
+      status: 'PENDING',
+    });
+    expect(mockReleaseAllSpawnLocks).not.toHaveBeenCalled();
+  });
+
+  it('rejects a legacy task identity mismatch before publishing claim or closure', async () => {
+    const taskId = 'restart-legacy-task-mismatch';
+    const { root, tasks, ref } = fixture(taskId);
+    const result = { taskId, selfAssessment: 'NO_GO', testsPassed: false };
+    writeFileSync(join(tasks, `task-${taskId}.json`), JSON.stringify({
+      id: 'foreign-task',
+      status: 'PENDING',
+    }), 'utf-8');
+    writeFileSync(join(tasks, `task-${taskId}.result`), JSON.stringify(result), 'utf-8');
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({ ref, exitCode: 1, result }));
+    mockSpawnSync.mockReturnValue(spawnResult(1, '', 'Error: No such container'));
+
+    await expect(new DockerSpawnBackend(root).reconcilePendingAttempts())
+      .rejects.toThrow(/legacy-settlement-task-mismatch/);
+
+    expect(readTaskResultSettlementActiveClaim(ref)).toBeNull();
+    expect(readTaskResultSettlementClosure(ref)).toBeNull();
+    expect(mockReleaseAllSpawnLocks).not.toHaveBeenCalled();
+  });
+
   it('closes an attempt that never crossed the prepared/provider boundary', async () => {
     const taskId = 'restart-unprepared';
     const { root, tasks, ref } = fixture(taskId);

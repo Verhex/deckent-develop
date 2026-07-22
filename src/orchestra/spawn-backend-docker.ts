@@ -10,7 +10,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { homedir, totalmem } from 'node:os';
 import type { ModelType } from '../core/types.js';
-import { getProviderForModel, UnknownModelError, type ProviderName, type TaskResult } from '../core/task-types.js';
+import { getProviderForModel, TaskStatus, UnknownModelError, type ProviderName, type TaskResult } from '../core/task-types.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { getProviderCommandSpec, buildProviderCommand, type ProviderCommandSpec } from '../core/provider-command-spec.js';
 import { createClaudeAdapter } from '../providers/claude.js';
@@ -2277,6 +2277,107 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     for (const pending of listPendingTaskResultSettlementAttempts(this.projectDir)) {
       const { attempt, prepared, dispatch, settlement } = pending;
+      if (settlement && !prepared && !dispatch) {
+        const candidateContainerNames = new Set([
+          `${CONTAINER_PREFIX}${attempt.taskId}`,
+          dockerContainerNameForTask(this.projectDir, attempt.taskId),
+        ]);
+        for (const containerName of candidateContainerNames) {
+          const authority = this.inspectContainerAuthority(containerName);
+          if (authority.state === 'unavailable') {
+            throw new SpawnBackendError(
+              `${DOCKER_ERROR_CODES.AUTHORITY_UNAVAILABLE}:${containerName}:${authority.evidence}`,
+              this.name,
+            );
+          }
+          if (authority.state === 'present') {
+            throw new SpawnBackendError(
+              `${DOCKER_ERROR_CODES.OWNERSHIP_CONFLICT}:legacy-settlement-container-present:${attempt.taskId}/${attempt.attemptId}:${containerName}`,
+              this.name,
+            );
+          }
+        }
+
+        const resultPath = join(tasksDir, `task-${attempt.taskId}.result`);
+        const taskPath = join(tasksDir, `task-${attempt.taskId}.json`);
+        let rawResult: Record<string, unknown>;
+        let taskProjection: Record<string, unknown>;
+        try {
+          rawResult = JSON.parse(readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
+          taskProjection = JSON.parse(readFileSync(taskPath, 'utf-8')) as Record<string, unknown>;
+        } catch (error) {
+          throw new SpawnBackendError(
+            `DECKENT_E091:legacy-settlement-projection-unreadable:${attempt.taskId}/${attempt.attemptId}:${error instanceof Error ? error.message : String(error)}`,
+            this.name,
+          );
+        }
+        const rawResultDigest = createTaskResultSettlement({
+          ref: attempt,
+          exitCode: settlement.exitCode,
+          result: rawResult,
+        }).resultSha256;
+        if (rawResultDigest !== settlement.resultSha256) {
+          throw new SpawnBackendError(
+            `DECKENT_E091:legacy-settlement-result-mismatch:${attempt.taskId}/${attempt.attemptId}`,
+            this.name,
+          );
+        }
+        if (taskProjection['id'] !== attempt.taskId) {
+          throw new SpawnBackendError(
+            `DECKENT_E091:legacy-settlement-task-mismatch:${attempt.taskId}/${attempt.attemptId}`,
+            this.name,
+          );
+        }
+        const assessment = settlement.result['selfAssessment'];
+        const terminalStatus = assessment === 'DONE' || assessment === 'GO_WITH_TECH_DEBT'
+          ? TaskStatus.DONE
+          : assessment === 'NO_GO'
+            ? TaskStatus.NO_GO
+            : null;
+        if (terminalStatus === null) {
+          throw new SpawnBackendError(
+            `DECKENT_E091:legacy-settlement-assessment-unknown:${attempt.taskId}/${attempt.attemptId}`,
+            this.name,
+          );
+        }
+        const currentStatus = taskProjection['status'];
+        const activeStatuses = new Set<string>([
+          TaskStatus.PENDING,
+          TaskStatus.CLAIMED,
+          TaskStatus.EXECUTING,
+          TaskStatus.TESTING,
+          TaskStatus.DOCUMENTING,
+          TaskStatus.PAUSED,
+          TaskStatus.MANUAL_REVIEW_REQUIRED,
+        ]);
+        if (currentStatus !== terminalStatus && !activeStatuses.has(String(currentStatus))) {
+          throw new SpawnBackendError(
+            `DECKENT_E091:legacy-settlement-status-conflict:${attempt.taskId}/${attempt.attemptId}:${String(currentStatus)}->${terminalStatus}`,
+            this.name,
+          );
+        }
+
+        if (!pending.claim) claimTaskResultSettlementAttemptAtomic(attempt);
+        if (currentStatus !== terminalStatus) {
+          taskProjection['status'] = terminalStatus;
+          atomicWriteFileSync(taskPath, `${JSON.stringify(taskProjection, null, 2)}\n`);
+        }
+        releaseAllSpawnLocks(this.projectDir, attempt.taskId);
+        releaseStaleSpawnLocksForTask(this.projectDir, attempt.taskId);
+        if (hasSpawnLocksForTask(this.projectDir, attempt.taskId)) {
+          throw new SpawnBackendError(
+            `DECKENT_E091:recovery-lock-release-failed:${attempt.taskId}/${attempt.attemptId}`,
+            this.name,
+          );
+        }
+        writeTaskResultSettlementClosureAtomic(attempt, {
+          containerDisposition: 'absent-after-exit',
+          locksReleased: true,
+          evidenceRef: 'legacy-lifecycle-adoption:v1',
+        });
+        report.closedAbsentAfterExit.push(attempt.taskId);
+        continue;
+      }
       if (!pending.claim) {
         if (prepared || dispatch || settlement) {
           throw new SpawnBackendError(
