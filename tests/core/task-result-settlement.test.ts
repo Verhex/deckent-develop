@@ -12,13 +12,25 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   assertTaskResultSettlementRef,
+  claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlement,
   createTaskResultSettlementRef,
+  dockerAttemptLabels,
+  dockerContainerNameForTask,
+  listPendingTaskResultSettlementAttempts,
+  readTaskResultSettlementActiveClaim,
+  readTaskResultSettlementClosure,
+  readTaskResultSettlementDispatch,
+  readTaskResultSettlementPrepared,
   readTaskResultSettlement,
   taskResultSettlementAttemptPath,
+  taskResultSettlementPreparedPath,
   taskResultSettlementPath,
   writeTaskResultSettlementAtomic,
   writeTaskResultSettlementAttemptAtomic,
+  writeTaskResultSettlementClosureAtomic,
+  writeTaskResultSettlementDispatchAtomic,
+  writeTaskResultSettlementPreparedAtomic,
 } from '../../src/core/task-result-settlement.js';
 
 const roots: string[] = [];
@@ -123,5 +135,106 @@ describe('host-authoritative Docker TaskResult settlement', () => {
     tampered.result = { taskId: 'task-a', selfAssessment: 'NO_GO' };
     writeFileSync(path, JSON.stringify(tampered), 'utf-8');
     expect(readTaskResultSettlement(ref)).toBeNull();
+  });
+
+  it('derives daemon-global names and labels from project, task and attempt authority', () => {
+    const { root } = fixture();
+    const otherRoot = join(root, '..', 'other-project');
+    mkdirSync(otherRoot, { recursive: true });
+    const ref = createTaskResultSettlementRef(root, 'same-task');
+
+    expect(dockerContainerNameForTask(root, 'same-task')).toMatch(/^deckent-w-[a-f0-9]{12}-[a-f0-9]{16}$/);
+    expect(dockerContainerNameForTask(otherRoot, 'same-task')).not.toBe(
+      dockerContainerNameForTask(root, 'same-task'),
+    );
+    expect(dockerAttemptLabels(ref)).toEqual({
+      'io.deckent.managed': 'true',
+      'io.deckent.project': ref.projectRootSha256,
+      'io.deckent.task': expect.stringMatching(/^[a-f0-9]{64}$/),
+      'io.deckent.attempt': ref.attemptId,
+    });
+  });
+
+  it('serializes same-task attempts through an append-only settlement/closure claim chain', () => {
+    const { root } = fixture();
+    const first = createTaskResultSettlementRef(root, 'task-chain');
+    const second = createTaskResultSettlementRef(root, 'task-chain');
+    writeTaskResultSettlementAttemptAtomic(first, '2026-07-22T00:00:00.000Z');
+    writeTaskResultSettlementAttemptAtomic(second, '2026-07-22T00:00:01.000Z');
+
+    claimTaskResultSettlementAttemptAtomic(first, '2026-07-22T00:00:02.000Z');
+    claimTaskResultSettlementAttemptAtomic(first, '2026-07-22T00:00:03.000Z');
+    expect(readTaskResultSettlementActiveClaim(first)).toMatchObject(first);
+    expect(() => claimTaskResultSettlementAttemptAtomic(second)).toThrow(/Conflicting active/);
+
+    writeTaskResultSettlementPreparedAtomic(first, 'claude-fable-5');
+    writeTaskResultSettlementDispatchAtomic(first, 'a'.repeat(64));
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({
+      ref: first,
+      exitCode: 0,
+      result: { taskId: first.taskId, selfAssessment: 'DONE' },
+    }));
+    expect(() => claimTaskResultSettlementAttemptAtomic(second)).toThrow(/Conflicting active/);
+    writeTaskResultSettlementClosureAtomic(first, {
+      containerDisposition: 'stopped-removed',
+      locksReleased: true,
+    });
+
+    expect(readTaskResultSettlementActiveClaim(first)).toBeNull();
+    claimTaskResultSettlementAttemptAtomic(first);
+    expect(readTaskResultSettlementActiveClaim(first)).toBeNull();
+    expect(() => listPendingTaskResultSettlementAttempts(root)).not.toThrow();
+    claimTaskResultSettlementAttemptAtomic(second);
+    expect(readTaskResultSettlementActiveClaim(second)).toMatchObject(second);
+    expect(readTaskResultSettlementClosure(first)).toMatchObject({
+      state: 'closed',
+      containerDisposition: 'stopped-removed',
+      locksReleased: true,
+    });
+  });
+
+  it('requires a durable attempt before claim and binds dispatch to immutable prepared metadata', () => {
+    const { root } = fixture();
+    const ref = createTaskResultSettlementRef(root, 'task-dispatch');
+    expect(() => claimTaskResultSettlementAttemptAtomic(ref)).toThrow(/no matching durable pending attempt/);
+
+    writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
+    const prepared = writeTaskResultSettlementPreparedAtomic(ref, 'gpt-5.6-sol');
+    const dispatch = writeTaskResultSettlementDispatchAtomic(ref, 'b'.repeat(64));
+    expect(readTaskResultSettlementPrepared(ref)).toEqual(prepared);
+    expect(readTaskResultSettlementDispatch(ref)).toEqual(dispatch);
+    expect(dispatch.preparedSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(() => writeTaskResultSettlementDispatchAtomic(ref, 'c'.repeat(64))).toThrow(/Conflicting immutable/);
+
+    const tampered = JSON.parse(readFileSync(taskResultSettlementPreparedPath(ref), 'utf-8')) as Record<string, unknown>;
+    tampered.model = 'claude-fable-5';
+    writeFileSync(taskResultSettlementPreparedPath(ref), JSON.stringify(tampered), 'utf-8');
+    expect(readTaskResultSettlementDispatch(ref)).toBeNull();
+  });
+
+  it('enumerates only project-scoped lifecycle-pending attempts and fails loud on corrupt records', () => {
+    const { root } = fixture();
+    const otherRoot = join(root, '..', 'other-project');
+    mkdirSync(otherRoot, { recursive: true });
+    const active = createTaskResultSettlementRef(root, 'task-active');
+    const other = createTaskResultSettlementRef(otherRoot, 'task-other');
+    writeTaskResultSettlementAttemptAtomic(active, '2026-07-22T00:00:00.000Z');
+    writeTaskResultSettlementAttemptAtomic(other, '2026-07-22T00:00:01.000Z');
+    claimTaskResultSettlementAttemptAtomic(active);
+    writeTaskResultSettlementPreparedAtomic(active, 'claude-fable-5');
+
+    expect(listPendingTaskResultSettlementAttempts(root)).toEqual([
+      expect.objectContaining({
+        attempt: expect.objectContaining({ attemptId: active.attemptId }),
+        claim: expect.objectContaining({ attemptId: active.attemptId }),
+        prepared: expect.objectContaining({ model: 'claude-fable-5' }),
+        dispatch: null,
+        settlement: null,
+      }),
+    ]);
+
+    writeFileSync(taskResultSettlementAttemptPath(active), '{}', 'utf-8');
+    expect(() => listPendingTaskResultSettlementAttempts(root)).toThrow(/Corrupt Docker result settlement attempt/);
   });
 });

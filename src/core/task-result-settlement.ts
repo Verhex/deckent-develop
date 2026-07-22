@@ -6,6 +6,7 @@ import {
   linkSync,
   mkdirSync,
   openSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   unlinkSync,
@@ -16,6 +17,7 @@ import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { deckentPath } from './state-paths.js';
 
 export const TASK_RESULT_SETTLEMENT_SCHEMA_VERSION = 1 as const;
+export const TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION = 1 as const;
 
 export interface TaskResultSettlementRefV1 {
   schemaVersion: typeof TASK_RESULT_SETTLEMENT_SCHEMA_VERSION;
@@ -30,6 +32,43 @@ export interface TaskResultSettlementAttemptV1 extends TaskResultSettlementRefV1
   createdAt: string;
 }
 
+export interface TaskResultSettlementActiveClaimV1 extends TaskResultSettlementRefV1 {
+  lifecycleVersion: typeof TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION;
+  state: 'claimed';
+  claimedAt: string;
+  previousClosureSha256: string | null;
+}
+
+export interface TaskResultSettlementPreparedV1 extends TaskResultSettlementRefV1 {
+  lifecycleVersion: typeof TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION;
+  state: 'prepared';
+  preparedAt: string;
+  containerName: string;
+  model: string;
+  labels: Readonly<Record<string, string>>;
+}
+
+export interface TaskResultSettlementDispatchV1 extends TaskResultSettlementRefV1 {
+  lifecycleVersion: typeof TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION;
+  state: 'dispatched';
+  dispatchedAt: string;
+  containerName: string;
+  containerId: string;
+  model: string;
+  labels: Readonly<Record<string, string>>;
+  preparedSha256: string;
+}
+
+export interface TaskResultSettlementClosureV1 extends TaskResultSettlementRefV1 {
+  lifecycleVersion: typeof TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION;
+  state: 'closed';
+  closedAt: string;
+  settlementSha256: string;
+  containerDisposition: 'not-dispatched' | 'stopped-removed' | 'absent-after-exit';
+  locksReleased: true;
+  evidenceRef?: string;
+}
+
 export interface TaskResultSettlementV1 extends TaskResultSettlementRefV1 {
   state: 'settled';
   settledAt: string;
@@ -42,22 +81,57 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+const DOCKER_CONTAINER_PREFIX = 'deckent-w-';
+export const DOCKER_ATTEMPT_LABELS = Object.freeze({
+  managed: 'io.deckent.managed',
+  project: 'io.deckent.project',
+  task: 'io.deckent.task',
+  attempt: 'io.deckent.attempt',
+} as const);
+
 export function canonicalProjectRoot(projectRoot: string): string {
   try { return realpathSync.native(projectRoot); } catch { return resolve(projectRoot); }
+}
+
+function dockerContainerNameFromAuthority(projectRootSha256: string, taskId: string): string {
+  return `${DOCKER_CONTAINER_PREFIX}${projectRootSha256.slice(0, 12)}-${sha256(taskId).slice(0, 16)}`;
+}
+
+/** Docker names are daemon-global, so project and task authority both participate. */
+export function dockerContainerNameForTask(projectRoot: string, taskId: string): string {
+  return dockerContainerNameFromAuthority(
+    sha256(canonicalProjectRoot(projectRoot)),
+    taskId,
+  );
+}
+
+export function dockerAttemptLabels(
+  ref: TaskResultSettlementRefV1,
+): Readonly<Record<string, string>> {
+  if (!hasValidRefShape(ref as unknown as Record<string, unknown>)) {
+    throw new Error('Invalid Docker result settlement reference');
+  }
+  return Object.freeze({
+    [DOCKER_ATTEMPT_LABELS.managed]: 'true',
+    [DOCKER_ATTEMPT_LABELS.project]: ref.projectRootSha256,
+    [DOCKER_ATTEMPT_LABELS.task]: sha256(ref.taskId),
+    [DOCKER_ATTEMPT_LABELS.attempt]: ref.attemptId,
+  });
+}
+
+function settlementProjectDir(projectRootSha256: string): string {
+  return deckentPath(undefined, 'runtime', 'task-result-settlements', projectRootSha256);
+}
+
+function settlementTaskDir(ref: TaskResultSettlementRefV1): string {
+  return resolve(settlementProjectDir(ref.projectRootSha256), sha256(ref.taskId));
 }
 
 function settlementAttemptDir(ref: TaskResultSettlementRefV1): string {
   if (!hasValidRefShape(ref as unknown as Record<string, unknown>)) {
     throw new Error('Invalid Docker result settlement reference');
   }
-  return deckentPath(
-    undefined,
-    'runtime',
-    'task-result-settlements',
-    ref.projectRootSha256,
-    sha256(ref.taskId),
-    ref.attemptId,
-  );
+  return resolve(settlementTaskDir(ref), ref.attemptId);
 }
 
 function canonicalPathWithMissingLeaf(path: string): string {
@@ -123,6 +197,35 @@ export function taskResultSettlementPath(ref: TaskResultSettlementRefV1): string
   return resolve(settlementAttemptDir(ref), 'settled.json');
 }
 
+export function taskResultSettlementPreparedPath(ref: TaskResultSettlementRefV1): string {
+  return resolve(settlementAttemptDir(ref), 'prepared.json');
+}
+
+export function taskResultSettlementDispatchPath(ref: TaskResultSettlementRefV1): string {
+  return resolve(settlementAttemptDir(ref), 'dispatch.json');
+}
+
+export function taskResultSettlementClosurePath(ref: TaskResultSettlementRefV1): string {
+  return resolve(settlementAttemptDir(ref), 'closure.json');
+}
+
+function taskResultSettlementClaimsDir(ref: TaskResultSettlementRefV1): string {
+  return resolve(settlementTaskDir(ref), 'claims');
+}
+
+export function taskResultSettlementClaimPath(
+  ref: TaskResultSettlementRefV1,
+  previousClosureSha256: string | null = null,
+): string {
+  if (previousClosureSha256 !== null && !/^[a-f0-9]{64}$/.test(previousClosureSha256)) {
+    throw new Error('Invalid Docker result settlement closure digest');
+  }
+  return resolve(
+    taskResultSettlementClaimsDir(ref),
+    previousClosureSha256 === null ? 'root.json' : `${previousClosureSha256}.json`,
+  );
+}
+
 function resultDigest(result: Record<string, unknown>): string {
   return sha256(JSON.stringify(result));
 }
@@ -144,6 +247,27 @@ function hasValidRefShape(record: Record<string, unknown>): boolean {
     && /^[a-f0-9]{64}$/.test(record.projectRootSha256)
     && typeof record.attemptId === 'string'
     && /^[0-9a-f-]{36}$/i.test(record.attemptId);
+}
+
+function hasExactAttemptLabels(
+  value: unknown,
+  ref: TaskResultSettlementRefV1,
+): value is Readonly<Record<string, string>> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const labels = value as Record<string, unknown>;
+  const expected = dockerAttemptLabels(ref);
+  return Object.keys(labels).length === Object.keys(expected).length
+    && Object.entries(expected).every(([key, expectedValue]) => labels[key] === expectedValue);
+}
+
+function hasValidContainerIdentity(
+  record: Record<string, unknown>,
+  ref: TaskResultSettlementRefV1,
+): boolean {
+  return record.containerName === dockerContainerNameFromAuthority(ref.projectRootSha256, ref.taskId)
+    && typeof record.model === 'string'
+    && record.model.length > 0
+    && hasExactAttemptLabels(record.labels, ref);
 }
 
 export function createTaskResultSettlement(input: {
@@ -176,6 +300,78 @@ export function parseTaskResultSettlementAttempt(
     || typeof record.createdAt !== 'string'
   ) return null;
   return record as unknown as TaskResultSettlementAttemptV1;
+}
+
+export function parseTaskResultSettlementActiveClaim(
+  value: unknown,
+): TaskResultSettlementActiveClaimV1 | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (
+    !hasValidRefShape(record)
+    || record.lifecycleVersion !== TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION
+    || record.state !== 'claimed'
+    || typeof record.claimedAt !== 'string'
+    || (record.previousClosureSha256 !== null
+      && (typeof record.previousClosureSha256 !== 'string'
+        || !/^[a-f0-9]{64}$/.test(record.previousClosureSha256)))
+  ) return null;
+  return record as unknown as TaskResultSettlementActiveClaimV1;
+}
+
+export function parseTaskResultSettlementPrepared(
+  value: unknown,
+): TaskResultSettlementPreparedV1 | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const ref = record as unknown as TaskResultSettlementRefV1;
+  if (
+    !hasValidRefShape(record)
+    || record.lifecycleVersion !== TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION
+    || record.state !== 'prepared'
+    || typeof record.preparedAt !== 'string'
+    || !hasValidContainerIdentity(record, ref)
+  ) return null;
+  return record as unknown as TaskResultSettlementPreparedV1;
+}
+
+export function parseTaskResultSettlementDispatch(
+  value: unknown,
+): TaskResultSettlementDispatchV1 | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const ref = record as unknown as TaskResultSettlementRefV1;
+  if (
+    !hasValidRefShape(record)
+    || record.lifecycleVersion !== TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION
+    || record.state !== 'dispatched'
+    || typeof record.dispatchedAt !== 'string'
+    || typeof record.containerId !== 'string'
+    || !/^[a-f0-9]{12,64}$/i.test(record.containerId)
+    || typeof record.preparedSha256 !== 'string'
+    || !/^[a-f0-9]{64}$/.test(record.preparedSha256)
+    || !hasValidContainerIdentity(record, ref)
+  ) return null;
+  return record as unknown as TaskResultSettlementDispatchV1;
+}
+
+export function parseTaskResultSettlementClosure(
+  value: unknown,
+): TaskResultSettlementClosureV1 | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (
+    !hasValidRefShape(record)
+    || record.lifecycleVersion !== TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION
+    || record.state !== 'closed'
+    || typeof record.closedAt !== 'string'
+    || typeof record.settlementSha256 !== 'string'
+    || !/^[a-f0-9]{64}$/.test(record.settlementSha256)
+    || !['not-dispatched', 'stopped-removed', 'absent-after-exit'].includes(String(record.containerDisposition))
+    || record.locksReleased !== true
+    || (record.evidenceRef !== undefined && typeof record.evidenceRef !== 'string')
+  ) return null;
+  return record as unknown as TaskResultSettlementClosureV1;
 }
 
 export function parseTaskResultSettlement(value: unknown): TaskResultSettlementV1 | null {
@@ -249,8 +445,219 @@ export function writeTaskResultSettlementAttemptAtomic(
   );
 }
 
+function readJson(path: string): unknown {
+  try { return JSON.parse(readFileSync(path, 'utf-8')); } catch { return null; }
+}
+
+function closureDigest(closure: TaskResultSettlementClosureV1): string {
+  return sha256(JSON.stringify(closure));
+}
+
+function preparedDigest(prepared: TaskResultSettlementPreparedV1): string {
+  return sha256(JSON.stringify(prepared));
+}
+
+export function readTaskResultSettlementClosure(
+  ref: TaskResultSettlementRefV1,
+): TaskResultSettlementClosureV1 | null {
+  const closure = parseTaskResultSettlementClosure(readJson(taskResultSettlementClosurePath(ref)));
+  if (!closure || !sameRef(closure, ref)) return null;
+  const settlement = readTaskResultSettlement(ref);
+  return settlement && closure.settlementSha256 === sha256(JSON.stringify(settlement))
+    ? closure
+    : null;
+}
+
+function resolveTaskResultSettlementClaimChain(
+  ref: TaskResultSettlementRefV1,
+): {
+  active: TaskResultSettlementActiveClaimV1 | null;
+  nextPreviousClosureSha256: string | null;
+  closedAttemptIds: ReadonlySet<string>;
+} {
+  let previousClosureSha256: string | null = null;
+  const closedAttemptIds = new Set<string>();
+  const seenClaimPaths = new Set<string>();
+  for (let depth = 0; depth < 1024; depth++) {
+    const claimPath = taskResultSettlementClaimPath(ref, previousClosureSha256);
+    if (seenClaimPaths.has(claimPath)) {
+      throw new Error(`Cyclic Docker result settlement claim chain: ${claimPath}`);
+    }
+    seenClaimPaths.add(claimPath);
+    if (!existsSync(claimPath)) {
+      return { active: null, nextPreviousClosureSha256: previousClosureSha256, closedAttemptIds };
+    }
+    const claim = parseTaskResultSettlementActiveClaim(readJson(claimPath));
+    if (
+      !claim
+      || claim.projectRootSha256 !== ref.projectRootSha256
+      || claim.taskId !== ref.taskId
+      || claim.previousClosureSha256 !== previousClosureSha256
+    ) {
+      throw new Error(`Corrupt Docker result settlement claim chain: ${claimPath}`);
+    }
+    const closurePath = taskResultSettlementClosurePath(claim);
+    if (!existsSync(closurePath)) {
+      return { active: claim, nextPreviousClosureSha256: previousClosureSha256, closedAttemptIds };
+    }
+    const closure = readTaskResultSettlementClosure(claim);
+    if (!closure) {
+      throw new Error(`Corrupt Docker result settlement closure: ${closurePath}`);
+    }
+    closedAttemptIds.add(claim.attemptId);
+    previousClosureSha256 = closureDigest(closure);
+  }
+  throw new Error('Docker result settlement claim chain exceeds the bounded recovery depth');
+}
+
+export function readTaskResultSettlementActiveClaim(
+  ref: TaskResultSettlementRefV1,
+): TaskResultSettlementActiveClaimV1 | null {
+  return resolveTaskResultSettlementClaimChain(ref).active;
+}
+
+/**
+ * Claim the daemon-global project/task execution slot before any Docker side effect.
+ * The claim chain is append-only. A closed claim's immutable digest selects the
+ * next first-writer-wins slot, so no actor ever unlinks a newer owner's claim.
+ */
+export function claimTaskResultSettlementAttemptAtomic(
+  ref: TaskResultSettlementRefV1,
+  claimedAt: string = new Date().toISOString(),
+): void {
+  if (!hasValidRefShape(ref as unknown as Record<string, unknown>)) {
+    throw new Error('Invalid Docker result settlement reference');
+  }
+  const attempt = parseTaskResultSettlementAttempt(readJson(taskResultSettlementAttemptPath(ref)));
+  if (!attempt || !sameRef(attempt, ref)) {
+    throw new Error('Docker result settlement claim has no matching durable pending attempt');
+  }
+  const chain = resolveTaskResultSettlementClaimChain(ref);
+  if (chain.closedAttemptIds.has(ref.attemptId)) return;
+  if (chain.active) {
+    if (sameRef(chain.active, ref)) return;
+    throw new Error(
+      `Conflicting active Docker result settlement attempt: ${chain.active.taskId}/${chain.active.attemptId}`,
+    );
+  }
+
+  const claim: TaskResultSettlementActiveClaimV1 = {
+    ...ref,
+    lifecycleVersion: TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION,
+    state: 'claimed',
+    claimedAt,
+    previousClosureSha256: chain.nextPreviousClosureSha256,
+  };
+  publishJsonFirstWriter(
+    taskResultSettlementClaimPath(ref, chain.nextPreviousClosureSha256),
+    claim,
+    (existing) => {
+      const parsed = parseTaskResultSettlementActiveClaim(existing);
+      return parsed !== null
+        && sameRef(parsed, ref)
+        && parsed.previousClosureSha256 === chain.nextPreviousClosureSha256;
+    },
+  );
+}
+
+function assertPendingAttemptAndClaim(ref: TaskResultSettlementRefV1): void {
+  const attempt = parseTaskResultSettlementAttempt(readJson(taskResultSettlementAttemptPath(ref)));
+  const claim = readTaskResultSettlementActiveClaim(ref);
+  if (!attempt || !sameRef(attempt, ref) || !claim || !sameRef(claim, ref)) {
+    throw new Error('Docker dispatch metadata has no matching durable pending attempt claim');
+  }
+}
+
+export function writeTaskResultSettlementPreparedAtomic(
+  ref: TaskResultSettlementRefV1,
+  model: string,
+  preparedAt: string = new Date().toISOString(),
+): TaskResultSettlementPreparedV1 {
+  assertPendingAttemptAndClaim(ref);
+  if (!model.trim()) throw new Error('Docker dispatch model identity must be non-empty');
+  const prepared: TaskResultSettlementPreparedV1 = {
+    ...ref,
+    lifecycleVersion: TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION,
+    state: 'prepared',
+    preparedAt,
+    containerName: dockerContainerNameFromAuthority(ref.projectRootSha256, ref.taskId),
+    model,
+    labels: dockerAttemptLabels(ref),
+  };
+  publishJsonFirstWriter(
+    taskResultSettlementPreparedPath(ref),
+    prepared,
+    (existing) => {
+      const parsed = parseTaskResultSettlementPrepared(existing);
+      return parsed !== null
+        && sameRef(parsed, ref)
+        && parsed.model === prepared.model
+        && parsed.containerName === prepared.containerName;
+    },
+  );
+  return prepared;
+}
+
+export function readTaskResultSettlementPrepared(
+  ref: TaskResultSettlementRefV1,
+): TaskResultSettlementPreparedV1 | null {
+  const prepared = parseTaskResultSettlementPrepared(readJson(taskResultSettlementPreparedPath(ref)));
+  return prepared && sameRef(prepared, ref) ? prepared : null;
+}
+
+export function writeTaskResultSettlementDispatchAtomic(
+  ref: TaskResultSettlementRefV1,
+  containerId: string,
+  dispatchedAt: string = new Date().toISOString(),
+): TaskResultSettlementDispatchV1 {
+  assertPendingAttemptAndClaim(ref);
+  const prepared = readTaskResultSettlementPrepared(ref);
+  if (!prepared) throw new Error('Docker dispatch has no matching immutable prepared metadata');
+  const dispatch: TaskResultSettlementDispatchV1 = {
+    ...ref,
+    lifecycleVersion: TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION,
+    state: 'dispatched',
+    dispatchedAt,
+    containerName: prepared.containerName,
+    containerId,
+    model: prepared.model,
+    labels: prepared.labels,
+    preparedSha256: preparedDigest(prepared),
+  };
+  if (!parseTaskResultSettlementDispatch(dispatch)) {
+    throw new Error('Invalid Docker dispatch container identity');
+  }
+  publishJsonFirstWriter(
+    taskResultSettlementDispatchPath(ref),
+    dispatch,
+    (existing) => {
+      const parsed = parseTaskResultSettlementDispatch(existing);
+      return parsed !== null
+        && sameRef(parsed, ref)
+        && parsed.containerId === dispatch.containerId
+        && parsed.containerName === dispatch.containerName;
+    },
+  );
+  return dispatch;
+}
+
+export function readTaskResultSettlementDispatch(
+  ref: TaskResultSettlementRefV1,
+): TaskResultSettlementDispatchV1 | null {
+  const dispatch = parseTaskResultSettlementDispatch(readJson(taskResultSettlementDispatchPath(ref)));
+  if (!dispatch || !sameRef(dispatch, ref)) return null;
+  const prepared = readTaskResultSettlementPrepared(ref);
+  return prepared && dispatch.preparedSha256 === preparedDigest(prepared) ? dispatch : null;
+}
+
 /** Host-global, attempt-bound receipt; Docker workers never mount this state root. */
 export function writeTaskResultSettlementAtomic(settlement: TaskResultSettlementV1): void {
+  const existingSettlement = readTaskResultSettlement(settlement);
+  if (
+    existingSettlement
+    && existingSettlement.exitCode === settlement.exitCode
+    && existingSettlement.resultSha256 === settlement.resultSha256
+  ) return;
   let attempt: TaskResultSettlementAttemptV1 | null = null;
   try {
     attempt = parseTaskResultSettlementAttempt(
@@ -259,6 +666,12 @@ export function writeTaskResultSettlementAtomic(settlement: TaskResultSettlement
   } catch { /* handled by the fail-closed branch below */ }
   if (!attempt || !sameRef(attempt, settlement)) {
     throw new Error('Docker result settlement has no matching durable pending attempt');
+  }
+  if (existsSync(taskResultSettlementClaimsDir(settlement))) {
+    const active = readTaskResultSettlementActiveClaim(settlement);
+    if (!active || !sameRef(active, settlement)) {
+      throw new Error('Docker result settlement attempt does not own the active lifecycle claim');
+    }
   }
   publishJsonFirstWriter(
     taskResultSettlementPath(settlement),
@@ -284,4 +697,114 @@ export function readTaskResultSettlement(
   } catch {
     return null;
   }
+}
+
+export function writeTaskResultSettlementClosureAtomic(
+  ref: TaskResultSettlementRefV1,
+  input: {
+    containerDisposition: TaskResultSettlementClosureV1['containerDisposition'];
+    locksReleased: true;
+    evidenceRef?: string;
+    closedAt?: string;
+  },
+): TaskResultSettlementClosureV1 {
+  const existingClosure = readTaskResultSettlementClosure(ref);
+  if (existingClosure) {
+    if (
+      existingClosure.containerDisposition === input.containerDisposition
+      && existingClosure.locksReleased === input.locksReleased
+      && existingClosure.evidenceRef === input.evidenceRef
+    ) return existingClosure;
+    throw new Error(`Conflicting immutable Docker result settlement already exists: ${taskResultSettlementClosurePath(ref)}`);
+  }
+  const active = readTaskResultSettlementActiveClaim(ref);
+  if (!active || !sameRef(active, ref)) {
+    throw new Error('Cannot close a foreign or inactive Docker result settlement claim');
+  }
+  const settlement = readTaskResultSettlement(ref);
+  if (!settlement) {
+    throw new Error('Cannot close an unsettled Docker result settlement claim');
+  }
+  const closure: TaskResultSettlementClosureV1 = {
+    ...ref,
+    lifecycleVersion: TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION,
+    state: 'closed',
+    closedAt: input.closedAt ?? new Date().toISOString(),
+    settlementSha256: sha256(JSON.stringify(settlement)),
+    containerDisposition: input.containerDisposition,
+    locksReleased: input.locksReleased,
+    ...(input.evidenceRef ? { evidenceRef: input.evidenceRef } : {}),
+  };
+  publishJsonFirstWriter(
+    taskResultSettlementClosurePath(ref),
+    closure,
+    (existing) => {
+      const parsed = parseTaskResultSettlementClosure(existing);
+      return parsed !== null
+        && sameRef(parsed, ref)
+        && parsed.settlementSha256 === closure.settlementSha256
+        && parsed.containerDisposition === closure.containerDisposition
+        && parsed.locksReleased === true;
+    },
+  );
+  return closure;
+}
+
+export interface PendingTaskResultSettlementAttemptV1 {
+  attempt: TaskResultSettlementAttemptV1;
+  claim: TaskResultSettlementActiveClaimV1 | null;
+  prepared: TaskResultSettlementPreparedV1 | null;
+  dispatch: TaskResultSettlementDispatchV1 | null;
+  settlement: TaskResultSettlementV1 | null;
+}
+
+/**
+ * Enumerate unsettled attempts for exactly one canonical project. Directory names
+ * are never trusted; every record is parsed and matched back to its embedded ref.
+ */
+export function listPendingTaskResultSettlementAttempts(
+  projectRoot: string,
+): PendingTaskResultSettlementAttemptV1[] {
+  const projectRootSha256 = sha256(canonicalProjectRoot(projectRoot));
+  const projectDir = settlementProjectDir(projectRootSha256);
+  if (!existsSync(projectDir)) return [];
+
+  const pending: PendingTaskResultSettlementAttemptV1[] = [];
+  for (const taskDirName of readdirSync(projectDir)) {
+    const taskDir = resolve(projectDir, taskDirName);
+    let attemptNames: string[];
+    try { attemptNames = readdirSync(taskDir); } catch { continue; }
+    for (const attemptName of attemptNames) {
+      if (attemptName === 'claims') continue;
+      const attemptPath = resolve(taskDir, attemptName, 'attempt.json');
+      const attempt = parseTaskResultSettlementAttempt(readJson(attemptPath));
+      const looksLikeAttempt = /^[0-9a-f-]{36}$/i.test(attemptName);
+      if (looksLikeAttempt && !attempt) {
+        throw new Error(`Corrupt Docker result settlement attempt: ${attemptPath}`);
+      }
+      if (
+        !attempt
+        || attempt.projectRootSha256 !== projectRootSha256
+        || sha256(attempt.taskId) !== taskDirName
+        || attempt.attemptId !== attemptName
+      ) continue;
+      if (existsSync(taskResultSettlementClosurePath(attempt))) {
+        const closure = readTaskResultSettlementClosure(attempt);
+        if (!closure) throw new Error(`Corrupt Docker result settlement closure: ${taskResultSettlementClosurePath(attempt)}`);
+        continue;
+      }
+      const claim = readTaskResultSettlementActiveClaim(attempt);
+      pending.push({
+        attempt,
+        claim: claim && sameRef(claim, attempt) ? claim : null,
+        prepared: readTaskResultSettlementPrepared(attempt),
+        dispatch: readTaskResultSettlementDispatch(attempt),
+        settlement: readTaskResultSettlement(attempt),
+      });
+    }
+  }
+  return pending.sort((a, b) => (
+    a.attempt.createdAt.localeCompare(b.attempt.createdAt)
+      || a.attempt.attemptId.localeCompare(b.attempt.attemptId)
+  ));
 }
