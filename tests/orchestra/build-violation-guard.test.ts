@@ -44,6 +44,7 @@ vi.mock('node:child_process', () => ({
       },
       stderr: { on: vi.fn() },
       on: vi.fn(),
+      once: vi.fn(),
     };
     return stub as unknown as ChildProcess;
   }),
@@ -243,7 +244,7 @@ function invokeMonitor(
     args.taskId,
     `deckent-w-${args.taskId}`,
     args.tasksDir,
-    'sonnet',
+    'claude-sonnet-5',
     args.projectDir,
     args.distFingerprintBefore,
   );
