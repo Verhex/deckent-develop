@@ -50,8 +50,13 @@ function baseDeps(over: Partial<MissionDispatchDeps> = {}): MissionDispatchDeps 
 describe('buildMissionDispatch — task', () => {
   it('routes kind=task to runTask with ctx built from spec, returns its ResultLike', async () => {
     const calls: MissionTaskContext[] = [];
+    const claims: MissionDispatchClaim[] = [];
     const dispatch = buildMissionDispatch(baseDeps({
-      runTask: async (ctx) => { calls.push(ctx); return { ok: true, reason: 'task done' }; },
+      runTask: async (ctx, claim) => {
+        calls.push(ctx);
+        claims.push(claim);
+        return { ok: true, reason: 'task done' };
+      },
     }));
     const res = await dispatch(mkItem('task', { description: 'do the thing', model: 'opus', provider: 'claude', scopeDir: 'src/x' }), CLAIM);
     expect(res).toEqual({ ok: true, reason: 'task done' });
@@ -62,17 +67,22 @@ describe('buildMissionDispatch — task', () => {
       model: 'opus',
       provider: 'claude',
       scopeDir: 'src/x',
-      dispatchClaim: CLAIM,
     });
+    expect(claims).toEqual([CLAIM]);
+    expect(JSON.stringify(calls[0])).not.toContain(CLAIM.fenceToken);
   });
 
   it('falls back to item.id as description when spec has none; omits absent optional fields', async () => {
     let captured: MissionTaskContext | undefined;
+    let capturedClaim: MissionDispatchClaim | undefined;
     const dispatch = buildMissionDispatch(baseDeps({
-      runTask: async (ctx) => { captured = ctx; return { ok: true }; },
+      runTask: async (ctx, claim) => { captured = ctx; capturedClaim = claim; return { ok: true }; },
     }));
-    await dispatch(mkItem('task', null, 'm-w7'), { ...CLAIM, workItemId: 'm-w7' });
-    expect(captured).toEqual({ projectRoot: '/proj', description: 'm-w7', dispatchClaim: { ...CLAIM, workItemId: 'm-w7' } });
+    const claim = { ...CLAIM, workItemId: 'm-w7' };
+    await dispatch(mkItem('task', null, 'm-w7'), claim);
+    expect(captured).toEqual({ projectRoot: '/proj', description: 'm-w7' });
+    expect(capturedClaim).toBe(claim);
+    expect(captured).not.toHaveProperty('dispatchClaim');
     expect(captured).not.toHaveProperty('model');
     expect(captured).not.toHaveProperty('provider');
     expect(captured).not.toHaveProperty('scopeDir');

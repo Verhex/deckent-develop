@@ -3,7 +3,11 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteMissionStore } from '../../../../src/orchestra/autonomous/mission-store/sqlite-mission-store.js';
-import { runMissionScheduler, type DispatchFn } from '../../../../src/orchestra/autonomous/mission-store/mission-scheduler.js';
+import {
+  MissionClaimSettlementError,
+  runMissionScheduler,
+  type DispatchFn,
+} from '../../../../src/orchestra/autonomous/mission-store/mission-scheduler.js';
 import {
   PRODUCTION_V2_RUNNER_REGISTRY,
   admitWorkItemBatch,
@@ -101,18 +105,40 @@ describe('runMissionScheduler — mission settlement', () => {
 });
 
 describe('runMissionScheduler — robustness', () => {
-  it('does not let a stale dispatch settlement overwrite a concurrent transition', async () => {
+  it('fails loud when exact settlement CAS loses and never performs a blind second write', async () => {
     const s = storeWith('stale-settle', 1);
-    const summary = await runMissionScheduler(s, async (item) => {
-      s.updateItemStatus(item.id, 'pending', { ok: false, reason: 'new authority required' });
-      return { ok: true, reason: 'stale success' };
-    }, { poolSize: 1, intervalMs: 1, maxIterations: 1 });
+    await expect(runMissionScheduler(s, async (item) => {
+        s.updateItemStatus(item.id, 'pending', { ok: false, reason: 'new authority required' });
+        return { ok: true, reason: 'stale success' };
+      }, { poolSize: 1, intervalMs: 1, maxIterations: 1 }))
+      .rejects.toBeInstanceOf(MissionClaimSettlementError);
 
-    expect(summary.dispatched).toBe(1);
     expect(s.listItems('stale-settle')[0]).toMatchObject({
       status: 'pending',
       lastResult: { ok: false, reason: 'new authority required' },
     });
+    s.close();
+  });
+
+  it('parks a host HOLD without counting a provider dispatch or settling the mission successful', async () => {
+    const s = storeWith('provider-hold', 1);
+    const summary = await runMissionScheduler(s, async () => ({
+      ok: false,
+      dispatchDisposition: 'parked',
+      reason: 'MISSION_WORKER_INVOCATION_AUTHORITY_UNAVAILABLE',
+    }), { poolSize: 1, intervalMs: 1, maxIterations: 10 });
+
+    expect(summary.dispatched).toBe(0);
+    expect(summary.reason).toBe('drained');
+    expect(s.listItems('provider-hold')[0]).toMatchObject({
+      status: 'parked',
+      lastResult: {
+        ok: false,
+        dispatchDisposition: 'parked',
+        reason: 'MISSION_WORKER_INVOCATION_AUTHORITY_UNAVAILABLE',
+      },
+    });
+    expect(s.getMission('provider-hold')!.status).toBe('pending');
     s.close();
   });
 
@@ -140,7 +166,7 @@ describe('runMissionScheduler — robustness', () => {
     const calls: string[] = [];
     const runtimeRegistry = bindMissionRunnerRegistry(PRODUCTION_V2_RUNNER_REGISTRY, {
       task: async (item) => { calls.push(item.id); return { ok: true }; },
-    });
+    }, (claim) => s.isDispatchClaimActive(claim));
 
     const summary = await runMissionScheduler(s, async () => ({ ok: false }), {
       poolSize: 1,
@@ -158,12 +184,43 @@ describe('runMissionScheduler — robustness', () => {
   it('a throwing dispatch marks the item failed; loop continues', async () => {
     const s = storeWith('m', 2);
     const dispatch: DispatchFn = async (item) => { if (item.id.endsWith('w0')) throw new Error('kaboom'); return { ok: true }; };
-    await runMissionScheduler(s, dispatch, { poolSize: 2, intervalMs: 1, maxIterations: 100 });
+    const summary = await runMissionScheduler(s, dispatch, { poolSize: 2, intervalMs: 1, maxIterations: 100 });
     const items = s.listItems('m');
     expect(items.find((i) => i.id === 'm-w0')!.status).toBe('failed');
     expect(items.find((i) => i.id === 'm-w1')!.status).toBe('done');
+    expect(summary.dispatched).toBe(2);
     s.close();
   });
+
+  it.each(['max_iterations', 'aborted'] as const)(
+    'propagates a delayed settlement conflict while draining a %s boundary',
+    async (boundary) => {
+      const s = storeWith(`delayed-${boundary}`, 2);
+      const controller = new AbortController();
+      const run = runMissionScheduler(s, async (item) => {
+        if (item.id.endsWith('w0')) {
+          if (boundary === 'aborted') controller.abort();
+          return { ok: true };
+        }
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        s.updateItemStatus(item.id, 'pending', { ok: false, reason: 'new authority required' });
+        return { ok: true, reason: 'stale success' };
+      }, {
+        poolSize: 2,
+        intervalMs: 1,
+        signal: controller.signal,
+        maxIterations: 1,
+      });
+
+      await expect(run).rejects.toBeInstanceOf(MissionClaimSettlementError);
+      expect(s.listItems(`delayed-${boundary}`).find((item) => item.id.endsWith('w1')))
+        .toMatchObject({
+          status: 'pending',
+          lastResult: { ok: false, reason: 'new authority required' },
+        });
+      s.close();
+    },
+  );
 
   it('abort drains in-flight and leaves no item running', async () => {
     const s = storeWith('m', 4);

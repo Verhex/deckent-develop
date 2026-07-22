@@ -867,31 +867,23 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     const controllerV2 = new AbortController();
     const sigintV2 = (): void => controllerV2.abort();
     process.on('SIGINT', sigintV2);
-    const taskConfigV2 = { ...resolvedConfig, deckent_style: 'task' as const };
     const sprintConfigV2 = { ...resolvedConfig, deckent_style: 'sprint' as const };
-    const resultTimeoutMs =
-      ((resolvedConfig.autonomous as Record<string, unknown> | undefined)?.result_timeout_ms as number | undefined) ?? 600_000;
     const maxIterationsV2 = opts.maxIterations !== undefined
       ? Math.max(0, parseInt(opts.maxIterations, 10) || 0)
       : undefined;
     const invocationReceiptStore = new InvocationReceiptStore(root);
     try {
       const summary = await runV2Engine(root, resolvedConfig, {
-        // Real task execution: spawn via runTaskMode → wait for the result file →
-        // map selfAssessment to the scheduler's ResultLike contract.
-        runTask: async (ctx) => {
-          const { taskId, projectRoot, settlementRef } = await runTaskMode({
-            description: ctx.description,
-            model: ctx.model as ModelType | undefined,
-            provider: ctx.provider,
-            ...(ctx.scopeDir ? { scope: { directories: [ctx.scopeDir] } } : {}),
-            projectRoot: ctx.projectRoot ?? root,
-            autoApprove: false,
-            budget: ctx.budget,
-          }, taskConfigV2);
-          const res = await waitForRunResult(projectRoot, taskId, resultTimeoutMs, { settlementRef });
-          if (!res) return { ok: false, reason: 'task timed out (no result file)' };
-          return { ok: res.selfAssessment !== 'NO_GO', reason: res.notes };
+        // Provider admission/reservation/receipt authority is not yet injected at
+        // this composition root. Park before Task JSON, prompt, or provider spawn.
+        runTask: async (_ctx, dispatchClaim) => {
+          return {
+            ok: false,
+            dispatchDisposition: 'parked',
+            reason: 'MISSION_WORKER_INVOCATION_AUTHORITY_UNAVAILABLE',
+            authorityEvidenceRef: `mission-dispatch-claim:${dispatchClaim.fenceTokenHash}`,
+            invocationReceiptRef: null,
+          };
         },
         runSprint: (projectRoot) => runSprintLifecycle(projectRoot, sprintConfigV2),
         // Type-2 goal-driver: real planner + acceptance evaluator (same provider as

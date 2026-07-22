@@ -29,7 +29,14 @@ export interface Progress { done: number; total: number; phase?: string; step?: 
  * migration needed, it round-trips through the existing JSON `last_result` column.
  */
 export type SettleDetail = 'done' | 'debt' | 'failed';
-export interface ResultLike { ok: boolean; reason?: string; settleDetail?: SettleDetail; [k: string]: unknown; }
+export interface ResultLike {
+  ok: boolean;
+  reason?: string;
+  settleDetail?: SettleDetail;
+  /** Host-side HOLD: no provider execution occurred and the item must remain parked. */
+  dispatchDisposition?: 'parked';
+  [k: string]: unknown;
+}
 
 export interface Mission {
   id: string; kind: MissionKind; status: MissionStatus; tenant: string;
@@ -144,6 +151,8 @@ export interface MissionStore {
   queryDue(opts?: { tenant?: string; limit?: number; registry?: MissionRunnerRegistryV1 }): WorkItem[];
   /** Atomically claim and return the only authority allowed to settle this running attempt. */
   claimItemWithAuthority(id: string, by: string, fence?: MissionClaimFence): MissionDispatchClaim | null;
+  /** Read-only persisted provenance check. This is not an atomic provider execution grant. */
+  isDispatchClaimActive(claim: MissionDispatchClaim): boolean;
   /** First-writer-wins settlement for one exact claim; stale/wrong/replayed authority is a no-op. */
   settleClaimedItem(
     claim: MissionDispatchClaim,

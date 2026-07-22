@@ -41,6 +41,19 @@ export interface MissionSchedulerSummary {
   reason: 'aborted' | 'max_iterations' | 'drained';
 }
 
+/** Exact-CAS failure is an integrity error, never a best-effort scheduler outcome. */
+export class MissionClaimSettlementError extends Error {
+  readonly workItemId: string;
+  readonly attemptId: string;
+
+  constructor(claim: MissionDispatchClaim) {
+    super(`MISSION_CLAIM_SETTLEMENT_CONFLICT: ${claim.workItemId} (${claim.attemptId})`);
+    this.name = 'MissionClaimSettlementError';
+    this.workItemId = claim.workItemId;
+    this.attemptId = claim.attemptId;
+  }
+}
+
 const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 /** Settle a mission when all its items are terminal. Fail-safe (caller wraps in try/catch). */
@@ -72,11 +85,19 @@ export async function runMissionScheduler(
   const cap = opts.perTenantPoolSize;
   let iterations = 0;
   let dispatched = 0;
+  let fatalError: MissionClaimSettlementError | null = null;
 
   for (;;) {
-    if (opts.signal?.aborted) { await Promise.allSettled(inFlight); return { iterations, dispatched, reason: 'aborted' }; }
+    if (fatalError) throw fatalError;
+    if (opts.signal?.aborted) {
+      await Promise.allSettled(inFlight);
+      if (fatalError) throw fatalError;
+      return { iterations, dispatched, reason: 'aborted' };
+    }
     if (opts.maxIterations !== undefined && iterations >= opts.maxIterations) {
-      await Promise.allSettled(inFlight); return { iterations, dispatched, reason: 'max_iterations' };
+      await Promise.allSettled(inFlight);
+      if (fatalError) throw fatalError;
+      return { iterations, dispatched, reason: 'max_iterations' };
     }
     iterations++;
 
@@ -142,13 +163,27 @@ export async function runMissionScheduler(
           continue; // someone else won / fence changed
         }
         claimedOne = true;
-        dispatched++; claimedThisTick++;
+        claimedThisTick++;
         if (cap !== undefined) perTenantFlight.set(tenant, (perTenantFlight.get(tenant) ?? 0) + 1);
+        let providerDispatchCounted = false;
         const p: Promise<void> = Promise.resolve()
           .then(() => (opts.runtimeRegistry ? opts.runtimeRegistry.dispatch(item, claim) : dispatch(item, claim)))
-          .then((r) => { store.settleClaimedItem(claim, r.ok ? 'done' : 'failed', r); })
+          .then((r) => {
+            const parked = r.dispatchDisposition === 'parked';
+            if (!parked) {
+              dispatched++;
+              providerDispatchCounted = true;
+            }
+            const settled = store.settleClaimedItem(claim, parked ? 'parked' : r.ok ? 'done' : 'failed', r);
+            if (!settled) fatalError ??= new MissionClaimSettlementError(claim);
+          })
           .catch((e) => {
-            store.settleClaimedItem(claim, 'failed', { ok: false, reason: String((e as Error)?.message ?? e) });
+            if (!providerDispatchCounted) dispatched++;
+            const settled = store.settleClaimedItem(claim, 'failed', {
+              ok: false,
+              reason: String((e as Error)?.message ?? e),
+            });
+            if (!settled) fatalError ??= new MissionClaimSettlementError(claim);
           })
           .finally(() => {
             inFlight.delete(p);
@@ -163,6 +198,7 @@ export async function runMissionScheduler(
 
     if (inFlight.size > 0) {
       await Promise.race(inFlight);            // an item settles → a slot frees
+      if (fatalError) throw fatalError;
     } else if (claimedThisTick === 0) {
       if (opts.maxIterations !== undefined) return { iterations, dispatched, reason: 'drained' };
       await sleep(opts.intervalMs);            // idle (live)

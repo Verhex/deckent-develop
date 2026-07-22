@@ -1057,7 +1057,7 @@ export class SqliteMissionStore implements MissionStore {
           itemDefinitionDigest: fence.admissionFence.itemDefinitionDigest,
         });
         if (info.changes !== 1) return null;
-        return {
+        return Object.freeze({
           schemaVersion: 1,
           workItemId: current.id,
           missionId: current.missionId,
@@ -1069,7 +1069,7 @@ export class SqliteMissionStore implements MissionStore {
           fenceTokenHash,
           claimRegistryRevision: fence.admissionFence.registryRevision,
           claimRegistryDigest: fence.admissionFence.registryDigest,
-        };
+        });
       }
 
       this.reconcileUnsupportedKinds(id);
@@ -1104,7 +1104,7 @@ export class SqliteMissionStore implements MissionStore {
         fenceTokenHash,
       });
       if (info.changes !== 1) return null;
-      return {
+      return Object.freeze({
         schemaVersion: 1,
         workItemId: current.id,
         missionId: current.missionId,
@@ -1116,7 +1116,7 @@ export class SqliteMissionStore implements MissionStore {
         fenceTokenHash,
         claimRegistryRevision: null,
         claimRegistryDigest: null,
-      };
+      });
     });
     return transaction.immediate();
   }
@@ -1152,6 +1152,39 @@ export class SqliteMissionStore implements MissionStore {
         ts: this.now(),
       });
     return info.changes === 1;
+  }
+
+  isDispatchClaimActive(claim: MissionDispatchClaim): boolean {
+    if (claim.schemaVersion !== 1
+      || claim.workItemId.length === 0
+      || claim.missionId.length === 0
+      || claim.claimedBy.length === 0
+      || claim.attemptId.length === 0
+      || claim.fenceToken.length === 0
+      || claim.fenceTokenHash !== this.claimTokenHash(claim.fenceToken)) return false;
+    const row = this.db.prepare(`SELECT mission_id,status,claimed_by,claimed_at,revision,
+      claim_attempt_id,claim_fence_token_hash,claim_registry_revision,claim_registry_digest
+      FROM work_items WHERE id=?`).get(claim.workItemId) as {
+        mission_id: string;
+        status: string;
+        claimed_by: string | null;
+        claimed_at: string | null;
+        revision: number;
+        claim_attempt_id: string | null;
+        claim_fence_token_hash: string | null;
+        claim_registry_revision: string | null;
+        claim_registry_digest: string | null;
+      } | undefined;
+    return row !== undefined
+      && row.mission_id === claim.missionId
+      && row.status === 'running'
+      && row.claimed_by === claim.claimedBy
+      && row.claimed_at === claim.claimedAt
+      && row.revision === claim.itemRevision
+      && row.claim_attempt_id === claim.attemptId
+      && row.claim_fence_token_hash === claim.fenceTokenHash
+      && row.claim_registry_revision === claim.claimRegistryRevision
+      && row.claim_registry_digest === claim.claimRegistryDigest;
   }
 
   claimItem(id: string, by: string, fence?: MissionClaimFence): boolean {

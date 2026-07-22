@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 
 import {
   CANONICAL_WORK_ITEM_KINDS,
@@ -6,6 +7,7 @@ import {
   PRODUCTION_V2_RUNNER_REGISTRY,
   assertCanonicalWorkItemKind,
   assertWorkItemBatchAdmitted,
+  admitWorkItemBatch,
   bindMissionRunnerRegistry,
   computeSprintSnapshotDigest,
   createMissionRunnerRegistry,
@@ -27,6 +29,50 @@ const allWired: MissionRuntimeAdmission = createMissionRunnerRegistry({
   })),
 });
 
+function productionItem(): WorkItem {
+  const admitted = admitWorkItemBatch([{
+    id: 'task-a',
+    missionId: 'mission-a',
+    kind: 'task' as const,
+    spec: { description: 'bounded' },
+  }], PRODUCTION_V2_RUNNER_REGISTRY)[0]!;
+  return {
+    ...admitted,
+    status: 'pending',
+    policy: 'auto',
+    renderAs: 'task',
+    progress: null,
+    dependsOn: [],
+    trigger: null,
+    claimedAt: null,
+    claimedBy: null,
+    revision: 0,
+    claimRegistryRevision: null,
+    claimRegistryDigest: null,
+    createdAt: '2026-07-22T00:00:00.000Z',
+    updatedAt: '2026-07-22T00:00:00.000Z',
+    lastResult: null,
+  };
+}
+
+function productionClaim(overrides: Partial<MissionDispatchClaim> = {}): MissionDispatchClaim {
+  const fenceToken = 'host-private-token';
+  return Object.freeze({
+    schemaVersion: 1,
+    workItemId: 'task-a',
+    missionId: 'mission-a',
+    claimedBy: 'scheduler',
+    claimedAt: '2026-07-22T00:00:00.000Z',
+    itemRevision: 1,
+    attemptId: 'attempt-1',
+    fenceToken,
+    fenceTokenHash: createHash('sha256').update(fenceToken).digest('hex'),
+    claimRegistryRevision: PRODUCTION_V2_RUNNER_REGISTRY.registryRevision,
+    claimRegistryDigest: PRODUCTION_V2_RUNNER_REGISTRY.registryDigest,
+    ...overrides,
+  });
+}
+
 describe('mission kind admission registry', () => {
   it('contains exactly the four canonical work-item kinds', () => {
     expect(CANONICAL_WORK_ITEM_KINDS).toEqual(['task', 'sprint', 'capability', 'process']);
@@ -36,44 +82,61 @@ describe('mission kind admission registry', () => {
     expect(listRuntimeAdmittedKinds(PRODUCTION_V2_ADMISSION)).toEqual(['task']);
     expect(PRODUCTION_V2_ADMISSION).toBe(PRODUCTION_V2_RUNNER_REGISTRY);
     expect(PRODUCTION_V2_RUNNER_REGISTRY.registryDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(PRODUCTION_V2_RUNNER_REGISTRY).toMatchObject({
+      registryRevision: 'goal-v2-production-v2',
+      runners: [{
+        kind: 'task',
+        runnerContract: 'mission-task-host-authority-v2',
+        runnerRevision: 'task-mode-runner-v2',
+      }],
+    });
   });
 
   it('binds exactly the handlers declared by the immutable registry', () => {
     const task = async () => ({ ok: true });
-    expect(bindMissionRunnerRegistry(PRODUCTION_V2_RUNNER_REGISTRY, { task }).descriptor)
+    expect(bindMissionRunnerRegistry(PRODUCTION_V2_RUNNER_REGISTRY, { task }, () => true).descriptor)
       .toBe(PRODUCTION_V2_RUNNER_REGISTRY);
-    expect(() => bindMissionRunnerRegistry(PRODUCTION_V2_RUNNER_REGISTRY, {}))
+    expect(() => bindMissionRunnerRegistry(PRODUCTION_V2_RUNNER_REGISTRY, {}, () => true))
       .toThrow('MISSION_RUNNER_BINDING_MISMATCH');
     expect(() => bindMissionRunnerRegistry(PRODUCTION_V2_RUNNER_REGISTRY, {
       task,
       sprint: task,
-    })).toThrow('MISSION_RUNNER_BINDING_MISMATCH');
+    }, () => true)).toThrow('MISSION_RUNNER_BINDING_MISMATCH');
   });
 
-  it('rejects an item/claim identity mismatch before the bound handler runs', async () => {
-    let called = false;
+  it('validates the complete frozen attempt authority before the bound handler runs', async () => {
+    let calls = 0;
+    const activeClaim = productionClaim();
     const bound = bindMissionRunnerRegistry(PRODUCTION_V2_RUNNER_REGISTRY, {
-      task: async () => { called = true; return { ok: true }; },
-    });
-    const item = {
-      id: 'task-a', missionId: 'mission-a', kind: 'task', status: 'running',
-      spec: { description: 'bounded' }, policy: 'auto', renderAs: 'task', progress: null,
-      dependsOn: [], trigger: null, claimedAt: null, claimedBy: null, revision: 1,
-      admissionFence: null, claimRegistryRevision: null, claimRegistryDigest: null,
-      createdAt: 't', updatedAt: 't', lastResult: null,
-    } as WorkItem;
-    const claim = {
-      schemaVersion: 1, workItemId: 'other-task', missionId: 'mission-a',
-      claimedBy: 'scheduler', claimedAt: '2026-07-22T00:00:00.000Z', itemRevision: 1,
-      attemptId: 'attempt', fenceToken: 'token', fenceTokenHash: 'hash',
-      claimRegistryRevision: null, claimRegistryDigest: null,
-    } as MissionDispatchClaim;
+      task: async () => { calls++; return { ok: true }; },
+    }, (claim) => claim === activeClaim);
+    const item = productionItem();
 
-    await expect(bound.dispatch(item, claim)).resolves.toEqual({
+    await expect(bound.dispatch(item, activeClaim)).resolves.toEqual({ ok: true });
+    expect(calls).toBe(1);
+
+    const invalidClaims: Array<[MissionDispatchClaim, string]> = [
+      [{ ...productionClaim() }, 'AUTHORITY_MUTABLE'],
+      [productionClaim({ workItemId: 'other-task' }), 'ITEM_IDENTITY_MISMATCH'],
+      [productionClaim({ itemRevision: 2 }), 'ITEM_REVISION_MISMATCH'],
+      [productionClaim({ claimedAt: 'not-a-timestamp' }), 'CLAIMED_AT_INVALID'],
+      [productionClaim({ fenceTokenHash: '0'.repeat(64) }), 'FENCE_TOKEN_HASH_MISMATCH'],
+      [productionClaim({ claimRegistryRevision: 'goal-v2-production-v1' }), 'CLAIM_REGISTRY_MISMATCH'],
+    ];
+    for (const [claim, code] of invalidClaims) {
+      await expect(bound.dispatch(item, claim)).resolves.toMatchObject({
+        ok: false,
+        dispatchDisposition: 'parked',
+        reason: `MISSION_DISPATCH_CLAIM_INVALID: ${code}`,
+      });
+    }
+    const structurallyValidButUnissued = productionClaim();
+    await expect(bound.dispatch(item, structurallyValidButUnissued)).resolves.toMatchObject({
       ok: false,
-      reason: 'MISSION_DISPATCH_CLAIM_MISMATCH',
+      dispatchDisposition: 'parked',
+      reason: 'MISSION_DISPATCH_CLAIM_INVALID: PERSISTED_AUTHORITY_MISMATCH',
     });
-    expect(called).toBe(false);
+    expect(calls).toBe(1);
   });
 
   it('admits a described task in production and rejects an empty description', () => {

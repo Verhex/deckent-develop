@@ -15,7 +15,11 @@ import {
   buildGoalDeps,
   GoalInvocationHeldError,
 } from '../../../../src/orchestra/autonomous/mission-store/goal-mission.js';
-import type { NewWorkItem, WorkItem } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
+import type {
+  MissionDispatchClaim,
+  NewWorkItem,
+  WorkItem,
+} from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 import {
   PRODUCTION_V2_RUNNER_REGISTRY,
   admitWorkItemBatch,
@@ -139,8 +143,15 @@ describe('runV2Engine', () => {
     enqueueProduction(store, { id: 'm1-1', missionId: 'm1', kind: 'task', spec: { description: 'do 1' } });
 
     const seen: string[] = [];
+    const claims: MissionDispatchClaim[] = [];
     const deps: RunV2EngineDeps = {
-      runTask: async (ctx: MissionTaskContext) => { seen.push(ctx.description); return { ok: true }; },
+      runTask: async (ctx: MissionTaskContext, claim) => {
+        seen.push(ctx.description);
+        claims.push(claim);
+        expect(ctx).not.toHaveProperty('dispatchClaim');
+        expect(JSON.stringify(ctx)).not.toContain(claim.fenceToken);
+        return { ok: true };
+      },
       runSprint: async () => undefined,
       store,
       maxIterations: BOUNDED,
@@ -150,9 +161,47 @@ describe('runV2Engine', () => {
 
     // fake dispatch ran both items, the mission settled completed.
     expect(seen.sort()).toEqual(['do 0', 'do 1']);
+    expect(claims).toHaveLength(2);
+    expect(claims.every(Object.isFrozen)).toBe(true);
     expect(summary.dispatched).toBe(2);
     expect(store.getMission('m1')!.status).toBe('completed');
     expect(store.listItems('m1').every((i) => i.status === 'done')).toBe(true);
+  });
+
+  it('persists a host HOLD without contradictory failed settlement detail or delivery', async () => {
+    const r = root();
+    const store = openStore(r);
+    store.createMission({ id: 'mH', kind: 'list', title: 'Hold', renderAs: 'checklist' });
+    enqueueProduction(store, {
+      id: 'mH-0', missionId: 'mH', kind: 'task', spec: { description: 'hold before provider' },
+    });
+    const notify = vi.fn();
+
+    const summary = await runV2Engine(r, cfg({ engine: 'v2' }), {
+      runTask: async () => ({
+        ok: false,
+        dispatchDisposition: 'parked',
+        settleDetail: 'failed',
+        reason: 'MISSION_WORKER_INVOCATION_AUTHORITY_UNAVAILABLE',
+      }),
+      runSprint: async () => undefined,
+      notify,
+      store,
+      maxIterations: BOUNDED,
+    });
+
+    expect(summary.dispatched).toBe(0);
+    expect(store.listItems('mH')[0]).toMatchObject({
+      status: 'parked',
+      lastResult: {
+        ok: false,
+        dispatchDisposition: 'parked',
+        reason: 'MISSION_WORKER_INVOCATION_AUTHORITY_UNAVAILABLE',
+      },
+    });
+    expect(store.listItems('mH')[0]!.lastResult).not.toHaveProperty('settleDetail');
+    expect(store.getMission('mH')!.status).toBe('pending');
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it('boot recover() parks an orphaned running item instead of risking duplicate side effects', async () => {

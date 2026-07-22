@@ -58,7 +58,10 @@ import {
   resolvePlannerModelIdentity,
 } from '../../src/cli/commands/autonomous.js';
 import type { LlmComplete } from '../../src/orchestra/autonomous/goal-planner-types.js';
-import type { WorkItem } from '../../src/orchestra/autonomous/mission-store/mission-types.js';
+import type {
+  MissionDispatchClaim,
+  WorkItem,
+} from '../../src/orchestra/autonomous/mission-store/mission-types.js';
 import { createGoalAcceptanceContract } from '../../src/orchestra/autonomous/mission-store/mission-acceptance.js';
 import { GoalInvocationHeldError } from '../../src/orchestra/autonomous/mission-store/goal-mission.js';
 import type { ResolvedConfig } from '../../src/core/types.js';
@@ -369,7 +372,7 @@ describe('handleStart — engine=v2 passes live goalDeps to runV2Engine', () => 
     expect(plannerResolveAdapterSpy).not.toHaveBeenCalled();
   });
 
-  it('runs v2 task work with autoApprove disabled', async () => {
+  it('parks v2 task work before Task JSON or provider spawn when host authority is unavailable', async () => {
     const root = mkRoot();
     const cfgDir = join(root, '.deckent');
     mkdirSync(cfgDir, { recursive: true });
@@ -390,15 +393,34 @@ describe('handleStart — engine=v2 passes live goalDeps to runV2Engine', () => 
     }
 
     const deps = runV2Spy.mock.calls[0]![2] as {
-      runTask: (ctx: { description: string; projectRoot: string }) => Promise<unknown>;
+      runTask: (
+        ctx: { description: string; projectRoot: string },
+        claim: MissionDispatchClaim,
+      ) => Promise<unknown>;
     };
-    await deps.runTask({ description: 'safe task', projectRoot: root });
-
-    expect(runTaskModeSpy).toHaveBeenCalledTimes(1);
-    expect(runTaskModeSpy.mock.calls[0]![0]).toMatchObject({
-      description: 'safe task',
-      projectRoot: root,
-      autoApprove: false,
+    const claim = Object.freeze({
+      schemaVersion: 1 as const,
+      workItemId: 'safe-task',
+      missionId: 'safe-mission',
+      claimedBy: 'scheduler',
+      claimedAt: '2026-07-22T00:00:00.000Z',
+      itemRevision: 1,
+      attemptId: 'attempt-1',
+      fenceToken: 'host-private',
+      fenceTokenHash: 'a'.repeat(64),
+      claimRegistryRevision: 'goal-v2-production-v2',
+      claimRegistryDigest: 'b'.repeat(64),
     });
+    const result = await deps.runTask({ description: 'safe task', projectRoot: root }, claim);
+
+    expect(result).toEqual({
+      ok: false,
+      dispatchDisposition: 'parked',
+      reason: 'MISSION_WORKER_INVOCATION_AUTHORITY_UNAVAILABLE',
+      authorityEvidenceRef: `mission-dispatch-claim:${claim.fenceTokenHash}`,
+      invocationReceiptRef: null,
+    });
+    expect(runTaskModeSpy).not.toHaveBeenCalled();
+    expect(waitForRunResultSpy).not.toHaveBeenCalled();
   });
 });

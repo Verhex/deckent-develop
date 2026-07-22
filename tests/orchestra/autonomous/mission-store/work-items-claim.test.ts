@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -74,6 +75,7 @@ describe('WorkItems + atomic claim', () => {
       missionId: 'm',
       itemRevision: 1,
     });
+    expect(Object.isFrozen(claim)).toBe(true);
     const row = s.__rawGet(`SELECT claim_attempt_id,claim_fence_token_hash
       FROM work_items WHERE id='authority'`);
     expect(row).toEqual({
@@ -90,6 +92,14 @@ describe('WorkItems + atomic claim', () => {
     const claim = s.claimItemWithAuthority('settle', 'scheduler')!;
     const before = s.__rawGet("SELECT status,revision,last_result FROM work_items WHERE id='settle'");
 
+    expect(s.isDispatchClaimActive(claim)).toBe(true);
+    expect(s.isDispatchClaimActive(Object.freeze({ ...claim, claimedBy: 'other' }))).toBe(false);
+    const forgedToken = 'self-consistent-forgery';
+    expect(s.isDispatchClaimActive(Object.freeze({
+      ...claim,
+      fenceToken: forgedToken,
+      fenceTokenHash: createHash('sha256').update(forgedToken).digest('hex'),
+    }))).toBe(false);
     expect(s.settleClaimedItem({ ...claim, claimedBy: 'other' }, 'done', { ok: true })).toBe(false);
     expect(s.settleClaimedItem({ ...claim, attemptId: 'other' }, 'done', { ok: true })).toBe(false);
     expect(s.settleClaimedItem({ ...claim, itemRevision: claim.itemRevision + 1 }, 'done', { ok: true })).toBe(false);
@@ -98,6 +108,7 @@ describe('WorkItems + atomic claim', () => {
       .toEqual(before);
 
     expect(s.settleClaimedItem(claim, 'done', { ok: true, reason: 'exact' })).toBe(true);
+    expect(s.isDispatchClaimActive(claim)).toBe(false);
     expect(s.settleClaimedItem(claim, 'failed', { ok: false, reason: 'replay' })).toBe(false);
     expect(s.__rawGet(`SELECT status,revision,last_result,claim_attempt_id,claim_fence_token_hash
       FROM work_items WHERE id='settle'`)).toEqual({
@@ -339,6 +350,38 @@ describe('WorkItems + atomic claim', () => {
     expect(s.reconcileRuntimeAdmission(PRODUCTION_V2_RUNNER_REGISTRY)).toEqual([]);
     expect(s.__rawGet("SELECT status,revision,updated_at,last_result FROM work_items WHERE id='legacy-no-fence'"))
       .toEqual(first);
+    s.close();
+  });
+
+  it('parks a v1 runner fence when production advances to the host-authority v2 contract', () => {
+    const s = freshMission();
+    const oldRegistry = createMissionRunnerRegistry({
+      registryRevision: 'goal-v2-production-v1',
+      runners: [{
+        kind: 'task',
+        runnerContract: 'mission-task-context-v1',
+        runnerRevision: 'task-mode-runner-v1',
+      }],
+    });
+    const oldItem = admitWorkItemBatch([{
+      id: 'v1-fence',
+      missionId: 'm',
+      kind: 'task' as const,
+      spec: { description: 'must be re-admitted' },
+    }], oldRegistry)[0]!;
+    s.enqueueItem(oldItem);
+
+    expect(s.queryDue({ registry: PRODUCTION_V2_RUNNER_REGISTRY })).toEqual([]);
+    expect(s.listItems('m')[0]).toMatchObject({
+      status: 'parked',
+      lastResult: {
+        ok: false,
+        missionAdmission: {
+          code: 'RUNTIME_REGISTRY_MISMATCH',
+          decision: 'parked-hold',
+        },
+      },
+    });
     s.close();
   });
 

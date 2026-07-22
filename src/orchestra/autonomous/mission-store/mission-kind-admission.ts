@@ -46,6 +46,7 @@ export interface WorkItemAdmissionFenceV1 {
 }
 
 export type MissionRuntimeRunner = (item: WorkItem, claim: MissionDispatchClaim) => Promise<ResultLike>;
+export type MissionDispatchClaimVerifier = (claim: MissionDispatchClaim) => boolean;
 
 export interface BoundMissionRunnerRegistryV1 {
   descriptor: MissionRunnerRegistryV1;
@@ -192,11 +193,11 @@ export function assertMissionRunnerRegistry(registry: MissionRunnerRegistryV1): 
 
 /** Production Goal-v2 truth today: only task dispatch has a faithful live runner. */
 export const PRODUCTION_V2_RUNNER_REGISTRY = createMissionRunnerRegistry({
-  registryRevision: 'goal-v2-production-v1',
+  registryRevision: 'goal-v2-production-v2',
   runners: [{
     kind: 'task',
-    runnerContract: 'mission-task-context-v1',
-    runnerRevision: 'task-mode-runner-v1',
+    runnerContract: 'mission-task-host-authority-v2',
+    runnerRevision: 'task-mode-runner-v2',
   }],
 });
 
@@ -412,9 +413,42 @@ export function validateWorkItemAdmission(
   return { ok: true };
 }
 
+function isCanonicalIsoTimestamp(value: string): boolean {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && new Date(parsed).toISOString() === value;
+}
+
+function validateDispatchClaim(
+  item: WorkItem,
+  claim: MissionDispatchClaim,
+  descriptor: MissionRunnerRegistryV1,
+): string | null {
+  if (!Object.isFrozen(claim)) return 'AUTHORITY_MUTABLE';
+  if (claim.schemaVersion !== 1) return 'SCHEMA_VERSION_MISMATCH';
+  if (claim.workItemId !== item.id || claim.missionId !== item.missionId) return 'ITEM_IDENTITY_MISMATCH';
+  if (item.status !== 'pending') return 'PRE_CLAIM_STATE_MISMATCH';
+  if (claim.itemRevision !== item.revision + 1) return 'ITEM_REVISION_MISMATCH';
+  if (!nonEmptyCanonicalString(claim.claimedBy)) return 'CLAIMED_BY_INVALID';
+  if (!isCanonicalIsoTimestamp(claim.claimedAt)) return 'CLAIMED_AT_INVALID';
+  if (!nonEmptyCanonicalString(claim.attemptId)) return 'ATTEMPT_ID_INVALID';
+  if (!nonEmptyCanonicalString(claim.fenceToken)) return 'FENCE_TOKEN_INVALID';
+  if (!/^[a-f0-9]{64}$/.test(claim.fenceTokenHash)
+    || createHash('sha256').update(claim.fenceToken).digest('hex') !== claim.fenceTokenHash) {
+    return 'FENCE_TOKEN_HASH_MISMATCH';
+  }
+  if (claim.claimRegistryRevision !== descriptor.registryRevision
+    || claim.claimRegistryDigest !== descriptor.registryDigest) {
+    return 'CLAIM_REGISTRY_MISMATCH';
+  }
+  const admission = validateWorkItemAdmission(item, item.admissionFence, descriptor);
+  if (!admission.ok) return `ADMISSION_${admission.code}`;
+  return null;
+}
+
 export function bindMissionRunnerRegistry(
   descriptor: MissionRunnerRegistryV1,
   handlers: Partial<Record<WorkItemKind, MissionRuntimeRunner>>,
+  verifyClaim: MissionDispatchClaimVerifier,
 ): BoundMissionRunnerRegistryV1 {
   assertMissionRunnerRegistry(descriptor);
   const expected = listRuntimeAdmittedKinds(descriptor);
@@ -427,13 +461,20 @@ export function bindMissionRunnerRegistry(
   return Object.freeze({
     descriptor,
     dispatch: async (item: WorkItem, claim: MissionDispatchClaim): Promise<ResultLike> => {
-      if (claim.workItemId !== item.id || claim.missionId !== item.missionId) {
-        return { ok: false, reason: 'MISSION_DISPATCH_CLAIM_MISMATCH' };
+      const claimFailure = validateDispatchClaim(item, claim, descriptor);
+      if (claimFailure) {
+        return {
+          ok: false,
+          dispatchDisposition: 'parked',
+          reason: `MISSION_DISPATCH_CLAIM_INVALID: ${claimFailure}`,
+        };
       }
-      try {
-        assertWorkItemBatchAdmitted([item], descriptor);
-      } catch (error) {
-        return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+      if (!verifyClaim(claim)) {
+        return {
+          ok: false,
+          dispatchDisposition: 'parked',
+          reason: 'MISSION_DISPATCH_CLAIM_INVALID: PERSISTED_AUTHORITY_MISMATCH',
+        };
       }
       const handler = handlers[item.kind];
       if (!handler) return { ok: false, reason: `MISSION_RUNNER_BINDING_MISSING: ${item.kind}` };

@@ -21,7 +21,13 @@ import { runMissionScheduler, type DispatchFn, type MissionSchedulerSummary } fr
 import { advanceGoalMission, type GoalAdvanceDeps } from './goal-mission.js';
 import { auditMissionLifecycle } from './mission-audit-bridge.js';
 import type { MissionApprovalCoordinatorLike } from './mission-approval-coordinator.js';
-import type { Mission, MissionStore, ResultLike, SettleDetail } from './mission-types.js';
+import type {
+  Mission,
+  MissionDispatchClaim,
+  MissionStore,
+  ResultLike,
+  SettleDetail,
+} from './mission-types.js';
 
 /**
  * Pure flag predicate — true only when the project config opts into the v2
@@ -38,7 +44,8 @@ export function isV2Engine(config: ResolvedConfig): boolean {
 /** Injected execution + delivery primitives for `runV2Engine`. */
 export interface RunV2EngineDeps {
   /** kind='task' — run a single worker for the item's description (→ ResultLike). */
-  runTask: (ctx: MissionTaskContext) => Promise<ResultLike>;
+  /** Exact claim is host-private and never embedded in MissionTaskContext. */
+  runTask: (ctx: MissionTaskContext, claim: MissionDispatchClaim) => Promise<ResultLike>;
   /** kind='sprint' — run the full sprint lifecycle (success unless it throws). */
   runSprint: (projectRoot: string, config: ResolvedConfig) => Promise<unknown>;
   /** kind='capability' — optional broker; absent → capability items fail clearly. */
@@ -101,8 +108,13 @@ export function deriveSettleDetail(result: Pick<ResultLike, 'ok' | 'settleDetail
  * 'completed', never 'failed'.
  */
 function withSettleDetail(runTask: RunV2EngineDeps['runTask']): RunV2EngineDeps['runTask'] {
-  return async (ctx) => {
-    const res = await runTask(ctx);
+  return async (ctx, claim) => {
+    const res = await runTask(ctx, claim);
+    if (res.dispatchDisposition === 'parked') {
+      const held: ResultLike = { ...res };
+      delete held.settleDetail;
+      return held;
+    }
     return { ...res, settleDetail: deriveSettleDetail(res) };
   };
 }
@@ -157,7 +169,7 @@ export async function runV2Engine(
     // production registry and its exact bound handlers are one authority.
     const runtimeRegistry = bindMissionRunnerRegistry(PRODUCTION_V2_RUNNER_REGISTRY, {
       task: kindDispatch,
-    });
+    }, (claim) => store.isDispatchClaimActive(claim));
 
     store.migrate();
     // B11 crash-recovery wire (ADR-043): a previous engine run that crashed or was
