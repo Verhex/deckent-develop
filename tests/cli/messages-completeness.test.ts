@@ -21,6 +21,17 @@ interface MessageEntry {
   trText: string | null;
 }
 
+function extractLiteralValue(block: string, language: 'en' | 'tr'): string | null {
+  const expression = block.match(
+    new RegExp(`\\b${language}:\\s*((?:'(?:[^'\\\\]|\\\\.)*'\\s*(?:\\+\\s*)?)+)`),
+  )?.[1];
+  if (!expression) return null;
+
+  return [...expression.matchAll(/'((?:[^'\\]|\\.)*)'/g)]
+    .map(match => match[1])
+    .join('');
+}
+
 function parseMessageEntries(): MessageEntry[] {
   const sourcePath = join(process.cwd(), 'src/cli/helpers/messages.ts');
   const source = readFileSync(sourcePath, 'utf-8');
@@ -49,16 +60,12 @@ function parseMessageEntries(): MessageEntry[] {
     const hasEn = /\ben:/.test(block);
     const hasTr = /\btr:/.test(block);
 
-    // Extract simple single-quoted string values; null for array/computed values
-    const enMatch = block.match(/\ben:\s+'((?:[^'\\]|\\.)*)'/);
-    const trMatch = block.match(/\btr:\s+'((?:[^'\\]|\\.)*)'/);
-
     entries.push({
       key,
       hasEn,
       hasTr,
-      enText: enMatch ? enMatch[1] : null,
-      trText: trMatch ? trMatch[1] : null,
+      enText: extractLiteralValue(block, 'en'),
+      trText: extractLiteralValue(block, 'tr'),
     });
   }
 

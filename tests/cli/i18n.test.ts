@@ -140,10 +140,18 @@ describe('getMessages()', () => {
 
 describe('getLanguage()', () => {
   const origLang = process.env['LANG'];
+  const origLcAll = process.env['LC_ALL'];
+
+  beforeEach(() => {
+    delete process.env['LANG'];
+    delete process.env['LC_ALL'];
+  });
 
   afterEach(() => {
     if (origLang !== undefined) process.env['LANG'] = origLang;
     else delete process.env['LANG'];
+    if (origLcAll !== undefined) process.env['LC_ALL'] = origLcAll;
+    else delete process.env['LC_ALL'];
   });
 
   it('normalizes tr_TR.UTF-8 to "tr"', () => {
