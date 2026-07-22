@@ -36,6 +36,12 @@ export interface HostTerminalResultContractV1 {
   protocol: 'xverify-v1';
 }
 
+export interface SpawnBackendRecoveryReport {
+  adopted: string[];
+  closedNotDispatched: string[];
+  closedAbsentAfterExit: string[];
+}
+
 // ─── SpawnBackend Interface ───────────────────────────────────────────────────
 
 /**
@@ -78,6 +84,13 @@ export interface SpawnBackend {
    * For SubprocessBackend: always true (requires only Node.js).
    */
   isAvailable(): Promise<boolean>;
+
+  /**
+   * Reconcile durable pre-crash attempts after the coordinator holds project
+   * leadership and before checkpoint state is interpreted. Backends without a
+   * host-owned attempt journal omit this method.
+   */
+  reconcilePendingAttempts?(): Promise<SpawnBackendRecoveryReport>;
 }
 
 // ─── SpawnBackendOptions ──────────────────────────────────────────────────────

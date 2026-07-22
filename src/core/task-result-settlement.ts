@@ -347,7 +347,7 @@ export function parseTaskResultSettlementDispatch(
     || record.state !== 'dispatched'
     || typeof record.dispatchedAt !== 'string'
     || typeof record.containerId !== 'string'
-    || !/^[a-f0-9]{12,64}$/i.test(record.containerId)
+    || !/^[a-f0-9]{64}$/i.test(record.containerId)
     || typeof record.preparedSha256 !== 'string'
     || !/^[a-f0-9]{64}$/.test(record.preparedSha256)
     || !hasValidContainerIdentity(record, ref)

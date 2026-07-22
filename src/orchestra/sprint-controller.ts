@@ -645,6 +645,13 @@ export function decidePromptGateBlock(
   return { blocked: true, overridden: false, message };
 }
 
+export async function reconcileSpawnBackendBeforeRestore(
+  spawnBackend: SpawnBackend | undefined,
+): Promise<void> {
+  if (!spawnBackend?.reconcilePendingAttempts) return;
+  await spawnBackend.reconcilePendingAttempts();
+}
+
 // ═══ RunSprintOptions ═════════════════════════════════════════════
 
 export interface RunSprintOptions {
@@ -1195,6 +1202,23 @@ export async function runSprint(
   let beforeExitHandler: (() => void) | null = null;
 
   try {
+  // K1 crash fence: project leadership is held at this point. Reconcile the
+  // host-owned attempt journal before checkpoint status can classify a still-
+  // running exact Docker attempt as stale and create a parallel execution.
+  // A prior per-task Docker override can leave a journal even when the current
+  // run default is subprocess/tmux, so journal recovery cannot be conditional
+  // on today's default backend.
+  const recoveryBackend = spawnBackend?.reconcilePendingAttempts
+    ? spawnBackend
+    : SpawnBackendFactory.create({
+        backend: 'docker',
+        projectDir: projectRoot,
+        dockerImage: config.docker_image,
+        dockerTimeoutSeconds: config.docker_timeout,
+        dockerMemoryLimit: config.worker_memory_limit,
+      });
+  await reconcileSpawnBackendBeforeRestore(recoveryBackend);
+
   // ═══ State Recovery on Brain Restart (Sprint 162 — Task T-004) ════
   // Pair with T-002 (checkpoint loop) and T-001 (exception handler).
   // If the previous Brain process left a sprint-state.json behind,

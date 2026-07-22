@@ -45,7 +45,9 @@ import {
   dockerAttemptLabels,
   dockerContainerNameForTask,
   assertTaskResultSettlementRef,
+  listPendingTaskResultSettlementAttempts,
   readTaskResultSettlement,
+  readTaskResultSettlementClosure,
   writeTaskResultSettlementClosureAtomic,
   writeTaskResultSettlementDispatchAtomic,
   writeTaskResultSettlementPreparedAtomic,
@@ -53,7 +55,12 @@ import {
   type TaskResultSettlementRefV1,
 } from '../core/task-result-settlement.js';
 import { BASE_PROVIDER_CREDENTIAL_ENV } from '../providers/cross-provider-keys.js';
-import type { HostTerminalResultContractV1, SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
+import type {
+  HostTerminalResultContractV1,
+  SpawnBackend,
+  SpawnBackendOptions,
+  SpawnBackendRecoveryReport,
+} from './spawn-backend.js';
 import { SpawnBackendError, checkLethalGuard } from './spawn-backend.js';
 import { getDefaultProviderName } from './sprint-utils.js';
 import { installGitGuard, buildDockerGitGuardArgs, buildGitGuardDir, CONTAINER_GIT_PATH } from './git-worker-guard.js';
@@ -197,6 +204,30 @@ export function reconcileDockerRuntimeBudgetUsage(
   // Any pre-exit local cost was computed from the stale usage claim. Real
   // providerBilling, when present, remains authoritative and is not fabricated.
   delete result.cost;
+  return true;
+}
+
+interface DockerRecoveryContainment {
+  attemptId: string;
+}
+
+function reconcileDockerRecoveryContainmentResultFile(
+  resultPath: string,
+  taskId: string,
+  recovery: DockerRecoveryContainment | undefined,
+): boolean {
+  if (!recovery || !existsSync(resultPath)) return false;
+  const result = JSON.parse(readFileSync(resultPath, 'utf-8')) as TaskResult;
+  if (result.taskId !== taskId) {
+    throw new Error(`Docker recovery result taskId mismatch: expected ${taskId}`);
+  }
+  result.selfAssessment = 'NO_GO';
+  result.testsPassed = false;
+  const evidence = `Host restart contained a live Docker attempt because its pre-crash budget observer did not survive. attemptId=${recovery.attemptId}.`;
+  if (!result.notes?.includes(`attemptId=${recovery.attemptId}`)) {
+    result.notes = `${evidence} ${result.notes ?? ''}`.trim();
+  }
+  atomicWriteFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
   return true;
 }
 
@@ -963,7 +994,7 @@ export function parseDockerAuthorityInspectOutput(raw: string): DockerAuthorityI
   const exitCode = Number(exitCodeRaw);
   if (
     !containerId
-    || !/^[a-f0-9]{12,64}$/i.test(containerId)
+    || !/^[a-f0-9]{64}$/i.test(containerId)
     || !['true', 'false'].includes(runningRaw ?? '')
     || !Number.isInteger(exitCode)
   ) return null;
@@ -2228,6 +2259,184 @@ export class DockerSpawnBackend implements SpawnBackend {
     // is out of this task's DISTINCT-FILE scope, and several existing docker-backend
     // test suites assert exactly one `docker run` call per spawn).
     this.verifyProviderCliInImage = opts?.verifyProviderCliInImage ?? false;
+  }
+
+  /**
+   * Recover attempts left behind by a dead coordinator. The caller must hold
+   * project leadership: this method adopts an exact container into the normal
+   * monitor before containment, and a second coordinator must never install a
+   * competing monitor for the same attempt.
+   */
+  async reconcilePendingAttempts(): Promise<SpawnBackendRecoveryReport> {
+    const report: SpawnBackendRecoveryReport = {
+      adopted: [],
+      closedNotDispatched: [],
+      closedAbsentAfterExit: [],
+    };
+    const tasksDir = join(this.projectDir, TASKS_DIR);
+
+    for (const pending of listPendingTaskResultSettlementAttempts(this.projectDir)) {
+      const { attempt, prepared, dispatch, settlement } = pending;
+      if (!pending.claim) {
+        if (prepared || dispatch || settlement) {
+          throw new SpawnBackendError(
+            `DECKENT_E091:pending-attempt-without-active-claim:${attempt.taskId}/${attempt.attemptId}`,
+            this.name,
+          );
+        }
+        claimTaskResultSettlementAttemptAtomic(attempt);
+      }
+
+      if (!prepared) {
+        const resultPath = join(tasksDir, `task-${attempt.taskId}.result`);
+        if (existsSync(resultPath)) {
+          throw new SpawnBackendError(
+            `DECKENT_E091:unprepared-attempt-has-worker-result:${attempt.taskId}/${attempt.attemptId}`,
+            this.name,
+          );
+        }
+        atomicWriteFileSync(resultPath, `${JSON.stringify({
+          taskId: attempt.taskId,
+          workerId: `docker-recovery-${attempt.taskId}`,
+          filesChanged: [],
+          linesAdded: 0,
+          linesRemoved: 0,
+          testsPassed: false,
+          selfAssessment: 'NO_GO',
+          notes: `DECKENT_E091:coordinator-crashed-before-docker-prepare:${attempt.attemptId}`,
+          exitCode: null,
+          tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 },
+        }, null, 2)}\n`);
+        this.settleRecoveredAttempt(attempt, tasksDir, null, 'not-dispatched');
+        report.closedNotDispatched.push(attempt.taskId);
+        continue;
+      }
+
+      const selector = dispatch?.containerId ?? prepared.containerName;
+      const authority = this.inspectContainerAuthority(selector);
+      if (authority.state === 'unavailable') {
+        throw new SpawnBackendError(
+          `${DOCKER_ERROR_CODES.AUTHORITY_UNAVAILABLE}:${authority.evidence}`,
+          this.name,
+        );
+      }
+      if (authority.state === 'absent') {
+        const resultPath = join(tasksDir, `task-${attempt.taskId}.result`);
+        if (!settlement && !existsSync(resultPath)) {
+          throw new SpawnBackendError(
+            `DECKENT_E091:ambiguous-dispatch-container-absent:${attempt.taskId}/${attempt.attemptId}`,
+            this.name,
+          );
+        }
+        this.settleRecoveredAttempt(attempt, tasksDir, settlement?.exitCode ?? null, 'absent-after-exit');
+        report.closedAbsentAfterExit.push(attempt.taskId);
+        continue;
+      }
+
+      const inspection = authority.inspection;
+      const identity: DockerAttemptIdentity = {
+        ref: attempt,
+        durable: true,
+        containerName: prepared.containerName,
+        labels: prepared.labels,
+      };
+      if (
+        !this.inspectionMatchesAttempt(inspection, identity)
+        || (dispatch && inspection.containerId !== dispatch.containerId)
+      ) {
+        throw new SpawnBackendError(
+          `${DOCKER_ERROR_CODES.OWNERSHIP_CONFLICT}:recovery-authority-mismatch:${attempt.taskId}/${attempt.attemptId}`,
+          this.name,
+        );
+      }
+      if (!dispatch) writeTaskResultSettlementDispatchAtomic(attempt, inspection.containerId);
+
+      await this.adoptAndSettleRecoveredAttempt(
+        attempt,
+        inspection.containerId,
+        prepared.model,
+        tasksDir,
+        inspection.running,
+      );
+      report.adopted.push(attempt.taskId);
+    }
+    return report;
+  }
+
+  private settleRecoveredAttempt(
+    ref: TaskResultSettlementRefV1,
+    tasksDir: string,
+    exitCode: number | null,
+    disposition: 'not-dispatched' | 'absent-after-exit',
+  ): void {
+    if (!readTaskResultSettlement(ref)) {
+      const persisted = persistDockerTaskResultSettlement(this.projectDir, tasksDir, ref, exitCode);
+      if (!persisted) {
+        throw new SpawnBackendError(
+          `DECKENT_E091:recovery-result-missing:${ref.taskId}/${ref.attemptId}`,
+          this.name,
+        );
+      }
+    }
+    releaseAllSpawnLocks(this.projectDir, ref.taskId);
+    releaseStaleSpawnLocksForTask(this.projectDir, ref.taskId);
+    if (hasSpawnLocksForTask(this.projectDir, ref.taskId)) {
+      throw new SpawnBackendError(
+        `DECKENT_E091:recovery-lock-release-failed:${ref.taskId}/${ref.attemptId}`,
+        this.name,
+      );
+    }
+    closeDockerTaskResultSettlement(ref, disposition);
+  }
+
+  private async adoptAndSettleRecoveredAttempt(
+    ref: TaskResultSettlementRefV1,
+    containerId: string,
+    model: string,
+    tasksDir: string,
+    running: boolean,
+  ): Promise<void> {
+    const existing = this.containers.get(ref.taskId);
+    if (existing && existing.containerId !== containerId) {
+      throw new SpawnBackendError(
+        `${DOCKER_ERROR_CODES.OWNERSHIP_CONFLICT}:recovery-monitor-conflict:${ref.taskId}`,
+        this.name,
+      );
+    }
+    this.containers.set(ref.taskId, {
+      containerId,
+      containerName: dockerContainerNameForTask(this.projectDir, ref.taskId),
+      model,
+      projectDir: this.projectDir,
+      tasksDir,
+      settlementRef: ref,
+    });
+    this.monitorContainer(
+      ref.taskId,
+      containerId,
+      tasksDir,
+      model,
+      this.projectDir,
+      computeDistFingerprint(join(this.projectDir, 'dist')),
+      undefined,
+      undefined,
+      ref,
+      undefined,
+      running ? { attemptId: ref.attemptId } : undefined,
+    );
+    if (running) {
+      terminateDockerContainerForBudget(containerId, this.gracefulTimeoutSeconds);
+    }
+
+    const deadline = Date.now() + ((this.gracefulTimeoutSeconds + 45) * 1_000);
+    while (Date.now() < deadline) {
+      if (readTaskResultSettlementClosure(ref)) return;
+      await new Promise<void>(resolveWait => setTimeout(resolveWait, 25));
+    }
+    throw new SpawnBackendError(
+      `DECKENT_E091:recovery-settlement-timeout:${ref.taskId}/${ref.attemptId}`,
+      this.name,
+    );
   }
 
   /**
@@ -3516,6 +3725,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     executionBudget?: import('../core/work-model.js').ExecutionBudget,
     settlementRef?: TaskResultSettlementRefV1,
     hostTerminalResultContract?: HostTerminalResultContractV1,
+    recoveryContainment?: DockerRecoveryContainment,
   ): void {
     const child = nodeSpawn('docker', ['wait', containerId], {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -3701,7 +3911,7 @@ export class DockerSpawnBackend implements SpawnBackend {
         try { unlinkSync(partialPath); } catch { /* ok */ }
       }
 
-      if (!existsSync(resultPath) && exitCode !== 0) {
+      if (!existsSync(resultPath)) {
         // Sprint 272 T-003: enriched EXIT_WITHOUT_RESULT marker. This host fallback
         // fires when the container EXIT trap was bypassed (e.g. SIGKILL/OOM), so the
         // wrapper never wrote a marker. workPresent is unknown host-side (the container
@@ -3730,6 +3940,17 @@ export class DockerSpawnBackend implements SpawnBackend {
         if (!existsSync(timeoutPath)) {
           writeFileSync(timeoutPath, `container_exit_${exitCode}`, 'utf-8');
         }
+        try {
+          atomicWriteFileSync(hbPath, `${JSON.stringify({
+            workerId: `docker-${taskId}`,
+            taskId,
+            status: 'FAILED',
+            sequence: 100,
+            timestamp: new Date().toISOString(),
+            exitCode,
+            backend: 'docker',
+          }, null, 2)}\n`);
+        } catch (e) { debugLog('docker-backend:hb-missing-result', e); }
       }
 
       // born-644 (BUILD-VIOLATION-GUARD): advisory-only dist/ mutation check — compares
@@ -3854,6 +4075,19 @@ export class DockerSpawnBackend implements SpawnBackend {
         } catch (e) {
           debugLog('docker-backend:budget-usage-reconcile', e);
         }
+      }
+      try {
+        reconcileDockerRecoveryContainmentResultFile(
+          resultPath,
+          taskId,
+          recoveryContainment,
+        );
+      } catch (e) {
+        debugLog('docker-backend:recovery-result-reconcile', e);
+        // Keep the stopped container, claim and spawn locks intact. A later
+        // coordinator can re-adopt the exact attempt; sealing a receipt after
+        // losing the host containment verdict would manufacture success.
+        return;
       }
 
       // Cleanup container
