@@ -30,13 +30,17 @@ import type { MemoryEntryV2 } from '../../src/core/memory-types.js';
  *    change, not a literal-repeat trim — exactly the "W4-tarzı politika-değişikliği" this
  *    task's nogo criteria forbids, and would require rewriting >=6 pinned assertions across 3
  *    test files (the "testleri güncelleyerek anlam-kaybı gizleme" NO-GO condition). It is
- *    therefore intentionally left untouched: prompt-god-template.ts carries ZERO edits from
- *    this task (0-byte delta — see the byte-measurement test below).
- *  - No OTHER duplicate block (>=40 chars) was found sweeping every optional segment: skills,
+ *    therefore remains intentionally untouched.
+ *  - A later plan-time execution-contract addition repeated the 54-character unset override
+ *    explanation for Auth and Backend. The shared state label is now shorter than the 40-char
+ *    guard while both authority fields and host-resolution semantics remain explicit. No OTHER
+ *    duplicate block (>=40 chars) is present when sweeping every optional segment: skills,
  *    agent persona, ADR mandatory-rules block, scope (both the explicit-filesWrite branch and
  *    the directory-fallback branch), dependencies (pending + aggregate original/fix), shared
  *    context, upstream handoffs, worker-comms instructions, the Tier-1 smoke note, doc-only vs
  *    targeted verify-steps, idempotency on/off, and the host-config portability note on/off.
+ *    The byte-measurement test reconstructs the exact pre-fix contract wording and pins the
+ *    resulting 72-byte reduction.
  *
  * This suite is the permanent regression guard for that finding: it fails if a NEW accidental
  * literal-repeat block appears anywhere in a comprehensive render, while allowlisting exactly
@@ -68,7 +72,7 @@ function makeFullSurfaceTask(overrides: Partial<Task> = {}): Task {
     id: '353-015',
     title: 'WPOPT-DEDUP full-surface render',
     description: 'Exercises every optional prompt segment for duplicate-block detection.',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'wpopt-dedup coverage',
@@ -169,7 +173,7 @@ describe('WPOPT-DEDUP (353-015) — worker-prompt literal-repeat guard', () => {
       id: '353-015-min',
       title: 'Minimal render',
       description: 'No ADRs, deps, shared/handoff/comms, or smoke.',
-      model: 'sonnet',
+      model: 'claude-sonnet-5',
       effort: 'normal',
       priority: 'NORMAL',
       reason: 'wpopt-dedup coverage',
@@ -188,7 +192,7 @@ describe('WPOPT-DEDUP (353-015) — worker-prompt literal-repeat guard', () => {
       id: '353-015-doc',
       title: 'Doc-only render',
       description: 'Exercises the doc-only VERIFY STEPS branch.',
-      model: 'sonnet',
+      model: 'claude-sonnet-5',
       effort: 'normal',
       priority: 'NORMAL',
       reason: 'wpopt-dedup coverage',
@@ -202,14 +206,17 @@ describe('WPOPT-DEDUP (353-015) — worker-prompt literal-repeat guard', () => {
     expect(findLiteralRepeats(prompt, 40)).toEqual([]);
   });
 
-  it('records the before/after byte measurement for this task (0-byte delta — no safe cut found)', () => {
-    // Evidence: the exhaustive sweep above found no unsafe-to-keep literal duplicate block, so
-    // prompt-god-template.ts received ZERO edits from sprint-353 353-015. Before === after.
+  it('records the exact byte reduction from the duplicated unset override explanation', () => {
     const { prompt } = buildTaskPromptSegmented(makeFullSurfaceTask(), makeFullSurfaceCtx());
-    const beforeBytes = Buffer.byteLength(prompt, 'utf-8');
+    const compactFallback = 'unset; host resolves';
+    const legacyFallback = 'not explicitly requested — host admission must resolve';
+    const compactOccurrences = prompt.split(compactFallback).length - 1;
+    const legacyPrompt = prompt.replaceAll(compactFallback, legacyFallback);
+    const beforeBytes = Buffer.byteLength(legacyPrompt, 'utf-8');
     const afterBytes = Buffer.byteLength(prompt, 'utf-8');
 
-    expect(beforeBytes).toBeGreaterThan(0);
-    expect(afterBytes).toBe(beforeBytes);
+    expect(compactOccurrences).toBe(2);
+    expect(beforeBytes - afterBytes).toBe(72);
+    expect(afterBytes).toBeLessThan(beforeBytes);
   });
 });
