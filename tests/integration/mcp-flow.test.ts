@@ -466,8 +466,8 @@ Write tests.
 
     const parsed = JSON.parse(result.content[0]!.text);
     expect(parsed.estimatedModels).toBeDefined();
-    expect(parsed.estimatedModels.opus).toBeGreaterThanOrEqual(0);
-    expect(parsed.estimatedModels.sonnet).toBeGreaterThanOrEqual(0);
-    expect(parsed.estimatedModels.haiku).toBeGreaterThanOrEqual(0);
+    expect(parsed.estimatedModels['claude-opus-4-8']).toBeGreaterThanOrEqual(0);
+    expect(parsed.estimatedModels['claude-sonnet-5']).toBeGreaterThanOrEqual(0);
+    expect(parsed.estimatedModels['claude-haiku-4-5-20251001']).toBeGreaterThanOrEqual(0);
   });
 });

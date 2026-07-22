@@ -69,6 +69,7 @@ vi.mock('../../src/orchestra/sprint-reporter.js', async (importOriginal) => ({
 
 import { TaskEvaluation, SprintStatus, SprintPhase } from '../../src/core/types.js';
 import type { Sprint, Task, TaskResult, ResolvedConfig } from '../../src/core/types.js';
+import { createAgentDefinition } from '../../src/core/agent-types.js';
 import { finalizeSprint } from '../../src/orchestra/sprint-finalizer.js';
 
 // Same real better-sqlite3/fs pipeline as finalize-refinalize.test.ts — slow
@@ -84,7 +85,7 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     id,
     title: `Task ${id}`,
     description: 'fixture task',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -131,10 +132,13 @@ function seedAgent(root: string, id: string): string {
   const dir = join(root, '.deckent', 'agents', id);
   mkdirSync(dir, { recursive: true });
   const p = join(dir, 'agent.json');
-  writeFileSync(p, JSON.stringify({
-    id, name: id, source: 'user', enabled: true,
-    stats: { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '' },
-  }, null, 2), 'utf-8');
+  writeFileSync(p, JSON.stringify(createAgentDefinition({
+    id,
+    name: id,
+    source: 'user',
+    enabled: true,
+    preferredModel: 'claude-sonnet-5',
+  }), null, 2), 'utf-8');
   return p;
 }
 
@@ -185,7 +189,8 @@ describe('sprint-finalizer — ROUTE-V1-DEADBRANCH-COLLAPSE (351-010)', () => {
   });
 
   it('v2-default flow (no config) records each task outcome to learnings.json exactly once', async () => {
-    seedAgent(root, 'rvdc-agent');
+    const agentPath = seedAgent(root, 'rvdc-agent');
+    expect(readJson<{ preferredModel: string }>(agentPath).preferredModel).toBe('claude-sonnet-5');
     const tasks = [makeTask('901-001'), makeTask('901-002')];
     const evaluations = new Map<string, TaskEvaluation>([
       ['901-001', TaskEvaluation.DONE],

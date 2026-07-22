@@ -21,7 +21,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '001',
     title: 'Test Task',
     description: 'A test task',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'Test reason',
@@ -71,8 +71,9 @@ function makeAgentDefinition(overrides: Partial<AgentDefinition> = {}): AgentDef
     id: 'test-agent',
     name: 'Test Agent',
     description: 'An agent for testing',
+    systemPrompt: '',
     expertise: ['testing'],
-    preferredModel: 'sonnet',
+    preferredModel: 'claude-sonnet-5',
     effortMultiplier: 1.0,
     persistent: true,
     enabled: true,
@@ -117,6 +118,7 @@ describe('Agent stats guard fix — generic agents tracked', () => {
 
     const agent = pool.getAgent('generic');
     expect(agent).toBeDefined();
+    expect(agent!.preferredModel).toBe('claude-sonnet-5');
     expect(agent!.stats!.totalUses).toBe(1);
   });
 

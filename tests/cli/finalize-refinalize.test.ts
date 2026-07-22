@@ -96,6 +96,7 @@ vi.mock('../../src/core/config.js', async (importOriginal) => ({
 import { Command } from 'commander';
 import { TaskEvaluation, SprintStatus, SprintPhase } from '../../src/core/types.js';
 import type { Sprint, Task, TaskResult, ResolvedConfig } from '../../src/core/types.js';
+import { createAgentDefinition } from '../../src/core/agent-types.js';
 import { buildSprintFromTasks, registerFinalize } from '../../src/cli/commands/finalize.js';
 import { finalizeSprint, persistFinalSprintState } from '../../src/orchestra/sprint-finalizer.js';
 
@@ -115,7 +116,7 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     id,
     title: `Task ${id}`,
     description: 'fixture task',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -162,10 +163,13 @@ function seedAgent(root: string, id: string): string {
   const dir = join(root, '.deckent', 'agents', id);
   mkdirSync(dir, { recursive: true });
   const p = join(dir, 'agent.json');
-  writeFileSync(p, JSON.stringify({
-    id, name: id, source: 'user', enabled: true,
-    stats: { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '' },
-  }, null, 2), 'utf-8');
+  writeFileSync(p, JSON.stringify(createAgentDefinition({
+    id,
+    name: id,
+    source: 'user',
+    enabled: true,
+    preferredModel: 'claude-sonnet-5',
+  }), null, 2), 'utf-8');
   return p;
 }
 
@@ -331,6 +335,7 @@ describe('finalizeSprint — double-finalize stats idempotency (FINALIZE-RECOUNT
   it('V1: second finalize does not re-count agent/skill uses (lastUsedInSprint pre-scan)', async () => {
     const agentPath = seedAgent(root, 'test-agent-268');
     const skillPath = seedSkill(root, 'test-skill-268');
+    expect(readJson<{ preferredModel: string }>(agentPath).preferredModel).toBe('claude-sonnet-5');
     const tasks = [
       makeTask('900-001', { assignedAgent: 'test-agent-268', assignedSkills: ['test-skill-268'] }),
       makeTask('900-002', { assignedAgent: 'test-agent-268', assignedSkills: ['test-skill-268'] }),
@@ -552,6 +557,7 @@ describe('finalize CLI — end-to-end re-finalize pipeline (tmpdir)', () => {
     writeTaskFixture(tasksDir, makeTask('900-001', { assignedAgent: 'test-agent-268' }));
     writeResultFixture(tasksDir, makeResult('900-001'));
     const agentPath = seedAgent(root, 'test-agent-268');
+    expect(readJson<{ preferredModel: string }>(agentPath).preferredModel).toBe('claude-sonnet-5');
 
     await runFinalizeCli(['--force']);
     await runFinalizeCli(['--force']);

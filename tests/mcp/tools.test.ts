@@ -27,7 +27,8 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  readAuthMode: vi.fn().mockResolvedValue('subscription'),
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
 }));
@@ -245,13 +246,17 @@ describe('MCP Tools', () => {
         id: '7-001',
         title: 'Auth API',
         description: 'Implement auth',
-        model: 'sonnet',
+        model: 'claude-sonnet-5',
         effort: 'normal',
         priority: 'HIGH',
         reason: 'directive',
         scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
         dependencies: [],
-        goNogo: { testsPass: true, coverageMin: 90 },
+        goNogo: {
+          goCriteria: 'Auth API targeted tests pass',
+          noGoCriteria: 'Auth API targeted tests fail',
+          techDebtAcceptable: 'none',
+        },
         status: TaskStatus.PENDING,
       };
 
@@ -300,6 +305,7 @@ describe('MCP Tools', () => {
       expect(parsed.sprintId).toBe('sprint-007');
       expect(parsed.tasks).toHaveLength(1);
       expect(parsed.tasks[0].title).toBe('Auth API');
+      expect(parsed.tasks[0].model).toBe('claude-sonnet-5');
       expect(parsed.recommendation.size).toBe('full');
     });
 

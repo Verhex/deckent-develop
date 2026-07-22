@@ -3,6 +3,8 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getCapabilityCounts, formatHelp, HELP_CONTENT } from '../../src/cli/commands/help.js';
+import { AgentPoolManager } from '../../src/core/agent-pool.js';
+import { createAgentDefinition } from '../../src/core/agent-types.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -20,7 +22,13 @@ function seedAgent(root: string, id: string): void {
   mkdirSync(agentDir, { recursive: true });
   writeFileSync(
     join(agentDir, 'agent.json'),
-    JSON.stringify({ id, name: `Agent ${id}`, source: 'builtin', enabled: true }),
+    JSON.stringify(createAgentDefinition({
+      id,
+      name: `Agent ${id}`,
+      source: 'builtin',
+      enabled: true,
+      preferredModel: 'claude-sonnet-5',
+    })),
     'utf8',
   );
 }
@@ -58,6 +66,7 @@ describe('getCapabilityCounts — agent count is dynamic', () => {
     seedAgent(root, 'beta');
     const counts = getCapabilityCounts(root);
     expect(counts.agents).toBe(2);
+    expect(new AgentPoolManager(root).getAgent('alpha')?.preferredModel).toBe('claude-sonnet-5');
   });
 
   it('reflects additional agents added at runtime', () => {

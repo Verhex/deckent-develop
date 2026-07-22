@@ -25,10 +25,26 @@ import type { RunFlowEvent } from '../../src/core/run-flow-contract.js';
 
 vi.mock('../../src/core/config.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/core/config.js')>()),
+  readAuthMode: vi.fn().mockResolvedValue('subscription'),
   loadConfig: vi.fn().mockResolvedValue({
     terminal: { run_flow_v2: true },
-    activeModeConfig: { max_workers: 2, brain_model: 'sonnet' },
+    worker_provider: 'claude',
+    spawn_backend: 'subprocess',
+    activeModeConfig: {
+      max_workers: 2,
+      brain_model: 'claude-sonnet-5',
+      default_model: 'claude-sonnet-5',
+    },
+    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
   }),
+}));
+
+vi.mock('../../src/cli/helpers/detached-start.js', () => ({
+  buildFlowStartSpawn: vi.fn(() => (_sprint: unknown, flowId: string) => ({
+    flowId,
+    jobId: `flow-${flowId}-test`,
+    logRef: `test://${flowId}`,
+  })),
 }));
 
 // Mirror tests/api/run-flow-routes.test.ts: the plan step rides mocked
@@ -77,7 +93,7 @@ async function call(
 const FIXTURE_SPRINT = {
   id: 'sprint-fixture', number: 1, status: 'PLANNING', phase: 'PLAN',
   tasks: [{
-    id: '001-001', title: 'Do the thing', description: 'Well.', model: 'sonnet',
+    id: '001-001', title: 'Do the thing', description: 'Well.', model: 'claude-sonnet-5',
     effort: 'normal', priority: 'NORMAL', reason: 'test',
     scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
     dependencies: [], goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
@@ -96,7 +112,7 @@ function installFixturePlanner(): void {
     reasoning: 'Single task.',
     tasks: [{
       title: 'Backend export endpoint', description: 'Add POST /export handler.',
-      model: 'sonnet', effort: 'normal', priority: 'NORMAL', reason: 'crud',
+      model: 'claude-sonnet-5', effort: 'normal', priority: 'NORMAL', reason: 'crud',
       scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/export.ts'] },
       dependencies: [],
       goNogo: { goCriteria: 'ok', noGoCriteria: 'bad', techDebtAcceptable: '' },
@@ -139,7 +155,9 @@ describe('SURF-1c — single-authority durability', () => {
     const flowId = (proposed.body as { proposal: { flowId: string } }).proposal.flowId;
 
     // planned sprint is durable at preview time
-    expect((loadPlannedSprint(root, flowId)?.sprint as { id: string }).id).toBe('sprint-fixture');
+    const planned = loadPlannedSprint(root, flowId);
+    expect((planned?.sprint as { id: string }).id).toBe('sprint-fixture');
+    expect((planned?.sprint as { tasks: Array<{ model: string }> }).tasks[0]?.model).toBe('claude-sonnet-5');
 
     _resetRunFlowRoutesState(); // restart between preview and approval
 
@@ -150,6 +168,7 @@ describe('SURF-1c — single-authority durability', () => {
     const snapshot = loadApprovedSnapshot(root, flowId);
     expect(snapshot).toBeDefined();
     expect((snapshot!.sprint as { id: string }).id).toBe('sprint-fixture');
+    expect(snapshot!.planDigestContext?.executionBudgetPolicy?.roles.worker?.default).toEqual({ maxTurns: 1 });
   });
 
   it('every durable event is live-published to the SSE layer (coordinator onEvent wire)', async () => {
