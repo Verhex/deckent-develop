@@ -299,7 +299,40 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
       // Stops at a literal backslash (NDJSON logs carry `\n` as two chars) or
       // a closing quote, so escaped-JSON wrapping cannot bleed into the reason.
       const matches = raw.match(/VERDICT:\s*(?:REFUTED|CONFIRMED|UNCLEAR)[^"\\\n]*/g);
-      if (matches && matches.length > 0) return matches[matches.length - 1]!;
+      if (matches && matches.length > 0) {
+        const terminalVerdict = matches[matches.length - 1]!;
+
+        // The provider completed the verifier's sole acceptance criterion, but
+        // generic Docker wrappers cannot write a TaskResult for host-CLI output
+        // and therefore leave an EXIT_WITHOUT_RESULT/NO_GO marker. Reconcile
+        // ONLY this xverify task after the final-line parser has proven a real
+        // terminal protocol line. Generic implementation workers remain NO_GO.
+        // Preserve provider usage/billing and exit evidence; remove only stale
+        // marker discriminators that would make consumers classify this DONE
+        // audit as an unfinished wrapper exit.
+        try {
+          const resultPath = join(input.projectRoot, TASKS_DIR, `task-${verifierTaskId}.result`);
+          if (existsSync(resultPath)) {
+            const recovered = JSON.parse(readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
+            recovered.selfAssessment = 'DONE';
+            recovered.testsPassed = true;
+            recovered.notes = `Recovered terminal verifier output from provider log.\n${terminalVerdict}`;
+            recovered.completedAt = typeof recovered.completedAt === 'string'
+              ? recovered.completedAt
+              : new Date().toISOString();
+            delete recovered.markerType;
+            delete recovered.workPresent;
+            delete recovered.diffStat;
+            atomicWriteFileSync(resultPath, JSON.stringify(recovered, null, 2) + '\n');
+          }
+        } catch (err) {
+          // Result repair is evidence hygiene, not verdict authority. A corrupt
+          // or unwritable marker must not discard the independently recovered
+          // terminal verdict returned below.
+          debugLog('cross-verify:terminal-result-recovery-failed', String(err));
+        }
+        return terminalVerdict;
+      }
     }
   } catch (err) {
     debugLog('cross-verify:log-fallback-read-failed', String(err));

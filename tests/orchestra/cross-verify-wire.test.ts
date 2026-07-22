@@ -234,6 +234,27 @@ describe('runCrossVerify — dispatch + advisory write', () => {
   it('ignores wrapper marker notes and recovers the terminal verdict from the provider log', async () => {
     defaultSpawnMocks.spawnWorkerMultiProvider.mockImplementationOnce(async (taskId, _model, _prompt, projectRoot) => {
       writeFileSync(
+        join(projectRoot, TASKS_DIR, `task-${taskId}.result`),
+        JSON.stringify({
+          taskId,
+          workerId: `docker-${taskId}`,
+          filesChanged: [],
+          linesAdded: 0,
+          linesRemoved: 0,
+          testsPassed: false,
+          coverage: 0,
+          selfAssessment: 'NO_GO',
+          markerType: 'EXIT_WITHOUT_RESULT',
+          workPresent: false,
+          diffStat: '',
+          exitCode: 0,
+          notes: 'Worker exited without writing result. EXIT_WITHOUT_RESULT marker.',
+          tokenUsage: { inputTokens: 11, outputTokens: 22, cacheReadTokens: 33 },
+          providerBilling: { source: 'provider-envelope', providerReportedUsd: 0.25 },
+        }),
+        'utf-8',
+      );
+      writeFileSync(
         join(projectRoot, TASKS_DIR, `task-${taskId}.log`),
         [
           'prompt example: VERDICT: REFUTED placeholder',
@@ -265,6 +286,22 @@ describe('runCrossVerify — dispatch + advisory write', () => {
         reason: 'exact receipt was not present',
       },
     });
+
+    const recovered = JSON.parse(readFileSync(
+      join(root, TASKS_DIR, 'task-276-001-xverify.result'),
+      'utf-8',
+    )) as Record<string, unknown>;
+    expect(recovered).toMatchObject({
+      selfAssessment: 'DONE',
+      testsPassed: true,
+      exitCode: 0,
+      tokenUsage: { inputTokens: 11, outputTokens: 22, cacheReadTokens: 33 },
+      providerBilling: { source: 'provider-envelope', providerReportedUsd: 0.25 },
+    });
+    expect(recovered).not.toHaveProperty('markerType');
+    expect(recovered).not.toHaveProperty('workPresent');
+    expect(recovered).not.toHaveProperty('diffStat');
+    expect(String(recovered.notes)).toMatch(/VERDICT: UNCLEAR exact receipt was not present$/);
   });
 
   it('enabled + high-stakes + 2 providers + CONFIRMED → runs, writes advisory, not refuted', async () => {
