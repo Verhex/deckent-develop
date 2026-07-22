@@ -43,7 +43,7 @@ import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
 import { normalizeTaskResultShape } from '../core/task-result-schema.js';
 import {
   assertTaskResultSettlementRef,
-  readTaskResultSettlement,
+  readClosedTaskResultSettlement,
   type TaskResultSettlementRefV1,
 } from '../core/task-result-settlement.js';
 import {
@@ -196,7 +196,7 @@ async function waitForSettledVerifierResult(
   assertTaskResultSettlementRef(projectRoot, taskId, ref);
   const deadline = Date.now() + timeoutMs;
   do {
-    const settlement = readTaskResultSettlement(ref);
+    const settlement = readClosedTaskResultSettlement(ref);
     if (settlement) {
       return normalizeTaskResultShape(settlement.result as unknown as TaskResult);
     }
@@ -350,10 +350,10 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
   // terminal protocol line; otherwise continue to the provider log fallback.
   const hasTerminalVerdict = /^VERDICT:\s*(?:REFUTED|CONFIRMED|UNCLEAR)\s+.+$/i.test(lastNoteLine);
   if (spawnResult.settlementRef) {
-    // A Docker attempt with a host receipt has exactly one terminal authority.
-    // Project task status from that receipt regardless of verdict availability;
-    // a settled NO_GO must not remain PENDING, and a later log read must never
-    // contradict an already-immutable receipt.
+    // A Docker attempt with a closed host receipt has exactly one terminal
+    // authority. Project task status from that receipt regardless of verdict
+    // availability; a closed NO_GO must not remain PENDING, and a later log read
+    // must never contradict an already-immutable receipt.
     finalizeTaskStatusFromSettlement(
       input.projectRoot,
       verifierTaskId,

@@ -28,7 +28,7 @@ import { resolveTaskExecutionBudget } from '../../orchestra/runtime-budget-monit
 import {
   assertTaskResultSettlementRef,
   createTaskResultSettlementRef,
-  readTaskResultSettlement,
+  readClosedTaskResultSettlement,
   writeTaskResultSettlementAttemptAtomic,
   type TaskResultSettlementRefV1,
 } from '../../core/task-result-settlement.js';
@@ -284,14 +284,14 @@ export function finalizeTaskStatusFromResult(root: string, taskId: string): Task
   }
 }
 
-/** Finalize a Docker task only from the exact host-owned attempt receipt. */
+/** Finalize a Docker task only from the exact closed host-owned attempt receipt. */
 export function finalizeTaskStatusFromSettlement(
   root: string,
   taskId: string,
   settlementRef: TaskResultSettlementRefV1,
 ): TaskStatus | null {
   assertTaskResultSettlementRef(root, taskId, settlementRef);
-  const settlement = readTaskResultSettlement(settlementRef);
+  const settlement = readClosedTaskResultSettlement(settlementRef);
   if (!settlement) return null;
   const result = normalizeTaskResultShape(settlement.result as unknown as TaskResult);
   if (!result || result.taskId !== taskId) return null;

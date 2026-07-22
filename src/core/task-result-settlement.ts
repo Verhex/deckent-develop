@@ -733,6 +733,37 @@ export function readTaskResultSettlement(
   }
 }
 
+/**
+ * Read a terminal product result only after the host-owned lifecycle closure
+ * proves that container disposition and lock release completed for the exact
+ * immutable receipt. Recovery code intentionally uses the raw receipt reader;
+ * user-facing/result consumers must use this closed authority.
+ */
+export function readClosedTaskResultSettlement(
+  ref: TaskResultSettlementRefV1,
+): TaskResultSettlementV1 | null {
+  const settlementPath = taskResultSettlementPath(ref);
+  const closurePath = taskResultSettlementClosurePath(ref);
+  const settlementExists = existsSync(settlementPath);
+  const closureExists = existsSync(closurePath);
+
+  if (!settlementExists) {
+    if (closureExists) {
+      throw new Error(`Corrupt Docker result settlement closure without receipt: ${closurePath}`);
+    }
+    return null;
+  }
+  const settlement = readTaskResultSettlement(ref);
+  if (!settlement) {
+    throw new Error(`Corrupt host-owned Docker result settlement: ${settlementPath}`);
+  }
+  if (!closureExists) return null;
+  if (!readTaskResultSettlementClosure(ref)) {
+    throw new Error(`Corrupt Docker result settlement closure: ${closurePath}`);
+  }
+  return settlement;
+}
+
 export function writeTaskResultSettlementClosureAtomic(
   ref: TaskResultSettlementRefV1,
   input: {

@@ -29,6 +29,7 @@ import {
   taskResultSettlementPath,
   writeTaskResultSettlementAtomic,
   writeTaskResultSettlementAttemptAtomic,
+  writeTaskResultSettlementClosureAtomic,
 } from '../../src/core/task-result-settlement.js';
 import { waitForResults } from '../../src/orchestra/result-collector.js';
 import { pollForResultFile } from '../../src/orchestra/sprint-phases.js';
@@ -108,14 +109,21 @@ describe('result collector settlement authority wire', () => {
     claimTaskResultSettlementAttemptAtomic(ref);
 
     const pending = waitForResults(root, sprint, 1_000);
-    setTimeout(() => {
-      const hostResult = result(taskId, 'NO_GO', 'immutable host settlement');
-      writeTaskResultSettlementAtomic(createTaskResultSettlement({
-        ref,
-        exitCode: 1,
-        result: hostResult as unknown as Record<string, unknown>,
-      }));
-    }, 25);
+    const hostResult = result(taskId, 'NO_GO', 'immutable host settlement');
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({
+      ref,
+      exitCode: 1,
+      result: hostResult as unknown as Record<string, unknown>,
+    }));
+    const receiptOnly = await Promise.race([
+      pending.then(() => 'resolved'),
+      new Promise<string>((resolve) => setTimeout(() => resolve('pending'), 75)),
+    ]);
+    expect(receiptOnly).toBe('pending');
+    writeTaskResultSettlementClosureAtomic(ref, {
+      containerDisposition: 'stopped-removed',
+      locksReleased: true,
+    });
 
     const results = await pending;
     expect(results).toHaveLength(1);
@@ -146,6 +154,11 @@ describe('result collector settlement authority wire', () => {
       exitCode: 1,
       result: hostResult as unknown as Record<string, unknown>,
     }));
+    await expect(pollForResultFile(root, taskId, 20, 5)).resolves.toBeNull();
+    writeTaskResultSettlementClosureAtomic(ref, {
+      containerDisposition: 'stopped-removed',
+      locksReleased: true,
+    });
     await expect(pollForResultFile(root, taskId, 20, 5)).resolves.toMatchObject({
       selfAssessment: 'NO_GO',
       notes: 'settled truth',

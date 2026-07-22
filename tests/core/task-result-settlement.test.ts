@@ -18,6 +18,7 @@ import {
   dockerAttemptLabels,
   dockerContainerNameForTask,
   listPendingTaskResultSettlementAttempts,
+  readClosedTaskResultSettlement,
   readLatestTaskResultSettlementRef,
   readTaskResultSettlementActiveClaim,
   readTaskResultSettlementClosure,
@@ -26,6 +27,7 @@ import {
   readTaskResultSettlement,
   taskResultSettlementAttemptPath,
   taskResultSettlementClaimPath,
+  taskResultSettlementClosurePath,
   taskResultSettlementPreparedPath,
   taskResultSettlementPath,
   writeTaskResultSettlementAtomic,
@@ -137,6 +139,71 @@ describe('host-authoritative Docker TaskResult settlement', () => {
     tampered.result = { taskId: 'task-a', selfAssessment: 'NO_GO' };
     writeFileSync(path, JSON.stringify(tampered), 'utf-8');
     expect(readTaskResultSettlement(ref)).toBeNull();
+    expect(() => readClosedTaskResultSettlement(ref))
+      .toThrow(/Corrupt host-owned Docker result settlement/);
+  });
+
+  it('exposes a product result only after a matching lifecycle closure', () => {
+    const { root } = fixture();
+    const pending = createTaskResultSettlementRef(root, 'task-pending-closure');
+    writeTaskResultSettlementAttemptAtomic(pending);
+    claimTaskResultSettlementAttemptAtomic(pending);
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({
+      ref: pending,
+      exitCode: 0,
+      result: { taskId: pending.taskId, selfAssessment: 'DONE' },
+    }));
+    expect(readClosedTaskResultSettlement(pending)).toBeNull();
+
+    writeTaskResultSettlementClosureAtomic(pending, {
+      containerDisposition: 'stopped-removed',
+      locksReleased: true,
+    });
+    expect(readClosedTaskResultSettlement(pending)).toMatchObject({
+      ...pending,
+      state: 'settled',
+      result: { taskId: pending.taskId, selfAssessment: 'DONE' },
+    });
+  });
+
+  it('fails loudly on existing corrupt or digest-mismatched closure evidence', () => {
+    const { root } = fixture();
+    const dangling = createTaskResultSettlementRef(root, 'task-dangling-closure');
+    writeTaskResultSettlementAttemptAtomic(dangling);
+    writeFileSync(taskResultSettlementClosurePath(dangling), '{}', 'utf-8');
+    expect(() => readClosedTaskResultSettlement(dangling))
+      .toThrow(/closure without receipt/);
+
+    const corrupt = createTaskResultSettlementRef(root, 'task-corrupt-closure');
+    writeTaskResultSettlementAttemptAtomic(corrupt);
+    claimTaskResultSettlementAttemptAtomic(corrupt);
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({
+      ref: corrupt,
+      exitCode: 1,
+      result: { taskId: corrupt.taskId, selfAssessment: 'NO_GO' },
+    }));
+    writeFileSync(taskResultSettlementClosurePath(corrupt), '{}', 'utf-8');
+    expect(() => readClosedTaskResultSettlement(corrupt))
+      .toThrow(/Corrupt Docker result settlement closure/);
+
+    const mismatched = createTaskResultSettlementRef(root, 'task-mismatched-closure');
+    writeTaskResultSettlementAttemptAtomic(mismatched);
+    claimTaskResultSettlementAttemptAtomic(mismatched);
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({
+      ref: mismatched,
+      exitCode: 0,
+      result: { taskId: mismatched.taskId, selfAssessment: 'DONE' },
+    }));
+    writeTaskResultSettlementClosureAtomic(mismatched, {
+      containerDisposition: 'stopped-removed',
+      locksReleased: true,
+    });
+    const receiptPath = taskResultSettlementPath(mismatched);
+    const receipt = JSON.parse(readFileSync(receiptPath, 'utf-8')) as Record<string, unknown>;
+    receipt.settledAt = `${String(receipt.settledAt)}-tampered`;
+    writeFileSync(receiptPath, JSON.stringify(receipt), 'utf-8');
+    expect(() => readClosedTaskResultSettlement(mismatched))
+      .toThrow(/Corrupt Docker result settlement closure/);
   });
 
   it('derives daemon-global names and labels from project, task and attempt authority', () => {

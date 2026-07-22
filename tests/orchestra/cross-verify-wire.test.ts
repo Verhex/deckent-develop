@@ -20,10 +20,12 @@ import { TaskEvaluation, TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskResult, ResolvedConfig, ProviderName, CrossVerifyConfig } from '../../src/core/types.js';
 import { TASKS_DIR } from '../../src/core/constants.js';
 import {
+  claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlement,
   createTaskResultSettlementRef,
   writeTaskResultSettlementAtomic,
   writeTaskResultSettlementAttemptAtomic,
+  writeTaskResultSettlementClosureAtomic,
 } from '../../src/core/task-result-settlement.js';
 
 const defaultSpawnMocks = vi.hoisted(() => ({
@@ -254,6 +256,7 @@ describe('runCrossVerify — dispatch + advisory write', () => {
     defaultSpawnMocks.spawnWorkerMultiProvider.mockImplementationOnce(async (taskId, _model, _prompt, projectRoot) => {
       const ref = createTaskResultSettlementRef(projectRoot, taskId);
       writeTaskResultSettlementAttemptAtomic(ref);
+      claimTaskResultSettlementAttemptAtomic(ref);
       writeTaskResultSettlementAtomic(createTaskResultSettlement({
         ref,
         exitCode: 0,
@@ -264,6 +267,10 @@ describe('runCrossVerify — dispatch + advisory write', () => {
           notes: 'Host-observed terminal xverify protocol completed.\nVERDICT: CONFIRMED settled evidence',
         },
       }));
+      writeTaskResultSettlementClosureAtomic(ref, {
+        containerDisposition: 'stopped-removed',
+        locksReleased: true,
+      });
       return { backend: 'docker', provider: 'claude', settlementRef: ref };
     });
 
@@ -284,10 +291,44 @@ describe('runCrossVerify — dispatch + advisory write', () => {
     expect(defaultSpawnMocks.pollForResultFile).not.toHaveBeenCalled();
   });
 
+  it('does not accept a verifier receipt without lifecycle closure as a verdict', async () => {
+    defaultSpawnMocks.finalizeTaskStatusFromSettlement.mockReturnValueOnce(null);
+    defaultSpawnMocks.spawnWorkerMultiProvider.mockImplementationOnce(async (taskId, _model, _prompt, projectRoot) => {
+      const ref = createTaskResultSettlementRef(projectRoot, taskId);
+      writeTaskResultSettlementAttemptAtomic(ref);
+      claimTaskResultSettlementAttemptAtomic(ref);
+      writeTaskResultSettlementAtomic(createTaskResultSettlement({
+        ref,
+        exitCode: 0,
+        result: {
+          taskId,
+          selfAssessment: 'DONE',
+          testsPassed: true,
+          notes: 'VERDICT: CONFIRMED receipt-only evidence',
+        },
+      }));
+      return { backend: 'docker', provider: 'claude', settlementRef: ref };
+    });
+
+    const res = await runCrossVerify(
+      root,
+      makeTask({ provider: 'codex', model: 'gpt-5.6-sol' }),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true }),
+      { availableProviders: ['codex', 'claude'], verifierModel: 'claude-fable-5', timeoutMs: 30 },
+    );
+
+    expect(res).toMatchObject({ outcome: 'unclear', advisory: { verdict: 'unclear' } });
+    expect(defaultSpawnMocks.finalizeTaskStatusFromSettlement).toHaveBeenCalledOnce();
+    expect(defaultSpawnMocks.pollForResultFile).not.toHaveBeenCalled();
+  });
+
   it('does not override a settled NO_GO with a later provider-log verdict', async () => {
     defaultSpawnMocks.spawnWorkerMultiProvider.mockImplementationOnce(async (taskId, _model, _prompt, projectRoot) => {
       const ref = createTaskResultSettlementRef(projectRoot, taskId);
       writeTaskResultSettlementAttemptAtomic(ref);
+      claimTaskResultSettlementAttemptAtomic(ref);
       writeTaskResultSettlementAtomic(createTaskResultSettlement({
         ref,
         exitCode: 0,
@@ -299,6 +340,10 @@ describe('runCrossVerify — dispatch + advisory write', () => {
           notes: 'Worker exited without writing result.',
         },
       }));
+      writeTaskResultSettlementClosureAtomic(ref, {
+        containerDisposition: 'stopped-removed',
+        locksReleased: true,
+      });
       writeFileSync(
         join(projectRoot, TASKS_DIR, `task-${taskId}.log`),
         'VERDICT: CONFIRMED contradictory raw log',

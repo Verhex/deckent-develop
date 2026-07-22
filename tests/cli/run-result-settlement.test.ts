@@ -5,10 +5,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { waitForRunResult } from '../../src/cli/commands/run.js';
 import {
+  claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlement,
   createTaskResultSettlementRef,
+  taskResultSettlementClosurePath,
   writeTaskResultSettlementAtomic,
   writeTaskResultSettlementAttemptAtomic,
+  writeTaskResultSettlementClosureAtomic,
 } from '../../src/core/task-result-settlement.js';
 
 const roots: string[] = [];
@@ -48,6 +51,7 @@ describe('waitForRunResult settlement authority', () => {
     rawResult(tasks, taskId, 'DONE');
     const ref = createTaskResultSettlementRef(root, taskId);
     writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
 
     const waiting = waitForRunResult(root, taskId, 2_000, { settlementRef: ref });
     const early = await Promise.race([
@@ -68,6 +72,15 @@ describe('waitForRunResult settlement authority', () => {
         notes: 'host budget veto',
       },
     }));
+    const receiptOnly = await Promise.race([
+      waiting.then(() => 'resolved'),
+      new Promise<string>((resolve) => setTimeout(() => resolve('pending'), 150)),
+    ]);
+    expect(receiptOnly).toBe('pending');
+    writeTaskResultSettlementClosureAtomic(ref, {
+      containerDisposition: 'stopped-removed',
+      locksReleased: true,
+    });
     await expect(waiting).resolves.toMatchObject({
       taskId,
       selfAssessment: 'NO_GO',
@@ -97,6 +110,7 @@ describe('waitForRunResult settlement authority', () => {
     const taskId = 'immutable-a';
     const ref = createTaskResultSettlementRef(root, taskId);
     writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
     writeTaskResultSettlementAtomic(createTaskResultSettlement({
       ref,
       exitCode: 137,
@@ -104,7 +118,18 @@ describe('waitForRunResult settlement authority', () => {
     }));
     rawResult(tasks, taskId, 'DONE');
 
-    await expect(waitForRunResult(root, taskId, 500, { settlementRef: ref })).resolves.toMatchObject({
+    const waiting = waitForRunResult(root, taskId, 1_000, { settlementRef: ref });
+    const receiptOnly = await Promise.race([
+      waiting.then(() => 'resolved'),
+      new Promise<string>((resolve) => setTimeout(() => resolve('pending'), 150)),
+    ]);
+    expect(receiptOnly).toBe('pending');
+    writeTaskResultSettlementClosureAtomic(ref, {
+      containerDisposition: 'stopped-removed',
+      locksReleased: true,
+    });
+
+    await expect(waiting).resolves.toMatchObject({
       selfAssessment: 'NO_GO',
       notes: 'settled',
     });
@@ -116,5 +141,23 @@ describe('waitForRunResult settlement authority', () => {
     await expect(waitForRunResult(root, 'legacy-a', 500)).resolves.toMatchObject({
       selfAssessment: 'DONE',
     });
+  });
+
+  it('rejects corrupt closure evidence instead of timing out or reading raw output', async () => {
+    const { root, tasks } = fixture();
+    const taskId = 'corrupt-closure-a';
+    rawResult(tasks, taskId, 'DONE');
+    const ref = createTaskResultSettlementRef(root, taskId);
+    writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({
+      ref,
+      exitCode: 1,
+      result: { taskId, selfAssessment: 'NO_GO' },
+    }));
+    writeFileSync(taskResultSettlementClosurePath(ref), '{}', 'utf-8');
+
+    await expect(waitForRunResult(root, taskId, 500, { settlementRef: ref }))
+      .rejects.toThrow(/Corrupt Docker result settlement closure/);
   });
 });

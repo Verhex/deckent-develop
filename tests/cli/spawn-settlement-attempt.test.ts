@@ -33,11 +33,13 @@ import {
   spawnWorkerMultiProvider,
 } from '../../src/cli/commands/spawn.js';
 import {
+  claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlement,
   createTaskResultSettlementRef,
   taskResultSettlementAttemptPath,
   writeTaskResultSettlementAtomic,
   writeTaskResultSettlementAttemptAtomic,
+  writeTaskResultSettlementClosureAtomic,
 } from '../../src/core/task-result-settlement.js';
 
 const roots: string[] = [];
@@ -164,12 +166,22 @@ describe('spawnWorkerMultiProvider Docker settlement attempt', () => {
     }), 'utf-8');
     const ref = createTaskResultSettlementRef(root, taskId);
     writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
     writeTaskResultSettlementAtomic(createTaskResultSettlement({
       ref,
       exitCode: 0,
       result: { taskId, selfAssessment: 'DONE', notes: 'VERDICT: CONFIRMED settled' },
     }));
 
+    expect(finalizeTaskStatusFromSettlement(root, taskId, ref)).toBeNull();
+    expect(JSON.parse(readFileSync(join(tasks, `task-${taskId}.json`), 'utf-8'))).toMatchObject({
+      id: taskId,
+      status: 'PENDING',
+    });
+    writeTaskResultSettlementClosureAtomic(ref, {
+      containerDisposition: 'stopped-removed',
+      locksReleased: true,
+    });
     expect(finalizeTaskStatusFromSettlement(root, taskId, ref)).toBe('DONE');
     expect(JSON.parse(readFileSync(join(tasks, `task-${taskId}.json`), 'utf-8'))).toMatchObject({
       id: taskId,

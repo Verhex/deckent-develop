@@ -16,7 +16,7 @@ import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.j
 import { applyWorkerExecutionBudgetPolicy } from '../../core/execution-plan-digest.js';
 import {
   assertTaskResultSettlementRef,
-  readTaskResultSettlement,
+  readClosedTaskResultSettlement,
   type TaskResultSettlementRefV1,
 } from '../../core/task-result-settlement.js';
 
@@ -187,7 +187,7 @@ export async function waitForRunResult(
 
   const readAuthoritativeResult = (): TaskResult | null => {
     if (settlementRef) {
-      const settlement = readTaskResultSettlement(settlementRef);
+      const settlement = readClosedTaskResultSettlement(settlementRef);
       if (!settlement) return null;
       const result = normalizeTaskResultShape(settlement.result as unknown as TaskResult);
       return result?.taskId === taskId ? result : null;
@@ -240,8 +240,9 @@ export async function waitForRunResult(
     timeoutTimer = setTimeout(() => { cleanup(); resolve(null); }, timeoutMs);
     heartbeatTimer = setInterval(checkHeartbeat, 30_000);
 
-    // A host settlement lives outside the project mount. Polling here is only
-    // transport for an exact immutable receipt, never a time/quiescence guess.
+    // Host settlement evidence lives outside the project mount. Polling here
+    // waits for the exact immutable receipt plus matching lifecycle closure,
+    // never a time/quiescence guess.
     if (settlementRef) {
       fallbackTimer = setInterval(checkResult, 100);
       return;
@@ -301,7 +302,7 @@ export async function streamWorkerLog(
         stream.on('error', resolve);
       });
     }
-    if (settlementRef ? readTaskResultSettlement(settlementRef) !== null : existsSync(resultPath)) break;
+    if (settlementRef ? readClosedTaskResultSettlement(settlementRef) !== null : existsSync(resultPath)) break;
     await sleep(pollInterval);
   }
 }

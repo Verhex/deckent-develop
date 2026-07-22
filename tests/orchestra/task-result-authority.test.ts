@@ -54,7 +54,7 @@ describe('task result authority', () => {
     });
   });
 
-  it('returns the immutable host settlement payload even when raw output disagrees', () => {
+  it('returns the immutable host settlement payload only after closure even when raw output disagrees', () => {
     const { root, tasksDir } = fixture();
     const taskId = 'settled-docker';
     writeRaw(tasksDir, taskId, { taskId, selfAssessment: 'DONE', notes: 'tampered raw' });
@@ -67,6 +67,16 @@ describe('task result authority', () => {
       exitCode: 1,
       result: hostResult,
     }));
+
+    expect(readAuthoritativeTaskResult(root, taskId)).toMatchObject({
+      state: 'pending-settlement',
+      result: null,
+      settlementRef: ref,
+    });
+    writeTaskResultSettlementClosureAtomic(ref, {
+      containerDisposition: 'stopped-removed',
+      locksReleased: true,
+    });
 
     expect(readAuthoritativeTaskResult(root, taskId)).toMatchObject({
       state: 'settled',
