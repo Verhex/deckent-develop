@@ -55,7 +55,11 @@ import { waitForRunResult, formatModelError } from './run.js';
 import { resolveExecutionModelIdentity } from '../../orchestra/execution-request-builder.js';
 import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
 import { isV2Engine, runV2Engine } from '../../orchestra/autonomous/mission-store/mission-engine-wire.js';
-import { buildGoalDeps, type GoalAdvanceDeps } from '../../orchestra/autonomous/mission-store/goal-mission.js';
+import {
+  buildGoalDeps,
+  GoalInvocationHeldError,
+  type GoalAdvanceDeps,
+} from '../../orchestra/autonomous/mission-store/goal-mission.js';
 import {
   verifyGoalAcceptanceInvocationReceipt,
   workItemEvidenceRef,
@@ -77,9 +81,12 @@ import {
 } from '../../orchestra/autonomous/mission-store/mission-kind-admission.js';
 import { loadConfig, resolveBrainModel } from '../../core/config.js';
 import { PROJECT_CONFIG_PATH, RECENT_WORKS_DIR } from '../../core/constants.js';
-import { bootstrapProviders } from '../../core/provider.js';
+import { bootstrapProviders, orderedRoleProviders } from '../../core/provider.js';
 import type { ModelType, ResolvedConfig } from '../../core/types.js';
 import { ALL_PROVIDER_NAMES } from '../../core/types.js';
+import { getEquivalentModel } from '../../core/model-equivalence.js';
+import { defaultRoleInvocationPolicy } from '../../core/role-invocation-resolver.js';
+import { HostRoleInvocationAdmissionRuntime } from '../../core/host-role-invocation-admission-runtime.js';
 import { loadReactiveMap } from '../../orchestra/autonomous/reactive/reactive-map.js';
 import { makeReactiveIngester } from '../../orchestra/autonomous/reactive/reactive-ingester.js';
 import { makeNervousReactiveSource } from '../../orchestra/autonomous/reactive/nervous-reactive-source.js';
@@ -90,7 +97,7 @@ import { createNervousSystemIfEnabled, type NervousSystemHandle } from '../../ne
 import { getSprintStateSnapshot } from '../../orchestra/sprint-state-tracker.js';
 import type { DeckentConfig } from '../../core/types.js';
 import { DeckentError } from '../../core/errors.js';
-import type { InvocationReceiptRef } from '../../core/invocation-receipt.js';
+import type { InvocationPurpose, InvocationReceiptRef, InvocationRole } from '../../core/invocation-receipt.js';
 import { InvocationReceiptStore } from '../../core/invocation-receipt-store.js';
 
 // ─── Filesystem layout helpers ────────────────────────────────────────
@@ -680,7 +687,48 @@ export interface LiveGoalDepsOptions {
   /** Row-603 seam: completion + host-owned invocation provenance for this exact evaluator call. */
   acceptanceComplete?: (prompt: string) => Promise<LiveGoalAcceptanceCompletion>;
   acceptanceReceiptVerifier?: GoalAdvanceDeps['verifyAcceptanceReceipt'];
+  /** Host-owned pre-provider admission. Production injects this fail-closed;
+   *  hermetic adapters may omit it and supply a fully controlled completion. */
+  admitInvocation?: (input: {
+    role: Extract<InvocationRole, 'brain' | 'auditor'>;
+    purpose: Extract<InvocationPurpose, 'goal-authoring' | 'goal-acceptance'>;
+  }) => void | Promise<void>;
   now?: () => Date;
+}
+
+function makeUnavailableGoalRoleAdmissionGuard(
+  config: ResolvedConfig,
+): NonNullable<LiveGoalDepsOptions['admitInvocation']> {
+  const runtime = new HostRoleInvocationAdmissionRuntime(null);
+  const configuredBrainModel = resolveBrainModel(config);
+  return ({ role, purpose }): void => {
+    const order = orderedRoleProviders(role, config);
+    const roleModel = getEquivalentModel(configuredBrainModel, order.primary);
+    const result = runtime.admit({
+      invocation: {
+        role,
+        purpose,
+        primaryProvider: order.primary,
+        model: roleModel,
+        fallbackProviders: order.fallbacks,
+        policy: defaultRoleInvocationPolicy(role, order.unattended),
+      },
+      candidates: {},
+      buildReservation: () => {
+        throw new Error('UNREACHABLE_GOAL_RESERVATION_WITHOUT_HOST_AUTHORITIES');
+      },
+    });
+    if (result.decision !== 'hold') {
+      throw new Error('GOAL_INVOCATION_ADMISSION_INVARIANT');
+    }
+    throw new GoalInvocationHeldError({
+      schemaVersion: 1,
+      reasonCode: result.reasonCode,
+      evidenceRefs: [result.authorityEvidenceRef],
+      invocationReceiptRef: null,
+      heldAt: new Date().toISOString(),
+    });
+  };
 }
 
 /**
@@ -698,6 +746,7 @@ export function buildLiveGoalDeps(complete: LlmComplete, opts: LiveGoalDepsOptio
     priorItems: WorkItem[],
     acceptanceContract?: GoalAcceptanceContractV1,
   ): Promise<NewWorkItem[]> => {
+    await opts.admitInvocation?.({ role: 'brain', purpose: 'goal-authoring' });
     const raw = await complete(buildGoalNextPrompt(
       goal,
       priorItems,
@@ -711,6 +760,7 @@ export function buildLiveGoalDeps(complete: LlmComplete, opts: LiveGoalDepsOptio
     items: WorkItem[],
     acceptanceContract?: GoalAcceptanceContractV1,
   ): Promise<boolean | GoalAcceptanceEvaluation> => {
+    await opts.admitInvocation?.({ role: 'auditor', purpose: 'goal-acceptance' });
     if (!acceptanceContract) {
       const raw = await complete(buildGoalAcceptPromptLegacy(goal, items));
       return parseGoalAccepted(raw);
@@ -852,6 +902,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
         goalDeps: buildLiveGoalDeps(
           realPlannerComplete(resolvePlannerModelIdentity(resolvedConfig, lang)),
           {
+            admitInvocation: makeUnavailableGoalRoleAdmissionGuard(resolvedConfig),
             acceptanceReceiptVerifier: (mission, evaluation) =>
               verifyGoalAcceptanceInvocationReceipt(invocationReceiptStore, mission, evaluation),
           },

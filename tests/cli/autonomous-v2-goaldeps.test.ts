@@ -11,10 +11,11 @@
 
 // Mock the v2 engine wire so handleStart's v2 path is captured WITHOUT running the
 // real MissionScheduler. `...actual` keeps isV2Engine real (handleStart gates on it).
-const { runV2Spy, runTaskModeSpy, waitForRunResultSpy } = vi.hoisted(() => ({
+const { runV2Spy, runTaskModeSpy, waitForRunResultSpy, plannerResolveAdapterSpy } = vi.hoisted(() => ({
   runV2Spy: vi.fn(),
   runTaskModeSpy: vi.fn().mockResolvedValue({ taskId: 'v2-safe-task' }),
   waitForRunResultSpy: vi.fn().mockResolvedValue({ selfAssessment: 'DONE', notes: 'ok' }),
+  plannerResolveAdapterSpy: vi.fn(() => { throw new Error('planner provider must not be reached'); }),
 }));
 vi.mock('../../src/orchestra/autonomous/mission-store/mission-engine-wire.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -36,6 +37,11 @@ vi.mock('../../src/cli/commands/run.js', async (importOriginal) => {
   return { ...actual, waitForRunResult: (...args: unknown[]) => waitForRunResultSpy(...args) };
 });
 
+vi.mock('../../src/orchestra/planner.js', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return { ...actual, resolveAdapter: (...args: unknown[]) => plannerResolveAdapterSpy(...args) };
+});
+
 // Mock bootstrapProviders so the ollama HTTP probe does not run in CI (hermetic + fast).
 vi.mock('../../src/core/provider.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -54,6 +60,7 @@ import {
 import type { LlmComplete } from '../../src/orchestra/autonomous/goal-planner-types.js';
 import type { WorkItem } from '../../src/orchestra/autonomous/mission-store/mission-types.js';
 import { createGoalAcceptanceContract } from '../../src/orchestra/autonomous/mission-store/mission-acceptance.js';
+import { GoalInvocationHeldError } from '../../src/orchestra/autonomous/mission-store/goal-mission.js';
 import type { ResolvedConfig } from '../../src/core/types.js';
 import { useSandboxHome } from '../helpers/sandbox-home.js';
 
@@ -107,6 +114,31 @@ describe('resolvePlannerModelIdentity — canonical Brain role', () => {
 // ─── buildLiveGoalDeps — planner adapter ───────────────────────────────
 
 describe('buildLiveGoalDeps — planner', () => {
+  it('runs the injected role admission before either provider completion', async () => {
+    const complete = vi.fn(async () => JSON.stringify({ items: [] }));
+    const admitted: Array<{ role: string; purpose: string }> = [];
+    const deps = buildLiveGoalDeps(complete, {
+      admitInvocation: async (input) => {
+        admitted.push(input);
+        throw new GoalInvocationHeldError({
+          schemaVersion: 1,
+          reasonCode: 'authority_unavailable',
+          evidenceRefs: [`host-role-admission:${input.purpose}`],
+          invocationReceiptRef: null,
+          heldAt: '2026-07-22T06:00:00.000Z',
+        });
+      },
+    });
+
+    await expect(deps.author('goal', [])).rejects.toBeInstanceOf(GoalInvocationHeldError);
+    await expect(deps.accept('goal', [])).rejects.toBeInstanceOf(GoalInvocationHeldError);
+    expect(admitted).toEqual([
+      { role: 'brain', purpose: 'goal-authoring' },
+      { role: 'auditor', purpose: 'goal-acceptance' },
+    ]);
+    expect(complete).not.toHaveBeenCalled();
+  });
+
   it('parses the LLM {items:[…]} output into NewWorkItem[] (id/kind/description)', async () => {
     const complete: LlmComplete = async () =>
       JSON.stringify({
@@ -295,6 +327,46 @@ describe('handleStart — engine=v2 passes live goalDeps to runV2Engine', () => 
     expect(deps.goalDeps).toBeDefined();
     expect(typeof deps.goalDeps!.author).toBe('function');
     expect(typeof deps.goalDeps!.accept).toBe('function');
+  });
+
+  it('holds production Goal author/accepter before the planner provider when authority is unavailable', async () => {
+    const root = mkRoot();
+    const cfgDir = join(root, '.deckent');
+    mkdirSync(cfgDir, { recursive: true });
+    writeFileSync(
+      join(cfgDir, 'config.json'),
+      JSON.stringify({ autonomous: { enabled: true, engine: 'v2' } }, null, 2),
+      'utf-8',
+    );
+    runV2Spy.mockClear();
+    plannerResolveAdapterSpy.mockClear();
+
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    try {
+      await handleStart({ root, lang: 'en', maxIterations: '1' });
+    } finally {
+      stdout.mockRestore();
+    }
+
+    const runtime = runV2Spy.mock.calls[0]![2] as {
+      goalDeps: {
+        author: (goal: string, items: WorkItem[]) => Promise<unknown>;
+        accept: (goal: string, items: WorkItem[]) => Promise<unknown>;
+      };
+    };
+    const authorError = await runtime.goalDeps.author('goal', []).catch((error: unknown) => error);
+    const acceptError = await runtime.goalDeps.accept('goal', []).catch((error: unknown) => error);
+
+    expect(authorError).toMatchObject({
+      name: 'GoalInvocationHeldError',
+      hold: { reasonCode: 'authority_unavailable', invocationReceiptRef: null },
+    });
+    expect(acceptError).toMatchObject({
+      name: 'GoalInvocationHeldError',
+      hold: { reasonCode: 'authority_unavailable', invocationReceiptRef: null },
+    });
+    expect(authorError.hold.evidenceRefs[0]).not.toBe(acceptError.hold.evidenceRefs[0]);
+    expect(plannerResolveAdapterSpy).not.toHaveBeenCalled();
   });
 
   it('runs v2 task work with autoApprove disabled', async () => {
