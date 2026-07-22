@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import type { DoctorResult } from '../../src/core/types.js';
 import { formatDoctorResult } from '../../src/cli/helpers/output.js';
 
@@ -14,6 +14,17 @@ function makeDoctorResult(checks: Array<{ name: string; passed: boolean; message
 // ─── Traffic light colors ───────────────────────────────────────────
 
 describe('doctor UX — traffic light colors', () => {
+  const originalNoColor = process.env.NO_COLOR;
+
+  beforeEach(() => {
+    delete process.env.NO_COLOR;
+  });
+
+  afterEach(() => {
+    if (originalNoColor === undefined) delete process.env.NO_COLOR;
+    else process.env.NO_COLOR = originalNoColor;
+  });
+
   it('uses green [PASS] for passing checks', () => {
     const result = makeDoctorResult([
       { name: 'Node.js', passed: true, message: 'v20.0.0 (>=18 required)', required: true },
@@ -64,6 +75,17 @@ describe('doctor UX — traffic light colors', () => {
 // ─── Error messages with suggestions ────────────────────────────────
 
 describe('doctor UX — error messages', () => {
+  const originalNoColor = process.env.NO_COLOR;
+
+  beforeEach(() => {
+    delete process.env.NO_COLOR;
+  });
+
+  afterEach(() => {
+    if (originalNoColor === undefined) delete process.env.NO_COLOR;
+    else process.env.NO_COLOR = originalNoColor;
+  });
+
   // We test indirectly by checking runDoctorChecks output when mocking spawnSync
 
   it('tmux failure message includes install suggestion', () => {

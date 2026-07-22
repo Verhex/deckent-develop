@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import {
   formatSkillsLabel,
   formatDashboard,
@@ -40,6 +40,17 @@ function makeAgent(overrides: Partial<AgentInfo> & { assignedSkills?: string[] }
 // ─── formatSkillsLabel ──────────────────────────────────────────────
 
 describe('formatSkillsLabel', () => {
+  const originalNoColor = process.env.NO_COLOR;
+
+  beforeEach(() => {
+    delete process.env.NO_COLOR;
+  });
+
+  afterEach(() => {
+    if (originalNoColor === undefined) delete process.env.NO_COLOR;
+    else process.env.NO_COLOR = originalNoColor;
+  });
+
   it('returns dim "none" for undefined skills', () => {
     const label = formatSkillsLabel(undefined);
     expect(label).toContain('none');
