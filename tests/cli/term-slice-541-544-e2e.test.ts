@@ -206,7 +206,7 @@ const plan = {
   tasks: [{
     title: 'Refactor the worker module',
     description: 'Refactor auth in the worker module and add tests for it.',
-    model: 'sonnet', effort: 'normal', priority: 'NORMAL',
+    model: 'claude-sonnet-5', effort: 'normal', priority: 'NORMAL',
     reason: 'deckent 452-005 e2e fixture — deterministic canned plan, no live AI call',
     scope: { directories: ['src/orchestra/'], filesRead: [], filesWrite: ['src/orchestra/worker.ts'] },
     dependencies: [],
