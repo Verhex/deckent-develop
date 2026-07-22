@@ -141,6 +141,7 @@ import {
 
 // ─── Result Map Helper ──────────────────────────────────────────
 import { buildResultsMap } from './result-collector.js';
+import { readAuthoritativeTaskResult } from './task-result-authority.js';
 
 // ─── Overlap Detection (Sprint 324 — Task 324-004) ───────────────
 import { ResultMerger } from './result-merger.js';
@@ -1351,8 +1352,9 @@ export function evaluateRuntimeExtension(
  *
  * Used by {@link runEvaluatePhase} when an extension is granted — gives the
  * still-progressing worker a chance to write its result before the synthetic
- * NO_GO fires. Fail-soft: any parse or stat error simply continues the poll
- * loop until the budget expires.
+ * NO_GO fires. Missing/invalid legacy files remain pollable; corrupt Docker
+ * authority or an invalid immutable settlement payload fails loudly instead
+ * of being converted into a synthetic result.
  */
 export async function pollForResultFile(
   projectRoot: string,
@@ -1360,25 +1362,24 @@ export async function pollForResultFile(
   budgetMs: number,
   pollIntervalMs = 5_000,
 ): Promise<TaskResult | null> {
-  const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
   const deadline = Date.now() + budgetMs;
   while (Date.now() < deadline) {
-    try {
-      if (existsSync(resultPath)) {
-        const parsed = normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
-        if (parsed) return parsed;
-      }
-    } catch (e) { debugLog('pollForResultFile:read', e); }
+    const authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+    const parsed = normalizeTaskResultShape(authority.result);
+    if (authority.state === 'settled' && !parsed) {
+      throw new Error(`Invalid host-owned Docker result settlement payload for task ${taskId}`);
+    }
+    if (parsed) return parsed;
     await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
   }
   // Final check after the loop's last sleep — covers the case where the
   // result lands exactly on the deadline boundary.
-  try {
-    if (existsSync(resultPath)) {
-      const parsed = normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
-      if (parsed) return parsed;
-    }
-  } catch (e) { debugLog('pollForResultFile:finalRead', e); }
+  const authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+  const parsed = normalizeTaskResultShape(authority.result);
+  if (authority.state === 'settled' && !parsed) {
+    throw new Error(`Invalid host-owned Docker result settlement payload for task ${taskId}`);
+  }
+  if (parsed) return parsed;
   return null;
 }
 

@@ -21,7 +21,7 @@ import { TaskStatus } from '../core/types.js';
 import { TASKS_DIR } from '../core/constants.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
-import { readJsonSafe, debugLog } from '../core/utils.js';
+import { debugLog } from '../core/utils.js';
 
 // ─── Result watcher (fs.watch-based) ──────────────────────────────
 import { createResultWatcher } from './result-watcher.js';
@@ -45,6 +45,10 @@ import {
 import type { SchedulerSnapshot } from './scheduler-reducer.js';
 import { ApprovalBroker } from '../core/approval-broker.js';
 import type { BrainAnswer, WorkerQuestion, TokenUsage } from '../core/task-types.js';
+import {
+  readAuthoritativeTaskResult,
+  type TaskResultAuthorityRead,
+} from './task-result-authority.js';
 
 // born-611 B-katmanı: soru-köprüsü timeout'u gate'in 5dk insan-penceresiyle hizalı
 // (bridge'in kendi default'u 60sn — insan-karar için kısa; advisor S3).
@@ -329,6 +333,17 @@ export function normalizeIngestedTaskId(
     `normalizing to the filename-derived id.`,
   );
   result.taskId = expectedTaskId;
+}
+
+function normalizeAuthoritativeTaskResult(
+  authority: TaskResultAuthorityRead<TaskResult>,
+  taskId: string,
+): TaskResult | null {
+  const result = normalizeTaskResultShape(authority.result);
+  if (authority.state === 'settled' && !result) {
+    throw new Error(`Invalid host-owned Docker result settlement payload for task ${taskId}`);
+  }
+  return result;
 }
 
 // ═══ TOPP B — Continuous Dispatch Planner (Sprint 178 / ADR-064) ══
@@ -939,10 +954,10 @@ export async function waitForResults(
     const newlyCollected: string[] = [];
     for (const taskId of taskIds) {
       if (collected.has(taskId)) continue;
-      const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
-      const resultExists = await stat(resultPath).then(() => true, () => false);
-      if (resultExists) {
-        const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
+      const authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+      const resultPath = authority.rawResultPath;
+      if (authority.result) {
+        const result = normalizeAuthoritativeTaskResult(authority, taskId);
         if (result) {
           // born-655 (TT550D): normalize the worker-reported taskId against the
           // filename-derived (authoritative) id at THIS single ingest chokepoint,
@@ -1070,6 +1085,7 @@ export async function waitForResults(
           continue;
         }
       }
+      if (authority.state === 'pending-settlement') continue;
       // Check for .timeout marker — worker exceeded time limit
       const timeoutPath = join(projectRoot, TASKS_DIR, `task-${taskId}.timeout`);
       const timeoutExists = await stat(timeoutPath).then(() => true, () => false);
@@ -1077,8 +1093,8 @@ export async function waitForResults(
         // Sprint 145: Check if EXIT trap already wrote a .result (e.g. TIMEOUT_WITH_WORK)
         // before overwriting with synthetic NO_GO. The EXIT trap runs between timeout kill
         // and result collection, so .result may appear after the first resultExists check.
-        const lateResultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
-        const lateResult = normalizeTaskResultShape(readJsonSafe<TaskResult>(lateResultPath));
+        const lateAuthority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+        const lateResult = normalizeAuthoritativeTaskResult(lateAuthority, taskId);
         if (lateResult) {
           enrichResultTokenUsage(lateResult, taskMap.get(taskId), projectRoot);
           enrichResultCost(lateResult, taskMap.get(taskId), projectRoot);
@@ -1093,6 +1109,7 @@ export async function waitForResults(
           debugLog('collectResults:lateResult', `taskId=${taskId} EXIT trap wrote .result (${lateResult.selfAssessment}), skipping synthetic NO_GO`);
           continue;
         }
+        if (lateAuthority.state === 'pending-settlement') continue;
 
         // Sprint 195 195-001 (W-INTEGRITY) — disk-verify gate.
         // Before writing a synthetic NO_GO, check whether the worker actually
@@ -1811,10 +1828,9 @@ export async function waitForResults(
   // Note: Only read .result files here (not .timeout) to avoid side effects in edge cases
   for (const taskId of taskIds) {
     if (collected.has(taskId)) continue;
-    const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
-    const finalExists = await stat(resultPath).then(() => true, () => false);
-    if (finalExists) {
-      const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
+    const finalAuthority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+    if (finalAuthority.result) {
+      const result = normalizeAuthoritativeTaskResult(finalAuthority, taskId);
       if (result) {
         enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
         enrichResultCost(result, taskMap.get(taskId), projectRoot);
