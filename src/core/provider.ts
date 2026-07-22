@@ -1386,7 +1386,7 @@ export async function bootstrapProviders(
     },
     codex: async () => {
       const { createCodexAdapter } = await import('../providers/codex.js');
-      return createCodexAdapter(root);
+      return createCodexAdapter(root, { credentialEnvKeys });
     },
     gemini: async () => {
       const { createGeminiAdapter } = await import('../providers/gemini.js');

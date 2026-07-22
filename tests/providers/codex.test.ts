@@ -24,6 +24,7 @@ import { ProviderError } from '../../src/core/provider.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { resolveCrossProviderCredentialKeys } from '../../src/providers/cross-provider-keys.js';
 
 const mockSpawn = spawn as unknown as MockInstance;
 const mockSpawnSync = spawnSync as unknown as MockInstance;
@@ -231,6 +232,7 @@ describe('CodexAdapter', () => {
       adapter.spawn('task-001', 'gpt-4.1', 'prompt');
       const spawnOpts = mockSpawn.mock.calls[0][2] as { env: Record<string, string> };
       expect(spawnOpts.env['OPENAI_API_KEY']).toBe('sk-deck-key-456');
+      expect(spawnOpts.env['DECKENT_OPENAI_API_KEY']).toBeUndefined();
     });
 
     it('should not overwrite OPENAI_API_KEY with DECKENT_OPENAI_API_KEY when both present', () => {
@@ -239,6 +241,61 @@ describe('CodexAdapter', () => {
       adapter.spawn('task-001', 'gpt-4.1', 'prompt');
       const spawnOpts = mockSpawn.mock.calls[0][2] as { env: Record<string, string> };
       expect(spawnOpts.env['OPENAI_API_KEY']).toBe('sk-original');
+      expect(spawnOpts.env['DECKENT_OPENAI_API_KEY']).toBeUndefined();
+    });
+
+    it('should prefer an explicit owned OPENAI_API_KEY over host credentials', () => {
+      process.env['OPENAI_API_KEY'] = 'sk-host';
+      process.env['DECKENT_OPENAI_API_KEY'] = 'sk-deck';
+      adapter.spawn('task-001', 'gpt-4.1', 'prompt', {
+        env: { OPENAI_API_KEY: 'sk-explicit' },
+      });
+
+      const spawnOpts = mockSpawn.mock.calls[0][2] as { env: Record<string, string> };
+      expect(spawnOpts.env['OPENAI_API_KEY']).toBe('sk-explicit');
+      expect(spawnOpts.env['DECKENT_OPENAI_API_KEY']).toBeUndefined();
+    });
+
+    it('should scrub canonical, custom and raw deck credentials without mutating the host env', () => {
+      const registry = [{
+        name: 'my-llm',
+        type: 'openai-compatible' as const,
+        apiKeyEnv: 'MY_LLM_KEY',
+      }];
+      const credentialEnvKeys = resolveCrossProviderCredentialKeys({ registry });
+      for (const key of credentialEnvKeys) process.env[key] = `${key}-HOST`;
+      process.env['PATH'] = '/usr/bin:/bin';
+      const hostSnapshot = Object.fromEntries(credentialEnvKeys.map((key) => [key, process.env[key]]));
+      const scoped = new CodexAdapter(projectDir, { credentialEnvKeys });
+
+      scoped.spawn('task-secret-scrub', 'gpt-4.1', 'prompt', {
+        env: { OPENAI_API_KEY: 'sk-codex-OWN' },
+      });
+
+      const spawnOpts = mockSpawn.mock.calls[0][2] as { env: Record<string, string> };
+      expect(spawnOpts.env['OPENAI_API_KEY']).toBe('sk-codex-OWN');
+      for (const key of credentialEnvKeys) {
+        if (key === 'OPENAI_API_KEY') continue;
+        expect(spawnOpts.env[key], `Codex child must not see ${key}`).toBeUndefined();
+        expect(process.env[key]).toBe(hostSnapshot[key]);
+      }
+      expect(spawnOpts.env['PATH']).toBe('/usr/bin:/bin');
+      expect(process.env['OPENAI_API_KEY']).toBe(hostSnapshot['OPENAI_API_KEY']);
+    });
+
+    it('should keep subscription/session spawn free of every provider credential', () => {
+      const credentialEnvKeys = resolveCrossProviderCredentialKeys();
+      for (const key of credentialEnvKeys) process.env[key] = `${key}-HOST`;
+      delete process.env['OPENAI_API_KEY'];
+      delete process.env['DECKENT_OPENAI_API_KEY'];
+      const scoped = new CodexAdapter(projectDir, { credentialEnvKeys });
+
+      scoped.spawn('task-subscription-scrub', 'gpt-4.1', 'prompt');
+
+      const spawnOpts = mockSpawn.mock.calls[0][2] as { env: Record<string, string> };
+      for (const key of credentialEnvKeys) {
+        expect(spawnOpts.env[key], `subscription Codex child must not see ${key}`).toBeUndefined();
+      }
     });
   });
 

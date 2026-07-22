@@ -17,13 +17,14 @@ import { isOpenAIModel } from '../core/types.js';
 import { PROVIDER_PACKAGES } from '../core/provider-packages.js';
 import { modelRegistry, registerCodexParityModels } from '../core/model-registry.js';
 import type { ProviderAdapter, ProviderSpawnOptions, ProviderAvailabilityDetail } from '../core/provider.js';
-import { ProviderError, resolveBinaryPath, parseSemverFromOutput, buildCliInvocation } from '../core/provider.js';
+import { ProviderError, resolveBinaryPath, parseSemverFromOutput, buildCliInvocation, buildProviderChildEnv } from '../core/provider.js';
 import { normalizeUsage, type TokenUsage } from '../core/token-usage.js';
 import type { ProviderDetectResult } from './claude.js';
 import { TASKS_DIR } from '../core/constants.js';
 import type { ModelTier } from '../core/model-equivalence.js';
 import { getModelForProviderTier } from '../core/model-equivalence.js';
 import { killProcessGroupWithEscalation } from './subprocess.js';
+import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
 
 // Side-effect: register the Codex parity catalog (gpt-5.5 + gpt-5.6 family)
 // into the singleton registry the first time this module is imported —
@@ -137,11 +138,29 @@ export class CodexAdapter implements ProviderAdapter {
    * without a real spawn. Defaults to `process.platform`.
    */
   private readonly platform: NodeJS.Platform;
+  private readonly spawnImpl: typeof spawn;
+  private readonly credentialEnvKeys: readonly string[];
 
-  constructor(projectDir: string, opts?: { defaultTimeoutMs?: number; platform?: NodeJS.Platform }) {
+  constructor(
+    projectDir: string,
+    opts?: {
+      defaultTimeoutMs?: number;
+      platform?: NodeJS.Platform;
+      spawnImpl?: typeof spawn;
+      credentialEnvKeys?: readonly string[];
+    },
+  ) {
     this.projectDir = projectDir;
     this.defaultTimeoutMs = opts?.defaultTimeoutMs ?? 0;
     this.platform = opts?.platform ?? process.platform;
+    this.spawnImpl = opts?.spawnImpl ?? spawn;
+    this.credentialEnvKeys = Object.freeze([
+      ...new Set([
+        ...(opts?.credentialEnvKeys ?? resolveCrossProviderCredentialKeys()),
+        'OPENAI_API_KEY',
+        'DECKENT_OPENAI_API_KEY',
+      ]),
+    ]);
   }
 
   // ─── spawn() ────────────────────────────────────────────────────────
@@ -180,12 +199,18 @@ export class CodexAdapter implements ProviderAdapter {
     // See {@link CODEX_USAGE_EMIT_ARGS}.
     args.push(...CODEX_USAGE_EMIT_ARGS);
 
-    // Build env — inject API key from DECKENT_OPENAI_API_KEY if available
-    const spawnEnv = { ...process.env };
-    const deckentKey = process.env['DECKENT_OPENAI_API_KEY'];
-    if (deckentKey && !spawnEnv['OPENAI_API_KEY']) {
-      spawnEnv['OPENAI_API_KEY'] = deckentKey;
-    }
+    // Scrub every canonical/config-driven credential (including raw `.deck`
+    // aliases) from the copied host env, then re-inject only Codex's normalized
+    // runtime key. No owned key means subscription/session auth remains keyless.
+    const mergedEnv = { ...process.env, ...(opts?.env ?? {}) };
+    const ownCredential = opts?.env?.['OPENAI_API_KEY']
+      || process.env['OPENAI_API_KEY']
+      || process.env['DECKENT_OPENAI_API_KEY'];
+    const spawnEnv = buildProviderChildEnv(
+      mergedEnv,
+      this.credentialEnvKeys,
+      ownCredential ? { OPENAI_API_KEY: ownCredential } : undefined,
+    );
 
     // PGID-TEARDOWN parity (born-568, ADR-G-013): on POSIX, `detached: true`
     // makes this worker the LEADER of a brand-new process group (its pid IS
@@ -206,7 +231,7 @@ export class CodexAdapter implements ProviderAdapter {
       detached: this.platform !== 'win32',
     };
 
-    const child = spawn(inv.command, inv.args, spawnOpts);
+    const child = this.spawnImpl(inv.command, inv.args, spawnOpts);
     closeSync(logFd);
 
     // Write heartbeat
@@ -725,7 +750,12 @@ function extractUsageFromPayload(payload: unknown): TokenUsage | null {
  */
 export function createCodexAdapter(
   projectDir: string,
-  opts?: { defaultTimeoutMs?: number },
+  opts?: {
+    defaultTimeoutMs?: number;
+    platform?: NodeJS.Platform;
+    spawnImpl?: typeof spawn;
+    credentialEnvKeys?: readonly string[];
+  },
 ): CodexAdapter {
   return new CodexAdapter(projectDir, opts);
 }

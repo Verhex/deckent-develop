@@ -52,6 +52,13 @@ const BASE_KEYS = [
   'DASHSCOPE_API_KEY',
   'ZHIPU_API_KEY',
   'OPENROUTER_API_KEY',
+  'DECKENT_CLAUDE_API_KEY',
+  'DECKENT_OPENAI_API_KEY',
+  'DECKENT_GOOGLE_API_KEY',
+  'DECKENT_DEEPSEEK_API_KEY',
+  'DECKENT_DASHSCOPE_API_KEY',
+  'DECKENT_ZHIPU_API_KEY',
+  'DECKENT_OPENROUTER_API_KEY',
 ];
 
 /** A config-driven openai-compatible provider whose credential is NOT a built-in. */
@@ -68,12 +75,13 @@ describe('F1-014 phase-2 (A): resolveCrossProviderCredentialKeys', () => {
     expect(resolveCrossProviderCredentialKeys({ registry: [] })).toEqual(BASE_KEYS);
   });
 
-  it('unions a config provider apiKeyEnv onto the base set (MY_LLM_KEY)', () => {
+  it('unions a config provider runtime key and raw deck alias onto the base set', () => {
     const keys = resolveCrossProviderCredentialKeys({ registry: MY_LLM_REGISTRY });
-    expect(keys).toEqual([...BASE_KEYS, 'MY_LLM_KEY']);
+    expect(keys).toEqual([...BASE_KEYS, 'MY_LLM_KEY', 'DECKENT_MY_LLM_KEY']);
     // contains base + the config key
     for (const k of BASE_KEYS) expect(keys).toContain(k);
     expect(keys).toContain('MY_LLM_KEY');
+    expect(keys).toContain('DECKENT_MY_LLM_KEY');
   });
 
   it('dedupes a config apiKeyEnv that collides with a base key, and is deterministic', () => {
@@ -84,7 +92,7 @@ describe('F1-014 phase-2 (A): resolveCrossProviderCredentialKeys', () => {
     const keys = resolveCrossProviderCredentialKeys({ registry });
     // OPENAI_API_KEY appears exactly once; MY_LLM_KEY appended once.
     expect(keys.filter((k) => k === 'OPENAI_API_KEY')).toHaveLength(1);
-    expect(keys).toEqual([...BASE_KEYS, 'MY_LLM_KEY']);
+    expect(keys).toEqual([...BASE_KEYS, 'MY_LLM_KEY', 'DECKENT_MY_LLM_KEY']);
     // Determinism: same input → same output.
     expect(resolveCrossProviderCredentialKeys({ registry })).toEqual(keys);
   });
@@ -95,7 +103,11 @@ describe('F1-014 phase-2 (A): resolveCrossProviderCredentialKeys', () => {
       { name: 'blank', type: 'openai-compatible', apiKeyEnv: '   ' },
       { name: 'my-llm', type: 'openai-compatible', apiKeyEnv: 'MY_LLM_KEY' },
     ];
-    expect(resolveCrossProviderCredentialKeys({ registry })).toEqual([...BASE_KEYS, 'MY_LLM_KEY']);
+    expect(resolveCrossProviderCredentialKeys({ registry })).toEqual([
+      ...BASE_KEYS,
+      'MY_LLM_KEY',
+      'DECKENT_MY_LLM_KEY',
+    ]);
   });
 
   it('BASE_PROVIDER_CREDENTIAL_ENV mirrors core/provider.ts applyDeckSecretsToEnv', () => {
@@ -151,6 +163,7 @@ const TOUCHED_ENV = [
   'OPENAI_API_KEY',
   'GOOGLE_API_KEY',
   'MY_LLM_KEY',
+  'DECKENT_MY_LLM_KEY',
   'LANG',
   'DECKENT_NONSECRET_PROBE',
 ] as const;
@@ -171,6 +184,7 @@ describe('F1-014 phase-2 (B): subprocess backend scrubs config-provider apiKeyEn
     process.env['OPENAI_API_KEY'] = 'sk-oai-HOST';
     process.env['GOOGLE_API_KEY'] = 'goog-HOST';
     process.env['MY_LLM_KEY'] = 'my-llm-HOST';
+    process.env['DECKENT_MY_LLM_KEY'] = 'my-llm-RAW-HOST';
     process.env['LANG'] = 'en_US.UTF-8';
     process.env['DECKENT_NONSECRET_PROBE'] = 'keep-me';
 
@@ -210,6 +224,7 @@ describe('F1-014 phase-2 (B): subprocess backend scrubs config-provider apiKeyEn
     expect(env['ANTHROPIC_API_KEY']).toBeUndefined();
     expect(env['GOOGLE_API_KEY']).toBeUndefined();
     expect(env['MY_LLM_KEY']).toBeUndefined();
+    expect(env['DECKENT_MY_LLM_KEY']).toBeUndefined();
   });
 
   it('OWNING worker (my-llm) — MY_LLM_KEY re-injected from opts.env only, host value scrubbed', () => {
@@ -224,6 +239,7 @@ describe('F1-014 phase-2 (B): subprocess backend scrubs config-provider apiKeyEn
     expect(env['ANTHROPIC_API_KEY']).toBeUndefined();
     expect(env['OPENAI_API_KEY']).toBeUndefined();
     expect(env['GOOGLE_API_KEY']).toBeUndefined();
+    expect(env['DECKENT_MY_LLM_KEY']).toBeUndefined();
   });
 
   it('PRE-FIX RED: WITHOUT the registry, the static base set misses MY_LLM_KEY → it leaks', () => {
@@ -238,6 +254,7 @@ describe('F1-014 phase-2 (B): subprocess backend scrubs config-provider apiKeyEn
     expect(env['GOOGLE_API_KEY']).toBeUndefined();
     // ...but the config provider's key LEAKS — exactly the gap phase-2 closes.
     expect(env['MY_LLM_KEY']).toBe('my-llm-HOST');
+    expect(env['DECKENT_MY_LLM_KEY']).toBe('my-llm-RAW-HOST');
   });
 
   it('subscription claude (no opts.env) gets NO ANTHROPIC_API_KEY even with a registry (ADR-076)', () => {
@@ -249,6 +266,7 @@ describe('F1-014 phase-2 (B): subprocess backend scrubs config-provider apiKeyEn
     expect(env['OPENAI_API_KEY']).toBeUndefined();
     expect(env['GOOGLE_API_KEY']).toBeUndefined();
     expect(env['MY_LLM_KEY']).toBeUndefined();
+    expect(env['DECKENT_MY_LLM_KEY']).toBeUndefined();
   });
 
   it('preserves base non-secret host vars (PATH/LANG/probe) byte-for-byte', () => {

@@ -3,6 +3,7 @@ import type { ProviderDefinition, ResolvedConfig } from '../../src/core/config-t
 
 const mockState = vi.hoisted(() => ({
   captures: {
+    codex: [] as Array<{ credentialEnvKeys?: readonly string[] }>,
     ollama: [] as Array<{ credentialEnvKeys?: readonly string[] }>,
     openaiCompatible: [] as Array<{ credentialEnvKeys?: readonly string[] }>,
     openrouter: [] as Array<{ credentialEnvKeys?: readonly string[] }>,
@@ -31,6 +32,13 @@ vi.mock('../../src/providers/ollama.js', () => ({
   createOllamaAdapter: vi.fn((_root: string, opts?: { credentialEnvKeys?: readonly string[] }) => {
     mockState.captures.ollama.push(opts ?? {});
     return mockState.adapter('ollama');
+  }),
+}));
+
+vi.mock('../../src/providers/codex.js', () => ({
+  createCodexAdapter: vi.fn((_root: string, opts?: { credentialEnvKeys?: readonly string[] }) => {
+    mockState.captures.codex.push(opts ?? {});
+    return mockState.adapter('codex');
   }),
 }));
 
@@ -82,12 +90,14 @@ describe('bootstrapProviders — canonical credential scrub key threading', () =
       apiKeyEnv: 'MY_LLM_KEY',
       models: ['my-llm-v1'],
     },
+    { name: 'codex-alias', type: 'codex' },
     { name: 'local-alias', type: 'ollama' },
   ];
   const credentialKeys = resolveCrossProviderCredentialKeys({ registry: registryDefs });
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockState.captures.codex.length = 0;
     mockState.captures.ollama.length = 0;
     mockState.captures.openaiCompatible.length = 0;
     mockState.captures.openrouter.length = 0;
@@ -100,7 +110,7 @@ describe('bootstrapProviders — canonical credential scrub key threading', () =
     globalThis.fetch = originalFetch;
   });
 
-  it('passes the same base+registry key set to Ollama, OpenAI-compatible and OpenRouter adapters', async () => {
+  it('passes the same base+registry key set to Codex, Ollama, OpenAI-compatible and OpenRouter adapters', async () => {
     const config = {
       projectRoot: '/tmp/provider-credential-key-threading',
       auth_mode: 'api',
@@ -114,9 +124,11 @@ describe('bootstrapProviders — canonical credential scrub key threading', () =
     await bootstrapProviders(config, config.projectRoot, new ProviderRegistry());
 
     const expected = resolveCrossProviderCredentialKeys({ registry: registryDefs });
+    expect(mockState.captures.codex).toHaveLength(1);
     expect(mockState.captures.ollama).toHaveLength(1);
     expect(mockState.captures.openaiCompatible).toHaveLength(1);
     expect(mockState.captures.openrouter).toHaveLength(1);
+    expect(mockState.captures.codex[0]?.credentialEnvKeys).toEqual(expected);
     expect(mockState.captures.ollama[0]?.credentialEnvKeys).toEqual(expected);
     expect(mockState.captures.openaiCompatible[0]?.credentialEnvKeys).toEqual(expected);
     expect(mockState.captures.openrouter[0]?.credentialEnvKeys).toEqual(expected);

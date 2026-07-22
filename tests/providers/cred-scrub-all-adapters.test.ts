@@ -73,6 +73,13 @@ const BASE_KEYS = [
   'DASHSCOPE_API_KEY',
   'ZHIPU_API_KEY',
   'OPENROUTER_API_KEY',
+  'DECKENT_CLAUDE_API_KEY',
+  'DECKENT_OPENAI_API_KEY',
+  'DECKENT_GOOGLE_API_KEY',
+  'DECKENT_DEEPSEEK_API_KEY',
+  'DECKENT_DASHSCOPE_API_KEY',
+  'DECKENT_ZHIPU_API_KEY',
+  'DECKENT_OPENROUTER_API_KEY',
 ] as const;
 
 /** A mock child with the surface every adapter's spawn() touches. */
@@ -180,17 +187,7 @@ describe('§B SubprocessSpawnBackend — full mixed-provider fleet, zero cross-l
   let saved: Record<string, string | undefined>;
   let spawnImpl: MockInstance;
 
-  const ALL_KEYS = [...BASE_KEYS, 'MY_LLM_KEY'] as const;
-
-  const HOST_VALUES: Record<string, string> = {
-    ANTHROPIC_API_KEY: 'sk-ant-HOST',
-    OPENAI_API_KEY: 'sk-oai-HOST',
-    GOOGLE_API_KEY: 'goog-HOST',
-    DEEPSEEK_API_KEY: 'ds-HOST',
-    DASHSCOPE_API_KEY: 'qw-HOST',
-    ZHIPU_API_KEY: 'zp-HOST',
-    MY_LLM_KEY: 'my-llm-HOST',
-  };
+  const ALL_KEYS = [...BASE_KEYS, 'MY_LLM_KEY', 'DECKENT_MY_LLM_KEY'] as const;
 
   /** Every (cliCommand, own credential env var, own credential value) triple. */
   const IDENTITIES = [
@@ -208,7 +205,7 @@ describe('§B SubprocessSpawnBackend — full mixed-provider fleet, zero cross-l
     vi.clearAllMocks();
     saved = {};
     for (const k of ALL_KEYS) saved[k] = process.env[k];
-    for (const k of ALL_KEYS) process.env[k] = HOST_VALUES[k];
+    for (const k of ALL_KEYS) process.env[k] = `${k}-HOST`;
     spawnImpl = vi.fn().mockReturnValue(makeMockChild()) as unknown as MockInstance;
   });
 
@@ -253,7 +250,7 @@ describe('§B SubprocessSpawnBackend — full mixed-provider fleet, zero cross-l
 
       const env = spawnedEnv(spawnImpl);
       expect(env[ownKey]).toBe(ownValue);
-      for (const { ownKey: foreignKey } of IDENTITIES) {
+      for (const foreignKey of ALL_KEYS) {
         if (foreignKey === ownKey) continue;
         expect(env[foreignKey], `${cli} worker must not see foreign key ${foreignKey}`).toBeUndefined();
       }
@@ -265,8 +262,8 @@ describe('§B SubprocessSpawnBackend — full mixed-provider fleet, zero cross-l
     backend.spawn('t-claude-sub', 'model-x' as ModelType, 'prompt');
 
     const env = spawnedEnv(spawnImpl);
-    for (const { ownKey } of IDENTITIES) {
-      expect(env[ownKey]).toBeUndefined();
+    for (const key of ALL_KEYS) {
+      expect(env[key]).toBeUndefined();
     }
   });
 
@@ -298,7 +295,7 @@ describe('§B SubprocessSpawnBackend — full mixed-provider fleet, zero cross-l
 
 describe('§C standalone injectable adapters — zero cross-provider leak', () => {
   const projectDir = '/tmp/test-cred-scrub-gap';
-  const ALL_KEYS = [...BASE_KEYS, 'MY_LLM_KEY'] as const;
+  const ALL_KEYS = [...BASE_KEYS, 'MY_LLM_KEY', 'DECKENT_MY_LLM_KEY'] as const;
   let saved: Record<string, string | undefined>;
 
   beforeEach(() => {
