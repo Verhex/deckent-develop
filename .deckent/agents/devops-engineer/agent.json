@@ -44,7 +44,7 @@
     "Grep"
   ],
   "deniedTools": [],
-  "preferredModel": "sonnet",
+  "preferredModel": "claude-sonnet-5",
   "effortMultiplier": 1,
   "triggerKeywords": [
     "docker",
@@ -135,7 +135,7 @@
       ]
     },
     "numerical": {
-      "preferredModel": "sonnet",
+      "preferredModel": "claude-sonnet-5",
       "costTier": "standard",
       "maxParallel": null
     }

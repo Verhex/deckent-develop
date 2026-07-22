@@ -30,6 +30,7 @@ function makeBackend(): SpawnBackend & { spawned: string[] } {
   const spawned: string[] = [];
   return {
     name: 'mock-610',
+    liveUsageBudgetSupport: 'measured-stream' as const,
     spawn(taskId: string, _m: ModelType, _p: string, _o?: SpawnBackendOptions) { spawned.push(taskId); },
     kill() { /* no-op */ },
     list() { return spawned; },
@@ -41,11 +42,12 @@ function makeBackend(): SpawnBackend & { spawned: string[] } {
 function task(id: string, status: TaskStatus, dependencies: string[] = []): Task {
   return {
     id, title: `Task ${id}`, description: `single-truth ${id}`,
-    model: 'sonnet' as ModelType, effort: 'normal', priority: 'NORMAL', reason: '610-test',
+    model: 'claude-sonnet-5' as ModelType, effort: 'normal', priority: 'NORMAL', reason: '610-test',
     scope: { directories: ['src/'], filesRead: [], filesWrite: [`src/st-${id}.ts`] },
     dependencies,
     goNogo: { goCriteria: 'x', noGoCriteria: 'x', techDebtAcceptable: 'none' },
     status, sprintId: 'sprint-610', assignedAgent: 'generic', assignedSkills: [], provider: 'claude',
+    budget: { maxTurns: 1 },
   } as unknown as Task;
 }
 

@@ -105,8 +105,8 @@ function makeResolvedConfig(root: string): ResolvedConfig {
     mode: 'performance',
     activeModeConfig: {
       max_workers: 4,
-      brain_model: 'opus',
-      default_model: 'sonnet',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: true,
       brain_planning: 'structured',
     },
@@ -139,7 +139,7 @@ const SIMPLE_DIRECTIVES = `# DIRECTIVES — Sprint 001 (Hello World)
 ---
 
 ## Task 1: Create hello.ts
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: low
 - Files: src/hello.ts
 - Scope: src/
@@ -159,7 +159,7 @@ const MULTI_TASK_DIRECTIVES = `# DIRECTIVES — Sprint 002 (Feature Build)
 ---
 
 ## Task 1: Auth Module
-- Model: opus
+- Model: claude-opus-4-8
 - Effort: high
 - Files: src/auth/login.ts, src/auth/register.ts
 - Scope: src/auth/
@@ -174,7 +174,7 @@ Implement user authentication with login and register.
 ---
 
 ## Task 2: API Endpoint
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Files: src/api/users.ts
 - Scope: src/api/
@@ -258,7 +258,7 @@ describe('E2E: First Sprint Flow', () => {
       expect(task.title).toBeDefined();
       expect(task.description).toBeDefined();
       expect(task.model).toBeTruthy();
-      expect(['opus', 'sonnet', 'haiku']).toContain(task.model);
+      expect(['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001']).toContain(task.model);
       expect(task.scope).toBeDefined();
       expect(task.scope.directories).toBeInstanceOf(Array);
       expect(task.sprintId).toBe(sprint.id);

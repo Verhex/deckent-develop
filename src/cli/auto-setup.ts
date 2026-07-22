@@ -55,7 +55,8 @@ function selectTiers(mode: PlanMode): { brain_tier: ModelTier; worker_tier: Mode
  */
 function tierToModel(tier: ModelTier): ModelType {
   const model = modelRegistry.getByProviderAndTier('claude', tier);
-  return (model?.id ?? 'sonnet') as ModelType;
+  if (!model) throw new Error(`E_DEFAULT_MODEL_UNAVAILABLE: provider=claude tier=${tier}`);
+  return model.id as ModelType;
 }
 
 // ─── Planning Mode ───────────────────────────────────────────────────

@@ -20,9 +20,10 @@ vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
   spawn: vi.fn(() => {
     const stub = {
-      stdout: { on: vi.fn() },
-      stderr: { on: vi.fn() },
+      stdout: { on: vi.fn(), resume: vi.fn() },
+      stderr: { on: vi.fn(), resume: vi.fn() },
       on: vi.fn(),
+      once: vi.fn(),
     };
     return stub as unknown as ChildProcess;
   }),
@@ -30,7 +31,9 @@ vi.mock('node:child_process', () => ({
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(() => true),
-  readFileSync: vi.fn(() => '{}'),
+  readFileSync: vi.fn((path: string) => path.endsWith('/.gemini/settings.json')
+    ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
+    : '{}'),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
   unlinkSync: vi.fn(),
@@ -65,10 +68,15 @@ import {
   DEFAULT_WORKER_MEMORY_LIMIT,
   DEFAULT_WORKER_MEMORY_SWAP,
   parseMemoryString,
+  buildProviderAuthIsolation,
+  buildGeminiAuthSelectionBootstrap,
   WORKER_NODE_OPTIONS,
+  DOCKER_ERROR_CODES,
 } from '../../src/orchestra/spawn-backend-docker.js';
+import { SpawnBackendError } from '../../src/orchestra/spawn-backend.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
+const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -159,6 +167,92 @@ describe('parseMemoryString', () => {
   });
 });
 
+describe('buildProviderAuthIsolation', () => {
+  const allExist = (): boolean => true;
+
+  it('mounts only the Claude credential file and bootstraps a private HOME', () => {
+    const isolated = buildProviderAuthIsolation(
+      '/host/home',
+      'claude',
+      '.claude',
+      false,
+      allExist,
+    );
+
+    expect(isolated.mountArgs).toEqual([
+      '--mount',
+      'type=bind,src=/host/home/.claude/.credentials.json,dst=/run/deckent-auth-claude-.credentials.json,readonly',
+    ]);
+    expect(isolated.mountArgs.some(arg => arg.includes('/host/home/.claude:/'))).toBe(false);
+    expect(isolated.bootstrapLines.some(line => line.includes(
+      'cp "/run/deckent-auth-claude-.credentials.json" "$HOME/.claude/.credentials.json"',
+    ))).toBe(true);
+    expect(isolated.bootstrapLines.every(line => line.endsWith('|| exit 78'))).toBe(true);
+    expect(isolated.credentialCount).toBe(1);
+    expect(isolated.missingRequiredFiles).toEqual([]);
+  });
+
+  it('does not mount subscription credentials in API mode', () => {
+    expect(buildProviderAuthIsolation('/host/home', 'claude', '.claude', true, allExist))
+      .toEqual({ mountArgs: [], bootstrapLines: [], credentialCount: 0, missingRequiredFiles: [] });
+  });
+
+  it('uses each provider credential allowlist without mounting provider homes', () => {
+    const codex = buildProviderAuthIsolation('/host/home', 'codex', '.codex', false, allExist);
+    const gemini = buildProviderAuthIsolation('/host/home', 'gemini', '.gemini', false, allExist);
+
+    expect(codex.mountArgs).toEqual([
+      '--mount',
+      'type=bind,src=/host/home/.codex/auth.json,dst=/run/deckent-auth-codex-auth.json,readonly',
+    ]);
+    expect(gemini.mountArgs).toEqual([
+      '--mount',
+      'type=bind,src=/host/home/.gemini/gemini-credentials.json,dst=/run/deckent-auth-gemini-gemini-credentials.json,readonly',
+      '--mount',
+      'type=bind,src=/host/home/.gemini/google_accounts.json,dst=/run/deckent-auth-gemini-google_accounts.json,readonly',
+    ]);
+    expect([...codex.mountArgs, ...gemini.mountArgs].some(arg => /\.(codex|gemini):\//.test(arg))).toBe(false);
+  });
+
+  it('fails closed when a required credential is missing but optional metadata exists', () => {
+    const onlyAccountMetadata = (path: string): boolean => path.endsWith('google_accounts.json');
+    const isolated = buildProviderAuthIsolation(
+      '/host/home',
+      'gemini',
+      '.gemini',
+      false,
+      onlyAccountMetadata,
+    );
+
+    expect(isolated.credentialCount).toBe(1);
+    expect(isolated.missingRequiredFiles).toEqual(['gemini-credentials.json']);
+  });
+});
+
+describe('buildGeminiAuthSelectionBootstrap', () => {
+  it('copies only selectedType and excludes unrelated host settings', () => {
+    const bootstrap = buildGeminiAuthSelectionBootstrap('/host/home', () => JSON.stringify({
+      security: { auth: { selectedType: 'gemini-api-key' } },
+      mcpServers: { expensive: { command: 'must-not-enter-worker' } },
+      ide: { enabled: true },
+    }));
+
+    expect(bootstrap?.selectedType).toBe('gemini-api-key');
+    expect(bootstrap?.bootstrapLines.join('\n')).toContain(
+      '{"security":{"auth":{"selectedType":"gemini-api-key"}}}',
+    );
+    expect(bootstrap?.bootstrapLines.join('\n')).not.toContain('mcpServers');
+    expect(bootstrap?.bootstrapLines.join('\n')).not.toContain('ide');
+  });
+
+  it('fails closed on a missing or shell-unsafe selectedType', () => {
+    expect(buildGeminiAuthSelectionBootstrap('/host/home', () => '{}')).toBeNull();
+    expect(buildGeminiAuthSelectionBootstrap('/host/home', () => JSON.stringify({
+      security: { auth: { selectedType: "oauth'; touch /tmp/pwn" } },
+    }))).toBeNull();
+  });
+});
+
 // ─── DockerSpawnBackend: memory budget defaults ─────────────────────────────
 
 describe('DockerSpawnBackend: memory budget defaults (Sprint 191 T-001)', () => {
@@ -176,7 +270,7 @@ describe('DockerSpawnBackend: memory budget defaults (Sprint 191 T-001)', () => 
 
   it('passes --memory 4g --memory-swap 6g to docker run when opts omitted', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('test-default-mem', 'sonnet', 'prompt-body');
+    backend.spawn('test-default-mem', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -189,7 +283,7 @@ describe('DockerSpawnBackend: memory budget defaults (Sprint 191 T-001)', () => 
       memoryLimit: '8g',
       memorySwap: '12g',
     });
-    backend.spawn('test-override-mem', 'sonnet', 'prompt-body');
+    backend.spawn('test-override-mem', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -296,27 +390,33 @@ describe('.deckent/config.json — Sprint 191 max_workers + memory normalization
 
 // ─── Sprint 193+: per-task authMode wire ──────────────────────────────────
 // feedback_container_auth_precedence: task.authMode === 'api' MUST skip the
-// ~/.claude session mount and REQUIRE ANTHROPIC_API_KEY. Default (undefined /
-// 'subscription') preserves the original mount so rate-limit-free subscription
-// workers keep working.
+// Claude session credential and REQUIRE ANTHROPIC_API_KEY. Default (undefined /
+// 'subscription') mounts only the credential file; global settings/MCP/skills
+// never enter the worker container.
 
 describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const fs = await import('node:fs');
+    vi.mocked(fs.readFileSync).mockImplementation((path) => String(path).endsWith('/.gemini/settings.json')
+      ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
+      : '{}');
     installSpawnRouter();
   });
 
-  it('default (no authMode in task JSON) mounts ~/.claude into the container', async () => {
+  it('default subscription mounts only the Claude credential file', async () => {
     const fs = await import('node:fs');
-    vi.mocked(fs.readFileSync).mockImplementation(() => '{}');
+    vi.mocked(fs.readFileSync).mockImplementation((path) => String(path).endsWith('/.gemini/settings.json')
+      ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
+      : '{}');
 
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('auth-default', 'sonnet', 'prompt');
+    backend.spawn('auth-default', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
-    const hasClaudeMount = argv.some(arg => arg.includes('/.claude:'));
-    expect(hasClaudeMount).toBe(true);
+    expect(argv.some(arg => arg.includes('src=/home/') && arg.includes('/.claude/.credentials.json,dst=/run/deckent-auth-claude-'))).toBe(true);
+    expect(argv.some(arg => arg.includes('/.claude:'))).toBe(false);
     const authEnvIdx = argv.indexOf('DECKENT_AUTH_MODE=subscription');
     expect(authEnvIdx).toBeGreaterThan(-1);
   });
@@ -329,7 +429,7 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
 
     try {
       const backend = new DockerSpawnBackend('/test/project');
-      backend.spawn('auth-api', 'sonnet', 'prompt');
+      backend.spawn('auth-api', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
 
       expect(capturedDockerRunArgs.length).toBe(1);
       const argv = capturedDockerRunArgs[0]!;
@@ -350,10 +450,52 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
 
     try {
       const backend = new DockerSpawnBackend('/test/project');
-      expect(() => backend.spawn('auth-api-noenv', 'sonnet', 'prompt'))
+      expect(() => backend.spawn('auth-api-noenv', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS))
         .toThrow(/ANTHROPIC_API_KEY/);
     } finally {
       if (prevKey !== undefined) process.env.ANTHROPIC_API_KEY = prevKey;
+    }
+  });
+
+  it.each([
+    ['gpt-5.6-sol', 'OPENAI_API_KEY'],
+    ['gemini-2.5-flash', 'GOOGLE_API_KEY'],
+  ] as const)('%s subscription mode is held before unmetered Docker work', async (model, envName) => {
+    const fs = await import('node:fs');
+    vi.mocked(fs.readFileSync).mockImplementation((path) => String(path).endsWith('/.gemini/settings.json')
+      ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
+      : '{}');
+    const previous = process.env[envName];
+    process.env[envName] = 'host-api-key-must-not-leak';
+
+    try {
+      expect(() => new DockerSpawnBackend('/test/project')
+        .spawn(`auth-sub-${model}`, model, 'prompt', TEST_EXECUTION_OPTIONS))
+        .toThrow(/does not expose incremental measured usage/);
+      expect(capturedDockerRunArgs).toHaveLength(0);
+    } finally {
+      if (previous === undefined) delete process.env[envName];
+      else process.env[envName] = previous;
+    }
+  });
+
+  it.each([
+    ['gpt-5.6-sol', 'OPENAI_API_KEY'],
+    ['gemini-2.5-flash', 'GOOGLE_API_KEY'],
+  ] as const)('%s API mode is held before unmetered Docker work', async (model, envName) => {
+    const fs = await import('node:fs');
+    vi.mocked(fs.readFileSync).mockImplementation(() => JSON.stringify({ authMode: 'api' }));
+    const previous = process.env[envName];
+    process.env[envName] = 'provider-specific-api-key';
+
+    try {
+      expect(() => new DockerSpawnBackend('/test/project')
+        .spawn(`auth-api-${model}`, model, 'prompt', TEST_EXECUTION_OPTIONS))
+        .toThrow(/does not expose incremental measured usage/);
+      expect(capturedDockerRunArgs).toHaveLength(0);
+    } finally {
+      if (previous === undefined) delete process.env[envName];
+      else process.env[envName] = previous;
     }
   });
 });
@@ -370,14 +512,16 @@ describe('DockerSpawnBackend: NODE_OPTIONS container env (Sprint 194 T-004)', ()
     // Reset readFileSync mock: authMode tests override it with JSON.stringify({authMode:'api'})
     // and vi.clearAllMocks() does not reset implementations — only call history.
     const fs = await import('node:fs');
-    vi.mocked(fs.readFileSync).mockReturnValue('{}' as unknown as Buffer);
+    vi.mocked(fs.readFileSync).mockImplementation((path) => (String(path).endsWith('/.gemini/settings.json')
+      ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
+      : '{}') as unknown as Buffer);
     vi.mocked(fs.existsSync).mockReturnValue(true);
     installSpawnRouter();
   });
 
   it('passes -e NODE_OPTIONS=... to docker run argv', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('node-opts-present', 'sonnet', 'prompt-body');
+    backend.spawn('node-opts-present', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -393,7 +537,7 @@ describe('DockerSpawnBackend: NODE_OPTIONS container env (Sprint 194 T-004)', ()
     expect(WORKER_NODE_OPTIONS).toBe('NODE_OPTIONS=--max-old-space-size-percentage=75');
 
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('node-opts-value', 'sonnet', 'prompt-body');
+    backend.spawn('node-opts-value', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
 
     const argv = capturedDockerRunArgs[0]!;
     const optsEntry = argv.find(a => a.startsWith('NODE_OPTIONS='));
@@ -411,7 +555,7 @@ describe('DockerSpawnBackend: NODE_OPTIONS container env (Sprint 194 T-004)', ()
 
     try {
       const backend = new DockerSpawnBackend('/test/project');
-      backend.spawn('node-opts-override', 'sonnet', 'prompt-body');
+      backend.spawn('node-opts-override', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
 
       const argv = capturedDockerRunArgs[0]!;
       const nodeOptionEntries = argv.filter(a => a.startsWith('NODE_OPTIONS='));
@@ -425,9 +569,13 @@ describe('DockerSpawnBackend: NODE_OPTIONS container env (Sprint 194 T-004)', ()
   });
 });
 
-describe('DockerSpawnBackend: PSL-1 provider-aware command + OAuth mount (Sprint 252)', () => {
-  beforeEach(() => {
+describe('DockerSpawnBackend: provider-aware command + isolated OAuth credential', () => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const fs = await import('node:fs');
+    vi.mocked(fs.readFileSync).mockImplementation((path) => String(path).endsWith('/.gemini/settings.json')
+      ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
+      : '{}');
     installSpawnRouter();
   });
 
@@ -439,34 +587,29 @@ describe('DockerSpawnBackend: PSL-1 provider-aware command + OAuth mount (Sprint
     return call ? String(call[1]) : '';
   }
 
-  it('claude: docker worker script uses claude command + mounts ~/.claude (regression)', async () => {
-    new DockerSpawnBackend('/test/project').spawn('psl-claude', 'sonnet', 'prompt-body');
+  it('claude: uses exact API model ID and an auth-only credential mount', async () => {
+    new DockerSpawnBackend('/test/project').spawn('psl-claude', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
     const script = await workerScriptFor('psl-claude');
     expect(script).toContain('claude -p -');
     expect(script).toContain('--dangerously-skip-permissions');
-    expect(capturedDockerRunArgs[0]!.some(a => a.includes('/.claude:'))).toBe(true);
+    expect(script).toContain('--model claude-sonnet-5');
+    expect(script).toContain('cp "/run/deckent-auth-claude-.credentials.json"');
+    expect(capturedDockerRunArgs[0]!.some(a => a.includes('/.claude/.credentials.json,dst='))).toBe(true);
+    expect(capturedDockerRunArgs[0]!.some(a => a.includes('/.claude:'))).toBe(false);
   });
 
-  it('gemini: docker worker script uses gemini command (yolo/skip-trust, NOT claude flags) + mounts ~/.gemini', async () => {
-    new DockerSpawnBackend('/test/project').spawn('psl-gemini', 'gemini-2.5-flash', 'prompt-body');
-    const script = await workerScriptFor('psl-gemini');
-    expect(script).toContain('gemini -p "$(cat');
-    expect(script).toContain('--approval-mode yolo');
-    expect(script).toContain('--skip-trust');
-    expect(script).toContain('-m gemini-2.5-flash');
-    expect(script).not.toContain('--dangerously-skip-permissions'); // claude-only flag must NOT leak
-    expect(capturedDockerRunArgs[0]!.some(a => a.includes('/.gemini:'))).toBe(true);
+  it('gemini: fails closed before Docker because incremental usage is unavailable', () => {
+    expect(() => new DockerSpawnBackend('/test/project')
+      .spawn('psl-gemini', 'gemini-2.5-flash', 'prompt-body', TEST_EXECUTION_OPTIONS))
+      .toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 
-  it('codex: docker worker script uses validated codex flags (--dangerously-bypass…, apiId, stdin) + mounts ~/.codex', async () => {
-    new DockerSpawnBackend('/test/project').spawn('psl-codex', 'gpt-5', 'prompt-body');
-    const script = await workerScriptFor('psl-codex');
-    expect(script).toContain('codex exec --skip-git-repo-check');
-    expect(script).toContain('--dangerously-bypass-approvals-and-sandbox');
-    expect(script).toContain('--model gpt-5.5'); // apiId, not the gpt-5 alias
-    expect(script).not.toContain('--full-auto');  // deprecated; not used
-    expect(script).toMatch(/codex exec .*< "/);   // stdin promptFeed → prompt file piped in
-    expect(capturedDockerRunArgs[0]!.some(a => a.includes('/.codex:'))).toBe(true);
+  it('codex: fails closed before Docker because incremental usage is unavailable', () => {
+    expect(() => new DockerSpawnBackend('/test/project')
+      .spawn('psl-codex', 'gpt-5.6-sol', 'prompt-body', TEST_EXECUTION_OPTIONS))
+      .toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 });
 
@@ -502,7 +645,7 @@ describe('A23: host-side claude auth health-check (Sprint 194 W-AUTH wire)', () 
   });
 
   it('claude auth failure → writes AUTH_FAILED NO_GO .result and SKIPS docker run', async () => {
-    new DockerSpawnBackend('/test/project').spawn('t-a23-authfail', 'sonnet', 'prompt');
+    new DockerSpawnBackend('/test/project').spawn('t-a23-authfail', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
 
     // The doomed container is never spawned — no silent exit-0 phantom worker.
     // (Pre-fix this was 1: the spawn proceeded straight to docker run.)
@@ -517,9 +660,59 @@ describe('A23: host-side claude auth health-check (Sprint 194 W-AUTH wire)', () 
     expect(String(resultWrite![1])).toContain('NO_GO');
   });
 
-  it('codex (non-claude) spawn is NOT gated by the claude auth check', () => {
-    new DockerSpawnBackend('/test/project').spawn('t-a23-codex', 'gpt-5', 'prompt');
-    // codex worker proceeds to docker run even though claude --version would fail.
-    expect(capturedDockerRunArgs.length).toBe(1);
+  it('codex is not claude-auth-gated but remains held by live-usage admission', () => {
+    expect(() => new DockerSpawnBackend('/test/project')
+      .spawn('t-a23-codex', 'gpt-5.6-sol', 'prompt', TEST_EXECUTION_OPTIONS))
+      .toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
+    expect(mockSpawnSync.mock.calls.some(c => c[0] === 'claude')).toBe(false);
+  });
+});
+
+// ─── 455-003: daemon preflight blocks the spawn (never collapses to image-missing) ──
+// A permission-denied / down daemon must surface its OWN distinct code and the
+// doomed container must never be spawned — proving the preflight runs BEFORE the
+// image lookup and the `docker run`.
+describe('DockerSpawnBackend: daemon preflight (455-003 DOCKER-PREFLIGHT-TRUTH)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedDockerRunArgs.length = 0;
+  });
+
+  it('permission-denied daemon → throws E086, image lookup + docker run never happen', () => {
+    // `docker info` fails permission-denied; if the preflight were absent the code
+    // would fall through to `docker images -q` (empty) and mis-throw image-missing.
+    mockSpawnSync.mockImplementation((cmd, args) => {
+      const argv = (args as string[] | undefined) ?? [];
+      if (cmd === 'docker' && argv[0] === 'info') {
+        return {
+          stdout: '', status: 1, signal: null, pid: 1,
+          stderr: 'Got permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock',
+          output: [],
+        } as unknown as ReturnType<typeof spawnSync>;
+      }
+      if (cmd === 'docker' && argv[0] === 'run') {
+        capturedDockerRunArgs.push([...argv]);
+      }
+      return { stdout: '', stderr: '', status: 0, signal: null, pid: 1, output: [] } as unknown as ReturnType<typeof spawnSync>;
+    });
+
+    let error: SpawnBackendError | null = null;
+    try {
+      new DockerSpawnBackend('/test/project').spawn('t-preflight-perm', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
+    } catch (e) {
+      error = e as SpawnBackendError;
+    }
+
+    expect(error).toBeInstanceOf(SpawnBackendError);
+    expect(error!.message).toContain(DOCKER_ERROR_CODES.DAEMON_PERMISSION);
+    expect(error!.message).not.toContain(DOCKER_ERROR_CODES.IMAGE_NOT_FOUND);
+    // The doomed container is never spawned.
+    expect(capturedDockerRunArgs.length).toBe(0);
+    // No `docker images -q` lookup either — the preflight short-circuits first.
+    const imagesCalled = mockSpawnSync.mock.calls.some(
+      (c) => c[0] === 'docker' && (c[1] as string[] | undefined)?.[0] === 'images',
+    );
+    expect(imagesCalled).toBe(false);
   });
 });

@@ -8,6 +8,7 @@ import type { BacklogEntry } from './backlog-types.js';
 import type { Task, TaskResult, TaskScope, RubricScore, EvaluationResult, ProviderName, TaskEvaluation } from '../../core/types.js';
 import { TaskStatus } from '../../core/types.js';
 import type { ResolvedConfig } from '../../core/types.js';
+import { resolveDefaultModel } from '../../core/config.js';
 import { evaluateWithRubric, reconcileEvaluationSpuriousNoGo } from '../result-evaluator.js';
 import type { BoundaryViolation } from '../../core/monitoring-types.js';
 import {
@@ -35,13 +36,16 @@ export interface BacklogEvaluation {
 }
 
 /** Build the minimal Task the sprint-mode kernels expect from a backlog entry + its run
- *  result. Shared by every adapter so the entry->Task mapping is single-source. */
-export function buildTaskForEval(entry: BacklogEntry, result: TaskResult): Task {
+ *  result. Shared by every adapter so the entry->Task mapping is single-source.
+ *  454-003: the model fallback (when neither the entry nor the worker's tokenUsage
+ *  report one) resolves through the canonical default-model resolver — never a bare
+ *  alias literal ('sonnet') that the model registry would not recognize. */
+export function buildTaskForEval(entry: BacklogEntry, result: TaskResult, config?: ResolvedConfig): Task {
   return {
     id: result.taskId || entry.id,
     title: entry.title,
     description: entry.spec.description ?? entry.summary ?? entry.title,
-    model: (entry.model ?? result.tokenUsage?.model ?? 'sonnet') as Task['model'],
+    model: (entry.model ?? result.tokenUsage?.model ?? resolveDefaultModel(config)) as Task['model'],
     effort: 'normal',
     priority: 'NORMAL',
     reason: '',
@@ -79,8 +83,9 @@ export async function evaluateBacklogResult(
   entry: BacklogEntry,
   result: TaskResult,
   projectRoot: string,
+  config?: ResolvedConfig,
 ): Promise<BacklogEvaluation> {
-  const task = buildTaskForEval(entry, result);
+  const task = buildTaskForEval(entry, result, config);
   const evaluation = await reconcileEvaluationSpuriousNoGo(
     evaluateWithRubric(result, task, undefined, projectRoot), result, task, projectRoot);
   return mapEvaluation(result, evaluation);
@@ -193,7 +198,7 @@ export async function crossVerifyBacklogResult(
   evaluation: BacklogEvaluation,
   opts: RunCrossVerifyOptions = {},
 ): Promise<CrossVerifyVerdict> {
-  const task = buildTaskForEval(entry, result);
+  const task = buildTaskForEval(entry, result, config);
   // EvaluationResult.decision strings equal the TaskEvaluation enum values.
   const decisionEnum = evaluation.decision as unknown as TaskEvaluation;
   const run = await runCrossVerify(projectRoot, task, result, decisionEnum, config, opts);

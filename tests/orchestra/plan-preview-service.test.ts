@@ -33,7 +33,7 @@ function makeConfig(): ResolvedConfig {
   return {
     mode: 'max_plan',
     activeModeConfig: {
-      max_workers: 8, brain_model: 'opus', default_model: 'sonnet',
+      max_workers: 8, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5',
       haiku_allowed: true, brain_planning: 'auto',
     },
     modes: {} as any,
@@ -55,7 +55,7 @@ function makeRecommendation(): SprintSizeRecommendation {
 
 function makeTask(overrides?: Partial<Task>): Task {
   return {
-    id: '001-001', title: 'Do the thing', description: 'Do the thing well.', model: 'sonnet',
+    id: '001-001', title: 'Do the thing', description: 'Do the thing well.', model: 'claude-sonnet-5',
     effort: 'normal', priority: 'NORMAL', reason: 'test',
     scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
     dependencies: [],
@@ -227,7 +227,7 @@ const fakeSingleTaskPlanner: RunProposalPlanner = () => ({
     description: 'Deflake the retry test by replacing the sleep with a deterministic clock.',
     scope: { directories: ['tests/utils/'], filesRead: [], filesWrite: ['tests/utils/retry.test.ts'] },
     dependencies: [],
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'Deterministic single-task fixture for the round-trip suite.',

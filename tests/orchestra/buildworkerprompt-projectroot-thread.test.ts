@@ -43,6 +43,34 @@ vi.mock('../../src/orchestra/result-watcher.js', () => ({
   }),
 }));
 
+// This suite verifies projectRoot propagation, not the host budget ledger.
+// Keep the remote fixture finite while preventing a 45s wait for Docker-owned
+// terminal usage evidence that this in-memory backend cannot produce.
+vi.mock('../../src/orchestra/runtime-budget-monitor.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/orchestra/runtime-budget-monitor.js')>();
+  const terminalUsage = () => ({
+    terminal: true,
+    decision: {
+      state: 'within-budget' as const,
+      reasons: [],
+      counters: {
+        turns: 1,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+        totalTokens: 0,
+        maxContextTokens: 0,
+      },
+    },
+  });
+  return {
+    ...actual,
+    readRuntimeBudgetUsage: terminalUsage,
+    waitForTerminalRuntimeBudgetUsage: () => Promise.resolve(terminalUsage()),
+  };
+});
+
 import { spawnWorkers } from '../../src/orchestra/sprint-spawner.js';
 import { waitForResults } from '../../src/orchestra/result-collector.js';
 
@@ -59,6 +87,7 @@ function makeCapturingBackend(onSpawn?: (taskId: string) => void): SpawnBackend 
   const calls: SpawnCall[] = [];
   return {
     name: 'mock',
+    liveUsageBudgetSupport: 'measured-stream' as const,
     spawn(taskId, model, prompt, opts) {
       calls.push({ taskId, model, prompt, opts });
       onSpawn?.(taskId);
@@ -96,7 +125,7 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     id,
     title: `Task ${id}`,
     description: `Description for ${id}`,
-    model: 'sonnet' as ModelType,
+    model: 'claude-sonnet-5' as ModelType,
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -108,6 +137,7 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     assignedAgent: 'generic',
     assignedSkills: [],
     provider: 'claude',
+    budget: { maxTurns: 1 },
     ...overrides,
   } as Task;
 }
@@ -142,6 +172,21 @@ function doneResult(id: string): TaskResult {
     coverage: 90,
     selfAssessment: 'DONE',
     notes: 'ran',
+    tokenUsage: {
+      inputTokens: 1,
+      outputTokens: 1,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0,
+      source: 'provider-adapter',
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+    },
+    cost: {
+      usd: 0,
+      currency: 'USD',
+      pricingSource: 'provider-envelope',
+      isLocal: false,
+    },
   };
 }
 

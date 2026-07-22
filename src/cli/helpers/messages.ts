@@ -852,6 +852,73 @@ const MESSAGES: MessageMap = {
     en: 'Aborted — agent \'{name}\' not deleted. Pass --force to skip this prompt.',
     tr: 'İptal edildi — \'{name}\' agent\'ı silinmedi. Bu onayı atlamak için --force kullanın.',
   },
+  'agent.create.description': {
+    en: 'Create a custom agent (use --prompt/--description for wizard-style setup)',
+    tr: 'Özel bir agent oluştur (--prompt/--description ile yönlendirmeli kurulum)',
+  },
+  'agent.create.option_model': {
+    en: 'Canonical provider API model ID (defaults to the active config)',
+    tr: 'Canonical provider API model kimliği (varsayılan: aktif config)',
+  },
+  'agent.create.option_triggers': {
+    en: 'Trigger keywords for task routing',
+    tr: 'Task routing için tetikleyici anahtar kelimeler',
+  },
+  'agent.create.option_prompt': {
+    en: 'Set the agent system prompt content directly (written to PROMPT.md)',
+    tr: 'Agent system prompt içeriğini doğrudan ayarla (PROMPT.md dosyasına yazılır)',
+  },
+  'agent.create.option_description': {
+    en: 'Set the agent description',
+    tr: 'Agent açıklamasını ayarla',
+  },
+  'agent.create.invalid_name': {
+    en: 'Invalid agent name "{name}". Use alphanumeric characters and hyphens only.',
+    tr: 'Geçersiz agent adı "{name}". Yalnız alfanümerik karakter ve tire kullanın.',
+  },
+  'agent.create.invalid_model': {
+    en: 'Invalid or unregistered canonical model "{model}". Registered API IDs: {models}',
+    tr: 'Geçersiz veya kayıtlı olmayan canonical model "{model}". Kayıtlı API kimlikleri: {models}',
+  },
+  'agent.create.trigger_empty': {
+    en: 'Empty trigger keyword',
+    tr: 'Boş tetikleyici anahtar kelime',
+  },
+  'agent.create.trigger_invalid': {
+    en: 'Invalid trigger "{trigger}": use alphanumeric chars, hyphens, underscores, dots, or wildcards',
+    tr: 'Geçersiz tetikleyici "{trigger}": alfanümerik karakter, tire, alt çizgi, nokta veya joker kullanın',
+  },
+  'agent.create.invalid_triggers': {
+    en: 'Invalid triggers:\n  {errors}',
+    tr: 'Geçersiz tetikleyiciler:\n  {errors}',
+  },
+  'agent.create.exists': {
+    en: 'Agent "{name}" already exists.',
+    tr: '"{name}" agent\'ı zaten var.',
+  },
+  'agent.create.default_description': {
+    en: 'Custom agent: {name}',
+    tr: 'Özel agent: {name}',
+  },
+  'agent.create.created': {
+    en: 'Agent "{name}" created at {path}',
+    tr: '"{name}" agent\'ı {path} konumunda oluşturuldu',
+  },
+  'agent.create.file': { en: '  - {file}', tr: '  - {file}' },
+  'agent.create.model': { en: '  Model: {model}', tr: '  Model: {model}' },
+  'agent.create.description_value': {
+    en: '  Description: {description}',
+    tr: '  Açıklama: {description}',
+  },
+  'agent.create.triggers': { en: '  Triggers: {triggers}', tr: '  Tetikleyiciler: {triggers}' },
+  'agent.create.prompt': {
+    en: '  Prompt: (custom, {chars} chars)',
+    tr: '  Prompt: (özel, {chars} karakter)',
+  },
+  'test.model_invalid': {
+    en: 'Invalid or unregistered canonical model: {model}',
+    tr: 'Geçersiz veya kayıtlı olmayan canonical model: {model}',
+  },
   'analyze.vocabulary_bootstrap': {
     en: 'Routing vocabulary bootstrap: {count} project domain(s) derived — {status} ({path})',
     tr: 'Routing sözlük-bootstrap: {count} proje-domain\'i türetildi — {status} ({path})',

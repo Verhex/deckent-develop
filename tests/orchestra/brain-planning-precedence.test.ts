@@ -77,6 +77,7 @@ vi.mock('../../src/monitor/auditor.js', () => ({
 // output task list is the signal that the AI path (not structured) was taken.
 vi.mock('../../src/orchestra/planner.js', () => ({
   resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
+  createPlannerTaskModelPolicy: vi.fn((defaultModel: string) => ({ defaultModel, allowedModels: [defaultModel] })),
   callBrainPlannerWithReason: vi.fn().mockReturnValue({
     ok: true,
     data: {
@@ -84,7 +85,7 @@ vi.mock('../../src/orchestra/planner.js', () => ({
         {
           title: 'AI Planned Task',
           description: 'From AI',
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           effort: 'normal',
           priority: 'NORMAL',
           reason: 'AI decided',
@@ -147,7 +148,7 @@ vi.mock('../../src/orchestra/model-selector.js', async (importOriginal) => {
     ...actual,
     resolveTaskModel: vi.fn(
       (_t: string, _d: string, _s: unknown, _c: unknown, _p: unknown, forceModel?: string) =>
-        forceModel ?? 'sonnet',
+        forceModel ?? 'claude-sonnet-5',
     ),
   };
 });
@@ -233,8 +234,8 @@ function makePlanSprintConfig(activePlanning: BrainPlanningMode, topLevelPlannin
     mode: 'performance',
     activeModeConfig: {
       max_workers: 4,
-      brain_model: 'opus',
-      default_model: 'opus',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-opus-4-8',
       haiku_allowed: true,
       brain_planning: activePlanning,
     },

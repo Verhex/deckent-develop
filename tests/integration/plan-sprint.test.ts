@@ -86,8 +86,8 @@ function makeConfig(root: string): ResolvedConfig {
     mode: 'max_plan',
     activeModeConfig: {
       max_workers: 4,
-      brain_model: 'opus',
-      default_model: 'sonnet',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: true,
       brain_planning: 'structured', // use structured to avoid AI call
     },
@@ -172,7 +172,11 @@ Update project documentation.
       expect(taskJson.title).toBeDefined();
       expect(taskJson.description).toBeDefined();
       expect(taskJson.model).toBeDefined();
-      expect(['opus', 'sonnet', 'haiku']).toContain(taskJson.model);
+      expect([
+        'claude-opus-4-8',
+        'claude-sonnet-5',
+        'claude-haiku-4-5-20251001',
+      ]).toContain(taskJson.model);
       expect(taskJson.effort).toBeDefined();
       expect(taskJson.priority).toBeDefined();
       expect(taskJson.reason).toBeDefined();
@@ -237,12 +241,12 @@ Update project documentation.
     const config = makeConfig(root);
     const context = makeContext(root);
     const recommendation: SprintSizeRecommendation = {
-      size: 'reduced', maxWorkers: 2, modelConstraint: 'haiku', reason: 'High usage',
+      size: 'reduced', maxWorkers: 2, modelConstraint: 'claude-haiku-4-5-20251001', reason: 'High usage',
     };
     const sprint = await planSprint(root, config, context, recommendation, { mode: 'structured' });
 
     for (const task of sprint.tasks) {
-      expect(task.model).toBe('haiku');
+      expect(task.model).toBe('claude-haiku-4-5-20251001');
     }
   });
 

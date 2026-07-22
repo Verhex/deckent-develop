@@ -81,7 +81,7 @@ describe('createTask scopeDerivation audit trail (Sprint 196 WP-3)', () => {
     const task = createTask({
       title: 'Test task',
       description: 'Test',
-      model: 'sonnet',
+      model: 'claude-sonnet-5',
       effort: 'normal',
       priority: 'NORMAL',
       reason: 'test',
@@ -99,7 +99,7 @@ describe('createTask scopeDerivation audit trail (Sprint 196 WP-3)', () => {
     const task = createTask({
       title: 'Docs task',
       description: 'Docs only',
-      model: 'haiku',
+      model: 'claude-haiku-4-5-20251001',
       effort: 'low',
       priority: 'NORMAL',
       reason: 'test',

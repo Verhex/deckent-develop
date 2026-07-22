@@ -29,7 +29,7 @@
     "build-verification",
     "github-actions"
   ],
-  "preferredModel": "sonnet",
+  "preferredModel": "claude-sonnet-5",
   "effortMultiplier": 0.8,
   "triggerKeywords": [
     "ci",
@@ -122,7 +122,7 @@
       ]
     },
     "numerical": {
-      "preferredModel": "sonnet",
+      "preferredModel": "claude-sonnet-5",
       "costTier": "standard",
       "maxParallel": null
     }

@@ -5,6 +5,19 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { DIRECTIVES_FILE } from '../../core/constants.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { getActiveDirectivesProtection } from '../../nervous/observer.js';
+import { modelRegistry, LEGACY_MODEL_ALIASES } from '../../core/model-registry.js';
+
+// 454-004: the tool description's Model example must teach an exact provider
+// API ID + explicit Provider ownership — never a retired alias
+// (resolveCanonicalModelIdentity() throws E_LEGACY_MODEL_ALIAS on
+// "opus"/"sonnet"/"haiku"/"gpt-5"/"gpt-5.6"). Mirrors run.ts's canonical-model voice.
+const DIRECTIVES_EXAMPLE_MODEL = modelRegistry.getByProviderAndTier('claude', 'standard');
+if (!DIRECTIVES_EXAMPLE_MODEL) throw new Error('E_DIRECTIVES_EXAMPLE_MODEL_UNAVAILABLE');
+const DIRECTIVES_EXAMPLE_MODEL_ID = DIRECTIVES_EXAMPLE_MODEL.id;
+const DIRECTIVES_REJECTED_LEGACY_ALIASES = Object.keys(LEGACY_MODEL_ALIASES).join('/');
+const DIRECTIVES_PROVIDER_NAMES = [...new Set(
+  modelRegistry.getAllModels().map(model => model.provider),
+)].sort().join('/');
 
 function computeBreakdown(content: string): { code: number; docs: number; test: number; analysis: number } {
   const headers = content.match(/^##\s+(Görev|Task)\s+\d+[:\s].*/gm) ?? [];
@@ -18,12 +31,16 @@ function computeBreakdown(content: string): { code: number; docs: number; test: 
   return { code, docs, test, analysis };
 }
 
-function computeEstimatedModels(breakdown: { code: number; docs: number; test: number; analysis: number }): { opus: number; sonnet: number; haiku: number } {
+function computeEstimatedModels(breakdown: { code: number; docs: number; test: number; analysis: number }): Record<string, number> {
   const complex = breakdown.code + breakdown.test;
+  const premium = modelRegistry.getByProviderAndTier('claude', 'premium');
+  const standard = modelRegistry.getByProviderAndTier('claude', 'standard');
+  const economy = modelRegistry.getByProviderAndTier('claude', 'economy');
+  if (!premium || !standard || !economy) throw new Error('E_DIRECTIVES_ESTIMATE_MODEL_UNAVAILABLE');
   return {
-    opus: Math.ceil(complex * 0.4),
-    sonnet: Math.ceil(complex * 0.6) + Math.ceil(breakdown.analysis * 0.5),
-    haiku: breakdown.docs + Math.floor(breakdown.analysis * 0.5),
+    [premium.id]: Math.ceil(complex * 0.4),
+    [standard.id]: Math.ceil(complex * 0.6) + Math.ceil(breakdown.analysis * 0.5),
+    [economy.id]: breakdown.docs + Math.floor(breakdown.analysis * 0.5),
   };
 }
 
@@ -32,10 +49,11 @@ export function registerSetDirectivesTool(server: McpServer): void {
     'deckent_set_directives',
     {
       title: 'Set Directives',
-      description: `Write DIRECTIVES.md content. The brain engine parses "## Task N:" or "## Görev N:" blocks to create sprint tasks. Each block should include: Model (opus/sonnet/haiku), Effort (low/normal/high), Skills (e.g. typescript-expert), Files, Scope (directory list), and Description. Example format:
+      description: `Write DIRECTIVES.md content. The brain engine parses "## Task N:" or "## Görev N:" blocks to create sprint tasks. Each block should include: Model (an exact provider API ID, e.g. ${DIRECTIVES_EXAMPLE_MODEL_ID} — see deckent_models for the live catalog; legacy aliases [${DIRECTIVES_REJECTED_LEGACY_ALIASES}] are rejected), optional Provider (explicit ownership: ${DIRECTIVES_PROVIDER_NAMES}, required when it can't be inferred from the id's prefix), Effort (low/normal/high), Skills (e.g. typescript-expert), Files, Scope (directory list), and Description. Example format:
 
 ## Task 1: Add authentication middleware
-- Model: sonnet
+- Model: ${DIRECTIVES_EXAMPLE_MODEL_ID}
+- Provider: claude
 - Effort: normal
 - Skills: typescript-expert
 - Files: src/middleware/auth.ts
@@ -47,7 +65,7 @@ Implement JWT-based authentication middleware...
 Prerequisite: deckent_init must have been run. Overwrites DIRECTIVES.md each call. Run deckent_plan after to preview tasks.`,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        content: z.string().describe('Formatted DIRECTIVES.md content with ## Task N: or ## Görev N: blocks. Each block needs Model, Effort, Skills, Files, Scope, and Description sub-sections.'),
+        content: z.string().describe('Formatted DIRECTIVES.md content with ## Task N: or ## Görev N: blocks. Each block needs Model (exact provider API ID — no legacy aliases), Effort, Skills, Files, Scope, and Description sub-sections; Provider is optional.'),
       }),
     },
     async ({ content }) => {

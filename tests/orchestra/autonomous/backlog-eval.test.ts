@@ -134,12 +134,23 @@ describe('crossVerifyBacklogResult (Component ③ — XVER-1 cross-provider, adv
     expect(xv.verdict).toBeUndefined();
   });
   it('surfaces a refuted advisory but does NOT throw / does not block (advisory)', async () => {
-    const config = { cross_verify: { enabled: true, high_stakes_only: false } } as unknown as ResolvedConfig;
+    const config = {
+      cross_verify: { enabled: true, high_stakes_only: false },
+      activeModeConfig: {
+        brain_model: 'claude-opus-4-8',
+        default_model: 'claude-sonnet-5',
+      },
+      spawn_backend: 'docker',
+      execution_budget: {
+        roles: { auditor: { default: { maxCacheReadTokens: 1_000_000, maxTurns: 12 } } },
+        unmetered_backend: { action: 'reroute-or-hold', ordered_backends: ['docker'] },
+      },
+    } as unknown as ResolvedConfig;
     const xv = await crossVerifyBacklogResult(
       entry, result({}), '/nonexistent-root', config, passingEval,
       {
         availableProviders: ['claude', 'codex'],
-        spawnVerifier: async () => 'VERDICT: refuted\nThe change does not cover the error path.',
+        spawnVerifier: async () => 'VERDICT: REFUTED The change does not cover the error path.',
       },
     );
     expect(xv.ran).toBe(true);

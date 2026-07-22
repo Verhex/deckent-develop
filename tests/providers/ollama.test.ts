@@ -149,7 +149,7 @@ describe('OllamaAdapter.complete', () => {
     }) as unknown as typeof fetch;
 
     const adapter = new OllamaAdapter(PROJECT_DIR, { fetchImpl });
-    const result = await adapter.complete('Merhaba', 'qwen-coder-7b');
+    const result = await adapter.complete('Merhaba', 'qwen2.5-coder:7b');
 
     expect(calls).toHaveLength(1);
     expect(calls[0]!.url).toMatch(/\/api\/generate$/);
@@ -167,7 +167,7 @@ describe('OllamaAdapter.complete', () => {
   it('throws ProviderError when the server returns non-2xx', async () => {
     const fetchImpl = (async () => new Response('boom', { status: 500 })) as unknown as typeof fetch;
     const adapter = new OllamaAdapter(PROJECT_DIR, { fetchImpl });
-    await expect(adapter.complete('x', 'qwen-coder-7b')).rejects.toThrow(/500/);
+    await expect(adapter.complete('x', 'qwen2.5-coder:7b')).rejects.toThrow(/500/);
   });
 
   it('rejects unsupported models', async () => {
@@ -252,12 +252,12 @@ describe('Ollama model-registry integration', () => {
     const ollamaModels = modelRegistry.getByProvider('ollama');
     expect(ollamaModels.length).toBe(4);
     const ids = ollamaModels.map(m => m.id).sort();
-    expect(ids).toEqual(['llama-3-8b', 'llama-3.2-3b', 'qwen-coder-32b', 'qwen-coder-7b']);
+    expect(ids).toEqual(['llama3.2:3b', 'llama3:8b', 'qwen2.5-coder:32b', 'qwen2.5-coder:7b']);
   });
 
-  it('maps qwen-coder-32b → premium tier and llama-3.2-3b → economy tier', () => {
-    expect(modelRegistry.getTier('qwen-coder-32b')).toBe('premium');
-    expect(modelRegistry.getTier('llama-3.2-3b')).toBe('economy');
+  it('maps qwen2.5-coder:32b → premium tier and llama3.2:3b → economy tier', () => {
+    expect(modelRegistry.getTier('qwen2.5-coder:32b')).toBe('premium');
+    expect(modelRegistry.getTier('llama3.2:3b')).toBe('economy');
   });
 
   it('costPerMillion is zero for local Ollama models', () => {
@@ -269,8 +269,8 @@ describe('Ollama model-registry integration', () => {
 
   it('getModelForTier() walks the tier ladder', () => {
     const adapter = new OllamaAdapter(PROJECT_DIR);
-    expect(adapter.getModelForTier('premium')).toBe('qwen-coder-32b');
-    expect(adapter.getModelForTier('economy')).toBe('llama-3.2-3b');
+    expect(adapter.getModelForTier('premium')).toBe('qwen2.5-coder:32b');
+    expect(adapter.getModelForTier('economy')).toBe('llama3.2:3b');
   });
 });
 

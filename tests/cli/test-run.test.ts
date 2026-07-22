@@ -73,8 +73,8 @@ function makeConfig() {
     mode: 'max_plan',
     activeModeConfig: {
       max_workers: 8,
-      brain_model: 'opus',
-      default_model: 'sonnet',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: true,
       planning: 'structured',
     },

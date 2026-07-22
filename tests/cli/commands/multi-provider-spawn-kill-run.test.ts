@@ -19,7 +19,7 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn().mockReturnValue('/test/project'),
 }));
 vi.mock('../../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn().mockResolvedValue({ language: 'en' }),
 }));
@@ -68,7 +68,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '001-001',
     title: 'Test task',
     description: 'Test description',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -93,7 +93,7 @@ describe('spawn multi-provider', () => {
 
   it('spawnWorkerMultiProvider uses tmux for claude models', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    const result = await spawnWorkerMultiProvider('t1', 'sonnet', 'prompt', '/root', {});
+    const result = await spawnWorkerMultiProvider('t1', 'claude-sonnet-5', 'prompt', '/root', {});
     expect(result.backend).toBe('tmux');
     expect(ensureSession).toHaveBeenCalled();
     expect(spawnWorker).toHaveBeenCalled();
@@ -118,8 +118,8 @@ describe('spawn multi-provider', () => {
 
   it('spawnWorkerMultiProvider passes autoApprove to tmux', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    await spawnWorkerMultiProvider('t1', 'opus', 'prompt', '/root', { autoApprove: true });
-    expect(spawnWorker).toHaveBeenCalledWith('t1', 'opus', 'prompt', '/root', { autoApprove: true });
+    await spawnWorkerMultiProvider('t1', 'claude-opus-4-8', 'prompt', '/root', { autoApprove: true });
+    expect(spawnWorker).toHaveBeenCalledWith('t1', 'claude-opus-4-8', 'prompt', '/root', { autoApprove: true });
   });
 
   it('spawnWorkerMultiProvider passes autoApprove to subprocess', async () => {

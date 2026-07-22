@@ -60,7 +60,7 @@ describe.skipIf(!codexAvailable)('CodexAdapter Integration (real CLI)', () => {
   });
 
   it('should return correct tier models', () => {
-    expect(adapter.getModelForTier('premium')).toBe('gpt-5');
+    expect(adapter.getModelForTier('premium')).toBe('gpt-5.5');
     expect(adapter.getModelForTier('standard')).toBe('gpt-4.1');
     expect(adapter.getModelForTier('economy')).toBe('gpt-5-mini');
   });
@@ -75,7 +75,7 @@ describe.skipIf(!codexAvailable)('CodexAdapter Integration (real CLI)', () => {
   });
 
   it('should support expected models', () => {
-    expect(adapter.supportedModels).toContain('gpt-5');
+    expect(adapter.supportedModels).toContain('gpt-5.5');
     expect(adapter.supportedModels).toContain('gpt-4.1');
     expect(adapter.supportedModels).toContain('gpt-4.1-mini');
   });

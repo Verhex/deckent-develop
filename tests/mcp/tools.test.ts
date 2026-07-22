@@ -268,8 +268,8 @@ describe('MCP Tools', () => {
         mode: 'max_plan',
         activeModeConfig: {
           max_workers: 8,
-          brain_model: 'opus',
-          default_model: 'sonnet',
+          brain_model: 'claude-opus-4-8',
+          default_model: 'claude-sonnet-5',
           haiku_allowed: true,
 
         },
@@ -311,7 +311,7 @@ describe('MCP Tools', () => {
       vi.mocked(loadConfig).mockResolvedValue({
         mode: 'max_plan',
         activeModeConfig: {
-          max_workers: 8, brain_model: 'opus', default_model: 'sonnet',
+          max_workers: 8, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5',
           haiku_allowed: true,
         },
         modes: {} as ResolvedConfig['modes'],

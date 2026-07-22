@@ -38,11 +38,18 @@ describe('canonical provider API model identity', () => {
   });
 
   it('preserves an unambiguous or explicitly owned parametric API ID byte-for-byte', () => {
-    const inferred = buildParametricModel('gpt-7.2-reasoning');
+    const inferred = buildParametricModel('gpt-7.2-reasoning', {
+      costPerMillion: { input: 3, output: 15 },
+      pricingEvidenceRef: 'catalog:test:gpt-7.2-reasoning',
+    });
     expect(inferred).toMatchObject({ id: 'gpt-7.2-reasoning', apiId: 'gpt-7.2-reasoning', provider: 'codex', status: 'preview' });
 
-    const explicit = buildParametricModel('vendor/model-v3:2026-07-20', { provider: 'gemini' });
-    expect(explicit).toMatchObject({ id: 'vendor/model-v3:2026-07-20', apiId: 'vendor/model-v3:2026-07-20', provider: 'gemini' });
+    const explicit = buildParametricModel('vendor-model-v3-2026-07-20', {
+      provider: 'gemini',
+      costPerMillion: { input: 2, output: 10 },
+      pricingEvidenceRef: 'catalog:test:vendor-model-v3-2026-07-20',
+    });
+    expect(explicit).toMatchObject({ id: 'vendor-model-v3-2026-07-20', apiId: 'vendor-model-v3-2026-07-20', provider: 'gemini' });
   });
 
   it('rejects dual identity at parametric and registry mutation boundaries', () => {
@@ -66,12 +73,15 @@ describe('canonical provider API model identity', () => {
     expect(() => resolveCanonicalModelIdentity('Vendor/Model-V9')).toThrowError(expect.objectContaining({ code: 'E_MODEL_PROVIDER_UNVERIFIED' }));
     expect(() => resolveCanonicalModelIdentity('gpt-5.6-sol', { provider: 'claude' })).toThrowError(expect.objectContaining({ code: 'E_MODEL_PROVIDER_MISMATCH' }));
 
-    const registered = resolveCanonicalModelIdentity('Vendor/Model-V9', {
+    const registeredId = 'Vendor-Model-V9';
+    modelRegistry.register(buildParametricModel(registeredId, {
       provider: 'gemini',
-      registerParametric: true,
-    });
-    expect(registered.id).toBe('Vendor/Model-V9');
-    expect(modelRegistry.get('Vendor/Model-V9')?.provider).toBe('gemini');
-    modelRegistry.unregister('Vendor/Model-V9');
+      costPerMillion: { input: 2, output: 10 },
+      pricingEvidenceRef: 'catalog:test:Vendor-Model-V9',
+    }));
+    const registered = resolveCanonicalModelIdentity(registeredId, { provider: 'gemini' });
+    expect(registered.id).toBe(registeredId);
+    expect(modelRegistry.get(registeredId)?.provider).toBe('gemini');
+    modelRegistry.unregister(registeredId);
   });
 });

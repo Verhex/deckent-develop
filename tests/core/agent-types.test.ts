@@ -3,6 +3,7 @@ import {
   createDefaultStats,
   createAgentDefinition,
 } from '../../src/core/agent-types.js';
+import { modelRegistry } from '../../src/core/model-registry.js';
 import type {
   AgentStats,
   AgentDefinition,
@@ -54,7 +55,7 @@ describe('createAgentDefinition', () => {
     expect(agent.expertise).toEqual([]);
     expect(agent.allowedTools).toEqual([]);
     expect(agent.deniedTools).toEqual([]);
-    expect(agent.preferredModel).toBe('sonnet');
+    expect(modelRegistry.get(agent.preferredModel)?.tier).toBe('standard');
     expect(agent.effortMultiplier).toBe(1.0);
     expect(agent.triggerKeywords).toEqual([]);
     expect(agent.triggerScopes).toEqual([]);
@@ -74,22 +75,24 @@ describe('createAgentDefinition', () => {
     expect(agent.description).toBe('Custom desc');
   });
 
-  it('allows overriding preferredModel to opus', () => {
+  it('allows overriding preferredModel to a canonical premium model', () => {
+    const model = modelRegistry.getByTier('premium')[0]!.id;
     const agent = createAgentDefinition({
       id: 'heavy',
       name: 'Heavy',
-      preferredModel: 'opus',
+      preferredModel: model,
     });
-    expect(agent.preferredModel).toBe('opus');
+    expect(agent.preferredModel).toBe(model);
   });
 
-  it('allows overriding preferredModel to haiku', () => {
+  it('allows overriding preferredModel to a canonical economy model', () => {
+    const model = modelRegistry.getByTier('economy')[0]!.id;
     const agent = createAgentDefinition({
       id: 'light',
       name: 'Light',
-      preferredModel: 'haiku',
+      preferredModel: model,
     });
-    expect(agent.preferredModel).toBe('haiku');
+    expect(agent.preferredModel).toBe(model);
   });
 
   it('allows overriding effortMultiplier', () => {

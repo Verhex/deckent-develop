@@ -26,6 +26,7 @@ import {
 } from '../../src/orchestra/task-builder.js';
 import { TaskStatus } from '../../src/core/types.js';
 import type { Task, PlannerTask, CreateTaskParams } from '../../src/core/types.js';
+import { buildParametricModel, modelRegistry } from '../../src/core/model-registry.js';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -33,7 +34,7 @@ function makeBaseParams(overrides: Partial<CreateTaskParams> = {}): CreateTaskPa
   return {
     title: 'Test Task',
     description: 'A test task description',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'Testing purposes',
@@ -50,7 +51,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '025-001',
     title: 'Test Task',
     description: 'A test task description',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'Testing purposes',
@@ -77,7 +78,7 @@ function makePlannerTask(overrides: Partial<PlannerTask> = {}): PlannerTask {
   return {
     title: 'Planner Task',
     description: 'Planner task desc',
-    model: 'opus',
+    model: 'claude-opus-4-8',
     effort: 'high',
     priority: 'HIGH',
     reason: 'Complexity',
@@ -313,7 +314,7 @@ Do something useful`;
 describe('plannerTaskToParams', () => {
   it('maps PlannerTask fields to CreateTaskParams', () => {
     const pt = makePlannerTask();
-    const params = plannerTaskToParams(pt, 'sprint-025', 'sonnet');
+    const params = plannerTaskToParams(pt, 'sprint-025', 'claude-sonnet-5');
     expect(params.title).toBe(pt.title);
     expect(params.description).toBe(pt.description);
     expect(params.effort).toBe(pt.effort);
@@ -326,26 +327,26 @@ describe('plannerTaskToParams', () => {
   });
 
   it('uses PlannerTask model when provided', () => {
-    const pt = makePlannerTask({ model: 'opus' });
-    const params = plannerTaskToParams(pt, 'sprint-025', 'sonnet');
-    expect(params.model).toBe('opus');
+    const pt = makePlannerTask({ model: 'claude-opus-4-8' });
+    const params = plannerTaskToParams(pt, 'sprint-025', 'claude-sonnet-5');
+    expect(params.model).toBe('claude-opus-4-8');
   });
 
   it('falls back to modelOverride when PlannerTask.model is undefined', () => {
     const pt = makePlannerTask({ model: undefined as any });
-    const params = plannerTaskToParams(pt, 'sprint-025', 'haiku');
-    expect(params.model).toBe('haiku');
+    const params = plannerTaskToParams(pt, 'sprint-025', 'claude-haiku-4-5-20251001');
+    expect(params.model).toBe('claude-haiku-4-5-20251001');
   });
 
   it('passes initialStatus when provided', () => {
     const pt = makePlannerTask();
-    const params = plannerTaskToParams(pt, 'sprint-025', 'sonnet', TaskStatus.DRAFT);
+    const params = plannerTaskToParams(pt, 'sprint-025', 'claude-sonnet-5', TaskStatus.DRAFT);
     expect(params.initialStatus).toBe(TaskStatus.DRAFT);
   });
 
   it('initialStatus is undefined when not provided', () => {
     const pt = makePlannerTask();
-    const params = plannerTaskToParams(pt, 'sprint-025', 'sonnet');
+    const params = plannerTaskToParams(pt, 'sprint-025', 'claude-sonnet-5');
     expect(params.initialStatus).toBeUndefined();
   });
 });
@@ -443,9 +444,9 @@ describe('buildWorkerPrompt', () => {
   });
 
   it('includes model in prompt', () => {
-    const task = makeTask({ model: 'opus' });
+    const task = makeTask({ model: 'claude-opus-4-8' });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('Model: opus');
+    expect(prompt).toContain('Model: claude-opus-4-8');
   });
 
   it('includes effort level', () => {
@@ -625,16 +626,16 @@ describe('buildWorkerPrompt', () => {
 // ─── forceModel / forceEffort (DIRECTIVES.md user override) ─────────────
 
 describe('parseStructuredDirectives — forceModel/forceEffort', () => {
-  it('parses "Model: opus" into forceModel', () => {
-    const content = '## Task 1: Security Audit\n- Model: opus\n- Scope: src/auth/\n\n### Description\nAudit auth.';
+  it('parses "Model: claude-opus-4-8" into forceModel', () => {
+    const content = '## Task 1: Security Audit\n- Model: claude-opus-4-8\n- Scope: src/auth/\n\n### Description\nAudit auth.';
     const tasks = parseStructuredDirectives(content);
-    expect(tasks[0].forceModel).toBe('opus');
+    expect(tasks[0].forceModel).toBe('claude-opus-4-8');
   });
 
-  it('parses "Model: haiku" into forceModel', () => {
-    const content = '## Task 1: Quick Fix\nModel: haiku\n\n### Description\nFix typo.';
+  it('parses "Model: claude-haiku-4-5-20251001" into forceModel', () => {
+    const content = '## Task 1: Quick Fix\nModel: claude-haiku-4-5-20251001\n\n### Description\nFix typo.';
     const tasks = parseStructuredDirectives(content);
-    expect(tasks[0].forceModel).toBe('haiku');
+    expect(tasks[0].forceModel).toBe('claude-haiku-4-5-20251001');
   });
 
   it('returns undefined forceModel when no Model line', () => {
@@ -643,13 +644,43 @@ describe('parseStructuredDirectives — forceModel/forceEffort', () => {
     expect(tasks[0].forceModel).toBeUndefined();
   });
 
-  it('drops an unrecognized model for a non-adapter provider (validates against ALL_MODELS)', () => {
+  it('fails loudly for an unknown model without an explicit provider', () => {
     const content = '## Task 1: Bad Model\nModel: gpt4\n\n### Description\nTest.';
+    expect(() => parseStructuredDirectives(content)).toThrow(/E_MODEL_PROVIDER_UNVERIFIED/);
+  });
+
+  it('accepts an exact future API model ID after catalog-backed registration', () => {
+    const model = 'gpt-7.2-preview-2031-04-09';
+    const content = `## Task 1: Future Model\n- Provider: codex\n- Model: ${model}\n\n### Description\nTest.`;
+    try {
+      modelRegistry.register(buildParametricModel(model, {
+        provider: 'codex',
+        costPerMillion: { input: 9, output: 45 },
+        pricingEvidenceRef: 'catalog:test:gpt-7.2-preview-2031-04-09',
+        status: 'ga',
+        register: false,
+      }));
+      const tasks = parseStructuredDirectives(content);
+      expect(tasks[0].forceModel).toBe(model);
+      expect(modelRegistry.get(model)?.provider).toBe('codex');
+      expect(modelRegistry.get(model)?.apiId).toBe(model);
+    } finally {
+      modelRegistry.unregister(model);
+    }
+  });
+
+  it('does not mutate the registry while parsing a dynamic local tag', () => {
+    const model = 'parser-purity:9b';
+    modelRegistry.unregister(model);
+    const content = `## Task 1: Local Model\n- Provider: ollama\n- Model: ${model}\n\n### Description\nTest.`;
     const tasks = parseStructuredDirectives(content);
-    // No provider → default (claude, non-adapter) → `gpt4` is not in ALL_MODELS,
-    // so it is dropped to undefined. Adapter-providers (ollama) pass raw tags
-    // through — covered in task-builder-ollama-flow.test.ts. (Sprint-235 contract.)
-    expect(tasks[0].forceModel).toBeUndefined();
+    expect(tasks[0].forceModel).toBe(model);
+    expect(modelRegistry.has(model)).toBe(false);
+  });
+
+  it('rejects legacy model aliases instead of rewriting task intent', () => {
+    const content = '## Task 1: Legacy Alias\n- Model: gpt-5\n\n### Description\nTest.';
+    expect(() => parseStructuredDirectives(content)).toThrow(/E_LEGACY_MODEL_ALIAS/);
   });
 
   it('parses "Effort: high" into forceEffort', () => {
@@ -665,16 +696,15 @@ describe('parseStructuredDirectives — forceModel/forceEffort', () => {
   });
 
   it('parses both Model and Effort together', () => {
-    const content = '## Task 1: Full Override\nModel: opus\nEffort: high\n- Scope: src/\n\n### Description\nBig task.';
+    const content = '## Task 1: Full Override\nModel: claude-opus-4-8\nEffort: high\n- Scope: src/\n\n### Description\nBig task.';
     const tasks = parseStructuredDirectives(content);
-    expect(tasks[0].forceModel).toBe('opus');
+    expect(tasks[0].forceModel).toBe('claude-opus-4-8');
     expect(tasks[0].forceEffort).toBe('high');
   });
 
-  it('case-insensitive Model parsing', () => {
+  it('preserves case sensitivity and rejects a non-canonical model ID', () => {
     const content = '## Task 1: Case Test\n- model: OPUS\n\n### Description\nTest.';
-    const tasks = parseStructuredDirectives(content);
-    expect(tasks[0].forceModel).toBe('opus');
+    expect(() => parseStructuredDirectives(content)).toThrow(/E_MODEL_PROVIDER_UNVERIFIED/);
   });
 });
 
@@ -693,8 +723,8 @@ describe('resolveWorkerEffort — forceEffort override', () => {
 
 describe('createTask — forceModel/forceEffort passthrough', () => {
   it('passes forceModel to task', () => {
-    const task = createTask(makeBaseParams({ forceModel: 'opus' }), 1);
-    expect(task.forceModel).toBe('opus');
+    const task = createTask(makeBaseParams({ forceModel: 'claude-opus-4-8' }), 1);
+    expect(task.forceModel).toBe('claude-opus-4-8');
   });
 
   it('passes forceEffort to task', () => {
@@ -812,7 +842,7 @@ describe('buildWorkerPrompt — agentPrompt parameter', () => {
   });
 
   it('agent block appears for forceModel tasks with assigned agent', () => {
-    const task = makeTask({ assignedAgent: 'bug-fixer', forceModel: 'opus' } as Partial<Task>);
+    const task = makeTask({ assignedAgent: 'bug-fixer', forceModel: 'claude-opus-4-8' } as Partial<Task>);
     const prompt = buildWorkerPrompt(task, 'Bug fixing specialist.');
     expect(prompt).toContain('=== Agent: bug-fixer ===');
     expect(prompt).toContain('Bug fixing specialist.');
@@ -835,13 +865,13 @@ describe('DirectiveTaskSchema', () => {
   it('accepts optional model field with valid value', () => {
     const result = DirectiveTaskSchema.safeParse({
       title: 'Audit security',
-      model: 'opus',
+      model: 'claude-opus-4-8',
       files: [],
       scope: [],
       description: 'Security review',
     });
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.model).toBe('opus');
+    if (result.success) expect(result.data.model).toBe('claude-opus-4-8');
   });
 
   it('rejects invalid model value', () => {
@@ -856,7 +886,7 @@ describe('DirectiveTaskSchema', () => {
   });
 
   it('accepts all valid model values', () => {
-    for (const model of ['opus', 'sonnet', 'haiku'] as const) {
+    for (const model of ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'] as const) {
       const result = DirectiveTaskSchema.safeParse({
         title: 'Task',
         model,
@@ -1132,7 +1162,7 @@ describe('validateDirective', () => {
       goal: 'Full directive',
       tasks: [{
         title: 'Full task',
-        model: 'sonnet',
+        model: 'claude-sonnet-5',
         effort: 'normal',
         files: ['src/core/foo.ts'],
         scope: ['src/core/'],
@@ -1142,7 +1172,7 @@ describe('validateDirective', () => {
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.tasks[0].model).toBe('sonnet');
+      expect(result.data.tasks[0].model).toBe('claude-sonnet-5');
       expect(result.data.tasks[0].effort).toBe('normal');
       expect(result.data.tasks[0].tests).toEqual(['Test A', 'Test B']);
     }
@@ -1273,7 +1303,7 @@ describe('DirectiveTaskSchema — provider field', () => {
 
 describe('createTask — provider field', () => {
   it('passes provider to task when specified', () => {
-    const task = createTask(makeBaseParams({ provider: 'codex' }), 1);
+    const task = createTask(makeBaseParams({ model: 'gpt-5.5', provider: 'codex' }), 1);
     expect(task.provider).toBe('codex');
   });
 
@@ -1282,12 +1312,11 @@ describe('createTask — provider field', () => {
     expect(task.provider).toBeUndefined();
   });
 
-  it('logs model-provider incompatibility via debugLog but still creates task', () => {
-    // 'opus' is a claude model, not compatible with 'codex' provider
-    // debugLog uses DECKENT_DEBUG env gate (no console.warn) — just verify task is created
-    const task = createTask(makeBaseParams({ model: 'opus', provider: 'codex' }), 1);
-    expect(task.provider).toBe('codex');
-    expect(task.model).toBe('opus');
+  it('fails loudly when model and provider identities conflict', () => {
+    expect(() => createTask(
+      makeBaseParams({ model: 'claude-opus-4-8', provider: 'codex' }),
+      1,
+    )).toThrow(/E_MODEL_PROVIDER_MISMATCH/);
   });
 
   it('does not warn when model and provider are compatible', () => {
@@ -1301,21 +1330,21 @@ describe('createTask — provider field', () => {
 
   it('does not warn when provider is not specified', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const task = createTask(makeBaseParams({ model: 'opus' }), 1);
+    const task = createTask(makeBaseParams({ model: 'claude-opus-4-8' }), 1);
     expect(task.provider).toBeUndefined();
     expect(warnSpy).not.toHaveBeenCalled();
     warnSpy.mockRestore();
   });
 
   it('provider appears in created task JSON', () => {
-    const task = createTask(makeBaseParams({ provider: 'gemini' }), 1);
+    const task = createTask(makeBaseParams({ model: 'gemini-2.5-pro', provider: 'gemini' }), 1);
     const json = JSON.parse(JSON.stringify(task));
     expect(json.provider).toBe('gemini');
   });
 
   it('compatible claude model with claude provider does not warn', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const task = createTask(makeBaseParams({ model: 'opus', provider: 'claude' }), 1);
+    const task = createTask(makeBaseParams({ model: 'claude-opus-4-8', provider: 'claude' }), 1);
     expect(task.provider).toBe('claude');
     expect(warnSpy).not.toHaveBeenCalled();
     warnSpy.mockRestore();
@@ -1364,9 +1393,9 @@ describe('parseBulletOrNumberedTasks', () => {
   });
 
   it('extracts Model override from sub-lines', () => {
-    const content = `- Task: Complex refactor\n  - Model: opus`;
+    const content = `- Task: Complex refactor\n  - Model: claude-opus-4-8`;
     const tasks = parseBulletOrNumberedTasks(content);
-    expect(tasks[0]!.forceModel).toBe('opus');
+    expect(tasks[0]!.forceModel).toBe('claude-opus-4-8');
   });
 
   it('extracts Effort override from sub-lines', () => {
@@ -1642,9 +1671,9 @@ describe('createTask — assignedAgent/assignedSkills defaults', () => {
   });
 
   it('all created tasks have assignedAgent regardless of params', () => {
-    const params1 = makeBaseParams({ model: 'opus', effort: 'high', priority: 'CRITICAL' });
-    const params2 = makeBaseParams({ model: 'haiku', effort: 'low', priority: 'LOW' });
-    const params3 = makeBaseParams({ forceModel: 'opus', forceEffort: 'high' });
+    const params1 = makeBaseParams({ model: 'claude-opus-4-8', effort: 'high', priority: 'CRITICAL' });
+    const params2 = makeBaseParams({ model: 'claude-haiku-4-5-20251001', effort: 'low', priority: 'LOW' });
+    const params3 = makeBaseParams({ forceModel: 'claude-opus-4-8', forceEffort: 'high' });
     const task1 = createTask(params1, 1);
     const task2 = createTask(params2, 2);
     const task3 = createTask(params3, 3);
@@ -1662,31 +1691,31 @@ describe('createTask — assignedAgent/assignedSkills defaults', () => {
 describe('plannerTaskToParams — override fields pass-through', () => {
   it('passes forceAgent from PlannerTask to CreateTaskParams', () => {
     const pt = makePlannerTask({ forceAgent: 'security-auditor' });
-    const params = plannerTaskToParams(pt, 'sprint-066', 'sonnet');
+    const params = plannerTaskToParams(pt, 'sprint-066', 'claude-sonnet-5');
     expect(params.forceAgent).toBe('security-auditor');
   });
 
   it('passes forceSkills from PlannerTask to CreateTaskParams', () => {
     const pt = makePlannerTask({ forceSkills: ['typescript-expert', 'testing-expert'] });
-    const params = plannerTaskToParams(pt, 'sprint-066', 'sonnet');
+    const params = plannerTaskToParams(pt, 'sprint-066', 'claude-sonnet-5');
     expect(params.forceSkills).toEqual(['typescript-expert', 'testing-expert']);
   });
 
   it('passes excludeAgent from PlannerTask to CreateTaskParams', () => {
     const pt = makePlannerTask({ excludeAgent: ['doc-writer', 'refactorer'] });
-    const params = plannerTaskToParams(pt, 'sprint-066', 'sonnet');
+    const params = plannerTaskToParams(pt, 'sprint-066', 'claude-sonnet-5');
     expect(params.excludeAgent).toEqual(['doc-writer', 'refactorer']);
   });
 
   it('passes excludeSkills from PlannerTask to CreateTaskParams', () => {
     const pt = makePlannerTask({ excludeSkills: ['ci-testing'] });
-    const params = plannerTaskToParams(pt, 'sprint-066', 'sonnet');
+    const params = plannerTaskToParams(pt, 'sprint-066', 'claude-sonnet-5');
     expect(params.excludeSkills).toEqual(['ci-testing']);
   });
 
   it('override fields are undefined when not set in PlannerTask', () => {
     const pt = makePlannerTask();
-    const params = plannerTaskToParams(pt, 'sprint-066', 'sonnet');
+    const params = plannerTaskToParams(pt, 'sprint-066', 'claude-sonnet-5');
     expect(params.forceAgent).toBeUndefined();
     expect(params.forceSkills).toBeUndefined();
     expect(params.excludeAgent).toBeUndefined();
@@ -1701,7 +1730,7 @@ describe('plannerTaskToParams — override fields pass-through', () => {
         filesWrite: ['src/core/config.ts'],
       },
     });
-    const params = plannerTaskToParams(pt, 'sprint-066', 'sonnet');
+    const params = plannerTaskToParams(pt, 'sprint-066', 'claude-sonnet-5');
     // enrichScopeWithTestFiles should add tests/core/config.test.ts
     expect(params.scope.filesWrite).toContain('tests/core/config.test.ts');
   });
@@ -1714,7 +1743,7 @@ describe('plannerTaskToParams — override fields pass-through', () => {
         filesWrite: ['src/orchestra/brain.ts'],
       },
     });
-    const params = plannerTaskToParams(pt, 'sprint-066', 'sonnet');
+    const params = plannerTaskToParams(pt, 'sprint-066', 'claude-sonnet-5');
     expect(params.scope.filesWrite).toEqual(['src/orchestra/brain.ts']);
     expect(params.scope.directories).toEqual(['src/orchestra/']);
   });
@@ -1895,7 +1924,7 @@ describe('parseStructuredDirectives — Sprint 134 DIRECTIVES self-parse', () =>
 ---
 
 ## Task 1: Task Dependency Pipeline
-- Model: opus
+- Model: claude-opus-4-8
 - Effort: high
 - Scope: src/orchestra/
 - Files: src/orchestra/task-builder.ts
@@ -1906,7 +1935,7 @@ Implement dependency pipeline.
 ---
 
 ## Task 2: DIRECTIVES Scope Parser Hardening
-- Model: opus
+- Model: claude-opus-4-8
 - Effort: normal
 - Scope: src/orchestra/
 - Files: src/orchestra/task-builder.ts, src/orchestra/planner.ts
@@ -1917,7 +1946,7 @@ Fix scope parser edge cases.
 ---
 
 ## Task 3: Auditor Heartbeat Cleanup
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: low
 - Scope: src/monitor/, src/agents/
 
@@ -1927,7 +1956,7 @@ Clean up heartbeat files.
 ---
 
 ## Task 4: Gitignore Cleanup
-- Model: haiku
+- Model: claude-haiku-4-5-20251001
 - Effort: low
 - Scope: .
 - Files: .gitignore
@@ -1938,7 +1967,7 @@ Update gitignore patterns.
 ---
 
 ## Task 7: ADR-033 Product Vision
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Scope: .brain/, docs/vision/
 - Files: .brain/DECISIONS.md, docs/vision/roadmap.md
@@ -1949,7 +1978,7 @@ Write ADR-033.
 ---
 
 ## Task 12: Multi-Project Isolation
-- Model: opus
+- Model: claude-opus-4-8
 - Effort: normal
 - Scope: .brain/, docs/design/, src/agents/
 
@@ -1959,7 +1988,7 @@ Write ADR-034.
 ---
 
 ## Task 15: Competitive Analysis
-- Model: haiku
+- Model: claude-haiku-4-5-20251001
 - Effort: low
 - Scope: docs/analysis/
 
@@ -2174,7 +2203,7 @@ Task with extra whitespace around priority.`;
 
   it('backward compat: task without Priority field defaults to undefined (caller uses NORMAL)', () => {
     const content = `## Task 1: Legacy Task
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Files: src/core/utils.ts
 - Scope: src/core/
@@ -2331,7 +2360,7 @@ describe('parseAuthModeDirective', () => {
 describe('parseStructuredDirectives — authMode parsing', () => {
   it('propagates "- Auth: api" from a structured task block to the parsed task', () => {
     const content = `## Task 1: API mode opt-in
-- Model: sonnet
+- Model: claude-sonnet-5
 - Auth: api
 - Files: src/core/config.ts
 - Scope: src/core/
@@ -2345,7 +2374,7 @@ Run this task with the API key instead of the subscription session.`;
 
   it('leaves authMode undefined when no Auth: line is present', () => {
     const content = `## Task 1: Default auth
-- Model: sonnet
+- Model: claude-sonnet-5
 - Files: src/core/config.ts
 - Scope: src/core/
 

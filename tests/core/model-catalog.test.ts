@@ -154,7 +154,8 @@ describe('model-catalog: mapRemoteEntry', () => {
       status: 'ga',
     });
     expect(def).not.toBeNull();
-    expect(def?.id).toBe('sonnet-x');
+    expect(def?.id).toBe('claude-sonnet-x');
+    expect(def?.apiId).toBe('claude-sonnet-x');
     expect(def?.provider).toBe('claude');
     expect(def?.tier).toBe('standard');
     expect(def?.capabilities.toolUse).toBe(true);
@@ -182,6 +183,7 @@ describe('model-catalog: mapRemoteEntry', () => {
     const def = mapRemoteEntry({
       id: 'plain',
       provider: 'google',
+      costPerMillion: { input: 1, output: 4 },
     });
     expect(def?.capabilities.streaming).toBe(true);
     expect(def?.capabilities.toolUse).toBe(false);
@@ -416,8 +418,8 @@ describe('ModelRegistry.loadFromCatalog / mergeFromCatalog', () => {
     const reg = new ModelRegistry(BUILTIN_MODELS);
     const baseline = reg.getAllModelIds().length;
     const override: ModelDefinition = {
-      id: 'opus',
-      apiId: 'override-opus',
+      id: 'claude-opus-4-8',
+      apiId: 'claude-opus-4-8',
       provider: 'claude',
       tier: 'premium_plus',
       contextWindow: 2_000_000,
@@ -427,8 +429,8 @@ describe('ModelRegistry.loadFromCatalog / mergeFromCatalog', () => {
     };
     reg.mergeFromCatalog([override]);
     expect(reg.getAllModelIds().length).toBe(baseline);
-    expect(reg.getOrThrow('opus').apiId).toBe('override-opus');
-    expect(reg.getOrThrow('opus').tier).toBe('premium_plus');
+    expect(reg.getOrThrow('claude-opus-4-8').apiId).toBe('claude-opus-4-8');
+    expect(reg.getOrThrow('claude-opus-4-8').tier).toBe('premium_plus');
   });
 });
 

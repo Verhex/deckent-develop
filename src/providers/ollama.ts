@@ -626,7 +626,7 @@ export class OllamaAdapter implements ProviderAdapter {
     return `curl -s -X POST "${this.host}/api/generate" -H "Content-Type: application/json" --data-binary @${promptPath} -d '{"model":"${apiId}","stream":false}'`;
   }
 
-  buildPlannerCommand(prompt: string, model: ModelType): { command: string; args: string[] } {
+  buildPlannerCommand(prompt: string, model: ModelType): import('../core/provider.js').ProviderPlannerCommand {
     const apiId = modelRegistry.get(model)?.apiId ?? model;
     const body = JSON.stringify({ model: apiId, prompt, stream: false });
     return {
@@ -641,6 +641,10 @@ export class OllamaAdapter implements ProviderAdapter {
         '-d',
         body,
       ],
+      calledProvider: 'ollama',
+      calledModel: apiId,
+      transport: 'http',
+      executionBackend: 'host-subprocess',
     };
   }
 
@@ -668,7 +672,7 @@ export class OllamaAdapter implements ProviderAdapter {
       const m = modelRegistry.getByProviderAndTier(OLLAMA_PROVIDER, t);
       if (m) return m.id as OllamaModel;
     }
-    return 'llama-3.2-3b';
+    throw new Error(`E_OLLAMA_TIER_MODEL_UNAVAILABLE: tier=${tier}`);
   }
 
   // ─── Accessors ─────────────────────────────────────────────────────

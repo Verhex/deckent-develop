@@ -4,17 +4,10 @@
 // cost=0, and that the 13-model BUILTIN invariant is preserved.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  ModelRegistry,
-  BUILTIN_MODELS,
-  registerOllamaModels,
-  type RegistryProviderName,
-} from '../../src/core/model-registry.js';
+import { ModelRegistry, BUILTIN_MODELS, registerOllamaModels } from '../../src/core/model-registry.js';
 import { OLLAMA_BUILTIN_MODELS } from '../../src/core/ollama-models.js';
 
-// Cast helper — `RegistryProviderName` doesn't yet include 'ollama' in the
-// static union (see model-registry.ts NOTE). Runtime values are correct.
-const OLLAMA = 'ollama' as unknown as RegistryProviderName;
+const OLLAMA = 'ollama' as const;
 
 describe('OLLAMA_BUILTIN_MODELS catalog (src/core/ollama-models.ts)', () => {
   it('contains at least 3 Ollama entries (premium/standard/economy coverage)', () => {
@@ -24,6 +17,12 @@ describe('OLLAMA_BUILTIN_MODELS catalog (src/core/ollama-models.ts)', () => {
   it('every entry declares provider="ollama"', () => {
     for (const m of OLLAMA_BUILTIN_MODELS) {
       expect(m.provider).toBe('ollama');
+    }
+  });
+
+  it('preserves the provider wire tag byte-for-byte as the canonical identity', () => {
+    for (const m of OLLAMA_BUILTIN_MODELS) {
+      expect(m.id).toBe(m.apiId);
     }
   });
 
@@ -97,12 +96,12 @@ describe('ModelRegistry — Ollama tier resolution (opt-in)', () => {
   it('preserves the 14-model BUILTIN invariant — Ollama models are NOT in BUILTIN_MODELS', () => {
     expect(BUILTIN_MODELS).toHaveLength(14);
     const builtinProviders = new Set(BUILTIN_MODELS.map(m => m.provider));
-    expect(builtinProviders.has('ollama' as unknown as RegistryProviderName)).toBe(false);
+    expect(builtinProviders.has('ollama')).toBe(false);
   });
 
   it('grows the registry by exactly OLLAMA_BUILTIN_MODELS.length after registration', () => {
     const before = registry.getAllModelIds().length;
-    expect(before).toBe(BUILTIN_MODELS.length);
+    expect(before).toBeGreaterThan(BUILTIN_MODELS.length);
     registerOllamaModels(registry);
     const after = registry.getAllModelIds().length;
     expect(after - before).toBe(OLLAMA_BUILTIN_MODELS.length);

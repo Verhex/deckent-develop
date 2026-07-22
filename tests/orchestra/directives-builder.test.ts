@@ -23,7 +23,7 @@ function makeIntent(): DirectiveBuildIntent {
         files: ['src/orchestra/directives-builder.ts', 'tests/orchestra/directives-builder.test.ts'],
         scope: ['src/orchestra/', 'src/core/', 'tests/orchestra/', 'docs/adr/'],
         deps: [],
-        model: 'sonnet',
+        model: 'claude-sonnet-5',
         effort: 'high',
         skills: ['typescript-expert'],
         goCriteria: ['round-trip build→parse→deep-equal holds', 'parser is never edited', '`tsc` temiz'],

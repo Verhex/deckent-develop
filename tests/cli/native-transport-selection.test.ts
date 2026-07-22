@@ -28,7 +28,7 @@ describe('resolveNativeSelection — claude', () => {
 
   it('resolves with a .deck DECKENT_CLAUDE_API_KEY (ADR-G-005: .deck over env)', () => {
     const r = resolveNativeSelection(
-      { provider: 'claude', model: 'fable' },
+      { provider: 'claude', model: 'claude-fable-5' },
       { env: emptyEnv, config: cfg, secrets: { DECKENT_CLAUDE_API_KEY: 'sk-deck' } },
     );
     ok(r);
@@ -42,13 +42,12 @@ describe('resolveNativeSelection — claude', () => {
     expect(r.providerName).toBe('claude');
   });
 
-  it("maps the 'fable' alias onto its API-pinned wire id", () => {
+  it("rejects the legacy 'fable' alias at the native execution boundary", () => {
     const r = resolveNativeSelection(
       { provider: 'claude', model: 'fable' },
       { env: { ANTHROPIC_API_KEY: 'k' }, config: cfg },
     );
-    ok(r);
-    expect(r.model).toBe('claude-fable-5');
+    expect(r).toMatchObject({ errorCode: 'unknown-model', provider: 'claude', detail: 'fable' });
   });
 
   it('never ships a non-claude model id at the anthropic transport (incident guard)', () => {
@@ -73,13 +72,12 @@ describe('resolveNativeSelection — claude', () => {
     expect(r).toMatchObject({ errorCode: 'unknown-model', provider: 'claude', detail: 'deepseek-chat' });
   });
 
-  it('still passes through a claude-SHAPED id unknown to the registry (forward-compat for new claude models)', () => {
+  it('rejects a claude-shaped id until catalog registration supplies authority', () => {
     const r = resolveNativeSelection(
       { provider: 'claude', model: 'claude-future-9' },
       { env: { ANTHROPIC_API_KEY: 'k' }, config: {} },
     );
-    ok(r);
-    expect(r.model).toBe('claude-future-9');
+    expect(r).toMatchObject({ errorCode: 'unknown-model', provider: 'claude', detail: 'claude-future-9' });
   });
 });
 
@@ -104,7 +102,7 @@ describe('resolveNativeSelection — ollama / vendors / unsupported', () => {
       { env: emptyEnv, config: { ollama_host: 'http://127.0.0.1:11434', native_model: 'fable' } },
     );
     ok(r);
-    expect(r.model).toBe('qwen3');
+    expect(r.model).toBe('qwen2.5-coder:7b');
   });
 
   it('resolves vendor presets from their key envs (deepseek) and refuses without', () => {
@@ -127,7 +125,7 @@ describe('resolveNativeProvider — settings pin (native_provider)', () => {
   it('binds claude+fable from settings when a .deck key exists', () => {
     const r = resolveNativeProvider(
       emptyEnv,
-      { native_provider: 'claude', native_model: 'fable' },
+      { native_provider: 'claude', native_model: 'claude-fable-5' },
       { DECKENT_CLAUDE_API_KEY: 'sk-deck' },
     );
     ok(r);
@@ -138,13 +136,13 @@ describe('resolveNativeProvider — settings pin (native_provider)', () => {
     // ollama_host present — silent fallback would have picked it; the pin must not.
     const r = resolveNativeProvider(
       emptyEnv,
-      { native_provider: 'claude', native_model: 'fable', ollama_host: 'http://127.0.0.1:11434' },
+      { native_provider: 'claude', native_model: 'claude-fable-5', ollama_host: 'http://127.0.0.1:11434' },
     );
     expect(r).toMatchObject({ errorCode: 'missing-api-key' });
   });
 
   it('keeps the detection order when no pin is set (env key → claude)', () => {
-    const r = resolveNativeProvider({ ANTHROPIC_API_KEY: 'k' }, { native_model: 'fable' });
+    const r = resolveNativeProvider({ ANTHROPIC_API_KEY: 'k' }, { native_model: 'claude-fable-5' });
     ok(r);
     expect(r).toMatchObject({ providerName: 'claude', model: 'claude-fable-5' });
   });

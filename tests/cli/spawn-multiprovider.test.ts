@@ -246,7 +246,7 @@ describe('spawnWorkerMultiProvider — control: non-adapter providers still use 
   it('claude model with spawnBackend=docker still uses docker backend (not adapter)', async () => {
     const result = await spawnWorkerMultiProvider(
       't-claude-001',
-      'sonnet',
+      'claude-sonnet-5',
       'prompt',
       '/root',
       { spawnBackend: 'docker' },

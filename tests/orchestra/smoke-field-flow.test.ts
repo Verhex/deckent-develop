@@ -31,7 +31,7 @@ function baseParams(overrides: Partial<CreateTaskParams> = {}): CreateTaskParams
   return {
     title: 'flow task',
     description: 'flow description',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'flow test',
@@ -47,7 +47,7 @@ function basePlannerTask(overrides: Partial<PlannerTask> = {}): PlannerTask {
   return {
     title: 'planner task',
     description: 'planner description',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'ai',
@@ -77,7 +77,7 @@ describe('smoke-field-flow: end-to-end Smoke: → task.smoke → gate-acceptable
   it('structured-parse: Smoke line in DIRECTIVES → task.smoke populated and gate-acceptable', () => {
     const directive = `
 ## Task 1: 221-001 — serve token fix
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Files: src/api/server.ts
 - Scope: src/api/
@@ -106,7 +106,7 @@ Wire up serve token injection.
   it('bullet-parse: `- Smoke:` line in bullet/numbered task → task.smoke populated and gate-acceptable', () => {
     const directive = `
 - Task: serve token fix
-  - Model: sonnet
+  - Model: claude-sonnet-5
   - Smoke: node dist/cli/entry.js serve → http_code=200
   - Files: src/api/server.ts
 `;
@@ -130,7 +130,7 @@ Wire up serve token injection.
     const smoke = { command: 'node dist/cli/entry.js --help', expect: 'usage' };
     const pt = { ...basePlannerTask(), smoke };
 
-    const params = plannerTaskToParams(pt, 'sprint-221', 'sonnet');
+    const params = plannerTaskToParams(pt, 'sprint-221', 'claude-sonnet-5');
     expect(params.smoke).toEqual(smoke);
 
     const task = createTask(params, 3);
@@ -141,7 +141,7 @@ Wire up serve token injection.
   it('no Smoke: line → task.smoke is undefined and gate is inert (Tier-0 path)', () => {
     const directive = `
 ## Task 1: 221-X — internal refactor
-- Model: haiku
+- Model: claude-haiku-4-5-20251001
 - Effort: low
 - Files: src/core/types.ts
 - Scope: src/core/
@@ -164,7 +164,7 @@ Rename a few internal types.
   it('JSON round-trip: task.smoke survives serialisation in `.tasks/task-NNN.json` shape', () => {
     const directive = `
 ## Task 1: 221-002 — REPL agentic wire
-- Model: opus
+- Model: claude-opus-4-8
 - Effort: normal
 - Files: src/cli/commands/chat-native.ts
 - Scope: src/cli/

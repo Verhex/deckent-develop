@@ -22,10 +22,11 @@ function computeWaveBreakdown(taskCount: number, maxWorkers: number): Record<str
   return waves;
 }
 
-function computeModelDistribution(tasks: Array<{ model: string }>): Record<string, number> {
+function computeModelDistribution(tasks: Array<{ model?: string }>): Record<string, number> {
   const dist: Record<string, number> = {};
   for (const t of tasks) {
-    const m = t.model ?? 'sonnet';
+    if (!t.model) throw new Error('E_PLAN_TASK_MODEL_MISSING');
+    const m = t.model;
     dist[m] = (dist[m] ?? 0) + 1;
   }
   return dist;

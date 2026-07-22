@@ -110,44 +110,31 @@ describe('TmuxBackend', () => {
     expect(backend.name).toBe('tmux');
   });
 
-  it('spawn() calls ensureSession and spawnWorker', () => {
-    backend.spawn('task-001', 'opus', 'Do something');
+  it('spawn() fails closed before tmux work when no execution budget exists', () => {
+    expect(() => backend.spawn('task-001', 'claude-opus-4-8', 'Do something'))
+      .toThrow(/Remote execution budget is required/);
 
-    expect(mockTmux.ensureSession).toHaveBeenCalledOnce();
-    expect(mockTmux.spawnWorker).toHaveBeenCalledWith(
-      'task-001',
-      'opus',
-      'Do something',
-      '/project/root',
-      { allowedTools: undefined, autoApprove: undefined },
-    );
+    expect(mockTmux.ensureSession).not.toHaveBeenCalled();
+    expect(mockTmux.spawnWorker).not.toHaveBeenCalled();
   });
 
-  it('spawn() uses opts.projectDir when provided', () => {
-    backend.spawn('task-002', 'sonnet', 'prompt', { projectDir: '/custom/dir' });
+  it('spawn() rejects a turn ceiling because tmux has no live usage metering', () => {
+    expect(() => backend.spawn('task-002', 'claude-sonnet-5', 'prompt', {
+      projectDir: '/custom/dir',
+      executionBudget: { maxTurns: 1 },
+    })).toThrow(/requires measured streaming usage/);
 
-    expect(mockTmux.spawnWorker).toHaveBeenCalledWith(
-      'task-002',
-      'sonnet',
-      'prompt',
-      '/custom/dir',
-      expect.any(Object),
-    );
+    expect(mockTmux.spawnWorker).not.toHaveBeenCalled();
   });
 
-  it('spawn() passes allowedTools and autoApprove', () => {
-    backend.spawn('task-003', 'haiku', 'prompt', {
+  it('spawn() never forwards tool grants when admission is unmetered', () => {
+    expect(() => backend.spawn('task-003', 'claude-haiku-4-5-20251001', 'prompt', {
       allowedTools: 'Read,Edit',
       autoApprove: true,
-    });
+      executionBudget: { maxTurns: 1 },
+    })).toThrow(/requires measured streaming usage/);
 
-    expect(mockTmux.spawnWorker).toHaveBeenCalledWith(
-      'task-003',
-      'haiku',
-      'prompt',
-      '/project/root',
-      { allowedTools: 'Read,Edit', autoApprove: true },
-    );
+    expect(mockTmux.spawnWorker).not.toHaveBeenCalled();
   });
 
   it('kill() delegates to killWorker', () => {

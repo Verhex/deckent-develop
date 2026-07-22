@@ -194,7 +194,7 @@ describe('371-001 CATALOG-MATERIALIZE: builtin fallback makes the 6 new items po
         expertise: [],
         allowedTools: [],
         deniedTools: [],
-        preferredModel: 'sonnet',
+        preferredModel: 'claude-sonnet-5',
         effortMultiplier: 1,
         triggerKeywords: [],
         triggerScopes: [],

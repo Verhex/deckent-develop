@@ -223,8 +223,8 @@ function makeConfig(): ResolvedConfig {
     projectName: 'test',
     activeModeConfig: {
       max_workers: 4,
-      default_model: 'sonnet',
-      brain_model: 'opus',
+      default_model: 'claude-sonnet-5',
+      brain_model: 'claude-opus-4-8',
       brain_planning: 'auto',
       haiku_allowed: false,
     },

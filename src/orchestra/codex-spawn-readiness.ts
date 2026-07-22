@@ -254,7 +254,9 @@ export interface AssessCodexSpawnReadinessOptions {
 export async function assessCodexSpawnReadiness(
   opts?: AssessCodexSpawnReadinessOptions,
 ): Promise<CodexSpawnReadinessReport> {
-  const models = opts?.models ?? (['gpt-5.5'] as OpenAIModel[]);
+  const defaultModel = modelRegistry.getByProviderAndTier('codex', 'premium');
+  if (!defaultModel) throw new Error('E_CODEX_READINESS_MODEL_UNAVAILABLE');
+  const models = opts?.models ?? ([defaultModel.id] as OpenAIModel[]);
 
   const [host, docker] = await Promise.all([
     checkCodexHostReadiness({

@@ -109,10 +109,10 @@ describe('SandboxSpawnBackend', () => {
 
     it('should support fable, opus, sonnet, haiku models', () => {
       const backend = new SandboxSpawnBackend(projectDir);
-      expect(backend.supportedModels).toContain('fable');
-      expect(backend.supportedModels).toContain('opus');
-      expect(backend.supportedModels).toContain('sonnet');
-      expect(backend.supportedModels).toContain('haiku');
+      expect(backend.supportedModels).toContain('claude-fable-5');
+      expect(backend.supportedModels).toContain('claude-opus-4-8');
+      expect(backend.supportedModels).toContain('claude-sonnet-5');
+      expect(backend.supportedModels).toContain('claude-haiku-4-5-20251001');
     });
 
     it('should support exactly 4 models', () => {
@@ -266,7 +266,7 @@ describe('SandboxSpawnBackend', () => {
     it('should spawn when dir is within projectDir', () => {
       const child = setupMockChild();
       const backend = new SandboxSpawnBackend(projectDir);
-      expect(() => backend.spawn('task-001', 'opus', 'test')).not.toThrow();
+      expect(() => backend.spawn('task-001', 'claude-opus-4-8', 'test')).not.toThrow();
       expect(mockSpawn).toHaveBeenCalled();
     });
 
@@ -274,7 +274,7 @@ describe('SandboxSpawnBackend', () => {
       setupMockChild();
       const backend = new SandboxSpawnBackend(projectDir);
       expect(() =>
-        backend.spawn('task-001', 'opus', 'test', { projectDir: '/outside' }),
+        backend.spawn('task-001', 'claude-opus-4-8', 'test', { projectDir: '/outside' }),
       ).toThrow(ProviderError);
     });
 
@@ -282,7 +282,7 @@ describe('SandboxSpawnBackend', () => {
       setupMockChild();
       const backend = new SandboxSpawnBackend(projectDir);
       try {
-        backend.spawn('task-001', 'opus', 'test', { projectDir: '/outside' });
+        backend.spawn('task-001', 'claude-opus-4-8', 'test', { projectDir: '/outside' });
       } catch {
         // expected
       }
@@ -292,7 +292,7 @@ describe('SandboxSpawnBackend', () => {
     it('should pass through spawn options to parent when scope is valid', () => {
       setupMockChild();
       const backend = new SandboxSpawnBackend(projectDir);
-      backend.spawn('task-001', 'opus', 'test', {
+      backend.spawn('task-001', 'claude-opus-4-8', 'test', {
         projectDir,
         allowedTools: 'Read',
         autoApprove: false,

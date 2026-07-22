@@ -24,6 +24,7 @@ import type { SpawnBackend } from '../../src/orchestra/spawn-backend.js';
 function makeBackend(): SpawnBackend {
   return {
     name: 'mock-depnorm',
+    liveUsageBudgetSupport: 'measured-stream' as const,
     spawn() { /* no-op — we only assert on dependency mutation, not spawn */ },
     kill() { /* no-op */ },
     list() { return []; },
@@ -36,7 +37,7 @@ function createTask(id: string, title: string, dependencies: string[]): Task {
     id,
     title,
     description: `dep-norm test ${id}`,
-    model: 'sonnet' as ModelType,
+    model: 'claude-sonnet-5' as ModelType,
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'dep-norm-test',
@@ -48,6 +49,7 @@ function createTask(id: string, title: string, dependencies: string[]): Task {
     assignedAgent: 'generic',
     assignedSkills: [],
     provider: 'claude',
+    budget: { maxTurns: 1 },
   } as unknown as Task;
 }
 

@@ -8,19 +8,37 @@
 import type { DetectorContext, DetectorResult } from '../../core/nervous-types.js';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { modelRegistry, getLegacyModelMigration } from '../../core/model-registry.js';
 
 /** Default maliyet eşiği (USD) */
 const DEFAULT_COST_THRESHOLD = 50;
 
-/** Token → USD yaklaşık dönüşüm oranları (per 1M token) */
-const TOKEN_COST_PER_MILLION: Record<string, { input: number; output: number }> = {
-  opus: { input: 15, output: 75 },
-  sonnet: { input: 3, output: 15 },
-  haiku: { input: 0.25, output: 1.25 },
-};
-
-/** Default oran (bilinmeyen model için sonnet tahmini) */
-const DEFAULT_RATE = { input: 3, output: 15 };
+/**
+ * Resolve a result's model text to its CANONICAL registry pricing (per-MTok
+ * `costPerMillion`), or `null` when the model is unknown — never a silent named
+ * default. Prices come from the model-registry (the canonical per-model source),
+ * so a stale hardcoded per-alias rate can no longer drift from the live catalog.
+ *
+ * Reading historical `.result` files is a HISTORICAL EVIDENCE lookup, so legacy
+ * alias text (`opus`/`sonnet`/`haiku`) is recognized ONLY through the explicit
+ * non-dispatch compatibility boundary (`getLegacyModelMigration`): that path only
+ * prices past evidence, it never routes or dispatches. An unknown model is reported
+ * as unpriced (`unpricedModelCount`), never charged at a named model's rate.
+ */
+function resolveModelPricing(
+  model: string | undefined,
+): { input: number; output: number } | null {
+  if (!model) return null;
+  const direct = modelRegistry.get(model);
+  if (direct) return direct.costPerMillion;
+  // Non-dispatch historical compat: map a legacy alias to its canonical id, then price.
+  const migrated = getLegacyModelMigration(model);
+  if (migrated) {
+    const def = modelRegistry.get(migrated);
+    if (def) return def.costPerMillion;
+  }
+  return null;
+}
 
 interface TokenUsage {
   inputTokens?: number;
@@ -73,6 +91,7 @@ export class TokenSpikeDetector {
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
     let estimatedCostUsd = 0;
+    let unpricedModelCount = 0;
 
     for (const rf of resultFiles) {
       try {
@@ -83,13 +102,18 @@ export class TokenSpikeDetector {
         if (data.tokenUsage) {
           const input = data.tokenUsage.inputTokens ?? 0;
           const output = data.tokenUsage.outputTokens ?? 0;
-          const model = data.tokenUsage.model ?? 'sonnet';
-          const rates = TOKEN_COST_PER_MILLION[model] ?? DEFAULT_RATE;
 
           totalInputTokens += input;
           totalOutputTokens += output;
-          estimatedCostUsd += (input / 1_000_000) * rates.input
-            + (output / 1_000_000) * rates.output;
+
+          const pricing = resolveModelPricing(data.tokenUsage.model);
+          if (pricing) {
+            estimatedCostUsd += (input / 1_000_000) * pricing.input
+              + (output / 1_000_000) * pricing.output;
+          } else {
+            // Unknown model → visibly unavailable, NOT priced at a named default.
+            unpricedModelCount += 1;
+          }
         }
       } catch {
         // Corrupt result — skip
@@ -135,6 +159,9 @@ export class TokenSpikeDetector {
         totalInputTokens,
         totalOutputTokens,
         taskCount: resultFiles.length,
+        // Models we could not price (unknown to the registry) — surfaced so an
+        // unknown model is visibly unavailable, never silently priced as a default.
+        unpricedModelCount,
       },
     };
   }

@@ -11,10 +11,7 @@
 // module is loaded. Consumers that never import OllamaAdapter remain
 // byte-identical to the pre-Ollama registry.
 //
-// The `provider` field uses the wider `RegistryProviderName` via cast;
-// task-types.ts's narrower `ProviderName` widen lives in a follow-up task.
-
-import type { ModelDefinition, RegistryProviderName } from './model-registry.js';
+import type { ModelDefinition } from './model-registry.js';
 
 /** Tier→local-model catalog for the Ollama provider.
  *  premium → qwen2.5-coder:32b (coding-tuned, large context)
@@ -24,9 +21,9 @@ import type { ModelDefinition, RegistryProviderName } from './model-registry.js'
  *  All entries have cost=0 (local inference, no third-party billing). */
 export const OLLAMA_BUILTIN_MODELS: readonly ModelDefinition[] = [
   {
-    id: 'qwen-coder-32b',
+    id: 'qwen2.5-coder:32b',
     apiId: 'qwen2.5-coder:32b',
-    provider: 'ollama' as unknown as RegistryProviderName,
+    provider: 'ollama',
     tier: 'premium',
     contextWindow: 128_000,
     costPerMillion: { input: 0, output: 0 },
@@ -34,9 +31,9 @@ export const OLLAMA_BUILTIN_MODELS: readonly ModelDefinition[] = [
     status: 'ga',
   },
   {
-    id: 'qwen-coder-7b',
+    id: 'qwen2.5-coder:7b',
     apiId: 'qwen2.5-coder:7b',
-    provider: 'ollama' as unknown as RegistryProviderName,
+    provider: 'ollama',
     tier: 'standard',
     contextWindow: 32_768,
     costPerMillion: { input: 0, output: 0 },
@@ -44,9 +41,9 @@ export const OLLAMA_BUILTIN_MODELS: readonly ModelDefinition[] = [
     status: 'ga',
   },
   {
-    id: 'llama-3-8b',
+    id: 'llama3:8b',
     apiId: 'llama3:8b',
-    provider: 'ollama' as unknown as RegistryProviderName,
+    provider: 'ollama',
     tier: 'standard',
     contextWindow: 8_192,
     costPerMillion: { input: 0, output: 0 },
@@ -54,9 +51,9 @@ export const OLLAMA_BUILTIN_MODELS: readonly ModelDefinition[] = [
     status: 'ga',
   },
   {
-    id: 'llama-3.2-3b',
+    id: 'llama3.2:3b',
     apiId: 'llama3.2:3b',
-    provider: 'ollama' as unknown as RegistryProviderName,
+    provider: 'ollama',
     tier: 'economy',
     contextWindow: 8_192,
     costPerMillion: { input: 0, output: 0 },

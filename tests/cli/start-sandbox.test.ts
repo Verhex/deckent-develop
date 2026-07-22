@@ -91,7 +91,7 @@ import { registerStart } from '../../src/cli/commands/start.js';
 
 function makeConfig(overrides = {}) {
   return {
-    activeModeConfig: { brain_model: 'opus', max_workers: 3, haiku_allowed: true },
+    activeModeConfig: { brain_model: 'claude-opus-4-8', max_workers: 3, haiku_allowed: true },
     brain_planning: 'auto',
     language: 'en',
     ...overrides,

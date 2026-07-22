@@ -50,6 +50,7 @@ function makeMockBackend(): SpawnBackend & { calls: SpawnCall[] } {
   const calls: SpawnCall[] = [];
   return {
     name: 'mock',
+    liveUsageBudgetSupport: 'measured-stream' as const,
     spawn(taskId, model, prompt, opts) {
       calls.push({ taskId, model, prompt, opts });
     },
@@ -67,7 +68,7 @@ function createTask(id: string, filesWrite: string[]): Task {
     id,
     title: `Task ${id}`,
     description: `W3.1 collision test ${id}`,
-    model: 'sonnet' as ModelType,
+    model: 'claude-sonnet-5' as ModelType,
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'collision-live-fire-test',
@@ -87,6 +88,7 @@ function createTask(id: string, filesWrite: string[]): Task {
     assignedAgent: 'generic',
     assignedSkills: [],
     provider: 'claude',
+    budget: { maxTurns: 1 },
   } as unknown as Task;
 }
 

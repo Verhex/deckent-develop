@@ -306,7 +306,8 @@ describe('buildDirectivesPlaceholder', () => {
     );
 
     expect(content).toContain('## Task 1:');
-    expect(content).toContain('- Model: sonnet');
+    expect(content).toContain('- Model: claude-sonnet-5');
+    expect(content).toContain('- Provider: claude');
     expect(content).toContain('- Effort: normal');
     expect(content).toContain('### Description');
   });

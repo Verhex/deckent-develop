@@ -10,8 +10,8 @@ import { getProviderBinaryForModel } from '../../src/orchestra/spawn-backend-doc
 import type { ModelType } from '../../src/core/types.js';
 
 describe('getProviderBinaryForModel', () => {
-  it('returns "claude" for a claude model (sonnet)', () => {
-    const binary = getProviderBinaryForModel('sonnet' as ModelType);
+  it('returns "claude" for a Claude API model ID', () => {
+    const binary = getProviderBinaryForModel('claude-sonnet-5' as ModelType);
     expect(binary).toBe('claude');
   });
 
@@ -37,13 +37,13 @@ describe('getProviderBinaryForModel', () => {
     expect(binary).toBe('claude');
   });
 
-  it('returns "claude" for opus model', () => {
-    const binary = getProviderBinaryForModel('opus' as ModelType);
+  it('returns "claude" for the exact Opus API model ID', () => {
+    const binary = getProviderBinaryForModel('claude-opus-4-8' as ModelType);
     expect(binary).toBe('claude');
   });
 
-  it('returns "codex" for gpt-5 model', () => {
-    const binary = getProviderBinaryForModel('gpt-5' as ModelType);
+  it('returns "codex" for the exact GPT-5.5 API model ID', () => {
+    const binary = getProviderBinaryForModel('gpt-5.5' as ModelType);
     expect(binary).toBe('codex');
   });
 

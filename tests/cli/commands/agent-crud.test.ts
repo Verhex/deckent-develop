@@ -29,7 +29,7 @@ function makeAgent(name: string, overrides: Record<string, unknown> = {}) {
     name,
     type: 'custom',
     enabled: true,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     triggers: [],
     description: `Agent ${name}`,
     uses: 5,
@@ -98,11 +98,11 @@ describe('agent CRUD commands', () => {
   describe('agent edit', () => {
     it('should update model via --model', async () => {
       makeAgent('edit-me');
-      await run(['agent', 'edit', 'edit-me', '--model', 'opus']);
+      await run(['agent', 'edit', 'edit-me', '--model', 'claude-opus-4-8']);
 
       const config = JSON.parse(readFileSync(join(testRoot, '.deckent/agents/edit-me/agent.json'), 'utf-8'));
-      expect(config.model).toBe('opus');
-      expect(output.some((o) => o.includes('model=opus'))).toBe(true);
+      expect(config.model).toBe('claude-opus-4-8');
+      expect(output.some((o) => o.includes('model=claude-opus-4-8'))).toBe(true);
     });
 
     it('should update description via --description', async () => {
@@ -115,15 +115,15 @@ describe('agent CRUD commands', () => {
     });
 
     it('should show error for non-existent agent', async () => {
-      await run(['agent', 'edit', 'nope', '--model', 'opus']);
+      await run(['agent', 'edit', 'nope', '--model', 'claude-opus-4-8']);
       expect(output.some((o) => o.includes('not found'))).toBe(true);
       expect(process.exitCode).toBe(1);
     });
 
     it('should show info when no options given', async () => {
-      makeAgent('show-me', { model: 'haiku', description: 'Test desc' });
+      makeAgent('show-me', { model: 'claude-haiku-4-5-20251001', description: 'Test desc' });
       await run(['agent', 'edit', 'show-me']);
-      expect(output.some((o) => o.includes('haiku'))).toBe(true);
+      expect(output.some((o) => o.includes('claude-haiku-4-5-20251001'))).toBe(true);
       expect(output.some((o) => o.includes('Test desc'))).toBe(true);
     });
   });
@@ -131,10 +131,10 @@ describe('agent CRUD commands', () => {
   // ─── info ────────────────────────────────────────────────
   describe('agent info', () => {
     it('should show agent details', async () => {
-      makeAgent('info-agent', { model: 'opus', uses: 10, successRate: 95 });
+      makeAgent('info-agent', { model: 'claude-opus-4-8', uses: 10, successRate: 95 });
       await run(['agent', 'info', 'info-agent']);
       expect(output.some((o) => o.includes('info-agent'))).toBe(true);
-      expect(output.some((o) => o.includes('opus'))).toBe(true);
+      expect(output.some((o) => o.includes('claude-opus-4-8'))).toBe(true);
       expect(output.some((o) => o.includes('95%'))).toBe(true);
     });
 

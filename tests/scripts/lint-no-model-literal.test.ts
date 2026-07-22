@@ -12,8 +12,11 @@ import {
   extractIdFields,
   deriveKnownModelIdsFromSource,
   deriveKnownModelIds,
+  deriveLegacyModelAliasesFromSource,
+  deriveLegacyModelAliases,
   extractModelLiteralSites,
   diffAgainstBaseline,
+  isExplicitLegacyMigrationSite,
   scanSource,
   loadBaseline,
 } from '../../scripts/lint-no-model-literal.mjs';
@@ -24,6 +27,12 @@ import {
 // real (much larger) source.
 const FIXTURE_REGISTRY = `
 import type { ModelDefinition } from './model-registry-types.js';
+
+export const LEGACY_MODEL_ALIASES = Object.freeze({
+  opus: 'claude-opus-4-8',
+  sonnet: 'claude-sonnet-5',
+  'gpt-5': 'gpt-5.5',
+} as const);
 
 export const BUILTIN_MODELS: readonly ModelDefinition[] = [
   {
@@ -77,14 +86,26 @@ describe('deriveKnownModelIdsFromSource', () => {
     expect(ids).toEqual(new Set(['opus', 'sonnet', 'gpt-5.5']));
   });
 
-  it('derives from the REAL model-registry.ts (sanity: known ids present, apiId absent)', () => {
+  it('derives canonical API ids from the REAL model-registry.ts', () => {
     const ids = deriveKnownModelIds();
-    for (const known of ['fable', 'opus', 'sonnet', 'haiku', 'o3', 'gpt-5', 'gpt-5.5']) {
+    for (const known of ['claude-fable-5', 'claude-opus-4-8', 'claude-sonnet-5', 'o3', 'gpt-5.5', 'gpt-5.6-sol']) {
       expect(ids.has(known), `expected known id "${known}"`).toBe(true);
     }
-    // apiId-only values must never leak into the id dictionary.
-    expect(ids.has('claude-opus-4-8')).toBe(false);
-    expect(ids.has('claude-sonnet-5')).toBe(false);
+    expect(ids.has('opus')).toBe(false);
+    expect(ids.has('sonnet')).toBe(false);
+  });
+});
+
+describe('deriveLegacyModelAliasesFromSource', () => {
+  it('derives migration-only alias keys separately from canonical ids', () => {
+    expect(deriveLegacyModelAliasesFromSource(FIXTURE_REGISTRY)).toEqual(new Set(['opus', 'sonnet', 'gpt-5']));
+  });
+
+  it('reads the real compatibility table', () => {
+    const aliases = deriveLegacyModelAliases();
+    expect(aliases.has('opus')).toBe(true);
+    expect(aliases.has('gpt-5')).toBe(true);
+    expect(aliases.has('claude-opus-4-8')).toBe(false);
   });
 });
 
@@ -107,11 +128,8 @@ describe('extractModelLiteralSites', () => {
     expect(extractModelLiteralSites(` * pass 'sonnet' to the CLI`, knownIds)).toHaveLength(0);
   });
 
-  it('does NOT filter a single-line /** ... */ block comment (known limitation, mirrored from lint-no-spawnsync.mjs)', () => {
-    // extractSpawnSyncCalls only special-cases lines whose TRIMMED text starts with
-    // `//` or `*` — a fully single-line `/** ... */` doc comment starts with `/`,
-    // not `*`, so it slips through there too. Mirrored deliberately, not a bug.
-    expect(extractModelLiteralSites(`/** e.g. 'opus' or 'sonnet' */`, knownIds)).toHaveLength(1);
+  it('filters a single-line /** ... */ block comment', () => {
+    expect(extractModelLiteralSites(`/** e.g. 'opus' or 'sonnet' */`, knownIds)).toHaveLength(0);
   });
 
   it('matches double-quote and interpolation-free backtick literals', () => {
@@ -181,6 +199,23 @@ describe('diffAgainstBaseline', () => {
   });
 });
 
+describe('isExplicitLegacyMigrationSite', () => {
+  it('allows only switch-case input discriminators in the config migration boundary', () => {
+    expect(isExplicitLegacyMigrationSite({
+      file: 'src/core/config-migration.ts',
+      code: "case 'sonnet':",
+    })).toBe(true);
+    expect(isExplicitLegacyMigrationSite({
+      file: 'src/core/config-migration.ts',
+      code: "const fallback = 'sonnet';",
+    })).toBe(false);
+    expect(isExplicitLegacyMigrationSite({
+      file: 'src/core/config.ts',
+      code: "case 'sonnet':",
+    })).toBe(false);
+  });
+});
+
 describe('scanSource excludes model-registry.ts', () => {
   let tmpRoot: string;
 
@@ -213,6 +248,12 @@ describe('live baseline is in sync (the committed gate is green)', () => {
     // the baseline drifts, this fails here (mirroring `npm run lint:model-literal`).
     const { newCalls } = diffAgainstBaseline(scanSource(), loadBaseline());
     expect(newCalls, `new model literal sites: ${JSON.stringify(newCalls)}`).toHaveLength(0);
+  });
+
+  it('has no migration-only alias literal in runtime source', () => {
+    const runtimeAliases = scanSource(undefined, undefined, deriveLegacyModelAliases())
+      .filter((site) => !isExplicitLegacyMigrationSite(site));
+    expect(runtimeAliases).toEqual([]);
   });
 
   it('model-registry.ts is never scanned as a violation source', () => {

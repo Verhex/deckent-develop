@@ -53,7 +53,7 @@ function rawAgentManifest(overrides: Record<string, unknown> = {}): Record<strin
     expertise: ['foo'],
     allowedTools: ['Read'],
     deniedTools: [],
-    preferredModel: 'sonnet',
+    preferredModel: 'claude-sonnet-5',
     effortMultiplier: 1,
     triggerKeywords: [],
     triggerScopes: [],

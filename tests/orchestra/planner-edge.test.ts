@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process';
 function makeMockAdapter(): ProviderAdapter {
   return {
     name: 'claude',
-    supportedModels: ['opus', 'sonnet', 'haiku'] as readonly ModelType[],
+    supportedModels: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'] as readonly ModelType[],
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
@@ -63,7 +63,7 @@ function makeValidPlannerJSON(overrides: Record<string, unknown> = {}): string {
       {
         title: 'Task 1',
         description: 'Do something',
-        model: 'sonnet',
+        model: 'claude-sonnet-5',
         effort: 'normal',
         priority: 'NORMAL',
         reason: 'Standard work',
@@ -280,7 +280,7 @@ describe('parsePlannerResponse', () => {
         {
           title: 'T',
           description: 'D',
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           effort: 'normal',
           priority: 'NORMAL',
           reason: 'r',
@@ -320,7 +320,7 @@ describe('parsePlannerResponse', () => {
         {
           title: 'Task 1',
           description: 'Desc',
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           effort: 'extreme',
           priority: 'NORMAL',
           reason: 'r',
@@ -340,7 +340,7 @@ describe('parsePlannerResponse', () => {
         {
           title: 'Task 1',
           description: 'Desc',
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           effort: 'normal',
           priority: 'MEDIUM',
           reason: 'r',
@@ -360,7 +360,7 @@ describe('parsePlannerResponse', () => {
         {
           title: '',
           description: 'Desc',
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           effort: 'normal',
           priority: 'NORMAL',
           reason: 'r',
@@ -380,7 +380,7 @@ describe('parsePlannerResponse', () => {
         {
           title: 'T',
           description: '',
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           effort: 'normal',
           priority: 'NORMAL',
           reason: 'r',
@@ -398,7 +398,7 @@ describe('parsePlannerResponse', () => {
     const task = {
       title: 'Task',
       description: 'Desc',
-      model: 'sonnet',
+      model: 'claude-sonnet-5',
       effort: 'normal',
       priority: 'NORMAL',
       reason: 'r',
@@ -421,7 +421,7 @@ describe('parsePlannerResponse', () => {
   });
 
   it('parses all valid model types', () => {
-    for (const model of ['opus', 'sonnet', 'haiku']) {
+    for (const model of ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001']) {
       const raw = makeValidPlannerJSON({
         tasks: [
           {
@@ -450,7 +450,7 @@ describe('parsePlannerResponse', () => {
           {
             title: 'T',
             description: 'D',
-            model: 'sonnet',
+            model: 'claude-sonnet-5',
             effort: 'normal',
             priority,
             reason: 'r',
@@ -471,7 +471,7 @@ describe('parsePlannerResponse', () => {
         {
           title: 'T',
           description: 'D',
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           effort: 'normal',
           priority: 'NORMAL',
           reason: 'r',
@@ -492,7 +492,7 @@ describe('parsePlannerResponse', () => {
         {
           title: 'T',
           description: 'D',
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           effort: 'normal',
           priority: 'NORMAL',
           reason: 'r',
@@ -513,7 +513,7 @@ describe('parsePlannerResponse', () => {
         {
           title: 'T',
           description: 'D',
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           effort: 'normal',
           priority: 'NORMAL',
           reason: 'r',
@@ -556,57 +556,57 @@ describe('callBrainPlanner', () => {
 
   it('returns null when the spawn exits non-zero', async () => {
     const { fn } = makeSpawnFn({ status: 1, stdout: '', stderr: 'error occurred' });
-    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
+    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'claude-sonnet-5', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
   });
 
   it('returns null when stdout is empty', async () => {
     const { fn } = makeSpawnFn({ status: 0, stdout: '' });
-    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
+    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'claude-sonnet-5', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
   });
 
   it('returns null when stdout is null-ish', async () => {
     const { fn } = makeSpawnFn({ status: 0, stdout: null as unknown as string });
-    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
+    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'claude-sonnet-5', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
   });
 
   it('returns null on timeout (status null, signal SIGTERM)', async () => {
     const { fn } = makeSpawnFn({ status: null, stdout: '', signal: 'SIGTERM' });
-    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
+    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'claude-opus-4-8', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
   });
 
   it('returns null when stdout is malformed JSON', async () => {
     const { fn } = makeSpawnFn({ status: 0, stdout: 'not valid json' });
-    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
+    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'claude-sonnet-5', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
   });
 
   it('returns null when stdout has valid JSON but fails Zod validation', async () => {
     const { fn } = makeSpawnFn({ status: 0, stdout: JSON.stringify({ tasks: [], reasoning: 'empty' }) });
-    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
+    await expect(callBrainPlanner(makeContext(), makeRecommendation(), 'claude-sonnet-5', 'proj', adapter, undefined, undefined, fn)).resolves.toBeNull();
   });
 
   it('returns PlannerResult on valid stdout', async () => {
     const { fn } = makeSpawnFn();
-    const result = await callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter, undefined, undefined, fn);
+    const result = await callBrainPlanner(makeContext(), makeRecommendation(), 'claude-sonnet-5', 'proj', adapter, undefined, undefined, fn);
     expect(result).not.toBeNull();
     expect(result!.tasks).toHaveLength(1);
   });
 
   it('spawns the correct claude command', async () => {
     const { fn, calls } = makeSpawnFn();
-    await callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'proj', adapter, undefined, undefined, fn);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'claude-opus-4-8', 'proj', adapter, undefined, undefined, fn);
     expect(calls[0]!.command).toBe('claude');
-    expect(calls[0]!.args).toEqual(expect.arrayContaining(['-p', expect.any(String), '--model', 'opus']));
+    expect(calls[0]!.args).toEqual(expect.arrayContaining(['-p', expect.any(String), '--model', 'claude-opus-4-8']));
   });
 
   it('spawns with the output-format json flag', async () => {
     const { fn, calls } = makeSpawnFn();
-    await callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter, undefined, undefined, fn);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'claude-sonnet-5', 'proj', adapter, undefined, undefined, fn);
     expect(calls[0]!.args).toEqual(expect.arrayContaining(['--output-format', 'json']));
   });
 
   it('passes a timeout to the spawn', async () => {
     const { fn, calls } = makeSpawnFn();
-    await callBrainPlanner(makeContext(), makeRecommendation(), 'haiku', 'proj', adapter, undefined, undefined, fn);
+    await callBrainPlanner(makeContext(), makeRecommendation(), 'claude-haiku-4-5-20251001', 'proj', adapter, undefined, undefined, fn);
     expect(calls[0]!.timeoutMs).toEqual(expect.any(Number));
   });
 });
@@ -620,7 +620,7 @@ describe('Zod Schema validation via parsePlannerResponse', () => {
         {
           title: 'T',
           description: 'D',
-          model: 'haiku',
+          model: 'claude-haiku-4-5-20251001',
           effort: 'low',
           priority: 'LOW',
           reason: 'r',
@@ -632,7 +632,7 @@ describe('Zod Schema validation via parsePlannerResponse', () => {
     });
     const result = parsePlannerResponse(raw);
     expect(result).not.toBeNull();
-    expect(result!.tasks[0].model).toBe('haiku');
+    expect(result!.tasks[0].model).toBe('claude-haiku-4-5-20251001');
   });
 
   it('rejects when dependencies is not an array', () => {
@@ -641,7 +641,7 @@ describe('Zod Schema validation via parsePlannerResponse', () => {
         {
           title: 'T',
           description: 'D',
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           effort: 'normal',
           priority: 'NORMAL',
           reason: 'r',
@@ -662,7 +662,7 @@ describe('Zod Schema validation via parsePlannerResponse', () => {
         {
           title: 'T',
           description: 'D',
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           effort: 'normal',
           priority: 'NORMAL',
           reason: 'r',
@@ -683,7 +683,7 @@ describe('Zod Schema validation via parsePlannerResponse', () => {
         {
           title: 'T',
           description: 'D',
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           effort: 'normal',
           priority: 'NORMAL',
           // reason missing
@@ -704,7 +704,7 @@ describe('Zod Schema validation via parsePlannerResponse', () => {
         {
           title: 'T',
           description: 'D',
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           effort: 'normal',
           priority: 'NORMAL',
           reason: '',
@@ -726,7 +726,7 @@ describe('Zod Schema validation via parsePlannerResponse', () => {
           {
             title: 'T',
             description: 'D',
-            model: 'sonnet',
+            model: 'claude-sonnet-5',
             effort,
             priority: 'NORMAL',
             reason: 'r',

@@ -79,10 +79,10 @@ describe('ClaudeAdapter', () => {
     });
 
     it('should support fable, opus, sonnet, haiku models', () => {
-      expect(adapter.supportedModels).toContain('fable');
-      expect(adapter.supportedModels).toContain('opus');
-      expect(adapter.supportedModels).toContain('sonnet');
-      expect(adapter.supportedModels).toContain('haiku');
+      expect(adapter.supportedModels).toContain('claude-fable-5');
+      expect(adapter.supportedModels).toContain('claude-opus-4-8');
+      expect(adapter.supportedModels).toContain('claude-sonnet-5');
+      expect(adapter.supportedModels).toContain('claude-haiku-4-5-20251001');
     });
 
     it('should support exactly 4 models', () => {
@@ -104,15 +104,15 @@ describe('ClaudeAdapter', () => {
 
   describe('spawn()', () => {
     it('should call ensureSession before spawning', () => {
-      adapter.spawn('task-001', 'opus', 'test prompt');
+      adapter.spawn('task-001', 'claude-opus-4-8', 'test prompt');
       expect(mockTmuxEnsureSession).toHaveBeenCalledOnce();
     });
 
     it('should call tmux.spawnWorker with correct arguments', () => {
-      adapter.spawn('task-001', 'opus', 'test prompt');
+      adapter.spawn('task-001', 'claude-opus-4-8', 'test prompt');
       expect(mockTmuxSpawnWorker).toHaveBeenCalledWith(
         'task-001',
-        'opus',
+        'claude-opus-4-8',
         'test prompt',
         projectDir,
         { allowedTools: undefined, autoApprove: undefined },
@@ -121,10 +121,10 @@ describe('ClaudeAdapter', () => {
 
     it('should pass allowedTools from opts', () => {
       const opts: ProviderSpawnOptions = { allowedTools: 'Read,Write' };
-      adapter.spawn('task-001', 'sonnet', 'test', opts);
+      adapter.spawn('task-001', 'claude-sonnet-5', 'test', opts);
       expect(mockTmuxSpawnWorker).toHaveBeenCalledWith(
         'task-001',
-        'sonnet',
+        'claude-sonnet-5',
         'test',
         projectDir,
         { allowedTools: 'Read,Write', autoApprove: undefined },
@@ -133,10 +133,10 @@ describe('ClaudeAdapter', () => {
 
     it('should pass autoApprove from opts', () => {
       const opts: ProviderSpawnOptions = { autoApprove: true };
-      adapter.spawn('task-002', 'haiku', 'prompt', opts);
+      adapter.spawn('task-002', 'claude-haiku-4-5-20251001', 'prompt', opts);
       expect(mockTmuxSpawnWorker).toHaveBeenCalledWith(
         'task-002',
-        'haiku',
+        'claude-haiku-4-5-20251001',
         'prompt',
         projectDir,
         { allowedTools: undefined, autoApprove: true },
@@ -145,10 +145,10 @@ describe('ClaudeAdapter', () => {
 
     it('should use opts.projectDir if provided', () => {
       const opts: ProviderSpawnOptions = { projectDir: '/custom/dir' };
-      adapter.spawn('task-001', 'opus', 'prompt', opts);
+      adapter.spawn('task-001', 'claude-opus-4-8', 'prompt', opts);
       expect(mockTmuxSpawnWorker).toHaveBeenCalledWith(
         'task-001',
-        'opus',
+        'claude-opus-4-8',
         'prompt',
         '/custom/dir',
         expect.any(Object),
@@ -156,10 +156,10 @@ describe('ClaudeAdapter', () => {
     });
 
     it('should fall back to constructor projectDir when opts.projectDir is absent', () => {
-      adapter.spawn('task-003', 'sonnet', 'prompt');
+      adapter.spawn('task-003', 'claude-sonnet-5', 'prompt');
       expect(mockTmuxSpawnWorker).toHaveBeenCalledWith(
         'task-003',
-        'sonnet',
+        'claude-sonnet-5',
         'prompt',
         projectDir,
         expect.any(Object),
@@ -330,42 +330,42 @@ describe('ClaudeAdapter', () => {
 
   describe('buildCommand()', () => {
     it('should build basic command without opts (real model name, not alias)', () => {
-      // Sprint 237: --model carries the real apiId (claude-opus-4-8), not 'opus'
-      const cmd = adapter.buildCommand('opus', '/tmp/prompt.txt');
+      // Sprint 237: --model carries the real apiId (claude-opus-4-8), not 'claude-opus-4-8'
+      const cmd = adapter.buildCommand('claude-opus-4-8', '/tmp/prompt.txt');
       expect(cmd).toBe('claude -p - --model claude-opus-4-8 < /tmp/prompt.txt');
     });
 
     it('should include --allowedTools when provided', () => {
-      const cmd = adapter.buildCommand('sonnet', '/tmp/p.txt', { allowedTools: 'Read,Write' });
+      const cmd = adapter.buildCommand('claude-sonnet-5', '/tmp/p.txt', { allowedTools: 'Read,Write' });
       expect(cmd).toContain("--allowedTools 'Read,Write'");
     });
 
     it('should include --dangerously-skip-permissions when autoApprove is true', () => {
-      const cmd = adapter.buildCommand('haiku', '/tmp/p.txt', { autoApprove: true });
+      const cmd = adapter.buildCommand('claude-haiku-4-5-20251001', '/tmp/p.txt', { autoApprove: true });
       expect(cmd).toContain('--dangerously-skip-permissions');
     });
 
     it('should not include --dangerously-skip-permissions when autoApprove is false', () => {
-      const cmd = adapter.buildCommand('haiku', '/tmp/p.txt', { autoApprove: false });
+      const cmd = adapter.buildCommand('claude-haiku-4-5-20251001', '/tmp/p.txt', { autoApprove: false });
       expect(cmd).not.toContain('--dangerously-skip-permissions');
     });
 
     it('should use stdin redirection from promptPath', () => {
-      const cmd = adapter.buildCommand('opus', '/path/to/prompt.txt');
+      const cmd = adapter.buildCommand('claude-opus-4-8', '/path/to/prompt.txt');
       expect(cmd).toContain('< /path/to/prompt.txt');
     });
 
     it('should pass the real model apiId (not the short alias) to --model', () => {
       // alias → real version-pinned name via registry (live from models.dev)
-      expect(adapter.buildCommand('opus', '/p')).toContain('--model claude-opus-4-8');
-      expect(adapter.buildCommand('sonnet', '/p')).toContain(`--model ${modelRegistry.resolveApiId('sonnet')}`);
-      expect(adapter.buildCommand('haiku', '/p')).toContain('--model claude-haiku-4-5-20251001');
+      expect(adapter.buildCommand('claude-opus-4-8', '/p')).toContain('--model claude-opus-4-8');
+      expect(adapter.buildCommand('claude-sonnet-5', '/p')).toContain(`--model ${modelRegistry.resolveApiId('claude-sonnet-5')}`);
+      expect(adapter.buildCommand('claude-haiku-4-5-20251001', '/p')).toContain('--model claude-haiku-4-5-20251001');
       // never the bare alias
-      expect(adapter.buildCommand('opus', '/p')).not.toContain('--model opus ');
+      expect(adapter.buildCommand('claude-opus-4-8', '/p')).not.toContain('--model opus ');
     });
 
     it('should combine allowedTools and autoApprove', () => {
-      const cmd = adapter.buildCommand('opus', '/tmp/p.txt', {
+      const cmd = adapter.buildCommand('claude-opus-4-8', '/tmp/p.txt', {
         allowedTools: 'Read',
         autoApprove: true,
       });
@@ -375,24 +375,24 @@ describe('ClaudeAdapter', () => {
 
     // ─── F1-RE: native reasoning-effort flag ───────────────────────
     it('appends --effort when a valid reasoning-effort is given (tmux)', () => {
-      const cmd = adapter.buildCommand('opus', '/tmp/p.txt', { reasoningEffort: 'high' });
+      const cmd = adapter.buildCommand('claude-opus-4-8', '/tmp/p.txt', { reasoningEffort: 'high' });
       expect(cmd).toContain('--effort high');
     });
 
     it('omits --effort when no reasoning-effort is given', () => {
-      const cmd = adapter.buildCommand('opus', '/tmp/p.txt');
+      const cmd = adapter.buildCommand('claude-opus-4-8', '/tmp/p.txt');
       expect(cmd).not.toContain('--effort');
     });
 
     it('drops an invalid reasoning-effort (validated against claude vocabulary)', () => {
       // 'minimal' is a codex level, not a claude level → must NOT leak through
-      const cmd = adapter.buildCommand('opus', '/tmp/p.txt', { reasoningEffort: 'minimal' });
+      const cmd = adapter.buildCommand('claude-opus-4-8', '/tmp/p.txt', { reasoningEffort: 'minimal' });
       expect(cmd).not.toContain('--effort');
     });
 
     it('accepts the full claude effort vocabulary (xhigh, max)', () => {
-      expect(adapter.buildCommand('opus', '/p', { reasoningEffort: 'xhigh' })).toContain('--effort xhigh');
-      expect(adapter.buildCommand('opus', '/p', { reasoningEffort: 'max' })).toContain('--effort max');
+      expect(adapter.buildCommand('claude-opus-4-8', '/p', { reasoningEffort: 'xhigh' })).toContain('--effort xhigh');
+      expect(adapter.buildCommand('claude-opus-4-8', '/p', { reasoningEffort: 'max' })).toContain('--effort max');
     });
   });
 
@@ -476,10 +476,10 @@ describe('createClaudeAdapter', () => {
     const mockTmuxSpawnWorkerFn = tmux.spawnWorker as MockInstance;
     const mockEnsureSession = tmux.ensureSession as MockInstance;
     vi.clearAllMocks();
-    adapter.spawn('t-001', 'opus', 'hello');
+    adapter.spawn('t-001', 'claude-opus-4-8', 'hello');
     expect(mockTmuxSpawnWorkerFn).toHaveBeenCalledWith(
       't-001',
-      'opus',
+      'claude-opus-4-8',
       'hello',
       '/my/project',
       expect.any(Object),
@@ -520,7 +520,7 @@ describe('ClaudeAdapter — claude_backend', () => {
 
   it('should use tmux spawn when backend is tmux', () => {
     const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'tmux' });
-    adapter.spawn('task-001', 'opus', 'test prompt');
+    adapter.spawn('task-001', 'claude-opus-4-8', 'test prompt');
     expect(mockTmuxEnsureSession).toHaveBeenCalledOnce();
     expect(mockTmuxSpawnWorker).toHaveBeenCalledOnce();
   });
@@ -539,7 +539,7 @@ describe('ClaudeAdapter — claude_backend', () => {
 
   it('should build tmux-style command when backend is tmux', () => {
     const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'tmux' });
-    const cmd = adapter.buildCommand('opus', '/tmp/prompt.txt');
+    const cmd = adapter.buildCommand('claude-opus-4-8', '/tmp/prompt.txt');
     expect(cmd).toBe('claude -p - --model claude-opus-4-8 < /tmp/prompt.txt');
   });
 
@@ -552,7 +552,7 @@ describe('ClaudeAdapter — claude_backend', () => {
 
   it('should NOT call tmux.ensureSession when backend is subprocess', () => {
     const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'subprocess' });
-    adapter.spawn('task-001', 'opus', 'test prompt');
+    adapter.spawn('task-001', 'claude-opus-4-8', 'test prompt');
     expect(mockTmuxEnsureSession).not.toHaveBeenCalled();
     expect(mockTmuxSpawnWorker).not.toHaveBeenCalled();
   });
@@ -560,14 +560,14 @@ describe('ClaudeAdapter — claude_backend', () => {
   it('should NOT call tmux.killWorker when backend is subprocess', () => {
     const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'subprocess' });
     // Spawn first so there's a worker to kill
-    adapter.spawn('task-001', 'opus', 'test prompt');
+    adapter.spawn('task-001', 'claude-opus-4-8', 'test prompt');
     adapter.kill('task-001');
     expect(mockTmuxKillWorker).not.toHaveBeenCalled();
   });
 
   it('should build subprocess-style command with --dangerously-skip-permissions', () => {
     const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'subprocess' });
-    const cmd = adapter.buildCommand('opus', '/tmp/prompt.txt');
+    const cmd = adapter.buildCommand('claude-opus-4-8', '/tmp/prompt.txt');
     expect(cmd).toContain('--dangerously-skip-permissions');
     expect(cmd).toContain('--model claude-opus-4-8');
     expect(cmd).toContain('claude -p "/tmp/prompt.txt"');
@@ -576,7 +576,7 @@ describe('ClaudeAdapter — claude_backend', () => {
 
   it('should include --allowedTools in subprocess command when provided', () => {
     const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'subprocess' });
-    const cmd = adapter.buildCommand('sonnet', '/tmp/p.txt', { allowedTools: 'Read,Write' });
+    const cmd = adapter.buildCommand('claude-sonnet-5', '/tmp/p.txt', { allowedTools: 'Read,Write' });
     expect(cmd).toContain("--allowedTools 'Read,Write'");
     expect(cmd).toContain('--dangerously-skip-permissions');
   });
@@ -599,24 +599,24 @@ describe('ClaudeAdapter — claude_backend', () => {
 
   it('should throw ProviderError on spawn() when backend is mcp', () => {
     const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'mcp' });
-    expect(() => adapter.spawn('task-001', 'opus', 'test prompt')).toThrow(ProviderError);
+    expect(() => adapter.spawn('task-001', 'claude-opus-4-8', 'test prompt')).toThrow(ProviderError);
   });
 
   it('should throw with Sprint 048 context in error message for mcp spawn', () => {
     const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'mcp' });
-    expect(() => adapter.spawn('task-001', 'opus', 'test prompt'))
+    expect(() => adapter.spawn('task-001', 'claude-opus-4-8', 'test prompt'))
       .toThrow('Sprint 048');
   });
 
   it('should include alternatives in mcp spawn error message', () => {
     const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'mcp' });
-    expect(() => adapter.spawn('task-001', 'opus', 'test prompt'))
+    expect(() => adapter.spawn('task-001', 'claude-opus-4-8', 'test prompt'))
       .toThrow(/tmux|subprocess/);
   });
 
   it('should include roadmap reference in mcp spawn error message', () => {
     const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'mcp' });
-    expect(() => adapter.spawn('task-001', 'opus', 'test prompt'))
+    expect(() => adapter.spawn('task-001', 'claude-opus-4-8', 'test prompt'))
       .toThrow(/DECKENT-MASTER-BLUEPRINT\.md/);
   });
 

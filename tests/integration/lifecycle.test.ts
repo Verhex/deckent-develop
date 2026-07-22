@@ -123,7 +123,7 @@ function makeTestTask(id: string, overrides?: Partial<Task>): Task {
     id,
     title: `Task ${id}`,
     description: `Description for ${id}`,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -163,7 +163,7 @@ function makeTestConfig(root: string, overrides?: Partial<ResolvedConfig>): Reso
   return {
     mode: 'performance',
     activeModeConfig: {
-      max_workers: 3, brain_model: 'opus', default_model: 'sonnet',
+      max_workers: 3, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5',
       haiku_allowed: true,
     },
     modes: {} as ResolvedConfig['modes'],
@@ -217,8 +217,8 @@ describe('Config integration', () => {
     );
     const config = await loadConfig(root);
     expect(config.activeModeConfig.max_workers).toBe(6);
-    expect(config.activeModeConfig.brain_model).toBe('opus');
-    expect(config.activeModeConfig.default_model).toBe('opus');
+    expect(config.activeModeConfig.brain_model).toBe('claude-opus-4-8');
+    expect(config.activeModeConfig.default_model).toBe('claude-opus-4-8');
   });
 
   it('throws ConfigValidationError for invalid mode', async () => {
@@ -598,7 +598,7 @@ describe('Sprint mini-cycle integration', () => {
     providerRegistry.clear();
     const mockAdapter: ProviderAdapter = {
       name: 'claude',
-      supportedModels: ['opus', 'sonnet', 'haiku'],
+      supportedModels: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'],
       spawn: () => {},
       kill: () => {},
       listWorkers: () => [],

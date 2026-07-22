@@ -26,7 +26,7 @@ const TEST_DIR = '/tmp/deckent-provider-smoke-test';
 function makeMockAdapter(
   name: string,
   available: boolean,
-  models: ModelType[] = ['opus', 'sonnet', 'haiku'],
+  models: ModelType[] = ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'],
 ): ProviderAdapter {
   return {
     name,
@@ -50,13 +50,13 @@ describe('Claude Adapter Smoke Tests', () => {
 
   it('should have correct name and supported models', () => {
     expect(adapter.name).toBe('claude-tmux');
-    expect(adapter.supportedModels).toContain('opus');
-    expect(adapter.supportedModels).toContain('sonnet');
-    expect(adapter.supportedModels).toContain('haiku');
+    expect(adapter.supportedModels).toContain('claude-opus-4-8');
+    expect(adapter.supportedModels).toContain('claude-sonnet-5');
+    expect(adapter.supportedModels).toContain('claude-haiku-4-5-20251001');
   });
 
   it('buildCommand produces valid claude CLI string with model', () => {
-    const cmd = adapter.buildCommand('opus', '/tmp/prompt.txt');
+    const cmd = adapter.buildCommand('claude-opus-4-8', '/tmp/prompt.txt');
     expect(cmd).toContain('claude');
     expect(cmd).toContain('-p -');
     expect(cmd).toContain('--model claude-opus-4-8');
@@ -64,22 +64,22 @@ describe('Claude Adapter Smoke Tests', () => {
   });
 
   it('buildCommand includes allowedTools when specified', () => {
-    const cmd = adapter.buildCommand('sonnet', '/tmp/prompt.txt', {
+    const cmd = adapter.buildCommand('claude-sonnet-5', '/tmp/prompt.txt', {
       allowedTools: 'Read,Write,Bash',
     });
     expect(cmd).toContain("--allowedTools 'Read,Write,Bash'");
   });
 
   it('buildCommand includes --dangerously-skip-permissions when autoApprove', () => {
-    const cmd = adapter.buildCommand('haiku', '/tmp/prompt.txt', {
+    const cmd = adapter.buildCommand('claude-haiku-4-5-20251001', '/tmp/prompt.txt', {
       autoApprove: true,
     });
     expect(cmd).toContain('--dangerously-skip-permissions');
   });
 
   it('buildCommand without opts produces clean command', () => {
-    const cmd = adapter.buildCommand('sonnet', '/tmp/task.txt');
-    expect(cmd).toBe(`claude -p - --model ${modelRegistry.resolveApiId('sonnet')} < /tmp/task.txt`);
+    const cmd = adapter.buildCommand('claude-sonnet-5', '/tmp/task.txt');
+    expect(cmd).toBe(`claude -p - --model ${modelRegistry.resolveApiId('claude-sonnet-5')} < /tmp/task.txt`);
   });
 
   it('isAvailable returns boolean (checks claude --version)', async () => {
@@ -99,17 +99,17 @@ describe('Codex Adapter Smoke Tests', () => {
 
   it('should have correct name and supported models', () => {
     expect(adapter.name).toBe('codex');
-    expect(adapter.supportedModels).toContain('gpt-5');
+    expect(adapter.supportedModels).toContain('gpt-5.5');
     expect(adapter.supportedModels).toContain('gpt-5-mini');
     expect(adapter.supportedModels).toContain('gpt-4.1');
     expect(adapter.supportedModels).toContain('o3');
   });
 
   it('buildCommand produces valid codex exec string', () => {
-    const cmd = adapter.buildCommand('gpt-5', '/tmp/prompt.txt');
+    const cmd = adapter.buildCommand('gpt-5.5', '/tmp/prompt.txt');
     expect(cmd).toContain('codex exec');
     expect(cmd).toContain('--full-auto');
-    expect(cmd).toContain('--model gpt-5');
+    expect(cmd).toContain('--model gpt-5.5');
     expect(cmd).toContain('$(cat /tmp/prompt.txt)');
   });
 
@@ -232,7 +232,7 @@ describe('Provider Registry Smoke Tests', () => {
 
   it('registers providers and sets first as default', () => {
     const claude = makeMockAdapter('claude', true);
-    const codex = makeMockAdapter('codex', true, ['gpt-5', 'gpt-4.1']);
+    const codex = makeMockAdapter('codex', true, ['gpt-5.5', 'gpt-4.1']);
 
     registry.registerProvider(claude);
     registry.registerProvider(codex);
@@ -294,44 +294,44 @@ describe('Provider Fallback Chain Smoke Tests', () => {
 
     const result = await resolveProviderWithFallback(
       'claude',
-      'opus',
+      'claude-opus-4-8',
       {},
       registry,
     );
 
     expect(result.provider).toBe('claude');
-    expect(result.model).toBe('opus');
+    expect(result.model).toBe('claude-opus-4-8');
     expect(result.wasOriginal).toBe(true);
   });
 
   it('falls back to alternative provider when primary unavailable', async () => {
     const claude = makeMockAdapter('claude', false);
-    const codex = makeMockAdapter('codex', true, ['gpt-5', 'gpt-4.1', 'gpt-5-mini', 'gpt-4.1-mini', 'o3', 'o4-mini']);
+    const codex = makeMockAdapter('codex', true, ['gpt-5.5', 'gpt-4.1', 'gpt-5-mini', 'gpt-4.1-mini', 'o3', 'o4-mini']);
     registry.registerProvider(claude);
     registry.registerProvider(codex);
 
     const result = await resolveProviderWithFallback(
       'claude',
-      'opus',
+      'claude-opus-4-8',
       { fallback_provider: 'codex' },
       registry,
     );
 
     expect(result.provider).toBe('codex');
     expect(result.wasOriginal).toBe(false);
-    // opus → gpt-5 (premium tier equivalent)
-    expect(result.model).toBe('gpt-5');
+    // Claude premium → canonical Codex premium equivalent.
+    expect(result.model).toBe('gpt-5.5');
   });
 
   it('applies model equivalence during fallback: sonnet → gpt-4.1', async () => {
     const claude = makeMockAdapter('claude', false);
-    const codex = makeMockAdapter('codex', true, ['gpt-5', 'gpt-4.1', 'gpt-5-mini', 'gpt-4.1-mini', 'o3', 'o4-mini']);
+    const codex = makeMockAdapter('codex', true, ['gpt-5.5', 'gpt-4.1', 'gpt-5-mini', 'gpt-4.1-mini', 'o3', 'o4-mini']);
     registry.registerProvider(claude);
     registry.registerProvider(codex);
 
     const result = await resolveProviderWithFallback(
       'claude',
-      'sonnet',
+      'claude-sonnet-5',
       { fallback_provider: 'codex' },
       registry,
     );
@@ -341,13 +341,13 @@ describe('Provider Fallback Chain Smoke Tests', () => {
 
   it('applies model equivalence during fallback: haiku → gpt-5-mini', async () => {
     const claude = makeMockAdapter('claude', false);
-    const codex = makeMockAdapter('codex', true, ['gpt-5', 'gpt-4.1', 'gpt-5-mini', 'gpt-4.1-mini', 'o3', 'o4-mini']);
+    const codex = makeMockAdapter('codex', true, ['gpt-5.5', 'gpt-4.1', 'gpt-5-mini', 'gpt-4.1-mini', 'o3', 'o4-mini']);
     registry.registerProvider(claude);
     registry.registerProvider(codex);
 
     const result = await resolveProviderWithFallback(
       'claude',
-      'haiku',
+      'claude-haiku-4-5-20251001',
       { fallback_provider: 'codex' },
       registry,
     );
@@ -360,7 +360,7 @@ describe('Provider Fallback Chain Smoke Tests', () => {
     registry.registerProvider(claude);
 
     await expect(
-      resolveProviderWithFallback('claude', 'opus', {}, registry),
+      resolveProviderWithFallback('claude', 'claude-opus-4-8', {}, registry),
     ).rejects.toThrow(ProviderUnavailableError);
   });
 
@@ -373,7 +373,7 @@ describe('Provider Fallback Chain Smoke Tests', () => {
     await expect(
       resolveProviderWithFallback(
         'claude',
-        'opus',
+        'claude-opus-4-8',
         { fallback_provider: 'codex' },
         registry,
       ),
@@ -388,7 +388,7 @@ describe('Provider Fallback Chain Smoke Tests', () => {
 
     const result = await resolveProviderWithFallback(
       'claude',
-      'opus',
+      'claude-opus-4-8',
       { fallback_provider: 'gemini' },
       registry,
     );
@@ -402,31 +402,31 @@ describe('Provider Fallback Chain Smoke Tests', () => {
 
 describe('Model Equivalence Smoke Tests', () => {
   it('getModelTier returns correct tiers', () => {
-    expect(getModelTier('opus')).toBe('premium');
-    expect(getModelTier('sonnet')).toBe('standard');
-    expect(getModelTier('haiku')).toBe('economy');
-    expect(getModelTier('gpt-5')).toBe('premium');
+    expect(getModelTier('claude-opus-4-8')).toBe('premium');
+    expect(getModelTier('claude-sonnet-5')).toBe('standard');
+    expect(getModelTier('claude-haiku-4-5-20251001')).toBe('economy');
+    expect(getModelTier('gpt-5.5')).toBe('premium');
     expect(getModelTier('gemini-2.5-pro')).toBe('premium');
   });
 
   it('getEquivalentModel maps across providers correctly', () => {
-    expect(getEquivalentModel('opus', 'codex')).toBe('gpt-5');
-    expect(getEquivalentModel('opus', 'gemini')).toBe('gemini-2.5-pro');
-    expect(getEquivalentModel('sonnet', 'codex')).toBe('gpt-4.1');
-    expect(getEquivalentModel('sonnet', 'gemini')).toBe('gemini-2.5-flash');
-    expect(getEquivalentModel('haiku', 'codex')).toBe('gpt-5-mini');
-    expect(getEquivalentModel('haiku', 'gemini')).toBe('gemini-2.0-flash');
+    expect(getEquivalentModel('claude-opus-4-8', 'codex')).toBe('gpt-5.5');
+    expect(getEquivalentModel('claude-opus-4-8', 'gemini')).toBe('gemini-2.5-pro');
+    expect(getEquivalentModel('claude-sonnet-5', 'codex')).toBe('gpt-4.1');
+    expect(getEquivalentModel('claude-sonnet-5', 'gemini')).toBe('gemini-2.5-flash');
+    expect(getEquivalentModel('claude-haiku-4-5-20251001', 'codex')).toBe('gpt-5-mini');
+    expect(getEquivalentModel('claude-haiku-4-5-20251001', 'gemini')).toBe('gemini-2.0-flash');
   });
 
   it('getEquivalentModel returns same model for same provider', () => {
-    expect(getEquivalentModel('opus', 'claude')).toBe('opus');
-    expect(getEquivalentModel('gpt-5', 'codex')).toBe('gpt-5');
+    expect(getEquivalentModel('claude-opus-4-8', 'claude')).toBe('claude-opus-4-8');
+    expect(getEquivalentModel('gpt-5.5', 'codex')).toBe('gpt-5.5');
     expect(getEquivalentModel('gemini-2.5-pro', 'gemini')).toBe('gemini-2.5-pro');
   });
 
   it('getModelProvider returns correct provider', () => {
-    expect(getModelProvider('opus')).toBe('claude');
-    expect(getModelProvider('gpt-5')).toBe('codex');
+    expect(getModelProvider('claude-opus-4-8')).toBe('claude');
+    expect(getModelProvider('gpt-5.5')).toBe('codex');
     expect(getModelProvider('gemini-2.5-pro')).toBe('gemini');
   });
 

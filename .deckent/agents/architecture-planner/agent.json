@@ -53,7 +53,7 @@
     "Edit"
   ],
   "deniedTools": [],
-  "preferredModel": "opus",
+  "preferredModel": "claude-opus-4-8",
   "effortMultiplier": 1.3,
   "triggerKeywords": [
     "architecture",
@@ -140,7 +140,7 @@
       ]
     },
     "numerical": {
-      "preferredModel": "opus",
+      "preferredModel": "claude-opus-4-8",
       "costTier": "premium",
       "maxParallel": null
     }

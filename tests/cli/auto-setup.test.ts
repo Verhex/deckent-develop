@@ -41,8 +41,8 @@ describe('generateSetupRecommendation', () => {
 
     expect(result.mode).toBe('performance');
     expect(result.maxWorkers).toBe(4); // ceil(8 * 0.5)
-    expect(result.brainModel).toBe('opus');
-    expect(result.defaultModel).toBe('opus');
+    expect(result.brainModel).toBe('claude-opus-4-8');
+    expect(result.defaultModel).toBe('claude-opus-4-8');
     expect(result.planning).toBe('ai');
   });
 
@@ -55,8 +55,8 @@ describe('generateSetupRecommendation', () => {
 
     expect(result.mode).toBe('economic');
     expect(result.maxWorkers).toBe(3); // ceil(3 * 1.0)
-    expect(result.brainModel).toBe('sonnet');
-    expect(result.defaultModel).toBe('sonnet');
+    expect(result.brainModel).toBe('claude-sonnet-5');
+    expect(result.defaultModel).toBe('claude-sonnet-5');
     expect(result.planning).toBe('structured');
   });
 
@@ -68,8 +68,8 @@ describe('generateSetupRecommendation', () => {
     );
 
     expect(result.mode).toBe('economic');
-    expect(result.brainModel).toBe('sonnet');
-    expect(result.defaultModel).toBe('sonnet');
+    expect(result.brainModel).toBe('claude-sonnet-5');
+    expect(result.defaultModel).toBe('claude-sonnet-5');
     expect(result.planning).toBe('structured');
   });
 

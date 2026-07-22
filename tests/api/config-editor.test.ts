@@ -22,7 +22,7 @@ vi.mock('../../src/core/config.js', () => ({
   resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(async () => ({
-    activeModeConfig: { brain_model: 'opus', default_model: 'sonnet', haiku_allowed: false, max_workers: 4 },
+    activeModeConfig: { brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: false, max_workers: 4 },
   })),
   createDefaultConfig: vi.fn(() => ({
     mode: 'performance',
@@ -56,10 +56,10 @@ vi.mock('../../src/core/config.js', () => ({
     rollback_policy: 'never',
     auto_clean_locks: false,
     modes: {
-      performance: { max_workers: 8, brain_model: 'opus', default_model: 'opus', haiku_allowed: true, brain_planning: 'auto' },
+      performance: { max_workers: 8, brain_model: 'claude-opus-4-8', default_model: 'opus', haiku_allowed: true, brain_planning: 'auto' },
       balanced: { max_workers: 5, brain_model: 'sonnet', default_model: 'opus', haiku_allowed: true, brain_planning: 'auto' },
-      economic: { max_workers: 3, brain_model: 'sonnet', default_model: 'sonnet', haiku_allowed: false, brain_planning: 'auto' },
-      api: { max_workers: 10, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: true, budget_per_sprint: 5.0, requires: 'ANTHROPIC_API_KEY', brain_planning: 'auto' },
+      economic: { max_workers: 3, brain_model: 'sonnet', default_model: 'claude-sonnet-5', haiku_allowed: false, brain_planning: 'auto' },
+      api: { max_workers: 10, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: true, budget_per_sprint: 5.0, requires: 'ANTHROPIC_API_KEY', brain_planning: 'auto' },
     },
   })),
   deepMerge: vi.fn((base: Record<string, unknown>, override: Record<string, unknown>) => ({ ...base, ...override })),

@@ -22,6 +22,7 @@ const KNOWN_KEYS = [
   'start.sprint_planned',
   'start.reasoning',
   'start.planning_mode',
+  'planning.receipt_ref',
   'start.workers_info',
   'start.dry_run_complete',
   'start.watch_window_created',
@@ -49,6 +50,16 @@ const KNOWN_KEYS = [
 
 describe('getMessage', () => {
   describe('key lookup', () => {
+    it('renders an opaque invocation receipt reference in both languages', () => {
+      const vars = { invocationId: 'inv-1', tenantId: 'tenant-a', projectId: 'project-a' };
+      expect(getMessage('planning.receipt_ref', 'en', vars)).toBe(
+        'Invocation receipt: inv-1 · tenant=tenant-a · project=project-a',
+      );
+      expect(getMessage('planning.receipt_ref', 'tr', vars)).toBe(
+        'Çağrı makbuzu: inv-1 · tenant=tenant-a · project=project-a',
+      );
+    });
+
     it('returns English message for hint.COMPLETE with lang=en', () => {
       const result = getMessage('hint.COMPLETE', 'en');
       expect(result).toContain('Sprint complete');

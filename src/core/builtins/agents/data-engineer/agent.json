@@ -33,7 +33,7 @@
       "deliverables": ["code-src", "code-test", "migration"]
     },
     "numerical": {
-      "preferredModel": "sonnet",
+      "preferredModel": "claude-sonnet-5",
       "costTier": "standard",
       "maxParallel": null
     }
@@ -93,7 +93,7 @@
     "Grep"
   ],
   "deniedTools": [],
-  "preferredModel": "sonnet",
+  "preferredModel": "claude-sonnet-5",
   "effortMultiplier": 1,
   "triggerKeywords": [
     "database",

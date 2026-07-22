@@ -14,16 +14,16 @@ import type { SprintHistoryData } from '../../src/orchestra/brain-context.js';
 
 describe('resolveModelLabel — label canlı registry', () => {
   it('returns provider/apiId for known claude model (opus)', () => {
-    const label = resolveModelLabel('opus');
+    const label = resolveModelLabel('claude-opus-4-8');
     // opus should resolve to 'claude/claude-opus-4-8' (or whatever the live apiId is)
     expect(label).toMatch(/^claude\//);
-    expect(label).not.toBe('opus'); // must not be raw alias
+    expect(label).not.toBe('claude-opus-4-8'); // must not be raw alias
   });
 
   it('returns provider/apiId for known claude model (sonnet)', () => {
-    const label = resolveModelLabel('sonnet');
+    const label = resolveModelLabel('claude-sonnet-5');
     expect(label).toMatch(/^claude\//);
-    expect(label).toContain('sonnet');
+    expect(label).toContain('claude-sonnet-5');
   });
 
   it('returns provider/apiId for known codex model (gpt-4.1)', () => {
@@ -56,17 +56,17 @@ describe('resolveModelLabel — bilinmeyen model graceful', () => {
 describe('registry tier doğruluğu — tier doğru', () => {
   it('opus is premium tier in registry', () => {
     const registry = new ModelRegistry();
-    expect(registry.get('opus')?.tier).toBe('premium');
+    expect(registry.get('claude-opus-4-8')?.tier).toBe('premium');
   });
 
   it('haiku is economy tier in registry', () => {
     const registry = new ModelRegistry();
-    expect(registry.get('haiku')?.tier).toBe('economy');
+    expect(registry.get('claude-haiku-4-5-20251001')?.tier).toBe('economy');
   });
 
   it('sonnet is standard tier in registry', () => {
     const registry = new ModelRegistry();
-    expect(registry.get('sonnet')?.tier).toBe('standard');
+    expect(registry.get('claude-sonnet-5')?.tier).toBe('standard');
   });
 });
 
@@ -76,7 +76,7 @@ describe('formatHistoryContext — provider prefix', () => {
   it('model distribution shows provider/ prefix for known model', () => {
     const history: SprintHistoryData = {
       taskTypes: {},
-      models: { opus: 4 },
+      models: { 'claude-opus-4-8': 4 },
       successRate: 1.0,
       noGoPatterns: [],
     };
@@ -110,7 +110,7 @@ describe('formatHistoryContext — provider prefix', () => {
   it('mixed known and unknown models all appear', () => {
     const history: SprintHistoryData = {
       taskTypes: { feature: 2 },
-      models: { opus: 3, 'legacy-model': 1 },
+      models: { 'claude-opus-4-8': 3, 'legacy-model': 1 },
       successRate: 0.9,
       noGoPatterns: [],
     };

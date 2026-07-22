@@ -22,11 +22,30 @@ vi.mock('../../src/core/utils.js', () => ({
 
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { DockerSpawnBackend, isDockerAvailable } from '../../src/orchestra/spawn-backend-docker.js';
+import {
+  DockerSpawnBackend,
+  isDockerAvailable,
+  classifyDockerPreflight,
+  DOCKER_ERROR_CODES,
+} from '../../src/orchestra/spawn-backend-docker.js';
 import { SpawnBackendError } from '../../src/orchestra/spawn-backend.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
 const mockExistsSync = vi.mocked(existsSync);
+const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
+
+/** Build a spawnSync-shaped return object for the mock. */
+function spawnResult(over: { stdout?: string; stderr?: string; status?: number | null; error?: Error }): any {
+  return {
+    stdout: over.stdout ?? '',
+    stderr: over.stderr ?? '',
+    status: over.status ?? 0,
+    signal: null,
+    pid: 1,
+    output: ['', over.stdout ?? '', over.stderr ?? ''],
+    ...(over.error ? { error: over.error } : {}),
+  };
+}
 
 // ─── Tests ──────────────────────────────────────────────────────────
 
@@ -45,39 +64,116 @@ describe('DockerSpawnBackend', () => {
 
   describe('spawn', () => {
     it('should throw SpawnBackendError when Docker image is not found', () => {
-      // Image check returns empty stdout → image not found
-      mockSpawnSync.mockReturnValueOnce({
-        stdout: '',
-        stderr: '',
-        status: 0,
-        signal: null,
-        pid: 1,
-        output: ['', '', ''],
-      } as any);
+      // 455-003: call 1 = `docker info` daemon preflight (healthy), call 2 =
+      // `docker images -q` (empty → image not found).
+      mockSpawnSync
+        .mockReturnValueOnce(spawnResult({ stdout: 'Server: healthy', status: 0 }))
+        .mockReturnValueOnce(spawnResult({ stdout: '', status: 0 }));
 
-      expect(() => backend.spawn('001-001', 'sonnet', 'test prompt'))
-        .toThrow("Docker image 'test-image:latest' not ready for provider 'claude'");
+      expect(() => backend.spawn('001-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS))
+        .toThrow(/not found locally for provider 'claude'/);
     });
 
-    it('should throw a SpawnBackendError instance with correct backendName', () => {
-      mockSpawnSync.mockReturnValueOnce({
-        stdout: '',
-        stderr: '',
-        status: 0,
-        signal: null,
-        pid: 1,
-        output: [],
-      } as any);
+    it('image-missing failure carries the distinct IMAGE_NOT_FOUND code (not a daemon/CLI collapse)', () => {
+      mockSpawnSync
+        .mockReturnValueOnce(spawnResult({ stdout: 'Server: healthy', status: 0 }))
+        .mockReturnValueOnce(spawnResult({ stdout: '', status: 0 }));
+
+      expect(() => backend.spawn('001-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS))
+        .toThrow(DOCKER_ERROR_CODES.IMAGE_NOT_FOUND);
+    });
+
+    it('daemon permission-denied preflight is NOT reported as image-missing (distinct code)', () => {
+      // 455-003 core NO-GO guard: a permission-denied daemon must surface E086,
+      // never the IMAGE_NOT_FOUND path. `docker info` fails first → we never
+      // reach the image lookup at all.
+      mockSpawnSync.mockReturnValueOnce(spawnResult({
+        status: 1,
+        stderr: 'Got permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock',
+      }));
 
       let error: SpawnBackendError | null = null;
       try {
-        backend.spawn('001-001', 'sonnet', 'test prompt');
+        backend.spawn('001-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
+      } catch (e) {
+        error = e as SpawnBackendError;
+      }
+      expect(error).toBeInstanceOf(SpawnBackendError);
+      expect(error!.message).toContain(DOCKER_ERROR_CODES.DAEMON_PERMISSION);
+      expect(error!.message).not.toContain(DOCKER_ERROR_CODES.IMAGE_NOT_FOUND);
+      // The image lookup never ran — only the `docker info` preflight was spawned.
+      expect(mockSpawnSync).toHaveBeenCalledTimes(1);
+    });
+
+    it('daemon-unavailable preflight surfaces E085 with evidence, never image-missing', () => {
+      mockSpawnSync.mockReturnValueOnce(spawnResult({
+        status: 1,
+        stderr: 'Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?',
+      }));
+
+      expect(() => backend.spawn('001-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS))
+        .toThrow(DOCKER_ERROR_CODES.DAEMON_UNAVAILABLE);
+    });
+
+    it('should throw a SpawnBackendError instance with correct backendName', () => {
+      mockSpawnSync
+        .mockReturnValueOnce(spawnResult({ stdout: 'Server: healthy', status: 0 }))
+        .mockReturnValueOnce(spawnResult({ stdout: '', status: 0 }));
+
+      let error: SpawnBackendError | null = null;
+      try {
+        backend.spawn('001-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
       } catch (e) {
         error = e as SpawnBackendError;
       }
 
       expect(error).toBeInstanceOf(SpawnBackendError);
       expect(error!.backendName).toBe('docker');
+    });
+  });
+
+  // ─── 455-003: daemon preflight classifier (distinct daemon/permission/absent) ──
+  describe('classifyDockerPreflight', () => {
+    it('returns null for a healthy daemon (status 0)', () => {
+      expect(classifyDockerPreflight({ status: 0, stderr: '' })).toBeNull();
+    });
+
+    it('classifies a permission-denied socket as DAEMON_PERMISSION (E086)', () => {
+      const out = classifyDockerPreflight({
+        status: 1,
+        stderr: 'Got permission denied while trying to connect to the Docker daemon socket',
+      });
+      expect(out?.code).toBe(DOCKER_ERROR_CODES.DAEMON_PERMISSION);
+      expect(out?.evidence).toContain('permission denied');
+    });
+
+    it('classifies an unreachable daemon as DAEMON_UNAVAILABLE (E085)', () => {
+      const out = classifyDockerPreflight({
+        status: 1,
+        stderr: 'Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?',
+      });
+      expect(out?.code).toBe(DOCKER_ERROR_CODES.DAEMON_UNAVAILABLE);
+    });
+
+    it('classifies an absent docker binary (ENOENT) as DOCKER_ABSENT (E087)', () => {
+      const out = classifyDockerPreflight({
+        status: null,
+        stderr: '',
+        spawnError: { code: 'ENOENT' },
+      });
+      expect(out?.code).toBe(DOCKER_ERROR_CODES.DOCKER_ABSENT);
+    });
+
+    it('classifies status 127 as DOCKER_ABSENT (command not found)', () => {
+      const out = classifyDockerPreflight({ status: 127, stderr: 'docker: command not found' });
+      expect(out?.code).toBe(DOCKER_ERROR_CODES.DOCKER_ABSENT);
+    });
+
+    it('permission-denied is distinguished from image-missing — the three classes never share a code', () => {
+      const perm = classifyDockerPreflight({ status: 1, stderr: 'permission denied' })?.code;
+      const down = classifyDockerPreflight({ status: 1, stderr: 'Is the docker daemon running?' })?.code;
+      const absent = classifyDockerPreflight({ status: 127, stderr: '' })?.code;
+      expect(new Set([perm, down, absent, DOCKER_ERROR_CODES.IMAGE_NOT_FOUND]).size).toBe(4);
     });
   });
 

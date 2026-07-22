@@ -196,22 +196,20 @@ describe('checkCodexDockerReadiness', () => {
 
 describe('getCodexModelArgEvidence', () => {
   it('never spawns a real codex process (pure, buildCommand only)', () => {
-    const evidence = getCodexModelArgEvidence('gpt-5', { projectDir: '/tmp/codex-readiness-test' });
-    expect(evidence.model).toBe('gpt-5');
+    const evidence = getCodexModelArgEvidence('gpt-5.5', { projectDir: '/tmp/codex-readiness-test' });
+    expect(evidence.model).toBe('gpt-5.5');
     expect(typeof evidence.spawnCommand).toBe('string');
   });
 
-  it('proves the --model param is sent as the wire apiId (gpt-5 -> gpt-5.5), not the deckent alias', () => {
-    const evidence = getCodexModelArgEvidence('gpt-5', { projectDir: '/tmp/codex-readiness-test' });
+  it('proves the canonical API ID passes to --model unchanged', () => {
+    const evidence = getCodexModelArgEvidence('gpt-5.5', { projectDir: '/tmp/codex-readiness-test' });
 
     expect(evidence.wireModel).toBe('gpt-5.5');
     expect(evidence.spawnCommand).toContain('--model gpt-5.5');
-    expect(evidence.spawnCommand).not.toContain('--model gpt-5 ');
-    expect(evidence.spawnCommand.endsWith('--model gpt-5')).toBe(false);
   });
 
   it('proves the prompt-feed format: prompt is fed via `$(cat <promptPath>)`, not inline', () => {
-    const evidence = getCodexModelArgEvidence('gpt-5', {
+    const evidence = getCodexModelArgEvidence('gpt-5.5', {
       projectDir: '/tmp/codex-readiness-test',
       promptPath: '/tmp/codex-readiness-test/.tasks/task-x.prompt',
     });
@@ -221,7 +219,7 @@ describe('getCodexModelArgEvidence', () => {
   });
 
   it('proves the output-format flag: CODEX_USAGE_EMIT_ARGS is --json (structured JSONL stream)', () => {
-    const evidence = getCodexModelArgEvidence('gpt-5');
+    const evidence = getCodexModelArgEvidence('gpt-5.5');
     expect(evidence.usageEmitArgs).toEqual(CODEX_USAGE_EMIT_ARGS);
     expect(evidence.usageEmitArgs).toEqual(['--json']);
   });
@@ -253,7 +251,7 @@ describe('assessCodexSpawnReadiness', () => {
     expect(report.backendRequired).toBe('subprocess');
     expect(report.reason).toBe(report.docker.reason);
     expect(report.modelArgEvidence).toHaveLength(1);
-    expect(report.modelArgEvidence[0]?.model).toBe('gpt-5');
+    expect(report.modelArgEvidence[0]?.model).toBe('gpt-5.5');
     expect(report.modelArgEvidence[0]?.wireModel).toBe('gpt-5.5');
 
     // neither the real `codex` nor real `docker` binaries were ever invoked
@@ -282,9 +280,9 @@ describe('assessCodexSpawnReadiness', () => {
       hostSpawnImpl,
       dockerSpawnImpl,
       env: {},
-      models: ['gpt-5', 'gpt-5-mini'],
+      models: ['gpt-5.5', 'gpt-5-mini'],
     });
 
-    expect(report.modelArgEvidence.map((e) => e.model)).toEqual(['gpt-5', 'gpt-5-mini']);
+    expect(report.modelArgEvidence.map((e) => e.model)).toEqual(['gpt-5.5', 'gpt-5-mini']);
   });
 });

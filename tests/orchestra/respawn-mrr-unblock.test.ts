@@ -23,6 +23,7 @@ function makeBackend(): SpawnBackend & { spawned: string[] } {
   const spawned: string[] = [];
   return {
     name: 'mock-mrr',
+    liveUsageBudgetSupport: 'measured-stream' as const,
     spawn(taskId: string, _m: ModelType, _p: string, _o?: SpawnBackendOptions) { spawned.push(taskId); },
     kill() { /* no-op */ },
     list() { return spawned; },
@@ -34,11 +35,12 @@ function makeBackend(): SpawnBackend & { spawned: string[] } {
 function task(id: string, status: TaskStatus, dependencies: string[] = []): Task {
   return {
     id, title: `Task ${id}`, description: `mrr-unblock ${id}`,
-    model: 'sonnet' as ModelType, effort: 'normal', priority: 'NORMAL', reason: 'mrr-test',
+    model: 'claude-sonnet-5' as ModelType, effort: 'normal', priority: 'NORMAL', reason: 'mrr-test',
     scope: { directories: ['src/'], filesRead: [], filesWrite: [`src/mrr-${id}.ts`] },
     dependencies,
     goNogo: { goCriteria: 'x', noGoCriteria: 'x', techDebtAcceptable: 'none' },
     status, sprintId: 'sprint-280', assignedAgent: 'generic', assignedSkills: [], provider: 'claude',
+    budget: { maxTurns: 1 },
   } as unknown as Task;
 }
 

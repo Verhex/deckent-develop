@@ -17,7 +17,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '239-test',
     title: 'Work-model consumer test task',
     description: 'Test task for canonical TaskKind consumption',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -33,7 +33,7 @@ function makeCreateParams(scopeOverride: Partial<Task['scope']> = {}): CreateTas
   return {
     title: 'Test task',
     description: 'A test description',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',

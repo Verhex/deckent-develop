@@ -423,7 +423,7 @@ describe('waitForResults — SCHED5 live wiring: initial tick spawns via the inj
     const { sprint, readyTask } = buildFixture();
     const config = {
       dependency_pipeline_enabled: true,
-      activeModeConfig: { max_workers: 3, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: true },
+      activeModeConfig: { max_workers: 3, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: true },
     } as unknown as ResolvedConfig;
 
     await waitForResults(root, sprint, 300, undefined, undefined, undefined, config);
@@ -439,7 +439,7 @@ describe('waitForResults — SCHED5 live wiring: initial tick spawns via the inj
     const config = {
       dependency_pipeline_enabled: true,
       scheduler: { engine: 'reducer' },
-      activeModeConfig: { max_workers: 3, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: true },
+      activeModeConfig: { max_workers: 3, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: true },
     } as unknown as ResolvedConfig;
 
     await waitForResults(root, sprint, 300, undefined, undefined, undefined, config);
@@ -454,7 +454,7 @@ describe('waitForResults — SCHED5 live wiring: initial tick spawns via the inj
     const { sprint, readyTask } = buildFixture();
     const config = {
       dependency_pipeline_enabled: true,
-      activeModeConfig: { max_workers: 3, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: true },
+      activeModeConfig: { max_workers: 3, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: true },
     } as unknown as ResolvedConfig;
     expect((config as { scheduler?: unknown }).scheduler).toBeUndefined();
 

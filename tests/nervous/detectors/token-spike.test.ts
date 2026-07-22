@@ -96,11 +96,12 @@ describe('TokenSpikeDetector', () => {
   });
 
   it('positive: cost exceeds threshold → warning alert', () => {
-    // Arrange — 2 opus tasks = high token usage (~$15+ for opus at 15/75 per 1M)
-    // 500K input + 100K output per task = 2 * ($7.50 + $7.50) = $30
+    // Arrange — 2 opus tasks priced at the CANONICAL registry rate (5/25 per 1M),
+    // resolved through the non-dispatch legacy-alias compat boundary.
+    // 1.5M input + 300K output per task = 2 × ($7.50 + $7.50) = $30
     setupResults([
-      { inputTokens: 500_000, outputTokens: 100_000, model: 'opus' },
-      { inputTokens: 500_000, outputTokens: 100_000, model: 'opus' },
+      { inputTokens: 1_500_000, outputTokens: 300_000, model: 'opus' },
+      { inputTokens: 1_500_000, outputTokens: 300_000, model: 'opus' },
     ]);
 
     // Act
@@ -116,7 +117,8 @@ describe('TokenSpikeDetector', () => {
   });
 
   it('negative: cost below threshold → null', () => {
-    // Arrange — 1 haiku task = tiny cost (~$0.00025 input + $0.00125 output ≈ $0.0015)
+    // Arrange — 1 haiku task = tiny cost (registry haiku 0.8/4 per 1M:
+    // ~$0.0008 input + $0.004 output ≈ $0.0048), well under the $10 threshold.
     setupResults([
       { inputTokens: 1000, outputTokens: 1000, model: 'haiku' },
     ]);
@@ -125,6 +127,18 @@ describe('TokenSpikeDetector', () => {
     const result = detector.detect(makeCtx());
 
     // Assert
+    expect(result).toBeNull();
+  });
+
+  it('honest-unknown: an unknown model is NOT priced at a named default', () => {
+    // A large token burn on a model unknown to the registry must NOT be silently
+    // priced (e.g. as sonnet, which would be 5M×$3 + 1M×$15 = $30 → a false
+    // critical spike). It contributes $0, is counted as unpriced, and no spike fires.
+    setupResults([
+      { inputTokens: 5_000_000, outputTokens: 1_000_000, model: 'totally-unknown-model' },
+    ]);
+
+    const result = detector.detect(makeCtx());
     expect(result).toBeNull();
   });
 

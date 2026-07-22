@@ -48,7 +48,7 @@ const V2_FIXTURE_AGENT = {
   manifestVersion: 2,
   source: 'builtin',
   deniedTools: [],
-  preferredModel: 'sonnet',
+  preferredModel: 'claude-sonnet-5',
   activation: {
     rules: [
       { when: { 'intent.primary': 'implementation' }, score: 10 },
@@ -68,7 +68,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: 'slice0-smoke-task',
     title: 'Build a feature',
     description: 'Implement the described behavior in the codebase.',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'slice0-smoke fixture',

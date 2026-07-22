@@ -134,8 +134,7 @@ function synthesizeSkillManifest(id: string, skillMdPath: string): Record<string
 
 const VALID_CATEGORIES: SkillCategory[] = ['language', 'framework', 'tool', 'domain', 'workflow'];
 const VALID_POSITIONS = ['prepend', 'append', 'section'] as const;
-import { ALL_MODELS } from './types.js';
-const VALID_MODELS = ALL_MODELS;
+import { modelRegistry, resolveCanonicalModelIdentity } from './model-registry.js';
 
 // ─── Activation Schema (born-590 ACTIVATION-VALIDATION) ─────────────────────
 //
@@ -612,8 +611,11 @@ export class SkillPoolManager {
 
     // model validation
     if (obj['model'] !== undefined) {
-      if (!(VALID_MODELS as readonly string[]).includes(obj['model'] as typeof VALID_MODELS[number])) {
-        errors.push(`"model" must be one of: ${VALID_MODELS.join(', ')}`);
+      try {
+        if (typeof obj['model'] !== 'string') throw new Error('invalid model type');
+        resolveCanonicalModelIdentity(obj['model'], { registerParametric: false });
+      } catch {
+        errors.push(`"model" must be a canonical registered model ID: ${modelRegistry.getAllModelIds().join(', ')}`);
       }
     }
 

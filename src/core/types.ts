@@ -19,8 +19,8 @@ export * from './invocation-receipt.js';
 // these aliases unblock the adapter, registry, and config layers that DO live
 // in scoped files.
 
-/** Ollama-served model identifiers (curated subset, registry holds full apiId). */
-export type OllamaModel = 'qwen-coder-32b' | 'qwen-coder-7b' | 'llama-3-8b' | 'llama-3.2-3b';
+/** Ollama-served exact API tags; runtime membership is registry-validated. */
+export type OllamaModel = string & {};
 
 /** Extended provider name — includes local Ollama and the OpenRouter HTTP
  *  gateway. Hand-mirrored with `ProviderName` (core/task-types.ts) and

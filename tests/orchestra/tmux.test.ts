@@ -125,7 +125,7 @@ describe.skipIf(isWindows)('spawnWorker', () => {
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
     } as never);
 
-    spawnWorker('task-001', 'sonnet', 'build the feature', '/project');
+    spawnWorker('task-001', 'claude-sonnet-5', 'build the feature', '/project');
 
     expect(mockedSpawnSync).toHaveBeenCalledTimes(3);
     // new-window
@@ -142,7 +142,7 @@ describe.skipIf(isWindows)('spawnWorker', () => {
     expect(args).toContain('deckent:w-task-001');
     const cmdArg = args.find((a) => a.includes('claude'));
     expect(cmdArg).toBeDefined();
-    expect(cmdArg).toContain(`claude -p - --model ${modelRegistry.resolveApiId('sonnet')}`);
+    expect(cmdArg).toContain(`claude -p - --model ${modelRegistry.resolveApiId('claude-sonnet-5')}`);
     // Sprint 170 P0-3: taskId-aware prompt filename (collision-safe, mirrors Docker)
     expect(cmdArg).toContain('.prompt-task-001-abcdef01.txt');
   });
@@ -153,7 +153,7 @@ describe.skipIf(isWindows)('spawnWorker', () => {
     } as never);
 
     const dangerousPrompt = "$(rm -rf /); `curl evil.com`; ${PATH}";
-    spawnWorker('task-002', 'opus', dangerousPrompt, '/project');
+    spawnWorker('task-002', 'claude-opus-4-8', dangerousPrompt, '/project');
 
     // The command string should NOT contain the prompt text
     const sendKeysCall = mockedSpawnSync.mock.calls[1];
@@ -171,7 +171,7 @@ describe.skipIf(isWindows)('spawnWorker', () => {
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
     } as never);
 
-    spawnWorker('task-003', 'sonnet', 'do work', '/project', {
+    spawnWorker('task-003', 'claude-sonnet-5', 'do work', '/project', {
       allowedTools: 'Read,Write,Bash',
     });
 
@@ -187,7 +187,7 @@ describe.skipIf(isWindows)('spawnWorker', () => {
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
     } as never);
 
-    spawnWorker('task-004', 'haiku', 'quick task', '/project', {
+    spawnWorker('task-004', 'claude-haiku-4-5-20251001', 'quick task', '/project', {
       autoApprove: true,
     });
 
@@ -202,7 +202,7 @@ describe.skipIf(isWindows)('spawnWorker', () => {
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
     } as never);
 
-    spawnWorker('task-010', 'sonnet', 'do work', '/project');
+    spawnWorker('task-010', 'claude-sonnet-5', 'do work', '/project');
 
     // 3 calls: new-window + send-keys + pipe-pane
     expect(mockedSpawnSync).toHaveBeenCalledTimes(3);
@@ -218,13 +218,13 @@ describe.skipIf(isWindows)('spawnWorker', () => {
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
     } as never);
 
-    spawnWorker('task-005', 'sonnet', 'simple task', '/project');
+    spawnWorker('task-005', 'claude-sonnet-5', 'simple task', '/project');
 
     const sendKeysCall = mockedSpawnSync.mock.calls[1];
     const args = sendKeysCall![1] as string[];
     const cmdArg = args.find((a) => a.includes('claude'));
     expect(cmdArg).toBeDefined();
-    expect(cmdArg).toContain(`--model ${modelRegistry.resolveApiId('sonnet')}`);
+    expect(cmdArg).toContain(`--model ${modelRegistry.resolveApiId('claude-sonnet-5')}`);
     expect(cmdArg).toContain('-p -');
     expect(cmdArg).toContain('< ');
     expect(cmdArg).not.toContain('--allowedTools');
@@ -301,7 +301,7 @@ describe.skipIf(isWindows)('startAuditor', () => {
     // send-keys with the resolved sonnet apiId
     const sendKeysArgs = mockedSpawnSync.mock.calls[2]![1] as string[];
     const cmdArg = sendKeysArgs.find((a) => a.includes('claude'));
-    expect(cmdArg).toContain(`--model ${modelRegistry.resolveApiId('sonnet')}`);
+    expect(cmdArg).toContain(`--model ${modelRegistry.resolveApiId('claude-sonnet-5')}`);
   });
 
   it('skips new-window when auditor window already exists', () => {
@@ -496,8 +496,8 @@ describe.skipIf(isWindows)('attachToWorkerPane', () => {
 
 function createMockAdapter(overrides?: Partial<ProviderAdapter>): ProviderAdapter {
   return {
-    name: 'mock-provider',
-    supportedModels: ['opus', 'sonnet', 'haiku'] as readonly ModelType[],
+    name: 'claude',
+    supportedModels: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'] as readonly ModelType[],
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn(() => []),
@@ -512,23 +512,23 @@ function createMockAdapter(overrides?: Partial<ProviderAdapter>): ProviderAdapte
 
 describe.skipIf(isWindows)('buildWorkerCommand', () => {
   it('produces Claude CLI command without adapter (backward compat)', () => {
-    const cmd = buildWorkerCommand('sonnet', '/tmp/prompt.txt');
-    expect(cmd).toBe(`claude -p - --model ${modelRegistry.resolveApiId('sonnet')} < /tmp/prompt.txt`);
+    const cmd = buildWorkerCommand('claude-sonnet-5', '/tmp/prompt.txt');
+    expect(cmd).toBe(`claude -p - --model ${modelRegistry.resolveApiId('claude-sonnet-5')} < /tmp/prompt.txt`);
   });
 
   it('includes --allowedTools when opts provided (no adapter)', () => {
-    const cmd = buildWorkerCommand('opus', '/tmp/p.txt', { allowedTools: 'Read,Write' });
+    const cmd = buildWorkerCommand('claude-opus-4-8', '/tmp/p.txt', { allowedTools: 'Read,Write' });
     expect(cmd).toContain("--allowedTools 'Read,Write'");
     expect(cmd).toContain('claude -p - --model claude-opus-4-8');
   });
 
   it('includes --dangerously-skip-permissions when autoApprove (no adapter)', () => {
-    const cmd = buildWorkerCommand('haiku', '/tmp/p.txt', { autoApprove: true });
+    const cmd = buildWorkerCommand('claude-haiku-4-5-20251001', '/tmp/p.txt', { autoApprove: true });
     expect(cmd).toContain('--dangerously-skip-permissions');
   });
 
   it('includes both opts flags together (no adapter)', () => {
-    const cmd = buildWorkerCommand('sonnet', '/tmp/p.txt', {
+    const cmd = buildWorkerCommand('claude-sonnet-5', '/tmp/p.txt', {
       allowedTools: 'Bash',
       autoApprove: true,
     });
@@ -539,38 +539,38 @@ describe.skipIf(isWindows)('buildWorkerCommand', () => {
 
   // ─── F1-RE: native reasoning-effort flag (no-adapter fallback) ──────
   it('appends --effort for a valid reasoning-effort (no adapter)', () => {
-    const cmd = buildWorkerCommand('opus', '/tmp/p.txt', { reasoningEffort: 'high' });
+    const cmd = buildWorkerCommand('claude-opus-4-8', '/tmp/p.txt', { reasoningEffort: 'high' });
     expect(cmd).toContain('--effort high');
   });
 
   it('drops an invalid reasoning-effort (no adapter)', () => {
     // 'minimal' is codex-only — not part of the claude vocabulary
-    const cmd = buildWorkerCommand('opus', '/tmp/p.txt', { reasoningEffort: 'minimal' });
+    const cmd = buildWorkerCommand('claude-opus-4-8', '/tmp/p.txt', { reasoningEffort: 'minimal' });
     expect(cmd).not.toContain('--effort');
   });
 
   it('forwards reasoningEffort to adapter.buildCommand when adapter present', () => {
     const adapter = createMockAdapter();
-    buildWorkerCommand('opus', '/tmp/p.txt', { reasoningEffort: 'xhigh' }, adapter);
-    expect(adapter.buildCommand).toHaveBeenCalledWith('opus', '/tmp/p.txt',
+    buildWorkerCommand('claude-opus-4-8', '/tmp/p.txt', { reasoningEffort: 'xhigh' }, adapter);
+    expect(adapter.buildCommand).toHaveBeenCalledWith('claude-opus-4-8', '/tmp/p.txt',
       expect.objectContaining({ reasoningEffort: 'xhigh' }));
   });
 
   it('delegates to adapter.buildCommand when adapter is provided', () => {
     const adapter = createMockAdapter();
-    const cmd = buildWorkerCommand('opus', '/tmp/p.txt', undefined, adapter);
-    expect(adapter.buildCommand).toHaveBeenCalledWith('opus', '/tmp/p.txt', {
+    const cmd = buildWorkerCommand('claude-opus-4-8', '/tmp/p.txt', undefined, adapter);
+    expect(adapter.buildCommand).toHaveBeenCalledWith('claude-opus-4-8', '/tmp/p.txt', {
       allowedTools: undefined,
       autoApprove: undefined,
       reasoningEffort: undefined,
     });
-    expect(cmd).toBe('mock-cli --model opus < /tmp/p.txt');
+    expect(cmd).toBe('mock-cli --model claude-opus-4-8 < /tmp/p.txt');
   });
 
   it('passes opts to adapter.buildCommand correctly', () => {
     const adapter = createMockAdapter();
-    buildWorkerCommand('sonnet', '/tmp/p.txt', { allowedTools: 'Read', autoApprove: true }, adapter);
-    expect(adapter.buildCommand).toHaveBeenCalledWith('sonnet', '/tmp/p.txt', {
+    buildWorkerCommand('claude-sonnet-5', '/tmp/p.txt', { allowedTools: 'Read', autoApprove: true }, adapter);
+    expect(adapter.buildCommand).toHaveBeenCalledWith('claude-sonnet-5', '/tmp/p.txt', {
       allowedTools: 'Read',
       autoApprove: true,
     });
@@ -580,14 +580,14 @@ describe.skipIf(isWindows)('buildWorkerCommand', () => {
     const adapter = createMockAdapter({
       buildCommand: vi.fn(() => 'custom-cli run --fast'),
     });
-    const cmd = buildWorkerCommand('opus', '/tmp/p.txt', { allowedTools: 'Read' }, adapter);
+    const cmd = buildWorkerCommand('claude-opus-4-8', '/tmp/p.txt', { allowedTools: 'Read' }, adapter);
     expect(cmd).toBe('custom-cli run --fast');
     expect(cmd).not.toContain('claude');
     expect(cmd).not.toContain('--allowedTools');
   });
 
   it('wraps with timeout when taskId is provided (no adapter)', () => {
-    const cmd = buildWorkerCommand('opus', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '001-001');
+    const cmd = buildWorkerCommand('claude-opus-4-8', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '001-001');
     // born-466 parity (docs/reference/worker-wrapper-contract.md §1-2): tmux.ts:219 wraps as
     // `timeout -k 30 <N>` (docker-parity hard-KILL grace) — see tmux-timeout-parity.test.ts.
     expect(cmd).toContain(`timeout -k 30 ${WORKER_TIMEOUT_SECONDS}`);
@@ -597,14 +597,14 @@ describe.skipIf(isWindows)('buildWorkerCommand', () => {
   });
 
   it('does not wrap timeout when taskId is not provided (backward compat)', () => {
-    const cmd = buildWorkerCommand('sonnet', '/tmp/prompt.txt');
+    const cmd = buildWorkerCommand('claude-sonnet-5', '/tmp/prompt.txt');
     expect(cmd).not.toContain('timeout');
     expect(cmd).not.toContain('WORKER_TIMEOUT');
-    expect(cmd).toBe(`claude -p - --model ${modelRegistry.resolveApiId('sonnet')} < /tmp/prompt.txt`);
+    expect(cmd).toBe(`claude -p - --model ${modelRegistry.resolveApiId('claude-sonnet-5')} < /tmp/prompt.txt`);
   });
 
   it('uses custom timeout seconds when provided', () => {
-    const cmd = buildWorkerCommand('haiku', '/proj/.tasks/.prompt-x.txt', undefined, undefined, '002-001', 600);
+    const cmd = buildWorkerCommand('claude-haiku-4-5-20251001', '/proj/.tasks/.prompt-x.txt', undefined, undefined, '002-001', 600);
     // born-466 parity shape — `timeout -k 30 <N>` (see comment above)
     expect(cmd).toContain('timeout -k 30 600');
     expect(cmd).toContain('task-002-001.timeout');
@@ -612,15 +612,15 @@ describe.skipIf(isWindows)('buildWorkerCommand', () => {
 
   it('does not wrap timeout when adapter is provided', () => {
     const adapter = createMockAdapter();
-    const cmd = buildWorkerCommand('opus', '/tmp/p.txt', undefined, adapter, '001-001');
+    const cmd = buildWorkerCommand('claude-opus-4-8', '/tmp/p.txt', undefined, adapter, '001-001');
     expect(cmd).not.toContain('timeout');
-    expect(cmd).toBe('mock-cli --model opus < /tmp/p.txt');
+    expect(cmd).toBe('mock-cli --model claude-opus-4-8 < /tmp/p.txt');
   });
 
   it('does not wrap timeout when timeoutSeconds is 0', () => {
-    const cmd = buildWorkerCommand('sonnet', '/proj/.tasks/.prompt-z.txt', undefined, undefined, '003-001', 0);
+    const cmd = buildWorkerCommand('claude-sonnet-5', '/proj/.tasks/.prompt-z.txt', undefined, undefined, '003-001', 0);
     expect(cmd).not.toContain('timeout');
-    expect(cmd).toContain(`claude -p - --model ${modelRegistry.resolveApiId('sonnet')}`);
+    expect(cmd).toContain(`claude -p - --model ${modelRegistry.resolveApiId('claude-sonnet-5')}`);
   });
 
   it('WORKER_TIMEOUT_SECONDS has the expected default value', () => {
@@ -634,8 +634,8 @@ describe.skipIf(isWindows)('buildClaudeCommand alias', () => {
   });
 
   it('produces identical output to buildWorkerCommand', () => {
-    const a = buildClaudeCommand('opus', '/tmp/p.txt', { allowedTools: 'Bash' });
-    const b = buildWorkerCommand('opus', '/tmp/p.txt', { allowedTools: 'Bash' });
+    const a = buildClaudeCommand('claude-opus-4-8', '/tmp/p.txt', { allowedTools: 'Bash' });
+    const b = buildWorkerCommand('claude-opus-4-8', '/tmp/p.txt', { allowedTools: 'Bash' });
     expect(a).toBe(b);
   });
 });
@@ -650,7 +650,7 @@ describe.skipIf(isWindows)('spawnWorker with adapter', () => {
       buildCommand: vi.fn(() => 'codex --model o3-mini < /project/.tasks/.prompt-abcdef01.txt'),
     });
 
-    spawnWorker('task-100', 'opus', 'do work', '/project', undefined, adapter);
+    spawnWorker('task-100', 'claude-opus-4-8', 'do work', '/project', undefined, adapter);
 
     // send-keys call should contain the adapter's command, not claude
     const sendKeysCall = mockedSpawnSync.mock.calls[1];
@@ -666,13 +666,13 @@ describe.skipIf(isWindows)('spawnWorker with adapter', () => {
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
     } as never);
 
-    spawnWorker('task-101', 'sonnet', 'do work', '/project');
+    spawnWorker('task-101', 'claude-sonnet-5', 'do work', '/project');
 
     const sendKeysCall = mockedSpawnSync.mock.calls[1];
     const args = sendKeysCall![1] as string[];
     const cmdArg = args.find((a) => a.includes('claude'));
     expect(cmdArg).toBeDefined();
-    expect(cmdArg).toContain(`claude -p - --model ${modelRegistry.resolveApiId('sonnet')}`);
+    expect(cmdArg).toContain(`claude -p - --model ${modelRegistry.resolveApiId('claude-sonnet-5')}`);
   });
 });
 
@@ -695,7 +695,7 @@ describe.skipIf(isWindows)('taskId validation in public functions', () => {
 
   for (const malId of maliciousIds) {
     it(`spawnWorker rejects malicious taskId: ${JSON.stringify(malId)}`, () => {
-      expect(() => spawnWorker(malId, 'sonnet', 'prompt', '/project')).toThrow(ValidationError);
+      expect(() => spawnWorker(malId, 'claude-sonnet-5', 'prompt', '/project')).toThrow(ValidationError);
       // spawnSync should NOT have been called — validation fires first
       expect(mockedSpawnSync).not.toHaveBeenCalled();
     });
@@ -716,17 +716,17 @@ describe.skipIf(isWindows)('taskId validation in public functions', () => {
   }
 
   it('buildWorkerCommand rejects malicious taskId', () => {
-    expect(() => buildWorkerCommand('opus', '/tmp/p.txt', undefined, undefined, '; rm -rf /')).toThrow(ValidationError);
+    expect(() => buildWorkerCommand('claude-opus-4-8', '/tmp/p.txt', undefined, undefined, '; rm -rf /')).toThrow(ValidationError);
   });
 
   it('buildWorkerCommand accepts valid taskId', () => {
-    const cmd = buildWorkerCommand('opus', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '001-001');
+    const cmd = buildWorkerCommand('claude-opus-4-8', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '001-001');
     expect(cmd).toContain('claude');
     expect(cmd).toContain('001-001');
   });
 
   it('spawnWorker accepts valid taskId and proceeds normally', () => {
-    spawnWorker('task-001', 'sonnet', 'build the feature', '/project');
+    spawnWorker('task-001', 'claude-sonnet-5', 'build the feature', '/project');
     expect(mockedSpawnSync).toHaveBeenCalled();
   });
 });

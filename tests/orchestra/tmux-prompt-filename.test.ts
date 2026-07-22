@@ -75,7 +75,7 @@ describe('Sprint 170 P0-3 — tmux prompt filename taskId-aware', () => {
   it('emits a tmux prompt file whose filename embeds the taskId (.prompt-${taskId}-${hash}.txt)', () => {
     const taskId = '170-bug2b-1';
 
-    spawnWorker(taskId, 'sonnet', 'task prompt content', '/proj');
+    spawnWorker(taskId, 'claude-sonnet-5', 'task prompt content', '/proj');
 
     const promptCall = mockedWriteFileSync.mock.calls.find((c) =>
       String(c[0]).includes('.prompt-'),
@@ -97,7 +97,7 @@ describe('Sprint 170 P0-3 — tmux prompt filename taskId-aware', () => {
   it('emitted filename satisfies the `-${taskId}-` selective filter used by ClaudeAdapter cleanup', () => {
     const taskId = '170-bug2b-2';
 
-    spawnWorker(taskId, 'sonnet', 'work', '/proj');
+    spawnWorker(taskId, 'claude-sonnet-5', 'work', '/proj');
 
     const promptCall = mockedWriteFileSync.mock.calls.find((c) =>
       String(c[0]).includes('.prompt-'),

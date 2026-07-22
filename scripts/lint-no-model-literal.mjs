@@ -102,6 +102,26 @@ export function deriveKnownModelIds(registryPath = REGISTRY_PATH) {
   return deriveKnownModelIdsFromSource(readFileSync(registryPath, 'utf-8'));
 }
 
+/** Derive migration-only legacy aliases from LEGACY_MODEL_ALIASES source. */
+export function deriveLegacyModelAliasesFromSource(content) {
+  const start = content.indexOf('export const LEGACY_MODEL_ALIASES');
+  if (start === -1) return new Set();
+  const end = content.indexOf('} as const);', start);
+  if (end === -1) return new Set();
+  const aliases = new Set();
+  for (const rawLine of content.slice(start, end).split('\n')) {
+    const line = rawLine.trim();
+    const match = /^(?:'([^']+)'|([a-zA-Z][\w.-]*)):\s*'[^']+'/.exec(line);
+    const alias = match?.[1] ?? match?.[2];
+    if (alias) aliases.add(alias);
+  }
+  return aliases;
+}
+
+export function deriveLegacyModelAliases(registryPath = REGISTRY_PATH) {
+  return deriveLegacyModelAliasesFromSource(readFileSync(registryPath, 'utf-8'));
+}
+
 /**
  * Extract model-name string-literal SITES from a source file: a line is a "site" if
  * it contains at least one quoted string (single, double, or interpolation-free
@@ -123,7 +143,7 @@ export function extractModelLiteralSites(content, knownIds) {
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
     const trimmed = raw.trim();
-    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue; // comment
+    if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) continue; // comment
     if (trimmed.startsWith('import ') || trimmed.startsWith('} from')) continue; // import
     STRING_RE.lastIndex = 0;
     let hasKnownLiteral = false;
@@ -184,6 +204,20 @@ export function scanSource(srcDir = SRC_DIR, rootDir = REPO_ROOT, knownIds = der
     }
   }
   return found;
+}
+
+/**
+ * A legacy alias may exist only as an input discriminator at the explicit
+ * config-migration boundary. This exemption is deliberately line- and
+ * file-shaped: it does not permit alias-valued defaults, assignments, or
+ * return values anywhere, including elsewhere in config-migration.ts.
+ *
+ * @param {{file: string, code: string}} site
+ * @returns {boolean}
+ */
+export function isExplicitLegacyMigrationSite(site) {
+  return site.file === 'src/core/config-migration.ts'
+    && /^case\s+(['"`])[^'"`]+\1\s*:\s*$/.test(site.code);
 }
 
 /** Multiset key for a call site (file + normalized code). */
@@ -267,19 +301,27 @@ if (invokedDirectly) {
   }
 
   const { newCalls } = diffAgainstBaseline(scan, baseline);
-  if (newCalls.length === 0) {
+  const legacyCalls = scanSource(SRC_DIR, REPO_ROOT, deriveLegacyModelAliases())
+    .filter((site) => !isExplicitLegacyMigrationSite(site));
+  if (newCalls.length === 0 && legacyCalls.length === 0) {
     process.stdout.write(
-      `[no-model-literal] ✓ no new model-name literal — ${baseline.sanctioned?.length ?? 0} sanctioned (grandfathered)\n`,
+      `[no-model-literal] ✓ no new canonical literal and no runtime legacy alias — ${baseline.sanctioned?.length ?? 0} canonical sites sanctioned (grandfathered)\n`,
     );
     process.exit(0);
   }
 
-  process.stderr.write(`[no-model-literal] FAIL: ${newCalls.length} new model-name literal site(s):\n`);
+  process.stderr.write(`[no-model-literal] FAIL: ${newCalls.length} new canonical literal site(s), ${legacyCalls.length} runtime legacy alias site(s):\n`);
   for (const c of newCalls) {
     process.stderr.write(
       `  ${c.file}: [new model literal] ${c.code}\n`
       + `    Reference src/core/model-registry.ts (the SSOT) instead of hardcoding the model name.\n`
       + `    If genuinely grandfathered debt, run \`node scripts/lint-no-model-literal.mjs --update\` (diff-visible in review).\n`,
+    );
+  }
+  for (const c of legacyCalls) {
+    process.stderr.write(
+      `  ${c.file}: [legacy runtime alias] ${c.code}\n`
+      + '    Legacy aliases are migration-input metadata only; runtime producers must resolve a registered API ID.\n',
     );
   }
   process.exit(1);

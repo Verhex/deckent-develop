@@ -18,14 +18,14 @@ describe('BUILTIN_MODELS catalog', () => {
   it('has 4 Claude models', () => {
     const claude = BUILTIN_MODELS.filter(m => m.provider === 'claude');
     expect(claude).toHaveLength(4);
-    expect(claude.map(m => m.id).sort()).toEqual(['fable', 'haiku', 'opus', 'sonnet']);
+    expect(claude.map(m => m.id).sort()).toEqual(['claude-fable-5', 'claude-haiku-4-5-20251001', 'claude-opus-4-8', 'claude-sonnet-5']);
   });
 
   it('has 6 OpenAI/Codex models', () => {
     const codex = BUILTIN_MODELS.filter(m => m.provider === 'codex');
     expect(codex).toHaveLength(6);
     expect(codex.map(m => m.id).sort()).toEqual([
-      'gpt-4.1', 'gpt-4.1-mini', 'gpt-5', 'gpt-5-mini', 'o3', 'o4-mini',
+      'gpt-4.1', 'gpt-4.1-mini', 'gpt-5-mini', 'gpt-5.5', 'o3', 'o4-mini',
     ]);
   });
 
@@ -82,9 +82,9 @@ describe('ModelRegistry', () => {
 
   describe('get()', () => {
     it('returns model for valid id', () => {
-      const model = registry.get('opus');
+      const model = registry.get('claude-opus-4-8');
       expect(model).toBeDefined();
-      expect(model!.id).toBe('opus');
+      expect(model!.id).toBe('claude-opus-4-8');
       expect(model!.provider).toBe('claude');
     });
 
@@ -95,8 +95,8 @@ describe('ModelRegistry', () => {
 
   describe('has()', () => {
     it('returns true for known models', () => {
-      expect(registry.has('opus')).toBe(true);
-      expect(registry.has('gpt-5')).toBe(true);
+      expect(registry.has('claude-opus-4-8')).toBe(true);
+      expect(registry.has('gpt-5.5')).toBe(true);
       expect(registry.has('gemini-2.5-pro')).toBe(true);
     });
 
@@ -107,8 +107,8 @@ describe('ModelRegistry', () => {
 
   describe('getOrThrow()', () => {
     it('returns model for valid id', () => {
-      const model = registry.getOrThrow('sonnet');
-      expect(model.id).toBe('sonnet');
+      const model = registry.getOrThrow('claude-sonnet-5');
+      expect(model.id).toBe('claude-sonnet-5');
     });
 
     it('throws for unknown model', () => {
@@ -123,8 +123,8 @@ describe('ModelRegistry', () => {
       expect(registry.getByProvider('claude')).toHaveLength(4);
     });
 
-    it('returns 6 models for codex', () => {
-      expect(registry.getByProvider('codex')).toHaveLength(6);
+    it('returns all 9 canonical Codex models', () => {
+      expect(registry.getByProvider('codex')).toHaveLength(9);
     });
 
     it('returns 4 models for gemini', () => {
@@ -181,7 +181,7 @@ describe('ModelRegistry', () => {
     it('returns GA model for claude+premium', () => {
       const model = registry.getByProviderAndTier('claude', 'premium');
       expect(model).toBeDefined();
-      expect(model!.id).toBe('opus');
+      expect(model!.id).toBe('claude-opus-4-8');
     });
 
     it('returns GA model for codex+standard', () => {
@@ -202,41 +202,41 @@ describe('ModelRegistry', () => {
 
   describe('getEquivalent()', () => {
     it('maps opus → gpt-5 (claude premium → codex premium)', () => {
-      expect(registry.getEquivalent('opus', 'codex')).toBe('gpt-5');
+      expect(registry.getEquivalent('claude-opus-4-8', 'codex')).toBe('gpt-5.5');
     });
 
     it('maps opus → gemini-2.5-pro (claude premium → gemini premium)', () => {
-      expect(registry.getEquivalent('opus', 'gemini')).toBe('gemini-2.5-pro');
+      expect(registry.getEquivalent('claude-opus-4-8', 'gemini')).toBe('gemini-2.5-pro');
     });
 
     it('maps gpt-5 → opus (codex premium → claude premium)', () => {
-      expect(registry.getEquivalent('gpt-5', 'claude')).toBe('opus');
+      expect(registry.getEquivalent('gpt-5.5', 'claude')).toBe('claude-opus-4-8');
     });
 
     it('maps sonnet → gpt-4.1 (claude standard → codex standard)', () => {
-      expect(registry.getEquivalent('sonnet', 'codex')).toBe('gpt-4.1');
+      expect(registry.getEquivalent('claude-sonnet-5', 'codex')).toBe('gpt-4.1');
     });
 
     it('maps sonnet → gemini-2.5-flash (claude standard → gemini standard)', () => {
-      expect(registry.getEquivalent('sonnet', 'gemini')).toBe('gemini-2.5-flash');
+      expect(registry.getEquivalent('claude-sonnet-5', 'gemini')).toBe('gemini-2.5-flash');
     });
 
     it('maps haiku → gpt-5-mini (claude economy → codex economy)', () => {
-      expect(registry.getEquivalent('haiku', 'codex')).toBe('gpt-5-mini');
+      expect(registry.getEquivalent('claude-haiku-4-5-20251001', 'codex')).toBe('gpt-5-mini');
     });
 
     it('maps haiku → gemini-2.0-flash (claude economy → gemini economy)', () => {
-      expect(registry.getEquivalent('haiku', 'gemini')).toBe('gemini-2.0-flash');
+      expect(registry.getEquivalent('claude-haiku-4-5-20251001', 'gemini')).toBe('gemini-2.0-flash');
     });
 
     it('returns same model when target provider matches source', () => {
-      expect(registry.getEquivalent('opus', 'claude')).toBe('opus');
+      expect(registry.getEquivalent('claude-opus-4-8', 'claude')).toBe('claude-opus-4-8');
     });
 
     it('maps premium_plus to claude premium_plus (fable)', () => {
       // o3 is codex premium_plus; claude now has a premium_plus GA model (fable),
       // so the equivalent is the exact-tier match, not a premium fallback.
-      expect(registry.getEquivalent('o3', 'claude')).toBe('fable');
+      expect(registry.getEquivalent('o3', 'claude')).toBe('claude-fable-5');
     });
 
     it('throws when no equivalent exists', () => {
@@ -244,7 +244,7 @@ describe('ModelRegistry', () => {
       const tiny = new ModelRegistry([
         {
           id: 'custom-top',
-          apiId: 'custom-top-v1',
+          apiId: 'custom-top',
           provider: 'claude' as RegistryProviderName,
           tier: 'premium_plus',
           contextWindow: 100_000,
@@ -261,11 +261,11 @@ describe('ModelRegistry', () => {
 
   describe('getTier()', () => {
     it('returns correct tier for each known model', () => {
-      expect(registry.getTier('opus')).toBe('premium');
-      expect(registry.getTier('sonnet')).toBe('standard');
-      expect(registry.getTier('haiku')).toBe('economy');
+      expect(registry.getTier('claude-opus-4-8')).toBe('premium');
+      expect(registry.getTier('claude-sonnet-5')).toBe('standard');
+      expect(registry.getTier('claude-haiku-4-5-20251001')).toBe('economy');
       expect(registry.getTier('o3')).toBe('premium_plus');
-      expect(registry.getTier('gpt-5')).toBe('premium');
+      expect(registry.getTier('gpt-5.5')).toBe('premium');
       expect(registry.getTier('gpt-4.1')).toBe('standard');
       expect(registry.getTier('gpt-5-mini')).toBe('economy');
       expect(registry.getTier('gemini-3.1-pro-preview')).toBe('premium_plus');
@@ -303,23 +303,23 @@ describe('ModelRegistry', () => {
 
   describe('isAtLeastTier()', () => {
     it('opus (premium) is at least economy', () => {
-      expect(registry.isAtLeastTier('opus', 'economy')).toBe(true);
+      expect(registry.isAtLeastTier('claude-opus-4-8', 'economy')).toBe(true);
     });
 
     it('opus (premium) is at least standard', () => {
-      expect(registry.isAtLeastTier('opus', 'standard')).toBe(true);
+      expect(registry.isAtLeastTier('claude-opus-4-8', 'standard')).toBe(true);
     });
 
     it('opus (premium) is at least premium', () => {
-      expect(registry.isAtLeastTier('opus', 'premium')).toBe(true);
+      expect(registry.isAtLeastTier('claude-opus-4-8', 'premium')).toBe(true);
     });
 
     it('opus (premium) is NOT at least premium_plus', () => {
-      expect(registry.isAtLeastTier('opus', 'premium_plus')).toBe(false);
+      expect(registry.isAtLeastTier('claude-opus-4-8', 'premium_plus')).toBe(false);
     });
 
     it('haiku (economy) is NOT at least standard', () => {
-      expect(registry.isAtLeastTier('haiku', 'standard')).toBe(false);
+      expect(registry.isAtLeastTier('claude-haiku-4-5-20251001', 'standard')).toBe(false);
     });
 
     it('o3 (premium_plus) is at least any tier', () => {
@@ -336,7 +336,7 @@ describe('ModelRegistry', () => {
     it('adds a new model at runtime', () => {
       const customModel: ModelDefinition = {
         id: 'custom-test-model',
-        apiId: 'custom-test-v1',
+        apiId: 'custom-test-model',
         provider: 'claude',
         tier: 'standard',
         contextWindow: 128_000,
@@ -352,11 +352,11 @@ describe('ModelRegistry', () => {
     });
 
     it('overwrites existing model with same id', () => {
-      const original = registry.get('opus')!;
+      const original = registry.get('claude-opus-4-8')!;
       const modified: ModelDefinition = { ...original, contextWindow: 999_999 };
 
       registry.register(modified);
-      expect(registry.get('opus')!.contextWindow).toBe(999_999);
+      expect(registry.get('claude-opus-4-8')!.contextWindow).toBe(999_999);
     });
   });
 
@@ -364,7 +364,7 @@ describe('ModelRegistry', () => {
     it('removes a model', () => {
       registry.register({
         id: 'temp-model',
-        apiId: 'temp-v1',
+        apiId: 'temp-model',
         provider: 'claude',
         tier: 'economy',
         contextWindow: 100_000,
@@ -386,15 +386,15 @@ describe('ModelRegistry', () => {
 
   describe('resolveApiId()', () => {
     it('returns correct API ID for Claude models', () => {
-      expect(registry.resolveApiId('opus')).toBe('claude-opus-4-8');
-      expect(registry.resolveApiId('sonnet')).toBe('claude-sonnet-5');
-      expect(registry.resolveApiId('haiku')).toBe('claude-haiku-4-5-20251001');
+      expect(registry.resolveApiId('claude-opus-4-8')).toBe('claude-opus-4-8');
+      expect(registry.resolveApiId('claude-sonnet-5')).toBe('claude-sonnet-5');
+      expect(registry.resolveApiId('claude-haiku-4-5-20251001')).toBe('claude-haiku-4-5-20251001');
     });
 
     it('returns correct API ID for OpenAI models', () => {
       // Sprint 248 (Provider Parity): premium codex id `gpt-5` wires to apiId
       // `gpt-5.5` — the name a ChatGPT subscription accepts (`gpt-5` is rejected).
-      expect(registry.resolveApiId('gpt-5')).toBe('gpt-5.5');
+      expect(registry.resolveApiId('gpt-5.5')).toBe('gpt-5.5');
       expect(registry.resolveApiId('gpt-4.1')).toBe('gpt-4.1');
       expect(registry.resolveApiId('o3')).toBe('o3');
       expect(registry.resolveApiId('o4-mini')).toBe('o4-mini');
@@ -419,18 +419,18 @@ describe('ModelRegistry', () => {
   describe('estimateCost()', () => {
     it('calculates cost for opus with 1M input + 500K output', () => {
       // opus (4.5+ repricing): $5/M input, $25/M output — baseline-aligned
-      const cost = registry.estimateCost('opus', 1_000_000, 500_000);
+      const cost = registry.estimateCost('claude-opus-4-8', 1_000_000, 500_000);
       expect(cost).toBeCloseTo(5 + 12.5, 2);
     });
 
     it('calculates cost for haiku with 100K input + 50K output', () => {
       // haiku: $0.8/M input, $4/M output
-      const cost = registry.estimateCost('haiku', 100_000, 50_000);
+      const cost = registry.estimateCost('claude-haiku-4-5-20251001', 100_000, 50_000);
       expect(cost).toBeCloseTo(0.08 + 0.2, 4);
     });
 
     it('returns 0 for zero tokens', () => {
-      expect(registry.estimateCost('sonnet', 0, 0)).toBe(0);
+      expect(registry.estimateCost('claude-sonnet-5', 0, 0)).toBe(0);
     });
 
     it('calculates cost for gpt-4.1-mini (cheapest model)', () => {
@@ -448,15 +448,15 @@ describe('ModelRegistry', () => {
 
   describe('getNumericTier()', () => {
     it('returns 0 for economy', () => {
-      expect(registry.getNumericTier('haiku')).toBe(0);
+      expect(registry.getNumericTier('claude-haiku-4-5-20251001')).toBe(0);
     });
 
     it('returns 1 for standard', () => {
-      expect(registry.getNumericTier('sonnet')).toBe(1);
+      expect(registry.getNumericTier('claude-sonnet-5')).toBe(1);
     });
 
     it('returns 2 for premium', () => {
-      expect(registry.getNumericTier('opus')).toBe(2);
+      expect(registry.getNumericTier('claude-opus-4-8')).toBe(2);
     });
 
     it('returns 3 for premium_plus', () => {
@@ -467,12 +467,12 @@ describe('ModelRegistry', () => {
   // ── getAllModelIds / getAllModels / getAllProviders ──
 
   describe('getAllModelIds()', () => {
-    it('returns all 14 builtin model ids', () => {
+    it('returns the 14 core and 3 pinned Codex parity model ids', () => {
       const ids = registry.getAllModelIds();
-      expect(ids).toHaveLength(14);
-      expect(ids).toContain('fable');
-      expect(ids).toContain('opus');
-      expect(ids).toContain('gpt-5');
+      expect(ids).toHaveLength(17);
+      expect(ids).toContain('claude-fable-5');
+      expect(ids).toContain('claude-opus-4-8');
+      expect(ids).toContain('gpt-5.5');
       expect(ids).toContain('gemini-2.5-pro');
       expect(ids).toContain('gpt-4.1-mini');
       expect(ids).toContain('gemini-3.1-pro-preview');
@@ -480,9 +480,9 @@ describe('ModelRegistry', () => {
   });
 
   describe('getAllModels()', () => {
-    it('returns all 14 builtin model definitions', () => {
+    it('returns all canonical model definitions', () => {
       const models = registry.getAllModels();
-      expect(models).toHaveLength(14);
+      expect(models).toHaveLength(17);
       for (const m of models) {
         expect(m.id).toBeDefined();
         expect(m.apiId).toBeDefined();
@@ -507,8 +507,8 @@ describe('ModelRegistry', () => {
     it('accepts custom builtins array', () => {
       const custom = new ModelRegistry([BUILTIN_MODELS[0]!]);
       expect(custom.getAllModelIds()).toHaveLength(1);
-      expect(custom.has('fable')).toBe(true); // BUILTIN_MODELS[0] is now claude-fable-5
-      expect(custom.has('sonnet')).toBe(false);
+      expect(custom.has('claude-fable-5')).toBe(true); // BUILTIN_MODELS[0] is now claude-fable-5
+      expect(custom.has('claude-sonnet-5')).toBe(false);
     });
 
     it('empty array creates empty registry', () => {
@@ -533,7 +533,7 @@ describe('ModelRegistry', () => {
     });
 
     it('opus does not have reasoning capability', () => {
-      expect(registry.get('opus')!.capabilities.reasoning).toBe(false);
+      expect(registry.get('claude-opus-4-8')!.capabilities.reasoning).toBe(false);
     });
 
     it('all models support streaming and toolUse', () => {
@@ -567,7 +567,7 @@ describe('modelRegistry singleton', () => {
     expect(modelRegistry).toBeInstanceOf(ModelRegistry);
   });
 
-  it('has all 14 builtin models', () => {
-    expect(modelRegistry.getAllModelIds()).toHaveLength(14);
+  it('has the complete canonical offline catalog', () => {
+    expect(modelRegistry.getAllModelIds()).toHaveLength(17);
   });
 });

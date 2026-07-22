@@ -76,10 +76,20 @@ export function resolveCanonicalModelIdentity(
     return existing;
   }
 
+  const inferredProvider = inferProviderFromId(apiId);
+  if (options.provider !== undefined
+    && inferredProvider !== undefined
+    && options.provider !== inferredProvider) {
+    throw new DeckentError('E_MODEL_PROVIDER_MISMATCH', 'E_MODEL_PROVIDER_MISMATCH');
+  }
+
   if (!options.provider) {
     throw new DeckentError('E_MODEL_PROVIDER_UNVERIFIED', 'E_MODEL_PROVIDER_UNVERIFIED');
   }
 
+  // Only local Ollama identities can be materialized without catalog/pricing
+  // evidence. A provider name alone is not authority to mint a cloud model at
+  // zero cost; cloud IDs must already be catalog/probe registered.
   const definition = buildParametricModel(apiId, {
     provider: options.provider,
     register: false,
@@ -340,12 +350,11 @@ const TIER_ORDER: Record<ModelTier, number> = {
 };
 
 // ─── Parametric / Extensible Resolution (F1-PD) ────────────────────────────
-// The bundled BUILTIN_MODELS catalog is the offline fallback, but the registry
-// is no longer a closed set: an unknown / brand-new model id is RESOLVED into a
-// runtime-validated ModelDefinition rather than rejected. The string-union
-// hardcode (OpenAIModel / GeminiModel in task-types.ts) no longer gates runtime
-// resolution — provider + tier are derived parametrically from the id, with
-// every field overridable via ParametricResolveOptions.
+// The bundled catalog is the offline fallback, but exact API ids are not gated
+// by a TypeScript string union. Provider/tier may be derived parametrically;
+// cloud admission still requires explicit finite pricing evidence. Naming
+// heuristics diagnose ownership and tier — they do not prove reachability or
+// mint free cloud capacity.
 
 /** Diagnostic namespace inference. An unknown namespace has no authority. */
 export function inferProviderFromId(id: string): RegistryProviderNameExt | undefined {
@@ -398,10 +407,9 @@ export function inferTierFromId(id: string): ModelTier {
   return 'standard';
 }
 
-/** Build a runtime-validated ModelDefinition for an arbitrary (possibly unknown)
- *  model id. Provider and tier are inferred from the id unless overridden; the
- *  remaining fields fall back to safe, neutral defaults. This is the parametric
- *  core that lets the catalog accept new model ids without a code change. */
+/** Build a runtime-validated ModelDefinition for an exact API id. Provider and
+ *  tier are inferred unless explicitly owned; dynamic cloud definitions require
+ *  finite pricing evidence, while local Ollama tags may use zero-cost defaults. */
 export function buildParametricModel(
   id: string,
   opts: ParametricResolveOptions = {},
@@ -422,23 +430,34 @@ export function buildParametricModel(
       `Provider ownership is required for model API ID: ${id}`,
     );
   }
-  if (provider === 'openrouter') {
+  const inferredProvider = inferProviderFromId(id);
+  if (opts.provider !== undefined
+    && inferredProvider !== undefined
+    && opts.provider !== inferredProvider) {
+    throw new DeckentError(
+      'E_MODEL_PROVIDER_MISMATCH',
+      `Model API ID ${id} belongs to ${inferredProvider}, not ${opts.provider}`,
+    );
+  }
+  if (provider !== 'ollama') {
     const suppliedCost = opts.costPerMillion;
     const validSuppliedCost = suppliedCost !== undefined
       && Number.isFinite(suppliedCost.input)
       && Number.isFinite(suppliedCost.output)
       && suppliedCost.input >= 0
       && suppliedCost.output >= 0;
-    const verifiedFreeId = id.endsWith(':free');
     const evidenceRef = opts.pricingEvidenceRef;
     if (!validSuppliedCost
       || typeof evidenceRef !== 'string'
       || evidenceRef.length === 0
       || evidenceRef !== evidenceRef.trim()
-      || (!verifiedFreeId && suppliedCost.input === 0 && suppliedCost.output === 0)) {
+      || (provider === 'openrouter'
+        && !id.endsWith(':free')
+        && suppliedCost.input === 0
+        && suppliedCost.output === 0)) {
       throw new DeckentError(
         'E_MODEL_PRICING_UNVERIFIED',
-        `OpenRouter pricing evidence is required for model API ID: ${id}`,
+        `Cloud pricing evidence is required for model API ID: ${id}`,
       );
     }
   }
@@ -464,7 +483,7 @@ export function buildParametricModel(
     // OpenRouter id is only ever reachable when the operator named it explicitly AND
     // the gateway serves it verbatim (id === apiId), so 'ga' is the honest default.
     // An explicit `opts.status` still wins.
-    status: opts.status ?? (provider === 'openrouter' ? 'ga' : 'preview'),
+    status: opts.status ?? (provider === 'ollama' || provider === 'openrouter' ? 'ga' : 'preview'),
   };
   if (opts.maxOutputTokens !== undefined) {
     def.maxOutputTokens = opts.maxOutputTokens;
@@ -502,15 +521,12 @@ export class ModelRegistry {
   /**
    * Parametric resolution (F1-PD) — the non-throwing counterpart of getOrThrow().
    *
-   * Returns the catalog entry for `id` when present; otherwise synthesizes a
-   * runtime-validated ModelDefinition (provider + tier inferred from the id,
-   * every field overridable via `opts`) instead of rejecting an unknown / new
-   * model id. By default the synthesized entry is also registered so subsequent
-   * lookups (get / getOrThrow / resolveApiId / cost) treat it as first-class;
-   * pass `{ register: false }` to resolve without mutating the registry.
-   *
-   * This keeps the bundled catalog as the fallback while making it extensible:
-   * a brand-new model id is accepted without a code change.
+   * Returns a catalog entry when present; otherwise synthesizes only when the
+   * caller supplies the authority required for that execution-cost class.
+   * Dynamic cloud ids require finite pricing plus an evidence reference; local
+   * Ollama tags may be admitted from explicit local ownership. By default a
+   * successful synthesis registers the identity; pass `{ register: false }`
+   * for pure validation.
    */
   resolve(id: string, opts: ParametricResolveOptions = {}): ModelDefinition {
     const existing = this.models.get(id);
@@ -743,11 +759,16 @@ export function ensureOpenRouterModelRegistered(
   if (!modelId) return;
   const existing = registry.get(modelId);
   if (existing) {
-    if (existing.provider === 'openrouter' &&
-      (typeof existing.pricingEvidenceRef !== 'string'
+    if (existing.provider !== 'openrouter') {
+      throw new DeckentError(
+        'E_MODEL_PROVIDER_MISMATCH',
+        `Model API ID ${modelId} is already owned by ${existing.provider}`,
+      );
+    }
+    if (typeof existing.pricingEvidenceRef !== 'string'
         || existing.pricingEvidenceRef.length === 0
         || (!modelId.endsWith(':free')
-          && existing.costPerMillion.input === 0 && existing.costPerMillion.output === 0))) {
+          && existing.costPerMillion.input === 0 && existing.costPerMillion.output === 0)) {
       throw new DeckentError(
         'E_MODEL_PRICING_UNVERIFIED',
         `OpenRouter pricing evidence is required for non-free model API ID: ${modelId}`,

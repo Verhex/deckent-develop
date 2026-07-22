@@ -156,19 +156,21 @@ describe('reconcileModels', () => {
 // ─── detectAndRegisterModels ──────────────────────────────────────────────────
 
 describe('detectAndRegisterModels', () => {
-  it('registers bundled-external models after CLI probe', async () => {
+  it('keeps an unpriced cloud discovery as reachability evidence only', async () => {
     const registry = new ModelRegistry();
     // CLI returns a model NOT in BUILTIN_MODELS
     const output = JSON.stringify({ models: [{ id: 'claude-mythos-5' }] });
     const spawnFn = makeSpawnFn(output);
 
-    await detectAndRegisterModels(registry, {
+    const [result] = await detectAndRegisterModels(registry, {
       providers: ['claude'],
       spawnFn,
       cacheDir: workDir,
     });
 
-    expect(registry.has('claude-mythos-5')).toBe(true);
+    expect(registry.has('claude-mythos-5')).toBe(false);
+    expect(result?.discovered).toContain('claude-mythos-5');
+    expect(result?.registered).toBe(0);
   });
 
   it('discovered models do not break existing builtin models', async () => {
@@ -188,7 +190,7 @@ describe('detectAndRegisterModels', () => {
     }
   });
 
-  it('unknown new model is selectable via registry.resolve (no throw)', async () => {
+  it('unknown cloud model remains non-selectable without pricing evidence', async () => {
     const registry = new ModelRegistry();
     const newModel = 'claude-future-unknown-xyz';
     const output = JSON.stringify({ models: [{ id: newModel }] });
@@ -200,13 +202,11 @@ describe('detectAndRegisterModels', () => {
       cacheDir: workDir,
     });
 
-    // resolve must not throw for the newly registered model
-    const def = registry.resolve(newModel);
-    expect(def).toBeDefined();
-    expect(def.id).toBe(newModel);
+    expect(registry.has(newModel)).toBe(false);
+    expect(() => registry.resolve(newModel)).toThrow(/pricing evidence is required/i);
   });
 
-  it('unknown new model resolve returns correct provider inference', async () => {
+  it('does not turn provider inference into cloud catalog authority', async () => {
     const registry = new ModelRegistry();
     const output = JSON.stringify({ models: [{ id: 'claude-mythos-9000' }] });
     const spawnFn = makeSpawnFn(output);
@@ -217,8 +217,8 @@ describe('detectAndRegisterModels', () => {
       cacheDir: workDir,
     });
 
-    const def = registry.resolve('claude-mythos-9000');
-    expect(def.provider).toBe('claude');
+    expect(registry.has('claude-mythos-9000')).toBe(false);
+    expect(() => registry.resolve('claude-mythos-9000')).toThrow(/pricing evidence is required/i);
   });
 
   it('gracefully handles provider CLI failure', async () => {
@@ -236,7 +236,7 @@ describe('detectAndRegisterModels', () => {
     expect(results[0]?.registered).toBe(0);
   });
 
-  it('probes multiple providers and registers all discovered models', async () => {
+  it('probes multiple providers while keeping unpriced cloud IDs evidence-only', async () => {
     const registry = new ModelRegistry();
     const spawnFn: SpawnFn = vi.fn().mockImplementation((cmd: string) => {
       if (cmd === 'claude') {
@@ -248,14 +248,16 @@ describe('detectAndRegisterModels', () => {
       return Promise.resolve({ stdout: '', exitCode: 1 });
     });
 
-    await detectAndRegisterModels(registry, {
+    const results = await detectAndRegisterModels(registry, {
       providers: ['claude', 'codex'],
       spawnFn,
       cacheDir: workDir,
     });
 
-    expect(registry.has('claude-mythos-5')).toBe(true);
-    expect(registry.has('gpt-6-turbo')).toBe(true);
+    expect(registry.has('claude-mythos-5')).toBe(false);
+    expect(registry.has('gpt-6-turbo')).toBe(false);
+    expect(results.find(r => r.provider === 'claude')?.discovered).toContain('claude-mythos-5');
+    expect(results.find(r => r.provider === 'codex')?.discovered).toContain('gpt-6-turbo');
   });
 
   it('uses cache when available and within TTL', async () => {
@@ -278,7 +280,7 @@ describe('detectAndRegisterModels', () => {
 
     // Second call — same ts, cache is warm (within 1h TTL)
     const registry2 = new ModelRegistry();
-    await detectAndRegisterModels(registry2, {
+    const [cachedResult] = await detectAndRegisterModels(registry2, {
       providers: ['claude'],
       spawnFn,
       cacheDir: workDir,
@@ -287,7 +289,9 @@ describe('detectAndRegisterModels', () => {
 
     // spawn should NOT be called again (cache hit)
     expect(vi.mocked(spawnFn)).not.toHaveBeenCalled();
-    expect(registry2.has('claude-cached-model')).toBe(true);
+    expect(registry2.has('claude-cached-model')).toBe(false);
+    expect(cachedResult?.source).toBe('cache');
+    expect(cachedResult?.discovered).toContain('claude-cached-model');
   });
 
   it('returns DetectResult with correct shape', async () => {

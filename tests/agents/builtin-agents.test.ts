@@ -14,7 +14,7 @@ const BUILTIN_AGENTS = [
   'performance-analyzer',
 ];
 
-const VALID_MODELS = ['opus', 'sonnet', 'haiku'];
+const VALID_MODELS = ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'];
 
 interface AgentStats {
   totalUses: number;
@@ -103,7 +103,7 @@ describe('Built-in Agents', () => {
     it('should have valid preferredModel', () => {
       const config = readAgentJson(agentId);
       expect(VALID_MODELS).toContain(config.preferredModel);
-      expect(config.preferredModel).toBe('opus');
+      expect(config.preferredModel).toBe('claude-opus-4-8');
     });
 
     it('should have effortMultiplier in valid range', () => {
@@ -148,7 +148,7 @@ describe('Built-in Agents', () => {
     it('should have valid preferredModel and restricted tools', () => {
       const config = readAgentJson(agentId);
       expect(VALID_MODELS).toContain(config.preferredModel);
-      expect(config.preferredModel).toBe('sonnet');
+      expect(config.preferredModel).toBe('claude-sonnet-5');
       expect(config.allowedTools).toContain('Read');
       expect(config.allowedTools).toContain('Write');
       expect(config.deniedTools).toContain('Bash');
@@ -195,7 +195,7 @@ describe('Built-in Agents', () => {
     it('should have valid preferredModel and read-only tools', () => {
       const config = readAgentJson(agentId);
       expect(VALID_MODELS).toContain(config.preferredModel);
-      expect(config.preferredModel).toBe('opus');
+      expect(config.preferredModel).toBe('claude-opus-4-8');
       expect(config.allowedTools).toContain('Read');
       expect(config.allowedTools).toContain('Grep');
       expect(config.deniedTools).toContain('Write');
@@ -242,7 +242,7 @@ describe('Built-in Agents', () => {
     it('should have valid preferredModel', () => {
       const config = readAgentJson(agentId);
       expect(VALID_MODELS).toContain(config.preferredModel);
-      expect(config.preferredModel).toBe('sonnet');
+      expect(config.preferredModel).toBe('claude-sonnet-5');
     });
 
     it('should have effortMultiplier in valid range', () => {
@@ -286,7 +286,7 @@ describe('Built-in Agents', () => {
     it('should have valid preferredModel and high effort', () => {
       const config = readAgentJson(agentId);
       expect(VALID_MODELS).toContain(config.preferredModel);
-      expect(config.preferredModel).toBe('opus');
+      expect(config.preferredModel).toBe('claude-opus-4-8');
       expect(config.effortMultiplier).toBe(1.5);
     });
 
@@ -331,7 +331,7 @@ describe('Built-in Agents', () => {
     it('should have valid preferredModel', () => {
       const config = readAgentJson(agentId);
       expect(VALID_MODELS).toContain(config.preferredModel);
-      expect(config.preferredModel).toBe('sonnet');
+      expect(config.preferredModel).toBe('claude-sonnet-5');
     });
 
     it('should have effortMultiplier in valid range', () => {
@@ -375,7 +375,7 @@ describe('Built-in Agents', () => {
     it('should have valid preferredModel', () => {
       const config = readAgentJson(agentId);
       expect(VALID_MODELS).toContain(config.preferredModel);
-      expect(config.preferredModel).toBe('opus');
+      expect(config.preferredModel).toBe('claude-opus-4-8');
     });
 
     it('should have effortMultiplier in valid range', () => {

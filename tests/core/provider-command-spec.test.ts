@@ -103,6 +103,12 @@ describe('getProviderCommandSpec', () => {
     expect(getProviderCommandSpec('gemini')?.binary).toBe('gemini');
     expect(getProviderCommandSpec('claude')?.binary).toBe('claude');
   });
+
+  it('declares live-usage capability separately from final usage output', () => {
+    expect(getProviderCommandSpec('claude')?.liveUsage).toBe('incremental');
+    expect(getProviderCommandSpec('codex')?.liveUsage).toBe('final-only');
+    expect(getProviderCommandSpec('gemini')?.liveUsage).toBe('final-only');
+  });
   it('returns null for an unknown/host-only provider (e.g. ollama) → caller honest-fails', () => {
     expect(getProviderCommandSpec('ollama')).toBeNull();
     expect(getProviderCommandSpec('nope')).toBeNull();

@@ -76,7 +76,7 @@ function makeConfig(): ResolvedConfig {
     activeModeConfig: {
       max_workers: 2,
       brain_model: 'sonnet',
-      default_model: 'sonnet',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: false,
     },
     modes: {} as ResolvedConfig['modes'],

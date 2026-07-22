@@ -179,9 +179,24 @@ describe('detectAvailableProviders', () => {
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(1, '') as ReturnType<typeof spawnSync>);
     const providers = await detectAvailableProviders();
     const claude = providers.find(p => p.name === 'claude')!;
-    expect(claude.models).toEqual(['fable', 'opus', 'sonnet', 'haiku']);
+    expect(claude.models).toEqual([
+      'claude-fable-5',
+      'claude-opus-4-8',
+      'claude-sonnet-5',
+      'claude-haiku-4-5-20251001',
+    ]);
     const codex = providers.find(p => p.name === 'codex')!;
-    expect(codex.models).toEqual(['o3', 'gpt-5', 'gpt-4.1', 'o4-mini', 'gpt-5-mini', 'gpt-4.1-mini']);
+    expect(codex.models).toEqual([
+      'o3',
+      'gpt-5.5',
+      'gpt-4.1',
+      'o4-mini',
+      'gpt-5-mini',
+      'gpt-4.1-mini',
+      'gpt-5.6-sol',
+      'gpt-5.6-terra',
+      'gpt-5.6-luna',
+    ]);
     const gemini = providers.find(p => p.name === 'gemini')!;
     expect(gemini.models).toEqual(['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash']);
   });

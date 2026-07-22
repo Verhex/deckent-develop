@@ -78,6 +78,11 @@ function makeTmpDir(prefix: string): string {
   const dir = join(tmpdir(), `${prefix}-${randomBytes(4).toString('hex')}`);
   mkdirSync(join(dir, '.tasks'), { recursive: true });
   mkdirSync(join(dir, '.deckent'), { recursive: true });
+  writeFileSync(
+    join(dir, '.deckent', 'cost-config.json'),
+    readFileSync(join(process.cwd(), 'src', 'core', 'pricing-data-baseline.json'), 'utf-8'),
+    'utf-8',
+  );
   return dir;
 }
 
@@ -86,7 +91,7 @@ function makeTask(id: string, overrides?: Partial<Task>): Task {
     id,
     title: `Task ${id}`,
     description: `desc ${id}`,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -98,6 +103,7 @@ function makeTask(id: string, overrides?: Partial<Task>): Task {
     createdAt: new Date().toISOString(),
     assignedAgent: 'generic',
     assignedSkills: [],
+    budget: { maxTurns: 1 },
     ...overrides,
   } as Task;
 }
@@ -113,6 +119,7 @@ function makeMockBackend(): SpawnBackend & { calls: MockSpawnCall[] } {
   const calls: MockSpawnCall[] = [];
   return {
     name: 'mock-backend',
+    liveUsageBudgetSupport: 'measured-stream',
     spawn(taskId, model, prompt, opts) {
       calls.push({ taskId, model: model as unknown as string, prompt, opts });
     },
@@ -148,7 +155,7 @@ describe('executeSpawnTask — fix-task routing-lineage inheritance', () => {
   afterEach(() => { rmSync(root, { recursive: true, force: true }); vi.clearAllMocks(); });
 
   it('inherits forceModel/provider/modelEffort from the original when the fix-task left them unset (behavior a)', async () => {
-    const original = makeTask('700-001', { forceModel: 'opus', provider: 'claude', modelEffort: 'high' });
+    const original = makeTask('700-001', { forceModel: 'claude-opus-4-8', provider: 'claude', modelEffort: 'high' });
     writeOriginalTask(root, original);
 
     const fixTask = makeTask('700-001-fix', { isPriorityFix: true, fixForTaskId: '700-001' });
@@ -157,7 +164,7 @@ describe('executeSpawnTask — fix-task routing-lineage inheritance', () => {
     const disposition = await executeSpawnTask({ task: fixTask }, baseDeps(root, { backend }));
 
     expect(disposition.kind).toBe('spawned');
-    expect(fixTask.forceModel).toBe('opus');
+    expect(fixTask.forceModel).toBe('claude-opus-4-8');
     expect(fixTask.provider).toBe('claude');
     expect(fixTask.modelEffort).toBe('high');
     // reasoning-effort resolution runs AFTER inheritance, so the inherited
@@ -260,7 +267,7 @@ describe('executeSpawnTask — resolution parity across caller-shaped deps (thre
   afterEach(() => { rmSync(root, { recursive: true, force: true }); vi.clearAllMocks(); });
 
   it('resolves identical forceModel/provider/modelEffort for the same fix-task fixture whether invoked with local-path-shaped or heavyweight-respawn-shaped deps', async () => {
-    const original = makeTask('701-001', { forceModel: 'opus', provider: 'claude', modelEffort: 'high' });
+    const original = makeTask('701-001', { forceModel: 'claude-opus-4-8', provider: 'claude', modelEffort: 'high' });
     writeOriginalTask(root, original);
 
     // "local" deps — represents processQueue / forceRescanIfIdle /
@@ -282,7 +289,7 @@ describe('executeSpawnTask — resolution parity across caller-shaped deps (thre
     const heavyFixTask = makeTask('701-001-fix-heavy', { isPriorityFix: true, fixForTaskId: '701-001' });
     const fullConfig = {
       spawn_backend: undefined,
-      activeModeConfig: { max_workers: 3, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: true },
+      activeModeConfig: { max_workers: 3, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: true },
     } as unknown as ResolvedConfig;
     const heavyDisposition = await executeSpawnTask(
       { task: heavyFixTask },
@@ -315,7 +322,7 @@ describe('waitForResults — queue-completion trigger (processQueue) delegates t
     const original = makeTask('702-001', { modelEffort: 'high', provider: 'claude' });
     writeOriginalTask(root, original);
 
-    const active = makeTask('702-000', { status: TaskStatus.EXECUTING });
+    const active = makeTask('702-000', { status: TaskStatus.EXECUTING, budget: undefined });
     const fixTask = makeTask('702-001-fix', { isPriorityFix: true, fixForTaskId: '702-001' });
 
     const sprint: Sprint = {
@@ -335,14 +342,23 @@ describe('waitForResults — queue-completion trigger (processQueue) delegates t
       JSON.stringify({
         taskId: '702-000', workerId: 'w-702-000', filesChanged: [], linesAdded: 0, linesRemoved: 0,
         testsPassed: true, coverage: 100, selfAssessment: 'DONE', notes: 'ok',
+        tokenUsage: {
+          inputTokens: 10,
+          outputTokens: 2,
+          cacheReadTokens: 0,
+          source: 'provider-adapter',
+          provider: 'claude',
+          model: 'claude-sonnet-5',
+        },
+        cost: { usd: 0.01, currency: 'USD', pricingSource: 'provider-envelope', isLocal: false },
       }),
     );
 
-    await waitForResults(root, sprint, 300, [fixTask]);
+    const backend = makeMockBackend();
+    await waitForResults(root, sprint, 300, [fixTask], { spawnBackend: backend });
 
-    expect(vi.mocked(spawnWorker)).toHaveBeenCalledWith(
-      '702-001-fix', expect.any(String), expect.any(String), root, expect.any(Object),
-    );
+    expect(backend.calls.map(call => call.taskId)).toContain('702-001-fix');
+    expect(vi.mocked(spawnWorker)).not.toHaveBeenCalled();
     expect(fixTask.provider).toBe('claude');
     expect(fixTask.modelEffort).toBe('high');
 
@@ -383,14 +399,22 @@ describe('waitForResults — dep-ready trigger (dispatchReadyTasks) delegates to
 
     const config = {
       dependency_pipeline_enabled: false,
-      activeModeConfig: { max_workers: 3, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: true },
+      activeModeConfig: { max_workers: 3, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: true },
     } as unknown as ResolvedConfig;
 
-    await waitForResults(root, sprint, 300, undefined, undefined, undefined, config);
-
-    expect(vi.mocked(spawnWorker)).toHaveBeenCalledWith(
-      '703-001-fix', expect.any(String), expect.any(String), root, expect.any(Object),
+    const backend = makeMockBackend();
+    await waitForResults(
+      root,
+      sprint,
+      300,
+      undefined,
+      { spawnBackend: backend },
+      undefined,
+      config,
     );
+
+    expect(backend.calls.map(call => call.taskId)).toContain('703-001-fix');
+    expect(vi.mocked(spawnWorker)).not.toHaveBeenCalled();
     expect(fixTask.provider).toBe('claude');
     expect(fixTask.modelEffort).toBe('high');
 

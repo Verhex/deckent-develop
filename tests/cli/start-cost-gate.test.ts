@@ -118,7 +118,7 @@ import type { SprintCostEstimate } from '../../src/core/cost-calculator.js';
 
 function makeConfig() {
   return {
-    activeModeConfig: { brain_model: 'opus', max_workers: 3 },
+    activeModeConfig: { brain_model: 'claude-opus-4-8', max_workers: 3 },
     brain_planning: 'auto',
     language: 'en',
   };

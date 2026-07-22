@@ -66,7 +66,7 @@ import { registerStart } from '../../src/cli/commands/start.js';
 
 function makeConfig() {
   return {
-    activeModeConfig: { brain_model: 'opus', max_workers: 3 },
+    activeModeConfig: { brain_model: 'claude-opus-4-8', max_workers: 3 },
     brain_planning: 'auto',
     language: 'en',
   };

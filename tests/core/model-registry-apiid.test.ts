@@ -6,8 +6,8 @@ import {
 } from '../../src/core/model-registry.js';
 
 describe('model-registry apiId correctness (207-001)', () => {
-  it('opus bundled apiId is current (claude-opus-4-8, not stale 4-6)', () => {
-    const opus = BUILTIN_MODELS.find(m => m.id === 'opus');
+  it('Claude Opus canonical id is current and identical to apiId', () => {
+    const opus = BUILTIN_MODELS.find(m => m.id === 'claude-opus-4-8');
     expect(opus).toBeDefined();
     expect(opus!.apiId).toBe('claude-opus-4-8');
     expect(opus!.apiId).not.toBe('claude-opus-4-6');
@@ -15,9 +15,9 @@ describe('model-registry apiId correctness (207-001)', () => {
 
   it('tier mapping is preserved after apiId update', () => {
     const registry = new ModelRegistry();
-    expect(registry.getTier('opus')).toBe('premium');
-    expect(registry.getTier('sonnet')).toBe('standard');
-    expect(registry.getTier('haiku')).toBe('economy');
+    expect(registry.getTier('claude-opus-4-8')).toBe('premium');
+    expect(registry.getTier('claude-sonnet-5')).toBe('standard');
+    expect(registry.getTier('claude-haiku-4-5-20251001')).toBe('economy');
   });
 
   it('14-model invariant holds (4 Claude + 6 OpenAI + 4 Gemini)', () => {
@@ -30,13 +30,13 @@ describe('model-registry apiId correctness (207-001)', () => {
     expect(gemini.length).toBe(4);
   });
 
-  it('bundled fallback: ModelRegistry resolves opus apiId correctly', () => {
+  it('bundled fallback resolves the canonical Opus API ID unchanged', () => {
     const registry = new ModelRegistry(BUILTIN_MODELS);
-    expect(registry.resolveApiId('opus')).toBe('claude-opus-4-8');
-    expect(registry.has('opus')).toBe(true);
+    expect(registry.resolveApiId('claude-opus-4-8')).toBe('claude-opus-4-8');
+    expect(registry.has('claude-opus-4-8')).toBe(true);
   });
 
-  it('singleton modelRegistry also returns updated opus apiId', () => {
-    expect(modelRegistry.resolveApiId('opus')).toBe('claude-opus-4-8');
+  it('singleton modelRegistry also returns canonical Opus unchanged', () => {
+    expect(modelRegistry.resolveApiId('claude-opus-4-8')).toBe('claude-opus-4-8');
   });
 });

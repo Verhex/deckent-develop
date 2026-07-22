@@ -133,7 +133,7 @@ import { registerRun } from '../../src/cli/commands/run.js';
 
 function makeConfig(overrides: Record<string, unknown> = {}) {
   return {
-    activeModeConfig: { brain_model: 'opus', max_workers: 3 },
+    activeModeConfig: { brain_model: 'claude-opus-4-8', max_workers: 3 },
     brain_planning: 'auto',
     language: 'en',
     // Drives run.ts's spawn call to SpawnBackendFactory (production default —

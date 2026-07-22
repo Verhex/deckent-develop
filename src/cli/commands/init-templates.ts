@@ -10,6 +10,26 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { FullStackResult } from '../../core/stack-detector.js';
+import { modelRegistry } from '../../core/model-registry.js';
+
+// ─── Canonical Model IDs (454-004) ──────────────────────────────────
+// Generated templates must teach exact provider API IDs + explicit provider
+// ownership — never the retired opus/sonnet/haiku/gpt-5 aliases (see
+// LEGACY_MODEL_ALIASES in core/model-registry.ts; resolveCanonicalModelIdentity()
+// throws E_LEGACY_MODEL_ALIAS on those). Derived from the registry so the
+// examples track the live catalog instead of drifting hardcodes.
+function requireTemplateModel(provider: 'claude' | 'codex' | 'gemini', tier: 'economy' | 'standard' | 'premium'): string {
+  const model = modelRegistry.getByProviderAndTier(provider, tier);
+  if (!model) throw new Error(`E_TEMPLATE_MODEL_UNAVAILABLE: provider=${provider} tier=${tier}`);
+  return model.id;
+}
+const CLAUDE_PREMIUM = requireTemplateModel('claude', 'premium');
+const CLAUDE_STANDARD = requireTemplateModel('claude', 'standard');
+const CLAUDE_ECONOMY = requireTemplateModel('claude', 'economy');
+const CODEX_PREMIUM = requireTemplateModel('codex', 'premium');
+const CODEX_STANDARD = requireTemplateModel('codex', 'standard');
+const GEMINI_PREMIUM = requireTemplateModel('gemini', 'premium');
+const GEMINI_STANDARD = requireTemplateModel('gemini', 'standard');
 
 // ─── Small Helpers ──────────────────────────────────────────────────
 
@@ -59,7 +79,8 @@ export function generateDeckentContentTR(projectName: string, buildCmd: string, 
 Her task şu yapıda olmalı:
 \`\`\`
 ## Task N: Başlık
-- Model: opus/sonnet/haiku
+- Model: ${CLAUDE_STANDARD}  (tam provider API ID — deckent_models canlı katalog; opus/sonnet/haiku alias'ları KABUL EDİLMEZ)
+- Provider: claude  (opsiyonel — ID prefiksinden çıkarılamıyorsa zorunlu)
 - Effort: low/normal/high
 - Skills: typescript-expert, testing-expert, vb.
 - Files: değişecek dosyalar
@@ -71,7 +92,7 @@ Detaylı rehber: .deckent/docs/directives-guide.md
 
 ## Providers
 - Claude (varsayılan), Codex (OPENAI_API_KEY), Gemini (GOOGLE_API_KEY)
-- Model eşdeğerleri: opus↔gpt-5↔gemini-2.5-pro, sonnet↔gpt-4.1↔gemini-2.5-flash
+- Model eşdeğerleri (tam API ID'leri): ${CLAUDE_PREMIUM}↔${CODEX_PREMIUM}↔${GEMINI_PREMIUM}, ${CLAUDE_STANDARD}↔${CODEX_STANDARD}↔${GEMINI_STANDARD}
 
 ## Agent Instructions
 Brain rolü için: @.claude/rules/brain.md
@@ -120,7 +141,8 @@ export function generateDeckentContentEN(projectName: string, buildCmd: string, 
 Each task should follow this structure:
 \`\`\`
 ## Task N: Title
-- Model: opus/sonnet/haiku
+- Model: ${CLAUDE_STANDARD}  (exact provider API ID — see deckent_models for the live catalog; opus/sonnet/haiku aliases are REJECTED)
+- Provider: claude  (optional — required when the ID's provider can't be inferred from its prefix)
 - Effort: low/normal/high
 - Skills: typescript-expert, testing-expert, etc.
 - Files: files to modify
@@ -132,7 +154,7 @@ Detailed guide: .deckent/docs/directives-guide.md
 
 ## Providers
 - Claude (default), Codex (OPENAI_API_KEY), Gemini (GOOGLE_API_KEY)
-- Model equivalence: opus↔gpt-5↔gemini-2.5-pro, sonnet↔gpt-4.1↔gemini-2.5-flash
+- Model equivalence (exact API IDs): ${CLAUDE_PREMIUM}↔${CODEX_PREMIUM}↔${GEMINI_PREMIUM}, ${CLAUDE_STANDARD}↔${CODEX_STANDARD}↔${GEMINI_STANDARD}
 
 ## Agent Instructions
 When acting as Brain: @.claude/rules/brain.md
@@ -167,7 +189,8 @@ export function generateDirectivesTemplateTR(stack: FullStackResult, projectName
 ---
 
 ## Task 1: Örnek — Bu task'ı düzenleyin veya silin
-- Model: sonnet
+- Model: ${CLAUDE_STANDARD}
+- Provider: claude
 - Effort: normal
 - Skills: ${skill}
 - Files: ${files}
@@ -177,7 +200,8 @@ export function generateDirectivesTemplateTR(stack: FullStackResult, projectName
 Bu örnek task'tır. Kendi hedefinize göre düzenleyin.
 
 Her task şunları içermelidir:
-- **Model:** opus (karmaşık), sonnet (genel), haiku (basit)
+- **Model:** tam provider API ID — ${CLAUDE_PREMIUM} (karmaşık), ${CLAUDE_STANDARD} (genel), ${CLAUDE_ECONOMY} (basit). Legacy alias'lar (opus/sonnet/haiku) REDDEDİLİR — bkz. deckent_models.
+- **Provider:** claude | codex | gemini — Model ID'nin sahibi provider (ID prefiksinden çıkarılamıyorsa zorunlu)
 - **Effort:** low (<1 saat), normal (1-3 saat), high (3+ saat)
 - **Skills:** Uzmanlık alanı (typescript-expert, testing-expert, vb.)
 - **Files:** Değiştirilecek dosyalar
@@ -208,7 +232,8 @@ export function generateDirectivesTemplateEN(stack: FullStackResult, projectName
 ---
 
 ## Task 1: Example — Edit or delete this task
-- Model: sonnet
+- Model: ${CLAUDE_STANDARD}
+- Provider: claude
 - Effort: normal
 - Skills: ${skill}
 - Files: ${files}
@@ -218,7 +243,8 @@ export function generateDirectivesTemplateEN(stack: FullStackResult, projectName
 This is an example task. Edit it to match your goals.
 
 Each task should include:
-- **Model:** opus (complex), sonnet (general), haiku (simple)
+- **Model:** exact provider API ID — ${CLAUDE_PREMIUM} (complex), ${CLAUDE_STANDARD} (general), ${CLAUDE_ECONOMY} (simple). Legacy aliases (opus/sonnet/haiku) are REJECTED — see deckent_models.
+- **Provider:** claude | codex | gemini — the ID's owning provider (required when it can't be inferred from the ID's prefix)
 - **Effort:** low (<1 hour), normal (1-3 hours), high (3+ hours)
 - **Skills:** Expertise area (typescript-expert, testing-expert, etc.)
 - **Files:** Files to be modified
@@ -350,7 +376,8 @@ export function generateDirectivesGuideDoc(lang: string): string {
 ## Goal: Sprint amacını bir paragrafta açıkla.
 
 ## Task 1: Task Başlığı
-- Model: sonnet
+- Model: ${CLAUDE_STANDARD}
+- Provider: claude
 - Effort: normal
 - Skills: typescript-expert
 - Files: src/core/config.ts
@@ -367,7 +394,8 @@ Task'ın ne yapacağını detaylı açıkla.
 
 | Alan | Değerler | Açıklama |
 |------|----------|----------|
-| Model | opus, sonnet, haiku | AI modeli — opus: karmaşık, sonnet: genel, haiku: basit |
+| Model | tam provider API ID (örn. ${CLAUDE_PREMIUM}, ${CLAUDE_STANDARD}, ${CLAUDE_ECONOMY}) | AI modeli — legacy alias'lar (opus/sonnet/haiku) REDDEDİLİR; canlı katalog için deckent_models |
+| Provider | claude, codex, gemini | Model ID'nin sahibi provider — ID prefiksinden (claude-*/gpt-*/gemini-*) çıkarılamıyorsa zorunlu |
 | Effort | low, normal, high | İş yükü — low: <1 saat, normal: 1-3 saat, high: 3+ saat |
 | Skills | skill-id listesi | Uzmanlık alanı (virgülle ayır) |
 | Files | dosya yolları | Değiştirilecek dosyalar |
@@ -396,7 +424,8 @@ Task'ın ne yapacağını detaylı açıkla.
 ## Goal: Describe the sprint goal in one paragraph.
 
 ## Task 1: Task Title
-- Model: sonnet
+- Model: ${CLAUDE_STANDARD}
+- Provider: claude
 - Effort: normal
 - Skills: typescript-expert
 - Files: src/core/config.ts
@@ -413,7 +442,8 @@ Describe what the task will do in detail.
 
 | Field | Values | Description |
 |-------|--------|-------------|
-| Model | opus, sonnet, haiku | AI model — opus: complex, sonnet: general, haiku: simple |
+| Model | exact provider API ID (e.g. ${CLAUDE_PREMIUM}, ${CLAUDE_STANDARD}, ${CLAUDE_ECONOMY}) | AI model — legacy aliases (opus/sonnet/haiku) are REJECTED; see deckent_models for the live catalog |
+| Provider | claude, codex, gemini | The ID's owning provider — required when it can't be inferred from the ID's prefix (claude-*/gpt-*/gemini-*) |
 | Effort | low, normal, high | Workload — low: <1h, normal: 1-3h, high: 3+h |
 | Skills | skill-id list | Expertise area (comma-separated) |
 | Files | file paths | Files to be modified |

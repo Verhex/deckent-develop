@@ -145,7 +145,7 @@ import { registerStart } from '../../src/cli/commands/start.js';
 
 function makeConfig() {
   return {
-    activeModeConfig: { brain_model: 'opus', max_workers: 3 },
+    activeModeConfig: { brain_model: 'claude-opus-4-8', max_workers: 3 },
     brain_planning: 'auto',
     language: 'en',
   };
@@ -252,7 +252,7 @@ function createMockServer(): MockServer {
 
 const MCP_MOCK_CONFIG = {
   mode: 'max_plan',
-  activeModeConfig: { max_workers: 4, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: false },
+  activeModeConfig: { max_workers: 4, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: false },
   modes: {},
   language: 'en',
   projectName: 'test-403-002',

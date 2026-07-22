@@ -217,7 +217,7 @@ vi.mock('../../src/orchestra/result-collector.js', () => ({
   resolveAgentPrompt: vi.fn().mockResolvedValue(undefined),
   resolveSkillPrompts: vi.fn().mockResolvedValue([]),
   buildResultsMap: vi.fn().mockReturnValue(new Map()),
-  estimateTokenUsage: vi.fn().mockReturnValue({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model: 'sonnet' }),
+  estimateTokenUsage: vi.fn().mockReturnValue({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model: 'claude-sonnet-5' }),
   enrichResultTokenUsage: vi.fn(),
   handleWorkerQuestion: vi.fn(),
   checkWorkerQuestions: vi.fn().mockReturnValue([]),
@@ -289,8 +289,8 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     mode: 'max_plan',
     activeModeConfig: {
       max_workers: 4,
-      brain_model: 'opus',
-      default_model: 'sonnet',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: false,
     },
     modes: {} as never,
@@ -307,7 +307,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '001-001',
     title: 'Test task',
     description: 'A test task',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -352,7 +352,7 @@ function makeMockBackend(): SpawnBackend & {
 function makeMockProvider(): ProviderAdapter {
   return {
     name: 'mock-provider',
-    supportedModels: ['opus', 'sonnet', 'haiku'] as const,
+    supportedModels: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'] as const,
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
@@ -414,7 +414,7 @@ describe('spawnWorkers with SpawnBackend', () => {
     expect(backend.spawn).toHaveBeenCalledOnce();
     expect(backend.spawn).toHaveBeenCalledWith(
       '001-001',
-      'sonnet',
+      'claude-sonnet-5',
       expect.any(String),
       expect.objectContaining({ projectDir: ROOT }),
     );
@@ -489,7 +489,7 @@ describe('spawnWorkers with SpawnBackend', () => {
       makeTask({ id: '001-003' }),
     ];
     const sprint = makeSprint({ tasks });
-    const config = makeConfig({ activeModeConfig: { max_workers: 2, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: false } });
+    const config = makeConfig({ activeModeConfig: { max_workers: 2, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: false } });
 
     const queued = await spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
 

@@ -56,7 +56,7 @@
       ]
     },
     "numerical": {
-      "preferredModel": "opus",
+      "preferredModel": "claude-opus-4-8",
       "costTier": "premium",
       "maxParallel": null
     }
@@ -74,7 +74,7 @@
     "Write"
   ],
   "deniedTools": [],
-  "preferredModel": "opus",
+  "preferredModel": "claude-opus-4-8",
   "effortMultiplier": 1.5,
   "triggerKeywords": [
     "fix",

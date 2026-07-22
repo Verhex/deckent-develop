@@ -53,8 +53,8 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     mode: 'max_plan',
     activeModeConfig: {
       max_workers: 4,
-      brain_model: 'opus',
-      default_model: 'sonnet',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: true,
     },
     modes: {} as never,

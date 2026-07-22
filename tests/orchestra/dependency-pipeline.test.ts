@@ -78,7 +78,7 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
 });
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   resolveEffectiveWorkers: vi.fn().mockReturnValue(4),
   loadConfig: vi.fn().mockReturnValue({}),
@@ -186,7 +186,7 @@ vi.mock('../../src/orchestra/sprint-utils.js', async (importOriginal) => {
 });
 
 vi.mock('../../src/orchestra/model-selector.js', () => ({
-  resolveTaskModel: vi.fn().mockReturnValue('opus'),
+  resolveTaskModel: vi.fn().mockReturnValue('claude-opus-4-8'),
   parsePatterns: vi.fn().mockReturnValue([]),
   deduplicatePatterns: vi.fn().mockReturnValue([]),
   calculateModelScore: vi.fn().mockReturnValue(3),
@@ -267,7 +267,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '134-001',
     title: 'Test task',
     description: 'desc',
-    model: 'opus',
+    model: 'claude-opus-4-8',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -303,10 +303,10 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     version: '1.0.0',
     activeModeConfig: {
       max_workers: 4,
-      default_model: 'opus',
+      default_model: 'claude-opus-4-8',
       haiku_allowed: false,
       brain_planning: 'structured',
-      brain_model: 'opus',
+      brain_model: 'claude-opus-4-8',
     },
     modes: {} as ResolvedConfig['modes'],
     ...overrides,
@@ -362,7 +362,7 @@ describe('Dependency Pipeline', () => {
 ---
 
 ## Task 1: Dependency Test
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Dependencies: 134-005, 134-007
 - Files: src/core/config.ts
@@ -384,7 +384,7 @@ Test task with dependencies.
 ---
 
 ## Task 1: No Deps Task
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Files: src/core/config.ts
 - Scope: src/core/

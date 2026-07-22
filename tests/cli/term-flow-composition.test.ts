@@ -41,6 +41,7 @@ import { join } from 'node:path';
 // GERÇEK-şekilli plan döner, böylece propose-yolu hermetik kalır.
 vi.mock('../../src/orchestra/planner.js', () => ({
   resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
+  createPlannerTaskModelPolicy: vi.fn((defaultModel: string) => ({ defaultModel, allowedModels: [defaultModel] })),
   callZeroConfigPlanner: vi.fn(() => ({
     reasoning: 'canned single-task plan (hermetic planner boundary)',
     tasks: [{
@@ -48,7 +49,7 @@ vi.mock('../../src/orchestra/planner.js', () => ({
       description: 'Canned single-task plan for RunFlow tests (429-001 planner-seam).',
       scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/planned.ts'] },
       dependencies: [],
-      model: 'sonnet', effort: 'normal', priority: 'NORMAL', reason: 'canned',
+      model: 'claude-sonnet-5', effort: 'normal', priority: 'NORMAL', reason: 'canned',
       goNogo: { goCriteria: 'The planned change works.', noGoCriteria: 'The planned change breaks.', techDebtAcceptable: '' },
     }],
   })),
@@ -96,10 +97,11 @@ function makeConfig(): ResolvedConfig {
   return {
     mode: 'max_plan',
     activeModeConfig: {
-      max_workers: 8, brain_model: 'opus', default_model: 'sonnet',
+      max_workers: 8, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5',
       haiku_allowed: true, brain_planning: 'auto',
     },
     modes: {} as any,
+    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
     language: 'en', projectName: 'test', projectRoot: '/mock/root',
     version: '1.0.0', auto_docs: { tier1: true, tier2: true, tier3: false },
     terminal: { run_flow_v2: true } as any,
@@ -116,7 +118,7 @@ function makeBrainContext(): BrainContext {
 function makeTask(overrides?: Partial<Task>): Task {
   return {
     id: '001-001', title: 'Export module A', description: 'Build the CSV exporter.',
-    model: 'sonnet', effort: 'normal', priority: 'NORMAL', reason: 'test',
+    model: 'claude-sonnet-5', effort: 'normal', priority: 'NORMAL', reason: 'test',
     scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
     dependencies: [],
     goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
@@ -410,7 +412,7 @@ describe('term-flow composition-gate — builder-validation neutralizes unsafe i
     const { directivesMarkdown } = await compileRunProposal(unsafeProposal);
     const parsed = parseStructuredDirectives(directivesMarkdown);
     expect(parsed).toHaveLength(1);
-    // Planner-mock 'sonnet' der; user-metnindeki sahte label bunu EZEMEZ.
+    // Planner-mock 'claude-sonnet-5' der; user-metnindeki sahte label bunu EZEMEZ.
     expect(parsed[0]!.forceModel).not.toBe('gpt-4-turbo');
   });
 });

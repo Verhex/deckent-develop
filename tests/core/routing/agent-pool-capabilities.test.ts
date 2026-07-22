@@ -60,7 +60,7 @@ function validCapabilities(): CapabilityVector {
       deliverables: ['code-src', 'code-test'],
     },
     numerical: {
-      preferredModel: 'sonnet',
+      preferredModel: 'claude-sonnet-5',
       costTier: 'standard',
       maxParallel: null,
     },
@@ -123,6 +123,27 @@ describe('AgentPoolManager — capabilities (445-012, additive load)', () => {
     expect(invalid[0]?.id).toBe('bad-cap-agent');
     expect(invalid[0]?.severity).toBe('warning');
     expect(invalid[0]?.errors.length).toBeGreaterThan(0);
+  });
+
+  it('drops a nested legacy model alias instead of routing it', () => {
+    const agent = createAgentDefinition({ id: 'alias-cap-agent', name: 'Alias Cap Agent' });
+    const capabilities = validCapabilities();
+    capabilities.numerical.preferredModel = 'sonnet';
+    const withCaps = { ...agent, capabilities };
+
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const s = String(p);
+      return s.includes('.deckent/agents') && !s.includes('.tasks');
+    });
+    vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('alias-cap-agent')] as any);
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(withCaps));
+
+    const loaded = manager.loadAgents().get('alias-cap-agent');
+    expect(loaded).toBeDefined();
+    expect(loaded?.capabilities).toBeUndefined();
+    expect(manager.getInvalidManifests()[0]?.errors).toContain(
+      '"capabilities.numerical.preferredModel" must be a canonical registered model ID',
+    );
   });
 
   it('leaves an agent with no capabilities field entirely unaffected (backward-compat / additive guarantee)', () => {
@@ -188,4 +209,3 @@ function makePool(...agents: AgentDefinition[]): AgentPool {
 function makeSkillPool(...skills: SkillDefinition[]): Map<string, SkillDefinition> {
   return new Map(skills.map((s) => [s.id, s]));
 }
-

@@ -119,7 +119,7 @@ describe('buildHealthSnapshot — provider/model/mode field-level fail-soft', ()
 
   it('model label is sourced LIVE from modelRegistry — not a hardcoded literal', async () => {
     const root = makeTmpRoot();
-    const cfg = makeConfig({ brain_provider: 'claude', mode: 'balanced' }); // default brain_model='sonnet'
+    const cfg = makeConfig({ brain_provider: 'claude', mode: 'balanced' }); // default brain_model='claude-sonnet-5'
     const deps: HealthSnapshotDeps = {
       loadConfigFn: async () => cfg,
       loadMcpServersFn: NOOP_MCP,
@@ -127,7 +127,7 @@ describe('buildHealthSnapshot — provider/model/mode field-level fail-soft', ()
       probeAuthFn: async (): Promise<AuthProbeResult> => ({ state: 'unknown' }),
     };
     const snapshot = await buildHealthSnapshot(root, deps);
-    const liveApiId = modelRegistry.getOrThrow('sonnet').apiId; // ground truth from the registry, not a literal
+    const liveApiId = modelRegistry.getOrThrow('claude-sonnet-5').apiId; // ground truth from the registry, not a literal
     expect(snapshot.model.status).toBe('ok');
     expect(snapshot.model.label).toContain(liveApiId);
   });

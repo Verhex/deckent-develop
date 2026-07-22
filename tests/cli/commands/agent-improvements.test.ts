@@ -34,7 +34,7 @@ function makeAgent(name: string, overrides: Record<string, unknown> = {}) {
     name,
     type: 'custom',
     enabled: true,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     triggers: [],
     description: `Agent ${name}`,
     uses: 5,
@@ -138,7 +138,7 @@ describe('agent improvements', () => {
       const config = JSON.parse(readFileSync(
         join(testRoot, '.deckent/agents/trigger-good-agent/agent.json'), 'utf-8',
       ));
-      expect(config.triggers).toEqual(['typescript', 'react']);
+      expect(config.triggerKeywords).toEqual(['typescript', 'react']);
     });
 
     it('enforces validation during agent edit --triggers', async () => {
@@ -188,23 +188,23 @@ describe('agent improvements', () => {
       const config = JSON.parse(readFileSync(
         join(testRoot, '.deckent/agents/default-model-agent/agent.json'), 'utf-8',
       ));
-      expect(config.model).toBe('sonnet');
+      expect(config.preferredModel).toBe('claude-opus-4-8');
     });
 
     it('uses opus when --model opus specified', async () => {
-      await run(['agent', 'create', 'opus-agent', '--model', 'opus']);
+      await run(['agent', 'create', 'opus-agent', '--model', 'claude-opus-4-8']);
       const config = JSON.parse(readFileSync(
         join(testRoot, '.deckent/agents/opus-agent/agent.json'), 'utf-8',
       ));
-      expect(config.model).toBe('opus');
+      expect(config.preferredModel).toBe('claude-opus-4-8');
     });
 
     it('uses haiku when --model haiku specified', async () => {
-      await run(['agent', 'create', 'haiku-agent', '--model', 'haiku']);
+      await run(['agent', 'create', 'haiku-agent', '--model', 'claude-haiku-4-5-20251001']);
       const config = JSON.parse(readFileSync(
         join(testRoot, '.deckent/agents/haiku-agent/agent.json'), 'utf-8',
       ));
-      expect(config.model).toBe('haiku');
+      expect(config.preferredModel).toBe('claude-haiku-4-5-20251001');
     });
 
     it('rejects invalid model name', async () => {
@@ -214,8 +214,8 @@ describe('agent improvements', () => {
     });
 
     it('shows model in create output', async () => {
-      await run(['agent', 'create', 'model-output-agent', '--model', 'opus']);
-      expect(output.some(o => o.includes('opus'))).toBe(true);
+      await run(['agent', 'create', 'model-output-agent', '--model', 'claude-opus-4-8']);
+      expect(output.some(o => o.includes('claude-opus-4-8'))).toBe(true);
     });
   });
 });

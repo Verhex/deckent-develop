@@ -19,7 +19,7 @@ const REGISTRY = new ModelRegistry();
 const OPUS_IN = 5 / 1_000_000; // $0.000005 / token
 const OPUS_OUT = 25 / 1_000_000; // $0.000025 / token
 
-/** Config whose `opus` alias carries REAL per-model cache prices (api regime reads these). */
+/** Config whose exact Opus API ID carries REAL per-model cache prices. */
 const CONFIG_WITH_OPUS_CACHE: CostConfig = {
   _version: '1.0',
   providers: {
@@ -47,7 +47,7 @@ const CONFIG_WITH_OPUS_CACHE: CostConfig = {
   update_config: { sources_priority: ['litellm'] },
 };
 
-/** Config that does NOT know `opus` (so api regime must fall back to archetype-B cache
+/** Config that does NOT know the exact Opus API ID (so api regime must fall back to archetype-B cache
  *  defaults) but DOES carry a config-only model absent from the registry. */
 const CONFIG_NO_OPUS: CostConfig = {
   _version: '1.0',
@@ -84,8 +84,8 @@ describe('billingModeToRegime', () => {
 describe('calculateRegimeCost — subscription (limit-burn)', () => {
   it('counts cacheRead as ZERO weight (cacheRead never affects the burn)', () => {
     const base: RegimeCostUsage = { inputTokens: 1_000_000, outputTokens: 0, cacheCreationTokens: 0 };
-    const noRead = calculateRegimeCost({ ...base, cacheReadTokens: 0 }, 'opus', 'subscription', CONFIG_WITH_OPUS_CACHE, REGISTRY);
-    const hugeRead = calculateRegimeCost({ ...base, cacheReadTokens: 5_000_000 }, 'opus', 'subscription', CONFIG_WITH_OPUS_CACHE, REGISTRY);
+    const noRead = calculateRegimeCost({ ...base, cacheReadTokens: 0 }, 'claude-opus-4-8', 'subscription', CONFIG_WITH_OPUS_CACHE, REGISTRY);
+    const hugeRead = calculateRegimeCost({ ...base, cacheReadTokens: 5_000_000 }, 'claude-opus-4-8', 'subscription', CONFIG_WITH_OPUS_CACHE, REGISTRY);
 
     expect(noRead.value).toBeCloseTo(hugeRead.value, 10); // identical → cacheRead is free
     expect(noRead.value).toBeCloseTo(1_000_000 * OPUS_IN, 6); // input-only burn
@@ -96,7 +96,7 @@ describe('calculateRegimeCost — subscription (limit-burn)', () => {
   it('prices cacheWrite at 1.25×input', () => {
     const r = calculateRegimeCost(
       { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 1_000_000 },
-      'opus',
+      'claude-opus-4-8',
       'subscription',
       CONFIG_WITH_OPUS_CACHE,
       REGISTRY,
@@ -109,7 +109,7 @@ describe('calculateRegimeCost — subscription (limit-burn)', () => {
   it('full formula = in·$in + out·$out + cacheWrite·1.25·$in', () => {
     const r = calculateRegimeCost(
       { inputTokens: 1_000_000, outputTokens: 1_000_000, cacheReadTokens: 1_000_000, cacheCreationTokens: 1_000_000 },
-      'opus',
+      'claude-opus-4-8',
       'subscription',
       CONFIG_WITH_OPUS_CACHE,
       REGISTRY,
@@ -125,19 +125,19 @@ describe('calculateRegimeCost — api ($-per-token)', () => {
   it('pulls per-model in/out price from the REGISTRY, not the cost-config', () => {
     const r = calculateRegimeCost(
       { inputTokens: 1_000_000, outputTokens: 0 },
-      'opus',
+      'claude-opus-4-8',
       'api',
       CONFIG_WITH_OPUS_CACHE, // config says $50/MTok; registry says $5/MTok
       REGISTRY,
     );
     expect(r.value).toBeCloseTo(5, 4); // registry $5, NOT config $50
-    expect(r.pricingSource).toBe('registry:opus');
+    expect(r.pricingSource).toBe('registry:claude-opus-4-8');
   });
 
   it('charges cacheRead (discounted) — unlike subscription, it is NOT free', () => {
     const usage: RegimeCostUsage = { inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 1_000_000 };
-    const api = calculateRegimeCost(usage, 'opus', 'api', CONFIG_WITH_OPUS_CACHE, REGISTRY);
-    const sub = calculateRegimeCost(usage, 'opus', 'subscription', CONFIG_WITH_OPUS_CACHE, REGISTRY);
+    const api = calculateRegimeCost(usage, 'claude-opus-4-8', 'api', CONFIG_WITH_OPUS_CACHE, REGISTRY);
+    const sub = calculateRegimeCost(usage, 'claude-opus-4-8', 'subscription', CONFIG_WITH_OPUS_CACHE, REGISTRY);
 
     // api uses config cacheRead price $0.50/MTok → 5 + 0.5 = 5.5
     expect(api.value).toBeCloseTo(5 + 0.5, 4);
@@ -149,7 +149,7 @@ describe('calculateRegimeCost — api ($-per-token)', () => {
   it('measures the cache-hit ratio from real token counts (never assumed)', () => {
     const r = calculateRegimeCost(
       { inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 1_000_000, cacheCreationTokens: 0 },
-      'opus',
+      'claude-opus-4-8',
       'api',
       CONFIG_WITH_OPUS_CACHE,
       REGISTRY,
@@ -162,7 +162,7 @@ describe('calculateRegimeCost — api ($-per-token)', () => {
   it('falls back to archetype-B cache weights when the config has no per-model cache price', () => {
     const r = calculateRegimeCost(
       { inputTokens: 0, outputTokens: 0, cacheReadTokens: 1_000_000, cacheCreationTokens: 1_000_000 },
-      'opus',
+      'claude-opus-4-8',
       'api',
       CONFIG_NO_OPUS, // opus absent from config → derive cache prices from input
       REGISTRY,
@@ -171,7 +171,7 @@ describe('calculateRegimeCost — api ($-per-token)', () => {
     const expected = 1_000_000 * 0.1 * OPUS_IN + 1_000_000 * 1.25 * OPUS_IN;
     expect(r.value).toBeCloseTo(expected, 6); // 0.5 + 6.25 = 6.75
     expect(r.value).toBeCloseTo(6.75, 4);
-    expect(r.pricingSource).toBe('registry:opus');
+    expect(r.pricingSource).toBe('registry:claude-opus-4-8');
   });
 });
 
@@ -180,7 +180,7 @@ describe('calculateRegimeCost — local / unknown / config-fallback', () => {
   it('local regime is always $0 regardless of tokens', () => {
     const r = calculateRegimeCost(
       { inputTokens: 5_000_000, outputTokens: 500_000, cacheCreationTokens: 1_000_000 },
-      'opus',
+      'claude-opus-4-8',
       'local',
       CONFIG_WITH_OPUS_CACHE,
       REGISTRY,

@@ -61,7 +61,7 @@ import { exportConfig, importConfig, registerConfig } from '../../src/cli/comman
 function makeResolvedConfig(overrides = {}) {
   return {
     mode: 'max_plan',
-    activeModeConfig: { brain_model: 'opus', max_workers: 3 },
+    activeModeConfig: { brain_model: 'claude-opus-4-8', max_workers: 3 },
     language: 'en',
     projectName: 'test-project',
     projectRoot: '/mock/root',

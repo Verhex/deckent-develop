@@ -20,7 +20,7 @@ import { modelRegistry, registerOllamaModels } from '../../src/core/model-regist
 import type { ModelType } from '../../src/core/types.js';
 
 // Ollama models are opt-in (registered by providers/ollama.js at module-load
-// time in production) — register them explicitly so 'qwen-coder-32b' below
+// time in production) — register them explicitly so 'qwen2.5-coder:32b' below
 // resolves to provider 'ollama' instead of falling through to the
 // unregistered-id default (claude).
 registerOllamaModels();
@@ -32,7 +32,7 @@ describe.skipIf(isWindows)('TMUX-PROVIDER-CLI (364-003, born-481 parity)', () =>
 
   describe('codex-provider task', () => {
     it('produces a `codex exec` command with the codex binary, never claude', () => {
-      const cmd = buildWorkerCommand('gpt-5' as ModelType, '/proj/.tasks/.prompt-t1.txt');
+      const cmd = buildWorkerCommand('gpt-5.5' as ModelType, '/proj/.tasks/.prompt-t1.txt');
 
       expect(cmd).toContain('codex exec');
       expect(cmd).not.toMatch(/^claude /);
@@ -40,7 +40,7 @@ describe.skipIf(isWindows)('TMUX-PROVIDER-CLI (364-003, born-481 parity)', () =>
     });
 
     it('feeds the wire apiId (gpt-5.5), never the deckent-facing alias (gpt-5)', () => {
-      const cmd = buildWorkerCommand('gpt-5' as ModelType, '/proj/.tasks/.prompt-t2.txt');
+      const cmd = buildWorkerCommand('gpt-5.5' as ModelType, '/proj/.tasks/.prompt-t2.txt');
 
       expect(cmd).toContain('--model gpt-5.5');
       expect(cmd).not.toContain('--model gpt-5 ');
@@ -48,31 +48,31 @@ describe.skipIf(isWindows)('TMUX-PROVIDER-CLI (364-003, born-481 parity)', () =>
     });
 
     it('pipes the prompt file via stdin redirection (codex promptFeed is stdin)', () => {
-      const cmd = buildWorkerCommand('gpt-5' as ModelType, '/proj/.tasks/.prompt-t3.txt');
+      const cmd = buildWorkerCommand('gpt-5.5' as ModelType, '/proj/.tasks/.prompt-t3.txt');
       expect(cmd).toContain('< /proj/.tasks/.prompt-t3.txt');
     });
 
     it('autoApprove appends the codex sandbox-bypass flag only when set', () => {
-      const withoutApprove = buildWorkerCommand('gpt-5' as ModelType, '/tmp/p.txt', {});
+      const withoutApprove = buildWorkerCommand('gpt-5.5' as ModelType, '/tmp/p.txt', {});
       expect(withoutApprove).not.toContain('--dangerously-bypass-approvals-and-sandbox');
 
-      const withApprove = buildWorkerCommand('gpt-5' as ModelType, '/tmp/p.txt', { autoApprove: true });
+      const withApprove = buildWorkerCommand('gpt-5.5' as ModelType, '/tmp/p.txt', { autoApprove: true });
       expect(withApprove).toContain('--dangerously-bypass-approvals-and-sandbox');
     });
 
     it('applies codex reasoning-effort via -c model_reasoning_effort=<level>', () => {
-      const cmd = buildWorkerCommand('gpt-5' as ModelType, '/tmp/p.txt', { reasoningEffort: 'high' });
+      const cmd = buildWorkerCommand('gpt-5.5' as ModelType, '/tmp/p.txt', { reasoningEffort: 'high' });
       expect(cmd).toContain('-c model_reasoning_effort=high');
     });
 
     it('drops an invalid reasoning-effort for codex (claude-only vocabulary)', () => {
-      const cmd = buildWorkerCommand('gpt-5' as ModelType, '/tmp/p.txt', { reasoningEffort: 'xhigh' });
+      const cmd = buildWorkerCommand('gpt-5.5' as ModelType, '/tmp/p.txt', { reasoningEffort: 'xhigh' });
       expect(cmd).not.toContain('model_reasoning_effort');
     });
 
     it('shared-table reuse (import-evidence): matches buildProviderCommand(getProviderCommandSpec("codex"), ...) directly', () => {
       const opts = { autoApprove: true, reasoningEffort: 'medium' };
-      const cmd = buildWorkerCommand('gpt-5' as ModelType, '/tmp/p.txt', opts, undefined, undefined, 0);
+      const cmd = buildWorkerCommand('gpt-5.5' as ModelType, '/tmp/p.txt', opts, undefined, undefined, 0);
 
       const spec = getProviderCommandSpec('codex');
       expect(spec).not.toBeNull();
@@ -89,15 +89,15 @@ describe.skipIf(isWindows)('TMUX-PROVIDER-CLI (364-003, born-481 parity)', () =>
 
   describe('claude-provider task — byte-identical to pre-364-003', () => {
     it('produces the exact pre-existing hardcoded claude command shape (no --output-format json)', () => {
-      const cmd = buildWorkerCommand('sonnet' as ModelType, '/tmp/prompt.txt');
-      expect(cmd).toBe(`claude -p - --model ${modelRegistry.resolveApiId('sonnet' as ModelType)} < /tmp/prompt.txt`);
+      const cmd = buildWorkerCommand('claude-sonnet-5' as ModelType, '/tmp/prompt.txt');
+      expect(cmd).toBe(`claude -p - --model ${modelRegistry.resolveApiId('claude-sonnet-5' as ModelType)} < /tmp/prompt.txt`);
       // PROVIDER_COMMAND_SPECS.claude carries --output-format json — the tmux
       // no-adapter fallback deliberately does NOT, to stay byte-identical.
       expect(cmd).not.toContain('--output-format');
     });
 
     it('includes --allowedTools and --dangerously-skip-permissions (no adapter, unchanged)', () => {
-      const cmd = buildWorkerCommand('opus' as ModelType, '/tmp/p.txt', {
+      const cmd = buildWorkerCommand('claude-opus-4-8' as ModelType, '/tmp/p.txt', {
         allowedTools: 'Read,Write',
         autoApprove: true,
       });
@@ -107,7 +107,7 @@ describe.skipIf(isWindows)('TMUX-PROVIDER-CLI (364-003, born-481 parity)', () =>
     });
 
     it('appends --effort for a valid claude reasoning-effort (unchanged)', () => {
-      const cmd = buildWorkerCommand('opus' as ModelType, '/tmp/p.txt', { reasoningEffort: 'high' });
+      const cmd = buildWorkerCommand('claude-opus-4-8' as ModelType, '/tmp/p.txt', { reasoningEffort: 'high' });
       expect(cmd).toContain('--effort high');
     });
   });
@@ -142,25 +142,27 @@ describe.skipIf(isWindows)('TMUX-PROVIDER-CLI (364-003, born-481 parity)', () =>
   describe('unsupported provider — honest failure (Yasa #2: no silent claude fallback)', () => {
     it('ollama (host-only, no ProviderCommandSpec) throws TmuxError, never builds a claude command', () => {
       expect(() =>
-        buildWorkerCommand('qwen-coder-32b' as ModelType, '/tmp/p.txt'),
+        buildWorkerCommand('qwen2.5-coder:32b' as ModelType, '/tmp/p.txt'),
       ).toThrow(TmuxError);
     });
 
-    it('a fully unregistered model id falls back to the default provider (claude), not an error', () => {
-      const cmd = buildWorkerCommand('totally-unregistered-model-id' as ModelType, '/tmp/prompt.txt');
-      expect(cmd).toBe('claude -p - --model totally-unregistered-model-id < /tmp/prompt.txt');
+    it('a fully unregistered model id fails loudly', () => {
+      expect(() =>
+        buildWorkerCommand('totally-unregistered-model-id' as ModelType, '/tmp/prompt.txt'),
+      ).toThrow(TmuxError);
     });
   });
 
   // ─── adapter-supplied path is unaffected ───────────────────────────────
 
   describe('adapter path is unaffected by the provider-resolution fix', () => {
-    it('still delegates entirely to adapter.buildCommand, skipping provider resolution', () => {
+    it('delegates the exact registered API ID to a matching adapter', () => {
       const adapter = {
-        buildCommand: () => 'mock-cli --model gpt-5 < /tmp/p.txt',
-      };
-      const cmd = buildWorkerCommand('gpt-5' as ModelType, '/tmp/p.txt', undefined, adapter);
-      expect(cmd).toBe('mock-cli --model gpt-5 < /tmp/p.txt');
+        name: 'codex',
+        buildCommand: () => 'mock-cli --model gpt-5.5 < /tmp/p.txt',
+      } as never;
+      const cmd = buildWorkerCommand('gpt-5.5' as ModelType, '/tmp/p.txt', undefined, adapter);
+      expect(cmd).toBe('mock-cli --model gpt-5.5 < /tmp/p.txt');
     });
   });
 });

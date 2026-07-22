@@ -15,10 +15,10 @@ import { SkillPoolManager } from '../../core/skill-pool.js';
 import { createSkillDefinition } from '../../core/skill-types.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { RegistryClient, type RegistrySkillEntry } from '../../core/marketplace/registry-client.js';
-import { ALL_MODELS, type ModelType } from '../../core/types.js';
+import type { ModelType } from '../../core/types.js';
+import { resolveCanonicalModelIdentity } from '../../core/model-registry.js';
 import { BRAIN_DIR, MEMORY_DB_FILE, PROJECT_CONFIG_PATH } from '../../core/constants.js';
 
-const MODEL_ENUM_VALUES = ALL_MODELS as unknown as readonly [string, ...string[]];
 const SKILL_CATEGORY_VALUES = ['language', 'framework', 'tool', 'domain', 'workflow'] as const;
 
 // ─── Injectable deps (hermetic-test seam — mirrors CostToolDeps in cost.ts) ──
@@ -59,7 +59,7 @@ export function registerAgentManageTool(server: McpServer): void {
         id: z.string().describe('Agent id (required for all actions)'),
         name: z.string().optional().describe('Display name (action=add; defaults to id)'),
         description: z.string().optional().describe('Agent description (action=add)'),
-        model: z.enum(MODEL_ENUM_VALUES).optional().describe('Preferred model (action=add; default: sonnet)'),
+        model: z.string().min(1).optional().describe('Registered canonical provider API model ID (action=add; registry default when omitted)'),
         triggers: z.array(z.string()).optional().describe('Trigger keywords for routing (action=add)'),
         prompt: z.string().optional().describe('System prompt content (action=add)'),
         root: z.string().optional().describe('Project root (default: cwd)'),
@@ -74,12 +74,15 @@ export function registerAgentManageTool(server: McpServer): void {
           if (manager.getAgent(id)) {
             return fail(`Agent "${id}" already exists.`);
           }
+          const preferredModel = model === undefined
+            ? undefined
+            : resolveCanonicalModelIdentity(model, { registerParametric: false }).id as ModelType;
           const agent = createAgentDefinition({
             id,
             name: name ?? id,
             description: description ?? `Custom agent: ${id}`,
             systemPrompt: prompt ?? '',
-            preferredModel: (model as ModelType | undefined) ?? 'sonnet',
+            ...(preferredModel ? { preferredModel } : {}),
             triggerKeywords: triggers ?? [],
             source: 'user',
             persistent: true,

@@ -40,7 +40,7 @@
     "Write"
   ],
   "deniedTools": [],
-  "preferredModel": "sonnet",
+  "preferredModel": "claude-sonnet-5",
   "effortMultiplier": 1,
   "triggerKeywords": [
     "ink",
@@ -97,7 +97,7 @@
       "deliverables": ["code-src", "code-test"]
     },
     "numerical": {
-      "preferredModel": "sonnet",
+      "preferredModel": "claude-sonnet-5",
       "costTier": "standard",
       "maxParallel": null
     }

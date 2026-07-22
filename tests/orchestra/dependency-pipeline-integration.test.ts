@@ -245,7 +245,7 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
       default_model: 'opus',
       haiku_allowed: false,
       brain_planning: 'structured',
-      brain_model: 'opus',
+      brain_model: 'claude-opus-4-8',
     },
     modes: {} as ResolvedConfig['modes'],
     ...overrides,

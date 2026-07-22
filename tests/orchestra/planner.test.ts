@@ -28,7 +28,7 @@ import {
 } from '../../src/orchestra/planner.js';
 import { providerRegistry } from '../../src/core/provider.js';
 import { BRAIN_PLAN_TIMEOUT_MS } from '../../src/core/constants.js';
-import { modelRegistry } from '../../src/core/model-registry.js';
+import { buildParametricModel, modelRegistry } from '../../src/core/model-registry.js';
 
 /** Hermetic PlannerSpawnFn fake: records every call, returns the canned
  *  outcome (per-call overrides supported for the retry path). */
@@ -457,6 +457,11 @@ describe('buildPlannerSpawnArgs', () => {
 
   it('registers an explicitly authorized versioned API model for downstream DIRECTIVES parsing', () => {
     const apiId = 'claude-versioned-policy-test-2026-07-20';
+    modelRegistry.register(buildParametricModel(apiId, {
+      provider: 'claude',
+      costPerMillion: { input: 1, output: 5 },
+      pricingEvidenceRef: 'test-fixture:versioned-policy-model',
+    }));
     const policy = createPlannerTaskModelPolicy(apiId, 'claude');
     expect(policy.defaultModel).toBe(apiId);
     expect(policy.allowedModels).toContain(apiId);

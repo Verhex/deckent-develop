@@ -32,7 +32,7 @@ function makeAgentConfig(overrides?: Partial<Record<string, unknown>>) {
     name: 'test-agent',
     type: 'custom',
     enabled: true,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     triggers: ['test'],
     description: 'Test agent',
     uses: 5,
@@ -130,7 +130,7 @@ describe('agent list', () => {
     await runCommand(['agent', 'list']);
     expect(formatTable).toHaveBeenCalledWith(
       ['Name', 'Type', 'Status', 'Uses', 'Success', 'Model'],
-      [['test-agent', 'custom', 'enabled', '5', '80%', 'sonnet']],
+      [['test-agent', 'custom', 'enabled', '5', '80%', 'claude-sonnet-5']],
     );
     expect(print).toHaveBeenCalledWith('formatted-table');
   });
@@ -169,7 +169,7 @@ describe('agent list', () => {
 
   it('handles multiple agents', async () => {
     const agent1 = makeAgentConfig({ name: 'alpha' });
-    const agent2 = makeAgentConfig({ name: 'beta', model: 'opus', uses: 10 });
+    const agent2 = makeAgentConfig({ name: 'beta', model: 'claude-opus-4-8', uses: 10 });
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([
       { name: 'alpha', isDirectory: () => true } as any,
@@ -258,12 +258,13 @@ describe('agent create', () => {
     );
     expect(jsonCall).toBeDefined();
     const config = JSON.parse(String(jsonCall![1]));
+    expect(config.id).toBe('new-agent');
     expect(config.name).toBe('new-agent');
-    expect(config.type).toBe('custom');
+    expect(config.source).toBe('user');
     expect(config.enabled).toBe(true);
-    expect(config.model).toBe('sonnet');
-    expect(config.uses).toBe(0);
-    expect(config.successRate).toBe(0);
+    expect(config.preferredModel).toBe('claude-opus-4-8');
+    expect(config.stats.totalUses).toBe(0);
+    expect(config.stats.successRate).toBe(0);
   });
 
   it('writes PROMPT.md template with agent name', async () => {

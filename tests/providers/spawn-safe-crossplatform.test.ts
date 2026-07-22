@@ -145,7 +145,7 @@ describe('provider spawn() — cross-platform buildCliInvocation (born-580)', ()
         spawnImpl: fn as unknown as typeof spawn,
         platform: 'win32',
       });
-      adapter.spawn('t-1', 'llama-3.2-3b', 'unused');
+      adapter.spawn('t-1', 'llama3.2:3b', 'unused');
 
       expect(calls).toHaveLength(1);
       expect(calls[0]!.command).toBe('cmd.exe');
@@ -162,7 +162,7 @@ describe('provider spawn() — cross-platform buildCliInvocation (born-580)', ()
         spawnImpl: fn as unknown as typeof spawn,
         platform: 'linux',
       });
-      adapter.spawn('t-2', 'llama-3.2-3b', 'unused');
+      adapter.spawn('t-2', 'llama3.2:3b', 'unused');
 
       expect(calls[0]!.command).toBe('node');
       expect(calls[0]!.args[0]).toBe('/fake/entry.js');

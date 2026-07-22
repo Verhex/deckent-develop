@@ -2,7 +2,7 @@
  * Provider Matrix — Claude + Codex Mixed Mini-Sprint E2E Tests
  *
  * Validates multi-provider routing scenarios:
- * - 3-task mini sprint with opus (Claude), gpt-4.1 (Codex), haiku (Claude)
+ * - 3-task mini sprint with exact Claude/Codex API model identities
  * - Codex timeout → Claude fallback via resolveProviderWithFallback
  * - Per-provider metrics tracking (latency, tokens, cost)
  * - Provider stats aggregation for retro
@@ -32,7 +32,7 @@ import type { Task } from '../../../src/core/task-types.js';
 function makeMockAdapter(
   name: string,
   available: boolean,
-  models: ModelType[] = ['opus', 'sonnet', 'haiku'],
+  models: ModelType[] = ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'],
 ): ProviderAdapter {
   return {
     name,
@@ -50,7 +50,7 @@ function makeMockAdapter(
 function makeTask(overrides: Partial<Task> & { id: string; title: string }): Task {
   return {
     description: overrides.title,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'Provider matrix test',
@@ -67,8 +67,8 @@ const MINI_SPRINT_TASKS: Task[] = [
   makeTask({
     id: '148-A',
     title: 'Architect core routing refactor',
-    model: 'opus',
-    forceModel: 'opus',
+    model: 'claude-opus-4-8',
+    forceModel: 'claude-opus-4-8',
     scope: { directories: ['src/core/'], filesRead: ['src/core/routing-engine.ts'], filesWrite: ['src/core/routing-engine.ts'] },
     assignedAgent: 'architect',
     assignedSkills: ['typescript-expert'],
@@ -86,8 +86,8 @@ const MINI_SPRINT_TASKS: Task[] = [
   makeTask({
     id: '148-C',
     title: 'Quick doc update for provider guide',
-    model: 'haiku',
-    forceModel: 'haiku',
+    model: 'claude-haiku-4-5-20251001',
+    forceModel: 'claude-haiku-4-5-20251001',
     scope: { directories: ['docs/'], filesRead: [], filesWrite: ['docs/provider-guide.md'] },
     assignedAgent: 'doc-writer',
     assignedSkills: ['documentation-writer'],
@@ -156,8 +156,8 @@ describe('Provider Matrix — Claude + Codex Mixed Mini-Sprint', () => {
 
   describe('Test 1: 3-task multi-provider routing', () => {
     it('routes each task to the correct provider based on forceModel', () => {
-      const claudeAdapter = makeMockAdapter('claude', true, ['opus', 'sonnet', 'haiku']);
-      const codexAdapter = makeMockAdapter('codex', true, ['gpt-5', 'gpt-4.1', 'gpt-5-mini', 'gpt-4.1-mini', 'o3', 'o4-mini']);
+      const claudeAdapter = makeMockAdapter('claude', true);
+      const codexAdapter = makeMockAdapter('codex', true, ['gpt-5.5', 'gpt-4.1', 'gpt-5-mini', 'gpt-4.1-mini', 'o3', 'o4-mini']);
 
       registry.registerProvider(claudeAdapter);
       registry.registerProvider(codexAdapter);
@@ -170,11 +170,11 @@ describe('Provider Matrix — Claude + Codex Mixed Mini-Sprint', () => {
         routing: routeTask(task, config, availableProviders),
       }));
 
-      // Task A: opus → claude
+      // Task A: claude-opus-4-8 → claude
       expect(routingResults[0].routing.provider).toBe('claude');
       // Task B: gpt-4.1 → codex
       expect(routingResults[1].routing.provider).toBe('codex');
-      // Task C: haiku → claude
+      // Task C: claude-haiku-4-5-20251001 → claude
       expect(routingResults[2].routing.provider).toBe('claude');
 
       // Verify 2 different providers used (claude for 2 tasks, codex for 1)
@@ -190,15 +190,15 @@ describe('Provider Matrix — Claude + Codex Mixed Mini-Sprint', () => {
     });
 
     it('model tiers are correctly identified for each task model', () => {
-      expect(getModelTier('opus')).toBe('premium');
+      expect(getModelTier('claude-opus-4-8')).toBe('premium');
       expect(getModelTier('gpt-4.1')).toBe('standard');
-      expect(getModelTier('haiku')).toBe('economy');
+      expect(getModelTier('claude-haiku-4-5-20251001')).toBe('economy');
     });
 
     it('model providers are correctly identified', () => {
-      expect(getModelProvider('opus')).toBe('claude');
+      expect(getModelProvider('claude-opus-4-8')).toBe('claude');
       expect(getModelProvider('gpt-4.1')).toBe('codex');
-      expect(getModelProvider('haiku')).toBe('claude');
+      expect(getModelProvider('claude-haiku-4-5-20251001')).toBe('claude');
     });
   });
 
@@ -206,8 +206,8 @@ describe('Provider Matrix — Claude + Codex Mixed Mini-Sprint', () => {
 
   describe('Test 2: Codex timeout → Claude fallback', () => {
     it('falls back to Claude when Codex is unavailable', async () => {
-      const claudeAdapter = makeMockAdapter('claude', true, ['opus', 'sonnet', 'haiku']);
-      const codexAdapter = makeMockAdapter('codex', false, ['gpt-5', 'gpt-4.1']);
+      const claudeAdapter = makeMockAdapter('claude', true);
+      const codexAdapter = makeMockAdapter('codex', false, ['gpt-5.5', 'gpt-4.1']);
 
       registry.registerProvider(claudeAdapter);
       registry.registerProvider(codexAdapter);
@@ -221,20 +221,20 @@ describe('Provider Matrix — Claude + Codex Mixed Mini-Sprint', () => {
 
       expect(result.provider).toBe('claude');
       expect(result.wasOriginal).toBe(false);
-      // gpt-4.1 (standard tier) → sonnet (Claude standard tier)
-      expect(result.model).toBe('sonnet');
+      // gpt-4.1 (standard tier) → Claude's canonical standard model
+      expect(result.model).toBe('claude-sonnet-5');
       expect(result.reason).toContain('unavailable');
       expect(result.reason).toContain('fallback');
     });
 
-    it('model equivalence maps gpt-4.1 → sonnet on fallback', () => {
+    it('model equivalence maps gpt-4.1 to Claude canonical standard on fallback', () => {
       const equivalent = getEquivalentModel('gpt-4.1', 'claude');
-      expect(equivalent).toBe('sonnet');
+      expect(equivalent).toBe('claude-sonnet-5');
     });
 
-    it('model equivalence maps gpt-5 → opus on fallback', () => {
-      const equivalent = getEquivalentModel('gpt-5', 'claude');
-      expect(equivalent).toBe('opus');
+    it('model equivalence maps gpt-5.5 to Claude canonical premium on fallback', () => {
+      const equivalent = getEquivalentModel('gpt-5.5', 'claude');
+      expect(equivalent).toBe('claude-opus-4-8');
     });
 
     it('throws ProviderUnavailableError when both providers unavailable', async () => {
@@ -272,12 +272,12 @@ describe('Provider Matrix — Claude + Codex Mixed Mini-Sprint', () => {
       const metrics: ProviderMetrics[] = [
         {
           provider: 'claude',
-          model: 'opus',
+          model: 'claude-opus-4-8',
           taskId: '148-A',
           latencyMs: 45_000,
           inputTokens: 15_000,
           outputTokens: 3_200,
-          cost: modelRegistry.estimateCost('opus', 15_000, 3_200),
+          cost: modelRegistry.estimateCost('claude-opus-4-8', 15_000, 3_200),
         },
         {
           provider: 'codex',
@@ -290,12 +290,12 @@ describe('Provider Matrix — Claude + Codex Mixed Mini-Sprint', () => {
         },
         {
           provider: 'claude',
-          model: 'haiku',
+          model: 'claude-haiku-4-5-20251001',
           taskId: '148-C',
           latencyMs: 8_000,
           inputTokens: 5_000,
           outputTokens: 1_200,
-          cost: modelRegistry.estimateCost('haiku', 5_000, 1_200),
+          cost: modelRegistry.estimateCost('claude-haiku-4-5-20251001', 5_000, 1_200),
         },
       ];
 
@@ -310,20 +310,20 @@ describe('Provider Matrix — Claude + Codex Mixed Mini-Sprint', () => {
         expect(m.cost).toBeGreaterThanOrEqual(0);
       }
 
-      // Cost reflects tier pricing — opus > gpt-4.1 > haiku
+      // Cost reflects tier pricing — Claude premium > Claude economy
       expect(metrics[0].cost).toBeGreaterThan(metrics[2].cost);
     });
 
     it('estimateCost uses correct model pricing from ModelRegistry', () => {
       // All models used in the mini-sprint should be registered
-      expect(modelRegistry.has('opus')).toBe(true);
+      expect(modelRegistry.has('claude-opus-4-8')).toBe(true);
       expect(modelRegistry.has('gpt-4.1')).toBe(true);
-      expect(modelRegistry.has('haiku')).toBe(true);
+      expect(modelRegistry.has('claude-haiku-4-5-20251001')).toBe(true);
 
       // Cost is non-negative for valid inputs
-      const opusCost = modelRegistry.estimateCost('opus', 10_000, 2_000);
+      const opusCost = modelRegistry.estimateCost('claude-opus-4-8', 10_000, 2_000);
       const codexCost = modelRegistry.estimateCost('gpt-4.1', 10_000, 2_000);
-      const haikuCost = modelRegistry.estimateCost('haiku', 10_000, 2_000);
+      const haikuCost = modelRegistry.estimateCost('claude-haiku-4-5-20251001', 10_000, 2_000);
 
       expect(opusCost).toBeGreaterThan(0);
       expect(codexCost).toBeGreaterThan(0);
@@ -341,7 +341,7 @@ describe('Provider Matrix — Claude + Codex Mixed Mini-Sprint', () => {
       const metrics: ProviderMetrics[] = [
         {
           provider: 'claude',
-          model: 'opus',
+          model: 'claude-opus-4-8',
           taskId: '148-A',
           latencyMs: 45_000,
           inputTokens: 15_000,
@@ -359,7 +359,7 @@ describe('Provider Matrix — Claude + Codex Mixed Mini-Sprint', () => {
         },
         {
           provider: 'claude',
-          model: 'haiku',
+          model: 'claude-haiku-4-5-20251001',
           taskId: '148-C',
           latencyMs: 8_000,
           inputTokens: 5_000,
@@ -379,7 +379,7 @@ describe('Provider Matrix — Claude + Codex Mixed Mini-Sprint', () => {
       expect(claudeStats).toBeDefined();
       expect(codexStats).toBeDefined();
 
-      // Claude: 2 tasks (opus + haiku)
+      // Claude: 2 tasks (premium + economy)
       expect(claudeStats!.taskCount).toBe(2);
       expect(claudeStats!.totalLatencyMs).toBe(53_000); // 45000 + 8000
       expect(claudeStats!.avgLatencyMs).toBe(26_500);   // 53000 / 2

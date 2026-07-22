@@ -242,13 +242,13 @@ describe('plugin validateManifest type safety', () => {
       description: 'A test plugin',
       entrypoint: 'index.ts',
       triggers: ['on-build'],
-      model: 'opus',
+      model: 'claude-opus-4-8',
     }, '/test');
 
     expect(manifest.name).toBe('test-plugin');
     expect(manifest.version).toBe('1.0.0');
     expect(manifest.triggers).toEqual(['on-build']);
-    expect(manifest.model).toBe('opus');
+    expect(manifest.model).toBe('claude-opus-4-8');
   });
 
   it('rejects invalid model value', () => {
@@ -258,7 +258,7 @@ describe('plugin validateManifest type safety', () => {
       description: 'test',
       entrypoint: 'index.ts',
       model: 'invalid-model',
-    }, '/test')).toThrow(/must be one of/);
+    }, '/test')).toThrow(/canonical registered API ID/);
   });
 
   it('rejects non-array triggers', () => {

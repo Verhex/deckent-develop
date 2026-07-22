@@ -16,9 +16,10 @@ vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
   spawn: vi.fn(() => {
     const stub = {
-      stdout: { on: vi.fn() },
-      stderr: { on: vi.fn() },
+      stdout: { on: vi.fn(), resume: vi.fn() },
+      stderr: { on: vi.fn(), resume: vi.fn() },
       on: vi.fn(),
+      once: vi.fn(),
     };
     return stub as unknown as ChildProcess;
   }),
@@ -72,6 +73,7 @@ import {
 import { SpawnBackendFactory } from '../../src/orchestra/spawn-backend.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
+const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -104,9 +106,9 @@ function installSpawnRouter(): void {
       outcome = successOutcome;
     } else if (cmd === 'docker' && sub === 'inspect') {
       outcome = inspectOutcome;
-    } else if (cmd === 'claude' && sub === '--version') {
-      // A23: host-side authHealthCheck runs claude --version before a claude spawn.
-      outcome = { stdout: 'claude 1.0.0 (host auth ok)', stderr: '', status: 0 };
+    } else if (cmd === 'claude' && argv.join(' ') === 'auth status --json') {
+      // A23: strict auth truth requires the structured loggedIn envelope.
+      outcome = { stdout: '{"loggedIn":true}', stderr: '', status: 0 };
     } else {
       outcome = fallback;
     }
@@ -163,7 +165,7 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
     const backend = new DockerSpawnBackend('/test/project', {
       kindMemoryLimits: { documentation: '768m', 'code-development': '1536m' },
     });
-    backend.spawn('task-doc-001', 'sonnet', 'prompt-body');
+    backend.spawn('task-doc-001', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -177,7 +179,7 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
     const backend = new DockerSpawnBackend('/test/project', {
       kindMemoryLimits: { documentation: '768m', 'code-development': '1536m' },
     });
-    backend.spawn('task-code-001', 'sonnet', 'prompt-body');
+    backend.spawn('task-code-001', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -191,7 +193,7 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
     const backend = new DockerSpawnBackend('/test/project', {
       kindMemoryLimits: { documentation: '768m', 'code-development': '1536m' },
     });
-    backend.spawn('task-audit-001', 'sonnet', 'prompt-body');
+    backend.spawn('task-audit-001', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -202,7 +204,7 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
   it('falls back to default 4g when kindMemoryLimits is empty (zero-config behavior)', () => {
     mockTaskJson = JSON.stringify({ type: 'code-development' });
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('task-noconfig-001', 'sonnet', 'prompt-body');
+    backend.spawn('task-noconfig-001', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -211,11 +213,11 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
   });
 
   it('falls back to default when task JSON has no type field', () => {
-    mockTaskJson = JSON.stringify({ model: 'sonnet', effort: 'normal' }); // no type
+    mockTaskJson = JSON.stringify({ model: 'claude-sonnet-5', effort: 'normal' }); // no type
     const backend = new DockerSpawnBackend('/test/project', {
       kindMemoryLimits: { 'code-development': '1536m' },
     });
-    backend.spawn('task-notype-001', 'sonnet', 'prompt-body');
+    backend.spawn('task-notype-001', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -245,7 +247,7 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
         devops: '512m',
       },
     });
-    backend.spawn('task-test-001', 'sonnet', 'prompt-body');
+    backend.spawn('task-test-001', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -270,7 +272,7 @@ describe('SpawnBackendFactory: B-WORKERMEM config-driven --memory wire', () => {
     const backend = SpawnBackendFactory.create({
       backend: 'docker', projectDir: '/test/project', dockerMemoryLimit: '2g',
     });
-    backend.spawn('task-mem-1', 'sonnet', 'prompt-body');
+    backend.spawn('task-mem-1', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
     const argv = capturedDockerRunArgs.at(-1) ?? [];
     // Pre-wire the factory ignored dockerMemoryLimit → '4g' (RED). Now '2g'.
     expect(flagValue(argv, '--memory')).toBe('2g');
@@ -280,7 +282,7 @@ describe('SpawnBackendFactory: B-WORKERMEM config-driven --memory wire', () => {
     const backend = SpawnBackendFactory.create({
       backend: 'docker', projectDir: '/test/project',
     });
-    backend.spawn('task-mem-2', 'sonnet', 'prompt-body');
+    backend.spawn('task-mem-2', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
     const argv = capturedDockerRunArgs.at(-1) ?? [];
     expect(flagValue(argv, '--memory')).toBe(DEFAULT_WORKER_MEMORY_LIMIT);
   });

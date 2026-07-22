@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   ModelRegistry,
-  BUILTIN_MODELS,
+  CANONICAL_MODELS,
   buildParametricModel,
   inferProviderFromId,
   inferTierFromId,
@@ -23,9 +23,9 @@ describe('parametric model resolution (F1-PD)', () => {
 
   describe('bundled catalog fallback is preserved', () => {
     it('keeps all bundled builtin models available', () => {
-      expect(registry.getAllModelIds()).toHaveLength(BUILTIN_MODELS.length);
+      expect(registry.getAllModelIds()).toHaveLength(CANONICAL_MODELS.length);
       // resolve() returns the bundled entry verbatim for a known id (no synthesis).
-      expect(registry.resolve('opus')).toEqual(registry.getOrThrow('opus'));
+      expect(registry.resolve('claude-opus-4-8')).toEqual(registry.getOrThrow('claude-opus-4-8'));
       expect(registry.resolve('gemini-2.5-pro').apiId).toBe('gemini-2.5-pro');
     });
 
@@ -44,7 +44,12 @@ describe('parametric model resolution (F1-PD)', () => {
       expect(() => registry.getOrThrow('gpt-6-turbo')).toThrow();
 
       // After: the parametric path accepts and resolves it instead of throwing.
-      const def = registry.resolve('gpt-6-turbo');
+      const def = registry.resolve('gpt-6-turbo', {
+        provider: 'codex',
+        costPerMillion: { input: 7, output: 35 },
+        pricingEvidenceRef: 'catalog:test:gpt-6-turbo',
+        status: 'ga',
+      });
       expect(def.id).toBe('gpt-6-turbo');
       expect(def.apiId).toBe('gpt-6-turbo');
       expect(def.status).toBe('ga');
@@ -54,14 +59,19 @@ describe('parametric model resolution (F1-PD)', () => {
       expect(() => registry.getOrThrow('gpt-6-turbo')).not.toThrow();
       expect(registry.resolveApiId('gpt-6-turbo')).toBe('gpt-6-turbo');
       // Registering the new id must not drop any bundled entry.
-      expect(registry.getAllModelIds()).toHaveLength(BUILTIN_MODELS.length + 1);
+      expect(registry.getAllModelIds()).toHaveLength(CANONICAL_MODELS.length + 1);
     });
 
     it('resolve({ register: false }) resolves without mutating the registry', () => {
-      const def = registry.resolve('ephemeral-model-x', { register: false });
+      const def = registry.resolve('ephemeral-model-x', {
+        provider: 'codex',
+        costPerMillion: { input: 1, output: 2 },
+        pricingEvidenceRef: 'catalog:test:ephemeral-model-x',
+        register: false,
+      });
       expect(def.id).toBe('ephemeral-model-x');
       expect(registry.has('ephemeral-model-x')).toBe(false);
-      expect(registry.getAllModelIds()).toHaveLength(BUILTIN_MODELS.length);
+      expect(registry.getAllModelIds()).toHaveLength(CANONICAL_MODELS.length);
     });
   });
 
@@ -84,11 +94,17 @@ describe('parametric model resolution (F1-PD)', () => {
     });
 
     it('resolve() wires the inferred provider + tier onto the new model', () => {
-      const gem = registry.resolve('gemini-9.0-pro');
+      const gem = registry.resolve('gemini-9.0-pro', {
+        costPerMillion: { input: 3, output: 15 },
+        pricingEvidenceRef: 'catalog:test:gemini-9.0-pro',
+      });
       expect(gem.provider).toBe('gemini');
       expect(gem.tier).toBe('premium');
 
-      const mini = registry.resolve('gpt-7-mini');
+      const mini = registry.resolve('gpt-7-mini', {
+        costPerMillion: { input: 1, output: 4 },
+        pricingEvidenceRef: 'catalog:test:gpt-7-mini',
+      });
       expect(mini.provider).toBe('codex');
       expect(mini.tier).toBe('economy');
 
@@ -101,15 +117,16 @@ describe('parametric model resolution (F1-PD)', () => {
       const def = buildParametricModel('mystery-model', {
         provider: 'claude',
         tier: 'premium_plus',
-        apiId: 'mystery-model-2026',
+        apiId: 'mystery-model',
         contextWindow: 500_000,
         costPerMillion: { input: 7, output: 21 },
+        pricingEvidenceRef: 'catalog:test:mystery-model',
         capabilities: { reasoning: true },
         maxOutputTokens: 64_000,
       });
       expect(def.provider).toBe('claude');
       expect(def.tier).toBe('premium_plus');
-      expect(def.apiId).toBe('mystery-model-2026');
+      expect(def.apiId).toBe('mystery-model');
       expect(def.contextWindow).toBe(500_000);
       expect(def.costPerMillion).toEqual({ input: 7, output: 21 });
       expect(def.capabilities.reasoning).toBe(true);

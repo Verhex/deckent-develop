@@ -26,21 +26,23 @@ import type {
 
 describe('PROVIDER_MODEL_MAP', () => {
   it('maps claude to fable, opus, sonnet, haiku', () => {
-    expect(PROVIDER_MODEL_MAP.claude).toEqual(['fable', 'opus', 'sonnet', 'haiku']);
+    expect(PROVIDER_MODEL_MAP.claude).toEqual(['claude-fable-5', 'claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001']);
   });
 
-  it('maps codex to o3, gpt-5, gpt-4.1, o4-mini, gpt-5-mini, gpt-4.1-mini', () => {
-    expect(PROVIDER_MODEL_MAP.codex).toEqual(['o3', 'gpt-5', 'gpt-4.1', 'o4-mini', 'gpt-5-mini', 'gpt-4.1-mini']);
+  it('maps codex to canonical core and parity API IDs', () => {
+    expect(PROVIDER_MODEL_MAP.codex).toEqual([
+      'o3', 'gpt-5.5', 'gpt-4.1', 'o4-mini', 'gpt-5-mini', 'gpt-4.1-mini',
+      'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna',
+    ]);
   });
 
   it('maps gemini to gemini-3.1-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash', () => {
     expect(PROVIDER_MODEL_MAP.gemini).toEqual(['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash']);
   });
 
-  it('has exactly 4 providers (claude, codex, gemini, ollama)', () => {
-    // Sprint 202 Task 202-001: ollama joined PROVIDER_MODEL_MAP as a key.
-    expect(Object.keys(PROVIDER_MODEL_MAP)).toHaveLength(4);
-    expect(Object.keys(PROVIDER_MODEL_MAP).sort()).toEqual(['claude', 'codex', 'gemini', 'ollama']);
+  it('has every canonical provider including OpenRouter', () => {
+    expect(Object.keys(PROVIDER_MODEL_MAP)).toHaveLength(5);
+    expect(Object.keys(PROVIDER_MODEL_MAP).sort()).toEqual(['claude', 'codex', 'gemini', 'ollama', 'openrouter']);
   });
 });
 
@@ -48,7 +50,7 @@ describe('PROVIDER_MODEL_MAP', () => {
 
 describe('CLAUDE_MODELS', () => {
   it('contains fable, opus, sonnet, haiku', () => {
-    expect(CLAUDE_MODELS).toEqual(['fable', 'opus', 'sonnet', 'haiku']);
+    expect(CLAUDE_MODELS).toEqual(['claude-fable-5', 'claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001']);
   });
 
   it('is readonly (cannot mutate)', () => {
@@ -60,8 +62,8 @@ describe('CLAUDE_MODELS', () => {
 // ─── ALL_MODELS ──────────────────────────────────────────────────────────────
 
 describe('ALL_MODELS', () => {
-  it('contains all 14 model names', () => {
-    expect(ALL_MODELS).toHaveLength(14);
+  it('contains the complete 17-model canonical offline catalog', () => {
+    expect(ALL_MODELS).toHaveLength(17);
   });
 
   it('includes all Claude models', () => {
@@ -71,7 +73,7 @@ describe('ALL_MODELS', () => {
   });
 
   it('includes OpenAI models', () => {
-    expect(ALL_MODELS).toContain('gpt-5');
+    expect(ALL_MODELS).toContain('gpt-5.5');
     expect(ALL_MODELS).toContain('gpt-5-mini');
     expect(ALL_MODELS).toContain('gpt-4.1');
     expect(ALL_MODELS).toContain('gpt-4.1-mini');
@@ -98,15 +100,15 @@ describe('ALL_MODELS', () => {
 
 describe('getProviderForModel', () => {
   it('returns claude for opus', () => {
-    expect(getProviderForModel('opus')).toBe('claude');
+    expect(getProviderForModel('claude-opus-4-8')).toBe('claude');
   });
 
   it('returns claude for sonnet', () => {
-    expect(getProviderForModel('sonnet')).toBe('claude');
+    expect(getProviderForModel('claude-sonnet-5')).toBe('claude');
   });
 
   it('returns claude for haiku', () => {
-    expect(getProviderForModel('haiku')).toBe('claude');
+    expect(getProviderForModel('claude-haiku-4-5-20251001')).toBe('claude');
   });
 
   it('returns codex for gpt-4.1', () => {
@@ -138,15 +140,15 @@ describe('getProviderForModel', () => {
 
 describe('isClaudeModel', () => {
   it('returns true for opus', () => {
-    expect(isClaudeModel('opus')).toBe(true);
+    expect(isClaudeModel('claude-opus-4-8')).toBe(true);
   });
 
   it('returns true for sonnet', () => {
-    expect(isClaudeModel('sonnet')).toBe(true);
+    expect(isClaudeModel('claude-sonnet-5')).toBe(true);
   });
 
   it('returns true for haiku', () => {
-    expect(isClaudeModel('haiku')).toBe(true);
+    expect(isClaudeModel('claude-haiku-4-5-20251001')).toBe(true);
   });
 
   it('returns false for gpt-4.1', () => {
@@ -174,7 +176,7 @@ describe('isOpenAIModel', () => {
   });
 
   it('returns false for opus', () => {
-    expect(isOpenAIModel('opus')).toBe(false);
+    expect(isOpenAIModel('claude-opus-4-8')).toBe(false);
   });
 
   it('returns false for gemini-2.5-flash', () => {
@@ -194,7 +196,7 @@ describe('isGeminiModel', () => {
   });
 
   it('returns false for opus', () => {
-    expect(isGeminiModel('opus')).toBe(false);
+    expect(isGeminiModel('claude-opus-4-8')).toBe(false);
   });
 
   it('returns false for o3', () => {
@@ -206,14 +208,14 @@ describe('isGeminiModel', () => {
 
 describe('getModelTier', () => {
   it('tier 0 (economy): haiku, gpt-5-mini, gpt-4.1-mini, gemini-2.0-flash', () => {
-    expect(getModelTier('haiku')).toBe(0);
+    expect(getModelTier('claude-haiku-4-5-20251001')).toBe(0);
     expect(getModelTier('gpt-5-mini')).toBe(0);
     expect(getModelTier('gpt-4.1-mini')).toBe(0);
     expect(getModelTier('gemini-2.0-flash')).toBe(0);
   });
 
   it('tier 1 (standard): sonnet, gpt-4.1, o4-mini, gemini-2.5-flash', () => {
-    expect(getModelTier('sonnet')).toBe(1);
+    expect(getModelTier('claude-sonnet-5')).toBe(1);
     expect(getModelTier('gpt-4.1')).toBe(1);
     expect(getModelTier('o4-mini')).toBe(1);
     expect(getModelTier('gemini-2.5-flash')).toBe(1);
@@ -225,8 +227,8 @@ describe('getModelTier', () => {
   });
 
   it('tier 2 (premium): opus, gpt-5, gemini-2.5-pro', () => {
-    expect(getModelTier('opus')).toBe(2);
-    expect(getModelTier('gpt-5')).toBe(2);
+    expect(getModelTier('claude-opus-4-8')).toBe(2);
+    expect(getModelTier('gpt-5.5')).toBe(2);
     expect(getModelTier('gemini-2.5-pro')).toBe(2);
   });
 
@@ -258,7 +260,7 @@ describe('isValidModel', () => {
 
 describe('Type compatibility', () => {
   it('ClaudeModel values are valid ModelType values', () => {
-    const models: ClaudeModel[] = ['opus', 'sonnet', 'haiku'];
+    const models: ClaudeModel[] = ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'];
     for (const m of models) {
       const _mt: ModelType = m; // compile-time check
       expect(isValidModel(_mt)).toBe(true);
@@ -266,7 +268,7 @@ describe('Type compatibility', () => {
   });
 
   it('OpenAIModel values are valid ModelType values', () => {
-    const models: OpenAIModel[] = ['gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini'];
+    const models: OpenAIModel[] = ['gpt-5.5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini'];
     for (const m of models) {
       const _mt: ModelType = m;
       expect(isValidModel(_mt)).toBe(true);
@@ -336,13 +338,13 @@ describe('Re-export from types.ts barrel', () => {
 
 describe('MODEL_API_IDS', () => {
   it('maps Claude aliases to actual API model IDs', () => {
-    expect(MODEL_API_IDS['opus']).toBe('claude-opus-4-8');
-    expect(MODEL_API_IDS['sonnet']).toBe(modelRegistry.resolveApiId('sonnet'));
-    expect(MODEL_API_IDS['haiku']).toBe('claude-haiku-4-5-20251001');
+    expect(MODEL_API_IDS['claude-opus-4-8']).toBe('claude-opus-4-8');
+    expect(MODEL_API_IDS['claude-sonnet-5']).toBe(modelRegistry.resolveApiId('claude-sonnet-5'));
+    expect(MODEL_API_IDS['claude-haiku-4-5-20251001']).toBe('claude-haiku-4-5-20251001');
   });
 
   it('maps OpenAI models to their API IDs', () => {
-    expect(MODEL_API_IDS['gpt-5']).toBe('gpt-5.5');
+    expect(MODEL_API_IDS['gpt-5.5']).toBe('gpt-5.5');
     expect(MODEL_API_IDS['gpt-4.1']).toBe('gpt-4.1');
     expect(MODEL_API_IDS['gpt-4.1-mini']).toBe('gpt-4.1-mini');
     expect(MODEL_API_IDS['gpt-5-mini']).toBe('gpt-5-mini');
@@ -368,13 +370,13 @@ describe('MODEL_API_IDS', () => {
 
 describe('resolveApiModelId', () => {
   it('resolves Claude aliases to full API model IDs', () => {
-    expect(resolveApiModelId('opus')).toBe('claude-opus-4-8');
-    expect(resolveApiModelId('sonnet')).toBe(modelRegistry.resolveApiId('sonnet'));
-    expect(resolveApiModelId('haiku')).toBe('claude-haiku-4-5-20251001');
+    expect(resolveApiModelId('claude-opus-4-8')).toBe('claude-opus-4-8');
+    expect(resolveApiModelId('claude-sonnet-5')).toBe(modelRegistry.resolveApiId('claude-sonnet-5'));
+    expect(resolveApiModelId('claude-haiku-4-5-20251001')).toBe('claude-haiku-4-5-20251001');
   });
 
   it('resolves OpenAI models (alias = API ID)', () => {
-    expect(resolveApiModelId('gpt-5')).toBe('gpt-5.5');
+    expect(resolveApiModelId('gpt-5.5')).toBe('gpt-5.5');
     expect(resolveApiModelId('gpt-4.1')).toBe('gpt-4.1');
     expect(resolveApiModelId('o3')).toBe('o3');
   });
@@ -394,9 +396,9 @@ describe('resolveApiModelId', () => {
 describe('Tier equivalence consistency', () => {
   it('each tier has exactly one model per provider', () => {
     const tiers = [
-      { tier: 2, claude: 'opus', codex: 'gpt-5', gemini: 'gemini-2.5-pro' },
-      { tier: 1, claude: 'sonnet', codex: 'gpt-4.1', gemini: 'gemini-2.5-flash' },
-      { tier: 0, claude: 'haiku', codex: 'gpt-5-mini', gemini: 'gemini-2.0-flash' },
+      { tier: 2, claude: 'claude-opus-4-8', codex: 'gpt-5.5', gemini: 'gemini-2.5-pro' },
+      { tier: 1, claude: 'claude-sonnet-5', codex: 'gpt-4.1', gemini: 'gemini-2.5-flash' },
+      { tier: 0, claude: 'claude-haiku-4-5-20251001', codex: 'gpt-5-mini', gemini: 'gemini-2.0-flash' },
     ];
     for (const { tier, claude, codex, gemini } of tiers) {
       expect(getModelTier(claude as ModelType)).toBe(tier);
@@ -405,7 +407,10 @@ describe('Tier equivalence consistency', () => {
     }
   });
 
-  it('all 14 models have corresponding API IDs', () => {
-    expect(Object.keys(MODEL_API_IDS)).toHaveLength(14);
+  it('all canonical models have identity API IDs', () => {
+    expect(Object.keys(MODEL_API_IDS)).toHaveLength(17);
+    for (const [id, apiId] of Object.entries(MODEL_API_IDS)) {
+      expect(apiId).toBe(id);
+    }
   });
 });

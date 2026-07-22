@@ -210,7 +210,7 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     activeModeConfig: {
       max_workers: 4,
       brain_model: 'sonnet',
-      default_model: 'sonnet',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: true,
     },
     modes: {},

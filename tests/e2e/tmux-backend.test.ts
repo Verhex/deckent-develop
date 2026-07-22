@@ -96,26 +96,26 @@ describe('TmuxBackend Unit Tests (mock-based)', () => {
   describe('buildWorkerCommand', () => {
     it('produces default Claude CLI command without adapter', async () => {
       const { buildWorkerCommand } = await import('../../src/orchestra/tmux.js');
-      const cmd = buildWorkerCommand('sonnet', '/tmp/prompt.txt');
-      expect(cmd).toContain(`claude -p - --model ${modelRegistry.resolveApiId('sonnet')}`);
+      const cmd = buildWorkerCommand('claude-sonnet-5', '/tmp/prompt.txt');
+      expect(cmd).toContain(`claude -p - --model ${modelRegistry.resolveApiId('claude-sonnet-5')}`);
       expect(cmd).toContain('< /tmp/prompt.txt');
     });
 
     it('includes --allowedTools when opts.allowedTools is set', async () => {
       const { buildWorkerCommand } = await import('../../src/orchestra/tmux.js');
-      const cmd = buildWorkerCommand('opus', '/tmp/p.txt', { allowedTools: 'Read,Write,Bash' });
+      const cmd = buildWorkerCommand('claude-opus-4-8', '/tmp/p.txt', { allowedTools: 'Read,Write,Bash' });
       expect(cmd).toContain("--allowedTools 'Read,Write,Bash'");
     });
 
     it('includes --dangerously-skip-permissions when autoApprove is true', async () => {
       const { buildWorkerCommand } = await import('../../src/orchestra/tmux.js');
-      const cmd = buildWorkerCommand('haiku', '/tmp/p.txt', { autoApprove: true });
+      const cmd = buildWorkerCommand('claude-haiku-4-5-20251001', '/tmp/p.txt', { autoApprove: true });
       expect(cmd).toContain('--dangerously-skip-permissions');
     });
 
     it('wraps with timeout when taskId is provided', async () => {
       const { buildWorkerCommand, WORKER_TIMEOUT_SECONDS } = await import('../../src/orchestra/tmux.js');
-      const cmd = buildWorkerCommand('opus', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '001-001');
+      const cmd = buildWorkerCommand('claude-opus-4-8', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '001-001');
       expect(cmd).toContain(`timeout -k 30 ${WORKER_TIMEOUT_SECONDS}`);
       expect(cmd).toContain('task-001-001.timeout');
       expect(cmd).toContain('WORKER_TIMEOUT');
@@ -123,22 +123,22 @@ describe('TmuxBackend Unit Tests (mock-based)', () => {
 
     it('uses custom timeout seconds when provided', async () => {
       const { buildWorkerCommand } = await import('../../src/orchestra/tmux.js');
-      const cmd = buildWorkerCommand('haiku', '/proj/.tasks/.prompt-x.txt', undefined, undefined, '002-001', 300);
+      const cmd = buildWorkerCommand('claude-haiku-4-5-20251001', '/proj/.tasks/.prompt-x.txt', undefined, undefined, '002-001', 300);
       expect(cmd).toContain('timeout -k 30 300');
     });
 
     it('delegates to adapter.buildCommand when adapter is provided', async () => {
       const { buildWorkerCommand } = await import('../../src/orchestra/tmux.js');
       const adapter = {
-        name: 'mock',
-        supportedModels: ['opus', 'sonnet', 'haiku'] as const,
+        name: 'claude',
+        supportedModels: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'] as const,
         spawn: vi.fn(),
         kill: vi.fn(),
         listWorkers: vi.fn(() => []),
         isAvailable: vi.fn(async () => true),
         buildCommand: vi.fn(() => 'custom-cli --fast'),
       };
-      const cmd = buildWorkerCommand('opus', '/tmp/p.txt', undefined, adapter as any);
+      const cmd = buildWorkerCommand('claude-opus-4-8', '/tmp/p.txt', undefined, adapter as any);
       expect(cmd).toBe('custom-cli --fast');
       expect(adapter.buildCommand).toHaveBeenCalled();
     });
@@ -150,7 +150,7 @@ describe('TmuxBackend Unit Tests (mock-based)', () => {
 
     it('does not wrap timeout when timeoutSeconds is 0', async () => {
       const { buildWorkerCommand } = await import('../../src/orchestra/tmux.js');
-      const cmd = buildWorkerCommand('sonnet', '/proj/.tasks/.prompt-z.txt', undefined, undefined, '003-001', 0);
+      const cmd = buildWorkerCommand('claude-sonnet-5', '/proj/.tasks/.prompt-z.txt', undefined, undefined, '003-001', 0);
       expect(cmd).not.toContain('timeout');
     });
 

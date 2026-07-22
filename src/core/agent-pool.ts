@@ -5,12 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { AgentDefinition, AgentPool, AgentStats } from './agent-types.js';
-import { createDefaultStats } from './agent-types.js';
+import { createDefaultStats, resolveDefaultAgentModel } from './agent-types.js';
 import type { ActivationRule } from './routing-types.js';
 import { createDefaultActivationConfig } from './routing-types.js';
 import { readJsonSafe, debugLog } from './utils.js';
 import { capabilityVectorSchema } from './routing/capability-vector.js';
 import type { CapabilityVector } from './routing/capability-vector.js';
+import { modelRegistry, resolveCanonicalModelIdentity } from './model-registry.js';
 
 // ─── Builtin Fallback (371-001 CATALOG-MATERIALIZE) ─────────────────────────
 //
@@ -117,7 +118,7 @@ function synthesizeAgentDefinition(id: string, promptMdPath: string): Record<str
     expertise: [],
     allowedTools: ['Read', 'Grep', 'Bash', 'Write'],
     deniedTools: [],
-    preferredModel: 'sonnet',
+    preferredModel: resolveDefaultAgentModel(),
     effortMultiplier: 1,
     triggerKeywords: [],
     triggerScopes: [],
@@ -337,8 +338,6 @@ export function isTempAgentStale(
 
 // ─── Validation ──────────────────────────────────────────────────────────────
 
-import { ALL_MODELS } from './types.js';
-const VALID_MODELS = ALL_MODELS;
 const VALID_SOURCES = ['builtin', 'user', 'learned'] as const;
 
 // ─── Activation Schema (born-590 ACTIVATION-VALIDATION) ─────────────────────
@@ -543,6 +542,21 @@ export class AgentPoolManager {
 
     const result = capabilityVectorSchema.safeParse(capabilities);
     if (result.success) {
+      const preferredModel = result.data.numerical.preferredModel;
+      if (preferredModel !== undefined) {
+        try {
+          resolveCanonicalModelIdentity(preferredModel, { registerParametric: false });
+        } catch {
+          delete raw['capabilities'];
+          this._recordInvalidManifest(
+            id,
+            manifestPath,
+            ['"capabilities.numerical.preferredModel" must be a canonical registered model ID'],
+            'warning',
+          );
+          return;
+        }
+      }
       raw['capabilities'] = result.data;
       return;
     }
@@ -1035,9 +1049,14 @@ export class AgentPoolManager {
     }
 
     // preferredModel validation
-    if (obj['preferredModel'] !== undefined) {
-      if (!VALID_MODELS.includes(obj['preferredModel'] as typeof VALID_MODELS[number])) {
-        errors.push(`"preferredModel" must be one of: ${VALID_MODELS.join(', ')}`);
+    if (obj['preferredModel'] === undefined) {
+      errors.push('"preferredModel" must be a canonical registered model ID');
+    } else {
+      try {
+        if (typeof obj['preferredModel'] !== 'string') throw new Error('invalid model type');
+        resolveCanonicalModelIdentity(obj['preferredModel'], { registerParametric: false });
+      } catch {
+        errors.push(`"preferredModel" must be a canonical registered model ID: ${modelRegistry.getAllModelIds().join(', ')}`);
       }
     }
 

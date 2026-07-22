@@ -185,11 +185,14 @@ export function resolveDefaultUsageCli(): string | undefined {
     // type lives outside RegistryProviderName — cast follows the existing
     // pattern documented in model-registry.ts.
     const defaultProviderName = defaultAdapter.name as RegistryProviderName;
-    const defaultModel = (
-      modelRegistry.getByProviderAndTier(defaultProviderName, 'premium')?.id
-      ?? modelRegistry.getByProviderAndTier('claude', 'premium')?.id
-      ?? 'opus'
-    ) as ModelType;
+    const defaultModelDefinition = (
+      modelRegistry.getByProviderAndTier(defaultProviderName, 'premium_plus')
+      ?? modelRegistry.getByProviderAndTier(defaultProviderName, 'premium')
+      ?? modelRegistry.getByProviderAndTier(defaultProviderName, 'standard')
+      ?? modelRegistry.getByProviderAndTier(defaultProviderName, 'economy')
+    );
+    if (!defaultModelDefinition) throw new Error(`E_DEFAULT_MODEL_UNAVAILABLE: provider=${defaultProviderName}`);
+    const defaultModel = defaultModelDefinition.id as ModelType;
     const cmdStr = defaultAdapter.buildCommand(defaultModel, '/dev/null');
     const firstToken = cmdStr.split(/\s+/)[0];
     return firstToken || undefined;

@@ -21,8 +21,8 @@ describe('resolveNativeProvider', () => {
     expect('adapter' in r && r.adapter.name).toBe('ollama');
   });
   it('honors DECKENT_NATIVE_MODEL override', () => {
-    const r = resolveNativeProvider({ ANTHROPIC_API_KEY: 'k', DECKENT_NATIVE_MODEL: 'claude-x' }, {});
-    expect('adapter' in r && r.model).toBe('claude-x');
+    const r = resolveNativeProvider({ ANTHROPIC_API_KEY: 'k', DECKENT_NATIVE_MODEL: 'claude-fable-5' }, {});
+    expect('adapter' in r && r.model).toBe('claude-fable-5');
   });
   it('returns an honest error (no adapter) when no transport is available', () => {
     const r = resolveNativeProvider({}, {});

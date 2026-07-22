@@ -53,6 +53,7 @@ vi.mock('node:child_process', () => {
 
 vi.mock('../../src/orchestra/planner.js', () => ({
   resolvePlanTimeoutMs: vi.fn(() => 900_000),
+  createPlannerTaskModelPolicy: vi.fn((defaultModel: string) => ({ defaultModel, allowedModels: [defaultModel] })),
   // 429-001 emsali (do-runflow-adapter.test.ts): compiler'ın AI-sınırı canned
   // gerçek-şekilli tek-task döner; gate'in gördüğü scope'u brain.js mock'u belirler.
   callZeroConfigPlanner: vi.fn(() => ({
@@ -62,14 +63,16 @@ vi.mock('../../src/orchestra/planner.js', () => ({
       description: 'Canned single-task plan for scope-mirror tests.',
       scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/planned.ts'] },
       dependencies: [],
-      model: 'sonnet', effort: 'normal', priority: 'NORMAL', reason: 'canned',
+      model: 'claude-sonnet-5', effort: 'normal', priority: 'NORMAL', reason: 'canned',
       goNogo: { goCriteria: 'The planned change works.', noGoCriteria: 'The planned change breaks.', techDebtAcceptable: '' },
     }],
   })),
 }));
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',
+  resolveBrainModel: () => 'claude-sonnet-5',
+  resolveDefaultModel: () => 'claude-sonnet-5',
+  readAuthMode: () => 'subscription',
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',
   loadConfig: vi.fn(),
 }));
@@ -104,13 +107,14 @@ function makeConfig(): ResolvedConfig {
   return {
     mode: 'max_plan',
     activeModeConfig: {
-      max_workers: 8, brain_model: 'opus', default_model: 'sonnet',
+      max_workers: 8, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5',
       haiku_allowed: true, brain_planning: 'auto',
     },
     modes: {} as any,
     language: 'en', projectName: 'test', projectRoot: '/mock/root',
     version: '1.0.0', auto_docs: { tier1: true, tier2: true, tier3: false },
     terminal: { run_flow_v2: true } as any,
+    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
   } as ResolvedConfig;
 }
 
@@ -123,7 +127,7 @@ function makeBrainContext(): BrainContext {
 
 function makeTask(filesWrite: string[]): Task {
   return {
-    id: '001-001', title: 'Do the thing', description: 'Do the thing well.', model: 'sonnet',
+    id: '001-001', title: 'Do the thing', description: 'Do the thing well.', model: 'claude-sonnet-5',
     effort: 'normal', priority: 'NORMAL', reason: 'test',
     scope: { directories: ['src/'], filesRead: [], filesWrite },
     dependencies: [],

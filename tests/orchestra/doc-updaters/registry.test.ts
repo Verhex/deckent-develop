@@ -33,7 +33,7 @@ function makeContext(overrides: Partial<DocUpdateContext> = {}): DocUpdateContex
   const config: ResolvedConfig = {
     mode: 'max_plan',
     activeModeConfig: {
-      max_workers: 8, brain_model: 'opus', default_model: 'opus',
+      max_workers: 8, brain_model: 'claude-opus-4-8', default_model: 'opus',
       haiku_allowed: true,
       brain_planning: 'auto',
     },

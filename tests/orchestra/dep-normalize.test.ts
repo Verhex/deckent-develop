@@ -38,7 +38,7 @@ function buildStructuredTasks(directives: string, sprintId = 'sprint-465'): Task
   return parsed.map(p => createTask({
     title: p.title,
     description: p.description,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: p.priority ?? 'NORMAL',
     reason: 'test fixture',

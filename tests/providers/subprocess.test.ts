@@ -82,10 +82,10 @@ describe('SubprocessSpawnBackend', () => {
     });
 
     it('should support fable, opus, sonnet, haiku models', () => {
-      expect(backend.supportedModels).toContain('fable');
-      expect(backend.supportedModels).toContain('opus');
-      expect(backend.supportedModels).toContain('sonnet');
-      expect(backend.supportedModels).toContain('haiku');
+      expect(backend.supportedModels).toContain('claude-fable-5');
+      expect(backend.supportedModels).toContain('claude-opus-4-8');
+      expect(backend.supportedModels).toContain('claude-sonnet-5');
+      expect(backend.supportedModels).toContain('claude-haiku-4-5-20251001');
     });
 
     it('should support exactly 4 models', () => {
@@ -102,54 +102,54 @@ describe('SubprocessSpawnBackend', () => {
   describe('spawn()', () => {
     it('should call node:child_process spawn', () => {
       setupMockChild();
-      backend.spawn('task-001', 'opus', 'test prompt');
+      backend.spawn('task-001', 'claude-opus-4-8', 'test prompt');
       expect(mockSpawn).toHaveBeenCalledOnce();
     });
 
     it('should spawn with "claude" command', () => {
       setupMockChild();
-      backend.spawn('task-001', 'opus', 'test prompt');
+      backend.spawn('task-001', 'claude-opus-4-8', 'test prompt');
       const [cmd] = mockSpawn.mock.calls[0];
       expect(cmd).toBe('claude');
     });
 
     it('should include model in spawn args', () => {
       setupMockChild();
-      backend.spawn('task-001', 'opus', 'test prompt');
+      backend.spawn('task-001', 'claude-opus-4-8', 'test prompt');
       const [, args] = mockSpawn.mock.calls[0];
       expect(args).toContain('claude-opus-4-8');
     });
 
     it('should include --model flag in args', () => {
       setupMockChild();
-      backend.spawn('task-001', 'sonnet', 'test prompt');
+      backend.spawn('task-001', 'claude-sonnet-5', 'test prompt');
       const [, args] = mockSpawn.mock.calls[0];
       const modelIdx = args.indexOf('--model');
       expect(modelIdx).toBeGreaterThan(-1);
-      expect(args[modelIdx + 1]).toBe(modelRegistry.resolveApiId('sonnet'));
+      expect(args[modelIdx + 1]).toBe(modelRegistry.resolveApiId('claude-sonnet-5'));
     });
 
     it('should write prompt via stdin', () => {
       const child = setupMockChild();
-      backend.spawn('task-001', 'opus', 'my prompt');
+      backend.spawn('task-001', 'claude-opus-4-8', 'my prompt');
       expect(child.stdin.write).toHaveBeenCalledWith('my prompt', 'utf-8');
     });
 
     it('should close stdin after writing prompt', () => {
       const child = setupMockChild();
-      backend.spawn('task-001', 'opus', 'my prompt');
+      backend.spawn('task-001', 'claude-opus-4-8', 'my prompt');
       expect(child.stdin.end).toHaveBeenCalled();
     });
 
     it('should write heartbeat on spawn', () => {
       setupMockChild();
-      backend.spawn('task-001', 'opus', 'test');
+      backend.spawn('task-001', 'claude-opus-4-8', 'test');
       expect(mockWriteFileSync).toHaveBeenCalled();
     });
 
     it('should create task log file in .tasks/ directory', () => {
       setupMockChild();
-      backend.spawn('task-001', 'opus', 'test');
+      backend.spawn('task-001', 'claude-opus-4-8', 'test');
       const logPathArg = mockOpenSync.mock.calls[0][0];
       expect(logPathArg).toContain('.tasks');
       expect(logPathArg).toContain('task-001.log');
@@ -157,9 +157,9 @@ describe('SubprocessSpawnBackend', () => {
 
     it('should throw if task is already running', () => {
       setupMockChild();
-      backend.spawn('task-001', 'opus', 'first');
+      backend.spawn('task-001', 'claude-opus-4-8', 'first');
       setupMockChild();
-      expect(() => backend.spawn('task-001', 'opus', 'second')).toThrow(
+      expect(() => backend.spawn('task-001', 'claude-opus-4-8', 'second')).toThrow(
         /already running/,
       );
     });
@@ -167,21 +167,21 @@ describe('SubprocessSpawnBackend', () => {
     it('should use opts.projectDir if provided', () => {
       setupMockChild();
       const opts: ProviderSpawnOptions = { projectDir: '/custom/dir' };
-      backend.spawn('task-001', 'opus', 'test', opts);
+      backend.spawn('task-001', 'claude-opus-4-8', 'test', opts);
       const [, , spawnOpts] = mockSpawn.mock.calls[0];
       expect(spawnOpts.cwd).toBe('/custom/dir');
     });
 
     it('should fall back to constructor projectDir when no opts.projectDir', () => {
       setupMockChild();
-      backend.spawn('task-001', 'opus', 'test');
+      backend.spawn('task-001', 'claude-opus-4-8', 'test');
       const [, , spawnOpts] = mockSpawn.mock.calls[0];
       expect(spawnOpts.cwd).toBe(projectDir);
     });
 
     it('should include allowedTools in spawn args when provided', () => {
       setupMockChild();
-      backend.spawn('task-001', 'opus', 'test', { allowedTools: 'Read,Write' });
+      backend.spawn('task-001', 'claude-opus-4-8', 'test', { allowedTools: 'Read,Write' });
       const [, args] = mockSpawn.mock.calls[0];
       expect(args).toContain('--allowedTools');
       expect(args).toContain('Read,Write');
@@ -189,14 +189,14 @@ describe('SubprocessSpawnBackend', () => {
 
     it('should include --dangerously-skip-permissions when autoApprove is true', () => {
       setupMockChild();
-      backend.spawn('task-001', 'opus', 'test', { autoApprove: true });
+      backend.spawn('task-001', 'claude-opus-4-8', 'test', { autoApprove: true });
       const [, args] = mockSpawn.mock.calls[0];
       expect(args).toContain('--dangerously-skip-permissions');
     });
 
     it('should redirect stdout/stderr to log file fd', () => {
       setupMockChild();
-      backend.spawn('task-001', 'opus', 'test');
+      backend.spawn('task-001', 'claude-opus-4-8', 'test');
       const [, , spawnOpts] = mockSpawn.mock.calls[0];
       const [stdin, stdout, stderr] = spawnOpts.stdio;
       expect(stdin).toBe('pipe');
@@ -206,7 +206,7 @@ describe('SubprocessSpawnBackend', () => {
 
     it('should defer log fd close to child exit handler (not immediate)', () => {
       setupMockChild();
-      backend.spawn('task-001', 'opus', 'test');
+      backend.spawn('task-001', 'claude-opus-4-8', 'test');
       // BUG-26 fix: closeSync deferred to child exit — not called immediately after spawn
       expect(mockCloseSync).not.toHaveBeenCalled();
     });
@@ -214,13 +214,13 @@ describe('SubprocessSpawnBackend', () => {
     it('should create tasks dir if it does not exist', () => {
       mockExistsSync.mockReturnValue(false);
       setupMockChild();
-      backend.spawn('task-001', 'opus', 'test');
+      backend.spawn('task-001', 'claude-opus-4-8', 'test');
       expect(mockMkdirSync).toHaveBeenCalled();
     });
 
     it('should register worker in internal map after spawn', () => {
       setupMockChild();
-      backend.spawn('task-001', 'opus', 'test');
+      backend.spawn('task-001', 'claude-opus-4-8', 'test');
       expect(backend.listWorkers()).toContain('task-001');
     });
   });
@@ -230,14 +230,14 @@ describe('SubprocessSpawnBackend', () => {
   describe('kill()', () => {
     it('should kill the process with SIGTERM', () => {
       const child = setupMockChild();
-      backend.spawn('task-001', 'opus', 'test');
+      backend.spawn('task-001', 'claude-opus-4-8', 'test');
       backend.kill('task-001');
       expect(child.kill).toHaveBeenCalledWith('SIGTERM');
     });
 
     it('should remove worker from internal map after kill', () => {
       setupMockChild();
-      backend.spawn('task-001', 'opus', 'test');
+      backend.spawn('task-001', 'claude-opus-4-8', 'test');
       backend.kill('task-001');
       expect(backend.listWorkers()).not.toContain('task-001');
     });
@@ -256,9 +256,9 @@ describe('SubprocessSpawnBackend', () => {
 
     it('should return task IDs of running workers', () => {
       setupMockChild();
-      backend.spawn('task-001', 'opus', 'test1');
+      backend.spawn('task-001', 'claude-opus-4-8', 'test1');
       setupMockChild();
-      backend.spawn('task-002', 'sonnet', 'test2');
+      backend.spawn('task-002', 'claude-sonnet-5', 'test2');
       const workers = backend.listWorkers();
       expect(workers).toContain('task-001');
       expect(workers).toContain('task-002');
@@ -266,7 +266,7 @@ describe('SubprocessSpawnBackend', () => {
 
     it('should not include killed workers', () => {
       setupMockChild();
-      backend.spawn('task-001', 'opus', 'test');
+      backend.spawn('task-001', 'claude-opus-4-8', 'test');
       backend.kill('task-001');
       expect(backend.listWorkers()).not.toContain('task-001');
     });
@@ -329,38 +329,38 @@ describe('SubprocessSpawnBackend', () => {
 
   describe('buildCommand()', () => {
     it('should build basic command', () => {
-      const cmd = backend.buildCommand('opus', '/tmp/prompt.txt');
+      const cmd = backend.buildCommand('claude-opus-4-8', '/tmp/prompt.txt');
       expect(cmd).toBe('claude -p - --model claude-opus-4-8 < /tmp/prompt.txt');
     });
 
     it('should include --allowedTools when provided', () => {
-      const cmd = backend.buildCommand('sonnet', '/p.txt', { allowedTools: 'Read,Write' });
+      const cmd = backend.buildCommand('claude-sonnet-5', '/p.txt', { allowedTools: 'Read,Write' });
       expect(cmd).toContain("--allowedTools 'Read,Write'");
     });
 
     it('should include --dangerously-skip-permissions when autoApprove is true', () => {
-      const cmd = backend.buildCommand('haiku', '/p.txt', { autoApprove: true });
+      const cmd = backend.buildCommand('claude-haiku-4-5-20251001', '/p.txt', { autoApprove: true });
       expect(cmd).toContain('--dangerously-skip-permissions');
     });
 
     it('should not include --dangerously-skip-permissions when autoApprove is false', () => {
-      const cmd = backend.buildCommand('haiku', '/p.txt', { autoApprove: false });
+      const cmd = backend.buildCommand('claude-haiku-4-5-20251001', '/p.txt', { autoApprove: false });
       expect(cmd).not.toContain('--dangerously-skip-permissions');
     });
 
     it('should use stdin redirection from promptPath', () => {
-      const cmd = backend.buildCommand('opus', '/path/prompt.txt');
+      const cmd = backend.buildCommand('claude-opus-4-8', '/path/prompt.txt');
       expect(cmd).toContain('< /path/prompt.txt');
     });
 
     // ─── F1-RE: native reasoning-effort flag ───────────────────────
     it('appends --effort for a valid reasoning-effort', () => {
-      const cmd = backend.buildCommand('opus', '/p.txt', { reasoningEffort: 'high' });
+      const cmd = backend.buildCommand('claude-opus-4-8', '/p.txt', { reasoningEffort: 'high' });
       expect(cmd).toContain('--effort high');
     });
 
     it('drops an invalid reasoning-effort', () => {
-      const cmd = backend.buildCommand('opus', '/p.txt', { reasoningEffort: 'minimal' });
+      const cmd = backend.buildCommand('claude-opus-4-8', '/p.txt', { reasoningEffort: 'minimal' });
       expect(cmd).not.toContain('--effort');
     });
   });
@@ -368,19 +368,19 @@ describe('SubprocessSpawnBackend', () => {
   // ─── F1-RE: buildArgs reasoning-effort (argv path) ─────────────────
   describe('CLAUDE_SUBPROCESS_CONFIG.buildArgs reasoning-effort', () => {
     it('adds --effort argv pair for a valid level', () => {
-      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('opus', { reasoningEffort: 'max' });
+      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('claude-opus-4-8', { reasoningEffort: 'max' });
       const i = args.indexOf('--effort');
       expect(i).toBeGreaterThan(-1);
       expect(args[i + 1]).toBe('max');
     });
 
     it('omits --effort when no reasoning-effort given', () => {
-      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('opus');
+      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('claude-opus-4-8');
       expect(args).not.toContain('--effort');
     });
 
     it('drops an invalid (codex-only) level', () => {
-      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('opus', { reasoningEffort: 'minimal' });
+      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('claude-opus-4-8', { reasoningEffort: 'minimal' });
       expect(args).not.toContain('--effort');
     });
   });
@@ -395,7 +395,7 @@ describe('SubprocessSpawnBackend', () => {
       mockExistsSync.mockReturnValue(true);
       const b2 = new SubprocessSpawnBackend(projectDir);
       setupMockChild();
-      b2.spawn('task-hb', 'opus', 'test');
+      b2.spawn('task-hb', 'claude-opus-4-8', 'test');
       // writeFileSync should have been called for heartbeat
       expect(mockWriteFileSync).toHaveBeenCalled();
       const [hbPath, content] = mockWriteFileSync.mock.calls[0];
@@ -407,7 +407,7 @@ describe('SubprocessSpawnBackend', () => {
 
     it('should include timestamp in heartbeat', () => {
       setupMockChild();
-      backend.spawn('task-ts', 'opus', 'test');
+      backend.spawn('task-ts', 'claude-opus-4-8', 'test');
       const [, content] = mockWriteFileSync.mock.calls[0];
       const parsed = JSON.parse(content as string);
       expect(parsed.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
@@ -441,7 +441,7 @@ describe('SubprocessSpawnBackend', () => {
       vi.useFakeTimers();
       const child = setupMockChild();
       const b = new SubprocessSpawnBackend(projectDir, { defaultTimeoutMs: 1000 });
-      b.spawn('task-timeout', 'opus', 'test');
+      b.spawn('task-timeout', 'claude-opus-4-8', 'test');
       vi.advanceTimersByTime(1100);
       expect(child.kill).toHaveBeenCalledWith('SIGKILL');
       vi.useRealTimers();
@@ -471,7 +471,7 @@ describe('createSubprocessBackend', () => {
     const config: SubprocessProviderConfig = {
       cliCommand: 'my-cli',
       name: 'my-subprocess',
-      supportedModels: ['opus', 'sonnet'],
+      supportedModels: ['claude-opus-4-8', 'claude-sonnet-5'],
       buildArgs: (model) => ['--model', model],
       buildCommandString: (model, path) => `my-cli --model ${model} < ${path}`,
     };
@@ -489,7 +489,7 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
   const customConfig: SubprocessProviderConfig = {
     cliCommand: 'my-ai-cli',
     name: 'custom-subprocess',
-    supportedModels: ['opus', 'sonnet'] as readonly ModelType[],
+    supportedModels: ['claude-opus-4-8', 'claude-sonnet-5'] as readonly ModelType[],
     buildArgs(model: ModelType, opts?: ProviderSpawnOptions): string[] {
       const args = ['run', '--model', model];
       if (opts?.allowedTools) {
@@ -533,7 +533,7 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
   it('should spawn with "claude" command by default (backward compat)', () => {
     setupMockChild();
     const backend = new SubprocessSpawnBackend(projectDir);
-    backend.spawn('task-001', 'opus', 'test prompt');
+    backend.spawn('task-001', 'claude-opus-4-8', 'test prompt');
     const [cmd] = mockSpawn.mock.calls[0];
     expect(cmd).toBe('claude');
   });
@@ -545,9 +545,9 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
 
   it('should support claude models by default', () => {
     const backend = new SubprocessSpawnBackend(projectDir);
-    expect(backend.supportedModels).toContain('opus');
-    expect(backend.supportedModels).toContain('sonnet');
-    expect(backend.supportedModels).toContain('haiku');
+    expect(backend.supportedModels).toContain('claude-opus-4-8');
+    expect(backend.supportedModels).toContain('claude-sonnet-5');
+    expect(backend.supportedModels).toContain('claude-haiku-4-5-20251001');
   });
 
   // ─── Custom Provider Config ───────────────────────────────────────
@@ -555,7 +555,7 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
   it('should use custom cliCommand when providerConfig provided', () => {
     setupMockChild();
     const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
-    backend.spawn('task-001', 'opus', 'test prompt');
+    backend.spawn('task-001', 'claude-opus-4-8', 'test prompt');
     const [cmd] = mockSpawn.mock.calls[0];
     expect(cmd).toBe('my-ai-cli');
   });
@@ -567,23 +567,23 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
 
   it('should use custom supportedModels from providerConfig', () => {
     const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
-    expect(backend.supportedModels).toEqual(['opus', 'sonnet']);
-    expect(backend.supportedModels).not.toContain('haiku');
+    expect(backend.supportedModels).toEqual(['claude-opus-4-8', 'claude-sonnet-5']);
+    expect(backend.supportedModels).not.toContain('claude-haiku-4-5-20251001');
   });
 
   it('should use adapter.buildArgs when adapter provided', () => {
     setupMockChild();
     const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
-    backend.spawn('task-001', 'opus', 'test prompt');
+    backend.spawn('task-001', 'claude-opus-4-8', 'test prompt');
     const [, args] = mockSpawn.mock.calls[0];
     // customConfig buildArgs produces ['run', '--model', model]
-    expect(args).toEqual(['run', '--model', 'opus']);
+    expect(args).toEqual(['run', '--model', 'claude-opus-4-8']);
   });
 
   it('should pass allowedTools through custom buildArgs', () => {
     setupMockChild();
     const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
-    backend.spawn('task-001', 'opus', 'test prompt', { allowedTools: 'Read,Write' });
+    backend.spawn('task-001', 'claude-opus-4-8', 'test prompt', { allowedTools: 'Read,Write' });
     const [, args] = mockSpawn.mock.calls[0];
     expect(args).toContain('--tools');
     expect(args).toContain('Read,Write');
@@ -592,7 +592,7 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
   it('should pass autoApprove through custom buildArgs', () => {
     setupMockChild();
     const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
-    backend.spawn('task-001', 'opus', 'test', { autoApprove: true });
+    backend.spawn('task-001', 'claude-opus-4-8', 'test', { autoApprove: true });
     const [, args] = mockSpawn.mock.calls[0];
     expect(args).toContain('--yes');
     // Should NOT contain claude-specific flag
@@ -601,9 +601,8 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
 
   it('should use custom buildCommandString for buildCommand()', () => {
     const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
-    const cmd = backend.buildCommand('opus', '/tmp/prompt.txt');
-    expect(cmd).toBe('my-ai-cli run --model opus < /tmp/prompt.txt');
-    expect(cmd).not.toContain('claude');
+    const cmd = backend.buildCommand('claude-opus-4-8', '/tmp/prompt.txt');
+    expect(cmd).toBe('my-ai-cli run --model claude-opus-4-8 < /tmp/prompt.txt');
   });
 
   it('should use custom cliCommand in isAvailable()', async () => {
@@ -626,8 +625,8 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
     const claudeBackend = new SubprocessSpawnBackend(projectDir);
     const customBackend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
 
-    const claudeCmd = claudeBackend.buildCommand('opus', '/tmp/p.txt');
-    const customCmd = customBackend.buildCommand('opus', '/tmp/p.txt');
+    const claudeCmd = claudeBackend.buildCommand('claude-opus-4-8', '/tmp/p.txt');
+    const customCmd = customBackend.buildCommand('claude-opus-4-8', '/tmp/p.txt');
 
     expect(claudeCmd).not.toEqual(customCmd);
     expect(claudeCmd).toContain('claude');
@@ -637,12 +636,12 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
   it('should produce different spawn commands for different configs', () => {
     const child1 = setupMockChild();
     const claudeBackend = new SubprocessSpawnBackend(projectDir);
-    claudeBackend.spawn('task-c', 'opus', 'test');
+    claudeBackend.spawn('task-c', 'claude-opus-4-8', 'test');
     const [claudeCliCmd, claudeArgs] = mockSpawn.mock.calls[0];
 
     const child2 = setupMockChild();
     const customBackend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
-    customBackend.spawn('task-x', 'opus', 'test');
+    customBackend.spawn('task-x', 'claude-opus-4-8', 'test');
     const [customCliCmd, customArgs] = mockSpawn.mock.calls[1];
 
     expect(claudeCliCmd).toBe('claude');
@@ -661,25 +660,25 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
   });
 
   it('should export CLAUDE_SUBPROCESS_CONFIG with buildArgs producing correct args', () => {
-    const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('sonnet');
-    expect(args).toEqual(['-p', '-', '--model', modelRegistry.resolveApiId('sonnet')]);
+    const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('claude-sonnet-5');
+    expect(args).toEqual(['-p', '-', '--model', modelRegistry.resolveApiId('claude-sonnet-5')]);
   });
 
   it('should export CLAUDE_SUBPROCESS_CONFIG with buildCommandString producing correct command', () => {
-    const cmd = CLAUDE_SUBPROCESS_CONFIG.buildCommandString('opus', '/tmp/p.txt');
+    const cmd = CLAUDE_SUBPROCESS_CONFIG.buildCommandString('claude-opus-4-8', '/tmp/p.txt');
     expect(cmd).toBe('claude -p - --model claude-opus-4-8 < /tmp/p.txt');
   });
 
   // F3.1: --exclude-dynamic-system-prompt-sections is opt-in on both builders.
   it('buildArgs appends --exclude-dynamic-system-prompt-sections when opted in, omits otherwise', () => {
-    expect(CLAUDE_SUBPROCESS_CONFIG.buildArgs('opus', { excludeDynamicPromptSections: true }))
+    expect(CLAUDE_SUBPROCESS_CONFIG.buildArgs('claude-opus-4-8', { excludeDynamicPromptSections: true }))
       .toContain('--exclude-dynamic-system-prompt-sections');
-    expect(CLAUDE_SUBPROCESS_CONFIG.buildArgs('opus', {}))
+    expect(CLAUDE_SUBPROCESS_CONFIG.buildArgs('claude-opus-4-8', {}))
       .not.toContain('--exclude-dynamic-system-prompt-sections');
   });
 
   it('buildCommandString appends the exclude-dynamic flag before the stdin redirect when opted in', () => {
-    const cmd = CLAUDE_SUBPROCESS_CONFIG.buildCommandString('opus', '/tmp/p.txt', { excludeDynamicPromptSections: true });
+    const cmd = CLAUDE_SUBPROCESS_CONFIG.buildCommandString('claude-opus-4-8', '/tmp/p.txt', { excludeDynamicPromptSections: true });
     expect(cmd).toBe('claude -p - --model claude-opus-4-8 --exclude-dynamic-system-prompt-sections < /tmp/p.txt');
   });
 

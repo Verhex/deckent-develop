@@ -29,7 +29,7 @@ describe("Config API integration — dashboard client", () => {
       const configData = {
         mode: "balanced",
         max_workers: 4,
-        brain_model: "opus",
+        brain_model: "claude-opus-4-8",
         language: "en",
         memory_budget: 600,
       };
@@ -84,7 +84,7 @@ describe("Config API integration — dashboard client", () => {
     });
 
     it("returns merged config from server response", async () => {
-      const merged = { mode: "economic", max_workers: 4, brain_model: "opus" };
+      const merged = { mode: "economic", max_workers: 4, brain_model: "claude-opus-4-8" };
       mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(merged) });
 
       const result = await postJson<typeof merged>("/api/config", { mode: "economic" });
@@ -166,7 +166,7 @@ describe("Config API integration — dashboard client", () => {
       const fullConfig = {
         mode: "performance",
         max_workers: 8,
-        brain_model: "opus",
+        brain_model: "claude-opus-4-8",
         language: "tr",
         memory_budget: 900,
       };
@@ -214,7 +214,7 @@ describe("Config API integration — dashboard client", () => {
 
     it("nested key round-trip: modes.performance.max_workers updated, brain_model preserved", async () => {
       const merged = {
-        modes: { performance: { max_workers: 8, brain_model: "opus" }, balanced: { max_workers: 2 } },
+        modes: { performance: { max_workers: 8, brain_model: "claude-opus-4-8" }, balanced: { max_workers: 2 } },
       };
 
       mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(merged) });
@@ -238,7 +238,7 @@ describe("Config API integration — dashboard client", () => {
 
   describe("GET /api/config/defaults", () => {
     it("returns default config object", async () => {
-      const defaults = { mode: "balanced", max_workers: 4, brain_model: "opus" };
+      const defaults = { mode: "balanced", max_workers: 4, brain_model: "claude-opus-4-8" };
       mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(defaults) });
 
       const result = await fetchJson<typeof defaults>("/api/config/defaults");

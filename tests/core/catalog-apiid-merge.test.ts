@@ -23,62 +23,60 @@ function makeModel(id: string, apiId: string, provider: 'claude' | 'codex' | 'ge
 // ─── mergeApiIdOverrides — pure function tests ─────────────────────────────
 
 describe('mergeApiIdOverrides', () => {
-  it('remote apiId overrides bundled when remote.id matches existing.apiId', () => {
-    // Bundled has stale apiId; remote has same api ID as its own id (models.dev pattern)
-    const existing = [makeModel('opus', 'claude-opus-4-6')];
-    // Remote: id='claude-opus-4-6' means "this is the entry for claude-opus-4-6,
-    // and its current apiId is claude-opus-4-8" (renamed/updated upstream)
-    const remote = [makeModel('claude-opus-4-6', 'claude-opus-4-8')];
+  it('remote metadata refreshes a bundled entry with the same canonical API identity', () => {
+    const existing = [makeModel('claude-opus-4-8', 'claude-opus-4-8')];
+    const remote = [
+      makeModel('claude-opus-4-8', 'claude-opus-4-8'),
+    ];
+    remote[0]!.contextWindow = 1_000_000;
 
     const result = mergeApiIdOverrides(existing, remote);
 
     expect(result).toHaveLength(1);
-    expect(result[0]!.id).toBe('opus');        // logical id preserved
-    expect(result[0]!.apiId).toBe('claude-opus-4-8'); // apiId updated to live value
+    expect(result[0]!.id).toBe('claude-opus-4-8');
+    expect(result[0]!.apiId).toBe('claude-opus-4-8');
+    expect(result[0]!.contextWindow).toBe(1_000_000);
   });
 
   it('bundled apiId is preserved when no remote entry matches', () => {
     const existing = [
-      makeModel('opus', 'claude-opus-4-8'),
-      makeModel('sonnet', 'claude-sonnet-5'),
+      makeModel('claude-opus-4-8', 'claude-opus-4-8'),
+      makeModel('claude-sonnet-5', 'claude-sonnet-5'),
     ];
     const remote: ModelDefinition[] = []; // no remote models at all
 
     const result = mergeApiIdOverrides(existing, remote);
 
     expect(result).toHaveLength(2);
-    expect(result.find(m => m.id === 'opus')?.apiId).toBe('claude-opus-4-8');
-    expect(result.find(m => m.id === 'sonnet')?.apiId).toBe('claude-sonnet-5');
+    expect(result.find(m => m.id === 'claude-opus-4-8')?.apiId).toBe('claude-opus-4-8');
+    expect(result.find(m => m.id === 'claude-sonnet-5')?.apiId).toBe('claude-sonnet-5');
   });
 
   it('merge is idempotent — applying twice gives same result', () => {
-    const existing = [makeModel('opus', 'claude-opus-4-6')];
-    const remote = [makeModel('claude-opus-4-6', 'claude-opus-4-8')];
+    const existing = [makeModel('claude-opus-4-8', 'claude-opus-4-8')];
+    const remote = [makeModel('claude-opus-4-8', 'claude-opus-4-8')];
 
     const first = mergeApiIdOverrides(existing, remote);
-    // Apply again using the already-updated result as "existing"
     const second = mergeApiIdOverrides(first, remote);
 
     expect(first[0]!.apiId).toBe('claude-opus-4-8');
-    // Second pass: remote.id='claude-opus-4-6' but existing.apiId='claude-opus-4-8' now
-    // → no match → result unchanged
     expect(second[0]!.apiId).toBe('claude-opus-4-8');
     expect(second).toEqual(first);
   });
 
   it('unmatched remote models are appended; existing bundled entries stay intact', () => {
-    const existing = [makeModel('opus', 'claude-opus-4-8')];
+    const existing = [makeModel('claude-opus-4-8', 'claude-opus-4-8')];
     // Remote has a completely different model; no apiId match
-    const remote = [makeModel('gpt-5', 'gpt-5', 'codex')];
+    const remote = [makeModel('gpt-5.6-sol', 'gpt-5.6-sol', 'codex')];
 
     const result = mergeApiIdOverrides(existing, remote);
 
     // Zero-hardcode: unmatched remote is APPENDED (live catalog surfaces new
-    // models); the bundled 'opus' entry stays byte-identical. (model-catalog.ts:43)
+    // models); the bundled canonical entry stays byte-identical.
     expect(result).toHaveLength(2);
-    const opus = result.find(m => m.id === 'opus');
+    const opus = result.find(m => m.id === 'claude-opus-4-8');
     expect(opus?.apiId).toBe('claude-opus-4-8'); // unchanged
-    expect(result.some(m => m.id === 'gpt-5')).toBe(true); // appended
+    expect(result.some(m => m.id === 'gpt-5.6-sol')).toBe(true); // appended
   });
 });
 
@@ -91,7 +89,7 @@ describe('bootstrapFromCatalog apiId override integration', () => {
 
   beforeEach(() => {
     mergedWith = [];
-    existingModels = [makeModel('opus', 'claude-opus-4-6')];
+    existingModels = [makeModel('claude-opus-4-8', 'claude-opus-4-8')];
     workDir = mkdtempSync(join(tmpdir(), 'catalog-apiid-test-'));
   });
 
@@ -105,12 +103,11 @@ describe('bootstrapFromCatalog apiId override integration', () => {
       mergeFromCatalog: (models: ModelDefinition[]) => { mergedWith = models; },
     };
 
-    // Remote returns: id='claude-opus-4-6' (matches existing.apiId), apiId='claude-opus-4-8'
     const mockFetch = async () => ({
       ok: true,
       json: async () => ({
         version: '1.0.0',
-        models: [{ id: 'claude-opus-4-6', apiId: 'claude-opus-4-8', provider: 'anthropic', tier: 'premium' }],
+        models: [{ id: 'claude-opus-4-8', apiId: 'claude-opus-4-8', provider: 'anthropic', tier: 'premium' }],
       }),
     } as Response);
 
@@ -121,7 +118,7 @@ describe('bootstrapFromCatalog apiId override integration', () => {
       _cachePath: join(workDir, 'cache.json'),
     });
 
-    const opusResult = mergedWith.find(m => m.id === 'opus');
+    const opusResult = mergedWith.find(m => m.id === 'claude-opus-4-8');
     expect(opusResult).toBeDefined();
     expect(opusResult!.apiId).toBe('claude-opus-4-8');
   });
@@ -140,8 +137,8 @@ describe('bootstrapFromCatalog apiId override integration', () => {
       _cachePath: join(workDir, 'empty-cache.json'),
     });
 
-    const opusResult = mergedWith.find(m => m.id === 'opus');
+    const opusResult = mergedWith.find(m => m.id === 'claude-opus-4-8');
     expect(opusResult).toBeDefined();
-    expect(opusResult!.apiId).toBe('claude-opus-4-6'); // bundled preserved (no remote match on fresh BUILTIN_MODELS)
+    expect(opusResult!.apiId).toBe('claude-opus-4-8'); // bundled preserved
   });
 });

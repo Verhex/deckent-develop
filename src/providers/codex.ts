@@ -28,10 +28,8 @@ import { killProcessGroupWithEscalation } from './subprocess.js';
 // Side-effect: register the Codex parity catalog (gpt-5.5 + gpt-5.6 family)
 // into the singleton registry the first time this module is imported —
 // mirrors `registerOllamaModels(modelRegistry)` in providers/ollama.ts.
-// Until 2026-07-11 this function had ZERO callers (half-wire): `gpt-5.5` was
-// reachable only through the legacy `id: 'gpt-5'` builtin whose apiId remaps
-// to gpt-5.5 (Sprint-248 shim). First-class ids are now directly addressable
-// (`--model gpt-5.6-sol` etc.); the gpt-5 shim stays for backward-compat.
+// Canonical API IDs are directly addressable (`gpt-5.5`, `gpt-5.6-sol`, etc.).
+// Legacy aliases are handled only by explicit config migration, never here.
 registerCodexParityModels(modelRegistry);
 
 // ─── Constants ───────────────────────────────────────────────────────
@@ -53,10 +51,16 @@ function getCodexModels(): readonly OpenAIModel[] {
  * Kept for backward compatibility with existing imports.
  */
 export const CODEX_TIER_MODELS = {
-  get premium() { return (getModelForProviderTier('codex', 'premium') ?? 'gpt-5') as OpenAIModel; },
-  get standard() { return (getModelForProviderTier('codex', 'standard') ?? 'gpt-4.1') as OpenAIModel; },
-  get economy() { return (getModelForProviderTier('codex', 'economy') ?? 'gpt-4.1-mini') as OpenAIModel; },
+  get premium() { return requireCodexTierModel('premium'); },
+  get standard() { return requireCodexTierModel('standard'); },
+  get economy() { return requireCodexTierModel('economy'); },
 };
+
+function requireCodexTierModel(tier: ModelTier): OpenAIModel {
+  const model = getModelForProviderTier('codex', tier);
+  if (!model) throw new Error(`E_CODEX_TIER_MODEL_UNAVAILABLE: tier=${tier}`);
+  return model as OpenAIModel;
+}
 
 /**
  * Worker Output Contract (Class-A, spec §Class-A) — args appended at SPAWN time so
@@ -505,10 +509,15 @@ export class CodexAdapter implements ProviderAdapter {
    *
    * We keep `--full-auto` for backward compat — Rust CLI ignores it harmlessly.
    */
-  buildPlannerCommand(prompt: string, model: ModelType): { command: string; args: string[] } {
+  buildPlannerCommand(prompt: string, model: ModelType): import('../core/provider.js').ProviderPlannerCommand {
+    const calledModel = modelRegistry.get(model)?.apiId ?? model;
     return {
       command: 'codex',
-      args: ['exec', '--full-auto', prompt, '--model', model],
+      args: ['exec', '--full-auto', prompt, '--model', calledModel],
+      calledProvider: 'codex',
+      calledModel,
+      transport: 'cli',
+      executionBackend: 'host-subprocess',
     };
   }
 

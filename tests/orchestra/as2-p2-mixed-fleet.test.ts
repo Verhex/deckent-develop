@@ -62,6 +62,7 @@ function makeBackend(root: string): SpawnBackend & { calls: SpawnRec[] } {
   const calls: SpawnRec[] = [];
   return {
     name: 'mock-docker',
+    liveUsageBudgetSupport: 'measured-stream' as const,
     spawn(taskId: string, model: ModelType) {
       calls.push({ taskId, model });
       writeFileSync(
@@ -81,6 +82,7 @@ function makeOllamaAdapter(root: string): ProviderAdapter & { calls: SpawnRec[] 
   const calls: SpawnRec[] = [];
   const adapter = {
     name: 'ollama' as ProviderName,
+    liveUsageBudgetSupport: 'measured-stream' as const,
     buildCommand: () => 'ollama',
     isAvailable: () => Promise.resolve(true),
     spawn(taskId: string, model: ModelType) {
@@ -116,6 +118,7 @@ function makeTask(id: string, provider: ProviderName, model: string, file: strin
     assignedAgent: 'generic',
     assignedSkills: [],
     provider,
+    budget: { maxTurns: 1 },
   } as unknown as Task;
 }
 
@@ -329,7 +332,7 @@ describe('AS2-P2 — mixed-fleet provider-switcher parity + non-leak', () => {
 
     it('ollama task routed to host adapter, claude task routed to docker backend — no cross-routing', async () => {
       const ollamaTask = makeTask('AS2-OLL-1', 'ollama', 'qwen3.6:27b', 'src/ollama-out.ts');
-      const claudeTask = makeTask('AS2-CLA-1', 'claude', 'sonnet', 'src/claude-out.ts');
+      const claudeTask = makeTask('AS2-CLA-1', 'claude', 'claude-sonnet-5', 'src/claude-out.ts');
       persist([ollamaTask, claudeTask]);
       const backend = makeBackend(root);
 
@@ -355,7 +358,7 @@ describe('AS2-P2 — mixed-fleet provider-switcher parity + non-leak', () => {
 
     it('both workers produce a .result on disk — parallel independent success', async () => {
       const ollamaTask = makeTask('AS2-OLL-2', 'ollama', 'qwen3.6:27b', 'src/o2.ts');
-      const claudeTask = makeTask('AS2-CLA-2', 'claude', 'sonnet', 'src/c2.ts');
+      const claudeTask = makeTask('AS2-CLA-2', 'claude', 'claude-sonnet-5', 'src/c2.ts');
       persist([ollamaTask, claudeTask]);
       const backend = makeBackend(root);
 
@@ -385,7 +388,7 @@ describe('AS2-P2 — mixed-fleet provider-switcher parity + non-leak', () => {
 
     it('provider state does not leak between concurrent workers (each result carries its own via)', async () => {
       const ollamaTask = makeTask('AS2-OLL-3', 'ollama', 'qwen3.6:27b', 'src/o3.ts');
-      const claudeTask = makeTask('AS2-CLA-3', 'claude', 'sonnet', 'src/c3.ts');
+      const claudeTask = makeTask('AS2-CLA-3', 'claude', 'claude-sonnet-5', 'src/c3.ts');
       persist([ollamaTask, claudeTask]);
       const backend = makeBackend(root);
 

@@ -279,8 +279,8 @@ function makeConfig(): ResolvedConfig {
     version: '0.1.0',
     activeModeConfig: {
       max_workers: 4,
-      brain_model: 'opus',
-      default_model: 'sonnet',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: false,
     },
     modes: {} as never,

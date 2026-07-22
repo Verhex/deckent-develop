@@ -19,7 +19,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: 'test-001',
     title: 'fixture',
     description: 'overflow gate test task',
-    model: 'opus',
+    model: 'claude-opus-4-8',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'fixture',
@@ -77,7 +77,7 @@ describe('decidePreSpawnOverflow', () => {
   // ─── (a) flag-off → always null (no overflow) ────────────────────────
 
   it('(a) flag-off (undefined config) → null, reason=disabled, no advisory', () => {
-    const task = makeTask({ model: 'opus', provider: 'claude' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude' });
     const decision: PreSpawnOverflowDecision = decidePreSpawnOverflow({
       task,
       rateLimitState: OVER_QUOTA, // even when over-quota...
@@ -91,7 +91,7 @@ describe('decidePreSpawnOverflow', () => {
   });
 
   it('(a) flag explicitly false → null, reason=disabled', () => {
-    const task = makeTask({ model: 'opus', provider: 'claude' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude' });
     const decision = decidePreSpawnOverflow({
       task,
       rateLimitState: OVER_QUOTA,
@@ -103,7 +103,7 @@ describe('decidePreSpawnOverflow', () => {
   });
 
   it('(a) flag-off even with over-quota + configured target → no overflow', () => {
-    const task = makeTask({ model: 'opus', provider: 'claude' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude' });
     const cfg: ProviderOverflowConfig = { apiProvider: 'codex' }; // dynamic undefined
     const decision = decidePreSpawnOverflow({
       task,
@@ -118,7 +118,7 @@ describe('decidePreSpawnOverflow', () => {
   // ─── (b) flag-on + rate-limited + configured target → returns target ──
 
   it('(b) flag-on + over-quota + codex target → overflow opus→gpt-5 on codex', () => {
-    const task = makeTask({ model: 'opus', provider: 'claude' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude' });
     const decision = decidePreSpawnOverflow({
       task,
       rateLimitState: OVER_QUOTA,
@@ -127,16 +127,16 @@ describe('decidePreSpawnOverflow', () => {
     });
     expect(decision.reason).toBe('overflow');
     expect(decision.overflowProvider).toBe('codex');
-    expect(decision.overflowModel).toBe('gpt-5'); // premium-tier equivalent
+    expect(decision.overflowModel).toBe('gpt-5.5'); // premium-tier equivalent
     expect(decision.advisory).toBeNull();
     // Original task untouched — decision is pure (caller applies the swap).
     expect(task.provider).toBe('claude');
-    expect(task.model).toBe('opus');
+    expect(task.model).toBe('claude-opus-4-8');
     expect(task.authMode).toBe('subscription');
   });
 
   it('(b) provider-agnostic — gemini target → overflow opus→gemini-2.5-pro', () => {
-    const task = makeTask({ model: 'opus', provider: 'claude' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude' });
     const decision = decidePreSpawnOverflow({
       task,
       rateLimitState: OVER_QUOTA,
@@ -151,7 +151,7 @@ describe('decidePreSpawnOverflow', () => {
   // ─── (c) flag-on + rate-limited + NO target → null + honest advisory ──
 
   it('(c) flag-on + over-quota + NO target → null, reason=no_target, advisory set', () => {
-    const task = makeTask({ model: 'opus', provider: 'claude' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude' });
     const decision = decidePreSpawnOverflow({
       task,
       rateLimitState: OVER_QUOTA,
@@ -169,7 +169,7 @@ describe('decidePreSpawnOverflow', () => {
   // ─── (d) flag-on + provider NOT limited → null ───────────────────────
 
   it('(d) flag-on + under-quota signal → null, reason=no_limit, no advisory', () => {
-    const task = makeTask({ model: 'opus', provider: 'claude' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude' });
     const decision = decidePreSpawnOverflow({
       task,
       rateLimitState: NO_THROTTLE,
@@ -182,7 +182,7 @@ describe('decidePreSpawnOverflow', () => {
   });
 
   it('(d) flag-on + null signal (no snapshot yet) → null, reason=no_limit', () => {
-    const task = makeTask({ model: 'opus', provider: 'claude' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude' });
     const decision = decidePreSpawnOverflow({
       task,
       rateLimitState: null,
@@ -196,7 +196,7 @@ describe('decidePreSpawnOverflow', () => {
   // ─── Extra honest-fail / edge coverage ───────────────────────────────
 
   it('already-api task → null, reason=already_api (nothing to overflow)', () => {
-    const task = makeTask({ model: 'gpt-5', provider: 'codex', authMode: 'api' });
+    const task = makeTask({ model: 'gpt-5.5', provider: 'codex', authMode: 'api' });
     const decision = decidePreSpawnOverflow({
       task,
       rateLimitState: OVER_QUOTA,
@@ -213,7 +213,7 @@ describe('decidePreSpawnOverflow', () => {
     const geminiOnly = new ModelRegistry(
       BUILTIN_MODELS.filter(m => m.provider === 'gemini' || m.provider === 'claude'),
     );
-    const task = makeTask({ model: 'opus', provider: 'claude' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude' });
     const decision = decidePreSpawnOverflow({
       task,
       rateLimitState: OVER_QUOTA,
@@ -228,7 +228,7 @@ describe('decidePreSpawnOverflow', () => {
 
   it('uses the default singleton registry when none is injected', () => {
     // No `registry` arg → falls back to modelRegistry; opus→codex still resolves.
-    const task = makeTask({ model: 'opus', provider: 'claude' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude' });
     const decision = decidePreSpawnOverflow({
       task,
       rateLimitState: OVER_QUOTA,

@@ -56,35 +56,38 @@ describe('provider-capabilities', () => {
   // ─── getProvidersWithCapability ───────────────────────────────────
 
   describe('getProvidersWithCapability', () => {
-    // Sprint 202 Task 202-001: Ollama joined the capability matrix. Its
+    // Sprint 202 Task 202-001: Ollama joined the capability matrix; row 477
+    // later added OpenRouter as the fifth provider. Their
     // capability flags differ from claude/codex/gemini (streaming=true,
     // toolUse=false, vision=false, codeExecution=false, cost=0), so per-cap
     // expected counts vary — see each `it` block.
-    it('returns claude/codex/gemini/ollama for streaming', () => {
+    it('returns all five providers for streaming', () => {
       const providers = getProvidersWithCapability('streaming');
       expect(providers).toContain('claude');
       expect(providers).toContain('codex');
       expect(providers).toContain('gemini');
       expect(providers).toContain('ollama');
-      expect(providers).toHaveLength(4);
+      expect(providers).toContain('openrouter');
+      expect(providers).toHaveLength(5);
     });
 
-    it('returns claude/codex/gemini for toolUse (ollama: false)', () => {
+    it('returns claude/codex/gemini/openrouter for toolUse (ollama: false)', () => {
       const providers = getProvidersWithCapability('toolUse');
-      expect(providers).toHaveLength(3);
-      expect(providers).not.toContain('ollama');
-    });
-
-    it('returns all 4 providers for maxContextTokens (non-zero)', () => {
-      const providers = getProvidersWithCapability('maxContextTokens');
       expect(providers).toHaveLength(4);
+      expect(providers).not.toContain('ollama');
+      expect(providers).toContain('openrouter');
     });
 
-    it('returns all 4 providers for costPerMillionTokens', () => {
+    it('returns all 5 providers for maxContextTokens (non-zero)', () => {
+      const providers = getProvidersWithCapability('maxContextTokens');
+      expect(providers).toHaveLength(5);
+    });
+
+    it('returns all 5 providers for costPerMillionTokens', () => {
       // costPerMillionTokens is treated as "always has this capability" when
       // the value is a non-null object — Ollama's {input:0,output:0} counts.
       const providers = getProvidersWithCapability('costPerMillionTokens');
-      expect(providers).toHaveLength(4);
+      expect(providers).toHaveLength(5);
     });
   });
 
@@ -127,13 +130,14 @@ describe('provider-capabilities', () => {
   // ─── getAllProviders ──────────────────────────────────────────────
 
   describe('getAllProviders', () => {
-    it('returns all four providers (claude, codex, gemini, ollama)', () => {
+    it('returns all five providers, including openrouter', () => {
       const all = getAllProviders();
-      expect(all).toHaveLength(4);
+      expect(all).toHaveLength(5);
       expect(all).toContain('claude');
       expect(all).toContain('codex');
       expect(all).toContain('gemini');
       expect(all).toContain('ollama');
+      expect(all).toContain('openrouter');
     });
   });
 });

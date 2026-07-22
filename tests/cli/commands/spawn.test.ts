@@ -3,6 +3,10 @@ import { Command } from 'commander';
 import type { Task } from '../../../src/core/types.js';
 import { TaskStatus } from '../../../src/core/types.js';
 
+const { mockBackendSpawn } = vi.hoisted(() => ({
+  mockBackendSpawn: vi.fn(),
+}));
+
 // ─── Mocks ───────────────────────────────────────────────────────────
 
 vi.mock('../../../src/agents/worker.js', () => ({
@@ -24,7 +28,7 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
 }));
 
 vi.mock('../../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn().mockResolvedValue({ language: 'en' }),
 }));
@@ -41,7 +45,9 @@ vi.mock('../../../src/orchestra/sprint-controller.js', () => ({
 vi.mock('../../../src/orchestra/spawn-backend.js', () => ({
   SpawnBackendFactory: {
     create: vi.fn().mockReturnValue({
-      spawn: vi.fn(),
+      name: 'measured-test',
+      liveUsageBudgetSupport: 'measured-stream',
+      spawn: mockBackendSpawn,
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),
     }),
@@ -73,7 +79,7 @@ function makeTask(overrides?: Partial<Task>): Task {
     id: '001-001',
     title: 'Test Task',
     description: 'Test description',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -83,6 +89,7 @@ function makeTask(overrides?: Partial<Task>): Task {
     status: TaskStatus.PENDING,
     sprintId: 'sprint-001',
     createdAt: new Date().toISOString(),
+    budget: { maxTurns: 2 },
     ...overrides,
   };
 }
@@ -104,7 +111,14 @@ describe('spawn command (isolated)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.exitCode = undefined;
-    vi.mocked(loadConfig).mockResolvedValue({ language: 'en' } as any);
+    vi.mocked(loadConfig).mockResolvedValue({ language: 'en', spawn_backend: 'subprocess' } as any);
+    vi.mocked(SpawnBackendFactory.create).mockReturnValue({
+      name: 'measured-test',
+      liveUsageBudgetSupport: 'measured-stream',
+      spawn: mockBackendSpawn,
+      kill: vi.fn(),
+      list: vi.fn().mockReturnValue([]),
+    } as never);
   });
 
   afterEach(() => {
@@ -119,7 +133,7 @@ describe('spawn command (isolated)', () => {
   });
 
   it('calls readTask with project root and taskId', async () => {
-    vi.mocked(readTask).mockReturnValue(makeTask({ id: '001-001', model: 'opus' }));
+    vi.mocked(readTask).mockReturnValue(makeTask({ id: '001-001', model: 'claude-opus-4-8' }));
     vi.mocked(ensureSession).mockImplementation(() => {});
     vi.mocked(spawnWorker).mockImplementation(() => {});
 
@@ -128,35 +142,35 @@ describe('spawn command (isolated)', () => {
     expect(readTask).toHaveBeenCalledWith('/mock/root', '001-001');
   });
 
-  it('calls ensureSession before spawning worker', async () => {
+  it('uses the configured measured backend without opening a tmux session', async () => {
     vi.mocked(readTask).mockReturnValue(makeTask());
     vi.mocked(ensureSession).mockImplementation(() => {});
     vi.mocked(spawnWorker).mockImplementation(() => {});
 
     await runCommand(['spawn', '001-001']);
 
-    expect(ensureSession).toHaveBeenCalled();
+    expect(mockBackendSpawn).toHaveBeenCalled();
+    expect(ensureSession).not.toHaveBeenCalled();
   });
 
-  it('calls spawnWorker with taskId, model, prompt, and root', async () => {
-    const task = makeTask({ id: '001-002', model: 'haiku' });
+  it('calls the measured backend with taskId, model, prompt, and root', async () => {
+    const task = makeTask({ id: '001-002', model: 'claude-haiku-4-5-20251001' });
     vi.mocked(readTask).mockReturnValue(task);
     vi.mocked(ensureSession).mockImplementation(() => {});
     vi.mocked(spawnWorker).mockImplementation(() => {});
 
     await runCommand(['spawn', '001-002']);
 
-    expect(spawnWorker).toHaveBeenCalledWith(
+    expect(mockBackendSpawn).toHaveBeenCalledWith(
       '001-002',
-      'haiku',
+      'claude-haiku-4-5-20251001',
       expect.stringContaining('Worker agent'),
-      '/mock/root',
       expect.objectContaining({ autoApprove: false })
     );
   });
 
   it('prints success message with task ID and model', async () => {
-    const task = makeTask({ id: '005-003', model: 'opus' });
+    const task = makeTask({ id: '005-003', model: 'claude-opus-4-8' });
     vi.mocked(readTask).mockReturnValue(task);
     vi.mocked(ensureSession).mockImplementation(() => {});
     vi.mocked(spawnWorker).mockImplementation(() => {});
@@ -164,7 +178,7 @@ describe('spawn command (isolated)', () => {
     await runCommand(['spawn', '005-003']);
 
     expect(print).toHaveBeenCalledWith(expect.stringContaining('005-003'));
-    expect(print).toHaveBeenCalledWith(expect.stringContaining('opus'));
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('claude-opus-4-8'));
   });
 
   it('handles readTask error and sets exit code', async () => {
@@ -178,7 +192,7 @@ describe('spawn command (isolated)', () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it('handles ensureSession error gracefully', async () => {
+  it('does not consult tmux when the configured measured backend is available', async () => {
     vi.mocked(readTask).mockReturnValue(makeTask());
     vi.mocked(ensureSession).mockImplementation(() => {
       throw new Error('tmux session failed');
@@ -186,14 +200,14 @@ describe('spawn command (isolated)', () => {
 
     await runCommand(['spawn', '001-001']);
 
-    expect(printError).toHaveBeenCalled();
-    expect(process.exitCode).toBe(1);
+    expect(mockBackendSpawn).toHaveBeenCalled();
+    expect(ensureSession).not.toHaveBeenCalled();
+    expect(printError).not.toHaveBeenCalled();
   });
 
-  it('handles spawnWorker error and sets exit code', async () => {
+  it('handles configured backend spawn errors and sets exit code', async () => {
     vi.mocked(readTask).mockReturnValue(makeTask());
-    vi.mocked(ensureSession).mockImplementation(() => {});
-    vi.mocked(spawnWorker).mockImplementation(() => {
+    mockBackendSpawn.mockImplementationOnce(() => {
       throw new Error('Failed to spawn worker');
     });
 
@@ -203,12 +217,12 @@ describe('spawn command (isolated)', () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it('passes different models correctly to spawnWorker', async () => {
-    const models: Array<'haiku' | 'sonnet' | 'opus'> = ['haiku', 'sonnet', 'opus'];
+  it('passes different canonical model IDs correctly to the measured backend', async () => {
+    const models: Array<'claude-haiku-4-5-20251001' | 'claude-sonnet-5' | 'claude-opus-4-8'> = ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-4-8'];
 
     for (const model of models) {
       vi.clearAllMocks();
-      vi.mocked(loadConfig).mockResolvedValue({ language: 'en' } as any);
+      vi.mocked(loadConfig).mockResolvedValue({ language: 'en', spawn_backend: 'subprocess' } as any);
       const task = makeTask({ model });
       vi.mocked(readTask).mockReturnValue(task);
       vi.mocked(ensureSession).mockImplementation(() => {});
@@ -216,19 +230,18 @@ describe('spawn command (isolated)', () => {
 
       await runCommand(['spawn', '001-001']);
 
-      expect(spawnWorker).toHaveBeenCalledWith(
-        expect.any(String),
-        model,
-        expect.any(String),
-        expect.any(String),
-        expect.any(Object)
+      expect(mockBackendSpawn).toHaveBeenCalledWith(
+      expect.any(String),
+      model,
+      expect.any(String),
+      expect.any(Object)
       );
     }
   });
 
   it('uses English message when language is en', async () => {
-    vi.mocked(loadConfig).mockResolvedValue({ language: 'en' } as any);
-    const task = makeTask({ id: '001-001', model: 'sonnet' });
+    vi.mocked(loadConfig).mockResolvedValue({ language: 'en', spawn_backend: 'subprocess' } as any);
+    const task = makeTask({ id: '001-001', model: 'claude-sonnet-5' });
     vi.mocked(readTask).mockReturnValue(task);
     vi.mocked(ensureSession).mockImplementation(() => {});
     vi.mocked(spawnWorker).mockImplementation(() => {});
@@ -236,13 +249,13 @@ describe('spawn command (isolated)', () => {
     await runCommand(['spawn', '001-001']);
 
     expect(print).toHaveBeenCalledWith(
-      'Worker spawned for task 001-001 (model: sonnet).'
+      'Worker spawned for task 001-001 (model: claude-sonnet-5).'
     );
   });
 
   it('uses Turkish message when language is tr', async () => {
-    vi.mocked(loadConfig).mockResolvedValue({ language: 'tr' } as any);
-    const task = makeTask({ id: '001-001', model: 'sonnet' });
+    vi.mocked(loadConfig).mockResolvedValue({ language: 'tr', spawn_backend: 'subprocess' } as any);
+    const task = makeTask({ id: '001-001', model: 'claude-sonnet-5' });
     vi.mocked(readTask).mockReturnValue(task);
     vi.mocked(ensureSession).mockImplementation(() => {});
     vi.mocked(spawnWorker).mockImplementation(() => {});
@@ -250,22 +263,21 @@ describe('spawn command (isolated)', () => {
     await runCommand(['spawn', '001-001']);
 
     expect(print).toHaveBeenCalledWith(
-      '001-001 görevi için worker başlatıldı (model: sonnet).'
+      '001-001 görevi için worker başlatıldı (model: claude-sonnet-5).'
     );
   });
 
-  it('falls back to English when config load fails', async () => {
+  it('fails closed in English when config loading removes the measured backend contract', async () => {
     vi.mocked(loadConfig).mockRejectedValue(new Error('config error'));
-    const task = makeTask({ id: '002-001', model: 'haiku' });
+    const task = makeTask({ id: '002-001', model: 'claude-haiku-4-5-20251001' });
     vi.mocked(readTask).mockReturnValue(task);
     vi.mocked(ensureSession).mockImplementation(() => {});
     vi.mocked(spawnWorker).mockImplementation(() => {});
 
     await runCommand(['spawn', '002-001']);
 
-    expect(print).toHaveBeenCalledWith(
-      'Worker spawned for task 002-001 (model: haiku).'
-    );
+    expect(printError).toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
   });
 
   it('calls loadConfig with project root', async () => {
@@ -358,44 +370,75 @@ describe('spawnWorkerMultiProvider', () => {
     expect(backend.spawn).not.toHaveBeenCalled();
   });
 
-  it('returns tmux backend and claude provider for Claude models', async () => {
-    const result = await spawnWorkerMultiProvider('001', 'sonnet', 'prompt', '/root', {});
-    expect(result.backend).toBe('tmux');
-    expect(result.provider).toBe('claude');
+  it('blocks the implicit Claude tmux fallback because it cannot meter live usage', async () => {
+    await expect(spawnWorkerMultiProvider(
+      '001',
+      'claude-sonnet-5',
+      'prompt',
+      '/root',
+      { executionBudget: { maxTurns: 2 } },
+    )).rejects.toThrow('does not declare that capability');
+    expect(ensureSession).not.toHaveBeenCalled();
   });
 
-  it('returns subprocess backend and codex provider for OpenAI models', async () => {
+  it('returns a measured configured backend and codex provider for OpenAI models', async () => {
     const mockBackend = { spawn: vi.fn(), kill: vi.fn(), list: vi.fn() };
+    Object.assign(mockBackend, { name: 'measured-test', liveUsageBudgetSupport: 'measured-stream' });
     vi.mocked(SpawnBackendFactory.create).mockReturnValue(mockBackend as any);
-    const result = await spawnWorkerMultiProvider('002', 'gpt-4.1', 'prompt', '/root', {});
-    expect(result.backend).toBe('subprocess');
+    const result = await spawnWorkerMultiProvider('002', 'gpt-4.1', 'prompt', '/root', {
+      spawnBackend: 'subprocess',
+      executionBudget: { maxTurns: 2 },
+    });
+    expect(result.backend).toBe('measured-test');
     expect(result.provider).toBe('codex');
     expect(mockBackend.spawn).toHaveBeenCalled();
   });
 
-  it('returns subprocess backend and gemini provider for Gemini models', async () => {
+  it('returns a measured configured backend and gemini provider for Gemini models', async () => {
     const mockBackend = { spawn: vi.fn(), kill: vi.fn(), list: vi.fn() };
+    Object.assign(mockBackend, { name: 'measured-test', liveUsageBudgetSupport: 'measured-stream' });
     vi.mocked(SpawnBackendFactory.create).mockReturnValue(mockBackend as any);
-    const result = await spawnWorkerMultiProvider('003', 'gemini-2.5-pro', 'prompt', '/root', {});
-    expect(result.backend).toBe('subprocess');
+    const result = await spawnWorkerMultiProvider('003', 'gemini-2.5-pro', 'prompt', '/root', {
+      spawnBackend: 'subprocess',
+      executionBudget: { maxTurns: 2 },
+    });
+    expect(result.backend).toBe('measured-test');
     expect(result.provider).toBe('gemini');
   });
 
-  it('passes allowedTools to tmux spawnWorker for Claude models', async () => {
-    await spawnWorkerMultiProvider('004', 'opus', 'prompt', '/root', {
+  it('passes allowedTools to a measured configured backend for Claude models', async () => {
+    const mockBackend = {
+      name: 'measured-test',
+      liveUsageBudgetSupport: 'measured-stream' as const,
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      list: vi.fn(),
+    };
+    vi.mocked(SpawnBackendFactory.create).mockReturnValue(mockBackend as any);
+    await spawnWorkerMultiProvider('004', 'claude-opus-4-8', 'prompt', '/root', {
       allowedTools: 'Read,Write,Edit,Bash,Glob,Grep',
+      spawnBackend: 'subprocess',
+      executionBudget: { maxTurns: 2 },
     });
-    expect(spawnWorker).toHaveBeenCalledWith(
-      '004', 'opus', 'prompt', '/root',
+    expect(mockBackend.spawn).toHaveBeenCalledWith(
+      '004', 'claude-opus-4-8', 'prompt',
       expect.objectContaining({ allowedTools: 'Read,Write,Edit,Bash,Glob,Grep' }),
     );
   });
 
   it('passes allowedTools to subprocess backend for non-Claude models', async () => {
-    const mockBackend = { spawn: vi.fn(), kill: vi.fn(), list: vi.fn() };
+    const mockBackend = {
+      name: 'measured-test',
+      liveUsageBudgetSupport: 'measured-stream' as const,
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      list: vi.fn(),
+    };
     vi.mocked(SpawnBackendFactory.create).mockReturnValue(mockBackend as any);
     await spawnWorkerMultiProvider('005', 'gpt-4.1-mini', 'prompt', '/root', {
       allowedTools: 'Read,Bash',
+      spawnBackend: 'subprocess',
+      executionBudget: { maxTurns: 2 },
     });
     expect(mockBackend.spawn).toHaveBeenCalledWith(
       '005', 'gpt-4.1-mini', 'prompt',
@@ -410,7 +453,14 @@ describe('spawn command provider display', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.exitCode = undefined;
-    vi.mocked(loadConfig).mockResolvedValue({ language: 'en' } as any);
+    vi.mocked(loadConfig).mockResolvedValue({ language: 'en', spawn_backend: 'subprocess' } as any);
+    vi.mocked(SpawnBackendFactory.create).mockReturnValue({
+      name: 'measured-test',
+      liveUsageBudgetSupport: 'measured-stream',
+      spawn: mockBackendSpawn,
+      kill: vi.fn(),
+      list: vi.fn().mockReturnValue([]),
+    } as never);
     vi.mocked(ensureSession).mockImplementation(() => {});
     vi.mocked(spawnWorker).mockImplementation(() => {});
   });
@@ -420,7 +470,7 @@ describe('spawn command provider display', () => {
   });
 
   it('prints provider name after spawning worker', async () => {
-    vi.mocked(readTask).mockReturnValue(makeTask({ model: 'sonnet' }));
+    vi.mocked(readTask).mockReturnValue(makeTask({ model: 'claude-sonnet-5' }));
     await runCommand(['spawn', '001-001']);
     expect(print).toHaveBeenCalledWith(expect.stringContaining('Provider: claude'));
   });
@@ -430,8 +480,7 @@ describe('spawn command provider display', () => {
       scope: { directories: ['src/cli/'], filesRead: [], filesWrite: ['src/cli/spawn.ts'] },
     }));
     await runCommand(['spawn', '001-001']);
-    expect(spawnWorker).toHaveBeenCalledWith(
-      expect.any(String),
+    expect(mockBackendSpawn).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(String),
       expect.any(String),

@@ -9,7 +9,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '001-001',
     title: 'Test task',
     description: 'A test task',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -116,7 +116,7 @@ describe('routeTask', () => {
   });
 
   it('uses task forceModel to infer provider', () => {
-    const task = makeTask({ forceModel: 'gpt-5' });
+    const task = makeTask({ forceModel: 'gpt-5.5' });
     const result = routeTask(task, defaultConfig, allProviders);
     expect(result.provider).toBe('codex');
     expect(result.reason).toContain('forceModel');
@@ -198,7 +198,7 @@ describe('routeTask', () => {
 
   it('config skill_routing takes priority over task forceModel', () => {
     const task = makeTask({
-      forceModel: 'gpt-5',
+      forceModel: 'gpt-5.5',
       scope: { directories: ['ui/'], filesRead: [], filesWrite: [] },
     });
     const config: TaskRouterConfig = { skill_routing: { design: 'claude' } };

@@ -5,13 +5,14 @@ import { execSync } from 'node:child_process';
 import { loadConfig } from '../../core/config.js';
 import { DIRECTIVES_FILE } from '../../core/constants.js';
 import type { ModelType } from '../../core/types.js';
-import { ALL_MODELS } from '../../core/types.js';
+import { resolveCanonicalModelIdentity } from '../../core/model-registry.js';
 import {
   runSprint,
   BrainError,
 } from '../../orchestra/brain.js';
 import { print, printError, formatSprintSummary } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 export type TestReporter = 'default' | 'junit' | 'tap';
 
@@ -106,10 +107,14 @@ export function registerTestRun(program: Command): void {
       }
 
       // Validate model if provided
-      if (opts.model && !(ALL_MODELS as readonly string[]).includes(opts.model)) {
-        printError(new Error(`Invalid model: ${opts.model}. Must be one of: ${ALL_MODELS.join(', ')}`));
-        process.exitCode = 1;
-        return;
+      if (opts.model) {
+        try {
+          resolveCanonicalModelIdentity(opts.model, { registerParametric: false });
+        } catch {
+          printError(new Error(getMessage('test.model_invalid', getLanguage(), { model: opts.model })));
+          process.exitCode = 1;
+          return;
+        }
       }
 
       // F) Validate --min-coverage flag
@@ -268,4 +273,3 @@ export function registerTestRun(program: Command): void {
       }
     });
 }
-

@@ -12,14 +12,14 @@ import type { ModelType } from '../../src/core/types.js';
 
 describe('Docker provider binary resolution (provider-free smoke)', () => {
   it('resolves claude provider models to "claude" binary', () => {
-    expect(getProviderBinaryForModel('sonnet' as ModelType)).toBe('claude');
-    expect(getProviderBinaryForModel('opus' as ModelType)).toBe('claude');
-    expect(getProviderBinaryForModel('haiku' as ModelType)).toBe('claude');
+    expect(getProviderBinaryForModel('claude-sonnet-5' as ModelType)).toBe('claude');
+    expect(getProviderBinaryForModel('claude-opus-4-8' as ModelType)).toBe('claude');
+    expect(getProviderBinaryForModel('claude-haiku-4-5-20251001' as ModelType)).toBe('claude');
   });
 
   it('resolves codex provider models to "codex" binary', () => {
     expect(getProviderBinaryForModel('gpt-4.1' as ModelType)).toBe('codex');
-    expect(getProviderBinaryForModel('gpt-5' as ModelType)).toBe('codex');
+    expect(getProviderBinaryForModel('gpt-5.5' as ModelType)).toBe('codex');
   });
 
   it('resolves gemini provider models to "gemini" binary', () => {

@@ -22,8 +22,8 @@ describe('Sprint 248 provider-parity contract', () => {
   });
 
   describe('modelRegistry codex wire model', () => {
-    it('gpt-5 apiId is gpt-5.5 (codex subscription wire)', () => {
-      expect(modelRegistry.get('gpt-5')?.apiId).toBe('gpt-5.5');
+    it('preserves the exact GPT-5.5 API identity', () => {
+      expect(modelRegistry.get('gpt-5.5')?.apiId).toBe('gpt-5.5');
     });
   });
 });

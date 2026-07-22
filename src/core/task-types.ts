@@ -8,23 +8,10 @@ import type { ProviderBillingEvidence } from './provider-billing-evidence.js';
 
 // ─── Models ──────────────────────────────────────────────────────────
 
-/** Claude-family model identifiers */
-export type ClaudeModel = 'claude-fable-5' | 'claude-opus-4-8' | 'claude-sonnet-5' | 'claude-haiku-4-5-20251001';
-
-/** OpenAI / Codex model identifiers */
-export type OpenAIModel =
-  | 'gpt-5.5'
-  | 'gpt-5.6-sol'
-  | 'gpt-5.6-terra'
-  | 'gpt-5.6-luna'
-  | 'gpt-5-mini'
-  | 'gpt-4.1'
-  | 'gpt-4.1-mini'
-  | 'o3'
-  | 'o4-mini';
-
-/** Gemini model identifiers */
-export type GeminiModel = 'gemini-2.5-pro' | 'gemini-2.5-flash' | 'gemini-2.0-flash' | 'gemini-3.1-pro-preview';
+/** Provider-family model identifiers are registry-validated opaque API IDs. */
+export type ClaudeModel = string & {};
+export type OpenAIModel = string & {};
+export type GeminiModel = string & {};
 
 /**
  * Union of all supported model identifiers across providers.
@@ -34,7 +21,7 @@ export type GeminiModel = 'gemini-2.5-pro' | 'gemini-2.5-flash' | 'gemini-2.0-fl
  * `bootstrapFromCatalog()` (models.dev). Registry-validation guards the
  * runtime side; the literal union covers the bundled builtin-13 surface.
  */
-export type ModelType = ClaudeModel | OpenAIModel | GeminiModel | (string & {});
+export type ModelType = string & {};
 
 /**
  * Supported AI provider names.
@@ -86,6 +73,10 @@ export const PROVIDER_MODEL_MAP: Record<ProviderName, readonly ModelType[]> = Ob
     // whatever is currently in the registry under the 'ollama' provider key.
     ollama: {
       get: () => modelRegistry.getAllModels().filter(m => m.provider as string === 'ollama').map(m => m.id) as readonly ModelType[],
+      enumerable: true,
+    },
+    openrouter: {
+      get: () => modelRegistry.getByProvider('openrouter').map(m => m.id) as readonly ModelType[],
       enumerable: true,
     },
   },

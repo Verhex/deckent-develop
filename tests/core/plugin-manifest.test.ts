@@ -188,26 +188,26 @@ describe('validateManifest — hooks (v2)', () => {
 
 describe('validateManifest — model (v2)', () => {
   it('accepts opus', () => {
-    const raw = { name: 'p', version: '1.0.0', description: 'd', entrypoint: 'SKILL.md', model: 'opus' };
+    const raw = { name: 'p', version: '1.0.0', description: 'd', entrypoint: 'SKILL.md', model: 'claude-opus-4-8' };
     const manifest = validateManifest(raw, pluginDir);
-    expect(manifest.model).toBe('opus');
+    expect(manifest.model).toBe('claude-opus-4-8');
   });
 
   it('accepts sonnet', () => {
-    const raw = { name: 'p', version: '1.0.0', description: 'd', entrypoint: 'SKILL.md', model: 'sonnet' };
+    const raw = { name: 'p', version: '1.0.0', description: 'd', entrypoint: 'SKILL.md', model: 'claude-sonnet-5' };
     const manifest = validateManifest(raw, pluginDir);
-    expect(manifest.model).toBe('sonnet');
+    expect(manifest.model).toBe('claude-sonnet-5');
   });
 
   it('accepts haiku', () => {
-    const raw = { name: 'p', version: '1.0.0', description: 'd', entrypoint: 'SKILL.md', model: 'haiku' };
+    const raw = { name: 'p', version: '1.0.0', description: 'd', entrypoint: 'SKILL.md', model: 'claude-haiku-4-5-20251001' };
     const manifest = validateManifest(raw, pluginDir);
-    expect(manifest.model).toBe('haiku');
+    expect(manifest.model).toBe('claude-haiku-4-5-20251001');
   });
 
   it('throws for invalid model', () => {
     const raw = { name: 'p', version: '1.0.0', description: 'd', entrypoint: 'SKILL.md', model: 'gpt-4' };
-    expect(() => validateManifest(raw, pluginDir)).toThrow(/model.*must be one of/);
+    expect(() => validateManifest(raw, pluginDir)).toThrow(/model.*canonical registered API ID/);
   });
 
   it('omits model if not specified', () => {
@@ -261,7 +261,7 @@ describe('validateManifest — full v2 manifest', () => {
       triggers: ['test', 'run-tests', 'vitest'],
       permissions: ['read:tasks', 'write:results'],
       hooks: { beforeSprint: 'scripts/setup.sh', afterSprint: 'scripts/cleanup.sh' },
-      model: 'sonnet',
+      model: 'claude-sonnet-5',
       dependencies: ['code-reviewer'],
     };
     const manifest = validateManifest(raw, pluginDir);
@@ -272,7 +272,7 @@ describe('validateManifest — full v2 manifest', () => {
     expect(manifest.permissions).toEqual(['read:tasks', 'write:results']);
     expect(manifest.hooks?.beforeSprint).toBe('scripts/setup.sh');
     expect(manifest.hooks?.afterSprint).toBe('scripts/cleanup.sh');
-    expect(manifest.model).toBe('sonnet');
+    expect(manifest.model).toBe('claude-sonnet-5');
     expect(manifest.dependencies).toEqual(['code-reviewer']);
   });
 
@@ -282,11 +282,11 @@ describe('validateManifest — full v2 manifest', () => {
       version: '1.0.0',
       description: 'Documentation plugin',
       entrypoint: 'SKILL.md',
-      model: 'opus',
+      model: 'claude-opus-4-8',
       triggers: ['doc', 'write-docs'],
     };
     const manifest = validateManifest(raw, pluginDir);
-    expect(manifest.model).toBe('opus');
+    expect(manifest.model).toBe('claude-opus-4-8');
     expect(manifest.triggers).toEqual(['doc', 'write-docs']);
     expect(manifest.permissions).toBeUndefined();
     expect(manifest.hooks).toBeUndefined();

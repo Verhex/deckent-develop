@@ -2,11 +2,12 @@
 // Extracted from brain.ts — score-based and layered model selection
 import type { TaskScope, ModelType, ResolvedConfig, PatternEntry, ProviderName } from '../core/types.js';
 import { getModelTier } from '../core/types.js';
-import { getEquivalentModel, isModelAvailable } from '../core/model-equivalence.js';
+import { getEquivalentModel, isModelAvailable, getModelForProviderTier } from '../core/model-equivalence.js';
 import type { ModelTier } from '../core/model-equivalence.js';
 import { enforceModelTierGuard } from '../core/model-tier-guard.js';
+import { DeckentError } from '../core/errors.js';
 import { debugLog } from '../core/utils.js';
-import { getDefaultProviderName, isAdapterProvider } from './sprint-utils.js';
+import { getDefaultProviderName } from './sprint-utils.js';
 
 // ─── Tier Helpers ───────────────────────────────────────────────────
 
@@ -18,30 +19,46 @@ const TIER_RANK: Record<ModelTier, number> = {
   premium_plus: 3,
 };
 
-/** Claude model for each tier — used as canonical reference for cross-provider mapping */
-const TIER_CLAUDE_MODEL: Record<string, ModelType> = {
-  economy: 'haiku',
-  standard: 'sonnet',
-  premium: 'opus',
-  premium_plus: 'opus', // Falls back to premium until premium_plus models are added
-};
-
 /**
- * Resolve a tier name to a concrete model for the configured provider.
- * Uses config's worker_provider (fallback: brain_provider, then 'claude').
- * Maps the tier to its Claude reference model, then converts to target provider via equivalence.
+ * Resolve a tier name to a concrete model (exact registered API ID) for the
+ * configured provider. Uses config's worker_provider (fallback: brain_provider,
+ * then the registry default provider). Resolves the tier directly against the
+ * ModelRegistry — no Claude reference model, no alias table. Fails loudly if the
+ * provider has no model for the tier (never a silent 'sonnet'/'claude' default).
  */
 function resolveTierToModel(tier: ModelTier, config: ResolvedConfig): ModelType {
-  // Sprint 202 Task 202-003: resolve via registry default before the absolute
-  // 'claude' floor so pure-Ollama configs don't silently map tiers through the
-  // Claude reference model when Claude isn't registered.
+  // Sprint 202 Task 202-003: resolve via registry default so pure-Ollama configs
+  // don't silently map tiers through a Claude reference model.
   const provider: ProviderName =
     config.worker_provider
     ?? config.brain_provider
     ?? getDefaultProviderName();
-  const claudeModel: ModelType = TIER_CLAUDE_MODEL[tier] ?? 'sonnet';
-  if (provider === 'claude') return claudeModel;
-  return getEquivalentModel(claudeModel, provider);
+  const model = getModelForProviderTier(provider, tier);
+  if (!model) {
+    throw new DeckentError(
+      'E_NO_EQUIVALENT_MODEL',
+      `No ${tier}-tier model registered for provider '${provider}'`,
+    );
+  }
+  return model;
+}
+
+/**
+ * Resolve a tier to a concrete model when no provider/config is available, using
+ * the registry's default provider (parametric — never a hardcoded Claude alias).
+ * Returns an exact registered API ID; throws if the default provider has no model
+ * for the tier (fail loudly rather than emit an alias).
+ */
+function resolveTierForDefaultProvider(tier: ModelTier): ModelType {
+  const provider = getDefaultProviderName();
+  const model = getModelForProviderTier(provider, tier);
+  if (!model) {
+    throw new DeckentError(
+      'E_NO_EQUIVALENT_MODEL',
+      `No ${tier}-tier model registered for default provider '${provider}'`,
+    );
+  }
+  return model;
 }
 
 /**
@@ -119,16 +136,18 @@ function inferTierFromScore(title: string, description: string, scope: TaskScope
 /**
  * Infer the appropriate AI model based on task complexity score.
  * Score >= 4 maps to premium tier, score <= -1 maps to economy tier, otherwise standard.
- * Returns Claude-centric model names for backward compatibility.
+ * Resolves the tier against the registry's default provider — returns an exact
+ * registered API ID.
  * @param title - Task title text
  * @param description - Task description text
  * @param scope - Task scope defining directories and files
- * @returns The recommended model type (Claude-centric: opus/sonnet/haiku)
+ * @returns The recommended model (exact registered API ID for the default provider)
  */
 export function inferModelFromDirective(title: string, description: string, scope: TaskScope): ModelType {
   const tier = inferTierFromScore(title, description, scope);
-  // Return Claude-centric defaults for backward compat (no config available here)
-  return TIER_CLAUDE_MODEL[tier] ?? 'sonnet';
+  // No config/provider context here — resolve the tier against the registry's
+  // default provider, returning an exact registered API ID (not a Claude alias).
+  return resolveTierForDefaultProvider(tier);
 }
 
 // ─── Pattern Utilities ──────────────────────────────────────────────
@@ -178,16 +197,17 @@ function suggestTierFromPatterns(scope: TaskScope, patterns: PatternEntry[]): Mo
 }
 
 /**
- * Suggest model upgrade based on detected patterns.
- * Returns 'opus' if patterns indicate boundary violations or circular deps in src/tests scope.
+ * Suggest a model upgrade based on detected patterns.
+ * Returns the default provider's premium model (exact registered API ID) if
+ * patterns indicate boundary violations or circular deps in src/tests scope.
  * Returns null otherwise.
- * Returns Claude-centric model names for backward compatibility.
  */
 export function suggestModelFromPatterns(scope: TaskScope, patterns: PatternEntry[]): ModelType | null {
   const tier = suggestTierFromPatterns(scope, patterns);
   if (!tier) return null;
-  // Return Claude-centric default for backward compat (no config available here)
-  return TIER_CLAUDE_MODEL[tier] ?? 'opus';
+  // No config/provider context here — resolve the tier against the registry's
+  // default provider, returning an exact registered API ID (not a Claude alias).
+  return resolveTierForDefaultProvider(tier);
 }
 
 /**
@@ -223,13 +243,6 @@ export function resolveTaskModel(
 
   // Layer 0: user override from DIRECTIVES.md — bypasses all auto-selection
   if (forceModel) {
-    // Sprint 236: adapter-providers (ollama) use dynamic, locally-pulled tags
-    // that aren't in the static PROVIDER_MODELS / TIER_PROVIDER_MAP — the user's
-    // forceModel is authoritative; skip the static-map availability/equivalence
-    // path (which would throw "No equivalent model" for an ollama tag).
-    if (isAdapterProvider(targetProvider)) {
-      return forceModel;
-    }
     // Validate forceModel against target provider; if mismatch, map to equivalent
     if (!isModelAvailable(forceModel, targetProvider)) {
       return getEquivalentModel(forceModel, targetProvider);

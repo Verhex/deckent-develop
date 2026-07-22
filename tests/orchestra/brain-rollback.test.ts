@@ -384,7 +384,7 @@ function makeConfig(): ResolvedConfig {
       default_model: 'opus',
       haiku_allowed: false,
       brain_planning: 'structured',
-      brain_model: 'opus',
+      brain_model: 'claude-opus-4-8',
     },
   } as unknown as ResolvedConfig;
 }

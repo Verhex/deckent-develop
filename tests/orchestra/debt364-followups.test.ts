@@ -50,7 +50,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: 'task-364-001-fix',
     title: 'Test task',
     description: 'desc',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -149,7 +149,7 @@ describe('handleEvaluation: TIMEOUT-PARTIAL classification (365-003, closes debt
 });
 
 describe('injectCriticalDebtTasks: timeout-partial skip (365-003, closes debt-364-001)', () => {
-  const MODEL: ModelType = 'sonnet';
+  const MODEL: ModelType = 'claude-sonnet-5';
   const SPRINT_ID = 'sprint-365';
 
   function makeDebt(overrides: Partial<DebtItem>): DebtItem {

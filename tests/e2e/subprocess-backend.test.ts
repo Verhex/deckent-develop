@@ -85,7 +85,7 @@ function makeNodeProviderConfig(script?: string): SubprocessProviderConfig {
   return {
     cliCommand: 'node',
     name: 'node-test',
-    supportedModels: ['sonnet'] as const,
+    supportedModels: ['claude-sonnet-5'] as const,
     buildArgs(_model, _opts) {
       if (script) {
         return ['-e', script];
@@ -104,7 +104,7 @@ function makeQuickExitConfig(code = 0): SubprocessProviderConfig {
   return {
     cliCommand: 'node',
     name: 'node-quick-exit',
-    supportedModels: ['sonnet'] as const,
+    supportedModels: ['claude-sonnet-5'] as const,
     buildArgs() {
       return ['-e', `process.exit(${code})`];
     },
@@ -119,7 +119,7 @@ function makeSleepConfig(seconds = 30): SubprocessProviderConfig {
   return {
     cliCommand: 'node',
     name: 'node-sleep',
-    supportedModels: ['sonnet'] as const,
+    supportedModels: ['claude-sonnet-5'] as const,
     buildArgs() {
       return ['-e', `setTimeout(() => process.exit(0), ${seconds * 1000})`];
     },
@@ -134,7 +134,7 @@ function makeEchoConfig(message: string): SubprocessProviderConfig {
   return {
     cliCommand: 'node',
     name: 'node-echo',
-    supportedModels: ['sonnet'] as const,
+    supportedModels: ['claude-sonnet-5'] as const,
     buildArgs() {
       return ['-e', `process.stdout.write(${JSON.stringify(message)}); process.exit(0);`];
     },
@@ -191,7 +191,7 @@ describe('Subprocess Backend E2E', () => {
       const config = makeSleepConfig(10);
       const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
 
-      backend.spawn(taskId, 'sonnet', 'test prompt');
+      backend.spawn(taskId, 'claude-sonnet-5', 'test prompt');
 
       const hbPath = path.join(projectDir, TASKS_DIR, `task-${taskId}.hb`);
       await waitForFile(hbPath, 3000);
@@ -227,13 +227,13 @@ describe('Subprocess Backend E2E', () => {
       const config: SubprocessProviderConfig = {
         cliCommand: 'node',
         name: 'node-stdin-test',
-        supportedModels: ['sonnet'] as const,
+        supportedModels: ['claude-sonnet-5'] as const,
         buildArgs() { return ['-e', script]; },
         buildCommandString() { return 'node -e "..."'; },
       };
 
       const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
-      backend.spawn(taskId, 'sonnet', prompt);
+      backend.spawn(taskId, 'claude-sonnet-5', prompt);
 
       await waitForFile(markerPath, 5000);
       const received = fs.readFileSync(markerPath, 'utf-8');
@@ -251,7 +251,7 @@ describe('Subprocess Backend E2E', () => {
 
       expect(backend.listWorkers()).toEqual([]);
 
-      backend.spawn(taskId, 'sonnet', 'test');
+      backend.spawn(taskId, 'claude-sonnet-5', 'test');
       expect(backend.listWorkers()).toContain(taskId);
 
       backend.kill(taskId);
@@ -267,7 +267,7 @@ describe('Subprocess Backend E2E', () => {
       const config = makeEchoConfig(logMessage);
       const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
 
-      backend.spawn(taskId, 'sonnet', '');
+      backend.spawn(taskId, 'claude-sonnet-5', '');
 
       // Wait for process to finish and log file to be written
       const logPath = path.join(projectDir, TASKS_DIR, `task-${taskId}.log`);
@@ -289,7 +289,7 @@ describe('Subprocess Backend E2E', () => {
       const config = makeQuickExitConfig(0);
       const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
 
-      backend.spawn(taskId, 'sonnet', '');
+      backend.spawn(taskId, 'claude-sonnet-5', '');
 
       const resultPath = path.join(projectDir, TASKS_DIR, `task-${taskId}.result`);
       await waitForFile(resultPath, 5000);
@@ -306,7 +306,7 @@ describe('Subprocess Backend E2E', () => {
       const config = makeQuickExitConfig(1);
       const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
 
-      backend.spawn(taskId, 'sonnet', '');
+      backend.spawn(taskId, 'claude-sonnet-5', '');
 
       const resultPath = path.join(projectDir, TASKS_DIR, `task-${taskId}.result`);
       await waitForFile(resultPath, 5000);
@@ -326,7 +326,7 @@ describe('Subprocess Backend E2E', () => {
 
       const config = makeQuickExitConfig(0);
       const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
-      backend.spawn(taskId, 'sonnet', '');
+      backend.spawn(taskId, 'claude-sonnet-5', '');
 
       // Wait for process to exit
       await waitForCondition(() => !backend.listWorkers().includes(taskId), 5000);
@@ -345,7 +345,7 @@ describe('Subprocess Backend E2E', () => {
       const config = makeQuickExitConfig(0);
       const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
 
-      backend.spawn(taskId, 'sonnet', '');
+      backend.spawn(taskId, 'claude-sonnet-5', '');
 
       // Wait for worker to exit
       await waitForCondition(() => !backend.listWorkers().includes(taskId), 5000);
@@ -364,7 +364,7 @@ describe('Subprocess Backend E2E', () => {
       const config = makeQuickExitConfig(42);
       const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
 
-      backend.spawn(taskId, 'sonnet', '');
+      backend.spawn(taskId, 'claude-sonnet-5', '');
 
       await waitForCondition(() => !backend.listWorkers().includes(taskId), 5000);
 
@@ -382,7 +382,7 @@ describe('Subprocess Backend E2E', () => {
       const config = makeSleepConfig(30);
       const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
 
-      backend.spawn(taskId, 'sonnet', '');
+      backend.spawn(taskId, 'claude-sonnet-5', '');
       expect(backend.listWorkers()).toContain(taskId);
 
       backend.kill(taskId);
@@ -411,10 +411,10 @@ describe('Subprocess Backend E2E', () => {
       const config = makeSleepConfig(10);
       const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
 
-      backend.spawn(taskId, 'sonnet', 'first');
+      backend.spawn(taskId, 'claude-sonnet-5', 'first');
 
-      expect(() => backend.spawn(taskId, 'sonnet', 'second')).toThrow(ProviderError);
-      expect(() => backend.spawn(taskId, 'sonnet', 'second')).toThrow(/already running/);
+      expect(() => backend.spawn(taskId, 'claude-sonnet-5', 'second')).toThrow(ProviderError);
+      expect(() => backend.spawn(taskId, 'claude-sonnet-5', 'second')).toThrow(/already running/);
 
       backend.kill(taskId);
     });
@@ -431,7 +431,7 @@ describe('Subprocess Backend E2E', () => {
         defaultTimeoutMs: 500, // Kill after 500ms
       });
 
-      backend.spawn(taskId, 'sonnet', '');
+      backend.spawn(taskId, 'claude-sonnet-5', '');
       expect(backend.listWorkers()).toContain(taskId);
 
       // Wait for timeout to fire
@@ -448,9 +448,9 @@ describe('Subprocess Backend E2E', () => {
       const config = makeSleepConfig(10);
       const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
 
-      backend.spawn('multi-001', 'sonnet', 'a');
-      backend.spawn('multi-002', 'sonnet', 'b');
-      backend.spawn('multi-003', 'sonnet', 'c');
+      backend.spawn('multi-001', 'claude-sonnet-5', 'a');
+      backend.spawn('multi-002', 'claude-sonnet-5', 'b');
+      backend.spawn('multi-003', 'claude-sonnet-5', 'c');
 
       const workers = backend.listWorkers();
       expect(workers).toHaveLength(3);
@@ -473,15 +473,15 @@ describe('Subprocess Backend E2E', () => {
   describe('T14: buildCommand()', () => {
     it('returns formatted command string from CLAUDE_SUBPROCESS_CONFIG', () => {
       const backend = new SubprocessSpawnBackend(projectDir);
-      const cmd = backend.buildCommand('sonnet', '/tmp/prompt.txt');
+      const cmd = backend.buildCommand('claude-sonnet-5', '/tmp/prompt.txt');
       expect(cmd).toContain('claude');
-      expect(cmd).toContain('sonnet');
+      expect(cmd).toContain('claude-sonnet-5');
       expect(cmd).toContain('/tmp/prompt.txt');
     });
 
     it('includes allowedTools and autoApprove flags', () => {
       const backend = new SubprocessSpawnBackend(projectDir);
-      const cmd = backend.buildCommand('opus', '/tmp/p.txt', {
+      const cmd = backend.buildCommand('claude-opus-4-8', '/tmp/p.txt', {
         allowedTools: 'Read,Edit',
         autoApprove: true,
       });
@@ -506,7 +506,7 @@ describe('Subprocess Backend E2E', () => {
       const config: SubprocessProviderConfig = {
         cliCommand: 'nonexistent-binary-xyz-9999',
         name: 'missing',
-        supportedModels: ['sonnet'] as const,
+        supportedModels: ['claude-sonnet-5'] as const,
         buildArgs() { return ['--version']; },
         buildCommandString() { return ''; },
       };
@@ -539,7 +539,7 @@ describe('Subprocess Backend E2E', () => {
       const config = makeSleepConfig(10);
       const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
 
-      backend.spawn('accessor-001', 'sonnet', 'test');
+      backend.spawn('accessor-001', 'claude-sonnet-5', 'test');
       const entry = backend.getWorkerEntry('accessor-001');
       expect(entry).toBeDefined();
       expect(entry!.taskId).toBe('accessor-001');
@@ -560,7 +560,7 @@ describe('Subprocess Backend E2E', () => {
       const config: SubprocessProviderConfig = {
         cliCommand: 'node',
         name: 'custom-test-provider',
-        supportedModels: ['sonnet', 'opus'] as const,
+        supportedModels: ['claude-sonnet-5', 'claude-opus-4-8'] as const,
         buildArgs() {
           return ['-e', `require('fs').writeFileSync(${JSON.stringify(markerPath)}, 'custom-ok'); process.exit(0);`];
         },
@@ -571,10 +571,10 @@ describe('Subprocess Backend E2E', () => {
 
       const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
       expect(backend.name).toBe('custom-test-provider');
-      expect(backend.supportedModels).toContain('sonnet');
-      expect(backend.supportedModels).toContain('opus');
+      expect(backend.supportedModels).toContain('claude-sonnet-5');
+      expect(backend.supportedModels).toContain('claude-opus-4-8');
 
-      backend.spawn(taskId, 'sonnet', '');
+      backend.spawn(taskId, 'claude-sonnet-5', '');
 
       await waitForFile(markerPath, 5000);
       const content = fs.readFileSync(markerPath, 'utf-8');
@@ -621,7 +621,7 @@ describe('Subprocess Backend E2E', () => {
 
   describe('T20: CLAUDE_SUBPROCESS_CONFIG', () => {
     it('buildArgs includes model flag', () => {
-      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('opus');
+      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('claude-opus-4-8');
       expect(args).toContain('-p');
       expect(args).toContain('-');
       expect(args).toContain('--model');
@@ -629,24 +629,24 @@ describe('Subprocess Backend E2E', () => {
     });
 
     it('buildArgs includes allowedTools when provided', () => {
-      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('sonnet', { allowedTools: 'Read,Edit,Bash' });
+      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('claude-sonnet-5', { allowedTools: 'Read,Edit,Bash' });
       expect(args).toContain('--allowedTools');
       expect(args).toContain('Read,Edit,Bash');
     });
 
     it('buildArgs includes --dangerously-skip-permissions when autoApprove', () => {
-      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('haiku', { autoApprove: true });
+      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('claude-haiku-4-5-20251001', { autoApprove: true });
       expect(args).toContain('--dangerously-skip-permissions');
     });
 
     it('buildArgs omits optional flags when not set', () => {
-      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('sonnet');
+      const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('claude-sonnet-5');
       expect(args).not.toContain('--allowedTools');
       expect(args).not.toContain('--dangerously-skip-permissions');
     });
 
     it('buildCommandString formats correctly', () => {
-      const cmd = CLAUDE_SUBPROCESS_CONFIG.buildCommandString('opus', '/tmp/prompt.txt', {
+      const cmd = CLAUDE_SUBPROCESS_CONFIG.buildCommandString('claude-opus-4-8', '/tmp/prompt.txt', {
         allowedTools: 'Read',
         autoApprove: true,
       });

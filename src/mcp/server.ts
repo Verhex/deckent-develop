@@ -14,6 +14,26 @@ import { installWriterLeaseGate, type WriterLeaseGateContext } from './writer-le
 import { installWriterLeaseReleaseHooks } from './writer-lease.js';
 import { getLanguage } from '../cli/helpers/messages.js';
 import { loadConfig } from '../core/config.js';
+import { modelRegistry, LEGACY_MODEL_ALIASES } from '../core/model-registry.js';
+
+// 454-004: the DIRECTIVES-format example + Parameters reference below must
+// teach an exact provider API ID + explicit provider ownership — never a
+// retired alias (LEGACY_MODEL_ALIASES). resolveCanonicalModelIdentity() throws
+// E_LEGACY_MODEL_ALIAS on "opus"/"sonnet"/"haiku"/"gpt-5"/"gpt-5.6", so documenting them
+// as valid "Model:" values would teach a broken DIRECTIVES.md. Derived from the
+// registry so the instructions track the live catalog instead of a hardcode.
+function requireMcpExampleModel(tier: 'economy' | 'standard' | 'premium'): string {
+  const model = modelRegistry.getByProviderAndTier('claude', tier);
+  if (!model) throw new Error(`E_MCP_EXAMPLE_MODEL_UNAVAILABLE: tier=${tier}`);
+  return model.id;
+}
+const MCP_EXAMPLE_MODEL_ID = requireMcpExampleModel('standard');
+const MCP_MODEL_TIER_EXAMPLES = [
+  requireMcpExampleModel('premium'),
+  MCP_EXAMPLE_MODEL_ID,
+  requireMcpExampleModel('economy'),
+].join(', ');
+const MCP_REJECTED_LEGACY_ALIASES = Object.keys(LEGACY_MODEL_ALIASES).join('/');
 
 export const DECKENT_MCP_INSTRUCTIONS = `
 Deckent is an AI agent orchestration CLI that runs multi-agent runs inside your project.
@@ -88,7 +108,8 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 # DIRECTIVES — Run NNN: Title
 
 ## Task 1: Feature Name
-- Model: sonnet
+- Model: ${MCP_EXAMPLE_MODEL_ID}
+- Provider: claude
 - Effort: high
 - Skills: typescript-expert, testing-expert
 - Files: src/feature.ts
@@ -102,10 +123,10 @@ What to implement and why.
 \`\`\`
 
 ## Parameters
-- model: opus | sonnet | haiku
+- model: an exact provider API ID (e.g. ${MCP_MODEL_TIER_EXAMPLES}) — resolved through the canonical registry (deckent_models); legacy aliases (${MCP_REJECTED_LEGACY_ALIASES}) are rejected
+- provider: claude | codex | gemini — explicit ownership of the model id, required when it can't be inferred from the id's prefix
 - effort: low | normal | high
 - mode (plan): ai | structured | auto
-- provider: claude | codex | gemini
 
 ## Error Recovery
 Run stuck → deckent_kill → deckent_cleanup → deckent_doctor

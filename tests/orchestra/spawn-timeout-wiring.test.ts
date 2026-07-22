@@ -28,6 +28,7 @@ function makeRecordingBackend(): SpawnBackend & { calls: SpawnCall[] } {
   const calls: SpawnCall[] = [];
   return {
     name: 'mock-timeout',
+    liveUsageBudgetSupport: 'measured-stream' as const,
     spawn(taskId, _model, _prompt, opts) { calls.push({ taskId, opts }); },
     kill() { /* no-op */ },
     list() { return calls.map(c => c.taskId); },
@@ -39,12 +40,13 @@ function makeRecordingBackend(): SpawnBackend & { calls: SpawnCall[] } {
 function createTask(id: string, effort: 'low' | 'normal' | 'high'): Task {
   return {
     id, title: `Task ${id}`, description: `timeout-wiring ${id}`,
-    model: 'sonnet' as ModelType, effort, priority: 'NORMAL', reason: 'tw-test',
+    model: 'claude-sonnet-5' as ModelType, effort, priority: 'NORMAL', reason: 'tw-test',
     scope: { directories: ['src/'], filesRead: [], filesWrite: [`src/tw-${id}.ts`] },
     dependencies: [],
     goNogo: { goCriteria: 'x', noGoCriteria: 'x', techDebtAcceptable: 'none' },
     status: TaskStatus.PENDING, sprintId: 'sprint-280',
     assignedAgent: 'generic', assignedSkills: [], provider: 'claude',
+    budget: { maxTurns: 1 },
   } as unknown as Task;
 }
 

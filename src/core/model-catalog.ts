@@ -216,21 +216,28 @@ export function mapRemoteEntry(remote: RemoteCatalogModel): ModelDefinition | nu
   const provider = normalizeProvider(remote.provider);
   if (!provider) return null;
 
-  const cost = {
-    input: remote.costPerMillion?.input ?? 0,
-    output: remote.costPerMillion?.output ?? 0,
-  };
+  const apiId = remote.apiId ?? remote.id;
+  if (!apiId || typeof apiId !== 'string') return null;
+
+  // Missing cloud pricing is unknown, never free. An unusable catalog row is
+  // skipped and surfaced in load warnings instead of becoming a $0 authority.
+  const inputCost = remote.costPerMillion?.input;
+  const outputCost = remote.costPerMillion?.output;
+  if (!Number.isFinite(inputCost) || !Number.isFinite(outputCost)
+    || (inputCost as number) < 0 || (outputCost as number) < 0) return null;
+  const cost = { input: inputCost as number, output: outputCost as number };
 
   const tier =
     normalizeTier(remote.tier) ?? inferTierFromCost(cost.input, cost.output);
 
   const def: ModelDefinition = {
-    id: remote.id,
-    apiId: remote.apiId ?? remote.id,
+    id: apiId,
+    apiId,
     provider: provider as RegistryProviderName,
     tier,
     contextWindow: remote.contextWindow ?? 200_000,
     costPerMillion: cost,
+    pricingEvidenceRef: `catalog:models.dev:${apiId}`,
     capabilities: {
       streaming: remote.capabilities?.streaming ?? true,
       toolUse: remote.capabilities?.toolUse ?? false,
@@ -442,43 +449,21 @@ interface BootstrapOptions {
 /**
  * Merge remote catalog into existing (bundled) model definitions — apiId-aware.
  *
- * The remote catalog (models.dev) uses full API IDs as both its `id` and
- * `apiId` fields (e.g. `claude-opus-4-8`), while the bundled registry uses
- * short logical IDs (e.g. `opus`) with the current API ID in `apiId`.
- *
- * Match: `remote.apiId === bundled.apiId` OR `remote.id === bundled.apiId`.
- * On match the bundled entry's `apiId`, `costPerMillion`, and `contextWindow`
- * are refreshed from the remote (live source wins), while `id` (the alias)
- * and all other fields are preserved.
+ * Remote and bundled definitions share one identity contract: `id===apiId`.
+ * Exact API ids are the merge key, so a remote row can refresh pricing and
+ * capabilities without preserving or minting a Deckent-side alias.
  *
  * Unmatched remote entries are appended as new entries so that upstream-only
- * models reach the registry (offline-safe: if remote is empty, the result is
- * just the existing bundled list).
+ * models reach the registry only after map-time pricing validation
+ * (offline-safe: if remote is empty, the result is the bundled list).
  */
 export function mergeApiIdOverrides(
   existing: ModelDefinition[],
   remote: ModelDefinition[],
 ): ModelDefinition[] {
-  const consumed = new Set<ModelDefinition>();
-
-  const updated = existing.map(bundled => {
-    // apiId-aware match: remote.apiId OR remote.id equals bundled.apiId
-    const match = remote.find(
-      rm => !consumed.has(rm) && (rm.apiId === bundled.apiId || rm.id === bundled.apiId),
-    );
-    if (!match) return bundled;
-    consumed.add(match);
-    return {
-      ...bundled,
-      apiId: match.apiId,
-      costPerMillion: match.costPerMillion,
-      contextWindow: match.contextWindow,
-    };
-  });
-
-  // Append unmatched remote entries as new registry entries
-  const unmatched = remote.filter(rm => !consumed.has(rm));
-  return unmatched.length === 0 ? updated : [...updated, ...unmatched];
+  const merged = new Map(existing.map(model => [model.apiId, model]));
+  for (const model of remote) merged.set(model.apiId, model);
+  return [...merged.values()];
 }
 
 /**
@@ -489,21 +474,16 @@ export function mergeApiIdOverrides(
  */
 export async function bootstrapFromCatalog(opts?: BootstrapOptions): Promise<void> {
   if (_catalogBootstrapped && !opts?.force) return;
-  try {
-    const result = await loadCatalog({
-      offline: opts?.offline,
-      forceRefresh: opts?.force,
-      fetchImpl: opts?._fetchImpl,
-      cachePath: opts?._cachePath,
-      onFetchAttempt: opts?.onFetchAttempt,
-    });
-    const registry = opts?._registry ?? modelRegistry;
-    // Apply apiId-aware override: remote entries update bundled apiIds by apiId match
-    const existing = registry.getAllModels?.() ?? modelRegistry.getAllModels();
-    const merged = mergeApiIdOverrides(existing, result.models);
-    registry.mergeFromCatalog(merged);
-    _catalogBootstrapped = true;
-  } catch {
-    // silent fallback — loadCatalog never throws, but guard unexpected errors
-  }
+  const result = await loadCatalog({
+    offline: opts?.offline,
+    forceRefresh: opts?.force,
+    fetchImpl: opts?._fetchImpl,
+    cachePath: opts?._cachePath,
+    onFetchAttempt: opts?.onFetchAttempt,
+  });
+  const registry = opts?._registry ?? modelRegistry;
+  const existing = registry.getAllModels?.() ?? modelRegistry.getAllModels();
+  const merged = mergeApiIdOverrides(existing, result.models);
+  registry.mergeFromCatalog(merged);
+  _catalogBootstrapped = true;
 }

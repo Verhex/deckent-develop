@@ -614,9 +614,9 @@ describe('registerSetDirectivesTool', () => {
       const parsed = parseToolResult(result);
 
       expect(parsed.estimatedModels).toBeDefined();
-      expect(typeof parsed.estimatedModels.opus).toBe('number');
-      expect(typeof parsed.estimatedModels.sonnet).toBe('number');
-      expect(typeof parsed.estimatedModels.haiku).toBe('number');
+      expect(typeof parsed.estimatedModels['claude-opus-4-8']).toBe('number');
+      expect(typeof parsed.estimatedModels['claude-sonnet-5']).toBe('number');
+      expect(typeof parsed.estimatedModels['claude-haiku-4-5-20251001']).toBe('number');
     });
   });
 

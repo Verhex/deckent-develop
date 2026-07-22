@@ -21,7 +21,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '182-010',
     title: 'F6 fixture title',
     description: 'F6 fixture description',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -42,7 +42,7 @@ describe('F6 — DIRECTIVES title vs ### Description split', () => {
   it('extracts description from after `### Description` (skips title + metadata lines)', () => {
     const content = [
       '## Task 1: Real task title',
-      '- Model: opus',
+      '- Model: claude-opus-4-8',
       '- Effort: normal',
       '- Files: src/foo/bar.ts',
       '- Scope: src/foo/',

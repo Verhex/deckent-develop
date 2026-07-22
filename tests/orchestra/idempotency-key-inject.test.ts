@@ -38,18 +38,19 @@ vi.mock('node:child_process', () => {
       if (args[0] === 'run') {
         return { status: 0, stdout: 'container-id-abcdef\n', stderr: '' };
       }
-      // A23: host-side authHealthCheck runs claude --version before a claude spawn.
-      if (cmd === 'claude' && args[0] === '--version') {
-        return { status: 0, stdout: 'claude 1.0.0 (host auth ok)', stderr: '' };
+      // A23: strict auth truth requires the structured loggedIn envelope.
+      if (cmd === 'claude' && args.join(' ') === 'auth status --json') {
+        return { status: 0, stdout: '{"loggedIn":true}', stderr: '' };
       }
       return { status: 0, stdout: '', stderr: '' };
     }),
     // monitorContainer uses node-spawn(); stub a minimal child shape so it
     // doesn't throw when wiring stdout/error listeners.
     spawn: vi.fn(() => ({
-      stdout: { on: vi.fn() },
-      stderr: { on: vi.fn() },
+      stdout: { on: vi.fn(), resume: vi.fn() },
+      stderr: { on: vi.fn(), resume: vi.fn() },
       on: vi.fn(),
+      once: vi.fn(),
     })),
   };
 });
@@ -59,6 +60,8 @@ vi.mock('node:child_process', () => {
 import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
 import { buildTaskPrompt, type SprintContext } from '../../src/orchestra/prompt-god-template.js';
 import type { Task } from '../../src/core/task-types.js';
+
+const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
 
 // ─── Test scaffolding ─────────────────────────────────────────────────────
 
@@ -80,7 +83,7 @@ afterEach(() => {
 describe('DockerSpawnBackend — IDEMPOTENCY_KEY env injection', () => {
   it('injects IDEMPOTENCY_KEY=<16-hex> env var into docker run args', () => {
     const backend = new DockerSpawnBackend(projectDir, { timeoutSeconds: 600 });
-    backend.spawn('test-001', 'sonnet', 'prompt body');
+    backend.spawn('test-001', 'claude-sonnet-5', 'prompt body', TEST_EXECUTION_OPTIONS);
 
     // Locate the `docker run` invocation in captured calls
     const runCall = spawnSyncCalls.find(
@@ -100,7 +103,7 @@ describe('DockerSpawnBackend — IDEMPOTENCY_KEY env injection', () => {
 
   it('emits the env var with the -e flag immediately preceding it', () => {
     const backend = new DockerSpawnBackend(projectDir);
-    backend.spawn('test-002', 'haiku', 'prompt');
+    backend.spawn('test-002', 'claude-haiku-4-5-20251001', 'prompt', TEST_EXECUTION_OPTIONS);
 
     const runCall = spawnSyncCalls.find(c => c.cmd === 'docker' && c.args[0] === 'run');
     expect(runCall).toBeDefined();
@@ -115,8 +118,8 @@ describe('DockerSpawnBackend — IDEMPOTENCY_KEY env injection', () => {
 
   it('generates a fresh IDEMPOTENCY_KEY for each spawn call', () => {
     const backend = new DockerSpawnBackend(projectDir);
-    backend.spawn('test-003', 'sonnet', 'prompt-a');
-    backend.spawn('test-004', 'sonnet', 'prompt-b');
+    backend.spawn('test-003', 'claude-sonnet-5', 'prompt-a', TEST_EXECUTION_OPTIONS);
+    backend.spawn('test-004', 'claude-sonnet-5', 'prompt-b', TEST_EXECUTION_OPTIONS);
 
     const runCalls = spawnSyncCalls.filter(c => c.cmd === 'docker' && c.args[0] === 'run');
     expect(runCalls.length).toBe(2);
@@ -143,7 +146,7 @@ describe('buildTaskPrompt — Idempotency Key directive', () => {
       // suite verifies the KEY FORMAT, so the task carries an outbound-call scope
       // (src/providers) to keep the block present — the key value is unaffected.
       description: 'Test description',
-      model: 'sonnet',
+      model: 'claude-sonnet-5',
       effort: 'normal',
       priority: 'NORMAL',
       reason: 'unit-test',

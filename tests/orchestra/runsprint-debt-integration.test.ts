@@ -79,7 +79,7 @@ vi.mock('../../src/agents/worker.js', () => ({
 vi.mock('../../src/core/provider.js', () => {
   const mockAdapter = {
     name: 'claude',
-    supportedModels: ['opus', 'sonnet', 'haiku'],
+    supportedModels: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'],
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
@@ -158,6 +158,14 @@ vi.mock('../../src/orchestra/result-watcher.js', () => ({
   }),
 }));
 
+vi.mock('../../src/orchestra/runtime-budget-monitor.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/orchestra/runtime-budget-monitor.js')>()),
+  // This fixture exercises debt resolution after result collection. Runtime
+  // budget settlement has its own contract tests; resolve immediately here so
+  // the hermetic backend does not wait for a host usage envelope it never emits.
+  waitForTerminalRuntimeBudgetUsage: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('../../src/orchestra/rollback.js', () => ({
   createSafetyPoint: vi.fn().mockReturnValue({ id: 'sp-001', sprintId: 'sprint-001', branchName: 'deckent-backup-sprint-001', createdAt: new Date().toISOString() }),
   rollback: vi.fn().mockReturnValue({ success: true }),
@@ -192,7 +200,9 @@ vi.mock('../../src/core/system-profile.js', () => ({
 }));
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  readAuthMode: vi.fn().mockReturnValue('subscription'),
+  resolveLiveTraceEnabled: vi.fn().mockReturnValue(false),
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   resolveEffectiveWorkers: vi.fn().mockReturnValue(4),
 }));
@@ -244,6 +254,7 @@ vi.mock('../../src/core/memory-store.js', () => ({
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { runSprint } from '../../src/orchestra/brain.js';
+import { SpawnBackendFactory } from '../../src/orchestra/spawn-backend.js';
 
 const mockedReadFileSync = vi.mocked(readFileSync);
 const mockedWriteFileSync = vi.mocked(writeFileSync);
@@ -291,11 +302,13 @@ function makeConfig(): ResolvedConfig {
     version: '0.1.0',
     activeModeConfig: {
       max_workers: 4,
-      brain_model: 'opus',
-      default_model: 'sonnet',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: false,
     },
     modes: {} as never,
+    spawn_backend: 'docker',
+    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
   };
 }
 
@@ -419,6 +432,13 @@ function debtWasResolved(sprintId = EXPECTED_SPRINT_ID): boolean {
 describe('runSprint Phase 4 — debt resolution integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(SpawnBackendFactory.create).mockReturnValue({
+      name: 'test-measured',
+      liveUsageBudgetSupport: 'measured-stream',
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      list: vi.fn().mockReturnValue([]),
+    });
   });
 
   afterEach(() => {

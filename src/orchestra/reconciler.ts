@@ -22,6 +22,8 @@
 // It is consumed by the sprint-finalize summary + dashboard reconciliation
 // panel; `formatReconciliation` renders the ready-to-surface text block.
 
+import { modelRegistry } from '../core/model-registry.js';
+
 // ─── Input contracts (structural subsets — callers pass the real types) ───────
 //
 // These are deliberately the *minimal* shapes the reconciler needs. They are
@@ -134,7 +136,7 @@ export interface ReconcileOptions {
   warnRatioThreshold?: number;
   /** Minimum actual USD for a task to be signal-worthy (suppresses sub-cent noise). Default 0.01. */
   signalMinUsd?: number;
-  /** Model-downgrade ladder (`model alias → cheaper alias`), merged over the built-in tiers. */
+  /** Model-downgrade ladder (`canonical API id → cheaper canonical API id`). */
   downgradeLadder?: Record<string, string>;
 }
 
@@ -146,16 +148,28 @@ const DEFAULT_WARN_RATIO_THRESHOLD = 3.0;
 const DEFAULT_SIGNAL_MIN_USD = 0.01;
 
 /**
- * Built-in model-downgrade ladder. Keyed by model *alias*; matched against the
- * full apiId too via keyword scan (so `claude-opus-4-8` resolves to `sonnet`).
- * Provider-agnostic: callers extend it for non-Claude tiers via
- * `ReconcileOptions.downgradeLadder`. An unknown model yields no suggestion
- * (the over-run signal is still emitted, just without a downgrade hint).
+ * Built-in same-family model-downgrade ladder — ADVISORY ONLY, never a dispatch or
+ * pricing authority.
+ *
+ * Reconciliation prices EXCLUSIVELY from the canonical, provider-normalized
+ * `result.cost.usd` (§1.4); this ladder only decorates an over-run
+ * OptimizationSignal with a human-readable "consider <cheaper>" hint. It never
+ * routes a task and never feeds a cost number. Even this advisory surface emits
+ * exact API ids so telemetry and copy cannot reintroduce a second identity.
+ * Intentionally Claude-family-scoped (premium→standard→economy): an unknown / cross-family
+ * model yields NO suggestion (the over-run signal still fires — see
+ * {@link suggestCheaperModel}), and callers extend other families explicitly via
+ * `ReconcileOptions.downgradeLadder`.
  */
-const DEFAULT_DOWNGRADE_LADDER: Readonly<Record<string, string>> = {
-  opus: 'sonnet',
-  sonnet: 'haiku',
-};
+const DEFAULT_DOWNGRADE_LADDER: Readonly<Record<string, string>> = (() => {
+  const premium = modelRegistry.getByProviderAndTier('claude', 'premium');
+  const standard = modelRegistry.getByProviderAndTier('claude', 'standard');
+  const economy = modelRegistry.getByProviderAndTier('claude', 'economy');
+  return {
+    ...(premium && standard ? { [premium.id]: standard.id } : {}),
+    ...(standard && economy ? { [standard.id]: economy.id } : {}),
+  };
+})();
 
 // ─── Numeric helpers ─────────────────────────────────────────────────────────
 
@@ -179,9 +193,9 @@ function formatRatio(ratio: number): string {
 /**
  * Suggest a cheaper same-family model for `model`, or `null` when none is known.
  *
- * Resolution order: (1) direct alias hit in the ladder, then (2) a keyword scan
- * so a concrete apiId (`claude-opus-4-8`) still resolves through its tier
- * (`opus → sonnet`). The lookup is single-step (no recursive descent) and
+ * Resolution order: (1) direct canonical-id hit in the ladder, then (2) a
+ * compatibility keyword scan for externally supplied historical text. The
+ * lookup is single-step (no recursive descent) and
  * case-insensitive.
  */
 export function suggestCheaperModel(

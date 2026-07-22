@@ -9,8 +9,8 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     mode: 'max_plan',
     activeModeConfig: {
       max_workers: 4,
-      brain_model: 'opus',
-      default_model: 'sonnet',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: true,
     },
     modes: {} as never,
@@ -37,19 +37,19 @@ describe('resolveTaskModel — provider parameter backward compat', () => {
     // haiku (economy), but MODEL-GUARD forbids economy for code → sonnet.
     const scope = makeScope(['src/cli/']);
     const result = resolveTaskModel('Simple fix', 'A tiny change', scope, config);
-    expect(result).toBe('sonnet');
+    expect(result).toBe('claude-sonnet-5');
   });
 
   it('honors forceModel=haiku on a code scope (explicit override)', () => {
     const scope = makeScope(['src/cli/']);
-    const result = resolveTaskModel('Simple fix', 'A tiny change', scope, config, [], 'haiku');
-    expect(result).toBe('haiku');
+    const result = resolveTaskModel('Simple fix', 'A tiny change', scope, config, [], 'claude-haiku-4-5-20251001');
+    expect(result).toBe('claude-haiku-4-5-20251001');
   });
 
   it('no provider parameter returns Claude model (sonnet)', () => {
     const scope = makeScope(['src/core/', 'src/cli/']);
     const result = resolveTaskModel('Normal task', 'Some description', scope, config);
-    expect(result).toBe('sonnet');
+    expect(result).toBe('claude-sonnet-5');
   });
 
   it('no provider parameter returns Claude model (opus)', () => {
@@ -57,7 +57,7 @@ describe('resolveTaskModel — provider parameter backward compat', () => {
     const result = resolveTaskModel(
       'Architect migration refactor', 'Cross-cutting refactor', scope, config, patterns,
     );
-    expect(result).toBe('opus');
+    expect(result).toBe('claude-opus-4-8');
   });
 
   it('explicit provider=claude returns same as no provider', () => {
@@ -114,7 +114,7 @@ describe('resolveTaskModel — codex provider', () => {
       'Architect migration refactor', 'Cross-cutting refactor', scope, config, patterns,
       undefined, undefined, 'codex',
     );
-    expect(result).toBe('gpt-5');
+    expect(result).toBe('gpt-5.5');
   });
 
 });
@@ -165,18 +165,18 @@ describe('resolveTaskModel — forceModel + provider', () => {
     const scope = makeScope(['src/core/']);
     const result = resolveTaskModel(
       'Forced task', 'Forced model', scope, config, patterns,
-      'opus', undefined, 'codex',
+      'claude-opus-4-8', undefined, 'codex',
     );
-    expect(result).toBe('opus');
+    expect(result).toBe('gpt-5.5');
   });
 
   it('forceModel=sonnet on gemini returns sonnet (adapter provider — forceModel is authoritative)', () => {
     const scope = makeScope(['src/core/']);
     const result = resolveTaskModel(
       'Forced task', 'Forced model', scope, config, patterns,
-      'sonnet', undefined, 'gemini',
+      'claude-sonnet-5', undefined, 'gemini',
     );
-    expect(result).toBe('sonnet');
+    expect(result).toBe('gemini-2.5-flash');
   });
 
   it('forceModel=gpt-4.1 on codex returns gpt-4.1 directly (same provider)', () => {
@@ -192,18 +192,18 @@ describe('resolveTaskModel — forceModel + provider', () => {
     const scope = makeScope(['src/core/']);
     const result = resolveTaskModel(
       'Forced task', 'Forced model', scope, config, patterns,
-      'opus', undefined, 'claude',
+      'claude-opus-4-8', undefined, 'claude',
     );
-    expect(result).toBe('opus');
+    expect(result).toBe('claude-opus-4-8');
   });
 
   it('forceModel=haiku on gemini returns haiku (adapter provider — forceModel is authoritative)', () => {
     const scope = makeScope(['src/core/']);
     const result = resolveTaskModel(
       'Forced task', 'Forced model', scope, config, patterns,
-      'haiku', undefined, 'gemini',
+      'claude-haiku-4-5-20251001', undefined, 'gemini',
     );
-    expect(result).toBe('haiku');
+    expect(result).toBe('gemini-2.0-flash');
   });
 });
 
@@ -224,8 +224,8 @@ describe('resolveTaskModel — layer interactions with provider', () => {
     const config = makeConfig({
       activeModeConfig: {
         max_workers: 4,
-        brain_model: 'opus',
-        default_model: 'sonnet',
+        brain_model: 'claude-opus-4-8',
+        default_model: 'claude-sonnet-5',
         haiku_allowed: false,
       },
     });
@@ -245,7 +245,7 @@ describe('resolveTaskModel — layer interactions with provider', () => {
     const scope = makeScope(['docs/']);
     const result = resolveTaskModel(
       'Write docs', 'Documentation', scope, config, patterns,
-      undefined, ['opus'], 'codex',
+      undefined, ['claude-opus-4-8'], 'codex',
     );
     // skill upgrades to opus, Layer 3 caps to sonnet, then codex mapping -> gpt-4.1
     expect(result).toBe('gpt-4.1');
@@ -257,9 +257,9 @@ describe('resolveTaskModel — layer interactions with provider', () => {
     const scope = makeScope(['src/cli/']);
     const result = resolveTaskModel(
       'Simple fix', 'A tiny change', scope, config, patterns,
-      undefined, ['opus'], 'codex',
+      undefined, ['claude-opus-4-8'], 'codex',
     );
     // skill upgrades to opus, no caps apply, codex mapping -> gpt-5
-    expect(result).toBe('gpt-5');
+    expect(result).toBe('gpt-5.5');
   });
 });

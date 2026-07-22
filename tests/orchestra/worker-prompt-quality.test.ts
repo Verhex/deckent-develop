@@ -21,7 +21,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '900-001',
     title: 'Fix null deref in evaluate phase',
     description: 'Add a null guard and a regression test.',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'HIGH',
     reason: 'crash on null result',
@@ -99,11 +99,18 @@ describe('worker prompt quality invariants', () => {
     expect(prompt).toMatch(/Simplicity/);
   });
 
-  it('differs between claude and gemini ONLY by the provider token, not by structure (parity)', () => {
+  it('differs between claude and gemini only by canonical provider identity fields (parity)', () => {
     const c = buildWorkerPrompt(makeTask({ provider: 'claude' }), AGENT, SKILLS);
-    const g = buildWorkerPrompt(makeTask({ provider: 'gemini' }), AGENT, SKILLS);
-    // normalize the legitimately provider-specific tokenUsage value
-    const norm = (s: string) => s.replace(/"provider": "(claude|gemini|codex)"/g, '"provider": "X"');
+    const g = buildWorkerPrompt(
+      makeTask({ provider: 'gemini', model: 'gemini-2.5-flash' }),
+      AGENT,
+      SKILLS,
+    );
+    // Normalize the only legitimate provider-specific receipt fields.
+    const norm = (s: string) => s
+      .replace(/"provider": "(claude|gemini|codex)"/g, '"provider": "X"')
+      .replace(/claude-sonnet-5|gemini-2\.5-flash/g, 'MODEL_API_ID')
+      .replace(/(Requested provider|Plan-resolved provider): (claude|gemini)/g, '$1: PROVIDER');
     expect(norm(c)).toBe(norm(g));
   });
 });

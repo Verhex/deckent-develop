@@ -14,7 +14,7 @@ import { createAnthropicAdapter } from '../../agent/provider-tooluse/anthropic.j
 import { createOpenAIAdapter } from '../../agent/provider-tooluse/openai.js';
 import { createOllamaAdapter } from '../../agent/provider-tooluse/ollama.js';
 import type { ProviderAdapter } from '../../agent/provider-tooluse/types.js';
-import { inferProviderFromId, modelRegistry } from '../../core/model-registry.js';
+import { inferProviderFromId, modelRegistry, OLLAMA_BUILTIN_MODELS } from '../../core/model-registry.js';
 import { OPENAI_COMPAT_PRESET_META } from '../../providers/openai-compatible.js';
 import { createStreamSegmenter, type Segment } from './stream-segmenter.js';
 
@@ -38,17 +38,25 @@ export interface ProviderError {
   provider?: string;
 }
 
+function requireNativeDefault(provider: 'claude' | 'codex' | 'ollama'): string {
+  const definition = provider === 'ollama'
+    ? OLLAMA_BUILTIN_MODELS.find(model => model.tier === 'standard' && model.status === 'ga')
+    : modelRegistry.getByProviderAndTier(provider, 'standard');
+  if (!definition) throw new Error(`E_NATIVE_DEFAULT_MODEL_UNAVAILABLE: provider=${provider}`);
+  return definition.id;
+}
+
 const DEFAULT_MODEL: Record<'anthropic-api' | 'openai-compatible' | 'ollama', string> = {
-  'anthropic-api': 'claude-sonnet-5',
-  'openai-compatible': 'gpt-4.1',
-  ollama: 'qwen3',
+  'anthropic-api': requireNativeDefault('claude'),
+  'openai-compatible': requireNativeDefault('codex'),
+  ollama: requireNativeDefault('ollama'),
 };
 
 /** Config surface the native transport reads (all optional). */
 export type NativeTransportConfig = TransportConfig & {
   /** Pin the native provider from settings ('claude' | 'openai' | 'ollama' | 'deepseek' | 'qwen' | 'glm'). */
   native_provider?: string;
-  /** Wire/alias model id for the native transport (e.g. 'fable', 'qwen3.6:27b'). */
+  /** Exact registered provider API model ID for the native transport. */
   native_model?: string;
   /** Prompt-side context budget override (estimated tokens). */
   native_context_tokens?: number;
@@ -85,23 +93,13 @@ export function inferNativeProviderForModel(model: string): string | null {
   return null;
 }
 
-/** Affirmatively claude-shaped id (starts with a known Anthropic family token) —
- *  distinct from `inferProviderFromId`, whose unknown-id fallback is 'claude'
- *  and therefore CANNOT tell a real claude id from an unrecognized vendor id
- *  (REPL-575 K6). */
-function isClaudeShapedId(id: string): boolean {
-  return /^(claude|opus|sonnet|haiku|fable)/.test(id.toLowerCase().trim());
-}
-
 /** Result of resolving a claude wire model: either an API-pinned id, or a signal
  *  that the requested id is not a resolvable claude model (so the switch must be
  *  refused instead of shipped at the Anthropic transport). */
 type ClaudeWireResult = { apiId: string } | { unresolved: string };
 
-/** Map a claude model id/alias ('fable', 'opus', …) onto its API-pinned wire id
- *  ('claude-fable-5'). A registry-known id must belong to the claude provider; a
- *  claude-SHAPED id unknown to the registry passes through parametrically
- *  (forward-compat for a brand-new claude model). Everything else — a
+/** Resolve a registry-known Claude model to its exact provider API ID.
+ *  Unknown shaped IDs remain unavailable until catalog registration. Everything else — a
  *  registry-known FOREIGN model (`deepseek-chat`, whose provider is 'deepseek')
  *  or an unknown non-claude-shaped id (`mistral-large`) — is REFUSED. Both used
  *  to slip through: `modelRegistry.resolve` happily returns a deepseek model's
@@ -115,12 +113,9 @@ function resolveClaudeWireModel(model: string | null): ClaudeWireResult {
   if (known) {
     return known.provider === 'claude' ? { apiId: known.apiId } : { unresolved: candidate };
   }
-  // Unknown to the registry: only an affirmatively claude-shaped id may pass
-  // through parametrically. A non-claude-shaped unknown id (inferProviderFromId
-  // would default it to 'claude') is refused.
-  if (isClaudeShapedId(candidate)) {
-    return { apiId: modelRegistry.resolve(candidate, { register: false }).apiId };
-  }
+  // Shape inference is diagnostic only. A future Claude API ID becomes usable
+  // after catalog registration; an unknown shaped string is not execution
+  // authority and must remain unresolved.
   return { unresolved: candidate };
 }
 
@@ -157,7 +152,7 @@ export function resolveNativeSelection(
       // REPL-575 K6 — refuse an unrecognized non-claude model instead of
       // shipping it at the Anthropic transport with a false 'switched' report.
       return {
-        error: `unknown model "${wire.unresolved}" — not a recognized claude model (use e.g. opus/sonnet/haiku/fable, or switch provider first)`,
+        error: `unknown model "${wire.unresolved}" — not a registered Claude API model ID (run deckent models or switch provider first)`,
         errorCode: 'unknown-model',
         detail: wire.unresolved,
         provider: 'claude',

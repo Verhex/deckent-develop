@@ -78,12 +78,12 @@ describe('models.dev wire — type guards loosened to registry lookup', () => {
   });
 
   it('builtin models still resolve to the correct provider after the change', () => {
-    expect(isClaudeModel('opus')).toBe(true);
+    expect(isClaudeModel('claude-opus-4-8')).toBe(true);
     expect(isOpenAIModel('gpt-4.1')).toBe(true);
     expect(isGeminiModel('gemini-2.5-pro')).toBe(true);
     expect(isClaudeModel('gpt-4.1')).toBe(false);
-    expect(isOpenAIModel('opus')).toBe(false);
-    expect(isGeminiModel('opus')).toBe(false);
+    expect(isOpenAIModel('claude-opus-4-8')).toBe(false);
+    expect(isGeminiModel('claude-opus-4-8')).toBe(false);
   });
 });
 
@@ -135,10 +135,10 @@ describe('models.dev wire — PROVIDER_MODEL_MAP reads live registry', () => {
   it('preserves builtin model coverage when no extras are registered', () => {
     // Builtin baseline — these must always be present in the live view.
     expect(PROVIDER_MODEL_MAP.claude).toEqual(
-      expect.arrayContaining(['opus', 'sonnet', 'haiku']),
+      expect.arrayContaining(['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001']),
     );
     expect(PROVIDER_MODEL_MAP.codex).toEqual(
-      expect.arrayContaining(['gpt-5', 'gpt-4.1', 'o3']),
+      expect.arrayContaining(['gpt-5.6-sol', 'gpt-4.1', 'o3']),
     );
     expect(PROVIDER_MODEL_MAP.gemini).toEqual(
       expect.arrayContaining(['gemini-2.5-pro', 'gemini-2.5-flash']),

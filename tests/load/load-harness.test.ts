@@ -66,7 +66,7 @@ function createTmpProject(): string {
       modes: {
         performance: {
           max_workers: 8,
-          brain_model: 'opus',
+          brain_model: 'claude-opus-4-8',
           default_model: 'opus',
           haiku_allowed: true,
           brain_planning: 'auto',
@@ -81,14 +81,14 @@ function createTmpProject(): string {
         economic: {
           max_workers: 3,
           brain_model: 'sonnet',
-          default_model: 'sonnet',
+          default_model: 'claude-sonnet-5',
           haiku_allowed: false,
           brain_planning: 'auto',
         },
         api: {
           max_workers: 10,
-          brain_model: 'opus',
-          default_model: 'sonnet',
+          brain_model: 'claude-opus-4-8',
+          default_model: 'claude-sonnet-5',
           haiku_allowed: true,
           budget_per_sprint: 5.0,
           requires: 'ANTHROPIC_API_KEY',

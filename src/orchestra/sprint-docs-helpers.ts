@@ -2,6 +2,15 @@
 // Pure string/template builder functions extracted from sprint-docs-updater.ts.
 // No file I/O — only transforms data to formatted strings/arrays.
 import type { Sprint, SprintMetrics, TaskResult, TaskEvaluation } from '../core/types.js';
+import { modelRegistry } from '../core/model-registry.js';
+
+// 454-004: the DIRECTIVES.md placeholder must teach an exact provider API ID —
+// never a retired alias (opus/sonnet/haiku) that resolveCanonicalModelIdentity()
+// now rejects. Derived from the registry so the placeholder tracks the live
+// catalog; absence is a loud configuration error.
+const PLACEHOLDER_MODEL = modelRegistry.getByProviderAndTier('claude', 'standard');
+if (!PLACEHOLDER_MODEL) throw new Error('E_SPRINT_DOCS_MODEL_UNAVAILABLE');
+const PLACEHOLDER_MODEL_ID = PLACEHOLDER_MODEL.id;
 
 // ═══ Sprint Log Builders ════════════════════════════════════════
 
@@ -108,7 +117,8 @@ export function buildDirectivesPlaceholder(
     '---',
     '',
     '## Task 1: (Task başlığı)',
-    '- Model: sonnet',
+    `- Model: ${PLACEHOLDER_MODEL_ID}`,
+    '- Provider: claude',
     '- Effort: normal',
     '- Skills: ',
     '- Files: ',

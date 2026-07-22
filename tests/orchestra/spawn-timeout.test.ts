@@ -46,7 +46,7 @@ describe('buildWorkerCommand — timeout integration', () => {
   const promptPath = '/tmp/test/.tasks/.prompt-abc.txt';
 
   it('uses default WORKER_TIMEOUT_SECONDS when no timeoutSeconds provided', () => {
-    const cmd = buildWorkerCommand('sonnet', promptPath, undefined, undefined, '001-001');
+    const cmd = buildWorkerCommand('claude-sonnet-5', promptPath, undefined, undefined, '001-001');
     // Should contain the default timeout value (1200). born-466 parity (tmux.ts:219) wraps
     // as `timeout -k 30 <N>` (docker-parity hard-KILL grace), not bare `timeout <N>` — see
     // docs/reference/worker-wrapper-contract.md §1-2 and tmux-timeout-parity.test.ts.
@@ -55,24 +55,24 @@ describe('buildWorkerCommand — timeout integration', () => {
   });
 
   it('uses custom timeoutSeconds when provided (low effort ~600s)', () => {
-    const cmd = buildWorkerCommand('sonnet', promptPath, undefined, undefined, '001-001', 600);
+    const cmd = buildWorkerCommand('claude-sonnet-5', promptPath, undefined, undefined, '001-001', 600);
     expect(cmd).toContain('timeout -k 30 600');
     expect(cmd).not.toContain('timeout -k 30 1200');
   });
 
   it('uses custom timeoutSeconds for high effort (~2400s)', () => {
-    const cmd = buildWorkerCommand('opus', promptPath, undefined, undefined, '001-001', 2400);
+    const cmd = buildWorkerCommand('claude-opus-4-8', promptPath, undefined, undefined, '001-001', 2400);
     expect(cmd).toContain('timeout -k 30 2400');
   });
 
   it('applies tmux backend factor result (~1080s for normal with 0.9x)', () => {
     // brainEstimateTimeout with tmux backend factor 0.9 on 1200 base = 1080
-    const cmd = buildWorkerCommand('sonnet', promptPath, undefined, undefined, '001-001', 1080);
+    const cmd = buildWorkerCommand('claude-sonnet-5', promptPath, undefined, undefined, '001-001', 1080);
     expect(cmd).toContain('timeout -k 30 1080');
   });
 
   it('includes EXIT trap with result file fallback', () => {
-    const cmd = buildWorkerCommand('sonnet', promptPath, undefined, undefined, '001-001', 600);
+    const cmd = buildWorkerCommand('claude-sonnet-5', promptPath, undefined, undefined, '001-001', 600);
     expect(cmd).toContain('trap');
     expect(cmd).toContain('RFILE=');
     expect(cmd).toContain('.result');
@@ -167,7 +167,7 @@ describe('Config override scenarios', () => {
     const clamped = Math.max(minFloor, estimated);
     expect(clamped).toBe(1200);
 
-    const cmd = buildWorkerCommand('sonnet', '/tmp/.tasks/.prompt.txt', undefined, undefined, '001-001', clamped);
+    const cmd = buildWorkerCommand('claude-sonnet-5', '/tmp/.tasks/.prompt.txt', undefined, undefined, '001-001', clamped);
     // born-466 parity shape (see comment above) — `timeout -k 30 <N>`, not bare `timeout <N>`
     expect(cmd).toContain('timeout -k 30 1200');
   });
@@ -178,7 +178,7 @@ describe('Config override scenarios', () => {
     const clamped = Math.min(maxCeiling, estimated);
     expect(clamped).toBe(7200);
 
-    const cmd = buildWorkerCommand('opus', '/tmp/.tasks/.prompt.txt', undefined, undefined, '001-001', clamped);
+    const cmd = buildWorkerCommand('claude-opus-4-8', '/tmp/.tasks/.prompt.txt', undefined, undefined, '001-001', clamped);
     expect(cmd).toContain('timeout -k 30 7200');
   });
 });
@@ -191,7 +191,7 @@ describe('Backward compatibility', () => {
   });
 
   it('buildWorkerCommand falls back to WORKER_TIMEOUT_SECONDS when timeoutSeconds is undefined', () => {
-    const cmd = buildWorkerCommand('sonnet', '/tmp/.tasks/.prompt.txt', undefined, undefined, '001-001');
+    const cmd = buildWorkerCommand('claude-sonnet-5', '/tmp/.tasks/.prompt.txt', undefined, undefined, '001-001');
     // born-466 parity shape — `timeout -k 30 <N>` (see comment at top of this file)
     expect(cmd).toContain(`timeout -k 30 ${WORKER_TIMEOUT_SECONDS}`);
   });

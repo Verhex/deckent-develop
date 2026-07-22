@@ -164,7 +164,7 @@ describe.skipIf(isWindows)('spawnWorker edge cases', () => {
     mockedExistsSync.mockReturnValue(false);
     mockedSpawnSync.mockReturnValue(successResult);
 
-    spawnWorker('task-edge-01', 'sonnet', 'prompt text', '/myproject');
+    spawnWorker('task-edge-01', 'claude-sonnet-5', 'prompt text', '/myproject');
 
     expect(mockedMkdirSync).toHaveBeenCalledWith(
       '/myproject/.tasks',
@@ -176,7 +176,7 @@ describe.skipIf(isWindows)('spawnWorker edge cases', () => {
     mockedExistsSync.mockReturnValue(true);
     mockedSpawnSync.mockReturnValue(successResult);
 
-    spawnWorker('task-edge-02', 'opus', 'do work', '/myproject');
+    spawnWorker('task-edge-02', 'claude-opus-4-8', 'do work', '/myproject');
 
     // WORKER-GIT-GUARD (born-499): spawnWorker unconditionally calls
     // installGitGuard(gitGuardDir, ...) which mkdirSync's the per-task shim
@@ -194,7 +194,7 @@ describe.skipIf(isWindows)('spawnWorker edge cases', () => {
     mockedSpawnSync.mockReturnValue(successResult);
     const prompt = 'sensitive content with $SHELL and `whoami`';
 
-    spawnWorker('task-edge-03', 'sonnet', prompt, '/proj');
+    spawnWorker('task-edge-03', 'claude-sonnet-5', prompt, '/proj');
 
     // writeFileSync should be called with the prompt content
     expect(mockedWriteFileSync).toHaveBeenCalledWith(
@@ -208,7 +208,7 @@ describe.skipIf(isWindows)('spawnWorker edge cases', () => {
   it('sets up pipe-pane log with correct task-prefixed filename', () => {
     mockedSpawnSync.mockReturnValue(successResult);
 
-    spawnWorker('edge-99', 'haiku', 'test prompt', '/workspace');
+    spawnWorker('edge-99', 'claude-haiku-4-5-20251001', 'test prompt', '/workspace');
 
     const pipePaneCall = mockedSpawnSync.mock.calls.find(
       c => (c[1] as string[])[0] === 'pipe-pane',
@@ -224,7 +224,7 @@ describe.skipIf(isWindows)('spawnWorker edge cases', () => {
   it('uses both allowedTools and autoApprove together', () => {
     mockedSpawnSync.mockReturnValue(successResult);
 
-    spawnWorker('task-combo', 'sonnet', 'work', '/proj', {
+    spawnWorker('task-combo', 'claude-sonnet-5', 'work', '/proj', {
       allowedTools: 'Read,Write',
       autoApprove: true,
     });
@@ -239,7 +239,7 @@ describe.skipIf(isWindows)('spawnWorker edge cases', () => {
   it('uses correct window name format w-<taskId>', () => {
     mockedSpawnSync.mockReturnValue(successResult);
 
-    spawnWorker('sprint5-task', 'sonnet', 'prompt', '/proj');
+    spawnWorker('sprint5-task', 'claude-sonnet-5', 'prompt', '/proj');
 
     const newWindowCall = mockedSpawnSync.mock.calls[0]!;
     const args = newWindowCall[1] as string[];

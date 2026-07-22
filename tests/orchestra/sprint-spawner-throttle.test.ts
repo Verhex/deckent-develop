@@ -33,6 +33,7 @@ function makeTimedBackend(): SpawnBackend & { calls: SpawnCall[] } {
   const calls: SpawnCall[] = [];
   return {
     name: 'mock-timed',
+    liveUsageBudgetSupport: 'measured-stream' as const,
     spawn(taskId, model, prompt, opts) {
       calls.push({ taskId, timestamp: Date.now(), model, prompt, opts });
     },
@@ -48,7 +49,7 @@ function createTask(id: string): Task {
     id,
     title: `Task ${id}`,
     description: `Throttle test task ${id}`,
-    model: 'sonnet' as ModelType,
+    model: 'claude-sonnet-5' as ModelType,
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'token-throttle-test',
@@ -68,6 +69,7 @@ function createTask(id: string): Task {
     assignedAgent: 'generic',
     assignedSkills: [],
     provider: 'claude',
+    budget: { maxTurns: 1 },
   } as unknown as Task;
 }
 

@@ -66,6 +66,7 @@ vi.mock('../../src/monitor/auditor.js', () => ({
 
 vi.mock('../../src/orchestra/planner.js', () => ({
   resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
+  createPlannerTaskModelPolicy: vi.fn((defaultModel: string) => ({ defaultModel, allowedModels: [defaultModel] })),
   callBrainPlannerWithReason: vi.fn().mockReturnValue({ ok: false, reason: 'no_providers', message: 'no providers' }),
   callBrainPlanner: vi.fn().mockReturnValue(null),
 }));
@@ -119,7 +120,7 @@ vi.mock('../../src/orchestra/model-selector.js', async (importOriginal) => {
     ...actual,
     resolveTaskModel: vi.fn(
       (_t: string, _d: string, _s: unknown, _c: unknown, _p: unknown, forceModel?: string) =>
-        forceModel ?? 'sonnet',
+        forceModel ?? 'claude-sonnet-5',
     ),
   };
 });
@@ -146,8 +147,8 @@ function makeConfig(): ResolvedConfig {
     mode: 'performance',
     activeModeConfig: {
       max_workers: 4,
-      brain_model: 'opus',
-      default_model: 'opus',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-opus-4-8',
       haiku_allowed: true,
       brain_planning: 'structured',
     },
@@ -184,7 +185,7 @@ const SMOKE_DIRECTIVES = [
   '# DIRECTIVES — Sprint 291 smoke test',
   '',
   '## Task 1: Tier-1 serve endpoint',
-  '- Model: sonnet',
+  '- Model: claude-sonnet-5',
   '- Effort: normal',
   '- Files: src/api/server.ts',
   '- Scope: src/api/',
@@ -199,7 +200,7 @@ const NO_SMOKE_DIRECTIVES = [
   '# DIRECTIVES — Sprint 291 smoke test',
   '',
   '## Task 1: internal refactor',
-  '- Model: haiku',
+  '- Model: claude-haiku-4-5-20251001',
   '- Effort: low',
   '- Files: src/core/types.ts',
   '- Scope: src/core/',

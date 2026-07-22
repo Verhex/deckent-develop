@@ -182,9 +182,25 @@ export function enforceModelTierGuard(input: ModelTierGuardInput): ModelTierGuar
     };
   }
 
-  // Upgrade to the provider-appropriate standard model.
-  const provider: ProviderName = input.targetProvider ?? modelRegistry.get(originalModel)?.provider as ProviderName ?? 'claude';
-  const upgraded = getModelForProviderTier(provider, 'standard') ?? 'sonnet';
+  // Upgrade to the provider-appropriate standard model (exact registered API ID).
+  // We're in the economy branch, so originalModel is a registered model — its own
+  // provider is the honest default when no targetProvider is supplied.
+  const provider: ProviderName =
+    input.targetProvider ?? (modelRegistry.get(originalModel)?.provider as ProviderName);
+  const upgraded = getModelForProviderTier(provider, 'standard');
+
+  // No standard-tier model registered for this provider — cannot upgrade to a real
+  // id without inventing an alias. Keep the original model and report why (the guard
+  // never throws and never emits a non-registered alias).
+  if (!upgraded) {
+    return {
+      model: originalModel,
+      upgraded: false,
+      originalModel,
+      overrideHonored: false,
+      reason: `Economy model '${originalModel}' on ${kind} task, but provider '${provider}' has no standard-tier model registered — kept unchanged (MODEL-GUARD could not upgrade)`,
+    };
+  }
 
   return {
     model: upgraded,

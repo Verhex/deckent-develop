@@ -6,7 +6,7 @@ import type { ModelType } from '../../src/core/types.js';
 function createMockAdapter(): ProviderAdapter {
   return {
     name: 'mock-provider',
-    supportedModels: ['opus', 'sonnet', 'haiku'] as readonly ModelType[],
+    supportedModels: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'] as readonly ModelType[],
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn(() => []),
@@ -25,12 +25,12 @@ const isWindows = process.platform === 'win32';
 
 describe.skipIf(isWindows)('buildWorkerCommand — tmux timeout parity (born-466)', () => {
   it('wraps the worker command with a -k 30 hard-kill grace period', () => {
-    const cmd = buildWorkerCommand('opus', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '359-003');
+    const cmd = buildWorkerCommand('claude-opus-4-8', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '359-003');
     expect(cmd).toContain(`timeout -k 30 ${WORKER_TIMEOUT_SECONDS}`);
   });
 
   it('captures the exit code instead of masking it with `|| echo "WORKER_TIMEOUT"`', () => {
-    const cmd = buildWorkerCommand('opus', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '359-003');
+    const cmd = buildWorkerCommand('claude-opus-4-8', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '359-003');
     expect(cmd).toContain('CLAUDE_EXIT=$?');
     // Old pattern: the sh -c invocation was directly followed by `|| echo "WORKER_TIMEOUT"`,
     // which fired on ANY non-zero exit (crash, CLI arg error), not just a real timeout.
@@ -40,13 +40,13 @@ describe.skipIf(isWindows)('buildWorkerCommand — tmux timeout parity (born-466
   });
 
   it('gates the .timeout marker on exit code 124 or 137 only', () => {
-    const cmd = buildWorkerCommand('opus', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '359-003');
+    const cmd = buildWorkerCommand('claude-opus-4-8', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '359-003');
     expect(cmd).toContain('[ "$CLAUDE_EXIT" -eq 124 ] || [ "$CLAUDE_EXIT" -eq 137 ]');
     expect(cmd).toContain('task-359-003.timeout');
   });
 
   it('only writes the .timeout marker when no .result file already exists', () => {
-    const cmd = buildWorkerCommand('opus', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '359-003');
+    const cmd = buildWorkerCommand('claude-opus-4-8', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '359-003');
     expect(cmd).toContain('[ ! -f "');
     expect(cmd).toContain('task-359-003.result');
     // marker write must be conditioned inside the same `if` guard as the result check
@@ -58,20 +58,20 @@ describe.skipIf(isWindows)('buildWorkerCommand — tmux timeout parity (born-466
   });
 
   it('respects a custom timeoutSeconds value in the -k 30 wrap', () => {
-    const cmd = buildWorkerCommand('haiku', '/proj/.tasks/.prompt-x.txt', undefined, undefined, '359-004', 600);
+    const cmd = buildWorkerCommand('claude-haiku-4-5-20251001', '/proj/.tasks/.prompt-x.txt', undefined, undefined, '359-004', 600);
     expect(cmd).toContain('timeout -k 30 600');
     expect(cmd).toContain('task-359-004.timeout');
   });
 
   it('preserves the existing EXIT trap / RFILE fallback contract', () => {
-    const cmd = buildWorkerCommand('opus', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '359-003');
+    const cmd = buildWorkerCommand('claude-opus-4-8', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '359-003');
     expect(cmd).toMatch(/^RFILE=.*task-359-003\.result; trap /);
     expect(cmd).toContain("trap '[ -f $RFILE ] || echo ");
     expect(cmd).toContain("' EXIT;");
   });
 
   it('does not wrap timeout when taskId is not provided (backward compat)', () => {
-    const cmd = buildWorkerCommand('sonnet', '/tmp/prompt.txt');
+    const cmd = buildWorkerCommand('claude-sonnet-5', '/tmp/prompt.txt');
     expect(cmd).not.toContain('timeout');
     expect(cmd).not.toContain('CLAUDE_EXIT');
   });
@@ -80,7 +80,7 @@ describe.skipIf(isWindows)('buildWorkerCommand — tmux timeout parity (born-466
     const adapter = {
       buildCommand: () => 'mock-cli --model opus < /tmp/p.txt',
     };
-    const cmd = buildWorkerCommand('opus', '/tmp/p.txt', undefined, adapter, '359-003');
+    const cmd = buildWorkerCommand('claude-opus-4-8', '/tmp/p.txt', undefined, adapter, '359-003');
     expect(cmd).not.toContain('timeout -k 30');
     expect(cmd).not.toContain('CLAUDE_EXIT');
   });

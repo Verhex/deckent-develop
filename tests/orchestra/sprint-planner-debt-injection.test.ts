@@ -17,7 +17,7 @@ import { injectCriticalDebtTasks } from '../../src/orchestra/sprint-planner.js';
 import { DebtPriority, TaskStatus } from '../../src/core/types.js';
 import type { DebtItem, ModelType } from '../../src/core/types.js';
 
-const MODEL: ModelType = 'sonnet';
+const MODEL: ModelType = 'claude-sonnet-5';
 const SPRINT_ID = 'sprint-179';
 
 function makeDebt(overrides: Partial<DebtItem>): DebtItem {

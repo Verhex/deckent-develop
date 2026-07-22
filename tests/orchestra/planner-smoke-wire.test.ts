@@ -11,7 +11,7 @@ import type { PlannerTask } from '../../src/core/types.js';
 
 const DIRECTIVE_WITH_SMOKE = `
 ## Task 1: 219-001 — native REPL entry
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Files: src/cli/entry.ts, tests/cli/default-repl.test.ts
 - Scope: src/cli/, tests/cli/
@@ -24,7 +24,7 @@ Wire default entry to open REPL.
 
 const DIRECTIVE_NO_SMOKE = `
 ## Task 1: refactor types
-- Model: haiku
+- Model: claude-haiku-4-5-20251001
 - Effort: low
 - Files: src/core/types.ts
 - Scope: src/core/
@@ -37,7 +37,7 @@ function baseParams(overrides: Partial<CreateTaskParams> = {}): CreateTaskParams
   return {
     title: 'test task',
     description: 'test description',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -53,7 +53,7 @@ function basePlannerTask(overrides: Partial<PlannerTask> = {}): PlannerTask {
   return {
     title: 'ai planner task',
     description: 'ai description',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'ai reason',
@@ -102,13 +102,13 @@ describe('planner-smoke-wire: parsed.smoke → CreateTaskParams → task.smoke',
   it('plannerTaskToParams propagates smoke from planner task to CreateTaskParams', () => {
     const smoke = { command: 'node dist/cli/entry.js --help', expect: 'usage' };
     const pt = { ...basePlannerTask(), smoke };
-    const params = plannerTaskToParams(pt, 'sprint-219', 'sonnet');
+    const params = plannerTaskToParams(pt, 'sprint-219', 'claude-sonnet-5');
     expect(params.smoke).toEqual(smoke);
   });
 
   it('plannerTaskToParams returns smoke=undefined when PlannerTask has no smoke', () => {
     const pt = basePlannerTask();
-    const params = plannerTaskToParams(pt, 'sprint-219', 'sonnet');
+    const params = plannerTaskToParams(pt, 'sprint-219', 'claude-sonnet-5');
     expect(params.smoke).toBeUndefined();
   });
 

@@ -3,7 +3,7 @@ import { parseStructuredDirectives, parseBulletOrNumberedTasks } from '../../src
 
 const HEADER_BLOCK_WITH_SMOKE = `
 ## Task 1: serve token fix
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Files: src/api/server.ts
 - Scope: src/api/
@@ -16,7 +16,7 @@ Fix localhost token injection.
 
 const HEADER_BLOCK_DASH_SMOKE = `
 ## Task 1: serve token fix
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Smoke: node dist/cli/entry.js serve --port 3099 → http_code=200
 - Files: src/api/server.ts
@@ -28,7 +28,7 @@ Fix localhost token injection.
 
 const HEADER_BLOCK_NO_SMOKE = `
 ## Task 1: serve token fix
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Files: src/api/server.ts
 - Scope: src/api/
@@ -39,7 +39,7 @@ Fix localhost token injection.
 
 const HEADER_BLOCK_MALFORMED_SMOKE = `
 ## Task 1: serve token fix
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Smoke: node dist/cli/entry.js serve --port 3099
 - Files: src/api/server.ts
@@ -83,7 +83,7 @@ describe('parseStructuredDirectives — Smoke: parsing', () => {
   it('parses complex multi-word command and expect from real DIRECTIVES format', () => {
     const content = `
 ## Task 6: serve fix
-- Model: opus
+- Model: claude-opus-4-8
 - Effort: normal
 - Files: src/api/server.ts
 - Scope: src/api/
@@ -106,7 +106,7 @@ describe('parseBulletOrNumberedTasks — Smoke: parsing', () => {
   it('parses - Smoke: line in bullet task format', () => {
     const content = `
 - Task: serve token fix
-  - Model: sonnet
+  - Model: claude-sonnet-5
   - Smoke: node dist/cli/entry.js serve → http_code=200
   - Files: src/api/server.ts
 `;
@@ -121,7 +121,7 @@ describe('parseBulletOrNumberedTasks — Smoke: parsing', () => {
   it('returns undefined smoke for bullet task with no Smoke: line', () => {
     const content = `
 - Task: plain task
-  - Model: haiku
+  - Model: claude-haiku-4-5-20251001
   - Files: docs/README.md
 `;
     const tasks = parseBulletOrNumberedTasks(content);

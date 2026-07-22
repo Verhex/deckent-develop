@@ -252,6 +252,7 @@ describe('agent-pool readJsonSafe migration', () => {
     writeJson(join(agentDir, 'agent.json'), {
       id: 'test-agent',
       name: 'Test Agent',
+      preferredModel: 'claude-sonnet-5',
       enabled: true,
     });
     const mgr = new AgentPoolManager(projDir);

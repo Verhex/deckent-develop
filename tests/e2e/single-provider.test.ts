@@ -40,7 +40,7 @@ function createMockTask(overrides: Partial<Task> = {}): Task {
     id: '001-001',
     title: 'Test task',
     description: 'A test task',
-    model: 'sonnet' as ModelType,
+    model: 'claude-sonnet-5' as ModelType,
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -68,7 +68,7 @@ describe('Codex-only sprint (no Claude, no Gemini)', () => {
   beforeEach(() => {
     registry = new ProviderRegistry();
     codexAdapter = createMockAdapter('codex', true, [
-      'gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini',
+      'gpt-5.5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini',
     ]);
     registry.registerProvider(codexAdapter, true);
   });
@@ -100,12 +100,12 @@ describe('Codex-only sprint (no Claude, no Gemini)', () => {
   it('resolveProviderWithFallback selects codex for gpt-5 tasks', async () => {
     const result = await resolveProviderWithFallback(
       'codex',
-      'gpt-5' as ModelType,
+      'gpt-5.5' as ModelType,
       {},
       registry,
     );
     expect(result.provider).toBe('codex');
-    expect(result.model).toBe('gpt-5');
+    expect(result.model).toBe('gpt-5.5');
   });
 
   it('spawn is called on codexAdapter for codex tasks', () => {
@@ -124,7 +124,7 @@ describe('Codex-only sprint (no Claude, no Gemini)', () => {
 
   it('spawn called for both tasks in a 2-task sprint', () => {
     const task1 = createMockTask({ id: '001-001', model: 'gpt-4.1' as ModelType, provider: 'codex' });
-    const task2 = createMockTask({ id: '001-002', model: 'gpt-5' as ModelType, provider: 'codex' });
+    const task2 = createMockTask({ id: '001-002', model: 'gpt-5.5' as ModelType, provider: 'codex' });
 
     for (const task of [task1, task2]) {
       const adapter = registry.getProvider(task.provider!);
@@ -133,7 +133,7 @@ describe('Codex-only sprint (no Claude, no Gemini)', () => {
 
     expect(codexAdapter.spawn).toHaveBeenCalledTimes(2);
     expect(codexAdapter.spawn).toHaveBeenCalledWith('001-001', 'gpt-4.1', expect.any(String), expect.any(Object));
-    expect(codexAdapter.spawn).toHaveBeenCalledWith('001-002', 'gpt-5', expect.any(String), expect.any(Object));
+    expect(codexAdapter.spawn).toHaveBeenCalledWith('001-002', 'gpt-5.5', expect.any(String), expect.any(Object));
   });
 
   it('requesting claude provider throws ProviderNotFoundError', () => {
@@ -152,7 +152,7 @@ describe('Codex-only sprint (no Claude, no Gemini)', () => {
 
   it('resolveProviderWithFallback throws when requesting claude with no fallback', async () => {
     await expect(
-      resolveProviderWithFallback('claude', 'opus' as ModelType, {}, registry),
+      resolveProviderWithFallback('claude', 'claude-opus-4-8' as ModelType, {}, registry),
     ).rejects.toThrow(ProviderUnavailableError);
   });
 });
@@ -249,7 +249,7 @@ describe('Gemini-only sprint (no Claude, no Codex)', () => {
 
   it('resolveProviderWithFallback throws when requesting claude with no fallback', async () => {
     await expect(
-      resolveProviderWithFallback('claude', 'opus' as ModelType, {}, registry),
+      resolveProviderWithFallback('claude', 'claude-opus-4-8' as ModelType, {}, registry),
     ).rejects.toThrow(ProviderUnavailableError);
   });
 });
@@ -336,7 +336,7 @@ describe('Fallback from Codex to Gemini (no Claude)', () => {
 
     // Codex is registered but UNAVAILABLE
     codexAdapter = createMockAdapter('codex', false, [
-      'gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini',
+      'gpt-5.5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini',
     ]);
     registry.registerProvider(codexAdapter);
 
@@ -376,7 +376,7 @@ describe('Fallback from Codex to Gemini (no Claude)', () => {
   it('fallback: gpt-5 (premium tier) maps to gemini-2.5-pro', async () => {
     const result = await resolveProviderWithFallback(
       'codex',
-      'gpt-5' as ModelType,
+      'gpt-5.5' as ModelType,
       { fallback_provider: 'gemini' as ProviderName },
       registry,
     );

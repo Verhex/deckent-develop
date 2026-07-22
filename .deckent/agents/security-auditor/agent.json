@@ -34,7 +34,7 @@
     "Write"
   ],
   "deniedTools": [],
-  "preferredModel": "opus",
+  "preferredModel": "claude-opus-4-8",
   "effortMultiplier": 1.2,
   "triggerKeywords": [
     "security",
@@ -115,7 +115,7 @@
       ]
     },
     "numerical": {
-      "preferredModel": "opus",
+      "preferredModel": "claude-opus-4-8",
       "costTier": "premium",
       "maxParallel": null
     }

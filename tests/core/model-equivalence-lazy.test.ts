@@ -11,9 +11,9 @@ vi.mock('../../src/core/model-registry.js', () => ({
   modelRegistry: {
     getByTier: vi.fn().mockImplementation((tier: string) => {
       const map: Record<string, Array<{ id: string }>> = {
-        premium: [{ id: 'opus' }, { id: 'gpt-5' }],
-        standard: [{ id: 'sonnet' }, { id: 'gpt-4.1' }],
-        economy: [{ id: 'haiku' }, { id: 'gpt-5-mini' }],
+        premium: [{ id: 'claude-opus-4-8' }, { id: 'gpt-5.5' }],
+        standard: [{ id: 'claude-sonnet-5' }, { id: 'gpt-4.1' }],
+        economy: [{ id: 'claude-haiku-4-5-20251001' }, { id: 'gpt-5-mini' }],
         premium_plus: [{ id: 'o3' }],
       };
       return map[tier] ?? [];
@@ -22,7 +22,7 @@ vi.mock('../../src/core/model-registry.js', () => ({
     getByProvider: vi.fn().mockReturnValue([]),
     has: vi.fn().mockReturnValue(true),
     getTier: vi.fn().mockReturnValue('standard'),
-    get: vi.fn().mockReturnValue({ id: 'opus', provider: 'claude' }),
+    get: vi.fn().mockReturnValue({ id: 'claude-opus-4-8', provider: 'claude' }),
     getAllModelIds: vi.fn().mockReturnValue([]),
     getAllModels: vi.fn().mockReturnValue([]),
     getByProviderAndTier: vi.fn(),
@@ -44,13 +44,13 @@ describe('MODEL_TIERS lazy-init', () => {
 
   it('premium tier returns correct model IDs on first access', () => {
     const result = MODEL_TIERS['premium'];
-    expect(result).toContain('opus');
-    expect(result).toContain('gpt-5');
+    expect(result).toContain('claude-opus-4-8');
+    expect(result).toContain('gpt-5.5');
   });
 
   it('all tiers populated with correct model IDs', () => {
-    expect(MODEL_TIERS['standard']).toContain('sonnet');
-    expect(MODEL_TIERS['economy']).toContain('haiku');
+    expect(MODEL_TIERS['standard']).toContain('claude-sonnet-5');
+    expect(MODEL_TIERS['economy']).toContain('claude-haiku-4-5-20251001');
     expect(MODEL_TIERS['premium_plus']).toContain('o3');
   });
 
@@ -68,8 +68,8 @@ describe('MODEL_TIERS lazy-init', () => {
   });
 
   it('getModelsInTier delegates to MODEL_TIERS via Proxy correctly', () => {
-    expect(getModelsInTier('premium')).toContain('opus');
-    expect(getModelsInTier('economy')).toContain('haiku');
-    expect(getModelsInTier('standard')).toContain('sonnet');
+    expect(getModelsInTier('premium')).toContain('claude-opus-4-8');
+    expect(getModelsInTier('economy')).toContain('claude-haiku-4-5-20251001');
+    expect(getModelsInTier('standard')).toContain('claude-sonnet-5');
   });
 });

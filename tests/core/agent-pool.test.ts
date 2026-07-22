@@ -27,6 +27,7 @@ import { createAgentDefinition } from '../../src/core/agent-types.js';
 import type { AgentDefinition } from '../../src/core/agent-types.js';
 import { buildWorkerPrompt } from '../../src/orchestra/task-builder.js';
 import type { Task } from '../../src/core/types.js';
+import { modelRegistry } from '../../src/core/model-registry.js';
 
 const ROOT = '/test/project';
 
@@ -488,8 +489,8 @@ describe('AgentPoolManager.validateAgentDefinition', () => {
     ]));
   });
 
-  it('accepts valid preferredModel values', () => {
-    for (const model of ['opus', 'sonnet', 'haiku']) {
+  it('accepts canonical registered preferredModel values', () => {
+    for (const model of modelRegistry.getAllModelIds()) {
       const result = AgentPoolManager.validateAgentDefinition({
         id: 'x', name: 'X', preferredModel: model,
       });
@@ -581,10 +582,10 @@ describe('AgentPoolManager.validateAgentDefinition', () => {
     ]));
   });
 
-  it('accepts minimal valid object (only id + name)', () => {
+  it('rejects an object without canonical preferredModel', () => {
     const result = AgentPoolManager.validateAgentDefinition({ id: 'min', name: 'Min' });
-    expect(result.valid).toBe(true);
-    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('"preferredModel" must be a canonical registered model ID');
   });
 
   it('returns multiple errors at once', () => {

@@ -40,6 +40,7 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
   SpawnBackendFactory: {
     create: vi.fn(() => ({
       name: 'docker',
+      liveUsageBudgetSupport: 'measured-stream',
       spawn: hoisted.backendSpawn,
       kill: hoisted.backendKill,
       list: hoisted.backendList,
@@ -47,6 +48,7 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
     })),
     createAsync: vi.fn(async () => ({
       name: 'docker',
+      liveUsageBudgetSupport: 'measured-stream',
       spawn: hoisted.backendSpawn,
       kill: hoisted.backendKill,
       list: hoisted.backendList,
@@ -68,6 +70,38 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
   SubprocessBackend: class SubprocessBackend {},
 }));
 
+vi.mock('../../src/cli/commands/spawn.js', () => ({
+  spawnWorkerMultiProvider: vi.fn(async (
+    taskId: string,
+    model: string,
+    prompt: string,
+    root: string,
+    opts: Record<string, unknown>,
+  ) => {
+    hoisted.backendSpawn(taskId, model, prompt, { ...opts, projectDir: root });
+    return { backend: 'docker', provider: opts.provider ?? 'claude' };
+  }),
+}));
+
+vi.mock('../../src/core/execution-plan-digest.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/execution-plan-digest.js')>();
+  return {
+    ...actual,
+    applyWorkerExecutionBudgetPolicy: vi.fn((tasks: Array<Record<string, any>>, _policy: unknown, provider?: string) => (
+      tasks.map((task) => {
+        task.budget = { maxTokens: 100_000 };
+        return {
+          state: 'allow',
+          role: 'worker',
+          resolvedProvider: provider ?? task.provider ?? 'claude',
+          executionCostClass: 'remote',
+          profileRef: 'test.worker.default',
+        };
+      })
+    )),
+  };
+});
+
 vi.mock('../../src/orchestra/brain.js', () => ({
   buildWorkerPrompt: vi.fn().mockReturnValue('You are a worker...'),
 }));
@@ -88,6 +122,7 @@ import { ensureSession, spawnWorker } from '../../src/orchestra/tmux.js';
 import { buildWorkerPrompt } from '../../src/orchestra/brain.js';
 import { print, printError } from '../../src/cli/helpers/output.js';
 import { resolveProjectRoot } from '../../src/cli/helpers/process.js';
+import { buildParametricModel, modelRegistry } from '../../src/core/model-registry.js';
 import {
   createRunTaskId,
   buildRunTask,
@@ -278,13 +313,16 @@ describe('registerRun', () => {
     program.exitOverride();
     registerRun(program);
 
-    await program.parseAsync(['node', 'deckent', 'run', 'test task', '--model', 'sonnet']);
+    // 453-001: 'sonnet' is a legacy alias the canonical resolver now rejects —
+    // an exact provider model ID is required. The resolved ID flows byte-for-byte
+    // to spawn (identity preservation).
+    await program.parseAsync(['node', 'deckent', 'run', 'test task', '--model', 'claude-sonnet-5']);
 
     // Sprint 178 refactor: backend.spawn(taskId, model, prompt, opts) — 4 args,
     // projectDir lives inside the opts object instead of as a positional arg.
     expect(hoisted.backendSpawn).toHaveBeenCalledWith(
       expect.stringMatching(/^run-/),
-      'sonnet',
+      'claude-sonnet-5',
       expect.any(String),
       expect.objectContaining({ projectDir: '/project' }),
     );
@@ -320,5 +358,117 @@ describe('registerRun', () => {
     expect(hoisted.backendSpawn).toHaveBeenCalled();
     expect(process.exitCode).toBe(1);
     process.exitCode = origExitCode as number;
+  });
+});
+
+// ─── Canonical model boundary — full-action matrix (453-001) ──────────────────
+// Drives the real `deckent run` action through commander. Success paths need a
+// result file (existsSync→true) so waitForRunResult returns immediately; failure
+// paths resolve the model FIRST and must never write a Task JSON or spawn. Unique
+// unseen IDs per test avoid within-file registry bleed (registerParametric mutates
+// the shared singleton).
+describe('registerRun — canonical model boundary (453-001)', () => {
+  const DONE_RESULT = JSON.stringify({
+    taskId: 'run-x', selfAssessment: 'DONE', testsPassed: true, filesChanged: [], notes: 'ok',
+  });
+
+  /** Parsed contents of every `.json` file written this test (Task JSON writes). */
+  function jsonWrites(): Record<string, unknown>[] {
+    return vi.mocked(writeFileSync).mock.calls
+      .filter(c => typeof c[0] === 'string' && /\.tasks\/task-run-.*\.json$/.test(c[0] as string))
+      .map(c => JSON.parse(c[1] as string) as Record<string, unknown>);
+  }
+
+  async function runWith(args: string[]): Promise<void> {
+    const program = new Command();
+    program.exitOverride();
+    registerRun(program);
+    await program.parseAsync(['node', 'deckent', 'run', 'do work', ...args]);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.backendSpawn.mockClear();
+    vi.mocked(resolveProjectRoot).mockReturnValue('/project');
+    vi.mocked(mkdirSync).mockReturnValue(undefined);
+    vi.mocked(writeFileSync).mockReturnValue(undefined);
+    vi.mocked(unlinkSync).mockReturnValue(undefined);
+  });
+
+  it('accepts a known exact ID (gpt-5.6-sol) and spawns with it unchanged', async () => {
+    const orig = process.exitCode;
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(DONE_RESULT);
+
+    await runWith(['--model', 'gpt-5.6-sol']);
+
+    expect(hoisted.backendSpawn).toHaveBeenCalledWith(
+      expect.stringMatching(/^run-/),
+      'gpt-5.6-sol',
+      expect.any(String),
+      expect.objectContaining({ projectDir: '/project' }),
+    );
+    expect(process.exitCode).toBe(0);
+    process.exitCode = orig as number;
+  });
+
+  it('accepts a pricing-verified versioned ID with --provider codex; Task JSON + spawn preserve it', async () => {
+    const orig = process.exitCode;
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(DONE_RESULT);
+    modelRegistry.register(buildParametricModel('gpt-5.6-neo-453d', {
+      provider: 'codex',
+      costPerMillion: { input: 2, output: 10 },
+      pricingEvidenceRef: 'catalog:test:gpt-5.6-neo-453d',
+      status: 'ga',
+    }));
+
+    await runWith(['--model', 'gpt-5.6-neo-453d', '--provider', 'codex']);
+
+    const written = jsonWrites();
+    expect(written).toHaveLength(1);
+    expect(written[0]).toMatchObject({ model: 'gpt-5.6-neo-453d', provider: 'codex' });
+    // Same exact ID reaches the spawn wire (identity preservation).
+    expect(hoisted.backendSpawn).toHaveBeenCalledWith(
+      expect.stringMatching(/^run-/),
+      'gpt-5.6-neo-453d',
+      expect.any(String),
+      expect.objectContaining({ projectDir: '/project' }),
+    );
+    process.exitCode = orig as number;
+  });
+
+  it('omitted --model resolves from the canonical config default (never a literal alias)', async () => {
+    const orig = process.exitCode;
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(DONE_RESULT);
+
+    await runWith([]);
+
+    expect(hoisted.backendSpawn).toHaveBeenCalledWith(
+      expect.stringMatching(/^run-/),
+      'claude-opus-4-8',
+      expect.any(String),
+      expect.objectContaining({ projectDir: '/project' }),
+    );
+    process.exitCode = orig as number;
+  });
+
+  it.each([
+    ['legacy alias (gpt-5)', ['--model', 'gpt-5']],
+    ['unknown without provider', ['--model', 'gpt-5.6-ghost-453e']],
+    ['provider/model mismatch', ['--model', 'claude-opus-4-8', '--provider', 'codex']],
+  ])('fails loudly before disk/spawn: %s', async (_label, args) => {
+    const orig = process.exitCode;
+    vi.mocked(existsSync).mockReturnValue(false);
+
+    await runWith(args);
+
+    expect(printError).toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+    // No Task JSON written, no worker spawned — the alias/mismatch never reached disk.
+    expect(jsonWrites()).toHaveLength(0);
+    expect(hoisted.backendSpawn).not.toHaveBeenCalled();
+    process.exitCode = orig as number;
   });
 });

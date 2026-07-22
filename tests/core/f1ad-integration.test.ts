@@ -1,7 +1,7 @@
-// ─── F1-AD Integration: bootstrap wire + cache-hit + timeout behaviour ────────
+// ─── F1-AD Integration: reachability discovery + cache + timeout ─────────────
 // Hermetic tests — no real CLI calls, no disk I/O in the home dir.
 // Tests the three goCriteria that are distinct from the unit-level f1ad-model-detect tests:
-//   1. bootstrap wiring: detectAndRegisterModels fills the registry via bootstrapProviders
+//   1. bootstrap wiring: cloud CLI discovery never mints executable identities
 //   2. cache-hit: second call returns instantly without invoking the spawnFn again
 //   3. probe-timeout does not block: slow spawnFn resolves within timeout margin
 
@@ -33,10 +33,10 @@ function makeSpawnFn(stdout: string, exitCode = 0): SpawnFn {
   return vi.fn().mockResolvedValue({ stdout, exitCode });
 }
 
-// ─── Test 1: bootstrap fills registry with bundled-external model ─────────────
+// ─── Test 1: bootstrap keeps cloud reachability separate from catalog authority ─
 
-describe('bootstrap → probe-mock fills registry with external model', () => {
-  it('registers a model not in BUILTIN_MODELS after bootstrap wire', async () => {
+describe('bootstrap → cloud probe is reachability evidence only', () => {
+  it('discovers but does not register a cloud model missing priced catalog evidence', async () => {
     const registry = new ModelRegistry();
     const externalModel = 'claude-mythos-99';
     const output = JSON.stringify({ models: [{ id: externalModel }] });
@@ -44,13 +44,15 @@ describe('bootstrap → probe-mock fills registry with external model', () => {
 
     // This mirrors what bootstrapProviders does: call detectAndRegisterModels
     // with the injected registry and mock spawnFn (the _hooks pattern).
-    await detectAndRegisterModels(registry, {
+    const results = await detectAndRegisterModels(registry, {
       providers: ['claude'],
       spawnFn,
       cacheDir: workDir,
     });
 
-    expect(registry.has(externalModel)).toBe(true);
+    expect(results[0]?.discovered).toContain(externalModel);
+    expect(results[0]?.registered).toBe(0);
+    expect(registry.has(externalModel)).toBe(false);
   });
 
   it('probe-mock result is accessible via modelAutoDetectPromise', async () => {
@@ -68,8 +70,9 @@ describe('bootstrap → probe-mock fills registry with external model', () => {
     const results = await promise;
 
     expect(results).toHaveLength(1);
-    expect(results[0]?.registered).toBeGreaterThan(0);
-    expect(registry.has(externalModel)).toBe(true);
+    expect(results[0]?.discovered).toContain(externalModel);
+    expect(results[0]?.registered).toBe(0);
+    expect(registry.has(externalModel)).toBe(false);
   });
 
   it('bootstrapProviders wires detectAndRegisterModels and resolves promise', async () => {
@@ -107,8 +110,8 @@ describe('bootstrap → probe-mock fills registry with external model', () => {
     // Await the background detection
     await result.modelAutoDetectPromise;
 
-    // External model must now be in the injected registry
-    expect(registry.has(externalModel)).toBe(true);
+    // Reachability must not become an executable cloud identity without pricing evidence.
+    expect(registry.has(externalModel)).toBe(false);
   });
 });
 
@@ -144,8 +147,8 @@ describe('cache-hit: second call does not invoke spawnFn', () => {
 
     // spawnFn must NOT be called (cache hit)
     expect(vi.mocked(spawnFn)).not.toHaveBeenCalled();
-    // Model must still be registered via cache
-    expect(registry2.has(cachedModel)).toBe(true);
+    // Cached reachability remains discoverable without becoming catalog authority.
+    expect(registry2.has(cachedModel)).toBe(false);
   });
 
   it('cache-hit returns source=cache in DetectResult', async () => {

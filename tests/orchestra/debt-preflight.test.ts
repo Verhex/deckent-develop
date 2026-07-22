@@ -249,7 +249,7 @@ describe('planSprint wiring — preflight runs under dryRun:true', () => {
       const config = {
         mode: 'max_plan',
         activeModeConfig: {
-          max_workers: 4, brain_model: 'opus', default_model: 'sonnet',
+          max_workers: 4, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5',
           haiku_allowed: false, brain_planning: 'structured',
         },
         modes: {},

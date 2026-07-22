@@ -7,7 +7,7 @@ vi.mock('../../../src/core/config.js', () => ({
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn().mockResolvedValue({
     activeModeConfig: {
-      default_model: 'sonnet',
+      default_model: 'claude-sonnet-5',
       brain_model: 'sonnet',
       haiku_allowed: true,
       max_workers: 3,
@@ -178,6 +178,8 @@ describe('test-run — registerTestRun', () => {
     registerTestRun(program);
     const cmd = program.commands.find(c => c.name() === 'test')!;
     await cmd.parseAsync(['--model', 'invalid-model'], { from: 'user' });
-    expect(printError).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('Invalid model') }));
+    expect(printError).toHaveBeenCalledWith(expect.objectContaining({
+      message: expect.stringContaining('Invalid or unregistered canonical model'),
+    }));
   });
 });

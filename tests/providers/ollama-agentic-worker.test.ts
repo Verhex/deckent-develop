@@ -116,7 +116,7 @@ describe('OllamaAdapter.spawn — T-233-002 wire to agentic-worker-entry', () =>
       spawnImpl: fn as unknown as typeof import('node:child_process').spawn,
     });
 
-    adapter.spawn('t-001', 'llama-3.2-3b', 'unused-prompt');
+    adapter.spawn('t-001', 'llama3.2:3b', 'unused-prompt');
 
     expect(calls).toHaveLength(1);
     const call = calls[0]!;
@@ -124,7 +124,7 @@ describe('OllamaAdapter.spawn — T-233-002 wire to agentic-worker-entry', () =>
     expect(call.command).not.toBe('curl');
     expect(call.args[0]).toBe(entryPath);
     expect(call.args[1]).toBe('t-001');
-    // apiId for llama-3.2-3b in modelRegistry should be present — just confirm a
+    // apiId for llama3.2:3b in modelRegistry should be present — just confirm a
     // non-empty string was forwarded (registry id resolution is its own contract).
     expect(typeof call.args[2]).toBe('string');
     expect((call.args[2] ?? '').length).toBeGreaterThan(0);
@@ -163,8 +163,8 @@ describe('OllamaAdapter.isSupportedModel — T-233-002 dynamic /api/tags', () =>
     expect(adapter.isSupportedModel('qwen3.6:27b' as never)).toBe(true);
     expect(adapter.isSupportedModel('mystery-coder:13b' as never)).toBe(true);
 
-    // Static fallback still works (llama-3.2-3b is in the built-in catalog).
-    expect(adapter.isSupportedModel('llama-3.2-3b' as never)).toBe(true);
+    // Static fallback still works (llama3.2:3b is in the built-in catalog).
+    expect(adapter.isSupportedModel('llama3.2:3b' as never)).toBe(true);
 
     // Random unknown model still rejected — fail-closed.
     expect(adapter.isSupportedModel('definitely-not-installed:99b' as never)).toBe(false);
@@ -179,7 +179,7 @@ describe('OllamaAdapter.isSupportedModel — T-233-002 dynamic /api/tags', () =>
     await adapter.refreshSupportedModels(); // swallows the error
 
     // Static catalog still recognized; dynamic model rejected.
-    expect(adapter.isSupportedModel('llama-3.2-3b' as never)).toBe(true);
+    expect(adapter.isSupportedModel('llama3.2:3b' as never)).toBe(true);
     expect(adapter.isSupportedModel('qwen3.6:27b' as never)).toBe(false);
   });
 });
@@ -339,7 +339,7 @@ describe('OllamaAdapter lifecycle — T-233-002 regression: kill + timeout', () 
       spawnImpl: fn as unknown as typeof import('node:child_process').spawn,
     });
 
-    adapter.spawn('t-kill', 'llama-3.2-3b', 'ignored');
+    adapter.spawn('t-kill', 'llama3.2:3b', 'ignored');
     expect(adapter.listWorkers()).toContain('t-kill');
 
     adapter.kill('t-kill');
@@ -357,7 +357,7 @@ describe('OllamaAdapter lifecycle — T-233-002 regression: kill + timeout', () 
       spawnImpl: fn as unknown as typeof import('node:child_process').spawn,
     });
 
-    adapter.spawn('t-timeout', 'llama-3.2-3b', 'ignored');
+    adapter.spawn('t-timeout', 'llama3.2:3b', 'ignored');
     expect(children[0]!.signals).toEqual([]);
 
     vi.advanceTimersByTime(100);
@@ -373,7 +373,7 @@ describe('OllamaAdapter lifecycle — T-233-002 regression: kill + timeout', () 
       spawnImpl: fn as unknown as typeof import('node:child_process').spawn,
     });
 
-    adapter.spawn('t-exit', 'llama-3.2-3b', 'ignored');
+    adapter.spawn('t-exit', 'llama3.2:3b', 'ignored');
     expect(adapter.listWorkers()).toContain('t-exit');
 
     children[0]!.emit('exit', 0, null);

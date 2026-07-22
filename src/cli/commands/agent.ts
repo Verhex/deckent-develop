@@ -7,8 +7,10 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { promptConfirm } from '../helpers/prompt.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import { ErrorRegistry } from '../../core/errors.js';
-import { ALL_MODELS } from '../../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR } from '../../core/constants.js';
+import { loadConfig, resolveDefaultModel } from '../../core/config.js';
+import { modelRegistry, resolveCanonicalModelIdentity } from '../../core/model-registry.js';
+import { createAgentDefinition } from '../../core/agent-types.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -17,7 +19,9 @@ export interface AgentConfig {
   type?: 'built-in' | 'custom';
   enabled: boolean;
   model?: string;
+  preferredModel?: string;
   triggers?: string[];
+  triggerKeywords?: string[];
   description?: string;
   uses?: number;
   successRate?: number;
@@ -35,7 +39,6 @@ export interface AgentConfig {
 
 // ─── Constants ──────────────────────────────────────────────────────
 
-const VALID_MODELS = ALL_MODELS as readonly string[];
 const VALID_TRIGGER_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9\-_.*]+$/;
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -66,13 +69,13 @@ function isValidAgentName(name: string): boolean {
  * Validate trigger keywords — must be non-empty alphanumeric strings
  * with optional hyphens, underscores, dots, and wildcards.
  */
-export function validateTriggers(triggers: string[]): string[] {
+export function validateTriggers(triggers: string[], lang = 'en'): string[] {
   const errors: string[] = [];
   for (const trigger of triggers) {
     if (!trigger || trigger.trim().length === 0) {
-      errors.push(`Empty trigger keyword`);
+      errors.push(getMessage('agent.create.trigger_empty', lang));
     } else if (!VALID_TRIGGER_PATTERN.test(trigger.trim())) {
-      errors.push(`Invalid trigger "${trigger}": use alphanumeric chars, hyphens, underscores, dots, or wildcards`);
+      errors.push(getMessage('agent.create.trigger_invalid', lang, { trigger }));
     }
   }
   return errors;
@@ -116,21 +119,6 @@ export function saveAgentConfig(root: string, agent: AgentConfig): void {
     join(agentDir, 'agent.json'),
     JSON.stringify(agent, null, 2) + '\n',
   );
-}
-
-function createDefaultAgent(name: string, model = 'sonnet'): AgentConfig {
-  return {
-    name,
-    type: 'custom',
-    enabled: true,
-    model,
-    triggers: [],
-    description: `Custom agent: ${name}`,
-    uses: 0,
-    successRate: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
 }
 
 /**
@@ -232,6 +220,7 @@ export async function shouldProceedAgentDelete(
 
 export function registerAgent(program: Command): void {
   const agentCmd = program.command('agent').description('Manage agent pool');
+  const registrationLang = getLanguage();
 
   // ─── agent lint (ROUTING-V3 Slice-1, 446) ────────────────────────
   agentCmd
@@ -345,7 +334,7 @@ export function registerAgent(program: Command): void {
           a.enabled ? 'enabled' : 'disabled',
           String(getAgentUses(a)),
           `${getAgentSuccessRate(a)}%`,
-          a.model ?? '-',
+          a.preferredModel ?? a.model ?? '-',
         ]);
         print(formatTable(headers, rows));
       } catch (error) {
@@ -357,49 +346,63 @@ export function registerAgent(program: Command): void {
   // ─── agent create ───────────────────────────────────────────────
   agentCmd
     .command('create <name>')
-    .description('Create a custom agent (use --prompt/--description for wizard-style setup)')
-    .option('--model <model>', `Model to use (${VALID_MODELS.join('|')})`, 'sonnet')
-    .option('--triggers <triggers...>', 'Trigger keywords for task routing')
-    .option('--prompt <text>', 'Set the agent system prompt content directly (written to PROMPT.md)')
-    .option('--description <desc>', 'Set the agent description')
+    .description(getMessage('agent.create.description', registrationLang))
+    .option('--model <model>', getMessage('agent.create.option_model', registrationLang))
+    .option('--triggers <triggers...>', getMessage('agent.create.option_triggers', registrationLang))
+    .option('--prompt <text>', getMessage('agent.create.option_prompt', registrationLang))
+    .option('--description <desc>', getMessage('agent.create.option_description', registrationLang))
     .action(async (name: string, opts: { model?: string; triggers?: string[]; prompt?: string; description?: string }) => {
       try {
         const root = resolveProjectRoot();
+        const config = await loadConfig(root).catch(() => undefined);
+        const lang = getLanguage(config?.language);
 
         if (!isValidAgentName(name)) {
           throw ErrorRegistry.createError('DECKENT_E032', {
-            message: `Invalid agent name "${name}". Use alphanumeric characters and hyphens only.`,
+            message: getMessage('agent.create.invalid_name', lang, { name }),
           });
         }
 
-        const model = opts.model ?? 'sonnet';
-        if (!VALID_MODELS.includes(model)) {
-          throw new Error(`Invalid model "${model}". Valid options: ${VALID_MODELS.join(', ')}`);
+        const requestedModel = opts.model ?? resolveDefaultModel(config);
+        let model: string;
+        try {
+          model = resolveCanonicalModelIdentity(requestedModel, { registerParametric: false }).id;
+        } catch {
+          throw new Error(getMessage('agent.create.invalid_model', lang, {
+            model: requestedModel,
+            models: modelRegistry.getAllModelIds().join(', '),
+          }));
         }
 
         // Validate triggers if provided
         const triggers = opts.triggers ?? [];
         if (triggers.length > 0) {
-          const triggerErrors = validateTriggers(triggers);
+          const triggerErrors = validateTriggers(triggers, lang);
           if (triggerErrors.length > 0) {
-            throw new Error(`Invalid triggers:\n  ${triggerErrors.join('\n  ')}`);
+            throw new Error(getMessage('agent.create.invalid_triggers', lang, {
+              errors: triggerErrors.join('\n  '),
+            }));
           }
         }
 
         const agentDir = join(getAgentsDir(root), name);
         if (existsSync(join(agentDir, 'agent.json'))) {
-          throw ErrorRegistry.createError('DECKENT_E033', { message: `Agent "${name}" already exists.` });
+          throw ErrorRegistry.createError('DECKENT_E033', {
+            message: getMessage('agent.create.exists', lang, { name }),
+          });
         }
 
-        // G) Use --prompt if provided, otherwise fall back to default template
         const promptContent = opts.prompt ?? PROMPT_TEMPLATE.replace('{name}', name);
-        const agent = createDefaultAgent(name, model);
-        agent.triggers = triggers;
-        // G) Apply optional description override
-        if (opts.description) {
-          agent.description = opts.description;
-        }
-        agent.systemPrompt = promptContent;
+        const agent = createAgentDefinition({
+          id: name,
+          name,
+          description: opts.description ?? getMessage('agent.create.default_description', lang, { name }),
+          systemPrompt: promptContent,
+          preferredModel: model,
+          triggerKeywords: triggers,
+          manifestVersion: 1,
+          source: 'user',
+        });
         mkdirSync(agentDir, { recursive: true });
         writeFileSync(
           join(agentDir, 'agent.json'),
@@ -407,18 +410,18 @@ export function registerAgent(program: Command): void {
         );
         writeFileSync(join(agentDir, 'PROMPT.md'), promptContent);
 
-        print(`Agent "${name}" created at ${agentDir}`);
-        print('  - agent.json');
-        print('  - PROMPT.md');
-        print(`  Model: ${model}`);
+        print(getMessage('agent.create.created', lang, { name, path: agentDir }));
+        print(getMessage('agent.create.file', lang, { file: 'agent.json' }));
+        print(getMessage('agent.create.file', lang, { file: 'PROMPT.md' }));
+        print(getMessage('agent.create.model', lang, { model }));
         if (opts.description) {
-          print(`  Description: ${opts.description}`);
+          print(getMessage('agent.create.description_value', lang, { description: opts.description }));
         }
         if (triggers.length > 0) {
-          print(`  Triggers: ${triggers.join(', ')}`);
+          print(getMessage('agent.create.triggers', lang, { triggers: triggers.join(', ') }));
         }
         if (opts.prompt) {
-          print(`  Prompt: (custom, ${promptContent.length} chars)`);
+          print(getMessage('agent.create.prompt', lang, { chars: String(promptContent.length) }));
         }
       } catch (error) {
         printError(error);
@@ -550,24 +553,26 @@ export function registerAgent(program: Command): void {
     .action(async (name: string, opts: { model?: string; description?: string; enable?: boolean; disable?: boolean; triggers?: string[]; syncPrompt?: boolean }) => {
       try {
         const root = resolveProjectRoot();
+        const config = await loadConfig(root).catch(() => undefined);
+        const lang = getLanguage(config?.language);
         const agentDir = join(getAgentsDir(root), name);
         const agent = loadAgentConfig(agentDir);
 
         const updates: string[] = [];
         if (opts.triggers) {
-          const triggerErrors = validateTriggers(opts.triggers);
+          const triggerErrors = validateTriggers(opts.triggers, lang);
           if (triggerErrors.length > 0) {
             throw new Error(`Invalid triggers:\n  ${triggerErrors.join('\n  ')}`);
           }
-          agent.triggers = opts.triggers;
+          if (agent.preferredModel !== undefined) agent.triggerKeywords = opts.triggers;
+          else agent.triggers = opts.triggers;
           updates.push(`triggers=[${opts.triggers.join(', ')}]`);
         }
         if (opts.model) {
-          if (!VALID_MODELS.includes(opts.model)) {
-            throw new Error(`Invalid model "${opts.model}". Valid options: ${VALID_MODELS.join(', ')}`);
-          }
-          agent.model = opts.model;
-          updates.push(`model=${opts.model}`);
+          const canonicalModel = resolveCanonicalModelIdentity(opts.model, { registerParametric: false }).id;
+          if (agent.preferredModel !== undefined) agent.preferredModel = canonicalModel;
+          else agent.model = canonicalModel;
+          updates.push(`model=${canonicalModel}`);
         }
         if (opts.description) {
           agent.description = opts.description;

@@ -28,7 +28,7 @@
   "deniedTools": [
     "Write"
   ],
-  "preferredModel": "opus",
+  "preferredModel": "claude-opus-4-8",
   "effortMultiplier": 1,
   "triggerKeywords": [
     "review",
@@ -97,7 +97,7 @@
       ]
     },
     "numerical": {
-      "preferredModel": "opus",
+      "preferredModel": "claude-opus-4-8",
       "costTier": "premium",
       "maxParallel": null
     }

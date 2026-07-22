@@ -445,7 +445,7 @@ export const VALID_PROVIDERS: readonly ProviderName[] = Object.keys(PROVIDER_MOD
  * `E_MODEL_PROVIDER_UNVERIFIED`. So a missing entry here does not merely fail
  * validation, it makes the provider unaddressable from a directive.
  */
-export const VALID_PROVIDERS_ALL: readonly string[] = [...VALID_PROVIDERS, 'ollama', 'openrouter'];
+export const VALID_PROVIDERS_ALL: readonly string[] = VALID_PROVIDERS;
 
 function requireDefaultModel(provider: ProviderName, tier: ModelStrategy['brain_tier']): ModelType {
   const model = modelRegistry.getByProviderAndTier(provider, tier);

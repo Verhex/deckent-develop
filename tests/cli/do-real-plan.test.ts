@@ -42,7 +42,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
 }));
@@ -102,7 +102,7 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
   return {
     mode: 'max_plan',
     activeModeConfig: {
-      max_workers: 8, brain_model: 'opus', default_model: 'sonnet',
+      max_workers: 8, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5',
       haiku_allowed: true, brain_planning: 'auto',
     },
     modes: {} as any,
@@ -128,7 +128,7 @@ function makePlannerTask(overrides?: Partial<PlannerTask>): PlannerTask {
   return {
     title: 'Backend export endpoints',
     description: 'Add POST /export/csv and /export/json handlers.',
-    model: 'sonnet', effort: 'normal', priority: 'NORMAL',
+    model: 'claude-sonnet-5', effort: 'normal', priority: 'NORMAL',
     reason: 'Single-module CRUD change, follows existing route pattern.',
     scope: { directories: ['src/api/'], filesRead: ['src/api/router.ts'], filesWrite: ['src/api/export.ts'] },
     dependencies: [],
@@ -180,7 +180,7 @@ function makeTask(overrides?: Partial<Task>): Task {
   return {
     id: '001-001', title: 'Backend export endpoints',
     description: 'Add POST /export/csv and /export/json handlers.',
-    model: 'sonnet', effort: 'normal', priority: 'NORMAL', reason: 'test',
+    model: 'claude-sonnet-5', effort: 'normal', priority: 'NORMAL', reason: 'test',
     scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/export.ts'] },
     dependencies: [],
     goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
@@ -291,7 +291,7 @@ describe('deckent do — flag-on, fake-planner-driven real multi-task plan (N678
       expect(mockCallZeroConfigPlanner).toHaveBeenCalledTimes(1);
       const [description, model] = mockCallZeroConfigPlanner.mock.calls[0]!;
       expect(description).toBe(goal);
-      expect(model).toBe('sonnet');
+      expect(model).toBe('claude-sonnet-5');
 
       // ── the REAL (unmocked) compileRunProposal/buildDirectives chain turned
       // that fake plan into genuine multi-task DIRECTIVES markdown — observed

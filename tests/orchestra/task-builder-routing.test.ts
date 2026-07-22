@@ -58,7 +58,7 @@ describe('task-builder — routing overrides', () => {
     it('parses Agent: override from directive', () => {
       const content = `# DIRECTIVES
 ## Task 1: Security Audit
-- Model: opus
+- Model: claude-opus-4-8
 - Agent: security-auditor
 - Files: src/auth/login.ts
 - Scope: src/auth/
@@ -117,7 +117,7 @@ Implement new command.
     it('directive without Agent/Skills has undefined overrides', () => {
       const content = `# DIRECTIVES
 ## Task 1: Basic task
-- Model: sonnet
+- Model: claude-sonnet-5
 - Files: src/core/utils.ts
 - Scope: src/core/
 

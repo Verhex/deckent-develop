@@ -59,6 +59,11 @@ import { SpawnBackendFactory } from '../../src/orchestra/spawn-backend.js';
 import { spawnWorker } from '../../src/orchestra/tmux.js';
 import { loadConfig } from '../../src/core/config.js';
 import { TaskStatus } from '../../src/core/types.js';
+import {
+  createTaskResultSettlement,
+  writeTaskResultSettlementAtomic,
+  type TaskResultSettlementRefV1,
+} from '../../src/core/task-result-settlement.js';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -67,7 +72,7 @@ function makeTaskJson(taskId: string, overrides?: Record<string, unknown>): Reco
     id: taskId,
     title: 'Lifecycle test task',
     description: 'Test description for spawn lifecycle',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -77,6 +82,7 @@ function makeTaskJson(taskId: string, overrides?: Record<string, unknown>): Reco
     status: TaskStatus.PENDING,
     sprintId: 'sprint-test',
     createdAt: new Date().toISOString(),
+    budget: { maxTurns: 1 },
     ...overrides,
   };
 }
@@ -98,10 +104,27 @@ function writeResult(taskId: string, selfAssessment: string): void {
       testsPassed: selfAssessment !== 'NO_GO',
       selfAssessment,
       notes: 'test result',
-      tokenUsage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, provider: 'claude', model: 'sonnet' },
+      tokenUsage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, provider: 'claude', model: 'claude-sonnet-5' },
     }, null, 2),
     'utf-8',
   );
+}
+
+function settleResult(
+  taskId: string,
+  selfAssessment: string,
+  opts: { settlementRef?: TaskResultSettlementRefV1 },
+): void {
+  writeResult(taskId, selfAssessment);
+  if (!opts.settlementRef) return;
+  const result = JSON.parse(
+    readFileSync(join(state.root, '.tasks', `task-${taskId}.result`), 'utf-8'),
+  );
+  writeTaskResultSettlementAtomic(createTaskResultSettlement({
+    ref: opts.settlementRef,
+    exitCode: 0,
+    result,
+  }));
 }
 
 function readTaskStatus(taskId: string): string {
@@ -131,9 +154,18 @@ beforeEach(() => {
   state.root = mkdtempSync(join(tmpdir(), 'spawn-lifecycle-'));
   mkdirSync(join(state.root, '.tasks'), { recursive: true });
   backendSpawn = vi.fn();
-  vi.mocked(SpawnBackendFactory.create).mockReturnValue({ name: 'docker', spawn: backendSpawn } as never);
+  vi.mocked(SpawnBackendFactory.create).mockReturnValue({
+    name: 'docker',
+    liveUsageBudgetSupport: 'measured-stream',
+    spawn: backendSpawn,
+  } as never);
   // routing_engine v1 → registerRun skips the V2 routing block (kept out of scope here)
-  vi.mocked(loadConfig).mockResolvedValue({ language: 'en', spawn_backend: 'docker', routing_engine: 'v2' } as never);
+  vi.mocked(loadConfig).mockResolvedValue({
+    language: 'en',
+    spawn_backend: 'docker',
+    routing_engine: 'v2',
+    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
+  } as never);
 });
 
 afterEach(() => {
@@ -145,21 +177,23 @@ afterEach(() => {
 
 describe('spawnWorkerMultiProvider — modelEffort pass-through', () => {
   it('passes a valid claude level to the config backend spawn as reasoningEffort', async () => {
-    await spawnWorkerMultiProvider('t-001', 'sonnet', 'prompt', state.root, {
+    await spawnWorkerMultiProvider('t-001', 'claude-sonnet-5', 'prompt', state.root, {
       spawnBackend: 'docker',
       modelEffort: 'high',
+      executionBudget: { maxTurns: 1 },
     });
 
     expect(backendSpawn).toHaveBeenCalledWith(
-      't-001', 'sonnet', 'prompt',
+      't-001', 'claude-sonnet-5', 'prompt',
       expect.objectContaining({ reasoningEffort: 'high' }),
     );
   });
 
   it('does NOT emit reasoningEffort for an invalid level (resolveReasoningEffort gate)', async () => {
-    await spawnWorkerMultiProvider('t-002', 'sonnet', 'prompt', state.root, {
+    await spawnWorkerMultiProvider('t-002', 'claude-sonnet-5', 'prompt', state.root, {
       spawnBackend: 'docker',
       modelEffort: 'turbo',
+      executionBudget: { maxTurns: 1 },
     });
 
     expect(backendSpawn).toHaveBeenCalledOnce();
@@ -168,23 +202,22 @@ describe('spawnWorkerMultiProvider — modelEffort pass-through', () => {
   });
 
   it('keeps opt-in semantics: no modelEffort → reasoningEffort undefined', async () => {
-    await spawnWorkerMultiProvider('t-003', 'sonnet', 'prompt', state.root, {
+    await spawnWorkerMultiProvider('t-003', 'claude-sonnet-5', 'prompt', state.root, {
       spawnBackend: 'docker',
+      executionBudget: { maxTurns: 1 },
     });
 
     const opts = backendSpawn.mock.calls[0]?.[3] as { reasoningEffort?: string };
     expect(opts.reasoningEffort).toBeUndefined();
   });
 
-  it('passes reasoningEffort on the tmux fallback path (no spawnBackend)', async () => {
-    await spawnWorkerMultiProvider('t-004', 'sonnet', 'prompt', state.root, {
+  it('holds the unmetered tmux fallback before provider work', async () => {
+    await expect(spawnWorkerMultiProvider('t-004', 'claude-sonnet-5', 'prompt', state.root, {
       modelEffort: 'max',
-    });
+      executionBudget: { maxTurns: 1 },
+    })).rejects.toThrow(/requires measured streaming usage/);
 
-    expect(spawnWorker).toHaveBeenCalledWith(
-      't-004', 'sonnet', 'prompt', state.root,
-      expect.objectContaining({ reasoningEffort: 'max' }),
-    );
+    expect(spawnWorker).not.toHaveBeenCalled();
   });
 });
 
@@ -218,7 +251,9 @@ describe('registerRun — --model-effort flag path', () => {
   it('forwards --model-effort through buildExecutionRequest to the backend spawn', async () => {
     // Simulate a blocking-style worker: write the result during spawn so the
     // run command returns immediately (no timeout wait).
-    backendSpawn.mockImplementation((taskId: string) => writeResult(taskId, 'DONE'));
+    backendSpawn.mockImplementation((taskId: string, _model: string, _prompt: string, opts: { settlementRef?: TaskResultSettlementRefV1 }) => {
+      settleResult(taskId, 'DONE', opts);
+    });
 
     await runCommand(['run', 'do a thing', '--model-effort', 'high', '--timeout', '3000']);
 
@@ -228,7 +263,9 @@ describe('registerRun — --model-effort flag path', () => {
   });
 
   it('emits no reasoningEffort for an invalid --model-effort level', async () => {
-    backendSpawn.mockImplementation((taskId: string) => writeResult(taskId, 'DONE'));
+    backendSpawn.mockImplementation((taskId: string, _model: string, _prompt: string, opts: { settlementRef?: TaskResultSettlementRefV1 }) => {
+      settleResult(taskId, 'DONE', opts);
+    });
 
     await runCommand(['run', 'do a thing', '--model-effort', 'turbo', '--timeout', '3000']);
 
@@ -297,7 +334,9 @@ describe('registerSpawn — status finalize when .result appears', () => {
   it('finalizes task JSON to DONE when the worker result is DONE', async () => {
     writeTaskJson('268-921');
     // Blocking-style backend (docker): result exists by the time spawn returns.
-    backendSpawn.mockImplementation((taskId: string) => writeResult(taskId, 'DONE'));
+    backendSpawn.mockImplementation((taskId: string, _model: string, _prompt: string, opts: { settlementRef?: TaskResultSettlementRefV1 }) => {
+      settleResult(taskId, 'DONE', opts);
+    });
 
     await runCommand(['spawn', '268-921']);
 
@@ -306,7 +345,9 @@ describe('registerSpawn — status finalize when .result appears', () => {
 
   it('finalizes task JSON to NO_GO when the worker result is NO_GO', async () => {
     writeTaskJson('268-922');
-    backendSpawn.mockImplementation((taskId: string) => writeResult(taskId, 'NO_GO'));
+    backendSpawn.mockImplementation((taskId: string, _model: string, _prompt: string, opts: { settlementRef?: TaskResultSettlementRefV1 }) => {
+      settleResult(taskId, 'NO_GO', opts);
+    });
 
     await runCommand(['spawn', '268-922']);
 

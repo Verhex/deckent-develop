@@ -107,8 +107,8 @@ function makeResolvedConfig(root: string): ResolvedConfig {
     mode: 'performance',
     activeModeConfig: {
       max_workers: 4,
-      brain_model: 'opus',
-      default_model: 'sonnet',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: true,
       brain_planning: 'structured',
     },
@@ -200,7 +200,11 @@ Test planning sprint.
       expect(taskJson.title).toBeDefined();
       expect(taskJson.description).toBeDefined();
       expect(taskJson.model).toBeTruthy();
-      expect(['opus', 'sonnet', 'haiku']).toContain(taskJson.model);
+      expect([
+        'claude-opus-4-8',
+        'claude-sonnet-5',
+        'claude-haiku-4-5-20251001',
+      ]).toContain(taskJson.model);
       expect(taskJson.scope).toBeDefined();
       expect(taskJson.scope.directories).toBeInstanceOf(Array);
       expect(taskJson.sprintId).toBe(sprint.id);

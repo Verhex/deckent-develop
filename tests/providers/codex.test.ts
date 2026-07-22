@@ -73,20 +73,21 @@ describe('CodexAdapter', () => {
       expect(adapter.supportedModels).toContain('o4-mini');
     });
 
-    it('should support exactly 11 models (6 builtin + 5 codex-parity)', () => {
+    it('should support exactly 9 canonical models (6 builtin + 3 pinned parity)', () => {
       // 2026-07-11 (MASTER-PLAN 538): providers/codex.ts registers
-      // CODEX_PARITY_MODELS (gpt-5.5 + gpt-5.6/-sol/-terra/-luna) into the
+      // CODEX_PARITY_MODELS (gpt-5.6-sol/-terra/-luna) into the
       // singleton registry at module-load, so the adapter's registry-derived
-      // model list grew 6 → 11. First-class ids replace the gpt-5→5.5 shim
-      // as the addressing path; the shim itself stays for backward-compat.
-      expect(adapter.supportedModels).toHaveLength(11);
-      for (const id of ['gpt-5.5', 'gpt-5.6', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']) {
+      // model list grows 6 → 9 with pinned IDs only.
+      expect(adapter.supportedModels).toHaveLength(9);
+      for (const id of ['gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']) {
         expect(adapter.supportedModels).toContain(id);
       }
+      expect(adapter.supportedModels).not.toContain('gpt-5.6');
     });
 
-    it('should support gpt-5, gpt-5-mini, gpt-4.1-mini models', () => {
-      expect(adapter.supportedModels).toContain('gpt-5');
+    it('should support gpt-5.5, gpt-5-mini, gpt-4.1-mini models', () => {
+      expect(adapter.supportedModels).toContain('gpt-5.5');
+      expect(adapter.supportedModels).not.toContain('gpt-5');
       expect(adapter.supportedModels).toContain('gpt-5-mini');
       expect(adapter.supportedModels).toContain('gpt-4.1-mini');
     });
@@ -481,6 +482,14 @@ describe('CodexAdapter', () => {
     it('should include the model', () => {
       const result = adapter.buildPlannerCommand('prompt', 'o4-mini');
       expect(result.args).toContain('o4-mini');
+      expect(result.calledProvider).toBe('codex');
+      expect(result.calledModel).toBe('o4-mini');
+    });
+
+    it('should expose the registry apiId as both wire and receipt model', () => {
+      const result = adapter.buildPlannerCommand('prompt', 'gpt-5.5');
+      expect(result.args).toContain('gpt-5.5');
+      expect(result.calledModel).toBe('gpt-5.5');
     });
   });
 
@@ -497,8 +506,8 @@ describe('CodexAdapter', () => {
   // ─── CODEX_TIER_MODELS ─────────────────────────────────────────────
 
   describe('CODEX_TIER_MODELS', () => {
-    it('should map premium to gpt-5', () => {
-      expect(CODEX_TIER_MODELS.premium).toBe('gpt-5');
+    it('should map premium to gpt-5.5', () => {
+      expect(CODEX_TIER_MODELS.premium).toBe('gpt-5.5');
     });
 
     it('should map standard to gpt-4.1', () => {
@@ -514,7 +523,7 @@ describe('CodexAdapter', () => {
 
   describe('getModelForTier()', () => {
     it('should return correct model for each tier', () => {
-      expect(adapter.getModelForTier('premium')).toBe('gpt-5');
+      expect(adapter.getModelForTier('premium')).toBe('gpt-5.5');
       expect(adapter.getModelForTier('standard')).toBe('gpt-4.1');
       expect(adapter.getModelForTier('economy')).toBe('gpt-5-mini');
     });

@@ -148,7 +148,7 @@ describe('brain sub-module integration — re-exports match direct imports', () 
       const params = {
         title: 'Test Task',
         description: 'A test',
-        model: 'sonnet' as const,
+        model: 'claude-sonnet-5' as const,
         effort: 'normal' as const,
         priority: 'NORMAL' as const,
         reason: 'test',
@@ -234,8 +234,8 @@ describe('brain sub-module integration — re-exports match direct imports', () 
         mode: 'max_plan',
         activeModeConfig: {
           max_workers: 8,
-          brain_model: 'opus' as const,
-          default_model: 'sonnet' as const,
+          brain_model: 'claude-opus-4-8' as const,
+          default_model: 'claude-sonnet-5' as const,
           haiku_allowed: true,
           brain_planning: 'auto' as const,
         },
@@ -260,7 +260,7 @@ describe('brain sub-module integration — re-exports match direct imports', () 
         sprintId: 'sprint-001',
       }, 1);
       expect(task.model).toBe(model);
-      expect(['opus', 'sonnet', 'haiku']).toContain(task.model);
+      expect(['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001']).toContain(task.model);
     });
 
     it('all exported functions are actual functions', () => {

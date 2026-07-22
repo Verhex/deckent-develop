@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { PROJECT_CONFIG_PATH } from './constants.js';
 import { readJsonSafeAsync } from './utils.js';
+import { modelRegistry } from './model-registry.js';
 import type {
   SubscriptionProfile,
   PlanMode,
@@ -56,11 +57,11 @@ function isClaudeCliAvailable(): boolean {
 // ─── Core Detection ───────────────────────────────────────────────────
 
 /**
- * Detect Claude subscription tier by probing opus model availability.
+ * Detect Claude subscription tier by probing the registry-selected premium model.
  *
- * - Runs: claude -p "respond with just your model name" --model opus
- * - Success (exit 0) → Max subscription (opus available)
- * - Failure (non-zero exit) → Pro subscription (opus not available)
+ * - Runs Claude CLI with the exact premium API id from ModelRegistry
+ * - Success (exit 0) → Max subscription (premium model available)
+ * - Failure (non-zero exit) → Pro subscription (premium model unavailable)
  * - CLI not found → Unknown
  * - Timeout (15s) → Unknown with graceful fallback
  */
@@ -78,9 +79,13 @@ export function detectSubscription(): SubscriptionProfile {
 
   let result: ReturnType<typeof spawnSync>;
   try {
+    const probeModel = modelRegistry.getByProviderAndTier('claude', 'premium');
+    if (!probeModel) {
+      return { detected: 'unknown', opusAvailable: false, testedAt, method: 'error' };
+    }
     result = spawnSync(
       'claude',
-      ['-p', 'respond with just your model name', '--model', 'opus'],
+      ['-p', 'respond with just your model name', '--model', probeModel.apiId],
       {
         encoding: 'utf-8',
         timeout: 15_000,

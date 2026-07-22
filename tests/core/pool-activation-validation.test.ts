@@ -372,13 +372,15 @@ describe('born-590: activation validation + visible-signal (AgentPoolManager)', 
   describe('AgentPoolManager.validateAgentDefinition — activation sub-cases', () => {
     it('accepts a valid agent with the real activation shape', () => {
       const result = AgentPoolManager.validateAgentDefinition({
-        id: 'x', name: 'X', activation: REAL_ACTIVATION_SHAPE,
+        id: 'x', name: 'X', preferredModel: 'claude-sonnet-5', activation: REAL_ACTIVATION_SHAPE,
       });
       expect(result.valid).toBe(true);
     });
 
     it('accepts an agent with no activation field (unvalidated, not narrowed)', () => {
-      const result = AgentPoolManager.validateAgentDefinition({ id: 'x', name: 'X' });
+      const result = AgentPoolManager.validateAgentDefinition({
+        id: 'x', name: 'X', preferredModel: 'claude-sonnet-5',
+      });
       expect(result.valid).toBe(true);
     });
 

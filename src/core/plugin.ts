@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { ModelType } from './types.js';
 import { readJsonSafe } from './utils.js';
+import { modelRegistry, resolveCanonicalModelIdentity } from './model-registry.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -48,9 +49,6 @@ export class PluginSecurityError extends Error {
 }
 
 // ─── Validation ──────────────────────────────────────────────────────────────
-
-import { ALL_MODELS } from './types.js';
-const VALID_MODELS: readonly ModelType[] = ALL_MODELS;
 
 export function validateManifest(raw: unknown, pluginDir: string): PluginManifest {
   if (!raw || typeof raw !== 'object') {
@@ -97,10 +95,12 @@ export function validateManifest(raw: unknown, pluginDir: string): PluginManifes
 
   // Validate model
   if (obj['model'] !== undefined) {
-    // safe: cast needed for includes() comparison; invalid values rejected by the throw below
-    if (!VALID_MODELS.includes(obj['model'] as ModelType)) {
+    try {
+      if (typeof obj['model'] !== 'string') throw new Error('invalid model type');
+      resolveCanonicalModelIdentity(obj['model'], { registerParametric: false });
+    } catch {
       throw new PluginError(
-        `Invalid manifest in ${pluginDir}: "model" must be one of ${VALID_MODELS.join(', ')}`
+        `Invalid manifest in ${pluginDir}: "model" must be a canonical registered API ID`
       );
     }
   }
@@ -450,13 +450,15 @@ export async function createPlugin(name: string, pluginsDir: string): Promise<Pl
     'utf8',
   );
 
+  const defaultSkillModel = modelRegistry.getByTier('standard').find(model => model.status === 'ga');
+  if (!defaultSkillModel) throw new PluginError('E_PLUGIN_DEFAULT_MODEL_UNAVAILABLE');
   const skillMd = [
     '---',
     `name: ${name}`,
     'version: 0.1.0',
     'description: ""',
     'triggers: []',
-    'model: opus',
+    `model: ${defaultSkillModel.id}`,
     '---',
     '',
     `# ${name}`,

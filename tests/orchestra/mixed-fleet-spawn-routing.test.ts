@@ -36,6 +36,7 @@ function makeBackend(root: string): SpawnBackend & { calls: SpawnRec[] } {
   const calls: SpawnRec[] = [];
   return {
     name: 'mock-docker',
+    liveUsageBudgetSupport: 'measured-stream' as const,
     spawn(taskId, model) {
       calls.push({ taskId, model });
       writeFileSync(
@@ -56,6 +57,7 @@ function makeOllamaAdapter(root: string): ProviderAdapter & { calls: SpawnRec[];
   const state = { calls: [] as SpawnRec[], refreshed: 0 };
   const adapter = {
     name: 'ollama' as ProviderName,
+    liveUsageBudgetSupport: 'measured-stream' as const,
     buildCommand: () => 'ollama',
     isAvailable: () => Promise.resolve(true),
     spawn(taskId: string, model: ModelType) {
@@ -93,6 +95,7 @@ function makeTask(id: string, provider: ProviderName, model: string, file: strin
     assignedAgent: 'generic',
     assignedSkills: [],
     provider,
+    budget: { maxTurns: 1 },
   } as unknown as Task;
 }
 
@@ -144,7 +147,7 @@ describe('Sprint 238 İŞ8 — mixed-provider fleet spawn routing', () => {
 
   it('routes ollama→host adapter and claude→docker backend (no cross-routing)', async () => {
     const ollamaTask = makeTask('OLL-1', 'ollama', 'qwen3.6:27b', 'src/ollama-out.ts');
-    const claudeTask = makeTask('CLA-1', 'claude', 'sonnet', 'src/claude-out.ts');
+    const claudeTask = makeTask('CLA-1', 'claude', 'claude-sonnet-5', 'src/claude-out.ts');
     const tasks = [ollamaTask, claudeTask];
     persist(tasks);
     const backend = makeBackend(root);
@@ -185,7 +188,7 @@ describe('Sprint 238 İŞ8 — mixed-provider fleet spawn routing', () => {
 
   it('both fleet paths produce a .result on disk (two-result disk-verify)', async () => {
     const ollamaTask = makeTask('OLL-3', 'ollama', 'qwen3.6:27b', 'src/o3.ts');
-    const claudeTask = makeTask('CLA-3', 'claude', 'sonnet', 'src/c3.ts');
+    const claudeTask = makeTask('CLA-3', 'claude', 'claude-sonnet-5', 'src/c3.ts');
     const tasks = [ollamaTask, claudeTask];
     persist(tasks);
     const backend = makeBackend(root);

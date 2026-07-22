@@ -76,7 +76,7 @@ describe('getDefaultModes', () => {
   it('performance: max_workers=8, brain_model=opus', () => {
     const modes = getDefaultModes();
     expect(modes.performance.max_workers).toBe(8);
-    expect(modes.performance.brain_model).toBe('opus');
+    expect(modes.performance.brain_model).toBe('claude-opus-4-8');
   });
 
   it('api: budget_per_sprint=5.0, requires=ANTHROPIC_API_KEY', () => {
@@ -104,7 +104,7 @@ describe('loadConfig', () => {
     const config = await loadConfig('/test/project');
     expect(config.mode).toBe('economic');
     expect(config.activeModeConfig.max_workers).toBe(3);
-    expect(config.activeModeConfig.brain_model).toBe('sonnet');
+    expect(config.activeModeConfig.brain_model).toBe('claude-sonnet-5');
   });
 
   it('merges global and project config', async () => {
@@ -135,7 +135,7 @@ describe('loadConfig', () => {
 
     const config = await loadConfig('/test/project');
     expect(config.modes.performance.max_workers).toBe(6);
-    expect(config.modes.performance.brain_model).toBe('opus'); // preserved
+    expect(config.modes.performance.brain_model).toBe('claude-opus-4-8'); // preserved
   });
 
   it('carries top-level max_workers through resolution (B-MAXWORKERS-WIRE not-a-dead-knob)', async () => {
@@ -517,37 +517,37 @@ describe('resolveMode', () => {
 
 describe('resolveBrainModel', () => {
   it("returns 'opus' for performance mode", () => {
-    expect(resolveBrainModel({ mode: 'performance' })).toBe('opus');
+    expect(resolveBrainModel({ mode: 'performance' })).toBe('claude-opus-4-8');
   });
 
   it("returns 'sonnet' for balanced mode", () => {
-    expect(resolveBrainModel({ mode: 'balanced' })).toBe('sonnet');
+    expect(resolveBrainModel({ mode: 'balanced' })).toBe('claude-sonnet-5');
   });
 
   it("returns 'sonnet' for economic mode", () => {
-    expect(resolveBrainModel({ mode: 'economic' })).toBe('sonnet');
+    expect(resolveBrainModel({ mode: 'economic' })).toBe('claude-sonnet-5');
   });
 
   it("returns 'opus' for api mode", () => {
-    expect(resolveBrainModel({ mode: 'api' })).toBe('opus');
+    expect(resolveBrainModel({ mode: 'api' })).toBe('claude-opus-4-8');
   });
 
   it('falls back to balanced brain_model for undefined config', () => {
-    expect(resolveBrainModel(undefined)).toBe('sonnet');
+    expect(resolveBrainModel(undefined)).toBe('claude-sonnet-5');
   });
 
   it('falls back to balanced brain_model for null config', () => {
-    expect(resolveBrainModel(null)).toBe('sonnet');
+    expect(resolveBrainModel(null)).toBe('claude-sonnet-5');
   });
 
   it('falls back to balanced brain_model for an unknown/corrupt mode string', () => {
     const cfg = { mode: 'totally_unknown_mode' as unknown as PlanMode };
-    expect(resolveBrainModel(cfg)).toBe('sonnet');
+    expect(resolveBrainModel(cfg)).toBe('claude-sonnet-5');
   });
 
   it('falls back to balanced brain_model when modes is present but missing the referenced mode key', () => {
     const cfg = { mode: 'performance' as PlanMode, modes: {} };
-    expect(resolveBrainModel(cfg)).toBe('sonnet');
+    expect(resolveBrainModel(cfg)).toBe('claude-sonnet-5');
   });
 
   it('does not throw for a malformed config object', () => {
@@ -557,37 +557,37 @@ describe('resolveBrainModel', () => {
 
 describe('resolveDefaultModel', () => {
   it("returns 'opus' for performance mode", () => {
-    expect(resolveDefaultModel({ mode: 'performance' })).toBe('opus');
+    expect(resolveDefaultModel({ mode: 'performance' })).toBe('claude-opus-4-8');
   });
 
   it("returns 'opus' for balanced mode", () => {
-    expect(resolveDefaultModel({ mode: 'balanced' })).toBe('opus');
+    expect(resolveDefaultModel({ mode: 'balanced' })).toBe('claude-opus-4-8');
   });
 
   it("returns 'sonnet' for economic mode", () => {
-    expect(resolveDefaultModel({ mode: 'economic' })).toBe('sonnet');
+    expect(resolveDefaultModel({ mode: 'economic' })).toBe('claude-sonnet-5');
   });
 
   it("returns 'sonnet' for api mode", () => {
-    expect(resolveDefaultModel({ mode: 'api' })).toBe('sonnet');
+    expect(resolveDefaultModel({ mode: 'api' })).toBe('claude-sonnet-5');
   });
 
   it('falls back to balanced default_model for undefined config', () => {
-    expect(resolveDefaultModel(undefined)).toBe('opus');
+    expect(resolveDefaultModel(undefined)).toBe('claude-opus-4-8');
   });
 
   it('falls back to balanced default_model for null config', () => {
-    expect(resolveDefaultModel(null)).toBe('opus');
+    expect(resolveDefaultModel(null)).toBe('claude-opus-4-8');
   });
 
   it('falls back to balanced default_model for an unknown/corrupt mode string', () => {
     const cfg = { mode: 'totally_unknown_mode' as unknown as PlanMode };
-    expect(resolveDefaultModel(cfg)).toBe('opus');
+    expect(resolveDefaultModel(cfg)).toBe('claude-opus-4-8');
   });
 
   it('falls back to balanced default_model when modes is present but missing the referenced mode key', () => {
     const cfg = { mode: 'performance' as PlanMode, modes: {} };
-    expect(resolveDefaultModel(cfg)).toBe('opus');
+    expect(resolveDefaultModel(cfg)).toBe('claude-opus-4-8');
   });
 
   it('does not throw for a malformed config object', () => {
@@ -620,7 +620,7 @@ describe('loadConfig — mode alias resolution', () => {
 
     const config = await loadConfig('/test/project');
     expect(config.mode).toBe('economic');
-    expect(config.activeModeConfig.brain_model).toBe('sonnet');
+    expect(config.activeModeConfig.brain_model).toBe('claude-sonnet-5');
   });
 
   it("resolves legacy alias 'unlimited' in project config to 'api' (with API key)", async () => {
@@ -637,14 +637,13 @@ describe('loadConfig — mode alias resolution', () => {
 // ─── Multi-Provider Config ──────────────────────────────────────────
 
 describe('VALID_PROVIDERS', () => {
-  it('contains claude, codex, gemini, ollama', () => {
-    // Sprint 202 Task 202-001: ollama joined the ProviderName union and is
-    // therefore now an Object.keys(PROVIDER_MODEL_MAP) member.
+  it('contains every provider represented by PROVIDER_MODEL_MAP', () => {
     expect(VALID_PROVIDERS).toContain('claude');
     expect(VALID_PROVIDERS).toContain('codex');
     expect(VALID_PROVIDERS).toContain('gemini');
     expect(VALID_PROVIDERS).toContain('ollama');
-    expect(VALID_PROVIDERS).toHaveLength(4);
+    expect(VALID_PROVIDERS).toContain('openrouter');
+    expect(VALID_PROVIDERS).toHaveLength(5);
   });
 });
 
@@ -1483,7 +1482,7 @@ describe('Plan tier generalization (sprint-072)', () => {
     const config = await loadConfig('/test/project');
     expect(config.mode).toBe('performance');
     expect(config.activeModeConfig.max_workers).toBe(8);
-    expect(config.activeModeConfig.brain_model).toBe('opus');
+    expect(config.activeModeConfig.brain_model).toBe('claude-opus-4-8');
   });
 
   it('DEFAULT_MODES contains all 4 canonical tiers', () => {
@@ -1504,6 +1503,6 @@ describe('Plan tier generalization (sprint-072)', () => {
     const config = await loadConfig('/test/project');
     expect(config.mode).toBe('economic');
     expect(config.activeModeConfig.max_workers).toBe(4);
-    expect(config.activeModeConfig.brain_model).toBe('sonnet'); // preserved from default
+    expect(config.activeModeConfig.brain_model).toBe('claude-sonnet-5'); // preserved from default
   });
 });

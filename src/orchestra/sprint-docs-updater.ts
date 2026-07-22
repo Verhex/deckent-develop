@@ -75,10 +75,11 @@ export function updateProjectDocs(projectRoot: string, sprintResult: SprintResul
   // pure-Ollama / pure-Codex configs don't silently materialize an `'opus'`
   // model their adapter can't run.
   const defaultProviderName = getDefaultProviderName() as RegistryProviderName;
-  const defaultPremiumModelId =
+  const defaultPremiumModel =
     modelRegistry.getByProviderAndTier(defaultProviderName, 'premium')?.id
-    ?? modelRegistry.getByProviderAndTier('claude', 'premium')?.id
-    ?? 'opus';
+    ?? modelRegistry.getByProviderAndTier(defaultProviderName, 'standard')?.id;
+  if (!defaultPremiumModel) throw new Error(`E_DOCS_MODEL_UNAVAILABLE: provider=${defaultProviderName}`);
+  const defaultPremiumModelId = defaultPremiumModel;
   const resolvedConfig: ResolvedConfig = config ?? {
     mode: 'performance',
     activeModeConfig: {

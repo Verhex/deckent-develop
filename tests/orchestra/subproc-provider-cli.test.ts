@@ -93,7 +93,7 @@ describe('SUBPROC-PROVIDER-CLI (364-002, born-481)', () => {
   describe('codex-provider task', () => {
     it('constructs SubprocessSpawnBackend with a codex providerConfig (not claude)', () => {
       const backend = new SubprocessBackend('/proj');
-      backend.spawn('t-codex-1', 'gpt-5' as ModelType, 'prompt', {});
+      backend.spawn('t-codex-1', 'gpt-5.5' as ModelType, 'prompt', {});
 
       expect(subprocessCtorSpy).toHaveBeenCalledTimes(1);
       const config = providerConfigFromCall(0);
@@ -103,10 +103,10 @@ describe('SUBPROC-PROVIDER-CLI (364-002, born-481)', () => {
 
     it('produces a `codex exec` command (string-assert) — the born-481 fix', () => {
       const backend = new SubprocessBackend('/proj');
-      backend.spawn('t-codex-2', 'gpt-5' as ModelType, 'prompt', { autoApprove: true });
+      backend.spawn('t-codex-2', 'gpt-5.5' as ModelType, 'prompt', { autoApprove: true });
 
       const config = providerConfigFromCall(0);
-      const args = config.buildArgs('gpt-5' as ModelType, { autoApprove: true });
+      const args = config.buildArgs('gpt-5.5' as ModelType, { autoApprove: true });
       const command = `${config.cliCommand} ${args.join(' ')}`;
 
       expect(command).toContain('codex exec');
@@ -120,42 +120,42 @@ describe('SUBPROC-PROVIDER-CLI (364-002, born-481)', () => {
 
     it('autoApprove appends the codex sandbox-bypass flag only when set', () => {
       const backend = new SubprocessBackend('/proj');
-      backend.spawn('t-codex-3', 'gpt-5' as ModelType, 'prompt', {});
+      backend.spawn('t-codex-3', 'gpt-5.5' as ModelType, 'prompt', {});
       const config = providerConfigFromCall(0);
 
-      const withoutApprove = config.buildArgs('gpt-5' as ModelType, {});
+      const withoutApprove = config.buildArgs('gpt-5.5' as ModelType, {});
       expect(withoutApprove).not.toContain('--dangerously-bypass-approvals-and-sandbox');
 
-      const withApprove = config.buildArgs('gpt-5' as ModelType, { autoApprove: true });
+      const withApprove = config.buildArgs('gpt-5.5' as ModelType, { autoApprove: true });
       expect(withApprove).toContain('--dangerously-bypass-approvals-and-sandbox');
     });
 
     it('applies codex reasoning-effort via -c model_reasoning_effort=<level>', () => {
       const backend = new SubprocessBackend('/proj');
-      backend.spawn('t-codex-4', 'gpt-5' as ModelType, 'prompt', {});
+      backend.spawn('t-codex-4', 'gpt-5.5' as ModelType, 'prompt', {});
       const config = providerConfigFromCall(0);
 
-      const args = config.buildArgs('gpt-5' as ModelType, { reasoningEffort: 'high' });
+      const args = config.buildArgs('gpt-5.5' as ModelType, { reasoningEffort: 'high' });
       expect(args).toContain('-c');
       expect(args).toContain('model_reasoning_effort=high');
     });
 
     it('carries the usage-emit flag ONLY via usageEmitArgs, never inline in buildArgs (dry-run stability)', () => {
       const backend = new SubprocessBackend('/proj');
-      backend.spawn('t-codex-5', 'gpt-5' as ModelType, 'prompt', {});
+      backend.spawn('t-codex-5', 'gpt-5.5' as ModelType, 'prompt', {});
       const config = providerConfigFromCall(0);
 
-      const args = config.buildArgs('gpt-5' as ModelType, {});
+      const args = config.buildArgs('gpt-5.5' as ModelType, {});
       expect(args).not.toContain('--json');
       expect(config.usageEmitArgs).toEqual(['--json']);
     });
 
     it('buildCommandString() also reads `codex exec ... < <promptPath>`', () => {
       const backend = new SubprocessBackend('/proj');
-      backend.spawn('t-codex-6', 'gpt-5' as ModelType, 'prompt', {});
+      backend.spawn('t-codex-6', 'gpt-5.5' as ModelType, 'prompt', {});
       const config = providerConfigFromCall(0);
 
-      const cmd = config.buildCommandString('gpt-5' as ModelType, '/tmp/.tasks/.prompt-t-codex-6.txt', {});
+      const cmd = config.buildCommandString('gpt-5.5' as ModelType, '/tmp/.tasks/.prompt-t-codex-6.txt', {});
       expect(cmd).toContain('codex exec');
       expect(cmd).toContain('< /tmp/.tasks/.prompt-t-codex-6.txt');
     });
@@ -166,7 +166,7 @@ describe('SUBPROC-PROVIDER-CLI (364-002, born-481)', () => {
   describe('claude-provider task', () => {
     it('constructs SubprocessSpawnBackend with the exact CLAUDE_SUBPROCESS_CONFIG singleton', () => {
       const backend = new SubprocessBackend('/proj');
-      backend.spawn('t-claude-1', 'sonnet' as ModelType, 'prompt', {});
+      backend.spawn('t-claude-1', 'claude-sonnet-5' as ModelType, 'prompt', {});
 
       const config = providerConfigFromCall(0);
       expect(config).toBe(CLAUDE_SUBPROCESS_CONFIG);
@@ -176,11 +176,11 @@ describe('SUBPROC-PROVIDER-CLI (364-002, born-481)', () => {
     it('buildArgs output is unchanged from CLAUDE_SUBPROCESS_CONFIG directly (byte-identical)', () => {
       const backend = new SubprocessBackend('/proj');
       const opts = { autoApprove: true, allowedTools: 'Read,Edit' };
-      backend.spawn('t-claude-2', 'sonnet' as ModelType, 'prompt', opts);
+      backend.spawn('t-claude-2', 'claude-sonnet-5' as ModelType, 'prompt', opts);
 
       const config = providerConfigFromCall(0);
-      const viaBackend = config.buildArgs('sonnet' as ModelType, opts);
-      const viaDirect = CLAUDE_SUBPROCESS_CONFIG.buildArgs('sonnet' as ModelType, opts);
+      const viaBackend = config.buildArgs('claude-sonnet-5' as ModelType, opts);
+      const viaDirect = CLAUDE_SUBPROCESS_CONFIG.buildArgs('claude-sonnet-5' as ModelType, opts);
       expect(viaBackend).toEqual(viaDirect);
     });
   });
@@ -214,7 +214,7 @@ describe('SUBPROC-PROVIDER-CLI (364-002, born-481)', () => {
     it('ollama (host-only, no ProviderCommandSpec) throws SpawnBackendError', () => {
       const backend = new SubprocessBackend('/proj');
       expect(() =>
-        backend.spawn('t-ollama-1', 'qwen-coder-32b' as ModelType, 'prompt', {}),
+        backend.spawn('t-ollama-1', 'qwen2.5-coder:32b' as ModelType, 'prompt', {}),
       ).toThrow(SpawnBackendError);
       expect(subprocessCtorSpy).not.toHaveBeenCalled();
     });
@@ -238,8 +238,8 @@ describe('SUBPROC-PROVIDER-CLI (364-002, born-481)', () => {
   describe('mixed-provider sprint (spawn_backend=subprocess for both claude + codex tasks)', () => {
     it('each provider gets its OWN SubprocessSpawnBackend instance with the right CLI', () => {
       const backend = new SubprocessBackend('/proj');
-      backend.spawn('t-mix-codex', 'gpt-5' as ModelType, 'prompt', {});
-      backend.spawn('t-mix-claude', 'sonnet' as ModelType, 'prompt', {});
+      backend.spawn('t-mix-codex', 'gpt-5.5' as ModelType, 'prompt', {});
+      backend.spawn('t-mix-claude', 'claude-sonnet-5' as ModelType, 'prompt', {});
 
       expect(subprocessCtorSpy).toHaveBeenCalledTimes(2);
       const codexConfig = providerConfigFromCall(0);
@@ -250,7 +250,7 @@ describe('SUBPROC-PROVIDER-CLI (364-002, born-481)', () => {
 
     it('spawning a SECOND codex task reuses the cached codex backend (no new construction)', () => {
       const backend = new SubprocessBackend('/proj');
-      backend.spawn('t-mix-codex-a', 'gpt-5' as ModelType, 'prompt', {});
+      backend.spawn('t-mix-codex-a', 'gpt-5.5' as ModelType, 'prompt', {});
       backend.spawn('t-mix-codex-b', 'o4-mini' as ModelType, 'prompt', {});
 
       // Both codex tasks share ONE constructed backend instance.
@@ -259,16 +259,16 @@ describe('SUBPROC-PROVIDER-CLI (364-002, born-481)', () => {
 
     it('list() aggregates workers across every provider backend', () => {
       const backend = new SubprocessBackend('/proj');
-      backend.spawn('t-list-codex', 'gpt-5' as ModelType, 'prompt', {});
-      backend.spawn('t-list-claude', 'sonnet' as ModelType, 'prompt', {});
+      backend.spawn('t-list-codex', 'gpt-5.5' as ModelType, 'prompt', {});
+      backend.spawn('t-list-claude', 'claude-sonnet-5' as ModelType, 'prompt', {});
 
       expect(backend.list().sort()).toEqual(['t-list-claude', 't-list-codex'].sort());
     });
 
     it('kill() routes to the backend instance that actually holds the taskId', () => {
       const backend = new SubprocessBackend('/proj');
-      backend.spawn('t-kill-codex', 'gpt-5' as ModelType, 'prompt', {});
-      backend.spawn('t-kill-claude', 'sonnet' as ModelType, 'prompt', {});
+      backend.spawn('t-kill-codex', 'gpt-5.5' as ModelType, 'prompt', {});
+      backend.spawn('t-kill-claude', 'claude-sonnet-5' as ModelType, 'prompt', {});
 
       const codexInstance = instanceFromCall(0);
       const claudeInstance = instanceFromCall(1);

@@ -114,7 +114,7 @@ vi.mock('../../src/core/system-profile.js', () => ({
 }));
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   resolveEffectiveWorkers: vi.fn().mockReturnValue(4),
   resolveLiveTraceEnabled: () => false,  // 583/N5 — spawn gate reads it; false = pre-N5 byte-stable opts
@@ -130,7 +130,7 @@ vi.mock('../../src/orchestra/result-watcher.js', () => ({
 vi.mock('../../src/orchestra/model-selector.js', () => ({
   calculateModelScore: vi.fn(),
   inferModelFromDirective: vi.fn(),
-  resolveTaskModel: vi.fn().mockReturnValue('sonnet'),
+  resolveTaskModel: vi.fn().mockReturnValue('claude-sonnet-5'),
   parsePatterns: vi.fn().mockReturnValue([]),
   deduplicatePatterns: vi.fn().mockReturnValue([]),
   suggestModelFromPatterns: vi.fn(),
@@ -374,7 +374,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '001-001',
     title: 'Test task',
     description: 'desc',
-    model: 'opus',
+    model: 'claude-opus-4-8',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -384,6 +384,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     status: TaskStatus.PENDING,
     sprintId: 'sprint-001',
     createdAt: new Date().toISOString(),
+    budget: { maxTurns: 1 },
     ...overrides,
   };
 }
@@ -410,10 +411,10 @@ function makeConfig(): ResolvedConfig {
     version: '1.0.0',
     activeModeConfig: {
       max_workers: 4,
-      default_model: 'opus',
+      default_model: 'claude-opus-4-8',
       haiku_allowed: false,
       brain_planning: 'structured',
-      brain_model: 'opus',
+      brain_model: 'claude-opus-4-8',
     },
     modes: {} as ResolvedConfig['modes'],
   } as ResolvedConfig;
@@ -460,8 +461,8 @@ describe('BrainError', () => {
         succeeded: false,
         requestedProvider: 'claude' as const,
         resolvedProvider: 'claude' as const,
-        requestedModel: 'opus' as const,
-        resolvedModel: 'opus' as const,
+        requestedModel: 'claude-opus-4-8' as const,
+        resolvedModel: 'claude-opus-4-8' as const,
         failureReason: 'spawn_failed',
       },
     };
@@ -912,22 +913,22 @@ describe('getChannelRegistry', () => {
 
 describe('resolveTaskProvider', () => {
   it('returns task.provider when explicitly set', () => {
-    const task = makeTask({ provider: 'codex', model: 'opus' });
+    const task = makeTask({ provider: 'codex', model: 'claude-opus-4-8' });
     expect(resolveTaskProvider(task)).toBe('codex');
   });
 
   it('infers claude from opus model', () => {
-    const task = makeTask({ model: 'opus' });
+    const task = makeTask({ model: 'claude-opus-4-8' });
     expect(resolveTaskProvider(task)).toBe('claude');
   });
 
   it('infers claude from sonnet model', () => {
-    const task = makeTask({ model: 'sonnet' });
+    const task = makeTask({ model: 'claude-sonnet-5' });
     expect(resolveTaskProvider(task)).toBe('claude');
   });
 
   it('infers claude from haiku model', () => {
-    const task = makeTask({ model: 'haiku' });
+    const task = makeTask({ model: 'claude-haiku-4-5-20251001' });
     expect(resolveTaskProvider(task)).toBe('claude');
   });
 
@@ -952,7 +953,7 @@ describe('resolveTaskProvider', () => {
   });
 
   it('explicit provider overrides model inference', () => {
-    const task = makeTask({ model: 'opus', provider: 'gemini' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'gemini' });
     expect(resolveTaskProvider(task)).toBe('gemini');
   });
 
@@ -1068,6 +1069,7 @@ describe('resolveDefaultUsageCli', () => {
 describe('spawnWorkers — provider routing', () => {
   const mockCodexAdapter = {
     name: 'codex',
+    liveUsageBudgetSupport: 'measured-stream' as const,
     supportedModels: ['gpt-4.1', 'o3', 'o4-mini'],
     spawn: vi.fn(),
     kill: vi.fn(),
@@ -1078,6 +1080,7 @@ describe('spawnWorkers — provider routing', () => {
 
   const mockGeminiAdapter = {
     name: 'gemini',
+    liveUsageBudgetSupport: 'measured-stream' as const,
     supportedModels: ['gemini-2.5-pro', 'gemini-2.5-flash'],
     spawn: vi.fn(),
     kill: vi.fn(),
@@ -1097,32 +1100,30 @@ describe('spawnWorkers — provider routing', () => {
     });
   });
 
-  it('spawns Claude tasks via tmux (backward compat, no backend)', async () => {
-    const task = makeTask({ id: '001-001', model: 'opus' });
+  it('holds Claude tasks before tmux worker dispatch', async () => {
+    const task = makeTask({ id: '001-001', model: 'claude-opus-4-8' });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
-    await spawnWorkers('/tmp/test', sprint, config);
+    await expect(spawnWorkers('/tmp/test', sprint, config))
+      .rejects.toThrow(/requires measured streaming usage/);
 
-    expect(mockedEnsureSession).toHaveBeenCalled();
-    expect(mockedSpawnWorker).toHaveBeenCalledWith(
-      '001-001', 'opus', expect.any(String), '/tmp/test',
-      expect.objectContaining({ autoApprove: false }),
-    );
+    expect(mockedEnsureSession).toHaveBeenCalledOnce();
+    expect(mockedSpawnWorker).not.toHaveBeenCalled();
     expect(mockCodexAdapter.spawn).not.toHaveBeenCalled();
     expect(mockGeminiAdapter.spawn).not.toHaveBeenCalled();
   });
 
   it('spawns Claude tasks via SpawnBackend when provided', async () => {
-    const mockBackend = { name: 'test', spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
-    const task = makeTask({ id: '001-001', model: 'sonnet' });
+    const mockBackend = { name: 'test', liveUsageBudgetSupport: 'measured-stream' as const, spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
+    const task = makeTask({ id: '001-001', model: 'claude-sonnet-5' });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
     await spawnWorkers('/tmp/test', sprint, config, { spawnBackend: mockBackend });
 
     expect(mockBackend.spawn).toHaveBeenCalledWith(
-      '001-001', 'sonnet', expect.any(String),
+      '001-001', 'claude-sonnet-5', expect.any(String),
       expect.objectContaining({ projectDir: '/tmp/test' }),
     );
     expect(mockedEnsureSession).not.toHaveBeenCalled();
@@ -1184,20 +1185,18 @@ describe('spawnWorkers — provider routing', () => {
   });
 
   it('handles mixed sprint: Claude + Codex + Gemini tasks', async () => {
-    const claudeTask = makeTask({ id: '001-001', model: 'opus' });
+    const mockBackend = { name: 'test', liveUsageBudgetSupport: 'measured-stream' as const, spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
+    const claudeTask = makeTask({ id: '001-001', model: 'claude-opus-4-8' });
     const codexTask = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
     const geminiTask = makeTask({ id: '003-001', model: 'gemini-2.5-pro', provider: 'gemini' });
     const sprint = makeSprint({ tasks: [claudeTask, codexTask, geminiTask] });
     const config = makeConfig();
 
-    await spawnWorkers('/tmp/test', sprint, config);
+    await spawnWorkers('/tmp/test', sprint, config, { spawnBackend: mockBackend });
 
-    // Claude via tmux
-    expect(mockedEnsureSession).toHaveBeenCalled();
-    expect(mockedSpawnWorker).toHaveBeenCalledTimes(1);
-    expect(mockedSpawnWorker).toHaveBeenCalledWith(
-      '001-001', 'opus', expect.any(String), '/tmp/test', expect.any(Object),
-    );
+    // Claude via measured test backend
+    expect(mockedEnsureSession).not.toHaveBeenCalled();
+    expect(mockBackend.spawn).toHaveBeenCalledTimes(1);
     // Codex via adapter
     expect(mockCodexAdapter.spawn).toHaveBeenCalledTimes(1);
     expect(mockCodexAdapter.spawn).toHaveBeenCalledWith(
@@ -1221,30 +1220,33 @@ describe('spawnWorkers — provider routing', () => {
   });
 
   it('no provider field defaults to claude for Claude models', async () => {
-    const task = makeTask({ id: '001-001', model: 'haiku' }); // no provider, Claude model
+    const mockBackend = { name: 'test', liveUsageBudgetSupport: 'measured-stream' as const, spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
+    const task = makeTask({ id: '001-001', model: 'claude-haiku-4-5-20251001' }); // no provider, Claude model
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
-    await spawnWorkers('/tmp/test', sprint, config);
+    await spawnWorkers('/tmp/test', sprint, config, { spawnBackend: mockBackend });
 
-    expect(mockedEnsureSession).toHaveBeenCalled();
-    expect(mockedSpawnWorker).toHaveBeenCalledWith(
-      '001-001', 'haiku', expect.any(String), '/tmp/test', expect.any(Object),
+    expect(mockedEnsureSession).not.toHaveBeenCalled();
+    expect(mockBackend.spawn).toHaveBeenCalledWith(
+      '001-001', 'claude-haiku-4-5-20251001', expect.any(String),
+      expect.objectContaining({ projectDir: '/tmp/test' }),
     );
   });
 
   it('returns queued tasks beyond max_workers', async () => {
+    const mockBackend = { name: 'test', liveUsageBudgetSupport: 'measured-stream' as const, spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
     const tasks = [
-      makeTask({ id: '001-001', model: 'opus' }),
-      makeTask({ id: '001-002', model: 'opus' }),
-      makeTask({ id: '001-003', model: 'opus' }),
-      makeTask({ id: '001-004', model: 'opus' }),
-      makeTask({ id: '001-005', model: 'opus' }),
+      makeTask({ id: '001-001', model: 'claude-opus-4-8' }),
+      makeTask({ id: '001-002', model: 'claude-opus-4-8' }),
+      makeTask({ id: '001-003', model: 'claude-opus-4-8' }),
+      makeTask({ id: '001-004', model: 'claude-opus-4-8' }),
+      makeTask({ id: '001-005', model: 'claude-opus-4-8' }),
     ];
     const sprint = makeSprint({ tasks });
     const config = makeConfig(); // maxWorkers = 4
 
-    const queued = await spawnWorkers('/tmp/test', sprint, config);
+    const queued = await spawnWorkers('/tmp/test', sprint, config, { spawnBackend: mockBackend });
 
     expect(queued).toHaveLength(1);
     expect(queued[0].id).toBe('001-005');
@@ -1334,7 +1336,7 @@ describe('cleanup — provider kill routing', () => {
   });
 
   it('does not call adapter kill for Claude tasks during cleanup', () => {
-    const task = makeTask({ id: '001-001', model: 'opus' });
+    const task = makeTask({ id: '001-001', model: 'claude-opus-4-8' });
     const sprint = makeSprint({ tasks: [task] });
 
     cleanup('/tmp/test', sprint);
@@ -2061,7 +2063,7 @@ describe('waitForResults timeout', () => {
 // ═══ Task 067-004: spawnWorkers sets task status to EXECUTING ════════
 
 describe('spawnWorkers — task status update to EXECUTING', () => {
-  const mockBackend = { name: 'test', spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
+  const mockBackend = { name: 'test', liveUsageBudgetSupport: 'measured-stream' as const, spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -2069,7 +2071,7 @@ describe('spawnWorkers — task status update to EXECUTING', () => {
   });
 
   it('updates task.status to EXECUTING after spawning via SpawnBackend', async () => {
-    const task = makeTask({ id: '001-001', model: 'sonnet', status: TaskStatus.PENDING });
+    const task = makeTask({ id: '001-001', model: 'claude-sonnet-5', status: TaskStatus.PENDING });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
@@ -2079,7 +2081,7 @@ describe('spawnWorkers — task status update to EXECUTING', () => {
   });
 
   it('writes task JSON with EXECUTING status to disk after spawn', async () => {
-    const task = makeTask({ id: '001-001', model: 'sonnet', status: TaskStatus.PENDING });
+    const task = makeTask({ id: '001-001', model: 'claude-sonnet-5', status: TaskStatus.PENDING });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 

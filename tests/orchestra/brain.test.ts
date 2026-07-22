@@ -118,9 +118,21 @@ vi.mock('../../src/agents/worker.js', () => ({
   isWorkerStoppable: vi.fn(() => true),
 }));
 
+vi.mock('../../src/core/live-execution-budget.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/live-execution-budget.js')>();
+  return {
+    ...actual,
+    assertLiveUsageBudgetSupport: vi.fn(),
+  };
+});
+
 vi.mock('../../src/orchestra/planner.js', () => ({
   resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
   normalizePlannerDependencies: () => ({ resolvedCount: 0, dropped: [] }),
+  createPlannerTaskModelPolicy: vi.fn((model: string, provider?: string) => ({
+    defaultModel: provider === 'codex' ? 'gpt-5.5' : model,
+    allowedModels: provider === 'codex' ? ['gpt-5.5'] : [model],
+  })),
   callBrainPlanner: vi.fn().mockReturnValue(null),
 }));
 
@@ -194,8 +206,8 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     mode: 'max_plan',
     activeModeConfig: {
       max_workers: 4,
-      brain_model: 'opus',
-      default_model: 'sonnet',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: false,
     },
     modes: {} as never,
@@ -212,7 +224,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '001-001',
     title: 'Test task',
     description: 'A test task',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -396,7 +408,7 @@ describe('readContext', () => {
 describe('createTask', () => {
   it('creates task with correct ID format', () => {
     const task = createTask({
-      title: 'Test', description: 'Desc', model: 'sonnet', effort: 'normal',
+      title: 'Test', description: 'Desc', model: 'claude-sonnet-5', effort: 'normal',
       priority: 'NORMAL', reason: 'test', scope: { directories: [], filesRead: [], filesWrite: [] },
       dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
       sprintId: 'sprint-001',
@@ -406,7 +418,7 @@ describe('createTask', () => {
 
   it('sets status to PENDING', () => {
     const task = createTask({
-      title: 'T', description: '', model: 'opus', effort: 'high',
+      title: 'T', description: '', model: 'claude-opus-4-8', effort: 'high',
       priority: 'CRITICAL', reason: '', scope: { directories: [], filesRead: [], filesWrite: [] },
       dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
       sprintId: 'sprint-002',
@@ -416,7 +428,7 @@ describe('createTask', () => {
 
   it('pads sequence to 3 digits', () => {
     const task = createTask({
-      title: 'T', description: '', model: 'sonnet', effort: 'normal',
+      title: 'T', description: '', model: 'claude-sonnet-5', effort: 'normal',
       priority: 'NORMAL', reason: '', scope: { directories: [], filesRead: [], filesWrite: [] },
       dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
       sprintId: 'sprint-003',
@@ -426,7 +438,7 @@ describe('createTask', () => {
 
   it('sets isPriorityFix when provided', () => {
     const task = createTask({
-      title: 'Fix', description: '', model: 'sonnet', effort: 'high',
+      title: 'Fix', description: '', model: 'claude-sonnet-5', effort: 'high',
       priority: 'CRITICAL', reason: '', scope: { directories: [], filesRead: [], filesWrite: [] },
       dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
       sprintId: 'sprint-001', isPriorityFix: true, fixForTaskId: '001-001',
@@ -634,7 +646,7 @@ describe('planSprint', () => {
   it('mode=auto uses AI result when available', async () => {
     mockedCallBrainPlanner.mockReturnValue({
       tasks: [{
-        title: 'AI Task', description: 'From AI', model: 'sonnet' as const,
+        title: 'AI Task', description: 'From AI', model: 'claude-sonnet-5' as const,
         effort: 'normal' as const, priority: 'HIGH' as const, reason: 'AI decided',
         scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
         dependencies: [], goNogo: { goCriteria: 'Pass', noGoCriteria: 'Fail', techDebtAcceptable: 'Minor' },
@@ -676,7 +688,7 @@ describe('planSprint', () => {
   function makeAiResult(count: number) {
     return {
       tasks: Array.from({ length: count }, (_, i) => ({
-        title: `AI Task ${i + 1}`, description: `From AI ${i + 1}`, model: 'sonnet' as const,
+        title: `AI Task ${i + 1}`, description: `From AI ${i + 1}`, model: 'claude-sonnet-5' as const,
         effort: 'normal' as const, priority: 'NORMAL' as const, reason: 'AI decided',
         scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
         dependencies: [], goNogo: { goCriteria: 'Pass', noGoCriteria: 'Fail', techDebtAcceptable: 'Minor' },
@@ -807,7 +819,7 @@ describe('confirmDraftTasks', () => {
 describe('createTask initialStatus', () => {
   it('uses initialStatus when provided', () => {
     const task = createTask({
-      title: 'T', description: 'D', model: 'sonnet', effort: 'normal', priority: 'NORMAL',
+      title: 'T', description: 'D', model: 'claude-sonnet-5', effort: 'normal', priority: 'NORMAL',
       reason: 'R', scope: { directories: [], filesRead: [], filesWrite: [] },
       dependencies: [], goNogo: { goCriteria: 'G', noGoCriteria: 'N', techDebtAcceptable: 'T' },
       sprintId: 'sprint-001', initialStatus: TaskStatus.DRAFT,
@@ -817,7 +829,7 @@ describe('createTask initialStatus', () => {
 
   it('defaults to PENDING when initialStatus not provided', () => {
     const task = createTask({
-      title: 'T', description: 'D', model: 'sonnet', effort: 'normal', priority: 'NORMAL',
+      title: 'T', description: 'D', model: 'claude-sonnet-5', effort: 'normal', priority: 'NORMAL',
       reason: 'R', scope: { directories: [], filesRead: [], filesWrite: [] },
       dependencies: [], goNogo: { goCriteria: 'G', noGoCriteria: 'N', techDebtAcceptable: 'T' },
       sprintId: 'sprint-001',
@@ -828,15 +840,14 @@ describe('createTask initialStatus', () => {
 
 describe('spawnWorkers', () => {
   const config = makeConfig();
-  const sprint = makeSprint();
 
   it('calls ensureSession first', async () => {
-    await spawnWorkers(ROOT, sprint, config);
+    await spawnWorkers(ROOT, makeSprint(), config);
     expect(mockedEnsureSession).toHaveBeenCalledTimes(1);
   });
 
   it('does NOT call startAuditor (scan loop runs in-process)', async () => {
-    await spawnWorkers(ROOT, sprint, config);
+    await spawnWorkers(ROOT, makeSprint(), config);
     // startAuditor is no longer imported — spawnWorkers only calls ensureSession + spawnWorker
     expect(mockedEnsureSession).toHaveBeenCalled();
   });
@@ -850,7 +861,7 @@ describe('spawnWorkers', () => {
   });
 
   it('includes task id in worker prompt', async () => {
-    await spawnWorkers(ROOT, sprint, config);
+    await spawnWorkers(ROOT, makeSprint(), config);
     const call = mockedSpawnWorker.mock.calls[0];
     expect(call?.[0]).toBe('001-001');
     expect(call?.[2]).toContain('001-001');
@@ -858,7 +869,7 @@ describe('spawnWorkers', () => {
   });
 
   it('updates dashboard after spawning', async () => {
-    await spawnWorkers(ROOT, sprint, config);
+    await spawnWorkers(ROOT, makeSprint(), config);
     expect(mockedUpdateDashboard).toHaveBeenCalledTimes(1);
   });
 });
@@ -1717,13 +1728,12 @@ describe('parseStructuredDirectives', () => {
 
 describe('spawnWorkers — autoApprove flag (DEBT-005)', () => {
   const config = makeConfig();
-  const sprint = makeSprint();
 
   it('passes autoApprove: false by default (not haiku_allowed)', async () => {
     const haikuConfig = makeConfig({
       activeModeConfig: { ...makeConfig().activeModeConfig, haiku_allowed: true },
     });
-    await spawnWorkers(ROOT, sprint, haikuConfig);
+    await spawnWorkers(ROOT, makeSprint(), haikuConfig);
     const call = mockedSpawnWorker.mock.calls[0];
     const opts = call?.[4] as { autoApprove?: boolean } | undefined;
     // haiku_allowed should NOT propagate to autoApprove
@@ -1731,14 +1741,14 @@ describe('spawnWorkers — autoApprove flag (DEBT-005)', () => {
   });
 
   it('passes autoApprove: true when spawnOpts.autoApprove is true', async () => {
-    await spawnWorkers(ROOT, sprint, config, { autoApprove: true });
+    await spawnWorkers(ROOT, makeSprint(), config, { autoApprove: true });
     const call = mockedSpawnWorker.mock.calls[0];
     const opts = call?.[4] as { autoApprove?: boolean } | undefined;
     expect(opts?.autoApprove).toBe(true);
   });
 
   it('passes autoApprove: false when spawnOpts.autoApprove is false', async () => {
-    await spawnWorkers(ROOT, sprint, config, { autoApprove: false });
+    await spawnWorkers(ROOT, makeSprint(), config, { autoApprove: false });
     const call = mockedSpawnWorker.mock.calls[0];
     const opts = call?.[4] as { autoApprove?: boolean } | undefined;
     expect(opts?.autoApprove).toBe(false);
@@ -2318,7 +2328,7 @@ describe('calculateModelScore + inferModelFromDirective', () => {
       }
     );
     // +3 (cross-module: src, agents, monitor = 3 modules) +2 (refactor) -1 (has 3 dirs, not single) = 4
-    expect(result).toBe('opus');
+    expect(result).toBe('claude-opus-4-8');
   });
 
   it('returns opus for score >= 4: many files', () => {
@@ -2332,7 +2342,7 @@ describe('calculateModelScore + inferModelFromDirective', () => {
       }
     );
     // +3 (20 files) +2 (refactor) -1 (single dir) = 4
-    expect(result).toBe('opus');
+    expect(result).toBe('claude-opus-4-8');
   });
 
   // ─── Test: Decision logic (haiku <= -1) ──────────────────────────────
@@ -2347,7 +2357,7 @@ describe('calculateModelScore + inferModelFromDirective', () => {
       }
     );
     // -2 (docs) -1 (single dir) = -3 ≤ -1
-    expect(result).toBe('haiku');
+    expect(result).toBe('claude-haiku-4-5-20251001');
   });
 
   it('returns haiku for score <= -1: test-only', () => {
@@ -2361,7 +2371,7 @@ describe('calculateModelScore + inferModelFromDirective', () => {
       }
     );
     // -1 (single dir) -1 (test-only) = -2 ≤ -1
-    expect(result).toBe('haiku');
+    expect(result).toBe('claude-haiku-4-5-20251001');
   });
 
   it('returns haiku for score <= -1: simple config', () => {
@@ -2375,7 +2385,7 @@ describe('calculateModelScore + inferModelFromDirective', () => {
       }
     );
     // -2 (config) -1 (single dir) = -3 ≤ -1
-    expect(result).toBe('haiku');
+    expect(result).toBe('claude-haiku-4-5-20251001');
   });
 
   // ─── Test: Decision logic (sonnet: -1 < score < 4) ──────────────────
@@ -2390,7 +2400,7 @@ describe('calculateModelScore + inferModelFromDirective', () => {
       }
     );
     // -1 (single dir) = -1, but >= is opus (4), <= is haiku (-1), so -1 returns haiku
-    expect(result).toBe('haiku');
+    expect(result).toBe('claude-haiku-4-5-20251001');
   });
 
   it('returns sonnet for score between -1 and 4: moderate refactoring', () => {
@@ -2407,7 +2417,7 @@ describe('calculateModelScore + inferModelFromDirective', () => {
       }
     );
     // +2 (refactor) -1 (single dir) = 1, which is -1 < 1 < 4 → sonnet
-    expect(result).toBe('sonnet');
+    expect(result).toBe('claude-sonnet-5');
   });
 
   it('returns sonnet for score between -1 and 4: medium file count', () => {
@@ -2429,7 +2439,7 @@ describe('calculateModelScore + inferModelFromDirective', () => {
       }
     );
     // +2 (7 files > 5) -1 (single dir) = 1 → sonnet
-    expect(result).toBe('sonnet');
+    expect(result).toBe('claude-sonnet-5');
   });
 
   // ─── Test: Real-world scenarios ──────────────────────────────────────
@@ -2457,7 +2467,7 @@ describe('calculateModelScore + inferModelFromDirective', () => {
     // +2 files doesn't trigger (+1 is > 5), single dir = -1
     // So: 0 or +2 (if system counts) -1 = -1 or +1
     // Let's be conservative: score should be >= -1 for sonnet at least
-    expect(['haiku', 'sonnet']).toContain(result);
+    expect(['claude-haiku-4-5-20251001', 'claude-sonnet-5']).toContain(result);
   });
 
   it('correctly scores Doc Task: BRAIN-GUIDE.md', () => {
@@ -2471,7 +2481,7 @@ describe('calculateModelScore + inferModelFromDirective', () => {
       }
     );
     // -2 (docs) -1 (single dir) = -3 ≤ -1 → haiku
-    expect(result).toBe('haiku');
+    expect(result).toBe('claude-haiku-4-5-20251001');
   });
 
   it('correctly scores Task Queue Fix: cross-module', () => {
@@ -2500,7 +2510,7 @@ describe('calculateModelScore + inferModelFromDirective', () => {
     // +3 (cross-module) = 3 < 4 → sonnet, but semantically this should be opus
     // The issue is we don't give enough points for non-architectural cross-module work
     // For now, let's test what the function returns
-    expect(['sonnet', 'opus']).toContain(result);
+    expect(['claude-sonnet-5', 'claude-opus-4-8']).toContain(result);
   });
 });
 
@@ -2519,7 +2529,7 @@ describe('updateProjectDocs', () => {
           id: '019-001',
           title: 'Feature Alpha',
           description: 'Implement alpha',
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           effort: 'normal',
           priority: 'NORMAL',
           reason: 'test',
@@ -2534,7 +2544,7 @@ describe('updateProjectDocs', () => {
           id: '019-002',
           title: 'Feature Beta',
           description: 'Implement beta',
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           effort: 'normal',
           priority: 'NORMAL',
           reason: 'test',
@@ -2727,4 +2737,3 @@ describe('updateProjectDocs', () => {
     expect(readmeCall).toBeUndefined();
   });
 });
-

@@ -168,13 +168,13 @@ describe('CLAUDE_SUBPROCESS_CONFIG usage-emit wiring', () => {
   });
 
   it('keeps the usage-emit flag OUT of buildArgs (spawn-only) so the arg-shape seam is stable', () => {
-    const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('sonnet');
+    const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('claude-sonnet-5');
     expect(args).not.toContain('--output-format');
-    expect(args).toEqual(['-p', '-', '--model', modelRegistry.resolveApiId('sonnet')]);
+    expect(args).toEqual(['-p', '-', '--model', modelRegistry.resolveApiId('claude-sonnet-5')]);
   });
 
   it('keeps the usage-emit flag OUT of buildCommandString (dry-run display stays stable)', () => {
-    const cmd = CLAUDE_SUBPROCESS_CONFIG.buildCommandString('opus', '/tmp/p.txt');
+    const cmd = CLAUDE_SUBPROCESS_CONFIG.buildCommandString('claude-opus-4-8', '/tmp/p.txt');
     expect(cmd).not.toContain('--output-format');
     expect(cmd).toBe('claude -p - --model claude-opus-4-8 < /tmp/p.txt');
   });

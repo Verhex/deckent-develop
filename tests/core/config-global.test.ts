@@ -264,7 +264,7 @@ describe('saveGlobalConfig — edge cases', () => {
         economic: {
           max_workers: 5,
           brain_model: 'sonnet',
-          default_model: 'sonnet',
+          default_model: 'claude-sonnet-5',
           haiku_allowed: false,
 
           brain_planning: 'auto',
@@ -298,7 +298,7 @@ describe('mergeConfigs — edge cases', () => {
         economic: {
           max_workers: 7,
           brain_model: 'sonnet',
-          default_model: 'sonnet',
+          default_model: 'claude-sonnet-5',
           haiku_allowed: false,
 
           brain_planning: 'auto',
@@ -315,7 +315,7 @@ describe('mergeConfigs — edge cases', () => {
         economic: {
           max_workers: 3,
           brain_model: 'sonnet',
-          default_model: 'sonnet',
+          default_model: 'claude-sonnet-5',
           haiku_allowed: false,
 
           brain_planning: 'auto',
@@ -327,7 +327,7 @@ describe('mergeConfigs — edge cases', () => {
         economic: {
           max_workers: 5,
           brain_model: 'sonnet',
-          default_model: 'sonnet',
+          default_model: 'claude-sonnet-5',
           haiku_allowed: false,
 
           brain_planning: 'auto',

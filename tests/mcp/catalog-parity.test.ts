@@ -125,7 +125,7 @@ describe('deckent_agent_manage', () => {
 
   it('add creates a new custom agent on disk', async () => {
     const tool = getTool();
-    const result = await tool.handler({ action: 'add', id: 'my-agent', name: 'My Agent', description: 'desc', model: 'sonnet', triggers: ['foo'], root: tmpDir });
+    const result = await tool.handler({ action: 'add', id: 'my-agent', name: 'My Agent', description: 'desc', model: 'claude-sonnet-5', triggers: ['foo'], root: tmpDir });
     const parsed = parseResult(result);
     expect(parsed.success).toBe(true);
 
@@ -134,7 +134,7 @@ describe('deckent_agent_manage', () => {
     expect(agent).toBeDefined();
     expect(agent!.name).toBe('My Agent');
     expect(agent!.source).toBe('user');
-    expect(agent!.preferredModel).toBe('sonnet');
+    expect(agent!.preferredModel).toBe('claude-sonnet-5');
     expect(agent!.triggerKeywords).toEqual(['foo']);
   });
 
@@ -143,7 +143,7 @@ describe('deckent_agent_manage', () => {
     await tool.handler({ action: 'add', id: 'bare-agent', root: tmpDir });
     const agent = new AgentPoolManager(tmpDir).getAgent('bare-agent');
     expect(agent!.name).toBe('bare-agent');
-    expect(agent!.preferredModel).toBe('sonnet');
+    expect(agent!.preferredModel).toBe('claude-sonnet-5');
   });
 
   it('add rejects a duplicate id', async () => {

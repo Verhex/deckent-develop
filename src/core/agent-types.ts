@@ -1,6 +1,7 @@
 // ─── Agent Pool Types ────────────────────────────────────────────────────────
 import type { ModelType } from './types.js';
 import type { ActivationConfig } from './routing-types.js';
+import { modelRegistry } from './model-registry.js';
 
 // ─── Agent Stats ─────────────────────────────────────────────────────────────
 
@@ -69,6 +70,13 @@ export function createDefaultStats(): AgentStats {
   };
 }
 
+/** Registry-derived standard GA model for synthesized/user agents. */
+export function resolveDefaultAgentModel(): ModelType {
+  const preferredModel = modelRegistry.getByTier('standard').find((model) => model.status === 'ga');
+  if (!preferredModel) throw new Error('E_AGENT_DEFAULT_MODEL_UNAVAILABLE');
+  return preferredModel.id as ModelType;
+}
+
 /**
  * Create an AgentDefinition with sensible defaults.
  * Requires at minimum `id` and `name`.
@@ -82,7 +90,7 @@ export function createAgentDefinition(
     expertise: [],
     allowedTools: [],
     deniedTools: [],
-    preferredModel: 'sonnet',
+    preferredModel: resolveDefaultAgentModel(),
     effortMultiplier: 1.0,
     triggerKeywords: [],
     triggerScopes: [],

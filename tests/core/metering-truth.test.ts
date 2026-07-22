@@ -55,46 +55,46 @@ describe('TT554 K1 — tariff/capability drift vs cost SSOT', () => {
     // The task claimed sonnet was under-priced (3/15, should be 5/25). Primary source
     // (bundled SSOT, _verified_at 2026-07-02) says 3/15 — so the registry is correct
     // and changing it would be the hardcode-without-evidence the nogo forbids.
-    const sonnetSsot = resolveSsotForModel({ id: 'sonnet', apiId: 'claude-sonnet-5' }, ssot)!;
+    const sonnetSsot = resolveSsotForModel({ id: 'claude-sonnet-5', apiId: 'claude-sonnet-5' }, ssot)!;
     expect(sonnetSsot.pricing.input_cost_per_token * 1e6).toBeCloseTo(3, 6);
     expect(sonnetSsot.pricing.output_cost_per_token * 1e6).toBeCloseTo(15, 6);
-    expect(of('sonnet', 'inputCostPerMTok').drift).toBe(false);
-    expect(of('sonnet', 'outputCostPerMTok').drift).toBe(false);
+    expect(of('claude-sonnet-5', 'inputCostPerMTok').drift).toBe(false);
+    expect(of('claude-sonnet-5', 'outputCostPerMTok').drift).toBe(false);
   });
 
   it('RED→GREEN: opus maxOutputTokens drift is now FIXED (128K, was unset)', () => {
     // RED — pre-fix synthetic opus WITHOUT maxOutputTokens is flagged by the detector.
     const preFix: ModelDefinition[] = [
-      { ...BUILTIN_MODELS.find(m => m.id === 'opus')!, maxOutputTokens: undefined },
+      { ...BUILTIN_MODELS.find(m => m.id === 'claude-opus-4-8')!, maxOutputTokens: undefined },
     ];
     const red = detectTariffDrift(preFix, ssot).find(d => d.field === 'maxOutputTokens')!;
     expect(red.drift).toBe(true);
     expect(red.ssotValue).toBe(128_000);
 
     // GREEN — the real (fixed) registry entry now matches the SSOT.
-    expect(of('opus', 'maxOutputTokens').registryValue).toBe(128_000);
-    expect(of('opus', 'maxOutputTokens').drift).toBe(false);
+    expect(of('claude-opus-4-8', 'maxOutputTokens').registryValue).toBe(128_000);
+    expect(of('claude-opus-4-8', 'maxOutputTokens').drift).toBe(false);
   });
 
   it('RED→GREEN: haiku maxOutputTokens drift is now FIXED (64K, was unset)', () => {
     const preFix: ModelDefinition[] = [
-      { ...BUILTIN_MODELS.find(m => m.id === 'haiku')!, maxOutputTokens: undefined },
+      { ...BUILTIN_MODELS.find(m => m.id === 'claude-haiku-4-5-20251001')!, maxOutputTokens: undefined },
     ];
     const red = detectTariffDrift(preFix, ssot).find(d => d.field === 'maxOutputTokens')!;
     expect(red.drift).toBe(true);
     expect(red.ssotValue).toBe(64_000);
 
-    expect(of('haiku', 'maxOutputTokens').registryValue).toBe(64_000);
-    expect(of('haiku', 'maxOutputTokens').drift).toBe(false);
+    expect(of('claude-haiku-4-5-20251001', 'maxOutputTokens').registryValue).toBe(64_000);
+    expect(of('claude-haiku-4-5-20251001', 'maxOutputTokens').drift).toBe(false);
   });
 
   it('SURFACES (not silences) the known haiku cost drift 0.8/4 vs SSOT 1/5', () => {
     // Deliberately NOT changed in the registry (would red the read-only
     // model-registry.test.ts:429). The detector proves it is caught, loudly.
-    expect(of('haiku', 'inputCostPerMTok').registryValue).toBe(0.8);
-    expect(of('haiku', 'inputCostPerMTok').ssotValue).toBeCloseTo(1, 6);
-    expect(of('haiku', 'inputCostPerMTok').drift).toBe(true);
-    expect(of('haiku', 'outputCostPerMTok').drift).toBe(true);
+    expect(of('claude-haiku-4-5-20251001', 'inputCostPerMTok').registryValue).toBe(0.8);
+    expect(of('claude-haiku-4-5-20251001', 'inputCostPerMTok').ssotValue).toBeCloseTo(1, 6);
+    expect(of('claude-haiku-4-5-20251001', 'inputCostPerMTok').drift).toBe(true);
+    expect(of('claude-haiku-4-5-20251001', 'outputCostPerMTok').drift).toBe(true);
   });
 
   it('after the maxOut fix, the ONLY residual claude drift is the known haiku cost', () => {
@@ -103,7 +103,7 @@ describe('TT554 K1 — tariff/capability drift vs cost SSOT', () => {
     expect(drifts.some(d => d.field === 'maxOutputTokens')).toBe(false);
     expect(drifts.some(d => d.field === 'contextWindow')).toBe(false);
     // Everything left is haiku cost, and only haiku cost.
-    expect(drifts.every(d => d.modelId === 'haiku' && d.field.endsWith('CostPerMTok'))).toBe(true);
+    expect(drifts.every(d => d.modelId === 'claude-haiku-4-5-20251001' && d.field.endsWith('CostPerMTok'))).toBe(true);
     expect(drifts).toHaveLength(2);
   });
 });
@@ -113,8 +113,8 @@ describe('TT554 K1 — tariff/capability drift vs cost SSOT', () => {
 describe('TT554 K2 — cost-ledger bridge + variance alert', () => {
   it('prices EVERY entry incl off-task helper calls (haiku helper on-ledger)', () => {
     const entries: CostLedgerEntry[] = [
-      { model: 'sonnet', usage: { inputTokens: 1_000_000, outputTokens: 100_000 }, kind: 'task' },
-      { model: 'haiku', usage: { inputTokens: 50_000, outputTokens: 5_000 }, kind: 'helper' },
+      { model: 'claude-sonnet-5', usage: { inputTokens: 1_000_000, outputTokens: 100_000 }, kind: 'task' },
+      { model: 'claude-haiku-4-5-20251001', usage: { inputTokens: 50_000, outputTokens: 5_000 }, kind: 'helper' },
     ];
     const ledger = buildCostLedger(entries, bundledConfig(), 'claude');
     // sonnet 1M*$3 + 100k*$15 = 4.5 ; haiku 50k*$1 + 5k*$5 = 0.075 (SSOT rates)
@@ -122,7 +122,7 @@ describe('TT554 K2 — cost-ledger bridge + variance alert', () => {
     expect(ledger.unpricedCount).toBe(0);
     const helper = ledger.rows.find(r => r.kind === 'helper')!;
     expect(helper.usd).toBeGreaterThan(0); // the haiku helper is NOT off-ledger
-    expect(helper.model).toBe('haiku');
+    expect(helper.model).toBe('claude-haiku-4-5-20251001');
   });
 
   it('detects the 413-002/003 under-count (provider $8.48 vs ledger $5.08 = ~40%)', () => {
@@ -149,8 +149,8 @@ describe('TT554 K2 — cost-ledger bridge + variance alert', () => {
   it('reconcile ties the bridge under-count to a loud alert', () => {
     const log = vi.fn();
     const entries: CostLedgerEntry[] = [
-      { model: 'sonnet', usage: { inputTokens: 1_000_000, outputTokens: 100_000 } },
-      { model: 'haiku', usage: { inputTokens: 50_000, outputTokens: 5_000 }, kind: 'helper' },
+      { model: 'claude-sonnet-5', usage: { inputTokens: 1_000_000, outputTokens: 100_000 } },
+      { model: 'claude-haiku-4-5-20251001', usage: { inputTokens: 50_000, outputTokens: 5_000 }, kind: 'helper' },
     ];
     const { ledger, variance, warned } = reconcileLedgerAgainstProvider(
       entries,

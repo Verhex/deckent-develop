@@ -53,6 +53,7 @@ vi.mock('../../src/monitor/auditor.js', () => ({
 
 vi.mock('../../src/orchestra/planner.js', () => ({
   resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
+  createPlannerTaskModelPolicy: vi.fn((defaultModel: string) => ({ defaultModel, allowedModels: [defaultModel] })),
   callBrainPlannerWithReason: vi.fn().mockReturnValue({
     ok: false,
     reason: 'parse_failed',
@@ -105,7 +106,7 @@ vi.mock('../../src/core/stack-detector.js', () => ({
 
 vi.mock('../../src/orchestra/model-selector.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/orchestra/model-selector.js')>();
-  return { ...actual, resolveTaskModel: vi.fn().mockReturnValue('sonnet') };
+  return { ...actual, resolveTaskModel: vi.fn().mockReturnValue('claude-sonnet-5') };
 });
 
 vi.mock('../../src/core/utils.js', async (importOriginal) => {
@@ -180,8 +181,8 @@ function makeConfig(): ResolvedConfig {
     mode: 'max_plan',
     activeModeConfig: {
       max_workers: 4,
-      brain_model: 'opus',
-      default_model: 'sonnet',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: false,
       brain_planning: 'auto',
     },
@@ -330,13 +331,13 @@ describe('planner overflow guard: >2x tasks → notify', () => {
       ok: true,
       data: {
         tasks: [
-          { title: 'T1', description: 'd', model: 'sonnet', effort: 'normal', priority: 'NORMAL',
+          { title: 'T1', description: 'd', model: 'claude-sonnet-5', effort: 'normal', priority: 'NORMAL',
             reason: 'r', scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
             dependencies: [], goNogo: { goCriteria: 'go', noGoCriteria: 'nogo', techDebtAcceptable: '' } },
-          { title: 'T2', description: 'd', model: 'sonnet', effort: 'normal', priority: 'NORMAL',
+          { title: 'T2', description: 'd', model: 'claude-sonnet-5', effort: 'normal', priority: 'NORMAL',
             reason: 'r', scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
             dependencies: [], goNogo: { goCriteria: 'go', noGoCriteria: 'nogo', techDebtAcceptable: '' } },
-          { title: 'T3', description: 'd', model: 'sonnet', effort: 'normal', priority: 'NORMAL',
+          { title: 'T3', description: 'd', model: 'claude-sonnet-5', effort: 'normal', priority: 'NORMAL',
             reason: 'r', scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
             dependencies: [], goNogo: { goCriteria: 'go', noGoCriteria: 'nogo', techDebtAcceptable: '' } },
         ],

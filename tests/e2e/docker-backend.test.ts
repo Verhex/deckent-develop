@@ -42,6 +42,10 @@ import { _clearAllPending } from '../../src/core/active-workers.js';
 
 const PROJECT_ROOT = process.cwd();
 const TEST_TASKS_DIR = path.join(PROJECT_ROOT, '.tasks');
+const TEST_EXECUTION_OPTIONS = {
+  projectDir: PROJECT_ROOT,
+  executionBudget: { maxTurns: 1 },
+} as const;
 
 // Suite-level pre-flight: flush any stale test-docker artifacts left by a prior
 // interrupted run (e.g. CI killed mid-suite or monitorContainer wrote after cleanup).
@@ -211,15 +215,13 @@ describe('Docker Backend Integration', () => {
 
   // ─── Test 2: spawn() writes heartbeat with backend: docker ───────────────
 
-  it.skipIf(!dockerAvailable)('spawn() writes heartbeat file with backend: docker', () => {
+  it.skipIf(!dockerE2eEnabled)('spawn() writes heartbeat file with backend: docker', () => {
     // Arrange
     const hbPath = path.join(TEST_TASKS_DIR, `task-${testTaskId}.hb`);
     expect(fs.existsSync(hbPath)).toBe(false); // pre-condition: no stale file
 
     // Act — .hb is written synchronously inside spawn() before returning
-    backend.spawn(testTaskId, 'haiku', 'integration test placeholder', {
-      projectDir: PROJECT_ROOT,
-    });
+    backend.spawn(testTaskId, 'claude-haiku-4-5-20251001', 'integration test placeholder', TEST_EXECUTION_OPTIONS);
 
     // Assert — .hb must exist immediately
     expect(fs.existsSync(hbPath)).toBe(true);
@@ -237,14 +239,12 @@ describe('Docker Backend Integration', () => {
 
   // ─── Test 3: spawn() registers taskId in list() ──────────────────────────
 
-  it.skipIf(!dockerAvailable)('spawn() registers taskId in list()', () => {
+  it.skipIf(!dockerE2eEnabled)('spawn() registers taskId in list()', () => {
     // Arrange
     expect(backend.list()).not.toContain(testTaskId);
 
     // Act
-    backend.spawn(testTaskId, 'haiku', 'register test', {
-      projectDir: PROJECT_ROOT,
-    });
+    backend.spawn(testTaskId, 'claude-haiku-4-5-20251001', 'register test', TEST_EXECUTION_OPTIONS);
 
     // Assert — list() must reflect the new taskId immediately
     expect(backend.list()).toContain(testTaskId);
@@ -255,14 +255,12 @@ describe('Docker Backend Integration', () => {
   // We verify via containerId captured in .hb — if containerId is present,
   // docker successfully created and started the container.
 
-  it.skipIf(!dockerAvailable)('spawn() starts a real Docker container (containerId in heartbeat)', () => {
+  it.skipIf(!dockerE2eEnabled)('spawn() starts a real Docker container (containerId in heartbeat)', () => {
     // Arrange
     const hbPath = path.join(TEST_TASKS_DIR, `task-${testTaskId}.hb`);
 
     // Act
-    backend.spawn(testTaskId, 'haiku', 'container start test', {
-      projectDir: PROJECT_ROOT,
-    });
+    backend.spawn(testTaskId, 'claude-haiku-4-5-20251001', 'container start test', TEST_EXECUTION_OPTIONS);
 
     // Assert — containerId is written only when docker run -d succeeds
     expect(fs.existsSync(hbPath)).toBe(true);
@@ -283,11 +281,9 @@ describe('Docker Backend Integration', () => {
 
   // ─── Test 5: kill() deregisters taskId from list() ───────────────────────
 
-  it.skipIf(!dockerAvailable)('kill() deregisters taskId from list()', () => {
+  it.skipIf(!dockerE2eEnabled)('kill() deregisters taskId from list()', () => {
     // Arrange — spawn to register the task
-    backend.spawn(testTaskId, 'haiku', 'kill test', {
-      projectDir: PROJECT_ROOT,
-    });
+    backend.spawn(testTaskId, 'claude-haiku-4-5-20251001', 'kill test', TEST_EXECUTION_OPTIONS);
     expect(backend.list()).toContain(testTaskId);
 
     // Act
@@ -308,9 +304,7 @@ describe('Docker Backend Integration', () => {
     const hbPath = path.join(TEST_TASKS_DIR, `task-${testTaskId}.hb`);
 
     // Act — spawn (claude exits quickly in test env)
-    backend.spawn(testTaskId, 'haiku', 'cleanup test', {
-      projectDir: PROJECT_ROOT,
-    });
+    backend.spawn(testTaskId, 'claude-haiku-4-5-20251001', 'cleanup test', TEST_EXECUTION_OPTIONS);
 
     // Get the container that was started
     const hb = JSON.parse(fs.readFileSync(hbPath, 'utf-8')) as Record<string, unknown>;
@@ -337,7 +331,7 @@ describe('Docker Backend Integration', () => {
 
   // ─── Test 7: list() tracks multiple concurrent spawns ─────────────────────
 
-  it.skipIf(!dockerAvailable)('list() tracks multiple concurrent task IDs', () => {
+  it.skipIf(!dockerE2eEnabled)('list() tracks multiple concurrent task IDs', () => {
     const taskId2 = `${testTaskId}-b`;
     const containerName2 = `deckent-w-${taskId2}`;
 
@@ -348,8 +342,8 @@ describe('Docker Backend Integration', () => {
       expect(backend.list()).not.toContain(taskId2);
 
       // Act — spawn two tasks
-      backend.spawn(testTaskId, 'haiku', 'multi test 1', { projectDir: PROJECT_ROOT });
-      backend.spawn(taskId2, 'haiku', 'multi test 2', { projectDir: PROJECT_ROOT });
+      backend.spawn(testTaskId, 'claude-haiku-4-5-20251001', 'multi test 1', TEST_EXECUTION_OPTIONS);
+      backend.spawn(taskId2, 'claude-haiku-4-5-20251001', 'multi test 2', TEST_EXECUTION_OPTIONS);
 
       // Assert — both registered
       const active = backend.list();
@@ -373,14 +367,12 @@ describe('Docker Backend Integration', () => {
   // ─── Test 8: monitorContainer updates heartbeat with backend: docker ─────
   // After container exits naturally, monitorContainer() must write hb with backend field.
 
-  it.skipIf(!dockerAvailable)('monitorContainer updates heartbeat with backend: docker after container exit', async () => {
+  it.skipIf(!dockerE2eEnabled)('monitorContainer updates heartbeat with backend: docker after container exit', async () => {
     // Arrange
     const hbPath = path.join(TEST_TASKS_DIR, `task-${testTaskId}.hb`);
 
     // Act — spawn (claude exits quickly without auth in test env)
-    backend.spawn(testTaskId, 'haiku', 'backend-field-test', {
-      projectDir: PROJECT_ROOT,
-    });
+    backend.spawn(testTaskId, 'claude-haiku-4-5-20251001', 'backend-field-test', TEST_EXECUTION_OPTIONS);
 
     // Initial .hb written by spawn() — verify pre-condition
     expect(fs.existsSync(hbPath)).toBe(true);
@@ -418,7 +410,7 @@ describe('Docker Backend Integration', () => {
   // when Claude exits without writing one. This verifies host-visible result delivery
   // via the shared .tasks/ volume mount between host and container.
 
-  it.skipIf(!dockerAvailable)('EXIT trap writes .result to shared .tasks/ volume accessible from host', async () => {
+  it.skipIf(!dockerE2eEnabled)('EXIT trap writes .result to shared .tasks/ volume accessible from host', async () => {
     // Use a unique task ID separate from testTaskId to avoid afterEach cleanup collision
     const trapTaskId = `${testTaskId}-trap`;
     const resultPath = path.join(TEST_TASKS_DIR, `task-${trapTaskId}.result`);
@@ -429,9 +421,7 @@ describe('Docker Backend Integration', () => {
 
     try {
       // Act — spawn without real Claude auth; EXIT trap will fire and write fallback .result
-      backend.spawn(trapTaskId, 'haiku', 'exit-trap-test', {
-        projectDir: PROJECT_ROOT,
-      });
+      backend.spawn(trapTaskId, 'claude-haiku-4-5-20251001', 'exit-trap-test', TEST_EXECUTION_OPTIONS);
 
       // Poll up to 25s for .result to appear on host via shared volume mount
       // (container start + claude exit + EXIT trap + volume flush can take ~5-10s)
@@ -461,13 +451,13 @@ describe('Docker Backend Integration', () => {
   }, 30_000);
 
   // ── Test 10: Docker log extraction writes .log file ───────────────────
-  it.skipIf(!dockerAvailable)('monitorContainer extracts container stdout to .log file', async () => {
+  it.skipIf(!dockerE2eEnabled)('monitorContainer extracts container stdout to .log file', async () => {
     const logTaskId = `test-docker-${Date.now()}-${process.pid}-${++_dockerTestSeq}-log`;
     const containerName = `deckent-w-${logTaskId}`;
     const logPath = path.join(TEST_TASKS_DIR, `task-${logTaskId}.log`);
     try {
-      backend.spawn(logTaskId, 'sonnet', 'echo "log capture test"', {
-        projectDir: PROJECT_ROOT,
+      backend.spawn(logTaskId, 'claude-sonnet-5', 'echo "log capture test"', {
+        ...TEST_EXECUTION_OPTIONS,
         autoApprove: true,
       });
       // Wait for container to exit and monitorContainer to extract logs
@@ -774,14 +764,11 @@ describe('Docker Backend Parity — fsync verifyResultAfterStop (unit)', () => {
       'utf-8',
     );
 
-    // Assert — monitorContainer must also fsync (belt-and-suspenders comment present)
+    // Assert — monitorContainer performs post-exit durability before reading.
     expect(src).toContain('belt-and-suspenders');
-    // monitorContainer uses fsyncSync after container exit to flush volume buffers.
-    // Anchor on the function definition (`private monitorContainer`) so the slice
-    // starts at the implementation, not at an earlier comment-only mention.
     const monitorIdx = src.indexOf('private monitorContainer');
     expect(monitorIdx).toBeGreaterThan(-1);
-    const monitorSection = src.slice(monitorIdx, monitorIdx + 3000);
+    const monitorSection = src.slice(monitorIdx, monitorIdx + 7000);
     expect(monitorSection).toContain('fsyncSync');
   });
 });

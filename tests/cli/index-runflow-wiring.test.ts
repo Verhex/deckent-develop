@@ -150,7 +150,7 @@ function printed(): string {
 function flagOffConfig(): unknown {
   return {
     mode: 'max_plan',
-    activeModeConfig: { max_workers: 4, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: true, brain_planning: 'auto' },
+    activeModeConfig: { max_workers: 4, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: true, brain_planning: 'auto' },
     language: 'en',
     projectName: 'test',
     projectRoot: '/mock/root',

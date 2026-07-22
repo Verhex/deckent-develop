@@ -20,7 +20,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: 'test-001',
     title: 'Test task',
     description: 'Test',
-    model: 'opus',
+    model: 'claude-opus-4-8',
     effort: 'normal',
     priority: 'normal',
     reason: 'test',
@@ -132,21 +132,21 @@ describe('applyRateLimitFailover', () => {
   });
 
   it('returns null when task is already api authMode (no overflow needed)', () => {
-    const task = makeTask({ authMode: 'api', model: 'gpt-5', provider: 'codex' });
+    const task = makeTask({ authMode: 'api', model: 'gpt-5.5', provider: 'codex' });
     const result = makeResult('429 rate limit exceeded');
     // resolveWithOverflow returns reason='already_api' → applyRateLimitFailover returns null
     expect(applyRateLimitFailover(task, result)).toBeNull();
   });
 
   it('returns null when non-exhausted rateLimitState provided (no throttle signal)', () => {
-    const task = makeTask({ model: 'opus', provider: 'claude', authMode: 'subscription' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude', authMode: 'subscription' });
     // notes have no 429; rateLimitState has plenty remaining → shouldThrottle=false
     const result = makeResult('Worker ran out of time');
     expect(applyRateLimitFailover(task, result, FINE_STATE)).toBeNull();
   });
 
   it('opus-sub → gpt-5-api: detects 429 in notes and overflows to codex', () => {
-    const task = makeTask({ model: 'opus', provider: 'claude', authMode: 'subscription' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude', authMode: 'subscription' });
     const result = makeResult('Error 429: rate limit exceeded on claude.ai');
 
     const resolution = applyRateLimitFailover(task, result);
@@ -157,12 +157,12 @@ describe('applyRateLimitFailover', () => {
     expect(resolution!.task.authMode).toBe('api');
     expect(resolution!.task.provider).toBe('codex');
     // opus is premium tier → codex equivalent premium = gpt-5
-    expect(resolution!.fallbackModel).toBe('gpt-5');
+    expect(resolution!.fallbackModel).toBe('gpt-5.5');
     expect(resolution!.fallbackProvider).toBe('codex');
   });
 
   it('uses provided exhausted rateLimitState to trigger failover without 429 in notes', () => {
-    const task = makeTask({ model: 'sonnet', provider: 'claude', authMode: 'subscription' });
+    const task = makeTask({ model: 'claude-sonnet-5', provider: 'claude', authMode: 'subscription' });
     const result = makeResult('Some generic failure message'); // no '429' text
 
     const resolution = applyRateLimitFailover(task, result, EXHAUSTED_STATE);
@@ -174,20 +174,20 @@ describe('applyRateLimitFailover', () => {
   });
 
   it('returned fallback model is in the model registry and same tier as original', () => {
-    const task = makeTask({ model: 'opus', provider: 'claude', authMode: 'subscription' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude', authMode: 'subscription' });
     const result = makeResult('429 Too Many Requests');
 
     const resolution = applyRateLimitFailover(task, result);
 
     expect(resolution?.fallbackModel).toBeTruthy();
     // Both opus (claude) and gpt-5 (codex) are premium tier
-    expect(modelRegistry.getTier('opus')).toBe('premium');
+    expect(modelRegistry.getTier('claude-opus-4-8')).toBe('premium');
     expect(modelRegistry.getTier(resolution!.fallbackModel!)).toBe('premium');
   });
 
   it('overflowed task preserves all non-provider fields from original', () => {
     const task = makeTask({
-      model: 'opus',
+      model: 'claude-opus-4-8',
       provider: 'claude',
       authMode: 'subscription',
       title: 'Important Task',
@@ -209,7 +209,7 @@ describe('applyRateLimitFailover', () => {
 describe('MidSprintAdapter.handleRateLimitFailover', () => {
   it('returns new task when 429 detected in result notes', () => {
     const adapter = makeAdapter();
-    const task = makeTask({ model: 'opus', provider: 'claude', authMode: 'subscription' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude', authMode: 'subscription' });
     const result = makeResult('429 rate limit hit, retry after 60 seconds');
 
     const newTask = adapter.handleRateLimitFailover(task, result);
@@ -217,12 +217,12 @@ describe('MidSprintAdapter.handleRateLimitFailover', () => {
     expect(newTask).not.toBeNull();
     expect(newTask!.provider).toBe('codex');
     expect(newTask!.authMode).toBe('api');
-    expect(newTask!.model).toBe('gpt-5');
+    expect(newTask!.model).toBe('gpt-5.5');
   });
 
   it('returns null when no 429 detected in notes', () => {
     const adapter = makeAdapter();
-    const task = makeTask({ model: 'opus', provider: 'claude', authMode: 'subscription' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude', authMode: 'subscription' });
     const result = makeResult('Task failed due to scope violation');
 
     expect(adapter.handleRateLimitFailover(task, result)).toBeNull();
@@ -230,7 +230,7 @@ describe('MidSprintAdapter.handleRateLimitFailover', () => {
 
   it('uses explicit exhausted rateLimitState when notes have no 429', () => {
     const adapter = makeAdapter();
-    const task = makeTask({ model: 'opus', provider: 'claude', authMode: 'subscription' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude', authMode: 'subscription' });
     const result = makeResult('Worker failed unexpectedly');
 
     const newTask = adapter.handleRateLimitFailover(task, result, EXHAUSTED_STATE);
@@ -242,7 +242,7 @@ describe('MidSprintAdapter.handleRateLimitFailover', () => {
 
   it('returns null when task is already on api authMode', () => {
     const adapter = makeAdapter();
-    const task = makeTask({ model: 'gpt-5', provider: 'codex', authMode: 'api' });
+    const task = makeTask({ model: 'gpt-5.5', provider: 'codex', authMode: 'api' });
     const result = makeResult('429 rate limit exceeded');
 
     // already_api → resolveWithOverflow returns overflowed=false → handleRateLimitFailover=null

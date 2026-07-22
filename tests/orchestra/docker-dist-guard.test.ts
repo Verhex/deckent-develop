@@ -28,9 +28,10 @@ vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
   spawn: vi.fn(() => {
     const stub = {
-      stdout: { on: vi.fn() },
-      stderr: { on: vi.fn() },
+      stdout: { on: vi.fn(), resume: vi.fn() },
+      stderr: { on: vi.fn(), resume: vi.fn() },
       on: vi.fn(),
+      once: vi.fn(),
     };
     return stub as unknown as ChildProcess;
   }),
@@ -77,6 +78,7 @@ import { spawnSync } from 'node:child_process';
 import { DockerSpawnBackend, buildDistReadOnlyMountArgs } from '../../src/orchestra/spawn-backend-docker.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
+const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
 
 // ─── 1. Pure helper — the regression guard ──────────────────────────────────
 
@@ -132,8 +134,8 @@ function installSpawnRouter(): void {
       outcome = successOutcome;
     } else if (cmd === 'docker' && sub === 'inspect') {
       outcome = inspectOutcome;
-    } else if (cmd === 'claude' && sub === '--version') {
-      outcome = { stdout: 'claude 1.0.0 (host auth ok)', stderr: '', status: 0 };
+    } else if (cmd === 'claude' && argv.join(' ') === 'auth status --json') {
+      outcome = { stdout: '{"loggedIn":true}', stderr: '', status: 0 };
     } else {
       outcome = fallback;
     }
@@ -158,7 +160,7 @@ describe('DockerSpawnBackend: dist/ read-only mount wiring (born-644 B542)', () 
 
   it('adds the read-only dist/ mount to `docker run` argv when dist/ exists', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('dist-guard-present', 'sonnet', 'prompt-body');
+    backend.spawn('dist-guard-present', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -168,7 +170,7 @@ describe('DockerSpawnBackend: dist/ read-only mount wiring (born-644 B542)', () 
   it('omits the dist/ mount when dist/ does not exist (no phantom host dir)', () => {
     distAbsentPath = '/test/project/dist';
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('dist-guard-absent', 'sonnet', 'prompt-body');
+    backend.spawn('dist-guard-absent', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -177,7 +179,7 @@ describe('DockerSpawnBackend: dist/ read-only mount wiring (born-644 B542)', () 
 
   it('keeps every pre-existing mount byte-identical — only the new ro-mount is additive', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('dist-guard-parity', 'sonnet', 'prompt-body');
+    backend.spawn('dist-guard-parity', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;

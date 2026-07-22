@@ -16,11 +16,11 @@ describe('model-equivalence', () => {
   // ─── getModelTier ─────────────────────────────────────────────────
   describe('getModelTier', () => {
     it('returns premium for opus', () => {
-      expect(getModelTier('opus')).toBe('premium');
+      expect(getModelTier('claude-opus-4-8')).toBe('premium');
     });
 
     it('returns premium for gpt-5', () => {
-      expect(getModelTier('gpt-5')).toBe('premium');
+      expect(getModelTier('gpt-5.5')).toBe('premium');
     });
 
     it('returns premium for gemini-2.5-pro', () => {
@@ -28,7 +28,7 @@ describe('model-equivalence', () => {
     });
 
     it('returns standard for sonnet', () => {
-      expect(getModelTier('sonnet')).toBe('standard');
+      expect(getModelTier('claude-sonnet-5')).toBe('standard');
     });
 
     it('returns standard for gpt-4.1', () => {
@@ -44,7 +44,7 @@ describe('model-equivalence', () => {
     });
 
     it('returns economy for haiku', () => {
-      expect(getModelTier('haiku')).toBe('economy');
+      expect(getModelTier('claude-haiku-4-5-20251001')).toBe('economy');
     });
 
     it('returns economy for gpt-5-mini', () => {
@@ -71,68 +71,68 @@ describe('model-equivalence', () => {
   // ─── getEquivalentModel — Claude → Codex ──────────────────────────
   describe('getEquivalentModel — Claude to Codex', () => {
     it('opus → gpt-5 for codex (premium tier)', () => {
-      expect(getEquivalentModel('opus', 'codex')).toBe('gpt-5');
+      expect(getEquivalentModel('claude-opus-4-8', 'codex')).toBe('gpt-5.5');
     });
 
     it('sonnet → gpt-4.1 for codex (standard tier)', () => {
-      expect(getEquivalentModel('sonnet', 'codex')).toBe('gpt-4.1');
+      expect(getEquivalentModel('claude-sonnet-5', 'codex')).toBe('gpt-4.1');
     });
 
     it('haiku → gpt-5-mini for codex (economy tier)', () => {
-      expect(getEquivalentModel('haiku', 'codex')).toBe('gpt-5-mini');
+      expect(getEquivalentModel('claude-haiku-4-5-20251001', 'codex')).toBe('gpt-5-mini');
     });
   });
 
   // ─── getEquivalentModel — Claude → Gemini ─────────────────────────
   describe('getEquivalentModel — Claude to Gemini', () => {
     it('opus → gemini-2.5-pro for gemini', () => {
-      expect(getEquivalentModel('opus', 'gemini')).toBe('gemini-2.5-pro');
+      expect(getEquivalentModel('claude-opus-4-8', 'gemini')).toBe('gemini-2.5-pro');
     });
 
     it('sonnet → gemini-2.5-flash for gemini', () => {
-      expect(getEquivalentModel('sonnet', 'gemini')).toBe('gemini-2.5-flash');
+      expect(getEquivalentModel('claude-sonnet-5', 'gemini')).toBe('gemini-2.5-flash');
     });
 
     it('haiku → gemini-2.0-flash for gemini (economy tier)', () => {
-      expect(getEquivalentModel('haiku', 'gemini')).toBe('gemini-2.0-flash');
+      expect(getEquivalentModel('claude-haiku-4-5-20251001', 'gemini')).toBe('gemini-2.0-flash');
     });
   });
 
   // ─── getEquivalentModel — Codex → Claude ──────────────────────────
   describe('getEquivalentModel — Codex to Claude', () => {
     it('gpt-5 → opus for claude (premium)', () => {
-      expect(getEquivalentModel('gpt-5', 'claude')).toBe('opus');
+      expect(getEquivalentModel('gpt-5.5', 'claude')).toBe('claude-opus-4-8');
     });
 
     it('gpt-4.1 → sonnet for claude (standard)', () => {
-      expect(getEquivalentModel('gpt-4.1', 'claude')).toBe('sonnet');
+      expect(getEquivalentModel('gpt-4.1', 'claude')).toBe('claude-sonnet-5');
     });
 
-    it('o3 → opus for claude (premium_plus falls back to premium)', () => {
-      expect(getEquivalentModel('o3', 'claude')).toBe('opus');
+    it('o3 → fable for claude (premium_plus exact tier)', () => {
+      expect(getEquivalentModel('o3', 'claude')).toBe('claude-fable-5');
     });
 
     it('gpt-5-mini → haiku for claude (economy)', () => {
-      expect(getEquivalentModel('gpt-5-mini', 'claude')).toBe('haiku');
+      expect(getEquivalentModel('gpt-5-mini', 'claude')).toBe('claude-haiku-4-5-20251001');
     });
 
     it('gpt-4.1-mini → haiku for claude (economy)', () => {
-      expect(getEquivalentModel('gpt-4.1-mini', 'claude')).toBe('haiku');
+      expect(getEquivalentModel('gpt-4.1-mini', 'claude')).toBe('claude-haiku-4-5-20251001');
     });
 
     it('o4-mini → sonnet for claude (standard)', () => {
-      expect(getEquivalentModel('o4-mini', 'claude')).toBe('sonnet');
+      expect(getEquivalentModel('o4-mini', 'claude')).toBe('claude-sonnet-5');
     });
   });
 
   // ─── getEquivalentModel — same provider ───────────────────────────
   describe('getEquivalentModel — same provider', () => {
     it('opus → opus for claude', () => {
-      expect(getEquivalentModel('opus', 'claude')).toBe('opus');
+      expect(getEquivalentModel('claude-opus-4-8', 'claude')).toBe('claude-opus-4-8');
     });
 
     it('gpt-5 → gpt-5 for codex', () => {
-      expect(getEquivalentModel('gpt-5', 'codex')).toBe('gpt-5');
+      expect(getEquivalentModel('gpt-5.5', 'codex')).toBe('gpt-5.5');
     });
 
     it('gpt-4.1 → gpt-4.1 for codex', () => {
@@ -155,7 +155,7 @@ describe('model-equivalence', () => {
   // ─── getEquivalentModel — Gemini → Codex ──────────────────────────
   describe('getEquivalentModel — Gemini to Codex', () => {
     it('gemini-2.5-pro → gpt-5 for codex (premium)', () => {
-      expect(getEquivalentModel('gemini-2.5-pro', 'codex')).toBe('gpt-5');
+      expect(getEquivalentModel('gemini-2.5-pro', 'codex')).toBe('gpt-5.5');
     });
 
     it('gemini-2.5-flash → gpt-4.1 for codex (standard)', () => {
@@ -170,7 +170,7 @@ describe('model-equivalence', () => {
   // ─── getEquivalentModel — Codex → Gemini ──────────────────────────
   describe('getEquivalentModel — Codex to Gemini', () => {
     it('gpt-5 → gemini-2.5-pro for gemini (premium)', () => {
-      expect(getEquivalentModel('gpt-5', 'gemini')).toBe('gemini-2.5-pro');
+      expect(getEquivalentModel('gpt-5.5', 'gemini')).toBe('gemini-2.5-pro');
     });
 
     it('gpt-4.1 → gemini-2.5-flash for gemini (standard)', () => {
@@ -197,30 +197,30 @@ describe('model-equivalence', () => {
   // ─── getEquivalentModel — Gemini → Claude ─────────────────────────
   describe('getEquivalentModel — Gemini to Claude', () => {
     it('gemini-2.5-pro → opus for claude (premium)', () => {
-      expect(getEquivalentModel('gemini-2.5-pro', 'claude')).toBe('opus');
+      expect(getEquivalentModel('gemini-2.5-pro', 'claude')).toBe('claude-opus-4-8');
     });
 
     it('gemini-2.5-flash → sonnet for claude (standard)', () => {
-      expect(getEquivalentModel('gemini-2.5-flash', 'claude')).toBe('sonnet');
+      expect(getEquivalentModel('gemini-2.5-flash', 'claude')).toBe('claude-sonnet-5');
     });
 
     it('gemini-2.0-flash → haiku for claude (economy)', () => {
-      expect(getEquivalentModel('gemini-2.0-flash', 'claude')).toBe('haiku');
+      expect(getEquivalentModel('gemini-2.0-flash', 'claude')).toBe('claude-haiku-4-5-20251001');
     });
   });
 
   // ─── isModelAvailable ─────────────────────────────────────────────
   describe('isModelAvailable', () => {
     it('opus is available on claude', () => {
-      expect(isModelAvailable('opus', 'claude')).toBe(true);
+      expect(isModelAvailable('claude-opus-4-8', 'claude')).toBe(true);
     });
 
     it('opus is NOT available on codex', () => {
-      expect(isModelAvailable('opus', 'codex')).toBe(false);
+      expect(isModelAvailable('claude-opus-4-8', 'codex')).toBe(false);
     });
 
     it('gpt-5 is available on codex', () => {
-      expect(isModelAvailable('gpt-5', 'codex')).toBe(true);
+      expect(isModelAvailable('gpt-5.5', 'codex')).toBe(true);
     });
 
     it('gpt-5-mini is available on codex', () => {
@@ -236,7 +236,7 @@ describe('model-equivalence', () => {
     });
 
     it('gpt-5 is NOT available on claude', () => {
-      expect(isModelAvailable('gpt-5', 'claude')).toBe(false);
+      expect(isModelAvailable('gpt-5.5', 'claude')).toBe(false);
     });
 
     it('gemini-2.5-pro is available on gemini', () => {
@@ -248,7 +248,7 @@ describe('model-equivalence', () => {
     });
 
     it('haiku is NOT available on gemini', () => {
-      expect(isModelAvailable('haiku', 'gemini')).toBe(false);
+      expect(isModelAvailable('claude-haiku-4-5-20251001', 'gemini')).toBe(false);
     });
 
     it('gemini-2.0-flash is NOT available on claude', () => {
@@ -259,11 +259,11 @@ describe('model-equivalence', () => {
   // ─── getModelProvider ─────────────────────────────────────────────
   describe('getModelProvider', () => {
     it('opus belongs to claude', () => {
-      expect(getModelProvider('opus')).toBe('claude');
+      expect(getModelProvider('claude-opus-4-8')).toBe('claude');
     });
 
     it('gpt-5 belongs to codex', () => {
-      expect(getModelProvider('gpt-5')).toBe('codex');
+      expect(getModelProvider('gpt-5.5')).toBe('codex');
     });
 
     it('gpt-5-mini belongs to codex', () => {
@@ -293,27 +293,39 @@ describe('model-equivalence', () => {
 
   // ─── getModelsInTier ──────────────────────────────────────────────
   describe('getModelsInTier', () => {
-    it('premium tier has 3 models', () => {
-      expect(getModelsInTier('premium')).toEqual(['opus', 'gpt-5', 'gemini-2.5-pro']);
+    it('premium tier exposes every registered canonical API id', () => {
+      expect(getModelsInTier('premium')).toEqual([
+        'claude-opus-4-8', 'gpt-5.5', 'gemini-2.5-pro', 'gpt-5.6-sol',
+      ]);
     });
 
-    it('standard tier has 4 models', () => {
-      expect(getModelsInTier('standard')).toEqual(['sonnet', 'gpt-4.1', 'o4-mini', 'gemini-2.5-flash']);
+    it('standard tier exposes every registered canonical API id', () => {
+      expect(getModelsInTier('standard')).toEqual([
+        'claude-sonnet-5', 'gpt-4.1', 'o4-mini', 'gemini-2.5-flash', 'gpt-5.6-terra',
+      ]);
     });
 
-    it('economy tier has 4 models', () => {
-      expect(getModelsInTier('economy')).toEqual(['haiku', 'gpt-5-mini', 'gpt-4.1-mini', 'gemini-2.0-flash']);
+    it('economy tier exposes every registered canonical API id', () => {
+      expect(getModelsInTier('economy')).toEqual([
+        'claude-haiku-4-5-20251001', 'gpt-5-mini', 'gpt-4.1-mini',
+        'gemini-2.0-flash', 'gpt-5.6-luna',
+      ]);
     });
   });
 
   // ─── getProviderModels ────────────────────────────────────────────
   describe('getProviderModels', () => {
     it('claude has 4 models', () => {
-      expect(getProviderModels('claude')).toEqual(['fable', 'opus', 'sonnet', 'haiku']);
+      expect(getProviderModels('claude')).toEqual([
+        'claude-fable-5', 'claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001',
+      ]);
     });
 
-    it('codex has 6 models', () => {
-      expect(getProviderModels('codex')).toEqual(['o3', 'gpt-5', 'gpt-4.1', 'o4-mini', 'gpt-5-mini', 'gpt-4.1-mini']);
+    it('codex exposes the base and versioned canonical API ids', () => {
+      expect(getProviderModels('codex')).toEqual([
+        'o3', 'gpt-5.5', 'gpt-4.1', 'o4-mini', 'gpt-5-mini', 'gpt-4.1-mini',
+        'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna',
+      ]);
     });
 
     it('gemini has 4 models', () => {
@@ -327,9 +339,9 @@ describe('model-equivalence', () => {
       expect(Object.keys(MODEL_TIERS)).toEqual(['premium', 'standard', 'economy', 'premium_plus']);
     });
 
-    it('total model count is 14', () => {
+    it('total model count includes the versioned 5.6 family', () => {
       const total = Object.values(MODEL_TIERS).reduce((sum, models) => sum + models.length, 0);
-      expect(total).toBe(14);
+      expect(total).toBe(17);
     });
 
     it('every model in MODEL_TIERS has a provider', () => {
@@ -357,8 +369,8 @@ describe('model-equivalence', () => {
   describe('equivalence completeness', () => {
     const providers: ProviderName[] = ['claude', 'codex', 'gemini'];
     const allModels: MultiProviderModelType[] = [
-      'opus', 'sonnet', 'haiku',
-      'o3', 'gpt-5', 'gpt-4.1', 'o4-mini', 'gpt-5-mini', 'gpt-4.1-mini',
+      'claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001',
+      'o3', 'gpt-5.5', 'gpt-4.1', 'o4-mini', 'gpt-5-mini', 'gpt-4.1-mini',
       'gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash',
     ];
 

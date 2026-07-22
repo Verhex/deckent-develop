@@ -27,20 +27,14 @@ describe('parseStructuredDirectives — ollama provider+model pass-through', () 
     expect(tasks[0].forceModel).toBe('qwen3.6:27b');
   });
 
-  it('preserves non-adapter regression: claude + gibberish model → undefined', () => {
+  it('fails loudly for claude + unknown cloud model', () => {
     const content = '## Task 1: Claude Bad Model\n- Provider: claude\n- Model: gibberish99\n- Scope: src/core/\n\n### Description\nNon-adapter validates against ALL_MODELS.';
-    const tasks = parseStructuredDirectives(content);
-    expect(tasks).toHaveLength(1);
-    expect(tasks[0].provider).toBe('claude');
-    expect(tasks[0].forceModel).toBeUndefined();
+    expect(() => parseStructuredDirectives(content)).toThrow('Cloud pricing evidence is required');
   });
 
-  it('preserves existing claude+opus parse behavior (regression)', () => {
+  it('rejects a retired alias at the input boundary', () => {
     const content = '## Task 1: Classic\n- Provider: claude\n- Model: opus\n- Scope: src/core/\n\n### Description\nClassic path.';
-    const tasks = parseStructuredDirectives(content);
-    expect(tasks).toHaveLength(1);
-    expect(tasks[0].provider).toBe('claude');
-    expect(tasks[0].forceModel).toBe('opus');
+    expect(() => parseStructuredDirectives(content)).toThrow('E_LEGACY_MODEL_ALIAS');
   });
 
   it('accepts ollama model tag case-insensitively (input lower-cased)', () => {
@@ -48,7 +42,7 @@ describe('parseStructuredDirectives — ollama provider+model pass-through', () 
     const tasks = parseStructuredDirectives(content);
     expect(tasks).toHaveLength(1);
     expect(tasks[0].provider).toBe('ollama');
-    expect(tasks[0].forceModel).toBe('qwen3.6:27b');
+    expect(tasks[0].forceModel).toBe('QwEn3.6:27B');
   });
 });
 
@@ -66,16 +60,13 @@ describe('parseBulletOrNumberedTasks — ollama provider+model pass-through', ()
     expect(tasks[0].forceModel).toBe('qwen3.6:27b');
   });
 
-  it('preserves bullet-list non-adapter regression: claude + gibberish → undefined', () => {
+  it('fails loudly for bullet-list claude + unknown cloud model', () => {
     const content = [
       '- Task: Claude bad model in bullet form',
       '  - Provider: claude',
       '  - Model: gibberish99',
       '  - Scope: src/core/',
     ].join('\n');
-    const tasks = parseBulletOrNumberedTasks(content);
-    expect(tasks).toHaveLength(1);
-    expect(tasks[0].provider).toBe('claude');
-    expect(tasks[0].forceModel).toBeUndefined();
+    expect(() => parseBulletOrNumberedTasks(content)).toThrow('Cloud pricing evidence is required');
   });
 });

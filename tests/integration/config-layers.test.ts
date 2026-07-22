@@ -148,8 +148,8 @@ describe('Config Layers Integration', () => {
         modes: {
           economic: {
             max_workers: 3,
-            brain_model: 'sonnet',
-            default_model: 'sonnet',
+            brain_model: 'claude-sonnet-5',
+            default_model: 'claude-sonnet-5',
             haiku_allowed: false,
             brain_planning: 'auto',
           },
@@ -160,8 +160,8 @@ describe('Config Layers Integration', () => {
         modes: {
           economic: {
             max_workers: 5,
-            brain_model: 'sonnet',
-            default_model: 'sonnet',
+            brain_model: 'claude-sonnet-5',
+            default_model: 'claude-sonnet-5',
             haiku_allowed: false,
             brain_planning: 'auto',
           },
@@ -257,7 +257,7 @@ describe('Config Layers Integration', () => {
             economic: {
               max_workers: 3,
               brain_model: 'invalid' as unknown as DeckentConfig['mode'],
-              default_model: 'sonnet',
+              default_model: 'claude-sonnet-5',
               haiku_allowed: false,
               brain_planning: 'auto',
             },
@@ -273,8 +273,8 @@ describe('Config Layers Integration', () => {
           modes: {
             economic: {
               max_workers: -1, // Invalid: must be >= 1 or 'auto'
-              brain_model: 'sonnet',
-              default_model: 'sonnet',
+              brain_model: 'claude-sonnet-5',
+              default_model: 'claude-sonnet-5',
               haiku_allowed: false,
               brain_planning: 'auto',
             },
@@ -310,8 +310,8 @@ describe('Config Layers Integration', () => {
         modes: {
           economic: {
             max_workers: 10,
-            brain_model: 'opus',
-            default_model: 'opus',
+            brain_model: 'claude-opus-4-8',
+            default_model: 'claude-opus-4-8',
             haiku_allowed: true,
             brain_planning: 'ai',
           },
@@ -321,7 +321,7 @@ describe('Config Layers Integration', () => {
       const result = deepMerge(base, override);
 
       expect(result.modes.economic.max_workers).toBe(10);
-      expect(result.modes.economic.brain_model).toBe('opus');
+      expect(result.modes.economic.brain_model).toBe('claude-opus-4-8');
       // Other modes should be unchanged
       expect(result.modes.performance.max_workers).toBe(8);
     });

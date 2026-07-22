@@ -5,12 +5,13 @@
 // any malformed/errored response, and the writeFreeModelCache atomic
 // write + round-trip read.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   fetchOpenRouterModels,
   writeFreeModelCache,
+  lookupFreeModel,
   OpenRouterProbeError,
   FREE_MODEL_CACHE_FILE,
   type FetchFn,
@@ -50,7 +51,7 @@ const MIXED_FIXTURE = {
       architecture: { modality: 'text->text' },
     },
     {
-      // no architecture / context_length → defaults apply
+      // missing completion price → excluded even though prompt is zero
       id: 'mistralai/mistral-7b-instruct:free',
       pricing: { prompt: '0' },
     },
@@ -84,16 +85,15 @@ const MIXED_FIXTURE = {
 // ─── fetchOpenRouterModels — filter + mapping ────────────────────────────────
 
 describe('fetchOpenRouterModels — filter + mapping', () => {
-  it('keeps only ":free"-suffixed entries with pricing.prompt === 0, mapped to {id, context, modality}', async () => {
+  it('keeps only exact free ids with both prompt and completion prices equal to zero', async () => {
     const fetchImpl = vi.fn(async () => jsonResponse(MIXED_FIXTURE)) as unknown as FetchFn;
 
     const result = await fetchOpenRouterModels(fetchImpl);
 
     expect(result).toEqual([
-      { id: 'meta-llama/llama-3.1-8b-instruct:free', context: 131072, modality: 'text->text' },
-      { id: 'google/gemma-2-9b-it:free', context: 8192, modality: 'text->text' },
-      { id: 'qwen/qwen-2-7b-instruct:free', context: 32768, modality: 'text->text' },
-      { id: 'mistralai/mistral-7b-instruct:free', context: 0, modality: 'unknown' },
+      { id: 'meta-llama/llama-3.1-8b-instruct:free', context: 131072, modality: 'text->text', pricing: { prompt: 0, completion: 0 } },
+      { id: 'google/gemma-2-9b-it:free', context: 8192, modality: 'text->text', pricing: { prompt: 0, completion: 0 } },
+      { id: 'qwen/qwen-2-7b-instruct:free', context: 32768, modality: 'text->text', pricing: { prompt: 0, completion: 0 } },
     ]);
   });
 
@@ -176,7 +176,10 @@ describe('writeFreeModelCache — cache round-trip', () => {
   });
 
   it('writes .deckent/settings/openrouter-models.json with generatedAt + models', () => {
-    const list = [{ id: 'meta-llama/llama-3.1-8b-instruct:free', context: 131072, modality: 'text->text' }];
+    const list = [{
+      id: 'meta-llama/llama-3.1-8b-instruct:free', context: 131072,
+      modality: 'text->text', pricing: { prompt: 0 as const, completion: 0 as const },
+    }];
 
     const returned = writeFreeModelCache(root, list);
 
@@ -185,8 +188,12 @@ describe('writeFreeModelCache — cache round-trip', () => {
 
     const onDisk = JSON.parse(readFileSync(filePath, 'utf-8'));
     expect(onDisk.models).toEqual(list);
+    expect(onDisk.schemaVersion).toBe(1);
+    expect(onDisk.source).toBe('https://openrouter.ai/api/v1/models');
     expect(typeof onDisk.generatedAt).toBe('string');
     expect(new Date(onDisk.generatedAt).toISOString()).toBe(onDisk.generatedAt);
+    expect(new Date(onDisk.expiresAt).getTime()).toBeGreaterThan(new Date(onDisk.generatedAt).getTime());
+    expect(onDisk.payloadHash).toMatch(/^[a-f0-9]{64}$/);
 
     // The returned value mirrors exactly what was persisted.
     expect(returned).toEqual(onDisk);
@@ -205,10 +212,46 @@ describe('writeFreeModelCache — cache round-trip', () => {
   });
 
   it('overwrites (never appends) on a second write with different content', () => {
-    writeFreeModelCache(root, [{ id: 'a/model:free', context: 1000, modality: 'text->text' }]);
-    writeFreeModelCache(root, [{ id: 'b/model:free', context: 2000, modality: 'text->text' }]);
+    writeFreeModelCache(root, [{
+      id: 'a/model:free', context: 1000, modality: 'text->text', pricing: { prompt: 0, completion: 0 },
+    }]);
+    writeFreeModelCache(root, [{
+      id: 'b/model:free', context: 2000, modality: 'text->text', pricing: { prompt: 0, completion: 0 },
+    }]);
 
     const onDisk = JSON.parse(readFileSync(join(root, FREE_MODEL_CACHE_FILE), 'utf-8'));
-    expect(onDisk.models).toEqual([{ id: 'b/model:free', context: 2000, modality: 'text->text' }]);
+    expect(onDisk.models).toEqual([{
+      id: 'b/model:free', context: 2000, modality: 'text->text', pricing: { prompt: 0, completion: 0 },
+    }]);
+  });
+
+  it('returns pricing authority only while the integrity-bound cache is fresh', () => {
+    const now = new Date('2026-07-20T12:00:00.000Z');
+    const model = {
+      id: 'a/model:free', context: 1000, modality: 'text->text',
+      pricing: { prompt: 0 as const, completion: 0 as const },
+    };
+    writeFreeModelCache(root, [model], { now, ttlMs: 60_000 });
+    expect(lookupFreeModel(root, model.id, new Date('2026-07-20T12:00:30.000Z')))
+      .toMatchObject({
+        ...model,
+        fetchedAt: '2026-07-20T12:00:00.000Z',
+        expiresAt: '2026-07-20T12:01:00.000Z',
+      });
+    expect(lookupFreeModel(root, model.id, new Date('2026-07-20T12:01:00.000Z')))
+      .toBeUndefined();
+  });
+
+  it('rejects tampered cache payloads instead of authorizing zero price', () => {
+    const model = {
+      id: 'a/model:free', context: 1000, modality: 'text->text',
+      pricing: { prompt: 0 as const, completion: 0 as const },
+    };
+    writeFreeModelCache(root, [model]);
+    const path = join(root, FREE_MODEL_CACHE_FILE);
+    const tampered = JSON.parse(readFileSync(path, 'utf-8'));
+    tampered.models[0].id = 'paid/model';
+    writeFileSync(path, JSON.stringify(tampered), 'utf-8');
+    expect(lookupFreeModel(root, model.id)).toBeUndefined();
   });
 });

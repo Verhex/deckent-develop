@@ -31,7 +31,7 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     id,
     title: `Task ${id}`,
     description: `sched-state ${id}`,
-    model: 'sonnet' as ModelType,
+    model: 'claude-sonnet-5' as ModelType,
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'sched1-test',
@@ -43,6 +43,7 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     assignedAgent: 'generic',
     assignedSkills: [],
     provider: 'claude',
+    budget: { maxTurns: 1 },
     ...overrides,
   } as unknown as Task;
 }
@@ -77,6 +78,7 @@ function makeBackend(): SpawnBackend & { spawned: string[] } {
   const spawned: string[] = [];
   return {
     name: 'mock-sched1',
+    liveUsageBudgetSupport: 'measured-stream' as const,
     spawn(taskId: string, _m: ModelType, _p: string, _o?: SpawnBackendOptions) { spawned.push(taskId); },
     kill() { /* no-op */ },
     list() { return spawned; },

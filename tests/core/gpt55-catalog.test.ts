@@ -21,13 +21,13 @@ import {
 } from '../../src/core/model-registry.js';
 import { loadCostConfig, findModel } from '../../src/core/cost-config-loader.js';
 
-describe('model-registry: CODEX_PARITY_MODELS (gpt-5.5)', () => {
-  it('is not part of BUILTIN_MODELS — preserves the hardcoded builtin-count invariant', () => {
-    expect(BUILTIN_MODELS.some(m => m.id === 'gpt-5.5')).toBe(false);
+describe('model-registry: canonical gpt-5.5', () => {
+  it('is a canonical core model, not an alias shim', () => {
+    expect(BUILTIN_MODELS.some(m => m.id === 'gpt-5.5' && m.apiId === m.id)).toBe(true);
   });
 
   it('declares gpt-5.5 with feed-verified fields', () => {
-    const def = CODEX_PARITY_MODELS.find(m => m.id === 'gpt-5.5');
+    const def = BUILTIN_MODELS.find(m => m.id === 'gpt-5.5');
     expect(def).toBeDefined();
     expect(def!.apiId).toBe('gpt-5.5');
     expect(def!.provider).toBe('codex');
@@ -42,10 +42,8 @@ describe('model-registry: CODEX_PARITY_MODELS (gpt-5.5)', () => {
     expect(def!.capabilities.reasoning).toBe(true);
   });
 
-  it('registerCodexParityModels() makes gpt-5.5 first-class and resolvable on a fresh registry', () => {
+  it('is first-class and resolvable on a fresh registry', () => {
     const registry = new ModelRegistry();
-    expect(registry.has('gpt-5.5')).toBe(false);
-    registerCodexParityModels(registry);
     expect(registry.has('gpt-5.5')).toBe(true);
     expect(registry.resolveApiId('gpt-5.5')).toBe('gpt-5.5');
     expect(registry.getTier('gpt-5.5')).toBe('premium');
@@ -61,28 +59,22 @@ describe('model-registry: CODEX_PARITY_MODELS (gpt-5.5)', () => {
     expect(registry.getByProvider('codex').length).toBe(firstCount);
   });
 
-  it('does not disturb the existing gpt-5 apiId shim (Sprint 248)', () => {
+  it('does not register the removed gpt-5 alias', () => {
     const registry = new ModelRegistry();
     registerCodexParityModels(registry);
-    const gpt5 = registry.get('gpt-5');
-    expect(gpt5).toBeDefined();
-    expect(gpt5!.apiId).toBe('gpt-5.5');
-    expect(gpt5!.tier).toBe('premium');
-    // Insertion order is preserved: the legacy 'gpt-5' shim still wins the
-    // provider+tier lookup after the parity entry is registered.
-    expect(registry.getByProviderAndTier('codex', 'premium')!.id).toBe('gpt-5');
+    expect(registry.get('gpt-5')).toBeUndefined();
+    expect(registry.getByProviderAndTier('codex', 'premium')!.id).toBe('gpt-5.5');
   });
 });
 
 describe('model-registry: gpt-5.6 family (Alperen 2026-07-11, feed-verified)', () => {
   const FAMILY = [
-    { id: 'gpt-5.6', tier: 'premium', cost: { input: 5, output: 30 } },
     { id: 'gpt-5.6-sol', tier: 'premium', cost: { input: 5, output: 30 } },
     { id: 'gpt-5.6-terra', tier: 'standard', cost: { input: 2.5, output: 15 } },
     { id: 'gpt-5.6-luna', tier: 'economy', cost: { input: 1, output: 6 } },
   ] as const;
 
-  it('declares all four with feed-verified fields, out of BUILTIN_MODELS', () => {
+  it('declares all three pinned API IDs outside the 14 core entries', () => {
     for (const { id, tier, cost } of FAMILY) {
       expect(BUILTIN_MODELS.some(m => m.id === id)).toBe(false);
       const def = CODEX_PARITY_MODELS.find(m => m.id === id);
@@ -114,9 +106,10 @@ describe('model-registry: gpt-5.6 family (Alperen 2026-07-11, feed-verified)', (
     // providers/ollama.ts). Importing the module must be sufficient.
     await import('../../src/providers/codex.js');
     const { modelRegistry } = await import('../../src/core/model-registry.js');
-    for (const id of ['gpt-5.5', 'gpt-5.6', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']) {
+    for (const id of ['gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']) {
       expect(modelRegistry.has(id), id).toBe(true);
     }
+    expect(modelRegistry.has('gpt-5.6')).toBe(false);
   });
 });
 

@@ -2,22 +2,22 @@
  * born-479 / 362-002 MODEL-DROP-FIX — `- Model:` directive override drop repro + fix proof.
  *
  * Sprint-361 Task 5 (CODEX-RETRY-RCA, confirmed via `git log -p -- DIRECTIVES.md`) used:
- *   - Model: gpt-5
+ *   - Model: gpt-5.5
  *   - Backend: subprocess
  * with NO explicit `- Provider:` line. The written task JSON ended up with
- * `model: 'opus'` while `provider` was (correctly) later inferred as `'codex'` by
+ * `model: 'claude-opus-4-8'` while `provider` was (correctly) later inferred as `'codex'` by
  * task-router.ts from the still-intact `forceModel`.
  *
  * Root cause: `planSprint()`'s structured-fallback loop
  * (`src/orchestra/sprint-planner.ts`) called
  *   resolveTaskModel(..., src.forceModel, undefined, src.provider)
  * with `src.provider === undefined`. `resolveTaskModel` defaults the target provider to
- * the registry default ('claude') when no provider is given, sees `gpt-5` unavailable for
- * claude, and silently remaps it to the claude equivalent ('opus') via getEquivalentModel.
+ * the registry default ('claude') when no provider is given, sees `gpt-5.5` unavailable for
+ * claude, and silently remaps it to the claude equivalent ('claude-opus-4-8') via getEquivalentModel.
  * `recommendation.modelConstraint ??` had the identical silent-override risk.
  *
  * Unlike `planner-override-precedence.test.ts` (which mocks `model-selector.js` with a
- * `forceModel ?? 'sonnet'` stub and therefore cannot observe this bug), this file keeps
+ * `forceModel ?? 'claude-sonnet-5'` stub and therefore cannot observe this bug), this file keeps
  * `resolveTaskModel` / `model-registry` REAL so the cross-provider remap actually fires.
  */
 
@@ -72,6 +72,10 @@ vi.mock('../../src/monitor/auditor.js', () => ({
 
 vi.mock('../../src/orchestra/planner.js', () => ({
   resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
+  createPlannerTaskModelPolicy: vi.fn((model: string, provider?: string) => ({
+    defaultModel: provider === 'codex' ? 'gpt-5.5' : model,
+    allowedModels: provider === 'codex' ? ['gpt-5.5'] : [model],
+  })),
   callBrainPlannerWithReason: vi.fn().mockReturnValue({
     ok: false,
     reason: 'not_used_in_structured_mode',
@@ -152,8 +156,8 @@ function makeConfig(): ResolvedConfig {
     mode: 'performance',
     activeModeConfig: {
       max_workers: 4,
-      brain_model: 'opus',
-      default_model: 'opus',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-opus-4-8',
       haiku_allowed: true,
       brain_planning: 'structured',
     },
@@ -183,13 +187,13 @@ function makeRecommendation(modelConstraint: SprintSizeRecommendation['modelCons
   return { size: 'full', maxWorkers: 4, modelConstraint, reason: 'test' };
 }
 
-// Reconstructs sprint-361 Task 5 (CODEX-RETRY-RCA) exactly: `- Model: gpt-5` +
+// Reconstructs sprint-361 Task 5 (CODEX-RETRY-RCA) exactly: `- Model: gpt-5.5` +
 // `- Backend: subprocess`, NO `- Provider:` line — the born-479 repro shape.
 const GPT5_NO_PROVIDER_DIRECTIVES = [
   '# DIRECTIVES — born-479 repro',
   '',
   '## Task 1: CODEX-RETRY-RCA — codex-timeout kok-analizi',
-  '- Model: gpt-5',
+  '- Model: gpt-5.5',
   '- Backend: subprocess',
   '- Files: docs/analysis/repro.md',
   '- Scope: docs/analysis/',
@@ -203,7 +207,7 @@ const GPT5_WITH_PROVIDER_DIRECTIVES = [
   '',
   '## Task 1: CODEX-RETRY-RCA — explicit provider',
   '- Provider: codex',
-  '- Model: gpt-5',
+  '- Model: gpt-5.5',
   '- Backend: subprocess',
   '- Files: docs/analysis/repro.md',
   '- Scope: docs/analysis/',
@@ -214,11 +218,11 @@ const GPT5_WITH_PROVIDER_DIRECTIVES = [
 
 function haikuDirectives(): string {
   return [
-    '# DIRECTIVES — haiku regression',
+    '# DIRECTIVES — claude-haiku-4-5-20251001 regression',
     '',
     '## Task 1: Haiku Override Task',
-    '- Model: haiku',
-    '- Files: docs/analysis/haiku.md',
+    '- Model: claude-haiku-4-5-20251001',
+    '- Files: docs/analysis/claude-haiku-4-5-20251001.md',
     '- Scope: docs/analysis/',
     '',
     '### Description',
@@ -228,11 +232,11 @@ function haikuDirectives(): string {
 
 function fableDirectives(): string {
   return [
-    '# DIRECTIVES — fable regression',
+    '# DIRECTIVES — claude-fable-5 regression',
     '',
     '## Task 1: Fable Override Task',
-    '- Model: fable',
-    '- Files: docs/analysis/fable.md',
+    '- Model: claude-fable-5',
+    '- Files: docs/analysis/claude-fable-5.md',
     '- Scope: docs/analysis/',
     '',
     '### Description',
@@ -240,20 +244,15 @@ function fableDirectives(): string {
   ].join('\n');
 }
 
-// `- Provider: claude` + `- Model: gpt-5` is an explicit, contradictory combo
-// (gpt-5 is a codex-only catalog entry). This is the one shape that survives
-// task-builder.ts's parse-time gate while still being "unavailable for the
-// stated provider" — every other "unknown model" shape (no provider + a
-// non-catalog id, or explicit non-adapter provider + a non-catalog id) is
-// already dropped to `forceModel: undefined` upstream in task-builder.ts
-// (see tests/orchestra/task-builder-ollama-flow.test.ts), which is out of
-// this task's write scope and unaffected by this fix.
+// `- Provider: claude` + `- Model: gpt-5.5` is an explicit contradiction:
+// gpt-5.5 is registry-owned by codex. Canonical authoring rejects this before
+// task creation instead of preserving an impossible invocation identity.
 const CONTRADICTORY_PROVIDER_MODEL_DIRECTIVES = [
   '# DIRECTIVES — contradictory provider+model',
   '',
   '## Task 1: Contradictory Combo Task',
   '- Provider: claude',
-  '- Model: gpt-5',
+  '- Model: gpt-5.5',
   '- Files: docs/analysis/contradictory.md',
   '- Scope: docs/analysis/',
   '',
@@ -275,69 +274,62 @@ afterEach(() => {
 // ─── Tests ────────────────────────────────────────────────────────
 
 describe('born-479 — forceModel must always win (no silent drop)', () => {
-  it('repro/fix proof: `- Model: gpt-5` with NO `- Provider:` line resolves to gpt-5, not opus', async () => {
+  it('repro/fix proof: `- Model: gpt-5.5` with NO `- Provider:` line resolves to gpt-5.5, not claude-opus-4-8', async () => {
     const sprint = await planSprint(
       ROOT, makeConfig(), makeContext(GPT5_NO_PROVIDER_DIRECTIVES), makeRecommendation(), { mode: 'structured' },
     );
     const t = sprint.tasks.find((x) => x.title.startsWith('CODEX-RETRY-RCA'));
     expect(t).toBeDefined();
-    expect(t!.forceModel).toBe('gpt-5');
-    // Pre-fix this was 'opus' (resolveTaskModel defaulted provider to claude,
-    // gpt-5 unavailable there, silently remapped to the claude equivalent).
-    expect(t!.model).toBe('gpt-5');
+    expect(t!.forceModel).toBe('gpt-5.5');
+    // Pre-fix this was 'claude-opus-4-8' (resolveTaskModel defaulted provider to claude,
+    // gpt-5.5 unavailable there, silently remapped to the claude equivalent).
+    expect(t!.model).toBe('gpt-5.5');
   });
 
-  it('explicit `- Provider: codex` + `- Model: gpt-5` still resolves to gpt-5 (no regression)', async () => {
+  it('explicit `- Provider: codex` + `- Model: gpt-5.5` still resolves to gpt-5.5 (no regression)', async () => {
     const sprint = await planSprint(
       ROOT, makeConfig(), makeContext(GPT5_WITH_PROVIDER_DIRECTIVES), makeRecommendation(), { mode: 'structured' },
     );
     const t = sprint.tasks.find((x) => x.title.startsWith('CODEX-RETRY-RCA'));
     expect(t).toBeDefined();
     expect(t!.provider).toBe('codex');
-    expect(t!.forceModel).toBe('gpt-5');
-    expect(t!.model).toBe('gpt-5');
+    expect(t!.forceModel).toBe('gpt-5.5');
+    expect(t!.model).toBe('gpt-5.5');
   });
 
   it('recommendation.modelConstraint set does NOT override a forceModel directive', async () => {
     const sprint = await planSprint(
-      ROOT, makeConfig(), makeContext(GPT5_NO_PROVIDER_DIRECTIVES), makeRecommendation('sonnet'), { mode: 'structured' },
+      ROOT, makeConfig(), makeContext(GPT5_NO_PROVIDER_DIRECTIVES), makeRecommendation('claude-sonnet-5'), { mode: 'structured' },
     );
     const t = sprint.tasks.find((x) => x.title.startsWith('CODEX-RETRY-RCA'));
     expect(t).toBeDefined();
-    expect(t!.forceModel).toBe('gpt-5');
-    expect(t!.model).toBe('gpt-5');
+    expect(t!.forceModel).toBe('gpt-5.5');
+    expect(t!.model).toBe('gpt-5.5');
   });
 
-  it('regression: `- Model: haiku` (no provider) resolves to haiku verbatim', async () => {
+  it('regression: `- Model: claude-haiku-4-5-20251001` (no provider) resolves to claude-haiku-4-5-20251001 verbatim', async () => {
     const sprint = await planSprint(
       ROOT, makeConfig(), makeContext(haikuDirectives()), makeRecommendation(), { mode: 'structured' },
     );
     const t = sprint.tasks.find((x) => x.title === 'Haiku Override Task');
     expect(t).toBeDefined();
-    expect(t!.forceModel).toBe('haiku');
-    expect(t!.model).toBe('haiku');
+    expect(t!.forceModel).toBe('claude-haiku-4-5-20251001');
+    expect(t!.model).toBe('claude-haiku-4-5-20251001');
   });
 
-  it('regression: `- Model: fable` (no provider) resolves to fable verbatim', async () => {
+  it('regression: `- Model: claude-fable-5` (no provider) resolves to claude-fable-5 verbatim', async () => {
     const sprint = await planSprint(
       ROOT, makeConfig(), makeContext(fableDirectives()), makeRecommendation(), { mode: 'structured' },
     );
     const t = sprint.tasks.find((x) => x.title === 'Fable Override Task');
     expect(t).toBeDefined();
-    expect(t!.forceModel).toBe('fable');
-    expect(t!.model).toBe('fable');
+    expect(t!.forceModel).toBe('claude-fable-5');
+    expect(t!.model).toBe('claude-fable-5');
   });
 
-  it('explicit contradictory `- Provider: claude` + `- Model: gpt-5`: forceModel still wins verbatim (not remapped to opus)', async () => {
-    const sprint = await planSprint(
+  it('rejects explicit contradictory provider/model identity before task creation', async () => {
+    await expect(planSprint(
       ROOT, makeConfig(), makeContext(CONTRADICTORY_PROVIDER_MODEL_DIRECTIVES), makeRecommendation(), { mode: 'structured' },
-    );
-    const t = sprint.tasks.find((x) => x.title === 'Contradictory Combo Task');
-    expect(t).toBeDefined();
-    expect(t!.provider).toBe('claude');
-    expect(t!.forceModel).toBe('gpt-5');
-    // gpt-5 IS in the global catalog (just not available for claude specifically) —
-    // preserved verbatim, not silently remapped to the claude tier-equivalent (opus).
-    expect(t!.model).toBe('gpt-5');
+    )).rejects.toThrow(/E_MODEL_PROVIDER_MISMATCH/);
   });
 });

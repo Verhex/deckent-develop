@@ -100,7 +100,7 @@ import { spawnSync } from 'node:child_process';
 
 function makeConfig(overrides: Record<string, unknown> = {}) {
   return {
-    activeModeConfig: { brain_model: 'opus', max_workers: 3 },
+    activeModeConfig: { brain_model: 'claude-opus-4-8', max_workers: 3 },
     brain_planning: 'auto',
     language: 'en',
     ...overrides,

@@ -11,9 +11,13 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { modelRegistry } from '../src/core/model-registry.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const documentedModels = modelRegistry.getAllModels().map(model => model.id).join(', ');
+const documentedDefaultModel = modelRegistry.getByProviderAndTier('claude', 'standard');
+if (!documentedDefaultModel) throw new Error('E_CLI_DOC_DEFAULT_MODEL_UNAVAILABLE');
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -324,12 +328,12 @@ export const CLI_COMMANDS: CliCommand[] = [
     description: 'Run a single one-shot task without a sprint cycle. Creates a minimal task, spawns one worker, waits for the result.',
     category: 'Workers & Tasks',
     options: [
-      { flags: '--model <model>', description: 'Model to use. Options: opus, sonnet, haiku, gpt-4.1, o3, o4-mini, gemini-2.5-pro, gemini-2.5-flash', defaultValue: 'sonnet' },
+      { flags: '--model <model>', description: `Canonical provider API model ID. Registered options: ${documentedModels}`, defaultValue: documentedDefaultModel.id },
       { flags: '--scope <dir>', description: 'Worker scope directory', defaultValue: './' },
     ],
     examples: [
       'deckent run "Fix the login page redirect bug"',
-      'deckent run "Add input validation" --model opus --scope src/api/',
+      `deckent run "Add input validation" --model ${documentedDefaultModel.id} --scope src/api/`,
     ],
   },
   {

@@ -3,6 +3,7 @@
 
 import type { Task, TaskEvaluation, ModelType, ProviderName } from './task-types.js';
 import type { PromptGateResult } from './prompt-gate-types.js';
+import type { InvocationReceiptRef } from './invocation-receipt.js';
 
 // ─── Sprint System ──────────────────────────────────────────────────
 export enum SprintPhase {
@@ -53,6 +54,7 @@ export interface PlannerProof {
     readonly requestedModel: ModelType | null;
     readonly resolvedModel: ModelType | null;
     readonly failureReason: string | null;
+    readonly receiptRef: InvocationReceiptRef | null;
   };
 }
 

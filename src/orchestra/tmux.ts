@@ -7,9 +7,9 @@ import type { ProviderAdapter } from '../core/provider.js';
 import { debugLog } from '../core/utils.js';
 import { validateTaskId } from '../core/validators.js';
 import { modelRegistry } from '../core/model-registry.js';
+import type { RegistryProviderName } from '../core/model-registry.js';
 import { resolveReasoningEffort } from '../core/reasoning-effort.js';
 import { getProviderCommandSpec, buildProviderCommand } from '../core/provider-command-spec.js';
-import { getDefaultProviderName } from './sprint-utils.js';
 import { installGitGuard, resolveHostGitPath, buildGitGuardPathExport, buildGitGuardDir } from './git-worker-guard.js';
 import {
   TMUX_SESSION_NAME,
@@ -147,12 +147,14 @@ function buildProviderWorkerCommand(
   promptFilePath: string,
   opts?: SpawnOptions,
 ): string {
-  const provider = modelRegistry.get(model)?.provider ?? getDefaultProviderName();
+  const definition = modelRegistry.get(model);
+  if (!definition) throw new TmuxError(`E_UNKNOWN_MODEL: ${model}`);
+  const provider = definition.provider;
 
   if (provider === 'claude') {
     // Default: Claude CLI syntax (backward compat)
     // Use stdin redirection from file — no shell metacharacter risk
-    let cmd = `claude -p - --model ${modelRegistry.get(model)?.apiId ?? model}`;
+    let cmd = `claude -p - --model ${definition.apiId}`;
     if (opts?.allowedTools) {
       // allowedTools is a controlled string (never user input)
       cmd += ` --allowedTools '${opts.allowedTools}'`;
@@ -183,7 +185,7 @@ function buildProviderWorkerCommand(
     );
   }
 
-  const apiId = modelRegistry.get(model)?.apiId ?? model;
+  const apiId = definition.apiId;
   let cmd = buildProviderCommand(spec, apiId, promptFilePath, {
     allowedTools: opts?.allowedTools,
     autoApprove: opts?.autoApprove,
@@ -214,9 +216,16 @@ export function buildWorkerCommand(
   taskId?: string,
   timeoutSeconds?: number,
 ): string {
+  const definition = modelRegistry.get(model);
+  if (!definition) throw new TmuxError(`E_UNKNOWN_MODEL: ${model}`);
   // Delegate to provider adapter when available
   if (adapter) {
-    return adapter.buildCommand(model, promptFilePath, {
+    if (adapter.name !== definition.provider) {
+      throw new TmuxError(
+        `E_MODEL_PROVIDER_MISMATCH: model=${model} provider=${definition.provider} adapter=${adapter.name}`,
+      );
+    }
+    return adapter.buildCommand(definition.apiId as ModelType, promptFilePath, {
       allowedTools: opts?.allowedTools,
       autoApprove: opts?.autoApprove,
       reasoningEffort: opts?.reasoningEffort,
@@ -382,7 +391,12 @@ export function startAuditor(projectDir: string, opts?: SpawnOptions, adapter?: 
     ]);
   }
   const promptPath = writePromptFile(projectDir, 'auditor');
-  const cmd = buildWorkerCommand('sonnet', promptPath, opts, adapter);
+  const provider = adapter?.name as RegistryProviderName | undefined;
+  const model = provider
+    ? modelRegistry.getByProviderAndTier(provider, 'standard')
+    : modelRegistry.getByTier('standard').find(candidate => candidate.status === 'ga');
+  if (!model) throw new TmuxError(`E_AUDITOR_MODEL_UNAVAILABLE: provider=${provider ?? 'registry'}`);
+  const cmd = buildWorkerCommand(model.id as ModelType, promptPath, opts, adapter);
   run([
     'send-keys',
     '-t', `${TMUX_SESSION_NAME}:${TMUX_AUDITOR_WINDOW}`,

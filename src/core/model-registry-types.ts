@@ -50,11 +50,10 @@ export interface ModelDefinition {
 /**
  * Options for parametric model resolution (F1-PD).
  *
- * Every field is optional — when omitted, the registry infers a sensible value
- * from the model id (provider/tier heuristics) or applies a safe default. This
- * is what makes the catalog **parametric / extensible**: an unknown-but-new
- * model id is resolved into a runtime-validated `ModelDefinition` instead of
- * being rejected. Supplying any field overrides the inferred/default value.
+ * Provider/tier can be inferred from an exact API id, but a dynamic cloud
+ * identity is admitted only with finite pricing plus an immutable evidence
+ * reference. Local Ollama tags are the sole zero-cost default. This keeps the
+ * catalog extensible without turning naming heuristics into cloud authority.
  */
 export interface ParametricResolveOptions {
   /** Explicit provider ownership when the API ID is not unambiguously namespaced. */
@@ -65,10 +64,10 @@ export interface ParametricResolveOptions {
   apiId?: string;
   /** Context window in tokens (default 200_000). */
   contextWindow?: number;
-  /** Cost per million tokens. Dynamic OpenRouter entries require this together
-   *  with `pricingEvidenceRef`; other providers retain the legacy zero default. */
+  /** Cost per million tokens. Every dynamic cloud entry requires this together
+   *  with `pricingEvidenceRef`; only local Ollama tags may use the zero default. */
   costPerMillion?: ModelCost;
-  /** Opaque pricing source reference required for dynamic OpenRouter entries. */
+  /** Opaque pricing source reference required for every dynamic cloud entry. */
   pricingEvidenceRef?: string;
   /** Capability flags (defaults: streaming+toolUse true, rest false). */
   capabilities?: Partial<ModelCapabilities>;

@@ -18,7 +18,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: 'test-001',
     title: 'fixture',
     description: 'overflow test task',
-    model: 'opus',
+    model: 'claude-opus-4-8',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'fixture',
@@ -73,7 +73,7 @@ describe('resolveWithOverflow', () => {
   const registry = new ModelRegistry(BUILTIN_MODELS);
 
   it('limit-altı subs — no throttle signal → keeps task unchanged', () => {
-    const task = makeTask({ model: 'opus', provider: 'claude' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude' });
     const result: OverflowResolution = resolveWithOverflow(
       task,
       registry,
@@ -84,42 +84,42 @@ describe('resolveWithOverflow', () => {
     expect(result.reason).toBe('no_signal');
     expect(result.task).toBe(task); // identity preserved
     expect(result.task.authMode).toBe('subscription');
-    expect(result.task.model).toBe('opus');
+    expect(result.task.model).toBe('claude-opus-4-8');
   });
 
   it('limit-altı with null state → returns no_signal', () => {
-    const task = makeTask({ model: 'sonnet', provider: 'claude' });
+    const task = makeTask({ model: 'claude-sonnet-5', provider: 'claude' });
     const result = resolveWithOverflow(task, registry, null);
 
     expect(result.overflowed).toBe(false);
     expect(result.reason).toBe('no_signal');
-    expect(result.task.model).toBe('sonnet');
+    expect(result.task.model).toBe('claude-sonnet-5');
   });
 
   it('limit-üstü → falls back to equivalent API model (opus → gpt-5 on codex)', () => {
-    const task = makeTask({ model: 'opus', provider: 'claude' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude' });
     const result = resolveWithOverflow(task, registry, OVER_QUOTA);
 
     expect(result.overflowed).toBe(true);
     expect(result.reason).toBe('overflow');
     expect(result.fallbackProvider).toBe('codex');
-    expect(result.fallbackModel).toBe('gpt-5'); // premium tier match
-    expect(result.task.model).toBe('gpt-5');
+    expect(result.fallbackModel).toBe('gpt-5.5'); // premium tier match
+    expect(result.task.model).toBe('gpt-5.5');
     expect(result.task.provider).toBe('codex');
     expect(result.task.authMode).toBe('api');
     // Original task is unmodified (immutability check)
-    expect(task.model).toBe('opus');
+    expect(task.model).toBe('claude-opus-4-8');
     expect(task.authMode).toBe('subscription');
   });
 
   it('eşdeğer-tier seçim — haiku → gpt-5-mini (economy), sonnet → gpt-4.1 (standard)', () => {
-    const haikuTask = makeTask({ model: 'haiku', provider: 'claude' });
+    const haikuTask = makeTask({ model: 'claude-haiku-4-5-20251001', provider: 'claude' });
     const haikuResult = resolveWithOverflow(haikuTask, registry, OVER_QUOTA);
     expect(haikuResult.overflowed).toBe(true);
     expect(haikuResult.fallbackModel).toBe('gpt-5-mini');
     expect(haikuResult.task.model).toBe('gpt-5-mini');
 
-    const sonnetTask = makeTask({ model: 'sonnet', provider: 'claude' });
+    const sonnetTask = makeTask({ model: 'claude-sonnet-5', provider: 'claude' });
     const sonnetResult = resolveWithOverflow(sonnetTask, registry, OVER_QUOTA);
     expect(sonnetResult.overflowed).toBe(true);
     // standard tier on codex — getEquivalent returns first match
@@ -133,7 +133,7 @@ describe('resolveWithOverflow', () => {
     const geminiOnly = new ModelRegistry(
       BUILTIN_MODELS.filter(m => m.provider === 'gemini' || m.provider === 'claude'),
     );
-    const task = makeTask({ model: 'opus', provider: 'claude' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude' });
     const result = resolveWithOverflow(task, geminiOnly, OVER_QUOTA, {
       apiProvider: 'codex', // explicit — but no codex models in this registry
     });
@@ -146,7 +146,7 @@ describe('resolveWithOverflow', () => {
 
   it('already-api task — skips overflow logic (returns already_api)', () => {
     const task = makeTask({
-      model: 'gpt-5',
+      model: 'gpt-5.5',
       provider: 'codex',
       authMode: 'api',
     });
@@ -158,7 +158,7 @@ describe('resolveWithOverflow', () => {
   });
 
   it('honors apiProvider option — overflows to gemini when configured', () => {
-    const task = makeTask({ model: 'opus', provider: 'claude' });
+    const task = makeTask({ model: 'claude-opus-4-8', provider: 'claude' });
     const result = resolveWithOverflow(task, registry, OVER_QUOTA, {
       apiProvider: 'gemini',
     });

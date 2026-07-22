@@ -22,14 +22,14 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
 }));
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(async () => ({
-    activeModeConfig: { brain_model: 'opus', default_model: 'sonnet', haiku_allowed: false, max_workers: 4 },
+    activeModeConfig: { brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: false, max_workers: 4 },
   })),
   deepMerge: vi.fn((base: Record<string, unknown>, override: Record<string, unknown>) => ({ ...base, ...override })),
   validatePartialConfig: vi.fn(),
-  createDefaultConfig: vi.fn(() => ({ mode: 'balanced', max_workers: 4, brain_model: 'opus' })),
+  createDefaultConfig: vi.fn(() => ({ mode: 'balanced', max_workers: 4, brain_model: 'claude-opus-4-8' })),
   ConfigValidationError: class extends Error { name = 'ConfigValidationError'; errors: string[] = []; },
 }));
 
@@ -743,7 +743,7 @@ describe('createHttpServer', () => {
     });
 
     it('deepMerge preserves existing fields — only sent keys change', async () => {
-      const existingConfig = { mode: 'balanced', max_workers: 4, brain_model: 'opus', language: 'en' };
+      const existingConfig = { mode: 'balanced', max_workers: 4, brain_model: 'claude-opus-4-8', language: 'en' };
       mockReadJsonSafe.mockReturnValue(existingConfig);
 
       api = createHttpServer(PROJECT_ROOT, 0);
@@ -755,19 +755,19 @@ describe('createHttpServer', () => {
       const postBody = JSON.parse(postRes.body);
       expect(postBody.mode).toBe('economic');
       expect(postBody.max_workers).toBe(4);       // preserved
-      expect(postBody.brain_model).toBe('opus');  // preserved
+      expect(postBody.brain_model).toBe('claude-opus-4-8');  // preserved
       expect(postBody.language).toBe('en');       // preserved
     });
 
     it('round-trip with 5 fields: POST → GET values match', async () => {
       // POST /api/config → GET /api/config config write/read round-trip for 5 fields
-      const initial = { mode: 'balanced', max_workers: 2, brain_model: 'haiku', language: 'en', memory_budget: 600 };
+      const initial = { mode: 'balanced', max_workers: 2, brain_model: 'claude-haiku-4-5-20251001', language: 'en', memory_budget: 600 };
       mockReadJsonSafe.mockReturnValue(initial);
 
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
-      const update = { mode: 'performance', max_workers: 8, brain_model: 'opus', language: 'tr', memory_budget: 900 };
+      const update = { mode: 'performance', max_workers: 8, brain_model: 'claude-opus-4-8', language: 'tr', memory_budget: 900 };
       const postRes = await request(api, '/api/config', 'POST', update);
       expect(postRes.status).toBe(200);
       const postBody = JSON.parse(postRes.body);
@@ -775,7 +775,7 @@ describe('createHttpServer', () => {
       // All 5 updated fields present in POST response
       expect(postBody.mode).toBe('performance');
       expect(postBody.max_workers).toBe(8);
-      expect(postBody.brain_model).toBe('opus');
+      expect(postBody.brain_model).toBe('claude-opus-4-8');
       expect(postBody.language).toBe('tr');
       expect(postBody.memory_budget).toBe(900);
 
@@ -790,7 +790,7 @@ describe('createHttpServer', () => {
       // GET values must match POST response (round-trip)
       expect(getBody.mode).toBe('performance');
       expect(getBody.max_workers).toBe(8);
-      expect(getBody.brain_model).toBe('opus');
+      expect(getBody.brain_model).toBe('claude-opus-4-8');
       expect(getBody.language).toBe('tr');
       expect(getBody.memory_budget).toBe(900);
     });
@@ -880,7 +880,7 @@ describe('createHttpServer', () => {
 
       const initial = {
         mode: 'balanced',
-        modes: { performance: { max_workers: 4, brain_model: 'opus' }, balanced: { max_workers: 2 } },
+        modes: { performance: { max_workers: 4, brain_model: 'claude-opus-4-8' }, balanced: { max_workers: 2 } },
       };
       mockReadJsonSafe.mockReturnValue(initial);
 
@@ -894,7 +894,7 @@ describe('createHttpServer', () => {
       expect(postRes.status).toBe(200);
       const postBody = JSON.parse(postRes.body);
       expect(postBody.modes.performance.max_workers).toBe(8);             // updated
-      expect(postBody.modes.performance.brain_model).toBe('opus');        // preserved
+      expect(postBody.modes.performance.brain_model).toBe('claude-opus-4-8'); // preserved
       expect(postBody.modes.balanced.max_workers).toBe(2);               // sibling preserved
 
       // Simulate disk read-back
@@ -905,7 +905,7 @@ describe('createHttpServer', () => {
       expect(getRes.status).toBe(200);
       const getBody = JSON.parse(getRes.body);
       expect(getBody.modes.performance.max_workers).toBe(8);
-      expect(getBody.modes.performance.brain_model).toBe('opus');
+      expect(getBody.modes.performance.brain_model).toBe('claude-opus-4-8');
       expect(getBody.modes.balanced.max_workers).toBe(2);
     });
   });
@@ -987,7 +987,7 @@ describe('createHttpServer', () => {
 
   describe('GET /api/worker/:taskId/log', () => {
     it('returns task and log when both exist', async () => {
-      const taskData = { id: '001-001', title: 'Setup project', status: 'EXECUTING', model: 'sonnet' };
+      const taskData = { id: '001-001', title: 'Setup project', status: 'EXECUTING', model: 'claude-sonnet-5' };
       mockReadJsonSafe.mockReturnValue(taskData);
       mockReadWorkerLog.mockReturnValue('Building project...\nTests passed.');
 
@@ -1309,7 +1309,7 @@ describe('createHttpServer', () => {
 
   describe('GET /api/config — response field validation', () => {
     it('returns flat config object without extra wrapping', async () => {
-      const configData = { mode: 'balanced', max_workers: 4, brain_model: 'opus' };
+      const configData = { mode: 'balanced', max_workers: 4, brain_model: 'claude-opus-4-8' };
       mockReadJsonSafe.mockReturnValue(configData);
 
       api = createHttpServer(PROJECT_ROOT, 0);

@@ -103,7 +103,7 @@ function setupProjectDir(root: string): void {
 function makeTestTask(id: string, sprintId: string, overrides?: Partial<Task>): Task {
   return {
     id, title: `Task ${id}`, description: `Description for ${id}`,
-    model: 'sonnet', effort: 'normal', priority: 'NORMAL', reason: 'test',
+    model: 'claude-sonnet-5', effort: 'normal', priority: 'NORMAL', reason: 'test',
     scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
     dependencies: [], goNogo: { goCriteria: 'Tests pass', noGoCriteria: 'Build fails', techDebtAcceptable: 'Minor' },
     status: TaskStatus.PENDING, sprintId, createdAt: new Date().toISOString(),
@@ -129,7 +129,7 @@ function makeConfig(root: string): ResolvedConfig {
   return {
     mode: 'max_plan',
     activeModeConfig: {
-      max_workers: 3, brain_model: 'opus', default_model: 'sonnet',
+      max_workers: 3, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5',
       haiku_allowed: true,
     },
     modes: {} as ResolvedConfig['modes'],

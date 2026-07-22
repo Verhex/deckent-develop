@@ -226,7 +226,7 @@ describe('buildWorkerPrompt safe skill section', () => {
     const task = createTask({
       title: 'Test Task',
       description: 'A test',
-      model: 'sonnet',
+      model: 'claude-sonnet-5',
       effort: 'normal',
       priority: 'NORMAL',
       reason: 'testing',

@@ -29,7 +29,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: 'test-001',
     title: 'Test Task',
     description: '',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -54,8 +54,8 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     mode: 'balanced',
     activeModeConfig: {
       max_workers: 4,
-      brain_model: 'opus',
-      default_model: 'sonnet',
+      brain_model: 'claude-opus-4-8',
+      default_model: 'claude-sonnet-5',
       haiku_allowed: true,
     },
     modes: {},
@@ -88,7 +88,7 @@ describe('TIMEOUT-TIER — model-tier multiplier (born-667a, Task 427-023)', () 
 
     it('modelMultiplier is 1.0 for opus/sonnet/haiku tasks when config carries no model_multiplier', () => {
       const config = makeConfig();
-      for (const model of ['opus', 'sonnet', 'haiku']) {
+      for (const model of ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001']) {
         const task = makeTask({ model, effort: 'high' });
         const { breakdown } = brainEstimateTimeout(task, config, emptyHistory());
         expect(breakdown.modelMultiplier).toBe(1.0);
@@ -96,7 +96,7 @@ describe('TIMEOUT-TIER — model-tier multiplier (born-667a, Task 427-023)', () 
     });
 
     it("today's dogfood value is unchanged: high-effort opus task on docker = 2400s", () => {
-      const task = makeTask({ model: 'opus', effort: 'high' });
+      const task = makeTask({ model: 'claude-opus-4-8', effort: 'high' });
       const config = makeConfig();
       const { timeoutSeconds, breakdown } = brainEstimateTimeout(task, config, emptyHistory());
 
@@ -108,7 +108,7 @@ describe('TIMEOUT-TIER — model-tier multiplier (born-667a, Task 427-023)', () 
 
   describe('resolveModelMultiplier (pure helper)', () => {
     it('returns 1.0 when table is undefined', () => {
-      expect(resolveModelMultiplier('opus', undefined)).toBe(1.0);
+      expect(resolveModelMultiplier('claude-opus-4-8', undefined)).toBe(1.0);
     });
 
     it('returns 1.0 for an unrecognized/custom model string and never throws', () => {
@@ -120,19 +120,19 @@ describe('TIMEOUT-TIER — model-tier multiplier (born-667a, Task 427-023)', () 
 
     it('resolves opus → premium, sonnet → standard, haiku → economy', () => {
       const table = { premium: 2.0, standard: 1.0, economy: 0.5 };
-      expect(resolveModelMultiplier('opus', table)).toBe(2.0);
-      expect(resolveModelMultiplier('sonnet', table)).toBe(1.0);
-      expect(resolveModelMultiplier('haiku', table)).toBe(0.5);
+      expect(resolveModelMultiplier('claude-opus-4-8', table)).toBe(2.0);
+      expect(resolveModelMultiplier('claude-sonnet-5', table)).toBe(1.0);
+      expect(resolveModelMultiplier('claude-haiku-4-5-20251001', table)).toBe(0.5);
     });
 
     it('falls back to 1.0 for a tier missing from a partial table', () => {
-      expect(resolveModelMultiplier('opus', { economy: 0.5 })).toBe(1.0);
+      expect(resolveModelMultiplier('claude-opus-4-8', { economy: 0.5 })).toBe(1.0);
     });
 
     it('ignores a non-positive or non-finite entry and falls back to 1.0', () => {
-      expect(resolveModelMultiplier('opus', { premium: 0 })).toBe(1.0);
-      expect(resolveModelMultiplier('opus', { premium: -1 })).toBe(1.0);
-      expect(resolveModelMultiplier('opus', { premium: NaN })).toBe(1.0);
+      expect(resolveModelMultiplier('claude-opus-4-8', { premium: 0 })).toBe(1.0);
+      expect(resolveModelMultiplier('claude-opus-4-8', { premium: -1 })).toBe(1.0);
+      expect(resolveModelMultiplier('claude-opus-4-8', { premium: NaN })).toBe(1.0);
     });
   });
 
@@ -144,7 +144,7 @@ describe('TIMEOUT-TIER — model-tier multiplier (born-667a, Task 427-023)', () 
       };
       const baseline = makeConfig();
       const withMultiplier = makeConfig({ timeout: timeoutCfg });
-      const task = makeTask({ model: 'opus', effort: 'high' });
+      const task = makeTask({ model: 'claude-opus-4-8', effort: 'high' });
 
       const { timeoutSeconds: baseSeconds, breakdown: baseBreak } = brainEstimateTimeout(
         task,
@@ -171,7 +171,7 @@ describe('TIMEOUT-TIER — model-tier multiplier (born-667a, Task 427-023)', () 
         model_multiplier: { premium: 2.0, economy: 0.5 },
       };
       const config = makeConfig({ timeout: timeoutCfg });
-      const task = makeTask({ model: 'sonnet', effort: 'normal' });
+      const task = makeTask({ model: 'claude-sonnet-5', effort: 'normal' });
       const { breakdown } = brainEstimateTimeout(task, config, emptyHistory());
 
       expect(breakdown.modelMultiplier).toBe(1.0);
@@ -184,7 +184,7 @@ describe('TIMEOUT-TIER — model-tier multiplier (born-667a, Task 427-023)', () 
         model_multiplier: { economy: 0.5 },
       };
       const config = makeConfig({ timeout: timeoutCfg });
-      const task = makeTask({ model: 'haiku', effort: 'normal' });
+      const task = makeTask({ model: 'claude-haiku-4-5-20251001', effort: 'normal' });
       const { breakdown } = brainEstimateTimeout(task, config, emptyHistory());
 
       expect(breakdown.modelMultiplier).toBe(0.5);

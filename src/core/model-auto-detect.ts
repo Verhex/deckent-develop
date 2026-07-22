@@ -1,10 +1,11 @@
 // ─── Model Auto-Detect (F1-AD first-slice) ───────────────────────────────────
 // Runtime-probe each connected provider CLI → discover accessible model-ids →
-// reconcile with catalog and bundled fallback → register in ModelRegistry.
+// reconcile reachability with catalog and bundled identities.
 //
-// Priority: CLI > models.dev catalog > bundled BUILTIN_MODELS (F1-PD parametric).
-// New models (e.g. 'claude-mythos-5') are accepted without code changes via the
-// parametric resolver already in ModelRegistry.resolve().
+// Priority: CLI > models.dev catalog > bundled BUILTIN_MODELS. A cloud CLI
+// probe is reachability evidence, never pricing/catalog authority: an unknown
+// cloud identity is not executable until a priced catalog producer admits it.
+// Local Ollama tags are the only zero-cost dynamic registration path.
 //
 // Cache: ~/.deckent/cache/model-auto-detect-{provider}-{authMode}.json (1h TTL)
 // Spawn: async child_process.spawn, injected for tests (no spawnSync, ADR-087).
@@ -294,16 +295,11 @@ function inferAuthMode(provider: AutoDetectProvider): string {
 // ─── detectAndRegisterModels ─────────────────────────────────────────────────
 
 /**
- * Probe all (or specified) providers, reconcile model ids, and register
- * discovered models in the given ModelRegistry using the parametric resolver.
+ * Probe all (or specified) providers and reconcile reachable model ids.
  *
- * This is the main public API of this module. Call it once at startup to
- * populate the registry with live-available models beyond the bundled catalog.
- * Idempotent: re-registering an id that already exists is a no-op.
- *
- * New model ids (e.g. 'claude-mythos-5') are accepted without a code change
- * because ModelRegistry.resolve() builds a parametric definition via
- * inferProviderFromId + inferTierFromId (F1-PD).
+ * Cloud discoveries remain reachability-only until catalog pricing evidence
+ * admits the exact API id. Local Ollama discoveries may be registered because
+ * the local execution-cost class has no remote pricing requirement.
  */
 export async function detectAndRegisterModels(
   registry: ModelRegistry,
@@ -360,14 +356,16 @@ export async function detectAndRegisterModels(
       }
     }
 
-    // Register every discovered model id that isn't already in the registry.
-    // ModelRegistry.resolve() handles the parametric definition (F1-PD).
+    // A CLI discovery is reachability evidence, not pricing/catalog authority.
+    // Unknown cloud IDs remain outside the executable registry until a priced
+    // catalog producer admits them. Local Ollama tags are the sole zero-cost
+    // dynamic registration path.
     let registered = 0;
     for (const id of discovered) {
-      if (!registry.has(id)) {
+      if (!registry.has(id) && provider === 'ollama') {
         const providerHint = inferProviderFromId(id);
         const def: ModelDefinition = buildParametricModel(id, {
-          provider: providerHint as RegistryProviderName,
+          provider: (providerHint ?? 'ollama') as RegistryProviderName,
           register: false,
         });
         registry.register(def);

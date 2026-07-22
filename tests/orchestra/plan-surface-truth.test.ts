@@ -37,24 +37,24 @@ afterEach(() => {
 
 describe('splitDirectiveLineSegments', () => {
   it('splits a combined "- Model: X | Agent: Y" line into two segments', () => {
-    const segs = splitDirectiveLineSegments('- Model: sonnet | Agent: bug-fixer');
+    const segs = splitDirectiveLineSegments('- Model: claude-sonnet-5 | Agent: bug-fixer');
     expect(segs).toEqual([
-      { key: 'model', value: 'sonnet' },
+      { key: 'model', value: 'claude-sonnet-5' },
       { key: 'agent', value: 'bug-fixer' },
     ]);
   });
 
   it('is order-independent ("- Agent: X | Model: Y" also splits cleanly)', () => {
-    const segs = splitDirectiveLineSegments('- Agent: bug-fixer | Model: sonnet');
+    const segs = splitDirectiveLineSegments('- Agent: bug-fixer | Model: claude-sonnet-5');
     expect(segs).toEqual([
       { key: 'agent', value: 'bug-fixer' },
-      { key: 'model', value: 'sonnet' },
+      { key: 'model', value: 'claude-sonnet-5' },
     ]);
   });
 
   it('behaves identically to a single directive on its own line (no pipe)', () => {
-    expect(splitDirectiveLineSegments('- Model: opus')).toEqual([{ key: 'model', value: 'opus' }]);
-    expect(splitDirectiveLineSegments('Model: opus')).toEqual([{ key: 'model', value: 'opus' }]);
+    expect(splitDirectiveLineSegments('- Model: claude-opus-4-8')).toEqual([{ key: 'model', value: 'claude-opus-4-8' }]);
+    expect(splitDirectiveLineSegments('Model: claude-opus-4-8')).toEqual([{ key: 'model', value: 'claude-opus-4-8' }]);
   });
 
   it('does not mistake prose containing a colon for a directive segment', () => {
@@ -69,14 +69,14 @@ describe('splitDirectiveLineSegments', () => {
 
 describe('findDirectiveValue', () => {
   it('finds a value on a combined line', () => {
-    const lines = ['- Model: sonnet | Agent: bug-fixer', '- Scope: src/orchestra/'];
-    expect(findDirectiveValue(lines, 'model')).toBe('sonnet');
+    const lines = ['- Model: claude-sonnet-5 | Agent: bug-fixer', '- Scope: src/orchestra/'];
+    expect(findDirectiveValue(lines, 'model')).toBe('claude-sonnet-5');
     expect(findDirectiveValue(lines, 'agent')).toBe('bug-fixer');
   });
 
   it('first occurrence wins across multiple lines', () => {
-    const lines = ['- Model: opus', '- Model: haiku'];
-    expect(findDirectiveValue(lines, 'model')).toBe('opus');
+    const lines = ['- Model: claude-opus-4-8', '- Model: claude-haiku-4-5-20251001'];
+    expect(findDirectiveValue(lines, 'model')).toBe('claude-opus-4-8');
   });
 
   it('returns undefined when the key never appears', () => {
@@ -90,38 +90,38 @@ describe('parseStructuredDirectives — combined "- Model: X | Agent: Y" line (b
   it('captures BOTH forceModel and forceAgent from the exact DIRECTIVES.md task-header shape', () => {
     // This is the literal line shape used by sprint-404's own DIRECTIVES.md task
     // headers (e.g. "## Task 3: ... \n- Model: sonnet | Agent: bug-fixer").
-    const content = '## Task 1: PLAN-SURFACE-TRUTH\n- Model: sonnet | Agent: bug-fixer\n- Scope: src/orchestra/\n\n### Description\nFix the hint-drop.';
+    const content = '## Task 1: PLAN-SURFACE-TRUTH\n- Model: claude-sonnet-5 | Agent: bug-fixer\n- Scope: src/orchestra/\n\n### Description\nFix the hint-drop.';
     const tasks = parseStructuredDirectives(content);
     expect(tasks).toHaveLength(1);
-    expect(tasks[0]!.forceModel).toBe('sonnet');
+    expect(tasks[0]!.forceModel).toBe('claude-sonnet-5');
     expect(tasks[0]!.forceAgent).toBe('bug-fixer');
   });
 
   it('captures both hints regardless of Model/Agent order on the combined line', () => {
-    const content = '## Task 1: Order Test\n- Agent: doc-writer | Model: haiku\n\n### Description\nOrder independence.';
+    const content = '## Task 1: Order Test\n- Agent: doc-writer | Model: claude-haiku-4-5-20251001\n\n### Description\nOrder independence.';
     const tasks = parseStructuredDirectives(content);
     expect(tasks[0]!.forceAgent).toBe('doc-writer');
-    expect(tasks[0]!.forceModel).toBe('haiku');
+    expect(tasks[0]!.forceModel).toBe('claude-haiku-4-5-20251001');
   });
 
   it('still supports the separate-line variant (no regression)', () => {
-    const content = '## Task 1: Separate Lines\n- Model: opus\n- Agent: security-auditor\n\n### Description\nClassic form.';
+    const content = '## Task 1: Separate Lines\n- Model: claude-opus-4-8\n- Agent: security-auditor\n\n### Description\nClassic form.';
     const tasks = parseStructuredDirectives(content);
-    expect(tasks[0]!.forceModel).toBe('opus');
+    expect(tasks[0]!.forceModel).toBe('claude-opus-4-8');
     expect(tasks[0]!.forceAgent).toBe('security-auditor');
   });
 
   it('combines Model+Agent+Effort on one line', () => {
-    const content = '## Task 1: Triple Combo\n- Model: opus | Agent: refactorer | Effort: high\n\n### Description\nAll three.';
+    const content = '## Task 1: Triple Combo\n- Model: claude-opus-4-8 | Agent: refactorer | Effort: high\n\n### Description\nAll three.';
     const tasks = parseStructuredDirectives(content);
-    expect(tasks[0]!.forceModel).toBe('opus');
+    expect(tasks[0]!.forceModel).toBe('claude-opus-4-8');
     expect(tasks[0]!.forceAgent).toBe('refactorer');
     expect(tasks[0]!.forceEffort).toBe('high');
   });
 
   it('"Agent: none" on a combined line still maps to generic (no WARN)', () => {
     const writeSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-    const content = '## Task 1: None Agent\n- Model: sonnet | Agent: none\n\n### Description\nNo agent wanted.';
+    const content = '## Task 1: None Agent\n- Model: claude-sonnet-5 | Agent: none\n\n### Description\nNo agent wanted.';
     const tasks = parseStructuredDirectives(content);
     expect(tasks[0]!.forceAgent).toBe('generic');
     expect(writeSpy).not.toHaveBeenCalled();
@@ -129,7 +129,7 @@ describe('parseStructuredDirectives — combined "- Model: X | Agent: Y" line (b
 
   it('"Agent: auto" on a combined line still maps to undefined (no WARN — deliberate no-op)', () => {
     const writeSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-    const content = '## Task 1: Auto Agent\n- Model: sonnet | Agent: auto\n\n### Description\nLet the router pick.';
+    const content = '## Task 1: Auto Agent\n- Model: claude-sonnet-5 | Agent: auto\n\n### Description\nLet the router pick.';
     const tasks = parseStructuredDirectives(content);
     expect(tasks[0]!.forceAgent).toBeUndefined();
     expect(writeSpy).not.toHaveBeenCalled();
@@ -139,20 +139,16 @@ describe('parseStructuredDirectives — combined "- Model: X | Agent: Y" line (b
 // ─── stderr-WARN on truly uncaptured hints (born-458 precedent) ─────────────
 
 describe('parseStructuredDirectives — uncaptured-hint stderr WARN (born-458 precedent)', () => {
-  it('WARNs when Model: is present but resolves to an unrecognized model id', () => {
+  it('fails loudly when Model: resolves to an unrecognized model id', () => {
     const writeSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     const content = '## Task 1: Bad Model Combo\n- Model: gpt4 | Agent: refactorer\n\n### Description\nTypo model.';
-    const tasks = parseStructuredDirectives(content);
-    expect(tasks[0]!.forceModel).toBeUndefined();
-    expect(tasks[0]!.forceAgent).toBe('refactorer');
-    expect(writeSpy).toHaveBeenCalledTimes(1);
-    expect(writeSpy.mock.calls[0]![0]).toContain('gpt4');
-    expect(writeSpy.mock.calls[0]![0]).toContain('WARN');
+    expect(() => parseStructuredDirectives(content)).toThrow('E_MODEL_PROVIDER_UNVERIFIED');
+    expect(writeSpy).not.toHaveBeenCalled();
   });
 
   it('does not WARN when Model: resolves to a valid model', () => {
     const writeSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-    const content = '## Task 1: Good Model\n- Model: opus | Agent: refactorer\n\n### Description\nValid.';
+    const content = '## Task 1: Good Model\n- Model: claude-opus-4-8 | Agent: refactorer\n\n### Description\nValid.';
     parseStructuredDirectives(content);
     expect(writeSpy).not.toHaveBeenCalled();
   });
@@ -171,23 +167,20 @@ describe('parseBulletOrNumberedTasks — combined "- Model: X | Agent: Y" line (
   it('captures both forceModel and forceAgent at the bullet-list parse site', () => {
     const content = [
       '- Task: Fix the routing bug',
-      '  - Model: sonnet | Agent: bug-fixer',
+      '  - Model: claude-sonnet-5 | Agent: bug-fixer',
     ].join('\n');
     const tasks = parseBulletOrNumberedTasks(content);
-    expect(tasks[0]!.forceModel).toBe('sonnet');
+    expect(tasks[0]!.forceModel).toBe('claude-sonnet-5');
     expect(tasks[0]!.forceAgent).toBe('bug-fixer');
   });
 
-  it('WARNs when the bullet-list Model: value is unrecognized', () => {
+  it('fails loudly when the bullet-list Model: value is unrecognized', () => {
     const writeSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     const content = [
       '- Task: Bad model in bullet form',
       '  - Model: totallybogus | Agent: refactorer',
     ].join('\n');
-    const tasks = parseBulletOrNumberedTasks(content);
-    expect(tasks[0]!.forceModel).toBeUndefined();
-    expect(tasks[0]!.forceAgent).toBe('refactorer');
-    expect(writeSpy).toHaveBeenCalledTimes(1);
+    expect(() => parseBulletOrNumberedTasks(content)).toThrow('E_MODEL_PROVIDER_UNVERIFIED');
+    expect(writeSpy).not.toHaveBeenCalled();
   });
 });
-

@@ -54,17 +54,17 @@ describe('isEconomyAllowedForKind', () => {
 
 describe('enforceModelTierGuard — economy on code task', () => {
   it('upgrades haiku → sonnet (standard) for a code-development task', () => {
-    const out = enforceModelTierGuard({ taskKind: 'code-development', model: 'haiku' });
+    const out = enforceModelTierGuard({ taskKind: 'code-development', model: 'claude-haiku-4-5-20251001' });
     expect(out.upgraded).toBe(true);
-    expect(out.originalModel).toBe('haiku');
-    expect(out.model).toBe('sonnet');
+    expect(out.originalModel).toBe('claude-haiku-4-5-20251001');
+    expect(out.model).toBe('claude-sonnet-5');
     expect(out.reason).toMatch(/economy/i);
   });
 
   it('upgrades a code task classified from a .tsx scope (kind derived from scope)', () => {
-    const out = enforceModelTierGuard({ scope: codeScope(), model: 'haiku' });
+    const out = enforceModelTierGuard({ scope: codeScope(), model: 'claude-haiku-4-5-20251001' });
     expect(out.upgraded).toBe(true);
-    expect(out.model).toBe('sonnet');
+    expect(out.model).toBe('claude-sonnet-5');
   });
 
   it('upgrades gpt-5-mini → gpt-4.1 (codex standard) honoring provider', () => {
@@ -84,19 +84,19 @@ describe('enforceModelTierGuard — economy on code task', () => {
 
 describe('enforceModelTierGuard — economy on doc/audit task', () => {
   it('leaves haiku untouched for a document-write task', () => {
-    const out = enforceModelTierGuard({ taskKind: 'document-write', model: 'haiku' });
+    const out = enforceModelTierGuard({ taskKind: 'document-write', model: 'claude-haiku-4-5-20251001' });
     expect(out.upgraded).toBe(false);
-    expect(out.model).toBe('haiku');
+    expect(out.model).toBe('claude-haiku-4-5-20251001');
   });
   it('leaves haiku untouched for a doc scope (derived)', () => {
-    const out = enforceModelTierGuard({ scope: docScope(), model: 'haiku' });
+    const out = enforceModelTierGuard({ scope: docScope(), model: 'claude-haiku-4-5-20251001' });
     expect(out.upgraded).toBe(false);
-    expect(out.model).toBe('haiku');
+    expect(out.model).toBe('claude-haiku-4-5-20251001');
   });
   it('leaves haiku untouched for an audit scope (derived)', () => {
-    const out = enforceModelTierGuard({ scope: auditScope(), model: 'haiku' });
+    const out = enforceModelTierGuard({ scope: auditScope(), model: 'claude-haiku-4-5-20251001' });
     expect(out.upgraded).toBe(false);
-    expect(out.model).toBe('haiku');
+    expect(out.model).toBe('claude-haiku-4-5-20251001');
   });
 });
 
@@ -104,9 +104,9 @@ describe('enforceModelTierGuard — economy on doc/audit task', () => {
 
 describe('enforceModelTierGuard — explicit override honored', () => {
   it('honors explicitOverride: keeps haiku on a code task but flags it', () => {
-    const out = enforceModelTierGuard({ taskKind: 'code-development', model: 'haiku', explicitOverride: true });
+    const out = enforceModelTierGuard({ taskKind: 'code-development', model: 'claude-haiku-4-5-20251001', explicitOverride: true });
     expect(out.upgraded).toBe(false);
-    expect(out.model).toBe('haiku');
+    expect(out.model).toBe('claude-haiku-4-5-20251001');
     expect(out.overrideHonored).toBe(true);
     expect(out.reason).toMatch(/override/i);
   });
@@ -116,14 +116,14 @@ describe('enforceModelTierGuard — explicit override honored', () => {
 
 describe('enforceModelTierGuard — non-economy unaffected', () => {
   it('leaves sonnet (standard) untouched on a code task', () => {
-    const out = enforceModelTierGuard({ taskKind: 'code-development', model: 'sonnet' });
+    const out = enforceModelTierGuard({ taskKind: 'code-development', model: 'claude-sonnet-5' });
     expect(out.upgraded).toBe(false);
-    expect(out.model).toBe('sonnet');
+    expect(out.model).toBe('claude-sonnet-5');
   });
   it('leaves opus (premium) untouched on a code task', () => {
-    const out = enforceModelTierGuard({ taskKind: 'code-development', model: 'opus' });
+    const out = enforceModelTierGuard({ taskKind: 'code-development', model: 'claude-opus-4-8' });
     expect(out.upgraded).toBe(false);
-    expect(out.model).toBe('opus');
+    expect(out.model).toBe('claude-opus-4-8');
   });
   it('leaves an unknown/ollama tag untouched (no registry tier → no guard)', () => {
     const out = enforceModelTierGuard({ taskKind: 'code-development', model: 'qwen3.6:27b' });

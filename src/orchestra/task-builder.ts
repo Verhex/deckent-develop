@@ -9,13 +9,12 @@ import type {
   Task, TaskScope, GoNoGoCriteria, ModelType, TaskEffort, TaskPriority,
   PlannerTask, ProviderName, TaskResult,
 } from '../core/types.js';
-import { TaskStatus, ALL_MODELS, PROVIDER_MODEL_MAP } from '../core/types.js';
+import { TaskStatus, PROVIDER_MODEL_MAP } from '../core/types.js';
 import { VALID_PROVIDERS_ALL } from '../core/config.js';
-import { isAdapterProvider } from './sprint-utils.js';
 import { detectTaskType } from './rubric-registry.js';
 import { lintWorkerPromptContract } from './prompt-lint.js';
 import { rubricTypeToKind } from '../core/work-model.js';
-import { modelRegistry, ensureOllamaModelRegistered } from '../core/model-registry.js';
+import { resolveCanonicalModelIdentity } from '../core/model-registry.js';
 import type { TaskDNA } from '../core/routing-types.js';
 import { calculateModelScore } from './model-selector.js';
 import { debugLog } from '../core/utils.js';
@@ -70,10 +69,6 @@ import type { ResolvedVerifyCommands } from './worker-verify-tool.js';
 import { computeToolAllowlist } from '../core/tool-allowlist.js';
 import type { ToolAllowlistResult } from '../core/tool-allowlist.js';
 
-// ─── Model enum values for Zod schemas ───────────────────────────────────
-// ALL_MODELS is readonly ModelType[] — extract as tuple for z.enum()
-const MODEL_ENUM_VALUES = ALL_MODELS as unknown as [string, ...string[]];
-
 // ─── Provider enum values for Zod schemas ────────────────────────────────
 const PROVIDER_NAMES = Object.keys(PROVIDER_MODEL_MAP) as [string, ...string[]];
 
@@ -82,13 +77,27 @@ const PROVIDER_NAMES = Object.keys(PROVIDER_MODEL_MAP) as [string, ...string[]];
 /** Zod schema for a single directive task section */
 export const DirectiveTaskSchema = z.object({
   title: z.string().min(1, 'Task title must not be empty'),
-  model: z.enum(MODEL_ENUM_VALUES).optional(),
+  model: z.string().min(1).optional(),
   effort: z.enum(['low', 'normal', 'high']).optional(),
   provider: z.enum(PROVIDER_NAMES).optional(),
   files: z.array(z.string()),
   scope: z.array(z.string()),
   description: z.string(),
   tests: z.array(z.string()).optional(),
+}).superRefine((task, context) => {
+  if (!task.model) return;
+  try {
+    resolveCanonicalModelIdentity(task.model, {
+      ...(task.provider ? { provider: task.provider as ProviderName } : {}),
+      registerParametric: false,
+    });
+  } catch (error) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['model'],
+      message: error instanceof DeckentError ? error.code : 'E_MODEL_INVALID',
+    });
+  }
 });
 
 /** Zod schema for a complete parsed DIRECTIVES.md document */
@@ -622,31 +631,15 @@ export function createTask(params: CreateTaskParams, sequence: number): Task & {
   const sprintNumber = params.sprintId.replace('sprint-', '');
   const id = `${sprintNumber}-${String(sequence).padStart(3, '0')}`;
 
-  // Sprint 236: register locally-pulled Ollama tags on-demand BEFORE any
-  // registry lookup (tier/provider/apiId during routing) so a `- Model: <tag>`
-  // not in the static catalog doesn't throw "Unknown model". Adapter-providers
-  // only — cloud models keep throwing on genuinely-unknown ids.
-  if (params.provider && isAdapterProvider(params.provider)) {
-    for (const m of [params.forceModel, params.model]) {
-      if (m && !modelRegistry.has(m)) ensureOllamaModelRegistered(m);
-    }
+  const authoredModel = params.forceModel ?? params.model;
+  if (authoredModel) {
+    resolveCanonicalModelIdentity(authoredModel, {
+      ...(params.provider ? { provider: params.provider } : {}),
+      registerParametric: true,
+    });
   }
 
-  // Validate model-provider compatibility when both are specified
-  let provider = params.provider;
-  if (provider && params.model) {
-    const allowedModels = PROVIDER_MODEL_MAP[provider];
-    if (!allowedModels || !(allowedModels as readonly string[]).includes(params.model)) {
-      // Log warning but keep provider as-is — task 6's model equivalence will handle later
-      debugLog(
-        'createTask:model-provider-mismatch',
-        new Error(
-          `Model "${params.model}" is not compatible with provider "${provider}". ` +
-          `Allowed models for ${provider}: ${(allowedModels ?? []).join(', ')}`,
-        ),
-      );
-    }
-  }
+  const provider = params.provider;
 
   // Sprint 196 WP-3: Derive test scope for audit trail (scopeDerivation).
   // Actual scope.filesWrite enrichment happens in enrichScopeWithTestFiles at parse-time.
@@ -1136,8 +1129,8 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
       : undefined;
 
     // Extract optional Provider: override (e.g., "Provider: codex", "Provider: ollama").
-    // NOTE: Provider parse runs BEFORE Model parse — adapter-providers (e.g. ollama)
-    // accept raw model tags (pass-through) that are not in the static ALL_MODELS list.
+    // Provider parse runs before Model so an exact, previously unseen API model ID
+    // can be registered parametrically against an explicit provider.
     // born-629: findDirectiveValue understands both one-per-line ("- Provider: X")
     // and pipe-combined ("- Model: X | Agent: Y") directive lines — the previous
     // whole-line-anchored `.find` silently dropped every directive after the
@@ -1146,23 +1139,16 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     // VALID_PROVIDERS_ALL is the canonical extended source (includes 'ollama' alongside claude/codex/gemini).
     const parsedProvider = (rawProvider && VALID_PROVIDERS_ALL.includes(rawProvider) ? rawProvider : undefined) as ProviderName | undefined;
 
-    // Extract optional Model: override (e.g., "Model: opus", "Model: qwen3.6:27b").
-    // Adapter-providers (ollama/codex/gemini) accept raw model tags not in the
-    // static ALL_MODELS list (pass-through); non-adapter providers (claude)
-    // validate — a gibberish model is dropped to undefined. Restores the
-    // Sprint-235 contract that 325-001 lost when it added verbatim `- Model:` parse.
-    const forceModel = findDirectiveValue(lines, 'model')?.toLowerCase();
-    const parsedForceModel = (
-      !forceModel
-        ? undefined
-        : (parsedProvider && isAdapterProvider(parsedProvider)) ||
-            (ALL_MODELS as readonly string[]).includes(forceModel)
-          ? forceModel
-          : undefined
-    ) as ModelType | undefined;
-    // born-458 precedent: a hint the operator wrote must never vanish silently —
-    // Model: was present but didn't resolve to a usable value for this provider.
-    if (forceModel && !parsedForceModel) warnUncapturedHint(title, 'Model', forceModel);
+    // Extract optional Model: override as an exact API ID. Known IDs must match
+    // their provider; unknown IDs require an explicit provider and are registered
+    // parametrically. Legacy aliases and unverifiable identities fail loudly.
+    const forceModel = findDirectiveValue(lines, 'model')?.trim();
+    const parsedForceModel = forceModel
+      ? resolveCanonicalModelIdentity(forceModel, {
+          ...(parsedProvider ? { provider: parsedProvider } : {}),
+          registerParametric: false,
+        }).id as ModelType
+      : undefined;
 
     // Extract optional Effort: override (e.g., "Effort: max")
     const forceEffort = findDirectiveValue(lines, 'effort')?.toLowerCase();
@@ -1313,8 +1299,8 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
           };
         }, { directories: [], filesRead: [], filesWrite: [] });
 
-        // Extract Provider override — Provider parse BEFORE Model parse so adapter-providers
-        // (e.g. ollama) can pass-through raw model tags that are not in static ALL_MODELS.
+        // Extract Provider before Model so an exact, previously unseen API model ID
+        // can be registered parametrically against an explicit provider.
         // born-629: findDirectiveValue understands pipe-combined directive lines
         // (e.g. "- Model: X | Agent: Y") — the previous greedy `.replace(/.*Key:\s*/i, '')`
         // captured everything to the end of the line, corrupting Model's value with a
@@ -1323,20 +1309,15 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
         // VALID_PROVIDERS_ALL is the canonical extended source (includes 'ollama').
         const parsedProvider = (rawProvider && VALID_PROVIDERS_ALL.includes(rawProvider) ? rawProvider : undefined) as ProviderName | undefined;
 
-        // Extract Model override — adapter-providers pass raw tags through;
-        // non-adapter (claude) validates against ALL_MODELS (Sprint-235 contract;
-        // 325-001 verbatim-parse regression fix).
-        const rawModel = findDirectiveValue(allLines, 'model')?.toLowerCase();
-        const parsedForceModel = (
-          !rawModel
-            ? undefined
-            : (parsedProvider && isAdapterProvider(parsedProvider)) ||
-                (ALL_MODELS as readonly string[]).includes(rawModel)
-              ? rawModel
-              : undefined
-        ) as ModelType | undefined;
-        // born-458 precedent: a hint the operator wrote must never vanish silently.
-        if (rawModel && !parsedForceModel) warnUncapturedHint(title, 'Model', rawModel);
+        // Extract Model as an exact API ID; aliases, provider mismatches, and
+        // unknown identities without an explicit provider fail loudly.
+        const rawModel = findDirectiveValue(allLines, 'model')?.trim();
+        const parsedForceModel = rawModel
+          ? resolveCanonicalModelIdentity(rawModel, {
+              ...(parsedProvider ? { provider: parsedProvider } : {}),
+              registerParametric: false,
+            }).id as ModelType
+          : undefined;
 
         // Extract Effort override
         const rawEffort = findDirectiveValue(allLines, 'effort')?.toLowerCase();
