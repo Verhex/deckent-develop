@@ -46,10 +46,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildLiveGoalDeps, handleStart } from '../../src/cli/commands/autonomous.js';
+import {
+  buildLiveGoalDeps,
+  handleStart,
+  resolvePlannerModelIdentity,
+} from '../../src/cli/commands/autonomous.js';
 import type { LlmComplete } from '../../src/orchestra/autonomous/goal-planner-types.js';
 import type { WorkItem } from '../../src/orchestra/autonomous/mission-store/mission-types.js';
 import { createGoalAcceptanceContract } from '../../src/orchestra/autonomous/mission-store/mission-acceptance.js';
+import type { ResolvedConfig } from '../../src/core/types.js';
 import { useSandboxHome } from '../helpers/sandbox-home.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────
@@ -73,6 +78,31 @@ function wi(partial: Partial<WorkItem>): WorkItem {
     ...partial,
   };
 }
+
+describe('resolvePlannerModelIdentity — canonical Brain role', () => {
+  const config = {
+    mode: 'balanced',
+    projectRoot: '/hermetic/project',
+    modes: {
+      balanced: {
+        brain_model: 'claude-fable-5',
+        default_model: 'claude-sonnet-5',
+      },
+    },
+  } as unknown as ResolvedConfig;
+
+  it('uses the configured Brain model rather than the worker default', () => {
+    expect(resolvePlannerModelIdentity(config, 'en')).toBe('claude-fable-5');
+  });
+
+  it('preserves an explicit canonical API model identity', () => {
+    expect(resolvePlannerModelIdentity(config, 'en', 'gpt-5.6-sol', 'codex')).toBe('gpt-5.6-sol');
+  });
+
+  it('fails loud when an explicit provider does not own the model', () => {
+    expect(() => resolvePlannerModelIdentity(config, 'en', 'claude-fable-5', 'codex')).toThrow();
+  });
+});
 
 // ─── buildLiveGoalDeps — planner adapter ───────────────────────────────
 
