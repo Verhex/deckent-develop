@@ -32,6 +32,7 @@ import type { CapabilityTarget } from '../core/work-model.js';
 import type { TaskResult, SelfAssessment } from '../core/types.js';
 import type { BacklogEntry } from './autonomous/backlog-types.js';
 import type { FlowReporter } from './autonomous/flow-reporter.js';
+import type { TaskResultSettlementRefV1 } from '../core/task-result-settlement.js';
 
 /** One step of a process — a code task (default) or a capability invocation. */
 export interface ProcessStep {
@@ -64,9 +65,14 @@ export interface RunProcessDeps {
   runTask: (
     ctx: { projectRoot: string; description: string; model?: string; provider?: string; scope?: { directories: string[] } },
     config: ResolvedConfig,
-  ) => Promise<unknown>;
+  ) => Promise<{ taskId?: string; settlementRef?: TaskResultSettlementRefV1 } | null | undefined>;
   /** Wait for a launched task's `.result` (null on timeout). */
-  waitForResult: (projectRoot: string, taskId: string, timeoutMs: number) => Promise<TaskResult | null>;
+  waitForResult: (
+    projectRoot: string,
+    taskId: string,
+    timeoutMs: number,
+    opts?: { settlementRef?: TaskResultSettlementRefV1 },
+  ) => Promise<TaskResult | null>;
   /** Max ms to wait per task step (defaults to 600_000, matching the dispatcher). */
   resultTimeoutMs?: number;
   /** F8 capability broker — required only if the process contains capability steps. */
@@ -223,13 +229,20 @@ export async function runProcess(entry: BacklogEntry, deps: RunProcessDeps): Pro
         scope: { directories: [step.scopeDir ?? entry.spec.scopeDir ?? '.'] },
       },
       deps.config,
-    )) as { taskId?: string } | null | undefined;
+    ));
 
     const taskId = launched?.taskId;
     if (!taskId) {
       return makeProcessResult(entry, 'NO_GO', `${label}: runTask returned no taskId (completion not trackable)`, { filesChanged });
     }
-    const result = await deps.waitForResult(deps.projectRoot, taskId, timeoutMs);
+    const result = launched.settlementRef
+      ? await deps.waitForResult(
+          deps.projectRoot,
+          taskId,
+          timeoutMs,
+          { settlementRef: launched.settlementRef },
+        )
+      : await deps.waitForResult(deps.projectRoot, taskId, timeoutMs);
     if (!result) {
       return makeProcessResult(entry, 'NO_GO', `${label}: timeout — no result within limit`, { filesChanged });
     }

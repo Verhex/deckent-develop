@@ -9,6 +9,7 @@ import { loadBacklog } from '../../../src/orchestra/autonomous/backlog.js';
 import type { BacklogEntry, BacklogFile } from '../../../src/orchestra/autonomous/backlog-types.js';
 import type { TaskResult } from '../../../src/core/types.js';
 import type { ExecutionPool } from '../../../src/orchestra/autonomous/execution-pool.js';
+import type { TaskResultSettlementRefV1 } from '../../../src/core/task-result-settlement.js';
 
 // ─── Shared helpers ──────────────────────────────────────────────────
 
@@ -51,6 +52,14 @@ const noGoResult: TaskResult = {
 const okEval = () => ({ decision: 'DONE' as const, quality: 100, reconciled: false, reason: 'ok' });
 const okAudit = async () => ({ boundary: 'clean' as const, adr: 'ok' as const, functional: 'pass' as const });
 const skipXVerify = async () => ({ ran: false });
+
+const settlementRef = (taskId: string): TaskResultSettlementRefV1 => ({
+  schemaVersion: 1,
+  taskId,
+  backend: 'docker',
+  projectRootSha256: 'a'.repeat(64),
+  attemptId: '00000000-0000-4000-8000-000000000001',
+});
 
 // ─── Tmpdir management ───────────────────────────────────────────────
 
@@ -218,6 +227,31 @@ describe('execute-dispatcher', () => {
     const e = bl.entries.find((x) => x.id === 'e');
     expect(e?.status).toBe('failed');
     expect(e?.lastResult?.ok).toBe(false);
+  });
+
+  it('threads the exact Docker settlement authority into result waiting', async () => {
+    const backlogPath = seedBacklog(tmpDir, taskEntry);
+    const ref = settlementRef('t');
+    const waitForResult = vi.fn().mockResolvedValue(doneResult);
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir,
+      config: {} as never,
+      runTask: vi.fn().mockResolvedValue({ taskId: 't', settlementRef: ref }),
+      runSprint: vi.fn(),
+      backlogPath,
+      waitForResult,
+      evaluate: okEval,
+      audit: okAudit,
+      crossVerify: skipXVerify,
+    });
+
+    expect((await handler('autonomous.execute', { entry: taskEntry })).outcome).toBe('success');
+    expect(waitForResult).toHaveBeenCalledWith(
+      tmpDir,
+      't',
+      600_000,
+      { settlementRef: ref },
+    );
   });
 
   it('kind=task: selfAssessment=NO_GO → entry failed, outcome=failure', async () => {

@@ -35,6 +35,7 @@ import { evaluatePolicy } from '../../core/policy-engine.js';
 import type { PolicyActivationInput, PolicyConditionInput, PolicyRbacInput, PolicyInput } from '../../core/policy-engine.js';
 import { resolveRiskClass } from '../../core/work-model.js';
 import type { Capability } from '../../core/work-model.js';
+import type { TaskResultSettlementRefV1 } from '../../core/task-result-settlement.js';
 
 /** Action id the backlog-trigger sets on every entry-driven trigger. */
 export const AUTONOMOUS_EXECUTE_ACTION = 'autonomous.execute';
@@ -73,7 +74,7 @@ export interface ExecuteDispatcherDeps {
   runTask: (
     ctx: { projectRoot: string; description: string; model?: string; provider?: string; scope?: { directories: string[] } },
     config: ResolvedConfig,
-  ) => Promise<unknown>;
+  ) => Promise<{ taskId?: string; settlementRef?: TaskResultSettlementRefV1 } | null | undefined>;
   /** Injected runSprint (kind=sprint). */
   runSprint: (projectRoot: string, config: ResolvedConfig) => Promise<unknown>;
   /** Durable backlog path — used for Gap B status writeback. */
@@ -83,7 +84,12 @@ export interface ExecuteDispatcherDeps {
    * Injected for hermetic tests; live wire uses waitForRunResult from run.ts.
    * Returns the parsed TaskResult or null on timeout.
    */
-  waitForResult: (projectRoot: string, taskId: string, timeoutMs: number) => Promise<TaskResult | null>;
+  waitForResult: (
+    projectRoot: string,
+    taskId: string,
+    timeoutMs: number,
+    opts?: { settlementRef?: TaskResultSettlementRefV1 },
+  ) => Promise<TaskResult | null>;
   /**
    * Max ms to wait for a task result before declaring failure.
    * Defaults to 600_000 (10 min) — ollama models can be slow to load.
@@ -375,7 +381,7 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
               scope: { directories: [entry.spec.scopeDir ?? '.'] },
             },
             deps.config,
-          ) as { taskId?: string } | null | undefined;
+          );
 
           const taskId = r?.taskId;
           if (taskId) {
@@ -398,12 +404,19 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
             // result event so buildCausalChain can reconstruct the spawn→result chain.
             const spawnEventHmac = readLastAuditHmac(deps.projectRoot, auditSprintId);
             // Gap F: wait for real done/failed (not just launched)
-            let result = await deps.waitForResult(deps.projectRoot, taskId, timeoutMs);
+            const resultAuthority = r.settlementRef
+              ? { settlementRef: r.settlementRef }
+              : undefined;
+            let result = resultAuthority
+              ? await deps.waitForResult(deps.projectRoot, taskId, timeoutMs, resultAuthority)
+              : await deps.waitForResult(deps.projectRoot, taskId, timeoutMs);
             if (!result) {
               // false-FAILURE fix: a real worker can write its .result seconds after the
               // window closes — observed 9s past a 600s timeout (2026-06-17 dogfood).
               // Grace re-poll once before failing (disk-verify outranks the timeout).
-              result = await deps.waitForResult(deps.projectRoot, taskId, GRACE_RESULT_MS);
+              result = resultAuthority
+                ? await deps.waitForResult(deps.projectRoot, taskId, GRACE_RESULT_MS, resultAuthority)
+                : await deps.waitForResult(deps.projectRoot, taskId, GRACE_RESULT_MS);
             }
 
             if (result) {

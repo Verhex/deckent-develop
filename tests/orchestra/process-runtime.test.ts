@@ -12,6 +12,7 @@ import { createDefaultRegistry } from '../../src/core/capability-broker.js';
 import type { BacklogEntry } from '../../src/orchestra/autonomous/backlog-types.js';
 import type { TaskResult } from '../../src/core/types.js';
 import type { ResolvedConfig } from '../../src/core/config-types.js';
+import type { TaskResultSettlementRefV1 } from '../../src/core/task-result-settlement.js';
 
 const dirs: string[] = [];
 function tmp(): string { const d = mkdtempSync(join(tmpdir(), 'proc-rt-')); dirs.push(d); return d; }
@@ -31,6 +32,14 @@ function processEntry(spec: Record<string, unknown>): BacklogEntry {
 const doneResult = (taskId: string): TaskResult => ({
   taskId, workerId: 'w', filesChanged: [`f-${taskId}.ts`], linesAdded: 1, linesRemoved: 0,
   testsPassed: true, coverage: 0, selfAssessment: 'DONE', notes: 'ok',
+});
+
+const settlementRef = (taskId: string): TaskResultSettlementRefV1 => ({
+  schemaVersion: 1,
+  taskId,
+  backend: 'docker',
+  projectRootSha256: 'b'.repeat(64),
+  attemptId: '00000000-0000-4000-8000-000000000002',
 });
 
 describe('runProcess — sequential execution + envelope', () => {
@@ -90,6 +99,28 @@ describe('runProcess — sequential execution + envelope', () => {
     const entry = processEntry({ steps: [{ description: 'a' }, { description: 'b' }] });
     const res = await runProcess(entry, { projectRoot: tmp(), config: cfg, runTask, waitForResult });
     expect(res.selfAssessment).toBe('GO_WITH_TECH_DEBT');
+  });
+
+  it('threads each task step settlement authority into its result wait', async () => {
+    const root = tmp();
+    const ref = settlementRef('t-settled');
+    const waitForResult = vi.fn().mockResolvedValue(doneResult('t-settled'));
+    const entry = processEntry({ steps: [{ description: 'settled step' }] });
+
+    const res = await runProcess(entry, {
+      projectRoot: root,
+      config: cfg,
+      runTask: vi.fn().mockResolvedValue({ taskId: 't-settled', settlementRef: ref }),
+      waitForResult,
+    });
+
+    expect(res.selfAssessment).toBe('DONE');
+    expect(waitForResult).toHaveBeenCalledWith(
+      root,
+      't-settled',
+      600_000,
+      { settlementRef: ref },
+    );
   });
 });
 
