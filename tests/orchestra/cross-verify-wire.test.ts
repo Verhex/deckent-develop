@@ -302,6 +302,10 @@ describe('runCrossVerify — dispatch + advisory write', () => {
     expect(recovered).not.toHaveProperty('workPresent');
     expect(recovered).not.toHaveProperty('diffStat');
     expect(String(recovered.notes)).toMatch(/VERDICT: UNCLEAR exact receipt was not present$/);
+    expect(JSON.parse(readFileSync(
+      join(root, TASKS_DIR, 'task-276-001-xverify.json'),
+      'utf-8',
+    ))).toMatchObject({ id: '276-001-xverify', status: TaskStatus.DONE });
   });
 
   it('waits for a provider log finalized shortly after the wrapper marker', async () => {
@@ -364,6 +368,58 @@ describe('runCrossVerify — dispatch + advisory write', () => {
       testsPassed: true,
       tokenUsage: { inputTokens: 101, outputTokens: 202, cacheReadTokens: 303 },
     });
+    expect(JSON.parse(readFileSync(
+      join(root, TASKS_DIR, 'task-276-001-xverify.json'),
+      'utf-8',
+    ))).toMatchObject({ id: '276-001-xverify', status: TaskStatus.DONE });
+  });
+
+  it('keeps the verifier task pending when no terminal verdict exists', async () => {
+    defaultSpawnMocks.spawnWorkerMultiProvider.mockImplementationOnce(async (taskId, _model, _prompt, projectRoot) => {
+      writeFileSync(
+        join(projectRoot, TASKS_DIR, `task-${taskId}.result`),
+        JSON.stringify({
+          taskId,
+          selfAssessment: 'NO_GO',
+          testsPassed: false,
+          markerType: 'EXIT_WITHOUT_RESULT',
+          notes: 'Worker exited without writing result. EXIT_WITHOUT_RESULT marker.',
+        }),
+        'utf-8',
+      );
+      writeFileSync(
+        join(projectRoot, TASKS_DIR, `task-${taskId}.log`),
+        'bounded evidence ended without a terminal protocol line',
+        'utf-8',
+      );
+      return { backend: 'docker', provider: 'claude' };
+    });
+    defaultSpawnMocks.pollForResultFile.mockResolvedValueOnce({
+      notes: 'Worker exited without writing result. EXIT_WITHOUT_RESULT marker.',
+    });
+
+    const res = await runCrossVerify(
+      root,
+      makeTask({ provider: 'codex', model: 'gpt-5.6-sol' }),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true }),
+      {
+        availableProviders: ['codex', 'claude'],
+        verifierModel: 'claude-fable-5',
+        timeoutMs: 0,
+      },
+    );
+
+    expect(res).toMatchObject({ ran: true, outcome: 'unclear' });
+    expect(JSON.parse(readFileSync(
+      join(root, TASKS_DIR, 'task-276-001-xverify.result'),
+      'utf-8',
+    ))).toMatchObject({ selfAssessment: 'NO_GO', markerType: 'EXIT_WITHOUT_RESULT' });
+    expect(JSON.parse(readFileSync(
+      join(root, TASKS_DIR, 'task-276-001-xverify.json'),
+      'utf-8',
+    ))).toMatchObject({ id: '276-001-xverify', status: 'PENDING' });
   });
 
   it('enabled + high-stakes + 2 providers + CONFIRMED → runs, writes advisory, not refuted', async () => {
