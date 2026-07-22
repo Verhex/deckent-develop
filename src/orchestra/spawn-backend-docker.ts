@@ -48,6 +48,7 @@ import {
   listPendingTaskResultSettlementAttempts,
   readTaskResultSettlement,
   readTaskResultSettlementClosure,
+  writeTaskResultSettlementAttemptAtomic,
   writeTaskResultSettlementClosureAtomic,
   writeTaskResultSettlementDispatchAtomic,
   writeTaskResultSettlementPreparedAtomic,
@@ -971,7 +972,6 @@ export type DockerErrorCode = (typeof DOCKER_ERROR_CODES)[keyof typeof DOCKER_ER
 
 interface DockerAttemptIdentity {
   ref: TaskResultSettlementRefV1;
-  durable: boolean;
   containerName: string;
   labels: Readonly<Record<string, string>>;
 }
@@ -2336,7 +2336,6 @@ export class DockerSpawnBackend implements SpawnBackend {
       const inspection = authority.inspection;
       const identity: DockerAttemptIdentity = {
         ref: attempt,
-        durable: true,
         containerName: prepared.containerName,
         labels: prepared.labels,
       };
@@ -2474,9 +2473,6 @@ export class DockerSpawnBackend implements SpawnBackend {
         );
       }
     }
-    const resolvedOpts = executionBudget === opts?.executionBudget
-      ? opts
-      : { ...opts, executionBudget };
     let gitIsolation: DockerGitIsolation;
     try {
       gitIsolation = buildDockerGitIsolation(dir);
@@ -2491,6 +2487,14 @@ export class DockerSpawnBackend implements SpawnBackend {
     const effectiveTimeout = opts?.taskTimeoutSeconds ?? this.timeoutSeconds;
     const tasksDir = join(dir, TASKS_DIR);
     mkdirSync(tasksDir, { recursive: true });
+    const settlementRef = opts?.settlementRef ?? createTaskResultSettlementRef(dir, taskId);
+    assertTaskResultSettlementRef(dir, taskId, settlementRef);
+    writeTaskResultSettlementAttemptAtomic(settlementRef);
+    const resolvedOpts: SpawnBackendOptions = {
+      ...opts,
+      executionBudget,
+      settlementRef,
+    };
 
     // Sprint 170 P0-5: mark as pending BEFORE prompt write + lock acquisition.
     // Bridges the ~3s race window between prompt write and .hb creation during
@@ -2534,6 +2538,37 @@ export class DockerSpawnBackend implements SpawnBackend {
     // command. codex/gemini CLIs are opt-in build-args in Dockerfile.worker; claude
     // is the lean default. (Re-used downstream for the ProviderCommandSpec lookup.)
     const provider = modelRegistry.get(model)?.provider ?? getDefaultProviderName();
+    const attemptRef = opts?.settlementRef;
+    if (!attemptRef) {
+      throw new SpawnBackendError(
+        `Docker settlement authority was not prepared for task ${taskId}`,
+        this.name,
+      );
+    }
+    const attemptIdentity: DockerAttemptIdentity = {
+      ref: attemptRef,
+      containerName: dockerContainerNameForTask(dir, taskId),
+      labels: dockerAttemptLabels(attemptRef),
+    };
+    const prepareAttempt = (): void => {
+      claimTaskResultSettlementAttemptAtomic(attemptRef);
+      writeTaskResultSettlementPreparedAtomic(attemptRef, model);
+    };
+    const finalizeNotDispatched = (exitCode: number | null): void => {
+      const persisted = finalizeDockerHostTerminalResult(
+        dir,
+        tasksDir,
+        taskId,
+        attemptRef,
+        exitCode,
+      );
+      if (!persisted || !closeDockerTaskResultSettlement(attemptRef, 'not-dispatched')) {
+        throw new SpawnBackendError(
+          `Docker host-terminal settlement could not be durably closed for task ${taskId}`,
+          this.name,
+        );
+      }
+    };
 
     // 455-003 (DOCKER-PREFLIGHT-TRUTH): daemon preflight BEFORE the image lookup.
     // A stopped/forbidden daemon (or an absent docker binary) makes `docker images
@@ -2637,12 +2672,12 @@ export class DockerSpawnBackend implements SpawnBackend {
         notes: reason,
         tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider, model },
       };
-      try {
-        writeFileSync(join(tasksDir, `task-${taskId}.result`), JSON.stringify(honestFail, null, 2), 'utf-8');
-      } catch (e) { debugLog('docker-backend:no-spec-honestfail', e); }
-      try {
-        finalizeDockerHostTerminalResult(dir, tasksDir, taskId, opts?.settlementRef, null);
-      } catch (e) { debugLog('docker-backend:no-spec-settlement', e); }
+      prepareAttempt();
+      atomicWriteFileSync(
+        join(tasksDir, `task-${taskId}.result`),
+        `${JSON.stringify(honestFail, null, 2)}\n`,
+      );
+      finalizeNotDispatched(null);
       console.warn(`[deckent:spawn-backend-docker] ${reason}`);
       return;
     }
@@ -2691,9 +2726,8 @@ export class DockerSpawnBackend implements SpawnBackend {
           `[deckent:spawn-backend-docker] claude auth health-check failed for task ${taskId} `
           + `— wrote AUTH_FAILED NO_GO, skipping container spawn`,
         );
-        try {
-          finalizeDockerHostTerminalResult(dir, tasksDir, taskId, opts?.settlementRef, null);
-        } catch (e) { debugLog('docker-backend:auth-settlement', e); }
+        prepareAttempt();
+        finalizeNotDispatched(null);
         return;
       }
     }
@@ -2903,17 +2937,6 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     const containerCmd = `sh ${CONTAINER_WORKSPACE}/${TASKS_DIR}/${scriptFileName}`;
 
-    const attemptRef = opts?.settlementRef ?? createTaskResultSettlementRef(dir, taskId);
-    const attemptIdentity: DockerAttemptIdentity = {
-      ref: attemptRef,
-      durable: opts?.settlementRef !== undefined,
-      containerName: dockerContainerNameForTask(dir, taskId),
-      labels: dockerAttemptLabels(attemptRef),
-    };
-    if (attemptIdentity.durable) {
-      claimTaskResultSettlementAttemptAtomic(attemptRef);
-      writeTaskResultSettlementPreparedAtomic(attemptRef, model);
-    }
     const containerName = attemptIdentity.containerName;
 
     // F1-LIM faz-2a (Sprint 272): kind-based memory limit — opt-in override.
@@ -3088,6 +3111,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Each attempt: docker run + 3s wait + docker inspect. If inspect reports
     // Running=true OR Running=false+ExitCode=0 (instant-exit success), proceed.
     // Otherwise, classify stderr and retry up to MAX_SPAWN_ATTEMPTS.
+    prepareAttempt();
     const spawnOutcome = this.runDockerWithRetry(taskId, attemptIdentity, dockerArgs);
 
     if (!spawnOutcome.ok) {
@@ -3102,6 +3126,13 @@ export class DockerSpawnBackend implements SpawnBackend {
         `${baseMarker}:${spawnOutcome.error.code}:${spawnOutcome.error.message}`,
         'utf-8',
       );
+      if (spawnOutcome.error.code === DOCKER_ERROR_CODES.AUTHORITY_UNAVAILABLE) {
+        // The daemon did not prove whether `docker run` created the exact
+        // attempt. Sealing not-dispatched here could hide a live orphan and
+        // permit a duplicate dispatch. Keep the durable prepared claim open
+        // for restart reconciliation and surface the ambiguity fail-loud.
+        throw new SpawnBackendError(spawnOutcome.error.message, this.name);
+      }
       // Sprint 156 Task 10 (fix): release spawn locks so a retry / fix-worker
       // for this scope is not permanently blocked by a transient docker error.
       try { releaseAllSpawnLocks(dir, taskId); } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
@@ -3123,20 +3154,7 @@ export class DockerSpawnBackend implements SpawnBackend {
         join(tasksDir, `task-${taskId}.result`),
         `${JSON.stringify(startFailureResult, null, 2)}\n`,
       );
-      try {
-        finalizeDockerHostTerminalResult(
-          dir,
-          tasksDir,
-          taskId,
-          opts?.settlementRef,
-          spawnOutcome.error.exitCode,
-        );
-      } catch (e) { debugLog('docker-backend:start-failure-settlement', e); }
-      if (attemptIdentity.durable) {
-        try {
-          closeDockerTaskResultSettlement(attemptRef, 'not-dispatched');
-        } catch (e) { debugLog('docker-backend:start-failure-closure', e); }
-      }
+      finalizeNotDispatched(spawnOutcome.error.exitCode);
       return;
     }
 
@@ -3147,7 +3165,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       model,
       projectDir: dir,
       tasksDir,
-      ...(opts?.settlementRef ? { settlementRef: opts.settlementRef } : {}),
+      settlementRef: attemptRef,
     });
     debugLog(
       'docker-backend:spawn-ok',
@@ -3198,7 +3216,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       distFingerprintBefore,
       liveCtx,
       opts?.executionBudget,
-      opts?.settlementRef,
+      attemptRef,
       opts?.hostTerminalResultContract,
     );
   }
@@ -3245,9 +3263,7 @@ export class DockerSpawnBackend implements SpawnBackend {
         if (authority.state === 'present') {
           const existing = authority.inspection;
           if (this.inspectionMatchesAttempt(existing, identity)) {
-            if (identity.durable) {
-              writeTaskResultSettlementDispatchAtomic(identity.ref, existing.containerId);
-            }
+            writeTaskResultSettlementDispatchAtomic(identity.ref, existing.containerId);
             return {
               ok: true,
               containerId: existing.containerId,
@@ -3283,13 +3299,11 @@ export class DockerSpawnBackend implements SpawnBackend {
       }
 
       const containerId = result.stdout?.trim() ?? '';
-      if (identity.durable) {
-        try {
-          writeTaskResultSettlementDispatchAtomic(identity.ref, containerId);
-        } catch (error) {
-          try { terminateDockerContainerForBudget(containerId, this.gracefulTimeoutSeconds); } catch { /* exact ID containment is best-effort here; the original error remains authoritative */ }
-          throw error;
-        }
+      try {
+        writeTaskResultSettlementDispatchAtomic(identity.ref, containerId);
+      } catch (error) {
+        try { terminateDockerContainerForBudget(containerId, this.gracefulTimeoutSeconds); } catch { /* exact ID containment is best-effort here; the original error remains authoritative */ }
+        throw error;
       }
 
       // docker run succeeded — now confirm the container is actually alive.

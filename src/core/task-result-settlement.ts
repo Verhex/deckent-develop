@@ -472,10 +472,12 @@ function resolveTaskResultSettlementClaimChain(
   ref: TaskResultSettlementRefV1,
 ): {
   active: TaskResultSettlementActiveClaimV1 | null;
+  latest: TaskResultSettlementActiveClaimV1 | null;
   nextPreviousClosureSha256: string | null;
   closedAttemptIds: ReadonlySet<string>;
 } {
   let previousClosureSha256: string | null = null;
+  let latest: TaskResultSettlementActiveClaimV1 | null = null;
   const closedAttemptIds = new Set<string>();
   const seenClaimPaths = new Set<string>();
   for (let depth = 0; depth < 1024; depth++) {
@@ -485,7 +487,7 @@ function resolveTaskResultSettlementClaimChain(
     }
     seenClaimPaths.add(claimPath);
     if (!existsSync(claimPath)) {
-      return { active: null, nextPreviousClosureSha256: previousClosureSha256, closedAttemptIds };
+      return { active: null, latest, nextPreviousClosureSha256: previousClosureSha256, closedAttemptIds };
     }
     const claim = parseTaskResultSettlementActiveClaim(readJson(claimPath));
     if (
@@ -496,9 +498,10 @@ function resolveTaskResultSettlementClaimChain(
     ) {
       throw new Error(`Corrupt Docker result settlement claim chain: ${claimPath}`);
     }
+    latest = claim;
     const closurePath = taskResultSettlementClosurePath(claim);
     if (!existsSync(closurePath)) {
-      return { active: claim, nextPreviousClosureSha256: previousClosureSha256, closedAttemptIds };
+      return { active: claim, latest, nextPreviousClosureSha256: previousClosureSha256, closedAttemptIds };
     }
     const closure = readTaskResultSettlementClosure(claim);
     if (!closure) {
@@ -514,6 +517,37 @@ export function readTaskResultSettlementActiveClaim(
   ref: TaskResultSettlementRefV1,
 ): TaskResultSettlementActiveClaimV1 | null {
   return resolveTaskResultSettlementClaimChain(ref).active;
+}
+
+/**
+ * Resolve the exact host-owned lifecycle authority for one canonical project/task.
+ * Active execution wins; after closure the immutable tail remains discoverable so
+ * restart-time consumers do not need an in-memory settlementRef or raw `.result`.
+ */
+export function readLatestTaskResultSettlementRef(
+  projectRoot: string,
+  taskId: string,
+): TaskResultSettlementRefV1 | null {
+  const probe = createTaskResultSettlementRef(projectRoot, taskId);
+  const chain = resolveTaskResultSettlementClaimChain(probe);
+  const latest = chain.active ?? chain.latest;
+  if (!latest) return null;
+  assertTaskResultSettlementRef(projectRoot, taskId, latest);
+  const attempt = parseTaskResultSettlementAttempt(
+    readJson(taskResultSettlementAttemptPath(latest)),
+  );
+  if (!attempt || !sameRef(attempt, latest)) {
+    throw new Error(
+      `Corrupt Docker result settlement authority: ${taskResultSettlementAttemptPath(latest)}`,
+    );
+  }
+  return Object.freeze({
+    schemaVersion: latest.schemaVersion,
+    taskId: latest.taskId,
+    backend: latest.backend,
+    projectRootSha256: latest.projectRootSha256,
+    attemptId: latest.attemptId,
+  });
 }
 
 /**

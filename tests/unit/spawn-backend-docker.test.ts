@@ -20,6 +20,11 @@ vi.mock('../../src/core/utils.js', () => ({
   debugLog: vi.fn(),
 }));
 
+vi.mock('../../src/core/task-result-settlement.js', () => {
+  return import('../helpers/task-result-settlement-stub.js')
+    .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
+});
+
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import {

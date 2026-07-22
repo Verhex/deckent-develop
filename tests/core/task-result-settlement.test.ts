@@ -18,12 +18,14 @@ import {
   dockerAttemptLabels,
   dockerContainerNameForTask,
   listPendingTaskResultSettlementAttempts,
+  readLatestTaskResultSettlementRef,
   readTaskResultSettlementActiveClaim,
   readTaskResultSettlementClosure,
   readTaskResultSettlementDispatch,
   readTaskResultSettlementPrepared,
   readTaskResultSettlement,
   taskResultSettlementAttemptPath,
+  taskResultSettlementClaimPath,
   taskResultSettlementPreparedPath,
   taskResultSettlementPath,
   writeTaskResultSettlementAtomic,
@@ -191,6 +193,61 @@ describe('host-authoritative Docker TaskResult settlement', () => {
       containerDisposition: 'stopped-removed',
       locksReleased: true,
     });
+  });
+
+  it('resolves the active or latest closed project/task authority without in-memory state', () => {
+    const { root } = fixture();
+    const first = createTaskResultSettlementRef(root, 'task-latest');
+    writeTaskResultSettlementAttemptAtomic(first);
+    claimTaskResultSettlementAttemptAtomic(first);
+    writeTaskResultSettlementPreparedAtomic(first, 'claude-fable-5');
+
+    expect(readLatestTaskResultSettlementRef(root, 'task-latest')).toEqual(first);
+
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({
+      ref: first,
+      exitCode: 0,
+      result: { taskId: first.taskId, selfAssessment: 'DONE' },
+    }));
+    writeTaskResultSettlementClosureAtomic(first, {
+      containerDisposition: 'stopped-removed',
+      locksReleased: true,
+    });
+    expect(readLatestTaskResultSettlementRef(root, 'task-latest')).toEqual(first);
+
+    const second = createTaskResultSettlementRef(root, 'task-latest');
+    writeTaskResultSettlementAttemptAtomic(second);
+    claimTaskResultSettlementAttemptAtomic(second);
+    writeTaskResultSettlementPreparedAtomic(second, 'gpt-5.6-sol');
+    expect(readLatestTaskResultSettlementRef(root, 'task-latest')).toEqual(second);
+  });
+
+  it('keeps latest-authority lookup project-scoped and fails loud on corrupt chain evidence', () => {
+    const { root } = fixture();
+    const otherRoot = join(root, '..', 'other-project');
+    mkdirSync(otherRoot, { recursive: true });
+    const ref = createTaskResultSettlementRef(root, 'task-corrupt-latest');
+    writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
+
+    expect(readLatestTaskResultSettlementRef(otherRoot, ref.taskId)).toBeNull();
+
+    const claimPath = taskResultSettlementClaimPath(ref);
+    const corrupt = JSON.parse(readFileSync(claimPath, 'utf-8')) as Record<string, unknown>;
+    corrupt.projectRootSha256 = 'f'.repeat(64);
+    writeFileSync(claimPath, JSON.stringify(corrupt), 'utf-8');
+    expect(() => readLatestTaskResultSettlementRef(root, ref.taskId)).toThrow(/Corrupt Docker result settlement claim chain/);
+  });
+
+  it('rejects a claim whose durable attempt evidence is missing or corrupt', () => {
+    const { root } = fixture();
+    const ref = createTaskResultSettlementRef(root, 'task-missing-attempt');
+    writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
+    writeFileSync(taskResultSettlementAttemptPath(ref), '{}', 'utf-8');
+
+    expect(() => readLatestTaskResultSettlementRef(root, ref.taskId))
+      .toThrow(/Corrupt Docker result settlement authority/);
   });
 
   it('requires a durable attempt before claim and binds dispatch to immutable prepared metadata', () => {

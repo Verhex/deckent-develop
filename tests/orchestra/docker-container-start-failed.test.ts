@@ -57,6 +57,14 @@ vi.mock('../../src/core/file-lock.js', () => ({
   SpawnLockError: class extends Error {},
 }));
 
+// This suite isolates Docker retry/error classification. Settlement persistence
+// is exercised with real tmpdir state in docker-backend-owned-settlement.test.ts;
+// keep this legacy whole-fs mock from becoming a second settlement implementation.
+vi.mock('../../src/core/task-result-settlement.js', () => {
+  return import('../helpers/task-result-settlement-stub.js')
+    .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
+});
+
 import { spawnSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import {
@@ -333,7 +341,12 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
       }],
     });
 
-    backend.spawn('test-authority-unavailable', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
+    expect(() => backend.spawn(
+      'test-authority-unavailable',
+      'claude-sonnet-5',
+      'prompt',
+      TEST_EXECUTION_OPTIONS,
+    )).toThrow(DOCKER_ERROR_CODES.AUTHORITY_UNAVAILABLE);
 
     expect(countDockerCalls('run')).toBe(1);
     expect(countDockerCalls('inspect')).toBe(1);
