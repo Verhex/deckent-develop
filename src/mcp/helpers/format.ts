@@ -3,6 +3,7 @@
 // MCP tool responses include both `data` (JSON) and `summary` (human-readable).
 
 import type { PlannerProof } from '../../core/sprint-types.js';
+import { modelRegistry } from '../../core/model-registry.js';
 
 export interface StatusData {
   sprint?: { id?: string; phase?: string; startedAt?: string };
@@ -68,14 +69,8 @@ export interface ErrorData {
   howToFix?: string;
 }
 
-const MODEL_LABELS: Record<string, string> = {
-  opus: 'complex',
-  sonnet: 'standard',
-  haiku: 'lightweight',
-};
-
-function modelLabel(model: string): string {
-  return MODEL_LABELS[model] ?? model;
+function modelLabel(model: string): string | undefined {
+  return modelRegistry.get(model)?.tier;
 }
 
 function pluralize(n: number, singular: string, plural?: string): string {
@@ -123,7 +118,10 @@ export function formatPlanResponse(data: PlanData): string {
 
   const dist = data.modelDistribution ?? {};
   const modelParts = Object.entries(dist)
-    .map(([model, count]) => `${count} ${model} (${modelLabel(model)})`)
+    .map(([model, count]) => {
+      const label = modelLabel(model);
+      return label ? `${count} ${model} (${label})` : `${count} ${model}`;
+    })
     .join(', ');
 
   const parts: string[] = [

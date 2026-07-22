@@ -4,7 +4,8 @@ import { registerPlanTool } from '../../../src/mcp/tools/plan.js';
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 vi.mock('../../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  readAuthMode: vi.fn().mockResolvedValue('subscription'),
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
 }));
@@ -61,8 +62,8 @@ function makeDefaultMocks(overrides: Partial<{
   mode: string;
 }> = {}) {
   const tasks = overrides.tasks ?? [
-    { id: '001', title: 'Task A', model: 'opus', priority: 'HIGH' },
-    { id: '002', title: 'Task B', model: 'sonnet', priority: 'NORMAL' },
+    { id: '001', title: 'Task A', model: 'claude-opus-4-8', priority: 'HIGH' },
+    { id: '002', title: 'Task B', model: 'claude-sonnet-5', priority: 'NORMAL' },
   ];
 
   mockLoadConfig.mockResolvedValue({ brain_planning: 'auto', max_workers: overrides.maxWorkers ?? 3, activeModeConfig: { max_workers: overrides.maxWorkers ?? 3 } } as any);
@@ -70,7 +71,16 @@ function makeDefaultMocks(overrides: Partial<{
   mockPlanSprint.mockReturnValue({
     id: 'sprint-001',
     number: 1,
-    tasks: tasks.map((t) => ({ ...t, scope: { directories: [] }, status: 'PENDING', description: '', effort: 'normal' })),
+    tasks: tasks.map((t) => ({
+      ...t,
+      description: '',
+      reason: '',
+      effort: 'normal',
+      scope: { directories: [], filesRead: [], filesWrite: [] },
+      dependencies: [],
+      goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
+      status: 'PENDING',
+    })),
     reasoning: 'AI-generated plan',
     planningMode: overrides.mode ?? 'auto',
     plannerProof: {
@@ -84,8 +94,8 @@ function makeDefaultMocks(overrides: Partial<{
         succeeded: overrides.mode !== 'structured',
         requestedProvider: null,
         resolvedProvider: overrides.mode === 'structured' ? null : 'claude',
-        requestedModel: 'opus',
-        resolvedModel: overrides.mode === 'structured' ? null : 'opus',
+        requestedModel: 'claude-opus-4-8',
+        resolvedModel: overrides.mode === 'structured' ? null : 'claude-opus-4-8',
         failureReason: null,
       },
     },
@@ -292,13 +302,13 @@ describe('registerPlanTool', () => {
       expect(content.tasks[0]).toMatchObject({
         id: '001',
         title: 'Task A',
-        model: 'opus',
+        model: 'claude-opus-4-8',
         priority: 'HIGH',
       });
       expect(content.tasks[1]).toMatchObject({
         id: '002',
         title: 'Task B',
-        model: 'sonnet',
+        model: 'claude-sonnet-5',
         priority: 'NORMAL',
       });
     });
@@ -308,9 +318,9 @@ describe('registerPlanTool', () => {
       registerPlanTool(server as any);
       makeDefaultMocks({
         tasks: [
-          { id: '001', title: 'T1', model: 'opus', priority: 'CRITICAL' },
-          { id: '002', title: 'T2', model: 'sonnet', priority: 'HIGH' },
-          { id: '003', title: 'T3', model: 'haiku', priority: 'NORMAL' },
+          { id: '001', title: 'T1', model: 'claude-opus-4-8', priority: 'CRITICAL' },
+          { id: '002', title: 'T2', model: 'claude-sonnet-5', priority: 'HIGH' },
+          { id: '003', title: 'T3', model: 'claude-haiku-4-5-20251001', priority: 'NORMAL' },
         ],
       });
 
@@ -325,16 +335,19 @@ describe('registerPlanTool', () => {
       registerPlanTool(server as any);
       makeDefaultMocks({
         tasks: [
-          { id: '001', title: 'T1', model: 'opus', priority: 'HIGH' },
-          { id: '002', title: 'T2', model: 'opus', priority: 'NORMAL' },
-          { id: '003', title: 'T3', model: 'sonnet', priority: 'NORMAL' },
+          { id: '001', title: 'T1', model: 'claude-opus-4-8', priority: 'HIGH' },
+          { id: '002', title: 'T2', model: 'claude-opus-4-8', priority: 'NORMAL' },
+          { id: '003', title: 'T3', model: 'claude-sonnet-5', priority: 'NORMAL' },
         ],
       });
 
       const result = await server.callTool('deckent_plan', {});
       const content = JSON.parse(result.content[0].text);
 
-      expect(content.modelDistribution).toEqual({ opus: 2, sonnet: 1 });
+      expect(content.modelDistribution).toEqual({
+        'claude-opus-4-8': 2,
+        'claude-sonnet-5': 1,
+      });
     });
 
     it('returns wave breakdown based on maxWorkers', async () => {
@@ -342,10 +355,10 @@ describe('registerPlanTool', () => {
       registerPlanTool(server as any);
       makeDefaultMocks({
         tasks: [
-          { id: '001', title: 'T1', model: 'opus', priority: 'HIGH' },
-          { id: '002', title: 'T2', model: 'sonnet', priority: 'NORMAL' },
-          { id: '003', title: 'T3', model: 'haiku', priority: 'LOW' },
-          { id: '004', title: 'T4', model: 'sonnet', priority: 'NORMAL' },
+          { id: '001', title: 'T1', model: 'claude-opus-4-8', priority: 'HIGH' },
+          { id: '002', title: 'T2', model: 'claude-sonnet-5', priority: 'NORMAL' },
+          { id: '003', title: 'T3', model: 'claude-haiku-4-5-20251001', priority: 'LOW' },
+          { id: '004', title: 'T4', model: 'claude-sonnet-5', priority: 'NORMAL' },
         ],
         maxWorkers: 2,
       });
@@ -361,7 +374,7 @@ describe('registerPlanTool', () => {
       registerPlanTool(server as any);
 
       // low risk: <= 3 tasks
-      makeDefaultMocks({ tasks: [{ id: '001', title: 'T1', model: 'sonnet', priority: 'NORMAL' }] });
+      makeDefaultMocks({ tasks: [{ id: '001', title: 'T1', model: 'claude-sonnet-5', priority: 'NORMAL' }] });
       let result = await server.callTool('deckent_plan', {});
       let content = JSON.parse(result.content[0].text);
       expect(content.riskAssessment).toBe('low');
@@ -371,7 +384,7 @@ describe('registerPlanTool', () => {
         tasks: Array.from({ length: 5 }, (_, i) => ({
           id: `00${i + 1}`,
           title: `Task ${i + 1}`,
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           priority: 'NORMAL',
         })),
       });
@@ -384,7 +397,7 @@ describe('registerPlanTool', () => {
         tasks: Array.from({ length: 10 }, (_, i) => ({
           id: `0${i + 1}`,
           title: `Task ${i + 1}`,
-          model: 'sonnet',
+          model: 'claude-sonnet-5',
           priority: 'NORMAL',
         })),
       });
@@ -448,8 +461,8 @@ describe('registerPlanTool', () => {
           succeeded: false,
           requestedProvider: 'claude',
           resolvedProvider: 'claude',
-          requestedModel: 'opus',
-          resolvedModel: 'opus',
+          requestedModel: 'claude-opus-4-8',
+          resolvedModel: 'claude-opus-4-8',
           failureReason: 'spawn_failed',
         },
       };

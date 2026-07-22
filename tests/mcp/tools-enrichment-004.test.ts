@@ -26,7 +26,8 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  readAuthMode: vi.fn().mockResolvedValue('subscription'),
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
 }));
@@ -183,9 +184,9 @@ describe('MCP Enrichment 004 — set_directives', () => {
     const parsed = JSON.parse(result.content[0]!.text);
 
     expect(parsed.estimatedModels).toBeDefined();
-    expect(typeof parsed.estimatedModels.opus).toBe('number');
-    expect(typeof parsed.estimatedModels.sonnet).toBe('number');
-    expect(typeof parsed.estimatedModels.haiku).toBe('number');
+    expect(typeof parsed.estimatedModels['claude-opus-4-8']).toBe('number');
+    expect(typeof parsed.estimatedModels['claude-sonnet-5']).toBe('number');
+    expect(typeof parsed.estimatedModels['claude-haiku-4-5-20251001']).toBe('number');
   });
 
   it('existing fields (success, taskCount) preserved after enrichment', async () => {
@@ -235,11 +236,16 @@ describe('MCP Enrichment 004 — set_directives', () => {
 describe('MCP Enrichment 004 — plan', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  function makeTask(id: string, model: 'opus' | 'sonnet' | 'haiku' = 'sonnet'): Task {
+  function makeTask(
+    id: string,
+    model: 'claude-opus-4-8' | 'claude-sonnet-5' | 'claude-haiku-4-5-20251001' = 'claude-sonnet-5',
+  ): Task {
     return {
       id, title: `Task ${id}`, description: '', model, effort: 'normal', priority: 'NORMAL',
       reason: '', scope: { directories: [], filesRead: [], filesWrite: [] },
-      dependencies: [], goNogo: { testsPass: true, coverageMin: 80 }, status: TaskStatus.PENDING,
+      dependencies: [],
+      goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
+      status: TaskStatus.PENDING,
     };
   }
 
@@ -296,7 +302,11 @@ describe('MCP Enrichment 004 — plan', () => {
 
     vi.mocked(planSprint).mockReturnValue({
       id: 'sprint-022', number: 22, status: SprintStatus.PLANNING, phase: SprintPhase.PLAN,
-      tasks: [makeTask('1', 'opus'), makeTask('2', 'haiku'), makeTask('3', 'opus')], workers: [],
+      tasks: [
+        makeTask('1', 'claude-opus-4-8'),
+        makeTask('2', 'claude-haiku-4-5-20251001'),
+        makeTask('3', 'claude-opus-4-8'),
+      ], workers: [],
     });
 
     const result = await mock.tools.get('deckent_plan')!.handler({});
@@ -304,8 +314,8 @@ describe('MCP Enrichment 004 — plan', () => {
     const data = parsed.data ?? parsed;
 
     expect(data.modelDistribution).toBeDefined();
-    expect(data.modelDistribution.opus).toBe(2);
-    expect(data.modelDistribution.haiku).toBe(1);
+    expect(data.modelDistribution['claude-opus-4-8']).toBe(2);
+    expect(data.modelDistribution['claude-haiku-4-5-20251001']).toBe(1);
   });
 
   it('riskAssessment is low for 0-3 tasks', async () => {

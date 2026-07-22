@@ -132,22 +132,22 @@ describe('formatPlanResponse', () => {
   it('shows task count and model distribution', () => {
     const data: PlanData = {
       tasks: [
-        { id: '1', title: 'T1', model: 'opus' },
-        { id: '2', title: 'T2', model: 'sonnet' },
-        { id: '3', title: 'T3', model: 'sonnet' },
+        { id: '1', title: 'T1', model: 'claude-opus-4-8' },
+        { id: '2', title: 'T2', model: 'claude-sonnet-5' },
+        { id: '3', title: 'T3', model: 'claude-sonnet-5' },
       ],
-      modelDistribution: { opus: 1, sonnet: 2 },
+      modelDistribution: { 'claude-opus-4-8': 1, 'claude-sonnet-5': 2 },
     };
     const result = formatPlanResponse(data);
     expect(result).toContain('Planned 3 tasks');
-    expect(result).toContain('1 opus (complex)');
-    expect(result).toContain('2 sonnet (standard)');
+    expect(result).toContain('1 claude-opus-4-8 (premium)');
+    expect(result).toContain('2 claude-sonnet-5 (standard)');
   });
 
   it('shows wave info when multiple waves', () => {
     const data: PlanData = {
-      tasks: Array.from({ length: 8 }, (_, i) => ({ id: String(i), title: `T${i}`, model: 'sonnet' })),
-      modelDistribution: { sonnet: 8 },
+      tasks: Array.from({ length: 8 }, (_, i) => ({ id: String(i), title: `T${i}`, model: 'claude-sonnet-5' })),
+      modelDistribution: { 'claude-sonnet-5': 8 },
       recommendation: { maxWorkers: 4 },
       waveBreakdown: { wave1: 4, wave2: 4 },
     };
@@ -158,8 +158,8 @@ describe('formatPlanResponse', () => {
 
   it('shows risk assessment', () => {
     const data: PlanData = {
-      tasks: [{ id: '1', title: 'T1', model: 'opus' }],
-      modelDistribution: { opus: 1 },
+      tasks: [{ id: '1', title: 'T1', model: 'claude-opus-4-8' }],
+      modelDistribution: { 'claude-opus-4-8': 1 },
       riskAssessment: 'low',
     };
     const result = formatPlanResponse(data);
@@ -168,20 +168,20 @@ describe('formatPlanResponse', () => {
 
   it('uses singular "task" for single task', () => {
     const data: PlanData = {
-      tasks: [{ id: '1', title: 'T1', model: 'opus' }],
-      modelDistribution: { opus: 1 },
+      tasks: [{ id: '1', title: 'T1', model: 'claude-opus-4-8' }],
+      modelDistribution: { 'claude-opus-4-8': 1 },
     };
     const result = formatPlanResponse(data);
     expect(result).toContain('Planned 1 task:');
   });
 
-  it('includes haiku label', () => {
+  it('includes the registry-derived economy tier', () => {
     const data: PlanData = {
-      tasks: [{ id: '1', title: 'T1', model: 'haiku' }],
-      modelDistribution: { haiku: 1 },
+      tasks: [{ id: '1', title: 'T1', model: 'claude-haiku-4-5-20251001' }],
+      modelDistribution: { 'claude-haiku-4-5-20251001': 1 },
     };
     const result = formatPlanResponse(data);
-    expect(result).toContain('haiku (lightweight)');
+    expect(result).toContain('claude-haiku-4-5-20251001 (economy)');
   });
 
   it('handles unknown model names gracefully', () => {
@@ -190,7 +190,8 @@ describe('formatPlanResponse', () => {
       modelDistribution: { 'gemini-pro': 1 },
     };
     const result = formatPlanResponse(data);
-    expect(result).toContain('gemini-pro (gemini-pro)');
+    expect(result).toContain('1 gemini-pro');
+    expect(result).not.toContain('gemini-pro (gemini-pro)');
   });
 });
 
