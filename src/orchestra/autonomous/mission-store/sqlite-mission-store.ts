@@ -12,7 +12,11 @@ import type {
   MissionAcceptanceDecisionRecord,
   MissionAcceptanceDecisionV1,
 } from './mission-acceptance.js';
-import { assertCanonicalWorkItemKind } from './mission-kind-admission.js';
+import {
+  CANONICAL_WORK_ITEM_KINDS,
+  assertCanonicalWorkItemKind,
+  isCanonicalWorkItemKind,
+} from './mission-kind-admission.js';
 import {
   assertStoredMissionAcceptanceRecord,
   readGoalAcceptanceContract,
@@ -28,6 +32,11 @@ import {
 const WORK_ITEM_STATUSES: ReadonlySet<WorkItemStatus> = new Set([
   'pending', 'running', 'done', 'failed', 'blocked', 'parked',
 ]);
+const CANONICAL_KIND_POSITIONAL = CANONICAL_WORK_ITEM_KINDS.map(() => '?').join(',');
+const CANONICAL_KIND_NAMED = CANONICAL_WORK_ITEM_KINDS.map((_, index) => `@canonicalKind${index}`).join(',');
+const CANONICAL_KIND_BINDINGS = Object.fromEntries(
+  CANONICAL_WORK_ITEM_KINDS.map((kind, index) => [`canonicalKind${index}`, kind]),
+);
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS missions (
@@ -80,6 +89,9 @@ export class SqliteMissionStore implements MissionStore {
   }
   migrate(): void { this.db.exec(SCHEMA); }
   recover(): void {
+    // Classify an unsupported running row before the generic orphan rule can
+    // obscure its stronger cause or leave it eligible for a future redrive.
+    this.reconcileUnsupportedKinds();
     const result = JSON.stringify({
       ok: false,
       reason: 'RECOVERY_RECONCILIATION_REQUIRED: prior running attempt has no terminal dispatch evidence; automatic redrive refused',
@@ -105,6 +117,48 @@ export class SqliteMissionStore implements MissionStore {
       return value ?? null;
     };
     return JSON.stringify(normalize(v));
+  }
+
+  /**
+   * Preserve unsupported persisted rows for forensics while making every
+   * non-terminal form durably non-executable. Intake cannot create these rows;
+   * this is the legacy/tamper/recovery boundary.
+   */
+  private reconcileUnsupportedKinds(itemId?: string): string[] {
+    const rows = this.db.prepare(`SELECT id, mission_id, kind FROM work_items
+      WHERE status IN ('pending','running','parked')${itemId === undefined ? '' : ' AND id=?'}`)
+      .all(...(itemId === undefined ? [] : [itemId])) as Array<{
+        id: string;
+        mission_id: string;
+        kind: unknown;
+      }>;
+    const changedMissions = new Set<string>();
+    const update = this.db.prepare(`UPDATE work_items SET status='failed', last_result=@result,
+      claimed_at=NULL, claimed_by=NULL, updated_at=@ts
+      WHERE id=@id AND status IN ('pending','running','parked') AND kind=@kind`);
+
+    for (const row of rows) {
+      if (isCanonicalWorkItemKind(row.kind)) continue;
+      const persistedKind = String(row.kind);
+      const result = JSON.stringify({
+        ok: false,
+        reason: `UNKNOWN_KIND: unsupported persisted work-item kind ${JSON.stringify(persistedKind)}`,
+        missionAdmission: {
+          code: 'UNKNOWN_KIND',
+          itemId: row.id,
+          persistedKind,
+          decision: 'failed-closed',
+        },
+      });
+      const info = update.run({
+        id: row.id,
+        kind: row.kind,
+        result,
+        ts: this.now(),
+      });
+      if (info.changes === 1) changedMissions.add(row.mission_id);
+    }
+    return [...changedMissions];
   }
 
   // --- Missions CRUD ---
@@ -442,9 +496,11 @@ export class SqliteMissionStore implements MissionStore {
     return this.rowToItem(this.db.prepare('SELECT * FROM work_items WHERE id=?').get(item.id));
   }
   listApprovalCandidates(): WorkItem[] {
+    this.reconcileUnsupportedKinds();
     const sql = `SELECT wi.* FROM work_items wi JOIN missions m ON m.id=wi.mission_id
       LEFT JOIN work_item_approvals approval ON approval.work_item_id=wi.id
       WHERE wi.status='pending'
+        AND wi.kind IN (${CANONICAL_KIND_POSITIONAL})
         AND wi.policy IN ('approval-required','risk-tagged')
         AND m.status IN ('pending','active')
         AND approval.work_item_id IS NULL
@@ -454,9 +510,10 @@ export class SqliteMissionStore implements MissionStore {
           WHERE upstream.id IS NULL OR upstream.status<>'done'
         )
       ORDER BY wi.created_at`;
-    return (this.db.prepare(sql).all() as any[]).map(this.rowToItem);
+    return (this.db.prepare(sql).all(...CANONICAL_WORK_ITEM_KINDS) as any[]).map(this.rowToItem);
   }
   parkInvalidApprovalCandidate(itemId: string, reason: string): boolean {
+    this.reconcileUnsupportedKinds(itemId);
     const result = JSON.stringify({ ok: false, reason: `APPROVAL_REQUEST_INVALID: ${reason}` });
     const info = this.db.prepare(`UPDATE work_items AS target SET status='parked', last_result=@result,
       claimed_at=NULL, claimed_by=NULL, updated_at=@ts
@@ -474,6 +531,7 @@ export class SqliteMissionStore implements MissionStore {
     return info.changes === 1;
   }
   parkItemForApproval(itemId: string, request: ApprovalRequest): WorkItemApprovalBinding | null {
+    this.reconcileUnsupportedKinds(itemId);
     const transaction = this.db.transaction((): WorkItemApprovalBinding | null => {
       const existing = this.db.prepare(`SELECT approval.*, wi.mission_id FROM work_item_approvals approval
         JOIN work_items wi ON wi.id=approval.work_item_id WHERE approval.work_item_id=?`).get(itemId);
@@ -584,6 +642,7 @@ export class SqliteMissionStore implements MissionStore {
     return transaction.immediate();
   }
   reconcilePendingDependencies(): string[] {
+    this.reconcileUnsupportedKinds();
     const transaction = this.db.transaction((): string[] => {
       const changedMissions = new Set<string>();
       const missionRows = this.db.prepare(
@@ -664,11 +723,13 @@ export class SqliteMissionStore implements MissionStore {
     return transaction.immediate();
   }
   queryDue(opts?: { tenant?: string; limit?: number }): WorkItem[] {
+    this.reconcileUnsupportedKinds();
     // Only mission-local dependency-success items are eligible. Missing,
     // failed, running, parked or pending dependencies keep the item out.
-    const args: unknown[] = [];
+    const args: unknown[] = [...CANONICAL_WORK_ITEM_KINDS];
     let sql = `SELECT wi.* FROM work_items wi JOIN missions m ON m.id = wi.mission_id
       WHERE wi.status='pending' AND m.status IN ('pending','active')
+      AND wi.kind IN (${CANONICAL_KIND_POSITIONAL})
       AND (
         wi.policy='auto' OR (
           wi.policy IN ('approval-required','risk-tagged') AND EXISTS (
@@ -688,9 +749,11 @@ export class SqliteMissionStore implements MissionStore {
   }
   claimItem(id: string, by: string): boolean {
     const transaction = this.db.transaction((): boolean => {
+      this.reconcileUnsupportedKinds(id);
       const info = this.db.prepare(`UPDATE work_items AS target
         SET status='running', claimed_at=@ts, claimed_by=@by, updated_at=@ts
-        WHERE id=@id AND status='pending' AND EXISTS (
+        WHERE id=@id AND status='pending'
+        AND target.kind IN (${CANONICAL_KIND_NAMED}) AND EXISTS (
           SELECT 1 FROM missions mission
           WHERE mission.id=target.mission_id AND mission.status IN ('pending','active')
         ) AND (
@@ -704,7 +767,7 @@ export class SqliteMissionStore implements MissionStore {
           SELECT 1 FROM json_each(COALESCE(target.depends_on, '[]')) dep
           LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=target.mission_id
           WHERE upstream.id IS NULL OR upstream.status<>'done'
-        )`).run({ id, by, ts: this.now() });
+        )`).run({ ...CANONICAL_KIND_BINDINGS, id, by, ts: this.now() });
       return info.changes === 1;
     });
     return transaction.immediate();

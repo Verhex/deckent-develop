@@ -105,9 +105,14 @@ function computeRawSnapshotDigest(snapshot: Record<string, unknown>): string {
 }
 
 export function assertCanonicalWorkItemKind(kind: unknown, itemId: string): asserts kind is WorkItemKind {
-  if (typeof kind !== 'string' || !CANONICAL_KIND_SET.has(kind)) {
+  if (!isCanonicalWorkItemKind(kind)) {
     throw new MissionAdmissionError('UNKNOWN_KIND', itemId, String(kind));
   }
+}
+
+/** Runtime predicate shared by intake and persisted-row recovery/claim gates. */
+export function isCanonicalWorkItemKind(kind: unknown): kind is WorkItemKind {
+  return typeof kind === 'string' && CANONICAL_KIND_SET.has(kind);
 }
 
 function assertTask(item: Pick<NewWorkItem, 'id' | 'kind' | 'spec'>, admission: MissionRuntimeAdmission): void {

@@ -164,6 +164,66 @@ describe('WorkItems + atomic claim', () => {
     s.close();
   });
 
+  it('durably fails an unsupported persisted kind before due-query or approval publication', () => {
+    const s = freshMission();
+    s.enqueueItem({
+      id: 'corrupt-due',
+      missionId: 'm',
+      kind: 'task',
+      policy: 'approval-required',
+      spec: { description: 'must never execute' },
+    });
+    s.__rawExec("UPDATE work_items SET kind='deploy' WHERE id='corrupt-due'");
+
+    expect(s.listApprovalCandidates()).toEqual([]);
+    expect(s.queryDue()).toEqual([]);
+    const row = s.__rawGet("SELECT kind,status,claimed_by,last_result FROM work_items WHERE id='corrupt-due'");
+    expect(row).toMatchObject({ kind: 'deploy', status: 'failed', claimed_by: null });
+    expect(JSON.parse(row.last_result)).toEqual({
+      ok: false,
+      reason: 'UNKNOWN_KIND: unsupported persisted work-item kind "deploy"',
+      missionAdmission: {
+        code: 'UNKNOWN_KIND',
+        itemId: 'corrupt-due',
+        persistedKind: 'deploy',
+        decision: 'failed-closed',
+      },
+    });
+    s.close();
+  });
+
+  it('atomically refuses and classifies an unsupported kind when claim is the first read', () => {
+    const s = freshMission();
+    s.enqueueItem({ id: 'corrupt-claim', missionId: 'm', kind: 'task' });
+    s.__rawExec("UPDATE work_items SET kind='deploy' WHERE id='corrupt-claim'");
+
+    expect(s.claimItem('corrupt-claim', 'scheduler')).toBe(false);
+    expect(s.__rawGet("SELECT status,claimed_at,claimed_by FROM work_items WHERE id='corrupt-claim'"))
+      .toEqual({ status: 'failed', claimed_at: null, claimed_by: null });
+    s.close();
+  });
+
+  it('classifies a corrupt running row before orphan recovery and stays idempotent', () => {
+    const s = freshMission();
+    s.enqueueItem({ id: 'corrupt-running', missionId: 'm', kind: 'task' });
+    expect(s.claimItem('corrupt-running', 'dead-worker')).toBe(true);
+    s.__rawExec("UPDATE work_items SET kind='deploy' WHERE id='corrupt-running'");
+
+    s.recover();
+    const first = s.__rawGet("SELECT kind,status,claimed_at,claimed_by,last_result,updated_at FROM work_items WHERE id='corrupt-running'");
+    expect(first).toMatchObject({
+      kind: 'deploy', status: 'failed', claimed_at: null, claimed_by: null,
+    });
+    expect(JSON.parse(first.last_result).missionAdmission).toMatchObject({
+      code: 'UNKNOWN_KIND', persistedKind: 'deploy', decision: 'failed-closed',
+    });
+
+    s.recover();
+    expect(s.__rawGet("SELECT kind,status,claimed_at,claimed_by,last_result,updated_at FROM work_items WHERE id='corrupt-running'"))
+      .toEqual(first);
+    s.close();
+  });
+
   it('rejects a semantically mismatched decision-state transition', () => {
     const s = freshMission();
     const req = request('approval-semantic');

@@ -6,6 +6,7 @@ import {
   assertCanonicalWorkItemKind,
   assertWorkItemBatchAdmitted,
   computeSprintSnapshotDigest,
+  isCanonicalWorkItemKind,
   listRuntimeAdmittedKinds,
   type MissionRuntimeAdmission,
 } from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
@@ -20,6 +21,8 @@ const allWired: MissionRuntimeAdmission = {
 describe('mission kind admission registry', () => {
   it('contains exactly the four canonical work-item kinds', () => {
     expect(CANONICAL_WORK_ITEM_KINDS).toEqual(['task', 'sprint', 'capability', 'process']);
+    expect(CANONICAL_WORK_ITEM_KINDS.every(isCanonicalWorkItemKind)).toBe(true);
+    expect(isCanonicalWorkItemKind('deploy')).toBe(false);
     expect(() => assertCanonicalWorkItemKind('deploy' as never, 'bad')).toThrow('UNKNOWN_KIND');
     expect(listRuntimeAdmittedKinds(PRODUCTION_V2_ADMISSION)).toEqual(['task']);
   });
