@@ -13,6 +13,7 @@ import { spawnWorkerMultiProvider } from './spawn.js';
 import { loadConfig, resolveDefaultModel } from '../../core/config.js';
 import { buildExecutionRequest, resolveToTask, resolveExecutionModelIdentity } from '../../orchestra/execution-request-builder.js';
 import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
+import { applyWorkerExecutionBudgetPolicy } from '../../core/execution-plan-digest.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -359,6 +360,24 @@ export function registerRun(program: Command): void {
       });
       const task = resolveToTask(execReq, taskId);
 
+      // BUDGET-PRODUCER: `deckent run` is a first-class one-shot producer, so it
+      // must bind the same owner-authored worker policy snapshot as the planner.
+      // The task is still memory-only here: a missing remote policy/profile must
+      // HOLD before a Task JSON exists and before any provider/backend bootstrap.
+      const budgetPolicy = applyWorkerExecutionBudgetPolicy(
+        [task],
+        cfg?.execution_budget,
+        identity.provider,
+      )[0]!; // exactly one in-memory task enters the one-shot producer
+      if (budgetPolicy.state === 'hold') {
+        printError(new Error(getMessage('run.budget_hold', lang, {
+          reason: budgetPolicy.reasonCode ?? 'unknown',
+          profile: budgetPolicy.profileRef,
+        })));
+        process.exitCode = 1;
+        return;
+      }
+
       // WM-1b: V2 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
       try {
         const routingVersion = cfg?.routing_engine ?? 'v2';
@@ -408,6 +427,10 @@ export function registerRun(program: Command): void {
           dockerImage: cfg?.docker_image,
           dockerTimeout: cfg?.docker_timeout,
           provider: execReq.provider,
+          // Exact resolved owner ceiling — the Task JSON and live spawn carry
+          // the same value. The spawn layer remains the final measured-usage
+          // enforcement boundary and independently rejects budgetless remotes.
+          executionBudget: task.budget,
           // F1-RE (268-003): task.modelEffort (from --model-effort) is validated
           // per-provider inside spawnWorkerMultiProvider via resolveReasoningEffort.
           modelEffort: task.modelEffort,
@@ -483,4 +506,3 @@ export function registerRun(program: Command): void {
       });
   }
 }
-

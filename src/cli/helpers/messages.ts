@@ -161,6 +161,14 @@ const MESSAGES: MessageMap = {
     en: 'Unknown provider "{provider}" — valid providers: {providers}.',
     tr: 'Bilinmeyen sağlayıcı "{provider}" — geçerli sağlayıcılar: {providers}.',
   },
+  'run.budget_hold': {
+    en: 'Run held before task creation: execution budget policy is not ready '
+      + '(reason: {reason}, required profile: {profile}). Configure an owner-authored '
+      + 'worker budget profile; no provider or backend was started.',
+    tr: 'Run, görev oluşturulmadan beklemeye alındı: execution budget policy hazır değil '
+      + '(neden: {reason}, gerekli profil: {profile}). Owner tarafından yazılmış bir '
+      + 'worker budget profili yapılandırın; provider veya backend başlatılmadı.',
+  },
   // Row 477: E_MODEL_PRICING_UNVERIFIED previously fell into the generic
   // provider_unverified message, which tells the user to "pass --provider" they
   // already passed — misleading. The real remedy is refreshing the verified
