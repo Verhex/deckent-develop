@@ -5,7 +5,7 @@ import type { ModelType } from '../../src/core/types.js';
 
 function createMockAdapter(): ProviderAdapter {
   return {
-    name: 'mock-provider',
+    name: 'claude',
     supportedModels: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'] as readonly ModelType[],
     spawn: vi.fn(),
     kill: vi.fn(),
@@ -77,9 +77,7 @@ describe.skipIf(isWindows)('buildWorkerCommand — tmux timeout parity (born-466
   });
 
   it('does not wrap timeout when an adapter is provided', () => {
-    const adapter = {
-      buildCommand: () => 'mock-cli --model opus < /tmp/p.txt',
-    };
+    const adapter = createMockAdapter();
     const cmd = buildWorkerCommand('claude-opus-4-8', '/tmp/p.txt', undefined, adapter, '359-003');
     expect(cmd).not.toContain('timeout -k 30');
     expect(cmd).not.toContain('CLAUDE_EXIT');

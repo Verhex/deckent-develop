@@ -17,7 +17,10 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildCliInvocation, detectCliVersion } from '../../src/core/provider.js';
-import { SubprocessSpawnBackend } from '../../src/providers/subprocess.js';
+import {
+  CLAUDE_SUBPROCESS_CONFIG,
+  SubprocessSpawnBackend,
+} from '../../src/providers/subprocess.js';
 
 // ─── Fakes ───────────────────────────────────────────────────────────
 
@@ -40,6 +43,23 @@ function makeChild() {
     triggerExit: (code: number) => exitCb?.(code),
   };
   return child;
+}
+
+const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
+
+function createMeasuredTestBackend(
+  projectDir: string,
+  platform: NodeJS.Platform,
+  spawnImpl: ReturnType<typeof vi.fn>,
+): SubprocessSpawnBackend {
+  return new SubprocessSpawnBackend(projectDir, {
+    platform,
+    spawnImpl: spawnImpl as never,
+    providerConfig: {
+      ...CLAUDE_SUBPROCESS_CONFIG,
+      liveBudgetEvidenceTrust: 'host-isolated',
+    },
+  });
 }
 
 // ─── buildCliInvocation (pure helper) ────────────────────────────────
@@ -142,11 +162,8 @@ describe('SubprocessSpawnBackend — DEP0190/ADR-006 safe (worker spawn)', () =>
   it('win32 spawn → cmd.exe /c <cli> wrapper, discrete args, shell:false', () => {
     const child = makeChild();
     const spawnImpl = vi.fn(() => child);
-    const backend = new SubprocessSpawnBackend(freshDir(), {
-      platform: 'win32',
-      spawnImpl: spawnImpl as never,
-    });
-    backend.spawn('t-win', 'opus', 'prompt');
+    const backend = createMeasuredTestBackend(freshDir(), 'win32', spawnImpl);
+    backend.spawn('t-win', 'claude-opus-4-8', 'prompt', TEST_EXECUTION_OPTIONS);
 
     const [command, args, options] = spawnImpl.mock.calls[0]!;
     expect(command).toBe('cmd.exe');
@@ -162,11 +179,8 @@ describe('SubprocessSpawnBackend — DEP0190/ADR-006 safe (worker spawn)', () =>
   it('posix spawn → bare "claude" command, shell:false, args unchanged (byte-for-byte)', () => {
     const child = makeChild();
     const spawnImpl = vi.fn(() => child);
-    const backend = new SubprocessSpawnBackend(freshDir(), {
-      platform: 'linux',
-      spawnImpl: spawnImpl as never,
-    });
-    backend.spawn('t-nix', 'opus', 'prompt');
+    const backend = createMeasuredTestBackend(freshDir(), 'linux', spawnImpl);
+    backend.spawn('t-nix', 'claude-opus-4-8', 'prompt', TEST_EXECUTION_OPTIONS);
 
     const [command, args, options] = spawnImpl.mock.calls[0]!;
     expect(command).toBe('claude');

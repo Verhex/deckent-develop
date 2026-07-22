@@ -3,6 +3,8 @@ import { Command } from 'commander';
 import { SprintStatus, SprintPhase, TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, DashboardState, ResolvedConfig } from '../../src/core/types.js';
 
+const spawnBackend = vi.hoisted(() => ({ spawn: vi.fn(), kill: vi.fn() }));
+
 // ─── Common Mocks ───────────────────────────────────────────────────
 
 vi.mock('node:fs', () => ({
@@ -104,6 +106,20 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
   },
 }));
 
+vi.mock('../../src/orchestra/spawn-backend.js', () => ({
+  SpawnBackendFactory: {
+    create: vi.fn(() => ({
+      name: 'subprocess',
+      liveUsageBudgetSupport: 'measured-stream',
+      spawn: spawnBackend.spawn,
+      kill: spawnBackend.kill,
+      list: vi.fn(() => []),
+      isAvailable: vi.fn(async () => true),
+    })),
+  },
+  createSandboxBackend: vi.fn(),
+}));
+
 vi.mock('../../src/agents/worker.js', () => ({
   readTask: vi.fn(),
 }));
@@ -201,6 +217,7 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
     projectName: 'test-project',
     projectRoot: '/tmp/test',
     version: '0.1.0',
+    spawn_backend: 'subprocess',
     ...overrides,
   };
 }
@@ -216,7 +233,8 @@ function makeSprint(overrides?: Partial<Sprint>): Sprint {
 function makeTask(overrides?: Partial<Task>): Task {
   return {
     id: 'task-001', title: 'Test task', description: 'desc',
-    model: 'sonnet', effort: 'normal', priority: 'NORMAL',
+    model: 'claude-sonnet-5', provider: 'claude', effort: 'normal', priority: 'NORMAL',
+    budget: { maxTurns: 1 },
     reason: 'test', scope: { directories: [], filesRead: [], filesWrite: [] },
     dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
     status: TaskStatus.PENDING,
@@ -418,6 +436,7 @@ describe('kill command', () => {
 
   it('handles not found worker', async () => {
     vi.mocked(killWorker).mockImplementation(() => { throw new TmuxError('no window'); });
+    spawnBackend.kill.mockImplementation(() => { throw new Error('no subprocess'); });
     await runCommand(registerKill, ['kill', 'task-999']);
     expect(stderr()).toContain('Worker not found');
     expect(process.exitCode).toBe(1);
@@ -777,10 +796,8 @@ describe('spawn command', () => {
   it('spawns a worker for a task', async () => {
     vi.mocked(loadConfig).mockResolvedValue(makeConfig());
     vi.mocked(readTask).mockReturnValue(makeTask());
-    vi.mocked(ensureSession).mockImplementation(() => {});
-    vi.mocked(spawnWorker).mockImplementation(() => {});
     await runCommand(registerSpawn, ['spawn', 'task-001']);
-    expect(spawnWorker).toHaveBeenCalled();
+    expect(spawnBackend.spawn).toHaveBeenCalled();
     expect(stdout()).toContain('Worker spawned');
   });
 
@@ -793,33 +810,31 @@ describe('spawn command', () => {
   });
 
   it('passes correct model to spawnWorker', async () => {
-    const task = makeTask({ model: 'haiku' });
+    const task = makeTask({ model: 'claude-haiku-4-5-20251001' });
     vi.mocked(loadConfig).mockResolvedValue(makeConfig());
     vi.mocked(readTask).mockReturnValue(task);
-    vi.mocked(ensureSession).mockImplementation(() => {});
-    vi.mocked(spawnWorker).mockImplementation(() => {});
     await runCommand(registerSpawn, ['spawn', 'task-001']);
-    expect(spawnWorker).toHaveBeenCalledWith(
-      'task-001', 'haiku', expect.any(String), expect.any(String), expect.any(Object),
+    expect(spawnBackend.spawn).toHaveBeenCalledWith(
+      'task-001', 'claude-haiku-4-5-20251001', expect.any(String), expect.objectContaining({
+        autoApprove: false,
+        executionBudget: { maxTurns: 1 },
+      }),
     );
   });
 
-  it('ensures session before spawning', async () => {
+  it('uses the configured backend without opening a tmux session', async () => {
     vi.mocked(loadConfig).mockResolvedValue(makeConfig());
     vi.mocked(readTask).mockReturnValue(makeTask());
-    vi.mocked(ensureSession).mockImplementation(() => {});
-    vi.mocked(spawnWorker).mockImplementation(() => {});
     await runCommand(registerSpawn, ['spawn', 'task-001']);
-    expect(ensureSession).toHaveBeenCalled();
+    expect(spawnBackend.spawn).toHaveBeenCalled();
+    expect(ensureSession).not.toHaveBeenCalled();
   });
 
   it('spawn does not use haiku_allowed as autoApprove', async () => {
     // haiku_allowed belongs to model config — autoApprove is always false for spawn command
     vi.mocked(readTask).mockReturnValue(makeTask());
-    vi.mocked(ensureSession).mockImplementation(() => {});
-    vi.mocked(spawnWorker).mockImplementation(() => {});
     await runCommand(registerSpawn, ['spawn', 'task-001']);
-    const spawnOpts = vi.mocked(spawnWorker).mock.calls[0]?.[4];
+    const spawnOpts = spawnBackend.spawn.mock.calls[0]?.[3];
     expect(spawnOpts?.autoApprove).toBe(false);
   });
 });

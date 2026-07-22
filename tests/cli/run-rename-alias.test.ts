@@ -36,14 +36,16 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
 vi.mock('../../src/orchestra/spawn-backend.js', () => ({
   SpawnBackendFactory: {
     create: vi.fn(() => ({
-      name: 'docker',
+      name: 'subprocess',
+      liveUsageBudgetSupport: 'measured-stream',
       spawn: vi.fn(),
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),
       isAvailable: vi.fn().mockResolvedValue(true),
     })),
     createAsync: vi.fn(async () => ({
-      name: 'docker',
+      name: 'subprocess',
+      liveUsageBudgetSupport: 'measured-stream',
       spawn: vi.fn(),
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),
@@ -56,6 +58,16 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
   SpawnBackendError: class SpawnBackendError extends Error {},
   TmuxBackend: class TmuxBackend {},
   SubprocessBackend: class SubprocessBackend {},
+}));
+
+vi.mock('../../src/core/config.js', () => ({
+  loadConfig: vi.fn(async () => ({
+    language: 'en',
+    spawn_backend: 'subprocess',
+    activeModeConfig: { default_model: 'claude-sonnet-5' },
+    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
+  })),
+  resolveDefaultModel: vi.fn(() => 'claude-sonnet-5'),
 }));
 
 vi.mock('../../src/orchestra/brain.js', () => ({
@@ -194,7 +206,7 @@ describe('run "<description>" — legacy one-shot signature unaffected', () => {
     program.exitOverride();
     registerRun(program);
 
-    await program.parseAsync(['node', 'deckent', 'run', 'test task', '--model', 'sonnet']);
+    await program.parseAsync(['node', 'deckent', 'run', 'test task', '--model', 'claude-sonnet-5']);
 
     expect(process.exitCode).toBe(0);
     process.exitCode = origExitCode as number;

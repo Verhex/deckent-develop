@@ -47,6 +47,7 @@ const mockReaddirSync = vi.mocked(readdirSync);
 const mockOpenSync = vi.mocked(openSync);
 const mockFsyncSync = vi.mocked(fsyncSync);
 const mockCloseSync = vi.mocked(closeSync);
+const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ function createMockDockerWait(): EventEmitter & { stdout: EventEmitter; stderr: 
   const child = new EventEmitter() as EventEmitter & { stdout: EventEmitter; stderr: EventEmitter };
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
+  (child.stderr as EventEmitter & { resume: () => void }).resume = vi.fn();
   return child;
 }
 
@@ -132,7 +134,7 @@ describe('Docker Worker Exit Pattern — Host-Side Fallback', () => {
   it('should write fallback .result when container exits with SIGKILL (exit 137) and no result file', () => {
     const waitChild = setupSpawnMocks();
 
-    backend.spawn('test-kill-001', 'sonnet', 'test prompt');
+    backend.spawn('test-kill-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
 
     // Simulate container exit with code 137 (SIGKILL / OOM)
     waitChild.stdout.emit('data', Buffer.from('137\n'));
@@ -155,7 +157,7 @@ describe('Docker Worker Exit Pattern — Host-Side Fallback', () => {
     // Result already exists before container exits
     const waitChild = setupSpawnMocks({ resultExistsOnExit: true });
 
-    backend.spawn('test-normal-001', 'sonnet', 'test prompt');
+    backend.spawn('test-normal-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
 
     // Container exits normally
     waitChild.stdout.emit('data', Buffer.from('0\n'));
@@ -182,7 +184,7 @@ describe('Docker Worker Exit Pattern — Host-Side Fallback', () => {
       return '';
     });
 
-    backend.spawn('test-sigterm-001', 'sonnet', 'test prompt');
+    backend.spawn('test-sigterm-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
 
     // Container exits with SIGTERM exit code (143 = 128 + 15)
     waitChild.stdout.emit('data', Buffer.from('143\n'));
@@ -198,7 +200,7 @@ describe('Docker Worker Exit Pattern — Host-Side Fallback', () => {
   it('should write fallback .result for OOM kill (exit 137) — no trap possible', () => {
     const waitChild = setupSpawnMocks();
 
-    backend.spawn('test-oom-001', 'sonnet', 'test prompt');
+    backend.spawn('test-oom-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
 
     // OOM kill → exit 137
     waitChild.stdout.emit('data', Buffer.from('137\n'));

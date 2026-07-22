@@ -3,6 +3,10 @@ import { writeFileSync } from 'node:fs';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
+const { mockSpawnOneShot } = vi.hoisted(() => ({
+  mockSpawnOneShot: vi.fn(),
+}));
+
 vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   writeFileSync: vi.fn(),
@@ -31,16 +35,19 @@ vi.mock('../../src/orchestra/sprint-controller.js', () => ({
   resolveSkillPrompts: vi.fn().mockResolvedValue([]),
 }));
 
+vi.mock('../../src/orchestra/routing-plan-adapter.js', () => ({
+  routeSingleTaskV3: vi.fn().mockResolvedValue({ agentId: 'generic', skillIds: [] }),
+}));
+
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveDefaultModel: () => 'claude-sonnet-5',
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
 }));
 
-vi.mock('../../src/orchestra/spawn-backend.js', () => ({
-  SpawnBackendFactory: {
-    create: vi.fn().mockReturnValue({ spawn: vi.fn(), name: 'subprocess' }),
-  },
+vi.mock('../../src/cli/commands/spawn.js', () => ({
+  spawnWorkerMultiProvider: mockSpawnOneShot,
 }));
 
 import { loadConfig } from '../../src/core/config.js';
@@ -67,13 +74,15 @@ function createMockServer(): MockServer {
 describe('deckent_run — provider-free (Fix A)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSpawnOneShot.mockResolvedValue({ backend: 'subprocess', provider: 'claude' });
   });
 
-  it('uses config worker_provider when set — no literal "claude" hardcode', async () => {
+  it('derives Codex ownership from the exact model ID', async () => {
     vi.mocked(loadConfig).mockResolvedValue({
       worker_provider: 'codex',
       brain_provider: 'claude',
-      spawn_backend: 'auto',
+      spawn_backend: 'subprocess',
+      routing_engine: 'v2',
     } as never);
 
     const { registerRunTool } = await import('../../src/mcp/tools/run.ts');
@@ -81,7 +90,7 @@ describe('deckent_run — provider-free (Fix A)', () => {
     registerRunTool(server);
 
     const handler = server.tools.get('deckent_run')!.handler;
-    await handler({ description: 'fix a bug', model: 'sonnet', autoApprove: true });
+    await handler({ description: 'fix a bug', model: 'gpt-5.6-sol', autoApprove: true });
 
     const writtenCall = vi.mocked(writeFileSync).mock.calls.find(
       (c) => typeof c[0] === 'string' && (c[0] as string).endsWith('.json'),
@@ -89,14 +98,22 @@ describe('deckent_run — provider-free (Fix A)', () => {
     expect(writtenCall).toBeDefined();
     const task = JSON.parse(writtenCall![1] as string);
     expect(task.provider).toBe('codex');
-    expect(task.provider).not.toBe('claude');
+    expect(task.model).toBe('gpt-5.6-sol');
+    expect(mockSpawnOneShot).toHaveBeenCalledWith(
+      expect.any(String),
+      'gpt-5.6-sol',
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ provider: 'codex' }),
+    );
   });
 
-  it('falls back to brain_provider when worker_provider is undefined', async () => {
+  it('derives Gemini ownership from the exact model ID', async () => {
     vi.mocked(loadConfig).mockResolvedValue({
       worker_provider: undefined,
       brain_provider: 'gemini',
       spawn_backend: 'subprocess',
+      routing_engine: 'v2',
     } as never);
 
     const { registerRunTool } = await import('../../src/mcp/tools/run.ts');
@@ -104,21 +121,22 @@ describe('deckent_run — provider-free (Fix A)', () => {
     registerRunTool(server);
 
     const handler = server.tools.get('deckent_run')!.handler;
-    await handler({ description: 'write tests', model: 'haiku', autoApprove: false });
+    await handler({ description: 'write tests', model: 'gemini-2.5-flash', autoApprove: false });
 
     const writtenCall = vi.mocked(writeFileSync).mock.calls.find(
       (c) => typeof c[0] === 'string' && (c[0] as string).endsWith('.json'),
     );
     const task = JSON.parse(writtenCall![1] as string);
     expect(task.provider).toBe('gemini');
-    expect(task.provider).not.toBe('claude');
+    expect(task.model).toBe('gemini-2.5-flash');
   });
 
-  it('provider is undefined (not "claude") when config has no provider configured', async () => {
+  it('infers Claude ownership when config has no provider configured', async () => {
     vi.mocked(loadConfig).mockResolvedValue({
       worker_provider: undefined,
       brain_provider: undefined,
-      spawn_backend: 'auto',
+      spawn_backend: 'subprocess',
+      routing_engine: 'v2',
     } as never);
 
     const { registerRunTool } = await import('../../src/mcp/tools/run.ts');
@@ -126,13 +144,38 @@ describe('deckent_run — provider-free (Fix A)', () => {
     registerRunTool(server);
 
     const handler = server.tools.get('deckent_run')!.handler;
-    await handler({ description: 'do work', model: 'sonnet', autoApprove: true });
+    await handler({ description: 'do work', model: 'claude-sonnet-5', autoApprove: true });
 
     const writtenCall = vi.mocked(writeFileSync).mock.calls.find(
       (c) => typeof c[0] === 'string' && (c[0] as string).endsWith('.json'),
     );
     const task = JSON.parse(writtenCall![1] as string);
-    // undefined serializes as missing key — no literal 'claude' forced
-    expect(task.provider).toBeUndefined();
+    expect(task.provider).toBe('claude');
+    expect(task.model).toBe('claude-sonnet-5');
+  });
+
+  it('rejects a provider/model mismatch before writing a task', async () => {
+    vi.mocked(loadConfig).mockResolvedValue({
+      worker_provider: undefined,
+      brain_provider: undefined,
+      spawn_backend: 'subprocess',
+      routing_engine: 'v2',
+    } as never);
+
+    const { registerRunTool } = await import('../../src/mcp/tools/run.ts');
+    const server = createMockServer() as never;
+    registerRunTool(server);
+
+    const handler = server.tools.get('deckent_run')!.handler;
+    const result = await handler({
+      description: 'do work',
+      model: 'claude-sonnet-5',
+      provider: 'codex',
+      autoApprove: true,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(writeFileSync).not.toHaveBeenCalled();
+    expect(mockSpawnOneShot).not.toHaveBeenCalled();
   });
 });

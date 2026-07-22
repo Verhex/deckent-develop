@@ -48,6 +48,7 @@ const mockOpenSync = vi.mocked(openSync);
 const mockFsyncSync = vi.mocked(fsyncSync);
 const mockCloseSync = vi.mocked(closeSync);
 const mockUnlinkSync = vi.mocked(unlinkSync);
+const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -55,6 +56,7 @@ function createMockDockerWait(): EventEmitter & { stdout: EventEmitter; stderr: 
   const child = new EventEmitter() as EventEmitter & { stdout: EventEmitter; stderr: EventEmitter };
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
+  (child.stderr as EventEmitter & { resume: () => void }).resume = vi.fn();
   return child;
 }
 
@@ -155,7 +157,7 @@ describe('Docker Worker Exit Pattern Final Fix (Sprint 149)', () => {
   it('should write fallback .result with signal_info when SIGKILL (exit 137) and no result', () => {
     const waitChild = setupSpawnMocks();
 
-    backend.spawn('exit-137-001', 'sonnet', 'test prompt');
+    backend.spawn('exit-137-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
 
     // Simulate container exit with SIGKILL (137 = 128 + 9)
     waitChild.stdout.emit('data', Buffer.from('137\n'));
@@ -179,7 +181,7 @@ describe('Docker Worker Exit Pattern Final Fix (Sprint 149)', () => {
   it('should NOT write fallback .result when worker wrote result normally (exit 0)', () => {
     const waitChild = setupSpawnMocks({ resultExistsOnExit: true });
 
-    backend.spawn('normal-001', 'sonnet', 'test prompt');
+    backend.spawn('normal-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
 
     // Normal exit
     waitChild.stdout.emit('data', Buffer.from('0\n'));
@@ -200,7 +202,7 @@ describe('Docker Worker Exit Pattern Final Fix (Sprint 149)', () => {
       return '';
     });
 
-    backend.spawn('sigterm-001', 'sonnet', 'test prompt');
+    backend.spawn('sigterm-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
 
     // SIGTERM exit (143 = 128 + 15)
     waitChild.stdout.emit('data', Buffer.from('143\n'));
@@ -225,7 +227,7 @@ describe('Docker Worker Exit Pattern Final Fix (Sprint 149)', () => {
   it('should write fallback .result for OOM kill (exit 137) with signal_info', () => {
     const waitChild = setupSpawnMocks();
 
-    backend.spawn('oom-001', 'sonnet', 'test prompt');
+    backend.spawn('oom-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
 
     // OOM kill → exit 137 (128 + 9 = SIGKILL)
     waitChild.stdout.emit('data', Buffer.from('137\n'));
@@ -273,7 +275,7 @@ describe('Docker Worker Exit Pattern Final Fix (Sprint 149)', () => {
       }
     });
 
-    backend.spawn('partial-001', 'sonnet', 'test prompt');
+    backend.spawn('partial-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
 
     // Container exits with error
     waitChild.stdout.emit('data', Buffer.from('1\n'));
@@ -297,7 +299,7 @@ describe('Docker Worker Exit Pattern Final Fix (Sprint 149)', () => {
   it('should use docker stop --time=15 and fallback to SIGTERM (not SIGKILL) in kill()', () => {
     const waitChild = setupSpawnMocks();
 
-    backend.spawn('kill-test-001', 'sonnet', 'test prompt');
+    backend.spawn('kill-test-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
 
     // Make docker stop fail so fallback triggers
     mockSpawnSync.mockImplementation((cmd: unknown, args: unknown[]) => {

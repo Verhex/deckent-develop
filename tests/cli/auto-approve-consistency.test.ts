@@ -26,7 +26,8 @@ const hoisted = vi.hoisted(() => ({
 // for why each module is (or isn't) mocked.
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveDefaultModel: () => 'claude-sonnet-5',
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
 }));
@@ -70,6 +71,7 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
   SpawnBackendFactory: {
     create: vi.fn(() => ({
       name: 'docker',
+      liveUsageBudgetSupport: 'measured-stream',
       spawn: hoisted.backendSpawn,
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),
@@ -77,6 +79,7 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
     })),
     createAsync: vi.fn(async () => ({
       name: 'docker',
+      liveUsageBudgetSupport: 'measured-stream',
       spawn: hoisted.backendSpawn,
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),
@@ -139,6 +142,7 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
     // Drives run.ts's spawn call to SpawnBackendFactory (production default —
     // see src/core/config.ts:1202) instead of the tmux fallback path.
     spawn_backend: 'docker',
+    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
     ...overrides,
   };
 }
@@ -147,7 +151,7 @@ function makeSprint(overrides: Record<string, unknown> = {}) {
   return {
     id: 'sprint-001',
     number: 1,
-    tasks: [{ id: '001-001', title: 'Task One', model: 'sonnet', priority: 'NORMAL' }],
+    tasks: [{ id: '001-001', title: 'Task One', model: 'claude-sonnet-5', priority: 'NORMAL' }],
     reasoning: 'Test reasoning',
     planningMode: 'structured',
     ...overrides,
@@ -226,7 +230,7 @@ describe('deckent run — --auto-approve consistency (born-561)', () => {
     await runRun();
     expect(hoisted.backendSpawn).toHaveBeenCalledWith(
       expect.stringMatching(/^run-/),
-      'sonnet',
+      'claude-sonnet-5',
       expect.any(String),
       expect.objectContaining({ autoApprove: false }),
     );
@@ -236,7 +240,7 @@ describe('deckent run — --auto-approve consistency (born-561)', () => {
     await runRun('--auto-approve');
     expect(hoisted.backendSpawn).toHaveBeenCalledWith(
       expect.stringMatching(/^run-/),
-      'sonnet',
+      'claude-sonnet-5',
       expect.any(String),
       expect.objectContaining({ autoApprove: true }),
     );
