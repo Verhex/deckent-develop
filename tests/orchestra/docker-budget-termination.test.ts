@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   describeDockerPartialResultTermination,
+  reconcileDockerRuntimeBudgetResult,
   terminateDockerContainerForBudget,
   type DockerSyncCommand,
   type DockerSyncCommandResult,
@@ -68,6 +69,77 @@ describe('Docker partial-result termination attribution', () => {
     const notes = describeDockerPartialResultTermination(137, null);
     expect(notes).toContain('Container OOM-killed (exit 137, SIGKILL)');
     expect(notes).not.toContain('circuit breaker');
+  });
+});
+
+describe('Docker runtime-budget result reconciliation', () => {
+  function doneResult() {
+    return {
+      taskId: 't3',
+      workerId: 'docker-t3',
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+      testsPassed: true,
+      coverage: 100,
+      selfAssessment: 'DONE' as const,
+      notes: 'Worker claimed completion.',
+      tokenUsage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        provider: 'claude' as const,
+        model: 'claude-sonnet-4-20250514' as const,
+        source: 'estimate',
+      },
+      cost: { usd: 0, currency: 'USD', pricingSource: 'estimate', isLocal: false },
+      providerBilling: {
+        provider: 'claude' as const,
+        currency: 'USD',
+        providerReportedUsd: 0.25,
+        source: 'provider-final' as const,
+        fetchedAt: '2026-07-21T20:00:05.429Z',
+      },
+    };
+  }
+
+  it('vetoes exit-0 DONE with exact host counters and durable provenance', () => {
+    const result = doneResult();
+
+    expect(reconcileDockerRuntimeBudgetResult(result, 0, budgetStop())).toBe(true);
+    expect(result.selfAssessment).toBe('NO_GO');
+    expect(result.testsPassed).toBe(false);
+    expect(result.tokenUsage).toEqual({
+      inputTokens: 1,
+      outputTokens: 2,
+      cacheReadTokens: 3,
+      cacheCreationTokens: 4,
+      source: 'host-runtime-budget',
+      provider: 'claude',
+      model: 'claude-sonnet-4-20250514',
+    });
+    expect(result.cost).toBeUndefined();
+    expect(result.providerBilling.providerReportedUsd).toBe(0.25);
+    expect(result.notes).toContain('exitCode=0');
+    expect(result.notes).toContain('attemptId=attempt-1');
+    expect(result.notes).toContain('evidenceSource=stop-marker');
+    expect(result.notes).toContain(`budgetFingerprint=${'a'.repeat(64)}`);
+  });
+
+  it('is idempotent for the same exhausted attempt', () => {
+    const result = doneResult();
+    reconcileDockerRuntimeBudgetResult(result, 0, budgetStop());
+    const once = JSON.stringify(result);
+
+    expect(reconcileDockerRuntimeBudgetResult(result, 0, budgetStop())).toBe(true);
+    expect(JSON.stringify(result)).toBe(once);
+  });
+
+  it('leaves a successful result untouched without terminal budget evidence', () => {
+    const result = doneResult();
+    const before = JSON.stringify(result);
+
+    expect(reconcileDockerRuntimeBudgetResult(result, 0, null)).toBe(false);
+    expect(JSON.stringify(result)).toBe(before);
   });
 });
 

@@ -10,7 +10,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { homedir, totalmem } from 'node:os';
 import type { ModelType } from '../core/types.js';
-import { getProviderForModel, UnknownModelError } from '../core/task-types.js';
+import { getProviderForModel, UnknownModelError, type TaskResult } from '../core/task-types.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { getProviderCommandSpec, buildProviderCommand, type ProviderCommandSpec } from '../core/provider-command-spec.js';
 import { createClaudeAdapter } from '../providers/claude.js';
@@ -35,6 +35,7 @@ import {
 } from '../core/file-lock.js';
 import { markPending, markActive, clearPending } from '../core/active-workers.js';
 import { authHealthCheck } from '../agents/worker.js';
+import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
 import { BASE_PROVIDER_CREDENTIAL_ENV } from '../providers/cross-provider-keys.js';
 import type { SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
 import { SpawnBackendError, checkLethalGuard } from './spawn-backend.js';
@@ -99,6 +100,73 @@ export function describeDockerPartialResultTermination(
   }
   const signalInfo = exitCode > 128 ? ` signal=${exitCode - 128}` : '';
   return `Container killed (exitCode=${exitCode}${signalInfo}). Partial-result promoted by host monitor.`;
+}
+
+/**
+ * Host-owned terminal budget evidence vetoes any worker-authored success,
+ * including a natural process exit with code 0. The provider's final billing
+ * evidence remains a separate truth channel and is intentionally preserved.
+ */
+export function reconcileDockerRuntimeBudgetResult(
+  result: TaskResult,
+  exitCode: number,
+  budgetStop: RuntimeBudgetStopEvidence | null,
+): boolean {
+  if (!budgetStop) return false;
+
+  result.selfAssessment = 'NO_GO';
+  result.testsPassed = false;
+  const previousUsage = result.tokenUsage;
+  const counters = budgetStop.decision.counters;
+  result.tokenUsage = {
+    inputTokens: counters.inputTokens,
+    outputTokens: counters.outputTokens,
+    cacheReadTokens: counters.cacheReadTokens,
+    cacheCreationTokens: counters.cacheCreationTokens,
+    source: 'host-runtime-budget',
+    ...(previousUsage?.provider ? { provider: previousUsage.provider } : {}),
+    ...(previousUsage?.model ? { model: previousUsage.model } : {}),
+  };
+  // A cost computed from the worker's previous usage claim is no longer valid.
+  // Provider-final billing evidence, when present, is retained for later
+  // authoritative reconciliation by the result collector.
+  delete result.cost;
+
+  const reason = budgetStop.decision.reasons.join('; ') || 'execution budget exceeded';
+  const evidenceNote = `Runtime budget circuit breaker invalidated the worker result (exitCode=${exitCode}): ${reason}. attemptId=${budgetStop.attemptId}; evidenceSource=${budgetStop.evidenceSource ?? 'stop-marker'}; budgetFingerprint=${budgetStop.budgetFingerprint}.`;
+  const previousNotes = result.notes ?? '';
+  const notesAreAmbiguousHostAttribution = previousNotes.includes('Partial-result promoted by host monitor.');
+  if (!previousNotes.includes(`attemptId=${budgetStop.attemptId}`)) {
+    result.notes = notesAreAmbiguousHostAttribution
+      ? evidenceNote
+      : `${evidenceNote} ${previousNotes}`.trim();
+  }
+  return true;
+}
+
+function reconcileDockerRuntimeBudgetResultFile(
+  resultPath: string,
+  taskId: string,
+  model: ModelType,
+  exitCode: number,
+  budgetStop: RuntimeBudgetStopEvidence | null,
+): boolean {
+  if (!budgetStop) return false;
+  let result: TaskResult;
+  try {
+    result = JSON.parse(readFileSync(resultPath, 'utf-8')) as TaskResult;
+  } catch {
+    result = buildExitWithoutResultMarker({
+      taskId,
+      model,
+      exitCode,
+      workPresent: false,
+      source: 'host',
+    }) as unknown as TaskResult;
+  }
+  reconcileDockerRuntimeBudgetResult(result, exitCode, budgetStop);
+  atomicWriteFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
+  return true;
 }
 
 export function buildProviderPrivateHomeBootstrap(
@@ -3139,19 +3207,32 @@ export class DockerSpawnBackend implements SpawnBackend {
       waitExitObserved = true;
       debugLog('docker-backend:exit', `taskId=${taskId} exitCode=${exitCode}`);
       stopFollow(); // container exited — the `docker logs -f` follow can end.
+      try { budgetMonitor?.settle(); } catch (e) { debugLog('docker-backend:budget-settle-before-result', e); }
 
       // Sprint 139: fsync .result from host side before reading
       // Container's fsync_file trap may have run, but belt-and-suspenders from host
       const resultPath = join(tasksDir, `task-${taskId}.result`);
-      const runtimeBudgetExhaustion = exitCode === 0
-        ? null
-        : readRuntimeBudgetExhaustion(projectDir, taskId);
+      // Process exit status is transport evidence, not budget truth. A worker can
+      // naturally exit 0 after the host monitor has already persisted exhaustion.
+      const runtimeBudgetExhaustion = readRuntimeBudgetExhaustion(projectDir, taskId);
       try {
         if (existsSync(resultPath)) {
           const fd = openSync(resultPath, 'r');
           try { fsyncSync(fd); } finally { closeSync(fd); }
         }
       } catch { /* fsync best-effort — continue with reconciliation */ }
+
+      try {
+        reconcileDockerRuntimeBudgetResultFile(
+          resultPath,
+          taskId,
+          model,
+          exitCode,
+          runtimeBudgetExhaustion,
+        );
+      } catch (e) {
+        debugLog('docker-backend:budget-result-reconcile', e);
+      }
 
       // Determine heartbeat status: check .result file for reconciliation
       // If .result exists with DONE/GO_WITH_TECH_DEBT, treat as DONE regardless of exitCode
@@ -3351,6 +3432,34 @@ export class DockerSpawnBackend implements SpawnBackend {
         }
       } catch (e) { debugLog('docker-backend:log-extract', e); }
       try { budgetMonitor?.settle(); } catch (e) { debugLog('docker-backend:budget-settle', e); }
+
+      // When live activity tracing is disabled, budget events are observed from
+      // the captured provider log above. Re-read after settle so that path gets
+      // the same fail-closed result and heartbeat truth as live-follow mode.
+      const finalRuntimeBudgetExhaustion = readRuntimeBudgetExhaustion(projectDir, taskId)
+        ?? runtimeBudgetExhaustion;
+      try {
+        if (reconcileDockerRuntimeBudgetResultFile(
+          resultPath,
+          taskId,
+          model,
+          exitCode,
+          finalRuntimeBudgetExhaustion,
+        )) {
+          const hbPath = join(tasksDir, `task-${taskId}.hb`);
+          atomicWriteFileSync(hbPath, `${JSON.stringify({
+            workerId: `docker-${taskId}`,
+            taskId,
+            status: 'FAILED',
+            sequence: 99,
+            timestamp: new Date().toISOString(),
+            exitCode,
+            backend: 'docker',
+          }, null, 2)}\n`);
+        }
+      } catch (e) {
+        debugLog('docker-backend:budget-final-reconcile', e);
+      }
 
       // Cleanup container
       try {
