@@ -79,7 +79,7 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
 });
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   resolveEffectiveWorkers: vi.fn().mockReturnValue(8),
   loadConfig: vi.fn().mockReturnValue({}),
@@ -121,9 +121,13 @@ vi.mock('../../src/orchestra/sprint-utils.js', async (importOriginal) => {
     ...actual,
     readFileSafe: vi.fn().mockReturnValue(''),
     now: vi.fn().mockReturnValue(new Date().toISOString()),
-    isTmuxProvider: vi.fn().mockReturnValue(true),
+    isTmuxProvider: vi.fn().mockReturnValue(false),
     resolveTaskProvider: vi.fn().mockReturnValue('claude'),
-    getProviderAdapterForTask: vi.fn().mockReturnValue(null),
+    getProviderAdapterForTask: vi.fn().mockReturnValue({
+      name: 'measured-claude-test',
+      liveUsageBudgetSupport: 'measured-stream',
+      spawn: vi.fn(),
+    }),
     getDefaultProvider: vi.fn().mockReturnValue(null),
   };
 });
@@ -195,7 +199,6 @@ import {
   applyStatusMutation,
 } from '../../src/orchestra/result-collector.js';
 
-import { spawnWorker } from '../../src/orchestra/tmux.js';
 import { writeEvent } from '../../src/orchestra/event-stream.js';
 import { DependencyCycleError } from '../../src/orchestra/parallel-pipeline.js';
 
@@ -206,7 +209,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '164-001',
     title: 'Test task',
     description: 'desc',
-    model: 'opus',
+    model: 'claude-opus-4-8',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -216,6 +219,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     status: TaskStatus.PENDING,
     sprintId: 'sprint-164',
     createdAt: new Date().toISOString(),
+    budget: { maxTurns: 1 },
     ...overrides,
   };
 }
@@ -242,7 +246,7 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     version: '1.0.0',
     activeModeConfig: {
       max_workers: 8,
-      default_model: 'opus',
+      default_model: 'claude-opus-4-8',
       haiku_allowed: false,
       brain_planning: 'structured',
       brain_model: 'claude-opus-4-8',
@@ -548,8 +552,7 @@ describe('Dependency Pipeline Integration — ADR-045 / Sprint 164 Task 5', () =
       expect(spawnedAll).not.toContain('164-C');
       expect(tickCount).toBeGreaterThanOrEqual(1);
 
-      // tmux spawnWorker mock was invoked for at least one task
-      expect(vi.mocked(spawnWorker).mock.calls.length).toBeGreaterThanOrEqual(1);
+      expect(b.status).toBe(TaskStatus.EXECUTING);
     });
   });
 });

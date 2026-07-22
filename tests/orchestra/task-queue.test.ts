@@ -17,6 +17,7 @@ import { join } from 'node:path';
 
 import { TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskResult, Sprint, ResolvedConfig, BrainContext } from '../../src/core/types.js';
+import type { SpawnBackend } from '../../src/orchestra/spawn-backend.js';
 import {
   TASKS_DIR, BRAIN_DIR, DECKENT_DIR, SPRINTS_DIR,
   DIRECTIVES_FILE, DASHBOARD_FILE,
@@ -53,6 +54,33 @@ vi.mock('../../src/orchestra/result-watcher.js', () => ({
   })),
 }));
 
+// Queue tests own an in-memory measured backend. Supply matching terminal
+// host evidence so result ingestion does not wait for a Docker-owned ledger.
+vi.mock('../../src/orchestra/runtime-budget-monitor.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/orchestra/runtime-budget-monitor.js')>();
+  const terminalUsage = () => ({
+    terminal: true,
+    decision: {
+      state: 'within-budget' as const,
+      reasons: [],
+      counters: {
+        turns: 1,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+        totalTokens: 0,
+        maxContextTokens: 0,
+      },
+    },
+  });
+  return {
+    ...actual,
+    readRuntimeBudgetUsage: terminalUsage,
+    waitForTerminalRuntimeBudgetUsage: () => Promise.resolve(terminalUsage()),
+  };
+});
+
 vi.mock('node:readline/promises', () => ({
   createInterface: vi.fn(() => ({
     question: vi.fn().mockResolvedValue('y'),
@@ -62,7 +90,7 @@ vi.mock('node:readline/promises', () => ({
 
 // ─── Import after mocks ──────────────────────────────────────────────
 
-import { spawnWorker, killWorker } from '../../src/orchestra/tmux.js';
+import { killWorker } from '../../src/orchestra/tmux.js';
 import { planSprint, spawnWorkers, waitForResults } from '../../src/orchestra/brain.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -105,7 +133,19 @@ function makeTask(id: string, sprintId = 'sprint-001', overrides?: Partial<Task>
     status: TaskStatus.PENDING,
     sprintId,
     createdAt: new Date().toISOString(),
+    budget: { maxTurns: 1 },
     ...overrides,
+  };
+}
+
+function makeMockBackend(onSpawn?: (taskId: string) => void): SpawnBackend {
+  return {
+    name: 'measured-test',
+    liveUsageBudgetSupport: 'measured-stream',
+    spawn: vi.fn((taskId: string) => onSpawn?.(taskId)),
+    kill: vi.fn(),
+    list: vi.fn(() => []),
+    isAvailable: vi.fn(async () => true),
   };
 }
 
@@ -149,6 +189,21 @@ function writeTaskResult(root: string, taskId: string): void {
     coverage: 95,
     selfAssessment: 'DONE',
     notes: 'Done',
+    tokenUsage: {
+      inputTokens: 1,
+      outputTokens: 1,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0,
+      source: 'provider-adapter',
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+    },
+    cost: {
+      usd: 0,
+      currency: 'USD',
+      pricingSource: 'provider-envelope',
+      isLocal: false,
+    },
   };
   writeFileSync(
     join(root, TASKS_DIR, `task-${taskId}.result`),
@@ -266,10 +321,11 @@ describe('spawnWorkers — initial batch and queue return', () => {
     const tasks = Array.from({ length: 10 }, (_, i) => makeTask(`001-00${i + 1}`));
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 3);
+    const backend = makeMockBackend();
 
-    await spawnWorkers(root, sprint, config);
+    await spawnWorkers(root, sprint, config, { spawnBackend: backend });
 
-    expect(vi.mocked(spawnWorker)).toHaveBeenCalledTimes(3);
+    expect(backend.spawn).toHaveBeenCalledTimes(3);
   });
 
   it('returns the remaining queued tasks when tasks > max_workers', async () => {
@@ -277,7 +333,7 @@ describe('spawnWorkers — initial batch and queue return', () => {
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 3);
 
-    const queue = await spawnWorkers(root, sprint, config);
+    const queue = await spawnWorkers(root, sprint, config, { spawnBackend: makeMockBackend() });
 
     expect(queue.length).toBe(2);
     expect(queue[0].id).toBe('001-004');
@@ -289,10 +345,11 @@ describe('spawnWorkers — initial batch and queue return', () => {
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 3);
 
-    const queue = await spawnWorkers(root, sprint, config);
+    const backend = makeMockBackend();
+    const queue = await spawnWorkers(root, sprint, config, { spawnBackend: backend });
 
     expect(queue.length).toBe(0);
-    expect(vi.mocked(spawnWorker)).toHaveBeenCalledTimes(2);
+    expect(backend.spawn).toHaveBeenCalledTimes(2);
   });
 
   it('dashboard progress.total equals all tasks (not just active workers)', async () => {
@@ -300,7 +357,7 @@ describe('spawnWorkers — initial batch and queue return', () => {
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 3);
 
-    await spawnWorkers(root, sprint, config);
+    await spawnWorkers(root, sprint, config, { spawnBackend: makeMockBackend() });
 
     const dashboard = JSON.parse(readFileSync(join(root, DASHBOARD_FILE), 'utf-8'));
     expect(dashboard.progress.total).toBe(8);
@@ -312,7 +369,7 @@ describe('spawnWorkers — initial batch and queue return', () => {
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 3);
 
-    await spawnWorkers(root, sprint, config);
+    await spawnWorkers(root, sprint, config, { spawnBackend: makeMockBackend() });
 
     const dashboard = JSON.parse(readFileSync(join(root, DASHBOARD_FILE), 'utf-8'));
     expect(dashboard.progress.total).toBe(3);
@@ -324,9 +381,10 @@ describe('spawnWorkers — initial batch and queue return', () => {
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 3);
 
-    const queue = await spawnWorkers(root, sprint, config);
+    const backend = makeMockBackend();
+    const queue = await spawnWorkers(root, sprint, config, { spawnBackend: backend });
 
-    expect(vi.mocked(spawnWorker)).toHaveBeenCalledTimes(3);
+    expect(backend.spawn).toHaveBeenCalledTimes(3);
     expect(queue.length).toBe(0);
   });
 });
@@ -364,22 +422,21 @@ describe('waitForResults — queue processing', () => {
     const task2 = makeTask('001-002'); // queued
     const sprint = makeSprint([task1, task2]);
 
-    // Both results available immediately
+    // Only the active result exists initially; the queued result appears after dispatch.
     writeTaskResult(root, '001-001');
-    writeTaskResult(root, '001-002');
 
     const queue = [task2];
-    const results = await waitForResults(root, sprint, 5000, queue);
+    const backend = makeMockBackend(taskId => writeTaskResult(root, taskId));
+    const results = await waitForResults(root, sprint, 5000, queue, { spawnBackend: backend });
 
-    // killWorker called for task1 (completed, has a queue entry to replace)
-    expect(vi.mocked(killWorker)).toHaveBeenCalledWith('001-001');
-    // spawnWorker called for task2 (from queue)
-    expect(vi.mocked(spawnWorker)).toHaveBeenCalledWith(
+    // Backend kill called for task1 (completed, has a queue entry to replace)
+    expect(backend.kill).toHaveBeenCalledWith('001-001');
+    // Backend spawn called for task2 (from queue)
+    expect(backend.spawn).toHaveBeenCalledWith(
       '001-002',
       expect.any(String),
       expect.any(String),
-      root,
-      expect.any(Object),
+      expect.objectContaining({ projectDir: root, executionBudget: { maxTurns: 1 } }),
     );
     expect(results.length).toBe(2);
   });
@@ -422,14 +479,15 @@ describe('waitForResults — queue processing', () => {
     const sprint = makeSprint(tasks);
     const queue = [tasks[2], tasks[3]]; // tasks 3 and 4 are queued
 
-    for (const t of tasks) writeTaskResult(root, t.id);
+    for (const t of tasks.slice(0, 2)) writeTaskResult(root, t.id);
 
-    await waitForResults(root, sprint, 5000, queue);
+    const backend = makeMockBackend(taskId => writeTaskResult(root, taskId));
+    await waitForResults(root, sprint, 5000, queue, { spawnBackend: backend });
 
-    // killWorker called once per queue entry consumed (task1 and task2)
-    expect(vi.mocked(killWorker)).toHaveBeenCalledTimes(2);
-    // spawnWorker called for task3 and task4
-    expect(vi.mocked(spawnWorker)).toHaveBeenCalledTimes(2);
+    // Backend kill called once per queue entry consumed (task1 and task2)
+    expect(backend.kill).toHaveBeenCalledTimes(2);
+    // Backend spawn called for task3 and task4
+    expect(backend.spawn).toHaveBeenCalledTimes(2);
   });
 
   it('returns partial results when timeout elapses without all completing', async () => {

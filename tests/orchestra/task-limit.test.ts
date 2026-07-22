@@ -18,6 +18,7 @@ import { join } from 'node:path';
 
 import { TaskStatus } from '../../src/core/types.js';
 import type { Task, Sprint, ResolvedConfig, BrainContext, SprintSizeRecommendation } from '../../src/core/types.js';
+import type { SpawnBackend } from '../../src/orchestra/spawn-backend.js';
 import {
   TASKS_DIR, BRAIN_DIR, DECKENT_DIR, SPRINTS_DIR,
   DIRECTIVES_FILE, DASHBOARD_FILE,
@@ -57,7 +58,6 @@ vi.mock('node:readline/promises', () => ({
 
 // ─── Import after mocks ──────────────────────────────────────────────
 
-import { spawnWorker } from '../../src/orchestra/tmux.js';
 import { planSprint, spawnWorkers, parseStructuredDirectives } from '../../src/orchestra/brain.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -145,7 +145,19 @@ function makeTask(id: string, sprintId = 'sprint-001', overrides?: Partial<Task>
     status: TaskStatus.PENDING,
     sprintId,
     createdAt: new Date().toISOString(),
+    budget: { maxTurns: 1 },
     ...overrides,
+  };
+}
+
+function makeMockBackend(): SpawnBackend {
+  return {
+    name: 'measured-test',
+    liveUsageBudgetSupport: 'measured-stream',
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    list: vi.fn(() => []),
+    isAvailable: vi.fn(async () => true),
   };
 }
 
@@ -328,10 +340,11 @@ describe('spawnWorkers — max_workers limits concurrent spawn only', () => {
     const tasks = Array.from({ length: 14 }, (_, i) => makeTask(`001-${String(i + 1).padStart(3, '0')}`));
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 8);
+    const backend = makeMockBackend();
 
-    await spawnWorkers(root, sprint, config);
+    await spawnWorkers(root, sprint, config, { spawnBackend: backend });
 
-    expect(vi.mocked(spawnWorker)).toHaveBeenCalledTimes(8);
+    expect(backend.spawn).toHaveBeenCalledTimes(8);
   });
 
   it('with 14 tasks and max_workers=8, returns 6 queued tasks', async () => {
@@ -339,7 +352,7 @@ describe('spawnWorkers — max_workers limits concurrent spawn only', () => {
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 8);
 
-    const queue = await spawnWorkers(root, sprint, config);
+    const queue = await spawnWorkers(root, sprint, config, { spawnBackend: makeMockBackend() });
 
     expect(queue.length).toBe(6);
   });
@@ -349,10 +362,11 @@ describe('spawnWorkers — max_workers limits concurrent spawn only', () => {
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 8);
 
-    const queue = await spawnWorkers(root, sprint, config);
+    const backend = makeMockBackend();
+    const queue = await spawnWorkers(root, sprint, config, { spawnBackend: backend });
 
     expect(queue.length).toBe(12);
-    expect(vi.mocked(spawnWorker)).toHaveBeenCalledTimes(8);
+    expect(backend.spawn).toHaveBeenCalledTimes(8);
   });
 
   it('dashboard progress.total = all 14 tasks (not just active 8)', async () => {
@@ -360,7 +374,7 @@ describe('spawnWorkers — max_workers limits concurrent spawn only', () => {
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 8);
 
-    await spawnWorkers(root, sprint, config);
+    await spawnWorkers(root, sprint, config, { spawnBackend: makeMockBackend() });
 
     const dashboard = JSON.parse(readFileSync(join(root, DASHBOARD_FILE), 'utf-8'));
     expect(dashboard.progress.total).toBe(14);
@@ -372,7 +386,7 @@ describe('spawnWorkers — max_workers limits concurrent spawn only', () => {
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 8);
 
-    await spawnWorkers(root, sprint, config);
+    await spawnWorkers(root, sprint, config, { spawnBackend: makeMockBackend() });
 
     const dashboard = JSON.parse(readFileSync(join(root, DASHBOARD_FILE), 'utf-8'));
     expect(dashboard.progress.total).toBe(20);

@@ -103,7 +103,7 @@ vi.mock('../../src/core/system-profile.js', () => ({
 }));
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   resolveEffectiveWorkers: vi.fn().mockReturnValue(4),
   resolveLiveTraceEnabled: () => false,  // 583/N5 — spawn gate reads it; false = pre-N5 byte-stable opts
@@ -119,7 +119,7 @@ vi.mock('../../src/orchestra/result-watcher.js', () => ({
 vi.mock('../../src/orchestra/model-selector.js', () => ({
   calculateModelScore: vi.fn(),
   inferModelFromDirective: vi.fn(),
-  resolveTaskModel: vi.fn().mockReturnValue('sonnet'),
+  resolveTaskModel: vi.fn().mockReturnValue('claude-sonnet-5'),
   parsePatterns: vi.fn().mockReturnValue([]),
   deduplicatePatterns: vi.fn().mockReturnValue([]),
   suggestModelFromPatterns: vi.fn(),
@@ -319,7 +319,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: 'test-001',
     title: 'Test Task',
     description: 'A test task for spawn prevention',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'testing',
@@ -329,6 +329,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     status: TaskStatus.PENDING,
     sprintId: 'sprint-test',
     createdAt: new Date().toISOString(),
+    budget: { maxTurns: 1 },
     ...overrides,
   } as Task;
 }
@@ -357,6 +358,7 @@ function makeConfig(): ResolvedConfig {
 function makeMockBackend(): SpawnBackend {
   return {
     name: 'mock',
+    liveUsageBudgetSupport: 'measured-stream',
     spawn: vi.fn(),
     kill: vi.fn(),
     list: vi.fn(() => []),
@@ -385,7 +387,7 @@ describe('spawnWorkers — spawn prevention (backend vs legacy)', () => {
     expect(mockBackend.spawn).toHaveBeenCalledTimes(1);
     expect(mockBackend.spawn).toHaveBeenCalledWith(
       'test-001',
-      'sonnet',
+      'claude-sonnet-5',
       'mock-worker-prompt',
       expect.objectContaining({
         projectDir: '/tmp/test-project',
@@ -439,18 +441,20 @@ describe('spawnWorkers — spawn prevention (backend vs legacy)', () => {
     expect(mockedSpawnWorker).not.toHaveBeenCalled();
   });
 
-  it('should fall back to legacy tmux when no backend is provided (Claude provider)', async () => {
-    // No backend → isTmuxProvider returns true → legacy tmux path
+  it('should fail closed when legacy tmux cannot meter the task budget', async () => {
     mockedIsTmuxProvider.mockReturnValue(true);
 
     const task = makeTask();
     const sprint = makeSprint([task]);
     const config = makeConfig();
 
-    await spawnWorkers('/tmp/test-project', sprint, config);
+    await expect(spawnWorkers('/tmp/test-project', sprint, config)).rejects.toThrow(
+      /does not declare that capability/,
+    );
 
-    expect(mockedSpawnWorker).toHaveBeenCalledTimes(1);
-    expect(mockedEnsureSession).toHaveBeenCalledTimes(1);
+    expect(mockedSpawnWorker).not.toHaveBeenCalled();
+    // Session bootstrap precedes per-task metering admission; provider spawn remains blocked.
+    expect(mockedEnsureSession).toHaveBeenCalledOnce();
   });
 
   it('should use adapter when no backend and provider is non-tmux', async () => {
@@ -459,6 +463,7 @@ describe('spawnWorkers — spawn prevention (backend vs legacy)', () => {
 
     const mockAdapter = {
       name: 'codex',
+      liveUsageBudgetSupport: 'measured-stream',
       spawn: vi.fn(),
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),

@@ -39,6 +39,7 @@ vi.mock('../../../src/orchestra/spawn-backend.js', () => ({
   SpawnBackendFactory: {
     create: vi.fn().mockReturnValue({
       name: 'subprocess',
+      liveUsageBudgetSupport: 'measured-stream',
       spawn: mockSubprocessSpawn,
       kill: mockSubprocessKill,
       list: mockSubprocessList,
@@ -91,17 +92,24 @@ describe('spawn multi-provider', () => {
     process.exitCode = undefined;
   });
 
-  it('spawnWorkerMultiProvider uses tmux for claude models', async () => {
+  it('spawnWorkerMultiProvider fails closed for unmetered tmux claude execution', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    const result = await spawnWorkerMultiProvider('t1', 'claude-sonnet-5', 'prompt', '/root', {});
-    expect(result.backend).toBe('tmux');
-    expect(ensureSession).toHaveBeenCalled();
-    expect(spawnWorker).toHaveBeenCalled();
+    await expect(spawnWorkerMultiProvider(
+      't1',
+      'claude-sonnet-5',
+      'prompt',
+      '/root',
+      { executionBudget: { maxTurns: 1 } },
+    )).rejects.toThrow(/does not declare that capability/);
+    expect(ensureSession).not.toHaveBeenCalled();
+    expect(spawnWorker).not.toHaveBeenCalled();
   });
 
   it('spawnWorkerMultiProvider uses subprocess for codex models', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    const result = await spawnWorkerMultiProvider('t1', 'gpt-4.1', 'prompt', '/root', {});
+    const result = await spawnWorkerMultiProvider('t1', 'gpt-4.1', 'prompt', '/root', {
+      executionBudget: { maxTurns: 1 },
+    });
     expect(result.backend).toBe('subprocess');
     expect(mockSubprocessSpawn).toHaveBeenCalledWith('t1', 'gpt-4.1', 'prompt', expect.objectContaining({
       projectDir: '/root',
@@ -111,20 +119,34 @@ describe('spawn multi-provider', () => {
 
   it('spawnWorkerMultiProvider uses subprocess for gemini models', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    const result = await spawnWorkerMultiProvider('t1', 'gemini-2.5-pro', 'prompt', '/root', {});
+    const result = await spawnWorkerMultiProvider('t1', 'gemini-2.5-pro', 'prompt', '/root', {
+      executionBudget: { maxTurns: 1 },
+    });
     expect(result.backend).toBe('subprocess');
     expect(mockSubprocessSpawn).toHaveBeenCalled();
   });
 
-  it('spawnWorkerMultiProvider passes autoApprove to tmux', async () => {
+  it('spawnWorkerMultiProvider passes autoApprove to a measured backend', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    await spawnWorkerMultiProvider('t1', 'claude-opus-4-8', 'prompt', '/root', { autoApprove: true });
-    expect(spawnWorker).toHaveBeenCalledWith('t1', 'claude-opus-4-8', 'prompt', '/root', { autoApprove: true });
+    await spawnWorkerMultiProvider('t1', 'claude-opus-4-8', 'prompt', '/root', {
+      autoApprove: true,
+      spawnBackend: 'subprocess',
+      executionBudget: { maxTurns: 1 },
+    });
+    expect(mockSubprocessSpawn).toHaveBeenCalledWith(
+      't1',
+      'claude-opus-4-8',
+      'prompt',
+      expect.objectContaining({ autoApprove: true }),
+    );
   });
 
   it('spawnWorkerMultiProvider passes autoApprove to subprocess', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    await spawnWorkerMultiProvider('t1', 'o3', 'prompt', '/root', { autoApprove: true });
+    await spawnWorkerMultiProvider('t1', 'o3', 'prompt', '/root', {
+      autoApprove: true,
+      executionBudget: { maxTurns: 1 },
+    });
     expect(mockSubprocessSpawn).toHaveBeenCalledWith('t1', 'o3', 'prompt', expect.objectContaining({
       autoApprove: true,
     }));
@@ -133,7 +155,9 @@ describe('spawn multi-provider', () => {
   it('registerSpawn prints backend info for codex task', async () => {
     vi.mocked(readTask).mockReturnValue(makeTask({ model: 'gpt-4.1', id: 'test-codex' }));
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    const result = await spawnWorkerMultiProvider('test-codex', 'gpt-4.1', 'prompt', '/test/project', {});
+    const result = await spawnWorkerMultiProvider('test-codex', 'gpt-4.1', 'prompt', '/test/project', {
+      executionBudget: { maxTurns: 1 },
+    });
     expect(result.backend).toBe('subprocess');
   });
 });

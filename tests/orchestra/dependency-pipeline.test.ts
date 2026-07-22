@@ -165,9 +165,13 @@ vi.mock('../../src/orchestra/sprint-utils.js', async (importOriginal) => {
     ...actual,
     readFileSafe: vi.fn().mockReturnValue(''),
     now: vi.fn().mockReturnValue(new Date().toISOString()),
-    isTmuxProvider: vi.fn().mockReturnValue(true),
+    isTmuxProvider: vi.fn().mockReturnValue(false),
     resolveTaskProvider: vi.fn().mockReturnValue('claude'),
-    getProviderAdapterForTask: vi.fn().mockReturnValue(null),
+    getProviderAdapterForTask: vi.fn().mockReturnValue({
+      name: 'measured-claude-test',
+      liveUsageBudgetSupport: 'measured-stream',
+      spawn: vi.fn(),
+    }),
     getDefaultProvider: vi.fn().mockReturnValue(null),
     writeSprintState: vi.fn(),
     readSprintState: vi.fn().mockReturnValue(null),
@@ -277,6 +281,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     status: TaskStatus.PENDING,
     sprintId: 'sprint-134',
     createdAt: new Date().toISOString(),
+    budget: { maxTurns: 1 },
     ...overrides,
   };
 }

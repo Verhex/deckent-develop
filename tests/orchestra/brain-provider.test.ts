@@ -317,6 +317,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     status: TaskStatus.PENDING,
     sprintId: 'sprint-001',
     createdAt: '2026-03-16T00:00:00.000Z',
+    budget: { maxTurns: 1 },
     ...overrides,
   };
 }
@@ -342,6 +343,7 @@ function makeMockBackend(): SpawnBackend & {
 } {
   return {
     name: 'mock-backend',
+    liveUsageBudgetSupport: 'measured-stream',
     spawn: vi.fn(),
     kill: vi.fn(),
     list: vi.fn().mockReturnValue([]),
@@ -440,14 +442,15 @@ describe('spawnWorkers with SpawnBackend', () => {
     expect(spawnWorker).not.toHaveBeenCalled();
   });
 
-  it('uses legacy tmux path when no spawnBackend provided', async () => {
+  it('fails closed when the legacy tmux path cannot meter the task budget', async () => {
     const sprint = makeSprint();
     const config = makeConfig();
 
-    await spawnWorkers(ROOT, sprint, config);
+    await expect(spawnWorkers(ROOT, sprint, config)).rejects.toThrow(/does not declare that capability/);
 
+    // Session bootstrap precedes per-task metering admission; provider spawn remains blocked.
     expect(ensureSession).toHaveBeenCalledOnce();
-    expect(spawnWorker).toHaveBeenCalledOnce();
+    expect(spawnWorker).not.toHaveBeenCalled();
   });
 
   it('passes autoApprove to spawnBackend', async () => {
@@ -623,4 +626,3 @@ describe('SpawnBackendFactory re-export', () => {
     expect(SpawnBackendFactory.create).not.toHaveBeenCalled();
   });
 });
-
