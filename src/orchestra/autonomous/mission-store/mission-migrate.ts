@@ -5,7 +5,7 @@ import { DECKENT_DIR } from '../../../core/constants.js';
 import type { MissionStore, NewMissionWorkItem } from './mission-types.js';
 import type { BacklogEntry, BacklogStatus } from '../backlog-types.js';
 import {
-  assertWorkItemBatchAdmitted,
+  admitWorkItemBatch,
   type MissionRuntimeAdmission,
 } from './mission-kind-admission.js';
 
@@ -94,11 +94,17 @@ export function migrateBacklogJson(
       } : e.lastResult ? { initialResult: e.lastResult } : {}),
     };
   });
+  let admittedItems = items;
   if (opts.admission) {
     // Terminal rows are historical evidence, not execution requests. Every
     // non-terminal row must be admitted as one batch before any DB mutation.
     const executable = items.filter((item) => item.initialStatus !== 'done' && item.initialStatus !== 'failed');
-    assertWorkItemBatchAdmitted(executable, opts.admission);
+    const admittedById = new Map(admitWorkItemBatch(executable, opts.admission)
+      .map((item) => [item.id, item.admissionFence]));
+    admittedItems = items.map((item) => {
+      const admissionFence = admittedById.get(item.id);
+      return admissionFence ? { ...item, admissionFence } : item;
+    });
   }
   const sourceDigest = createHash('sha256').update(canonicalJson(entries)).digest('hex');
   const existing = store.getMission('legacy');
@@ -143,7 +149,7 @@ export function migrateBacklogJson(
       renderAs: 'checklist',
       spec: { legacyImport: { schemaVersion: 1, source: 'backlog.json', sourceDigest } },
     },
-    items,
+    admittedItems,
   );
   return items.length;
 }

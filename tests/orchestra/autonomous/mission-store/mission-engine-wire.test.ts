@@ -16,6 +16,10 @@ import {
   GoalInvocationHeldError,
 } from '../../../../src/orchestra/autonomous/mission-store/goal-mission.js';
 import type { NewWorkItem, WorkItem } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
+import {
+  PRODUCTION_V2_RUNNER_REGISTRY,
+  admitWorkItemBatch,
+} from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
 import type { ResolvedConfig } from '../../../../src/core/config-types.js';
 import { ApprovalBroker } from '../../../../src/core/approval-broker.js';
 import { ApprovalStore } from '../../../../src/core/approval-store.js';
@@ -27,6 +31,9 @@ const stores: SqliteMissionStore[] = [];
 function root(): string { const d = mkdtempSync(join(tmpdir(), 'wire-')); dirs.push(d); return d; }
 function openStore(r: string): SqliteMissionStore {
   const s = new SqliteMissionStore(r); s.migrate(); stores.push(s); return s;
+}
+function enqueueProduction(store: SqliteMissionStore, item: NewWorkItem): WorkItem {
+  return store.enqueueItem(admitWorkItemBatch([item], PRODUCTION_V2_RUNNER_REGISTRY)[0]!);
 }
 afterEach(() => {
   for (const s of stores.splice(0)) { try { s.close(); } catch { /* already closed */ } }
@@ -64,7 +71,7 @@ describe('runV2Engine', () => {
     const r = root();
     const store = openStore(r);
     store.createMission({ id: 'mA', kind: 'list', title: 'Approval', renderAs: 'checklist' });
-    store.enqueueItem({
+    enqueueProduction(store, {
       id: 'mA-0',
       missionId: 'mA',
       kind: 'task',
@@ -128,8 +135,8 @@ describe('runV2Engine', () => {
     const r = root();
     const store = openStore(r);
     store.createMission({ id: 'm1', kind: 'list', title: 'List', renderAs: 'checklist' });
-    store.enqueueItem({ id: 'm1-0', missionId: 'm1', kind: 'task', spec: { description: 'do 0' } });
-    store.enqueueItem({ id: 'm1-1', missionId: 'm1', kind: 'task', spec: { description: 'do 1' } });
+    enqueueProduction(store, { id: 'm1-0', missionId: 'm1', kind: 'task', spec: { description: 'do 0' } });
+    enqueueProduction(store, { id: 'm1-1', missionId: 'm1', kind: 'task', spec: { description: 'do 1' } });
 
     const seen: string[] = [];
     const deps: RunV2EngineDeps = {
@@ -152,7 +159,7 @@ describe('runV2Engine', () => {
     const r = root();
     const store = openStore(r);
     store.createMission({ id: 'mR', kind: 'list', title: 'Recover', renderAs: 'checklist' });
-    store.enqueueItem({ id: 'mR-0', missionId: 'mR', kind: 'task', spec: { description: 'orphaned' } });
+    enqueueProduction(store, { id: 'mR-0', missionId: 'mR', kind: 'task', spec: { description: 'orphaned' } });
     // Simulate a prior crash after claim. The provider side effect may already
     // have happened, so automatically returning this row to pending would risk
     // executing it twice.
@@ -179,7 +186,7 @@ describe('runV2Engine', () => {
     const r = root();
     const store = openStore(r);
     createGoalMission(store, { id: 'gR', title: 'Recovered goal', goal: 'do not duplicate' });
-    store.enqueueItem({ id: 'gR-0', missionId: 'gR', kind: 'task', spec: { description: 'uncertain effect' } });
+    enqueueProduction(store, { id: 'gR-0', missionId: 'gR', kind: 'task', spec: { description: 'uncertain effect' } });
     expect(store.claimItem('gR-0', 'dead-worker')).toBe(true);
 
     const runTask = vi.fn(async (): Promise<{ ok: boolean }> => ({ ok: true }));
@@ -207,7 +214,7 @@ describe('runV2Engine', () => {
     const r = root();
     const store = openStore(r);
     store.createMission({ id: 'mF', kind: 'list', title: 'Fail', renderAs: 'checklist' });
-    store.enqueueItem({ id: 'mF-0', missionId: 'mF', kind: 'task', spec: { description: 'boom' } });
+    enqueueProduction(store, { id: 'mF-0', missionId: 'mF', kind: 'task', spec: { description: 'boom' } });
 
     const deps: RunV2EngineDeps = {
       runTask: async () => ({ ok: false, reason: 'nope' }),
@@ -219,7 +226,7 @@ describe('runV2Engine', () => {
     expect(store.getMission('mF')!.status).toBe('failed');
   });
 
-  it('dispatches a sprint work-item through the injected runSprint (ok on resolve)', async () => {
+  it('parks a persisted sprint item even when generic runSprint is injected', async () => {
     const r = root();
     const store = openStore(r);
     store.createMission({ id: 'mS', kind: 'list', title: 'Sprint', renderAs: 'checklist' });
@@ -234,8 +241,10 @@ describe('runV2Engine', () => {
     };
     await runV2Engine(r, cfg({ engine: 'v2' }), deps);
 
-    expect(sprintCalls).toBe(1);
-    expect(store.getMission('mS')!.status).toBe('completed');
+    expect(sprintCalls).toBe(0);
+    expect(store.listItems('mS')[0]!.status).toBe('parked');
+    expect(store.listItems('mS')[0]!.lastResult?.reason).toContain('ADMISSION_FENCE_MISSING');
+    expect(store.getMission('mS')!.status).toBe('pending');
   });
 
   it('imports backlog.json into the store at boot (migrateBacklogJson called)', async () => {
@@ -296,7 +305,7 @@ describe('runV2Engine', () => {
     const r = root();
     const store = openStore(r);
     store.createMission({ id: 'mN', kind: 'list', title: 'Notify', renderAs: 'checklist', deliverTo: 'alice' });
-    store.enqueueItem({ id: 'mN-0', missionId: 'mN', kind: 'task', spec: { description: 'x' } });
+    enqueueProduction(store, { id: 'mN-0', missionId: 'mN', kind: 'task', spec: { description: 'x' } });
 
     const payloads: MissionNotifyPayload[] = [];
     const deps: RunV2EngineDeps = {
@@ -318,7 +327,7 @@ describe('runV2Engine', () => {
     // Seed one mission via a separate connection, then close it so the engine owns the file.
     const seed = new SqliteMissionStore(r); seed.migrate();
     seed.createMission({ id: 'mOwn', kind: 'list', title: 'Own', renderAs: 'checklist' });
-    seed.enqueueItem({ id: 'mOwn-0', missionId: 'mOwn', kind: 'task', spec: { description: 'own' } });
+    enqueueProduction(seed, { id: 'mOwn-0', missionId: 'mOwn', kind: 'task', spec: { description: 'own' } });
     seed.close();
 
     const deps: RunV2EngineDeps = {
@@ -489,8 +498,8 @@ describe('runV2Engine — goal-driven (Type-2)', () => {
     const r = root();
     const store = openStore(r);
     createGoalMission(store, { id: 'gD', title: 'Goal Dependency', goal: 'ordered', deliverTo: 'dana' });
-    store.enqueueItem({ id: 'gD-a', missionId: 'gD', kind: 'task', dependsOn: ['gD-b'] });
-    store.enqueueItem({ id: 'gD-b', missionId: 'gD', kind: 'task', dependsOn: ['gD-a'] });
+    enqueueProduction(store, { id: 'gD-a', missionId: 'gD', kind: 'task', spec: { description: 'a' }, dependsOn: ['gD-b'] });
+    enqueueProduction(store, { id: 'gD-b', missionId: 'gD', kind: 'task', spec: { description: 'b' }, dependsOn: ['gD-a'] });
 
     const payloads: MissionNotifyPayload[] = [];
     const deps: RunV2EngineDeps = {
@@ -517,7 +526,7 @@ describe('runV2Engine — goal-driven (Type-2)', () => {
     const r = root();
     const store = openStore(r);
     store.createMission({ id: 'mL', kind: 'list', title: 'List', renderAs: 'checklist' });
-    store.enqueueItem({ id: 'mL-0', missionId: 'mL', kind: 'task', spec: { description: 'list work' } });
+    enqueueProduction(store, { id: 'mL-0', missionId: 'mL', kind: 'task', spec: { description: 'list work' } });
 
     const planner = vi.fn(async (): Promise<NewWorkItem[]> => []);
     const accepter = vi.fn(async () => false);

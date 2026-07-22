@@ -36,6 +36,9 @@ describe('migrateBacklogJson', () => {
     expect(items.find(i => i.id === 'e2')!.kind).toBe('sprint');
     expect(items.find(i => i.id === 'e2')!.status).toBe('done');
     expect(items.find(i => i.id === 'e2')!.lastResult).toEqual({ ok: true, reason: 'historical success' });
+    expect(items.find(i => i.id === 'e1')!.admissionFence?.registryDigest)
+      .toBe(PRODUCTION_V2_ADMISSION.registryDigest);
+    expect(items.find(i => i.id === 'e2')!.admissionFence).toBeNull();
     expect(legacy.spec?.['legacyImport']).toMatchObject({ schemaVersion: 1, source: 'backlog.json' });
     expect(migrateBacklogJson(r, s, { admission: PRODUCTION_V2_ADMISSION })).toBe(0); // idempotent — reserved legacy mission exists
     s.close();

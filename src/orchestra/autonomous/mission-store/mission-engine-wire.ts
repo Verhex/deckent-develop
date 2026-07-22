@@ -12,7 +12,11 @@ import { SqliteMissionStore } from './sqlite-mission-store.js';
 import { buildMissionDispatch, type MissionTaskContext } from './mission-dispatch.js';
 import { makeMissionDeliver, type MissionNotifyPayload } from './mission-deliver.js';
 import { migrateBacklogJson } from './mission-migrate.js';
-import { PRODUCTION_V2_ADMISSION } from './mission-kind-admission.js';
+import {
+  PRODUCTION_V2_RUNNER_REGISTRY,
+  bindMissionRunnerRegistry,
+  type BoundMissionRunnerRegistryV1,
+} from './mission-kind-admission.js';
 import { runMissionScheduler, type DispatchFn, type MissionSchedulerSummary } from './mission-scheduler.js';
 import { advanceGoalMission, type GoalAdvanceDeps } from './goal-mission.js';
 import { auditMissionLifecycle } from './mission-audit-bridge.js';
@@ -142,6 +146,19 @@ export async function runV2Engine(
   const ownsStore = deps.store === undefined;
   const store: MissionStore = deps.store ?? new SqliteMissionStore(projectRoot);
   try {
+    const kindDispatch = buildMissionDispatch({
+      projectRoot,
+      config,
+      runTask: withSettleDetail(deps.runTask),
+      runSprint: deps.runSprint,
+      ...(deps.runCapability ? { runCapability: deps.runCapability } : {}),
+    });
+    // A generic primitive merely being injected does not admit its kind. The
+    // production registry and its exact bound handlers are one authority.
+    const runtimeRegistry = bindMissionRunnerRegistry(PRODUCTION_V2_RUNNER_REGISTRY, {
+      task: kindDispatch,
+    });
+
     store.migrate();
     // B11 crash-recovery wire (ADR-043): a previous engine run that crashed or was
     // killed mid-dispatch leaves work_items stuck in 'running' (claimed but never
@@ -150,15 +167,9 @@ export async function runV2Engine(
     // touches status='running' rows; a clean boot is a no-op.
     store.recover();
     // Boot: import the legacy backlog into a `legacy` mission (no-op if missions exist).
-    migrateBacklogJson(projectRoot, store, { admission: PRODUCTION_V2_ADMISSION });
-
-    const dispatch = buildMissionDispatch({
-      projectRoot,
-      config,
-      runTask: withSettleDetail(deps.runTask),
-      runSprint: deps.runSprint,
-      ...(deps.runCapability ? { runCapability: deps.runCapability } : {}),
-    });
+    migrateBacklogJson(projectRoot, store, { admission: runtimeRegistry.descriptor });
+    store.reconcileRuntimeAdmission(runtimeRegistry.descriptor);
+    const dispatch = runtimeRegistry.dispatch;
 
     const deliver = makeMissionDeliver({
       notify: deps.notify ?? ((): void => { /* no delivery channel — settle silently */ }),
@@ -193,6 +204,7 @@ export async function runV2Engine(
         intervalMs,
         onMissionSettled,
         goalDeps: deps.goalDeps,
+        runtimeRegistry,
         ...(deps.approvalCoordinator ? { approvalCoordinator: deps.approvalCoordinator } : {}),
         ...(perTenantPoolSize !== undefined ? { perTenantPoolSize } : {}),
         ...(deps.signal ? { signal: deps.signal } : {}),
@@ -204,6 +216,7 @@ export async function runV2Engine(
       poolSize,
       intervalMs,
       onMissionSettled,
+      runtimeRegistry,
       ...(deps.approvalCoordinator ? { approvalCoordinator: deps.approvalCoordinator } : {}),
       ...(perTenantPoolSize !== undefined ? { perTenantPoolSize } : {}),
       ...(deps.signal ? { signal: deps.signal } : {}),
@@ -222,6 +235,7 @@ interface GoalDrivenEngineOpts {
   intervalMs: number;
   onMissionSettled: (mission: Mission) => void;
   goalDeps: GoalAdvanceDeps;
+  runtimeRegistry: BoundMissionRunnerRegistryV1;
   approvalCoordinator?: MissionApprovalCoordinatorLike;
   signal?: AbortSignal;
   maxIterations?: number;
@@ -256,7 +270,8 @@ const GOAL_DRAIN_BOUND = 100_000;
  *      dispatched nothing this pass. `signal`/`maxIterations` bound the loop.
  */
 async function runGoalDrivenEngine(opts: GoalDrivenEngineOpts): Promise<MissionSchedulerSummary> {
-  const { store, dispatch, poolSize, intervalMs, onMissionSettled, goalDeps, signal } = opts;
+  const { store, dispatch, poolSize, intervalMs, onMissionSettled, runtimeRegistry, signal } = opts;
+  const goalDeps: GoalAdvanceDeps = { ...opts.goalDeps, admission: runtimeRegistry.descriptor };
   const maxIterations = opts.maxIterations ?? Infinity;
   // A durably failed goal is terminal. Seed it as finalized so a clean engine
   // restart does not re-deliver the same settlement. This is at-most-once
@@ -321,6 +336,7 @@ async function runGoalDrivenEngine(opts: GoalDrivenEngineOpts): Promise<MissionS
       poolSize,
       intervalMs,
       onMissionSettled: schedOnSettled,
+      runtimeRegistry,
       maxIterations: GOAL_DRAIN_BOUND,
       ...(opts.approvalCoordinator ? { approvalCoordinator: opts.approvalCoordinator } : {}),
       ...(opts.perTenantPoolSize !== undefined ? { perTenantPoolSize: opts.perTenantPoolSize } : {}),

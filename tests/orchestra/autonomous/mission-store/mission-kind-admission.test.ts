@@ -3,20 +3,25 @@ import { describe, expect, it } from 'vitest';
 import {
   CANONICAL_WORK_ITEM_KINDS,
   PRODUCTION_V2_ADMISSION,
+  PRODUCTION_V2_RUNNER_REGISTRY,
   assertCanonicalWorkItemKind,
   assertWorkItemBatchAdmitted,
+  bindMissionRunnerRegistry,
   computeSprintSnapshotDigest,
+  createMissionRunnerRegistry,
   isCanonicalWorkItemKind,
   listRuntimeAdmittedKinds,
   type MissionRuntimeAdmission,
 } from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
 
-const allWired: MissionRuntimeAdmission = {
-  taskRunner: true,
-  sprintSnapshotRunner: true,
-  capabilityBroker: true,
-  processRunner: true,
-};
+const allWired: MissionRuntimeAdmission = createMissionRunnerRegistry({
+  registryRevision: 'test-all-runners-v1',
+  runners: CANONICAL_WORK_ITEM_KINDS.map((kind) => ({
+    kind,
+    runnerContract: `${kind}-contract-v1`,
+    runnerRevision: `${kind}-runner-v1`,
+  })),
+});
 
 describe('mission kind admission registry', () => {
   it('contains exactly the four canonical work-item kinds', () => {
@@ -25,6 +30,20 @@ describe('mission kind admission registry', () => {
     expect(isCanonicalWorkItemKind('deploy')).toBe(false);
     expect(() => assertCanonicalWorkItemKind('deploy' as never, 'bad')).toThrow('UNKNOWN_KIND');
     expect(listRuntimeAdmittedKinds(PRODUCTION_V2_ADMISSION)).toEqual(['task']);
+    expect(PRODUCTION_V2_ADMISSION).toBe(PRODUCTION_V2_RUNNER_REGISTRY);
+    expect(PRODUCTION_V2_RUNNER_REGISTRY.registryDigest).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('binds exactly the handlers declared by the immutable registry', () => {
+    const task = async () => ({ ok: true });
+    expect(bindMissionRunnerRegistry(PRODUCTION_V2_RUNNER_REGISTRY, { task }).descriptor)
+      .toBe(PRODUCTION_V2_RUNNER_REGISTRY);
+    expect(() => bindMissionRunnerRegistry(PRODUCTION_V2_RUNNER_REGISTRY, {}))
+      .toThrow('MISSION_RUNNER_BINDING_MISMATCH');
+    expect(() => bindMissionRunnerRegistry(PRODUCTION_V2_RUNNER_REGISTRY, {
+      task,
+      sprint: task,
+    })).toThrow('MISSION_RUNNER_BINDING_MISMATCH');
   });
 
   it('admits a described task in production and rejects an empty description', () => {

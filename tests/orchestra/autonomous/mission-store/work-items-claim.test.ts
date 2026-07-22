@@ -4,6 +4,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteMissionStore } from '../../../../src/orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import type { ApprovalDecision, ApprovalRequest } from '../../../../src/core/approval-contract.js';
+import {
+  PRODUCTION_V2_RUNNER_REGISTRY,
+  admitWorkItemBatch,
+  createMissionRunnerRegistry,
+} from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
+import type { NewWorkItem } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 
 const dirs: string[] = [];
 function freshMission() {
@@ -29,6 +35,10 @@ function decision(requestId: string, action: ApprovalDecision['decision'] = 'all
     requestId, decision: action, decidedBy: 'owner', channel: 'test',
     decidedAt: '2026-07-22T00:01:00.000Z', reason: 'test',
   };
+}
+
+function admitted(item: NewWorkItem): NewWorkItem {
+  return admitWorkItemBatch([item], PRODUCTION_V2_RUNNER_REGISTRY)[0]!;
 }
 
 describe('WorkItems + atomic claim', () => {
@@ -221,6 +231,134 @@ describe('WorkItems + atomic claim', () => {
     s.recover();
     expect(s.__rawGet("SELECT kind,status,claimed_at,claimed_by,last_result,updated_at FROM work_items WHERE id='corrupt-running'"))
       .toEqual(first);
+    s.close();
+  });
+
+  it('persists the production registry fence and records claim authority provenance', () => {
+    const s = freshMission();
+    s.enqueueItem(admitted({
+      id: 'fenced', missionId: 'm', kind: 'task', spec: { description: 'fenced task' },
+    }));
+
+    const due = s.queryDue({ registry: PRODUCTION_V2_RUNNER_REGISTRY });
+    expect(due).toHaveLength(1);
+    expect(due[0]!.admissionFence?.registryDigest).toBe(PRODUCTION_V2_RUNNER_REGISTRY.registryDigest);
+    expect(s.claimItem('fenced', 'scheduler', {
+      itemRevision: due[0]!.revision,
+      admissionFence: due[0]!.admissionFence!,
+      registry: PRODUCTION_V2_RUNNER_REGISTRY,
+    })).toBe(true);
+
+    const claimed = s.listItems('m')[0]!;
+    expect(claimed.revision).toBe(due[0]!.revision + 1);
+    expect(claimed.claimRegistryRevision).toBe(PRODUCTION_V2_RUNNER_REGISTRY.registryRevision);
+    expect(claimed.claimRegistryDigest).toBe(PRODUCTION_V2_RUNNER_REGISTRY.registryDigest);
+    s.close();
+  });
+
+  it('parks a missing-fence legacy task durably and idempotently', () => {
+    const s = freshMission();
+    s.enqueueItem({ id: 'legacy-no-fence', missionId: 'm', kind: 'task', spec: { description: 'legacy' } });
+
+    expect(s.reconcileRuntimeAdmission(PRODUCTION_V2_RUNNER_REGISTRY)).toEqual(['m']);
+    const first = s.__rawGet("SELECT status,revision,updated_at,last_result FROM work_items WHERE id='legacy-no-fence'");
+    expect(first.status).toBe('parked');
+    expect(JSON.parse(first.last_result).missionAdmission).toMatchObject({
+      code: 'ADMISSION_FENCE_MISSING',
+      decision: 'parked-hold',
+    });
+    expect(s.reconcileRuntimeAdmission(PRODUCTION_V2_RUNNER_REGISTRY)).toEqual([]);
+    expect(s.__rawGet("SELECT status,revision,updated_at,last_result FROM work_items WHERE id='legacy-no-fence'"))
+      .toEqual(first);
+    s.close();
+  });
+
+  it.each(['sprint', 'capability', 'process'] as const)(
+    'parks a fence-bearing task tampered to canonical but unwired kind=%s',
+    (kind) => {
+      const s = freshMission();
+      s.enqueueItem(admitted({
+        id: `tampered-${kind}`, missionId: 'm', kind: 'task', spec: { description: 'must not dispatch' },
+      }));
+      s.__rawExec(`UPDATE work_items SET kind='${kind}' WHERE id='tampered-${kind}'`);
+
+      expect(s.queryDue({ registry: PRODUCTION_V2_RUNNER_REGISTRY })).toEqual([]);
+      const item = s.listItems('m')[0]!;
+      expect(item.kind).toBe(kind);
+      expect(item.status).toBe('parked');
+      expect(item.lastResult?.reason).toContain('RUNTIME_RUNNER_UNAVAILABLE');
+      expect(s.claimItem(item.id, 'bypass')).toBe(false);
+      s.close();
+    },
+  );
+
+  it('fails a definition changed after admission even when row revision was not advanced', () => {
+    const s = freshMission();
+    s.enqueueItem(admitted({
+      id: 'definition-tamper', missionId: 'm', kind: 'task', spec: { description: 'original' },
+    }));
+    s.__rawExec("UPDATE work_items SET spec='{\"description\":\"changed\"}' WHERE id='definition-tamper'");
+
+    expect(s.queryDue({ registry: PRODUCTION_V2_RUNNER_REGISTRY })).toEqual([]);
+    const item = s.listItems('m')[0]!;
+    expect(item.status).toBe('failed');
+    expect(item.lastResult?.reason).toContain('WORK_ITEM_DEFINITION_MISMATCH');
+    s.close();
+  });
+
+  it('loses a stale row-revision claim without dispatch authority', () => {
+    const s = freshMission();
+    s.enqueueItem(admitted({ id: 'stale', missionId: 'm', kind: 'task', spec: { description: 'stale' } }));
+    const stale = s.queryDue({ registry: PRODUCTION_V2_RUNNER_REGISTRY })[0]!;
+    s.updateItemStatus('stale', 'pending', { ok: false, reason: 'concurrent metadata transition' });
+
+    expect(s.claimItem('stale', 'stale-scheduler', {
+      itemRevision: stale.revision,
+      admissionFence: stale.admissionFence!,
+      registry: PRODUCTION_V2_RUNNER_REGISTRY,
+    })).toBe(false);
+    expect(s.listItems('m')[0]!.status).toBe('pending');
+
+    const fresh = s.queryDue({ registry: PRODUCTION_V2_RUNNER_REGISTRY })[0]!;
+    expect(s.claimItem('stale', 'fresh-scheduler', {
+      itemRevision: fresh.revision,
+      admissionFence: fresh.admissionFence!,
+      registry: PRODUCTION_V2_RUNNER_REGISTRY,
+    })).toBe(true);
+    s.close();
+  });
+
+  it('holds a fence when the same registry revision is reused with a different digest', () => {
+    const s = freshMission();
+    s.enqueueItem(admitted({ id: 'registry-drift', missionId: 'm', kind: 'task', spec: { description: 'drift' } }));
+    const due = s.queryDue({ registry: PRODUCTION_V2_RUNNER_REGISTRY })[0]!;
+    const drifted = createMissionRunnerRegistry({
+      registryRevision: PRODUCTION_V2_RUNNER_REGISTRY.registryRevision,
+      runners: [{ kind: 'task', runnerContract: 'mission-task-context-v1', runnerRevision: 'task-mode-runner-v2' }],
+    });
+
+    expect(s.claimItem('registry-drift', 'drifted-scheduler', {
+      itemRevision: due.revision,
+      admissionFence: due.admissionFence!,
+      registry: drifted,
+    })).toBe(false);
+    const held = s.listItems('m')[0]!;
+    expect(held.status).toBe('parked');
+    expect(held.lastResult?.reason).toContain('RUNTIME_REGISTRY_MISMATCH');
+    s.close();
+  });
+
+  it('rolls back a whole admitted goal batch on one id conflict', () => {
+    const s = freshMission();
+    s.enqueueItem(admitted({ id: 'existing', missionId: 'm', kind: 'task', spec: { description: 'existing' } }));
+    const batch = admitWorkItemBatch([
+      { id: 'new-before-conflict', missionId: 'm', kind: 'task' as const, spec: { description: 'new' } },
+      { id: 'existing', missionId: 'm', kind: 'task' as const, spec: { description: 'collision' } },
+    ], PRODUCTION_V2_RUNNER_REGISTRY);
+
+    expect(() => s.enqueueItems(batch)).toThrow('MISSION_BATCH_CONFLICT');
+    expect(s.listItems('m').map((item) => item.id)).toEqual(['existing']);
+    expect(s.__rawGet('SELECT COUNT(*) AS count FROM work_item_admission_fences')).toEqual({ count: 1 });
     s.close();
   });
 

@@ -3,8 +3,8 @@ import type {
 } from './mission-types.js';
 import type { InvocationReceiptRef } from '../../../core/invocation-receipt.js';
 import {
+  admitWorkItemBatch,
   assertCanonicalWorkItemKind,
-  assertWorkItemBatchAdmitted,
   type MissionRuntimeAdmission,
 } from './mission-kind-admission.js';
 import {
@@ -259,9 +259,14 @@ export async function advanceGoalMission(
     throw error;
   }
   if (next.length > 0) {
+    const scopedNext = next.map((item) => ({ ...item, missionId }));
+    let admittedNext: NewWorkItem[];
     try {
-      if (deps.admission) assertWorkItemBatchAdmitted(next, deps.admission);
-      else for (const item of next) assertCanonicalWorkItemKind(item.kind, item.id);
+      if (deps.admission) admittedNext = admitWorkItemBatch(scopedNext, deps.admission);
+      else {
+        for (const item of scopedNext) assertCanonicalWorkItemKind(item.kind, item.id);
+        admittedNext = scopedNext;
+      }
     } catch (error) {
       store.updateMissionStatus(missionId, 'failed', {
         ok: false,
@@ -269,10 +274,9 @@ export async function advanceGoalMission(
       });
       return 'exhausted';
     }
-    for (const item of next) {
-      // Stamp missionId — author cannot know it on round-0 (priorItems is empty).
-      store.enqueueItem({ ...item, missionId });
-    }
+    // One admitted planner batch is one durable mutation. A mid-batch conflict
+    // cannot strand a partial goal round.
+    store.enqueueItems(admittedNext);
     return 'authored';
   }
 

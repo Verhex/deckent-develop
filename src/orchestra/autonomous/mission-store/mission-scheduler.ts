@@ -1,5 +1,6 @@
 import type { MissionStore, WorkItem, Mission, ResultLike } from './mission-types.js';
 import type { MissionApprovalCoordinatorLike } from './mission-approval-coordinator.js';
+import type { BoundMissionRunnerRegistryV1 } from './mission-kind-admission.js';
 
 /** Executes one claimed work item. Injected — composition root wires the real
  *  runTask/runSprint/broker; tests inject a fake. Resolve on completion; a thrown
@@ -24,6 +25,8 @@ export interface MissionSchedulerOptions {
   perTenantPoolSize?: number;
   /** Optional non-blocking approval outbox/decision driver, always before claim. */
   approvalCoordinator?: MissionApprovalCoordinatorLike;
+  /** Production claim+dispatch authority. When present, no separate runner path is used. */
+  runtimeRegistry?: BoundMissionRunnerRegistryV1;
 }
 
 export interface MissionSchedulerSummary {
@@ -74,7 +77,13 @@ export async function runMissionScheduler(
     // Dependency reconciliation precedes every claim wave. Invalid/cyclic or
     // failed-upstream items become terminal without dispatch; settle their
     // missions even when this tick performs zero provider work.
-    const changedMissions = new Set(store.reconcilePendingDependencies());
+    const changedMissions = new Set<string>();
+    if (opts.runtimeRegistry) {
+      for (const missionId of store.reconcileRuntimeAdmission(opts.runtimeRegistry.descriptor)) {
+        changedMissions.add(missionId);
+      }
+    }
+    for (const missionId of store.reconcilePendingDependencies()) changedMissions.add(missionId);
     if (opts.approvalCoordinator) {
       const approval = await opts.approvalCoordinator.tick();
       for (const missionId of approval.changedMissionIds) changedMissions.add(missionId);
@@ -94,7 +103,11 @@ export async function runMissionScheduler(
       // claim the first item whose tenant is still below its concurrency cap, so
       // a tenant flooding more than `poolSize` items cannot hide every other
       // tenant behind it (limit:poolSize would). FIFO within a tenant is kept.
-      const due = cap !== undefined ? store.queryDue() : store.queryDue({ limit: 1 });
+      const queryOpts = {
+        ...(cap === undefined ? { limit: 1 } : {}),
+        ...(opts.runtimeRegistry ? { registry: opts.runtimeRegistry.descriptor } : {}),
+      };
+      const due = store.queryDue(queryOpts);
       if (due.length === 0) break;
 
       let claimedOne = false;
@@ -104,12 +117,28 @@ export async function runMissionScheduler(
           tenant = store.getMission(item.missionId)?.tenant ?? 'local';
           if ((perTenantFlight.get(tenant) ?? 0) >= cap) continue; // tenant full → skip to next due item
         }
-        if (!store.claimItem(item.id, 'scheduler')) continue; // someone else won → try next due item
+        if (opts.runtimeRegistry && !item.admissionFence) {
+          for (const missionId of store.reconcileRuntimeAdmission(opts.runtimeRegistry.descriptor, item.id)) {
+            changedMissions.add(missionId);
+          }
+          continue;
+        }
+        const claimFence = opts.runtimeRegistry && item.admissionFence
+          ? {
+            itemRevision: item.revision,
+            admissionFence: item.admissionFence,
+            registry: opts.runtimeRegistry.descriptor,
+          }
+          : undefined;
+        if (!store.claimItem(item.id, 'scheduler', claimFence)) {
+          try { checkMissionComplete(store, item.missionId, opts); } catch { /* fail-safe */ }
+          continue; // someone else won / fence changed
+        }
         claimedOne = true;
         dispatched++; claimedThisTick++;
         if (cap !== undefined) perTenantFlight.set(tenant, (perTenantFlight.get(tenant) ?? 0) + 1);
         const p: Promise<void> = Promise.resolve()
-          .then(() => dispatch(item))
+          .then(() => (opts.runtimeRegistry ? opts.runtimeRegistry.dispatch(item) : dispatch(item)))
           .then((r) => store.updateItemStatus(item.id, r.ok ? 'done' : 'failed', r))
           .catch((e) => store.updateItemStatus(item.id, 'failed', { ok: false, reason: String((e as Error)?.message ?? e) }))
           .finally(() => {

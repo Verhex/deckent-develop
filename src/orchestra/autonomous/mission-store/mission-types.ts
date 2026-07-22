@@ -4,6 +4,10 @@ import type {
   MissionAcceptanceDecisionRecord,
   MissionAcceptanceDecisionV1,
 } from './mission-acceptance.js';
+import type {
+  MissionRunnerRegistryV1,
+  WorkItemAdmissionFenceV1,
+} from './mission-kind-admission.js';
 export type MissionKind = 'list' | 'goal';
 export type MissionStatus = 'pending' | 'active' | 'completed' | 'failed' | 'cancelled';
 export type MissionRenderAs = 'checklist' | 'goal';
@@ -45,12 +49,16 @@ export interface WorkItem {
   spec: Record<string, unknown> | null; policy: WorkItemPolicy; renderAs: WorkItemRenderAs;
   progress: Progress | null; dependsOn: string[]; trigger: Record<string, unknown> | null;
   claimedAt: string | null; claimedBy: string | null;
+  revision: number; admissionFence: WorkItemAdmissionFenceV1 | null;
+  claimRegistryRevision: string | null; claimRegistryDigest: string | null;
   createdAt: string; updatedAt: string; lastResult: ResultLike | null;
 }
 export interface NewWorkItem {
   id: string; missionId: string; kind: WorkItemKind; spec?: Record<string, unknown>;
   policy?: WorkItemPolicy; renderAs?: WorkItemRenderAs; dependsOn?: string[];
   trigger?: Record<string, unknown>;
+  /** Host-issued runtime proof. User/planner values are replaced during admission. */
+  admissionFence?: WorkItemAdmissionFenceV1;
 }
 /** Atomic mission-batch item. Initial state exists for durable import/recovery;
  * normal `enqueueItem` remains pending-only and cannot bypass the claim lifecycle. */
@@ -76,6 +84,11 @@ export interface ApprovalDecisionTransition {
   workItemId: string;
   changed: boolean;
 }
+export interface MissionClaimFence {
+  itemRevision: number;
+  admissionFence: WorkItemAdmissionFenceV1;
+  registry: MissionRunnerRegistryV1;
+}
 export interface MissionEvent { ts: string; workItemId?: string; type: string; data?: unknown; }
 
 export interface MissionStore {
@@ -93,6 +106,8 @@ export interface MissionStore {
   recordAcceptanceDecision(decision: MissionAcceptanceDecisionV1): MissionAcceptanceDecisionRecord;
   listAcceptanceDecisions(missionId: string): MissionAcceptanceDecisionRecord[];
   enqueueItem(item: NewWorkItem): WorkItem;
+  /** Atomically enqueue a complete already-admitted goal round. */
+  enqueueItems(items: readonly NewWorkItem[]): WorkItem[];
   /** Dependency-ready pending items whose policy requires an approval binding. */
   listApprovalCandidates(): WorkItem[];
   /** Atomically park one candidate and persist its canonical approval outbox. */
@@ -110,8 +125,10 @@ export interface MissionStore {
   /** Fail invalid/cyclic/failed-upstream pending dependency chains durably.
    * Returns mission ids whose item status changed during reconciliation. */
   reconcilePendingDependencies(): string[];
-  queryDue(opts?: { tenant?: string; limit?: number }): WorkItem[];
-  claimItem(id: string, by: string): boolean;
+  /** Quarantine non-terminal rows that cannot execute under the current registry. */
+  reconcileRuntimeAdmission(registry: MissionRunnerRegistryV1, itemId?: string): string[];
+  queryDue(opts?: { tenant?: string; limit?: number; registry?: MissionRunnerRegistryV1 }): WorkItem[];
+  claimItem(id: string, by: string, fence?: MissionClaimFence): boolean;
   updateItemStatus(id: string, status: WorkItemStatus, result?: ResultLike): void;
   listItems(missionId: string): WorkItem[];
 }

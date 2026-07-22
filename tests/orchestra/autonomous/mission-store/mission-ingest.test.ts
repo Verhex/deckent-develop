@@ -214,6 +214,20 @@ describe('createListMission', () => {
     expect(createMissionWithItems).not.toHaveBeenCalled();
   });
 
+  it('persists one production admission fence for every executable list item', () => {
+    const store = newStore();
+    createListMission(store, {
+      id: 'runtime-fenced-list',
+      title: 'Fenced',
+      items: [{ id: 'runtime-task', kind: 'task', spec: { description: 'execute safely' } }],
+    }, { admission: PRODUCTION_V2_ADMISSION });
+
+    const item = store.listItems('runtime-fenced-list')[0]!;
+    expect(item.admissionFence?.registryDigest).toBe(PRODUCTION_V2_ADMISSION.registryDigest);
+    expect(store.__rawGet('SELECT COUNT(*) AS count FROM work_item_admission_fences')).toEqual({ count: 1 });
+    store.close();
+  });
+
   it('rejects an arbitrary kind cast at the store boundary before a mission is written', () => {
     const store = newStore();
     expect(() => createListMission(store, {

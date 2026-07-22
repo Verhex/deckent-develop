@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import type { NewWorkItem, WorkItemKind } from './mission-types.js';
+import type { NewWorkItem, ResultLike, WorkItem, WorkItemKind } from './mission-types.js';
 
 export const CANONICAL_WORK_ITEM_KINDS = [
   'task',
@@ -11,29 +11,54 @@ export const CANONICAL_WORK_ITEM_KINDS = [
 
 const CANONICAL_KIND_SET: ReadonlySet<string> = new Set(CANONICAL_WORK_ITEM_KINDS);
 
-export interface MissionRuntimeAdmission {
-  taskRunner: boolean;
-  sprintSnapshotRunner: boolean;
-  capabilityBroker: boolean;
-  processRunner: boolean;
+export const MISSION_RUNNER_REGISTRY_SCHEMA_VERSION = 1 as const;
+
+export interface MissionRunnerRegistryEntryV1 {
+  kind: WorkItemKind;
+  runnerContract: string;
+  runnerRevision: string;
 }
 
-/** Production Goal-v2 truth today: only task dispatch has a faithful live runner. */
-export const PRODUCTION_V2_ADMISSION: Readonly<MissionRuntimeAdmission> = Object.freeze({
-  taskRunner: true,
-  sprintSnapshotRunner: false,
-  capabilityBroker: false,
-  processRunner: false,
-});
-
-export function listRuntimeAdmittedKinds(admission: MissionRuntimeAdmission): WorkItemKind[] {
-  return CANONICAL_WORK_ITEM_KINDS.filter((kind) => (
-    (kind === 'task' && admission.taskRunner)
-    || (kind === 'sprint' && admission.sprintSnapshotRunner)
-    || (kind === 'capability' && admission.capabilityBroker)
-    || (kind === 'process' && admission.processRunner)
-  ));
+/** Immutable descriptor shared by intake, persistence, claim and dispatch. */
+export interface MissionRunnerRegistryV1 {
+  schemaVersion: typeof MISSION_RUNNER_REGISTRY_SCHEMA_VERSION;
+  registryRevision: string;
+  registryDigest: string;
+  runners: readonly MissionRunnerRegistryEntryV1[];
 }
+
+/** Compatibility name retained for callers while the boolean authority is retired. */
+export type MissionRuntimeAdmission = MissionRunnerRegistryV1;
+
+export interface WorkItemAdmissionFenceV1 {
+  schemaVersion: 1;
+  registryRevision: string;
+  registryDigest: string;
+  kind: WorkItemKind;
+  runnerRevision: string;
+  itemDefinitionDigest: string;
+}
+
+export type MissionRuntimeRunner = (item: WorkItem) => Promise<ResultLike>;
+
+export interface BoundMissionRunnerRegistryV1 {
+  descriptor: MissionRunnerRegistryV1;
+  dispatch: MissionRuntimeRunner;
+}
+
+type AdmissionItem = {
+  id: string;
+  kind: WorkItemKind;
+  spec?: Record<string, unknown> | null;
+};
+
+type DefinitionItem = AdmissionItem & {
+  missionId: string;
+  policy?: NewWorkItem['policy'];
+  renderAs?: NewWorkItem['renderAs'];
+  dependsOn?: readonly string[];
+  trigger?: Record<string, unknown> | null;
+};
 
 export type MissionAdmissionCode =
   | 'UNKNOWN_KIND'
@@ -95,6 +120,95 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(normalize(value));
 }
 
+function nonEmptyCanonicalString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value === value.trim();
+}
+
+function registryPayload(registry: Omit<MissionRunnerRegistryV1, 'registryDigest'>): unknown {
+  return {
+    schemaVersion: registry.schemaVersion,
+    registryRevision: registry.registryRevision,
+    runners: registry.runners,
+  };
+}
+
+function computeRegistryDigest(registry: Omit<MissionRunnerRegistryV1, 'registryDigest'>): string {
+  return createHash('sha256').update(canonicalJson(registryPayload(registry))).digest('hex');
+}
+
+export function createMissionRunnerRegistry(input: {
+  registryRevision: string;
+  runners: readonly MissionRunnerRegistryEntryV1[];
+}): MissionRunnerRegistryV1 {
+  if (!nonEmptyCanonicalString(input.registryRevision)) {
+    throw new TypeError('MISSION_RUNNER_REGISTRY_INVALID: registryRevision');
+  }
+  const seen = new Set<WorkItemKind>();
+  const runners = input.runners.map((entry) => {
+    if (!isCanonicalWorkItemKind(entry.kind)
+      || !nonEmptyCanonicalString(entry.runnerContract)
+      || !nonEmptyCanonicalString(entry.runnerRevision)
+      || seen.has(entry.kind)) {
+      throw new TypeError(`MISSION_RUNNER_REGISTRY_INVALID: runner ${String(entry.kind)}`);
+    }
+    seen.add(entry.kind);
+    return Object.freeze({ ...entry });
+  }).sort((left, right) => (
+    CANONICAL_WORK_ITEM_KINDS.indexOf(left.kind) - CANONICAL_WORK_ITEM_KINDS.indexOf(right.kind)
+  ));
+  const payload = {
+    schemaVersion: MISSION_RUNNER_REGISTRY_SCHEMA_VERSION,
+    registryRevision: input.registryRevision,
+    runners,
+  } as const;
+  return Object.freeze({
+    ...payload,
+    runners: Object.freeze(runners),
+    registryDigest: computeRegistryDigest(payload),
+  });
+}
+
+export function assertMissionRunnerRegistry(registry: MissionRunnerRegistryV1): void {
+  if (registry.schemaVersion !== MISSION_RUNNER_REGISTRY_SCHEMA_VERSION
+    || !nonEmptyCanonicalString(registry.registryRevision)
+    || registry.registryDigest !== computeRegistryDigest(registry)) {
+    throw new TypeError('MISSION_RUNNER_REGISTRY_INVALID: descriptor integrity');
+  }
+  const canonical = createMissionRunnerRegistry({
+    registryRevision: registry.registryRevision,
+    runners: registry.runners,
+  });
+  if (canonical.registryDigest !== registry.registryDigest
+    || canonicalJson(canonical.runners) !== canonicalJson(registry.runners)) {
+    throw new TypeError('MISSION_RUNNER_REGISTRY_INVALID: non-canonical descriptor');
+  }
+}
+
+/** Production Goal-v2 truth today: only task dispatch has a faithful live runner. */
+export const PRODUCTION_V2_RUNNER_REGISTRY = createMissionRunnerRegistry({
+  registryRevision: 'goal-v2-production-v1',
+  runners: [{
+    kind: 'task',
+    runnerContract: 'mission-task-context-v1',
+    runnerRevision: 'task-mode-runner-v1',
+  }],
+});
+
+/** @deprecated Use PRODUCTION_V2_RUNNER_REGISTRY; this is the same immutable object. */
+export const PRODUCTION_V2_ADMISSION = PRODUCTION_V2_RUNNER_REGISTRY;
+
+export function listRuntimeAdmittedKinds(registry: MissionRunnerRegistryV1): WorkItemKind[] {
+  assertMissionRunnerRegistry(registry);
+  return registry.runners.map((entry) => entry.kind);
+}
+
+function runnerForKind(
+  registry: MissionRunnerRegistryV1,
+  kind: WorkItemKind,
+): MissionRunnerRegistryEntryV1 | undefined {
+  return registry.runners.find((entry) => entry.kind === kind);
+}
+
 export function computeSprintSnapshotDigest(snapshot: SnapshotPayload): string {
   return createHash('sha256').update(canonicalJson(snapshot)).digest('hex');
 }
@@ -115,16 +229,16 @@ export function isCanonicalWorkItemKind(kind: unknown): kind is WorkItemKind {
   return typeof kind === 'string' && CANONICAL_KIND_SET.has(kind);
 }
 
-function assertTask(item: Pick<NewWorkItem, 'id' | 'kind' | 'spec'>, admission: MissionRuntimeAdmission): void {
+function assertTask(item: AdmissionItem, admission: MissionRuntimeAdmission): void {
   if (!nonEmptyString(item.spec?.['description'])) {
     throw new MissionAdmissionError('TASK_DESCRIPTION_REQUIRED', item.id, item.kind);
   }
-  if (!admission.taskRunner) {
+  if (!runnerForKind(admission, 'task')) {
     throw new MissionAdmissionError('TASK_RUNNER_UNWIRED', item.id, item.kind);
   }
 }
 
-function assertSprint(item: Pick<NewWorkItem, 'id' | 'kind' | 'spec'>, admission: MissionRuntimeAdmission): void {
+function assertSprint(item: AdmissionItem, admission: MissionRuntimeAdmission): void {
   const raw = item.spec?.['sprintSnapshot'];
   if (!isRecord(raw)) {
     throw new MissionAdmissionError('SPRINT_SNAPSHOT_REQUIRED', item.id, item.kind);
@@ -142,36 +256,37 @@ function assertSprint(item: Pick<NewWorkItem, 'id' | 'kind' | 'spec'>, admission
   if (raw['digest'] !== computeRawSnapshotDigest(raw)) {
     throw new MissionAdmissionError('SPRINT_SNAPSHOT_DIGEST_MISMATCH', item.id, item.kind);
   }
-  if (!admission.sprintSnapshotRunner) {
+  if (!runnerForKind(admission, 'sprint')) {
     throw new MissionAdmissionError('SPRINT_SNAPSHOT_RUNNER_UNWIRED', item.id, item.kind);
   }
 }
 
-function assertCapability(item: Pick<NewWorkItem, 'id' | 'kind' | 'spec'>, admission: MissionRuntimeAdmission): void {
+function assertCapability(item: AdmissionItem, admission: MissionRuntimeAdmission): void {
   const target = item.spec?.['capabilityTarget'];
   if (!isRecord(target) || !nonEmptyString(target['capability'])) {
     throw new MissionAdmissionError('CAPABILITY_TARGET_REQUIRED', item.id, item.kind);
   }
-  if (!admission.capabilityBroker) {
+  if (!runnerForKind(admission, 'capability')) {
     throw new MissionAdmissionError('CAPABILITY_BROKER_UNWIRED', item.id, item.kind);
   }
 }
 
-function assertProcess(item: Pick<NewWorkItem, 'id' | 'kind' | 'spec'>, admission: MissionRuntimeAdmission): void {
+function assertProcess(item: AdmissionItem, admission: MissionRuntimeAdmission): void {
   const definition = item.spec?.['processDefinition'];
   if (!isRecord(definition) || !nonEmptyString(definition['revision']) || !Array.isArray(definition['steps']) || definition['steps'].length === 0) {
     throw new MissionAdmissionError('PROCESS_DEFINITION_REQUIRED', item.id, item.kind);
   }
-  if (!admission.processRunner) {
+  if (!runnerForKind(admission, 'process')) {
     throw new MissionAdmissionError('PROCESS_RUNNER_UNWIRED', item.id, item.kind);
   }
 }
 
 /** Validate a complete executable batch before any MissionStore mutation. */
 export function assertWorkItemBatchAdmitted(
-  items: readonly Pick<NewWorkItem, 'id' | 'kind' | 'spec'>[],
+  items: readonly AdmissionItem[],
   admission: MissionRuntimeAdmission,
 ): void {
+  assertMissionRunnerRegistry(admission);
   for (const item of items) {
     assertCanonicalWorkItemKind(item.kind, item.id);
     if (item.kind === 'task') assertTask(item, admission);
@@ -179,4 +294,141 @@ export function assertWorkItemBatchAdmitted(
     else if (item.kind === 'capability') assertCapability(item, admission);
     else assertProcess(item, admission);
   }
+}
+
+function defaultRenderAs(kind: WorkItemKind): WorkItem['renderAs'] {
+  return kind === 'sprint' ? 'sprint' : kind === 'process' ? 'workflow' : kind === 'capability' ? 'action' : 'task';
+}
+
+export function computeWorkItemDefinitionDigest(
+  item: DefinitionItem,
+): string {
+  return createHash('sha256').update(canonicalJson({
+    id: item.id,
+    missionId: item.missionId,
+    kind: item.kind,
+    spec: item.spec ?? null,
+    policy: item.policy ?? 'auto',
+    renderAs: item.renderAs ?? defaultRenderAs(item.kind),
+    dependsOn: [...(item.dependsOn ?? [])].sort(),
+    trigger: item.trigger ?? null,
+  })).digest('hex');
+}
+
+export function buildWorkItemAdmissionFence(
+  item: DefinitionItem,
+  registry: MissionRunnerRegistryV1,
+): WorkItemAdmissionFenceV1 {
+  assertWorkItemBatchAdmitted([item], registry);
+  const runner = runnerForKind(registry, item.kind)!;
+  return Object.freeze({
+    schemaVersion: 1,
+    registryRevision: registry.registryRevision,
+    registryDigest: registry.registryDigest,
+    kind: item.kind,
+    runnerRevision: runner.runnerRevision,
+    itemDefinitionDigest: computeWorkItemDefinitionDigest(item),
+  });
+}
+
+export function admitWorkItemBatch<T extends NewWorkItem>(
+  items: readonly T[],
+  registry: MissionRunnerRegistryV1,
+): Array<T & { admissionFence: WorkItemAdmissionFenceV1 }> {
+  assertWorkItemBatchAdmitted(items, registry);
+  return items.map((item) => ({
+    ...item,
+    admissionFence: buildWorkItemAdmissionFence(item, registry),
+  }));
+}
+
+export type WorkItemAdmissionFailureCode =
+  | 'ADMISSION_FENCE_MISSING'
+  | 'ADMISSION_FENCE_INVALID'
+  | 'RUNTIME_REGISTRY_MISMATCH'
+  | 'RUNTIME_RUNNER_UNAVAILABLE'
+  | 'WORK_ITEM_DEFINITION_MISMATCH'
+  | MissionAdmissionCode;
+
+export type WorkItemAdmissionValidation =
+  | { ok: true }
+  | {
+    ok: false;
+    code: WorkItemAdmissionFailureCode;
+    disposition: 'failed' | 'parked';
+    reason: string;
+  };
+
+function isFence(value: unknown): value is WorkItemAdmissionFenceV1 {
+  if (!isRecord(value)) return false;
+  return value['schemaVersion'] === 1
+    && nonEmptyCanonicalString(value['registryRevision'])
+    && nonEmptyCanonicalString(value['registryDigest'])
+    && isCanonicalWorkItemKind(value['kind'])
+    && nonEmptyCanonicalString(value['runnerRevision'])
+    && nonEmptyCanonicalString(value['itemDefinitionDigest']);
+}
+
+export function validateWorkItemAdmission(
+  item: Pick<WorkItem, 'id' | 'missionId' | 'kind' | 'spec' | 'policy' | 'renderAs' | 'dependsOn' | 'trigger'>,
+  fence: WorkItemAdmissionFenceV1 | null,
+  registry: MissionRunnerRegistryV1,
+): WorkItemAdmissionValidation {
+  assertMissionRunnerRegistry(registry);
+  if (!fence) {
+    return { ok: false, code: 'ADMISSION_FENCE_MISSING', disposition: 'parked', reason: 'work item has no durable admission fence' };
+  }
+  if (!isFence(fence)) {
+    return { ok: false, code: 'ADMISSION_FENCE_INVALID', disposition: 'failed', reason: 'durable admission fence is malformed' };
+  }
+  const runner = isCanonicalWorkItemKind(item.kind) ? runnerForKind(registry, item.kind) : undefined;
+  if (!runner) {
+    return { ok: false, code: 'RUNTIME_RUNNER_UNAVAILABLE', disposition: 'parked', reason: `no runner is admitted for ${String(item.kind)}` };
+  }
+  if (fence.registryRevision !== registry.registryRevision || fence.registryDigest !== registry.registryDigest) {
+    return { ok: false, code: 'RUNTIME_REGISTRY_MISMATCH', disposition: 'parked', reason: 'admission fence belongs to a different runtime registry' };
+  }
+  if (fence.kind !== item.kind || fence.runnerRevision !== runner.runnerRevision) {
+    return { ok: false, code: 'ADMISSION_FENCE_INVALID', disposition: 'failed', reason: 'admission fence runner identity does not match the work item' };
+  }
+  if (fence.itemDefinitionDigest !== computeWorkItemDefinitionDigest(item)) {
+    return { ok: false, code: 'WORK_ITEM_DEFINITION_MISMATCH', disposition: 'failed', reason: 'work item definition changed after admission' };
+  }
+  try {
+    assertWorkItemBatchAdmitted([item], registry);
+  } catch (error) {
+    if (error instanceof MissionAdmissionError) {
+      const parked = error.code.endsWith('_UNWIRED');
+      return { ok: false, code: error.code, disposition: parked ? 'parked' : 'failed', reason: error.message };
+    }
+    throw error;
+  }
+  return { ok: true };
+}
+
+export function bindMissionRunnerRegistry(
+  descriptor: MissionRunnerRegistryV1,
+  handlers: Partial<Record<WorkItemKind, MissionRuntimeRunner>>,
+): BoundMissionRunnerRegistryV1 {
+  assertMissionRunnerRegistry(descriptor);
+  const expected = listRuntimeAdmittedKinds(descriptor);
+  const supplied = Object.keys(handlers);
+  if (supplied.some((kind) => !isCanonicalWorkItemKind(kind))
+    || supplied.length !== expected.length
+    || expected.some((kind) => typeof handlers[kind] !== 'function')) {
+    throw new TypeError('MISSION_RUNNER_BINDING_MISMATCH');
+  }
+  return Object.freeze({
+    descriptor,
+    dispatch: async (item: WorkItem): Promise<ResultLike> => {
+      try {
+        assertWorkItemBatchAdmitted([item], descriptor);
+      } catch (error) {
+        return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+      }
+      const handler = handlers[item.kind];
+      if (!handler) return { ok: false, reason: `MISSION_RUNNER_BINDING_MISSING: ${item.kind}` };
+      return await handler(item);
+    },
+  });
 }

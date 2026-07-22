@@ -418,6 +418,26 @@ describe('advanceGoalMission', () => {
     expect(store.getMission('g-admission')!.lastResult?.reason).toContain('CAPABILITY_BROKER_UNWIRED');
     store.close();
   });
+
+  it('stamps and atomically persists the production fence on an authored goal round', async () => {
+    const store = newStore();
+    createGoalMission(store, { id: 'g-fenced', title: 'Fenced goal', goal: 'g' });
+
+    const outcome = await advanceGoalMission(store, 'g-fenced', {
+      author: async () => [{
+        id: 'g-fenced-1', missionId: '', kind: 'task', spec: { description: 'admitted work' },
+      }],
+      accept: async () => false,
+      admission: PRODUCTION_V2_ADMISSION,
+    });
+
+    expect(outcome).toBe('authored');
+    const item = store.listItems('g-fenced')[0]!;
+    expect(item.missionId).toBe('g-fenced');
+    expect(item.admissionFence?.registryDigest).toBe(PRODUCTION_V2_ADMISSION.registryDigest);
+    expect(store.__rawGet('SELECT COUNT(*) AS count FROM work_item_admission_fences')).toEqual({ count: 1 });
+    store.close();
+  });
 });
 
 describe('buildGoalDeps', () => {

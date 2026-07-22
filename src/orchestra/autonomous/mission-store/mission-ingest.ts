@@ -6,7 +6,7 @@ import type {
   WorkItemPolicy,
 } from './mission-types.js';
 import {
-  assertWorkItemBatchAdmitted,
+  admitWorkItemBatch,
   type MissionRuntimeAdmission,
 } from './mission-kind-admission.js';
 
@@ -53,6 +53,6 @@ export function createListMission(
       dependsOn: item.dependsOn,
       trigger: item.trigger,
     }));
-  if (opts.admission) assertWorkItemBatchAdmitted(items, opts.admission);
-  return store.createMissionWithItems(missionInput, items);
+  const admitted = opts.admission ? admitWorkItemBatch(items, opts.admission) : items;
+  return store.createMissionWithItems(missionInput, admitted);
 }

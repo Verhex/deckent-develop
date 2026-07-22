@@ -4,6 +4,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteMissionStore } from '../../../../src/orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import { runMissionScheduler, type DispatchFn } from '../../../../src/orchestra/autonomous/mission-store/mission-scheduler.js';
+import {
+  PRODUCTION_V2_RUNNER_REGISTRY,
+  admitWorkItemBatch,
+  bindMissionRunnerRegistry,
+} from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
+import type { MissionClaimFence } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 
 const dirs: string[] = [];
 function storeWith(missionId: string, n: number): SqliteMissionStore {
@@ -69,6 +75,41 @@ describe('runMissionScheduler — mission settlement', () => {
 });
 
 describe('runMissionScheduler — robustness', () => {
+  it('does not dispatch or increment dispatched when the query-to-claim row revision turns stale', async () => {
+    class RacingStore extends SqliteMissionStore {
+      private raced = false;
+      override claimItem(id: string, by: string, fence?: MissionClaimFence): boolean {
+        if (fence && !this.raced) {
+          this.raced = true;
+          this.updateItemStatus(id, 'pending', { ok: false, reason: 'concurrent transition' });
+        }
+        return super.claimItem(id, by, fence);
+      }
+    }
+    const d = mkdtempSync(join(tmpdir(), 'sched-race-')); dirs.push(d);
+    const s = new RacingStore(d); s.migrate();
+    s.createMission({ id: 'race', kind: 'list', title: 'race', renderAs: 'checklist' });
+    s.enqueueItem(admitWorkItemBatch([{
+      id: 'race-task', missionId: 'race', kind: 'task', spec: { description: 'race' },
+    }], PRODUCTION_V2_RUNNER_REGISTRY)[0]!);
+    const calls: string[] = [];
+    const runtimeRegistry = bindMissionRunnerRegistry(PRODUCTION_V2_RUNNER_REGISTRY, {
+      task: async (item) => { calls.push(item.id); return { ok: true }; },
+    });
+
+    const summary = await runMissionScheduler(s, async () => ({ ok: false }), {
+      poolSize: 1,
+      intervalMs: 1,
+      maxIterations: 1,
+      runtimeRegistry,
+    });
+
+    expect(summary.dispatched).toBe(0);
+    expect(calls).toEqual([]);
+    expect(s.listItems('race')[0]!.status).toBe('pending');
+    s.close();
+  });
+
   it('a throwing dispatch marks the item failed; loop continues', async () => {
     const s = storeWith('m', 2);
     const dispatch: DispatchFn = async (item) => { if (item.id.endsWith('w0')) throw new Error('kaboom'); return { ok: true }; };
