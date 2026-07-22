@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeScope, isPlaceholderPath, isJsAccessPattern } from '../../src/orchestra/scope-sanitizer.js';
+import {
+  sanitizeReadScope,
+  sanitizeScope,
+  isPlaceholderPath,
+  isJsAccessPattern,
+} from '../../src/orchestra/scope-sanitizer.js';
 import { parseStructuredDirectives, maskCodeBlocks } from '../../src/orchestra/task-builder.js';
 
 describe('scope-sanitizer v2 — code snippet false positive fix', () => {
@@ -24,7 +29,7 @@ describe('scope-sanitizer v2 — code snippet false positive fix', () => {
 ---
 
 ## Task 1: Config Update
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Files: src/core/config.ts
 - Scope: src/core/
@@ -228,6 +233,66 @@ describe('sanitizeScope Rule-5 trackedRootFiles-aware (sprint-397 evidence: 011/
     expect(withTracked).toEqual(withoutTracked);
     expect(withTracked.filesWrite).toEqual(['src\\core\\config.ts']);
     expect(withTracked.warnings).toEqual([]);
+  });
+});
+
+describe('sanitizeReadScope — exact project-file authority', () => {
+  it('preserves exact root manifests without weakening their write protection', () => {
+    const read = sanitizeReadScope([
+      'package.json',
+      'tsconfig.json',
+      'package-lock.json',
+      'src/core/config.ts',
+      'foo..bar.ts',
+      ' PACKAGE.JSON ',
+    ]);
+
+    expect(read.filesRead).toEqual([
+      'package.json',
+      'tsconfig.json',
+      'package-lock.json',
+      'src/core/config.ts',
+      'foo..bar.ts',
+    ]);
+    expect(read.warnings).toEqual([]);
+    expect(read.rejected).toEqual([]);
+    expect(sanitizeScope(['package.json', 'tsconfig.json']).filesWrite).toEqual([]);
+  });
+
+  it('rejects cross-platform absolute, traversal, glob, control and directory-shaped reads', () => {
+    const invalid = [
+      '/etc/passwd',
+      'C:\\Windows\\system.ini',
+      'C:relative\\file.txt',
+      '\\\\server\\share\\file.txt',
+      '\\\\?\\C:\\secret.txt',
+      '../outside.ts',
+      'src/../../outside.ts',
+      'src/**/*.ts',
+      'src/[ab].ts',
+      'src/',
+      'src\\',
+      `src/${String.fromCharCode(0)}secret.ts`,
+    ];
+
+    const result = sanitizeReadScope([...invalid, 'src/core/config.ts']);
+    expect(result.filesRead).toEqual(['src/core/config.ts']);
+    expect(result.rejected).toEqual(invalid);
+  });
+
+  it('rejects Windows absolute write paths on non-Windows hosts too', () => {
+    const result = sanitizeScope([
+      'C:\\Windows\\system.ini',
+      '\\\\server\\share\\file.txt',
+      '\\\\?\\C:\\secret.txt',
+      'src/core/config.ts',
+    ]);
+    expect(result.filesWrite).toEqual(['src/core/config.ts']);
+    expect(result.rejected).toEqual([
+      'C:\\Windows\\system.ini',
+      '\\\\server\\share\\file.txt',
+      '\\\\?\\C:\\secret.txt',
+    ]);
   });
 });
 

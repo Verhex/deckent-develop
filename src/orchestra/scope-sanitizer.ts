@@ -2,12 +2,36 @@
 // Filters invalid, dangerous, or noisy paths from task scope filesWrite.
 // Sprint 145 evidence: T-145-001 wrote to "config.json" and "dist/cli/entry.js"
 
+import { posix, win32 } from 'node:path';
+
 import { debugLog } from '../core/utils.js';
 
 export interface SanitizeResult {
   filesWrite: string[];
   warnings: string[];
   rejected: string[];
+}
+
+export interface SanitizeReadResult {
+  filesRead: string[];
+  warnings: string[];
+  rejected: string[];
+}
+
+function isAbsoluteScopePath(path: string): boolean {
+  return posix.isAbsolute(path) || win32.isAbsolute(path) || /^[A-Za-z]:/u.test(path);
+}
+
+function hasTraversalSegment(path: string): boolean {
+  return path.split(/[\\/]/u).includes('..');
+}
+
+function hasGlobSyntax(path: string): boolean {
+  return /[*?\[\]{}]/u.test(path);
+}
+
+function hasControlCharacter(path: string): boolean {
+  return /[\u0000-\u001f\u007f]/u.test(path);
 }
 
 // ─── Code Snippet False Positive Filters (Sprint 149) ──────────────
@@ -130,7 +154,7 @@ export function sanitizeScope(
     if (!path) continue;
 
     // Rule 1: Absolute paths → reject
-    if (path.startsWith('/')) {
+    if (isAbsoluteScopePath(path)) {
       rejected.push(path);
       continue;
     }
@@ -216,4 +240,51 @@ export function sanitizeScope(
   }
 
   return { filesWrite: deduped, warnings, rejected };
+}
+
+/**
+ * Sanitize an authored exact `filesRead` list without applying write-only
+ * protections such as `GLOBAL_PROTECTED` or the unqualified-filename rule.
+ * A root manifest (`package.json`, `tsconfig.json`, lockfiles) is a valid exact
+ * read target even though workers must never receive write authority for it.
+ *
+ * Read targets remain file-exact and project-relative on every supported host:
+ * POSIX/drive/UNC/device absolute paths, traversal segments, glob expressions,
+ * control characters, and directory-shaped paths are rejected. Invalid authored
+ * entries are reported rather than broadened to a directory fallback.
+ */
+export function sanitizeReadScope(filesRead: string[]): SanitizeReadResult {
+  const warnings: string[] = [];
+  const rejected: string[] = [];
+  const cleaned: string[] = [];
+
+  for (const raw of filesRead) {
+    const path = raw.trim();
+    if (!path) continue;
+    if (isAbsoluteScopePath(path)
+      || hasTraversalSegment(path)
+      || hasGlobSyntax(path)
+      || hasControlCharacter(path)
+      || path.endsWith('/')
+      || path.endsWith('\\')
+      || path === '.') {
+      rejected.push(path);
+      continue;
+    }
+    cleaned.push(path);
+  }
+
+  const seen = new Set<string>();
+  const files: string[] = [];
+  for (const path of cleaned) {
+    const key = path.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    files.push(path);
+  }
+
+  if (rejected.length > 0) {
+    debugLog('scope-sanitizer:read', `rejected=${rejected.length}`);
+  }
+  return { filesRead: files, warnings, rejected };
 }

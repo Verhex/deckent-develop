@@ -121,4 +121,41 @@ describe('inspection-only worker prompt contract', () => {
     expect(prompt).not.toContain('You may ONLY modify files in these directories');
     expect(prompt).not.toContain('you may write to any file within the directories above');
   });
+
+  it('renders exact repo-root manifests as reads while preserving zero project-write authority', () => {
+    const task = makeInspectionTask();
+    task.scope.filesRead = ['package.json', 'tsconfig.json'];
+    const { prompt } = buildTaskPrompt(task, { effort: 'low' });
+
+    expect(prompt).toContain('## Scope Rules (inspection-only)');
+    expect(prompt).toContain('  - package.json');
+    expect(prompt).toContain('  - tsconfig.json');
+    expect(prompt).toContain('PROJECT WRITE authority: NONE');
+    expect(prompt).not.toContain('no valid read targets remain after path validation');
+    expect(prompt).not.toContain('you may write to any file within the directories above');
+  });
+
+  it('rejects mixed-platform path escapes without dropping a valid exact root read', () => {
+    const task = makeInspectionTask();
+    task.scope.filesRead = [
+      '/etc/passwd',
+      'C:\\Windows\\system.ini',
+      '\\\\server\\share\\file.txt',
+      '../outside.ts',
+      'src/**/*.ts',
+      'src/',
+      'package.json',
+    ];
+    const { prompt } = buildTaskPrompt(task, { effort: 'low' });
+    const exactReads = prompt.slice(
+      prompt.indexOf('Exact project files to inspect:'),
+      prompt.indexOf('PROJECT WRITE authority: NONE'),
+    );
+
+    expect(exactReads).toContain('  - package.json');
+    for (const rejected of task.scope.filesRead.slice(0, -1)) {
+      expect(exactReads).not.toContain(`  - ${rejected}`);
+    }
+    expect(prompt).toContain('PROJECT WRITE authority: NONE');
+  });
 });

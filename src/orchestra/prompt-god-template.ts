@@ -14,7 +14,7 @@ import { personaCoreBody, selectGuidanceSlice } from '../core/persona-guidance.j
 import { evaluateScopeGate } from '../core/scope-gate.js';
 import { mirrorTestPath } from '../core/task-builder-scope.js';
 import type { ToolAllowlistResult } from '../core/tool-allowlist.js';
-import { sanitizeScope } from './scope-sanitizer.js';
+import { sanitizeReadScope, sanitizeScope } from './scope-sanitizer.js';
 import { truncateAtParagraph, inferTaskDomains, logInjectionAudit } from './task-builder.js';
 import { getDefaultProviderName } from './sprint-utils.js';
 import type { ResolvedVerifyCommands } from './worker-verify-tool.js';
@@ -919,8 +919,9 @@ export function buildScopeBlock(
   for (const r of sanitized.rejected) outWarnings.push(`Rejected path: ${r}`);
 
   // Inspection-only tasks carry exact read targets and no project write targets.
-  // Sanitize read paths through the same path contract before rendering them.
-  const sanitizedRead = sanitizeScope(scope.filesRead, trackedRootFiles);
+  // Their validator is intentionally distinct from write sanitization: root
+  // manifests are valid exact reads while remaining globally write-protected.
+  const sanitizedRead = sanitizeReadScope(scope.filesRead);
   for (const w of sanitizedRead.warnings) outWarnings.push(`Read scope: ${w}`);
   for (const r of sanitizedRead.rejected) outWarnings.push(`Rejected read path: ${r}`);
   // Presence of an authored read list selects fail-closed inspection mode even
@@ -965,8 +966,8 @@ export function buildScopeBlock(
     `\n\nSeparately, your worker-protocol files under \`.tasks/\` (your \`.plan\`, \`.hb\`, \`.result\`, and a \`.question\` if you escalate) are lifecycle artifacts, NOT project changes — they are always writable and are exempt from this scope audit. Writing them is required and never counts as touching a file outside your scope.`;
 
   if (isInspectionOnly) {
-    const readFiles = sanitizedRead.filesWrite.length > 0
-      ? sanitizedRead.filesWrite.map(f => `  - ${f}`).join('\n')
+    const readFiles = sanitizedRead.filesRead.length > 0
+      ? sanitizedRead.filesRead.map(f => `  - ${f}`).join('\n')
       : '  - (no valid read targets remain after path validation — STOP and report NO_GO)';
     return `## Scope Rules (inspection-only)
 READ/context directories — navigation context only; they grant no project write authority:
