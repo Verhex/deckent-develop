@@ -8,7 +8,16 @@ import type {
   WorkItem, NewWorkItem, NewMissionWorkItem, WorkItemStatus,
   WorkItemApprovalBinding, WorkItemApprovalState, ApprovalDecisionTransition,
 } from './mission-types.js';
+import type {
+  MissionAcceptanceDecisionRecord,
+  MissionAcceptanceDecisionV1,
+} from './mission-acceptance.js';
 import { assertCanonicalWorkItemKind } from './mission-kind-admission.js';
+import {
+  assertStoredMissionAcceptanceRecord,
+  readGoalAcceptanceContract,
+  validateMissionAcceptanceDecision,
+} from './mission-acceptance.js';
 import {
   validateStoredApprovalDecision,
   validateStoredApprovalRequest,
@@ -47,6 +56,16 @@ CREATE TABLE IF NOT EXISTS work_item_approvals (
   updated_at TEXT NOT NULL );
 CREATE INDEX IF NOT EXISTS idx_wia_publish ON work_item_approvals(publish_state, created_at);
 CREATE INDEX IF NOT EXISTS idx_wia_decision ON work_item_approvals(decision_state, created_at);
+CREATE TABLE IF NOT EXISTS mission_acceptance_decisions (
+  mission_id TEXT NOT NULL REFERENCES missions(id),
+  round INTEGER NOT NULL CHECK(round >= 0),
+  contract_digest TEXT NOT NULL,
+  decision_digest TEXT NOT NULL,
+  record_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY(mission_id, round),
+  UNIQUE(mission_id, decision_digest) );
+CREATE INDEX IF NOT EXISTS idx_mad_mission_created ON mission_acceptance_decisions(mission_id, created_at);
 `;
 
 /** Durable mission store (SQLite WAL) — the autonomous-v2 single source of truth. */
@@ -264,6 +283,114 @@ export class SqliteMissionStore implements MissionStore {
   }
   setMissionProgress(id: string, progress: Progress): void {
     this.db.prepare('UPDATE missions SET progress=?, updated_at=? WHERE id=?').run(JSON.stringify(progress), this.now(), id);
+  }
+
+  recordAcceptanceDecision(decision: MissionAcceptanceDecisionV1): MissionAcceptanceDecisionRecord {
+    const transaction = this.db.transaction((): MissionAcceptanceDecisionRecord => {
+      const mission = this.getMission(decision.missionId);
+      if (!mission) throw new Error(`MISSION_ACCEPTANCE_INVALID: mission not found ${decision.missionId}`);
+      if (mission.kind !== 'goal') throw new Error(`MISSION_ACCEPTANCE_INVALID: mission ${decision.missionId} is not a goal`);
+      const contract = readGoalAcceptanceContract(mission);
+      if (!contract) throw new Error(`MISSION_ACCEPTANCE_INVALID: mission ${decision.missionId} has no v1 contract`);
+
+      const existing = this.db.prepare(
+        'SELECT * FROM mission_acceptance_decisions WHERE mission_id=? AND round=?',
+      ).get(decision.missionId, decision.round) as Record<string, unknown> | undefined;
+      if (existing) {
+        const record = assertStoredMissionAcceptanceRecord(this.p(existing['record_json']));
+        if (existing['contract_digest'] !== contract.digest
+          || existing['decision_digest'] !== decision.decisionDigest
+          || this.canonical(record.decision) !== this.canonical(decision)) {
+          throw new Error(`MISSION_ACCEPTANCE_CONFLICT: mission ${decision.missionId} round ${decision.round}`);
+        }
+        return record;
+      }
+
+      const items = this.listItems(decision.missionId);
+      const validationErrors = validateMissionAcceptanceDecision(
+        decision,
+        decision.missionId,
+        contract,
+        decision.round,
+        items,
+      );
+      const effectiveOutcome = validationErrors.length === 0 ? decision.outcome : 'unknown';
+      const record: MissionAcceptanceDecisionRecord = {
+        decision,
+        validationErrors,
+        effectiveOutcome,
+        createdAt: decision.decidedAt,
+      };
+      this.db.prepare(`INSERT INTO mission_acceptance_decisions(
+        mission_id,round,contract_digest,decision_digest,record_json,created_at
+      ) VALUES(@missionId,@round,@contractDigest,@decisionDigest,@recordJson,@createdAt)`).run({
+        missionId: decision.missionId,
+        round: decision.round,
+        contractDigest: contract.digest,
+        decisionDigest: decision.decisionDigest,
+        recordJson: JSON.stringify(record),
+        createdAt: record.createdAt,
+      });
+
+      const accepted = effectiveOutcome === 'accepted';
+      const reason = accepted
+        ? 'goal acceptance criteria met'
+        : validationErrors.length > 0
+          ? `GOAL_ACCEPTANCE_EVIDENCE_INVALID: ${validationErrors.join('; ')}`
+          : 'goal not reached, acceptance criteria rejected';
+      const result: ResultLike = {
+        ok: accepted,
+        reason,
+        acceptanceDecision: decision,
+        acceptanceValidationErrors: validationErrors,
+      };
+      const ts = this.now();
+      this.db.prepare(`UPDATE missions SET status=@status, updated_at=@ts,
+        completed_at=COALESCE(completed_at,@ts), last_result=@result WHERE id=@id`).run({
+        id: decision.missionId,
+        status: accepted ? 'completed' : 'failed',
+        ts,
+        result: JSON.stringify(result),
+      });
+      return record;
+    });
+    try {
+      return transaction.immediate();
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('MISSION_ACCEPTANCE_')) throw error;
+      throw new Error(`MISSION_ACCEPTANCE_CONFLICT: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  listAcceptanceDecisions(missionId: string): MissionAcceptanceDecisionRecord[] {
+    const mission = this.getMission(missionId);
+    if (!mission) throw new Error(`MISSION_ACCEPTANCE_INVALID: mission not found ${missionId}`);
+    const contract = readGoalAcceptanceContract(mission);
+    if (!contract) throw new Error(`MISSION_ACCEPTANCE_INVALID: mission ${missionId} has no v1 contract`);
+    const items = this.listItems(missionId);
+    const rows = this.db.prepare(
+      'SELECT * FROM mission_acceptance_decisions WHERE mission_id=? ORDER BY round',
+    ).all(missionId) as Array<Record<string, unknown>>;
+    return rows.map((row) => {
+      const record = assertStoredMissionAcceptanceRecord(this.p(row['record_json']));
+      if (row['contract_digest'] !== record.decision.contractDigest
+        || row['decision_digest'] !== record.decision.decisionDigest) {
+        throw new Error(`MISSION_ACCEPTANCE_CORRUPT: row mismatch ${missionId}`);
+      }
+      const validationErrors = validateMissionAcceptanceDecision(
+        record.decision,
+        missionId,
+        contract,
+        record.decision.round,
+        items,
+      );
+      const effectiveOutcome = validationErrors.length === 0 ? record.decision.outcome : 'unknown';
+      if (this.canonical(validationErrors) !== this.canonical(record.validationErrors)
+        || effectiveOutcome !== record.effectiveOutcome) {
+        throw new Error(`MISSION_ACCEPTANCE_CORRUPT: validation mismatch ${missionId}`);
+      }
+      return record;
+    });
   }
 
   // --- Work-items + atomic claim ---

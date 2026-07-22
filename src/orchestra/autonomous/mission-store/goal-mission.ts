@@ -6,6 +6,13 @@ import {
   assertWorkItemBatchAdmitted,
   type MissionRuntimeAdmission,
 } from './mission-kind-admission.js';
+import {
+  buildMissionAcceptanceDecision,
+  createGoalAcceptanceContract,
+  readGoalAcceptanceContract,
+  type GoalAcceptanceContractV1,
+  type GoalAcceptanceEvaluation,
+} from './mission-acceptance.js';
 
 /** Type-2 (goal) mission specification — "run until the goal is reached". */
 export interface GoalMissionSpec {
@@ -15,6 +22,10 @@ export interface GoalMissionSpec {
   goal: string;
   /** Optional acceptance criteria (evaluated by the injected `accept`). */
   acceptance?: string;
+  /** Host-known author surface. `actorId:null` is honest when no principal exists. */
+  acceptanceAuthoredBy?: GoalAcceptanceContractV1['authoredBy'];
+  /** Test/replay seam; production defaults to the current host time. */
+  acceptanceAuthoredAt?: string;
   tenant?: string;
   deliverTo?: string;
 }
@@ -31,9 +42,17 @@ export type GoalAdvanceOutcome = 'authored' | 'accepted' | 'exhausted' | 'waitin
 /** Injected dependencies for one goal-loop step. */
 export interface GoalAdvanceDeps {
   /** Plan the next work-items for the goal given the prior items. Empty ⇒ nothing more to do. */
-  author(goal: string, priorItems: WorkItem[]): Promise<NewWorkItem[]>;
+  author(
+    goal: string,
+    priorItems: WorkItem[],
+    acceptanceContract?: GoalAcceptanceContractV1,
+  ): Promise<NewWorkItem[]>;
   /** Decide whether the goal is reached given the (settled) items. */
-  accept(goal: string, items: WorkItem[]): Promise<boolean>;
+  accept(
+    goal: string,
+    items: WorkItem[],
+    acceptanceContract?: GoalAcceptanceContractV1,
+  ): Promise<boolean | GoalAcceptanceEvaluation>;
   /**
    * Infinite-loop guard — maximum cumulative work-items the goal may author
    * before being force-exhausted. Defaults to `Infinity` (rely on `author`
@@ -54,9 +73,17 @@ export interface GoalAdvanceDeps {
  */
 export interface GoalDeps {
   /** Real planner — produce the next work-items for the goal given prior items. */
-  planner(goal: string, priorItems: WorkItem[]): Promise<NewWorkItem[]>;
+  planner(
+    goal: string,
+    priorItems: WorkItem[],
+    acceptanceContract?: GoalAcceptanceContractV1,
+  ): Promise<NewWorkItem[]>;
   /** Real acceptance evaluator (LLM / Brain-eval) — is the goal reached? */
-  accepter(goal: string, items: WorkItem[]): Promise<boolean>;
+  accepter(
+    goal: string,
+    items: WorkItem[],
+    acceptanceContract?: GoalAcceptanceContractV1,
+  ): Promise<boolean | GoalAcceptanceEvaluation>;
   /** Infinite-loop guard, forwarded verbatim to {@link advanceGoalMission}. */
   maxRounds?: number;
   /** Runtime capability truth used to reject an unsupported authored batch before enqueue. */
@@ -73,8 +100,12 @@ export interface GoalDeps {
  */
 export function buildGoalDeps(deps: GoalDeps): GoalAdvanceDeps {
   return {
-    author: (goal, priorItems) => deps.planner(goal, priorItems),
-    accept: (goal, items) => deps.accepter(goal, items),
+    author: (goal, priorItems, acceptanceContract) => acceptanceContract
+      ? deps.planner(goal, priorItems, acceptanceContract)
+      : deps.planner(goal, priorItems),
+    accept: (goal, items, acceptanceContract) => acceptanceContract
+      ? deps.accepter(goal, items, acceptanceContract)
+      : deps.accepter(goal, items),
     ...(deps.maxRounds !== undefined ? { maxRounds: deps.maxRounds } : {}),
     ...(deps.admission ? { admission: deps.admission } : {}),
   };
@@ -85,6 +116,12 @@ export function buildGoalDeps(deps: GoalDeps): GoalAdvanceDeps {
  * are persisted in the mission spec; the loop is driven by {@link advanceGoalMission}.
  */
 export function createGoalMission(store: MissionStore, spec: GoalMissionSpec): Mission {
+  const acceptanceContract = spec.acceptance === undefined
+    ? null
+    : createGoalAcceptanceContract(spec.acceptance, {
+      ...(spec.acceptanceAuthoredAt ? { authoredAt: spec.acceptanceAuthoredAt } : {}),
+      authoredBy: spec.acceptanceAuthoredBy ?? { surface: 'unknown', actorId: null },
+    });
   return store.createMission({
     id: spec.id,
     kind: 'goal',
@@ -92,7 +129,7 @@ export function createGoalMission(store: MissionStore, spec: GoalMissionSpec): M
     tenant: spec.tenant,
     deliverTo: spec.deliverTo,
     renderAs: 'goal',
-    spec: { goal: spec.goal, acceptance: spec.acceptance ?? null },
+    spec: { goal: spec.goal, acceptanceContract },
   });
 }
 
@@ -125,6 +162,7 @@ export async function advanceGoalMission(
   if (open.length > 0) return 'waiting';
 
   const goal = readGoal(mission);
+  const acceptanceContract = readGoalAcceptanceContract(mission);
 
   // Infinite-loop guard: bound cumulative authored work-items.
   const maxRounds = deps.maxRounds ?? Infinity;
@@ -137,7 +175,9 @@ export async function advanceGoalMission(
   }
 
   // Ask the planner for the next batch of work.
-  const next = await deps.author(goal, all);
+  const next = acceptanceContract
+    ? await deps.author(goal, all, acceptanceContract)
+    : await deps.author(goal, all);
   if (next.length > 0) {
     try {
       if (deps.admission) assertWorkItemBatchAdmitted(next, deps.admission);
@@ -157,8 +197,30 @@ export async function advanceGoalMission(
   }
 
   // No further work — decide acceptance.
-  const accepted = await deps.accept(goal, all);
-  if (accepted) {
+  const accepted = acceptanceContract
+    ? await deps.accept(goal, all, acceptanceContract)
+    : await deps.accept(goal, all);
+  if (acceptanceContract) {
+    const evaluation: GoalAcceptanceEvaluation = typeof accepted === 'boolean'
+      ? {
+        outcome: accepted ? 'accepted' : 'rejected',
+        criteria: [],
+        evaluator: { role: 'brain', instanceId: null },
+        invocationReceiptRef: null,
+        decidedAt: new Date().toISOString(),
+      }
+      : accepted;
+    const decision = buildMissionAcceptanceDecision(
+      missionId,
+      acceptanceContract,
+      all.length,
+      evaluation,
+      all,
+    );
+    const record = store.recordAcceptanceDecision(decision);
+    return record.effectiveOutcome === 'accepted' ? 'accepted' : 'exhausted';
+  }
+  if (accepted === true) {
     store.updateMissionStatus(missionId, 'completed', { ok: true });
     return 'accepted';
   }

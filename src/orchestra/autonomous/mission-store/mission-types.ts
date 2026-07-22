@@ -1,5 +1,9 @@
 // Autonomous v2 — durable mission/work-item model + store/view contracts.
 import type { ApprovalDecision, ApprovalRequest } from '../../../core/approval-contract.js';
+import type {
+  MissionAcceptanceDecisionRecord,
+  MissionAcceptanceDecisionV1,
+} from './mission-acceptance.js';
 export type MissionKind = 'list' | 'goal';
 export type MissionStatus = 'pending' | 'active' | 'completed' | 'failed' | 'cancelled';
 export type MissionRenderAs = 'checklist' | 'goal';
@@ -84,6 +88,9 @@ export interface MissionStore {
   listMissions(f?: { status?: MissionStatus[]; tenant?: string }): Mission[];
   updateMissionStatus(id: string, status: MissionStatus, result?: ResultLike): void;
   setMissionProgress(id: string, progress: Progress): void;
+  /** Atomically persist one acceptance round and settle the mission from the validated decision. */
+  recordAcceptanceDecision(decision: MissionAcceptanceDecisionV1): MissionAcceptanceDecisionRecord;
+  listAcceptanceDecisions(missionId: string): MissionAcceptanceDecisionRecord[];
   enqueueItem(item: NewWorkItem): WorkItem;
   /** Dependency-ready pending items whose policy requires an approval binding. */
   listApprovalCandidates(): WorkItem[];

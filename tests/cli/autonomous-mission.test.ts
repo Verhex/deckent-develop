@@ -155,7 +155,11 @@ describe('handleCreateGoal', () => {
       expect(mission!.kind).toBe('goal');
       expect(mission!.renderAs).toBe('goal');
       expect(mission!.spec?.['goal']).toBe('Achieve full test coverage');
-      expect(mission!.spec?.['acceptance']).toBe('coverage >= 90%');
+      expect(mission!.spec?.['acceptanceContract']).toMatchObject({
+        schemaVersion: 1,
+        authoredBy: { surface: 'cli', actorId: null },
+        criteria: [{ text: 'coverage >= 90%', critical: true }],
+      });
     } finally {
       store.close();
     }

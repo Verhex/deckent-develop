@@ -10,6 +10,7 @@ import {
 } from '../../../../src/orchestra/autonomous/mission-store/goal-mission.js';
 import type { NewWorkItem, WorkItem } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 import { PRODUCTION_V2_ADMISSION } from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
+import type { InvocationReceiptRef } from '../../../../src/core/invocation-receipt.js';
 
 const dirs: string[] = [];
 function newStore() {
@@ -31,6 +32,8 @@ describe('createGoalMission', () => {
       title: 'Ship the feature',
       goal: 'All endpoints return 200',
       acceptance: 'integration tests green',
+      acceptanceAuthoredAt: '2026-07-22T00:00:00.000Z',
+      acceptanceAuthoredBy: { surface: 'cli', actorId: null },
       tenant: 'acme',
       deliverTo: 'user@example.com',
     });
@@ -43,13 +46,126 @@ describe('createGoalMission', () => {
     expect(mission.deliverTo).toBe('user@example.com');
 
     const stored = store.getMission('goal-1')!;
-    expect(stored.spec).toEqual({ goal: 'All endpoints return 200', acceptance: 'integration tests green' });
+    expect(stored.spec?.['goal']).toBe('All endpoints return 200');
+    expect(stored.spec?.['acceptanceContract']).toMatchObject({
+      schemaVersion: 1,
+      authoredAt: '2026-07-22T00:00:00.000Z',
+      authoredBy: { surface: 'cli', actorId: null },
+      criteria: [{ text: 'integration tests green', critical: true }],
+    });
+    expect((stored.spec?.['acceptanceContract'] as { digest: string }).digest).toMatch(/^[a-f0-9]{64}$/);
 
     store.close();
   });
 });
 
 describe('advanceGoalMission', () => {
+  it('passes the exact immutable acceptance contract to the author prompt seam', async () => {
+    const store = newStore();
+    createGoalMission(store, {
+      id: 'g-author-contract',
+      title: 'Author with contract',
+      goal: 'ship',
+      acceptance: 'all targeted tests pass',
+      acceptanceAuthoredAt: '2026-07-22T00:00:00.000Z',
+    });
+    const author = vi.fn(async (): Promise<NewWorkItem[]> => [
+      { id: 'g-author-contract-1', missionId: '', kind: 'task', spec: { description: 'run tests' } },
+    ]);
+
+    await expect(advanceGoalMission(store, 'g-author-contract', {
+      author,
+      accept: async () => false,
+    })).resolves.toBe('authored');
+
+    expect(author).toHaveBeenCalledTimes(1);
+    const contract = author.mock.calls[0]![2];
+    expect(contract.criteria[0]!.text).toBe('all targeted tests pass');
+    expect(contract.digest).toMatch(/^[a-f0-9]{64}$/);
+    store.close();
+  });
+
+  it('atomically persists criterion evidence and completes only with evaluator receipt provenance', async () => {
+    const store = newStore();
+    createGoalMission(store, {
+      id: 'g-evidenced',
+      title: 'Evidenced acceptance',
+      goal: 'ship',
+      acceptance: 'targeted tests pass',
+      acceptanceAuthoredAt: '2026-07-22T00:00:00.000Z',
+    });
+    store.enqueueItem({ id: 'g-evidenced-test', missionId: 'g-evidenced', kind: 'task' });
+    store.updateItemStatus('g-evidenced-test', 'done', { ok: true, reason: '27 tests passed' });
+    const receiptRef: InvocationReceiptRef = {
+      schemaVersion: 1,
+      invocationId: 'inv-goal-accept-1',
+      tenantId: 'local',
+      projectId: 'project-test',
+    };
+
+    const outcome = await advanceGoalMission(store, 'g-evidenced', {
+      author: async () => [],
+      accept: async (_goal, _items, contract) => ({
+        outcome: 'accepted',
+        criteria: [{
+          criterionId: contract!.criteria[0]!.id,
+          verdict: 'met',
+          evidenceRefs: ['work-item:g-evidenced-test'],
+          rationale: 'the durable task result records the targeted test pass',
+        }],
+        evaluator: { role: 'brain', instanceId: 'goal-evaluator-1' },
+        invocationReceiptRef: receiptRef,
+        decidedAt: '2026-07-22T00:05:00.000Z',
+      }),
+    });
+
+    expect(outcome).toBe('accepted');
+    const records = store.listAcceptanceDecisions('g-evidenced');
+    expect(records).toHaveLength(1);
+    expect(records[0]!.effectiveOutcome).toBe('accepted');
+    expect(records[0]!.decision.criteria[0]!.evidence[0]).toMatchObject({
+      kind: 'work-item-result',
+      ref: 'work-item:g-evidenced-test',
+      workItemId: 'g-evidenced-test',
+      status: 'done',
+    });
+    expect(records[0]!.decision.criteria[0]!.evidence[0]!.resultDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(store.getMission('g-evidenced')!.lastResult).toMatchObject({
+      ok: true,
+      acceptanceValidationErrors: [],
+      acceptanceDecision: { invocationReceiptRef: receiptRef },
+    });
+    store.close();
+  });
+
+  it('fails closed and persists unknown when explicit acceptance lacks receipt/evidence provenance', async () => {
+    const store = newStore();
+    createGoalMission(store, {
+      id: 'g-no-receipt',
+      title: 'No receipt',
+      goal: 'ship',
+      acceptance: 'tests pass',
+      acceptanceAuthoredAt: '2026-07-22T00:00:00.000Z',
+    });
+
+    const outcome = await advanceGoalMission(store, 'g-no-receipt', {
+      author: async () => [],
+      accept: async () => true,
+    });
+
+    expect(outcome).toBe('exhausted');
+    const record = store.listAcceptanceDecisions('g-no-receipt')[0]!;
+    expect(record.effectiveOutcome).toBe('unknown');
+    expect(record.validationErrors).toEqual(expect.arrayContaining([
+      expect.stringContaining('missing criterion result'),
+      expect.stringContaining('evaluator instanceId'),
+      expect.stringContaining('InvocationReceiptRef'),
+    ]));
+    expect(store.getMission('g-no-receipt')!.status).toBe('failed');
+    expect(store.getMission('g-no-receipt')!.lastResult?.reason).toContain('GOAL_ACCEPTANCE_EVIDENCE_INVALID');
+    store.close();
+  });
+
   it('authors the next work-items when there are no open items', async () => {
     const store = newStore();
     createGoalMission(store, { id: 'g-author', title: 'Author round', goal: 'do work' });

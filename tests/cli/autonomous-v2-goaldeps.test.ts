@@ -49,6 +49,7 @@ import { join } from 'node:path';
 import { buildLiveGoalDeps, handleStart } from '../../src/cli/commands/autonomous.js';
 import type { LlmComplete } from '../../src/orchestra/autonomous/goal-planner-types.js';
 import type { WorkItem } from '../../src/orchestra/autonomous/mission-store/mission-types.js';
+import { createGoalAcceptanceContract } from '../../src/orchestra/autonomous/mission-store/mission-acceptance.js';
 import { useSandboxHome } from '../helpers/sandbox-home.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────
@@ -121,13 +122,23 @@ describe('buildLiveGoalDeps — planner', () => {
     const prompts: string[] = [];
     const complete: LlmComplete = async (p) => { prompts.push(p); return JSON.stringify({ items: [] }); };
     const deps = buildLiveGoalDeps(complete);
+    const contract = createGoalAcceptanceContract('all integration tests pass exactly', {
+      authoredAt: '2026-07-22T00:00:00.000Z',
+      authoredBy: { surface: 'cli', actorId: null },
+    });
 
-    await deps.author('ship feature X', [wi({ id: 'done-1', status: 'done', spec: { description: 'built X core' } })]);
+    await deps.author(
+      'ship feature X',
+      [wi({ id: 'done-1', status: 'done', spec: { description: 'built X core' } })],
+      contract,
+    );
 
     expect(prompts).toHaveLength(1);
     expect(prompts[0]).toContain('ship feature X');
     expect(prompts[0]).toContain('built X core');
     expect(prompts[0]).toContain('Runtime-admitted kinds: task');
+    expect(prompts[0]).toContain(contract.digest);
+    expect(prompts[0]).toContain('all integration tests pass exactly');
   });
 });
 
@@ -147,6 +158,76 @@ describe('buildLiveGoalDeps — accepter', () => {
   it('defaults to false on an unparseable / ambiguous verdict (conservative)', async () => {
     const deps = buildLiveGoalDeps(async () => 'I think we are not quite there yet.');
     expect(await deps.accept('goal', [])).toBe(false);
+  });
+
+  it('injects the exact contract and returns host-provenanced criterion evidence', async () => {
+    const prompts: string[] = [];
+    const contract = createGoalAcceptanceContract('targeted tests pass', {
+      authoredAt: '2026-07-22T00:00:00.000Z',
+      authoredBy: { surface: 'cli', actorId: null },
+    });
+    const item = wi({
+      id: 'targeted-test',
+      status: 'done',
+      spec: { description: 'run targeted tests' },
+      lastResult: { ok: true, reason: '27 tests passed' },
+    });
+    const deps = buildLiveGoalDeps(async () => JSON.stringify({ items: [] }), {
+      now: () => new Date('2026-07-22T00:05:00.000Z'),
+      acceptanceComplete: async (prompt) => {
+        prompts.push(prompt);
+        return {
+          output: JSON.stringify({
+            outcome: 'accepted',
+            criteria: [{
+              criterionId: contract.criteria[0]!.id,
+              verdict: 'met',
+              evidenceRefs: ['work-item:targeted-test'],
+              rationale: 'the durable targeted-test result records 27 passing tests',
+            }],
+          }),
+          evaluatorInstanceId: 'goal-evaluator-live-1',
+          invocationReceiptRef: {
+            schemaVersion: 1,
+            invocationId: 'inv-goal-accept-live-1',
+            tenantId: 'local',
+            projectId: 'project-test',
+          },
+        };
+      },
+    });
+
+    const result = await deps.accept('ship', [item], contract);
+
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]).toContain(contract.digest);
+    expect(prompts[0]).toContain(contract.criteria[0]!.id);
+    expect(prompts[0]).toContain('targeted tests pass');
+    expect(prompts[0]).toContain('evidenceRef=work-item:targeted-test');
+    expect(result).toMatchObject({
+      outcome: 'accepted',
+      evaluator: { role: 'brain', instanceId: 'goal-evaluator-live-1' },
+      invocationReceiptRef: { invocationId: 'inv-goal-accept-live-1' },
+      decidedAt: '2026-07-22T00:05:00.000Z',
+      criteria: [{
+        criterionId: contract.criteria[0]!.id,
+        evidenceRefs: ['work-item:targeted-test'],
+      }],
+    });
+  });
+
+  it('does not apply the legacy positive-token regex to an explicit contract', async () => {
+    const contract = createGoalAcceptanceContract('tests pass', {
+      authoredAt: '2026-07-22T00:00:00.000Z',
+    });
+    const deps = buildLiveGoalDeps(async () => 'accepted');
+
+    await expect(deps.accept('ship', [], contract)).resolves.toMatchObject({
+      outcome: 'unknown',
+      criteria: [],
+      evaluator: { instanceId: null },
+      invocationReceiptRef: null,
+    });
   });
 });
 

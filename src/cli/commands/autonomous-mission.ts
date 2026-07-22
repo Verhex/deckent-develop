@@ -168,6 +168,7 @@ export function handleCreateGoal(opts: CreateGoalOpts): void {
       title: opts.title ?? opts.goal,
       goal: opts.goal,
       acceptance: opts.acceptance,
+      acceptanceAuthoredBy: { surface: 'cli', actorId: null },
       tenant: opts.tenant,
       deliverTo: opts.deliverTo,
     });

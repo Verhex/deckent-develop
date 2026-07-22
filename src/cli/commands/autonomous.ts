@@ -56,6 +56,13 @@ import { resolveExecutionModelIdentity } from '../../orchestra/execution-request
 import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
 import { isV2Engine, runV2Engine } from '../../orchestra/autonomous/mission-store/mission-engine-wire.js';
 import { buildGoalDeps, type GoalAdvanceDeps } from '../../orchestra/autonomous/mission-store/goal-mission.js';
+import {
+  workItemEvidenceRef,
+  type GoalAcceptanceContractV1,
+  type GoalAcceptanceEvaluation,
+  type GoalAcceptanceOutcome,
+  type GoalAcceptanceVerdict,
+} from '../../orchestra/autonomous/mission-store/mission-acceptance.js';
 import type { NewWorkItem, WorkItem } from '../../orchestra/autonomous/mission-store/mission-types.js';
 import { createListMission } from '../../orchestra/autonomous/mission-store/mission-ingest.js';
 import { auditMissionLifecycle } from '../../orchestra/autonomous/mission-store/mission-audit-bridge.js';
@@ -82,6 +89,7 @@ import { createNervousSystemIfEnabled, type NervousSystemHandle } from '../../ne
 import { getSprintStateSnapshot } from '../../orchestra/sprint-state-tracker.js';
 import type { DeckentConfig } from '../../core/types.js';
 import { DeckentError } from '../../core/errors.js';
+import type { InvocationReceiptRef } from '../../core/invocation-receipt.js';
 
 // ─── Filesystem layout helpers ────────────────────────────────────────
 
@@ -464,9 +472,25 @@ function formatWorkItemLines(items: WorkItem[]): string {
     .map((i) => {
       const desc = typeof i.spec?.['description'] === 'string' ? (i.spec['description'] as string) : i.id;
       const outcome = i.lastResult?.ok === false ? 'FAILED' : i.status;
-      return `- [${outcome}] ${desc}`;
+      const result = i.lastResult === null
+        ? 'result=missing'
+        : `result=${JSON.stringify({
+          ok: i.lastResult.ok,
+          reason: i.lastResult.reason ?? null,
+          settleDetail: i.lastResult.settleDetail ?? null,
+        })}`;
+      return `- [${outcome}] ${desc} | evidenceRef=${workItemEvidenceRef(i.id)} | ${result}`;
     })
     .join('\n');
+}
+
+function formatAcceptanceContract(contract?: GoalAcceptanceContractV1): string {
+  if (!contract) return '(not specified)';
+  return JSON.stringify({
+    schemaVersion: contract.schemaVersion,
+    digest: contract.digest,
+    criteria: contract.criteria,
+  });
 }
 
 /**
@@ -476,10 +500,18 @@ function formatWorkItemLines(items: WorkItem[]): string {
  * work so the model can go dry — the signal the goal-loop needs to evaluate
  * acceptance instead of authoring forever.
  */
-function buildGoalNextPrompt(goal: string, priorItems: WorkItem[], allowedKinds: readonly string[]): string {
+function buildGoalNextPrompt(
+  goal: string,
+  priorItems: WorkItem[],
+  allowedKinds: readonly string[],
+  acceptanceContract?: GoalAcceptanceContractV1,
+): string {
   return `You are the Deckent autonomous GOAL driver. Decide the NEXT batch of work-items that advances the GOAL, given what has ALREADY been done.
 
 GOAL: ${goal}
+
+IMMUTABLE ACCEPTANCE CONTRACT (exact text + digest; do not rewrite):
+${formatAcceptanceContract(acceptanceContract)}
 
 Already attempted/completed work-items:
 ${formatWorkItemLines(priorItems)}
@@ -497,8 +529,8 @@ Output STRICT JSON: { "items": PlannedItem[] }. Each PlannedItem:
 Output ONLY the JSON, no prose.`;
 }
 
-/** Acceptance prompt: given the goal + settled work, ask for a strict reached verdict. */
-function buildGoalAcceptPrompt(goal: string, items: WorkItem[]): string {
+/** Legacy compatibility for missions authored before acceptance-contract v1. */
+function buildGoalAcceptPromptLegacy(goal: string, items: WorkItem[]): string {
   return `You are the Deckent autonomous GOAL acceptance evaluator. Decide whether the GOAL has been REACHED, given the settled work-items below.
 
 GOAL: ${goal}
@@ -507,6 +539,35 @@ Settled work-items:
 ${formatWorkItemLines(items)}
 
 Answer STRICT JSON: { "reached": true } if the goal is fully achieved, else { "reached": false }. Output ONLY the JSON, no prose.`;
+}
+
+/** Acceptance prompt: given the exact contract + settled evidence, ask for a criterion verdict. */
+function buildGoalAcceptPrompt(
+  goal: string,
+  items: WorkItem[],
+  acceptanceContract: GoalAcceptanceContractV1,
+): string {
+  return `You are the Deckent autonomous GOAL acceptance evaluator. Judge ONLY the immutable acceptance criteria against the settled work-item evidence below.
+
+GOAL: ${goal}
+
+IMMUTABLE ACCEPTANCE CONTRACT (criterion id/text and digest must stay exact):
+${formatAcceptanceContract(acceptanceContract)}
+
+Settled work-items:
+${formatWorkItemLines(items)}
+
+Evidence rules:
+- Cite ONLY evidenceRef values shown above. The host resolves each cited ref to the durable WorkItem result digest.
+- Every critical criterion marked met requires at least one evidenceRef.
+- Do not add, remove, merge, or rewrite criterion ids.
+
+Answer STRICT JSON:
+{ "outcome": "accepted"|"rejected"|"unknown", "criteria": [
+  { "criterionId": "exact id", "verdict": "met"|"unmet"|"unknown",
+    "evidenceRefs": ["work-item:<id>"], "rationale": "short evidence-grounded reason" }
+] }
+Output ONLY the JSON, no prose.`;
 }
 
 /** Map validated PlannedItems onto the goal-loop's NewWorkItem contract. `missionId`
@@ -548,6 +609,75 @@ function parseGoalAccepted(raw: string): boolean {
   return /^(true|yes|reached|accepted)\b/i.test(s);
 }
 
+function parseAcceptanceObject(raw: string): Record<string, unknown> | null {
+  const s = raw.trim();
+  const i = s.indexOf('{');
+  const j = s.lastIndexOf('}');
+  if (i < 0 || j <= i) return null;
+  try {
+    const parsed = JSON.parse(s.slice(i, j + 1)) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const object = parsed as Record<string, unknown>;
+    return typeof object['result'] === 'string' ? parseAcceptanceObject(object['result']) : object;
+  } catch {
+    return null;
+  }
+}
+
+function parseGoalAcceptanceEvaluation(
+  raw: string,
+  evaluatorInstanceId: string | null,
+  invocationReceiptRef: InvocationReceiptRef | null,
+  decidedAt: string,
+): GoalAcceptanceEvaluation {
+  const parsed = parseAcceptanceObject(raw);
+  const outcome = parsed?.['outcome'];
+  const rawCriteria = parsed?.['criteria'];
+  const allowedOutcomes: readonly GoalAcceptanceOutcome[] = ['accepted', 'rejected', 'unknown'];
+  const allowedVerdicts: readonly GoalAcceptanceVerdict[] = ['met', 'unmet', 'unknown'];
+  const criteria = Array.isArray(rawCriteria)
+    ? rawCriteria.flatMap((rawCriterion) => {
+      if (!rawCriterion || typeof rawCriterion !== 'object' || Array.isArray(rawCriterion)) return [];
+      const criterion = rawCriterion as Record<string, unknown>;
+      const criterionId = criterion['criterionId'];
+      const verdict = criterion['verdict'];
+      const evidenceRefs = criterion['evidenceRefs'];
+      const rationale = criterion['rationale'];
+      if (typeof criterionId !== 'string'
+        || typeof verdict !== 'string' || !allowedVerdicts.includes(verdict as GoalAcceptanceVerdict)
+        || !Array.isArray(evidenceRefs) || !evidenceRefs.every((ref) => typeof ref === 'string')
+        || typeof rationale !== 'string') return [];
+      return [{
+        criterionId,
+        verdict: verdict as GoalAcceptanceVerdict,
+        evidenceRefs: evidenceRefs as string[],
+        rationale,
+      }];
+    })
+    : [];
+  return {
+    outcome: typeof outcome === 'string' && allowedOutcomes.includes(outcome as GoalAcceptanceOutcome)
+      ? outcome as GoalAcceptanceOutcome
+      : 'unknown',
+    criteria,
+    evaluator: { role: 'brain', instanceId: evaluatorInstanceId },
+    invocationReceiptRef,
+    decidedAt,
+  };
+}
+
+export interface LiveGoalAcceptanceCompletion {
+  output: string;
+  evaluatorInstanceId: string;
+  invocationReceiptRef: InvocationReceiptRef;
+}
+
+export interface LiveGoalDepsOptions {
+  /** Row-603 seam: completion + host-owned invocation provenance for this exact evaluator call. */
+  acceptanceComplete?: (prompt: string) => Promise<LiveGoalAcceptanceCompletion>;
+  now?: () => Date;
+}
+
 /**
  * Build the live Type-2 goal-loop bindings from an injected LLM completion. The
  * production wire passes `realPlannerComplete(resolvePlannerModelIdentity(...))`
@@ -557,18 +687,43 @@ function parseGoalAccepted(raw: string): boolean {
  * asks the same LLM whether the goal is reached. {@link buildGoalDeps} adapts these
  * onto the loop's author/accept surface and carries the maxRounds guard.
  */
-export function buildLiveGoalDeps(complete: LlmComplete): GoalAdvanceDeps {
-  const planner = async (goal: string, priorItems: WorkItem[]): Promise<NewWorkItem[]> => {
+export function buildLiveGoalDeps(complete: LlmComplete, opts: LiveGoalDepsOptions = {}): GoalAdvanceDeps {
+  const planner = async (
+    goal: string,
+    priorItems: WorkItem[],
+    acceptanceContract?: GoalAcceptanceContractV1,
+  ): Promise<NewWorkItem[]> => {
     const raw = await complete(buildGoalNextPrompt(
       goal,
       priorItems,
       listRuntimeAdmittedKinds(PRODUCTION_V2_ADMISSION),
+      acceptanceContract,
     ));
     return plannedItemsToWorkItems(parsePlannedItems(raw));
   };
-  const accepter = async (goal: string, items: WorkItem[]): Promise<boolean> => {
-    const raw = await complete(buildGoalAcceptPrompt(goal, items));
-    return parseGoalAccepted(raw);
+  const accepter = async (
+    goal: string,
+    items: WorkItem[],
+    acceptanceContract?: GoalAcceptanceContractV1,
+  ): Promise<boolean | GoalAcceptanceEvaluation> => {
+    if (!acceptanceContract) {
+      const raw = await complete(buildGoalAcceptPromptLegacy(goal, items));
+      return parseGoalAccepted(raw);
+    }
+    const prompt = buildGoalAcceptPrompt(goal, items, acceptanceContract);
+    const completed = opts.acceptanceComplete
+      ? await opts.acceptanceComplete(prompt)
+      : {
+        output: await complete(prompt),
+        evaluatorInstanceId: null,
+        invocationReceiptRef: null,
+      };
+    return parseGoalAcceptanceEvaluation(
+      completed.output,
+      completed.evaluatorInstanceId,
+      completed.invocationReceiptRef,
+      (opts.now ?? (() => new Date()))().toISOString(),
+    );
   };
   return buildGoalDeps({
     planner,
