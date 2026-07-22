@@ -52,10 +52,11 @@ export interface NewWorkItem {
   policy?: WorkItemPolicy; renderAs?: WorkItemRenderAs; dependsOn?: string[];
   trigger?: Record<string, unknown>;
 }
-/** Atomic mission-batch item. `initialStatus` exists for durable import/recovery;
+/** Atomic mission-batch item. Initial state exists for durable import/recovery;
  * normal `enqueueItem` remains pending-only and cannot bypass the claim lifecycle. */
 export interface NewMissionWorkItem extends NewWorkItem {
   initialStatus?: WorkItemStatus;
+  initialResult?: ResultLike;
 }
 export interface WorkItemApprovalBinding {
   workItemId: string;

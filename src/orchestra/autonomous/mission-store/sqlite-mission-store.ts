@@ -202,6 +202,14 @@ export class SqliteMissionStore implements MissionStore {
       if (item.initialStatus !== undefined && !WORK_ITEM_STATUSES.has(item.initialStatus)) {
         throw new Error(`MISSION_BATCH_INVALID: item ${item.id} has invalid initial status`);
       }
+      if (item.initialResult !== undefined && (
+        item.initialStatus === undefined
+        || item.initialResult === null
+        || typeof item.initialResult !== 'object'
+        || typeof item.initialResult.ok !== 'boolean'
+      )) {
+        throw new Error(`MISSION_BATCH_INVALID: item ${item.id} has invalid initial result`);
+      }
       return { ...item, dependsOn: [...dependencies].sort() };
     });
     const ids = new Set<string>();
@@ -241,6 +249,9 @@ export class SqliteMissionStore implements MissionStore {
     const transaction = this.db.transaction((): Mission => {
       const existing = this.getMission(m.id);
       if (existing) {
+        if (normalizedItems.some((item) => item.initialStatus !== undefined || item.initialResult !== undefined)) {
+          throw new Error(`MISSION_BATCH_CONFLICT: mission ${m.id} import/recovery state requires external replay provenance`);
+        }
         const expectedMission = {
           id: m.id,
           kind: m.kind,
@@ -291,8 +302,8 @@ export class SqliteMissionStore implements MissionStore {
       }
 
       const mission = this.createMission(m);
-      const insert = this.db.prepare(`INSERT INTO work_items(id,mission_id,kind,status,spec,policy,render_as,depends_on,trigger,created_at,updated_at)
-        VALUES(@id,@missionId,@kind,@status,@spec,@policy,@renderAs,@dependsOn,@trigger,@ts,@ts)`);
+      const insert = this.db.prepare(`INSERT INTO work_items(id,mission_id,kind,status,spec,policy,render_as,depends_on,trigger,created_at,updated_at,last_result)
+        VALUES(@id,@missionId,@kind,@status,@spec,@policy,@renderAs,@dependsOn,@trigger,@ts,@ts,@lastResult)`);
       for (const item of normalizedItems) {
         const ts = this.now();
         insert.run({
@@ -305,6 +316,7 @@ export class SqliteMissionStore implements MissionStore {
           renderAs: item.renderAs ?? this.defaultRenderAs(item.kind),
           dependsOn: this.j(item.dependsOn ?? []),
           trigger: this.j(item.trigger ?? null),
+          lastResult: this.j(item.initialResult),
           ts,
         });
       }

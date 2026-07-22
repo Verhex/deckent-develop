@@ -331,7 +331,7 @@ export async function handlePlan(opts: AutonomousPlanOptions): Promise<void> {
       // Cutover must not strand an already-authored v1 backlog merely because an
       // unrelated v2 mission exists. The reserved legacy mission is the one-time
       // import boundary; normal v2 plan batches never write backlog.json.
-      migrateBacklogJson(root, store);
+      migrateBacklogJson(root, store, { admission: PRODUCTION_V2_ADMISSION });
       const existing = store.getMission(missionId);
       createListMission(store, {
         id: missionId,

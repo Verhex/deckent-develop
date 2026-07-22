@@ -18,7 +18,13 @@ import { detectLang } from '../helpers/i18n.js';
 import { SqliteMissionStore } from '../../orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import { createListMission } from '../../orchestra/autonomous/mission-store/mission-ingest.js';
 import { createGoalMission } from '../../orchestra/autonomous/mission-store/goal-mission.js';
+import {
+  MissionAdmissionError,
+  PRODUCTION_V2_ADMISSION,
+  listRuntimeAdmittedKinds,
+} from '../../orchestra/autonomous/mission-store/mission-kind-admission.js';
 import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
+import { DeckentError } from '../../core/errors.js';
 
 /**
  * born-570 — is the autonomous engine explicitly enabled? A mission created
@@ -121,13 +127,26 @@ export function handleCreateList(opts: CreateListOpts): void {
   const store = openStore(opts.root);
   try {
     const missionId = opts.id ?? `list-${Date.now()}`;
-    const mission = createListMission(store, {
-      id: missionId,
-      title: opts.title,
-      tenant: opts.tenant,
-      deliverTo: opts.deliverTo,
-      items: opts.items,
-    });
+    let mission: ReturnType<typeof createListMission>;
+    try {
+      mission = createListMission(store, {
+        id: missionId,
+        title: opts.title,
+        tenant: opts.tenant,
+        deliverTo: opts.deliverTo,
+        items: opts.items,
+      }, { admission: PRODUCTION_V2_ADMISSION });
+    } catch (error) {
+      if (error instanceof MissionAdmissionError) {
+        throw new DeckentError('DECKENT_E039', getMessage('autonomous.plan_kind_rejected', opts.lang, {
+          id: error.itemId,
+          kind: error.kind,
+          reason: error.code,
+          allowed: listRuntimeAdmittedKinds(PRODUCTION_V2_ADMISSION).join(', '),
+        }));
+      }
+      throw error;
+    }
     auditMissionLifecycle(opts.root, {
       tenantId: opts.tenant ?? 'local',
       actor: 'cli',

@@ -267,6 +267,31 @@ describe('runV2Engine', () => {
     expect(legacy!.status).toBe('completed');
   });
 
+  it('rejects an unwired legacy kind before mission persistence or dispatch', async () => {
+    const r = root();
+    mkdirSync(join(r, '.deckent', 'autonomous'), { recursive: true });
+    writeFileSync(join(r, '.deckent', 'autonomous', 'backlog.json'), JSON.stringify({
+      _version: '1.0',
+      entries: [
+        { id: 'legacy-sprint', title: 'Unsafe', kind: 'sprint', spec: { directivesRef: 'mutable' }, policy: 'auto', trigger: { type: 'one-off' }, status: 'pending' },
+      ],
+    }), 'utf-8');
+    const store = openStore(r);
+    const runTask = vi.fn(async () => ({ ok: true }));
+    const runSprint = vi.fn(async () => undefined);
+
+    await expect(runV2Engine(r, cfg({ engine: 'v2' }), {
+      runTask,
+      runSprint,
+      store,
+      maxIterations: BOUNDED,
+    })).rejects.toThrow('SPRINT_SNAPSHOT_REQUIRED');
+
+    expect(store.getMission('legacy')).toBeNull();
+    expect(runTask).not.toHaveBeenCalled();
+    expect(runSprint).not.toHaveBeenCalled();
+  });
+
   it('fires the settle-delivery notify when a mission settles', async () => {
     const r = root();
     const store = openStore(r);

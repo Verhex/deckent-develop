@@ -60,8 +60,8 @@ describe('handleCreateList', () => {
     const root = mkRoot();
     const items: ParsedItem[] = [
       { kind: 'task', spec: { description: 'first' } },
-      { kind: 'sprint', spec: { directivesRef: 'DIRECTIVES.md' } },
-      { kind: 'task' },
+      { kind: 'task', spec: { description: 'second' } },
+      { kind: 'task', spec: { description: 'third' } },
     ];
 
     const out = captureOutput(() =>
@@ -84,7 +84,7 @@ describe('handleCreateList', () => {
       const workItems = store.listItems('list-cli-001');
       expect(workItems).toHaveLength(3);
       expect(workItems.every((wi) => wi.status === 'pending')).toBe(true);
-      expect(workItems.map((wi) => wi.kind)).toEqual(['task', 'sprint', 'task']);
+      expect(workItems.map((wi) => wi.kind)).toEqual(['task', 'task', 'task']);
     } finally {
       store.close();
     }
@@ -96,7 +96,7 @@ describe('handleCreateList', () => {
       root,
       lang: 'en',
       title: 'Tenant test',
-      items: [{ kind: 'task' }],
+      items: [{ kind: 'task', spec: { description: 'tenant task' } }],
       id: 'list-tenant-001',
       tenant: 'acme',
       deliverTo: 'ops@example.com',
@@ -121,13 +121,50 @@ describe('handleCreateList', () => {
         root,
         lang: 'tr',
         title: 'TR list',
-        items: [{ kind: 'task' }],
+        items: [{ kind: 'task', spec: { description: 'TR task' } }],
         id: 'list-tr-001',
       }),
     );
     // getMessage resolves the key — no ham-key in output, readable Turkish string present
     expect(out).not.toContain('autonomous_mission.');
     expect(out).toContain('Misyon oluşturuldu: list-tr-001');
+  });
+
+  it.each([
+    {
+      name: 'unwired capability',
+      items: [
+        { kind: 'task', spec: { description: 'valid sibling' } },
+        { kind: 'capability', spec: { capabilityTarget: { capability: 'db.query' } } },
+      ] as ParsedItem[],
+      reason: 'CAPABILITY_BROKER_UNWIRED',
+    },
+    {
+      name: 'empty task description',
+      items: [{ kind: 'task' }] as ParsedItem[],
+      reason: 'TASK_DESCRIPTION_REQUIRED',
+    },
+    {
+      name: 'unknown kind cast',
+      items: [{ kind: 'deploy' as never, spec: { description: 'invalid' } }] as ParsedItem[],
+      reason: 'UNKNOWN_KIND',
+    },
+  ])('rejects $name before mission persistence with a localized reason', ({ items, reason }) => {
+    const root = mkRoot();
+    expect(() => handleCreateList({
+      root,
+      lang: 'en',
+      title: 'Rejected list',
+      items,
+      id: `rejected-${reason.toLowerCase()}`,
+    })).toThrow(reason);
+
+    const store = newStore(root);
+    try {
+      expect(store.listMissions()).toEqual([]);
+    } finally {
+      store.close();
+    }
   });
 });
 
@@ -216,7 +253,10 @@ describe('handleListMissions', () => {
       root,
       lang: 'en',
       title: 'Alpha list',
-      items: [{ kind: 'task' }, { kind: 'task' }],
+      items: [
+        { kind: 'task', spec: { description: 'alpha one' } },
+        { kind: 'task', spec: { description: 'alpha two' } },
+      ],
       id: 'list-alpha',
     });
     handleCreateGoal({ root, lang: 'en', goal: 'Beta goal', id: 'goal-beta' });
@@ -235,7 +275,7 @@ describe('handleListMissions', () => {
       root,
       lang: 'en',
       title: 'JSON test',
-      items: [{ kind: 'task' }],
+      items: [{ kind: 'task', spec: { description: 'json task' } }],
       id: 'list-json-001',
     });
 
@@ -298,7 +338,7 @@ describe('born-570 — engine-disabled honest warning on create', () => {
   it('DISABLED (no config): create-list warns loudly the mission will not drain', () => {
     const root = mkRoot();
     const out = captureOutput(() =>
-      handleCreateList({ root, lang: 'en', title: 'X', items: [{ kind: 'task' }], id: 'l1' }),
+      handleCreateList({ root, lang: 'en', title: 'X', items: [{ kind: 'task', spec: { description: 'x' } }], id: 'l1' }),
     );
     expect(out).toContain('Mission created: l1');
     expect(out).toContain(WARN_EN);
@@ -319,7 +359,7 @@ describe('born-570 — engine-disabled honest warning on create', () => {
     const root = mkRoot();
     writeAutonomousEnabled(root, true);
     const out = captureOutput(() =>
-      handleCreateList({ root, lang: 'en', title: 'X', items: [{ kind: 'task' }], id: 'l2' }),
+      handleCreateList({ root, lang: 'en', title: 'X', items: [{ kind: 'task', spec: { description: 'x' } }], id: 'l2' }),
     );
     expect(out).toContain('Mission created: l2');
     expect(out).not.toContain(WARN_EN);

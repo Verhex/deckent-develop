@@ -12,6 +12,7 @@ import { SqliteMissionStore } from './sqlite-mission-store.js';
 import { buildMissionDispatch, type MissionTaskContext } from './mission-dispatch.js';
 import { makeMissionDeliver, type MissionNotifyPayload } from './mission-deliver.js';
 import { migrateBacklogJson } from './mission-migrate.js';
+import { PRODUCTION_V2_ADMISSION } from './mission-kind-admission.js';
 import { runMissionScheduler, type DispatchFn, type MissionSchedulerSummary } from './mission-scheduler.js';
 import { advanceGoalMission, type GoalAdvanceDeps } from './goal-mission.js';
 import { auditMissionLifecycle } from './mission-audit-bridge.js';
@@ -149,7 +150,7 @@ export async function runV2Engine(
     // touches status='running' rows; a clean boot is a no-op.
     store.recover();
     // Boot: import the legacy backlog into a `legacy` mission (no-op if missions exist).
-    migrateBacklogJson(projectRoot, store);
+    migrateBacklogJson(projectRoot, store, { admission: PRODUCTION_V2_ADMISSION });
 
     const dispatch = buildMissionDispatch({
       projectRoot,
