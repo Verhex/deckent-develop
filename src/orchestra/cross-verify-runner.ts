@@ -142,6 +142,45 @@ export interface RunCrossVerifyOptions {
 /** Default short timeout for the adversarial verifier (2 minutes). */
 export const CROSS_VERIFY_TIMEOUT_MS = 120_000;
 
+/**
+ * Docker writes its fallback result before it captures and normalizes provider logs.
+ * Keep the post-marker grace short and bounded: this is artifact reconciliation, not
+ * another worker/provider timeout.
+ */
+const CROSS_VERIFY_LOG_FINALIZE_GRACE_MS = 2_000;
+const CROSS_VERIFY_LOG_POLL_MS = 50;
+
+function extractLastTerminalVerdict(raw: string): string | null {
+  // Return ONLY the LAST VERDICT line, never the whole log: the adversarial
+  // prompt itself contains `VERDICT: REFUTED <reason>` as a FORMAT EXAMPLE,
+  // and `parseRefuteVerdict` checks REFUTED_RE first — feeding a log that
+  // echoes the prompt would turn every run into a false REFUTED. The final
+  // agent message always comes after any prompt echo, so last-match wins.
+  // Stops at a literal backslash (NDJSON logs carry `\n` as two chars) or
+  // a closing quote, so escaped-JSON wrapping cannot bleed into the reason.
+  const matches = raw.match(/VERDICT:\s*(?:REFUTED|CONFIRMED|UNCLEAR)[^"\\\n]*/g);
+  return matches?.at(-1)?.trim() ?? null;
+}
+
+async function waitForTerminalVerifierLog(logPath: string, timeoutMs: number): Promise<string | null> {
+  const graceMs = Math.min(CROSS_VERIFY_LOG_FINALIZE_GRACE_MS, Math.max(0, timeoutMs));
+  const deadline = Date.now() + graceMs;
+  do {
+    try {
+      if (existsSync(logPath)) {
+        const terminalVerdict = extractLastTerminalVerdict(readFileSync(logPath, 'utf-8'));
+        if (terminalVerdict) return terminalVerdict;
+      }
+    } catch (err) {
+      debugLog('cross-verify:log-fallback-read-failed', String(err));
+    }
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) break;
+    await new Promise<void>((resolve) => setTimeout(resolve, Math.min(CROSS_VERIFY_LOG_POLL_MS, remainingMs)));
+  } while (true);
+  return null;
+}
+
 function resolveVerifierModel(
   taskModel: string,
   verifierProvider: ProviderName,
@@ -285,22 +324,14 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
   // log, yet the outcome resolved to 'unclear' because notes stayed empty. The
   // raw log tail is a valid verdict source: `parseRefuteVerdict` scans for the
   // LAST `VERDICT:` line, and the NDJSON wrapping does not defeat that match.
-  // Best-effort + capped: an unreadable/absent log keeps the honest '' →
-  // 'unclear' path.
+  // Best-effort + capped: Docker persists the wrapper marker before its awaited
+  // provider-log capture. A single immediate read therefore races the normalized
+  // log by a few milliseconds. Poll only this artifact-finalization gap; an
+  // unreadable/absent log still keeps the honest '' → 'unclear' path.
   try {
     const logPath = join(input.projectRoot, TASKS_DIR, `task-${verifierTaskId}.log`);
-    if (existsSync(logPath)) {
-      const raw = readFileSync(logPath, 'utf-8');
-      // Return ONLY the LAST VERDICT line, never the whole log: the adversarial
-      // prompt itself contains `VERDICT: REFUTED <reason>` as a FORMAT EXAMPLE,
-      // and `parseRefuteVerdict` checks REFUTED_RE first — feeding a log that
-      // echoes the prompt would turn every run into a false REFUTED. The final
-      // agent message always comes after any prompt echo, so last-match wins.
-      // Stops at a literal backslash (NDJSON logs carry `\n` as two chars) or
-      // a closing quote, so escaped-JSON wrapping cannot bleed into the reason.
-      const matches = raw.match(/VERDICT:\s*(?:REFUTED|CONFIRMED|UNCLEAR)[^"\\\n]*/g);
-      if (matches && matches.length > 0) {
-        const terminalVerdict = matches[matches.length - 1]!;
+    const terminalVerdict = await waitForTerminalVerifierLog(logPath, input.timeoutMs);
+    if (terminalVerdict) {
 
         // The provider completed the verifier's sole acceptance criterion, but
         // generic Docker wrappers cannot write a TaskResult for host-CLI output
@@ -331,8 +362,7 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
           // terminal verdict returned below.
           debugLog('cross-verify:terminal-result-recovery-failed', String(err));
         }
-        return terminalVerdict;
-      }
+      return terminalVerdict;
     }
   } catch (err) {
     debugLog('cross-verify:log-fallback-read-failed', String(err));

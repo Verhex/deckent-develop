@@ -304,6 +304,68 @@ describe('runCrossVerify — dispatch + advisory write', () => {
     expect(String(recovered.notes)).toMatch(/VERDICT: UNCLEAR exact receipt was not present$/);
   });
 
+  it('waits for a provider log finalized shortly after the wrapper marker', async () => {
+    defaultSpawnMocks.spawnWorkerMultiProvider.mockImplementationOnce(async (taskId, _model, _prompt, projectRoot) => {
+      writeFileSync(
+        join(projectRoot, TASKS_DIR, `task-${taskId}.result`),
+        JSON.stringify({
+          taskId,
+          workerId: `docker-${taskId}`,
+          filesChanged: [],
+          linesAdded: 0,
+          linesRemoved: 0,
+          testsPassed: false,
+          coverage: 0,
+          selfAssessment: 'NO_GO',
+          markerType: 'EXIT_WITHOUT_RESULT',
+          notes: 'Worker exited without writing result. EXIT_WITHOUT_RESULT marker.',
+          tokenUsage: { inputTokens: 101, outputTokens: 202, cacheReadTokens: 303 },
+        }),
+        'utf-8',
+      );
+      setTimeout(() => {
+        writeFileSync(
+          join(projectRoot, TASKS_DIR, `task-${taskId}.log`),
+          [
+            'prompt example: VERDICT: REFUTED placeholder',
+            'VERDICT: CONFIRMED delayed normalized log is authoritative',
+          ].join('\n'),
+          'utf-8',
+        );
+      }, 25);
+      return { backend: 'docker', provider: 'claude' };
+    });
+    defaultSpawnMocks.pollForResultFile.mockResolvedValueOnce({
+      notes: 'Worker exited without writing result. EXIT_WITHOUT_RESULT marker.',
+    });
+
+    const res = await runCrossVerify(
+      root,
+      makeTask({ provider: 'codex', model: 'gpt-5.6-sol' }),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true }),
+      { availableProviders: ['codex', 'claude'], verifierModel: 'claude-fable-5' },
+    );
+
+    expect(res).toMatchObject({
+      ran: true,
+      outcome: 'confirmed',
+      advisory: {
+        verdict: 'confirmed',
+        reason: 'delayed normalized log is authoritative',
+      },
+    });
+    expect(JSON.parse(readFileSync(
+      join(root, TASKS_DIR, 'task-276-001-xverify.result'),
+      'utf-8',
+    ))).toMatchObject({
+      selfAssessment: 'DONE',
+      testsPassed: true,
+      tokenUsage: { inputTokens: 101, outputTokens: 202, cacheReadTokens: 303 },
+    });
+  });
+
   it('enabled + high-stakes + 2 providers + CONFIRMED → runs, writes advisory, not refuted', async () => {
     writeResultFile('276-001', makeResult());
     const { fn, calls } = makeSpawnSpy('Examined the diff.\nVERDICT: CONFIRMED jwt checks present');

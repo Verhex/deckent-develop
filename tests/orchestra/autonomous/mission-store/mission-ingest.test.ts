@@ -100,4 +100,99 @@ describe('createListMission', () => {
 
     store.close();
   });
+
+  it('accepts forward dependencies and exact replay without duplicate rows', () => {
+    const store = newStore();
+    const spec = {
+      id: 'mission-dag',
+      title: 'Atomic DAG',
+      items: [
+        { id: 'downstream', kind: 'task' as const, dependsOn: ['upstream'] },
+        { id: 'upstream', kind: 'task' as const },
+      ],
+    };
+
+    expect(createListMission(store, spec).id).toBe('mission-dag');
+    expect(createListMission(store, spec).id).toBe('mission-dag');
+    const items = store.listItems('mission-dag');
+    expect(items).toHaveLength(2);
+    expect(items.find((item) => item.id === 'downstream')!.dependsOn).toEqual(['upstream']);
+    expect(store.queryDue().map((item) => item.id)).toEqual(['upstream']);
+    store.close();
+  });
+
+  it.each([
+    {
+      name: 'duplicate item identity',
+      items: [
+        { id: 'same', kind: 'task' as const },
+        { id: 'same', kind: 'task' as const },
+      ],
+      reason: 'duplicate work-item id',
+    },
+    {
+      name: 'self dependency',
+      items: [{ id: 'self', kind: 'task' as const, dependsOn: ['self'] }],
+      reason: 'self dependency',
+    },
+    {
+      name: 'missing or foreign dependency',
+      items: [{ id: 'child', kind: 'task' as const, dependsOn: ['outside'] }],
+      reason: 'missing or foreign item',
+    },
+    {
+      name: 'dependency cycle',
+      items: [
+        { id: 'a', kind: 'task' as const, dependsOn: ['b'] },
+        { id: 'b', kind: 'task' as const, dependsOn: ['a'] },
+      ],
+      reason: 'dependency cycle',
+    },
+  ])('rejects $name before persisting any row', ({ items, reason }) => {
+    const store = newStore();
+    expect(() => createListMission(store, {
+      id: `invalid-${reason.replace(/\s+/g, '-')}`,
+      title: 'Invalid DAG',
+      items,
+    })).toThrow(reason);
+    expect(store.listMissions()).toEqual([]);
+    store.close();
+  });
+
+  it('rolls back the mission when a global work-item identity conflicts', () => {
+    const store = newStore();
+    createListMission(store, {
+      id: 'owner',
+      title: 'Existing owner',
+      items: [{ id: 'global-item', kind: 'task' }],
+    });
+
+    expect(() => createListMission(store, {
+      id: 'conflicting-mission',
+      title: 'Must roll back',
+      items: [{ id: 'global-item', kind: 'task' }],
+    })).toThrow('MISSION_BATCH_CONFLICT');
+    expect(store.getMission('conflicting-mission')).toBeNull();
+    expect(store.listItems('conflicting-mission')).toEqual([]);
+    expect(store.listItems('owner').map((item) => item.id)).toEqual(['global-item']);
+    store.close();
+  });
+
+  it('rejects a conflicting replay without mutating the original batch', () => {
+    const store = newStore();
+    createListMission(store, {
+      id: 'replay',
+      title: 'Original',
+      items: [{ id: 'one', kind: 'task' }],
+    });
+
+    expect(() => createListMission(store, {
+      id: 'replay',
+      title: 'Changed',
+      items: [{ id: 'one', kind: 'task' }],
+    })).toThrow('MISSION_BATCH_CONFLICT');
+    expect(store.getMission('replay')!.title).toBe('Original');
+    expect(store.listItems('replay')).toHaveLength(1);
+    store.close();
+  });
 });

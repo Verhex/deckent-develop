@@ -31,4 +31,12 @@ describe('SqliteMissionStore — schema', () => {
     expect(JSON.parse(row.last_result).reason).toContain('RECOVERY_RECONCILIATION_REQUIRED');
     store.close();
   });
+
+  it('enforces mission foreign keys on direct work-item writes', () => {
+    const store = new SqliteMissionStore(sandbox());
+    store.migrate();
+    expect(() => store.__rawExec("INSERT INTO work_items(id,mission_id,kind,status,render_as,policy,created_at,updated_at) VALUES('orphan','missing','task','pending','task','auto','t','t')"))
+      .toThrow(/FOREIGN KEY constraint failed/i);
+    store.close();
+  });
 });

@@ -52,6 +52,8 @@ export interface MissionStore {
   recover(): void;
   close(): void;
   createMission(m: NewMission): Mission;
+  /** Validate and persist a new mission plus its complete work-item DAG atomically. */
+  createMissionWithItems(m: NewMission, items: readonly NewWorkItem[]): Mission;
   getMission(id: string): Mission | null;
   listMissions(f?: { status?: MissionStatus[]; tenant?: string }): Mission[];
   updateMissionStatus(id: string, status: MissionStatus, result?: ResultLike): void;

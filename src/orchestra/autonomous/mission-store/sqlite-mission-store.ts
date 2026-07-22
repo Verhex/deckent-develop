@@ -31,6 +31,7 @@ export class SqliteMissionStore implements MissionStore {
     const dir = join(projectRoot, DECKENT_DIR, 'autonomous');
     mkdirSync(dir, { recursive: true });
     this.db = new Database(join(dir, 'autonomous.db'));
+    this.db.pragma('foreign_keys = ON');
     this.db.pragma('journal_mode = WAL');
   }
   migrate(): void { this.db.exec(SCHEMA); }
@@ -48,6 +49,19 @@ export class SqliteMissionStore implements MissionStore {
   private now(): string { return new Date().toISOString(); }
   private j(v: unknown): string | null { return v === undefined || v === null ? null : JSON.stringify(v); }
   private p<T>(s: unknown): T | null { return typeof s === 'string' && s.length ? JSON.parse(s) as T : null; }
+  private canonical(v: unknown): string {
+    const normalize = (value: unknown): unknown => {
+      if (Array.isArray(value)) return value.map(normalize);
+      if (value !== null && typeof value === 'object') {
+        return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+          .filter(([, nested]) => nested !== undefined)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([key, nested]) => [key, normalize(nested)]));
+      }
+      return value ?? null;
+    };
+    return JSON.stringify(normalize(v));
+  }
 
   // --- Missions CRUD ---
   private rowToMission = (r: any): Mission => ({
@@ -67,6 +81,138 @@ export class SqliteMissionStore implements MissionStore {
       progress: this.j(m.progress), ts,
     });
     return this.getMission(m.id)!;
+  }
+  createMissionWithItems(m: NewMission, items: readonly NewWorkItem[]): Mission {
+    if (!m.id || m.id !== m.id.trim()) {
+      throw new Error('MISSION_BATCH_INVALID: mission id must be a non-empty canonical string');
+    }
+    const normalizedItems = items.map((item): NewWorkItem => {
+      if (!item.id || item.id !== item.id.trim()) {
+        throw new Error('MISSION_BATCH_INVALID: work-item id must be a non-empty canonical string');
+      }
+      if (item.missionId !== m.id) {
+        throw new Error(`MISSION_BATCH_INVALID: item ${item.id} belongs to foreign mission ${item.missionId}`);
+      }
+      const dependencies = item.dependsOn ?? [];
+      if (dependencies.some((id) => !id || id !== id.trim())) {
+        throw new Error(`MISSION_BATCH_INVALID: item ${item.id} has a non-canonical dependency id`);
+      }
+      if (new Set(dependencies).size !== dependencies.length) {
+        throw new Error(`MISSION_BATCH_INVALID: item ${item.id} has duplicate dependencies`);
+      }
+      return { ...item, dependsOn: [...dependencies].sort() };
+    });
+    const ids = new Set<string>();
+    for (const item of normalizedItems) {
+      if (ids.has(item.id)) throw new Error(`MISSION_BATCH_INVALID: duplicate work-item id ${item.id}`);
+      ids.add(item.id);
+    }
+    for (const item of normalizedItems) {
+      if (item.dependsOn?.includes(item.id)) {
+        throw new Error(`MISSION_BATCH_INVALID: self dependency ${item.id}`);
+      }
+      const missing = item.dependsOn?.filter((id) => !ids.has(id)) ?? [];
+      if (missing.length > 0) {
+        throw new Error(`MISSION_BATCH_INVALID: item ${item.id} depends on missing or foreign item ${missing.join(', ')}`);
+      }
+    }
+
+    const byId = new Map(normalizedItems.map((item) => [item.id, item]));
+    const visiting = new Set<string>();
+    const visited = new Set<string>();
+    const stack: string[] = [];
+    const visit = (id: string): void => {
+      if (visited.has(id)) return;
+      if (visiting.has(id)) {
+        const cycleStart = stack.lastIndexOf(id);
+        throw new Error(`MISSION_BATCH_INVALID: dependency cycle ${stack.slice(cycleStart).concat(id).join(' -> ')}`);
+      }
+      visiting.add(id);
+      stack.push(id);
+      for (const dependency of byId.get(id)?.dependsOn ?? []) visit(dependency);
+      stack.pop();
+      visiting.delete(id);
+      visited.add(id);
+    };
+    for (const id of ids) visit(id);
+
+    const transaction = this.db.transaction((): Mission => {
+      const existing = this.getMission(m.id);
+      if (existing) {
+        const expectedMission = {
+          id: m.id,
+          kind: m.kind,
+          tenant: m.tenant ?? 'local',
+          title: m.title,
+          spec: m.spec ?? null,
+          createdBy: m.createdBy ?? null,
+          deliverTo: m.deliverTo ?? null,
+          renderAs: m.renderAs ?? (m.kind === 'list' ? 'checklist' : 'goal'),
+          progress: m.progress ?? null,
+        };
+        const actualMission = {
+          id: existing.id,
+          kind: existing.kind,
+          tenant: existing.tenant,
+          title: existing.title,
+          spec: existing.spec,
+          createdBy: existing.createdBy,
+          deliverTo: existing.deliverTo,
+          renderAs: existing.renderAs,
+          progress: existing.progress,
+        };
+        const actualItems = this.listItems(m.id).map((item) => ({
+          id: item.id,
+          missionId: item.missionId,
+          kind: item.kind,
+          spec: item.spec,
+          policy: item.policy,
+          renderAs: item.renderAs,
+          dependsOn: [...item.dependsOn].sort(),
+          trigger: item.trigger,
+        })).sort((a, b) => a.id.localeCompare(b.id));
+        const expectedItems = normalizedItems.map((item) => ({
+          id: item.id,
+          missionId: item.missionId,
+          kind: item.kind,
+          spec: item.spec ?? null,
+          policy: item.policy ?? 'auto',
+          renderAs: item.renderAs ?? this.defaultRenderAs(item.kind),
+          dependsOn: item.dependsOn ?? [],
+          trigger: item.trigger ?? null,
+        })).sort((a, b) => a.id.localeCompare(b.id));
+        if (
+          this.canonical(actualMission) === this.canonical(expectedMission)
+          && this.canonical(actualItems) === this.canonical(expectedItems)
+        ) return existing;
+        throw new Error(`MISSION_BATCH_CONFLICT: mission ${m.id} already exists with different creation data`);
+      }
+
+      const mission = this.createMission(m);
+      const insert = this.db.prepare(`INSERT INTO work_items(id,mission_id,kind,status,spec,policy,render_as,depends_on,trigger,created_at,updated_at)
+        VALUES(@id,@missionId,@kind,'pending',@spec,@policy,@renderAs,@dependsOn,@trigger,@ts,@ts)`);
+      for (const item of normalizedItems) {
+        const ts = this.now();
+        insert.run({
+          id: item.id,
+          missionId: item.missionId,
+          kind: item.kind,
+          spec: this.j(item.spec),
+          policy: item.policy ?? 'auto',
+          renderAs: item.renderAs ?? this.defaultRenderAs(item.kind),
+          dependsOn: this.j(item.dependsOn ?? []),
+          trigger: this.j(item.trigger ?? null),
+          ts,
+        });
+      }
+      return mission;
+    });
+    try {
+      return transaction.immediate();
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('MISSION_BATCH_')) throw error;
+      throw new Error(`MISSION_BATCH_CONFLICT: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
   getMission(id: string): Mission | null {
     const r = this.db.prepare('SELECT * FROM missions WHERE id=?').get(id);

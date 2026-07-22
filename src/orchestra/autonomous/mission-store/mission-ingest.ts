@@ -1,10 +1,17 @@
-import type { Mission, MissionStore, WorkItemKind, WorkItemPolicy } from './mission-types.js';
+import type {
+  Mission,
+  MissionStore,
+  NewWorkItem,
+  WorkItemKind,
+  WorkItemPolicy,
+} from './mission-types.js';
 
 export interface ListItemSpec {
   id?: string;
   kind: WorkItemKind;
   spec?: Record<string, unknown>;
   policy?: WorkItemPolicy;
+  dependsOn?: string[];
 }
 
 export interface ListMissionSpec {
@@ -20,24 +27,21 @@ export interface ListMissionSpec {
  * Missing item.id is derived as `${missionId}-${index}`.
  */
 export function createListMission(store: MissionStore, spec: ListMissionSpec): Mission {
-  const mission = store.createMission({
+  const missionInput = {
     id: spec.id,
-    kind: 'list',
+    kind: 'list' as const,
     title: spec.title,
     tenant: spec.tenant,
     deliverTo: spec.deliverTo,
-    renderAs: 'checklist',
-  });
-
-  for (const [i, item] of spec.items.entries()) {
-    store.enqueueItem({
-      id: item.id ?? `${mission.id}-${i}`,
-      missionId: mission.id,
+    renderAs: 'checklist' as const,
+  };
+  const items: NewWorkItem[] = spec.items.map((item, i) => ({
+      id: item.id ?? `${spec.id}-${i}`,
+      missionId: spec.id,
       kind: item.kind,
       spec: item.spec,
       policy: item.policy,
-    });
-  }
-
-  return mission;
+      dependsOn: item.dependsOn,
+    }));
+  return store.createMissionWithItems(missionInput, items);
 }
