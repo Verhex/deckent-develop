@@ -12,6 +12,7 @@ export interface ListItemSpec {
   spec?: Record<string, unknown>;
   policy?: WorkItemPolicy;
   dependsOn?: string[];
+  trigger?: NewWorkItem['trigger'];
 }
 
 export interface ListMissionSpec {
@@ -42,6 +43,7 @@ export function createListMission(store: MissionStore, spec: ListMissionSpec): M
       spec: item.spec,
       policy: item.policy,
       dependsOn: item.dependsOn,
+      trigger: item.trigger,
     }));
   return store.createMissionWithItems(missionInput, items);
 }

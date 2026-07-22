@@ -1733,6 +1733,14 @@ const MESSAGES: MessageMap = {
     en: 'Wrote {count} item(s) to the backlog (pending). Review: deckent autonomous backlog list',
     tr: '{count} madde backlog’a yazıldı (pending). Gözden geçir: deckent autonomous backlog list',
   },
+  'autonomous.plan_mission_written': {
+    en: 'Wrote {count} item(s) atomically to MissionStore mission {missionId} (pending).',
+    tr: '{count} madde MissionStore mission {missionId} içine atomik yazıldı (pending).',
+  },
+  'autonomous.plan_mission_replayed': {
+    en: 'MissionStore mission {missionId} already contains the exact {count}-item plan; no duplicate was created.',
+    tr: 'MissionStore mission {missionId} aynı {count} maddelik planı zaten içeriyor; mükerrer kayıt oluşturulmadı.',
+  },
   'autonomous.plan_dryrun': {
     en: 'Dry-run — nothing written.',
     tr: 'Dry-run — hiçbir şey yazılmadı.',

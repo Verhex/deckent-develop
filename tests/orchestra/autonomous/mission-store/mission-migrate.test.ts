@@ -21,14 +21,41 @@ describe('migrateBacklogJson', () => {
       ],
     }), 'utf-8');
     const s = new SqliteMissionStore(r); s.migrate();
+    s.createMissionWithItems(
+      { id: 'unrelated', kind: 'list', title: 'Existing v2 mission' },
+      [],
+    );
     const n = migrateBacklogJson(r, s);
     expect(n).toBe(2);
-    const legacy = s.listMissions({})[0];
+    const legacy = s.getMission('legacy')!;
     expect(legacy.id).toBe('legacy');
+    expect(s.getMission('unrelated')).not.toBeNull();
     const items = s.listItems('legacy');
     expect(items.map(i => i.id).sort()).toEqual(['e1', 'e2']);
     expect(items.find(i => i.id === 'e2')!.kind).toBe('sprint');
-    expect(migrateBacklogJson(r, s)).toBe(0); // idempotent — missions exist
+    expect(items.find(i => i.id === 'e2')!.status).toBe('done');
+    expect(migrateBacklogJson(r, s)).toBe(0); // idempotent — reserved legacy mission exists
+    s.close();
+  });
+
+  it('rolls back the reserved legacy mission when an item identity conflicts', () => {
+    const r = root();
+    mkdirSync(join(r, '.deckent', 'autonomous'), { recursive: true });
+    writeFileSync(join(r, '.deckent', 'autonomous', 'backlog.json'), JSON.stringify({
+      _version: '1.0',
+      entries: [
+        { id: 'e1', title: 'Conflict', kind: 'task', spec: { description: 'legacy' }, policy: 'auto', trigger: { type: 'one-off' }, status: 'pending' },
+      ],
+    }), 'utf-8');
+    const s = new SqliteMissionStore(r); s.migrate();
+    s.createMissionWithItems(
+      { id: 'owner', kind: 'list', title: 'Identity owner' },
+      [{ id: 'e1', missionId: 'owner', kind: 'task' }],
+    );
+
+    expect(() => migrateBacklogJson(r, s)).toThrow('MISSION_BATCH_CONFLICT');
+    expect(s.getMission('legacy')).toBeNull();
+    expect(s.listItems('owner').map((item) => item.id)).toEqual(['e1']);
     s.close();
   });
 });

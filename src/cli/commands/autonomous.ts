@@ -12,6 +12,7 @@
 // ADR-012: registerAutonomous(program) pattern.
 
 import { Command } from 'commander';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -56,6 +57,10 @@ import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.j
 import { isV2Engine, runV2Engine } from '../../orchestra/autonomous/mission-store/mission-engine-wire.js';
 import { buildGoalDeps, type GoalAdvanceDeps } from '../../orchestra/autonomous/mission-store/goal-mission.js';
 import type { NewWorkItem, WorkItem } from '../../orchestra/autonomous/mission-store/mission-types.js';
+import { createListMission } from '../../orchestra/autonomous/mission-store/mission-ingest.js';
+import { auditMissionLifecycle } from '../../orchestra/autonomous/mission-store/mission-audit-bridge.js';
+import { migrateBacklogJson } from '../../orchestra/autonomous/mission-store/mission-migrate.js';
+import { SqliteMissionStore } from '../../orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import { loadConfig, resolveDefaultModel } from '../../core/config.js';
 import { PROJECT_CONFIG_PATH, RECENT_WORKS_DIR } from '../../core/constants.js';
 import { bootstrapProviders } from '../../core/provider.js';
@@ -226,6 +231,8 @@ export interface AutonomousPlanOptions {
   policy?: string;
   maxItems?: number;
   dryRun?: boolean;
+  /** Explicit persistence target resolved from the loaded autonomous config. */
+  engine?: 'v1' | 'v2';
   lang?: string;
   complete: LlmComplete;
   print?: (line: string) => void;
@@ -265,6 +272,62 @@ export async function handlePlan(opts: AutonomousPlanOptions): Promise<void> {
 
   if (opts.dryRun) {
     out(getMessage('autonomous.plan_dryrun', lang));
+    return;
+  }
+
+  if (opts.engine === 'v2') {
+    const missionProjection = JSON.stringify({ goal: opts.goal, items });
+    const missionId = `plan-${createHash('sha256').update(missionProjection).digest('hex').slice(0, 24)}`;
+    const store = new SqliteMissionStore(root);
+    try {
+      store.migrate();
+      // Cutover must not strand an already-authored v1 backlog merely because an
+      // unrelated v2 mission exists. The reserved legacy mission is the one-time
+      // import boundary; normal v2 plan batches never write backlog.json.
+      migrateBacklogJson(root, store);
+      const existing = store.getMission(missionId);
+      createListMission(store, {
+        id: missionId,
+        title: opts.goal,
+        items: items.map((item) => {
+          const snapshot = plannedItemToBacklogEntry(item);
+          return {
+            id: `${missionId}-${item.id}`,
+            kind: item.kind,
+            spec: {
+              ...snapshot.spec,
+              title: item.title,
+              summary: item.summary,
+              planned: true,
+              plannerItemId: item.id,
+              ...(item.fanOut ? { fanOut: item.fanOut } : {}),
+            },
+            policy: item.policy,
+            trigger: { ...snapshot.trigger },
+          };
+        }),
+      });
+      if (existing) {
+        out(getMessage('autonomous.plan_mission_replayed', lang, {
+          count: String(items.length),
+          missionId,
+        }));
+      } else {
+        auditMissionLifecycle(root, {
+          tenantId: 'local',
+          actor: 'cli',
+          action: 'missions:create',
+          missionId,
+          metadata: { kind: 'list', title: opts.goal, source: 'autonomous-plan' },
+        });
+        out(getMessage('autonomous.plan_mission_written', lang, {
+          count: String(items.length),
+          missionId,
+        }));
+      }
+    } finally {
+      store.close();
+    }
     return;
   }
 
@@ -1136,6 +1199,7 @@ export function registerAutonomous(program: Command): void {
           goal, root, from: o.from, policy: o.policy,
           maxItems: o.maxItems ? parseInt(o.maxItems, 10) : undefined,
           dryRun: o.dryRun, lang: o.lang, complete: realPlannerComplete(model),
+          engine: isV2Engine(config) ? 'v2' : 'v1',
         });
       } catch (err) { printError(err); process.exitCode = 1; }
     });

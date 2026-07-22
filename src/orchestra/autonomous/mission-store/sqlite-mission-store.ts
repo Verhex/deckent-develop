@@ -5,8 +5,12 @@ import { join } from 'node:path';
 import { DECKENT_DIR } from '../../../core/constants.js';
 import type {
   MissionStore, Mission, NewMission, MissionStatus, Progress, ResultLike,
-  WorkItem, NewWorkItem, WorkItemStatus,
+  WorkItem, NewWorkItem, NewMissionWorkItem, WorkItemStatus,
 } from './mission-types.js';
+
+const WORK_ITEM_STATUSES: ReadonlySet<WorkItemStatus> = new Set([
+  'pending', 'running', 'done', 'failed', 'blocked', 'parked',
+]);
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS missions (
@@ -82,11 +86,11 @@ export class SqliteMissionStore implements MissionStore {
     });
     return this.getMission(m.id)!;
   }
-  createMissionWithItems(m: NewMission, items: readonly NewWorkItem[]): Mission {
+  createMissionWithItems(m: NewMission, items: readonly NewMissionWorkItem[]): Mission {
     if (!m.id || m.id !== m.id.trim()) {
       throw new Error('MISSION_BATCH_INVALID: mission id must be a non-empty canonical string');
     }
-    const normalizedItems = items.map((item): NewWorkItem => {
+    const normalizedItems = items.map((item): NewMissionWorkItem => {
       if (!item.id || item.id !== item.id.trim()) {
         throw new Error('MISSION_BATCH_INVALID: work-item id must be a non-empty canonical string');
       }
@@ -99,6 +103,9 @@ export class SqliteMissionStore implements MissionStore {
       }
       if (new Set(dependencies).size !== dependencies.length) {
         throw new Error(`MISSION_BATCH_INVALID: item ${item.id} has duplicate dependencies`);
+      }
+      if (item.initialStatus !== undefined && !WORK_ITEM_STATUSES.has(item.initialStatus)) {
+        throw new Error(`MISSION_BATCH_INVALID: item ${item.id} has invalid initial status`);
       }
       return { ...item, dependsOn: [...dependencies].sort() };
     });
@@ -190,13 +197,14 @@ export class SqliteMissionStore implements MissionStore {
 
       const mission = this.createMission(m);
       const insert = this.db.prepare(`INSERT INTO work_items(id,mission_id,kind,status,spec,policy,render_as,depends_on,trigger,created_at,updated_at)
-        VALUES(@id,@missionId,@kind,'pending',@spec,@policy,@renderAs,@dependsOn,@trigger,@ts,@ts)`);
+        VALUES(@id,@missionId,@kind,@status,@spec,@policy,@renderAs,@dependsOn,@trigger,@ts,@ts)`);
       for (const item of normalizedItems) {
         const ts = this.now();
         insert.run({
           id: item.id,
           missionId: item.missionId,
           kind: item.kind,
+          status: item.initialStatus ?? 'pending',
           spec: this.j(item.spec),
           policy: item.policy ?? 'auto',
           renderAs: item.renderAs ?? this.defaultRenderAs(item.kind),

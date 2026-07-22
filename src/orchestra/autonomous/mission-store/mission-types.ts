@@ -45,6 +45,11 @@ export interface NewWorkItem {
   policy?: WorkItemPolicy; renderAs?: WorkItemRenderAs; dependsOn?: string[];
   trigger?: Record<string, unknown>;
 }
+/** Atomic mission-batch item. `initialStatus` exists for durable import/recovery;
+ * normal `enqueueItem` remains pending-only and cannot bypass the claim lifecycle. */
+export interface NewMissionWorkItem extends NewWorkItem {
+  initialStatus?: WorkItemStatus;
+}
 export interface MissionEvent { ts: string; workItemId?: string; type: string; data?: unknown; }
 
 export interface MissionStore {
@@ -53,7 +58,7 @@ export interface MissionStore {
   close(): void;
   createMission(m: NewMission): Mission;
   /** Validate and persist a new mission plus its complete work-item DAG atomically. */
-  createMissionWithItems(m: NewMission, items: readonly NewWorkItem[]): Mission;
+  createMissionWithItems(m: NewMission, items: readonly NewMissionWorkItem[]): Mission;
   getMission(id: string): Mission | null;
   listMissions(f?: { status?: MissionStatus[]; tenant?: string }): Mission[];
   updateMissionStatus(id: string, status: MissionStatus, result?: ResultLike): void;
