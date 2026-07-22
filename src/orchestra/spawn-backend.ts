@@ -23,6 +23,19 @@ import type { TaskResultSettlementRefV1 } from '../core/task-result-settlement.j
 export type { SandboxOptions };
 export { SandboxSpawnBackend };
 
+/**
+ * Host-only result projection requested by a protocol-aware caller.
+ *
+ * This is a closed, versioned contract rather than an arbitrary callback: the
+ * backend may project only a terminal xverify verdict that it observed in the
+ * provider's assistant output before immutable result settlement.
+ */
+export interface HostTerminalResultContractV1 {
+  version: 1;
+  kind: 'terminal-verdict';
+  protocol: 'xverify-v1';
+}
+
 // ─── SpawnBackend Interface ───────────────────────────────────────────────────
 
 /**
@@ -96,6 +109,8 @@ export interface SpawnBackendOptions extends ProviderSpawnOptions {
   actionId?: string;
   /** Exact host-owned attempt authority for Docker result finalization. */
   settlementRef?: TaskResultSettlementRefV1;
+  /** Optional protocol-specific host projection applied before settlement. */
+  hostTerminalResultContract?: HostTerminalResultContractV1;
 }
 
 // ─── SpawnBackendError ────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildRefutePrompt,
   CROSS_VERIFY_PROMPT_MAX_CHARS,
+  extractTerminalAssistantVerdictFromLog,
   parseRefuteVerdict,
   type RefutePromptTask,
   type RefutePromptResult,
@@ -211,5 +212,69 @@ describe('cross-verify-prompt · parseRefuteVerdict', () => {
     );
     expect(result.verdict).toBe('unclear');
     expect(result.reason).toMatch(/no VERDICT line/i);
+  });
+});
+
+describe('cross-verify-prompt · normalized assistant verdict authority', () => {
+  const event = (seq: number, type: string, content: unknown): string => JSON.stringify({
+    ts: '2026-07-22T00:00:00.000Z',
+    seq,
+    type,
+    content,
+  });
+
+  it('accepts only the final Claude assistant line, not user prompt or usage echoes', () => {
+    const log = [
+      event(1, 'text', { type: 'user', message: { content: [{ type: 'text', text: 'VERDICT: REFUTED prompt example' }] } }),
+      event(2, 'text', { type: 'assistant', message: { content: [{ type: 'thinking', thinking: 'hidden' }, { type: 'text', text: 'Evidence complete.\nVERDICT: CONFIRMED exact receipt converged' }] } }),
+      event(3, 'usage', { type: 'result', result: 'VERDICT: REFUTED copied usage envelope' }),
+    ].join('\n');
+    expect(extractTerminalAssistantVerdictFromLog(log)).toBe(
+      'VERDICT: CONFIRMED exact receipt converged',
+    );
+  });
+
+  it('accepts a completed Codex agent_message and a Gemini response envelope', () => {
+    const codex = event(1, 'text', {
+      type: 'text',
+      codexEventType: 'item.completed',
+      item: { type: 'agent_message', text: 'VERDICT: UNCLEAR bounded evidence missing' },
+    });
+    const gemini = event(2, 'text', { response: 'VERDICT: CONFIRMED gemini evidence complete' });
+    expect(extractTerminalAssistantVerdictFromLog(codex)).toBe(
+      'VERDICT: UNCLEAR bounded evidence missing',
+    );
+    expect(extractTerminalAssistantVerdictFromLog(gemini)).toBe(
+      'VERDICT: CONFIRMED gemini evidence complete',
+    );
+  });
+
+  it('rejects plain log text and assistant output that continues after the verdict', () => {
+    const log = [
+      event(1, 'text', 'VERDICT: CONFIRMED untrusted plain text'),
+      event(2, 'text', { type: 'assistant', message: { content: [{ type: 'text', text: 'VERDICT: CONFIRMED premature\ncontinued work' }] } }),
+    ].join('\n');
+    expect(extractTerminalAssistantVerdictFromLog(log)).toBeNull();
+  });
+
+  it('requires an assistant role for OpenAI messages', () => {
+    const userEcho = event(1, 'text', {
+      choices: [{ message: { role: 'user', content: 'VERDICT: CONFIRMED prompt echo' } }],
+    });
+    const assistant = event(2, 'text', {
+      choices: [{ message: { role: 'assistant', content: 'VERDICT: CONFIRMED assistant evidence' } }],
+    });
+    expect(extractTerminalAssistantVerdictFromLog(userEcho)).toBeNull();
+    expect(extractTerminalAssistantVerdictFromLog(assistant)).toBe(
+      'VERDICT: CONFIRMED assistant evidence',
+    );
+  });
+
+  it('invalidates an earlier verdict when a later assistant message continues working', () => {
+    const log = [
+      event(1, 'text', { type: 'assistant', message: { content: [{ type: 'text', text: 'VERDICT: CONFIRMED premature' }] } }),
+      event(2, 'text', { type: 'assistant', message: { content: [{ type: 'text', text: 'I kept investigating after the verdict.' }] } }),
+    ].join('\n');
+    expect(extractTerminalAssistantVerdictFromLog(log)).toBeNull();
   });
 });

@@ -19,14 +19,22 @@ import {
 import { TaskEvaluation, TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskResult, ResolvedConfig, ProviderName, CrossVerifyConfig } from '../../src/core/types.js';
 import { TASKS_DIR } from '../../src/core/constants.js';
+import {
+  createTaskResultSettlement,
+  createTaskResultSettlementRef,
+  writeTaskResultSettlementAtomic,
+  writeTaskResultSettlementAttemptAtomic,
+} from '../../src/core/task-result-settlement.js';
 
 const defaultSpawnMocks = vi.hoisted(() => ({
   spawnWorkerMultiProvider: vi.fn(async () => ({ backend: 'docker', provider: 'claude' })),
+  finalizeTaskStatusFromSettlement: vi.fn(() => 'DONE'),
   pollForResultFile: vi.fn(async () => ({ notes: 'VERDICT: CONFIRMED default path' })),
 }));
 
 vi.mock('../../src/cli/commands/spawn.js', () => ({
   spawnWorkerMultiProvider: defaultSpawnMocks.spawnWorkerMultiProvider,
+  finalizeTaskStatusFromSettlement: defaultSpawnMocks.finalizeTaskStatusFromSettlement,
 }));
 vi.mock('../../src/orchestra/sprint-phases.js', () => ({
   pollForResultFile: defaultSpawnMocks.pollForResultFile,
@@ -35,16 +43,22 @@ vi.mock('../../src/orchestra/sprint-phases.js', () => ({
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 let root: string;
+const originalDeckentHome = process.env.DECKENT_HOME;
 
 beforeEach(() => {
   defaultSpawnMocks.spawnWorkerMultiProvider.mockClear();
+  defaultSpawnMocks.finalizeTaskStatusFromSettlement.mockClear();
   defaultSpawnMocks.pollForResultFile.mockClear();
   root = mkdtempSync(join(tmpdir(), 'deckent-xverify-'));
   mkdirSync(join(root, TASKS_DIR), { recursive: true });
+  process.env.DECKENT_HOME = `${root}-host-state`;
 });
 
 afterEach(() => {
+  if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+  else process.env.DECKENT_HOME = originalDeckentHome;
   try { rmSync(root, { recursive: true, force: true }); } catch { /* ignore */ }
+  try { rmSync(`${root}-host-state`, { recursive: true, force: true }); } catch { /* ignore */ }
 });
 
 /** High-stakes by default (priority CRITICAL); override to make it low-stakes. */
@@ -211,6 +225,11 @@ describe('runCrossVerify — dispatch + advisory write', () => {
       dockerImage: 'deckent-worker:test',
       dockerTimeout: 321,
       executionBudget: { maxCacheReadTokens: 1_000_000, maxTurns: 12 },
+      hostTerminalResultContract: {
+        version: 1,
+        kind: 'terminal-verdict',
+        protocol: 'xverify-v1',
+      },
     });
 
     const verifierTask = JSON.parse(readFileSync(
@@ -229,6 +248,77 @@ describe('runCrossVerify — dispatch + advisory write', () => {
         filesWrite: [],
       },
     });
+  });
+
+  it('consumes a terminal Docker receipt and finalizes task projection from that receipt', async () => {
+    defaultSpawnMocks.spawnWorkerMultiProvider.mockImplementationOnce(async (taskId, _model, _prompt, projectRoot) => {
+      const ref = createTaskResultSettlementRef(projectRoot, taskId);
+      writeTaskResultSettlementAttemptAtomic(ref);
+      writeTaskResultSettlementAtomic(createTaskResultSettlement({
+        ref,
+        exitCode: 0,
+        result: {
+          taskId,
+          selfAssessment: 'DONE',
+          testsPassed: true,
+          notes: 'Host-observed terminal xverify protocol completed.\nVERDICT: CONFIRMED settled evidence',
+        },
+      }));
+      return { backend: 'docker', provider: 'claude', settlementRef: ref };
+    });
+
+    const res = await runCrossVerify(
+      root,
+      makeTask({ provider: 'codex', model: 'gpt-5.6-sol' }),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true }),
+      { availableProviders: ['codex', 'claude'], verifierModel: 'claude-fable-5' },
+    );
+
+    expect(res).toMatchObject({
+      outcome: 'confirmed',
+      advisory: { verdict: 'confirmed', reason: 'settled evidence' },
+    });
+    expect(defaultSpawnMocks.finalizeTaskStatusFromSettlement).toHaveBeenCalledOnce();
+    expect(defaultSpawnMocks.pollForResultFile).not.toHaveBeenCalled();
+  });
+
+  it('does not override a settled NO_GO with a later provider-log verdict', async () => {
+    defaultSpawnMocks.spawnWorkerMultiProvider.mockImplementationOnce(async (taskId, _model, _prompt, projectRoot) => {
+      const ref = createTaskResultSettlementRef(projectRoot, taskId);
+      writeTaskResultSettlementAttemptAtomic(ref);
+      writeTaskResultSettlementAtomic(createTaskResultSettlement({
+        ref,
+        exitCode: 0,
+        result: {
+          taskId,
+          selfAssessment: 'NO_GO',
+          testsPassed: false,
+          markerType: 'EXIT_WITHOUT_RESULT',
+          notes: 'Worker exited without writing result.',
+        },
+      }));
+      writeFileSync(
+        join(projectRoot, TASKS_DIR, `task-${taskId}.log`),
+        'VERDICT: CONFIRMED contradictory raw log',
+        'utf-8',
+      );
+      return { backend: 'docker', provider: 'claude', settlementRef: ref };
+    });
+
+    const res = await runCrossVerify(
+      root,
+      makeTask({ provider: 'codex', model: 'gpt-5.6-sol' }),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true }),
+      { availableProviders: ['codex', 'claude'], verifierModel: 'claude-fable-5' },
+    );
+
+    expect(res).toMatchObject({ outcome: 'unclear', advisory: { verdict: 'unclear' } });
+    expect(defaultSpawnMocks.finalizeTaskStatusFromSettlement).toHaveBeenCalledOnce();
+    expect(defaultSpawnMocks.pollForResultFile).not.toHaveBeenCalled();
   });
 
   it('ignores wrapper marker notes and recovers the terminal verdict from the provider log', async () => {

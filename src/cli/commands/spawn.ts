@@ -13,7 +13,7 @@ import { TASKS_DIR } from '../../core/constants.js';
 import { readJsonSafe, debugLog } from '../../core/utils.js';
 import { buildWorkerPrompt } from '../../orchestra/task-builder.js';
 import { resolveAgentPrompt, resolveSkillPrompts } from '../../orchestra/sprint-controller.js';
-import { SpawnBackendFactory } from '../../orchestra/spawn-backend.js';
+import { SpawnBackendError, SpawnBackendFactory, type HostTerminalResultContractV1 } from '../../orchestra/spawn-backend.js';
 import { isAdapterProvider, getProviderAdapterForTask } from '../../orchestra/sprint-utils.js';
 import { ensureOllamaModelRegistered } from '../../core/model-registry.js';
 import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
@@ -65,7 +65,7 @@ export async function spawnWorkerMultiProvider(
   model: string,
   prompt: string,
   root: string,
-  opts: { autoApprove?: boolean; allowedTools?: string; spawnBackend?: string; dockerImage?: string; dockerTimeout?: number; provider?: string; modelEffort?: string; executionBudget?: ExecutionBudget },
+  opts: { autoApprove?: boolean; allowedTools?: string; spawnBackend?: string; dockerImage?: string; dockerTimeout?: number; provider?: string; modelEffort?: string; executionBudget?: ExecutionBudget; hostTerminalResultContract?: HostTerminalResultContractV1 },
 ): Promise<{ backend: string; provider: ProviderName; settlementRef?: TaskResultSettlementRefV1 }> {
   const executionBudget = resolveTaskExecutionBudget(root, taskId, opts.executionBudget);
 
@@ -117,6 +117,12 @@ export async function spawnWorkerMultiProvider(
   // catalog are rejected with ProviderError. The race is deterministic: without await,
   // spawn() executes in the same tick as the unresolved refresh promise.
   if (isAdapterProvider(provider)) {
+    if (opts.hostTerminalResultContract) {
+      throw new SpawnBackendError(
+        `Host terminal result protocol ${opts.hostTerminalResultContract.protocol} requires an immutable-settlement backend; host-adapter does not provide one.`,
+        'host-adapter',
+      );
+    }
     let adapter = getProviderAdapterForTask(provider);
     // OPENROUTER-PROVIDER (row 477): lazy re-bootstrap, mirroring
     // sprint-spawner.ts's `wantsHostAdapter && !adapterRouted` recovery. Unlike the
@@ -168,6 +174,12 @@ export async function spawnWorkerMultiProvider(
       dockerImage: opts.dockerImage,
       dockerTimeoutSeconds: opts.dockerTimeout,
     });
+    if (opts.hostTerminalResultContract && backend.name !== 'docker') {
+      throw new SpawnBackendError(
+        `Host terminal result protocol ${opts.hostTerminalResultContract.protocol} requires Docker settlement; resolved backend was ${backend.name}.`,
+        backend.name,
+      );
+    }
     assertLiveUsageBudgetSupport(
       executionBudget,
       backend.liveUsageBudgetSupport,
@@ -188,6 +200,7 @@ export async function spawnWorkerMultiProvider(
       reasoningEffort,
       executionBudget,
       settlementRef,
+      hostTerminalResultContract: opts.hostTerminalResultContract,
     });
     return {
       backend: backend.name,
@@ -197,6 +210,12 @@ export async function spawnWorkerMultiProvider(
   }
 
   // No config override → provider-based fallback
+  if (opts.hostTerminalResultContract) {
+    throw new SpawnBackendError(
+      `Host terminal result protocol ${opts.hostTerminalResultContract.protocol} requires an explicit immutable-settlement backend.`,
+      provider === 'claude' ? 'tmux' : 'subprocess',
+    );
+  }
   if (provider === 'claude') {
     assertLiveUsageBudgetSupport(executionBudget, undefined, 'tmux');
     ensureSession();

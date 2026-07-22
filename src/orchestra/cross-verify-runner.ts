@@ -238,7 +238,7 @@ function resolveVerifierModel(
  */
 async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> {
   const verifierTaskId = `${input.task.id}-xverify`;
-  const { spawnWorkerMultiProvider } = await import('../cli/commands/spawn.js');
+  const { spawnWorkerMultiProvider, finalizeTaskStatusFromSettlement } = await import('../cli/commands/spawn.js');
   const { pollForResultFile } = await import('./sprint-phases.js');
 
   // OPENROUTER-PROVIDER (row 477) — closes the "live multi-provider capture"
@@ -319,6 +319,11 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
       spawnBackend: input.spawnBackend,
       dockerImage: input.dockerImage,
       dockerTimeout: input.dockerTimeout,
+      hostTerminalResultContract: {
+        version: 1,
+        kind: 'terminal-verdict',
+        protocol: 'xverify-v1',
+      },
     },
   );
 
@@ -343,7 +348,20 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
   // A wrapper-generated EXIT_WITHOUT_RESULT note is non-empty but is not a
   // verifier verdict. Accept notes only when their final non-empty line is the
   // terminal protocol line; otherwise continue to the provider log fallback.
-  if (/^VERDICT:\s*(?:REFUTED|CONFIRMED|UNCLEAR)\s+.+$/i.test(lastNoteLine)) {
+  const hasTerminalVerdict = /^VERDICT:\s*(?:REFUTED|CONFIRMED|UNCLEAR)\s+.+$/i.test(lastNoteLine);
+  if (spawnResult.settlementRef) {
+    // A Docker attempt with a host receipt has exactly one terminal authority.
+    // Project task status from that receipt regardless of verdict availability;
+    // a settled NO_GO must not remain PENDING, and a later log read must never
+    // contradict an already-immutable receipt.
+    finalizeTaskStatusFromSettlement(
+      input.projectRoot,
+      verifierTaskId,
+      spawnResult.settlementRef,
+    );
+    return hasTerminalVerdict ? lastNoteLine : '';
+  }
+  if (hasTerminalVerdict) {
     return lastNoteLine;
   }
 
@@ -374,10 +392,6 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
         // marker discriminators that would make consumers classify this DONE
         // audit as an unfinished wrapper exit.
         let resultRecovered = false;
-        // Docker's exact host receipt is immutable authority. The terminal log
-        // was captured before that receipt, so it can supply the verifier
-        // protocol verdict, but no consumer may rewrite the settled TaskResult.
-        if (spawnResult.settlementRef) return terminalVerdict;
         try {
           const resultPath = join(input.projectRoot, TASKS_DIR, `task-${verifierTaskId}.result`);
           if (existsSync(resultPath)) {

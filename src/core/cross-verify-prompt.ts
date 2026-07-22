@@ -9,6 +9,7 @@
 // - ADR-008: core/ → no orchestra/ imports
 
 import type { GoNoGoCriteria } from './task-types.js';
+import type { LogEvent } from './log-event.js';
 
 // ─── Input types ─────────────────────────────────────────────────────────────
 
@@ -218,4 +219,91 @@ export function parseRefuteVerdict(output: string): RefuteVerdict {
   // No recognised VERDICT line — return unclear with a truncated excerpt.
   const excerpt = output.trim().slice(0, 120).replace(/\n/g, ' ');
   return { verdict: 'unclear', reason: `no VERDICT line found; output excerpt: "${excerpt}"` };
+}
+
+/**
+ * Extract the last terminal xverify protocol line from normalized provider log events.
+ *
+ * Only provider shapes that represent an assistant/model response are eligible. In
+ * particular, plain text rows, user/prompt envelopes, tool results and final usage
+ * envelopes are ignored even when they contain a copied `VERDICT:` example. This is
+ * the host-side authority parser used before Docker result settlement.
+ */
+export function extractTerminalAssistantVerdictFromLog(rawLog: string): string | null {
+  let terminal: string | null = null;
+  for (const line of rawLog.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    let event: unknown;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!isRecord(event) || event['type'] !== 'text' || !isRecord(event['content'])) continue;
+    const assistantText = extractAssistantText(event as unknown as LogEvent);
+    if (!assistantText) continue;
+    const lastLine = assistantText.trim().split(/\r?\n/)
+      .filter(value => value.trim().length > 0)
+      .at(-1)?.trim() ?? '';
+    // The terminal protocol must belong to the final assistant message. A later
+    // assistant message that keeps working after a verdict invalidates it.
+    terminal = VERDICT_RE.test(lastLine) ? lastLine : null;
+  }
+  return terminal;
+}
+
+function extractAssistantText(event: LogEvent): string | null {
+  if (!isRecord(event.content)) return null;
+  const content = event.content;
+
+  // Claude Code stream-json assistant message. User and result envelopes are
+  // deliberately ineligible even when they echo the protocol examples.
+  if (content['type'] === 'assistant' && isRecord(content['message'])) {
+    const blocks = content['message']['content'];
+    if (typeof blocks === 'string') return blocks;
+    if (Array.isArray(blocks)) {
+      const text = blocks
+        .filter(block => isRecord(block) && block['type'] === 'text' && typeof block['text'] === 'string')
+        .map(block => (block as Record<string, unknown>)['text'] as string)
+        .join('\n');
+      return text || null;
+    }
+  }
+
+  // Codex JSON event bridged by spawn-backend-docker.ts.
+  if (content['codexEventType'] === 'item.completed' && isRecord(content['item'])) {
+    const item = content['item'];
+    if (item['type'] === 'agent_message' && typeof item['text'] === 'string') return item['text'];
+  }
+
+  // Gemini/Ollama final model response envelope.
+  if (typeof content['response'] === 'string') return content['response'];
+
+  // OpenAI-compatible assistant message/chunk envelope.
+  const choices = content['choices'];
+  if (Array.isArray(choices) && isRecord(choices[0])) {
+    const message = choices[0]['message'];
+    if (isRecord(message)
+      && message['role'] === 'assistant'
+      && typeof message['content'] === 'string') {
+      return message['content'];
+    }
+    const delta = choices[0]['delta'];
+    if (isRecord(delta)
+      && (delta['role'] === undefined || delta['role'] === 'assistant')
+      && typeof delta['content'] === 'string') {
+      return delta['content'];
+    }
+  }
+
+  if (isRecord(content['message'])
+    && content['message']['role'] === 'assistant'
+    && typeof content['message']['content'] === 'string') {
+    return content['message']['content'];
+  }
+  return null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

@@ -22,6 +22,7 @@ import { DECK_FILE_NAME } from '../core/deck-file.js';
 import { debugLog } from '../core/utils.js';
 import { DeckentError } from '../core/errors.js';
 import { normalizeStreamEvent, writeLogEvent, type StreamLogEvent } from '../core/log-event.js';
+import { extractTerminalAssistantVerdictFromLog } from '../core/cross-verify-prompt.js';
 import {
   assertExecutionBudgetShape,
   assertLiveUsageBudgetSupport,
@@ -43,7 +44,7 @@ import {
   type TaskResultSettlementRefV1,
 } from '../core/task-result-settlement.js';
 import { BASE_PROVIDER_CREDENTIAL_ENV } from '../providers/cross-provider-keys.js';
-import type { SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
+import type { HostTerminalResultContractV1, SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
 import { SpawnBackendError, checkLethalGuard } from './spawn-backend.js';
 import { getDefaultProviderName } from './sprint-utils.js';
 import { installGitGuard, buildDockerGitGuardArgs, buildGitGuardDir, CONTAINER_GIT_PATH } from './git-worker-guard.js';
@@ -205,6 +206,50 @@ export function persistDockerTaskResultSettlement(
   const settlement = createTaskResultSettlement({ ref, exitCode, result });
   writeTaskResultSettlementAtomic(settlement);
   return true;
+}
+
+/**
+ * Project a completed host-only terminal protocol into the Docker result before
+ * immutable settlement. Generic worker results are never promoted: the exact
+ * xverify contract, task identity and host EXIT_WITHOUT_RESULT marker must all
+ * match, and the verdict must come from a normalized assistant-output event.
+ */
+export function reconcileDockerHostTerminalResultFile(
+  resultPath: string,
+  normalizedLogPath: string,
+  taskId: string,
+  contract: HostTerminalResultContractV1 | undefined,
+): string | null {
+  if (contract?.version !== 1
+    || contract.kind !== 'terminal-verdict'
+    || contract.protocol !== 'xverify-v1'
+    || !existsSync(resultPath)
+    || !existsSync(normalizedLogPath)) {
+    return null;
+  }
+
+  const result = JSON.parse(readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
+  if (result['taskId'] !== taskId
+    || result['selfAssessment'] !== 'NO_GO'
+    || result['markerType'] !== 'EXIT_WITHOUT_RESULT'
+    || result['exitCode'] !== 0) {
+    return null;
+  }
+
+  const terminalVerdict = extractTerminalAssistantVerdictFromLog(
+    readFileSync(normalizedLogPath, 'utf-8'),
+  );
+  if (!terminalVerdict) return null;
+
+  result['selfAssessment'] = 'DONE';
+  result['testsPassed'] = true;
+  result['notes'] = `Host-observed terminal xverify protocol completed.\n${terminalVerdict}`;
+  if (typeof result['completedAt'] !== 'string') result['completedAt'] = new Date().toISOString();
+  delete result['markerType'];
+  delete result['workPresent'];
+  delete result['diffStat'];
+  atomicWriteFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
+  return terminalVerdict;
 }
 
 function hasSpawnLocksForTask(projectRoot: string, taskId: string): boolean {
@@ -2854,6 +2899,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       liveCtx,
       opts?.executionBudget,
       opts?.settlementRef,
+      opts?.hostTerminalResultContract,
     );
   }
 
@@ -3305,6 +3351,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     liveCtx?: ActivityTapContext,
     executionBudget?: import('../core/work-model.js').ExecutionBudget,
     settlementRef?: TaskResultSettlementRefV1,
+    hostTerminalResultContract?: HostTerminalResultContractV1,
   ): void {
     const child = nodeSpawn('docker', ['wait', containerName], {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -3588,6 +3635,20 @@ export class DockerSpawnBackend implements SpawnBackend {
           // single-envelope and the new stream-json format (see the usage-patch
           // regression fixture in tests/orchestra/trace-content-parity.test.ts).
           patchResultUsageFromEnvelope(tasksDir, taskId, model, logContent);
+          if (!capture.captureIncomplete) {
+            try {
+              reconcileDockerHostTerminalResultFile(
+                resultPath,
+                logPath,
+                taskId,
+                hostTerminalResultContract,
+              );
+            } catch (e) {
+              // Projection failure remains visible as the existing NO_GO marker;
+              // never manufacture success or prevent the host receipt from settling.
+              debugLog('docker-backend:host-terminal-result', e);
+            }
+          }
         }
       } catch (e) { debugLog('docker-backend:log-extract', e); }
       try { budgetMonitor?.settle(); } catch (e) { debugLog('docker-backend:budget-settle', e); }
