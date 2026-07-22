@@ -2,11 +2,15 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   describeDockerPartialResultTermination,
   reconcileDockerRuntimeBudgetResult,
+  reconcileDockerRuntimeBudgetUsage,
   terminateDockerContainerForBudget,
   type DockerSyncCommand,
   type DockerSyncCommandResult,
 } from '../../src/orchestra/spawn-backend-docker.js';
-import type { RuntimeBudgetStopEvidence } from '../../src/orchestra/runtime-budget-monitor.js';
+import type {
+  RuntimeBudgetStopEvidence,
+  RuntimeBudgetUsageEvidence,
+} from '../../src/orchestra/runtime-budget-monitor.js';
 
 function scripted(results: DockerSyncCommandResult[]) {
   const run = vi.fn((_command: string, _args: string[]) => (
@@ -42,6 +46,40 @@ function budgetStop(
     },
     stoppedAt: '2026-07-21T20:00:05.429Z',
     evidenceSource,
+  };
+}
+
+function budgetUsage(
+  state: RuntimeBudgetUsageEvidence['decision']['state'] = 'within-budget',
+  terminal = true,
+): RuntimeBudgetUsageEvidence {
+  const counters = {
+    turns: 3,
+    inputTokens: 11,
+    outputTokens: 22,
+    cacheReadTokens: 33,
+    cacheCreationTokens: 44,
+    totalTokens: 110,
+    maxContextTokens: 88,
+  };
+  return {
+    version: 2,
+    projectId: 'project-1',
+    taskId: 't3',
+    attemptId: 'attempt-2',
+    budgetFingerprint: 'b'.repeat(64),
+    backend: 'docker',
+    terminal,
+    budget: { maxTurns: 4 },
+    decision: { state, reasons: [], counters },
+    guardState: {
+      version: 1,
+      counters,
+      seenDedupeKeys: ['call:msg-1', 'call:msg-2', 'call:msg-3'],
+      measurableEvents: 3,
+      incrementalUsageEvents: 3,
+    },
+    updatedAt: '2026-07-22T05:00:00.000Z',
   };
 }
 
@@ -140,6 +178,66 @@ describe('Docker runtime-budget result reconciliation', () => {
 
     expect(reconcileDockerRuntimeBudgetResult(result, 0, null)).toBe(false);
     expect(JSON.stringify(result)).toBe(before);
+  });
+
+  it('patches terminal within-budget counters without changing verdict or billing truth', () => {
+    const result = doneResult();
+    const previousBilling = result.providerBilling;
+
+    expect(reconcileDockerRuntimeBudgetUsage(result, budgetUsage(), {
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+    })).toBe(true);
+    expect(result.selfAssessment).toBe('DONE');
+    expect(result.testsPassed).toBe(true);
+    expect(result.notes).toBe('Worker claimed completion.');
+    expect(result.providerBilling).toBe(previousBilling);
+    expect(result.cost).toBeUndefined();
+    expect(result.tokenUsage).toEqual({
+      inputTokens: 11,
+      outputTokens: 22,
+      cacheReadTokens: 33,
+      cacheCreationTokens: 44,
+      source: 'host-runtime-budget',
+      provider: 'claude',
+      model: 'claude-sonnet-4-20250514',
+    });
+  });
+
+  it('is idempotent and supplies canonical identity when the worker omitted it', () => {
+    const result = doneResult();
+    delete result.tokenUsage.provider;
+    delete result.tokenUsage.model;
+    reconcileDockerRuntimeBudgetUsage(result, budgetUsage(), {
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+    });
+    const once = JSON.stringify(result);
+
+    expect(reconcileDockerRuntimeBudgetUsage(result, budgetUsage(), {
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+    })).toBe(true);
+    expect(JSON.stringify(result)).toBe(once);
+    expect(result.tokenUsage).toMatchObject({ provider: 'claude', model: 'claude-sonnet-5' });
+  });
+
+  it('does not patch nonterminal, unmeasurable, or exceeded evidence', () => {
+    const cases = [
+      budgetUsage('within-budget', false),
+      { ...budgetUsage(), decision: { ...budgetUsage().decision, counters: {
+        turns: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0,
+        cacheCreationTokens: 0, totalTokens: 0, maxContextTokens: 0,
+      } } },
+      budgetUsage('unmeasurable'),
+      budgetUsage('exceeded'),
+    ];
+    for (const evidence of cases) {
+      const result = doneResult();
+      const before = JSON.stringify(result);
+      expect(reconcileDockerRuntimeBudgetUsage(result, evidence)).toBe(false);
+      expect(JSON.stringify(result)).toBe(before);
+    }
   });
 });
 

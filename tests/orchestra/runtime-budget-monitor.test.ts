@@ -90,18 +90,56 @@ describe('RuntimeBudgetMonitor', () => {
       budget: { maxTurns: 5, maxContextTokens: 1_000 },
       onStop: vi.fn(),
     });
+    const repeated = {
+      type: 'text',
+      content: {
+        type: 'assistant' as const,
+        message: {
+          id: 'msg-1',
+          usage: {
+            input_tokens: 10,
+            output_tokens: 2,
+            cache_read_input_tokens: 20,
+            cache_creation_input_tokens: 3,
+          },
+          content: [],
+        },
+      },
+    } as const;
+    monitor.observe(repeated);
+    monitor.observe(repeated);
     monitor.observe({
       type: 'text',
       content: {
         type: 'assistant',
-        message: { id: 'msg-1', usage: { input_tokens: 10, cache_read_input_tokens: 20 }, content: [] },
+        message: {
+          id: 'msg-2',
+          usage: {
+            input_tokens: 5,
+            output_tokens: 4,
+            cache_read_input_tokens: 7,
+            cache_creation_input_tokens: 6,
+          },
+          content: [],
+        },
       },
     });
     expect(readRuntimeBudgetUsage(projectRoot, 't3')?.terminal).toBe(false);
     monitor.settle();
     expect(readRuntimeBudgetUsage(projectRoot, 't3')).toMatchObject({
       terminal: true,
-      decision: { state: 'within-budget', counters: { turns: 1, maxContextTokens: 30 } },
+      decision: {
+        state: 'within-budget',
+        counters: {
+          turns: 2,
+          inputTokens: 15,
+          outputTokens: 6,
+          cacheReadTokens: 27,
+          cacheCreationTokens: 9,
+          totalTokens: 57,
+          maxContextTokens: 33,
+        },
+      },
     });
   });
 

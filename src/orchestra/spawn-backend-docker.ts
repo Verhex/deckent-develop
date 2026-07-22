@@ -10,7 +10,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { homedir, totalmem } from 'node:os';
 import type { ModelType } from '../core/types.js';
-import { getProviderForModel, UnknownModelError, type TaskResult } from '../core/task-types.js';
+import { getProviderForModel, UnknownModelError, type ProviderName, type TaskResult } from '../core/task-types.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { getProviderCommandSpec, buildProviderCommand, type ProviderCommandSpec } from '../core/provider-command-spec.js';
 import { createClaudeAdapter } from '../providers/claude.js';
@@ -47,8 +47,10 @@ import { extractProviderBillingEvidence } from '../core/provider-billing-evidenc
 import {
   createRuntimeBudgetMonitor,
   readRuntimeBudgetExhaustion,
+  readRuntimeBudgetUsage,
   resolveTaskExecutionBudget,
   type RuntimeBudgetStopEvidence,
+  type RuntimeBudgetUsageEvidence,
 } from './runtime-budget-monitor.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────
@@ -144,6 +146,44 @@ export function reconcileDockerRuntimeBudgetResult(
   return true;
 }
 
+/**
+ * Persist host-measured partial-stream usage for a successful budgeted run even
+ * when the provider emitted no final billing envelope. This is usage truth only:
+ * assessment and provider billing remain independent and untouched.
+ */
+export function reconcileDockerRuntimeBudgetUsage(
+  result: TaskResult,
+  usage: RuntimeBudgetUsageEvidence | null,
+  identity?: { provider: ProviderName; model: ModelType },
+): boolean {
+  if (!usage?.terminal || usage.decision.state !== 'within-budget') return false;
+  const counters = usage.decision.counters;
+  const measurableTokens = counters.inputTokens
+    + counters.outputTokens
+    + counters.cacheReadTokens
+    + counters.cacheCreationTokens;
+  if (measurableTokens <= 0) return false;
+
+  const previousUsage = result.tokenUsage;
+  result.tokenUsage = {
+    inputTokens: counters.inputTokens,
+    outputTokens: counters.outputTokens,
+    cacheReadTokens: counters.cacheReadTokens,
+    cacheCreationTokens: counters.cacheCreationTokens,
+    source: 'host-runtime-budget',
+    ...(previousUsage?.provider || identity?.provider
+      ? { provider: previousUsage?.provider ?? identity!.provider }
+      : {}),
+    ...(previousUsage?.model || identity?.model
+      ? { model: previousUsage?.model ?? identity!.model }
+      : {}),
+  };
+  // Any pre-exit local cost was computed from the stale usage claim. Real
+  // providerBilling, when present, remains authoritative and is not fabricated.
+  delete result.cost;
+  return true;
+}
+
 function reconcileDockerRuntimeBudgetResultFile(
   resultPath: string,
   taskId: string,
@@ -165,6 +205,31 @@ function reconcileDockerRuntimeBudgetResultFile(
     }) as unknown as TaskResult;
   }
   reconcileDockerRuntimeBudgetResult(result, exitCode, budgetStop);
+  atomicWriteFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
+  return true;
+}
+
+function reconcileDockerRuntimeBudgetUsageFile(
+  resultPath: string,
+  model: ModelType,
+  usage: RuntimeBudgetUsageEvidence | null,
+): boolean {
+  if (!usage?.terminal || usage.decision.state !== 'within-budget' || !existsSync(resultPath)) {
+    return false;
+  }
+  let result: TaskResult;
+  try {
+    result = JSON.parse(readFileSync(resultPath, 'utf-8')) as TaskResult;
+  } catch {
+    // Usage evidence cannot manufacture a successful TaskResult. Missing or
+    // corrupt result truth remains owned by the existing host fallback path.
+    return false;
+  }
+  const changed = reconcileDockerRuntimeBudgetUsage(result, usage, {
+    provider: getProviderForModel(model),
+    model,
+  });
+  if (!changed) return false;
   atomicWriteFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
   return true;
 }
@@ -3459,6 +3524,17 @@ export class DockerSpawnBackend implements SpawnBackend {
         }
       } catch (e) {
         debugLog('docker-backend:budget-final-reconcile', e);
+      }
+      if (!finalRuntimeBudgetExhaustion) {
+        try {
+          reconcileDockerRuntimeBudgetUsageFile(
+            resultPath,
+            model,
+            readRuntimeBudgetUsage(projectDir, taskId),
+          );
+        } catch (e) {
+          debugLog('docker-backend:budget-usage-reconcile', e);
+        }
       }
 
       // Cleanup container
