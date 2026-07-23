@@ -296,6 +296,21 @@ export class ApprovalBroker extends EventEmitter {
     });
   }
 
+  /** Exact read-only lookup used by trusted decision ingress adapters. */
+  getRequest(id: string): ApprovalRequest | null {
+    if (!approvalLookupIdSchema.safeParse(id).success) return null;
+    const request = this.readRequestFromDisk(id);
+    if (request) this.requestsById.set(id, request);
+    return request ?? null;
+  }
+
+  /** Exact read-only durable winner lookup. Never creates or changes a decision. */
+  getDecision(id: string): ApprovalDecision | null {
+    if (!approvalLookupIdSchema.safeParse(id).success) return null;
+    this.checkForExternalDecisions();
+    return this.decisionsById.get(id) ?? null;
+  }
+
   /**
    * Resolve `id` with a decision. Validates against the contract, persists the
    * decision atomically, resolves any queued {@link ApprovalBroker.awaitDecision}

@@ -196,6 +196,13 @@ export async function runMissionScheduler(
             registry: opts.runtimeRegistry.descriptor,
           }
           : undefined;
+        // A persisted `decision_state='allowed'` is audit evidence, not a
+        // perpetual execution grant. Guarded work must revalidate the exact
+        // request/session/integrity authority at the immediate pre-claim seam.
+        if (item.policy !== 'auto'
+          && opts.approvalCoordinator?.authorizeClaim?.(item) !== true) {
+          continue;
+        }
         const claim = store.claimItemWithAuthority(item.id, 'scheduler', claimFence, opts.engineLease);
         if (!claim) {
           checkMissionCompleteFailSafe(store, item.missionId, opts);

@@ -56,6 +56,25 @@ function validDecision(): Record<string, unknown> {
   };
 }
 
+function validAuthorization(): Record<string, unknown> {
+  return {
+    schemaVersion: 1,
+    kind: 'live-session',
+    requestDigest: '1'.repeat(64),
+    commandDigest: '2'.repeat(64),
+    idempotencyKeyHash: '3'.repeat(64),
+    actorId: 'alperen',
+    tenantId: 'local',
+    role: 'owner',
+    sessionRefHash: '4'.repeat(64),
+    authorityRef: 'terminal-session:v1',
+    authenticatedAt: CREATED_AT,
+    authExpiresAt: EXPIRES_AT,
+    integrityKeyId: 'approval-key-v1',
+    integrityMac: '5'.repeat(64),
+  };
+}
+
 describe('approval-contract — enum shape (spec counts)', () => {
   it('requester role is the 5-value enum', () => {
     expect([...ALL_REQUESTER_ROLES].sort()).toEqual(
@@ -342,6 +361,36 @@ describe('approval-contract — ApprovalDecision', () => {
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.value.reason).toBe('looks safe, pre-approved for this sprint');
+  });
+
+  it('round-trips the strict live-session authorization envelope without requiring it on legacy decisions', () => {
+    const legacy = validateApprovalDecision(validDecision());
+    expect(legacy.ok).toBe(true);
+    if (!legacy.ok) return;
+    expect(legacy.value.authorization).toBeUndefined();
+
+    const authorized = validateApprovalDecision({
+      ...validDecision(),
+      authorization: validAuthorization(),
+    });
+    expect(authorized.ok).toBe(true);
+    if (!authorized.ok) return;
+    expect(authorized.value.authorization).toEqual(validAuthorization());
+  });
+
+  it('rejects malformed digests, raw session fields, and non-forward auth expiry', () => {
+    expect(validateApprovalDecision({
+      ...validDecision(),
+      authorization: { ...validAuthorization(), requestDigest: 'not-a-digest' },
+    }).ok).toBe(false);
+    expect(validateApprovalDecision({
+      ...validDecision(),
+      authorization: { ...validAuthorization(), rawSessionToken: 'secret' },
+    }).ok).toBe(false);
+    expect(validateApprovalDecision({
+      ...validDecision(),
+      authorization: { ...validAuthorization(), authExpiresAt: CREATED_AT },
+    }).ok).toBe(false);
   });
 
   it('rejects an unknown decision value', () => {

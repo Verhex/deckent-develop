@@ -172,6 +172,22 @@ describe('ApprovalBroker — atomic write', () => {
 // ─── decide + awaitDecision ───────────────────────────────────────────────────
 
 describe('ApprovalBroker.decide / awaitDecision', () => {
+  it('exposes exact read-only request and durable-winner lookups', () => {
+    const req = broker.submit(buildRequest('apr-read-only'));
+    expect(broker.getRequest(req.id)).toEqual(req);
+    expect(broker.getDecision(req.id)).toBeNull();
+
+    const decision = broker.decide(req.id, {
+      decision: 'deny',
+      decidedBy: 'operator',
+      channel: 'terminal',
+      decidedAt: FIXED_NOW.toISOString(),
+    });
+    expect(broker.getDecision(req.id)).toEqual(decision);
+    expect(broker.getRequest('../escape')).toBeNull();
+    expect(broker.getDecision('../escape')).toBeNull();
+  });
+
   it('rejects a decision without a durable request', () => {
     try {
       broker.decide('apr-unknown', {

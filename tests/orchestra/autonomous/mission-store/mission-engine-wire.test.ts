@@ -28,6 +28,7 @@ import {
 import type { ResolvedConfig } from '../../../../src/core/config-types.js';
 import { ApprovalBroker } from '../../../../src/core/approval-broker.js';
 import { ApprovalStore } from '../../../../src/core/approval-store.js';
+import type { ApprovalDecisionAuthority } from '../../../../src/core/approval-decision-ingress.js';
 import { MissionApprovalCoordinator } from '../../../../src/orchestra/autonomous/mission-store/mission-approval-coordinator.js';
 
 // ── tmpdir lifecycle ──────────────────────────────────────────────────
@@ -273,6 +274,11 @@ describe('runV2Engine', () => {
 
     const broker = new ApprovalBroker(r);
     const decisions = new ApprovalStore(r);
+    // This test owns only composition threading. Cryptographic/session behavior
+    // is covered by approval-decision-ingress + coordinator tests.
+    const decisionAuthority = {
+      validate: () => ({ ok: true, authorization: {} }),
+    } as unknown as ApprovalDecisionAuthority;
     const coordinator = new MissionApprovalCoordinator({
       store,
       publisher: broker,
@@ -291,6 +297,7 @@ describe('runV2Engine', () => {
         createdAt: '2026-07-22T00:00:00.000Z',
         expiresAt: '2026-07-23T00:00:00.000Z',
       }),
+      decisionAuthority,
       now: () => new Date('2026-07-22T00:00:00.000Z'),
     });
     const runTask = vi.fn(async (): Promise<{ ok: boolean }> => ({ ok: true }));

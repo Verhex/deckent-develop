@@ -105,6 +105,7 @@ const closureReasonSchema = z.enum(['expired']);
 
 /** Project-wide ISO 8601 UTC convention (`new Date().toISOString()` output). */
 const isoDateTimeSchema = z.string().datetime();
+const sha256HexSchema = z.string().regex(/^[a-f0-9]{64}$/u, 'must be a lowercase SHA-256 digest');
 
 // ─── ApprovalRequest ──────────────────────────────────────────────────────────
 
@@ -153,6 +154,42 @@ export type ApprovalRequest = z.infer<typeof approvalRequestSchema>;
 
 // ─── ApprovalDecision ─────────────────────────────────────────────────────────
 
+/**
+ * Host-attested authority carried by a human decision. It contains only
+ * irreversible digests and opaque authority references — never a bearer/session
+ * secret. Optional at the outer decision boundary for v1 read compatibility;
+ * security-sensitive consumers explicitly require and validate it.
+ */
+export const approvalDecisionAuthorizationSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    kind: z.literal('live-session'),
+    requestDigest: sha256HexSchema,
+    commandDigest: sha256HexSchema,
+    idempotencyKeyHash: sha256HexSchema,
+    actorId: z.string().min(1),
+    tenantId: z.string().min(1),
+    role: z.string().min(1).nullable(),
+    sessionRefHash: sha256HexSchema,
+    authorityRef: z.string().min(1),
+    authenticatedAt: isoDateTimeSchema,
+    authExpiresAt: isoDateTimeSchema,
+    integrityKeyId: z.string().min(1),
+    integrityMac: sha256HexSchema,
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (Date.parse(value.authExpiresAt) <= Date.parse(value.authenticatedAt)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['authExpiresAt'],
+        message: 'authExpiresAt must be after authenticatedAt',
+      });
+    }
+  });
+
+export type ApprovalDecisionAuthorization = z.infer<typeof approvalDecisionAuthorizationSchema>;
+
 const approvalDecisionShape = {
     decision: approvalActionSchema,
     decidedBy: z.string().min(1),
@@ -166,6 +203,9 @@ const approvalDecisionShape = {
      *  decision files — never `.default()`ed, so it is only ever present when a
      *  system closure explicitly stamped it. See {@link closureReasonSchema}. */
     closureReason: closureReasonSchema.optional(),
+    /** Additive v1 compatibility: legacy/system decisions omit this. A Goal-v2
+     *  allow is never authority unless this envelope passes host validation. */
+    authorization: approvalDecisionAuthorizationSchema.optional(),
 };
 
 function buildApprovalDecisionSchema(idSchema: z.ZodType<string>) {

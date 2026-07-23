@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,6 +7,13 @@ import { join } from 'node:path';
 import { ApprovalBroker } from '../../../../src/core/approval-broker.js';
 import { ApprovalStore } from '../../../../src/core/approval-store.js';
 import { validateApprovalRequest, type ApprovalAction, type ApprovalRequest } from '../../../../src/core/approval-contract.js';
+import {
+  ApprovalDecisionAuthority,
+  ApprovalDecisionIngress,
+  type ApprovalDecisionIntegrityAuthority,
+  type LiveApprovalAuthenticator,
+  type LiveApprovalSessionProof,
+} from '../../../../src/core/approval-decision-ingress.js';
 import {
   MissionApprovalCoordinator,
   approvalRequestIdForWorkItem,
@@ -16,6 +24,41 @@ import { SqliteMissionStore } from '../../../../src/orchestra/autonomous/mission
 
 const roots: string[] = [];
 const NOW = new Date('2026-07-22T00:00:00.000Z');
+const INTEGRITY_KEY = Buffer.from('mission-approval-hermetic-key-v1');
+
+class TestIntegrity implements ApprovalDecisionIntegrityAuthority {
+  sign(payload: string) {
+    return { keyId: 'mission-test-key', mac: createHmac('sha256', INTEGRITY_KEY).update(payload).digest('hex') };
+  }
+  verify(keyId: string, payload: string, mac: string): boolean {
+    if (keyId !== 'mission-test-key' || !/^[a-f0-9]{64}$/u.test(mac)) return false;
+    return timingSafeEqual(
+      Buffer.from(mac, 'hex'),
+      Buffer.from(this.sign(payload).mac, 'hex'),
+    );
+  }
+}
+
+class TestAuthenticator implements LiveApprovalAuthenticator {
+  active = true;
+  async reauthenticate() {
+    return this.active ? {
+      actorId: 'owner-a',
+      tenantId: 'tenant-a',
+      role: 'owner',
+      sessionRef: 'mission-session-secret',
+      authorityRef: 'mission-test-session:v1',
+      authenticatedAt: NOW.toISOString(),
+      expiresAt: new Date(NOW.getTime() + 60_000).toISOString(),
+    } : null;
+  }
+  isSessionActive(proof: LiveApprovalSessionProof): boolean {
+    return this.active
+      && proof.actorId === 'owner-a'
+      && proof.tenantId === 'tenant-a'
+      && proof.sessionRefHash === createHash('sha256').update('mission-session-secret').digest('hex');
+  }
+}
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'mission-approval-'));
@@ -25,7 +68,17 @@ function fixture() {
   store.createMission({ id: 'm', kind: 'list', title: 'Mission', tenant: 'tenant-a' });
   const broker = new ApprovalBroker(root);
   const decisions = new ApprovalStore(root);
-  return { root, store, broker, decisions };
+  const authenticator = new TestAuthenticator();
+  const integrity = new TestIntegrity();
+  const decisionAuthority = new ApprovalDecisionAuthority(integrity, authenticator);
+  const ingress = new ApprovalDecisionIngress({
+    broker,
+    authenticator,
+    integrity,
+    channel: 'test',
+    now: () => NOW,
+  });
+  return { root, store, broker, decisions, authenticator, decisionAuthority, ingress };
 }
 
 afterEach(() => {
@@ -56,18 +109,19 @@ function coordinator(f: ReturnType<typeof fixture>) {
     publisher: f.broker,
     decisions: f.decisions,
     requestFactory,
+    decisionAuthority: f.decisionAuthority,
     now: () => NOW,
   });
 }
 
-function decide(f: ReturnType<typeof fixture>, requestId: string, action: ApprovalAction, channel = 'test'): void {
-  f.broker.decide(requestId, {
-    decision: action,
-    decidedBy: 'owner-a',
-    channel,
-    decidedAt: new Date(NOW.getTime() + 1_000).toISOString(),
+async function decide(f: ReturnType<typeof fixture>, requestId: string, action: ApprovalAction): Promise<void> {
+  const outcome = await f.ingress.decide({
+    requestId,
+    action,
+    idempotencyKey: `mission-command-${requestId}`,
     reason: 'test decision',
   });
+  expect(outcome.kind).toBe('decided');
 }
 
 describe('MissionApprovalCoordinator', () => {
@@ -110,6 +164,7 @@ describe('MissionApprovalCoordinator', () => {
       publisher: new ApprovalBroker(f.root),
       decisions: new ApprovalStore(f.root),
       requestFactory,
+      decisionAuthority: f.decisionAuthority,
       now: () => NOW,
     });
     expect(restarted.tick()).toMatchObject({ published: 1 });
@@ -118,19 +173,20 @@ describe('MissionApprovalCoordinator', () => {
     f.store.close();
   });
 
-  it('hydrates allow after restart and preserves exactly-once claim', () => {
+  it('hydrates allow after restart and preserves exactly-once claim', async () => {
     const f = fixture();
     f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });
     const c = coordinator(f);
     c.tick();
     const requestId = f.store.listApprovalBindings()[0]!.requestId;
-    decide(f, requestId, 'allow');
+    await decide(f, requestId, 'allow');
 
     const restarted = new MissionApprovalCoordinator({
       store: f.store,
       publisher: new ApprovalBroker(f.root),
       decisions: new ApprovalStore(f.root),
       requestFactory,
+      decisionAuthority: f.decisionAuthority,
       now: () => NOW,
     });
     expect(restarted.tick()).toMatchObject({ decided: 1 });
@@ -141,17 +197,60 @@ describe('MissionApprovalCoordinator', () => {
     f.store.close();
   });
 
+  it('keeps an unattested legacy allow parked instead of turning it into Goal-v2 claim authority', () => {
+    const f = fixture();
+    f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });
+    const c = coordinator(f);
+    c.tick();
+    const requestId = f.store.listApprovalBindings()[0]!.requestId;
+    f.broker.decide(requestId, {
+      decision: 'allow',
+      decidedBy: 'owner-a',
+      channel: 'legacy-test',
+      decidedAt: NOW.toISOString(),
+    });
+
+    expect(c.tick()).toMatchObject({ decided: 0, invalid: 1 });
+    expect(f.store.listApprovalBindings()[0]!.decisionState).toBe('pending');
+    expect(f.store.listItems('m')[0]!.status).toBe('parked');
+    expect(f.store.claimItem('guarded', 'bypass')).toBe(false);
+    f.store.close();
+  });
+
+  it('rechecks live session authority immediately before claim and dispatches nothing after revocation', async () => {
+    const f = fixture();
+    f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });
+    const c = coordinator(f);
+    c.tick();
+    const requestId = f.store.listApprovalBindings()[0]!.requestId;
+    await decide(f, requestId, 'allow');
+    expect(c.tick()).toMatchObject({ decided: 1 });
+    expect(f.store.listApprovalBindings()[0]!.decisionState).toBe('allowed');
+
+    f.authenticator.active = false;
+    const calls: string[] = [];
+    const summary = await runMissionScheduler(f.store, async (item) => {
+      calls.push(item.id);
+      return { ok: true };
+    }, { poolSize: 1, intervalMs: 1, maxIterations: 1, approvalCoordinator: c });
+
+    expect(summary.dispatched).toBe(0);
+    expect(calls).toEqual([]);
+    expect(f.store.listItems('m')[0]!.status).toBe('pending');
+    f.store.close();
+  });
+
   it.each([
     ['deny', 'denied', 'blocked'],
     ['defer', 'deferred', 'parked'],
     ['escalate', 'escalated', 'parked'],
-  ] as const)('maps %s to durable %s and item %s', (action, state, status) => {
+  ] as const)('maps %s to durable %s and item %s', async (action, state, status) => {
     const f = fixture();
     f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'risk-tagged' });
     const c = coordinator(f);
     c.tick();
     const requestId = f.store.listApprovalBindings()[0]!.requestId;
-    decide(f, requestId, action);
+    await decide(f, requestId, action);
     expect(c.tick()).toMatchObject({ decided: 1 });
     expect(f.store.listApprovalBindings()[0]!.decisionState).toBe(state);
     expect(f.store.listItems('m')[0]!.status).toBe(status);
@@ -192,6 +291,7 @@ describe('MissionApprovalCoordinator', () => {
       publisher: new ApprovalBroker(f.root),
       decisions: new ApprovalStore(f.root),
       requestFactory,
+      decisionAuthority: f.decisionAuthority,
       now: () => later,
     });
 
@@ -211,7 +311,7 @@ describe('MissionApprovalCoordinator', () => {
     });
     const c = new MissionApprovalCoordinator({
       store: f.store, publisher: f.broker, decisions: f.decisions,
-      requestFactory: invalidFactory, now: () => NOW,
+      requestFactory: invalidFactory, decisionAuthority: f.decisionAuthority, now: () => NOW,
     });
 
     expect(c.tick()).toMatchObject({ invalid: 1, parked: 0, published: 0 });
@@ -232,6 +332,7 @@ describe('MissionApprovalCoordinator', () => {
       publisher: f.broker,
       decisions: f.decisions,
       requestFactory: () => { throw new Error('identity unavailable'); },
+      decisionAuthority: f.decisionAuthority,
       now: () => NOW,
     });
     const calls: string[] = [];
@@ -263,7 +364,7 @@ describe('MissionApprovalCoordinator', () => {
     f.store.close();
   });
 
-  it('does not apply a foreign allow decision whose request body conflicts with the outbox', () => {
+  it('does not apply a foreign allow decision whose request body conflicts with the outbox', async () => {
     const f = fixture();
     const item = f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });
     const mission = f.store.getMission('m')!;
@@ -273,7 +374,7 @@ describe('MissionApprovalCoordinator', () => {
     if (!expected.ok || !foreign.ok) throw new Error('fixture invalid');
     f.store.parkItemForApproval(item.id, expected.value);
     f.broker.submit(foreign.value);
-    decide(f, id, 'allow');
+    await decide(f, id, 'allow');
 
     expect(() => coordinator(f).tick()).toThrow('MISSION_APPROVAL_REQUEST_CONFLICT');
     expect(f.store.listItems('m')[0]!.status).toBe('parked');

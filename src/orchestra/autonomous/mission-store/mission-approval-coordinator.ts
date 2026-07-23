@@ -6,6 +6,7 @@ import {
   type ApprovalRequest,
 } from '../../../core/approval-contract.js';
 import type { ApprovalStoreSnapshot } from '../../../core/approval-store.js';
+import type { ApprovalDecisionAuthority } from '../../../core/approval-decision-ingress.js';
 import type {
   Mission,
   MissionStore,
@@ -34,6 +35,8 @@ export interface MissionApprovalCoordinatorOptions {
   publisher: MissionApprovalPublisher;
   decisions: MissionApprovalDecisionSource;
   requestFactory: MissionApprovalRequestFactory;
+  /** Host-only live-session + integrity authority. Absent means human allow stays HOLD. */
+  decisionAuthority?: ApprovalDecisionAuthority;
   now?: () => Date;
 }
 
@@ -47,6 +50,8 @@ export interface MissionApprovalTickSummary {
 
 export interface MissionApprovalCoordinatorLike {
   tick(): MissionApprovalTickSummary | Promise<MissionApprovalTickSummary>;
+  /** Revalidate the durable allow immediately before a guarded item is claimed. */
+  authorizeClaim?(item: WorkItem): boolean;
 }
 
 function canonical(value: unknown): string {
@@ -107,6 +112,7 @@ export class MissionApprovalCoordinator implements MissionApprovalCoordinatorLik
   private readonly publisher: MissionApprovalPublisher;
   private readonly decisions: MissionApprovalDecisionSource;
   private readonly requestFactory: MissionApprovalRequestFactory;
+  private readonly decisionAuthority?: ApprovalDecisionAuthority;
   private readonly now: () => Date;
 
   constructor(opts: MissionApprovalCoordinatorOptions) {
@@ -114,7 +120,18 @@ export class MissionApprovalCoordinator implements MissionApprovalCoordinatorLik
     this.publisher = opts.publisher;
     this.decisions = opts.decisions;
     this.requestFactory = opts.requestFactory;
+    this.decisionAuthority = opts.decisionAuthority;
     this.now = opts.now ?? (() => new Date());
+  }
+
+  authorizeClaim(item: WorkItem): boolean {
+    if (item.policy === 'auto') return true;
+    const binding = this.store.listApprovalBindings()
+      .find((candidate) => candidate.workItemId === item.id);
+    if (!binding || binding.decisionState !== 'allowed' || !binding.decision || !this.decisionAuthority) {
+      return false;
+    }
+    return this.decisionAuthority.validate(binding.request, binding.decision, this.now()).ok;
   }
 
   tick(): MissionApprovalTickSummary {
@@ -124,6 +141,7 @@ export class MissionApprovalCoordinator implements MissionApprovalCoordinatorLik
     let indexedRequests = requestMap(snapshot);
     const changedMissionIds = new Set<string>();
     let decided = 0;
+    let invalid = 0;
 
     // Restart hydration happens before new admission. A durable decision always
     // wins over generating another request for the same parked work item.
@@ -135,6 +153,12 @@ export class MissionApprovalCoordinator implements MissionApprovalCoordinatorLik
       }
       const settled = decisionState(snapshot, binding.requestId);
       if (!settled) continue;
+      if (settled.state === 'allowed'
+        && (!this.decisionAuthority
+          || !this.decisionAuthority.validate(binding.request, settled.decision, now).ok)) {
+        invalid++;
+        continue;
+      }
       const transition = this.store.applyApprovalDecision(binding.requestId, settled.state, settled.decision);
       if (transition?.changed) {
         decided++;
@@ -143,7 +167,6 @@ export class MissionApprovalCoordinator implements MissionApprovalCoordinatorLik
     }
 
     let parked = 0;
-    let invalid = 0;
     for (const item of this.store.listApprovalCandidates()) {
       const mission = this.store.getMission(item.missionId);
       if (!mission) throw new Error(`MISSION_APPROVAL_INVALID: mission not found for item ${item.id}`);
