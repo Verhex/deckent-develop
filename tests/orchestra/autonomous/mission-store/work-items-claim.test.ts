@@ -126,7 +126,8 @@ describe('WorkItems + atomic claim', () => {
     s.enqueueItem({ id: 'orphan', missionId: 'm', kind: 'task' });
     const claim = s.claimItemWithAuthority('orphan', 'dead-worker')!;
 
-    s.recover();
+    const lease = s.acquireEngineLease('recovery-test', 30_000)!;
+    s.recover(lease);
 
     expect(s.settleClaimedItem(claim, 'done', { ok: true })).toBe(false);
     expect(s.__rawGet(`SELECT status,claimed_at,claimed_by,claim_attempt_id,claim_fence_token_hash
@@ -299,7 +300,8 @@ describe('WorkItems + atomic claim', () => {
     expect(s.claimItem('corrupt-running', 'dead-worker')).toBe(true);
     s.__rawExec("UPDATE work_items SET kind='deploy' WHERE id='corrupt-running'");
 
-    s.recover();
+    const lease = s.acquireEngineLease('corrupt-recovery', 30_000)!;
+    s.recover(lease);
     const first = s.__rawGet("SELECT kind,status,claimed_at,claimed_by,last_result,updated_at FROM work_items WHERE id='corrupt-running'");
     expect(first).toMatchObject({
       kind: 'deploy', status: 'failed', claimed_at: null, claimed_by: null,
@@ -308,7 +310,7 @@ describe('WorkItems + atomic claim', () => {
       code: 'UNKNOWN_KIND', persistedKind: 'deploy', decision: 'failed-closed',
     });
 
-    s.recover();
+    s.recover(lease);
     expect(s.__rawGet("SELECT kind,status,claimed_at,claimed_by,last_result,updated_at FROM work_items WHERE id='corrupt-running'"))
       .toEqual(first);
     s.close();
@@ -458,6 +460,59 @@ describe('WorkItems + atomic claim', () => {
     expect(held.status).toBe('parked');
     expect(held.lastResult?.reason).toContain('RUNTIME_REGISTRY_MISMATCH');
     s.close();
+  });
+
+  it('grants one active engine lease and fences old claim authority after expiry takeover', () => {
+    const d = mkdtempSync(join(tmpdir(), 'wi-engine-lease-')); dirs.push(d);
+    const first = new SqliteMissionStore(d); first.migrate();
+    first.createMission({ id: 'lease-mission', kind: 'list', title: 'lease', renderAs: 'checklist' });
+    first.enqueueItem({ id: 'lease-task', missionId: 'lease-mission', kind: 'task' });
+    const second = new SqliteMissionStore(d); second.migrate();
+
+    const leaseA = first.acquireEngineLease('engine-a', 30_000)!;
+    expect(leaseA).toMatchObject({ schemaVersion: 1, ownerId: 'engine-a', epoch: 1 });
+    expect(Object.isFrozen(leaseA)).toBe(true);
+    expect(second.acquireEngineLease('engine-b', 30_000)).toBeNull();
+    expect(first.renewEngineLease(leaseA, 30_000)).toMatchObject({ epoch: leaseA.epoch });
+
+    const claim = first.claimItemWithAuthority('lease-task', 'scheduler-a', undefined, leaseA)!;
+    expect(claim).not.toBeNull();
+    first.__rawExec('UPDATE mission_engine_lease SET expires_at_ms=0');
+    const leaseB = second.acquireEngineLease('engine-b', 30_000)!;
+    expect(leaseB.epoch).toBe(leaseA.epoch + 1);
+
+    expect(first.renewEngineLease(leaseA, 30_000)).toBeNull();
+    expect(first.isDispatchClaimActive(claim, leaseA)).toBe(false);
+    expect(first.settleClaimedItem(claim, 'done', { ok: true }, leaseA)).toBe(false);
+    expect(first.releaseEngineLease(leaseA)).toBe(false);
+
+    second.recover(leaseB);
+    expect(second.listItems('lease-mission')[0]).toMatchObject({
+      status: 'parked',
+      lastResult: { reason: expect.stringContaining('RECOVERY_RECONCILIATION_REQUIRED') },
+    });
+    expect(second.releaseEngineLease(leaseB)).toBe(true);
+    first.close();
+    second.close();
+  });
+
+  it('releases only exact engine authority and keeps epochs monotonic across clean handoff', () => {
+    const d = mkdtempSync(join(tmpdir(), 'wi-engine-release-')); dirs.push(d);
+    const first = new SqliteMissionStore(d); first.migrate();
+    const second = new SqliteMissionStore(d); second.migrate();
+    const leaseA = first.acquireEngineLease('engine-a', 30_000)!;
+
+    expect(first.releaseEngineLease({ ...leaseA, ownerId: 'other' })).toBe(false);
+    expect(first.releaseEngineLease({ ...leaseA, leaseToken: 'forged' })).toBe(false);
+    expect(second.acquireEngineLease('engine-b', 30_000)).toBeNull();
+    expect(first.releaseEngineLease(leaseA)).toBe(true);
+
+    const leaseB = second.acquireEngineLease('engine-b', 30_000)!;
+    expect(leaseB.epoch).toBe(leaseA.epoch + 1);
+    expect(first.renewEngineLease(leaseA, 30_000)).toBeNull();
+    expect(second.releaseEngineLease(leaseB)).toBe(true);
+    first.close();
+    second.close();
   });
 
   it('rolls back a whole admitted goal batch on one id conflict', () => {

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteMissionStore } from '../../../../src/orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import {
+  MissionEngineLeaseUnavailableError,
   isV2Engine,
   runV2Engine as runV2EngineRuntime,
   type RunV2EngineDeps,
@@ -578,6 +579,58 @@ describe('runV2Engine', () => {
     // Re-open to verify the engine persisted + completed the mission, then closed cleanly.
     const verify = openStore(r);
     expect(verify.getMission('mOwn')!.status).toBe('completed');
+  });
+
+  it('refuses a second engine before recovery while another process owns the active lease', async () => {
+    const r = root();
+    const owner = openStore(r);
+    owner.createMission({ id: 'mLeaseConflict', kind: 'list', title: 'lease conflict', renderAs: 'checklist' });
+    enqueueProduction(owner, {
+      id: 'mLeaseConflict-0', missionId: 'mLeaseConflict', kind: 'task', spec: { description: 'uncertain' },
+    });
+    expect(owner.claimItem('mLeaseConflict-0', 'prior-engine')).toBe(true);
+    const activeLease = owner.acquireEngineLease('active-engine', 30_000)!;
+    const contender = openStore(r);
+    const runTask = vi.fn(async () => ({ ok: true }));
+
+    await expect(runV2EngineRuntime(r, cfg({ engine: 'v2' }), {
+      runTask,
+      runSprint: async () => undefined,
+      store: contender,
+      maxIterations: BOUNDED,
+    })).rejects.toBeInstanceOf(MissionEngineLeaseUnavailableError);
+
+    expect(runTask).not.toHaveBeenCalled();
+    expect(contender.listItems('mLeaseConflict')[0]!.status).toBe('running');
+    expect(owner.releaseEngineLease(activeLease)).toBe(true);
+  });
+
+  it('renews the engine lease while provider work remains in flight and releases it on completion', async () => {
+    const r = root();
+    const store = openStore(r);
+    store.createMission({ id: 'mLeaseHeartbeat', kind: 'list', title: 'lease heartbeat', renderAs: 'checklist' });
+    enqueueProduction(store, {
+      id: 'mLeaseHeartbeat-0', missionId: 'mLeaseHeartbeat', kind: 'task', spec: { description: 'long work' },
+    });
+
+    const summary = await runV2Engine(r, cfg({ engine: 'v2' }), {
+      runTask: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 180));
+        return { ok: true };
+      },
+      runSprint: async () => undefined,
+      store,
+      maxIterations: BOUNDED,
+      engineLeaseOwnerId: 'heartbeat-engine',
+      engineLeaseTtlMs: 80,
+      engineLeaseRenewIntervalMs: 20,
+    });
+
+    expect(summary.dispatched).toBe(1);
+    expect(store.listItems('mLeaseHeartbeat')[0]!.status).toBe('done');
+    const next = store.acquireEngineLease('next-engine', 30_000)!;
+    expect(next.epoch).toBeGreaterThan(1);
+    expect(store.releaseEngineLease(next)).toBe(true);
   });
 });
 

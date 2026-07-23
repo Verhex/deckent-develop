@@ -110,12 +110,28 @@ export interface MissionDispatchClaim {
   claimRegistryRevision: string | null;
   claimRegistryDigest: string | null;
 }
+/** Host-private singleton authority for one Goal-v2 engine process on one MissionStore. */
+export interface MissionEngineLease {
+  schemaVersion: 1;
+  ownerId: string;
+  epoch: number;
+  acquiredAt: string;
+  renewedAt: string;
+  expiresAt: string;
+  leaseToken: string;
+  leaseTokenHash: string;
+}
 export interface MissionEvent { ts: string; workItemId?: string; type: string; data?: unknown; }
 
 export interface MissionStore {
   migrate(): void;
-  recover(): void;
+  /** Recovery is a singleton-engine mutation and requires current exact lease authority. */
+  recover(engineLease: MissionEngineLease): void;
   close(): void;
+  acquireEngineLease(ownerId: string, ttlMs: number): MissionEngineLease | null;
+  renewEngineLease(lease: MissionEngineLease, ttlMs: number): MissionEngineLease | null;
+  releaseEngineLease(lease: MissionEngineLease): boolean;
+  isEngineLeaseActive(lease: MissionEngineLease): boolean;
   createMission(m: NewMission): Mission;
   /** Validate and persist a new mission plus its complete work-item DAG atomically. */
   createMissionWithItems(m: NewMission, items: readonly NewMissionWorkItem[]): Mission;
@@ -150,14 +166,20 @@ export interface MissionStore {
   reconcileRuntimeAdmission(registry: MissionRunnerRegistryV1, itemId?: string): string[];
   queryDue(opts?: { tenant?: string; limit?: number; registry?: MissionRunnerRegistryV1 }): WorkItem[];
   /** Atomically claim and return the only authority allowed to settle this running attempt. */
-  claimItemWithAuthority(id: string, by: string, fence?: MissionClaimFence): MissionDispatchClaim | null;
+  claimItemWithAuthority(
+    id: string,
+    by: string,
+    fence?: MissionClaimFence,
+    engineLease?: MissionEngineLease,
+  ): MissionDispatchClaim | null;
   /** Read-only persisted provenance check. This is not an atomic provider execution grant. */
-  isDispatchClaimActive(claim: MissionDispatchClaim): boolean;
+  isDispatchClaimActive(claim: MissionDispatchClaim, engineLease?: MissionEngineLease): boolean;
   /** First-writer-wins settlement for one exact claim; stale/wrong/replayed authority is a no-op. */
   settleClaimedItem(
     claim: MissionDispatchClaim,
     status: Extract<WorkItemStatus, 'done' | 'failed' | 'parked'>,
     result?: ResultLike,
+    engineLease?: MissionEngineLease,
   ): boolean;
   /** Compatibility/admin claim surface. Runtime schedulers must use claimItemWithAuthority. */
   claimItem(id: string, by: string, fence?: MissionClaimFence): boolean;

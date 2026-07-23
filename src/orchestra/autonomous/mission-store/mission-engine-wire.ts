@@ -7,6 +7,7 @@
 // All execution primitives (runTask / runSprint / runCapability / notify) are
 // INJECTED so this module is hermetically testable: the live CLI passes the real
 // spawn+wait wiring; tests pass fakes and a real SqliteMissionStore at a tmpdir.
+import { randomUUID } from 'node:crypto';
 import type { ResolvedConfig } from '../../../core/config-types.js';
 import { SqliteMissionStore } from './sqlite-mission-store.js';
 import { buildMissionDispatch, type MissionTaskContext } from './mission-dispatch.js';
@@ -17,7 +18,12 @@ import {
   bindMissionRunnerRegistry,
   type BoundMissionRunnerRegistryV1,
 } from './mission-kind-admission.js';
-import { runMissionScheduler, type DispatchFn, type MissionSchedulerSummary } from './mission-scheduler.js';
+import {
+  MissionEngineLeaseLostError,
+  runMissionScheduler,
+  type DispatchFn,
+  type MissionSchedulerSummary,
+} from './mission-scheduler.js';
 import { advanceGoalMission, type GoalAdvanceDeps } from './goal-mission.js';
 import { auditMissionLifecycle } from './mission-audit-bridge.js';
 import type { MissionApprovalCoordinatorLike } from './mission-approval-coordinator.js';
@@ -31,6 +37,7 @@ import type {
 import type {
   Mission,
   MissionDispatchClaim,
+  MissionEngineLease,
   MissionStore,
   ResultLike,
   SettleDetail,
@@ -103,6 +110,61 @@ export interface RunV2EngineDeps {
    * its own SqliteMissionStore(projectRoot) and closes it on completion.
    */
   store?: MissionStore;
+  /** Internal single-host lease identity seam; production generates a unique process instance id. */
+  engineLeaseOwnerId?: string;
+  /** Internal lease TTL seam. Default 30s; must exceed the renewal interval. */
+  engineLeaseTtlMs?: number;
+  /** Internal heartbeat interval seam. Default 10s; must be positive and below TTL. */
+  engineLeaseRenewIntervalMs?: number;
+}
+
+const DEFAULT_ENGINE_LEASE_TTL_MS = 30_000;
+const DEFAULT_ENGINE_LEASE_RENEW_INTERVAL_MS = 10_000;
+
+/** Another live Goal-v2 engine owns the same single-host MissionStore. */
+export class MissionEngineLeaseUnavailableError extends Error {
+  readonly ownerId: string;
+
+  constructor(ownerId: string) {
+    super(`MISSION_ENGINE_LEASE_UNAVAILABLE: ${ownerId}`);
+    this.name = 'MissionEngineLeaseUnavailableError';
+    this.ownerId = ownerId;
+  }
+}
+
+function assertEngineLeaseTiming(ttlMs: number, renewIntervalMs: number): void {
+  if (!Number.isSafeInteger(ttlMs) || ttlMs <= 0) {
+    throw new TypeError('MISSION_ENGINE_LEASE_INVALID: ttlMs');
+  }
+  if (!Number.isSafeInteger(renewIntervalMs) || renewIntervalMs <= 0 || renewIntervalMs >= ttlMs) {
+    throw new TypeError('MISSION_ENGINE_LEASE_INVALID: renewIntervalMs');
+  }
+}
+
+function startEngineLeaseHeartbeat(
+  store: MissionStore,
+  lease: MissionEngineLease,
+  ttlMs: number,
+  renewIntervalMs: number,
+): { stop: () => void } {
+  let stopped = false;
+  const timer = setInterval(() => {
+    if (stopped) return;
+    try {
+      if (!store.renewEngineLease(lease, ttlMs)) stopped = true;
+    } catch {
+      // A transient store failure does not invent a renewal. Runtime checks the
+      // durable row before every claim/dispatch/settlement and will fail closed
+      // when the last proven expiry passes.
+    }
+  }, renewIntervalMs);
+  timer.unref();
+  return {
+    stop: () => {
+      stopped = true;
+      clearInterval(timer);
+    },
+  };
 }
 
 /**
@@ -141,6 +203,7 @@ function withSettleDetail(runTask: RunV2EngineDeps['runTask']): RunV2EngineDeps[
 
 function withWorkerInvocationCoordinator(
   store: MissionStore,
+  engineLease: MissionEngineLease,
   coordinator: MissionWorkerInvocationCoordinatorLike | undefined,
   runAdmittedTask: RunV2EngineDeps['runAdmittedTask'],
 ): RunV2EngineDeps['runTask'] {
@@ -173,7 +236,7 @@ function withWorkerInvocationCoordinator(
       mission,
       context: ctx,
       claim,
-      isClaimActive: () => store.isDispatchClaimActive(claim),
+      isClaimActive: () => store.isDispatchClaimActive(claim, engineLease),
     }, grant => runAdmittedTask(
       Object.freeze(safeContext),
       Object.freeze(claimBinding),
@@ -220,12 +283,24 @@ export async function runV2Engine(
 ): Promise<MissionSchedulerSummary> {
   const ownsStore = deps.store === undefined;
   const store: MissionStore = deps.store ?? new SqliteMissionStore(projectRoot);
+  let engineLease: MissionEngineLease | null = null;
+  let heartbeat: { stop: () => void } | null = null;
   try {
+    store.migrate();
+    const leaseTtlMs = deps.engineLeaseTtlMs ?? DEFAULT_ENGINE_LEASE_TTL_MS;
+    const leaseRenewIntervalMs = deps.engineLeaseRenewIntervalMs ?? DEFAULT_ENGINE_LEASE_RENEW_INTERVAL_MS;
+    assertEngineLeaseTiming(leaseTtlMs, leaseRenewIntervalMs);
+    const leaseOwnerId = deps.engineLeaseOwnerId ?? `goal-v2:${process.pid}:${randomUUID()}`;
+    engineLease = store.acquireEngineLease(leaseOwnerId, leaseTtlMs);
+    if (!engineLease) throw new MissionEngineLeaseUnavailableError(leaseOwnerId);
+    heartbeat = startEngineLeaseHeartbeat(store, engineLease, leaseTtlMs, leaseRenewIntervalMs);
+
     const kindDispatch = buildMissionDispatch({
       projectRoot,
       config,
       runTask: withWorkerInvocationCoordinator(
         store,
+        engineLease,
         deps.workerInvocationCoordinator,
         deps.runAdmittedTask,
       ),
@@ -236,15 +311,14 @@ export async function runV2Engine(
     // production registry and its exact bound handlers are one authority.
     const runtimeRegistry = bindMissionRunnerRegistry(PRODUCTION_V2_RUNNER_REGISTRY, {
       task: kindDispatch,
-    }, (claim) => store.isDispatchClaimActive(claim));
+    }, (claim) => store.isDispatchClaimActive(claim, engineLease!));
 
-    store.migrate();
     // B11 crash-recovery wire (ADR-043): a previous engine run that crashed or was
     // killed mid-dispatch leaves work_items stuck in 'running' (claimed but never
     // settled). Blind redrive could duplicate a provider side effect, so recover()
     // parks those rows for owner reconciliation. Idempotent and narrow: only
     // touches status='running' rows; a clean boot is a no-op.
-    store.recover();
+    store.recover(engineLease);
     // Boot: import the legacy backlog into a `legacy` mission (no-op if missions exist).
     migrateBacklogJson(projectRoot, store, { admission: runtimeRegistry.descriptor });
     store.reconcileRuntimeAdmission(runtimeRegistry.descriptor);
@@ -258,6 +332,9 @@ export async function runV2Engine(
     // fail-safe) BEFORE delivery. Both the scheduler-only path and the
     // goal-driven path consume this handler, so wrapping here covers both.
     const onMissionSettled = (mission: Mission): void => {
+      if (!store.isEngineLeaseActive(engineLease!)) {
+        throw new MissionEngineLeaseLostError(engineLease!);
+      }
       auditMissionLifecycle(projectRoot, {
         tenantId: mission.tenant,
         actor: 'scheduler',
@@ -284,6 +361,7 @@ export async function runV2Engine(
         onMissionSettled,
         goalDeps: deps.goalDeps,
         runtimeRegistry,
+        engineLease,
         ...(deps.approvalCoordinator ? { approvalCoordinator: deps.approvalCoordinator } : {}),
         ...(perTenantPoolSize !== undefined ? { perTenantPoolSize } : {}),
         ...(deps.signal ? { signal: deps.signal } : {}),
@@ -296,12 +374,15 @@ export async function runV2Engine(
       intervalMs,
       onMissionSettled,
       runtimeRegistry,
+      engineLease,
       ...(deps.approvalCoordinator ? { approvalCoordinator: deps.approvalCoordinator } : {}),
       ...(perTenantPoolSize !== undefined ? { perTenantPoolSize } : {}),
       ...(deps.signal ? { signal: deps.signal } : {}),
       ...(deps.maxIterations !== undefined ? { maxIterations: deps.maxIterations } : {}),
     });
   } finally {
+    heartbeat?.stop();
+    if (engineLease) store.releaseEngineLease(engineLease);
     if (ownsStore) store.close();
   }
 }
@@ -315,6 +396,7 @@ interface GoalDrivenEngineOpts {
   onMissionSettled: (mission: Mission) => void;
   goalDeps: GoalAdvanceDeps;
   runtimeRegistry: BoundMissionRunnerRegistryV1;
+  engineLease: MissionEngineLease;
   approvalCoordinator?: MissionApprovalCoordinatorLike;
   signal?: AbortSignal;
   maxIterations?: number;
@@ -380,6 +462,9 @@ async function runGoalDrivenEngine(opts: GoalDrivenEngineOpts): Promise<MissionS
   };
 
   for (;;) {
+    if (!store.isEngineLeaseActive(opts.engineLease)) {
+      throw new MissionEngineLeaseLostError(opts.engineLease);
+    }
     if (signal?.aborted) return { iterations, dispatched, reason: 'aborted' };
     if (iterations >= maxIterations) return { iterations, dispatched, reason: 'max_iterations' };
     iterations++;
@@ -398,6 +483,9 @@ async function runGoalDrivenEngine(opts: GoalDrivenEngineOpts): Promise<MissionS
         continue; // round in flight or recovery reconciliation required
       }
       const outcome = await advanceGoalMission(store, mission.id, goalDeps);
+      if (!store.isEngineLeaseActive(opts.engineLease)) {
+        throw new MissionEngineLeaseLostError(opts.engineLease);
+      }
       if (outcome === 'authored') {
         authoredAny = true;
         // The scheduler may have flipped this mission to 'completed' after the
@@ -416,6 +504,7 @@ async function runGoalDrivenEngine(opts: GoalDrivenEngineOpts): Promise<MissionS
       intervalMs,
       onMissionSettled: schedOnSettled,
       runtimeRegistry,
+      engineLease: opts.engineLease,
       maxIterations: GOAL_DRAIN_BOUND,
       ...(opts.approvalCoordinator ? { approvalCoordinator: opts.approvalCoordinator } : {}),
       ...(opts.perTenantPoolSize !== undefined ? { perTenantPoolSize: opts.perTenantPoolSize } : {}),

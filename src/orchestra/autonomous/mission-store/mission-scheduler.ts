@@ -1,5 +1,6 @@
 import type {
   MissionDispatchClaim,
+  MissionEngineLease,
   MissionStore,
   WorkItem,
   Mission,
@@ -33,6 +34,8 @@ export interface MissionSchedulerOptions {
   approvalCoordinator?: MissionApprovalCoordinatorLike;
   /** Production claim+dispatch authority. When present, no separate runner path is used. */
   runtimeRegistry?: BoundMissionRunnerRegistryV1;
+  /** Exact single-host engine authority. Production Goal-v2 always supplies this. */
+  engineLease?: MissionEngineLease;
 }
 
 export interface MissionSchedulerSummary {
@@ -54,10 +57,30 @@ export class MissionClaimSettlementError extends Error {
   }
 }
 
+/** The singleton engine fence expired or was replaced; provider work must stop. */
+export class MissionEngineLeaseLostError extends Error {
+  readonly ownerId: string;
+  readonly epoch: number;
+
+  constructor(lease: MissionEngineLease) {
+    super(`MISSION_ENGINE_LEASE_LOST: ${lease.ownerId} (epoch ${lease.epoch})`);
+    this.name = 'MissionEngineLeaseLostError';
+    this.ownerId = lease.ownerId;
+    this.epoch = lease.epoch;
+  }
+}
+
 const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+function assertEngineLeaseActive(store: MissionStore, opts: MissionSchedulerOptions): void {
+  if (opts.engineLease && !store.isEngineLeaseActive(opts.engineLease)) {
+    throw new MissionEngineLeaseLostError(opts.engineLease);
+  }
+}
 
 /** Settle a mission when all its items are terminal. Fail-safe (caller wraps in try/catch). */
 function checkMissionComplete(store: MissionStore, missionId: string, opts: MissionSchedulerOptions): void {
+  assertEngineLeaseActive(store, opts);
   const items = store.listItems(missionId);
   if (items.length === 0) return;
   if (items.some((i) => i.status !== 'done' && i.status !== 'failed' && i.status !== 'blocked')) return; // still active
@@ -68,6 +91,19 @@ function checkMissionComplete(store: MissionStore, missionId: string, opts: Miss
   if (opts.onMissionSettled) {
     const m = store.getMission(missionId);
     if (m) opts.onMissionSettled(m);
+  }
+}
+
+function checkMissionCompleteFailSafe(
+  store: MissionStore,
+  missionId: string,
+  opts: MissionSchedulerOptions,
+): void {
+  try {
+    checkMissionComplete(store, missionId, opts);
+  } catch (error) {
+    if (error instanceof MissionEngineLeaseLostError) throw error;
+    // Mission projection/delivery remains fail-safe; exact engine authority does not.
   }
 }
 
@@ -85,10 +121,11 @@ export async function runMissionScheduler(
   const cap = opts.perTenantPoolSize;
   let iterations = 0;
   let dispatched = 0;
-  let fatalError: MissionClaimSettlementError | null = null;
+  let fatalError: MissionClaimSettlementError | MissionEngineLeaseLostError | null = null;
 
   for (;;) {
     if (fatalError) throw fatalError;
+    assertEngineLeaseActive(store, opts);
     if (opts.signal?.aborted) {
       await Promise.allSettled(inFlight);
       if (fatalError) throw fatalError;
@@ -113,18 +150,20 @@ export async function runMissionScheduler(
     for (const missionId of store.reconcilePendingDependencies()) changedMissions.add(missionId);
     if (opts.approvalCoordinator) {
       const approval = await opts.approvalCoordinator.tick();
+      assertEngineLeaseActive(store, opts);
       for (const missionId of approval.changedMissionIds) changedMissions.add(missionId);
       // A deny/expiry can block an upstream item; propagate that failure before
       // this tick's claim wave so downstream work never dispatches in-between.
       for (const missionId of store.reconcilePendingDependencies()) changedMissions.add(missionId);
     }
     for (const missionId of changedMissions) {
-      try { checkMissionComplete(store, missionId, opts); } catch { /* fail-safe */ }
+      checkMissionCompleteFailSafe(store, missionId, opts);
     }
 
     // serial claim up to free slots — atomic, race-free
     let claimedThisTick = 0;
     while (inFlight.size < opts.poolSize) {
+      assertEngineLeaseActive(store, opts);
       // No cap → original single-item FIFO (limit:1; zero extra store calls,
       // behaviour + perf unchanged). Cap set → scan the full pending FIFO and
       // claim the first item whose tenant is still below its concurrency cap, so
@@ -157,9 +196,9 @@ export async function runMissionScheduler(
             registry: opts.runtimeRegistry.descriptor,
           }
           : undefined;
-        const claim = store.claimItemWithAuthority(item.id, 'scheduler', claimFence);
+        const claim = store.claimItemWithAuthority(item.id, 'scheduler', claimFence, opts.engineLease);
         if (!claim) {
-          try { checkMissionComplete(store, item.missionId, opts); } catch { /* fail-safe */ }
+          checkMissionCompleteFailSafe(store, item.missionId, opts);
           continue; // someone else won / fence changed
         }
         claimedOne = true;
@@ -167,8 +206,12 @@ export async function runMissionScheduler(
         if (cap !== undefined) perTenantFlight.set(tenant, (perTenantFlight.get(tenant) ?? 0) + 1);
         let providerDispatchCounted = false;
         const p: Promise<void> = Promise.resolve()
-          .then(() => (opts.runtimeRegistry ? opts.runtimeRegistry.dispatch(item, claim) : dispatch(item, claim)))
+          .then(() => {
+            assertEngineLeaseActive(store, opts);
+            return opts.runtimeRegistry ? opts.runtimeRegistry.dispatch(item, claim) : dispatch(item, claim);
+          })
           .then((r) => {
+            assertEngineLeaseActive(store, opts);
             const parked = r.dispatchDisposition === 'parked';
             const reconciliationRequired = r.dispatchDisposition === 'reconciliation-required';
             if (!parked) {
@@ -179,21 +222,38 @@ export async function runMissionScheduler(
               claim,
               parked || reconciliationRequired ? 'parked' : r.ok ? 'done' : 'failed',
               r,
+              opts.engineLease,
             );
             if (!settled) fatalError ??= new MissionClaimSettlementError(claim);
           })
           .catch((e) => {
+            if (e instanceof MissionEngineLeaseLostError) {
+              fatalError ??= e;
+              return;
+            }
+            try {
+              assertEngineLeaseActive(store, opts);
+            } catch (leaseError) {
+              fatalError ??= leaseError as MissionEngineLeaseLostError;
+              return;
+            }
             if (!providerDispatchCounted) dispatched++;
             const settled = store.settleClaimedItem(claim, 'failed', {
               ok: false,
               reason: String((e as Error)?.message ?? e),
-            });
+            }, opts.engineLease);
             if (!settled) fatalError ??= new MissionClaimSettlementError(claim);
           })
           .finally(() => {
             inFlight.delete(p);
             if (cap !== undefined) perTenantFlight.set(tenant, (perTenantFlight.get(tenant) ?? 1) - 1);
-            try { checkMissionComplete(store, item.missionId, opts); } catch { /* fail-safe */ }
+            if (!fatalError) {
+              try {
+                checkMissionCompleteFailSafe(store, item.missionId, opts);
+              } catch (error) {
+                fatalError ??= error as MissionEngineLeaseLostError;
+              }
+            }
           });
         inFlight.add(p);
         break; // claimed one → re-evaluate free slots from the top

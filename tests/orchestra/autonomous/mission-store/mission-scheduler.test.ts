@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteMissionStore } from '../../../../src/orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import {
+  MissionEngineLeaseLostError,
   MissionClaimSettlementError,
   runMissionScheduler,
   type DispatchFn,
@@ -196,6 +197,62 @@ describe('runMissionScheduler — robustness', () => {
     expect(summary.dispatched).toBe(0);
     expect(calls).toEqual([]);
     expect(s.listItems('race')[0]!.status).toBe('pending');
+    s.close();
+  });
+
+  it('fails loud before provider dispatch when the engine lease is lost after claim', async () => {
+    class LeaseLossStore extends SqliteMissionStore {
+      override claimItemWithAuthority(
+        id: string,
+        by: string,
+        fence?: MissionClaimFence,
+        engineLease?: Parameters<SqliteMissionStore['claimItemWithAuthority']>[3],
+      ): MissionDispatchClaim | null {
+        const claim = super.claimItemWithAuthority(id, by, fence, engineLease);
+        if (claim) this.__rawExec('UPDATE mission_engine_lease SET expires_at_ms=0');
+        return claim;
+      }
+    }
+    const d = mkdtempSync(join(tmpdir(), 'sched-lease-loss-')); dirs.push(d);
+    const s = new LeaseLossStore(d); s.migrate();
+    s.createMission({ id: 'lease-loss', kind: 'list', title: 'lease loss', renderAs: 'checklist' });
+    s.enqueueItem({ id: 'lease-loss-task', missionId: 'lease-loss', kind: 'task' });
+    const lease = s.acquireEngineLease('scheduler-lease-loss', 30_000)!;
+    const calls: string[] = [];
+
+    await expect(runMissionScheduler(s, async (item) => {
+      calls.push(item.id);
+      return { ok: true };
+    }, {
+      poolSize: 1,
+      intervalMs: 1,
+      maxIterations: 10,
+      engineLease: lease,
+    })).rejects.toBeInstanceOf(MissionEngineLeaseLostError);
+
+    expect(calls).toEqual([]);
+    expect(s.listItems('lease-loss')[0]!.status).toBe('running');
+    s.close();
+  });
+
+  it('refuses stale settlement when the engine lease is lost during provider dispatch', async () => {
+    const s = storeWith('lease-loss-settle', 1);
+    const lease = s.acquireEngineLease('scheduler-lease-settle', 30_000)!;
+
+    await expect(runMissionScheduler(s, async () => {
+      s.__rawExec('UPDATE mission_engine_lease SET expires_at_ms=0');
+      return { ok: true, reason: 'must not settle' };
+    }, {
+      poolSize: 1,
+      intervalMs: 1,
+      maxIterations: 10,
+      engineLease: lease,
+    })).rejects.toBeInstanceOf(MissionEngineLeaseLostError);
+
+    expect(s.listItems('lease-loss-settle')[0]).toMatchObject({
+      status: 'running',
+      lastResult: null,
+    });
     s.close();
   });
 

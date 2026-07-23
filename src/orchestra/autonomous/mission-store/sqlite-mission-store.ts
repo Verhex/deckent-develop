@@ -8,7 +8,7 @@ import type {
   MissionStore, Mission, NewMission, MissionStatus, Progress, ResultLike,
   WorkItem, NewWorkItem, NewMissionWorkItem, WorkItemStatus,
   WorkItemApprovalBinding, WorkItemApprovalState, ApprovalDecisionTransition,
-  MissionClaimFence, MissionDispatchClaim,
+  MissionClaimFence, MissionDispatchClaim, MissionEngineLease,
 } from './mission-types.js';
 import type {
   MissionAcceptanceDecisionRecord,
@@ -102,6 +102,15 @@ CREATE TABLE IF NOT EXISTS mission_acceptance_decisions (
   PRIMARY KEY(mission_id, round),
   UNIQUE(mission_id, decision_digest) );
 CREATE INDEX IF NOT EXISTS idx_mad_mission_created ON mission_acceptance_decisions(mission_id, created_at);
+CREATE TABLE IF NOT EXISTS mission_engine_lease (
+  singleton_id INTEGER PRIMARY KEY CHECK(singleton_id=1),
+  owner_id TEXT NOT NULL,
+  epoch INTEGER NOT NULL CHECK(epoch >= 1),
+  lease_token_hash TEXT NOT NULL,
+  acquired_at TEXT NOT NULL,
+  renewed_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  expires_at_ms INTEGER NOT NULL );
 `;
 
 /** Durable mission store (SQLite WAL) — the autonomous-v2 single source of truth. */
@@ -123,24 +132,67 @@ export class SqliteMissionStore implements MissionStore {
     if (!columns.has('claim_attempt_id')) this.db.exec('ALTER TABLE work_items ADD COLUMN claim_attempt_id TEXT');
     if (!columns.has('claim_fence_token_hash')) this.db.exec('ALTER TABLE work_items ADD COLUMN claim_fence_token_hash TEXT');
   }
-  recover(): void {
-    // Classify an unsupported running row before the generic orphan rule can
-    // obscure its stronger cause or leave it eligible for a future redrive.
-    this.reconcileUnsupportedKinds();
-    const result = JSON.stringify({
-      ok: false,
-      reason: 'RECOVERY_RECONCILIATION_REQUIRED: prior running attempt has no terminal dispatch evidence; automatic redrive refused',
+  recover(engineLease: MissionEngineLease): void {
+    const transaction = this.db.transaction((): void => {
+      if (!this.isEngineLeaseActive(engineLease)) {
+        throw new Error(`MISSION_ENGINE_LEASE_LOST: recovery authority ${engineLease.ownerId}`);
+      }
+      // Classify an unsupported running row before the generic orphan rule can
+      // obscure its stronger cause or leave it eligible for a future redrive.
+      this.reconcileUnsupportedKinds();
+      const result = JSON.stringify({
+        ok: false,
+        reason: 'RECOVERY_RECONCILIATION_REQUIRED: prior running attempt has no terminal dispatch evidence; automatic redrive refused',
+      });
+      this.db.prepare(`UPDATE work_items SET status='parked', last_result=@result, revision=revision+1,
+        claimed_at=NULL, claimed_by=NULL, claim_attempt_id=NULL, claim_fence_token_hash=NULL,
+        updated_at=@ts WHERE status='running'`)
+        .run({ result, ts: this.now() });
     });
-    this.db.prepare(`UPDATE work_items SET status='parked', last_result=@result, revision=revision+1,
-      claimed_at=NULL, claimed_by=NULL, claim_attempt_id=NULL, claim_fence_token_hash=NULL,
-      updated_at=@ts WHERE status='running'`)
-      .run({ result, ts: this.now() });
+    transaction.immediate();
   }
   close(): void { this.db.close(); }
 
   private now(): string { return new Date().toISOString(); }
   private claimTokenHash(token: string): string {
     return createHash('sha256').update(token, 'utf8').digest('hex');
+  }
+  private validEngineLeaseShape(lease: MissionEngineLease): boolean {
+    return lease.schemaVersion === 1
+      && lease.ownerId.length > 0
+      && lease.ownerId === lease.ownerId.trim()
+      && Number.isSafeInteger(lease.epoch)
+      && lease.epoch >= 1
+      && lease.leaseToken.length > 0
+      && lease.leaseTokenHash === this.claimTokenHash(lease.leaseToken);
+  }
+  private assertLeaseTtl(ttlMs: number): void {
+    if (!Number.isSafeInteger(ttlMs) || ttlMs <= 0) {
+      throw new TypeError('MISSION_ENGINE_LEASE_INVALID: ttlMs');
+    }
+  }
+  private engineLeasePredicate(engineLease: MissionEngineLease | undefined, nowMs: number): {
+    sql: string;
+    bindings: Record<string, unknown>;
+  } | null {
+    if (!engineLease) return { sql: '', bindings: {} };
+    if (!this.validEngineLeaseShape(engineLease)) return null;
+    return {
+      sql: ` AND EXISTS (
+        SELECT 1 FROM mission_engine_lease engine
+        WHERE engine.singleton_id=1
+          AND engine.owner_id=@engineOwnerId
+          AND engine.epoch=@engineEpoch
+          AND engine.lease_token_hash=@engineTokenHash
+          AND engine.expires_at_ms>@engineNowMs
+      )`,
+      bindings: {
+        engineOwnerId: engineLease.ownerId,
+        engineEpoch: engineLease.epoch,
+        engineTokenHash: engineLease.leaseTokenHash,
+        engineNowMs: nowMs,
+      },
+    };
   }
   private j(v: unknown): string | null { return v === undefined || v === null ? null : JSON.stringify(v); }
   private p<T>(s: unknown): T | null { return typeof s === 'string' && s.length ? JSON.parse(s) as T : null; }
@@ -156,6 +208,113 @@ export class SqliteMissionStore implements MissionStore {
       return value ?? null;
     };
     return JSON.stringify(normalize(v));
+  }
+
+  acquireEngineLease(ownerId: string, ttlMs: number): MissionEngineLease | null {
+    if (!ownerId || ownerId !== ownerId.trim()) {
+      throw new TypeError('MISSION_ENGINE_LEASE_INVALID: ownerId');
+    }
+    this.assertLeaseTtl(ttlMs);
+    const transaction = this.db.transaction((): MissionEngineLease | null => {
+      const nowMs = Date.now();
+      const row = this.db.prepare(`SELECT owner_id,epoch,lease_token_hash,expires_at_ms
+        FROM mission_engine_lease WHERE singleton_id=1`).get() as {
+        owner_id: string;
+        epoch: number;
+        lease_token_hash: string;
+        expires_at_ms: number;
+      } | undefined;
+      if (row && row.expires_at_ms > nowMs) return null;
+
+      const epoch = (row?.epoch ?? 0) + 1;
+      const leaseToken = randomUUID();
+      const leaseTokenHash = this.claimTokenHash(leaseToken);
+      const acquiredAt = new Date(nowMs).toISOString();
+      const expiresAtMs = nowMs + ttlMs;
+      const expiresAt = new Date(expiresAtMs).toISOString();
+      this.db.prepare(`INSERT INTO mission_engine_lease(
+        singleton_id,owner_id,epoch,lease_token_hash,acquired_at,renewed_at,expires_at,expires_at_ms
+      ) VALUES(1,@ownerId,@epoch,@leaseTokenHash,@acquiredAt,@acquiredAt,@expiresAt,@expiresAtMs)
+      ON CONFLICT(singleton_id) DO UPDATE SET
+        owner_id=excluded.owner_id,
+        epoch=excluded.epoch,
+        lease_token_hash=excluded.lease_token_hash,
+        acquired_at=excluded.acquired_at,
+        renewed_at=excluded.renewed_at,
+        expires_at=excluded.expires_at,
+        expires_at_ms=excluded.expires_at_ms`).run({
+        ownerId,
+        epoch,
+        leaseTokenHash,
+        acquiredAt,
+        expiresAt,
+        expiresAtMs,
+      });
+      return Object.freeze({
+        schemaVersion: 1 as const,
+        ownerId,
+        epoch,
+        acquiredAt,
+        renewedAt: acquiredAt,
+        expiresAt,
+        leaseToken,
+        leaseTokenHash,
+      });
+    });
+    return transaction.immediate();
+  }
+
+  renewEngineLease(lease: MissionEngineLease, ttlMs: number): MissionEngineLease | null {
+    this.assertLeaseTtl(ttlMs);
+    if (!this.validEngineLeaseShape(lease)) return null;
+    const nowMs = Date.now();
+    const renewedAt = new Date(nowMs).toISOString();
+    const expiresAtMs = nowMs + ttlMs;
+    const expiresAt = new Date(expiresAtMs).toISOString();
+    const info = this.db.prepare(`UPDATE mission_engine_lease SET
+      renewed_at=@renewedAt, expires_at=@expiresAt, expires_at_ms=@expiresAtMs
+      WHERE singleton_id=1 AND owner_id=@ownerId AND epoch=@epoch
+        AND lease_token_hash=@leaseTokenHash AND expires_at_ms>@nowMs`).run({
+      ownerId: lease.ownerId,
+      epoch: lease.epoch,
+      leaseTokenHash: lease.leaseTokenHash,
+      nowMs,
+      renewedAt,
+      expiresAt,
+      expiresAtMs,
+    });
+    return info.changes === 1
+      ? Object.freeze({ ...lease, renewedAt, expiresAt })
+      : null;
+  }
+
+  releaseEngineLease(lease: MissionEngineLease): boolean {
+    if (!this.validEngineLeaseShape(lease)) return false;
+    const nowMs = Date.now();
+    const now = new Date(nowMs).toISOString();
+    const info = this.db.prepare(`UPDATE mission_engine_lease SET
+      renewed_at=@now, expires_at=@now, expires_at_ms=0
+      WHERE singleton_id=1 AND owner_id=@ownerId AND epoch=@epoch
+        AND lease_token_hash=@leaseTokenHash`).run({
+      ownerId: lease.ownerId,
+      epoch: lease.epoch,
+      leaseTokenHash: lease.leaseTokenHash,
+      now,
+    });
+    return info.changes === 1;
+  }
+
+  isEngineLeaseActive(lease: MissionEngineLease): boolean {
+    if (!this.validEngineLeaseShape(lease)) return false;
+    const row = this.db.prepare(`SELECT 1 AS active FROM mission_engine_lease
+      WHERE singleton_id=1 AND owner_id=? AND epoch=? AND lease_token_hash=?
+        AND expires_at_ms>?`).get(
+      lease.ownerId,
+      lease.epoch,
+      lease.leaseTokenHash,
+      Date.now(),
+    );
+    return row !== undefined;
   }
 
   /**
@@ -994,12 +1153,19 @@ export class SqliteMissionStore implements MissionStore {
       return false;
     });
   }
-  claimItemWithAuthority(id: string, by: string, fence?: MissionClaimFence): MissionDispatchClaim | null {
+  claimItemWithAuthority(
+    id: string,
+    by: string,
+    fence?: MissionClaimFence,
+    engineLease?: MissionEngineLease,
+  ): MissionDispatchClaim | null {
     if (by.length === 0 || by !== by.trim()) {
       throw new TypeError('MISSION_DISPATCH_CLAIM_INVALID: claimedBy');
     }
     const transaction = this.db.transaction((): MissionDispatchClaim | null => {
       const claimedAt = this.now();
+      const engineAuthority = this.engineLeasePredicate(engineLease, Date.now());
+      if (!engineAuthority) return null;
       const attemptId = randomUUID();
       const fenceToken = randomUUID();
       const fenceTokenHash = this.claimTokenHash(fenceToken);
@@ -1043,8 +1209,9 @@ export class SqliteMissionStore implements MissionStore {
             SELECT 1 FROM json_each(COALESCE(target.depends_on, '[]')) dep
             LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=target.mission_id
             WHERE upstream.id IS NULL OR upstream.status<>'done'
-          )`).run({
+          )${engineAuthority.sql}`).run({
           ...runtimeBindings,
+          ...engineAuthority.bindings,
           id,
           by,
           ts: claimedAt,
@@ -1094,8 +1261,9 @@ export class SqliteMissionStore implements MissionStore {
           SELECT 1 FROM json_each(COALESCE(target.depends_on, '[]')) dep
           LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=target.mission_id
           WHERE upstream.id IS NULL OR upstream.status<>'done'
-        )`).run({
+        )${engineAuthority.sql}`).run({
         ...CANONICAL_KIND_BINDINGS,
+        ...engineAuthority.bindings,
         id,
         by,
         ts: claimedAt,
@@ -1125,6 +1293,7 @@ export class SqliteMissionStore implements MissionStore {
     claim: MissionDispatchClaim,
     status: Extract<WorkItemStatus, 'done' | 'failed' | 'parked'>,
     result?: ResultLike,
+    engineLease?: MissionEngineLease,
   ): boolean {
     if (claim.schemaVersion !== 1
       || claim.workItemId.length === 0
@@ -1133,13 +1302,17 @@ export class SqliteMissionStore implements MissionStore {
       || claim.attemptId.length === 0
       || claim.fenceToken.length === 0
       || claim.fenceTokenHash !== this.claimTokenHash(claim.fenceToken)) return false;
+    const engineAuthority = this.engineLeasePredicate(engineLease, Date.now());
+    if (!engineAuthority) return false;
     const info = this.db.prepare(`UPDATE work_items SET status=@status,
       last_result=COALESCE(@result,last_result), revision=revision+1,
       claim_attempt_id=NULL, claim_fence_token_hash=NULL, updated_at=@ts
       WHERE id=@id AND mission_id=@missionId AND status='running'
         AND claimed_by=@claimedBy AND claimed_at=@claimedAt AND revision=@itemRevision
-        AND claim_attempt_id=@attemptId AND claim_fence_token_hash=@fenceTokenHash`)
+        AND claim_attempt_id=@attemptId AND claim_fence_token_hash=@fenceTokenHash
+        ${engineAuthority.sql}`)
       .run({
+        ...engineAuthority.bindings,
         id: claim.workItemId,
         missionId: claim.missionId,
         claimedBy: claim.claimedBy,
@@ -1154,7 +1327,7 @@ export class SqliteMissionStore implements MissionStore {
     return info.changes === 1;
   }
 
-  isDispatchClaimActive(claim: MissionDispatchClaim): boolean {
+  isDispatchClaimActive(claim: MissionDispatchClaim, engineLease?: MissionEngineLease): boolean {
     if (claim.schemaVersion !== 1
       || claim.workItemId.length === 0
       || claim.missionId.length === 0
@@ -1162,6 +1335,7 @@ export class SqliteMissionStore implements MissionStore {
       || claim.attemptId.length === 0
       || claim.fenceToken.length === 0
       || claim.fenceTokenHash !== this.claimTokenHash(claim.fenceToken)) return false;
+    if (engineLease && !this.isEngineLeaseActive(engineLease)) return false;
     const row = this.db.prepare(`SELECT mission_id,status,claimed_by,claimed_at,revision,
       claim_attempt_id,claim_fence_token_hash,claim_registry_revision,claim_registry_digest
       FROM work_items WHERE id=?`).get(claim.workItemId) as {
