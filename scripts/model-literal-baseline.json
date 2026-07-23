@@ -344,56 +344,6 @@
   ],
   "sanctionedMarkdown": [
     {
-      "file": ".deckent/DIRECTIVES-features.md",
-      "kind": "directive-model",
-      "code": "- Model: sonnet"
-    },
-    {
-      "file": ".deckent/DIRECTIVES-features.md",
-      "kind": "directive-model",
-      "code": "- Model: sonnet"
-    },
-    {
-      "file": ".deckent/DIRECTIVES-features.md",
-      "kind": "directive-model",
-      "code": "- Model: sonnet"
-    },
-    {
-      "file": ".deckent/DIRECTIVES-features.md",
-      "kind": "directive-model",
-      "code": "- Model: sonnet"
-    },
-    {
-      "file": ".deckent/DIRECTIVES-features.md",
-      "kind": "directive-model",
-      "code": "- Model: sonnet"
-    },
-    {
-      "file": ".deckent/DIRECTIVES-features.md",
-      "kind": "directive-model",
-      "code": "- Model: sonnet"
-    },
-    {
-      "file": ".deckent/DIRECTIVES-features.md",
-      "kind": "directive-model",
-      "code": "- Model: sonnet"
-    },
-    {
-      "file": ".deckent/DIRECTIVES-features.md",
-      "kind": "directive-model",
-      "code": "- Model: sonnet"
-    },
-    {
-      "file": ".deckent/DIRECTIVES-features.md",
-      "kind": "directive-model",
-      "code": "- Model: sonnet"
-    },
-    {
-      "file": ".deckent/DIRECTIVES-features.md",
-      "kind": "directive-model",
-      "code": "- Model: sonnet"
-    },
-    {
       "file": "docs/architecture/architecture.md",
       "kind": "table-cell",
       "code": "| `api` | 10 | opus | sonnet | true |"
@@ -639,16 +589,6 @@
       "code": "| `standard` | sonnet | gpt-4.1 / o4-mini | gemini-2.5-flash | General development (default) |"
     },
     {
-      "file": "docs/guide/first-sprint.md",
-      "kind": "directive-model",
-      "code": "- Model: opus"
-    },
-    {
-      "file": "docs/guide/first-sprint.md",
-      "kind": "directive-model",
-      "code": "- Model: sonnet"
-    },
-    {
       "file": "docs/guide/getting-started-en.md",
       "kind": "directive-model",
       "code": "- Model: sonnet"
@@ -665,16 +605,6 @@
     },
     {
       "file": "docs/guide/multi-provider-fleet.md",
-      "kind": "directive-model",
-      "code": "- Model: sonnet"
-    },
-    {
-      "file": "docs/guide/quickstart.md",
-      "kind": "directive-model",
-      "code": "- Model: sonnet"
-    },
-    {
-      "file": "docs/guide/quickstart.md",
       "kind": "directive-model",
       "code": "- Model: sonnet"
     },

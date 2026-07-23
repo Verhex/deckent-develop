@@ -24,7 +24,7 @@ Create or edit `DIRECTIVES.md` in your project root:
 ## Goal: Add a /health endpoint and a settings page to the dashboard.
 
 ## Task 1: Health Check Endpoint
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: low
 - Files: src/api/health.ts (new), tests/api/health.test.ts (new)
 - Scope: src/api/, tests/api/
@@ -36,7 +36,7 @@ Add a GET /health endpoint that returns system status.
 - Write at least 3 tests
 
 ## Task 2: Settings Page
-- Model: opus
+- Model: claude-opus-4-8
 - Effort: normal
 - Files: src/pages/settings.tsx (new), tests/pages/settings.test.tsx (new)
 - Scope: src/pages/, tests/pages/, src/components/
@@ -52,7 +52,7 @@ Build a settings page for the dashboard.
 
 ### Directive Tips
 
-- **Model selection**: Use `opus` for complex tasks (architecture, multi-file changes), `sonnet` for standard work, `haiku` for simple tasks.
+- **Model selection**: Use exact registered API IDs in `Model` fields. The current Claude examples are `claude-opus-4-8` for complex work, `claude-sonnet-5` for standard work, and `claude-haiku-4-5-20251001` for simple work. Run `deckent models list` for the current catalog; provider-agnostic policy should select a tier and let the registry resolve it.
 - **Effort levels**: `low` (< 50 lines), `normal` (50-200 lines), `high` (200+ lines). Brain uses this to estimate time and parallelism.
 - **Scope**: List all directories a worker may read from or write to. The auditor flags boundary violations.
 
@@ -70,8 +70,8 @@ Output:
 Sprint 001 -- 2 tasks planned
 
   ID        TITLE                  MODEL    PRIORITY   EFFORT
-  001-001   Health Check Endpoint  sonnet   NORMAL     low
-  001-002   Settings Page          opus     HIGH       normal
+  001-001   Health Check Endpoint  claude-sonnet-5   NORMAL     low
+  001-002   Settings Page          claude-opus-4-8   HIGH       normal
 
 Max workers: 8 (performance)
 Planning mode: ai
@@ -90,7 +90,7 @@ deckent start
 What happens under the hood:
 
 1. **PLAN phase** -- Brain reads directives, creates `.tasks/task-001-001.json` and `.tasks/task-001-002.json`
-2. **SPAWN phase** -- Brain opens tmux windows (or subprocess/Docker containers), one per task; when `dependency_pipeline_enabled: true` (the default), tasks are sorted into dependency waves via Kahn's topological algorithm so independent tasks run in parallel and dependent tasks unblock only when their dependencies are done
+2. **SPAWN phase** -- Brain launches each ready task on its resolved backend. Fresh config defaults to Docker; init explicitly persists `subprocess` when Docker cannot be prepared. `spawn_backend: auto` resolves to subprocess on native Windows and Docker elsewhere, with no silent runtime fallback chain. Explicit tmux selection is deprecated. When `dependency_pipeline_enabled: true` (the default), tasks are sorted into dependency waves via Kahn's topological algorithm so independent tasks run in parallel and dependent tasks unblock only when their dependencies are done
 3. **EXECUTE phase** -- Workers read their task files, write code, run tests, produce `.result` files; heartbeat files (`.hb`) are written periodically so the Auditor can detect stale workers
 4. **EVALUATE phase** -- Brain reads each `.result`, assigns GO / NO-GO / GO_WITH_TECH_DEBT
 5. **FIX phase** -- Failed tasks are retried with enriched prompts (optional, configurable timeout)
@@ -100,15 +100,17 @@ What happens under the hood:
 
 ### Watching Workers Live
 
-Workers run in tmux. Attach to the session:
+Monitor progress on every backend with `deckent status --watch`. For a
+Docker-backed task, follow its container logs with:
 
 ```bash
-tmux attach -t deckent
+deckent watch --follow 001-001
 ```
 
-Switch between workers with `Ctrl+B` then a window number (0, 1, 2...).
-
-Detach without stopping: `Ctrl+B` then `d`.
+If you explicitly selected the deprecated tmux backend, you may instead attach
+with `tmux attach -t deckent`. For subprocess workers, `deckent status --watch`
+is the portable path today; fully unified live-log following remains tracked
+backend-parity work.
 
 ### Monitoring Progress
 
@@ -124,8 +126,8 @@ This refreshes every 2 seconds:
 Sprint sprint-001 -- EXECUTE phase
 
   TASK        STATUS      MODEL    LAST HEARTBEAT
-  001-001     DONE        sonnet   12s ago
-  001-002     EXECUTING   opus     3s ago
+  001-001     DONE        claude-sonnet-5   12s ago
+  001-002     EXECUTING   claude-opus-4-8   3s ago
 
 Progress: 1/2 done  |  0 failed  |  1 running
 
@@ -146,8 +148,8 @@ deckent status
 Sprint sprint-001 -- COMPLETE
 
   TASK        STATUS   MODEL    ASSESSMENT
-  001-001     DONE     sonnet   DONE
-  001-002     DONE     opus     DONE
+  001-001     DONE     claude-sonnet-5   DONE
+  001-002     DONE     claude-opus-4-8   DONE
 
 Progress: 2/2 done  |  0 failed
 
@@ -229,7 +231,7 @@ Fix the underlying issue (often a missing dependency or unclear directive), upda
 
 - Check `deckent status --watch` for stale heartbeats
 - Reduce task complexity by splitting into smaller tasks
-- Use `haiku` model for simple tasks to save capacity
+- Use an exact economy model ID such as `claude-haiku-4-5-20251001` for simple tasks when policy and reachability allow it
 
 ### Want to Use Multiple Providers
 
@@ -237,11 +239,22 @@ Configure different providers for Brain and workers:
 
 ```json
 {
-  "brain_provider": "claude",
-  "worker_provider": "codex",
-  "fallback_provider": "gemini"
+  "providers": {
+    "brain": "claude",
+    "worker": "codex"
+  },
+  "provider_fallback": {
+    "brain": ["codex", "gemini"],
+    "worker": ["claude", "gemini"],
+    "auditor_provider": "codex",
+    "auditor": ["claude", "gemini"],
+    "unattended": false
+  }
 }
 ```
+
+This is candidate order, not availability proof. Dispatch still requires valid
+auth, backend/model reachability, limit evidence, and execution-budget admission.
 
 See the [Multi-Provider Guide](/reference/multi-provider) for details.
 

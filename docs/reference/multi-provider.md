@@ -24,7 +24,7 @@ configured provider order, but configuration is not availability proof.
 
 | Provider | CLI / SDK | Auth | Worker Backend | Status |
 |----------|-----------|------|----------------|--------|
-| **Claude** | `claude` CLI (`@anthropic-ai/claude-code`) | OAuth session managed by CLI (subscription or `ANTHROPIC_API_KEY`) | tmux (default) or subprocess; Docker with `~/.claude` mount | Default, full feature support |
+| **Claude** | `claude` CLI (`@anthropic-ai/claude-code`) | OAuth session managed by CLI (subscription or `ANTHROPIC_API_KEY`) | Docker by default; subprocess supported; explicit tmux deprecated | Default, full feature support |
 | **Codex** | `codex` CLI (`@openai/codex`) | `OPENAI_API_KEY` **or** ChatGPT subscription (`codex auth status`) | subprocess (host-adapter); Docker with `~/.codex` mount | Full sprint + worker support |
 | **Gemini** | `gemini` CLI (`@google/gemini-cli`) | OAuth session (default) **or** `GOOGLE_API_KEY` | subprocess (host-adapter); Docker with `~/.gemini` mount | Full sprint + worker support (Sprint 248) |
 | **Ollama** | HTTP server (`localhost:11434`) | None — local, zero-cost | Node subprocess via agentic-worker-entry.js (HTTP API) | Local/private; any pulled model |

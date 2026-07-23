@@ -22,25 +22,20 @@
 |-------------|-----------------|--------------|
 | Node.js | >= 24 | `node --version` |
 | git | any | `git --version` |
-| Claude Code CLI | any | `claude --version` |
-| tmux | any (optional) | `tmux -V` |
+| At least one provider CLI | current supported | `claude --version`, `codex --version`, or `gemini --version` |
+| Docker Engine | current supported (default path; optional when init selects subprocess) | `docker info` |
 
-**tmux** is the default backend for spawning workers. If tmux is not available, Deckent falls back to the subprocess backend automatically.
+Fresh configuration uses the Docker backend. During `deckent init`, if Docker
+cannot be prepared, Deckent explicitly writes `spawn_backend: subprocess` and
+reports that decision. At dispatch time there is no silent
+Docker→tmux→subprocess fallback chain. If you deliberately configure
+`spawn_backend: auto`, it resolves to subprocess on native Windows and Docker
+elsewhere. Explicit tmux support is deprecated.
 
-Install tmux if needed:
-
-```bash
-# macOS
-brew install tmux
-
-# Ubuntu/Debian
-sudo apt install tmux
-
-# Fedora
-sudo dnf install tmux
-```
-
-You also need an active Claude subscription (Pro, Max 5x, Max 20x) or an Anthropic API key. Alternatively, you can use OpenAI Codex or Google Gemini as providers — see [Multi-Provider Guide](../reference/multi-provider.md).
+For Claude, use an active subscription or Anthropic API key. OpenAI Codex and
+Google Gemini are also supported; provider configuration alone does not prove
+auth, reachability, limits, budget admission, or a successful dispatch. See the
+[Multi-Provider Guide](../reference/multi-provider.md).
 
 ---
 
@@ -77,7 +72,7 @@ Expected output:
 ```
   [PASS] Node.js        v24.0.0 (>=24 required)
   [PASS] git            git 2.43.0
-  [PASS] tmux           tmux 3.3a
+  [PASS] Docker         daemon reachable
   [PASS] Claude CLI     claude 1.2.3
   [FAIL] Workspace      .deckent/ not found
 ```
@@ -99,8 +94,8 @@ The wizard will prompt you for:
 
 - **Language** -- `en` (English) or `tr` (Turkish)
 - **Plan mode** -- a resource/cost preset (it does NOT ask for a subscription tier or price):
-  - `Performance` -- up to 8 parallel workers, premium Brain (Opus)
-  - `Balanced` -- up to 5 parallel workers, standard Brain (Sonnet)
+  - `Performance` -- up to 8 parallel workers, premium-tier Brain
+  - `Balanced` -- up to 5 parallel workers, standard-tier Brain
   - `Economic` -- up to 3 parallel workers, economy models
   - `API` -- API-key billing mode (set `ANTHROPIC_API_KEY`)
 - **Project name** -- for example, `my-project`
@@ -145,7 +140,7 @@ Open `DIRECTIVES.md` and describe what you want to build. Use the `## Task N:` f
 # DIRECTIVES -- Sprint 1
 
 ## Task 1: User Authentication
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Skills: typescript-expert, security-specialist
 - Files: src/auth/index.ts, tests/auth/auth.test.ts
@@ -162,7 +157,7 @@ Implement JWT-based login and registration endpoints.
 **Test:** 3+ tests (happy path, invalid credentials, token validation)
 
 ## Task 2: User Profile Page
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: low
 - Skills: react-specialist
 - Files: src/pages/profile.tsx
@@ -184,7 +179,7 @@ Create a user profile page showing name, email, and avatar.
 - Define the scope so workers know their boundaries
 - Include test requirements -- workers run tests before marking done
 - Each `## Task N:` block becomes one parallel worker agent
-- Use higher priority and the `opus` model for complex tasks
+- Use exact registered API IDs in `Model` fields; for example, `claude-opus-4-8` for complex Claude tasks. Run `deckent models list` for the current catalog
 
 ---
 
@@ -204,8 +199,8 @@ Output:
 Sprint 001 -- 2 tasks planned
 
   ID        TITLE                    MODEL    PRIORITY   EFFORT
-  001-001   User Authentication      sonnet   HIGH       normal
-  001-002   User Profile Page        haiku    NORMAL     low
+  001-001   User Authentication      claude-sonnet-5              HIGH       normal
+  001-002   User Profile Page        claude-haiku-4-5-20251001    NORMAL     low
 
 Max workers: 8 (performance)
 Planning mode: ai
@@ -220,7 +215,7 @@ deckent start
 Brain runs the full 8-phase sprint lifecycle:
 
 1. **PLAN** — Read `DIRECTIVES.md`, write `.tasks/task-NNN.json` files
-2. **SPAWN** — Launch one worker per task in separate tmux windows (or subprocess/Docker); sort into dependency waves when `dependency_pipeline_enabled: true`
+2. **SPAWN** — Launch each ready task on its resolved backend (Docker by default, or the explicitly persisted/configured backend); sort into dependency waves when `dependency_pipeline_enabled: true`
 3. **EXECUTE** — Workers write code, run tests, update heartbeat files, produce `.result` files
 4. **EVALUATE** — Review each result: GO / NO-GO / GO_WITH_TECH_DEBT
 5. **FIX** — Retry failed tasks with enriched prompts (configurable timeout)
@@ -228,12 +223,17 @@ Brain runs the full 8-phase sprint lifecycle:
 7. **DECAY** — Prune old memory entries to stay within budget
 8. **CLEANUP** — Archive task files, release locks, mark sprint complete
 
-Workers run in tmux windows. Attach to watch a worker live:
+Use `deckent status --watch` for backend-neutral progress. For a Docker-backed
+task, follow its container logs with:
 
 ```bash
-tmux attach -t deckent
-# Press Ctrl+B, then a window number to switch workers
+deckent watch --follow 001-001
 ```
+
+If you explicitly selected the deprecated tmux backend, `tmux attach -t
+deckent` remains available. For subprocess workers, `deckent status --watch`
+is the portable path today; fully unified live-log following remains tracked
+backend-parity work.
 
 ### Dry Run
 
@@ -245,20 +245,22 @@ deckent start --dry-run
 
 ### Auto-Approve Mode
 
-Skip all worker permission prompts:
+Opt into the provider permission-bypass mode:
 
 ```bash
 deckent start --auto-approve
 ```
 
-Use `--auto-approve` only in trusted environments. Workers are scoped to assigned directories, but auto-approve removes confirmation prompts.
+On non-container backends, use `--auto-approve` only in trusted environments;
+file scope enforcement is advisory today. Docker workers already run with the
+provider's permission bypass because the container is the isolation boundary.
 
 ### Open the Web Dashboard
 
 While a sprint is running, open the live web dashboard in your browser:
 
 ```bash
-deckent web   # opens at http://localhost:3100
+deckent serve   # listens on http://127.0.0.1:3100
 ```
 
 The dashboard shows live worker status, task results, memory, and sprint history. It uses Server-Sent Events (SSE) for real-time updates — no page refresh needed.
@@ -279,8 +281,8 @@ Example output during a sprint:
 Sprint sprint-001 -- EXECUTE phase
 
   TASK        STATUS      MODEL    LAST HEARTBEAT
-  001-001     EXECUTING   sonnet   5s ago
-  001-002     DONE        haiku    42s ago
+  001-001     EXECUTING   claude-sonnet-5              5s ago
+  001-002     DONE        claude-haiku-4-5-20251001    42s ago
 
 Progress: 1/2 done  |  0 failed  |  1 running
 

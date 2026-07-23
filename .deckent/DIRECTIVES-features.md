@@ -1,6 +1,6 @@
 # DIRECTIVES — Sprint Features-Showcase: deckent Özellik Sunum Dokümanları (canlı sunum)
 
-## Goal: **Canlı sunum için deckent'in özelliklerini anlatan 20 Türkçe slide-style markdown dosyası** `docs/features/` altına. Kaynak: `.deckent/features-manifest.json` (kürate edilerek sunum anlatısına dönüştürülür). **10 task × 2 doc = 20 dosya**, her task distinct filesWrite → **tam paralel-güvenli (tek wave)**. Hedef: ekrana yansıtılabilir, yoğun-olmayan, **DÜRÜST** (çalışmayan özellik "çalışıyor" gibi sunulmaz — dormant'lar `🔜 roadmap` etiketli). **god-level kalite, koddan-türetilmiş gerçek sayılar (hardcode YASAK), sunum-hazır.**
+## Goal: **Canlı sunum için deckent'in özelliklerini anlatan 20 Türkçe slide-style markdown dosyası** `docs/features/` altına. Kaynak: `.deckent/features-manifest.json` (kürate edilerek sunum anlatısına dönüştürülür). **10 task × 2 doc = 20 dosya**, her task distinct filesWrite → **paralel-güvenli (tek wave; eşzamanlılık configured `max_workers` ile sınırlı)**. Hedef: ekrana yansıtılabilir, yoğun-olmayan, **DÜRÜST** (çalışmayan özellik "çalışıyor" gibi sunulmaz — dormant'lar `🔜 roadmap` etiketli). **god-level kalite, koddan-türetilmiş gerçek sayılar (hardcode YASAK), sunum-hazır.**
 
 Bu ayrı directives dosyasıdır — `DIRECTIVES.md`'deki Sprint 224/225/226 backlog'una **karışmaz**. Çalıştırmak için aşağıdaki "Çalıştırma" bölümüne bak.
 
@@ -44,7 +44,7 @@ Bu ayrı directives dosyasıdır — `DIRECTIVES.md`'deki Sprint 224/225/226 bac
 ---
 
 ## Task 1: FX-01 — Genel Bakış + Mimari
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Skills: documentation-writer
 - Files: docs/features/00-genel-bakis.md, docs/features/01-mimari.md
@@ -55,7 +55,7 @@ Bu ayrı directives dosyasıdır — `DIRECTIVES.md`'deki Sprint 224/225/226 bac
 **Kanıt:** her iki dosya slide-şablonun 5 başlığını içerir; 00 → 19 link.
 
 ## Task 2: FX-02 — Sprint Yaşam Döngüsü + Task Routing
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Skills: documentation-writer
 - Files: docs/features/02-sprint-yasam-dongusu.md, docs/features/03-task-routing.md
@@ -64,7 +64,7 @@ Bu ayrı directives dosyasıdır — `DIRECTIVES.md`'deki Sprint 224/225/226 bac
 **02:** 8 faz PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP (DECKENT.md lifecycle tablosu). **03:** Routing Engine V2 — intent-based `routeTaskV2`, confidence scoring, agent+skill+provider ataması (manifest `routing-engine-v2`). ✅ canlı.
 
 ## Task 3: FX-03 — Model Registry/Multi-Provider + Memory V2
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Skills: documentation-writer
 - Files: docs/features/04-model-registry-multi-provider.md, docs/features/05-memory-v2.md
@@ -73,7 +73,7 @@ Bu ayrı directives dosyasıdır — `DIRECTIVES.md`'deki Sprint 224/225/226 bac
 **04:** ModelRegistry tek-kaynak, tier-eşdeğerlik (premium/standard/economy), 3 provider (Claude/Codex/Gemini) + 8-fleet hedefi; sayıyı `model-registry.ts`'ten türet (manifest `model-registry`). **05:** Memory V2 — SQLite FTS5, dual-layer Türkçe normalize (TR/EN/DE), DB-first, "%96 bağlam azalması" iddiası → benchmark dosyası yoksa "~%96 (iddia)" diye belirt (MASTER-PLAN §9). ✅ canlı.
 
 ## Task 4: FX-04 — Agents + Skills
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Skills: documentation-writer
 - Files: docs/features/06-agents.md, docs/features/07-skills.md
@@ -82,16 +82,16 @@ Bu ayrı directives dosyasıdır — `DIRECTIVES.md`'deki Sprint 224/225/226 bac
 **06:** Built-in agent'lar (vertical) — sayıyı `src/core/agent-pool.ts` veya `.deckent/agents/`'tan say (DECKENT.md "15 built-in + 2 custom" diyor; KOD ile doğrula, çelişirse kod kazanır + not düş); aktivasyon-anahtarları örneği. **07:** Built-in skill'ler (horizontal) — `deckent skill list`; AST sandbox doğrulama. ADR-041 taxonomy. ✅ canlı. **`deckent agent_list` / `deckent skill_list` komutlarını örnek ver.**
 
 ## Task 5: FX-05 — Spawn Backend'ler + Dependency Waves
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Skills: documentation-writer
 - Files: docs/features/08-spawn-backends.md, docs/features/09-dependency-waves.md
 - Scope: docs/features/
 ### Description
-**08:** 3 backend — tmux (default) / docker (izolasyon, graceful shutdown) / subprocess (tmux-suz); ADR-027 hibrit (manifest `tmux/docker/subprocess-backend`). **09:** Dependency Scheduler — Kahn topological wave sıralama, paralel dalga semantiği, ADR-045 (manifest `dependency-scheduler`). ✅ canlı.
+**08:** Backend'ler — Docker (default config, izolasyon/graceful shutdown) / subprocess / deprecated explicit tmux; `auto` native Windows'ta subprocess, diğer platformlarda Docker çözer ve runtime'da sessiz fallback zinciri kurmaz (ADR-G-014). **09:** Dependency Scheduler — Kahn topological wave sıralama, paralel dalga semantiği, ADR-045 (manifest `dependency-scheduler`). ✅ canlı.
 
 ## Task 6: FX-06 — Result Evaluation + Auditor/RBAC
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Skills: documentation-writer
 - Files: docs/features/10-result-evaluation.md, docs/features/11-auditor-rbac.md
@@ -100,7 +100,7 @@ Bu ayrı directives dosyasıdır — `DIRECTIVES.md`'deki Sprint 224/225/226 bac
 **10:** Result Evaluator — GO / NO_GO / GO_WITH_TECH_DEBT, rubric skorlama, CODE_VERIFIED_DONE, disk-verify ground-truth (manifest `result-evaluator`). **11:** Auditor 30s scan-loop (heartbeat, git-diff boundary, stale-lock) + ADR-037 Authority Matrix RBAC (V1.0 advisory, V2 hard-flip post-GA — bunu dürüst belirt). ✅ canlı.
 
 ## Task 7: FX-07 — Event-Stream/Observability + Native REPL
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Skills: documentation-writer
 - Files: docs/features/12-event-stream-observability.md, docs/features/13-native-repl-agentic.md
@@ -109,7 +109,7 @@ Bu ayrı directives dosyasıdır — `DIRECTIVES.md`'deki Sprint 224/225/226 bac
 **12:** Event Stream — append-only `sprint-NNN-events.jsonl`, ADR-035 15-kanal protokol, gözlemlenebilirlik (manifest `event-stream`). **13:** Native agentic REPL — argümansız `deckent` → konuşan agentic REPL, tool-use (write/edit/read/bash), streaming, slash-menü, permission-memory; ADR-081/083/085/086. ✅ canlı (F11 parity dalgası — bazı cilalar 🔜 belirt: UTF-8 audit, multi-provider parity).
 
 ## Task 8: FX-08 — Dashboard + MCP Entegrasyonu
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Skills: documentation-writer
 - Files: docs/features/14-dashboard-control-plane.md, docs/features/15-mcp-integration.md
@@ -118,7 +118,7 @@ Bu ayrı directives dosyasıdır — `DIRECTIVES.md`'deki Sprint 224/225/226 bac
 **14:** Web Dashboard — React+Vite+Tailwind, sayfa sayısını `src/dashboard/src/pages/`'ten say (canlı veri SSE, sprint kontrol, terminal, evolution/nervous/enterprise sayfaları); ADR-080. **15:** MCP — tool sayısını MCP server kaynağından say (DECKENT.md "31" vs IDENTITY.md "32" çelişkisini çöz + not), 8 resource, stdio transport; `claude mcp add deckent`. ✅ canlı.
 
 ## Task 9: FX-09 — CLI Komutları + Evolution Pipeline
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Skills: documentation-writer
 - Files: docs/features/16-cli-commands.md, docs/features/17-evolution-pipeline.md
@@ -127,7 +127,7 @@ Bu ayrı directives dosyasıdır — `DIRECTIVES.md`'deki Sprint 224/225/226 bac
 **16:** CLI — komut sayısını `src/cli/commands/`'tan türet (init/plan/start/status/review/retro/recall/remember/...); `deckent --help` örneği; CLI/MCP parity. **17:** Agent/Skill Evolution — promotion/demotion pipeline, adaptive-agent, identity-mutation closed-loop (manifest `promotion-pipeline`); F5 ✅ canlı, scale/A-B 🔜 roadmap (dürüst).
 
 ## Task 10: FX-10 — Nervous System (roadmap) + Vizyon/Yol Haritası
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Skills: documentation-writer
 - Files: docs/features/18-nervous-system.md, docs/features/19-vizyon-yol-haritasi.md
@@ -137,7 +137,7 @@ Bu ayrı directives dosyasıdır — `DIRECTIVES.md`'deki Sprint 224/225/226 bac
 
 ---
 
-**Beklenen:** 20/20 doc DONE, 0 scope-collision (her task 2 distinct dosya, 10 task = tek wave paralel). **Dürüst:** dormant'lar `🔜 roadmap`, sayılar koddan-türetilmiş, komutlar gerçek. **Sunum-hazır:** slide-style, Türkçe, ≤120 satır/doc, 00 = içindekiler. `docs/features/` 20 dosya ile dolu.
+**Beklenen:** 20/20 doc DONE, 0 scope-collision (her task 2 distinct dosya, 10 task = tek wave; eşzamanlı çalışan sayısı configured `max_workers`'ı aşmaz). **Dürüst:** dormant'lar `🔜 roadmap`, sayılar koddan-türetilmiş, komutlar gerçek. **Sunum-hazır:** slide-style, Türkçe, ≤120 satır/doc, 00 = içindekiler. `docs/features/` 20 dosya ile dolu.
 
 **Pre-flight:** main temiz+commit'li (reset-bug güvenli — [[project_deckent_self_git_mutation_bug]]). **CLI'dan `env -u ANTHROPIC_API_KEY`** (subscription, API yasak). dependency_pipeline_enabled=false → tek wave zaten (bağımlılık yok). Her wave sonrası `git log -1` + `git stash list`.
 
@@ -153,7 +153,7 @@ env -u ANTHROPIC_API_KEY deckent start
 # 3) Bitince backlog'u geri al:
 cp DIRECTIVES.backlog.md DIRECTIVES.md
 ```
-> Not: `--mode structured` (deterministik, deckent-dev'de mükemmel — [[feedback_ai_planner_silent_fallback]]). 10 task bağımsız → tek wave, ~10 worker paralel.
+> Not: `--mode structured` (deterministik, deckent-dev'de mükemmel — [[feedback_ai_planner_silent_fallback]]). 10 task bağımsız → tek wave; performance preset bugün en fazla 8 worker'ı eşzamanlı çalıştırır, kalan task'lar slot açıldıkça ilerler.
 
 İlgili memory: [[feedback_proof_of_function_dod]] · [[feedback_zero_hardcode_live_data]] · [[feedback_god_level_i18n_quality_bar]] · [[project_deckent_everyone_everywhere]] · [[feedback_ai_planner_silent_fallback]] · [[project_deckent_self_git_mutation_bug]]
 İlgili kaynak: `.deckent/features-manifest.json` · `DECKENT.md` · `docs/MASTER-PLAN.md`
