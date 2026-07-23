@@ -40,11 +40,11 @@ Say yes, and you watch a **team** go to work — not one assistant editing one f
 ```
 Sprint 286 · 5 tasks · 2 waves
 
-  ▸ 286-001  Add JWT middleware            opus    EXECUTING
-  ▸ 286-002  POST /auth/login endpoint     opus    EXECUTING
-  ▸ 286-003  bcrypt password hashing       sonnet  EXECUTING
-    286-004  auth tests                    sonnet  (waits on 001–003)
-    286-005  document the auth flow        haiku   (waits on 002)
+  ▸ 286-001  Add JWT middleware       claude-opus-4-8             EXECUTING
+  ▸ 286-002  POST /auth/login         claude-opus-4-8             EXECUTING
+  ▸ 286-003  Password hashing         claude-sonnet-5             EXECUTING
+    286-004  Auth tests               claude-sonnet-5             (waits on 001–003)
+    286-005  Document auth flow       claude-haiku-4-5-20251001   (waits on 002)
 
   Auditor: watching scopes · 0 violations
 ```
@@ -119,7 +119,7 @@ deckent   claude   ~/my-project
 › /recall "rate limiting"
 › /status
 › /plan
-› /model sonnet        switch model mid-session
+› /model claude-sonnet-5   switch model mid-session
 › /provider ollama     switch provider mid-session
 ```
 
@@ -146,7 +146,7 @@ Hash passwords with bcrypt. Add tests for valid and invalid credentials.
 ---
 
 ## Task 2: Document the auth flow
-- Model: haiku
+- Model: claude-haiku-4-5-20251001
 - Scope: docs/
 
 ### Description
@@ -163,7 +163,7 @@ Want more control? Every task accepts optional directives:
 
 | Directive | What it does | Example |
 |-----------|--------------|---------|
-| `- Model:` | Force the model | `- Model: opus` |
+| `- Model:` | Force an exact provider API model ID | `- Model: claude-opus-4-8` |
 | `- Effort:` | Work size (timeout/budget) | `- Effort: high` |
 | `- Agent:` | Force the specialist agent | `- Agent: security-auditor` |
 | `- Skills:` | Force / exclude skills (`-` excludes) | `- Skills: typescript-expert, -ci-testing` |
@@ -272,16 +272,26 @@ deckent is provider-agnostic to the core. Configure providers in `.deckent/confi
 ```markdown
 ## Task 1: Security audit
 - Provider: codex
-- Model: gpt-5
+- Model: gpt-5.6-sol
 
 ## Task 2: UI polish
 - Provider: gemini
 
 ## Task 3: Core refactor       # uses the config default (Claude)
-- Model: opus
+- Model: claude-opus-4-8
 ```
 
-Or skip model names entirely and let the **model registry** (14 models across 4 tiers — `premium_plus` / `premium` / `standard` / `economy`) pick the equivalent model for whatever provider you chose, via `model_strategy.brain_tier` / `worker_tier`. Pricing is fetched live (with a bundled fallback), so cost estimates stay honest.
+Model values are exact provider API IDs (`id === apiId`); legacy names such as
+`opus`, `sonnet`, `haiku`, and `gpt-5` are rejected in authored tasks. Use
+`deckent models list` for the live/cached catalog. Catalog presence is not live
+availability: auth, backend/model reachability, limit evidence, and execution-budget
+admission must still pass.
+
+Or skip model names entirely and let the **model registry** (live/cached catalog
+with a bundled offline fallback across `premium_plus` / `premium` / `standard` /
+`economy`) pick the registered exact API ID for the provider you chose, via
+`model_strategy.brain_tier` / `worker_tier`. Pricing evidence remains part of
+remote execution admission, so an unknown cloud model is never silently priced at zero.
 
 → Full guide: [docs/reference/multi-provider.md](https://github.com/VerhexIO/deckent/blob/main/docs/reference/multi-provider.md)
 

@@ -5,7 +5,7 @@
 ---
 
 ## Task 1: Validate Project Structure
-- Model: haiku
+- Model: claude-haiku-4-5-20251001
 - Effort: low
 - Skills: typescript-expert
 - Files: SUMMARY.md
@@ -25,7 +25,7 @@ Verify that the quickstart project directory structure is correct:
 ---
 
 ## Task 2: Generate Summary Report
-- Model: haiku
+- Model: claude-haiku-4-5-20251001
 - Effort: low
 - Skills: documentation-writer
 - Files: SUMMARY.md

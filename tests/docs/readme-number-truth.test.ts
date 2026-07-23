@@ -4,9 +4,9 @@ import { join } from 'node:path';
 
 // 379-001 DOCS-NUM-TRUTH — pins README.md / README-TR.md / DECKENT.md against the
 // live, code-derived counts named by the user-truth-audit as "GERÇEK" (real):
-// 47 MCP tools · 20 built-in agents · 31 built-in skills · 14 models · 20 dashboard
-// pages. Every count below is recomputed from source on each run — never a
-// hardcoded pin — so this test does not itself go stale as the codebase grows.
+// MCP tools/resources · built-in agents/skills · dashboard pages. Model catalog
+// size is intentionally not pinned in docs: exact API identities come from the
+// live/cached catalog with a bundled offline fallback.
 //
 // Agents/skills are counted from `src/core/builtins/{agents,skills}` (the full
 // authored catalog every `deckent init` seeds), NOT `.deckent/{agents,skills}`
@@ -50,20 +50,11 @@ function countDashboardPages(dir: string): number {
   return readdirSync(dir).filter((n) => n.endsWith('.tsx') && !n.endsWith('.test.tsx')).length;
 }
 
-function countBuiltinModels(): number {
-  const src = readFileSync(join(ROOT, 'src/core/model-registry.ts'), 'utf-8');
-  const start = src.indexOf('export const BUILTIN_MODELS');
-  const end = src.indexOf('] as const;', start);
-  if (start === -1 || end === -1) throw new Error('BUILTIN_MODELS array not found in model-registry.ts');
-  return (src.slice(start, end).match(/^\s*id:\s*'/gm) ?? []).length;
-}
-
 // Live counts, computed once for all assertions below.
 const MCP_TOOLS = countRegistrations(join(ROOT, 'src/mcp/tools'), /server\.registerTool\(\s*['"][a-zA-Z0-9_-]+['"]/g);
 const MCP_RESOURCES = countRegistrations(join(ROOT, 'src/mcp/resources'), /server\.registerResource\(\s*['"][a-zA-Z0-9_-]+['"]/g);
 const BUILTIN_AGENTS = countBuiltinDirs(join(ROOT, 'src/core/builtins/agents'));
 const BUILTIN_SKILLS = countBuiltinDirs(join(ROOT, 'src/core/builtins/skills'));
-const BUILTIN_MODELS_COUNT = countBuiltinModels();
 const DASHBOARD_PAGES = countDashboardPages(join(ROOT, 'src/dashboard/src/pages'));
 
 // Sanity: these must match the numbers the task named as "GERÇEK" today. If a future
@@ -80,10 +71,6 @@ describe('live counts match the current known-true values', () => {
     expect(BUILTIN_SKILLS).toBe(31);
   });
 
-  it('14 built-in models', () => {
-    expect(BUILTIN_MODELS_COUNT).toBe(14);
-  });
-
   it('20 dashboard pages', () => {
     expect(DASHBOARD_PAGES).toBe(20);
   });
@@ -94,7 +81,6 @@ describe('live counts match the current known-true values', () => {
 const STALE_TOOL_COUNTS = ['35 tools', '37 tools', '34 tool', '35 tool', '35 araç'];
 const STALE_AGENT_COUNTS = ['15 built-in agent', '15 built-in agents'];
 const STALE_SKILL_COUNTS = ['21 built-in skill', '21 built-in skills'];
-const STALE_MODEL_COUNTS = ['13 models'];
 const STALE_PAGE_COUNTS = ['16 pages', '16 sayfa'];
 
 describe('README.md — number truth', () => {
@@ -156,8 +142,8 @@ describe('README-TR.md — number truth', () => {
 describe('DECKENT.md — number truth', () => {
   const content = readFileSync(join(ROOT, 'DECKENT.md'), 'utf-8');
 
-  it('contains no legacy stale tool/agent/skill/model counts', () => {
-    for (const stale of [...STALE_TOOL_COUNTS, ...STALE_MODEL_COUNTS]) {
+  it('contains no legacy stale tool/agent/skill counts', () => {
+    for (const stale of STALE_TOOL_COUNTS) {
       expect(content).not.toContain(stale);
     }
     // "15 built-in agents" / "21 built-in skills" no longer appear as the summary
@@ -170,8 +156,10 @@ describe('DECKENT.md — number truth', () => {
     expect(content).toContain(`${MCP_TOOLS} araç`);
   });
 
-  it(`reflects the live model count (${BUILTIN_MODELS_COUNT})`, () => {
-    expect(content).toContain(`${BUILTIN_MODELS_COUNT} models`);
+  it('uses the parametric catalog contract instead of a fixed model count', () => {
+    expect(content).not.toMatch(/\b\d+\s+models\b/);
+    expect(content).toContain('live/cached catalog plus bundled offline fallback');
+    expect(content).toContain('deckent models list');
   });
 
   it(`reflects the live built-in agent/skill counts (${BUILTIN_AGENTS}/${BUILTIN_SKILLS})`, () => {

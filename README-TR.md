@@ -42,11 +42,11 @@ Evet deyin ve bir **ekibin** işe koyulduğunu izleyin — tek bir dosyayı düz
 ```
 Sprint 286 · 5 görev · 2 dalga
 
-  ▸ 286-001  JWT middleware ekle            opus    EXECUTING
-  ▸ 286-002  POST /auth/login endpoint      opus    EXECUTING
-  ▸ 286-003  bcrypt parola hash'leme        sonnet  EXECUTING
-    286-004  auth testleri                  sonnet  (001–003 bekler)
-    286-005  auth akışını belgele           haiku   (002 bekler)
+  ▸ 286-001  JWT middleware ekle       claude-opus-4-8             EXECUTING
+  ▸ 286-002  POST /auth/login          claude-opus-4-8             EXECUTING
+  ▸ 286-003  Parola hash'leme          claude-sonnet-5             EXECUTING
+    286-004  Auth testleri             claude-sonnet-5             (001–003 bekler)
+    286-005  Auth akışını belgele      claude-haiku-4-5-20251001   (002 bekler)
 
   Auditor: kapsamları izliyor · 0 ihlal
 ```
@@ -121,7 +121,7 @@ komutlar için /help · ya da yazmaya başlayın
 › /recall "rate limiting"
 › /status
 › /plan
-› /model sonnet        oturum ortasında model değiştir
+› /model claude-sonnet-5   oturum ortasında model değiştir
 › /provider ollama     oturum ortasında provider değiştir
 ```
 
@@ -148,7 +148,7 @@ Parolaları bcrypt ile hash'le. Geçerli ve geçersiz kimlik bilgileri için tes
 ---
 
 ## Task 2: Auth akışını belgele
-- Model: haiku
+- Model: claude-haiku-4-5-20251001
 - Scope: docs/
 
 ### Description
@@ -165,7 +165,7 @@ Daha fazla kontrol mü? Her görev isteğe bağlı directive'ler kabul eder:
 
 | Directive | Ne yapar | Örnek |
 |-----------|----------|-------|
-| `- Model:` | Modeli zorla | `- Model: opus` |
+| `- Model:` | Tam provider API model ID'sini zorla | `- Model: claude-opus-4-8` |
 | `- Effort:` | İş boyutu (timeout/bütçe) | `- Effort: high` |
 | `- Agent:` | Uzman agent'ı zorla | `- Agent: security-auditor` |
 | `- Skills:` | Skill zorla / hariç tut (`-` hariç tutar) | `- Skills: typescript-expert, -ci-testing` |
@@ -274,16 +274,27 @@ deckent çekirdeğine kadar provider-agnostiktir. Provider'ları `.deckent/confi
 ```markdown
 ## Task 1: Security audit
 - Provider: codex
-- Model: gpt-5
+- Model: gpt-5.6-sol
 
 ## Task 2: UI polish
 - Provider: gemini
 
 ## Task 3: Core refactor       # config varsayılanını kullanır (Claude)
-- Model: opus
+- Model: claude-opus-4-8
 ```
 
-Ya da model isimlerini tamamen atlayın ve **model registry**'nin (4 tier boyunca 14 model — `premium_plus` / `premium` / `standard` / `economy`) seçtiğiniz provider için eşdeğer modeli `model_strategy.brain_tier` / `worker_tier` üzerinden seçmesine izin verin. Fiyatlandırma canlı çekilir (paketlenmiş bir fallback ile), böylece maliyet tahminleri dürüst kalır.
+Model değerleri tam provider API ID'leridir (`id === apiId`); `opus`, `sonnet`,
+`haiku` ve `gpt-5` gibi legacy adlar authored task'larda reddedilir. Live/cached
+katalog için `deckent models list` kullanın. Catalog presence canlı availability
+değildir: auth, backend/model reachability, limit evidence ve execution-budget
+admission ayrıca geçmelidir.
+
+Ya da model isimlerini tamamen atlayın ve **model registry**'nin (live/cached
+catalog + `premium_plus` / `premium` / `standard` / `economy` tier'larını kapsayan
+bundled offline fallback) seçtiğiniz provider için kayıtlı tam API ID'sini
+`model_strategy.brain_tier` / `worker_tier` üzerinden seçmesine izin verin.
+Pricing evidence remote execution admission'ın parçası olarak kalır; bilinmeyen
+bir cloud model sessizce sıfır maliyetli sayılmaz.
 
 → Tam rehber: [docs/reference/multi-provider.md](docs/reference/multi-provider.md)
 
