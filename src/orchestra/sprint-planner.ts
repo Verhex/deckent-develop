@@ -1193,8 +1193,11 @@ function isHonestNoopFixWaveEcho(item: DebtItem): boolean {
  *  - born-603 (Sprint 396): honest no-op fix-wave echo (see
  *    {@link isHonestNoopFixWaveEcho}) → skip WITHOUT resolving (tracked in
  *    `skippedNoop`, not `skipped` — see {@link DebtInjectionResult}).
- *  - `originScope` present → inherit `directories` + `filesWrite`; `filesRead`
- *    mirrors `directories` so the worker can read the area it must write to.
+ *  - `originScope` present → inherit `directories` + `filesWrite`; when exact
+ *    `filesWrite` targets exist, `filesRead` mirrors `directories` as context.
+ *    A directory-only fix keeps `filesRead` empty so every backend recognizes
+ *    the established directory-fallback WRITE authority instead of silently
+ *    reclassifying the fix as inspection-only.
  *  - `originScope` absent → broad legacy fallback `src/` (matches behaviour
  *    expected of pre-W1-1 debt rows so they still get a fix attempt).
  */
@@ -1238,7 +1241,9 @@ export function injectCriticalDebtTasks(
     const scope: TaskScope = hasOriginScope
       ? {
           directories: [...item.originScope!.directories],
-          filesRead: [...item.originScope!.directories],
+          filesRead: item.originScope!.filesWrite.length > 0
+            ? [...item.originScope!.directories]
+            : [],
           filesWrite: [...item.originScope!.filesWrite],
         }
       : legacyFallbackScope();

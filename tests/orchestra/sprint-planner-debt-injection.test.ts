@@ -14,6 +14,8 @@
 import { describe, it, expect } from 'vitest';
 
 import { injectCriticalDebtTasks } from '../../src/orchestra/sprint-planner.js';
+import { buildTaskPrompt } from '../../src/orchestra/prompt-god-template.js';
+import { buildDockerAllowedTools } from '../../src/orchestra/spawn-backend-docker.js';
 import { DebtPriority, TaskStatus } from '../../src/core/types.js';
 import type { DebtItem, ModelType } from '../../src/core/types.js';
 
@@ -86,6 +88,41 @@ describe('Sprint 179 W1-1 — injectCriticalDebtTasks', () => {
     expect(result.tasks).toEqual([]);
     expect(result.skipped).toEqual(['DEBT-VERIFIED']);
     expect(result.nextSeq).toBe(1);
+  });
+
+  it('keeps a directory-only origin debt writable across prompt and Docker authority', () => {
+    const debt: DebtItem[] = [
+      makeDebt({
+        id: 'DEBT-DIRECTORY-WRITE',
+        description: 'Repair the affected core area when no exact file survived recovery',
+        originScope: {
+          directories: ['src/core/'],
+          filesWrite: [],
+        },
+      }),
+    ];
+
+    const result = injectCriticalDebtTasks(debt, SPRINT_ID, MODEL, 1, TaskStatus.PENDING);
+
+    expect(result.tasks).toHaveLength(1);
+    const fix = result.tasks[0]!;
+    expect(fix.type).toBe('code-development');
+    expect(fix.scope).toEqual({
+      directories: ['src/core/', 'tests/core/'],
+      filesRead: [],
+      filesWrite: [],
+    });
+
+    const { prompt } = buildTaskPrompt(fix, { effort: 'high' });
+    expect(prompt).toContain('You may ONLY modify files in these directories:');
+    expect(prompt).toContain('src/core/');
+    expect(prompt).toContain('tests/core/');
+    expect(prompt).not.toContain('## Scope Rules (inspection-only)');
+    expect(prompt).not.toContain('PROJECT WRITE authority: NONE');
+
+    expect(buildDockerAllowedTools(fix.scope)).toBe(
+      'Read,Write(.tasks/,src/core/,tests/core/),Edit(.tasks/,src/core/,tests/core/),Bash,Glob,Grep',
+    );
   });
 
   it('(c) legacy fallback: debt without originScope still gets a fix task with broad src/ scope', () => {
