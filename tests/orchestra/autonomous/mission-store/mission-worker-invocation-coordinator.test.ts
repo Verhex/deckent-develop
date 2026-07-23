@@ -219,7 +219,7 @@ async function harness(
     idFactory: () => 'project-worker-a', now: () => T2,
   });
   const truthStore = new ProviderTruthStore(projectRoot, {
-    projectId: receiptStore.projectId, now: () => new Date(T2),
+    projectId: receiptStore.projectId, now: () => new Date(T2), integrityKey: INTEGRITY_KEY,
   });
   const limitStore = new ProviderLimitStore(projectRoot, {
     now: () => new Date(T2), policyResolver: () => POLICY,

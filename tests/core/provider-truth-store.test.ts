@@ -1,5 +1,6 @@
+import { createHash } from 'node:crypto';
 import Database from 'better-sqlite3';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -12,7 +13,9 @@ import {
 import {
   ProviderTruthStore,
   ProviderTruthStoreError,
+  resolveProviderTruthStorePath,
   type ExactReachabilityQuery,
+  type ProviderTruthStoreOptions,
 } from '../../src/core/provider-truth-store.js';
 
 const roots: string[] = [];
@@ -21,11 +24,41 @@ const HASH_A = 'a'.repeat(64);
 const HASH_B = 'b'.repeat(64);
 const HASH_C = 'c'.repeat(64);
 const HASH_D = 'd'.repeat(64);
+const INTEGRITY_KEY = 'provider-truth-test-integrity-key-0001';
+const OTHER_INTEGRITY_KEY = 'provider-truth-other-integrity-key-0002';
 
 function makeRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'deckent-provider-truth-'));
   roots.push(root);
   return root;
+}
+
+function openStore(
+  stateRoot: string,
+  options: Omit<ProviderTruthStoreOptions, 'integrityKey'> & { integrityKey?: string | Buffer },
+): ProviderTruthStore {
+  return new ProviderTruthStore(stateRoot, {
+    ...options,
+    integrityKey: options.integrityKey ?? INTEGRITY_KEY,
+  });
+}
+
+function restoreReachabilityUpdateTrigger(db: Database.Database): void {
+  db.exec(`
+    CREATE TRIGGER reachability_results_no_update
+      BEFORE UPDATE ON reachability_results BEGIN
+        SELECT RAISE(ABORT, 'reachability results are immutable');
+      END;
+  `);
+}
+
+function restoreCatalogUpdateTrigger(db: Database.Database): void {
+  db.exec(`
+    CREATE TRIGGER capability_catalogs_no_update
+      BEFORE UPDATE ON capability_catalogs BEGIN
+        SELECT RAISE(ABORT, 'capability catalogs are immutable');
+      END;
+  `);
 }
 
 async function result(
@@ -110,20 +143,46 @@ afterEach(() => {
 });
 
 describe('ProviderTruthStore', () => {
+  it('uses the platform global-state path rather than a project workspace path', () => {
+    expect(resolveProviderTruthStorePath('linux', { HOME: '/home/alice' }))
+      .toBe('/home/alice/.local/state/deckent/provider-truth.db');
+    expect(resolveProviderTruthStorePath('win32', {
+      USERPROFILE: 'C:\\Users\\Alice', LOCALAPPDATA: 'D:\\State',
+    })).toBe('D:\\State\\deckent\\provider-truth.db');
+
+    const root = makeRoot();
+    const store = openStore(root, { projectId: 'project-a' });
+    store.close();
+    expect(existsSync(join(root, 'provider-truth.db'))).toBe(true);
+    expect(existsSync(join(root, '.deckent', 'runtime', 'provider-truth.db'))).toBe(false);
+  });
+
+  it('requires a host-private key before opening or writing the store', () => {
+    const root = makeRoot();
+    expect(() => new ProviderTruthStore(root, {
+      projectId: 'project-a', integrityKey: '',
+    })).toThrowError(/at least 32 bytes/);
+    expect(() => new ProviderTruthStore(root, {
+      projectId: 'project-a', integrityKey: 'too-short',
+    })).toThrowError(/at least 32 bytes/);
+    expect(existsSync(join(root, 'provider-truth.db'))).toBe(false);
+  });
+
   it('fails loudly instead of opening an unversioned incompatible truth schema', () => {
     const root = makeRoot();
     const dbPath = join(root, '.deckent', 'provider-truth-legacy.db');
     mkdirSync(join(root, '.deckent'), { recursive: true });
     const legacy = new Database(dbPath);
     legacy.exec('CREATE TABLE reachability_results (payload_hash TEXT)');
+    legacy.pragma('user_version = 1');
     legacy.close();
-    expect(() => new ProviderTruthStore(root, { dbPath, projectId: 'project-a' }))
-      .toThrowError(/schema migration is required/);
+    expect(() => openStore(root, { dbPath, projectId: 'project-a' }))
+      .toThrowError(/explicit authority migration/);
   });
 
   it('persists and verifies a catalog without promoting catalog presence to live proof', () => {
     const root = makeRoot();
-    const store = new ProviderTruthStore(root, { now: () => T0, projectId: 'project-a' });
+    const store = openStore(root, { now: () => T0, projectId: 'project-a' });
     const catalog = createCapabilityCatalog({
       catalogId: 'catalog-1', idempotencyKey: 'catalog-key-1',
       tenantId: 'tenant-a', projectId: store.projectId,
@@ -141,7 +200,7 @@ describe('ProviderTruthStore', () => {
   it('persists exact scoped evidence across restart and projects stale at read time', async () => {
     const root = makeRoot();
     const dbPath = join(root, '.deckent', 'runtime', 'provider-truth.db');
-    const first = new ProviderTruthStore(root, {
+    const first = openStore(root, {
       dbPath, now: () => T0, projectId: 'project-a',
     });
     const evidence = await result(first);
@@ -151,7 +210,7 @@ describe('ProviderTruthStore', () => {
     expect(first.putReachability(evidence).created).toBe(false);
     first.close();
 
-    const restarted = new ProviderTruthStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
+    const restarted = openStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
     expect(restarted.projectId).toBe('project-a');
     expect(restarted.getLatestReachability(query(restarted), T0)).toMatchObject({
       reachabilityId: 'reachability-1', state: 'known', reachable: true,
@@ -166,7 +225,7 @@ describe('ProviderTruthStore', () => {
 
   it('does not reuse evidence across account, backend, runtime, model or tenant scope', async () => {
     const root = makeRoot();
-    const store = new ProviderTruthStore(root, { now: () => T0, projectId: 'project-a' });
+    const store = openStore(root, { now: () => T0, projectId: 'project-a' });
     store.putReachability(await result(store));
 
     expect(store.getLatestReachability(query(store, { accountRefHash: 'e'.repeat(64) }), T0)).toBeNull();
@@ -179,7 +238,7 @@ describe('ProviderTruthStore', () => {
 
   it('uses insertion sequence, not random evidence id, for same-timestamp latest truth', async () => {
     const root = makeRoot();
-    const store = new ProviderTruthStore(root, { now: () => T0, projectId: 'project-a' });
+    const store = openStore(root, { now: () => T0, projectId: 'project-a' });
     const success = await result(store);
     store.putReachability(success);
     store.putReachability({
@@ -207,7 +266,7 @@ describe('ProviderTruthStore', () => {
   it('rejects conflicting idempotency and enforces append-only storage', async () => {
     const root = makeRoot();
     const dbPath = join(root, '.deckent', 'runtime', 'provider-truth.db');
-    const store = new ProviderTruthStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
+    const store = openStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
     const evidence = await result(store);
     store.putReachability(evidence);
     expect(() => store.putReachability({
@@ -241,7 +300,7 @@ describe('ProviderTruthStore', () => {
   it('detects payload tampering even if the database trigger is bypassed', async () => {
     const root = makeRoot();
     const dbPath = join(root, '.deckent', 'runtime', 'provider-truth.db');
-    const store = new ProviderTruthStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
+    const store = openStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
     const evidence = await result(store);
     store.putReachability(evidence);
     store.close();
@@ -249,9 +308,10 @@ describe('ProviderTruthStore', () => {
     const raw = new Database(dbPath);
     raw.exec('DROP TRIGGER reachability_results_no_update');
     raw.prepare("UPDATE reachability_results SET payload_json='{}'").run();
+    restoreReachabilityUpdateTrigger(raw);
     raw.close();
 
-    const reopened = new ProviderTruthStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
+    const reopened = openStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
     expect(() => reopened.getReachability(
       { tenantId: 'tenant-a', projectId: reopened.projectId }, evidence.reachabilityId, T0,
     )).toThrowError(ProviderTruthStoreError);
@@ -261,16 +321,17 @@ describe('ProviderTruthStore', () => {
   it('detects normalized query-envelope tampering even when payload and its hash are untouched', async () => {
     const root = makeRoot();
     const dbPath = join(root, '.deckent', 'runtime', 'provider-truth.db');
-    const store = new ProviderTruthStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
+    const store = openStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
     store.putReachability(await result(store));
     store.close();
 
     const raw = new Database(dbPath);
     raw.exec('DROP TRIGGER reachability_results_no_update');
     raw.prepare("UPDATE reachability_results SET provider='evil'").run();
+    restoreReachabilityUpdateTrigger(raw);
     raw.close();
 
-    const reopened = new ProviderTruthStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
+    const reopened = openStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
     expect(() => reopened.getLatestReachability(query(reopened, { provider: 'evil' }), T0))
       .toThrowError(/envelope mismatch/);
     reopened.close();
@@ -279,7 +340,7 @@ describe('ProviderTruthStore', () => {
   it('detects capability catalog envelope tampering', () => {
     const root = makeRoot();
     const dbPath = join(root, '.deckent', 'runtime', 'provider-truth.db');
-    const store = new ProviderTruthStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
+    const store = openStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
     const catalog = createCapabilityCatalog({
       catalogId: 'catalog-tamper', idempotencyKey: 'catalog-tamper-key',
       tenantId: 'tenant-a', projectId: store.projectId,
@@ -292,9 +353,10 @@ describe('ProviderTruthStore', () => {
     const raw = new Database(dbPath);
     raw.exec('DROP TRIGGER capability_catalogs_no_update');
     raw.prepare("UPDATE capability_catalogs SET fetched_at='2099-01-01T00:00:00.000Z'").run();
+    restoreCatalogUpdateTrigger(raw);
     raw.close();
 
-    const reopened = new ProviderTruthStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
+    const reopened = openStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
     expect(() => reopened.getCatalog(catalog, catalog.catalogId)).toThrowError(/envelope mismatch/);
     reopened.close();
   });
@@ -302,7 +364,7 @@ describe('ProviderTruthStore', () => {
   it('stores no prompt, response, argv, endpoint URL or credential material', async () => {
     const root = makeRoot();
     const dbPath = join(root, '.deckent', 'runtime', 'provider-truth.db');
-    const store = new ProviderTruthStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
+    const store = openStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
     store.putReachability(await result(store));
     store.close();
     const bytes = readFileSync(dbPath).toString('utf8');
@@ -311,5 +373,106 @@ describe('ProviderTruthStore', () => {
     expect(bytes).not.toContain('--dangerously-skip-permissions');
     expect(bytes).not.toContain('user prompt');
     expect(bytes).not.toContain('model response');
+    expect(bytes).not.toContain(INTEGRITY_KEY);
+  });
+
+  it('rejects a forged payload even when an attacker recomputes plain SHA-256', async () => {
+    const root = makeRoot();
+    const dbPath = join(root, 'provider-truth.db');
+    const store = openStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
+    const evidence = await result(store);
+    store.putReachability(evidence);
+    store.close();
+
+    const forgedPayload = JSON.stringify({ ...evidence, reachable: false });
+    const raw = new Database(dbPath);
+    raw.exec('DROP TRIGGER reachability_results_no_update');
+    raw.prepare('UPDATE reachability_results SET payload_json = ?, payload_hash = ?')
+      .run(forgedPayload, createHash('sha256').update(forgedPayload).digest('hex'));
+    restoreReachabilityUpdateTrigger(raw);
+    raw.close();
+
+    const reopened = openStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
+    expect(() => reopened.getReachability(
+      { tenantId: 'tenant-a', projectId: 'project-a' }, evidence.reachabilityId, T0,
+    )).toThrowError(/hash mismatch/);
+    reopened.close();
+  });
+
+  it('fails at open for the wrong key or a tampered immutable schema', async () => {
+    const root = makeRoot();
+    const dbPath = join(root, 'provider-truth.db');
+    const store = openStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
+    store.putReachability(await result(store));
+    store.close();
+
+    expect(() => openStore(root, {
+      dbPath, now: () => T0, projectId: 'project-a', integrityKey: OTHER_INTEGRITY_KEY,
+    })).toThrowError(/authority mismatch/);
+
+    const raw = new Database(dbPath);
+    raw.exec('DROP TRIGGER reachability_results_no_delete');
+    raw.close();
+    expect(() => openStore(root, { dbPath, now: () => T0, projectId: 'project-a' }))
+      .toThrowError(/immutable triggers are invalid/);
+  });
+
+  it('rejects same-named weak indexes and inert immutable triggers at open', () => {
+    const weakIndexRoot = makeRoot();
+    const weakIndexPath = join(weakIndexRoot, 'provider-truth.db');
+    openStore(weakIndexRoot, { dbPath: weakIndexPath, projectId: 'project-a' }).close();
+    const weakIndexDb = new Database(weakIndexPath);
+    weakIndexDb.exec(`
+      DROP INDEX idx_reachability_exact_scope;
+      CREATE INDEX idx_reachability_exact_scope
+        ON reachability_results (execution_profile_ref, capability, completed_at);
+    `);
+    weakIndexDb.close();
+    expect(() => openStore(weakIndexRoot, { dbPath: weakIndexPath, projectId: 'project-a' }))
+      .toThrowError(/scope index is invalid/);
+
+    const inertTriggerRoot = makeRoot();
+    const inertTriggerPath = join(inertTriggerRoot, 'provider-truth.db');
+    openStore(inertTriggerRoot, { dbPath: inertTriggerPath, projectId: 'project-a' }).close();
+    const inertTriggerDb = new Database(inertTriggerPath);
+    inertTriggerDb.exec(`
+      DROP TRIGGER reachability_results_no_update;
+      CREATE TRIGGER reachability_results_no_update
+        BEFORE UPDATE ON reachability_results WHEN 0 BEGIN
+          SELECT RAISE(ABORT, 'reachability results are immutable');
+        END;
+    `);
+    inertTriggerDb.close();
+    expect(() => openStore(inertTriggerRoot, { dbPath: inertTriggerPath, projectId: 'project-a' }))
+      .toThrowError(/immutable triggers are invalid/);
+  });
+
+  it('isolates equal opaque ids and idempotency keys across projects in one host-global database', async () => {
+    const root = makeRoot();
+    const dbPath = join(root, 'provider-truth.db');
+    const projectA = openStore(root, { dbPath, now: () => T0, projectId: 'project-a' });
+    const projectB = openStore(root, { dbPath, now: () => T0, projectId: 'project-b' });
+    const catalogA = createCapabilityCatalog({
+      catalogId: 'shared-catalog-id', idempotencyKey: 'shared-catalog-key',
+      tenantId: 'tenant-a', projectId: projectA.projectId,
+      source: { sourceId: 'builtin', kind: 'builtin', fetchedAt: T0.toISOString(), expiresAt: null },
+      entries: [{ provider: 'openrouter', model: 'openai/gpt-5.6-sol', capabilities: {} }],
+    });
+    const catalogB = createCapabilityCatalog({
+      ...catalogA,
+      projectId: projectB.projectId,
+    });
+    expect(projectA.putCatalog(catalogA).created).toBe(true);
+    expect(projectB.putCatalog(catalogB).created).toBe(true);
+    projectA.putReachability(await result(projectA));
+    projectB.putReachability(await result(projectB));
+
+    expect(projectA.getCatalog(catalogA, catalogA.catalogId)?.projectId).toBe('project-a');
+    expect(projectB.getCatalog(catalogB, catalogB.catalogId)?.projectId).toBe('project-b');
+    expect(projectA.getLatestReachability(query(projectA), T0)?.projectId).toBe('project-a');
+    expect(projectB.getLatestReachability(query(projectB), T0)?.projectId).toBe('project-b');
+    expect(() => projectA.getLatestReachability(query(projectB), T0)).toThrowError(/project scope mismatch/);
+    projectA.close();
+    projectB.close();
   });
 });

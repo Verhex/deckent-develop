@@ -232,7 +232,9 @@ async function setup(
   runtime: HostRoleInvocationAdmissionRuntime;
 }> {
   const root = makeRoot();
-  const truthStore = new ProviderTruthStore(root, { projectId: 'project-a', now });
+  const truthStore = new ProviderTruthStore(root, {
+    projectId: 'project-a', now, integrityKey: INTEGRITY_KEY,
+  });
   const limitStore = new ProviderLimitStore(root, {
     now, policyResolver: () => POLICY,
     terminationEvidenceVerifier: () => true, integrityKey: INTEGRITY_KEY,
