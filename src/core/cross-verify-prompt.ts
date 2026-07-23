@@ -239,20 +239,35 @@ export function extractTerminalAssistantVerdictFromLog(rawLog: string): string |
     } catch {
       continue;
     }
-    if (!isRecord(event) || event['type'] !== 'text' || !isRecord(event['content'])) continue;
-    const assistantText = extractAssistantText(event as unknown as LogEvent);
-    if (!assistantText) continue;
-    const lastLine = assistantText.trim().split(/\r?\n/)
+    if (!isRecord(event) || !isRecord(event['content'])) continue;
+    // A normalized tool-use action proves execution continued after any earlier
+    // verdict. Tool results remain ineligible: they can contain copied prompt or
+    // result text and are not themselves an assistant decision.
+    if (event['type'] === 'tool_use') {
+      terminal = null;
+      continue;
+    }
+    if (event['type'] !== 'text') continue;
+    const assistantEnvelope = extractAssistantEnvelope(event as unknown as LogEvent);
+    if (!assistantEnvelope) continue;
+    // A verdict is terminal only when it belongs to the final recognized
+    // assistant/model envelope. Tool-use-only and empty assistant continuations
+    // therefore invalidate an earlier verdict even though they contain no text.
+    terminal = null;
+    if (!assistantEnvelope.text) continue;
+    const lastLine = assistantEnvelope.text.trim().split(/\r?\n/)
       .filter(value => value.trim().length > 0)
       .at(-1)?.trim() ?? '';
-    // The terminal protocol must belong to the final assistant message. A later
-    // assistant message that keeps working after a verdict invalidates it.
     terminal = VERDICT_RE.test(lastLine) ? lastLine : null;
   }
   return terminal;
 }
 
-function extractAssistantText(event: LogEvent): string | null {
+interface AssistantEnvelope {
+  text: string | null;
+}
+
+function extractAssistantEnvelope(event: LogEvent): AssistantEnvelope | null {
   if (!isRecord(event.content)) return null;
   const content = event.content;
 
@@ -260,46 +275,61 @@ function extractAssistantText(event: LogEvent): string | null {
   // deliberately ineligible even when they echo the protocol examples.
   if (content['type'] === 'assistant' && isRecord(content['message'])) {
     const blocks = content['message']['content'];
-    if (typeof blocks === 'string') return blocks;
+    if (typeof blocks === 'string') return { text: blocks || null };
     if (Array.isArray(blocks)) {
       const text = blocks
         .filter(block => isRecord(block) && block['type'] === 'text' && typeof block['text'] === 'string')
         .map(block => (block as Record<string, unknown>)['text'] as string)
         .join('\n');
-      return text || null;
+      return { text: text || null };
     }
+    return { text: null };
   }
 
   // Codex JSON event bridged by spawn-backend-docker.ts.
   if (content['codexEventType'] === 'item.completed' && isRecord(content['item'])) {
     const item = content['item'];
-    if (item['type'] === 'agent_message' && typeof item['text'] === 'string') return item['text'];
+    if (item['type'] === 'agent_message') {
+      return { text: typeof item['text'] === 'string' ? item['text'] || null : null };
+    }
   }
 
   // Gemini/Ollama final model response envelope.
-  if (typeof content['response'] === 'string') return content['response'];
+  if (typeof content['response'] === 'string') return { text: content['response'] || null };
 
   // OpenAI-compatible assistant message/chunk envelope.
   const choices = content['choices'];
   if (Array.isArray(choices) && isRecord(choices[0])) {
     const message = choices[0]['message'];
-    if (isRecord(message)
-      && message['role'] === 'assistant'
-      && typeof message['content'] === 'string') {
-      return message['content'];
+    if (isRecord(message) && message['role'] === 'assistant') {
+      return {
+        text: typeof message['content'] === 'string' ? message['content'] || null : null,
+      };
     }
     const delta = choices[0]['delta'];
-    if (isRecord(delta)
-      && (delta['role'] === undefined || delta['role'] === 'assistant')
-      && typeof delta['content'] === 'string') {
-      return delta['content'];
+    const isEmptyStopMarker = isRecord(delta)
+      && choices[0]['finish_reason'] === 'stop'
+      && (delta['content'] === undefined || delta['content'] === '')
+      && !Array.isArray(delta['tool_calls']);
+    if (isEmptyStopMarker) return null;
+    if (isRecord(delta) && (
+      delta['role'] === 'assistant'
+      || typeof delta['content'] === 'string'
+      || Array.isArray(delta['tool_calls'])
+    )) {
+      return {
+        text: typeof delta['content'] === 'string' ? delta['content'] || null : null,
+      };
     }
   }
 
   if (isRecord(content['message'])
-    && content['message']['role'] === 'assistant'
-    && typeof content['message']['content'] === 'string') {
-    return content['message']['content'];
+    && content['message']['role'] === 'assistant') {
+    return {
+      text: typeof content['message']['content'] === 'string'
+        ? content['message']['content'] || null
+        : null,
+    };
   }
   return null;
 }

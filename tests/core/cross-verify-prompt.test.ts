@@ -277,4 +277,41 @@ describe('cross-verify-prompt · normalized assistant verdict authority', () => 
     ].join('\n');
     expect(extractTerminalAssistantVerdictFromLog(log)).toBeNull();
   });
+
+  it('invalidates an earlier verdict when a later assistant envelope contains only tool use', () => {
+    const log = [
+      event(1, 'text', { type: 'assistant', message: { content: [{ type: 'text', text: 'VERDICT: CONFIRMED premature' }] } }),
+      event(2, 'tool_use', {
+        type: 'assistant',
+        message: { content: [{ type: 'tool_use', name: 'Read', input: { path: 'bounded.ts' } }] },
+      }),
+    ].join('\n');
+    expect(extractTerminalAssistantVerdictFromLog(log)).toBeNull();
+  });
+
+  it('keeps a terminal assistant verdict across later ineligible envelopes', () => {
+    const verdict = 'VERDICT: CONFIRMED bounded evidence complete';
+    const log = [
+      event(1, 'text', { type: 'assistant', message: { content: [{ type: 'text', text: verdict }] } }),
+      event(2, 'text', { type: 'user', message: { content: [{ type: 'tool_result', content: verdict }] } }),
+      event(3, 'usage', { type: 'result', result: verdict }),
+    ].join('\n');
+    expect(extractTerminalAssistantVerdictFromLog(log)).toBe(verdict);
+  });
+
+  it('keeps a streamed OpenAI verdict across its empty finish marker', () => {
+    const verdict = 'VERDICT: CONFIRMED streamed evidence complete';
+    const bareFinishLog = [
+      event(1, 'text', { choices: [{ delta: { role: 'assistant', content: verdict } }] }),
+      event(2, 'text', { choices: [{ delta: {}, finish_reason: 'stop' }] }),
+    ].join('\n');
+    const explicitEmptyFinishLog = [
+      event(1, 'text', { choices: [{ delta: { role: 'assistant', content: verdict } }] }),
+      event(2, 'text', {
+        choices: [{ delta: { role: 'assistant', content: '' }, finish_reason: 'stop' }],
+      }),
+    ].join('\n');
+    expect(extractTerminalAssistantVerdictFromLog(bareFinishLog)).toBe(verdict);
+    expect(extractTerminalAssistantVerdictFromLog(explicitEmptyFinishLog)).toBe(verdict);
+  });
 });
