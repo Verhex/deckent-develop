@@ -180,6 +180,8 @@ export interface InvocationOpenDispatchScan {
   /** Caller-authored UTC/offset timestamp; candidate selection is not death evidence. */
   readonly before: string;
   readonly tenantId?: string;
+  /** Exact identity filter for recovery sagas; prevents unrelated open heads from starving lookup. */
+  readonly invocationId?: string;
   readonly limit?: number;
 }
 

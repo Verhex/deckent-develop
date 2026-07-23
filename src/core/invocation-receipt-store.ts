@@ -423,6 +423,7 @@ export class InvocationReceiptStore implements InvocationReceiptReconciliationLe
       throw new InvocationReceiptStoreError('SCOPE_MISMATCH', 'Open-dispatch scan limit must be an integer from 1 to 1000');
     }
     if (input.tenantId !== undefined) requireIdentity('tenantId', input.tenantId);
+    if (input.invocationId !== undefined) requireIdentity('invocationId', input.invocationId);
     const scanTransaction = this.db.transaction((): readonly InvocationOpenDispatchCandidate[] => {
       const rows = this.db.prepare(`
         WITH latest AS (
@@ -438,6 +439,7 @@ export class InvocationReceiptStore implements InvocationReceiptReconciliationLe
           ON e.invocation_id = l.invocation_id AND e.sequence = l.sequence
         WHERE i.project_id = @project_id
           AND (@tenant_id IS NULL OR i.tenant_id = @tenant_id)
+          AND (@invocation_id IS NULL OR i.invocation_id = @invocation_id)
           AND e.event_type = 'dispatch_started'
           AND julianday(e.occurred_at) <= julianday(@before)
         ORDER BY julianday(e.occurred_at) ASC, i.invocation_id ASC
@@ -445,6 +447,7 @@ export class InvocationReceiptStore implements InvocationReceiptReconciliationLe
       `).all({
         project_id: this.projectId,
         tenant_id: input.tenantId ?? null,
+        invocation_id: input.invocationId ?? null,
         before,
         limit,
       }) as InvocationRow[];

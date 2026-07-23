@@ -135,6 +135,44 @@ describe('WorkItems + atomic claim', () => {
     s.close();
   });
 
+  it('journals an exact running claim before trigger recovery clears its authority', () => {
+    const s = freshMission();
+    s.enqueueItem({
+      id: 'trigger-drift-after-claim',
+      missionId: 'm',
+      kind: 'task',
+      trigger: { type: 'one-off' },
+    });
+    const lease = s.acquireEngineLease('trigger-capture-order', 30_000)!;
+    const claim = s.claimItemWithAuthority(
+      'trigger-drift-after-claim',
+      'worker-before-trigger-drift',
+      undefined,
+      lease,
+    )!;
+    s.__rawExec(`UPDATE work_items
+      SET trigger='{"type":"recurring","cron":"0 9 * * *"}'
+      WHERE id='trigger-drift-after-claim'`);
+
+    const recoveries = s.recover(lease);
+
+    expect(recoveries).toMatchObject([{
+      missionId: 'm',
+      workItemId: 'trigger-drift-after-claim',
+      claimedBy: 'worker-before-trigger-drift',
+      attemptId: claim.attemptId,
+      fenceTokenHash: claim.fenceTokenHash,
+    }]);
+    expect(s.listItems('m')[0]).toMatchObject({
+      status: 'parked',
+      claimedAt: null,
+      claimedBy: null,
+      lastResult: { reason: 'TRIGGER_OCCURRENCE_AUTHORITY_REQUIRED' },
+    });
+    expect(JSON.stringify(recoveries)).not.toContain(claim.fenceToken);
+    s.close();
+  });
+
   it('rejects unknown fresh trigger families and fails closed for persisted trigger drift', () => {
     const s = freshMission();
     expect(() => s.enqueueItem({

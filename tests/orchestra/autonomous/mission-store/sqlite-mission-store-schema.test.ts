@@ -20,6 +20,8 @@ describe('SqliteMissionStore — schema', () => {
     expect(tables).toContain('work_item_admission_fences');
     expect(tables).toContain('work_item_approvals');
     expect(tables).toContain('mission_engine_lease');
+    expect(tables).toContain('mission_dispatch_recoveries');
+    expect(tables).toContain('mission_dispatch_recovery_acknowledgements');
     store.close();
   });
 

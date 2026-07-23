@@ -35,6 +35,9 @@ import type {
   MissionWorkerExactExecutionContext,
 } from './mission-worker-invocation-coordinator.js';
 import type {
+  MissionWorkerInvocationRecoveryReconcilerLike,
+} from './mission-worker-invocation-recovery.js';
+import type {
   Mission,
   MissionDispatchClaim,
   MissionEngineLease,
@@ -93,6 +96,11 @@ export interface RunV2EngineDeps {
    * production work before Task JSON, prompt, or provider side effects.
    */
   workerInvocationCoordinator?: MissionWorkerInvocationCoordinatorLike;
+  /**
+   * Crash-takeover receipt closer. It consumes immutable recovery captures
+   * before any scheduler claim and never re-drives an uncertain provider call.
+   */
+  workerInvocationRecoveryReconciler?: MissionWorkerInvocationRecoveryReconcilerLike;
   /**
    * Type-2 (goal) loop bindings. When present, `runV2Engine` interleaves a
    * goal-driver with the scheduler: idle `kind='goal'` missions are advanced
@@ -318,7 +326,12 @@ export async function runV2Engine(
     // settled). Blind redrive could duplicate a provider side effect, so recover()
     // parks those rows for owner reconciliation. Idempotent and narrow: only
     // touches status='running' rows; a clean boot is a no-op.
-    store.recover(engineLease);
+    const recoveredDispatches = store.recover(engineLease);
+    deps.workerInvocationRecoveryReconciler?.reconcile(
+      store,
+      recoveredDispatches,
+      engineLease,
+    );
     // Boot: import the legacy backlog into a `legacy` mission (no-op if missions exist).
     migrateBacklogJson(projectRoot, store, { admission: runtimeRegistry.descriptor });
     store.reconcileRuntimeAdmission(runtimeRegistry.descriptor);

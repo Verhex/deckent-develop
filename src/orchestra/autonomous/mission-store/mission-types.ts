@@ -121,12 +121,48 @@ export interface MissionEngineLease {
   leaseToken: string;
   leaseTokenHash: string;
 }
+/** Immutable crash-takeover evidence captured before a running claim is revoked. */
+export interface MissionRecoveredDispatchAttemptV1 {
+  readonly schemaVersion: 1;
+  readonly recoveryId: string;
+  readonly tenantId: string;
+  readonly missionId: string;
+  readonly workItemId: string;
+  readonly claimedBy: string;
+  readonly claimedAt: string;
+  readonly itemRevision: number;
+  readonly attemptId: string;
+  readonly fenceTokenHash: string;
+  readonly claimRegistryRevision: string | null;
+  readonly claimRegistryDigest: string | null;
+  readonly observedByEngineOwnerId: string;
+  readonly observedByEngineEpoch: number;
+  readonly observedAt: string;
+}
+export type MissionDispatchRecoveryOutcome = 'receipt-reconciled' | 'receipt-already-terminal';
+/** Immutable acknowledgement written only after receipt truth reaches a terminal head. */
+export interface MissionDispatchRecoveryAcknowledgementV1 {
+  readonly schemaVersion: 1;
+  readonly recoveryId: string;
+  readonly outcome: MissionDispatchRecoveryOutcome;
+  readonly invocationId: string;
+  readonly receiptEventId: string;
+  readonly receiptEventHash: string;
+  readonly acknowledgedAt: string;
+}
 export interface MissionEvent { ts: string; workItemId?: string; type: string; data?: unknown; }
 
 export interface MissionStore {
   migrate(): void;
   /** Recovery is a singleton-engine mutation and requires current exact lease authority. */
-  recover(engineLease: MissionEngineLease): void;
+  recover(engineLease: MissionEngineLease): readonly MissionRecoveredDispatchAttemptV1[];
+  /** Durable cross-database saga inbox; acknowledged attempts are excluded. */
+  listPendingDispatchRecoveries(): readonly MissionRecoveredDispatchAttemptV1[];
+  /** First-writer-wins terminal acknowledgement under the current engine lease. */
+  acknowledgeDispatchRecovery(
+    acknowledgement: MissionDispatchRecoveryAcknowledgementV1,
+    engineLease: MissionEngineLease,
+  ): boolean;
   close(): void;
   acquireEngineLease(ownerId: string, ttlMs: number): MissionEngineLease | null;
   renewEngineLease(lease: MissionEngineLease, ttlMs: number): MissionEngineLease | null;

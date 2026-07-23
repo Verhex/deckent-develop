@@ -100,6 +100,7 @@ import { DeckentError } from '../../core/errors.js';
 import type { InvocationPurpose, InvocationReceiptRef, InvocationRole } from '../../core/invocation-receipt.js';
 import { InvocationReceiptStore } from '../../core/invocation-receipt-store.js';
 import { MissionWorkerInvocationCoordinator } from '../../orchestra/autonomous/mission-store/mission-worker-invocation-coordinator.js';
+import { MissionWorkerInvocationRecoveryReconciler } from '../../orchestra/autonomous/mission-store/mission-worker-invocation-recovery.js';
 
 // ─── Filesystem layout helpers ────────────────────────────────────────
 
@@ -883,6 +884,8 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
         // truth/limit/key/usage authorities and route-lock are not composed yet,
         // so its null authority parks before this callback, Task JSON, or spawn.
         workerInvocationCoordinator: new MissionWorkerInvocationCoordinator(null),
+        workerInvocationRecoveryReconciler:
+          new MissionWorkerInvocationRecoveryReconciler(invocationReceiptStore),
         runTask: async () => ({
           ok: false,
           dispatchDisposition: 'parked',

@@ -330,10 +330,14 @@ describe('handleStart — engine=v2 passes live goalDeps to runV2Engine', () => 
     }
 
     expect(runV2Spy).toHaveBeenCalledTimes(1);
-    const deps = runV2Spy.mock.calls[0]![2] as { goalDeps?: { author?: unknown; accept?: unknown } };
+    const deps = runV2Spy.mock.calls[0]![2] as {
+      goalDeps?: { author?: unknown; accept?: unknown };
+      workerInvocationRecoveryReconciler?: { reconcile?: unknown };
+    };
     expect(deps.goalDeps).toBeDefined();
     expect(typeof deps.goalDeps!.author).toBe('function');
     expect(typeof deps.goalDeps!.accept).toBe('function');
+    expect(typeof deps.workerInvocationRecoveryReconciler?.reconcile).toBe('function');
   });
 
   it('holds production Goal author/accepter before the planner provider when authority is unavailable', async () => {

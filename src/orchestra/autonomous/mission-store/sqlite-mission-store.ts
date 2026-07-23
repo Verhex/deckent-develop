@@ -9,6 +9,7 @@ import type {
   WorkItem, NewWorkItem, NewMissionWorkItem, WorkItemStatus,
   WorkItemApprovalBinding, WorkItemApprovalState, ApprovalDecisionTransition,
   MissionClaimFence, MissionDispatchClaim, MissionEngineLease,
+  MissionRecoveredDispatchAttemptV1, MissionDispatchRecoveryAcknowledgementV1,
 } from './mission-types.js';
 import type {
   MissionAcceptanceDecisionRecord,
@@ -150,6 +151,33 @@ CREATE TABLE IF NOT EXISTS mission_engine_lease (
   renewed_at TEXT NOT NULL,
   expires_at TEXT NOT NULL,
   expires_at_ms INTEGER NOT NULL );
+CREATE TABLE IF NOT EXISTS mission_dispatch_recoveries (
+  recovery_id TEXT PRIMARY KEY,
+  attempt_id TEXT NOT NULL UNIQUE,
+  payload_json TEXT NOT NULL,
+  payload_hash TEXT NOT NULL,
+  captured_at TEXT NOT NULL );
+CREATE TABLE IF NOT EXISTS mission_dispatch_recovery_acknowledgements (
+  recovery_id TEXT PRIMARY KEY REFERENCES mission_dispatch_recoveries(recovery_id),
+  payload_json TEXT NOT NULL,
+  payload_hash TEXT NOT NULL,
+  acknowledged_at TEXT NOT NULL );
+CREATE TRIGGER IF NOT EXISTS mission_dispatch_recoveries_no_update
+  BEFORE UPDATE ON mission_dispatch_recoveries BEGIN
+    SELECT RAISE(ABORT, 'mission dispatch recoveries are immutable');
+  END;
+CREATE TRIGGER IF NOT EXISTS mission_dispatch_recoveries_no_delete
+  BEFORE DELETE ON mission_dispatch_recoveries BEGIN
+    SELECT RAISE(ABORT, 'mission dispatch recoveries are immutable');
+  END;
+CREATE TRIGGER IF NOT EXISTS mission_dispatch_recovery_acks_no_update
+  BEFORE UPDATE ON mission_dispatch_recovery_acknowledgements BEGIN
+    SELECT RAISE(ABORT, 'mission dispatch recovery acknowledgements are immutable');
+  END;
+CREATE TRIGGER IF NOT EXISTS mission_dispatch_recovery_acks_no_delete
+  BEFORE DELETE ON mission_dispatch_recovery_acknowledgements BEGIN
+    SELECT RAISE(ABORT, 'mission dispatch recovery acknowledgements are immutable');
+  END;
 `;
 
 /** Durable mission store (SQLite WAL) — the autonomous-v2 single source of truth. */
@@ -171,13 +199,86 @@ export class SqliteMissionStore implements MissionStore {
     if (!columns.has('claim_attempt_id')) this.db.exec('ALTER TABLE work_items ADD COLUMN claim_attempt_id TEXT');
     if (!columns.has('claim_fence_token_hash')) this.db.exec('ALTER TABLE work_items ADD COLUMN claim_fence_token_hash TEXT');
   }
-  recover(engineLease: MissionEngineLease): void {
-    const transaction = this.db.transaction((): void => {
+  recover(engineLease: MissionEngineLease): readonly MissionRecoveredDispatchAttemptV1[] {
+    const transaction = this.db.transaction((): readonly MissionRecoveredDispatchAttemptV1[] => {
       if (!this.isEngineLeaseActive(engineLease)) {
         throw new Error(`MISSION_ENGINE_LEASE_LOST: recovery authority ${engineLease.ownerId}`);
       }
-      // Classify an unsupported running row before the generic orphan rule can
-      // obscure its stronger cause or leave it eligible for a future redrive.
+      // Capture every complete running claim before ANY recovery mutation can
+      // revoke its exact identity. Kind/trigger classification still owns the
+      // final parked/failed reason, but cannot strand an already-started receipt.
+      const running = this.db.prepare(`SELECT
+          wi.id,wi.mission_id,wi.claimed_by,wi.claimed_at,wi.revision,
+          wi.claim_attempt_id,wi.claim_fence_token_hash,
+          wi.claim_registry_revision,wi.claim_registry_digest,m.tenant
+        FROM work_items wi JOIN missions m ON m.id=wi.mission_id
+        WHERE wi.status='running'
+        ORDER BY wi.id`).all() as Array<{
+          id: string;
+          mission_id: string;
+          claimed_by: string | null;
+          claimed_at: string | null;
+          revision: number;
+          claim_attempt_id: string | null;
+          claim_fence_token_hash: string | null;
+          claim_registry_revision: string | null;
+          claim_registry_digest: string | null;
+          tenant: string;
+        }>;
+      const insertRecovery = this.db.prepare(`INSERT INTO mission_dispatch_recoveries(
+          recovery_id,attempt_id,payload_json,payload_hash,captured_at
+        ) VALUES(@recoveryId,@attemptId,@payloadJson,@payloadHash,@capturedAt)
+        ON CONFLICT(recovery_id) DO NOTHING`);
+      for (const row of running) {
+        if (!row.tenant || !row.mission_id || !row.id
+          || !row.claimed_by || !row.claimed_at
+          || !Number.isFinite(Date.parse(row.claimed_at))
+          || !row.claim_attempt_id
+          || !row.claim_fence_token_hash
+          || !/^[a-f0-9]{64}$/u.test(row.claim_fence_token_hash)
+          || !Number.isSafeInteger(row.revision) || row.revision < 1) continue;
+        const recoveryId = `mission-dispatch-recovery-${this.claimTokenHash([
+          row.tenant, row.mission_id, row.id, row.claim_attempt_id, row.claim_fence_token_hash,
+        ].join('\0'))}`;
+        const recovery: MissionRecoveredDispatchAttemptV1 = Object.freeze({
+          schemaVersion: 1,
+          recoveryId,
+          tenantId: row.tenant,
+          missionId: row.mission_id,
+          workItemId: row.id,
+          claimedBy: row.claimed_by,
+          claimedAt: row.claimed_at,
+          itemRevision: row.revision,
+          attemptId: row.claim_attempt_id,
+          fenceTokenHash: row.claim_fence_token_hash,
+          claimRegistryRevision: row.claim_registry_revision,
+          claimRegistryDigest: row.claim_registry_digest,
+          observedByEngineOwnerId: engineLease.ownerId,
+          observedByEngineEpoch: engineLease.epoch,
+          observedAt: engineLease.acquiredAt,
+        });
+        const payloadJson = this.canonical(recovery);
+        const payloadHash = this.claimTokenHash(payloadJson);
+        const info = insertRecovery.run({
+          recoveryId,
+          attemptId: recovery.attemptId,
+          payloadJson,
+          payloadHash,
+          capturedAt: recovery.observedAt,
+        });
+        if (info.changes === 0) {
+          const existing = this.db.prepare(`SELECT payload_json,payload_hash
+            FROM mission_dispatch_recoveries WHERE recovery_id=?`).get(recoveryId) as {
+              payload_json: string;
+              payload_hash: string;
+            } | undefined;
+          if (!existing || existing.payload_json !== payloadJson || existing.payload_hash !== payloadHash) {
+            throw new Error(`MISSION_DISPATCH_RECOVERY_CONFLICT: ${recoveryId}`);
+          }
+        }
+      }
+      // Classify unsupported/trigger-invalid rows only after their exact claim
+      // identity is durably journaled. These routines may clear claim columns.
       this.reconcileUnsupportedKinds();
       this.reconcileNonExecutableTriggers();
       const result = JSON.stringify({
@@ -188,8 +289,80 @@ export class SqliteMissionStore implements MissionStore {
         claimed_at=NULL, claimed_by=NULL, claim_attempt_id=NULL, claim_fence_token_hash=NULL,
         updated_at=@ts WHERE status='running'`)
         .run({ result, ts: this.now() });
+      return this.listPendingDispatchRecoveries();
     });
-    transaction.immediate();
+    return transaction.immediate();
+  }
+  listPendingDispatchRecoveries(): readonly MissionRecoveredDispatchAttemptV1[] {
+    const rows = this.db.prepare(`SELECT
+        recovery.recovery_id,recovery.payload_json,recovery.payload_hash,
+        ack.payload_json AS ack_payload_json,ack.payload_hash AS ack_payload_hash
+      FROM mission_dispatch_recoveries recovery
+      LEFT JOIN mission_dispatch_recovery_acknowledgements ack
+        ON ack.recovery_id=recovery.recovery_id
+      ORDER BY recovery.captured_at,recovery.recovery_id`).all() as Array<{
+        recovery_id: string;
+        payload_json: string;
+        payload_hash: string;
+        ack_payload_json: string | null;
+        ack_payload_hash: string | null;
+      }>;
+    const pending: MissionRecoveredDispatchAttemptV1[] = [];
+    for (const row of rows) {
+      const recovery = this.readDispatchRecovery(row.payload_json, row.payload_hash);
+      if (recovery.recoveryId !== row.recovery_id) {
+        throw new Error('MISSION_DISPATCH_RECOVERY_INTEGRITY_FAILURE');
+      }
+      if (row.ack_payload_json !== null || row.ack_payload_hash !== null) {
+        if (row.ack_payload_json === null || row.ack_payload_hash === null) {
+          throw new Error('MISSION_DISPATCH_RECOVERY_ACK_INTEGRITY_FAILURE');
+        }
+        const acknowledgement = this.readDispatchRecoveryAcknowledgement(
+          row.ack_payload_json,
+          row.ack_payload_hash,
+        );
+        if (acknowledgement.recoveryId !== recovery.recoveryId) {
+          throw new Error('MISSION_DISPATCH_RECOVERY_ACK_INTEGRITY_FAILURE');
+        }
+        continue;
+      }
+      pending.push(recovery);
+    }
+    return pending;
+  }
+  acknowledgeDispatchRecovery(
+    acknowledgement: MissionDispatchRecoveryAcknowledgementV1,
+    engineLease: MissionEngineLease,
+  ): boolean {
+    const transaction = this.db.transaction((): boolean => {
+      if (!this.isEngineLeaseActive(engineLease)) {
+        throw new Error(`MISSION_ENGINE_LEASE_LOST: recovery acknowledgement ${engineLease.ownerId}`);
+      }
+      this.assertDispatchRecoveryAcknowledgement(acknowledgement);
+      const recovery = this.db.prepare(`SELECT 1 AS present FROM mission_dispatch_recoveries
+        WHERE recovery_id=?`).get(acknowledgement.recoveryId);
+      if (!recovery) throw new Error(`MISSION_DISPATCH_RECOVERY_NOT_FOUND: ${acknowledgement.recoveryId}`);
+      const payloadJson = this.canonical(acknowledgement);
+      const payloadHash = this.claimTokenHash(payloadJson);
+      const info = this.db.prepare(`INSERT INTO mission_dispatch_recovery_acknowledgements(
+          recovery_id,payload_json,payload_hash,acknowledged_at
+        ) VALUES(@recoveryId,@payloadJson,@payloadHash,@acknowledgedAt)
+        ON CONFLICT(recovery_id) DO NOTHING`).run({
+          recoveryId: acknowledgement.recoveryId,
+          payloadJson,
+          payloadHash,
+          acknowledgedAt: acknowledgement.acknowledgedAt,
+        });
+      if (info.changes === 1) return true;
+      const existing = this.db.prepare(`SELECT payload_json,payload_hash
+        FROM mission_dispatch_recovery_acknowledgements WHERE recovery_id=?`)
+        .get(acknowledgement.recoveryId) as { payload_json: string; payload_hash: string } | undefined;
+      if (!existing || existing.payload_json !== payloadJson || existing.payload_hash !== payloadHash) {
+        throw new Error(`MISSION_DISPATCH_RECOVERY_ACK_CONFLICT: ${acknowledgement.recoveryId}`);
+      }
+      return false;
+    });
+    return transaction.immediate();
   }
   close(): void { this.db.close(); }
 
@@ -248,6 +421,49 @@ export class SqliteMissionStore implements MissionStore {
       return value ?? null;
     };
     return JSON.stringify(normalize(v));
+  }
+  private readDispatchRecovery(
+    payloadJson: string,
+    payloadHash: string,
+  ): MissionRecoveredDispatchAttemptV1 {
+    if (this.claimTokenHash(payloadJson) !== payloadHash) {
+      throw new Error('MISSION_DISPATCH_RECOVERY_INTEGRITY_FAILURE');
+    }
+    const value = JSON.parse(payloadJson) as MissionRecoveredDispatchAttemptV1;
+    if (value.schemaVersion !== 1
+      || !value.recoveryId || !value.tenantId || !value.missionId || !value.workItemId
+      || !value.claimedBy || !value.claimedAt || !value.attemptId
+      || !Number.isSafeInteger(value.itemRevision) || value.itemRevision < 1
+      || !/^[a-f0-9]{64}$/u.test(value.fenceTokenHash)
+      || !value.observedByEngineOwnerId
+      || !Number.isSafeInteger(value.observedByEngineEpoch)
+      || value.observedByEngineEpoch < 1
+      || !Number.isFinite(Date.parse(value.observedAt))) {
+      throw new Error('MISSION_DISPATCH_RECOVERY_INTEGRITY_FAILURE');
+    }
+    return Object.freeze(value);
+  }
+  private assertDispatchRecoveryAcknowledgement(
+    value: MissionDispatchRecoveryAcknowledgementV1,
+  ): void {
+    if (value.schemaVersion !== 1
+      || !value.recoveryId || !value.invocationId || !value.receiptEventId
+      || !/^[a-f0-9]{64}$/u.test(value.receiptEventHash)
+      || !Number.isFinite(Date.parse(value.acknowledgedAt))
+      || (value.outcome !== 'receipt-reconciled' && value.outcome !== 'receipt-already-terminal')) {
+      throw new Error('MISSION_DISPATCH_RECOVERY_ACK_INVALID');
+    }
+  }
+  private readDispatchRecoveryAcknowledgement(
+    payloadJson: string,
+    payloadHash: string,
+  ): MissionDispatchRecoveryAcknowledgementV1 {
+    if (this.claimTokenHash(payloadJson) !== payloadHash) {
+      throw new Error('MISSION_DISPATCH_RECOVERY_ACK_INTEGRITY_FAILURE');
+    }
+    const value = JSON.parse(payloadJson) as MissionDispatchRecoveryAcknowledgementV1;
+    this.assertDispatchRecoveryAcknowledgement(value);
+    return Object.freeze(value);
   }
 
   private classifyPersistedTrigger(rawTrigger: unknown): PersistedTriggerDisposition {

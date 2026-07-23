@@ -244,6 +244,18 @@ describe('InvocationReceiptStore', () => {
     expect(store.scanOpenDispatches({
       before: '2026-07-20T12:03:00.000Z', limit: 2,
     }).map(candidate => candidate.ref.invocationId)).toEqual(['inv-other-tenant', 'inv-old']);
+    expect(store.scanOpenDispatches({
+      before: '2026-07-20T12:03:00.000Z',
+      tenantId: 'tenant-a',
+      invocationId: 'inv-new',
+      limit: 1,
+    }).map(candidate => candidate.ref.invocationId)).toEqual(['inv-new']);
+    expect(store.scanOpenDispatches({
+      before: '2026-07-20T12:03:00.000Z',
+      tenantId: 'tenant-a',
+      invocationId: 'inv-other-tenant',
+      limit: 1,
+    })).toEqual([]);
     store.close();
   });
 

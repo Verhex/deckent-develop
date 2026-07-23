@@ -18,6 +18,9 @@ import {
 } from '../../../../src/orchestra/autonomous/mission-store/goal-mission.js';
 import type {
   MissionDispatchClaim,
+  MissionEngineLease,
+  MissionRecoveredDispatchAttemptV1,
+  MissionStore,
   NewWorkItem,
   WorkItem,
 } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
@@ -411,9 +414,21 @@ describe('runV2Engine', () => {
     expect(store.listItems('mR')[0]!.status).toBe('running');
 
     const seen: string[] = [];
+    const reconcile = vi.fn((
+      _store: MissionStore,
+      attempts: readonly MissionRecoveredDispatchAttemptV1[],
+      lease: MissionEngineLease,
+    ) => ({
+      inspected: attempts.length,
+      reconciled: 0,
+      alreadyTerminal: 0,
+      pending: attempts.length,
+      leaseEpoch: lease.epoch,
+    }));
     const deps: RunV2EngineDeps = {
       runTask: async (ctx: MissionTaskContext) => { seen.push(ctx.description); return { ok: true }; },
       runSprint: async () => undefined,
+      workerInvocationRecoveryReconciler: { reconcile },
       store,
       maxIterations: BOUNDED,
     };
@@ -424,6 +439,12 @@ describe('runV2Engine', () => {
     expect(seen).toEqual([]);
     expect(recovered.status).toBe('parked');
     expect(recovered.lastResult?.reason).toContain('RECOVERY_RECONCILIATION_REQUIRED');
+    expect(reconcile).toHaveBeenCalledTimes(1);
+    expect(reconcile.mock.calls[0]?.[1]).toMatchObject([{
+      missionId: 'mR',
+      workItemId: 'mR-0',
+      claimedBy: 'dead-worker',
+    }]);
   });
 
   it('does not author, accept, or dispatch a goal whose recovered attempt is parked', async () => {
