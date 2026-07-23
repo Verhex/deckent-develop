@@ -4,7 +4,8 @@
 // baseline or fails the gate.
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -14,9 +15,12 @@ import {
   deriveKnownModelIds,
   deriveLegacyModelAliasesFromSource,
   deriveLegacyModelAliases,
+  extractActionableMarkdownAliasSites,
   extractModelLiteralSites,
   diffAgainstBaseline,
   isExplicitLegacyMigrationSite,
+  isActionableMarkdownPath,
+  scanActionableMarkdown,
   scanSource,
   loadBaseline,
 } from '../../scripts/lint-no-model-literal.mjs';
@@ -55,6 +59,26 @@ export const CODEX_PARITY_MODELS: readonly ModelDefinition[] = [
   },
 ] as const;
 `;
+
+function runNode(scriptPath: string, cwd: string): Promise<{
+  code: number | null;
+  stderr: string;
+}> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [scriptPath], {
+      cwd,
+      env: { ...process.env },
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+    let stderr = '';
+    child.stderr.setEncoding('utf-8');
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+    child.once('error', reject);
+    child.once('close', (code) => resolve({ code, stderr }));
+  });
+}
 
 describe('sliceRegistryArray + extractIdFields', () => {
   it('slices BUILTIN_MODELS and extracts only its id fields', () => {
@@ -154,6 +178,121 @@ describe('extractModelLiteralSites', () => {
   });
 });
 
+describe('actionable Markdown legacy aliases', () => {
+  const aliases = new Set(['opus', 'sonnet', 'gpt-5']);
+
+  it('detects directive, slash-command, and exact table-cell inputs', () => {
+    const sites = extractActionableMarkdownAliasSites([
+      '- Model: sonnet',
+      '> /model opus',
+      '| Role | Model |',
+      '| --- | --- |',
+      '| auditor | `gpt-5` |',
+    ].join('\n'), aliases);
+
+    expect(sites.map((site) => site.kind)).toEqual([
+      'directive-model',
+      'slash-model',
+      'table-cell',
+    ]);
+  });
+
+  it('ignores prose and explicit migration/rejection documentation', () => {
+    const sites = extractActionableMarkdownAliasSites([
+      'The sonnet legacy alias is rejected at runtime.',
+      '| Legacy alias | Canonical API ID |',
+      '| --- | --- |',
+      '| sonnet | claude-sonnet-5 |',
+      '| gpt-5 | gpt-5.5 |',
+      '| Role | Model |',
+      '| --- | --- |',
+      `| worker | opus | <!-- deckent:model-alias-migration -->`,
+    ].join('\n'), aliases);
+
+    expect(sites).toEqual([]);
+  });
+
+  it('uses an explicit current-doc path policy', () => {
+    for (const included of [
+      'README.md',
+      'DECKENT.md',
+      '.deckent/DIRECTIVES-features.md',
+      'docs/guide/first-sprint.md',
+      'examples/quickstart/DIRECTIVES.md',
+    ]) {
+      expect(isActionableMarkdownPath(included), included).toBe(true);
+    }
+    for (const excluded of [
+      'docs/archive/old.md',
+      'docs/analysis/report.md',
+      'docs/audits/report.md',
+      'docs/logs/run.md',
+      'docs/superpowers/plan.md',
+      'docs/alperen-analysis/review.md',
+      'docs/MASTER-PLAN.md',
+      '.analysis/report.md',
+      '.tasks/task.md',
+    ]) {
+      expect(isActionableMarkdownPath(excluded), excluded).toBe(false);
+    }
+  });
+
+  it('recursively scans only current Markdown surfaces in a hermetic fixture', () => {
+    const root = mkdtempSync(join(tmpdir(), 'lint-model-markdown-'));
+    try {
+      mkdirSync(join(root, 'docs', 'guide'), { recursive: true });
+      mkdirSync(join(root, 'docs', 'archive'), { recursive: true });
+      mkdirSync(join(root, 'examples', 'demo'), { recursive: true });
+      writeFileSync(join(root, 'README.md'), 'Sonnet is a historical family name.\n', 'utf-8');
+      writeFileSync(join(root, 'docs', 'guide', 'run.md'), '- Model: sonnet\n', 'utf-8');
+      writeFileSync(join(root, 'docs', 'archive', 'old.md'), '- Model: opus\n', 'utf-8');
+      writeFileSync(join(root, 'examples', 'demo', 'DIRECTIVES.md'), '/model gpt-5\n', 'utf-8');
+
+      expect(scanActionableMarkdown(root, aliases)).toEqual([
+        {
+          file: 'docs/guide/run.md',
+          kind: 'directive-model',
+          code: '- Model: sonnet',
+        },
+        {
+          file: 'examples/demo/DIRECTIVES.md',
+          kind: 'slash-model',
+          code: '/model gpt-5',
+        },
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('makes the CLI fail closed for a new actionable alias in a hermetic repo', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'lint-model-markdown-cli-'));
+    try {
+      mkdirSync(join(root, 'scripts'), { recursive: true });
+      mkdirSync(join(root, 'src', 'core'), { recursive: true });
+      mkdirSync(join(root, 'docs'), { recursive: true });
+      copyFileSync(
+        join(process.cwd(), 'scripts', 'lint-no-model-literal.mjs'),
+        join(root, 'scripts', 'lint-no-model-literal.mjs'),
+      );
+      writeFileSync(join(root, 'src', 'core', 'model-registry.ts'), FIXTURE_REGISTRY, 'utf-8');
+      writeFileSync(
+        join(root, 'scripts', 'model-literal-baseline.json'),
+        `${JSON.stringify({ sanctioned: [], sanctionedMarkdown: [] }, null, 2)}\n`,
+        'utf-8',
+      );
+      writeFileSync(join(root, 'docs', 'new-guide.md'), '- Model: sonnet\n', 'utf-8');
+
+      const result = await runNode(join(root, 'scripts', 'lint-no-model-literal.mjs'), root);
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain('docs/new-guide.md');
+      expect(result.stderr).toContain('actionable Markdown alias:directive-model');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('diffAgainstBaseline', () => {
   const baseline = {
     sanctioned: [{ file: 'src/core/config.ts', code: "default_model: 'opus'," }],
@@ -196,6 +335,22 @@ describe('diffAgainstBaseline', () => {
     // A THIRD occurrence beyond the baselined two is new.
     const scanWithThird = [...scanWithGenuineDuplicate, { file: 'src/core/config.ts', code: "brain_model: 'opus'," }];
     expect(diffAgainstBaseline(scanWithThird, dupBaselineBoth).newCalls).toHaveLength(1);
+  });
+
+  it('includes the Markdown kind in the multiset identity', () => {
+    const scan = [
+      { file: 'docs/guide.md', kind: 'directive-model', code: '- Model: sonnet' },
+      { file: 'docs/guide.md', kind: 'table-cell', code: '- Model: sonnet' },
+    ];
+    const markdownBaseline = {
+      sanctioned: [
+        { file: 'docs/guide.md', kind: 'directive-model', code: '- Model: sonnet' },
+      ],
+    };
+
+    expect(diffAgainstBaseline(scan, markdownBaseline).newCalls).toEqual([
+      { file: 'docs/guide.md', kind: 'table-cell', code: '- Model: sonnet' },
+    ]);
   });
 });
 
@@ -254,6 +409,15 @@ describe('live baseline is in sync (the committed gate is green)', () => {
     const runtimeAliases = scanSource(undefined, undefined, deriveLegacyModelAliases())
       .filter((site) => !isExplicitLegacyMigrationSite(site));
     expect(runtimeAliases).toEqual([]);
+  });
+
+  it('the checked-in Markdown baseline matches current actionable docs debt', () => {
+    const baseline = loadBaseline();
+    const { newCalls } = diffAgainstBaseline(
+      scanActionableMarkdown(),
+      { sanctioned: baseline.sanctionedMarkdown ?? [] },
+    );
+    expect(newCalls, `new actionable docs aliases: ${JSON.stringify(newCalls)}`).toHaveLength(0);
   });
 
   it('model-registry.ts is never scanned as a violation source', () => {

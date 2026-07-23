@@ -1,5 +1,5 @@
 {
-  "note": "Model-name string-literal ratchet baseline (born-item 431-001). `sanctioned` = un-audited grandfathered call sites (model names hardcoded outside the src/core/model-registry.ts SSOT); a site absent here fails the gate. Known model ids are derived dynamically at scan time from model-registry.ts `id` fields, never copy-pasted here. Regenerate with --update.",
+  "note": "Model-name string-literal ratchet baseline (born-item 431-001). `sanctioned` = un-audited grandfathered source call sites; `sanctionedMarkdown` = actionable legacy aliases in current docs. A site absent from its matching multiset fails the gate. Canonical ids and aliases are derived dynamically from src/core/model-registry.ts, never copy-pasted here. Regenerate with --update.",
   "sanctioned": [
     {
       "file": "src/cli/auto-setup.ts",
@@ -340,6 +340,503 @@
     {
       "file": "src/providers/gemini.ts",
       "code": "return (getModelForProviderTier('gemini', tier) ?? 'gemini-2.5-flash') as GeminiModel;"
+    }
+  ],
+  "sanctionedMarkdown": [
+    {
+      "file": ".deckent/DIRECTIVES-features.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": ".deckent/DIRECTIVES-features.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": ".deckent/DIRECTIVES-features.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": ".deckent/DIRECTIVES-features.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": ".deckent/DIRECTIVES-features.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": ".deckent/DIRECTIVES-features.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": ".deckent/DIRECTIVES-features.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": ".deckent/DIRECTIVES-features.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": ".deckent/DIRECTIVES-features.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": ".deckent/DIRECTIVES-features.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/architecture/architecture.md",
+      "kind": "table-cell",
+      "code": "| `api` | 10 | opus | sonnet | true |"
+    },
+    {
+      "file": "docs/architecture/architecture.md",
+      "kind": "table-cell",
+      "code": "| `balanced` | 5 | sonnet | opus | true |"
+    },
+    {
+      "file": "docs/architecture/architecture.md",
+      "kind": "table-cell",
+      "code": "| `economic` | 3 | sonnet | sonnet | false |"
+    },
+    {
+      "file": "docs/architecture/architecture.md",
+      "kind": "table-cell",
+      "code": "| `performance` | 8 | opus | opus | true |"
+    },
+    {
+      "file": "docs/architecture/architecture.md",
+      "kind": "table-cell",
+      "code": "| Economy | haiku | gpt-5-mini / gpt-4.1-mini | gemini-2.0-flash |"
+    },
+    {
+      "file": "docs/architecture/architecture.md",
+      "kind": "table-cell",
+      "code": "| Premium | opus | gpt-5 | gemini-2.5-pro |"
+    },
+    {
+      "file": "docs/architecture/architecture.md",
+      "kind": "table-cell",
+      "code": "| Premium+ | fable | o3 | gemini-3.1-pro-preview |"
+    },
+    {
+      "file": "docs/architecture/architecture.md",
+      "kind": "table-cell",
+      "code": "| Standard | sonnet | gpt-4.1 / o4-mini | gemini-2.5-flash |"
+    },
+    {
+      "file": "docs/cookbook/01-first-sprint.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/cookbook/02-multi-provider-fleet.md",
+      "kind": "directive-model",
+      "code": "- Model: gpt-5"
+    },
+    {
+      "file": "docs/cookbook/02-multi-provider-fleet.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/cookbook/02-multi-provider-fleet.md",
+      "kind": "table-cell",
+      "code": "| `claude` | `haiku` | economy | Fastest Claude |"
+    },
+    {
+      "file": "docs/cookbook/02-multi-provider-fleet.md",
+      "kind": "table-cell",
+      "code": "| `claude` | `opus` | premium | Most capable Claude |"
+    },
+    {
+      "file": "docs/cookbook/02-multi-provider-fleet.md",
+      "kind": "table-cell",
+      "code": "| `claude` | `sonnet` | standard | Balanced (default) |"
+    },
+    {
+      "file": "docs/cookbook/02-multi-provider-fleet.md",
+      "kind": "table-cell",
+      "code": "| `codex` | `gpt-5` | premium | Frontier OpenAI |"
+    },
+    {
+      "file": "docs/cookbook/add-rest-api.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/cookbook/add-rest-api.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/cookbook/add-rest-api.md",
+      "kind": "directive-model",
+      "code": "model:   sonnet"
+    },
+    {
+      "file": "docs/cookbook/fix-bug.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/cookbook/getting-started-en.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/cookbook/getting-started-en.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/cookbook/multi-provider-and-cost-en.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/cookbook/multi-provider-and-cost-en.md",
+      "kind": "table-cell",
+      "code": "| `claude` | `haiku` | economy | Fastest Claude |"
+    },
+    {
+      "file": "docs/cookbook/multi-provider-and-cost-en.md",
+      "kind": "table-cell",
+      "code": "| `claude` | `opus` | premium | Most capable Claude |"
+    },
+    {
+      "file": "docs/cookbook/multi-provider-and-cost-en.md",
+      "kind": "table-cell",
+      "code": "| `claude` | `sonnet` | standard | Balanced, default |"
+    },
+    {
+      "file": "docs/cookbook/multi-provider-and-cost-en.md",
+      "kind": "table-cell",
+      "code": "| `codex` | `gpt-5` | premium | Frontier OpenAI |"
+    },
+    {
+      "file": "docs/cookbook/update-docs.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/cookbook/update-docs.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/development/brain-guide.md",
+      "kind": "table-cell",
+      "code": "| Cross-module / architecture keywords OR ≥6 files | `opus` |"
+    },
+    {
+      "file": "docs/development/brain-guide.md",
+      "kind": "table-cell",
+      "code": "| Everything else | `sonnet` |"
+    },
+    {
+      "file": "docs/development/brain-guide.md",
+      "kind": "table-cell",
+      "code": "| Trivial keywords (rename, typo, config change) + ≤2 files | `haiku` |"
+    },
+    {
+      "file": "docs/development/plugin-guide.md",
+      "kind": "directive-model",
+      "code": "model: haiku"
+    },
+    {
+      "file": "docs/development/plugin-guide.md",
+      "kind": "directive-model",
+      "code": "model: sonnet"
+    },
+    {
+      "file": "docs/development/plugin-guide.md",
+      "kind": "table-cell",
+      "code": "| `haiku` | Simple checks, formatting, low-complexity |"
+    },
+    {
+      "file": "docs/development/plugin-guide.md",
+      "kind": "table-cell",
+      "code": "| `haiku` | Simple transformations, formatting, low-complexity tasks |"
+    },
+    {
+      "file": "docs/development/plugin-guide.md",
+      "kind": "table-cell",
+      "code": "| `opus` | Security-sensitive, complex logic, architecture decisions |"
+    },
+    {
+      "file": "docs/development/plugin-guide.md",
+      "kind": "table-cell",
+      "code": "| `opus` | Security, complex logic, architecture |"
+    },
+    {
+      "file": "docs/development/plugin-guide.md",
+      "kind": "table-cell",
+      "code": "| `sonnet` | Standard implementation, analysis, docs |"
+    },
+    {
+      "file": "docs/development/plugin-guide.md",
+      "kind": "table-cell",
+      "code": "| `sonnet` | Standard implementation, analysis, documentation |"
+    },
+    {
+      "file": "docs/guide/chat-mode.md",
+      "kind": "slash-model",
+      "code": "| `/model <id>` | Switch model at runtime (e.g. `/model sonnet`) |"
+    },
+    {
+      "file": "docs/guide/concepts.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/guide/faq.md",
+      "kind": "directive-model",
+      "code": "- Model: opus"
+    },
+    {
+      "file": "docs/guide/faq.md",
+      "kind": "directive-model",
+      "code": "- Model: opus"
+    },
+    {
+      "file": "docs/guide/faq.md",
+      "kind": "table-cell",
+      "code": "| `economy` | haiku | gpt-5-mini / gpt-4.1-mini | gemini-2.0-flash |"
+    },
+    {
+      "file": "docs/guide/faq.md",
+      "kind": "table-cell",
+      "code": "| `economy` | haiku | gpt-5-mini / gpt-4.1-mini | gemini-2.0-flash | Docs, simple fixes |"
+    },
+    {
+      "file": "docs/guide/faq.md",
+      "kind": "table-cell",
+      "code": "| `premium` | opus | gpt-5 | gemini-2.5-pro |"
+    },
+    {
+      "file": "docs/guide/faq.md",
+      "kind": "table-cell",
+      "code": "| `premium` | opus | gpt-5 | gemini-2.5-pro | Complex tasks, major refactors |"
+    },
+    {
+      "file": "docs/guide/faq.md",
+      "kind": "table-cell",
+      "code": "| `standard` | sonnet | gpt-4.1 / o4-mini | gemini-2.5-flash |"
+    },
+    {
+      "file": "docs/guide/faq.md",
+      "kind": "table-cell",
+      "code": "| `standard` | sonnet | gpt-4.1 / o4-mini | gemini-2.5-flash | General development (default) |"
+    },
+    {
+      "file": "docs/guide/first-sprint.md",
+      "kind": "directive-model",
+      "code": "- Model: opus"
+    },
+    {
+      "file": "docs/guide/first-sprint.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/guide/getting-started-en.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/guide/getting-started.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/guide/multi-provider-fleet.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/guide/multi-provider-fleet.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/guide/multi-provider.md",
+      "kind": "directive-model",
+      "code": "- Model: opus"
+    },
+    {
+      "file": "docs/guide/multi-provider.md",
+      "kind": "table-cell",
+      "code": "| `economy` | `haiku` | `gpt-5-mini` / `gpt-4.1-mini` | `gemini-2.0-flash` |"
+    },
+    {
+      "file": "docs/guide/multi-provider.md",
+      "kind": "table-cell",
+      "code": "| `fable` | `claude-fable-5` | `premium_plus` |"
+    },
+    {
+      "file": "docs/guide/multi-provider.md",
+      "kind": "table-cell",
+      "code": "| `gpt-5` | `gpt-5.5` | `premium` |"
+    },
+    {
+      "file": "docs/guide/multi-provider.md",
+      "kind": "table-cell",
+      "code": "| `haiku` | `claude-haiku-4-5-20251001` | `economy` |"
+    },
+    {
+      "file": "docs/guide/multi-provider.md",
+      "kind": "table-cell",
+      "code": "| `opus` | `claude-opus-4-8` | `premium` |"
+    },
+    {
+      "file": "docs/guide/multi-provider.md",
+      "kind": "table-cell",
+      "code": "| `premium_plus` | `fable` | `o3` | `gemini-3.1-pro-preview` |"
+    },
+    {
+      "file": "docs/guide/multi-provider.md",
+      "kind": "table-cell",
+      "code": "| `premium` | `opus` | `gpt-5` | `gemini-2.5-pro` |"
+    },
+    {
+      "file": "docs/guide/multi-provider.md",
+      "kind": "table-cell",
+      "code": "| `sonnet` | `claude-sonnet-4-6` | `standard` |"
+    },
+    {
+      "file": "docs/guide/multi-provider.md",
+      "kind": "table-cell",
+      "code": "| `standard` | `sonnet` | `gpt-4.1` / `o4-mini` | `gemini-2.5-flash` |"
+    },
+    {
+      "file": "docs/guide/quickstart.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/guide/quickstart.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/launch/blog-hashnode-launch.md",
+      "kind": "directive-model",
+      "code": "- Model: sonnet"
+    },
+    {
+      "file": "docs/launch/blog-hashnode-launch.md",
+      "kind": "table-cell",
+      "code": "| economy | haiku | gpt-5-mini | gemini-2.0-flash |"
+    },
+    {
+      "file": "docs/launch/blog-hashnode-launch.md",
+      "kind": "table-cell",
+      "code": "| premium | opus | gpt-5 | gemini-2.5-pro |"
+    },
+    {
+      "file": "docs/launch/blog-hashnode-launch.md",
+      "kind": "table-cell",
+      "code": "| standard | sonnet | gpt-4.1 | gemini-2.5-flash |"
+    },
+    {
+      "file": "docs/reference/config-reference.md",
+      "kind": "table-cell",
+      "code": "| `brain_model` | `opus` | `sonnet` | `sonnet` | `opus` |"
+    },
+    {
+      "file": "docs/reference/config-reference.md",
+      "kind": "table-cell",
+      "code": "| `default_model` | `opus` | `opus` | `sonnet` | `sonnet` |"
+    },
+    {
+      "file": "docs/reference/config-reference.md",
+      "kind": "table-cell",
+      "code": "| Economy | `haiku` | `gpt-5-mini` | `gemini-2.0-flash` |"
+    },
+    {
+      "file": "docs/reference/config-reference.md",
+      "kind": "table-cell",
+      "code": "| Premium | `opus` | `gpt-5` | `gemini-2.5-pro` |"
+    },
+    {
+      "file": "docs/reference/config-reference.md",
+      "kind": "table-cell",
+      "code": "| Standard | `sonnet` | `gpt-4.1` | `gemini-2.5-flash` |"
+    },
+    {
+      "file": "docs/reference/multi-provider.md",
+      "kind": "table-cell",
+      "code": "| **Economy** | `haiku` | `gpt-5-mini` · `gpt-4.1-mini` | `gemini-2.0-flash` |"
+    },
+    {
+      "file": "docs/reference/multi-provider.md",
+      "kind": "table-cell",
+      "code": "| **Premium** | `opus` | `gpt-5` | `gemini-2.5-pro` |"
+    },
+    {
+      "file": "docs/reference/multi-provider.md",
+      "kind": "table-cell",
+      "code": "| **Premium+** | `fable` | `o3` | `gemini-3.1-pro-preview` |"
+    },
+    {
+      "file": "docs/reference/multi-provider.md",
+      "kind": "table-cell",
+      "code": "| **Standard** | `sonnet` | `gpt-4.1` · `o4-mini` | `gemini-2.5-flash` |"
+    },
+    {
+      "file": "docs/reference/performance.md",
+      "kind": "table-cell",
+      "code": "| `haiku` | ~5,000 | ~$0.001 |"
+    },
+    {
+      "file": "docs/reference/performance.md",
+      "kind": "table-cell",
+      "code": "| `haiku` | Fastest | Cheapest | Simple docs, boilerplate, config files |"
+    },
+    {
+      "file": "docs/reference/performance.md",
+      "kind": "table-cell",
+      "code": "| `opus` | ~15,000 | ~$0.15 |"
+    },
+    {
+      "file": "docs/reference/performance.md",
+      "kind": "table-cell",
+      "code": "| `opus` | Slowest | Most expensive | Architecture decisions, complex logic, AI planning |"
+    },
+    {
+      "file": "docs/reference/performance.md",
+      "kind": "table-cell",
+      "code": "| `sonnet` | ~10,000 | ~$0.03 |"
+    },
+    {
+      "file": "docs/reference/performance.md",
+      "kind": "table-cell",
+      "code": "| `sonnet` | Balanced | Medium | Most feature work, tests, refactoring |"
+    },
+    {
+      "file": "docs/reference/performance.md",
+      "kind": "table-cell",
+      "code": "| Architecture, security design | `opus` |"
+    },
+    {
+      "file": "docs/reference/performance.md",
+      "kind": "table-cell",
+      "code": "| Documentation, config, i18n | `haiku` |"
+    },
+    {
+      "file": "docs/reference/performance.md",
+      "kind": "table-cell",
+      "code": "| Feature implementation, complex tests | `sonnet` |"
     }
   ]
 }

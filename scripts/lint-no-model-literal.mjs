@@ -18,8 +18,13 @@
 // is spelled with a capital `I`, so the literal substring `id:` never occurs inside
 // `apiId:`, and the two are told apart without any lookbehind/lookaround trickery.
 //
+// The same gate also ratchets actionable Markdown aliases (`Model: sonnet`,
+// `/model sonnet`, or an exact alias table cell). Prose is not scanned, and
+// the alias dictionary is derived from LEGACY_MODEL_ALIASES below — never
+// duplicated here.
+//
 // Baseline: scripts/model-literal-baseline.json (regenerate with --update;
-// initialise with --init).
+// initialise with --init). Source and Markdown debt live in separate fields.
 //
 // Exit: 0 = clean, 1 = violations, 2 = scan error
 // Usage:
@@ -36,6 +41,28 @@ const SRC_DIR = join(REPO_ROOT, 'src');
 const BASELINE_PATH = join(REPO_ROOT, 'scripts', 'model-literal-baseline.json');
 const REGISTRY_PATH = join(SRC_DIR, 'core', 'model-registry.ts');
 const REGISTRY_REL = 'src/core/model-registry.ts';
+const MARKDOWN_ROOT_FILES = [
+  'README.md',
+  'README-TR.md',
+  'DECKENT.md',
+  'DIRECTIVES.md',
+  '.deckent/DIRECTIVES-features.md',
+];
+const MARKDOWN_ROOT_DIRS = ['docs', 'examples'];
+const MARKDOWN_EXCLUDED_PREFIXES = [
+  'docs/archive/',
+  'docs/analysis/',
+  'docs/audits/',
+  'docs/logs/',
+  'docs/superpowers/',
+  'docs/alperen-analysis/',
+];
+const MARKDOWN_EXCLUDED_FILES = new Set([
+  'docs/MASTER-PLAN.md',
+  'docs/CHANGELOG.md',
+  'docs/SPRINT-LOG.md',
+]);
+const MARKDOWN_MIGRATION_MARKER = '<!-- deckent:model-alias-migration -->';
 
 // The two registry arrays the known-id dictionary is derived from. Each array's
 // source is bounded by its `export const NAME` marker and the `] as const;` that
@@ -120,6 +147,134 @@ export function deriveLegacyModelAliasesFromSource(content) {
 
 export function deriveLegacyModelAliases(registryPath = REGISTRY_PATH) {
   return deriveLegacyModelAliasesFromSource(readFileSync(registryPath, 'utf-8'));
+}
+
+function normalizeMarkdownCell(cell) {
+  let value = cell.trim();
+  while (
+    (value.startsWith('`') && value.endsWith('`'))
+    || (value.startsWith('**') && value.endsWith('**'))
+    || (value.startsWith('*') && value.endsWith('*'))
+  ) {
+    value = value.startsWith('**') ? value.slice(2, -2).trim() : value.slice(1, -1).trim();
+  }
+  return value;
+}
+
+function isMigrationTableHeader(cells) {
+  return cells.some((cell) => /^(?:legacy (?:model )?alias|migration input|rejected input)$/i.test(
+    normalizeMarkdownCell(cell),
+  ));
+}
+
+/**
+ * Extract actionable legacy-model alias sites from Markdown. Ordinary prose is
+ * intentionally invisible. A migration/rejection table must declare that role
+ * in its header, or a single exceptional row may use the review-visible marker.
+ *
+ * @param {string} content
+ * @param {Set<string>} aliases
+ * @returns {Array<{line: number, kind: 'directive-model'|'slash-model'|'table-cell', code: string}>}
+ */
+export function extractActionableMarkdownAliasSites(content, aliases) {
+  const sites = [];
+  const lines = content.split('\n');
+  let migrationTable = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const trimmed = raw.trim();
+    const isTableRow = trimmed.startsWith('|') && trimmed.endsWith('|');
+    const cells = isTableRow ? trimmed.slice(1, -1).split('|') : [];
+
+    if (!isTableRow) migrationTable = false;
+    if (isTableRow && isMigrationTableHeader(cells)) {
+      migrationTable = true;
+      continue;
+    }
+    if (trimmed.includes(MARKDOWN_MIGRATION_MARKER)) continue;
+
+    const directive = /^\s*(?:[-*]\s*)?(?:force)?model\s*:\s*`?([^\s`|#]+)`?/i.exec(raw);
+    if (directive && aliases.has(directive[1])) {
+      sites.push({ line: i + 1, kind: 'directive-model', code: trimmed });
+      continue;
+    }
+
+    const slashModel = /(?:^|[\s>`|›$])\/model\s+`?([^\s`|]+)`?/g;
+    let commandMatch;
+    let hasSlashAlias = false;
+    while ((commandMatch = slashModel.exec(raw)) !== null) {
+      if (aliases.has(commandMatch[1])) {
+        hasSlashAlias = true;
+        break;
+      }
+    }
+    if (hasSlashAlias) {
+      sites.push({ line: i + 1, kind: 'slash-model', code: trimmed });
+      continue;
+    }
+
+    if (isTableRow && !migrationTable && cells.some((cell) => aliases.has(normalizeMarkdownCell(cell)))) {
+      sites.push({ line: i + 1, kind: 'table-cell', code: trimmed });
+    }
+  }
+
+  return sites;
+}
+
+/** Current user/agent instruction Markdown only; historical evidence is excluded. */
+export function isActionableMarkdownPath(relPath) {
+  const rel = relPath.replace(/\\/g, '/');
+  if (!rel.endsWith('.md')) return false;
+  if (MARKDOWN_EXCLUDED_FILES.has(rel)) return false;
+  if (MARKDOWN_EXCLUDED_PREFIXES.some((prefix) => rel.startsWith(prefix))) return false;
+  return MARKDOWN_ROOT_FILES.includes(rel)
+    || MARKDOWN_ROOT_DIRS.some((dir) => rel.startsWith(`${dir}/`));
+}
+
+function collectMarkdownFiles(dir, rootDir, results = []) {
+  if (!existsSync(dir)) return results;
+  for (const entry of readdirSync(dir)) {
+    if (entry === 'node_modules') continue;
+    const full = join(dir, entry);
+    const st = statSync(full);
+    if (st.isDirectory()) {
+      collectMarkdownFiles(full, rootDir, results);
+    } else {
+      const rel = relative(rootDir, full).replace(/\\/g, '/');
+      if (isActionableMarkdownPath(rel)) results.push(full);
+    }
+  }
+  return results;
+}
+
+/**
+ * Scan current Markdown instruction surfaces for actionable legacy aliases.
+ * @param {string} [rootDir]
+ * @param {Set<string>} [aliases]
+ * @returns {Array<{file: string, kind: string, code: string}>}
+ */
+export function scanActionableMarkdown(
+  rootDir = REPO_ROOT,
+  aliases = deriveLegacyModelAliases(),
+) {
+  const candidates = [];
+  for (const rel of MARKDOWN_ROOT_FILES) {
+    const abs = join(rootDir, rel);
+    if (existsSync(abs) && statSync(abs).isFile()) candidates.push(abs);
+  }
+  for (const rel of MARKDOWN_ROOT_DIRS) {
+    collectMarkdownFiles(join(rootDir, rel), rootDir, candidates);
+  }
+
+  const found = [];
+  for (const abs of [...new Set(candidates)]) {
+    const rel = relative(rootDir, abs).replace(/\\/g, '/');
+    for (const site of extractActionableMarkdownAliasSites(readFileSync(abs, 'utf-8'), aliases)) {
+      found.push({ file: rel, kind: site.kind, code: site.code });
+    }
+  }
+  return found;
 }
 
 /**
@@ -220,8 +375,8 @@ export function isExplicitLegacyMigrationSite(site) {
     && /^case\s+(['"`])[^'"`]+\1\s*:\s*$/.test(site.code);
 }
 
-/** Multiset key for a call site (file + normalized code). */
-const keyOf = (e) => JSON.stringify([e.file, e.code]);
+/** Multiset key for a source/docs site (file + optional kind + normalized code). */
+const keyOf = (e) => JSON.stringify([e.file, e.kind ?? null, e.code]);
 
 /** Build a count-map (multiset) from a list of entries. */
 function countMap(entries) {
@@ -233,9 +388,9 @@ function countMap(entries) {
 /**
  * Compare the live scan against the baseline. A live occurrence beyond the
  * baseline count (per (file, code) key) is a NEW model-name literal.
- * @param {Array<{file: string, code: string}>} scan
- * @param {{ sanctioned?: Array<{file: string, code: string}> }} baseline
- * @returns {{ newCalls: Array<{file: string, code: string}> }}
+ * @param {Array<{file: string, kind?: string, code: string}>} scan
+ * @param {{ sanctioned?: Array<{file: string, kind?: string, code: string}> }} baseline
+ * @returns {{ newCalls: Array<{file: string, kind?: string, code: string}> }}
  */
 export function diffAgainstBaseline(scan, baseline) {
   const base = countMap(baseline.sanctioned ?? []);
@@ -244,8 +399,9 @@ export function diffAgainstBaseline(scan, baseline) {
   for (const [k, liveN] of liveCounts) {
     const baseN = base.get(k) ?? 0;
     if (liveN > baseN) {
-      const [file, code] = JSON.parse(k);
-      for (let i = 0; i < liveN - baseN; i++) newCalls.push({ file, code });
+      const [file, kind, code] = JSON.parse(k);
+      const entry = kind ? { file, kind, code } : { file, code };
+      for (let i = 0; i < liveN - baseN; i++) newCalls.push(entry);
     }
   }
   return { newCalls };
@@ -261,7 +417,11 @@ export function loadBaseline(path = BASELINE_PATH) {
 
 function dedupeSorted(entries) {
   // Preserve multiplicity but produce a stable, diff-friendly order.
-  return [...entries].sort((a, b) => (a.file === b.file ? a.code.localeCompare(b.code) : a.file.localeCompare(b.file)));
+  return [...entries].sort((a, b) => {
+    if (a.file !== b.file) return a.file.localeCompare(b.file);
+    if ((a.kind ?? '') !== (b.kind ?? '')) return (a.kind ?? '').localeCompare(b.kind ?? '');
+    return a.code.localeCompare(b.code);
+  });
 }
 
 const invokedDirectly = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
@@ -269,8 +429,10 @@ const invokedDirectly = process.argv[1] && fileURLToPath(import.meta.url) === re
 if (invokedDirectly) {
   const mode = process.argv[2];
   let scan;
+  let markdownScan;
   try {
     scan = scanSource();
+    markdownScan = scanActionableMarkdown();
   } catch (err) {
     process.stderr.write(`[no-model-literal] ERROR: ${err instanceof Error ? err.message : String(err)}\n`);
     process.exit(2);
@@ -283,11 +445,16 @@ if (invokedDirectly) {
         + 'un-audited grandfathered call sites (model names hardcoded outside the '
         + 'src/core/model-registry.ts SSOT); a site absent here fails the gate. Known '
         + 'model ids are derived dynamically at scan time from model-registry.ts `id` '
-        + 'fields, never copy-pasted here. Regenerate with --update.',
+        + 'fields, never copy-pasted here. `sanctionedMarkdown` separately tracks '
+        + 'actionable legacy aliases in current docs; aliases are derived from '
+        + 'LEGACY_MODEL_ALIASES. Regenerate with --update.',
       sanctioned: dedupeSorted(scan),
+      sanctionedMarkdown: dedupeSorted(markdownScan),
     };
     writeFileSync(BASELINE_PATH, JSON.stringify(out, null, 2) + '\n', 'utf-8');
-    process.stdout.write(`[no-model-literal] --init: ${out.sanctioned.length} sanctioned sites written\n`);
+    process.stdout.write(
+      `[no-model-literal] --init: ${out.sanctioned.length} source + ${out.sanctionedMarkdown.length} Markdown sanctioned sites written\n`,
+    );
     process.exit(0);
   }
 
@@ -295,22 +462,34 @@ if (invokedDirectly) {
 
   if (mode === '--update') {
     baseline.sanctioned = dedupeSorted(scan);
+    baseline.sanctionedMarkdown = dedupeSorted(markdownScan);
     writeFileSync(BASELINE_PATH, JSON.stringify(baseline, null, 2) + '\n', 'utf-8');
-    process.stdout.write(`[no-model-literal] --update: sanctioned baseline refreshed (${baseline.sanctioned.length} sites)\n`);
-    process.exit(0);
-  }
-
-  const { newCalls } = diffAgainstBaseline(scan, baseline);
-  const legacyCalls = scanSource(SRC_DIR, REPO_ROOT, deriveLegacyModelAliases())
-    .filter((site) => !isExplicitLegacyMigrationSite(site));
-  if (newCalls.length === 0 && legacyCalls.length === 0) {
     process.stdout.write(
-      `[no-model-literal] ✓ no new canonical literal and no runtime legacy alias — ${baseline.sanctioned?.length ?? 0} canonical sites sanctioned (grandfathered)\n`,
+      `[no-model-literal] --update: baseline refreshed (${baseline.sanctioned.length} source + ${baseline.sanctionedMarkdown.length} Markdown sites)\n`,
     );
     process.exit(0);
   }
 
-  process.stderr.write(`[no-model-literal] FAIL: ${newCalls.length} new canonical literal site(s), ${legacyCalls.length} runtime legacy alias site(s):\n`);
+  const { newCalls } = diffAgainstBaseline(scan, baseline);
+  const { newCalls: newMarkdownCalls } = diffAgainstBaseline(
+    markdownScan,
+    { sanctioned: baseline.sanctionedMarkdown ?? [] },
+  );
+  const legacyCalls = scanSource(SRC_DIR, REPO_ROOT, deriveLegacyModelAliases())
+    .filter((site) => !isExplicitLegacyMigrationSite(site));
+  if (newCalls.length === 0 && legacyCalls.length === 0 && newMarkdownCalls.length === 0) {
+    process.stdout.write(
+      `[no-model-literal] ✓ no new canonical literal, runtime legacy alias, or actionable docs alias — `
+      + `${baseline.sanctioned?.length ?? 0} source + ${baseline.sanctionedMarkdown?.length ?? 0} Markdown sites sanctioned (grandfathered)\n`,
+    );
+    process.exit(0);
+  }
+
+  process.stderr.write(
+    `[no-model-literal] FAIL: ${newCalls.length} new canonical literal site(s), `
+    + `${legacyCalls.length} runtime legacy alias site(s), `
+    + `${newMarkdownCalls.length} actionable Markdown alias site(s):\n`,
+  );
   for (const c of newCalls) {
     process.stderr.write(
       `  ${c.file}: [new model literal] ${c.code}\n`
@@ -322,6 +501,13 @@ if (invokedDirectly) {
     process.stderr.write(
       `  ${c.file}: [legacy runtime alias] ${c.code}\n`
       + '    Legacy aliases are migration-input metadata only; runtime producers must resolve a registered API ID.\n',
+    );
+  }
+  for (const c of newMarkdownCalls) {
+    process.stderr.write(
+      `  ${c.file}: [actionable Markdown alias:${c.kind ?? 'unknown'}] ${c.code}\n`
+      + '    Use an exact registered provider API ID, or document migration in prose/a table with an explicit migration header.\n'
+      + '    If genuinely grandfathered debt, run `node scripts/lint-no-model-literal.mjs --update` (diff-visible in review).\n',
     );
   }
   process.exit(1);
