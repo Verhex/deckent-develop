@@ -669,56 +669,6 @@
       "code": "- Model: sonnet"
     },
     {
-      "file": "docs/guide/multi-provider.md",
-      "kind": "directive-model",
-      "code": "- Model: opus"
-    },
-    {
-      "file": "docs/guide/multi-provider.md",
-      "kind": "table-cell",
-      "code": "| `economy` | `haiku` | `gpt-5-mini` / `gpt-4.1-mini` | `gemini-2.0-flash` |"
-    },
-    {
-      "file": "docs/guide/multi-provider.md",
-      "kind": "table-cell",
-      "code": "| `fable` | `claude-fable-5` | `premium_plus` |"
-    },
-    {
-      "file": "docs/guide/multi-provider.md",
-      "kind": "table-cell",
-      "code": "| `gpt-5` | `gpt-5.5` | `premium` |"
-    },
-    {
-      "file": "docs/guide/multi-provider.md",
-      "kind": "table-cell",
-      "code": "| `haiku` | `claude-haiku-4-5-20251001` | `economy` |"
-    },
-    {
-      "file": "docs/guide/multi-provider.md",
-      "kind": "table-cell",
-      "code": "| `opus` | `claude-opus-4-8` | `premium` |"
-    },
-    {
-      "file": "docs/guide/multi-provider.md",
-      "kind": "table-cell",
-      "code": "| `premium_plus` | `fable` | `o3` | `gemini-3.1-pro-preview` |"
-    },
-    {
-      "file": "docs/guide/multi-provider.md",
-      "kind": "table-cell",
-      "code": "| `premium` | `opus` | `gpt-5` | `gemini-2.5-pro` |"
-    },
-    {
-      "file": "docs/guide/multi-provider.md",
-      "kind": "table-cell",
-      "code": "| `sonnet` | `claude-sonnet-4-6` | `standard` |"
-    },
-    {
-      "file": "docs/guide/multi-provider.md",
-      "kind": "table-cell",
-      "code": "| `standard` | `sonnet` | `gpt-4.1` / `o4-mini` | `gemini-2.5-flash` |"
-    },
-    {
       "file": "docs/guide/quickstart.md",
       "kind": "directive-model",
       "code": "- Model: sonnet"
@@ -747,51 +697,6 @@
       "file": "docs/launch/blog-hashnode-launch.md",
       "kind": "table-cell",
       "code": "| standard | sonnet | gpt-4.1 | gemini-2.5-flash |"
-    },
-    {
-      "file": "docs/reference/config-reference.md",
-      "kind": "table-cell",
-      "code": "| `brain_model` | `opus` | `sonnet` | `sonnet` | `opus` |"
-    },
-    {
-      "file": "docs/reference/config-reference.md",
-      "kind": "table-cell",
-      "code": "| `default_model` | `opus` | `opus` | `sonnet` | `sonnet` |"
-    },
-    {
-      "file": "docs/reference/config-reference.md",
-      "kind": "table-cell",
-      "code": "| Economy | `haiku` | `gpt-5-mini` | `gemini-2.0-flash` |"
-    },
-    {
-      "file": "docs/reference/config-reference.md",
-      "kind": "table-cell",
-      "code": "| Premium | `opus` | `gpt-5` | `gemini-2.5-pro` |"
-    },
-    {
-      "file": "docs/reference/config-reference.md",
-      "kind": "table-cell",
-      "code": "| Standard | `sonnet` | `gpt-4.1` | `gemini-2.5-flash` |"
-    },
-    {
-      "file": "docs/reference/multi-provider.md",
-      "kind": "table-cell",
-      "code": "| **Economy** | `haiku` | `gpt-5-mini` · `gpt-4.1-mini` | `gemini-2.0-flash` |"
-    },
-    {
-      "file": "docs/reference/multi-provider.md",
-      "kind": "table-cell",
-      "code": "| **Premium** | `opus` | `gpt-5` | `gemini-2.5-pro` |"
-    },
-    {
-      "file": "docs/reference/multi-provider.md",
-      "kind": "table-cell",
-      "code": "| **Premium+** | `fable` | `o3` | `gemini-3.1-pro-preview` |"
-    },
-    {
-      "file": "docs/reference/multi-provider.md",
-      "kind": "table-cell",
-      "code": "| **Standard** | `sonnet` | `gpt-4.1` · `o4-mini` | `gemini-2.5-flash` |"
     },
     {
       "file": "docs/reference/performance.md",

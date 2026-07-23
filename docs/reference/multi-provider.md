@@ -1,6 +1,9 @@
 # Multi-Provider Guide
 
-Deckent supports multiple AI providers: **Claude** (default), **OpenAI Codex**, **Google Gemini**, **Ollama** (local), and OpenAI-compatible HTTP providers (**DeepSeek**, **Qwen**, **GLM/Zhipu**). You can mix providers per role (Brain vs Worker) or let the fallback chain handle provider failures automatically.
+Deckent supports multiple AI providers: **Claude** (default), **OpenAI
+Codex**, **Google Gemini**, **Ollama** (local), **OpenRouter**, and configured
+OpenAI-compatible HTTP providers. Brain, Worker and Auditor may use independent
+configured provider order, but configuration is not availability proof.
 
 ---
 
@@ -25,6 +28,7 @@ Deckent supports multiple AI providers: **Claude** (default), **OpenAI Codex**, 
 | **Codex** | `codex` CLI (`@openai/codex`) | `OPENAI_API_KEY` **or** ChatGPT subscription (`codex auth status`) | subprocess (host-adapter); Docker with `~/.codex` mount | Full sprint + worker support |
 | **Gemini** | `gemini` CLI (`@google/gemini-cli`) | OAuth session (default) **or** `GOOGLE_API_KEY` | subprocess (host-adapter); Docker with `~/.gemini` mount | Full sprint + worker support (Sprint 248) |
 | **Ollama** | HTTP server (`localhost:11434`) | None — local, zero-cost | Node subprocess via agentic-worker-entry.js (HTTP API) | Local/private; any pulled model |
+| **OpenRouter** | HTTP API | `OPENROUTER_API_KEY` or Deckent secret | Host HTTP adapter | Opt-in; exact `vendor/model` ID + pricing evidence |
 | **DeepSeek** | HTTP (OpenAI-compat) | `DEEPSEEK_API_KEY` | HTTP-only (no spawn, no Docker) | Brain planner + HTTP tasks |
 | **Qwen** | HTTP (OpenAI-compat) | `DASHSCOPE_API_KEY` | HTTP-only (no spawn, no Docker) | Brain planner + HTTP tasks |
 | **GLM / Zhipu** | HTTP (OpenAI-compat) | `ZHIPU_API_KEY` | HTTP-only (no spawn, no Docker) | Brain planner + HTTP tasks |
@@ -181,14 +185,24 @@ Doctor checks each configured provider's prerequisites and reports their status.
 
 ## 3. Configuration
 
-Provider settings live in `.deckent/config.json`:
+Provider settings live in `.deckent/config.json`. The grouped `providers`
+object is canonical; flat provider keys remain compatibility inputs.
 
 ```json
 {
   "mode": "max_plan",
-  "brain_provider": "claude",
-  "worker_provider": "codex",
-  "fallback_provider": "gemini"
+  "providers": {
+    "brain": "claude",
+    "worker": "codex"
+  },
+  "provider_fallback": {
+    "brain": ["codex", "gemini"],
+    "worker": ["claude", "openrouter"],
+    "auditor_provider": "codex",
+    "auditor": ["claude", "gemini"],
+    "global": ["ollama"],
+    "unattended": false
+  }
 }
 ```
 
@@ -196,91 +210,105 @@ Provider settings live in `.deckent/config.json`:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `brain_provider` | `ProviderName` | `"claude"` | Provider for Brain (planning, evaluation, retrospective) |
-| `worker_provider` | `ProviderName` | `"claude"` | Default provider for worker task execution |
-| `fallback_provider` | `ProviderName` | — | Automatic fallback when primary provider fails |
-
-### Per-Mode Provider Config
-
-You can also set providers within specific mode blocks:
-
-```json
-{
-  "mode": "max_plan",
-  "modes": {
-    "max_plan": {
-      "brain_provider": "claude",
-      "worker_provider": "claude"
-    },
-    "api": {
-      "brain_provider": "codex",
-      "worker_provider": "codex"
-    }
-  }
-}
-```
+| `providers.brain` | `ProviderName` | `"claude"` | Brain primary (planning/evaluation) |
+| `providers.worker` | `ProviderName` | `"claude"` | Worker primary |
+| `provider_fallback.auditor_provider` | `ProviderName` | Brain primary | Auditor primary |
+| `provider_fallback.brain` | `ProviderName[]` | — | Ordered Brain fallback candidates |
+| `provider_fallback.worker` | `ProviderName[]` | — | Ordered Worker fallback candidates |
+| `provider_fallback.auditor` | `ProviderName[]` | — | Ordered Auditor fallback candidates |
+| `provider_fallback.global` | `ProviderName[]` | — | Used only when the role has no non-empty chain |
+| `provider_fallback.unattended` | `boolean` | `true` | Fail closed on unknown/stale/unavailable reachability or limits during unattended resolution |
+| `brain_provider`, `worker_provider`, `fallback_provider` | `ProviderName` | varies | Deprecated flat compatibility fields, used when the corresponding grouped slot is absent; conflicting values fail loudly |
 
 ---
 
 ## 4. Model Equivalence
 
-When a task requires a specific model tier but the target provider does not support that exact model, Deckent automatically maps to an equivalent model using tier-based equivalence.
+Provider-agnostic policy should select a tier, then resolve that tier to a
+registered exact API ID owned by the chosen provider. An explicitly authored
+provider/model pair is different: ownership mismatch fails loudly and is never
+silently rewritten.
 
 ### Tier Mapping
 
 | Tier | Claude | Codex | Gemini |
 |------|--------|-------|--------|
-| **Premium+** | `fable` | `o3` | `gemini-3.1-pro-preview` |
-| **Premium** | `opus` | `gpt-5` | `gemini-2.5-pro` |
-| **Standard** | `sonnet` | `gpt-4.1` · `o4-mini` | `gemini-2.5-flash` |
-| **Economy** | `haiku` | `gpt-5-mini` · `gpt-4.1-mini` | `gemini-2.0-flash` |
+| **Premium+** | `claude-fable-5` | `o3` | `gemini-3.1-pro-preview` |
+| **Premium** | `claude-opus-4-8` | `gpt-5.6-sol` · `gpt-5.5` | `gemini-2.5-pro` |
+| **Standard** | `claude-sonnet-5` | `gpt-5.6-terra` · `gpt-4.1` · `o4-mini` | `gemini-2.5-flash` |
+| **Economy** | `claude-haiku-4-5-20251001` | `gpt-5.6-luna` · `gpt-5-mini` · `gpt-4.1-mini` | `gemini-2.0-flash` |
 
-> **Wire model note:** The deckent-facing id `gpt-5` maps to wire model `gpt-5.5` (the current ChatGPT-subscription frontier). The CodexAdapter sends the registry `apiId` to avoid rejection. Similarly `opus` → `claude-opus-4-8`, `fable` → `claude-fable-5`.
+These are bundled examples, not a fixed allowlist. Use `deckent models list`
+for the current live/cached catalog. Catalog presence does not prove auth,
+backend/model reachability, limit evidence or execution-budget admission.
 
 ### How It Works
 
-If Brain plans a task with model `opus` but the worker provider is `codex`, the model is automatically mapped:
+If policy selects the `premium` tier for a Codex worker, the registry may
+resolve a registered Codex premium identity such as:
 
 ```
-opus (Claude, premium tier) --> gpt-5 (Codex, premium tier)
+premium + codex --> gpt-5.6-sol
 ```
 
-Similarly:
+Other examples:
+
 ```
-sonnet (Claude, standard) --> gemini-2.5-flash (Gemini, standard)
-haiku (Claude, economy)   --> gpt-5-mini (Codex, economy)
-fable (Claude, premium+)  --> o3 (Codex, premium+)
+standard + gemini --> gemini-2.5-flash
+economy + codex   --> gpt-5.6-luna
+premium+ + claude --> claude-fable-5
 ```
 
-This mapping is handled by `getEquivalentModel()` in `src/core/model-equivalence.ts`.
+The registry remains authoritative; a future exact API ID can join the catalog
+without inventing a new Deckent alias.
 
 ---
 
 ## 5. Fallback Chain
 
-When a primary provider fails (unavailable, rate limited, auth error), Deckent attempts the fallback provider automatically.
+Fallback configuration defines ordered candidates for Brain, Worker and
+Auditor. It does not by itself authorize a provider call or prove that an
+automatic retry happened.
 
 ### How Fallback Works
 
-1. Brain or Worker attempts to use the primary provider
-2. If the provider fails, Deckent checks if `fallback_provider` is configured
-3. If available, the model is remapped via equivalence and the fallback provider is used
-4. Only one retry is attempted — no infinite loops
+1. Resolve the role primary from `providers` (or flat compatibility keys).
+2. Use the role-specific chain when non-empty; otherwise use `global`, then the
+   legacy single `fallback_provider`.
+3. Remove the primary and duplicates while preserving configured order.
+4. For each candidate, require backend/auth, exact-model reachability, limit
+   and execution-budget evidence.
+5. Persist requested/resolved/called identity and fallback reason in the
+   invocation receipt; exhaust the chain as a visible HOLD/NO_GO.
 
 ### Example
 
 ```json
 {
-  "worker_provider": "codex",
-  "fallback_provider": "claude"
+  "providers": {
+    "worker": "codex"
+  },
+  "provider_fallback": {
+    "worker": ["claude", "gemini"],
+    "unattended": true
+  }
 }
 ```
 
-If Codex is rate-limited during a sprint, workers automatically fall back to Claude with equivalent models.
+The example makes Claude the first Worker fallback candidate. It does not make
+Claude reachable, admit an unknown-limit unattended call, or promise that
+every legacy execution surface consumes the chain.
+
+> **Current coverage:** role ordering, validation and admission contracts are
+> present, and selected host/Goal-v2 consumers use them. Legacy sprint routing,
+> every planner path and every cross-verify boundary do not yet share one
+> complete live-authority + receipt chain. Treat fallback on an uncovered
+> surface as unsupported; never infer success from provider registration order.
 
 ### No Fallback
 
-If `fallback_provider` is not set, provider failures result in a task `NO_GO`.
+With no configured chain, provider failure must become a visible HOLD/NO_GO;
+selecting the first registered provider is not a supported fallback policy.
 
 ---
 
@@ -367,15 +395,22 @@ If workers fail despite an active session, look for `gemini login` / `please aut
 
 ### Model Not Supported by Provider
 
-If you specify a model that does not belong to the configured provider, Deckent will attempt equivalence mapping. If no equivalent exists, the task will fail with a clear error message.
+If an explicitly authored model does not belong to the configured provider,
+Deckent fails loudly. Use a provider-agnostic tier policy when equivalence is
+the desired behavior.
 
 ### Fallback Not Working
 
-Ensure `fallback_provider` is set and the fallback provider's prerequisites are met. Only one fallback attempt is made per failure.
+Inspect the configured role chain, then verify live auth/reachability, limits,
+budget admission and the invocation receipt. A catalog entry or
+`fallback_provider` field alone is insufficient evidence.
 
 ### Codex: workers fail with "model is not supported"
 
-Deckent sends the registry `apiId` (`gpt-5.5`) rather than the deckent-facing alias (`gpt-5`). If you see this error, your Codex CLI may be outdated. Update with `npm update -g @openai/codex`.
+Use a registered exact API ID such as `gpt-5.6-sol` or `gpt-5.5`. Legacy
+`gpt-5` is not an authored runtime identity. If a registered exact ID is still
+rejected, verify that the Codex account/model is reachable and update the CLI
+with `npm update -g @openai/codex`.
 
 ### Ollama: no models available
 

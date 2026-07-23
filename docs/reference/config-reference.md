@@ -61,9 +61,11 @@ These fields sit at the root of `.deckent/config.json`:
 | `language` | `"en"` or `"tr"` | `"en"` | CLI output language. |
 | `projectName` | `string` | `"deckent-project"` | Project name shown in dashboard and logs. |
 | `version` | `string` | (from package.json) | Deckent version. Usually not set manually. |
-| `brain_provider` | `ProviderName` | `"claude"` | Provider for Brain planning and evaluation. One of: `claude`, `codex`, `gemini`, `ollama`. Canonical form is the grouped `providers: { brain, worker }`; these flat keys are the deprecated alias. |
-| `worker_provider` | `ProviderName` | `"claude"` | Default provider for worker tasks. |
-| `fallback_provider` | `ProviderName` | -- | Fallback provider when primary fails. |
+| `providers` | `{ brain?, worker?, fallback?, overrides? }` | Claude primaries | Canonical grouped provider configuration. Flat/grouped conflicts fail loudly. |
+| `provider_fallback` | `ProviderFallbackPolicyConfig` | -- | Configured Brain/Worker/Auditor candidate order and unattended evidence policy; not availability proof. |
+| `brain_provider` | `ProviderName` | `"claude"` | Deprecated flat compatibility field for the Brain primary. |
+| `worker_provider` | `ProviderName` | `"claude"` | Deprecated flat compatibility field for the Worker primary. |
+| `fallback_provider` | `ProviderName` | -- | Deprecated single fallback compatibility field, used only when no role/global chain is configured. |
 | `last_sprint_id` | `string` | -- | Last sprint ID. Managed by Brain. Do not edit manually. |
 | `mcp_client_enabled` | `boolean` | `false` | Opt-in gate for the git-tracked project MCP scope (smart-split). Your OWN servers — `~/.deckent/mcp.json` (global) and gitignored `.mcp.local.json` (personal) — always connect at REPL boot / on `/mcp`. A git-tracked `<root>/.mcp.json` (travels with a cloned repo) connects only when this is explicitly `true`; when such project servers are skipped, the REPL prints an honest disabled-notice. |
 
@@ -91,8 +93,8 @@ Deckent ships with four built-in plan modes, each tuned for a different Claude s
 |-------|-----------|-------------|-----------|-------|
 | **Subscription** | Max 20x ($200/mo) | Max 5x ($100/mo) | Pro ($20/mo) | API key (pay-as-you-go) |
 | `max_workers` | 8 | 5 | 3 | 10 |
-| `brain_model` | `opus` | `sonnet` | `sonnet` | `opus` |
-| `default_model` | `opus` | `opus` | `sonnet` | `sonnet` |
+| `brain_model` | `claude-opus-4-8` | `claude-sonnet-5` | `claude-sonnet-5` | `claude-opus-4-8` |
+| `default_model` | `claude-opus-4-8` | `claude-opus-4-8` | `claude-sonnet-5` | `claude-sonnet-5` |
 | `haiku_allowed` | `true` | `true` | `false` | `true` |
 | `budget_per_sprint` | -- | -- | -- | $5.00 |
 | `requires` env var | -- | -- | -- | `ANTHROPIC_API_KEY` |
@@ -141,9 +143,9 @@ Each mode block (`modes.<modeName>`) supports these fields:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `max_workers` | number (1-100) or `"auto"` | Yes | Maximum parallel workers for this mode. Values >= 20 emit a high-contention warning (not an error). `"auto"` resolves to `systemProfile.recommendedMaxWorkers`. |
-| `brain_model` | any model in the registry | Yes | Model used by Brain for planning and evaluation. Validated against `ALL_MODELS` (13 models across Claude/Codex/Gemini), not just the three Claude names. |
-| `default_model` | any model in the registry | Yes | Default model assigned to workers. Validated against `ALL_MODELS`. |
-| `haiku_allowed` | boolean | Yes | Whether Brain can assign `haiku` to workers. |
+| `brain_model` | exact registered provider API ID | Yes | Model used by Brain for planning and evaluation. No fixed-count allowlist or legacy alias. |
+| `default_model` | exact registered provider API ID | Yes | Default model assigned to workers. Provider ownership is validated. |
+| `haiku_allowed` | boolean | Yes | Deprecated compatibility control; `false` maps to a `standard` minimum tier. |
 | `budget_per_sprint` | number > 0 | No (API mode only) | Maximum USD budget per sprint. |
 | `requires` | string | No | Required environment variable name. |
 | `brain_planning` | `BrainPlanningMode` | No | Planning mode override for this mode. |
@@ -156,7 +158,7 @@ Each mode block (`modes.<modeName>`) supports these fields:
 
 **default_model** -- Fallback model for worker tasks when Brain's planner does not specify a different model. Brain can override per-task.
 
-**haiku_allowed** -- When `false`, Brain will never assign `haiku` to any worker task. Set to `false` for `economic` mode to conserve rate limits.
+**haiku_allowed** -- Deprecated compatibility field. `false` prevents economy-tier assignment by mapping to a `standard` minimum tier.
 
 **budget_per_sprint** -- Only meaningful for `api` mode. Brain tracks estimated token cost and pauses execution if the budget would be exceeded. Value is in USD.
 
@@ -278,8 +280,8 @@ Nested objects are merged recursively. Setting `modes.performance.max_workers: 4
   "modes": {
     "performance": {
       "max_workers": 4,
-      "brain_model": "opus",
-      "default_model": "sonnet",
+      "brain_model": "claude-opus-4-8",
+      "default_model": "claude-sonnet-5",
       "haiku_allowed": true,
       "brain_planning": "auto"
     }
@@ -297,8 +299,8 @@ Nested objects are merged recursively. Setting `modes.performance.max_workers: 4
   "modes": {
     "api": {
       "max_workers": 6,
-      "brain_model": "opus",
-      "default_model": "sonnet",
+      "brain_model": "claude-opus-4-8",
+      "default_model": "claude-sonnet-5",
       "haiku_allowed": true,
       "budget_per_sprint": 3.00,
       "requires": "ANTHROPIC_API_KEY",
@@ -318,8 +320,8 @@ Nested objects are merged recursively. Setting `modes.performance.max_workers: 4
   "modes": {
     "economic": {
       "max_workers": 3,
-      "brain_model": "sonnet",
-      "default_model": "sonnet",
+      "brain_model": "claude-sonnet-5",
+      "default_model": "claude-sonnet-5",
       "haiku_allowed": false,
       "brain_planning": "structured"
     }
@@ -337,29 +339,29 @@ Nested objects are merged recursively. Setting `modes.performance.max_workers: 4
   "modes": {
     "performance": {
       "max_workers": 8,
-      "brain_model": "opus",
-      "default_model": "opus",
+      "brain_model": "claude-opus-4-8",
+      "default_model": "claude-opus-4-8",
       "haiku_allowed": true,
       "brain_planning": "ai"
     },
     "balanced": {
       "max_workers": 5,
-      "brain_model": "sonnet",
-      "default_model": "sonnet",
+      "brain_model": "claude-sonnet-5",
+      "default_model": "claude-sonnet-5",
       "haiku_allowed": true,
       "brain_planning": "auto"
     },
     "economic": {
       "max_workers": 2,
-      "brain_model": "sonnet",
-      "default_model": "sonnet",
+      "brain_model": "claude-sonnet-5",
+      "default_model": "claude-sonnet-5",
       "haiku_allowed": false,
       "brain_planning": "structured"
     },
     "api": {
       "max_workers": 10,
-      "brain_model": "opus",
-      "default_model": "sonnet",
+      "brain_model": "claude-opus-4-8",
+      "default_model": "claude-sonnet-5",
       "haiku_allowed": true,
       "budget_per_sprint": 5.0,
       "requires": "ANTHROPIC_API_KEY",
@@ -431,14 +433,15 @@ Deckent validates the config on every load. A `ConfigValidationError` is thrown 
 | `mode` | Must be one of: `performance`, `balanced`, `economic`, `api` (legacy aliases `max_plan`, `max5x_plan`, `pro_plan` also accepted) |
 | `language` | Must be one of: `en`, `tr` |
 | `modes.<name>.max_workers` | Number between 1 and 100 (inclusive) or `"auto"`; >= 20 warns |
-| `modes.<name>.brain_model` | Any model in `ALL_MODELS` (13-model registry) |
-| `modes.<name>.default_model` | Any model in `ALL_MODELS` (13-model registry) |
+| `modes.<name>.brain_model` | Exact registered provider API ID; legacy aliases rejected |
+| `modes.<name>.default_model` | Exact registered provider API ID; legacy aliases rejected |
 | `modes.<name>.haiku_allowed` | Must be a boolean (deprecated; `false` maps to `min_tier: standard`) |
 | `modes.<name>.budget_per_sprint` | Positive number (API mode only) |
 | `modes.<name>.brain_planning` | One of: `ai`, `structured`, `auto` |
-| `brain_provider` | One of: `claude`, `codex`, `gemini`, `ollama` (if set) |
-| `worker_provider` | One of: `claude`, `codex`, `gemini`, `ollama` (if set) |
-| `fallback_provider` | One of: `claude`, `codex`, `gemini`, `ollama` (if set) |
+| Provider fields/chains | Entries must be registered `ProviderName` values such as `claude`, `codex`, `gemini`, `ollama`, `openrouter` |
+| `provider_fallback.global/brain/worker/auditor` | Arrays only; unknown provider or key fails loudly |
+| `provider_fallback.auditor_provider` | Valid primary provider for Auditor |
+| `provider_fallback.unattended` | Boolean |
 | API mode + `ANTHROPIC_API_KEY` | Environment variable must be set when mode is `"api"` |
 
 ### Example Validation Error
@@ -453,7 +456,8 @@ ConfigValidationError: Config validation failed:
 
 ## 11. Multi-Provider Configuration
 
-Deckent supports three AI providers. Configure them at the top level of your config:
+Deckent supports built-in and config-driven providers. Configure role primaries
+and ordered fallback candidates at the top level.
 
 ### Provider Names
 
@@ -463,16 +467,22 @@ Deckent supports three AI providers. Configure them at the top level of your con
 | `codex` | OpenAI Codex via Codex CLI | `codex --version` + `OPENAI_API_KEY` |
 | `gemini` | Google Gemini via API | `GOOGLE_API_KEY` env var |
 | `ollama` | Local LLM via Ollama (Sprint 190) | local Ollama runtime |
+| `openrouter` | OpenRouter HTTP gateway | key/secret + exact `vendor/model` pricing evidence |
 
-> The grouped form `providers: { brain, worker }` is the canonical layout (Sprint 150). The flat `brain_provider` / `worker_provider` / `fallback_provider` keys are still accepted as a deprecated alias.
+> The grouped `providers` object is canonical. Flat
+> `brain_provider` / `worker_provider` / `fallback_provider` keys remain
+> compatibility inputs; conflicting grouped and flat values fail loudly.
 
 ### Provider Config Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `brain_provider` | `ProviderName` | `"claude"` | Provider used by Brain for planning and evaluation |
-| `worker_provider` | `ProviderName` | `"claude"` | Default provider for worker tasks |
-| `fallback_provider` | `ProviderName` | -- | Fallback when primary provider fails |
+| `providers.brain` | `ProviderName` | `"claude"` | Brain primary |
+| `providers.worker` | `ProviderName` | `"claude"` | Worker primary |
+| `provider_fallback.auditor_provider` | `ProviderName` | Brain primary | Auditor primary |
+| `provider_fallback.brain/worker/auditor` | `ProviderName[]` | -- | Ordered role-specific candidates |
+| `provider_fallback.global` | `ProviderName[]` | -- | Candidate order when a role-specific chain is absent |
+| `provider_fallback.unattended` | boolean | `true` | Unknown/stale/unavailable reachability or limits cannot become unattended ALLOW |
 
 ### Model Equivalence
 
@@ -480,20 +490,38 @@ When switching providers, models are mapped to equivalent tiers:
 
 | Tier | Claude | Codex | Gemini |
 |------|--------|-------|--------|
-| Premium | `opus` | `gpt-5` | `gemini-2.5-pro` |
-| Standard | `sonnet` | `gpt-4.1` | `gemini-2.5-flash` |
-| Economy | `haiku` | `gpt-5-mini` | `gemini-2.0-flash` |
+| Premium+ | `claude-fable-5` | `o3` | `gemini-3.1-pro-preview` |
+| Premium | `claude-opus-4-8` | `gpt-5.6-sol` / `gpt-5.5` | `gemini-2.5-pro` |
+| Standard | `claude-sonnet-5` | `gpt-5.6-terra` / `gpt-4.1` | `gemini-2.5-flash` |
+| Economy | `claude-haiku-4-5-20251001` | `gpt-5.6-luna` / `gpt-5-mini` | `gemini-2.0-flash` |
 
 ### Example: Mixed Provider Config
 
 ```json
 {
   "mode": "performance",
-  "brain_provider": "claude",
-  "worker_provider": "codex",
-  "fallback_provider": "gemini"
+  "providers": {
+    "brain": "claude",
+    "worker": "codex"
+  },
+  "provider_fallback": {
+    "brain": ["codex", "gemini"],
+    "worker": ["claude", "openrouter"],
+    "auditor_provider": "codex",
+    "auditor": ["claude", "gemini"],
+    "global": ["ollama"],
+    "unattended": false
+  }
 }
 ```
+
+Role-specific order replaces `global`; the primary and duplicates are removed
+while configured order is preserved. This is candidate policy, not a
+reachability claim. Every attempted candidate still requires backend/auth,
+exact-model reachability, limit and budget evidence plus durable invocation
+provenance. Current role-order/admission wiring is not yet universal across
+all legacy sprint/planner/cross-verify surfaces, so an uncovered surface must
+not be documented as automatically falling back.
 
 ### Environment Variables
 
@@ -659,7 +687,10 @@ Optional configuration block for Sprint 278 COMM-1: worker-to-worker communicati
 
 ## 14. Tier-Based Model Strategy (`model_strategy`)
 
-Replaces hard-coded model names with provider-agnostic tiers. Starts from the mode preset (`mode-presets.ts`), then `config.model_strategy` overlays on top (config.ts:1051-1066). A custom mode falls back to the `balanced` preset.
+Replaces hard-coded model names with provider-agnostic tiers. Starts from the
+selected built-in mode preset (`mode-presets.ts`), then
+`config.model_strategy` overlays on top. Unknown/custom mode names are rejected
+by config validation; they do not silently fall back to `balanced`.
 
 | Field | Values | Description |
 |-------|--------|-------------|
@@ -670,7 +701,14 @@ Replaces hard-coded model names with provider-agnostic tiers. Starts from the mo
 | `auto_upgrade` | boolean | Upgrade tier for high-complexity tasks. |
 | `auto_downgrade` | boolean | Downgrade tier for doc/test tasks. |
 
-Tier equivalence (DECKENT.md model registry): `premium` = opus / gpt-5 / gemini-2.5-pro; `standard` = sonnet / gpt-4.1 / gemini-2.5-flash; `economy` = haiku / gpt-5-mini / gemini-2.0-flash; `premium_plus` = o3 / gemini-3.1-pro-preview.
+Tier examples (current bundled snapshot): `premium` =
+`claude-opus-4-8` / `gpt-5.6-sol` / `gpt-5.5` /
+`gemini-2.5-pro`; `standard` = `claude-sonnet-5` /
+`gpt-5.6-terra` / `gpt-4.1` / `gemini-2.5-flash`; `economy`
+= `claude-haiku-4-5-20251001` / `gpt-5.6-luna` /
+`gpt-5-mini` / `gemini-2.0-flash`; `premium_plus` =
+`claude-fable-5` / `o3` / `gemini-3.1-pro-preview`. Use
+`deckent models list` for the current catalog.
 
 ---
 

@@ -1,6 +1,6 @@
 # Multi-Provider Guide
 
-> Use Claude, Codex (OpenAI), Gemini (Google), Ollama (local), or OpenAI-compatible providers (DeepSeek, Qwen, GLM) as your Deckent worker provider.
+> Use Claude, Codex (OpenAI), Gemini (Google), Ollama (local), OpenRouter, or configured OpenAI-compatible providers as Deckent execution providers.
 
 ---
 
@@ -30,6 +30,7 @@ Deckent supports multiple providers for worker execution:
 | `codex` | `codex` CLI | `OPENAI_API_KEY` or ChatGPT subscription | Opt-in |
 | `gemini` | `gemini` CLI | OAuth session (default) **or** `GOOGLE_API_KEY` | Opt-in |
 | `ollama` | HTTP server | None — local, zero-cost | Opt-in |
+| `openrouter` | HTTP API | `OPENROUTER_API_KEY` or Deckent secret | Opt-in; exact `vendor/model` ID |
 | `deepseek` | HTTP (OpenAI-compat) | `DEEPSEEK_API_KEY` | Opt-in |
 | `qwen` | HTTP (OpenAI-compat) | `DASHSCOPE_API_KEY` | Opt-in |
 | `zhipu` (GLM) | HTTP (OpenAI-compat) | `ZHIPU_API_KEY` | Opt-in |
@@ -38,7 +39,11 @@ Deckent supports multiple providers for worker execution:
 
 ## 2. Model Registry & Tier Equivalence
 
-Deckent's built-in model catalog (`src/core/model-registry.ts`) defines 14 cloud models across 3 providers and 4 tiers, plus Ollama as an opt-in local provider. Ollama models are registered at runtime and are NOT part of the 14-model cloud catalog.
+Deckent loads a live/cached model catalog and keeps a bundled offline snapshot in
+`src/core/model-registry.ts`. The catalog is extensible: Ollama tags are
+discovered locally, OpenRouter uses exact `vendor/model` IDs with pricing
+evidence, and future cloud models are admitted without adding aliases. Do not
+pin application logic to a catalog count.
 
 ### Tiers
 
@@ -49,40 +54,45 @@ Deckent's built-in model catalog (`src/core/model-registry.ts`) defines 14 cloud
 | `standard` | General-purpose, cost-efficient | Most development, bug fixes, tests |
 | `economy` | Lowest cost, fastest | Docs, simple edits, formatting |
 
-### Built-in Cloud Models
+### Bundled Cloud Model Examples
 
-The deckent id (used in DIRECTIVES `- Model:`) maps to an `apiId` (the wire value sent to the provider).
+The authored Deckent identity is the provider API ID itself (`id === apiId`).
+DIRECTIVES, config, receipts and provider calls therefore carry the same value.
+Legacy aliases such as `fable`, `opus`, `sonnet`, `haiku`, `gpt-5` and
+`gpt-5.6` are compatibility-migration inputs only; new authored tasks must not
+use them.
 
 **Claude (Anthropic)**
 
-| Deckent Id | API Id | Tier |
-|------------|--------|------|
-| `fable` | `claude-fable-5` | `premium_plus` |
-| `opus` | `claude-opus-4-8` | `premium` |
-| `sonnet` | `claude-sonnet-4-6` | `standard` |
-| `haiku` | `claude-haiku-4-5-20251001` | `economy` |
+| Exact API ID | Tier |
+|--------------|------|
+| `claude-fable-5` | `premium_plus` |
+| `claude-opus-4-8` | `premium` |
+| `claude-sonnet-5` | `standard` |
+| `claude-haiku-4-5-20251001` | `economy` |
 
 **Codex (OpenAI)**
 
-| Deckent Id | API Id | Tier |
-|------------|--------|------|
-| `o3` | `o3` | `premium_plus` |
-| `gpt-5` | `gpt-5.5` | `premium` |
-| `gpt-4.1` | `gpt-4.1` | `standard` |
-| `o4-mini` | `o4-mini` | `standard` |
-| `gpt-5-mini` | `gpt-5-mini` | `economy` |
-| `gpt-4.1-mini` | `gpt-4.1-mini` | `economy` |
-
-> **Note:** `gpt-5` uses wire id `gpt-5.5` — the current ChatGPT-subscription frontier. `gpt-5` (bare) is rejected by Codex with a subscription account; `gpt-5.5` is accepted. The registry resolves this automatically via `resolveApiId()`.
+| Exact API ID | Tier |
+|--------------|------|
+| `o3` | `premium_plus` |
+| `gpt-5.6-sol` | `premium` |
+| `gpt-5.6-terra` | `standard` |
+| `gpt-5.6-luna` | `economy` |
+| `gpt-5.5` | `premium` |
+| `gpt-4.1` | `standard` |
+| `o4-mini` | `standard` |
+| `gpt-5-mini` | `economy` |
+| `gpt-4.1-mini` | `economy` |
 
 **Gemini (Google)**
 
-| Deckent Id | API Id | Tier | Status |
-|------------|--------|------|--------|
-| `gemini-3.1-pro-preview` | `gemini-3.1-pro-preview` | `premium_plus` | preview |
-| `gemini-2.5-pro` | `gemini-2.5-pro` | `premium` | ga |
-| `gemini-2.5-flash` | `gemini-2.5-flash` | `standard` | ga |
-| `gemini-2.0-flash` | `gemini-2.0-flash` | `economy` | ga |
+| Exact API ID | Tier | Status |
+|--------------|------|--------|
+| `gemini-3.1-pro-preview` | `premium_plus` | preview |
+| `gemini-2.5-pro` | `premium` | ga |
+| `gemini-2.5-flash` | `standard` | ga |
+| `gemini-2.0-flash` | `economy` | ga |
 
 > **Note:** `gemini-3.1-pro-preview` is in preview status — behavior may change without notice.
 
@@ -92,12 +102,47 @@ When you switch a task from one provider to another, Deckent maps models by tier
 
 | Tier | Claude | Codex | Gemini |
 |------|--------|-------|--------|
-| `premium_plus` | `fable` | `o3` | `gemini-3.1-pro-preview` |
-| `premium` | `opus` | `gpt-5` | `gemini-2.5-pro` |
-| `standard` | `sonnet` | `gpt-4.1` / `o4-mini` | `gemini-2.5-flash` |
-| `economy` | `haiku` | `gpt-5-mini` / `gpt-4.1-mini` | `gemini-2.0-flash` |
+| `premium_plus` | `claude-fable-5` | `o3` | `gemini-3.1-pro-preview` |
+| `premium` | `claude-opus-4-8` | `gpt-5.6-sol` / `gpt-5.5` | `gemini-2.5-pro` |
+| `standard` | `claude-sonnet-5` | `gpt-5.6-terra` / `gpt-4.1` / `o4-mini` | `gemini-2.5-flash` |
+| `economy` | `claude-haiku-4-5-20251001` | `gpt-5.6-luna` / `gpt-5-mini` / `gpt-4.1-mini` | `gemini-2.0-flash` |
 
-Use `deckent models` (CLI) or `deckent_models` (MCP) to see the live registry.
+Use `deckent models list` (CLI) or `deckent_models` (MCP) to inspect the
+current catalog. Catalog presence is not proof of authentication, exact-model
+reachability, subscription limits or execution-budget admission.
+
+### Role-Aware Provider Order
+
+Brain, Worker and Auditor can have independent configured primaries and
+fallback order:
+
+```json
+{
+  "providers": {
+    "brain": "claude",
+    "worker": "codex"
+  },
+  "provider_fallback": {
+    "brain": ["codex", "gemini"],
+    "worker": ["claude", "openrouter"],
+    "auditor_provider": "codex",
+    "auditor": ["claude", "gemini"],
+    "global": ["ollama"],
+    "unattended": false
+  }
+}
+```
+
+A per-role chain replaces `global`; the primary and duplicates are removed
+while preserving configured order. The legacy single `fallback_provider`
+remains a compatibility input when no role/global chain is configured.
+
+This policy defines candidate order only. Every attempted candidate still
+needs backend/auth, exact-model reachability, limit and budget evidence. A
+catalog entry or configured fallback must never be reported as a successful
+fallback without an invocation receipt. Some legacy execution surfaces do not
+yet consume the full role-admission/receipt chain; on those surfaces,
+automatic fallback is unsupported rather than implied.
 
 ---
 
@@ -289,9 +334,9 @@ You can override the provider on a per-task basis in `DIRECTIVES.md` using `- Pr
 ### Mixed-fleet example
 
 ```markdown
-## Task 1: Architecture planning (Claude opus — deep reasoning)
+## Task 1: Architecture planning (Claude — deep reasoning)
 - Provider: claude
-- Model: opus
+- Model: claude-opus-4-8
 - Effort: high
 - Skills: system-architect
 - Files: docs/architecture.md
@@ -329,7 +374,10 @@ You can override the provider on a per-task basis in `DIRECTIVES.md` using `- Pr
 - Scope: docs/
 ```
 
-The `- Provider:` line overrides `worker_provider` for that specific task. The `- Model:` line sets the exact model within that provider. Both are independent — you can mix any combination of providers and models across tasks in the same sprint.
+The `- Provider:` line overrides `worker_provider` for that task. The
+`- Model:` line is the exact provider API ID. Mixed-provider sprints are
+supported, but provider ownership is not arbitrary: a model owned by another
+provider fails loudly instead of being silently remapped.
 
 ### Backend and reasoning-effort (per task)
 
