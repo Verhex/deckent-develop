@@ -7,6 +7,7 @@ export type InvocationPurpose =
   | 'sprint-planning'
   | 'goal-authoring'
   | 'goal-acceptance'
+  | 'reachability-probe'
   | 'worker-execution'
   | 'audit-evaluation';
 export type InvocationEvidenceState = 'known' | 'unknown' | 'stale' | 'unavailable';

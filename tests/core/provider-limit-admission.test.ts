@@ -409,7 +409,7 @@ describe('admitRoleInvocation', () => {
     close();
   });
 
-  it('fails closed on integrity-key mismatch without trying fallback', () => {
+  it('fails closed at store-open on integrity-key mismatch before fallback is possible', () => {
     const { store, root } = setup();
     const request = {
       invocation: invocation(), candidateScopes: candidateScopes(),
@@ -417,18 +417,13 @@ describe('admitRoleInvocation', () => {
     };
     expect(admitRoleInvocation(store, request).decision).toBe('allow');
     store.close();
-    const wrongKeyStore = new ProviderLimitStore(root, {
+    expect(() => new ProviderLimitStore(root, {
       now: () => new Date(T1), policyResolver: () => POLICY,
       terminationEvidenceVerifier: () => true,
       integrityKey: 'wrong-admission-integrity-key-00000001',
-    });
-    const result = admitRoleInvocation(wrongKeyStore, request);
-    expect(result).toMatchObject({
-      decision: 'hold', reservation: null, reasonCode: 'store_failure',
-      resolution: { selected: null },
-    });
-    expect(result.attempts).toHaveLength(1);
-    wrongKeyStore.close();
+    })).toThrowError(expect.objectContaining<Partial<ProviderLimitStoreError>>({
+      code: 'INTEGRITY_FAILURE',
+    }));
   });
 
   it('enforces one allowed provider winner for a logical invocation', () => {

@@ -14,6 +14,11 @@ import {
   ProviderAuthorityKeyringError,
 } from './provider-authority-keyring.js';
 import {
+  ProviderEvidenceProducer,
+  type ProviderEvidenceSources,
+} from './provider-evidence-producer.js';
+import type { InvocationReceiptLedger } from './invocation-receipt.js';
+import {
   ProviderLimitStore,
   ProviderLimitStoreError,
   type ProviderLimitSnapshotQuery,
@@ -53,6 +58,7 @@ export interface ProviderAuthorityCompositionReady {
   readonly truthProducerAuthorityRef: string;
   readonly limitProducerAuthorityRef: string;
   readonly accountAuthorityRef: string;
+  readonly evidenceProducer: ProviderEvidenceProducer;
   readonly keyring: ProviderAuthorityKeyring;
   readonly truthStore: ProviderTruthStore;
   readonly limitStore: ProviderLimitStore;
@@ -83,9 +89,8 @@ export interface ProviderAuthorityCompositionOptions {
     scope: ProviderLimitSnapshotQuery,
   ) => ProviderLimitResult['policy'] | null;
   readonly terminationEvidenceVerifier?: ProviderLimitStoreOptions['terminationEvidenceVerifier'];
-  readonly accountAuthorityRef?: string;
-  readonly truthProducerAuthorityRef?: string;
-  readonly limitProducerAuthorityRef?: string;
+  readonly evidenceSources?: ProviderEvidenceSources;
+  readonly receiptLedger?: InvocationReceiptLedger;
 }
 
 function evidenceRef(reason: ProviderAuthorityCompositionHoldReason, detail: string): string {
@@ -150,12 +155,18 @@ export function composeProviderAuthority(
   if (!options.terminationEvidenceVerifier) {
     return hold('termination_authority_unavailable', tenantId, false);
   }
-  const accountAuthorityRef = requiredRef(options.accountAuthorityRef);
-  if (!accountAuthorityRef) return hold('account_authority_unavailable', tenantId, false);
-  const truthProducerAuthorityRef = requiredRef(options.truthProducerAuthorityRef);
-  if (!truthProducerAuthorityRef) return hold('truth_producer_unavailable', tenantId, true);
-  const limitProducerAuthorityRef = requiredRef(options.limitProducerAuthorityRef);
-  if (!limitProducerAuthorityRef) return hold('limit_producer_unavailable', tenantId, true);
+  if (!options.evidenceSources?.account) {
+    return hold('account_authority_unavailable', tenantId, false);
+  }
+  if (!options.evidenceSources.reachability) {
+    return hold('truth_producer_unavailable', tenantId, true);
+  }
+  if (!options.evidenceSources.limit) {
+    return hold('limit_producer_unavailable', tenantId, true);
+  }
+  if (!options.receiptLedger || options.receiptLedger.projectId !== options.projectId) {
+    return hold('truth_producer_unavailable', 'receipt-ledger', false);
+  }
 
   let truthStore: ProviderTruthStore | null = null;
   let limitStore: ProviderLimitStore | null = null;
@@ -186,14 +197,26 @@ export function composeProviderAuthority(
       limitStore,
       now: options.now,
     });
+    const evidenceProducer = new ProviderEvidenceProducer({
+      tenantId,
+      projectId: options.projectId,
+      keyring,
+      truthStore,
+      limitStore,
+      receiptLedger: options.receiptLedger,
+      sources: options.evidenceSources,
+      policyResolver: scope => options.policyResolver?.(scope) ?? null,
+      now: options.now,
+    });
     let closed = false;
     return {
       state: 'ready',
       tenantId,
       projectId: options.projectId,
-      truthProducerAuthorityRef,
-      limitProducerAuthorityRef,
-      accountAuthorityRef,
+      truthProducerAuthorityRef: options.evidenceSources.reachability.authorityRef,
+      limitProducerAuthorityRef: options.evidenceSources.limit.authorityRef,
+      accountAuthorityRef: options.evidenceSources.account.authorityRef,
+      evidenceProducer,
       keyring,
       truthStore,
       limitStore,
