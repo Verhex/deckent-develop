@@ -36,65 +36,89 @@ function readFileStub(files: Record<string, string>): AuthProbeReadFile {
   };
 }
 
-/** A spawn stub that fails the test if ever called (proves env short-circuit). */
+/** A spawn stub that fails the test if ever called (proves env presence stays call-free). */
 const neverSpawn: AuthProbeSpawnImpl = async () => {
-  throw new Error('spawn must not be called when env auth short-circuits');
+  throw new Error('spawn must not be called for configured API-key presence');
 };
 
-describe('probeProviderAuth — claude (file/env based)', () => {
-  it('logged-in via ANTHROPIC_API_KEY env (no file read needed)', async () => {
+describe('probeProviderAuth — claude (structured CLI status)', () => {
+  it('keeps ANTHROPIC_API_KEY presence unknown without a paid provider request', async () => {
     const res = await probeProviderAuth('claude', {
       env: { ANTHROPIC_API_KEY: 'sk-ant-SECRET' },
-      readFileImpl: () => {
-        throw new Error('readFile must not be called when API key is set');
-      },
-      homeDir: HOME,
+      spawnImpl: neverSpawn,
     });
-    expect(res.state).toBe('logged-in');
-    // Secret safety: the key value must never leak into detail.
+    expect(res).toMatchObject({
+      state: 'unknown', present: true, authenticated: 'unknown', method: 'api-key',
+    });
     expect(res.detail ?? '').not.toContain('sk-ant-SECRET');
   });
 
-  it('logged-in via credentials file (claudeAiOauth.accessToken present)', async () => {
-    const creds = JSON.stringify({
-      claudeAiOauth: { accessToken: 'oauth-SECRET-token', refreshToken: 'r', expiresAt: 9 },
-    });
-    const res = await probeProviderAuth('claude', {
-      env: {},
-      homeDir: HOME,
-      readFileImpl: readFileStub({ [`${HOME}/.claude/.credentials.json`]: creds }),
-    });
-    expect(res.state).toBe('logged-in');
-    expect(res.detail ?? '').not.toContain('oauth-SECRET-token');
-  });
-
-  it('logged-out when the credentials file is absent', async () => {
-    const res = await probeProviderAuth('claude', {
-      env: {},
-      homeDir: HOME,
-      readFileImpl: readFileStub({}), // every path throws ENOENT
-    });
-    expect(res.state).toBe('logged-out');
-  });
-
-  it('unknown when the credentials file is present but malformed JSON', async () => {
-    const res = await probeProviderAuth('claude', {
-      env: {},
-      homeDir: HOME,
-      readFileImpl: readFileStub({ [`${HOME}/.claude/.credentials.json`]: '{ not json' }),
-    });
-    expect(res.state).toBe('unknown');
-  });
-
-  it('logged-out when the credentials file exists but has no access token', async () => {
-    const res = await probeProviderAuth('claude', {
-      env: {},
-      homeDir: HOME,
-      readFileImpl: readFileStub({
-        [`${HOME}/.claude/.credentials.json`]: JSON.stringify({ claudeAiOauth: {} }),
+  it('accepts only exit 0 + structured loggedIn=true', async () => {
+    const { impl, calls } = spawnStub({
+      status: 0,
+      stdout: JSON.stringify({
+        loggedIn: true,
+        authMethod: 'claude.ai',
+        email: 'private@example.test',
+        orgId: 'private-org',
       }),
+      timedOut: false,
     });
-    expect(res.state).toBe('logged-out');
+    const res = await probeProviderAuth('claude', {
+      env: {},
+      spawnImpl: impl,
+    });
+    expect(res).toMatchObject({
+      state: 'logged-in', present: true, authenticated: true, method: 'subscription',
+    });
+    expect(calls).toEqual([{ command: 'claude', args: ['auth', 'status', '--json'] }]);
+    expect(JSON.stringify(res)).not.toContain('private@example.test');
+    expect(JSON.stringify(res)).not.toContain('private-org');
+  });
+
+  it('reports structured loggedIn=false as logged-out', async () => {
+    const { impl } = spawnStub({
+      status: 0, stdout: JSON.stringify({ loggedIn: false, email: 'must-not-leak@example.test' }), timedOut: false,
+    });
+    const res = await probeProviderAuth('claude', {
+      env: {},
+      spawnImpl: impl,
+    });
+    expect(res).toMatchObject({
+      state: 'logged-out', present: true, authenticated: false, method: 'none',
+    });
+    expect(JSON.stringify(res)).not.toContain('must-not-leak@example.test');
+  });
+
+  it.each([
+    [{ status: 0, stdout: 'not-json', timedOut: false }, /unparseable/i],
+    [{ status: 7, stdout: '{"loggedIn":true}', timedOut: false }, /non-zero/i],
+    [{ status: null, stdout: '', timedOut: true }, /timed out/i],
+    [{ status: null, stdout: '', timedOut: false, spawnError: true }, /not available/i],
+  ] as const)('keeps failed status evidence unknown', async (result, detail) => {
+    const { impl } = spawnStub(result);
+    const res = await probeProviderAuth('claude', {
+      env: {},
+      spawnImpl: impl,
+    });
+    expect(res).toMatchObject({ state: 'unknown', authenticated: 'unknown', method: 'none' });
+    expect(res.detail).toMatch(detail);
+  });
+
+  it('does not accept truthy or missing loggedIn values', async () => {
+    for (const payload of [{ loggedIn: 'true' }, { authMethod: 'claude.ai' }]) {
+      const { impl } = spawnStub({ status: 0, stdout: JSON.stringify(payload), timedOut: false });
+      const res = await probeProviderAuth('claude', { env: {}, spawnImpl: impl });
+      expect(res).toMatchObject({ state: 'unknown', authenticated: 'unknown' });
+    }
+  });
+
+  it('preserves an exact API-key method reported by the CLI status contract', async () => {
+    const { impl } = spawnStub({
+      status: 0, stdout: JSON.stringify({ loggedIn: true, authMethod: 'api_key' }), timedOut: false,
+    });
+    const res = await probeProviderAuth('claude', { env: {}, spawnImpl: impl });
+    expect(res).toMatchObject({ state: 'logged-in', authenticated: true, method: 'api-key' });
   });
 });
 
@@ -138,18 +162,20 @@ describe('probeProviderAuth — codex (CLI based)', () => {
     expect(res.state).toBe('unknown');
   });
 
-  it('logged-in via OPENAI_API_KEY env WITHOUT spawning the CLI', async () => {
+  it('keeps OPENAI_API_KEY presence unknown WITHOUT spawning the CLI', async () => {
     const res = await probeProviderAuth('codex', {
       env: { OPENAI_API_KEY: 'sk-openai-SECRET' },
       spawnImpl: neverSpawn,
     });
-    expect(res.state).toBe('logged-in');
+    expect(res).toMatchObject({
+      state: 'unknown', present: true, authenticated: 'unknown', method: 'api-key',
+    });
     expect(res.detail ?? '').not.toContain('sk-openai-SECRET');
   });
 });
 
 describe('probeProviderAuth — gemini (file/env based)', () => {
-  it('logged-in via GEMINI_API_KEY env', async () => {
+  it('keeps GEMINI_API_KEY presence unknown without a paid provider request', async () => {
     const res = await probeProviderAuth('gemini', {
       env: { GEMINI_API_KEY: 'g-SECRET' },
       homeDir: HOME,
@@ -157,11 +183,13 @@ describe('probeProviderAuth — gemini (file/env based)', () => {
         throw new Error('readFile must not be called when API key is set');
       },
     });
-    expect(res.state).toBe('logged-in');
+    expect(res).toMatchObject({
+      state: 'unknown', present: true, authenticated: 'unknown', method: 'api-key',
+    });
     expect(res.detail ?? '').not.toContain('g-SECRET');
   });
 
-  it('logged-in via oauth_creds.json (access_token present)', async () => {
+  it('keeps oauth_creds.json token presence unknown without a supported status command', async () => {
     const res = await probeProviderAuth('gemini', {
       env: {},
       homeDir: HOME,
@@ -169,7 +197,9 @@ describe('probeProviderAuth — gemini (file/env based)', () => {
         [`${HOME}/.gemini/oauth_creds.json`]: JSON.stringify({ access_token: 'tok-SECRET' }),
       }),
     });
-    expect(res.state).toBe('logged-in');
+    expect(res).toMatchObject({
+      state: 'unknown', present: true, authenticated: 'unknown', method: 'subscription',
+    });
     expect(res.detail ?? '').not.toContain('tok-SECRET');
   });
 

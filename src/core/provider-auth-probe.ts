@@ -21,14 +21,15 @@
 //     We do NOT invent a confident answer (task directive: "emin olamadığın
 //     provider'da 'unknown' dön — UYDURMA").
 //
-// Grounded per-provider methods (verified live on a dev box / documented CLI layout):
-//   - claude : `~/.claude/.credentials.json` → claudeAiOauth.accessToken (live-
-//              verified shape) OR `ANTHROPIC_API_KEY` env. File-based, no network.
+// Grounded per-provider methods (verified against the installed CLI contracts):
+//   - claude : `claude auth status --json`; only exit 0 + JSON `loggedIn === true`
+//              proves a usable local session. Credential/API-key presence alone is
+//              configuration evidence, not authentication proof.
 //   - codex  : `codex login status` → prints "Not logged in" with EXIT 0 (live-
 //              verified — exit code is NOT a signal, parse stdout) OR
-//              `OPENAI_API_KEY`/`DECKENT_OPENAI_API_KEY` env.
-//   - gemini : `~/.gemini/oauth_creds.json` → access_token (documented gemini-cli
-//              OAuth layout) OR `GEMINI_API_KEY`/`GOOGLE_API_KEY` env.
+//              configured API-key presence, which remains unverified.
+//   - gemini : installed CLI exposes no auth-status subcommand. OAuth/API-key
+//              presence is reported as present but authentication remains unknown.
 //
 // PSL-6-WIRE (Sprint 356, row 206): the original `{ state, detail }` shape only
 // answers "logged in or not". It cannot tell "CLI/creds missing entirely" apart
@@ -168,74 +169,108 @@ function envValue(env: NodeJS.ProcessEnv, key: string): string | undefined {
   return typeof v === 'string' && v.trim().length > 0 ? v : undefined;
 }
 
+function configuredApiKey(): AuthProbeResult {
+  return {
+    state: 'unknown',
+    detail: 'API key configured; validity requires a provider request',
+    present: true,
+    authenticated: 'unknown',
+    method: 'api-key',
+  };
+}
+
 // ─── claude ────────────────────────────────────────────────────────────────
 
 /**
- * Claude session = OAuth credentials managed by the CLI at
- * `~/.claude/.credentials.json` (`claudeAiOauth.accessToken`), OR an
- * `ANTHROPIC_API_KEY` for API auth. Both checks are local — no network.
+ * Claude session truth comes from the CLI's structured local status contract.
+ * Raw output may contain account metadata, so only the exact status fields are
+ * projected and the raw envelope is never returned.
  */
-function probeClaude(
-  readFile: AuthProbeReadFile,
+async function probeClaude(
+  spawnImpl: AuthProbeSpawnImpl,
   env: NodeJS.ProcessEnv,
-  home: string,
-): AuthProbeResult {
+  timeoutMs: number,
+): Promise<AuthProbeResult> {
   if (envValue(env, 'ANTHROPIC_API_KEY')) {
-    return {
-      state: 'logged-in',
-      detail: 'ANTHROPIC_API_KEY set (api auth)',
-      present: true,
-      authenticated: true,
-      method: 'api-key',
-    };
+    return configuredApiKey();
   }
 
-  const credPath = join(home, '.claude', '.credentials.json');
-  let raw: string;
-  try {
-    raw = readFile(credPath);
-  } catch {
+  const res = await spawnImpl('claude', ['auth', 'status', '--json'], { timeoutMs });
+  if (res.spawnError) {
     return {
-      state: 'logged-out',
-      detail: 'no credentials file — run: claude (then /login)',
+      state: 'unknown',
+      detail: 'claude CLI not available',
       present: false,
-      authenticated: false,
+      authenticated: 'unknown',
       method: 'none',
     };
   }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
+  if (res.timedOut) {
     return {
       state: 'unknown',
-      detail: 'credentials file present but unparseable',
+      detail: 'claude auth status timed out',
+      present: 'unknown',
+      authenticated: 'unknown',
+      method: 'none',
+    };
+  }
+  if (res.status !== 0) {
+    return {
+      state: 'unknown',
+      detail: 'claude auth status exited with non-zero status',
       present: true,
       authenticated: 'unknown',
       method: 'none',
     };
   }
 
-  // Presence of a non-empty accessToken ⇒ a session exists (the CLI auto-refreshes
-  // via refreshToken). We read only its TYPE/presence — never its value.
-  const oauth = (parsed as { claudeAiOauth?: { accessToken?: unknown } } | null)?.claudeAiOauth;
-  const hasToken = typeof oauth?.accessToken === 'string' && oauth.accessToken.length > 0;
-  return hasToken
-    ? {
-        state: 'logged-in',
-        detail: 'session credentials present',
-        present: true,
-        authenticated: true,
-        method: 'subscription',
-      }
-    : {
-        state: 'logged-out',
-        detail: 'credentials file present but no session token',
-        present: true,
-        authenticated: false,
-        method: 'none',
-      };
+  let parsed: Record<string, unknown>;
+  try {
+    const value = JSON.parse(res.stdout) as unknown;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid envelope');
+    parsed = value as Record<string, unknown>;
+  } catch {
+    return {
+      state: 'unknown',
+      detail: 'claude auth status returned unparseable JSON',
+      present: true,
+      authenticated: 'unknown',
+      method: 'none',
+    };
+  }
+
+  if (parsed['loggedIn'] === false) {
+    return {
+      state: 'logged-out',
+      detail: 'claude auth status reports logged out',
+      present: true,
+      authenticated: false,
+      method: 'none',
+    };
+  }
+  if (parsed['loggedIn'] !== true) {
+    return {
+      state: 'unknown',
+      detail: 'claude auth status omitted an exact loggedIn boolean',
+      present: true,
+      authenticated: 'unknown',
+      method: 'none',
+    };
+  }
+
+  const authMethod = parsed['authMethod'];
+  const method: AuthProbeMethod = authMethod === 'api_key'
+    ? 'api-key'
+    : authMethod === 'claude.ai' ? 'subscription' : 'none';
+  return {
+    state: 'logged-in',
+    detail: method === 'none'
+      ? 'claude auth status confirms login with an unclassified method'
+      : 'claude auth status confirms login',
+    present: true,
+    authenticated: true,
+    method,
+  };
 }
 
 // ─── codex ───────────────────────────────────────────────────────────────────
@@ -255,13 +290,7 @@ async function probeCodex(
   timeoutMs: number,
 ): Promise<AuthProbeResult> {
   if (envValue(env, 'OPENAI_API_KEY') ?? envValue(env, 'DECKENT_OPENAI_API_KEY')) {
-    return {
-      state: 'logged-in',
-      detail: 'OPENAI_API_KEY set (api auth)',
-      present: true,
-      authenticated: true,
-      method: 'api-key',
-    };
+    return configuredApiKey();
   }
 
   const res = await spawnImpl('codex', ['login', 'status'], { timeoutMs });
@@ -331,20 +360,23 @@ function probeGemini(
     envValue(env, 'GOOGLE_API_KEY') ??
     envValue(env, 'DECKENT_GOOGLE_API_KEY')
   ) {
-    return {
-      state: 'logged-in',
-      detail: 'GEMINI/GOOGLE API key set (api auth)',
-      present: true,
-      authenticated: true,
-      method: 'api-key',
-    };
+    return configuredApiKey();
   }
 
   const credPath = join(home, '.gemini', 'oauth_creds.json');
   let raw: string;
   try {
     raw = readFile(credPath);
-  } catch {
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException | null)?.code !== 'ENOENT') {
+      return {
+        state: 'unknown',
+        detail: 'oauth credentials could not be inspected',
+        present: 'unknown',
+        authenticated: 'unknown',
+        method: 'none',
+      };
+    }
     return {
       state: 'logged-out',
       detail: 'no oauth creds — run: gemini (then /auth)',
@@ -371,10 +403,10 @@ function probeGemini(
   const hasToken = typeof token === 'string' && token.length > 0;
   return hasToken
     ? {
-        state: 'logged-in',
-        detail: 'oauth session present',
+        state: 'unknown',
+        detail: 'oauth session configured; installed Gemini CLI has no auth-status contract',
         present: true,
-        authenticated: true,
+        authenticated: 'unknown',
         method: 'subscription',
       }
     : {
@@ -391,10 +423,10 @@ function probeGemini(
 /**
  * Probe whether a provider is ACTUALLY logged in (distinct from "CLI installed").
  *
- * Cheap and network-free: claude/gemini read a local credentials file or env;
- * codex makes a single local `codex login status` call. Never reads, logs, or
- * returns any secret value. Returns 'unknown' whenever the state cannot be
- * honestly determined (timeout, missing CLI, malformed creds, unknown provider).
+ * Cheap and provider-call-free: Claude and Codex use their bounded local status
+ * contracts; Gemini can only report credential presence because its installed CLI
+ * has no auth-status subcommand. Never logs or returns raw status/account metadata
+ * or secret values. Returns 'unknown' whenever validity cannot be proven.
  *
  * @param provider 'claude' | 'codex' | 'gemini' (any other value → 'unknown').
  * @param opts     Injectable seams (spawnImpl / readFileImpl / env / homeDir / timeoutMs)
@@ -412,7 +444,7 @@ export async function probeProviderAuth(
 
   switch (provider) {
     case 'claude':
-      return probeClaude(readFile, env, home);
+      return probeClaude(spawnImpl, env, timeoutMs);
     case 'codex':
       return probeCodex(spawnImpl, env, timeoutMs);
     case 'gemini':

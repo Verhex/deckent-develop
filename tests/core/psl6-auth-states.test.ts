@@ -34,30 +34,28 @@ function readFileStub(files: Record<string, string>): AuthProbeReadFile {
 
 describe('probeProviderAuth — enriched status matrix (present × authenticated × method)', () => {
   describe('claude', () => {
-    it('ANTHROPIC_API_KEY set → present=true, authenticated=true, method=api-key', async () => {
+    it('ANTHROPIC_API_KEY set → present=true, authenticated=unknown, method=api-key', async () => {
       const res = await probeProviderAuth('claude', {
         env: { ANTHROPIC_API_KEY: 'sk-ant-SECRET' },
         homeDir: HOME,
-        readFileImpl: () => {
-          throw new Error('readFile must not be called when API key is set');
+        spawnImpl: async () => {
+          throw new Error('spawn must not be called when API key is merely configured');
         },
       });
       expect(res).toMatchObject({
-        state: 'logged-in',
+        state: 'unknown',
         present: true,
-        authenticated: true,
+        authenticated: 'unknown',
         method: 'api-key',
       });
     });
 
-    it('credentials file with token → present=true, authenticated=true, method=subscription', async () => {
-      const creds = JSON.stringify({
-        claudeAiOauth: { accessToken: 'oauth-SECRET-token', refreshToken: 'r', expiresAt: 9 },
-      });
+    it('structured CLI status loggedIn=true → present=true, authenticated=true, method=subscription', async () => {
       const res = await probeProviderAuth('claude', {
         env: {},
-        homeDir: HOME,
-        readFileImpl: readFileStub({ [`${HOME}/.claude/.credentials.json`]: creds }),
+        spawnImpl: spawnStub({
+          status: 0, stdout: '{"loggedIn":true,"authMethod":"claude.ai"}', timedOut: false,
+        }),
       });
       expect(res).toMatchObject({
         state: 'logged-in',
@@ -67,25 +65,23 @@ describe('probeProviderAuth — enriched status matrix (present × authenticated
       });
     });
 
-    it('no credentials file → present=false, authenticated=false, method=none', async () => {
+    it('structured CLI status loggedIn=false → present=true, authenticated=false, method=none', async () => {
       const res = await probeProviderAuth('claude', {
         env: {},
-        homeDir: HOME,
-        readFileImpl: readFileStub({}),
+        spawnImpl: spawnStub({ status: 0, stdout: '{"loggedIn":false}', timedOut: false }),
       });
       expect(res).toMatchObject({
         state: 'logged-out',
-        present: false,
+        present: true,
         authenticated: false,
         method: 'none',
       });
     });
 
-    it('malformed credentials JSON → present=true, authenticated=unknown (never guessed), method=none', async () => {
+    it('malformed CLI status → present=true, authenticated=unknown (never guessed), method=none', async () => {
       const res = await probeProviderAuth('claude', {
         env: {},
-        homeDir: HOME,
-        readFileImpl: readFileStub({ [`${HOME}/.claude/.credentials.json`]: '{ not json' }),
+        spawnImpl: spawnStub({ status: 0, stdout: '{ not json', timedOut: false }),
       });
       expect(res).toMatchObject({
         state: 'unknown',
@@ -95,25 +91,22 @@ describe('probeProviderAuth — enriched status matrix (present × authenticated
       });
     });
 
-    it('credentials file present but no token → present=true, authenticated=false, method=none', async () => {
+    it('CLI timeout → present=unknown, authenticated=unknown, method=none', async () => {
       const res = await probeProviderAuth('claude', {
         env: {},
-        homeDir: HOME,
-        readFileImpl: readFileStub({
-          [`${HOME}/.claude/.credentials.json`]: JSON.stringify({ claudeAiOauth: {} }),
-        }),
+        spawnImpl: spawnStub({ status: null, stdout: '', timedOut: true }),
       });
       expect(res).toMatchObject({
-        state: 'logged-out',
-        present: true,
-        authenticated: false,
+        state: 'unknown',
+        present: 'unknown',
+        authenticated: 'unknown',
         method: 'none',
       });
     });
   });
 
   describe('codex', () => {
-    it('OPENAI_API_KEY set → present=true, authenticated=true, method=api-key (no spawn)', async () => {
+    it('OPENAI_API_KEY set → present=true, authenticated=unknown, method=api-key (no spawn)', async () => {
       const res = await probeProviderAuth('codex', {
         env: { OPENAI_API_KEY: 'sk-openai-SECRET' },
         spawnImpl: async () => {
@@ -121,9 +114,9 @@ describe('probeProviderAuth — enriched status matrix (present × authenticated
         },
       });
       expect(res).toMatchObject({
-        state: 'logged-in',
+        state: 'unknown',
         present: true,
-        authenticated: true,
+        authenticated: 'unknown',
         method: 'api-key',
       });
     });
@@ -200,7 +193,7 @@ describe('probeProviderAuth — enriched status matrix (present × authenticated
   });
 
   describe('gemini', () => {
-    it('GEMINI_API_KEY set → present=true, authenticated=true, method=api-key', async () => {
+    it('GEMINI_API_KEY set → present=true, authenticated=unknown, method=api-key', async () => {
       const res = await probeProviderAuth('gemini', {
         env: { GEMINI_API_KEY: 'g-SECRET' },
         homeDir: HOME,
@@ -209,14 +202,14 @@ describe('probeProviderAuth — enriched status matrix (present × authenticated
         },
       });
       expect(res).toMatchObject({
-        state: 'logged-in',
+        state: 'unknown',
         present: true,
-        authenticated: true,
+        authenticated: 'unknown',
         method: 'api-key',
       });
     });
 
-    it('oauth_creds.json with access_token → present=true, authenticated=true, method=subscription', async () => {
+    it('oauth_creds.json with access_token → present=true, authenticated=unknown, method=subscription', async () => {
       const res = await probeProviderAuth('gemini', {
         env: {},
         homeDir: HOME,
@@ -225,9 +218,9 @@ describe('probeProviderAuth — enriched status matrix (present × authenticated
         }),
       });
       expect(res).toMatchObject({
-        state: 'logged-in',
+        state: 'unknown',
         present: true,
-        authenticated: true,
+        authenticated: 'unknown',
         method: 'subscription',
       });
     });
@@ -276,18 +269,16 @@ describe('probeProviderAuth — enriched status matrix (present × authenticated
 
 describe('probeProviderAuth — never-throw honesty contract holds for the enriched fields', () => {
   it('resolves (never rejects) even when readFileImpl throws an unexpected, non-ENOENT error', async () => {
-    const res = await probeProviderAuth('claude', {
+    const res = await probeProviderAuth('gemini', {
       env: {},
       homeDir: HOME,
       readFileImpl: () => {
         throw new Error('EACCES: permission denied');
       },
     });
-    // Any throw from the file seam is treated the same as "not present" — the
-    // module's existing contract (a throw ⇒ logged-out, never a crash).
-    expect(res.state).toBe('logged-out');
-    expect(res.present).toBe(false);
-    expect(res.authenticated).toBe(false);
+    expect(res.state).toBe('unknown');
+    expect(res.present).toBe('unknown');
+    expect(res.authenticated).toBe('unknown');
     expect(res.method).toBe('none');
   });
 
@@ -317,10 +308,12 @@ describe('probeProviderAuth — backward compatibility (doctor.ts / health-snaps
     expect(narrow.state).toBe(expectedState);
   }
 
-  it('claude logged-in result narrows to the old { state, detail? } shape', async () => {
+  it('claude authenticated result narrows to the old { state, detail? } shape', async () => {
     const res = await probeProviderAuth('claude', {
-      env: { ANTHROPIC_API_KEY: 'sk-ant-SECRET' },
-      homeDir: HOME,
+      env: {},
+      spawnImpl: spawnStub({
+        status: 0, stdout: '{"loggedIn":true,"authMethod":"claude.ai"}', timedOut: false,
+      }),
     });
     assertNarrowShapeStillWorks(res, 'logged-in');
     expect(typeof res.detail === 'string' || res.detail === undefined).toBe(true);
