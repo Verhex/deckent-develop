@@ -15,12 +15,13 @@
 - Memory budget: 900 lines max in .brain/ (MEMORY 300, RETRO 120, PATTERNS 150, sprint log 100 per file)
 
 ## Providers
-- Default: Claude (docker backend, session auth)
-- Optional: Codex (set OPENAI_API_KEY), Gemini (set GOOGLE_API_KEY)
-- Config: brain_provider, worker_provider, fallback_provider in .deckent/config.json
-- Model Registry: 14 models, 3 providers, 4 tiers — single source of truth (model-registry.ts)
-- Tier equivalence: premium_plus (o3, gemini-3.1-pro-preview), premium (opus↔gpt-5↔gemini-2.5-pro), standard (sonnet↔gpt-4.1↔o4-mini↔gemini-2.5-flash), economy (haiku↔gpt-5-mini↔gpt-4.1-mini↔gemini-2.0-flash)
-- Provider-agnostic config: brain_tier/worker_tier instead of model names
+- Core provider identities: `claude`, `codex`, `gemini`, `ollama`, `openrouter`; config-driven provider definitions can extend the runtime registry
+- Default config: `providers: { brain: "claude", worker: "claude" }`; Claude workers use the Docker backend unless explicitly configured otherwise
+- Role-aware fallback: `provider_fallback.brain|worker|auditor` → `provider_fallback.global` → legacy single `fallback_provider`; `provider_fallback.auditor_provider` selects the Auditor primary
+- Configured order is authoritative, but fallback is never an availability claim: auth, backend/model reachability, limit evidence and execution-budget admission must still pass
+- Model Registry: live/cached catalog plus bundled offline fallback — `src/core/model-registry.ts`; inspect with `deckent models list`
+- Runtime model identity is the exact provider API ID (`id === apiId`). Legacy names such as `opus`, `sonnet`, `haiku` and `gpt-5` are migration inputs only and are rejected in authored tasks
+- Provider-agnostic selection uses `model_strategy.brain_tier` / `model_strategy.worker_tier`; tier resolution returns a registered exact API ID
 - Planning mode: brain_planning = 'ai' | 'structured' | 'auto'
 
 ## Agents & Skills
@@ -202,7 +203,7 @@ DIRECTIVES.md dosyasi sprint hedeflerini tanimlar. Her task asagidaki formati iz
 ---
 
 ## Task 1: Task Basligi
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Skills: typescript-expert
 - Files: src/core/config.ts, src/core/types.ts
@@ -219,7 +220,7 @@ hangi fonksiyonlar eklenecek/degistirilecek, neden gerekli oldugunu belirt.
 ---
 
 ## Task 2: Diger Task
-- Model: haiku
+- Model: claude-haiku-4-5-20251001
 - Effort: low
 - Skills: documentation-writer
 - Files: README.md, docs/guide.md
@@ -233,8 +234,8 @@ hangi fonksiyonlar eklenecek/degistirilecek, neden gerekli oldugunu belirt.
 
 | Alan | Gecerli Degerler | Aciklama |
 |------|-----------------|----------|
-| Model | opus, sonnet, haiku | Kullanilacak AI modeli |
-| Provider | claude, codex, gemini, ollama | Bu task'i hangi provider kossun (per-task override) |
+| Model | Kayitli tam provider API ID (örn. claude-sonnet-5, gpt-5.6-sol) | Kullanilacak AI modeli; legacy alias'lar reddedilir, canli katalog icin `deckent models list` |
+| Provider | claude, codex, gemini, ollama, openrouter veya kayitli provider | Bu task'i hangi provider kossun (per-task override; erisilebilirlik kaniti degildir) |
 | Effort | low, normal, high | Tahmini **is YUKU** (timeout/butce/token-tahmin). Reasoning-derinligi DEGIL — onun icin ModelEffort |
 | ModelEffort | claude: low/medium/high/xhigh/max · codex: minimal/low/medium/high | Modelin **reasoning DERINLIGI** (claude `--effort`, codex `model_reasoning_effort`). Opt-in; gemini/ollama desteklemez. Effort (is-yuku) ile karistirma. |
 | Backend | docker, tmux, subprocess | Task'i belirli spawn-backend'e zorlar — host-adapter provider'i (codex/gemini/ollama) docker container'da kosturmak icin (varsayilan: codex/gemini/ollama host CLI, claude docker) |
@@ -325,30 +326,40 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
 ### Model
 
+Bu tablo bundled offline catalog'dan örnekler gösterir; sabit bir allowlist değildir.
+Canonical kimlik `id === apiId`'dir. Güncel catalog presence için `deckent models list`,
+gerçek kullanılabilirlik için ayrıca auth/backend/model reachability ve limit evidence kontrol edilir.
+
 | Deger | Provider | Tier | Kullanim |
 |-------|----------|------|---------|
-| `opus` | Claude | Premium | Karmasik mimari, kritik karar, multi-file refactor |
-| `sonnet` | Claude | Standard | Genel gelistirme, bug fix, test yazimi |
-| `haiku` | Claude | Economy | Dokumantasyon, basit degisiklik, format duzenlemesi |
-| `o3` | Codex | Premium+ | En yuksek seviye reasoning (OPENAI_API_KEY gerekli) |
-| `gpt-5` | Codex | Premium | opus esdegeri (OPENAI_API_KEY gerekli) |
-| `gpt-4.1` | Codex | Standard | sonnet esdegeri |
+| `claude-fable-5` | Claude | Premium+ | Karmasik mimari, kritik karar, multi-file refactor |
+| `claude-opus-4-8` | Claude | Premium | Karmasik uygulama ve denetim |
+| `claude-sonnet-5` | Claude | Standard | Genel gelistirme, bug fix, test yazimi |
+| `claude-haiku-4-5-20251001` | Claude | Economy | Dokumantasyon ve dusuk-riskli degisiklik |
+| `o3` | Codex | Premium+ | En yuksek seviye reasoning |
+| `gpt-5.6-sol` | Codex | Premium | Cross-verify ve kapsamli reasoning |
+| `gpt-5.6-terra` | Codex | Standard | Genel gelistirme ve reasoning |
+| `gpt-5.6-luna` | Codex | Economy | Dusuk-maliyetli reasoning |
+| `gpt-5.5` | Codex | Premium | Karmasik gorevler |
+| `gpt-4.1` | Codex | Standard | Genel gelistirme |
 | `o4-mini` | Codex | Standard | Hafif reasoning modeli |
-| `gpt-5-mini` | Codex | Economy | haiku esdegeri |
+| `gpt-5-mini` | Codex | Economy | Dusuk-maliyetli gorevler |
 | `gpt-4.1-mini` | Codex | Economy | Dusuk maliyetli genel kullanim |
-| `gemini-3.1-pro-preview` | Gemini | Premium+ | En yuksek seviye Gemini (GOOGLE_API_KEY gerekli, preview) |
-| `gemini-2.5-pro` | Gemini | Premium | opus esdegeri (GOOGLE_API_KEY gerekli) |
-| `gemini-2.5-flash` | Gemini | Standard | sonnet esdegeri |
-| `gemini-2.0-flash` | Gemini | Economy | haiku esdegeri |
+| `gemini-3.1-pro-preview` | Gemini | Premium+ | En yuksek seviye Gemini (preview) |
+| `gemini-2.5-pro` | Gemini | Premium | Karmasik gorevler |
+| `gemini-2.5-flash` | Gemini | Standard | Genel gelistirme |
+| `gemini-2.0-flash` | Gemini | Economy | Dusuk-maliyetli gorevler |
+| `vendor/model-id` | OpenRouter | Catalog/probe belirler | Exact vendor/model API ID; pricing evidence olmadan remote admission yok |
+| `name:tag` | Ollama | Registry/inference belirler | Local model tag'i; canli endpoint ve model varligi ayrica dogrulanir |
 
 ### Tier
 
 | Tier | Aciklama | Ornek Modeller |
 |------|----------|----------------|
-| `premium_plus` | En yuksek seviye, ileri reasoning | o3, gemini-3.1-pro-preview |
-| `premium` | Karmasik gorevler, mimari kararlar | opus, gpt-5, gemini-2.5-pro |
-| `standard` | Genel gelistirme, dengeli maliyet | sonnet, gpt-4.1, o4-mini, gemini-2.5-flash |
-| `economy` | Basit gorevler, dusuk maliyet | haiku, gpt-5-mini, gpt-4.1-mini, gemini-2.0-flash |
+| `premium_plus` | En yuksek seviye, ileri reasoning | claude-fable-5, o3, gemini-3.1-pro-preview |
+| `premium` | Karmasik gorevler, mimari kararlar | claude-opus-4-8, gpt-5.6-sol, gpt-5.5, gemini-2.5-pro |
+| `standard` | Genel gelistirme, dengeli maliyet | claude-sonnet-5, gpt-5.6-terra, gpt-4.1, o4-mini, gemini-2.5-flash |
+| `economy` | Basit gorevler, dusuk maliyet | claude-haiku-4-5-20251001, gpt-5.6-luna, gpt-5-mini, gpt-4.1-mini, gemini-2.0-flash |
 
 ### Effort
 
@@ -368,11 +379,37 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
 ### Provider
 
-| Deger | Backend | Konfigürasyon |
-|-------|---------|---------------|
-| `claude` | Claude Code (tmux) | Varsayilan, oturum kimlik dogrulamasi |
-| `codex` | OpenAI Codex | `OPENAI_API_KEY` env var gerekli |
-| `gemini` | Google Gemini | `GOOGLE_API_KEY` env var gerekli |
+| Deger | Execution surface | Admission notu |
+|-------|-------------------|---------------|
+| `claude` | Claude CLI; backend config'e gore Docker/tmux/subprocess | Session/API auth ve exact model reachability dogrulanir |
+| `codex` | Codex CLI adapter | Auth, exact model reachability, limit ve budget evidence gerekir |
+| `gemini` | Gemini CLI adapter | Auth, exact model reachability, limit ve budget evidence gerekir |
+| `ollama` | Local Ollama adapter | Local endpoint ve exact model tag'i canli olmali |
+| `openrouter` | OpenRouter API adapter | Exact `vendor/model` ID ve pricing evidence gerekir |
+
+Brain, Worker ve Auditor icin fallback sirasi ayri tanimlanabilir:
+
+```json
+{
+  "providers": {
+    "brain": "claude",
+    "worker": "codex"
+  },
+  "provider_fallback": {
+    "brain": ["codex", "gemini"],
+    "worker": ["claude", "openrouter"],
+    "auditor_provider": "codex",
+    "auditor": ["claude", "gemini"],
+    "global": ["ollama"],
+    "unattended": false
+  }
+}
+```
+
+Per-role zincir varsa global zincirin yerini alir; primary zincirden cikarilir ve
+duplicate'ler configured order korunarak tekillestirilir. Bu config yalniz aday
+sirasini tanimlar: bilinmeyen/stale limit veya kanitsiz reachability unattended
+fallback'i available yapmaz.
 
 ---
 
