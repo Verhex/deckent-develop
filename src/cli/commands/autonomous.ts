@@ -583,18 +583,22 @@ Output ONLY the JSON, no prose.`;
 /** Map validated PlannedItems onto the goal-loop's NewWorkItem contract. `missionId`
  *  is a placeholder — advanceGoalMission stamps the real mission id at enqueue. */
 function plannedItemsToWorkItems(items: PlannedItem[]): NewWorkItem[] {
-  return items.map((p) => ({
-    id: p.id,
-    missionId: '',
-    kind: p.kind,
-    spec: {
-      description: p.summary,
-      scopeDir: p.scopeDir,
-      ...(p.capabilityTarget ? { capabilityTarget: p.capabilityTarget } : {}),
-      ...(p.fanOut ? { fanOut: p.fanOut } : {}),
-    },
-    policy: p.policy,
-  }));
+  return items.map((p) => {
+    const snapshot = plannedItemToBacklogEntry(p);
+    return {
+      id: p.id,
+      missionId: '',
+      kind: p.kind,
+      spec: {
+        description: p.summary,
+        scopeDir: p.scopeDir,
+        ...(p.capabilityTarget ? { capabilityTarget: p.capabilityTarget } : {}),
+        ...(p.fanOut ? { fanOut: p.fanOut } : {}),
+      },
+      policy: p.policy,
+      trigger: { ...snapshot.trigger },
+    };
+  });
 }
 
 /**

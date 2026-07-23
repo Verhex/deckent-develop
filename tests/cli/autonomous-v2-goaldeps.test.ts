@@ -142,23 +142,27 @@ describe('buildLiveGoalDeps — planner', () => {
     expect(complete).not.toHaveBeenCalled();
   });
 
-  it('parses the LLM {items:[…]} output into NewWorkItem[] (id/kind/description)', async () => {
+  it('preserves id, kind, description, and canonical trigger through the Goal projection', async () => {
     const complete: LlmComplete = async () =>
       JSON.stringify({
         items: [
           { id: 'step-1', title: 'Step 1', kind: 'task', scopeDir: 'src/api/', summary: 'do step 1', policy: 'auto', trigger: 'one-off' },
-          { id: 'step-2', title: 'Step 2', kind: 'sprint', scopeDir: 'src/', summary: 'do step 2', policy: 'auto', trigger: 'one-off' },
+          { id: 'step-2', title: 'Step 2', kind: 'sprint', scopeDir: 'src/', summary: 'do step 2', policy: 'auto', trigger: { recurring: '*/15 * * * *' } },
+          { id: 'step-3', title: 'Step 3', kind: 'task', scopeDir: 'src/', summary: 'do step 3', policy: 'approval-required', trigger: { reactive: 'debt_trend' } },
         ],
       });
     const deps = buildLiveGoalDeps(complete);
 
     const items = await deps.author('reach the goal', []);
 
-    expect(items.map((i) => i.id)).toEqual(['step-1', 'step-2']);
+    expect(items.map((i) => i.id)).toEqual(['step-1', 'step-2', 'step-3']);
     expect(items[0]!.kind).toBe('task');
     expect(items[0]!.spec?.['description']).toBe('do step 1');
     expect(items[0]!.spec?.['scopeDir']).toBe('src/api/');
+    expect(items[0]!.trigger).toEqual({ type: 'one-off' });
     expect(items[1]!.kind).toBe('sprint');
+    expect(items[1]!.trigger).toEqual({ type: 'recurring', cron: '*/15 * * * *' });
+    expect(items[2]!.trigger).toEqual({ type: 'reactive', detector: 'debt_trend' });
   });
 
   it('returns [] when the LLM emits an empty item list (goal-reached / dry signal)', async () => {
