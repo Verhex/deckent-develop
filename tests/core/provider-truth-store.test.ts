@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import Database from 'better-sqlite3';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -11,8 +11,13 @@ import {
   type ReachabilityResult,
 } from '../../src/core/provider-truth.js';
 import {
+  ProviderAuthorityKeyring,
+  type ProviderIntegrityAuthority,
+} from '../../src/core/provider-authority-keyring.js';
+import {
   ProviderTruthStore,
   ProviderTruthStoreError,
+  migrateProviderTruthStoreV2ToV3,
   resolveProviderTruthStorePath,
   type ExactReachabilityQuery,
   type ProviderTruthStoreOptions,
@@ -474,5 +479,193 @@ describe('ProviderTruthStore', () => {
     expect(() => projectA.getLatestReachability(query(projectB), T0)).toThrowError(/project scope mismatch/);
     projectA.close();
     projectB.close();
+  });
+
+  it('stamps exact key ids and keeps retired-key evidence readable after rotation', () => {
+    const root = makeRoot();
+    const dbPath = join(root, 'provider-truth.db');
+    const keyring = ProviderAuthorityKeyring.create({
+      dataDir: root,
+      keyringIdFactory: () => 'par-truth-rotation-0001',
+      keyIdFactory: () => 'pak-truth-rotation-0001',
+      randomBytesFactory: size => Buffer.alloc(size, 0x61),
+    }).keyring;
+    const store = new ProviderTruthStore(root, {
+      dbPath,
+      projectId: 'project-a',
+      integrityAuthority: keyring,
+    });
+    const first = createCapabilityCatalog({
+      catalogId: 'catalog-before-rotation',
+      idempotencyKey: 'catalog-before-rotation-key',
+      tenantId: 'tenant-a',
+      projectId: store.projectId,
+      source: { sourceId: 'builtin', kind: 'builtin', fetchedAt: T0.toISOString(), expiresAt: null },
+      entries: [{ provider: 'claude', model: 'claude-fable-5', capabilities: {} }],
+    });
+    store.putCatalog(first);
+    keyring.rotate({
+      expectedRevisionHash: keyring.snapshot().revisionHash,
+      keyIdFactory: () => 'pak-truth-rotation-0002',
+      randomBytesFactory: size => Buffer.alloc(size, 0x62),
+    });
+    const second = {
+      ...first,
+      catalogId: 'catalog-after-rotation',
+      idempotencyKey: 'catalog-after-rotation-key',
+    };
+    store.putCatalog(second);
+    store.close();
+
+    const raw = new Database(dbPath);
+    expect(raw.prepare(`
+      SELECT catalog_id, integrity_key_id FROM capability_catalogs ORDER BY catalog_id
+    `).all()).toEqual([
+      { catalog_id: 'catalog-after-rotation', integrity_key_id: 'pak-truth-rotation-0002' },
+      { catalog_id: 'catalog-before-rotation', integrity_key_id: 'pak-truth-rotation-0001' },
+    ]);
+    raw.close();
+
+    const reopened = new ProviderTruthStore(root, {
+      dbPath,
+      projectId: 'project-a',
+      integrityAuthority: keyring,
+    });
+    expect(reopened.getCatalog(first, first.catalogId)?.catalogId).toBe(first.catalogId);
+    expect(reopened.getCatalog(second, second.catalogId)?.catalogId).toBe(second.catalogId);
+    reopened.close();
+  });
+
+  it('migrates exact v2 evidence only through an explicit retired-key binding', () => {
+    const root = makeRoot();
+    const dbPath = join(root, 'provider-truth-v2.db');
+    const legacyKeyId = 'pak-legacy-truth-v2-0001';
+    const store = openStore(root, { dbPath, projectId: 'project-a' });
+    const catalog = createCapabilityCatalog({
+      catalogId: 'catalog-v2-migration',
+      idempotencyKey: 'catalog-v2-migration-key',
+      tenantId: 'tenant-a',
+      projectId: store.projectId,
+      source: { sourceId: 'builtin', kind: 'builtin', fetchedAt: T0.toISOString(), expiresAt: null },
+      entries: [{ provider: 'claude', model: 'claude-fable-5', capabilities: {} }],
+    });
+    store.putCatalog(catalog);
+    store.close();
+
+    const legacy = new Database(dbPath);
+    legacy.exec(`
+      DROP TRIGGER capability_catalogs_no_update;
+      DROP TRIGGER capability_catalogs_active_key_insert;
+      DROP TRIGGER reachability_results_active_key_insert;
+    `);
+    const catalogPayload = legacy.prepare(`
+      SELECT payload_json FROM capability_catalogs WHERE catalog_id = ?
+    `).get(catalog.catalogId) as { payload_json: string };
+    const legacyHash = createHmac('sha256', INTEGRITY_KEY)
+      .update(catalogPayload.payload_json)
+      .digest('hex');
+    legacy.prepare('UPDATE capability_catalogs SET payload_hash = ?').run(legacyHash);
+    legacy.prepare(`
+      UPDATE provider_truth_authority
+      SET integrity_check = ?, active_key_id = ?, integrity_version = 1, authority_revision = 0
+    `).run(
+      createHmac('sha256', INTEGRITY_KEY)
+        .update('deckent-provider-truth-store:v2')
+        .digest('hex'),
+      legacyKeyId,
+    );
+    legacy.exec(`
+      ALTER TABLE provider_truth_authority DROP COLUMN authority_revision;
+      ALTER TABLE provider_truth_authority DROP COLUMN integrity_version;
+      ALTER TABLE provider_truth_authority DROP COLUMN active_key_id;
+      ALTER TABLE capability_catalogs DROP COLUMN integrity_version;
+      ALTER TABLE capability_catalogs DROP COLUMN integrity_key_id;
+      ALTER TABLE reachability_results DROP COLUMN integrity_version;
+      ALTER TABLE reachability_results DROP COLUMN integrity_key_id;
+    `);
+    restoreCatalogUpdateTrigger(legacy);
+    legacy.pragma('user_version = 2');
+    const before = legacy.prepare(`
+      SELECT payload_json, payload_hash FROM capability_catalogs WHERE catalog_id = ?
+    `).get(catalog.catalogId);
+    legacy.close();
+
+    migrateProviderTruthStoreV2ToV3({
+      dbPath,
+      legacyKeyId,
+      legacyIntegrityKey: INTEGRITY_KEY,
+    });
+    const keyring = ProviderAuthorityKeyring.create({
+      dataDir: root,
+      keyringIdFactory: () => 'par-truth-migration-0001',
+      keyIdFactory: () => 'pak-truth-current-0001',
+      randomBytesFactory: size => Buffer.alloc(size, 0x63),
+    }).keyring;
+    keyring.importLegacyVerificationKey({
+      expectedRevisionHash: keyring.snapshot().revisionHash,
+      domain: 'truth',
+      legacyKey: INTEGRITY_KEY,
+      keyIdFactory: () => legacyKeyId,
+    });
+    const migrated = new ProviderTruthStore(root, {
+      dbPath,
+      projectId: 'project-a',
+      integrityAuthority: keyring,
+    });
+    expect(migrated.getCatalog(catalog, catalog.catalogId)?.catalogId).toBe(catalog.catalogId);
+    migrated.close();
+
+    const verify = new Database(dbPath);
+    expect(verify.prepare(`
+      SELECT payload_json, payload_hash FROM capability_catalogs WHERE catalog_id = ?
+    `).get(catalog.catalogId)).toEqual(before);
+    expect(verify.pragma('user_version', { simple: true })).toBe(3);
+    verify.close();
+  });
+
+  it('blocks a stale open writer from reactivating a retired authority revision', () => {
+    const root = makeRoot();
+    const dbPath = join(root, 'provider-truth-stale-writer.db');
+    const keys = {
+      'pak-stale-writer-0001': 'stale-writer-key-material-000000000001',
+      'pak-stale-writer-0002': 'stale-writer-key-material-000000000002',
+    } as const;
+    const authority = (
+      activeKeyId: keyof typeof keys,
+      authorityRevision: number,
+    ): ProviderIntegrityAuthority => ({
+      sign: (_domain, value) => ({
+        keyId: activeKeyId,
+        authorityRevision,
+        mac: createHmac('sha256', keys[activeKeyId]).update(value).digest('hex'),
+      }),
+      verify: (_domain, keyId, value, mac) => {
+        const key = keys[keyId as keyof typeof keys];
+        if (!key) throw new Error('unknown test key');
+        return createHmac('sha256', key).update(value).digest('hex') === mac;
+      },
+    });
+    const stale = new ProviderTruthStore(root, {
+      dbPath,
+      projectId: 'project-a',
+      integrityAuthority: authority('pak-stale-writer-0001', 1),
+    });
+    const current = new ProviderTruthStore(root, {
+      dbPath,
+      projectId: 'project-a',
+      integrityAuthority: authority('pak-stale-writer-0002', 2),
+    });
+    const catalog = createCapabilityCatalog({
+      catalogId: 'catalog-stale-writer',
+      idempotencyKey: 'catalog-stale-writer-key',
+      tenantId: 'tenant-a',
+      projectId: stale.projectId,
+      source: { sourceId: 'builtin', kind: 'builtin', fetchedAt: T0.toISOString(), expiresAt: null },
+      entries: [{ provider: 'claude', model: 'claude-fable-5', capabilities: {} }],
+    });
+    expect(() => stale.putCatalog(catalog)).toThrow(/authority revision is stale/);
+    expect(current.putCatalog(catalog).created).toBe(true);
+    stale.close();
+    current.close();
   });
 });

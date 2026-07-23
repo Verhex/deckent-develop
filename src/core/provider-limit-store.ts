@@ -21,8 +21,16 @@ import {
   type GlobalScopeEnv,
   type GlobalScopePlatform,
 } from './global-scope-resolver.js';
+import {
+  createProviderIntegrityAuthority,
+  ProviderAuthorityKeyringError,
+  type ProviderAuthorityMac,
+  type ProviderIntegrityAuthority,
+} from './provider-authority-keyring.js';
 
-export const PROVIDER_LIMIT_STORE_SCHEMA_VERSION = 1;
+export const PROVIDER_LIMIT_STORE_SCHEMA_VERSION = 2;
+const PROVIDER_LIMIT_SENTINEL_INPUT = 'deckent-provider-limit-store:v2';
+const ROW_INTEGRITY_VERSION = 2;
 
 export interface ProviderLimitStoreOptions {
   readonly dbPath?: string;
@@ -30,7 +38,8 @@ export interface ProviderLimitStoreOptions {
   /** Global tenant/account policy authority. Missing policy fails every write/admission closed. */
   readonly policyResolver: (scope: ProviderLimitSnapshotQuery) => ProviderLimitResult['policy'] | null;
   /** Host-coordinator secret; never mounted into an untrusted worker. */
-  readonly integrityKey: string | Buffer;
+  readonly integrityAuthority?: ProviderIntegrityAuthority;
+  readonly integrityKey?: string | Buffer;
   /** Host-owned durable runtime/cancellation evidence authority. */
   readonly terminationEvidenceVerifier: (input: {
     readonly evidenceRef: string;
@@ -107,6 +116,8 @@ interface SnapshotRow {
   readonly expires_at: string;
   readonly payload_json: string;
   readonly payload_hash: string;
+  readonly integrity_key_id: string;
+  readonly integrity_version: number;
 }
 
 interface ReservationRow {
@@ -130,6 +141,8 @@ interface ReservationRow {
   readonly lease_expires_at: string;
   readonly payload_json: string;
   readonly payload_hash: string;
+  readonly integrity_key_id: string;
+  readonly integrity_version: number;
 }
 
 interface ReservationEventRow {
@@ -142,6 +155,8 @@ interface ReservationEventRow {
   readonly payload_hash: string;
   readonly previous_hash: string | null;
   readonly event_hash: string;
+  readonly integrity_key_id: string;
+  readonly integrity_version: number;
 }
 
 interface ActiveReservationRow extends ReservationRow {
@@ -153,6 +168,8 @@ interface ActiveReservationRow extends ReservationRow {
   readonly terminal_payload_hash: string | null;
   readonly terminal_previous_hash: string | null;
   readonly terminal_event_hash: string | null;
+  readonly terminal_integrity_key_id: string | null;
+  readonly terminal_integrity_version: number | null;
 }
 
 export class ProviderLimitStoreError extends Error {
@@ -162,12 +179,136 @@ export class ProviderLimitStoreError extends Error {
       | 'INTEGRITY_FAILURE'
       | 'LOGICAL_WINNER_EXISTS'
       | 'RESERVATION_NOT_FOUND'
-      | 'RESERVATION_SETTLED',
+      | 'RESERVATION_SETTLED'
+      | 'MIGRATION_REQUIRED'
+      | 'INTEGRITY_KEY_UNAVAILABLE',
     message: string,
     readonly evidenceRef: string | null = null,
   ) {
     super(message);
     this.name = 'ProviderLimitStoreError';
+  }
+}
+
+function sqlLiteral(value: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/u.test(value)) {
+    throw new ProviderLimitStoreError('INTEGRITY_FAILURE', 'Legacy provider limit key id is invalid');
+  }
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+/**
+ * Explicit v1→v2 migration. Evidence/event-chain bytes stay unchanged and are
+ * bound to a retired raw-v1 limit key previously imported into the keyring.
+ */
+export function migrateProviderLimitStoreV1ToV2(input: {
+  readonly dbPath: string;
+  readonly legacyKeyId: string;
+  readonly legacyIntegrityKey: string | Buffer;
+}): void {
+  const legacyKey = Buffer.isBuffer(input.legacyIntegrityKey)
+    ? Buffer.from(input.legacyIntegrityKey)
+    : Buffer.from(input.legacyIntegrityKey, 'utf8');
+  if (legacyKey.byteLength < 32) {
+    throw new ProviderLimitStoreError('INTEGRITY_FAILURE', 'Legacy provider limit key is too short');
+  }
+  const db = new Database(input.dbPath);
+  try {
+    db.pragma('journal_mode = WAL');
+    db.pragma('synchronous = FULL');
+    const migrate = db.transaction(() => {
+      const version = db.pragma('user_version', { simple: true }) as number;
+      if (version !== 1) {
+        throw new ProviderLimitStoreError('MIGRATION_REQUIRED', 'Provider limit migration requires exact schema v1');
+      }
+      const legacyMac = (value: string): string => createHmac('sha256', legacyKey).update(value).digest('hex');
+      for (const table of ['provider_limit_snapshots', 'provider_limit_reservations'] as const) {
+        const rows = db.prepare(`SELECT payload_json, payload_hash FROM ${table}`).all() as Array<{
+          payload_json: string;
+          payload_hash: string;
+        }>;
+        if (rows.some(row => legacyMac(row.payload_json) !== row.payload_hash)) {
+          throw new ProviderLimitStoreError(
+            'INTEGRITY_FAILURE',
+            'Legacy provider limit evidence failed integrity verification',
+          );
+        }
+      }
+      const events = db.prepare(`
+        SELECT event_id, reservation_id, sequence, event_type, occurred_at,
+          payload_json, payload_hash, previous_hash, event_hash
+        FROM provider_limit_reservation_events
+        ORDER BY reservation_id, sequence
+      `).all() as ReservationEventRow[];
+      for (const event of events) {
+        if (legacyMac(event.payload_json) !== event.payload_hash
+          || legacyMac(canonicalJson({
+            reservationId: event.reservation_id,
+            sequence: event.sequence,
+            eventId: event.event_id,
+            type: event.event_type,
+            occurredAt: event.occurred_at,
+            payloadHash: event.payload_hash,
+            previousHash: event.previous_hash,
+          })) !== event.event_hash) {
+          throw new ProviderLimitStoreError(
+            'INTEGRITY_FAILURE',
+            'Legacy provider limit event chain failed integrity verification',
+          );
+        }
+      }
+      const keyLiteral = sqlLiteral(input.legacyKeyId);
+      const sentinel = createHmac('sha256', legacyKey).update('deckent-provider-limit-store:v1').digest('hex');
+      db.exec(`
+        CREATE TABLE provider_limit_authority (
+          singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+          integrity_check TEXT NOT NULL,
+          active_key_id TEXT NOT NULL,
+          integrity_version INTEGER NOT NULL,
+          authority_revision INTEGER NOT NULL
+        );
+        INSERT INTO provider_limit_authority (
+          singleton_id, integrity_check, active_key_id, integrity_version, authority_revision
+        ) VALUES (1, '${sentinel}', ${keyLiteral}, 1, 0);
+        ALTER TABLE provider_limit_snapshots
+          ADD COLUMN integrity_key_id TEXT NOT NULL DEFAULT ${keyLiteral};
+        ALTER TABLE provider_limit_snapshots
+          ADD COLUMN integrity_version INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE provider_limit_reservations
+          ADD COLUMN integrity_key_id TEXT NOT NULL DEFAULT ${keyLiteral};
+        ALTER TABLE provider_limit_reservations
+          ADD COLUMN integrity_version INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE provider_limit_reservation_events
+          ADD COLUMN integrity_key_id TEXT NOT NULL DEFAULT ${keyLiteral};
+        ALTER TABLE provider_limit_reservation_events
+          ADD COLUMN integrity_version INTEGER NOT NULL DEFAULT 1;
+        CREATE TRIGGER provider_limit_snapshots_active_key_insert
+          BEFORE INSERT ON provider_limit_snapshots
+          WHEN NEW.integrity_version != 2 OR NEW.integrity_key_id != (
+            SELECT active_key_id FROM provider_limit_authority WHERE singleton_id = 1
+          ) BEGIN
+            SELECT RAISE(ABORT, 'provider limit active authority is immutable');
+          END;
+        CREATE TRIGGER provider_limit_reservations_active_key_insert
+          BEFORE INSERT ON provider_limit_reservations
+          WHEN NEW.integrity_version != 2 OR NEW.integrity_key_id != (
+            SELECT active_key_id FROM provider_limit_authority WHERE singleton_id = 1
+          ) BEGIN
+            SELECT RAISE(ABORT, 'provider limit active authority is immutable');
+          END;
+        CREATE TRIGGER provider_limit_events_active_key_insert
+          BEFORE INSERT ON provider_limit_reservation_events
+          WHEN NEW.integrity_version != 2 OR NEW.integrity_key_id != (
+            SELECT active_key_id FROM provider_limit_authority WHERE singleton_id = 1
+          ) BEGIN
+            SELECT RAISE(ABORT, 'provider limit active authority is immutable');
+          END;
+      `);
+      db.pragma(`user_version = ${PROVIDER_LIMIT_STORE_SCHEMA_VERSION}`);
+    });
+    migrate.immediate();
+  } finally {
+    db.close();
   }
 }
 
@@ -232,12 +373,14 @@ export class ProviderLimitStore {
   private readonly now: () => Date;
   private readonly policyResolver: ProviderLimitStoreOptions['policyResolver'];
   private readonly terminationEvidenceVerifier: ProviderLimitStoreOptions['terminationEvidenceVerifier'];
-  private readonly integrityKey: Buffer;
+  private readonly integrityAuthority: ProviderIntegrityAuthority;
 
   constructor(globalStateDir: string, options: ProviderLimitStoreOptions) {
     if (!options || typeof options.policyResolver !== 'function'
       || typeof options.terminationEvidenceVerifier !== 'function'
-      || (typeof options.integrityKey !== 'string' && !Buffer.isBuffer(options.integrityKey))) {
+      || (!options.integrityAuthority
+        && typeof options.integrityKey !== 'string' && !Buffer.isBuffer(options.integrityKey))
+      || (options.integrityAuthority !== undefined && options.integrityKey !== undefined)) {
       throw new ProviderLimitStoreError(
         'INTEGRITY_FAILURE',
         'Provider limit store requires policy, termination-evidence and integrity authorities',
@@ -248,11 +391,8 @@ export class ProviderLimitStore {
     this.now = options.now ?? (() => new Date());
     this.policyResolver = options.policyResolver;
     this.terminationEvidenceVerifier = options.terminationEvidenceVerifier;
-    this.integrityKey = Buffer.isBuffer(options.integrityKey)
-      ? Buffer.from(options.integrityKey) : Buffer.from(options.integrityKey, 'utf8');
-    if (this.integrityKey.byteLength < 32) {
-      throw new ProviderLimitStoreError('INTEGRITY_FAILURE', 'Provider limit integrity key must be at least 32 bytes');
-    }
+    this.integrityAuthority = options.integrityAuthority
+      ?? createProviderIntegrityAuthority(options.integrityKey!);
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
@@ -267,10 +407,19 @@ export class ProviderLimitStore {
         SELECT 1 AS present FROM sqlite_master
         WHERE type = 'table' AND name LIKE 'provider_limit_%' LIMIT 1
       `).get() as { present: number } | undefined;
-      if (existing) this.assertSchema();
-      this.initSchema();
-      this.assertSchema();
-      if (version === 0) this.db.pragma(`user_version = ${PROVIDER_LIMIT_STORE_SCHEMA_VERSION}`);
+      if (existing && version !== PROVIDER_LIMIT_STORE_SCHEMA_VERSION) {
+        throw new ProviderLimitStoreError(
+          'MIGRATION_REQUIRED',
+          'Provider limit schema migration is required through the explicit authority migrator',
+        );
+      }
+      if (existing) {
+        this.assertSchema();
+      } else {
+        this.initSchema();
+        this.db.pragma(`user_version = ${PROVIDER_LIMIT_STORE_SCHEMA_VERSION}`);
+        this.assertSchema();
+      }
     } catch (error) {
       this.db.close();
       throw error;
@@ -278,7 +427,16 @@ export class ProviderLimitStore {
   }
 
   private initSchema(): void {
+    const sentinel = this.signIntegrity('authority', PROVIDER_LIMIT_SENTINEL_INPUT);
     this.db.exec(`
+      CREATE TABLE IF NOT EXISTS provider_limit_authority (
+        singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+        integrity_check TEXT NOT NULL,
+        active_key_id TEXT NOT NULL,
+        integrity_version INTEGER NOT NULL,
+        authority_revision INTEGER NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS provider_limit_snapshots (
         inserted_seq INTEGER PRIMARY KEY AUTOINCREMENT,
         limit_result_id TEXT NOT NULL UNIQUE,
@@ -296,6 +454,8 @@ export class ProviderLimitStore {
         expires_at TEXT NOT NULL,
         payload_json TEXT NOT NULL,
         payload_hash TEXT NOT NULL,
+        integrity_key_id TEXT NOT NULL,
+        integrity_version INTEGER NOT NULL,
         UNIQUE (tenant_id, provider, quota_scope_ref_hash, auth_mode, idempotency_key)
       );
 
@@ -331,6 +491,8 @@ export class ProviderLimitStore {
         lease_expires_at TEXT NOT NULL,
         payload_json TEXT NOT NULL,
         payload_hash TEXT NOT NULL,
+        integrity_key_id TEXT NOT NULL,
+        integrity_version INTEGER NOT NULL,
         UNIQUE (tenant_id, provider, quota_scope_ref_hash, auth_mode, idempotency_key)
       );
 
@@ -359,6 +521,8 @@ export class ProviderLimitStore {
         payload_hash TEXT NOT NULL,
         previous_hash TEXT,
         event_hash TEXT NOT NULL,
+        integrity_key_id TEXT NOT NULL,
+        integrity_version INTEGER NOT NULL,
         UNIQUE (reservation_id, sequence),
         FOREIGN KEY (reservation_id) REFERENCES provider_limit_reservations (reservation_id)
       );
@@ -387,21 +551,59 @@ export class ProviderLimitStore {
         BEFORE DELETE ON provider_limit_reservation_events BEGIN
           SELECT RAISE(ABORT, 'provider limit reservation events are immutable');
         END;
+      CREATE TRIGGER IF NOT EXISTS provider_limit_snapshots_active_key_insert
+        BEFORE INSERT ON provider_limit_snapshots
+        WHEN NEW.integrity_version != 2 OR NEW.integrity_key_id != (
+          SELECT active_key_id FROM provider_limit_authority WHERE singleton_id = 1
+        ) BEGIN
+          SELECT RAISE(ABORT, 'provider limit active authority is immutable');
+        END;
+      CREATE TRIGGER IF NOT EXISTS provider_limit_reservations_active_key_insert
+        BEFORE INSERT ON provider_limit_reservations
+        WHEN NEW.integrity_version != 2 OR NEW.integrity_key_id != (
+          SELECT active_key_id FROM provider_limit_authority WHERE singleton_id = 1
+        ) BEGIN
+          SELECT RAISE(ABORT, 'provider limit active authority is immutable');
+        END;
+      CREATE TRIGGER IF NOT EXISTS provider_limit_events_active_key_insert
+        BEFORE INSERT ON provider_limit_reservation_events
+        WHEN NEW.integrity_version != 2 OR NEW.integrity_key_id != (
+          SELECT active_key_id FROM provider_limit_authority WHERE singleton_id = 1
+        ) BEGIN
+          SELECT RAISE(ABORT, 'provider limit active authority is immutable');
+        END;
     `);
+    this.db.prepare(`
+      INSERT OR IGNORE INTO provider_limit_authority (
+        singleton_id, integrity_check, active_key_id, integrity_version, authority_revision
+      ) VALUES (1, ?, ?, ?, ?)
+    `).run(
+      sentinel.mac,
+      sentinel.keyId,
+      ROW_INTEGRITY_VERSION,
+      sentinel.authorityRevision,
+    );
   }
 
   private assertSchema(): void {
     const required: Readonly<Record<string, readonly string[]>> = {
+      provider_limit_authority: [
+        'singleton_id', 'integrity_check', 'active_key_id', 'integrity_version', 'authority_revision',
+      ],
       provider_limit_snapshots: [
         'inserted_seq', 'limit_result_id', 'quota_scope_ref_hash', 'transport',
         'execution_backend', 'endpoint_ref_hash', 'payload_hash',
+        'integrity_key_id', 'integrity_version',
       ],
       provider_limit_reservations: [
         'inserted_seq', 'reservation_id', 'run_id', 'call_id', 'attempt_id', 'model',
         'quota_scope_ref_hash', 'transport',
         'execution_backend', 'endpoint_ref_hash', 'payload_hash',
+        'integrity_key_id', 'integrity_version',
       ],
-      provider_limit_reservation_events: ['event_id', 'reservation_id', 'event_hash'],
+      provider_limit_reservation_events: [
+        'event_id', 'reservation_id', 'event_hash', 'integrity_key_id', 'integrity_version',
+      ],
     };
     for (const [table, columns] of Object.entries(required)) {
       const rows = this.db.pragma(`table_info(${table})`) as Array<{
@@ -496,6 +698,9 @@ export class ProviderLimitStore {
       ['provider_limit_reservations_no_delete', ['provider_limit_reservations', 'delete']],
       ['provider_limit_events_no_update', ['provider_limit_reservation_events', 'update']],
       ['provider_limit_events_no_delete', ['provider_limit_reservation_events', 'delete']],
+      ['provider_limit_snapshots_active_key_insert', ['provider_limit_snapshots', 'insert']],
+      ['provider_limit_reservations_active_key_insert', ['provider_limit_reservations', 'insert']],
+      ['provider_limit_events_active_key_insert', ['provider_limit_reservation_events', 'insert']],
     ] as const);
     const triggers = this.db.prepare(`
       SELECT name, tbl_name, sql FROM sqlite_master WHERE type = 'trigger'
@@ -510,6 +715,49 @@ export class ProviderLimitStore {
     })) {
       throw new ProviderLimitStoreError('INTEGRITY_FAILURE', 'Provider limit schema triggers are invalid');
     }
+    const authority = this.db.prepare(`
+      SELECT integrity_check, active_key_id, integrity_version, authority_revision
+      FROM provider_limit_authority WHERE singleton_id = 1
+    `).get() as {
+      integrity_check: string;
+      active_key_id: string;
+      integrity_version: number;
+      authority_revision: number;
+    } | undefined;
+    const sentinelInput = authority?.integrity_version === 1
+      ? 'deckent-provider-limit-store:v1'
+      : PROVIDER_LIMIT_SENTINEL_INPUT;
+    let authorityVerified = false;
+    try {
+      authorityVerified = authority !== undefined && this.verifyIntegrity(
+        'authority',
+        authority.active_key_id,
+        sentinelInput,
+        authority.integrity_check,
+        authority.integrity_version,
+      );
+    } catch (error) {
+      if (!(error instanceof ProviderLimitStoreError)
+        || error.code !== 'INTEGRITY_KEY_UNAVAILABLE') throw error;
+    }
+    if (!authority || !authorityVerified) {
+      throw new ProviderLimitStoreError('INTEGRITY_FAILURE', 'Provider limit integrity authority mismatch');
+    }
+    const current = this.signIntegrity('authority', PROVIDER_LIMIT_SENTINEL_INPUT);
+    if (current.authorityRevision < authority.authority_revision
+      || (current.authorityRevision === authority.authority_revision
+        && authority.active_key_id !== current.keyId)) {
+      throw new ProviderLimitStoreError('INTEGRITY_FAILURE', 'Provider limit authority revision is stale');
+    }
+    if (authority.active_key_id !== current.keyId
+      || authority.integrity_version !== ROW_INTEGRITY_VERSION
+      || authority.authority_revision !== current.authorityRevision) {
+      this.db.prepare(`
+        UPDATE provider_limit_authority
+        SET integrity_check = ?, active_key_id = ?, integrity_version = ?, authority_revision = ?
+        WHERE singleton_id = 1
+      `).run(current.mac, current.keyId, ROW_INTEGRITY_VERSION, current.authorityRevision);
+    }
   }
 
   putSnapshot(result: ProviderLimitResult): { evidenceRef: string; created: boolean } {
@@ -522,8 +770,9 @@ export class ProviderLimitStore {
       throw new ProviderLimitStoreError('INTEGRITY_FAILURE', 'Future-dated provider limit evidence cannot be persisted');
     }
     const payloadJson = canonicalJson(authoritative);
-    const payloadHash = this.integrityHash(payloadJson);
     const transaction = this.db.transaction(() => {
+      this.syncAuthorityForWrite();
+      const signed = this.signIntegrity('snapshot', payloadJson);
       this.verifyIncorporatedEvents(authoritative);
       const existing = this.db.prepare(`
         SELECT * FROM provider_limit_snapshots
@@ -542,7 +791,7 @@ export class ProviderLimitStore {
       }) as SnapshotRow | undefined;
       if (existing) {
         const persisted = this.verifySnapshotRow(existing);
-        if (persisted.limitResultId !== authoritative.limitResultId || existing.payload_hash !== payloadHash) {
+        if (persisted.limitResultId !== authoritative.limitResultId || existing.payload_json !== payloadJson) {
           throw new ProviderLimitStoreError('IDEMPOTENCY_CONFLICT', 'Provider limit snapshot idempotency conflict');
         }
         return { evidenceRef: `provider-limit:${authoritative.limitResultId}`, created: false };
@@ -551,14 +800,16 @@ export class ProviderLimitStore {
         INSERT INTO provider_limit_snapshots (
           limit_result_id, tenant_id, project_id, idempotency_key, provider,
           account_ref_hash, quota_scope_ref_hash, auth_mode, transport, execution_backend,
-          endpoint_ref_hash, fetched_at, expires_at, payload_json, payload_hash
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          endpoint_ref_hash, fetched_at, expires_at, payload_json, payload_hash,
+          integrity_key_id, integrity_version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         authoritative.limitResultId, authoritative.tenantId, authoritative.projectId,
         authoritative.idempotencyKey, authoritative.provider, authoritative.accountRefHash,
         authoritative.quotaScopeRefHash, authoritative.authMode, authoritative.backend.transport,
         authoritative.backend.executionBackend, authoritative.backend.endpointRefHash,
-        authoritative.source.fetchedAt, authoritative.source.expiresAt, payloadJson, payloadHash,
+        authoritative.source.fetchedAt, authoritative.source.expiresAt,
+        payloadJson, signed.mac, signed.keyId, ROW_INTEGRITY_VERSION,
       );
       return { evidenceRef: `provider-limit:${authoritative.limitResultId}`, created: true };
     });
@@ -579,6 +830,7 @@ export class ProviderLimitStore {
     const now = this.now();
     const payloadRequestHash = sha256(canonicalJson(request));
     const transaction = this.db.transaction((): ProviderLimitReservationWrite => {
+      this.syncAuthorityForWrite();
       const existing = this.db.prepare(`
         SELECT * FROM provider_limit_reservations
         WHERE tenant_id = @tenant_id AND provider = @provider
@@ -686,21 +938,23 @@ export class ProviderLimitStore {
       };
       assertProviderLimitReservation(reservation);
       const payloadJson = canonicalJson(reservation);
-      const payloadHash = this.integrityHash(payloadJson);
+      const signed = this.signIntegrity('reservation', payloadJson);
       try {
         this.db.prepare(`
           INSERT INTO provider_limit_reservations (
             reservation_id, tenant_id, project_id, idempotency_key, run_id, call_id, attempt_id,
             provider, account_ref_hash,
             model, quota_scope_ref_hash, auth_mode, transport, execution_backend, endpoint_ref_hash,
-            decision, requested_at, lease_expires_at, payload_json, payload_hash
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            decision, requested_at, lease_expires_at, payload_json, payload_hash,
+            integrity_key_id, integrity_version
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           request.reservationId, request.tenantId, request.projectId, request.idempotencyKey,
           request.runId, request.callId, request.attemptId,
           request.provider, request.accountRefHash, request.model, request.quotaScopeRefHash, request.authMode,
           request.backend.transport, request.backend.executionBackend, request.backend.endpointRefHash, decision,
-          request.requestedAt, request.leaseExpiresAt, payloadJson, payloadHash,
+          request.requestedAt, request.leaseExpiresAt, payloadJson,
+          signed.mac, signed.keyId, ROW_INTEGRITY_VERSION,
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -744,6 +998,7 @@ export class ProviderLimitStore {
   ): ProviderLimitReservationEventWrite {
     assertProviderLimitReservationEvent(event);
     const transaction = this.db.transaction((): ProviderLimitReservationEventWrite => {
+      this.syncAuthorityForWrite();
       const row = this.db.prepare(`
         SELECT * FROM provider_limit_reservations
         WHERE reservation_id = @reservation_id AND tenant_id = @tenant_id AND project_id = @project_id
@@ -835,24 +1090,33 @@ export class ProviderLimitStore {
         }
       }
       const payloadJson = canonicalJson(reservationEventPayload(event));
-      const payloadHash = this.integrityHash(payloadJson);
+      const payloadSigned = this.signIntegrity('reservation-event-payload', payloadJson);
       const sequence = (previousEvent?.sequence ?? 0) + 1;
       const previousHash = previousEvent?.hash ?? null;
-      const eventHash = this.integrityHash(canonicalJson({
+      const eventEnvelope = canonicalJson({
         reservationId, sequence, eventId: event.eventId, type: event.type,
-        occurredAt: event.occurredAt, payloadHash, previousHash,
-      }));
+        occurredAt: event.occurredAt, payloadHash: payloadSigned.mac, previousHash,
+      });
+      const eventSigned = this.signIntegrity('reservation-event-chain', eventEnvelope);
+      if (eventSigned.keyId !== payloadSigned.keyId) {
+        throw new ProviderLimitStoreError(
+          'INTEGRITY_FAILURE',
+          'Provider limit authority rotated during event signing',
+        );
+      }
       this.db.prepare(`
         INSERT INTO provider_limit_reservation_events (
           event_id, reservation_id, sequence, event_type, occurred_at,
-          payload_json, payload_hash, previous_hash, event_hash
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          payload_json, payload_hash, previous_hash, event_hash,
+          integrity_key_id, integrity_version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         event.eventId, reservationId, sequence, event.type, event.occurredAt,
-        payloadJson, payloadHash, previousHash, eventHash,
+        payloadJson, payloadSigned.mac, previousHash, eventSigned.mac,
+        eventSigned.keyId, ROW_INTEGRITY_VERSION,
       );
       return {
-        event: { ...event, reservationId, sequence, previousHash, hash: eventHash },
+        event: { ...event, reservationId, sequence, previousHash, hash: eventSigned.mac },
         created: true,
       };
     });
@@ -962,7 +1226,9 @@ export class ProviderLimitStore {
         e.payload_json AS terminal_payload_json,
         e.payload_hash AS terminal_payload_hash,
         e.previous_hash AS terminal_previous_hash,
-        e.event_hash AS terminal_event_hash
+        e.event_hash AS terminal_event_hash,
+        e.integrity_key_id AS terminal_integrity_key_id,
+        e.integrity_version AS terminal_integrity_version
       FROM provider_limit_reservations r
       LEFT JOIN provider_limit_reservation_events e ON e.reservation_id = r.reservation_id
       WHERE r.tenant_id = @tenant_id AND r.provider = @provider
@@ -999,6 +1265,8 @@ export class ProviderLimitStore {
           payload_hash: row.terminal_payload_hash!,
           previous_hash: row.terminal_previous_hash,
           event_hash: row.terminal_event_hash!,
+          integrity_key_id: row.terminal_integrity_key_id!,
+          integrity_version: row.terminal_integrity_version!,
         }));
       }
     }
@@ -1060,7 +1328,9 @@ export class ProviderLimitStore {
   }
 
   private verifySnapshotRow(row: SnapshotRow): ProviderLimitResult {
-    if (this.integrityHash(row.payload_json) !== row.payload_hash) {
+    if (!this.verifyIntegrity(
+      'snapshot', row.integrity_key_id, row.payload_json, row.payload_hash, row.integrity_version,
+    )) {
       throw new ProviderLimitStoreError('INTEGRITY_FAILURE', 'Provider limit snapshot hash mismatch');
     }
     const result = JSON.parse(row.payload_json) as ProviderLimitResult;
@@ -1129,7 +1399,9 @@ export class ProviderLimitStore {
   }
 
   private verifyReservationRow(row: ReservationRow): ProviderLimitReservation {
-    if (this.integrityHash(row.payload_json) !== row.payload_hash) {
+    if (!this.verifyIntegrity(
+      'reservation', row.integrity_key_id, row.payload_json, row.payload_hash, row.integrity_version,
+    )) {
       throw new ProviderLimitStoreError('INTEGRITY_FAILURE', 'Provider limit reservation hash mismatch');
     }
     const reservation = JSON.parse(row.payload_json) as ProviderLimitReservation;
@@ -1160,7 +1432,13 @@ export class ProviderLimitStore {
       terminationEvidenceRef: string | null;
       terminationAuthorityRef: string | null;
     };
-    if (this.integrityHash(row.payload_json) !== row.payload_hash) {
+    if (!this.verifyIntegrity(
+      'reservation-event-payload',
+      row.integrity_key_id,
+      row.payload_json,
+      row.payload_hash,
+      row.integrity_version,
+    )) {
       throw new ProviderLimitStoreError('INTEGRITY_FAILURE', 'Provider limit event payload hash mismatch');
     }
     const actual = payload.actual ?? undefined;
@@ -1180,16 +1458,27 @@ export class ProviderLimitStore {
       throw new ProviderLimitStoreError('INTEGRITY_FAILURE', 'Provider limit event envelope mismatch');
     }
     assertProviderLimitReservationEvent(event);
-    const payloadHash = this.integrityHash(canonicalJson(reservationEventPayload(event)));
-    if (payloadHash !== row.payload_hash) {
+    if (!this.verifyIntegrity(
+      'reservation-event-payload',
+      row.integrity_key_id,
+      canonicalJson(reservationEventPayload(event)),
+      row.payload_hash,
+      row.integrity_version,
+    )) {
       throw new ProviderLimitStoreError('INTEGRITY_FAILURE', 'Provider limit event hash mismatch');
     }
-    const eventHash = this.integrityHash(canonicalJson({
+    const eventEnvelope = canonicalJson({
       reservationId: row.reservation_id, sequence: row.sequence, eventId: row.event_id,
       type: row.event_type, occurredAt: row.occurred_at,
       payloadHash: row.payload_hash, previousHash: row.previous_hash,
-    }));
-    if (eventHash !== row.event_hash) {
+    });
+    if (!this.verifyIntegrity(
+      'reservation-event-chain',
+      row.integrity_key_id,
+      eventEnvelope,
+      row.event_hash,
+      row.integrity_version,
+    )) {
       throw new ProviderLimitStoreError('INTEGRITY_FAILURE', 'Provider limit event chain mismatch');
     }
     return {
@@ -1205,7 +1494,89 @@ export class ProviderLimitStore {
     this.db.close();
   }
 
-  private integrityHash(value: string): string {
-    return createHmac('sha256', this.integrityKey).update(value).digest('hex');
+  private signIntegrity(kind: string, value: string): ProviderAuthorityMac {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const selected = this.integrityAuthority.sign('limit', value);
+      const envelope = canonicalJson({
+        domain: 'provider-limit',
+        integrityVersion: ROW_INTEGRITY_VERSION,
+        keyId: selected.keyId,
+        kind,
+        value,
+      });
+      const signed = this.integrityAuthority.sign('limit', envelope);
+      if (signed.keyId === selected.keyId
+        && signed.authorityRevision === selected.authorityRevision) return signed;
+    }
+    throw new ProviderLimitStoreError('INTEGRITY_FAILURE', 'Provider limit authority rotated during signing');
+  }
+
+  private syncAuthorityForWrite(): void {
+    const authority = this.db.prepare(`
+      SELECT integrity_check, active_key_id, integrity_version, authority_revision
+      FROM provider_limit_authority WHERE singleton_id = 1
+    `).get() as {
+      integrity_check: string;
+      active_key_id: string;
+      integrity_version: number;
+      authority_revision: number;
+    } | undefined;
+    const sentinelInput = authority?.integrity_version === 1
+      ? 'deckent-provider-limit-store:v1'
+      : PROVIDER_LIMIT_SENTINEL_INPUT;
+    if (!authority || !this.verifyIntegrity(
+      'authority',
+      authority.active_key_id,
+      sentinelInput,
+      authority.integrity_check,
+      authority.integrity_version,
+    )) {
+      throw new ProviderLimitStoreError('INTEGRITY_FAILURE', 'Provider limit integrity authority mismatch');
+    }
+    const current = this.signIntegrity('authority', PROVIDER_LIMIT_SENTINEL_INPUT);
+    if (current.authorityRevision < authority.authority_revision
+      || (current.authorityRevision === authority.authority_revision
+        && authority.active_key_id !== current.keyId)) {
+      throw new ProviderLimitStoreError('INTEGRITY_FAILURE', 'Provider limit authority revision is stale');
+    }
+    if (authority.active_key_id !== current.keyId
+      || authority.integrity_version !== ROW_INTEGRITY_VERSION
+      || authority.authority_revision !== current.authorityRevision) {
+      this.db.prepare(`
+        UPDATE provider_limit_authority
+        SET integrity_check = ?, active_key_id = ?, integrity_version = ?, authority_revision = ?
+        WHERE singleton_id = 1
+      `).run(current.mac, current.keyId, ROW_INTEGRITY_VERSION, current.authorityRevision);
+    }
+  }
+
+  private verifyIntegrity(
+    kind: string,
+    keyId: string,
+    value: string,
+    mac: string,
+    version: number,
+  ): boolean {
+    try {
+      if (version !== 1 && version !== ROW_INTEGRITY_VERSION) return false;
+      const signedValue = version === 1
+        ? value
+        : canonicalJson({
+          domain: 'provider-limit',
+          integrityVersion: ROW_INTEGRITY_VERSION,
+          keyId,
+          kind,
+          value,
+        });
+      return this.integrityAuthority.verify('limit', keyId, signedValue, mac);
+    } catch (error) {
+      if (error instanceof ProviderAuthorityKeyringError && error.code === 'KEYRING_UNKNOWN_KEY_ID') {
+        throw new ProviderLimitStoreError(
+          'INTEGRITY_KEY_UNAVAILABLE',
+          'Provider limit evidence references an unavailable authority key',
+        );
+      }
+      throw error;
+    }
   }
 }

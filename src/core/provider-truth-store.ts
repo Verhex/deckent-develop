@@ -9,6 +9,12 @@ import {
   type GlobalScopeEnv,
   type GlobalScopePlatform,
 } from './global-scope-resolver.js';
+import {
+  createProviderIntegrityAuthority,
+  ProviderAuthorityKeyringError,
+  type ProviderAuthorityMac,
+  type ProviderIntegrityAuthority,
+} from './provider-authority-keyring.js';
 import type { InvocationScope } from './invocation-receipt.js';
 import {
   assertCapabilityCatalog,
@@ -23,14 +29,18 @@ export interface ProviderTruthStoreOptions {
   /** Canonical project id shared with InvocationReceiptStore. This store never mints a second identity. */
   readonly projectId: string;
   /** Host-private authority key. It must never be mounted into an untrusted worker. */
-  readonly integrityKey: string | Buffer;
+  /** Production authority. Raw root-key support remains for compatibility/tests. */
+  readonly integrityAuthority?: ProviderIntegrityAuthority;
+  readonly integrityKey?: string | Buffer;
   readonly dbPath?: string;
   readonly now?: () => Date;
 }
 
-export const PROVIDER_TRUTH_STORE_SCHEMA_VERSION = 2;
+export const PROVIDER_TRUTH_STORE_SCHEMA_VERSION = 3;
 
-const INTEGRITY_SENTINEL_INPUT = 'deckent-provider-truth-store:v2';
+const LEGACY_INTEGRITY_SENTINEL_INPUT = 'deckent-provider-truth-store:v2';
+const INTEGRITY_SENTINEL_INPUT = 'deckent-provider-truth-store:v3';
+const ROW_INTEGRITY_VERSION = 2;
 
 const EXACT_REACHABILITY_SCOPE_INDEX_SQL = `
   CREATE INDEX idx_reachability_exact_scope
@@ -66,6 +76,24 @@ const IMMUTABLE_TRIGGER_SQL = {
         SELECT RAISE(ABORT, 'reachability results are immutable');
       END
   `,
+  capability_catalogs_active_key_insert: `
+    CREATE TRIGGER capability_catalogs_active_key_insert
+      BEFORE INSERT ON capability_catalogs
+      WHEN NEW.integrity_version != 2 OR NEW.integrity_key_id != (
+        SELECT active_key_id FROM provider_truth_authority WHERE singleton_id = 1
+      ) BEGIN
+        SELECT RAISE(ABORT, 'provider truth active authority is immutable');
+      END
+  `,
+  reachability_results_active_key_insert: `
+    CREATE TRIGGER reachability_results_active_key_insert
+      BEFORE INSERT ON reachability_results
+      WHEN NEW.integrity_version != 2 OR NEW.integrity_key_id != (
+        SELECT active_key_id FROM provider_truth_authority WHERE singleton_id = 1
+      ) BEGIN
+        SELECT RAISE(ABORT, 'provider truth active authority is immutable');
+      END
+  `,
 } as const;
 
 export function resolveProviderTruthStorePath(
@@ -80,6 +108,8 @@ export function resolveProviderTruthStorePath(
 interface PayloadRow {
   readonly payload_json: string;
   readonly payload_hash: string;
+  readonly integrity_key_id: string;
+  readonly integrity_version: number;
 }
 
 interface CatalogRow extends PayloadRow {
@@ -128,11 +158,107 @@ export interface ExactReachabilityQuery extends InvocationScope {
 
 export class ProviderTruthStoreError extends Error {
   constructor(
-    readonly code: 'SCOPE_MISMATCH' | 'IDEMPOTENCY_CONFLICT' | 'INTEGRITY_FAILURE',
+    readonly code:
+      | 'SCOPE_MISMATCH'
+      | 'IDEMPOTENCY_CONFLICT'
+      | 'INTEGRITY_FAILURE'
+      | 'MIGRATION_REQUIRED'
+      | 'INTEGRITY_KEY_UNAVAILABLE',
     message: string,
   ) {
     super(message);
     this.name = 'ProviderTruthStoreError';
+  }
+}
+
+function sqlLiteral(value: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/u.test(value)) {
+    throw new ProviderTruthStoreError('INTEGRITY_FAILURE', 'Legacy provider truth key id is invalid');
+  }
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+/**
+ * Explicit, owner-run v2→v3 migration. Immutable evidence bytes are preserved;
+ * the supplied legacy key must first be imported as a retired truth key in the
+ * host Provider Authority Keyring.
+ */
+export function migrateProviderTruthStoreV2ToV3(input: {
+  readonly dbPath: string;
+  readonly legacyKeyId: string;
+  readonly legacyIntegrityKey: string | Buffer;
+}): void {
+  const legacyKey = Buffer.isBuffer(input.legacyIntegrityKey)
+    ? Buffer.from(input.legacyIntegrityKey)
+    : Buffer.from(input.legacyIntegrityKey, 'utf8');
+  if (legacyKey.byteLength < 32) {
+    throw new ProviderTruthStoreError('INTEGRITY_FAILURE', 'Legacy provider truth key is too short');
+  }
+  const db = new Database(input.dbPath);
+  try {
+    db.pragma('journal_mode = WAL');
+    db.pragma('synchronous = FULL');
+    const migrate = db.transaction(() => {
+      const version = db.pragma('user_version', { simple: true }) as number;
+      if (version !== 2) {
+        throw new ProviderTruthStoreError('MIGRATION_REQUIRED', 'Provider truth migration requires exact schema v2');
+      }
+      const authority = db.prepare(`
+        SELECT integrity_check FROM provider_truth_authority WHERE singleton_id = 1
+      `).get() as { integrity_check: string } | undefined;
+      const expected = createHmac('sha256', legacyKey).update(LEGACY_INTEGRITY_SENTINEL_INPUT).digest('hex');
+      if (!authority || authority.integrity_check !== expected) {
+        throw new ProviderTruthStoreError('INTEGRITY_FAILURE', 'Legacy provider truth authority mismatch');
+      }
+      for (const table of ['capability_catalogs', 'reachability_results'] as const) {
+        const rows = db.prepare(`SELECT payload_json, payload_hash FROM ${table}`).all() as Array<{
+          payload_json: string;
+          payload_hash: string;
+        }>;
+        if (rows.some(row => createHmac('sha256', legacyKey).update(row.payload_json).digest('hex')
+          !== row.payload_hash)) {
+          throw new ProviderTruthStoreError(
+            'INTEGRITY_FAILURE',
+            'Legacy provider truth evidence failed integrity verification',
+          );
+        }
+      }
+      const keyLiteral = sqlLiteral(input.legacyKeyId);
+      db.exec(`
+        ALTER TABLE provider_truth_authority
+          ADD COLUMN active_key_id TEXT NOT NULL DEFAULT ${keyLiteral};
+        ALTER TABLE provider_truth_authority
+          ADD COLUMN integrity_version INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE provider_truth_authority
+          ADD COLUMN authority_revision INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE capability_catalogs
+          ADD COLUMN integrity_key_id TEXT NOT NULL DEFAULT ${keyLiteral};
+        ALTER TABLE capability_catalogs
+          ADD COLUMN integrity_version INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE reachability_results
+          ADD COLUMN integrity_key_id TEXT NOT NULL DEFAULT ${keyLiteral};
+        ALTER TABLE reachability_results
+          ADD COLUMN integrity_version INTEGER NOT NULL DEFAULT 1;
+        CREATE TRIGGER capability_catalogs_active_key_insert
+          BEFORE INSERT ON capability_catalogs
+          WHEN NEW.integrity_version != 2 OR NEW.integrity_key_id != (
+            SELECT active_key_id FROM provider_truth_authority WHERE singleton_id = 1
+          ) BEGIN
+            SELECT RAISE(ABORT, 'provider truth active authority is immutable');
+          END;
+        CREATE TRIGGER reachability_results_active_key_insert
+          BEFORE INSERT ON reachability_results
+          WHEN NEW.integrity_version != 2 OR NEW.integrity_key_id != (
+            SELECT active_key_id FROM provider_truth_authority WHERE singleton_id = 1
+          ) BEGIN
+            SELECT RAISE(ABORT, 'provider truth active authority is immutable');
+          END;
+      `);
+      db.pragma(`user_version = ${PROVIDER_TRUTH_STORE_SCHEMA_VERSION}`);
+    });
+    migrate.immediate();
+  } finally {
+    db.close();
   }
 }
 
@@ -168,25 +294,20 @@ export class ProviderTruthStore {
   readonly projectId: string;
   private readonly db: Database.Database;
   private readonly now: () => Date;
-  private readonly integrityKey: Buffer;
+  private readonly integrityAuthority: ProviderIntegrityAuthority;
 
   constructor(globalStateDir: string, options: ProviderTruthStoreOptions) {
-    if (!options || (typeof options.integrityKey !== 'string' && !Buffer.isBuffer(options.integrityKey))) {
+    if (!options || (!options.integrityAuthority
+      && typeof options.integrityKey !== 'string' && !Buffer.isBuffer(options.integrityKey))
+      || (options.integrityAuthority !== undefined && options.integrityKey !== undefined)) {
       throw new ProviderTruthStoreError(
         'INTEGRITY_FAILURE',
         'Provider truth store requires a host integrity authority',
       );
     }
     requireIdentity('projectId', options.projectId);
-    this.integrityKey = Buffer.isBuffer(options.integrityKey)
-      ? Buffer.from(options.integrityKey)
-      : Buffer.from(options.integrityKey, 'utf8');
-    if (this.integrityKey.byteLength < 32) {
-      throw new ProviderTruthStoreError(
-        'INTEGRITY_FAILURE',
-        'Provider truth integrity key must be at least 32 bytes',
-      );
-    }
+    this.integrityAuthority = options.integrityAuthority
+      ?? createProviderIntegrityAuthority(options.integrityKey!);
     const dbPath = options.dbPath ?? join(globalStateDir, 'provider-truth.db');
     mkdirSync(dirname(dbPath), { recursive: true });
     this.now = options.now ?? (() => new Date());
@@ -210,8 +331,8 @@ export class ProviderTruthStore {
       if (existingTables.length > 0) {
         if (schemaVersion !== PROVIDER_TRUTH_STORE_SCHEMA_VERSION) {
           throw new ProviderTruthStoreError(
-            'INTEGRITY_FAILURE',
-            'Unsigned provider truth schema requires an explicit authority migration',
+            'MIGRATION_REQUIRED',
+            'Provider truth schema requires an explicit authority migration',
           );
         }
         this.assertSchema();
@@ -233,7 +354,10 @@ export class ProviderTruthStore {
     this.db.exec(`
       CREATE TABLE provider_truth_authority (
         singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
-        integrity_check TEXT NOT NULL
+        integrity_check TEXT NOT NULL,
+        active_key_id TEXT NOT NULL,
+        integrity_version INTEGER NOT NULL,
+        authority_revision INTEGER NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS capability_catalogs (
@@ -244,6 +368,8 @@ export class ProviderTruthStore {
         fetched_at TEXT NOT NULL,
         payload_json TEXT NOT NULL,
         payload_hash TEXT NOT NULL,
+        integrity_key_id TEXT NOT NULL,
+        integrity_version INTEGER NOT NULL,
         PRIMARY KEY (tenant_id, project_id, catalog_id),
         UNIQUE (tenant_id, project_id, idempotency_key)
       );
@@ -267,29 +393,42 @@ export class ProviderTruthStore {
         completed_at TEXT NOT NULL,
         payload_json TEXT NOT NULL,
         payload_hash TEXT NOT NULL,
+        integrity_key_id TEXT NOT NULL,
+        integrity_version INTEGER NOT NULL,
         UNIQUE (tenant_id, project_id, reachability_id),
         UNIQUE (tenant_id, project_id, idempotency_key)
       );
     `);
     this.db.exec(EXACT_REACHABILITY_SCOPE_INDEX_SQL);
     for (const triggerSql of Object.values(IMMUTABLE_TRIGGER_SQL)) this.db.exec(triggerSql);
+    const sentinel = this.signIntegrity('authority', INTEGRITY_SENTINEL_INPUT);
     this.db.prepare(`
-      INSERT INTO provider_truth_authority (singleton_id, integrity_check) VALUES (1, ?)
-    `).run(this.integrityHash(INTEGRITY_SENTINEL_INPUT));
+      INSERT INTO provider_truth_authority (
+        singleton_id, integrity_check, active_key_id, integrity_version, authority_revision
+      ) VALUES (1, ?, ?, ?, ?)
+    `).run(
+      sentinel.mac,
+      sentinel.keyId,
+      ROW_INTEGRITY_VERSION,
+      sentinel.authorityRevision,
+    );
   }
 
   private assertSchema(): void {
     const requiredColumns: Readonly<Record<string, readonly string[]>> = {
-      provider_truth_authority: ['singleton_id', 'integrity_check'],
+      provider_truth_authority: [
+        'singleton_id', 'integrity_check', 'active_key_id', 'integrity_version', 'authority_revision',
+      ],
       capability_catalogs: [
         'catalog_id', 'tenant_id', 'project_id', 'idempotency_key', 'fetched_at',
-        'payload_json', 'payload_hash',
+        'payload_json', 'payload_hash', 'integrity_key_id', 'integrity_version',
       ],
       reachability_results: [
         'inserted_seq', 'reachability_id', 'tenant_id', 'project_id', 'idempotency_key',
         'provider', 'model', 'auth_mode', 'account_ref_hash', 'transport',
         'execution_backend', 'endpoint_ref_hash', 'runtime_fingerprint',
         'execution_profile_ref', 'capability', 'completed_at', 'payload_json', 'payload_hash',
+        'integrity_key_id', 'integrity_version',
       ],
     };
     for (const [table, required] of Object.entries(requiredColumns)) {
@@ -350,10 +489,44 @@ export class ProviderTruthStore {
     }
 
     const authority = this.db.prepare(`
-      SELECT integrity_check FROM provider_truth_authority WHERE singleton_id = 1
-    `).get() as { integrity_check: string } | undefined;
-    if (!authority || authority.integrity_check !== this.integrityHash(INTEGRITY_SENTINEL_INPUT)) {
+      SELECT integrity_check, active_key_id, integrity_version, authority_revision
+      FROM provider_truth_authority WHERE singleton_id = 1
+    `).get() as {
+      integrity_check: string;
+      active_key_id: string;
+      integrity_version: number;
+      authority_revision: number;
+    } | undefined;
+    let authorityVerified = false;
+    try {
+      authorityVerified = authority !== undefined && this.verifyIntegrity(
+        'authority',
+        authority.active_key_id,
+        authority.integrity_version === 1 ? LEGACY_INTEGRITY_SENTINEL_INPUT : INTEGRITY_SENTINEL_INPUT,
+        authority.integrity_check,
+        authority.integrity_version,
+      );
+    } catch (error) {
+      if (!(error instanceof ProviderTruthStoreError)
+        || error.code !== 'INTEGRITY_KEY_UNAVAILABLE') throw error;
+    }
+    if (!authority || !authorityVerified) {
       throw new ProviderTruthStoreError('INTEGRITY_FAILURE', 'Provider truth integrity authority mismatch');
+    }
+    const current = this.signIntegrity('authority', INTEGRITY_SENTINEL_INPUT);
+    if (current.authorityRevision < authority.authority_revision
+      || (current.authorityRevision === authority.authority_revision
+        && authority.active_key_id !== current.keyId)) {
+      throw new ProviderTruthStoreError('INTEGRITY_FAILURE', 'Provider truth authority revision is stale');
+    }
+    if (authority.active_key_id !== current.keyId
+      || authority.integrity_version !== ROW_INTEGRITY_VERSION
+      || authority.authority_revision !== current.authorityRevision) {
+      this.db.prepare(`
+        UPDATE provider_truth_authority
+        SET integrity_check = ?, active_key_id = ?, integrity_version = ?, authority_revision = ?
+        WHERE singleton_id = 1
+      `).run(current.mac, current.keyId, ROW_INTEGRITY_VERSION, current.authorityRevision);
     }
   }
 
@@ -369,8 +542,9 @@ export class ProviderTruthStore {
     this.assertScope(catalog);
     assertCapabilityCatalog(catalog);
     const payloadJson = canonicalJson(catalog);
-    const payloadHash = this.integrityHash(payloadJson);
     const transaction = this.db.transaction((): ProviderTruthWriteResult => {
+      this.syncAuthorityForWrite();
+      const signed = this.signIntegrity('catalog', payloadJson);
       const existing = this.db.prepare(`
         SELECT * FROM capability_catalogs
         WHERE tenant_id = ? AND project_id = ? AND idempotency_key = ?
@@ -378,18 +552,19 @@ export class ProviderTruthStore {
         CatalogRow | undefined;
       if (existing) {
         this.verifyCatalogRow(existing);
-        if (existing.catalog_id !== catalog.catalogId || existing.payload_hash !== payloadHash) {
+        if (existing.catalog_id !== catalog.catalogId || existing.payload_json !== payloadJson) {
           throw new ProviderTruthStoreError('IDEMPOTENCY_CONFLICT', 'Catalog idempotency conflict');
         }
         return { evidenceRef: `capability-catalog:${catalog.catalogId}`, created: false };
       }
       this.db.prepare(`
         INSERT INTO capability_catalogs (
-          catalog_id, tenant_id, project_id, idempotency_key, fetched_at, payload_json, payload_hash
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          catalog_id, tenant_id, project_id, idempotency_key, fetched_at, payload_json, payload_hash,
+          integrity_key_id, integrity_version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         catalog.catalogId, catalog.tenantId, catalog.projectId, catalog.idempotencyKey,
-        catalog.source.fetchedAt, payloadJson, payloadHash,
+        catalog.source.fetchedAt, payloadJson, signed.mac, signed.keyId, ROW_INTEGRITY_VERSION,
       );
       return { evidenceRef: `capability-catalog:${catalog.catalogId}`, created: true };
     });
@@ -403,8 +578,9 @@ export class ProviderTruthStore {
     }
     assertReachabilityResult(result);
     const payloadJson = canonicalJson(result);
-    const payloadHash = this.integrityHash(payloadJson);
     const transaction = this.db.transaction((): ProviderTruthWriteResult => {
+      this.syncAuthorityForWrite();
+      const signed = this.signIntegrity('reachability', payloadJson);
       const existing = this.db.prepare(`
         SELECT * FROM reachability_results
         WHERE tenant_id = ? AND project_id = ? AND idempotency_key = ?
@@ -412,7 +588,7 @@ export class ProviderTruthStore {
         ReachabilityRow | undefined;
       if (existing) {
         this.verifyReachabilityRow(existing);
-        if (existing.reachability_id !== result.reachabilityId || existing.payload_hash !== payloadHash) {
+        if (existing.reachability_id !== result.reachabilityId || existing.payload_json !== payloadJson) {
           throw new ProviderTruthStoreError('IDEMPOTENCY_CONFLICT', 'Reachability idempotency conflict');
         }
         return { evidenceRef: `provider-reachability:${result.reachabilityId}`, created: false };
@@ -421,15 +597,16 @@ export class ProviderTruthStore {
         INSERT INTO reachability_results (
           reachability_id, tenant_id, project_id, idempotency_key, provider, model,
           auth_mode, account_ref_hash, transport, execution_backend, endpoint_ref_hash,
-          runtime_fingerprint, execution_profile_ref, capability, completed_at, payload_json, payload_hash
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          runtime_fingerprint, execution_profile_ref, capability, completed_at, payload_json, payload_hash,
+          integrity_key_id, integrity_version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         result.reachabilityId, result.tenantId, result.projectId, result.idempotencyKey,
         result.provider, result.model, result.auth.mode, result.auth.accountRefHash,
         result.backend.transport, result.backend.executionBackend, result.backend.endpointRefHash,
         result.backend.runtimeFingerprint, result.backend.executionProfileRef,
         result.probe.capability, result.probe.completedAt,
-        payloadJson, payloadHash,
+        payloadJson, signed.mac, signed.keyId, ROW_INTEGRITY_VERSION,
       );
       return { evidenceRef: `provider-reachability:${result.reachabilityId}`, created: true };
     });
@@ -492,7 +669,9 @@ export class ProviderTruthStore {
   }
 
   private verifyReachabilityRow(row: ReachabilityRow): ReachabilityResult {
-    if (this.integrityHash(row.payload_json) !== row.payload_hash) {
+    if (!this.verifyIntegrity(
+      'reachability', row.integrity_key_id, row.payload_json, row.payload_hash, row.integrity_version,
+    )) {
       throw new ProviderTruthStoreError('INTEGRITY_FAILURE', 'Reachability evidence hash mismatch');
     }
     const result = JSON.parse(row.payload_json) as ReachabilityResult;
@@ -519,7 +698,9 @@ export class ProviderTruthStore {
   }
 
   private verifyCatalogRow(row: CatalogRow): CapabilityCatalog {
-    if (this.integrityHash(row.payload_json) !== row.payload_hash) {
+    if (!this.verifyIntegrity(
+      'catalog', row.integrity_key_id, row.payload_json, row.payload_hash, row.integrity_version,
+    )) {
       throw new ProviderTruthStoreError('INTEGRITY_FAILURE', 'Capability catalog evidence hash mismatch');
     }
     const catalog = JSON.parse(row.payload_json) as CapabilityCatalog;
@@ -538,7 +719,85 @@ export class ProviderTruthStore {
     this.db.close();
   }
 
-  private integrityHash(value: string): string {
-    return createHmac('sha256', this.integrityKey).update(value).digest('hex');
+  private signIntegrity(kind: string, value: string): ProviderAuthorityMac {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const selected = this.integrityAuthority.sign('truth', value);
+      const envelope = canonicalJson({
+        domain: 'provider-truth',
+        integrityVersion: ROW_INTEGRITY_VERSION,
+        keyId: selected.keyId,
+        kind,
+        value,
+      });
+      const signed = this.integrityAuthority.sign('truth', envelope);
+      if (signed.keyId === selected.keyId
+        && signed.authorityRevision === selected.authorityRevision) return signed;
+    }
+    throw new ProviderTruthStoreError('INTEGRITY_FAILURE', 'Provider truth authority rotated during signing');
+  }
+
+  private syncAuthorityForWrite(): void {
+    const authority = this.db.prepare(`
+      SELECT integrity_check, active_key_id, integrity_version, authority_revision
+      FROM provider_truth_authority WHERE singleton_id = 1
+    `).get() as {
+      integrity_check: string;
+      active_key_id: string;
+      integrity_version: number;
+      authority_revision: number;
+    } | undefined;
+    if (!authority || !this.verifyIntegrity(
+      'authority',
+      authority.active_key_id,
+      authority.integrity_version === 1 ? LEGACY_INTEGRITY_SENTINEL_INPUT : INTEGRITY_SENTINEL_INPUT,
+      authority.integrity_check,
+      authority.integrity_version,
+    )) {
+      throw new ProviderTruthStoreError('INTEGRITY_FAILURE', 'Provider truth integrity authority mismatch');
+    }
+    const current = this.signIntegrity('authority', INTEGRITY_SENTINEL_INPUT);
+    if (current.authorityRevision < authority.authority_revision
+      || (current.authorityRevision === authority.authority_revision
+        && authority.active_key_id !== current.keyId)) {
+      throw new ProviderTruthStoreError('INTEGRITY_FAILURE', 'Provider truth authority revision is stale');
+    }
+    if (authority.active_key_id !== current.keyId
+      || authority.integrity_version !== ROW_INTEGRITY_VERSION
+      || authority.authority_revision !== current.authorityRevision) {
+      this.db.prepare(`
+        UPDATE provider_truth_authority
+        SET integrity_check = ?, active_key_id = ?, integrity_version = ?, authority_revision = ?
+        WHERE singleton_id = 1
+      `).run(current.mac, current.keyId, ROW_INTEGRITY_VERSION, current.authorityRevision);
+    }
+  }
+
+  private verifyIntegrity(
+    kind: string,
+    keyId: string,
+    value: string,
+    mac: string,
+    version: number,
+  ): boolean {
+    try {
+      const signedValue = version === 1
+        ? value
+        : canonicalJson({
+          domain: 'provider-truth',
+          integrityVersion: ROW_INTEGRITY_VERSION,
+          keyId,
+          kind,
+          value,
+        });
+      return this.integrityAuthority.verify('truth', keyId, signedValue, mac);
+    } catch (error) {
+      if (error instanceof ProviderAuthorityKeyringError && error.code === 'KEYRING_UNKNOWN_KEY_ID') {
+        throw new ProviderTruthStoreError(
+          'INTEGRITY_KEY_UNAVAILABLE',
+          'Provider truth evidence references an unavailable authority key',
+        );
+      }
+      throw error;
+    }
   }
 }

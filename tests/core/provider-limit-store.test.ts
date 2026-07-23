@@ -1,9 +1,14 @@
+import { createHmac } from 'node:crypto';
 import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import {
+  ProviderAuthorityKeyring,
+  type ProviderIntegrityAuthority,
+} from '../../src/core/provider-authority-keyring.js';
 import {
   createProviderLimitResult,
   deriveProviderQuotaScopeRefHash,
@@ -14,6 +19,7 @@ import {
 import {
   ProviderLimitStore,
   ProviderLimitStoreError,
+  migrateProviderLimitStoreV1ToV2,
   resolveProviderLimitStorePath,
   type ProviderLimitReservationQuery,
 } from '../../src/core/provider-limit-store.js';
@@ -472,8 +478,13 @@ describe('ProviderLimitStore', () => {
     raw.prepare(`
       INSERT INTO provider_limit_reservation_events (
         event_id, reservation_id, sequence, event_type, occurred_at,
-        payload_json, payload_hash, previous_hash, event_hash
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        payload_json, payload_hash, previous_hash, event_hash,
+        integrity_key_id, integrity_version
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        (SELECT active_key_id FROM provider_limit_authority WHERE singleton_id = 1),
+        2
+      )
     `).run(
       'forged-release-event', 'forged-release', 1, 'released', T1,
       '{}', '0'.repeat(64), null, '1'.repeat(64),
@@ -589,13 +600,11 @@ describe('ProviderLimitStore', () => {
     });
     first.putSnapshot(createProviderLimitResult(observation(), POLICY, { idFactory: () => 'snapshot-1' }));
     first.close();
-    const wrongKey = new ProviderLimitStore(root, {
+    expect(() => new ProviderLimitStore(root, {
       dbPath, now: () => new Date(T2), policyResolver: () => POLICY,
       terminationEvidenceVerifier: () => true,
       integrityKey: 'different-deckent-provider-limit-key-0001',
-    });
-    expect(() => wrongKey.getLatestSnapshot(query())).toThrow(/hash mismatch/);
-    wrongKey.close();
+    })).toThrow(/authority mismatch/);
   });
 
   it('serializes projected policy across eight independent store connections', () => {
@@ -616,5 +625,199 @@ describe('ProviderLimitStore', () => {
       .reduce((total, item) => total + item.estimates[0]!.amount, 0)).toBe(80);
     expect(reservations.slice(4).every(item => item.reasonCode === 'policy_block')).toBe(true);
     for (const store of stores) store.close();
+  });
+
+  it('keeps mixed active/retired limit evidence readable across key rotation', () => {
+    const root = makeRoot();
+    const dbPath = join(root, 'provider-limits.db');
+    const keyring = ProviderAuthorityKeyring.create({
+      dataDir: root,
+      keyringIdFactory: () => 'par-limit-rotation-0001',
+      keyIdFactory: () => 'pak-limit-rotation-0001',
+      randomBytesFactory: size => Buffer.alloc(size, 0x71),
+    }).keyring;
+    const store = new ProviderLimitStore(root, {
+      dbPath,
+      now: () => new Date(T2),
+      policyResolver: () => POLICY,
+      terminationEvidenceVerifier: () => true,
+      integrityAuthority: keyring,
+    });
+    store.putSnapshot(createProviderLimitResult(
+      observation(),
+      POLICY,
+      { idFactory: () => 'snapshot-before-rotation' },
+    ));
+    keyring.rotate({
+      expectedRevisionHash: keyring.snapshot().revisionHash,
+      keyIdFactory: () => 'pak-limit-rotation-0002',
+      randomBytesFactory: size => Buffer.alloc(size, 0x72),
+    });
+    store.putSnapshot(createProviderLimitResult(
+      observation({
+        idempotencyKey: 'snapshot-key-after-rotation',
+        source: {
+          ...observation().source,
+          evidenceRef: 'limit-source:after-rotation',
+          fetchedAt: T1,
+        },
+      }),
+      POLICY,
+      { idFactory: () => 'snapshot-after-rotation' },
+    ));
+    store.close();
+
+    const raw = new Database(dbPath);
+    expect(raw.prepare(`
+      SELECT limit_result_id, integrity_key_id
+      FROM provider_limit_snapshots ORDER BY limit_result_id
+    `).all()).toEqual([
+      { limit_result_id: 'snapshot-after-rotation', integrity_key_id: 'pak-limit-rotation-0002' },
+      { limit_result_id: 'snapshot-before-rotation', integrity_key_id: 'pak-limit-rotation-0001' },
+    ]);
+    raw.close();
+
+    const reopened = new ProviderLimitStore(root, {
+      dbPath,
+      now: () => new Date(T2),
+      policyResolver: () => POLICY,
+      terminationEvidenceVerifier: () => true,
+      integrityAuthority: keyring,
+    });
+    expect(reopened.getLatestSnapshot(query())?.limitResultId).toBe('snapshot-after-rotation');
+    reopened.close();
+  });
+
+  it('migrates v1 evidence transactionally without rewriting payload identity', () => {
+    const root = makeRoot();
+    const dbPath = join(root, 'provider-limits-v1.db');
+    const legacyKeyId = 'pak-legacy-limit-v1-0001';
+    const store = new ProviderLimitStore(root, {
+      dbPath,
+      now: () => new Date(T2),
+      policyResolver: () => POLICY,
+      terminationEvidenceVerifier: () => true,
+      integrityKey: INTEGRITY_KEY,
+    });
+    store.putSnapshot(createProviderLimitResult(
+      observation(),
+      POLICY,
+      { idFactory: () => 'snapshot-v1-migration' },
+    ));
+    store.close();
+
+    const legacy = new Database(dbPath);
+    legacy.exec(`
+      DROP TRIGGER provider_limit_snapshots_no_update;
+      DROP TRIGGER provider_limit_snapshots_active_key_insert;
+      DROP TRIGGER provider_limit_reservations_active_key_insert;
+      DROP TRIGGER provider_limit_events_active_key_insert;
+    `);
+    const snapshot = legacy.prepare(`
+      SELECT payload_json FROM provider_limit_snapshots WHERE limit_result_id = ?
+    `).get('snapshot-v1-migration') as { payload_json: string };
+    const legacyHash = createHmac('sha256', INTEGRITY_KEY)
+      .update(snapshot.payload_json)
+      .digest('hex');
+    legacy.prepare('UPDATE provider_limit_snapshots SET payload_hash = ?').run(legacyHash);
+    legacy.exec(`
+      DROP TABLE provider_limit_authority;
+      ALTER TABLE provider_limit_snapshots DROP COLUMN integrity_version;
+      ALTER TABLE provider_limit_snapshots DROP COLUMN integrity_key_id;
+      ALTER TABLE provider_limit_reservations DROP COLUMN integrity_version;
+      ALTER TABLE provider_limit_reservations DROP COLUMN integrity_key_id;
+      ALTER TABLE provider_limit_reservation_events DROP COLUMN integrity_version;
+      ALTER TABLE provider_limit_reservation_events DROP COLUMN integrity_key_id;
+      CREATE TRIGGER provider_limit_snapshots_no_update
+        BEFORE UPDATE ON provider_limit_snapshots BEGIN
+          SELECT RAISE(ABORT, 'provider limit snapshots are immutable');
+        END;
+    `);
+    legacy.pragma('user_version = 1');
+    const before = legacy.prepare(`
+      SELECT payload_json, payload_hash FROM provider_limit_snapshots WHERE limit_result_id = ?
+    `).get('snapshot-v1-migration');
+    legacy.close();
+
+    migrateProviderLimitStoreV1ToV2({
+      dbPath,
+      legacyKeyId,
+      legacyIntegrityKey: INTEGRITY_KEY,
+    });
+    const keyring = ProviderAuthorityKeyring.create({
+      dataDir: root,
+      keyringIdFactory: () => 'par-limit-migration-0001',
+      keyIdFactory: () => 'pak-limit-current-0001',
+      randomBytesFactory: size => Buffer.alloc(size, 0x73),
+    }).keyring;
+    keyring.importLegacyVerificationKey({
+      expectedRevisionHash: keyring.snapshot().revisionHash,
+      domain: 'limit',
+      legacyKey: INTEGRITY_KEY,
+      keyIdFactory: () => legacyKeyId,
+    });
+    const migrated = new ProviderLimitStore(root, {
+      dbPath,
+      now: () => new Date(T2),
+      policyResolver: () => POLICY,
+      terminationEvidenceVerifier: () => true,
+      integrityAuthority: keyring,
+    });
+    expect(migrated.getLatestSnapshot(query())?.limitResultId).toBe('snapshot-v1-migration');
+    migrated.close();
+
+    const verify = new Database(dbPath);
+    expect(verify.prepare(`
+      SELECT payload_json, payload_hash FROM provider_limit_snapshots WHERE limit_result_id = ?
+    `).get('snapshot-v1-migration')).toEqual(before);
+    expect(verify.pragma('user_version', { simple: true })).toBe(2);
+    verify.close();
+  });
+
+  it('rejects a stale writer after a newer limit authority revision is durable', () => {
+    const root = makeRoot();
+    const dbPath = join(root, 'provider-limit-stale-writer.db');
+    const keys = {
+      'pak-limit-stale-0001': 'limit-stale-writer-key-material-00000001',
+      'pak-limit-stale-0002': 'limit-stale-writer-key-material-00000002',
+    } as const;
+    const authority = (
+      activeKeyId: keyof typeof keys,
+      authorityRevision: number,
+    ): ProviderIntegrityAuthority => ({
+      sign: (_domain, value) => ({
+        keyId: activeKeyId,
+        authorityRevision,
+        mac: createHmac('sha256', keys[activeKeyId]).update(value).digest('hex'),
+      }),
+      verify: (_domain, keyId, value, mac) => {
+        const key = keys[keyId as keyof typeof keys];
+        if (!key) throw new Error('unknown test key');
+        return createHmac('sha256', key).update(value).digest('hex') === mac;
+      },
+    });
+    const options = {
+      dbPath,
+      now: () => new Date(T2),
+      policyResolver: () => POLICY,
+      terminationEvidenceVerifier: () => true,
+    };
+    const stale = new ProviderLimitStore(root, {
+      ...options,
+      integrityAuthority: authority('pak-limit-stale-0001', 1),
+    });
+    const current = new ProviderLimitStore(root, {
+      ...options,
+      integrityAuthority: authority('pak-limit-stale-0002', 2),
+    });
+    const snapshot = createProviderLimitResult(
+      observation(),
+      POLICY,
+      { idFactory: () => 'snapshot-stale-writer' },
+    );
+    expect(() => stale.putSnapshot(snapshot)).toThrow(/authority revision is stale/);
+    expect(current.putSnapshot(snapshot).created).toBe(true);
+    stale.close();
+    current.close();
   });
 });
