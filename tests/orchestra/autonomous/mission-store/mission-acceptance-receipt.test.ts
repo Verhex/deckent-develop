@@ -18,6 +18,7 @@ import {
   type GoalAcceptanceEvaluation,
 } from '../../../../src/orchestra/autonomous/mission-store/mission-acceptance.js';
 import { SqliteMissionStore } from '../../../../src/orchestra/autonomous/mission-store/sqlite-mission-store.js';
+import { settleMissionItem } from '../../../helpers/mission-store.js';
 
 const roots: string[] = [];
 function makeRoot(): string {
@@ -87,7 +88,7 @@ describe('Goal-v2 acceptance InvocationReceipt truth', () => {
       tenant: 'tenant-a',
     });
     missionStore.enqueueItem({ id: 'goal-live-test', missionId: 'goal-live-receipt', kind: 'task' });
-    missionStore.updateItemStatus('goal-live-test', 'done', { ok: true, reason: 'tests passed' });
+    settleMissionItem(missionStore, 'goal-live-test', 'done', { ok: true, reason: 'tests passed' });
 
     let ledger = new InvocationReceiptStore(root, { idFactory: () => 'project-goal' });
     const input = receipt(ledger, 'goal-live-receipt');
@@ -142,7 +143,7 @@ describe('Goal-v2 acceptance InvocationReceipt truth', () => {
       acceptance: 'tests pass', acceptanceAuthoredAt: '2026-07-22T00:00:00.000Z', tenant: 'tenant-a',
     });
     missionStore.enqueueItem({ id: 'goal-reject-test', missionId: 'goal-reject-ref', kind: 'task' });
-    missionStore.updateItemStatus('goal-reject-test', 'done', { ok: true });
+    settleMissionItem(missionStore, 'goal-reject-test', 'done', { ok: true });
     const ledger = new InvocationReceiptStore(root, { idFactory: () => 'project-goal' });
     const input = receipt(ledger, 'goal-reject-ref');
     settleAccepted(ledger, input);

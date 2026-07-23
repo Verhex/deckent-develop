@@ -12,6 +12,7 @@ import {
 import type { NewWorkItem, WorkItem } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 import { PRODUCTION_V2_ADMISSION } from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
 import type { InvocationReceiptRef } from '../../../../src/core/invocation-receipt.js';
+import { settleMissionItem } from '../../../helpers/mission-store.js';
 
 const dirs: string[] = [];
 function newStore() {
@@ -106,7 +107,7 @@ describe('advanceGoalMission', () => {
       acceptanceAuthoredAt: '2026-07-22T00:00:00.000Z',
     });
     store.enqueueItem({ id: 'g-evidenced-test', missionId: 'g-evidenced', kind: 'task' });
-    store.updateItemStatus('g-evidenced-test', 'done', { ok: true, reason: '27 tests passed' });
+    settleMissionItem(store, 'g-evidenced-test', 'done', { ok: true, reason: '27 tests passed' });
     const receiptRef: InvocationReceiptRef = {
       schemaVersion: 1,
       invocationId: 'inv-goal-accept-1',
@@ -344,7 +345,7 @@ describe('advanceGoalMission', () => {
     const store = newStore();
     createGoalMission(store, { id: 'g-parked', title: 'Parked', goal: 'g' });
     store.enqueueItem({ id: 'g-parked-open', missionId: 'g-parked', kind: 'task' });
-    store.updateItemStatus('g-parked-open', 'parked', {
+    settleMissionItem(store, 'g-parked-open', 'parked', {
       ok: false,
       reason: 'RECOVERY_RECONCILIATION_REQUIRED',
     });
@@ -366,8 +367,8 @@ describe('advanceGoalMission', () => {
     // Two already-settled items; with maxRounds=2 the cumulative cap is reached.
     store.enqueueItem({ id: 'g-max-1', missionId: 'g-max', kind: 'task' });
     store.enqueueItem({ id: 'g-max-2', missionId: 'g-max', kind: 'task' });
-    store.updateItemStatus('g-max-1', 'done', { ok: true });
-    store.updateItemStatus('g-max-2', 'done', { ok: true });
+    settleMissionItem(store, 'g-max-1', 'done', { ok: true });
+    settleMissionItem(store, 'g-max-2', 'done', { ok: true });
 
     const author = vi.fn(async (): Promise<NewWorkItem[]> => [
       { id: 'g-max-3', missionId: 'g-max', kind: 'task' },
@@ -489,7 +490,7 @@ describe('buildGoalDeps', () => {
     const store = newStore();
     createGoalMission(store, { id: 'g-bd-max', title: 'Max', goal: 'g' });
     store.enqueueItem({ id: 'g-bd-max-1', missionId: 'g-bd-max', kind: 'task' });
-    store.updateItemStatus('g-bd-max-1', 'done', { ok: true });
+    settleMissionItem(store, 'g-bd-max-1', 'done', { ok: true });
 
     const planner = vi.fn(async (): Promise<NewWorkItem[]> => [
       { id: 'never', missionId: 'g-bd-max', kind: 'task' },

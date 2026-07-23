@@ -11,6 +11,7 @@ import {
   createMissionRunnerRegistry,
 } from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
 import type { NewWorkItem } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
+import { settleMissionItem } from '../../../helpers/mission-store.js';
 
 const dirs: string[] = [];
 function freshMission() {
@@ -326,14 +327,65 @@ describe('WorkItems + atomic claim', () => {
     s.close();
   });
 
-  it('claimItem skips an already-running item; updateItemStatus persists result', () => {
+  it('claimItem skips an already-running item; exact settlement persists result', () => {
     const s = freshMission();
     s.enqueueItem({ id: 'w', missionId: 'm', kind: 'task' });
-    expect(s.claimItem('w', 'a')).toBe(true);
+    const claim = s.claimItemWithAuthority('w', 'a')!;
+    expect(claim).not.toBeNull();
     expect(s.claimItem('w', 'b')).toBe(false);                // already running
     expect(s.queryDue().length).toBe(0);                       // not surfaced once running
-    s.updateItemStatus('w', 'done', { ok: true, reason: 'ok' });
+    expect(s.settleClaimedItem(claim, 'done', { ok: true, reason: 'ok' })).toBe(true);
     expect(s.listItems('m')[0].lastResult).toEqual({ ok: true, reason: 'ok' });
+    s.close();
+  });
+
+  it('backfills only claim-free terminal legacy evidence under exact row revision', () => {
+    const s = freshMission();
+    s.createMissionWithItems(
+      { id: 'legacy-terminal', kind: 'list', title: 'legacy', renderAs: 'checklist' },
+      [{
+        id: 'legacy-done',
+        missionId: 'legacy-terminal',
+        kind: 'task',
+        initialStatus: 'done',
+      }],
+    );
+    const observed = s.listItems('legacy-terminal')[0]!;
+    expect(observed).toMatchObject({ status: 'done', revision: 0, lastResult: null });
+    expect(s.backfillLegacyTerminalResult(
+      observed.id,
+      observed.revision,
+      'done',
+      { ok: true, reason: 'historical evidence' },
+    )).toBe(true);
+    expect(s.backfillLegacyTerminalResult(
+      observed.id,
+      observed.revision,
+      'done',
+      { ok: true, reason: 'altered retry' },
+    )).toBe(false);
+    expect(s.listItems('legacy-terminal')[0]).toMatchObject({
+      status: 'done',
+      revision: 1,
+      lastResult: { ok: true, reason: 'historical evidence' },
+    });
+
+    s.enqueueItem({ id: 'non-terminal', missionId: 'm', kind: 'task' });
+    const pending = s.listItems('m').find((item) => item.id === 'non-terminal')!;
+    expect(s.backfillLegacyTerminalResult(
+      pending.id,
+      pending.revision,
+      'done',
+      { ok: true },
+    )).toBe(false);
+    const claim = s.claimItemWithAuthority('non-terminal', 'active-worker')!;
+    expect(s.backfillLegacyTerminalResult(
+      claim.workItemId,
+      claim.itemRevision,
+      'done',
+      { ok: true },
+    )).toBe(false);
+    expect(s.isDispatchClaimActive(claim)).toBe(true);
     s.close();
   });
 
@@ -359,8 +411,9 @@ describe('WorkItems + atomic claim', () => {
     expect(s.queryDue().map((item) => item.id)).toEqual(['upstream']);
     expect(s.claimItem('downstream', 'racing-scheduler')).toBe(false);
 
-    expect(s.claimItem('upstream', 'scheduler')).toBe(true);
-    s.updateItemStatus('upstream', 'done', { ok: true });
+    const upstreamClaim = s.claimItemWithAuthority('upstream', 'scheduler')!;
+    expect(upstreamClaim).not.toBeNull();
+    expect(s.settleClaimedItem(upstreamClaim, 'done', { ok: true })).toBe(true);
     expect(s.queryDue().map((item) => item.id)).toEqual(['downstream']);
     expect(s.claimItem('downstream', 'scheduler')).toBe(true);
     s.close();
@@ -389,7 +442,7 @@ describe('WorkItems + atomic claim', () => {
     const s = freshMission();
     s.enqueueItem({ id: 'failed-root', missionId: 'm', kind: 'task' });
     s.enqueueItem({ id: 'blocked-child', missionId: 'm', kind: 'task', dependsOn: ['failed-root'] });
-    s.updateItemStatus('failed-root', 'failed', { ok: false, reason: 'root failed' });
+    settleMissionItem(s, 'failed-root', 'failed', { ok: false, reason: 'root failed' });
 
     expect(s.reconcilePendingDependencies()).toEqual(['m']);
     expect(s.listItems('m').find((item) => item.id === 'blocked-child')!.status).toBe('blocked');
@@ -609,7 +662,9 @@ describe('WorkItems + atomic claim', () => {
     const s = freshMission();
     s.enqueueItem(admitted({ id: 'stale', missionId: 'm', kind: 'task', spec: { description: 'stale' } }));
     const stale = s.queryDue({ registry: PRODUCTION_V2_RUNNER_REGISTRY })[0]!;
-    s.updateItemStatus('stale', 'pending', { ok: false, reason: 'concurrent metadata transition' });
+    s.__rawExec(`UPDATE work_items SET revision=revision+1,
+      last_result='{"ok":false,"reason":"concurrent metadata transition"}'
+      WHERE id='stale' AND status='pending'`);
 
     expect(s.claimItem('stale', 'stale-scheduler', {
       itemRevision: stale.revision,

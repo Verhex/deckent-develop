@@ -108,8 +108,11 @@ describe('runMissionScheduler — mission settlement', () => {
 describe('runMissionScheduler — robustness', () => {
   it('fails loud when exact settlement CAS loses and never performs a blind second write', async () => {
     const s = storeWith('stale-settle', 1);
-    await expect(runMissionScheduler(s, async (item) => {
-        s.updateItemStatus(item.id, 'pending', { ok: false, reason: 'new authority required' });
+    await expect(runMissionScheduler(s, async () => {
+        s.__rawExec(`UPDATE work_items SET status='pending',revision=revision+1,
+          last_result='{"ok":false,"reason":"new authority required"}',
+          claimed_at=NULL,claimed_by=NULL,claim_attempt_id=NULL,claim_fence_token_hash=NULL
+          WHERE id='stale-settle-w0'`);
         return { ok: true, reason: 'stale success' };
       }, { poolSize: 1, intervalMs: 1, maxIterations: 1 }))
       .rejects.toBeInstanceOf(MissionClaimSettlementError);
@@ -171,7 +174,10 @@ describe('runMissionScheduler — robustness', () => {
       ): MissionDispatchClaim | null {
         if (fence && !this.raced) {
           this.raced = true;
-          this.updateItemStatus(id, 'pending', { ok: false, reason: 'concurrent transition' });
+          if (id !== 'race-task') throw new Error(`Unexpected race item ${id}`);
+          this.__rawExec(`UPDATE work_items SET revision=revision+1,
+            last_result='{"ok":false,"reason":"concurrent transition"}'
+            WHERE id='race-task' AND status='pending'`);
         }
         return super.claimItemWithAuthority(id, by, fence);
       }
@@ -278,7 +284,12 @@ describe('runMissionScheduler — robustness', () => {
           return { ok: true };
         }
         await new Promise((resolve) => setTimeout(resolve, 5));
-        s.updateItemStatus(item.id, 'pending', { ok: false, reason: 'new authority required' });
+        const expectedId = `delayed-${boundary}-w1`;
+        if (item.id !== expectedId) throw new Error(`Unexpected delayed item ${item.id}`);
+        s.__rawExec(`UPDATE work_items SET status='pending',revision=revision+1,
+          last_result='{"ok":false,"reason":"new authority required"}',
+          claimed_at=NULL,claimed_by=NULL,claim_attempt_id=NULL,claim_fence_token_hash=NULL
+          WHERE id='${expectedId}'`);
         return { ok: true, reason: 'stale success' };
       }, {
         poolSize: 2,

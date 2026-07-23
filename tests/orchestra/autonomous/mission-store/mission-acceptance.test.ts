@@ -10,6 +10,7 @@ import {
   createGoalAcceptanceContract,
   readGoalAcceptanceContract,
 } from '../../../../src/orchestra/autonomous/mission-store/mission-acceptance.js';
+import { settleMissionItem } from '../../../helpers/mission-store.js';
 
 const roots: string[] = [];
 function root(): string {
@@ -73,7 +74,7 @@ describe('SqliteMissionStore acceptance decision fence', () => {
       acceptanceAuthoredBy: { surface: 'cli', actorId: null },
     });
     store.enqueueItem({ id: 'goal-fence-test', missionId: 'goal-fence', kind: 'task' });
-    store.updateItemStatus('goal-fence-test', 'done', { ok: true, reason: 'all tests passed' });
+    settleMissionItem(store, 'goal-fence-test', 'done', { ok: true, reason: 'all tests passed' });
     const mission = store.getMission('goal-fence')!;
     const contract = readGoalAcceptanceContract(mission)!;
     const items = store.listItems('goal-fence');
@@ -126,7 +127,7 @@ describe('SqliteMissionStore acceptance decision fence', () => {
       acceptanceAuthoredAt: '2026-07-22T00:00:00.000Z',
     });
     store.enqueueItem({ id: 'goal-atomic-test', missionId: 'goal-atomic', kind: 'task' });
-    store.updateItemStatus('goal-atomic-test', 'done', { ok: true, reason: 'passed' });
+    settleMissionItem(store, 'goal-atomic-test', 'done', { ok: true, reason: 'passed' });
     const contract = readGoalAcceptanceContract(store.getMission('goal-atomic')!)!;
     const decision = buildMissionAcceptanceDecision('goal-atomic', contract, 1, {
       outcome: 'accepted',

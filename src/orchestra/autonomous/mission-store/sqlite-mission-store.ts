@@ -1729,6 +1729,30 @@ export class SqliteMissionStore implements MissionStore {
     return info.changes === 1;
   }
 
+  backfillLegacyTerminalResult(
+    id: string,
+    expectedRevision: number,
+    status: Extract<WorkItemStatus, 'done' | 'failed'>,
+    result: ResultLike,
+  ): boolean {
+    if (!id || id !== id.trim()
+      || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0
+      || (status !== 'done' && status !== 'failed')) return false;
+    const info = this.db.prepare(`UPDATE work_items SET
+      last_result=@result,revision=revision+1,updated_at=@ts
+      WHERE id=@id AND revision=@expectedRevision AND status=@status
+        AND last_result IS NULL
+        AND claimed_at IS NULL AND claimed_by IS NULL
+        AND claim_attempt_id IS NULL AND claim_fence_token_hash IS NULL`).run({
+      id,
+      expectedRevision,
+      status,
+      result: JSON.stringify(result),
+      ts: this.now(),
+    });
+    return info.changes === 1;
+  }
+
   isDispatchClaimActive(claim: MissionDispatchClaim, engineLease?: MissionEngineLease): boolean {
     if (claim.schemaVersion !== 1
       || claim.workItemId.length === 0
@@ -1765,12 +1789,6 @@ export class SqliteMissionStore implements MissionStore {
 
   claimItem(id: string, by: string, fence?: MissionClaimFence): boolean {
     return this.claimItemWithAuthority(id, by, fence) !== null;
-  }
-
-  updateItemStatus(id: string, status: WorkItemStatus, result?: ResultLike): void {
-    this.db.prepare(`UPDATE work_items SET status=?, last_result=COALESCE(?, last_result),
-      claim_attempt_id=NULL, claim_fence_token_hash=NULL, revision=revision+1, updated_at=? WHERE id=?`)
-      .run(status, result ? JSON.stringify(result) : null, this.now(), id);
   }
   listItems(missionId: string): WorkItem[] {
     return (this.db.prepare(`SELECT ${WORK_ITEM_WITH_FENCE_COLUMNS}

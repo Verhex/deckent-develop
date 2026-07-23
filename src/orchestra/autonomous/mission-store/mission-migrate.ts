@@ -160,7 +160,28 @@ export function migrateBacklogJson(
     for (const item of items) {
       if ((item.initialStatus === 'done' || item.initialStatus === 'failed') && item.initialResult) {
         const stored = storedItems.find((candidate) => candidate.id === item.id);
-        if (stored?.lastResult === null) store.updateItemStatus(item.id, item.initialStatus, item.initialResult);
+        if (!stored) {
+          throw new Error(`MISSION_MIGRATION_CONFLICT: terminal item missing for ${item.id}`);
+        }
+        if (stored?.lastResult === null) {
+          const backfilled = store.backfillLegacyTerminalResult(
+            item.id,
+            stored.revision,
+            item.initialStatus,
+            item.initialResult,
+          );
+          if (!backfilled) {
+            const current = store.listItems('legacy').find((candidate) => candidate.id === item.id);
+            if (!current
+              || current.status !== item.initialStatus
+              || canonicalJson(current.lastResult) !== canonicalJson(item.initialResult)) {
+              throw new Error(`MISSION_MIGRATION_CONFLICT: terminal evidence changed for ${item.id}`);
+            }
+          }
+        } else if (stored.status !== item.initialStatus
+          || canonicalJson(stored.lastResult) !== canonicalJson(item.initialResult)) {
+          throw new Error(`MISSION_MIGRATION_CONFLICT: terminal evidence changed for ${item.id}`);
+        }
       }
     }
     return 0;

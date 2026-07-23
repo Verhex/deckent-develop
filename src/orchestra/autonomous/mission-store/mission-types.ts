@@ -219,9 +219,17 @@ export interface MissionStore {
     result?: ResultLike,
     engineLease?: MissionEngineLease,
   ): boolean;
+  /**
+   * Migration-only terminal evidence backfill. It cannot change lifecycle
+   * status or touch an active claim and is fenced by the observed row revision.
+   */
+  backfillLegacyTerminalResult(
+    id: string,
+    expectedRevision: number,
+    status: Extract<WorkItemStatus, 'done' | 'failed'>,
+    result: ResultLike,
+  ): boolean;
   /** Compatibility/admin claim surface. Runtime schedulers must use claimItemWithAuthority. */
   claimItem(id: string, by: string, fence?: MissionClaimFence): boolean;
-  /** Compatibility/admin transition. Runtime schedulers must use settleClaimedItem. */
-  updateItemStatus(id: string, status: WorkItemStatus, result?: ResultLike): void;
   listItems(missionId: string): WorkItem[];
 }

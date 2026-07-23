@@ -8,6 +8,10 @@ import {
   computeSprintSnapshotDigest,
   PRODUCTION_V2_ADMISSION,
 } from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
+import type {
+  ResultLike,
+  WorkItemStatus,
+} from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 
 const dirs: string[] = [];
 function root() { const d = mkdtempSync(join(tmpdir(), 'mig-')); dirs.push(d); return d; }
@@ -92,6 +96,98 @@ describe('migrateBacklogJson', () => {
 
     expect(migrateBacklogJson(r, s, { admission: PRODUCTION_V2_ADMISSION })).toBe(0);
     expect(s.listItems('legacy')[0]!.lastResult).toEqual({ ok: true, reason: 'restored' });
+    s.close();
+  });
+
+  it('fails loud when a concurrent revision wins before terminal evidence backfill', () => {
+    class RacingBackfillStore extends SqliteMissionStore {
+      override backfillLegacyTerminalResult(
+        id: string,
+        expectedRevision: number,
+        status: Extract<WorkItemStatus, 'done' | 'failed'>,
+        result: ResultLike,
+      ): boolean {
+        this.__rawExec(`UPDATE work_items SET revision=revision+1
+          WHERE id='historical-race' AND status='done' AND last_result IS NULL`);
+        return super.backfillLegacyTerminalResult(id, expectedRevision, status, result);
+      }
+    }
+    const r = root();
+    mkdirSync(join(r, '.deckent', 'autonomous'), { recursive: true });
+    writeFileSync(join(r, '.deckent', 'autonomous', 'backlog.json'), JSON.stringify({
+      _version: '1.0',
+      entries: [{
+        id: 'historical-race',
+        title: 'Historical race',
+        kind: 'task',
+        spec: { description: 'historical' },
+        policy: 'auto',
+        trigger: { type: 'one-off' },
+        status: 'done',
+        lastResult: { ok: true, reason: 'expected evidence' },
+      }],
+    }), 'utf-8');
+    const s = new RacingBackfillStore(r);
+    s.migrate();
+    s.createMissionWithItems(
+      { id: 'legacy', kind: 'list', title: 'Imported backlog', renderAs: 'checklist' },
+      [{
+        id: 'historical-race',
+        missionId: 'legacy',
+        kind: 'task',
+        spec: { description: 'historical' },
+        policy: 'auto',
+        trigger: { type: 'one-off' },
+        initialStatus: 'done',
+      }],
+    );
+
+    expect(() => migrateBacklogJson(r, s, { admission: PRODUCTION_V2_ADMISSION }))
+      .toThrow('MISSION_MIGRATION_CONFLICT: terminal evidence changed for historical-race');
+    expect(s.listItems('legacy')[0]).toMatchObject({
+      status: 'done',
+      revision: 1,
+      lastResult: null,
+    });
+    s.close();
+  });
+
+  it('rejects pre-existing terminal evidence that differs from the legacy source', () => {
+    const r = root();
+    mkdirSync(join(r, '.deckent', 'autonomous'), { recursive: true });
+    writeFileSync(join(r, '.deckent', 'autonomous', 'backlog.json'), JSON.stringify({
+      _version: '1.0',
+      entries: [{
+        id: 'historical-mismatch',
+        title: 'Historical mismatch',
+        kind: 'task',
+        spec: { description: 'historical' },
+        policy: 'auto',
+        trigger: { type: 'one-off' },
+        status: 'done',
+        lastResult: { ok: true, reason: 'source evidence' },
+      }],
+    }), 'utf-8');
+    const s = new SqliteMissionStore(r);
+    s.migrate();
+    s.createMissionWithItems(
+      { id: 'legacy', kind: 'list', title: 'Imported backlog', renderAs: 'checklist' },
+      [{
+        id: 'historical-mismatch',
+        missionId: 'legacy',
+        kind: 'task',
+        spec: { description: 'historical' },
+        policy: 'auto',
+        trigger: { type: 'one-off' },
+        initialStatus: 'done',
+        initialResult: { ok: true, reason: 'different stored evidence' },
+      }],
+    );
+
+    expect(() => migrateBacklogJson(r, s, { admission: PRODUCTION_V2_ADMISSION }))
+      .toThrow('MISSION_MIGRATION_CONFLICT: terminal evidence changed for historical-mismatch');
+    expect(s.listItems('legacy')[0]!.lastResult)
+      .toEqual({ ok: true, reason: 'different stored evidence' });
     s.close();
   });
 

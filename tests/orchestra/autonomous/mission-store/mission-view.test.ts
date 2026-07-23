@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteMissionStore } from '../../../../src/orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import { projectMission } from '../../../../src/orchestra/autonomous/mission-store/mission-view.js';
+import { settleMissionItem } from '../../../helpers/mission-store.js';
 
 const dirs: string[] = [];
 function store() { const d = mkdtempSync(join(tmpdir(), 'mv-')); dirs.push(d); const s = new SqliteMissionStore(d); s.migrate(); return s; }
@@ -15,7 +16,7 @@ describe('MissionView projection', () => {
     s.createMission({ id: 'm', kind: 'list', title: 'L', renderAs: 'checklist' });
     s.enqueueItem({ id: 'w1', missionId: 'm', kind: 'sprint' });
     s.enqueueItem({ id: 'w2', missionId: 'm', kind: 'task' });
-    s.claimItem('w1', 'x'); s.updateItemStatus('w1', 'done', { ok: true });
+    settleMissionItem(s, 'w1', 'done', { ok: true });
     const view = projectMission(s, 'm')!;
     expect(view.renderAs).toBe('checklist');
     expect(view.items.map(i => i.renderAs)).toEqual(['sprint', 'task']);

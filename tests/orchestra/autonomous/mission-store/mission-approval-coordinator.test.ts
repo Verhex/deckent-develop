@@ -21,6 +21,7 @@ import {
 } from '../../../../src/orchestra/autonomous/mission-store/mission-approval-coordinator.js';
 import { runMissionScheduler } from '../../../../src/orchestra/autonomous/mission-store/mission-scheduler.js';
 import { SqliteMissionStore } from '../../../../src/orchestra/autonomous/mission-store/sqlite-mission-store.js';
+import { settleMissionItem } from '../../../helpers/mission-store.js';
 
 const roots: string[] = [];
 const NOW = new Date('2026-07-22T00:00:00.000Z');
@@ -135,7 +136,7 @@ describe('MissionApprovalCoordinator', () => {
 
     expect(c.tick()).toMatchObject({ parked: 0, published: 0 });
     expect(f.store.listApprovalBindings()).toEqual([]);
-    f.store.updateItemStatus('upstream', 'done', { ok: true });
+    settleMissionItem(f.store, 'upstream', 'done', { ok: true });
     expect(c.tick()).toMatchObject({ parked: 1, published: 1 });
 
     const binding = f.store.listApprovalBindings()[0]!;
