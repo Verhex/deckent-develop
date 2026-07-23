@@ -39,6 +39,7 @@ export type InvocationReasonCode =
   | 'fallback_limit_hold'
   | 'fallback_exhausted'
   | 'provider_resolution_fallback'
+  | 'coordinator_restart_orphan'
   | 'duplicate_invocation';
 
 export interface InvocationScope {
@@ -128,6 +129,10 @@ export type InvocationEvent =
         readonly signal: string | null;
         readonly reasonCode: InvocationReasonCode;
         readonly durationMs: number;
+        readonly reconciliation?: {
+          readonly evidenceRef: string;
+          readonly dispatchEventHash: string;
+        };
       };
     }
   | {
@@ -164,10 +169,42 @@ export interface InvocationDeclarationResult {
   readonly created: boolean;
 }
 
+export interface InvocationOpenDispatchCandidate {
+  readonly ref: InvocationReceiptRef;
+  readonly receipt: InvocationReceipt;
+  readonly dispatchEvent: StoredInvocationEvent;
+}
+
+export interface InvocationOpenDispatchScan {
+  /** Caller-authored UTC/offset timestamp; candidate selection is not death evidence. */
+  readonly before: string;
+  readonly tenantId?: string;
+  readonly limit?: number;
+}
+
+export interface InvocationDispatchReconciliation {
+  readonly eventId: string;
+  readonly evidenceRef: string;
+  readonly occurredAt?: string;
+  readonly outcome: 'succeeded' | 'failed' | 'timeout' | 'unknown';
+  readonly exitCode: number | null;
+  readonly signal: string | null;
+  readonly reasonCode: InvocationReasonCode;
+  readonly durationMs: number;
+}
+
 export interface InvocationReceiptLedger {
   readonly projectId: string;
   declare(receipt: InvocationReceipt): InvocationDeclarationResult;
   append(scope: InvocationScope, invocationId: string, event: InvocationEvent): StoredInvocationEvent;
   get(scope: InvocationScope, invocationId: string): InvocationReceiptView | null;
   close(): void;
+}
+
+export interface InvocationReceiptReconciliationLedger extends InvocationReceiptLedger {
+  scanOpenDispatches(input: InvocationOpenDispatchScan): readonly InvocationOpenDispatchCandidate[];
+  reconcileOpenDispatch(
+    candidate: InvocationOpenDispatchCandidate,
+    reconciliation: InvocationDispatchReconciliation,
+  ): StoredInvocationEvent;
 }

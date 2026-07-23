@@ -207,4 +207,167 @@ describe('InvocationReceiptStore', () => {
     expect(bytes).not.toContain('sk-secret-key');
     expect(bytes).not.toContain('--dangerously-skip-permissions');
   });
+
+  it('scans only bounded open dispatch heads oldest-first and tenant-scoped', () => {
+    const root = makeRoot();
+    const store = new InvocationReceiptStore(root, { idFactory: () => 'project-a' });
+    const declareOpen = (invocationId: string, tenantId: string, occurredAt: string): void => {
+      const input = receipt(store, {
+        invocationId,
+        idempotencyKey: invocationId,
+        tenantId,
+      });
+      store.declare(input);
+      store.append(input, invocationId, {
+        eventId: `${invocationId}-start`,
+        type: 'dispatch_started',
+        occurredAt,
+        payload: { attempt: 1 },
+      });
+    };
+    declareOpen('inv-new', 'tenant-a', '2026-07-20T12:02:00.000Z');
+    declareOpen('inv-old', 'tenant-a', '2026-07-20T12:00:00.000Z');
+    declareOpen('inv-other-tenant', 'tenant-b', '2026-07-20T11:59:00.000Z');
+    const settled = receipt(store, { invocationId: 'inv-settled', idempotencyKey: 'inv-settled' });
+    store.declare(settled);
+    store.append(settled, settled.invocationId, {
+      eventId: 'settled-start', type: 'dispatch_started', occurredAt: '2026-07-20T11:58:00.000Z', payload: { attempt: 1 },
+    });
+    store.append(settled, settled.invocationId, {
+      eventId: 'settled-terminal', type: 'transport_settled',
+      payload: { outcome: 'succeeded', exitCode: 0, signal: null, reasonCode: 'none', durationMs: 1 },
+    });
+
+    expect(store.scanOpenDispatches({
+      before: '2026-07-20T12:01:00.000Z', tenantId: 'tenant-a', limit: 10,
+    }).map(candidate => candidate.ref.invocationId)).toEqual(['inv-old']);
+    expect(store.scanOpenDispatches({
+      before: '2026-07-20T12:03:00.000Z', limit: 2,
+    }).map(candidate => candidate.ref.invocationId)).toEqual(['inv-other-tenant', 'inv-old']);
+    store.close();
+  });
+
+  it('compares and orders valid offset timestamps by absolute time', () => {
+    const root = makeRoot();
+    const store = new InvocationReceiptStore(root, { idFactory: () => 'project-a' });
+    const declareOpen = (invocationId: string, occurredAt: string): void => {
+      const input = receipt(store, { invocationId, idempotencyKey: invocationId });
+      store.declare(input);
+      store.append(input, invocationId, {
+        eventId: `${invocationId}-start`, type: 'dispatch_started', occurredAt, payload: { attempt: 1 },
+      });
+    };
+    declareOpen('inv-offset-earlier', '2026-07-20T13:00:00.000+02:00');
+    declareOpen('inv-z-later', '2026-07-20T11:30:00.000Z');
+
+    expect(store.scanOpenDispatches({ before: '2026-07-20T11:15:00.000Z' })
+      .map(candidate => candidate.ref.invocationId)).toEqual(['inv-offset-earlier']);
+    expect(store.scanOpenDispatches({ before: '2026-07-20T12:00:00.000Z' })
+      .map(candidate => candidate.ref.invocationId)).toEqual(['inv-offset-earlier', 'inv-z-later']);
+    store.close();
+  });
+
+  it('reconciles an exact open head once with durable evidence provenance', () => {
+    const root = makeRoot();
+    const store = new InvocationReceiptStore(root, { idFactory: () => 'project-a' });
+    const input = receipt(store);
+    store.declare(input);
+    store.append(input, input.invocationId, {
+      eventId: 'event-start', type: 'dispatch_started', occurredAt: '2026-07-20T12:00:00.000Z', payload: { attempt: 1 },
+    });
+    const [candidate] = store.scanOpenDispatches({ before: '2026-07-20T12:01:00.000Z' });
+    expect(candidate).toBeDefined();
+    const reconciliation = {
+      eventId: 'event-reconcile',
+      evidenceRef: 'docker-inspect:container-absent:sha256:abc',
+      occurredAt: '2026-07-20T12:01:00.000Z',
+      outcome: 'unknown' as const,
+      exitCode: null,
+      signal: null,
+      reasonCode: 'coordinator_restart_orphan' as const,
+      durationMs: 60_000,
+    };
+    const first = store.reconcileOpenDispatch(candidate!, reconciliation);
+    expect(store.reconcileOpenDispatch(candidate!, reconciliation)).toEqual(first);
+    expect(store.get(input, input.invocationId)).toMatchObject({
+      transportOutcome: 'unknown',
+      events: [
+        { type: 'dispatch_started' },
+        {
+          type: 'transport_settled',
+          payload: {
+            reasonCode: 'coordinator_restart_orphan',
+            reconciliation: {
+              evidenceRef: reconciliation.evidenceRef,
+              dispatchEventHash: candidate!.dispatchEvent.hash,
+            },
+          },
+        },
+      ],
+    });
+    store.close();
+  });
+
+  it('refuses stale-head reconciliation and altered retry evidence', () => {
+    const root = makeRoot();
+    const store = new InvocationReceiptStore(root, { idFactory: () => 'project-a' });
+    const input = receipt(store);
+    store.declare(input);
+    store.append(input, input.invocationId, {
+      eventId: 'event-start', type: 'dispatch_started', occurredAt: '2026-07-20T12:00:00.000Z', payload: { attempt: 1 },
+    });
+    const [candidate] = store.scanOpenDispatches({ before: '2026-07-20T12:01:00.000Z' });
+    store.append(input, input.invocationId, {
+      eventId: 'provider-terminal', type: 'transport_settled',
+      payload: { outcome: 'succeeded', exitCode: 0, signal: null, reasonCode: 'none', durationMs: 5 },
+    });
+    expect(() => store.reconcileOpenDispatch(candidate!, {
+      eventId: 'event-reconcile', evidenceRef: 'stale-observation', outcome: 'unknown',
+      exitCode: null, signal: null, reasonCode: 'coordinator_restart_orphan', durationMs: 60_000,
+    })).toThrowError(expect.objectContaining({ code: 'RECONCILIATION_CONFLICT' }));
+
+    const retryRoot = makeRoot();
+    const retryStore = new InvocationReceiptStore(retryRoot, { idFactory: () => 'project-b' });
+    const retryInput = receipt(retryStore);
+    retryStore.declare(retryInput);
+    retryStore.append(retryInput, retryInput.invocationId, {
+      eventId: 'retry-start', type: 'dispatch_started', payload: { attempt: 1 },
+    });
+    const [retryCandidate] = retryStore.scanOpenDispatches({ before: '2100-01-01T00:00:00.000Z' });
+    retryStore.reconcileOpenDispatch(retryCandidate!, {
+      eventId: 'retry-reconcile', evidenceRef: 'evidence-a', outcome: 'failed',
+      exitCode: null, signal: null, reasonCode: 'coordinator_restart_orphan', durationMs: 1,
+    });
+    expect(() => retryStore.reconcileOpenDispatch(retryCandidate!, {
+      eventId: 'retry-reconcile', evidenceRef: 'evidence-b', outcome: 'failed',
+      exitCode: null, signal: null, reasonCode: 'coordinator_restart_orphan', durationMs: 1,
+    })).toThrowError(expect.objectContaining({ code: 'IDEMPOTENCY_CONFLICT' }));
+    store.close();
+    retryStore.close();
+  });
+
+  it('validates bounded scan and reconciliation evidence inputs', () => {
+    const root = makeRoot();
+    const store = new InvocationReceiptStore(root, { idFactory: () => 'project-a' });
+    const input = receipt(store);
+    store.declare(input);
+    store.append(input, input.invocationId, {
+      eventId: 'event-start', type: 'dispatch_started', payload: { attempt: 1 },
+    });
+    expect(() => store.scanOpenDispatches({ before: 'not-a-time' }))
+      .toThrowError(expect.objectContaining({ code: 'SCOPE_MISMATCH' }));
+    expect(() => store.scanOpenDispatches({ before: '2100-01-01T00:00:00.000Z', limit: 0 }))
+      .toThrowError(expect.objectContaining({ code: 'SCOPE_MISMATCH' }));
+    const [candidate] = store.scanOpenDispatches({ before: '2100-01-01T00:00:00.000Z' });
+    expect(() => store.reconcileOpenDispatch(candidate!, {
+      eventId: 'event-reconcile', evidenceRef: '', outcome: 'unknown', exitCode: null,
+      signal: null, reasonCode: 'coordinator_restart_orphan', durationMs: 1,
+    })).toThrowError(expect.objectContaining({ code: 'SCOPE_MISMATCH' }));
+    expect(() => store.reconcileOpenDispatch(candidate!, {
+      eventId: 'event-reconcile', evidenceRef: 'probe:absent', occurredAt: 'not-a-time',
+      outcome: 'unknown', exitCode: null, signal: null,
+      reasonCode: 'coordinator_restart_orphan', durationMs: 1,
+    })).toThrowError(expect.objectContaining({ code: 'SCOPE_MISMATCH' }));
+    store.close();
+  });
 });

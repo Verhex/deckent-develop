@@ -7,9 +7,12 @@ import { DECKENT_DIR } from './constants.js';
 import {
   INVOCATION_RECEIPT_SCHEMA_VERSION,
   type InvocationDeclarationResult,
+  type InvocationDispatchReconciliation,
   type InvocationEvent,
+  type InvocationOpenDispatchCandidate,
+  type InvocationOpenDispatchScan,
   type InvocationReceipt,
-  type InvocationReceiptLedger,
+  type InvocationReceiptReconciliationLedger,
   type InvocationReceiptRef,
   type InvocationReceiptView,
   type InvocationScope,
@@ -49,7 +52,8 @@ export class InvocationReceiptStoreError extends Error {
       | 'IDEMPOTENCY_CONFLICT'
       | 'INVOCATION_NOT_FOUND'
       | 'INTEGRITY_FAILURE'
-      | 'INVALID_TRANSITION',
+      | 'INVALID_TRANSITION'
+      | 'RECONCILIATION_CONFLICT',
     message: string,
   ) {
     super(message);
@@ -106,7 +110,13 @@ function requireIdentity(label: string, value: string): void {
   }
 }
 
-export class InvocationReceiptStore implements InvocationReceiptLedger {
+function requireTimestamp(label: string, value: string): void {
+  if (!Number.isFinite(new Date(value).getTime())) {
+    throw new InvocationReceiptStoreError('SCOPE_MISMATCH', `${label} must be a valid timestamp`);
+  }
+}
+
+export class InvocationReceiptStore implements InvocationReceiptReconciliationLedger {
   readonly projectId: string;
   private readonly db: DatabaseType;
   private readonly idFactory: () => string;
@@ -197,6 +207,8 @@ export class InvocationReceiptStore implements InvocationReceiptLedger {
         ON invocations (tenant_id, project_id, created_at);
       CREATE INDEX IF NOT EXISTS idx_invocation_events_scope_invocation
         ON invocation_events (tenant_id, project_id, invocation_id, sequence);
+      CREATE INDEX IF NOT EXISTS idx_invocation_events_open_scan
+        ON invocation_events (project_id, event_type, julianday(occurred_at), invocation_id, sequence);
 
       CREATE TRIGGER IF NOT EXISTS invocations_no_update
         BEFORE UPDATE ON invocations BEGIN
@@ -295,7 +307,17 @@ export class InvocationReceiptStore implements InvocationReceiptLedger {
   }
 
   append(scope: InvocationScope, invocationId: string, event: InvocationEvent): StoredInvocationEvent {
+    return this.appendGuarded(scope, invocationId, event);
+  }
+
+  private appendGuarded(
+    scope: InvocationScope,
+    invocationId: string,
+    event: InvocationEvent,
+    expectedHeadHash?: string,
+  ): StoredInvocationEvent {
     this.assertScope(scope);
+    if (event.occurredAt !== undefined) requireTimestamp('Invocation event occurredAt', event.occurredAt);
     const semanticJson = canonicalJson({ type: event.type, payload: event.payload });
     const payloadHash = sha256(semanticJson);
     const appendTransaction = this.db.transaction((): StoredInvocationEvent => {
@@ -337,6 +359,12 @@ export class InvocationReceiptStore implements InvocationReceiptLedger {
         invocation_id: invocationId,
       }) as EventRow[], invocationId);
       const previous = existingEvents.at(-1);
+      if (expectedHeadHash !== undefined && previous?.hash !== expectedHeadHash) {
+        throw new InvocationReceiptStoreError(
+          'RECONCILIATION_CONFLICT',
+          'Open dispatch changed after scan; reconciliation refused',
+        );
+      }
       assertEventTransition(previous?.type ?? null, event.type);
       const sequence = (previous?.sequence ?? 0) + 1;
       const occurredAt = event.occurredAt ?? this.now();
@@ -384,6 +412,98 @@ export class InvocationReceiptStore implements InvocationReceiptLedger {
       };
     });
     return appendTransaction.immediate();
+  }
+
+  scanOpenDispatches(input: InvocationOpenDispatchScan): readonly InvocationOpenDispatchCandidate[] {
+    requireTimestamp('Open-dispatch cutoff', input.before);
+    const parsedBefore = new Date(input.before);
+    const before = parsedBefore.toISOString();
+    const limit = input.limit ?? 100;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 1_000) {
+      throw new InvocationReceiptStoreError('SCOPE_MISMATCH', 'Open-dispatch scan limit must be an integer from 1 to 1000');
+    }
+    if (input.tenantId !== undefined) requireIdentity('tenantId', input.tenantId);
+    const scanTransaction = this.db.transaction((): readonly InvocationOpenDispatchCandidate[] => {
+      const rows = this.db.prepare(`
+        WITH latest AS (
+          SELECT invocation_id, MAX(sequence) AS sequence
+          FROM invocation_events
+          WHERE project_id = @project_id
+          GROUP BY invocation_id
+        )
+        SELECT i.invocation_id, i.tenant_id, i.project_id, i.payload_json, i.payload_hash
+        FROM invocations i
+        JOIN latest l ON l.invocation_id = i.invocation_id
+        JOIN invocation_events e
+          ON e.invocation_id = l.invocation_id AND e.sequence = l.sequence
+        WHERE i.project_id = @project_id
+          AND (@tenant_id IS NULL OR i.tenant_id = @tenant_id)
+          AND e.event_type = 'dispatch_started'
+          AND julianday(e.occurred_at) <= julianday(@before)
+        ORDER BY julianday(e.occurred_at) ASC, i.invocation_id ASC
+        LIMIT @limit
+      `).all({
+        project_id: this.projectId,
+        tenant_id: input.tenantId ?? null,
+        before,
+        limit,
+      }) as InvocationRow[];
+
+      return rows.map((row): InvocationOpenDispatchCandidate => {
+        const receipt = this.verifyInvocationRow(row);
+        const events = this.verifyEventRows(this.selectEvents.all({
+          tenant_id: row.tenant_id,
+          project_id: row.project_id,
+          invocation_id: row.invocation_id,
+        }) as EventRow[], row.invocation_id);
+        const dispatchEvent = events.at(-1);
+        if (!dispatchEvent || dispatchEvent.type !== 'dispatch_started') {
+          throw new InvocationReceiptStoreError('INTEGRITY_FAILURE', 'Open-dispatch scan head is invalid');
+        }
+        return {
+          ref: this.toRef(receipt),
+          receipt,
+          dispatchEvent,
+        };
+      });
+    });
+    return scanTransaction.deferred();
+  }
+
+  reconcileOpenDispatch(
+    candidate: InvocationOpenDispatchCandidate,
+    reconciliation: InvocationDispatchReconciliation,
+  ): StoredInvocationEvent {
+    this.assertScope(candidate.ref);
+    requireIdentity('invocationId', candidate.ref.invocationId);
+    requireIdentity('eventId', reconciliation.eventId);
+    requireIdentity('evidenceRef', reconciliation.evidenceRef);
+    if (reconciliation.occurredAt !== undefined) {
+      requireTimestamp('Reconciliation occurredAt', reconciliation.occurredAt);
+    }
+    if (candidate.dispatchEvent.invocationId !== candidate.ref.invocationId
+      || candidate.dispatchEvent.type !== 'dispatch_started') {
+      throw new InvocationReceiptStoreError('RECONCILIATION_CONFLICT', 'Candidate is not an open dispatch head');
+    }
+    if (!Number.isFinite(reconciliation.durationMs) || reconciliation.durationMs < 0) {
+      throw new InvocationReceiptStoreError('RECONCILIATION_CONFLICT', 'Reconciliation duration must be non-negative');
+    }
+    return this.appendGuarded(candidate.ref, candidate.ref.invocationId, {
+      eventId: reconciliation.eventId,
+      type: 'transport_settled',
+      ...(reconciliation.occurredAt ? { occurredAt: reconciliation.occurredAt } : {}),
+      payload: {
+        outcome: reconciliation.outcome,
+        exitCode: reconciliation.exitCode,
+        signal: reconciliation.signal,
+        reasonCode: reconciliation.reasonCode,
+        durationMs: reconciliation.durationMs,
+        reconciliation: {
+          evidenceRef: reconciliation.evidenceRef,
+          dispatchEventHash: candidate.dispatchEvent.hash,
+        },
+      },
+    }, candidate.dispatchEvent.hash);
   }
 
   get(scope: InvocationScope, invocationId: string): InvocationReceiptView | null {
