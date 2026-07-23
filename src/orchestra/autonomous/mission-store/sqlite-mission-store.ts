@@ -52,6 +52,40 @@ const WORK_ITEM_WITH_FENCE_COLUMNS = `wi.*,
   fence.runner_revision AS admission_runner_revision,
   fence.item_definition_digest AS admission_item_definition_digest`;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isExactLegacyUnknownKindQuarantine(
+  mission: NewMission,
+  item: NewMissionWorkItem,
+): boolean {
+  const legacyImport = mission.spec?.['legacyImport'];
+  const admission = item.initialResult?.['missionAdmission'];
+  return mission.id === 'legacy'
+    && mission.kind === 'list'
+    && isRecord(legacyImport)
+    && legacyImport['schemaVersion'] === 1
+    && legacyImport['source'] === 'backlog.json'
+    && typeof legacyImport['sourceDigest'] === 'string'
+    && /^[a-f0-9]{64}$/u.test(legacyImport['sourceDigest'])
+    && item.initialStatus === 'failed'
+    && item.admissionFence === undefined
+    && item.initialResult?.ok === false
+    && typeof item.initialResult.reason === 'string'
+    && item.initialResult.reason.startsWith('MISSION_MIGRATION_QUARANTINED:')
+    && isRecord(admission)
+    && admission['code'] === 'UNKNOWN_KIND'
+    && admission['itemId'] === item.id
+    && admission['persistedKind'] === String(item.kind)
+    && admission['decision'] === 'failed-closed'
+    && admission['source'] === 'legacy-backlog-import'
+    && typeof admission['authorityRevision'] === 'string'
+    && admission['authorityRevision'].length > 0
+    && typeof admission['authorityDigest'] === 'string'
+    && /^[a-f0-9]{64}$/u.test(admission['authorityDigest']);
+}
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS missions (
   id TEXT PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL,
@@ -380,6 +414,16 @@ export class SqliteMissionStore implements MissionStore {
     return this.getMission(m.id)!;
   }
   createMissionWithItems(m: NewMission, items: readonly NewMissionWorkItem[]): Mission {
+    return this.createMissionWithItemsInternal(m, items, false);
+  }
+  importLegacyMissionWithItems(m: NewMission, items: readonly NewMissionWorkItem[]): Mission {
+    return this.createMissionWithItemsInternal(m, items, true);
+  }
+  private createMissionWithItemsInternal(
+    m: NewMission,
+    items: readonly NewMissionWorkItem[],
+    allowLegacyUnknownKindQuarantine: boolean,
+  ): Mission {
     if (!m.id || m.id !== m.id.trim()) {
       throw new Error('MISSION_BATCH_INVALID: mission id must be a non-empty canonical string');
     }
@@ -390,7 +434,11 @@ export class SqliteMissionStore implements MissionStore {
       if (item.missionId !== m.id) {
         throw new Error(`MISSION_BATCH_INVALID: item ${item.id} belongs to foreign mission ${item.missionId}`);
       }
-      assertCanonicalWorkItemKind(item.kind, item.id);
+      if (!isCanonicalWorkItemKind(item.kind)) {
+        if (!allowLegacyUnknownKindQuarantine || !isExactLegacyUnknownKindQuarantine(m, item)) {
+          assertCanonicalWorkItemKind(item.kind, item.id);
+        }
+      }
       this.assertPersistableFence(item);
       const dependencies = item.dependsOn ?? [];
       if (dependencies.some((id) => !id || id !== id.trim())) {
@@ -832,6 +880,22 @@ export class SqliteMissionStore implements MissionStore {
       if (validation.ok) continue;
       const status: WorkItemStatus = validation.disposition;
       const existingAdmission = item.lastResult?.['missionAdmission'];
+      const preservesCurrentLegacyQuarantine = item.status === 'parked'
+        && status === 'parked'
+        && item.admissionFence === null
+        && item.claimedAt === null
+        && item.claimedBy === null
+        && existingAdmission !== null
+        && typeof existingAdmission === 'object'
+        && (existingAdmission as Record<string, unknown>)['source'] === 'legacy-backlog-import'
+        && (existingAdmission as Record<string, unknown>)['decision'] === 'parked-hold'
+        && typeof (existingAdmission as Record<string, unknown>)['code'] === 'string'
+        && ((existingAdmission as Record<string, unknown>)['code'] as string).endsWith('_UNWIRED')
+        && (existingAdmission as Record<string, unknown>)['itemId'] === item.id
+        && (existingAdmission as Record<string, unknown>)['persistedKind'] === item.kind
+        && (existingAdmission as Record<string, unknown>)['authorityRevision'] === registry.registryRevision
+        && (existingAdmission as Record<string, unknown>)['authorityDigest'] === registry.registryDigest;
+      if (preservesCurrentLegacyQuarantine) continue;
       if (item.status === status
         && item.claimedAt === null
         && item.claimedBy === null

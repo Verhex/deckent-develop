@@ -135,6 +135,8 @@ export interface MissionStore {
   createMission(m: NewMission): Mission;
   /** Validate and persist a new mission plus its complete work-item DAG atomically. */
   createMissionWithItems(m: NewMission, items: readonly NewMissionWorkItem[]): Mission;
+  /** Recovery-only import: preserves an exact terminal UNKNOWN_KIND quarantine without weakening fresh intake. */
+  importLegacyMissionWithItems(m: NewMission, items: readonly NewMissionWorkItem[]): Mission;
   getMission(id: string): Mission | null;
   listMissions(f?: { status?: MissionStatus[]; tenant?: string }): Mission[];
   updateMissionStatus(id: string, status: MissionStatus, result?: ResultLike): void;

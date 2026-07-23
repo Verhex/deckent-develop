@@ -513,13 +513,14 @@ describe('runV2Engine', () => {
     expect(legacy!.status).toBe('completed');
   });
 
-  it('rejects an unwired legacy kind before mission persistence or dispatch', async () => {
+  it('boots past a quarantined legacy kind and still dispatches its admitted sibling', async () => {
     const r = root();
     mkdirSync(join(r, '.deckent', 'autonomous'), { recursive: true });
     writeFileSync(join(r, '.deckent', 'autonomous', 'backlog.json'), JSON.stringify({
       _version: '1.0',
       entries: [
-        { id: 'legacy-sprint', title: 'Unsafe', kind: 'sprint', spec: { directivesRef: 'mutable' }, policy: 'auto', trigger: { type: 'one-off' }, status: 'pending' },
+        { id: 'legacy-task', title: 'Runnable', kind: 'task', spec: { description: 'safe task' }, policy: 'auto', trigger: { type: 'one-off' }, status: 'pending' },
+        { id: 'legacy-deploy', title: 'Unsafe', kind: 'deploy', spec: { target: 'production' }, policy: 'auto', trigger: { type: 'one-off' }, status: 'pending' },
       ],
     }), 'utf-8');
     const store = openStore(r);
@@ -531,10 +532,16 @@ describe('runV2Engine', () => {
       runSprint,
       store,
       maxIterations: BOUNDED,
-    })).rejects.toThrow('SPRINT_SNAPSHOT_REQUIRED');
+    })).resolves.toMatchObject({ reason: 'drained', dispatched: 1 });
 
-    expect(store.getMission('legacy')).toBeNull();
-    expect(runTask).not.toHaveBeenCalled();
+    expect(store.getMission('legacy')?.status).toBe('failed');
+    expect(store.listItems('legacy')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'legacy-task', status: 'done', kind: 'task' }),
+      expect.objectContaining({ id: 'legacy-deploy', status: 'failed', kind: 'deploy', spec: { target: 'production' } }),
+    ]));
+    expect(store.listItems('legacy').find((item) => item.id === 'legacy-deploy')?.lastResult)
+      .toMatchObject({ missionAdmission: { code: 'UNKNOWN_KIND', decision: 'failed-closed' } });
+    expect(runTask).toHaveBeenCalledOnce();
     expect(runSprint).not.toHaveBeenCalled();
   });
 

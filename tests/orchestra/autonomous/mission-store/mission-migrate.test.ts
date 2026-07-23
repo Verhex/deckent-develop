@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteMissionStore } from '../../../../src/orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import { migrateBacklogJson } from '../../../../src/orchestra/autonomous/mission-store/mission-migrate.js';
-import { PRODUCTION_V2_ADMISSION } from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
+import {
+  computeSprintSnapshotDigest,
+  PRODUCTION_V2_ADMISSION,
+} from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
 
 const dirs: string[] = [];
 function root() { const d = mkdtempSync(join(tmpdir(), 'mig-')); dirs.push(d); return d; }
@@ -92,7 +95,7 @@ describe('migrateBacklogJson', () => {
     s.close();
   });
 
-  it('rejects a pending unwired legacy kind atomically and preserves the source backlog', () => {
+  it('quarantines an invalid legacy definition without blocking an admitted sibling', () => {
     const r = root();
     const path = join(r, '.deckent', 'autonomous', 'backlog.json');
     mkdirSync(join(r, '.deckent', 'autonomous'), { recursive: true });
@@ -106,9 +109,125 @@ describe('migrateBacklogJson', () => {
     writeFileSync(path, source, 'utf-8');
     const s = new SqliteMissionStore(r); s.migrate();
 
-    expect(() => migrateBacklogJson(r, s, { admission: PRODUCTION_V2_ADMISSION }))
-      .toThrow('SPRINT_SNAPSHOT_REQUIRED');
-    expect(s.getMission('legacy')).toBeNull();
+    expect(migrateBacklogJson(r, s, { admission: PRODUCTION_V2_ADMISSION })).toBe(2);
+    const valid = s.listItems('legacy').find((item) => item.id === 'valid')!;
+    const quarantined = s.listItems('legacy').find((item) => item.id === 'unwired')!;
+    expect(valid).toMatchObject({ status: 'pending', kind: 'task' });
+    expect(valid.admissionFence?.registryDigest).toBe(PRODUCTION_V2_ADMISSION.registryDigest);
+    expect(quarantined).toMatchObject({
+      status: 'failed',
+      kind: 'sprint',
+      spec: { directivesRef: 'D' },
+    });
+    expect(quarantined.admissionFence).toBeNull();
+    expect(quarantined.lastResult).toMatchObject({
+      ok: false,
+      missionAdmission: {
+        code: 'SPRINT_SNAPSHOT_REQUIRED',
+        itemId: 'unwired',
+        persistedKind: 'sprint',
+        decision: 'failed-closed',
+        source: 'legacy-backlog-import',
+      },
+    });
+    expect(s.queryDue({ registry: PRODUCTION_V2_ADMISSION }).map((item) => item.id)).toEqual(['valid']);
+    expect(readFileSync(path, 'utf-8')).toBe(source);
+    s.close();
+  });
+
+  it('preserves a raw unknown legacy kind as failed quarantine while fresh intake stays strict', () => {
+    const r = root();
+    const path = join(r, '.deckent', 'autonomous', 'backlog.json');
+    mkdirSync(join(r, '.deckent', 'autonomous'), { recursive: true });
+    const source = JSON.stringify({
+      _version: '1.0',
+      entries: [
+        { id: 'runnable', title: 'Runnable', kind: 'task', spec: { description: 'safe task' }, policy: 'auto', trigger: { type: 'one-off' }, status: 'pending' },
+        { id: 'legacy-deploy', title: 'Unknown', kind: 'deploy', spec: { target: 'production' }, policy: 'auto', trigger: { type: 'one-off' }, status: 'pending' },
+      ],
+    });
+    writeFileSync(path, source, 'utf-8');
+    const s = new SqliteMissionStore(r); s.migrate();
+
+    expect(migrateBacklogJson(r, s, { admission: PRODUCTION_V2_ADMISSION })).toBe(2);
+    const rawKind = s.listItems('legacy').find((item) => item.id === 'legacy-deploy')!;
+    expect(rawKind).toMatchObject({
+      status: 'failed', kind: 'deploy', spec: { target: 'production' }, renderAs: 'action',
+      lastResult: {
+        ok: false,
+        missionAdmission: {
+          code: 'UNKNOWN_KIND', itemId: 'legacy-deploy', persistedKind: 'deploy',
+          decision: 'failed-closed', source: 'legacy-backlog-import',
+        },
+      },
+    });
+    expect(s.queryDue({ registry: PRODUCTION_V2_ADMISSION }).map((item) => item.id)).toEqual(['runnable']);
+    expect(s.claimItem('legacy-deploy', 'bypass')).toBe(false);
+    expect(readFileSync(path, 'utf-8')).toBe(source);
+
+    expect(() => s.createMissionWithItems(
+      { id: 'fresh', kind: 'list', title: 'Fresh intake' },
+      [{
+        id: 'fresh-deploy', missionId: 'fresh', kind: 'deploy' as never,
+        spec: { target: 'production' }, initialStatus: 'failed',
+        initialResult: rawKind.lastResult!,
+      }],
+    )).toThrow('UNKNOWN_KIND');
+    expect(s.getMission('fresh')).toBeNull();
+    s.close();
+  });
+
+  it('parks a valid legacy definition when its canonical runner is not wired', () => {
+    const r = root();
+    const path = join(r, '.deckent', 'autonomous', 'backlog.json');
+    mkdirSync(join(r, '.deckent', 'autonomous'), { recursive: true });
+    const snapshotPayload = {
+      version: 1 as const,
+      revision: 'legacy-sprint-revision-1',
+      approvalEvidenceRef: 'approval:legacy-sprint-1',
+      directives: '# Legacy sprint directives',
+      executionPlan: { tasks: [] },
+    };
+    const source = JSON.stringify({
+      _version: '1.0',
+      entries: [{
+        id: 'valid-unwired-sprint', title: 'Unwired sprint', kind: 'sprint',
+        spec: {
+          sprintSnapshot: {
+            ...snapshotPayload,
+            digest: computeSprintSnapshotDigest(snapshotPayload),
+          },
+        },
+        policy: 'auto', trigger: { type: 'one-off' }, status: 'pending',
+      }],
+    });
+    writeFileSync(path, source, 'utf-8');
+    const s = new SqliteMissionStore(r); s.migrate();
+
+    expect(migrateBacklogJson(r, s, { admission: PRODUCTION_V2_ADMISSION })).toBe(1);
+    const quarantined = s.listItems('legacy')[0]!;
+    expect(quarantined).toMatchObject({ status: 'parked', kind: 'sprint' });
+    expect(quarantined.admissionFence).toBeNull();
+    expect(quarantined.lastResult).toMatchObject({
+      ok: false,
+      missionAdmission: {
+        code: 'SPRINT_SNAPSHOT_RUNNER_UNWIRED',
+        itemId: 'valid-unwired-sprint',
+        persistedKind: 'sprint',
+        decision: 'parked-hold',
+        source: 'legacy-backlog-import',
+      },
+    });
+    expect(s.queryDue({ registry: PRODUCTION_V2_ADMISSION })).toEqual([]);
+    expect(s.claimItem('valid-unwired-sprint', 'bypass')).toBe(false);
+    expect(s.listItems('legacy')[0]!.lastResult).toMatchObject({
+      missionAdmission: {
+        code: 'SPRINT_SNAPSHOT_RUNNER_UNWIRED',
+        authorityRevision: PRODUCTION_V2_ADMISSION.registryRevision,
+        authorityDigest: PRODUCTION_V2_ADMISSION.registryDigest,
+        source: 'legacy-backlog-import',
+      },
+    });
     expect(readFileSync(path, 'utf-8')).toBe(source);
     s.close();
   });

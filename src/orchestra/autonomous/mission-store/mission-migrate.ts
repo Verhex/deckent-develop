@@ -6,6 +6,7 @@ import type { MissionStore, NewMissionWorkItem } from './mission-types.js';
 import type { BacklogEntry, BacklogStatus } from '../backlog-types.js';
 import {
   admitWorkItemBatch,
+  MissionAdmissionError,
   type MissionRuntimeAdmission,
 } from './mission-kind-admission.js';
 
@@ -96,14 +97,38 @@ export function migrateBacklogJson(
   });
   let admittedItems = items;
   if (opts.admission) {
-    // Terminal rows are historical evidence, not execution requests. Every
-    // non-terminal row must be admitted as one batch before any DB mutation.
-    const executable = items.filter((item) => item.initialStatus !== 'done' && item.initialStatus !== 'failed');
-    const admittedById = new Map(admitWorkItemBatch(executable, opts.admission)
-      .map((item) => [item.id, item.admissionFence]));
-    admittedItems = items.map((item) => {
-      const admissionFence = admittedById.get(item.id);
-      return admissionFence ? { ...item, admissionFence } : item;
+    // Terminal rows are historical evidence, not execution requests. Classify
+    // every non-terminal row independently before the single atomic store write:
+    // one legacy definition must not make unrelated admitted work unreachable.
+    // Rejected rows preserve their exact kind/spec plus durable fail-closed
+    // evidence; they are never rewritten into task or silently dropped.
+    admittedItems = items.map((item): NewMissionWorkItem => {
+      if (item.initialStatus === 'done' || item.initialStatus === 'failed') return item;
+      try {
+        return admitWorkItemBatch([item], opts.admission!)[0]!;
+      } catch (error) {
+        if (!(error instanceof MissionAdmissionError)) throw error;
+        const parked = error.code.endsWith('_UNWIRED');
+        return {
+          ...item,
+          ...(error.code === 'UNKNOWN_KIND' ? { renderAs: 'action' as const } : {}),
+          initialStatus: parked ? 'parked' : 'failed',
+          initialResult: {
+            ok: false,
+            reason: `MISSION_MIGRATION_QUARANTINED: ${error.message}`,
+            missionAdmission: {
+              schemaVersion: 1,
+              code: error.code,
+              itemId: error.itemId,
+              persistedKind: error.kind,
+              authorityRevision: opts.admission!.registryRevision,
+              authorityDigest: opts.admission!.registryDigest,
+              decision: parked ? 'parked-hold' : 'failed-closed',
+              source: 'legacy-backlog-import',
+            },
+          },
+        };
+      }
     });
   }
   const sourceDigest = createHash('sha256').update(canonicalJson(entries)).digest('hex');
@@ -141,7 +166,7 @@ export function migrateBacklogJson(
     return 0;
   }
   if (items.length === 0) return 0;
-  store.createMissionWithItems(
+  store.importLegacyMissionWithItems(
     {
       id: 'legacy',
       kind: 'list',
