@@ -52,6 +52,153 @@ describe('WorkItems + atomic claim', () => {
     s.close();
   });
 
+  it.each(['recurring', 'reactive'] as const)(
+    'parks trigger=%s before due-query and never publishes a template approval',
+    (triggerType) => {
+      const s = freshMission();
+      s.enqueueItem({
+        id: `trigger-${triggerType}`,
+        missionId: 'm',
+        kind: 'task',
+        policy: 'approval-required',
+        trigger: triggerType === 'recurring'
+          ? { type: triggerType, cron: '* * * * *' }
+          : { type: triggerType, detector: 'debt_trend' },
+      });
+
+      expect(s.listApprovalCandidates()).toEqual([]);
+      expect(s.queryDue()).toEqual([]);
+      const first = s.__rawGet(`SELECT status,revision,claimed_at,claimed_by,last_result
+        FROM work_items WHERE id='trigger-${triggerType}'`);
+      expect(first).toMatchObject({
+        status: 'parked',
+        claimed_at: null,
+        claimed_by: null,
+      });
+      expect(JSON.parse(first.last_result)).toMatchObject({
+        ok: false,
+        reason: 'TRIGGER_OCCURRENCE_AUTHORITY_REQUIRED',
+        triggerAdmission: {
+          schemaVersion: 1,
+          code: 'TRIGGER_OCCURRENCE_AUTHORITY_REQUIRED',
+          itemId: `trigger-${triggerType}`,
+          triggerType,
+          decision: 'parked-hold',
+        },
+      });
+
+      expect(s.listApprovalCandidates()).toEqual([]);
+      expect(s.queryDue()).toEqual([]);
+      expect(s.__rawGet(`SELECT status,revision,claimed_at,claimed_by,last_result
+        FROM work_items WHERE id='trigger-${triggerType}'`)).toEqual(first);
+      expect(s.queryDue({ registry: PRODUCTION_V2_RUNNER_REGISTRY })).toEqual([]);
+      expect(s.queryDue({ registry: PRODUCTION_V2_RUNNER_REGISTRY })).toEqual([]);
+      expect(s.__rawGet(`SELECT status,revision,claimed_at,claimed_by,last_result
+        FROM work_items WHERE id='trigger-${triggerType}'`)).toEqual(first);
+      s.close();
+    },
+  );
+
+  it('atomically refuses direct recurring claim and revokes stale running authority during recovery', () => {
+    const s = freshMission();
+    s.enqueueItem({
+      id: 'recurring-direct',
+      missionId: 'm',
+      kind: 'task',
+      trigger: { type: 'recurring', cron: '0 9 * * *' },
+    });
+    expect(s.claimItemWithAuthority('recurring-direct', 'bypass')).toBeNull();
+    expect(s.listItems('m')[0]).toMatchObject({
+      status: 'parked',
+      claimedAt: null,
+      claimedBy: null,
+      lastResult: { reason: 'TRIGGER_OCCURRENCE_AUTHORITY_REQUIRED' },
+    });
+
+    s.__rawExec(`UPDATE work_items SET status='running', claimed_at='stale',
+      claimed_by='dead-worker', claim_attempt_id='attempt',
+      claim_fence_token_hash='hash' WHERE id='recurring-direct'`);
+    const lease = s.acquireEngineLease('trigger-recovery', 30_000)!;
+    s.recover(lease);
+    expect(s.__rawGet(`SELECT status,claimed_at,claimed_by,claim_attempt_id,
+      claim_fence_token_hash,last_result FROM work_items WHERE id='recurring-direct'`))
+      .toMatchObject({
+        status: 'parked',
+        claimed_at: null,
+        claimed_by: null,
+        claim_attempt_id: null,
+        claim_fence_token_hash: null,
+      });
+    expect(JSON.parse(s.__rawGet(
+      "SELECT last_result FROM work_items WHERE id='recurring-direct'",
+    ).last_result).reason).toBe('TRIGGER_OCCURRENCE_AUTHORITY_REQUIRED');
+    s.close();
+  });
+
+  it('rejects unknown fresh trigger families and fails closed for persisted trigger drift', () => {
+    const s = freshMission();
+    expect(() => s.enqueueItem({
+      id: 'fresh-unknown',
+      missionId: 'm',
+      kind: 'task',
+      trigger: { type: 'calendar' },
+    })).toThrow('MISSION_TRIGGER_INVALID: fresh-unknown');
+    expect(s.__rawGet("SELECT COUNT(*) AS count FROM work_items WHERE id='fresh-unknown'"))
+      .toEqual({ count: 0 });
+
+    s.enqueueItem({ id: 'persisted-unknown', missionId: 'm', kind: 'task' });
+    s.__rawExec(`UPDATE work_items SET trigger='{"type":"calendar","secret":"not-in-evidence"}'
+      WHERE id='persisted-unknown'`);
+    expect(s.queryDue()).toEqual([]);
+    const row = s.__rawGet(`SELECT status,claimed_at,claimed_by,last_result
+      FROM work_items WHERE id='persisted-unknown'`);
+    expect(row).toMatchObject({ status: 'failed', claimed_at: null, claimed_by: null });
+    const result = JSON.parse(row.last_result);
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'TRIGGER_INVALID',
+      triggerAdmission: {
+        schemaVersion: 1,
+        code: 'TRIGGER_INVALID',
+        itemId: 'persisted-unknown',
+        triggerType: 'calendar',
+        decision: 'failed-closed',
+      },
+    });
+    expect(result.triggerAdmission.triggerDigest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(row.last_result).not.toContain('not-in-evidence');
+    s.close();
+  });
+
+  it('imports an unknown legacy trigger without aborting boot, then quarantines it durably', () => {
+    const d = mkdtempSync(join(tmpdir(), 'wi-legacy-trigger-')); dirs.push(d);
+    const s = new SqliteMissionStore(d); s.migrate();
+    s.importLegacyMissionWithItems(
+      { id: 'legacy-trigger-mission', kind: 'list', title: 'legacy', renderAs: 'checklist' },
+      [{
+        id: 'legacy-trigger-item',
+        missionId: 'legacy-trigger-mission',
+        kind: 'task',
+        trigger: { type: 'calendar', source: 'legacy' },
+      }],
+    );
+
+    expect(s.queryDue()).toEqual([]);
+    const row = s.__rawGet(`SELECT status,last_result FROM work_items
+      WHERE id='legacy-trigger-item'`);
+    expect(row.status).toBe('failed');
+    expect(JSON.parse(row.last_result)).toMatchObject({
+      reason: 'TRIGGER_INVALID',
+      triggerAdmission: {
+        code: 'TRIGGER_INVALID',
+        itemId: 'legacy-trigger-item',
+        triggerType: 'calendar',
+        decision: 'failed-closed',
+      },
+    });
+    s.close();
+  });
+
   it('claimItem is atomic — exactly one of N concurrent claims wins', () => {
     const s = freshMission();
     s.enqueueItem({ id: 'w', missionId: 'm', kind: 'task' });

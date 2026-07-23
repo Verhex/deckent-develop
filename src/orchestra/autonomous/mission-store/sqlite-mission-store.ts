@@ -56,6 +56,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+type PersistedTriggerDisposition =
+  | { kind: 'one-off'; triggerType: 'one-off' }
+  | { kind: 'occurrence-authority-required'; triggerType: 'recurring' | 'reactive' }
+  | { kind: 'invalid'; triggerType: string | null };
+
 function isExactLegacyUnknownKindQuarantine(
   mission: NewMission,
   item: NewMissionWorkItem,
@@ -174,6 +179,7 @@ export class SqliteMissionStore implements MissionStore {
       // Classify an unsupported running row before the generic orphan rule can
       // obscure its stronger cause or leave it eligible for a future redrive.
       this.reconcileUnsupportedKinds();
+      this.reconcileNonExecutableTriggers();
       const result = JSON.stringify({
         ok: false,
         reason: 'RECOVERY_RECONCILIATION_REQUIRED: prior running attempt has no terminal dispatch evidence; automatic redrive refused',
@@ -242,6 +248,104 @@ export class SqliteMissionStore implements MissionStore {
       return value ?? null;
     };
     return JSON.stringify(normalize(v));
+  }
+
+  private classifyPersistedTrigger(rawTrigger: unknown): PersistedTriggerDisposition {
+    if (rawTrigger === null || rawTrigger === undefined) {
+      return { kind: 'one-off', triggerType: 'one-off' };
+    }
+    let trigger: unknown;
+    try {
+      trigger = typeof rawTrigger === 'string' ? JSON.parse(rawTrigger) : rawTrigger;
+    } catch {
+      return { kind: 'invalid', triggerType: null };
+    }
+    const triggerType = isRecord(trigger) && typeof trigger['type'] === 'string'
+      ? trigger['type']
+      : null;
+    if (triggerType === 'one-off') return { kind: 'one-off', triggerType };
+    if (triggerType === 'recurring' || triggerType === 'reactive') {
+      return { kind: 'occurrence-authority-required', triggerType };
+    }
+    return { kind: 'invalid', triggerType };
+  }
+
+  private assertPersistableTrigger(item: NewWorkItem): void {
+    const classification = this.classifyPersistedTrigger(item.trigger);
+    if (classification.kind === 'invalid') {
+      throw new Error(`MISSION_TRIGGER_INVALID: ${item.id}`);
+    }
+  }
+
+  /**
+   * A recurring/reactive row is a trigger definition, not an executable
+   * occurrence. Until an occurrence-specific WorkItem has been materialized,
+   * every direct execution surface must fail closed. Invalid persisted trigger
+   * shapes are quarantined as terminal failures without persisting raw payloads.
+   */
+  private reconcileNonExecutableTriggers(itemId?: string): string[] {
+    const rows = this.db.prepare(`SELECT id,mission_id,status,revision,trigger,
+        claimed_at,claimed_by,last_result FROM work_items
+      WHERE status IN ('pending','running','parked') AND trigger IS NOT NULL
+        ${itemId === undefined ? '' : 'AND id=?'}`)
+      .all(...(itemId === undefined ? [] : [itemId])) as Array<{
+        id: string;
+        mission_id: string;
+        status: WorkItemStatus;
+        revision: number;
+        trigger: unknown;
+        claimed_at: string | null;
+        claimed_by: string | null;
+        last_result: string | null;
+      }>;
+    const changedMissions = new Set<string>();
+    const update = this.db.prepare(`UPDATE work_items SET status=@status,
+      last_result=@result, revision=revision+1,
+      claimed_at=NULL, claimed_by=NULL, claim_attempt_id=NULL, claim_fence_token_hash=NULL,
+      updated_at=@ts WHERE id=@id AND revision=@revision
+        AND status IN ('pending','running','parked')`);
+
+    for (const row of rows) {
+      const classification = this.classifyPersistedTrigger(row.trigger);
+      if (classification.kind === 'one-off') continue;
+      const status: WorkItemStatus = classification.kind === 'occurrence-authority-required'
+        ? 'parked'
+        : 'failed';
+      const code = classification.kind === 'occurrence-authority-required'
+        ? 'TRIGGER_OCCURRENCE_AUTHORITY_REQUIRED'
+        : 'TRIGGER_INVALID';
+      const priorResult = this.p<ResultLike>(row.last_result);
+      const priorAdmission = priorResult?.['triggerAdmission'];
+      const triggerDigest = createHash('sha256')
+        .update(typeof row.trigger === 'string' ? row.trigger : this.canonical(row.trigger), 'utf8')
+        .digest('hex');
+      const result: ResultLike = {
+        ok: false,
+        reason: code,
+        ...(priorResult && !isRecord(priorAdmission) ? { priorResult } : {}),
+        triggerAdmission: {
+          schemaVersion: 1,
+          code,
+          itemId: row.id,
+          triggerType: classification.triggerType,
+          triggerDigest,
+          decision: status === 'parked' ? 'parked-hold' : 'failed-closed',
+        },
+      };
+      if (row.status === status
+        && row.claimed_at === null
+        && row.claimed_by === null
+        && this.canonical(priorResult) === this.canonical(result)) continue;
+      const info = update.run({
+        id: row.id,
+        revision: row.revision,
+        status,
+        result: JSON.stringify(result),
+        ts: this.now(),
+      });
+      if (info.changes === 1) changedMissions.add(row.mission_id);
+    }
+    return [...changedMissions];
   }
 
   acquireEngineLease(ownerId: string, ttlMs: number): MissionEngineLease | null {
@@ -439,6 +543,7 @@ export class SqliteMissionStore implements MissionStore {
           assertCanonicalWorkItemKind(item.kind, item.id);
         }
       }
+      if (!allowLegacyUnknownKindQuarantine) this.assertPersistableTrigger(item);
       this.assertPersistableFence(item);
       const dependencies = item.dependsOn ?? [];
       if (dependencies.some((id) => !id || id !== id.trim())) {
@@ -803,6 +908,7 @@ export class SqliteMissionStore implements MissionStore {
 
   enqueueItem(item: NewWorkItem): WorkItem {
     assertCanonicalWorkItemKind(item.kind, item.id);
+    this.assertPersistableTrigger(item);
     this.assertPersistableFence(item);
     const transaction = this.db.transaction((): WorkItem => {
       const ts = this.now();
@@ -828,6 +934,7 @@ export class SqliteMissionStore implements MissionStore {
       }
       ids.add(item.id);
       assertCanonicalWorkItemKind(item.kind, item.id);
+      this.assertPersistableTrigger(item);
       this.assertPersistableFence(item);
       if (!this.getMission(item.missionId)) {
         throw new Error(`MISSION_BATCH_INVALID: mission not found ${item.missionId}`);
@@ -875,6 +982,10 @@ export class SqliteMissionStore implements MissionStore {
       WHERE id=@id AND revision=@revision AND status IN ('pending','running','parked')`);
 
     for (const row of rows) {
+      // Trigger definitions are not executable WorkItems. Their single
+      // authority is the trigger reconciler below; runtime admission applies
+      // only after an occurrence-specific one-off WorkItem exists.
+      if (this.classifyPersistedTrigger(row.trigger).kind !== 'one-off') continue;
       const item = this.rowToItem(row);
       const validation = validateWorkItemAdmission(item, item.admissionFence, registry);
       if (validation.ok) continue;
@@ -937,11 +1048,15 @@ export class SqliteMissionStore implements MissionStore {
       });
       if (info.changes === 1) changedMissions.add(item.missionId);
     }
+    for (const missionId of this.reconcileNonExecutableTriggers(itemId)) {
+      changedMissions.add(missionId);
+    }
     return [...changedMissions];
   }
 
   listApprovalCandidates(): WorkItem[] {
     this.reconcileUnsupportedKinds();
+    this.reconcileNonExecutableTriggers();
     const sql = `SELECT wi.* FROM work_items wi JOIN missions m ON m.id=wi.mission_id
       LEFT JOIN work_item_approvals approval ON approval.work_item_id=wi.id
       WHERE wi.status='pending'
@@ -959,6 +1074,7 @@ export class SqliteMissionStore implements MissionStore {
   }
   parkInvalidApprovalCandidate(itemId: string, reason: string): boolean {
     this.reconcileUnsupportedKinds(itemId);
+    this.reconcileNonExecutableTriggers(itemId);
     const result = JSON.stringify({ ok: false, reason: `APPROVAL_REQUEST_INVALID: ${reason}` });
     const info = this.db.prepare(`UPDATE work_items AS target SET status='parked', last_result=@result,
       revision=revision+1,
@@ -979,6 +1095,7 @@ export class SqliteMissionStore implements MissionStore {
   }
   parkItemForApproval(itemId: string, request: ApprovalRequest): WorkItemApprovalBinding | null {
     this.reconcileUnsupportedKinds(itemId);
+    this.reconcileNonExecutableTriggers(itemId);
     const transaction = this.db.transaction((): WorkItemApprovalBinding | null => {
       const existing = this.db.prepare(`SELECT approval.*, wi.mission_id FROM work_item_approvals approval
         JOIN work_items wi ON wi.id=approval.work_item_id WHERE approval.work_item_id=?`).get(itemId);
@@ -1092,6 +1209,7 @@ export class SqliteMissionStore implements MissionStore {
   }
   reconcilePendingDependencies(): string[] {
     this.reconcileUnsupportedKinds();
+    this.reconcileNonExecutableTriggers();
     const transaction = this.db.transaction((): string[] => {
       const changedMissions = new Set<string>();
       const missionRows = this.db.prepare(
@@ -1175,7 +1293,10 @@ export class SqliteMissionStore implements MissionStore {
   }
   queryDue(opts?: { tenant?: string; limit?: number; registry?: MissionRunnerRegistryV1 }): WorkItem[] {
     if (opts?.registry) this.reconcileRuntimeAdmission(opts.registry);
-    else this.reconcileUnsupportedKinds();
+    else {
+      this.reconcileUnsupportedKinds();
+      this.reconcileNonExecutableTriggers();
+    }
     // Only mission-local dependency-success items are eligible. Missing,
     // failed, running, parked or pending dependencies keep the item out.
     const admittedKinds = opts?.registry
@@ -1304,6 +1425,7 @@ export class SqliteMissionStore implements MissionStore {
       }
 
       this.reconcileUnsupportedKinds(id);
+      this.reconcileNonExecutableTriggers(id);
       const current = this.selectItem(id);
       if (!current) return null;
       const info = this.db.prepare(`UPDATE work_items AS target
