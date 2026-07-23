@@ -82,6 +82,11 @@ import { waitForRunResult, cleanupRunTask } from '../../src/cli/commands/run.js'
 // path applies to modelEffort (resolveReasoningEffort SSOT, F1-RE 268-003).
 import { resolveReasoningEffort } from '../../src/core/reasoning-effort.js';
 
+const REMOTE_WORKER_CONFIG = {
+  spawn_backend: 'subprocess',
+  execution_budget: { roles: { worker: { default: { maxTurns: 4 } } } },
+} as const;
+
 // ─── Mock Server ────────────────────────────────────────────────────
 
 type ToolHandler = (args: Record<string, unknown>) => Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }>;
@@ -125,7 +130,7 @@ describe('deckent_run MCP — modelEffort/timeoutMs/keep parity (269-004)', () =
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(loadConfig).mockResolvedValue({ spawn_backend: 'subprocess' } as never);
+    vi.mocked(loadConfig).mockResolvedValue(REMOTE_WORKER_CONFIG as never);
     vi.mocked(spawnWorkerMultiProvider).mockResolvedValue({ backend: 'subprocess' } as never);
     vi.mocked(waitForRunResult).mockResolvedValue(null);
     server = createMockServer();
@@ -185,7 +190,7 @@ describe('deckent_run MCP — modelEffort/timeoutMs/keep parity (269-004)', () =
     expect(JSON.parse(res.content[0]!.text).timeoutMs).toBe(60_000);
 
     vi.clearAllMocks();
-    vi.mocked(loadConfig).mockResolvedValue({ spawn_backend: 'subprocess' } as never);
+    vi.mocked(loadConfig).mockResolvedValue(REMOTE_WORKER_CONFIG as never);
     vi.mocked(spawnWorkerMultiProvider).mockResolvedValue({ backend: 'subprocess' } as never);
     const resDefault = await handler({ description: 'fix a bug', model: 'sonnet', autoApprove: true });
     expect(JSON.parse(resDefault.content[0]!.text).timeoutMs).toBe(300_000);

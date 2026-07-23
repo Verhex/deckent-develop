@@ -98,6 +98,7 @@ describe('deckent_run MCP — WM-1b routing', () => {
     vi.mocked(loadConfig).mockResolvedValue({
       routing_engine: 'v2',
       spawn_backend: 'subprocess',
+      execution_budget: { roles: { worker: { default: { maxTurns: 4 } } } },
     } as never);
 
     const { registerRunTool } = await import('../../../src/mcp/tools/run.ts');
@@ -121,6 +122,7 @@ describe('deckent_run MCP — WM-1b routing', () => {
     vi.mocked(loadConfig).mockResolvedValue({
       routing_engine: 'v2',
       spawn_backend: 'subprocess',
+      execution_budget: { roles: { worker: { default: { maxTurns: 4 } } } },
     } as never);
 
     const { registerRunTool } = await import('../../../src/mcp/tools/run.ts');
@@ -142,6 +144,7 @@ describe('deckent_run MCP — WM-1b routing', () => {
     vi.mocked(loadConfig).mockResolvedValue({
       routing_engine: 'v2',
       spawn_backend: 'subprocess',
+      execution_budget: { roles: { worker: { default: { maxTurns: 4 } } } },
     } as never);
     vi.mocked(routeSingleTaskV3).mockImplementationOnce(() => { throw new Error('routing failure'); });
 
@@ -167,6 +170,7 @@ describe('deckent_run MCP — WM-1b routing', () => {
     vi.mocked(loadConfig).mockResolvedValue({
       routing_engine: 'v2',
       spawn_backend: 'subprocess',
+      execution_budget: { roles: { worker: { default: { maxTurns: 4 } } } },
     } as never);
 
     const { registerRunTool } = await import('../../../src/mcp/tools/run.ts');

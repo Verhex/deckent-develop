@@ -14,6 +14,8 @@ import { buildWorkerPrompt } from '../../orchestra/brain.js';
 import { resolveAgentPrompt, resolveSkillPrompts } from '../../orchestra/sprint-controller.js';
 import type { UserOverride } from '../../core/routing-types.js';
 import { debugLog } from '../../core/utils.js';
+import { applyWorkerExecutionBudgetPolicy } from '../../core/execution-plan-digest.js';
+import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
 
 function generateJobId(): string {
   return `run-${Date.now().toString(36)}`;
@@ -44,7 +46,6 @@ export function registerRunTool(server: McpServer): void {
         const jobId = generateJobId();
         const taskId = `run-${jobId}`;
         const tasksDir = join(root, TASKS_DIR);
-        mkdirSync(tasksDir, { recursive: true });
 
         // C-MCP-parite (269-004): CLI --timeout / --keep counterparts. MCP keep
         // defaults to TRUE (preserve) — the fire-and-forget MCP path never cleaned
@@ -92,6 +93,21 @@ export function registerRunTool(server: McpServer): void {
         });
         const task = resolveToTask(execReq, taskId);
 
+        // BUDGET-PRODUCER parity: bind the same owner-authored immutable worker
+        // policy used by CLI one-shot and task-mode before routing, prompt
+        // construction, Task JSON, or backend/provider side effects.
+        const [budgetPolicy] = applyWorkerExecutionBudgetPolicy(
+          [task],
+          cfg.execution_budget,
+          identity.provider,
+        );
+        if (budgetPolicy?.state === 'hold') {
+          throw new Error(getMessage('run.budget_hold', getLanguage(cfg.language), {
+            reason: budgetPolicy.reasonCode ?? 'unknown',
+            profile: budgetPolicy.profileRef,
+          }));
+        }
+
         // WM-1b: V2 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
         try {
           const routingVersion = cfg?.routing_engine ?? 'v2';
@@ -119,6 +135,7 @@ export function registerRunTool(server: McpServer): void {
           debugLog('run:mcp:routing', `V2 routing failed, using generic fallback: ${routingErr}`);
         }
 
+        mkdirSync(tasksDir, { recursive: true });
         writeFileSync(join(tasksDir, `task-${taskId}.json`), JSON.stringify(task, null, 2) + '\n');
 
         // Build worker prompt with agent/skill context
@@ -131,6 +148,9 @@ export function registerRunTool(server: McpServer): void {
           dockerImage: cfg.docker_image,
           dockerTimeout: cfg.docker_timeout,
           provider: execReq.provider,
+          // Exact resolved owner ceiling — Task JSON and live spawn carry the
+          // same budget. The spawn seam independently rejects unmetered remotes.
+          executionBudget: task.budget,
           // C-MCP-parite (269-004): task.modelEffort is validated per-provider
           // inside spawnWorkerMultiProvider via resolveReasoningEffort — an invalid
           // or unsupported level resolves to undefined (no flag emitted), exactly
