@@ -49,6 +49,7 @@ import {
 } from '../core/task-result-settlement.js';
 import {
   buildRefutePrompt,
+  extractTerminalAssistantVerdictFromLog,
   parseRefuteVerdict,
   type RefuteVerdict,
 } from '../core/cross-verify-prompt.js';
@@ -157,35 +158,26 @@ export const CROSS_VERIFY_TIMEOUT_MS = 120_000;
 const CROSS_VERIFY_LOG_FINALIZE_GRACE_MS = 2_000;
 const CROSS_VERIFY_LOG_POLL_MS = 50;
 
-function extractLastTerminalVerdict(raw: string): string | null {
-  // Return ONLY the LAST VERDICT line, never the whole log: the adversarial
-  // prompt itself contains `VERDICT: REFUTED <reason>` as a FORMAT EXAMPLE,
-  // and `parseRefuteVerdict` checks REFUTED_RE first — feeding a log that
-  // echoes the prompt would turn every run into a false REFUTED. The final
-  // agent message always comes after any prompt echo, so last-match wins.
-  // Stops at a literal backslash (NDJSON logs carry `\n` as two chars) or
-  // a closing quote, so escaped-JSON wrapping cannot bleed into the reason.
-  const matches = raw.match(/VERDICT:\s*(?:REFUTED|CONFIRMED|UNCLEAR)[^"\\\n]*/g);
-  return matches?.at(-1)?.trim() ?? null;
-}
-
 async function waitForTerminalVerifierLog(logPath: string, timeoutMs: number): Promise<string | null> {
   const graceMs = Math.min(CROSS_VERIFY_LOG_FINALIZE_GRACE_MS, Math.max(0, timeoutMs));
   const deadline = Date.now() + graceMs;
+  let terminalVerdict: string | null = null;
   do {
     try {
       if (existsSync(logPath)) {
-        const terminalVerdict = extractLastTerminalVerdict(readFileSync(logPath, 'utf-8'));
-        if (terminalVerdict) return terminalVerdict;
+        terminalVerdict = extractTerminalAssistantVerdictFromLog(
+          readFileSync(logPath, 'utf-8'),
+        );
       }
     } catch (err) {
+      terminalVerdict = null;
       debugLog('cross-verify:log-fallback-read-failed', String(err));
     }
     const remainingMs = deadline - Date.now();
     if (remainingMs <= 0) break;
     await new Promise<void>((resolve) => setTimeout(resolve, Math.min(CROSS_VERIFY_LOG_POLL_MS, remainingMs)));
   } while (true);
-  return null;
+  return terminalVerdict;
 }
 
 async function waitForSettledVerifierResult(
@@ -373,8 +365,10 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
   // for this spawn shape — proven live 2026-07-20: a codex verifier ran the full
   // verification (tests + lint) and emitted `VERDICT: CONFIRMED ...` into the
   // log, yet the outcome resolved to 'unclear' because notes stayed empty. The
-  // raw log tail is a valid verdict source: `parseRefuteVerdict` scans for the
-  // LAST `VERDICT:` line, and the NDJSON wrapping does not defeat that match.
+  // normalized provider log is a valid verdict source only when its final
+  // assistant/model message is the terminal protocol line. Prompt/user echoes,
+  // usage envelopes, plain wrapper text, and superseded assistant lines carry
+  // no verdict authority.
   // Best-effort + capped: Docker persists the wrapper marker before its awaited
   // provider-log capture. A single immediate read therefore races the normalized
   // log by a few milliseconds. Poll only this artifact-finalization gap; an

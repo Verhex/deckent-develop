@@ -7,7 +7,7 @@
 // No gitignored state read; no spawnSync; passes on a fresh checkout (CI-hermetic).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -154,6 +154,15 @@ function makeSpawnSpy(output: string): { fn: SpawnVerifierFn; calls: SpawnVerifi
 }
 
 const TWO_PROVIDERS: readonly ProviderName[] = ['claude', 'codex'];
+
+function normalizedLogEvent(seq: number, type: string, content: unknown): string {
+  return JSON.stringify({
+    ts: '2026-07-23T00:00:00.000Z',
+    seq,
+    type,
+    content,
+  });
+}
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
@@ -393,9 +402,18 @@ describe('runCrossVerify — dispatch + advisory write', () => {
       writeFileSync(
         join(projectRoot, TASKS_DIR, `task-${taskId}.log`),
         [
-          'prompt example: VERDICT: REFUTED placeholder',
-          'bounded evidence was insufficient',
-          'VERDICT: UNCLEAR exact receipt was not present',
+          normalizedLogEvent(1, 'text', {
+            type: 'user',
+            message: { content: [{ type: 'text', text: 'VERDICT: REFUTED prompt example' }] },
+          }),
+          normalizedLogEvent(2, 'text', {
+            type: 'assistant',
+            message: { content: [{ type: 'text', text: 'Bounded evidence was insufficient.\nVERDICT: UNCLEAR exact receipt was not present' }] },
+          }),
+          normalizedLogEvent(3, 'usage', {
+            type: 'result',
+            result: 'VERDICT: CONFIRMED copied usage envelope',
+          }),
         ].join('\n'),
         'utf-8',
       );
@@ -467,8 +485,14 @@ describe('runCrossVerify — dispatch + advisory write', () => {
         writeFileSync(
           join(projectRoot, TASKS_DIR, `task-${taskId}.log`),
           [
-            'prompt example: VERDICT: REFUTED placeholder',
-            'VERDICT: CONFIRMED delayed normalized log is authoritative',
+            normalizedLogEvent(1, 'text', {
+              type: 'user',
+              message: { content: [{ type: 'text', text: 'VERDICT: REFUTED prompt example' }] },
+            }),
+            normalizedLogEvent(2, 'text', {
+              type: 'assistant',
+              message: { content: [{ type: 'text', text: 'VERDICT: CONFIRMED delayed normalized log is authoritative' }] },
+            }),
           ].join('\n'),
           'utf-8',
         );
@@ -525,7 +549,24 @@ describe('runCrossVerify — dispatch + advisory write', () => {
       );
       writeFileSync(
         join(projectRoot, TASKS_DIR, `task-${taskId}.log`),
-        'bounded evidence ended without a terminal protocol line',
+        [
+          normalizedLogEvent(1, 'text', {
+            type: 'user',
+            message: { content: [{ type: 'text', text: 'VERDICT: CONFIRMED prompt echo' }] },
+          }),
+          normalizedLogEvent(2, 'text', {
+            type: 'assistant',
+            message: { content: [{ type: 'text', text: 'VERDICT: CONFIRMED premature' }] },
+          }),
+          normalizedLogEvent(3, 'text', {
+            type: 'assistant',
+            message: { content: [{ type: 'text', text: 'I kept working after the verdict.' }] },
+          }),
+          normalizedLogEvent(4, 'usage', {
+            type: 'result',
+            result: 'VERDICT: CONFIRMED usage echo',
+          }),
+        ].join('\n'),
         'utf-8',
       );
       return { backend: 'docker', provider: 'claude' };
@@ -556,6 +597,64 @@ describe('runCrossVerify — dispatch + advisory write', () => {
       join(root, TASKS_DIR, 'task-276-001-xverify.json'),
       'utf-8',
     ))).toMatchObject({ id: '276-001-xverify', status: 'PENDING' });
+  });
+
+  it('waits through finalization and rejects a verdict followed by a later assistant continuation', async () => {
+    defaultSpawnMocks.spawnWorkerMultiProvider.mockImplementationOnce(async (taskId, _model, _prompt, projectRoot) => {
+      writeFileSync(
+        join(projectRoot, TASKS_DIR, `task-${taskId}.result`),
+        JSON.stringify({
+          taskId,
+          selfAssessment: 'NO_GO',
+          testsPassed: false,
+          markerType: 'EXIT_WITHOUT_RESULT',
+          notes: 'Worker exited without writing result. EXIT_WITHOUT_RESULT marker.',
+        }),
+        'utf-8',
+      );
+      const logPath = join(projectRoot, TASKS_DIR, `task-${taskId}.log`);
+      writeFileSync(
+        logPath,
+        normalizedLogEvent(1, 'text', {
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'VERDICT: CONFIRMED premature' }] },
+        }),
+        'utf-8',
+      );
+      setTimeout(() => {
+        appendFileSync(
+          logPath,
+          `\n${normalizedLogEvent(2, 'text', {
+            type: 'assistant',
+            message: { content: [{ type: 'text', text: 'I kept working after the verdict.' }] },
+          })}`,
+          'utf-8',
+        );
+      }, 25);
+      return { backend: 'docker', provider: 'claude' };
+    });
+    defaultSpawnMocks.pollForResultFile.mockResolvedValueOnce({
+      notes: 'Worker exited without writing result. EXIT_WITHOUT_RESULT marker.',
+    });
+
+    const res = await runCrossVerify(
+      root,
+      makeTask({ provider: 'codex', model: 'gpt-5.6-sol' }),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true }),
+      {
+        availableProviders: ['codex', 'claude'],
+        verifierModel: 'claude-fable-5',
+        timeoutMs: 100,
+      },
+    );
+
+    expect(res).toMatchObject({ ran: true, outcome: 'unclear' });
+    expect(JSON.parse(readFileSync(
+      join(root, TASKS_DIR, 'task-276-001-xverify.result'),
+      'utf-8',
+    ))).toMatchObject({ selfAssessment: 'NO_GO', markerType: 'EXIT_WITHOUT_RESULT' });
   });
 
   it('enabled + high-stakes + 2 providers + CONFIRMED → runs, writes advisory, not refuted', async () => {
