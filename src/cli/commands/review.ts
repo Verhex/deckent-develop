@@ -5,6 +5,7 @@ import type { Task, TaskResult } from '../../core/types.js';
 import { TASKS_DIR, BRAIN_DIR } from '../../core/constants.js';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { readAuthoritativeTaskResult } from '../../orchestra/task-result-authority.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -83,13 +84,7 @@ function loadTasks(root: string): Task[] {
 }
 
 function loadResult(root: string, taskId: string): TaskResult | null {
-  const resultPath = join(root, TASKS_DIR, `task-${taskId}.result`);
-  if (!existsSync(resultPath)) return null;
-  try {
-    return JSON.parse(readFileSync(resultPath, 'utf-8')) as TaskResult;
-  } catch {
-    return null;
-  }
+  return readAuthoritativeTaskResult<TaskResult>(root, taskId).result;
 }
 
 function detectSprintId(tasks: Task[]): string {

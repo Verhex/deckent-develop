@@ -31,6 +31,14 @@ vi.mock('../../../src/orchestra/tmux.js', () => ({
   killWorker: vi.fn(),
 }));
 
+const authorityMocks = vi.hoisted(() => ({
+  readAuthoritativeTaskResult: vi.fn(),
+}));
+
+vi.mock('../../../src/orchestra/task-result-authority.js', () => ({
+  readAuthoritativeTaskResult: authorityMocks.readAuthoritativeTaskResult,
+}));
+
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { print, printError } from '../../../src/cli/helpers/output.js';
 import { registerReview, loadReviewState, saveReviewState } from '../../../src/cli/commands/review.js';
@@ -86,6 +94,12 @@ async function runCommand(args: string[]): Promise<void> {
 describe('review command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    authorityMocks.readAuthoritativeTaskResult.mockReturnValue({
+      state: 'absent',
+      result: null,
+      settlementRef: null,
+      rawResultPath: '/mock/root/.tasks/task-001.result',
+    });
     process.exitCode = undefined;
   });
 
@@ -132,6 +146,12 @@ describe('review command', () => {
       if (String(p).includes('.result')) return JSON.stringify(sampleResult);
       return JSON.stringify(sampleTask);
     });
+    authorityMocks.readAuthoritativeTaskResult.mockReturnValue({
+      state: 'settled',
+      result: sampleResult,
+      settlementRef: null,
+      rawResultPath: '/mock/root/.tasks/task-001.result',
+    });
     await runCommand(['review', '--auto']);
     expect(writeFileSync).toHaveBeenCalled();
     const calls = vi.mocked(print).mock.calls.map((c) => c[0]);
@@ -151,10 +171,76 @@ describe('review command', () => {
       if (String(p).includes('.result')) return JSON.stringify(noGoResult);
       return JSON.stringify(sampleTask);
     });
+    authorityMocks.readAuthoritativeTaskResult.mockReturnValue({
+      state: 'settled',
+      result: noGoResult,
+      settlementRef: null,
+      rawResultPath: '/mock/root/.tasks/task-001.result',
+    });
     await runCommand(['review', '--auto']);
     const calls = vi.mocked(print).mock.calls.map((c) => c[0]);
     const output = calls.join('\n');
     expect(output).toContain('rejected');
+  });
+
+  it('--auto keeps a task pending while host settlement is pending despite raw DONE output', async () => {
+    vi.mocked(existsSync).mockImplementation((p: any) => {
+      if (String(p).includes('.tasks') && !String(p).includes('task-') && !String(p).includes('review-')) return true;
+      if (String(p).includes('task-001.json')) return true;
+      if (String(p).includes('task-001.result')) return true;
+      return false;
+    });
+    vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
+    vi.mocked(readFileSync).mockImplementation((p: any) => {
+      if (String(p).includes('.result')) return JSON.stringify(sampleResult);
+      return JSON.stringify(sampleTask);
+    });
+    authorityMocks.readAuthoritativeTaskResult.mockReturnValue({
+      state: 'pending-settlement',
+      result: null,
+      settlementRef: { version: 1, taskId: '001', attemptId: 'attempt-1' },
+      rawResultPath: '/mock/root/.tasks/task-001.result',
+    });
+
+    await runCommand(['review', '--auto']);
+
+    const persisted = vi.mocked(writeFileSync).mock.calls
+      .map((call) => String(call[1]))
+      .find((value) => value.includes('"sprintId": "sprint-030"'));
+    expect(persisted).toBeDefined();
+    expect(JSON.parse(persisted!).reviews).toEqual([
+      expect.objectContaining({ taskId: '001', decision: 'pending' }),
+    ]);
+  });
+
+  it('--auto uses the closed host result when raw worker output disagrees', async () => {
+    vi.mocked(existsSync).mockImplementation((p: any) => {
+      if (String(p).includes('.tasks') && !String(p).includes('task-') && !String(p).includes('review-')) return true;
+      if (String(p).includes('task-001.json')) return true;
+      if (String(p).includes('task-001.result')) return true;
+      return false;
+    });
+    vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
+    vi.mocked(readFileSync).mockImplementation((p: any) => {
+      if (String(p).includes('.result')) return JSON.stringify(sampleResult);
+      return JSON.stringify(sampleTask);
+    });
+    authorityMocks.readAuthoritativeTaskResult.mockReturnValue({
+      state: 'settled',
+      result: noGoResult,
+      settlementRef: { version: 1, taskId: '001', attemptId: 'attempt-1' },
+      rawResultPath: '/mock/root/.tasks/task-001.result',
+    });
+
+    await runCommand(['review', '--auto']);
+
+    const persisted = vi.mocked(writeFileSync).mock.calls
+      .map((call) => String(call[1]))
+      .find((value) => value.includes('"sprintId": "sprint-030"'));
+    expect(persisted).toBeDefined();
+    expect(JSON.parse(persisted!).reviews).toEqual([
+      expect.objectContaining({ taskId: '001', decision: 'rejected' }),
+    ]);
   });
 
   it('--json outputs JSON state', async () => {
