@@ -510,15 +510,20 @@ export async function planSprint(
           ));
         }
       }
-    } else if (planMode === 'ai') {
+    } else if (planMode === 'ai'
+      || callResult.reason === 'receipt_replay_blocked'
+      || callResult.reason === 'receipt_failed') {
       plannerFailureReason = callResult.reason;
-      plannerResolutionReason = 'model-failure';
+      plannerResolutionReason = callResult.reason === 'receipt_replay_blocked'
+        || callResult.reason === 'receipt_failed'
+        ? 'invocation-authority-failure'
+        : 'model-failure';
       // Strict ai-mode: surface the actual failure reason + message so the user
       // sees *why* (spawn_failed / timeout / parse_failed / no_providers / …)
       // instead of a generic "failed" message. structured moda düşülmedi (mode=ai).
       throw new BrainError(
         `AI planner failed (provider=${brainProviderName ?? 'unknown'}, reason=${callResult.reason}). ` +
-        `${callResult.message} structured moda düşülmedi (mode=ai).`,
+        `${callResult.message} structured moda düşülmedi (mode=${planMode}).`,
         SprintPhase.PLAN,
         buildPlannerProof('failed'),
       );

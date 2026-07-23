@@ -35,6 +35,7 @@ export type PlannerProofResolutionReason =
   | 'directive-routing-override'
   | 'model-success'
   | 'model-failure'
+  | 'invocation-authority-failure'
   | 'model-failure-fallback'
   | 'task-count-low-fallback'
   | 'task-count-high-fallback';

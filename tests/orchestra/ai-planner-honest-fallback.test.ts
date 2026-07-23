@@ -337,6 +337,49 @@ describe('Sprint 224 / Task 224-001 — AI planner discriminant honest-fallback'
     });
   });
 
+  it.each(['receipt_replay_blocked', 'receipt_failed'] as const)(
+    'mode=auto + reason=%s → fails loud instead of minting a structured planning authority',
+    async (reason) => {
+      const receiptRef = {
+        schemaVersion: 1 as const,
+        invocationId: `inv-${reason}`,
+        tenantId: 'local',
+        projectId: 'project-proof',
+      };
+      mockedCallBrainPlanner.mockReturnValue({
+        ok: false,
+        reason,
+        message: reason === 'receipt_replay_blocked'
+          ? 'INVOCATION_RECEIPT_DUPLICATE_DISPATCH_BLOCKED'
+          : 'INVOCATION_RECEIPT_EVENT_WRITE_FAILED',
+        receiptRef,
+      });
+
+      const error = await planSprint(
+        ROOT,
+        makeConfig('claude'),
+        makeContext('Task A\nTask B'),
+        recommendation,
+        { mode: 'auto' },
+      ).catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(BrainError);
+      expect(error.message).toContain(`reason=${reason}`);
+      expect(error.message).toContain('structured moda düşülmedi (mode=auto)');
+      expect((error as BrainError).plannerProof).toMatchObject({
+        requestedMode: 'auto',
+        actualMode: 'failed',
+        resolutionReason: 'invocation-authority-failure',
+        call: {
+          attempted: true,
+          succeeded: false,
+          failureReason: reason,
+          receiptRef,
+        },
+      });
+    },
+  );
+
   it('mode=ai + reason=no_providers → throws BrainError with reason=no_providers (registry empty)', async () => {
     mockedCallBrainPlanner.mockReturnValue({
       ok: false,
