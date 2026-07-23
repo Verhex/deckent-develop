@@ -1,12 +1,19 @@
 # Multi-Provider Fleet Guide
 
-> Run tasks on different AI providers **simultaneously** within a single sprint — ollama/codex/gemini on the host, claude in the configured backend, all in parallel.
+> Run tasks on different AI providers within one sprint — Ollama, Codex,
+> Gemini, and OpenRouter through host adapters; Claude through the configured
+> backend; dependency-ready work sharing the configured worker slots.
 
 ---
 
 ## Overview
 
-Deckent's mixed-fleet capability lets you assign each task in a sprint to a different AI provider. Tasks routed to `ollama`, `codex`, or `gemini` run directly on the host machine via their respective host adapters — no Docker container required. Tasks routed to `claude` run inside the configured backend (Docker container, tmux session, or subprocess) by default. All groups execute concurrently within the same wave, so a sprint can have an ollama worker and a claude worker running at the exact same time.
+Deckent's mixed-fleet capability lets you assign each task in a sprint to a
+different AI provider. Tasks routed to `ollama`, `codex`, `gemini`, or
+`openrouter` use their host adapters by default. Tasks routed to `claude` run
+inside the configured backend (Docker by default, subprocess when selected, or
+deprecated explicit tmux). Dependency-ready tasks may share a wave and run
+concurrently, bounded by configured worker slots.
 
 ---
 
@@ -20,19 +27,26 @@ isAdapterProvider(task.provider)?
   NO  → backend.spawn()   — configured backend (Docker / tmux / subprocess)
 ```
 
-`isAdapterProvider` returns `true` for `ollama`, `codex`, and `gemini`; `false` for `claude`.
+`isAdapterProvider` returns `true` for `ollama`, `codex`, `gemini`, and
+`openrouter`; `false` for `claude`.
 
-**Host-adapter path** (`ollama`, `codex`, `gemini`):
-- Bypasses the Docker backend entirely.
+**Host-adapter path** (`ollama`, `codex`, `gemini`, `openrouter`):
+- When selected, bypasses the configured spawn backend.
 - `OllamaAdapter.spawn()` calls `localhost:11434` — the local Ollama service running on the host.
 - `CodexAdapter.spawn()` and `GeminiAdapter.spawn()` exec the `codex` / `gemini` CLI binaries on the host machine.
-- No container. Provider credentials come from the host environment or CLI session.
+- OpenRouter uses its host HTTP worker and host-resolved secret.
+- Provider credentials come from the host environment, secret store, or CLI session.
 
 **Backend path** (`claude`):
-- Runs inside the Docker worker image (or tmux/subprocess if Docker is not configured).
+- Uses the configured backend: Docker by default, explicitly/persistently
+  selected subprocess, or deprecated explicit tmux.
 - The worker container gets Claude credentials via environment variable or `~/.claude/` mount.
 
-> **Note:** Any provider can be forced into the Docker backend by adding `- Backend: docker` to a task in DIRECTIVES. When forced into Docker, the provider's host session directory (`.codex`, `.gemini`) is mounted into the container automatically.
+> **Note:** Codex and Gemini can be explicitly routed to Docker with
+> `- Backend: docker` when the worker image contains their binaries and the
+> corresponding host session directory is mounted. Ollama and OpenRouter are
+> host-only adapters and reject Docker routing rather than silently changing
+> provider.
 
 | Provider | Default Routing Path | Execution Environment |
 |----------|---------------------|----------------------|
@@ -40,14 +54,19 @@ isAdapterProvider(task.provider)?
 | `codex` | Host-adapter | `codex` CLI spawned on host machine |
 | `gemini` | Host-adapter | `gemini` CLI spawned on host machine |
 | `ollama` | Host-adapter | HTTP to `localhost:11434` (host machine, no container) |
+| `openrouter` | Host-adapter | Host HTTP worker using an OpenRouter secret |
 
 ---
 
 ## Per-Task Provider Selection
 
-Add a `- Provider:` line to any task in `DIRECTIVES.md` to override the default `worker_provider` for that specific task. Pair it with a `- Model:` line that names a model supported by that provider.
+Add a `- Provider:` line to any task in `DIRECTIVES.md` to override
+`providers.worker` for that task. Pair it with a `- Model:` line containing an
+exact API ID owned by that provider.
 
-For the full list of deckent model ids, apiIds, and tier equivalences across providers, see [Multi-Provider Guide — Model Registry & Tier Equivalence](multi-provider.md#2-model-registry--tier-equivalence).
+For current live/cached model identities and bundled tier examples, run
+`deckent models list` and see [Multi-Provider Guide — Model
+Equivalence](multi-provider.md#4-model-equivalence).
 
 ```markdown
 ## Task 1: Local model task
@@ -59,13 +78,15 @@ For the full list of deckent model ids, apiIds, and tier equivalences across pro
 
 ## Task 2: Cloud model task
 - Provider: claude
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: low
 - Files: docs/guide/multi-provider-fleet.md
 - Scope: docs/guide/
 ```
 
-Valid provider values: `claude`, `codex`, `gemini`, `ollama`.
+First-class provider values: `claude`, `codex`, `gemini`, `ollama`,
+`openrouter`. OpenRouter model IDs are catalog-driven `vendor/model`
+identities.
 
 ---
 
@@ -95,22 +116,26 @@ host (localhost:11434) — no Docker, no API key.
 
 ## Task 2: [Claude] Cloud documentation task
 - Provider: claude
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: low
 - Files: docs/guide/cloud-notes.md
 - Scope: docs/guide/
 
 ### Description
 Write a complementary guide using the claude provider. Runs inside the
-configured Docker backend concurrently with Task 1.
+configured Docker backend and is eligible to run concurrently with Task 1 when
+runtime admission and worker capacity allow.
 ```
 
-When Brain plans this sprint, both tasks land in Wave 1 (no inter-task dependencies). The spawner dispatches them in the same wave:
+When Brain plans this sprint, both tasks are eligible for Wave 1 because they
+have no inter-task dependencies. The spawner may dispatch them concurrently
+when at least two configured worker slots are available:
 
 - Task 1 → `isAdapterProvider('ollama') = true` → `OllamaAdapter.spawn()` → host
 - Task 2 → `isAdapterProvider('claude') = false` → `backend.spawn()` → Docker
 
-Both workers execute at the same time — **paralel, eş-zamanlı** — and write their `.result` files independently. Brain evaluates them together.
+Each worker writes its `.result` independently; the configured concurrency cap
+and runtime admission gates still govern actual dispatch.
 
 ---
 
@@ -123,9 +148,13 @@ ollama serve                  # start the service (localhost:11434)
 ollama pull qwen3.6:27b       # download the model
 ```
 
-**Codex/Gemini (for host CLI tasks):**
+**Codex/Gemini/OpenRouter (for host tasks):**
 
-Install and authenticate `codex` / `gemini` on the host machine. See [Multi-Provider Guide](multi-provider.md) for setup. These providers spawn their CLIs directly on the host — no Docker image change required.
+Install and authenticate `codex` / `gemini` on the host machine. Configure an
+OpenRouter secret for OpenRouter tasks. See [Multi-Provider
+Guide](multi-provider.md) for setup. Configuration is candidate order only; it
+does not prove auth, model reachability, limits, budget admission, dispatch, or
+a persisted receipt.
 
 **Claude (for Docker backend tasks):**
 
@@ -133,7 +162,7 @@ Follow the setup in [Multi-Provider Guide](multi-provider.md) — ensure the Cla
 
 **Config (optional — override the default worker provider globally):**
 ```bash
-npx deckent config set worker_provider claude    # default backend provider
+deckent config set providers.worker claude
 # Per-task - Provider: in DIRECTIVES overrides this for individual tasks
 ```
 
@@ -146,9 +175,14 @@ npx deckent config set worker_provider claude    # default backend provider
 - `codex` → host-adapter path (`codex` CLI on host), bypasses Docker by default.
 - `gemini` → host-adapter path (`gemini` CLI on host), bypasses Docker by default.
 - `ollama` → host-adapter path (HTTP to `localhost:11434`), bypasses Docker.
-- Any provider can be forced into Docker via `- Backend: docker` in DIRECTIVES.
-- Tasks with different providers and no shared file dependencies run in the **same wave, simultaneously** — a true mixed-fleet sprint.
-- Sprint 236 is the first live proof: `ollama/qwen3.6:27b` (Task 1) and `claude/sonnet` (Task 2) ran in parallel in a single sprint, each routed through its respective path.
+- `openrouter` → host HTTP-adapter path; dynamic exact `vendor/model` identity.
+- Codex/Gemini may use explicit Docker when the image and credential mounts
+  support it; Ollama/OpenRouter remain host-only.
+- Dependency-ready tasks can share a wave and run concurrently up to configured
+  worker capacity.
+- Sprint 236 recorded an Ollama/Claude mixed-fleet run. Its historical
+  artefacts—not this current catalog example—remain authoritative for the exact
+  called Claude model.
 
 ---
 

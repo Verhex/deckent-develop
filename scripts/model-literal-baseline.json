@@ -389,36 +389,6 @@
       "code": "- Model: sonnet"
     },
     {
-      "file": "docs/cookbook/02-multi-provider-fleet.md",
-      "kind": "directive-model",
-      "code": "- Model: gpt-5"
-    },
-    {
-      "file": "docs/cookbook/02-multi-provider-fleet.md",
-      "kind": "directive-model",
-      "code": "- Model: sonnet"
-    },
-    {
-      "file": "docs/cookbook/02-multi-provider-fleet.md",
-      "kind": "table-cell",
-      "code": "| `claude` | `haiku` | economy | Fastest Claude |"
-    },
-    {
-      "file": "docs/cookbook/02-multi-provider-fleet.md",
-      "kind": "table-cell",
-      "code": "| `claude` | `opus` | premium | Most capable Claude |"
-    },
-    {
-      "file": "docs/cookbook/02-multi-provider-fleet.md",
-      "kind": "table-cell",
-      "code": "| `claude` | `sonnet` | standard | Balanced (default) |"
-    },
-    {
-      "file": "docs/cookbook/02-multi-provider-fleet.md",
-      "kind": "table-cell",
-      "code": "| `codex` | `gpt-5` | premium | Frontier OpenAI |"
-    },
-    {
       "file": "docs/cookbook/add-rest-api.md",
       "kind": "directive-model",
       "code": "- Model: sonnet"
@@ -595,16 +565,6 @@
     },
     {
       "file": "docs/guide/getting-started.md",
-      "kind": "directive-model",
-      "code": "- Model: sonnet"
-    },
-    {
-      "file": "docs/guide/multi-provider-fleet.md",
-      "kind": "directive-model",
-      "code": "- Model: sonnet"
-    },
-    {
-      "file": "docs/guide/multi-provider-fleet.md",
       "kind": "directive-model",
       "code": "- Model: sonnet"
     },

@@ -6,16 +6,19 @@ This recipe is for sprint operators who want a mixed fleet: Claude for writing, 
 
 ## Prerequisites
 
-Install and authenticate the provider CLIs you want to use:
+Install and authenticate the provider runtimes you want to use:
 
 - **`claude`**: Claude runs by default via subscription auth. For API-key mode, set `ANTHROPIC_API_KEY` and add `- Auth: api` to the task.
 - **`codex`**: Install the Codex CLI, then either run `codex login` (ChatGPT subscription) or set `OPENAI_API_KEY`.
 - **`gemini`**: Install the Gemini CLI, then set `GOOGLE_API_KEY` (or `DECKENT_GOOGLE_API_KEY` in `.deck`).
-- **`ollama`**: Run Ollama locally and pull the model you want (e.g. `ollama pull llama3.2`). Note: Ollama sprint-worker support is limited to REPL/chat; sprint workers run stubs.
+- **`ollama`**: Run Ollama locally and pull the model you want (e.g. `ollama pull llama3.2`). Sprint workers use the host HTTP adapter against the local Ollama service.
+- **`openrouter`**: Configure the OpenRouter provider and host-side secret; use an exact catalog `vendor/model` ID.
 
 ## Quick Start
 
-Add `- Provider:` and `- Model:` lines to each task in `DIRECTIVES.md`. Use the short registry model ID (`sonnet`, `gpt-5`, `gemini-2.5-pro`, etc.), not the full API ID.
+Add `- Provider:` and `- Model:` lines to each task in `DIRECTIVES.md`. Use the
+exact provider API ID, not a family alias. Run `deckent models list` for the
+current live/cached catalog.
 
 ```markdown
 # DIRECTIVES — Sprint 001: Mixed Fleet
@@ -27,7 +30,7 @@ Add `- Provider:` and `- Model:` lines to each task in `DIRECTIVES.md`. Use the 
 ## Task 1: Write onboarding guide
 - Agent: doc-writer
 - Provider: claude
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: low
 - Files: docs/onboarding.md
 - Scope: docs/
@@ -42,7 +45,7 @@ Create a short onboarding guide for new contributors.
 ## Task 2: Implement validation fix
 - Agent: bug-fixer
 - Provider: codex
-- Model: gpt-5
+- Model: gpt-5.6-sol
 - Effort: normal
 - Files: src/core/validator.ts
 - Scope: src/core/
@@ -77,15 +80,19 @@ deckent start
 
 ## Provider Model Reference
 
-Use these short registry IDs in `- Model:`:
+These exact IDs are examples from the current bundled snapshot, not a fixed
+allowlist. Use `deckent models list` for the active catalog.
 
 | Provider | Model ID | Tier | Notes |
 | --- | --- | --- | --- |
-| `claude` | `opus` | premium | Most capable Claude |
-| `claude` | `sonnet` | standard | Balanced (default) |
-| `claude` | `haiku` | economy | Fastest Claude |
+| `claude` | `claude-fable-5` | premium_plus | Highest bundled Claude tier |
+| `claude` | `claude-opus-4-8` | premium | Premium Claude |
+| `claude` | `claude-sonnet-5` | standard | Standard Claude |
+| `claude` | `claude-haiku-4-5-20251001` | economy | Economy Claude |
 | `codex` | `o3` | premium_plus | Advanced reasoning |
-| `codex` | `gpt-5` | premium | Frontier OpenAI |
+| `codex` | `gpt-5.6-sol` | premium | Premium Codex |
+| `codex` | `gpt-5.6-terra` | standard | Standard Codex |
+| `codex` | `gpt-5.6-luna` | economy | Economy Codex |
 | `codex` | `gpt-4.1` | standard | Balanced OpenAI |
 | `codex` | `o4-mini` | standard | Reasoning, efficient |
 | `codex` | `gpt-5-mini` | economy | Economy OpenAI |
@@ -93,13 +100,15 @@ Use these short registry IDs in `- Model:`:
 | `gemini` | `gemini-2.5-flash` | standard | Fast Gemini 2.5 |
 | `gemini` | `gemini-2.0-flash` | economy | Economy Gemini |
 
-If a task omits `- Provider:` or `- Model:`, Deckent falls back to the sprint or workspace defaults (`brain_provider` / `worker_provider` in `.deckent/config.json`).
+If a task omits `- Provider:` or `- Model:`, Deckent resolves the configured
+workspace role and tier defaults. This is default selection, not evidence that
+a runtime fallback occurred.
 
 ## Per-Task Backend and Reasoning Depth
 
 Two optional fields extend per-task control:
 
-- **`- Backend: docker | tmux | subprocess`** — by default, `codex`/`gemini`/`ollama` run via their host CLI and `claude` runs in a Docker container. Use `- Backend: docker` to run a host-CLI provider inside the container (the host session is mounted: `~/.codex`, `~/.gemini`).
+- **`- Backend: docker | tmux | subprocess`** — Codex/Gemini use host adapters by default and may use explicit Docker when the image contains their binaries and host sessions are mounted. Ollama/OpenRouter are host-only and reject Docker routing. Claude uses the configured backend (Docker by default; explicit tmux is deprecated).
 - **`- ModelEffort: <level>`** — the model's **reasoning depth**, independent of `- Effort:` (which controls task work size and timeout). Claude accepts `low / medium / high / xhigh / max`; Codex accepts `minimal / low / medium / high`. Gemini and Ollama do not support this field.
 
 ```markdown
@@ -135,20 +144,40 @@ Analyse the tricky module with extended reasoning.
 
 ## Workspace Defaults
 
-Provider configuration that applies to all tasks without overrides:
+Provider configuration that applies to all tasks without overrides, in
+`.deckent/config.json`:
 
 ```json
-// .deckent/config.json
 {
-  "brain_provider": "claude",
-  "worker_provider": "claude",
-  "fallback_provider": "claude",
-  "brain_tier": "premium",
-  "worker_tier": "standard"
+  "providers": {
+    "brain": "claude",
+    "worker": "codex"
+  },
+  "provider_fallback": {
+    "brain": ["codex", "gemini"],
+    "worker": ["claude", "gemini"],
+    "auditor_provider": "codex",
+    "auditor": ["claude", "gemini"],
+    "global": ["ollama"],
+    "unattended": false
+  },
+  "model_strategy": {
+    "brain_tier": "premium",
+    "worker_tier": "standard",
+    "min_tier": "economy",
+    "max_tier": "premium_plus",
+    "auto_upgrade": true,
+    "auto_downgrade": true
+  }
 }
 ```
 
-Set `worker_provider` to `codex` or `gemini` to change the default for all workers, then use `- Provider: claude` on tasks that specifically need Claude.
+This defines ordered candidates, not live availability. Auth, backend/model
+reachability, limit evidence, execution-budget admission, dispatch, and
+receipt persistence remain separate proofs.
+
+Use `deckent config set providers.worker codex` to change the Worker primary,
+then use `- Provider: claude` on tasks that specifically need Claude.
 
 ## Contributing
 
