@@ -82,7 +82,7 @@ function makeTask(id: string, overrides?: Partial<Task>): Task {
     id,
     title: `Task ${id}`,
     description: `desc ${id}`,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -94,6 +94,18 @@ function makeTask(id: string, overrides?: Partial<Task>): Task {
     createdAt: new Date().toISOString(),
     assignedAgent: 'generic',
     assignedSkills: [],
+    budget: { maxTurns: 1 },
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      taskKind: 'code-development',
+      resolvedProvider: 'claude',
+      executionCostClass: 'remote',
+      profileRef: 'tests.orchestra.scheduler-effects-cascade',
+      policyDigest: '9'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: { reserve_ratio: 0.25 },
+    },
     ...overrides,
   } as Task;
 }
@@ -125,6 +137,8 @@ function makeMockBackend(): SpawnBackend & { calls: Array<{ taskId: string }> } 
   const calls: Array<{ taskId: string }> = [];
   return {
     name: 'mock-backend',
+    liveUsageBudgetSupport: 'measured-stream',
+    executionLandingCapability: 'cooperative-landing',
     spawn(taskId: string, _model, _prompt, _opts?: SpawnBackendOptions) {
       calls.push({ taskId });
     },
@@ -246,7 +260,7 @@ describe('executeSchedulerDecision — CascadeSkip effect', () => {
       cascadeSkipped: true,
       notes: 'pre-crash synthetic result',
       tokenUsage: {
-        inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model: 'sonnet',
+        inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model: 'claude-sonnet-5',
       },
     };
     const resultPath = join(root, '.tasks', 'task-800-040.result');

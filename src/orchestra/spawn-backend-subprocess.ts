@@ -52,6 +52,12 @@ export interface StreamCaptureOptions {
    */
   onEvent?: (event: StreamLogEvent, seq: number) => void;
   /**
+   * Authority-critical consumers may opt into fail-closed tap behavior.
+   * Default false preserves the live-observability contract: a presentation
+   * tap cannot break provider stream capture.
+   */
+  failOnEventError?: boolean;
+  /**
    * SURF-3 S3 — when `false`, DON'T append to `logPath` (still normalize + tap
    * `onEvent`). The docker `docker logs -f` follow reads a stream whose `.log`
    * is ALREADY written authoritatively post-exit (writeNormalizedDockerLog), so
@@ -95,7 +101,14 @@ export async function captureStreamToLog(
   stream: Readable,
   opts: StreamCaptureOptions,
 ): Promise<StreamCaptureResult> {
-  const { logPath, provider, startSeq = 1, onEvent, writeLog = true } = opts;
+  const {
+    logPath,
+    provider,
+    startSeq = 1,
+    onEvent,
+    writeLog = true,
+    failOnEventError = false,
+  } = opts;
 
   let seq = startSeq;
   let eventsWritten = 0;
@@ -119,8 +132,9 @@ export async function captureStreamToLog(
     if (onEvent) {
       try {
         onEvent(event, seq);
-      } catch {
-        // Fail-safe: a live-tap consumer must never break stream capture.
+      } catch (error) {
+        if (failOnEventError) throw error;
+        // Default fail-safe: a presentation tap must never break capture.
       }
     }
 

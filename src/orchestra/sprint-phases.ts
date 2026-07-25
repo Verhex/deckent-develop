@@ -21,6 +21,7 @@ import {
   TaskStatus, TaskEvaluation, SprintPhase,
   SprintStatus, AlertLevel,
 } from '../core/types.js';
+import { DeckentError, createExecutionAuthorityError } from '../core/errors.js';
 
 // ─── Core (type imports) ──────────────────────────────────────────
 import type {
@@ -37,7 +38,10 @@ import { readJsonSafe, debugLog } from '../core/utils.js';
 import { getDebtItems } from '../core/debt-store.js';
 import { isPidAlive as isPidAliveShared } from '../core/pid-liveness.js';
 import type { ProviderAdapter } from '../core/provider.js';
+import { ProviderExecutionIngressHoldError } from '../core/provider-execution-ingress-authority.js';
 import type { SpawnBackend } from './spawn-backend.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
+import type { MandatoryCrossVerifyInvocationFactory } from './cross-verify-runner.js';
 // born-614 SPRINT-TRACE-WIRE: EVALUATE-sonu worker-transcript + Brain-verdict kaydı.
 import { recordSprintWorkerTrace } from './output-collector.js';
 import { createOutputCollector } from '../core/output-collector.js';
@@ -141,7 +145,11 @@ import {
 
 // ─── Result Map Helper ──────────────────────────────────────────
 import { buildResultsMap } from './result-collector.js';
-import { readAuthoritativeTaskResult } from './task-result-authority.js';
+import {
+  assertTaskResultAuthoritiesReady,
+  readAuthoritativeTaskResult,
+  readRuntimeBudgetEvaluationAuthority,
+} from './task-result-authority.js';
 
 // ─── Overlap Detection (Sprint 324 — Task 324-004) ───────────────
 import { ResultMerger } from './result-merger.js';
@@ -563,10 +571,13 @@ export function buildBrainEvaluationReason(
   verdictLabel: string,
   gated: { honest: boolean; violation?: string },
   result: Pick<TaskResult, 'testsPassed' | 'selfAssessment'>,
+  authorityCause?: string,
 ): string {
   if (evaluation === TaskEvaluation.NO_GO) {
     let vetoReason: string | undefined;
-    if (!gated.honest && gated.violation) {
+    if (authorityCause) {
+      vetoReason = authorityCause;
+    } else if (!gated.honest && gated.violation) {
       vetoReason = gated.violation;
     } else if (result.testsPassed === false) {
       vetoReason = 'concrete_test_failed';
@@ -610,6 +621,7 @@ export function persistBrainVerdict(
   rubricScore: number,
   gated: { honest: boolean; violation?: string },
   result: Pick<TaskResult, 'testsPassed' | 'selfAssessment'>,
+  authorityCause?: string,
 ): void {
   try {
     const resultPath = join(projectRoot, '.tasks', `task-${taskId}.result`);
@@ -619,7 +631,7 @@ export function persistBrainVerdict(
         const verdictLabel = toAuditDecision(evaluation);
         persisted.brainEvaluation = verdictLabel;
         persisted.brainEvaluationReason = buildBrainEvaluationReason(
-          rubricScore, evaluation, verdictLabel, gated, result,
+          rubricScore, evaluation, verdictLabel, gated, result, authorityCause,
         );
         writeFileSync(resultPath, JSON.stringify(persisted, null, 2) + '\n', 'utf-8');
       }
@@ -1077,7 +1089,12 @@ export async function runSpawnPhase(
       // before workers are spawned. Status remains whatever planSprint
       // emitted (PLANNING) until ACTIVE flips after a successful spawn.
       persistPhaseTransition(projectRoot, sprint, SprintPhase.SPAWN, sprint.status);
-      taskQueue = await spawnWorkers(projectRoot, sprint, config, { autoApprove: opts?.autoApprove, spawnBackend });
+      taskQueue = await spawnWorkers(projectRoot, sprint, config, {
+        autoApprove: opts?.autoApprove,
+        spawnBackend,
+        attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
+        providerAuthority: opts?.providerAuthority,
+      });
       // Spawn succeeded — promote to ACTIVE and re-persist.
       persistPhaseTransition(projectRoot, sprint, SprintPhase.SPAWN, SprintStatus.ACTIVE);
       try {
@@ -1102,6 +1119,10 @@ export async function runSpawnPhase(
       } catch (e) { debugLog('runSpawnPhase:startScanLoop', e); }
       break;
     } catch (err) {
+      if (err instanceof ProviderExecutionIngressHoldError) {
+        if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+        throw err;
+      }
       spawnAttempts++;
       if (spawnAttempts >= 2) {
         if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
@@ -1380,6 +1401,11 @@ export async function pollForResultFile(
     throw new Error(`Invalid host-owned Docker result settlement payload for task ${taskId}`);
   }
   if (parsed) return parsed;
+  if (authority.state === 'pending-settlement') {
+    throw createExecutionAuthorityError(
+      `Result poll deadline HOLD for task ${taskId}: Docker settlement is pending`,
+    );
+  }
   return null;
 }
 
@@ -1405,7 +1431,11 @@ export async function runEvaluatePhase(
   config?: ResolvedConfig,
   extensionState?: ExtensionStateMap,
   deferredTaskIds?: ReadonlySet<string>,
-  options?: { enforceDispatchGate?: boolean },
+  options?: {
+    enforceDispatchGate?: boolean;
+    providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+    crossVerifyInvocationFactory?: MandatoryCrossVerifyInvocationFactory;
+  },
 ): Promise<void> {
   // ─── Idempotency Guard (Sprint 157 Task 002) ───────────────────
   // Acquire PID-bound lock; if a live evaluation is already running
@@ -1432,6 +1462,12 @@ export async function runEvaluatePhase(
     }
   }
   try {
+    assertTaskResultAuthoritiesReady(
+      projectRoot,
+      sprint.tasks.map(task => task.id),
+      'evaluate-entry',
+    );
+
     // ─── Pre-Dispatch Trigger Guard (Sprint 192 — Task 192-009 — W-INTEGRITY I-3) ──
     // Memory: Sprint 191 RC — runEvaluatePhase Wave-N task'lar dispatch
     // olmadan tetiklendi → boş evaluations + bozuk cascade. Bayrak opt-in:
@@ -1565,14 +1601,24 @@ export async function runEvaluatePhase(
           debugLog('runEvaluatePhase:honestGate', `task=${task.id} violation=${gated.violation} → forced NO_GO`);
         }
 
+        const runtimeBudgetAuthority = readRuntimeBudgetEvaluationAuthority(
+          projectRoot,
+          task.id,
+        );
+
         // Sprint 191 P191-1: pass projectRoot so OOM-killed / partial-result
         // workers can be reconciled via reconcileSpuriousNoGo (git diff fallback).
         // 369-001: fault-armor (born-484) extracted to safeRubricReconcile —
         // single source shared by every evaluateWithRubric call site in this
-        // module (see helper doc comment).
-        const rubricResult: EvaluationResult = await safeRubricReconcile(
-          projectRoot, sprint.id, task, result);
-        let evaluation = toTaskEvaluation(rubricResult);
+        // module (see helper doc comment). Exact host runtime-budget authority
+        // skips that recovery probe: immutable containment is not a spurious
+        // worker NO_GO and must not spend more host work trying to promote it.
+        const rubricResult: EvaluationResult = runtimeBudgetAuthority
+          ? evaluateWithRubric(result, task, undefined, projectRoot)
+          : await safeRubricReconcile(projectRoot, sprint.id, task, result);
+        let evaluation = runtimeBudgetAuthority
+          ? TaskEvaluation.NO_GO
+          : toTaskEvaluation(rubricResult);
 
         // PROMOTE-W1b: flag-gated partial promotion (default-off).
         // Runs BEFORE the honest-gate lock so genuine rubric-NO_GO+isPartialPromotable
@@ -1584,7 +1630,8 @@ export async function runEvaluatePhase(
             ppEnabled &&
             evaluation === TaskEvaluation.NO_GO &&
             rubricResult.isPartialPromotable === true &&
-            gated.honest
+            gated.honest &&
+            !runtimeBudgetAuthority
           ) {
             try {
               const ppResult = await attemptPartialPromotion(projectRoot, task, result, rubricResult);
@@ -1788,7 +1835,18 @@ export async function runEvaluatePhase(
           (evaluation === TaskEvaluation.DONE || evaluation === TaskEvaluation.GO_WITH_TECH_DEBT)
         ) {
           try {
-            const xvResult = await runCrossVerify(projectRoot, task, result, evaluation, resolvedConfig);
+            const xvResult = await runCrossVerify(
+              projectRoot,
+              task,
+              result,
+              evaluation,
+              resolvedConfig,
+              {
+                ...(options?.crossVerifyInvocationFactory
+                  ? { mandatoryInvocationFactory: options.crossVerifyInvocationFactory }
+                  : {}),
+              },
+            );
             if (xvResult.outcome === 'unavailable') {
               try {
                 const sidXv = getCurrentSprintId(projectRoot) ?? sprint.id;
@@ -1827,12 +1885,20 @@ export async function runEvaluatePhase(
               } catch (e) { debugLog('runEvaluatePhase:crossVerify-event', e); }
             }
             // Task 323-004 / A18 — flag-gated enforcement: a REFUTED high-stakes
-            // result becomes NO_GO so the standard FIX path is triggered. Default-off
-            // (enforce_refuted unset → blocked always false) keeps advisory behavior.
+            // result, or an unavailable mandatory verifier, becomes NO_GO so the
+            // standard FIX path is triggered. Default-off keeps advisory behavior.
             if (xvResult.blocked) {
-              debugLog('runEvaluatePhase:crossVerify-enforce', `task=${task.id} REFUTED→NO_GO (enforce_refuted)`);
+              debugLog(
+                'runEvaluatePhase:crossVerify-enforce',
+                `task=${task.id} outcome=${xvResult.outcome} → NO_GO (enforce_refuted)`,
+              );
               evaluation = TaskEvaluation.NO_GO;
-              const enfNote = `[cross-verify ENFORCED NO_GO] verifier=${xvResult.advisory?.verifier ?? '?'} refuted: ${xvResult.advisory?.reason ?? ''}`.trim();
+              const enfNote = [
+                '[cross-verify:enforced-no-go]',
+                `outcome=${xvResult.outcome}`,
+                `verifier=${xvResult.advisory?.verifier ?? 'none'}`,
+                `reason=${xvResult.advisory?.reason ?? xvResult.skippedReason ?? 'unknown'}`,
+              ].join(' ');
               result.notes = result.notes ? `${result.notes}\n${enfNote}` : enfNote;
             }
           } catch (e) { debugLog('runEvaluatePhase:crossVerify', e); }
@@ -1916,6 +1982,17 @@ export async function runEvaluatePhase(
           } catch (e) { debugLog('runEvaluatePhase:adrCompliance', e); }
         }
 
+        // M4-044: final terminal lock immediately before persistence. Every
+        // intermediate policy above is downgrade-only today, but this guard
+        // keeps future promotion gates from silently outranking immutable host
+        // settlement + exact-attempt runtime-budget evidence.
+        if (runtimeBudgetAuthority) {
+          evaluation = TaskEvaluation.NO_GO;
+        }
+        const runtimeBudgetAuthorityReason = runtimeBudgetAuthority
+          ? `host_runtime_budget_exhausted:${runtimeBudgetAuthority.settlementRef.attemptId}`
+          : undefined;
+
         debugLog('runEvaluatePhase:task', `task=${task.id} selfAssessment=${result.selfAssessment} evaluation=${evaluation} testsPassed=${result.testsPassed}`);
         handleEvaluation(projectRoot, task, evaluation, result);
         evaluations.set(task.id, evaluation);
@@ -1924,7 +2001,15 @@ export async function runEvaluatePhase(
         // .result file so a .result shows WHY a FIX was spawned, not just the worker's
         // self-claim. Shared with the FIX phase via persistBrainVerdict (MF-5,
         // Sprint 331) so both phases write the identical brainEvaluation block.
-        persistBrainVerdict(projectRoot, task.id, evaluation, rubricResult.totalScore, gated, result);
+        persistBrainVerdict(
+          projectRoot,
+          task.id,
+          evaluation,
+          rubricResult.totalScore,
+          gated,
+          result,
+          runtimeBudgetAuthorityReason,
+        );
 
         // Sprint 161 Task 2 (T-003): per-task forensic audit record.
         // Joins the rubric outcome with the task's rubric definition
@@ -1932,7 +2017,14 @@ export async function runEvaluatePhase(
         // .deckent/runtime/evaluations/<sprintId>/<taskId>-attempt-1.json.
         // 352-003: shared writer — see writeTaskEvaluationAudit doc comment
         // for why this can no longer be an inline block local to this branch.
-        writeTaskEvaluationAudit(projectRoot, sprint.id, task, evaluation, rubricResult);
+        writeTaskEvaluationAudit(
+          projectRoot,
+          sprint.id,
+          task,
+          evaluation,
+          rubricResult,
+          runtimeBudgetAuthorityReason,
+        );
 
         // DECKENT→USER:NOTIFY (Hot Fix H6) — task-done / task-no-go, fail-safe
         try {
@@ -2319,6 +2411,7 @@ export async function runEvaluatePhase(
       }
     } catch (e) { debugLog('runEvaluatePhase:cascadeWire', e); }
   } catch (err) {
+    if (err instanceof DeckentError && err.code === 'DECKENT_E077') throw err;
     // EVALUATE-ERROR-SURFACE (born-484, sprints 365/366 live case — sibling of
     // the born-453 EXECUTE surface in sprint-controller): this catch used to
     // swallow a mid-EVALUATE throw into a dashboard line only. The sprint then
@@ -2706,12 +2799,28 @@ export async function runFixPhase(
       }
 
       const fixSprint: Sprint = { ...sprint, tasks: fixTasks, workers: fixTasks.map(t => `w-${t.id}`) };
-      await spawnWorkers(projectRoot, fixSprint, config, { autoApprove: opts?.autoApprove, spawnBackend });
+      await spawnWorkers(projectRoot, fixSprint, config, {
+        autoApprove: opts?.autoApprove,
+        spawnBackend,
+        attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
+        providerAuthority: opts?.providerAuthority,
+      });
       // Sprint 154 audit A4.F2: 600s yetersiz (Sprint 152 opus FIX worker timeout cascade kanıt) → 1800s.
       const fixPhaseTimeout = (config as unknown as Record<string, unknown>).fix_phase_timeout as number | undefined
         ?? opts?.fixPhaseTimeoutMs
         ?? 1_800_000;
-      const fixResults = await waitForResults(projectRoot, fixSprint, fixPhaseTimeout, undefined, { spawnBackend }, config);
+      const fixResults = await waitForResults(
+        projectRoot,
+        fixSprint,
+        fixPhaseTimeout,
+        undefined,
+        {
+          spawnBackend,
+          attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
+          providerAuthority: opts?.providerAuthority,
+        },
+        config,
+      );
       const sprintIdForUnblock = getCurrentSprintId(projectRoot) ?? sprint.id;
       for (const fixTask of fixTasks) {
         const fixResult = fixResults.find(r => r.taskId === fixTask.id);
@@ -2882,9 +2991,23 @@ export async function runFixPhase(
           const reDispatchTimeout = (config as unknown as Record<string, unknown>).fix_phase_timeout as number | undefined
             ?? opts?.fixPhaseTimeoutMs
             ?? 1_800_000;
-          await spawnWorkers(projectRoot, reDispatchSprint, config, { autoApprove: opts?.autoApprove, spawnBackend });
+          await spawnWorkers(projectRoot, reDispatchSprint, config, {
+            autoApprove: opts?.autoApprove,
+            spawnBackend,
+            attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
+            providerAuthority: opts?.providerAuthority,
+          });
           const reDispatchResults = await waitForResults(
-            projectRoot, reDispatchSprint, reDispatchTimeout, undefined, { spawnBackend }, config,
+            projectRoot,
+            reDispatchSprint,
+            reDispatchTimeout,
+            undefined,
+            {
+              spawnBackend,
+              attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
+              providerAuthority: opts?.providerAuthority,
+            },
+            config,
           );
 
           for (const rTask of eligible) {
@@ -2951,7 +3074,10 @@ export async function runFixPhase(
           );
         } catch (e) { debugLog('runFixPhase:reDispatchResult:event', e); }
       }
-    } catch (e) { debugLog('runFixPhase:reDispatchExecution', e); }
+    } catch (e) {
+      if (e instanceof ProviderExecutionIngressHoldError) throw e;
+      debugLog('runFixPhase:reDispatchExecution', e);
+    }
 
     // ─── POSTFIX-PENDING-SCAN (Sprint 361 361-004 — born-475) ────────────
     // 360 live lesson: tasks 003/008 whose parent tasks were already DONE
@@ -2971,7 +3097,15 @@ export async function runFixPhase(
     // a second immediate respawn attempt within this call.
     try {
       const postFixSpawnedIds = await respawnEligibleTasks(
-        projectRoot, sprint, config, { autoApprove: opts?.autoApprove, spawnBackend },
+        projectRoot,
+        sprint,
+        config,
+        {
+          autoApprove: opts?.autoApprove,
+          spawnBackend,
+          attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
+          providerAuthority: opts?.providerAuthority,
+        },
       );
       if (postFixSpawnedIds.length > 0) {
         debugLog(
@@ -2988,7 +3122,16 @@ export async function runFixPhase(
           ?? opts?.fixPhaseTimeoutMs
           ?? 1_800_000;
         const postFixResults = await waitForResults(
-          projectRoot, postFixSprint, postFixTimeout, undefined, { spawnBackend }, config,
+          projectRoot,
+          postFixSprint,
+          postFixTimeout,
+          undefined,
+          {
+            spawnBackend,
+            attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
+            providerAuthority: opts?.providerAuthority,
+          },
+          config,
         );
 
         let succeeded = 0;
@@ -3027,8 +3170,12 @@ export async function runFixPhase(
           },
         );
       }
-    } catch (e) { debugLog('runFixPhase:postFixPendingScan', e); }
+    } catch (e) {
+      if (e instanceof ProviderExecutionIngressHoldError) throw e;
+      debugLog('runFixPhase:postFixPendingScan', e);
+    }
   } catch (err) {
+    if (err instanceof ProviderExecutionIngressHoldError) throw err;
     safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
@@ -3099,6 +3246,11 @@ export async function runRetroPhase(
   flowId?: string,
 ): Promise<SprintMetrics | RetroPhaseFailure | undefined> {
   if (!testMode) {
+    assertTaskResultAuthoritiesReady(
+      projectRoot,
+      sprint.tasks.map(task => task.id),
+      'retro-entry',
+    );
     try {
       sprint.status = SprintStatus.RETROSPECTIVE;
       sprint.phase = SprintPhase.RETRO;
@@ -3121,11 +3273,10 @@ export async function runRetroPhase(
         const haveSentinel = typeof writeHonestSentinelResult === 'function';
         const haveStubCheck = typeof isConfirmedStub === 'function';
         if (haveSentinel || haveStubCheck) {
-          const tasksDir = join(projectRoot, TASKS_DIR);
           for (const task of sprint.tasks) {
-            const resultPath = join(tasksDir, `task-${task.id}.result`);
-            const exists = existsSync(resultPath);
-            if (!exists) {
+            const authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, task.id);
+            const persistedResult = authority.result;
+            if (!persistedResult) {
               // Sprint 351 351-008 (MOAT-3) — THE production bug this task
               // fixes: this pass previously clobbered EVERY missing-result
               // task to a "worker-crashed-no-result" NO_GO sentinel,
@@ -3155,10 +3306,11 @@ export async function runRetroPhase(
               }
               continue;
             }
-            // Existing .result — check for stub shape and rewrite if dishonest
+            // Existing authoritative result — check for stub shape and rewrite
+            // the raw projection if dishonest. For Docker tasks this reads the
+            // immutable closed host settlement, never contradictory raw output.
             try {
-              const raw = readFileSync(resultPath, 'utf-8');
-              const parsed = JSON.parse(raw) as TaskResult;
+              const parsed = persistedResult;
               // B-STUB / B-DOCKER-RACE / B-SENTINEL-CLOBBER (Sprint 318): isConfirmedStub
               // adds the MF-8 disk-evidence override the retro-phase caller previously
               // bypassed — a result is only flipped if it matches the stub shape AND has

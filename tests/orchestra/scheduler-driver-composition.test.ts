@@ -30,9 +30,9 @@
  *      model) on the spawned-id set.
  *   5. Live `waitForResults` integration: the SAME dependency-ready fixture,
  *      toggled only by `config.scheduler.engine`, spawns the same task via
- *      the same tmux `spawnWorker` call whether engine is 'legacy' (default)
- *      or 'reducer' — proving the wiring at the true call-site level, not
- *      just the driver in isolation.
+ *      the same injected canonical executor whether engine is 'legacy'
+ *      (default) or 'reducer' — proving the wiring at the true call-site
+ *      level without claiming unattended tmux budget-landing support.
  */
 import {
   describe, it, expect, vi, beforeEach, afterEach,
@@ -88,7 +88,7 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     id,
     title: `Task ${id}`,
     description: `sched5 ${id}`,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'sched5-test',
@@ -99,6 +99,18 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     sprintId: 'sprint-sched5',
     assignedAgent: 'generic',
     assignedSkills: [],
+    budget: { maxTurns: 1 },
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      taskKind: 'code-development',
+      resolvedProvider: 'claude',
+      executionCostClass: 'remote',
+      profileRef: 'tests.orchestra.scheduler-driver-composition',
+      policyDigest: '9'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: { reserve_ratio: 0.25 },
+    },
     ...overrides,
   } as Task;
 }
@@ -128,6 +140,8 @@ function makeMockBackend(log?: string[]): SpawnBackend & { calls: MockSpawnCall[
   const calls: MockSpawnCall[] = [];
   return {
     name: 'mock-backend',
+    liveUsageBudgetSupport: 'measured-stream',
+    executionLandingCapability: 'cooperative-landing',
     spawn(taskId, model, prompt, opts) {
       calls.push({ taskId, model: model as unknown as string, prompt, opts });
       log?.push(`spawn:${taskId}`);
@@ -419,50 +433,50 @@ describe('waitForResults — SCHED5 live wiring: initial tick spawns via the inj
     return { sprint, dep, readyTask };
   }
 
-  it('legacy engine (config.scheduler absent — default): dispatchReadyTasks spawns the dependency-ready task', async () => {
+  it('legacy engine (config.scheduler absent — default): dispatchReadyTasks spawns through the injected canonical executor', async () => {
     const { sprint, readyTask } = buildFixture();
+    const backend = makeMockBackend();
     const config = {
       dependency_pipeline_enabled: true,
       activeModeConfig: { max_workers: 3, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: true },
     } as unknown as ResolvedConfig;
 
-    await waitForResults(root, sprint, 300, undefined, undefined, undefined, config);
+    await waitForResults(root, sprint, 300, undefined, { spawnBackend: backend }, undefined, config);
 
-    expect(vi.mocked(spawnWorker)).toHaveBeenCalledWith(
-      '705-001', expect.any(String), expect.any(String), root, expect.any(Object),
-    );
+    expect(backend.calls.map(call => call.taskId)).toContain('705-001');
+    expect(vi.mocked(spawnWorker)).not.toHaveBeenCalled();
     expect(readyTask.status).toBe(TaskStatus.EXECUTING);
   });
 
-  it('reducer engine (config.scheduler.engine="reducer"): the injected driver spawns the same task via the same tmux path', async () => {
+  it('reducer engine (config.scheduler.engine="reducer"): the injected driver spawns through the same canonical executor', async () => {
     const { sprint, readyTask } = buildFixture();
+    const backend = makeMockBackend();
     const config = {
       dependency_pipeline_enabled: true,
       scheduler: { engine: 'reducer' },
       activeModeConfig: { max_workers: 3, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: true },
     } as unknown as ResolvedConfig;
 
-    await waitForResults(root, sprint, 300, undefined, undefined, undefined, config);
+    await waitForResults(root, sprint, 300, undefined, { spawnBackend: backend }, undefined, config);
 
-    expect(vi.mocked(spawnWorker)).toHaveBeenCalledWith(
-      '705-001', expect.any(String), expect.any(String), root, expect.any(Object),
-    );
+    expect(backend.calls.map(call => call.taskId)).toContain('705-001');
+    expect(vi.mocked(spawnWorker)).not.toHaveBeenCalled();
     expect(readyTask.status).toBe(TaskStatus.EXECUTING);
   });
 
   it('does not touch the live dogfood default: a config with no scheduler block at all behaves exactly like the explicit legacy case', async () => {
     const { sprint, readyTask } = buildFixture();
+    const backend = makeMockBackend();
     const config = {
       dependency_pipeline_enabled: true,
       activeModeConfig: { max_workers: 3, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: true },
     } as unknown as ResolvedConfig;
     expect((config as { scheduler?: unknown }).scheduler).toBeUndefined();
 
-    await waitForResults(root, sprint, 300, undefined, undefined, undefined, config);
+    await waitForResults(root, sprint, 300, undefined, { spawnBackend: backend }, undefined, config);
 
-    expect(vi.mocked(spawnWorker)).toHaveBeenCalledWith(
-      '705-001', expect.any(String), expect.any(String), root, expect.any(Object),
-    );
+    expect(backend.calls.map(call => call.taskId)).toContain('705-001');
+    expect(vi.mocked(spawnWorker)).not.toHaveBeenCalled();
     expect(readyTask.status).toBe(TaskStatus.EXECUTING);
   });
 });

@@ -7,7 +7,7 @@
  *   (c) Auth required AND auth-status fails → ok=false, .result written
  *       with AUTH_FAILED notes + selfAssessment NO_GO, AUTH_FAILED audit
  *       event emitted on WORKER→BRAIN:AUTH_FAILED channel
- *   (d) Auth required BUT DECKENT_AUTH_SKIP=1 (test env bypass) → check
+ *   (d) Auth required + exact Vitest-only bypass authority → check
  *       skipped, no .result, no event
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -106,6 +106,10 @@ describe('worker.authHealthCheck', () => {
 
     const result = authHealthCheck('/project', '194-001', 'sprint-194', {
       CLAUDE_AUTH_REQUIRED: '1',
+      ANTHROPIC_API_KEY: 'owned-anthropic',
+      OPENAI_API_KEY: 'foreign-openai',
+      GOOGLE_API_KEY: 'foreign-google',
+      OPENROUTER_API_KEY: 'foreign-openrouter',
     });
 
     expect(result.ok).toBe(true);
@@ -113,8 +117,17 @@ describe('worker.authHealthCheck', () => {
     expect(mockedSpawnSync).toHaveBeenCalledWith(
       'claude',
       ['auth', 'status', '--json'],
-      expect.objectContaining({ encoding: 'utf-8', timeout: 5_000 }),
+      expect.objectContaining({
+        encoding: 'utf-8',
+        timeout: 5_000,
+        shell: false,
+        env: expect.objectContaining({ ANTHROPIC_API_KEY: 'owned-anthropic' }),
+      }),
     );
+    const childEnv = mockedSpawnSync.mock.calls[0]?.[2]?.env as NodeJS.ProcessEnv;
+    expect(childEnv).not.toHaveProperty('OPENAI_API_KEY');
+    expect(childEnv).not.toHaveProperty('GOOGLE_API_KEY');
+    expect(childEnv).not.toHaveProperty('OPENROUTER_API_KEY');
     // No AUTH_FAILED event should be emitted on success
     const authEventCalls = mockedWriteEvent.mock.calls.filter(
       (call) => call[4] === 'WORKER→BRAIN:AUTH_FAILED',
@@ -166,10 +179,12 @@ describe('worker.authHealthCheck', () => {
     expect(authPayload.stderr).toContain('Invalid API key');
   });
 
-  it('(d) DECKENT_AUTH_SKIP=1 bypass → skipped even when CLAUDE_AUTH_REQUIRED=1', () => {
+  it('(d) exact Vitest-only bypass skips when auth is required', () => {
     const result = authHealthCheck('/project', '194-001', 'sprint-194', {
       CLAUDE_AUTH_REQUIRED: '1',
       DECKENT_AUTH_SKIP: '1',
+      NODE_ENV: 'test',
+      VITEST: 'true',
     });
 
     expect(result.ok).toBe(true);
@@ -178,7 +193,31 @@ describe('worker.authHealthCheck', () => {
     expect(mockedWriteEvent).not.toHaveBeenCalled();
   });
 
-  it('(e) empty/invalid JSON despite exit 0 is AUTH_FAILED', () => {
+  it('(e) ignores a lone production DECKENT_AUTH_SKIP and fails closed', () => {
+    mockedSpawnSync.mockReturnValue({
+      pid: 1,
+      status: 1,
+      signal: null,
+      output: ['', '{"loggedIn":false}', ''],
+      stdout: '{"loggedIn":false}',
+      stderr: '',
+    } as unknown as ReturnType<typeof spawnSync>);
+
+    const result = authHealthCheck('/project', '194-001', 'sprint-194', {
+      CLAUDE_AUTH_REQUIRED: '1',
+      DECKENT_AUTH_SKIP: '1',
+      NODE_ENV: 'production',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.skipped).toBeUndefined();
+    expect(mockedSpawnSync).toHaveBeenCalledOnce();
+    expect(mockedWriteEvent.mock.calls.some(
+      (call) => call[4] === 'WORKER→BRAIN:AUTH_FAILED',
+    )).toBe(true);
+  });
+
+  it('(f) empty/invalid JSON despite exit 0 is AUTH_FAILED', () => {
     mockedSpawnSync.mockReturnValue({
       pid: 1,
       status: 0,
@@ -200,7 +239,7 @@ describe('worker.authHealthCheck', () => {
     expect(result.stderr).toContain('invalid JSON');
   });
 
-  it('(f) exit 0 with loggedIn=false is AUTH_FAILED', () => {
+  it('(g) exit 0 with loggedIn=false is AUTH_FAILED', () => {
     mockedSpawnSync.mockReturnValue({
       pid: 1,
       status: 0,

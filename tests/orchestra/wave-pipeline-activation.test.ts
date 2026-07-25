@@ -30,6 +30,11 @@ import {
   TaskStatus, SprintStatus, SprintPhase,
 } from '../../src/core/types.js';
 import type { Task, Sprint, ResolvedConfig } from '../../src/core/types.js';
+import {
+  TEST_MEASURED_LANDING_CAPABILITIES,
+  TEST_REMOTE_EXECUTION_BUDGET,
+  TEST_REMOTE_WORKER_BUDGET_POLICY,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 // ─── Mocks (mirror dependency-pipeline-wire.test.ts pattern) ────────
 
@@ -136,7 +141,7 @@ vi.mock('../../src/orchestra/sprint-utils.js', async (importOriginal) => {
     resolveTaskProvider: vi.fn().mockReturnValue('claude'),
     getProviderAdapterForTask: vi.fn().mockReturnValue({
       name: 'measured-claude-test',
-      liveUsageBudgetSupport: 'measured-stream',
+      ...TEST_MEASURED_LANDING_CAPABILITIES,
       spawn: vi.fn(),
     }),
     getDefaultProvider: vi.fn().mockReturnValue(null),
@@ -224,7 +229,10 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     status: TaskStatus.PENDING,
     sprintId: 'sprint-182',
     createdAt: new Date().toISOString(),
-    budget: { maxTurns: 1 },
+    provider: 'claude',
+    type: 'code-development',
+    budget: TEST_REMOTE_EXECUTION_BUDGET,
+    budgetPolicy: TEST_REMOTE_WORKER_BUDGET_POLICY,
     ...overrides,
   };
 }

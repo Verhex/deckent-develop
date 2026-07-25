@@ -42,6 +42,12 @@ import { writeEvent } from './event-stream.js';
 // host-primary liveness decision via its single adopter, instead of judging solely
 // from the worker's own `.hb` timestamp (the 412-003 wrong-kill).
 import { voteWorkerLivenessFromRecord } from './heartbeat-monitor.js';
+import {
+  readAuthoritativeTaskResult,
+  type TaskResultAuthorityRead,
+} from './task-result-authority.js';
+import { readLatestTaskResultSettlementRef } from '../core/task-result-settlement.js';
+import { createExecutionAuthorityError } from '../core/errors.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -630,7 +636,7 @@ export function getTasksForResume(
   allTasks: Task[],
   projectRoot: string,
   thresholdMs: number = STALE_HEARTBEAT_THRESHOLD_MS,
-): { pendingTasks: Task[]; staleExecutingTasks: Task[] } {
+): { pendingTasks: Task[]; staleExecutingTasks: Task[]; parkedSettlementTasks: Task[] } {
   const completedSet = new Set(checkpoint.completedTasks);
   const activeTaskIds = new Set(checkpoint.activeWorkers.map(w => w.taskId));
 
@@ -646,22 +652,105 @@ export function getTasksForResume(
     t => staleTaskIds.has(t.id) && !completedSet.has(t.id),
   );
 
-  // Check if any "active" worker actually has a .result file now (completed during crash)
+  // Host settlement authority, not raw `.result` existence, decides whether an
+  // active worker completed during the crash or must remain parked.
   const resultCompletedIds = new Set<string>();
+  const resultParkedIds = new Set<string>();
   for (const worker of checkpoint.activeWorkers) {
-    const resultPath = join(projectRoot, TASKS_DIR, `task-${worker.taskId}.result`);
-    if (existsSync(resultPath)) {
+    const authority = readResumeTaskResultAuthority(projectRoot, worker.taskId);
+    if (authority.state === 'terminal') {
       resultCompletedIds.add(worker.taskId);
+    } else if (
+      authority.state === 'pending-settlement'
+      || authority.state === 'invalid-settlement'
+    ) {
+      resultParkedIds.add(worker.taskId);
     }
   }
 
   return {
-    pendingTasks: pendingTasks.filter(t => !resultCompletedIds.has(t.id)),
-    staleExecutingTasks: staleExecutingTasks.filter(t => !resultCompletedIds.has(t.id)),
+    pendingTasks: pendingTasks.filter(
+      t => !resultCompletedIds.has(t.id) && !resultParkedIds.has(t.id),
+    ),
+    staleExecutingTasks: staleExecutingTasks.filter(
+      t => !resultCompletedIds.has(t.id) && !resultParkedIds.has(t.id),
+    ),
+    parkedSettlementTasks: allTasks.filter(t => resultParkedIds.has(t.id)),
   };
 }
 
 // ─── Durable Interrupted-Worker Reset (455-001, resume CLI surface) ──
+
+export type ResumeTaskResultAuthorityState =
+  | 'terminal'
+  | 'resumable'
+  | 'pending-settlement'
+  | 'invalid-settlement';
+
+export interface ResumeTaskResultAuthority {
+  state: ResumeTaskResultAuthorityState;
+  result: TaskResult | null;
+}
+
+const TERMINAL_SELF_ASSESSMENTS = new Set([
+  'DONE',
+  'GO_WITH_TECH_DEBT',
+  'NO_GO',
+]);
+
+/**
+ * Project one canonical result authority into the resume state machine.
+ * A Docker claim makes a closed host receipt mandatory; its absence or invalid
+ * terminal payload is parked, never converted into permission to respawn.
+ */
+export function readResumeTaskResultAuthority(
+  projectRoot: string,
+  taskId: string,
+): ResumeTaskResultAuthority {
+  let authority: TaskResultAuthorityRead<TaskResult>;
+  try {
+    authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+  } catch {
+    // Corrupt/inconsistent Docker authority is a parked recovery state. It must
+    // never degrade to legacy raw-file compatibility or permission to respawn.
+    try {
+      if (readLatestTaskResultSettlementRef(projectRoot, taskId)) {
+        return { state: 'invalid-settlement', result: null };
+      }
+    } catch {
+      return { state: 'invalid-settlement', result: null };
+    }
+    return { state: 'resumable', result: null };
+  }
+  if (authority.state === 'pending-settlement') {
+    return { state: 'pending-settlement', result: null };
+  }
+  const result = authority.result;
+  const terminal = result?.taskId === taskId
+    && TERMINAL_SELF_ASSESSMENTS.has(String(result.selfAssessment));
+  if (terminal) return { state: 'terminal', result };
+  if (authority.state === 'settled') {
+    return { state: 'invalid-settlement', result: null };
+  }
+  return { state: 'resumable', result: null };
+}
+
+function requireRestorableTaskResultAuthority(
+  projectRoot: string,
+  taskId: string,
+  context: 'active-worker' | 'cascade-skip',
+): ResumeTaskResultAuthority {
+  const authority = readResumeTaskResultAuthority(projectRoot, taskId);
+  if (
+    authority.state === 'pending-settlement'
+    || authority.state === 'invalid-settlement'
+  ) {
+    throw createExecutionAuthorityError(
+      `Checkpoint restore HOLD for task ${taskId}: ${context} result authority is ${authority.state}`,
+    );
+  }
+  return authority;
+}
 
 /**
  * Durable-evidence check: does a task carry a VALID terminal `.result` on disk?
@@ -673,16 +762,15 @@ export function getTasksForResume(
  * that crashed mid-flight (reset to PENDING).
  */
 export function hasValidResult(projectRoot: string, taskId: string): boolean {
-  const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
-  if (!existsSync(resultPath)) return false;
-  try {
-    const parsed = JSON.parse(readFileSync(resultPath, 'utf-8')) as { taskId?: unknown; selfAssessment?: unknown };
-    return parsed.taskId === taskId && (parsed.selfAssessment === 'DONE'
-      || parsed.selfAssessment === 'GO_WITH_TECH_DEBT'
-      || parsed.selfAssessment === 'NO_GO');
-  } catch {
-    return false;
-  }
+  return readResumeTaskResultAuthority(projectRoot, taskId).state === 'terminal';
+}
+
+export interface ResumeDisposition {
+  resumableIds: string[];
+  parkedSettlements: Array<{
+    taskId: string;
+    state: 'pending-settlement' | 'invalid-settlement';
+  }>;
 }
 
 /**
@@ -701,12 +789,28 @@ export function deriveResumableTaskIds(
   projectRoot: string,
   checkpoint: Pick<SprintCheckpoint, 'pendingTasks' | 'activeWorkers' | 'taskStates'>,
 ): string[] {
+  return deriveResumeDisposition(projectRoot, checkpoint).resumableIds;
+}
+
+export function deriveResumeDisposition(
+  projectRoot: string,
+  checkpoint: Pick<SprintCheckpoint, 'pendingTasks' | 'activeWorkers' | 'taskStates'>,
+): ResumeDisposition {
   const ids: string[] = [];
+  const parkedSettlements: ResumeDisposition['parkedSettlements'] = [];
   const seen = new Set<string>();
   const consider = (id: string): void => {
     if (seen.has(id)) return;
     seen.add(id);
-    if (hasValidResult(projectRoot, id)) return;
+    const authority = readResumeTaskResultAuthority(projectRoot, id);
+    if (authority.state === 'terminal') return;
+    if (
+      authority.state === 'pending-settlement'
+      || authority.state === 'invalid-settlement'
+    ) {
+      parkedSettlements.push({ taskId: id, state: authority.state });
+      return;
+    }
     const task = readJsonSafe<Task>(join(projectRoot, TASKS_DIR, `task-${id}.json`));
     if (!task) return;
     const resumableStatus = task.status === TaskStatus.DRAFT
@@ -734,7 +838,7 @@ export function deriveResumableTaskIds(
       if (staleActiveIds.has(worker.taskId)) consider(worker.taskId);
     }
   }
-  return ids;
+  return { resumableIds: ids, parkedSettlements };
 }
 
 /** Outcome of {@link resetInterruptedWorkersToPending}. */
@@ -786,12 +890,13 @@ export function resetInterruptedWorkersToPending(
   const selected = new Set(resumableIds);
 
   for (const taskId of resumableIds) {
-    if (hasValidResult(projectRoot, taskId)) {
+    const authority = readResumeTaskResultAuthority(projectRoot, taskId);
+    if (authority.state !== 'resumable') {
       return {
         resetIds,
         checkpoint,
         committed: false,
-        error: `Task ${taskId} became terminal while resume was preparing`,
+        error: `Task ${taskId} resume authority changed to ${authority.state} while preparing`,
       };
     }
     const taskPath = join(projectRoot, TASKS_DIR, `task-${taskId}.json`);
@@ -908,8 +1013,14 @@ export function buildPreplannedResumeSprint(
       return task;
     }
 
-    const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
-    const result = readJsonSafe<TaskResult>(resultPath);
+    const authority = readResumeTaskResultAuthority(projectRoot, taskId);
+    if (
+      authority.state === 'pending-settlement'
+      || authority.state === 'invalid-settlement'
+    ) {
+      throw createExecutionAuthorityError(`Task ${taskId} resume authority is ${authority.state}`);
+    }
+    const result = authority.result;
     if (result?.selfAssessment === 'DONE' || result?.selfAssessment === 'GO_WITH_TECH_DEBT') {
       task.status = TaskStatus.DONE;
     } else if (result?.selfAssessment === 'NO_GO') {
@@ -1114,7 +1225,12 @@ function cascadeSkipPendingDescendants(
     if (!t) continue; // defensive — every effect taskId originates from `tasks` itself
 
     const resultPath = join(projectRoot, TASKS_DIR, `task-${t.id}.result`);
-    if (!existsSync(resultPath)) {
+    const resultAuthority = requireRestorableTaskResultAuthority(
+      projectRoot,
+      t.id,
+      'cascade-skip',
+    );
+    if (resultAuthority.state === 'resumable') {
       const skip: TaskResult = {
         taskId: t.id,
         workerId: `w-${t.id}`,
@@ -1304,13 +1420,20 @@ export function restoreSprintFromCheckpoint(
   const startedAt = (cp as SprintCheckpoint & { sprintStartedAt?: string }).sprintStartedAt
     ?? cp.timestamp;
 
-  // Classify active workers against the .result file on disk.
+  // Classify active workers against the host settlement authority. A raw
+  // worker-writable `.result` is terminal only on the legacy non-Docker path;
+  // pending/corrupt Docker authority must HOLD recovery instead of becoming
+  // either stale-complete or synthetic NO_GO.
   const staleTasksWithResult: string[] = [];
   const staleTasksMarkedNoGo: string[] = [];
 
   for (const worker of cp.activeWorkers ?? []) {
-    const resultPath = join(projectRoot, TASKS_DIR, `task-${worker.taskId}.result`);
-    if (existsSync(resultPath)) {
+    const resultAuthority = requireRestorableTaskResultAuthority(
+      projectRoot,
+      worker.taskId,
+      'active-worker',
+    );
+    if (resultAuthority.state === 'terminal') {
       staleTasksWithResult.push(worker.taskId);
       continue;
     }

@@ -157,7 +157,7 @@ describe('buildDependencyGraph', () => {
     expect(graph.cycleTaskIds).toEqual(['A', 'B', 'C']);
   });
 
-  it('should ignore dependencies referencing unknown task IDs', () => {
+  it('should retain unresolved dependency refs so runtime enforcement blocks instead of silently spawning', () => {
     const tasks = [
       createTask('001', ['nonexistent']),
       createTask('002'),
@@ -166,9 +166,15 @@ describe('buildDependencyGraph', () => {
     const graph = buildDependencyGraph(tasks, false);
 
     expect(graph.hasCycle).toBe(false);
-    // 001's dep on 'nonexistent' is ignored → both in wave 0
+    // Diagnostic waves remain visible, but the runtime dependency set keeps
+    // the unknown ref and therefore cannot claim task 001.
     expect(graph.waves).toHaveLength(1);
     expect(graph.waves[0]!.taskIds).toEqual(['001', '002']);
+    expect(graph.dependencies.get('001')).toEqual(new Set(['nonexistent']));
+    expect(enforceWaveDependency(graph, ['001', '002'], new Set())).toMatchObject({
+      eligible: ['002'],
+      blocked: ['001'],
+    });
   });
 
   it('should add collision edges when includeCollisions=true', () => {
@@ -248,10 +254,9 @@ describe('buildDependencyGraph', () => {
     expect(bDependents!.size).toBe(0);
   });
 
-  // 323-031: an unresolvable dependency (e.g. an un-normalized planner title
-  // string) is still dropped from the graph — but it must be LOGGED, never lost
-  // silently, so an operator can see the dependency-pipeline gap.
-  it('warns (debugLog) instead of silently dropping an unresolvable dependency', () => {
+  // An unresolvable dependency is retained as a runtime blocker and logged,
+  // so neither operator evidence nor enforcement silently loses it.
+  it('warns (debugLog) and retains an unresolvable dependency as a blocker', () => {
     vi.mocked(debugLog).mockClear();
     const tasks = [
       createTask('001'),
@@ -260,8 +265,7 @@ describe('buildDependencyGraph', () => {
 
     const graph = buildDependencyGraph(tasks, false);
 
-    // Behaviour preserved: the unresolvable dep is dropped from the edge set.
-    expect(graph.dependencies.get('002')!.size).toBe(0);
+    expect(graph.dependencies.get('002')).toEqual(new Set(['Build REST API']));
     expect(graph.hasCycle).toBe(false);
 
     // But it is surfaced, not silent.

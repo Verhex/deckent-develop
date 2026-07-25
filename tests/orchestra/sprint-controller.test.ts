@@ -370,11 +370,14 @@ import { eventBus } from '../../src/orchestra/event-bus.js';
 // ─── Helpers ────────────────────────────────────────────────────────
 
 function makeTask(overrides: Partial<Task> = {}): Task {
+  const model = overrides.model ?? 'claude-opus-4-8';
+  const resolvedProvider = overrides.provider
+    ?? (model.startsWith('gemini-') ? 'gemini' : /^(gpt-|o\d)/.test(model) ? 'codex' : 'claude');
   return {
     id: '001-001',
     title: 'Test task',
     description: 'desc',
-    model: 'claude-opus-4-8',
+    model,
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -385,6 +388,17 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     sprintId: 'sprint-001',
     createdAt: new Date().toISOString(),
     budget: { maxTurns: 1 },
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      taskKind: 'code-development',
+      resolvedProvider,
+      executionCostClass: 'remote',
+      profileRef: 'tests.orchestra.sprint-controller',
+      policyDigest: '8'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: { reserve_ratio: 0.25 },
+    },
     ...overrides,
   };
 }
@@ -1070,6 +1084,7 @@ describe('spawnWorkers — provider routing', () => {
   const mockCodexAdapter = {
     name: 'codex',
     liveUsageBudgetSupport: 'measured-stream' as const,
+    executionLandingCapability: 'cooperative-landing' as const,
     supportedModels: ['gpt-4.1', 'o3', 'o4-mini'],
     spawn: vi.fn(),
     kill: vi.fn(),
@@ -1081,6 +1096,7 @@ describe('spawnWorkers — provider routing', () => {
   const mockGeminiAdapter = {
     name: 'gemini',
     liveUsageBudgetSupport: 'measured-stream' as const,
+    executionLandingCapability: 'cooperative-landing' as const,
     supportedModels: ['gemini-2.5-pro', 'gemini-2.5-flash'],
     spawn: vi.fn(),
     kill: vi.fn(),
@@ -1115,7 +1131,7 @@ describe('spawnWorkers — provider routing', () => {
   });
 
   it('spawns Claude tasks via SpawnBackend when provided', async () => {
-    const mockBackend = { name: 'test', liveUsageBudgetSupport: 'measured-stream' as const, spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
+    const mockBackend = { name: 'test', liveUsageBudgetSupport: 'measured-stream' as const, executionLandingCapability: 'cooperative-landing' as const, spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
     const task = makeTask({ id: '001-001', model: 'claude-sonnet-5' });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
@@ -1185,7 +1201,7 @@ describe('spawnWorkers — provider routing', () => {
   });
 
   it('handles mixed sprint: Claude + Codex + Gemini tasks', async () => {
-    const mockBackend = { name: 'test', liveUsageBudgetSupport: 'measured-stream' as const, spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
+    const mockBackend = { name: 'test', liveUsageBudgetSupport: 'measured-stream' as const, executionLandingCapability: 'cooperative-landing' as const, spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
     const claudeTask = makeTask({ id: '001-001', model: 'claude-opus-4-8' });
     const codexTask = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
     const geminiTask = makeTask({ id: '003-001', model: 'gemini-2.5-pro', provider: 'gemini' });
@@ -1220,7 +1236,7 @@ describe('spawnWorkers — provider routing', () => {
   });
 
   it('no provider field defaults to claude for Claude models', async () => {
-    const mockBackend = { name: 'test', liveUsageBudgetSupport: 'measured-stream' as const, spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
+    const mockBackend = { name: 'test', liveUsageBudgetSupport: 'measured-stream' as const, executionLandingCapability: 'cooperative-landing' as const, spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
     const task = makeTask({ id: '001-001', model: 'claude-haiku-4-5-20251001' }); // no provider, Claude model
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
@@ -1235,7 +1251,7 @@ describe('spawnWorkers — provider routing', () => {
   });
 
   it('returns queued tasks beyond max_workers', async () => {
-    const mockBackend = { name: 'test', liveUsageBudgetSupport: 'measured-stream' as const, spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
+    const mockBackend = { name: 'test', liveUsageBudgetSupport: 'measured-stream' as const, executionLandingCapability: 'cooperative-landing' as const, spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
     const tasks = [
       makeTask({ id: '001-001', model: 'claude-opus-4-8' }),
       makeTask({ id: '001-002', model: 'claude-opus-4-8' }),
@@ -1438,7 +1454,7 @@ describe('Task Router wiring in sprint-controller', () => {
     // routeSprintTasksImpl and runSpawnPhase remain in runSprint within sprint-controller.ts.
     // Verify the order: runPlanPhase → routeSprintTasksImpl → runSpawnPhase
     const planIdx = source.indexOf('runPlanPhase(');
-    const routeIdx = source.indexOf('routeSprintTasksImpl(sprint.tasks, config, availableProviders)');
+    const routeIdx = source.indexOf('routeSprintTasksImpl(');
     const spawnIdx = source.indexOf('runSpawnPhase(');
     expect(planIdx).toBeGreaterThan(-1);
     expect(routeIdx).toBeGreaterThan(-1);
@@ -1488,15 +1504,20 @@ describe('Task Router wiring in sprint-controller', () => {
     expect(source).toContain('task.assignedSkills = routing.skills');
   });
 
-  it('routing phase is wrapped in try-catch for backward compatibility', async () => {
+  it('routing phase persists context and rethrows instead of backward-compatible continuation', async () => {
     const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
     const source = actualFs.readFileSync(
       new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
       'utf-8',
     );
-    // The routeSprintTasksImpl call is inside a try block with a non-fatal catch
-    expect(source).toContain('routeSprintTasksImpl(sprint.tasks, config, availableProviders)');
-    expect(source).toContain("debugLog('runSprint:routeSprintTasks'");
+    const start = source.indexOf('// Phase 1.5: Route tasks to providers');
+    const end = source.indexOf('try { updateLastSprintId', start);
+    const boundary = source.slice(start, end);
+    expect(boundary).toContain('routeSprintTasksImpl(');
+    expect(boundary).toContain('{ projectRoot, sprintId: sprint.id }');
+    expect(boundary).toContain('BRAIN→AUDITOR:PROVIDER_ROUTING_HOLD');
+    expect(boundary).toContain('throw e');
+    expect(boundary).not.toContain("debugLog('runSprint:routeSprintTasks', e)");
   });
 
   it('routeTask mock returns correct default shape', () => {
@@ -2063,7 +2084,7 @@ describe('waitForResults timeout', () => {
 // ═══ Task 067-004: spawnWorkers sets task status to EXECUTING ════════
 
 describe('spawnWorkers — task status update to EXECUTING', () => {
-  const mockBackend = { name: 'test', liveUsageBudgetSupport: 'measured-stream' as const, spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
+  const mockBackend = { name: 'test', liveUsageBudgetSupport: 'measured-stream' as const, executionLandingCapability: 'cooperative-landing' as const, spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
 
   beforeEach(() => {
     vi.clearAllMocks();

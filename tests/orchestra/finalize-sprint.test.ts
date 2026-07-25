@@ -181,14 +181,18 @@ vi.mock('../../src/orchestra/rollback.js', () => ({
   loadSafetyPoint: vi.fn().mockReturnValue(null),
 }));
 
-vi.mock('../../src/core/provider.js', () => ({
-  providerRegistry: {
-    getDefault: vi.fn().mockReturnValue(null),
-    register: vi.fn(),
-    get: vi.fn(),
-    list: vi.fn().mockReturnValue([]),
-  },
-}));
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/provider.js')>();
+  return {
+    ...actual,
+    providerRegistry: {
+      getDefault: vi.fn().mockReturnValue(null),
+      register: vi.fn(),
+      get: vi.fn(),
+      list: vi.fn().mockReturnValue([]),
+    },
+  };
+});
 
 vi.mock('../../src/core/plugin-hooks.js', () => ({
   runHooks: vi.fn().mockResolvedValue(undefined),

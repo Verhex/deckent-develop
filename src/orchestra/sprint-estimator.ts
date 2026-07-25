@@ -6,15 +6,17 @@ import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Task } from '../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR, DASHBOARD_FILE } from '../core/constants.js';
+import { getModelTier, type ModelTier } from '../core/model-equivalence.js';
 import { debugLog } from '../core/utils.js';
 
 // ─── Duration Baselines (minutes) ────────────────────────────────────────────
 
-/** Per-task base duration by model */
-const MODEL_BASE_MIN: Record<string, number> = {
-  opus: 30,
-  sonnet: 20,
-  haiku: 10,
+/** Per-task base duration by registry capability tier */
+const MODEL_TIER_BASE_MIN: Record<ModelTier, number> = {
+  premium_plus: 30,
+  premium: 30,
+  standard: 20,
+  economy: 10,
 };
 
 /** Effort multiplier */
@@ -64,7 +66,7 @@ export interface SprintEstimate {
  * Combines model base time, effort multiplier, and scope size.
  */
 export function scoreTaskComplexity(task: Task): TaskComplexityScore {
-  const baseMin = MODEL_BASE_MIN[task.model] ?? 20;
+  const baseMin = MODEL_TIER_BASE_MIN[getModelTier(task.model)];
   const multiplier = EFFORT_MULTIPLIER[task.effort] ?? 1.0;
   const effortMin = baseMin * multiplier;
 

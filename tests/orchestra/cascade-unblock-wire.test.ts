@@ -46,6 +46,20 @@ vi.mock('../../src/core/utils.js', () => ({
   debugLog: vi.fn(),
 }));
 
+// Results are injected directly in this cascade unit suite. Settlement
+// authority is exercised by dedicated real-disk tests; declare the legacy
+// absent-authority seam instead of letting the full fs mock invent claims.
+vi.mock('../../src/orchestra/task-result-authority.js', () => ({
+  assertTaskResultAuthoritiesReady: vi.fn(),
+  readAuthoritativeTaskResult: vi.fn((projectRoot: string, taskId: string) => ({
+    state: 'absent',
+    result: null,
+    settlementRef: null,
+    rawResultPath: `${projectRoot}/.tasks/task-${taskId}.result`,
+  })),
+  readRuntimeBudgetEvaluationAuthority: vi.fn(() => null),
+}));
+
 // Result evaluator: rubric scoring and FailureContext type are real; only
 // evaluateWithRubric is overridden so tests can drive evaluation outcomes.
 vi.mock('../../src/orchestra/result-evaluator.js', async (importOriginal) => {

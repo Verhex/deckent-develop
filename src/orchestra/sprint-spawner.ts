@@ -22,7 +22,20 @@ import { TASKS_DIR } from '../core/constants.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { debugLog } from '../core/utils.js';
-import { assertLiveUsageBudgetSupport } from '../core/live-execution-budget.js';
+import {
+  assertExecutionLandingSupport,
+  assertLiveUsageBudgetSupport,
+} from '../core/live-execution-budget.js';
+import {
+  attendedExecutionProjectId,
+  type AttendedExecutionApprovalAuthority,
+  type AttendedExecutionApprovalExpectedDispatch,
+} from '../core/attended-execution-approval.js';
+import { createTaskResultSettlementRefForAttempt } from '../core/task-result-settlement.js';
+import {
+  assertAttendedExecutionProposalMaterial,
+  createAttendedExecutionProposalMaterialFromTask,
+} from '../core/attended-execution-proposal.js';
 
 // ─── Core — config ────────────────────────────────────────────────
 import { resolveEffectiveWorkers, resolveLiveTraceEnabled } from '../core/config.js';
@@ -107,7 +120,11 @@ import { resolveReasoningEffort } from '../core/reasoning-effort.js';
 import { bootstrapProviders } from '../core/provider.js';
 
 // ─── Canonical Spawn Executor (SCHED3, born-634/635) ──────────────
-import { executeSpawnTask } from './scheduler-effects.js';
+import {
+  assertSprintWorkerProviderAuthority,
+  executeSpawnTask,
+} from './scheduler-effects.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
 
 // ─── Tmux ────────────────────────────────────────────────────────
 import { ensureSession, spawnWorker } from './tmux.js';
@@ -128,7 +145,7 @@ import { normalizePlannerDependencies } from './planner.js';
 import { ParallelPipelineManager } from './parallel-pipeline.js';
 
 // ─── Task Router ────────────────────────────────────────────────
-import { routeTask, emitTimeoutEvents } from './task-router.js';
+import { ProviderRoutingError, routeTask, emitTimeoutEvents } from './task-router.js';
 import { aggregateSprintHistory } from './timeout-estimator.js';
 
 // ─── Routing-Decision-Journal (409-003 ROUTING-TEK-OTORİTE) ──────
@@ -145,6 +162,8 @@ function routingDecisionJournalPath(projectRoot: string, sprintId: string): stri
   return joinPath(projectRoot, '.deckent', 'routing', 'decisions', `${sprintId}.jsonl`);
 }
 
+export const PROVIDER_FALLBACK_SELECTED_CHANNEL = 'BRAIN→AUDITOR:PROVIDER_FALLBACK_SELECTED';
+
 // Sprint 280 root-cause fix: adaptive per-task timeout is wired into every spawn
 // path (emitTimeoutEvents was a 0-caller dormant function, so docker_timeout
 // silently capped every worker at ~20min).
@@ -159,7 +178,7 @@ function routingDecisionJournalPath(projectRoot: string, sprintId: string): stri
 import { metric } from '../core/observability.js';
 
 // ─── Collision Detection (Sprint 138 ADR-035) ──────────────────
-import { detectScopeCollisions } from './conflict-resolver.js';
+import { deriveExecutionTopology } from '../core/execution-topology.js';
 import { writeEvent, CHANNELS, getCurrentSprintId, readSequence } from './event-stream.js';
 import { collectRbacBlockedTaskIds } from './sprint-runtime.js';
 
@@ -403,6 +422,8 @@ export async function spawnWorkers(
   spawnOpts?: {
     autoApprove?: boolean;
     spawnBackend?: SpawnBackend;
+    attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+    providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
   },
 ): Promise<Task[]> {
   const backend = spawnOpts?.spawnBackend;
@@ -449,8 +470,43 @@ export async function spawnWorkers(
     ...t,
     scope: { ...t.scope, filesWrite: normalizeScopeFiles(t.scope.filesWrite) },
   }));
-  const collisionResult = detectScopeCollisions(normalizedPendingTasks);
   const blockedTaskIds = new Set<string>();
+  // Runtime serialization must account for writers that already left PENDING.
+  // Looking only at pending tasks lets the second writer spawn while the first
+  // is still EXECUTING. The full-plan topology provides the same stable slot
+  // order preview/approval used; a later writer is eligible only after every
+  // earlier writer for that collision is DONE.
+  const fullRuntimeTopology = deriveExecutionTopology(sprint.tasks, { maxWorkers });
+  for (const collision of fullRuntimeTopology.collisions) {
+    for (let index = 1; index < collision.writerSlots.length; index++) {
+      const task = sprint.tasks[collision.writerSlots[index]! - 1];
+      if (!task || task.status !== TaskStatus.PENDING) continue;
+      const predecessorIncomplete = collision.writerSlots
+        .slice(0, index)
+        .some(slot => sprint.tasks[slot - 1]?.status !== TaskStatus.DONE);
+      if (predecessorIncomplete) blockedTaskIds.add(task.id);
+    }
+  }
+  const runtimeTopology = deriveExecutionTopology(pendingTasks, { maxWorkers });
+  const collisionResult = {
+    collisions: new Map(runtimeTopology.collisions.map(collision => [
+      collision.path,
+      collision.writerSlots.map(slot => pendingTasks[slot - 1]!.id),
+    ])),
+    collisionCount: runtimeTopology.collisions.length,
+    collidingPairs: runtimeTopology.collisions.flatMap(collision => {
+      const pairs: Array<[string, string]> = [];
+      for (let i = 0; i < collision.writerSlots.length; i++) {
+        for (let j = i + 1; j < collision.writerSlots.length; j++) {
+          pairs.push([
+            pendingTasks[collision.writerSlots[i]! - 1]!.id,
+            pendingTasks[collision.writerSlots[j]! - 1]!.id,
+          ]);
+        }
+      }
+      return pairs;
+    }),
+  };
   if (collisionResult.collisionCount > 0) {
     const sprintId = getCurrentSprintId(projectRoot) ?? sprint.id;
     // FIX-5 (B-COLLISION-HANG re-notify debounce — B-STALEMD pattern): the
@@ -495,7 +551,7 @@ export async function spawnWorkers(
         // writes the shared file this tick → concurrent-write safety is preserved
         // (the original goal of the block), without the deadlock or any
         // approval-gate (the serialize order is deterministic, not a decision).
-        const ordered = [...decision.taskIds].sort();
+        const ordered = [...writers];
         const winner = ordered[0];
         const deferred = ordered.slice(1);
         for (const id of deferred) blockedTaskIds.add(id);
@@ -559,8 +615,9 @@ export async function spawnWorkers(
     activeTasks = eligibleTasks.slice(0, maxWorkers);
     queuedTasks = eligibleTasks.slice(maxWorkers);
   } else {
-    activeTasks = sprint.tasks.slice(0, maxWorkers);
-    queuedTasks = sprint.tasks.slice(maxWorkers);
+    const pending = sprint.tasks.filter(task => task.status === TaskStatus.PENDING);
+    activeTasks = pending.slice(0, maxWorkers);
+    queuedTasks = pending.slice(maxWorkers);
   }
 
   // Pre-check: do any active tasks need tmux?
@@ -663,6 +720,15 @@ export async function spawnWorkers(
       }
     }
 
+    assertSprintWorkerProviderAuthority({
+      authority: spawnOpts?.providerAuthority,
+      projectRoot,
+      task,
+      config,
+      sprintFallbackId: sprint.id,
+      backend,
+    });
+
     const agentPrompt = await resolveAgentPrompt(projectRoot, task);
     const taskSkillPrompts = await resolveSkillPrompts(projectRoot, task);
     const prompt = buildWorkerPrompt(task, agentPrompt, taskSkillPrompts, projectRoot);
@@ -706,8 +772,9 @@ export async function spawnWorkers(
     //
     // Sprint 234 AS-2 Faz 2: host-HTTP adapter providers (`isAdapterProvider`)
     // bypass any configured backend. The previous priority order let a docker
-    // backend silently swallow ollama tasks and route them to the `claude`
-    // CLI fallback in `spawn-backend-docker.ts:getProviderBinaryForModel`.
+    // backend silently swallow Ollama tasks and route them toward Docker CLI
+    // binary selection. That boundary now rejects adapter-only providers;
+    // host-adapter routing remains the sole valid path.
     // Now: if the task's provider is a host-HTTP adapter and its adapter is
     // registered, refresh dynamic model acceptance and use `adapter.spawn`.
     // `refreshSupportedModels` is optional (`?.`) so non-Ollama adapters that
@@ -741,6 +808,39 @@ export async function spawnWorkers(
     // F3.1: prefix-stable claude system prompt (config-global, default true). Passed
     // to every spawn path; only claude arg-builders emit the flag, others ignore it.
     const excludeDynamicPromptSections = config.prompt?.exclude_dynamic_system_prompt_sections !== false;
+    const approvalExpectedDispatch = (
+      backendName: string,
+    ): AttendedExecutionApprovalExpectedDispatch | undefined => {
+      if (!task.budget
+        || !task.budgetPolicy?.landingPolicy
+        || !task.budgetPolicy.policyDigest
+        || !task.budgetPolicy.approvalProposal) {
+        return undefined;
+      }
+      assertAttendedExecutionProposalMaterial(
+        createAttendedExecutionProposalMaterialFromTask(
+          task as unknown as Record<string, unknown>,
+          prompt,
+        ),
+        task.budgetPolicy.approvalProposal,
+      );
+      return {
+        ...task.budgetPolicy.approvalProposal,
+        tenantId: task.actor?.tenantId ?? 'local',
+        projectId: attendedExecutionProjectId(projectRoot),
+        runId: task.sprintId ?? sprint.id,
+        taskId: task.id,
+        provider: taskProvider,
+        model,
+        backend: backendName,
+        budget: task.budget,
+        policy: {
+          profileRef: task.budgetPolicy.profileRef,
+          policyDigest: task.budgetPolicy.policyDigest,
+          landing: task.budgetPolicy.landingPolicy,
+        },
+      };
+    };
     // Sprint 280 root-cause fix: compute + emit the adaptive per-task timeout and
     // pass it to the spawn backend below as `taskTimeoutSeconds`, so docker_timeout
     // is the FALLBACK (not the de-facto ~20min cap). emitTimeoutEvents was dormant.
@@ -784,6 +884,17 @@ export async function spawnWorkers(
         adapterRouted.name,
         adapterRouted.executionCostClass,
       );
+      assertExecutionLandingSupport({
+        budget: task.budget,
+        policy: task.budgetPolicy?.landingPolicy,
+        mode: task.budgetPolicy?.admissionMode,
+        capability: adapterRouted.executionLandingCapability,
+        executor: adapterRouted.name,
+        approvalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
+        approvalAuthority: spawnOpts?.attendedExecutionApprovalAuthority,
+        approvalExpectedDispatch: approvalExpectedDispatch('host-adapter'),
+        executionCostClass: adapterRouted.executionCostClass,
+      });
       adapterRouted.spawn(task.id, model, prompt, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
@@ -792,6 +903,9 @@ export async function spawnWorkers(
         excludeDynamicPromptSections,
         taskTimeoutSeconds,
         executionBudget: task.budget,
+        executionLandingPolicy: task.budgetPolicy?.landingPolicy,
+        executionAdmissionMode: task.budgetPolicy?.admissionMode,
+        executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
         env: buildWorkerApprovalGateEnv(config.approval?.gate_enabled === true, task.sprintId, task.id),
       });
     } else if (wantsHostAdapter) {
@@ -815,6 +929,23 @@ export async function spawnWorkers(
         effectiveBackend.liveUsageBudgetSupport,
         effectiveBackend.name,
       );
+      const approvalGrant = assertExecutionLandingSupport({
+        budget: task.budget,
+        policy: task.budgetPolicy?.landingPolicy,
+        mode: task.budgetPolicy?.admissionMode,
+        capability: effectiveBackend.executionLandingCapability,
+        executor: effectiveBackend.name,
+        approvalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
+        approvalAuthority: spawnOpts?.attendedExecutionApprovalAuthority,
+        approvalExpectedDispatch: approvalExpectedDispatch(effectiveBackend.name),
+      });
+      const settlementRef = effectiveBackend.name === 'docker' && approvalGrant
+        ? createTaskResultSettlementRefForAttempt(
+          projectRoot,
+          task.id,
+          approvalGrant.receipt.binding.attemptId,
+        )
+        : undefined;
       effectiveBackend.spawn(task.id, model, prompt, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
@@ -823,6 +954,12 @@ export async function spawnWorkers(
         excludeDynamicPromptSections,
         taskTimeoutSeconds,
         executionBudget: task.budget,
+        executionLandingPolicy: task.budgetPolicy?.landingPolicy,
+        executionAdmissionMode: task.budgetPolicy?.admissionMode,
+        executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
+        executionApprovalGrant: approvalGrant,
+        executionApprovalExpectedDispatch: approvalExpectedDispatch(effectiveBackend.name),
+        settlementRef,
         // SURF-3 S2/S3 — live tool-by-tool activity (flag-gated; no-op when
         // off). 583/N5: env-twin aware — an interactive-origin coordinator
         // (DECKENT_LIVE_TRACE=1) streams live without a global config flip.
@@ -838,16 +975,40 @@ export async function spawnWorkers(
           adapter.name,
           adapter.executionCostClass,
         );
+        assertExecutionLandingSupport({
+          budget: task.budget,
+          policy: task.budgetPolicy?.landingPolicy,
+          mode: task.budgetPolicy?.admissionMode,
+          capability: adapter.executionLandingCapability,
+          executor: adapter.name,
+          approvalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
+          approvalAuthority: spawnOpts?.attendedExecutionApprovalAuthority,
+          approvalExpectedDispatch: approvalExpectedDispatch('host-adapter'),
+          executionCostClass: adapter.executionCostClass,
+        });
         adapter.spawn(task.id, model, prompt, {
           allowedTools,
           autoApprove: spawnOpts?.autoApprove ?? false,
           projectDir: projectRoot,
           executionBudget: task.budget,
+          executionLandingPolicy: task.budgetPolicy?.landingPolicy,
+          executionAdmissionMode: task.budgetPolicy?.admissionMode,
+          executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
           env: buildWorkerApprovalGateEnv(config.approval?.gate_enabled === true, task.sprintId, task.id),
         });
       }
     } else {
       assertLiveUsageBudgetSupport(task.budget, undefined, 'tmux');
+      assertExecutionLandingSupport({
+        budget: task.budget,
+        policy: task.budgetPolicy?.landingPolicy,
+        mode: task.budgetPolicy?.admissionMode,
+        capability: 'unsupported',
+        executor: 'tmux',
+        approvalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
+        approvalAuthority: spawnOpts?.attendedExecutionApprovalAuthority,
+        approvalExpectedDispatch: approvalExpectedDispatch('tmux'),
+      });
       spawnWorker(task.id, model, prompt, projectRoot, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
@@ -924,7 +1085,12 @@ export async function respawnEligibleTasks(
   projectRoot: string,
   sprint: Sprint,
   config: ResolvedConfig,
-  spawnOpts?: { autoApprove?: boolean; spawnBackend?: SpawnBackend },
+  spawnOpts?: {
+    autoApprove?: boolean;
+    spawnBackend?: SpawnBackend;
+    attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+    providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  },
   onWaveTransition?: (durationMs: number, fromWave: string, toWave: string) => void,
 ): Promise<string[]> {
   if (!config.dependency_pipeline_enabled) return [];
@@ -1223,12 +1389,10 @@ export function validateTaskDependencies(tasks: Task[]): import('./parallel-pipe
  * audit trail rather than noise on every task.
  *
  * Fail-soft (ADR-G-009), mirrors routing-engine.ts's own
- * `appendRoutingDecisionRecord`: a journal-write fault must never affect
- * spawn. No-op when `journalContext` is absent (409-003: the sole current
- * caller, sprint-controller.ts's `runSprint` Phase 1.5, does not thread
- * projectRoot/sprintId through — out of this task's write scope. The
- * single-authority pin below is unconditional either way; only the audit
- * trail degrades to silent-fail-soft without journalContext).
+ * `appendRoutingDecisionRecord`: an agent-journal write fault must never
+ * affect spawn. No-op when a non-production caller omits `journalContext`;
+ * `runSprint` threads the real project/sprint context. Provider fallback
+ * provenance below has the stricter fail-closed contract.
  */
 function appendSpawnFallbackRoutingDecision(
   journalContext: { projectRoot: string; sprintId: string } | undefined,
@@ -1285,10 +1449,9 @@ function appendSpawnFallbackRoutingDecision(
  * @param tasks - Array of tasks to route
  * @param config - Resolved config with skill_routing overrides
  * @param availableProviders - List of available provider names (from Connector or registry)
- * @param journalContext - Optional projectRoot/sprintId for the spawn-fallback
- *   decision journal. Omitted by the current sprint-controller.ts call site
- *   (out of scope to thread through here) — fallback pin logic still applies
- *   unconditionally; only the audit-trail write degrades to a no-op.
+ * @param journalContext - projectRoot/sprintId for durable fallback provenance.
+ *   Optional only for no-fallback callers; a selected provider fallback fails
+ *   closed when this context is absent.
  */
 export function routeSprintTasks(
   tasks: Task[],
@@ -1298,6 +1461,31 @@ export function routeSprintTasks(
 ): void {
   for (const task of tasks) {
     const routing = routeTask(task, config, availableProviders);
+    if (routing.providerFallback) {
+      if (!journalContext) {
+        throw new ProviderRoutingError(
+          'E_PROVIDER_FALLBACK_PROVENANCE_REQUIRED',
+          routing.providerFallback.selectedProvider,
+        );
+      }
+      const persisted = writeEvent(
+        journalContext.projectRoot,
+        journalContext.sprintId,
+        'brain',
+        'auditor',
+        PROVIDER_FALLBACK_SELECTED_CHANNEL,
+        {
+          taskId: task.id,
+          ...routing.providerFallback,
+        },
+      );
+      if (!persisted) {
+        throw new ProviderRoutingError(
+          'E_PROVIDER_FALLBACK_PROVENANCE_WRITE_FAILED',
+          routing.providerFallback.selectedProvider,
+        );
+      }
+    }
     task.provider = routing.provider;
     const hasPlanTimeAssignment =
       task.assignedAgent != null && task.assignedAgent !== '' && task.assignedAgent !== 'generic';

@@ -37,6 +37,13 @@ const guardDirs: string[] = [];
 const originalDeckentHome = process.env.DECKENT_HOME;
 const mockSpawn = vi.mocked(spawn);
 const mockSpawnSync = vi.mocked(spawnSync);
+const EXECUTION_BUDGET = { maxTurns: 1 } as const;
+const EXECUTION_LANDING_POLICY = { reserve_ratio: 0.25 } as const;
+const EXECUTION_OPTIONS = {
+  executionBudget: EXECUTION_BUDGET,
+  executionLandingPolicy: EXECUTION_LANDING_POLICY,
+  executionAdmissionMode: 'unattended' as const,
+};
 
 class FakeChild extends EventEmitter {
   readonly stdout = new PassThrough();
@@ -66,9 +73,31 @@ function fixture(taskId: string): { root: string; tasks: string } {
   const tasks = join(root, '.tasks');
   mkdirSync(tasks, { recursive: true });
   process.env.DECKENT_HOME = join(base, 'host-state');
+  writeFileSync(join(root, 'source.ts'), 'export const fixture = true;\n', 'utf-8');
   writeFileSync(join(tasks, `task-${taskId}.json`), JSON.stringify({
     id: taskId,
-    scope: { filesRead: [], filesWrite: [] },
+    model: 'claude-fable-5',
+    type: 'code-development',
+    provider: 'claude',
+    authMode: 'subscription',
+    scope: { filesRead: ['source.ts'], filesWrite: ['source.ts'] },
+    goNogo: {
+      goCriteria: 'settlement attempt is durable',
+      noGoCriteria: 'attempt authority is ambiguous',
+      techDebtAcceptable: 'none',
+    },
+    budget: EXECUTION_BUDGET,
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      taskKind: 'code-development',
+      resolvedProvider: 'claude',
+      executionCostClass: 'remote',
+      profileRef: 'execution_budget.roles.worker.default',
+      policyDigest: 'a'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: EXECUTION_LANDING_POLICY,
+    },
   }), 'utf-8');
   return { root, tasks };
 }
@@ -135,7 +164,7 @@ describe('Docker backend-owned settlement authority', () => {
       taskId,
       'claude-fable-5',
       'bounded prompt',
-      { executionBudget: { maxTurns: 1 } },
+      EXECUTION_OPTIONS,
     );
 
     const ref = readLatestTaskResultSettlementRef(root, taskId);
@@ -176,7 +205,7 @@ describe('Docker backend-owned settlement authority', () => {
       taskId,
       'claude-fable-5',
       'same attempt',
-      { executionBudget: { maxTurns: 1 }, settlementRef: active },
+      { ...EXECUTION_OPTIONS, settlementRef: active },
     )).not.toThrow();
     expect(readTaskResultSettlementDispatch(active)).toMatchObject({ containerId });
 
@@ -187,7 +216,7 @@ describe('Docker backend-owned settlement authority', () => {
       taskId,
       'claude-fable-5',
       'conflicting attempt',
-      { executionBudget: { maxTurns: 1 }, settlementRef: conflicting },
+      { ...EXECUTION_OPTIONS, settlementRef: conflicting },
     )).toThrow(/Conflicting active Docker result settlement attempt/);
 
     expect(mockSpawnSync.mock.calls.filter(call => call[0] === 'docker' && call[1]?.[0] === 'run'))
@@ -221,7 +250,7 @@ describe('Docker backend-owned settlement authority', () => {
       taskId,
       'claude-fable-5',
       'ambiguous dispatch',
-      { executionBudget: { maxTurns: 1 } },
+      EXECUTION_OPTIONS,
     )).toThrow(/DECKENT_E090/);
 
     const ref = readLatestTaskResultSettlementRef(root, taskId);

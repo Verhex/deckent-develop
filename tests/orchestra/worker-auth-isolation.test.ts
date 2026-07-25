@@ -31,8 +31,10 @@ vi.mock('node:child_process', () => ({
   spawn: vi.fn(() => {
     const stub = {
       stdout: { on: vi.fn() },
-      stderr: { on: vi.fn() },
+      stderr: { on: vi.fn(), resume: vi.fn() },
       on: vi.fn(),
+      once: vi.fn(),
+      kill: vi.fn(),
     };
     return stub as unknown as ChildProcess;
   }),
@@ -76,9 +78,23 @@ vi.mock('../../src/core/active-workers.js', () => ({
   clearPending: vi.fn(),
 }));
 
+vi.mock('../../src/core/task-result-settlement.js', () => {
+  return import('../helpers/task-result-settlement-stub.js')
+    .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
+});
+
+vi.mock('../../src/orchestra/execution-landing-coordinator.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../src/orchestra/execution-landing-coordinator.js')>()),
+  prepareDockerExecutionLanding: vi.fn(({ prompt }: { prompt: string }) => ({ prompt, context: null })),
+}));
+
 import { spawnSync } from 'node:child_process';
 import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
 import type { ModelType } from '../../src/core/types.js';
+import {
+  TEST_DOCKER_EXECUTION_OPTIONS,
+  budgetedDockerTaskJson,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
 
@@ -103,8 +119,8 @@ function installSpawnRouter(): void {
       stdout = 'container-id-abc123';
     } else if (cmd === 'docker' && sub === 'inspect') {
       stdout = 'true|0';
-    } else if (cmd === 'claude' && sub === '--version') {
-      stdout = 'claude 1.0.0 (host auth ok)';
+    } else if (cmd === 'claude' && argv.join(' ') === 'auth status --json') {
+      stdout = '{"loggedIn":true}';
     }
 
     return {
@@ -142,11 +158,19 @@ function collectForwardedCredentialKeys(argv: string[]): string[] {
  * else (auth mount, .claude.json) defaults to false — mirrors the isolation in
  * docker-auth-precedence.test.ts.
  */
-function stubTaskAuthMode(taskId: string, authMode: 'subscription' | 'api'): void {
-  fsState.existsSyncImpl = (p: string) => p.endsWith(`task-${taskId}.json`);
+function stubTaskEnvelope(
+  taskId: string,
+  model: string,
+  authMode: 'subscription' | 'api',
+): void {
+  fsState.existsSyncImpl = (p: string) =>
+    p.endsWith(`task-${taskId}.json`)
+    || (model.startsWith('claude-')
+      && authMode === 'subscription'
+      && p.endsWith('/.claude/.credentials.json'));
   fsState.readFileSyncImpl = (p: string) => {
     if (p.endsWith(`task-${taskId}.json`)) {
-      return JSON.stringify({ authMode, scope: { filesWrite: [] } });
+      return budgetedDockerTaskJson(p, { authMode, model });
     }
     return '{}';
   };
@@ -158,11 +182,27 @@ function resetFsStubs(): void {
 }
 
 /** Spawn one worker and return the credential keys forwarded into its container. */
-function forwardedKeysFor(model: ModelType, taskId: string): string[] {
+function forwardedKeysFor(
+  model: ModelType,
+  taskId: string,
+  authMode: 'subscription' | 'api' = 'subscription',
+): string[] {
+  stubTaskEnvelope(taskId, model, authMode);
   const backend = new DockerSpawnBackend('/test/project');
-  backend.spawn(taskId, model, 'prompt');
+  backend.spawn(taskId, model, 'prompt', TEST_DOCKER_EXECUTION_OPTIONS);
   expect(capturedDockerRunArgs.length).toBe(1);
   return collectForwardedCredentialKeys(capturedDockerRunArgs[0]!);
+}
+
+function expectMeteringHold(model: ModelType, taskId: string): void {
+  const backend = new DockerSpawnBackend('/test/project');
+  expect(() => backend.spawn(
+    taskId,
+    model,
+    'prompt',
+    TEST_DOCKER_EXECUTION_OPTIONS,
+  )).toThrow(/does not expose incremental measured usage/);
+  expect(capturedDockerRunArgs).toHaveLength(0);
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -184,7 +224,11 @@ describe('DockerSpawnBackend: runtime per-worker auth non-leak (F1-014r)', () =>
   });
 
   // ── subscription-Claude: the Sprint-213 killer — must carry NO Anthropic key ──
-  it.each(['sonnet', 'opus', 'haiku'] as ModelType[])(
+  it.each([
+    'claude-sonnet-5',
+    'claude-opus-4-8',
+    'claude-haiku-4-5-20251001',
+  ] as ModelType[])(
     'subscription-Claude (%s) forwards NO credential key (no ANTHROPIC_API_KEY leak)',
     (model) => {
       expect(forwardedKeysFor(model, `t-sub-${model}`)).toEqual([]);
@@ -192,30 +236,33 @@ describe('DockerSpawnBackend: runtime per-worker auth non-leak (F1-014r)', () =>
   );
 
   // ── api-mode Claude: ONLY Anthropic, no foreign keys ──
-  it('api-mode Claude (sonnet) forwards ONLY ANTHROPIC_API_KEY', () => {
-    stubTaskAuthMode('t-api-claude', 'api');
-    expect(forwardedKeysFor('sonnet' as ModelType, 't-api-claude')).toEqual(['ANTHROPIC_API_KEY']);
+  it('api-mode canonical Claude forwards ONLY ANTHROPIC_API_KEY', () => {
+    expect(forwardedKeysFor(
+      'claude-sonnet-5' as ModelType,
+      't-api-claude',
+      'api',
+    )).toEqual(['ANTHROPIC_API_KEY']);
   });
 
-  // ── codex: ONLY OpenAI, never GOOGLE/ANTHROPIC (cross-leak guard) ──
-  it.each(['gpt-4.1', 'gpt-5'] as ModelType[])(
-    'codex worker (%s) forwards ONLY OPENAI_API_KEY (no GOOGLE/ANTHROPIC cross-leak)',
+  // ── codex: final-only usage cannot safely enter Docker env assembly ──
+  it.each(['gpt-4.1', 'gpt-5.5'] as ModelType[])(
+    'codex worker (%s) HOLDs before any provider key enters a container',
     (model) => {
-      expect(forwardedKeysFor(model, `t-codex-${model}`)).toEqual(['OPENAI_API_KEY']);
+      expectMeteringHold(model, `t-codex-${model}`);
     },
   );
 
-  // ── gemini: ONLY Google, never OPENAI/ANTHROPIC (cross-leak guard) ──
+  // ── gemini: final-only usage cannot safely enter Docker env assembly ──
   it.each(['gemini-2.5-flash', 'gemini-2.5-pro'] as ModelType[])(
-    'gemini worker (%s) forwards ONLY GOOGLE_API_KEY (no OPENAI/ANTHROPIC cross-leak)',
+    'gemini worker (%s) HOLDs before any provider key enters a container',
     (model) => {
-      expect(forwardedKeysFor(model, `t-gemini-${model}`)).toEqual(['GOOGLE_API_KEY']);
+      expectMeteringHold(model, `t-gemini-${model}`);
     },
   );
 
-  // ── a non-claude worker in api authMode still must not receive ANTHROPIC ──
-  it('codex worker with authMode=api forwards ONLY OPENAI_API_KEY (no ANTHROPIC leak)', () => {
-    stubTaskAuthMode('t-codex-api', 'api');
-    expect(forwardedKeysFor('gpt-4.1' as ModelType, 't-codex-api')).toEqual(['OPENAI_API_KEY']);
+  // ── API auth cannot override the live-metering capability gate ──
+  it('Codex with authMode=api still HOLDs before provider env assembly', () => {
+    stubTaskEnvelope('t-codex-api', 'gpt-4.1', 'api');
+    expectMeteringHold('gpt-4.1' as ModelType, 't-codex-api');
   });
 });

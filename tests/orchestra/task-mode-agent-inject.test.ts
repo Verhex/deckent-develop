@@ -32,7 +32,7 @@ vi.mock('../../src/cli/commands/run.js', () => ({
     id: 'run-test-001',
     title: 'test task',
     description: 'do something',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -62,7 +62,10 @@ function taskConfig(): ResolvedConfig {
   return {
     deckent_style: 'task',
     spawn_backend: 'subprocess',
-    execution_budget: { roles: { worker: { default: { maxTokens: 100_000, maxTurns: 10 } } } },
+    execution_budget: {
+      roles: { worker: { default: { maxTokens: 100_000, maxTurns: 10 } } },
+      landing: { reserve_ratio: 0.25 },
+    },
   } as unknown as ResolvedConfig;
 }
 

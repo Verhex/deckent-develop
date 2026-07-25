@@ -25,13 +25,15 @@
 // budget-policy, scope, dependencies, acceptance and prompt-gate state).
 
 import { planSprint } from './brain.js';
-import { readAuthMode } from '../core/config.js';
+import { readAuthMode, resolveEffectiveWorkers } from '../core/config.js';
+import { getSystemProfile } from '../core/system-profile.js';
 import {
   buildExecutionPlanDigestContext,
-  computeExecutionPlanDigest,
+  computeExecutionPlanDigestV3,
   type ExecutionPlanDigestContext,
   EXECUTION_PLAN_DIGEST_VERSION,
 } from '../core/execution-plan-digest.js';
+import type { ExecutionTopology } from '../core/execution-topology.js';
 import type {
   BrainContext, BrainPlanningMode, ResolvedConfig, Sprint, SprintSizeRecommendation,
 } from '../core/types.js';
@@ -56,6 +58,8 @@ export interface PlanPreviewResult {
   readonly policyDecision: RunFlowPolicyDecision;
   /** born-684: promptGate bulgularının insan-okur özeti (digest-dışı). */
   readonly gateFindings: readonly string[];
+  readonly topology: ExecutionTopology;
+  readonly topologyGateResult: RunFlowGateResult;
 }
 
 function computeTaskSummaries(sprint: Sprint): RunFlowTaskSummary[] {
@@ -75,8 +79,12 @@ function computeGateFindings(sprint: Sprint): readonly string[] {
   );
 }
 
-function computePolicyDecision(gateResult: RunFlowGateResult): RunFlowPolicyDecision {
-  return gateResult === 'fail' ? 'needs-approval' : 'allow';
+function computePolicyDecision(
+  promptGateResult: RunFlowGateResult,
+  topologyGateResult: RunFlowGateResult,
+): RunFlowPolicyDecision {
+  if (topologyGateResult === 'fail') return 'deny';
+  return promptGateResult === 'fail' ? 'needs-approval' : 'allow';
 }
 
 /**
@@ -91,17 +99,29 @@ export async function generatePlanPreview(
   recommendation: SprintSizeRecommendation,
   options?: PlanPreviewOptions,
 ): Promise<PlanPreviewResult> {
-  const sprint = await planSprint(root, config, context, recommendation, {
+  const configuredMaxWorkers = resolveEffectiveWorkers(config, getSystemProfile());
+  const effectiveRecommendation = configuredMaxWorkers === recommendation.maxWorkers
+    ? recommendation
+    : { ...recommendation, maxWorkers: configuredMaxWorkers };
+  const sprint = await planSprint(root, config, context, effectiveRecommendation, {
     mode: options?.mode,
     acknowledgePromptGate: options?.acknowledgePromptGate,
     dryRun: true,
   });
 
   const taskSummaries = computeTaskSummaries(sprint);
-  const gateResult = computeGateResult(sprint);
-  const policyDecision = computePolicyDecision(gateResult);
-  const planDigestContext = buildExecutionPlanDigestContext(config, await readAuthMode(root));
-  const digest = computeExecutionPlanDigest(sprint, planDigestContext);
+  const promptGateResult = computeGateResult(sprint);
+  const planDigestContext = buildExecutionPlanDigestContext(
+    config,
+    await readAuthMode(root),
+    effectiveRecommendation.maxWorkers,
+  );
+  const digest = computeExecutionPlanDigestV3(sprint, planDigestContext);
+  const topology = digest.topology!;
+  const topologyGateResult: RunFlowGateResult = topology.verdict === 'pass' ? 'pass' : 'fail';
+  const policyDecision = computePolicyDecision(promptGateResult, topologyGateResult);
+  const gateResult: RunFlowGateResult =
+    promptGateResult === 'fail' || topologyGateResult === 'fail' ? 'fail' : promptGateResult;
 
   return {
     sprint,
@@ -112,5 +132,7 @@ export async function generatePlanPreview(
     gateResult,
     policyDecision,
     gateFindings: computeGateFindings(sprint),
+    topology,
+    topologyGateResult,
   };
 }

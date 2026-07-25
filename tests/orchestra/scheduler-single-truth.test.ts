@@ -25,12 +25,17 @@ import type { TaskResult } from '../../src/core/types.js';
 import { TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, ResolvedConfig, ModelType } from '../../src/core/types.js';
 import type { SpawnBackend, SpawnBackendOptions } from '../../src/orchestra/spawn-backend.js';
+import {
+  TEST_MEASURED_LANDING_CAPABILITIES,
+  TEST_REMOTE_EXECUTION_BUDGET,
+  TEST_REMOTE_WORKER_BUDGET_POLICY,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 function makeBackend(): SpawnBackend & { spawned: string[] } {
   const spawned: string[] = [];
   return {
     name: 'mock-610',
-    liveUsageBudgetSupport: 'measured-stream' as const,
+    ...TEST_MEASURED_LANDING_CAPABILITIES,
     spawn(taskId: string, _m: ModelType, _p: string, _o?: SpawnBackendOptions) { spawned.push(taskId); },
     kill() { /* no-op */ },
     list() { return spawned; },
@@ -47,7 +52,8 @@ function task(id: string, status: TaskStatus, dependencies: string[] = []): Task
     dependencies,
     goNogo: { goCriteria: 'x', noGoCriteria: 'x', techDebtAcceptable: 'none' },
     status, sprintId: 'sprint-610', assignedAgent: 'generic', assignedSkills: [], provider: 'claude',
-    budget: { maxTurns: 1 },
+    budget: TEST_REMOTE_EXECUTION_BUDGET,
+    budgetPolicy: TEST_REMOTE_WORKER_BUDGET_POLICY,
   } as unknown as Task;
 }
 

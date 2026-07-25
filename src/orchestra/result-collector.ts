@@ -56,6 +56,9 @@ const QUESTION_BRIDGE_TIMEOUT_MS = 5 * 60_000;
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
+import type { AttendedExecutionApprovalAuthority } from '../core/attended-execution-approval.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
+import { ProviderExecutionIngressHoldError } from '../core/provider-execution-ingress-authority.js';
 
 // ─── Shared Memory (Sprint 278 COMM-1 — worker-to-worker comms) ──
 import { SharedMemory } from './shared-memory.js';
@@ -77,7 +80,10 @@ import { getAgentPrompt } from '../core/agent-pool.js';
 
 // ─── tmux ─────────────────────────────────────────────────────────
 import { killWorker } from './tmux.js';
-import { drainRespawnRequests } from '../nervous/respawn-request.js';
+import {
+  drainRespawnRequests,
+  RESPAWN_REQUESTS_FILE,
+} from '../nervous/respawn-request.js';
 
 // ─── Canonical Spawn Executor (SCHED3, born-634/635) ─────────────
 import { executeSpawnTask } from './scheduler-effects.js';
@@ -899,7 +905,12 @@ export async function waitForResults(
   sprint: Sprint,
   timeoutMs?: number,
   queue?: Task[],
-  spawnOpts?: { autoApprove?: boolean; spawnBackend?: SpawnBackend },
+  spawnOpts?: {
+    autoApprove?: boolean;
+    spawnBackend?: SpawnBackend;
+    attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+    providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  },
   channelRegistry?: ChannelRegistry,
   config?: ResolvedConfig,
   costGuardOpts?: CostGuardWaitOpts,
@@ -1230,6 +1241,7 @@ export async function waitForResults(
         }
       }
     } catch (e) {
+      if (e instanceof ProviderExecutionIngressHoldError) throw e;
       debugLog('waitForResults:respawn', e);
     }
   };
@@ -1305,6 +1317,9 @@ export async function waitForResults(
       emitProgress({ root: projectRoot, phase: 'SPAWN', detail: nextTask.id });
       return true;
     } catch (err) {
+      if (err instanceof ProviderExecutionIngressHoldError) {
+        throw err;
+      }
       debugLog('waitForResults:queue-spawn', `Failed to spawn queued task ${nextTask.id}: ${err instanceof Error ? err.message : String(err)}`);
       // Allow a future retry for this task (e.g. force re-scan).
       assignedTaskIds.delete(nextTask.id);
@@ -1702,7 +1717,9 @@ export async function waitForResults(
   }
 
   // Use fs.watch with fallback polling (5s instead of 15s)
-  const watcher = createResultWatcher(projectRoot, WATCH_FALLBACK_MS);
+  const watcher = createResultWatcher(projectRoot, WATCH_FALLBACK_MS, {
+    wakeFiles: [RESPAWN_REQUESTS_FILE],
+  });
   // born-452 tick-armor: a single tick-step throwing (collectResults /
   // drainNervousRespawns / dispatchTick / forceRescanIfIdle / dispatchReadyTasks /
   // cascadeSkipDeadBlocked) used to propagate straight out of this function —

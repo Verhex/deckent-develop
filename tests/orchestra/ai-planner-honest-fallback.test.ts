@@ -102,6 +102,24 @@ const providerFixtures = vi.hoisted(() => {
 });
 
 vi.mock('../../src/core/provider.js', () => ({
+  orderedRoleProviders: vi.fn((role: string, config: {
+    brain_provider?: string;
+    worker_provider?: string;
+    providers?: { brain?: string; worker?: string };
+    provider_fallback?: { auditor_provider?: string; unattended?: boolean };
+  }) => ({
+    role,
+    primary: role === 'worker'
+      ? config.providers?.worker ?? config.worker_provider ?? 'claude'
+      : role === 'auditor'
+        ? config.provider_fallback?.auditor_provider
+          ?? config.providers?.brain
+          ?? config.brain_provider
+          ?? 'claude'
+        : config.providers?.brain ?? config.brain_provider ?? 'claude',
+    fallbacks: [],
+    unattended: config.provider_fallback?.unattended ?? true,
+  })),
   providerRegistry: {
     getDefault: vi.fn(() => providerFixtures.claudeAdapter),
     getProvider: vi.fn(
@@ -470,6 +488,70 @@ describe('Sprint 224 / Task 224-001 — AI planner discriminant honest-fallback'
     expect(mockedCallBrainPlanner).toHaveBeenCalledTimes(1);
     const adapterArg = mockedCallBrainPlanner.mock.calls[0]![4];
     expect(adapterArg).toBe(providerFixtures.ollamaAdapter);
+    expect(mockedGetDefault).not.toHaveBeenCalled();
+  });
+
+  it('uses grouped providers.brain as adapter, proof, and receipt requested authority', async () => {
+    mockedCallBrainPlanner.mockReturnValue(okResult);
+    const config = {
+      ...makeConfig(),
+      providers: { brain: 'ollama', worker: 'claude' },
+    } as ResolvedConfig;
+
+    const sprint = await planSprint(
+      ROOT,
+      config,
+      makeContext(''),
+      recommendation,
+      { mode: 'ai' },
+    );
+
+    expect(mockedGetProvider).toHaveBeenCalledWith('ollama');
+    expect(mockedGetDefault).not.toHaveBeenCalled();
+    expect(mockedCallBrainPlanner.mock.calls[0]![4]).toBe(providerFixtures.ollamaAdapter);
+    expect(mockedCallBrainPlanner.mock.calls[0]![8]).toMatchObject({
+      configuredProvider: 'ollama',
+      requestedProvider: 'ollama',
+    });
+    expect(sprint.plannerProof?.call).toMatchObject({
+      requestedProvider: 'ollama',
+      resolvedProvider: 'ollama',
+    });
+  });
+
+  it('keeps an absent configured primary unresolved and never substitutes registry default', async () => {
+    mockedHasProvider.mockImplementation((name) => name !== 'ollama' && providerFixtures.registered.has(name));
+    mockedCallBrainPlanner.mockImplementation((...args) => args[4]
+      ? okResult
+      : {
+          ok: false,
+          reason: 'no_providers',
+          message: 'Provider not found: "ollama"',
+        });
+    const config = makeConfig('ollama');
+
+    const error = await planSprint(
+      ROOT,
+      config,
+      makeContext(''),
+      recommendation,
+      { mode: 'ai' },
+    ).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(BrainError);
+    expect(mockedGetDefault).not.toHaveBeenCalled();
+    expect(mockedGetProvider).not.toHaveBeenCalledWith('ollama');
+    expect(mockedCallBrainPlanner.mock.calls[0]![4]).toBeUndefined();
+    expect(mockedCallBrainPlanner.mock.calls[0]![8]).toMatchObject({
+      configuredProvider: 'ollama',
+      requestedProvider: 'ollama',
+    });
+    expect((error as BrainError).plannerProof?.call).toMatchObject({
+      requestedProvider: 'ollama',
+      resolvedProvider: null,
+      resolvedModel: null,
+      failureReason: 'no_providers',
+    });
   });
 
   it('mode=auto + reason=timeout → structured fallback succeeds (honest fallback via notify, not console.error)', async () => {

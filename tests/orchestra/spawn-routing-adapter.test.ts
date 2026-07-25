@@ -9,9 +9,8 @@
 //      be called for ollama tasks.
 //   3. claude tasks regress to `backend.spawn` as before (regression-free).
 //   4. `respawnEligibleTasks` (wave-2 wire) applies the same routing.
-//   5. `spawn-backend-docker.getProviderBinaryForModel` no longer silently
-//      degrades ollama to claude — the defensive fallback now emits an
-//      explicit warning (honest-fail).
+//   5. `spawn-backend-docker.getProviderBinaryForModel` rejects an Ollama
+//      Docker misroute before any different provider binary can be selected.
 //
 // Hermetic: tmpdir + mocked SpawnBackend + adapter mocked into
 // providerRegistry. No real docker, no network, no spawnSync.
@@ -62,6 +61,8 @@ function makeMockBackend(): SpawnBackend & { calls: SpawnCall[] } {
   const calls: SpawnCall[] = [];
   return {
     name: 'mock-backend',
+    liveUsageBudgetSupport: 'measured-stream',
+    executionLandingCapability: 'cooperative-landing',
     spawn(taskId, model, prompt, opts) {
       calls.push({ taskId, model, prompt, opts });
     },
@@ -84,6 +85,7 @@ function makeMockOllamaAdapter(): MockAdapter {
   let refreshCount = 0;
   const adapter: MockAdapter = {
     name: 'ollama',
+    executionCostClass: 'local',
     supportedModels: ['qwen3.6'] as unknown as readonly ModelType[],
     spawn(taskId, model, prompt, opts) {
       spawnCalls.push({ taskId, model, prompt, opts });
@@ -106,7 +108,7 @@ function makeMockOllamaAdapter(): MockAdapter {
 // ─── Task / Sprint / Config Factories ─────────────────────────────
 
 function createTask(id: string, provider: 'claude' | 'ollama', model: ModelType, filesWrite: string[] = []): Task {
-  return {
+  const task = {
     id,
     title: `Task ${id}`,
     description: `Routing-adapter test task ${id}`,
@@ -126,11 +128,29 @@ function createTask(id: string, provider: 'claude' | 'ollama', model: ModelType,
       techDebtAcceptable: 'none',
     },
     status: TaskStatus.PENDING,
+    type: 'code-development',
     sprintId: 'sprint-234',
     assignedAgent: 'generic',
     assignedSkills: [],
     provider,
   } as unknown as Task;
+  if (provider === 'claude') applyRemoteBudget(task);
+  return task;
+}
+
+function applyRemoteBudget(task: Task): void {
+  task.budget = { maxTurns: 1 };
+  task.budgetPolicy = {
+    state: 'allow',
+    role: 'worker',
+    taskKind: task.type,
+    resolvedProvider: task.provider ?? 'unknown',
+    executionCostClass: 'remote',
+    profileRef: 'tests.orchestra.spawn-routing-adapter',
+    policyDigest: '9'.repeat(64),
+    admissionMode: 'unattended',
+    landingPolicy: { reserve_ratio: 0.25 },
+  };
 }
 
 function makeConfig(opts?: Partial<ResolvedConfig>): ResolvedConfig {
@@ -233,7 +253,7 @@ describe('spawnWorkers — host-HTTP adapter routing', () => {
   });
 
   it('routes claude task to backend.spawn (no regression)', async () => {
-    const claudeTask = createTask('234-ROUTE-B', 'claude', 'sonnet' as ModelType, ['src/bar.ts']);
+    const claudeTask = createTask('234-ROUTE-B', 'claude', 'claude-sonnet-5', ['src/bar.ts']);
     persistTasks([claudeTask]);
     const sprint = makeSprint('sprint-234', [claudeTask]);
     const backend = makeMockBackend();
@@ -298,6 +318,7 @@ describe('spawnWorkers — host-HTTP adapter routing', () => {
     providerRegistry.registerProvider(ollamaAdapter);
 
     const task: Task = { ...createTask('250-BK', 'ollama', 'qwen3.6' as ModelType, ['src/x.ts']), backend: 'docker' };
+    applyRemoteBudget(task);
     persistTasks([task]);
     const sprint = makeSprint('sprint-bk', [task]);
     const backend = makeMockBackend();
@@ -315,7 +336,7 @@ describe('spawnWorkers — host-HTTP adapter routing', () => {
     providerRegistry.registerProvider(ollamaAdapter);
 
     const ollamaTask = createTask('234-ROUTE-C', 'ollama', 'qwen3.6' as ModelType, ['src/c.ts']);
-    const claudeTask = createTask('234-ROUTE-D', 'claude', 'sonnet' as ModelType, ['src/d.ts']);
+    const claudeTask = createTask('234-ROUTE-D', 'claude', 'claude-sonnet-5', ['src/d.ts']);
     persistTasks([ollamaTask, claudeTask]);
     const sprint = makeSprint('sprint-234', [ollamaTask, claudeTask]);
     const backend = makeMockBackend();
@@ -358,7 +379,7 @@ describe('respawnEligibleTasks — host-HTTP adapter routing (wave-2)', () => {
 
     // Wave-2 scenario: dependency_pipeline_enabled, blocker is DONE,
     // ollama task is PENDING with its dependency satisfied.
-    const blocker = createTask('234-RESP-A', 'claude', 'sonnet' as ModelType, ['src/blocker.ts']);
+    const blocker = createTask('234-RESP-A', 'claude', 'claude-sonnet-5', ['src/blocker.ts']);
     blocker.status = TaskStatus.DONE;
     const ollamaTask = createTask('234-RESP-B', 'ollama', 'qwen3.6' as ModelType, ['src/wave2.ts']);
     ollamaTask.dependencies = ['234-RESP-A'];
@@ -382,25 +403,14 @@ describe('respawnEligibleTasks — host-HTTP adapter routing (wave-2)', () => {
   });
 });
 
-describe('spawn-backend-docker — ollama defensive honest-fail', () => {
-  it('emits explicit warning when ollama provider reaches Docker backend (no silent claude swap)', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* swallow for test */ });
-
+describe('spawn-backend-docker — Ollama defensive honest-fail', () => {
+  it('throws when an Ollama provider reaches Docker binary selection', () => {
     // Call with a registered ollama model id — getProviderForModel maps it to
     // 'ollama'. Layer-2 routing should have prevented this; the defensive
-    // fallback now surfaces a loud warning instead of silently picking claude.
-    // 'llama-3.2-3b' is registered by `registerOllamaModels` (side-effect of
+    // boundary must not substitute another provider.
+    // 'llama3.2:3b' is registered by `registerOllamaModels` (side-effect of
     // importing providers/ollama at the top of this file).
-    const binary = getProviderBinaryForModel('llama-3.2-3b' as ModelType);
-
-    // Legacy contract preserved: returns 'claude' so an in-flight container
-    // does not crash mid-sprint. But the warning MUST be visible.
-    expect(binary).toBe('claude');
-    expect(warnSpy).toHaveBeenCalled();
-    const warningMessage = warnSpy.mock.calls.map(args => String(args[0])).join('\n');
-    expect(warningMessage).toMatch(/ollama/i);
-    expect(warningMessage).toMatch(/sprint-spawner|isAdapterProvider/);
-
-    warnSpy.mockRestore();
+    expect(() => getProviderBinaryForModel('llama3.2:3b' as ModelType))
+      .toThrow(/Ollama provider cannot use the Docker CLI backend/);
   });
 });

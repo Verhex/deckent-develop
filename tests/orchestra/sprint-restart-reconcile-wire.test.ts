@@ -28,11 +28,24 @@ describe('runSprint restart reconciliation seam', () => {
     expect(restoreIndex).toBeGreaterThan(reconcileIndex);
   });
 
+  it('propagates checkpoint execution-authority HOLD instead of falling through to PLAN', () => {
+    const source = readFileSync(join(process.cwd(), 'src/orchestra/sprint-controller.ts'), 'utf-8');
+    const restoreIndex = source.indexOf('const recovery = restoreSprintFromCheckpoint');
+    const recoveryCatchIndex = source.indexOf('catch (e) {', restoreIndex);
+    const recoveryCatchEnd = source.indexOf('// ─── Outer-scope variables', recoveryCatchIndex);
+    const boundary = source.slice(recoveryCatchIndex, recoveryCatchEnd);
+
+    expect(boundary).toContain("e instanceof DeckentError && e.code === 'DECKENT_E077'");
+    expect(boundary).toContain('throw e');
+  });
+
   it('awaits the backend recovery authority exactly once', async () => {
     const reconcile = vi.fn(async () => ({
       adopted: ['task-a'],
       closedNotDispatched: [],
       closedAbsentAfterExit: [],
+      retiredLanded: [],
+      resumedContinuations: [],
     }));
 
     await reconcileSpawnBackendBeforeRestore(backend(reconcile));

@@ -312,17 +312,25 @@ describe('resolveAdapter', () => {
     expect(resolveAdapter(undefined, 'claude-sonnet-5')).toBe(claude);
   });
 
-  it('born-690: falls back to registry default for models unknown to the model registry', () => {
+  it('fails loudly for models unknown to the model registry instead of using the registry default', () => {
     const codex = makeCodexAdapter();
     providerRegistry.registerProvider(codex, true);
-    expect(resolveAdapter(undefined, 'my-custom-ollama-tag' as ModelType)).toBe(codex);
+    expect(() => resolveAdapter(undefined, 'my-custom-ollama-tag' as ModelType))
+      .toThrow(/Unknown model/);
   });
 
-  it('born-690: falls back to registry default when the owning provider is not registered', () => {
+  it('fails loudly when the owning provider is absent instead of using a foreign registry default', () => {
     const codex = makeCodexAdapter();
     providerRegistry.registerProvider(codex, true);
-    // 'claude-sonnet-5' is owned by claude, but claude is not registered → default (codex)
-    expect(resolveAdapter(undefined, 'claude-sonnet-5')).toBe(codex);
+    expect(() => resolveAdapter(undefined, 'claude-sonnet-5'))
+      .toThrow(/Provider not found: "claude"/);
+  });
+
+  it('fails loudly for an absent explicit requested provider instead of re-resolving from model owner', () => {
+    const claude = makeMockAdapter({ name: 'claude' });
+    providerRegistry.registerProvider(claude, true);
+    expect(() => resolveAdapter(undefined, 'claude-sonnet-5', 'ollama'))
+      .toThrow(/Provider not found: "ollama"/);
   });
 
   it('born-690: an explicitly provided adapter still wins over model-aware resolution', () => {
@@ -500,7 +508,7 @@ describe('callBrainPlanner with adapter', () => {
     expect(calls[0]!.args).toEqual(expect.arrayContaining(['--model', modelRegistry.resolveApiId('gpt-5.5')]));
   });
 
-  it('falls back to registry default when no adapter passed', async () => {
+  it('resolves the registered model-owning adapter when no adapter is passed', async () => {
     const adapter = makeMockAdapter({ name: 'claude' });
     providerRegistry.registerProvider(adapter, true);
     const { fn, calls } = makeSpawnFn();
@@ -511,10 +519,24 @@ describe('callBrainPlanner with adapter', () => {
     expect(calls[0]!.args).toEqual(expect.arrayContaining(['--model', 'claude-opus-4-8']));
   });
 
+  it('rejects a foreign registry default before provider spawn when the model owner is absent', async () => {
+    providerRegistry.registerProvider(makeCodexAdapter(), true);
+    const { fn, calls } = makeSpawnFn();
+
+    await expect(
+      callBrainPlanner(
+        makeContext(), makeRecommendation(), 'claude-opus-4-8', 'test',
+        undefined, undefined, undefined, fn,
+      ),
+    ).rejects.toThrow(/Provider not found: "claude"/);
+
+    expect(calls).toEqual([]);
+  });
+
   it('rejects when registry is empty and no adapter provided (no silent fallback)', async () => {
     await expect(
       callBrainPlanner(makeContext(), makeRecommendation(), 'claude-opus-4-8', 'test'),
-    ).rejects.toThrow(/No providers registered/);
+    ).rejects.toThrow(/Provider not found: "claude"/);
   });
 
   it('returns parsed result when adapter-based call succeeds', async () => {
@@ -583,7 +605,7 @@ describe('callZeroConfigPlanner', () => {
   it('rejects when no adapter and empty registry (no silent fallback)', async () => {
     await expect(
       callZeroConfigPlanner('Add login page', 'claude-sonnet-5', 'test-project'),
-    ).rejects.toThrow(/No providers registered/);
+    ).rejects.toThrow(/Provider not found: "claude"/);
   });
 
   it('uses adapter CLI when adapter provided', async () => {
@@ -596,7 +618,7 @@ describe('callZeroConfigPlanner', () => {
     expect(calls[0]!.args).toEqual(expect.arrayContaining(['--model', modelRegistry.resolveApiId('gpt-5.5')]));
   });
 
-  it('uses registry default when no adapter passed but registry has provider', async () => {
+  it('resolves the registered model-owning adapter when no adapter is passed', async () => {
     const adapter = makeCodexAdapter({ name: 'codex' });
     providerRegistry.registerProvider(adapter, true);
     const { fn, calls } = makeSpawnFn();

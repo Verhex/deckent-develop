@@ -303,11 +303,14 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
 }
 
 function makeTask(overrides: Partial<Task> = {}): Task {
+  const model = overrides.model ?? 'claude-sonnet-5';
+  const resolvedProvider = overrides.provider
+    ?? (model.startsWith('gemini-') ? 'gemini' : /^(gpt-|o\d)/.test(model) ? 'codex' : 'claude');
   return {
     id: '001-001',
     title: 'Test task',
     description: 'A test task',
-    model: 'claude-sonnet-5',
+    model,
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -318,6 +321,17 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     sprintId: 'sprint-001',
     createdAt: '2026-03-16T00:00:00.000Z',
     budget: { maxTurns: 1 },
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      taskKind: 'code-development',
+      resolvedProvider,
+      executionCostClass: 'remote',
+      profileRef: 'tests.orchestra.brain-provider',
+      policyDigest: '8'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: { reserve_ratio: 0.25 },
+    },
     ...overrides,
   };
 }
@@ -344,6 +358,7 @@ function makeMockBackend(): SpawnBackend & {
   return {
     name: 'mock-backend',
     liveUsageBudgetSupport: 'measured-stream',
+    executionLandingCapability: 'cooperative-landing',
     spawn: vi.fn(),
     kill: vi.fn(),
     list: vi.fn().mockReturnValue([]),
@@ -354,6 +369,8 @@ function makeMockBackend(): SpawnBackend & {
 function makeMockProvider(): ProviderAdapter {
   return {
     name: 'mock-provider',
+    liveUsageBudgetSupport: 'measured-stream',
+    executionLandingCapability: 'cooperative-landing',
     supportedModels: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'] as const,
     spawn: vi.fn(),
     kill: vi.fn(),

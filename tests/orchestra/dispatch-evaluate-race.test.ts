@@ -37,6 +37,11 @@ vi.mock('../../src/orchestra/result-watcher.js', () => ({
 import { TaskStatus, SprintPhase, SprintStatus } from '../../src/core/types.js';
 import type { Task, Sprint, ResolvedConfig, TaskResult } from '../../src/core/types.js';
 import type { SpawnBackend } from '../../src/orchestra/spawn-backend.js';
+import {
+  TEST_MEASURED_LANDING_CAPABILITIES,
+  TEST_REMOTE_EXECUTION_BUDGET,
+  TEST_REMOTE_WORKER_BUDGET_POLICY,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 import { findReadyUndispatchedTasks, waitForResults } from '../../src/orchestra/result-collector.js';
 import { findReadyUndispatchedTaskIds } from '../../src/orchestra/sprint-phases.js';
@@ -48,7 +53,11 @@ function makeTask(id: string, overrides?: Partial<Task>): Task {
     id,
     title: `Task ${id}`,
     description: `Description for ${id}`,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
+    provider: 'claude',
+    type: 'code-development',
+    budget: TEST_REMOTE_EXECUTION_BUDGET,
+    budgetPolicy: TEST_REMOTE_WORKER_BUDGET_POLICY,
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -225,6 +234,7 @@ describe('waitForResults — dispatch/EVALUATE race fix', () => {
 
     const spawned: string[] = [];
     const backend: SpawnBackend = {
+      ...TEST_MEASURED_LANDING_CAPABILITIES,
       name: 'mock',
       spawn: (taskId: string) => {
         spawned.push(taskId);
@@ -259,6 +269,7 @@ describe('waitForResults — dispatch/EVALUATE race fix', () => {
 
     const attempts: string[] = [];
     const backend: SpawnBackend = {
+      ...TEST_MEASURED_LANDING_CAPABILITIES,
       name: 'mock-err',
       spawn: (taskId: string) => {
         attempts.push(taskId);
@@ -282,6 +293,30 @@ describe('waitForResults — dispatch/EVALUATE race fix', () => {
     // synthetic NO_GO at EVALUATE (out of scope here).
     expect(attempts).toContain('b');
     expect(results.map(r => r.taskId)).toEqual(['a']);
+  });
+
+  it('keeps a remote dispatch fail-closed when the backend omits landing capability', async () => {
+    const a = makeTask('a', { status: TaskStatus.EXECUTING });
+    const b = makeTask('b', { status: TaskStatus.PENDING, dependencies: ['a'] });
+    const sprint = makeSprint([a, b]);
+    writeFileSync(join(root, '.tasks', 'task-a.result'), JSON.stringify(doneResult('a')), 'utf-8');
+
+    const spawned: string[] = [];
+    const backendWithoutLanding: SpawnBackend = {
+      name: 'mock-without-landing',
+      spawn: (taskId: string) => { spawned.push(taskId); },
+      kill: () => {},
+      list: () => [],
+      isAvailable: async () => true,
+    };
+
+    const results = await waitForResults(
+      root, sprint, 100, undefined,
+      { spawnBackend: backendWithoutLanding, autoApprove: true }, undefined, makeConfig(false),
+    );
+
+    expect(spawned).toEqual([]);
+    expect(results.map(result => result.taskId)).toEqual(['a']);
   });
 
   it('is an inert no-op for legacy callers without config (behavior preserved)', async () => {

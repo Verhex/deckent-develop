@@ -27,6 +27,10 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import {
+  TEST_DOCKER_EXECUTION_OPTIONS,
+  budgetedDockerTaskJson,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 import {
   buildDockerAllowedTools,
@@ -40,6 +44,7 @@ import {
 const tmpDirs: string[] = [];
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   while (tmpDirs.length) {
     const d = tmpDirs.pop();
     if (d && existsSync(d)) rmSync(d, { recursive: true, force: true });
@@ -300,6 +305,7 @@ describe('DockerSpawnBackend.spawn() — allowedTools SSOT integration', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    vi.stubEnv('ANTHROPIC_API_KEY', 'test-api-key');
     capturedDockerRunArgs = [];
     const { spawnSync } = await import('node:child_process');
     vi.mocked(spawnSync).mockImplementation((cmd, args) => {
@@ -308,7 +314,10 @@ describe('DockerSpawnBackend.spawn() — allowedTools SSOT integration', () => {
       let stdout = '';
       const status = 0;
       if (cmd === 'docker' && sub === 'images') stdout = 'imghash';
-      else if (cmd === 'docker' && sub === 'run') { capturedDockerRunArgs.push([...argv]); stdout = 'container-id-ssot'; }
+      else if (cmd === 'docker' && sub === 'run') {
+        capturedDockerRunArgs.push([...argv]);
+        stdout = 'a'.repeat(64);
+      }
       else if (cmd === 'docker' && sub === 'inspect') stdout = 'true|0';
       else if (cmd === 'claude' && sub === '--version') stdout = 'claude 1.0.0 (host auth ok)';
       else if (cmd === 'claude' && sub === 'auth') stdout = JSON.stringify({ loggedIn: true });
@@ -324,10 +333,14 @@ describe('DockerSpawnBackend.spawn() — allowedTools SSOT integration', () => {
     mkdirSync(tasksDir, { recursive: true });
     mkdirSync(join(dir, '.locks'), { recursive: true });
     const taskId = 'ssot-001';
+    const taskPath = join(tasksDir, `task-${taskId}.json`);
+    const budgetedTask = JSON.parse(
+      budgetedDockerTaskJson(taskPath, { authMode: 'api' }),
+    ) as Record<string, unknown>;
     writeFileSync(
-      join(tasksDir, `task-${taskId}.json`),
+      taskPath,
       JSON.stringify({
-        id: taskId,
+        ...budgetedTask,
         scope: {
           directories: ['src/orchestra/', 'docs/adr/'],
           filesRead: [],
@@ -342,8 +355,8 @@ describe('DockerSpawnBackend.spawn() — allowedTools SSOT integration', () => {
     // Deliberately pass a WIDE (buggy-shape) opts.allowedTools that includes
     // the read-only directory — the docker backend must NOT use it verbatim.
     backend.spawn(taskId, 'claude-sonnet-5', 'prompt', {
+      ...TEST_DOCKER_EXECUTION_OPTIONS,
       allowedTools: 'Read,Write(.tasks/,docs/adr/,src/orchestra/spawn-backend-docker.ts),Edit(.tasks/,docs/adr/,src/orchestra/spawn-backend-docker.ts),Bash,Glob,Grep',
-      executionBudget: { maxTurns: 1 },
     });
 
     expect(capturedDockerRunArgs.length).toBe(1);
@@ -361,24 +374,24 @@ describe('DockerSpawnBackend.spawn() — allowedTools SSOT integration', () => {
     expect(scriptContent).toContain('stat -c %Y "$HBFILE"');
   });
 
-  it('falls back to opts.allowedTools when no task JSON exists on disk', async () => {
+  it('fails closed before Docker dispatch when no persisted task envelope exists', async () => {
     const dir = freshTmp('deckent-ssot-nofallback-');
     const tasksDir = join(dir, '.tasks');
     mkdirSync(tasksDir, { recursive: true });
     mkdirSync(join(dir, '.locks'), { recursive: true });
     const taskId = 'ssot-002';
-    // No task-<id>.json written — resolveAllowedTools must fall back.
+    // No task-<id>.json is written. Remote landing authority requires the
+    // durable task envelope before allowedTools resolution or Docker dispatch.
 
     const { DockerSpawnBackend } = await import('../../src/orchestra/spawn-backend-docker.js');
     const backend = new DockerSpawnBackend(dir);
-    backend.spawn(taskId, 'claude-sonnet-5', 'prompt', {
+    expect(() => backend.spawn(taskId, 'claude-sonnet-5', 'prompt', {
+      ...TEST_DOCKER_EXECUTION_OPTIONS,
       allowedTools: 'Read,Bash',
-      executionBudget: { maxTurns: 1 },
-    });
+    })).toThrow('could not read the persisted task');
 
-    expect(capturedDockerRunArgs.length).toBe(1);
+    expect(capturedDockerRunArgs).toHaveLength(0);
     const scriptPath = join(tasksDir, `.worker-${taskId}.sh`);
-    const scriptContent = readFileSync(scriptPath, 'utf-8');
-    expect(scriptContent).toContain('--allowedTools "Read,Bash"');
+    expect(existsSync(scriptPath)).toBe(false);
   });
 });

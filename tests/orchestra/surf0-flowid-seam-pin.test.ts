@@ -28,6 +28,9 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const controllerSrc = readFileSync(join(REPO, 'src/orchestra/sprint-controller.ts'), 'utf-8');
 const phasesSrc = readFileSync(join(REPO, 'src/orchestra/sprint-phases.ts'), 'utf-8');
 const startSrc = readFileSync(join(REPO, 'src/cli/commands/start.ts'), 'utf-8');
+const flowBranchStart = startSrc.indexOf('const flowId = opts.flowId!');
+const flowBranchEnd = startSrc.indexOf('// ─── Provider Bootstrap', flowBranchStart);
+const flowBranchSrc = startSrc.slice(flowBranchStart, flowBranchEnd);
 
 describe('SURF-0 flowId correlation chain — every hop stays wired', () => {
   it('RunSprintOptions carries the additive correlation fields (432-001)', () => {
@@ -36,8 +39,11 @@ describe('SURF-0 flowId correlation chain — every hop stays wired', () => {
   });
 
   it('start.ts forwards --flow-id into the runSprint options object (432-002)', () => {
-    // The flowFlagsGiven branch must pass the extracted `flowId` const on.
-    expect(startSrc).toMatch(/preplannedSprint: approvedSnapshot!\.sprint,[\s\S]{0,400}?flowId,/);
+    expect(flowBranchStart).toBeGreaterThanOrEqual(0);
+    expect(flowBranchEnd).toBeGreaterThan(flowBranchStart);
+    expect(flowBranchSrc).toMatch(
+      /runSprint\([\s\S]*?preplannedSprint: approvedSnapshot!\.sprint,[\s\S]*?flowId,[\s\S]*?\}\);/,
+    );
   });
 
   it('runSprint forwards opts?.flowId into runRetroPhase — the middle hop (CC seam fix)', () => {

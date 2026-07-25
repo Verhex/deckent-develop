@@ -21,16 +21,20 @@ vi.mock('node:child_process', () => ({
   spawn: vi.fn(() => {
     const stub = {
       stdout: { on: vi.fn() },
-      stderr: { on: vi.fn() },
+      stderr: { on: vi.fn(), resume: vi.fn() },
       on: vi.fn(),
+      once: vi.fn(),
+      kill: vi.fn(),
     };
     return stub as unknown as ChildProcess;
   }),
 }));
 
 vi.mock('node:fs', () => ({
-  existsSync: vi.fn(() => false),
-  readFileSync: vi.fn(() => '{}'),
+  existsSync: vi.fn((path: string) => path.endsWith('/.claude/.credentials.json')),
+  readFileSync: vi.fn((path: string) => budgetedDockerTaskJson(path, {
+    model: path.includes('opus') ? 'claude-opus-4-8' : 'claude-sonnet-5',
+  })),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
   unlinkSync: vi.fn(),
@@ -59,9 +63,23 @@ vi.mock('../../src/core/active-workers.js', () => ({
   clearPending: vi.fn(),
 }));
 
+vi.mock('../../src/core/task-result-settlement.js', () => {
+  return import('../helpers/task-result-settlement-stub.js')
+    .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
+});
+
+vi.mock('../../src/orchestra/execution-landing-coordinator.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../src/orchestra/execution-landing-coordinator.js')>()),
+  prepareDockerExecutionLanding: vi.fn(({ prompt }: { prompt: string }) => ({ prompt, context: null })),
+}));
+
 import { spawnSync } from 'node:child_process';
 import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
 import type { ModelType } from '../../src/core/types.js';
+import {
+  TEST_DOCKER_EXECUTION_OPTIONS,
+  budgetedDockerTaskJson,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
 
@@ -83,8 +101,8 @@ function installSpawnRouter(): void {
       stdout = 'container-id-f1014';
     } else if (cmd === 'docker' && sub === 'inspect') {
       stdout = 'true|0';
-    } else if (cmd === 'claude' && sub === '--version') {
-      stdout = 'claude 1.0.0 (host auth ok)';
+    } else if (cmd === 'claude' && argv.join(' ') === 'auth status --json') {
+      stdout = '{"loggedIn":true}';
     }
 
     return {
@@ -139,7 +157,12 @@ describe('F1-014r (a): claude-subscription spawn — no OPENAI_API_KEY / GOOGLE_
 
   it('does NOT inject OPENAI_API_KEY into claude (sonnet) container', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-f1014a-sonnet', 'sonnet' as ModelType, 'prompt');
+    backend.spawn(
+      't-f1014a-sonnet',
+      'claude-sonnet-5' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    );
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -148,7 +171,12 @@ describe('F1-014r (a): claude-subscription spawn — no OPENAI_API_KEY / GOOGLE_
 
   it('does NOT inject GOOGLE_API_KEY into claude (sonnet) container', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-f1014a-sonnet-g', 'sonnet' as ModelType, 'prompt');
+    backend.spawn(
+      't-f1014a-sonnet-g',
+      'claude-sonnet-5' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    );
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -157,7 +185,12 @@ describe('F1-014r (a): claude-subscription spawn — no OPENAI_API_KEY / GOOGLE_
 
   it('does NOT inject OPENAI_API_KEY into claude (opus) container', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-f1014a-opus', 'opus' as ModelType, 'prompt');
+    backend.spawn(
+      't-f1014a-opus',
+      'claude-opus-4-8' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    );
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -186,32 +219,37 @@ describe('F1-014r (b): codex spawn (subscription) — no ANTHROPIC_API_KEY in do
     }
   });
 
-  it('does NOT inject ANTHROPIC_API_KEY into codex (gpt-4.1) container in subscription mode', () => {
+  it('holds codex (gpt-4.1) before any container can inherit ANTHROPIC_API_KEY', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-f1014b-gpt41', 'gpt-4.1' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
-    // subscription mode: useApiOnly=false → ANTHROPIC_API_KEY gate is false → not injected
-    expect(hasEnvFlag(argv, 'ANTHROPIC_API_KEY')).toBe(false);
+    expect(() => backend.spawn(
+      't-f1014b-gpt41',
+      'gpt-4.1' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 
-  it('does NOT inject ANTHROPIC_API_KEY into codex (gpt-5) container in subscription mode', () => {
+  it('holds canonical gpt-5.5 before any container can inherit ANTHROPIC_API_KEY', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-f1014b-gpt5', 'gpt-5' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
-    expect(hasEnvFlag(argv, 'ANTHROPIC_API_KEY')).toBe(false);
+    expect(() => backend.spawn(
+      't-f1014b-gpt55',
+      'gpt-5.5' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 
-  it('does NOT inject ANTHROPIC_API_KEY into gemini container in subscription mode', () => {
+  it('holds Gemini before any container can inherit ANTHROPIC_API_KEY', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-f1014b-gemini', 'gemini-2.5-flash' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
-    expect(hasEnvFlag(argv, 'ANTHROPIC_API_KEY')).toBe(false);
+    expect(() => backend.spawn(
+      't-f1014b-gemini',
+      'gemini-2.5-flash' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 });
 
@@ -240,43 +278,53 @@ describe('F1-014r (c): mixed-fleet — 2 workers each gets only its own provider
     if (savedGoogle === undefined) { delete process.env.GOOGLE_API_KEY; } else { process.env.GOOGLE_API_KEY = savedGoogle; }
   });
 
-  it('claude container has no OPENAI/GOOGLE key; codex container has OPENAI but no ANTHROPIC key', () => {
+  it('Claude container has no OPENAI/GOOGLE key; Codex is held before container work', () => {
     const claudeBackend = new DockerSpawnBackend('/test/project');
-    claudeBackend.spawn('t-f1014c-claude', 'sonnet' as ModelType, 'prompt');
+    claudeBackend.spawn(
+      't-f1014c-claude',
+      'claude-sonnet-5' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    );
 
     const codexBackend = new DockerSpawnBackend('/test/project');
-    codexBackend.spawn('t-f1014c-codex', 'gpt-4.1' as ModelType, 'prompt');
+    expect(() => codexBackend.spawn(
+      't-f1014c-codex',
+      'gpt-4.1' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
 
-    expect(capturedDockerRunArgs.length).toBe(2);
+    expect(capturedDockerRunArgs.length).toBe(1);
 
     const claudeArgv = capturedDockerRunArgs[0]!;
-    const codexArgv = capturedDockerRunArgs[1]!;
 
-    // claude container must not receive OPENAI or GOOGLE keys
     expect(hasEnvFlag(claudeArgv, 'OPENAI_API_KEY')).toBe(false);
     expect(hasEnvFlag(claudeArgv, 'GOOGLE_API_KEY')).toBe(false);
-
-    // codex container must not receive ANTHROPIC key (subscription mode)
-    expect(hasEnvFlag(codexArgv, 'ANTHROPIC_API_KEY')).toBe(false);
-    // codex container gets its own OPENAI key
-    expect(hasEnvFlag(codexArgv, 'OPENAI_API_KEY')).toBe(true);
   });
 
-  it('claude container has no GOOGLE_API_KEY; gemini container has GOOGLE_API_KEY', () => {
+  it('Claude container has no GOOGLE_API_KEY; Gemini is held before container work', () => {
     const claudeBackend = new DockerSpawnBackend('/test/project');
-    claudeBackend.spawn('t-f1014c-claude2', 'sonnet' as ModelType, 'prompt');
+    claudeBackend.spawn(
+      't-f1014c-claude2',
+      'claude-sonnet-5' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    );
 
     const geminiBackend = new DockerSpawnBackend('/test/project');
-    geminiBackend.spawn('t-f1014c-gemini', 'gemini-2.5-flash' as ModelType, 'prompt');
+    expect(() => geminiBackend.spawn(
+      't-f1014c-gemini',
+      'gemini-2.5-flash' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
 
-    expect(capturedDockerRunArgs.length).toBe(2);
+    expect(capturedDockerRunArgs.length).toBe(1);
 
     const claudeArgv = capturedDockerRunArgs[0]!;
-    const geminiArgv = capturedDockerRunArgs[1]!;
 
     expect(hasEnvFlag(claudeArgv, 'GOOGLE_API_KEY')).toBe(false);
-    expect(hasEnvFlag(geminiArgv, 'GOOGLE_API_KEY')).toBe(true);
-    expect(hasEnvFlag(geminiArgv, 'ANTHROPIC_API_KEY')).toBe(false);
   });
 });
 
@@ -290,25 +338,36 @@ describe('F1-014r (d): CLAUDE_AUTH_REQUIRED injected only for claude provider', 
 
   it('injects CLAUDE_AUTH_REQUIRED for claude (sonnet)', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-f1014d-claude', 'sonnet' as ModelType, 'prompt');
+    backend.spawn(
+      't-f1014d-claude',
+      'claude-sonnet-5' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    );
 
     expect(capturedDockerRunArgs.length).toBe(1);
     expect(hasEnvFlag(capturedDockerRunArgs[0]!, 'CLAUDE_AUTH_REQUIRED')).toBe(true);
   });
 
-  it('does NOT inject CLAUDE_AUTH_REQUIRED for codex (gpt-4.1)', () => {
+  it('holds Codex before any CLAUDE_AUTH_REQUIRED env can be assembled', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-f1014d-codex', 'gpt-4.1' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    expect(hasEnvFlag(capturedDockerRunArgs[0]!, 'CLAUDE_AUTH_REQUIRED')).toBe(false);
+    expect(() => backend.spawn(
+      't-f1014d-codex',
+      'gpt-4.1' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 
-  it('does NOT inject CLAUDE_AUTH_REQUIRED for gemini (gemini-2.5-flash)', () => {
+  it('holds Gemini before any CLAUDE_AUTH_REQUIRED env can be assembled', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-f1014d-gemini', 'gemini-2.5-flash' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    expect(hasEnvFlag(capturedDockerRunArgs[0]!, 'CLAUDE_AUTH_REQUIRED')).toBe(false);
+    expect(() => backend.spawn(
+      't-f1014d-gemini',
+      'gemini-2.5-flash' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 });

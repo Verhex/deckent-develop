@@ -67,7 +67,7 @@ const baseMeta = (taskId: string) => ({
   taskId,
   sprintId: 'sprint-402',
   agent: 'worker',
-  model: 'sonnet',
+  model: 'claude-sonnet-5',
   selfAssessment: 'DONE',
   ts: '2026-07-11T00:00:00.000Z',
 });
@@ -330,7 +330,17 @@ describe('FIX 2 — usage-patch regresyon: MEVCUT token-usage sayıları korunur
     const root = makeRoot();
     writeFileSync(
       join(root, '.tasks', `task-${taskId}.result`),
-      JSON.stringify({ taskId, selfAssessment: 'DONE', tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model: 'sonnet' } }),
+      JSON.stringify({
+        taskId,
+        selfAssessment: 'DONE',
+        tokenUsage: {
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          provider: 'claude',
+          model: 'claude-sonnet-5',
+        },
+      }),
       'utf-8',
     );
     return join(root, '.tasks');
@@ -340,8 +350,18 @@ describe('FIX 2 — usage-patch regresyon: MEVCUT token-usage sayıları korunur
     const oldTasksDir = makeTaskDir('999-usage-old');
     const newTasksDir = makeTaskDir('999-usage-new');
 
-    patchResultUsageFromEnvelope(oldTasksDir, '999-usage-old', 'sonnet', OLD_SINGLE_ENVELOPE_LOG);
-    patchResultUsageFromEnvelope(newTasksDir, '999-usage-new', 'sonnet', NEW_STREAM_JSON_LOG);
+    patchResultUsageFromEnvelope(
+      oldTasksDir,
+      '999-usage-old',
+      'claude-sonnet-5',
+      OLD_SINGLE_ENVELOPE_LOG,
+    );
+    patchResultUsageFromEnvelope(
+      newTasksDir,
+      '999-usage-new',
+      'claude-sonnet-5',
+      NEW_STREAM_JSON_LOG,
+    );
 
     const oldResult = JSON.parse(readFileSync(join(oldTasksDir, 'task-999-usage-old.result'), 'utf-8')) as {
       tokenUsage: Record<string, unknown>;

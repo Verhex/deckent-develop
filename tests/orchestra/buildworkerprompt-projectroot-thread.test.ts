@@ -33,6 +33,11 @@ import { MemoryStore } from '../../src/core/memory-store.js';
 import { TaskStatus, SprintPhase, SprintStatus } from '../../src/core/types.js';
 import type { Task, Sprint, ResolvedConfig, TaskResult, ModelType } from '../../src/core/types.js';
 import type { SpawnBackend, SpawnBackendOptions } from '../../src/orchestra/spawn-backend.js';
+import {
+  TEST_MEASURED_LANDING_CAPABILITIES,
+  TEST_REMOTE_EXECUTION_BUDGET,
+  TEST_REMOTE_WORKER_BUDGET_POLICY,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 // Short-tick watcher so waitForResults' main loop iterates promptly instead of
 // falling back to its 5s poll (mirrors cost-guard-enabled-path.test.ts / dispatch-evaluate-race.test.ts).
@@ -87,7 +92,7 @@ function makeCapturingBackend(onSpawn?: (taskId: string) => void): SpawnBackend 
   const calls: SpawnCall[] = [];
   return {
     name: 'mock',
-    liveUsageBudgetSupport: 'measured-stream' as const,
+    ...TEST_MEASURED_LANDING_CAPABILITIES,
     spawn(taskId, model, prompt, opts) {
       calls.push({ taskId, model, prompt, opts });
       onSpawn?.(taskId);
@@ -137,7 +142,9 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     assignedAgent: 'generic',
     assignedSkills: [],
     provider: 'claude',
-    budget: { maxTurns: 1 },
+    type: 'code-development',
+    budget: TEST_REMOTE_EXECUTION_BUDGET,
+    budgetPolicy: TEST_REMOTE_WORKER_BUDGET_POLICY,
     ...overrides,
   } as Task;
 }

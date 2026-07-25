@@ -35,8 +35,7 @@ import type { RunFlowContext, RunHandle } from '../core/run-flow-contract.js';
 import type { ActorContext } from '../core/work-model.js';
 import type { Sprint } from '../core/types.js';
 import {
-  computeExecutionPlanDigest,
-  EXECUTION_PLAN_DIGEST_VERSION,
+  computeExecutionPlanDigestByVersion,
 } from '../core/execution-plan-digest.js';
 import type { PlanPreview } from '../core/run-flow-contract.js';
 
@@ -46,6 +45,7 @@ export type RunFlowDecisionRefusalCode =
   | 'NO_LIVE_PREVIEW'
   | 'PLANNED_SPRINT_MISSING'
   | 'PLANNED_SPRINT_DIGEST_MISMATCH'
+  | 'TOPOLOGY_BLOCKED'
   | 'NOT_APPROVED';
 
 /** A refusal that is a state-of-the-world fact, not a transition bug —
@@ -89,13 +89,25 @@ function loadAndVerifyPlannedSprint(
   }
   if (preview.planDigestVersion !== undefined) {
     const context = planned.planDigestContext;
-    const actual = preview.planDigestVersion === EXECUTION_PLAN_DIGEST_VERSION && context
-      ? computeExecutionPlanDigest(planned.sprint as Sprint, context).digest
-      : 'invalid-versioned-plan-digest-metadata';
+    let digestResult;
+    try {
+      digestResult = context
+        ? computeExecutionPlanDigestByVersion(preview.planDigestVersion, planned.sprint as Sprint, context)
+        : undefined;
+    } catch {
+      digestResult = undefined;
+    }
+    const actual = digestResult?.digest ?? 'invalid-versioned-plan-digest-metadata';
     if (actual !== preview.planDigest || planned.planDigest !== preview.planDigest) {
       throw new RunFlowDecisionError(
         'PLANNED_SPRINT_DIGEST_MISMATCH',
         `run-flow: planned sprint content digest mismatch (expected=${preview.planDigest}, actual=${actual})`,
+      );
+    }
+    if (digestResult?.topology?.verdict === 'block') {
+      throw new RunFlowDecisionError(
+        'TOPOLOGY_BLOCKED',
+        'run-flow: structural execution topology blocked approval',
       );
     }
   }

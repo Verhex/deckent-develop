@@ -151,11 +151,10 @@ describe('routeTask', () => {
     expect(result.reason).toContain('worker_provider');
   });
 
-  it('falls back to first available provider when nothing matches', () => {
+  it('fails loudly when no configured worker candidate is available', () => {
     const task = makeTask({ scope: { directories: ['misc/'], filesRead: [], filesWrite: ['data.bin'] } });
-    const result = routeTask(task, defaultConfig, ['codex', 'gemini']);
-    expect(result.provider).toBe('codex');
-    expect(result.reason).toContain('first available');
+    expect(() => routeTask(task, defaultConfig, ['codex', 'gemini']))
+      .toThrow('E_PROVIDER_FALLBACK_EXHAUSTED');
   });
 
   it('falls back when preferred provider is unavailable', () => {
@@ -165,11 +164,41 @@ describe('routeTask', () => {
     expect(result.reason).toContain('unavailable');
   });
 
-  it('falls back to claude when no providers are available', () => {
+  it('fails loudly when no providers are available', () => {
     const task = makeTask();
-    const result = routeTask(task, defaultConfig, []);
-    expect(result.provider).toBe('claude');
-    expect(result.reason).toContain('No providers available');
+    try {
+      routeTask(task, defaultConfig, []);
+      throw new Error('expected provider routing failure');
+    } catch (error) {
+      expect(error).toMatchObject({
+        name: 'ProviderRoutingError',
+        code: 'E_PROVIDER_FALLBACK_EXHAUSTED',
+      });
+    }
+  });
+
+  it('honors configured worker fallback order instead of availability order', () => {
+    const task = makeTask({ provider: 'ollama' });
+    const config: TaskRouterConfig = {
+      worker_provider: 'claude',
+      provider_fallback: { worker: ['gemini', 'codex'] },
+    };
+    const result = routeTask(task, config, ['codex', 'gemini']);
+    expect(result.provider).toBe('gemini');
+    expect(result.reason).toContain("fell back to 'gemini'");
+    expect(result.providerFallback).toEqual({
+      requestedProvider: 'ollama',
+      selectedProvider: 'gemini',
+      configuredOrder: ['claude', 'gemini', 'codex'],
+      reasonCode: 'preferred_unavailable',
+    });
+  });
+
+  it('accepts OpenRouter as a first-class configured worker provider', () => {
+    const task = makeTask({ provider: 'openrouter' });
+    const result = routeTask(task, { worker_provider: 'openrouter' }, ['openrouter']);
+    expect(result.provider).toBe('openrouter');
+    expect(result.providerFallback).toBeUndefined();
   });
 
   it('preserves assignedAgent from task', () => {

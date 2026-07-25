@@ -41,6 +41,7 @@ import { spawnWorkerMultiProvider } from '../../src/cli/commands/spawn.js';
 import { buildWorkerPrompt } from '../../src/orchestra/task-builder.js';
 import type { ResolvedConfig } from '../../src/core/config-types.js';
 import type { ExecutionBudget } from '../../src/core/work-model.js';
+import { ProviderExecutionIngressHoldError } from '../../src/core/provider-execution-ingress-authority.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,7 @@ function makeTaskConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig
       roles: {
         worker: { default: { maxTokens: 100_000, maxTurns: 10 } },
       },
+      landing: { reserve_ratio: 0.25 },
     },
     ...overrides,
   } as unknown as ResolvedConfig;
@@ -164,12 +166,79 @@ describe('runTaskMode — phase-1a gap fixes (E + G)', () => {
     expect(spawnWorkerMultiProvider).not.toHaveBeenCalled();
   });
 
+  it('consumes configured provider authority before routing, Task JSON, prompt, event, or spawn', async () => {
+    const executionRunId = 'task-mode-authority-hold';
+    const authorityEvidenceRef = `provider-authority:${'a'.repeat(64)}`;
+    const caught = await runTaskMode({
+      description: 'must stop at provider authority',
+      projectRoot: root,
+      model: 'claude-sonnet-5',
+      provider: 'claude',
+      executionRunId,
+      providerAuthority: {
+        state: 'hold',
+        reasonCode: 'keyring_unavailable',
+        authorityEvidenceRef,
+        retryable: false,
+        close: vi.fn(),
+      },
+    }, makeTaskConfig({
+      spawn_backend: 'docker',
+      provider_fallback: {
+        worker: ['codex', 'gemini'],
+        unattended: true,
+      },
+    })).catch((error: unknown) => error);
+
+    expect(caught).toBeInstanceOf(ProviderExecutionIngressHoldError);
+    expect(caught).toMatchObject({
+      reasonCode: 'keyring_unavailable',
+      durableEvidenceWritten: true,
+      request: {
+        role: 'worker',
+        purpose: 'worker-execution',
+        runId: executionRunId,
+        provider: 'claude',
+        model: 'claude-sonnet-5',
+        configuredBackend: 'docker',
+        fallbackProviders: ['codex', 'gemini'],
+        unattended: true,
+      },
+    });
+    expect(existsSync(join(root, '.tasks'))).toBe(false);
+    expect(buildWorkerPrompt).not.toHaveBeenCalled();
+    expect(spawnWorkerMultiProvider).not.toHaveBeenCalled();
+
+    const eventPath = join(
+      root,
+      '.deckent',
+      'recently-works',
+      `${executionRunId}-events.jsonl`,
+    );
+    const events = readFileSync(eventPath, 'utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line) as {
+        channel: string;
+        payload: { taskId: string; authorityEvidenceRefs: string[] };
+      });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      channel: 'BRAIN→AUDITOR:PROVIDER_AUTHORITY_HOLD',
+      payload: {
+        taskId: expect.stringMatching(/^run-/),
+        authorityEvidenceRefs: expect.arrayContaining([authorityEvidenceRef]),
+      },
+    });
+  });
+
   it('persists and spawns with the same owner budget while request ceilings only narrow it', async () => {
     const config = makeTaskConfig({
       execution_budget: {
         roles: {
           worker: { default: { maxTokens: 20_000, maxTurns: 8, maxOutputTokens: 4_000 } },
         },
+        landing: { reserve_ratio: 0.25 },
       },
     });
 
@@ -193,6 +262,24 @@ describe('runTaskMode — phase-1a gap fixes (E + G)', () => {
     });
     const spawnOptions = (spawnWorkerMultiProvider as ReturnType<typeof vi.fn>).mock.calls[0]![4];
     expect(spawnOptions.executionBudget).toEqual(persisted.budget);
+  });
+
+  it('forwards one runtime-wide attended authority and exact tenant/run identity', async () => {
+    const authority = { verifyAndClaim: vi.fn() };
+    await runTaskMode({
+      description: 'authority forwarding',
+      projectRoot: root,
+      model: 'claude-sonnet-5',
+      provider: 'claude',
+      attendedExecutionApprovalAuthority: authority as never,
+      executionTenantId: 'tenant-a',
+      executionRunId: 'run-a',
+    }, makeTaskConfig());
+
+    const spawnOptions = (spawnWorkerMultiProvider as ReturnType<typeof vi.fn>).mock.calls[0]![4];
+    expect(spawnOptions.attendedExecutionApprovalAuthority).toBe(authority);
+    expect(spawnOptions.executionTenantId).toBe('tenant-a');
+    expect(spawnOptions.executionRunId).toBe('run-a');
   });
 
   it.each([

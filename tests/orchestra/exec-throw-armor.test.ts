@@ -54,6 +54,7 @@ vi.mock('../../src/orchestra/result-watcher.js', () => ({
 // drainNervousRespawns' sole external call — injectable throw for the
 // tick-armor tests (part a).
 vi.mock('../../src/nervous/respawn-request.js', () => ({
+  RESPAWN_REQUESTS_FILE: '.deckent/nervous-respawn-requests.jsonl',
   drainRespawnRequests: vi.fn(() => {
     respawnDrainState.callCount++;
     if (respawnDrainState.alwaysThrow || respawnDrainState.callCount <= respawnDrainState.throwUntilCall) {
@@ -90,6 +91,11 @@ import type { Task, Sprint, ResolvedConfig, TaskResult } from '../../src/core/ty
 import type { SpawnBackend } from '../../src/orchestra/spawn-backend.js';
 import { debugLog } from '../../src/core/utils.js';
 import {
+  TEST_MEASURED_LANDING_CAPABILITIES,
+  TEST_REMOTE_EXECUTION_BUDGET,
+  TEST_REMOTE_WORKER_BUDGET_POLICY,
+} from '../helpers/budgeted-docker-execution-fixture.js';
+import {
   planDispatch,
   buildSpawnWriteTargets,
   waitForResults,
@@ -102,7 +108,11 @@ function makeTask(id: string, overrides?: Partial<Task>): Task {
     id,
     title: `Task ${id}`,
     description: `Description for ${id}`,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
+    provider: 'claude',
+    type: 'code-development',
+    budget: TEST_REMOTE_EXECUTION_BUDGET,
+    budgetPolicy: TEST_REMOTE_WORKER_BUDGET_POLICY,
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -294,6 +304,7 @@ describe('spawnIfNotAssigned — prompt-build throw retry (born-452 THROW-ADAYLA
 
     const spawned: string[] = [];
     const backend: SpawnBackend = {
+      ...TEST_MEASURED_LANDING_CAPABILITIES,
       name: 'mock',
       spawn: (taskId: string) => {
         spawned.push(taskId);

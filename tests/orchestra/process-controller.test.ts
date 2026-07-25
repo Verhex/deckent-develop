@@ -3,7 +3,7 @@
 // Safe-by-default: policy='risk-tagged' so the EffectClass decides auto vs park —
 // read-only (erp.read) auto-runs, side-effecting (erp.write) parks for approval.
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -74,6 +74,107 @@ describe('makeProcessController.submit', () => {
     const ctl = makeProcessController(deps());
     const res = await ctl.submit({ description: 'summarize the changelog', kind: 'task', scopeDir: 'docs/' });
     expect(res.status).toBe('completed');
+  });
+
+  it('durably parks an auto task when provider authority holds before dispatch', async () => {
+    const runTask = vi.fn().mockResolvedValue({ taskId: 'must-not-run' });
+    const d = deps({
+      runTask,
+      admitProviderExecution: (entry) => ({
+        decision: 'hold',
+        hold: {
+          schemaVersion: 1,
+          executionId: entry.id,
+          tenantId: entry.tenant ?? 'local',
+          projectId: null,
+          reasonCode: 'policy_authority_unavailable',
+          authorityEvidenceRefs: ['provider-authority:hold-001'],
+          heldAt: '2026-07-25T10:00:00.000Z',
+        },
+      }),
+    });
+    const ctl = makeProcessController(d);
+
+    const res = await ctl.submit({
+      description: 'summarize the changelog',
+      kind: 'task',
+      scopeDir: 'docs/',
+      tenant: 'tenant-a',
+    });
+
+    expect(res).toMatchObject({
+      executionId: 'proc-1',
+      status: 'held',
+      reason: 'policy_authority_unavailable',
+      providerAuthorityHold: {
+        executionId: 'proc-1',
+        tenantId: 'tenant-a',
+        projectId: null,
+        authorityEvidenceRefs: ['provider-authority:hold-001'],
+      },
+    });
+    expect(runTask).not.toHaveBeenCalled();
+    expect(ctl.status('proc-1')).toMatchObject({
+      status: 'parked',
+      lastResult: {
+        ok: false,
+        providerAuthorityHold: {
+          reasonCode: 'policy_authority_unavailable',
+          executionId: 'proc-1',
+        },
+      },
+    });
+  });
+
+  it('does not apply provider admission to provider-free capabilities', async () => {
+    const admitProviderExecution = vi.fn();
+    const ctl = makeProcessController(deps({ admitProviderExecution }));
+    const res = await ctl.submit({
+      description: 'read open sales orders',
+      kind: 'capability',
+      capabilityTarget: { capability: 'erp.read' },
+    });
+
+    expect(res.status).toBe('completed');
+    expect(admitProviderExecution).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['sprint', { description: 'document the release', kind: 'sprint' as const, scopeDir: 'docs/' }],
+    ['process', {
+      description: 'document through a process',
+      kind: 'process' as const,
+      scopeDir: 'docs/',
+      steps: [{ description: 'summarize docs' }],
+    }],
+  ])('holds an auto %s entry before task or sprint execution', async (_kind, request) => {
+    const runTask = vi.fn();
+    const runSprint = vi.fn();
+    const ctl = makeProcessController(deps({
+      runTask,
+      runSprint,
+      admitProviderExecution: (entry) => ({
+        decision: 'hold',
+        hold: {
+          schemaVersion: 1,
+          executionId: entry.id,
+          tenantId: 'local',
+          projectId: 'project-1',
+          reasonCode: 'candidate_authority_unavailable',
+          authorityEvidenceRefs: ['provider-authority:ready-without-candidate'],
+          heldAt: '2026-07-25T10:00:00.000Z',
+        },
+      }),
+    }));
+
+    expect(await ctl.submit(request)).toMatchObject({
+      status: 'held',
+      providerAuthorityHold: {
+        reasonCode: 'candidate_authority_unavailable',
+      },
+    });
+    expect(runTask).not.toHaveBeenCalled();
+    expect(runSprint).not.toHaveBeenCalled();
   });
 
   it('parks a task with no recognizable scope (fail-safe → critical-irreversible)', async () => {

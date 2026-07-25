@@ -48,7 +48,7 @@ import { resolveCanonicalModelIdentity } from '../core/model-registry.js';
 
 // ─── Core — provider abstraction ──────────────────────────────────
 import type { ProviderAdapter } from '../core/provider.js';
-import { providerRegistry } from '../core/provider.js';
+import { orderedRoleProviders, providerRegistry } from '../core/provider.js';
 
 // ─── Core — skill system ─────────────────────────────────────────
 import { detectProjectStack, detectFullStack } from '../core/stack-detector.js';
@@ -282,6 +282,8 @@ export async function planSprint(
   let plannerResolvedModel: ModelType | null = null;
   let plannerFailureReason: string | null = null;
   let plannerReceiptRef: InvocationReceiptRef | null = null;
+  const configuredBrainProvider = config.providers?.brain ?? config.brain_provider ?? null;
+  let plannerRequestedProvider: ProviderName | null = configuredBrainProvider;
   const initialStatus = options?.asDraft ? TaskStatus.DRAFT : TaskStatus.PENDING;
 
   // Sprint 238 İŞ1 (+ 429-007 PLNR2): Per-task `- Provider:`/`- Model:`/`- Agent:`/
@@ -310,7 +312,7 @@ export async function planSprint(
     call: {
       attempted: plannerCallAttempted,
       succeeded: plannerCallSucceeded,
-      requestedProvider: config.brain_provider ?? null,
+      requestedProvider: plannerRequestedProvider,
       resolvedProvider: plannerResolvedProvider,
       requestedModel: config.activeModeConfig.brain_model ?? null,
       resolvedModel: plannerResolvedModel,
@@ -393,32 +395,37 @@ export async function planSprint(
 
   // AI planner attempt
   if (planMode === 'ai' || planMode === 'auto') {
-    // Resolve brain provider adapter — no hardcoded fallback to any specific provider.
-    // Uses config.brain_provider if set, then registry default.
+    // The role policy owns the requested primary. Registry order is catalog
+    // state, not fallback/reachability authority, so an absent primary remains
+    // unresolved and reaches the existing no-provider receipt/HOLD path.
+    const brainProviderOrder = orderedRoleProviders('brain', config);
+    const brainProviderName = brainProviderOrder.primary;
+    plannerRequestedProvider = brainProviderName;
     let brainAdapter: ProviderAdapter | undefined;
-    let brainProviderName: ProviderName | undefined = config.brain_provider;
-    try {
-      if (brainProviderName && providerRegistry.hasProvider(brainProviderName)) {
-        brainAdapter = providerRegistry.getProvider(brainProviderName);
-      } else {
-        brainAdapter = providerRegistry.getDefault();
-        brainProviderName = brainAdapter.name as ProviderName;
-      }
-    } catch (e) {
-      debugLog('planSprint:resolveProvider', e);
-      // No providers registered — planner will throw a clear error via resolveAdapter()
+    if (providerRegistry.hasProvider(brainProviderName)) {
+      brainAdapter = providerRegistry.getProvider(brainProviderName);
+    } else {
+      debugLog(
+        'planSprint:resolveProvider',
+        `Configured Brain primary is not registered: ${brainProviderName}`,
+      );
     }
 
-    // Map brain_model through provider-aware model selector
-    const brainModel = resolveTaskModel(
-      'sprint-planning', 'AI planner invocation',
-      { directories: [], filesRead: [], filesWrite: [] },
-      config,
-      undefined, config.activeModeConfig.brain_model,
-      undefined, brainProviderName,
-    );
-    plannerResolvedProvider = brainProviderName ?? null;
-    plannerResolvedModel = brainModel;
+    // Model equivalence is meaningful only after the exact requested provider
+    // adapter exists. When it does not, preserve the configured model solely as
+    // requested identity so the planner can persist a truthful no-provider
+    // rejection instead of fabricating a cross-provider model resolution.
+    const brainModel = brainAdapter
+      ? resolveTaskModel(
+          'sprint-planning', 'AI planner invocation',
+          { directories: [], filesRead: [], filesWrite: [] },
+          config,
+          undefined, config.activeModeConfig.brain_model,
+          undefined, brainProviderName,
+        )
+      : config.activeModeConfig.brain_model;
+    plannerResolvedProvider = brainAdapter ? brainProviderName : null;
+    plannerResolvedModel = brainAdapter ? brainModel : null;
 
     // Fetch worst agent+skill combinations from OutcomeTracker to inject into planner prompt
     let worstCombinations: string | undefined;
@@ -463,8 +470,8 @@ export async function planSprint(
         projectRoot,
         runId: sprintId,
         taskId: null,
-        configuredProvider: config.brain_provider ?? null,
-        requestedProvider: config.brain_provider ?? null,
+        configuredProvider: configuredBrainProvider,
+        requestedProvider: brainProviderName,
         configuredModel: config.activeModeConfig.brain_model ?? null,
         requestedModel: config.activeModeConfig.brain_model ?? null,
         authMode: plannerAuthMode,

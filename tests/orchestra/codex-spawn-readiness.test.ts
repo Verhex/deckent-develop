@@ -36,7 +36,7 @@ function makeChild(result: CannedResult): EventEmitter & SpawnedProcessLike {
   return child;
 }
 
-/** Routes `codex --version` vs `codex auth status` calls to canned results. */
+/** Routes `codex --version` vs `codex login status` calls to canned results. */
 function makeCodexHostSpawn(routes: { version?: CannedResult; auth?: CannedResult }): ReturnType<typeof vi.fn<SpawnImpl>> {
   return vi.fn<SpawnImpl>((_command, args) => {
     const result = args[0] === '--version' ? routes.version ?? {} : routes.auth ?? {};
@@ -102,14 +102,55 @@ describe('checkCodexHostReadiness', () => {
   it('scenario: cli-ok + subscription auth (no env key) → ready', async () => {
     const spawnImpl = makeCodexHostSpawn({
       version: { code: 0, stdout: 'codex-cli 0.138.0\n' },
-      // lowercase 'logged in' matches the exact substring providers/codex.ts's
-      // detectAuthMode() checks for real `codex auth status` output.
-      auth: { code: 0, stdout: 'logged in with ChatGPT subscription\n' },
+      auth: { code: 0, stdout: 'Logged in using ChatGPT\n' },
     });
     const result = await checkCodexHostReadiness({ spawnImpl, env: {} });
 
     expect(result.authMode).toBe('subscription');
     expect(result.ready).toBe(true);
+    expect(spawnImpl).toHaveBeenLastCalledWith(
+      'codex',
+      ['login', 'status'],
+      { shell: false, env: {} },
+    );
+  });
+
+  it('scrubs provider credentials from both local readiness subprocesses', async () => {
+    const spawnImpl = makeCodexHostSpawn({
+      version: { code: 0, stdout: 'codex-cli 0.138.0\n' },
+      auth: { code: 0, stdout: 'Logged in using ChatGPT\n' },
+    });
+    await checkCodexHostReadiness({
+      spawnImpl,
+      env: {
+        PATH: '/safe/bin',
+        HOME: '/safe/home',
+        ANTHROPIC_API_KEY: 'foreign-anthropic',
+        GOOGLE_API_KEY: 'foreign-google',
+        OPENROUTER_API_KEY: 'foreign-openrouter',
+      },
+    });
+
+    expect(spawnImpl).toHaveBeenCalledTimes(2);
+    for (const call of spawnImpl.mock.calls) {
+      const childEnv = call[2].env;
+      expect(childEnv).toMatchObject({ PATH: '/safe/bin', HOME: '/safe/home' });
+      expect(childEnv).not.toHaveProperty('ANTHROPIC_API_KEY');
+      expect(childEnv).not.toHaveProperty('GOOGLE_API_KEY');
+      expect(childEnv).not.toHaveProperty('OPENROUTER_API_KEY');
+      expect(childEnv).not.toHaveProperty('OPENAI_API_KEY');
+    }
+  });
+
+  it('does not accept the logged-in substring inside a logged-out status', async () => {
+    const spawnImpl = makeCodexHostSpawn({
+      version: { code: 0, stdout: 'codex-cli 0.138.0\n' },
+      auth: { code: 0, stdout: 'Not logged in\n' },
+    });
+    const result = await checkCodexHostReadiness({ spawnImpl, env: {} });
+
+    expect(result.authMode).toBe('none');
+    expect(result.ready).toBe(false);
   });
 
   it('treats a codex spawn error (binary not installed) as cli-missing', async () => {

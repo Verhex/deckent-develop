@@ -17,8 +17,13 @@ import {
   type PlannerSpawnOutcome,
 } from '../../src/orchestra/planner.js';
 import { providerRegistry } from '../../src/core/provider.js';
+import {
+  ensureOpenRouterModelRegistered,
+  modelRegistry,
+} from '../../src/core/model-registry.js';
 
 const roots: string[] = [];
+const OPENROUTER_MODEL = 'deckent/api-identity-proof:free';
 const validPlannerJSON = JSON.stringify({
   tasks: [{
     title: 'Receipt task',
@@ -104,6 +109,7 @@ async function invoke(
 
 afterEach(() => {
   providerRegistry.clear();
+  modelRegistry.unregister(OPENROUTER_MODEL);
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
@@ -187,6 +193,81 @@ describe('Brain planner InvocationReceipt boundary', () => {
     expect(bytes).not.toContain('super-secret-prompt-marker');
     expect(bytes).not.toContain('super-secret-response-marker');
     expect(bytes).not.toContain('--model');
+  });
+
+  it('persists exact OpenRouter api/api identity before a provider-native call', async () => {
+    ensureOpenRouterModelRegistered(OPENROUTER_MODEL, {
+      costPerMillion: { input: 0, output: 0 },
+      pricingEvidenceRef: 'openrouter-model-pricing:api-identity-0001',
+    });
+    const root = makeRoot();
+    const store = new InvocationReceiptStore(root);
+    const execute = vi.fn(async () => ({
+      status: 0,
+      signal: null,
+      stdout: validPlannerJSON.replace('claude-sonnet-5', OPENROUTER_MODEL),
+      stderr: '',
+    }));
+    const openrouterAdapter: ProviderAdapter = {
+      name: 'openrouter',
+      supportedModels: [OPENROUTER_MODEL] as readonly ModelType[],
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      listWorkers: vi.fn(() => []),
+      isAvailable: vi.fn(async () => true),
+      buildCommand: vi.fn(() => 'must-not-run'),
+      buildPlannerInvocation: () => ({
+        calledProvider: 'openrouter',
+        calledModel: OPENROUTER_MODEL,
+        transport: 'api',
+        executionBackend: 'api',
+        execute,
+      }),
+    };
+    const context: PlannerReceiptContext = {
+      tenantId: 'tenant-a',
+      projectRoot: root,
+      runId: 'sprint-openrouter-api-identity',
+      configuredProvider: 'openrouter',
+      requestedProvider: 'openrouter',
+      configuredModel: OPENROUTER_MODEL,
+      requestedModel: OPENROUTER_MODEL,
+      authMode: 'api',
+      store,
+    };
+    const spawn: PlannerSpawnFn = vi.fn();
+
+    const result = await callBrainPlannerWithReason(
+      makeContext(),
+      recommendation,
+      OPENROUTER_MODEL,
+      'receipt-project',
+      openrouterAdapter,
+      1_000,
+      undefined,
+      spawn,
+      context,
+      {
+        defaultModel: OPENROUTER_MODEL,
+        allowedModels: [OPENROUTER_MODEL],
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(execute).toHaveBeenCalledOnce();
+    expect(spawn).not.toHaveBeenCalled();
+    const ref = result.receiptRef!;
+    expect(store.get(ref, ref.invocationId)?.receipt).toMatchObject({
+      called: {
+        provider: 'openrouter',
+        model: OPENROUTER_MODEL,
+      },
+      backend: {
+        transport: 'api',
+        executionBackend: 'api',
+      },
+    });
+    store.close();
   });
 
   it.each([

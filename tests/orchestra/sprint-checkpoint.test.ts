@@ -16,15 +16,27 @@ import {
   persistDependencyGraph,
   resetInterruptedWorkersToPending,
   deriveResumableTaskIds,
+  deriveResumeDisposition,
   hasValidResult,
+  readResumeTaskResultAuthority,
+  buildPreplannedResumeSprint,
 } from '../../src/orchestra/sprint-checkpoint.js';
 import type { SprintCheckpoint } from '../../src/orchestra/sprint-checkpoint.js';
 import { SprintPhase, SprintStatus, TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task } from '../../src/core/types.js';
+import { DeckentError } from '../../src/core/errors.js';
 import {
   buildDependencyGraph,
   enforceWaveDependency,
 } from '../../src/orchestra/dependency-scheduler.js';
+import {
+  claimTaskResultSettlementAttemptAtomic,
+  createTaskResultSettlement,
+  createTaskResultSettlementRefForAttempt,
+  writeTaskResultSettlementAtomic,
+  writeTaskResultSettlementAttemptAtomic,
+  writeTaskResultSettlementClosureAtomic,
+} from '../../src/core/task-result-settlement.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -543,5 +555,116 @@ describe('resetInterruptedWorkersToPending + deriveResumableTaskIds (455-001)', 
     expect(hasValidResult(root, '455-034')).toBe(false);
     expect(hasValidResult(root, '455-099')).toBe(false); // no file
     rmSync(root, { recursive: true, force: true });
+  });
+
+  it('parks a pending Docker settlement even when raw worker output says DONE', () => {
+    const root = setupRoot();
+    const hostState = join(tmpdir(), `deckent-host-state-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const previousDeckentHome = process.env.DECKENT_HOME;
+    process.env.DECKENT_HOME = hostState;
+    try {
+      writeTaskJson(root, '455-040', TaskStatus.EXECUTING);
+      writeResultFile(root, '455-040', 'DONE');
+      const ref = createTaskResultSettlementRefForAttempt(
+        root,
+        '455-040',
+        '11111111-1111-4111-8111-111111111111',
+      );
+      writeTaskResultSettlementAttemptAtomic(ref);
+      claimTaskResultSettlementAttemptAtomic(ref);
+      const cp = baseCp({ activeWorkers: [activeWorker('455-040')] });
+
+      expect(readResumeTaskResultAuthority(root, '455-040')).toEqual({
+        state: 'pending-settlement',
+        result: null,
+      });
+      expect(deriveResumeDisposition(root, cp)).toEqual({
+        resumableIds: [],
+        parkedSettlements: [
+          { taskId: '455-040', state: 'pending-settlement' },
+        ],
+      });
+      expect(deriveResumableTaskIds(root, cp)).toEqual([]);
+      expect(resetInterruptedWorkersToPending(root, cp)).toMatchObject({
+        resetIds: [],
+        committed: true,
+      });
+      expect(statusOf(root, '455-040')).toBe(TaskStatus.EXECUTING);
+      const buildResume = () => buildPreplannedResumeSprint(root, cp, []);
+      expect(buildResume).toThrow(
+        /455-040 resume authority is pending-settlement/,
+      );
+      try {
+        buildResume();
+        expect.unreachable('pending settlement must block resume');
+      } catch (error) {
+        expect(error).toBeInstanceOf(DeckentError);
+        expect((error as DeckentError).code).toBe('DECKENT_E077');
+      }
+    } finally {
+      if (previousDeckentHome === undefined) delete process.env.DECKENT_HOME;
+      else process.env.DECKENT_HOME = previousDeckentHome;
+      rmSync(root, { recursive: true, force: true });
+      rmSync(hostState, { recursive: true, force: true });
+    }
+  });
+
+  it('uses closed host settlement over contradictory raw output and parks invalid settlement', () => {
+    const root = setupRoot();
+    const hostState = join(tmpdir(), `deckent-host-state-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const previousDeckentHome = process.env.DECKENT_HOME;
+    process.env.DECKENT_HOME = hostState;
+    try {
+      for (const id of ['455-041', '455-042']) {
+        writeTaskJson(root, id, TaskStatus.EXECUTING);
+        writeResultFile(root, id, 'DONE');
+        const ref = createTaskResultSettlementRefForAttempt(
+          root,
+          id,
+          id === '455-041'
+            ? '22222222-2222-4222-8222-222222222222'
+            : '33333333-3333-4333-8333-333333333333',
+        );
+        writeTaskResultSettlementAttemptAtomic(ref);
+        claimTaskResultSettlementAttemptAtomic(ref);
+        const hostResult = id === '455-041'
+          ? { taskId: id, selfAssessment: 'NO_GO', testsPassed: false }
+          : { taskId: id, selfAssessment: 'NOT_TERMINAL', testsPassed: false };
+        writeTaskResultSettlementAtomic(createTaskResultSettlement({
+          ref,
+          exitCode: 1,
+          result: hostResult,
+        }));
+        writeTaskResultSettlementClosureAtomic(ref, {
+          containerDisposition: 'absent-after-exit',
+          locksReleased: true,
+        });
+      }
+
+      expect(readResumeTaskResultAuthority(root, '455-041')).toMatchObject({
+        state: 'terminal',
+        result: { taskId: '455-041', selfAssessment: 'NO_GO' },
+      });
+      expect(readResumeTaskResultAuthority(root, '455-042')).toEqual({
+        state: 'invalid-settlement',
+        result: null,
+      });
+      expect(hasValidResult(root, '455-041')).toBe(true);
+      expect(hasValidResult(root, '455-042')).toBe(false);
+
+      const cp = baseCp({
+        activeWorkers: [activeWorker('455-041'), activeWorker('455-042')],
+      });
+      const disposition = deriveResumeDisposition(root, cp);
+      expect(disposition.resumableIds).toEqual([]);
+      expect(disposition.parkedSettlements).toEqual([
+        { taskId: '455-042', state: 'invalid-settlement' },
+      ]);
+    } finally {
+      if (previousDeckentHome === undefined) delete process.env.DECKENT_HOME;
+      else process.env.DECKENT_HOME = previousDeckentHome;
+      rmSync(root, { recursive: true, force: true });
+      rmSync(hostState, { recursive: true, force: true });
+    }
   });
 });

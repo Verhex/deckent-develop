@@ -20,7 +20,7 @@
  * RC2 wire layer and writes the BLOCKED event itself; sprint-spawner just
  * checks the returned `action === 'block'` and short-circuits.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { writeFileSync, mkdirSync, rmSync, existsSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -29,6 +29,8 @@ import { readEvents, CHANNELS } from '../../src/orchestra/event-stream.js';
 import { TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, ResolvedConfig, ModelType } from '../../src/core/types.js';
 import type { SpawnBackend, SpawnBackendOptions } from '../../src/orchestra/spawn-backend.js';
+import { runSpawnPhase } from '../../src/orchestra/sprint-phases.js';
+import { ProviderExecutionIngressHoldError } from '../../src/core/provider-execution-ingress-authority.js';
 
 // ─── Mock SpawnBackend ────────────────────────────────────────────
 
@@ -44,6 +46,7 @@ function makeMockBackend(): SpawnBackend & { calls: SpawnCall[] } {
   return {
     name: 'mock',
     liveUsageBudgetSupport: 'measured-stream' as const,
+    executionLandingCapability: 'cooperative-landing' as const,
     spawn(taskId, model, prompt, opts) {
       calls.push({ taskId, model, prompt, opts });
     },
@@ -82,6 +85,16 @@ function createTask(id: string, filesWrite: string[]): Task {
     assignedSkills: [],
     provider: 'claude',
     budget: { maxTurns: 1 },
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      resolvedProvider: 'claude',
+      executionCostClass: 'remote',
+      profileRef: 'tests.orchestra.spawn-spawner-wire',
+      policyDigest: 'a'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: { reserve_ratio: 0.25 },
+    },
   } as unknown as Task;
 }
 
@@ -134,6 +147,82 @@ describe('spawnWorkers — C0c wire (Sprint 168 W2.5)', () => {
       );
     }
   }
+
+  it('blocks initial sprint dispatch when attended authority is only a raw reference', async () => {
+    const task = createTask('168-ATTENDED-RAW', []);
+    task.budgetPolicy = {
+      ...task.budgetPolicy!,
+      admissionMode: 'attended',
+      landingPolicy: { reserve_ratio: 0.25, attended_unsupported: 'allow-hard-stop' },
+      approvalEvidenceRef: 'approval://raw-reference-is-not-authority',
+    };
+    persistTasks([task]);
+    const sprint = makeSprint('sprint-168', [task]);
+    const backend = makeMockBackend();
+    Object.defineProperty(backend, 'executionLandingCapability', { value: 'unsupported' });
+
+    const origCwd = process.cwd();
+    process.chdir(testRoot);
+    try {
+      await expect(spawnWorkers(testRoot, sprint, makeConfig(), { spawnBackend: backend }))
+        .rejects.toThrow('exact final dispatch binding');
+    } finally {
+      process.chdir(origCwd);
+    }
+    expect(backend.calls).toHaveLength(0);
+  });
+
+  it('does not retry a provider-authority HOLD and never reaches prompt/task assignment/backend', async () => {
+    const task = createTask('168-PROVIDER-AUTH-HOLD', []);
+    persistTasks([task]);
+    const sprint = makeSprint('sprint-168-provider-authority', [task]);
+    const backend = makeMockBackend();
+    const admit = vi.fn(() => ({
+      decision: 'hold',
+      reservation: null,
+      reasonCode: 'authority_unavailable',
+      resolution: {},
+      attempts: [],
+      authorityEvidenceRef: `host-role-admission:${'b'.repeat(64)}`,
+    }));
+    const authority = {
+      state: 'ready',
+      tenantId: 'local',
+      projectId: 'project-provider-authority',
+      authorityEvidenceRef: `provider-authority:${'a'.repeat(64)}`,
+      service: { roleAdmissionRuntime: { admit } },
+      close: vi.fn(),
+    } as never;
+
+    const caught = await runSpawnPhase(
+      testRoot,
+      sprint,
+      makeConfig(),
+      { providerAuthority: authority },
+      backend,
+    ).catch(error => error);
+
+    expect(caught).toBeInstanceOf(ProviderExecutionIngressHoldError);
+    expect(caught).toMatchObject({
+      reasonCode: 'candidate_authority_unavailable',
+      durableEvidenceWritten: true,
+      request: {
+        role: 'worker',
+        purpose: 'worker-execution',
+        taskId: task.id,
+        provider: 'claude',
+        model: 'claude-sonnet-5',
+        configuredBackend: 'mock',
+        unattended: true,
+      },
+    });
+    expect(admit).toHaveBeenCalledOnce();
+    expect(backend.calls).toHaveLength(0);
+    expect(task.status).toBe(TaskStatus.PENDING);
+    expect(readEvents(testRoot, sprint.id).filter(
+      event => event.channel === CHANNELS.TASK_ASSIGN,
+    )).toHaveLength(0);
+  });
 
   it('emits BRAIN→SPAWN:BLOCKED when two tasks collide on filesWrite', async () => {
     const t1 = createTask('168-W25-A', ['src/shared.ts']);

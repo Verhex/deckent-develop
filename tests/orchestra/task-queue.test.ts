@@ -134,6 +134,17 @@ function makeTask(id: string, sprintId = 'sprint-001', overrides?: Partial<Task>
     sprintId,
     createdAt: new Date().toISOString(),
     budget: { maxTurns: 1 },
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      taskKind: 'code-development',
+      resolvedProvider: 'claude',
+      executionCostClass: 'remote',
+      profileRef: 'tests.orchestra.task-queue',
+      policyDigest: '9'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: { reserve_ratio: 0.25 },
+    },
     ...overrides,
   };
 }
@@ -142,6 +153,7 @@ function makeMockBackend(onSpawn?: (taskId: string) => void): SpawnBackend {
   return {
     name: 'measured-test',
     liveUsageBudgetSupport: 'measured-stream',
+    executionLandingCapability: 'cooperative-landing',
     spawn: vi.fn((taskId: string) => onSpawn?.(taskId)),
     kill: vi.fn(),
     list: vi.fn(() => []),

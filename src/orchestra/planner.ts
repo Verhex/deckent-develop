@@ -407,8 +407,8 @@ export interface PlannerSpawnSpec {
   readonly args: string[];
   readonly calledProvider: string;
   readonly calledModel: string;
-  readonly transport: 'cli' | 'http' | 'local-runtime';
-  readonly executionBackend: 'host-subprocess' | 'docker' | 'tmux' | 'in-process' | 'unknown';
+  readonly transport: InvocationTransport;
+  readonly executionBackend: InvocationExecutionBackend;
 }
 
 function extractWireModel(command: ProviderPlannerCommand): string | null {
@@ -547,25 +547,25 @@ export function buildPlannerSpawnArgs(
 
 /**
  * @internal Resolve the provider adapter to use for planner calls.
- * If an adapter is explicitly provided, use it. Otherwise, when a `model`
- * is given, resolve the adapter that OWNS that model (born-690: the default
- * provider and the requested model are independent axes — spawning the
- * default CLI with a foreign model name is a hard 400, e.g. `codex exec
- * --model sonnet`). Falls back to ProviderRegistry.getDefault() when the
- * model is unknown to the registry or its provider is not registered
- * (custom ollama tags keep their historical default-provider behavior).
- * Throws if no provider is available at all — callers must ensure at least
- * one provider is registered.
+ * If an adapter is explicitly provided, use it. Otherwise, when an explicit
+ * `requestedProvider` authority is supplied, resolve ONLY that adapter. When no
+ * provider authority is supplied but a `model` is given, resolve ONLY the
+ * adapter that owns that canonical model identity.
+ * Unknown models and absent owner adapters fail before dispatch: registry
+ * default order is not model ownership, reachability, or fallback authority.
+ *
+ * Model-less legacy callers retain ProviderRegistry.getDefault(). Evidence-backed
+ * role fallback is a separate admission decision and must inject the selected
+ * adapter rather than relying on this identity resolver.
  */
-export function resolveAdapter(adapter?: ProviderAdapter, model?: ModelType): ProviderAdapter {
+export function resolveAdapter(
+  adapter?: ProviderAdapter,
+  model?: ModelType,
+  requestedProvider?: string | null,
+): ProviderAdapter {
   if (adapter) return adapter;
-  if (model) {
-    try {
-      return providerRegistry.getProvider(getProviderForModel(model));
-    } catch {
-      // UnknownModelError or ProviderNotFoundError → historical default path.
-    }
-  }
+  if (requestedProvider) return providerRegistry.getProvider(requestedProvider);
+  if (model) return providerRegistry.getProvider(getProviderForModel(model));
   // Throws ProviderError('No providers registered') if registry is empty
   return providerRegistry.getDefault();
 }
@@ -906,7 +906,7 @@ export async function callBrainPlannerWithReason(
   // Surface as `no_providers` reason so the caller does not silently fall back.
   let resolved: ProviderAdapter;
   try {
-    resolved = resolveAdapter(adapter, model);
+    resolved = resolveAdapter(adapter, model, receiptContext?.requestedProvider);
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     return rejectedBeforeDispatch(

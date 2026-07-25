@@ -73,7 +73,7 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     id,
     title: `Task ${id}`,
     description: `sched7-s7c ${id}`,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'sched7-s7c-test',
@@ -84,6 +84,18 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     sprintId: 'sprint-sched7-s7c',
     assignedAgent: 'generic',
     assignedSkills: [],
+    budget: { maxTurns: 1 },
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      taskKind: 'code-development',
+      resolvedProvider: 'claude',
+      executionCostClass: 'remote',
+      profileRef: 'tests.orchestra.scheduler-fifo-composition',
+      policyDigest: '9'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: { reserve_ratio: 0.25 },
+    },
     ...overrides,
   } as Task;
 }
@@ -113,6 +125,8 @@ function makeMockBackend(log?: string[]): SpawnBackend & { calls: MockSpawnCall[
   const calls: MockSpawnCall[] = [];
   return {
     name: 'mock-backend',
+    liveUsageBudgetSupport: 'measured-stream',
+    executionLandingCapability: 'cooperative-landing',
     spawn(taskId, model, prompt, opts) {
       calls.push({ taskId, model: model as unknown as string, prompt, opts });
       log?.push(`spawn:${taskId}`);

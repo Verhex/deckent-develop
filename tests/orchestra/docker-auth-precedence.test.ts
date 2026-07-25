@@ -26,8 +26,10 @@ vi.mock('node:child_process', () => ({
   spawn: vi.fn(() => {
     const stub = {
       stdout: { on: vi.fn() },
-      stderr: { on: vi.fn() },
+      stderr: { on: vi.fn(), resume: vi.fn() },
       on: vi.fn(),
+      once: vi.fn(),
+      kill: vi.fn(),
     };
     return stub as unknown as ChildProcess;
   }),
@@ -71,9 +73,23 @@ vi.mock('../../src/core/active-workers.js', () => ({
   clearPending: vi.fn(),
 }));
 
+vi.mock('../../src/core/task-result-settlement.js', () => {
+  return import('../helpers/task-result-settlement-stub.js')
+    .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
+});
+
+vi.mock('../../src/orchestra/execution-landing-coordinator.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../src/orchestra/execution-landing-coordinator.js')>()),
+  prepareDockerExecutionLanding: vi.fn(({ prompt }: { prompt: string }) => ({ prompt, context: null })),
+}));
+
 import { spawnSync } from 'node:child_process';
 import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
 import type { ModelType } from '../../src/core/types.js';
+import {
+  TEST_DOCKER_EXECUTION_OPTIONS,
+  budgetedDockerTaskJson,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
 
@@ -95,8 +111,8 @@ function installSpawnRouter(): void {
       stdout = 'container-id-abc123';
     } else if (cmd === 'docker' && sub === 'inspect') {
       stdout = 'true|0';
-    } else if (cmd === 'claude' && sub === '--version') {
-      stdout = 'claude 1.0.0 (host auth ok)';
+    } else if (cmd === 'claude' && sub === 'auth') {
+      stdout = '{"loggedIn":true}';
     }
 
     return {
@@ -123,15 +139,21 @@ function hasEnvFlag(argv: string[], key: string): boolean {
 
 /**
  * Configure the fs mock so readTaskAuthMode() returns the requested authMode
- * value for taskId. existsSync returns true ONLY for the task JSON path; all
- * other existsSync queries (auth mount, .claude.json) default to false to
- * mirror the existing docker-provider-auth.test.ts isolation.
+ * value for taskId. Subscription cases expose only the allowlisted Claude
+ * credential plus the task JSON; no provider home or unrelated host state is
+ * made visible to the backend.
  */
-function stubTaskAuthMode(taskId: string, authMode: 'subscription' | 'api'): void {
-  fsState.existsSyncImpl = (p: string) => p.endsWith(`task-${taskId}.json`);
+function stubTaskEnvelope(
+  taskId: string,
+  model: string,
+  authMode: 'subscription' | 'api',
+): void {
+  fsState.existsSyncImpl = (p: string) =>
+    p.endsWith(`task-${taskId}.json`)
+    || (authMode === 'subscription' && p.endsWith('/.claude/.credentials.json'));
   fsState.readFileSyncImpl = (p: string) => {
     if (p.endsWith(`task-${taskId}.json`)) {
-      return JSON.stringify({ authMode, scope: { filesWrite: [] } });
+      return budgetedDockerTaskJson(p, { authMode, model });
     }
     return '{}';
   };
@@ -161,11 +183,17 @@ describe('DockerSpawnBackend: env-forwarding auth-precedence (Sprint 214 T-001)'
 
   it('subscription + ANTHROPIC_API_KEY set → does NOT forward ANTHROPIC_API_KEY', () => {
     // Subscription = no task-level "Auth: api" override. existsSync defaults
-    // to false → readTaskAuthMode → undefined → useApiOnly === false.
+    // to the explicit persisted subscription envelope.
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-host-leak');
+    stubTaskEnvelope('t-auth-sub', 'claude-sonnet-5', 'subscription');
 
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-auth-sub', 'sonnet' as ModelType, 'prompt');
+    backend.spawn(
+      't-auth-sub',
+      'claude-sonnet-5' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    );
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -173,52 +201,63 @@ describe('DockerSpawnBackend: env-forwarding auth-precedence (Sprint 214 T-001)'
   });
 
   it('api authMode + ANTHROPIC_API_KEY set → forwards ANTHROPIC_API_KEY', () => {
-    stubTaskAuthMode('t-auth-api', 'api');
+    stubTaskEnvelope('t-auth-api', 'claude-sonnet-5', 'api');
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-api-mode');
 
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-auth-api', 'sonnet' as ModelType, 'prompt');
+    backend.spawn(
+      't-auth-api',
+      'claude-sonnet-5' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    );
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
     expect(hasEnvFlag(argv, 'ANTHROPIC_API_KEY')).toBe(true);
   });
 
-  it('codex provider (gpt-4.1) → forwards OPENAI_API_KEY, NOT ANTHROPIC_API_KEY', () => {
+  it('codex provider (gpt-4.1) → metering HOLD before any credential forwarding', () => {
     vi.stubEnv('OPENAI_API_KEY', 'sk-openai');
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-anthropic-irrelevant');
 
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-auth-codex', 'gpt-4.1' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
-    expect(hasEnvFlag(argv, 'OPENAI_API_KEY')).toBe(true);
-    // Non-claude provider must not receive Anthropic's key (cross-provider
-    // confusion guard).
-    expect(hasEnvFlag(argv, 'ANTHROPIC_API_KEY')).toBe(false);
+    expect(() => backend.spawn(
+      't-auth-codex',
+      'gpt-4.1' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 
-  it('gemini provider (gemini-2.5-flash) → forwards GOOGLE_API_KEY, NOT ANTHROPIC_API_KEY', () => {
+  it('gemini provider → metering HOLD before any credential forwarding', () => {
     vi.stubEnv('GOOGLE_API_KEY', 'ya29-google');
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-anthropic-irrelevant');
 
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-auth-gemini', 'gemini-2.5-flash' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
-    expect(hasEnvFlag(argv, 'GOOGLE_API_KEY')).toBe(true);
-    expect(hasEnvFlag(argv, 'ANTHROPIC_API_KEY')).toBe(false);
+    expect(() => backend.spawn(
+      't-auth-gemini',
+      'gemini-2.5-flash' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 
   it('claude provider + subscription → does NOT forward OPENAI_API_KEY even if set', () => {
     // Regression bonus: OPENAI_API_KEY should also not leak into a claude
     // worker (cross-provider auth confusion guard, symmetric to ANTHROPIC).
     vi.stubEnv('OPENAI_API_KEY', 'sk-openai-leak');
+    stubTaskEnvelope('t-auth-claude-pure', 'claude-haiku-4-5-20251001', 'subscription');
 
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-auth-claude-pure', 'haiku' as ModelType, 'prompt');
+    backend.spawn(
+      't-auth-claude-pure',
+      'claude-haiku-4-5-20251001' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    );
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;

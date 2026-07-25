@@ -21,6 +21,11 @@ import { brainEstimateTimeout, type SprintHistory } from '../../src/orchestra/ti
 import { TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, ResolvedConfig, ModelType } from '../../src/core/types.js';
 import type { SpawnBackend, SpawnBackendOptions } from '../../src/orchestra/spawn-backend.js';
+import {
+  TEST_MEASURED_LANDING_CAPABILITIES,
+  TEST_REMOTE_EXECUTION_BUDGET,
+  TEST_REMOTE_WORKER_BUDGET_POLICY,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 interface SpawnCall { taskId: string; opts?: SpawnBackendOptions; }
 
@@ -28,7 +33,7 @@ function makeRecordingBackend(): SpawnBackend & { calls: SpawnCall[] } {
   const calls: SpawnCall[] = [];
   return {
     name: 'mock-timeout',
-    liveUsageBudgetSupport: 'measured-stream' as const,
+    ...TEST_MEASURED_LANDING_CAPABILITIES,
     spawn(taskId, _model, _prompt, opts) { calls.push({ taskId, opts }); },
     kill() { /* no-op */ },
     list() { return calls.map(c => c.taskId); },
@@ -46,7 +51,8 @@ function createTask(id: string, effort: 'low' | 'normal' | 'high'): Task {
     goNogo: { goCriteria: 'x', noGoCriteria: 'x', techDebtAcceptable: 'none' },
     status: TaskStatus.PENDING, sprintId: 'sprint-280',
     assignedAgent: 'generic', assignedSkills: [], provider: 'claude',
-    budget: { maxTurns: 1 },
+    budget: TEST_REMOTE_EXECUTION_BUDGET,
+    budgetPolicy: TEST_REMOTE_WORKER_BUDGET_POLICY,
   } as unknown as Task;
 }
 

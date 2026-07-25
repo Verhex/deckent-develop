@@ -25,6 +25,8 @@ import type {
 import { TASKS_DIR } from '../core/constants.js';
 import { resolveLiveTraceEnabled } from '../core/config.js';
 import { ErrorRegistry } from '../core/errors.js';
+import { buildProviderChildEnv } from '../core/provider.js';
+import { resolveCrossProviderCredentialKeys } from '../providers/cross-provider-keys.js';
 import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-enforcer.js';
 import { writeEvent, getCurrentSprintId, CHANNELS } from '../orchestra/event-stream.js';
 import { emitWorkerActivity } from './worker-activity.js';
@@ -683,12 +685,11 @@ export function emitWorkerQuestion(
 // Brain treats it as a real NO_GO and the sprint retro can count failures.
 //
 // Activation contract (env-gated, fail-closed when required):
-//   • Skipped entirely unless `CLAUDE_AUTH_REQUIRED=1` — local/tmux/subprocess
-//     backends remain backward-compatible.
-//   • Bypassed when `DECKENT_AUTH_SKIP=1` — for test env / CI where the
-//     `claude` binary is intentionally unavailable.
-//   • spawn-backend-docker.ts sets `CLAUDE_AUTH_REQUIRED=1` on container env
-//     so docker workers always run this check before the actual task.
+//   • Skipped entirely unless `CLAUDE_AUTH_REQUIRED=1`.
+//   • Bypassed only when `DECKENT_AUTH_SKIP=1`, `NODE_ENV=test`, and
+//     `VITEST=true` — a lone inherited variable is never production authority.
+//   • Every raw-CLI spawn backend invokes this on the host before the actual
+//     Claude task; the container/child itself never owns the auth decision.
 
 export interface AuthHealthCheckResult {
   /** true = auth OK or check skipped; false = AUTH_FAILED .result was written */
@@ -703,16 +704,17 @@ export interface AuthHealthCheckResult {
  * Run a pre-spawn Claude CLI auth health check.
  *
  * Behavior:
- *   - When neither `CLAUDE_AUTH_REQUIRED` nor `DECKENT_AUTH_SKIP` indicates we
- *     should check, returns `{ok: true, skipped: true}` without touching disk.
- *   - When `CLAUDE_AUTH_REQUIRED=1` AND `DECKENT_AUTH_SKIP` unset:
+ *   - When `CLAUDE_AUTH_REQUIRED` is unset, returns `{ok: true, skipped: true}`
+ *     without touching disk.
+ *   - When `CLAUDE_AUTH_REQUIRED=1` and the exact test bypass is absent:
  *       runs `claude auth status --json` (5s timeout). Only exit 0 + valid
  *       JSON + `loggedIn === true` is accepted. Every other outcome
  *       writes a real `.result` (selfAssessment NO_GO, notes `AUTH_FAILED: ...`,
  *       filesChanged=[]) AND emits a `WORKER→BRAIN:AUTH_FAILED` event, then
  *       returns `{ok: false, stderr}`. Caller should `process.exit(1)` so Brain
  *       sees a clean fail with a real result on disk.
- *   - When `DECKENT_AUTH_SKIP=1`, returns `{ok: true, skipped: true}`.
+ *   - The bypass requires the exact triple `DECKENT_AUTH_SKIP=1`,
+ *     `NODE_ENV=test`, and `VITEST=true`.
  */
 export function authHealthCheck(
   projectRoot: string,
@@ -721,7 +723,9 @@ export function authHealthCheck(
   env: NodeJS.ProcessEnv = process.env,
 ): AuthHealthCheckResult {
   const required = env.CLAUDE_AUTH_REQUIRED === '1';
-  const bypass = env.DECKENT_AUTH_SKIP === '1';
+  const bypass = env.DECKENT_AUTH_SKIP === '1'
+    && env.NODE_ENV === 'test'
+    && env.VITEST === 'true';
   if (!required || bypass) {
     return { ok: true, skipped: true };
   }
@@ -730,10 +734,17 @@ export function authHealthCheck(
   let stdout = '';
   let stderr = '';
   try {
+    const ownedCredential = env.ANTHROPIC_API_KEY;
+    const childEnv = buildProviderChildEnv(
+      env,
+      resolveCrossProviderCredentialKeys(),
+      ownedCredential ? { ANTHROPIC_API_KEY: ownedCredential } : undefined,
+    );
     const r = spawnSync('claude', ['auth', 'status', '--json'], {
       encoding: 'utf-8',
       timeout: 5_000,
       shell: process.platform === 'win32',
+      env: childEnv,
     });
     exitCode = r.status;
     stdout = (r.stdout ?? '').trim();

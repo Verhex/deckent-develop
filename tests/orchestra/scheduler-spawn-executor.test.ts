@@ -71,6 +71,8 @@ import type { SpawnBackend, SpawnBackendOptions } from '../../src/orchestra/spaw
 import { executeSpawnTask, type SpawnTaskDeps } from '../../src/orchestra/scheduler-effects.js';
 import { spawnWorker } from '../../src/orchestra/tmux.js';
 import { waitForResults } from '../../src/orchestra/result-collector.js';
+import { buildWorkerPrompt } from '../../src/orchestra/task-builder.js';
+import { ProviderExecutionIngressHoldError } from '../../src/core/provider-execution-ingress-authority.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -104,6 +106,17 @@ function makeTask(id: string, overrides?: Partial<Task>): Task {
     assignedAgent: 'generic',
     assignedSkills: [],
     budget: { maxTurns: 1 },
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      taskKind: 'code-development',
+      resolvedProvider: 'claude',
+      executionCostClass: 'remote',
+      profileRef: 'tests.orchestra.scheduler-spawn-executor',
+      policyDigest: '9'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: { reserve_ratio: 0.25 },
+    },
     ...overrides,
   } as Task;
 }
@@ -120,6 +133,7 @@ function makeMockBackend(): SpawnBackend & { calls: MockSpawnCall[] } {
   return {
     name: 'mock-backend',
     liveUsageBudgetSupport: 'measured-stream',
+    executionLandingCapability: 'cooperative-landing',
     spawn(taskId, model, prompt, opts) {
       calls.push({ taskId, model: model as unknown as string, prompt, opts });
     },
@@ -145,6 +159,79 @@ function baseDeps(projectRoot: string, overrides?: Partial<SpawnTaskDeps>): Spaw
 function writeOriginalTask(root: string, task: Task): void {
   writeFileSync(join(root, '.tasks', `task-${task.id}.json`), JSON.stringify(task, null, 2), 'utf-8');
 }
+
+describe('executeSpawnTask — provider-authority ingress', () => {
+  let root: string;
+
+  beforeEach(() => { root = makeTmpDir('sched3-provider-authority'); });
+  afterEach(() => { rmSync(root, { recursive: true, force: true }); vi.clearAllMocks(); });
+
+  it('holds before prompt construction or backend dispatch and preserves explicit attendance', async () => {
+    const task = makeTask('700-AUTH-HOLD', {
+      provider: 'claude',
+      budgetPolicy: {
+        ...makeTask('budget-template').budgetPolicy!,
+        admissionMode: 'attended',
+      },
+    });
+    const backend = makeMockBackend();
+    const authority = {
+      state: 'hold',
+      reasonCode: 'keyring_unavailable',
+      authorityEvidenceRef: `provider-authority:${'a'.repeat(64)}`,
+      retryable: false,
+      close: vi.fn(),
+    } as const;
+    const config = {
+      spawn_backend: 'docker',
+      worker_provider: 'claude',
+      provider_fallback: { worker: ['codex', 'gemini'] },
+    } as unknown as ResolvedConfig;
+
+    const caught = await executeSpawnTask(
+      { task },
+      baseDeps(root, {
+        backend,
+        config,
+        spawnOpts: { providerAuthority: authority },
+      }),
+    ).catch(error => error);
+
+    expect(caught).toBeInstanceOf(ProviderExecutionIngressHoldError);
+    expect(caught).toMatchObject({
+      reasonCode: 'keyring_unavailable',
+      durableEvidenceWritten: true,
+      request: {
+        role: 'worker',
+        purpose: 'worker-execution',
+        runId: 'sprint-sched3',
+        taskId: '700-AUTH-HOLD',
+        provider: 'claude',
+        model: 'claude-sonnet-5',
+        configuredBackend: 'mock-backend',
+        unattended: false,
+      },
+    });
+    expect((caught as ProviderExecutionIngressHoldError).request.fallbackProviders)
+      .toEqual(['codex', 'gemini']);
+    expect(buildWorkerPrompt).not.toHaveBeenCalled();
+    expect(backend.calls).toHaveLength(0);
+    expect(task.status).toBe(TaskStatus.PENDING);
+  });
+
+  it('preserves the existing executor behavior when provider authority is not configured', async () => {
+    const task = makeTask('700-AUTH-ABSENT', { provider: 'claude' });
+    const backend = makeMockBackend();
+
+    await expect(executeSpawnTask(
+      { task },
+      baseDeps(root, { backend }),
+    )).resolves.toMatchObject({ kind: 'spawned', taskId: task.id });
+
+    expect(buildWorkerPrompt).toHaveBeenCalledOnce();
+    expect(backend.calls).toHaveLength(1);
+  });
+});
 
 // ─── executeSpawnTask — fix-routing lineage inheritance ──────────────────────
 
@@ -256,6 +343,24 @@ describe('executeSpawnTask — fix-task routing-lineage inheritance', () => {
     expect(disposition.kind).toBe('spawned');
     expect(backend.calls).toHaveLength(1);
   });
+
+  it('blocks queued/respawn dispatch when attended authority is only a raw reference', async () => {
+    const task = makeTask('700-008', {
+      budgetPolicy: {
+        ...makeTask('template').budgetPolicy!,
+        admissionMode: 'attended',
+        landingPolicy: { reserve_ratio: 0.25, attended_unsupported: 'allow-hard-stop' },
+        approvalEvidenceRef: 'approval://raw-reference-is-not-authority',
+      },
+    });
+    const backend = makeMockBackend();
+    Object.defineProperty(backend, 'executionLandingCapability', { value: 'unsupported' });
+
+    await expect(executeSpawnTask({ task }, baseDeps(root, { backend })))
+      .rejects.toThrow('exact final dispatch binding');
+    expect(backend.calls).toHaveLength(0);
+    expect(existsSync(join(root, '.tasks', 'task-700-008.json'))).toBe(false);
+  });
 });
 
 // ─── executeSpawnTask — resolution parity across trigger-shaped deps ────────
@@ -365,6 +470,75 @@ describe('waitForResults — queue-completion trigger (processQueue) delegates t
     const persisted = JSON.parse(readFileSync(join(root, '.tasks', 'task-702-001-fix.json'), 'utf-8'));
     expect(persisted.status).toBe(TaskStatus.EXECUTING);
     expect(persisted.modelEffort).toBe('high');
+  });
+
+  it('propagates one provider-authority HOLD instead of retrying a queued task', async () => {
+    const active = makeTask('702-AUTH-ACTIVE', {
+      status: TaskStatus.EXECUTING,
+      budget: undefined,
+    });
+    const queued = makeTask('702-AUTH-QUEUED', { provider: 'claude' });
+    const sprint = {
+      id: 'sprint-sched3',
+      number: 1,
+      tasks: [active, queued],
+      workers: [`w-${active.id}`, `w-${queued.id}`],
+      phase: SprintPhase.EXECUTE,
+      status: SprintStatus.ACTIVE,
+      planningMode: 'structured',
+    } as Sprint;
+    writeFileSync(
+      join(root, '.tasks', `task-${active.id}.result`),
+      JSON.stringify({
+        taskId: active.id,
+        workerId: `w-${active.id}`,
+        filesChanged: [],
+        linesAdded: 0,
+        linesRemoved: 0,
+        testsPassed: true,
+        coverage: 100,
+        selfAssessment: 'DONE',
+        notes: 'ok',
+      }),
+    );
+    const admit = vi.fn(() => ({
+      decision: 'hold',
+      reservation: null,
+      reasonCode: 'authority_unavailable',
+      resolution: {},
+      attempts: [],
+      authorityEvidenceRef: `host-role-admission:${'b'.repeat(64)}`,
+    }));
+    const authority = {
+      state: 'ready',
+      tenantId: 'local',
+      projectId: 'project-sched3',
+      authorityEvidenceRef: `provider-authority:${'a'.repeat(64)}`,
+      service: { roleAdmissionRuntime: { admit } },
+      close: vi.fn(),
+    } as never;
+    const backend = makeMockBackend();
+    const config = {
+      dependency_pipeline_enabled: false,
+      worker_provider: 'claude',
+      provider_fallback: { worker: ['codex'] },
+      activeModeConfig: { max_workers: 1 },
+    } as unknown as ResolvedConfig;
+
+    await expect(waitForResults(
+      root,
+      sprint,
+      300,
+      [queued],
+      { spawnBackend: backend, providerAuthority: authority },
+      undefined,
+      config,
+    )).rejects.toBeInstanceOf(ProviderExecutionIngressHoldError);
+
+    expect(admit).toHaveBeenCalledOnce();
+    expect(backend.calls).toHaveLength(0);
+    expect(buildWorkerPrompt).not.toHaveBeenCalled();
+    expect(queued.status).toBe(TaskStatus.PENDING);
   });
 });
 

@@ -51,7 +51,10 @@ import type { Task, TaskResult } from '../../src/core/types.js';
 function makeTaskConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
   return {
     deckent_style: 'task',
-    execution_budget: { roles: { worker: { default: { maxTokens: 100_000, maxTurns: 10 } } } },
+    execution_budget: {
+      roles: { worker: { default: { maxTokens: 100_000, maxTurns: 10 } } },
+      landing: { reserve_ratio: 0.25 },
+    },
     ...overrides,
   } as unknown as ResolvedConfig;
 }
@@ -75,7 +78,13 @@ function writeWorkerResultStub(root: string, taskId: string): void {
     notes: 'stub worker result',
     // Worker Output Contract: workers leave counts at 0 and let the
     // orchestrator fill real counts server-side.
-    tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model: 'sonnet' },
+    tokenUsage: {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+    },
   };
   writeFileSync(join(root, '.tasks', `task-${taskId}.result`), JSON.stringify(stub, null, 2), 'utf-8');
 }

@@ -8,10 +8,21 @@ import { mkdirSync, rmSync, existsSync, writeFileSync, readFileSync } from 'node
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { restoreSprintFromCheckpoint } from '../../src/orchestra/sprint-checkpoint.js';
+import {
+  readResumeTaskResultAuthority,
+  restoreSprintFromCheckpoint,
+} from '../../src/orchestra/sprint-checkpoint.js';
 import type { SprintCheckpoint } from '../../src/orchestra/sprint-checkpoint.js';
 import { SprintPhase, SprintStatus, TaskStatus } from '../../src/core/types.js';
 import type { Task } from '../../src/core/types.js';
+import {
+  claimTaskResultSettlementAttemptAtomic,
+  createTaskResultSettlement,
+  createTaskResultSettlementRef,
+  writeTaskResultSettlementAtomic,
+  writeTaskResultSettlementAttemptAtomic,
+  writeTaskResultSettlementClosureAtomic,
+} from '../../src/core/task-result-settlement.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -65,13 +76,21 @@ function readTaskJson(root: string, id: string): Task | null {
 
 describe('restoreSprintFromCheckpoint (Sprint 162 T-004)', () => {
   let root: string;
+  let hostRoot: string;
+  let originalDeckentHome: string | undefined;
 
   beforeEach(() => {
     root = makeTempRoot();
+    hostRoot = makeTempRoot();
+    originalDeckentHome = process.env.DECKENT_HOME;
+    process.env.DECKENT_HOME = hostRoot;
   });
 
   afterEach(() => {
+    if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+    else process.env.DECKENT_HOME = originalDeckentHome;
     rmSync(root, { recursive: true, force: true });
+    rmSync(hostRoot, { recursive: true, force: true });
   });
 
   it('1. no checkpoint → returns action:"fresh"', () => {
@@ -172,6 +191,89 @@ describe('restoreSprintFromCheckpoint (Sprint 162 T-004)', () => {
     // And reflected in the rebuilt in-memory Sprint
     const inMemTask = result.restoredSprint!.tasks.find(x => x.id === '162-002');
     expect(inMemTask!.status).toBe(TaskStatus.NO_GO);
+  });
+
+  it('holds restore when a raw DONE is backed by a pending Docker settlement', () => {
+    const taskId = '162-010';
+    writeTaskJson(root, makeTask(taskId, TaskStatus.EXECUTING));
+    const rawResultPath = join(root, '.tasks', `task-${taskId}.result`);
+    writeFileSync(
+      rawResultPath,
+      JSON.stringify({ taskId, selfAssessment: 'DONE', notes: 'worker-writable claim' }),
+      'utf-8',
+    );
+    const cp: SprintCheckpoint = {
+      sprintId: 'sprint-162',
+      checkpointNumber: 1,
+      timestamp: '2026-05-12T12:00:00.000Z',
+      completedTasks: [],
+      pendingTasks: [],
+      activeWorkers: [
+        { workerId: `w-${taskId}`, taskId, status: 'EXECUTING', spawnedAt: '2026-05-12T11:50:00.000Z' },
+      ],
+      brainPhase: SprintPhase.EXECUTE,
+      eventStreamOffset: 18,
+    };
+    writeCheckpointFile(root, cp);
+    const ref = createTaskResultSettlementRef(root, taskId);
+    writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
+
+    let thrown: unknown;
+    try {
+      restoreSprintFromCheckpoint(root, cp.sprintId);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toMatchObject({ code: 'DECKENT_E077' });
+    expect(readTaskJson(root, taskId)?.status).toBe(TaskStatus.EXECUTING);
+    expect(JSON.parse(readFileSync(rawResultPath, 'utf-8'))).toMatchObject({
+      selfAssessment: 'DONE',
+      notes: 'worker-writable claim',
+    });
+    expect(existsSync(join(root, '.deckent', 'sprint-state.json'))).toBe(false);
+  });
+
+  it('uses a closed host NO_GO instead of a contradictory raw DONE on restore', () => {
+    const taskId = '162-011';
+    writeTaskJson(root, makeTask(taskId, TaskStatus.EXECUTING));
+    writeFileSync(
+      join(root, '.tasks', `task-${taskId}.result`),
+      JSON.stringify({ taskId, selfAssessment: 'DONE', notes: 'contradictory raw claim' }),
+      'utf-8',
+    );
+    const cp: SprintCheckpoint = {
+      sprintId: 'sprint-162',
+      checkpointNumber: 1,
+      timestamp: '2026-05-12T12:00:00.000Z',
+      completedTasks: [],
+      pendingTasks: [],
+      activeWorkers: [
+        { workerId: `w-${taskId}`, taskId, status: 'EXECUTING', spawnedAt: '2026-05-12T11:50:00.000Z' },
+      ],
+      brainPhase: SprintPhase.EXECUTE,
+      eventStreamOffset: 18,
+    };
+    writeCheckpointFile(root, cp);
+    const ref = createTaskResultSettlementRef(root, taskId);
+    writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({
+      ref,
+      exitCode: 1,
+      result: { taskId, selfAssessment: 'NO_GO', notes: 'host settlement truth' },
+    }));
+    writeTaskResultSettlementClosureAtomic(ref, {
+      containerDisposition: 'stopped-removed',
+      locksReleased: true,
+    });
+
+    const restored = restoreSprintFromCheckpoint(root, cp.sprintId);
+    expect(restored.staleTasksWithResult).toEqual([taskId]);
+    expect(readResumeTaskResultAuthority(root, taskId)).toMatchObject({
+      state: 'terminal',
+      result: { selfAssessment: 'NO_GO', notes: 'host settlement truth' },
+    });
   });
 
   it('5. startedAt preserved from checkpoint (sprintStartedAt > timestamp fallback)', () => {

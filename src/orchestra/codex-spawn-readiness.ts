@@ -19,7 +19,7 @@
 
 import { spawn as nodeSpawn } from 'node:child_process';
 import type { OpenAIModel } from '../core/types.js';
-import { parseSemverFromOutput } from '../core/provider.js';
+import { buildProviderChildEnv, parseSemverFromOutput } from '../core/provider.js';
 import { modelRegistry } from '../core/model-registry.js';
 import {
   checkWorkerImage,
@@ -30,6 +30,11 @@ import {
 } from '../core/worker-image-check.js';
 import { CodexAdapter, CODEX_USAGE_EMIT_ARGS } from '../providers/codex.js';
 import type { CodexAuthMode } from '../providers/codex.js';
+import { resolveCrossProviderCredentialKeys } from '../providers/cross-provider-keys.js';
+import {
+  classifyCodexAuthStatus,
+  CODEX_AUTH_STATUS_ARGS,
+} from '../core/provider-auth-probe.js';
 
 // ─── Host readiness ──────────────────────────────────────────────────────
 
@@ -38,7 +43,7 @@ export interface CodexHostReadiness {
   cliFound: boolean;
   /** Parsed semver, or raw version output when it doesn't parse as semver. */
   version?: string;
-  /** 'api_key' (env var) | 'subscription' (`codex auth status`) | 'none'. */
+  /** 'api_key' (env var) | 'subscription' (`codex login status`) | 'none'. */
   authMode: CodexAuthMode;
   /** cliFound && authMode !== 'none'. */
   ready: boolean;
@@ -69,22 +74,32 @@ interface CodexRunResult {
   /** Exit code, or -1 when the spawn itself errored (codex not installed). */
   code: number;
   stdout: string;
+  stderr: string;
 }
 
-function runCodex(spawnImpl: SpawnImpl, args: string[]): Promise<CodexRunResult> {
+function runCodex(
+  spawnImpl: SpawnImpl,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+): Promise<CodexRunResult> {
   return new Promise((resolve) => {
-    const child: SpawnedProcessLike = spawnImpl('codex', args, { shell: false });
+    const child: SpawnedProcessLike = spawnImpl('codex', args, {
+      shell: false,
+      env,
+    });
     const stdoutP = collectStream(child.stdout);
+    const stderrP = collectStream(child.stderr);
     let settled = false;
     child.on('error', () => {
       if (settled) return;
       settled = true;
-      resolve({ code: -1, stdout: '' });
+      resolve({ code: -1, stdout: '', stderr: '' });
     });
     child.on('close', (code) => {
       if (settled) return;
       settled = true;
-      void stdoutP.then((stdout) => resolve({ code: code ?? -1, stdout }));
+      void Promise.all([stdoutP, stderrP])
+        .then(([stdout, stderr]) => resolve({ code: code ?? -1, stdout, stderr }));
     });
   });
 }
@@ -101,8 +116,9 @@ export async function checkCodexHostReadiness(
 ): Promise<CodexHostReadiness> {
   const spawnImpl: SpawnImpl = opts?.spawnImpl ?? ((command, args, options) => nodeSpawn(command, args, options));
   const env = opts?.env ?? process.env;
+  const childEnv = buildProviderChildEnv(env, resolveCrossProviderCredentialKeys());
 
-  const versionResult = await runCodex(spawnImpl, ['--version']);
+  const versionResult = await runCodex(spawnImpl, ['--version'], childEnv);
   const cliFound = versionResult.code === 0;
   const trimmedVersion = versionResult.stdout.trim();
   const version = cliFound
@@ -115,8 +131,11 @@ export async function checkCodexHostReadiness(
   } else if (env['OPENAI_API_KEY'] ?? env['DECKENT_OPENAI_API_KEY']) {
     authMode = 'api_key';
   } else {
-    const authResult = await runCodex(spawnImpl, ['auth', 'status']);
-    if (authResult.code === 0 && authResult.stdout.includes('logged in')) {
+    const authResult = await runCodex(spawnImpl, [...CODEX_AUTH_STATUS_ARGS], childEnv);
+    if (classifyCodexAuthStatus(
+      authResult.code,
+      `${authResult.stdout}\n${authResult.stderr}`,
+    ) === 'logged-in') {
       authMode = 'subscription';
     }
   }
@@ -125,7 +144,7 @@ export async function checkCodexHostReadiness(
   const reason = !cliFound
     ? 'Codex CLI not found on host (codex --version failed)'
     : authMode === 'none'
-      ? 'Codex CLI found but no authentication configured (no OPENAI_API_KEY/DECKENT_OPENAI_API_KEY, no active `codex auth status` session)'
+      ? 'Codex CLI found but no authentication configured (no OPENAI_API_KEY/DECKENT_OPENAI_API_KEY, no active `codex login status` session)'
       : `Codex CLI ${version ?? '(unknown version)'} ready on host (auth: ${authMode})`;
 
   return { cliFound, ...(version !== undefined ? { version } : {}), authMode, ready, reason };

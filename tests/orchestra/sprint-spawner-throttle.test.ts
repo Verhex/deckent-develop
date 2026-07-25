@@ -34,6 +34,7 @@ function makeTimedBackend(): SpawnBackend & { calls: SpawnCall[] } {
   return {
     name: 'mock-timed',
     liveUsageBudgetSupport: 'measured-stream' as const,
+    executionLandingCapability: 'cooperative-landing' as const,
     spawn(taskId, model, prompt, opts) {
       calls.push({ taskId, timestamp: Date.now(), model, prompt, opts });
     },
@@ -70,6 +71,17 @@ function createTask(id: string): Task {
     assignedSkills: [],
     provider: 'claude',
     budget: { maxTurns: 1 },
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      taskKind: 'code-development',
+      resolvedProvider: 'claude',
+      executionCostClass: 'remote',
+      profileRef: 'tests.orchestra.sprint-spawner-throttle',
+      policyDigest: '9'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: { reserve_ratio: 0.25 },
+    },
   } as unknown as Task;
 }
 

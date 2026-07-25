@@ -12,13 +12,15 @@ import type { SandboxOptions } from '../providers/sandbox.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { getProviderCommandSpec } from '../core/provider-command-spec.js';
 import { resolveReasoningEffort } from '../core/reasoning-effort.js';
-import { getDefaultProviderName } from './sprint-utils.js';
 import {
   assertLiveUsageBudgetSupport,
+  type ExecutionLandingCapability,
   type LiveUsageBudgetSupport,
 } from '../core/live-execution-budget.js';
-import { resolveTaskExecutionBudget } from './runtime-budget-monitor.js';
+import { resolveHostExecutionBudget } from './runtime-budget-monitor.js';
 import type { TaskResultSettlementRefV1 } from '../core/task-result-settlement.js';
+import type { ExecutionLandingContextEnvelopeV1 } from '../core/execution-landing-context.js';
+import { authHealthCheck } from '../agents/worker.js';
 
 export type { SandboxOptions };
 export { SandboxSpawnBackend };
@@ -40,6 +42,8 @@ export interface SpawnBackendRecoveryReport {
   adopted: string[];
   closedNotDispatched: string[];
   closedAbsentAfterExit: string[];
+  retiredLanded: string[];
+  resumedContinuations: string[];
 }
 
 // ─── SpawnBackend Interface ───────────────────────────────────────────────────
@@ -57,6 +61,7 @@ export interface SpawnBackend {
   /** Human-readable backend name (e.g. 'tmux', 'subprocess') */
   readonly name: string;
   readonly liveUsageBudgetSupport?: LiveUsageBudgetSupport;
+  readonly executionLandingCapability?: ExecutionLandingCapability;
 
   /**
    * Spawn a worker process for the given task.
@@ -100,6 +105,18 @@ export interface SpawnBackendOptions extends ProviderSpawnOptions {
   projectDir?: string;
   /** Tools the worker is allowed to use */
   allowedTools?: string;
+  /**
+   * Provider-visible built-in tool schema for a finite protocol worker.
+   * Unlike `allowedTools`, this removes unused tool definitions from model
+   * context. Currently consumed only by provider specs that declare support.
+   */
+  availableTools?: string;
+  /**
+   * Run with the provider's isolated finite-context flags. This is opt-in and
+   * protocol-scoped; ordinary implementation workers keep their existing
+   * project instructions, hooks, plugins, and session behavior.
+   */
+  isolatedContext?: boolean;
   /** Whether to auto-approve all Claude prompts */
   autoApprove?: boolean;
   /** Log file path override (for subprocess backend) */
@@ -122,6 +139,8 @@ export interface SpawnBackendOptions extends ProviderSpawnOptions {
   actionId?: string;
   /** Exact host-owned attempt authority for Docker result finalization. */
   settlementRef?: TaskResultSettlementRefV1;
+  /** Host-owned pre-mount landing context; Docker-only and never worker-authored. */
+  executionLandingContext?: ExecutionLandingContextEnvelopeV1;
   /** Optional protocol-specific host projection applied before settlement. */
   hostTerminalResultContract?: HostTerminalResultContractV1;
 }
@@ -159,6 +178,25 @@ export function checkLethalGuard(actionId: string | undefined, backendName: stri
   }
 }
 
+export function preflightClaudeAuthForLocalBackend(
+  projectDir: string,
+  taskId: string,
+  provider: string | undefined,
+  opts?: SpawnBackendOptions,
+): boolean {
+  if (provider !== 'claude') return true;
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    ...(opts?.env ?? {}),
+    CLAUDE_AUTH_REQUIRED: '1',
+  };
+  if (!opts?.env?.['ANTHROPIC_API_KEY']) {
+    delete env.ANTHROPIC_API_KEY;
+    delete env.DECKENT_CLAUDE_API_KEY;
+  }
+  return authHealthCheck(projectDir, taskId, undefined, env).ok;
+}
+
 // ─── TmuxBackend ─────────────────────────────────────────────────────────────
 
 /**
@@ -180,7 +218,7 @@ export class TmuxBackend implements SpawnBackend {
   spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void {
     checkLethalGuard(opts?.actionId, this.name);
     const dir = opts?.projectDir ?? this.projectDir;
-    const executionBudget = resolveTaskExecutionBudget(dir, taskId, opts?.executionBudget);
+    const executionBudget = resolveHostExecutionBudget(dir, taskId, opts?.executionBudget);
     assertLiveUsageBudgetSupport(executionBudget, this.liveUsageBudgetSupport, this.name);
     // Sprint 168 C0e Cross-Backend Contract: tmpfiles persist until sprint cleanup,
     // archived together by archivePromptFiles() during sprint cleanup phase.
@@ -383,7 +421,17 @@ export class SubprocessBackend implements SpawnBackend {
     // here is a marker that future prompt persistence MUST follow this lifecycle.
     // 364-002 (born-481): resolve the CLI-binary from the TASK'S ACTUAL PROVIDER,
     // not a fixed claude default — mirrors spawn-backend-docker.ts's runSpawn().
-    const provider = modelRegistry.get(model)?.provider ?? getDefaultProviderName();
+    const modelDefinition = modelRegistry.get(model);
+    if (!modelDefinition) {
+      throw new SpawnBackendError(
+        `Subprocess backend cannot resolve a provider for unregistered model "${model}". `
+        + 'Register the canonical API model identity with its explicit provider before dispatch.',
+        'subprocess',
+      );
+    }
+    const provider = modelDefinition.provider;
+    const dir = opts?.projectDir ?? this.projectDir;
+    if (!preflightClaudeAuthForLocalBackend(dir, taskId, provider, opts)) return;
     const timeoutOverrideMs = opts?.taskTimeoutSeconds != null
       ? opts.taskTimeoutSeconds * 1000
       : undefined;
@@ -430,14 +478,19 @@ export class SandboxBackend implements SpawnBackend {
   readonly name = 'claude-sandbox';
   readonly liveUsageBudgetSupport = undefined;
 
+  private readonly projectDir: string;
   private readonly inner: SandboxSpawnBackend;
 
   constructor(projectDir: string, opts?: SandboxOptions) {
+    this.projectDir = projectDir;
     this.inner = new SandboxSpawnBackend(projectDir, opts);
   }
 
   spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void {
     checkLethalGuard(opts?.actionId, this.name);
+    const dir = opts?.projectDir ?? this.projectDir;
+    const provider = modelRegistry.get(model)?.provider;
+    if (!preflightClaudeAuthForLocalBackend(dir, taskId, provider, opts)) return;
     this.inner.spawn(taskId, model, prompt, opts);
   }
 

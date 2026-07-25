@@ -9,10 +9,7 @@
  *   2. Empty-registry fallback — must not throw, must yield the 'claude' floor
  *   3. Pure-Ollama config — registry default propagates instead of silently
  *      hard-coding 'claude'
- *   4. task-router fallback — uses the registry default when availableProviders
- *      is empty
- *   5. ensureAvailable — falls back to registry default when preferred and
- *      available[] are both empty
+ *   4. task-router boundary — never treats registry presence as execution availability
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -46,7 +43,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '202-test',
     title: 'default-resolution test task',
     description: 'verify registry-default fallback',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -120,23 +117,27 @@ describe('getDefaultProviderName — last-resort floor', () => {
 
 // ─── task-router integration ─────────────────────────────────────────
 
-describe('routeTask — registry-default fallback when no providers available', () => {
+describe('routeTask — registry default is not execution availability', () => {
   let restore: () => void;
   beforeEach(() => { restore = snapshotAndClearRegistry(); });
   afterEach(() => restore());
 
-  it('uses the registry default (ollama) when availableProviders is empty', () => {
+  it('rejects empty availability even when a registry default exists', () => {
     providerRegistry.registerProvider(makeAdapter('ollama'), true);
     const config: TaskRouterConfig = {};
-    const result = routeTask(makeTask(), config, [] as ProviderName[]);
-    expect(result.provider).toBe('ollama');
-    expect(result.reason).toMatch(/registry default/);
+    expect(() => routeTask(makeTask(), config, [] as ProviderName[]))
+      .toThrow('E_PROVIDER_FALLBACK_EXHAUSTED');
   });
 
-  it("falls back to 'claude' literal only when both available[] and registry are empty", () => {
-    // No providers registered, no available list — the absolute floor.
+  it('rejects empty availability when both the list and registry are empty', () => {
     const config: TaskRouterConfig = {};
-    const result = routeTask(makeTask(), config, [] as ProviderName[]);
-    expect(result.provider).toBe('claude');
+    expect(() => routeTask(makeTask(), config, [] as ProviderName[]))
+      .toThrow('E_PROVIDER_FALLBACK_EXHAUSTED');
+  });
+
+  it('routes a configured pure-Ollama worker only when Ollama is available', () => {
+    providerRegistry.registerProvider(makeAdapter('ollama'), true);
+    const config: TaskRouterConfig = { worker_provider: 'ollama' };
+    expect(routeTask(makeTask(), config, ['ollama']).provider).toBe('ollama');
   });
 });

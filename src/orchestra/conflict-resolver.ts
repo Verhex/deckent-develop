@@ -152,9 +152,8 @@ export class ConflictResolver {
 // Detects file write collisions BEFORE tasks run, builds collision-aware waves.
 
 import type { Task } from '../core/types.js';
-import { ParallelPipelineManager } from './parallel-pipeline.js';
 import type { ExecutionWave } from './parallel-pipeline.js';
-import { debugLog } from '../core/utils.js';
+import { deriveExecutionTopology } from '../core/execution-topology.js';
 
 /** Map of file path → array of task IDs that write to it (only files with 2+ writers). */
 export type CollisionMap = Map<string, string[]>;
@@ -171,38 +170,24 @@ export interface CollisionResult {
  * Returns files written by 2+ tasks and the colliding task pairs.
  */
 export function detectScopeCollisions(tasks: Task[]): CollisionResult {
-  const fileWriters: Map<string, string[]> = new Map();
-
-  for (const task of tasks) {
-    if (!task.scope?.filesWrite) continue;
-
-    for (const file of task.scope.filesWrite) {
-      const normalized = file.trim();
-      if (!normalized) continue;
-
-      const writers = fileWriters.get(normalized) ?? [];
-      writers.push(task.id);
-      fileWriters.set(normalized, writers);
-    }
-  }
-
-  // Filter to only collisions (2+ writers)
+  const topology = deriveExecutionTopology(tasks, { maxWorkers: Math.max(1, tasks.length) });
   const collisions: CollisionMap = new Map();
-  for (const [file, writers] of fileWriters) {
-    if (writers.length >= 2) {
-      collisions.set(file, writers);
-    }
+  for (const collision of topology.collisions) {
+    collisions.set(
+      collision.path,
+      collision.writerSlots.map(slot => tasks[slot - 1]!.id),
+    );
   }
-
-  // Build unique collision pairs
   const collidingPairs: Array<[string, string]> = [];
   const seenPairs = new Set<string>();
-  for (const writers of collisions.values()) {
-    for (let i = 0; i < writers.length; i++) {
-      for (let j = i + 1; j < writers.length; j++) {
-        const wi = writers[i]!;
-        const wj = writers[j]!;
-        const pair = [wi, wj].sort().join(':');
+  for (const collision of topology.collisions) {
+    for (let i = 0; i < collision.writerSlots.length; i++) {
+      for (let j = i + 1; j < collision.writerSlots.length; j++) {
+        const leftSlot = collision.writerSlots[i]!;
+        const rightSlot = collision.writerSlots[j]!;
+        const wi = tasks[leftSlot - 1]!.id;
+        const wj = tasks[rightSlot - 1]!.id;
+        const pair = `${Math.min(leftSlot, rightSlot)}:${Math.max(leftSlot, rightSlot)}`;
         if (!seenPairs.has(pair)) {
           seenPairs.add(pair);
           collidingPairs.push([wi, wj]);
@@ -228,49 +213,9 @@ export function buildCollisionAwareWaves(
   tasks: Task[],
   maxWorkers: number,
 ): ExecutionWave[] {
-  if (tasks.length === 0) return [];
-
-  const { collidingPairs } = detectScopeCollisions(tasks);
-
-  // Build augmented dependency list
-  const taskDeps = new Map<string, string[]>();
-  for (const task of tasks) {
-    taskDeps.set(task.id, [...(task.dependencies ?? [])]);
-  }
-
-  // Add collision edges: lower ID task first, higher depends on it
-  for (const [a, b] of collidingPairs) {
-    const sorted = [a, b].sort();
-    const first = sorted[0]!;
-    const second = sorted[1]!;
-    const secondDeps = taskDeps.get(second);
-    if (secondDeps && !secondDeps.includes(first)) {
-      secondDeps.push(first);
-      debugLog('conflict-resolver', `Collision edge: ${second} → ${first} (shared file write)`);
-    }
-  }
-
-  // Topological sort with augmented deps
-  const pipeline = new ParallelPipelineManager();
-  const pipelineTasks = tasks.map(t => ({
-    id: t.id,
-    dependencies: taskDeps.get(t.id) ?? [],
+  const topology = deriveExecutionTopology(tasks, { maxWorkers });
+  return topology.waves.map(wave => ({
+    waveIndex: wave.wave - 1,
+    taskIds: wave.slots.map(slot => tasks[slot - 1]!.id),
   }));
-
-  const rawWaves = pipeline.createPipeline(pipelineTasks);
-
-  // Split waves that exceed maxWorkers
-  const waves: ExecutionWave[] = [];
-  for (const wave of rawWaves) {
-    if (wave.taskIds.length <= maxWorkers) {
-      waves.push({ waveIndex: waves.length, taskIds: wave.taskIds });
-    } else {
-      for (let i = 0; i < wave.taskIds.length; i += maxWorkers) {
-        const chunk = wave.taskIds.slice(i, i + maxWorkers);
-        waves.push({ waveIndex: waves.length, taskIds: chunk });
-      }
-    }
-  }
-
-  return waves;
 }

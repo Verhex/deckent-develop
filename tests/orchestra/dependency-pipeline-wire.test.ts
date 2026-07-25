@@ -133,6 +133,7 @@ vi.mock('../../src/orchestra/sprint-utils.js', async (importOriginal) => {
     getProviderAdapterForTask: vi.fn().mockReturnValue({
       name: 'measured-claude-test',
       liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
       spawn: vi.fn(),
     }),
     getDefaultProvider: vi.fn().mockReturnValue(null),
@@ -237,6 +238,17 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     sprintId: 'sprint-164',
     createdAt: new Date().toISOString(),
     budget: { maxTurns: 1 },
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      taskKind: 'code-development',
+      resolvedProvider: 'claude',
+      executionCostClass: 'remote',
+      profileRef: 'tests.orchestra.dependency-pipeline-wire',
+      policyDigest: '9'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: { reserve_ratio: 0.25 },
+    },
     ...overrides,
   };
 }

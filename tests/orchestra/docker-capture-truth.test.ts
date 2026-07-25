@@ -276,7 +276,13 @@ describe('usage-patch pin (413-001) — captureDockerLogs feeds patchResultUsage
       JSON.stringify({
         taskId,
         selfAssessment: 'DONE',
-        tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model: 'sonnet' },
+        tokenUsage: {
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          provider: 'claude',
+          model: 'claude-sonnet-5',
+        },
       }),
       'utf-8',
     );
@@ -293,7 +299,7 @@ describe('usage-patch pin (413-001) — captureDockerLogs feeds patchResultUsage
     expect(cap.content).not.toContain('"usage"'); // terminal envelope was cut off
 
     const tasksDir = makeTaskDir('usage-red');
-    patchResultUsageFromEnvelope(tasksDir, 'usage-red', 'sonnet', cap.content);
+    patchResultUsageFromEnvelope(tasksDir, 'usage-red', 'claude-sonnet-5', cap.content);
 
     const r = JSON.parse(readFileSync(join(tasksDir, 'task-usage-red.result'), 'utf-8')) as {
       tokenUsage: Record<string, number>;
@@ -313,7 +319,7 @@ describe('usage-patch pin (413-001) — captureDockerLogs feeds patchResultUsage
     expect(cap.content).toContain('"usage"'); // terminal envelope survived the >1 MiB payload
 
     const tasksDir = makeTaskDir('usage-green');
-    patchResultUsageFromEnvelope(tasksDir, 'usage-green', 'sonnet', cap.content);
+    patchResultUsageFromEnvelope(tasksDir, 'usage-green', 'claude-sonnet-5', cap.content);
 
     const r = JSON.parse(readFileSync(join(tasksDir, 'task-usage-green.result'), 'utf-8')) as {
       tokenUsage: Record<string, number>;

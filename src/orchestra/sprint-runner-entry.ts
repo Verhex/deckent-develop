@@ -11,6 +11,7 @@ import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { redactSensitive } from './sensitive-redactor.js';
 import { bootstrapNotifyDispatcher, resolveWebhookBootstrapOption } from '../core/notify-bootstrap.js';
+import type { ApprovalAuthorityBootstrapResult } from '../core/approval-authority-bootstrap.js';
 
 // ─── IPC File Names ──────────────────────────────────────────────
 export const IPC_CONFIG_FILE = 'config.json';
@@ -206,14 +207,17 @@ async function main(): Promise<void> {
     pid: process.pid,
   });
 
+  let approvalAuthority: ApprovalAuthorityBootstrapResult | undefined;
   try {
     // Dynamic imports — these pull in the full sprint machinery
     const { loadConfig } = await import('../core/config.js');
     const { bootstrapProviders } = await import('../core/provider.js');
+    const { bootstrapApprovalAuthority } = await import('../core/approval-authority-bootstrap.js');
     const { runSprint } = await import('./sprint-controller.js');
     const { writeJobState, buildTaskSummaries } = await import('../mcp/tools/job-runner.js');
 
     const config = await loadConfig(projectRoot);
+    approvalAuthority = bootstrapApprovalAuthority(projectRoot, config);
 
     writeIpcStatus(ipcDir, {
       phase: 'BOOTSTRAP',
@@ -257,6 +261,12 @@ async function main(): Promise<void> {
       sandboxMode,
       timeoutMs,
       connector: bootstrap?.connector,
+      ...(approvalAuthority.state === 'ready'
+        ? {
+            attendedExecutionApprovalAuthority:
+              approvalAuthority.runtime.attendedExecutionApprovalAuthority,
+          }
+        : {}),
     });
 
     // Build job state
@@ -330,7 +340,9 @@ async function main(): Promise<void> {
       completedAt: new Date().toISOString(),
     });
 
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    if (approvalAuthority?.state === 'ready') approvalAuthority.runtime.close();
   }
 }
 

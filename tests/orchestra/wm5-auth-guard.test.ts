@@ -15,16 +15,20 @@ vi.mock('node:child_process', () => ({
   spawn: vi.fn(() => {
     const stub = {
       stdout: { on: vi.fn() },
-      stderr: { on: vi.fn() },
+      stderr: { on: vi.fn(), resume: vi.fn() },
       on: vi.fn(),
+      once: vi.fn(),
+      kill: vi.fn(),
     };
     return stub as unknown as ChildProcess;
   }),
 }));
 
 vi.mock('node:fs', () => ({
-  existsSync: vi.fn(() => false),
-  readFileSync: vi.fn(() => '{}'),
+  existsSync: vi.fn((path: string) => path.endsWith('/.claude/.credentials.json')),
+  readFileSync: vi.fn((path: string) => budgetedDockerTaskJson(path, {
+    model: path.includes('opus') ? 'claude-opus-4-8' : 'claude-sonnet-5',
+  })),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
   unlinkSync: vi.fn(),
@@ -53,13 +57,29 @@ vi.mock('../../src/core/active-workers.js', () => ({
   clearPending: vi.fn(),
 }));
 
+vi.mock('../../src/core/task-result-settlement.js', () => {
+  return import('../helpers/task-result-settlement-stub.js')
+    .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
+});
+
+vi.mock('../../src/orchestra/execution-landing-coordinator.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../src/orchestra/execution-landing-coordinator.js')>()),
+  prepareDockerExecutionLanding: vi.fn(({ prompt }: { prompt: string }) => ({ prompt, context: null })),
+}));
+
 import { spawnSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
 import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
+import {
+  buildProviderCommand,
+  getProviderCommandSpec,
+} from '../../src/core/provider-command-spec.js';
 import type { ModelType } from '../../src/core/types.js';
+import {
+  TEST_DOCKER_EXECUTION_OPTIONS,
+  budgetedDockerTaskJson,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
-const mockWriteFileSync = vi.mocked(writeFileSync);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -107,11 +127,6 @@ function hasEnvFlag(argv: string[], key: string): boolean {
   return false;
 }
 
-/** Returns true if the docker run argv contains the exact string in any position. */
-function hasArg(argv: string[], arg: string): boolean {
-  return argv.includes(arg);
-}
-
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('WM-5: CLAUDE_AUTH_REQUIRED provider-gate', () => {
@@ -122,7 +137,12 @@ describe('WM-5: CLAUDE_AUTH_REQUIRED provider-gate', () => {
 
   it('sets CLAUDE_AUTH_REQUIRED for a claude model (sonnet)', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-wm5-claude', 'sonnet' as ModelType, 'prompt');
+    backend.spawn(
+      't-wm5-claude',
+      'claude-sonnet-5' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    );
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -131,47 +151,60 @@ describe('WM-5: CLAUDE_AUTH_REQUIRED provider-gate', () => {
 
   it('sets CLAUDE_AUTH_REQUIRED for opus (claude model)', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-wm5-opus', 'opus' as ModelType, 'prompt');
+    backend.spawn(
+      't-wm5-opus',
+      'claude-opus-4-8' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    );
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
     expect(hasEnvFlag(argv, 'CLAUDE_AUTH_REQUIRED')).toBe(true);
   });
 
-  it('does NOT set CLAUDE_AUTH_REQUIRED for a codex model (gpt-4.1)', () => {
+  it('holds Codex before CLAUDE_AUTH_REQUIRED can enter a container', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-wm5-codex', 'gpt-4.1' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
-    expect(hasEnvFlag(argv, 'CLAUDE_AUTH_REQUIRED')).toBe(false);
+    expect(() => backend.spawn(
+      't-wm5-codex',
+      'gpt-4.1' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 
-  it('does NOT set CLAUDE_AUTH_REQUIRED for gpt-5 (codex model)', () => {
+  it('holds canonical gpt-5.5 before CLAUDE_AUTH_REQUIRED can enter a container', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-wm5-gpt5', 'gpt-5' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
-    expect(hasEnvFlag(argv, 'CLAUDE_AUTH_REQUIRED')).toBe(false);
+    expect(() => backend.spawn(
+      't-wm5-gpt55',
+      'gpt-5.5' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 
-  it('does NOT set CLAUDE_AUTH_REQUIRED for a gemini model (gemini-2.5-flash)', () => {
+  it('holds Gemini Flash before CLAUDE_AUTH_REQUIRED can enter a container', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-wm5-gemini', 'gemini-2.5-flash' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
-    expect(hasEnvFlag(argv, 'CLAUDE_AUTH_REQUIRED')).toBe(false);
+    expect(() => backend.spawn(
+      't-wm5-gemini',
+      'gemini-2.5-flash' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 
-  it('does NOT set CLAUDE_AUTH_REQUIRED for gemini-2.5-pro', () => {
+  it('holds Gemini Pro before CLAUDE_AUTH_REQUIRED can enter a container', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-wm5-gemini-pro', 'gemini-2.5-pro' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
-    expect(hasEnvFlag(argv, 'CLAUDE_AUTH_REQUIRED')).toBe(false);
+    expect(() => backend.spawn(
+      't-wm5-gemini-pro',
+      'gemini-2.5-pro' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 });
 
@@ -181,46 +214,38 @@ describe('WM-5: --dangerously-skip-permissions non-leak', () => {
     installSpawnRouter();
   });
 
-  it('does NOT pass --dangerously-skip-permissions in docker run args for codex', () => {
+  it('Codex command spec never receives the Claude approval flag', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-wm5-dsp-codex', 'gpt-4.1' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
-    // --dangerously-skip-permissions is embedded inside the container command string
-    // (the sh -c "..." arg). It must NOT appear as a separate docker flag.
-    const rawArgs = argv.join(' ');
-    // The container cmd string is the last element (sh -c "<cmd>").
-    // Verify the claude-only flag does not appear at the docker-args level.
-    const dockerArgsBeforeCmd = argv.slice(0, argv.indexOf('sh'));
-    expect(hasArg(dockerArgsBeforeCmd, '--dangerously-skip-permissions')).toBe(false);
-    // Also verify it's not in any -e env var value
-    expect(hasEnvFlag(rawArgs.split(' '), '--dangerously-skip-permissions')).toBe(false);
+    expect(() => backend.spawn(
+      't-wm5-dsp-codex',
+      'gpt-4.1' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
+    const spec = getProviderCommandSpec('codex')!;
+    const command = buildProviderCommand(spec, 'gpt-4.1', '/tmp/prompt', { autoApprove: true });
+    expect(command).not.toContain('--dangerously-skip-permissions');
   });
 
-  it('does NOT pass --dangerously-skip-permissions in docker env for gemini', () => {
+  it('Gemini command spec never receives the Claude approval flag', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-wm5-dsp-gemini', 'gemini-2.5-flash' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
-    const dockerArgsBeforeCmd = argv.slice(0, argv.indexOf('sh'));
-    expect(hasArg(dockerArgsBeforeCmd, '--dangerously-skip-permissions')).toBe(false);
+    expect(() => backend.spawn(
+      't-wm5-dsp-gemini',
+      'gemini-2.5-flash' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
+    const spec = getProviderCommandSpec('gemini')!;
+    const command = buildProviderCommand(spec, 'gemini-2.5-flash', '/tmp/prompt', { autoApprove: true });
+    expect(command).not.toContain('--dangerously-skip-permissions');
   });
 
-  it('worker script for codex contains --dangerously-bypass-approvals-and-sandbox (not skip-permissions)', () => {
-    const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-wm5-codex-bypass', 'gpt-4.1' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    // The worker command is written to a .sh script via writeFileSync — find the call
-    // that wrote the script content (the call with a string that starts with '#!/bin/sh').
-    const scriptCall = mockWriteFileSync.mock.calls.find(
-      (call) => typeof call[1] === 'string' && (call[1] as string).startsWith('#!/bin/sh'),
-    );
-    expect(scriptCall).toBeDefined();
-    const scriptContent = scriptCall![1] as string;
-    expect(scriptContent).toContain('--dangerously-bypass-approvals-and-sandbox');
-    expect(scriptContent).not.toContain('--dangerously-skip-permissions');
+  it('Codex shared command spec contains its own external-sandbox approval flag', () => {
+    const spec = getProviderCommandSpec('codex')!;
+    const command = buildProviderCommand(spec, 'gpt-4.1', '/tmp/prompt', { autoApprove: true });
+    expect(command).toContain('--dangerously-bypass-approvals-and-sandbox');
+    expect(command).not.toContain('--dangerously-skip-permissions');
   });
 });

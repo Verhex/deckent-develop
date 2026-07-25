@@ -116,6 +116,30 @@ describe('generatePlanPreview', () => {
     );
   });
 
+  it('binds planner, digest, and topology to the runtime max-worker authority', async () => {
+    const config = makeConfig() as ResolvedConfig & { max_workers?: number };
+    config.max_workers = 2;
+    mockPlanSprint.mockReturnValue(makeSprint() as any);
+
+    const preview = await generatePlanPreview(
+      '/mock/root',
+      config,
+      makeContext(),
+      { ...makeRecommendation(), maxWorkers: 5 },
+      { mode: 'structured' },
+    );
+
+    expect(mockPlanSprint).toHaveBeenCalledWith(
+      '/mock/root',
+      config,
+      expect.anything(),
+      expect.objectContaining({ maxWorkers: 2 }),
+      expect.objectContaining({ dryRun: true, mode: 'structured' }),
+    );
+    expect(preview.planDigestContext.configuredMaxWorkers).toBe(2);
+    expect(preview.topology.configuredMaxWorkers).toBe(2);
+  });
+
   // ─── Determinism ─────────────────────────────────────────────────────────
 
   it('same task set + same gate outcome ⇒ identical planDigest, even across different sprint IDs', async () => {
@@ -196,6 +220,41 @@ describe('generatePlanPreview', () => {
 
     expect(preview.gateResult).toBe('fail');
     expect(preview.policyDecision).toBe('needs-approval');
+  });
+
+  it('makes an undeclared shared-writer collision a non-overridable structural deny', async () => {
+    mockPlanSprint.mockReturnValue(makeSprint({
+      tasks: [
+        makeTask({ id: 'volatile-z', title: 'One', scope: { directories: [], filesRead: [], filesWrite: ['src/shared.ts'] } }),
+        makeTask({ id: 'volatile-a', title: 'Two', scope: { directories: [], filesRead: [], filesWrite: ['./src/shared.ts'] } }),
+        makeTask({ id: 'volatile-m', title: 'Three', scope: { directories: [], filesRead: [], filesWrite: ['SRC\\SHARED.ts'] } }),
+      ],
+      promptGate: makeGate(true),
+    }) as any);
+    const preview = await generatePlanPreview('/mock/root', makeConfig(), makeContext(), makeRecommendation());
+
+    expect(preview.planDigestVersion).toBe(3);
+    expect(preview.topologyGateResult).toBe('fail');
+    expect(preview.policyDecision).toBe('deny');
+    expect(preview.gateResult).toBe('fail');
+    expect(preview.topology.waves.map(wave => wave.slots)).toEqual([[1], [2], [3]]);
+  });
+
+  it('keeps an explicitly ordered shared-writer chain safe and visible', async () => {
+    mockPlanSprint.mockReturnValue(makeSprint({
+      tasks: [
+        makeTask({ id: 'z', title: 'One', scope: { directories: [], filesRead: [], filesWrite: ['src/shared.ts'] } }),
+        makeTask({ id: 'a', title: 'Two', dependencies: ['One'], scope: { directories: [], filesRead: [], filesWrite: ['src/shared.ts'] } }),
+        makeTask({ id: 'm', title: 'Three', dependencies: ['Two'], scope: { directories: [], filesRead: [], filesWrite: ['src/shared.ts'] } }),
+      ],
+      promptGate: makeGate(true),
+    }) as any);
+    const preview = await generatePlanPreview('/mock/root', makeConfig(), makeContext(), makeRecommendation());
+
+    expect(preview.topologyGateResult).toBe('pass');
+    expect(preview.policyDecision).toBe('allow');
+    expect(preview.topology.syntheticEdges).toEqual([]);
+    expect(preview.topology.waves.map(wave => wave.slots)).toEqual([[1], [2], [3]]);
   });
 
   it('returns the underlying sprint unmodified so CLI/MCP display logic keeps working', async () => {

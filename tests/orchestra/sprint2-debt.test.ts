@@ -108,20 +108,24 @@ vi.mock('../../src/orchestra/planner.js', () => ({
   callBrainPlanner: vi.fn().mockReturnValue(null),
 }));
 
-vi.mock('../../src/core/provider.js', () => ({
-  providerRegistry: {
-    getDefault: vi.fn().mockReturnValue({
-      name: 'claude',
-      buildCommand: vi.fn().mockReturnValue('claude --model opus /dev/null'),
-      isAvailable: vi.fn().mockResolvedValue(true),
-    }),
-    registerProvider: vi.fn(),
-    getProvider: vi.fn(),
-    listProviders: vi.fn().mockReturnValue([]),
-    hasProvider: vi.fn().mockReturnValue(false),
-  },
-  ProviderAdapter: class {},
-}));
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/provider.js')>();
+  return {
+    ...actual,
+    providerRegistry: {
+      getDefault: vi.fn().mockReturnValue({
+        name: 'claude',
+        buildCommand: vi.fn().mockReturnValue('claude --model opus /dev/null'),
+        isAvailable: vi.fn().mockResolvedValue(true),
+      }),
+      registerProvider: vi.fn(),
+      getProvider: vi.fn(),
+      listProviders: vi.fn().mockReturnValue([]),
+      hasProvider: vi.fn().mockReturnValue(false),
+    },
+    ProviderAdapter: class {},
+  };
+});
 
 vi.mock('../../src/orchestra/result-watcher.js', () => ({
   createResultWatcher: vi.fn().mockReturnValue({

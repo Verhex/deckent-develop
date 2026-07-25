@@ -84,6 +84,29 @@ describe('followContainerActivity (SURF-3 S3)', () => {
     expect(readActivity(root)).toHaveLength(0);
   });
 
+  it('flag OFF: still follows provider events when the host budget monitor is attached', async () => {
+    let spawned = false;
+    const observed: number[] = [];
+    const child = fakeChildWith([TOOL_USE, USAGE]);
+    const spawnFn = (() => {
+      spawned = true;
+      return child;
+    }) as never;
+
+    followContainerActivity(
+      'cont-budget',
+      'claude',
+      ctx(false),
+      spawnFn,
+      (_event, sequence) => observed.push(sequence),
+    );
+    await drain();
+
+    expect(spawned).toBe(true);
+    expect(observed).toEqual([1, 2]);
+    expect(readActivity(root)).toHaveLength(0);
+  });
+
   it('does NOT write the task .log (activity-only — post-exit writer is authoritative, no double-write)', async () => {
     const child = fakeChildWith([TOOL_USE]);
     const spawnFn = (() => child) as never;

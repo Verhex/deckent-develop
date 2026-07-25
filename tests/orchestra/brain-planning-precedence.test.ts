@@ -106,6 +106,14 @@ const providerFixtures = vi.hoisted(() => {
 });
 
 vi.mock('../../src/core/provider.js', () => ({
+  orderedRoleProviders: vi.fn((role: 'brain' | 'worker' | 'auditor', config: ResolvedConfig) => ({
+    role,
+    primary: role === 'brain'
+      ? config.providers?.brain ?? config.brain_provider ?? 'claude'
+      : 'claude',
+    fallbacks: [],
+    unattended: config.provider_fallback?.unattended ?? true,
+  })),
   providerRegistry: {
     getDefault: vi.fn(() => providerFixtures.claudeAdapter),
     getProvider: vi.fn(() => providerFixtures.claudeAdapter),
