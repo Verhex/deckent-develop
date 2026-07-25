@@ -80,7 +80,7 @@ Type `/` to open the interactive command menu (Tab to autocomplete, ↑↓ to na
 | `/usage` | Token/limit usage (e.g. `/usage --sprint 285`) |
 | `/resources` | MCP resource snapshot |
 | `/mcp` | External MCP tools (project `.mcp.json`) |
-| `/model <id>` | Switch model at runtime (e.g. `/model sonnet`) |
+| `/model <id>` | Switch model at runtime (e.g. `/model claude-sonnet-5`) |
 | `/provider <name>` | Switch provider at runtime (e.g. `/provider codex`) |
 | `/approve <mode>` | Set approval mode (see below) |
 | `/cd <path>` | Change working directory |

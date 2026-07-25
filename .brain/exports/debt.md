@@ -9,6 +9,13 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| rollback-sprint-456 | Sprint sprint-456 rollback SUCCESS | normal | sprint-456 | resolved |
+| debt-455-001 | Tech debt from 455-001: Made the public recovery surfaces truthful within write  | normal | sprint-455 | resolved |
+| debt-455-003 | Tech debt from 455-003: Three concerns, all implemented + verified.
+
+CONCERN 1 — | normal | sprint-455 | resolved |
+| debt-454-002 | Timeout-partial from 454-002: worker killed mid-execution, work accepted | normal | sprint-454 | resolved |
+| debt-454-006 | Timeout-partial from 454-006: worker killed mid-execution, work accepted | normal | sprint-454 | resolved |
 | debt-452-001 | Tech debt from 452-001: RETRY of a task whose previous attempt (docker-452-001)  | normal | sprint-452 | resolved |
 | debt-452-005 | Tech debt from 452-005: 4/5 goCriteria items fully evidenced: tsc clean; all tas | normal | sprint-452 | resolved |
 | debt-451-001 | Tech debt from 451-001: Found that a builtins-drift gate already existed (checkB | normal | sprint-451 | resolved |

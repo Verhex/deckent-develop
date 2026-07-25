@@ -45,7 +45,7 @@ This cookbook covers a **document-write** task. The worker reads source code (an
 ---
 
 ## Task 1: Update README
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Agent: doc-writer
 - Skills: documentation-writer
@@ -72,7 +72,7 @@ Do NOT change the architecture diagram or the Contributing section — those are
 ---
 
 ## Task 2: Update API Reference
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Agent: doc-writer
 - Skills: documentation-writer, api-builder

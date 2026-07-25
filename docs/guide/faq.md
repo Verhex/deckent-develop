@@ -78,9 +78,9 @@ Configure `brain_tier` and `worker_tier` in `.deckent/config.json` instead of ha
 | Tier | Claude | Codex | Gemini | Best For |
 |------|--------|-------|--------|----------|
 | `premium_plus` | (fable) | o3 | gemini-3.1-pro-preview | Highest reasoning, architecture |
-| `premium` | opus | gpt-5 | gemini-2.5-pro | Complex tasks, major refactors |
-| `standard` | sonnet | gpt-4.1 / o4-mini | gemini-2.5-flash | General development (default) |
-| `economy` | haiku | gpt-5-mini / gpt-4.1-mini | gemini-2.0-flash | Docs, simple fixes |
+| `premium` | claude-opus-4-8 | gpt-5.5 | gemini-2.5-pro | Complex tasks, major refactors |
+| `standard` | claude-sonnet-5 | gpt-4.1 / o4-mini | gemini-2.5-flash | General development (default) |
+| `economy` | claude-haiku-4-5-20251001 | gpt-5-mini / gpt-4.1-mini | gemini-2.0-flash | Docs, simple fixes |
 
 ### Planning Modes
 
@@ -97,7 +97,7 @@ You can assign a specific provider or model to individual tasks in DIRECTIVES.md
 ```markdown
 ## Task 1: Security Audit
 - Provider: claude
-- Model: opus
+- Model: claude-opus-4-8
 ```
 
 ---
@@ -465,7 +465,7 @@ You can use different providers per task using the `- Provider:` directive in DI
 ```markdown
 ## Task 1: Complex Architecture
 - Provider: claude
-- Model: opus
+- Model: claude-opus-4-8
 
 ## Task 2: Generate Docs
 - Provider: gemini
@@ -499,9 +499,9 @@ When falling back, Deckent maps equivalent model tiers across providers:
 | Tier | Primary (Claude) | Fallback (Codex) | Fallback (Gemini) |
 |------|-----------------|------------------|-------------------|
 | `premium_plus` | (fable) | o3 | gemini-3.1-pro-preview |
-| `premium` | opus | gpt-5 | gemini-2.5-pro |
-| `standard` | sonnet | gpt-4.1 / o4-mini | gemini-2.5-flash |
-| `economy` | haiku | gpt-5-mini / gpt-4.1-mini | gemini-2.0-flash |
+| `premium` | claude-opus-4-8 | gpt-5.5 | gemini-2.5-pro |
+| `standard` | claude-sonnet-5 | gpt-4.1 / o4-mini | gemini-2.5-flash |
+| `economy` | claude-haiku-4-5-20251001 | gpt-5-mini / gpt-4.1-mini | gemini-2.0-flash |
 
 ### Behavior
 

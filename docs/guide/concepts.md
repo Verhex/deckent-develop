@@ -193,7 +193,7 @@ Directives are the primary input to every sprint. Write them clearly, and Brain 
 ## Goal: Add rate limiting and input validation to all endpoints.
 
 ## Task 1: Rate Limiter
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Files: src/api/rate-limiter.ts (new)
 - Scope: src/api/

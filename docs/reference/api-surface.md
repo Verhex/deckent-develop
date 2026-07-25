@@ -157,6 +157,69 @@ Failure:
 7. If successful, dashboard stores the token in sessionStorage and calls `GET /api/auth/me` to fetch user identity
 8. Dashboard sets authenticated state and redirects to home page
 
+### POST /api/approvals/:id/decision
+
+**Authentication:** Required, plus a fresh OIDC step-up at the decision
+boundary. Passing the ordinary API bearer middleware is not sufficient for
+attended execution.
+
+**Activation:** `approval.api_decide: true` and a ready
+`approval.authority` production composition. Missing approval custody,
+disabled/incomplete OIDC composition, static bearer, auth-disabled mode or an
+unsupported platform cannot authorize the request.
+
+**Request:**
+
+```http
+POST /api/approvals/<request-id>/decision
+Authorization: Bearer <fresh-oidc-assertion>
+Idempotency-Key: <caller-stable-key>
+Content-Type: application/json
+
+{
+  "decision": "allow",
+  "reason": "optional bounded reason"
+}
+```
+
+`decision` uses the ApprovalBroker action vocabulary. The endpoint re-verifies
+signature, pinned algorithm, issuer, audience, expiry, `sub`, exact tenant,
+`auth_time`, and configured ACR/AMR policy. Verified claims are converted into
+a durable request/action/channel-bound live-session lease; client-supplied
+actor fields are never identity authority.
+
+**Success (200):**
+
+```json
+{
+  "success": true,
+  "decision": {},
+  "idempotent": false
+}
+```
+
+The returned `decision` is the canonical signed ApprovalDecision envelope.
+Repeating the same command with the same `Idempotency-Key` returns
+`idempotent: true`; a different command for an already-settled request does not
+rewrite the first decision.
+
+**Errors:**
+
+- `400` — invalid request id/body or missing `Idempotency-Key`
+- `401` — missing fresh OIDC Bearer assertion
+- `403` — endpoint disabled or verified assertion/identity/policy rejected
+- `404` — request not found
+- `409` — request already terminal or expired
+- `503` — runtime-wide attended approval authority is not composed
+
+The endpoint records a decision only. Final dispatch independently revalidates
+the signed decision, active session, expiry and exact immutable proposal
+(tenant/project/run/task/attempt/provider/API model/backend/budget/policy plus
+task/prompt/scope/acceptance digests), then creates a first-writer dispatch
+claim. API, Goal-v2, CLI run/task-mode, MCP run, sprint and process execution
+consume the same injected authority. Static token, localhost, TTY, REPL/RPC
+literal actors and MCP stdio cannot decide an attended execution request.
+
 ---
 
 ## .tasks/ File Format (JSON)

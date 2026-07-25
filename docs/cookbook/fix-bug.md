@@ -62,7 +62,7 @@ The discount is being ignored. You want Deckent to find and fix the root cause.
 ---
 
 ## Task 1: Fix Invoice Discount Calculation
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Agent: bug-fixer
 - Skills: typescript-expert, testing-expert

@@ -1,8 +1,44 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-456 Learnings
+- Sprint sprint-456 Learnings: ## Sprint sprint-456 Learnings
+- Docker auth and provider-image fixture budget parity: NO_GO — Runtime budget circuit breaker stopped the worker: cache-read token budget exceeded (1032095 > 1000000). Runtime budget
+- Scheduler, adapter, MCP and pricing fixture admission parity: NO_GO — Runtime budget circuit breaker stopped the worker: cache-read token budget exceeded (1054925 > 1000000). Runtime budget
+- CLI dry-run and color hermeticity contract: NO_GO — Runtime budget circuit breaker stopped the worker: cache-read token budget exceeded (1103194 > 1000000). Runtime budget
+
+## Sprint sprint-455 Learnings
+- Sprint sprint-455 Learnings: ## Sprint sprint-455 Learnings
+- Crash-safe resume and recovery command truth: GO_WITH_TECH_DEBT — Made the public recovery surfaces truthful within write scope; verified against reality before coding.
+
+DELIVERED (all v
+- Docker preflight, timeout attribution, and terminal lifecycle truth: GO_WITH_TECH_DEBT — Three concerns, all implemented + verified.
+
+CONCERN 1 — Docker preflight truth (spawn-backend-docker.ts): added distinc
+
+## Gains
+- 455-002 — Evaluator rubric and recovered-result provenance truth — Root cause: safeRubricReconcile (sprint-phases.ts) is the single fault-armor wrapper for every ev...
+
+## Sprint sprint-454 Learnings
+- Sprint sprint-454 Learnings: ## Sprint sprint-454 Learnings
+- Parametric agent model front doors: GO_WITH_TECH_DEBT — Worker timeout/killed (exitCode=1) but git diff shows 5 files modified. Brain should reconcile via Spurious NO_GO helper
+- Canonical autonomous and task-mode producers: NO_GO — Removed every hardcoded 'sonnet' alias literal from the autonomous planning/JIT/backlog and task-mode producers, routing
+- Canonical estimation, reconciliation, and token-cost keys: NO_GO — Canonicalized estimation/cost keys off registry ID + tier metadata; eliminated the two silent named-default paths.
+
+toke
+- Remove gpt-5 alias and canonicalize Codex/subscription wire: GO_WITH_TECH_DEBT — Worker timeout/killed (exitCode=1) but git diff shows 6 files modified. Brain should reconcile via Spurious NO_GO helper
+
+## Gains
+- 454-004 — Canonical generated templates and MCP directives — Root cause: task-builder.ts's DirectiveTaskSchema calls resolveCanonicalModelIdentity() on the pa...
+
+## Sprint sprint-453 Learnings
+- Sprint sprint-453 Learnings: ## Sprint sprint-453 Learnings
+
+## Gains
+- 453-001 — Canonical CLI and MCP one-shot execution boundary — Canonical CLI + MCP one-shot execution boundary — all 10 goCriteria items evidenced.
+
 ## Sprint sprint-452 Learnings
 - Sprint sprint-452 Learnings: ## Sprint sprint-452 Learnings
-- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: ROOT-CAUSE FINDING (read first): the premise that 449-00…: GO_WITH_TECH_DEBT — RETRY of a task whose previous attempt (docker-452-001) was OOM-killed/force-stopped before writing a real result (only 
+- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: ROOT-CAUSE FINDING (read first): the premise that 449-00…: GO_WITH_TECH_DEBT — RETRY of a task whose previous attempt (docker-452-001) was OOM-killed/force-stopped before writing a real result (only
 - TERM-slice integration verify and real-binary dry-run proof: GO_WITH_TECH_DEBT — 4/5 goCriteria items fully evidenced: tsc clean; all task-1/2/3 test files green in one vitest run; tests/cli/term-slice
 
 ## Gains
@@ -125,7 +161,7 @@
 - Sprint sprint-442 Learnings: ## Sprint sprint-442 Learnings
 - Rehydrate event-fold sorgu-yuzeyi getFlow ve listFlows: GO_WITH_TECH_DEBT — Rehydrate event-fold query surface added to src/orchestra/run-flow-coordinator.ts.
 
-What changed (single file, additive 
+What changed (single file, additive
 - Legacy dual-read fallback ile snapshot ve run-handle sentetik-context: GO_WITH_TECH_DEBT — Legacy dual-read fallback filled in at getFlow's typed-miss seam in src/orchestra/run-flow-coordinator.ts (the only file
 
 ## Gains
@@ -264,7 +300,7 @@ What changed (single file, additive
 - Sprint sprint-427 Learnings: ## Sprint sprint-427 Learnings
 - WIRE-PROBE — sprint-start env-probe doldurma (born-670a): GO_WITH_TECH_DEBT — born-670a WIRE-PROBE implemented: runPlanPhase (sprint-phases.ts) now calls the new probeAndPersistToolInventory(project
 - WIRE-VERIFY — worker-prompt verify-komut dürüstlüğü (born-670b): GO_WITH_TECH_DEBT — born-670b WIRE-VERIFY implemented in prompt-god-template.ts (the only file in my write scope, plus the new test file). (
-- ALLOW-WIRE — allowlist'in prompt/yüzeye flag'li uygulanması (559): GO_WITH_TECH_DEBT — ALLOW-WIRE (born-664/559): Task-13's PURE selector (src/core/tool-allowlist.ts computeToolAllowlist) is now surfaced to 
+- ALLOW-WIRE — allowlist'in prompt/yüzeye flag'li uygulanması (559): GO_WITH_TECH_DEBT — ALLOW-WIRE (born-664/559): Task-13's PURE selector (src/core/tool-allowlist.ts computeToolAllowlist) is now surfaced to
 - STORE-CORE — run-flow-store'un core'a taşınması (born-671): GO_WITH_TECH_DEBT — Moved src/cli/repl/run-flow-store.ts -> src/core/run-flow-store.ts (born-671): pure relocation, only relative import spe
 
 ## Gains
@@ -351,7 +387,7 @@ WHAT SHIPPE
 
 ## Sprint sprint-417 Learnings
 - Sprint sprint-417 Learnings: ## Sprint sprint-417 Learnings
-- WIN665 — Windows init exit-code ezilmesi: SETUP_INCOMPLETE basıyor, exit 1 dönüyor (XPLAT-kilidi): GO_WITH_TECH_DEBT — exitCode-yazar envanteri (grep 'process.exitCode ='/'process.exit(' across src/cli/): init.ts:667 (initOutcomeExitCode, 
+- WIN665 — Windows init exit-code ezilmesi: SETUP_INCOMPLETE basıyor, exit 1 dönüyor (XPLAT-kilidi): GO_WITH_TECH_DEBT — exitCode-yazar envanteri (grep 'process.exitCode ='/'process.exit(' across src/cli/): init.ts:667 (initOutcomeExitCode,
 
 ## Gains
 - 417-002 — TT550D — result-ingest taskId-normalize (DAR kapsam — kazı YOK) — TT550D — result-ingest taskId-normalize (DAR scope, born-655 residual left open as scoped).
@@ -511,7 +547,7 @@ W
 ## Sprint sprint-398 Learnings
 - Sprint sprint-398 Learnings: ## Sprint sprint-398 Learnings
 - LAT-KPI-SEED — kpi-backfill + init-builtin-seed (3 fail): GO_WITH_TECH_DEBT — FIXED (tests/e2e/init-builtin-seed.test.ts, 2/2 fails resolved) — root-cause: builtin agent/skill catalog legitimately g
-- LAT-SWEEP-PROOF — coverage-eşdeğeri tam-suite yerel kanıt (kapanış-task'ı): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [10 
+- LAT-SWEEP-PROOF — coverage-eşdeğeri tam-suite yerel kanıt (kapanış-task'ı): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [10
 
 ## Gains
 - 398-001 — LAT-ADR — brain/decisions + dead-code-decisions: yeni-taksonomiye taşı (17 fail) — Root cause: both test files asserted the OLD sequential ADR-001..021 / ADR-038 taxonomy against ....
@@ -611,7 +647,7 @@ W
 
 ## Sprint sprint-389 Learnings
 - Sprint sprint-389 Learnings: ## Sprint sprint-389 Learnings
-- born-583 — GOV-MINORS — plugin-sig + opaque-bearer + deny-list loopback (P2): GO_WITH_TECH_DEBT — HONESTY DISCLOSURE FIRST (LP-10 disk-verify): the raw finding source (born-backlog.json) referenced by DIRECTIVES.md is 
+- born-583 — GOV-MINORS — plugin-sig + opaque-bearer + deny-list loopback (P2): GO_WITH_TECH_DEBT — HONESTY DISCLOSURE FIRST (LP-10 disk-verify): the raw finding source (born-backlog.json) referenced by DIRECTIVES.md is
 
 ## Gains
 - 389-001 — born-529 — REPL-ERRORBOUNDARY-I18N — ReplErrorBoundary label prop (P3) — Root cause: ReplErrorBoundary (src/cli/repl/app.tsx:681-688, out of write scope) was ALREADY corr...
@@ -639,7 +675,7 @@ W
 
 ## Sprint sprint-387 Learnings
 - Sprint sprint-387 Learnings: ## Sprint sprint-387 Learnings
-- born-493 — W2-WIRE — native-engine'i slash-dispatcher'a köprüle (24/37 komut sessiz-düşüyor) (P0): GO_WITH_TECH_DEBT — Root-cause read (not assumed): bare `deckent` with piped stdin never mounts Ink at all (entry.ts launchDefaultRepl only 
+- born-493 — W2-WIRE — native-engine'i slash-dispatcher'a köprüle (24/37 komut sessiz-düşüyor) (P0): GO_WITH_TECH_DEBT — Root-cause read (not assumed): bare `deckent` with piped stdin never mounts Ink at all (entry.ts launchDefaultRepl only
 - born-563 — MEMORY-TENANT-ISOLATION — tenant izolasyonu default-ON (P1): GO_WITH_TECH_DEBT — Fix implemented exactly as specified: MemoryStore constructor now defaults strictTenantIsolation to true (fail-closed) i
 - born-568 — PROCESS-GROUP-KILL — 6 adapter'da SIGTERM→SIGKILL process-group (P1): GO_WITH_TECH_DEBT — subprocess.ts already implemented POSIX process-group kill + SIGTERM->SIGKILL escalation (PGID-TEARDOWN, ADR-G-013, prio
 - born-83 — TOOL-CU — computer-use wire + navigate/region-screenshot + injection-harden (P2): GO_WITH_TECH_DEBT — Implemented within scope (src/core/computer-use-exec.ts + its test file only — write authority confirmed limited to thes
@@ -725,7 +761,7 @@ W
 ## Sprint sprint-379 Learnings
 - Sprint sprint-379 Learnings: ## Sprint sprint-379 Learnings
 - DOCS-NUM-TRUTH — README/DECKENT sayı-ve-dil doğruluğu: GO_WITH_TECH_DEBT — Ground-truth note: the rendered 'Scope Rules' section of my prompt only listed the two test-file paths, but .tasks/task-
-- PACK-SIZE — npm-paketi <5MB: GO_WITH_TECH_DEBT — Measured (real, not assumed): npm pack --dry-run --json => tarball 6,033,117 bytes (npm displays '6.0 MB', matches Gate 
+- PACK-SIZE — npm-paketi <5MB: GO_WITH_TECH_DEBT — Measured (real, not assumed): npm pack --dry-run --json => tarball 6,033,117 bytes (npm displays '6.0 MB', matches Gate
 - DIRECTIVES-RESTORE-QUIRK — kapanışta eski-içeriğe dönme fix'i: GO_WITH_TECH_DEBT — Root cause CONFIRMED with disk evidence + a real (non-mocked) hermetic repro test (tests/orchestra/directives-restore-qu
 
 ## Sprint sprint-378 Learnings
@@ -799,7 +835,7 @@ W
 ## Sprint sprint-371 Learnings
 - Sprint sprint-371 Learnings: ## Sprint sprint-371 Learnings
 - CATALOG-MATERIALIZE — builtin 3+3'ü pool-görünür yap (370-003 kapanışı): GO_WITH_TECH_DEBT — Decision (Option A over Option B, per task instruction to justify): pool-loading now reads the builtin tree directly (D-
-- SERVER-WIRE-ENDPOINTS — limits + evaluate-health kayıtları: GO_WITH_TECH_DEBT — Wired the two dead endpoints exactly mirroring the registerApprovalHistoryRoute pattern (server.ts:65/:1068 precedent): 
+- SERVER-WIRE-ENDPOINTS — limits + evaluate-health kayıtları: GO_WITH_TECH_DEBT — Wired the two dead endpoints exactly mirroring the registerApprovalHistoryRoute pattern (server.ts:65/:1068 precedent):
 
 ## Gains
 - 371-003 — TOOL-CU-DILIM-3 — exec-adapter (injectable-spawn, flag-zincirli) — Implemented executeComputerUseAction(action, {config, platform, spawn}) in src/core/computer-use-...
@@ -835,7 +871,7 @@ W
 
 ## Sprint sprint-368 Learnings
 - Sprint sprint-368 Learnings: ## Sprint sprint-368 Learnings
-- ONB-2-DILIM-3 — doctor windows-native profil + auth-state probe: GO_WITH_TECH_DEBT — Both parts delivered. (1) Platform profile: buildPlatformProfileReport(lang) + formatPlatformProfileLines(report, lang) 
+- ONB-2-DILIM-3 — doctor windows-native profil + auth-state probe: GO_WITH_TECH_DEBT — Both parts delivered. (1) Platform profile: buildPlatformProfileReport(lang) + formatPlatformProfileLines(report, lang)
 
 ## Gains
 - 368-001 — AGSK-1-DILIM-2-CARRY — 3 yeni builtin-skill (DOĞRU ağaç-yolu) — 367-008 carryover fixed: correct tree confirmed via `ls src/core/builtins/skills/` (28 existing i...
@@ -848,10 +884,10 @@ W
 
 ## Sprint sprint-367 Learnings
 - Sprint sprint-367 Learnings: ## Sprint sprint-367 Learnings
-- 366-003-DEBT-CLOSE — openrouter-probe debt-notunu oku-kapat: GO_WITH_TECH_DEBT — Read task-366-003.result (the sole sprint-366 GO_WITH_TECH_DEBT note, confirmed by grepping selfAssessment across all 8 
+- 366-003-DEBT-CLOSE — openrouter-probe debt-notunu oku-kapat: GO_WITH_TECH_DEBT — Read task-366-003.result (the sole sprint-366 GO_WITH_TECH_DEBT note, confirmed by grepping selfAssessment across all 8
 - ONB-APPLY-WIRE — onboarding-apply'ı onboard-komutuna bağla: GO_WITH_TECH_DEBT — Wired 366-006's onboarding-apply.ts (applyOnboardingPlan/dryRunOnboardingApply) into `deckent onboard` as an ADDITIVE pa
 - ONB-2-DOCTOR-FIX — zengin doctor dilimi (--fix): GO_WITH_TECH_DEBT — Enriched `deckent doctor --fix` (Sprint 356 Task 356-006 baseline: mkdir/chmod/config-migrate) with 2 new closed-whiteli
-- AGSK-1-DILIM-2 — agent/skill katalog genişlemesi: NO_GO — SCOPE-DEFECT self-flag (found before coding, documented in full in .tasks/task-367-008.plan): declared scope.filesWrite 
+- AGSK-1-DILIM-2 — agent/skill katalog genişlemesi: NO_GO — SCOPE-DEFECT self-flag (found before coding, documented in full in .tasks/task-367-008.plan): declared scope.filesWrite
 
 ## Gains
 - 367-001 — BORN-485 — spawn-timeout/tmux kırmızı-test onarımı (9 test) — Kontrat-kararı: kod kontrata UYUYOR, testler bayattı.
@@ -1086,7 +1122,7 @@ W
 
 ## Sprint sprint-346 Learnings
 - Sprint sprint-346 Learnings: ## Sprint sprint-346 Learnings
-- F07 — fix reference CLI (hand-curated only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [98 
+- F07 — fix reference CLI (hand-curated only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [98
 - F08 — fix reference config: NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=41, untrackedFiles=2
 - F09 — fix reference API: NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=399, untrackedFiles=
 - F14 — fix reference features/glossary/lifecycle (+ glossary dedup): NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=12, untrackedFiles=2
@@ -1409,7 +1445,7 @@ DISK-VERIFY (NO_GO preco
 - R4-SPRINTID — getCurrentSprintId core-canonical + active→state semantik (3 dosya → 1): GO_WITH_TECH_DEBT — R4-SPRINTID divergent-collapse — 3 getCurrentSprintId → 1 core-canonical.
 
 SOURCE-OF-TRUTH (read + diffed, not assumed):
-- R4-VITESTPARSE — parseVitestOutput disambiguation (sahte-SSOT → rename): NO_GO — rename-only, davranış birebir. Pure-rename disambiguation of 3 same-named-but-genuinely-different functions (sahte-SSOT 
+- R4-VITESTPARSE — parseVitestOutput disambiguation (sahte-SSOT → rename): NO_GO — rename-only, davranış birebir. Pure-rename disambiguation of 3 same-named-but-genuinely-different functions (sahte-SSOT
 
 ## Gains
 - 318-001 — R4-ISNOCOLOR — isNoColor superset SSOT (3 imza → 1) — R4-ISNOCOLOR — collapsed 3 divergent isNoColor into the architect-chosen canonical SSOT in src/cl...
@@ -1464,15 +1500,15 @@ SOURCE-OF-TRUTH (read + diffed, not assumed):
 ## Sprint sprint-313 Learnings
 - Sprint sprint-313 Learnings: ## Sprint sprint-313 Learnings
 - AUDIT agents#4 — agents code-audit (5 categories, code-only): NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=0, untrackedFiles=64
-- AUDIT agents#5 — agents code-audit (5 categories, code-only): GO_WITH_TECH_DEBT — Read-only audit of src/agents/worker.ts (745 lines). Wrote deckent-last-analyze/cluster-57.md with 11 findings across 4 
+- AUDIT agents#5 — agents code-audit (5 categories, code-only): GO_WITH_TECH_DEBT — Read-only audit of src/agents/worker.ts (745 lines). Wrote deckent-last-analyze/cluster-57.md with 11 findings across 4
 - AUDIT agent#3 — agent code-audit (5 categories, code-only): NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=0, untrackedFiles=63
 - AUDIT api#1 — api code-audit (5 categories, code-only): NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=0, untrackedFiles=63
-- AUDIT api#2 — api code-audit (5 categories, code-only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [56 
+- AUDIT api#2 — api code-audit (5 categories, code-only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [56
 - AUDIT api#3 — api code-audit (5 categories, code-only): NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=0, untrackedFiles=63
-- AUDIT api#4 — api code-audit (5 categories, code-only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [56 
-- AUDIT api#5 — api code-audit (5 categories, code-only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [56 
-- AUDIT mcp#1 — mcp code-audit (5 categories, code-only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [56 
-- AUDIT mcp#2 — mcp code-audit (5 categories, code-only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [56 
+- AUDIT api#4 — api code-audit (5 categories, code-only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [56
+- AUDIT api#5 — api code-audit (5 categories, code-only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [56
+- AUDIT mcp#1 — mcp code-audit (5 categories, code-only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [56
+- AUDIT mcp#2 — mcp code-audit (5 categories, code-only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [56
 
 ## Gains
 - 313-001 — AUDIT core#22 — core code-audit (5 categories, code-only) — Read-only code audit of core#22 (8 files, all read in full): system-profile.ts, task-types.ts, te...
@@ -1532,10 +1568,10 @@ SOURCE-OF-TRUTH (read + diffed, not assumed):
 ## Changes
 
 ### src/orchestra/result-collector.ts
-- `dispatchTick` closure body replaced: now 
+- `dispatchTick` closure body replaced: now
 - CORE-W3 — duplicate dedup (skill-registry + RateLimiter): GO_WITH_TECH_DEBT — CORE-W3 dedup completed:
 
-1. skill-registry.ts DELETED — 0 production callers confirmed (grep verified, only test files 
+1. skill-registry.ts DELETED — 0 production callers confirmed (grep verified, only test files
 
 ## Gains
 - 308-001 — ADR-001-W — Node 24+ full-sweep (no "Node 18" anywhere) — ADR-001-W Node 24+ sweep — ALL in-scope work complete and verified, but two goCriteria items are ...
@@ -1768,7 +1804,7 @@ WHAT CHANGED:
 - Stale sprint-state — finalize terminal-snapshot + /api/status reconcile: GO_WITH_TECH_DEBT — DASH-UX-2 fix implemented in two layers:
 
 1. sprint-finalizer.ts — Step 16 added: writeTerminalDashboardSnapshot() write
-- Nav tek-kaynak — Layout↔Sidebar birleştir, Workers/Directives erişilir: GO_WITH_TECH_DEBT — nav-items.ts created as single source of truth for all 13 routes across 3 groups (Konuş/İzle/Yönet). Layout.tsx imports 
+- Nav tek-kaynak — Layout↔Sidebar birleştir, Workers/Directives erişilir: GO_WITH_TECH_DEBT — nav-items.ts created as single source of truth for all 13 routes across 3 groups (Konuş/İzle/Yönet). Layout.tsx imports
 - Terminal-bar overlap — z-index/layout fix: NO_GO
 - Alert-dedup — auditor staleness-uyarısı tek-satır: GO_WITH_TECH_DEBT — Implemented identity-based alert dedup (DASH-UX-4).
 
@@ -1807,7 +1843,7 @@ WHAT CHANGED:
 
 ## Sprint sprint-279 Learnings
 - Sprint sprint-279 Learnings: ## Sprint sprint-279 Learnings
-- WK-nervous — panic-gate timeout wire (0-caller → spawn yolu): GO_WITH_TECH_DEBT — Fixed executor.ts handleApprove: imported awaitPanicGateApproval+isLockedPanicAction from panic-gate.ts; added optional 
+- WK-nervous — panic-gate timeout wire (0-caller → spawn yolu): GO_WITH_TECH_DEBT — Fixed executor.ts handleApprove: imported awaitPanicGateApproval+isLockedPanicAction from panic-gate.ts; added optional
 
 ## Gains
 - 279-001 — WK-import — core→orchestra import-cycle çöz (ADR-008) (OPUS) — WK-import / ADR-008 — core→orchestra ters bağımlılık çözüldü.
@@ -2035,7 +2071,7 @@ Changes:
 
 ## Sprint sprint-260 Learnings
 - Sprint sprint-260 Learnings: ## Sprint sprint-260 Learnings
-- Doc — Enterprise Foundation reference (consume-the-contract): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=1). Status 
+- Doc — Enterprise Foundation reference (consume-the-contract): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=1). Status
 
 ## Gains
 - 260-001 — ENT-1 — actor.role → worker authority (ADR-037 V2 step) — ENT-1 (ADR-037 V2 step): the nervous authority-matrix now consults ExecutionRequest.actor.role.
@@ -2103,7 +2139,7 @@ Changes:
 - 251-006 — provider fleet notes (benchmark; codex): NO_GO — Created docs/benchmark/provider-fleet-notes.md with qualitative provider fleet routing notes. Verified by reading the fi
 - 251-007 — cookbook index (gemini): GO_WITH_TECH_DEBT — Created docs/cookbook/index.md with a navigation index linking all cookbook recipes and their one-line descriptions.
 - 251-009 — tech debt tracking (cookbook; gemini): NO_GO — Docker backend received a non-claude provider binary "gemini" (provider "gemini") for task 251-009. The docker worker pa
-- 251-010 — nervous alerts (cookbook; ollama, small): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=1). Status 
+- 251-010 — nervous alerts (cookbook; ollama, small): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=1). Status
 
 ## Gains
 - 251-001 — event channels reference (code-derived) — Created docs/reference/event-channels.md with all 27 CHANNELS from src/orchestra/event-stream.ts.
@@ -2128,12 +2164,12 @@ Changes:
 - 249-004 — lint-i18n-hardcode guard (report-only): NO_GO — Created scripts/lint-i18n-hardcode.mjs — ESM, Node built-ins only (ADR-010). Scans src/cli/commands/*.ts for console.log
 - 249-006 — why-deckent comparison (factual): GO_WITH_TECH_DEBT — Created docs/comparison/why-deckent.md as a factual, positive positioning doc. Smoke checks passed: file exists, no comp
 - 249-007 — cookbook: first sprint: NO_GO — Created docs/cookbook/01-first-sprint.md with a concise first-sprint recipe and verified the requested CLI command seque
-- 249-008 — cookbook: multi-provider fleet: NO_GO — Created the multi-provider fleet cookbook recipe. It includes per-task Provider/Model override syntax, a 3-task snippet 
+- 249-008 — cookbook: multi-provider fleet: NO_GO — Created the multi-provider fleet cookbook recipe. It includes per-task Provider/Model override syntax, a 3-task snippet
 - 249-009 — architecture overview (EN): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0)
-- 249-010 — cookbook: memory recall: GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=3). Status 
-- 249-012 — getting-started (EN): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=1). Status 
-- 249-013 — feature matrix: NO_GO — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=2). Status 
-- 249-014 — glossary (ollama, small): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=6). Status 
+- 249-010 — cookbook: memory recall: GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=3). Status
+- 249-012 — getting-started (EN): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=1). Status
+- 249-013 — feature matrix: NO_GO — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=2). Status
+- 249-014 — glossary (ollama, small): GO_WITH_TECH_DEBT — Worker exited without writing result (exitCode=0) | disk-verify found evidence (linesAdded=0, untrackedFiles=6). Status
 
 ## Gains
 - 249-001 — benchmark/memory-v2 (verify the 96% claim) — Rewrote docs/benchmark/memory-v2.md to HONESTLY assess the '96% context reduction' claim against ...
@@ -2174,7 +2210,7 @@ Changes:
 
 ## Sprint sprint-243 Learnings
 - Sprint sprint-243 Learnings: ## Sprint sprint-243 Learnings
-- 243-001 — multi-provider docs kod-gerçeğine hizala: NO_GO — Model returned no tool calls and no files were changed. Assistant: 
+- 243-001 — multi-provider docs kod-gerçeğine hizala: NO_GO — Model returned no tool calls and no files were changed. Assistant:
 
 ## Sprint sprint-242 Learnings
 - Sprint sprint-242 Learnings: ## Sprint sprint-242 Learnings
@@ -2354,7 +2390,7 @@ Changes:
 
 ## Sprint sprint-204 Learnings
 - Sprint 204 Learnings: - Sprint sprint-204 Learnings: ## Sprint sprint-204 Learnings
-- 204-003 — Implementation intent için built-in agent adaylığı: NO_GO — Added BUILTIN_IMPLEMENTATION_INTENT_RULES map (refactorer=7, architect=6) + applyBuiltinImplementationRules() helper in 
+- 204-003 — Implementation intent için built-in agent adaylığı: NO_GO — Added BUILTIN_IMPLEMENTATION_INTENT_RULES map (refactorer=7, architect=6) + applyBuiltinImplementationRules() helper in
 - 204-005 — Native chat streaming response (Path C): NO_GO — F2-003 streaming added to chat-native loop via OPTIONAL ChatProviderAdapter.stream() method yielding StreamChunk { text?
 - 204-008 — Multi-tenant tenantId iskelet: NO_GO — Created src/core/tenant-context.ts with TenantContext interface, isValidTenantId(), tenantIsolationPath(), and resolveTe
 
@@ -2388,7 +2424,7 @@ IMPLEMENTATION:
 1. src/core/rule-templates/auditor.template.md — removed 'Append new patterns to PAT
 - 198-006 — Test baseline 41 → 26 attack (en kolay 15 fail): NO_GO — Sprint 200 T-200-006 attack on 18 failing tests across 4 target files.
 
-BASELINE (verified at task start, all 4 files): 
+BASELINE (verified at task start, all 4 files):
 - 198-009 — Memory backup auto-sync mekanizması (user-memory ↔ core-memory): NO_GO — All three deliverables were already implemented from prior sprint work and are fully functional:
 
 1. scripts/sync-core-m
@@ -2431,7 +2467,7 @@ IMPLEMENTATION:
 
 ## Changes
 
-### 
+###
 - 191-007 — CLI top-level error handler — silent exit kill: NO_GO — CLI top-level error handler — silent exit kill (Sprint 191 P191-10).
 
 IMPLEMENTATION:
@@ -2520,11 +2556,11 @@ Gate verdicts:
 - W2-7 — CI-only test flakes (PID portability + mock hygiene): GO_WITH_TECH_DEBT — W2-7 CI-only test flakes — final hygiene. Pre-work audit: src/core/pid-liveness.ts already shipped (Sprint 178 Task 4 fo
 - W3-5 — Dashboard TS errors + root lint wire: GO_WITH_TECH_DEBT — W3-5 implementation per sub-project #2 plan Task 5. (1) NEW src/dashboard/src/i18n/types.ts: Translator (strict, key: Tr
 - W3-6 — doctor DECISIONS.md obsolete + 5-file cascade: GO_WITH_TECH_DEBT — W3-6 doctor DECISIONS.md obsolete + 5-file cascade COMPLETE. TDD RED→GREEN: 2 tests in tests/cli/doctor-memory-v2.test.t
-- W4-8 — Prompt guard (I1 + I2 invariants) ★ BETA MUST: GO_WITH_TECH_DEBT — W4-8 Prompt Guard (I1 + I2) tamamlandı. matchPromptPatterns() 3 pattern (base_blob ≥256, osc_escape, curl_pipe_shell) + 
+- W4-8 — Prompt guard (I1 + I2 invariants) ★ BETA MUST: GO_WITH_TECH_DEBT — W4-8 Prompt Guard (I1 + I2) tamamlandı. matchPromptPatterns() 3 pattern (base_blob ≥256, osc_escape, curl_pipe_shell) +
 - W4-9 — Command guard (I3 default-deny remote) ★ BETA MUST: GO_WITH_TECH_DEBT — W4-9 Command Guard (I3 default-deny remote) — TDD complete.
 
 IMPLEMENTATION (src/api/terminal/command-guard.ts, NEW):
-- 
+-
 - W5-11 — mTLS hook (AuthProvider interface) ★ BETA MUST: GO_WITH_TECH_DEBT — W5-11 mTLS hook (AuthProvider interface) tam implement edildi. AuthProvider interface'e optional `verifyClientCert?(cert
 
 ## Sprint sprint-178 Learnings
@@ -2540,7 +2576,7 @@ IMPLEMENTATION (src/api/terminal/command-guard.ts, NEW):
 
 ## Sprint sprint-176 Learnings
 - Sprint 176 Learnings: - Sprint sprint-176 Learnings: ## Sprint sprint-176 Learnings
-- Fix debt: ADR-019 reconciliation: language-agnostic verify not implemented: NO_GO — REFUSED — empty-scope debt-injection dispatch. The task as dispatched is a live reproduction of the exact bug that W1-1 
+- Fix debt: ADR-019 reconciliation: language-agnostic verify not implemented: NO_GO — REFUSED — empty-scope debt-injection dispatch. The task as dispatched is a live reproduction of the exact bug that W1-1
 - W1-1 — Auto-debt empty-scope inheritance: NO_GO — Worker exited without writing result file
 - W1-2 — Re-plan orphan task file cleanup: NO_GO
 - W2-3 — DEP0190 shell:true win32-only conditional: NO_GO — Fixed DEP0190 deprecation: 3 call-sites changed from shell:true to shell:process.platform==='win32'. (1) src/core/plugin
@@ -2558,7 +2594,7 @@ IMPLEMENTATION (src/api/terminal/command-guard.ts, NEW):
 - W1.4 — PtySessionManager: NO_GO — W1.4 PtySessionManager — implemented per plan §1.4. TDD: wrote 4 tests first (bounded ring, detach≠kill, maxSessions, id
 - W2.2 — HTTP control + localhost bootstrap inject: NO_GO — Worker exited without writing result (exitCode=0)
 - W3.3 — TerminalView (xterm): NO_GO — W3.3 TerminalView (xterm) — TDD complete. RED phase confirmed: 'Failed to resolve import TerminalView' before implementa
-- W3.4 — TerminalTabs + TerminalPanel: NO_GO — W3.4 multi-tab TerminalPanel + quick-launch (claude/gemini/codex/deckent/shell) implemented per plan §3.4 verbatim. TDD 
+- W3.4 — TerminalTabs + TerminalPanel: NO_GO — W3.4 multi-tab TerminalPanel + quick-launch (claude/gemini/codex/deckent/shell) implemented per plan §3.4 verbatim. TDD
 - W3.5 — DockPanel + Layout: NO_GO — W3.5 DockPanel + Layout integration complete (TDD).
 
 ## Deliverables
@@ -2582,7 +2618,7 @@ Flow (1 it(), real `node-pt
 - C2 — reference docs auto-gen (MCP/ADR/CLI/agents): NO_GO — Sprint 172 Task C2 — reference docs auto-gen (5 üretici TDD). RED: tests/scripts/gen-reference-docs.test.ts ilk çalıştır
 - C3 — lint:link dead-link gate: NO_GO — Sprint 172 C3 — lint:link dead-link gate. TDD RED→GREEN: 28/28 unit test pass. `node scripts/lint-links.mjs` exit 0 (156
 - B1 — archive DB-parity doğrulama (B2 ön-koşulu): NO_GO — B1 archive ↔ memory.db parity verifier tamamlandı (read-only). Çıktı: 23 parity-OK retro + 196 DB-eksik (121 sprint + 75
-- B2 — .gitignore/.npmignore + archive git rm --cached: NO_GO — B2 tamamlandı — kısmi (B1 parity eksikliği nedeniyle). 
+- B2 — .gitignore/.npmignore + archive git rm --cached: NO_GO — B2 tamamlandı — kısmi (B1 parity eksikliği nedeniyle).
 
 ## DONE:
 1. .gitignore §4.3 bloğu eklendi: sprint-*-tasks/, spr
@@ -2595,7 +2631,7 @@ Flow (1 it(), real `node-pt
 ## Sprint sprint-170 Learnings
 - Sprint 170 Learnings: - Sprint sprint-170 Learnings: ## Sprint sprint-170 Learnings
 - P0-3 Tmux Prompt Filename TaskId-Aware: GO_WITH_TECH_DEBT — Sprint 170 P0-3 (Bug 2B / ADR-048 §Negative closure) — fix architecturally complete; 3/3 mandated TDD tests GREEN; 5 pre
-- P0-5 Docker Spawn Race Window Closure: GO_WITH_TECH_DEBT — P0-5 Docker Spawn Race Window Closure — Sprint 169 Bug 2A eradication. TDD red-green disciplined: 6 tests written first 
+- P0-5 Docker Spawn Race Window Closure: GO_WITH_TECH_DEBT — P0-5 Docker Spawn Race Window Closure — Sprint 169 Bug 2A eradication. TDD red-green disciplined: 6 tests written first
 - Fix: P0-6 Event Stream Prompt Write/Delete Visibility: NO_GO — Worker exited without writing result (exitCode=0)
 - P0-6 Event Stream Prompt Write/Delete Visibility: GO_WITH_TECH_DEBT — P0-6 Event Stream Prompt Write/Delete Visibility tamamlandı.
 
@@ -2781,7 +2817,7 @@ Skills: typescript-expert, system-architect, security-specialist, documentation-
 WHAT WAS DONE:
 1. src/orchestra/sprint-phase
 - assertSpawnSafe Whitelist Runtime: NO_GO — HONEST SELF-ASSESSMENT: Module + tests fully shipped (100% of in-scope work). spawn-backend-docker.ts wire-up explicitly
-- Runtime File Lock (flock spawn-time): NO_GO — Implemented spawn-time `.spawnlock` API in src/core/file-lock.ts (acquireSpawnLock, releaseSpawnLock, acquireSpawnLocks 
+- Runtime File Lock (flock spawn-time): NO_GO — Implemented spawn-time `.spawnlock` API in src/core/file-lock.ts (acquireSpawnLock, releaseSpawnLock, acquireSpawnLocks
 - EffectClass Annotation rubric-registry: GO_WITH_TECH_DEBT — EffectClass annotation eklendi. src/orchestra/rubric-registry.ts'e: (1) EffectClass type union ('pure'|'reversible'|'ide
 
 ## Sprint sprint-155 Learnings
@@ -2789,18 +2825,18 @@ WHAT WAS DONE:
 
 ## Sprint sprint-154 Learnings
 - Sprint 154 Learnings: - Sprint sprint-154 Learnings: ## Sprint sprint-154 Learnings
-- RubricRegistry Core Foundation: NO_GO — RubricRegistry foundation created at src/orchestra/rubric-registry.ts (196 LoC). Spec compliance: (1) TaskType taxonomy 
+- RubricRegistry Core Foundation: NO_GO — RubricRegistry foundation created at src/orchestra/rubric-registry.ts (196 LoC). Spec compliance: (1) TaskType taxonomy
 - RubricRegistry Test Suite: NO_GO — Created tests/orchestra/rubric-registry.test.ts with 26 test cases (exceeds 20+ requirement): isAuditTask (7), isDocumen
 
 ## Sprint sprint-153 Learnings
 - Sprint 153 Learnings: - Sprint sprint-153 Learnings: ## Sprint sprint-153 Learnings
 - Brain 8-Phase Sprint Lifecycle: NO_GO — Brain 8-Phase Sprint Lifecycle dokümantasyonu oluşturuldu. Her faz için Amaç, Kritik Karar ve Temel I/O bölümleri yazıld
 - Memory V2 SQLite Schema: NO_GO — Memory V2 SQLite schema documentation written. File docs/smoke-2026-05-12/T-SMOKE-03.md created with 1001 words (minimum
-- Multi-Provider Routing: NO_GO — docs/smoke-2026-05-12/T-SMOKE-04.md oluşturuldu. 587 kelime (gerekli ≥200). İçerik: multi-provider genel bakış tablosu, 
+- Multi-Provider Routing: NO_GO — docs/smoke-2026-05-12/T-SMOKE-04.md oluşturuldu. 587 kelime (gerekli ≥200). İçerik: multi-provider genel bakış tablosu,
 - Nervous System Detector'ları: NO_GO — T-SMOKE-06.md oluşturuldu: 982 kelime (≥200 minimum karşılandı). 11 detector tam olarak belgelendi: stale-worker, scope-
 - Ed25519 Skill Signature: NO_GO — T-SMOKE-07.md yazıldı: 722 kelime (≥200 şart karşılandı). Kapsanan konular: OpenClaw %20 malicious skill problemi, Ed255
 - Sprint Kill ve Cleanup Disiplini: NO_GO — T-SMOKE-08.md oluşturuldu. 679 kelime (≥200 koşulu sağlandı). Sprint kill kullanıcı onayı zorunluluğu, Nervous System lo
-- ADR-008 Unidirectional Imports: NO_GO — ADR-008 Unidirectional Imports dokümantasyonu oluşturuldu. 773 kelime (≥200 eşiği aşıldı). Kapsam: Brain→orchestra→core 
+- ADR-008 Unidirectional Imports: NO_GO — ADR-008 Unidirectional Imports dokümantasyonu oluşturuldu. 773 kelime (≥200 eşiği aşıldı). Kapsam: Brain→orchestra→core
 - Beta GA 20-Gate Listesi: NO_GO — Beta GA 20-Gate dökümanı oluşturuldu. Her kapı için açıklama, ölçüm kriteri ve Sprint 152 sonu durumu (PASS/IN_PROGRESS)
 
 ## Sprint sprint-152 Learnings
@@ -2846,7 +2882,7 @@ WHAT WAS DONE:
 - Agent Truncation Bug Fix: GO_WITH_TECH_DEBT — Root cause: task-builder.ts:761 had `agentPrompt.slice(0, 2000)` which truncated agent prompts to 2000 chars. This cause
 - ADR Relevance Scoring Engine: GO_WITH_TECH_DEBT — ADR Relevance Scoring Engine implemented. Created src/orchestra/adr-selector.ts (~330 LoC) with: selectRelevantAdrs() sc
 - Scope Sanitizer: GO_WITH_TECH_DEBT — Created scope-sanitizer.ts with 8 filter rules (absolute path reject, path traversal reject, dist/ remove, extension-onl
-- Generative Useful God Template — buildTaskPrompt Single Entry: GO_WITH_TECH_DEBT — buildTaskPrompt() implemented as single entry point in prompt-god-template.ts (~270 LoC). Pipeline: agent block → skill 
+- Generative Useful God Template — buildTaskPrompt Single Entry: GO_WITH_TECH_DEBT — buildTaskPrompt() implemented as single entry point in prompt-god-template.ts (~270 LoC). Pipeline: agent block → skill
 - DIRECTIVES.md Mid-Sprint Silme Bug Fix: GO_WITH_TECH_DEBT — Phase guard added to archiveDirectives() — rejects calls outside CLEANUP/COMPLETE phase. Emergency restore function adde
 - Rubric System Consolidation: GO_WITH_TECH_DEBT — Rubric system consolidated: (1) Removed rubricScores spec from worker prompt in prompt-god-template.ts — workers no long
 - Sprint 145 vitest Regression Fix: NO_GO — Docker worker exited without writing result file
@@ -2892,7 +2928,7 @@ WHAT WAS DONE:
 
 **P0 Findings:**
 - deck-file.ts: createDeckT
-- src/core/ batch 6 — Remaining core files: GO_WITH_TECH_DEBT — Read-only deep analysis of 10 src/core/ files completed. All 10 reports written with 16-section template. Key findings: 
+- src/core/ batch 6 — Remaining core files: GO_WITH_TECH_DEBT — Read-only deep analysis of 10 src/core/ files completed. All 10 reports written with 16-section template. Key findings:
 - src/core/ batch 7 — Final core files: GO_WITH_TECH_DEBT — Read-only deep analysis of 13 source files completed. 13 per-file reports written, each ≥40 lines with full 16-section t
 - src/orchestra/ batch 1 — Brain + Sprint lifecycle: GO_WITH_TECH_DEBT — Read-only deep analysis of 6 sprint lifecycle core files completed. All 6 reports written with 16-section template, each
 - src/orchestra/ batch 2 — Debt + Result + Retro: GO_WITH_TECH_DEBT — Read-only deep analysis of 8 orchestra files (debt-manager, sprint-retro-writer, sprint-reporter, result-evaluator, resu
@@ -2902,10 +2938,10 @@ WHAT WAS DONE:
 ## Sprint sprint-141 Learnings
 - Sprint 141 Learnings: - Sprint sprint-141 Learnings: ## Sprint sprint-141 Learnings
 - src/orchestra/ Analysis (82 dosya): NO_GO — Docker worker exited without writing result file
-- src/cli/ Analysis (75 dosya): GO_WITH_TECH_DEBT — src/cli/ analizi tamamlandı. 75 rapor dosyası oluşturuldu (.deckent/sprint-140-analysis/src/cli/ altında). Tüm dosyalar 
+- src/cli/ Analysis (75 dosya): GO_WITH_TECH_DEBT — src/cli/ analizi tamamlandı. 75 rapor dosyası oluşturuldu (.deckent/sprint-140-analysis/src/cli/ altında). Tüm dosyalar
 - src/agents/ + src/providers/ + src/monitor/ + src/api/ + src/extensions/ Analysis (30 dosya): NO_GO — Docker worker exited without writing result file
 - tests/ Category Analysis (28 kategori): GO_WITH_TECH_DEBT — 28 test kategorisi READ-ONLY analizi tamamlandı. Tüm raporlar .deckent/sprint-140-analysis/tests/ altında. Toplam 5133 s
-- docs/ Analysis (260 markdown): GO_WITH_TECH_DEBT — Batch analysis of 260 markdown docs across 8 categories. Read-only analysis completed successfully. Produced 7 detailed 
+- docs/ Analysis (260 markdown): GO_WITH_TECH_DEBT — Batch analysis of 260 markdown docs across 8 categories. Read-only analysis completed successfully. Produced 7 detailed
 - META — Architecture Graph + Circular Dependency: GO_WITH_TECH_DEBT — Comprehensive architecture graph and circular dependency analysis completed. 354 TypeScript files analyzed across 11 mod
 - META — Dead Code + Type Safety + Security: GO_WITH_TECH_DEBT — Read-only cross-cutting analysis completed: (1) Dead Code — 4 fully dead modules (~360 LoC), 14+ unused exports, ADR-038
 - META — ADR Compliance + CLI/MCP Parity + i18n: GO_WITH_TECH_DEBT — Comprehensive 3-section cross-cutting analysis completed: (1) ADR Compliance: 40/40 ADRs audited — 36 COMPLIANT, 2 PARTI
@@ -2944,7 +2980,7 @@ WHAT WAS DONE:
 - askBrain() Extraction Finish — Conservative Move + Re-Export Shim: NO_GO — Docker worker exited without writing result file
 - Structured Planner Priority + Dependencies Parsing: GO_WITH_TECH_DEBT — parseStructuredDirectives() and parseBulletOrNumberedTasks() now parse '- Priority: CRITICAL|HIGH|NORMAL|LOW' lines. New
 - GO_WITH_GATE_FAILURE Status Propagation Wire: GO_WITH_TECH_DEBT — GO_WITH_GATE_FAILURE status propagation wire implemented:
-1. Added `import { getRecentSprintStats, GO_WITH_GATE_FAILURE 
+1. Added `import { getRecentSprintStats, GO_WITH_GATE_FAILURE
 - Dashboard vs MCP State Divergence Fix: NO_GO — Created src/monitor/sprint-state.ts with getCurrentSprintId() that reads .deckent/sprint-state.json (source 1: sprint-ac
 - Brain Memory Budget Enforcement + Config Sync: GO_WITH_TECH_DEBT — Brain Memory Budget Enforcement + Config Sync tamamlandı. (1) DECAY_EXEMPT constant: DECISIONS.md ve PROJECT-IDENTITY.md
 
@@ -2960,7 +2996,11 @@ WHAT WAS DONE:
 - Competitive Analysis Güncelleme: GO_WITH_TECH_DEBT — Competitive analysis fully updated for April 2026. Changes: (1) competitive-analysis.md — title updated 'March 2026' → '
 
 ## Sprint sprint-132 Learnings
-- Sprint 132 Learnings: - Sprint 132 Learnings: 
+- Sprint 132 Learnings: - Sprint 132 Learnings:
 
 ## Sprint unknown Learnings
 - help: help
+
+## Sprint unknown Learnings
+- Goal-v2 worker invocation truth — 8bc23db7: 2026-07-22 fact-only closure. Commit 8bc23db7e34fe7ef8d4a8c468b1b688aef69d786 is pushed to origin/main. Delivered: Mission-claim-derived invocation/call/receipt/reservation identity; tenant/project prebinding; known reachability and scoped limit admission before receipt and unique dispatch grant; raw fence and authored provider/model removed from exact executor; actual provider/model/backend/auth evidence match; host-scoped consumed/released settlement; replay consults receipt plus reservation journals and never redrives after durable dispatch; pre-grant HOLD and post-grant reconciliation remain distinct. Evidence: 166/166 focused hermetic tests, npm run lint PASS, npm run build:all PASS, compiled CLI canary mission=pending item=parked authority_unavailable receipt=null taskArtifacts=0. Finite Fable xverify xv-1784716119261 CONFIRMED in one terminal 3-turn run; usage input=3557 output=5973 cacheRead=86290 cacheCreate=35768; provider envelope USD 0.435695 is not an invoice. Nonclaims: production live ALLOW is not wired; exact reachability, authoritative provider/account snapshots, route lock and usage authority remain; this is local durable at-most-once grant, not external exactly-once. Live debt: report CONFIRMED and hb DONE but verifier result NO_GO/EXIT_WITHOUT_RESULT and task JSON PENDING; MASTER-PLAN 609 changed to yellow. Artifact SHA-256: plan 51bc1e221d88ba49ccd76a61bbbe0b49ea1db8da293c30a31aff662b964f444a; result 0c3f17992ad8e6e941b8078234c87fac06ea9aafb13e0d3864638f546644eb18; xverify prompt 6e78511000c5fb6d8b227cccfac22de9822670c75b6325702f8bb31592df644b; wrapper 68d4219c24597c79714ca88c9b63ab7425b4d396252162a5efb74f738406eacf; hb 80d20a360e7abf81763f96a8b12c11f63b589a5a3b3a74dea6ddec1ab16d426b; task 79f4d48c98c796b3a546ee69c2e7586bf8b5d534d6c066d38dbdd9161e16af0d; log d1c9b05ed809228f6f6ed3ccdeebf3f3c3226de871933b65b7b57592541282d0; verifier result 1f522703bcd2e90d2e821f4e4965c35d43af154a6abb4bad19ff723080ee876a; report 255381bc0b89398b58d04b1c17664c1156b2535ab9e5592d6c420fa5ebf5b458.
+- Dogfood truth snapshot 2026-07-22: 2026-07-22 owner-approved dogfood truth snapshot. Evidence archive: /home/alperen/.deckent/recovery-snapshots/deckent-dev/tasks-reset-2026-07-22-8bc23db7; payload manifest SHA-256 1ce6a6d24a20c4193167e9c746422363008fc32065e24b3b848df61403c52273. The reset preserved 655 .tasks files and no active sprint was present. Audited range 105ebc67..5e26a5a7 is 135 files, +15,860/-847. At main 8bc23db7, host-authoritative Docker result settlement is wired for one-shot paths but v1 autonomous, process and sprint paths still consume container-writable result state without settlementRef. Detached Docker loses host live-budget monitoring after host crash until its 1200-second container cap; deterministic task container-name retry can force-remove an orphan, so boot reconciliation and settle-or-refuse are required. Remote provider execution must have an owner-authored measurable budget; MCP run lacks the policy producer, and worker-writable Task JSON must not be the budget authority. Prompt inspection canaries reduced prompt size from 17,481 to 7,683 characters, and a 5M cache-read ceiling would have prevented about 82.4 percent of the 29.6M cache-read Sprint-455 replay. Xverify must remain criteria-only, terminal and finite; report/result/task projection convergence remains open. Goal-v2 production remains honest HOLD until live reachability and limit producers, approval composition and exact execution authorities are wired. Canonical provider API model IDs are the runtime contract; the current dirty migration is incomplete, with 28 failures in the 498-test targeted model matrix, so it must not be committed as-is.

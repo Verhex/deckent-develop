@@ -160,7 +160,7 @@ Add input validation and a test for the `/api/users` endpoint.
 ## Task 1: Add request validation
 - Agent: api-builder
 - Skills: api-builder
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Files: src/api/users.ts, src/api/validators.ts
 - Scope: src/api/
@@ -177,7 +177,7 @@ error body; the existing 201 happy-path test still passes.
 ## Task 2: Write integration test
 - Agent: ci-guardian
 - Skills: testing-expert
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Files: tests/api/users.test.ts
 - Scope: tests/

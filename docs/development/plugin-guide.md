@@ -153,7 +153,7 @@ Deckent validates manifests on load and rejects invalid plugins with a `PluginEr
 name: my-plugin
 version: 1.0.0
 description: Brief description of what this skill does
-model: sonnet
+model: claude-sonnet-5
 triggers:
   - keyword one
   - keyword two
@@ -219,9 +219,9 @@ Result Summary:
 
 | Model | Use When |
 |-------|----------|
-| `haiku` | Simple transformations, formatting, low-complexity tasks |
-| `sonnet` | Standard implementation, analysis, documentation |
-| `opus` | Security-sensitive, complex logic, architecture decisions |
+| `claude-haiku-4-5-20251001` | Simple transformations, formatting, low-complexity tasks |
+| `claude-sonnet-5` | Standard implementation, analysis, documentation |
+| `claude-opus-4-8` | Security-sensitive, complex logic, architecture decisions |
 
 ---
 
@@ -597,7 +597,7 @@ Note: `"afterSprint": null` declares awareness of the hook point without providi
 name: dependency-checker
 version: 0.1.0
 description: Checks for outdated npm dependencies
-model: haiku
+model: claude-haiku-4-5-20251001
 triggers:
   - check dependencies
   - outdated packages
@@ -756,9 +756,9 @@ Once satisfied with the plugin:
 
 | Model | Best For |
 |-------|---------|
-| `haiku` | Simple checks, formatting, low-complexity |
-| `sonnet` | Standard implementation, analysis, docs |
-| `opus` | Security, complex logic, architecture |
+| `claude-haiku-4-5-20251001` | Simple checks, formatting, low-complexity |
+| `claude-sonnet-5` | Standard implementation, analysis, docs |
+| `claude-opus-4-8` | Security, complex logic, architecture |
 
 ### Plugin CLI Commands
 

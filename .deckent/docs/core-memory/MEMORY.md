@@ -15,5 +15,6 @@
 10. **[0-hardcode](feedback_zero_hardcode_live_data.md)** — model-adı/akış-değeri literal'i kod-yolunda YASAK; tek kaynak registry+config (ADR-G-036 + ratchet).
 11. **[Memory-iş ayrımı](law_memory_vs_work_separation.md)** — memory-adayı her kayıtta sor: iş mi (→MASTER-PLAN) kalıcı-durum mu (→memory)? Mutlaka Alperen'e danış.
 12. **[Kod+iş-özeti birlikte](feedback_code_plus_business_summary.md)** — her işi/seçeneği/raporu hem kod-detayı hem düz-Türkçe iş-tanımıyla sun; Alperen kodu açmadan karar verebilsin (Alperen 2026-07-16).
+13. **[Alp Discipline = karar-çapası](law_alp_discipline_anchor.md)** — `alp-discipline/ESSENCE.md` karpathy-discipline gibi kalıcı tempo-parçası; negative-space → sınır-içi-alternatif → kayıpta-dur → irtifa-ilanı her karar-sınırında (Alperen 2026-07-21).
 
 > ⏳ **GEÇİCİ** (kanun DEĞİL) — [Sprint prompt-kalite gözetimi](temp_sprint_prompt_quality_watch.md) — her sprintte prompt/persona/maliyet + iş/işçilik analizi sürekli; **3 günde 1 durum-hatırlat (sonraki: 2026-07-20)**; hedef-kalite VEYA iş-done → SİL (Alperen 2026-07-17).

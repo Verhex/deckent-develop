@@ -266,10 +266,10 @@ src/
 
 | Tier | Claude | OpenAI | Gemini |
 |------|--------|--------|--------|
-| Premium+ | fable | o3 | gemini-3.1-pro-preview |
-| Premium | opus | gpt-5 | gemini-2.5-pro |
-| Standard | sonnet | gpt-4.1 / o4-mini | gemini-2.5-flash |
-| Economy | haiku | gpt-5-mini / gpt-4.1-mini | gemini-2.0-flash |
+| Premium+ | claude-fable-5 | o3 | gemini-3.1-pro-preview |
+| Premium | claude-opus-4-8 | gpt-5.5 | gemini-2.5-pro |
+| Standard | claude-sonnet-5 | gpt-4.1 / o4-mini | gemini-2.5-flash |
+| Economy | claude-haiku-4-5-20251001 | gpt-5-mini / gpt-4.1-mini | gemini-2.0-flash |
 
 **Provider-aware model selection:** `resolveTaskModel(task, provider?)` maps task requirements to the best model for the target provider using tier equivalence.
 
@@ -868,10 +868,10 @@ Defaults per subscription tier, defined in `src/core/config.ts`:
 
 | Plan | `max_workers` | `brain_model` | `default_model` | `haiku_allowed` |
 |------|:------------:|:-------------:|:---------------:|:---------------:|
-| `performance` | 8 | opus | opus | true |
-| `balanced` | 5 | sonnet | opus | true |
-| `economic` | 3 | sonnet | sonnet | false |
-| `api` | 10 | opus | sonnet | true |
+| `performance` | 8 | claude-opus-4-8 | claude-opus-4-8 | true |
+| `balanced` | 5 | claude-sonnet-5 | claude-opus-4-8 | true |
+| `economic` | 3 | claude-sonnet-5 | claude-sonnet-5 | false |
+| `api` | 10 | claude-opus-4-8 | claude-sonnet-5 | true |
 
 > **These are recommended initial-setup defaults, not hard limits.** Every
 > Layer 1 value (`max_workers`, `brain_model`, `default_model`,

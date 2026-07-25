@@ -29,17 +29,18 @@ Probe + gate iki ayrı yüzeyde tüketilir:
 - **`deckent limits [--json]`** — probe'u çalıştırır, tabloyu (veya `--json`) basar,
   config'e göre gate verdict'ini gösterir. **Canlı ve bağımsız çalışır.**
 - **`checkStartLimitGate`** (start-gate mantığı) — aynı probe + windowed-gate'i
-  `--force-limits` bypass yoluyla bir sprint-başlatma önkoşuluna çevirir.
+  `deckent start` için bir sprint-başlatma önkoşuluna çevirir; mevcut ortak
+  preflight bypass'ı `deckent start --force` ile açıkça aşılabilir.
 
 ## Fail yönü — iki farklı yön, karıştırılmamalı
 
-- **Probe kullanılamaz olduğunda → fail OPEN (`ok`).** `claude -p "/usage"` metin formatı
-  resmi bir kontrat değil; format kayarsa (satır eksik/parse edilemez) hem
-  `evaluateLimitGate` hem `evaluateLimitGateByWindow` **`ok` döner** — bir CLI
-  text-format kaymasının sprint'i bloklaması kasıtlı olarak engellenir.
+- **Probe kullanılamaz olduğunda → `unknown` advisory.** `claude -p "/usage"` metin formatı
+  resmi bir kontrat değil; format kayarsa (satır eksik/parse edilemez)
+  `checkStartLimitGate` bilinmeyen durumu görünür mesajla raporlar. Attended CLI
+  `start` için mevcut politika ilerler; bu sonuç asla `ok` diye temsil edilmez.
 - **Probe başarılı + gerçek block verdict olduğunda → fail CLOSED.** `checkStartLimitGate`
   gerçek bir `block` verdict'inde `blocked: true` döner (sprint başlatma iptal edilmeli) —
-  `--force-limits` bypass'ı olmadıkça. Bu ayrım dokümantasyonda net tutulmalı: "probe
+  `deckent start --force` bypass'ı olmadıkça. Bu ayrım dokümantasyonda net tutulmalı: "probe
   belirsiz" ile "kullanım gerçekten tavanda" birbirine karıştırılırsa gate'in davranışı
   yanlış anlaşılır.
 
@@ -50,7 +51,7 @@ Probe + gate iki ayrı yüzeyde tüketilir:
 | `limit_gate.enabled` | `boolean` | `false` (absent) | Gate'i açar. Kapalıyken `checkStartLimitGate` **hiçbir probe çağrısı yapmaz**, anında `{blocked:false, verdict:'ok'}` döner — pre-361-002 akışıyla byte-identical no-op. |
 | `limit_gate.session_max_pct` | `number` (0-100) | `90` (`DEFAULT_LIMIT_GATE_THRESHOLDS.blockPct`) | Session penceresinin block tavanı (Kural 1). |
 | `limit_gate.weekly_max_pct` | `number` (0-100) | `90` | `week (all models)` + `week (Fable)` için paylaşılan block tavanı (Kural 2). |
-| `--force-limits` (CLI flag, `deckent start` ile aynı desen — `deckent start --force`'un cost-gate override'ını yansıtır) | `boolean` | off | Bir `block` verdict'ini bypass eder; verdict `block` olarak kalır ama `bypassed: true` + `blocked: false`. |
+| `deckent start --force` | `boolean` | off | Doctor, subscription-limit ve cost preflight kontrollerinin mevcut ortak owner bypass'ıdır. |
 
 Bu 3 alan **`config-types.ts`'te tipli bir alan olarak YOK** — `readLimitGateConfig`
 (`src/cli/commands/limits.ts`) global + proje `.deckent/config.json`'ı doğrudan
@@ -65,13 +66,11 @@ scope'u dışında bırakıldı (CONFIG-RESOLVER-FLAG-DROP emsali, commit c513ab
   `gate.enabled: false` olarak raporlar ve `process.exitCode` asla 1 olmaz.
 - `limit_gate.enabled: true` + `deckent limits --json` → `verdict` alanı `ok|warn|block`;
   `block` iken `process.exitCode = 1` (script/CI entegrasyonu için).
-- **Start-gate (`checkStartLimitGate`) HENÜZ `deckent start`'a BAĞLANMADI** — fonksiyon
-  yazılmış, test edilmiş, ama `src/cli/commands/start.ts` içinde hiçbir çağıran yok
-  (disk-doğrulanmış: `grep checkStartLimitGate src/` yalnız `limit-preflight.ts` +
-  `cli/commands/limits.ts`'in kendi tanımını buluyor). Yani bugün `limit_gate.enabled: true`
-  yazmak `deckent start`'ın davranışını **hiç değiştirmez** — yalnız `deckent limits`
-  komutunun çıktısını etkiler. Bu, dosyanın kendi başlık yorumunda da "NOT YET WIRED"
-  olarak işaretli, tesadüfi bir eksiklik değil.
+- **Start-gate `deckent start`a bağlıdır.** Doctor preflight'tan sonra, plan/cost/worker
+  spawn'dan önce çalışır. Gerçek `block` verdict'i normal start'ı exit 1 ile durdurur;
+  `--dry-run` yalnız would-block mesajını gösterip non-spawning preview'ı tamamlar.
+- Bu wiring yalnız CLI `start` içindir; MCP/do/autonomous/every-dispatch parity'si
+  tamamlanmış sayılmaz.
 
 ## Kapalıyken garanti
 
@@ -81,12 +80,12 @@ gösterge komutu, gate değil) — flag yalnız verdict/exit-code hesaplamasın�
 
 ## Riskler
 
-- **Start-gate'in bağlanmamış olması** en büyük risk: bir operatör `limit_gate.enabled: true`
-  ayarlayıp "artık sprint'ler otomatik durur" varsayabilir — bugün öyle değil, yalnız
-  `deckent limits` manuel çalıştırıldığında görünür bir sinyal üretir.
+- **Yüzey parity'si eksiktir:** `limit_gate.enabled: true` bugün CLI `deckent start`
+  akışını korur; MCP/do/autonomous/every-dispatch için aynı admission authority ayrıca
+  bağlanmalıdır.
 - `claude -p "/usage"` metin formatı resmi bir kontrat değil; Claude CLI güncellemesi
-  formatı değiştirirse probe `unavailable` düşer (fail-open) — sessizce yanlış bir `ok`
-  üretmez ama gate de artık hiçbir koruma sağlamaz ta ki format düzeltilene dek.
+  formatı değiştirirse probe `unknown` düşer. Attended CLI politikası bunu görünür
+  advisory ile geçirir; unattended HOLD politikası ayrı common-admission işidir.
 - `weekly_max_pct` iki farklı pencereyi (`all models` + `Fable`) TEK eşikle yönetir — ikisi
   farklı tavan istiyorsa bu ayrım bugün yok (per-window granularity yalnız session/weekly
   ikilisinde, üç ayrı pencerede değil).
@@ -95,10 +94,11 @@ gösterge komutu, gate değil) — flag yalnız verdict/exit-code hesaplamasın�
 
 - Testler: `tests/core/limit-preflight.test.ts` (38 test — probe parse, fail-honest
   unavailable path, `evaluateLimitGate` + `evaluateLimitGateByWindow` worst-verdict-wins),
-  `tests/cli/limits-command.test.ts` (25 test — `readLimitGateConfig` global/proje merge,
+  `tests/cli/limits-command.test.ts` (27 test — `readLimitGateConfig` global/proje merge,
   `checkStartLimitGate` block/warn/ok/bypass, `runLimitsCommand` table/JSON render).
-- Canlı doğrulama: `deckent limits` / `deckent limits --json` gerçek `claude -p "/usage"`
-  spawn'ı ile host-side çalıştırılabilir (spawn hermetik değil — gerçek `claude` binary'si
-  gerektirir, bu yüzden CI'da `spawnImpl` injection ile mock'lanır).
-- Disk-doğrulanmış eksik: `grep -rn checkStartLimitGate src/` `cli/commands/start.ts`
-  içinde HİÇBİR çağrı döndürmüyor — start-gate wire follow-up task olarak kalıyor.
+- Compiled CLI doğrulaması (2026-07-24): provider-stubbed `/usage` çıktısı session %85,
+  config tavanı %80 iken gerçek `dist/cli/entry.js start` tam bir limit probe sonrası
+  exit 1 verdi; plan/classifier/cost/worker çağrısı, yeni task ve container üretmedi.
+  Gate absent/disabled fixture'da `start --dry-run` exit 0 verdi ve `/usage` probe
+  üretmedi. Aynı dry-run'ın ayrı semantic classifier çağrısı yaptığı gözlendi; bu yüzden
+  “tam provider-free preview” iddiası yapılmaz.

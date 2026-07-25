@@ -128,7 +128,7 @@ Or edit `DIRECTIVES.md` manually:
 ## Goal: Build a REST API with user authentication
 
 ## Task 1: Auth Endpoints
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Files: src/auth/index.ts (new), tests/auth/auth.test.ts (new)
 - Scope: src/auth/, tests/auth/

@@ -204,9 +204,9 @@ The model registry maps tiers to the best available model per configured provide
 | Tier | Claude | Codex | Gemini |
 |------|--------|-------|--------|
 | premium_plus | — | o3 | gemini-3.1-pro-preview |
-| premium | opus | gpt-5 | gemini-2.5-pro |
-| standard | sonnet | gpt-4.1 | gemini-2.5-flash |
-| economy | haiku | gpt-5-mini | gemini-2.0-flash |
+| premium | claude-opus-4-8 | gpt-5.5 | gemini-2.5-pro |
+| standard | claude-sonnet-5 | gpt-4.1 | gemini-2.5-flash |
+| economy | claude-haiku-4-5-20251001 | gpt-5-mini | gemini-2.0-flash |
 
 Switching from Claude to Gemini is a single config key change. Zero task redefinition.
 
@@ -262,7 +262,7 @@ deckent status --watch           # live monitoring
 
 ```markdown
 ## Task 1: Add user authentication
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Skills: typescript-expert, security-specialist
 - Files: src/auth/auth.ts, src/auth/session.ts

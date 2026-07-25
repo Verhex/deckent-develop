@@ -50,8 +50,20 @@
 | adr-g-034 | Native Agentic Terminal | accepted |
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 | adr-g-036 | Zero-Hardcode Model & Flow Values (Parametric-Only) | accepted |
+| ADR-G-037 | Execution Budget Landing, Continuation & Metering Authority | accepted |
+| user-1784778390241 | Provider Authority Key Custody, Rotation & Composition | active |
 
 ## Recent Learnings
+- **Sprint sprint-456 Learnings** (sprint-456): ## Sprint sprint-456 Learnings
+- Docker auth and provider-image fixture budget parity: NO_GO — Runtime budget circuit...
+- **Sprint sprint-455 Learnings** (sprint-455): ## Sprint sprint-455 Learnings
+- Crash-safe resume and recovery command truth: GO_WITH_TECH_DEBT — Made the public re...
+- **Sprint sprint-454 Learnings** (sprint-454): ## Sprint sprint-454 Learnings
+- Parametric agent model front doors: GO_WITH_TECH_DEBT — Worker timeout/killed (exitC...
+- **Sprint sprint-453 Learnings** (sprint-453): ## Sprint sprint-453 Learnings
+
+## Gains
+- 453-001 — Canonical CLI and MCP one-shot execution boundary — Canonical CL...
 - **Sprint sprint-452 Learnings** (sprint-452): ## Sprint sprint-452 Learnings
 - Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: ROOT-CAUSE FINDING (read first...
 - **Sprint sprint-451 Learnings** (sprint-451): ## Sprint sprint-451 Learnings
@@ -66,14 +78,6 @@
 - 448-001 — Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: Investigat...
 - **Sprint sprint-447 Learnings** (sprint-447): ## Sprint sprint-447 Learnings
 - Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: Investigated the cross-depende...
-- **Sprint sprint-445 Learnings** (sprint-445): ## Sprint sprint-445 Learnings
-- builtin capabilities authoring — construction family: GO_WITH_TECH_DEBT — Authored R...
-- **Sprint sprint-444 Learnings** (sprint-444): ## Sprint sprint-444 Learnings
-- F3 routing pins move to the implementer era: GO_WITH_TECH_DEBT — All 4 target files ...
-- **Sprint sprint-443 Learnings** (sprint-443): ## Sprint sprint-443 Learnings
-- U4 persona-guidance parser and slice selector: GO_WITH_TECH_DEBT — parseGuidanceSect...
-- **Sprint sprint-442 Learnings** (sprint-442): ## Sprint sprint-442 Learnings
-- Rehydrate event-fold sorgu-yuzeyi getFlow ve listFlows: GO_WITH_TECH_DEBT — Rehydrat...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -148,5 +152,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 - Violation pattern: doc_sync_ground_truth_mismatch
+- Violation pattern: stale_heartbeat
 
-_Total entries: 1590 | Generated: 2026-07-19_
+_Total entries: 1617 | Generated: 2026-07-24_

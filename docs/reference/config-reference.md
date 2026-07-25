@@ -467,7 +467,12 @@ and ordered fallback candidates at the top level.
 | `codex` | OpenAI Codex via Codex CLI | `codex --version` + `OPENAI_API_KEY` |
 | `gemini` | Google Gemini via API | `GOOGLE_API_KEY` env var |
 | `ollama` | Local LLM via Ollama (Sprint 190) | local Ollama runtime |
-| `openrouter` | OpenRouter HTTP gateway | key/secret + exact `vendor/model` pricing evidence |
+| `openrouter` | OpenRouter remote API gateway (`transport=api`, `executionBackend=api`) | key/secret + exact `vendor/model` pricing evidence |
+
+Provider invocation identity classifies the execution authority, not the
+underlying TCP protocol. A direct OpenRouter call is therefore `api/api`;
+`http/in-process` remains reserved for local or protocol-level runtimes such as
+Ollama. Historical receipts are immutable and are not silently relabelled.
 
 > The grouped `providers` object is canonical. Flat
 > `brain_provider` / `worker_provider` / `fallback_provider` keys remain
@@ -759,6 +764,67 @@ Optional top-level block (config-types.ts:231) that extends the HTTP API bearer 
 - Exempt-path (`/health`, `/api/health`), query-token (`/api/events` SSE) and localhost-auto-inject semantics are unchanged; the query-token fallback applies to the static token only.
 
 **Server resolution** (server.ts:1035-1065): an explicit `oidc` option passed to `createHttpServer` wins; otherwise the project config's `api_oidc` block is consulted — and used only when `enabled: true` with a complete `issuer`/`algorithm`/`key`. A block that is missing, disabled, incomplete, or unparseable fails closed to the previous middleware behavior.
+
+#### 15.1.1 Attended-execution approval authority
+
+`approval.authority` is a separate, default-off authorization layer for the
+owner-attended hard-stop exception on landing-unsupported remote backends. It
+does not change ordinary API bearer authentication and does not make a backend
+reachable, metered, or landing-capable.
+
+| Key | Type | Required when enabled | Description |
+|-----|------|-----------------------|-------------|
+| `approval.authority.enabled` | boolean | yes | Opens the authority in open-only mode. Runtime never provisions, imports, rotates, repairs, or defaults a key. |
+| `approval.authority.tenant_id` | string | yes | Exact tenant bound into requests, verified sessions, decisions and final dispatch receipts. |
+| `approval.authority.oidc.authority_ref` | string | yes | Stable identity for the pinned OIDC verification authority. |
+| `approval.authority.oidc.tenant_claim` | string | yes | Verified claim carrying the exact tenant. |
+| `approval.authority.oidc.role_claim` | string | no | Verified role claim; omitted roles remain subject to request authorization. |
+| `approval.authority.oidc.max_auth_age_seconds` | positive number | yes | Maximum age of the IdP `auth_time` used as fresh reauthentication. |
+| `approval.authority.oidc.max_session_seconds` | positive number | yes | Upper bound for the durable live-session lease; assertion/request expiry may shorten it. |
+| `approval.authority.oidc.required_acr` | non-empty string[] | no | Accepted step-up authentication context values. |
+| `approval.authority.oidc.required_amr` | non-empty string[] | no | Authentication methods all required by policy. |
+
+The block also requires `api_oidc.enabled: true` with an explicit non-empty
+`api_oidc.audience`. The `api_oidc` key verifies the IdP assertion; it is not the
+approval decision-signing key. Decision integrity uses the separate host-global
+`keys/approval-decision/v1` custody domain. That keyring is deliberately absent
+from project config and worker mounts.
+
+```json
+{
+  "api_oidc": {
+    "enabled": true,
+    "issuer": "https://idp.example.com",
+    "audience": "deckent-api",
+    "algorithm": "RS256",
+    "key": "$DECK:OIDC_PUBLIC_KEY"
+  },
+  "approval": {
+    "api_decide": true,
+    "authority": {
+      "enabled": true,
+      "tenant_id": "tenant-acme",
+      "oidc": {
+        "authority_ref": "oidc:https://idp.example.com:deckent-api",
+        "tenant_claim": "tenant_id",
+        "role_claim": "role",
+        "max_auth_age_seconds": 300,
+        "max_session_seconds": 120,
+        "required_acr": ["urn:mfa"],
+        "required_amr": ["pwd", "mfa"]
+      }
+    }
+  }
+}
+```
+
+The attended decision endpoint re-verifies the Bearer value as a fresh OIDC
+step-up and requires `Idempotency-Key`. Static API tokens, auth-disabled mode,
+localhost, TTY/OS identity, REPL/RPC literal actors and MCP stdio cannot
+authorize attended execution. Missing/corrupt custody, unsupported platform,
+session expiry/revocation, proposal drift or replay HOLD before provider/backend
+work. Native Windows stays HOLD until a verified DACL/DPAPI/CNG custody adapter
+exists.
 
 ### 15.2 Terminal OIDC JWT (`terminal_oidc_jwks`)
 

@@ -5098,3 +5098,72 @@ yaşam bununla bağdaşmaz.
   ADR-G-001 (Layered Config) · ADR-G-019 (bu belgenin authoring-standardı).
 - **SSOT-notu:** Bu dosya `.brain/memory.db`'deki `adr-g-036` kaydının insan-okur export'udur
   (ADR-G-035 DB-first kuralı) — kod asla bu .md'yi parse etmez.
+
+
+---
+
+## ADR-G-037: Execution Budget Landing, Continuation & Metering Authority
+
+**Status:** accepted
+
+ADR-G-037 — Execution Budget Landing, Continuation & Metering Authority
+
+Owner: Alperen. Approved: 2026-07-23. Status: accepted.
+
+CONTEXT
+Hard runtime ceilings contain spend but do not preserve useful work. Sprint-456 proved the double loss: three workers spent about 3.19M cache-read tokens and about USD 2.17 API-equivalent, crossed the hard ceiling, and produced zero successful outcomes. Docker SIGTERM can fsync an existing result but cannot cause a native provider CLI to create a semantic checkpoint. Live metering, hard containment, terminal task-result settlement and sprint-level checkpoint/resume are necessary but distinct authorities.
+
+DECISION
+1. The immutable owner-authored hard budget remains the primary ceiling across an execution lineage. Landing never widens, resets or replaces it; all continuation-attempt consumption is cumulative.
+2. execution_budget.landing is owner-authored. reserve_ratio is finite and strictly between 0 and 1, is included in the policy digest, and has no product default. The approved 0.25 value is canary configuration only. Unknown fields fail loudly. attended_unsupported is hold|allow-hard-stop and defaults to hold. allow-hard-stop is valid only for explicitly attended execution and requires visible approval/risk evidence. Missing landing policy never manufactures reserve or capability; remote unattended dispatch HOLDs.
+3. attended|unattended is explicit common-admission authority, never inferred from TTY, autoApprove, backend name or provider fallback. Autonomous/scheduled/webhook are unattended. Interactive terminal/CLI is attended only with a runtime-wide ApprovalBroker capable of durable decision evidence. MCP/API/IDE carries authenticated mode and approval evidence. Missing/contradictory evidence resolves to unattended. provider_fallback.unattended may govern reachability policy but is not attendance SSOT.
+4. LiveUsageBudgetSupport and ExecutionLandingCapability are independent typed contracts. Landing capability is cooperative-landing|checkpoint-stop|unsupported; missing means unsupported. Actual called provider plus execution backend determines capability. measured-stream never implies landing. Docker remains unsupported until the host-owned checkpoint-stop protocol is binary-proven. Final-only providers remain unsupported for unattended execution.
+5. Lifecycle is RUNNING -> LANDING_REQUESTED -> LANDED|HARD_STOP, or RUNNING -> HARD_STOP. Landing is requested when a measurable counter reaches its owner threshold at 1-reserve_ratio. Crossing the original hard ceiling always becomes HARD_STOP. LANDED requires an immutable host-owned checkpoint receipt and is neither DONE nor NO_GO. Failure to checkpoint before the hard ceiling is HARD_STOP.
+6. The host-owned checkpoint binds tenant/project/task, original request/task digest, role/kind/attendance, configured/requested/resolved/called provider+model, backend/auth, policy and hard-budget digest, parent attempt/fence, cumulative usage and remaining hard budget, provider event sequence, scoped disk-diff/evidence refs, acceptance digest and timestamps. Worker semantic state is a proposal; the host stamps and hashes the receipt.
+7. Continuation claim cites the landing-checkpoint digest and is first-writer-wins. Competing coordinators adopt the matching claim or HOLD. Continuation receives immutable checkpoint plus bounded current disk/evidence context, not the full original prompt corpus. It cannot reset counters or gain a new hard budget. Terminal product settlement remains separate and occurs only after a genuine terminal result.
+8. Each applied provider observation records token deltas and a neutral consecutive distinct cache-read-event count. Ordinary cache reuse is not labelled waste. Duplicate/replayed events do not increment counters or streaks.
+9. Brain, worker and auditor share policy, attendance, capability, receipt and fallback authorities. CLI/MCP/terminal/API/process/autonomous are thin producers/consumers. Subscription and API paths share token/cache truth; pricing evidence may add USD truth but cannot replace measured ceilings.
+
+ROLLOUT
+Land schema/state/capability contracts preserving hard-stop behavior; add host-owned checkpoint and attempt-retirement authority; add bounded continuation and crash/restart tests; enable reserve_ratio 0.25 only in explicit canary config; run one low-risk real-binary Docker canary only after separate owner approval; no default flip is authorized.
+
+ACCEPTANCE
+Boundary tests below/at/above landing and hard ceilings; schema/digest and unknown-field tests; provider/backend capability matrix; unattended HOLD and attended explicit hard-only evidence; checkpoint corruption and competing-coordinator tests; cumulative-budget/no-full-replay continuation tests; Docker kill/landing matrix; targeted tests, lint, build:all, real binary proof and one finite Fable-5 verdict.
+
+---
+
+## ADR-G-038: Goal-v2 Normalized Dependency Authority & Bounded Reconciliation
+
+**Status:** accepted
+
+ADR-G-038 — Goal-v2 Normalized Dependency Authority & Bounded Reconciliation
+
+Owner: Alperen. Approved: 2026-07-25. Status: accepted.
+
+CONTEXT
+Goal-v2 dependency correctness existed for bounded graphs, but JSON arrays in work_items.depends_on remained the runtime graph authority. Six approval/due/claim seams executed json_each, and every reconciliation tick rebuilt complete pending mission graphs. That design preserved correctness at small scale but could not provide indexed reverse traversal, bounded per-tick work, durable cursor fairness or an explicit migration cutover.
+
+DECISION
+1. A mission has exactly one dependency authority. No mission_graph_authorities row means legacy JSON authority. migration-pending and quarantined are HOLD. active means work_item_dependencies is the sole runtime authority; JSON cannot authorize query, approval or claim.
+2. New normalized missions require explicit composition authority and atomically write mission, items, admission fences, normalized edges, readiness projection and graph digest. Normalized mode remains default-off until a separately approved flip.
+3. work_item_dependency_readiness and mission_dependency_reconcile_queue are durable scheduler projections, never final execution authority. Final claim rechecks exact normalized upstream statuses and the existing item revision, admission fence and engine lease in the same transaction.
+4. Terminal upstream state enqueues an exact mission/upstream/revision/outcome job transactionally. Reconciliation is owner-bounded by total edges and per-job edges, cursor-resumable, restart-safe and fair across jobs. Descendant blocking uses item-status CAS and recursively queues exact downstream terminal evidence.
+5. Migration is explicit per mission: prepare parses and validates legacy JSON with iterative Kahn validation, writes immutable evidence/edges/readiness and leaves migration-pending. Activation requires an owner decision bound to the exact graph digest and revalidates current source plus normalized digest. Invalid or drifted graphs quarantine or HOLD; no silent repair and no JSON rollback.
+6. All six store seams consume the same per-mission predicate: approval candidates, invalid-approval parking, approval-request parking, due query, registry-fenced claim and compatibility claim. Compatibility claim remains test/migration-only after cutover.
+7. SQLite WAL plus IMMEDIATE transaction, engine lease, fences and CAS is the single-host authority across Linux, WSL, macOS and Windows. A multi-host implementation requires a transactional graph-store adapter with server-side ordering/lease semantics; an unsupported adapter HOLDs.
+
+ROLLOUT
+Ship additive schema and provider-free tests/proofs first. Existing autonomous DB migration activation, live/paid canary, default flip, commit/push, publish and Desktop implementation require separate owner gates. Rollback disables normalized admission/dispatch and preserves graph history; it never reauthorizes stale JSON.
+
+ACCEPTANCE
+No active normalized mission authorizes from JSON; atomic intake and replay conflict tests; corrupt migration quarantine; all six seams share authority; stale readiness cannot win final claim; bounded direct/transitive propagation survives restart; 1K/10K/100K deterministic graph proofs remain within configured work bounds; legacy behavior, targeted hermetic tests, lint, build:all and compiled provider-free proof pass before any live canary.
+
+---
+
+## user-1784778390241: Provider Authority Key Custody, Rotation & Composition
+
+**Status:** accepted
+
+Status: accepted. Owner: Alperen. Date: 2026-07-23.
+
+Decision: Provider dispatch authority is host-global and versioned. Secret keyring revisions live only below the platform dataDir; ProviderTruth and ProviderLimit ledgers live below stateDir. The keyring has one active signing key, retired verify-only keys, an immutable account-pseudonym root, content-chained append-only revisions, and exact key IDs on every signed store record. HKDF-SHA256 domain separation is mandatory for truth integrity, limit integrity, and account pseudonymization. Raw account identity is never persisted; correlation is tenant/provider/auth-mode scoped HMAC. A missing or unsafe keyring, missing tenant/policy/account/producer authority, unknown historical key, or unverifiable schema causes a typed pre-dispatch HOLD; it never selects another key or fallback provider. Solo mode may default tenant to local; enterprise mode without an explicit verified tenant must HOLD. Legacy Truth/Limit schema migration is explicit, transactional, owner-run, and never constructor-implicit. Composition may boot the control plane unavailable, but cannot grant provider dispatch until all authorities are present. Key rotation and schema key-id support are one coherent delivery boundary. Approval ingress, recurring-trigger occurrence ledger, and sealed evidence archive remain separate dependent slices under their already approved contracts.
