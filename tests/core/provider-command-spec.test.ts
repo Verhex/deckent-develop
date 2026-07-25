@@ -39,6 +39,31 @@ describe('buildProviderCommand', () => {
     expect(cmd).not.toContain('--dangerously-skip-permissions');
   });
 
+  it('claude finite verifier narrows the visible tool schema and isolates project context', () => {
+    const cmd = buildProviderCommand(PROVIDER_COMMAND_SPECS.claude, 'claude-fable-5', P, {
+      autoApprove: true,
+      allowedTools: 'Bash',
+      availableTools: 'Bash',
+      isolatedContext: true,
+    });
+    expect(cmd).toContain('--allowedTools "Bash"');
+    expect(cmd).toContain('--tools "Bash"');
+    expect(cmd).toContain('--safe-mode');
+    expect(cmd).toContain('--disable-slash-commands');
+    expect(cmd).toContain('--no-session-persistence');
+  });
+
+  it('ordinary claude worker does not receive finite-verifier isolation flags', () => {
+    const cmd = buildProviderCommand(PROVIDER_COMMAND_SPECS.claude, 'claude-sonnet-5', P, {
+      autoApprove: true,
+      allowedTools: 'Read,Write,Edit,Bash,Glob,Grep',
+    });
+    expect(cmd).not.toContain('--tools ');
+    expect(cmd).not.toContain('--safe-mode');
+    expect(cmd).not.toContain('--disable-slash-commands');
+    expect(cmd).not.toContain('--no-session-persistence');
+  });
+
   it('promptFeed: claude+codex=stdin (caller pipes < file); gemini=inline (cat embedded in -p)', () => {
     // codex reads instructions from stdin when no positional prompt (validated
     // vs --help) → stdin (robust for large prompts). gemini -p needs the prompt

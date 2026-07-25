@@ -126,13 +126,18 @@ describe('memory stats command', () => {
 // ── Tests: export ───────────────────────────────────────────────
 
 describe('memory export command', () => {
+  let previousExitCode: typeof process.exitCode;
+
   beforeEach(() => {
     vi.clearAllMocks();
     projectRoot = mkdtempSync(join(tmpdir(), 'memory-export-'));
+    previousExitCode = process.exitCode;
+    process.exitCode = undefined;
     captureOutput();
   });
 
   afterEach(() => {
+    process.exitCode = previousExitCode;
     restoreOutput();
     try { rmSync(projectRoot, { recursive: true, force: true }); } catch { /* ignore */ }
   });
@@ -165,6 +170,51 @@ describe('memory export command', () => {
 
     const exportsDir = join(projectRoot, '.brain', 'exports');
     expect(existsSync(exportsDir)).toBe(true);
+  });
+
+  it('holds a partial non-empty DB before it replaces richer ADR snapshots', async () => {
+    ensureDbWithEntries(projectRoot, [
+      { id: 'user-owner-decision', type: 'adr', title: 'Owner Decision', content: 'Owner content', status: 'active' },
+    ]);
+    const exportsDir = join(projectRoot, '.brain', 'exports');
+    mkdirSync(exportsDir, { recursive: true });
+    const summaryPath = join(exportsDir, 'summary.md');
+    const decisionsPath = join(exportsDir, 'decisions.md');
+    const priorSummary = [
+      '# Brain Summary (auto-generated)',
+      '',
+      '## Active Architecture Decisions',
+      '| ID | Title | Status |',
+      '|-----|-------|--------|',
+      '| adr-g-001 | First | accepted |',
+      '| adr-g-002 | Second | accepted |',
+    ].join('\n');
+    const priorDecisions = [
+      '# Architecture Decision Records (auto-generated)',
+      '',
+      '## adr-g-001: First',
+      '',
+      '**Status:** accepted',
+      '',
+      'Decision: first.',
+      '',
+      '---',
+      '',
+      '## adr-g-002: Second',
+      '',
+      '**Status:** accepted',
+      '',
+      'Decision: second.',
+    ].join('\n');
+    writeFileSync(summaryPath, priorSummary, 'utf-8');
+    writeFileSync(decisionsPath, priorDecisions, 'utf-8');
+
+    await runMemory(['export']);
+
+    expect(process.exitCode).toBe(1);
+    expect(getStderr()).toContain('Export held');
+    expect(readFileSync(summaryPath, 'utf-8')).toBe(priorSummary);
+    expect(readFileSync(decisionsPath, 'utf-8')).toBe(priorDecisions);
   });
 });
 

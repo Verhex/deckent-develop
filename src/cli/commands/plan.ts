@@ -21,6 +21,11 @@ import {
 } from '../../core/directive-interrogator.js';
 import type { InterrogationAnswer } from '../../core/directive-interrogator.js';
 import { createSpinner } from './chat-spinner.js';
+import type { ExecutionTopology } from '../../core/execution-topology.js';
+import {
+  buildPlanPreviewCardLabels,
+  formatTopologyLines,
+} from '../repl/plan-preview-card.js';
 
 export type RlFactory = () => {
   question: (q: string) => Promise<string>;
@@ -173,7 +178,6 @@ export function registerPlan(program: Command): void {
         // A dry-run is a read-only preview across the whole command boundary;
         // deleting another process's draft tasks here would violate that contract.
         if (!dryRun) cleanupDraftTasks(root);
-
         const asDraft = opts.confirm !== false;
 
         const spinnerLabel = lang === 'tr' ? 'Planlanıyor…' : 'Planning…';
@@ -181,6 +185,7 @@ export function registerPlan(program: Command): void {
         spinner.start();
         let sprint;
         let planDigest: string | undefined;
+        let topology: ExecutionTopology | undefined;
         try {
           if (dryRun) {
             // --dry-run is already a pure preview (never writes task files) —
@@ -193,7 +198,11 @@ export function registerPlan(program: Command): void {
             });
             sprint = preview.sprint;
             planDigest = preview.planDigest;
+            topology = preview.topology;
           } else {
+            // A mutating plan replaces prior drafts. Read-only dry-run must
+            // preserve them byte-for-byte.
+            cleanupDraftTasks(root);
             sprint = await planSprint(root, config, context, recommendation, {
               mode: planMode,
               asDraft,
@@ -233,6 +242,19 @@ export function registerPlan(program: Command): void {
         // advisory; an unacknowledged BLOCK (persona-capability mismatch) halts the
         // plan before the approval prompt, mirroring the cost/scope-gate UX.
         const gate = sprint.promptGate;
+        if (topology) {
+          print('');
+          const labels = buildPlanPreviewCardLabels(lang);
+          for (const line of formatTopologyLines({
+            topology,
+            topologyGateResult: topology.verdict === 'block' ? 'fail' : 'pass',
+          }, labels)) {
+            print(line);
+          }
+          if (topology.verdict === 'block') {
+            process.exitCode = 1;
+          }
+        }
         if (gate && gate.findings.length > 0) {
           print('');
           print(getMessage('plan.prompt_gate_header', lang, { count: String(gate.findings.length) }));

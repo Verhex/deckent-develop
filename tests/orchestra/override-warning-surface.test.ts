@@ -25,13 +25,16 @@ import { collectOverrideWarnings } from '../../src/orchestra/sprint-planner.js';
 // orchestra/sprint-planner.js is intentionally NOT mocked — collectOverrideWarnings
 // must be the real implementation for the CLI-level assertions below to be honest.
 
-vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+vi.mock('../../src/core/config.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/config.js')>()),
+  readAuthMode: vi.fn().mockResolvedValue('subscription'),
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
 }));
 
-vi.mock('../../src/core/provider.js', () => ({
+vi.mock('../../src/core/provider.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/provider.js')>()),
   bootstrapProviders: vi.fn().mockResolvedValue({
     connector: {},
     registered: ['claude'],
@@ -82,13 +85,19 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
     modes: {} as any,
     language: 'en', projectName: 'test', projectRoot: '/mock/root',
     version: '1.0.0', auto_docs: { tier1: true, tier2: true, tier3: false },
+    worker_provider: 'claude',
+    spawn_backend: 'docker',
+    execution_budget: {
+      roles: { worker: { default: { maxTurns: 1 } } },
+      landing: { reserve_ratio: 0.25 },
+    },
     ...overrides,
   };
 }
 
 function makeTask(overrides?: Partial<Task>): Task {
   return {
-    id: '395-001', title: 'Test Task', description: 'desc', model: 'sonnet',
+    id: '395-001', title: 'Test Task', description: 'desc', model: 'claude-sonnet-5',
     effort: 'normal', priority: 'NORMAL', reason: 'test',
     scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
     dependencies: [],

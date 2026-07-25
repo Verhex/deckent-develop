@@ -15,8 +15,16 @@ import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import type { ModelType, Task, TaskResult } from '../core/types.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import type { ExecutionBudget } from '../core/work-model.js';
+import type { AttendedExecutionApprovalAuthority } from '../core/attended-execution-approval.js';
+import { createAttendedExecutionProposalMaterialFromTask } from '../core/attended-execution-proposal.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
+import {
+  preflightProviderExecutionIngress,
+  ProviderExecutionIngressHoldError,
+} from '../core/provider-execution-ingress-authority.js';
 import { resolveDefaultModel } from '../core/config.js';
 import { applyWorkerExecutionBudgetPolicy } from '../core/execution-plan-digest.js';
+import { orderedRoleProviders } from '../core/provider.js';
 import { buildExecutionRequest, resolveExecutionModelIdentity, resolveToTask } from './execution-request-builder.js';
 import { createRunTaskId } from '../cli/commands/run.js';
 import { spawnWorkerMultiProvider } from '../cli/commands/spawn.js';
@@ -28,6 +36,7 @@ import type { UserOverride } from '../core/routing-types.js';
 import { debugLog, readJsonSafe } from '../core/utils.js';
 import { normalizeTaskResultShape } from '../core/task-result-schema.js';
 import type { TaskResultSettlementRefV1 } from '../core/task-result-settlement.js';
+import { writeEvent } from './event-stream.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -54,6 +63,13 @@ export interface TaskModeContext {
   autoApprove?: boolean;
   /** Optional request ceiling. Owner config remains authority; this may only narrow it. */
   budget?: ExecutionBudget;
+  /** Trusted host composition; absence keeps attended hard-stop execution on HOLD. */
+  attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+  /** Process-scoped provider authority; never constructed by the task runner. */
+  providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  /** Exact tenant/run identity for an attended approval request. */
+  executionTenantId?: string;
+  executionRunId?: string;
   /** Project root override */
   projectRoot?: string;
 }
@@ -226,6 +242,53 @@ export async function runTaskMode(
     throw new Error(`EXECUTION_BUDGET_HOLD:${budgetPolicy.reasonCode}:${budgetPolicy.profileRef}`);
   }
 
+  if (ctx.providerAuthority) {
+    const providerOrder = orderedRoleProviders('worker', config);
+    const request = Object.freeze({
+      role: 'worker' as const,
+      purpose: 'worker-execution' as const,
+      runId: ctx.executionRunId ?? task.sprintId ?? taskId,
+      taskId,
+      provider: identity.provider,
+      model,
+      configuredBackend: config.spawn_backend ?? 'auto',
+      fallbackProviders: Object.freeze(
+        [providerOrder.primary, ...providerOrder.fallbacks]
+          .filter(candidate => candidate !== identity.provider),
+      ),
+      unattended: task.budgetPolicy?.admissionMode !== 'attended',
+    });
+    const providerAuthority = preflightProviderExecutionIngress(
+      ctx.providerAuthority,
+      request,
+    );
+    if (providerAuthority.decision === 'hold') {
+      let durableEvidenceWritten = false;
+      try {
+        durableEvidenceWritten = Boolean(writeEvent(
+          projectRoot,
+          request.runId,
+          'brain',
+          'auditor',
+          'BRAIN→AUDITOR:PROVIDER_AUTHORITY_HOLD',
+          {
+            ...request,
+            reasonCode: providerAuthority.reasonCode,
+            authorityEvidenceRefs: providerAuthority.authorityEvidenceRefs,
+          },
+        ));
+      } catch (error) {
+        debugLog('task-mode:provider-authority-hold-event', error);
+      }
+      throw new ProviderExecutionIngressHoldError(
+        providerAuthority.reasonCode,
+        providerAuthority.authorityEvidenceRefs,
+        request,
+        durableEvidenceWritten,
+      );
+    }
+  }
+
   // WM-1b: V2 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
   try {
     const routingVersion = config.routing_engine ?? 'v2';
@@ -292,6 +355,19 @@ export async function runTaskMode(
       dockerTimeout: config.docker_timeout,
       provider: execReq.provider,
       executionBudget: task.budget,
+      executionLandingPolicy: task.budgetPolicy?.landingPolicy,
+      executionBudgetProfileRef: task.budgetPolicy?.profileRef,
+      executionBudgetPolicyDigest: task.budgetPolicy?.policyDigest,
+      executionAdmissionMode: task.budgetPolicy?.admissionMode,
+      executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
+      executionApprovalProposal: task.budgetPolicy?.approvalProposal,
+      executionApprovalMaterial: createAttendedExecutionProposalMaterialFromTask(
+        task as unknown as Record<string, unknown>,
+        prompt,
+      ),
+      attendedExecutionApprovalAuthority: ctx.attendedExecutionApprovalAuthority,
+      executionTenantId: ctx.executionTenantId ?? task.actor?.tenantId,
+      executionRunId: ctx.executionRunId ?? task.sprintId ?? taskId,
     },
   );
 

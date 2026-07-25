@@ -2,10 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
-const { mockSubmit } = vi.hoisted(() => ({ mockSubmit: vi.fn() }));
+const { mockSubmit, mockClose } = vi.hoisted(() => ({
+  mockSubmit: vi.fn(),
+  mockClose: vi.fn(),
+}));
 
 vi.mock('../../../src/cli/helpers/process-runtime.js', () => ({
-  buildProcessController: vi.fn().mockResolvedValue({ submit: mockSubmit, status: vi.fn() }),
+  buildProcessController: vi.fn().mockResolvedValue({
+    submit: mockSubmit,
+    status: vi.fn(),
+    close: mockClose,
+  }),
 }));
 
 vi.mock('../../../src/orchestra/autonomous/backlog.js', () => ({
@@ -62,6 +69,41 @@ describe('deckent_process MCP tool', () => {
     expect(ctx.origin).toBe('mcp');
     expect((ctx.capabilityTarget as { capability: string }).capability).toBe('erp.read');
     expect(out).toMatchObject({ action: 'submit', executionId: 'proc-1', status: 'pending-approval' });
+    expect(mockClose).toHaveBeenCalledOnce();
+  });
+
+  it('returns a structured held result unchanged and closes the controller', async () => {
+    mockSubmit.mockResolvedValueOnce({
+      executionId: 'proc-held',
+      status: 'held',
+      providerAuthorityHold: {
+        schemaVersion: 1,
+        executionId: 'proc-held',
+        tenantId: 'local',
+        projectId: null,
+        reasonCode: 'policy_authority_unavailable',
+        authorityEvidenceRefs: ['provider-authority:hold'],
+        heldAt: '2026-07-25T10:00:00.000Z',
+      },
+    });
+
+    const out = parse(await call({
+      action: 'submit',
+      root: '/r',
+      description: 'summarize docs',
+      kind: 'task',
+      scopeDir: 'docs/',
+    }));
+
+    expect(out).toMatchObject({
+      action: 'submit',
+      executionId: 'proc-held',
+      status: 'held',
+      providerAuthorityHold: {
+        reasonCode: 'policy_authority_unavailable',
+      },
+    });
+    expect(mockClose).toHaveBeenCalledOnce();
   });
 
   it('action=submit without description → error', async () => {

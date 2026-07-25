@@ -23,6 +23,10 @@
 
 import { spawn as nodeSpawn } from 'node:child_process';
 import type { SpawnOptionsWithoutStdio } from 'node:child_process';
+import {
+  buildCliInvocation,
+  scrubCrossProviderEnv,
+} from './provider.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -100,25 +104,59 @@ export interface ProbeSubscriptionLimitsOptions {
   timeoutMs?: number;
   /** Override the `claude` binary name/path (default 'claude'). */
   claudeBin?: string;
+  /** Maximum stdout bytes accepted from the local command (default 64 KiB). */
+  maxOutputBytes?: number;
+  /** Cross-platform CLI wrapper resolution (default current platform). */
+  platform?: NodeJS.Platform;
+  /** Host environment to scrub before the subscription command. */
+  env?: NodeJS.ProcessEnv;
+  /** Additional config-defined credential keys. Canonical built-ins are always scrubbed. */
+  additionalCredentialKeys?: readonly string[];
 }
 
 const DEFAULT_TIMEOUT_MS = 15_000;
+const DEFAULT_MAX_OUTPUT_BYTES = 64 * 1024;
+const MAX_TIMEOUT_MS = 60_000;
+const MAX_OUTPUT_BYTES = 1024 * 1024;
 
-function collectStream(stream: NodeJS.ReadableStream | null): Promise<string> {
-  if (stream === null) return Promise.resolve('');
+function collectStream(
+  stream: NodeJS.ReadableStream | null,
+  maxOutputBytes: number,
+  onTruncated: () => void,
+): Promise<{ readonly stdout: string; readonly truncated: boolean }> {
+  if (stream === null) return Promise.resolve({ stdout: '', truncated: false });
   const chunks: Buffer[] = [];
-  return new Promise((resolve, reject) => {
+  let bytes = 0;
+  let truncated = false;
+  return new Promise((resolve) => {
     stream.on('data', (chunk: string | Buffer) => {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      const remaining = maxOutputBytes - bytes;
+      if (remaining > 0) {
+        const accepted = value.subarray(0, remaining);
+        chunks.push(accepted);
+        bytes += accepted.length;
+      }
+      if (!truncated && value.length > remaining) {
+        truncated = true;
+        onTruncated();
+      }
     });
-    stream.on('error', reject);
-    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    stream.on('error', () => resolve({
+      stdout: Buffer.concat(chunks).toString('utf8'),
+      truncated: true,
+    }));
+    stream.on('end', () => resolve({
+      stdout: Buffer.concat(chunks).toString('utf8'),
+      truncated,
+    }));
   });
 }
 
 interface UsageRunResult {
   code: number;
   stdout: string;
+  truncated: boolean;
 }
 
 /**
@@ -130,17 +168,31 @@ function runClaudeUsage(
   spawnImpl: SpawnImpl,
   claudeBin: string,
   timeoutMs: number,
+  maxOutputBytes: number,
+  platform: NodeJS.Platform,
+  env: NodeJS.ProcessEnv,
 ): Promise<UsageRunResult | null> {
   return new Promise((resolve) => {
     let child: SpawnedProcessLike;
     try {
-      child = spawnImpl(claudeBin, ['-p', '/usage'], { shell: false });
+      const invocation = buildCliInvocation(claudeBin, ['-p', '/usage'], platform);
+      child = spawnImpl(invocation.command, invocation.args, {
+        shell: invocation.shell,
+        env,
+      });
     } catch {
       resolve(null);
       return;
     }
 
-    const stdoutP = collectStream(child.stdout);
+    const stdoutP = collectStream(child.stdout, maxOutputBytes, () => {
+      try {
+        child.kill('SIGKILL');
+      } catch {
+        // best-effort — close/timeout still resolves the unavailable path
+      }
+    });
+    child.stderr?.resume();
     let settled = false;
 
     const timer = setTimeout(() => {
@@ -165,7 +217,11 @@ function runClaudeUsage(
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      void stdoutP.then((stdout) => resolve({ code: code ?? -1, stdout }));
+      void stdoutP.then(({ stdout, truncated }) => resolve({
+        code: code ?? -1,
+        stdout,
+        truncated,
+      }));
     });
   });
 }
@@ -267,13 +323,55 @@ export async function probeSubscriptionLimits(
     opts.spawnImpl ?? ((command, args, options) => nodeSpawn(command, args, options));
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const claudeBin = opts.claudeBin ?? 'claude';
+  const maxOutputBytes = opts.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > MAX_TIMEOUT_MS) {
+    return {
+      unavailable: true,
+      reason: 'claude -p "/usage" timeout bound is invalid',
+      raw: '',
+    };
+  }
+  if (!Number.isSafeInteger(maxOutputBytes)
+    || maxOutputBytes <= 0
+    || maxOutputBytes > MAX_OUTPUT_BYTES) {
+    return {
+      unavailable: true,
+      reason: 'claude -p "/usage" max output bound is invalid',
+      raw: '',
+    };
+  }
 
-  const run = await runClaudeUsage(spawnImpl, claudeBin, timeoutMs);
+  // Same sanctioned core→provider lazy seam used by bootstrapProviders in
+  // provider.ts: avoid a static layer edge while keeping one credential-key authority.
+  const { resolveCrossProviderCredentialKeys } =
+    await import('../providers/cross-provider-keys.js');
+  const credentialKeys = [
+    ...new Set([
+      ...resolveCrossProviderCredentialKeys(),
+      ...(opts.additionalCredentialKeys ?? []),
+    ]),
+  ];
+  const childEnv = scrubCrossProviderEnv(opts.env ?? process.env, credentialKeys);
+  const run = await runClaudeUsage(
+    spawnImpl,
+    claudeBin,
+    timeoutMs,
+    maxOutputBytes,
+    opts.platform ?? process.platform,
+    childEnv,
+  );
   if (run === null) {
     return {
       unavailable: true,
       reason: `claude -p "/usage" spawn failed or exceeded ${timeoutMs}ms timeout`,
       raw: '',
+    };
+  }
+  if (run.truncated) {
+    return {
+      unavailable: true,
+      reason: `claude -p "/usage" exceeded ${maxOutputBytes} stdout bytes`,
+      raw: run.stdout,
     };
   }
   if (run.code !== 0) {

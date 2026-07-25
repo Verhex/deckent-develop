@@ -22,8 +22,8 @@ function request(overrides: Partial<ReachabilityProbeRequest> = {}): Reachabilit
   const model = overrides.model ?? 'anthropic/claude-fable-5';
   const auth = overrides.auth ?? { mode: 'api' as const, accountRefHash: HASH_A };
   const backend = overrides.backend ?? {
-    transport: 'http' as const,
-    executionBackend: 'in-process' as const,
+    transport: 'api' as const,
+    executionBackend: 'api' as const,
     endpointRefHash: HASH_B,
     runtimeFingerprint: HASH_C,
     executionProfileRef: 'execution-profile:00000001',
@@ -32,6 +32,7 @@ function request(overrides: Partial<ReachabilityProbeRequest> = {}): Reachabilit
     profileRef: 'execution-profile:00000001',
     provider,
     allowed: [
+      { authMode: 'api' as const, transport: 'api' as const, executionBackend: 'api' as const },
       { authMode: 'api' as const, transport: 'http' as const, executionBackend: 'in-process' as const },
       { authMode: 'api' as const, transport: 'http' as const, executionBackend: 'docker' as const },
     ],

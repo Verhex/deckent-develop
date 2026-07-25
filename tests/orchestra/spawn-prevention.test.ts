@@ -315,11 +315,14 @@ const mockedGetProviderAdapterForTask = vi.mocked(getProviderAdapterForTask);
 // ─── Test Helpers ───────────────────────────────────────────────────
 
 function makeTask(overrides: Partial<Task> = {}): Task {
+  const model = overrides.model ?? 'claude-sonnet-5';
+  const resolvedProvider = overrides.provider
+    ?? (model.startsWith('gemini-') ? 'gemini' : /^(gpt-|o\d)/.test(model) ? 'codex' : 'claude');
   return {
     id: 'test-001',
     title: 'Test Task',
     description: 'A test task for spawn prevention',
-    model: 'claude-sonnet-5',
+    model,
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'testing',
@@ -330,6 +333,17 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     sprintId: 'sprint-test',
     createdAt: new Date().toISOString(),
     budget: { maxTurns: 1 },
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      taskKind: 'code-development',
+      resolvedProvider,
+      executionCostClass: 'remote',
+      profileRef: 'tests.orchestra.spawn-prevention',
+      policyDigest: '8'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: { reserve_ratio: 0.25 },
+    },
     ...overrides,
   } as Task;
 }
@@ -359,6 +373,7 @@ function makeMockBackend(): SpawnBackend {
   return {
     name: 'mock',
     liveUsageBudgetSupport: 'measured-stream',
+    executionLandingCapability: 'cooperative-landing',
     spawn: vi.fn(),
     kill: vi.fn(),
     list: vi.fn(() => []),
@@ -425,7 +440,13 @@ describe('spawnWorkers — spawn prevention (backend vs legacy)', () => {
     mockedResolveTaskProvider.mockReturnValue('codex');
     mockedIsTmuxProvider.mockReturnValue(false);
 
-    const mockAdapter = { spawn: vi.fn(), kill: vi.fn(), name: 'codex' };
+    const mockAdapter = {
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      name: 'codex',
+      liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
+    };
     mockedGetProviderAdapterForTask.mockReturnValue(mockAdapter as never);
 
     const task = makeTask({ provider: 'codex' as never });
@@ -464,6 +485,7 @@ describe('spawnWorkers — spawn prevention (backend vs legacy)', () => {
     const mockAdapter = {
       name: 'codex',
       liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
       spawn: vi.fn(),
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),

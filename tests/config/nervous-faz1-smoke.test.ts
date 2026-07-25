@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { NERVOUS_SYSTEM_SCHEMA } from '../../src/core/config.js';
+import { createDefaultConfig, NERVOUS_SYSTEM_SCHEMA } from '../../src/core/config.js';
 
 const root = resolve(import.meta.dirname, '..', '..');
 
@@ -54,30 +54,32 @@ describe.skipIf(!hasConfig)('Nervous Faz 1 smoke config (.deckent/config.json)',
     expect(notifications['severity_min']).toBe('info');
   });
 
-  it('stale_worker detector is enabled with threshold_ms 180000', () => {
-    const detectors = ns['detectors'] as Record<string, Record<string, unknown>>;
-    expect(detectors['stale_worker']['enabled']).toBe(true);
-    expect(detectors['stale_worker']['threshold_ms']).toBe(180000);
+});
+
+describe('Nervous Faz 1 product defaults (createDefaultConfig authority)', () => {
+  const ns = createDefaultConfig().nervous_system!;
+  const detectors = ns.detectors;
+
+  it('stale_worker is enabled with the canonical 120000ms threshold', () => {
+    expect(detectors.stale_worker.enabled).toBe(true);
+    expect(detectors.stale_worker.threshold_ms).toBe(120000);
   });
 
-  it('dead_event_stream detector is enabled (Sprint 148 reserve cleared)', () => {
-    const detectors = ns['detectors'] as Record<string, Record<string, unknown>>;
-    expect(detectors['dead_event_stream']['enabled']).toBe(true);
+  it('dead_event_stream is available but default-off', () => {
+    expect(detectors.dead_event_stream.enabled).toBe(false);
+    expect(detectors.dead_event_stream.reserve_for).toBeUndefined();
   });
 
-  it('directives_protection detector is enabled', () => {
-    const detectors = ns['detectors'] as Record<string, Record<string, unknown>>;
-    expect(detectors['directives_protection']['enabled']).toBe(true);
+  it('directives_protection is enabled', () => {
+    expect(detectors.directives_protection.enabled).toBe(true);
   });
 
-  it('exactly 8 detectors are enabled', () => {
-    const detectors = ns['detectors'] as Record<string, Record<string, unknown>>;
-    const enabledCount = Object.values(detectors).filter((d) => d['enabled'] === true).length;
-    expect(enabledCount).toBe(8);
+  it('exactly five base detectors are enabled by default', () => {
+    const enabledCount = Object.values(detectors).filter((d) => d.enabled === true).length;
+    expect(enabledCount).toBe(5);
   });
 
   it('W0 6 new detectors are all disabled', () => {
-    const detectors = ns['detectors'] as Record<string, Record<string, unknown>>;
     const w0Detectors = [
       'task_mode_idle',
       'build_failure_recurrence',
@@ -87,7 +89,7 @@ describe.skipIf(!hasConfig)('Nervous Faz 1 smoke config (.deckent/config.json)',
       'notification_delivery_health',
     ] as const;
     for (const name of w0Detectors) {
-      expect(detectors[name]['enabled'], `${name} should be disabled`).toBe(false);
+      expect(detectors[name].enabled, `${name} should be disabled`).toBe(false);
     }
   });
 });

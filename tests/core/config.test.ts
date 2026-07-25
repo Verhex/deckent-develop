@@ -15,6 +15,7 @@ import {
   clearConfigCache,
 } from '../../src/core/config.js';
 import type { SystemProfile, PlanMode } from '../../src/core/types.js';
+import type { ProviderLimitsConfig } from '../../src/core/config-types.js';
 import { DEFAULT_MODE } from '../../src/core/constants.js';
 import { ProviderConfigAliasConflictError } from '../../src/core/provider-config-canonicalizer.js';
 
@@ -34,6 +35,39 @@ import { readFile } from 'node:fs/promises';
 
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedReadFile = vi.mocked(readFile);
+
+function providerLimits(
+  authorityRef: string,
+  values: ProviderLimitsConfig['policies'][number]['values'],
+): ProviderLimitsConfig {
+  return {
+    schemaVersion: 1,
+    authorityRef,
+    policies: [{
+      selector: {
+        tenantId: 'local',
+        provider: 'claude',
+        accountRefHash: 'a'.repeat(64),
+        quotaScopeRefHash: 'b'.repeat(64),
+        authMode: 'subscription',
+        backend: {
+          transport: 'cli',
+          executionBackend: 'host-subprocess',
+          endpointRefHash: 'c'.repeat(64),
+        },
+        requiredWindowIds: ['session'],
+        sourceScopes: [{
+          sourceKind: 'provider-cli',
+          authority: 'authoritative',
+          transport: 'cli',
+          executionBackend: 'host-subprocess',
+          endpointRefHash: 'c'.repeat(64),
+        }],
+      },
+      values,
+    }],
+  };
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -124,6 +158,41 @@ describe('loadConfig', () => {
     const config = await loadConfig('/test/project');
     expect(config.language).toBe('tr');
     expect(config.mode).toBe('balanced');
+  });
+
+  it('preserves the canonical frozen provider-limit authority envelope after interpolation', async () => {
+    const parent = providerLimits(
+      'provider-limit-authority:global-0001',
+      { warnAtRatio: 0.7, blockAtRatio: 0.9, minimumRemaining: { tokens: 100 } },
+    );
+    const project = providerLimits(
+      'provider-limit-project:project-0001',
+      { blockAtRatio: 0.8, minimumRemaining: { tokens: 150 } },
+    );
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFile
+      .mockResolvedValueOnce(JSON.stringify({ provider_limits: parent }))
+      .mockResolvedValueOnce(JSON.stringify({ provider_limits: project }));
+
+    const config = await loadConfig('/test/project');
+
+    expect(config.provider_limit_authority).toMatchObject({
+      parent: {
+        scope: 'global',
+        config: { authorityRef: parent.authorityRef },
+      },
+      project: {
+        scope: 'project',
+        config: { authorityRef: project.authorityRef },
+      },
+    });
+    expect(Object.isFrozen(config.provider_limit_authority)).toBe(true);
+    expect(Object.isFrozen(
+      config.provider_limit_authority?.parent?.config.policies[0]?.values,
+    )).toBe(true);
+    expect(() => {
+      config.provider_limit_authority!.parent!.config.policies[0]!.values.blockAtRatio = 1;
+    }).toThrow(TypeError);
   });
 
   it('deep merges nested mode config', async () => {

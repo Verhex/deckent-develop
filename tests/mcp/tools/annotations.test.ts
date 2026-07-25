@@ -49,9 +49,13 @@ vi.mock('../../../src/core/config.js', () => ({
   validatePartialConfig: vi.fn(),
 }));
 
-vi.mock('../../../src/core/provider.js', () => ({
-  bootstrapProviders: vi.fn().mockResolvedValue(null),
-}));
+vi.mock('../../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/core/provider.js')>();
+  return {
+    ...actual,
+    bootstrapProviders: vi.fn().mockResolvedValue(null),
+  };
+});
 
 vi.mock('../../../src/orchestra/brain.js', () => ({
   readContext: vi.fn().mockReturnValue({}),

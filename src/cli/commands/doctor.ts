@@ -296,11 +296,31 @@ export function getMemoryHealthLabel(pct: number): string {
   return 'healthy';
 }
 
+type DoctorProviderAuthVerdict = 'ready' | 'logged-out' | 'unknown' | 'unavailable';
+
+function getDoctorProviderAuthVerdict(
+  provider: DetectedProvider,
+  authProbes?: Record<string, AuthProbeResult>,
+): DoctorProviderAuthVerdict {
+  if (!provider.available) return 'unavailable';
+  const probe = authProbes?.[provider.name];
+  if (!probe) return 'ready';
+  if (probe.state === 'logged-in') return 'ready';
+  return probe.state;
+}
+
 /**
- * Compute a provider summary: "N/M providers ready"
+ * Compute a provider summary: "N/M providers ready".
+ * When PSL-6 evidence is present, binary/config availability alone is not
+ * counted as authenticated readiness.
  */
-export function getProviderSummary(providers: DetectedProvider[]): string {
-  const ready = providers.filter(p => p.available).length;
+export function getProviderSummary(
+  providers: DetectedProvider[],
+  authProbes?: Record<string, AuthProbeResult>,
+): string {
+  const ready = providers.filter(
+    provider => getDoctorProviderAuthVerdict(provider, authProbes) === 'ready',
+  ).length;
   const total = providers.length;
   return `${ready}/${total} providers ready`;
 }
@@ -329,17 +349,95 @@ export function getReadinessLabel(result: DoctorResult, brainLines: number, brai
  *
  * Ollama probe is cheap (HTTP ping with 3s timeout) and never throws.
  */
-export async function runProviderDiagnosticsWithOllama(root: string): Promise<ProviderAvailabilityDetail[]> {
+export function reconcileProviderDiagnosticsAuth(
+  details: ProviderAvailabilityDetail[],
+  authProbes: Record<string, AuthProbeResult>,
+  lang: string = 'en',
+): ProviderAvailabilityDetail[] {
+  return details.map((detail): ProviderAvailabilityDetail => {
+    const catalogBounded: ProviderAvailabilityDetail = {
+      ...detail,
+      modelsEvidence: 'catalog-only',
+    };
+    if (!AUTH_PROBE_PROVIDERS.has(detail.name) || !detail.binaryFound) {
+      return catalogBounded;
+    }
+
+    const probe = authProbes[detail.name] ?? {
+      state: 'unknown',
+      present: 'unknown',
+      authenticated: 'unknown',
+      method: 'none',
+    } satisfies AuthProbeResult;
+    const authEvidence: NonNullable<ProviderAvailabilityDetail['authEvidence']> = {
+      source: 'local-auth-probe',
+      state: probe.state,
+      method: probe.method ?? 'none',
+      present: probe.present ?? 'unknown',
+      authenticated: probe.authenticated ?? 'unknown',
+    };
+
+    if (probe.state === 'logged-in') {
+      return {
+        ...catalogBounded,
+        authMethod: probe.method === 'api-key'
+          ? 'api_key'
+          : probe.method === 'subscription'
+            ? 'session'
+            : 'unknown',
+        authStatus: 'ok',
+        available: detail.versionStatus !== 'missing',
+        partial: false,
+        reason: authProbeConfirmedLine(probe, lang),
+        authEvidence,
+      };
+    }
+
+    if (probe.state === 'logged-out') {
+      return {
+        ...catalogBounded,
+        authMethod: 'none',
+        authStatus: 'missing',
+        available: false,
+        partial: true,
+        reason: authProbeLoggedOutLine(detail.name, lang),
+        authEvidence,
+      };
+    }
+
+    return {
+      ...catalogBounded,
+      authMethod: probe.method === 'api-key' ? 'api_key' : 'unknown',
+      authStatus: 'unknown',
+      available: false,
+      partial: true,
+      reason: authProbeUnknownLine(lang),
+      authEvidence,
+    };
+  });
+}
+
+export async function runProviderDiagnosticsWithOllama(
+  root: string,
+  probeFn: typeof probeProviderAuth = probeProviderAuth,
+  lang: string = 'en',
+): Promise<ProviderAvailabilityDetail[]> {
   const base = await runProviderDiagnostics(root);
+  let details = base;
   try {
     const { createOllamaAdapter } = await import('../../providers/ollama.js');
     const ollama = createOllamaAdapter(root);
     const ollamaDiag = await ollama.diagnoseAvailability();
-    return [...base, ollamaDiag];
+    details = [...base, ollamaDiag];
   } catch {
     // Lazy import / probe failure should never break the doctor output.
-    return base;
+    details = base;
   }
+  const authProbes = await runAuthProbesForNames(
+    details.filter(detail => detail.binaryFound).map(detail => detail.name),
+    probeFn,
+  );
+  return reconcileProviderDiagnosticsAuth(details, authProbes, lang);
 }
 
 export function getProviderPartialHint(name: string): string {
@@ -384,6 +482,7 @@ export function doctorStatusIcon(state: 'pass' | 'warn' | 'fail'): string {
  */
 export function formatProviderDiagnosticsActionable(
   details: ProviderAvailabilityDetail[],
+  lang: string = 'en',
 ): string {
   const lines: string[] = ['Provider Diagnostics:'];
   for (const d of details) {
@@ -399,7 +498,11 @@ export function formatProviderDiagnosticsActionable(
       const hint = getProviderPartialHint(d.name);
       // Sprint 192 Task 192-007: Ollama partial = server reachable, no models pulled.
       // Other providers: binary OK, auth missing. Tailor the label so it reads correctly.
-      const partialReason = d.name === 'ollama' ? 'server reachable, no models' : 'binary OK, auth missing';
+      const partialReason = d.name === 'ollama'
+        ? 'server reachable, no models'
+        : d.authStatus === 'unknown'
+          ? getMessage('doctor.provider_diagnostics_auth_unverified', lang)
+          : getMessage('doctor.provider_diagnostics_auth_missing', lang);
       stateLabel = `(${partialReason} — ${hint})`;
     } else {
       // Ollama has no CLI binary — `false` ready state means the local server is unreachable.
@@ -435,7 +538,11 @@ export function buildConnectorHealthResults(providers: DetectedProvider[]): Heal
   return providers.map(p => ({
     provider: p.name,
     available: p.available,
-    authStatus: (p.authMethod !== 'none' ? 'ok' : 'missing') as HealthCheckResult['authStatus'],
+    authStatus: (
+      p.authMethod !== 'none' || (p.name === 'ollama' && p.available)
+        ? 'ok'
+        : 'missing'
+    ) as HealthCheckResult['authStatus'],
     cliVersion: p.version ?? null,
     error: null,
   }));
@@ -453,10 +560,37 @@ const AUTH_PROBE_PROVIDERS = new Set(['claude', 'codex', 'gemini']);
 /** Short per-probe timeout so `deckent doctor` never stalls on a hung CLI. */
 const DOCTOR_AUTH_PROBE_TIMEOUT_MS = 2_000;
 
+async function runAuthProbesForNames(
+  providerNames: readonly string[],
+  probeFn: typeof probeProviderAuth,
+  timeoutMs: number = DOCTOR_AUTH_PROBE_TIMEOUT_MS,
+): Promise<Record<string, AuthProbeResult>> {
+  const targets = [...new Set(providerNames.filter(name => AUTH_PROBE_PROVIDERS.has(name)))];
+  const entries = await Promise.all(
+    targets.map(async (name): Promise<readonly [string, AuthProbeResult]> => {
+      try {
+        return [name, await probeFn(name, { timeoutMs })] as const;
+      } catch {
+        return [
+          name,
+          {
+            state: 'unknown',
+            detail: 'auth probe failed',
+            present: 'unknown',
+            authenticated: 'unknown',
+            method: 'none',
+          },
+        ] as const;
+      }
+    }),
+  );
+  return Object.fromEntries(entries);
+}
+
 /**
  * Run the auth probe for every AVAILABLE provider the probe understands, in
  * PARALLEL with a short timeout. Never throws — a failing probe degrades to
- * 'unknown' (which maps to existing behavior, no regression). `probeFn` is
+ * 'unknown' (which is reported as unverified, never guessed ready). `probeFn` is
  * injectable so the wiring can be tested hermetically (no real fs/spawn).
  *
  * @returns provider-name → {@link AuthProbeResult} (only for probed providers).
@@ -466,17 +600,11 @@ export async function runAuthProbes(
   probeFn: typeof probeProviderAuth = probeProviderAuth,
   timeoutMs: number = DOCTOR_AUTH_PROBE_TIMEOUT_MS,
 ): Promise<Record<string, AuthProbeResult>> {
-  const targets = providers.filter(p => p.available && AUTH_PROBE_PROVIDERS.has(p.name));
-  const entries = await Promise.all(
-    targets.map(async (p): Promise<readonly [string, AuthProbeResult]> => {
-      try {
-        return [p.name, await probeFn(p.name, { timeoutMs })] as const;
-      } catch {
-        return [p.name, { state: 'unknown', detail: 'auth probe failed' }] as const;
-      }
-    }),
+  return runAuthProbesForNames(
+    providers.filter(provider => provider.available).map(provider => provider.name),
+    probeFn,
+    timeoutMs,
   );
-  return Object.fromEntries(entries);
 }
 
 /** The single command that starts an interactive login for a provider. */
@@ -489,16 +617,76 @@ function getProviderLoginCmd(name: string): string {
   }
 }
 
-/**
- * Localized "CLI present but NOT logged in" diagnostic (EN default, TR provided).
- * Local i18n: messages.ts is outside this task's write-scope (Task 270-008/014);
- * these two strings live here and can be centralized later.
- */
 function authProbeLoggedOutLine(name: string, lang: string): string {
-  const cmd = getProviderLoginCmd(name);
-  return lang === 'tr'
-    ? `CLI mevcut ama oturum AÇILMAMIŞ — çalıştırın: ${cmd}`
-    : `CLI present but NOT logged in — run: ${cmd}`;
+  return getMessage('doctor.provider_auth_logged_out', lang, {
+    command: getProviderLoginCmd(name),
+  });
+}
+
+function authProbeUnknownLine(lang: string): string {
+  return getMessage('doctor.provider_auth_unknown', lang);
+}
+
+function authProbeConfirmedLine(probe: AuthProbeResult, lang: string): string {
+  const methodKey = probe.method === 'subscription'
+    ? 'doctor.provider_auth_method_subscription'
+    : probe.method === 'api-key'
+      ? 'doctor.provider_auth_method_api_key'
+      : 'doctor.provider_auth_method_unclassified';
+  return getMessage('doctor.provider_auth_confirmed', lang, {
+    method: getMessage(methodKey, lang),
+  });
+}
+
+function buildProviderAuthDoctorChecks(
+  providers: DetectedProvider[],
+  authProbes: Record<string, AuthProbeResult> | undefined,
+  lang: string,
+): DoctorCheck[] {
+  if (!authProbes) return [];
+  const checks: DoctorCheck[] = [];
+  for (const provider of providers) {
+    const verdict = getDoctorProviderAuthVerdict(provider, authProbes);
+    if (verdict !== 'logged-out' && verdict !== 'unknown') continue;
+    checks.push({
+      name: getMessage('doctor.provider_auth_check_name', lang, {
+        provider: capitalize(provider.name),
+      }),
+      passed: false,
+      message: verdict === 'logged-out'
+        ? authProbeLoggedOutLine(provider.name, lang)
+        : authProbeUnknownLine(lang),
+      required: false,
+    });
+  }
+  return checks;
+}
+
+/**
+ * Project reconciled provider diagnostics into the same optional doctor-check
+ * contract used by the plain CLI. This consumes existing auth evidence and
+ * never launches a second probe.
+ */
+export function buildProviderDiagnosticAuthChecks(
+  details: ProviderAvailabilityDetail[],
+  lang: string = 'en',
+): DoctorCheck[] {
+  const checks: DoctorCheck[] = [];
+  for (const detail of details) {
+    const state = detail.authEvidence?.state;
+    if (state !== 'logged-out' && state !== 'unknown') continue;
+    checks.push({
+      name: getMessage('doctor.provider_auth_check_name', lang, {
+        provider: capitalize(detail.name),
+      }),
+      passed: false,
+      message: state === 'logged-out'
+        ? authProbeLoggedOutLine(detail.name, lang)
+        : authProbeUnknownLine(lang),
+      required: false,
+    });
+  }
+  return checks;
 }
 
 // ─── Config-Based Auth State Probe (ONB-2-DILIM-3, Sprint 368 — 368-002) ─────
@@ -979,9 +1167,10 @@ export async function maybeFixWorkerImage(
  * Includes provider CLI status, .deck file summary, and detected environment.
  *
  * When `authProbes` is supplied (PSL-6, Task 270-006), a provider whose CLI is
- * present but whose probe proves there is NO usable session is downgraded from
- * the legacy "session auth active" PASS line to an actionable [WARN]. A
- * 'logged-in'/'unknown'/absent probe leaves existing behavior unchanged.
+ * present but whose probe does not confirm a usable session is downgraded from
+ * the legacy "session auth active" PASS line to an actionable [WARN].
+ * A confirmed session reports the grounded method; an absent probe preserves
+ * legacy behavior for callers that have not adopted PSL-6 evidence.
  */
 export function formatConnectorHealthLines(
   results: HealthCheckResult[],
@@ -994,9 +1183,15 @@ export function formatConnectorHealthLines(
   for (const r of results) {
     const versionStr = r.cliVersion ? ` ${r.cliVersion}` : '';
     const probe = authProbes?.[r.provider];
-    if (r.available && probe?.state === 'logged-out') {
+    if (r.available && r.provider === 'ollama') {
+      lines.push(`  ${doctorStatusIcon('pass')} ${capitalize(r.provider)} CLI${versionStr} — ${getMessage('doctor.provider_local_runtime_available', lang)}`);
+    } else if (r.available && probe?.state === 'logged-out') {
       // PSL-6: CLI installed but the probe proves no session — louder + actionable.
       lines.push(`  ${doctorStatusIcon('warn')} ${capitalize(r.provider)} CLI${versionStr} — ${authProbeLoggedOutLine(r.provider, lang)}`);
+    } else if (r.available && probe?.state === 'unknown') {
+      lines.push(`  ${doctorStatusIcon('warn')} ${capitalize(r.provider)} CLI${versionStr} — ${authProbeUnknownLine(lang)}`);
+    } else if (r.available && probe?.state === 'logged-in') {
+      lines.push(`  ${doctorStatusIcon('pass')} ${capitalize(r.provider)} CLI${versionStr} — ${authProbeConfirmedLine(probe, lang)}`);
     } else if (r.available && r.authStatus === 'ok') {
       const authLabel = r.provider === 'claude' ? 'session auth active' : 'API key configured';
       lines.push(`  ${doctorStatusIcon('pass')} ${capitalize(r.provider)} CLI${versionStr} — ${authLabel}`);
@@ -1152,6 +1347,12 @@ export function formatDoctorHonestSummary(summary: DoctorHonestSummary, lang: st
  */
 export function formatHumanDoctor(input: HumanDoctorInput): string {
   const { result, providers, brainLines, brainBudget, lastSprintId, debtItems } = input;
+  const lang = input.lang ?? 'en';
+  const providerAuthChecks = buildProviderAuthDoctorChecks(providers, input.authProbes, lang);
+  const presentationResult: DoctorResult = {
+    ...result,
+    checks: [...result.checks, ...providerAuthChecks],
+  };
   const lines: string[] = [];
 
   lines.push('Deckent Health Check');
@@ -1171,10 +1372,20 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
   // Provider status
   for (const p of providers) {
     const version = p.version ? ` v${p.version}` : '';
-    if (p.available) {
+    const authVerdict = getDoctorProviderAuthVerdict(p, input.authProbes);
+    const probe = input.authProbes?.[p.name];
+    if (authVerdict === 'ready') {
       const auth = p.authMethod === 'session' ? 'session auth' : p.authMethod === 'api_key' ? 'API key set' : '';
-      const authLabel = auth ? ` (${auth})` : '';
+      const authLabel = probe?.state === 'logged-in'
+        ? ` (${authProbeConfirmedLine(probe, lang)})`
+        : auth
+          ? ` (${auth})`
+          : '';
       lines.push(`  OK ${capitalize(p.name)} CLI${version} \u2014 Ready${authLabel}`);
+    } else if (authVerdict === 'logged-out') {
+      lines.push(`  WARN ${capitalize(p.name)} CLI${version} \u2014 ${authProbeLoggedOutLine(p.name, lang)}`);
+    } else if (authVerdict === 'unknown') {
+      lines.push(`  WARN ${capitalize(p.name)} CLI${version} \u2014 ${authProbeUnknownLine(lang)}`);
     } else {
       const hint = getProviderHint(p.name);
       // Use SKIP instead of FAIL for optional providers — avoids "FAIL + OK" confusion
@@ -1183,7 +1394,7 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
   }
 
   // Provider summary line
-  lines.push(`  ${getProviderSummary(providers)}`);
+  lines.push(`  ${getProviderSummary(providers, input.authProbes)}`);
 
   lines.push('');
 
@@ -1318,19 +1529,23 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
   }
 
   // --- Readiness ---
-  const readiness = getReadinessLabel(result, brainLines, brainBudget);
+  const readiness = getReadinessLabel(presentationResult, brainLines, brainBudget);
   lines.push(`Status: ${readiness}`);
   lines.push('');
 
   // --- Recommendation ---
   lines.push('Recommendation:');
 
-  const failedRequired = result.checks.filter(c => c.required && !c.passed);
+  const failedRequired = presentationResult.checks.filter(c => c.required && !c.passed);
   if (failedRequired.length > 0) {
     lines.push(`  Fix ${failedRequired.length} required issue${failedRequired.length > 1 ? 's' : ''} before starting a sprint.`);
     for (const c of failedRequired) {
       lines.push(`  \u2192 ${c.name}: ${c.message}`);
     }
+  } else if (providerAuthChecks.length > 0) {
+    lines.push(`  ${getMessage('doctor.provider_auth_recommendation', lang, {
+      count: String(providerAuthChecks.length),
+    })}`);
   } else {
     lines.push('  Everything looks good! You can start a new sprint with `deckent start`.');
   }
@@ -1347,8 +1562,8 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
 
   // --- Honest Summary (ONB-HONEST, Task 357-014) ---
   lines.push('');
-  const honestSummary = buildDoctorHonestSummary(result.checks, input.lang ?? 'en');
-  lines.push(...formatDoctorHonestSummary(honestSummary, input.lang ?? 'en'));
+  const honestSummary = buildDoctorHonestSummary(presentationResult.checks, lang);
+  lines.push(...formatDoctorHonestSummary(honestSummary, lang));
 
   return lines.join('\n');
 }
@@ -2004,7 +2219,7 @@ export function registerDoctor(program: Command): void {
 
       // --providers: detailed binary/version/auth diagnostics for Claude/Codex/Gemini + Ollama
       if (opts.providers) {
-        const diagnostics = await runProviderDiagnosticsWithOllama(root);
+        const diagnostics = await runProviderDiagnosticsWithOllama(root, probeProviderAuth, lang);
         if (opts.json) {
           print(JSON.stringify({ providers: diagnostics }, null, 2));
           const anyMissing = diagnostics.some(d => !d.available && !d.partial);
@@ -2015,7 +2230,7 @@ export function registerDoctor(program: Command): void {
         // per-provider hints (born-557: migrated off ✓/⚠/✗ onto doctorStatusIcon).
         // Legacy formatProviderDiagnostics still exported for callers needing
         // the [OK]/[PARTIAL]/[MISSING] bracket markers.
-        print(formatProviderDiagnosticsActionable(diagnostics));
+        print(formatProviderDiagnosticsActionable(diagnostics, lang));
         return;
       }
 
@@ -2089,12 +2304,41 @@ export function registerDoctor(program: Command): void {
         return;
       }
 
+      // PSL-6 auth evidence is shared by both machine-readable and human doctor
+      // surfaces. The legacy formatter intentionally preserves its historical
+      // provider-detection-only contract.
+      const authProbes = opts.json || !opts.legacy
+        ? await runAuthProbes(providers)
+        : undefined;
+
       if (opts.json) {
+        const providerAuthChecks = buildProviderAuthDoctorChecks(providers, authProbes, lang);
+        const jsonChecks = [...result.checks, ...providerAuthChecks];
+        const providerAuth = providers.map(provider => {
+          const probe = authProbes?.[provider.name];
+          const verdict = getDoctorProviderAuthVerdict(provider, authProbes);
+          return {
+            provider: provider.name,
+            available: provider.available,
+            state: !provider.available
+              ? 'unavailable'
+              : probe?.state ?? 'unprobed',
+            method: probe?.method ?? 'none',
+            ready: verdict === 'ready',
+            evidence: probe ? 'local-auth-probe' : 'availability-only',
+          };
+        });
         const jsonOutput: Record<string, unknown> = {
           ok: result.ok,
-          checks: result.checks,
+          checks: jsonChecks,
           providers,
-          honestSummary: buildDoctorHonestSummary(result.checks, lang),
+          providerAuth,
+          providerSummary: {
+            ready: providerAuth.filter(provider => provider.ready).length,
+            total: providerAuth.length,
+            authWarningCount: providerAuthChecks.length,
+          },
+          honestSummary: buildDoctorHonestSummary(jsonChecks, lang),
         };
         if (opts.profile) {
           const profile = getSystemProfile();
@@ -2126,9 +2370,6 @@ export function registerDoctor(program: Command): void {
         const lastSprintId = getLastSprintId(root);
         const debtItems = countDebtItems(root);
         const connectorHealthResults = buildConnectorHealthResults(providers);
-        // PSL-6 (Task 270-006): probe real login state in parallel (short timeout)
-        // so "CLI present but NOT logged in" is surfaced, not assumed-OK.
-        const authProbes = await runAuthProbes(providers);
 
         // ONB-2-DILIM-3 (Task 368-002): honest platform profile (WSL/win32-native
         // adaptations) + config-based auth state (env + .deck, no network/subprocess).

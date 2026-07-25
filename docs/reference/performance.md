@@ -123,9 +123,9 @@ Deckent uses three model tiers. Choosing the right model per task is the most im
 
 | Model | Speed | Cost | Best For |
 |-------|-------|------|----------|
-| `haiku` | Fastest | Cheapest | Simple docs, boilerplate, config files |
-| `sonnet` | Balanced | Medium | Most feature work, tests, refactoring |
-| `opus` | Slowest | Most expensive | Architecture decisions, complex logic, AI planning |
+| `claude-haiku-4-5-20251001` | Fastest | Cheapest | Simple docs, boilerplate, config files |
+| `claude-sonnet-5` | Balanced | Medium | Most feature work, tests, refactoring |
+| `claude-opus-4-8` | Slowest | Most expensive | Architecture decisions, complex logic, AI planning |
 
 ### 2.2 Model Assignment Flow
 
@@ -393,9 +393,9 @@ API mode uses dollar-based limits:
 
 | Model | Tokens (avg task) | Cost per task |
 |-------|------------------|---------------|
-| `haiku` | ~5,000 | ~$0.001 |
-| `sonnet` | ~10,000 | ~$0.03 |
-| `opus` | ~15,000 | ~$0.15 |
+| `claude-haiku-4-5-20251001` | ~5,000 | ~$0.001 |
+| `claude-sonnet-5` | ~10,000 | ~$0.03 |
+| `claude-opus-4-8` | ~15,000 | ~$0.15 |
 
 A sprint of 8 Sonnet tasks ≈ $0.24. A sprint of 8 Opus tasks ≈ $1.20.
 
@@ -588,9 +588,9 @@ Is free RAM < 400 MB?
 
 | Task Type | Recommended Model |
 |-----------|-----------------|
-| Architecture, security design | `opus` |
-| Feature implementation, complex tests | `sonnet` |
-| Documentation, config, i18n | `haiku` |
+| Architecture, security design | `claude-opus-4-8` |
+| Feature implementation, complex tests | `claude-sonnet-5` |
+| Documentation, config, i18n | `claude-haiku-4-5-20251001` |
 | Bug fix (trivial) | `haiku` or `sonnet` |
 | Bug fix (complex, multi-file) | `sonnet` or `opus` |
 | AI planning (brain_model) | `opus` (performance) or `sonnet` (economic) |

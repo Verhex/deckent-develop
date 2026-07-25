@@ -36,6 +36,10 @@ export interface MissionSchedulerOptions {
   runtimeRegistry?: BoundMissionRunnerRegistryV1;
   /** Exact single-host engine authority. Production Goal-v2 always supplies this. */
   engineLease?: MissionEngineLease;
+  /** Owner-configurable global dependency-edge work ceiling per scheduler tick. */
+  dependencyReconcileMaxEdges?: number;
+  /** Fair-share edge chunk for one dependency propagation job. */
+  dependencyReconcileMaxEdgesPerJob?: number;
 }
 
 export interface MissionSchedulerSummary {
@@ -122,6 +126,14 @@ export async function runMissionScheduler(
   let iterations = 0;
   let dispatched = 0;
   let fatalError: MissionClaimSettlementError | MissionEngineLeaseLostError | null = null;
+  const dependencyReconcileOptions = {
+    ...(opts.dependencyReconcileMaxEdges !== undefined
+      ? { maxEdges: opts.dependencyReconcileMaxEdges }
+      : {}),
+    ...(opts.dependencyReconcileMaxEdgesPerJob !== undefined
+      ? { maxEdgesPerJob: opts.dependencyReconcileMaxEdgesPerJob }
+      : {}),
+  };
 
   for (;;) {
     if (fatalError) throw fatalError;
@@ -147,14 +159,18 @@ export async function runMissionScheduler(
         changedMissions.add(missionId);
       }
     }
-    for (const missionId of store.reconcilePendingDependencies()) changedMissions.add(missionId);
+    for (const missionId of store.reconcilePendingDependencies(dependencyReconcileOptions)) {
+      changedMissions.add(missionId);
+    }
     if (opts.approvalCoordinator) {
       const approval = await opts.approvalCoordinator.tick();
       assertEngineLeaseActive(store, opts);
       for (const missionId of approval.changedMissionIds) changedMissions.add(missionId);
       // A deny/expiry can block an upstream item; propagate that failure before
       // this tick's claim wave so downstream work never dispatches in-between.
-      for (const missionId of store.reconcilePendingDependencies()) changedMissions.add(missionId);
+      for (const missionId of store.reconcilePendingDependencies(dependencyReconcileOptions)) {
+        changedMissions.add(missionId);
+      }
     }
     for (const missionId of changedMissions) {
       checkMissionCompleteFailSafe(store, missionId, opts);
@@ -272,6 +288,10 @@ export async function runMissionScheduler(
       await Promise.race(inFlight);            // an item settles → a slot frees
       if (fatalError) throw fatalError;
     } else if (claimedThisTick === 0) {
+      if (store.hasPendingDependencyReconciliation()) {
+        await sleep(opts.intervalMs);
+        continue;
+      }
       if (opts.maxIterations !== undefined) return { iterations, dispatched, reason: 'drained' };
       await sleep(opts.intervalMs);            // idle (live)
     }

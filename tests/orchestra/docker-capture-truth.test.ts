@@ -280,7 +280,13 @@ describe('usage-patch pin (413-001) — captureDockerLogs feeds patchResultUsage
       JSON.stringify({
         taskId,
         selfAssessment: 'DONE',
-        tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model: 'claude-sonnet-5' },
+        tokenUsage: {
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          provider: 'claude',
+          model: 'claude-sonnet-5',
+        },
       }),
       'utf-8',
     );

@@ -239,6 +239,24 @@ describe('exportMemoryMd', () => {
     expect(md).toContain('MADR v3');
   });
 
+  it('does not emit trailing whitespace from stored memory content', () => {
+    store.insert({
+      id: 'mem-140-trailing',
+      type: 'memory',
+      title: 'Trailing content',
+      content: 'Preserve meaning but normalize each line.   \nSecond line.   ',
+      source: 'brain',
+      status: 'active',
+      sprint_id: 'sprint-140',
+      sprint_num: 140,
+    });
+
+    const md = exportMemoryMd(store);
+
+    expect(md).toContain('Preserve meaning but normalize each line.\nSecond line.');
+    expect(md.split('\n').some(line => /[ \t]+$/u.test(line))).toBe(false);
+  });
+
   it('orders sprints descending (newest first)', () => {
     const md = exportMemoryMd(store);
     const idx139 = md.indexOf('sprint-139');

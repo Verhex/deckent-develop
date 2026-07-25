@@ -65,6 +65,8 @@ const GOAL_INVOCATION_HOLD_REASONS = new Set<GoalInvocationHoldReason>([
 export interface GoalInvocationHoldV1 {
   schemaVersion: typeof GOAL_INVOCATION_HOLD_SCHEMA_VERSION;
   reasonCode: GoalInvocationHoldReason;
+  /** Exact upstream provider-authority reason; additive provenance, never an allow signal. */
+  providerAuthorityReasonCode?: string;
   evidenceRefs: readonly string[];
   invocationReceiptRef: InvocationReceiptRef | null;
   heldAt: string;
@@ -80,6 +82,8 @@ export class GoalInvocationHeldError extends Error {
       || hold.evidenceRefs.length === 0
       || hold.evidenceRefs.some((ref) => !/^[a-z][a-z0-9-]*:.+$/u.test(ref))
       || new Set(hold.evidenceRefs).size !== hold.evidenceRefs.length
+      || (hold.providerAuthorityReasonCode !== undefined
+        && !/^[a-z][a-z0-9_]*$/u.test(hold.providerAuthorityReasonCode))
       || !Number.isFinite(Date.parse(hold.heldAt))
       || new Date(hold.heldAt).toISOString() !== hold.heldAt) {
       throw new TypeError('GOAL_INVOCATION_HOLD_INVALID');

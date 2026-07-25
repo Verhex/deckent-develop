@@ -34,12 +34,16 @@ vi.mock('../../../src/agents/worker.js', () => ({
 const mockSubprocessSpawn = vi.fn();
 const mockSubprocessKill = vi.fn();
 const mockSubprocessList = vi.fn().mockReturnValue([]);
+const mockBackendState = vi.hoisted(() => ({
+  landingCapability: 'checkpoint-stop' as 'checkpoint-stop' | 'unsupported',
+}));
 
 vi.mock('../../../src/orchestra/spawn-backend.js', () => ({
   SpawnBackendFactory: {
     create: vi.fn().mockReturnValue({
       name: 'subprocess',
       liveUsageBudgetSupport: 'measured-stream',
+      get executionLandingCapability() { return mockBackendState.landingCapability; },
       spawn: mockSubprocessSpawn,
       kill: mockSubprocessKill,
       list: mockSubprocessList,
@@ -63,6 +67,18 @@ vi.mock('../../../src/orchestra/sprint-utils.js', async (importOriginal) => {
 import { ensureSession, spawnWorker } from '../../../src/orchestra/tmux.js';
 import { readTask } from '../../../src/agents/worker.js';
 import type { Task } from '../../../src/core/types.js';
+
+const TEST_ATTENDED_EXECUTION_OPTIONS = {
+  executionBudget: { maxTurns: 1 },
+  executionLandingPolicy: {
+    reserve_ratio: 0.25,
+    attended_unsupported: 'allow-hard-stop',
+  },
+  executionBudgetProfileRef: 'execution_budget.roles.worker.default',
+  executionBudgetPolicyDigest: 'c'.repeat(64),
+  executionAdmissionMode: 'attended',
+  executionApprovalEvidenceRef: 'test-owner-approval://multi-provider-spawn',
+} as const;
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -89,6 +105,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
 describe('spawn multi-provider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockBackendState.landingCapability = 'checkpoint-stop';
     process.exitCode = undefined;
   });
 
@@ -105,22 +122,20 @@ describe('spawn multi-provider', () => {
     expect(spawnWorker).not.toHaveBeenCalled();
   });
 
-  it('spawnWorkerMultiProvider uses subprocess for codex models', async () => {
+  it('rejects raw attended evidence without an exact dispatch binding before subprocess provider work', async () => {
+    mockBackendState.landingCapability = 'unsupported';
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    const result = await spawnWorkerMultiProvider('t1', 'gpt-4.1', 'prompt', '/root', {
-      executionBudget: { maxTurns: 1 },
-    });
-    expect(result.backend).toBe('subprocess');
-    expect(mockSubprocessSpawn).toHaveBeenCalledWith('t1', 'gpt-4.1', 'prompt', expect.objectContaining({
-      projectDir: '/root',
-    }));
+    await expect(spawnWorkerMultiProvider('t1', 'gpt-4.1', 'prompt', '/root', {
+      ...TEST_ATTENDED_EXECUTION_OPTIONS,
+    })).rejects.toThrow('exact final dispatch binding');
+    expect(mockSubprocessSpawn).not.toHaveBeenCalled();
     expect(ensureSession).not.toHaveBeenCalled();
   });
 
   it('spawnWorkerMultiProvider uses subprocess for gemini models', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
     const result = await spawnWorkerMultiProvider('t1', 'gemini-2.5-pro', 'prompt', '/root', {
-      executionBudget: { maxTurns: 1 },
+      ...TEST_ATTENDED_EXECUTION_OPTIONS,
     });
     expect(result.backend).toBe('subprocess');
     expect(mockSubprocessSpawn).toHaveBeenCalled();
@@ -131,7 +146,7 @@ describe('spawn multi-provider', () => {
     await spawnWorkerMultiProvider('t1', 'claude-opus-4-8', 'prompt', '/root', {
       autoApprove: true,
       spawnBackend: 'subprocess',
-      executionBudget: { maxTurns: 1 },
+      ...TEST_ATTENDED_EXECUTION_OPTIONS,
     });
     expect(mockSubprocessSpawn).toHaveBeenCalledWith(
       't1',
@@ -145,7 +160,7 @@ describe('spawn multi-provider', () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
     await spawnWorkerMultiProvider('t1', 'o3', 'prompt', '/root', {
       autoApprove: true,
-      executionBudget: { maxTurns: 1 },
+      ...TEST_ATTENDED_EXECUTION_OPTIONS,
     });
     expect(mockSubprocessSpawn).toHaveBeenCalledWith('t1', 'o3', 'prompt', expect.objectContaining({
       autoApprove: true,
@@ -156,7 +171,7 @@ describe('spawn multi-provider', () => {
     vi.mocked(readTask).mockReturnValue(makeTask({ model: 'gpt-4.1', id: 'test-codex' }));
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
     const result = await spawnWorkerMultiProvider('test-codex', 'gpt-4.1', 'prompt', '/test/project', {
-      executionBudget: { maxTurns: 1 },
+      ...TEST_ATTENDED_EXECUTION_OPTIONS,
     });
     expect(result.backend).toBe('subprocess');
   });

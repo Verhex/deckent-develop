@@ -69,6 +69,13 @@ export interface MissionWorkerInvocationAuthorities {
   readonly prepare: (input: MissionWorkerInvocationPrepareInput) => MissionWorkerInvocationPreparation;
 }
 
+/** Exact upstream composition HOLD; unlike legacy null it preserves why authority is unavailable. */
+export interface MissionWorkerInvocationAuthorityHold {
+  readonly state: 'hold';
+  readonly reasonCode: string;
+  readonly authorityEvidenceRef: string;
+}
+
 export interface MissionWorkerInvocationExecutionGrant extends ProviderLimitExecutionGrant {
   readonly provider: string;
   readonly model: string;
@@ -429,12 +436,13 @@ function parked(
   detail: string,
   receiptRef: InvocationReceiptRef | null = null,
   existingDispatchEvidenceRef: string | null = null,
+  exactAuthorityEvidenceRef?: string,
 ): ResultLike {
   return {
     ok: false,
     dispatchDisposition: 'parked',
     reason,
-    authorityEvidenceRef: evidenceRef('hold', detail),
+    authorityEvidenceRef: exactAuthorityEvidenceRef ?? evidenceRef('hold', detail),
     invocationReceiptRef: receiptRef,
     ...(existingDispatchEvidenceRef ? { existingDispatchEvidenceRef } : {}),
   };
@@ -553,7 +561,12 @@ function classifyExistingInvocation(
  * reconciliation, never automatically re-driven.
  */
 export class MissionWorkerInvocationCoordinator implements MissionWorkerInvocationCoordinatorLike {
-  constructor(private readonly authorities: MissionWorkerInvocationAuthorities | null) {}
+  constructor(
+    private readonly authorities:
+      | MissionWorkerInvocationAuthorities
+      | MissionWorkerInvocationAuthorityHold
+      | null,
+  ) {}
 
   async execute(
     input: MissionWorkerInvocationExecuteInput,
@@ -563,6 +576,19 @@ export class MissionWorkerInvocationCoordinator implements MissionWorkerInvocati
       return parked(
         'MISSION_WORKER_INVOCATION_AUTHORITY_UNAVAILABLE',
         `${input.claim.missionId}:${input.claim.workItemId}:${input.claim.attemptId}`,
+      );
+    }
+    if ('state' in this.authorities) {
+      const validReason = /^[a-z][a-z0-9_]*$/u.test(this.authorities.reasonCode);
+      const validEvidence = /^[a-z][a-z0-9-]*:.+$/u.test(this.authorities.authorityEvidenceRef);
+      return parked(
+        `MISSION_WORKER_INVOCATION_HOLD:${
+          validReason ? this.authorities.reasonCode : 'authority_failure'
+        }`,
+        `${input.claim.missionId}:${input.claim.workItemId}:${input.claim.attemptId}`,
+        null,
+        null,
+        validEvidence ? this.authorities.authorityEvidenceRef : undefined,
       );
     }
 

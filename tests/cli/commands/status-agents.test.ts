@@ -150,7 +150,9 @@ describe('loadTaskFiles', () => {
   it('loads task files', () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue(['task-001.json', 'task-002.json'] as any);
-    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeTask()));
+    vi.mocked(readFileSync).mockImplementation((path) => JSON.stringify(
+      makeTask({ id: String(path).endsWith('task-002.json') ? '002' : '001' }),
+    ));
     const tasks = loadTaskFiles('/mock/root');
     expect(tasks).toHaveLength(2);
   });
@@ -163,12 +165,23 @@ describe('loadTaskFiles', () => {
     expect(tasks).toEqual([]);
   });
 
-  it('filters only task-*.json files', () => {
+  it('accepts only canonical task JSON records and excludes JSON sidecars', () => {
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue(['task-001.json', 'review-sprint.json', 'notes.txt'] as any);
-    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeTask()));
+    vi.mocked(readdirSync).mockReturnValue([
+      'task-001.json',
+      'task-001.landing-proposal.json',
+      'task-002.json',
+      'review-sprint.json',
+      'notes.txt',
+    ] as any);
+    vi.mocked(readFileSync).mockImplementation((path) => {
+      const file = String(path);
+      if (file.endsWith('task-001.json')) return JSON.stringify(makeTask({ id: '001' }));
+      if (file.endsWith('task-002.json')) return '{}';
+      return JSON.stringify({ proposal: true });
+    });
     const tasks = loadTaskFiles('/mock/root');
-    expect(tasks).toHaveLength(1);
+    expect(tasks.map(task => task.id)).toEqual(['001']);
   });
 });
 

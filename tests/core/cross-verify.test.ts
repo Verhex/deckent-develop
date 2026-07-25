@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   isHighStakesTask,
   selectVerifierProvider,
+  selectEligibleVerifierCandidate,
   decideCrossVerify,
   DEFAULT_VERIFIER_PRIORITY,
   type HighStakesTaskInput,
   type CrossVerifyDecision,
+  type VerifierEligibilityCandidate,
 } from '../../src/core/cross-verify.js';
 import type { Task, ProviderName } from '../../src/core/task-types.js';
 import { TaskStatus } from '../../src/core/task-types.js';
@@ -145,6 +147,106 @@ describe('cross-verify · selectVerifierProvider', () => {
     expect(DEFAULT_VERIFIER_PRIORITY).toContain('codex');
     expect(DEFAULT_VERIFIER_PRIORITY).toContain('gemini');
     expect(DEFAULT_VERIFIER_PRIORITY[0]).toBe('codex');
+  });
+});
+
+function eligibleCandidate(
+  provider: ProviderName,
+  model: string,
+  overrides: Partial<VerifierEligibilityCandidate> = {},
+): VerifierEligibilityCandidate {
+  return {
+    provider,
+    model,
+    auth: { mode: 'subscription', accountRefHash: 'a'.repeat(64) },
+    backend: {
+      transport: 'cli',
+      executionBackend: 'docker',
+      endpointRefHash: null,
+      executionProfileRef: `profile-${provider}`,
+    },
+    reachability: {
+      state: 'known',
+      reachable: true,
+      evidenceRef: `provider-reachability:${provider}-evidence`,
+    },
+    limits: {
+      state: 'known',
+      limited: false,
+      evidenceRefs: [`provider-limit:${provider}-evidence`],
+    },
+    ...overrides,
+  };
+}
+
+describe('cross-verify · exact verifier eligibility', () => {
+  it('uses configured priority only among exact fresh eligible candidates', () => {
+    const selected = selectEligibleVerifierCandidate(
+      'claude',
+      [
+        eligibleCandidate('codex', 'gpt-4.1'),
+        eligibleCandidate('gemini', 'gemini-2.5-flash'),
+      ],
+      ['gemini', 'codex'],
+    );
+    expect(selected).toMatchObject({ provider: 'gemini', model: 'gemini-2.5-flash' });
+  });
+
+  it.each([
+    ['unknown reachability', {
+      reachability: { state: 'unknown', reachable: true, evidenceRef: 'provider-reachability:unknown' },
+    }],
+    ['stale reachability', {
+      reachability: { state: 'stale', reachable: true, evidenceRef: 'provider-reachability:stale' },
+    }],
+    ['missing reachability ref', {
+      reachability: { state: 'known', reachable: true, evidenceRef: null },
+    }],
+    ['unknown limits', {
+      limits: { state: 'unknown', limited: false, evidenceRefs: ['provider-limit:unknown'] },
+    }],
+    ['exhausted limits', {
+      limits: { state: 'known', limited: true, evidenceRefs: ['provider-limit:blocked'] },
+    }],
+    ['missing limit ref', {
+      limits: { state: 'known', limited: false, evidenceRefs: [] },
+    }],
+  ] satisfies Array<[string, Partial<VerifierEligibilityCandidate>]>)(
+    'rejects %s without falling through to registration truth',
+    (_label, overrides) => {
+      expect(selectEligibleVerifierCandidate(
+        'claude',
+        [eligibleCandidate('codex', 'gpt-4.1', overrides)],
+      )).toBeNull();
+    },
+  );
+
+  it('rejects self-verification and ambiguous duplicate provider projections', () => {
+    expect(selectEligibleVerifierCandidate(
+      'claude',
+      [eligibleCandidate('claude', 'claude-fable-5')],
+    )).toBeNull();
+    expect(selectEligibleVerifierCandidate(
+      'claude',
+      [
+        eligibleCandidate('codex', 'gpt-4.1'),
+        eligibleCandidate('codex', 'gpt-5.6-sol'),
+      ],
+    )).toBeNull();
+  });
+
+  it('projects the exact admitted model through the combined decision', () => {
+    const d = decideCrossVerify({
+      task: { description: 'Patch auth', priority: 'CRITICAL' },
+      taskProvider: 'claude',
+      availableProviders: [],
+      eligibleCandidates: [eligibleCandidate('codex', 'gpt-4.1')],
+    });
+    expect(d).toMatchObject({
+      shouldVerify: true,
+      verifierProvider: 'codex',
+      verifierModel: 'gpt-4.1',
+    });
   });
 });
 

@@ -38,6 +38,7 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
     create: vi.fn(() => ({
       name: 'subprocess',
       liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
       spawn: vi.fn(),
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),
@@ -46,6 +47,7 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
     createAsync: vi.fn(async () => ({
       name: 'subprocess',
       liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
       spawn: vi.fn(),
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),
@@ -65,7 +67,10 @@ vi.mock('../../src/core/config.js', () => ({
     language: 'en',
     spawn_backend: 'subprocess',
     activeModeConfig: { default_model: 'claude-sonnet-5' },
-    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
+    execution_budget: {
+      roles: { worker: { default: { maxTurns: 1 } } },
+      landing: { reserve_ratio: 0.25 },
+    },
   })),
   resolveDefaultModel: vi.fn(() => 'claude-sonnet-5'),
 }));

@@ -81,7 +81,10 @@ function makeConfig(): ResolvedConfig {
       haiku_allowed: true, brain_planning: 'auto',
     },
     modes: {} as any,
-    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
+    execution_budget: {
+      roles: { worker: { default: { maxTurns: 1 } } },
+      landing: { reserve_ratio: 0.25 },
+    },
     language: 'en', projectName: 'test', projectRoot: '/mock/root',
     version: '1.0.0', auto_docs: { tier1: true, tier2: true, tier3: false },
   } as ResolvedConfig;
@@ -270,6 +273,22 @@ describe('createRunFlowController — trajectory (propose -> preview -> approve/
     expect(approved.approvedSnapshot?.approvedBy).toEqual({ id: 'alperen' });
     expect(approved.handle).toBeUndefined();
     expect(controller.getContext().state).toBe('APPROVED');
+  });
+
+  it('approve() cannot override an undeclared shared-writer topology block', async () => {
+    mockPlanSprint.mockReturnValue(makeSprint({
+      tasks: [
+        makeTask({ id: 'z', scope: { directories: [], filesRead: [], filesWrite: ['src/shared.ts'] } }),
+        makeTask({ id: 'a', scope: { directories: [], filesRead: [], filesWrite: ['./src/shared.ts'] } }),
+      ],
+    }) as any);
+    const controller = createRunFlowController(makeControllerDeps());
+    const previewed = await controller.proposeRun('Unsafe shared writers');
+
+    expect(previewed.preview?.topologyGateResult).toBe('fail');
+    expect(previewed.preview?.policyDecision).toBe('deny');
+    expect(() => controller.approve({ id: 'alperen' })).toThrow(/topology gate blocked approval/);
+    expect(controller.getContext().state).toBe('AWAITING_APPROVAL');
   });
 
   it('startApproved persists the proposal into the durable snapshot — REAL controller write path (G1)', async () => {

@@ -45,9 +45,13 @@ vi.mock('../../src/orchestra/brain.js', () => ({
   },
 }));
 
-vi.mock('../../src/core/provider.js', () => ({
-  bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
-}));
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/provider.js')>();
+  return {
+    ...actual,
+    bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
+  };
+});
 
 vi.mock('../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn(),
@@ -233,7 +237,10 @@ describe('start --flow-id branch (427-021)', () => {
       expect(mockRunSprint).toHaveBeenCalledWith(
         root,
         expect.anything(),
-        expect.objectContaining({ preplannedSprint: snapshot.sprint }),
+        expect.objectContaining({
+          preplannedSprint: snapshot.sprint,
+          flowId: snapshot.flowId,
+        }),
       );
       expect(mockPlanSprint).not.toHaveBeenCalled();
       expect(vi.mocked(evaluateCostGate)).toHaveBeenCalledTimes(1);

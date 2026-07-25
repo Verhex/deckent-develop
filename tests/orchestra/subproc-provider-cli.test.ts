@@ -22,6 +22,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { subprocessCtorSpy } = vi.hoisted(() => ({ subprocessCtorSpy: vi.fn() }));
+const TEST_CLAUDE_AUTH_BYPASS = {
+  env: {
+    DECKENT_AUTH_SKIP: '1',
+    NODE_ENV: 'test',
+    VITEST: 'true',
+  },
+} as const;
 
 vi.mock('../../src/providers/subprocess.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/providers/subprocess.js')>();
@@ -166,7 +173,12 @@ describe('SUBPROC-PROVIDER-CLI (364-002, born-481)', () => {
   describe('claude-provider task', () => {
     it('constructs SubprocessSpawnBackend with the exact CLAUDE_SUBPROCESS_CONFIG singleton', () => {
       const backend = new SubprocessBackend('/proj');
-      backend.spawn('t-claude-1', 'claude-sonnet-5' as ModelType, 'prompt', {});
+      backend.spawn(
+        't-claude-1',
+        'claude-sonnet-5' as ModelType,
+        'prompt',
+        TEST_CLAUDE_AUTH_BYPASS,
+      );
 
       const config = providerConfigFromCall(0);
       expect(config).toBe(CLAUDE_SUBPROCESS_CONFIG);
@@ -175,7 +187,11 @@ describe('SUBPROC-PROVIDER-CLI (364-002, born-481)', () => {
 
     it('buildArgs output is unchanged from CLAUDE_SUBPROCESS_CONFIG directly (byte-identical)', () => {
       const backend = new SubprocessBackend('/proj');
-      const opts = { autoApprove: true, allowedTools: 'Read,Edit' };
+      const opts = {
+        autoApprove: true,
+        allowedTools: 'Read,Edit',
+        ...TEST_CLAUDE_AUTH_BYPASS,
+      };
       backend.spawn('t-claude-2', 'claude-sonnet-5' as ModelType, 'prompt', opts);
 
       const config = providerConfigFromCall(0);
@@ -219,17 +235,12 @@ describe('SUBPROC-PROVIDER-CLI (364-002, born-481)', () => {
       expect(subprocessCtorSpy).not.toHaveBeenCalled();
     });
 
-    it('a fully unregistered model id falls back to the default provider (claude), not an error', () => {
-      // modelRegistry.get() returns undefined for an unknown id; the backend
-      // then falls back to getDefaultProviderName() (== 'claude' in this
-      // registry-less test env) — matches pre-364-002 fallback behavior for
-      // this specific (already-safe) case.
+    it('a fully unregistered model id fails before any provider backend is constructed', () => {
       const backend = new SubprocessBackend('/proj');
       expect(() =>
         backend.spawn('t-unknown-1', 'totally-unregistered-model-id' as ModelType, 'prompt', {}),
-      ).not.toThrow();
-      const config = providerConfigFromCall(0);
-      expect(config).toBe(CLAUDE_SUBPROCESS_CONFIG);
+      ).toThrow(SpawnBackendError);
+      expect(subprocessCtorSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -239,7 +250,12 @@ describe('SUBPROC-PROVIDER-CLI (364-002, born-481)', () => {
     it('each provider gets its OWN SubprocessSpawnBackend instance with the right CLI', () => {
       const backend = new SubprocessBackend('/proj');
       backend.spawn('t-mix-codex', 'gpt-5.5' as ModelType, 'prompt', {});
-      backend.spawn('t-mix-claude', 'claude-sonnet-5' as ModelType, 'prompt', {});
+      backend.spawn(
+        't-mix-claude',
+        'claude-sonnet-5' as ModelType,
+        'prompt',
+        TEST_CLAUDE_AUTH_BYPASS,
+      );
 
       expect(subprocessCtorSpy).toHaveBeenCalledTimes(2);
       const codexConfig = providerConfigFromCall(0);
@@ -260,7 +276,12 @@ describe('SUBPROC-PROVIDER-CLI (364-002, born-481)', () => {
     it('list() aggregates workers across every provider backend', () => {
       const backend = new SubprocessBackend('/proj');
       backend.spawn('t-list-codex', 'gpt-5.5' as ModelType, 'prompt', {});
-      backend.spawn('t-list-claude', 'claude-sonnet-5' as ModelType, 'prompt', {});
+      backend.spawn(
+        't-list-claude',
+        'claude-sonnet-5' as ModelType,
+        'prompt',
+        TEST_CLAUDE_AUTH_BYPASS,
+      );
 
       expect(backend.list().sort()).toEqual(['t-list-claude', 't-list-codex'].sort());
     });
@@ -268,7 +289,12 @@ describe('SUBPROC-PROVIDER-CLI (364-002, born-481)', () => {
     it('kill() routes to the backend instance that actually holds the taskId', () => {
       const backend = new SubprocessBackend('/proj');
       backend.spawn('t-kill-codex', 'gpt-5.5' as ModelType, 'prompt', {});
-      backend.spawn('t-kill-claude', 'claude-sonnet-5' as ModelType, 'prompt', {});
+      backend.spawn(
+        't-kill-claude',
+        'claude-sonnet-5' as ModelType,
+        'prompt',
+        TEST_CLAUDE_AUTH_BYPASS,
+      );
 
       const codexInstance = instanceFromCall(0);
       const claudeInstance = instanceFromCall(1);

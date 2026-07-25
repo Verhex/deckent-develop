@@ -29,7 +29,38 @@ vi.mock('../../src/core/config.js', () => ({
   readAuthMode: vi.fn().mockResolvedValue('subscription'),
   resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
+  resolveEffectiveWorkers: () => 8,
   loadConfig: vi.fn(),
+}));
+
+vi.mock('../../src/core/cost-config-loader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/cost-config-loader.js')>()),
+  initCostConfig: vi.fn(),
+  loadCostConfig: vi.fn(() => ({
+    _version: '1.0',
+    providers: {
+      anthropic: {
+        enabled: true,
+        billing_modes_supported: ['api'],
+        default_billing_mode: 'api',
+        models: {
+          'claude-sonnet-5': {
+            input_cost_per_token: 0.000003,
+            output_cost_per_token: 0.000015,
+            max_input_tokens: 1_000_000,
+            enabled: true,
+          },
+        },
+      },
+    },
+    cost_limits: {
+      sprint_max_usd: 5,
+      daily_max_usd: 50,
+      monthly_max_usd: 500,
+      auto_confirm_below_usd: 2,
+    },
+    update_config: { sources_priority: ['bundled'] },
+  })),
 }));
 
 vi.mock('../../src/core/utils.js', () => ({
@@ -86,6 +117,9 @@ vi.mock('../../src/mcp/tools/job-runner.js', () => ({
 
 vi.mock('../../src/core/provider.js', () => ({
   bootstrapProviders: vi.fn(),
+  providerRegistry: {
+    hasProvider: vi.fn(() => false),
+  },
 }));
 
 vi.mock('../../src/mcp/helpers/format.js', () => ({
@@ -386,7 +420,35 @@ describe('MCP Enrichment 004 — plan', () => {
 // ─── start enrichment tests ───────────────────────────────────────────
 
 describe('MCP Enrichment 004 — start', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(readContext).mockReturnValue(baseContext);
+    vi.mocked(planSprint).mockReturnValue({
+      id: 'sprint-022',
+      number: 22,
+      status: SprintStatus.PLANNING,
+      phase: SprintPhase.PLAN,
+      tasks: [{
+        id: '022-001',
+        title: 'Start fixture',
+        description: 'Exercise the enriched start response after real cost admission.',
+        model: 'claude-sonnet-5',
+        provider: 'claude',
+        effort: 'normal',
+        priority: 'NORMAL',
+        reason: 'MCP enrichment regression',
+        scope: { directories: [], filesRead: [], filesWrite: [] },
+        dependencies: [],
+        goNogo: {
+          goCriteria: 'start response is enriched',
+          noGoCriteria: 'cost admission is bypassed',
+          techDebtAcceptable: 'none',
+        },
+        status: TaskStatus.PENDING,
+      }],
+      workers: [],
+    });
+  });
 
   it('enriched response has activeWorkers field', async () => {
     const { registerStartTool } = await import('../../src/mcp/tools/start.js');

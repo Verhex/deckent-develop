@@ -12,7 +12,7 @@ import { runSprint } from '../../orchestra/brain.js';
 import {
   readCheckpoint, hasCheckpoint,
   detectStaleWorkers,
-  deriveResumableTaskIds,
+  deriveResumeDisposition,
   resetInterruptedWorkersToPending,
   hasValidResult,
   buildPreplannedResumeSprint,
@@ -93,9 +93,19 @@ export function registerResume(program: Command): void {
         print(getMessage('resume.crash_completed', lang, { taskIds: completedDuringCrash.join(', ') }));
       }
 
-      // Single source of truth for the resumable set — identical for --dry-run
-      // and real resume (parity by construction). Excludes completed workers.
-      const resumableIds = deriveResumableTaskIds(projectRoot, checkpoint);
+      // Single source of truth for both dry-run and real resume. Pending or
+      // invalid Docker settlement is neither success nor permission to redrive.
+      const resumeDisposition = deriveResumeDisposition(projectRoot, checkpoint);
+      if (resumeDisposition.parkedSettlements.length > 0) {
+        printError(getMessage('resume.settlement_hold', lang, {
+          tasks: resumeDisposition.parkedSettlements
+            .map(item => `${item.taskId} (${item.state})`)
+            .join(', '),
+        }));
+        process.exitCode = 1;
+        return;
+      }
+      const resumableIds = resumeDisposition.resumableIds;
       const resumableCount = resumableIds.length;
 
       if (opts.dryRun) {

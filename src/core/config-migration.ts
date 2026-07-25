@@ -15,13 +15,12 @@ import {
 } from 'node:fs';
 import { dirname, basename } from 'node:path';
 import { createDefaultConfig } from './config.js';
+import { resolveConfigMigrationModelTier } from './model-registry.js';
 import { structuredLog } from './observability.js';
 import type { DeckentConfig } from './types.js';
 import type { ModelTier } from './model-equivalence.js';
 import { canonicalizeProviderConfigAliases } from './provider-config-canonicalizer.js';
 import { canonicalizeModelConfigAliases, hasLegacyModelConfigAliases } from './model-config-canonicalizer.js';
-import { DeckentError } from './errors.js';
-import { getLegacyModelMigration, modelRegistry } from './model-registry.js';
 
 function replaceObjectContents(
   target: Record<string, unknown>,
@@ -474,15 +473,7 @@ export function migrateConfigFull(
  * Used during config migration to convert brain_model / default_model to tier-based config.
  */
 export function modelToTier(model: string): ModelTier {
-  const canonical = getLegacyModelMigration(model) ?? model;
-  const definition = modelRegistry.get(canonical);
-  if (!definition) {
-    throw new DeckentError(
-      'E_MODEL_TIER_UNVERIFIED',
-      `Cannot migrate unknown model to a tier without registry evidence: ${model}`,
-    );
-  }
-  return definition.tier;
+  return resolveConfigMigrationModelTier(model);
 }
 
 /**

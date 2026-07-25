@@ -27,7 +27,7 @@ Make one safe, reviewable improvement.
 ## Task 1: Update project notes
 - Agent: doc-writer
 - Skills: documentation-writer
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: low
 - Files: docs/notes.md
 - Scope: docs/

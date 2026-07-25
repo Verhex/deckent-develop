@@ -4,12 +4,15 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DECKENT_DIR } from '../../../core/constants.js';
+import { createExecutionAuthorityError } from '../../../core/errors.js';
 import type {
   MissionStore, Mission, NewMission, MissionStatus, Progress, ResultLike,
   WorkItem, NewWorkItem, NewMissionWorkItem, WorkItemStatus,
   WorkItemApprovalBinding, WorkItemApprovalState, ApprovalDecisionTransition,
   MissionClaimFence, MissionDispatchClaim, MissionEngineLease,
   MissionRecoveredDispatchAttemptV1, MissionDispatchRecoveryAcknowledgementV1,
+  MissionDependencyAuthorityV1, MissionDependencyActivationV1,
+  DependencyReconciliationOptions,
 } from './mission-types.js';
 import type {
   MissionAcceptanceDecisionRecord,
@@ -52,6 +55,78 @@ const WORK_ITEM_WITH_FENCE_COLUMNS = `wi.*,
   fence.item_kind AS admission_item_kind,
   fence.runner_revision AS admission_runner_revision,
   fence.item_definition_digest AS admission_item_definition_digest`;
+const DEFAULT_DEPENDENCY_RECONCILE_MAX_EDGES = 256;
+const DEFAULT_DEPENDENCY_RECONCILE_MAX_EDGES_PER_JOB = 64;
+
+export interface SqliteMissionStoreOptions {
+  /**
+   * Default-off cutover. Production composition must not select normalized-v1
+   * until the separately-gated owner default decision.
+   */
+  dependencyAuthorityMode?: 'legacy-json' | 'normalized-v1';
+  /** Durable composition decision reference required by normalized-v1 mode. */
+  dependencyAuthorityRef?: string;
+}
+
+interface NormalizedDependencyEdge {
+  missionId: string;
+  workItemId: string;
+  dependencyItemId: string;
+}
+
+function dependencySatisfiedPredicate(itemAlias: string): string {
+  return `(
+    (
+      NOT EXISTS (
+        SELECT 1 FROM mission_graph_authorities graph
+        WHERE graph.mission_id=${itemAlias}.mission_id
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM json_each(COALESCE(${itemAlias}.depends_on, '[]')) dep
+        LEFT JOIN work_items upstream
+          ON upstream.id=dep.value AND upstream.mission_id=${itemAlias}.mission_id
+        WHERE upstream.id IS NULL OR upstream.status<>'done'
+      )
+    )
+    OR (
+      EXISTS (
+        SELECT 1 FROM mission_graph_authorities graph
+        WHERE graph.mission_id=${itemAlias}.mission_id AND graph.authority_state='active'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM work_item_dependencies dependency
+        LEFT JOIN work_items upstream
+          ON upstream.id=dependency.dependency_item_id
+          AND upstream.mission_id=dependency.mission_id
+        WHERE dependency.mission_id=${itemAlias}.mission_id
+          AND dependency.work_item_id=${itemAlias}.id
+          AND (upstream.id IS NULL OR upstream.status<>'done')
+      )
+    )
+  )`;
+}
+
+function dependencyReadinessPredicate(itemAlias: string): string {
+  return `(
+    NOT EXISTS (
+      SELECT 1 FROM mission_graph_authorities graph
+      WHERE graph.mission_id=${itemAlias}.mission_id
+    )
+    OR (
+      EXISTS (
+        SELECT 1 FROM mission_graph_authorities graph
+        WHERE graph.mission_id=${itemAlias}.mission_id AND graph.authority_state='active'
+      )
+      AND EXISTS (
+        SELECT 1 FROM work_item_dependency_readiness readiness
+        WHERE readiness.mission_id=${itemAlias}.mission_id
+          AND readiness.work_item_id=${itemAlias}.id
+          AND readiness.remaining_count=0
+          AND readiness.failed_count=0
+      )
+    )
+  )`;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -109,6 +184,103 @@ CREATE TABLE IF NOT EXISTS work_items (
 CREATE INDEX IF NOT EXISTS idx_wi_mission_status ON work_items(mission_id, status);
 CREATE INDEX IF NOT EXISTS idx_wi_status ON work_items(status);
 CREATE INDEX IF NOT EXISTS idx_m_status_tenant ON missions(status, tenant);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_wi_mission_id_id ON work_items(mission_id, id);
+CREATE TABLE IF NOT EXISTS mission_graph_authorities (
+  mission_id TEXT PRIMARY KEY REFERENCES missions(id) ON DELETE CASCADE,
+  schema_version INTEGER NOT NULL CHECK(schema_version=1),
+  authority_state TEXT NOT NULL
+    CHECK(authority_state IN ('migration-pending','active','quarantined')),
+  graph_revision INTEGER NOT NULL CHECK(graph_revision>=1),
+  graph_digest TEXT NOT NULL,
+  source_kind TEXT NOT NULL CHECK(source_kind IN ('new-v1','legacy-json-v1')),
+  activation_json TEXT,
+  activation_digest TEXT,
+  activated_at TEXT,
+  quarantine_reason TEXT,
+  updated_at TEXT NOT NULL );
+CREATE INDEX IF NOT EXISTS idx_mga_state ON mission_graph_authorities(authority_state, updated_at);
+CREATE TABLE IF NOT EXISTS work_item_dependencies (
+  mission_id TEXT NOT NULL,
+  work_item_id TEXT NOT NULL,
+  dependency_item_id TEXT NOT NULL,
+  admitted_revision INTEGER NOT NULL CHECK(admitted_revision>=1),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY(mission_id, work_item_id, dependency_item_id),
+  CHECK(work_item_id<>dependency_item_id),
+  FOREIGN KEY(mission_id, work_item_id)
+    REFERENCES work_items(mission_id, id) ON DELETE CASCADE,
+  FOREIGN KEY(mission_id, dependency_item_id)
+    REFERENCES work_items(mission_id, id) ON DELETE RESTRICT );
+CREATE INDEX IF NOT EXISTS idx_wid_upstreams
+  ON work_item_dependencies(mission_id, work_item_id, dependency_item_id);
+CREATE INDEX IF NOT EXISTS idx_wid_dependants
+  ON work_item_dependencies(mission_id, dependency_item_id, work_item_id);
+CREATE TABLE IF NOT EXISTS work_item_dependency_readiness (
+  mission_id TEXT NOT NULL,
+  work_item_id TEXT NOT NULL,
+  graph_revision INTEGER NOT NULL CHECK(graph_revision>=1),
+  remaining_count INTEGER NOT NULL CHECK(remaining_count>=0),
+  failed_count INTEGER NOT NULL CHECK(failed_count>=0),
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(mission_id, work_item_id),
+  FOREIGN KEY(mission_id, work_item_id)
+    REFERENCES work_items(mission_id, id) ON DELETE CASCADE );
+CREATE INDEX IF NOT EXISTS idx_widr_ready
+  ON work_item_dependency_readiness(mission_id, failed_count, remaining_count, work_item_id);
+CREATE TABLE IF NOT EXISTS mission_dependency_reconcile_queue (
+  mission_id TEXT NOT NULL,
+  upstream_item_id TEXT NOT NULL,
+  upstream_revision INTEGER NOT NULL CHECK(upstream_revision>=0),
+  outcome TEXT NOT NULL CHECK(outcome IN ('done','failed','blocked')),
+  cursor_work_item_id TEXT NOT NULL DEFAULT '',
+  turn_seq INTEGER NOT NULL DEFAULT 0 CHECK(turn_seq>=0),
+  state TEXT NOT NULL CHECK(state IN ('pending','done')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(mission_id, upstream_item_id, upstream_revision, outcome),
+  FOREIGN KEY(mission_id, upstream_item_id)
+    REFERENCES work_items(mission_id, id) ON DELETE CASCADE );
+CREATE INDEX IF NOT EXISTS idx_mdrq_pending
+  ON mission_dependency_reconcile_queue(state, updated_at, mission_id, upstream_item_id);
+CREATE TABLE IF NOT EXISTS mission_graph_migration_evidence (
+  mission_id TEXT PRIMARY KEY REFERENCES missions(id) ON DELETE CASCADE,
+  source_digest TEXT NOT NULL,
+  graph_digest TEXT NOT NULL,
+  evidence_json TEXT NOT NULL,
+  evidence_digest TEXT NOT NULL,
+  created_at TEXT NOT NULL );
+CREATE TRIGGER IF NOT EXISTS mission_graph_migration_evidence_no_update
+  BEFORE UPDATE ON mission_graph_migration_evidence BEGIN
+    SELECT RAISE(ABORT, 'mission graph migration evidence is immutable');
+  END;
+CREATE TRIGGER IF NOT EXISTS mission_graph_migration_evidence_no_delete
+  BEFORE DELETE ON mission_graph_migration_evidence BEGIN
+    SELECT RAISE(ABORT, 'mission graph migration evidence is immutable');
+  END;
+CREATE TRIGGER IF NOT EXISTS normalized_dependency_no_update
+  BEFORE UPDATE ON work_item_dependencies BEGIN
+    SELECT RAISE(ABORT, 'normalized dependency edges are immutable');
+  END;
+CREATE TRIGGER IF NOT EXISTS normalized_dependency_no_delete
+  BEFORE DELETE ON work_item_dependencies BEGIN
+    SELECT RAISE(ABORT, 'normalized dependency edges are immutable');
+  END;
+CREATE TRIGGER IF NOT EXISTS normalized_dependency_terminal_update
+  AFTER UPDATE OF status ON work_items
+  WHEN NEW.status IN ('done','failed','blocked')
+    AND OLD.status<>NEW.status
+    AND EXISTS (
+      SELECT 1 FROM mission_graph_authorities graph
+      WHERE graph.mission_id=NEW.mission_id AND graph.authority_state='active'
+    )
+  BEGIN
+    INSERT OR IGNORE INTO mission_dependency_reconcile_queue(
+      mission_id,upstream_item_id,upstream_revision,outcome,
+      cursor_work_item_id,state,created_at,updated_at
+    ) VALUES(
+      NEW.mission_id,NEW.id,NEW.revision,NEW.status,'','pending',NEW.updated_at,NEW.updated_at
+    );
+  END;
 CREATE TABLE IF NOT EXISTS work_item_admission_fences (
   work_item_id TEXT PRIMARY KEY REFERENCES work_items(id) ON DELETE CASCADE,
   schema_version INTEGER NOT NULL,
@@ -183,7 +355,15 @@ CREATE TRIGGER IF NOT EXISTS mission_dispatch_recovery_acks_no_delete
 /** Durable mission store (SQLite WAL) — the autonomous-v2 single source of truth. */
 export class SqliteMissionStore implements MissionStore {
   protected db: DatabaseType;
-  constructor(projectRoot: string) {
+  private readonly dependencyAuthorityMode: 'legacy-json' | 'normalized-v1';
+  private readonly dependencyAuthorityRef: string | null;
+
+  constructor(projectRoot: string, opts: SqliteMissionStoreOptions = {}) {
+    this.dependencyAuthorityMode = opts.dependencyAuthorityMode ?? 'legacy-json';
+    this.dependencyAuthorityRef = opts.dependencyAuthorityRef?.trim() || null;
+    if (this.dependencyAuthorityMode === 'normalized-v1' && this.dependencyAuthorityRef === null) {
+      throw new TypeError('MISSION_DEPENDENCY_AUTHORITY_REF_REQUIRED');
+    }
     const dir = join(projectRoot, DECKENT_DIR, 'autonomous');
     mkdirSync(dir, { recursive: true });
     this.db = new Database(join(dir, 'autonomous.db'));
@@ -421,6 +601,253 @@ export class SqliteMissionStore implements MissionStore {
       return value ?? null;
     };
     return JSON.stringify(normalize(v));
+  }
+  private digest(v: unknown): string {
+    return this.claimTokenHash(typeof v === 'string' ? v : this.canonical(v));
+  }
+  private graphDigest(edges: readonly NormalizedDependencyEdge[]): string {
+    return this.digest(edges
+      .map((edge) => ({
+        missionId: edge.missionId,
+        workItemId: edge.workItemId,
+        dependencyItemId: edge.dependencyItemId,
+      }))
+      .sort((a, b) => a.workItemId.localeCompare(b.workItemId)
+        || a.dependencyItemId.localeCompare(b.dependencyItemId)));
+  }
+  private normalizedDependencies(missionId: string, workItemId: string): string[] {
+    return (this.db.prepare(`SELECT dependency_item_id FROM work_item_dependencies
+      WHERE mission_id=? AND work_item_id=? ORDER BY dependency_item_id`)
+      .all(missionId, workItemId) as Array<{ dependency_item_id: string }>)
+      .map((row) => row.dependency_item_id);
+  }
+  private dependencyAuthorityRow(missionId: string): any | undefined {
+    return this.db.prepare('SELECT * FROM mission_graph_authorities WHERE mission_id=?').get(missionId);
+  }
+  private validateGraph(
+    missionId: string,
+    definitions: readonly { id: string; dependsOn: readonly string[] }[],
+  ): NormalizedDependencyEdge[] {
+    const ids = new Set<string>();
+    for (const item of definitions) {
+      if (!item.id || item.id !== item.id.trim() || ids.has(item.id)) {
+        throw createExecutionAuthorityError(
+          `MISSION_DEPENDENCY_GRAPH_INVALID: duplicate or non-canonical item ${item.id}`,
+        );
+      }
+      ids.add(item.id);
+    }
+    const edges: NormalizedDependencyEdge[] = [];
+    const indegree = new Map<string, number>();
+    const dependants = new Map<string, string[]>();
+    for (const item of definitions) {
+      const unique = new Set<string>();
+      for (const dependencyId of item.dependsOn) {
+        if (!dependencyId || dependencyId !== dependencyId.trim()) {
+          throw createExecutionAuthorityError(
+            `MISSION_DEPENDENCY_GRAPH_INVALID: non-canonical dependency for ${item.id}`,
+          );
+        }
+        if (dependencyId === item.id) {
+          throw createExecutionAuthorityError(
+            `MISSION_DEPENDENCY_GRAPH_INVALID: self dependency ${item.id}`,
+          );
+        }
+        if (unique.has(dependencyId)) {
+          throw createExecutionAuthorityError(
+            `MISSION_DEPENDENCY_GRAPH_INVALID: duplicate dependency ${item.id}->${dependencyId}`,
+          );
+        }
+        if (!ids.has(dependencyId)) {
+          throw createExecutionAuthorityError(
+            `MISSION_DEPENDENCY_GRAPH_INVALID: missing or foreign dependency ${item.id}->${dependencyId}`,
+          );
+        }
+        unique.add(dependencyId);
+        edges.push({ missionId, workItemId: item.id, dependencyItemId: dependencyId });
+        const downstream = dependants.get(dependencyId) ?? [];
+        downstream.push(item.id);
+        dependants.set(dependencyId, downstream);
+      }
+      indegree.set(item.id, unique.size);
+    }
+    for (const downstream of dependants.values()) downstream.sort();
+    const ready = [...ids].filter((id) => indegree.get(id) === 0).sort();
+    let cursor = 0;
+    let visited = 0;
+    while (cursor < ready.length) {
+      const id = ready[cursor++]!;
+      visited++;
+      for (const dependant of dependants.get(id) ?? []) {
+        const next = (indegree.get(dependant) ?? 0) - 1;
+        indegree.set(dependant, next);
+        if (next === 0) ready.push(dependant);
+      }
+    }
+    if (visited !== definitions.length) {
+      const cyclic = [...indegree.entries()]
+        .filter(([, degree]) => degree > 0)
+        .map(([id]) => id)
+        .sort();
+      throw createExecutionAuthorityError(
+        `MISSION_DEPENDENCY_GRAPH_INVALID: cycle ${cyclic.join(', ')}`,
+      );
+    }
+    return edges.sort((a, b) => a.workItemId.localeCompare(b.workItemId)
+      || a.dependencyItemId.localeCompare(b.dependencyItemId));
+  }
+  private readLegacyGraph(missionId: string): {
+    definitions: Array<{ id: string; dependsOn: string[] }>;
+    edges: NormalizedDependencyEdge[];
+    sourceDigest: string;
+    graphDigest: string;
+  } {
+    const rows = this.db.prepare(`SELECT id,depends_on FROM work_items
+      WHERE mission_id=? ORDER BY id`).all(missionId) as Array<{ id: string; depends_on: string | null }>;
+    const definitions = rows.map((row) => {
+      let parsed: unknown;
+      try {
+        parsed = row.depends_on === null || row.depends_on === '' ? [] : JSON.parse(row.depends_on);
+      } catch {
+        throw createExecutionAuthorityError(
+          `MISSION_DEPENDENCY_GRAPH_INVALID: malformed JSON for ${row.id}`,
+        );
+      }
+      if (!Array.isArray(parsed) || parsed.some((value) => typeof value !== 'string')) {
+        throw createExecutionAuthorityError(
+          `MISSION_DEPENDENCY_GRAPH_INVALID: non-string dependency list for ${row.id}`,
+        );
+      }
+      return { id: row.id, dependsOn: parsed as string[] };
+    });
+    const edges = this.validateGraph(missionId, definitions);
+    return {
+      definitions,
+      edges,
+      sourceDigest: this.digest(rows),
+      graphDigest: this.graphDigest(edges),
+    };
+  }
+  private refreshReadiness(
+    missionId: string,
+    graphRevision: number,
+    ts: string,
+    itemIds?: readonly string[],
+  ): void {
+    const items = itemIds
+      ? itemIds.map((id) => ({ id }))
+      : this.db.prepare(`SELECT id FROM work_items WHERE mission_id=? ORDER BY id`)
+        .all(missionId) as Array<{ id: string }>;
+    const upsert = this.db.prepare(`INSERT INTO work_item_dependency_readiness(
+        mission_id,work_item_id,graph_revision,remaining_count,failed_count,updated_at
+      ) VALUES(@missionId,@workItemId,@graphRevision,@remaining,@failed,@ts)
+      ON CONFLICT(mission_id,work_item_id) DO UPDATE SET
+        graph_revision=excluded.graph_revision,
+        remaining_count=excluded.remaining_count,
+        failed_count=excluded.failed_count,
+        updated_at=excluded.updated_at`);
+    for (const item of items) {
+      const counts = this.db.prepare(`SELECT
+          SUM(CASE WHEN upstream.status<>'done' THEN 1 ELSE 0 END) AS remaining,
+          SUM(CASE WHEN upstream.status IN ('failed','blocked') THEN 1 ELSE 0 END) AS failed
+        FROM work_item_dependencies dependency
+        JOIN work_items upstream
+          ON upstream.mission_id=dependency.mission_id
+          AND upstream.id=dependency.dependency_item_id
+        WHERE dependency.mission_id=? AND dependency.work_item_id=?`)
+        .get(missionId, item.id) as { remaining: number | null; failed: number | null };
+      upsert.run({
+        missionId,
+        workItemId: item.id,
+        graphRevision,
+        remaining: counts.remaining ?? 0,
+        failed: counts.failed ?? 0,
+        ts,
+      });
+    }
+  }
+  private seedTerminalDependencyJobs(missionId: string, ts: string): void {
+    this.db.prepare(`INSERT OR IGNORE INTO mission_dependency_reconcile_queue(
+        mission_id,upstream_item_id,upstream_revision,outcome,
+        cursor_work_item_id,state,created_at,updated_at
+      )
+      SELECT mission_id,id,revision,status,'','pending',@ts,@ts
+      FROM work_items
+      WHERE mission_id=@missionId AND status IN ('done','failed','blocked')`)
+      .run({ missionId, ts });
+  }
+  private insertNormalizedEdges(
+    missionId: string,
+    edges: readonly NormalizedDependencyEdge[],
+    graphRevision: number,
+    ts: string,
+    readinessItemIds?: readonly string[],
+  ): void {
+    const insert = this.db.prepare(`INSERT INTO work_item_dependencies(
+      mission_id,work_item_id,dependency_item_id,admitted_revision,created_at
+    ) VALUES(@missionId,@workItemId,@dependencyItemId,@graphRevision,@ts)`);
+    for (const edge of edges) insert.run({ ...edge, graphRevision, ts });
+    this.refreshReadiness(missionId, graphRevision, ts, readinessItemIds);
+  }
+  private validateNormalizedAppend(
+    missionId: string,
+    items: readonly NewWorkItem[],
+  ): { edges: NormalizedDependencyEdge[]; graphRevision: number } {
+    const authority = this.getDependencyAuthority(missionId);
+    if (!authority) {
+      throw createExecutionAuthorityError(
+        `MISSION_DEPENDENCY_AUTHORITY_NOT_FOUND: ${missionId}`,
+      );
+    }
+    if (authority.state !== 'active') {
+      throw createExecutionAuthorityError(
+        `MISSION_DEPENDENCY_AUTHORITY_HOLD: ${missionId}:${authority.state}`,
+      );
+    }
+    const existingRows = this.db.prepare(`SELECT id FROM work_items
+      WHERE mission_id=? ORDER BY id`).all(missionId) as Array<{ id: string }>;
+    const existingDefinitions = existingRows.map((row) => ({
+      id: row.id,
+      dependsOn: this.normalizedDependencies(missionId, row.id),
+    }));
+    const all = [
+      ...existingDefinitions,
+      ...items.map((item) => ({ id: item.id, dependsOn: item.dependsOn ?? [] })),
+    ];
+    const newIds = new Set(items.map((item) => item.id));
+    const allEdges = this.validateGraph(missionId, all);
+    return {
+      edges: allEdges.filter((edge) => newIds.has(edge.workItemId)),
+      graphRevision: authority.graphRevision + 1,
+    };
+  }
+  private updateNormalizedGraphDigest(missionId: string, graphRevision: number, ts: string): string {
+    const rows = this.db.prepare(`SELECT mission_id,work_item_id,dependency_item_id
+      FROM work_item_dependencies WHERE mission_id=?
+      ORDER BY work_item_id,dependency_item_id`).all(missionId) as Array<{
+        mission_id: string;
+        work_item_id: string;
+        dependency_item_id: string;
+      }>;
+    const graphDigest = this.graphDigest(rows.map((row) => ({
+      missionId: row.mission_id,
+      workItemId: row.work_item_id,
+      dependencyItemId: row.dependency_item_id,
+    })));
+    const info = this.db.prepare(`UPDATE mission_graph_authorities
+      SET graph_revision=@graphRevision,graph_digest=@graphDigest,updated_at=@ts
+      WHERE mission_id=@missionId AND authority_state='active'`).run({
+      missionId,
+      graphRevision,
+      graphDigest,
+      ts,
+    });
+    if (info.changes !== 1) {
+      throw createExecutionAuthorityError(
+        `MISSION_DEPENDENCY_AUTHORITY_HOLD: ${missionId}`,
+      );
+    }
+    return graphDigest;
   }
   private readDispatchRecovery(
     payloadJson: string,
@@ -723,21 +1150,233 @@ export class SqliteMissionStore implements MissionStore {
   });
 
   createMission(m: NewMission): Mission {
-    const ts = this.now();
-    this.db.prepare(`INSERT INTO missions(id,kind,status,tenant,title,spec,created_by,deliver_to,render_as,progress,created_at,updated_at)
-      VALUES(@id,@kind,'pending',@tenant,@title,@spec,@createdBy,@deliverTo,@renderAs,@progress,@ts,@ts)`).run({
-      id: m.id, kind: m.kind, tenant: m.tenant ?? 'local', title: m.title, spec: this.j(m.spec),
-      createdBy: m.createdBy ?? null, deliverTo: m.deliverTo ?? null,
-      renderAs: m.renderAs ?? (m.kind === 'list' ? 'checklist' : 'goal'),
-      progress: this.j(m.progress), ts,
+    const transaction = this.db.transaction((): Mission => {
+      const ts = this.now();
+      this.db.prepare(`INSERT INTO missions(id,kind,status,tenant,title,spec,created_by,deliver_to,render_as,progress,created_at,updated_at)
+        VALUES(@id,@kind,'pending',@tenant,@title,@spec,@createdBy,@deliverTo,@renderAs,@progress,@ts,@ts)`).run({
+        id: m.id, kind: m.kind, tenant: m.tenant ?? 'local', title: m.title, spec: this.j(m.spec),
+        createdBy: m.createdBy ?? null, deliverTo: m.deliverTo ?? null,
+        renderAs: m.renderAs ?? (m.kind === 'list' ? 'checklist' : 'goal'),
+        progress: this.j(m.progress), ts,
+      });
+      if (this.dependencyAuthorityMode === 'normalized-v1') {
+        const graphDigest = this.graphDigest([]);
+        const activation = {
+          schemaVersion: 1,
+          source: 'normalized-store-composition',
+          approvalRef: this.dependencyAuthorityRef,
+          activatedAt: ts,
+        };
+        this.db.prepare(`INSERT INTO mission_graph_authorities(
+          mission_id,schema_version,authority_state,graph_revision,graph_digest,source_kind,
+          activation_json,activation_digest,activated_at,updated_at
+        ) VALUES(@missionId,1,'active',1,@graphDigest,'new-v1',
+          @activationJson,@activationDigest,@ts,@ts)`).run({
+          missionId: m.id,
+          graphDigest,
+          activationJson: this.canonical(activation),
+          activationDigest: this.digest(activation),
+          ts,
+        });
+      }
+      return this.getMission(m.id)!;
     });
-    return this.getMission(m.id)!;
+    return transaction.immediate();
   }
   createMissionWithItems(m: NewMission, items: readonly NewMissionWorkItem[]): Mission {
     return this.createMissionWithItemsInternal(m, items, false);
   }
   importLegacyMissionWithItems(m: NewMission, items: readonly NewMissionWorkItem[]): Mission {
     return this.createMissionWithItemsInternal(m, items, true);
+  }
+  getDependencyAuthority(missionId: string): MissionDependencyAuthorityV1 | null {
+    const row = this.dependencyAuthorityRow(missionId);
+    if (!row) return null;
+    const activation = this.p<Record<string, unknown>>(row.activation_json);
+    return {
+      schemaVersion: 1,
+      missionId: row.mission_id,
+      state: row.authority_state,
+      graphRevision: row.graph_revision,
+      graphDigest: row.graph_digest,
+      sourceKind: row.source_kind,
+      activationRef: typeof activation?.['approvalRef'] === 'string'
+        ? activation['approvalRef']
+        : null,
+      activatedAt: row.activated_at,
+      quarantineReason: row.quarantine_reason,
+      updatedAt: row.updated_at,
+    };
+  }
+  prepareNormalizedDependencyMigration(missionId: string): MissionDependencyAuthorityV1 {
+    const transaction = this.db.transaction((): MissionDependencyAuthorityV1 => {
+      if (!this.getMission(missionId)) {
+        throw createExecutionAuthorityError(
+          `MISSION_DEPENDENCY_MIGRATION_NOT_FOUND: ${missionId}`,
+        );
+      }
+      const existing = this.getDependencyAuthority(missionId);
+      if (existing) return existing;
+
+      let graph: ReturnType<SqliteMissionStore['readLegacyGraph']> | null = null;
+      let validationFailure: string | null = null;
+      try {
+        graph = this.readLegacyGraph(missionId);
+      } catch (error) {
+        validationFailure = error instanceof Error ? error.message : String(error);
+      }
+      if (validationFailure !== null) {
+        const ts = this.now();
+        const sourceRows = this.db.prepare(`SELECT id,depends_on FROM work_items
+          WHERE mission_id=? ORDER BY id`).all(missionId);
+        const sourceDigest = this.digest(sourceRows);
+        this.db.prepare(`INSERT INTO mission_graph_authorities(
+          mission_id,schema_version,authority_state,graph_revision,graph_digest,source_kind,
+          quarantine_reason,updated_at
+        ) VALUES(@missionId,1,'quarantined',1,@graphDigest,'legacy-json-v1',@reason,@ts)`)
+          .run({ missionId, graphDigest: sourceDigest, reason: validationFailure, ts });
+        const evidence = {
+          schemaVersion: 1,
+          missionId,
+          outcome: 'quarantined',
+          sourceDigest,
+          reason: validationFailure,
+          observedAt: ts,
+        };
+        this.db.prepare(`INSERT INTO mission_graph_migration_evidence(
+          mission_id,source_digest,graph_digest,evidence_json,evidence_digest,created_at
+        ) VALUES(@missionId,@sourceDigest,@graphDigest,@evidenceJson,@evidenceDigest,@ts)`).run({
+          missionId,
+          sourceDigest,
+          graphDigest: sourceDigest,
+          evidenceJson: this.canonical(evidence),
+          evidenceDigest: this.digest(evidence),
+          ts,
+        });
+        return this.getDependencyAuthority(missionId)!;
+      }
+      if (graph === null) {
+        throw createExecutionAuthorityError(
+          `MISSION_DEPENDENCY_MIGRATION_VALIDATION_MISSING: ${missionId}`,
+        );
+      }
+
+      const ts = this.now();
+      this.db.prepare(`INSERT INTO mission_graph_authorities(
+        mission_id,schema_version,authority_state,graph_revision,graph_digest,source_kind,updated_at
+      ) VALUES(@missionId,1,'migration-pending',1,@graphDigest,'legacy-json-v1',@ts)`).run({
+        missionId,
+        graphDigest: graph.graphDigest,
+        ts,
+      });
+      this.insertNormalizedEdges(missionId, graph.edges, 1, ts);
+      const evidence = {
+        schemaVersion: 1,
+        missionId,
+        outcome: 'migration-pending',
+        sourceDigest: graph.sourceDigest,
+        graphDigest: graph.graphDigest,
+        itemCount: graph.definitions.length,
+        edgeCount: graph.edges.length,
+        observedAt: ts,
+      };
+      this.db.prepare(`INSERT INTO mission_graph_migration_evidence(
+        mission_id,source_digest,graph_digest,evidence_json,evidence_digest,created_at
+      ) VALUES(@missionId,@sourceDigest,@graphDigest,@evidenceJson,@evidenceDigest,@ts)`).run({
+        missionId,
+        sourceDigest: graph.sourceDigest,
+        graphDigest: graph.graphDigest,
+        evidenceJson: this.canonical(evidence),
+        evidenceDigest: this.digest(evidence),
+        ts,
+      });
+      return this.getDependencyAuthority(missionId)!;
+    });
+    return transaction.immediate();
+  }
+  activateNormalizedDependencyAuthority(
+    activation: MissionDependencyActivationV1,
+  ): MissionDependencyAuthorityV1 {
+    if (activation.schemaVersion !== 1
+      || !activation.missionId.trim()
+      || !/^[a-f0-9]{64}$/u.test(activation.expectedGraphDigest)
+      || !activation.approvedBy.trim()
+      || !activation.approvalRef.trim()
+      || !Number.isFinite(Date.parse(activation.approvedAt))
+      || new Date(activation.approvedAt).toISOString() !== activation.approvedAt) {
+      throw new TypeError('MISSION_DEPENDENCY_ACTIVATION_INVALID');
+    }
+    const transaction = this.db.transaction(() => {
+      const authority = this.getDependencyAuthority(activation.missionId);
+      if (!authority) {
+        throw createExecutionAuthorityError(
+          `MISSION_DEPENDENCY_ACTIVATION_NOT_PREPARED: ${activation.missionId}`,
+        );
+      }
+      if (authority.state === 'quarantined') {
+        throw createExecutionAuthorityError(
+          `MISSION_DEPENDENCY_ACTIVATION_QUARANTINED: ${activation.missionId}`,
+        );
+      }
+      const activationJson = this.canonical(activation);
+      if (authority.state === 'active') {
+        const row = this.dependencyAuthorityRow(activation.missionId);
+        if (row.activation_json === activationJson
+          && row.activation_digest === this.digest(activationJson)) return;
+        throw createExecutionAuthorityError(
+          `MISSION_DEPENDENCY_ACTIVATION_CONFLICT: ${activation.missionId}`,
+        );
+      }
+      if (authority.graphDigest !== activation.expectedGraphDigest) {
+        throw createExecutionAuthorityError(
+          `MISSION_DEPENDENCY_ACTIVATION_DIGEST_MISMATCH: ${activation.missionId}`,
+        );
+      }
+      const current = this.readLegacyGraph(activation.missionId);
+      if (current.graphDigest !== authority.graphDigest) {
+        throw createExecutionAuthorityError(
+          `MISSION_DEPENDENCY_ACTIVATION_SOURCE_CHANGED: ${activation.missionId}`,
+        );
+      }
+      const persistedEdges = this.db.prepare(`SELECT mission_id,work_item_id,dependency_item_id
+        FROM work_item_dependencies WHERE mission_id=?
+        ORDER BY work_item_id,dependency_item_id`).all(activation.missionId) as Array<{
+          mission_id: string;
+          work_item_id: string;
+          dependency_item_id: string;
+        }>;
+      const persistedDigest = this.graphDigest(persistedEdges.map((edge) => ({
+        missionId: edge.mission_id,
+        workItemId: edge.work_item_id,
+        dependencyItemId: edge.dependency_item_id,
+      })));
+      if (persistedDigest !== authority.graphDigest) {
+        throw createExecutionAuthorityError(
+          `MISSION_DEPENDENCY_ACTIVATION_EDGE_MISMATCH: ${activation.missionId}`,
+        );
+      }
+      const ts = this.now();
+      const info = this.db.prepare(`UPDATE mission_graph_authorities
+        SET authority_state='active',activation_json=@activationJson,
+          activation_digest=@activationDigest,activated_at=@activatedAt,updated_at=@ts
+        WHERE mission_id=@missionId AND authority_state='migration-pending'
+          AND graph_digest=@expectedGraphDigest`).run({
+        missionId: activation.missionId,
+        expectedGraphDigest: activation.expectedGraphDigest,
+        activationJson,
+        activationDigest: this.digest(activationJson),
+        activatedAt: activation.approvedAt,
+        ts,
+      });
+      if (info.changes !== 1) {
+        throw createExecutionAuthorityError(
+          `MISSION_DEPENDENCY_ACTIVATION_CONFLICT: ${activation.missionId}`,
+        );
+      }
+      this.seedTerminalDependencyJobs(activation.missionId, ts);
+    });
+    transaction.immediate();
+    return this.getDependencyAuthority(activation.missionId)!;
   }
   private createMissionWithItemsInternal(
     m: NewMission,
@@ -796,24 +1435,18 @@ export class SqliteMissionStore implements MissionStore {
       }
     }
 
-    const byId = new Map(normalizedItems.map((item) => [item.id, item]));
-    const visiting = new Set<string>();
-    const visited = new Set<string>();
-    const stack: string[] = [];
-    const visit = (id: string): void => {
-      if (visited.has(id)) return;
-      if (visiting.has(id)) {
-        const cycleStart = stack.lastIndexOf(id);
-        throw new Error(`MISSION_BATCH_INVALID: dependency cycle ${stack.slice(cycleStart).concat(id).join(' -> ')}`);
-      }
-      visiting.add(id);
-      stack.push(id);
-      for (const dependency of byId.get(id)?.dependsOn ?? []) visit(dependency);
-      stack.pop();
-      visiting.delete(id);
-      visited.add(id);
-    };
-    for (const id of ids) visit(id);
+    try {
+      this.validateGraph(m.id, normalizedItems.map((item) => ({
+        id: item.id,
+        dependsOn: item.dependsOn ?? [],
+      })));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const reason = message.startsWith('MISSION_DEPENDENCY_GRAPH_INVALID: cycle ')
+        ? `dependency cycle ${message.slice('MISSION_DEPENDENCY_GRAPH_INVALID: cycle '.length)}`
+        : message.replace(/^MISSION_DEPENDENCY_GRAPH_INVALID:\s*/, '');
+      throw createExecutionAuthorityError(`MISSION_BATCH_INVALID: ${reason}`);
+    }
 
     const transaction = this.db.transaction((): Mission => {
       const existing = this.getMission(m.id);
@@ -883,12 +1516,31 @@ export class SqliteMissionStore implements MissionStore {
           spec: this.j(item.spec),
           policy: item.policy ?? 'auto',
           renderAs: item.renderAs ?? this.defaultRenderAs(item.kind),
-          dependsOn: this.j(item.dependsOn ?? []),
+          dependsOn: this.dependencyAuthorityMode === 'normalized-v1'
+            ? null
+            : this.j(item.dependsOn ?? []),
           trigger: this.j(item.trigger ?? null),
           lastResult: this.j(item.initialResult),
           ts,
         });
         this.insertAdmissionFence(item, ts);
+      }
+      if (this.dependencyAuthorityMode === 'normalized-v1') {
+        const edges = this.validateGraph(m.id, normalizedItems.map((item) => ({
+          id: item.id,
+          dependsOn: item.dependsOn ?? [],
+        })));
+        const ts = this.now();
+        const graphDigest = this.graphDigest(edges);
+        this.db.prepare(`UPDATE mission_graph_authorities
+          SET graph_digest=@graphDigest,updated_at=@ts
+          WHERE mission_id=@missionId AND authority_state='active'`).run({
+          missionId: m.id,
+          graphDigest,
+          ts,
+        });
+        this.insertNormalizedEdges(m.id, edges, 1, ts);
+        this.seedTerminalDependencyJobs(m.id, ts);
       }
       return mission;
     });
@@ -1031,6 +1683,10 @@ export class SqliteMissionStore implements MissionStore {
 
   // --- Work-items + atomic claim ---
   private rowToItem = (r: any): WorkItem => {
+    const dependencyAuthority = this.dependencyAuthorityRow(r.mission_id);
+    const dependsOn = dependencyAuthority
+      ? this.normalizedDependencies(r.mission_id, r.id)
+      : this.p<string[]>(r.depends_on) ?? [];
     const admissionFence: WorkItemAdmissionFenceV1 | null = r.admission_schema_version === undefined
       || r.admission_schema_version === null
       ? null
@@ -1045,7 +1701,7 @@ export class SqliteMissionStore implements MissionStore {
     return {
       id: r.id, missionId: r.mission_id, kind: r.kind, status: r.status, spec: this.p(r.spec),
       policy: r.policy, renderAs: r.render_as, progress: this.p<Progress>(r.progress),
-      dependsOn: this.p<string[]>(r.depends_on) ?? [], trigger: this.p(r.trigger),
+      dependsOn, trigger: this.p(r.trigger),
       claimedAt: r.claimed_at, claimedBy: r.claimed_by,
       revision: Number.isInteger(r.revision) ? r.revision : 0,
       admissionFence,
@@ -1128,14 +1784,36 @@ export class SqliteMissionStore implements MissionStore {
     this.assertPersistableFence(item);
     const transaction = this.db.transaction((): WorkItem => {
       const ts = this.now();
+      const authority = this.getDependencyAuthority(item.missionId);
+      const normalized = authority
+        ? this.validateNormalizedAppend(item.missionId, [item])
+        : null;
       const inserted = this.db.prepare(`INSERT INTO work_items(id,mission_id,kind,status,spec,policy,render_as,depends_on,trigger,created_at,updated_at)
         VALUES(@id,@missionId,@kind,'pending',@spec,@policy,@renderAs,@dependsOn,@trigger,@ts,@ts)
         ON CONFLICT(id) DO NOTHING`).run({
         id: item.id, missionId: item.missionId, kind: item.kind, spec: this.j(item.spec),
         policy: item.policy ?? 'auto', renderAs: item.renderAs ?? this.defaultRenderAs(item.kind),
-        dependsOn: this.j(item.dependsOn ?? []), trigger: this.j(item.trigger ?? null), ts,
+        dependsOn: normalized ? null : this.j(item.dependsOn ?? []),
+        trigger: this.j(item.trigger ?? null),
+        ts,
       });
-      if (inserted.changes === 1) this.insertAdmissionFence(item, ts);
+      if (inserted.changes === 1) {
+        this.insertAdmissionFence(item, ts);
+        if (normalized) {
+          this.insertNormalizedEdges(
+            item.missionId,
+            normalized.edges,
+            normalized.graphRevision,
+            ts,
+            [item.id],
+          );
+          this.updateNormalizedGraphDigest(item.missionId, normalized.graphRevision, ts);
+        }
+      } else if (normalized) {
+        throw createExecutionAuthorityError(
+          `MISSION_BATCH_CONFLICT: work-item ${item.id} already exists`,
+        );
+      }
       return this.selectItem(item.id)!;
     });
     return transaction.immediate();
@@ -1157,6 +1835,18 @@ export class SqliteMissionStore implements MissionStore {
       }
     }
     const transaction = this.db.transaction((): WorkItem[] => {
+      const missionIds = new Set(items.map((item) => item.missionId));
+      const normalizedByMission = new Map<string, {
+        edges: NormalizedDependencyEdge[];
+        graphRevision: number;
+      }>();
+      for (const missionId of missionIds) {
+        const authority = this.getDependencyAuthority(missionId);
+        if (authority) {
+          const missionItems = items.filter((item) => item.missionId === missionId);
+          normalizedByMission.set(missionId, this.validateNormalizedAppend(missionId, missionItems));
+        }
+      }
       const insert = this.db.prepare(`INSERT INTO work_items(
         id,mission_id,kind,status,spec,policy,render_as,depends_on,trigger,created_at,updated_at
       ) VALUES(@id,@missionId,@kind,'pending',@spec,@policy,@renderAs,@dependsOn,@trigger,@ts,@ts)`);
@@ -1169,11 +1859,25 @@ export class SqliteMissionStore implements MissionStore {
           spec: this.j(item.spec),
           policy: item.policy ?? 'auto',
           renderAs: item.renderAs ?? this.defaultRenderAs(item.kind),
-          dependsOn: this.j(item.dependsOn ?? []),
+          dependsOn: normalizedByMission.has(item.missionId) ? null : this.j(item.dependsOn ?? []),
           trigger: this.j(item.trigger ?? null),
           ts,
         });
         this.insertAdmissionFence(item, ts);
+      }
+      for (const [missionId, normalized] of normalizedByMission) {
+        const ts = this.now();
+        const missionItemIds = items
+          .filter((item) => item.missionId === missionId)
+          .map((item) => item.id);
+        this.insertNormalizedEdges(
+          missionId,
+          normalized.edges,
+          normalized.graphRevision,
+          ts,
+          missionItemIds,
+        );
+        this.updateNormalizedGraphDigest(missionId, normalized.graphRevision, ts);
       }
       return items.map((item) => this.selectItem(item.id)!);
     });
@@ -1280,11 +1984,8 @@ export class SqliteMissionStore implements MissionStore {
         AND wi.policy IN ('approval-required','risk-tagged')
         AND m.status IN ('pending','active')
         AND approval.work_item_id IS NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM json_each(COALESCE(wi.depends_on, '[]')) dep
-          LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=wi.mission_id
-          WHERE upstream.id IS NULL OR upstream.status<>'done'
-        )
+        AND ${dependencyReadinessPredicate('wi')}
+        AND ${dependencySatisfiedPredicate('wi')}
       ORDER BY wi.created_at`;
     return (this.db.prepare(sql).all(...CANONICAL_WORK_ITEM_KINDS) as any[]).map(this.rowToItem);
   }
@@ -1301,11 +2002,7 @@ export class SqliteMissionStore implements MissionStore {
           SELECT 1 FROM missions mission
           WHERE mission.id=target.mission_id AND mission.status IN ('pending','active')
         )
-        AND NOT EXISTS (
-          SELECT 1 FROM json_each(COALESCE(target.depends_on, '[]')) dep
-          LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=target.mission_id
-          WHERE upstream.id IS NULL OR upstream.status<>'done'
-        )`)
+        AND ${dependencySatisfiedPredicate('target')}`)
       .run({ id: itemId, result, ts: this.now() });
     return info.changes === 1;
   }
@@ -1333,11 +2030,7 @@ export class SqliteMissionStore implements MissionStore {
             SELECT 1 FROM missions mission
             WHERE mission.id=target.mission_id AND mission.status IN ('pending','active')
           )
-          AND NOT EXISTS (
-            SELECT 1 FROM json_each(COALESCE(target.depends_on, '[]')) dep
-            LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=target.mission_id
-            WHERE upstream.id IS NULL OR upstream.status<>'done'
-          )`).run({ id: itemId, ts });
+          AND ${dependencySatisfiedPredicate('target')}`).run({ id: itemId, ts });
       if (parked.changes !== 1) return null;
 
       this.db.prepare(`INSERT INTO work_item_approvals(
@@ -1423,13 +2116,23 @@ export class SqliteMissionStore implements MissionStore {
     });
     return transaction.immediate();
   }
-  reconcilePendingDependencies(): string[] {
+  reconcilePendingDependencies(opts: DependencyReconciliationOptions = {}): string[] {
+    const maxEdges = opts.maxEdges ?? DEFAULT_DEPENDENCY_RECONCILE_MAX_EDGES;
+    const maxEdgesPerJob = opts.maxEdgesPerJob ?? DEFAULT_DEPENDENCY_RECONCILE_MAX_EDGES_PER_JOB;
+    if (!Number.isSafeInteger(maxEdges) || maxEdges <= 0
+      || !Number.isSafeInteger(maxEdgesPerJob) || maxEdgesPerJob <= 0
+      || maxEdgesPerJob > maxEdges) {
+      throw new TypeError('MISSION_DEPENDENCY_RECONCILE_BOUNDS_INVALID');
+    }
     this.reconcileUnsupportedKinds();
     this.reconcileNonExecutableTriggers();
     const transaction = this.db.transaction((): string[] => {
       const changedMissions = new Set<string>();
       const missionRows = this.db.prepare(
-        "SELECT DISTINCT mission_id FROM work_items WHERE status='pending' ORDER BY mission_id",
+        `SELECT DISTINCT wi.mission_id FROM work_items wi
+          LEFT JOIN mission_graph_authorities graph ON graph.mission_id=wi.mission_id
+          WHERE wi.status='pending' AND graph.mission_id IS NULL
+          ORDER BY wi.mission_id`,
       ).all() as Array<{ mission_id: string }>;
 
       for (const { mission_id: missionId } of missionRows) {
@@ -1503,9 +2206,99 @@ export class SqliteMissionStore implements MissionStore {
           if (info.changes === 1) changedMissions.add(missionId);
         }
       }
+
+      let remainingBudget = maxEdges;
+      while (remainingBudget > 0) {
+        const job = this.db.prepare(`SELECT
+            mission_id,upstream_item_id,upstream_revision,outcome,cursor_work_item_id,turn_seq
+          FROM mission_dependency_reconcile_queue
+          WHERE state='pending'
+          ORDER BY turn_seq,updated_at,mission_id,upstream_item_id,upstream_revision,outcome
+          LIMIT 1`).get() as {
+            mission_id: string;
+            upstream_item_id: string;
+            upstream_revision: number;
+            outcome: 'done' | 'failed' | 'blocked';
+            cursor_work_item_id: string;
+            turn_seq: number;
+          } | undefined;
+        if (!job) break;
+        const chunkSize = Math.min(maxEdgesPerJob, remainingBudget);
+        const dependants = this.db.prepare(`SELECT work_item_id
+          FROM work_item_dependencies
+          WHERE mission_id=? AND dependency_item_id=? AND work_item_id>?
+          ORDER BY work_item_id
+          LIMIT ?`).all(
+          job.mission_id,
+          job.upstream_item_id,
+          job.cursor_work_item_id,
+          chunkSize,
+        ) as Array<{ work_item_id: string }>;
+        if (dependants.length === 0) {
+          this.db.prepare(`UPDATE mission_dependency_reconcile_queue
+            SET state='done',updated_at=@ts
+            WHERE mission_id=@missionId AND upstream_item_id=@upstreamItemId
+              AND upstream_revision=@upstreamRevision AND outcome=@outcome
+              AND state='pending'`).run({
+            ...job,
+            missionId: job.mission_id,
+            upstreamItemId: job.upstream_item_id,
+            upstreamRevision: job.upstream_revision,
+            ts: this.now(),
+          });
+          continue;
+        }
+
+        const terminalFailure = job.outcome === 'failed' || job.outcome === 'blocked';
+        for (const dependant of dependants) {
+          this.db.prepare(`UPDATE work_item_dependency_readiness
+            SET remaining_count=CASE WHEN remaining_count>0 THEN remaining_count-1 ELSE 0 END,
+              failed_count=failed_count+@failedDelta,updated_at=@ts
+            WHERE mission_id=@missionId AND work_item_id=@workItemId`).run({
+            missionId: job.mission_id,
+            workItemId: dependant.work_item_id,
+            failedDelta: terminalFailure ? 1 : 0,
+            ts: this.now(),
+          });
+          if (terminalFailure) {
+            const reason = `DEPENDENCY_FAILED: ${job.upstream_item_id}`;
+            const result = JSON.stringify({ ok: false, reason });
+            const info = this.db.prepare(`UPDATE work_items SET
+                status='blocked',last_result=@result,revision=revision+1,
+                claimed_at=NULL,claimed_by=NULL,claim_attempt_id=NULL,
+                claim_fence_token_hash=NULL,updated_at=@ts
+              WHERE mission_id=@missionId AND id=@workItemId AND status='pending'`).run({
+              missionId: job.mission_id,
+              workItemId: dependant.work_item_id,
+              result,
+              ts: this.now(),
+            });
+            if (info.changes === 1) changedMissions.add(job.mission_id);
+          }
+        }
+        const cursor = dependants.at(-1)!.work_item_id;
+        this.db.prepare(`UPDATE mission_dependency_reconcile_queue
+          SET cursor_work_item_id=@cursor,turn_seq=turn_seq+1,updated_at=@ts
+          WHERE mission_id=@missionId AND upstream_item_id=@upstreamItemId
+            AND upstream_revision=@upstreamRevision AND outcome=@outcome
+            AND state='pending' AND cursor_work_item_id=@priorCursor`).run({
+          missionId: job.mission_id,
+          upstreamItemId: job.upstream_item_id,
+          upstreamRevision: job.upstream_revision,
+          outcome: job.outcome,
+          cursor,
+          priorCursor: job.cursor_work_item_id,
+          ts: this.now(),
+        });
+        remainingBudget -= dependants.length;
+      }
       return [...changedMissions];
     });
     return transaction.immediate();
+  }
+  hasPendingDependencyReconciliation(): boolean {
+    return this.db.prepare(`SELECT 1 AS pending FROM mission_dependency_reconcile_queue
+      WHERE state='pending' LIMIT 1`).get() !== undefined;
   }
   queryDue(opts?: { tenant?: string; limit?: number; registry?: MissionRunnerRegistryV1 }): WorkItem[] {
     if (opts?.registry) this.reconcileRuntimeAdmission(opts.registry);
@@ -1533,11 +2326,9 @@ export class SqliteMissionStore implements MissionStore {
             WHERE approval.work_item_id=wi.id AND approval.decision_state='allowed'
           )
         )
-      ) AND NOT EXISTS (
-        SELECT 1 FROM json_each(COALESCE(wi.depends_on, '[]')) dep
-        LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=wi.mission_id
-        WHERE upstream.id IS NULL OR upstream.status<>'done'
-      )`;
+      )
+      AND ${dependencyReadinessPredicate('wi')}
+      AND ${dependencySatisfiedPredicate('wi')}`;
     if (opts?.registry) {
       sql += ' AND fence.registry_revision=? AND fence.registry_digest=?';
       args.push(opts.registry.registryRevision, opts.registry.registryDigest);
@@ -1606,11 +2397,8 @@ export class SqliteMissionStore implements MissionStore {
                 WHERE approval.work_item_id=target.id AND approval.decision_state='allowed'
               )
             )
-          ) AND NOT EXISTS (
-            SELECT 1 FROM json_each(COALESCE(target.depends_on, '[]')) dep
-            LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=target.mission_id
-            WHERE upstream.id IS NULL OR upstream.status<>'done'
-          )${engineAuthority.sql}`).run({
+          )
+          AND ${dependencySatisfiedPredicate('target')}${engineAuthority.sql}`).run({
           ...runtimeBindings,
           ...engineAuthority.bindings,
           id,
@@ -1659,11 +2447,8 @@ export class SqliteMissionStore implements MissionStore {
               WHERE approval.work_item_id=target.id AND approval.decision_state='allowed'
             )
           )
-        ) AND NOT EXISTS (
-          SELECT 1 FROM json_each(COALESCE(target.depends_on, '[]')) dep
-          LEFT JOIN work_items upstream ON upstream.id=dep.value AND upstream.mission_id=target.mission_id
-          WHERE upstream.id IS NULL OR upstream.status<>'done'
-        )${engineAuthority.sql}`).run({
+        )
+        AND ${dependencySatisfiedPredicate('target')}${engineAuthority.sql}`).run({
         ...CANONICAL_KIND_BINDINGS,
         ...engineAuthority.bindings,
         id,
@@ -1793,7 +2578,7 @@ export class SqliteMissionStore implements MissionStore {
   listItems(missionId: string): WorkItem[] {
     return (this.db.prepare(`SELECT ${WORK_ITEM_WITH_FENCE_COLUMNS}
       FROM work_items wi LEFT JOIN work_item_admission_fences fence ON fence.work_item_id=wi.id
-      WHERE wi.mission_id=? ORDER BY wi.created_at`).all(missionId) as any[]).map(this.rowToItem);
+      WHERE wi.mission_id=? ORDER BY wi.created_at,wi.rowid`).all(missionId) as any[]).map(this.rowToItem);
   }
 
   // Test-only raw helpers (prefixed __ — not part of the public MissionStore surface).

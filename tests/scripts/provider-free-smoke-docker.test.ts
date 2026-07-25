@@ -8,6 +8,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { getProviderBinaryForModel } from '../../src/orchestra/spawn-backend-docker.js';
+import { ensureOllamaModelRegistered } from '../../src/core/model-registry.js';
 import type { ModelType } from '../../src/core/types.js';
 
 describe('Docker provider binary resolution (provider-free smoke)', () => {
@@ -27,12 +28,15 @@ describe('Docker provider binary resolution (provider-free smoke)', () => {
     expect(getProviderBinaryForModel('gemini-2.5-pro' as ModelType)).toBe('gemini');
   });
 
-  it('resolves ollama to "claude" binary (HTTP-based — Docker fallback)', () => {
-    // Ollama uses HTTP transport, not a CLI binary; Docker workers fall back to claude
-    expect(getProviderBinaryForModel('ollama' as ModelType)).toBe('claude');
+  it('rejects Ollama at the Docker CLI binary boundary', () => {
+    const model = 'm4-088-provider-free-ollama';
+    ensureOllamaModelRegistered(model);
+    expect(() => getProviderBinaryForModel(model as ModelType))
+      .toThrow(/Ollama provider cannot use the Docker CLI backend/);
   });
 
-  it('resolves unknown model to "claude" binary (safe fallback)', () => {
-    expect(getProviderBinaryForModel('unknown-xyz' as ModelType)).toBe('claude');
+  it('rejects an unknown model instead of silently selecting Claude', () => {
+    expect(() => getProviderBinaryForModel('unknown-xyz' as ModelType))
+      .toThrow('Unknown model: unknown-xyz');
   });
 });

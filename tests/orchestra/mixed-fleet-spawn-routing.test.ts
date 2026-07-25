@@ -28,6 +28,11 @@ import type { ProviderAdapter } from '../../src/core/provider.js';
 import { TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, ResolvedConfig, ModelType, ProviderName } from '../../src/core/types.js';
 import type { SpawnBackend } from '../../src/orchestra/spawn-backend.js';
+import {
+  TEST_MEASURED_LANDING_CAPABILITIES,
+  TEST_REMOTE_EXECUTION_BUDGET,
+  TEST_REMOTE_WORKER_BUDGET_POLICY,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 interface SpawnRec { taskId: string; model: ModelType; }
 
@@ -36,7 +41,7 @@ function makeBackend(root: string): SpawnBackend & { calls: SpawnRec[] } {
   const calls: SpawnRec[] = [];
   return {
     name: 'mock-docker',
-    liveUsageBudgetSupport: 'measured-stream' as const,
+    ...TEST_MEASURED_LANDING_CAPABILITIES,
     spawn(taskId, model) {
       calls.push({ taskId, model });
       writeFileSync(
@@ -57,7 +62,7 @@ function makeOllamaAdapter(root: string): ProviderAdapter & { calls: SpawnRec[];
   const state = { calls: [] as SpawnRec[], refreshed: 0 };
   const adapter = {
     name: 'ollama' as ProviderName,
-    liveUsageBudgetSupport: 'measured-stream' as const,
+    executionCostClass: 'local' as const,
     buildCommand: () => 'ollama',
     isAvailable: () => Promise.resolve(true),
     spawn(taskId: string, model: ModelType) {
@@ -95,7 +100,12 @@ function makeTask(id: string, provider: ProviderName, model: string, file: strin
     assignedAgent: 'generic',
     assignedSkills: [],
     provider,
-    budget: { maxTurns: 1 },
+    ...(provider === 'claude'
+      ? {
+          budget: TEST_REMOTE_EXECUTION_BUDGET,
+          budgetPolicy: TEST_REMOTE_WORKER_BUDGET_POLICY,
+        }
+      : {}),
   } as unknown as Task;
 }
 

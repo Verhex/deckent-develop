@@ -36,6 +36,11 @@ import type {
 import type {
   SpawnBackend, SpawnBackendOptions,
 } from '../../src/orchestra/spawn-backend.js';
+import {
+  TEST_MEASURED_LANDING_CAPABILITIES,
+  TEST_REMOTE_EXECUTION_BUDGET,
+  TEST_REMOTE_WORKER_BUDGET_POLICY,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 // ─── Mock SpawnBackend ────────────────────────────────────────────
 
@@ -50,7 +55,7 @@ function makeMockBackend(): SpawnBackend & { calls: SpawnCall[] } {
   const calls: SpawnCall[] = [];
   return {
     name: 'mock',
-    liveUsageBudgetSupport: 'measured-stream' as const,
+    ...TEST_MEASURED_LANDING_CAPABILITIES,
     spawn(taskId, model, prompt, opts) {
       calls.push({ taskId, model, prompt, opts });
     },
@@ -88,7 +93,9 @@ function createTask(id: string, filesWrite: string[]): Task {
     assignedAgent: 'generic',
     assignedSkills: [],
     provider: 'claude',
-    budget: { maxTurns: 1 },
+    type: 'code-development',
+    budget: TEST_REMOTE_EXECUTION_BUDGET,
+    budgetPolicy: TEST_REMOTE_WORKER_BUDGET_POLICY,
   } as unknown as Task;
 }
 
@@ -271,5 +278,25 @@ describe('spawnWorkers C0c live wire (Sprint 169 W3.1)', () => {
     // The winner (lowest-id) IS spawned; only the deferred writer is held back.
     expect(backend.calls.map(c => c.taskId)).toContain('W31-H');
     expect(backend.calls.map(c => c.taskId)).not.toContain('W31-I');
+  });
+
+  it('does not spawn a later writer while the first writer is already EXECUTING', async () => {
+    const first = createTask('slot-z', ['src/shared.ts']);
+    first.status = TaskStatus.EXECUTING;
+    const second = createTask('slot-a', ['./src/shared.ts']);
+    const third = createTask('slot-m', ['SRC/SHARED.ts']);
+    persistTasks([first, second, third]);
+    const sprint = makeSprint('sprint-runtime-serialization', [first, second, third]);
+    const backend = makeMockBackend();
+
+    const origCwd = process.cwd();
+    process.chdir(testRoot);
+    try {
+      await spawnWorkers(testRoot, sprint, makeConfig(), { spawnBackend: backend });
+    } finally {
+      process.chdir(origCwd);
+    }
+
+    expect(backend.calls).toEqual([]);
   });
 });

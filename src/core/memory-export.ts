@@ -187,7 +187,8 @@ export function exportMemoryMd(store: MemoryStore): string {
   for (const [sprintId, entries] of groups) {
     lines.push(`## Sprint ${sprintId} Learnings`);
     for (const mem of entries) {
-      lines.push(`- ${mem.title}: ${mem.content}`);
+      const content = mem.content.replace(/[ \t]+$/gmu, '').trimEnd();
+      lines.push(`- ${mem.title}: ${content}`);
     }
     lines.push('');
   }
@@ -391,11 +392,55 @@ interface GuardedExportSpec {
   render: (store: MemoryStore) => string;
   entryType: EntryType;
   emptyMarker: string;
+  countDiskEntries?: (content: string) => number | null;
+}
+
+function countDecisionExportEntries(content: string): number | null {
+  if (!content.startsWith('# Architecture Decision Records (auto-generated)')) return null;
+  const lines = content.split('\n');
+  let count = 0;
+  for (let index = 0; index < lines.length - 2; index++) {
+    if (
+      /^## .+:\s*.+$/u.test(lines[index] ?? '')
+      && (lines[index + 1] ?? '') === ''
+      && /^\*\*Status:\*\*\s*\S+/u.test(lines[index + 2] ?? '')
+    ) {
+      count++;
+    }
+  }
+  return count;
+}
+
+function countSummaryDecisionEntries(content: string): number | null {
+  if (!content.startsWith('# Brain Summary (auto-generated)')) return null;
+  const section = content
+    .split('## Active Architecture Decisions')[1]
+    ?.split('\n## ')[0];
+  if (section === undefined) return null;
+  return section
+    .split('\n')
+    .filter(line =>
+      /^\| .+ \| .+ \| .+ \|$/u.test(line)
+      && !line.includes('| ID | Title | Status |')
+      && !line.includes('|-----|-------|--------|'))
+    .length;
 }
 
 const GUARDED_EXPORT_SPECS: GuardedExportSpec[] = [
-  { name: 'summary.md',   render: exportSummaryMd,   entryType: 'adr',    emptyMarker: '_No architecture decisions recorded._' },
-  { name: 'decisions.md', render: exportDecisionsMd, entryType: 'adr',    emptyMarker: '_No architecture decisions recorded._' },
+  {
+    name: 'summary.md',
+    render: exportSummaryMd,
+    entryType: 'adr',
+    emptyMarker: '_No architecture decisions recorded._',
+    countDiskEntries: countSummaryDecisionEntries,
+  },
+  {
+    name: 'decisions.md',
+    render: exportDecisionsMd,
+    entryType: 'adr',
+    emptyMarker: '_No architecture decisions recorded._',
+    countDiskEntries: countDecisionExportEntries,
+  },
   { name: 'memory.md',    render: exportMemoryMd,    entryType: 'memory', emptyMarker: '_No learnings recorded._' },
   { name: 'debt.md',      render: exportDebtMd,      entryType: 'debt',   emptyMarker: '_No technical debt recorded._' },
 ];
@@ -424,6 +469,12 @@ export function writeGuardedExports(
     const filePath = join(exportsDir, spec.name);
     const dbCount = store.getByType(spec.entryType).length;
     const renderIsEmpty = content.includes(spec.emptyMarker);
+    const diskContent = existsSync(filePath)
+      ? readFileSync(filePath, 'utf-8')
+      : null;
+    const diskCount = diskContent !== null && spec.countDiskEntries
+      ? spec.countDiskEntries(diskContent)
+      : null;
 
     if (dbCount > 0 && renderIsEmpty) {
       const warning =
@@ -435,8 +486,17 @@ export function writeGuardedExports(
       continue;
     }
 
-    if (dbCount === 0 && existsSync(filePath)) {
-      const diskContent = readFileSync(filePath, 'utf-8');
+    if (dbCount > 0 && diskCount !== null && diskCount > dbCount) {
+      const warning =
+        `export-wipe-guard: refused to write ${spec.name} — ` +
+        `DB has ${dbCount} ${spec.entryType} entries but disk export has ${diskCount} ` +
+        `(preserving previous file at ${filePath})`;
+      result.warnings.push(warning);
+      result.skipped.push(spec.name);
+      continue;
+    }
+
+    if (dbCount === 0 && diskContent !== null) {
       if (diskContent.trim().length > 0 && !diskContent.includes(spec.emptyMarker)) {
         const warning =
           `export-wipe-guard: refused to write ${spec.name} — ` +

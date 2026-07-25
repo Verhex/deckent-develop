@@ -14,6 +14,12 @@ import { loadConfig, resolveDefaultModel } from '../../core/config.js';
 import { buildExecutionRequest, resolveToTask, resolveExecutionModelIdentity } from '../../orchestra/execution-request-builder.js';
 import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
 import { applyWorkerExecutionBudgetPolicy } from '../../core/execution-plan-digest.js';
+import type { AttendedExecutionApprovalAuthority } from '../../core/attended-execution-approval.js';
+import { createAttendedExecutionProposalMaterialFromTask } from '../../core/attended-execution-proposal.js';
+import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
+import { preflightProviderExecutionIngress } from '../../core/provider-execution-ingress-authority.js';
+import { orderedRoleProviders } from '../../core/provider.js';
 import {
   assertTaskResultSettlementRef,
   readClosedTaskResultSettlement,
@@ -309,7 +315,13 @@ export async function streamWorkerLog(
 
 // ─── Command Registration ────────────────────────────────────────────
 
-export function registerRun(program: Command): void {
+export function registerRun(
+  program: Command,
+  runtime: {
+    attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+    providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  } = {},
+): void {
   const runCmd = program
     .command('run')
     .argument('<description>')
@@ -406,6 +418,31 @@ export function registerRun(program: Command): void {
         return;
       }
 
+      const workerProviderOrder = orderedRoleProviders('worker', cfg ?? {});
+      const providerAuthority = preflightProviderExecutionIngress(
+        runtime.providerAuthority,
+        {
+          runId: task.sprintId ?? taskId,
+          taskId,
+          provider: identity.provider,
+          model,
+          configuredBackend: cfg?.spawn_backend ?? 'auto',
+          fallbackProviders: [
+            workerProviderOrder.primary,
+            ...workerProviderOrder.fallbacks,
+          ].filter(candidate => candidate !== identity.provider),
+          unattended: workerProviderOrder.unattended,
+        },
+      );
+      if (providerAuthority.decision === 'hold') {
+        printError(new Error(getMessage('run.provider_authority_hold', lang, {
+          reason: providerAuthority.reasonCode,
+          evidence: providerAuthority.authorityEvidenceRefs.join(','),
+        })));
+        process.exitCode = 1;
+        return;
+      }
+
       // WM-1b: V2 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
       try {
         const routingVersion = cfg?.routing_engine ?? 'v2';
@@ -442,6 +479,14 @@ export function registerRun(program: Command): void {
       print(`Description: ${description}`);
       if (timeoutMs !== 300_000) print(`Timeout: ${timeoutMs}ms`);
 
+      const approvalBootstrap = !runtime.attendedExecutionApprovalAuthority && cfg
+        ? bootstrapApprovalAuthority(root, cfg)
+        : { state: 'disabled' as const };
+      const attendedExecutionApprovalAuthority =
+        runtime.attendedExecutionApprovalAuthority
+        ?? (approvalBootstrap.state === 'ready'
+          ? approvalBootstrap.runtime.attendedExecutionApprovalAuthority
+          : undefined);
       try {
         // Resolve agent and skill prompts if available (task may have assignedAgent/assignedSkills)
         const agentPrompt = await resolveAgentPrompt(root, task);
@@ -459,6 +504,19 @@ export function registerRun(program: Command): void {
           // the same value. The spawn layer remains the final measured-usage
           // enforcement boundary and independently rejects budgetless remotes.
           executionBudget: task.budget,
+          executionLandingPolicy: task.budgetPolicy?.landingPolicy,
+          executionBudgetProfileRef: task.budgetPolicy?.profileRef,
+          executionBudgetPolicyDigest: task.budgetPolicy?.policyDigest,
+          executionAdmissionMode: task.budgetPolicy?.admissionMode,
+          executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
+          executionApprovalProposal: task.budgetPolicy?.approvalProposal,
+          executionApprovalMaterial: createAttendedExecutionProposalMaterialFromTask(
+            task as unknown as Record<string, unknown>,
+            prompt,
+          ),
+          attendedExecutionApprovalAuthority,
+          executionTenantId: task.actor?.tenantId ?? 'local',
+          executionRunId: task.sprintId ?? taskId,
           // F1-RE (268-003): task.modelEffort (from --model-effort) is validated
           // per-provider inside spawnWorkerMultiProvider via resolveReasoningEffort.
           modelEffort: task.modelEffort,
@@ -509,6 +567,8 @@ export function registerRun(program: Command): void {
         if (!keepFiles) cleanupRunTask(root, taskId);
         printError(error);
         process.exitCode = 1;
+      } finally {
+        if (approvalBootstrap.state === 'ready') approvalBootstrap.runtime.close();
       }
     });
 

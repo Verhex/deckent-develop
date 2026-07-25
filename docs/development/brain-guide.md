@@ -61,9 +61,9 @@ Used only in structured mode to assign a model per task:
 
 | Signal | Model |
 |--------|-------|
-| Trivial keywords (rename, typo, config change) + ≤2 files | `haiku` |
-| Cross-module / architecture keywords OR ≥6 files | `opus` |
-| Everything else | `sonnet` |
+| Trivial keywords (rename, typo, config change) + ≤2 files | `claude-haiku-4-5-20251001` |
+| Cross-module / architecture keywords OR ≥6 files | `claude-opus-4-8` |
+| Everything else | `claude-sonnet-5` |
 
 Keywords that trigger `opus`: `mimari`, `architect`, `cross-cutting`, `refactor system`, `multiple module`, `brain.*worker`, `orchestrat`
 

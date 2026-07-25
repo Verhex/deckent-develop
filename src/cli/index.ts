@@ -75,6 +75,11 @@ import { registerXverifyCommand } from './commands/xverify.js';
 import { registerCuStatus } from './commands/cu-status.js';
 import { showSplash } from './helpers/splash.js';
 import { installFatalHandlers } from './helpers/error-handler.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
+
+export interface CliProgramRuntime {
+  readonly providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+}
 
 /**
  * Build and configure the CLI program with all commands registered.
@@ -83,7 +88,7 @@ import { installFatalHandlers } from './helpers/error-handler.js';
  * Also installs top-level uncaughtException / unhandledRejection
  * handlers on first call (idempotent; skipped under vitest).
  */
-export function buildProgram(): Command {
+export function buildProgram(runtime: CliProgramRuntime = {}): Command {
   installFatalHandlers();
 
   const program = new Command()
@@ -104,7 +109,11 @@ export function buildProgram(): Command {
     });
 
   registerInit(program);
-  registerStart(program);
+  registerStart(program, {
+    ...(runtime.providerAuthority
+      ? { providerAuthority: runtime.providerAuthority }
+      : {}),
+  });
   registerPlan(program);
   registerStatus(program);
   registerAttach(program);
@@ -125,7 +134,11 @@ export function buildProgram(): Command {
   registerWeb(program);
   registerSync(program);
   registerWatch(program);
-  registerRun(program);
+  registerRun(program, {
+    ...(runtime.providerAuthority
+      ? { providerAuthority: runtime.providerAuthority }
+      : {}),
+  });
   registerRuns(program);
   registerProcess(program);
   registerTestRun(program);
@@ -145,7 +158,11 @@ export function buildProgram(): Command {
   // to their pre-TERM-6 behavior. See docs/analysis/term-flow-unify-design-
   // 2026-07-11.md Sprint-6 row.
   registerPlanNl(program);
-  registerDo(program);
+  registerDo(program, {
+    ...(runtime.providerAuthority
+      ? { providerAuthority: runtime.providerAuthority }
+      : {}),
+  });
   registerHeartbeat(program);
   registerChat(program);
   registerCheckpoint(program);
@@ -180,7 +197,11 @@ export function buildProgram(): Command {
   registerImage(program);
   registerLimits(program);
   registerOpenRouterProbe(program);
-  registerXverifyCommand(program);
+  registerXverifyCommand(program, {
+    ...(runtime.providerAuthority
+      ? { providerAuthority: runtime.providerAuthority }
+      : {}),
+  });
   registerCuStatus(program);
   registerHelp(program);
 

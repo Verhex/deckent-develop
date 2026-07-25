@@ -42,8 +42,7 @@
 import type { ActorContext } from '../core/work-model.js';
 import type { Sprint } from '../core/types.js';
 import {
-  computeExecutionPlanDigest,
-  EXECUTION_PLAN_DIGEST_VERSION,
+  computeExecutionPlanDigestByVersion,
   type ExecutionPlanDigestContext,
 } from '../core/execution-plan-digest.js';
 
@@ -93,6 +92,7 @@ export type RunJobErrorCode =
   | 'RUN_JOB_FLOW_NOT_APPROVED'
   | 'RUN_JOB_DIGEST_MISMATCH'
   | 'RUN_JOB_BUDGET_HOLD'
+  | 'RUN_JOB_TOPOLOGY_HOLD'
   | 'RUN_JOB_STALE_HANDLE_CONFLICT';
 
 export abstract class RunJobError extends Error {
@@ -167,6 +167,16 @@ export class RunJobBudgetHoldError extends RunJobError {
         `slot-${item.slot} '${item.title}'[${item.reasonCode}:${item.profileRef}]`).join(', ')} — start refused`,
     );
     this.heldTasks = Object.freeze(ordered.map(item => Object.freeze({ ...item })));
+  }
+}
+
+/** A v3 approved snapshot contains a structural topology blocker. Human
+ * approval is not an override for an undeclared shared-writer collision. */
+export class RunJobTopologyHoldError extends RunJobError {
+  readonly code = 'RUN_JOB_TOPOLOGY_HOLD' as const;
+
+  constructor(flowId: string) {
+    super(flowId, `run-job-service: structural execution topology HOLD for flowId=${flowId} — start refused`);
   }
 }
 
@@ -246,10 +256,18 @@ export function startApprovedRun(deps: StartApprovedRunDeps): StartApprovedRunRe
   // record can never downgrade to that path by omitting its context.
   let versionedBudgetHolds: readonly HeldBudgetTask[] | undefined;
   if (approvedSnapshot.planDigestVersion !== undefined) {
-    const digestResult = approvedSnapshot.planDigestVersion === EXECUTION_PLAN_DIGEST_VERSION
-      && approvedSnapshot.planDigestContext
-      ? computeExecutionPlanDigest(approvedSnapshot.sprint, approvedSnapshot.planDigestContext)
-      : undefined;
+    let digestResult;
+    try {
+      digestResult = approvedSnapshot.planDigestContext
+        ? computeExecutionPlanDigestByVersion(
+            approvedSnapshot.planDigestVersion,
+            approvedSnapshot.sprint,
+            approvedSnapshot.planDigestContext,
+          )
+        : undefined;
+    } catch {
+      digestResult = undefined;
+    }
     const actualDigest = digestResult?.digest ?? 'invalid-versioned-plan-digest-metadata';
     if (actualDigest !== approvedSnapshot.planDigest) {
       throw new RunJobDigestMismatchError(
@@ -259,6 +277,9 @@ export function startApprovedRun(deps: StartApprovedRunDeps): StartApprovedRunRe
         approvedSnapshot.revision,
         actualDigest,
       );
+    }
+    if (digestResult?.topology?.verdict === 'block') {
+      throw new RunJobTopologyHoldError(flowId);
     }
     versionedBudgetHolds = digestResult!.budgetHolds;
   }

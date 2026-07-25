@@ -51,9 +51,10 @@ vi.mock('node:fs', async () => {
 });
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
+  readAuthMode: vi.fn().mockResolvedValue('subscription'),
 }));
 
 vi.mock('../../src/orchestra/brain.js', () => ({
@@ -159,7 +160,7 @@ const MOCK_SPRINT_PLAN: Sprint = {
       id: '999-001',
       title: 'mock',
       description: 'mock task',
-      model: 'opus',
+      model: 'claude-opus-4-8',
       effort: 'low',
       priority: 'NORMAL',
       reason: 'test',

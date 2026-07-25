@@ -114,6 +114,23 @@ describe('handleProcessSubmit', () => {
       handleProcessSubmit('', { root }, factory),
     ).rejects.toThrow(/Description is required/i);
   });
+
+  it('closes the process-scoped controller after submit', async () => {
+    const close = vi.fn();
+    const factory: ProcessControllerFactory = async () => ({
+      submit: async () => ({ executionId: 'proc-close', status: 'held' }),
+      status: () => null,
+      close,
+    });
+
+    await handleProcessSubmit('summarize the changelog', {
+      root: makeTmpDir(),
+      kind: 'task',
+      scopeDir: 'docs/',
+    }, factory);
+
+    expect(close).toHaveBeenCalledOnce();
+  });
 });
 
 describe('handleProcessStatus', () => {

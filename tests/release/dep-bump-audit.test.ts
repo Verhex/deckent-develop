@@ -39,11 +39,11 @@ describe('DEP669A — dependency-bump slice (offline-safe lockfile/manifest pins
     return entry.version;
   }
 
-  it('fast-uri is bumped to >=3.1.2 (fix floor) and stays on the 3.x line (non-major)', () => {
+  it('fast-uri is bumped to >=3.1.4 (CVE-2026-16221 fix floor) and stays on the 3.x line (non-major)', () => {
     const version = lockedVersion('fast-uri');
     const [major, minor, patch] = version.split('.').map(Number);
     expect(major).toBe(3);
-    expect(minor > 1 || (minor === 1 && patch >= 2)).toBe(true);
+    expect(minor > 1 || (minor === 1 && patch >= 4)).toBe(true);
   });
 
   it('hono is bumped to >=4.12.25 (fix floor) and stays on the 4.x line (non-major)', () => {

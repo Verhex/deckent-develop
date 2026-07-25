@@ -146,7 +146,8 @@ describe('result collector settlement authority wire', () => {
     writeTaskResultSettlementAttemptAtomic(ref);
     claimTaskResultSettlementAttemptAtomic(ref);
 
-    await expect(pollForResultFile(root, taskId, 20, 5)).resolves.toBeNull();
+    await expect(pollForResultFile(root, taskId, 20, 5))
+      .rejects.toMatchObject({ code: 'DECKENT_E077' });
 
     const hostResult = result(taskId, 'NO_GO', 'settled truth');
     writeTaskResultSettlementAtomic(createTaskResultSettlement({
@@ -154,7 +155,8 @@ describe('result collector settlement authority wire', () => {
       exitCode: 1,
       result: hostResult as unknown as Record<string, unknown>,
     }));
-    await expect(pollForResultFile(root, taskId, 20, 5)).resolves.toBeNull();
+    await expect(pollForResultFile(root, taskId, 20, 5))
+      .rejects.toMatchObject({ code: 'DECKENT_E077' });
     writeTaskResultSettlementClosureAtomic(ref, {
       containerDisposition: 'stopped-removed',
       locksReleased: true,

@@ -352,10 +352,10 @@ describe('CodexAdapter', () => {
     it('should return false when both OPENAI_API_KEY and DECKENT_OPENAI_API_KEY are missing and no subscription', async () => {
       delete process.env['OPENAI_API_KEY'];
       delete process.env['DECKENT_OPENAI_API_KEY'];
-      // codex --version succeeds but codex auth status fails
+      // codex --version succeeds but codex login status reports logged out
       mockSpawnSync
         .mockReturnValueOnce({ status: 0, stdout: 'codex 1.0.0', stderr: '' })
-        .mockReturnValueOnce({ status: 1, stdout: '', stderr: '' });
+        .mockReturnValueOnce({ status: 0, stdout: 'Not logged in', stderr: '' });
       expect(await adapter.isAvailable()).toBe(false);
     });
 
@@ -393,7 +393,7 @@ describe('CodexAdapter', () => {
       delete process.env['DECKENT_OPENAI_API_KEY'];
       mockSpawnSync
         .mockReturnValueOnce({ status: 0, stdout: 'codex 1.0.0', stderr: '' }) // --version
-        .mockReturnValueOnce({ status: 0, stdout: 'logged in as user@example.com', stderr: '' }); // auth status
+        .mockReturnValueOnce({ status: 0, stdout: 'Logged in using ChatGPT', stderr: '' }); // login status
       expect(await adapter.isAvailable()).toBe(true);
     });
   });
@@ -411,17 +411,25 @@ describe('CodexAdapter', () => {
       expect(adapter.detectAuthMode()).toBe('api_key');
     });
 
-    it('should return subscription when codex auth status reports logged in', () => {
+    it('should return subscription when codex login status reports logged in', () => {
       delete process.env['OPENAI_API_KEY'];
       delete process.env['DECKENT_OPENAI_API_KEY'];
-      mockSpawnSync.mockReturnValue({ status: 0, stdout: 'logged in as user@example.com', stderr: '' });
+      process.env['ANTHROPIC_API_KEY'] = 'foreign-anthropic';
+      process.env['GOOGLE_API_KEY'] = 'foreign-google';
+      process.env['OPENROUTER_API_KEY'] = 'foreign-openrouter';
+      mockSpawnSync.mockReturnValue({ status: 0, stdout: 'Logged in using ChatGPT', stderr: '' });
       expect(adapter.detectAuthMode()).toBe('subscription');
+      const options = mockSpawnSync.mock.calls.at(-1)?.[2] as { env?: NodeJS.ProcessEnv };
+      expect(options.env).not.toHaveProperty('ANTHROPIC_API_KEY');
+      expect(options.env).not.toHaveProperty('GOOGLE_API_KEY');
+      expect(options.env).not.toHaveProperty('OPENROUTER_API_KEY');
+      expect(options.env).not.toHaveProperty('OPENAI_API_KEY');
     });
 
-    it('should return none when no API key and auth status fails', () => {
+    it('should return none when no API key and login status reports logged out', () => {
       delete process.env['OPENAI_API_KEY'];
       delete process.env['DECKENT_OPENAI_API_KEY'];
-      mockSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: 'not logged in' });
+      mockSpawnSync.mockReturnValue({ status: 0, stdout: 'Not logged in', stderr: '' });
       expect(adapter.detectAuthMode()).toBe('none');
     });
 
@@ -433,7 +441,7 @@ describe('CodexAdapter', () => {
     });
 
     it('should prefer API key over subscription check', () => {
-      // API key set — should not call spawnSync for auth status
+      // API key set — should not call spawnSync for login status
       process.env['OPENAI_API_KEY'] = 'sk-test';
       const result = adapter.detectAuthMode();
       expect(result).toBe('api_key');
@@ -614,8 +622,8 @@ describe('CodexAdapter', () => {
         if (cmd === 'codex' && args[0] === '--version') {
           return { status: 0, stdout: 'codex 0.18.2\n', stderr: '' };
         }
-        // codex auth status — not logged in
-        return { status: 1, stdout: '', stderr: 'not logged in' };
+        // codex login status — not logged in
+        return { status: 0, stdout: 'Not logged in', stderr: '' };
       });
       const result = await adapter.detect();
       expect(result.binary).toBe(true);
@@ -631,7 +639,7 @@ describe('CodexAdapter', () => {
       expect(result.ready).toBe(false);
     });
 
-    it('returns ready=true via subscription auth (codex auth status logged in)', async () => {
+    it('returns ready=true via subscription auth (codex login status logged in)', async () => {
       delete process.env['OPENAI_API_KEY'];
       delete process.env['DECKENT_OPENAI_API_KEY'];
       mockSpawnSync.mockImplementation((cmd: string, args: string[]) => {
@@ -641,8 +649,8 @@ describe('CodexAdapter', () => {
         if (cmd === 'codex' && args[0] === '--version') {
           return { status: 0, stdout: 'codex 0.18.2\n', stderr: '' };
         }
-        // codex auth status — logged in
-        return { status: 0, stdout: 'logged in as user@example.com\n', stderr: '' };
+        // codex login status — logged in
+        return { status: 0, stdout: 'Logged in using ChatGPT\n', stderr: '' };
       });
       const result = await adapter.detect();
       expect(result.binary).toBe(true);

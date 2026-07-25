@@ -17,12 +17,17 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const PREMIUM_MODEL = 'claude-opus-4-8';
+const STANDARD_MODEL = 'claude-sonnet-5';
+const ECONOMY_MODEL = 'claude-haiku-4-5-20251001';
+const CROSS_PROVIDER_PREMIUM_MODEL = 'gpt-5.6-sol';
+
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
     id: 'task-001',
     title: 'Test Task',
     description: 'A test task',
-    model: 'sonnet',
+    model: STANDARD_MODEL,
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'testing',
@@ -43,20 +48,20 @@ function makeTmpDir(): string {
 // ─── scoreTaskComplexity ──────────────────────────────────────────────────────
 
 describe('scoreTaskComplexity', () => {
-  it('uses correct base minutes for opus model', () => {
-    const task = makeTask({ model: 'opus' });
+  it('uses correct base minutes for a premium model', () => {
+    const task = makeTask({ model: PREMIUM_MODEL });
     const score = scoreTaskComplexity(task);
     expect(score.baseMin).toBe(30);
   });
 
-  it('uses correct base minutes for sonnet model', () => {
-    const task = makeTask({ model: 'sonnet' });
+  it('uses correct base minutes for a standard model', () => {
+    const task = makeTask({ model: STANDARD_MODEL });
     const score = scoreTaskComplexity(task);
     expect(score.baseMin).toBe(20);
   });
 
-  it('uses correct base minutes for haiku model', () => {
-    const task = makeTask({ model: 'haiku' });
+  it('uses correct base minutes for an economy model', () => {
+    const task = makeTask({ model: ECONOMY_MODEL });
     const score = scoreTaskComplexity(task);
     expect(score.baseMin).toBe(10);
   });
@@ -74,27 +79,31 @@ describe('scoreTaskComplexity', () => {
     expect(score.baseMin).toBe(10);
   });
 
-  it('tier-infers an unknown model (metadata-derived, not a named default)', () => {
-    // An id the catalog does not carry → parametric tier inference (standard) → 20.
-    // The number comes from the tier classification, not a hardcoded unknown=sonnet.
-    const score = scoreTaskComplexity(makeTask({ model: 'brand-new-model-x' }));
-    expect(score.baseMin).toBe(20);
+  it('uses the same base minutes for the same tier across providers', () => {
+    const claudeScore = scoreTaskComplexity(makeTask({ model: PREMIUM_MODEL }));
+    const codexScore = scoreTaskComplexity(makeTask({ model: CROSS_PROVIDER_PREMIUM_MODEL }));
+    expect(codexScore.baseMin).toBe(claudeScore.baseMin);
+  });
+
+  it('fails loudly for an unregistered model instead of assuming a standard tier', () => {
+    expect(() => scoreTaskComplexity(makeTask({ model: 'unregistered-model-v1' })))
+      .toThrow(expect.objectContaining({ name: 'DeckentError', code: 'E_UNKNOWN_MODEL' }));
   });
 
   it('applies low effort multiplier (0.6)', () => {
-    const task = makeTask({ model: 'sonnet', effort: 'low' });
+    const task = makeTask({ model: STANDARD_MODEL, effort: 'low' });
     const score = scoreTaskComplexity(task);
     expect(score.effortMin).toBeCloseTo(20 * 0.6);
   });
 
   it('applies normal effort multiplier (1.0)', () => {
-    const task = makeTask({ model: 'sonnet', effort: 'normal' });
+    const task = makeTask({ model: STANDARD_MODEL, effort: 'normal' });
     const score = scoreTaskComplexity(task);
     expect(score.effortMin).toBeCloseTo(20 * 1.0);
   });
 
   it('applies high effort multiplier (1.6)', () => {
-    const task = makeTask({ model: 'sonnet', effort: 'high' });
+    const task = makeTask({ model: STANDARD_MODEL, effort: 'high' });
     const score = scoreTaskComplexity(task);
     expect(score.effortMin).toBeCloseTo(20 * 1.6);
   });
@@ -128,7 +137,7 @@ describe('scoreTaskComplexity', () => {
   });
 
   it('total equals effortMin + scopeMin', () => {
-    const task = makeTask({ model: 'opus', effort: 'high' });
+    const task = makeTask({ model: PREMIUM_MODEL, effort: 'high' });
     const score = scoreTaskComplexity(task);
     expect(score.totalMin).toBeCloseTo(score.effortMin + score.scopeMin);
   });
@@ -324,13 +333,13 @@ describe('estimateSprintDuration', () => {
   });
 
   it('returns positive number for non-empty task list', () => {
-    const tasks = [makeTask({ model: 'sonnet', effort: 'normal' })];
+    const tasks = [makeTask({ model: STANDARD_MODEL, effort: 'normal' })];
     const result = estimateSprintDuration(tasks, 1, tmpDir);
     expect(result).toBeGreaterThan(0);
   });
 
   it('returns lower estimate for more workers (parallelism)', () => {
-    const tasks = Array.from({ length: 5 }, () => makeTask({ model: 'sonnet', effort: 'normal' }));
+    const tasks = Array.from({ length: 5 }, () => makeTask({ model: STANDARD_MODEL, effort: 'normal' }));
     const single = estimateSprintDuration(tasks, 1, tmpDir);
     const multi = estimateSprintDuration(tasks, 4, tmpDir);
     expect(multi).toBeLessThan(single);
@@ -343,14 +352,14 @@ describe('estimateSprintDuration', () => {
     for (let i = 1; i <= 3; i++) {
       writeFileSync(join(sprintsDir, `sprint-00${i}.md`), '| Duration | 3600000ms |\n', 'utf-8');
     }
-    const tasks = [makeTask({ model: 'sonnet', effort: 'normal' })];
+    const tasks = [makeTask({ model: STANDARD_MODEL, effort: 'normal' })];
     const withHistory = estimateSprintDuration(tasks, 1, tmpDir);
     // Should blend heuristic with 60-min historical average
     expect(withHistory).toBeGreaterThan(0);
   });
 
   it('returns at least 1 minute', () => {
-    const tasks = [makeTask({ model: 'haiku', effort: 'low', scope: { directories: [], filesRead: [], filesWrite: [] } })];
+    const tasks = [makeTask({ model: ECONOMY_MODEL, effort: 'low', scope: { directories: [], filesRead: [], filesWrite: [] } })];
     const result = estimateSprintDuration(tasks, 100, tmpDir);
     expect(result).toBeGreaterThanOrEqual(1);
   });
@@ -392,7 +401,7 @@ describe('estimateSprintFull', () => {
   });
 
   it('serialTotalMin is sum of individual task scores', () => {
-    const tasks = [makeTask({ model: 'sonnet', effort: 'normal' }), makeTask({ model: 'opus', effort: 'high' })];
+    const tasks = [makeTask({ model: STANDARD_MODEL, effort: 'normal' }), makeTask({ model: PREMIUM_MODEL, effort: 'high' })];
     const result = estimateSprintFull(tasks, 1, tmpDir);
     const expectedSerial = result.taskScores.reduce((s, t) => s + t.totalMin, 0);
     expect(result.serialTotalMin).toBeCloseTo(expectedSerial);
@@ -420,7 +429,7 @@ describe('estimateSprintFull', () => {
     mkdirSync(sprintsDir, { recursive: true });
     // Historical average of 120 minutes
     writeFileSync(join(sprintsDir, 'sprint-001.md'), '| Duration | 7200000ms |\n', 'utf-8');
-    const task = makeTask({ model: 'sonnet', effort: 'normal', scope: { directories: [], filesRead: [], filesWrite: [] } });
+    const task = makeTask({ model: STANDARD_MODEL, effort: 'normal', scope: { directories: [], filesRead: [], filesWrite: [] } });
     const result = estimateSprintFull([task], 1, tmpDir);
     const heuristic = result.serialTotalMin * result.parallelismFactor;
     const expected = Math.max(1, Math.round(heuristic * 0.7 + 120 * 0.3));
@@ -428,7 +437,7 @@ describe('estimateSprintFull', () => {
   });
 
   it('uses only heuristic when no history', () => {
-    const task = makeTask({ model: 'sonnet', effort: 'normal', scope: { directories: [], filesRead: [], filesWrite: [] } });
+    const task = makeTask({ model: STANDARD_MODEL, effort: 'normal', scope: { directories: [], filesRead: [], filesWrite: [] } });
     const result = estimateSprintFull([task], 1, tmpDir);
     expect(result.historicalSprintCount).toBe(0);
     const expected = Math.max(1, Math.round(result.serialTotalMin * result.parallelismFactor));

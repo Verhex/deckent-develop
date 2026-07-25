@@ -63,6 +63,14 @@ vi.mock('../../src/orchestra/planner.js', () => ({
 }));
 
 vi.mock('../../src/core/provider.js', () => ({
+  orderedRoleProviders: vi.fn((role: 'brain' | 'worker' | 'auditor', config: ResolvedConfig) => ({
+    role,
+    primary: role === 'brain'
+      ? config.providers?.brain ?? config.brain_provider ?? 'claude'
+      : 'claude',
+    fallbacks: [],
+    unattended: config.provider_fallback?.unattended ?? true,
+  })),
   providerRegistry: {
     getDefault: vi.fn(() => ({ name: 'claude', buildCommand: () => 'claude', isAvailable: async () => true })),
     getProvider: vi.fn(() => ({ name: 'claude', buildCommand: () => 'claude', isAvailable: async () => true })),

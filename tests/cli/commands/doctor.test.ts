@@ -1670,6 +1670,15 @@ describe('buildConnectorHealthResults', () => {
     expect(results[0]?.authStatus).toBe('ok');
   });
 
+  it('maps available local Ollama runtime to auth-not-applicable ok status', () => {
+    const results = buildConnectorHealthResults([makeProvider('ollama', true, undefined, 'none')]);
+    expect(results[0]).toMatchObject({
+      provider: 'ollama',
+      available: true,
+      authStatus: 'ok',
+    });
+  });
+
   it('sets cliVersion to null when version is undefined', () => {
     const results = buildConnectorHealthResults([makeProvider('gemini', false, undefined)]);
     expect(results[0]?.cliVersion).toBeNull();
@@ -1732,6 +1741,17 @@ describe('formatConnectorHealthLines', () => {
     const codexLine = lines.find(l => l.includes('Codex'));
     expect(codexLine).toContain('[WARN]');
     expect(codexLine).toContain('auth missing');
+  });
+
+  it('shows local Ollama as available without inventing cloud auth', () => {
+    const results = [makeResult('ollama', true, 'ok')];
+    const lines = formatConnectorHealthLines(results, '/mock/root');
+    const ollamaLine = lines.find(l => l.includes('Ollama'));
+    expect(ollamaLine).toContain('[PASS]');
+    expect(ollamaLine).toContain('local runtime available');
+    expect(ollamaLine).toContain('authentication not required');
+    expect(ollamaLine).not.toContain('auth missing');
+    expect(ollamaLine).not.toContain('API key');
   });
 
   it('shows .deck file status line', () => {
@@ -2260,7 +2280,15 @@ describe('runProviderDiagnosticsWithOllama (Sprint 192 Task 192-007)', async () 
   });
 
   it('returns an entry for every provider including ollama', async () => {
-    const r = await runProviderDiagnosticsWithOllama('/mock/root');
+    const r = await runProviderDiagnosticsWithOllama(
+      '/mock/root',
+      async () => ({
+        state: 'logged-in',
+        present: true,
+        authenticated: true,
+        method: 'subscription',
+      }),
+    );
     const names = r.map(p => p.name).sort();
     expect(names).toContain('claude');
     expect(names).toContain('codex');
@@ -2269,9 +2297,18 @@ describe('runProviderDiagnosticsWithOllama (Sprint 192 Task 192-007)', async () 
   });
 
   it('ollama entry always carries the ollama-specific hints array', async () => {
-    const r = await runProviderDiagnosticsWithOllama('/mock/root');
+    const r = await runProviderDiagnosticsWithOllama(
+      '/mock/root',
+      async () => ({
+        state: 'logged-in',
+        present: true,
+        authenticated: true,
+        method: 'subscription',
+      }),
+    );
     const ollama = r.find(p => p.name === 'ollama');
     expect(ollama).toBeDefined();
     expect(Array.isArray(ollama!.hints)).toBe(true);
+    expect(ollama!.modelsEvidence).toBe('catalog-only');
   });
 });

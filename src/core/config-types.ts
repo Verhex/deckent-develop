@@ -12,6 +12,15 @@ import type { ApprovalPolicyRule } from './approval-policy.js';
 import type { ToolRiskLevel } from './tool-registry.js';
 import type { ComputerUseConfig } from './computer-use-contract.js';
 import type { ExecutionBudget, TaskKind } from './work-model.js';
+import type {
+  InvocationAuthMode,
+  InvocationExecutionBackend,
+  InvocationTransport,
+} from './invocation-receipt.js';
+import type {
+  ProviderLimitSourceKind,
+  ProviderLimitUnit,
+} from './provider-limit-truth.js';
 
 // ─── Timeout Configuration ──────────────────────────────────────────
 export interface TimeoutConfig {
@@ -194,6 +203,25 @@ export interface ApprovalConfig {
    *  config.json` authors; it is intentionally NOT mirrored onto
    *  `ResolvedConfig.approval` (see that type's doc comment). */
   api_decide?: boolean;
+  /**
+   * Production attended-execution authority. Default-off and open-only:
+   * enabling this never provisions custody. OIDC signature material comes
+   * from the existing `api_oidc` block; this block defines authorization and
+   * fresh-session policy only.
+   */
+  authority?: {
+    enabled: boolean;
+    tenant_id: string;
+    oidc: {
+      authority_ref: string;
+      tenant_claim: string;
+      role_claim?: string;
+      max_auth_age_seconds: number;
+      max_session_seconds: number;
+      required_acr?: string[];
+      required_amr?: string[];
+    };
+  };
   /** Activate the brain-side question→approval bridge (question-approval-bridge.ts
    *  via ipc-registry's CKPT-QUESTION-BRIDGE-WIRE seam): a CLI worker's `.question`
    *  becomes a runtime-wide ApprovalRequest decidable from the terminal/API instead
@@ -602,14 +630,86 @@ export interface ExecutionBudgetRolePolicyConfig {
   by_task_kind?: Partial<Record<TaskKind, ExecutionBudget>>;
 }
 
+export interface ExecutionLandingPolicyConfig {
+  /** Fraction of every hard ceiling reserved for landing; owner-authored, no runtime default. */
+  reserve_ratio: number;
+  /** Explicit attended-only escape hatch. Absence is the fail-closed `hold`. */
+  attended_unsupported?: 'hold' | 'allow-hard-stop';
+}
+
 /** Owner policy that produces remote invocation budgets before side effects. */
 export interface ExecutionBudgetPolicyConfig {
   roles: Partial<Record<ExecutionBudgetRole, ExecutionBudgetRolePolicyConfig>>;
+  /** ADR-G-037: metered work may request landing only from an owner-authored reserve. */
+  landing?: ExecutionLandingPolicyConfig;
   /** Missing block defaults to the safe `hold` behavior. Reroute order is owner-authored. */
   unmetered_backend?: {
     action: 'hold' | 'reroute-or-hold';
     ordered_backends?: Array<'docker' | 'subprocess' | 'tmux'>;
   };
+}
+
+export interface ProviderLimitPolicySourceScopeConfig {
+  sourceKind: ProviderLimitSourceKind;
+  authority: 'authoritative' | 'advisory';
+  transport: InvocationTransport;
+  executionBackend: InvocationExecutionBackend;
+  endpointRefHash: string | null;
+}
+
+export interface ProviderLimitPolicySelectorConfig {
+  tenantId: string;
+  provider: string;
+  accountRefHash: string | null;
+  quotaScopeRefHash: string;
+  authMode: Exclude<InvocationAuthMode, 'unknown'>;
+  backend: {
+    transport: InvocationTransport;
+    executionBackend: Exclude<InvocationExecutionBackend, 'unknown'>;
+    endpointRefHash: string | null;
+  };
+  requiredWindowIds: string[];
+  sourceScopes: ProviderLimitPolicySourceScopeConfig[];
+}
+
+export interface ProviderLimitPolicyValuesConfig {
+  warnAtRatio?: number;
+  blockAtRatio?: number;
+  minimumRemaining?: Partial<Record<ProviderLimitUnit, number>>;
+}
+
+export interface ProviderLimitPolicyEntryConfig {
+  selector: ProviderLimitPolicySelectorConfig;
+  values: ProviderLimitPolicyValuesConfig;
+}
+
+/**
+ * Authored provider account/window policy. Generic config merge may carry this
+ * value for inspection, but only provider-limit-policy.ts may resolve it into
+ * an effective policy from separate parent/project layers.
+ */
+export interface ProviderLimitsConfig {
+  schemaVersion: 1;
+  authorityRef: string;
+  policies: ProviderLimitPolicyEntryConfig[];
+}
+
+/** Canonical authored layer retained before generic config merging. */
+export interface ProviderLimitPolicyAuthoredLayerSnapshot {
+  readonly scope: 'global' | 'tenant' | 'project';
+  readonly config: ProviderLimitsConfig;
+}
+
+/**
+ * Runtime-safe provenance envelope for provider-limit policy resolution.
+ * `provider_limits` on ResolvedConfig remains inspection-only; consumers must
+ * use these separately authored layers and the authority digest.
+ */
+export interface ProviderLimitPolicyAuthoritySnapshot {
+  readonly schemaVersion: 1;
+  readonly authorityRef: string;
+  readonly parent: ProviderLimitPolicyAuthoredLayerSnapshot | null;
+  readonly project: ProviderLimitPolicyAuthoredLayerSnapshot | null;
 }
 
 /**
@@ -713,6 +813,8 @@ export interface DeckentConfig {
   provider_fallback?: ProviderFallbackPolicyConfig;
   /** Parametric role/task-kind remote execution budget producer. */
   execution_budget?: ExecutionBudgetPolicyConfig;
+  /** Authored provider account/window policy; never trusted from last-wins merge. */
+  provider_limits?: ProviderLimitsConfig;
   /** Per-task-type provider overrides */
   provider_overrides?: Record<string, ProviderName>;
   /** Tier-based model selection strategy. Merged with mode preset defaults.
@@ -1516,6 +1618,14 @@ export interface ResolvedConfig {
   provider_fallback?: ProviderFallbackPolicyConfig;
   /** Resolved owner policy; numerical defaults are never fabricated. */
   execution_budget?: ExecutionBudgetPolicyConfig;
+  /** Authored provider-limit input only; resolve parent/project layers separately. */
+  provider_limits?: ProviderLimitsConfig;
+  /**
+   * Separately authored, immutable provider-limit authority layers.
+   * Absent on manually constructed/legacy runtime config means unavailable,
+   * never permission to reinterpret the merged inspection value.
+   */
+  provider_limit_authority?: ProviderLimitPolicyAuthoritySnapshot;
   /** Per-task provider overrides resolved from grouped or legacy config. */
   provider_overrides?: Record<string, ProviderName>;
   /** Grouped provider config pass-through (F1-012). Routing fields are already
@@ -1675,7 +1785,10 @@ export interface ResolvedConfig {
     gate_enabled: boolean;
     relay_enabled: boolean;
     question_bridge: boolean;
+    authority?: ApprovalConfig['authority'];
   };
+  /** Pinned API OIDC verifier input, passed through after config validation/interpolation. */
+  api_oidc?: DeckentConfig['api_oidc'];
   /** Observability configuration (passed through from DeckentConfig) */
   observability?: DeckentConfig['observability'];
   /** Resolved runtime style — always 'sprint' or 'task' */

@@ -82,10 +82,14 @@ describe('Claude Adapter Smoke Tests', () => {
     expect(cmd).toBe(`claude -p - --model ${modelRegistry.resolveApiId('claude-sonnet-5')} < /tmp/task.txt`);
   });
 
-  it('isAvailable returns boolean (checks claude --version)', async () => {
+  it.skipIf(process.env.DECKENT_PROVIDER_INTEGRATION !== '1')(
+    'isAvailable returns boolean (explicit provider-integration profile)',
+    async () => {
     const result = await adapter.isAvailable();
     expect(typeof result).toBe('boolean');
-  }, 15_000);
+    },
+    15_000,
+  );
 });
 
 // ─── Codex Adapter ────────────────────────────────────────────────────────────
@@ -125,14 +129,13 @@ describe('Codex Adapter Smoke Tests', () => {
     expect(cmdWith).toContain('--full-auto');
   });
 
-  it('isAvailable checks OPENAI_API_KEY and codex CLI', async () => {
+  it.skipIf(process.env.DECKENT_PROVIDER_INTEGRATION !== '1')(
+    'isAvailable checks API-key or subscription auth (explicit provider-integration profile)',
+    async () => {
     const result = await adapter.isAvailable();
     expect(typeof result).toBe('boolean');
-    // Without OPENAI_API_KEY set, should be false
-    if (!process.env['OPENAI_API_KEY']) {
-      expect(result).toBe(false);
-    }
-  });
+    },
+  );
 
   it('listWorkers returns empty array initially', () => {
     expect(adapter.listWorkers()).toEqual([]);
@@ -165,14 +168,13 @@ describe('Gemini Adapter Smoke Tests', () => {
     expect(cmd).toContain('/tmp/prompt.json');
   });
 
-  it('isAvailable checks GOOGLE_API_KEY env var', async () => {
+  it.skipIf(process.env.DECKENT_PROVIDER_INTEGRATION !== '1')(
+    'isAvailable checks Gemini auth (explicit provider-integration profile)',
+    async () => {
     const result = await adapter.isAvailable();
     expect(typeof result).toBe('boolean');
-    // Without GOOGLE_API_KEY, should be false
-    if (!process.env['GOOGLE_API_KEY']) {
-      expect(result).toBe(false);
-    }
-  });
+    },
+  );
 
   it('validateApiKey returns invalid when key not set', () => {
     if (!process.env['GOOGLE_API_KEY']) {

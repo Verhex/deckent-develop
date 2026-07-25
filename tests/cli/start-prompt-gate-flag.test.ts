@@ -41,9 +41,35 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 // ═══ Mocks shared by the CLI section (mirrors tests/cli/start-gate-exit.test.ts) ═══
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
+  readAuthMode: vi.fn().mockResolvedValue('subscription'),
+}));
+
+vi.mock('../../src/core/cost-config-loader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/cost-config-loader.js')>()),
+  initCostConfig: vi.fn(),
+  loadCostConfig: vi.fn(() => ({
+    _version: '1.0',
+    providers: {
+      anthropic: {
+        enabled: true,
+        billing_modes_supported: ['api'],
+        default_billing_mode: 'api',
+        models: {
+          'claude-sonnet-5': {
+            input_cost_per_token: 0.000003,
+            output_cost_per_token: 0.000015,
+            max_input_tokens: 1_000_000,
+            enabled: true,
+          },
+        },
+      },
+    },
+    cost_limits: { sprint_max_usd: 5, daily_max_usd: 50, monthly_max_usd: 500, auto_confirm_below_usd: 2 },
+    update_config: { sources_priority: ['bundled'] },
+  })),
 }));
 
 vi.mock('../../src/orchestra/brain.js', () => ({
@@ -70,9 +96,13 @@ vi.mock('../../src/core/constants.js', async (importOriginal) => {
   return { ...actual, TMUX_SESSION_NAME: 'deckent' };
 });
 
-vi.mock('../../src/core/provider.js', () => ({
-  bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
-}));
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/provider.js')>();
+  return {
+    ...actual,
+    bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
+  };
+});
 
 vi.mock('../../src/cli/commands/doctor.js', () => ({
   runDoctorChecks: vi.fn().mockReturnValue({ checks: [] }),
@@ -155,7 +185,14 @@ function makeSprint() {
   return {
     id: 'sprint-001',
     number: 1,
-    tasks: [{ id: '001-001', title: 'Task One', model: 'sonnet', priority: 'NORMAL' }],
+    tasks: [{
+      id: '001-001',
+      title: 'Task One',
+      model: 'claude-sonnet-5',
+      priority: 'NORMAL',
+      scope: { directories: [], filesRead: [], filesWrite: [] },
+      dependencies: [],
+    }],
     reasoning: 'Test reasoning',
     planningMode: 'structured',
   };
@@ -287,6 +324,8 @@ describe('deckent_start MCP — acknowledgePromptGate → IPC config.json (task-
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(loadConfig).mockResolvedValue(MCP_MOCK_CONFIG as any);
+    vi.mocked(readContext).mockReturnValue({ memory: '', retro: '', debt: '', patterns: [] } as any);
+    vi.mocked(planSprint).mockReturnValue(makeSprint() as any);
     sandboxRoot = mkdtempSync(join(tmpdir(), 'deckent-prompt-gate-flag-test-'));
     cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(sandboxRoot);
   });
@@ -303,10 +342,10 @@ describe('deckent_start MCP — acknowledgePromptGate → IPC config.json (task-
 
   it('omitting acknowledgePromptGate writes acknowledgePromptGate: false into the IPC config.json', async () => {
     const tool = await getStartTool();
-    await tool.handler({ force: true });
+    const result = await tool.handler({ force: true });
 
     const cfg = readWrittenIpcConfig();
-    expect(cfg).toBeDefined();
+    expect(cfg, result.content[0]?.text).toBeDefined();
     expect(cfg!.acknowledgePromptGate).toBe(false);
   });
 

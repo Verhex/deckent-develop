@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { Task } from '../../../src/core/types.js';
 import { TaskStatus } from '../../../src/core/types.js';
 
@@ -47,6 +50,7 @@ vi.mock('../../../src/orchestra/spawn-backend.js', () => ({
     create: vi.fn().mockReturnValue({
       name: 'measured-test',
       liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
       spawn: mockBackendSpawn,
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),
@@ -74,12 +78,20 @@ import { buildAllowedToolsFromScope, spawnWorkerMultiProvider, registerSpawn } f
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
+const TEST_LANDING_POLICY = { reserve_ratio: 0.25 } as const;
+
 function makeTask(overrides?: Partial<Task>): Task {
+  const model = overrides?.model ?? 'claude-sonnet-5';
+  const resolvedProvider = model.startsWith('gpt') || model === 'o3'
+    ? 'codex'
+    : model.startsWith('gemini')
+      ? 'gemini'
+      : 'claude';
   return {
     id: '001-001',
     title: 'Test Task',
     description: 'Test description',
-    model: 'claude-sonnet-5',
+    model,
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -90,6 +102,17 @@ function makeTask(overrides?: Partial<Task>): Task {
     sprintId: 'sprint-001',
     createdAt: new Date().toISOString(),
     budget: { maxTurns: 2 },
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      taskKind: 'code-development',
+      resolvedProvider,
+      executionCostClass: 'remote',
+      profileRef: 'tests.cli.commands.spawn',
+      policyDigest: 'a'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: TEST_LANDING_POLICY,
+    },
     ...overrides,
   };
 }
@@ -115,6 +138,7 @@ describe('spawn command (isolated)', () => {
     vi.mocked(SpawnBackendFactory.create).mockReturnValue({
       name: 'measured-test',
       liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
       spawn: mockBackendSpawn,
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),
@@ -357,6 +381,33 @@ describe('spawnWorkerMultiProvider', () => {
     expect(spawnWorker).not.toHaveBeenCalled();
   });
 
+  it('does not elevate a worker-writable Task JSON budget into host spawn authority', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-host-budget-authority-'));
+    try {
+      mkdirSync(join(root, '.tasks'));
+      writeFileSync(
+        join(root, '.tasks', 'task-forged-budget.json'),
+        JSON.stringify({
+          id: 'forged-budget',
+          model: 'gpt-4.1',
+          budget: { maxTurns: 999, maxCacheReadTokens: 999_999_999 },
+        }),
+      );
+
+      await expect(spawnWorkerMultiProvider(
+        'forged-budget',
+        'gpt-4.1',
+        'prompt',
+        root,
+        {},
+      )).rejects.toThrow('Remote execution budget is required');
+      expect(SpawnBackendFactory.create).not.toHaveBeenCalled();
+      expect(spawnWorker).not.toHaveBeenCalled();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('blocks a budgeted remote worker when its backend cannot meter live usage', async () => {
     const backend = { spawn: vi.fn(), kill: vi.fn(), list: vi.fn(), name: 'subprocess' };
     vi.mocked(SpawnBackendFactory.create).mockReturnValue(backend as never);
@@ -383,11 +434,16 @@ describe('spawnWorkerMultiProvider', () => {
 
   it('returns a measured configured backend and codex provider for OpenAI models', async () => {
     const mockBackend = { spawn: vi.fn(), kill: vi.fn(), list: vi.fn() };
-    Object.assign(mockBackend, { name: 'measured-test', liveUsageBudgetSupport: 'measured-stream' });
+    Object.assign(mockBackend, {
+      name: 'measured-test',
+      liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
+    });
     vi.mocked(SpawnBackendFactory.create).mockReturnValue(mockBackend as any);
     const result = await spawnWorkerMultiProvider('002', 'gpt-4.1', 'prompt', '/root', {
       spawnBackend: 'subprocess',
       executionBudget: { maxTurns: 2 },
+      executionLandingPolicy: TEST_LANDING_POLICY,
     });
     expect(result.backend).toBe('measured-test');
     expect(result.provider).toBe('codex');
@@ -396,11 +452,16 @@ describe('spawnWorkerMultiProvider', () => {
 
   it('returns a measured configured backend and gemini provider for Gemini models', async () => {
     const mockBackend = { spawn: vi.fn(), kill: vi.fn(), list: vi.fn() };
-    Object.assign(mockBackend, { name: 'measured-test', liveUsageBudgetSupport: 'measured-stream' });
+    Object.assign(mockBackend, {
+      name: 'measured-test',
+      liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
+    });
     vi.mocked(SpawnBackendFactory.create).mockReturnValue(mockBackend as any);
     const result = await spawnWorkerMultiProvider('003', 'gemini-2.5-pro', 'prompt', '/root', {
       spawnBackend: 'subprocess',
       executionBudget: { maxTurns: 2 },
+      executionLandingPolicy: TEST_LANDING_POLICY,
     });
     expect(result.backend).toBe('measured-test');
     expect(result.provider).toBe('gemini');
@@ -410,6 +471,7 @@ describe('spawnWorkerMultiProvider', () => {
     const mockBackend = {
       name: 'measured-test',
       liveUsageBudgetSupport: 'measured-stream' as const,
+      executionLandingCapability: 'cooperative-landing' as const,
       spawn: vi.fn(),
       kill: vi.fn(),
       list: vi.fn(),
@@ -419,6 +481,7 @@ describe('spawnWorkerMultiProvider', () => {
       allowedTools: 'Read,Write,Edit,Bash,Glob,Grep',
       spawnBackend: 'subprocess',
       executionBudget: { maxTurns: 2 },
+      executionLandingPolicy: TEST_LANDING_POLICY,
     });
     expect(mockBackend.spawn).toHaveBeenCalledWith(
       '004', 'claude-opus-4-8', 'prompt',
@@ -430,6 +493,7 @@ describe('spawnWorkerMultiProvider', () => {
     const mockBackend = {
       name: 'measured-test',
       liveUsageBudgetSupport: 'measured-stream' as const,
+      executionLandingCapability: 'cooperative-landing' as const,
       spawn: vi.fn(),
       kill: vi.fn(),
       list: vi.fn(),
@@ -439,6 +503,7 @@ describe('spawnWorkerMultiProvider', () => {
       allowedTools: 'Read,Bash',
       spawnBackend: 'subprocess',
       executionBudget: { maxTurns: 2 },
+      executionLandingPolicy: TEST_LANDING_POLICY,
     });
     expect(mockBackend.spawn).toHaveBeenCalledWith(
       '005', 'gpt-4.1-mini', 'prompt',
@@ -457,6 +522,7 @@ describe('spawn command provider display', () => {
     vi.mocked(SpawnBackendFactory.create).mockReturnValue({
       name: 'measured-test',
       liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
       spawn: mockBackendSpawn,
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),

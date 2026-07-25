@@ -309,6 +309,8 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
       taskSummaries: result.taskSummaries,
       policyDecision: result.policyDecision,
       gateResult: result.gateResult,
+      topology: result.topology,
+      topologyGateResult: result.topologyGateResult,
       // born-684: gate-fail nedeni onay-yüzeyine taşınır (digest-dışı additive).
       ...(result.gateFindings.length > 0 ? { gateFindings: result.gateFindings } : {}),
       // Dogfood-449 B1: scope-gate aynası da digest-dışı additive alanlardır.
@@ -332,6 +334,9 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
     const { preview, flowId } = context;
     if (!preview || !flowId) {
       throw new Error('run-flow-controller: approve() requires a live preview (call proposeRun first; state must be AWAITING_APPROVAL)');
+    }
+    if (preview.topologyGateResult === 'fail') {
+      throw new Error('run-flow-controller: structural topology gate blocked approval');
     }
     context = reduceRunFlow(context, {
       schemaVersion: RUN_FLOW_EVENT_SCHEMA_VERSION,

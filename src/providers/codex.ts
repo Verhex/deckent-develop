@@ -25,6 +25,10 @@ import type { ModelTier } from '../core/model-equivalence.js';
 import { getModelForProviderTier } from '../core/model-equivalence.js';
 import { killProcessGroupWithEscalation } from './subprocess.js';
 import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
+import {
+  classifyCodexAuthStatus,
+  CODEX_AUTH_STATUS_ARGS,
+} from '../core/provider-auth-probe.js';
 
 // Side-effect: register the Codex parity catalog (gpt-5.5 + gpt-5.6 family)
 // into the singleton registry the first time this module is imported —
@@ -281,7 +285,7 @@ export class CodexAdapter implements ProviderAdapter {
   /**
    * Check whether the Codex CLI is available and auth is configured.
    * Checks both API key auth (OPENAI_API_KEY / DECKENT_OPENAI_API_KEY)
-   * and ChatGPT subscription auth (via `codex auth status`).
+   * and ChatGPT subscription auth (via `codex login status`).
    */
   async isAvailable(): Promise<boolean> {
     try {
@@ -301,7 +305,7 @@ export class CodexAdapter implements ProviderAdapter {
   /**
    * Three-layer probe: binary detection → version parsing → auth check.
    * Auth probes both API key (OPENAI_API_KEY / DECKENT_OPENAI_API_KEY) and
-   * subscription (`codex auth status` "logged in" string).
+   * subscription (`codex login status` local contract).
    *
    * Partial state: binary OK but neither api_key nor subscription found.
    */
@@ -376,7 +380,7 @@ export class CodexAdapter implements ProviderAdapter {
    * and projects the rich detail onto `{binary, version, auth, ready}`.
    *
    * Codex auth = `api_key` (OPENAI_API_KEY / DECKENT_OPENAI_API_KEY) OR
-   * `subscription` (`codex auth status` reports logged in). Binary OK with
+   * `subscription` (`codex login status` reports logged in). Binary OK with
    * neither auth method → `ready: 'partial'`.
    */
   async detect(): Promise<ProviderDetectResult> {
@@ -423,7 +427,7 @@ export class CodexAdapter implements ProviderAdapter {
   /**
    * Detect the current auth mode for Codex CLI.
    * Returns 'api_key' if OPENAI_API_KEY or DECKENT_OPENAI_API_KEY is set,
-   * 'subscription' if `codex auth status` reports active login,
+   * 'subscription' if `codex login status` reports active login,
    * or 'none' if no auth is available.
    */
   detectAuthMode(): CodexAuthMode {
@@ -433,11 +437,13 @@ export class CodexAdapter implements ProviderAdapter {
 
     // Check subscription auth via codex CLI
     try {
-      const result = spawnSync('codex', ['auth', 'status'], {
+      const result = spawnSync('codex', [...CODEX_AUTH_STATUS_ARGS], {
         encoding: 'utf-8',
         timeout: 5_000,
+        env: buildProviderChildEnv(process.env, this.credentialEnvKeys),
       });
-      if (result.status === 0 && result.stdout?.includes('logged in')) {
+      const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+      if (classifyCodexAuthStatus(result.status, output) === 'logged-in') {
         return 'subscription';
       }
     } catch {
@@ -553,7 +559,7 @@ export class CodexAdapter implements ProviderAdapter {
    * Delegates to model-equivalence.ts as the single source of truth.
    */
   getModelForTier(tier: ModelTier): OpenAIModel {
-    return (getModelForProviderTier('codex', tier) ?? 'gpt-4.1') as OpenAIModel;
+    return requireCodexTierModel(tier);
   }
 
   // ─── Internal helpers ───────────────────────────────────────────────

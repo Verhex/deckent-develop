@@ -51,18 +51,22 @@ export async function handleProcessSubmit(
     throw new Error(getMessage('process.description_required', lang));
   }
   const controller = await factory(root);
-  const result = await controller.submit({
-    description: description.trim(),
-    origin: 'cli',
-    ...(opts.kind ? { kind: opts.kind } : {}),
-    ...(opts.scopeDir ? { scopeDir: opts.scopeDir } : {}),
-    ...(opts.provider ? { provider: opts.provider } : {}),
-    ...(opts.model ? { model: opts.model } : {}),
-  });
-  print(getMessage('process.submit_success', lang, {
-    executionId: result.executionId,
-    status: result.status,
-  }));
+  try {
+    const result = await controller.submit({
+      description: description.trim(),
+      origin: 'cli',
+      ...(opts.kind ? { kind: opts.kind } : {}),
+      ...(opts.scopeDir ? { scopeDir: opts.scopeDir } : {}),
+      ...(opts.provider ? { provider: opts.provider } : {}),
+      ...(opts.model ? { model: opts.model } : {}),
+    });
+    print(getMessage('process.submit_success', lang, {
+      executionId: result.executionId,
+      status: result.status,
+    }));
+  } finally {
+    controller.close();
+  }
 }
 
 export interface ProcessStatusOptions {
@@ -81,17 +85,21 @@ export async function handleProcessStatus(
     throw new Error(getMessage('process.executionId_required', lang));
   }
   const controller = await factory(root);
-  const record = controller.status(executionId.trim());
-  if (!record) {
-    print(getMessage('process.not_found', lang, { executionId }));
-    return;
+  try {
+    const record = controller.status(executionId.trim());
+    if (!record) {
+      print(getMessage('process.not_found', lang, { executionId }));
+      return;
+    }
+    print(getMessage('process.status_found', lang, {
+      executionId: record.id,
+      status: record.status,
+      title: record.title,
+      kind: record.kind,
+    }));
+  } finally {
+    controller.close();
   }
-  print(getMessage('process.status_found', lang, {
-    executionId: record.id,
-    status: record.status,
-    title: record.title,
-    kind: record.kind,
-  }));
 }
 
 export interface ProcessResultOptions {
@@ -109,20 +117,24 @@ export async function handleProcessResult(
   if (!executionId || !executionId.trim()) {
     throw new Error(getMessage('process.executionId_required', lang));
   }
-  // Read from backlog directly (same source as MCP result action) to surface lastResult.
-  await factory(root); // ensure controller is wired (backlog file initialised if needed)
-  const entry = loadBacklog(backlogPath(root)).entries.find((e) => e.id === executionId.trim());
-  if (!entry) {
-    print(getMessage('process.not_found', lang, { executionId }));
-    return;
+  const controller = await factory(root);
+  try {
+    // Read from backlog directly (same source as MCP result action) to surface lastResult.
+    const entry = loadBacklog(backlogPath(root)).entries.find((e) => e.id === executionId.trim());
+    if (!entry) {
+      print(getMessage('process.not_found', lang, { executionId }));
+      return;
+    }
+    const resultStr = entry.lastResult ? JSON.stringify(entry.lastResult) : 'null';
+    print(getMessage('process.result_found', lang, {
+      executionId: entry.id,
+      status: entry.status,
+      title: entry.title,
+      result: resultStr,
+    }));
+  } finally {
+    controller.close();
   }
-  const resultStr = entry.lastResult ? JSON.stringify(entry.lastResult) : 'null';
-  print(getMessage('process.result_found', lang, {
-    executionId: entry.id,
-    status: entry.status,
-    title: entry.title,
-    result: resultStr,
-  }));
 }
 
 // ─── register ─────────────────────────────────────────────────────────────────

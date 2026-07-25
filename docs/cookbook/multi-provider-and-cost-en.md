@@ -152,11 +152,11 @@ Use these in `- Model:` directives:
 
 | Provider | Model ID | Tier | Notes |
 |----------|----------|------|-------|
-| `claude` | `opus` | premium | Most capable Claude |
-| `claude` | `sonnet` | standard | Balanced, default |
-| `claude` | `haiku` | economy | Fastest Claude |
+| `claude` | `claude-opus-4-8` | premium | Most capable Claude |
+| `claude` | `claude-sonnet-5` | standard | Balanced, default |
+| `claude` | `claude-haiku-4-5-20251001` | economy | Fastest Claude |
 | `codex` | `o3` | premium_plus | Advanced reasoning |
-| `codex` | `gpt-5` | premium | Frontier OpenAI |
+| `codex` | `gpt-5.5` | premium | Frontier OpenAI |
 | `codex` | `gpt-4.1` | standard | Balanced OpenAI |
 | `codex` | `o4-mini` | standard | Reasoning, efficient |
 | `codex` | `gpt-5-mini` | economy | Economy OpenAI |
@@ -182,7 +182,7 @@ Codex for implementation, Gemini for review.
 ## Task 1: Update onboarding guide
 - Agent: doc-writer
 - Provider: claude
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: low
 - Files: docs/onboarding.md
 - Scope: docs/

@@ -11,6 +11,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import type { SpawnBackend } from '../../src/orchestra/spawn-backend.js';
+import {
+  TEST_MEASURED_LANDING_CAPABILITIES,
+  TEST_REMOTE_EXECUTION_BUDGET,
+  TEST_REMOTE_WORKER_BUDGET_POLICY,
+  settleTestRuntimeBudget,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 import {
   CHANNELS,
@@ -292,7 +299,9 @@ describe('SPAWN emit fires during spawnIfNotAssigned (wiring test)', () => {
       id: 'exec-001',
       title: 'Executing task',
       description: 'test',
-      model: 'sonnet',
+      model: 'claude-sonnet-5',
+      provider: 'claude',
+      type: 'code-development',
       effort: 'normal',
       priority: 'NORMAL',
       reason: 'test',
@@ -304,6 +313,8 @@ describe('SPAWN emit fires during spawnIfNotAssigned (wiring test)', () => {
       createdAt: new Date().toISOString(),
       assignedAgent: 'generic',
       assignedSkills: [],
+      budget: TEST_REMOTE_EXECUTION_BUDGET,
+      budgetPolicy: TEST_REMOTE_WORKER_BUDGET_POLICY,
     };
 
     // One pending queue task that will be spawned
@@ -311,7 +322,9 @@ describe('SPAWN emit fires during spawnIfNotAssigned (wiring test)', () => {
       id: 'queue-001',
       title: 'Queue task',
       description: 'test',
-      model: 'sonnet',
+      model: 'claude-sonnet-5',
+      provider: 'claude',
+      type: 'code-development',
       effort: 'normal',
       priority: 'NORMAL',
       reason: 'test',
@@ -323,6 +336,8 @@ describe('SPAWN emit fires during spawnIfNotAssigned (wiring test)', () => {
       createdAt: new Date().toISOString(),
       assignedAgent: 'generic',
       assignedSkills: [],
+      budget: TEST_REMOTE_EXECUTION_BUDGET,
+      budgetPolicy: TEST_REMOTE_WORKER_BUDGET_POLICY,
     };
 
     const sprint = {
@@ -336,6 +351,7 @@ describe('SPAWN emit fires during spawnIfNotAssigned (wiring test)', () => {
     };
 
     // Write result for the executing task (immediate collection)
+    settleTestRuntimeBudget(testRoot, 'exec-001');
     writeFileSync(
       join(testRoot, '.tasks', 'task-exec-001.result'),
       JSON.stringify({
@@ -347,6 +363,20 @@ describe('SPAWN emit fires during spawnIfNotAssigned (wiring test)', () => {
         coverage: 100,
         selfAssessment: 'DONE',
         notes: 'done',
+        tokenUsage: {
+          inputTokens: 10,
+          outputTokens: 2,
+          cacheReadTokens: 0,
+          source: 'provider-adapter',
+          provider: 'claude',
+          model: 'claude-sonnet-5',
+        },
+        cost: {
+          usd: 0.01,
+          currency: 'USD',
+          pricingSource: 'provider-envelope',
+          isLocal: false,
+        },
       }),
       'utf-8',
     );
@@ -369,7 +399,15 @@ describe('SPAWN emit fires during spawnIfNotAssigned (wiring test)', () => {
 
     // Run with queue=[queueTask] — when exec-001 completes, processQueue fires
     // spawnIfNotAssigned for queueTask → emitProgress(SPAWN)
-    await waitForResults(testRoot, sprint, 5000, [queueTask]);
+    const backend: SpawnBackend = {
+      name: 'measured-test',
+      ...TEST_MEASURED_LANDING_CAPABILITIES,
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      list: vi.fn(() => []),
+      isAvailable: vi.fn(async () => true),
+    };
+    await waitForResults(testRoot, sprint, 5000, [queueTask], { spawnBackend: backend });
 
     // Verify emitProgress was called with phase='SPAWN'
     const spawnCalls = emitProgressMock.mock.calls.filter(

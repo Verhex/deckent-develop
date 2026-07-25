@@ -58,9 +58,9 @@ describe('multi-provider-fleet-smoke — MockFleetRegistry', () => {
 
   it('throws on duplicate registration', () => {
     const registry = new MockFleetRegistry();
-    registry.register({ name: 'claude', models: ['sonnet'], authMode: 'session', providerType: 'subscription' });
+    registry.register({ name: 'claude', authMode: 'session', providerType: 'subscription' });
     expect(() =>
-      registry.register({ name: 'claude', models: ['haiku'], authMode: 'session', providerType: 'subscription' }),
+      registry.register({ name: 'claude', authMode: 'session', providerType: 'subscription' }),
     ).toThrow('Provider already registered: claude');
   });
 
@@ -85,11 +85,11 @@ describe('multi-provider-fleet-smoke — createFleetAdapters', () => {
     expect(adapters.ollama.authMode).toBe('none');
   });
 
-  it('adapters have expected models', () => {
+  it('does not mint a second model catalog inside a provider-routing smoke', () => {
     const adapters = createFleetAdapters();
-    expect(adapters.claude.models).toContain('opus');
-    expect(adapters.deepseek.models).toContain('deepseek-chat');
-    expect(adapters.ollama.models).toContain('llama3');
+    for (const adapter of Object.values(adapters)) {
+      expect(adapter).not.toHaveProperty('models');
+    }
   });
 });
 
@@ -105,11 +105,10 @@ describe('multi-provider-fleet-smoke — per-task provider selection', () => {
     }
   });
 
-  it('unknown provider falls back to default (claude)', () => {
+  it('rejects an explicit unknown provider instead of selecting the default', () => {
     const registry = createFleetRegistry();
-    const result = routeFleetTask({ provider: 'unknown-xyz' }, registry);
-    expect(result.adapter.name).toBe('claude');
-    expect(result.reason).toContain('not registered');
+    expect(() => routeFleetTask({ provider: 'unknown-xyz' }, registry))
+      .toThrow("Unknown task.provider 'unknown-xyz'");
   });
 
   it('no task.provider uses default (claude)', () => {
@@ -212,7 +211,7 @@ describe('multi-provider-fleet-smoke — overflow trigger', () => {
 
   it('no_equivalent when registry has no API providers', () => {
     const registry = new MockFleetRegistry();
-    registry.register({ name: 'claude', models: ['sonnet'], authMode: 'session', providerType: 'subscription' });
+    registry.register({ name: 'claude', authMode: 'session', providerType: 'subscription' });
     const task = { provider: 'claude', authMode: 'session', rateLimitExhausted: true };
     const result = resolveFleetOverflow(task, registry);
     expect(result.overflowed).toBe(false);

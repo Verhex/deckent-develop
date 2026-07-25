@@ -1,7 +1,10 @@
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { runDoctorChecks } from '../../cli/commands/doctor.js';
-import { runProviderDiagnostics } from '../../cli/commands/doctor-checks.js';
+import {
+  buildProviderDiagnosticAuthChecks,
+  runDoctorChecks,
+  runProviderDiagnosticsWithOllama,
+} from '../../cli/commands/doctor.js';
 import { getSystemProfile } from '../../core/system-profile.js';
 import { detectSubscription } from '../../core/subscription.js';
 import { enrichResponse } from '../helpers/enrich.js';
@@ -18,7 +21,7 @@ export function registerDoctorTool(server: McpServer): void {
       inputSchema: z.object({
         includeProfile: z.boolean().optional().default(false).describe('Also include system profile: CPU core count, total/free RAM, recommended max workers, and detected Claude subscription tier'),
         profile: z.boolean().optional().default(false).describe('Alias for includeProfile — show system profile: CPU cores, RAM, recommended max workers, Claude subscription tier.'),
-        providers: z.boolean().optional().default(false).describe('Include detailed provider diagnostics (binary path, version, auth) for Claude/Codex/Gemini in the response.'),
+        providers: z.boolean().optional().default(false).describe('Include detailed provider diagnostics with local authentication evidence and catalog-only model metadata for available cloud and local providers.'),
         json: z.boolean().optional().default(false).describe('Return raw JSON data without the human-readable summary wrapper. Useful for programmatic consumption or piping.'),
       }),
     },
@@ -35,10 +38,18 @@ export function registerDoctorTool(server: McpServer): void {
 
       const response: Record<string, unknown> = { ...result };
 
-      // providers: include rich diagnostics for Claude/Codex/Gemini
+      // providers: use the same reconciled auth/catalog authority as CLI doctor.
       if (providers) {
         try {
-          response['providers'] = await runProviderDiagnostics(root);
+          const diagnostics = await runProviderDiagnosticsWithOllama(root);
+          const authChecks = buildProviderDiagnosticAuthChecks(diagnostics);
+          response['providers'] = diagnostics;
+          response['checks'] = [...result.checks, ...authChecks];
+          response['providerSummary'] = {
+            ready: diagnostics.filter(provider => provider.available).length,
+            total: diagnostics.length,
+            authWarningCount: authChecks.length,
+          };
         } catch (err) {
           response['providers'] = { error: err instanceof Error ? err.message : String(err) };
         }

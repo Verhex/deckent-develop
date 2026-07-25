@@ -84,7 +84,8 @@ vi.mock('../../src/agents/worker.js', () => ({
   isWorkerStoppable: vi.fn(() => true),
 }));
 
-vi.mock('../../src/core/provider.js', () => {
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/provider.js')>();
   const mockAdapter = {
     name: 'claude',
     supportedModels: ['opus', 'sonnet', 'haiku'],
@@ -99,12 +100,13 @@ vi.mock('../../src/core/provider.js', () => {
     }),
   };
   return {
+    ...actual,
     providerRegistry: {
       getDefault: vi.fn().mockReturnValue(mockAdapter),
       registerProvider: vi.fn(),
       getProvider: vi.fn().mockReturnValue(mockAdapter),
-      hasProvider: vi.fn().mockReturnValue(false),
-      listProviders: vi.fn().mockReturnValue([]),
+      hasProvider: vi.fn().mockImplementation((name: string) => name === 'claude'),
+      listProviders: vi.fn().mockReturnValue(['claude']),
       setDefault: vi.fn(),
       unregisterProvider: vi.fn(),
       clear: vi.fn(),
@@ -203,6 +205,7 @@ vi.mock('../../src/core/config.js', () => ({
   resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   resolveEffectiveWorkers: vi.fn().mockReturnValue(4),
+  readAuthMode: vi.fn().mockResolvedValue('subscription'),
 }));
 
 vi.mock('../../src/core/agent-pool.js', () => ({
@@ -277,6 +280,7 @@ function makeConfig(): ResolvedConfig {
     projectName: 'test',
     language: 'tr',
     version: '0.1.0',
+    brain_planning: 'structured',
     activeModeConfig: {
       max_workers: 4,
       brain_model: 'claude-opus-4-8',

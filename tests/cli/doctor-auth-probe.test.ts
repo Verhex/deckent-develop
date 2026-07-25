@@ -12,12 +12,16 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   runAuthProbes,
+  reconcileProviderDiagnosticsAuth,
+  buildProviderDiagnosticAuthChecks,
+  formatProviderDiagnosticsActionable,
   formatConnectorHealthLines,
   formatHumanDoctor,
 } from '../../src/cli/commands/doctor.js';
 import type { HumanDoctorInput } from '../../src/cli/commands/doctor.js';
 import type { AuthProbeResult } from '../../src/core/provider-auth-probe.js';
 import type { DetectedProvider } from '../../src/core/provider.js';
+import type { ProviderAvailabilityDetail } from '../../src/core/provider.js';
 import type { HealthCheckResult } from '../../src/orchestra/connector.js';
 
 // ─── helpers ─────────────────────────────────────────────────────────
@@ -44,6 +48,25 @@ function makeHealthResult(
   cliVersion: string | null = null,
 ): HealthCheckResult {
   return { provider: provider as HealthCheckResult['provider'], available, authStatus, cliVersion, error: null };
+}
+
+function makeDiagnostic(
+  name: string,
+  overrides: Partial<ProviderAvailabilityDetail> = {},
+): ProviderAvailabilityDetail {
+  return {
+    name,
+    binaryFound: true,
+    versionStatus: 'ok',
+    authMethod: 'session',
+    authStatus: 'ok',
+    available: true,
+    partial: false,
+    models: [],
+    reason: 'adapter inferred session auth',
+    hints: [],
+    ...overrides,
+  };
 }
 
 // ─── runAuthProbes ───────────────────────────────────────────────────
@@ -115,6 +138,148 @@ describe('runAuthProbes', () => {
   });
 });
 
+describe('reconcileProviderDiagnosticsAuth — diagnostics single truth', () => {
+  it('downgrades an adapter-inferred Claude session when the local probe says logged-out', () => {
+    const [detail] = reconcileProviderDiagnosticsAuth(
+      [makeDiagnostic('claude', { models: ['claude-fable-5'] })],
+      {
+        claude: {
+          state: 'logged-out',
+          present: true,
+          authenticated: false,
+          method: 'none',
+          detail: 'untrusted raw detail must not cross the boundary',
+        },
+      },
+    );
+
+    expect(detail).toMatchObject({
+      authMethod: 'none',
+      authStatus: 'missing',
+      available: false,
+      partial: true,
+      modelsEvidence: 'catalog-only',
+      authEvidence: {
+        source: 'local-auth-probe',
+        state: 'logged-out',
+        method: 'none',
+        present: true,
+        authenticated: false,
+      },
+    });
+    expect(JSON.stringify(detail)).not.toContain('untrusted raw detail');
+  });
+
+  it('preserves confirmed Codex subscription semantics without calling it an API key', () => {
+    const [detail] = reconcileProviderDiagnosticsAuth(
+      [makeDiagnostic('codex')],
+      {
+        codex: {
+          state: 'logged-in',
+          present: true,
+          authenticated: true,
+          method: 'subscription',
+        },
+      },
+    );
+
+    expect(detail).toMatchObject({
+      authMethod: 'session',
+      authStatus: 'ok',
+      available: true,
+      partial: false,
+      authEvidence: {
+        state: 'logged-in',
+        method: 'subscription',
+      },
+    });
+    expect(detail?.reason).toContain('subscription session');
+    expect(detail?.reason).not.toContain('API key');
+  });
+
+  it('keeps unknown and configured-but-unverified API-key auth fail-closed', () => {
+    const [detail] = reconcileProviderDiagnosticsAuth(
+      [makeDiagnostic('gemini')],
+      {
+        gemini: {
+          state: 'unknown',
+          present: true,
+          authenticated: 'unknown',
+          method: 'api-key',
+        },
+      },
+    );
+
+    expect(detail).toMatchObject({
+      authMethod: 'api_key',
+      authStatus: 'unknown',
+      available: false,
+      partial: true,
+      modelsEvidence: 'catalog-only',
+      authEvidence: {
+        state: 'unknown',
+        method: 'api-key',
+      },
+    });
+    const output = formatProviderDiagnosticsActionable([detail!]);
+    expect(output).toContain('authentication unverified');
+    expect(output).not.toContain('authentication missing');
+  });
+
+  it('does not invent cloud auth evidence for Ollama while bounding its models to catalog-only', () => {
+    const [detail] = reconcileProviderDiagnosticsAuth(
+      [makeDiagnostic('ollama', {
+        authMethod: 'none',
+        authStatus: 'ok',
+        models: ['qwen2.5-coder:7b'],
+      })],
+      {},
+    );
+
+    expect(detail?.available).toBe(true);
+    expect(detail?.modelsEvidence).toBe('catalog-only');
+    expect(detail?.authEvidence).toBeUndefined();
+  });
+});
+
+describe('buildProviderDiagnosticAuthChecks', () => {
+  it('projects only logged-out and unknown cloud evidence into optional warnings', () => {
+    const diagnostics = reconcileProviderDiagnosticsAuth(
+      [
+        makeDiagnostic('claude'),
+        makeDiagnostic('codex'),
+        makeDiagnostic('gemini'),
+        makeDiagnostic('ollama', { authMethod: 'none', authStatus: 'ok' }),
+      ],
+      {
+        claude: { state: 'logged-out', method: 'none' },
+        codex: { state: 'logged-in', method: 'subscription' },
+        gemini: { state: 'unknown', method: 'none' },
+      },
+    );
+
+    const checks = buildProviderDiagnosticAuthChecks(diagnostics);
+
+    expect(checks).toHaveLength(2);
+    expect(checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'Claude authentication',
+        passed: false,
+        required: false,
+        message: expect.stringContaining('NOT logged in'),
+      }),
+      expect.objectContaining({
+        name: 'Gemini authentication',
+        passed: false,
+        required: false,
+        message: expect.stringContaining('could not be verified'),
+      }),
+    ]));
+    expect(checks.some(check => check.name.includes('Codex'))).toBe(false);
+    expect(checks.some(check => check.name.includes('Ollama'))).toBe(false);
+  });
+});
+
 // ─── formatConnectorHealthLines auth-probe override ──────────────────
 
 describe('formatConnectorHealthLines — PSL-6 auth-probe override', () => {
@@ -148,23 +313,38 @@ describe('formatConnectorHealthLines — PSL-6 auth-probe override', () => {
     expect(geminiLine).toContain('run: gemini');
   });
 
-  it('keeps the existing [PASS] line when the probe says logged-in', () => {
+  it('reports a confirmed session when the probe says logged-in', () => {
     const results = [makeHealthResult('claude', true, 'ok', 'v2.1.81')];
-    const probes: Record<string, AuthProbeResult> = { claude: { state: 'logged-in' } };
+    const probes: Record<string, AuthProbeResult> = {
+      claude: { state: 'logged-in', method: 'subscription' },
+    };
     const lines = formatConnectorHealthLines(results, '/mock/root', probes);
     const claudeLine = lines.find(l => l.includes('Claude'));
     expect(claudeLine).toContain('[PASS]');
-    expect(claudeLine).toContain('session auth active');
+    expect(claudeLine).toContain('authentication confirmed (subscription session)');
     expect(claudeLine).not.toContain('NOT logged in');
   });
 
-  it('keeps existing behavior when the probe state is "unknown" (no regression)', () => {
+  it('reports [WARN] when the probe state is "unknown" instead of guessing ready', () => {
     const results = [makeHealthResult('claude', true, 'ok', 'v2.1.81')];
     const probes: Record<string, AuthProbeResult> = { claude: { state: 'unknown' } };
     const lines = formatConnectorHealthLines(results, '/mock/root', probes);
     const claudeLine = lines.find(l => l.includes('Claude'));
-    expect(claudeLine).toContain('[PASS]');
+    expect(claudeLine).toContain('[WARN]');
+    expect(claudeLine).toContain('authentication could not be verified');
     expect(claudeLine).not.toContain('NOT logged in');
+  });
+
+  it('does not mislabel a confirmed codex subscription session as an API key', () => {
+    const results = [makeHealthResult('codex', true, 'ok', 'v1.0')];
+    const probes: Record<string, AuthProbeResult> = {
+      codex: { state: 'logged-in', method: 'subscription' },
+    };
+    const lines = formatConnectorHealthLines(results, '/mock/root', probes);
+    const codexLine = lines.find(l => l.includes('Codex'));
+    expect(codexLine).toContain('[PASS]');
+    expect(codexLine).toContain('subscription session');
+    expect(codexLine).not.toContain('API key configured');
   });
 
   it('is a no-op when no authProbes map is supplied (backward compatible)', () => {
@@ -205,7 +385,7 @@ describe('formatHumanDoctor — authProbes forwarding', () => {
     projectRoot: '/mock/root',
   };
 
-  it('surfaces the [WARN] "NOT logged in" line in the Provider Health section', () => {
+  it('propagates auth failure into top summary, readiness, recommendation, and honest summary', () => {
     const input: HumanDoctorInput = {
       ...baseInput,
       connectorHealthResults: [makeHealthResult('claude', true, 'ok', 'v2.1.81')],
@@ -214,6 +394,14 @@ describe('formatHumanDoctor — authProbes forwarding', () => {
     const output = formatHumanDoctor(input);
     expect(output).toContain('CLI present but NOT logged in');
     expect(output).toContain('claude login');
+    expect(output).toContain('WARN Claude CLI v2.1');
+    expect(output).not.toContain('OK Claude CLI v2.1 — Ready');
+    expect(output).toContain('0/1 providers ready');
+    expect(output).toContain('Status: READY (with warnings)');
+    expect(output).toContain('1 provider authentication warning(s) remain');
+    expect(output).not.toContain('Everything looks good');
+    expect(output).toContain('Honest Summary:');
+    expect(output).toContain('Claude authentication');
   });
 
   it('preserves the [PASS] line when no authProbes are supplied', () => {
@@ -225,5 +413,22 @@ describe('formatHumanDoctor — authProbes forwarding', () => {
     expect(output).toContain('[PASS]');
     expect(output).toContain('session auth active');
     expect(output).not.toContain('NOT logged in');
+  });
+
+  it('renders confirmed codex subscription truth consistently in the top and health sections', () => {
+    const input: HumanDoctorInput = {
+      ...baseInput,
+      providers: [makeProvider('codex', true, 'session', '1.2')],
+      connectorHealthResults: [makeHealthResult('codex', true, 'ok', 'v1.2')],
+      authProbes: {
+        codex: { state: 'logged-in', method: 'subscription' },
+      },
+    };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('OK Codex CLI v1.2 — Ready (authentication confirmed (subscription session))');
+    expect(output).toContain('[PASS] Codex CLI v1.2 — authentication confirmed (subscription session)');
+    expect(output).not.toContain('API key configured');
+    expect(output).toContain('1/1 providers ready');
+    expect(output).toContain('Status: READY');
   });
 });

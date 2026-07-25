@@ -34,6 +34,13 @@ type FeaturesManifest = {
   lightly_used: FeatureEntry[];
   dormant: FeatureEntry[];
   dead: FeatureEntry[];
+  truth: Array<{
+    id: string;
+    label: string;
+    entryModule: string;
+    exportName?: string;
+    prodCallsitePattern?: string;
+  }>;
 };
 
 let manifest: FeaturesManifest;
@@ -283,6 +290,23 @@ describe('features-manifest.json — content-vs-code integrity', () => {
 
   it('manifest _meta.generatedBy references sync-manifest.mjs', () => {
     expect(manifest._meta.generatedBy).toContain('sync-manifest');
+  });
+
+  it('pins routing truth to the canonical V3 entry instead of retired V2 code', () => {
+    const routingTruth = manifest.truth.find(entry => entry.id === 'routing-decision-journal');
+    expect(routingTruth).toMatchObject({
+      entryModule: 'src/core/routing/route-task-v3.ts',
+      exportName: 'routeTaskV3',
+      prodCallsitePattern: 'routeTaskV3\\(',
+    });
+
+    const generator = readFileSync(join(process.cwd(), 'scripts', 'sync-manifest.mjs'), 'utf-8');
+    const routingBlock = generator.match(
+      /id: 'routing-decision-journal',[\s\S]*?\n  },/,
+    )?.[0];
+    expect(routingBlock).toContain("entryModule: 'src/core/routing/route-task-v3.ts'");
+    expect(routingBlock).not.toContain('src/core/routing-engine.ts');
+    expect(routingBlock).not.toContain('routeTaskV2');
   });
 });
 

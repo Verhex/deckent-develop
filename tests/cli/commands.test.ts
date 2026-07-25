@@ -44,7 +44,7 @@ vi.mock('node:readline', () => ({
 }));
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn().mockResolvedValue({ language: 'en' }),
   validatePartialConfig: vi.fn(),
@@ -60,6 +60,31 @@ vi.mock('../../src/core/config.js', () => ({
       this.errors = errors;
     }
   },
+}));
+
+vi.mock('../../src/core/cost-config-loader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/cost-config-loader.js')>()),
+  initCostConfig: vi.fn(),
+  loadCostConfig: vi.fn(() => ({
+    _version: '1.0',
+    providers: {
+      anthropic: {
+        enabled: true,
+        billing_modes_supported: ['api'],
+        default_billing_mode: 'api',
+        models: {
+          'claude-sonnet-5': {
+            input_cost_per_token: 0.000003,
+            output_cost_per_token: 0.000015,
+            max_input_tokens: 1_000_000,
+            enabled: true,
+          },
+        },
+      },
+    },
+    cost_limits: { sprint_max_usd: 5, daily_max_usd: 50, monthly_max_usd: 500, auto_confirm_below_usd: 2 },
+    update_config: { sources_priority: ['bundled'] },
+  })),
 }));
 
 vi.mock('../../src/core/utils.js', () => ({
@@ -111,6 +136,7 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
     create: vi.fn(() => ({
       name: 'subprocess',
       liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
       spawn: spawnBackend.spawn,
       kill: spawnBackend.kill,
       list: vi.fn(() => []),
@@ -235,6 +261,16 @@ function makeTask(overrides?: Partial<Task>): Task {
     id: 'task-001', title: 'Test task', description: 'desc',
     model: 'claude-sonnet-5', provider: 'claude', effort: 'normal', priority: 'NORMAL',
     budget: { maxTurns: 1 },
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      resolvedProvider: 'claude',
+      executionCostClass: 'remote',
+      profileRef: 'tests.cli.commands',
+      policyDigest: 'a'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: { reserve_ratio: 0.25 },
+    },
     reason: 'test', scope: { directories: [], filesRead: [], filesWrite: [] },
     dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
     status: TaskStatus.PENDING,
@@ -953,6 +989,8 @@ describe('start command', () => {
     vi.mocked(readFileSync).mockReturnValue('# Content');
     vi.mocked(readdirSync).mockReturnValue([] as unknown as ReturnType<typeof readdirSync>);
     vi.mocked(countBrainLines).mockReturnValue(100);
+    vi.mocked(readContext).mockReturnValue({ memory: '', retro: '', debt: '', patterns: [] } as any);
+    vi.mocked(planSprint).mockReturnValue(makeSprint());
   });
   afterEach(() => {
     restoreOutput();
@@ -1107,7 +1145,7 @@ describe('plan command', () => {
       projectState: { gitStatus: '', fileTree: [] },
     });
     vi.mocked(planSprint).mockReturnValue(makeSprint({
-      tasks: [makeTask({ id: 'task-001', title: 'CLI Module', model: 'sonnet', priority: 'HIGH' })],
+      tasks: [makeTask({ id: 'task-001', title: 'CLI Module', model: 'claude-sonnet-5', priority: 'HIGH' })],
     }));
     await runCommand(registerPlan, ['plan']);
     expect(stdout()).toContain('task-001');

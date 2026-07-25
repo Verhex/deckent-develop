@@ -9,6 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import type { UsageRecord } from '../../src/core/limit-ledger.js';
+import { MCP_TOOL_COUNT } from '../../src/mcp/tools/index.js';
 
 // ─── Mock server builder ─────────────────────────────────────────────────────
 
@@ -161,7 +162,7 @@ describe('getUsageData — sprint mode', () => {
 });
 
 describe('lint-mcp-instructions.mjs', () => {
-  it('(8) script exits 0 after adding deckent_usage (count-synced: 47 tools)', () => {
+  it('(8) script exits 0 with the canonical tool count', () => {
     const scriptPath = join(process.cwd(), 'scripts', 'lint-mcp-instructions.mjs');
     const result = spawnSync('node', [scriptPath], {
       encoding: 'utf-8',
@@ -169,6 +170,6 @@ describe('lint-mcp-instructions.mjs', () => {
     });
     expect(result.status).toBe(0);
     expect(result.stdout).toMatch(/^OK:/);
-    expect(result.stdout).toContain('47 tools');
+    expect(result.stdout).toContain(`${MCP_TOOL_COUNT} tools`);
   });
 });

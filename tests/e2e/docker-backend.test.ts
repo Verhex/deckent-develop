@@ -765,11 +765,17 @@ describe('Docker Backend Parity — fsync verifyResultAfterStop (unit)', () => {
     );
 
     // Assert — monitorContainer performs post-exit durability before reading.
-    expect(src).toContain('belt-and-suspenders');
     const monitorIdx = src.indexOf('private monitorContainer');
     expect(monitorIdx).toBeGreaterThan(-1);
-    const monitorSection = src.slice(monitorIdx, monitorIdx + 7000);
-    expect(monitorSection).toContain('fsyncSync');
+    const archiveExportIdx = src.indexOf('export function archivePromptFiles', monitorIdx);
+    expect(archiveExportIdx).toBeGreaterThan(monitorIdx);
+    const classEndIdx = src.lastIndexOf('\n}', archiveExportIdx);
+    expect(classEndIdx).toBeGreaterThan(monitorIdx);
+    const monitorSection = src.slice(monitorIdx, classEndIdx);
+    expect(monitorSection).toContain('belt-and-suspenders');
+    expect(monitorSection).toContain("openSync(resultPath, 'r')");
+    expect(monitorSection).toContain('fsyncSync(fd)');
+    expect(monitorSection).toContain('closeSync(fd)');
   });
 });
 

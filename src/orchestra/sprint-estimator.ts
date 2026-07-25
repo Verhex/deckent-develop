@@ -6,9 +6,8 @@ import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Task } from '../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR, DASHBOARD_FILE } from '../core/constants.js';
+import { getModelTier, type ModelTier } from '../core/model-equivalence.js';
 import { debugLog } from '../core/utils.js';
-import { modelRegistry, inferTierFromId } from '../core/model-registry.js';
-import type { ModelTier } from '../core/model-registry.js';
 
 // ─── Duration Baselines (minutes) ────────────────────────────────────────────
 
@@ -26,13 +25,12 @@ const TIER_BASE_MIN: Record<ModelTier, number> = {
 };
 
 /**
- * Resolve a task's model to its base-duration minutes via registry TIER metadata.
- * A known catalog id uses its authoritative tier; an id the catalog does not carry
- * falls back to parametric tier inference ({@link inferTierFromId}) — still
- * metadata-derived classification, never a silent "unknown = sonnet" named default.
+ * Resolve a task's model to its base-duration minutes via the canonical
+ * model-equivalence authority. Unknown identities fail loudly instead of
+ * acquiring an inferred capability tier at this downstream consumer.
  */
 function baseMinForModel(model: string): number {
-  const tier = modelRegistry.get(model)?.tier ?? inferTierFromId(model);
+  const tier = getModelTier(model);
   return TIER_BASE_MIN[tier];
 }
 

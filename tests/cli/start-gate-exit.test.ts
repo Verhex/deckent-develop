@@ -6,9 +6,35 @@ import { Command } from 'commander';
 // alone is dishonest for scripts/CI. See task-395-003.plan for the investigation.
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
+  readAuthMode: vi.fn().mockResolvedValue('subscription'),
+}));
+
+vi.mock('../../src/core/cost-config-loader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/cost-config-loader.js')>()),
+  initCostConfig: vi.fn(),
+  loadCostConfig: vi.fn(() => ({
+    _version: '1.0',
+    providers: {
+      anthropic: {
+        enabled: true,
+        billing_modes_supported: ['api'],
+        default_billing_mode: 'api',
+        models: {
+          'claude-sonnet-5': {
+            input_cost_per_token: 0.000003,
+            output_cost_per_token: 0.000015,
+            max_input_tokens: 1_000_000,
+            enabled: true,
+          },
+        },
+      },
+    },
+    cost_limits: { sprint_max_usd: 5, daily_max_usd: 50, monthly_max_usd: 500, auto_confirm_below_usd: 2 },
+    update_config: { sources_priority: ['bundled'] },
+  })),
 }));
 
 vi.mock('../../src/orchestra/brain.js', () => ({
@@ -35,9 +61,13 @@ vi.mock('../../src/core/constants.js', async (importOriginal) => {
   return { ...actual, TMUX_SESSION_NAME: 'deckent' };
 });
 
-vi.mock('../../src/core/provider.js', () => ({
-  bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
-}));
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/provider.js')>();
+  return {
+    ...actual,
+    bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
+  };
+});
 
 vi.mock('../../src/cli/commands/doctor.js', () => ({
   runDoctorChecks: vi.fn().mockReturnValue({ checks: [] }),
@@ -76,7 +106,7 @@ function makeSprint() {
   return {
     id: 'sprint-001',
     number: 1,
-    tasks: [{ id: '001-001', title: 'Task One', model: 'sonnet', priority: 'NORMAL' }],
+    tasks: [{ id: '001-001', title: 'Task One', model: 'claude-sonnet-5', priority: 'NORMAL' }],
     reasoning: 'Test reasoning',
     planningMode: 'structured',
   };

@@ -65,8 +65,13 @@ vi.mock('../../src/core/task-result-settlement.js', () => {
     .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
 });
 
+vi.mock('../../src/orchestra/execution-landing-coordinator.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../src/orchestra/execution-landing-coordinator.js')>()),
+  prepareDockerExecutionLanding: vi.fn(({ prompt }: { prompt: string }) => ({ prompt, context: null })),
+}));
+
 import { spawnSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import {
   DockerSpawnBackend,
   DOCKER_ERROR_CODES,
@@ -77,10 +82,15 @@ import {
   MAX_SPAWN_ATTEMPTS,
 } from '../../src/orchestra/spawn-backend-docker.js';
 import { DOCKER_ATTEMPT_LABELS } from '../../src/core/task-result-settlement.js';
+import {
+  TEST_DOCKER_EXECUTION_OPTIONS,
+  budgetedDockerTaskJson,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
+const mockReadFileSync = vi.mocked(readFileSync);
 const mockWriteFileSync = vi.mocked(writeFileSync);
-const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
+const TEST_EXECUTION_OPTIONS = TEST_DOCKER_EXECUTION_OPTIONS;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -241,6 +251,7 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockReadFileSync.mockImplementation((path: unknown) => budgetedDockerTaskJson(path));
     backend = new DockerSpawnBackend('/test/project', {
       image: 'deckent-worker:latest',
       timeoutSeconds: 60,

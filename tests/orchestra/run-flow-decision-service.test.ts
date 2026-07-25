@@ -26,6 +26,7 @@ import {
   RunFlowDecisionError,
 } from '../../src/orchestra/run-flow-decision-service.js';
 import { _resetRunFlowCoordinatorsForTests } from '../../src/orchestra/run-flow-coordinator-registry.js';
+import { getRunFlowCoordinator } from '../../src/orchestra/run-flow-coordinator-registry.js';
 import {
   savePlannedSprint,
   loadApprovedSnapshot,
@@ -33,7 +34,13 @@ import {
 } from '../../src/core/run-flow-store.js';
 import type { Sprint } from '../../src/core/types.js';
 import { SprintPhase, SprintStatus } from '../../src/core/sprint-types.js';
+import { TaskStatus } from '../../src/core/task-types.js';
 import type { RunHandle } from '../../src/core/run-flow-contract.js';
+import {
+  computeExecutionPlanDigestV3,
+  EXECUTION_PLAN_DIGEST_VERSION,
+  type ExecutionPlanDigestContext,
+} from '../../src/core/execution-plan-digest.js';
 
 const ACTOR = { id: 'decision-service-test' } as const;
 
@@ -117,6 +124,79 @@ describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
     expect(() => decideRunFlow(root, flowId, { decision: 'approve', actor: ACTOR })).toThrowError(
       /planned sprint record missing/,
     );
+  });
+
+  it('approve refuses a digest-valid v3 structural topology blocker before APPROVAL_GRANTED', () => {
+    const flowId = generateFlowId('decide-topology-block');
+    const sprint = testSprint();
+    sprint.tasks = ['One', 'Two'].map((title, index) => ({
+      id: `volatile-${index}`,
+      title,
+      description: title,
+      model: 'qwen3.6:27b',
+      effort: 'normal' as const,
+      priority: 'NORMAL' as const,
+      reason: 'test',
+      scope: { directories: [], filesRead: [], filesWrite: ['src/shared.ts'] },
+      dependencies: [],
+      goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
+      status: TaskStatus.PENDING,
+      provider: 'ollama' as const,
+    }));
+    const digestContext = {
+      configuredProvider: 'ollama',
+      configuredModel: 'qwen3.6:27b',
+      configuredBackend: 'subprocess',
+      configuredAuthMode: 'subscription',
+      fallbackProvider: null,
+      fallbackPolicy: null,
+      executionBudgetPolicy: null,
+      configuredMaxWorkers: 4,
+    } satisfies ExecutionPlanDigestContext;
+    const digest = computeExecutionPlanDigestV3(sprint, digestContext);
+    const coordinator = getRunFlowCoordinator(root);
+    coordinator.proposeFlow({
+      proposal: {
+        flowId,
+        tenant: 'local',
+        project: 'test',
+        actor: ACTOR,
+        origin: 'cli',
+        revision: 1,
+        intentSummary: 'unsafe writers',
+      },
+    });
+    coordinator.recordPreview({
+      preview: {
+        flowId,
+        revision: 1,
+        planDigest: digest.digest,
+        planDigestVersion: EXECUTION_PLAN_DIGEST_VERSION,
+        planDigestContext: digestContext,
+        taskSummaries: sprint.tasks.map(task => ({ title: task.title, summary: task.description })),
+        policyDecision: 'deny',
+        gateResult: 'fail',
+        topology: digest.topology,
+        topologyGateResult: 'fail',
+      },
+    });
+    savePlannedSprint(root, flowId, {
+      revision: 1,
+      sprint,
+      planDigest: digest.digest,
+      planDigestVersion: EXECUTION_PLAN_DIGEST_VERSION,
+      planDigestContext: digestContext,
+    });
+
+    let caught: unknown;
+    try {
+      decideRunFlow(root, flowId, { decision: 'approve', actor: ACTOR });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(RunFlowDecisionError);
+    expect((caught as RunFlowDecisionError).code).toBe('TOPOLOGY_BLOCKED');
+    expect(readFlowEvents(root, flowId).map(event => event.type)).not.toContain('APPROVAL_GRANTED');
   });
 
   it('reject → CANCELLED with the rejection recorded durably', () => {

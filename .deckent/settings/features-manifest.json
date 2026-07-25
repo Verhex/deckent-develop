@@ -1,7 +1,7 @@
 {
   "_meta": {
     "version": "2.0",
-    "generatedAt": "2026-07-23T13:33:27.232Z",
+    "generatedAt": "2026-07-25T11:03:19.083Z",
     "generatedBy": "scripts/sync-manifest.mjs",
     "sprintId": "sprint-456",
     "description": "Feature usage manifest — curated feature catalog (FEATURE_DEFINITIONS in scripts/sync-manifest.mjs) bucketed by an import-count heuristic plus manual lifecycle annotations. NOT a full import-graph analysis. Categories: active, lightly_used, dormant, dead.",
@@ -438,9 +438,9 @@
     {
       "id": "routing-decision-journal",
       "label": "Routing decision journal (born-622/641)",
-      "entryModule": "src/core/routing-engine.ts",
-      "exportName": "routeTaskV2",
-      "prodCallsitePattern": "routeTaskV2\\("
+      "entryModule": "src/core/routing/route-task-v3.ts",
+      "exportName": "routeTaskV3",
+      "prodCallsitePattern": "routeTaskV3\\("
     },
     {
       "id": "prompt-gate-block",

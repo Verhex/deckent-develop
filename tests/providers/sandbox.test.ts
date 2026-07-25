@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { MockInstance } from 'vitest';
 import { SandboxSpawnBackend, createSandboxBackend } from '../../src/providers/sandbox.js';
 import { ProviderError } from '../../src/core/provider.js';
+import { LocalSandboxTestBackend } from '../helpers/local-subprocess-backend-fixture.js';
 
 // ─── Mock node:child_process ─────────────────────────────────────────
 
@@ -97,18 +98,18 @@ describe('SandboxSpawnBackend', () => {
 
   describe('identity', () => {
     it('should have name "claude-sandbox"', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       expect(backend.name).toBe('claude-sandbox');
     });
 
     it('should extend SubprocessSpawnBackend', async () => {
       const { SubprocessSpawnBackend } = await import('../../src/providers/subprocess.js');
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       expect(backend).toBeInstanceOf(SubprocessSpawnBackend);
     });
 
     it('should support fable, opus, sonnet, haiku models', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       expect(backend.supportedModels).toContain('claude-fable-5');
       expect(backend.supportedModels).toContain('claude-opus-4-8');
       expect(backend.supportedModels).toContain('claude-sonnet-5');
@@ -116,7 +117,7 @@ describe('SandboxSpawnBackend', () => {
     });
 
     it('should support exactly 4 models', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       expect(backend.supportedModels).toHaveLength(4);
     });
   });
@@ -125,22 +126,22 @@ describe('SandboxSpawnBackend', () => {
 
   describe('constructor', () => {
     it('should default memoryLimitMb to 512', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       expect(backend.getMemoryLimitMb()).toBe(512);
     });
 
     it('should use custom memoryLimitMb when provided', () => {
-      const backend = new SandboxSpawnBackend(projectDir, { memoryLimitMb: 256 });
+      const backend = new LocalSandboxTestBackend(projectDir, { memoryLimitMb: 256 });
       expect(backend.getMemoryLimitMb()).toBe(256);
     });
 
     it('should default allowedDirs to [projectDir]', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       expect(backend.getAllowedDirs()).toEqual([projectDir]);
     });
 
     it('should use custom allowedDirs when provided', () => {
-      const backend = new SandboxSpawnBackend(projectDir, {
+      const backend = new LocalSandboxTestBackend(projectDir, {
         allowedDirs: ['/allowed/dir1', '/allowed/dir2'],
       });
       const dirs = backend.getAllowedDirs();
@@ -148,12 +149,12 @@ describe('SandboxSpawnBackend', () => {
     });
 
     it('should default blockNetwork to false', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       expect(backend.isNetworkBlocked()).toBe(false);
     });
 
     it('should set blockNetwork when provided', () => {
-      const backend = new SandboxSpawnBackend(projectDir, { blockNetwork: true });
+      const backend = new LocalSandboxTestBackend(projectDir, { blockNetwork: true });
       expect(backend.isNetworkBlocked()).toBe(true);
     });
   });
@@ -162,32 +163,32 @@ describe('SandboxSpawnBackend', () => {
 
   describe('enforceScope()', () => {
     it('should not throw for projectDir itself', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       expect(() => backend.enforceScope(projectDir)).not.toThrow();
     });
 
     it('should not throw for a subdirectory of projectDir', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       expect(() => backend.enforceScope(`${projectDir}/src`)).not.toThrow();
     });
 
     it('should throw ProviderError for a directory outside allowedDirs', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       expect(() => backend.enforceScope('/tmp/other-project')).toThrow(ProviderError);
     });
 
     it('should include "Sandbox scope violation" in error message', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       expect(() => backend.enforceScope('/etc/secrets')).toThrow(/Sandbox scope violation/);
     });
 
     it('should include the offending path in the error message', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       expect(() => backend.enforceScope('/etc/passwd')).toThrow(/\/etc\/passwd/);
     });
 
     it('should not throw for any of multiple allowedDirs', () => {
-      const backend = new SandboxSpawnBackend(projectDir, {
+      const backend = new LocalSandboxTestBackend(projectDir, {
         allowedDirs: [projectDir, '/tmp/allowed-extra'],
       });
       expect(() => backend.enforceScope('/tmp/allowed-extra')).not.toThrow();
@@ -195,7 +196,7 @@ describe('SandboxSpawnBackend', () => {
     });
 
     it('should throw when directory only partially matches an allowedDir', () => {
-      const backend = new SandboxSpawnBackend('/tmp/project');
+      const backend = new LocalSandboxTestBackend('/tmp/project');
       // /tmp/project-evil starts with /tmp/project but is NOT a subdir
       expect(() => backend.enforceScope('/tmp/project-evil')).toThrow(ProviderError);
     });
@@ -205,33 +206,33 @@ describe('SandboxSpawnBackend', () => {
 
   describe('buildEnv()', () => {
     it('should include NODE_OPTIONS with memory limit', () => {
-      const backend = new SandboxSpawnBackend(projectDir, { memoryLimitMb: 256 });
+      const backend = new LocalSandboxTestBackend(projectDir, { memoryLimitMb: 256 });
       const env = backend.buildEnv({});
       expect(env['NODE_OPTIONS']).toContain('--max-old-space-size=256');
     });
 
     it('should include default 512MB memory limit', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       const env = backend.buildEnv({});
       expect(env['NODE_OPTIONS']).toContain('--max-old-space-size=512');
     });
 
     it('should preserve existing NODE_OPTIONS and append memory flag', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       const env = backend.buildEnv({ NODE_OPTIONS: '--experimental-vm-modules' });
       expect(env['NODE_OPTIONS']).toContain('--experimental-vm-modules');
       expect(env['NODE_OPTIONS']).toContain('--max-old-space-size=512');
     });
 
     it('should not set proxy vars when blockNetwork is false', () => {
-      const backend = new SandboxSpawnBackend(projectDir, { blockNetwork: false });
+      const backend = new LocalSandboxTestBackend(projectDir, { blockNetwork: false });
       const env = backend.buildEnv({});
       expect(env['http_proxy']).toBeUndefined();
       expect(env['https_proxy']).toBeUndefined();
     });
 
     it('should set proxy vars when blockNetwork is true', () => {
-      const backend = new SandboxSpawnBackend(projectDir, { blockNetwork: true });
+      const backend = new LocalSandboxTestBackend(projectDir, { blockNetwork: true });
       const env = backend.buildEnv({});
       expect(env['http_proxy']).toBe('http://127.0.0.1:0');
       expect(env['https_proxy']).toBe('http://127.0.0.1:0');
@@ -240,20 +241,20 @@ describe('SandboxSpawnBackend', () => {
     });
 
     it('should set no_proxy to empty string when blockNetwork is true', () => {
-      const backend = new SandboxSpawnBackend(projectDir, { blockNetwork: true });
+      const backend = new LocalSandboxTestBackend(projectDir, { blockNetwork: true });
       const env = backend.buildEnv({});
       expect(env['no_proxy']).toBe('');
     });
 
     it('should copy provided base env vars', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       const env = backend.buildEnv({ MY_VAR: 'hello', OTHER: 'world' });
       expect(env['MY_VAR']).toBe('hello');
       expect(env['OTHER']).toBe('world');
     });
 
     it('should use process.env as base when no arg provided', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       const env = backend.buildEnv();
       // Should contain NODE_OPTIONS at minimum
       expect(env['NODE_OPTIONS']).toBeDefined();
@@ -265,14 +266,14 @@ describe('SandboxSpawnBackend', () => {
   describe('spawn()', () => {
     it('should spawn when dir is within projectDir', () => {
       const child = setupMockChild();
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       expect(() => backend.spawn('task-001', 'claude-opus-4-8', 'test')).not.toThrow();
       expect(mockSpawn).toHaveBeenCalled();
     });
 
     it('should throw ProviderError when opts.projectDir is outside allowedDirs', () => {
       setupMockChild();
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       expect(() =>
         backend.spawn('task-001', 'claude-opus-4-8', 'test', { projectDir: '/outside' }),
       ).toThrow(ProviderError);
@@ -280,7 +281,7 @@ describe('SandboxSpawnBackend', () => {
 
     it('should not call spawn when scope is violated', () => {
       setupMockChild();
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       try {
         backend.spawn('task-001', 'claude-opus-4-8', 'test', { projectDir: '/outside' });
       } catch {
@@ -291,7 +292,7 @@ describe('SandboxSpawnBackend', () => {
 
     it('should pass through spawn options to parent when scope is valid', () => {
       setupMockChild();
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       backend.spawn('task-001', 'claude-opus-4-8', 'test', {
         projectDir,
         allowedTools: 'Read',
@@ -323,7 +324,7 @@ describe('SandboxSpawnBackend', () => {
           }),
         });
 
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       const available = await backend.isAvailable();
       expect(available).toBe(true);
     });
@@ -336,7 +337,7 @@ describe('SandboxSpawnBackend', () => {
         }),
       });
 
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       const available = await backend.isAvailable();
       expect(available).toBe(false);
     });
@@ -357,14 +358,14 @@ describe('SandboxSpawnBackend', () => {
           }),
         });
 
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       const available = await backend.isAvailable();
       expect(available).toBe(false);
     });
 
     it('should return a Promise', () => {
       setupMockChildWithExit(0);
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       const result = backend.isAvailable();
       expect(result).toBeInstanceOf(Promise);
     });
@@ -374,12 +375,12 @@ describe('SandboxSpawnBackend', () => {
 
   describe('accessors', () => {
     it('getMemoryLimitMb should return configured limit', () => {
-      const backend = new SandboxSpawnBackend(projectDir, { memoryLimitMb: 1024 });
+      const backend = new LocalSandboxTestBackend(projectDir, { memoryLimitMb: 1024 });
       expect(backend.getMemoryLimitMb()).toBe(1024);
     });
 
     it('getAllowedDirs should return a copy (not the internal array)', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       const dirs1 = backend.getAllowedDirs();
       const dirs2 = backend.getAllowedDirs();
       expect(dirs1).not.toBe(dirs2); // different references
@@ -387,12 +388,12 @@ describe('SandboxSpawnBackend', () => {
     });
 
     it('isNetworkBlocked should return false by default', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
+      const backend = new LocalSandboxTestBackend(projectDir);
       expect(backend.isNetworkBlocked()).toBe(false);
     });
 
     it('isNetworkBlocked should return true when configured', () => {
-      const backend = new SandboxSpawnBackend(projectDir, { blockNetwork: true });
+      const backend = new LocalSandboxTestBackend(projectDir, { blockNetwork: true });
       expect(backend.isNetworkBlocked()).toBe(true);
     });
   });

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  aggregateProviderBillingEvidence,
   extractProviderBillingEvidence,
   reconcileProviderBilling,
 } from '../../src/core/provider-billing-evidence.js';
+import { DeckentError } from '../../src/core/errors.js';
 
 describe('provider billing evidence', () => {
   it('captures the provider-final total and normalized per-model usage', () => {
@@ -108,5 +110,111 @@ describe('provider billing evidence', () => {
   it('rejects malformed or negative provider totals', () => {
     expect(extractProviderBillingEvidence('claude', '{bad')).toBeNull();
     expect(extractProviderBillingEvidence('claude', JSON.stringify({ total_cost_usd: -1 }))).toBeNull();
+  });
+
+  it('aggregates exact-attempt envelopes and preserves lineage provenance', () => {
+    const parent = extractProviderBillingEvidence('claude', JSON.stringify({
+      type: 'result',
+      total_cost_usd: 0.4,
+      modelUsage: {
+        'claude-fable-5': {
+          inputTokens: 100,
+          outputTokens: 20,
+          cacheReadInputTokens: 500,
+          cacheCreationInputTokens: 50,
+          costUSD: 0.39,
+          contextWindow: 1000,
+        },
+      },
+    }))!;
+    const continuation = extractProviderBillingEvidence('claude', JSON.stringify({
+      type: 'result',
+      total_cost_usd: 0.15,
+      modelUsage: {
+        'claude-fable-5': {
+          inputTokens: 30,
+          outputTokens: 10,
+          cacheReadInputTokens: 100,
+          cacheCreationInputTokens: 20,
+          costUSD: 0.14,
+          contextWindow: 800,
+        },
+        'claude-haiku-4-5': {
+          inputTokens: 5,
+          outputTokens: 1,
+          costUSD: 0.01,
+          contextWindow: 200000,
+        },
+      },
+    }))!;
+
+    expect(aggregateProviderBillingEvidence([
+      { attemptId: 'parent', evidenceRef: 'parent-log:sha256:a', billing: parent },
+      { attemptId: 'continuation', evidenceRef: 'terminal-log:sha256:b', billing: continuation },
+    ], '2026-07-24T00:00:00.000Z')).toEqual({
+      source: 'provider-envelope',
+      provider: 'claude',
+      currency: 'USD',
+      providerReportedUsd: 0.55,
+      capturedAt: '2026-07-24T00:00:00.000Z',
+      modelUsage: {
+        'claude-fable-5': {
+          inputTokens: 130,
+          outputTokens: 30,
+          cacheReadTokens: 600,
+          cacheCreationTokens: 70,
+          costUsd: 0.53,
+          contextWindow: 1000,
+        },
+        'claude-haiku-4-5': {
+          inputTokens: 5,
+          outputTokens: 1,
+          costUsd: 0.01,
+          contextWindow: 200000,
+        },
+      },
+      lineage: {
+        coverage: 'complete',
+        attemptIds: ['parent', 'continuation'],
+        evidenceRefs: ['parent-log:sha256:a', 'terminal-log:sha256:b'],
+      },
+    });
+  });
+
+  it('rejects duplicate attempts and cross-provider aggregation', () => {
+    const claude = extractProviderBillingEvidence(
+      'claude',
+      JSON.stringify({ type: 'result', total_cost_usd: 1 }),
+    )!;
+    const codex = extractProviderBillingEvidence(
+      'codex',
+      JSON.stringify({ type: 'result', total_cost_usd: 2 }),
+    )!;
+
+    const duplicate = () => aggregateProviderBillingEvidence([
+      { attemptId: 'same', evidenceRef: 'a', billing: claude },
+      { attemptId: 'same', evidenceRef: 'b', billing: claude },
+    ]);
+    expect(duplicate).toThrow(/Duplicate provider billing attempt/);
+    try {
+      duplicate();
+      expect.unreachable('duplicate attempt must fail closed');
+    } catch (error) {
+      expect(error).toBeInstanceOf(DeckentError);
+      expect((error as DeckentError).code).toBe('DECKENT_E077');
+    }
+
+    const crossProvider = () => aggregateProviderBillingEvidence([
+      { attemptId: 'parent', evidenceRef: 'a', billing: claude },
+      { attemptId: 'continuation', evidenceRef: 'b', billing: codex },
+    ]);
+    expect(crossProvider).toThrow(/cannot cross provider or currency/);
+    try {
+      crossProvider();
+      expect.unreachable('cross-provider aggregation must fail closed');
+    } catch (error) {
+      expect(error).toBeInstanceOf(DeckentError);
+      expect((error as DeckentError).code).toBe('DECKENT_E077');
+    }
   });
 });

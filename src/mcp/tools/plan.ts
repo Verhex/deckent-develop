@@ -9,19 +9,6 @@ import type { BrainPlanningMode, PlannerProof, SprintSizeRecommendation } from '
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatPlanResponse, wrapResponse } from '../helpers/format.js';
 
-function computeWaveBreakdown(taskCount: number, maxWorkers: number): Record<string, number> {
-  const waves: Record<string, number> = {};
-  let remaining = taskCount;
-  let wave = 1;
-  while (remaining > 0) {
-    const inWave = Math.min(remaining, maxWorkers);
-    waves[`wave${wave}`] = inWave;
-    remaining -= inWave;
-    wave++;
-  }
-  return waves;
-}
-
 function computeModelDistribution(tasks: Array<{ model?: string }>): Record<string, number> {
   const dist: Record<string, number> = {};
   for (const t of tasks) {
@@ -55,14 +42,15 @@ export function registerPlanTool(server: McpServer): void {
 
       try {
       const config = await loadConfig(root);
-      // AI planning needs a registered provider. The MCP process does not bootstrap
-      // the registry on its own (unlike `deckent start`), so `mode: 'ai'` hit
-      // "No providers registered". Bootstrap from config (brain_provider etc.) here,
-      // mirroring CLI `deckent plan`. Idempotent; failure degrades to structured.
-      try {
-        await bootstrapProviders(config, root);
-      } catch (e) {
-        debugLog('mcp:plan:bootstrapProviders', e);
+      // Structured preview is provider-free by contract. Only bootstrap when
+      // the effective planner mode may call a provider.
+      const effectiveMode = input.mode ?? config.activeModeConfig.brain_planning;
+      if (effectiveMode !== 'structured') {
+        try {
+          await bootstrapProviders(config, root);
+        } catch (e) {
+          debugLog('mcp:plan:bootstrapProviders', e);
+        }
       }
       const context = readContext(root);
       const recommendation: SprintSizeRecommendation = {
@@ -88,7 +76,9 @@ export function registerPlanTool(server: McpServer): void {
         priority: t.priority,
       }));
 
-      const waveBreakdown = computeWaveBreakdown(tasks.length, recommendation.maxWorkers);
+      const waveBreakdown = Object.fromEntries(
+        preview.topology.waves.map(wave => [`wave${wave.wave}`, wave.slots.length]),
+      );
       const modelDistribution = computeModelDistribution(tasks);
       const riskAssessment = computeRiskAssessment(tasks.length);
 
@@ -111,7 +101,7 @@ export function registerPlanTool(server: McpServer): void {
         tasks,
         recommendation: {
           size: recommendation.size,
-          maxWorkers: recommendation.maxWorkers,
+          maxWorkers: preview.topology.configuredMaxWorkers,
           reason: recommendation.reason,
         },
         reasoning: sprint.reasoning,
@@ -121,10 +111,13 @@ export function registerPlanTool(server: McpServer): void {
         modelDistribution,
         riskAssessment,
         promptGate,
+        executionTopology: preview.topology,
+        topologyGate: preview.topologyGateResult,
         // planDigest (TERM2 424-001) — content hash of the real plan preview
         // (task summaries + gate/policy outcome), for future digest-bound
         // approval flows (design doc "Net Öneri"). Additive field only.
         planDigest: preview.planDigest,
+        planDigestVersion: preview.planDigestVersion,
       };
 
       const enrichedPlan = enrichResponse('plan', baseResponse);

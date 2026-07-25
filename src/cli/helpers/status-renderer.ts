@@ -412,12 +412,21 @@ export class StatusRenderer {
     const tasksDir = join(this.config.projectRoot, TASKS_DIR);
     if (!existsSync(tasksDir)) return [];
     const files = readdirSync(tasksDir).filter(
-      f => f.startsWith('task-') && f.endsWith('.json'),
+      f => /^task-[\w-]+\.json$/.test(f),
     );
     const tasks: Task[] = [];
     for (const f of files) {
       try {
-        tasks.push(JSON.parse(readFileSync(join(tasksDir, f), 'utf-8')) as Task);
+        const parsed: unknown = JSON.parse(readFileSync(join(tasksDir, f), 'utf-8'));
+        if (typeof parsed !== 'object' || parsed === null) continue;
+        const task = parsed as Partial<Task>;
+        if (
+          typeof task.id !== 'string'
+          || f !== `task-${task.id}.json`
+          || typeof task.title !== 'string'
+          || typeof task.status !== 'string'
+        ) continue;
+        tasks.push(task as Task);
       } catch {
         // skip malformed
       }

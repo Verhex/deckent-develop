@@ -467,6 +467,9 @@ const KNOWN_ORPHANS = [
   'src/core/config-validator.ts',
   'src/core/credentials-per-project.ts',
   'src/core/credentials.ts',
+  // Added by 5650e1cc as a pure post-result budget evaluator, but it still has
+  // no src/** or scripts/** consumer. Pin as suspicious dark code; allowlisting
+  // is not production wiring and M3 must either bind or retire this authority.
   'src/core/global-config.ts',
   'src/core/global-store.ts',
   'src/core/interaction-policy.ts',
@@ -476,11 +479,14 @@ const KNOWN_ORPHANS = [
   'src/core/notification-config.ts',
   'src/core/notification-providers/discord.ts',
   'src/core/notification-providers/slack.ts',
+  // `src/core/provider-authority-composition.ts` and
+  // `src/providers/claude-provider-evidence-sources.ts` closed on 2026-07-25:
+  // provider-authority-runtime-bootstrap.ts constructs both, and Goal-v2
+  // autonomous startup calls openLocalProviderAuthorityRuntime().
   'src/core/provider-capabilities.ts',
   'src/core/rate-limiter.ts',
   'src/core/skill-registry.ts',
   'src/core/spawn-safety.ts',
-  'src/core/state-paths.ts',
   'src/core/telemetry.ts',
   'src/core/token-counter.ts',
   'src/core/tokenizer-fallback.ts',
@@ -500,6 +506,8 @@ const KNOWN_ORPHANS = [
   'src/orchestra/brain-context.ts',
   'src/orchestra/capability-realizer.ts',
   'src/orchestra/codex-spawn-readiness.ts',
+  // Strict xverify Docker runtime authority has test-only consumers while its
+  // production-ingress F1-F5 composition remains explicitly owner-gated.
   'src/orchestra/doc-updaters/metrics-updater.ts',
   'src/orchestra/managed-docs/index.ts',
   'src/orchestra/monitor-adapter.ts',
@@ -524,7 +532,7 @@ const KNOWN_ORPHANS = [
 
 describe('KNOWN_ORPHANS allowlist sanity', () => {
   it('has the expected count and only well-formed src/**/*.ts(x) entries', () => {
-    expect(KNOWN_ORPHANS.length).toBe(83); // 86->84: agent-selector V2-kesimle silindi + vocabulary-bootstrap analyze --bootstrap-vocabulary ile kapandi (SURF-era); 84->83: spawn-backend-subprocess captureStreamToLog SURF-3 S3 followContainerActivity ile kapandi
+    expect(KNOWN_ORPHANS.length).toBe(82);
     for (const entry of KNOWN_ORPHANS) {
       expect(entry.startsWith('src/')).toBe(true);
       expect(entry.endsWith('.ts') || entry.endsWith('.tsx')).toBe(true);

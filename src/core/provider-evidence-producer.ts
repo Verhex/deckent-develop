@@ -3,9 +3,11 @@ import { createHash } from 'node:crypto';
 import {
   INVOCATION_RECEIPT_SCHEMA_VERSION,
   type InvocationAuthMode,
+  type InvocationExecutionBackend,
   type InvocationReceipt,
   type InvocationReceiptLedger,
   type InvocationReceiptRef,
+  type InvocationTransport,
 } from './invocation-receipt.js';
 import type { ProviderAuthorityKeyring } from './provider-authority-keyring.js';
 import type { ProviderLimitSnapshotQuery, ProviderLimitStore } from './provider-limit-store.js';
@@ -23,6 +25,7 @@ import {
   assertCanonicalModelApiId,
   assertCanonicalProviderId,
   assertOpaqueEvidenceRef,
+  assertOpaqueSha256,
   probeExactModelReachability,
   type ProviderExecutionProfile,
   type ReachabilityBackendScope,
@@ -31,16 +34,51 @@ import {
   type ReachabilityResult,
 } from './provider-truth.js';
 
+export type ProviderAccountIdentityKind =
+  | 'provider-account'
+  | 'organization'
+  | 'workspace';
+
+export interface ProviderAccountIdentityRequest {
+  readonly tenantId: string;
+  readonly provider: string;
+  readonly authMode: InvocationAuthMode;
+  readonly backend: ReachabilityBackendScope;
+  readonly executionProfile: ProviderExecutionProfile;
+}
+
+export interface ProviderAccountIdentityReady {
+  readonly state: 'ready';
+  readonly provider: string;
+  readonly authMode: InvocationAuthMode;
+  readonly identityKind: ProviderAccountIdentityKind;
+  readonly assurance: 'provider-verified';
+  readonly issuer: string;
+  /** Raw subject is host-memory-only and is immediately pseudonymized by the keyring. */
+  readonly stableSubject: string;
+  readonly evidenceRef: string;
+  readonly credentialGenerationRef: string;
+  readonly backendScopeRefHash: string;
+  readonly fetchedAt: string;
+  readonly expiresAt: string;
+}
+
+export interface ProviderCredentialOnlyIdentity {
+  readonly state: 'credential-only';
+  readonly credentialGenerationRef: string;
+  readonly evidenceRef: string;
+  readonly fetchedAt: string;
+  readonly expiresAt: string;
+}
+
+export type ProviderAccountIdentityResult =
+  | ProviderAccountIdentityReady
+  | ProviderCredentialOnlyIdentity
+  | { readonly state: 'hold'; readonly evidenceRef: string };
+
 export interface ProviderAccountIdentityAuthority {
   readonly authorityRef: string;
-  resolve(input: {
-    readonly tenantId: string;
-    readonly provider: string;
-    readonly authMode: InvocationAuthMode;
-  }): Promise<
-    | { readonly state: 'ready'; readonly stableAccountIdentity: string }
-    | { readonly state: 'hold'; readonly evidenceRef: string }
-  >;
+  resolve(input: ProviderAccountIdentityRequest): Promise<ProviderAccountIdentityResult>;
 }
 
 export interface ProviderLimitSourceObservation {
@@ -59,8 +97,14 @@ export interface ProviderLimitEvidenceSource {
     readonly tenantId: string;
     readonly projectId: string;
     readonly provider: string;
+    readonly model: string;
     readonly authMode: InvocationAuthMode;
     readonly accountRefHash: string | null;
+    readonly accountEvidence: {
+      readonly identityEvidenceRef: string;
+      readonly credentialGenerationRef: string;
+      readonly backendScopeRefHash: string;
+    } | null;
     readonly backend: ProviderLimitObservation['backend'];
   }): Promise<ProviderLimitSourceObservation>;
 }
@@ -76,6 +120,23 @@ export interface ProviderEvidenceSources {
   readonly reachability: ProviderReachabilityEvidenceSource;
 }
 
+export interface ProviderEvidenceSourceScope {
+  readonly provider: string;
+  readonly authMode: InvocationAuthMode;
+  readonly transport: InvocationTransport;
+  readonly executionBackend: InvocationExecutionBackend;
+}
+
+export interface ProviderEvidenceSourceSelection extends ProviderEvidenceSourceScope {
+  readonly authorityEvidenceRef: string;
+  readonly sources: ProviderEvidenceSources;
+}
+
+export interface ProviderEvidenceSourceResolver {
+  readonly authorityRef: string;
+  resolve(scope: ProviderEvidenceSourceScope): ProviderEvidenceSourceSelection | null;
+}
+
 export interface ProviderEvidenceProducerOptions {
   readonly tenantId: string;
   readonly projectId: string;
@@ -83,9 +144,10 @@ export interface ProviderEvidenceProducerOptions {
   readonly truthStore: ProviderTruthStore;
   readonly limitStore: ProviderLimitStore;
   readonly receiptLedger: InvocationReceiptLedger;
-  readonly sources: ProviderEvidenceSources;
+  readonly sourceResolver: ProviderEvidenceSourceResolver;
   readonly policyResolver: (input: ProviderLimitSnapshotQuery) => ProviderLimitPolicy | null;
   readonly now?: () => Date;
+  readonly accountIdentityMaxTtlMs?: number;
   readonly limitMaxTtlMs?: number;
   readonly reachabilityTtlMs?: number;
 }
@@ -116,6 +178,7 @@ export interface ProviderEvidenceRefreshRequest {
 
 export type ProviderEvidenceHoldReason =
   | 'account_authority_hold'
+  | 'source_bundle_unavailable'
   | 'limit_policy_unavailable'
   | 'limit_source_failure'
   | 'limit_source_invalid'
@@ -147,6 +210,12 @@ export type ProviderEvidenceRefreshResult =
 
 const DEFAULT_LIMIT_MAX_TTL_MS = 60_000;
 const DEFAULT_REACHABILITY_TTL_MS = 60_000;
+const DEFAULT_ACCOUNT_IDENTITY_MAX_TTL_MS = 60_000;
+const ACCOUNT_IDENTITY_KINDS = new Set<ProviderAccountIdentityKind>([
+  'provider-account',
+  'organization',
+  'workspace',
+]);
 
 function digest(...parts: readonly string[]): string {
   return createHash('sha256').update(parts.join('\u0000')).digest('hex');
@@ -154,6 +223,22 @@ function digest(...parts: readonly string[]): string {
 
 function authorityRef(kind: string, ...parts: readonly string[]): string {
   return `provider-evidence:${digest(kind, ...parts)}`;
+}
+
+export function deriveProviderAccountBackendScopeRefHash(
+  request: Pick<ProviderAccountIdentityRequest, 'provider' | 'authMode' | 'backend' | 'executionProfile'>,
+): string {
+  return digest(
+    request.provider,
+    request.authMode,
+    request.backend.transport,
+    request.backend.executionBackend,
+    request.backend.endpointRefHash ?? 'none',
+    request.backend.runtimeFingerprint ?? 'none',
+    request.backend.executionProfileRef,
+    request.executionProfile.profileRef,
+    request.executionProfile.provider,
+  );
 }
 
 function requireIdentity(name: string, value: string): void {
@@ -252,6 +337,7 @@ function mapTransportOutcome(observation: ReachabilityProbeObservation): {
 export class ProviderEvidenceProducer {
   readonly authorityRef: string;
   private readonly now: () => Date;
+  private readonly accountIdentityMaxTtlMs: number;
   private readonly limitMaxTtlMs: number;
   private readonly reachabilityTtlMs: number;
 
@@ -262,23 +348,24 @@ export class ProviderEvidenceProducer {
       || options.receiptLedger.projectId !== options.projectId) {
       throw new TypeError('Provider evidence stores must share one canonical project identity');
     }
-    for (const ref of [
-      options.sources.account.authorityRef,
-      options.sources.limit.authorityRef,
-      options.sources.reachability.authorityRef,
-    ]) assertOpaqueEvidenceRef('provider evidence source authority', ref, true);
+    assertOpaqueEvidenceRef(
+      'provider evidence source resolver authority',
+      options.sourceResolver.authorityRef,
+      true,
+    );
     this.now = options.now ?? (() => new Date());
+    this.accountIdentityMaxTtlMs = options.accountIdentityMaxTtlMs
+      ?? DEFAULT_ACCOUNT_IDENTITY_MAX_TTL_MS;
     this.limitMaxTtlMs = options.limitMaxTtlMs ?? DEFAULT_LIMIT_MAX_TTL_MS;
     this.reachabilityTtlMs = options.reachabilityTtlMs ?? DEFAULT_REACHABILITY_TTL_MS;
+    requirePositiveTtl('accountIdentityMaxTtlMs', this.accountIdentityMaxTtlMs);
     requirePositiveTtl('limitMaxTtlMs', this.limitMaxTtlMs);
     requirePositiveTtl('reachabilityTtlMs', this.reachabilityTtlMs);
     this.authorityRef = authorityRef(
       'producer',
       options.tenantId,
       options.projectId,
-      options.sources.account.authorityRef,
-      options.sources.limit.authorityRef,
-      options.sources.reachability.authorityRef,
+      options.sourceResolver.authorityRef,
     );
   }
 
@@ -304,25 +391,99 @@ export class ProviderEvidenceProducer {
       || request.executionProfile.profileRef !== request.backend.executionProfileRef) {
       return hold('authority_failure', 'execution-profile-mismatch');
     }
+    const sourceScope: ProviderEvidenceSourceScope = {
+      provider: request.provider,
+      authMode: request.authMode,
+      transport: request.backend.transport,
+      executionBackend: request.backend.executionBackend,
+    };
+    let sourceSelection: ProviderEvidenceSourceSelection | null;
+    try {
+      sourceSelection = this.options.sourceResolver.resolve(sourceScope);
+    } catch (error) {
+      return hold('source_bundle_unavailable', `resolver:${errorCode(error)}`);
+    }
+    if (!sourceSelection) {
+      return hold(
+        'source_bundle_unavailable',
+        digest(
+          sourceScope.provider,
+          sourceScope.authMode,
+          sourceScope.transport,
+          sourceScope.executionBackend,
+        ),
+      );
+    }
+    try {
+      assertCanonicalProviderId(sourceSelection.provider);
+      assertOpaqueEvidenceRef(
+        'provider evidence source selection',
+        sourceSelection.authorityEvidenceRef,
+        true,
+      );
+      for (const ref of [
+        sourceSelection.sources.account.authorityRef,
+        sourceSelection.sources.limit.authorityRef,
+        sourceSelection.sources.reachability.authorityRef,
+      ]) assertOpaqueEvidenceRef('provider evidence source authority', ref, true);
+    } catch {
+      return hold('source_bundle_unavailable', 'source-selection-invalid');
+    }
+    if (sourceSelection.provider !== sourceScope.provider
+      || sourceSelection.authMode !== sourceScope.authMode
+      || sourceSelection.transport !== sourceScope.transport
+      || sourceSelection.executionBackend !== sourceScope.executionBackend) {
+      return hold('source_bundle_unavailable', 'source-selection-scope-mismatch');
+    }
+    const sources = sourceSelection.sources;
 
     let accountRefHash: string | null = null;
+    let accountEvidence: {
+      readonly identityEvidenceRef: string;
+      readonly credentialGenerationRef: string;
+      readonly backendScopeRefHash: string;
+    } | null = null;
     if (request.authMode !== 'local') {
-      const identity = await this.options.sources.account.resolve({
+      const identityRequest: ProviderAccountIdentityRequest = {
         tenantId: this.options.tenantId,
         provider: request.provider,
         authMode: request.authMode,
-      });
+        backend: request.backend,
+        executionProfile: request.executionProfile,
+      };
+      let identity: ProviderAccountIdentityResult;
+      try {
+        identity = await sources.account.resolve(identityRequest);
+      } catch (error) {
+        return hold('account_authority_hold', `source:${errorCode(error)}`);
+      }
       if (identity.state === 'hold') {
         assertOpaqueEvidenceRef('account authority evidence', identity.evidenceRef, true);
         return hold('account_authority_hold', identity.evidenceRef);
       }
-      if (!identity.stableAccountIdentity) return hold('account_authority_hold', 'empty-principal');
+      if (identity.state === 'credential-only') {
+        try {
+          assertOpaqueEvidenceRef('credential generation evidence', identity.credentialGenerationRef, true);
+          assertOpaqueEvidenceRef('credential-only authority evidence', identity.evidenceRef, true);
+        } catch {
+          return hold('account_authority_hold', 'credential-only-evidence-invalid');
+        }
+        return hold('account_authority_hold', 'credential-only-not-account-authority');
+      }
+      if (!this.isUsableAccountIdentity(identity, identityRequest)) {
+        return hold('account_authority_hold', 'account-evidence-invalid');
+      }
       accountRefHash = this.options.keyring.pseudonymizeAccount({
         tenantId: this.options.tenantId,
         provider: request.provider,
         authMode: request.authMode,
-        stableAccountIdentity: identity.stableAccountIdentity,
+        stableAccountIdentity: identity.stableSubject,
       });
+      accountEvidence = {
+        identityEvidenceRef: identity.evidenceRef,
+        credentialGenerationRef: identity.credentialGenerationRef,
+        backendScopeRefHash: identity.backendScopeRefHash,
+      };
     }
 
     const limitScope = {
@@ -345,11 +506,15 @@ export class ProviderEvidenceProducer {
     const maxLimitExpiry = new Date(startedAt.getTime() + this.limitMaxTtlMs).toISOString();
     let observed: ProviderLimitSourceObservation;
     try {
-      observed = await this.options.sources.limit.observe(limitScope);
+      observed = await sources.limit.observe({
+        ...limitScope,
+        model: request.model,
+        accountEvidence,
+      });
     } catch (error) {
       const unavailable = createProviderLimitResult(sourceFailureObservation(request, {
         ...limitScope,
-        source: this.options.sources.limit,
+        source: sources.limit,
         now: startedAt,
         expiresAt: maxLimitExpiry,
         detail: errorCode(error),
@@ -368,7 +533,7 @@ export class ProviderEvidenceProducer {
       || fetchedAt > observedAt.getTime()
       || !Number.isFinite(observedExpiry)
       || observedExpiry > fetchedAt + this.limitMaxTtlMs) {
-      return hold('limit_source_invalid', this.options.sources.limit.authorityRef);
+      return hold('limit_source_invalid', sources.limit.authorityRef);
     }
     const limit = createProviderLimitResult({
       idempotencyKey: `${request.idempotencyKey}:limit`,
@@ -379,8 +544,8 @@ export class ProviderEvidenceProducer {
       windows: observed.windows,
       source: {
         ...observed.source,
-        kind: this.options.sources.limit.kind,
-        authority: this.options.sources.limit.authority,
+        kind: sources.limit.kind,
+        authority: sources.limit.authority,
       },
       evidenceRefs: observed.evidenceRefs,
     }, policy, {
@@ -450,7 +615,7 @@ export class ProviderEvidenceProducer {
         payload: { attempt: 1 },
       });
       try {
-        transportObservation = await this.options.sources.reachability.probe(probeRequest);
+        transportObservation = await sources.reachability.probe(probeRequest);
         return transportObservation;
       } catch (error) {
         transportObservation = {
@@ -523,9 +688,11 @@ export class ProviderEvidenceProducer {
         },
         executionProfile: request.executionProfile,
         evidenceRefs: [
-          this.options.sources.account.authorityRef,
-          this.options.sources.limit.authorityRef,
-          this.options.sources.reachability.authorityRef,
+          this.options.sourceResolver.authorityRef,
+          sourceSelection.authorityEvidenceRef,
+          sources.account.authorityRef,
+          sources.limit.authorityRef,
+          sources.reachability.authorityRef,
         ],
         ttlMs: this.reachabilityTtlMs,
       }, {
@@ -575,6 +742,43 @@ export class ProviderEvidenceProducer {
       reachability,
       receiptRef,
     };
+  }
+
+  private isUsableAccountIdentity(
+    identity: ProviderAccountIdentityReady,
+    request: ProviderAccountIdentityRequest,
+  ): boolean {
+    try {
+      assertCanonicalProviderId(identity.provider);
+      assertOpaqueEvidenceRef('account identity evidence', identity.evidenceRef, true);
+      assertOpaqueEvidenceRef(
+        'account credential generation evidence',
+        identity.credentialGenerationRef,
+        true,
+      );
+      assertOpaqueSha256('account backend scope ref', identity.backendScopeRefHash, true);
+      requireIdentity('account identity issuer', identity.issuer);
+      requireIdentity('account identity stable subject', identity.stableSubject);
+    } catch {
+      return false;
+    }
+    if (identity.provider !== request.provider
+      || identity.authMode !== request.authMode
+      || identity.assurance !== 'provider-verified'
+      || !ACCOUNT_IDENTITY_KINDS.has(identity.identityKind)
+      || identity.backendScopeRefHash !== deriveProviderAccountBackendScopeRefHash(request)) {
+      return false;
+    }
+    const fetchedAt = Date.parse(identity.fetchedAt);
+    const expiresAt = Date.parse(identity.expiresAt);
+    const now = this.now().getTime();
+    return Number.isFinite(fetchedAt)
+      && Number.isFinite(expiresAt)
+      && new Date(fetchedAt).toISOString() === identity.fetchedAt
+      && new Date(expiresAt).toISOString() === identity.expiresAt
+      && fetchedAt <= now
+      && expiresAt > now
+      && expiresAt - fetchedAt <= this.accountIdentityMaxTtlMs;
   }
 
   private invocationId(request: ProviderEvidenceRefreshRequest): string {

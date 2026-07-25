@@ -36,7 +36,25 @@ import { TaskStatus } from '../core/types.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { resolveLiveTraceEnabled } from '../core/config.js';
 import { debugLog } from '../core/utils.js';
-import { assertLiveUsageBudgetSupport } from '../core/live-execution-budget.js';
+import {
+  assertExecutionLandingSupport,
+  assertLiveUsageBudgetSupport,
+} from '../core/live-execution-budget.js';
+import {
+  attendedExecutionProjectId,
+  type AttendedExecutionApprovalAuthority,
+  type AttendedExecutionApprovalExpectedDispatch,
+} from '../core/attended-execution-approval.js';
+import { createTaskResultSettlementRefForAttempt } from '../core/task-result-settlement.js';
+import {
+  assertAttendedExecutionProposalMaterial,
+  createAttendedExecutionProposalMaterialFromTask,
+} from '../core/attended-execution-proposal.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
+import {
+  preflightProviderExecutionIngress,
+  ProviderExecutionIngressHoldError,
+} from '../core/provider-execution-ingress-authority.js';
 
 import {
   resolveTaskProvider, isTmuxProvider, isAdapterProvider, getProviderAdapterForTask,
@@ -44,7 +62,7 @@ import {
 import type { SpawnBackend } from './spawn-backend.js';
 import { SpawnBackendFactory } from './spawn-backend.js';
 import { resolveReasoningEffort } from '../core/reasoning-effort.js';
-import { bootstrapProviders } from '../core/provider.js';
+import { bootstrapProviders, orderedRoleProviders } from '../core/provider.js';
 import { spawnWorker } from './tmux.js';
 import { buildWorkerApprovalGateEnv } from '../agents/worker-approval-env.js';
 import { writeEvent, CHANNELS, getCurrentSprintId } from './event-stream.js';
@@ -177,7 +195,12 @@ export interface SpawnTaskDeps {
   sprintFallbackId: string;
   /** Optional — legacy/test callers may omit config entirely (see result-collector.ts). */
   config: ResolvedConfig | undefined;
-  spawnOpts?: { autoApprove?: boolean; spawnBackend?: SpawnBackend };
+  spawnOpts?: {
+    autoApprove?: boolean;
+    spawnBackend?: SpawnBackend;
+    attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+    providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  };
   /** Base backend for this call (e.g. the wave's configured backend, or the queue's spawnOpts.spawnBackend). */
   backend?: SpawnBackend;
   resolveAgentPrompt: (projectRoot: string, task: Task) => Promise<string | undefined>;
@@ -190,6 +213,99 @@ export type SpawnDisposition =
   | { kind: 'spawned'; taskId: string }
   | { kind: 'routing-lineage-missing'; taskId: string; fixForTaskId: string; detail: string }
   | { kind: 'provider-unavailable'; taskId: string; provider: string };
+
+function intendedWorkerBackend(
+  task: Task,
+  provider: ReturnType<typeof resolveTaskProvider>,
+  backend: SpawnBackend | undefined,
+): string {
+  if (task.backend) return task.backend;
+  if (isAdapterProvider(provider)) return 'host-adapter';
+  if (backend) return backend.name;
+  return isTmuxProvider(provider) ? 'tmux' : 'host-adapter';
+}
+
+/**
+ * Shared Sprint Worker ingress. The current production candidate adapter is
+ * intentionally absent, so configured authority can only HOLD. This function
+ * must run before prompt construction, provider bootstrap, task assignment or
+ * backend dispatch on every scheduler trigger.
+ */
+export function assertSprintWorkerProviderAuthority(input: {
+  readonly authority: ProviderAuthorityRuntimeServiceOpenResult | undefined;
+  readonly projectRoot: string;
+  readonly task: Task;
+  readonly config: ResolvedConfig | undefined;
+  readonly sprintFallbackId: string;
+  readonly backend: SpawnBackend | undefined;
+}): void {
+  if (!input.authority) return;
+  const provider = resolveTaskProvider(input.task);
+  if (!input.config) {
+    const request = Object.freeze({
+      role: 'worker' as const,
+      purpose: 'worker-execution' as const,
+      runId: input.task.sprintId ?? input.sprintFallbackId,
+      taskId: input.task.id,
+      provider,
+      model: input.task.model,
+      configuredBackend: intendedWorkerBackend(input.task, provider, input.backend),
+      fallbackProviders: Object.freeze([] as string[]),
+      unattended: input.task.budgetPolicy?.admissionMode !== 'attended',
+    });
+    throw new ProviderExecutionIngressHoldError(
+      'provider_config_unavailable',
+      Object.freeze([input.authority.authorityEvidenceRef]),
+      request,
+      Boolean(writeEvent(
+        input.projectRoot,
+        request.runId,
+        'brain',
+        'auditor',
+        'BRAIN→AUDITOR:PROVIDER_AUTHORITY_HOLD',
+        {
+          ...request,
+          reasonCode: 'provider_config_unavailable',
+          authorityEvidenceRefs: [input.authority.authorityEvidenceRef],
+        },
+      )),
+    );
+  }
+  const order = orderedRoleProviders('worker', input.config);
+  const request = Object.freeze({
+    role: 'worker' as const,
+    purpose: 'worker-execution' as const,
+    runId: input.task.sprintId ?? input.sprintFallbackId,
+    taskId: input.task.id,
+    provider,
+    model: input.task.model,
+    configuredBackend: intendedWorkerBackend(input.task, provider, input.backend),
+    fallbackProviders: Object.freeze(
+      [order.primary, ...order.fallbacks].filter(candidate => candidate !== provider),
+    ),
+    unattended: input.task.budgetPolicy?.admissionMode !== 'attended',
+  });
+  const decision = preflightProviderExecutionIngress(input.authority, request);
+  if (decision.decision === 'hold') {
+    throw new ProviderExecutionIngressHoldError(
+      decision.reasonCode,
+      decision.authorityEvidenceRefs,
+      request,
+      Boolean(writeEvent(
+        input.projectRoot,
+        request.runId,
+        'brain',
+        'auditor',
+        'BRAIN→AUDITOR:PROVIDER_AUTHORITY_HOLD',
+        {
+          ...request,
+          reasonCode: decision.reasonCode,
+          authorityEvidenceRefs: decision.authorityEvidenceRefs,
+        },
+      )),
+    );
+  }
+}
 
 function persistTask(projectRoot: string, task: Task): void {
   try {
@@ -266,7 +382,17 @@ export async function executeSpawnTask(
     return { kind: 'routing-lineage-missing', taskId: task.id, fixForTaskId: task.fixForTaskId!, detail };
   }
 
-  // ─── 2. Prompt / provider / backend / reasoning-effort resolution ───────
+  // ─── 2. Provider-authority admission — before prompt/bootstrap/spawn ─────
+  assertSprintWorkerProviderAuthority({
+    authority: spawnOpts?.providerAuthority,
+    projectRoot,
+    task,
+    config,
+    sprintFallbackId,
+    backend,
+  });
+
+  // ─── 3. Prompt / provider / backend / reasoning-effort resolution ───────
   const agentPrompt = await deps.resolveAgentPrompt(projectRoot, task);
   const skillPrompts = await deps.resolveSkillPrompts(projectRoot, task);
   const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, projectRoot);
@@ -290,6 +416,39 @@ export async function executeSpawnTask(
       : backend;
   const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
   const excludeDynamicPromptSections = config?.prompt?.exclude_dynamic_system_prompt_sections !== false;
+  const approvalExpectedDispatch = (
+    backendName: string,
+  ): AttendedExecutionApprovalExpectedDispatch | undefined => {
+    if (!task.budget
+      || !task.budgetPolicy?.landingPolicy
+      || !task.budgetPolicy.policyDigest
+      || !task.budgetPolicy.approvalProposal) {
+      return undefined;
+    }
+    assertAttendedExecutionProposalMaterial(
+      createAttendedExecutionProposalMaterialFromTask(
+        task as unknown as Record<string, unknown>,
+        prompt,
+      ),
+      task.budgetPolicy.approvalProposal,
+    );
+    return {
+      ...task.budgetPolicy.approvalProposal,
+      tenantId: task.actor?.tenantId ?? 'local',
+      projectId: attendedExecutionProjectId(projectRoot),
+      runId: task.sprintId ?? sprintFallbackId,
+      taskId: task.id,
+      provider: taskProvider,
+      model,
+      backend: backendName,
+      budget: task.budget,
+      policy: {
+        profileRef: task.budgetPolicy.profileRef,
+        policyDigest: task.budgetPolicy.policyDigest,
+        landing: task.budgetPolicy.landingPolicy,
+      },
+    };
+  };
 
   let adapterRouted = wantsHostAdapter ? getProviderAdapterForTask(taskProvider) : null;
   if (wantsHostAdapter && !adapterRouted && config) {
@@ -299,7 +458,7 @@ export async function executeSpawnTask(
     } catch (e) { debugLog('executeSpawnTask:lazyAdapterRebootstrap', e); }
   }
 
-  // ─── 3. Dispatch — single canonical branch set ───────────────────────────
+  // ─── 4. Dispatch — single canonical branch set ───────────────────────────
   if (adapterRouted) {
     const refresh = (adapterRouted as { refreshSupportedModels?: () => Promise<void> }).refreshSupportedModels;
     if (typeof refresh === 'function') await refresh.call(adapterRouted);
@@ -309,6 +468,17 @@ export async function executeSpawnTask(
       adapterRouted.name,
       adapterRouted.executionCostClass,
     );
+    assertExecutionLandingSupport({
+      budget: task.budget,
+      policy: task.budgetPolicy?.landingPolicy,
+      mode: task.budgetPolicy?.admissionMode,
+      capability: adapterRouted.executionLandingCapability,
+      executor: adapterRouted.name,
+      approvalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
+      approvalAuthority: spawnOpts?.attendedExecutionApprovalAuthority,
+      approvalExpectedDispatch: approvalExpectedDispatch('host-adapter'),
+      executionCostClass: adapterRouted.executionCostClass,
+    });
     adapterRouted.spawn(task.id, model, prompt, {
       allowedTools,
       autoApprove: spawnOpts?.autoApprove ?? false,
@@ -317,6 +487,9 @@ export async function executeSpawnTask(
       excludeDynamicPromptSections,
       taskTimeoutSeconds,
       executionBudget: task.budget,
+      executionLandingPolicy: task.budgetPolicy?.landingPolicy,
+      executionAdmissionMode: task.budgetPolicy?.admissionMode,
+      executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
       env: buildWorkerApprovalGateEnv(config?.approval?.gate_enabled === true, task.sprintId, task.id),
     });
   } else if (wantsHostAdapter) {
@@ -332,6 +505,23 @@ export async function executeSpawnTask(
       effectiveBackend.liveUsageBudgetSupport,
       effectiveBackend.name,
     );
+    const approvalGrant = assertExecutionLandingSupport({
+      budget: task.budget,
+      policy: task.budgetPolicy?.landingPolicy,
+      mode: task.budgetPolicy?.admissionMode,
+      capability: effectiveBackend.executionLandingCapability,
+      executor: effectiveBackend.name,
+      approvalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
+      approvalAuthority: spawnOpts?.attendedExecutionApprovalAuthority,
+      approvalExpectedDispatch: approvalExpectedDispatch(effectiveBackend.name),
+    });
+    const settlementRef = effectiveBackend.name === 'docker' && approvalGrant
+      ? createTaskResultSettlementRefForAttempt(
+        projectRoot,
+        task.id,
+        approvalGrant.receipt.binding.attemptId,
+      )
+      : undefined;
     effectiveBackend.spawn(task.id, model, prompt, {
       allowedTools,
       autoApprove: spawnOpts?.autoApprove ?? false,
@@ -340,6 +530,12 @@ export async function executeSpawnTask(
       excludeDynamicPromptSections,
       taskTimeoutSeconds,
       executionBudget: task.budget,
+      executionLandingPolicy: task.budgetPolicy?.landingPolicy,
+      executionAdmissionMode: task.budgetPolicy?.admissionMode,
+      executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
+      executionApprovalGrant: approvalGrant,
+      executionApprovalExpectedDispatch: approvalExpectedDispatch(effectiveBackend.name),
+      settlementRef,
       // SURF-3 S2/S3 — live tool-by-tool activity (flag-gated; no-op when
       // off). 583/N5: env-twin aware — an interactive-origin coordinator
       // (DECKENT_LIVE_TRACE=1) streams live without a global config flip.
@@ -355,16 +551,40 @@ export async function executeSpawnTask(
         adapter.name,
         adapter.executionCostClass,
       );
+      assertExecutionLandingSupport({
+        budget: task.budget,
+        policy: task.budgetPolicy?.landingPolicy,
+        mode: task.budgetPolicy?.admissionMode,
+        capability: adapter.executionLandingCapability,
+        executor: adapter.name,
+        approvalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
+        approvalAuthority: spawnOpts?.attendedExecutionApprovalAuthority,
+        approvalExpectedDispatch: approvalExpectedDispatch('host-adapter'),
+        executionCostClass: adapter.executionCostClass,
+      });
       adapter.spawn(task.id, model, prompt, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
         executionBudget: task.budget,
+        executionLandingPolicy: task.budgetPolicy?.landingPolicy,
+        executionAdmissionMode: task.budgetPolicy?.admissionMode,
+        executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
         env: buildWorkerApprovalGateEnv(config?.approval?.gate_enabled === true, task.sprintId, task.id),
       });
     }
   } else {
     assertLiveUsageBudgetSupport(task.budget, undefined, 'tmux');
+    assertExecutionLandingSupport({
+      budget: task.budget,
+      policy: task.budgetPolicy?.landingPolicy,
+      mode: task.budgetPolicy?.admissionMode,
+      capability: 'unsupported',
+      executor: 'tmux',
+      approvalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
+      approvalAuthority: spawnOpts?.attendedExecutionApprovalAuthority,
+      approvalExpectedDispatch: approvalExpectedDispatch('tmux'),
+    });
     spawnWorker(task.id, model, prompt, projectRoot, {
       allowedTools,
       autoApprove: spawnOpts?.autoApprove ?? false,

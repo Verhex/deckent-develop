@@ -26,13 +26,21 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
-import type { Task, TaskResult, ProviderName, ResolvedConfig } from '../../core/types.js';
+import type {
+  Task,
+  TaskResult,
+  ProviderName,
+  ResolvedConfig,
+  CrossVerifyExecutionEvidence,
+} from '../../core/types.js';
 import { TaskStatus, TaskEvaluation, ALL_PROVIDER_NAMES } from '../../core/types.js';
 import { loadConfig, resolveDefaultModel } from '../../core/config.js';
 import { registerOpenRouterModelFromCache, readFreeModelCache } from '../../core/openrouter-models.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
+import { createCrossVerifyProductionIngressAuthority } from '../../orchestra/cross-verify-production-ingress-authority.js';
 
 // ─── Options ────────────────────────────────────────────────────────────
 
@@ -68,6 +76,8 @@ export interface XverifyDeps {
   /** Invoked AFTER validation, BEFORE the verifier spawn — CLI prints its
    *  progress line here; the MCP twin passes nothing and stays silent. */
   onDispatch?: (info: { author: ProviderName; priority: readonly string[] }) => void;
+  /** Shared process authority; advisory mode receives it but performs no authority work. */
+  providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
 }
 
 // ─── Diff capture (default impl) ────────────────────────────────────────
@@ -95,10 +105,13 @@ export interface XverifyResult {
   id: string;
   author: ProviderName;
   verifier: string | null;
+  /** Exact canonical API id evidenced by the dispatched verifier advisory. */
+  verifierModel: string | null;
   verdict: string;
   outcome: string;
   skippedReason: string | null;
   reason: string | null;
+  execution: CrossVerifyExecutionEvidence | null;
   report: string;
 }
 
@@ -162,11 +175,11 @@ export async function runXverifyForResult(
 
   const task: Task = {
     id,
-    title: claim.slice(0, 100),
-    description: [
-      claim,
-      diffText ? `\n## Working-tree diff (evidence context)\n\n\`\`\`diff\n${diffText}\n\`\`\`` : '',
-    ].join('\n'),
+    // The complete claim remains in Description. A host-generated stable title
+    // avoids silently truncating a material claim before the prompt compiler can
+    // apply its explicit host-truncation contract.
+    title: `Session claim ${id}`,
+    description: claim,
     model: resolveDefaultModel(config),
     // Carrying the AUTHOR here is what enforces verifier≠author:
     // selectVerifierProvider never picks the task's own provider.
@@ -193,6 +206,7 @@ export async function runXverifyForResult(
     linesRemoved: 0,
     testsPassed: true,
     notes: claim,
+    ...(diffText ? { evidenceContext: diffText } : {}),
   } as TaskResult;
 
   // ── Effective cross_verify config for this invocation ──
@@ -226,9 +240,29 @@ export async function runXverifyForResult(
   const runCrossVerify = deps.runCrossVerifyFn
     ?? (await import('../../orchestra/cross-verify-runner.js')).runCrossVerify;
 
-  deps.onDispatch?.({ author, priority: verifierPriority });
+  // Registry/catalog presence is not live reachability. The interactive surface
+  // may carry only an explicit, attended owner selection into the runner. Without
+  // `--verifier`, the runner fails closed until the production authority
+  // composition supplies exact-model reachability and limit evidence.
+  const attendedVerifierCandidates = explicitVerifier
+    ? [explicitVerifier as ProviderName]
+    : undefined;
   const outcome = await runCrossVerify(root, task, result, TaskEvaluation.DONE, effectiveConfig, {
     timeoutMs,
+    operationClass: 'adjudicate-claim',
+    mandatoryInvocationFactory: createCrossVerifyProductionIngressAuthority({
+      providerAuthority: deps.providerAuthority,
+    }),
+    ...(attendedVerifierCandidates
+      ? { availableProviders: attendedVerifierCandidates }
+      : {}),
+    ...(deps.onDispatch
+      ? {
+        onVerifierDispatch: ({ verifierProvider }: { verifierProvider: ProviderName }) => {
+          deps.onDispatch?.({ author, priority: [verifierProvider] });
+        },
+      }
+      : {}),
     ...(opts.verifierModel ? { verifierModel: opts.verifierModel } : {}),
   });
 
@@ -237,13 +271,37 @@ export async function runXverifyForResult(
   mkdirSync(reportDir, { recursive: true });
   const reportPath = join(reportDir, `${id}.md`);
   const verdict = outcome.advisory?.verdict ?? 'unclear';
+  const verifierModel = outcome.advisory?.verifierModel ?? null;
+  const execution = outcome.advisory?.execution ?? null;
+  const executionLines = execution
+    ? [
+        `- ${getMessage('xverify.report.execution', lang, {
+          outcome: execution.outcome,
+          initial: execution.initialAttemptId,
+          terminal: execution.terminalAttemptId,
+        })}`,
+        ...(execution.cumulativeUsage
+          ? [
+              `- ${getMessage('xverify.report.cumulative_usage', lang, {
+                turns: String(execution.cumulativeUsage.turns),
+                tokens: String(execution.cumulativeUsage.totalTokens),
+                cacheRead: String(execution.cumulativeUsage.cacheReadTokens),
+              })}`,
+            ]
+          : []),
+      ]
+    : [];
   const report = [
     `# xverify advisory — ${id}`,
     '',
     `- **Claim author:** ${author}`,
     `- **Verifier:** ${outcome.advisory?.verifier ?? '(none dispatched)'}`,
+    `- ${getMessage('xverify.report.verifier_model', lang, {
+      model: verifierModel ?? getMessage('xverify.report.none_dispatched', lang),
+    })}`,
     `- **Verdict:** ${verdict.toUpperCase()}`,
     `- **Outcome:** ${outcome.outcome}${outcome.skippedReason ? ` (${outcome.skippedReason})` : ''}`,
+    ...executionLines,
     `- **At:** ${now.toISOString()}`,
     '',
     '## Claim',
@@ -263,10 +321,12 @@ export async function runXverifyForResult(
     id,
     author,
     verifier: outcome.advisory?.verifier ?? null,
+    verifierModel,
     verdict,
     outcome: outcome.outcome,
     skippedReason: outcome.skippedReason ?? null,
     reason: outcome.advisory?.reason ?? null,
+    execution,
     report: reportPath,
   };
 }
@@ -304,7 +364,7 @@ export async function runXverifyCommand(
 
 // ─── Registration ───────────────────────────────────────────────────────
 
-export function registerXverifyCommand(program: Command): void {
+export function registerXverifyCommand(program: Command, deps: XverifyDeps = {}): void {
   program
     .command('xverify <claim>')
     .description(getMessage('xverify.cmd_desc', getLanguage(undefined)))
@@ -316,6 +376,6 @@ export function registerXverifyCommand(program: Command): void {
     .option('--timeout <ms>', getMessage('xverify.opt_timeout', getLanguage(undefined)))
     .option('--json', getMessage('xverify.opt_json', getLanguage(undefined)))
     .action(async (claim: string, opts: XverifyCommandOpts) => {
-      await runXverifyCommand(claim, opts);
+      await runXverifyCommand(claim, opts, deps);
     });
 }

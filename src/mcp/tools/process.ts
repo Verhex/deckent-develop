@@ -84,8 +84,12 @@ export function registerProcessTool(server: McpServer): void {
             ...(actorId ? { actor: { id: actorId, ...(tenant ? { tenantId: tenant } : {}) } } : {}),
           };
           const controller = await buildProcessController(root);
-          const result = await controller.submit(ctx);
-          return jsonText(enrichResponse('process', { action: 'submit', ...result }));
+          try {
+            const result = await controller.submit(ctx);
+            return jsonText(enrichResponse('process', { action: 'submit', ...result }));
+          } finally {
+            controller.close();
+          }
         }
 
         // status | result — read the durable backlog entry by id

@@ -25,8 +25,13 @@ vi.mock('../../src/core/task-result-settlement.js', () => {
     .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
 });
 
+vi.mock('../../src/orchestra/execution-landing-coordinator.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../src/orchestra/execution-landing-coordinator.js')>()),
+  prepareDockerExecutionLanding: vi.fn(({ prompt }: { prompt: string }) => ({ prompt, context: null })),
+}));
+
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import {
   DockerSpawnBackend,
   isDockerAvailable,
@@ -34,10 +39,15 @@ import {
   DOCKER_ERROR_CODES,
 } from '../../src/orchestra/spawn-backend-docker.js';
 import { SpawnBackendError } from '../../src/orchestra/spawn-backend.js';
+import {
+  TEST_DOCKER_EXECUTION_OPTIONS,
+  budgetedDockerTaskJson,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
 const mockExistsSync = vi.mocked(existsSync);
-const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
+const mockReadFileSync = vi.mocked(readFileSync);
+const TEST_EXECUTION_OPTIONS = TEST_DOCKER_EXECUTION_OPTIONS;
 
 /** Build a spawnSync-shaped return object for the mock. */
 function spawnResult(over: { stdout?: string; stderr?: string; status?: number | null; error?: Error }): any {
@@ -84,6 +94,7 @@ describe('DockerSpawnBackend', () => {
     });
 
     mockExistsSync.mockReturnValue(true);
+    mockReadFileSync.mockImplementation((path: unknown) => budgetedDockerTaskJson(path));
   });
 
   describe('spawn', () => {

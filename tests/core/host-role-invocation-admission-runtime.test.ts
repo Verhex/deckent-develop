@@ -259,6 +259,69 @@ afterEach(() => {
 });
 
 describe('HostRoleInvocationAdmissionRuntime', () => {
+  it('projects exact fresh verifier evidence without creating a reservation', async () => {
+    const { truthStore, limitStore, runtime } = await setup();
+    const reserve = vi.spyOn(limitStore, 'reserveWithStatus');
+
+    const projected = runtime.projectVerifierCandidate(candidate(truthStore, 'codex'));
+
+    expect(projected).toMatchObject({
+      state: 'ready',
+      candidate: {
+        provider: 'codex',
+        model: 'gpt-5.5',
+        auth: { mode: 'api', accountRefHash: PROVIDERS.codex.accountRefHash },
+        backend: {
+          transport: 'http',
+          executionBackend: 'docker',
+          endpointRefHash: PROVIDERS.codex.endpointRefHash,
+          executionProfileRef: 'execution-profile:codex-0001',
+        },
+        reachability: { state: 'known', reachable: true },
+        limits: { state: 'known', limited: false },
+      },
+    });
+    expect(reserve).not.toHaveBeenCalled();
+    truthStore.close();
+    limitStore.close();
+  });
+
+  it('holds stale, unavailable and identity-mismatched verifier projections', async () => {
+    const stale = await setup({}, () => new Date(T10));
+    expect(stale.runtime.projectVerifierCandidate(candidate(stale.truthStore, 'codex')))
+      .toMatchObject({ state: 'hold', reasonCode: 'candidate_not_eligible' });
+    stale.truthStore.close();
+    stale.limitStore.close();
+
+    const limited = await setup({ codex: 0 });
+    expect(limited.runtime.projectVerifierCandidate(candidate(limited.truthStore, 'codex')))
+      .toMatchObject({ state: 'hold', reasonCode: 'candidate_not_eligible' });
+    limited.truthStore.close();
+    limited.limitStore.close();
+
+    const unavailable = await setup();
+    const missing = candidate(unavailable.truthStore, 'codex');
+    expect(unavailable.runtime.projectVerifierCandidate({
+      ...missing,
+      reachabilityQuery: {
+        ...missing.reachabilityQuery,
+        runtimeFingerprint: '7'.repeat(64),
+      },
+    })).toMatchObject({
+      state: 'hold',
+      reasonCode: 'candidate_evidence_unavailable',
+    });
+    expect(unavailable.runtime.projectVerifierCandidate({
+      ...missing,
+      limitQuery: { ...missing.limitQuery, accountRefHash: '1'.repeat(64) },
+    })).toMatchObject({
+      state: 'hold',
+      reasonCode: 'authority_identity_mismatch',
+    });
+    unavailable.truthStore.close();
+    unavailable.limitStore.close();
+  });
+
   it.each(['brain', 'worker', 'auditor'] as const)(
     'returns an explicit %s HOLD when host authorities are unavailable',
     (role) => {

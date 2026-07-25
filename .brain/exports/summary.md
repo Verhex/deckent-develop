@@ -50,7 +50,9 @@
 | adr-g-034 | Native Agentic Terminal | accepted |
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 | adr-g-036 | Zero-Hardcode Model & Flow Values (Parametric-Only) | accepted |
-| user-1784778390241 | Provider Authority Key Custody, Rotation & Composition | active |
+| ADR-G-037 | Execution Budget Landing, Continuation & Metering Authority | accepted |
+| ADR-G-038 | Goal-v2 Normalized Dependency Authority & Bounded Reconciliation | accepted |
+| user-1784778390241 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
 - **Sprint sprint-456 Learnings** (sprint-456): ## Sprint sprint-456 Learnings
@@ -153,4 +155,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: stale_heartbeat
 
-_Total entries: 1614 | Generated: 2026-07-23_
+_Total entries: 1618 | Generated: 2026-07-25_

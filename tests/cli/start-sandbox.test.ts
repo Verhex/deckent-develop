@@ -11,9 +11,40 @@ vi.mock('node:fs', () => ({
 }));
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
+  readAuthMode: vi.fn().mockResolvedValue('subscription'),
+}));
+
+vi.mock('../../src/core/cost-config-loader.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/cost-config-loader.js')>()),
+  initCostConfig: vi.fn(),
+  loadCostConfig: vi.fn(() => ({
+    _version: '1.0',
+    providers: {
+      anthropic: {
+        enabled: true,
+        billing_modes_supported: ['api'],
+        default_billing_mode: 'api',
+        models: {
+          'claude-sonnet-5': {
+            input_cost_per_token: 0.000003,
+            output_cost_per_token: 0.000015,
+            max_input_tokens: 1_000_000,
+            enabled: true,
+          },
+        },
+      },
+    },
+    cost_limits: {
+      sprint_max_usd: 5,
+      daily_max_usd: 50,
+      monthly_max_usd: 500,
+      auto_confirm_below_usd: 2,
+    },
+    update_config: { sources_priority: ['bundled'] },
+  })),
 }));
 
 vi.mock('../../src/orchestra/brain.js', () => ({
@@ -40,9 +71,13 @@ vi.mock('../../src/core/constants.js', async (importOriginal) => {
   return { ...actual, TMUX_SESSION_NAME: 'deckent' };
 });
 
-vi.mock('../../src/core/provider.js', () => ({
-  bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
-}));
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/provider.js')>();
+  return {
+    ...actual,
+    bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
+  };
+});
 
 vi.mock('../../src/cli/commands/doctor.js', () => ({
   runDoctorChecks: vi.fn(),
@@ -79,7 +114,7 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
 }));
 
 import { loadConfig } from '../../src/core/config.js';
-import { runSprint } from '../../src/orchestra/brain.js';
+import { runSprint, readContext, planSprint } from '../../src/orchestra/brain.js';
 import { runDoctorChecks } from '../../src/cli/commands/doctor.js';
 import { print } from '../../src/cli/helpers/output.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
@@ -102,7 +137,9 @@ function makeSprint(overrides = {}) {
   return {
     id: 'sprint-001',
     number: 1,
-    tasks: [],
+    tasks: [
+      { id: '001-001', title: 'Task One', model: 'claude-sonnet-5', priority: 'NORMAL' },
+    ],
     workers: [],
     status: 'COMPLETE',
     phase: 'COMPLETE',
@@ -138,6 +175,8 @@ describe('start --sandbox-mode', () => {
     vi.clearAllMocks();
     process.exitCode = undefined;
     vi.mocked(loadConfig).mockResolvedValue(makeConfig() as any);
+    vi.mocked(readContext).mockReturnValue({ memory: '', retro: '', debt: '', patterns: [] } as any);
+    vi.mocked(planSprint).mockReturnValue(makeSprint() as any);
     vi.mocked(runSprint).mockResolvedValue(makeSprint() as any);
     vi.mocked(runDoctorChecks).mockReturnValue(makeDoctorResult(true) as any);
     vi.mocked(prepareZeroConfig).mockReturnValue({
@@ -238,6 +277,8 @@ describe('start --sandbox (spawn backend selection)', () => {
     vi.clearAllMocks();
     process.exitCode = undefined;
     vi.mocked(loadConfig).mockResolvedValue(makeConfig() as any);
+    vi.mocked(readContext).mockReturnValue({ memory: '', retro: '', debt: '', patterns: [] } as any);
+    vi.mocked(planSprint).mockReturnValue(makeSprint() as any);
     vi.mocked(runSprint).mockResolvedValue(makeSprint() as any);
     vi.mocked(runDoctorChecks).mockReturnValue(makeDoctorResult(true) as any);
     vi.mocked(prepareZeroConfig).mockReturnValue({

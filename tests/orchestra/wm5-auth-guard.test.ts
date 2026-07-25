@@ -18,16 +18,17 @@ vi.mock('node:child_process', () => ({
       stderr: { on: vi.fn(), resume: vi.fn() },
       on: vi.fn(),
       once: vi.fn(),
+      kill: vi.fn(),
     };
     return stub as unknown as ChildProcess;
   }),
 }));
 
 vi.mock('node:fs', () => ({
-  existsSync: vi.fn((path: string) => /\.(claude|codex|gemini)\/(\.credentials\.json|auth\.json|gemini-credentials\.json|google_accounts\.json)$/.test(path)),
-  readFileSync: vi.fn((path: string) => path.endsWith('/.gemini/settings.json')
-    ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
-    : '{}'),
+  existsSync: vi.fn((path: string) => path.endsWith('/.claude/.credentials.json')),
+  readFileSync: vi.fn((path: string) => budgetedDockerTaskJson(path, {
+    model: path.includes('opus') ? 'claude-opus-4-8' : 'claude-sonnet-5',
+  })),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
   unlinkSync: vi.fn(),
@@ -61,14 +62,25 @@ vi.mock('../../src/core/task-result-settlement.js', () => {
     .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
 });
 
+vi.mock('../../src/orchestra/execution-landing-coordinator.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../src/orchestra/execution-landing-coordinator.js')>()),
+  prepareDockerExecutionLanding: vi.fn(({ prompt }: { prompt: string }) => ({ prompt, context: null })),
+}));
+
 import { spawnSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
-import { buildProviderCommand, getProviderCommandSpec } from '../../src/core/provider-command-spec.js';
+import {
+  buildProviderCommand,
+  getProviderCommandSpec,
+} from '../../src/core/provider-command-spec.js';
 import type { ModelType } from '../../src/core/types.js';
+import {
+  TEST_DOCKER_EXECUTION_OPTIONS,
+  budgetedDockerTaskJson,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
-const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
 const mockWriteFileSync = vi.mocked(writeFileSync);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -127,7 +139,12 @@ describe('WM-5: CLAUDE_AUTH_REQUIRED provider-gate', () => {
 
   it('sets CLAUDE_AUTH_REQUIRED for a claude model (sonnet)', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-wm5-claude', 'claude-sonnet-5' as ModelType, 'prompt', TEST_EXECUTION_OPTIONS);
+    backend.spawn(
+      't-wm5-claude',
+      'claude-sonnet-5' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    );
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -136,22 +153,59 @@ describe('WM-5: CLAUDE_AUTH_REQUIRED provider-gate', () => {
 
   it('sets CLAUDE_AUTH_REQUIRED for opus (claude model)', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-wm5-opus', 'claude-opus-4-8' as ModelType, 'prompt', TEST_EXECUTION_OPTIONS);
+    backend.spawn(
+      't-wm5-opus',
+      'claude-opus-4-8' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    );
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
     expect(hasEnvFlag(argv, 'CLAUDE_AUTH_REQUIRED')).toBe(true);
   });
 
-  it.each([
-    ['t-wm5-codex', 'gpt-4.1'],
-    ['t-wm5-gpt5', 'gpt-5.6-sol'],
-    ['t-wm5-gemini', 'gemini-2.5-flash'],
-    ['t-wm5-gemini-pro', 'gemini-2.5-pro'],
-  ] as const)('%s is held before CLAUDE_AUTH_REQUIRED can leak', (taskId, model) => {
-    expect(() => new DockerSpawnBackend('/test/project')
-      .spawn(taskId, model as ModelType, 'prompt', TEST_EXECUTION_OPTIONS))
-      .toThrow(/does not expose incremental measured usage/);
+  it('holds Codex before CLAUDE_AUTH_REQUIRED can enter a container', () => {
+    const backend = new DockerSpawnBackend('/test/project');
+    expect(() => backend.spawn(
+      't-wm5-codex',
+      'gpt-4.1' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
+  });
+
+  it('holds canonical gpt-5.6-sol before CLAUDE_AUTH_REQUIRED can enter a container', () => {
+    const backend = new DockerSpawnBackend('/test/project');
+    expect(() => backend.spawn(
+      't-wm5-sol',
+      'gpt-5.6-sol' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
+  });
+
+  it('holds Gemini Flash before CLAUDE_AUTH_REQUIRED can enter a container', () => {
+    const backend = new DockerSpawnBackend('/test/project');
+    expect(() => backend.spawn(
+      't-wm5-gemini',
+      'gemini-2.5-flash' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
+  });
+
+  it('holds Gemini Pro before CLAUDE_AUTH_REQUIRED can enter a container', () => {
+    const backend = new DockerSpawnBackend('/test/project');
+    expect(() => backend.spawn(
+      't-wm5-gemini-pro',
+      'gemini-2.5-pro' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
     expect(capturedDockerRunArgs).toHaveLength(0);
   });
 });
@@ -162,31 +216,39 @@ describe('WM-5: --dangerously-skip-permissions non-leak', () => {
     installSpawnRouter();
   });
 
-  it('codex command uses its own approval flag, never Claude skip-permissions', () => {
-    const command = buildProviderCommand(
-      getProviderCommandSpec('codex')!,
-      'gpt-4.1',
-      '/prompt',
-      { autoApprove: true },
-    );
+  it('Codex command spec never receives the Claude approval flag', () => {
+    const backend = new DockerSpawnBackend('/test/project');
+    expect(() => backend.spawn(
+      't-wm5-dsp-codex',
+      'gpt-4.1' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
+    expect(mockWriteFileSync).not.toHaveBeenCalled();
+    const spec = getProviderCommandSpec('codex')!;
+    const command = buildProviderCommand(spec, 'gpt-4.1', '/tmp/prompt', { autoApprove: true });
+    expect(command).not.toContain('--dangerously-skip-permissions');
+  });
+
+  it('Gemini command spec never receives the Claude approval flag', () => {
+    const backend = new DockerSpawnBackend('/test/project');
+    expect(() => backend.spawn(
+      't-wm5-dsp-gemini',
+      'gemini-2.5-flash' as ModelType,
+      'prompt',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    )).toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
+    const spec = getProviderCommandSpec('gemini')!;
+    const command = buildProviderCommand(spec, 'gemini-2.5-flash', '/tmp/prompt', { autoApprove: true });
+    expect(command).not.toContain('--dangerously-skip-permissions');
+  });
+
+  it('Codex shared command spec contains its own external-sandbox approval flag', () => {
+    const spec = getProviderCommandSpec('codex')!;
+    const command = buildProviderCommand(spec, 'gpt-4.1', '/tmp/prompt', { autoApprove: true });
     expect(command).toContain('--dangerously-bypass-approvals-and-sandbox');
     expect(command).not.toContain('--dangerously-skip-permissions');
-  });
-
-  it('gemini command never receives Claude skip-permissions', () => {
-    const command = buildProviderCommand(
-      getProviderCommandSpec('gemini')!,
-      'gemini-2.5-flash',
-      '/prompt',
-      { autoApprove: true },
-    );
-    expect(command).not.toContain('--dangerously-skip-permissions');
-  });
-
-  it('budgeted codex Docker spawn fails before writing a worker script', () => {
-    expect(() => new DockerSpawnBackend('/test/project')
-      .spawn('t-wm5-codex-bypass', 'gpt-4.1' as ModelType, 'prompt', TEST_EXECUTION_OPTIONS))
-      .toThrow(/does not expose incremental measured usage/);
-    expect(mockWriteFileSync).not.toHaveBeenCalled();
   });
 });

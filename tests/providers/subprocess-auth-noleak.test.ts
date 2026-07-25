@@ -24,6 +24,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { MockInstance } from 'vitest';
 import { SubprocessSpawnBackend } from '../../src/providers/subprocess.js';
 import type { SubprocessProviderConfig } from '../../src/providers/subprocess.js';
+import { LocalSubprocessTestBackend } from '../helpers/local-subprocess-backend-fixture.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
 import type { ModelType } from '../../src/core/types.js';
 
@@ -120,7 +121,7 @@ describe('Sprint 333 333-001 — subprocess backend per-worker auth NON-LEAK (F1
   });
 
   function makeBackend(cliCommand: string, name: string): SubprocessSpawnBackend {
-    return new SubprocessSpawnBackend(projectDir, {
+    return new LocalSubprocessTestBackend(projectDir, {
       providerConfig: makeConfig(cliCommand, name),
       platform: 'linux',
       spawnImpl: spawnImpl as unknown as typeof import('node:child_process').spawn,

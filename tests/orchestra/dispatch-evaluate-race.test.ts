@@ -37,6 +37,12 @@ vi.mock('../../src/orchestra/result-watcher.js', () => ({
 import { TaskStatus, SprintPhase, SprintStatus } from '../../src/core/types.js';
 import type { Task, Sprint, ResolvedConfig, TaskResult } from '../../src/core/types.js';
 import type { SpawnBackend } from '../../src/orchestra/spawn-backend.js';
+import {
+  TEST_MEASURED_LANDING_CAPABILITIES,
+  TEST_REMOTE_EXECUTION_BUDGET,
+  TEST_REMOTE_WORKER_BUDGET_POLICY,
+  settleTestRuntimeBudget,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 import { findReadyUndispatchedTasks, waitForResults } from '../../src/orchestra/result-collector.js';
 import { findReadyUndispatchedTaskIds } from '../../src/orchestra/sprint-phases.js';
@@ -48,7 +54,11 @@ function makeTask(id: string, overrides?: Partial<Task>): Task {
     id,
     title: `Task ${id}`,
     description: `Description for ${id}`,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
+    provider: 'claude',
+    type: 'code-development',
+    budget: TEST_REMOTE_EXECUTION_BUDGET,
+    budgetPolicy: TEST_REMOTE_WORKER_BUDGET_POLICY,
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -105,6 +115,20 @@ function doneResult(id: string): TaskResult {
     coverage: 90,
     selfAssessment: 'DONE',
     notes: 'ran',
+    tokenUsage: {
+      inputTokens: 10,
+      outputTokens: 2,
+      cacheReadTokens: 0,
+      source: 'provider-adapter',
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+    },
+    cost: {
+      usd: 0.01,
+      currency: 'USD',
+      pricingSource: 'provider-envelope',
+      isLocal: false,
+    },
   };
 }
 
@@ -221,13 +245,16 @@ describe('waitForResults — dispatch/EVALUATE race fix', () => {
     const a = makeTask('a', { status: TaskStatus.EXECUTING });
     const b = makeTask('b', { status: TaskStatus.PENDING, dependencies: ['a'] });
     const sprint = makeSprint([a, b]);
+    settleTestRuntimeBudget(root, 'a');
     writeFileSync(join(root, '.tasks', 'task-a.result'), JSON.stringify(doneResult('a')), 'utf-8');
 
     const spawned: string[] = [];
     const backend: SpawnBackend = {
+      ...TEST_MEASURED_LANDING_CAPABILITIES,
       name: 'mock',
       spawn: (taskId: string) => {
         spawned.push(taskId);
+        settleTestRuntimeBudget(root, taskId);
         writeFileSync(
           join(root, '.tasks', `task-${taskId}.result`),
           JSON.stringify(doneResult(taskId)),
@@ -255,10 +282,12 @@ describe('waitForResults — dispatch/EVALUATE race fix', () => {
     const a = makeTask('a', { status: TaskStatus.EXECUTING });
     const b = makeTask('b', { status: TaskStatus.PENDING, dependencies: ['a'] });
     const sprint = makeSprint([a, b]);
+    settleTestRuntimeBudget(root, 'a');
     writeFileSync(join(root, '.tasks', 'task-a.result'), JSON.stringify(doneResult('a')), 'utf-8');
 
     const attempts: string[] = [];
     const backend: SpawnBackend = {
+      ...TEST_MEASURED_LANDING_CAPABILITIES,
       name: 'mock-err',
       spawn: (taskId: string) => {
         attempts.push(taskId);
@@ -284,11 +313,35 @@ describe('waitForResults — dispatch/EVALUATE race fix', () => {
     expect(results.map(r => r.taskId)).toEqual(['a']);
   });
 
+  it('keeps a remote dispatch fail-closed when the backend omits landing capability', async () => {
+    const a = makeTask('a', { status: TaskStatus.EXECUTING, budget: undefined });
+    const b = makeTask('b', { status: TaskStatus.PENDING, dependencies: ['a'] });
+    const sprint = makeSprint([a, b]);
+    writeFileSync(join(root, '.tasks', 'task-a.result'), JSON.stringify(doneResult('a')), 'utf-8');
+
+    const spawned: string[] = [];
+    const backendWithoutLanding: SpawnBackend = {
+      name: 'mock-without-landing',
+      spawn: (taskId: string) => { spawned.push(taskId); },
+      kill: () => {},
+      list: () => [],
+      isAvailable: async () => true,
+    };
+
+    const results = await waitForResults(
+      root, sprint, 100, undefined,
+      { spawnBackend: backendWithoutLanding, autoApprove: true }, undefined, makeConfig(false),
+    );
+
+    expect(spawned).toEqual([]);
+    expect(results.map(result => result.taskId)).toEqual(['a']);
+  });
+
   it('is an inert no-op for legacy callers without config (behavior preserved)', async () => {
     // Single already-complete task — early all-collected return; the new
     // dispatchReadyTasks closure short-circuits on the missing config and must
     // not interfere.
-    const a = makeTask('a', { status: TaskStatus.EXECUTING });
+    const a = makeTask('a', { status: TaskStatus.EXECUTING, budget: undefined });
     const sprint = makeSprint([a]);
     writeFileSync(join(root, '.tasks', 'task-a.result'), JSON.stringify(doneResult('a')), 'utf-8');
 

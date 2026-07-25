@@ -14,12 +14,9 @@
 //    the SIGKILL escalation both reach the worker AND everything it spawned. A
 //    throwing group-kill (e.g. ESRCH — group already reaped) falls back to the
 //    original single-pid `proc.kill(signal)` so the worker is still reaped.
-//  - win32: `process.kill()` has no negative-pid group-signal semantics, and
-//    `detached` means something different there (new console, not new process
-//    group) — behavior is intentionally UNCHANGED: no `detached` at spawn, and
-//    `killWithSignal` always falls through to the original single-pid
-//    `proc.kill(signal)`. Full group teardown on Windows is a `taskkill /T`
-//    follow-up (ADR-G-013 roadmap), not solved by this task.
+//  - win32: `process.kill()` has no negative-pid group-signal semantics, so
+//    `taskkill /PID <pid> /T` owns graceful tree termination and `/F` owns the
+//    escalation. A taskkill launch failure falls back to direct-child kill.
 //
 // MOAT-2's `child.unref()` / heartbeat-interval-unref fixes are NOT touched by
 // this task — `tests/providers/subprocess-moat2-linger.test.ts` is the CI guard
@@ -33,7 +30,16 @@ import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import type { ChildProcess } from 'node:child_process';
 import { SubprocessSpawnBackend } from '../../src/providers/subprocess.js';
+import { LocalSubprocessTestBackend } from '../helpers/local-subprocess-backend-fixture.js';
 import type { ModelType } from '../../src/core/types.js';
+
+const { taskkillSpawn } = vi.hoisted(() => ({ taskkillSpawn: vi.fn() }));
+vi.mock('node:child_process', async () => {
+  const actual = await vi.importActual<typeof import('node:child_process')>(
+    'node:child_process',
+  );
+  return { ...actual, spawn: taskkillSpawn };
+});
 
 /** The `node:child_process` `spawn` function type — matches the backend's `spawnImpl` seam. */
 type SpawnFn = typeof import('node:child_process').spawn;
@@ -48,13 +54,20 @@ function makeFakeChild(pid = 4242): ChildProcess & { emit: EventEmitter['emit'] 
   return child;
 }
 
-const MODEL: ModelType = 'sonnet';
+const MODEL: ModelType = 'claude-sonnet-5';
 const WORKER_PID = 4242;
 
 let root: string;
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'pgid-teardown-'));
+  taskkillSpawn.mockImplementation(() => {
+    const killer = new EventEmitter() as EventEmitter & {
+      unref: ReturnType<typeof vi.fn>;
+    };
+    killer.unref = vi.fn();
+    return killer;
+  });
 });
 
 afterEach(() => {
@@ -68,7 +81,7 @@ function spawnPosixBackend(child: ReturnType<typeof makeFakeChild>): {
   spawnImpl: ReturnType<typeof vi.fn>;
 } {
   const spawnImpl = vi.fn(() => child) as unknown as ReturnType<typeof vi.fn> & SpawnFn;
-  const backend = new SubprocessSpawnBackend(root, { platform: 'linux', spawnImpl: spawnImpl as unknown as SpawnFn });
+  const backend = new LocalSubprocessTestBackend(root, { platform: 'linux', spawnImpl: spawnImpl as unknown as SpawnFn });
   backend.spawn('t1', MODEL, 'the-prompt', { projectDir: root });
   return { backend, spawnImpl };
 }
@@ -146,10 +159,10 @@ describe('PGID-TEARDOWN: killWithSignal signals the whole process group on POSIX
   });
 });
 
-describe('PGID-TEARDOWN: win32 keeps the pre-existing single-pid behavior unchanged', () => {
+describe('PGID-TEARDOWN: win32 uses taskkill tree authority', () => {
   function spawnWin32Backend(child: ReturnType<typeof makeFakeChild>) {
     const spawnImpl = vi.fn(() => child) as unknown as ReturnType<typeof vi.fn> & SpawnFn;
-    const backend = new SubprocessSpawnBackend(root, { platform: 'win32', spawnImpl: spawnImpl as unknown as SpawnFn });
+    const backend = new LocalSubprocessTestBackend(root, { platform: 'win32', spawnImpl: spawnImpl as unknown as SpawnFn });
     backend.spawn('t1', MODEL, 'the-prompt', { projectDir: root });
     return { backend, spawnImpl };
   }
@@ -161,7 +174,7 @@ describe('PGID-TEARDOWN: win32 keeps the pre-existing single-pid behavior unchan
     expect(spawnOpts.detached).toBe(false);
   });
 
-  it('kill() signals only the direct child pid — the process-group form is never used', () => {
+  it('kill() terminates the complete Windows child tree without POSIX group signals', () => {
     const child = makeFakeChild(WORKER_PID);
     const { backend } = spawnWin32Backend(child);
     const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
@@ -169,11 +182,16 @@ describe('PGID-TEARDOWN: win32 keeps the pre-existing single-pid behavior unchan
     backend.kill('t1');
 
     expect(killSpy).not.toHaveBeenCalled();
-    expect((child as unknown as { kill: ReturnType<typeof vi.fn> }).kill).toHaveBeenCalledWith('SIGTERM');
+    expect(taskkillSpawn).toHaveBeenCalledWith(
+      'taskkill',
+      ['/PID', String(WORKER_PID), '/T'],
+      { stdio: 'ignore', windowsHide: true },
+    );
+    expect((child as unknown as { kill: ReturnType<typeof vi.fn> }).kill).not.toHaveBeenCalled();
     child.emit('exit', 0);
   });
 
-  it('SIGTERM→SIGKILL escalation on win32 also stays single-pid', () => {
+  it('SIGTERM→SIGKILL escalation forces the complete Windows child tree', () => {
     vi.useFakeTimers();
     const child = makeFakeChild(WORKER_PID);
     const { backend } = spawnWin32Backend(child);
@@ -183,6 +201,11 @@ describe('PGID-TEARDOWN: win32 keeps the pre-existing single-pid behavior unchan
     vi.advanceTimersByTime(2_000);
 
     expect(killSpy).not.toHaveBeenCalled();
-    expect((child as unknown as { kill: ReturnType<typeof vi.fn> }).kill).toHaveBeenCalledWith('SIGKILL');
+    expect(taskkillSpawn).toHaveBeenCalledWith(
+      'taskkill',
+      ['/PID', String(WORKER_PID), '/T', '/F'],
+      { stdio: 'ignore', windowsHide: true },
+    );
+    expect((child as unknown as { kill: ReturnType<typeof vi.fn> }).kill).not.toHaveBeenCalled();
   });
 });

@@ -190,14 +190,18 @@ describe('resolveProvisionMode', () => {
   it('defaults to prompt', () => {
     expect(resolveProvisionMode({})).toBe('prompt');
   });
-  it('--yes → yes', () => {
-    expect(resolveProvisionMode({ yes: true })).toBe('yes');
+  it('--yes selects non-interactive defaults without installation consent', () => {
+    expect(resolveProvisionMode({ yes: true })).toBe('no-install');
+  });
+  it('--install is the explicit unattended installation authority', () => {
+    expect(resolveProvisionMode({ install: true })).toBe('yes');
+    expect(resolveProvisionMode({ yes: true, install: true })).toBe('yes');
   });
   it('--no-install → no-install', () => {
     expect(resolveProvisionMode({ noInstall: true })).toBe('no-install');
   });
-  it('--no-install wins over --yes (conservative)', () => {
-    expect(resolveProvisionMode({ yes: true, noInstall: true })).toBe('no-install');
+  it('--no-install wins over all positive flags (conservative)', () => {
+    expect(resolveProvisionMode({ yes: true, install: true, noInstall: true })).toBe('no-install');
   });
 });
 

@@ -24,31 +24,60 @@ const projectRoot = resolve(__dirname, '..');
 // ─── Load getProviderBinaryForModel from dist ─────────────────────────────────
 
 let getProviderBinaryForModel;
+let modelRegistry;
 
 try {
-  const distPath = resolve(projectRoot, 'dist/orchestra/spawn-backend-docker.js');
-  const mod = await import(distPath);
-  getProviderBinaryForModel = mod.getProviderBinaryForModel;
+  const backendPath = resolve(projectRoot, 'dist/orchestra/spawn-backend-docker.js');
+  const registryPath = resolve(projectRoot, 'dist/core/model-registry.js');
+  const [backendModule, registryModule] = await Promise.all([
+    import(backendPath),
+    import(registryPath),
+  ]);
+  getProviderBinaryForModel = backendModule.getProviderBinaryForModel;
+  modelRegistry = registryModule.modelRegistry;
   if (typeof getProviderBinaryForModel !== 'function') {
     throw new Error('getProviderBinaryForModel not exported from dist/orchestra/spawn-backend-docker.js');
   }
+  if (typeof modelRegistry?.getByProviderAndTier !== 'function') {
+    throw new Error('modelRegistry not exported from dist/core/model-registry.js');
+  }
 } catch (err) {
-  console.error('[SMOKE] ERROR: Failed to import getProviderBinaryForModel:', err.message);
+  console.error('[SMOKE] ERROR: Failed to import rebuilt provider authority:', err.message);
   console.error('[SMOKE] Ensure the project is built: npm run build');
   process.exit(2);
 }
 
 // ─── Docker Provider Binary Resolution Step ───────────────────────────────────
 
+function canonicalModel(provider, tier) {
+  const definition = modelRegistry.getByProviderAndTier(provider, tier);
+  if (!definition || definition.id !== definition.apiId) {
+    throw new Error(`No canonical ${provider}/${tier} model is available in the rebuilt registry`);
+  }
+  return definition.id;
+}
+
 const DOCKER_CASES = [
-  { model: 'sonnet',             expectedBinary: 'claude',  label: 'Claude (sonnet → claude)' },
-  { model: 'gpt-4.1',           expectedBinary: 'codex',   label: 'Codex (gpt-4.1 → codex)' },
-  { model: 'gemini-2.5-flash',  expectedBinary: 'gemini',  label: 'Gemini (gemini-2.5-flash → gemini)' },
-  { model: 'ollama',            expectedBinary: 'claude',   label: 'Ollama (HTTP fallback → claude)' },
+  {
+    model: canonicalModel('claude', 'standard'),
+    expectedBinary: 'claude',
+    label: 'Claude canonical standard model',
+  },
+  {
+    model: canonicalModel('codex', 'standard'),
+    expectedBinary: 'codex',
+    label: 'Codex canonical standard model',
+  },
+  {
+    model: canonicalModel('gemini', 'standard'),
+    expectedBinary: 'gemini',
+    label: 'Gemini canonical standard model',
+  },
 ];
 
 /**
- * Checks Docker provider binary resolution for all four providers.
+ * Checks Docker CLI binary resolution for the three CLI providers. Host API
+ * and local adapter providers are asserted as fail-loud in the hermetic tests.
  * Returns an array of check results.
  */
 export function checkDockerProviderBinaryResolution() {

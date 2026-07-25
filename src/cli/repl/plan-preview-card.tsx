@@ -93,6 +93,13 @@ export interface PlanPreviewCardLabels {
   scopeGateFailLabel?: string;
   /** Shown when the gate passed only because --force-scope acknowledged a suspect. Optional — see scopeGateFailLabel. */
   scopeGateOverriddenLabel?: string;
+  topologyPassLabel: string;
+  topologyBlockLabel: string;
+  topologyConcurrencyLabel: string;
+  topologyCollisionsLabel: string;
+  topologySyntheticEdgesLabel: string;
+  topologyWavesLabel: string;
+  topologyFindingsLabel: string;
 }
 
 /** Builds real en/tr labels from messages.ts's `runFlow.planPreview.*` keys. */
@@ -115,6 +122,13 @@ export function buildPlanPreviewCardLabels(lang: string): PlanPreviewCardLabels 
     noTasks: getMessage('runFlow.planPreview.noTasks', lang),
     scopeGateFailLabel: getMessage('runFlow.planPreview.scopeGate.fail', lang),
     scopeGateOverriddenLabel: getMessage('runFlow.planPreview.scopeGate.overridden', lang),
+    topologyPassLabel: getMessage('runFlow.planPreview.topology.pass', lang),
+    topologyBlockLabel: getMessage('runFlow.planPreview.topology.block', lang),
+    topologyConcurrencyLabel: getMessage('runFlow.planPreview.topology.concurrency', lang),
+    topologyCollisionsLabel: getMessage('runFlow.planPreview.topology.collisions', lang),
+    topologySyntheticEdgesLabel: getMessage('runFlow.planPreview.topology.syntheticEdges', lang),
+    topologyWavesLabel: getMessage('runFlow.planPreview.topology.waves', lang),
+    topologyFindingsLabel: getMessage('runFlow.planPreview.topology.findings', lang),
   };
 }
 
@@ -144,6 +158,53 @@ export function formatScopeGateLines(
   }
   if (preview.scopeGateOverridden && labels.scopeGateOverriddenLabel) return [labels.scopeGateOverriddenLabel];
   return [];
+}
+
+export function formatTopologyLines(
+  preview: Pick<PlanPreview, 'topology' | 'topologyGateResult'>,
+  labels: Pick<
+    PlanPreviewCardLabels,
+    | 'topologyPassLabel'
+    | 'topologyBlockLabel'
+    | 'topologyConcurrencyLabel'
+    | 'topologyCollisionsLabel'
+    | 'topologySyntheticEdgesLabel'
+    | 'topologyWavesLabel'
+    | 'topologyFindingsLabel'
+  >,
+): string[] {
+  const topology = preview.topology;
+  if (!topology) return [];
+  const lines = [
+    preview.topologyGateResult === 'fail' ? labels.topologyBlockLabel : labels.topologyPassLabel,
+    `  ${labels.topologyConcurrencyLabel} ${topology.configuredMaxWorkers}/${topology.effectiveConcurrency}`,
+  ];
+  if (topology.collisions.length > 0) {
+    lines.push(`  ${labels.topologyCollisionsLabel}`);
+    for (const collision of topology.collisions) {
+      lines.push(`    ${collision.path} [${collision.writerSlots.join(',')}]`);
+    }
+  }
+  if (topology.syntheticEdges.length > 0) {
+    lines.push(`  ${labels.topologySyntheticEdgesLabel}`);
+    for (const edge of topology.syntheticEdges) {
+      lines.push(`    ${edge.from} -> ${edge.to} [${edge.paths?.join(',') ?? ''}]`);
+    }
+  }
+  lines.push(
+    `  ${labels.topologyWavesLabel} ${topology.waves.map(wave => `${wave.wave}:[${wave.slots.join(',')}]`).join(' ')}`,
+  );
+  if (topology.findings.length > 0) {
+    lines.push(`  ${labels.topologyFindingsLabel}`);
+    for (const finding of topology.findings) {
+      lines.push(
+        `    ${finding.code} [${finding.slots.join(',')}]`
+        + (finding.path ? ` ${finding.path}` : '')
+        + (finding.ref ? ` ${finding.ref}` : ''),
+      );
+    }
+  }
+  return lines;
 }
 
 // ─── Props ──────────────────────────────────────────────────────────────────
@@ -208,6 +269,9 @@ export function PlanPreviewCard(props: PlanPreviewCardProps): ReactElement | nul
       </Box>
       {formatScopeGateLines(preview, labels).map((line, i) => (
         <Text key={`sg-${i}`} color={preview.scopeGateResult === 'fail' ? GATE_COLORS.fail : undefined}>{line}</Text>
+      ))}
+      {formatTopologyLines(preview, labels).map((line, i) => (
+        <Text key={`tg-${i}`} color={preview.topologyGateResult === 'fail' ? GATE_COLORS.fail : undefined}>{line}</Text>
       ))}
       <Text dimColor>{`${labels.digestLabel} ${formatDigestShort(preview.planDigest)}`}</Text>
       {expanded && (

@@ -80,6 +80,50 @@ describe('runMissionScheduler — concurrency', () => {
   });
 });
 
+describe('runMissionScheduler — normalized dependency reconciliation', () => {
+  it('threads owner bounds through restart-safe transitive propagation without freezing independent work', async () => {
+    const d = mkdtempSync(join(tmpdir(), 'sched-normalized-')); dirs.push(d);
+    const s = new SqliteMissionStore(d, {
+      dependencyAuthorityMode: 'normalized-v1',
+      dependencyAuthorityRef: 'owner-decision:m4-108',
+    });
+    s.migrate();
+    s.createMission({ id: 'normalized', kind: 'list', title: 'normalized' });
+    s.enqueueItems([
+      { id: 'root', missionId: 'normalized', kind: 'task' },
+      { id: 'direct', missionId: 'normalized', kind: 'task', dependsOn: ['root'] },
+      { id: 'transitive', missionId: 'normalized', kind: 'task', dependsOn: ['direct'] },
+      { id: 'independent', missionId: 'normalized', kind: 'task' },
+    ]);
+    const calls: string[] = [];
+    const summary = await runMissionScheduler(s, async (item) => {
+      calls.push(item.id);
+      return item.id === 'root'
+        ? { ok: false, reason: 'root failed' }
+        : { ok: true };
+    }, {
+      poolSize: 2,
+      intervalMs: 0,
+      maxIterations: 20,
+      dependencyReconcileMaxEdges: 1,
+      dependencyReconcileMaxEdgesPerJob: 1,
+    });
+
+    expect(summary.reason).toBe('drained');
+    expect(calls.sort()).toEqual(['independent', 'root']);
+    expect(s.listItems('normalized').map((item) => [item.id, item.status])).toEqual([
+      ['root', 'failed'],
+      ['direct', 'blocked'],
+      ['transitive', 'blocked'],
+      ['independent', 'done'],
+    ]);
+    expect(s.getMission('normalized')!.status).toBe('failed');
+    expect(s.__rawGet(`SELECT COUNT(*) AS count
+      FROM mission_dependency_reconcile_queue WHERE state='pending'`)).toEqual({ count: 0 });
+    s.close();
+  });
+});
+
 describe('runMissionScheduler — mission settlement', () => {
   it('marks mission completed when all items done; fires onMissionSettled once', async () => {
     const s = storeWith('m', 3);

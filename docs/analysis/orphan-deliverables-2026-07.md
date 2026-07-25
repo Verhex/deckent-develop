@@ -1,5 +1,14 @@
 # Orphan Deliverables Sweep — 2026-07 (Sprint 374, Task 374-004)
 
+> **Live delta — 2026-07-25:** Bu rapordaki 85 sayısı Sprint 374 tarihsel
+> snapshot'ıdır. Fail-loud live scanner bugün 83 orphan raporluyor:
+> `src/core/provider-authority-composition.ts` ve
+> `src/providers/claude-provider-evidence-sources.ts`,
+> `src/providers/provider-authority-runtime-bootstrap.ts` üzerinden production
+> call-graph'ına bağlandı; bu bootstrap Goal-v2 autonomous startup tarafından
+> tüketiliyor. Bu not wiring kanıtıdır; provider reachability, production key
+> provisioning veya default-enable kanıtı değildir.
+
 > **Kapsam:** `src/**/*.{ts,tsx}` (`src/dashboard/` hariç — ayrı bundler-resolution alt-proje,
 > kendi tsconfig/test sistemi var; bkz. `docs/audits/sprint-171/02-concern/01-dead-code.md`
 > emsali). **844 aday dosya** tarandı, importer evreni **repo-genelinde `tests/` hariç**

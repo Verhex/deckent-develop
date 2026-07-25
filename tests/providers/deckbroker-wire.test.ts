@@ -45,8 +45,8 @@ import { loadDeckSecrets } from '../../src/core/deck-file.js';
 import { bootstrapProviders, ProviderRegistry } from '../../src/core/provider.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
 import { DeckBroker } from '../../src/core/deck-broker.js';
-import { SubprocessSpawnBackend } from '../../src/providers/subprocess.js';
 import type { SubprocessProviderConfig } from '../../src/providers/subprocess.js';
+import { LocalSubprocessTestBackend } from '../helpers/local-subprocess-backend-fixture.js';
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
@@ -235,8 +235,8 @@ describe('SubprocessSpawnBackend.spawn() — DeckBroker consumption (354-006, fl
     vi.useRealTimers();
   });
 
-  function makeBackend(cliCommand: string, name: string): SubprocessSpawnBackend {
-    return new SubprocessSpawnBackend(projectDir, {
+  function makeBackend(cliCommand: string, name: string): LocalSubprocessTestBackend {
+    return new LocalSubprocessTestBackend(projectDir, {
       providerConfig: makeProviderConfig(cliCommand, name),
       platform: 'linux',
       spawnImpl: spawnImpl as unknown as typeof import('node:child_process').spawn,

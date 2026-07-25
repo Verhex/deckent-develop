@@ -64,6 +64,11 @@ const QUESTION_BRIDGE_TIMEOUT_MS = 5 * 60_000;
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
+import type { AttendedExecutionApprovalAuthority } from '../core/attended-execution-approval.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
+import {
+  isProviderExecutionIngressHoldError,
+} from '../core/provider-execution-ingress-authority.js';
 
 // ─── Shared Memory (Sprint 278 COMM-1 — worker-to-worker comms) ──
 import { SharedMemory } from './shared-memory.js';
@@ -85,7 +90,10 @@ import { getAgentPrompt } from '../core/agent-pool.js';
 
 // ─── tmux ─────────────────────────────────────────────────────────
 import { killWorker } from './tmux.js';
-import { drainRespawnRequests } from '../nervous/respawn-request.js';
+import {
+  drainRespawnRequests,
+  RESPAWN_REQUESTS_FILE,
+} from '../nervous/respawn-request.js';
 
 // ─── Canonical Spawn Executor (SCHED3, born-634/635) ─────────────
 import { executeSpawnTask } from './scheduler-effects.js';
@@ -947,7 +955,12 @@ export async function waitForResults(
   sprint: Sprint,
   timeoutMs?: number,
   queue?: Task[],
-  spawnOpts?: { autoApprove?: boolean; spawnBackend?: SpawnBackend },
+  spawnOpts?: {
+    autoApprove?: boolean;
+    spawnBackend?: SpawnBackend;
+    attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+    providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  },
   channelRegistry?: ChannelRegistry,
   config?: ResolvedConfig,
   costGuardOpts?: CostGuardWaitOpts,
@@ -966,12 +979,35 @@ export async function waitForResults(
   const taskMap = new Map(sprint.tasks.map(t => [t.id, t]));
   const collected = new Set<string>();
   const remainingQueue: Task[] = queue ? [...queue] : [];
-  const waitForBudgetTerminal = async (task: Task | undefined, taskId: string): Promise<void> => {
-    if (!hasLiveUsageCeiling(task?.budget)) return;
+  const waitForBudgetTerminal = async (
+    task: Task | undefined,
+    taskId: string,
+    result: TaskResult,
+  ): Promise<void> => {
+    if (
+      !hasLiveUsageCeiling(task?.budget)
+      || spawnOpts?.spawnBackend?.liveUsageBudgetSupport !== 'measured-stream'
+    ) return;
     // Budgeted workers are not accepted merely because they wrote `.result`;
     // the host stream must settle first so a late final envelope/turn cannot
-    // race a premature DONE. Same bounded window as Docker's final log capture.
-    await waitForTerminalRuntimeBudgetUsage(projectRoot, taskId, 45_000);
+    // race a premature DONE. Never wait past the caller's own collection
+    // deadline: a small bounded caller timeout must remain a real timeout.
+    const remainingMs = unlimited
+      ? 45_000
+      : Math.max(0, timeout - (Date.now() - startTime));
+    const terminal = await waitForTerminalRuntimeBudgetUsage(
+      projectRoot,
+      taskId,
+      Math.min(45_000, remainingMs),
+    );
+    if (terminal) return;
+
+    taskBudgetHold = true;
+    result.selfAssessment = 'NO_GO';
+    result.testsPassed = false;
+    const reason =
+      'Host runtime budget evidence did not reach a terminal measurable state before the collection deadline; worker DONE was not accepted.';
+    result.notes = result.notes ? `${result.notes} | ${reason}` : reason;
   };
 
   // ─── Sprint 165 Bug Y — duplicate spawn guard (Bug F) + force re-scan ────
@@ -1083,7 +1119,7 @@ export async function waitForResults(
             // (returns the instant the .log appears, so prompt dumps cost nothing).
             await waitForCliLog(projectRoot, taskId, 45000);
           }
-          await waitForBudgetTerminal(enrichTask, taskId);
+          await waitForBudgetTerminal(enrichTask, taskId, result);
           enrichResultTokenUsage(result, enrichTask, projectRoot);
           enrichResultCost(result, enrichTask, projectRoot);
           applyBudgetEvidence(enrichTask, result, taskId);
@@ -1153,7 +1189,7 @@ export async function waitForResults(
         const lateAuthority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
         const lateResult = normalizeAuthoritativeTaskResult(lateAuthority, taskId);
         if (lateResult) {
-          await waitForBudgetTerminal(taskMap.get(taskId), taskId);
+          await waitForBudgetTerminal(taskMap.get(taskId), taskId, lateResult);
           enrichResultTokenUsage(lateResult, taskMap.get(taskId), projectRoot);
           enrichResultCost(lateResult, taskMap.get(taskId), projectRoot);
           applyBudgetEvidence(taskMap.get(taskId), lateResult, taskId);
@@ -1293,6 +1329,7 @@ export async function waitForResults(
         }
       }
     } catch (e) {
+      if (isProviderExecutionIngressHoldError(e)) throw e;
       debugLog('waitForResults:respawn', e);
     }
   };
@@ -1368,6 +1405,9 @@ export async function waitForResults(
       emitProgress({ root: projectRoot, phase: 'SPAWN', detail: nextTask.id });
       return true;
     } catch (err) {
+      if (isProviderExecutionIngressHoldError(err)) {
+        throw err;
+      }
       debugLog('waitForResults:queue-spawn', `Failed to spawn queued task ${nextTask.id}: ${err instanceof Error ? err.message : String(err)}`);
       // Allow a future retry for this task (e.g. force re-scan).
       assignedTaskIds.delete(nextTask.id);
@@ -1818,7 +1858,9 @@ export async function waitForResults(
   }
 
   // Use fs.watch with fallback polling (5s instead of 15s)
-  const watcher = createResultWatcher(projectRoot, WATCH_FALLBACK_MS);
+  const watcher = createResultWatcher(projectRoot, WATCH_FALLBACK_MS, {
+    wakeFiles: [RESPAWN_REQUESTS_FILE],
+  });
   // born-452 tick-armor: a single tick-step throwing (collectResults /
   // drainNervousRespawns / dispatchTick / forceRescanIfIdle / dispatchReadyTasks /
   // cascadeSkipDeadBlocked) used to propagate straight out of this function —
@@ -1885,6 +1927,10 @@ export async function waitForResults(
         consecutiveTickErrors = 0;
         lastTickErrorSignature = null;
       } catch (tickErr) {
+        // Provider authority is a final pre-dispatch gate, not a transient
+        // scheduler fault. Generic tick armor must never turn its typed HOLD
+        // into a retry, a timeout, or a successful partial collection.
+        if (isProviderExecutionIngressHoldError(tickErr)) throw tickErr;
         const signature = tickErr instanceof Error
           ? `${tickErr.name}:${tickErr.message}`
           : String(tickErr);
@@ -1948,7 +1994,7 @@ export async function waitForResults(
     if (finalAuthority.result) {
       const result = normalizeAuthoritativeTaskResult(finalAuthority, taskId);
       if (result) {
-        await waitForBudgetTerminal(taskMap.get(taskId), taskId);
+        await waitForBudgetTerminal(taskMap.get(taskId), taskId, result);
         enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
         enrichResultCost(result, taskMap.get(taskId), projectRoot);
         applyBudgetEvidence(taskMap.get(taskId), result, taskId);

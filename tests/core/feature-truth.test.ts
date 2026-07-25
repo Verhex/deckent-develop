@@ -102,10 +102,7 @@ describe('L2-WIRED', () => {
   });
 
   it('call-site found in a non-test src file -> wired=ok with file:line evidence', () => {
-    // Arrow-const form deliberately avoids "doThing(" appearing in the declaration
-    // itself (`doThing = (` has a space before the paren) so the only match is the
-    // real call-site below — keeps the exact-evidence assertion meaningful.
-    writeFixture('src/exporter.ts', 'export const doThing = () => {};\n');
+    writeFixture('src/exporter.ts', 'export function doThing() {}\n');
     writeFixture('src/caller.ts', 'import { doThing } from "./exporter.js";\n\ndoThing();\n');
     const result = resolveSingle(
       {
@@ -119,6 +116,24 @@ describe('L2-WIRED', () => {
     );
     expect(result.wired).toBe('ok');
     expect(result.evidence.callsites).toEqual([{ file: 'src/caller.ts', line: 3 }]);
+  });
+
+  it('does not count the entry module function declaration as production wiring', () => {
+    writeFixture('src/exporter.ts', 'export function doThing() {}\n');
+    const result = resolveSingle(
+      {
+        id: 'self-declaration',
+        title: 'Self declaration',
+        entryModule: 'src/exporter.ts',
+        exportName: 'doThing',
+        prodCallsitePattern: 'doThing\\(',
+      },
+      ctx(),
+    );
+    expect(result.code).toBe('ok');
+    expect(result.wired).toBe('none');
+    expect(result.evidence.callsites).toEqual([]);
+    expect(classifyHalfWire(result).isHalfWireCandidate).toBe(true);
   });
 
   it('no call-site anywhere under src/ -> wired=none', () => {

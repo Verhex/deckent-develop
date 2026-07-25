@@ -35,6 +35,7 @@ import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import type { ChildProcess } from 'node:child_process';
 import { SubprocessSpawnBackend } from '../../src/providers/subprocess.js';
+import { LocalSubprocessTestBackend } from '../helpers/local-subprocess-backend-fixture.js';
 import type { ModelType } from '../../src/core/types.js';
 
 /** The `node:child_process` `spawn` function type — matches the backend's `spawnImpl` seam. */
@@ -81,7 +82,7 @@ function spawnWithSpies(opts?: { defaultTimeoutMs?: number }): {
   timeoutTimer: NodeJS.Timeout | undefined;
 } {
   const child = makeFakeChild();
-  const backend = new SubprocessSpawnBackend(root, {
+  const backend = new LocalSubprocessTestBackend(root, {
     defaultTimeoutMs: opts?.defaultTimeoutMs ?? 0,
     spawnImpl: (() => child) as unknown as SpawnFn,
   });
@@ -160,7 +161,7 @@ describe('MOAT-2: SIGTERM→SIGKILL escalation guarantees no orphan worker survi
 
   function spawnFake() {
     const child = makeFakeChild();
-    const backend = new SubprocessSpawnBackend(root, {
+    const backend = new LocalSubprocessTestBackend(root, {
       spawnImpl: (() => child) as unknown as SpawnFn,
     });
     backend.spawn('t1', MODEL, 'the-prompt', { projectDir: root });

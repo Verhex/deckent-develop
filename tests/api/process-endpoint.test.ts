@@ -76,6 +76,39 @@ describe('/api/process/* routes', () => {
     expect(res.status).toBe(400);
   });
 
+  it('returns a structured provider-authority HOLD for an auto task without HTTP 500', async () => {
+    handle = await startTestServer({ disableAuth: true });
+    const res = await call(handle, '/api/process/submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        description: 'summarize the changelog',
+        kind: 'task',
+        scopeDir: 'docs/',
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.json<{
+      status: string;
+      providerAuthorityHold: {
+        reasonCode: string;
+        executionId: string;
+        authorityEvidenceRefs: string[];
+      };
+    }>()).toMatchObject({
+      status: 'held',
+      providerAuthorityHold: {
+        reasonCode: expect.stringMatching(
+          /^(policy_authority_unavailable|keyring_unavailable)$/u,
+        ),
+        executionId: expect.stringMatching(/^proc-/u),
+        authorityEvidenceRefs: [
+          expect.stringMatching(/^provider-authority:[a-f0-9]{64}$/u),
+        ],
+      },
+    });
+  });
+
   it('GET /api/process/status/<unknown> → 404', async () => {
     handle = await startTestServer({ disableAuth: true });
     const res = await call(handle, '/api/process/status/proc-does-not-exist');

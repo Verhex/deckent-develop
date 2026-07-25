@@ -16,12 +16,23 @@ import type { UserOverride } from '../../core/routing-types.js';
 import { debugLog } from '../../core/utils.js';
 import { applyWorkerExecutionBudgetPolicy } from '../../core/execution-plan-digest.js';
 import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
+import type { AttendedExecutionApprovalAuthority } from '../../core/attended-execution-approval.js';
+import { createAttendedExecutionProposalMaterialFromTask } from '../../core/attended-execution-proposal.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
+import { preflightProviderExecutionIngress } from '../../core/provider-execution-ingress-authority.js';
+import { orderedRoleProviders } from '../../core/provider.js';
 
 function generateJobId(): string {
   return `run-${Date.now().toString(36)}`;
 }
 
-export function registerRunTool(server: McpServer): void {
+export function registerRunTool(
+  server: McpServer,
+  runtime: {
+    attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+    providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  } = {},
+): void {
   server.registerTool(
     'deckent_run',
     {
@@ -108,6 +119,33 @@ export function registerRunTool(server: McpServer): void {
           }));
         }
 
+        const workerProviderOrder = orderedRoleProviders('worker', cfg);
+        const providerAuthority = preflightProviderExecutionIngress(
+          runtime.providerAuthority,
+          {
+            runId: task.sprintId ?? taskId,
+            taskId,
+            provider: identity.provider,
+            model: identity.model,
+            configuredBackend: cfg.spawn_backend ?? 'auto',
+            fallbackProviders: [
+              workerProviderOrder.primary,
+              ...workerProviderOrder.fallbacks,
+            ].filter(candidate => candidate !== identity.provider),
+            unattended: workerProviderOrder.unattended,
+          },
+        );
+        if (providerAuthority.decision === 'hold') {
+          throw new Error(getMessage(
+            'run.provider_authority_hold',
+            getLanguage(cfg.language),
+            {
+              reason: providerAuthority.reasonCode,
+              evidence: providerAuthority.authorityEvidenceRefs.join(','),
+            },
+          ));
+        }
+
         // WM-1b: V2 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
         try {
           const routingVersion = cfg?.routing_engine ?? 'v2';
@@ -151,6 +189,19 @@ export function registerRunTool(server: McpServer): void {
           // Exact resolved owner ceiling — Task JSON and live spawn carry the
           // same budget. The spawn seam independently rejects unmetered remotes.
           executionBudget: task.budget,
+          executionLandingPolicy: task.budgetPolicy?.landingPolicy,
+          executionBudgetProfileRef: task.budgetPolicy?.profileRef,
+          executionBudgetPolicyDigest: task.budgetPolicy?.policyDigest,
+          executionAdmissionMode: task.budgetPolicy?.admissionMode,
+          executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
+          executionApprovalProposal: task.budgetPolicy?.approvalProposal,
+          executionApprovalMaterial: createAttendedExecutionProposalMaterialFromTask(
+            task as unknown as Record<string, unknown>,
+            prompt,
+          ),
+          attendedExecutionApprovalAuthority: runtime.attendedExecutionApprovalAuthority,
+          executionTenantId: task.actor?.tenantId ?? 'local',
+          executionRunId: task.sprintId ?? taskId,
           // C-MCP-parite (269-004): task.modelEffort is validated per-provider
           // inside spawnWorkerMultiProvider via resolveReasoningEffort — an invalid
           // or unsupported level resolves to undefined (no flag emitted), exactly

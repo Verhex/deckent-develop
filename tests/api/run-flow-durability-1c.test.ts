@@ -35,7 +35,10 @@ vi.mock('../../src/core/config.js', async (importOriginal) => ({
       brain_model: 'claude-sonnet-5',
       default_model: 'claude-sonnet-5',
     },
-    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
+    execution_budget: {
+      roles: { worker: { default: { maxTurns: 1 } } },
+      landing: { reserve_ratio: 0.25 },
+    },
   }),
 }));
 
@@ -169,6 +172,7 @@ describe('SURF-1c — single-authority durability', () => {
     expect(snapshot).toBeDefined();
     expect((snapshot!.sprint as { id: string }).id).toBe('sprint-fixture');
     expect(snapshot!.planDigestContext?.executionBudgetPolicy?.roles.worker?.default).toEqual({ maxTurns: 1 });
+    expect(snapshot!.planDigestContext?.executionBudgetPolicy?.landing).toEqual({ reserve_ratio: 0.25 });
   });
 
   it('every durable event is live-published to the SSE layer (coordinator onEvent wire)', async () => {

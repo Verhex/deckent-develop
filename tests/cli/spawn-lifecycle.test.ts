@@ -60,10 +60,13 @@ import { spawnWorker } from '../../src/orchestra/tmux.js';
 import { loadConfig } from '../../src/core/config.js';
 import { TaskStatus } from '../../src/core/types.js';
 import {
+  claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlement,
   writeTaskResultSettlementAtomic,
+  writeTaskResultSettlementClosureAtomic,
   type TaskResultSettlementRefV1,
 } from '../../src/core/task-result-settlement.js';
+import { TEST_DOCKER_EXECUTION_OPTIONS } from '../helpers/budgeted-docker-execution-fixture.js';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -83,6 +86,17 @@ function makeTaskJson(taskId: string, overrides?: Record<string, unknown>): Reco
     sprintId: 'sprint-test',
     createdAt: new Date().toISOString(),
     budget: { maxTurns: 1 },
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      taskKind: 'code-development',
+      resolvedProvider: 'claude',
+      executionCostClass: 'remote',
+      profileRef: 'tests.cli.spawn-lifecycle',
+      policyDigest: 'a'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: { reserve_ratio: 0.25 },
+    },
     ...overrides,
   };
 }
@@ -120,11 +134,16 @@ function settleResult(
   const result = JSON.parse(
     readFileSync(join(state.root, '.tasks', `task-${taskId}.result`), 'utf-8'),
   );
+  claimTaskResultSettlementAttemptAtomic(opts.settlementRef);
   writeTaskResultSettlementAtomic(createTaskResultSettlement({
     ref: opts.settlementRef,
     exitCode: 0,
     result,
   }));
+  writeTaskResultSettlementClosureAtomic(opts.settlementRef, {
+    containerDisposition: 'stopped-removed',
+    locksReleased: true,
+  });
 }
 
 function readTaskStatus(taskId: string): string {
@@ -157,6 +176,7 @@ beforeEach(() => {
   vi.mocked(SpawnBackendFactory.create).mockReturnValue({
     name: 'docker',
     liveUsageBudgetSupport: 'measured-stream',
+    executionLandingCapability: 'checkpoint-stop',
     spawn: backendSpawn,
   } as never);
   // routing_engine v1 → registerRun skips the V2 routing block (kept out of scope here)
@@ -164,7 +184,10 @@ beforeEach(() => {
     language: 'en',
     spawn_backend: 'docker',
     routing_engine: 'v2',
-    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
+    execution_budget: {
+      roles: { worker: { default: { maxTurns: 1 } } },
+      landing: { reserve_ratio: 0.25 },
+    },
   } as never);
 });
 
@@ -180,7 +203,7 @@ describe('spawnWorkerMultiProvider — modelEffort pass-through', () => {
     await spawnWorkerMultiProvider('t-001', 'claude-sonnet-5', 'prompt', state.root, {
       spawnBackend: 'docker',
       modelEffort: 'high',
-      executionBudget: { maxTurns: 1 },
+      ...TEST_DOCKER_EXECUTION_OPTIONS,
     });
 
     expect(backendSpawn).toHaveBeenCalledWith(
@@ -193,7 +216,7 @@ describe('spawnWorkerMultiProvider — modelEffort pass-through', () => {
     await spawnWorkerMultiProvider('t-002', 'claude-sonnet-5', 'prompt', state.root, {
       spawnBackend: 'docker',
       modelEffort: 'turbo',
-      executionBudget: { maxTurns: 1 },
+      ...TEST_DOCKER_EXECUTION_OPTIONS,
     });
 
     expect(backendSpawn).toHaveBeenCalledOnce();
@@ -204,7 +227,7 @@ describe('spawnWorkerMultiProvider — modelEffort pass-through', () => {
   it('keeps opt-in semantics: no modelEffort → reasoningEffort undefined', async () => {
     await spawnWorkerMultiProvider('t-003', 'claude-sonnet-5', 'prompt', state.root, {
       spawnBackend: 'docker',
-      executionBudget: { maxTurns: 1 },
+      ...TEST_DOCKER_EXECUTION_OPTIONS,
     });
 
     const opts = backendSpawn.mock.calls[0]?.[3] as { reasoningEffort?: string };

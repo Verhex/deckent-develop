@@ -7,6 +7,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { getProviderBinaryForModel } from '../../src/orchestra/spawn-backend-docker.js';
+import {
+  ensureOllamaModelRegistered,
+  ensureOpenRouterModelRegistered,
+} from '../../src/core/model-registry.js';
 import type { ModelType } from '../../src/core/types.js';
 
 describe('getProviderBinaryForModel', () => {
@@ -25,16 +29,26 @@ describe('getProviderBinaryForModel', () => {
     expect(binary).toBe('gemini');
   });
 
-  it('returns "claude" as fallback for an unknown model', () => {
-    // Unknown model — getProviderForModel throws UnknownModelError → fallback 'claude'
-    const binary = getProviderBinaryForModel('unknown-model-xyz' as ModelType);
-    expect(binary).toBe('claude');
+  it('rejects an unknown model before selecting any provider binary', () => {
+    expect(() => getProviderBinaryForModel('unknown-model-xyz' as ModelType))
+      .toThrow('Unknown model: unknown-model-xyz');
   });
 
-  it('returns "claude" for an ollama model (Docker special case)', () => {
-    // Ollama is HTTP-based and not supported inside Docker containers; fallback to claude
-    const binary = getProviderBinaryForModel('ollama' as ModelType);
-    expect(binary).toBe('claude');
+  it('rejects a registered Ollama model at the Docker binary boundary', () => {
+    const model = 'm4-088-ollama-fixture';
+    ensureOllamaModelRegistered(model);
+    expect(() => getProviderBinaryForModel(model as ModelType))
+      .toThrow(/Ollama provider cannot use the Docker CLI backend/);
+  });
+
+  it('rejects a registered OpenRouter model at the Docker binary boundary', () => {
+    const model = 'm4-088/openrouter-fixture:free';
+    ensureOpenRouterModelRegistered(model, {
+      pricingEvidenceRef: 'test:m4-088',
+      costPerMillion: { input: 0, output: 0 },
+    });
+    expect(() => getProviderBinaryForModel(model as ModelType))
+      .toThrow(/OpenRouter provider cannot use the Docker CLI backend/);
   });
 
   it('returns "claude" for the exact Opus API model ID', () => {

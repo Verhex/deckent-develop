@@ -29,6 +29,7 @@ vi.mock('node:child_process', () => ({
       stderr: { on: vi.fn(), resume: vi.fn() },
       on: vi.fn(),
       once: vi.fn(),
+      kill: vi.fn(),
     };
     return stub as unknown as ChildProcess;
   }),
@@ -72,14 +73,24 @@ vi.mock('../../src/core/task-result-settlement.js', () => {
     .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
 });
 
+vi.mock('../../src/orchestra/execution-landing-coordinator.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../src/orchestra/execution-landing-coordinator.js')>()),
+  prepareDockerExecutionLanding: vi.fn(({ prompt }: { prompt: string }) => ({ prompt, context: null })),
+}));
+
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import {
   DockerSpawnBackend,
   workerImageBuildCmdForProvider,
 } from '../../src/orchestra/spawn-backend-docker.js';
+import {
+  TEST_DOCKER_EXECUTION_OPTIONS,
+  budgetedDockerTaskJson,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
-const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
+const mockReadFileSync = vi.mocked(readFileSync);
 
 // ─── Spawn-seam router (mirrors spawn-backend-docker.test.ts) ────────────────
 
@@ -138,7 +149,13 @@ function installSpawnRouter(imagePresent: boolean): void {
 /** Run spawn() and return the thrown error message (or '' if it did not throw). */
 function spawnExpectMessage(taskId: string, model: string): string {
   try {
-    new DockerSpawnBackend('/test/project').spawn(taskId, model as never, 'prompt-body', TEST_EXECUTION_OPTIONS);
+    mockReadFileSync.mockImplementation(path => budgetedDockerTaskJson(path, { model }));
+    new DockerSpawnBackend('/test/project').spawn(
+      taskId,
+      model as never,
+      'prompt-body',
+      TEST_DOCKER_EXECUTION_OPTIONS,
+    );
     return '';
   } catch (err) {
     return err instanceof Error ? err.message : String(err);
@@ -197,21 +214,21 @@ describe('DockerSpawnBackend: provider-aware image-not-ready honest-fail (F1-005
     installSpawnRouter(/* imagePresent */ false);
   });
 
-  it('codex worker is held on live metering before image inspection', () => {
+  it('codex worker HOLDs on final-only usage before image inspection', () => {
     const msg = spawnExpectMessage('mc-codex', 'gpt-5.6-sol');
     expect(msg).toMatch(/does not expose incremental measured usage/);
     expect(capturedDockerRunArgs).toHaveLength(0);
     expect(capturedDockerBuildArgs).toHaveLength(0);
   });
 
-  it('codex honest-fail does NOT silently fall back to a claude container (no docker run)', () => {
+  it('codex metering HOLD does NOT silently fall back to a claude container', () => {
     spawnExpectMessage('mc-codex-nofallback', 'gpt-5.6-sol');
     // Never spawned a worker container, and never auto-built — honest-fail only.
     expect(capturedDockerRunArgs.length).toBe(0);
     expect(capturedDockerBuildArgs.length).toBe(0);
   });
 
-  it('gemini worker is held on live metering before image inspection', () => {
+  it('gemini worker HOLDs on final-only usage before image inspection', () => {
     const msg = spawnExpectMessage('mc-gemini', 'gemini-2.5-flash');
     expect(msg).toMatch(/does not expose incremental measured usage/);
     expect(capturedDockerRunArgs).toHaveLength(0);
@@ -237,11 +254,14 @@ describe('DockerSpawnBackend: claude worker uses the default image unchanged (F1
   });
 
   it('image present → claude worker runs the default image with NO `--build-arg` and NO docker build', () => {
+    mockReadFileSync.mockImplementation(
+      path => budgetedDockerTaskJson(path, { model: 'claude-sonnet-5' }),
+    );
     new DockerSpawnBackend('/test/project').spawn(
       'mc-claude-ok',
       'claude-sonnet-5' as never,
       'prompt-body',
-      TEST_EXECUTION_OPTIONS,
+      TEST_DOCKER_EXECUTION_OPTIONS,
     );
     expect(capturedDockerRunArgs.length).toBe(1);
     expect(capturedDockerBuildArgs.length).toBe(0);

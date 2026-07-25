@@ -19,6 +19,7 @@ vi.mock('node:fs', () => ({
 vi.mock('../../src/core/config.js', () => ({
   resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
+  resolveEffectiveWorkers: () => 8,
   loadConfig: vi.fn().mockResolvedValue({ spawn_backend: 'auto' }),
   validatePartialConfig: vi.fn(),
 }));

@@ -33,6 +33,7 @@ import {
   CLAUDE_SUBPROCESS_CONFIG,
 } from '../../src/providers/subprocess.js';
 import type { SubprocessProviderConfig } from '../../src/providers/subprocess.js';
+import { LocalSubprocessTestBackend } from '../helpers/local-subprocess-backend-fixture.js';
 import { ProviderError } from '../../src/core/provider.js';
 import { TASKS_DIR } from '../../src/core/constants.js';
 
@@ -189,7 +190,7 @@ describe('Subprocess Backend E2E', () => {
     it('writes .hb file immediately on spawn with EXECUTING status', async () => {
       const taskId = 'hb-test-001';
       const config = makeSleepConfig(10);
-      const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
+      const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: config });
 
       backend.spawn(taskId, 'claude-sonnet-5', 'test prompt');
 
@@ -232,7 +233,7 @@ describe('Subprocess Backend E2E', () => {
         buildCommandString() { return 'node -e "..."'; },
       };
 
-      const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
+      const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: config });
       backend.spawn(taskId, 'claude-sonnet-5', prompt);
 
       await waitForFile(markerPath, 5000);
@@ -247,7 +248,7 @@ describe('Subprocess Backend E2E', () => {
     it('listWorkers() includes spawned taskId', () => {
       const taskId = 'list-test-001';
       const config = makeSleepConfig(10);
-      const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
+      const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: config });
 
       expect(backend.listWorkers()).toEqual([]);
 
@@ -265,7 +266,7 @@ describe('Subprocess Backend E2E', () => {
       const taskId = 'log-test-001';
       const logMessage = 'subprocess log output test 12345';
       const config = makeEchoConfig(logMessage);
-      const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
+      const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: config });
 
       backend.spawn(taskId, 'claude-sonnet-5', '');
 
@@ -287,7 +288,7 @@ describe('Subprocess Backend E2E', () => {
     it('writes fallback .result with selfAssessment when worker exits code 0 without result', async () => {
       const taskId = 'fallback-ok-001';
       const config = makeQuickExitConfig(0);
-      const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
+      const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: config });
 
       backend.spawn(taskId, 'claude-sonnet-5', '');
 
@@ -304,7 +305,7 @@ describe('Subprocess Backend E2E', () => {
     it('writes fallback .result with NO_GO when worker exits non-zero without result', async () => {
       const taskId = 'fallback-fail-001';
       const config = makeQuickExitConfig(1);
-      const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
+      const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: config });
 
       backend.spawn(taskId, 'claude-sonnet-5', '');
 
@@ -325,7 +326,7 @@ describe('Subprocess Backend E2E', () => {
       fs.writeFileSync(resultPath, JSON.stringify(preWritten), 'utf-8');
 
       const config = makeQuickExitConfig(0);
-      const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
+      const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: config });
       backend.spawn(taskId, 'claude-sonnet-5', '');
 
       // Wait for process to exit
@@ -343,7 +344,7 @@ describe('Subprocess Backend E2E', () => {
     it('writes heartbeat with DONE status after exit code 0', async () => {
       const taskId = 'done-hb-001';
       const config = makeQuickExitConfig(0);
-      const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
+      const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: config });
 
       backend.spawn(taskId, 'claude-sonnet-5', '');
 
@@ -362,7 +363,7 @@ describe('Subprocess Backend E2E', () => {
     it('writes heartbeat with FAILED status after non-zero exit', async () => {
       const taskId = 'fail-hb-001';
       const config = makeQuickExitConfig(42);
-      const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
+      const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: config });
 
       backend.spawn(taskId, 'claude-sonnet-5', '');
 
@@ -380,7 +381,7 @@ describe('Subprocess Backend E2E', () => {
     it('terminates a running worker and removes it from list', async () => {
       const taskId = 'kill-test-001';
       const config = makeSleepConfig(30);
-      const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
+      const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: config });
 
       backend.spawn(taskId, 'claude-sonnet-5', '');
       expect(backend.listWorkers()).toContain(taskId);
@@ -394,7 +395,7 @@ describe('Subprocess Backend E2E', () => {
 
   describe('T10: kill() error handling', () => {
     it('throws ProviderError when killing unknown taskId', () => {
-      const backend = new SubprocessSpawnBackend(projectDir, {
+      const backend = new LocalSubprocessTestBackend(projectDir, {
         providerConfig: makeNodeProviderConfig(),
       });
 
@@ -409,7 +410,7 @@ describe('Subprocess Backend E2E', () => {
     it('throws ProviderError when spawning same taskId twice', () => {
       const taskId = 'dup-test-001';
       const config = makeSleepConfig(10);
-      const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
+      const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: config });
 
       backend.spawn(taskId, 'claude-sonnet-5', 'first');
 
@@ -426,7 +427,7 @@ describe('Subprocess Backend E2E', () => {
     it('automatically kills worker after configured timeout', async () => {
       const taskId = 'timeout-test-001';
       const config = makeSleepConfig(60); // Would sleep 60s
-      const backend = new SubprocessSpawnBackend(projectDir, {
+      const backend = new LocalSubprocessTestBackend(projectDir, {
         providerConfig: config,
         defaultTimeoutMs: 500, // Kill after 500ms
       });
@@ -446,7 +447,7 @@ describe('Subprocess Backend E2E', () => {
   describe('T13: Concurrent workers', () => {
     it('tracks multiple concurrent workers independently', () => {
       const config = makeSleepConfig(10);
-      const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
+      const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: config });
 
       backend.spawn('multi-001', 'claude-sonnet-5', 'a');
       backend.spawn('multi-002', 'claude-sonnet-5', 'b');
@@ -472,7 +473,7 @@ describe('Subprocess Backend E2E', () => {
 
   describe('T14: buildCommand()', () => {
     it('returns formatted command string from CLAUDE_SUBPROCESS_CONFIG', () => {
-      const backend = new SubprocessSpawnBackend(projectDir);
+      const backend = new LocalSubprocessTestBackend(projectDir);
       const cmd = backend.buildCommand('claude-sonnet-5', '/tmp/prompt.txt');
       expect(cmd).toContain('claude');
       expect(cmd).toContain('claude-sonnet-5');
@@ -480,7 +481,7 @@ describe('Subprocess Backend E2E', () => {
     });
 
     it('includes allowedTools and autoApprove flags', () => {
-      const backend = new SubprocessSpawnBackend(projectDir);
+      const backend = new LocalSubprocessTestBackend(projectDir);
       const cmd = backend.buildCommand('claude-opus-4-8', '/tmp/p.txt', {
         allowedTools: 'Read,Edit',
         autoApprove: true,
@@ -496,7 +497,7 @@ describe('Subprocess Backend E2E', () => {
   describe('T15: isAvailable()', () => {
     it('resolves true when CLI is accessible (node)', async () => {
       const config = makeNodeProviderConfig();
-      const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
+      const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: config });
       // node --version always works
       const result = await backend.isAvailable();
       expect(result).toBe(true);
@@ -510,7 +511,7 @@ describe('Subprocess Backend E2E', () => {
         buildArgs() { return ['--version']; },
         buildCommandString() { return ''; },
       };
-      const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
+      const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: config });
       const result = await backend.isAvailable();
       expect(result).toBe(false);
     });
@@ -520,24 +521,24 @@ describe('Subprocess Backend E2E', () => {
 
   describe('T16: Accessor methods', () => {
     it('getLogPath() returns correct path', () => {
-      const backend = new SubprocessSpawnBackend(projectDir);
+      const backend = new LocalSubprocessTestBackend(projectDir);
       const logPath = backend.getLogPath('test-001');
       expect(logPath).toBe(path.join(projectDir, TASKS_DIR, 'task-test-001.log'));
     });
 
     it('getProjectDir() returns constructor dir', () => {
-      const backend = new SubprocessSpawnBackend(projectDir);
+      const backend = new LocalSubprocessTestBackend(projectDir);
       expect(backend.getProjectDir()).toBe(projectDir);
     });
 
     it('getWorkerEntry() returns undefined for unknown taskId', () => {
-      const backend = new SubprocessSpawnBackend(projectDir);
+      const backend = new LocalSubprocessTestBackend(projectDir);
       expect(backend.getWorkerEntry('unknown')).toBeUndefined();
     });
 
     it('getWorkerEntry() returns entry for active worker', () => {
       const config = makeSleepConfig(10);
-      const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
+      const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: config });
 
       backend.spawn('accessor-001', 'claude-sonnet-5', 'test');
       const entry = backend.getWorkerEntry('accessor-001');
@@ -569,7 +570,7 @@ describe('Subprocess Backend E2E', () => {
         },
       };
 
-      const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: config });
+      const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: config });
       expect(backend.name).toBe('custom-test-provider');
       expect(backend.supportedModels).toContain('claude-sonnet-5');
       expect(backend.supportedModels).toContain('claude-opus-4-8');

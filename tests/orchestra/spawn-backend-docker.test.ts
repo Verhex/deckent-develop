@@ -67,7 +67,13 @@ vi.mock('../../src/core/task-result-settlement.js', () => {
     .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
 });
 
+vi.mock('../../src/orchestra/execution-landing-coordinator.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../src/orchestra/execution-landing-coordinator.js')>()),
+  prepareDockerExecutionLanding: vi.fn(({ prompt }: { prompt: string }) => ({ prompt, context: null })),
+}));
+
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import {
   DockerSpawnBackend,
   DEFAULT_WORKER_MEMORY_LIMIT,
@@ -79,9 +85,14 @@ import {
   DOCKER_ERROR_CODES,
 } from '../../src/orchestra/spawn-backend-docker.js';
 import { SpawnBackendError } from '../../src/orchestra/spawn-backend.js';
+import {
+  TEST_DOCKER_EXECUTION_OPTIONS,
+  budgetedDockerTaskJson,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
-const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
+const mockReadFileSync = vi.mocked(readFileSync);
+const TEST_EXECUTION_OPTIONS = TEST_DOCKER_EXECUTION_OPTIONS;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -263,6 +274,9 @@ describe('buildGeminiAuthSelectionBootstrap', () => {
 describe('DockerSpawnBackend: memory budget defaults (Sprint 191 T-001)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockReadFileSync.mockImplementation((path) => String(path).endsWith('/.gemini/settings.json')
+      ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
+      : budgetedDockerTaskJson(path));
     installSpawnRouter();
   });
 
@@ -405,7 +419,7 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
     const fs = await import('node:fs');
     vi.mocked(fs.readFileSync).mockImplementation((path) => String(path).endsWith('/.gemini/settings.json')
       ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
-      : '{}');
+      : budgetedDockerTaskJson(path));
     installSpawnRouter();
   });
 
@@ -413,7 +427,7 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
     const fs = await import('node:fs');
     vi.mocked(fs.readFileSync).mockImplementation((path) => String(path).endsWith('/.gemini/settings.json')
       ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
-      : '{}');
+      : budgetedDockerTaskJson(path));
 
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn('auth-default', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
@@ -428,7 +442,8 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
 
   it('authMode="api" in task JSON skips ~/.claude mount and stamps env=api', async () => {
     const fs = await import('node:fs');
-    vi.mocked(fs.readFileSync).mockImplementation(() => JSON.stringify({ authMode: 'api' }));
+    vi.mocked(fs.readFileSync).mockImplementation((path) =>
+      budgetedDockerTaskJson(path, { authMode: 'api' }));
     const prevKey = process.env.ANTHROPIC_API_KEY;
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
 
@@ -449,7 +464,8 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
 
   it('authMode="api" without ANTHROPIC_API_KEY throws SpawnBackendError', async () => {
     const fs = await import('node:fs');
-    vi.mocked(fs.readFileSync).mockImplementation(() => JSON.stringify({ authMode: 'api' }));
+    vi.mocked(fs.readFileSync).mockImplementation((path) =>
+      budgetedDockerTaskJson(path, { authMode: 'api' }));
     const prevKey = process.env.ANTHROPIC_API_KEY;
     delete process.env.ANTHROPIC_API_KEY;
 
@@ -469,7 +485,7 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
     const fs = await import('node:fs');
     vi.mocked(fs.readFileSync).mockImplementation((path) => String(path).endsWith('/.gemini/settings.json')
       ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
-      : '{}');
+      : budgetedDockerTaskJson(path));
     const previous = process.env[envName];
     process.env[envName] = 'host-api-key-must-not-leak';
 
@@ -489,7 +505,8 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
     ['gemini-2.5-flash', 'GOOGLE_API_KEY'],
   ] as const)('%s API mode is held before unmetered Docker work', async (model, envName) => {
     const fs = await import('node:fs');
-    vi.mocked(fs.readFileSync).mockImplementation(() => JSON.stringify({ authMode: 'api' }));
+    vi.mocked(fs.readFileSync).mockImplementation((path) =>
+      budgetedDockerTaskJson(path, { authMode: 'api' }));
     const previous = process.env[envName];
     process.env[envName] = 'provider-specific-api-key';
 
@@ -519,7 +536,7 @@ describe('DockerSpawnBackend: NODE_OPTIONS container env (Sprint 194 T-004)', ()
     const fs = await import('node:fs');
     vi.mocked(fs.readFileSync).mockImplementation((path) => (String(path).endsWith('/.gemini/settings.json')
       ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
-      : '{}') as unknown as Buffer);
+      : budgetedDockerTaskJson(path)) as unknown as Buffer);
     vi.mocked(fs.existsSync).mockReturnValue(true);
     installSpawnRouter();
   });
@@ -580,7 +597,7 @@ describe('DockerSpawnBackend: provider-aware command + isolated OAuth credential
     const fs = await import('node:fs');
     vi.mocked(fs.readFileSync).mockImplementation((path) => String(path).endsWith('/.gemini/settings.json')
       ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
-      : '{}');
+      : budgetedDockerTaskJson(path));
     installSpawnRouter();
   });
 
@@ -626,6 +643,7 @@ describe('DockerSpawnBackend: provider-aware command + isolated OAuth credential
 describe('A23: host-side claude auth health-check (Sprint 194 W-AUTH wire)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockReadFileSync.mockImplementation((path) => budgetedDockerTaskJson(path));
     capturedDockerRunArgs.length = 0;
     // Router: docker healthy, but `claude --version` FAILS (auth lost).
     mockSpawnSync.mockImplementation((cmd, args) => {
@@ -681,6 +699,7 @@ describe('A23: host-side claude auth health-check (Sprint 194 W-AUTH wire)', () 
 describe('DockerSpawnBackend: daemon preflight (455-003 DOCKER-PREFLIGHT-TRUTH)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockReadFileSync.mockImplementation((path) => budgetedDockerTaskJson(path));
     capturedDockerRunArgs.length = 0;
   });
 

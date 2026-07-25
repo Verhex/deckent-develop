@@ -4,6 +4,7 @@ import {
   reconcileDockerUnmeasurableRuntimeBudgetResult,
   reconcileDockerRuntimeBudgetResult,
   reconcileDockerRuntimeBudgetUsage,
+  requestDockerContainerLanding,
   terminateDockerContainerForBudget,
   type DockerSyncCommand,
   type DockerSyncCommandResult,
@@ -22,6 +23,7 @@ function scripted(results: DockerSyncCommandResult[]) {
 
 function budgetStop(
   evidenceSource: RuntimeBudgetStopEvidence['evidenceSource'] = 'stop-marker',
+  counterEvidenceSource: RuntimeBudgetStopEvidence['counterEvidenceSource'] = 'stop-marker',
 ): RuntimeBudgetStopEvidence {
   return {
     version: 2,
@@ -47,6 +49,7 @@ function budgetStop(
     },
     stoppedAt: '2026-07-21T20:00:05.429Z',
     evidenceSource,
+    counterEvidenceSource,
   };
 }
 
@@ -161,7 +164,21 @@ describe('Docker runtime-budget result reconciliation', () => {
     expect(result.notes).toContain('exitCode=0');
     expect(result.notes).toContain('attemptId=attempt-1');
     expect(result.notes).toContain('evidenceSource=stop-marker');
+    expect(result.notes).toContain('counterEvidenceSource=stop-marker');
     expect(result.notes).toContain(`budgetFingerprint=${'a'.repeat(64)}`);
+  });
+
+  it('surfaces terminal counter provenance separately from containment provenance', () => {
+    const result = doneResult();
+
+    reconcileDockerRuntimeBudgetResult(
+      result,
+      137,
+      budgetStop('stop-marker', 'terminal-usage'),
+    );
+
+    expect(result.notes).toContain('evidenceSource=stop-marker');
+    expect(result.notes).toContain('counterEvidenceSource=terminal-usage');
   });
 
   it('is idempotent for the same exhausted attempt', () => {
@@ -276,6 +293,39 @@ describe('Docker runtime-budget result reconciliation', () => {
 });
 
 describe('Docker budget termination state machine', () => {
+  it('freezes the whole container before exact checkpoint-stop termination', () => {
+    const run = scripted([{ status: 0 }, { status: 0 }]);
+
+    expect(requestDockerContainerLanding('deckent-w-landing', run)).toBeUndefined();
+    expect(run.mock.calls.map(call => call[1])).toEqual([
+      ['pause', 'deckent-w-landing'],
+      ['kill', '--signal=SIGKILL', 'deckent-w-landing'],
+    ]);
+  });
+
+  it('fails loud when Docker cannot freeze the checkpoint-stop attempt', () => {
+    const run = scripted([{ status: 1, stderr: 'container unavailable' }]);
+
+    expect(() => requestDockerContainerLanding('deckent-w-missing', run))
+      .toThrow(/could not freeze.*container unavailable/);
+  });
+
+  it('unpauses for hard-containment adoption when frozen-container kill fails', () => {
+    const run = scripted([
+      { status: 0 },
+      { status: 1, stderr: 'kill unavailable' },
+      { status: 0 },
+    ]);
+
+    expect(() => requestDockerContainerLanding('deckent-w-recoverable', run))
+      .toThrow(/could not terminate frozen.*container unpaused for hard-containment adoption/);
+    expect(run.mock.calls.map(call => call[1])).toEqual([
+      ['pause', 'deckent-w-recoverable'],
+      ['kill', '--signal=SIGKILL', 'deckent-w-recoverable'],
+      ['unpause', 'deckent-w-recoverable'],
+    ]);
+  });
+
   it('accepts docker stop only after inspect proves the container is stopped', () => {
     const run = scripted([
       { status: 0 },

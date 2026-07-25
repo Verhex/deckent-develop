@@ -20,6 +20,16 @@ function freshMission() {
   s.createMission({ id: 'm', kind: 'list', title: 'm', renderAs: 'checklist' });
   return s;
 }
+function freshNormalizedMission(missionId = 'm') {
+  const d = mkdtempSync(join(tmpdir(), 'wi-normalized-')); dirs.push(d);
+  const s = new SqliteMissionStore(d, {
+    dependencyAuthorityMode: 'normalized-v1',
+    dependencyAuthorityRef: 'owner-decision:m4-108',
+  });
+  s.migrate();
+  s.createMission({ id: missionId, kind: 'list', title: missionId, renderAs: 'checklist' });
+  return { root: d, store: s };
+}
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
 
 function request(id: string): ApprovalRequest {
@@ -780,5 +790,94 @@ describe('WorkItems + atomic claim', () => {
     expect(s.listItems('m')[0]!.status).toBe('parked');
     expect(s.listApprovalBindings()[0]!.decisionState).toBe('pending');
     s.close();
+  });
+});
+
+describe('WorkItems — normalized dependency authority', () => {
+  it('uses normalized edges across approval, due and both claim seams and ignores legacy JSON tamper', () => {
+    const { store: s } = freshNormalizedMission();
+    s.enqueueItems([
+      { id: 'upstream', missionId: 'm', kind: 'task' },
+      {
+        id: 'guarded',
+        missionId: 'm',
+        kind: 'task',
+        policy: 'approval-required',
+        dependsOn: ['upstream'],
+      },
+    ]);
+
+    expect(s.__rawGet(`SELECT COUNT(*) AS count FROM work_item_dependencies
+      WHERE mission_id='m'`)).toEqual({ count: 1 });
+    expect(s.__rawGet(`SELECT COUNT(*) AS count FROM work_items
+      WHERE mission_id='m' AND depends_on IS NOT NULL`)).toEqual({ count: 0 });
+    expect(s.listApprovalCandidates()).toEqual([]);
+    expect(s.parkInvalidApprovalCandidate('guarded', 'not-ready')).toBe(false);
+    expect(s.parkItemForApproval('guarded', request('normalized-request'))).toBeNull();
+    expect(s.queryDue().map((item) => item.id)).toEqual(['upstream']);
+    expect(s.claimItemWithAuthority('guarded', 'normalized-bypass')).toBeNull();
+    expect(s.claimItem('guarded', 'normalized-compat-bypass')).toBe(false);
+
+    // A stale ready projection and a forged legacy JSON value cannot authorize
+    // the item because the final predicate rechecks normalized edges/statuses.
+    s.__rawExec(`UPDATE work_item_dependency_readiness
+      SET remaining_count=0,failed_count=0 WHERE work_item_id='guarded'`);
+    s.__rawExec(`UPDATE work_items SET depends_on='[]' WHERE id='guarded'`);
+    expect(s.queryDue().map((item) => item.id)).toEqual(['upstream']);
+    expect(s.claimItemWithAuthority('guarded', 'stale-projection')).toBeNull();
+    s.__rawExec(`UPDATE work_item_dependency_readiness
+      SET remaining_count=1,failed_count=0 WHERE work_item_id='guarded'`);
+
+    const upstream = s.claimItemWithAuthority('upstream', 'scheduler')!;
+    expect(s.settleClaimedItem(upstream, 'done', { ok: true })).toBe(true);
+    // Projection is intentionally fail-safe: no dispatch until the bounded
+    // durable job advances.
+    expect(s.listApprovalCandidates()).toEqual([]);
+    expect(s.reconcilePendingDependencies({ maxEdges: 1, maxEdgesPerJob: 1 })).toEqual([]);
+    expect(s.listApprovalCandidates().map((item) => item.id)).toEqual(['guarded']);
+
+    const binding = s.parkItemForApproval('guarded', request('normalized-request'))!;
+    expect(binding.decisionState).toBe('pending');
+    expect(s.applyApprovalDecision(
+      binding.requestId,
+      'allowed',
+      decision(binding.requestId),
+    )).toMatchObject({ changed: true });
+    expect(s.claimItemWithAuthority('guarded', 'scheduler')).not.toBeNull();
+    s.close();
+  });
+
+  it('bounds and fairly rotates failure propagation jobs and resumes them after restart', () => {
+    const { root, store: first } = freshNormalizedMission('m-a');
+    first.createMission({ id: 'm-b', kind: 'list', title: 'm-b', renderAs: 'checklist' });
+    for (const missionId of ['m-a', 'm-b']) {
+      first.enqueueItems([
+        { id: `${missionId}-root`, missionId, kind: 'task' },
+        { id: `${missionId}-child-a`, missionId, kind: 'task', dependsOn: [`${missionId}-root`] },
+        { id: `${missionId}-child-b`, missionId, kind: 'task', dependsOn: [`${missionId}-root`] },
+      ]);
+      const claim = first.claimItemWithAuthority(`${missionId}-root`, 'scheduler')!;
+      expect(first.settleClaimedItem(claim, 'failed', { ok: false, reason: 'root-failed' })).toBe(true);
+    }
+
+    expect(first.reconcilePendingDependencies({ maxEdges: 2, maxEdgesPerJob: 1 }).sort())
+      .toEqual(['m-a', 'm-b']);
+    expect(first.__rawGet(`SELECT COUNT(*) AS count FROM work_items
+      WHERE mission_id='m-a' AND status='blocked'`)).toEqual({ count: 1 });
+    expect(first.__rawGet(`SELECT COUNT(*) AS count FROM work_items
+      WHERE mission_id='m-b' AND status='blocked'`)).toEqual({ count: 1 });
+    first.close();
+
+    const reopened = new SqliteMissionStore(root);
+    reopened.migrate();
+    for (let i = 0; i < 8; i++) {
+      reopened.reconcilePendingDependencies({ maxEdges: 2, maxEdgesPerJob: 1 });
+    }
+    expect(reopened.__rawGet(`SELECT COUNT(*) AS count FROM work_items
+      WHERE status='blocked'`)).toEqual({ count: 4 });
+    expect(reopened.__rawGet(`SELECT COUNT(*) AS count
+      FROM mission_dependency_reconcile_queue WHERE state='pending'`)).toEqual({ count: 0 });
+    expect(reopened.queryDue()).toEqual([]);
+    reopened.close();
   });
 });

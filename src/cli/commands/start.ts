@@ -10,6 +10,7 @@ import type { SprintSizeRecommendation } from '../../core/types.js';
 import { isSessionActive, setupWatchWindow } from '../../orchestra/tmux.js';
 import { TMUX_SESSION_NAME } from '../../core/constants.js';
 import { runDoctorChecks } from './doctor.js';
+import { checkStartLimitGate } from './limits.js';
 import { print, printError, formatSprintSummary, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
@@ -31,6 +32,7 @@ import { detectOrphan, archiveOrphan, listPidFiles } from '../../orchestra/sprin
 import { createSandboxBackend } from '../../orchestra/spawn-backend.js';
 import { captureGitBase } from '../../orchestra/run-diff-service.js';
 import { loadApprovedSnapshot, loadRunHandle, saveRunHandle } from '../../core/run-flow-store.js';
+import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
 import {
   startApprovedRun,
   RunJobFlowNotApprovedError,
@@ -38,6 +40,9 @@ import {
   RunJobStaleHandleConflictError,
   type RunHandle,
 } from '../../orchestra/run-job-service.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
+import { preflightCliBrainProviderAuthority } from '../provider-authority-process-runtime.js';
+import { ProviderExecutionIngressHoldError } from '../../core/provider-execution-ingress-authority.js';
 
 // ─── Provider Cache ───────────────────────────────────────────────
 
@@ -228,7 +233,11 @@ interface StartCommandOpts {
   planDigest?: string;
 }
 
-export function registerStart(program: Command): void {
+export interface StartCommandRuntime {
+  readonly providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+}
+
+export function registerStart(program: Command, runtime: StartCommandRuntime = {}): void {
   program
     .command('start [description]')
     .description('Start a new sprint (optionally with a one-line description for zero-config mode)')
@@ -247,6 +256,30 @@ export function registerStart(program: Command): void {
     .option('--plan-digest <digest>', 'RunFlow planDigest to CAS-verify against the approved snapshot (used with --flow-id)')
     .action(async (description: string | undefined, opts: StartCommandOpts) => {
       const root = resolveProjectRoot();
+      let authorityConfig: Awaited<ReturnType<typeof loadConfig>> | undefined;
+      if (runtime.providerAuthority) {
+        try {
+          authorityConfig = await loadConfig(root);
+          const admission = preflightCliBrainProviderAuthority(
+            runtime.providerAuthority,
+            authorityConfig,
+            root,
+            `cli-start:${process.pid}`,
+          );
+          if (admission.decision === 'hold') {
+            printError(new Error(getMessage('run.provider_authority_hold', authorityConfig.language, {
+              reason: admission.reasonCode,
+              evidence: admission.authorityEvidenceRefs.join(','),
+            })));
+            process.exitCode = 1;
+            return;
+          }
+        } catch (error) {
+          printError(error);
+          process.exitCode = 1;
+          return;
+        }
+      }
 
       // ─── Zero-Config Mode ────────────────────────────────────────
       let zeroConfigResult: ReturnType<typeof prepareZeroConfig> | null = null;
@@ -270,10 +303,12 @@ export function registerStart(program: Command): void {
       // ─── Sandbox State ───────────────────────────────────────────
       let sandboxState: SandboxState | null = null;
       let lang = 'en';
+      let approvalAuthority: ReturnType<typeof bootstrapApprovalAuthority> | undefined;
 
       try {
-        const config = await loadConfig(root);
+        const config = authorityConfig ?? await loadConfig(root);
         lang = config.language;
+        approvalAuthority = bootstrapApprovalAuthority(root, config);
 
         // ─── TERM-FLOW-UNIFY Sprint-4 (426-001): approved-snapshot-consuming
         // start ────────────────────────────────────────────────────────────
@@ -408,6 +443,15 @@ export function registerStart(program: Command): void {
               sandboxMode: opts.sandboxMode,
               timeoutMs: opts.timeout ? parseInt(opts.timeout, 10) : undefined,
               preplannedSprint: approvedSnapshot!.sprint,
+              ...(runtime.providerAuthority
+                ? { providerAuthority: runtime.providerAuthority }
+                : {}),
+              ...(approvalAuthority.state === 'ready'
+                ? {
+                    attendedExecutionApprovalAuthority:
+                      approvalAuthority.runtime.attendedExecutionApprovalAuthority,
+                  }
+                : {}),
               // SURF-0.2 (Task 432-002): the --flow-id value received above reaches
               // runSprint as-is via this already-extracted `flowId` const -- no new
               // id generation, no env fallback.
@@ -536,6 +580,22 @@ export function registerStart(program: Command): void {
           }
         }
 
+        // LIMIT-GATE-WIRE: the existing config-gated subscription probe is
+        // evaluated after environment health checks and before any planning,
+        // cost work, or worker spawn. Disabled remains a zero-probe no-op.
+        // Dry-run surfaces the would-block verdict but continues the
+        // non-spawning preview; --force preserves the existing preflight
+        // bypass shared with doctor and cost checks.
+        if (!opts.force) {
+          const limitGate = await checkStartLimitGate(root, lang);
+          if (limitGate.message) print(limitGate.message);
+          if (limitGate.blocked && !opts.dryRun) {
+            if (sandboxState) restoreSandbox(root, sandboxState);
+            process.exitCode = 1;
+            return;
+          }
+        }
+
         // WIRE-002 (MASTER-PLAN §4G): wire DECKENT→USER:NOTIFY to this terminal.
         // Pure-CLI sprints previously had a null global dispatcher, so every
         // notify() (task-done, sprint-finalized, human-checkpoint-required) was
@@ -568,7 +628,9 @@ export function registerStart(program: Command): void {
             modelConstraint: null,
             reason: 'No usage constraints',
           };
-          const sprint = await planSprint(root, config, context, recommendation);
+          const sprint = await planSprint(root, config, context, recommendation, {
+            dryRun: true,
+          });
 
           print(getMessage('start.sprint_planned', lang, {
             number: String(sprint.number),
@@ -774,6 +836,15 @@ export function registerStart(program: Command): void {
             sandboxMode: opts.sandboxMode,
             timeoutMs,
             spawnBackend: sandboxSpawnBackend,
+            ...(runtime.providerAuthority
+              ? { providerAuthority: runtime.providerAuthority }
+              : {}),
+            ...(approvalAuthority.state === 'ready'
+              ? {
+                  attendedExecutionApprovalAuthority:
+                    approvalAuthority.runtime.attendedExecutionApprovalAuthority,
+                }
+              : {}),
           });
         } finally {
           if (stopSubprocessWatch) stopSubprocessWatch();
@@ -803,7 +874,12 @@ export function registerStart(program: Command): void {
           print(`   Agent: ${agentStr}`);
         }
       } catch (error) {
-        if (error instanceof BrainError) {
+        if (error instanceof ProviderExecutionIngressHoldError) {
+          printError(new Error(getMessage('run.provider_authority_hold', lang, {
+            reason: error.reasonCode,
+            evidence: error.authorityEvidenceRefs.join(','),
+          })));
+        } else if (error instanceof BrainError) {
           printError(new Error(`Sprint failed at phase ${error.phase ?? 'unknown'}: ${error.message}`));
           if (error.plannerProof) {
             print(getMessage('planning.proof', lang, {
@@ -831,6 +907,7 @@ export function registerStart(program: Command): void {
         // printed message. Keep it unconditional for both branches above.
         process.exitCode = 1;
       } finally {
+        if (approvalAuthority?.state === 'ready') approvalAuthority.runtime.close();
         // Always clean up temp DIRECTIVES.md (moved from try/catch to finally)
         if (zeroConfigResult) cleanupZeroConfig(zeroConfigResult);
         // Restore sandbox state if applied

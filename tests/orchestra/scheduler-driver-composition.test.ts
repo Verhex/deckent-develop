@@ -30,9 +30,9 @@
  *      model) on the spawned-id set.
  *   5. Live `waitForResults` integration: the SAME dependency-ready fixture,
  *      toggled only by `config.scheduler.engine`, spawns the same task via
- *      the same tmux `spawnWorker` call whether engine is 'legacy' (default)
- *      or 'reducer' — proving the wiring at the true call-site level, not
- *      just the driver in isolation.
+ *      the same injected canonical executor whether engine is 'legacy'
+ *      (default) or 'reducer' — proving the wiring at the true call-site
+ *      level without claiming unattended tmux budget-landing support.
  */
 import {
   describe, it, expect, vi, beforeEach, afterEach,
@@ -100,6 +100,17 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     assignedAgent: 'generic',
     assignedSkills: [],
     budget: { maxTurns: 1 },
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      taskKind: 'code-development',
+      resolvedProvider: 'claude',
+      executionCostClass: 'remote',
+      profileRef: 'tests.orchestra.scheduler-driver-composition',
+      policyDigest: '9'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: { reserve_ratio: 0.25 },
+    },
     ...overrides,
   } as Task;
 }
@@ -130,6 +141,7 @@ function makeMockBackend(log?: string[]): SpawnBackend & { calls: MockSpawnCall[
   return {
     name: 'mock-backend',
     liveUsageBudgetSupport: 'measured-stream',
+    executionLandingCapability: 'cooperative-landing',
     spawn(taskId, model, prompt, opts) {
       calls.push({ taskId, model: model as unknown as string, prompt, opts });
       log?.push(`spawn:${taskId}`);
@@ -435,7 +447,7 @@ describe('waitForResults — SCHED5 live wiring: initial tick spawns via the inj
     return { sprint, dep, readyTask };
   }
 
-  it('legacy engine (config.scheduler absent — default): dispatchReadyTasks spawns the dependency-ready task', async () => {
+  it('legacy engine (config.scheduler absent — default): dispatchReadyTasks spawns through the injected canonical executor', async () => {
     const { sprint, readyTask } = buildFixture();
     const backend = makeMockBackend();
     const config = {
@@ -450,7 +462,7 @@ describe('waitForResults — SCHED5 live wiring: initial tick spawns via the inj
     expect(readyTask.status).toBe(TaskStatus.EXECUTING);
   });
 
-  it('reducer engine (config.scheduler.engine="reducer"): the injected driver spawns the same task via the same measured backend', async () => {
+  it('reducer engine (config.scheduler.engine="reducer"): the injected driver spawns through the same canonical executor', async () => {
     const { sprint, readyTask } = buildFixture();
     const backend = makeMockBackend();
     const config = {

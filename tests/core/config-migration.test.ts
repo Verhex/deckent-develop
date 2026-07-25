@@ -382,15 +382,16 @@ describe('modelToTier', () => {
     expect(modelToTier('opus')).toBe('premium');
     expect(modelToTier('sonnet')).toBe('standard');
     expect(modelToTier('haiku')).toBe('economy');
+    expect(modelToTier('fable')).toBe('premium_plus');
   });
 
   it('maps OpenAI models to correct tiers', () => {
     expect(modelToTier('gpt-5')).toBe('premium');
     expect(modelToTier('gpt-4.1')).toBe('standard');
-    expect(modelToTier('o3')).toBe('premium_plus');
+    expect(modelToTier('o3')).toBe('standard');
     expect(modelToTier('gpt-5-mini')).toBe('economy');
     expect(modelToTier('gpt-4.1-mini')).toBe('economy');
-    expect(modelToTier('o4-mini')).toBe('standard');
+    expect(modelToTier('o4-mini')).toBe('economy');
   });
 
   it('maps Gemini models to correct tiers', () => {
@@ -399,8 +400,10 @@ describe('modelToTier', () => {
     expect(modelToTier('gemini-2.0-flash')).toBe('economy');
   });
 
-  it('fails loud for unknown models instead of guessing standard', () => {
-    expect(() => modelToTier('unknown-model')).toThrow(/without registry evidence/);
+  it('fails loudly for an unknown migration model', () => {
+    expect(() => modelToTier('unknown-model')).toThrowError(
+      expect.objectContaining({ code: 'E_UNKNOWN_MODEL' }),
+    );
   });
 });
 

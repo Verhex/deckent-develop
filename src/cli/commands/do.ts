@@ -56,8 +56,11 @@ import {
   formatDigestShort,
   buildPlanPreviewCardLabels,
   formatScopeGateLines,
+  formatTopologyLines,
 } from '../repl/plan-preview-card.js';
 import { resolvePlanTimeoutMs } from '../../orchestra/planner.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
+import { preflightCliBrainProviderAuthority } from '../provider-authority-process-runtime.js';
 
 export interface DoCommandOptions {
   run?: boolean;
@@ -81,6 +84,8 @@ export interface DoEvaluateResult {
 
 /** The only two real-world-effectful seams — injectable for hermetic tests; default to the real thing. */
 export interface DoSeamDeps {
+  /** Process-root provider authority injected by the CLI composition root. */
+  providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
   confirm?: (question: string) => Promise<boolean>;
   spawnStart?: (root: string) => Promise<DoStartResult>;
   onEvent?: (event: GoldenFlowEvent) => void;
@@ -203,6 +208,7 @@ export function formatRunFlowDoPreview(preview: PlanPreview, run: boolean, lang:
   // PAYLAŞILAN pure helper'ından geçer — CLI ve REPL kartı AYNI metni üretir
   // (CLI↔REPL parity; dry-run'da bile operatör --run'ın neden öleceğini görsün).
   lines.push(...formatScopeGateLines(preview, labels));
+  lines.push(...formatTopologyLines(preview, labels));
   lines.push(`${labels.digestLabel} ${formatDigestShort(preview.planDigest)}`);
   return lines.join('\n');
 }
@@ -282,6 +288,13 @@ export async function runDoRunFlow(
   // followed by a silently-dead run (sprint-440/442 live cases — the death was
   // visible only in .deckent/recently-works/). The front door now makes the
   // SAME decision the child will make; --yes is consent, not a gate override.
+  if (preview.topologyGateResult === 'fail') {
+    controller.reject('topology-gate-block');
+    printError(buildPlanPreviewCardLabels(lang).topologyBlockLabel);
+    process.exitCode = 1;
+    return;
+  }
+
   if (preview.gateResult === 'fail') {
     controller.reject('prompt-gate-block');
     printError(getMessage('do.gate_blocked', lang, {
@@ -422,6 +435,20 @@ export function registerDo(program: Command, deps: DoSeamDeps = {}): void {
         // this is the ONLY flag check (mirrors start.ts's exact convention)
         // and structurally cannot fall through to the golden-flow branch below.
         if (config.terminal?.run_flow_v2 === true) {
+          const admission = preflightCliBrainProviderAuthority(
+            deps.providerAuthority,
+            config,
+            root,
+            `cli-do:${process.pid}`,
+          );
+          if (admission.decision === 'hold') {
+            printError(getMessage('run.provider_authority_hold', config.language, {
+              reason: admission.reasonCode,
+              evidence: admission.authorityEvidenceRefs.join(','),
+            }));
+            process.exitCode = 1;
+            return;
+          }
           await runDoRunFlow(root, config, trimmedGoal, { run, yes: !!opts.yes, forceScope: !!opts.forceScope }, deps);
           return;
         }

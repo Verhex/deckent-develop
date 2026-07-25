@@ -26,12 +26,17 @@ import type {
   ResolvedConfig, ProviderName,
 } from '../core/types.js';
 import type { PromptGateResult } from '../core/prompt-gate-types.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
+import type { MandatoryCrossVerifyInvocationFactory } from './cross-verify-runner.js';
+import { createCrossVerifyProductionIngressAuthority } from './cross-verify-production-ingress-authority.js';
+import { ProviderExecutionIngressHoldError } from '../core/provider-execution-ingress-authority.js';
 
 import { TASKS_DIR } from '../core/constants.js';
 import { CascadeDetector } from '../core/cascade-detector.js';
+import { DeckentError } from '../core/errors.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
-import { readJsonSafe, debugLog, updateLastSprintId } from '../core/utils.js';
+import { debugLog, updateLastSprintId } from '../core/utils.js';
 
 // ─── Core — adaptive timeout defaults (Sprint 192 Task 192-011) ────
 import {
@@ -86,6 +91,10 @@ import { checkWorkerLiveness } from './worker-liveness.js';
 import {
   waitForResults as waitForResultsImpl,
 } from './result-collector.js';
+import {
+  assertTaskResultAuthoritiesReady,
+  readAuthoritativeTaskResult,
+} from './task-result-authority.js';
 
 // ─── Coverage Validator ───────────────────────────────────────────
 import { validateWorkerCoverage } from './coverage-validator.js';
@@ -122,6 +131,7 @@ import { notify, notifyAsync } from '../core/notify.js';
 
 // ─── Directives Protection Baseline (Sprint 177 Task 5) ──────────
 import { getActiveDirectivesProtection } from '../nervous/observer.js';
+import type { AttendedExecutionApprovalAuthority } from '../core/attended-execution-approval.js';
 
 // ─── Panic Guard ─────────────────────────────────────────────────
 import { PanicGuard } from '../core/panic-guard.js';
@@ -645,6 +655,12 @@ export function decidePromptGateBlock(
   return { blocked: true, overridden: false, message };
 }
 
+/**
+ * Reconcile durable backend attempts before checkpoint/task state is restored.
+ *
+ * @param spawnBackend - Active backend, or undefined when no backend was composed.
+ * @returns A promise that resolves after supported reconciliation completes.
+ */
 export async function reconcileSpawnBackendBeforeRestore(
   spawnBackend: SpawnBackend | undefined,
 ): Promise<void> {
@@ -692,6 +708,12 @@ export interface RunSprintOptions {
   rollback?: boolean;
   /** Optional Connector instance — when provided, router uses connector.getAvailableProviders() */
   connector?: Connector;
+  /** Shared process-scoped attended-execution authority; spawn paths only consume it. */
+  attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+  /** Shared process-scoped provider authority; every Worker dispatch path only consumes it. */
+  providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  /** Hermetic composition seam; production uses the shared provider authority above. */
+  crossVerifyInvocationFactory?: MandatoryCrossVerifyInvocationFactory;
   /** Set to false to opt out of automatic HeartbeatDaemon start/stop during sprint (default: enabled) */
   enableHeartbeatDaemon?: boolean;
   /**
@@ -979,7 +1001,12 @@ export async function waitForResults(
   sprint: Sprint,
   timeoutMs?: number,
   queue?: Task[],
-  spawnOpts?: { autoApprove?: boolean; spawnBackend?: SpawnBackend },
+  spawnOpts?: {
+    autoApprove?: boolean;
+    spawnBackend?: SpawnBackend;
+    attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+    providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  },
   config?: ResolvedConfig,
 ): Promise<TaskResult[]> {
   return trace('wait_results', () =>
@@ -1050,6 +1077,10 @@ export async function retryEvaluateIfEmpty(
   coverageHardFloor: number | undefined,
   deferredTaskIds: ReadonlySet<string>,
   config?: ResolvedConfig,
+  options?: {
+    providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+    crossVerifyInvocationFactory?: MandatoryCrossVerifyInvocationFactory;
+  },
 ): Promise<void> {
   if (evaluations.size !== 0 || results.length === 0) return;
 
@@ -1061,7 +1092,15 @@ export async function retryEvaluateIfEmpty(
     projectRoot, sprint, results, evaluations, coverageHardFloor,
     // born-614 yarım-wire dersi: config'i DÜŞÜRME — training_trace sweep'i ve
     // gelecekteki her config-gated EVALUATE davranışı bu parametreye bağlı.
-    config, undefined, deferredTaskIds, { enforceDispatchGate: true },
+    config, undefined, deferredTaskIds, {
+      enforceDispatchGate: true,
+      ...(options?.providerAuthority
+        ? { providerAuthority: options.providerAuthority }
+        : {}),
+      ...(options?.crossVerifyInvocationFactory
+        ? { crossVerifyInvocationFactory: options.crossVerifyInvocationFactory }
+        : {}),
+    },
   );
   if (evaluations.size > 0) return;
 
@@ -1320,15 +1359,18 @@ export async function runSprint(
           recoveredSprint = recovery.restoredSprint ?? null;
           if (recoveredSprint) {
             for (const t of recoveredSprint.tasks) {
-              const resPath = join(projectRoot, TASKS_DIR, `task-${t.id}.result`);
-              const r = normalizeTaskResultShape(readJsonSafe<TaskResult>(resPath));
+              const authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, t.id);
+              const r = normalizeTaskResultShape(authority.result);
               if (r) resumeResults.push(r);
             }
           }
         }
       }
     }
-  } catch (e) { debugLog('runSprint:stateRecovery', e); }
+  } catch (e) {
+    if (e instanceof DeckentError && e.code === 'DECKENT_E077') throw e;
+    debugLog('runSprint:stateRecovery', e);
+  }
 
   // ─── Outer-scope variables (shared between fresh and resume paths) ──
   let sprint: Sprint;
@@ -1518,8 +1560,26 @@ export async function runSprint(
       const availableProviders = connector
         ? connector.getAvailableProviders()
         : providerRegistry.listProviders() as ProviderName[];
-      routeSprintTasksImpl(sprint.tasks, config, availableProviders);
-    } catch (e) { debugLog('runSprint:routeSprintTasks', e); }
+      routeSprintTasksImpl(
+        sprint.tasks,
+        config,
+        availableProviders,
+        { projectRoot, sprintId: sprint.id },
+      );
+    } catch (e) {
+      writeEvent(projectRoot, sprint.id, 'brain', 'auditor', 'BRAIN→AUDITOR:PROVIDER_ROUTING_HOLD', {
+        errorName: e instanceof Error ? e.name : 'UnknownError',
+        errorCode: e instanceof Error && 'code' in e ? String(e.code) : null,
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+      clearActiveSprint();
+      releaseSprintLock(projectRoot);
+      clearSprintState(projectRoot);
+      try { clearPid(projectRoot, sprint.id); } catch (pidError) {
+        debugLog('runSprint:routeSprintTasks:clearPid', pidError);
+      }
+      throw e;
+    }
 
     try { updateLastSprintId(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:updateLastSprintId', e); }
     try { resetDashboard(projectRoot, sprint.id, sprint.tasks.length); } catch (e) { debugLog('runSprint:resetDashboard', e); }
@@ -1608,8 +1668,21 @@ export async function runSprint(
       // R3: honor the sprint_timeout_minutes config knob (0 = unlimited) instead of
       // always falling back to waitForResults' hard-coded 30-minute default.
       const sprintTimeoutMs = resolveSprintTimeoutMs(opts?.timeoutMs, config);
-      results = await waitForResults(projectRoot, sprint, sprintTimeoutMs, taskQueue, { autoApprove: opts?.autoApprove, spawnBackend }, config);
+      results = await waitForResults(
+        projectRoot,
+        sprint,
+        sprintTimeoutMs,
+        taskQueue,
+        {
+          autoApprove: opts?.autoApprove,
+          spawnBackend,
+          attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
+          providerAuthority: opts?.providerAuthority,
+        },
+        config,
+      );
     } catch (err) {
+      if (err instanceof ProviderExecutionIngressHoldError) throw err;
       // EXECUTE-ERROR-SURFACE (born-453, sprint-351 live case — sibling of the
       // 350-002 finalize fix): this catch used to swallow a mid-EXECUTE throw
       // into a dashboard line that the COMPLETE-time dashboard overwrite then
@@ -1632,14 +1705,17 @@ export async function runSprint(
       const preGraceCollectedIds = new Set(results.map(r => r.taskId));
       for (const task of sprint.tasks) {
         if (preGraceCollectedIds.has(task.id)) continue;
-        const latePath = join(projectRoot, TASKS_DIR, `task-${task.id}.result`);
-        const lateExists = await stat(latePath).then(() => true, () => false);
-        if (lateExists) {
-          const lateResult = normalizeTaskResultShape(readJsonSafe<TaskResult>(latePath));
-          if (lateResult) results.push(lateResult);
-        }
+        const authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, task.id);
+        const lateResult = normalizeTaskResultShape(authority.result);
+        if (lateResult) results.push(lateResult);
       }
     } catch (e) { debugLog('postCollect:main', e); }
+
+    assertTaskResultAuthoritiesReady(
+      projectRoot,
+      sprint.tasks.map(task => task.id),
+      'post-collect',
+    );
 
     // Grace period (async file checks — Sprint 136 async I/O migration)
     try {
@@ -1648,11 +1724,9 @@ export async function runSprint(
       for (const t of sprint.tasks) {
         if (collectedIds.has(t.id)) continue;
         const hbPath = join(projectRoot, TASKS_DIR, `task-${t.id}.hb`);
-        const resultPath = join(projectRoot, TASKS_DIR, `task-${t.id}.result`);
-        const [hbExists, resExists] = await Promise.all([
-          stat(hbPath).then(() => true, () => false),
-          stat(resultPath).then(() => true, () => false),
-        ]);
+        const resultAuthority = readAuthoritativeTaskResult<TaskResult>(projectRoot, t.id);
+        const hbExists = await stat(hbPath).then(() => true, () => false);
+        const resExists = resultAuthority.result !== null;
         if (hbExists && !resExists) staleWorkers.push(t);
       }
 
@@ -1662,10 +1736,10 @@ export async function runSprint(
 
         for (const task of staleWorkers) {
           const resultPath = join(projectRoot, TASKS_DIR, `task-${task.id}.result`);
-          const resultExists = await stat(resultPath).then(() => true, () => false);
-          if (resultExists) {
-            const lateResult = normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
-            if (lateResult) results.push(lateResult);
+          const resultAuthority = readAuthoritativeTaskResult<TaskResult>(projectRoot, task.id);
+          const lateResult = normalizeTaskResultShape(resultAuthority.result);
+          if (lateResult) {
+            results.push(lateResult);
           } else {
             // ─── Sprint 192 Task 192-001 — W-INTEGRITY I-2 ────────────
             // Memory: [[feedback_no_synthetic_results]] — sentetik NO_GO yasak.
@@ -1853,8 +1927,8 @@ export async function runSprint(
     const collectedResultIds = new Set(results.map(r => r.taskId));
     for (const t of sprint.tasks) {
       if (collectedResultIds.has(t.id)) continue;
-      const resultPath = join(projectRoot, TASKS_DIR, `task-${t.id}.result`);
-      if (existsSync(resultPath)) continue;
+      const resultAuthority = readAuthoritativeTaskResult<TaskResult>(projectRoot, t.id);
+      if (resultAuthority.result) continue;
       const hbPath = join(projectRoot, TASKS_DIR, `task-${t.id}.hb`);
       const hasHb = existsSync(hbPath);
       const hasWorker = typeof t.assignedWorker === 'string' && t.assignedWorker.length > 0;
@@ -1881,18 +1955,40 @@ export async function runSprint(
     }
   } catch (e) { debugLog('runSprint:computeDeferred', e); }
 
+  const crossVerifyInvocationFactory = opts?.crossVerifyInvocationFactory
+    ?? createCrossVerifyProductionIngressAuthority({
+      providerAuthority: opts?.providerAuthority,
+    });
   await runEvaluatePhase(
     projectRoot, sprint, results, evaluations, config.coverage_hard_floor,
     // born-614 yarım-wire dersi (a778151a tool_surface'ın ölüm-biçimi): opsiyonel
     // config-param'ı undefined geçmek = flag'in tüketicisiz kalması. Sprint-400
     // canlı-kanıtı tam bu satır yüzünden İLK seferde başarısız oldu.
-    config, undefined, deferredTaskIds, { enforceDispatchGate: true },
+    config, undefined, deferredTaskIds, {
+      enforceDispatchGate: true,
+      ...(opts?.providerAuthority
+        ? { providerAuthority: opts.providerAuthority }
+        : {}),
+      crossVerifyInvocationFactory,
+    },
   );
 
   // Sprint 370 Task 370-001: EVALUATE_PREMATURE gate can return with `evaluations`
   // still empty while `results` is populated — retry once, then abort loudly.
   await retryEvaluateIfEmpty(
-    projectRoot, sprint, results, evaluations, config.coverage_hard_floor, deferredTaskIds, config,
+    projectRoot,
+    sprint,
+    results,
+    evaluations,
+    config.coverage_hard_floor,
+    deferredTaskIds,
+    config,
+    {
+      ...(opts?.providerAuthority
+        ? { providerAuthority: opts.providerAuthority }
+        : {}),
+      crossVerifyInvocationFactory,
+    },
   );
 
   // Sprint 140 cost-cascade circuit-breaker (B11 wire): N consecutive NO_GO →

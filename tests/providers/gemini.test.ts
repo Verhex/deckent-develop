@@ -3,6 +3,7 @@ import type { MockInstance } from 'vitest';
 import { GeminiAdapter, createGeminiAdapter, GEMINI_AUTH_HEADER, parseGeminiOutput, buildGeminiSpawnEnv, LOGIN_FAST_FAIL, QUOTA_FAST_FAIL } from '../../src/providers/gemini.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
 import { ProviderError } from '../../src/core/provider.js';
+import { resolveCrossProviderCredentialKeys } from '../../src/providers/cross-provider-keys.js';
 
 // ─── Mock node:child_process ─────────────────────────────────────────
 
@@ -171,6 +172,13 @@ describe('GeminiAdapter', () => {
     process.env.GOOGLE_API_KEY = 'regular-key';
     process.env.DECKENT_GOOGLE_API_KEY = 'deckent-key';
     expect(adapter.getApiKey()).toBe('deckent-key');
+  });
+
+  it('getApiKey accepts the Gemini CLI native GEMINI_API_KEY', () => {
+    delete process.env.DECKENT_GOOGLE_API_KEY;
+    delete process.env.GOOGLE_API_KEY;
+    process.env.GEMINI_API_KEY = 'gemini-native-key';
+    expect(adapter.getApiKey()).toBe('gemini-native-key');
   });
 
   it('getApiKey returns undefined when both env vars missing', () => {
@@ -935,6 +943,58 @@ describe('GeminiAdapter', () => {
     } finally {
       delete process.env['GOOGLE_API_KEY'];
     }
+  });
+
+  it('buildGeminiSpawnEnv keeps only Gemini-owned auth and scrubs config-driven foreign credentials', () => {
+    const hostEnv: NodeJS.ProcessEnv = {
+      PATH: '/usr/bin',
+      LANG: 'en_US.UTF-8',
+      ANTHROPIC_API_KEY: 'foreign-anthropic',
+      OPENAI_API_KEY: 'foreign-openai',
+      GOOGLE_API_KEY: 'foreign-google',
+      GEMINI_API_KEY: 'stale-gemini',
+      OPENROUTER_API_KEY: 'foreign-openrouter',
+      MY_LLM_KEY: 'foreign-custom',
+      DECKENT_MY_LLM_KEY: 'foreign-custom-alias',
+    };
+    const credentialEnvKeys = [
+      ...resolveCrossProviderCredentialKeys(),
+      'MY_LLM_KEY',
+      'DECKENT_MY_LLM_KEY',
+    ];
+
+    const env = buildGeminiSpawnEnv('owned-gemini', {
+      hostEnv,
+      credentialEnvKeys,
+    });
+
+    expect(env).toMatchObject({
+      PATH: '/usr/bin',
+      LANG: 'en_US.UTF-8',
+      GEMINI_API_KEY: 'owned-gemini',
+      GEMINI_NONINTERACTIVE: '1',
+    });
+    for (const key of credentialEnvKeys.filter((key) => key !== 'GEMINI_API_KEY')) {
+      expect(env[key], `Gemini child must not see provider credential ${key}`).toBeUndefined();
+    }
+    expect(hostEnv['ANTHROPIC_API_KEY']).toBe('foreign-anthropic');
+    expect(hostEnv['GEMINI_API_KEY']).toBe('stale-gemini');
+  });
+
+  it('buildGeminiSpawnEnv keeps OAuth/session mode free of inherited provider credentials', () => {
+    const credentialEnvKeys = resolveCrossProviderCredentialKeys();
+    const hostEnv = Object.fromEntries(
+      credentialEnvKeys.map((key) => [key, `foreign-${key}`]),
+    );
+    const env = buildGeminiSpawnEnv(undefined, {
+      hostEnv,
+      credentialEnvKeys,
+    });
+
+    for (const key of credentialEnvKeys) {
+      expect(env[key], `session child must not inherit provider credential ${key}`).toBeUndefined();
+    }
+    expect(env['GEMINI_NONINTERACTIVE']).toBe('1');
   });
 
   it('buildGeminiSpawnEnv sets GEMINI_NONINTERACTIVE=1 to prevent interactive login hang', () => {

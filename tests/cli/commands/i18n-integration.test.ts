@@ -249,9 +249,13 @@ vi.mock('../../../src/core/constants.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/core/constants.js')>();
   return { ...actual, TMUX_SESSION_NAME: 'deckent', DASHBOARD_FILE: '.dashboard', TASKS_DIR: '.tasks' };
 });
-vi.mock('../../../src/core/provider.js', () => ({
-  bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
-}));
+vi.mock('../../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/core/provider.js')>();
+  return {
+    ...actual,
+    bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
+  };
+});
 vi.mock('../../../src/cli/commands/quick-start.js', () => ({
   prepareZeroConfig: vi.fn(),
   cleanupZeroConfig: vi.fn(),

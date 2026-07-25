@@ -328,19 +328,40 @@ describe('Docker OOM Recovery — Partial Result File Simulation', () => {
 describe('Docker OOM Recovery — Docker Logs Drain', () => {
   it('container logs are extracted BEFORE container removal', () => {
     const source = readDockerSource();
-    // docker logs must appear before docker rm -f
-    const logsIdx = source.indexOf("'docker', ['logs'");
-    const rmIdx = source.indexOf("'docker', ['rm', '-f'", logsIdx);
+    const monitorIdx = source.indexOf('private monitorContainer');
+    const logsIdx = source.indexOf('await captureDockerLogs(containerId)', monitorIdx);
+    const rmIdx = source.indexOf(
+      "spawnSync('docker', ['rm', containerId]",
+      logsIdx,
+    );
+    expect(monitorIdx).toBeGreaterThan(-1);
     expect(logsIdx).toBeGreaterThan(-1);
     expect(rmIdx).toBeGreaterThan(logsIdx);
   });
 
   it('docker logs output is saved to .log file', () => {
     const source = readDockerSource();
-    expect(source).toContain('task-${taskId}.log');
-    // Both stdout and stderr are captured
-    expect(source).toContain('logResult.stdout');
-    expect(source).toContain('logResult.stderr');
+    const monitorIdx = source.indexOf('private monitorContainer');
+    const logsIdx = source.indexOf('await captureDockerLogs(containerId)', monitorIdx);
+    const writeIdx = source.indexOf('writeNormalizedDockerLog(', logsIdx);
+    const removalIdx = source.indexOf(
+      "spawnSync('docker', ['rm', containerId]",
+      writeIdx,
+    );
+    const persistenceSection = source.slice(logsIdx, removalIdx);
+    expect(persistenceSection).toContain('const logContent = capture.content');
+    expect(persistenceSection).toContain('task-${taskId}.log');
+    expect(writeIdx).toBeGreaterThan(logsIdx);
+    expect(removalIdx).toBeGreaterThan(writeIdx);
+
+    const captureIdx = source.indexOf('export function captureDockerLogs(');
+    const captureSection = source.slice(
+      captureIdx,
+      source.indexOf('// ─── Docker Spawn Backend', captureIdx),
+    );
+    expect(captureIdx).toBeGreaterThan(-1);
+    expect(captureSection).toContain("Buffer.concat(stdoutChunks).toString('utf8')");
+    expect(captureSection).toContain("Buffer.concat(stderrChunks).toString('utf8')");
   });
 
   it('docker logs has a timeout to prevent hanging on large output', () => {

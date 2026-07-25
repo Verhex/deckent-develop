@@ -4,7 +4,10 @@ import { existsSync, realpathSync } from 'node:fs';
 import type { ModelType } from '../core/types.js';
 import type { ProviderSpawnOptions } from '../core/provider.js';
 import { ProviderError } from '../core/provider.js';
-import { SubprocessSpawnBackend } from './subprocess.js';
+import {
+  SubprocessSpawnBackend,
+  type SubprocessProviderConfig,
+} from './subprocess.js';
 
 // ─── SandboxOptions ──────────────────────────────────────────────────
 export interface SandboxOptions {
@@ -14,6 +17,8 @@ export interface SandboxOptions {
   allowedDirs?: string[];
   /** Disable network access (best-effort via env/flag) */
   blockNetwork?: boolean;
+  /** Adapter-owned provider/cost classification; omitted keeps remote Claude. */
+  providerConfig?: SubprocessProviderConfig;
 }
 
 // ─── SandboxSpawnBackend ─────────────────────────────────────────────
@@ -33,7 +38,7 @@ export class SandboxSpawnBackend extends SubprocessSpawnBackend {
   private readonly blockNetwork: boolean;
 
   constructor(projectDir: string, sandboxOpts?: SandboxOptions) {
-    super(projectDir);
+    super(projectDir, { providerConfig: sandboxOpts?.providerConfig });
     this.memoryLimitMb = sandboxOpts?.memoryLimitMb ?? 512;
     this.allowedDirs = (sandboxOpts?.allowedDirs ?? [projectDir]).map((d) =>
       resolve(d),
@@ -54,10 +59,13 @@ export class SandboxSpawnBackend extends SubprocessSpawnBackend {
     // Scope enforcement: verify working directory is within allowedDirs
     this.enforceScope(dir);
 
-    // Call parent spawn — it handles process creation
-    // NOTE: NODE_OPTIONS memory limit is injected via buildEnv(), called by
-    // consumers before spawning (e.g., start.ts --sandbox-mode).
-    super.spawn(taskId, model, prompt, opts);
+    // Overlay only sandbox constraints and caller-authorized provider env.
+    // The parent constructs the scrubbed host environment; passing a
+    // process.env-derived map here would re-introduce foreign provider keys.
+    super.spawn(taskId, model, prompt, {
+      ...opts,
+      env: this.buildEnv(opts?.env ?? {}),
+    });
   }
 
   // ─── isAvailable() ─────────────────────────────────────────────────

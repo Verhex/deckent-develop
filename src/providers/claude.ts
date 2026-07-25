@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ModelType } from '../core/types.js';
@@ -23,6 +24,11 @@ import {
   CLAUDE_SUBPROCESS_CONFIG,
 } from './subprocess.js';
 import { normalizeUsage, type TokenUsage } from '../core/token-usage.js';
+import {
+  assertCanonicalModelApiId,
+  type ReachabilityOutcome,
+  type ReachabilityProbeObservation,
+} from '../core/provider-truth.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -502,6 +508,156 @@ function tryParseJson(text: string): unknown {
   } catch {
     return undefined;
   }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function unwrapClaudeEvent(candidate: unknown): Record<string, unknown> | null {
+  const record = asRecord(candidate);
+  if (!record) return null;
+  const directType = record.type;
+  if (directType === 'system' || directType === 'assistant' || directType === 'result') {
+    return record;
+  }
+  const content = asRecord(record.content);
+  if (!content) return null;
+  const contentType = content.type;
+  return contentType === 'system' || contentType === 'assistant' || contentType === 'result'
+    ? content
+    : null;
+}
+
+function collectClaudeEvents(rawOutput: string): Record<string, unknown>[] {
+  const trimmed = rawOutput.trim();
+  if (trimmed.length === 0) return [];
+
+  const whole = tryParseJson(trimmed);
+  const candidates: unknown[] = whole === undefined
+    ? rawOutput.split(/\r?\n/u)
+      .map(line => line.trim())
+      .filter(line => line.startsWith('{'))
+      .map(line => tryParseJson(line))
+      .filter((value): value is unknown => value !== undefined)
+    : Array.isArray(whole) ? whole : [whole];
+
+  return candidates
+    .map(unwrapClaudeEvent)
+    .filter((event): event is Record<string, unknown> => event !== null);
+}
+
+function singleCanonicalValue(values: readonly unknown[]): string | null {
+  const strings = values.filter((value): value is string => (
+    typeof value === 'string' && value.length > 0
+  ));
+  const unique = [...new Set(strings)];
+  if (unique.length !== 1) return null;
+  const value = unique[0];
+  if (value === undefined) return null;
+  try {
+    assertCanonicalModelApiId(value);
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+function sha256(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+function claudeFailureOutcome(result: Record<string, unknown>): ReachabilityOutcome {
+  const status = result.api_error_status;
+  if (status === 401 || status === 403) return 'auth-rejected';
+  if (status === 429) return 'rate-limited';
+
+  const subtype = typeof result.subtype === 'string' ? result.subtype.toLowerCase() : '';
+  if (subtype.includes('rate') && subtype.includes('limit')) return 'rate-limited';
+  if (subtype.includes('auth')) return 'auth-rejected';
+  if (subtype.includes('timeout')) return 'timeout';
+  return result.is_error === true ? 'transport-error' : 'invalid-response';
+}
+
+/**
+ * Convert Claude CLI JSON/JSONL output into a sanitized reachability observation.
+ *
+ * This parser deliberately has no requested-model argument: called-model truth
+ * comes only from agreeing provider-native init + assistant envelopes. The
+ * returned references are hashes; prompt/output/session/account/request-id
+ * values never cross this boundary.
+ */
+export function parseClaudeReachabilityObservation(
+  rawOutput: string,
+): ReachabilityProbeObservation {
+  const evidenceRef = `provider-log:${sha256(typeof rawOutput === 'string' ? rawOutput : '')}`;
+  if (typeof rawOutput !== 'string') {
+    return {
+      outcome: 'invalid-response',
+      calledProvider: null,
+      calledModel: null,
+      providerRequestRefHash: null,
+      latencyMs: null,
+      evidenceRefs: [evidenceRef],
+    };
+  }
+
+  const events = collectClaudeEvents(rawOutput);
+  const terminalResults = events.filter(event => event.type === 'result');
+  const result = terminalResults.length === 1 ? terminalResults[0] : null;
+  if (!result) {
+    return {
+      outcome: 'invalid-response',
+      calledProvider: null,
+      calledModel: null,
+      providerRequestRefHash: null,
+      latencyMs: null,
+      evidenceRefs: [evidenceRef],
+    };
+  }
+
+  const initModel = singleCanonicalValue(events
+    .filter(event => event.type === 'system' && event.subtype === 'init')
+    .map(event => event.model));
+  const assistantEvents = events.filter(event => event.type === 'assistant');
+  const assistantModel = singleCanonicalValue(assistantEvents.map(event => asRecord(event.message)?.model));
+  const calledModel = initModel !== null && initModel === assistantModel ? initModel : null;
+  const requestIds = [...new Set(assistantEvents
+    .map(event => event.request_id)
+    .filter((value): value is string => typeof value === 'string' && value.length > 0))]
+    .sort();
+  const providerRequestRefHash = requestIds.length > 0
+    ? sha256(JSON.stringify(requestIds))
+    : null;
+  const latency = readNonNegInt(result, 'duration_api_ms');
+  const latencyMs = latency ?? null;
+
+  const succeeded = result.subtype === 'success' && result.is_error === false;
+  const modelUsage = asRecord(result.modelUsage);
+  const primaryUsagePresent = calledModel !== null
+    && modelUsage !== null
+    && Object.prototype.hasOwnProperty.call(modelUsage, calledModel);
+  if (!succeeded || calledModel === null || providerRequestRefHash === null || !primaryUsagePresent) {
+    return {
+      outcome: succeeded ? 'invalid-response' : claudeFailureOutcome(result),
+      calledProvider: calledModel === null ? null : 'claude',
+      calledModel,
+      providerRequestRefHash,
+      latencyMs,
+      evidenceRefs: [evidenceRef],
+    };
+  }
+
+  return {
+    outcome: 'succeeded',
+    calledProvider: 'claude',
+    calledModel,
+    providerRequestRefHash,
+    latencyMs,
+    evidenceRefs: [evidenceRef],
+  };
 }
 
 /** Read a non-negative finite number from `obj[key]`, else undefined. */

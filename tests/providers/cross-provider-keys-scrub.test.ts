@@ -27,6 +27,7 @@ import {
 } from '../../src/providers/cross-provider-keys.js';
 import { SubprocessSpawnBackend } from '../../src/providers/subprocess.js';
 import type { SubprocessProviderConfig } from '../../src/providers/subprocess.js';
+import { LocalSubprocessTestBackend } from '../helpers/local-subprocess-backend-fixture.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
 import type { ModelType } from '../../src/core/types.js';
 import type { ProviderDefinition } from '../../src/core/config-types.js';
@@ -51,6 +52,7 @@ const BASE_KEYS = [
   'DEEPSEEK_API_KEY',
   'DASHSCOPE_API_KEY',
   'ZHIPU_API_KEY',
+  'GEMINI_API_KEY',
   'OPENROUTER_API_KEY',
   'DECKENT_CLAUDE_API_KEY',
   'DECKENT_OPENAI_API_KEY',
@@ -205,7 +207,7 @@ describe('F1-014 phase-2 (B): subprocess backend scrubs config-provider apiKeyEn
     name: string,
     providerRegistry?: readonly ProviderDefinition[],
   ): SubprocessSpawnBackend {
-    return new SubprocessSpawnBackend(projectDir, {
+    return new LocalSubprocessTestBackend(projectDir, {
       providerConfig: makeConfig(cliCommand, name),
       platform: 'linux',
       spawnImpl: spawnImpl as unknown as typeof import('node:child_process').spawn,

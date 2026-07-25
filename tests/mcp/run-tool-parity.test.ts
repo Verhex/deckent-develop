@@ -36,7 +36,7 @@ vi.mock('../../src/orchestra/sprint-controller.js', () => ({
 }));
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   resolveDefaultModel: () => 'claude-opus-4-8',  // 453-001: canonical default-model resolver (omitted model)
   loadConfig: vi.fn(),
@@ -86,7 +86,10 @@ import { buildParametricModel, modelRegistry } from '../../src/core/model-regist
 
 const REMOTE_WORKER_CONFIG = {
   spawn_backend: 'subprocess',
-  execution_budget: { roles: { worker: { default: { maxTurns: 4 } } } },
+  execution_budget: {
+    roles: { worker: { default: { maxTurns: 4 } } },
+    landing: { reserve_ratio: 0.25 },
+  },
 } as const;
 
 // ─── Mock Server ────────────────────────────────────────────────────

@@ -57,6 +57,8 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
   SpawnBackendFactory: {
     create: vi.fn().mockReturnValue({
       name: 'docker',
+      liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
       spawn: vi.fn(),
     }),
   },
@@ -73,6 +75,10 @@ import { spawnWorkerMultiProvider } from '../../src/cli/commands/spawn.js';
 import { SpawnBackendFactory } from '../../src/orchestra/spawn-backend.js';
 import { getProviderAdapterForTask } from '../../src/orchestra/sprint-utils.js';
 import { ensureOllamaModelRegistered } from '../../src/core/model-registry.js';
+import {
+  TEST_DOCKER_EXECUTION_OPTIONS,
+  TEST_MEASURED_LANDING_CAPABILITIES,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 // ─── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -92,7 +98,11 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
       p === 'ollama' ? (mockAdapter as any) : null,
     );
     // SpawnBackendFactory control: docker backend
-    vi.mocked(SpawnBackendFactory.create).mockReturnValue({ name: 'docker', spawn: vi.fn() } as any);
+    vi.mocked(SpawnBackendFactory.create).mockReturnValue({
+      name: 'docker',
+      ...TEST_MEASURED_LANDING_CAPABILITIES,
+      spawn: vi.fn(),
+    } as any);
   });
 
   // ── Core fix: ollama bypasses spawnBackend='docker' ────────────────────────
@@ -270,7 +280,7 @@ describe('spawnWorkerMultiProvider — control: non-adapter providers still use 
     mockDockerSpawn = vi.fn();
     vi.mocked(SpawnBackendFactory.create).mockReturnValue({
       name: 'docker',
-      liveUsageBudgetSupport: 'measured-stream',
+      ...TEST_MEASURED_LANDING_CAPABILITIES,
       spawn: mockDockerSpawn,
     } as any);
   });
@@ -281,7 +291,10 @@ describe('spawnWorkerMultiProvider — control: non-adapter providers still use 
       'claude-sonnet-5',
       'prompt',
       '/root',
-      { spawnBackend: 'docker', executionBudget: { maxTurns: 1 } },
+      {
+        spawnBackend: 'docker',
+        ...TEST_DOCKER_EXECUTION_OPTIONS,
+      },
     );
 
     // Docker backend IS used for claude

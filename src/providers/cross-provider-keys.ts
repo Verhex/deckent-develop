@@ -40,6 +40,11 @@ export const BASE_PROVIDER_CREDENTIAL_ENV = {
  */
 const BASE_CREDENTIAL_KEYS: readonly string[] = [
   ...Object.values(BASE_PROVIDER_CREDENTIAL_ENV),
+  // Gemini CLI's Developer API authentication uses GEMINI_API_KEY at the
+  // child-process boundary even though `.deck` normalizes its host input from
+  // DECKENT_GOOGLE_API_KEY. It is therefore a provider credential too and must
+  // be absent from every non-Gemini child.
+  'GEMINI_API_KEY',
   // OpenRouter resolves `.deck` host-side and intentionally never writes its
   // key into process.env. A host may still provide the canonical env var, so it
   // belongs to the scrub set without pretending it is part of the

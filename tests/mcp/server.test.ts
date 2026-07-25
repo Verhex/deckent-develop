@@ -1,7 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
+import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // Mock all dependencies before importing
-vi.mock('node:fs', () => ({
+vi.mock('node:fs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:fs')>()),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   existsSync: vi.fn(),
@@ -64,7 +69,11 @@ vi.mock('../../src/agents/worker.js', () => ({
   releaseAllLocks: vi.fn(),
 }));
 
-import { createServer, DECKENT_MCP_INSTRUCTIONS } from '../../src/mcp/server.js';
+import {
+  createServer,
+  DECKENT_MCP_INSTRUCTIONS,
+  isMcpEntryPoint,
+} from '../../src/mcp/server.js';
 
 describe('MCP Server', () => {
   it('creates a server instance', () => {
@@ -77,6 +86,40 @@ describe('MCP Server', () => {
     // The server is created — if it didn't throw, tools and resources registered fine
     expect(server).toBeTruthy();
   });
+});
+
+describe('isMcpEntryPoint', () => {
+  it('recognizes a direct executable path and fails closed for absent paths', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'deckent-mcp-entrypoint-'));
+    const target = join(root, 'server.js');
+    try {
+      await writeFile(target, '#!/usr/bin/env node\n');
+      const moduleUrl = pathToFileURL(target).href;
+
+      expect(isMcpEntryPoint(moduleUrl, target)).toBe(true);
+      expect(isMcpEntryPoint(moduleUrl, undefined)).toBe(false);
+      expect(isMcpEntryPoint(moduleUrl, join(root, 'missing.js'))).toBe(false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'recognizes an executable symlink as the module filesystem identity',
+    async () => {
+      const root = await mkdtemp(join(tmpdir(), 'deckent-mcp-entrypoint-symlink-'));
+      const target = join(root, 'server.js');
+      const link = join(root, 'deckent-mcp');
+      try {
+        await writeFile(target, '#!/usr/bin/env node\n');
+        await symlink(target, link);
+
+        expect(isMcpEntryPoint(pathToFileURL(target).href, link)).toBe(true);
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
 });
 
 describe('DECKENT_MCP_INSTRUCTIONS', () => {

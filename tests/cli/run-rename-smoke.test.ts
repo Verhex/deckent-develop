@@ -279,14 +279,19 @@ describe.skipIf(DIST_ABSENT)(
         expect(result.stdout).toContain('Run 375 (sprint) — completed');
       }, 20_000);
 
-      it('--json on the same COMPLETE run round-trips the internal sprint.id alias unchanged', async () => {
+      it('--json on the same COMPLETE run reports the canonical no-active contract', async () => {
         const root = project(makeCompletedRunProject);
         const result = await runCli(['status', '--json'], root, env, 15_000, track);
 
         expect(result.exitCode, `stderr:\n${result.stderr}`).toBe(0);
-        const parsed = JSON.parse(result.stdout) as { sprint: { id: string; number: number } };
-        expect(parsed.sprint.id).toBe('sprint-375');
-        expect(parsed.sprint.number).toBe(375);
+        const parsed = JSON.parse(result.stdout) as {
+          active: false;
+          pendingApprovals: unknown[];
+          sprint?: unknown;
+        };
+        expect(parsed.active).toBe(false);
+        expect(parsed.pendingApprovals).toEqual([]);
+        expect(parsed.sprint).toBeUndefined();
       }, 20_000);
 
       it.skipIf(MESSAGES_STALE)(

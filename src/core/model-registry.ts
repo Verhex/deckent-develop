@@ -44,6 +44,16 @@ export const LEGACY_MODEL_ALIASES = Object.freeze({
 
 export type LegacyModelAlias = keyof typeof LEGACY_MODEL_ALIASES;
 
+/**
+ * Historical V1 config semantics that intentionally differ from the current
+ * model capability tier. Keep the exception beside model identity metadata so
+ * migration consumers never grow a second hardcoded model dictionary.
+ */
+export const CONFIG_MIGRATION_TIER_OVERRIDES = Object.freeze({
+  o3: 'standard',
+  'o4-mini': 'economy',
+} as const satisfies Readonly<Record<string, ModelTier>>);
+
 export function getLegacyModelMigration(id: string): string | undefined {
   return LEGACY_MODEL_ALIASES[id as LegacyModelAlias];
 }
@@ -657,6 +667,30 @@ export class ModelRegistry {
 // ─── Singleton ─────────────────────────────────────────────────────────────
 
 export const modelRegistry = new ModelRegistry();
+
+/**
+ * Resolve a V1 config model to its V2 tier from the registry SSOT.
+ *
+ * Legacy aliases are accepted only at this explicit migration boundary.
+ * Unknown identities fail loudly because choosing `standard` would silently
+ * invent capability/routing authority for an unowned model.
+ */
+export function resolveConfigMigrationModelTier(id: string): ModelTier {
+  const override = CONFIG_MIGRATION_TIER_OVERRIDES[
+    id as keyof typeof CONFIG_MIGRATION_TIER_OVERRIDES
+  ];
+  if (override) return override;
+
+  const canonicalId = getLegacyModelMigration(id) ?? id;
+  const definition = modelRegistry.get(canonicalId);
+  if (!definition) {
+    throw new DeckentError(
+      'E_UNKNOWN_MODEL',
+      `Unknown model in V1 config migration: ${id}`,
+    );
+  }
+  return definition.tier;
+}
 
 // ─── Opt-in: register Ollama models on a target registry ──────────────────
 // Called once by `src/providers/ollama.ts` at module-load time. Idempotent:

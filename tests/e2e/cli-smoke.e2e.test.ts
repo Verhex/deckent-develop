@@ -174,6 +174,15 @@ describe.skipIf(DIST_ABSENT)(
           ok: boolean;
           checks: Array<{ name: string; passed: boolean; message: string; required: boolean }>;
           providers: Array<{ name: string; available: boolean }>;
+          providerAuth: Array<{
+            provider: string;
+            available: boolean;
+            state: 'logged-in' | 'logged-out' | 'unknown' | 'unavailable' | 'unprobed';
+            method: 'subscription' | 'api-key' | 'none';
+            ready: boolean;
+            evidence: 'local-auth-probe' | 'availability-only';
+          }>;
+          providerSummary: { ready: number; total: number; authWarningCount: number };
           honestSummary: { summaryLine: string };
         };
         expect(() => { parsed = JSON.parse(result.stdout); }, `stdout was not valid JSON:\n${result.stdout}`).not.toThrow();
@@ -193,6 +202,14 @@ describe.skipIf(DIST_ABSENT)(
         expect(parsed.providers).toHaveLength(4);
         const providerNames = parsed.providers.map((p) => p.name).sort();
         expect(providerNames).toEqual(['claude', 'codex', 'gemini', 'ollama']);
+
+        expect(parsed.providerAuth).toHaveLength(4);
+        expect(parsed.providerAuth.map(item => item.provider).sort()).toEqual(providerNames);
+        expect(parsed.providerSummary.total).toBe(4);
+        expect(parsed.providerSummary.ready).toBe(parsed.providerAuth.filter(item => item.ready).length);
+        expect(parsed.providerSummary.authWarningCount).toBe(
+          parsed.providerAuth.filter(item => item.state === 'logged-out' || item.state === 'unknown').length,
+        );
 
         expect(typeof parsed.honestSummary.summaryLine).toBe('string');
         expect(parsed.honestSummary.summaryLine.length).toBeGreaterThan(0);

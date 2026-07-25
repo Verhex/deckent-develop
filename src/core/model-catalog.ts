@@ -3,7 +3,7 @@
 //
 // Source of truth at runtime: https://models.dev/api/v1/catalog
 // Cache file: ~/.deckent/cache/models-catalog.json (24h TTL)
-// Bundled fallback: BUILTIN_MODELS from model-registry.ts (offline safety net)
+// Bundled fallback: CANONICAL_MODELS from model-registry.ts (offline safety net)
 //
 // Preserves ADR-023 tier-based routing (premium_plus / premium / standard / economy)
 // and ADR-017 provider-agnostic adapter interface.
@@ -13,7 +13,7 @@ import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { DeckentError } from './errors.js';
 import {
-  BUILTIN_MODELS,
+  CANONICAL_MODELS,
   modelRegistry,
   type ModelDefinition,
   type ModelTier,
@@ -319,7 +319,7 @@ export async function fetchRemoteCatalog(
 // ─── Bundled Fallback ──────────────────────────────────────────────────────
 
 export function getBundledCatalog(): ModelDefinition[] {
-  return [...BUILTIN_MODELS];
+  return [...CANONICAL_MODELS];
 }
 
 // ─── Public API ────────────────────────────────────────────────────────────
@@ -328,7 +328,7 @@ export function getBundledCatalog(): ModelDefinition[] {
  * Load the model catalog through the 3-stage fallback chain:
  *   1. fresh fetch from models.dev (skipped if offline or cache still warm)
  *   2. cached file at ~/.deckent/cache/models-catalog.json (if <24h old)
- *   3. bundled BUILTIN_MODELS snapshot (always succeeds)
+ *   3. bundled CANONICAL_MODELS snapshot (always succeeds)
  *
  * Never throws — bundled is the absorber of last resort.
  */
@@ -468,7 +468,7 @@ export function mergeApiIdOverrides(
 
 /**
  * Bootstrap the global ModelRegistry from the live models.dev catalog.
- * 3-stage fallback: remote fetch → 24h cache → bundled BUILTIN_MODELS.
+ * 3-stage fallback: remote fetch → 24h cache → bundled CANONICAL_MODELS.
  * Idempotent: no-op on repeated calls unless force:true is passed.
  * Never throws — network errors fall back silently to bundled models.
  */

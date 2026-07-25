@@ -3,9 +3,9 @@
  *
  * GET  /api/approvals              — pending/approved/denied buckets, maskedArgs-only.
  * GET  /api/approvals/:id          — single entry detail; raw args NEVER served.
- * POST /api/approvals/:id/decision — ApprovalBroker.decide(); flag-gated by
- *   `approval.api_decide` (default-off -> 403). The GET routes above are NOT
- *   gated by this flag (dashboard monitoring stays always-on).
+ * POST /api/approvals/:id/decision — verified runtime-wide OIDC ingress;
+ *   flag-gated by `approval.api_decide` (default-off -> 403). A static API
+ *   bearer never becomes attended-execution decision authority.
  *
  * Hermetic: real E2E server via startTestServer on a tmpdir project root.
  * Approval fixtures are seeded directly through a real ApprovalBroker pointed
@@ -156,33 +156,22 @@ describe('/api/approvals', () => {
       expect(body.error).toMatch(/api_decide/);
     });
 
-    it('decides via the broker when the flag is enabled, decidedBy server-derived', async () => {
+    it('HOLDs a static bearer when no verified approval authority is composed', async () => {
       enableApiDecide(handle!.projectRoot);
       const broker = new ApprovalBroker(handle!.projectRoot);
       broker.submit(buildRequest('apr-flagon-1'));
 
       const res = await call(handle!, '/api/approvals/apr-flagon-1/decision', {
         method: 'POST',
+        headers: { 'Idempotency-Key': 'static-token-is-not-step-up' },
         body: JSON.stringify({ decision: 'allow', reason: 'approved via API' }),
       });
-      expect(res.status).toBe(200);
-      const body = res.json<{
-        success: boolean;
-        decision: { decision: string; decidedBy: string; channel: string; reason: string };
-      }>();
-      expect(body.success).toBe(true);
-      expect(body.decision.decision).toBe('allow');
-      expect(body.decision.channel).toBe('api');
-      expect(body.decision.reason).toBe('approved via API');
-      expect(body.decision.decidedBy).toBeTruthy();
-
-      // Broker-visible effect: a fresh store re-scan sees it as approved.
-      const listRes = await call(handle!, '/api/approvals');
-      const listBody = listRes.json<{ approved: Array<{ request: { id: string } }> }>();
-      expect(listBody.approved.map((e) => e.request.id)).toContain('apr-flagon-1');
+      expect(res.status).toBe(503);
+      expect(res.json<{ error: string }>().error).toContain('authority is unavailable');
+      expect(new ApprovalBroker(handle!.projectRoot).getDecision('apr-flagon-1')).toBeNull();
     });
 
-    it('can resolve a path-safe legacy v1 id through the shared lookup contract', async () => {
+    it('resolves a path-safe legacy v1 id but never grants it static-bearer authority', async () => {
       enableApiDecide(handle!.projectRoot);
       const broker = new ApprovalBroker(handle!.projectRoot);
       const legacy = {
@@ -197,11 +186,11 @@ describe('/api/approvals', () => {
 
       const res = await call(handle!, '/api/approvals/APR-LEGACY-API/decision', {
         method: 'POST',
+        headers: { 'Idempotency-Key': 'legacy-static-token' },
         body: JSON.stringify({ decision: 'allow' }),
       });
-      expect(res.status).toBe(200);
-      expect(res.json<{ decision: { requestId: string } }>().decision.requestId).toBe('APR-LEGACY-API');
-      expect(broker.checkForExternalDecisions()).toHaveLength(1);
+      expect(res.status).toBe(503);
+      expect(broker.checkForExternalDecisions()).toHaveLength(0);
     });
 
     it('400s on an invalid decision body', async () => {
@@ -230,6 +219,7 @@ describe('/api/approvals', () => {
 
       const res = await call(handle!, '/api/approvals/apr-double-1/decision', {
         method: 'POST',
+        headers: { 'Idempotency-Key': 'already-decided' },
         body: JSON.stringify({ decision: 'allow' }),
       });
       expect(res.status).toBe(409);
@@ -239,6 +229,7 @@ describe('/api/approvals', () => {
       enableApiDecide(handle!.projectRoot);
       const res = await call(handle!, '/api/approvals/does-not-exist/decision', {
         method: 'POST',
+        headers: { 'Idempotency-Key': 'unknown-request' },
         body: JSON.stringify({ decision: 'allow' }),
       });
       expect(res.status).toBe(404);

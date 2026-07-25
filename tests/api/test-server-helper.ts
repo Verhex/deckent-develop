@@ -31,6 +31,10 @@ export interface TestServerOptions extends Omit<HttpServerOptions, 'port'> {
   apiToken?: string;
   /** Pre-populate dashboard JSON, sprint logs, config, exports, tasks. */
   seed?: SeedData;
+  /** Build a project-bound approval composition after the tmp root exists. */
+  approvalAuthorityFactory?: (
+    projectRoot: string,
+  ) => HttpServerOptions['approvalAuthority'];
 }
 
 export interface SeedData {
@@ -85,6 +89,8 @@ export async function startTestServer(
     delete process.env['DECKENT_API_TOKEN'];
   }
 
+  const approvalAuthority =
+    opts.approvalAuthorityFactory?.(projectRoot) ?? opts.approvalAuthority;
   const api = createHttpServer(projectRoot, {
     port: 0,
     apiToken: opts.apiToken,
@@ -95,6 +101,13 @@ export async function startTestServer(
     rateLimitExemptLoopback: opts.rateLimitExemptLoopback ?? false,
     staticDir: opts.staticDir,
     host: opts.host ?? '127.0.0.1',
+    ...(opts.oidc ? { oidc: opts.oidc } : {}),
+    ...(approvalAuthority ? { approvalAuthority } : {}),
+    ...(opts.providerAuthority ? { providerAuthority: opts.providerAuthority } : {}),
+    ...(opts.approvalExpirySweepMs !== undefined
+      ? { approvalExpirySweepMs: opts.approvalExpirySweepMs }
+      : {}),
+    ...(opts.terminalBackend ? { terminalBackend: opts.terminalBackend } : {}),
   });
 
   await new Promise<void>((resolve) => api.server.once('listening', () => resolve()));

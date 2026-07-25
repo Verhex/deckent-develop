@@ -34,6 +34,9 @@ import {
 } from './autonomous/execute-dispatcher.js';
 import type { ProcessStep } from './process-runtime.js';
 import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
+import type {
+  ProviderAuthorityCompositionHoldReason,
+} from '../core/provider-authority-composition.js';
 
 /** A single execution submission (the ExecutionRequest envelope, process flavor). */
 export interface ProcessSubmitCtx {
@@ -59,12 +62,33 @@ export interface ProcessSubmitCtx {
   origin?: string;
 }
 
-export type ProcessStatus = 'completed' | 'failed' | 'pending-approval';
+export type ProcessStatus = 'completed' | 'failed' | 'held' | 'pending-approval';
+export type ProcessProviderAuthorityHoldReason =
+  | ProviderAuthorityCompositionHoldReason
+  | 'candidate_authority_unavailable';
+
+export interface ProcessProviderAuthorityHoldV1 {
+  readonly schemaVersion: 1;
+  readonly executionId: string;
+  readonly tenantId: string;
+  readonly projectId: string | null;
+  readonly reasonCode: ProcessProviderAuthorityHoldReason;
+  readonly authorityEvidenceRefs: readonly string[];
+  readonly heldAt: string;
+}
+
+export type ProcessProviderExecutionAdmission =
+  | { readonly decision: 'allow' }
+  | {
+      readonly decision: 'hold';
+      readonly hold: ProcessProviderAuthorityHoldV1;
+    };
 
 export interface ProcessSubmitResult {
   executionId: string;
   status: ProcessStatus;
   reason?: string;
+  providerAuthorityHold?: ProcessProviderAuthorityHoldV1;
 }
 
 export interface ProcessRecord {
@@ -79,6 +103,15 @@ export interface ProcessControllerDeps
   extends Pick<ExecuteDispatcherDeps, 'projectRoot' | 'config' | 'runTask' | 'runSprint' | 'waitForResult' | 'resultTimeoutMs' | 'capabilityRegistry' | 'evaluate' | 'audit' | 'crossVerify'> {
   /** Durable backlog the submitted entry is appended to (and queried from). */
   backlogPath: string;
+  /**
+   * Host-owned provider admission for auto-dispatched execution kinds. Capability
+   * entries bypass this gate because they do not invoke an AI provider.
+   */
+  admitProviderExecution?: (
+    entry: Readonly<BacklogEntry>,
+  ) => ProcessProviderExecutionAdmission | Promise<ProcessProviderExecutionAdmission>;
+  /** Close process-scoped authority stores after the surface request completes. */
+  close?: () => void;
   /** Unique execution-id generator (injected for deterministic tests). */
   idGen?: () => string;
 }
@@ -86,6 +119,7 @@ export interface ProcessControllerDeps
 export interface ProcessController {
   submit(ctx: ProcessSubmitCtx): Promise<ProcessSubmitResult>;
   status(executionId: string): ProcessRecord | null;
+  close(): void;
 }
 
 function defaultIdGen(): string {
@@ -156,6 +190,29 @@ export function makeProcessController(deps: ProcessControllerDeps): ProcessContr
         return { executionId: id, status: 'pending-approval', reason: decision.reason };
       }
 
+      if (entry.kind !== 'capability' && deps.admitProviderExecution) {
+        const admission = await deps.admitProviderExecution(entry);
+        if (admission.decision === 'hold') {
+          const reload = loadBacklog(deps.backlogPath);
+          const heldEntry = reload.entries.find((candidate) => candidate.id === id);
+          if (heldEntry) {
+            heldEntry.status = 'parked';
+            heldEntry.lastResult = {
+              ok: false,
+              reason: `provider-authority-hold:${admission.hold.reasonCode}`,
+              providerAuthorityHold: admission.hold,
+            };
+            persist(reload);
+          }
+          return {
+            executionId: id,
+            status: 'held',
+            reason: admission.hold.reasonCode,
+            providerAuthorityHold: admission.hold,
+          };
+        }
+      }
+
       // auto → dispatch this single entry deterministically through the same
       // execute-dispatcher the autonomous loop uses (status writeback included).
       const dispatcher = makeExecuteDispatcher({
@@ -189,6 +246,10 @@ export function makeProcessController(deps: ProcessControllerDeps): ProcessContr
       const e = loadBacklog(deps.backlogPath).entries.find((x) => x.id === executionId);
       if (!e) return null;
       return { id: e.id, title: e.title, kind: e.kind, status: e.status, lastResult: e.lastResult };
+    },
+
+    close(): void {
+      deps.close?.();
     },
   };
 }

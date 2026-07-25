@@ -22,9 +22,11 @@
 //     provider'da 'unknown' dön — UYDURMA").
 //
 // Grounded per-provider methods (verified against the installed CLI contracts):
-//   - claude : `claude auth status --json`; only exit 0 + JSON `loggedIn === true`
-//              proves a usable local session. Credential/API-key presence alone is
-//              configuration evidence, not authentication proof.
+//   - claude : `claude auth status --json`; exact JSON `loggedIn === false` is
+//              authoritative even though the installed CLI exits 1 for that
+//              state. A usable session still requires exit 0 + `loggedIn ===
+//              true`. Credential/API-key presence alone is configuration
+//              evidence, not authentication proof.
 //   - codex  : `codex login status` → prints "Not logged in" with EXIT 0 (live-
 //              verified — exit code is NOT a signal, parse stdout) OR
 //              configured API-key presence, which remains unverified.
@@ -49,6 +51,7 @@ import { spawn as nodeSpawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { scrubCrossProviderEnv } from './provider.js';
 
 /** Providers this probe understands. Anything else → 'unknown'. */
 export type AuthProbeProvider = 'claude' | 'codex' | 'gemini';
@@ -97,7 +100,7 @@ export interface AuthProbeSpawnResult {
 export type AuthProbeSpawnImpl = (
   command: string,
   args: readonly string[],
-  opts: { timeoutMs: number },
+  opts: { timeoutMs: number; env: NodeJS.ProcessEnv },
 ) => Promise<AuthProbeSpawnResult>;
 
 /** Injectable file reader — must throw (like fs) when the path is absent. */
@@ -123,7 +126,7 @@ const DEFAULT_TIMEOUT_MS = 5_000;
  * secret-free {@link AuthProbeSpawnResult}; on a spawn error / timeout it reports
  * `spawnError` / `timedOut` so the caller maps to 'unknown'. No spawnSync.
  */
-const defaultSpawnImpl: AuthProbeSpawnImpl = (command, args, { timeoutMs }) =>
+const defaultSpawnImpl: AuthProbeSpawnImpl = (command, args, { timeoutMs, env }) =>
   new Promise<AuthProbeSpawnResult>((resolve) => {
     let settled = false;
     const done = (r: AuthProbeSpawnResult): void => {
@@ -135,7 +138,11 @@ const defaultSpawnImpl: AuthProbeSpawnImpl = (command, args, { timeoutMs }) =>
 
     let child: ReturnType<typeof nodeSpawn>;
     try {
-      child = nodeSpawn(command, [...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+      child = nodeSpawn(command, [...args], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env,
+        shell: false,
+      });
     } catch {
       resolve({ status: null, stdout: '', timedOut: false, spawnError: true });
       return;
@@ -162,6 +169,14 @@ const defaultSpawnImpl: AuthProbeSpawnImpl = (command, args, { timeoutMs }) =>
   });
 
 const defaultReadFile: AuthProbeReadFile = (path) => readFileSync(path, 'utf-8');
+
+async function buildAuthProbeChildEnv(
+  hostEnv: NodeJS.ProcessEnv,
+): Promise<NodeJS.ProcessEnv> {
+  const { resolveCrossProviderCredentialKeys } =
+    await import('../providers/cross-provider-keys.js');
+  return scrubCrossProviderEnv(hostEnv, resolveCrossProviderCredentialKeys());
+}
 
 /** Non-empty trimmed env value, or undefined. */
 function envValue(env: NodeJS.ProcessEnv, key: string): string | undefined {
@@ -195,7 +210,11 @@ async function probeClaude(
     return configuredApiKey();
   }
 
-  const res = await spawnImpl('claude', ['auth', 'status', '--json'], { timeoutMs });
+  const childEnv = await buildAuthProbeChildEnv(env);
+  const res = await spawnImpl('claude', ['auth', 'status', '--json'], {
+    timeoutMs,
+    env: childEnv,
+  });
   if (res.spawnError) {
     return {
       state: 'unknown',
@@ -214,16 +233,6 @@ async function probeClaude(
       method: 'none',
     };
   }
-  if (res.status !== 0) {
-    return {
-      state: 'unknown',
-      detail: 'claude auth status exited with non-zero status',
-      present: true,
-      authenticated: 'unknown',
-      method: 'none',
-    };
-  }
-
   let parsed: Record<string, unknown>;
   try {
     const value = JSON.parse(res.stdout) as unknown;
@@ -232,7 +241,9 @@ async function probeClaude(
   } catch {
     return {
       state: 'unknown',
-      detail: 'claude auth status returned unparseable JSON',
+      detail: res.status === 0
+        ? 'claude auth status returned unparseable JSON'
+        : 'claude auth status exited non-zero without authoritative JSON',
       present: true,
       authenticated: 'unknown',
       method: 'none',
@@ -257,6 +268,15 @@ async function probeClaude(
       method: 'none',
     };
   }
+  if (res.status !== 0) {
+    return {
+      state: 'unknown',
+      detail: 'claude auth status reported login with non-zero status',
+      present: true,
+      authenticated: 'unknown',
+      method: 'none',
+    };
+  }
 
   const authMethod = parsed['authMethod'];
   const method: AuthProbeMethod = authMethod === 'api_key'
@@ -275,8 +295,23 @@ async function probeClaude(
 
 // ─── codex ───────────────────────────────────────────────────────────────────
 
+export const CODEX_AUTH_STATUS_ARGS = ['login', 'status'] as const;
+
 const CODEX_LOGGED_OUT = /not\s+logged\s+in|not\s+authenticated|logged\s+out/i;
 const CODEX_LOGGED_IN = /logged\s+in|authenticated/i;
+
+/**
+ * Canonical parser for the installed Codex CLI's local auth-status contract.
+ * Logged-out text wins the substring trap; a positive login requires exit 0.
+ */
+export function classifyCodexAuthStatus(
+  status: number | null,
+  output: string,
+): AuthProbeState {
+  if (CODEX_LOGGED_OUT.test(output)) return 'logged-out';
+  if (status === 0 && CODEX_LOGGED_IN.test(output)) return 'logged-in';
+  return 'unknown';
+}
 
 /**
  * Codex session via `codex login status` (a real subcommand). NOTE: it exits 0
@@ -293,7 +328,11 @@ async function probeCodex(
     return configuredApiKey();
   }
 
-  const res = await spawnImpl('codex', ['login', 'status'], { timeoutMs });
+  const childEnv = await buildAuthProbeChildEnv(env);
+  const res = await spawnImpl('codex', CODEX_AUTH_STATUS_ARGS, {
+    timeoutMs,
+    env: childEnv,
+  });
   if (res.spawnError) {
     return {
       state: 'unknown',
@@ -313,8 +352,8 @@ async function probeCodex(
     };
   }
 
-  const out = res.stdout ?? '';
-  if (CODEX_LOGGED_OUT.test(out)) {
+  const state = classifyCodexAuthStatus(res.status, res.stdout ?? '');
+  if (state === 'logged-out') {
     return {
       state: 'logged-out',
       detail: 'codex login status: not logged in — run: codex login',
@@ -323,7 +362,7 @@ async function probeCodex(
       method: 'none',
     };
   }
-  if (CODEX_LOGGED_IN.test(out)) {
+  if (state === 'logged-in') {
     return {
       state: 'logged-in',
       detail: 'codex login status: logged in',

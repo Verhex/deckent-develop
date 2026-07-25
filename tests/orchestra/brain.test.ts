@@ -1,4 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   TaskStatus, TaskEvaluation, SprintPhase, SprintStatus, DebtPriority, AgentStatus,
 } from '../../src/core/types.js';
@@ -65,6 +67,18 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
   return {
     ...actual,
     getNextSprintId: vi.fn().mockReturnValue('sprint-001'),
+  };
+});
+
+// This legacy unit suite fully mocks node:fs and supplies raw task results.
+// Settlement behavior has dedicated tmpdir-backed suites; model this suite's
+// authority mode explicitly so the fs mock cannot fabricate a Docker claim.
+vi.mock('../../src/core/task-result-settlement.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/task-result-settlement.js')>();
+  return {
+    ...actual,
+    readLatestTaskResultSettlementRef: vi.fn(() => null),
+    readClosedTaskResultSettlement: vi.fn(() => null),
   };
 });
 
@@ -136,23 +150,36 @@ vi.mock('../../src/orchestra/planner.js', () => ({
   callBrainPlanner: vi.fn().mockReturnValue(null),
 }));
 
+const providerFixtures = vi.hoisted(() => ({
+  claudeAdapter: {
+    name: 'claude' as const,
+    buildCommand: vi.fn().mockReturnValue('claude --model claude-sonnet-5 /dev/null'),
+    isAvailable: vi.fn().mockResolvedValue(true),
+  },
+}));
+
 vi.mock('../../src/core/provider.js', () => ({
+  orderedRoleProviders: vi.fn((role: 'brain' | 'worker' | 'auditor', config: ResolvedConfig) => ({
+    role,
+    primary: role === 'brain'
+      ? config.providers?.brain ?? config.brain_provider ?? 'claude'
+      : 'claude',
+    fallbacks: [],
+    unattended: config.provider_fallback?.unattended ?? true,
+  })),
   providerRegistry: {
-    getDefault: vi.fn().mockReturnValue({
-      name: 'claude',
-      buildCommand: vi.fn().mockReturnValue('claude --model opus /dev/null'),
-      isAvailable: vi.fn().mockResolvedValue(true),
-    }),
+    getDefault: vi.fn().mockReturnValue(providerFixtures.claudeAdapter),
     registerProvider: vi.fn(),
-    getProvider: vi.fn(),
-    listProviders: vi.fn().mockReturnValue([]),
-    hasProvider: vi.fn().mockReturnValue(false),
+    getProvider: vi.fn().mockReturnValue(providerFixtures.claudeAdapter),
+    listProviders: vi.fn().mockReturnValue(['claude']),
+    hasProvider: vi.fn().mockImplementation((name: string) => name === 'claude'),
     setDefault: vi.fn(),
   },
   ProviderError: class ProviderError extends Error {},
   getProviderForModel: vi.fn().mockReturnValue('claude'),
 }));
 
+const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, statSync } from 'node:fs';
 import { stat as fspStat, writeFile as fspWriteFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
@@ -267,9 +294,16 @@ function makeSprint(overrides: Partial<Sprint> = {}): Sprint {
 }
 
 const spawnOk = { status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [] } as never;
+const originalDeckentHome = process.env.DECKENT_HOME;
+let sandboxDeckentHome = '';
 
 beforeEach(() => {
+  sandboxDeckentHome = actualFs.mkdtempSync(join(tmpdir(), 'deckent-brain-test-state-'));
+  process.env.DECKENT_HOME = sandboxDeckentHome;
   vi.clearAllMocks();
+  mockedReadFileSync.mockImplementation(() => {
+    throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+  });
   mockedExistsSync.mockReturnValue(false);
   mockedReaddirSync.mockReturnValue([] as never);
   mockedListWorkers.mockReturnValue([]);
@@ -286,6 +320,15 @@ beforeEach(() => {
   // Reset async fs mocks (node:fs/promises) — stat defaults to ENOENT (file not found)
   mockedFspStat.mockRejectedValue(new Error('ENOENT'));
   mockedFspWriteFile.mockResolvedValue(undefined);
+});
+
+afterEach(() => {
+  if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+  else process.env.DECKENT_HOME = originalDeckentHome;
+  if (sandboxDeckentHome) {
+    actualFs.rmSync(sandboxDeckentHome, { recursive: true, force: true });
+    sandboxDeckentHome = '';
+  }
 });
 
 // ═══ Tests ═══════════════════════════════════════════════════════════
@@ -877,7 +920,7 @@ describe('spawnWorkers', () => {
 describe('waitForResults', () => {
   it('returns immediately when all results exist', async () => {
     const sprint = makeSprint();
-    mockedExistsSync.mockReturnValue(true);
+    mockedExistsSync.mockImplementation(path => !String(path).includes('task-result-settlements'));
     mockedReadFileSync.mockReturnValue(JSON.stringify(makeResult()));
     mockedFspStat.mockResolvedValue({ isFile: () => true } as never);
 
@@ -908,7 +951,7 @@ describe('waitForResults', () => {
     const task2 = makeTask({ id: '001-002' });
     const sprint = makeSprint({ tasks: [makeTask(), task2] });
 
-    mockedExistsSync.mockReturnValue(true);
+    mockedExistsSync.mockImplementation(path => !String(path).includes('task-result-settlements'));
     mockedFspStat.mockResolvedValue({ isFile: () => true } as never);
     mockedReadFileSync.mockImplementation((path: unknown) => {
       const p = String(path);
@@ -941,7 +984,7 @@ describe('waitForResults', () => {
 
   it('does not include duplicates', async () => {
     const sprint = makeSprint();
-    mockedExistsSync.mockReturnValue(true);
+    mockedExistsSync.mockImplementation(path => !String(path).includes('task-result-settlements'));
     mockedFspStat.mockResolvedValue({ isFile: () => true } as never);
     mockedReadFileSync.mockReturnValue(JSON.stringify(makeResult()));
 

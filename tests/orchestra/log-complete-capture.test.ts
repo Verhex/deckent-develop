@@ -182,6 +182,23 @@ describe('captureStreamToLog — complete-stream capture (Phase 4.2)', () => {
     expect(seen[seen.length - 1].type).toBe('usage');
   });
 
+  it('keeps presentation taps fail-soft by default but lets authority taps fail closed', async () => {
+    const failSoft = Readable.from(`${SIX_EVENT_CLAUDE_STREAM[0]}\n`);
+    await expect(captureStreamToLog(failSoft, {
+      logPath,
+      provider: 'claude',
+      onEvent: () => { throw new Error('presentation tap failed'); },
+    })).resolves.toMatchObject({ eventsWritten: 1 });
+
+    const failClosed = Readable.from(`${SIX_EVENT_CLAUDE_STREAM[0]}\n`);
+    await expect(captureStreamToLog(failClosed, {
+      logPath,
+      provider: 'claude',
+      failOnEventError: true,
+      onEvent: () => { throw new Error('authority tap failed'); },
+    })).rejects.toThrow('authority tap failed');
+  });
+
   it('handles an empty stream without creating spurious events', async () => {
     const stream = Readable.from('');
     const res = await captureStreamToLog(stream, { logPath, provider: 'claude' });

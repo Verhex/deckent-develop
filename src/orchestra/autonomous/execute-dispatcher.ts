@@ -43,6 +43,17 @@ export const AUTONOMOUS_EXECUTE_ACTION = 'autonomous.execute';
 /** ENT-3: BacklogEntry extended with optional causal-lineage fields (runtime-only). */
 type EntryMeta = BacklogEntry & { correlationId?: string };
 
+export type AutonomousProviderAuthorityHold = NonNullable<
+  NonNullable<BacklogEntry['lastResult']>['providerAuthorityHold']
+>;
+
+export type AutonomousProviderExecutionAdmission =
+  | { readonly decision: 'allow' }
+  | {
+      readonly decision: 'hold';
+      readonly hold: AutonomousProviderAuthorityHold;
+    };
+
 /**
  * ENT-3: Read the hmac of the last written audit event for a sprint.
  * Used to establish causationId = parent-event-hmac in the result audit event.
@@ -95,6 +106,15 @@ export interface ExecuteDispatcherDeps {
    * Defaults to 600_000 (10 min) — ollama models can be slow to load.
    */
   resultTimeoutMs?: number;
+  /**
+   * Optional host-owned provider authority gate. When wired, every
+   * provider-backed kind is admitted before JIT planning or execution. A
+   * capability entry is provider-free and deliberately bypasses this gate.
+   * Absent keeps the v1 rollout behavior unchanged.
+   */
+  admitProviderExecution?: (
+    entry: BacklogEntry,
+  ) => AutonomousProviderExecutionAdmission | Promise<AutonomousProviderExecutionAdmission>;
   /**
    * Optional concurrency pool. When provided, each action is routed through
    * pool.submit() to enforce bounded parallel execution. Absent → direct/serial
@@ -243,6 +263,38 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
       // Gap B — mark running before any work begins (re-load so concurrent changes are seen)
       const bl0: BacklogFile = loadBacklog(deps.backlogPath);
       updateStatus(deps.backlogPath, bl0, entry.id, 'running', null);
+
+      // Provider authority must precede JIT: the detailer is itself a remote
+      // Brain invocation and may spend tokens before the eventual worker gate.
+      // Capability entries are fulfilled by the provider-free capability
+      // broker, so they remain reachable even while provider execution is held.
+      if (entry.kind !== 'capability' && deps.admitProviderExecution) {
+        try {
+          const admission = await deps.admitProviderExecution(entry);
+          if (admission.decision === 'hold') {
+            const reason = `provider-authority: ${admission.hold.reasonCode}`;
+            const blHold = loadBacklog(deps.backlogPath);
+            updateStatus(deps.backlogPath, blHold, entry.id, 'parked', {
+              ok: false,
+              reason,
+              providerAuthorityHold: admission.hold,
+            });
+            deps.flow?.step('parked', entry.id, reason);
+            return { outcome: 'failure', error: reason };
+          }
+        } catch (err: unknown) {
+          const reason = `provider-authority-admission-error: ${
+            err instanceof Error ? err.message : String(err)
+          }`;
+          const blErr = loadBacklog(deps.backlogPath);
+          updateStatus(deps.backlogPath, blErr, entry.id, 'failed', {
+            ok: false,
+            reason,
+          });
+          deps.flow?.step('failed', entry.id, reason);
+          return { outcome: 'failure', error: reason };
+        }
+      }
 
       // Phase 2: detail a planned task/sprint just-in-time, then persist so the
       // worker prompt + audit see the full description (and a re-dispatch is stable).

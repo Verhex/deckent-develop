@@ -63,6 +63,7 @@ function makeBackend(root: string): SpawnBackend & { calls: SpawnRec[] } {
   return {
     name: 'mock-docker',
     liveUsageBudgetSupport: 'measured-stream' as const,
+    executionLandingCapability: 'cooperative-landing' as const,
     spawn(taskId: string, model: ModelType) {
       calls.push({ taskId, model });
       writeFileSync(
@@ -83,6 +84,7 @@ function makeOllamaAdapter(root: string): ProviderAdapter & { calls: SpawnRec[] 
   const adapter = {
     name: 'ollama' as ProviderName,
     liveUsageBudgetSupport: 'measured-stream' as const,
+    executionCostClass: 'local' as const,
     buildCommand: () => 'ollama',
     isAvailable: () => Promise.resolve(true),
     spawn(taskId: string, model: ModelType) {
@@ -119,6 +121,20 @@ function makeTask(id: string, provider: ProviderName, model: string, file: strin
     assignedSkills: [],
     provider,
     budget: { maxTurns: 1 },
+    ...(provider === 'claude'
+      ? {
+        budgetPolicy: {
+          state: 'allow' as const,
+          role: 'worker' as const,
+          resolvedProvider: provider,
+          executionCostClass: 'remote' as const,
+          profileRef: 'tests.orchestra.as2-p2-mixed-fleet',
+          policyDigest: 'a'.repeat(64),
+          admissionMode: 'unattended' as const,
+          landingPolicy: { reserve_ratio: 0.25 },
+        },
+      }
+      : {}),
   } as unknown as Task;
 }
 

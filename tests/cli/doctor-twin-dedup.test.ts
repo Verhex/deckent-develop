@@ -40,10 +40,14 @@ const doctorSrc = readFileSync(new URL('../../src/cli/commands/doctor.ts', impor
 const doctorChecksSrc = readFileSync(new URL('../../src/cli/commands/doctor-checks.ts', import.meta.url), 'utf-8');
 
 describe('runDoctorChecks — single canonical check-list (static evidence)', () => {
-  it('doctor.ts has no local `DoctorCheck[]` array construction — only doctor-checks.ts builds the check-list', () => {
-    const arrayLiteralPattern = /:\s*DoctorCheck\[\]\s*=\s*\[/g;
-    expect(doctorSrc.match(arrayLiteralPattern) ?? []).toHaveLength(0);
-    expect(doctorChecksSrc.match(arrayLiteralPattern) ?? []).toHaveLength(1);
+  it('doctor.ts has no local `runDoctorChecks` check-list construction', () => {
+    const localRunDoctorBody = doctorSrc.match(
+      /(?:export )?function runDoctorChecks\([^)]*\)[\s\S]*?\n}\n/,
+    );
+    expect(localRunDoctorBody).toBeNull();
+    expect(doctorChecksSrc).toMatch(
+      /export function runDoctorChecks\([^)]*\)[\s\S]*?const checks:\s*DoctorCheck\[\]\s*=\s*\[/,
+    );
   });
 
   it('only ONE `function runDoctorChecks(` definition exists across doctor.ts + doctor-checks.ts', () => {

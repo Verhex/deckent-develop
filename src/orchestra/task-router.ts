@@ -6,7 +6,7 @@ import type { Task } from '../core/types.js';
 import type { ProviderName, ModelType } from '../core/task-types.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import { PROVIDER_MODEL_MAP } from '../core/task-types.js';
-import { getDefaultProviderName } from './sprint-utils.js';
+import { orderedRoleProviders, ProviderError, validateProviderName } from '../core/provider.js';
 import { brainEstimateTimeout } from './timeout-estimator.js';
 import type { SprintHistory } from './timeout-estimator.js';
 import { writeEvent, CHANNELS } from './event-stream.js';
@@ -26,8 +26,11 @@ export interface SkillRoutingConfig {
 /** Configuration subset used by the task router */
 export interface TaskRouterConfig {
   skill_routing?: SkillRoutingConfig;
-  brain_provider?: string;
-  worker_provider?: string;
+  brain_provider?: ProviderName;
+  worker_provider?: ProviderName;
+  fallback_provider?: ResolvedConfig['fallback_provider'];
+  provider_fallback?: ResolvedConfig['provider_fallback'];
+  providers?: ResolvedConfig['providers'];
   /** Config-level auth mode — resolved after task.authMode override (ADR-076) */
   auth_mode?: 'subscription' | 'api';
 }
@@ -42,6 +45,8 @@ export interface TaskRouting {
   skills: string[];
   /** Human-readable explanation of why this routing was chosen */
   reason: string;
+  /** Structured pre-dispatch fallback provenance; absent when the preferred provider won. */
+  providerFallback?: ProviderFallbackDecision;
   /** Estimated timeout in seconds from Brain heuristic estimator (optional) */
   timeoutSeconds?: number;
   /**
@@ -49,6 +54,33 @@ export interface TaskRouting {
    * Priority: task.authMode (DIRECTIVES) > config.auth_mode > 'subscription'.
    */
   authMode: 'subscription' | 'api';
+}
+
+export interface ProviderFallbackDecision {
+  requestedProvider: ProviderName;
+  selectedProvider: ProviderName;
+  configuredOrder: readonly ProviderName[];
+  reasonCode: 'preferred_unavailable';
+}
+
+interface ProviderAvailabilityResolution {
+  provider: ProviderName;
+  fallback?: ProviderFallbackDecision;
+}
+
+export type ProviderRoutingErrorCode =
+  | 'E_PROVIDER_FALLBACK_EXHAUSTED'
+  | 'E_PROVIDER_FALLBACK_PROVENANCE_REQUIRED'
+  | 'E_PROVIDER_FALLBACK_PROVENANCE_WRITE_FAILED';
+
+export class ProviderRoutingError extends ProviderError {
+  constructor(
+    public readonly code: ProviderRoutingErrorCode,
+    providerName: ProviderName | '',
+  ) {
+    super(code, providerName);
+    this.name = 'ProviderRoutingError';
+  }
 }
 
 /**
@@ -92,7 +124,7 @@ const INTENT_TO_ROUTING_KEY: Record<IntentType, keyof SkillRoutingConfig | null>
  * @returns True if the value is a recognized provider name
  */
 function isProviderName(value: string): value is ProviderName {
-  return value === 'claude' || value === 'codex' || value === 'gemini' || value === 'ollama';
+  return validateProviderName(value);
 }
 
 /**
@@ -205,8 +237,8 @@ export function resolveWorkerAuth(task: Task, config: TaskRouterConfig): 'subscr
  * 2. Task force: task.forceModel set → infer provider from model
  * 3. Agent preference: task.assignedAgent has preferredProvider → use it (if available)
  * 4. Skill affinity: task type maps to config skill_routing category
- * 5. Provider availability: if chosen provider not in availableProviders → first available
- * 6. Default: skill_routing.default or worker_provider or first available
+ * 5. Provider availability: if chosen provider is unavailable → configured worker fallback order
+ * 6. Default: first available candidate in the configured worker provider order
  *
  * @param task - The task to route
  * @param config - Configuration containing routing preferences
@@ -223,21 +255,8 @@ export function routeTask(
   // planner's V3 decision (positional axis owns surfaces/domains) is authoritative.
   const agent = task.assignedAgent ?? 'generic';
   const authMode = resolveWorkerAuth(task, config);
-
-  // Guard: no providers available
-  // Sprint 202 Task 202-003: resolve via registry default before the absolute
-  // 'claude' floor so pure-Ollama configs don't silently route to a missing
-  // Claude adapter.
-  if (availableProviders.length === 0) {
-    const fallback = getDefaultProviderName();
-    return {
-      provider: fallback,
-      agent,
-      skills,
-      reason: `No providers available; falling back to '${fallback}' (registry default)`,
-      authMode,
-    };
-  }
+  const workerOrder = orderedRoleProviders('worker', config);
+  const configuredProviders = [workerOrder.primary, ...workerOrder.fallbacks];
 
   const taskType = detectTaskType(task);
   const routing = config.skill_routing;
@@ -251,7 +270,8 @@ export function routeTask(
   if (routingKey && routing) {
     const configProvider = routing[routingKey];
     if (configProvider && isProviderName(configProvider)) {
-      const provider = ensureAvailable(configProvider, availableProviders);
+      const selection = ensureAvailable(configProvider, availableProviders, configuredProviders);
+      const provider = selection.provider;
       return {
         provider,
         agent,
@@ -259,6 +279,7 @@ export function routeTask(
         reason: provider === configProvider
           ? `Config skill_routing.${routingKey} = '${configProvider}' for ${taskType} task`
           : `Config skill_routing.${routingKey} = '${configProvider}' (unavailable, fell back to '${provider}')`,
+        ...(selection.fallback ? { providerFallback: selection.fallback } : {}),
         authMode,
       };
     }
@@ -268,7 +289,8 @@ export function routeTask(
   if (task.forceModel) {
     const inferred = inferProviderFromModel(task.forceModel);
     if (inferred) {
-      const provider = ensureAvailable(inferred, availableProviders);
+      const selection = ensureAvailable(inferred, availableProviders, configuredProviders);
+      const provider = selection.provider;
       return {
         provider,
         agent,
@@ -276,6 +298,7 @@ export function routeTask(
         reason: provider === inferred
           ? `Task forceModel '${task.forceModel}' → provider '${inferred}'`
           : `Task forceModel '${task.forceModel}' → provider '${inferred}' (unavailable, fell back to '${provider}')`,
+        ...(selection.fallback ? { providerFallback: selection.fallback } : {}),
         authMode,
       };
     }
@@ -283,7 +306,8 @@ export function routeTask(
 
   // ─── Priority 3: Task-level provider field ────────────────────────
   if (task.provider && isProviderName(task.provider)) {
-    const provider = ensureAvailable(task.provider, availableProviders);
+    const selection = ensureAvailable(task.provider, availableProviders, configuredProviders);
+    const provider = selection.provider;
     return {
       provider,
       agent,
@@ -291,6 +315,7 @@ export function routeTask(
       reason: provider === task.provider
         ? `Task provider field '${task.provider}'`
         : `Task provider field '${task.provider}' (unavailable, fell back to '${provider}')`,
+      ...(selection.fallback ? { providerFallback: selection.fallback } : {}),
       authMode,
     };
   }
@@ -299,7 +324,8 @@ export function routeTask(
   // (This covers task types that don't have a specific routing key but
   //  the 'default' key in skill_routing applies)
   if (routing?.default && isProviderName(routing.default)) {
-    const provider = ensureAvailable(routing.default, availableProviders);
+    const selection = ensureAvailable(routing.default, availableProviders, configuredProviders);
+    const provider = selection.provider;
     return {
       provider,
       agent,
@@ -307,13 +333,15 @@ export function routeTask(
       reason: provider === routing.default
         ? `Config skill_routing.default = '${routing.default}'`
         : `Config skill_routing.default = '${routing.default}' (unavailable, fell back to '${provider}')`,
+      ...(selection.fallback ? { providerFallback: selection.fallback } : {}),
       authMode,
     };
   }
 
   // ─── Priority 5: worker_provider from config ──────────────────────
   if (config.worker_provider && isProviderName(config.worker_provider)) {
-    const provider = ensureAvailable(config.worker_provider, availableProviders);
+    const selection = ensureAvailable(config.worker_provider, availableProviders, configuredProviders);
+    const provider = selection.provider;
     return {
       provider,
       agent,
@@ -321,34 +349,70 @@ export function routeTask(
       reason: provider === config.worker_provider
         ? `Config worker_provider = '${config.worker_provider}'`
         : `Config worker_provider = '${config.worker_provider}' (unavailable, fell back to '${provider}')`,
+      ...(selection.fallback ? { providerFallback: selection.fallback } : {}),
       authMode,
     };
   }
 
-  // ─── Priority 6: First available provider ─────────────────────────
-  // Sprint 202 Task 202-003: registry-default before the absolute 'claude' floor.
-  const fallback = availableProviders[0] ?? getDefaultProviderName();
+  // ─── Priority 6: Configured worker provider order ─────────────────
+  const selection = ensureAvailable(workerOrder.primary, availableProviders, configuredProviders);
+  const fallback = selection.provider;
   return {
     provider: fallback,
     agent,
     skills,
-    reason: `Default: first available provider '${fallback}'`,
+    reason: fallback === workerOrder.primary
+      ? `Default: configured worker provider '${fallback}'`
+      : `Default worker provider '${workerOrder.primary}' (unavailable, fell back to '${fallback}')`,
+    ...(selection.fallback ? { providerFallback: selection.fallback } : {}),
     authMode,
   };
 }
 
 /**
- * Ensure a provider is in the available list; if not, return the first available.
+ * Return the first provider in owner-authored order that is proven available.
+ * Registration/list order is never an authority.
+ */
+function firstConfiguredAvailable(
+  configured: readonly ProviderName[],
+  available: readonly ProviderName[],
+  excluded?: ProviderName,
+): ProviderName {
+  const selected = configured.find(
+    candidate => candidate !== excluded && available.includes(candidate),
+  );
+  if (selected) return selected;
+  throw new ProviderRoutingError(
+    'E_PROVIDER_FALLBACK_EXHAUSTED',
+    excluded ?? configured[0] ?? '',
+  );
+}
+
+/**
+ * Ensure a provider is in the available list; if not, follow configured worker order.
  * @param preferred - The preferred provider
  * @param available - List of available providers
- * @returns The preferred provider if available, otherwise the first available
+ * @param configured - Owner-authored worker primary + fallback chain
+ * @returns The preferred provider if available, otherwise the first configured available fallback
  */
-function ensureAvailable(preferred: ProviderName, available: ProviderName[]): ProviderName {
+function ensureAvailable(
+  preferred: ProviderName,
+  available: readonly ProviderName[],
+  configured: readonly ProviderName[],
+): ProviderAvailabilityResolution {
   if (available.includes(preferred)) {
-    return preferred;
+    return { provider: preferred };
   }
-  // Sprint 202 Task 202-003: registry-default before the absolute 'claude' floor.
-  return available[0] ?? getDefaultProviderName();
+  const provider = firstConfiguredAvailable(configured, available, preferred);
+  return {
+    provider,
+    fallback: {
+      requestedProvider: preferred,
+      selectedProvider: provider,
+      configuredOrder: [...configured],
+      reasonCode: 'preferred_unavailable',
+    },
+  };
 }
 
 // ─── Timeout Event Emission ────────────────────────────────────────

@@ -5,6 +5,7 @@ import { registerPlanTool } from '../../../src/mcp/tools/plan.js';
 
 vi.mock('../../../src/core/config.js', () => ({
   readAuthMode: vi.fn().mockResolvedValue('subscription'),
+  resolveEffectiveWorkers: (c: any) => c?.max_workers ?? c?.activeModeConfig?.max_workers ?? 4,
   resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
@@ -13,6 +14,17 @@ vi.mock('../../../src/core/config.js', () => ({
 vi.mock('../../../src/orchestra/brain.js', () => ({
   readContext: vi.fn(),
   planSprint: vi.fn(),
+}));
+
+vi.mock('../../../src/core/provider.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/core/provider.js')>()),
+  bootstrapProviders: vi.fn().mockResolvedValue({
+    connector: {},
+    registered: ['claude'],
+    skipped: [],
+    defaultProvider: 'claude',
+    providerEnvOverrides: {},
+  }),
 }));
 
 vi.mock('../../../src/mcp/helpers/enrich.js', () => ({
@@ -34,6 +46,7 @@ vi.mock('../../../src/mcp/helpers/format.js', () => ({
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 import { loadConfig } from '../../../src/core/config.js';
+import { bootstrapProviders } from '../../../src/core/provider.js';
 import { readContext, planSprint } from '../../../src/orchestra/brain.js';
 import { enrichResponse } from '../../../src/mcp/helpers/enrich.js';
 
@@ -59,6 +72,7 @@ function makeServer() {
 function makeDefaultMocks(overrides: Partial<{
   tasks: Array<{ id: string; title: string; model: string; priority: string }>;
   maxWorkers: number;
+  presetMaxWorkers: number;
   mode: string;
 }> = {}) {
   const tasks = overrides.tasks ?? [
@@ -66,7 +80,12 @@ function makeDefaultMocks(overrides: Partial<{
     { id: '002', title: 'Task B', model: 'claude-sonnet-5', priority: 'NORMAL' },
   ];
 
-  mockLoadConfig.mockResolvedValue({ brain_planning: 'auto', max_workers: overrides.maxWorkers ?? 3, activeModeConfig: { max_workers: overrides.maxWorkers ?? 3 } } as any);
+  const maxWorkers = overrides.maxWorkers ?? 3;
+  mockLoadConfig.mockResolvedValue({
+    brain_planning: 'auto',
+    max_workers: maxWorkers,
+    activeModeConfig: { max_workers: overrides.presetMaxWorkers ?? maxWorkers },
+  } as any);
   mockReadContext.mockReturnValue({ directives: 'some directives', memory: '', retro: '', debt: '', patterns: [] } as any);
   mockPlanSprint.mockReturnValue({
     id: 'sprint-001',
@@ -186,6 +205,7 @@ describe('registerPlanTool', () => {
         expect.anything(),
         expect.objectContaining({ mode: 'structured' }),
       );
+      expect(bootstrapProviders).not.toHaveBeenCalled();
     });
 
     it('passes auto mode to planSprint', async () => {
@@ -367,6 +387,37 @@ describe('registerPlanTool', () => {
       const content = JSON.parse(result.content[0].text);
 
       expect(content.waveBreakdown).toEqual({ wave1: 2, wave2: 2 });
+    });
+
+    it('returns the same digest-bound execution topology used by preview and scheduler', async () => {
+      const server = makeServer();
+      registerPlanTool(server as any);
+      makeDefaultMocks({ maxWorkers: 2 });
+
+      const result = await server.callTool('deckent_plan', {});
+      const content = JSON.parse(result.content[0].text);
+
+      expect(content.planDigestVersion).toBe(3);
+      expect(content.topologyGate).toBe('pass');
+      expect(content.executionTopology).toMatchObject({
+        schemaVersion: 1,
+        configuredMaxWorkers: 2,
+        effectiveConcurrency: 2,
+        verdict: 'pass',
+      });
+      expect(content.waveBreakdown).toEqual({ wave1: 2 });
+    });
+
+    it('surfaces the top-level runtime worker override instead of the mode preset', async () => {
+      const server = makeServer();
+      registerPlanTool(server as any);
+      makeDefaultMocks({ maxWorkers: 2, presetMaxWorkers: 5 });
+
+      const result = await server.callTool('deckent_plan', {});
+      const content = JSON.parse(result.content[0].text);
+
+      expect(content.recommendation.maxWorkers).toBe(2);
+      expect(content.executionTopology.configuredMaxWorkers).toBe(2);
     });
 
     it('returns risk assessment based on task count', async () => {

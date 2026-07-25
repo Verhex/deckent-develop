@@ -40,6 +40,12 @@ import type { ResolvedConfig } from '../../src/core/config-types.js';
 import type { SpawnBackend } from '../../src/orchestra/spawn-backend.js';
 import { waitForResults } from '../../src/orchestra/result-collector.js';
 import { requestWorkerRespawn } from '../../src/nervous/respawn-request.js';
+import {
+  TEST_MEASURED_LANDING_CAPABILITIES,
+  TEST_REMOTE_EXECUTION_BUDGET,
+  TEST_REMOTE_WORKER_BUDGET_POLICY,
+  settleTestRuntimeBudget,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -48,7 +54,11 @@ function makeTask(id: string, overrides?: Partial<Task>): Task {
     id,
     title: `Task ${id}`,
     description: `Description for ${id}`,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
+    provider: 'claude',
+    type: 'code-development',
+    budget: TEST_REMOTE_EXECUTION_BUDGET,
+    budgetPolicy: TEST_REMOTE_WORKER_BUDGET_POLICY,
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -107,6 +117,20 @@ function doneResult(id: string): TaskResult {
     coverage: 90,
     selfAssessment: 'DONE',
     notes: 'ran',
+    tokenUsage: {
+      inputTokens: 10,
+      outputTokens: 2,
+      cacheReadTokens: 0,
+      source: 'provider-adapter',
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+    },
+    cost: {
+      usd: 0.01,
+      currency: 'USD',
+      pricingSource: 'provider-envelope',
+      isLocal: false,
+    },
   };
 }
 
@@ -147,9 +171,11 @@ describe('born-562 enabled-path — cost-guard trip inside the live wait loop', 
     spawned = [];
     killed = [];
     backend = {
+      ...TEST_MEASURED_LANDING_CAPABILITIES,
       name: 'mock',
       spawn: (taskId: string) => {
         spawned.push(taskId);
+        settleTestRuntimeBudget(root, taskId);
         writeFileSync(
           join(root, '.tasks', `task-${taskId}.result`),
           JSON.stringify(doneResult(taskId)),
@@ -182,6 +208,7 @@ describe('born-562 enabled-path — cost-guard trip inside the live wait loop', 
     );
     await tripped;
     await sleep(60); // stopDispatch latch settle (microtask after getLimitCost)
+    settleTestRuntimeBudget(root, 'a');
     writeFileSync(join(root, '.tasks', 'task-a.result'), JSON.stringify(doneResult('a')), 'utf-8');
     const results = await pending;
     const elapsed = Date.now() - start;
@@ -206,6 +233,7 @@ describe('born-562 enabled-path — cost-guard trip inside the live wait loop', 
     );
     await tripped;
     await sleep(60);
+    settleTestRuntimeBudget(root, 'a');
     writeFileSync(join(root, '.tasks', 'task-a.result'), JSON.stringify(doneResult('a')), 'utf-8');
     const results = await pending;
 
@@ -228,6 +256,7 @@ describe('born-562 enabled-path — cost-guard trip inside the live wait loop', 
     );
     await tripped; // ≥1 monitor tick ran (same rhythm as tests 1-2)
     await sleep(60);
+    settleTestRuntimeBudget(root, 'a');
     writeFileSync(join(root, '.tasks', 'task-a.result'), JSON.stringify(doneResult('a')), 'utf-8');
     const results = await pending;
 

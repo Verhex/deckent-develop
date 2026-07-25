@@ -14,6 +14,7 @@ import {
   RunJobFlowNotApprovedError,
   RunJobDigestMismatchError,
   RunJobBudgetHoldError,
+  RunJobTopologyHoldError,
   RunJobStaleHandleConflictError,
   type ApprovedRunSnapshotInput,
   type ExistingRunHandleInput,
@@ -25,7 +26,9 @@ import { SprintPhase, SprintStatus } from '../../src/core/sprint-types.js';
 import { TaskStatus } from '../../src/core/task-types.js';
 import {
   computeExecutionPlanDigest,
+  computeExecutionPlanDigestV3,
   EXECUTION_PLAN_DIGEST_VERSION,
+  EXECUTION_PLAN_DIGEST_VERSION_V2,
   type ExecutionPlanDigestContext,
 } from '../../src/core/execution-plan-digest.js';
 
@@ -193,7 +196,7 @@ describe('startApprovedRun', () => {
       expectedPlanDigest: planDigest,
       approvedSnapshot: makeApprovedSnapshot({
         planDigest,
-        planDigestVersion: EXECUTION_PLAN_DIGEST_VERSION,
+        planDigestVersion: EXECUTION_PLAN_DIGEST_VERSION_V2,
         planDigestContext: context,
         sprint: heldSprint,
       }),
@@ -222,6 +225,47 @@ describe('startApprovedRun', () => {
     const legacy = makeDeps();
     expect(startApprovedRun(legacy).status).toBe('started');
     expect(legacy.spawnStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a digest-valid v3 snapshot with an undeclared writer collision before spawnStart', () => {
+    const blockedSprint = makeSprint();
+    blockedSprint.tasks = ['A', 'B'].map((title, index) => ({
+      id: `volatile-${index}`,
+      title,
+      description: title,
+      model: 'qwen3.6:27b',
+      effort: 'normal' as const,
+      priority: 'NORMAL' as const,
+      reason: 'test',
+      scope: { directories: [], filesRead: [], filesWrite: ['src/shared.ts'] },
+      dependencies: [],
+      goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
+      status: TaskStatus.PENDING,
+      provider: 'ollama' as const,
+    }));
+    const context = {
+      configuredProvider: 'ollama',
+      configuredModel: 'qwen3.6:27b',
+      configuredBackend: 'subprocess',
+      configuredAuthMode: 'subscription',
+      fallbackProvider: null,
+      fallbackPolicy: null,
+      executionBudgetPolicy: null,
+      configuredMaxWorkers: 4,
+    } satisfies ExecutionPlanDigestContext;
+    const planDigest = computeExecutionPlanDigestV3(blockedSprint, context).digest;
+    const deps = makeDeps({
+      expectedPlanDigest: planDigest,
+      approvedSnapshot: makeApprovedSnapshot({
+        planDigest,
+        planDigestVersion: EXECUTION_PLAN_DIGEST_VERSION,
+        planDigestContext: context,
+        sprint: blockedSprint,
+      }),
+    });
+
+    expect(() => startApprovedRun(deps)).toThrow(RunJobTopologyHoldError);
+    expect(deps.spawnStart).not.toHaveBeenCalled();
   });
 
   it('calls spawnStart exactly once with the approved Sprint and returns status=started', () => {

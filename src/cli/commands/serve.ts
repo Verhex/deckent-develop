@@ -10,6 +10,16 @@ import { getDashboardStaticDir } from '../helpers/dashboard-dir.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { loadConfig } from '../../core/config.js';
 import { bootstrapProviders } from '../../core/provider.js';
+import {
+  bootstrapApprovalAuthority,
+  type ApprovalAuthorityBootstrapResult,
+} from '../../core/approval-authority-bootstrap.js';
+import {
+  openLocalProviderAuthorityRuntimeIfConfigured,
+} from '../../providers/provider-authority-runtime-bootstrap.js';
+import type {
+  ProviderAuthorityRuntimeServiceOpenResult,
+} from '../../core/provider-authority-composition.js';
 
 /** Extended MIME types for static file serving (superset of server.ts defaults) */
 export const EXTENDED_MIME_TYPES: Record<string, string> = {
@@ -68,7 +78,7 @@ export function registerServe(program: Command): void {
     .option('--dev-port <number>', 'Vite dev server port for --dev proxy mode', '5173')
     .option('--host <addr>', 'Bind address for the server', '127.0.0.1')
     .option('--no-terminal', 'Disable the embedded web terminal')
-    .action((opts: ServeOpts) => {
+    .action(async (opts: ServeOpts) => {
       const root = resolveProjectRoot();
       const port = parseInt(opts.port ?? '3100', 10);
 
@@ -123,21 +133,54 @@ export function registerServe(program: Command): void {
       // "No providers registered" 502'siyle ölüyordu. do.ts/start.ts'in AYNI
       // bootstrap-konvansiyonu; fail-soft (fire-and-forget): provider'sız bir
       // ortamda API-only mod aynen çalışmaya devam eder, propose dürüst hata verir.
-      void (async () => {
-        try {
-          const config = await loadConfig(root);
-          await bootstrapProviders(config);
-        } catch (err) {
+      let approvalAuthority: Extract<ApprovalAuthorityBootstrapResult, { state: 'ready' }> | undefined;
+      let providerAuthority: ProviderAuthorityRuntimeServiceOpenResult | undefined;
+      try {
+        const config = await loadConfig(root);
+        providerAuthority = openLocalProviderAuthorityRuntimeIfConfigured(root, config);
+        void bootstrapProviders(config).catch((err: unknown) => {
           process.stderr.write(`[serve] provider bootstrap skipped: ${err instanceof Error ? err.message : String(err)}\n`);
+        });
+        const approvalBootstrap = bootstrapApprovalAuthority(root, config);
+        if (approvalBootstrap.state === 'ready') {
+          approvalAuthority = approvalBootstrap;
+        } else if (approvalBootstrap.state === 'hold') {
+          process.stderr.write(getMessage(
+            'serve.approval_authority_hold',
+            getLanguage(),
+            {
+              reason: approvalBootstrap.reasonCode,
+              detail: approvalBootstrap.detailCode,
+            },
+          ) + '\n');
         }
-      })();
+      } catch (err) {
+        process.stderr.write(`[serve] provider bootstrap skipped: ${err instanceof Error ? err.message : String(err)}\n`);
+      }
 
-      const api = createHttpServer(root, {
-        port,
-        staticDir,
-        host,
-        terminalBackend,
-      });
+      let api: ReturnType<typeof createHttpServer>;
+      try {
+        api = createHttpServer(root, {
+          port,
+          staticDir,
+          host,
+          terminalBackend,
+          ...(approvalAuthority
+            ? {
+                approvalAuthority: {
+                  runtime: approvalAuthority.runtime,
+                  policy: approvalAuthority.policy,
+                  verifier: approvalAuthority.verifier,
+                },
+              }
+            : {}),
+          ...(providerAuthority ? { providerAuthority } : {}),
+        });
+      } catch (error) {
+        approvalAuthority?.runtime.close();
+        providerAuthority?.close();
+        throw error;
+      }
 
       const lang = getLanguage();
 
@@ -180,7 +223,15 @@ export function registerServe(program: Command): void {
       registerShutdownHook(async () => {
         // Sync file-clear FIRST so a hung close can never block it.
         clearServeDaemonMeta(root);
-        await api.close();
+        const outcomes = await Promise.allSettled([
+          Promise.resolve().then(() => approvalAuthority?.runtime.close()),
+          Promise.resolve().then(() => providerAuthority?.close()),
+          api.close(),
+        ]);
+        const failed = outcomes.find(
+          (outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected',
+        );
+        if (failed) throw failed.reason;
       });
     });
 }

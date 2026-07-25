@@ -142,7 +142,7 @@ export type ProvisionMode = 'prompt' | 'yes' | 'no-install';
 export interface ProvisionOptions extends PlanOptions {
   /** Tools detected as missing by doctor/provider checks. */
   missing: ToolId[];
-  /** prompt = ask per tool; yes = install all (CI); no-install = legacy hint-only. */
+  /** prompt = ask per tool; yes = explicit --install; no-install = hint-only. */
   mode: ProvisionMode;
   /** Injected consent prompt (init.ts supplies a readline-backed impl). */
   confirm?: (tool: ToolId, instruction: string) => Promise<boolean>;
@@ -152,11 +152,23 @@ export interface ProvisionOptions extends PlanOptions {
   log?: (msg: string) => void;
 }
 
-/** Map `deckent init` CLI flags to a provision mode. --no-install is the
- *  conservative default-preserving choice and wins over --yes. */
-export function resolveProvisionMode(flags: { yes?: boolean; noInstall?: boolean }): ProvisionMode {
+/**
+ * Map `deckent init` CLI flags to a provision mode.
+ *
+ * `--yes` selects non-interactive setup defaults; it is deliberately NOT
+ * supply-chain consent. Only explicit `--install` authorizes unattended
+ * npm-global provider installation. Interactive callers retain per-tool
+ * prompting, and the compatibility `--no-install` flag remains the strongest
+ * opt-out.
+ */
+export function resolveProvisionMode(flags: {
+  yes?: boolean;
+  install?: boolean;
+  noInstall?: boolean;
+}): ProvisionMode {
   if (flags.noInstall) return 'no-install';
-  if (flags.yes) return 'yes';
+  if (flags.install) return 'yes';
+  if (flags.yes) return 'no-install';
   return 'prompt';
 }
 

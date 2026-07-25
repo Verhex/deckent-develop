@@ -14,6 +14,7 @@ import { join } from 'node:path';
 
 import { SubprocessSpawnBackend, CLAUDE_SUBPROCESS_CONFIG } from '../../src/providers/subprocess.js';
 import { CHANNELS } from '../../src/core/event-stream.js';
+import { LocalSubprocessTestBackend } from '../helpers/local-subprocess-backend-fixture.js';
 
 const TOOL_USE = JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', id: 'x', name: 'Edit', input: { file_path: 'a.ts' } }] } });
 const RESULT = JSON.stringify({ type: 'result', usage: { input_tokens: 3, output_tokens: 2 } });
@@ -65,7 +66,7 @@ describe('SubprocessSpawnBackend — live activity (SURF-3 S2)', () => {
   afterEach(() => { rmSync(root, { recursive: true, force: true }); });
 
   function backend(spawnImpl: unknown): SubprocessSpawnBackend {
-    return new SubprocessSpawnBackend(root, {
+    return new LocalSubprocessTestBackend(root, {
       providerConfig: CLAUDE_SUBPROCESS_CONFIG,
       platform: 'linux',
       spawnImpl: spawnImpl as typeof import('node:child_process').spawn,

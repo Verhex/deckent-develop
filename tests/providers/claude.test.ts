@@ -550,18 +550,18 @@ describe('ClaudeAdapter — claude_backend', () => {
     expect(adapter.getBackend()).toBe('subprocess');
   });
 
-  it('should NOT call tmux.ensureSession when backend is subprocess', () => {
+  it('should fail closed before spawn without measurable remote budget and never call tmux', () => {
     const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'subprocess' });
-    adapter.spawn('task-001', 'claude-opus-4-8', 'test prompt');
+    expect(() => adapter.spawn('task-001', 'claude-opus-4-8', 'test prompt'))
+      .toThrow(/remote execution budget|live usage budget|finite execution budget/i);
     expect(mockTmuxEnsureSession).not.toHaveBeenCalled();
     expect(mockTmuxSpawnWorker).not.toHaveBeenCalled();
   });
 
   it('should NOT call tmux.killWorker when backend is subprocess', () => {
     const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'subprocess' });
-    // Spawn first so there's a worker to kill
-    adapter.spawn('task-001', 'claude-opus-4-8', 'test prompt');
-    adapter.kill('task-001');
+    // Backend routing stays subprocess-owned even when no worker is registered.
+    expect(() => adapter.kill('task-001')).toThrow(/no running worker/i);
     expect(mockTmuxKillWorker).not.toHaveBeenCalled();
   });
 

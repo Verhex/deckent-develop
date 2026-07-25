@@ -11,6 +11,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomBytes } from 'node:crypto';
+import { MCP_TOOL_COUNT } from '../../src/mcp/tools/index.js';
 
 const SCRIPT_PATH = join(process.cwd(), 'scripts', 'lint-mcp-instructions.mjs');
 
@@ -36,11 +37,11 @@ describe('lint-mcp-instructions.mjs', () => {
     expect(stdout).toMatch(/^OK: \d+ tools, \d+ in instructions/);
   });
 
-  it('(b) exit 0 output contains correct tool count (47)', () => {
+  it('(b) exit 0 output contains the canonical tool count', () => {
     const { exitCode, stdout } = runLintScript();
     expect(exitCode).toBe(0);
-    expect(stdout).toContain('47 tools');
-    expect(stdout).toContain('47 in instructions');
+    expect(stdout).toContain(`${MCP_TOOL_COUNT} tools`);
+    expect(stdout).toContain(`${MCP_TOOL_COUNT} in instructions`);
   });
 
   it('(c) server.ts DECKENT_MCP_INSTRUCTIONS lists all 4 previously-missing tools', () => {
@@ -54,12 +55,12 @@ describe('lint-mcp-instructions.mjs', () => {
     expect(serverTs).toContain('deckent_recover');
   });
 
-  it('(d) server.ts DECKENT_MCP_INSTRUCTIONS header shows Tools (47)', () => {
+  it('(d) server.ts DECKENT_MCP_INSTRUCTIONS header shows the canonical count', () => {
     const serverTs = readFileSync(
       join(process.cwd(), 'src', 'mcp', 'server.ts'),
       'utf-8',
     );
-    expect(serverTs).toContain('## Tools (47)');
+    expect(serverTs).toContain(`## Tools (${MCP_TOOL_COUNT})`);
   });
 
   it('(e) lint script detects drift when a tool is removed from instructions (temp file test)', () => {

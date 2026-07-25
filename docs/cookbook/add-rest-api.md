@@ -35,7 +35,7 @@ Create or edit `DIRECTIVES.md` in your project root. Below is a complete, copy-p
 ---
 
 ## Task 1: User Profile Route Handler
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Skills: typescript-expert, api-builder
 - Files: src/routes/users.ts, src/services/user-service.ts, tests/routes/users.test.ts
@@ -67,7 +67,7 @@ For a **FastAPI** project, adjust the files and scope:
 
 ```markdown
 ## Task 1: User Profile Route Handler
-- Model: sonnet
+- Model: claude-sonnet-5
 - Effort: normal
 - Skills: python-expert, api-builder
 - Files: app/routes/users.py, app/services/user_service.py, tests/test_users.py
@@ -99,7 +99,7 @@ Deckent reads your `DIRECTIVES.md` and creates a task JSON file in `.tasks/`:
 ✓ Planning sprint-001...
 
 Task 001-001 — User Profile Route Handler
-  model:   sonnet
+  model:   claude-sonnet-5
   effort:  normal
   agent:   api-builder
   skills:  typescript-expert, api-builder

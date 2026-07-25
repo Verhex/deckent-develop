@@ -37,7 +37,7 @@ import {
   isGitGuardSupportedPlatform,
   buildGitGuardDir,
 } from '../orchestra/git-worker-guard.js';
-import { createRuntimeBudgetMonitor, resolveTaskExecutionBudget } from '../orchestra/runtime-budget-monitor.js';
+import { createRuntimeBudgetMonitor, resolveHostExecutionBudget } from '../orchestra/runtime-budget-monitor.js';
 
 /**
  * MOAT-2 (ADR-G-013): grace window between a graceful SIGTERM and the SIGKILL
@@ -182,6 +182,12 @@ export interface SubprocessProviderConfig {
    * isolated fake child to exercise the stream monitor itself.
    */
   readonly liveBudgetEvidenceTrust?: 'host-isolated';
+  /**
+   * Canonical cost classification for this adapter. Omitted means remote.
+   * Local test/CLI adapters may declare local explicitly; callers cannot
+   * downgrade a remote adapter through per-spawn options.
+   */
+  readonly executionCostClass?: 'remote' | 'local';
 }
 
 /**
@@ -343,11 +349,12 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     const dir = opts?.projectDir ?? this.projectDir;
     const tasksDir = join(dir, TASKS_DIR);
     ensureDir(tasksDir);
-    const executionBudget = resolveTaskExecutionBudget(dir, taskId, opts?.executionBudget);
+    const executionBudget = resolveHostExecutionBudget(dir, taskId, opts?.executionBudget);
     assertLiveUsageBudgetSupport(
       executionBudget,
       this.liveUsageBudgetSupport,
       this.name,
+      this.providerConfig.executionCostClass ?? 'remote',
     );
 
     // Worker Output Contract: append the provider's usage-emit flag(s) at spawn
@@ -468,6 +475,25 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     // per-tool ACTIVITY line for every complete NDJSON line. Fail-soft: a bad
     // line / failed emit never breaks the worker; a write error degrades to
     // activity-only. Only runs when liveActivity (stdout is piped then).
+    const budgetMonitor = streamCapture
+      ? createRuntimeBudgetMonitor({
+          projectRoot: dir,
+          taskId,
+          backend: this.name,
+          budget: executionBudget,
+          onStop: () => {
+            try {
+              killProcessGroupWithEscalation(child, 'SIGTERM', this.platform);
+            } catch { /* already exited */ }
+          },
+        })
+      : null;
+    const containObserverFailure = (error: Error): void => {
+      try { budgetMonitor?.failObservation(error); } catch { /* terminal evidence is best effort */ }
+      try {
+        killProcessGroupWithEscalation(child, 'SIGTERM', this.platform);
+      } catch { /* already exited */ }
+    };
     if (streamCapture && child.stdout) {
       const onActivity = liveActivity ? makeActivityOnEvent({
         projectRoot: dir,
@@ -476,15 +502,6 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
         enabled: true,
         ...(opts?.sprintId ? { sprintId: opts.sprintId } : {}),
       }) : undefined;
-      const budgetMonitor = createRuntimeBudgetMonitor({
-        projectRoot: dir,
-        taskId,
-        backend: this.name,
-        budget: executionBudget,
-        onStop: () => {
-          try { killProcessGroupWithEscalation(child, 'SIGTERM', this.platform); } catch { /* already exited */ }
-        },
-      });
       const provider = this.name;
       let lineBuf = '';
       const observeLine = (line: string): void => {
@@ -507,7 +524,11 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
         observeLine(lineBuf);
         try { budgetMonitor?.settle(); } catch { /* missing durable summary becomes UNKNOWN/HOLD */ }
       });
-      child.stdout.on('error', () => { /* stream error never breaks the worker */ });
+      child.stdout.on('error', (error: Error) => {
+        containObserverFailure(
+          new Error(`provider stdout observation failed: ${error.message}`),
+        );
+      });
       // MOAT-2 (ADR-G-013): a flowing Readable holds its OWN event-loop ref that
       // lives until stdout EOF (≈ worker exit) — so piping stdout for the tee
       // would re-pin the coordinator loop past `.result` (the exact linger the
@@ -517,6 +538,10 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
       // rationale as hbInterval.unref). Without this, live_trace-on subprocess
       // sprints would linger after completion.
       (child.stdout as unknown as { unref?: () => void }).unref?.();
+    } else if (streamCapture) {
+      containObserverFailure(
+        new Error('provider stdout observation stream was not attached'),
+      );
     }
     // BUG-26: DON'T close logFd here — keep open until child exits
     // On Windows the cmd.exe wrapper child inherits the FD; closing it before inherit causes empty logs

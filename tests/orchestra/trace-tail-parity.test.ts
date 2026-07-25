@@ -241,19 +241,34 @@ describe('GREEN — claude regression guard: whole-value fast path never fires f
 // ─── (3) usage-patch regression pin: BİREBİR korunur across all 3 providers ─
 
 describe('usage-patch regresyon: codex/gemini real numbers preserved after .log normalization', () => {
-  function makeTaskDir(taskId: string, provider: string): string {
+  function makeTaskDir(taskId: string, provider: string, model: string): string {
     const root = makeRoot();
     writeFileSync(
       join(root, '.tasks', `task-${taskId}.result`),
-      JSON.stringify({ taskId, selfAssessment: 'DONE', tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider, model: 'sonnet' } }),
+      JSON.stringify({
+        taskId,
+        selfAssessment: 'DONE',
+        tokenUsage: {
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          provider,
+          model,
+        },
+      }),
       'utf-8',
     );
     return join(root, '.tasks');
   }
 
   it('codex: patchResultUsageFromEnvelope pulls the REAL turn.completed usage from pristine content', () => {
-    const tasksDir = makeTaskDir('999-codex-usage', 'codex');
-    patchResultUsageFromEnvelope(tasksDir, '999-codex-usage', 'gpt-5', CODEX_FIXTURE_LINES);
+    const tasksDir = makeTaskDir('999-codex-usage', 'codex', 'gpt-5.6-sol');
+    patchResultUsageFromEnvelope(
+      tasksDir,
+      '999-codex-usage',
+      'gpt-5.6-sol',
+      CODEX_FIXTURE_LINES,
+    );
 
     const result = JSON.parse(readFileSync(join(tasksDir, 'task-999-codex-usage.result'), 'utf-8')) as {
       tokenUsage: Record<string, unknown>;
@@ -263,7 +278,7 @@ describe('usage-patch regresyon: codex/gemini real numbers preserved after .log 
   });
 
   it('gemini: patchResultUsageFromEnvelope pulls the REAL usageMetadata from pristine content', () => {
-    const tasksDir = makeTaskDir('999-gemini-usage', 'gemini');
+    const tasksDir = makeTaskDir('999-gemini-usage', 'gemini', 'gemini-2.5-pro');
     patchResultUsageFromEnvelope(tasksDir, '999-gemini-usage', 'gemini-2.5-pro', GEMINI_COMPACT_FIXTURE);
 
     const result = JSON.parse(readFileSync(join(tasksDir, 'task-999-gemini-usage.result'), 'utf-8')) as {
@@ -274,15 +289,15 @@ describe('usage-patch regresyon: codex/gemini real numbers preserved after .log 
   });
 
   it('codex numbers are IDENTICAL whether or not the .log is ALSO LogEvent-normalized (independent pristine-content path)', () => {
-    const tasksDirA = makeTaskDir('999-codex-a', 'codex');
-    const tasksDirB = makeTaskDir('999-codex-b', 'codex');
+    const tasksDirA = makeTaskDir('999-codex-a', 'codex', 'gpt-5.6-sol');
+    const tasksDirB = makeTaskDir('999-codex-b', 'codex', 'gpt-5.6-sol');
 
     // A: patch runs against the pristine raw content (as today).
-    patchResultUsageFromEnvelope(tasksDirA, '999-codex-a', 'gpt-5', CODEX_FIXTURE_LINES);
+    patchResultUsageFromEnvelope(tasksDirA, '999-codex-a', 'gpt-5.6-sol', CODEX_FIXTURE_LINES);
     // B: the .log ALSO gets normalized (this task's fix) — patch still reads the
     // SAME pristine variable, never the now-normalized disk file.
     writeNormalizedDockerLog(join(tasksDirB, 'task-999-codex-b.log'), CODEX_FIXTURE_LINES, 'codex');
-    patchResultUsageFromEnvelope(tasksDirB, '999-codex-b', 'gpt-5', CODEX_FIXTURE_LINES);
+    patchResultUsageFromEnvelope(tasksDirB, '999-codex-b', 'gpt-5.6-sol', CODEX_FIXTURE_LINES);
 
     const a = JSON.parse(readFileSync(join(tasksDirA, 'task-999-codex-a.result'), 'utf-8')) as { tokenUsage: Record<string, unknown> };
     const b = JSON.parse(readFileSync(join(tasksDirB, 'task-999-codex-b.result'), 'utf-8')) as { tokenUsage: Record<string, unknown> };

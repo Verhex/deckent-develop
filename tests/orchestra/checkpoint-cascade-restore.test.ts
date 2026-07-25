@@ -45,6 +45,11 @@ import {
 import type { SprintCheckpoint } from '../../src/orchestra/sprint-checkpoint.js';
 import { SprintPhase, SprintStatus, TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, TaskResult } from '../../src/core/types.js';
+import {
+  claimTaskResultSettlementAttemptAtomic,
+  createTaskResultSettlementRef,
+  writeTaskResultSettlementAttemptAtomic,
+} from '../../src/core/task-result-settlement.js';
 
 // ─── Helpers (mirrors checkpoint-mrr-restore.test.ts's fixture idiom) ────────
 
@@ -202,6 +207,50 @@ describe('restoreSprintFromCheckpoint — finishes an interrupted persist-before
     expect(existsSync(join(root, '.tasks', 'task-1001-002.result.tmp'))).toBe(false);
 
     rmSync(root, { recursive: true, force: true });
+  });
+});
+
+describe('restoreSprintFromCheckpoint — host settlement fence for cascade commit', () => {
+  it('does not overwrite or commit a cascade target while its Docker settlement is pending', () => {
+    const root = makeTempDir();
+    const hostRoot = makeTempDir('checkpoint-cascade-host');
+    const originalDeckentHome = process.env.DECKENT_HOME;
+    process.env.DECKENT_HOME = hostRoot;
+    try {
+      const sprintId = 'sprint-1006';
+      const upstream = makeTask('1006-001', sprintId, { status: TaskStatus.NO_GO });
+      const dependent = makeTask('1006-002', sprintId, {
+        status: TaskStatus.PENDING,
+        dependencies: [upstream.id],
+      });
+      [upstream, dependent].forEach(task => writeTaskFile(root, task));
+      const rawResultPath = join(root, '.tasks', `task-${dependent.id}.result`);
+      const rawClaim = {
+        taskId: dependent.id,
+        selfAssessment: 'DONE',
+        notes: 'worker-writable pending claim',
+      };
+      writeFileSync(rawResultPath, JSON.stringify(rawClaim), 'utf-8');
+      const ref = createTaskResultSettlementRef(root, dependent.id);
+      writeTaskResultSettlementAttemptAtomic(ref);
+      claimTaskResultSettlementAttemptAtomic(ref);
+      writeCheckpoint(root, makeSprint(sprintId, [upstream, dependent]), 0);
+
+      let thrown: unknown;
+      try {
+        restoreSprintFromCheckpoint(root, sprintId);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toMatchObject({ code: 'DECKENT_E077' });
+      expect(readTaskFile(root, dependent.id).status).toBe(TaskStatus.PENDING);
+      expect(JSON.parse(readFileSync(rawResultPath, 'utf-8'))).toEqual(rawClaim);
+    } finally {
+      if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+      else process.env.DECKENT_HOME = originalDeckentHome;
+      rmSync(root, { recursive: true, force: true });
+      rmSync(hostRoot, { recursive: true, force: true });
+    }
   });
 });
 

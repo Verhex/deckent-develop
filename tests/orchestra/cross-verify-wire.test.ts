@@ -8,14 +8,20 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { appendFileSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
   runCrossVerify,
+  type CrossVerifyInvocationReceiptContext,
+  type MandatoryCrossVerifyInvocationComposition,
   type SpawnVerifierInput,
   type SpawnVerifierFn,
 } from '../../src/orchestra/cross-verify-runner.js';
+import type {
+  CrossVerifyInvocationCoordinatorResult,
+} from '../../src/orchestra/cross-verify-invocation-coordinator.js';
 import { TaskEvaluation, TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskResult, ResolvedConfig, ProviderName, CrossVerifyConfig } from '../../src/core/types.js';
 import { TASKS_DIR } from '../../src/core/constants.js';
@@ -24,10 +30,22 @@ import {
   claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlement,
   createTaskResultSettlementRef,
+  createTaskResultSettlementRefForAttempt,
   writeTaskResultSettlementAtomic,
   writeTaskResultSettlementAttemptAtomic,
   writeTaskResultSettlementClosureAtomic,
+  writeTaskResultSettlementLandedRetirementAtomic,
 } from '../../src/core/task-result-settlement.js';
+import {
+  claimExecutionContinuationAtomic,
+  createExecutionLandingCheckpoint,
+  writeExecutionAttemptRetirementAtomic,
+  writeExecutionLandingCheckpointAtomic,
+} from '../../src/core/execution-landing-checkpoint.js';
+import { RuntimeBudgetMonitor } from '../../src/orchestra/runtime-budget-monitor.js';
+import type { VerifierEligibilityCandidate } from '../../src/core/cross-verify.js';
+import { InvocationReceiptStore } from '../../src/core/invocation-receipt-store.js';
+import type { InvocationReceipt, InvocationReceiptLedger } from '../../src/core/invocation-receipt.js';
 
 const defaultSpawnMocks = vi.hoisted(() => ({
   spawnWorkerMultiProvider: vi.fn(async () => ({ backend: 'docker', provider: 'claude' })),
@@ -47,6 +65,7 @@ vi.mock('../../src/orchestra/sprint-phases.js', () => ({
 
 let root: string;
 const originalDeckentHome = process.env.DECKENT_HOME;
+let receiptStores: InvocationReceiptStore[] = [];
 
 beforeEach(() => {
   defaultSpawnMocks.spawnWorkerMultiProvider.mockClear();
@@ -55,9 +74,11 @@ beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'deckent-xverify-'));
   mkdirSync(join(root, TASKS_DIR), { recursive: true });
   process.env.DECKENT_HOME = `${root}-host-state`;
+  receiptStores = [];
 });
 
 afterEach(() => {
+  for (const store of receiptStores) store.close();
   if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
   else process.env.DECKENT_HOME = originalDeckentHome;
   try { rmSync(root, { recursive: true, force: true }); } catch { /* ignore */ }
@@ -120,6 +141,7 @@ function makeConfig(
     spawn_backend: 'docker',
     execution_budget: {
       roles: { auditor: { default: { maxCacheReadTokens: 1_000_000, maxTurns: 12 } } },
+      landing: { reserve_ratio: 0.25 },
       unmetered_backend: { action: 'reroute-or-hold', ordered_backends: ['docker', 'subprocess'] },
     },
     cross_verify: crossVerify,
@@ -136,7 +158,25 @@ function writeResultFile(taskId: string, result: TaskResult): void {
 }
 
 function readResultFile(taskId: string): TaskResult & {
-  crossVerify?: { outcome: string; verifier?: string; verifierModel?: string; verdict?: string; reason: string };
+  crossVerify?: {
+    outcome: string;
+    verifier?: string;
+    verifierModel?: string;
+    verdict?: string;
+    reason: string;
+    authorityEvidenceRef?: string;
+    execution?: { outcome: string; terminalAttemptId: string };
+    eligibility?: {
+      reachabilityRef: string;
+      limitEvidenceRefs: string[];
+    };
+    invocationReceiptRef?: {
+      schemaVersion: number;
+      invocationId: string;
+      tenantId: string;
+      projectId: string;
+    };
+  };
 } {
   return JSON.parse(
     readFileSync(join(root, TASKS_DIR, `task-${taskId}.result`), 'utf-8'),
@@ -153,7 +193,180 @@ function makeSpawnSpy(output: string): { fn: SpawnVerifierFn; calls: SpawnVerifi
   return { fn, calls };
 }
 
+function exactCoordinatorSettled(
+  output: string,
+  overrides: Partial<Extract<
+    CrossVerifyInvocationCoordinatorResult,
+    { state: 'settled' }
+  >> = {},
+): Extract<CrossVerifyInvocationCoordinatorResult, { state: 'settled' }> {
+  const attemptId = '11111111-1111-4111-8111-111111111111';
+  return {
+    state: 'settled',
+    output,
+    execution: {
+      outcome: 'completed',
+      initialAttemptId: attemptId,
+      terminalAttemptId: attemptId,
+      cumulativeUsage: {
+        turns: 2,
+        inputTokens: 4,
+        outputTokens: 100,
+        cacheReadTokens: 20,
+        cacheCreationTokens: 10,
+        totalTokens: 134,
+        maxContextTokens: 34,
+      },
+    },
+    invocationReceiptRef: {
+      schemaVersion: 1,
+      tenantId: 'tenant-a',
+      projectId: 'project-a',
+      invocationId: 'invocation-mandatory-xverify',
+    },
+    providerLimitReservationId: 'reservation-mandatory-xverify',
+    providerLimitDispatchEvidenceRef: 'provider-limit-dispatch:mandatory-xverify',
+    providerLimitSettlementEvidenceRef: 'provider-limit-settlement:mandatory-xverify',
+    executionContractEvidenceRef: 'xverify-contract:mandatory-xverify',
+    outputArtifactRef: 'task-result-output:mandatory-xverify',
+    hostObservationEvidenceRef: 'xverify-host-observation:mandatory-xverify',
+    terminalSettlementRef: createTaskResultSettlementRefForAttempt(
+      root,
+      '276-001-xverify',
+      attemptId,
+    ),
+    calledProvider: 'codex',
+    calledModel: 'gpt-5.6-sol',
+    ...overrides,
+  };
+}
+
+function mandatoryComposition(
+  result: CrossVerifyInvocationCoordinatorResult | Error,
+): {
+  composition: MandatoryCrossVerifyInvocationComposition;
+  execute: ReturnType<typeof vi.fn>;
+  launcher: ReturnType<typeof vi.fn>;
+} {
+  const execute = vi.fn(async () => {
+    if (result instanceof Error) throw result;
+    return result;
+  });
+  const launcher = vi.fn();
+  const composition: MandatoryCrossVerifyInvocationComposition = {
+    coordinator: { execute },
+    input: {} as MandatoryCrossVerifyInvocationComposition['input'],
+    launcher: launcher as MandatoryCrossVerifyInvocationComposition['launcher'],
+  };
+  return { composition, execute, launcher };
+}
+
 const TWO_PROVIDERS: readonly ProviderName[] = ['claude', 'codex'];
+
+function exactCandidate(
+  overrides: Partial<VerifierEligibilityCandidate> = {},
+): VerifierEligibilityCandidate {
+  return {
+    provider: 'codex',
+    model: 'gpt-4.1',
+    auth: { mode: 'subscription', accountRefHash: 'a'.repeat(64) },
+    backend: {
+      transport: 'cli',
+      executionBackend: 'docker',
+      endpointRefHash: null,
+      executionProfileRef: 'profile-codex-docker',
+    },
+    reachability: {
+      state: 'known',
+      reachable: true,
+      evidenceRef: 'provider-reachability:codex-exact-evidence',
+    },
+    limits: {
+      state: 'known',
+      limited: false,
+      evidenceRefs: ['provider-limit:codex-exact-evidence'],
+    },
+    ...overrides,
+  };
+}
+
+function exactInvocationReceipt(
+  candidate: VerifierEligibilityCandidate,
+  overrides: Partial<InvocationReceipt> = {},
+): {
+  store: InvocationReceiptStore;
+  receipt: InvocationReceipt;
+  context: CrossVerifyInvocationReceiptContext;
+} {
+  const store = new InvocationReceiptStore(root);
+  receiptStores.push(store);
+  const receipt: InvocationReceipt = {
+    schemaVersion: 1,
+    invocationId: 'inv-xverify-276-001',
+    idempotencyKey: 'sprint-276:276-001-xverify:auditor:1',
+    tenantId: 'tenant-a',
+    projectId: store.projectId,
+    runId: 'sprint-276',
+    taskId: '276-001-xverify',
+    callId: 'call-xverify-276-001-1',
+    role: 'auditor',
+    purpose: 'audit-evaluation',
+    configured: {
+      provider: candidate.provider,
+      model: candidate.model,
+      source: 'config',
+      reasonCode: 'none',
+    },
+    requested: {
+      provider: candidate.provider,
+      model: candidate.model,
+      source: 'directive',
+      reasonCode: 'none',
+    },
+    resolved: {
+      provider: candidate.provider,
+      model: candidate.model,
+      source: 'router',
+      reasonCode: 'none',
+    },
+    called: {
+      provider: candidate.provider,
+      model: candidate.model,
+      source: 'wire',
+      reasonCode: 'none',
+    },
+    backend: {
+      transport: candidate.backend.transport,
+      executionBackend: candidate.backend.executionBackend,
+    },
+    auth: {
+      mode: candidate.auth.mode,
+      accountRefHash: candidate.auth.accountRefHash,
+    },
+    fallbackChain: [],
+    reachability: {
+      state: candidate.reachability.state,
+      evidenceRef: candidate.reachability.evidenceRef,
+    },
+    limits: {
+      state: candidate.limits.state,
+      evidenceRefs: [...candidate.limits.evidenceRefs],
+    },
+    createdAt: '2026-07-25T00:00:00.000Z',
+    ...overrides,
+  };
+  let eventSequence = 0;
+  return {
+    store,
+    receipt,
+    context: {
+      ledger: store,
+      receipt,
+      now: () => '2026-07-25T00:00:01.000Z',
+      eventIdFactory: () => `xverify-event-${++eventSequence}`,
+    },
+  };
+}
 
 function normalizedLogEvent(seq: number, type: string, content: unknown): string {
   return JSON.stringify({
@@ -221,6 +434,15 @@ describe('runCrossVerify — dispatch + advisory write', () => {
         filesWrite: ['src/core/auth.ts'],
       },
     });
+    defaultSpawnMocks.spawnWorkerMultiProvider.mockImplementationOnce(
+      async (taskId, _model, _prompt, projectRoot) => {
+        expect(readFileSync(
+          join(projectRoot, TASKS_DIR, `task-${taskId}.plan`),
+          'utf-8',
+        )).toContain(`# Exact xverify plan — ${taskId}`);
+        return { backend: 'docker', provider: 'claude' };
+      },
+    );
     const res = await runCrossVerify(
       root, task, makeResult(), TaskEvaluation.DONE,
       makeConfig({ enabled: true }, { docker_image: 'deckent-worker:test', docker_timeout: 321 }),
@@ -237,6 +459,9 @@ describe('runCrossVerify — dispatch + advisory write', () => {
       dockerImage: 'deckent-worker:test',
       dockerTimeout: 321,
       executionBudget: { maxCacheReadTokens: 1_000_000, maxTurns: 12 },
+      availableTools: 'Bash',
+      isolatedContext: true,
+      modelEffort: 'low',
       hostTerminalResultContract: {
         version: 1,
         kind: 'terminal-verdict',
@@ -251,15 +476,81 @@ describe('runCrossVerify — dispatch + advisory write', () => {
     expect(verifierTask).toMatchObject({
       model: 'claude-fable-5',
       provider: 'claude',
+      modelEffort: 'low',
       type: 'audit',
       backend: 'docker',
       budget: { maxCacheReadTokens: 1_000_000, maxTurns: 12 },
+      budgetPolicy: {
+        state: 'allow',
+        role: 'auditor',
+        taskKind: 'audit',
+        resolvedProvider: 'claude',
+        executionCostClass: 'remote',
+        profileRef: 'execution_budget.roles.auditor.default',
+        policyDigest: expect.stringMatching(/^[a-f0-9]{64}$/),
+        admissionMode: 'unattended',
+        landingPolicy: { reserve_ratio: 0.25 },
+      },
       scope: {
         directories: [],
         filesRead: ['src/core/auth.ts'],
         filesWrite: [],
       },
     });
+    const verifierPlan = readFileSync(
+      join(root, TASKS_DIR, 'task-276-001-xverify.plan'),
+      'utf-8',
+    );
+    expect(verifierPlan).toContain('# Exact xverify plan — 276-001-xverify');
+    expect(verifierPlan).toContain('- Provider: claude');
+    expect(verifierPlan).toContain('- Model: claude-fable-5');
+    expect(verifierPlan).toContain('inspection-only; project writes are forbidden');
+    expect(verifierPlan).toContain('- "src/core/auth.ts"');
+    expect(verifierPlan).toContain('exactly one terminal VERDICT');
+  });
+
+  it('returns UNCLEAR without spawn when exact verifier artifacts cannot be prepared', async () => {
+    const notADirectory = join(root, 'not-a-directory');
+    writeFileSync(notADirectory, 'file', 'utf-8');
+
+    const res = await runCrossVerify(
+      notADirectory,
+      makeTask({ provider: 'codex', model: 'gpt-5.6-sol' }),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true }),
+      { availableProviders: ['codex', 'claude'], verifierModel: 'claude-fable-5' },
+    );
+
+    expect(res).toMatchObject({
+      ran: true,
+      outcome: 'unclear',
+      advisory: { verdict: 'unclear' },
+    });
+    expect(defaultSpawnMocks.spawnWorkerMultiProvider).not.toHaveBeenCalled();
+  });
+
+  it('does not apply the Claude finite-verifier effort profile to another provider', async () => {
+    const res = await runCrossVerify(
+      root,
+      makeTask({ provider: 'claude', model: 'claude-sonnet-5' }),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true }),
+      { availableProviders: ['claude', 'codex'], verifierModel: 'gpt-5.6-sol' },
+    );
+
+    expect(res.outcome).toBe('confirmed');
+    const call = defaultSpawnMocks.spawnWorkerMultiProvider.mock.calls[0]!;
+    expect(call[4]).toMatchObject({ provider: 'codex' });
+    expect(call[4]).not.toHaveProperty('modelEffort');
+
+    const verifierTask = JSON.parse(readFileSync(
+      join(root, TASKS_DIR, 'task-276-001-xverify.json'),
+      'utf-8',
+    )) as Record<string, unknown>;
+    expect(verifierTask.provider).toBe('codex');
+    expect(verifierTask).not.toHaveProperty('modelEffort');
   });
 
   it('consumes a terminal Docker receipt and finalizes task projection from that receipt', async () => {
@@ -374,6 +665,197 @@ describe('runCrossVerify — dispatch + advisory write', () => {
     expect(res).toMatchObject({ outcome: 'unclear', advisory: { verdict: 'unclear' } });
     expect(defaultSpawnMocks.finalizeTaskStatusFromSettlement).toHaveBeenCalledOnce();
     expect(defaultSpawnMocks.pollForResultFile).not.toHaveBeenCalled();
+  });
+
+  it('follows a LANDED parent to its exact exhausted continuation without hiding either truth', async () => {
+    let continuationRef: ReturnType<typeof createTaskResultSettlementRefForAttempt> | undefined;
+    defaultSpawnMocks.spawnWorkerMultiProvider.mockImplementationOnce(async (taskId, _model, _prompt, projectRoot) => {
+      const parentRef = createTaskResultSettlementRef(projectRoot, taskId);
+      writeTaskResultSettlementAttemptAtomic(parentRef);
+      claimTaskResultSettlementAttemptAtomic(parentRef);
+      const checkpoint = createExecutionLandingCheckpoint(projectRoot, {
+        taskId,
+        attemptId: parentRef.attemptId,
+        tenantId: 'tenant-a',
+        originalRequestDigest: '1'.repeat(64),
+        taskDigest: '2'.repeat(64),
+        role: 'auditor',
+        kind: 'audit',
+        admissionMode: 'unattended',
+        identity: {
+          configuredProvider: 'claude',
+          configuredModel: 'claude-fable-5',
+          requestedProvider: 'claude',
+          requestedModel: 'claude-fable-5',
+          resolvedProvider: 'claude',
+          resolvedModel: 'claude-fable-5',
+          calledProvider: 'claude',
+          calledModel: 'claude-fable-5',
+          backend: 'docker',
+          auth: 'subscription',
+          fallbackReason: null,
+        },
+        policyDigest: '3'.repeat(64),
+        landingPolicy: { reserve_ratio: 0.25 },
+        hardBudget: { maxTurns: 12, maxCacheReadTokens: 800 },
+        cumulativeUsage: {
+          turns: 2,
+          inputTokens: 100,
+          outputTokens: 50,
+          cacheReadTokens: 500,
+          cacheCreationTokens: 50,
+          totalTokens: 700,
+          maxContextTokens: 650,
+        },
+        attemptFence: 'xverify-parent-fence',
+        providerSequence: {
+          firstSequence: 1,
+          lastSequence: 2,
+          eventCount: 2,
+          eventDigest: '4'.repeat(64),
+        },
+        semanticState: {
+          summary: 'Bounded evidence pass completed before landing.',
+          completedWork: ['read the exact evidence'],
+          remainingWork: ['emit the terminal verdict'],
+          nextAction: 'continue from this checkpoint once',
+          unresolvedRisks: [],
+        },
+        scope: {
+          filesRead: ['src/core/auth.ts'],
+          filesWrite: [],
+        },
+        diskDiffRefs: [`scope-diff:sha256:${'5'.repeat(64)}`],
+        evidenceRefs: [`budget-usage:sha256:${'6'.repeat(64)}`],
+        acceptanceCriteria: 'Emit one terminal verifier verdict.',
+        landingRequestedAt: '2026-07-24T00:00:00.000Z',
+        landedAt: '2026-07-24T00:00:01.000Z',
+      });
+      writeExecutionLandingCheckpointAtomic(projectRoot, checkpoint);
+      writeExecutionAttemptRetirementAtomic(projectRoot, checkpoint.checkpoint, {
+        checkpointSha256: checkpoint.checkpointSha256,
+        runtimeDisposition: 'stopped-removed',
+        resourcesReleased: true,
+        evidenceRefs: [`runtime-release:sha256:${'7'.repeat(64)}`],
+      });
+      writeTaskResultSettlementLandedRetirementAtomic(parentRef);
+
+      const continuationAttemptId = randomUUID();
+      claimExecutionContinuationAtomic(projectRoot, checkpoint.checkpoint, {
+        checkpointSha256: checkpoint.checkpointSha256,
+        continuationAttemptId,
+        continuationFence: 'xverify-continuation-fence',
+      });
+      continuationRef = createTaskResultSettlementRefForAttempt(
+        projectRoot,
+        taskId,
+        continuationAttemptId,
+      );
+      writeTaskResultSettlementAttemptAtomic(continuationRef);
+      claimTaskResultSettlementAttemptAtomic(continuationRef);
+
+      const monitor = new RuntimeBudgetMonitor({
+        projectRoot,
+        taskId,
+        attemptId: continuationAttemptId,
+        backend: 'docker',
+        budget: { maxTurns: 10, maxCacheReadTokens: 300 },
+        landingAlreadySatisfied: true,
+        counterScope: 'attempt',
+        onStop: vi.fn(),
+      });
+      monitor.observe({
+        type: 'text',
+        content: {
+          type: 'assistant',
+          message: {
+            id: 'msg-continuation',
+            usage: {
+              input_tokens: 20,
+              output_tokens: 5,
+              cache_read_input_tokens: 301,
+              cache_creation_input_tokens: 10,
+            },
+            content: [],
+          },
+        },
+      });
+
+      writeTaskResultSettlementAtomic(createTaskResultSettlement({
+        ref: continuationRef,
+        exitCode: 0,
+        result: {
+          taskId,
+          selfAssessment: 'NO_GO',
+          testsPassed: false,
+          notes: `Runtime budget circuit breaker invalidated the worker result. attemptId=${continuationAttemptId}`,
+        },
+      }));
+      writeTaskResultSettlementClosureAtomic(continuationRef, {
+        containerDisposition: 'stopped-removed',
+        locksReleased: true,
+      });
+      writeFileSync(
+        join(projectRoot, TASKS_DIR, `task-${taskId}.log`),
+        normalizedLogEvent(1, 'text', {
+          type: 'assistant',
+          message: {
+            content: [{
+              type: 'text',
+              text: 'Bounded claim supported.\nVERDICT: CONFIRMED exact continuation evidence',
+            }],
+          },
+        }),
+        'utf-8',
+      );
+      return { backend: 'docker', provider: 'claude', settlementRef: parentRef };
+    });
+
+    const task = makeTask({ provider: 'codex', model: 'gpt-5.6-sol' });
+    const originalResult = makeResult();
+    writeResultFile(task.id, originalResult);
+    const res = await runCrossVerify(
+      root,
+      task,
+      originalResult,
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true }),
+      { availableProviders: ['codex', 'claude'], verifierModel: 'claude-fable-5' },
+    );
+
+    expect(res).toMatchObject({
+      ran: true,
+      outcome: 'confirmed',
+      advisory: {
+        verdict: 'confirmed',
+        reason: 'exact continuation evidence',
+        execution: {
+          outcome: 'budget-exhausted',
+          terminalAttemptId: continuationRef!.attemptId,
+          reason: 'cache-read token budget exceeded (301 > 300)',
+          cumulativeUsage: {
+            turns: 3,
+            inputTokens: 120,
+            outputTokens: 55,
+            cacheReadTokens: 801,
+            cacheCreationTokens: 60,
+            totalTokens: 1036,
+            maxContextTokens: 650,
+          },
+        },
+      },
+    });
+    expect(res.advisory?.execution?.initialAttemptId)
+      .not.toBe(res.advisory?.execution?.terminalAttemptId);
+    expect(defaultSpawnMocks.finalizeTaskStatusFromSettlement)
+      .toHaveBeenCalledWith(root, `${task.id}-xverify`, continuationRef);
+    expect(readResultFile(task.id).crossVerify).toMatchObject({
+      outcome: 'confirmed',
+      execution: {
+        outcome: 'budget-exhausted',
+        terminalAttemptId: continuationRef!.attemptId,
+      },
+    });
   });
 
   it('ignores wrapper marker notes and recovers the terminal verdict from the provider log', async () => {
@@ -685,6 +1167,34 @@ describe('runCrossVerify — dispatch + advisory write', () => {
     expect(persisted.selfAssessment).toBe('DONE');
   });
 
+  it('threads an explicit claim-adjudication operation class into the verifier prompt', async () => {
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED dependency order supported');
+    const res = await runCrossVerify(
+      root,
+      makeTask({
+        description: 'M1 should precede M2 because M2 consumes the budget M1 protects.',
+        goNogo: {
+          goCriteria: 'Bounded evidence supports the material premises and dependency order.',
+          noGoCriteria: 'A prerequisite reversal is proven.',
+          techDebtAcceptable: 'none',
+        },
+      }),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true }),
+      {
+        availableProviders: TWO_PROVIDERS,
+        spawnVerifier: fn,
+        operationClass: 'adjudicate-claim',
+      },
+    );
+
+    expect(res.outcome).toBe('confirmed');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.prompt).toContain('Operation class: `adjudicate-claim`');
+    expect(calls[0]!.prompt).toContain('Do not require a future milestone behavior to');
+  });
+
   it('REFUTED verdict → refuted=true, advisory written, evaluation NOT downgraded', async () => {
     writeResultFile('276-001', makeResult());
     const { fn } = makeSpawnSpy('VERDICT: REFUTED signature check is missing on the refresh path');
@@ -721,36 +1231,247 @@ describe('runCrossVerify — dispatch + advisory write', () => {
   });
 });
 
-describe('runCrossVerify — REFUTED enforcement (323-004 / A18)', () => {
-  it('enforce_refuted=true + REFUTED → blocked=true (enforcement signal fires)', async () => {
+describe('runCrossVerify — mandatory exact-coordinator enforcement', () => {
+  it('projects a settled exact coordinator result without touching legacy spawn', async () => {
     writeResultFile('276-001', makeResult());
-    const { fn } = makeSpawnSpy('VERDICT: REFUTED signature check is missing on the refresh path');
-    const res = await runCrossVerify(
-      root, makeTask(), makeResult(), TaskEvaluation.DONE,
-      makeConfig({ enabled: true, enforce_refuted: true }),
-      { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
+    const { fn } = makeSpawnSpy('VERDICT: REFUTED legacy path must not run');
+    const exact = mandatoryComposition(
+      exactCoordinatorSettled('VERDICT: CONFIRMED exact host authority is complete'),
     );
-    expect(res.ran).toBe(true);
-    expect(res.refuted).toBe(true);
-    expect(res.blocked).toBe(true);
-    // ADR-070: even when enforcing, the runner never mutates the on-disk verdict —
-    // it only SURFACES `blocked`; the evaluation layer owns the NO_GO downgrade.
-    const persisted = readResultFile('276-001');
-    expect(persisted.selfAssessment).toBe('DONE');
-    expect(persisted.crossVerify?.verdict).toBe('refuted');
+
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: true }),
+      {
+        mandatoryInvocation: exact.composition,
+        spawnVerifier: fn,
+      },
+    );
+
+    expect(res).toMatchObject({
+      ran: true,
+      outcome: 'confirmed',
+      refuted: false,
+      blocked: false,
+      advisory: {
+        verifier: 'codex',
+        verifierModel: 'gpt-5.6-sol',
+        verdict: 'confirmed',
+        execution: {
+          outcome: 'completed',
+          terminalAttemptId: '11111111-1111-4111-8111-111111111111',
+        },
+        invocationReceiptRef: {
+          invocationId: 'invocation-mandatory-xverify',
+        },
+      },
+    });
+    expect(exact.execute).toHaveBeenCalledOnce();
+    expect(exact.execute).toHaveBeenCalledWith(
+      exact.composition.input,
+      exact.composition.launcher,
+    );
+    expect(fn).not.toHaveBeenCalled();
+    expect(exact.launcher).not.toHaveBeenCalled();
+    expect(readResultFile('276-001').crossVerify).toMatchObject({
+      outcome: 'confirmed',
+      verifier: 'codex',
+      verifierModel: 'gpt-5.6-sol',
+      invocationReceiptRef: {
+        invocationId: 'invocation-mandatory-xverify',
+      },
+    });
   });
 
-  it('enforce_refuted=true + CONFIRMED → blocked=false (only REFUTED blocks)', async () => {
+  it.each([
+    ['REFUTED', 'refuted', true],
+    ['UNCLEAR', 'unclear', false],
+  ] as const)(
+    'maps exact terminal %s without opening a second verifier',
+    async (protocolVerdict, outcome, blocked) => {
+      writeResultFile('276-001', makeResult());
+      const { fn } = makeSpawnSpy('VERDICT: CONFIRMED legacy path must not run');
+      const exact = mandatoryComposition(
+        exactCoordinatorSettled(
+          `VERDICT: ${protocolVerdict} exact bounded rationale`,
+        ),
+      );
+
+      const res = await runCrossVerify(
+        root,
+        makeTask(),
+        makeResult(),
+        TaskEvaluation.DONE,
+        makeConfig({ enabled: true, enforce_refuted: true }),
+        {
+          mandatoryInvocation: exact.composition,
+          spawnVerifier: fn,
+        },
+      );
+
+      expect(res).toMatchObject({
+        ran: true,
+        outcome,
+        blocked,
+        refuted: outcome === 'refuted',
+      });
+      expect(exact.execute).toHaveBeenCalledOnce();
+      expect(fn).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    {
+      state: 'hold' as const,
+      reasonCode: 'XVERIFY_INVOCATION_USAGE_HOLD:window_mapper_unavailable',
+      authorityEvidenceRef: 'xverify-authority-hold:mandatory',
+      invocationReceiptRef: null,
+    },
+    {
+      state: 'reconciliation-required' as const,
+      reasonCode: 'XVERIFY_INVOCATION_OBSERVATION_HOLD:settlement_incomplete',
+      authorityEvidenceRef: 'xverify-authority-reconcile:mandatory',
+      invocationReceiptRef: {
+        schemaVersion: 1 as const,
+        tenantId: 'tenant-a',
+        projectId: 'project-a',
+        invocationId: 'invocation-mandatory-xverify',
+      },
+      providerLimitDispatchEvidenceRef: 'provider-limit-dispatch:mandatory',
+    },
+  ])(
+    'maps exact coordinator $state to unavailable+blocked without fallback',
+    async coordinatorResult => {
+      writeResultFile('276-001', makeResult());
+      const { fn } = makeSpawnSpy('VERDICT: CONFIRMED legacy path must not run');
+      const exact = mandatoryComposition(coordinatorResult);
+
+      const res = await runCrossVerify(
+        root,
+        makeTask(),
+        makeResult(),
+        TaskEvaluation.DONE,
+        makeConfig({ enabled: true, enforce_refuted: true }),
+        {
+          mandatoryInvocation: exact.composition,
+          spawnVerifier: fn,
+        },
+      );
+
+      expect(res).toMatchObject({
+        ran: false,
+        outcome: 'unavailable',
+        blocked: true,
+        skippedReason:
+          `verifier-exact-invocation-${coordinatorResult.state}:${coordinatorResult.reasonCode}`,
+      });
+      expect(exact.execute).toHaveBeenCalledOnce();
+      expect(fn).not.toHaveBeenCalled();
+    },
+  );
+
+  it('maps an exact coordinator fault to unavailable+blocked without legacy fallback', async () => {
     writeResultFile('276-001', makeResult());
-    const { fn } = makeSpawnSpy('VERDICT: CONFIRMED jwt checks present');
+    const { fn } = makeSpawnSpy('VERDICT: CONFIRMED legacy path must not run');
+    const exact = mandatoryComposition(new Error('authority storage unavailable'));
+
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: true }),
+      {
+        mandatoryInvocation: exact.composition,
+        spawnVerifier: fn,
+      },
+    );
+
+    expect(res).toMatchObject({
+      ran: false,
+      outcome: 'unavailable',
+      blocked: true,
+      skippedReason: 'unexpected-error: authority storage unavailable',
+    });
+    expect(exact.execute).toHaveBeenCalledOnce();
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('keeps config default-off ahead of the exact coordinator', async () => {
+    const exact = mandatoryComposition(
+      exactCoordinatorSettled('VERDICT: CONFIRMED must not execute'),
+    );
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig(undefined),
+      { mandatoryInvocation: exact.composition },
+    );
+
+    expect(res).toMatchObject({
+      ran: false,
+      outcome: 'disabled',
+      blocked: false,
+    });
+    expect(exact.execute).not.toHaveBeenCalled();
+  });
+
+  it('does not let a legacy REFUTED spawn satisfy mandatory verification', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn } = makeSpawnSpy('VERDICT: REFUTED signature check is missing on the refresh path');
+    const candidate = exactCandidate();
+    const invocation = exactInvocationReceipt(candidate);
     const res = await runCrossVerify(
       root, makeTask(), makeResult(), TaskEvaluation.DONE,
       makeConfig({ enabled: true, enforce_refuted: true }),
-      { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
+      {
+        verifierCandidates: [candidate],
+        invocationReceipt: invocation.context,
+        spawnVerifier: fn,
+      },
     );
-    expect(res.ran).toBe(true);
+    expect(res.ran).toBe(false);
     expect(res.refuted).toBe(false);
-    expect(res.blocked).toBe(false);
+    expect(res.blocked).toBe(true);
+    expect(res).toMatchObject({
+      outcome: 'unavailable',
+      skippedReason: 'verifier-exact-invocation-coordinator-not-composed',
+    });
+    expect(fn).not.toHaveBeenCalled();
+    const persisted = readResultFile('276-001');
+    expect(persisted.selfAssessment).toBe('DONE');
+    expect(persisted.crossVerify).toEqual({
+      outcome: 'unavailable',
+      reason: 'verifier-exact-invocation-coordinator-not-composed',
+    });
+  });
+
+  it('does not let a legacy CONFIRMED spawn fabricate mandatory success', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn } = makeSpawnSpy('VERDICT: CONFIRMED jwt checks present');
+    const candidate = exactCandidate();
+    const invocation = exactInvocationReceipt(candidate);
+    const res = await runCrossVerify(
+      root, makeTask(), makeResult(), TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: true }),
+      {
+        verifierCandidates: [candidate],
+        invocationReceipt: invocation.context,
+        spawnVerifier: fn,
+      },
+    );
+    expect(res.ran).toBe(false);
+    expect(res.refuted).toBe(false);
+    expect(res.blocked).toBe(true);
+    expect(res.skippedReason).toBe(
+      'verifier-exact-invocation-coordinator-not-composed',
+    );
+    expect(fn).not.toHaveBeenCalled();
   });
 
   it('enforce_refuted=false (explicit) + REFUTED → blocked=false (advisory-only)', async () => {
@@ -766,7 +1487,504 @@ describe('runCrossVerify — REFUTED enforcement (323-004 / A18)', () => {
   });
 });
 
+describe('runCrossVerify — advisory InvocationReceipt lifecycle', () => {
+  it('holds enforced verification before dispatch when receipt authority is missing', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED must not run');
+    const onVerifierDispatch = vi.fn();
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: true }),
+      {
+        verifierCandidates: [exactCandidate()],
+        spawnVerifier: fn,
+        onVerifierDispatch,
+      },
+    );
+
+    expect(res).toMatchObject({
+      ran: false,
+      blocked: true,
+      outcome: 'unavailable',
+      skippedReason: 'verifier-exact-invocation-coordinator-not-composed',
+    });
+    expect(calls).toHaveLength(0);
+    expect(onVerifierDispatch).not.toHaveBeenCalled();
+  });
+
+  it('settles an explicit terminal UNCLEAR as an accepted verifier protocol result', async () => {
+    writeResultFile('276-001', makeResult());
+    const candidate = exactCandidate();
+    const invocation = exactInvocationReceipt(candidate);
+    const { fn } = makeSpawnSpy('VERDICT: UNCLEAR bounded evidence is insufficient');
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: false }),
+      {
+        verifierCandidates: [candidate],
+        invocationReceipt: invocation.context,
+        spawnVerifier: fn,
+      },
+    );
+
+    expect(res).toMatchObject({ ran: true, blocked: false, outcome: 'unclear' });
+    const view = invocation.store.get(
+      { tenantId: 'tenant-a', projectId: invocation.store.projectId },
+      invocation.receipt.invocationId,
+    );
+    expect(view?.transportOutcome).toBe('succeeded');
+    expect(view?.consumerOutcome).toBe('accepted');
+    expect(view?.events.at(-1)?.payload).toEqual({
+      outcome: 'accepted',
+      reasonCode: 'none',
+    });
+  });
+
+  it('records malformed output as a consumer parse rejection without fabricating success', async () => {
+    writeResultFile('276-001', makeResult());
+    const candidate = exactCandidate();
+    const invocation = exactInvocationReceipt(candidate);
+    const { fn } = makeSpawnSpy('No terminal protocol line was emitted.');
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: false }),
+      {
+        verifierCandidates: [candidate],
+        invocationReceipt: invocation.context,
+        spawnVerifier: fn,
+      },
+    );
+
+    expect(res).toMatchObject({ ran: true, outcome: 'unclear' });
+    const view = invocation.store.get(
+      { tenantId: 'tenant-a', projectId: invocation.store.projectId },
+      invocation.receipt.invocationId,
+    );
+    expect(view?.transportOutcome).toBe('succeeded');
+    expect(view?.consumerOutcome).toBe('rejected');
+    expect(view?.events.at(-1)?.payload).toEqual({
+      outcome: 'rejected',
+      reasonCode: 'parse_failed',
+    });
+  });
+
+  it('settles a thrown spawn as failed transport and rejected consumer', async () => {
+    writeResultFile('276-001', makeResult());
+    const candidate = exactCandidate();
+    const invocation = exactInvocationReceipt(candidate);
+    const fn: SpawnVerifierFn = vi.fn(async () => {
+      throw new Error('provider transport failed');
+    });
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: false }),
+      {
+        verifierCandidates: [candidate],
+        invocationReceipt: invocation.context,
+        spawnVerifier: fn,
+      },
+    );
+
+    expect(res).toMatchObject({
+      ran: false,
+      blocked: false,
+      outcome: 'unavailable',
+      skippedReason: 'spawn-error',
+      evidencePersisted: true,
+    });
+    const view = invocation.store.get(
+      { tenantId: 'tenant-a', projectId: invocation.store.projectId },
+      invocation.receipt.invocationId,
+    );
+    expect(view?.events.map(event => event.type)).toEqual([
+      'dispatch_started',
+      'transport_settled',
+      'consumer_settled',
+    ]);
+    expect(view?.transportOutcome).toBe('failed');
+    expect(view?.consumerOutcome).toBe('rejected');
+  });
+
+  it('rejects an immutable receipt binding mismatch before declaration or dispatch', async () => {
+    writeResultFile('276-001', makeResult());
+    const candidate = exactCandidate();
+    const invocation = exactInvocationReceipt(candidate, {
+      backend: { transport: 'api', executionBackend: 'api' },
+    });
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED must not run');
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: false }),
+      {
+        verifierCandidates: [candidate],
+        invocationReceipt: invocation.context,
+        spawnVerifier: fn,
+      },
+    );
+
+    expect(res).toMatchObject({
+      ran: false,
+      blocked: false,
+      outcome: 'unavailable',
+      skippedReason: 'verifier-invocation-receipt-binding-failed:backend-binding-mismatch',
+    });
+    expect(calls).toHaveLength(0);
+    expect(invocation.store.get(
+      { tenantId: 'tenant-a', projectId: invocation.store.projectId },
+      invocation.receipt.invocationId,
+    )).toBeNull();
+  });
+
+  it('accepts a contiguous fallback chain ending at the admitted exact candidate', async () => {
+    writeResultFile('276-001', makeResult());
+    const candidate = exactCandidate();
+    const invocation = exactInvocationReceipt(candidate, {
+      requested: {
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        source: 'directive',
+        reasonCode: 'none',
+      },
+      fallbackChain: [{
+        sequence: 1,
+        fromProvider: 'gemini',
+        fromModel: 'gemini-2.5-flash',
+        toProvider: candidate.provider,
+        toModel: candidate.model,
+        reasonCode: 'fallback_unreachable',
+        reachabilityRef: candidate.reachability.evidenceRef,
+        limitEvidenceRefs: [...candidate.limits.evidenceRefs],
+      }],
+    });
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED fallback provenance is exact');
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: false }),
+      {
+        verifierCandidates: [candidate],
+        invocationReceipt: invocation.context,
+        spawnVerifier: fn,
+      },
+    );
+
+    expect(res).toMatchObject({ ran: true, outcome: 'confirmed', blocked: false });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('blocks an invalid fallback chain before declaration or provider work', async () => {
+    writeResultFile('276-001', makeResult());
+    const candidate = exactCandidate();
+    const invocation = exactInvocationReceipt(candidate, {
+      requested: {
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        source: 'directive',
+        reasonCode: 'none',
+      },
+      fallbackChain: [{
+        sequence: 2,
+        fromProvider: 'gemini',
+        fromModel: 'gemini-2.5-flash',
+        toProvider: candidate.provider,
+        toModel: candidate.model,
+        reasonCode: 'fallback_unreachable',
+        reachabilityRef: candidate.reachability.evidenceRef,
+        limitEvidenceRefs: [...candidate.limits.evidenceRefs],
+      }],
+    });
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED must not run');
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: false }),
+      {
+        verifierCandidates: [candidate],
+        invocationReceipt: invocation.context,
+        spawnVerifier: fn,
+      },
+    );
+
+    expect(res.skippedReason).toBe(
+      'verifier-invocation-receipt-binding-failed:fallback-chain-invalid',
+    );
+    expect(res.blocked).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('blocks a duplicate receipt declaration without a second provider call', async () => {
+    writeResultFile('276-001', makeResult());
+    const candidate = exactCandidate();
+    const invocation = exactInvocationReceipt(candidate);
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED exactly once');
+    const options = {
+      verifierCandidates: [candidate],
+      invocationReceipt: invocation.context,
+      spawnVerifier: fn,
+    } as const;
+
+    const first = await runCrossVerify(
+      root, makeTask(), makeResult(), TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: false }), options,
+    );
+    const replay = await runCrossVerify(
+      root, makeTask(), makeResult(), TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: false }), options,
+    );
+
+    expect(first.outcome).toBe('confirmed');
+    expect(replay).toMatchObject({
+      ran: false,
+      blocked: false,
+      outcome: 'unavailable',
+      skippedReason: 'verifier-invocation-receipt-replay-blocked',
+    });
+    expect(calls).toHaveLength(1);
+    expect(readResultFile('276-001').crossVerify?.invocationReceiptRef)
+      .toMatchObject({ invocationId: invocation.receipt.invocationId });
+  });
+
+  it('blocks before provider work when dispatch_started cannot be persisted', async () => {
+    writeResultFile('276-001', makeResult());
+    const candidate = exactCandidate();
+    const invocation = exactInvocationReceipt(candidate);
+    const failingLedger: InvocationReceiptLedger = {
+      projectId: invocation.store.projectId,
+      declare: invocation.store.declare.bind(invocation.store),
+      append: () => {
+        throw new Error('disk unavailable');
+      },
+      get: invocation.store.get.bind(invocation.store),
+      close: () => {},
+    };
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED must not run');
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: false }),
+      {
+        verifierCandidates: [candidate],
+        invocationReceipt: { ...invocation.context, ledger: failingLedger },
+        spawnVerifier: fn,
+      },
+    );
+
+    expect(res).toMatchObject({
+      ran: false,
+      blocked: false,
+      outcome: 'unavailable',
+      skippedReason: 'verifier-invocation-receipt-pre-dispatch-write-failed',
+    });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('does not expose a semantic verdict when terminal receipt settlement fails', async () => {
+    writeResultFile('276-001', makeResult());
+    const candidate = exactCandidate();
+    const invocation = exactInvocationReceipt(candidate);
+    const failingLedger: InvocationReceiptLedger = {
+      projectId: invocation.store.projectId,
+      declare: invocation.store.declare.bind(invocation.store),
+      append: (scope, invocationId, event) => {
+        if (event.type === 'consumer_settled') throw new Error('consumer settlement unavailable');
+        return invocation.store.append(scope, invocationId, event);
+      },
+      get: invocation.store.get.bind(invocation.store),
+      close: () => {},
+    };
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED provider completed');
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: false }),
+      {
+        verifierCandidates: [candidate],
+        invocationReceipt: { ...invocation.context, ledger: failingLedger },
+        spawnVerifier: fn,
+      },
+    );
+
+    expect(res).toMatchObject({
+      ran: false,
+      blocked: false,
+      outcome: 'unavailable',
+      skippedReason: 'verifier-invocation-receipt-settlement-write-failed',
+    });
+    expect(calls).toHaveLength(1);
+    expect(invocation.store.get(
+      { tenantId: 'tenant-a', projectId: invocation.store.projectId },
+      invocation.receipt.invocationId,
+    )?.events.map(event => event.type)).toEqual([
+      'dispatch_started',
+      'transport_settled',
+    ]);
+  });
+});
+
 describe('runCrossVerify — honest-skip paths', () => {
+  it('blocks enforced verification when only a provider-name list is supplied', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED must not run');
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: true }),
+      { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
+    );
+
+    expect(res).toMatchObject({
+      ran: false,
+      blocked: true,
+      outcome: 'unavailable',
+      skippedReason: 'verifier-exact-invocation-coordinator-not-composed',
+      evidencePersisted: true,
+    });
+    expect(calls).toHaveLength(0);
+    expect(readResultFile('276-001').crossVerify).toEqual({
+      outcome: 'unavailable',
+      reason: 'verifier-exact-invocation-coordinator-not-composed',
+    });
+  });
+
+  it('does not let exact evidence plus a legacy receipt bypass the mandatory coordinator', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED exact evidence');
+    const candidate = exactCandidate();
+    const invocation = exactInvocationReceipt(candidate);
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: true }),
+      {
+        verifierCandidates: [candidate],
+        invocationReceipt: invocation.context,
+        spawnVerifier: fn,
+      },
+    );
+
+    expect(res).toMatchObject({
+      ran: false,
+      blocked: true,
+      outcome: 'unavailable',
+      skippedReason: 'verifier-exact-invocation-coordinator-not-composed',
+    });
+    expect(calls).toHaveLength(0);
+    expect(readResultFile('276-001').crossVerify).toEqual({
+      outcome: 'unavailable',
+      reason: 'verifier-exact-invocation-coordinator-not-composed',
+    });
+    expect(invocation.store.get(
+      { tenantId: 'tenant-a', projectId: invocation.store.projectId },
+      'inv-xverify-276-001',
+    )).toBeNull();
+  });
+
+  it('blocks advisory exact verification for unknown reachability before dispatch', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED must not run');
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: false }),
+      {
+        verifierCandidates: [exactCandidate({
+          reachability: {
+            state: 'unknown',
+            reachable: true,
+            evidenceRef: 'provider-reachability:unknown-evidence',
+          },
+        })],
+        spawnVerifier: fn,
+      },
+    );
+
+    expect(res).toMatchObject({
+      ran: false,
+      blocked: false,
+      outcome: 'unavailable',
+      skippedReason: expect.stringMatching(/no second provider/i),
+    });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('blocks an advisory exact candidate whose model is not capability-equivalent', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED must not run');
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: false }),
+      {
+        verifierCandidates: [exactCandidate({ model: 'gpt-5.6-sol' })],
+        spawnVerifier: fn,
+      },
+    );
+
+    expect(res).toMatchObject({
+      ran: false,
+      blocked: false,
+      outcome: 'unavailable',
+      skippedReason: expect.stringContaining('does not match capability-equivalent'),
+    });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('does not promote registry/catalog presence into verifier eligibility', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED must not run');
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true }),
+      { spawnVerifier: fn },
+    );
+
+    expect(res).toMatchObject({
+      ran: false,
+      outcome: 'unavailable',
+      skippedReason: 'verifier-eligibility-evidence-missing',
+      evidencePersisted: true,
+    });
+    expect(calls).toHaveLength(0);
+    expect(readResultFile('276-001').crossVerify).toEqual({
+      outcome: 'unavailable',
+      reason: 'verifier-eligibility-evidence-missing',
+    });
+  });
+
   it('uses catalog local economics for an Ollama verifier without owner remote budget', async () => {
     writeResultFile('276-001', makeResult());
     ensureOllamaModelRegistered('qwen3.6:27b');
@@ -800,6 +2018,36 @@ describe('runCrossVerify — honest-skip paths', () => {
     expect(readResultFile('276-001').crossVerify).toMatchObject({
       outcome: 'unavailable',
       reason: expect.stringContaining('verifier-budget-hold:budget-policy-missing'),
+    });
+  });
+
+  it('holds before verifier dispatch when the owner turn reserve cannot finish the finite protocol', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED must not run');
+    const onVerifierDispatch = vi.fn();
+    const res = await runCrossVerify(
+      root, makeTask(), makeResult(), TaskEvaluation.DONE,
+      makeConfig({ enabled: true }, {
+        execution_budget: {
+          roles: { auditor: { default: { maxCacheReadTokens: 200_000, maxTurns: 4 } } },
+          landing: { reserve_ratio: 0.25 },
+          unmetered_backend: { action: 'reroute-or-hold', ordered_backends: ['docker'] },
+        },
+      } as Partial<ResolvedConfig>),
+      { availableProviders: TWO_PROVIDERS, spawnVerifier: fn, onVerifierDispatch },
+    );
+    expect(res).toMatchObject({
+      ran: false,
+      outcome: 'unavailable',
+      skippedReason: expect.stringContaining(
+        'landing-turn-reserve-insufficient:execution_budget.roles.auditor.default.maxTurns:guaranteed=1:required=3',
+      ),
+    });
+    expect(calls).toHaveLength(0);
+    expect(onVerifierDispatch).not.toHaveBeenCalled();
+    expect(readResultFile('276-001').crossVerify).toMatchObject({
+      outcome: 'unavailable',
+      reason: expect.stringContaining('landing-turn-reserve-insufficient'),
     });
   });
 
@@ -838,14 +2086,20 @@ describe('runCrossVerify — honest-skip paths', () => {
   it('low-stakes task with high_stakes_only=false → verifies anyway', async () => {
     writeResultFile('276-002', makeResult({ taskId: '276-002' }));
     const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED clean refactor');
+    const onVerifierDispatch = vi.fn();
     const res = await runCrossVerify(
       root, makeLowStakesTask(), makeResult({ taskId: '276-002' }), TaskEvaluation.DONE,
       makeConfig({ enabled: true, high_stakes_only: false }),
-      { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
+      { availableProviders: TWO_PROVIDERS, spawnVerifier: fn, onVerifierDispatch },
     );
     expect(res.ran).toBe(true);
     expect(res.advisory?.verdict).toBe('confirmed');
     expect(calls.length).toBe(1);
+    expect(onVerifierDispatch).toHaveBeenCalledOnce();
+    expect(onVerifierDispatch).toHaveBeenCalledWith({
+      verifierProvider: 'codex',
+      verifierModel: 'gpt-4.1',
+    });
   });
 });
 
@@ -903,6 +2157,49 @@ describe('runCrossVerify — fail-safe + verifier selection', () => {
     );
     expect(res.outcome).toBe('unavailable');
     expect(res.evidencePersisted).toBe(false);
+  });
+
+  it('uses the production factory only for mandatory verification and persists typed HOLD', async () => {
+    writeResultFile('276-001', makeResult());
+    const compose = vi.fn(() => ({
+      state: 'hold' as const,
+      reasonCode: 'xverify_execution_profile_unavailable',
+      authorityEvidenceRef: 'xverify-production-ingress:test-hold',
+    }));
+    const mandatory = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({
+        enabled: true,
+        enforce_refuted: true,
+        high_stakes_only: false,
+      }),
+      { mandatoryInvocationFactory: { compose } },
+    );
+    expect(compose).toHaveBeenCalledTimes(1);
+    expect(mandatory).toMatchObject({
+      outcome: 'unavailable',
+      blocked: true,
+      skippedReason: expect.stringContaining('xverify_execution_profile_unavailable'),
+    });
+    expect(readResultFile('276-001').crossVerify).toMatchObject({
+      outcome: 'unavailable',
+      authorityEvidenceRef: 'xverify-production-ingress:test-hold',
+    });
+
+    compose.mockClear();
+    const advisory = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: false }),
+      { mandatoryInvocationFactory: { compose }, availableProviders: [] },
+    );
+    expect(compose).not.toHaveBeenCalled();
+    expect(advisory.outcome).toBe('unavailable');
   });
 
   it('verifier_priority config is respected when several providers qualify', async () => {

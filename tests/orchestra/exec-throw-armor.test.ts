@@ -54,6 +54,7 @@ vi.mock('../../src/orchestra/result-watcher.js', () => ({
 // drainNervousRespawns' sole external call — injectable throw for the
 // tick-armor tests (part a).
 vi.mock('../../src/nervous/respawn-request.js', () => ({
+  RESPAWN_REQUESTS_FILE: '.deckent/nervous-respawn-requests.jsonl',
   drainRespawnRequests: vi.fn(() => {
     respawnDrainState.callCount++;
     if (respawnDrainState.alwaysThrow || respawnDrainState.callCount <= respawnDrainState.throwUntilCall) {
@@ -90,6 +91,12 @@ import type { Task, Sprint, ResolvedConfig, TaskResult } from '../../src/core/ty
 import type { SpawnBackend } from '../../src/orchestra/spawn-backend.js';
 import { debugLog } from '../../src/core/utils.js';
 import {
+  TEST_MEASURED_LANDING_CAPABILITIES,
+  TEST_REMOTE_EXECUTION_BUDGET,
+  TEST_REMOTE_WORKER_BUDGET_POLICY,
+  settleTestRuntimeBudget,
+} from '../helpers/budgeted-docker-execution-fixture.js';
+import {
   planDispatch,
   buildSpawnWriteTargets,
   waitForResults,
@@ -102,7 +109,11 @@ function makeTask(id: string, overrides?: Partial<Task>): Task {
     id,
     title: `Task ${id}`,
     description: `Description for ${id}`,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
+    provider: 'claude',
+    type: 'code-development',
+    budget: TEST_REMOTE_EXECUTION_BUDGET,
+    budgetPolicy: TEST_REMOTE_WORKER_BUDGET_POLICY,
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -160,6 +171,20 @@ function doneResult(id: string): TaskResult {
     coverage: 90,
     selfAssessment: 'DONE',
     notes: 'ran',
+    tokenUsage: {
+      inputTokens: 10,
+      outputTokens: 2,
+      cacheReadTokens: 0,
+      source: 'provider-adapter',
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+    },
+    cost: {
+      usd: 0.01,
+      currency: 'USD',
+      pricingSource: 'provider-envelope',
+      isLocal: false,
+    },
   };
 }
 
@@ -290,13 +315,16 @@ describe('spawnIfNotAssigned — prompt-build throw retry (born-452 THROW-ADAYLA
     const a = makeTask('a', { status: TaskStatus.EXECUTING });
     const b = makeTask('b', { status: TaskStatus.PENDING, dependencies: ['a'] });
     const sprint = makeSprint([a, b]);
+    settleTestRuntimeBudget(root, 'a');
     writeFileSync(join(root, '.tasks', 'task-a.result'), JSON.stringify(doneResult('a')), 'utf-8');
 
     const spawned: string[] = [];
     const backend: SpawnBackend = {
+      ...TEST_MEASURED_LANDING_CAPABILITIES,
       name: 'mock',
       spawn: (taskId: string) => {
         spawned.push(taskId);
+        settleTestRuntimeBudget(root, taskId);
         writeFileSync(join(root, '.tasks', `task-${taskId}.result`), JSON.stringify(doneResult(taskId)), 'utf-8');
       },
       kill: () => {},

@@ -62,14 +62,18 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('../../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
+  readAuthMode: vi.fn().mockResolvedValue('subscription'),
 }));
 
 vi.mock('../../../src/orchestra/brain.js', () => ({
   readContext: vi.fn(() => ({})),
-  planSprint: vi.fn(),
+  planSprint: vi.fn().mockResolvedValue({
+    id: 'sprint-detached-fork',
+    tasks: [],
+  }),
   BrainError: class BrainError extends Error {
     phase?: string;
     constructor(msg: string, phase?: string) {
@@ -78,6 +82,21 @@ vi.mock('../../../src/orchestra/brain.js', () => ({
       this.phase = phase;
     }
   },
+}));
+
+vi.mock('../../../src/core/cost-config-loader.js', () => ({
+  initCostConfig: vi.fn(),
+  loadCostConfig: vi.fn(() => ({
+    _version: '1.0',
+    providers: {},
+    cost_limits: {
+      sprint_max_usd: 5,
+      daily_max_usd: 50,
+      monthly_max_usd: 500,
+      auto_confirm_below_usd: 2,
+    },
+    update_config: { sources_priority: ['bundled'] },
+  })),
 }));
 
 vi.mock('../../../src/mcp/tools/job-runner.js', () => ({

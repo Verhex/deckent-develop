@@ -47,7 +47,7 @@ vi.mock('node:fs', async () => {
 });
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
   readAuthMode: vi.fn().mockResolvedValue('subscription'),
@@ -157,7 +157,7 @@ const MOCK_SPRINT_PLAN: Sprint = {
       id: '998-001',
       title: 'mock',
       description: 'mock task',
-      model: 'opus',
+      model: 'claude-opus-4-8',
       effort: 'high',
       priority: 'NORMAL',
       reason: 'test',
@@ -275,16 +275,16 @@ describe('deckent_start — sprint duration estimate wire (B11)', () => {
     expect(single.estimatedDurationMin).toBeGreaterThan(0);
   });
 
-  it('falls back to the heuristic range when force=true skips the pre-plan', async () => {
-    // force=true bypasses the cost-gate pre-plan entirely, so no real estimate is
-    // available — the response honestly falls back to the heuristic range rather
-    // than spending an extra planSprint call.
+  it('force acknowledges numeric overrun without bypassing the cost pre-plan or duration evidence', async () => {
+    // `force` may acknowledge only a numeric cost overrun. It must not bypass
+    // the pre-plan/pricing path, so duration evidence remains plan-derived.
     const tool = await getStartTool();
     const result = await tool.handler({ force: true });
     const parsed = JSON.parse(result.content[0]!.text);
 
     expect(parsed.success).toBe(true);
-    expect(parsed.estimatedDuration).toBe('~10-30 minutes');
-    expect(parsed.estimatedDurationMin).toBeUndefined();
+    expect(parsed.estimatedDuration).toBe('~25 minutes');
+    expect(parsed.estimatedDurationMin).toBe(25);
+    expect(planSprint).toHaveBeenCalled();
   });
 });

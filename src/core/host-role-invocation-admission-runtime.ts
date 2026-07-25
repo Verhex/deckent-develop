@@ -32,6 +32,9 @@ import {
   type RoleInvocationResolution,
   type RoleInvocationSelected,
 } from './role-invocation-resolver.js';
+import type { VerifierEligibilityCandidate } from './cross-verify.js';
+import { modelRegistry } from './model-registry.js';
+import { PROVIDER_MODEL_MAP } from './task-types.js';
 
 export interface HostRoleInvocationAuthorities {
   /** Canonical tenant boundary for the entire primary→fallback chain. */
@@ -73,6 +76,33 @@ export interface HostRoleInvocationHeld {
 export type HostRoleInvocationAdmissionResult =
   | ProviderLimitAdmissionAllowed
   | HostRoleInvocationHeld;
+
+export type HostRoleVerifierCandidateProjection =
+  | {
+      readonly state: 'ready';
+      readonly candidate: VerifierEligibilityCandidate;
+      /** Exact caller-authored query authority used to produce `candidate`. */
+      readonly authority: HostRoleInvocationCandidateAuthority;
+      /** Exact fresh windows required by the selected provider-limit authority. */
+      readonly requiredWindows: readonly {
+        readonly windowId: string;
+        readonly unit: ProviderLimitReservationRequest['estimates'][number]['unit'];
+        readonly model: string | null;
+      }[];
+      /** Earliest expiry across reachability and limit evidence. */
+      readonly expiresAt: string;
+      readonly authorityEvidenceRef: string;
+    }
+  | {
+      readonly state: 'hold';
+      readonly reasonCode:
+        | 'authority_unavailable'
+        | 'authority_identity_mismatch'
+        | 'candidate_evidence_unavailable'
+        | 'candidate_not_eligible'
+        | 'authority_failure';
+      readonly authorityEvidenceRef: string;
+    };
 
 export class HostRoleInvocationAdmissionError extends Error {
   constructor(
@@ -161,6 +191,165 @@ function candidateIdentityMatches(
  */
 export class HostRoleInvocationAdmissionRuntime {
   constructor(private readonly authorities: HostRoleInvocationAuthorities | null) {}
+
+  /**
+   * Project one caller-authored exact scope into verifier eligibility evidence.
+   *
+   * This is deliberately read-only: it never reserves provider capacity and
+   * therefore never grants dispatch. Callers must retain the exact query
+   * authority; this runtime does not enumerate stores or guess account/backend
+   * identity.
+   */
+  projectVerifierCandidate(
+    candidate: HostRoleInvocationCandidateAuthority,
+  ): HostRoleVerifierCandidateProjection {
+    if (!this.authorities) {
+      return {
+        state: 'hold',
+        reasonCode: 'authority_unavailable',
+        authorityEvidenceRef: authorityEvidenceRef('unavailable', 'auditor'),
+      };
+    }
+
+    const { tenantId, truthStore, limitStore } = this.authorities;
+    if (!candidateIdentityMatches(
+      candidate.provider,
+      candidate,
+      tenantId,
+      truthStore.projectId,
+    )
+      || !Object.hasOwn(PROVIDER_MODEL_MAP, candidate.provider)
+      || modelRegistry.get(candidate.model)?.provider !== candidate.provider) {
+      return {
+        state: 'hold',
+        reasonCode: 'authority_identity_mismatch',
+        authorityEvidenceRef: authorityEvidenceRef('identity', candidate.provider),
+      };
+    }
+
+    try {
+      const at = this.authorities.now?.() ?? new Date();
+      const reachability = truthStore.getLatestReachability(candidate.reachabilityQuery, at);
+      const limit = limitStore.getLatestSnapshot(candidate.limitQuery, at);
+      if (!reachability || !limit) {
+        return {
+          state: 'hold',
+          reasonCode: 'candidate_evidence_unavailable',
+          authorityEvidenceRef: authorityEvidenceRef(
+            'candidate-evidence-unavailable',
+            candidate.provider,
+          ),
+        };
+      }
+      if (limit.provider !== candidate.provider
+        || limit.tenantId !== candidate.limitQuery.tenantId
+        || limit.accountRefHash !== candidate.limitQuery.accountRefHash
+        || limit.quotaScopeRefHash !== candidate.limitQuery.quotaScopeRefHash
+        || limit.authMode !== candidate.limitQuery.authMode
+        || !sameBackend(limit.backend, candidate)) {
+        return {
+          state: 'hold',
+          reasonCode: 'authority_identity_mismatch',
+          authorityEvidenceRef: authorityEvidenceRef('limit-identity', candidate.provider),
+        };
+      }
+
+      const reachabilityEvidence = toReachabilityEvidence(reachability, at);
+      const limitEvidence = toLimitEvidence(limit, at);
+      if (reachabilityEvidence.state !== 'known'
+        || !reachabilityEvidence.reachable
+        || reachabilityEvidence.evidenceRef === null
+        || limitEvidence.state !== 'known'
+        || limitEvidence.limited
+        || limitEvidence.evidenceRefs.length === 0) {
+        return {
+          state: 'hold',
+          reasonCode: 'candidate_not_eligible',
+          authorityEvidenceRef: authorityEvidenceRef(
+            'candidate-not-eligible',
+            [
+              candidate.provider,
+              reachabilityEvidence.state,
+              String(reachabilityEvidence.reachable),
+              limitEvidence.state,
+              String(limitEvidence.limited),
+            ].join('\0'),
+          ),
+        };
+      }
+
+      const projected: VerifierEligibilityCandidate = Object.freeze({
+        provider: candidate.provider as VerifierEligibilityCandidate['provider'],
+        model: candidate.model,
+        auth: Object.freeze({
+          mode: candidate.reachabilityQuery.authMode,
+          accountRefHash: candidate.reachabilityQuery.accountRefHash,
+        }),
+        backend: Object.freeze({
+          transport: candidate.reachabilityQuery.transport,
+          executionBackend: candidate.reachabilityQuery.executionBackend,
+          endpointRefHash: candidate.reachabilityQuery.endpointRefHash,
+          executionProfileRef: candidate.reachabilityQuery.executionProfileRef,
+        }),
+        reachability: Object.freeze({ ...reachabilityEvidence }),
+        limits: Object.freeze({
+          ...limitEvidence,
+          evidenceRefs: Object.freeze([...limitEvidence.evidenceRefs]),
+        }),
+      });
+      const requiredWindows = limit.requiredWindowIds.map(windowId => {
+        const window = limit.windows.find(item => item.windowId === windowId);
+        if (!window) {
+          throw new HostRoleInvocationAdmissionError(
+            'INVALID_EVENT',
+            `Provider limit evidence is missing required window ${windowId}`,
+          );
+        }
+        return Object.freeze({
+          windowId,
+          unit: window.unit,
+          model: window.model,
+        });
+      });
+      const expiresAtMs = Math.min(
+        Date.parse(reachability.probe.expiresAt),
+        Date.parse(limit.source.expiresAt),
+      );
+      if (!Number.isFinite(expiresAtMs) || expiresAtMs <= at.getTime()) {
+        throw new HostRoleInvocationAdmissionError(
+          'INVALID_EVENT',
+          'Verifier evidence has no common fresh validity window',
+        );
+      }
+      return {
+        state: 'ready',
+        candidate: projected,
+        authority: Object.freeze({
+          provider: candidate.provider,
+          model: candidate.model,
+          reachabilityQuery: Object.freeze({ ...candidate.reachabilityQuery }),
+          limitQuery: Object.freeze({ ...candidate.limitQuery }),
+        }),
+        requiredWindows: Object.freeze(requiredWindows),
+        expiresAt: new Date(expiresAtMs).toISOString(),
+        authorityEvidenceRef: authorityEvidenceRef(
+          'candidate-ready',
+          [
+            candidate.provider,
+            candidate.model,
+            reachabilityEvidence.evidenceRef,
+            ...limitEvidence.evidenceRefs,
+          ].join('\0'),
+        ),
+      };
+    } catch (error) {
+      return {
+        state: 'hold',
+        reasonCode: 'authority_failure',
+        authorityEvidenceRef: authorityEvidenceRef('failure', errorDetail(error)),
+      };
+    }
+  }
 
   admit(request: HostRoleInvocationAdmissionRequest): HostRoleInvocationAdmissionResult {
     const providers = orderedProviders(request);

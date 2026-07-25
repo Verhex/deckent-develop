@@ -41,12 +41,20 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
   setupWatchWindow: vi.fn(),
 }));
 
-vi.mock('../../src/core/provider.js', () => ({
-  bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
-}));
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/provider.js')>();
+  return {
+    ...actual,
+    bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
+  };
+});
 
 vi.mock('../../src/cli/commands/doctor.js', () => ({
   runDoctorChecks: vi.fn(() => ({ checks: [] })),
+}));
+
+vi.mock('../../src/cli/commands/limits.js', () => ({
+  checkStartLimitGate: vi.fn(),
 }));
 
 vi.mock('../../src/cli/helpers/output.js', () => ({
@@ -110,7 +118,8 @@ import { loadConfig } from '../../src/core/config.js';
 import { readContext, planSprint, runSprint } from '../../src/orchestra/brain.js';
 import { evaluateCostGate } from '../../src/core/cost-gate.js';
 import { promptConfirm } from '../../src/cli/helpers/prompt.js';
-import { printError } from '../../src/cli/helpers/output.js';
+import { print, printError } from '../../src/cli/helpers/output.js';
+import { checkStartLimitGate } from '../../src/cli/commands/limits.js';
 import { registerStart } from '../../src/cli/commands/start.js';
 import type { SprintCostEstimate } from '../../src/core/cost-calculator.js';
 
@@ -192,6 +201,12 @@ describe('cli start — cost gate (Sprint 189 T-008)', () => {
       metrics: undefined,
     } as never);
     vi.mocked(promptConfirm).mockResolvedValue(true);
+    vi.mocked(checkStartLimitGate).mockResolvedValue({
+      blocked: false,
+      bypassed: false,
+      verdict: 'ok',
+      message: null,
+    });
 
     // Default: cost gate passes with autoConfirm=true
     vi.mocked(evaluateCostGate).mockReturnValue({
@@ -209,7 +224,41 @@ describe('cli start — cost gate (Sprint 189 T-008)', () => {
 
   it('calls evaluateCostGate before spawning workers (gate active by default)', async () => {
     await runStart(['start']);
+    expect(vi.mocked(checkStartLimitGate)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(evaluateCostGate)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(checkStartLimitGate).mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(evaluateCostGate).mock.invocationCallOrder[0]!);
+  });
+
+  it('blocks before cost planning and worker spawn when the subscription limit gate blocks', async () => {
+    vi.mocked(checkStartLimitGate).mockResolvedValue({
+      blocked: true,
+      bypassed: false,
+      verdict: 'block',
+      message: 'subscription limit blocked',
+    });
+
+    await runStart(['start']);
+
+    expect(process.exitCode).toBe(1);
+    expect(vi.mocked(print)).toHaveBeenCalledWith('subscription limit blocked');
+    expect(vi.mocked(evaluateCostGate)).not.toHaveBeenCalled();
+    expect(vi.mocked(runSprint)).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a subscription warning and continues to the cost gate', async () => {
+    vi.mocked(checkStartLimitGate).mockResolvedValue({
+      blocked: false,
+      bypassed: false,
+      verdict: 'warn',
+      message: 'subscription limit warning',
+    });
+
+    await runStart(['start']);
+
+    expect(vi.mocked(print)).toHaveBeenCalledWith('subscription limit warning');
+    expect(vi.mocked(evaluateCostGate)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(runSprint)).toHaveBeenCalledTimes(1);
   });
 
   it('blocks the sprint with exitCode=1 when the gate returns COST_GATE_EXCEEDED', async () => {
@@ -262,6 +311,28 @@ describe('cli start — cost gate (Sprint 189 T-008)', () => {
     expect(process.exitCode).toBe(1);
     expect(vi.mocked(printError)).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'planner unavailable' }),
+    );
+    expect(vi.mocked(runSprint)).not.toHaveBeenCalled();
+  });
+
+  it('shows a would-block verdict in dry-run without spawning a worker', async () => {
+    vi.mocked(checkStartLimitGate).mockResolvedValue({
+      blocked: true,
+      bypassed: false,
+      verdict: 'block',
+      message: 'subscription limit would block',
+    });
+
+    await runStart(['start', '--dry-run']);
+
+    expect(vi.mocked(print)).toHaveBeenCalledWith('subscription limit would block');
+    expect(vi.mocked(planSprint)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(planSprint)).toHaveBeenCalledWith(
+      '/mock/root',
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ dryRun: true }),
     );
     expect(vi.mocked(runSprint)).not.toHaveBeenCalled();
   });

@@ -79,11 +79,22 @@ vi.mock('../../src/core/task-result-settlement.js', () => {
     .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
 });
 
+vi.mock('../../src/orchestra/execution-landing-coordinator.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../src/orchestra/execution-landing-coordinator.js')>()),
+  prepareDockerExecutionLanding: vi.fn(({ prompt }: { prompt: string }) => ({ prompt, context: null })),
+}));
+
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { DockerSpawnBackend, buildDistReadOnlyMountArgs } from '../../src/orchestra/spawn-backend-docker.js';
+import {
+  TEST_DOCKER_EXECUTION_OPTIONS,
+  budgetedDockerTaskJson,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
-const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
+const mockReadFileSync = vi.mocked(readFileSync);
+const TEST_EXECUTION_OPTIONS = TEST_DOCKER_EXECUTION_OPTIONS;
 
 // ─── 1. Pure helper — the regression guard ──────────────────────────────────
 
@@ -160,6 +171,7 @@ describe('DockerSpawnBackend: dist/ read-only mount wiring (born-644 B542)', () 
   beforeEach(() => {
     vi.clearAllMocks();
     distAbsentPath = undefined;
+    mockReadFileSync.mockImplementation((path: unknown) => budgetedDockerTaskJson(path));
     installSpawnRouter();
   });
 

@@ -76,7 +76,8 @@ vi.mock('../../src/agents/worker.js', () => ({
   isWorkerStoppable: vi.fn(() => true),
 }));
 
-vi.mock('../../src/core/provider.js', () => {
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/provider.js')>();
   const mockAdapter = {
     name: 'claude',
     supportedModels: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'],
@@ -91,12 +92,13 @@ vi.mock('../../src/core/provider.js', () => {
     }),
   };
   return {
+    ...actual,
     providerRegistry: {
       getDefault: vi.fn().mockReturnValue(mockAdapter),
       registerProvider: vi.fn(),
       getProvider: vi.fn().mockReturnValue(mockAdapter),
-      hasProvider: vi.fn().mockReturnValue(false),
-      listProviders: vi.fn().mockReturnValue([]),
+      hasProvider: vi.fn().mockImplementation((name: string) => name === 'claude'),
+      listProviders: vi.fn().mockReturnValue(['claude']),
       setDefault: vi.fn(),
       unregisterProvider: vi.fn(),
       clear: vi.fn(),
@@ -163,7 +165,10 @@ vi.mock('../../src/orchestra/runtime-budget-monitor.js', async (importOriginal) 
   // This fixture exercises debt resolution after result collection. Runtime
   // budget settlement has its own contract tests; resolve immediately here so
   // the hermetic backend does not wait for a host usage envelope it never emits.
-  waitForTerminalRuntimeBudgetUsage: vi.fn().mockResolvedValue(undefined),
+  waitForTerminalRuntimeBudgetUsage: vi.fn().mockResolvedValue({
+    terminal: true,
+    decision: { state: 'within-budget' },
+  }),
 }));
 
 vi.mock('../../src/orchestra/rollback.js', () => ({
@@ -305,10 +310,14 @@ function makeConfig(): ResolvedConfig {
       brain_model: 'claude-opus-4-8',
       default_model: 'claude-sonnet-5',
       haiku_allowed: false,
+      brain_planning: 'structured',
     },
     modes: {} as never,
     spawn_backend: 'docker',
-    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
+    execution_budget: {
+      roles: { worker: { default: { maxTurns: 1 } } },
+      landing: { reserve_ratio: 0.25 },
+    },
   };
 }
 
@@ -435,6 +444,7 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
     vi.mocked(SpawnBackendFactory.create).mockReturnValue({
       name: 'test-measured',
       liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
       spawn: vi.fn(),
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),

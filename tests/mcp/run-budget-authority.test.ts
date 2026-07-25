@@ -99,10 +99,10 @@ function createMockServer(): MockServer {
   };
 }
 
-async function getHandler(): Promise<ToolHandler> {
+async function getHandler(runtime: Record<string, unknown> = {}): Promise<ToolHandler> {
   const { registerRunTool } = await import('../../src/mcp/tools/run.ts');
   const server = createMockServer();
-  registerRunTool(server as never);
+  registerRunTool(server as never, runtime as never);
   return server.tools.get('deckent_run')!.handler;
 }
 
@@ -137,7 +137,10 @@ describe('deckent_run MCP — owner budget authority', () => {
   it('persists and dispatches the same owner-authored remote ceiling', async () => {
     vi.mocked(loadConfig).mockResolvedValue({
       spawn_backend: 'subprocess',
-      execution_budget: { roles: { worker: { default: { maxTurns: 4, maxTokens: 20_000 } } } },
+      execution_budget: {
+        roles: { worker: { default: { maxTurns: 4, maxTokens: 20_000 } } },
+        landing: { reserve_ratio: 0.25 },
+      },
     } as never);
 
     const handler = await getHandler();
@@ -165,6 +168,28 @@ describe('deckent_run MCP — owner budget authority', () => {
     expect(spawnOptions()['executionBudget']).toEqual(task['budget']);
   });
 
+  it('forwards the runtime-wide attended authority to the shared final dispatch seam', async () => {
+    vi.mocked(loadConfig).mockResolvedValue({
+      spawn_backend: 'subprocess',
+      execution_budget: {
+        roles: { worker: { default: { maxTurns: 4 } } },
+        landing: { reserve_ratio: 0.25 },
+      },
+    } as never);
+    const authority = { verifyAndClaim: vi.fn() };
+
+    const handler = await getHandler({ attendedExecutionApprovalAuthority: authority });
+    const result = await handler({
+      description: 'bounded attended-capable request',
+      model: 'gpt-5.6-sol',
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(spawnOptions()['attendedExecutionApprovalAuthority']).toBe(authority);
+    expect(spawnOptions()['executionTenantId']).toBe('local');
+    expect(spawnOptions()['executionRunId']).toMatch(/^run-run-/);
+  });
+
   it.each([
     ['missing policy', { spawn_backend: 'subprocess' }],
     ['missing worker role', {
@@ -184,6 +209,40 @@ describe('deckent_run MCP — owner budget authority', () => {
     expect(result.isError).toBe(true);
     expect(JSON.parse(result.content[0]!.text).message).toContain('execution budget policy');
     expectNoExecutionSideEffects();
+  });
+
+  it('consumes the injected process authority HOLD before every execution side effect', async () => {
+    vi.mocked(loadConfig).mockResolvedValue({
+      spawn_backend: 'docker',
+      execution_budget: {
+        roles: { worker: { default: { maxTurns: 4 } } },
+        landing: { reserve_ratio: 0.25 },
+      },
+    } as never);
+    const providerAuthority = {
+      state: 'hold',
+      reasonCode: 'termination_authority_unavailable',
+      authorityEvidenceRef: `provider-authority:${'a'.repeat(64)}`,
+      retryable: false,
+      close: vi.fn(),
+    };
+
+    const handler = await getHandler({ providerAuthority });
+    const result = await handler({
+      description: 'bounded provider-authority request',
+      model: 'claude-sonnet-5',
+      autoApprove: true,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0]!.text).message).toContain(
+      'provider execution authority is not ready',
+    );
+    expect(JSON.parse(result.content[0]!.text).message).toContain(
+      'termination_authority_unavailable',
+    );
+    expectNoExecutionSideEffects();
+    expect(providerAuthority.close).not.toHaveBeenCalled();
   });
 
   it('keeps adapter-declared local execution exempt without inventing a numeric budget', async () => {

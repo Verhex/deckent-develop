@@ -369,6 +369,24 @@ describe('MissionWorkerInvocationCoordinator', () => {
     h.close();
   });
 
+  it('preserves an exact upstream composition HOLD before the executor', async () => {
+    const executor = vi.fn();
+    const coordinator = new MissionWorkerInvocationCoordinator({
+      state: 'hold',
+      reasonCode: 'policy_authority_unavailable',
+      authorityEvidenceRef: 'provider-authority:policy-missing',
+    });
+
+    await expect(coordinator.execute(input(), executor)).resolves.toMatchObject({
+      ok: false,
+      dispatchDisposition: 'parked',
+      reason: 'MISSION_WORKER_INVOCATION_HOLD:policy_authority_unavailable',
+      authorityEvidenceRef: 'provider-authority:policy-missing',
+      invocationReceiptRef: null,
+    });
+    expect(executor).not.toHaveBeenCalled();
+  });
+
   it('binds known primary claim→receipt→grant→zero-usage settlement exactly once', async () => {
     const h = await harness();
     const coordinator = new MissionWorkerInvocationCoordinator(h.authorities);

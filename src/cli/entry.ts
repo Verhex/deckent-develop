@@ -45,6 +45,8 @@ import {
 } from '../providers/openai-compatible.js';
 import { buildHealthSnapshot, renderHealthSnapshot } from './helpers/health-snapshot.js';
 import { getLangFromConfig } from './helpers/config-reader.js';
+import { resolveWorktreeBinaryAuthority } from './worktree-binary-authority.js';
+import { withCliProviderAuthority } from './provider-authority-process-runtime.js';
 
 // ─── Default REPL Routing (Sprint 219 T-219-001) ────────────────────────────
 //
@@ -1147,22 +1149,19 @@ function isEntryMain(): boolean {
   }
 }
 
-// Sprint 221 Task 221-013: routing contract — argümansız (no args) → REPL;
-// argümanlı (`help` / `serve` / `--version` / unknown / any subcommand) →
-// Commander. Verified by tests/cli/cli-bin-invocation.test.ts so the global
-// `deckent` / `npx deckent <cmd>` cannot silently fall back to the REPL.
-if (isEntryMain()) {
-  if (shouldLaunchDefaultRepl(process.argv)) {
-    launchDefaultRepl()
-      .catch((err: unknown) => {
-        handleCliError(err);
-      })
-      .finally(() => {
-        // WIN665 / 417-001 — dispatch has settled; arm the exit-code contract lock.
-        lockExitCodeContract();
-      });
-  } else {
-    buildProgram()
+async function runCommanderInvocation(): Promise<void> {
+  await withCliProviderAuthority({
+    argv: process.argv,
+    projectRoot: process.cwd(),
+    loadConfig,
+  }, async (providerAuthority) => {
+    // The process composition root opens at most one provider authority before
+    // catalog/provider bootstrap and injects it into the command. An absent
+    // authored policy leaves rollout disabled, preserving the separately
+    // gated default.
+    await buildProgram({
+      ...(providerAuthority ? { providerAuthority } : {}),
+    })
       .hook('preAction', async () => {
         // SEC-04 (task 418-003): lazy catalog-bootstrap — only commands whose
         // execution path actually needs model-catalog data trigger this (see
@@ -1178,13 +1177,58 @@ if (isEntryMain()) {
           },
         });
       })
-      .parseAsync(process.argv)
-      .catch((err: unknown) => {
-        handleCliError(err);
-      })
-      .finally(() => {
-        // WIN665 / 417-001 — dispatch has settled; arm the exit-code contract lock.
-        lockExitCodeContract();
-      });
+      .parseAsync(process.argv);
+  });
+}
+
+// Sprint 221 Task 221-013: routing contract — argümansız (no args) → REPL;
+// argümanlı (`help` / `serve` / `--version` / unknown / any subcommand) →
+// Commander. Verified by tests/cli/cli-bin-invocation.test.ts so the global
+// `deckent` / `npx deckent <cmd>` cannot silently fall back to the REPL.
+if (isEntryMain()) {
+  const binaryAuthority = resolveWorktreeBinaryAuthority({
+    argv: process.argv,
+    projectRoot: process.cwd(),
+    runtimeModuleUrl: import.meta.url,
+    env: process.env,
+  });
+  const binaryAuthorityLang = getLangFromConfig(process.cwd());
+
+  if (binaryAuthority.status === 'hold') {
+    process.stderr.write(`${getMessage('cli.binary_identity.hold', binaryAuthorityLang, {
+      issue: binaryAuthority.issue,
+    })}\n`);
+    process.stderr.write(`${getMessage('cli.binary_identity.paths', binaryAuthorityLang, {
+      projectRoot: binaryAuthority.projectRoot,
+      runtimeRoot: binaryAuthority.runtimePackageRoot,
+    })}\n`);
+    process.stderr.write(`${getMessage('cli.binary_identity.hint', binaryAuthorityLang)}\n`);
+    process.exitCode = 1;
+    lockExitCodeContract();
+  } else {
+    if (binaryAuthority.status === 'override') {
+      process.stderr.write(`${getMessage('cli.binary_identity.override', binaryAuthorityLang, {
+        issue: binaryAuthority.issue,
+      })}\n`);
+    }
+    if (shouldLaunchDefaultRepl(process.argv)) {
+      launchDefaultRepl()
+        .catch((err: unknown) => {
+          handleCliError(err);
+        })
+        .finally(() => {
+          // WIN665 / 417-001 — dispatch has settled; arm the exit-code contract lock.
+          lockExitCodeContract();
+        });
+    } else {
+      runCommanderInvocation()
+        .catch((err: unknown) => {
+          handleCliError(err);
+        })
+        .finally(() => {
+          // WIN665 / 417-001 — dispatch has settled; arm the exit-code contract lock.
+          lockExitCodeContract();
+        });
+    }
   }
 }

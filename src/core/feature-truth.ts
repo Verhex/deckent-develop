@@ -213,14 +213,17 @@ function resolveWired(
   if (!def.prodCallsitePattern) return 'undefined';
 
   const pattern = new RegExp(def.prodCallsitePattern);
+  const entryModule = def.entryModule.split('\\').join('/');
   const callsites: Array<{ file: string; line: number }> = [];
 
   for (const file of walkSourceFiles(ctx.projectRoot)) {
+    const relativeFile = toPosixRelative(ctx.projectRoot, file);
+    if (relativeFile === entryModule) continue;
     const content = readFileSync(file, 'utf8');
     const lines = content.split(/\r?\n/);
     lines.forEach((line, i) => {
       if (pattern.test(line)) {
-        callsites.push({ file: toPosixRelative(ctx.projectRoot, file), line: i + 1 });
+        callsites.push({ file: relativeFile, line: i + 1 });
       }
     });
   }

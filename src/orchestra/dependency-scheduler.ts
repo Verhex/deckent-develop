@@ -20,7 +20,7 @@ import { join } from 'node:path';
 import type { Task } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
 import { DECKENT_DIR } from '../core/constants.js';
-import { detectScopeCollisions } from './conflict-resolver.js';
+import { deriveExecutionTopology } from '../core/execution-topology.js';
 import { debugLog } from '../core/utils.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -124,119 +124,65 @@ export function buildDependencyGraph(
   tasks: Task[],
   includeCollisions = true,
 ): DependencyGraph {
+  const topology = deriveExecutionTopology(tasks, { maxWorkers: Math.max(1, tasks.length) });
+  const selectedEdges = includeCollisions ? topology.effectiveEdges : topology.authoredEdges;
   const dependencies = new Map<string, Set<string>>();
   const dependents = new Map<string, Set<string>>();
-  const taskIds = new Set(tasks.map(t => t.id));
-
-  // Initialize adjacency lists
   for (const task of tasks) {
-    const deps = new Set<string>();
-    for (const dep of task.dependencies ?? []) {
-      if (taskIds.has(dep)) {
-        deps.add(dep);
-      } else {
-        // 323-031: a dependency ref that matches no sprint task id is dropped
-        // here — but NEVER silently. Most often this is an AI-planner title
-        // string that was never normalized to a slot id (see
-        // planner.normalizePlannerDependencies). Surface it so the operator can
-        // see the dependency-pipeline gap instead of a wave silently collapsing.
-        debugLog(
-          'dependency-scheduler:buildGraph',
-          `Task ${task.id}: dependency "${dep}" matches no sprint task id — dropped ` +
-          `(unresolvable; planner may have emitted a title instead of a NNN-NNN id)`,
-        );
-      }
-    }
-    dependencies.set(task.id, deps);
-    if (!dependents.has(task.id)) dependents.set(task.id, new Set());
+    dependencies.set(task.id, new Set());
+    dependents.set(task.id, new Set());
   }
 
-  // Build reverse edges
-  for (const [id, deps] of dependencies) {
-    for (const dep of deps) {
-      const rev = dependents.get(dep);
-      if (rev) rev.add(id);
+  for (const edge of selectedEdges) {
+    const from = tasks[edge.from - 1]?.id;
+    const to = tasks[edge.to - 1]?.id;
+    if (from && to) {
+      dependencies.get(to)?.add(from);
+      dependents.get(from)?.add(to);
     }
   }
 
-  // Add collision edges (Sprint 138 integration)
-  if (includeCollisions) {
-    const { collidingPairs } = detectScopeCollisions(tasks);
-    for (const [a, b] of collidingPairs) {
-      const sorted = [a, b].sort();
-      const first = sorted[0]!;
-      const second = sorted[1]!;
-      const secondDeps = dependencies.get(second);
-      if (secondDeps && !secondDeps.has(first)) {
-        secondDeps.add(first);
-        const firstDependents = dependents.get(first);
-        if (firstDependents) firstDependents.add(second);
-        debugLog('dependency-scheduler', `Collision edge: ${second} depends on ${first}`);
-      }
+  for (const finding of topology.findings) {
+    if (finding.code === 'unresolved-dependency') {
+      const taskId = tasks[(finding.slots[0] ?? 1) - 1]?.id ?? `slot-${finding.slots[0] ?? '?'}`;
+      // Preserve the unresolved ref in the runtime dependency set. Dropping it
+      // would make enforceWaveDependency treat the task as eligible even
+      // though the shared topology authority rejected the plan.
+      dependencies.get(taskId)?.add(finding.ref ?? 'unresolved-dependency');
+      debugLog(
+        'dependency-scheduler:buildGraph',
+        `Task ${taskId}: dependency "${finding.ref ?? ''}" is unresolved`,
+      );
     }
   }
 
-  // Kahn's algorithm — topological sort into waves
-  const inDegree = new Map<string, number>();
-  for (const [id, deps] of dependencies) {
-    inDegree.set(id, deps.size);
-  }
-
-  const waves: DependencyWave[] = [];
+  const selectedTopology = includeCollisions
+    ? topology
+    : deriveExecutionTopology(
+        tasks.map(task => ({ ...task, scope: { ...task.scope, filesWrite: [] } })),
+        { maxWorkers: Math.max(1, tasks.length) },
+      );
+  const waves: DependencyWave[] = selectedTopology.waves.map(wave => ({
+    waveIndex: wave.wave - 1,
+    taskIds: wave.slots.map(slot => tasks[slot - 1]!.id),
+  }));
   const waveAssignment = new Map<string, number>();
-  const resolved = new Set<string>();
-  let remaining = tasks.length;
-
-  while (remaining > 0) {
-    // Collect tasks with in-degree 0
-    const waveTaskIds: string[] = [];
-    for (const [id, deg] of inDegree) {
-      if (deg === 0 && !resolved.has(id)) {
-        waveTaskIds.push(id);
-      }
-    }
-
-    if (waveTaskIds.length === 0) {
-      // Cycle detected — remaining tasks form the cycle
-      const cycleTaskIds = [...inDegree.keys()].filter(id => !resolved.has(id));
-      debugLog('dependency-scheduler', `Cycle detected: ${cycleTaskIds.join(', ')}`);
-      return {
-        dependencies,
-        dependents,
-        waveAssignment,
-        waves,
-        hasCycle: true,
-        cycleTaskIds,
-      };
-    }
-
-    // Deterministic ordering
-    waveTaskIds.sort();
-
-    const waveIndex = waves.length;
-    waves.push({ waveIndex, taskIds: waveTaskIds });
-
-    for (const id of waveTaskIds) {
-      waveAssignment.set(id, waveIndex);
-      resolved.add(id);
-      remaining--;
-
-      // Decrement in-degree of dependents
-      const deps = dependents.get(id) ?? new Set();
-      for (const depId of deps) {
-        const current = inDegree.get(depId) ?? 0;
-        inDegree.set(depId, Math.max(0, current - 1));
-      }
-    }
+  for (const wave of waves) {
+    for (const taskId of wave.taskIds) waveAssignment.set(taskId, wave.waveIndex);
   }
 
+  const cycleSlots = selectedTopology.findings
+    .filter(finding => finding.code === 'dependency-cycle')
+    .flatMap(finding => finding.slots);
+  const cycleTaskIds = [...new Set(cycleSlots.map(slot => tasks[slot - 1]?.id).filter(Boolean) as string[])];
+  if (cycleTaskIds.length > 0) debugLog('dependency-scheduler', `Cycle detected: ${cycleTaskIds.join(', ')}`);
   return {
     dependencies,
     dependents,
     waveAssignment,
     waves,
-    hasCycle: false,
-    cycleTaskIds: [],
+    hasCycle: cycleTaskIds.length > 0,
+    cycleTaskIds,
   };
 }
 

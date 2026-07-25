@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { MockInstance } from 'vitest';
 import { SubprocessSpawnBackend, createSubprocessBackend, CLAUDE_SUBPROCESS_CONFIG } from '../../src/providers/subprocess.js';
 import type { SubprocessProviderConfig } from '../../src/providers/subprocess.js';
+import { LocalSubprocessTestBackend } from '../helpers/local-subprocess-backend-fixture.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
 import type { ModelType } from '../../src/core/types.js';
 import { modelRegistry } from '../../src/core/model-registry.js';
@@ -67,7 +68,7 @@ describe('SubprocessSpawnBackend', () => {
     vi.clearAllMocks();
     mockExistsSync.mockReturnValue(true);
     mockOpenSync.mockReturnValue(3);
-    backend = new SubprocessSpawnBackend(projectDir);
+    backend = new LocalSubprocessTestBackend(projectDir);
   });
 
   afterEach(() => {
@@ -100,6 +101,13 @@ describe('SubprocessSpawnBackend', () => {
   // ─── spawn() ─────────────────────────────────────────────────────
 
   describe('spawn()', () => {
+    it('holds the production remote backend before child spawn when no budget exists', () => {
+      const production = new SubprocessSpawnBackend(projectDir);
+      expect(() => production.spawn('remote-no-budget', 'claude-sonnet-5', 'prompt'))
+        .toThrow(/Remote execution budget is required/);
+      expect(mockSpawn).not.toHaveBeenCalled();
+    });
+
     it('should call node:child_process spawn', () => {
       setupMockChild();
       backend.spawn('task-001', 'claude-opus-4-8', 'test prompt');
@@ -393,7 +401,7 @@ describe('SubprocessSpawnBackend', () => {
       vi.clearAllMocks(); // clear earlier calls
       mockOpenSync.mockReturnValue(3);
       mockExistsSync.mockReturnValue(true);
-      const b2 = new SubprocessSpawnBackend(projectDir);
+      const b2 = new LocalSubprocessTestBackend(projectDir);
       setupMockChild();
       b2.spawn('task-hb', 'claude-opus-4-8', 'test');
       // writeFileSync should have been called for heartbeat
@@ -433,14 +441,14 @@ describe('SubprocessSpawnBackend', () => {
 
   describe('timeout', () => {
     it('should accept defaultTimeoutMs in constructor', () => {
-      const b = new SubprocessSpawnBackend(projectDir, { defaultTimeoutMs: 5000 });
+      const b = new LocalSubprocessTestBackend(projectDir, { defaultTimeoutMs: 5000 });
       expect(b).toBeInstanceOf(SubprocessSpawnBackend);
     });
 
     it('should auto-kill with SIGKILL after timeout', async () => {
       vi.useFakeTimers();
       const child = setupMockChild();
-      const b = new SubprocessSpawnBackend(projectDir, { defaultTimeoutMs: 1000 });
+      const b = new LocalSubprocessTestBackend(projectDir, { defaultTimeoutMs: 1000 });
       b.spawn('task-timeout', 'claude-opus-4-8', 'test');
       vi.advanceTimersByTime(1100);
       expect(child.kill).toHaveBeenCalledWith('SIGKILL');
@@ -532,19 +540,19 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
 
   it('should spawn with "claude" command by default (backward compat)', () => {
     setupMockChild();
-    const backend = new SubprocessSpawnBackend(projectDir);
+    const backend = new LocalSubprocessTestBackend(projectDir);
     backend.spawn('task-001', 'claude-opus-4-8', 'test prompt');
     const [cmd] = mockSpawn.mock.calls[0];
     expect(cmd).toBe('claude');
   });
 
   it('should have name "claude-subprocess" by default', () => {
-    const backend = new SubprocessSpawnBackend(projectDir);
+    const backend = new LocalSubprocessTestBackend(projectDir);
     expect(backend.name).toBe('claude-subprocess');
   });
 
   it('should support claude models by default', () => {
-    const backend = new SubprocessSpawnBackend(projectDir);
+    const backend = new LocalSubprocessTestBackend(projectDir);
     expect(backend.supportedModels).toContain('claude-opus-4-8');
     expect(backend.supportedModels).toContain('claude-sonnet-5');
     expect(backend.supportedModels).toContain('claude-haiku-4-5-20251001');
@@ -554,26 +562,26 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
 
   it('should use custom cliCommand when providerConfig provided', () => {
     setupMockChild();
-    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: customConfig });
     backend.spawn('task-001', 'claude-opus-4-8', 'test prompt');
     const [cmd] = mockSpawn.mock.calls[0];
     expect(cmd).toBe('my-ai-cli');
   });
 
   it('should use custom name from providerConfig', () => {
-    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: customConfig });
     expect(backend.name).toBe('custom-subprocess');
   });
 
   it('should use custom supportedModels from providerConfig', () => {
-    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: customConfig });
     expect(backend.supportedModels).toEqual(['claude-opus-4-8', 'claude-sonnet-5']);
     expect(backend.supportedModels).not.toContain('claude-haiku-4-5-20251001');
   });
 
   it('should use adapter.buildArgs when adapter provided', () => {
     setupMockChild();
-    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: customConfig });
     backend.spawn('task-001', 'claude-opus-4-8', 'test prompt');
     const [, args] = mockSpawn.mock.calls[0];
     // customConfig buildArgs produces ['run', '--model', model]
@@ -582,7 +590,7 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
 
   it('should pass allowedTools through custom buildArgs', () => {
     setupMockChild();
-    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: customConfig });
     backend.spawn('task-001', 'claude-opus-4-8', 'test prompt', { allowedTools: 'Read,Write' });
     const [, args] = mockSpawn.mock.calls[0];
     expect(args).toContain('--tools');
@@ -591,7 +599,7 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
 
   it('should pass autoApprove through custom buildArgs', () => {
     setupMockChild();
-    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: customConfig });
     backend.spawn('task-001', 'claude-opus-4-8', 'test', { autoApprove: true });
     const [, args] = mockSpawn.mock.calls[0];
     expect(args).toContain('--yes');
@@ -600,7 +608,7 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
   });
 
   it('should use custom buildCommandString for buildCommand()', () => {
-    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: customConfig });
     const cmd = backend.buildCommand('claude-opus-4-8', '/tmp/prompt.txt');
     expect(cmd).toBe('my-ai-cli run --model claude-opus-4-8 < /tmp/prompt.txt');
   });
@@ -613,7 +621,7 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
       }),
     };
     mockSpawn.mockReturnValue(child);
-    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    const backend = new LocalSubprocessTestBackend(projectDir, { providerConfig: customConfig });
     await backend.isAvailable();
     const [cmd] = mockSpawn.mock.calls[0];
     expect(cmd).toBe('my-ai-cli');
@@ -622,8 +630,8 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
   // ─── Different adapters produce different commands ─────────────────
 
   it('should produce different commands for different provider configs', () => {
-    const claudeBackend = new SubprocessSpawnBackend(projectDir);
-    const customBackend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    const claudeBackend = new LocalSubprocessTestBackend(projectDir);
+    const customBackend = new LocalSubprocessTestBackend(projectDir, { providerConfig: customConfig });
 
     const claudeCmd = claudeBackend.buildCommand('claude-opus-4-8', '/tmp/p.txt');
     const customCmd = customBackend.buildCommand('claude-opus-4-8', '/tmp/p.txt');
@@ -635,12 +643,12 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
 
   it('should produce different spawn commands for different configs', () => {
     const child1 = setupMockChild();
-    const claudeBackend = new SubprocessSpawnBackend(projectDir);
+    const claudeBackend = new LocalSubprocessTestBackend(projectDir);
     claudeBackend.spawn('task-c', 'claude-opus-4-8', 'test');
     const [claudeCliCmd, claudeArgs] = mockSpawn.mock.calls[0];
 
     const child2 = setupMockChild();
-    const customBackend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    const customBackend = new LocalSubprocessTestBackend(projectDir, { providerConfig: customConfig });
     customBackend.spawn('task-x', 'claude-opus-4-8', 'test');
     const [customCliCmd, customArgs] = mockSpawn.mock.calls[1];
 

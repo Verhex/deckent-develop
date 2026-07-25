@@ -22,7 +22,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TaskStatus, type Task, type ResolvedConfig, type ProviderName } from '../../src/core/types.js';
 import { routeTask } from '../../src/orchestra/task-router.js';
-import { routeSprintTasks } from '../../src/orchestra/sprint-spawner.js';
+import {
+  PROVIDER_FALLBACK_SELECTED_CHANNEL,
+  routeSprintTasks,
+} from '../../src/orchestra/sprint-spawner.js';
+import { readEvents } from '../../src/orchestra/event-stream.js';
 // S3: the V2 engine is gone — mirror sprint-spawner's local journal-path convention.
 import { join as joinJournalPath } from 'node:path';
 function routingDecisionJournalPath(projectRoot: string, sprintId: string): string {
@@ -34,7 +38,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '409-003-t',
     title: 'Surface routing test',
     description: 'Wire surface-bonus into plan-time router',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -157,5 +161,66 @@ describe('ROUTING-TEK-OTORİTE — spawn-fallback decision journal (tagged, fail
     const tasks = [makeTask({ scope: cliCommandsScope })];
     expect(() => routeSprintTasks(tasks, config, allProviders)).not.toThrow();
     expect(tasks[0]!.assignedAgent).toBeUndefined(); // S3: no spawn-time re-derivation
+  });
+});
+
+describe('provider fallback — durable pre-spawn provenance', () => {
+  let projectRoot: string;
+
+  afterEach(() => {
+    if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  const fallbackConfig = {
+    worker_provider: 'claude',
+    provider_fallback: { worker: ['gemini', 'codex'] },
+  } as unknown as ResolvedConfig;
+
+  it('persists structured fallback evidence before mutating the task provider', () => {
+    projectRoot = mkdtempSync(join(tmpdir(), 'deckent-provider-fallback-'));
+    const sprintId = 'sprint-provider-fallback';
+    const tasks = [makeTask({ provider: 'ollama' })];
+
+    routeSprintTasks(tasks, fallbackConfig, ['codex', 'gemini'], { projectRoot, sprintId });
+
+    expect(tasks[0]!.provider).toBe('gemini');
+    const events = readEvents(projectRoot, sprintId, {
+      channel: PROVIDER_FALLBACK_SELECTED_CHANNEL,
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]!.payload).toEqual({
+      taskId: tasks[0]!.id,
+      requestedProvider: 'ollama',
+      selectedProvider: 'gemini',
+      configuredOrder: ['claude', 'gemini', 'codex'],
+      reasonCode: 'preferred_unavailable',
+    });
+  });
+
+  it('rejects a fallback without durable sprint context before task mutation', () => {
+    const tasks = [makeTask({ provider: 'ollama' })];
+    try {
+      routeSprintTasks(tasks, fallbackConfig, ['codex', 'gemini']);
+      throw new Error('expected provider fallback provenance failure');
+    } catch (error) {
+      expect(error).toMatchObject({
+        name: 'ProviderRoutingError',
+        code: 'E_PROVIDER_FALLBACK_PROVENANCE_REQUIRED',
+      });
+    }
+    expect(tasks[0]!.provider).toBe('ollama');
+  });
+
+  it('does not emit fallback evidence when the preferred provider is available', () => {
+    projectRoot = mkdtempSync(join(tmpdir(), 'deckent-provider-primary-'));
+    const sprintId = 'sprint-provider-primary';
+    const tasks = [makeTask({ provider: 'claude' })];
+
+    routeSprintTasks(tasks, fallbackConfig, ['claude', 'gemini'], { projectRoot, sprintId });
+
+    expect(tasks[0]!.provider).toBe('claude');
+    expect(readEvents(projectRoot, sprintId, {
+      channel: PROVIDER_FALLBACK_SELECTED_CHANNEL,
+    })).toHaveLength(0);
   });
 });

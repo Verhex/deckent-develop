@@ -6,13 +6,18 @@ import {
 
 // Track statSync call count to distinguish cache hit vs miss
 let statSyncCallCount = 0;
-let statSyncMtimeMs = 1000;
+let projectMtimeMs = 1000;
+let globalMtimeMs = 1000;
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn().mockReturnValue(false),
-  statSync: vi.fn().mockImplementation(() => {
+  statSync: vi.fn().mockImplementation((filePath: string) => {
     statSyncCallCount++;
-    return { mtimeMs: statSyncMtimeMs };
+    return {
+      mtimeMs: filePath.startsWith('/tmp/test-project/') ? projectMtimeMs : globalMtimeMs,
+      size: 1,
+      ino: 1,
+    };
   }),
 }));
 
@@ -30,7 +35,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   clearConfigCache();
   statSyncCallCount = 0;
-  statSyncMtimeMs = 1000;
+  projectMtimeMs = 1000;
+  globalMtimeMs = 1000;
   mockedExistsSync.mockReturnValue(false);
   delete process.env['DECKENT_CONFIG_RELOAD'];
   delete process.env['ANTHROPIC_API_KEY'];
@@ -61,15 +67,15 @@ describe('loadConfig() module-level cache', () => {
     // On cache hit, statSync is called once (mtime check), but readFile is NOT called again
     // The key assertion: both calls return the same object reference (cache hit)
     expect(config2).toBe(config1);
-    // statSync is called once more for the mtime check on the cache hit path
-    expect(statSyncCallCount).toBe(countAfterFirst + 1);
+    // Both global and project authored layers participate in the cache identity.
+    expect(statSyncCallCount).toBe(countAfterFirst + 2);
   });
 
-  it('cache is invalidated when config file mtime changes', async () => {
+  it('cache is invalidated when project config mtime changes', async () => {
     const config1 = await loadConfig(projectRoot);
 
     // Simulate file modification by changing the mtime
-    statSyncMtimeMs = 2000;
+    projectMtimeMs = 2000;
 
     const config2 = await loadConfig(projectRoot);
 
@@ -77,6 +83,17 @@ describe('loadConfig() module-level cache', () => {
     expect(config2).not.toBe(config1);
     // But values should be equivalent (same defaults)
     expect(config2.mode).toBe(config1.mode);
+  });
+
+  it('cache is invalidated when effective global config mtime changes', async () => {
+    const config1 = await loadConfig(projectRoot);
+    globalMtimeMs = 2000;
+
+    const config2 = await loadConfig(projectRoot);
+
+    expect(config2).not.toBe(config1);
+    expect(config2.provider_limit_authority.authorityRef)
+      .toBe(config1.provider_limit_authority.authorityRef);
   });
 
   it('force: true bypasses cache even when mtime is unchanged', async () => {

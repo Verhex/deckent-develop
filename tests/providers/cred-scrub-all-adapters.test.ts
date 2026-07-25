@@ -26,9 +26,8 @@
  *      env at once (the worst-case mixed fleet); every provider identity's
  *      spawn must see ONLY its own key.
  * §C — Ollama/OpenAICompatible/OpenRouter injectable spawn seams now enforce
- *      the same zero-cross-provider-leak contract as §B. Codex/Gemini remain a
- *      dependent slice because their files belong to another active session;
- *      this file makes no claim about those two adapters.
+ *      the same zero-cross-provider-leak contract as §B. Gemini is included
+ *      through its injectable spawn seam and normalized GEMINI_API_KEY.
  *
  * Hermetic: node:fs is mocked (no disk I/O), every adapter is constructed with
  * an injected `spawnImpl` (no real process spawned), process.env is
@@ -45,9 +44,11 @@ import {
 import { resolveCrossProviderCredentialKeys } from '../../src/providers/cross-provider-keys.js';
 import { SubprocessSpawnBackend } from '../../src/providers/subprocess.js';
 import type { SubprocessProviderConfig } from '../../src/providers/subprocess.js';
+import { LocalSubprocessTestBackend } from '../helpers/local-subprocess-backend-fixture.js';
 import { OllamaAdapter } from '../../src/providers/ollama.js';
 import { OpenAICompatibleAdapter } from '../../src/providers/openai-compatible.js';
 import { OpenRouterProvider } from '../../src/providers/openrouter.js';
+import { GeminiAdapter } from '../../src/providers/gemini.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
 import type { ModelType } from '../../src/core/types.js';
 
@@ -72,6 +73,7 @@ const BASE_KEYS = [
   'DEEPSEEK_API_KEY',
   'DASHSCOPE_API_KEY',
   'ZHIPU_API_KEY',
+  'GEMINI_API_KEY',
   'OPENROUTER_API_KEY',
   'DECKENT_CLAUDE_API_KEY',
   'DECKENT_OPENAI_API_KEY',
@@ -231,7 +233,7 @@ describe('§B SubprocessSpawnBackend — full mixed-provider fleet, zero cross-l
   }
 
   function makeBackend(cliCommand: string, name: string): SubprocessSpawnBackend {
-    return new SubprocessSpawnBackend(projectDir, {
+    return new LocalSubprocessTestBackend(projectDir, {
       providerConfig: makeConfig(cliCommand, name),
       platform: 'linux',
       spawnImpl: spawnImpl as unknown as typeof import('node:child_process').spawn,
@@ -372,6 +374,23 @@ describe('§C standalone injectable adapters — zero cross-provider leak', () =
       expect(env[k], `OpenRouter worker must not see foreign key ${k}`).toBeUndefined();
     }
     expect(env['DECKENT_HTTP_EXTRA_BODY']).toBe(JSON.stringify({ reasoning: { effort: 'high' } }));
+    expect(env['PATH']).toBe(process.env['PATH']);
+  });
+
+  it('GeminiAdapter.spawn() retains only its normalized Gemini credential', () => {
+    const spawnImpl = vi.fn().mockReturnValue(makeMockChild());
+    const adapter = new GeminiAdapter(projectDir, {
+      spawnImpl: spawnImpl as unknown as typeof import('node:child_process').spawn,
+      credentialEnvKeys: ALL_KEYS,
+    });
+
+    adapter.spawn('t-gemini-gap', 'gemini-2.5-pro', 'prompt');
+
+    const env = spawnedEnv(spawnImpl as unknown as MockInstance);
+    expect(env['GEMINI_API_KEY']).toBe('DECKENT_GOOGLE_API_KEY-HOST');
+    for (const key of ALL_KEYS.filter((key) => key !== 'GEMINI_API_KEY')) {
+      expect(env[key], `Gemini worker must not see provider credential ${key}`).toBeUndefined();
+    }
     expect(env['PATH']).toBe(process.env['PATH']);
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   LiveExecutionBudgetGuard,
+  assertExecutionLandingSupport,
   assertLiveUsageBudgetSupport,
   extractLiveUsageObservation,
   hasLiveUsageCeiling,
@@ -22,6 +23,91 @@ function claudeBlock(id: string, usage: Record<string, number>, blockType = 'tex
 }
 
 describe('LiveExecutionBudgetGuard', () => {
+  it('requests owner-configured landing at 75% while preserving the hard ceiling', () => {
+    const guard = new LiveExecutionBudgetGuard(
+      { maxTurns: 4 },
+      undefined,
+      { reserve_ratio: 0.25 },
+    );
+    expect(guard.observe(claudeBlock('turn-1', { input_tokens: 1 })).state).toBe('within-budget');
+    expect(guard.observe(claudeBlock('turn-2', { input_tokens: 1 })).state).toBe('within-budget');
+    const landing = guard.observe(claudeBlock('turn-3', { input_tokens: 1 }));
+    expect(landing.state).toBe('landing-requested');
+    expect(landing.reasons[0]).toContain('turn landing threshold reached (3 >= 3');
+    expect(guard.observe(claudeBlock('turn-4', { input_tokens: 1 })).state).toBe('landing-requested');
+    expect(guard.observe(claudeBlock('turn-5', { input_tokens: 1 })).state).toBe('exceeded');
+  });
+
+  it('rounds a fractional turn reserve upward before another indivisible provider call', () => {
+    const guard = new LiveExecutionBudgetGuard(
+      { maxTurns: 5 },
+      undefined,
+      { reserve_ratio: 0.25 },
+    );
+    expect(guard.observe(claudeBlock('five-turn-1', { input_tokens: 1 })).state).toBe('within-budget');
+    expect(guard.observe(claudeBlock('five-turn-2', { input_tokens: 1 })).state).toBe('within-budget');
+    const landing = guard.observe(claudeBlock('five-turn-3', { input_tokens: 1 }));
+    expect(landing.state).toBe('landing-requested');
+    expect(landing.reasons[0]).toContain('turn landing threshold reached (3 >= 3');
+    expect(guard.observe(claudeBlock('five-turn-4', {
+      input_tokens: 1,
+    })).state).toBe('landing-requested');
+    expect(guard.observe(claudeBlock('five-turn-5', {
+      input_tokens: 1,
+    })).state).toBe('landing-requested');
+    expect(guard.observe(claudeBlock('five-turn-6', {
+      input_tokens: 1,
+    })).state).toBe('exceeded');
+  });
+
+  it('records applied deltas and neutral consecutive cache-read evidence without duplicate inflation', () => {
+    const guard = new LiveExecutionBudgetGuard({ maxCacheReadTokens: 1_000 });
+    const first = guard.observe(claudeBlock('cache-1', {
+      input_tokens: 2,
+      output_tokens: 3,
+      cache_read_input_tokens: 100,
+    }));
+    expect(first.appliedDelta).toEqual({
+      inputTokens: 2,
+      outputTokens: 3,
+      cacheReadTokens: 100,
+      cacheCreationTokens: 0,
+    });
+    expect(first.consecutiveCacheReadEvents).toBe(1);
+    const duplicate = guard.observe(claudeBlock('cache-1', {
+      input_tokens: 2,
+      output_tokens: 3,
+      cache_read_input_tokens: 100,
+    }, 'tool_use'));
+    expect(duplicate.appliedDelta).toBeUndefined();
+    expect(duplicate.consecutiveCacheReadEvents).toBe(1);
+    expect(guard.observe(claudeBlock('cache-2', {
+      cache_read_input_tokens: 200,
+    })).consecutiveCacheReadEvents).toBe(2);
+    expect(guard.observe(claudeBlock('no-cache', {
+      input_tokens: 1,
+    })).consecutiveCacheReadEvents).toBe(0);
+  });
+
+  it('restores v2 landing and repeated-read evidence without double counting', () => {
+    const policy = { reserve_ratio: 0.25 } as const;
+    const first = new LiveExecutionBudgetGuard({ maxCacheReadTokens: 200 }, undefined, policy);
+    const event = claudeBlock('restore-1', { cache_read_input_tokens: 120 });
+    first.observe(event);
+    const restored = new LiveExecutionBudgetGuard(
+      { maxCacheReadTokens: 200 },
+      first.exportState(),
+      policy,
+    );
+    const replay = restored.observe(event);
+    expect(replay.state).toBe('within-budget');
+    expect(replay.consecutiveCacheReadEvents).toBe(1);
+    const landing = restored.observe(claudeBlock('restore-2', { cache_read_input_tokens: 30 }));
+    expect(landing.state).toBe('landing-requested');
+    expect(landing.counters.cacheReadTokens).toBe(150);
+    expect(landing.consecutiveCacheReadEvents).toBe(2);
+  });
+
   it('deduplicates repeated Claude blocks by provider message id', () => {
     const guard = new LiveExecutionBudgetGuard({ maxTurns: 1, maxCacheReadTokens: 100 });
     const usage = {
@@ -183,5 +269,44 @@ describe('LiveExecutionBudgetGuard', () => {
       'ollama',
       'local',
     )).toThrow('does not declare that capability');
+  });
+
+  it('keeps metering and landing capability independent at final admission', () => {
+    expect(() => assertExecutionLandingSupport({
+      budget: { maxTurns: 4 },
+      policy: { reserve_ratio: 0.25, surprise: true } as never,
+      mode: 'unattended',
+      capability: 'checkpoint-stop',
+      executor: 'docker',
+    })).toThrow("Unknown field 'execution landing policy.surprise'");
+    expect(() => assertExecutionLandingSupport({
+      budget: { maxTurns: 4 },
+      policy: { reserve_ratio: 0.25 },
+      mode: 'unattended',
+      capability: 'unsupported',
+      executor: 'docker',
+    })).toThrow('does not support budget landing');
+    expect(() => assertExecutionLandingSupport({
+      budget: { maxTurns: 4 },
+      policy: { reserve_ratio: 0.25 },
+      mode: 'unattended',
+      capability: 'checkpoint-stop',
+      executor: 'docker',
+    })).not.toThrow();
+    expect(() => assertExecutionLandingSupport({
+      budget: { maxTurns: 4 },
+      policy: { reserve_ratio: 0.25, attended_unsupported: 'allow-hard-stop' },
+      mode: 'attended',
+      capability: 'unsupported',
+      executor: 'subprocess',
+    })).toThrow('requires an exact final dispatch binding');
+    expect(() => assertExecutionLandingSupport({
+      budget: { maxTurns: 4 },
+      policy: { reserve_ratio: 0.25, attended_unsupported: 'allow-hard-stop' },
+      mode: 'attended',
+      capability: 'unsupported',
+      executor: 'subprocess',
+      approvalEvidenceRef: 'approval://owner/decision-1',
+    })).toThrow('exact final dispatch binding');
   });
 });

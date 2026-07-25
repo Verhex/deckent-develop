@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'node:events';
+import { join } from 'node:path';
 
 // ── Module mocks ──────────────────────────────────────────────────────────────
 const mockWatchCallbacks: Array<(eventType: string, filename: string | null) => void> = [];
+const mockWatchPaths: string[] = [];
 let watchShouldThrow = false;
 
 const mockFsWatcher = new EventEmitter() as EventEmitter & { close: ReturnType<typeof vi.fn> };
@@ -12,6 +14,7 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn(() => true),
   watch: vi.fn((_path: string, cb: (eventType: string, filename: string | null) => void) => {
     if (watchShouldThrow) throw new Error('watch failed');
+    mockWatchPaths.push(_path);
     mockWatchCallbacks.push(cb);
     return mockFsWatcher;
   }),
@@ -46,7 +49,10 @@ import { createResultWatcher } from '../../src/orchestra/result-watcher.js';
 describe('createResultWatcher', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.clearAllMocks();
     mockWatchCallbacks.length = 0;
+    mockWatchPaths.length = 0;
+    mockFsWatcher.removeAllListeners();
     mockFsWatcher.close.mockClear();
     watchShouldThrow = false;
   });
@@ -74,6 +80,23 @@ describe('createResultWatcher', () => {
       const { existsSync } = await import('node:fs');
       vi.mocked(existsSync).mockReturnValueOnce(false);
       expect(() => createResultWatcher('/proj')).not.toThrow();
+    });
+
+    it('rejects escaping wake paths before installing any watcher', async () => {
+      const { watch } = await import('node:fs');
+      try {
+        createResultWatcher('/proj', 5_000, {
+          wakeFiles: ['../outside.signal'],
+        });
+        expect.unreachable('escaping wake path must fail closed');
+      } catch (error) {
+        expect(error).toMatchObject({
+          name: 'DeckentError',
+          code: 'DECKENT_E077',
+        });
+        expect(error).toHaveProperty('message', expect.stringContaining('escapes project root'));
+      }
+      expect(watch).not.toHaveBeenCalled();
     });
   });
 
@@ -142,6 +165,23 @@ describe('createResultWatcher', () => {
       triggerResult('task-002.result');
       await p2;
 
+      w.close();
+    });
+
+    it('resolves only for an exact configured control-plane wake file', async () => {
+      const wakeFile = '.deckent/nervous-respawn-requests.jsonl';
+      const w = createResultWatcher('/proj', 5_000, { wakeFiles: [wakeFile] });
+      const controlIndex = mockWatchPaths.indexOf(join('/proj', '.deckent'));
+      expect(controlIndex).toBeGreaterThan(-1);
+      let resolved = false;
+      const p = w.waitForChange().then(() => { resolved = true; });
+
+      mockWatchCallbacks[controlIndex]!('change', 'other-control-file.jsonl');
+      await Promise.resolve();
+      expect(resolved).toBe(false);
+
+      mockWatchCallbacks[controlIndex]!('change', 'nervous-respawn-requests.jsonl');
+      await expect(p).resolves.toBeUndefined();
       w.close();
     });
   });

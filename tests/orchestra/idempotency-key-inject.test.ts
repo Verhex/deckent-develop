@@ -17,7 +17,7 @@
 // out-of-band consumers but the prompt is now self-sufficient.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -36,7 +36,7 @@ vi.mock('node:child_process', () => {
       }
       // docker run -d → return container id
       if (args[0] === 'run') {
-        return { status: 0, stdout: 'container-id-abcdef\n', stderr: '' };
+        return { status: 0, stdout: `${'b'.repeat(64)}\n`, stderr: '' };
       }
       // A23: strict auth truth requires the structured loggedIn envelope.
       if (cmd === 'claude' && args.join(' ') === 'auth status --json') {
@@ -60,8 +60,10 @@ vi.mock('node:child_process', () => {
 import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
 import { buildTaskPrompt, type SprintContext } from '../../src/orchestra/prompt-god-template.js';
 import type { Task } from '../../src/core/task-types.js';
-
-const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
+import {
+  TEST_DOCKER_EXECUTION_OPTIONS,
+  budgetedDockerTaskJson,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 // ─── Test scaffolding ─────────────────────────────────────────────────────
 
@@ -69,21 +71,38 @@ let projectDir: string;
 
 beforeEach(() => {
   spawnSyncCalls.length = 0;
+  vi.stubEnv('ANTHROPIC_API_KEY', 'test-api-key');
   projectDir = mkdtempSync(join(tmpdir(), 'deckent-idempotency-test-'));
+  mkdirSync(join(projectDir, '.tasks'), { recursive: true });
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   if (projectDir && existsSync(projectDir)) {
     try { rmSync(projectDir, { recursive: true, force: true }); } catch { /* ok */ }
   }
 });
 
+function persistBudgetedTask(taskId: string, model = 'claude-sonnet-5'): void {
+  const taskPath = join(projectDir, '.tasks', `task-${taskId}.json`);
+  const task = JSON.parse(
+    budgetedDockerTaskJson(taskPath, { authMode: 'api', model }),
+  ) as Record<string, unknown>;
+  task.scope = {
+    directories: [],
+    filesRead: ['src/orchestra/spawn-backend-docker.ts'],
+    filesWrite: [],
+  };
+  writeFileSync(taskPath, JSON.stringify(task), 'utf-8');
+}
+
 // ─── 1. spawn-backend-docker: IDEMPOTENCY_KEY env injection ───────────────
 
 describe('DockerSpawnBackend — IDEMPOTENCY_KEY env injection', () => {
   it('injects IDEMPOTENCY_KEY=<16-hex> env var into docker run args', () => {
+    persistBudgetedTask('test-001');
     const backend = new DockerSpawnBackend(projectDir, { timeoutSeconds: 600 });
-    backend.spawn('test-001', 'claude-sonnet-5', 'prompt body', TEST_EXECUTION_OPTIONS);
+    backend.spawn('test-001', 'claude-sonnet-5', 'prompt body', TEST_DOCKER_EXECUTION_OPTIONS);
 
     // Locate the `docker run` invocation in captured calls
     const runCall = spawnSyncCalls.find(
@@ -102,8 +121,9 @@ describe('DockerSpawnBackend — IDEMPOTENCY_KEY env injection', () => {
   });
 
   it('emits the env var with the -e flag immediately preceding it', () => {
+    persistBudgetedTask('test-002', 'claude-haiku-4-5-20251001');
     const backend = new DockerSpawnBackend(projectDir);
-    backend.spawn('test-002', 'claude-haiku-4-5-20251001', 'prompt', TEST_EXECUTION_OPTIONS);
+    backend.spawn('test-002', 'claude-haiku-4-5-20251001', 'prompt', TEST_DOCKER_EXECUTION_OPTIONS);
 
     const runCall = spawnSyncCalls.find(c => c.cmd === 'docker' && c.args[0] === 'run');
     expect(runCall).toBeDefined();
@@ -117,9 +137,11 @@ describe('DockerSpawnBackend — IDEMPOTENCY_KEY env injection', () => {
   });
 
   it('generates a fresh IDEMPOTENCY_KEY for each spawn call', () => {
+    persistBudgetedTask('test-003');
+    persistBudgetedTask('test-004');
     const backend = new DockerSpawnBackend(projectDir);
-    backend.spawn('test-003', 'claude-sonnet-5', 'prompt-a', TEST_EXECUTION_OPTIONS);
-    backend.spawn('test-004', 'claude-sonnet-5', 'prompt-b', TEST_EXECUTION_OPTIONS);
+    backend.spawn('test-003', 'claude-sonnet-5', 'prompt-a', TEST_DOCKER_EXECUTION_OPTIONS);
+    backend.spawn('test-004', 'claude-sonnet-5', 'prompt-b', TEST_DOCKER_EXECUTION_OPTIONS);
 
     const runCalls = spawnSyncCalls.filter(c => c.cmd === 'docker' && c.args[0] === 'run');
     expect(runCalls.length).toBe(2);

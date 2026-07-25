@@ -34,6 +34,7 @@ vi.mock('node:child_process', () => ({
       stderr: { on: vi.fn(), resume: vi.fn() },
       on: vi.fn(),
       once: vi.fn(),
+      kill: vi.fn(),
     };
     return stub as unknown as ChildProcess;
   }),
@@ -84,12 +85,20 @@ vi.mock('../../src/core/task-result-settlement.js', () => {
     .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
 });
 
+vi.mock('../../src/orchestra/execution-landing-coordinator.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../src/orchestra/execution-landing-coordinator.js')>()),
+  prepareDockerExecutionLanding: vi.fn(({ prompt }: { prompt: string }) => ({ prompt, context: null })),
+}));
+
 import { spawnSync } from 'node:child_process';
 import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
 import type { ModelType } from '../../src/core/types.js';
+import {
+  TEST_DOCKER_EXECUTION_OPTIONS,
+  budgetedDockerTaskJson,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
-const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -158,11 +167,19 @@ function isProviderCredentialPath(path: string): boolean {
     || path.endsWith('/.gemini/google_accounts.json');
 }
 
-function stubTaskAuthMode(taskId: string, authMode: 'subscription' | 'api'): void {
-  fsState.existsSyncImpl = (p: string) => p.endsWith(`task-${taskId}.json`) || isProviderCredentialPath(p);
+function stubTaskEnvelope(
+  taskId: string,
+  model: string,
+  authMode: 'subscription' | 'api',
+): void {
+  fsState.existsSyncImpl = (p: string) =>
+    p.endsWith(`task-${taskId}.json`)
+    || (model.startsWith('claude-')
+      && authMode === 'subscription'
+      && p.endsWith('/.claude/.credentials.json'));
   fsState.readFileSyncImpl = (p: string) => {
     if (p.endsWith(`task-${taskId}.json`)) {
-      return JSON.stringify({ authMode, scope: { filesWrite: [] } });
+      return budgetedDockerTaskJson(p, { authMode, model });
     }
     return '{}';
   };
@@ -176,11 +193,27 @@ function resetFsStubs(): void {
 }
 
 /** Spawn one worker and return the credential keys forwarded into its container. */
-function forwardedKeysFor(model: ModelType, taskId: string): string[] {
+function forwardedKeysFor(
+  model: ModelType,
+  taskId: string,
+  authMode: 'subscription' | 'api' = 'subscription',
+): string[] {
+  stubTaskEnvelope(taskId, model, authMode);
   const backend = new DockerSpawnBackend('/test/project');
-  backend.spawn(taskId, model, 'prompt', TEST_EXECUTION_OPTIONS);
+  backend.spawn(taskId, model, 'prompt', TEST_DOCKER_EXECUTION_OPTIONS);
   expect(capturedDockerRunArgs.length).toBe(1);
   return collectForwardedCredentialKeys(capturedDockerRunArgs[0]!);
+}
+
+function expectMeteringHold(model: ModelType, taskId: string): void {
+  const backend = new DockerSpawnBackend('/test/project');
+  expect(() => backend.spawn(
+    taskId,
+    model,
+    'prompt',
+    TEST_DOCKER_EXECUTION_OPTIONS,
+  )).toThrow(/does not expose incremental measured usage/);
+  expect(capturedDockerRunArgs).toHaveLength(0);
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -202,7 +235,11 @@ describe('DockerSpawnBackend: runtime per-worker auth non-leak (F1-014r)', () =>
   });
 
   // ── subscription-Claude: the Sprint-213 killer — must carry NO Anthropic key ──
-  it.each(['claude-sonnet-5', 'claude-opus-4-8', 'claude-haiku-4-5-20251001'] as ModelType[])(
+  it.each([
+    'claude-sonnet-5',
+    'claude-opus-4-8',
+    'claude-haiku-4-5-20251001',
+  ] as ModelType[])(
     'subscription-Claude (%s) forwards NO credential key (no ANTHROPIC_API_KEY leak)',
     (model) => {
       expect(forwardedKeysFor(model, `t-sub-${model}`)).toEqual([]);
@@ -210,43 +247,38 @@ describe('DockerSpawnBackend: runtime per-worker auth non-leak (F1-014r)', () =>
   );
 
   // ── api-mode Claude: ONLY Anthropic, no foreign keys ──
-  it('api-mode Claude (sonnet) forwards ONLY ANTHROPIC_API_KEY', () => {
-    stubTaskAuthMode('t-api-claude', 'api');
-    expect(forwardedKeysFor('claude-sonnet-5' as ModelType, 't-api-claude')).toEqual(['ANTHROPIC_API_KEY']);
+  it('api-mode canonical Claude forwards ONLY ANTHROPIC_API_KEY', () => {
+    expect(forwardedKeysFor(
+      'claude-sonnet-5' as ModelType,
+      't-api-claude',
+      'api',
+    )).toEqual(['ANTHROPIC_API_KEY']);
   });
 
-  // ── subscription Codex: OAuth file only, no host API keys ──
+  // ── codex: final-only usage cannot safely enter Docker env assembly ──
   it.each(['gpt-4.1', 'gpt-5.6-sol'] as ModelType[])(
-    'subscription Codex worker (%s) is held before credential forwarding',
+    'codex worker (%s) HOLDs before any provider key enters a container',
     (model) => {
-      expect(() => forwardedKeysFor(model, `t-codex-${model}`))
-        .toThrow(/does not expose incremental measured usage/);
-      expect(capturedDockerRunArgs).toHaveLength(0);
+      expectMeteringHold(model, `t-codex-${model}`);
     },
   );
 
-  // ── subscription Gemini: OAuth file only, no host API keys ──
+  // ── gemini: final-only usage cannot safely enter Docker env assembly ──
   it.each(['gemini-2.5-flash', 'gemini-2.5-pro'] as ModelType[])(
-    'subscription Gemini worker (%s) is held before credential forwarding',
+    'gemini worker (%s) HOLDs before any provider key enters a container',
     (model) => {
-      expect(() => forwardedKeysFor(model, `t-gemini-${model}`))
-        .toThrow(/does not expose incremental measured usage/);
-      expect(capturedDockerRunArgs).toHaveLength(0);
+      expectMeteringHold(model, `t-gemini-${model}`);
     },
   );
 
-  // ── a non-claude worker in api authMode still must not receive ANTHROPIC ──
-  it('codex worker with authMode=api is held before credential forwarding', () => {
-    stubTaskAuthMode('t-codex-api', 'api');
-    expect(() => forwardedKeysFor('gpt-4.1' as ModelType, 't-codex-api'))
-      .toThrow(/does not expose incremental measured usage/);
-    expect(capturedDockerRunArgs).toHaveLength(0);
+  // ── API auth cannot override the live-metering capability gate ──
+  it('Codex with authMode=api still HOLDs before provider env assembly', () => {
+    stubTaskEnvelope('t-codex-api', 'gpt-4.1', 'api');
+    expectMeteringHold('gpt-4.1' as ModelType, 't-codex-api');
   });
 
-  it('gemini worker with authMode=api is held before credential forwarding', () => {
-    stubTaskAuthMode('t-gemini-api', 'api');
-    expect(() => forwardedKeysFor('gemini-2.5-flash' as ModelType, 't-gemini-api'))
-      .toThrow(/does not expose incremental measured usage/);
-    expect(capturedDockerRunArgs).toHaveLength(0);
+  it('Gemini with authMode=api still HOLDs before provider env assembly', () => {
+    stubTaskEnvelope('t-gemini-api', 'gemini-2.5-flash', 'api');
+    expectMeteringHold('gemini-2.5-flash' as ModelType, 't-gemini-api');
   });
 });

@@ -13,7 +13,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '215-007-test',
     title: 'Per-worker auth test',
     description: 'Tests per-worker provider+authMode resolution',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -77,11 +77,10 @@ describe('routeTask authMode resolution', () => {
     expect(result.authMode).toBe('subscription');
   });
 
-  it('includes authMode in routing result — no-provider fallback path', () => {
+  it('fails before producing a routing result when no provider is available', () => {
     const task = makeTask({ authMode: 'api' });
-    const result = routeTask(task, {}, []); // no providers → fallback path
-    expect(result.authMode).toBe('api');
-    expect(result.provider).toBeDefined();
+    expect(() => routeTask(task, {}, []))
+      .toThrow('E_PROVIDER_FALLBACK_EXHAUSTED');
   });
 
   it('authMode does not affect provider selection — provider resolved independently', () => {

@@ -6,11 +6,16 @@
 import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
 import type { SpawnOptionsWithoutStdio } from 'node:child_process';
 import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSync, fsyncSync, closeSync, readdirSync, renameSync, rmdirSync, chmodSync, statSync } from 'node:fs';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { createHash, randomBytes } from 'node:crypto';
 import { homedir, totalmem } from 'node:os';
 import type { ModelType } from '../core/types.js';
-import { getProviderForModel, TaskStatus, UnknownModelError, type ProviderName, type TaskResult } from '../core/task-types.js';
+import { canonicalJson } from '../core/audit-writer.js';
+import {
+  assertCrossVerifyEnforcedAttemptContract,
+  type CrossVerifyEnforcedAttemptContractV1,
+} from '../core/cross-verify-execution-contract.js';
+import { getProviderForModel, TaskStatus, type ProviderName, type Task, type TaskResult } from '../core/task-types.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { getProviderCommandSpec, buildProviderCommand, type ProviderCommandSpec } from '../core/provider-command-spec.js';
 import { createClaudeAdapter } from '../providers/claude.js';
@@ -20,11 +25,12 @@ import { buildSuggestedImageCmd } from '../core/worker-image-check.js';
 import { LOCKS_DIR, TASKS_DIR } from '../core/constants.js';
 import { DECK_FILE_NAME } from '../core/deck-file.js';
 import { debugLog } from '../core/utils.js';
-import { DeckentError } from '../core/errors.js';
+import { createDockerLifecycleError, DeckentError } from '../core/errors.js';
 import { normalizeStreamEvent, writeLogEvent, type StreamLogEvent } from '../core/log-event.js';
 import { extractTerminalAssistantVerdictFromLog } from '../core/cross-verify-prompt.js';
 import {
   assertExecutionBudgetShape,
+  assertExecutionLandingSupport,
   assertLiveUsageBudgetSupport,
   hasLiveUsageCeiling,
 } from '../core/live-execution-budget.js';
@@ -46,15 +52,40 @@ import {
   dockerContainerNameForTask,
   assertTaskResultSettlementRef,
   listPendingTaskResultSettlementAttempts,
+  readTaskProviderTerminalBillingReceipt,
+  readTaskResultSettlementExecutionBudgetAuthority,
+  readTaskResultSettlementExecutionContract,
   readTaskResultSettlement,
   readTaskResultSettlementClosure,
+  readTaskResultSettlementDispatch,
+  readTaskResultSettlementPrepared,
+  readTaskResultSettlementPrompt,
+  taskResultSettlementPromptEvidenceRef,
+  taskResultSettlementPromptPath,
+  taskProviderTerminalBillingEvidenceRef,
+  writeTaskProviderActualCallReceiptAtomic,
+  writeTaskProviderTerminalUsageReceiptAtomic,
+  writeTaskProviderTerminalBillingReceiptAtomic,
+  writeTaskResultSettlementLandedRetirementAtomic,
   writeTaskResultSettlementAttemptAtomic,
   writeTaskResultSettlementClosureAtomic,
   writeTaskResultSettlementDispatchAtomic,
+  writeTaskResultSettlementExecutionBudgetAuthorityAtomic,
+  writeTaskResultSettlementExecutionContractAtomic,
   writeTaskResultSettlementPreparedAtomic,
+  writeTaskResultSettlementPromptAtomic,
   writeTaskResultSettlementAtomic,
+  type TaskProviderTerminalBillingReceiptV1,
+  type TaskProviderTerminalUsageSourceV1,
   type TaskResultSettlementRefV1,
 } from '../core/task-result-settlement.js';
+import {
+  listRetiredExecutionLandings,
+  readExecutionLandingCheckpointByRef,
+  executionLandingCheckpointPath,
+  writeExecutionAttemptRetirementAtomic,
+  type ExecutionLandingCheckpointRefV1,
+} from '../core/execution-landing-checkpoint.js';
 import { BASE_PROVIDER_CREDENTIAL_ENV } from '../providers/cross-provider-keys.js';
 import type {
   HostTerminalResultContractV1,
@@ -67,15 +98,28 @@ import { getDefaultProviderName } from './sprint-utils.js';
 import { installGitGuard, buildDockerGitGuardArgs, buildGitGuardDir, CONTAINER_GIT_PATH } from './git-worker-guard.js';
 import { captureStreamToLog } from './spawn-backend-subprocess.js';
 import { makeActivityOnEvent, type ActivityTapContext } from '../agents/worker-activity.js';
-import { extractProviderBillingEvidence } from '../core/provider-billing-evidence.js';
+import {
+  aggregateProviderBillingEvidence,
+  extractProviderBillingEvidence,
+  type ProviderBillingEvidence,
+} from '../core/provider-billing-evidence.js';
 import {
   createRuntimeBudgetMonitor,
   readRuntimeBudgetExhaustion,
+  readRuntimeBudgetLandingRequest,
   readRuntimeBudgetUsage,
-  resolveTaskExecutionBudget,
+  resolveHostExecutionBudget,
+  type RuntimeBudgetLandingEvidence,
   type RuntimeBudgetStopEvidence,
   type RuntimeBudgetUsageEvidence,
 } from './runtime-budget-monitor.js';
+import {
+  dispatchExecutionContinuation,
+} from './execution-continuation-runner.js';
+import {
+  prepareDockerExecutionLanding,
+  stampDockerExecutionLandingCheckpoint,
+} from './execution-landing-coordinator.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
@@ -84,11 +128,86 @@ const DEFAULT_IMAGE = 'deckent-worker:latest';
 const DEFAULT_TIMEOUT_SECONDS = 1200; // 20 minutes
 const CONTAINER_WORKSPACE = '/workspace';
 const CONTAINER_GIT_COMMON_DIR = '/run/deckent-git/common';
+const CONTAINER_EXACT_XVERIFY_PROMPT = '/run/deckent-xverify-prompt.txt';
 const DEFAULT_GRACEFUL_TIMEOUT_SECONDS = 15;
 // Exported as the SSOT container-name prefix so the host-liveness probe
 // (heartbeat-monitor.ts) derives `deckent-w-<taskId>` from the SAME constant the
 // backend uses to `docker run --name` / `docker wait` — no drifting duplicate.
 export const CONTAINER_PREFIX = 'deckent-w-';
+
+export interface DockerExactCrossVerifySpawnInput {
+  readonly taskId: string;
+  readonly model: ModelType;
+  readonly prompt: string;
+  readonly executionContract: Readonly<CrossVerifyEnforcedAttemptContractV1>;
+  readonly settlementRef: TaskResultSettlementRefV1;
+  readonly options: SpawnBackendOptions;
+  readonly terminationAuthority: DockerExactCrossVerifyTerminationAuthority;
+}
+
+export interface DockerExactCrossVerifyTerminationBinding {
+  readonly bindingId: string;
+  readonly evidenceRef: string;
+  readonly authorityRef: string;
+}
+
+export interface DockerExactCrossVerifyTerminationAuthority {
+  bindPreparedAttempt(input: {
+    readonly settlementRef: Readonly<TaskResultSettlementRefV1>;
+    readonly executionContract: Readonly<CrossVerifyEnforcedAttemptContractV1>;
+  }): Readonly<DockerExactCrossVerifyTerminationBinding>;
+}
+
+export interface DockerExactCrossVerifyDispatchHandle {
+  readonly settlementRef: Readonly<TaskResultSettlementRefV1>;
+  readonly outputArtifactRef: string;
+}
+
+interface DockerExactCrossVerifyContext {
+  readonly executionContract: Readonly<CrossVerifyEnforcedAttemptContractV1>;
+  readonly terminationAuthority: DockerExactCrossVerifyTerminationAuthority;
+  readonly promptSha256: string;
+  readonly taskSnapshotSha256: string;
+  readonly promptEvidenceRef: string;
+  readonly promptHostPath: string;
+  readonly executionContractEvidenceRef: string;
+  readonly executionContractSha256: string;
+}
+
+function sameExactSettlementRef(
+  left: Readonly<TaskResultSettlementRefV1>,
+  right: Readonly<TaskResultSettlementRefV1>,
+): boolean {
+  return left.schemaVersion === right.schemaVersion
+    && left.taskId === right.taskId
+    && left.backend === right.backend
+    && left.projectRootSha256 === right.projectRootSha256
+    && left.attemptId === right.attemptId;
+}
+
+function exactCrossVerifyOutputArtifactRef(
+  ref: TaskResultSettlementRefV1,
+): string {
+  return `task-result-output:${createHash('sha256')
+    .update(JSON.stringify(ref))
+    .digest('hex')}`;
+}
+
+function exactCrossVerifyPromptMountArgs(promptHostPath: string): string[] {
+  if (!isAbsolute(promptHostPath)
+    || /[,\u0000\r\n]/u.test(promptHostPath)
+    || !existsSync(promptHostPath)
+    || !statSync(promptHostPath).isFile()) {
+    throw new SpawnBackendError(
+      'Exact xverify prompt path cannot be represented as a safe Docker bind mount',
+      'docker',
+    );
+  }
+  return [
+    '--mount',
+    `type=bind,source=${promptHostPath},target=${CONTAINER_EXACT_XVERIFY_PROMPT},readonly`,
+  ];
+}
 
 const PROVIDER_AUTH_FILES: Readonly<Record<string, readonly { file: string; required: boolean }[]>> = {
   claude: [{ file: '.credentials.json', required: true }],
@@ -159,7 +278,7 @@ export function reconcileDockerRuntimeBudgetResult(
   delete result.cost;
 
   const reason = budgetStop.decision.reasons.join('; ') || 'execution budget exceeded';
-  const evidenceNote = `Runtime budget circuit breaker invalidated the worker result (exitCode=${exitCode}): ${reason}. attemptId=${budgetStop.attemptId}; evidenceSource=${budgetStop.evidenceSource ?? 'stop-marker'}; budgetFingerprint=${budgetStop.budgetFingerprint}.`;
+  const evidenceNote = `Runtime budget circuit breaker invalidated the worker result (exitCode=${exitCode}): ${reason}. attemptId=${budgetStop.attemptId}; evidenceSource=${budgetStop.evidenceSource ?? 'stop-marker'}; counterEvidenceSource=${budgetStop.counterEvidenceSource ?? 'stop-marker'}; budgetFingerprint=${budgetStop.budgetFingerprint}.`;
   const previousNotes = result.notes ?? '';
   const notesAreAmbiguousHostAttribution = previousNotes.includes('Partial-result promoted by host monitor.');
   if (!previousNotes.includes(`attemptId=${budgetStop.attemptId}`)) {
@@ -225,9 +344,111 @@ export function reconcileDockerUnmeasurableRuntimeBudgetResult(
   return true;
 }
 
+export interface DockerTerminalProviderBillingEvidence {
+  receipt: TaskProviderTerminalBillingReceiptV1;
+  billing: ProviderBillingEvidence;
+  evidenceRef: string;
+}
+
+/**
+ * Persist the last canonical provider billing envelope observed by the host log
+ * stream under the exact settlement attempt. The project-mounted `.log` is
+ * evidence input only; the immutable host receipt is the recovery authority.
+ */
+export function persistDockerTerminalProviderBillingReceipt(
+  ref: TaskResultSettlementRefV1,
+  provider: string,
+  normalizedLog: string,
+): DockerTerminalProviderBillingEvidence | null {
+  let observed: {
+    billing: ProviderBillingEvidence;
+    sourceEventSha256: string;
+    observedAt: string;
+  } | null = null;
+  for (const line of normalizedLog.split(/\r?\n/)) {
+    const event = line.trim();
+    if (!event.startsWith('{')) continue;
+    let observedAt: string | undefined;
+    let providerEnvelope: unknown;
+    try {
+      const parsed = JSON.parse(event) as {
+        ts?: unknown;
+        type?: unknown;
+        content?: unknown;
+        total_cost_usd?: unknown;
+      };
+      if (
+        typeof parsed.ts === 'string'
+        && Number.isFinite(Date.parse(parsed.ts))
+      ) observedAt = parsed.ts;
+      providerEnvelope = parsed.type === 'usage'
+        && parsed.content
+        && typeof parsed.content === 'object'
+        && !Array.isArray(parsed.content)
+        ? parsed.content
+        : parsed.total_cost_usd !== undefined
+          ? parsed
+          : null;
+    } catch {
+      continue;
+    }
+    if (!providerEnvelope) continue;
+    const stableProviderEvent = JSON.stringify(providerEnvelope);
+    const billing = extractProviderBillingEvidence(
+      provider,
+      stableProviderEvent,
+      observedAt ?? new Date().toISOString(),
+    );
+    if (!billing) continue;
+    observed = {
+      billing,
+      sourceEventSha256: createHash('sha256').update(stableProviderEvent).digest('hex'),
+      observedAt: observedAt ?? billing.capturedAt,
+    };
+  }
+  if (!observed) return null;
+  writeTaskProviderTerminalBillingReceiptAtomic(
+    ref,
+    observed.billing,
+    observed.sourceEventSha256,
+    observed.observedAt,
+  );
+  const receipt = readTaskProviderTerminalBillingReceipt(ref);
+  if (!receipt) {
+    throw createDockerLifecycleError('Docker provider terminal billing receipt was not readable');
+  }
+  if (readTaskResultSettlementExecutionContract(ref)) {
+    writeTaskProviderActualCallReceiptAtomic(ref);
+  }
+  return {
+    receipt,
+    billing: receipt.billing,
+    evidenceRef: taskProviderTerminalBillingEvidenceRef(receipt),
+  };
+}
+
+function reconcileDockerProviderBillingReceiptResultFile(
+  resultPath: string,
+  taskId: string,
+  receipt: TaskProviderTerminalBillingReceiptV1 | null,
+): boolean {
+  if (!receipt || !existsSync(resultPath)) return false;
+  const result = JSON.parse(readFileSync(resultPath, 'utf-8')) as TaskResult;
+  if (result.taskId !== taskId || receipt.taskId !== taskId) {
+    throw createDockerLifecycleError('Docker provider billing result task identity mismatch');
+  }
+  result.providerBilling = receipt.billing;
+  delete result.cost;
+  atomicWriteFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
+  return true;
+}
+
 interface DockerRecoveryContainment {
   attemptId: string;
-  reason: 'host-restart-budget-observer-loss' | 'docker-wait-evidence-loss';
+  reason:
+    | 'host-restart-budget-observer-loss'
+    | 'docker-wait-evidence-loss'
+    | 'landing-checkpoint-unavailable';
   evidence?: string;
 }
 
@@ -245,10 +466,14 @@ function reconcileDockerRecoveryContainmentResultFile(
   result.testsPassed = false;
   const evidence = recovery.reason === 'host-restart-budget-observer-loss'
     ? `Host restart contained a live Docker attempt because its pre-crash budget observer did not survive. attemptId=${recovery.attemptId}.`
-    : `Host contained the exact Docker attempt because docker wait lost trustworthy terminal evidence. attemptId=${recovery.attemptId}.${recovery.evidence ? ` evidence=${recovery.evidence}.` : ''}`;
+    : recovery.reason === 'docker-wait-evidence-loss'
+      ? `Host contained the exact Docker attempt because docker wait lost trustworthy terminal evidence. attemptId=${recovery.attemptId}.${recovery.evidence ? ` evidence=${recovery.evidence}.` : ''}`
+      : `Host contained the exact Docker attempt at LANDING_REQUESTED, but no valid immutable checkpoint could be created from the final exact-attempt proposal. attemptId=${recovery.attemptId}.${recovery.evidence ? ` evidence=${recovery.evidence}.` : ''}`;
   const evidenceMarker = recovery.reason === 'host-restart-budget-observer-loss'
     ? 'pre-crash budget observer did not survive'
-    : 'docker wait lost trustworthy terminal evidence';
+    : recovery.reason === 'docker-wait-evidence-loss'
+      ? 'docker wait lost trustworthy terminal evidence'
+      : 'no valid immutable checkpoint could be created';
   if (!result.notes?.includes(evidenceMarker)) {
     result.notes = `${evidence} ${result.notes ?? ''}`.trim();
   }
@@ -318,13 +543,33 @@ export function reconcileDockerHostTerminalResultFile(
   );
   if (!terminalVerdict) return null;
 
+  const preTerminalHeartbeat = {
+    status: typeof result['lastHbStatus'] === 'string' && result['lastHbStatus'].length > 0
+      ? result['lastHbStatus']
+      : 'unknown',
+    sequence: typeof result['lastHbSequence'] === 'number'
+      ? result['lastHbSequence']
+      : 0,
+  };
   result['selfAssessment'] = 'DONE';
   result['testsPassed'] = true;
   result['notes'] = `Host-observed terminal xverify protocol completed.\n${terminalVerdict}`;
+  result['hostTerminalProjection'] = {
+    version: 1,
+    protocol: contract.protocol,
+    observedBy: 'host',
+    sourceMarker: {
+      type: 'EXIT_WITHOUT_RESULT',
+      exitCode: result['exitCode'],
+      preTerminalHeartbeat,
+    },
+  };
   if (typeof result['completedAt'] !== 'string') result['completedAt'] = new Date().toISOString();
   delete result['markerType'];
   delete result['workPresent'];
   delete result['diffStat'];
+  delete result['lastHbStatus'];
+  delete result['lastHbSequence'];
   atomicWriteFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
   return terminalVerdict;
 }
@@ -346,6 +591,306 @@ function hasSpawnLocksForTask(projectRoot: string, taskId: string): boolean {
   } catch {
     return true;
   }
+}
+
+/**
+ * Preserve worker-writable landing artefacts outside the project mount before
+ * removing them from `.tasks`; a continuation must never consume a prior
+ * attempt's TERM-generated result or startup partial marker.
+ */
+export function archiveLandedAttemptArtifacts(
+  tasksDir: string,
+  taskId: string,
+  ref: ExecutionLandingCheckpointRefV1,
+): string[] {
+  const archiveDir = resolve(dirname(executionLandingCheckpointPath(ref)), 'worker-artifacts');
+  mkdirSync(archiveDir, { recursive: true, mode: 0o700 });
+  const names = [
+    `task-${taskId}.result`,
+    `task-${taskId}.partial-result`,
+    `task-${taskId}.timeout`,
+    `task-${taskId}.landing-proposal.json`,
+    `task-${taskId}.log`,
+  ];
+  const evidenceRefs: string[] = [];
+  for (const name of names) {
+    const source = join(tasksDir, name);
+    if (!existsSync(source)) {
+      const archived = readdirSync(archiveDir)
+        .filter(file => file.startsWith(`${name}.`) && file.endsWith('.archive'));
+      if (archived.length > 1) {
+        throw createDockerLifecycleError(`Conflicting LANDED worker artefact archives for ${name}`);
+      }
+      if (archived.length === 1) {
+        const match = archived[0]!.match(/\.([a-f0-9]{64})\.archive$/);
+        if (!match) throw createDockerLifecycleError(`Invalid LANDED worker artefact archive name: ${archived[0]}`);
+        const content = readFileSync(resolve(archiveDir, archived[0]!));
+        if (createHash('sha256').update(content).digest('hex') !== match[1]) {
+          throw createDockerLifecycleError(`Corrupt LANDED worker artefact archive: ${archived[0]}`);
+        }
+        evidenceRefs.push(`worker-artifact:${name}:sha256:${match[1]}`);
+      }
+      continue;
+    }
+    const sourceStat = statSync(source);
+    if (!sourceStat.isFile()) {
+      throw createDockerLifecycleError(`LANDED worker artefact is not a regular file: ${source}`);
+    }
+    const content = readFileSync(source);
+    const digest = createHash('sha256').update(content).digest('hex');
+    const destination = resolve(archiveDir, `${name}.${digest}.archive`);
+    if (existsSync(destination)) {
+      const existing = readFileSync(destination);
+      if (!existing.equals(content)) {
+        throw createDockerLifecycleError(`Conflicting LANDED worker artefact archive: ${destination}`);
+      }
+    } else {
+      const tmp = `${destination}.${randomBytes(8).toString('hex')}.tmp`;
+      try {
+        writeFileSync(tmp, content, { mode: 0o600 });
+        const fd = openSync(tmp, 'r');
+        try { fsyncSync(fd); } finally { closeSync(fd); }
+        renameSync(tmp, destination);
+      } finally {
+        try { if (existsSync(tmp)) unlinkSync(tmp); } catch { /* best effort */ }
+      }
+    }
+    unlinkSync(source);
+    evidenceRefs.push(`worker-artifact:${name}:sha256:${digest}`);
+  }
+  return evidenceRefs;
+}
+
+export interface ArchivedLandedAttemptLog {
+  content: string;
+  evidenceRef: string;
+}
+
+/**
+ * Read one exact parent-attempt log from host authority and verify its
+ * content-addressed archive name before exposing it as billing evidence.
+ */
+export function readArchivedLandedAttemptLog(
+  ref: ExecutionLandingCheckpointRefV1,
+): ArchivedLandedAttemptLog | null {
+  const name = `task-${ref.taskId}.log`;
+  const archiveDir = resolve(dirname(executionLandingCheckpointPath(ref)), 'worker-artifacts');
+  if (!existsSync(archiveDir)) return null;
+  const archived = readdirSync(archiveDir)
+    .filter(file => file.startsWith(`${name}.`) && file.endsWith('.archive'));
+  if (archived.length > 1) {
+    throw createDockerLifecycleError(`Conflicting LANDED worker artefact archives for ${name}`);
+  }
+  if (archived.length === 0) return null;
+  const match = archived[0]!.match(/\.([a-f0-9]{64})\.archive$/);
+  if (!match) {
+    throw createDockerLifecycleError(`Invalid LANDED worker artefact archive name: ${archived[0]}`);
+  }
+  const path = resolve(archiveDir, archived[0]!);
+  const content = readFileSync(path);
+  const actualDigest = createHash('sha256').update(content).digest('hex');
+  if (actualDigest !== match[1]) {
+    throw createDockerLifecycleError(`Corrupt LANDED worker artefact archive: ${archived[0]}`);
+  }
+  return {
+    content: content.toString('utf-8'),
+    evidenceRef: `worker-artifact:${name}:sha256:${actualDigest}`,
+  };
+}
+
+function assertFiniteRuntimeCounters(
+  usage: RuntimeBudgetUsageEvidence,
+): RuntimeBudgetUsageEvidence['decision']['counters'] {
+  const counters = usage.decision.counters;
+  for (const field of [
+    'turns',
+    'inputTokens',
+    'outputTokens',
+    'cacheReadTokens',
+    'cacheCreationTokens',
+    'totalTokens',
+    'maxContextTokens',
+  ] as const) {
+    const value = counters[field];
+    if (!Number.isInteger(value) || value < 0) {
+      throw createDockerLifecycleError(
+        `Docker continuation runtime counter is invalid: ${field}=${String(value)}`,
+      );
+    }
+  }
+  return counters;
+}
+
+export interface ReconcileDockerContinuationLineageInput {
+  resultPath: string;
+  projectRoot: string;
+  taskId: string;
+  model: ModelType;
+  settlementRef: TaskResultSettlementRefV1;
+  executionContinuation: NonNullable<SpawnBackendOptions['executionContinuation']>;
+  terminalUsage: RuntimeBudgetUsageEvidence | null;
+  terminalBilling: ProviderBillingEvidence | null;
+  terminalBillingEvidenceRef: string | null;
+}
+
+/**
+ * Project the exact parent checkpoint + exact terminal attempt into the result
+ * before immutable settlement. Token usage is mandatory host truth. Provider
+ * billing is complete only when both exact provider envelopes survive.
+ */
+export function reconcileDockerContinuationLineageResultFile(
+  input: ReconcileDockerContinuationLineageInput,
+): boolean {
+  assertTaskResultSettlementRef(input.projectRoot, input.taskId, input.settlementRef);
+  if (
+    input.executionContinuation.continuationAttemptId !== input.settlementRef.attemptId
+    || input.executionContinuation.parentAttemptId === input.settlementRef.attemptId
+  ) {
+    throw createDockerLifecycleError('Docker continuation settlement lineage identity mismatch');
+  }
+  const parentRef: ExecutionLandingCheckpointRefV1 = {
+    schemaVersion: 1,
+    projectId: input.settlementRef.projectRootSha256,
+    taskId: input.taskId,
+    attemptId: input.executionContinuation.parentAttemptId,
+  };
+  const parent = readExecutionLandingCheckpointByRef(parentRef);
+  if (
+    !parent
+    || parent.checkpointSha256 !== input.executionContinuation.checkpointSha256
+    || parent.checkpoint.attemptId !== input.executionContinuation.parentAttemptId
+  ) {
+    throw createDockerLifecycleError('Docker continuation parent checkpoint authority mismatch');
+  }
+  if (
+    !input.terminalUsage?.terminal
+    || input.terminalUsage.projectId !== input.settlementRef.projectRootSha256
+    || input.terminalUsage.taskId !== input.taskId
+    || input.terminalUsage.attemptId !== input.settlementRef.attemptId
+  ) {
+    throw createDockerLifecycleError('Docker continuation terminal runtime evidence mismatch');
+  }
+  if (!existsSync(input.resultPath)) {
+    throw createDockerLifecycleError('Docker continuation result is missing before lineage settlement');
+  }
+  const result = JSON.parse(readFileSync(input.resultPath, 'utf-8')) as TaskResult;
+  if (result.taskId !== input.taskId) {
+    throw createDockerLifecycleError('Docker continuation result task identity mismatch');
+  }
+
+  const parentCounters = parent.checkpoint.cumulativeUsage;
+  const terminalCounters = assertFiniteRuntimeCounters(input.terminalUsage);
+  const previousUsage = result.tokenUsage;
+  result.tokenUsage = {
+    inputTokens: parentCounters.inputTokens + terminalCounters.inputTokens,
+    outputTokens: parentCounters.outputTokens + terminalCounters.outputTokens,
+    cacheReadTokens: parentCounters.cacheReadTokens + terminalCounters.cacheReadTokens,
+    cacheCreationTokens:
+      parentCounters.cacheCreationTokens + terminalCounters.cacheCreationTokens,
+    source: 'host-runtime-budget-lineage',
+    provider: previousUsage?.provider ?? getProviderForModel(input.model),
+    model: previousUsage?.model ?? input.model,
+  };
+  delete result.cost;
+
+  const parentLog = readArchivedLandedAttemptLog(parentRef);
+  if (input.terminalBilling && input.terminalBillingEvidenceRef) {
+    const terminalReceipt = readTaskProviderTerminalBillingReceipt(input.settlementRef);
+    const terminalBillingSha256 = createHash('sha256')
+      .update(JSON.stringify({
+        source: input.terminalBilling.source,
+        provider: input.terminalBilling.provider,
+        currency: input.terminalBilling.currency,
+        providerReportedUsd: input.terminalBilling.providerReportedUsd,
+        modelUsage: input.terminalBilling.modelUsage,
+      }))
+      .digest('hex');
+    if (
+      !terminalReceipt
+      || input.terminalBillingEvidenceRef
+        !== taskProviderTerminalBillingEvidenceRef(terminalReceipt)
+      || terminalReceipt.billingSha256 !== terminalBillingSha256
+    ) {
+      throw createDockerLifecycleError('Docker continuation terminal billing evidence reference is invalid');
+    }
+    const parentBilling = parentLog
+      ? extractProviderBillingEvidence(input.terminalBilling.provider, parentLog.content)
+      : null;
+    result.providerBilling = parentBilling
+      ? aggregateProviderBillingEvidence([
+          {
+            attemptId: input.executionContinuation.parentAttemptId,
+            evidenceRef: parentLog!.evidenceRef,
+            billing: parentBilling,
+          },
+          {
+            attemptId: input.settlementRef.attemptId,
+            evidenceRef: input.terminalBillingEvidenceRef,
+            billing: input.terminalBilling,
+          },
+        ])
+      : {
+          ...input.terminalBilling,
+          lineage: {
+            coverage: 'partial',
+            attemptIds: [input.settlementRef.attemptId],
+            evidenceRefs: [input.terminalBillingEvidenceRef],
+            missingAttemptIds: [input.executionContinuation.parentAttemptId],
+          },
+        };
+  } else {
+    // A worker-authored or stale attempt-level total cannot represent this
+    // cumulative result without an exact host-captured terminal envelope.
+    delete result.providerBilling;
+  }
+
+  atomicWriteFileSync(input.resultPath, `${JSON.stringify(result, null, 2)}\n`);
+  return true;
+}
+
+interface DockerContinuationRecoveryAuthority {
+  executionContinuation: NonNullable<SpawnBackendOptions['executionContinuation']>;
+  executionBudget: NonNullable<SpawnBackendOptions['executionBudget']>;
+  executionLandingPolicy: NonNullable<SpawnBackendOptions['executionLandingPolicy']>;
+}
+
+function settledContinuationCarriesLineage(
+  settlement: NonNullable<ReturnType<typeof readTaskResultSettlement>>,
+  authority: DockerContinuationRecoveryAuthority,
+  terminalReceipt: TaskProviderTerminalBillingReceiptV1 | null,
+): boolean {
+  const result = settlement.result;
+  const tokenUsage = result['tokenUsage'];
+  if (
+    !tokenUsage
+    || typeof tokenUsage !== 'object'
+    || Array.isArray(tokenUsage)
+    || (tokenUsage as Record<string, unknown>)['source'] !== 'host-runtime-budget-lineage'
+  ) {
+    return false;
+  }
+  const billing = result['providerBilling'];
+  if (!terminalReceipt) return billing === undefined;
+  if (!billing || typeof billing !== 'object' || Array.isArray(billing)) return false;
+  const lineage = (billing as Record<string, unknown>)['lineage'];
+  if (!lineage || typeof lineage !== 'object' || Array.isArray(lineage)) return false;
+  const record = lineage as Record<string, unknown>;
+  const attemptIds = record['attemptIds'];
+  const evidenceRefs = record['evidenceRefs'];
+  const missingAttemptIds = record['missingAttemptIds'];
+  if (
+    !Array.isArray(attemptIds)
+    || !attemptIds.includes(authority.executionContinuation.continuationAttemptId)
+    || !Array.isArray(evidenceRefs)
+    || !evidenceRefs.includes(taskProviderTerminalBillingEvidenceRef(terminalReceipt))
+  ) {
+    return false;
+  }
+  return record['coverage'] === 'complete'
+    ? attemptIds.includes(authority.executionContinuation.parentAttemptId)
+    : record['coverage'] === 'partial'
+      && Array.isArray(missingAttemptIds)
+      && missingAttemptIds.includes(authority.executionContinuation.parentAttemptId);
 }
 
 function finalizeDockerHostTerminalResult(
@@ -1187,20 +1732,6 @@ export function probeDockerDaemon(): DockerPreflightFailure | null {
 // landed in Node 20.6; Deckent runtime is Node ≥24).
 export const WORKER_NODE_OPTIONS = 'NODE_OPTIONS=--max-old-space-size-percentage=75';
 
-/**
- * Returns the CLI binary name for a given model.
- *
- * Sprint 234 AS-2 Faz 2 — host-HTTP defensive honest-fail:
- * Ollama is a host-HTTP provider; `sprint-spawner.ts:isAdapterProvider` should
- * route ollama tasks to the host `OllamaAdapter.spawn(...)` BEFORE this
- * function is ever consulted. If routing fails and ollama still reaches the
- * Docker backend, we emit an explicit warning (no longer silent) so the
- * regression surfaces in logs immediately, then preserve the legacy 'claude'
- * fallback so the in-flight container does not crash mid-sprint. The warning
- * is the defensive honest-fail signal that Layer-2 routing dropped the task.
- *
- * Unknown models also fall back to 'claude' as a safe default (legacy).
- */
 /** Provider CLI binary → adapter factory, for parsing the worker's usage envelope. */
 const USAGE_ADAPTER_FACTORIES: Record<string, (root: string) => { extractUsage?: (raw: string) => unknown }> = {
   claude: createClaudeAdapter,
@@ -1414,50 +1945,35 @@ export function claudeStreamJsonBaseArgs(baseArgs: readonly string[]): string[] 
   return next;
 }
 
+/**
+ * Resolve only a registered CLI provider's exact Docker binary.
+ *
+ * Unknown model identities retain `UnknownModelError`. Ollama and OpenRouter
+ * are host-adapter providers; reaching this boundary is a routing invariant
+ * violation and fails before a different provider binary can be selected.
+ * Fallback policy belongs to the admitted route/receipt authority, never this
+ * final binary projection.
+ */
 export function getProviderBinaryForModel(model: ModelType): string {
-  let provider: string;
-  try {
-    provider = getProviderForModel(model);
-  } catch (e) {
-    if (e instanceof UnknownModelError) {
-      provider = 'claude';
-    } else {
-      throw e;
-    }
-  }
+  const provider = getProviderForModel(model);
+  if (provider === 'claude') return 'claude';
   if (provider === 'codex') return 'codex';
   if (provider === 'gemini') return 'gemini';
   if (provider === 'ollama') {
-    // Routing fix (sprint-spawner isAdapterProvider) should have prevented
-    // ollama from reaching this function. Surface the regression honestly
-    // instead of silently degrading to the claude CLI.
-    const warning = `[deckent:spawn-backend-docker] Ollama provider routed to Docker backend for model "${model}" — `
-      + 'host adapter routing missed this task (sprint-spawner.ts isAdapterProvider). '
-      + 'Falling back to "claude" CLI to avoid mid-sprint crash, but the spawn is INCORRECT. '
-      + 'Investigate: providerRegistry must have an OllamaAdapter registered and isAdapterProvider(\'ollama\') must return true.';
-    console.warn(warning);
-    debugLog('docker-backend:ollama-misroute', warning);
-    return 'claude';
+    throw createDockerLifecycleError(
+      `Ollama provider cannot use the Docker CLI backend for model "${model}"; `
+      + 'host adapter routing must resolve this task before binary selection',
+    );
   }
   if (provider === 'openrouter') {
-    // OPENROUTER-PROVIDER (row 477): same honest-fail contract as the ollama branch
-    // above — `isAdapterProvider('openrouter')` is true, so reaching this function
-    // means host-adapter routing was missed. The container has no path to the
-    // `.deck`-resolved OpenRouter credential, so a "fallback" here is not a degraded
-    // OpenRouter run — it is a CLAUDE run wearing an OpenRouter label. Warn loudly
-    // rather than let that pass as an openrouter result.
-    // (In practice the ProviderCommandSpec guard rejects earlier and louder; this is
-    // defense-in-depth so the two providers behave symmetrically.)
-    const warning = `[deckent:spawn-backend-docker] OpenRouter provider routed to Docker backend for model "${model}" — `
-      + 'host adapter routing missed this task (sprint-spawner.ts isAdapterProvider). '
-      + 'Falling back to "claude" CLI to avoid mid-sprint crash, but the spawn is INCORRECT. '
-      + 'Investigate: providerRegistry must have an OpenRouterProvider registered '
-      + '(config.openrouter.enabled + $DECK:OPENROUTER_API_KEY) and isAdapterProvider(\'openrouter\') must return true.';
-    console.warn(warning);
-    debugLog('docker-backend:openrouter-misroute', warning);
-    return 'claude';
+    throw createDockerLifecycleError(
+      `OpenRouter provider cannot use the Docker CLI backend for model "${model}"; `
+      + 'host API adapter routing must resolve this task before binary selection',
+    );
   }
-  return 'claude';
+  throw createDockerLifecycleError(
+    `Provider "${provider}" has no Docker CLI binary authority for model "${model}"`,
+  );
 }
 
 // ─── SURF-3 S3 — live tool-by-tool activity from `docker logs -f` ─────────────
@@ -1494,6 +2010,53 @@ const runDockerSync: DockerSyncCommand = (command, args, options) => {
     ...(result.error ? { error: result.error } : {}),
   };
 };
+
+/**
+ * Freeze and terminate one exact Docker checkpoint-stop attempt.
+ *
+ * Docker declares `checkpoint-stop`, not provider-cooperative landing. Pausing
+ * the container cgroup first prevents the provider CLI (and its descendants)
+ * from opening another remote call while the exact SIGKILL is delivered.
+ * `docker wait`, log capture and host checkpoint validation remain the terminal
+ * authorities. If kill delivery fails, unpause best-effort before failing loud
+ * so the caller's hard-containment path can adopt a runnable container.
+ */
+export function requestDockerContainerLanding(
+  containerName: string,
+  run: DockerSyncCommand = runDockerSync,
+): void {
+  const pause = run('docker', ['pause', containerName], {
+    encoding: 'utf-8',
+    timeout: 10_000,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  if (pause.status !== 0 || pause.error) {
+    const detail = pause.error?.message ?? pause.stderr ?? `status=${String(pause.status)}`;
+    throw createDockerLifecycleError(
+      `Budget landing could not freeze Docker container "${containerName}": ${detail}`,
+    );
+  }
+
+  const kill = run('docker', ['kill', '--signal=SIGKILL', containerName], {
+    encoding: 'utf-8',
+    timeout: 10_000,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  if (kill.status === 0 && !kill.error) return;
+
+  const unpause = run('docker', ['unpause', containerName], {
+    encoding: 'utf-8',
+    timeout: 10_000,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  const killDetail = kill.error?.message ?? kill.stderr ?? `status=${String(kill.status)}`;
+  const recoveryDetail = unpause.status === 0 && !unpause.error
+    ? 'container unpaused for hard-containment adoption'
+    : `unpause failed: ${unpause.error?.message ?? unpause.stderr ?? `status=${String(unpause.status)}`}`;
+  throw createDockerLifecycleError(
+    `Budget landing could not terminate frozen Docker container "${containerName}": ${killDetail}; ${recoveryDetail}`,
+  );
+}
 
 /**
  * Bounded fail-closed container termination used by the budget circuit
@@ -1564,12 +2127,12 @@ export function terminateDockerContainerForBudget(
 export function followContainerActivity(
   containerName: string,
   provider: string,
-  ctx: ActivityTapContext,
+  ctx: ActivityTapContext | undefined,
   spawnFn: FollowSpawnFn = nodeSpawn,
-  eventTap?: (event: StreamLogEvent) => void,
+  eventTap?: (event: StreamLogEvent, sequence: number) => void,
   onCriticalFailure?: (error: Error) => void,
 ): () => void {
-  if (!ctx.enabled && !eventTap && !onCriticalFailure) return () => { /* no observer needs the stream */ };
+  if (!ctx?.enabled && !eventTap && !onCriticalFailure) return () => { /* no observer needs the stream */ };
   let child: ReturnType<FollowSpawnFn> | undefined;
   let intentionallyStopped = false;
   let failureReported = false;
@@ -1594,14 +2157,15 @@ export function followContainerActivity(
     }
   });
   if (child.stdout) {
-    const activityTap = ctx.enabled ? makeActivityOnEvent(ctx) : undefined;
+    const activityTap = ctx?.enabled ? makeActivityOnEvent(ctx) : undefined;
     void captureStreamToLog(child.stdout, {
       logPath: '', // unused: writeLog:false skips the .log append (post-exit writer is authoritative)
       provider,
       writeLog: false,
-      onEvent: (event) => {
+      failOnEventError: onCriticalFailure !== undefined,
+      onEvent: (event, sequence) => {
         activityTap?.(event);
-        eventTap?.(event);
+        eventTap?.(event, sequence);
       },
     }).catch(error => reportFailure(error instanceof Error ? error : new Error(String(error))));
   } else {
@@ -2272,6 +2836,8 @@ export function captureDockerLogs(
 export class DockerSpawnBackend implements SpawnBackend {
   readonly name = 'docker';
   readonly liveUsageBudgetSupport = 'measured-stream' as const;
+  /** ADR-G-037: host-stamped semantic checkpoint followed by exact-container stop. */
+  readonly executionLandingCapability = 'checkpoint-stop' as const;
 
   private readonly projectDir: string;
   private readonly image: string;
@@ -2323,11 +2889,103 @@ export class DockerSpawnBackend implements SpawnBackend {
       adopted: [],
       closedNotDispatched: [],
       closedAbsentAfterExit: [],
+      retiredLanded: [],
+      resumedContinuations: [],
     };
     const tasksDir = join(this.projectDir, TASKS_DIR);
+    const resumedAttemptIds = new Set<string>();
+    const continuationRecoveryByKey =
+      new Map<string, DockerContinuationRecoveryAuthority>();
+    for (const landed of listRetiredExecutionLandings(this.projectDir)) {
+      const continuation = dispatchExecutionContinuation({
+        projectRoot: this.projectDir,
+        checkpointRef: landed.checkpoint.checkpoint,
+        backend: this,
+      });
+      const recoveryAuthority: DockerContinuationRecoveryAuthority = {
+        executionContinuation: {
+          version: 1,
+          checkpointSha256: landed.checkpoint.checkpointSha256,
+          parentAttemptId: landed.checkpoint.checkpoint.attemptId,
+          continuationAttemptId: continuation.claim.continuationAttemptId,
+          continuationFence: continuation.claim.continuationFence,
+        },
+        executionBudget: landed.checkpoint.checkpoint.remainingBudget,
+        executionLandingPolicy: landed.checkpoint.checkpoint.landingPolicy,
+      };
+      const recoveryKey =
+        `${landed.checkpoint.checkpoint.taskId}\0${continuation.claim.continuationAttemptId}`;
+      const existingRecovery = continuationRecoveryByKey.get(recoveryKey);
+      if (
+        existingRecovery
+        && JSON.stringify(existingRecovery) !== JSON.stringify(recoveryAuthority)
+      ) {
+        throw new SpawnBackendError(
+          `DECKENT_E091:continuation-recovery-authority-conflict:${landed.checkpoint.checkpoint.taskId}/${continuation.claim.continuationAttemptId}`,
+          this.name,
+        );
+      }
+      continuationRecoveryByKey.set(recoveryKey, recoveryAuthority);
+      if (continuation.state === 'dispatched') {
+        resumedAttemptIds.add(continuation.settlementRef.attemptId);
+        report.resumedContinuations.push(landed.checkpoint.checkpoint.taskId);
+      }
+    }
 
     for (const pending of listPendingTaskResultSettlementAttempts(this.projectDir)) {
       const { attempt, prepared, dispatch, settlement } = pending;
+      if (resumedAttemptIds.has(attempt.attemptId)) continue;
+      const continuationRecovery = continuationRecoveryByKey.get(
+        `${attempt.taskId}\0${attempt.attemptId}`,
+      );
+      const landingRef: ExecutionLandingCheckpointRefV1 = {
+        schemaVersion: 1,
+        projectId: attempt.projectRootSha256,
+        taskId: attempt.taskId,
+        attemptId: attempt.attemptId,
+      };
+      const landingCheckpoint = readExecutionLandingCheckpointByRef(landingRef);
+      if (landingCheckpoint) {
+        if (settlement || !prepared || !dispatch) {
+          throw new SpawnBackendError(
+            `DECKENT_E091:landed-attempt-authority-conflict:${attempt.taskId}/${attempt.attemptId}`,
+            this.name,
+          );
+        }
+        const authority = this.inspectContainerAuthority(dispatch.containerId);
+        if (authority.state === 'unavailable') {
+          throw new SpawnBackendError(
+            `${DOCKER_ERROR_CODES.AUTHORITY_UNAVAILABLE}:${authority.evidence}`,
+            this.name,
+          );
+        }
+        if (authority.state === 'present' && authority.inspection.running) {
+          terminateDockerContainerForBudget(dispatch.containerId, this.gracefulTimeoutSeconds);
+        }
+        const retired = await this.finalizeLandedAttempt({
+          taskId: attempt.taskId,
+          containerId: dispatch.containerId,
+          tasksDir,
+          model: prepared.model,
+          projectDir: this.projectDir,
+          settlementRef: attempt,
+          checkpointSha256: landingCheckpoint.checkpointSha256,
+          exitCode: authority.state === 'present' ? authority.inspection.exitCode : -1,
+          containerAlreadyAbsent: authority.state === 'absent',
+        });
+        if (!retired) {
+          throw new SpawnBackendError(
+            `DECKENT_E091:landed-attempt-retirement-incomplete:${attempt.taskId}/${attempt.attemptId}`,
+            this.name,
+          );
+        }
+        report.retiredLanded.push(attempt.taskId);
+        continue;
+      }
+      const pendingLanding = readRuntimeBudgetLandingRequest(
+        this.projectDir,
+        attempt.taskId,
+      );
       if (settlement && !prepared && !dispatch) {
         const candidateContainerNames = new Set([
           `${CONTAINER_PREFIX}${attempt.taskId}`,
@@ -2474,10 +3132,58 @@ export class DockerSpawnBackend implements SpawnBackend {
       }
       if (authority.state === 'absent') {
         const resultPath = join(tasksDir, `task-${attempt.taskId}.result`);
+        const terminalReceipt = readTaskProviderTerminalBillingReceipt(attempt);
         if (!settlement && !existsSync(resultPath)) {
           throw new SpawnBackendError(
             `DECKENT_E091:ambiguous-dispatch-container-absent:${attempt.taskId}/${attempt.attemptId}`,
             this.name,
+          );
+        }
+        if (continuationRecovery) {
+          if (settlement) {
+            if (!settledContinuationCarriesLineage(
+              settlement,
+              continuationRecovery,
+              terminalReceipt,
+            )) {
+              throw new SpawnBackendError(
+                `DECKENT_E091:continuation-settlement-lineage-missing:${attempt.taskId}/${attempt.attemptId}`,
+                this.name,
+              );
+            }
+          } else {
+            reconcileDockerContinuationLineageResultFile({
+              resultPath,
+              projectRoot: this.projectDir,
+              taskId: attempt.taskId,
+              model: prepared.model as ModelType,
+              settlementRef: attempt,
+              executionContinuation: continuationRecovery.executionContinuation,
+              terminalUsage: readRuntimeBudgetUsage(this.projectDir, attempt.taskId),
+              terminalBilling: terminalReceipt?.billing ?? null,
+              terminalBillingEvidenceRef: terminalReceipt
+                ? taskProviderTerminalBillingEvidenceRef(terminalReceipt)
+                : null,
+            });
+          }
+        } else if (settlement) {
+          if (terminalReceipt) {
+            const settledBilling = settlement.result['providerBilling'];
+            if (
+              JSON.stringify(settledBilling)
+              !== JSON.stringify(terminalReceipt.billing)
+            ) {
+              throw new SpawnBackendError(
+                `DECKENT_E091:terminal-billing-settlement-conflict:${attempt.taskId}/${attempt.attemptId}`,
+                this.name,
+              );
+            }
+          }
+        } else {
+          reconcileDockerProviderBillingReceiptResultFile(
+            resultPath,
+            attempt.taskId,
+            terminalReceipt,
           );
         }
         this.settleRecoveredAttempt(attempt, tasksDir, settlement?.exitCode ?? null, 'absent-after-exit');
@@ -2502,12 +3208,76 @@ export class DockerSpawnBackend implements SpawnBackend {
       }
       if (!dispatch) writeTaskResultSettlementDispatchAtomic(attempt, inspection.containerId);
 
+      if (
+        pendingLanding
+        && pendingLanding.attemptId === attempt.attemptId
+        && pendingLanding.projectId === attempt.projectRootSha256
+      ) {
+        const stopped = inspection.running
+          ? terminateDockerContainerForBudget(inspection.containerId, this.gracefulTimeoutSeconds)
+          : {
+              containerName: inspection.containerId,
+              escalation: 'docker-stop' as const,
+              terminationConfirmed: true as const,
+              exitCode: inspection.exitCode,
+            };
+        let checkpoint: ReturnType<typeof stampDockerExecutionLandingCheckpoint>;
+        try {
+          checkpoint = stampDockerExecutionLandingCheckpoint({
+            projectRoot: this.projectDir,
+            settlementRef: attempt,
+            landing: pendingLanding,
+            terminalUsage: readRuntimeBudgetUsage(this.projectDir, attempt.taskId),
+          });
+        } catch (error) {
+          const evidence = error instanceof Error ? error.message : String(error);
+          debugLog(
+            'docker-backend:landing-request-recovery-held',
+            `taskId=${attempt.taskId} ${evidence}`,
+          );
+          await this.adoptAndSettleRecoveredAttempt(
+            attempt,
+            inspection.containerId,
+            prepared.model,
+            tasksDir,
+            false,
+            {
+              attemptId: attempt.attemptId,
+              reason: 'landing-checkpoint-unavailable',
+              evidence: evidence.slice(0, 500),
+            },
+          );
+          report.adopted.push(attempt.taskId);
+          continue;
+        }
+        const retired = await this.finalizeLandedAttempt({
+          taskId: attempt.taskId,
+          containerId: inspection.containerId,
+          tasksDir,
+          model: prepared.model,
+          projectDir: this.projectDir,
+          settlementRef: attempt,
+          checkpointSha256: checkpoint.checkpointSha256,
+          exitCode: stopped.exitCode,
+        });
+        if (!retired) {
+          throw new SpawnBackendError(
+            `DECKENT_E091:landing-request-retirement-incomplete:${attempt.taskId}/${attempt.attemptId}`,
+            this.name,
+          );
+        }
+        report.retiredLanded.push(attempt.taskId);
+        continue;
+      }
+
       await this.adoptAndSettleRecoveredAttempt(
         attempt,
         inspection.containerId,
         prepared.model,
         tasksDir,
         inspection.running,
+        undefined,
+        continuationRecovery,
       );
       report.adopted.push(attempt.taskId);
     }
@@ -2546,7 +3316,22 @@ export class DockerSpawnBackend implements SpawnBackend {
     model: string,
     tasksDir: string,
     running: boolean,
+    recoveryContainment?: DockerRecoveryContainment,
+    continuationRecovery?: DockerContinuationRecoveryAuthority,
   ): Promise<void> {
+    const recoveredBudgetAuthority =
+      readTaskResultSettlementExecutionBudgetAuthority(ref);
+    if (recoveredBudgetAuthority && recoveredBudgetAuthority.model !== model) {
+      throw new SpawnBackendError(
+        `${DOCKER_ERROR_CODES.OWNERSHIP_CONFLICT}:recovery-budget-model-mismatch:${ref.taskId}`,
+        this.name,
+      );
+    }
+    const recoveredExecutionBudget =
+      continuationRecovery?.executionBudget ?? recoveredBudgetAuthority?.budget;
+    const recoveredExecutionLandingPolicy =
+      continuationRecovery?.executionLandingPolicy
+      ?? recoveredBudgetAuthority?.landingPolicy;
     const existing = this.containers.get(ref.taskId);
     if (existing && existing.containerId !== containerId) {
       throw new SpawnBackendError(
@@ -2562,9 +3347,6 @@ export class DockerSpawnBackend implements SpawnBackend {
       tasksDir,
       settlementRef: ref,
     });
-    const recoveryBudget = readRuntimeBudgetExhaustion(this.projectDir, ref.taskId)
-      ? undefined
-      : resolveTaskExecutionBudget(this.projectDir, ref.taskId);
     this.monitorContainer(
       ref.taskId,
       containerId,
@@ -2573,12 +3355,15 @@ export class DockerSpawnBackend implements SpawnBackend {
       this.projectDir,
       computeDistFingerprint(join(this.projectDir, 'dist')),
       undefined,
-      recoveryBudget,
+      recoveredExecutionBudget,
+      recoveredExecutionLandingPolicy,
+      continuationRecovery?.executionContinuation,
+      undefined,
       ref,
       undefined,
-      running
+      recoveryContainment ?? (running
         ? { attemptId: ref.attemptId, reason: 'host-restart-budget-observer-loss' }
-        : undefined,
+        : undefined),
     );
     if (running) {
       terminateDockerContainerForBudget(containerId, this.gracefulTimeoutSeconds);
@@ -2604,9 +3389,106 @@ export class DockerSpawnBackend implements SpawnBackend {
    * - .tasks/ mounted read-write (shared volume for results)
    * - Claude auth cache mounted read-only
    * - API keys passed as env vars if available
-   * - timeout wrapper kills container after limit
-   */
+  * - timeout wrapper kills container after limit
+  */
   spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void {
+    this.spawnInternal(taskId, model, prompt, opts);
+  }
+
+  /**
+   * Dedicated exact-xverify entrypoint.
+   *
+   * This never routes through `SpawnBackendFactory` and never reads its prompt
+   * from the project `.tasks/` mount. The returned handle contains no
+   * actual-call, usage or terminal facts.
+   */
+  spawnExactCrossVerify(
+    input: DockerExactCrossVerifySpawnInput,
+  ): DockerExactCrossVerifyDispatchHandle {
+    assertCrossVerifyEnforcedAttemptContract(input.executionContract);
+    const contract = input.executionContract;
+    if (!input.terminationAuthority
+      || typeof input.terminationAuthority.bindPreparedAttempt !== 'function') {
+      throw new SpawnBackendError(
+        'Exact xverify requires a pre-dispatch termination binding authority',
+        this.name,
+      );
+    }
+    if (createHash('sha256').update(input.prompt).digest('hex')
+      !== contract.dispatchedPromptSha256) {
+      throw new SpawnBackendError(
+        'Exact xverify prompt bytes differ from the execution contract',
+        this.name,
+      );
+    }
+    const dir = input.options.projectDir ?? this.projectDir;
+    assertTaskResultSettlementRef(dir, input.taskId, input.settlementRef);
+    if (input.taskId !== contract.verifierTaskId
+      || input.model !== contract.model
+      || contract.executionBackend !== 'docker'
+      || getProviderForModel(input.model) !== contract.provider
+      || !sameExactSettlementRef(input.settlementRef, contract.settlementAttemptRef)
+      || canonicalJson(input.options.executionBudget) !== canonicalJson(contract.budget)
+      || canonicalJson(input.options.executionLandingPolicy)
+        !== canonicalJson(contract.landingPolicy)
+      || (input.options.executionAdmissionMode ?? 'unattended') !== contract.attendanceMode
+      || input.options.taskTimeoutSeconds !== contract.timeoutMs / 1_000
+      || input.options.isolatedContext !== contract.isolatedContext) {
+      throw new SpawnBackendError(
+        'Exact xverify Docker request differs from the execution contract',
+        this.name,
+      );
+    }
+    this.spawnInternal(
+      input.taskId,
+      input.model,
+      input.prompt,
+      {
+        ...input.options,
+        settlementRef: input.settlementRef,
+        hostTerminalResultContract: {
+          version: 1,
+          kind: 'terminal-verdict',
+          protocol: 'xverify-v1',
+        },
+      },
+      {
+        executionContract: contract,
+        terminationAuthority: input.terminationAuthority,
+        promptSha256: contract.dispatchedPromptSha256,
+        taskSnapshotSha256: contract.taskSnapshotSha256,
+        executionContractEvidenceRef: contract.evidenceRef,
+        executionContractSha256: contract.contractSha256,
+      },
+    );
+    const dispatch = readTaskResultSettlementDispatch(input.settlementRef);
+    if (!dispatch) {
+      throw new SpawnBackendError(
+        'Exact xverify Docker dispatch did not produce immutable dispatch evidence',
+        this.name,
+      );
+    }
+    return Object.freeze({
+      settlementRef: Object.freeze({ ...input.settlementRef }),
+      outputArtifactRef: exactCrossVerifyOutputArtifactRef(input.settlementRef),
+    });
+  }
+
+  private spawnInternal(
+    taskId: string,
+    model: ModelType,
+    prompt: string,
+    opts?: SpawnBackendOptions,
+    exact?: Pick<
+      DockerExactCrossVerifyContext,
+      | 'executionContract'
+      | 'terminationAuthority'
+      | 'promptSha256'
+      | 'taskSnapshotSha256'
+      | 'executionContractEvidenceRef'
+      | 'executionContractSha256'
+    >,
+  ): void {
     // GATE-W2 toggle-independent SAFETY_FLOOR guard — MUST run before any side
     // effect (markPending/mkdir/docker). The default backend previously skipped
     // it while tmux/subprocess enforced it: a lethal actionId could spawn here.
@@ -2615,7 +3497,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     if (opts?.settlementRef) {
       assertTaskResultSettlementRef(dir, taskId, opts.settlementRef);
     }
-    const executionBudget = resolveTaskExecutionBudget(dir, taskId, opts?.executionBudget);
+    const executionBudget = resolveHostExecutionBudget(dir, taskId, opts?.executionBudget);
     assertExecutionBudgetShape(executionBudget, this.name);
     if (typeof executionBudget?.maxUsd === 'number') {
       assertLiveUsageBudgetSupport(executionBudget, undefined, this.name);
@@ -2630,6 +3512,16 @@ export class DockerSpawnBackend implements SpawnBackend {
         );
       }
     }
+      assertExecutionLandingSupport({
+        budget: executionBudget,
+        policy: opts?.executionLandingPolicy,
+        mode: opts?.executionAdmissionMode,
+        capability: this.executionLandingCapability,
+        executor: this.name,
+        approvalEvidenceRef: opts?.executionApprovalEvidenceRef,
+        approvalGrant: opts?.executionApprovalGrant,
+        approvalExpectedDispatch: opts?.executionApprovalExpectedDispatch,
+      });
     let gitIsolation: DockerGitIsolation;
     try {
       gitIsolation = buildDockerGitIsolation(dir);
@@ -2647,10 +3539,97 @@ export class DockerSpawnBackend implements SpawnBackend {
     const settlementRef = opts?.settlementRef ?? createTaskResultSettlementRef(dir, taskId);
     assertTaskResultSettlementRef(dir, taskId, settlementRef);
     writeTaskResultSettlementAttemptAtomic(settlementRef);
+    writeTaskResultSettlementExecutionBudgetAuthorityAtomic(settlementRef, {
+      model,
+      budget: executionBudget,
+      landingPolicy: opts?.executionLandingPolicy,
+      admissionMode: opts?.executionAdmissionMode,
+      approvalEvidenceRef: opts?.executionApprovalEvidenceRef,
+    });
+    let preparedPrompt = prompt;
+    let executionLandingContext = opts?.executionLandingContext;
+    if (
+      exact
+      && opts?.executionLandingPolicy
+      && hasLiveUsageCeiling(executionBudget)
+      && !executionLandingContext
+    ) {
+      throw new SpawnBackendError(
+        'Exact xverify requires a precompiled immutable execution landing context',
+        this.name,
+      );
+    }
+    if (
+      !exact
+      &&
+      opts?.executionLandingPolicy
+      && hasLiveUsageCeiling(executionBudget)
+      && !opts.executionContinuation
+    ) {
+      let task: Task;
+      try {
+        task = JSON.parse(readFileSync(join(tasksDir, `task-${taskId}.json`), 'utf-8')) as Task;
+      } catch (error) {
+        throw new SpawnBackendError(
+          `Budget landing context for task ${taskId} could not read the persisted task: ${error instanceof Error ? error.message : String(error)}`,
+          this.name,
+        );
+      }
+      if (
+        task.id !== taskId
+        || task.model !== model
+        || JSON.stringify(task.budget) !== JSON.stringify(executionBudget)
+        || JSON.stringify(task.budgetPolicy?.landingPolicy) !== JSON.stringify(opts.executionLandingPolicy)
+        || task.budgetPolicy?.admissionMode !== (opts.executionAdmissionMode ?? 'unattended')
+        || (task.budgetPolicy?.approvalEvidenceRef ?? undefined) !== opts.executionApprovalEvidenceRef
+      ) {
+        throw new SpawnBackendError(
+          `Budget landing context for task ${taskId} does not match the host admission envelope`,
+          this.name,
+        );
+      }
+      const provider = getProviderForModel(model);
+      const prepared = prepareDockerExecutionLanding({
+        projectRoot: dir,
+        task,
+        prompt,
+        calledProvider: provider,
+        calledModel: model,
+        auth: task.authMode ?? this.readTaskAuthMode(dir, taskId) ?? 'subscription',
+        settlementRef,
+        ...(opts.hostTerminalResultContract?.protocol === 'xverify-v1'
+          ? { terminalProtocol: 'xverify-v1' as const }
+          : {}),
+      });
+      preparedPrompt = prepared.prompt;
+      executionLandingContext = prepared.context ?? undefined;
+    }
+    let exactContext: DockerExactCrossVerifyContext | undefined;
+    if (exact) {
+      const executionContract = writeTaskResultSettlementExecutionContractAtomic(
+        settlementRef,
+        exact.executionContract,
+      );
+      const promptArtifact = writeTaskResultSettlementPromptAtomic(settlementRef, preparedPrompt);
+      if (promptArtifact.promptSha256 !== exact.promptSha256) {
+        throw new SpawnBackendError(
+          'Exact xverify prompt artifact differs from the execution contract',
+          this.name,
+        );
+      }
+      exactContext = Object.freeze({
+        ...exact,
+        executionContractEvidenceRef: executionContract.evidenceRef,
+        executionContractSha256: executionContract.contractSha256,
+        promptEvidenceRef: taskResultSettlementPromptEvidenceRef(promptArtifact),
+        promptHostPath: taskResultSettlementPromptPath(settlementRef),
+      });
+    }
     const resolvedOpts: SpawnBackendOptions = {
       ...opts,
       executionBudget,
       settlementRef,
+      ...(executionLandingContext ? { executionLandingContext } : {}),
     };
 
     // Sprint 170 P0-5: mark as pending BEFORE prompt write + lock acquisition.
@@ -2672,7 +3651,17 @@ export class DockerSpawnBackend implements SpawnBackend {
     // the file scope for the next worker. monitorContainer's exit handler
     // is what releases on the happy path.
     try {
-      this.runSpawn(taskId, model, prompt, resolvedOpts, dir, effectiveTimeout, tasksDir, gitIsolation);
+      this.runSpawn(
+        taskId,
+        model,
+        preparedPrompt,
+        resolvedOpts,
+        dir,
+        effectiveTimeout,
+        tasksDir,
+        gitIsolation,
+        exactContext,
+      );
     } catch (err) {
       clearPending(taskId);
       try { releaseAllSpawnLocks(dir, taskId); } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
@@ -2689,6 +3678,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     effectiveTimeout: number,
     tasksDir: string,
     gitIsolation: DockerGitIsolation,
+    exact?: DockerExactCrossVerifyContext,
   ): void {
     // F1-005 (Sprint 332): resolve this worker's provider up-front so the image
     // readiness honest-fail below can name the EXACT provider-aware rebuild
@@ -2798,8 +3788,9 @@ export class DockerSpawnBackend implements SpawnBackend {
     const promptId = randomBytes(8).toString('hex');
     const fixSuffix = opts?.isPriorityFix ? '-fix' : '';
     const promptFileName = `.prompt-${taskId}-${promptId}${fixSuffix}.txt`;
-    const promptHostPath = join(tasksDir, promptFileName);
-    writeFileSync(promptHostPath, prompt, 'utf-8');
+    if (!exact) {
+      writeFileSync(join(tasksDir, promptFileName), prompt, 'utf-8');
+    }
 
     // Build the in-container worker command from the provider's declarative
     // ProviderCommandSpec (PSL-1, Sprint 252) — NO claude-hardcode. The spec is
@@ -2807,7 +3798,9 @@ export class DockerSpawnBackend implements SpawnBackend {
     // replaces the old block that emitted claude-CLI syntax (`-p -`,
     // `--dangerously-skip-permissions`) for EVERY provider (Sprint 249 root
     // cause: codex/gemini binaries rejected the claude-only flags).
-    const containerPromptPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/${promptFileName}`;
+    const containerPromptPath = exact
+      ? CONTAINER_EXACT_XVERIFY_PROMPT
+      : `${CONTAINER_WORKSPACE}/${TASKS_DIR}/${promptFileName}`;
     const spec = getProviderCommandSpec(provider);
     if (!spec) {
       // Host-only / unknown provider (e.g. ollama) reached the docker backend.
@@ -2907,6 +3900,11 @@ export class DockerSpawnBackend implements SpawnBackend {
       // scope, not trusted verbatim from opts.allowedTools — see the
       // ALLOWLIST-SSOT block comment above resolveAllowedTools.
       allowedTools: this.resolveAllowedTools(dir, taskId, opts?.allowedTools),
+      // `availableTools` narrows the provider-visible schema itself. It is
+      // protocol-scoped by the caller (xverify-v1) and distinct from the
+      // write/permission authority above.
+      availableTools: opts?.availableTools,
+      isolatedContext: opts?.isolatedContext,
       autoApprove: true,
       // F1-RE (Sprint 252): resolved model reasoning-effort (claude --effort,
       // codex -c model_reasoning_effort); undefined → no flag (CLI default).
@@ -3059,10 +4057,24 @@ export class DockerSpawnBackend implements SpawnBackend {
       'fsync_file "$PRFILE"',
       // EXIT trap: Sprint 145 — calls on_exit() which detects partial work via git diff
       'trap on_exit EXIT',
-      // SIGTERM trap: on graceful stop, fsync .result immediately (before grace
-      // period expires). born-466: exit 143 (128+TERM), NOT 0 — exiting 0 made
-      // on_exit classify a docker-stop as a clean run (TIMEOUT_WITH_WORK dead).
-      `trap 'fsync_file "$RFILE"; fsync_file "$HBFILE"; exit 143' TERM`,
+      // Docker signals PID1 only. A POSIX shell defers TERM traps while it waits
+      // on a foreground child, so the provider used to keep spending until the
+      // hard-stop timer even after a cooperative landing request. Track the
+      // existing timeout supervisor as a child and forward TERM to it; coreutils
+      // timeout then forwards TERM to the provider command it already supervises.
+      'PROVIDER_PID=""',
+      'on_provider_term() {',
+      '  trap "" TERM',
+      '  if [ -n "$PROVIDER_PID" ]; then',
+      '    kill -TERM "$PROVIDER_PID" 2>/dev/null || true',
+      '    wait "$PROVIDER_PID" 2>/dev/null || true',
+      '  fi',
+      '  CLAUDE_EXIT=143',
+      '  fsync_file "$RFILE"',
+      '  fsync_file "$HBFILE"',
+      '  exit 143',
+      '}',
+      'trap on_provider_term TERM',
       // born-468: heartbeat update loop (every 15s) — staleness-gated so it
       // never clobbers a richer heartbeat the worker itself just wrote; the
       // fallback write itself is atomic (tmp+mv). See buildHeartbeatWrapperLoop.
@@ -3077,8 +4089,11 @@ export class DockerSpawnBackend implements SpawnBackend {
       // `|| echo` + the trailing rm. The .timeout marker is timeout-PURE now:
       // only 124 (TERM-timeout) / 137 (KILL) qualify — a crash/CLI-arg error is
       // NOT a timeout — and never when a real .result already exists.
-      `timeout -k 30 $TIMEOUT ${workerCmd}${spec.promptFeed === 'stdin' ? ` < "${containerPromptPath}"` : ''}`,
+      `timeout -k 30 $TIMEOUT ${workerCmd}${spec.promptFeed === 'stdin' ? ` < "${containerPromptPath}"` : ''} &`,
+      'PROVIDER_PID=$!',
+      'wait "$PROVIDER_PID"',
       'CLAUDE_EXIT=$?',
+      'PROVIDER_PID=""',
       `if [ "$CLAUDE_EXIT" -eq 124 ] || [ "$CLAUDE_EXIT" -eq 137 ]; then [ ! -f "$RFILE" ] && echo "WORKER_TIMEOUT" > "${timeoutPath}"; fi`,
       // Sprint 151: Clean up .partial-result on normal exit — on_exit/EXIT trap handles abnormal exit
       'rm -f "$PRFILE" 2>/dev/null',
@@ -3151,6 +4166,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       ...deckShadowMountArgs,
       // WORKER-GIT-GUARD (381-001): read-only git-shim overlay (see above).
       ...gitGuard.mountArgs,
+      ...(exact ? exactCrossVerifyPromptMountArgs(exact.promptHostPath) : []),
       // .tasks/ mounted read-write (results, heartbeats, prompts)
       '-v', `${tasksDir}:${CONTAINER_WORKSPACE}/${TASKS_DIR}`,
       // .locks/ mounted read-write (file locking)
@@ -3269,6 +4285,53 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Running=true OR Running=false+ExitCode=0 (instant-exit success), proceed.
     // Otherwise, classify stderr and retry up to MAX_SPAWN_ATTEMPTS.
     prepareAttempt();
+    if (exact) {
+      const artifact = readTaskResultSettlementPrompt(attemptRef);
+      const executionContract = readTaskResultSettlementExecutionContract(attemptRef);
+      const prepared = readTaskResultSettlementPrepared(attemptRef);
+      let taskSnapshotSha256: string | null = null;
+      try {
+        const taskSnapshot = JSON.parse(
+          readFileSync(join(tasksDir, `task-${taskId}.json`), 'utf-8'),
+        ) as unknown;
+        taskSnapshotSha256 = createHash('sha256')
+          .update(canonicalJson(taskSnapshot))
+          .digest('hex');
+      } catch {
+        taskSnapshotSha256 = null;
+      }
+      if (!artifact
+        || artifact.promptSha256 !== exact.promptSha256
+        || taskResultSettlementPromptEvidenceRef(artifact) !== exact.promptEvidenceRef
+        || taskResultSettlementPromptPath(attemptRef) !== exact.promptHostPath
+        || !prepared
+        || prepared.model !== model
+        || taskSnapshotSha256 !== exact.taskSnapshotSha256
+        || !executionContract
+        || executionContract.evidenceRef !== exact.executionContractEvidenceRef
+        || executionContract.contractSha256 !== exact.executionContractSha256) {
+        throw new SpawnBackendError(
+          'Exact xverify final pre-dispatch authority verification failed',
+          this.name,
+        );
+      }
+      const terminationBinding = exact.terminationAuthority.bindPreparedAttempt({
+        settlementRef: attemptRef,
+        executionContract,
+      });
+      if (!terminationBinding
+        || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(terminationBinding.bindingId)
+        || !terminationBinding.evidenceRef
+        || !terminationBinding.authorityRef
+        || /[\u0000-\u001f\u007f]/u.test(
+          `${terminationBinding.evidenceRef}${terminationBinding.authorityRef}`,
+        )) {
+        throw new SpawnBackendError(
+          'Exact xverify termination binding authority returned invalid evidence',
+          this.name,
+        );
+      }
+    }
     const spawnOutcome = this.runDockerWithRetry(taskId, attemptIdentity, dockerArgs);
 
     if (!spawnOutcome.ok) {
@@ -3373,6 +4436,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       distFingerprintBefore,
       liveCtx,
       opts?.executionBudget,
+      opts?.executionLandingPolicy,
+      opts?.executionContinuation,
+      opts?.executionLandingContext,
       attemptRef,
       opts?.hostTerminalResultContract,
     );
@@ -3862,6 +4928,108 @@ export class DockerSpawnBackend implements SpawnBackend {
     }
   }
 
+  private async finalizeLandedAttempt(input: {
+    taskId: string;
+    containerId: string;
+    tasksDir: string;
+    model: string;
+    projectDir: string;
+    settlementRef: TaskResultSettlementRefV1;
+    checkpointSha256: string;
+    exitCode: number;
+    containerAlreadyAbsent?: boolean;
+  }): Promise<boolean> {
+    const landingRef: ExecutionLandingCheckpointRefV1 = {
+      schemaVersion: 1,
+      projectId: input.settlementRef.projectRootSha256,
+      taskId: input.taskId,
+      attemptId: input.settlementRef.attemptId,
+    };
+    const checkpoint = readExecutionLandingCheckpointByRef(landingRef);
+    if (!checkpoint || checkpoint.checkpointSha256 !== input.checkpointSha256) {
+      throw createDockerLifecycleError('Docker LANDED finalization has no matching immutable checkpoint');
+    }
+
+    if (!input.containerAlreadyAbsent) {
+      try {
+        const capture = await captureDockerLogs(input.containerId);
+        if (capture.content.trim()) {
+          writeNormalizedDockerLog(
+            join(input.tasksDir, `task-${input.taskId}.log`),
+            capture.content,
+            getProviderBinaryForModel(input.model),
+          );
+        }
+      } catch (error) {
+        debugLog('docker-backend:landed-log-capture', error);
+      }
+
+      const removal = spawnSync('docker', ['rm', input.containerId], {
+        encoding: 'utf-8',
+        timeout: 10_000,
+      });
+      if (removal.status !== 0) {
+        debugLog('docker-backend:landed-cleanup', `container removal failed: ${removal.stderr ?? ''}`);
+        return false;
+      }
+    }
+
+    let artefactRefs: string[];
+    try {
+      artefactRefs = archiveLandedAttemptArtifacts(input.tasksDir, input.taskId, landingRef);
+      releaseAllSpawnLocks(input.projectDir, input.taskId);
+      releaseStaleSpawnLocksForTask(input.projectDir, input.taskId);
+      if (hasSpawnLocksForTask(input.projectDir, input.taskId)) {
+        throw createDockerLifecycleError(`Task ${input.taskId} still owns spawn locks after LANDED cleanup`);
+      }
+      const baselinePath = join(input.tasksDir, `task-${input.taskId}.scope-baseline`);
+      if (existsSync(baselinePath)) unlinkSync(baselinePath);
+    } catch (error) {
+      debugLog('docker-backend:landed-authority-release', error);
+      return false;
+    }
+
+    const retirement = writeExecutionAttemptRetirementAtomic(
+      input.projectDir,
+      landingRef,
+      {
+        checkpointSha256: checkpoint.checkpointSha256,
+        runtimeDisposition: 'stopped-removed',
+        resourcesReleased: true,
+        evidenceRefs: [
+          `docker-container-retired:${input.containerId}`,
+          'docker-spawn-locks-released',
+          ...artefactRefs,
+        ],
+      },
+    );
+    writeTaskResultSettlementLandedRetirementAtomic(input.settlementRef);
+    atomicWriteFileSync(join(input.tasksDir, `task-${input.taskId}.hb`), `${JSON.stringify({
+      workerId: `docker-${input.taskId}`,
+      taskId: input.taskId,
+      status: 'LANDED',
+      sequence: 100,
+      timestamp: retirement.retiredAt,
+      exitCode: input.exitCode,
+      backend: 'docker',
+      checkpointSha256: checkpoint.checkpointSha256,
+    }, null, 2)}\n`);
+    this.containers.delete(input.taskId);
+    try {
+      dispatchExecutionContinuation({
+        projectRoot: input.projectDir,
+        checkpointRef: landingRef,
+        backend: this,
+      });
+    } catch (error) {
+      debugLog(
+        'docker-backend:landing-continuation-held',
+        `taskId=${input.taskId} ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    return true;
+  }
+
   /**
    * Monitor container until it exits, then update heartbeat and cleanup.
    *
@@ -3878,6 +5046,9 @@ export class DockerSpawnBackend implements SpawnBackend {
     distFingerprintBefore: DistFingerprint | null,
     liveCtx?: ActivityTapContext,
     executionBudget?: import('../core/work-model.js').ExecutionBudget,
+    executionLandingPolicy?: import('../core/config-types.js').ExecutionLandingPolicyConfig,
+    executionContinuation?: SpawnBackendOptions['executionContinuation'],
+    executionLandingContext?: SpawnBackendOptions['executionLandingContext'],
     settlementRef?: TaskResultSettlementRefV1,
     hostTerminalResultContract?: HostTerminalResultContractV1,
     recoveryContainment?: DockerRecoveryContainment,
@@ -3888,40 +5059,107 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     // SURF-3 S3 — start the live activity follow WHILE the container runs
     // (a no-op when live_trace is off); stop it once the container exits below.
-    let containmentStarted = false;
-    const contain = (reason: string): void => {
-      if (containmentStarted) return;
-      containmentStarted = true;
+    let finalizationStarted = false;
+    let containmentState: 'none' | 'landing' | 'hard' = 'none';
+    let landingEscalationTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearLandingEscalation = (): void => {
+      if (!landingEscalationTimer) return;
+      clearTimeout(landingEscalationTimer);
+      landingEscalationTimer = null;
+    };
+    const hardContain = (reason: string): void => {
+      if (containmentState === 'hard') return;
+      containmentState = 'hard';
+      clearLandingEscalation();
       try {
-        terminateDockerContainerForBudget(containerId, this.gracefulTimeoutSeconds);
+        terminateDockerContainerForBudget(containerId, 0);
       } catch (error) {
         debugLog('docker-backend:budget-containment', `${reason}: ${error instanceof Error ? error.message : String(error)}`);
       }
     };
+    const requestLanding = (): void => {
+      if (containmentState !== 'none') return;
+      containmentState = 'landing';
+      try {
+        requestDockerContainerLanding(containerId);
+      } catch (error) {
+        debugLog(
+          'docker-backend:budget-landing-checkpoint-stop',
+          error instanceof Error ? error.message : String(error),
+        );
+        hardContain('budget-landing-checkpoint-stop-failed');
+        return;
+      }
+      // The exact container is already frozen and SIGKILL-delivered. This timer
+      // is only a post-containment liveness guard for lost `docker wait`
+      // evidence; it grants the provider no additional spending window.
+      landingEscalationTimer = setTimeout(() => {
+        if (!finalizationStarted) hardContain('budget-landing-exit-evidence-timeout');
+      }, this.gracefulTimeoutSeconds * 1_000);
+      landingEscalationTimer.unref?.();
+    };
+    let landedCheckpointSha256: string | null = null;
+    let pendingLandingEvidence: RuntimeBudgetLandingEvidence | null = null;
     const budgetMonitor = createRuntimeBudgetMonitor({
       projectRoot: projectDir,
       taskId,
+      ...(settlementRef ? { attemptId: settlementRef.attemptId } : {}),
       backend: this.name,
       budget: executionBudget,
-      onStop: () => contain('budget-exceeded'),
+      landingPolicy: executionLandingPolicy,
+      landingAlreadySatisfied: executionContinuation !== undefined,
+      counterScope: executionContinuation ? 'attempt' : 'lineage',
+      onLandingRequested: executionLandingContext && settlementRef
+        ? evidence => {
+            // The usage event that crosses the reserve can be the first chunk of
+            // a logical assistant turn whose proposal-update tool call is still
+            // in flight. Publishing an immutable checkpoint here would freeze
+            // the previous semantic proposal forever. Persisted landing evidence
+            // already owns the threshold decision; stop the exact container now,
+            // then bind the newest exact-attempt proposal after observed exit.
+            pendingLandingEvidence = evidence;
+            requestLanding();
+          }
+        : undefined,
+      onStop: () => hardContain('budget-exceeded'),
     });
-    const stopFollow = liveCtx
-      ? followContainerActivity(
-          containerId,
-          getProviderBinaryForModel(model),
-          liveCtx,
-          nodeSpawn,
-          budgetMonitor ? event => budgetMonitor.observe(event) : undefined,
-          budgetMonitor
-            ? error => {
-                try { budgetMonitor.failObservation(error); } catch (settleError) { debugLog('docker-backend:budget-settle-after-observer-failure', settleError); }
-                contain(`budget-observer-failed: ${error.message}`);
+    const logProviderBinary = getProviderBinaryForModel(model);
+    let terminalBillingReceiptError: Error | null = null;
+    const stopFollow = followContainerActivity(
+      containerId,
+      logProviderBinary,
+      liveCtx,
+      nodeSpawn,
+      budgetMonitor || settlementRef
+        ? (event, sequence) => {
+            if (settlementRef) {
+              try {
+                persistDockerTerminalProviderBillingReceipt(
+                  settlementRef,
+                  logProviderBinary,
+                  JSON.stringify(event),
+                );
+              } catch (error) {
+                terminalBillingReceiptError =
+                  error instanceof Error ? error : new Error(String(error));
+                throw terminalBillingReceiptError;
               }
-            : undefined,
-        )
-      : (): void => { /* no ctx — no follow */ };
+            }
+            budgetMonitor?.observe(event, sequence);
+          }
+        : undefined,
+      budgetMonitor || settlementRef
+          ? error => {
+            try {
+              budgetMonitor?.failObservation(error);
+            } catch (settleError) {
+              debugLog('docker-backend:budget-settle-after-observer-failure', settleError);
+            }
+            hardContain(`budget-observer-failed: ${error.message}`);
+          }
+        : undefined,
+    );
 
-    let finalizationStarted = false;
     let waitFailureHandlingStarted = false;
     let waitStdout = '';
     let effectiveRecoveryContainment = recoveryContainment;
@@ -3929,9 +5167,74 @@ export class DockerSpawnBackend implements SpawnBackend {
     const finalizeObservedExit = async (exitCode: number): Promise<void> => {
       if (finalizationStarted) return;
       finalizationStarted = true;
+      clearLandingEscalation();
+      let capturedProviderBilling: ProviderBillingEvidence | null = null;
+      let capturedProviderBillingEvidenceRef: string | null = null;
       debugLog('docker-backend:exit', `taskId=${taskId} exitCode=${exitCode}`);
       stopFollow(); // container exited — the `docker logs -f` follow can end.
       try { budgetMonitor?.settle(); } catch (e) { debugLog('docker-backend:budget-settle-before-result', e); }
+
+      if (settlementRef) {
+        const landingRef: ExecutionLandingCheckpointRefV1 = {
+          schemaVersion: 1,
+          projectId: settlementRef.projectRootSha256,
+          taskId,
+          attemptId: settlementRef.attemptId,
+        };
+        if (pendingLandingEvidence && !readExecutionLandingCheckpointByRef(landingRef)) {
+          try {
+            const checkpoint = stampDockerExecutionLandingCheckpoint({
+              projectRoot: projectDir,
+              settlementRef,
+              landing: pendingLandingEvidence,
+              terminalUsage: readRuntimeBudgetUsage(projectDir, taskId),
+            });
+            landedCheckpointSha256 = checkpoint.checkpointSha256;
+          } catch (error) {
+            // The exact container is already contained. A missing/stale/corrupt
+            // proposal cannot mint LANDED or a continuation; fall through to the
+            // ordinary non-success settlement path.
+            const evidence = error instanceof Error ? error.message : String(error);
+            effectiveRecoveryContainment = {
+              attemptId: settlementRef.attemptId,
+              reason: 'landing-checkpoint-unavailable',
+              evidence: evidence.slice(0, 500),
+            };
+            debugLog(
+              'docker-backend:budget-landing-held',
+              `taskId=${taskId} ${evidence}`,
+            );
+          }
+        }
+        const checkpoint = readExecutionLandingCheckpointByRef(landingRef);
+        if (checkpoint) {
+          if (
+            landedCheckpointSha256 !== null
+            && landedCheckpointSha256 !== checkpoint.checkpointSha256
+          ) {
+            debugLog(
+              'docker-backend:landed-held',
+              `taskId=${taskId} in-memory checkpoint digest conflicts with durable authority`,
+            );
+            return;
+          }
+          try {
+            await this.finalizeLandedAttempt({
+              taskId,
+              containerId,
+              tasksDir,
+              model,
+              projectDir,
+              settlementRef,
+              checkpointSha256: checkpoint.checkpointSha256,
+              exitCode,
+            });
+          } catch (error) {
+            debugLog('docker-backend:landed-finalize', error);
+          }
+          return;
+        }
+      }
 
       // Sprint 139: fsync .result from host side before reading
       // Container's fsync_file trap may have run, but belt-and-suspenders from host
@@ -4145,7 +5448,6 @@ export class DockerSpawnBackend implements SpawnBackend {
           // tail + TRN-1 training-trace) see every provider's real trace instead
           // of the previous raw dump, which those readers always saw as zero
           // events (no `ts`/`seq`/`content` LogEvent shape on a raw CLI line).
-          const logProviderBinary = getProviderBinaryForModel(model);
           if (budgetMonitor) {
             for (const line of logContent.split(/\r?\n/)) {
               if (!line.trim()) continue;
@@ -4153,6 +5455,32 @@ export class DockerSpawnBackend implements SpawnBackend {
             }
           }
           writeNormalizedDockerLog(logPath, logContent, logProviderBinary);
+          const normalizedLog = readFileSync(logPath);
+          let terminalEvidence: DockerTerminalProviderBillingEvidence | null = null;
+          if (settlementRef) {
+            try {
+              terminalEvidence = persistDockerTerminalProviderBillingReceipt(
+                settlementRef,
+                logProviderBinary,
+                normalizedLog.toString('utf-8'),
+              );
+            } catch (error) {
+              terminalBillingReceiptError =
+                error instanceof Error ? error : new Error(String(error));
+              throw terminalBillingReceiptError;
+            }
+          }
+          capturedProviderBilling = terminalEvidence?.billing
+            ?? extractProviderBillingEvidence(
+              logProviderBinary,
+              normalizedLog.toString('utf-8'),
+            );
+          if (terminalEvidence) {
+            capturedProviderBillingEvidenceRef = terminalEvidence.evidenceRef;
+          } else if (capturedProviderBilling) {
+            capturedProviderBillingEvidenceRef =
+              `worker-log:task-${taskId}:sha256:${createHash('sha256').update(normalizedLog).digest('hex')}`;
+          }
           // Patch the .result with REAL token usage parsed from the CLI envelope in the
           // captured container stdout — at the SOURCE, sidestepping the orchestrator
           // enrich-timing race (the .log lands only after the container exits, which can
@@ -4180,7 +5508,60 @@ export class DockerSpawnBackend implements SpawnBackend {
           }
         }
       } catch (e) { debugLog('docker-backend:log-extract', e); }
-      try { budgetMonitor?.settle(); } catch (e) { debugLog('docker-backend:budget-settle', e); }
+      if (terminalBillingReceiptError) {
+        debugLog(
+          'docker-backend:provider-terminal-receipt-held',
+          `taskId=${taskId} ${terminalBillingReceiptError.message}`,
+        );
+        return;
+      }
+      if (settlementRef) {
+        const terminalReceipt = readTaskProviderTerminalBillingReceipt(settlementRef);
+        if (terminalReceipt) {
+          capturedProviderBilling = terminalReceipt.billing;
+          capturedProviderBillingEvidenceRef =
+            taskProviderTerminalBillingEvidenceRef(terminalReceipt);
+          try {
+            reconcileDockerProviderBillingReceiptResultFile(
+              resultPath,
+              taskId,
+              terminalReceipt,
+            );
+          } catch (error) {
+            debugLog('docker-backend:provider-terminal-result-held', error);
+            return;
+          }
+        }
+      }
+      let budgetSettleError: unknown;
+      try {
+        budgetMonitor?.settle();
+      } catch (error) {
+        budgetSettleError = error;
+        debugLog('docker-backend:budget-settle', error);
+      }
+      if (settlementRef && readTaskResultSettlementExecutionContract(settlementRef)) {
+        if (budgetSettleError) return;
+        const terminalUsage = readRuntimeBudgetUsage(projectDir, taskId);
+        if (!terminalUsage
+          || terminalUsage.terminal !== true
+          || terminalUsage.attemptId !== settlementRef.attemptId) {
+          debugLog(
+            'docker-backend:strict-terminal-usage-held',
+            `taskId=${taskId} attemptId=${settlementRef.attemptId}`,
+          );
+          return;
+        }
+        try {
+          writeTaskProviderTerminalUsageReceiptAtomic(
+            settlementRef,
+            terminalUsage as TaskProviderTerminalUsageSourceV1,
+          );
+        } catch (error) {
+          debugLog('docker-backend:strict-terminal-usage-held', error);
+          return;
+        }
+      }
 
       // When live activity tracing is disabled, budget events are observed from
       // the captured provider log above. Re-read after settle so that path gets
@@ -4271,6 +5652,27 @@ export class DockerSpawnBackend implements SpawnBackend {
           `taskId=${taskId} settlement reference unavailable; preserving container authority and locks`,
         );
         return;
+      }
+      if (executionContinuation) {
+        try {
+          reconcileDockerContinuationLineageResultFile({
+            resultPath,
+            projectRoot: projectDir,
+            taskId,
+            model: model as ModelType,
+            settlementRef,
+            executionContinuation,
+            terminalUsage: readRuntimeBudgetUsage(projectDir, taskId),
+            terminalBilling: capturedProviderBilling,
+            terminalBillingEvidenceRef: capturedProviderBillingEvidenceRef,
+          });
+        } catch (e) {
+          debugLog('docker-backend:continuation-lineage-held', e);
+          // The container has exited but its cumulative host truth is not
+          // settlement-ready. Preserve container/claim/locks so recovery can
+          // retry the exact attempt; never seal an attempt-only projection.
+          return;
+        }
       }
 
       // Cleanup container

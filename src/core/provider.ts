@@ -11,7 +11,16 @@ import { modelRegistry as globalModelRegistry, type ModelRegistry } from './mode
 import type { TokenUsage } from './token-usage.js';
 import { DeckBroker } from './deck-broker.js';
 import type { ExecutionBudget } from './work-model.js';
-import type { LiveUsageBudgetSupport } from './live-execution-budget.js';
+import type {
+  ExecutionLandingCapability,
+  LiveUsageBudgetSupport,
+} from './live-execution-budget.js';
+import type { ExecutionLandingPolicyConfig } from './config-types.js';
+import type { ExecutionAdmissionMode } from './execution-admission.js';
+import type {
+  AttendedExecutionApprovalExpectedDispatch,
+  VerifiedAttendedExecutionApproval,
+} from './attended-execution-approval.js';
 
 // ─── Provider Spawn Options ──────────────────────────────────────────
 export interface ProviderSpawnOptions {
@@ -72,6 +81,22 @@ export interface ProviderSpawnOptions {
   sprintId?: string;
   /** Owner-supplied hard ceilings; enforced only from host-observed measured usage. */
   executionBudget?: ExecutionBudget;
+  /** ADR-G-037 owner landing contract and explicit attendance evidence. */
+  executionLandingPolicy?: ExecutionLandingPolicyConfig;
+  executionAdmissionMode?: ExecutionAdmissionMode;
+  executionApprovalEvidenceRef?: string;
+  /** Host-verified attended authority; never serialized into worker-owned task data. */
+  executionApprovalGrant?: VerifiedAttendedExecutionApproval;
+  /** Exact final dispatch binding checked again by the backend before side effects. */
+  executionApprovalExpectedDispatch?: AttendedExecutionApprovalExpectedDispatch;
+  /** Immutable M1-C lineage proof; suppresses a second soft landing, never the hard ceiling. */
+  executionContinuation?: {
+    readonly version: 1;
+    readonly checkpointSha256: string;
+    readonly parentAttemptId: string;
+    readonly continuationAttemptId: string;
+    readonly continuationFence: string;
+  };
 }
 
 // ─── Provider Worker Info ────────────────────────────────────────────
@@ -115,6 +140,22 @@ export interface ProviderAvailabilityDetail {
   partial: boolean;
   /** Supported models (full list when binary present; empty if missing) */
   models: ModelType[];
+  /**
+   * Evidence boundary for `models`: diagnostics expose provider catalog/config
+   * membership only. This is never live model reachability proof.
+   */
+  modelsEvidence?: 'catalog-only';
+  /**
+   * Secret-free local observation that authoritatively overrides an adapter's
+   * inferred session state. Raw probe output/account metadata is never stored.
+   */
+  authEvidence?: {
+    source: 'local-auth-probe';
+    state: 'logged-in' | 'logged-out' | 'unknown';
+    method: 'subscription' | 'api-key' | 'none';
+    present: boolean | 'unknown';
+    authenticated: boolean | 'unknown';
+  };
   /** Human-readable status reason, e.g. "CLI installed, OPENAI_API_KEY missing" */
   reason: string;
   /** Suggested user actions, e.g. ["Set OPENAI_API_KEY", "Run codex login"] */
@@ -132,8 +173,8 @@ export interface ProviderPlannerCommand {
   args: string[];
   calledProvider?: string;
   calledModel?: string;
-  transport?: 'cli' | 'http' | 'local-runtime';
-  executionBackend?: 'host-subprocess' | 'docker' | 'tmux' | 'in-process' | 'unknown';
+  transport?: 'cli' | 'api' | 'http' | 'local-runtime';
+  executionBackend?: 'host-subprocess' | 'docker' | 'tmux' | 'api' | 'in-process' | 'unknown';
 }
 
 export interface ProviderPlannerInvocationOutcome {
@@ -157,13 +198,21 @@ export interface ProviderPlannerInvocationOutcome {
  * of fabricating a shell command; identity is declared before execute() so the
  * caller can durably persist dispatch intent before the provider side effect.
  */
-export interface ProviderPlannerInvocation {
+interface ProviderPlannerInvocationBase {
   readonly calledProvider: string;
   readonly calledModel: string;
-  readonly transport: 'http' | 'local-runtime';
-  readonly executionBackend: 'in-process';
   execute(options: { readonly timeoutMs: number }): Promise<ProviderPlannerInvocationOutcome>;
 }
+
+export type ProviderPlannerInvocation =
+  | (ProviderPlannerInvocationBase & {
+      readonly transport: 'api';
+      readonly executionBackend: 'api';
+    })
+  | (ProviderPlannerInvocationBase & {
+      readonly transport: 'http' | 'local-runtime';
+      readonly executionBackend: 'in-process';
+    });
 
 // ─── ProviderAdapter Interface ───────────────────────────────────────
 /**
@@ -179,6 +228,8 @@ export interface ProviderAdapter {
 
   /** Absent means budgeted in-flight execution is unsupported and must fail before spawn. */
   readonly liveUsageBudgetSupport?: LiveUsageBudgetSupport;
+  /** Independent from metering; absent means semantic landing is unsupported. */
+  readonly executionLandingCapability?: ExecutionLandingCapability;
 
   /**
    * Economic execution class used by the mandatory admission gate. Missing is
@@ -646,6 +697,7 @@ async function detectOllama(): Promise<DetectedProvider> {
 function detectGemini(): DetectedProvider {
   const version = detectCliVersion('gemini');
   const hasApiKey =
+    (typeof process.env['GEMINI_API_KEY'] === 'string' && process.env['GEMINI_API_KEY'].length > 0) ||
     (typeof process.env['GOOGLE_API_KEY'] === 'string' && process.env['GOOGLE_API_KEY'].length > 0) ||
     (typeof process.env['DECKENT_GOOGLE_API_KEY'] === 'string' && process.env['DECKENT_GOOGLE_API_KEY'].length > 0);
   const available = version !== undefined;
@@ -1390,7 +1442,7 @@ export async function bootstrapProviders(
     },
     gemini: async () => {
       const { createGeminiAdapter } = await import('../providers/gemini.js');
-      return createGeminiAdapter(root);
+      return createGeminiAdapter(root, { credentialEnvKeys });
     },
     // Sprint 202 Task 202-001 (F1 Provider Independence): Ollama is now a
     // 1st-class spawn target — bootstrap registers it so `worker_provider=

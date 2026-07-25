@@ -27,20 +27,44 @@ vi.mock('node:child_process', () => ({
 
 // Task JSON returned by readFileSync — configured per test via mockTaskJson
 let mockTaskJson = '{}';
+const mockFiles = new Map<string, string>();
 
 vi.mock('node:fs', () => ({
-  existsSync: vi.fn(() => true),
+  existsSync: vi.fn((p: unknown) => {
+    const path = String(p).replaceAll('\\', '/');
+    if (path.includes('/.deckent/runtime/')) return mockFiles.has(String(p));
+    return true;
+  }),
   readFileSync: vi.fn((p: unknown) => {
-    if (typeof p === 'string' && p.endsWith('.json')) return mockTaskJson;
+    const path = String(p);
+    const persisted = mockFiles.get(path);
+    if (persisted !== undefined) return persisted;
+    if (path.endsWith('.json')) return mockTaskJson;
     return '{}';
   }),
-  writeFileSync: vi.fn(),
+  writeFileSync: vi.fn((p: unknown, value: unknown) => {
+    mockFiles.set(String(p), String(value));
+  }),
   mkdirSync: vi.fn(),
-  unlinkSync: vi.fn(),
+  unlinkSync: vi.fn((p: unknown) => {
+    mockFiles.delete(String(p));
+  }),
   readdirSync: vi.fn(() => []),
   openSync: vi.fn(() => 0),
   fsyncSync: vi.fn(),
   closeSync: vi.fn(),
+  chmodSync: vi.fn(),
+  statSync: vi.fn(() => ({ mode: 0o100600 })),
+  linkSync: vi.fn((source: unknown, target: unknown) => {
+    const sourcePath = String(source);
+    const targetPath = String(target);
+    if (mockFiles.has(targetPath)) {
+      const error = new Error(`EEXIST: ${targetPath}`) as NodeJS.ErrnoException;
+      error.code = 'EEXIST';
+      throw error;
+    }
+    mockFiles.set(targetPath, mockFiles.get(sourcePath) ?? '');
+  }),
   renameSync: vi.fn(),
   rmdirSync: vi.fn(),
 }));
@@ -73,7 +97,48 @@ import {
 import { SpawnBackendFactory } from '../../src/orchestra/spawn-backend.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
-const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
+const TEST_EXECUTION_OPTIONS = {
+  executionBudget: { maxTurns: 1 },
+  executionLandingPolicy: { reserve_ratio: 0.25 },
+} as const;
+const TEST_POLICY_DIGEST = '9'.repeat(64);
+
+function persistedTaskJson(taskId: string, type?: string): string {
+  return JSON.stringify({
+    id: taskId,
+    title: 'Memory limit fixture',
+    description: 'Exercise Docker memory limit selection',
+    model: 'claude-sonnet-5',
+    effort: 'low',
+    priority: 'NORMAL',
+    reason: 'Regression fixture',
+    scope: {
+      directories: ['src'],
+      filesRead: ['src/input.ts'],
+      filesWrite: [],
+    },
+    dependencies: [],
+    goNogo: {
+      goCriteria: 'Docker arguments carry the expected memory limit',
+      noGoCriteria: 'Docker arguments use an unexpected memory limit',
+      techDebtAcceptable: 'None',
+    },
+    status: 'QUEUED',
+    ...(type ? { type } : {}),
+    budget: TEST_EXECUTION_OPTIONS.executionBudget,
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      ...(type ? { taskKind: type } : {}),
+      resolvedProvider: 'claude',
+      executionCostClass: 'remote',
+      profileRef: 'tests.orchestra.memory-limit-by-kind',
+      policyDigest: TEST_POLICY_DIGEST,
+      admissionMode: 'unattended',
+      landingPolicy: TEST_EXECUTION_OPTIONS.executionLandingPolicy,
+    },
+  });
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -87,7 +152,8 @@ const capturedDockerRunArgs: string[][] = [];
 
 function installSpawnRouter(): void {
   capturedDockerRunArgs.length = 0;
-  const successOutcome: SpawnSyncOutcome = { stdout: 'container-id-x', stderr: '', status: 0 };
+  mockFiles.clear();
+  const successOutcome: SpawnSyncOutcome = { stdout: 'a'.repeat(64), stderr: '', status: 0 };
   const imageOutcome: SpawnSyncOutcome = { stdout: 'imghash', stderr: '', status: 0 };
   const inspectOutcome: SpawnSyncOutcome = { stdout: 'true|0', stderr: '', status: 0 };
   const fallback: SpawnSyncOutcome = { stdout: '', stderr: '', status: 0 };
@@ -161,7 +227,7 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
   });
 
   it('applies documentation kind limit when task type matches', () => {
-    mockTaskJson = JSON.stringify({ type: 'documentation' });
+    mockTaskJson = persistedTaskJson('task-doc-001', 'documentation');
     const backend = new DockerSpawnBackend('/test/project', {
       kindMemoryLimits: { documentation: '768m', 'code-development': '1536m' },
     });
@@ -175,7 +241,7 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
   });
 
   it('applies code-development kind limit when task type matches', () => {
-    mockTaskJson = JSON.stringify({ type: 'code-development' });
+    mockTaskJson = persistedTaskJson('task-code-001', 'code-development');
     const backend = new DockerSpawnBackend('/test/project', {
       kindMemoryLimits: { documentation: '768m', 'code-development': '1536m' },
     });
@@ -189,7 +255,7 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
   });
 
   it('falls back to default 4g when task kind is not in kindMemoryLimits', () => {
-    mockTaskJson = JSON.stringify({ type: 'audit' }); // 'audit' not in map
+    mockTaskJson = persistedTaskJson('task-audit-001', 'audit'); // 'audit' not in map
     const backend = new DockerSpawnBackend('/test/project', {
       kindMemoryLimits: { documentation: '768m', 'code-development': '1536m' },
     });
@@ -202,7 +268,7 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
   });
 
   it('falls back to default 4g when kindMemoryLimits is empty (zero-config behavior)', () => {
-    mockTaskJson = JSON.stringify({ type: 'code-development' });
+    mockTaskJson = persistedTaskJson('task-noconfig-001', 'code-development');
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn('task-noconfig-001', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
 
@@ -212,17 +278,19 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
     expect(flagValue(argv, '--memory-swap')).toBe(DEFAULT_WORKER_MEMORY_SWAP);
   });
 
-  it('falls back to default when task JSON has no type field', () => {
-    mockTaskJson = JSON.stringify({ model: 'claude-sonnet-5', effort: 'normal' }); // no type
+  it('fails closed before Docker dispatch when task JSON has no canonical kind', () => {
+    mockTaskJson = persistedTaskJson('task-notype-001'); // no type
     const backend = new DockerSpawnBackend('/test/project', {
       kindMemoryLimits: { 'code-development': '1536m' },
     });
-    backend.spawn('task-notype-001', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    expect(() => backend.spawn(
+      'task-notype-001',
+      'claude-sonnet-5',
+      'prompt-body',
+      TEST_EXECUTION_OPTIONS,
+    )).toThrow(/requires a canonical task kind/i);
 
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
-    expect(flagValue(argv, '--memory')).toBe(DEFAULT_WORKER_MEMORY_LIMIT);
-    expect(flagValue(argv, '--memory-swap')).toBe(DEFAULT_WORKER_MEMORY_SWAP);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 
   it('throws at construction time for invalid memory limit strings', () => {
@@ -238,7 +306,7 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
   });
 
   it('accepts mixed kinds and applies the matching one only', () => {
-    mockTaskJson = JSON.stringify({ type: 'test' });
+    mockTaskJson = persistedTaskJson('task-test-001', 'test');
     const backend = new DockerSpawnBackend('/test/project', {
       kindMemoryLimits: {
         'code-development': '1536m',
@@ -269,6 +337,7 @@ describe('SpawnBackendFactory: B-WORKERMEM config-driven --memory wire', () => {
   });
 
   it('threads dockerMemoryLimit into the docker --memory flag', () => {
+    mockTaskJson = persistedTaskJson('task-mem-1', 'code-development');
     const backend = SpawnBackendFactory.create({
       backend: 'docker', projectDir: '/test/project', dockerMemoryLimit: '2g',
     });
@@ -279,6 +348,7 @@ describe('SpawnBackendFactory: B-WORKERMEM config-driven --memory wire', () => {
   });
 
   it('falls back to DEFAULT_WORKER_MEMORY_LIMIT when dockerMemoryLimit unset', () => {
+    mockTaskJson = persistedTaskJson('task-mem-2', 'code-development');
     const backend = SpawnBackendFactory.create({
       backend: 'docker', projectDir: '/test/project',
     });

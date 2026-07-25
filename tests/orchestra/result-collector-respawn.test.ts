@@ -20,6 +20,10 @@ import { randomBytes } from 'node:crypto';
 
 import type { Task, Sprint, TaskResult } from '../../src/core/types.js';
 import { TaskStatus, SprintPhase, SprintStatus } from '../../src/core/types.js';
+import type {
+  SpawnBackend,
+  SpawnBackendOptions,
+} from '../../src/orchestra/spawn-backend.js';
 
 // ─── Hoisted spies so mockImplementation can close over tmpDir ───────────────
 const { killWorkerSpy, spawnWorkerSpy } = vi.hoisted(() => ({
@@ -50,6 +54,7 @@ vi.mock('../../src/orchestra/task-builder.js', () => ({
 // ─── Import after mocks are registered ───────────────────────────────────────
 import { waitForResults } from '../../src/orchestra/result-collector.js';
 import { requestWorkerRespawn } from '../../src/nervous/respawn-request.js';
+import { settleTestRuntimeBudget } from '../helpers/budgeted-docker-execution-fixture.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -66,7 +71,10 @@ function makeTask(id: string, status: TaskStatus = TaskStatus.EXECUTING): Task {
     id,
     title: `Task ${id}`,
     description: 'test drain',
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
+    provider: 'claude',
+    authMode: 'subscription',
+    type: 'code-development',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -78,6 +86,18 @@ function makeTask(id: string, status: TaskStatus = TaskStatus.EXECUTING): Task {
     createdAt: new Date().toISOString(),
     assignedAgent: 'generic',
     assignedSkills: [],
+    budget: { maxTurns: 1 },
+    budgetPolicy: {
+      state: 'allow',
+      role: 'worker',
+      taskKind: 'code-development',
+      resolvedProvider: 'claude',
+      executionCostClass: 'remote',
+      profileRef: 'tests.orchestra.result-collector-respawn',
+      policyDigest: '9'.repeat(64),
+      admissionMode: 'unattended',
+      landingPolicy: { reserve_ratio: 0.25 },
+    },
   } as Task;
 }
 
@@ -104,13 +124,40 @@ function writeDoneResult(dir: string, taskId: string): void {
     coverage: 100,
     selfAssessment: 'DONE',
     notes: 'Respawned and done',
-    tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model: 'sonnet' },
+    tokenUsage: {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+    },
   };
   writeFileSync(
     join(dir, '.tasks', `task-${taskId}.result`),
     JSON.stringify(result),
     'utf-8',
   );
+  settleTestRuntimeBudget(dir, taskId);
+}
+
+function makeSpawnBackend(projectRoot: string): SpawnBackend {
+  return {
+    name: 'respawn-test-backend',
+    liveUsageBudgetSupport: 'measured-stream',
+    executionLandingCapability: 'cooperative-landing',
+    spawn(taskId, model, prompt, opts?: SpawnBackendOptions) {
+      spawnWorkerSpy(
+        taskId,
+        String(model),
+        prompt,
+        projectRoot,
+        opts as unknown as Record<string, unknown>,
+      );
+    },
+    kill: killWorkerSpy,
+    list: () => [],
+    isAvailable: () => Promise.resolve(true),
+  };
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -141,13 +188,14 @@ describe('drainNervousRespawns — N3 drain integration', () => {
 
     // Write durable respawn request (the nervous WORKER_RESPAWN action does this).
     requestWorkerRespawn(tmpDir, taskId);
+    const spawnBackend = makeSpawnBackend(tmpDir);
 
     const results = await waitForResults(
       tmpDir,
       sprint,
       10_000, // 10s timeout — test must finish well within this
       [],     // no queue
-      undefined,
+      { spawnBackend },
       undefined,
       // Opt-in via config.nervous_system.worker_respawn.
       // Omit dependency_pipeline_enabled → false → maybeRespawn is a no-op.
@@ -178,13 +226,14 @@ describe('drainNervousRespawns — N3 drain integration', () => {
     writeDoneResult(tmpDir, taskId);
     // Also write a respawn request for a DONE task — drain must skip it.
     requestWorkerRespawn(tmpDir, taskId);
+    const spawnBackend = makeSpawnBackend(tmpDir);
 
     const results = await waitForResults(
       tmpDir,
       sprint,
       10_000,
       [],
-      undefined,
+      { spawnBackend },
       undefined,
       { nervous_system: { worker_respawn: true } } as never,
     );
@@ -207,13 +256,14 @@ describe('drainNervousRespawns — N3 drain integration', () => {
 
     // Write result directly so the loop terminates even without respawn.
     writeDoneResult(tmpDir, taskId);
+    const spawnBackend = makeSpawnBackend(tmpDir);
 
     const results = await waitForResults(
       tmpDir,
       sprint,
       10_000,
       [],
-      undefined,
+      { spawnBackend },
       undefined,
       // worker_respawn explicitly false → drain is no-op.
       { nervous_system: { worker_respawn: false } } as never,

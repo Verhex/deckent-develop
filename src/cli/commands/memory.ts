@@ -1,10 +1,10 @@
 import { Command } from 'commander';
 import { join } from 'node:path';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { MemoryStore } from '../../core/memory-store.js';
 import { parseDecisionsMd, parseMemoryMd, parseDebtMd } from '../../core/memory-import.js';
-import { exportSummaryMd, exportDecisionsMd, exportMemoryMd, exportDebtMd } from '../../core/memory-export.js';
+import { writeGuardedExports } from '../../core/memory-export.js';
 import { syncAdrFilesToDb } from '../../core/adr-file-sync.js';
 import { BRAIN_DIR, MEMORY_DB_FILE, MEMORY_EXPORTS_DIR } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -91,23 +91,30 @@ export function registerMemory(program: Command): void {
     .description('Export memory.db to .brain/exports/*.md')
     .action(() => {
       const root = resolveProjectRoot();
+      const lang = getLanguage();
       const brainDir = join(root, BRAIN_DIR);
       const exportsDir = join(brainDir, MEMORY_EXPORTS_DIR);
       const dbPath = join(brainDir, MEMORY_DB_FILE);
 
       if (!existsSync(dbPath)) {
-        printError('memory.db not found. Run migration first.');
+        printError(getMessage('memory.export.not_found', lang));
         return;
       }
 
-      mkdirSync(exportsDir, { recursive: true });
       const store = new MemoryStore(dbPath);
       try {
-        writeFileSync(join(exportsDir, 'summary.md'), exportSummaryMd(store));
-        writeFileSync(join(exportsDir, 'decisions.md'), exportDecisionsMd(store));
-        writeFileSync(join(exportsDir, 'memory.md'), exportMemoryMd(store));
-        writeFileSync(join(exportsDir, 'debt.md'), exportDebtMd(store));
-        print('  Exported 4 .md files to .brain/exports/');
+        const result = writeGuardedExports(store, exportsDir);
+        if (result.skipped.length > 0) {
+          printError(getMessage('memory.export.guard_hold', lang, {
+            files: result.skipped.join(', '),
+            written: String(result.written.length),
+          }));
+          process.exitCode = 1;
+          return;
+        }
+        print(getMessage('memory.export.success', lang, {
+          count: String(result.written.length),
+        }));
       } finally {
         store.close();
       }

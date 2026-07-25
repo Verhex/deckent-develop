@@ -84,7 +84,10 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     brain_provider: 'claude',
     worker_provider: 'claude',
     fallback_provider: 'claude',
-    execution_budget: { roles: { worker: { default: { maxTokens: 100_000, maxTurns: 10 } } } },
+    execution_budget: {
+      roles: { worker: { default: { maxTokens: 100_000, maxTurns: 10 } } },
+      landing: { reserve_ratio: 0.25 },
+    },
     brain_planning: 'structured',
     routing_engine: 'v2',
     ...overrides,
@@ -153,7 +156,7 @@ describe('Mode-Aware Routing', () => {
       const config = makeConfig({ deckent_style: 'task' });
       const ctx: TaskModeContext = {
         description: 'Emit event test',
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-sonnet-5',
         projectRoot: testRoot,
       };
 
@@ -164,7 +167,7 @@ describe('Mode-Aware Routing', () => {
         expect.objectContaining({
           type: 'TASK_MODE_START',
           style: 'task',
-          model: 'claude-haiku-4-5-20251001',
+          model: 'claude-sonnet-5',
         }),
       );
     });

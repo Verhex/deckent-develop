@@ -126,6 +126,8 @@ describe('reconcileDockerHostTerminalResultFile', () => {
       markerType: 'EXIT_WITHOUT_RESULT',
       workPresent: false,
       diffStat: '',
+      lastHbStatus: 'unknown',
+      lastHbSequence: 0,
       exitCode: 0,
       tokenUsage: { inputTokens: 11, outputTokens: 22, cacheReadTokens: 33 },
       providerBilling: { source: 'provider-envelope', providerReportedUsd: 0.25 },
@@ -147,10 +149,25 @@ describe('reconcileDockerHostTerminalResultFile', () => {
       exitCode: 0,
       tokenUsage: { inputTokens: 11, outputTokens: 22, cacheReadTokens: 33 },
       providerBilling: { source: 'provider-envelope', providerReportedUsd: 0.25 },
+      hostTerminalProjection: {
+        version: 1,
+        protocol: 'xverify-v1',
+        observedBy: 'host',
+        sourceMarker: {
+          type: 'EXIT_WITHOUT_RESULT',
+          exitCode: 0,
+          preTerminalHeartbeat: {
+            status: 'unknown',
+            sequence: 0,
+          },
+        },
+      },
     });
     expect(result).not.toHaveProperty('markerType');
     expect(result).not.toHaveProperty('workPresent');
     expect(result).not.toHaveProperty('diffStat');
+    expect(result).not.toHaveProperty('lastHbStatus');
+    expect(result).not.toHaveProperty('lastHbSequence');
     expect(String(result['notes'])).toMatch(/VERDICT: CONFIRMED exact host evidence$/);
   });
 
