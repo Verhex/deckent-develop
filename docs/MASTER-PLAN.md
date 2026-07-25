@@ -46,8 +46,13 @@
   realpath ve executable-symlink STDIO initialize+tools/list aynı 48 tool ve
   aynı core tool setini verdi. **Evidence status:** code-present, production
   wired ve provider-free binary-proven; paid provider canary, independent
-  Fable verdict, default flip, push/publish ve provider-authoritative quota
-  ALLOW producer proof'u yoktur. Satır bu nedenle 🟡 kalır.
+  Fable verdict, default flip, publish ve provider-authoritative quota ALLOW
+  producer proof'u yoktur. **Main integration/push closure (2026-07-25):**
+  owner-approved merge commit `276401bde62cf979d32ba30cd8a9347194a4bbb0`,
+  `origin/main` üzerine fast-forward push edildi; local `HEAD`,
+  remote-tracking ref ve GitHub `refs/heads/main` aynı SHA'da,
+  ahead/behind=`0/0`. Bu git teslimatını kapatır; yukarıdaki
+  live-provider/default/publish kapılarını açmaz. Satır bu nedenle 🟡 kalır.
 - **Satır 609 evidence addendum — M4-099 (2026-07-25):** production default
   xverify verifier Task JSON’dan ve spawn’dan önce deterministic, host-authored,
   inspection-only `.plan` üretir. Exact verifier task/provider/model, quoted
