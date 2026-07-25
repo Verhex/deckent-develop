@@ -25,8 +25,14 @@ import type {
 // ─── PROVIDER_MODEL_MAP ──────────────────────────────────────────────────────
 
 describe('PROVIDER_MODEL_MAP', () => {
-  it('maps claude to fable, opus, sonnet, haiku', () => {
-    expect(PROVIDER_MODEL_MAP.claude).toEqual(['claude-fable-5', 'claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001']);
+  it('maps claude to every canonical Claude API identity', () => {
+    expect(PROVIDER_MODEL_MAP.claude).toEqual([
+      'claude-fable-5',
+      'claude-opus-4-8',
+      'claude-opus-5',
+      'claude-sonnet-5',
+      'claude-haiku-4-5-20251001',
+    ]);
   });
 
   it('maps codex to canonical core and parity API IDs', () => {
@@ -49,8 +55,14 @@ describe('PROVIDER_MODEL_MAP', () => {
 // ─── CLAUDE_MODELS ───────────────────────────────────────────────────────────
 
 describe('CLAUDE_MODELS', () => {
-  it('contains fable, opus, sonnet, haiku', () => {
-    expect(CLAUDE_MODELS).toEqual(['claude-fable-5', 'claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001']);
+  it('contains every canonical Claude API identity', () => {
+    expect(CLAUDE_MODELS).toEqual([
+      'claude-fable-5',
+      'claude-opus-4-8',
+      'claude-opus-5',
+      'claude-sonnet-5',
+      'claude-haiku-4-5-20251001',
+    ]);
   });
 
   it('is readonly (cannot mutate)', () => {
@@ -62,8 +74,8 @@ describe('CLAUDE_MODELS', () => {
 // ─── ALL_MODELS ──────────────────────────────────────────────────────────────
 
 describe('ALL_MODELS', () => {
-  it('contains the complete 17-model canonical offline catalog', () => {
-    expect(ALL_MODELS).toHaveLength(17);
+  it('contains the complete 18-model canonical offline catalog', () => {
+    expect(ALL_MODELS).toHaveLength(18);
   });
 
   it('includes all Claude models', () => {
@@ -394,7 +406,7 @@ describe('resolveApiModelId', () => {
 // ─── Tier consistency ──────────────────────────────────────────────────────
 
 describe('Tier equivalence consistency', () => {
-  it('each tier has exactly one model per provider', () => {
+  it('each tier has a stable representative model per provider', () => {
     const tiers = [
       { tier: 2, claude: 'claude-opus-4-8', codex: 'gpt-5.5', gemini: 'gemini-2.5-pro' },
       { tier: 1, claude: 'claude-sonnet-5', codex: 'gpt-4.1', gemini: 'gemini-2.5-flash' },
@@ -408,7 +420,7 @@ describe('Tier equivalence consistency', () => {
   });
 
   it('all canonical models have identity API IDs', () => {
-    expect(Object.keys(MODEL_API_IDS)).toHaveLength(17);
+    expect(Object.keys(MODEL_API_IDS)).toHaveLength(18);
     for (const [id, apiId] of Object.entries(MODEL_API_IDS)) {
       expect(apiId).toBe(id);
     }

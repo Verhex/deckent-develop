@@ -108,17 +108,18 @@ describe('SandboxSpawnBackend', () => {
       expect(backend).toBeInstanceOf(SubprocessSpawnBackend);
     });
 
-    it('should support fable, opus, sonnet, haiku models', () => {
+    it('should support fable, versioned opus, sonnet, haiku models', () => {
       const backend = new LocalSandboxTestBackend(projectDir);
       expect(backend.supportedModels).toContain('claude-fable-5');
       expect(backend.supportedModels).toContain('claude-opus-4-8');
+      expect(backend.supportedModels).toContain('claude-opus-5');
       expect(backend.supportedModels).toContain('claude-sonnet-5');
       expect(backend.supportedModels).toContain('claude-haiku-4-5-20251001');
     });
 
-    it('should support exactly 4 models', () => {
+    it('should support exactly 5 models', () => {
       const backend = new LocalSandboxTestBackend(projectDir);
-      expect(backend.supportedModels).toHaveLength(4);
+      expect(backend.supportedModels).toHaveLength(5);
     });
   });
 

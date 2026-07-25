@@ -296,6 +296,16 @@ describe('cost-config-loader', () => {
       const config = loadCostConfig(tmpDir, { forceReload: true });
       expect(config.providers.anthropic?.models['claude-opus-4-8']?.input_cost_per_token).toBe(0.000005);
       expect(config.providers.anthropic?.models['claude-opus-4-8']?.output_cost_per_token).toBe(0.000025);
+      expect(config.providers.anthropic?.models['claude-opus-5']).toMatchObject({
+        input_cost_per_token: 0.000005,
+        output_cost_per_token: 0.000025,
+        cache_creation_input_token_cost: 0.00000625,
+        cache_creation_input_token_cost_above_1hr: 0.00001,
+        cache_read_input_token_cost: 0.0000005,
+        max_input_tokens: 1000000,
+        max_output_tokens: 128000,
+        deckent_aliases: [],
+      });
       // Sonnet 5 should be 1M context (key renamed from claude-sonnet-4-6; legacy IDs live in aliases)
       expect(config.providers.anthropic?.models['claude-sonnet-5']?.max_input_tokens).toBe(1000000);
       expect(config.providers.anthropic?.models['claude-sonnet-5']?.deckent_aliases).toContain('claude-sonnet-4-6');

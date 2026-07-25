@@ -1,8 +1,8 @@
 {
   "_version": "1.0",
-  "_last_updated": "2026-04-15T00:00:00Z",
+  "_last_updated": "2026-07-25T00:00:00Z",
   "_update_source": "bundled",
-  "_user_notes": "Bundled baseline — ADR-033 offline-first, npx deckent zero-setup works. Run `deckent config update-pricing` for latest. All values verified from LiteLLM JSON + Anthropic docs + OpenAI pricing + Gemini docs 2026-04-15.",
+  "_user_notes": "Bundled baseline — ADR-033 offline-first, npx deckent zero-setup works. Run `deckent config update-pricing` for latest. Sources are recorded per model; Claude Opus 5 was verified against Anthropic docs on 2026-07-25.",
   "providers": {
     "anthropic": {
       "enabled": true,
@@ -57,6 +57,25 @@
           "enabled": true,
           "_source": "litellm",
           "_verified_at": "2026-04-15"
+        },
+        "claude-opus-5": {
+          "input_cost_per_token": 5e-06,
+          "output_cost_per_token": 2.5e-05,
+          "cache_creation_input_token_cost": 6.25e-06,
+          "cache_creation_input_token_cost_above_1hr": 1e-05,
+          "cache_read_input_token_cost": 5e-07,
+          "max_input_tokens": 1000000,
+          "max_output_tokens": 128000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": true,
+          "supports_vision": true,
+          "supports_tool_choice": true,
+          "deckent_tier": "premium",
+          "deckent_aliases": [],
+          "enabled": true,
+          "_source": "anthropic-docs",
+          "_verified_at": "2026-07-25",
+          "_notes": "Claude Opus 5 exact API ID (claude-opus-5), GA. $5/$25 per MTok; 1M context; 128K max output; adaptive thinking."
         },
         "claude-sonnet-5": {
           "input_cost_per_token": 3e-06,

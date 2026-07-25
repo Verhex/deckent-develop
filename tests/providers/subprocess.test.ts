@@ -82,15 +82,16 @@ describe('SubprocessSpawnBackend', () => {
       expect(backend.name).toBe('claude-subprocess');
     });
 
-    it('should support fable, opus, sonnet, haiku models', () => {
+    it('should support fable, versioned opus, sonnet, haiku models', () => {
       expect(backend.supportedModels).toContain('claude-fable-5');
       expect(backend.supportedModels).toContain('claude-opus-4-8');
+      expect(backend.supportedModels).toContain('claude-opus-5');
       expect(backend.supportedModels).toContain('claude-sonnet-5');
       expect(backend.supportedModels).toContain('claude-haiku-4-5-20251001');
     });
 
-    it('should support exactly 4 models', () => {
-      expect(backend.supportedModels).toHaveLength(4);
+    it('should support exactly 5 models', () => {
+      expect(backend.supportedModels).toHaveLength(5);
     });
 
     it('should expose getProjectDir()', () => {

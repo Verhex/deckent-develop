@@ -1,7 +1,7 @@
 // Sprint 202 F1 P0 — Ollama model registry tier→local model resolution.
 // Verifies that `getByProviderAndTier('ollama', tier)` works after the
 // opt-in `registerOllamaModels()` is called, that all Ollama entries have
-// cost=0, and that the 13-model BUILTIN invariant is preserved.
+// cost=0, and that the canonical BUILTIN invariant is preserved.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ModelRegistry, BUILTIN_MODELS, registerOllamaModels } from '../../src/core/model-registry.js';
@@ -93,8 +93,8 @@ describe('ModelRegistry — Ollama tier resolution (opt-in)', () => {
     expect(secondCount).toBe(firstCount);
   });
 
-  it('preserves the 14-model BUILTIN invariant — Ollama models are NOT in BUILTIN_MODELS', () => {
-    expect(BUILTIN_MODELS).toHaveLength(14);
+  it('preserves the 15-model BUILTIN invariant — Ollama models are NOT in BUILTIN_MODELS', () => {
+    expect(BUILTIN_MODELS).toHaveLength(15);
     const builtinProviders = new Set(BUILTIN_MODELS.map(m => m.provider));
     expect(builtinProviders.has('ollama')).toBe(false);
   });

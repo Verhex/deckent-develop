@@ -11,14 +11,20 @@ import {
 // ─── Builtin catalog tests ───────────────────────────────────────────
 
 describe('BUILTIN_MODELS catalog', () => {
-  it('contains exactly 14 models', () => {
-    expect(BUILTIN_MODELS).toHaveLength(14);
+  it('contains exactly 15 models', () => {
+    expect(BUILTIN_MODELS).toHaveLength(15);
   });
 
-  it('has 4 Claude models', () => {
+  it('has 5 Claude models', () => {
     const claude = BUILTIN_MODELS.filter(m => m.provider === 'claude');
-    expect(claude).toHaveLength(4);
-    expect(claude.map(m => m.id).sort()).toEqual(['claude-fable-5', 'claude-haiku-4-5-20251001', 'claude-opus-4-8', 'claude-sonnet-5']);
+    expect(claude).toHaveLength(5);
+    expect(claude.map(m => m.id).sort()).toEqual([
+      'claude-fable-5',
+      'claude-haiku-4-5-20251001',
+      'claude-opus-4-8',
+      'claude-opus-5',
+      'claude-sonnet-5',
+    ]);
   });
 
   it('has 6 OpenAI/Codex models', () => {
@@ -96,6 +102,7 @@ describe('ModelRegistry', () => {
   describe('has()', () => {
     it('returns true for known models', () => {
       expect(registry.has('claude-opus-4-8')).toBe(true);
+      expect(registry.has('claude-opus-5')).toBe(true);
       expect(registry.has('gpt-5.5')).toBe(true);
       expect(registry.has('gemini-2.5-pro')).toBe(true);
     });
@@ -119,8 +126,8 @@ describe('ModelRegistry', () => {
   // ── getByProvider ──
 
   describe('getByProvider()', () => {
-    it('returns 4 models for claude', () => {
-      expect(registry.getByProvider('claude')).toHaveLength(4);
+    it('returns 5 models for claude', () => {
+      expect(registry.getByProvider('claude')).toHaveLength(5);
     });
 
     it('returns all 9 canonical Codex models', () => {
@@ -423,6 +430,11 @@ describe('ModelRegistry', () => {
       expect(cost).toBeCloseTo(5 + 12.5, 2);
     });
 
+    it('calculates official Opus 5 cost with 1M input + 500K output', () => {
+      const cost = registry.estimateCost('claude-opus-5', 1_000_000, 500_000);
+      expect(cost).toBeCloseTo(5 + 12.5, 2);
+    });
+
     it('calculates cost for haiku with 100K input + 50K output', () => {
       // haiku: $0.8/M input, $4/M output
       const cost = registry.estimateCost('claude-haiku-4-5-20251001', 100_000, 50_000);
@@ -467,11 +479,12 @@ describe('ModelRegistry', () => {
   // ── getAllModelIds / getAllModels / getAllProviders ──
 
   describe('getAllModelIds()', () => {
-    it('returns the 14 core and 3 pinned Codex parity model ids', () => {
+    it('returns the 15 core and 3 pinned Codex parity model ids', () => {
       const ids = registry.getAllModelIds();
-      expect(ids).toHaveLength(17);
+      expect(ids).toHaveLength(18);
       expect(ids).toContain('claude-fable-5');
       expect(ids).toContain('claude-opus-4-8');
+      expect(ids).toContain('claude-opus-5');
       expect(ids).toContain('gpt-5.5');
       expect(ids).toContain('gemini-2.5-pro');
       expect(ids).toContain('gpt-4.1-mini');
@@ -482,7 +495,7 @@ describe('ModelRegistry', () => {
   describe('getAllModels()', () => {
     it('returns all canonical model definitions', () => {
       const models = registry.getAllModels();
-      expect(models).toHaveLength(17);
+      expect(models).toHaveLength(18);
       for (const m of models) {
         expect(m.id).toBeDefined();
         expect(m.apiId).toBeDefined();
@@ -534,6 +547,7 @@ describe('ModelRegistry', () => {
 
     it('opus does not have reasoning capability', () => {
       expect(registry.get('claude-opus-4-8')!.capabilities.reasoning).toBe(false);
+      expect(registry.get('claude-opus-5')!.capabilities.reasoning).toBe(false);
     });
 
     it('all models support streaming and toolUse', () => {
@@ -568,6 +582,6 @@ describe('modelRegistry singleton', () => {
   });
 
   it('has the complete canonical offline catalog', () => {
-    expect(modelRegistry.getAllModelIds()).toHaveLength(17);
+    expect(modelRegistry.getAllModelIds()).toHaveLength(18);
   });
 });

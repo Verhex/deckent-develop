@@ -295,7 +295,7 @@ describe('model-equivalence', () => {
   describe('getModelsInTier', () => {
     it('premium tier exposes every registered canonical API id', () => {
       expect(getModelsInTier('premium')).toEqual([
-        'claude-opus-4-8', 'gpt-5.5', 'gemini-2.5-pro', 'gpt-5.6-sol',
+        'claude-opus-4-8', 'claude-opus-5', 'gpt-5.5', 'gemini-2.5-pro', 'gpt-5.6-sol',
       ]);
     });
 
@@ -315,9 +315,10 @@ describe('model-equivalence', () => {
 
   // ─── getProviderModels ────────────────────────────────────────────
   describe('getProviderModels', () => {
-    it('claude has 4 models', () => {
+    it('claude has 5 models', () => {
       expect(getProviderModels('claude')).toEqual([
-        'claude-fable-5', 'claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001',
+        'claude-fable-5', 'claude-opus-4-8', 'claude-opus-5',
+        'claude-sonnet-5', 'claude-haiku-4-5-20251001',
       ]);
     });
 
@@ -339,9 +340,9 @@ describe('model-equivalence', () => {
       expect(Object.keys(MODEL_TIERS)).toEqual(['premium', 'standard', 'economy', 'premium_plus']);
     });
 
-    it('total model count includes the versioned 5.6 family', () => {
+    it('total model count includes the versioned 5.6 family and Opus 5', () => {
       const total = Object.values(MODEL_TIERS).reduce((sum, models) => sum + models.length, 0);
-      expect(total).toBe(17);
+      expect(total).toBe(18);
     });
 
     it('every model in MODEL_TIERS has a provider', () => {

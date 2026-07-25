@@ -122,7 +122,7 @@ function assertCanonicalModelDefinition(definition: ModelDefinition): void {
 // live source of truth; apiId values here must be kept current at build time.
 
 export const BUILTIN_MODELS: readonly ModelDefinition[] = [
-  // Claude (4)
+  // Claude (5)
   {
     // Claude Fable 5 — Anthropic's most capable widely released model (GA 2026-06-09).
     // Free on Pro/Max/Team subscriptions through 2026-06-22; reverts to $10/$50 paid after.
@@ -152,6 +152,22 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
     // default), disagreeing with the cost SSOT. pricing-data-baseline.json
     // claude-opus-4-8.max_output_tokens = 128000 (cross-confirmed: claude-api skill,
     // Opus 4.8 = 128K). Evidence-referenced, not a hardcode-patch.
+    maxOutputTokens: 128_000,
+  },
+  {
+    // Claude Opus 5 — GA, exact pinned API identity (Anthropic docs 2026-07-25).
+    // Keep after Opus 4.8 so catalog admission does not silently flip existing
+    // tier-based defaults; callers can select Opus 5 by its exact API ID.
+    id: 'claude-opus-5',
+    apiId: 'claude-opus-5',
+    provider: 'claude',
+    tier: 'premium',
+    contextWindow: 1_000_000,
+    costPerMillion: { input: 5, output: 25 },
+    // Adaptive thinking is supported, while legacy extended thinking is not.
+    // `reasoning` follows the existing registry's extended-thinking semantics.
+    capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: false },
+    status: 'ga',
     maxOutputTokens: 128_000,
   },
   {
