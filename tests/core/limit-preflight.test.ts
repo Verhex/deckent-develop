@@ -12,6 +12,7 @@ import {
   type SpawnedProcessLike,
   type SubscriptionLimitProbe,
 } from '../../src/core/limit-preflight.js';
+import { resolveCrossProviderCredentialKeys } from '../../src/providers/cross-provider-keys.js';
 
 // ─── Hermetic spawn mock ────────────────────────────────────────────────────
 // Mirrors the worker-image-check.test.ts pattern: EventEmitter-based fake
@@ -157,19 +158,62 @@ describe('probeSubscriptionLimits', () => {
 
   it('parses a successful spawn (exit 0) into a probe, never invoking real claude', async () => {
     const { spawnImpl } = makeUsageSpawn({ code: 0, stdout: FULL_FIXTURE });
-    const result = await probeSubscriptionLimits({ spawnImpl });
+    const result = await probeSubscriptionLimits({
+      spawnImpl,
+      platform: 'linux',
+      env: { PATH: '/bin' },
+    });
 
     expect(result.unavailable).toBe(false);
     expect((result as SubscriptionLimitProbe).sessionPct).toBe(81);
     expect(spawnImpl).toHaveBeenCalledTimes(1);
-    expect(spawnImpl).toHaveBeenCalledWith('claude', ['-p', '/usage'], { shell: false });
+    expect(spawnImpl).toHaveBeenCalledWith('claude', ['-p', '/usage'], {
+      shell: false,
+      env: { PATH: '/bin' },
+    });
   });
 
   it('honors a custom claudeBin override', async () => {
     const { spawnImpl } = makeUsageSpawn({ code: 0, stdout: FULL_FIXTURE });
-    await probeSubscriptionLimits({ spawnImpl, claudeBin: '/opt/claude/bin/claude' });
+    await probeSubscriptionLimits({
+      spawnImpl,
+      claudeBin: '/opt/claude/bin/claude',
+      platform: 'linux',
+      env: { PATH: '/bin' },
+    });
 
-    expect(spawnImpl).toHaveBeenCalledWith('/opt/claude/bin/claude', ['-p', '/usage'], { shell: false });
+    expect(spawnImpl).toHaveBeenCalledWith('/opt/claude/bin/claude', ['-p', '/usage'], {
+      shell: false,
+      env: { PATH: '/bin' },
+    });
+  });
+
+  it('uses the Windows wrapper and scrubs canonical plus config-defined credentials', async () => {
+    const { spawnImpl } = makeUsageSpawn({ code: 0, stdout: FULL_FIXTURE });
+    const credentialEnv = Object.fromEntries(
+      resolveCrossProviderCredentialKeys().map(key => [key, `secret-${key}`]),
+    );
+    await probeSubscriptionLimits({
+      spawnImpl,
+      platform: 'win32',
+      env: {
+        PATH: 'C:\\bin',
+        SAFE_VALUE: 'kept',
+        CUSTOM_PROVIDER_KEY: 'custom-secret',
+        ...credentialEnv,
+      },
+      additionalCredentialKeys: ['CUSTOM_PROVIDER_KEY'],
+    });
+
+    expect(spawnImpl).toHaveBeenCalledTimes(1);
+    const [command, args, options] = spawnImpl.mock.calls[0]!;
+    expect(command).toBe('cmd.exe');
+    expect(args).toEqual(['/c', 'claude', '-p', '/usage']);
+    expect(options.shell).toBe(false);
+    expect(options.env?.['SAFE_VALUE']).toBe('kept');
+    for (const key of [...resolveCrossProviderCredentialKeys(), 'CUSTOM_PROVIDER_KEY']) {
+      expect(options.env?.[key]).toBeUndefined();
+    }
   });
 
   it('returns unavailable when spawn emits an error event (e.g. ENOENT)', async () => {
@@ -207,6 +251,31 @@ describe('probeSubscriptionLimits', () => {
 
     expect(result.unavailable).toBe(true);
     expect(kill).toHaveBeenCalledWith('SIGTERM');
+  });
+
+  it('bounds stdout and rejects a truncated usage snapshot', async () => {
+    const { spawnImpl, kill } = makeUsageSpawn({
+      code: 0,
+      stdout: `${FULL_FIXTURE}${'x'.repeat(256)}`,
+    });
+    const result = await probeSubscriptionLimits({ spawnImpl, maxOutputBytes: 64 });
+
+    expect(result.unavailable).toBe(true);
+    if (result.unavailable) expect(result.reason).toMatch(/exceeded 64 stdout bytes/u);
+    expect(Buffer.byteLength(result.raw)).toBeLessThanOrEqual(64);
+    expect(kill).toHaveBeenCalledWith('SIGKILL');
+  });
+
+  it('rejects an invalid output bound without spawning', async () => {
+    const { spawnImpl } = makeUsageSpawn({ code: 0, stdout: FULL_FIXTURE });
+    const results = await Promise.all([
+      probeSubscriptionLimits({ spawnImpl, maxOutputBytes: 0 }),
+      probeSubscriptionLimits({ spawnImpl, maxOutputBytes: 1024 * 1024 + 1 }),
+      probeSubscriptionLimits({ spawnImpl, timeoutMs: 60_001 }),
+    ]);
+
+    expect(results.every(result => result.unavailable)).toBe(true);
+    expect(spawnImpl).not.toHaveBeenCalled();
   });
 
   it('never throws even when the CLI output format changes unexpectedly', async () => {

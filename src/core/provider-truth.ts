@@ -584,10 +584,10 @@ export function assertReachabilityResult(result: ReachabilityResult): void {
   if (!(['subscription', 'api', 'hybrid', 'local', 'unknown'] as const).includes(result.auth.mode)) {
     throw new Error('Unknown auth mode');
   }
-  if (!(['cli', 'http', 'local-runtime'] as const).includes(result.backend.transport)) {
+  if (!(['cli', 'api', 'http', 'local-runtime'] as const).includes(result.backend.transport)) {
     throw new Error('Unknown transport');
   }
-  if (!(['host-subprocess', 'docker', 'tmux', 'in-process', 'unknown'] as const)
+  if (!(['host-subprocess', 'docker', 'tmux', 'api', 'in-process', 'unknown'] as const)
     .includes(result.backend.executionBackend)) {
     throw new Error('Unknown execution backend');
   }
@@ -603,8 +603,8 @@ export function assertReachabilityResult(result: ReachabilityResult): void {
   if (result.executionProfile.allowed.length === 0) throw new Error('Execution profile has no allowed tuple');
   for (const item of result.executionProfile.allowed) {
     if (!(['subscription', 'api', 'hybrid', 'local', 'unknown'] as const).includes(item.authMode)
-      || !(['cli', 'http', 'local-runtime'] as const).includes(item.transport)
-      || !(['host-subprocess', 'docker', 'tmux', 'in-process', 'unknown'] as const)
+      || !(['cli', 'api', 'http', 'local-runtime'] as const).includes(item.transport)
+      || !(['host-subprocess', 'docker', 'tmux', 'api', 'in-process', 'unknown'] as const)
         .includes(item.executionBackend)) {
       throw new Error('Execution profile contains an unknown tuple');
     }

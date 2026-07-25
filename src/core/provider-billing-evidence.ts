@@ -1,3 +1,5 @@
+import { createExecutionAuthorityError } from './errors.js';
+
 /** Durable billing evidence captured from a provider's final response envelope. */
 export interface ProviderModelBillingUsage {
   inputTokens?: number;
@@ -25,6 +27,13 @@ export interface ProviderBillingEvidence {
   modelUsage: Record<string, ProviderModelBillingUsage>;
   capturedAt: string;
   reconciliation?: ProviderBillingReconciliation;
+  /** Exact host-owned execution lineage included in an aggregated total. */
+  lineage?: {
+    coverage: 'complete' | 'partial';
+    attemptIds: string[];
+    evidenceRefs: string[];
+    missingAttemptIds?: string[];
+  };
 }
 
 function nonNegative(value: unknown): number | undefined {
@@ -127,6 +136,77 @@ export function extractProviderBillingEvidence(
     };
   }
   return found;
+}
+
+/** Aggregate exact-attempt provider envelopes without repricing or estimation. */
+export function aggregateProviderBillingEvidence(
+  attempts: readonly {
+    attemptId: string;
+    evidenceRef: string;
+    billing: ProviderBillingEvidence;
+  }[],
+  capturedAt: string = new Date().toISOString(),
+): ProviderBillingEvidence {
+  if (attempts.length === 0) {
+    throw createExecutionAuthorityError('Provider billing aggregation requires at least one exact attempt');
+  }
+  const [first] = attempts;
+  const seenAttemptIds = new Set<string>();
+  const provider = first!.billing.provider;
+  const currency = first!.billing.currency;
+  let providerReportedUsd = 0;
+  const modelUsage: Record<string, ProviderModelBillingUsage> = {};
+
+  for (const attempt of attempts) {
+    if (!attempt.attemptId || !attempt.evidenceRef) {
+      throw createExecutionAuthorityError('Provider billing aggregation requires attempt and evidence identities');
+    }
+    if (seenAttemptIds.has(attempt.attemptId)) {
+      throw createExecutionAuthorityError(`Duplicate provider billing attempt: ${attempt.attemptId}`);
+    }
+    seenAttemptIds.add(attempt.attemptId);
+    if (attempt.billing.provider !== provider || attempt.billing.currency !== currency) {
+      throw createExecutionAuthorityError('Provider billing aggregation cannot cross provider or currency authority');
+    }
+    providerReportedUsd += attempt.billing.providerReportedUsd;
+    for (const [model, usage] of Object.entries(attempt.billing.modelUsage)) {
+      const current = modelUsage[model] ?? {};
+      const next: ProviderModelBillingUsage = {};
+      for (const field of [
+        'inputTokens',
+        'outputTokens',
+        'cacheReadTokens',
+        'cacheCreationTokens',
+        'costUsd',
+      ] as const) {
+        const value = usage[field];
+        const previous = current[field];
+        if (value !== undefined || previous !== undefined) {
+          next[field] = (previous ?? 0) + (value ?? 0);
+        }
+      }
+      const contextWindow = usage.contextWindow;
+      const previousContextWindow = current.contextWindow;
+      if (contextWindow !== undefined || previousContextWindow !== undefined) {
+        next.contextWindow = Math.max(previousContextWindow ?? 0, contextWindow ?? 0);
+      }
+      modelUsage[model] = next;
+    }
+  }
+
+  return {
+    source: 'provider-envelope',
+    provider,
+    currency,
+    providerReportedUsd,
+    modelUsage,
+    capturedAt,
+    lineage: {
+      coverage: 'complete',
+      attemptIds: attempts.map(attempt => attempt.attemptId),
+      evidenceRefs: attempts.map(attempt => attempt.evidenceRef),
+    },
+  };
 }
 
 export function reconcileProviderBilling(

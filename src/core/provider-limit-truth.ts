@@ -191,9 +191,9 @@ const WINDOW_KINDS = new Set<ProviderLimitWindowKind>([
 const SOURCE_KINDS = new Set<ProviderLimitSourceKind>([
   'provider-cli', 'provider-api', 'http-headers', 'historical-transcript', 'local-runtime', 'operator',
 ]);
-const TRANSPORTS = new Set<InvocationTransport>(['cli', 'http', 'local-runtime']);
+const TRANSPORTS = new Set<InvocationTransport>(['cli', 'api', 'http', 'local-runtime']);
 const EXECUTION_BACKENDS = new Set<InvocationExecutionBackend>([
-  'host-subprocess', 'docker', 'tmux', 'in-process', 'unknown',
+  'host-subprocess', 'docker', 'tmux', 'api', 'in-process', 'unknown',
 ]);
 
 function assertIdentity(name: string, value: string): void {

@@ -347,6 +347,7 @@ describe('modelToTier', () => {
     expect(modelToTier('opus')).toBe('premium');
     expect(modelToTier('sonnet')).toBe('standard');
     expect(modelToTier('haiku')).toBe('economy');
+    expect(modelToTier('fable')).toBe('premium_plus');
   });
 
   it('maps OpenAI models to correct tiers', () => {
@@ -364,8 +365,10 @@ describe('modelToTier', () => {
     expect(modelToTier('gemini-2.0-flash')).toBe('economy');
   });
 
-  it('returns standard as fallback for unknown models', () => {
-    expect(modelToTier('unknown-model')).toBe('standard');
+  it('fails loudly for an unknown migration model', () => {
+    expect(() => modelToTier('unknown-model')).toThrowError(
+      expect.objectContaining({ code: 'E_UNKNOWN_MODEL' }),
+    );
   });
 });
 

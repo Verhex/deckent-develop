@@ -15,6 +15,12 @@
 // and is consumed by orchestra/ (Task 7), never the reverse.
 
 import type { ProviderName, TaskPriority, TaskScope } from './task-types.js';
+import type {
+  InvocationAuthMode,
+  InvocationExecutionBackend,
+  InvocationEvidenceState,
+  InvocationTransport,
+} from './invocation-receipt.js';
 
 // ─── High-stakes detection ──────────────────────────────────────────────────
 
@@ -97,6 +103,86 @@ export function isHighStakesTask(task: HighStakesTaskInput): boolean {
 export const DEFAULT_VERIFIER_PRIORITY: readonly ProviderName[] = ['codex', 'gemini', 'claude', 'ollama'];
 
 /**
+ * Host-authority projection for one exact verifier candidate.
+ *
+ * This is deliberately evidence-shaped rather than registry-shaped: catalog
+ * presence, local login and provider configuration are not verifier eligibility.
+ * The model is the exact provider API identity already resolved for the source
+ * task's capability tier.
+ */
+export interface VerifierEligibilityCandidate {
+  readonly provider: ProviderName;
+  readonly model: string;
+  readonly auth: {
+    readonly mode: InvocationAuthMode;
+    readonly accountRefHash: string | null;
+  };
+  readonly backend: {
+    readonly transport: InvocationTransport;
+    readonly executionBackend: InvocationExecutionBackend;
+    readonly endpointRefHash: string | null;
+    readonly executionProfileRef: string;
+  };
+  readonly reachability: {
+    readonly state: InvocationEvidenceState;
+    readonly reachable: boolean;
+    readonly evidenceRef: string | null;
+  };
+  readonly limits: {
+    readonly state: InvocationEvidenceState;
+    readonly limited: boolean;
+    readonly evidenceRefs: readonly string[];
+  };
+}
+
+function hasExactEligibilityEvidence(candidate: VerifierEligibilityCandidate): boolean {
+  const hasAccountAuthority = candidate.auth.mode === 'local'
+    || candidate.auth.accountRefHash !== null;
+  return candidate.model.length > 0
+    && candidate.model === candidate.model.trim()
+    && hasAccountAuthority
+    && candidate.backend.executionBackend !== 'unknown'
+    && candidate.backend.executionProfileRef.length > 0
+    && candidate.reachability.state === 'known'
+    && candidate.reachability.reachable === true
+    && candidate.reachability.evidenceRef !== null
+    && candidate.limits.state === 'known'
+    && candidate.limits.limited === false
+    && candidate.limits.evidenceRefs.length > 0;
+}
+
+/**
+ * Select only from exact, fresh, positive verifier evidence.
+ *
+ * Duplicate provider projections are ambiguous and therefore ineligible. The
+ * caller-supplied priority remains the ordering authority; registration order
+ * never participates.
+ */
+export function selectEligibleVerifierCandidate(
+  taskProvider: ProviderName,
+  candidates: readonly VerifierEligibilityCandidate[],
+  priority: readonly ProviderName[] = DEFAULT_VERIFIER_PRIORITY,
+): VerifierEligibilityCandidate | null {
+  const counts = new Map<ProviderName, number>();
+  for (const candidate of candidates) {
+    counts.set(candidate.provider, (counts.get(candidate.provider) ?? 0) + 1);
+  }
+  const eligible = candidates.filter(candidate =>
+    candidate.provider !== taskProvider
+    && counts.get(candidate.provider) === 1
+    && hasExactEligibilityEvidence(candidate),
+  );
+  const provider = selectVerifierProvider(
+    taskProvider,
+    eligible.map(candidate => candidate.provider),
+    priority,
+  );
+  return provider === null
+    ? null
+    : (eligible.find(candidate => candidate.provider === provider) ?? null);
+}
+
+/**
  * Pick a provider DIFFERENT from the one that ran the task, to perform the adversarial
  * re-verification.
  *
@@ -141,6 +227,8 @@ export interface CrossVerifyDecision {
   shouldVerify: boolean;
   /** Provider chosen to perform the adversarial verification (absent when skipping). */
   verifierProvider?: ProviderName;
+  /** Exact admitted verifier model when host eligibility evidence was supplied. */
+  verifierModel?: string;
   /** Human-readable diagnostic explaining the decision. */
   reason: string;
   /** Stable machine-readable reason; callers must not classify by parsing `reason`. */
@@ -154,6 +242,8 @@ export interface CrossVerifyDecisionInput {
   taskProvider: ProviderName;
   /** Providers bootstrapped in this environment (caller-supplied). */
   availableProviders: readonly ProviderName[];
+  /** Exact authority projections. When supplied, this overrides the legacy provider list. */
+  eligibleCandidates?: readonly VerifierEligibilityCandidate[];
   /**
    * When true (default), only high-stakes tasks are eligible for cross-verify.
    * Mirrors config `cross_verify.high_stakes_only` (Task 5, default true).
@@ -184,11 +274,20 @@ export function decideCrossVerify(input: CrossVerifyDecisionInput): CrossVerifyD
     };
   }
 
-  const verifierProvider = selectVerifierProvider(
-    input.taskProvider,
-    input.availableProviders,
-    input.verifierPriority,
-  );
+  const exactCandidate = input.eligibleCandidates
+    ? selectEligibleVerifierCandidate(
+        input.taskProvider,
+        input.eligibleCandidates,
+        input.verifierPriority,
+      )
+    : null;
+  const verifierProvider = input.eligibleCandidates
+    ? exactCandidate?.provider ?? null
+    : selectVerifierProvider(
+        input.taskProvider,
+        input.availableProviders,
+        input.verifierPriority,
+      );
 
   if (verifierProvider === null) {
     return {
@@ -201,6 +300,7 @@ export function decideCrossVerify(input: CrossVerifyDecisionInput): CrossVerifyD
   return {
     shouldVerify: true,
     verifierProvider,
+    ...(exactCandidate ? { verifierModel: exactCandidate.model } : {}),
     reasonCode: 'selected',
     reason: highStakes
       ? `high-stakes task → adversarial cross-verify via ${verifierProvider}`

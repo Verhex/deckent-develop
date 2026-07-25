@@ -18,6 +18,7 @@ import {
 } from '../../src/core/model-catalog.js';
 import {
   BUILTIN_MODELS,
+  CANONICAL_MODELS,
   ModelRegistry,
   bootstrapFromCatalog,
   type ModelDefinition,
@@ -193,13 +194,16 @@ describe('model-catalog: mapRemoteEntry', () => {
 // ─── Bundled fallback ──────────────────────────────────────────────────────
 
 describe('model-catalog: bundled fallback', () => {
-  it('returns the BUILTIN_MODELS snapshot as a defensive copy', () => {
+  it('returns the CANONICAL_MODELS snapshot as a defensive copy', () => {
     const bundled = getBundledCatalog();
-    expect(bundled.length).toBe(BUILTIN_MODELS.length);
-    expect(bundled[0]?.id).toBe(BUILTIN_MODELS[0]?.id);
+    expect(bundled.length).toBe(CANONICAL_MODELS.length);
+    expect(bundled[0]?.id).toBe(CANONICAL_MODELS[0]?.id);
+    for (const id of ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']) {
+      expect(bundled.filter(model => model.id === id)).toHaveLength(1);
+    }
     // Defensive copy — mutations do not bleed back into source array.
     bundled.length = 0;
-    expect(getBundledCatalog().length).toBe(BUILTIN_MODELS.length);
+    expect(getBundledCatalog().length).toBe(CANONICAL_MODELS.length);
   });
 });
 
@@ -308,7 +312,7 @@ describe('loadCatalog: offline mode skips network', () => {
     });
     expect(result.source).toBe('bundled');
     expect(mock.calls).toBe(0);
-    expect(result.models.length).toBe(BUILTIN_MODELS.length);
+    expect(result.models.length).toBe(CANONICAL_MODELS.length);
   });
 
   it('uses cache (not bundled) when offline and cache exists', async () => {
@@ -357,7 +361,7 @@ describe('loadCatalog: remote failure falls back to cache then bundled', () => {
       fetchImpl: mock.impl,
     });
     expect(result.source).toBe('bundled');
-    expect(result.models.length).toBe(BUILTIN_MODELS.length);
+    expect(result.models.length).toBe(CANONICAL_MODELS.length);
   });
 
   it('treats malformed cache as missing and falls back', async () => {

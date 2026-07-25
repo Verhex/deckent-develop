@@ -43,6 +43,11 @@ import type { ModelStrategy } from './mode-presets.js';
 import { metric } from './observability.js';
 import { interpolateConfig } from './deck-interpolation.js';
 import { assertExecutionBudgetPolicyConfig } from './execution-budget-policy.js';
+import {
+  assertProviderLimitPolicyLayerPrecedence,
+  assertProviderLimitsConfig,
+  createProviderLimitPolicyAuthoritySnapshot,
+} from './provider-limit-policy.js';
 
 /**
  * Local intersection alias for `token_throttle_ms` — the pre-spawn quota gate
@@ -773,6 +778,14 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  if (config.provider_limits !== undefined) {
+    try {
+      assertProviderLimitsConfig(config.provider_limits);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   if (config.provider_overrides !== undefined) {
     if (typeof config.provider_overrides !== 'object' || config.provider_overrides === null || Array.isArray(config.provider_overrides)) {
       errors.push('provider_overrides must be an object');
@@ -1255,6 +1268,55 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  const approvalAuthority = config.approval?.authority;
+  if (approvalAuthority !== undefined) {
+    if (typeof approvalAuthority.enabled !== 'boolean') {
+      errors.push('approval.authority.enabled must be a boolean');
+    }
+    if (approvalAuthority.enabled === true) {
+      const oidc = approvalAuthority.oidc;
+      if (typeof approvalAuthority.tenant_id !== 'string' || approvalAuthority.tenant_id.trim().length === 0) {
+        errors.push('approval.authority.tenant_id must be a non-empty string when enabled');
+      }
+      if (!oidc || typeof oidc !== 'object') {
+        errors.push('approval.authority.oidc is required when enabled');
+      } else {
+        for (const [field, value] of [
+          ['authority_ref', oidc.authority_ref],
+          ['tenant_claim', oidc.tenant_claim],
+        ] as const) {
+          if (typeof value !== 'string' || value.trim().length === 0) {
+            errors.push(`approval.authority.oidc.${field} must be a non-empty string when enabled`);
+          }
+        }
+        for (const [field, value] of [
+          ['max_auth_age_seconds', oidc.max_auth_age_seconds],
+          ['max_session_seconds', oidc.max_session_seconds],
+        ] as const) {
+          if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+            errors.push(`approval.authority.oidc.${field} must be a positive finite number when enabled`);
+          }
+        }
+        for (const [field, value] of [
+          ['required_acr', oidc.required_acr],
+          ['required_amr', oidc.required_amr],
+        ] as const) {
+          if (value !== undefined
+            && (!Array.isArray(value)
+              || value.length === 0
+              || value.some(item => typeof item !== 'string' || item.trim().length === 0))) {
+            errors.push(`approval.authority.oidc.${field} must be a non-empty string array when configured`);
+          }
+        }
+      }
+      if (config.api_oidc?.enabled !== true
+        || typeof config.api_oidc.audience !== 'string'
+        || config.api_oidc.audience.trim().length === 0) {
+        errors.push('approval.authority requires enabled api_oidc with an explicit audience');
+      }
+    }
+  }
+
   if (errors.length > 0) {
     throw new ConfigValidationError(errors);
   }
@@ -1368,6 +1430,22 @@ export function resolveApprovalConfig(
     gate_enabled: config.approval?.gate_enabled ?? false,
     relay_enabled: config.approval?.relay_enabled ?? false,
     question_bridge: config.approval?.question_bridge === true,
+    ...(config.approval?.authority
+      ? {
+          authority: {
+            ...config.approval.authority,
+            oidc: {
+              ...config.approval.authority.oidc,
+              ...(config.approval.authority.oidc.required_acr
+                ? { required_acr: [...config.approval.authority.oidc.required_acr] }
+                : {}),
+              ...(config.approval.authority.oidc.required_amr
+                ? { required_amr: [...config.approval.authority.oidc.required_amr] }
+                : {}),
+            },
+          },
+        }
+      : {}),
   };
 }
 
@@ -1402,7 +1480,7 @@ async function readJsonFile<T>(filePath: string): Promise<T | null> {
 
 // ─── Config Cache ───────────────────────────────────────────────────
 let cachedConfig: ResolvedConfig | null = null;
-let cacheStamp: number = 0;
+let cacheStamp = '';
 let cachedProjectRoot: string | null = null;
 
 /**
@@ -1410,20 +1488,27 @@ let cachedProjectRoot: string | null = null;
  */
 export function clearConfigCache(): void {
   cachedConfig = null;
-  cacheStamp = 0;
+  cacheStamp = '';
   cachedProjectRoot = null;
 }
 
 /**
- * Get the mtime of the project config file, or 0 if the file does not exist.
+ * Bind cache validity to both authored config layers. Including the effective
+ * global path prevents a platform/legacy-path switch from reusing an authority
+ * snapshot produced from a different file.
  */
-function getConfigMtime(projectRoot: string): number {
-  const configPath = join(projectRoot, PROJECT_CONFIG_PATH);
-  try {
-    return statSync(configPath).mtimeMs;
-  } catch {
-    return 0;
-  }
+function getConfigCacheStamp(projectRoot: string): string {
+  const projectPath = join(projectRoot, PROJECT_CONFIG_PATH);
+  const globalPath = resolveGlobalConfigReadPath();
+  const fileStamp = (path: string): string => {
+    try {
+      const stat = statSync(path);
+      return `${stat.mtimeMs}:${stat.size}:${stat.ino}`;
+    } catch {
+      return 'missing';
+    }
+  };
+  return `${globalPath}\0${fileStamp(globalPath)}\0${projectPath}\0${fileStamp(projectPath)}`;
 }
 
 // ─── Public API ──────────────────────────────────────────────────────
@@ -1702,8 +1787,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
   // ─── Cache check ────────────────────────────────────────────────────
   const forceReload = options?.force === true || process.env['DECKENT_CONFIG_RELOAD'] === '1';
   if (!forceReload && cachedConfig !== null && cachedProjectRoot === root) {
-    const currentMtime = getConfigMtime(root);
-    if (currentMtime === cacheStamp) {
+    const currentStamp = getConfigCacheStamp(root);
+    if (currentStamp === cacheStamp) {
       metric('config.cache', 1, { result: 'hit' });
       return cachedConfig;
     }
@@ -1712,6 +1797,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
   let config = createDefaultConfig();
 
   const rawGlobalConfig = await readJsonFile<Partial<DeckentConfig>>(resolveGlobalConfigReadPath());
+  let globalConfig: Partial<DeckentConfig> | null = null;
   if (rawGlobalConfig) {
     const { config: providerCanonicalGlobalConfig } = canonicalizeProviderConfigAliases(
       rawGlobalConfig as Record<string, unknown>,
@@ -1721,7 +1807,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
       providerCanonicalGlobalConfig,
       'global',
     );
-    config = deepMerge(config, canonicalGlobalConfig as Partial<DeckentConfig>);
+    globalConfig = canonicalGlobalConfig as Partial<DeckentConfig>;
+    config = deepMerge(config, globalConfig);
   }
 
   const projectConfigPath = join(root, PROJECT_CONFIG_PATH);
@@ -1771,6 +1858,17 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
         // Non-fatal: migration failure should not block config load
       }
     }
+  }
+
+  try {
+    assertProviderLimitPolicyLayerPrecedence(
+      globalConfig?.provider_limits,
+      projectConfig?.provider_limits,
+    );
+  } catch (error) {
+    throw new ConfigValidationError([
+      error instanceof Error ? error.message : String(error),
+    ]);
   }
 
   // Resolve legacy mode aliases so 'max_plan' → 'performance' etc.
@@ -1984,6 +2082,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     gate: config.gate,
     // Approval — validated + defaulted via resolveApprovalConfig (Sprint 355 CFG-APR-WIRE)
     approval: resolveApprovalConfig(config),
+    api_oidc: config.api_oidc,
     // ERP connector — passed through (opt-in, absent = disabled; secret-free)
     erp: config.erp,
     // Plan config (Sprint 276 PLAN-INT-1) — passed through (opt-in, absent = disabled)
@@ -2013,6 +2112,13 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // twin-literal rule as `openrouter` below applies.
     provider_fallback: config.provider_fallback,
     execution_budget: config.execution_budget,
+    // Authored input only. The production authority must resolve the separately
+    // loaded parent/project layers through provider-limit-policy.ts.
+    provider_limits: config.provider_limits,
+    provider_limit_authority: createProviderLimitPolicyAuthoritySnapshot({
+      parent: globalConfig?.provider_limits,
+      project: projectConfig?.provider_limits,
+    }),
     // XVERIFY-TOOL (S1): cross_verify was a pinned born-464 gap since 358-014 —
     // declared on both config types, never passed through, so `runCrossVerify`'s
     // `enabled !== true` guard could NEVER pass from a real config file and the
@@ -2073,10 +2179,14 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
   if (interpolated.chat_provider === undefined) {
     interpolated.chat_provider = resolved.chat_provider;
   }
+  // Authority provenance is not an interpolated user-value surface. Preserve
+  // the canonical deeply frozen object; the generic interpolation clone would
+  // otherwise silently turn it back into mutable last-wins data.
+  interpolated.provider_limit_authority = resolved.provider_limit_authority;
 
   // ─── Update cache ───────────────────────────────────────────────────
   cachedConfig = interpolated;
-  cacheStamp = getConfigMtime(root);
+  cacheStamp = getConfigCacheStamp(root);
   cachedProjectRoot = root;
 
   metric('config.cache', 1, { result: 'miss' });
@@ -2668,6 +2778,16 @@ export function mergeConfigs(
   globalConfig: Partial<DeckentConfig> | null,
   projectConfig: Partial<DeckentConfig> | null,
 ): ResolvedConfig {
+  try {
+    assertProviderLimitPolicyLayerPrecedence(
+      globalConfig?.provider_limits,
+      projectConfig?.provider_limits,
+    );
+  } catch (error) {
+    throw new ConfigValidationError([
+      error instanceof Error ? error.message : String(error),
+    ]);
+  }
   let config = createDefaultConfig();
 
   if (globalConfig) {
@@ -2778,6 +2898,7 @@ export function mergeConfigs(
     gate: config.gate,
     // Approval — validated + defaulted via resolveApprovalConfig (Sprint 355 CFG-APR-WIRE)
     approval: resolveApprovalConfig(config),
+    api_oidc: config.api_oidc,
     // ERP connector — passed through (opt-in, absent = disabled; secret-free)
     erp: config.erp,
     // Plan config (Sprint 276 PLAN-INT-1) — passed through (opt-in, absent = disabled)
@@ -2809,6 +2930,12 @@ export function mergeConfigs(
     // twin-literal rule as `openrouter` below applies.
     provider_fallback: config.provider_fallback,
     execution_budget: config.execution_budget,
+    // Authored input only; never an effective policy authority.
+    provider_limits: config.provider_limits,
+    provider_limit_authority: createProviderLimitPolicyAuthoritySnapshot({
+      parent: globalConfig?.provider_limits,
+      project: projectConfig?.provider_limits,
+    }),
     // XVERIFY-TOOL (S1): cross_verify was a pinned born-464 gap since 358-014 —
     // declared on both config types, never passed through, so `runCrossVerify`'s
     // `enabled !== true` guard could NEVER pass from a real config file and the

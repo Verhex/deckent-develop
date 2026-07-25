@@ -3,12 +3,14 @@ import {
   BUILTIN_MODELS,
   CANONICAL_MODELS,
   CODEX_PARITY_MODELS,
+  CONFIG_MIGRATION_TIER_OVERRIDES,
   LEGACY_MODEL_ALIASES,
   ModelRegistry,
   buildParametricModel,
   getLegacyModelMigration,
   inferProviderFromId,
   modelRegistry,
+  resolveConfigMigrationModelTier,
   resolveCanonicalModelIdentity,
 } from '../../src/core/model-registry.js';
 
@@ -25,6 +27,20 @@ describe('canonical provider API model identity', () => {
       expect(modelRegistry.has(canonical), canonical).toBe(true);
       expect(getLegacyModelMigration(legacy)).toBe(canonical);
     }
+  });
+
+  it('owns V1 model-to-tier migration in the registry without a consumer dictionary', () => {
+    expect(CONFIG_MIGRATION_TIER_OVERRIDES).toEqual({
+      o3: 'standard',
+      'o4-mini': 'economy',
+    });
+    expect(resolveConfigMigrationModelTier('o3')).toBe('standard');
+    expect(resolveConfigMigrationModelTier('o4-mini')).toBe('economy');
+    expect(resolveConfigMigrationModelTier('gpt-5.6-sol')).toBe('premium');
+    expect(resolveConfigMigrationModelTier('fable')).toBe('premium_plus');
+    expect(() => resolveConfigMigrationModelTier('unknown-model')).toThrowError(
+      expect.objectContaining({ code: 'E_UNKNOWN_MODEL' }),
+    );
   });
 
   it('resolves versioned Sol and Fable API IDs directly', () => {

@@ -236,8 +236,15 @@ describe('cost-calculator', () => {
       expect(est.perProvider.anthropic?.totalApiCostUsd).toBe(0);
       expect(est.perProvider.google?.totalApiCostUsd).toBe(0);
 
-      // But subscription impact should be calculated for anthropic
-      expect(est.subscriptionImpact.anthropic?.dailyPercent).toBeGreaterThan(0);
+      // Subscription USD is zero, but quota is UNKNOWN without authoritative
+      // provider/account/window evidence — estimated tokens cannot mint % usage.
+      expect(est.subscriptionImpact.anthropic).toEqual({
+        state: 'unknown',
+        dailyPercent: null,
+        reason: 'provider-limit-evidence-not-supplied',
+      });
+      expect(est.perProvider.anthropic?.subscriptionQuotaPercent).toBeUndefined();
+      expect(est.perProvider.anthropic?.subscriptionQuotaState).toBe('unknown');
       expect(est.perProvider.anthropic?.billingMode).toBe('subscription');
       expect(est.perProvider.openai?.billingMode).toBe('api');
       expect(est.perProvider.google?.billingMode).toBe('free_tier');
@@ -347,7 +354,7 @@ describe('cost-calculator', () => {
       expect(output).toContain('Realistic:');
       expect(output).toContain('Optimistic');
       expect(output).toContain('Worst case');
-      expect(output).toContain('Budget check:');
+      expect(output).toContain('API/USD budget check:');
     });
 
     it('shows subscription impact for subs billing', () => {
@@ -357,7 +364,11 @@ describe('cost-calculator', () => {
       const est = estimateSprintCost(tasks, TEST_CONFIG);
       const output = formatEstimate(est);
       expect(output).toContain('Subscription impact');
-      expect(output).toContain('daily');
+      expect(output).toContain('anthropic: UNKNOWN');
+      expect(output).toContain('$0 (subscription; quota UNKNOWN)');
+      expect(output).not.toContain('0.0% daily quota');
+      expect(output).toContain('API/USD budget check');
+      expect(output).toContain('Within API/USD budget');
     });
   });
 
@@ -452,9 +463,16 @@ describe('cost-calculator', () => {
       expect(resolveBillingModeForAuth('anthropic', 'subscription')).toBe('subscription');
     });
 
+    it('keeps unknown/custom providers remote-by-default and follows explicit auth', () => {
+      expect(resolveBillingModeForAuth('custom-provider', 'subscription')).toBe('subscription');
+      expect(resolveBillingModeForAuth('custom-provider', 'api')).toBe('api');
+      expect(resolveBillingModeForAuth('custom-provider', 'hybrid')).toBeUndefined();
+    });
+
     it('defers to provider default (undefined) for hybrid/unknown auth', () => {
       expect(resolveBillingModeForAuth('openai', 'hybrid')).toBeUndefined();
       expect(resolveBillingModeForAuth('openai', undefined)).toBeUndefined();
+      expect(resolveBillingModeForAuth(undefined, undefined)).toBeUndefined();
     });
 
     it('subscription-auth codex task costs $0 even though cost-config default is api', () => {

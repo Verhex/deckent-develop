@@ -2,7 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { DeckentError, ErrorRegistry } from '../../src/core/errors.js';
+import {
+  DeckentError,
+  ErrorRegistry,
+  createCrossVerifyContractError,
+  createDockerLifecycleError,
+  createExecutionAdmissionError,
+  createExecutionAuthorityError,
+} from '../../src/core/errors.js';
 
 // ─── Registry: CLI Error Codes (E020–E039) ─────────────────────────
 
@@ -547,6 +554,26 @@ describe('ErrorRegistry API', () => {
   });
 });
 
+describe('Execution authority error families', () => {
+  const cases = [
+    ['DECKENT_E076', createCrossVerifyContractError],
+    ['DECKENT_E077', createExecutionAuthorityError],
+    ['DECKENT_E078', createExecutionAdmissionError],
+    ['DECKENT_E079', createDockerLifecycleError],
+  ] as const;
+
+  for (const [code, factory] of cases) {
+    it(`${code} is registered and preserves dynamic context`, () => {
+      expect(ErrorRegistry.has(code)).toBe(true);
+      const error = factory(`dynamic context for ${code}`);
+      expect(error).toBeInstanceOf(DeckentError);
+      expect(error.code).toBe(code);
+      expect(error.message).toBe(`dynamic context for ${code}`);
+      expect(error.suggestion).toBeTruthy();
+    });
+  }
+});
+
 // ─── Verify no generic Error in scope modules ───────────────────────
 
 describe('Error handling completeness', () => {
@@ -576,88 +603,11 @@ describe('Error handling completeness', () => {
     }
   });
 
-  it('no generic throw new Error in src/cli/commands/', async () => {
-    const { readFileSync, readdirSync } = await import('node:fs');
-    const { join } = await import('node:path');
-    const dir = join(process.cwd(), 'src/cli/commands');
-    // agent.ts and skill.ts use throw new Error for operational errors (git clone, model validation).
-    // chat-session.ts (spawn pipe missing) and chat-provider-parity.ts (Ollama/OpenAI-compat HTTP
-    // failures) throw for the same operational-error category — network/spawn faults surfaced to the
-    // caller, not domain errors warranting a registered DeckentError code.
-    // mcp.ts throws for CLI input/config validation (invalid kv-pair/scope/transport, missing HTTP
-    // url, server-not-found) — all i18n'd operational faults surfaced to the caller, same category,
-    // not domain errors warranting a registered DeckentError code.
-    // autonomous.ts throws for planner spawn faults (spawn failed / timed out / non-zero exit) —
-    // spawn/operational category like chat-session.ts. process.ts throws for i18n'd CLI input
-    // validation (missing description / executionId) — same input-validation category as mcp.ts.
-    const ALLOWED_FILES = new Set(['agent.ts', 'skill.ts', 'chat-session.ts', 'chat-provider-parity.ts', 'mcp.ts', 'autonomous.ts', 'process.ts', 'autonomous-mission.ts']);
-    const files = readdirSync(dir).filter(f => f.endsWith('.ts') && !ALLOWED_FILES.has(f));
-    for (const file of files) {
-      const content = readFileSync(join(dir, file), 'utf-8');
-      const matches = content.match(/throw new Error\(/g);
-      expect(matches).toBeNull();
-    }
-  });
-
-  it('no generic throw new Error in src/orchestra/ (except exhaustive switch defaults)', async () => {
-    const { readFileSync, readdirSync } = await import('node:fs');
-    const { join } = await import('node:path');
-    const dir = join(process.cwd(), 'src/orchestra');
-    const files = readdirSync(dir).filter(f => f.endsWith('.ts'));
-    // Allowlist: exhaustive switch defaults that intentionally use Error for unreachable paths
-    // task-mode-runner.ts: style mismatch guard (pending DeckentError migration — Sprint 151 T-012)
-    // sprint-controller.ts: readTaskJsonFresh ENOENT guard (Sprint 168 C0c RC3, pending DeckentError migration)
-    const allowlist = new Set(['monitor-adapter.ts', 'task-mode-runner.ts', 'sprint-controller.ts', 'honest-gate.ts']);
-    for (const file of files) {
-      if (allowlist.has(file)) continue;
-      const content = readFileSync(join(dir, file), 'utf-8');
-      const matches = content.match(/throw new Error\(/g);
-      expect(matches, `Found generic throw new Error() in ${file}`).toBeNull();
-    }
-  });
-
-  it('no generic throw new Error in src/agents/', async () => {
-    const { readFileSync, readdirSync } = await import('node:fs');
-    const { join } = await import('node:path');
-    const dir = join(process.cwd(), 'src/agents');
-    const files = readdirSync(dir).filter(f => f.endsWith('.ts'));
-    for (const file of files) {
-      const content = readFileSync(join(dir, file), 'utf-8');
-      const matches = content.match(/throw new Error\(/g);
-      expect(matches).toBeNull();
-    }
-  });
-
-  it('no generic throw new Error in src/core/ (excluding config validation)', async () => {
-    const { readFileSync, readdirSync, statSync } = await import('node:fs');
-    const { join } = await import('node:path');
-    const coreDir = join(process.cwd(), 'src/core');
-
-    // Allowlist files with legitimate use of throw new Error pending DeckentError migration
-    const coreAllowlist = new Set(['observability-rotation.ts', 'tenant-context.ts', 'scheduled-flow.ts']);
-
-    function scanDir(dir: string): void {
-      const entries = readdirSync(dir);
-      for (const entry of entries) {
-        const fullPath = join(dir, entry);
-        const stat = statSync(fullPath);
-        if (stat.isDirectory()) {
-          scanDir(fullPath);
-        } else if (entry.endsWith('.ts')) {
-          if (coreAllowlist.has(entry)) continue;
-          const content = readFileSync(fullPath, 'utf-8');
-          const lines = content.split('\n');
-          for (const line of lines) {
-            // ConfigValidationError extends Error and uses new Error() in its constructor — that is allowed
-            if (line.includes('throw new Error(') && !line.includes('ConfigValidationError')) {
-              throw new Error(`Found generic throw new Error() in ${fullPath}: ${line.trim()}`);
-            }
-          }
-        }
-      }
-    }
-
-    expect(() => scanDir(coreDir)).not.toThrow();
+  it('canonical raw-throw ratchet has no additions or stale baseline headroom', async () => {
+    const { runCheck } = await import('../../scripts/check-error-handling.mjs');
+    const result = runCheck(process.cwd());
+    expect(result.violations, 'New executable throw new Error(...) statements').toEqual([]);
+    expect(result.reductions, 'Baseline must be ratcheted when existing debt is removed').toEqual([]);
   });
 });
 
@@ -763,61 +713,6 @@ describe('catalog sources — HTTP error produces DeckentError E072 (graceful []
 
     createErr.mockRestore();
     warn.mockRestore();
-  });
-});
-
-// ─── check-error-handling.mjs: npm run lint:errors process-level tests ─────
-
-describe('npm run lint:errors — process-level invocation', () => {
-  it('exits with known violation count (monitor-adapter.ts exhaustive switch)', () => {
-    const { execSync } = require('node:child_process');
-    let exitCode = 0;
-    let stdout = '';
-    try {
-      stdout = execSync('npm run lint:errors', { stdio: 'pipe', cwd: process.cwd() }).toString();
-    } catch (err: unknown) {
-      exitCode = (err as { status?: number }).status ?? 1;
-      stdout = (err as { stdout?: Buffer }).stdout?.toString() ?? '';
-    }
-    // Known violations: monitor-adapter.ts + task-mode-runner.ts + managed-docs/docs-config.ts
-    // Tracked as acceptable until DeckentError migration is complete (Sprint 151 T-012)
-    expect(exitCode).toBeLessThanOrEqual(1);
-    if (exitCode === 1) {
-      // Multiple violations are known and tracked — just verify the script ran
-      expect(stdout.length).toBeGreaterThan(0);
-    }
-  });
-
-  it('exits non-zero when a violation is detected via script invocation', async () => {
-    const { execSync } = require('node:child_process');
-    const { writeFileSync, mkdirSync, rmSync, existsSync } = await import('node:fs');
-    const { join } = await import('node:path');
-    const { tmpdir } = await import('node:os');
-
-    // Create a fake project root with a violating orchestra file
-    const fakeRoot = join(tmpdir(), `deckent-lint-proc-test-${Date.now()}`);
-    mkdirSync(join(fakeRoot, 'src', 'orchestra'), { recursive: true });
-    writeFileSync(join(fakeRoot, 'src', 'orchestra', 'bad.ts'), `throw new Error('violation');\n`);
-
-    let exitCode = 0;
-    try {
-      // Run the script directly with node, pointing it at the fake root via cwd isn't enough
-      // since the script uses __dirname-relative ROOT. Pass root via env isn't supported,
-      // so we call runCheck() via a small inline script.
-      execSync(
-        `node -e "
-import { runCheck } from './scripts/check-error-handling.mjs';
-const r = runCheck('${fakeRoot.replace(/\\/g, '\\\\')}');
-process.exit(r.violations.length > 0 ? 1 : 0);
-"`,
-        { stdio: 'pipe', cwd: process.cwd() },
-      );
-    } catch (err: unknown) {
-      exitCode = (err as { status?: number }).status ?? 1;
-    } finally {
-      if (existsSync(fakeRoot)) rmSync(fakeRoot, { recursive: true, force: true });
-    }
-    expect(exitCode).toBe(1);
   });
 });
 

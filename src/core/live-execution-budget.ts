@@ -1,5 +1,18 @@
 import type { StreamLogEvent } from './log-event.js';
 import type { ExecutionBudget } from './work-model.js';
+import type { ExecutionLandingPolicyConfig } from './config-types.js';
+import type { ExecutionAdmissionMode } from './execution-admission.js';
+import {
+  type AttendedExecutionApprovalAuthority,
+  assertVerifiedAttendedExecutionApproval,
+  type AttendedExecutionApprovalExpectedDispatch,
+  type VerifiedAttendedExecutionApproval,
+} from './attended-execution-approval.js';
+import {
+  assertExecutionLandingPolicyConfig,
+  deriveExecutionLandingTurnAllocation,
+} from './execution-budget-policy.js';
+import { createExecutionAdmissionError } from './errors.js';
 
 export interface LiveUsageCounters {
   turns: number;
@@ -22,19 +35,35 @@ export interface LiveUsageObservation {
 }
 
 export interface LiveBudgetDecision {
-  state: 'within-budget' | 'exceeded' | 'unmeasurable';
+  state: 'within-budget' | 'landing-requested' | 'exceeded' | 'unmeasurable';
   reasons: string[];
   counters: LiveUsageCounters;
   observation?: LiveUsageObservation;
+  /** Exact host-applied delta for this distinct observation; absent for duplicates/unmeasurable events. */
+  appliedDelta?: LiveUsageObservation['counts'];
+  /** Neutral evidence: consecutive distinct observations that applied cache-read tokens. */
+  consecutiveCacheReadEvents: number;
 }
 
-export interface LiveUsageGuardState {
+export interface LiveUsageGuardStateV1 {
   version: 1;
   counters: LiveUsageCounters;
   seenDedupeKeys: string[];
   measurableEvents: number;
   incrementalUsageEvents: number;
 }
+
+export interface LiveUsageGuardStateV2 {
+  version: 2;
+  counters: LiveUsageCounters;
+  seenDedupeKeys: string[];
+  measurableEvents: number;
+  incrementalUsageEvents: number;
+  consecutiveCacheReadEvents: number;
+  lastAppliedDelta?: LiveUsageObservation['counts'];
+}
+
+export type LiveUsageGuardState = LiveUsageGuardStateV1 | LiveUsageGuardStateV2;
 
 const ZERO_COUNTERS: LiveUsageCounters = {
   turns: 0,
@@ -164,6 +193,10 @@ export function hasLiveUsageCeiling(budget: ExecutionBudget | undefined): boolea
 }
 
 export type LiveUsageBudgetSupport = 'measured-stream';
+export type ExecutionLandingCapability =
+  | 'cooperative-landing'
+  | 'checkpoint-stop'
+  | 'unsupported';
 
 const EXECUTION_BUDGET_FIELDS = new Set<keyof ExecutionBudget>([
   'maxUsd',
@@ -230,6 +263,64 @@ export function assertLiveUsageBudgetSupport(
   }
 }
 
+/**
+ * ADR-G-037 final pre-dispatch landing gate. Metering and landing are separate
+ * capabilities; an unattended remote call needs both. The attended hard-only
+ * escape hatch is valid only with owner policy plus durable approval evidence.
+ */
+export function assertExecutionLandingSupport(input: {
+  budget: ExecutionBudget | undefined;
+  policy: ExecutionLandingPolicyConfig | undefined;
+  mode: ExecutionAdmissionMode | undefined;
+  capability: ExecutionLandingCapability | undefined;
+  executor: string;
+  /**
+   * Legacy provenance only. A string reference never authorizes dispatch; the
+   * verified grant below is the sole attended hard-stop authority.
+   */
+  approvalEvidenceRef?: string;
+  approvalAuthority?: AttendedExecutionApprovalAuthority;
+  approvalGrant?: VerifiedAttendedExecutionApproval;
+  approvalExpectedDispatch?: AttendedExecutionApprovalExpectedDispatch;
+  executionCostClass?: 'remote' | 'local';
+}): VerifiedAttendedExecutionApproval | undefined {
+  if (input.executionCostClass === 'local') return undefined;
+  if (!hasLiveUsageCeiling(input.budget)) return undefined;
+  const mode = input.mode ?? 'unattended';
+  const capability = input.capability ?? 'unsupported';
+  if (!input.policy) {
+    throw createExecutionAdmissionError(
+      `Execution landing policy is required for remote executor "${input.executor}". Spawn blocked before provider work.`,
+    );
+  }
+  assertExecutionLandingPolicyConfig(input.policy, 'execution landing policy');
+  if (capability !== 'unsupported') return undefined;
+  if (
+    mode === 'attended'
+    && input.policy.attended_unsupported === 'allow-hard-stop'
+  ) {
+    if (!input.approvalExpectedDispatch) {
+      throw createExecutionAdmissionError(
+        `Attended remote executor "${input.executor}" requires an exact final dispatch binding. Spawn blocked before provider work.`,
+      );
+    }
+    const grant = input.approvalGrant
+      ?? (input.approvalAuthority && input.approvalEvidenceRef
+        ? input.approvalAuthority.verifyAndClaim(
+          input.approvalEvidenceRef,
+          input.approvalExpectedDispatch,
+        )
+        : undefined);
+    assertVerifiedAttendedExecutionApproval(grant, input.approvalExpectedDispatch);
+    return grant;
+  }
+  throw createExecutionAdmissionError(
+    mode === 'unattended'
+      ? `Unattended remote executor "${input.executor}" does not support budget landing. Spawn blocked before provider work.`
+      : `Attended remote executor "${input.executor}" requires explicit allow-hard-stop policy and approval evidence when budget landing is unsupported. Spawn blocked before provider work.`,
+  );
+}
+
 function addCounters(
   target: LiveUsageCounters,
   counts: LiveUsageObservation['counts'],
@@ -260,12 +351,24 @@ export class LiveExecutionBudgetGuard {
   private readonly counters: LiveUsageCounters;
   private measurableEvents: number;
   private incrementalUsageEvents: number;
+  private consecutiveCacheReadEvents: number;
+  private lastAppliedDelta: LiveUsageObservation['counts'] | undefined;
 
-  constructor(private readonly budget: ExecutionBudget, restored?: LiveUsageGuardState) {
+  constructor(
+    private readonly budget: ExecutionBudget,
+    restored?: LiveUsageGuardState,
+    private readonly landingPolicy?: ExecutionLandingPolicyConfig,
+  ) {
     this.seen = new Set(restored?.seenDedupeKeys ?? []);
     this.counters = restored ? { ...restored.counters } : { ...ZERO_COUNTERS };
     this.measurableEvents = restored?.measurableEvents ?? 0;
     this.incrementalUsageEvents = restored?.incrementalUsageEvents ?? 0;
+    this.consecutiveCacheReadEvents = restored?.version === 2
+      ? restored.consecutiveCacheReadEvents
+      : 0;
+    this.lastAppliedDelta = restored?.version === 2
+      ? restored.lastAppliedDelta
+      : undefined;
   }
 
   observe(event: StreamLogEvent): LiveBudgetDecision {
@@ -279,6 +382,10 @@ export class LiveExecutionBudgetGuard {
     const applied = observation.mode === 'cumulative'
       ? snapshotDelta(this.counters, observation.counts)
       : observation.counts;
+    this.lastAppliedDelta = { ...applied };
+    this.consecutiveCacheReadEvents = applied.cacheReadTokens > 0
+      ? this.consecutiveCacheReadEvents + 1
+      : 0;
     addCounters(this.counters, applied);
     if (observation.countsAsTurn) this.counters.turns += 1;
     if (observation.reportedTurns !== undefined) {
@@ -287,7 +394,7 @@ export class LiveExecutionBudgetGuard {
     if (observation.mode === 'incremental') {
       this.counters.maxContextTokens = Math.max(this.counters.maxContextTokens, observation.contextTokens);
     }
-    return this.decision('within-budget', observation);
+    return this.decision('within-budget', observation, applied);
   }
 
   snapshot(): LiveBudgetDecision {
@@ -296,17 +403,20 @@ export class LiveExecutionBudgetGuard {
 
   exportState(): LiveUsageGuardState {
     return {
-      version: 1,
+      version: 2,
       counters: { ...this.counters },
       seenDedupeKeys: [...this.seen],
       measurableEvents: this.measurableEvents,
       incrementalUsageEvents: this.incrementalUsageEvents,
+      consecutiveCacheReadEvents: this.consecutiveCacheReadEvents,
+      ...(this.lastAppliedDelta ? { lastAppliedDelta: { ...this.lastAppliedDelta } } : {}),
     };
   }
 
   private decision(
     emptyState: LiveBudgetDecision['state'],
     observation?: LiveUsageObservation,
+    appliedDelta?: LiveUsageObservation['counts'],
   ): LiveBudgetDecision {
     const reasons: string[] = [];
     const checks: Array<[number | undefined, number, string]> = [
@@ -323,6 +433,24 @@ export class LiveExecutionBudgetGuard {
         reasons.push(`${label} budget exceeded (${actual} > ${limit})`);
       }
     }
+    const landingReasons: string[] = [];
+    if (reasons.length === 0 && this.landingPolicy) {
+      const workRatio = 1 - this.landingPolicy.reserve_ratio;
+      for (const [limit, actual, label] of checks) {
+        if (typeof limit !== 'number') continue;
+        const threshold = label === 'turn'
+          ? deriveExecutionLandingTurnAllocation(
+            limit,
+            this.landingPolicy.reserve_ratio,
+          ).workTurns
+          : limit * workRatio;
+        if (actual >= threshold) {
+          landingReasons.push(
+            `${label} landing threshold reached (${actual} >= ${threshold}; reserve_ratio=${this.landingPolicy.reserve_ratio})`,
+          );
+        }
+      }
+    }
     if (
       reasons.length === 0
       && typeof this.budget.maxContextTokens === 'number'
@@ -332,14 +460,31 @@ export class LiveExecutionBudgetGuard {
         state: 'unmeasurable',
         reasons: ['per-call context token evidence unavailable from cumulative-only usage'],
         counters: { ...this.counters },
+        consecutiveCacheReadEvents: this.consecutiveCacheReadEvents,
+        ...(observation ? { observation } : {}),
+        ...(appliedDelta ? { appliedDelta: { ...appliedDelta } } : {}),
+      };
+    }
+    if (emptyState === 'unmeasurable' && this.measurableEvents === 0) {
+      return {
+        state: 'unmeasurable',
+        reasons: ['measured usage evidence unavailable'],
+        counters: { ...this.counters },
+        consecutiveCacheReadEvents: this.consecutiveCacheReadEvents,
         ...(observation ? { observation } : {}),
       };
     }
     return {
-      state: reasons.length > 0 ? 'exceeded' : emptyState,
-      reasons,
+      state: reasons.length > 0
+        ? 'exceeded'
+        : landingReasons.length > 0
+          ? 'landing-requested'
+          : emptyState,
+      reasons: reasons.length > 0 ? reasons : landingReasons,
       counters: { ...this.counters },
+      consecutiveCacheReadEvents: this.consecutiveCacheReadEvents,
       ...(observation ? { observation } : {}),
+      ...(appliedDelta ? { appliedDelta: { ...appliedDelta } } : {}),
     };
   }
 }

@@ -3,7 +3,10 @@ import {
   applyWorkerExecutionBudgetPolicy,
   buildExecutionPlanDigestContext,
   computeExecutionPlanDigest,
+  computeExecutionPlanDigestByVersion,
+  computeExecutionPlanDigestV3,
   EXECUTION_PLAN_DIGEST_VERSION,
+  EXECUTION_PLAN_DIGEST_VERSION_V2,
 } from '../../src/core/execution-plan-digest.js';
 import type { ExecutionBudgetPolicyConfig, ResolvedConfig } from '../../src/core/config-types.js';
 import type { Sprint, Task } from '../../src/core/types.js';
@@ -18,6 +21,7 @@ function policy(maxTurns = 40): ExecutionBudgetPolicyConfig {
         by_task_kind: { documentation: { maxTurns: 10, maxCacheReadTokens: 500_000 } },
       },
     },
+    landing: { reserve_ratio: 0.25 },
   };
 }
 
@@ -100,6 +104,8 @@ describe('plan-time worker budget projection', () => {
       state: 'allow',
       role: 'worker',
       profileRef: 'execution_budget.roles.worker.default',
+      admissionMode: 'unattended',
+      landingPolicy: { reserve_ratio: 0.25, attended_unsupported: 'hold' },
       requestedBudget: { maxTurns: 12, maxCacheReadTokens: 9_000_000 },
     });
     expect(planned.budgetPolicy).toEqual(snapshot);
@@ -122,6 +128,50 @@ describe('plan-time worker budget projection', () => {
     const [snapshot] = applyWorkerExecutionBudgetPolicy([planned]);
     expect(snapshot).toMatchObject({ state: 'allow', executionCostClass: 'local', profileRef: 'local-exempt' });
     expect(planned.budget).toBeUndefined();
+  });
+});
+
+describe('execution plan digest v3 topology binding', () => {
+  function v3(value: Sprint, maxWorkers = 4) {
+    return computeExecutionPlanDigestV3(
+      value,
+      buildExecutionPlanDigestContext(config(), 'subscription', maxWorkers),
+    );
+  }
+
+  it('binds shared-writer topology and configured concurrency while ignoring task-ID-only drift', () => {
+    const base = sprint({
+      tasks: [
+        task('counter-900', { scope: { directories: [], filesRead: [], filesWrite: ['src/shared.ts'] } }),
+        task('counter-100', { scope: { directories: [], filesRead: [], filesWrite: ['./src/shared.ts'] } }),
+      ],
+    });
+    const remapped = structuredClone(base);
+    remapped.tasks[0]!.id = 'new-a';
+    remapped.tasks[1]!.id = 'new-b';
+
+    expect(v3(remapped).digest).toBe(v3(base).digest);
+    expect(v3(base, 2).digest).not.toBe(v3(base, 1).digest);
+    expect(v3(base).topology.verdict).toBe('block');
+    expect(v3(base).version).toBe(EXECUTION_PLAN_DIGEST_VERSION);
+  });
+
+  it('keeps v2 byte semantics independent from the new optional concurrency context', () => {
+    const planned = sprint();
+    const oldContext = buildExecutionPlanDigestContext(config(), 'subscription');
+    const extendedContext = buildExecutionPlanDigestContext(config(), 'subscription', 8);
+    expect(computeExecutionPlanDigest(planned, extendedContext).digest)
+      .toBe(computeExecutionPlanDigest(planned, oldContext).digest);
+  });
+
+  it('dispatches persisted v2 and v3 explicitly and rejects unknown versions', () => {
+    const planned = sprint();
+    const context = buildExecutionPlanDigestContext(config(), 'subscription', 4);
+    expect(computeExecutionPlanDigestByVersion(EXECUTION_PLAN_DIGEST_VERSION_V2, planned, context).version)
+      .toBe(EXECUTION_PLAN_DIGEST_VERSION_V2);
+    expect(computeExecutionPlanDigestByVersion(EXECUTION_PLAN_DIGEST_VERSION, planned, context).version)
+      .toBe(EXECUTION_PLAN_DIGEST_VERSION);
+    expect(() => computeExecutionPlanDigestByVersion(99, planned, context)).toThrow('unsupported version 99');
   });
 });
 
@@ -185,7 +235,7 @@ describe('execution plan digest v2', () => {
       sprint(),
       buildExecutionPlanDigestContext(config(), 'subscription'),
     );
-    expect(result.version).toBe(EXECUTION_PLAN_DIGEST_VERSION);
+    expect(result.version).toBe(EXECUTION_PLAN_DIGEST_VERSION_V2);
     expect(result.digest).toMatch(/^[a-f0-9]{64}$/);
     expect(Object.isFrozen(result.projection)).toBe(true);
     expect(Object.isFrozen((result.projection.tasks as unknown[])[0])).toBe(true);
@@ -206,7 +256,7 @@ describe('execution plan digest v2', () => {
         flowId: 'flow-1',
         revision: 1,
         planDigest: approvedDigest,
-        planDigestVersion: EXECUTION_PLAN_DIGEST_VERSION,
+        planDigestVersion: EXECUTION_PLAN_DIGEST_VERSION_V2,
         planDigestContext: context,
         approvedBy: { id: 'owner' },
         approvedAt: '2026-07-21T00:00:00.000Z',

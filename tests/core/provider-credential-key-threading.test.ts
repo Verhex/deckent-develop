@@ -4,6 +4,7 @@ import type { ProviderDefinition, ResolvedConfig } from '../../src/core/config-t
 const mockState = vi.hoisted(() => ({
   captures: {
     codex: [] as Array<{ credentialEnvKeys?: readonly string[] }>,
+    gemini: [] as Array<{ credentialEnvKeys?: readonly string[] }>,
     ollama: [] as Array<{ credentialEnvKeys?: readonly string[] }>,
     openaiCompatible: [] as Array<{ credentialEnvKeys?: readonly string[] }>,
     openrouter: [] as Array<{ credentialEnvKeys?: readonly string[] }>,
@@ -39,6 +40,13 @@ vi.mock('../../src/providers/codex.js', () => ({
   createCodexAdapter: vi.fn((_root: string, opts?: { credentialEnvKeys?: readonly string[] }) => {
     mockState.captures.codex.push(opts ?? {});
     return mockState.adapter('codex');
+  }),
+}));
+
+vi.mock('../../src/providers/gemini.js', () => ({
+  createGeminiAdapter: vi.fn((_root: string, opts?: { credentialEnvKeys?: readonly string[] }) => {
+    mockState.captures.gemini.push(opts ?? {});
+    return mockState.adapter('gemini');
   }),
 }));
 
@@ -91,6 +99,7 @@ describe('bootstrapProviders — canonical credential scrub key threading', () =
       models: ['my-llm-v1'],
     },
     { name: 'codex-alias', type: 'codex' },
+    { name: 'gemini-alias', type: 'gemini' },
     { name: 'local-alias', type: 'ollama' },
   ];
   const credentialKeys = resolveCrossProviderCredentialKeys({ registry: registryDefs });
@@ -98,6 +107,7 @@ describe('bootstrapProviders — canonical credential scrub key threading', () =
   beforeEach(() => {
     vi.clearAllMocks();
     mockState.captures.codex.length = 0;
+    mockState.captures.gemini.length = 0;
     mockState.captures.ollama.length = 0;
     mockState.captures.openaiCompatible.length = 0;
     mockState.captures.openrouter.length = 0;
@@ -110,7 +120,7 @@ describe('bootstrapProviders — canonical credential scrub key threading', () =
     globalThis.fetch = originalFetch;
   });
 
-  it('passes the same base+registry key set to Codex, Ollama, OpenAI-compatible and OpenRouter adapters', async () => {
+  it('passes the same base+registry key set to Codex, Gemini, Ollama, OpenAI-compatible and OpenRouter adapters', async () => {
     const config = {
       projectRoot: '/tmp/provider-credential-key-threading',
       auth_mode: 'api',
@@ -125,10 +135,12 @@ describe('bootstrapProviders — canonical credential scrub key threading', () =
 
     const expected = resolveCrossProviderCredentialKeys({ registry: registryDefs });
     expect(mockState.captures.codex).toHaveLength(1);
+    expect(mockState.captures.gemini).toHaveLength(1);
     expect(mockState.captures.ollama).toHaveLength(1);
     expect(mockState.captures.openaiCompatible).toHaveLength(1);
     expect(mockState.captures.openrouter).toHaveLength(1);
     expect(mockState.captures.codex[0]?.credentialEnvKeys).toEqual(expected);
+    expect(mockState.captures.gemini[0]?.credentialEnvKeys).toEqual(expected);
     expect(mockState.captures.ollama[0]?.credentialEnvKeys).toEqual(expected);
     expect(mockState.captures.openaiCompatible[0]?.credentialEnvKeys).toEqual(expected);
     expect(mockState.captures.openrouter[0]?.credentialEnvKeys).toEqual(expected);

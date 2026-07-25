@@ -5,6 +5,10 @@
 import { modelRegistry, registerCodexParityModels } from './model-registry.js';
 import type { TaskKind, ActorContext, ExecutionBudget } from './work-model.js';
 import type { ProviderBillingEvidence } from './provider-billing-evidence.js';
+import type { ExecutionBudgetRole, ExecutionLandingPolicyConfig } from './config-types.js';
+import type { ExecutionAdmissionMode } from './execution-admission.js';
+import type { AttendedExecutionProposalReference } from './attended-execution-proposal.js';
+import type { InvocationReceiptRef } from './invocation-receipt.js';
 
 // ─── Models ──────────────────────────────────────────────────────────
 
@@ -281,13 +285,33 @@ export interface GoNoGoCriteria {
  */
 export interface TaskExecutionBudgetPolicySnapshot {
   readonly state: 'allow' | 'hold';
-  readonly role: 'worker';
+  readonly role: ExecutionBudgetRole;
   readonly taskKind?: TaskKind;
   readonly resolvedProvider: ProviderName | 'unknown';
   readonly executionCostClass: 'remote' | 'local';
   readonly profileRef: string;
   readonly policyDigest?: string;
-  readonly reasonCode?: 'budget-policy-missing' | 'role-profile-missing';
+  readonly reasonCode?:
+    | 'budget-policy-missing'
+    | 'role-profile-missing'
+    | 'landing-policy-missing'
+    | 'landing-turn-reserve-insufficient';
+  readonly requiredContinuationTurns?: number;
+  readonly guaranteedContinuationTurns?: number;
+  /** ADR-G-037 attendance is explicit; missing producer evidence resolves to unattended. */
+  readonly admissionMode: ExecutionAdmissionMode;
+  /** Owner-authored landing contract included in the execution-policy digest. */
+  readonly landingPolicy?: Readonly<ExecutionLandingPolicyConfig>;
+  /**
+   * Immutable ApprovalBroker request reference carried as provenance only.
+   * It is never an execution permit without final host receipt verification.
+   */
+  readonly approvalEvidenceRef?: string;
+  /**
+   * Exact immutable proposal digests approved by the owner. The request
+   * reference above is never sufficient without this host-verified projection.
+   */
+  readonly approvalProposal?: Readonly<AttendedExecutionProposalReference>;
   /** The pre-policy request, retained because a request may narrow but never widen owner authority. */
   readonly requestedBudget?: Readonly<ExecutionBudget>;
 }
@@ -526,6 +550,34 @@ export interface BrainAnswer {
 // ─── TaskResult ──────────────────────────────────────────────────────
 export type CrossVerifyVerdict = 'confirmed' | 'refuted' | 'unclear';
 
+/** Host-observed execution truth for one semantic cross-verification verdict. */
+export interface CrossVerifyExecutionEvidence {
+  outcome: 'completed' | 'budget-exhausted' | 'failed';
+  initialAttemptId: string;
+  terminalAttemptId: string;
+  reason?: string;
+  cumulativeUsage?: {
+    turns: number;
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cacheCreationTokens: number;
+    totalTokens: number;
+    maxContextTokens: number;
+  };
+}
+
+/** Exact host-authority references that admitted a verifier candidate. */
+export interface CrossVerifyEligibilityEvidence {
+  reachabilityRef: string;
+  limitEvidenceRefs: string[];
+  accountRefHash: string | null;
+  authMode: string;
+  transport: string;
+  executionBackend: string;
+  executionProfileRef: string;
+}
+
 /** Durable cross-provider verification evidence appended by the orchestrator. */
 export type CrossVerifyEvidence =
   | {
@@ -534,12 +586,17 @@ export type CrossVerifyEvidence =
       verifierModel: string;
       verdict: CrossVerifyVerdict;
       reason: string;
+      execution?: CrossVerifyExecutionEvidence;
+      eligibility?: CrossVerifyEligibilityEvidence;
+      invocationReceiptRef?: InvocationReceiptRef;
     }
   | {
       outcome: 'unavailable';
       verifier?: ProviderName;
       verifierModel?: string;
       reason: string;
+      invocationReceiptRef?: InvocationReceiptRef;
+      authorityEvidenceRef?: string;
     };
 
 export interface TaskResult {

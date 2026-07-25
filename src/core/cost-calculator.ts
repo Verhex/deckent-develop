@@ -21,6 +21,7 @@ import {
   type BillingMode,
 } from './cost-config-loader.js';
 import { modelRegistry, ModelRegistry } from './model-registry.js';
+import { resolveProviderExecutionCostClass } from './provider-execution-profile.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -57,9 +58,23 @@ export interface PerProviderBreakdown {
     }
   >;
   totalApiCostUsd: number;
-  /** For subscription mode: estimated % of daily quota consumed */
+  /** Present only when backed by authoritative provider-limit evidence. */
   subscriptionQuotaPercent?: number;
+  /** Unknown is distinct from a measured zero. */
+  subscriptionQuotaState?: 'known' | 'unknown';
 }
+
+export type SubscriptionQuotaImpact =
+  | {
+      state: 'known';
+      dailyPercent: number;
+      evidenceSource: string;
+    }
+  | {
+      state: 'unknown';
+      dailyPercent: null;
+      reason: 'provider-limit-evidence-not-supplied';
+    };
 
 export interface SprintCostEstimate {
   taskCount: number;
@@ -75,9 +90,9 @@ export interface SprintCostEstimate {
 
   /** Total USD across all API-billed tasks */
   totalApiCostUsd: number;
-  /** Subscription impact (Claude Max only — ChatGPT/Gemini impossible) */
+  /** Subscription quota impact; unknown is never represented as zero. */
   subscriptionImpact: {
-    [provider: string]: { dailyPercent: number };
+    [provider: string]: SubscriptionQuotaImpact;
   };
 
   /** Three confidence levels */
@@ -190,7 +205,7 @@ export function resolveBillingModeForAuth(
   provider: string | undefined,
   effectiveAuthMode: 'subscription' | 'api' | 'hybrid' | undefined,
 ): BillingMode | undefined {
-  if (provider === 'ollama') return 'local';
+  if (provider && resolveProviderExecutionCostClass(provider) === 'local') return 'local';
   if (effectiveAuthMode === 'subscription') return 'subscription';
   if (effectiveAuthMode === 'api') return 'api';
   return undefined;
@@ -691,18 +706,21 @@ export function estimateSprintCost(
     recommendations.push(`Add ${m} to .deckent/cost-config.json or use a known alias`);
   }
 
-  // Subscription impact rough estimate (Claude Max only)
+  // Subscription quota is provider/account/window evidence, not a function of
+  // estimated prompt tokens. Without that authority the only honest value is
+  // unknown; USD remains $0 because the plan is already subscription-paid.
   const subscriptionImpact: SprintCostEstimate['subscriptionImpact'] = {};
   for (const [provider, breakdown] of Object.entries(perProvider)) {
     if (breakdown.billingMode === 'subscription') {
-      // Rough heuristic: Claude Max ~= 250 messages/day equivalent
-      // Every 50K tokens ~= 1 message equivalent (very rough)
-      const totalTokens =
-        totalUncachedInputTokens + totalCacheCreationTokens + totalCacheReadTokens + totalOutputTokens;
-      const msgEquivalent = totalTokens / 50000;
-      const dailyPercent = (msgEquivalent / 250) * 100;
-      subscriptionImpact[provider] = { dailyPercent };
-      breakdown.subscriptionQuotaPercent = dailyPercent;
+      subscriptionImpact[provider] = {
+        state: 'unknown',
+        dailyPercent: null,
+        reason: 'provider-limit-evidence-not-supplied',
+      };
+      breakdown.subscriptionQuotaState = 'unknown';
+      warnings.push(
+        `${provider} subscription quota is unknown: no authoritative provider-limit evidence was supplied. USD $0 is not a quota-availability verdict.`,
+      );
     }
   }
 
@@ -796,8 +814,10 @@ export function formatEstimate(est: SprintCostEstimate): string {
     if (pp.billingMode === 'api') {
       lines.push(`  ${providerName.padEnd(20)} $${pp.totalApiCostUsd.toFixed(4)} (api)`);
     } else if (pp.billingMode === 'subscription') {
-      const pct = pp.subscriptionQuotaPercent?.toFixed(1) ?? '0.0';
-      lines.push(`  ${providerName.padEnd(20)} $0 (subscription, ~${pct}% daily quota)`);
+      const quota = pp.subscriptionQuotaState === 'known'
+        ? `~${pp.subscriptionQuotaPercent!.toFixed(1)}% daily quota`
+        : 'quota UNKNOWN';
+      lines.push(`  ${providerName.padEnd(20)} $0 (subscription; ${quota})`);
     } else if (pp.billingMode === 'local') {
       lines.push(`  ${providerName.padEnd(20)} $0 (local)`);
     } else {
@@ -812,15 +832,17 @@ export function formatEstimate(est: SprintCostEstimate): string {
   if (Object.keys(est.subscriptionImpact).length > 0) {
     lines.push(`\nSubscription impact:`);
     for (const [prov, impact] of Object.entries(est.subscriptionImpact)) {
-      lines.push(`  ${prov} daily: ${impact.dailyPercent.toFixed(1)}%`);
+      lines.push(impact.state === 'known'
+        ? `  ${prov} daily: ${impact.dailyPercent.toFixed(1)}% (${impact.evidenceSource})`
+        : `  ${prov}: UNKNOWN (${impact.reason})`);
     }
   }
 
-  lines.push(`\nBudget check:`);
-  lines.push(`  Sprint budget:       $${est.budgetUsd.toFixed(2)} (config: cost_limits.sprint_max_usd)`);
-  lines.push(`  Used:                ${est.percentOfBudget.toFixed(1)}%`);
+  lines.push(`\nAPI/USD budget check:`);
+  lines.push(`  Sprint USD budget:   $${est.budgetUsd.toFixed(2)} (config: cost_limits.sprint_max_usd)`);
+  lines.push(`  API USD used:        ${est.percentOfBudget.toFixed(1)}%`);
   const statusIcon = est.withinBudget ? '✅' : '❌';
-  lines.push(`  Status:              ${statusIcon} ${est.withinBudget ? 'Within budget' : 'EXCEEDS BUDGET'}`);
+  lines.push(`  USD status:          ${statusIcon} ${est.withinBudget ? 'Within API/USD budget' : 'EXCEEDS API/USD BUDGET'}`);
 
   if (est.warnings.length > 0) {
     lines.push(`\nWarnings:`);

@@ -4,10 +4,14 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  deriveProviderAccountBackendScopeRefHash,
   ProviderEvidenceProducer,
+  type ProviderAccountIdentityReady,
+  type ProviderAccountIdentityRequest,
   type ProviderEvidenceRefreshRequest,
   type ProviderEvidenceSources,
 } from '../../src/core/provider-evidence-producer.js';
+import { ProviderEvidenceSourceRegistry } from '../../src/core/provider-evidence-source-registry.js';
 import { ProviderAuthorityKeyring } from '../../src/core/provider-authority-keyring.js';
 import { ProviderLimitStore } from '../../src/core/provider-limit-store.js';
 import {
@@ -92,14 +96,32 @@ function request(overrides: Partial<ProviderEvidenceRefreshRequest> = {}): Provi
   };
 }
 
+function verifiedAccountIdentity(
+  input: ProviderAccountIdentityRequest,
+  overrides: Partial<ProviderAccountIdentityReady> = {},
+): ProviderAccountIdentityReady {
+  return {
+    state: 'ready',
+    provider: input.provider,
+    authMode: input.authMode,
+    identityKind: 'provider-account',
+    assurance: 'provider-verified',
+    issuer: 'provider.example',
+    stableSubject: 'raw-account@example.invalid',
+    evidenceRef: 'account-evidence:test-0001',
+    credentialGenerationRef: 'credential-generation:test-0001',
+    backendScopeRefHash: deriveProviderAccountBackendScopeRefHash(input),
+    fetchedAt: T0.toISOString(),
+    expiresAt: T1,
+    ...overrides,
+  };
+}
+
 function sources(overrides: Partial<ProviderEvidenceSources> = {}): ProviderEvidenceSources {
   return {
     account: {
       authorityRef: 'account-authority:test-0001',
-      resolve: async () => ({
-        state: 'ready',
-        stableAccountIdentity: 'raw-account@example.invalid',
-      }),
+      resolve: async input => verifiedAccountIdentity(input),
     },
     limit: {
       authorityRef: 'limit-authority:test-0001',
@@ -164,6 +186,7 @@ function fixture(sourceOverrides: Partial<ProviderEvidenceSources> = {}): {
     now: () => T0.toISOString(),
   });
   closers.push(truthStore, limitStore, receiptStore);
+  const selectedSources = sources(sourceOverrides);
   return {
     producer: new ProviderEvidenceProducer({
       tenantId: 'tenant-a',
@@ -172,7 +195,22 @@ function fixture(sourceOverrides: Partial<ProviderEvidenceSources> = {}): {
       truthStore,
       limitStore,
       receiptLedger: receiptStore,
-      sources: sources(sourceOverrides),
+      sourceResolver: new ProviderEvidenceSourceRegistry([
+        {
+          provider: 'claude',
+          authMode: 'subscription',
+          transport: 'cli',
+          executionBackend: 'host-subprocess',
+          sources: selectedSources,
+        },
+        {
+          provider: 'ollama',
+          authMode: 'local',
+          transport: 'local-runtime',
+          executionBackend: 'in-process',
+          sources: selectedSources,
+        },
+      ]),
       policyResolver: () => POLICY,
       now: () => T0,
     }),
@@ -190,6 +228,47 @@ afterEach(() => {
 });
 
 describe('ProviderEvidenceProducer', () => {
+  it('holds an unregistered exact source scope before any evidence source runs', async () => {
+    const accountResolve = vi.fn();
+    const limitObserve = vi.fn();
+    const reachabilityProbe = vi.fn();
+    const fx = fixture({
+      account: { authorityRef: 'account-authority:missing-scope', resolve: accountResolve },
+      limit: {
+        ...sources().limit,
+        authorityRef: 'limit-authority:missing-scope',
+        observe: limitObserve,
+      },
+      reachability: {
+        authorityRef: 'reachability-authority:missing-scope',
+        probe: reachabilityProbe,
+      },
+    });
+
+    const result = await fx.producer.refresh(request({
+      backend: { ...request().backend, executionBackend: 'docker' },
+      executionProfile: {
+        ...request().executionProfile,
+        allowed: [{
+          authMode: 'subscription',
+          transport: 'cli',
+          executionBackend: 'docker',
+        }],
+      },
+    }));
+
+    expect(result).toMatchObject({
+      state: 'hold',
+      reasonCode: 'source_bundle_unavailable',
+      limit: null,
+      reachability: null,
+      receiptRef: null,
+    });
+    expect(accountResolve).not.toHaveBeenCalled();
+    expect(limitObserve).not.toHaveBeenCalled();
+    expect(reachabilityProbe).not.toHaveBeenCalled();
+  });
+
   it('persists limit before one receipt-bound exact probe and exposes no raw principal', async () => {
     const order: string[] = [];
     const limitProbe = vi.fn(async () => {
@@ -306,6 +385,111 @@ describe('ProviderEvidenceProducer', () => {
       .not.toContain('contains-secret-output');
   });
 
+  it('holds credential-only identity evidence before limit, probe, or receipt declaration', async () => {
+    const limitProbe = vi.fn();
+    const exactProbe = vi.fn();
+    const fx = fixture({
+      account: {
+        authorityRef: 'account-authority:test-credential-only',
+        resolve: async () => ({
+          state: 'credential-only',
+          credentialGenerationRef: 'credential-generation:test-only',
+          evidenceRef: 'account-evidence:credential-only',
+          fetchedAt: T0.toISOString(),
+          expiresAt: T1,
+        }),
+      },
+      limit: { ...sources().limit, observe: limitProbe },
+      reachability: { ...sources().reachability, probe: exactProbe },
+    });
+
+    const result = await fx.producer.refresh(request());
+    expect(result).toMatchObject({
+      state: 'hold',
+      reasonCode: 'account_authority_hold',
+      limit: null,
+      reachability: null,
+      receiptRef: null,
+    });
+    expect(limitProbe).not.toHaveBeenCalled();
+    expect(exactProbe).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['provider mismatch', (input: ProviderAccountIdentityRequest) => (
+      verifiedAccountIdentity(input, { provider: 'codex' })
+    )],
+    ['auth mismatch', (input: ProviderAccountIdentityRequest) => (
+      verifiedAccountIdentity(input, { authMode: 'api' })
+    )],
+    ['backend mismatch', (input: ProviderAccountIdentityRequest) => (
+      verifiedAccountIdentity(input, { backendScopeRefHash: 'f'.repeat(64) })
+    )],
+    ['stale evidence', (input: ProviderAccountIdentityRequest) => (
+      verifiedAccountIdentity(input, {
+        fetchedAt: '2026-07-23T07:58:00.000Z',
+        expiresAt: '2026-07-23T07:59:00.000Z',
+      })
+    )],
+    ['overlong TTL', (input: ProviderAccountIdentityRequest) => (
+      verifiedAccountIdentity(input, { expiresAt: '2026-07-23T08:02:00.000Z' })
+    )],
+  ])('holds %s account evidence before downstream calls', async (_name, identityFactory) => {
+    const limitProbe = vi.fn();
+    const exactProbe = vi.fn();
+    const fx = fixture({
+      account: {
+        authorityRef: 'account-authority:test-invalid',
+        resolve: async input => identityFactory(input),
+      },
+      limit: { ...sources().limit, observe: limitProbe },
+      reachability: { ...sources().reachability, probe: exactProbe },
+    });
+
+    const result = await fx.producer.refresh(request());
+    expect(result).toMatchObject({
+      state: 'hold',
+      reasonCode: 'account_authority_hold',
+      limit: null,
+      reachability: null,
+      receiptRef: null,
+    });
+    expect(limitProbe).not.toHaveBeenCalled();
+    expect(exactProbe).not.toHaveBeenCalled();
+  });
+
+  it('keeps local execution accountless and never invokes the account authority', async () => {
+    const accountResolve = vi.fn();
+    const fx = fixture({
+      account: {
+        authorityRef: 'account-authority:test-local-unused',
+        resolve: accountResolve,
+      },
+    });
+    const localRequest = request({
+      provider: 'ollama',
+      model: 'qwen2.5-coder:7b',
+      authMode: 'local',
+      backend: {
+        ...request().backend,
+        transport: 'local-runtime',
+        executionBackend: 'in-process',
+      },
+      executionProfile: {
+        profileRef: 'execution-profile:probe-0001',
+        provider: 'ollama',
+        allowed: [{
+          authMode: 'local',
+          transport: 'local-runtime',
+          executionBackend: 'in-process',
+        }],
+      },
+    });
+    const result = await fx.producer.refresh(localRequest);
+    expect(accountResolve).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ limit: { accountRefHash: null } });
+  });
+
   it('persists a limit HOLD and a not-run reachability result without declaring a receipt', async () => {
     const exactProbe = vi.fn();
     const fx = fixture({
@@ -324,6 +508,40 @@ describe('ProviderEvidenceProducer', () => {
       receiptRef: null,
     });
     expect(exactProbe).not.toHaveBeenCalled();
+  });
+
+  it('threads exact model and verified account provenance into the limit source', async () => {
+    const defaultSources = sources();
+    const limitObserve = vi.fn(defaultSources.limit.observe);
+    const fx = fixture({
+      limit: { ...defaultSources.limit, observe: limitObserve },
+    });
+
+    await fx.producer.refresh(request());
+
+    expect(limitObserve).toHaveBeenCalledOnce();
+    expect(limitObserve).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'claude',
+      model: 'claude-fable-5',
+      authMode: 'subscription',
+      accountRefHash: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      accountEvidence: {
+        identityEvidenceRef: 'account-evidence:test-0001',
+        credentialGenerationRef: 'credential-generation:test-0001',
+        backendScopeRefHash: deriveProviderAccountBackendScopeRefHash({
+          tenantId: 'tenant-test',
+          provider: 'claude',
+          authMode: 'subscription',
+          backend: request().backend,
+          executionProfile: request().executionProfile,
+        }),
+      },
+      backend: {
+        transport: 'cli',
+        executionBackend: 'host-subprocess',
+        endpointRefHash: ENDPOINT_HASH,
+      },
+    }));
   });
 
   it('records successful transport but rejects an exact-model mismatch', async () => {

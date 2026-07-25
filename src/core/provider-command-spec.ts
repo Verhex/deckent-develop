@@ -37,6 +37,19 @@ export interface ProviderCommandSpec {
   /** Flag for the allowed-tools list, or null if the provider has no such flag. */
   allowedToolsFlag: string | null;
   /**
+   * Flag that narrows the provider-visible built-in tool schema, or null when
+   * the provider CLI has no equivalent. Distinct from `allowedToolsFlag`,
+   * which controls permission; this controls which tool definitions enter the
+   * model context at all.
+   */
+  availableToolsFlag: string | null;
+  /**
+   * Provider-native flags for an isolated finite-verification context.
+   * These suppress project/user customizations and session persistence without
+   * changing provider auth. Empty when the CLI has no equivalent contract.
+   */
+  isolatedContextArgs: readonly string[];
+  /**
    * How the prompt reaches the CLI:
    *  - 'stdin'  → command has no prompt; the caller pipes `< <promptFile>`
    *               (claude `-p -`, codex `exec` with no positional).
@@ -95,6 +108,8 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
     modelFlag: '--model',
     approvalArgs: ['--dangerously-skip-permissions'],
     allowedToolsFlag: '--allowedTools',
+    availableToolsFlag: '--tools',
+    isolatedContextArgs: ['--safe-mode', '--disable-slash-commands', '--no-session-persistence'],
     promptFeed: 'stdin',
     oauthHomeDir: '.claude',
     reasoningEffortArgs: (level) => ['--effort', level], // low|medium|high|xhigh|max
@@ -112,6 +127,8 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
     // Container is the external sandbox → bypass codex's internal sandbox+approvals.
     approvalArgs: ['--dangerously-bypass-approvals-and-sandbox'],
     allowedToolsFlag: null,
+    availableToolsFlag: null,
+    isolatedContextArgs: [],
     promptFeed: 'stdin',
     oauthHomeDir: '.codex',
     reasoningEffortArgs: (level) => ['-c', `model_reasoning_effort=${level}`], // minimal|low|medium|high
@@ -126,6 +143,8 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
     // trust the workspace headlessly (else the CLI aborts with a trust prompt).
     approvalArgs: ['--approval-mode', 'yolo', '--skip-trust'],
     allowedToolsFlag: null,
+    availableToolsFlag: null,
+    isolatedContextArgs: [],
     promptFeed: 'inline',
     oauthHomeDir: '.gemini',
     reasoningEffortArgs: null, // gemini CLI has no reasoning-effort knob
@@ -147,7 +166,14 @@ export function buildProviderCommand(
   spec: ProviderCommandSpec,
   apiId: string,
   promptPath: string,
-  opts: { allowedTools?: string; autoApprove?: boolean; reasoningEffort?: string; excludeDynamicPromptSections?: boolean } = {},
+  opts: {
+    allowedTools?: string;
+    availableTools?: string;
+    isolatedContext?: boolean;
+    autoApprove?: boolean;
+    reasoningEffort?: string;
+    excludeDynamicPromptSections?: boolean;
+  } = {},
 ): string {
   const parts: string[] = [spec.binary];
   for (const arg of spec.baseArgs) {
@@ -156,6 +182,12 @@ export function buildProviderCommand(
   parts.push(spec.modelFlag, apiId);
   if (spec.allowedToolsFlag && opts.allowedTools) {
     parts.push(spec.allowedToolsFlag, `"${opts.allowedTools}"`);
+  }
+  if (spec.availableToolsFlag && opts.availableTools) {
+    parts.push(spec.availableToolsFlag, `"${opts.availableTools}"`);
+  }
+  if (opts.isolatedContext) {
+    parts.push(...spec.isolatedContextArgs);
   }
   if (opts.autoApprove) {
     parts.push(...spec.approvalArgs);

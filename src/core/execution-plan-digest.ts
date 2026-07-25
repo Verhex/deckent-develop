@@ -16,8 +16,19 @@ import type {
   TaskExecutionBudgetPolicySnapshot,
 } from './types.js';
 import type { ExecutionBudget } from './work-model.js';
+import type { ExecutionAdmissionMode } from './execution-admission.js';
+import type { AttendedExecutionProposalReference } from './attended-execution-proposal.js';
+import {
+  deriveExecutionTopology,
+  type ExecutionTopology,
+} from './execution-topology.js';
+import { createExecutionAuthorityError } from './errors.js';
 
-export const EXECUTION_PLAN_DIGEST_VERSION = 2 as const;
+export const EXECUTION_PLAN_DIGEST_VERSION_V2 = 2 as const;
+export const EXECUTION_PLAN_DIGEST_VERSION = 3 as const;
+export type ExecutionPlanDigestVersion =
+  | typeof EXECUTION_PLAN_DIGEST_VERSION_V2
+  | typeof EXECUTION_PLAN_DIGEST_VERSION;
 
 export type ExecutionPlanAuthMode = 'subscription' | 'api' | 'hybrid';
 
@@ -30,15 +41,19 @@ export interface ExecutionPlanDigestContext {
   readonly fallbackProvider: ProviderName | null;
   readonly fallbackPolicy: ProviderFallbackPolicyConfig | null;
   readonly executionBudgetPolicy: ExecutionBudgetPolicyConfig | null;
+  /** V3-only topology input. V2 projection deliberately excludes this field. */
+  readonly configuredMaxWorkers?: number;
 }
 
 export interface ExecutionPlanDigestResult {
-  readonly version: typeof EXECUTION_PLAN_DIGEST_VERSION;
+  readonly version: ExecutionPlanDigestVersion;
   readonly digest: string;
   /** Deep-frozen, JSON-safe approval envelope used to produce `digest`. */
   readonly projection: Readonly<Record<string, unknown>>;
   /** Canonical derived HOLDs in stable plan-slot order. */
   readonly budgetHolds: readonly ExecutionPlanBudgetHold[];
+  /** Present only for digest v3. */
+  readonly topology?: ExecutionTopology;
 }
 
 export interface ExecutionPlanBudgetHold {
@@ -95,6 +110,11 @@ function budgetSnapshotFor(
   task: Task,
   policy: ExecutionBudgetPolicyConfig | undefined,
   configuredProvider?: ProviderName | null,
+  admission?: {
+    mode?: ExecutionAdmissionMode;
+    approvalEvidenceRef?: string;
+    approvalProposal?: AttendedExecutionProposalReference;
+  },
 ): TaskExecutionBudgetPolicySnapshot {
   const resolvedProvider = resolveProvider(task, configuredProvider);
   const adapterDeclaration = providerRegistry.hasProvider(resolvedProvider)
@@ -116,8 +136,24 @@ function budgetSnapshotFor(
     resolvedProvider,
     executionCostClass,
     profileRef: decision.profileRef,
+    admissionMode: admission?.mode ?? 'unattended',
     ...(decision.policyDigest ? { policyDigest: decision.policyDigest } : {}),
     ...(decision.state === 'hold' ? { reasonCode: decision.reasonCode } : {}),
+    ...(decision.state === 'hold' && decision.requiredContinuationTurns !== undefined
+      ? { requiredContinuationTurns: decision.requiredContinuationTurns }
+      : {}),
+    ...(decision.state === 'hold' && decision.guaranteedContinuationTurns !== undefined
+      ? { guaranteedContinuationTurns: decision.guaranteedContinuationTurns }
+      : {}),
+    ...(decision.state === 'allow' && decision.landingPolicy
+      ? { landingPolicy: cloneJson(decision.landingPolicy) }
+      : {}),
+    ...(admission?.approvalEvidenceRef
+      ? { approvalEvidenceRef: admission.approvalEvidenceRef }
+      : {}),
+    ...(admission?.approvalProposal
+      ? { approvalProposal: cloneJson(admission.approvalProposal) }
+      : {}),
     ...(requestedBudget ? { requestedBudget: cloneJson(requestedBudget) } : {}),
   });
 }
@@ -131,10 +167,15 @@ export function applyWorkerExecutionBudgetPolicy(
   tasks: Task[],
   policy?: ExecutionBudgetPolicyConfig,
   configuredProvider?: ProviderName,
+  admission?: {
+    mode?: ExecutionAdmissionMode;
+    approvalEvidenceRef?: string;
+    approvalProposal?: AttendedExecutionProposalReference;
+  },
 ): readonly TaskExecutionBudgetPolicySnapshot[] {
   return tasks.map((task) => {
     const requestedBudget = task.budgetPolicy?.requestedBudget ?? task.budget;
-    const snapshot = budgetSnapshotFor(task, policy, configuredProvider);
+    const snapshot = budgetSnapshotFor(task, policy, configuredProvider, admission);
     const decision = resolveExecutionBudgetPolicy({
       policy,
       role: 'worker',
@@ -159,6 +200,7 @@ export function applyWorkerExecutionBudgetPolicy(
 export function buildExecutionPlanDigestContext(
   config: ResolvedConfig,
   configuredAuthMode: ExecutionPlanAuthMode,
+  configuredMaxWorkers?: number,
 ): ExecutionPlanDigestContext {
   return deepFreeze({
     configuredProvider: config.worker_provider ?? null,
@@ -168,7 +210,21 @@ export function buildExecutionPlanDigestContext(
     fallbackProvider: config.fallback_provider ?? null,
     fallbackPolicy: config.provider_fallback ? cloneJson(config.provider_fallback) : null,
     executionBudgetPolicy: config.execution_budget ? cloneJson(config.execution_budget) : null,
+    ...(configuredMaxWorkers !== undefined ? { configuredMaxWorkers } : {}),
   });
+}
+
+/** Exact seven-field context shape used by persisted digest-v2 snapshots. */
+function projectDigestContextV2(context: ExecutionPlanDigestContext): Record<string, unknown> {
+  return {
+    configuredProvider: context.configuredProvider,
+    configuredModel: context.configuredModel,
+    configuredBackend: context.configuredBackend,
+    configuredAuthMode: context.configuredAuthMode,
+    fallbackProvider: context.fallbackProvider,
+    fallbackPolicy: cloneJson(context.fallbackPolicy),
+    executionBudgetPolicy: cloneJson(context.executionBudgetPolicy),
+  };
 }
 
 function normalizeTaskRef(ref: string, idToSlot: ReadonlyMap<string, number>): Record<string, unknown> {
@@ -280,7 +336,7 @@ function buildTaskProjection(
   };
 }
 
-export function computeExecutionPlanDigest(
+export function computeExecutionPlanDigestV2(
   sprint: Sprint,
   context: ExecutionPlanDigestContext,
 ): ExecutionPlanDigestResult {
@@ -301,8 +357,8 @@ export function computeExecutionPlanDigest(
     }];
   }));
   const projection = deepFreeze({
-    version: EXECUTION_PLAN_DIGEST_VERSION,
-    context: cloneJson(context),
+    version: EXECUTION_PLAN_DIGEST_VERSION_V2,
+    context: projectDigestContextV2(context),
     tasks: taskProjections,
     promptGate: sprint.promptGate
       ? {
@@ -313,9 +369,65 @@ export function computeExecutionPlanDigest(
       : { result: 'skipped', overrideApplied: false, findings: [] },
   }) as Readonly<Record<string, unknown>>;
   return {
-    version: EXECUTION_PLAN_DIGEST_VERSION,
+    version: EXECUTION_PLAN_DIGEST_VERSION_V2,
     digest: createHash('sha256').update(canonicalJson(projection)).digest('hex'),
     projection,
     budgetHolds,
   };
+}
+
+/**
+ * Compatibility export: callers that have not opted into a versioned
+ * topology input continue to produce frozen digest-v2 bytes.
+ */
+export const computeExecutionPlanDigest = computeExecutionPlanDigestV2;
+
+export function computeExecutionPlanDigestV3(
+  sprint: Sprint,
+  context: ExecutionPlanDigestContext,
+): ExecutionPlanDigestResult & {
+  readonly version: typeof EXECUTION_PLAN_DIGEST_VERSION;
+  readonly topology: ExecutionTopology;
+} {
+  const maxWorkers = context.configuredMaxWorkers;
+  if (!Number.isFinite(maxWorkers) || (maxWorkers ?? 0) < 1) {
+    throw createExecutionAuthorityError(
+      'execution-plan-digest: v3 requires configuredMaxWorkers >= 1',
+    );
+  }
+  const v2 = computeExecutionPlanDigestV2(sprint, context);
+  const topology = deriveExecutionTopology(sprint.tasks, { maxWorkers: maxWorkers! });
+  const projection = deepFreeze({
+    version: EXECUTION_PLAN_DIGEST_VERSION,
+    context: {
+      ...projectDigestContextV2(context),
+      configuredMaxWorkers: topology.configuredMaxWorkers,
+    },
+    tasks: (v2.projection.tasks as readonly unknown[]).map(item => cloneJson(item)),
+    promptGate: cloneJson(v2.projection.promptGate),
+    topology: cloneJson(topology),
+  }) as Readonly<Record<string, unknown>>;
+  return {
+    version: EXECUTION_PLAN_DIGEST_VERSION,
+    digest: createHash('sha256').update(canonicalJson(projection)).digest('hex'),
+    projection,
+    budgetHolds: v2.budgetHolds,
+    topology,
+  };
+}
+
+export function computeExecutionPlanDigestByVersion(
+  version: number,
+  sprint: Sprint,
+  context: ExecutionPlanDigestContext,
+): ExecutionPlanDigestResult {
+  if (version === EXECUTION_PLAN_DIGEST_VERSION_V2) {
+    return computeExecutionPlanDigestV2(sprint, context);
+  }
+  if (version === EXECUTION_PLAN_DIGEST_VERSION) {
+    return computeExecutionPlanDigestV3(sprint, context);
+  }
+  throw createExecutionAuthorityError(
+    `execution-plan-digest: unsupported version ${version}`,
+  );
 }

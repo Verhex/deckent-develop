@@ -15,6 +15,7 @@ import {
 } from 'node:fs';
 import { dirname, basename } from 'node:path';
 import { createDefaultConfig } from './config.js';
+import { resolveConfigMigrationModelTier } from './model-registry.js';
 import { structuredLog } from './observability.js';
 import type { DeckentConfig } from './types.js';
 import type { ModelTier } from './model-equivalence.js';
@@ -452,25 +453,7 @@ export function migrateConfigFull(
  * Used during config migration to convert brain_model / default_model to tier-based config.
  */
 export function modelToTier(model: string): ModelTier {
-  switch (model) {
-    case 'opus':
-    case 'gpt-5':
-    case 'gemini-2.5-pro':
-      return 'premium';
-    case 'sonnet':
-    case 'gpt-4.1':
-    case 'o3':
-    case 'gemini-2.5-flash':
-      return 'standard';
-    case 'haiku':
-    case 'gpt-5-mini':
-    case 'gpt-4.1-mini':
-    case 'o4-mini':
-    case 'gemini-2.0-flash':
-      return 'economy';
-    default:
-      return 'standard'; // safe fallback
-  }
+  return resolveConfigMigrationModelTier(model);
 }
 
 /**

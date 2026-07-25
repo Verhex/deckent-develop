@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  classifyCodexAuthStatus,
+  CODEX_AUTH_STATUS_ARGS,
   probeProviderAuth,
   type AuthProbeSpawnImpl,
   type AuthProbeSpawnResult,
@@ -53,7 +55,7 @@ describe('probeProviderAuth — claude (structured CLI status)', () => {
     expect(res.detail ?? '').not.toContain('sk-ant-SECRET');
   });
 
-  it('accepts only exit 0 + structured loggedIn=true', async () => {
+  it('accepts login only from exit 0 + structured loggedIn=true', async () => {
     const { impl, calls } = spawnStub({
       status: 0,
       stdout: JSON.stringify({
@@ -76,9 +78,16 @@ describe('probeProviderAuth — claude (structured CLI status)', () => {
     expect(JSON.stringify(res)).not.toContain('private-org');
   });
 
-  it('reports structured loggedIn=false as logged-out', async () => {
+  it('accepts the installed CLI contract: structured loggedIn=false exits 1', async () => {
     const { impl } = spawnStub({
-      status: 0, stdout: JSON.stringify({ loggedIn: false, email: 'must-not-leak@example.test' }), timedOut: false,
+      status: 1,
+      stdout: JSON.stringify({
+        loggedIn: false,
+        authMethod: 'none',
+        apiProvider: 'firstParty',
+        email: 'must-not-leak@example.test',
+      }),
+      timedOut: false,
     });
     const res = await probeProviderAuth('claude', {
       env: {},
@@ -88,6 +97,33 @@ describe('probeProviderAuth — claude (structured CLI status)', () => {
       state: 'logged-out', present: true, authenticated: false, method: 'none',
     });
     expect(JSON.stringify(res)).not.toContain('must-not-leak@example.test');
+  });
+
+  it('scrubs every canonical provider credential from the auth-status child env', async () => {
+    let observedEnv: NodeJS.ProcessEnv | undefined;
+    const impl: AuthProbeSpawnImpl = async (_command, _args, opts) => {
+      observedEnv = opts.env;
+      return {
+        status: 1,
+        stdout: JSON.stringify({ loggedIn: false }),
+        timedOut: false,
+      };
+    };
+    await probeProviderAuth('claude', {
+      env: {
+        PATH: '/safe/bin',
+        HOME: '/safe/home',
+        OPENAI_API_KEY: 'foreign-openai',
+        GOOGLE_API_KEY: 'foreign-google',
+        OPENROUTER_API_KEY: 'foreign-openrouter',
+      },
+      spawnImpl: impl,
+    });
+
+    expect(observedEnv).toMatchObject({ PATH: '/safe/bin', HOME: '/safe/home' });
+    expect(observedEnv).not.toHaveProperty('OPENAI_API_KEY');
+    expect(observedEnv).not.toHaveProperty('GOOGLE_API_KEY');
+    expect(observedEnv).not.toHaveProperty('OPENROUTER_API_KEY');
   });
 
   it.each([
@@ -123,6 +159,12 @@ describe('probeProviderAuth — claude (structured CLI status)', () => {
 });
 
 describe('probeProviderAuth — codex (CLI based)', () => {
+  it('uses one canonical command and rejects positive text on non-zero exit', () => {
+    expect(CODEX_AUTH_STATUS_ARGS).toEqual(['login', 'status']);
+    expect(classifyCodexAuthStatus(2, 'Logged in using ChatGPT')).toBe('unknown');
+    expect(classifyCodexAuthStatus(0, 'Not logged in')).toBe('logged-out');
+  });
+
   it('logged-out from "Not logged in" stdout EVEN with exit 0 (substring-trap guard)', async () => {
     // codex login status prints "Not logged in" with exit 0 — the logged-OUT
     // pattern must win over the "logged in" substring.
@@ -140,6 +182,29 @@ describe('probeProviderAuth — codex (CLI based)', () => {
     });
     const res = await probeProviderAuth('codex', { env: {}, spawnImpl: impl });
     expect(res.state).toBe('logged-in');
+  });
+
+  it('scrubs every canonical provider credential from the Codex status child env', async () => {
+    let observedEnv: NodeJS.ProcessEnv | undefined;
+    const impl: AuthProbeSpawnImpl = async (_command, _args, opts) => {
+      observedEnv = opts.env;
+      return { status: 0, stdout: 'Logged in using ChatGPT\n', timedOut: false };
+    };
+    await probeProviderAuth('codex', {
+      env: {
+        PATH: '/safe/bin',
+        HOME: '/safe/home',
+        ANTHROPIC_API_KEY: 'foreign-anthropic',
+        GOOGLE_API_KEY: 'foreign-google',
+        OPENROUTER_API_KEY: 'foreign-openrouter',
+      },
+      spawnImpl: impl,
+    });
+
+    expect(observedEnv).toMatchObject({ PATH: '/safe/bin', HOME: '/safe/home' });
+    expect(observedEnv).not.toHaveProperty('ANTHROPIC_API_KEY');
+    expect(observedEnv).not.toHaveProperty('GOOGLE_API_KEY');
+    expect(observedEnv).not.toHaveProperty('OPENROUTER_API_KEY');
   });
 
   it('unknown on probe timeout', async () => {

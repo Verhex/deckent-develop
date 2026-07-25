@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type {
+  ExecutionLandingPolicyConfig,
   ExecutionBudgetPolicyConfig,
   ExecutionBudgetRole,
 } from './config-types.js';
@@ -21,7 +22,9 @@ const BACKENDS = ['docker', 'subprocess', 'tmux'] as const;
 
 export type ExecutionBudgetPolicyHoldReason =
   | 'budget-policy-missing'
-  | 'role-profile-missing';
+  | 'role-profile-missing'
+  | 'landing-policy-missing'
+  | 'landing-turn-reserve-insufficient';
 
 export interface ExecutionBudgetPolicyAllowDecision {
   state: 'allow';
@@ -29,6 +32,7 @@ export interface ExecutionBudgetPolicyAllowDecision {
   profileRef: string;
   policyDigest: string;
   requestedNarrowing: boolean;
+  landingPolicy?: Readonly<ExecutionLandingPolicyConfig>;
 }
 
 export interface ExecutionBudgetPolicyHoldDecision {
@@ -36,6 +40,8 @@ export interface ExecutionBudgetPolicyHoldDecision {
   reasonCode: ExecutionBudgetPolicyHoldReason;
   profileRef: string;
   policyDigest?: string;
+  requiredContinuationTurns?: number;
+  guaranteedContinuationTurns?: number;
 }
 
 export type ExecutionBudgetPolicyDecision =
@@ -48,6 +54,61 @@ export class ExecutionBudgetPolicyError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'ExecutionBudgetPolicyError';
+  }
+}
+
+export interface ExecutionLandingTurnAllocation {
+  workTurns: number;
+  reservedTurns: number;
+}
+
+/**
+ * Allocate a discrete turn ceiling without rounding the owner-authored reserve
+ * down. Token ceilings are continuous; turns are indivisible provider calls.
+ */
+export function deriveExecutionLandingTurnAllocation(
+  maxTurns: number,
+  reserveRatio: number,
+): ExecutionLandingTurnAllocation {
+  if (!Number.isInteger(maxTurns) || maxTurns < 0) {
+    throw new ExecutionBudgetPolicyError('maxTurns must be a non-negative integer');
+  }
+  assertExecutionLandingPolicyConfig({ reserve_ratio: reserveRatio });
+  const reservedTurns = Math.ceil(maxTurns * reserveRatio);
+  return {
+    workTurns: Math.max(0, maxTurns - reservedTurns),
+    reservedTurns,
+  };
+}
+
+export function assertExecutionLandingPolicyConfig(
+  value: unknown,
+  path = 'execution_budget.landing',
+): asserts value is ExecutionLandingPolicyConfig {
+  if (!isPlainObject(value)) {
+    throw new ExecutionBudgetPolicyError(`${path} must be an object`);
+  }
+  assertKnownKeys(value, ['reserve_ratio', 'attended_unsupported'], path);
+  const reserveRatio = value.reserve_ratio;
+  if (
+    typeof reserveRatio !== 'number'
+    || !Number.isFinite(reserveRatio)
+    || reserveRatio <= 0
+    || reserveRatio >= 1
+  ) {
+    throw new ExecutionBudgetPolicyError(
+      `${path}.reserve_ratio must be a finite number greater than 0 and less than 1`,
+    );
+  }
+  const attendedUnsupported = value.attended_unsupported;
+  if (
+    attendedUnsupported !== undefined
+    && attendedUnsupported !== 'hold'
+    && attendedUnsupported !== 'allow-hard-stop'
+  ) {
+    throw new ExecutionBudgetPolicyError(
+      `${path}.attended_unsupported must be 'hold' or 'allow-hard-stop'`,
+    );
   }
 }
 
@@ -86,7 +147,7 @@ export function assertExecutionBudgetPolicyConfig(
   if (!isPlainObject(value)) {
     throw new ExecutionBudgetPolicyError('execution_budget must be an object');
   }
-  assertKnownKeys(value, ['roles', 'unmetered_backend'], 'execution_budget');
+  assertKnownKeys(value, ['roles', 'landing', 'unmetered_backend'], 'execution_budget');
   if (!isPlainObject(value.roles)) {
     throw new ExecutionBudgetPolicyError('execution_budget.roles must be an object');
   }
@@ -119,6 +180,10 @@ export function assertExecutionBudgetPolicyConfig(
         assertBudget(budget, `${rolePath}.by_task_kind.${kind}`);
       }
     }
+  }
+
+  if (value.landing !== undefined) {
+    assertExecutionLandingPolicyConfig(value.landing);
   }
 
   const unmetered = value.unmetered_backend;
@@ -176,6 +241,15 @@ function cloneBudget(value: ExecutionBudget): ExecutionBudget {
   ) as ExecutionBudget;
 }
 
+function cloneLandingPolicy(
+  value: ExecutionLandingPolicyConfig,
+): ExecutionLandingPolicyConfig {
+  return {
+    reserve_ratio: value.reserve_ratio,
+    attended_unsupported: value.attended_unsupported ?? 'hold',
+  };
+}
+
 function narrowBudget(authority: ExecutionBudget, requested?: ExecutionBudget): ExecutionBudget {
   const result = cloneBudget(authority);
   if (!requested) return result;
@@ -201,7 +275,16 @@ export function resolveExecutionBudgetPolicy(input: {
   taskKind?: TaskKind;
   requestedBudget?: ExecutionBudget;
   executionCostClass?: 'remote' | 'local';
+  minimumContinuationTurns?: number;
 }): ExecutionBudgetPolicyDecision {
+  if (
+    input.minimumContinuationTurns !== undefined
+    && (!Number.isInteger(input.minimumContinuationTurns) || input.minimumContinuationTurns < 1)
+  ) {
+    throw new ExecutionBudgetPolicyError(
+      'minimumContinuationTurns must be a positive integer',
+    );
+  }
   if (input.executionCostClass === 'local') {
     if (input.requestedBudget) assertBudget(input.requestedBudget, 'requested execution budget');
     const budget = input.requestedBudget ? Object.freeze(cloneBudget(input.requestedBudget)) : undefined;
@@ -223,6 +306,14 @@ export function resolveExecutionBudgetPolicy(input: {
 
   assertExecutionBudgetPolicyConfig(input.policy);
   const policyDigest = executionBudgetPolicyDigest(input.policy);
+  if (!input.policy.landing) {
+    return {
+      state: 'hold',
+      reasonCode: 'landing-policy-missing',
+      profileRef: 'execution_budget.landing',
+      policyDigest,
+    };
+  }
   const rolePolicy = input.policy.roles[input.role];
   const kindBudget = input.taskKind ? rolePolicy?.by_task_kind?.[input.taskKind] : undefined;
   const authority = kindBudget ?? rolePolicy?.default;
@@ -238,12 +329,34 @@ export function resolveExecutionBudgetPolicy(input: {
   }
 
   const budget = Object.freeze(narrowBudget(authority, input.requestedBudget));
+  const landingPolicy = Object.freeze(cloneLandingPolicy(input.policy.landing));
+  const profileRef = kindBudget
+    ? `execution_budget.roles.${input.role}.by_task_kind.${input.taskKind}`
+    : `execution_budget.roles.${input.role}.default`;
+  if (
+    input.minimumContinuationTurns !== undefined
+    && budget.maxTurns !== undefined
+  ) {
+    const guaranteedContinuationTurns = deriveExecutionLandingTurnAllocation(
+      budget.maxTurns,
+      landingPolicy.reserve_ratio,
+    ).reservedTurns;
+    if (guaranteedContinuationTurns < input.minimumContinuationTurns) {
+      return {
+        state: 'hold',
+        reasonCode: 'landing-turn-reserve-insufficient',
+        profileRef: `${profileRef}.maxTurns`,
+        policyDigest,
+        requiredContinuationTurns: input.minimumContinuationTurns,
+        guaranteedContinuationTurns,
+      };
+    }
+  }
   return {
     state: 'allow',
     budget,
-    profileRef: kindBudget
-      ? `execution_budget.roles.${input.role}.by_task_kind.${input.taskKind}`
-      : `execution_budget.roles.${input.role}.default`,
+    landingPolicy,
+    profileRef,
     policyDigest,
     requestedNarrowing: input.requestedBudget !== undefined,
   };

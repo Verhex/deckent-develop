@@ -16,7 +16,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 
@@ -24,6 +24,7 @@ import { dirname } from 'node:path';
 import {
   scanFile,
   collectTsFiles,
+  fingerprintObservations,
   runCheck,
   formatViolations,
 } from '../../scripts/check-error-handling.mjs';
@@ -40,6 +41,28 @@ function makeTmpDir(): string {
   return dir;
 }
 
+function runCommand(command: string, args: string[], cwd: string): Promise<{
+  code: number | null;
+  stdout: string;
+  stderr: string;
+}> {
+  return new Promise((resolveCommand, rejectCommand) => {
+    const child = spawn(command, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+    child.once('error', rejectCommand);
+    child.once('close', (code) => resolveCommand({ code, stdout, stderr }));
+  });
+}
+
 // ─── Lint Invoke Tests ────────────────────────────────────────────────────────
 
 describe('lint:errors — npm run invoke', () => {
@@ -51,19 +74,11 @@ describe('lint:errors — npm run invoke', () => {
     expect(scripts!['lint:errors']).toBe('node scripts/check-error-handling.mjs');
   });
 
-  it('npm run lint:errors reports only known allowlisted violations', () => {
-    // ADR-006: use spawnSync with args array, not shell:true
-    const result = spawnSync('npm', ['run', 'lint:errors'], {
-      cwd: PROJECT_ROOT,
-      encoding: 'utf-8',
-    });
-    // Known violations: monitor-adapter.ts + task-mode-runner.ts + managed-docs/docs-config.ts
-    // Tracked as acceptable until DeckentError migration is complete (Sprint 151 T-012)
-    expect(result.status).toBeLessThanOrEqual(1);
-    if (result.status === 1) {
-      // Verify script produced output with violation details
-      expect(result.stdout.length).toBeGreaterThan(0);
-    }
+  it('npm run lint:errors exits zero with visible known-debt count', async () => {
+    const result = await runCommand('npm', ['run', 'lint:errors'], PROJECT_ROOT);
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stdout).toContain('0 new violation(s)');
+    expect(result.stdout).toMatch(/\d+ known baseline occurrence\(s\)/);
   });
 
   it('check-error-handling.mjs file exists', () => {
@@ -161,6 +176,19 @@ describe('scanFile — pattern match', () => {
     const violations = scanFile(file);
     expect(violations).toHaveLength(0);
   });
+
+  it('ignores comments, strings and template literals containing the raw-throw text', () => {
+    const file = join(tmpDir, 'non-executable.ts');
+    writeFileSync(
+      file,
+      [
+        '// throw new Error("comment")',
+        'const plain = \'throw new Error("string")\';',
+        'const template = `throw new Error("template")`;',
+      ].join('\n'),
+    );
+    expect(scanFile(file)).toEqual([]);
+  });
 });
 
 // ─── collectTsFiles Tests ─────────────────────────────────────────────────────
@@ -229,20 +257,12 @@ describe('collectTsFiles — directory traversal', () => {
 // ─── runCheck Tests ───────────────────────────────────────────────────────────
 
 describe('runCheck — full scan', () => {
-  it('returns only known allowlisted violations for actual project src/orchestra/', () => {
-    const { violations, filesScanned } = runCheck(PROJECT_ROOT);
-    // Known violations tracked as acceptable until DeckentError migration (Sprint 151 T-012):
-    //   honest-gate.ts (3 false-positive lines: detection pattern strings in comments/template literals)
-    //   managed-docs/docs-config.ts (3 lines)
-    //   monitor-adapter.ts (1 line)
-    //   task-mode-runner.ts (1 line)
-    //   sprint-controller.ts (1 line)
-    //   autonomous/backlog.ts (4 lines — added Sprint 261/262)
-    //   autonomous/reactive/reactive-map.ts (3 lines — added Sprint 261/262)
-    //   autonomous/scheduled-flow.ts (1 line — added Sprint 261/262)
-    // Total: 17 violations as of Sprint 262
-    expect(violations.length).toBeLessThanOrEqual(17);
-    expect(filesScanned).toBeGreaterThan(0); // should find and scan TS files
+  it('current project exactly matches the canonical baseline', () => {
+    const { violations, reductions, knownCount, filesScanned } = runCheck(PROJECT_ROOT);
+    expect(violations).toEqual([]);
+    expect(reductions).toEqual([]);
+    expect(knownCount).toBeGreaterThan(0);
+    expect(filesScanned).toBeGreaterThan(0);
   });
 
   it('filesScanned is positive when scanning real project', () => {
@@ -262,6 +282,79 @@ describe('runCheck — full scan', () => {
       const { violations, filesScanned } = runCheck(mockRoot);
       expect(violations).toHaveLength(1);
       expect(filesScanned).toBe(1);
+    } finally {
+      rmSync(mockRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('fails when a governed file exceeds its explicit baseline count', () => {
+    const mockRoot = makeTmpDir();
+    try {
+      mkdirSync(join(mockRoot, 'src', 'core'), { recursive: true });
+      writeFileSync(join(mockRoot, 'src', 'core', 'bad.ts'), 'throw new Error("new debt");\n');
+      const result = runCheck(mockRoot, {
+        baseline: { version: 2, entries: [] },
+      });
+      expect(result.violations).toHaveLength(1);
+      expect(result.reductions).toEqual([]);
+    } finally {
+      rmSync(mockRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('fails when a reduction leaves reusable baseline headroom', () => {
+    const mockRoot = makeTmpDir();
+    try {
+      mkdirSync(join(mockRoot, 'src', 'core'), { recursive: true });
+      const file = join(mockRoot, 'src', 'core', 'clean.ts');
+      writeFileSync(file, 'throw new Error("legacy");\n');
+      const entries = fingerprintObservations(scanFile(file), mockRoot);
+      writeFileSync(file, 'export const ok = true;\n');
+      const result = runCheck(mockRoot, {
+        baseline: { version: 2, entries },
+      });
+      expect(result.violations).toEqual([]);
+      expect(result.reductions).toEqual([
+        {
+          file: entries[0]!.file,
+          fingerprint: entries[0]!.fingerprint,
+          expected: 1,
+          actual: 0,
+        },
+      ]);
+    } finally {
+      rmSync(mockRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('fails a count-neutral same-file substitution', () => {
+    const mockRoot = makeTmpDir();
+    try {
+      mkdirSync(join(mockRoot, 'src', 'core'), { recursive: true });
+      const file = join(mockRoot, 'src', 'core', 'same.ts');
+      writeFileSync(file, 'throw new Error("legacy");\n');
+      const entries = fingerprintObservations(scanFile(file), mockRoot);
+      writeFileSync(file, 'throw new Error("new debt");\n');
+      const result = runCheck(mockRoot, { baseline: { version: 2, entries } });
+      expect(result.violations).toHaveLength(1);
+      expect(result.reductions).toHaveLength(1);
+      expect(result.violations[0]?.content).toContain('new debt');
+    } finally {
+      rmSync(mockRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('does not fail when an unchanged throw moves to another line', () => {
+    const mockRoot = makeTmpDir();
+    try {
+      mkdirSync(join(mockRoot, 'src', 'core'), { recursive: true });
+      const file = join(mockRoot, 'src', 'core', 'moved.ts');
+      writeFileSync(file, 'throw new Error("same");\n');
+      const entries = fingerprintObservations(scanFile(file), mockRoot);
+      writeFileSync(file, '\n\nthrow new Error("same");\n');
+      const result = runCheck(mockRoot, { baseline: { version: 2, entries } });
+      expect(result.violations).toEqual([]);
+      expect(result.reductions).toEqual([]);
     } finally {
       rmSync(mockRoot, { recursive: true, force: true });
     }

@@ -7,7 +7,11 @@ import {
   composeProviderAuthority,
   type ProviderAuthorityCompositionOptions,
 } from '../../src/core/provider-authority-composition.js';
-import type { ProviderEvidenceSources } from '../../src/core/provider-evidence-producer.js';
+import {
+  deriveProviderAccountBackendScopeRefHash,
+  type ProviderEvidenceSources,
+} from '../../src/core/provider-evidence-producer.js';
+import { ProviderEvidenceSourceRegistry } from '../../src/core/provider-evidence-source-registry.js';
 import { ProviderAuthorityKeyring } from '../../src/core/provider-authority-keyring.js';
 import { InvocationReceiptStore } from '../../src/core/invocation-receipt-store.js';
 import type { ProviderLimitPolicy } from '../../src/core/provider-limit-truth.js';
@@ -31,7 +35,20 @@ function sources(): ProviderEvidenceSources {
   return {
     account: {
       authorityRef: 'account-authority:test-0001',
-      resolve: async () => ({ state: 'ready', stableAccountIdentity: 'test-account' }),
+      resolve: async input => ({
+        state: 'ready',
+        provider: input.provider,
+        authMode: input.authMode,
+        identityKind: 'provider-account',
+        assurance: 'provider-verified',
+        issuer: 'provider.example',
+        stableSubject: 'test-account',
+        evidenceRef: 'account-evidence:test-0001',
+        credentialGenerationRef: 'credential-generation:test-0001',
+        backendScopeRefHash: deriveProviderAccountBackendScopeRefHash(input),
+        fetchedAt: '2026-07-24T08:00:00.000Z',
+        expiresAt: '2026-07-24T08:01:00.000Z',
+      }),
     },
     limit: {
       authorityRef: 'limit-producer:test-0001',
@@ -48,6 +65,16 @@ function sources(): ProviderEvidenceSources {
       },
     },
   };
+}
+
+function sourceResolver(): ProviderEvidenceSourceRegistry {
+  return new ProviderEvidenceSourceRegistry([{
+    provider: 'claude',
+    authMode: 'subscription',
+    transport: 'cli',
+    executionBackend: 'host-subprocess',
+    sources: sources(),
+  }]);
 }
 
 function base(overrides: Partial<ProviderAuthorityCompositionOptions> = {}): ProviderAuthorityCompositionOptions {
@@ -71,7 +98,7 @@ function base(overrides: Partial<ProviderAuthorityCompositionOptions> = {}): Pro
     env: { HOME: projectRoot, DECKENT_HOME: globalRoot },
     policyResolver: () => POLICY,
     terminationEvidenceVerifier: () => true,
-    evidenceSources: sources(),
+    sourceResolver: sourceResolver(),
     receiptLedger,
     ...overrides,
   };
@@ -95,9 +122,7 @@ describe('composeProviderAuthority', () => {
     expect(composed.truthStore.projectId).toBe(options.projectId);
     expect(composed.evidenceProducer.authorityRef).toMatch(/^provider-evidence:[a-f0-9]{64}$/u);
     expect(composed).toMatchObject({
-      accountAuthorityRef: 'account-authority:test-0001',
-      truthProducerAuthorityRef: 'truth-producer:test-0001',
-      limitProducerAuthorityRef: 'limit-producer:test-0001',
+      sourceResolverAuthorityRef: options.sourceResolver!.authorityRef,
     });
     const account = composed.pseudonymizeAccount({
       provider: 'claude',
@@ -125,36 +150,11 @@ describe('composeProviderAuthority', () => {
   it.each([
     ['policyResolver', 'policy_authority_unavailable'],
     ['terminationEvidenceVerifier', 'termination_authority_unavailable'],
-    ['evidenceSources', 'account_authority_unavailable'],
-    ['receiptLedger', 'truth_producer_unavailable'],
+    ['sourceResolver', 'source_resolver_unavailable'],
+    ['receiptLedger', 'receipt_ledger_unavailable'],
   ] as const)('holds when %s is unavailable', (field, reasonCode) => {
     const composed = composeProviderAuthority(base({ [field]: undefined }));
     expect(composed).toMatchObject({ state: 'hold', reasonCode });
-  });
-
-  it('requires each concrete producer capability instead of accepting free-form readiness refs', () => {
-    const basis = base();
-    const accountMissing = {
-      ...basis,
-      evidenceSources: { ...basis.evidenceSources!, account: undefined },
-    } as unknown as ProviderAuthorityCompositionOptions;
-    expect(composeProviderAuthority(accountMissing)).toMatchObject({
-      state: 'hold', reasonCode: 'account_authority_unavailable',
-    });
-    const truthMissing = {
-      ...basis,
-      evidenceSources: { ...basis.evidenceSources!, reachability: undefined },
-    } as unknown as ProviderAuthorityCompositionOptions;
-    expect(composeProviderAuthority(truthMissing)).toMatchObject({
-      state: 'hold', reasonCode: 'truth_producer_unavailable',
-    });
-    const limitMissing = {
-      ...basis,
-      evidenceSources: { ...basis.evidenceSources!, limit: undefined },
-    } as unknown as ProviderAuthorityCompositionOptions;
-    expect(composeProviderAuthority(limitMissing)).toMatchObject({
-      state: 'hold', reasonCode: 'limit_producer_unavailable',
-    });
   });
 
   it('holds on missing or project-scoped custody without constructing a runtime', () => {

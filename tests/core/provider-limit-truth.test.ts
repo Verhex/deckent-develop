@@ -80,6 +80,39 @@ function observation(overrides: Partial<ProviderLimitObservation> = {}): Provide
 }
 
 describe('provider limit truth', () => {
+  it('accepts canonical remote API transport and backend without rewriting local HTTP identity', () => {
+    const backend = {
+      transport: 'api' as const,
+      executionBackend: 'api' as const,
+      endpointRefHash: ENDPOINT_HASH,
+    };
+    const result = createProviderLimitResult(observation({
+      provider: 'openrouter',
+      authMode: 'api',
+      backend,
+      quotaScopeRefHash: deriveProviderQuotaScopeRefHash({
+        tenantId: 'tenant-a',
+        provider: 'openrouter',
+        accountRefHash: ACCOUNT_HASH,
+        authMode: 'api',
+        backend,
+      }),
+      source: {
+        ...observation().source,
+        kind: 'provider-api',
+      },
+    }), POLICY);
+
+    expect(result).toMatchObject({
+      provider: 'openrouter',
+      authMode: 'api',
+      backend: {
+        transport: 'api',
+        executionBackend: 'api',
+      },
+    });
+  });
+
   it('derives a fresh allow decision from every complete required window', () => {
     const result = createProviderLimitResult(observation(), POLICY, {
       idFactory: () => 'limit-result-1',

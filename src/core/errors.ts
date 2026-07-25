@@ -625,6 +625,56 @@ registry.set('DECKENT_E075', {
   ],
 });
 
+// ─── Execution Authority Error Codes (DECKENT_E076-E079) ───────────
+
+registry.set('DECKENT_E076', {
+  message: 'cross-verification prompt contract rejected',
+  suggestion: 'Remove competing criteria, unresolved placeholders, or malformed verifier input before dispatch',
+  whatHappened: 'Deckent rejected a cross-verification prompt before provider execution.',
+  why: 'The prompt violated the finite-verification authority contract and could produce an ambiguous or fabricated verdict.',
+  howToFix: [
+    'Keep acceptance criteria only in the canonical GO/NO-GO fields',
+    'Resolve placeholders before invoking cross-verification',
+    'Retry with bounded, host-authored evidence',
+  ],
+});
+
+registry.set('DECKENT_E077', {
+  message: 'execution authority evidence invalid',
+  suggestion: 'Inspect the host-owned checkpoint, continuation, settlement, and budget evidence for the reported integrity mismatch',
+  whatHappened: 'Deckent rejected execution evidence that did not satisfy its immutable authority contract.',
+  why: 'Malformed, conflicting, stale, or lineage-mismatched evidence cannot safely authorize execution or settlement.',
+  howToFix: [
+    'Inspect the exact evidence path and execution attempt identifiers in the error message',
+    'Do not edit host-owned authority files manually',
+    'Reconcile or recover the affected attempt before retrying',
+  ],
+});
+
+registry.set('DECKENT_E078', {
+  message: 'execution admission contract rejected',
+  suggestion: 'Provide an explicit budget, live metering, landing capability, and approval evidence required by the selected execution mode',
+  whatHappened: 'Deckent blocked execution before provider work.',
+  why: 'The requested backend or policy did not satisfy the fail-closed execution admission contract.',
+  howToFix: [
+    'Inspect the executor, budget, landing policy, and admission mode named in the error',
+    'Use a live-metered landing-capable backend for unattended remote work',
+    'For attended hard-stop work, provide the owner-approved policy and durable approval evidence',
+  ],
+});
+
+registry.set('DECKENT_E079', {
+  message: 'Docker lifecycle safety contract failed',
+  suggestion: 'Inspect the named container, lock, worktree, settlement, or archive evidence before retrying',
+  whatHappened: 'Deckent could not prove a safe Docker lifecycle transition.',
+  why: 'Continuing could create duplicate execution, leaked locks, or conflicting host-owned evidence.',
+  howToFix: [
+    'Inspect the exact resource named in the error',
+    'Reconcile the existing attempt and host settlement evidence',
+    'Retry only after the lifecycle conflict is resolved',
+  ],
+});
+
 // ─── ErrorRegistry API ──────────────────────────────────────────────
 
 export const ErrorRegistry = {
@@ -676,6 +726,22 @@ export const ErrorRegistry = {
     registry.set(code, entry);
   },
 } as const;
+
+export function createCrossVerifyContractError(message: string): DeckentError {
+  return ErrorRegistry.createError('DECKENT_E076', { message });
+}
+
+export function createExecutionAuthorityError(message: string): DeckentError {
+  return ErrorRegistry.createError('DECKENT_E077', { message });
+}
+
+export function createExecutionAdmissionError(message: string): DeckentError {
+  return ErrorRegistry.createError('DECKENT_E078', { message });
+}
+
+export function createDockerLifecycleError(message: string): DeckentError {
+  return ErrorRegistry.createError('DECKENT_E079', { message });
+}
 
 // ─── Human-Friendly Error Formatter ─────────────────────────────────
 

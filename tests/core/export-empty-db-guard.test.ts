@@ -136,4 +136,53 @@ describe('writeGuardedExports — dbCount===0 disk-protect guard (Sprint 232 tas
     expect(content).toContain('Node16 Resolution');
     expect(content).not.toContain('_No architecture decisions recorded._');
   });
+
+  it('preserves richer ADR snapshots when the DB is non-empty but partial', () => {
+    mkdirSync(exportsDir, { recursive: true });
+    const summaryPath = join(exportsDir, 'summary.md');
+    const decisionsPath = join(exportsDir, 'decisions.md');
+    const priorSummary = [
+      '# Brain Summary (auto-generated)',
+      '',
+      '## Active Architecture Decisions',
+      '| ID | Title | Status |',
+      '|-----|-------|--------|',
+      '| adr-g-001 | First | accepted |',
+      '| adr-g-002 | Second | accepted |',
+      '',
+      '## Recent Learnings',
+      '_No learnings recorded._',
+    ].join('\n');
+    const priorDecisions = [
+      '# Architecture Decision Records (auto-generated)',
+      '',
+      '## adr-g-001: First',
+      '',
+      '**Status:** accepted',
+      '',
+      '## Context',
+      'First context.',
+      '',
+      '---',
+      '',
+      '## adr-g-002: Second',
+      '',
+      '**Status:** accepted',
+      '',
+      '## Context',
+      'Second context.',
+    ].join('\n');
+    writeFileSync(summaryPath, priorSummary, 'utf-8');
+    writeFileSync(decisionsPath, priorDecisions, 'utf-8');
+    store.insert(makeAdr({ id: 'user-owner-decision', title: 'Owner Decision' }));
+
+    const result = writeGuardedExports(store, exportsDir);
+
+    expect(result.skipped).toEqual(expect.arrayContaining(['summary.md', 'decisions.md']));
+    expect(result.warnings).toEqual(expect.arrayContaining([
+      expect.stringContaining('DB has 1 adr entries but disk export has 2'),
+    ]));
+    expect(readFileSync(summaryPath, 'utf-8')).toBe(priorSummary);
+    expect(readFileSync(decisionsPath, 'utf-8')).toBe(priorDecisions);
+  });
 });

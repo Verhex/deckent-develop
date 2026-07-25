@@ -71,7 +71,7 @@ export class ProviderLimitAdmissionError extends Error {
   }
 }
 
-function reservationEvidenceRef(reservationId: string): string {
+export function providerLimitReservationEvidenceRef(reservationId: string): string {
   const digest = createHash('sha256').update(reservationId).digest('hex');
   return `provider-limit-reservation:${digest}`;
 }
@@ -262,7 +262,7 @@ export function admitRoleInvocation(
       };
     }
 
-    const ref = reservationEvidenceRef(reservation.reservationId);
+    const ref = providerLimitReservationEvidenceRef(reservation.reservationId);
     attempts.push({
       provider: String(selected.provider), model: selected.model, reservation, errorRef: null,
     });

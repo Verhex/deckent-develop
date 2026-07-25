@@ -101,6 +101,10 @@ export interface PlanPreview {
    *  körce verilmesin. Kısa insan-okur satırlar ("BLOCK 431-002 · g6-...: msg");
    *  planDigest payload'ına DAHİL DEĞİL (additive, CAS-nötr). */
   readonly gateFindings?: readonly string[];
+  /** Digest-bound, shared preview/scheduler/runtime topology projection. */
+  readonly topology?: import('./execution-topology.js').ExecutionTopology;
+  /** Structural topology blockers cannot be acknowledged or overridden. */
+  readonly topologyGateResult?: RunFlowGateResult;
   /**
    * Dogfood-449 B1 (born-698a'nın scope-ikizi): detached-child'ın PLAN fazı
    * pre-spawn SCOPE gate'inde de FAIL-CLOSED — ön-kapı aynı kararı burada

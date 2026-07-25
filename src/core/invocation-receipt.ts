@@ -19,11 +19,12 @@ export type InvocationSelectionSource =
   | 'wire'
   | 'none';
 export type InvocationAuthMode = 'subscription' | 'api' | 'hybrid' | 'local' | 'unknown';
-export type InvocationTransport = 'cli' | 'http' | 'local-runtime';
+export type InvocationTransport = 'cli' | 'api' | 'http' | 'local-runtime';
 export type InvocationExecutionBackend =
   | 'host-subprocess'
   | 'docker'
   | 'tmux'
+  | 'api'
   | 'in-process'
   | 'unknown';
 export type InvocationReasonCode =
