@@ -14,7 +14,13 @@ import { join } from 'node:path';
 import type { ModelType, GeminiModel } from '../core/types.js';
 import type { ProviderAdapter, ProviderSpawnOptions, ProviderAvailabilityDetail } from '../core/provider.js';
 import { PROVIDER_PACKAGES } from '../core/provider-packages.js';
-import { ProviderError, resolveBinaryPath, parseSemverFromOutput, buildCliInvocation } from '../core/provider.js';
+import {
+  ProviderError,
+  resolveBinaryPath,
+  parseSemverFromOutput,
+  buildCliInvocation,
+  buildProviderChildEnv,
+} from '../core/provider.js';
 import type { ProviderDetectResult } from './claude.js';
 import { TASKS_DIR } from '../core/constants.js';
 import type { ModelTier } from '../core/model-equivalence.js';
@@ -22,6 +28,7 @@ import { getModelForProviderTier } from '../core/model-equivalence.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { normalizeUsage, type TokenUsage } from '../core/token-usage.js';
 import { killProcessGroupWithEscalation } from './subprocess.js';
+import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -40,8 +47,10 @@ function getGeminiModels(): readonly GeminiModel[] {
  * Build the environment for a spawned Gemini worker process.
  *
  * Sprint 248 (Provider Parity):
- *   - When `apiKey` is set, inject `GOOGLE_API_KEY`; otherwise leave it unset so
+ *   - When `apiKey` is set, inject `GEMINI_API_KEY`; otherwise leave it unset so
  *     the CLI falls back to its OAuth/subscription session.
+ *   - Remove every canonical/config-driven provider credential before injecting
+ *     only Gemini's owned key.
  *   - Strip every `GEMINI_CLI_IDE_*` variable. When deckent runs inside an IDE
  *     (Gemini CLI IDE integration sets `GEMINI_CLI_IDE_SERVER_PORT`,
  *     `GEMINI_CLI_IDE_WORKSPACE_PATH`, `GEMINI_CLI_IDE_AUTH_TOKEN`), a spawned
@@ -51,8 +60,18 @@ function getGeminiModels(): readonly GeminiModel[] {
  *
  * @internal exported for regression coverage
  */
-export function buildGeminiSpawnEnv(apiKey?: string): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...process.env };
+export function buildGeminiSpawnEnv(
+  apiKey?: string,
+  opts?: {
+    hostEnv?: NodeJS.ProcessEnv;
+    credentialEnvKeys?: readonly string[];
+  },
+): NodeJS.ProcessEnv {
+  const env = buildProviderChildEnv(
+    opts?.hostEnv ?? process.env,
+    opts?.credentialEnvKeys ?? resolveCrossProviderCredentialKeys(),
+    apiKey ? { GEMINI_API_KEY: apiKey } : undefined,
+  );
   for (const key of Object.keys(env)) {
     if (key.startsWith('GEMINI_CLI_IDE_')) {
       delete env[key];
@@ -84,11 +103,17 @@ export function buildGeminiSpawnEnv(apiKey?: string): NodeJS.ProcessEnv {
  * Kept for backward compatibility with existing imports.
  */
 export const GEMINI_TIER_MODELS = {
-  get premium_plus() { return (modelRegistry.getByProviderAndTier('gemini', 'premium_plus')?.id ?? getModelForProviderTier('gemini', 'premium') ?? 'gemini-2.5-pro') as GeminiModel; },
-  get premium() { return (getModelForProviderTier('gemini', 'premium') ?? 'gemini-2.5-pro') as GeminiModel; },
-  get standard() { return (getModelForProviderTier('gemini', 'standard') ?? 'gemini-2.5-flash') as GeminiModel; },
-  get economy() { return (getModelForProviderTier('gemini', 'economy') ?? 'gemini-2.0-flash') as GeminiModel; },
+  get premium_plus() { return requireGeminiTierModel('premium_plus'); },
+  get premium() { return requireGeminiTierModel('premium'); },
+  get standard() { return requireGeminiTierModel('standard'); },
+  get economy() { return requireGeminiTierModel('economy'); },
 };
+
+function requireGeminiTierModel(tier: ModelTier): GeminiModel {
+  const model = getModelForProviderTier('gemini', tier);
+  if (!model) throw new Error(`E_GEMINI_TIER_MODEL_UNAVAILABLE: tier=${tier}`);
+  return model as GeminiModel;
+}
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -239,11 +264,30 @@ export class GeminiAdapter implements ProviderAdapter {
    * without a real spawn. Defaults to `process.platform`.
    */
   private readonly platform: NodeJS.Platform;
+  private readonly spawnImpl: typeof spawn;
+  private readonly credentialEnvKeys: readonly string[];
 
-  constructor(projectDir: string, opts?: { defaultTimeoutMs?: number; platform?: NodeJS.Platform }) {
+  constructor(
+    projectDir: string,
+    opts?: {
+      defaultTimeoutMs?: number;
+      platform?: NodeJS.Platform;
+      spawnImpl?: typeof spawn;
+      credentialEnvKeys?: readonly string[];
+    },
+  ) {
     this.projectDir = projectDir;
     this.defaultTimeoutMs = opts?.defaultTimeoutMs ?? 0;
     this.platform = opts?.platform ?? process.platform;
+    this.spawnImpl = opts?.spawnImpl ?? spawn;
+    this.credentialEnvKeys = Object.freeze([
+      ...new Set([
+        ...(opts?.credentialEnvKeys ?? resolveCrossProviderCredentialKeys()),
+        'GEMINI_API_KEY',
+        'GOOGLE_API_KEY',
+        'DECKENT_GOOGLE_API_KEY',
+      ]),
+    ]);
   }
 
   // ─── spawn() ───────────────────────────────────────────────────────
@@ -272,7 +316,11 @@ export class GeminiAdapter implements ProviderAdapter {
     // Gemini CLI also authenticates via an OAuth/subscription session. When a
     // key is present we inject it; when absent the CLI uses its logged-in
     // session. (Previously this threw, making OAuth-only users unusable.)
-    const apiKey = this.getApiKey();
+    const mergedHostEnv = { ...process.env, ...(opts?.env ?? {}) };
+    const apiKey = opts?.env?.['GEMINI_API_KEY']
+      ?? opts?.env?.['GOOGLE_API_KEY']
+      ?? opts?.env?.['DECKENT_GOOGLE_API_KEY']
+      ?? this.getApiKey();
 
     const dir = opts?.projectDir ?? this.projectDir;
     const tasksDir = join(dir, TASKS_DIR);
@@ -301,12 +349,15 @@ export class GeminiAdapter implements ProviderAdapter {
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: buildGeminiSpawnEnv(apiKey),
+      env: buildGeminiSpawnEnv(apiKey, {
+        hostEnv: mergedHostEnv,
+        credentialEnvKeys: this.credentialEnvKeys,
+      }),
       shell: inv.shell,
       detached: this.platform !== 'win32',
     };
 
-    const child = spawn(inv.command, inv.args, spawnOpts);
+    const child = this.spawnImpl(inv.command, inv.args, spawnOpts);
 
     // Write heartbeat
     this.writeHeartbeat(taskId, dir, 'EXECUTING');
@@ -568,7 +619,7 @@ export class GeminiAdapter implements ProviderAdapter {
    * Delegates to model-equivalence.ts as the single source of truth.
    */
   getModelForTier(tier: ModelTier): GeminiModel {
-    return (getModelForProviderTier('gemini', tier) ?? 'gemini-2.5-flash') as GeminiModel;
+    return requireGeminiTierModel(tier);
   }
 
   // ─── getCliVersion() ──────────────────────────────────────────────
@@ -699,7 +750,9 @@ export class GeminiAdapter implements ProviderAdapter {
   }
 
   getApiKey(): string | undefined {
-    return process.env.DECKENT_GOOGLE_API_KEY ?? process.env.GOOGLE_API_KEY;
+    return process.env.DECKENT_GOOGLE_API_KEY
+      ?? process.env.GEMINI_API_KEY
+      ?? process.env.GOOGLE_API_KEY;
   }
 
   /**
@@ -904,7 +957,12 @@ function extractGeminiUsageFromPayload(payload: unknown): TokenUsage | null {
  */
 export function createGeminiAdapter(
   projectDir: string,
-  opts?: { defaultTimeoutMs?: number },
+  opts?: {
+    defaultTimeoutMs?: number;
+    platform?: NodeJS.Platform;
+    spawnImpl?: typeof spawn;
+    credentialEnvKeys?: readonly string[];
+  },
 ): GeminiAdapter {
   return new GeminiAdapter(projectDir, opts);
 }

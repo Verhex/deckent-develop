@@ -31,7 +31,7 @@ export class MockFleetRegistry {
 
   /**
    * Register a mock adapter.
-   * @param {{name: string, models: string[], authMode?: string, providerType?: string}} adapter
+   * @param {{name: string, authMode?: string, providerType?: string}} adapter
    * @param {boolean} setDefault
    */
   register(adapter, setDefault = false) {
@@ -86,18 +86,18 @@ export class MockFleetRegistry {
 export function createFleetAdapters() {
   return {
     // Subscription providers (CLI-spawn)
-    claude:   { name: 'claude',   models: ['opus', 'sonnet', 'haiku'],       authMode: 'session', providerType: 'subscription' },
-    gemini:   { name: 'gemini',   models: ['gemini-2.5-pro', 'gemini-2.5-flash'], authMode: 'session', providerType: 'subscription' },
-    codex:    { name: 'codex',    models: ['gpt-5', 'gpt-4.1', 'gpt-5-mini'], authMode: 'session', providerType: 'subscription' },
+    claude:   { name: 'claude', authMode: 'session', providerType: 'subscription' },
+    gemini:   { name: 'gemini', authMode: 'session', providerType: 'subscription' },
+    codex:    { name: 'codex', authMode: 'session', providerType: 'subscription' },
 
     // OpenAI-compatible API providers (HTTP fetch)
-    deepseek: { name: 'deepseek', models: ['deepseek-chat', 'deepseek-coder'], authMode: 'api',     providerType: 'api' },
-    qwen:     { name: 'qwen',     models: ['qwen-turbo', 'qwen-plus'],         authMode: 'api',     providerType: 'api' },
-    glm:      { name: 'glm',      models: ['glm-4', 'glm-4-flash'],            authMode: 'api',     providerType: 'api' },
-    mistral:  { name: 'mistral',  models: ['mistral-large', 'mistral-small'],  authMode: 'api',     providerType: 'api' },
+    deepseek: { name: 'deepseek', authMode: 'api', providerType: 'api' },
+    qwen:     { name: 'qwen', authMode: 'api', providerType: 'api' },
+    glm:      { name: 'glm', authMode: 'api', providerType: 'api' },
+    mistral:  { name: 'mistral', authMode: 'api', providerType: 'api' },
 
     // Local providers
-    ollama:   { name: 'ollama',   models: ['llama3', 'codellama', 'phi3'],     authMode: 'none',    providerType: 'local' },
+    ollama:   { name: 'ollama', authMode: 'none', providerType: 'local' },
   };
 }
 
@@ -127,14 +127,18 @@ export function createFleetRegistry() {
 
 /**
  * Route a task to a fleet provider adapter.
- * Priority: task.provider (if registered) → registry default.
+ * An explicit provider must be registered. Only an absent provider consumes
+ * this fixture's configured default.
  *
  * @param {{provider?: string}} task
  * @param {MockFleetRegistry} registry
  * @returns {{adapter: {name: string}, reason: string}}
  */
 export function routeFleetTask(task, registry) {
-  if (task.provider && registry.has(task.provider)) {
+  if (task.provider) {
+    if (!registry.has(task.provider)) {
+      throw new Error(`Unknown task.provider '${task.provider}'`);
+    }
     return {
       adapter: registry.get(task.provider),
       reason: `task.provider '${task.provider}'`,
@@ -146,9 +150,7 @@ export function routeFleetTask(task, registry) {
   }
   return {
     adapter: defaultAdapter,
-    reason: task.provider
-      ? `task.provider '${task.provider}' not registered, fell back to default '${defaultAdapter.name}'`
-      : `no task.provider, using default '${defaultAdapter.name}'`,
+    reason: `no task.provider, using configured default '${defaultAdapter.name}'`,
   };
 }
 

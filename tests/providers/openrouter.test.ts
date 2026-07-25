@@ -340,7 +340,7 @@ describe('OpenRouterProvider — ProviderAdapter contract shape', () => {
     );
   });
 
-  it('executes planner calls as single-attempt http + in-process requests', async () => {
+  it('executes planner calls with canonical api transport and backend identity', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, {
       model: 'anthropic/claude-3.7-sonnet',
       choices: [{ message: { content: '{"tasks":[],"reasoning":"proof"}' } }],
@@ -354,8 +354,8 @@ describe('OpenRouterProvider — ProviderAdapter contract shape', () => {
     expect(invocation).toMatchObject({
       calledProvider: 'openrouter',
       calledModel: 'anthropic/claude-3.7-sonnet',
-      transport: 'http',
-      executionBackend: 'in-process',
+      transport: 'api',
+      executionBackend: 'api',
     });
     const outcome = await invocation.execute({ timeoutMs: 1234 });
     expect(outcome).toMatchObject({

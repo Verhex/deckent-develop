@@ -577,8 +577,8 @@ export class OpenRouterProvider implements ProviderAdapter {
     return {
       calledProvider: this.name,
       calledModel: String(model),
-      transport: 'http',
-      executionBackend: 'in-process',
+      transport: 'api',
+      executionBackend: 'api',
       execute: async ({ timeoutMs }) => {
         try {
           // Planner calls are deliberately single-attempt. After an ambiguous

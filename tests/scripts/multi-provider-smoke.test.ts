@@ -14,8 +14,8 @@ import {
 describe('multi-provider-smoke — MockProviderRegistry', () => {
   it('registers providers and lists them', () => {
     const registry = new MockProviderRegistry();
-    registry.register({ name: 'claude', models: ['sonnet'] });
-    registry.register({ name: 'ollama', models: ['llama3'] });
+    registry.register({ name: 'claude' });
+    registry.register({ name: 'ollama' });
     expect(registry.list()).toContain('claude');
     expect(registry.list()).toContain('ollama');
     expect(registry.list()).toHaveLength(2);
@@ -23,29 +23,29 @@ describe('multi-provider-smoke — MockProviderRegistry', () => {
 
   it('first registered provider becomes default', () => {
     const registry = new MockProviderRegistry();
-    registry.register({ name: 'claude', models: ['sonnet'] });
-    registry.register({ name: 'ollama', models: ['llama3'] });
+    registry.register({ name: 'claude' });
+    registry.register({ name: 'ollama' });
     expect(registry.getDefault()?.name).toBe('claude');
   });
 
   it('setDefault=true overrides default', () => {
     const registry = new MockProviderRegistry();
-    registry.register({ name: 'claude', models: ['sonnet'] });
-    registry.register({ name: 'ollama', models: ['llama3'] }, true);
+    registry.register({ name: 'claude' });
+    registry.register({ name: 'ollama' }, true);
     expect(registry.getDefault()?.name).toBe('ollama');
   });
 
   it('has() returns true for registered, false for unknown', () => {
     const registry = new MockProviderRegistry();
-    registry.register({ name: 'claude', models: ['sonnet'] });
+    registry.register({ name: 'claude' });
     expect(registry.has('claude')).toBe(true);
     expect(registry.has('unknown-xyz')).toBe(false);
   });
 
   it('throws on duplicate registration', () => {
     const registry = new MockProviderRegistry();
-    registry.register({ name: 'claude', models: ['sonnet'] });
-    expect(() => registry.register({ name: 'claude', models: ['haiku'] })).toThrow(
+    registry.register({ name: 'claude' });
+    expect(() => registry.register({ name: 'claude' })).toThrow(
       'Provider already registered: claude',
     );
   });
@@ -90,11 +90,10 @@ describe('multi-provider-smoke — routeTaskToProvider', () => {
     expect(result.adapter.name).toBe('openai-compat');
   });
 
-  it('unknown provider falls back to default (claude)', () => {
+  it('rejects an explicit unknown provider instead of selecting the default', () => {
     const registry = createMockRegistry();
-    const result = routeTaskToProvider({ provider: 'unknown-xyz' }, registry);
-    expect(result.adapter.name).toBe('claude');
-    expect(result.reason).toContain('not registered');
+    expect(() => routeTaskToProvider({ provider: 'unknown-xyz' }, registry))
+      .toThrow("Unknown task.provider 'unknown-xyz'");
   });
 
   it('no task.provider uses default (claude)', () => {
@@ -140,12 +139,12 @@ describe('multi-provider-smoke — mix coexist', () => {
 // ─── createMockAdapters ───────────────────────────────────────────────────────
 
 describe('multi-provider-smoke — createMockAdapters', () => {
-  it('returns adapters with expected model lists', () => {
+  it('does not mint a second model catalog inside a provider-routing smoke', () => {
     const adapters = createMockAdapters();
-    expect(adapters.claude.models).toContain('opus');
-    expect(adapters.claude.models).toContain('sonnet');
-    expect(adapters.ollama.models).toContain('llama3');
-    expect(adapters['openai-compat'].models).toContain('deepseek-chat');
+    for (const adapter of Object.values(adapters)) {
+      expect(adapter).toEqual({ name: adapter.name });
+      expect(adapter).not.toHaveProperty('models');
+    }
   });
 });
 
@@ -165,7 +164,7 @@ describe('multi-provider-smoke — runSmoke', () => {
     const scenarioNames = result.scenarios.map((s: string) => s.replace(/^(PASS|FAIL) /, ''));
     expect(scenarioNames).toContain('three-providers-registered');
     expect(scenarioNames).toContain('per-task-provider-selection');
-    expect(scenarioNames).toContain('unknown-provider-fallback');
+    expect(scenarioNames).toContain('unknown-provider-rejected');
     expect(scenarioNames).toContain('mix-coexist');
   });
 });

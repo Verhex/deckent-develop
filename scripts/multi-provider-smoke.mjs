@@ -22,7 +22,7 @@ export class MockProviderRegistry {
 
   /**
    * Register a mock adapter. First registered becomes default unless setDefault=true.
-   * @param {{name: string, models: string[]}} adapter
+   * @param {{name: string}} adapter
    * @param {boolean} setDefault
    */
   register(adapter, setDefault = false) {
@@ -35,7 +35,7 @@ export class MockProviderRegistry {
     }
   }
 
-  /** @param {string} name @returns {{name: string, models: string[]} | undefined} */
+  /** @param {string} name @returns {{name: string} | undefined} */
   get(name) {
     return this._providers.get(name);
   }
@@ -50,7 +50,7 @@ export class MockProviderRegistry {
     return this._providers.has(name);
   }
 
-  /** @returns {{name: string, models: string[]} | null} */
+  /** @returns {{name: string} | null} */
   getDefault() {
     if (this._default === null) return null;
     return this._providers.get(this._default) ?? null;
@@ -62,9 +62,9 @@ export class MockProviderRegistry {
 /** Create the three standard mock adapters for smoke testing. */
 export function createMockAdapters() {
   return {
-    claude: { name: 'claude', models: ['opus', 'sonnet', 'haiku'] },
-    ollama: { name: 'ollama', models: ['llama3', 'codellama'] },
-    'openai-compat': { name: 'openai-compat', models: ['deepseek-chat', 'qwen-turbo'] },
+    claude: { name: 'claude' },
+    ollama: { name: 'ollama' },
+    'openai-compat': { name: 'openai-compat' },
   };
 }
 
@@ -86,15 +86,19 @@ export function createMockRegistry() {
 
 /**
  * Route a task to a provider adapter, mirroring task-router.ts Priority 3 logic.
- * If task.provider is set and registered → use it.
- * Otherwise → fall back to registry default.
+ * If task.provider is set and registered → use it. An explicit unknown provider
+ * fails loudly; only an absent provider may consume this fixture's configured
+ * default.
  *
  * @param {{provider?: string}} task
  * @param {MockProviderRegistry} registry
- * @returns {{adapter: {name: string, models: string[]}, reason: string}}
+ * @returns {{adapter: {name: string}, reason: string}}
  */
 export function routeTaskToProvider(task, registry) {
-  if (task.provider && registry.has(task.provider)) {
+  if (task.provider) {
+    if (!registry.has(task.provider)) {
+      throw new Error(`Unknown task.provider '${task.provider}'`);
+    }
     return {
       adapter: registry.get(task.provider),
       reason: `task.provider field '${task.provider}'`,
@@ -106,9 +110,7 @@ export function routeTaskToProvider(task, registry) {
   }
   return {
     adapter: defaultAdapter,
-    reason: task.provider
-      ? `task.provider '${task.provider}' not registered, fell back to default '${defaultAdapter.name}'`
-      : `no task.provider, using default '${defaultAdapter.name}'`,
+    reason: `no task.provider, using configured default '${defaultAdapter.name}'`,
   };
 }
 
@@ -156,19 +158,19 @@ export async function runSmoke() {
     failed.push(`per-task-provider-selection: ${err.message}`);
   }
 
-  // Scenario 3: unknown provider → falls back to default (claude)
+  // Scenario 3: explicit unknown provider fails before default selection
   try {
     const registry = createMockRegistry();
-    const result = routeTaskToProvider({ provider: 'unknown-xyz' }, registry);
-    if (result.adapter.name !== 'claude') {
-      throw new Error(`Unknown provider fallback: expected 'claude', got '${result.adapter.name}'`);
+    let rejected = false;
+    try {
+      routeTaskToProvider({ provider: 'unknown-xyz' }, registry);
+    } catch (err) {
+      rejected = err instanceof Error && err.message.includes('Unknown task.provider');
     }
-    if (!result.reason.includes('not registered')) {
-      throw new Error('Fallback reason should mention "not registered"');
-    }
-    passed.push('unknown-provider-fallback');
+    if (!rejected) throw new Error('Unknown provider did not fail loudly');
+    passed.push('unknown-provider-rejected');
   } catch (err) {
-    failed.push(`unknown-provider-fallback: ${err.message}`);
+    failed.push(`unknown-provider-rejected: ${err.message}`);
   }
 
   // Scenario 4: mix coexist — concurrent routing across all 3 providers

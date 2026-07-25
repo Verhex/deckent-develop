@@ -58,7 +58,7 @@ describe('CodexAdapter.diagnoseAvailability', () => {
     mockSpawnSync.mockImplementation((cmd: string, args: string[]) => {
       if (cmd === 'which' || cmd === 'where') return { status: 0, stdout: '/usr/local/bin/codex\n', stderr: '' };
       if (cmd === 'codex' && args[0] === '--version') return { status: 0, stdout: 'codex 0.5.1\n', stderr: '' };
-      if (cmd === 'codex' && args[0] === 'auth') return { status: 1, stdout: '', stderr: 'not logged in' };
+      if (cmd === 'codex' && args[0] === 'login') return { status: 0, stdout: 'Not logged in', stderr: '' };
       return { status: 1, stdout: '', stderr: '' };
     });
     const adapter = new CodexAdapter(PROJECT_DIR);
@@ -94,7 +94,7 @@ describe('CodexAdapter.diagnoseAvailability', () => {
     mockSpawnSync.mockImplementation((cmd: string, args: string[]) => {
       if (cmd === 'which' || cmd === 'where') return { status: 0, stdout: '/usr/local/bin/codex\n', stderr: '' };
       if (cmd === 'codex' && args[0] === '--version') return { status: 0, stdout: 'codex 0.5.1', stderr: '' };
-      if (cmd === 'codex' && args[0] === 'auth') return { status: 0, stdout: 'You are logged in as user@example.com', stderr: '' };
+      if (cmd === 'codex' && args[0] === 'login') return { status: 0, stdout: 'Logged in using ChatGPT', stderr: '' };
       return { status: 1, stdout: '', stderr: '' };
     });
     const adapter = new CodexAdapter(PROJECT_DIR);
