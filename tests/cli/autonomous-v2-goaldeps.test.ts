@@ -11,11 +11,18 @@
 
 // Mock the v2 engine wire so handleStart's v2 path is captured WITHOUT running the
 // real MissionScheduler. `...actual` keeps isV2Engine real (handleStart gates on it).
-const { runV2Spy, runTaskModeSpy, waitForRunResultSpy, plannerResolveAdapterSpy } = vi.hoisted(() => ({
+const {
+  runV2Spy,
+  runTaskModeSpy,
+  waitForRunResultSpy,
+  plannerResolveAdapterSpy,
+  bootstrapProvidersSpy,
+} = vi.hoisted(() => ({
   runV2Spy: vi.fn(),
   runTaskModeSpy: vi.fn().mockResolvedValue({ taskId: 'v2-safe-task' }),
   waitForRunResultSpy: vi.fn().mockResolvedValue({ selfAssessment: 'DONE', notes: 'ok' }),
   plannerResolveAdapterSpy: vi.fn(() => { throw new Error('planner provider must not be reached'); }),
+  bootstrapProvidersSpy: vi.fn().mockResolvedValue({ registered: [], skipped: [] }),
 }));
 vi.mock('../../src/orchestra/autonomous/mission-store/mission-engine-wire.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -45,7 +52,7 @@ vi.mock('../../src/orchestra/planner.js', async (importOriginal) => {
 // Mock bootstrapProviders so the ollama HTTP probe does not run in CI (hermetic + fast).
 vi.mock('../../src/core/provider.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
-  return { ...actual, bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [] }) };
+  return { ...actual, bootstrapProviders: bootstrapProvidersSpy };
 });
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -321,6 +328,7 @@ describe('handleStart — engine=v2 passes live goalDeps to runV2Engine', () => 
       'utf-8',
     );
     runV2Spy.mockClear();
+    bootstrapProvidersSpy.mockClear();
 
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     try {
@@ -338,6 +346,7 @@ describe('handleStart — engine=v2 passes live goalDeps to runV2Engine', () => 
     expect(typeof deps.goalDeps!.author).toBe('function');
     expect(typeof deps.goalDeps!.accept).toBe('function');
     expect(typeof deps.workerInvocationRecoveryReconciler?.reconcile).toBe('function');
+    expect(bootstrapProvidersSpy).not.toHaveBeenCalled();
   });
 
   it('holds production Goal author/accepter before the planner provider when authority is unavailable', async () => {
@@ -370,13 +379,22 @@ describe('handleStart — engine=v2 passes live goalDeps to runV2Engine', () => 
 
     expect(authorError).toMatchObject({
       name: 'GoalInvocationHeldError',
-      hold: { reasonCode: 'authority_unavailable', invocationReceiptRef: null },
+      hold: {
+        reasonCode: 'authority_unavailable',
+        providerAuthorityReasonCode: 'policy_authority_unavailable',
+        invocationReceiptRef: null,
+      },
     });
     expect(acceptError).toMatchObject({
       name: 'GoalInvocationHeldError',
-      hold: { reasonCode: 'authority_unavailable', invocationReceiptRef: null },
+      hold: {
+        reasonCode: 'authority_unavailable',
+        providerAuthorityReasonCode: 'policy_authority_unavailable',
+        invocationReceiptRef: null,
+      },
     });
-    expect(authorError.hold.evidenceRefs[0]).not.toBe(acceptError.hold.evidenceRefs[0]);
+    expect(authorError.hold.evidenceRefs[0]).toBe(acceptError.hold.evidenceRefs[0]);
+    expect(authorError.hold.evidenceRefs[1]).not.toBe(acceptError.hold.evidenceRefs[1]);
     expect(plannerResolveAdapterSpy).not.toHaveBeenCalled();
   });
 
@@ -442,7 +460,7 @@ describe('handleStart — engine=v2 passes live goalDeps to runV2Engine', () => 
     expect(result).toMatchObject({
       ok: false,
       dispatchDisposition: 'parked',
-      reason: 'MISSION_WORKER_INVOCATION_AUTHORITY_UNAVAILABLE',
+      reason: 'MISSION_WORKER_INVOCATION_HOLD:policy_authority_unavailable',
       invocationReceiptRef: null,
     });
     expect(exactExecutor).not.toHaveBeenCalled();

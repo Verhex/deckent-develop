@@ -23,6 +23,11 @@ const sprintEntry: BacklogEntry = {
   ...taskEntry, id: 'e-sprint', kind: 'sprint', spec: { directivesRef: 'D.md' },
 };
 
+const processEntry: BacklogEntry = {
+  ...taskEntry, id: 'e-process', kind: 'process',
+  spec: { description: 'run bounded process' },
+};
+
 const capabilityEntry: BacklogEntry = {
   ...taskEntry, id: 'e-cap', kind: 'capability', provider: undefined, model: undefined,
   spec: { capabilityTarget: { capability: 'echo', args: { ping: 'pong' } } },
@@ -73,6 +78,122 @@ afterEach(() => {
 });
 
 // ─── Tests ───────────────────────────────────────────────────────────
+
+describe('execute-dispatcher — provider authority admission', () => {
+  it.each([
+    ['task', taskEntry],
+    ['sprint', sprintEntry],
+    ['process', processEntry],
+  ] as const)('parks kind=%s before JIT or dispatch with durable HOLD provenance', async (_kind, entry) => {
+    const planned = { ...entry, planned: true, summary: 'bounded work' };
+    const backlogPath = seedBacklog(tmpDir, planned);
+    const runTask = vi.fn();
+    const runSprint = vi.fn();
+    const waitForResult = vi.fn();
+    const jitComplete = vi.fn();
+    const hold = {
+      schemaVersion: 1 as const,
+      executionId: entry.id,
+      tenantId: 'local',
+      projectId: null,
+      reasonCode: 'candidate_authority_unavailable',
+      authorityEvidenceRefs: ['provider-authority:root', 'provider-execution-ingress:request'],
+      heldAt: '2026-07-25T00:00:00.000Z',
+    };
+    const admitProviderExecution = vi.fn().mockResolvedValue({
+      decision: 'hold',
+      hold,
+    });
+
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir,
+      config: {} as never,
+      runTask,
+      runSprint,
+      backlogPath,
+      waitForResult,
+      jitComplete,
+      admitProviderExecution,
+    });
+
+    const result = await handler('autonomous.execute', { entry: planned });
+
+    expect(result).toEqual({
+      outcome: 'failure',
+      error: 'provider-authority: candidate_authority_unavailable',
+    });
+    expect(admitProviderExecution).toHaveBeenCalledOnce();
+    expect(admitProviderExecution).toHaveBeenCalledWith(planned);
+    expect(jitComplete).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
+    expect(runSprint).not.toHaveBeenCalled();
+    expect(waitForResult).not.toHaveBeenCalled();
+    expect(loadBacklog(backlogPath).entries[0]).toMatchObject({
+      status: 'parked',
+      lastResult: {
+        ok: false,
+        reason: 'provider-authority: candidate_authority_unavailable',
+        providerAuthorityHold: hold,
+      },
+    });
+  });
+
+  it('keeps provider-free capability execution outside the provider admission gate', async () => {
+    const backlogPath = seedBacklog(tmpDir, capabilityEntry);
+    const admitProviderExecution = vi.fn();
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir,
+      config: {} as never,
+      runTask: vi.fn(),
+      runSprint: vi.fn(),
+      backlogPath,
+      waitForResult: vi.fn(),
+      capabilityRegistry: createDefaultRegistry(),
+      admitProviderExecution,
+      runBudgetedDecay: vi.fn(),
+    });
+
+    expect((await handler('autonomous.execute', { entry: capabilityEntry })).outcome).toBe('success');
+    expect(admitProviderExecution).not.toHaveBeenCalled();
+    expect(loadBacklog(backlogPath).entries[0]?.status).toBe('done');
+  });
+
+  it('fails loudly before JIT/dispatch when canonical admission rejects the identity', async () => {
+    const planned = { ...taskEntry, planned: true, summary: 'bounded work' };
+    const backlogPath = seedBacklog(tmpDir, planned);
+    const runTask = vi.fn();
+    const runSprint = vi.fn();
+    const jitComplete = vi.fn();
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir,
+      config: {} as never,
+      runTask,
+      runSprint,
+      backlogPath,
+      waitForResult: vi.fn(),
+      jitComplete,
+      admitProviderExecution: () => {
+        throw new Error('E_PROVIDER_MODEL_MISMATCH');
+      },
+    });
+
+    const result = await handler('autonomous.execute', { entry: planned });
+
+    expect(result.outcome).toBe('failure');
+    expect(result.error).toContain('provider-authority-admission-error');
+    expect(result.error).toContain('E_PROVIDER_MODEL_MISMATCH');
+    expect(jitComplete).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
+    expect(runSprint).not.toHaveBeenCalled();
+    expect(loadBacklog(backlogPath).entries[0]).toMatchObject({
+      status: 'failed',
+      lastResult: {
+        ok: false,
+        reason: expect.stringContaining('E_PROVIDER_MODEL_MISMATCH'),
+      },
+    });
+  });
+});
 
 describe('execute-dispatcher — capability branch (F8 broker dispatch)', () => {
   it('kind=capability → registry invoked, backlog moves pending→running→done', async () => {

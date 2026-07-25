@@ -79,14 +79,19 @@ import {
   assertWorkItemBatchAdmitted,
   listRuntimeAdmittedKinds,
 } from '../../orchestra/autonomous/mission-store/mission-kind-admission.js';
-import { loadConfig, resolveBrainModel } from '../../core/config.js';
+import { loadConfig, resolveBrainModel, resolveDefaultModel } from '../../core/config.js';
 import { PROJECT_CONFIG_PATH, RECENT_WORKS_DIR } from '../../core/constants.js';
 import { bootstrapProviders, orderedRoleProviders } from '../../core/provider.js';
 import type { ModelType, ResolvedConfig } from '../../core/types.js';
 import { ALL_PROVIDER_NAMES } from '../../core/types.js';
 import { getEquivalentModel } from '../../core/model-equivalence.js';
 import { defaultRoleInvocationPolicy } from '../../core/role-invocation-resolver.js';
-import { HostRoleInvocationAdmissionRuntime } from '../../core/host-role-invocation-admission-runtime.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
+import {
+  openLocalProviderAuthorityRuntime,
+  openLocalProviderAuthorityRuntimeIfConfigured,
+} from '../../providers/provider-authority-runtime-bootstrap.js';
+import { preflightProviderExecutionIngress } from '../../core/provider-execution-ingress-authority.js';
 import { loadReactiveMap } from '../../orchestra/autonomous/reactive/reactive-map.js';
 import { makeReactiveIngester } from '../../orchestra/autonomous/reactive/reactive-ingester.js';
 import { makeNervousReactiveSource } from '../../orchestra/autonomous/reactive/nervous-reactive-source.js';
@@ -96,11 +101,16 @@ import { NervousObserver } from '../../nervous/observer.js';
 import { createNervousSystemIfEnabled, type NervousSystemHandle } from '../../nervous/bootstrap.js';
 import { getSprintStateSnapshot } from '../../orchestra/sprint-state-tracker.js';
 import type { DeckentConfig } from '../../core/types.js';
-import { DeckentError } from '../../core/errors.js';
+import {
+  DeckentError,
+  createExecutionAuthorityError,
+} from '../../core/errors.js';
 import type { InvocationPurpose, InvocationReceiptRef, InvocationRole } from '../../core/invocation-receipt.js';
 import { InvocationReceiptStore } from '../../core/invocation-receipt-store.js';
 import { MissionWorkerInvocationCoordinator } from '../../orchestra/autonomous/mission-store/mission-worker-invocation-coordinator.js';
 import { MissionWorkerInvocationRecoveryReconciler } from '../../orchestra/autonomous/mission-store/mission-worker-invocation-recovery.js';
+import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
+import { MissionApprovalCoordinator } from '../../orchestra/autonomous/mission-store/mission-approval-coordinator.js';
 
 // ─── Filesystem layout helpers ────────────────────────────────────────
 
@@ -702,15 +712,28 @@ export interface LiveGoalDepsOptions {
   now?: () => Date;
 }
 
-function makeUnavailableGoalRoleAdmissionGuard(
+function makeGoalRoleAdmissionGuard(
   config: ResolvedConfig,
+  providerAuthority: ProviderAuthorityRuntimeServiceOpenResult,
 ): NonNullable<LiveGoalDepsOptions['admitInvocation']> {
-  const runtime = new HostRoleInvocationAdmissionRuntime(null);
   const configuredBrainModel = resolveBrainModel(config);
   return ({ role, purpose }): void => {
+    if (providerAuthority.state === 'hold') {
+      const roleEvidenceRef = `goal-role-admission:${createHash('sha256')
+        .update(`${providerAuthority.authorityEvidenceRef}\0${role}\0${purpose}`)
+        .digest('hex')}`;
+      throw new GoalInvocationHeldError({
+        schemaVersion: 1,
+        reasonCode: 'authority_unavailable',
+        providerAuthorityReasonCode: providerAuthority.reasonCode,
+        evidenceRefs: [providerAuthority.authorityEvidenceRef, roleEvidenceRef],
+        invocationReceiptRef: null,
+        heldAt: new Date().toISOString(),
+      });
+    }
     const order = orderedRoleProviders(role, config);
     const roleModel = getEquivalentModel(configuredBrainModel, order.primary);
-    const result = runtime.admit({
+    const result = providerAuthority.service.roleAdmissionRuntime.admit({
       invocation: {
         role,
         purpose,
@@ -730,7 +753,11 @@ function makeUnavailableGoalRoleAdmissionGuard(
     throw new GoalInvocationHeldError({
       schemaVersion: 1,
       reasonCode: result.reasonCode,
-      evidenceRefs: [result.authorityEvidenceRef],
+      providerAuthorityReasonCode: 'candidate_authority_unavailable',
+      evidenceRefs: [...new Set([
+        providerAuthority.authorityEvidenceRef,
+        result.authorityEvidenceRef,
+      ])],
       invocationReceiptRef: null,
       heldAt: new Date().toISOString(),
     });
@@ -867,7 +894,6 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
   // MissionScheduler runtime; the entire v1 path below stays byte-for-byte
   // unchanged when the flag is absent/'v1' (existing autonomous tests stay green).
   if (isV2Engine(resolvedConfig)) {
-    await bootstrapProviders(resolvedConfig);
     const stopFileV2 = stopMarkerPath(root);
     if (existsSync(stopFileV2)) rmSync(stopFileV2);
     const controllerV2 = new AbortController();
@@ -877,13 +903,78 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     const maxIterationsV2 = opts.maxIterations !== undefined
       ? Math.max(0, parseInt(opts.maxIterations, 10) || 0)
       : undefined;
-    const invocationReceiptStore = new InvocationReceiptStore(root);
+    const providerAuthority = openLocalProviderAuthorityRuntime(root, resolvedConfig);
+    const approvalAuthority = bootstrapApprovalAuthority(root, resolvedConfig);
+    const missionStore = new SqliteMissionStore(root);
+    const approvalCoordinator = approvalAuthority.state === 'ready'
+      ? new MissionApprovalCoordinator({
+          store: missionStore,
+          publisher: approvalAuthority.runtime.broker,
+          decisions: approvalAuthority.runtime.store,
+          decisionAuthority: approvalAuthority.runtime.decisionAuthority,
+          requestFactory: (item, mission) => {
+            if (!mission.createdBy) {
+              throw createExecutionAuthorityError('MISSION_APPROVAL_VERIFIED_OWNER_MISSING');
+            }
+            return {
+              requester: {
+                role: 'brain',
+                instanceId: `goal-v2:${mission.id}`,
+              },
+              summary: getMessage('autonomous.approval_request_summary', lang, {
+                id: item.id,
+                title: String(item.spec?.['title'] ?? item.id),
+              }),
+              details: {
+                missionId: mission.id,
+                workItemId: item.id,
+                kind: item.kind,
+                policy: item.policy,
+                revision: item.revision,
+              },
+              scopeId: mission.id,
+              scope: 'lifecycle',
+              risk: item.policy === 'risk-tagged' ? 'critical' : 'high',
+              policy: 'require-approval',
+              defaultAction: 'deny',
+              tenantId: mission.tenant,
+              userId: mission.createdBy,
+              createdAt: item.createdAt,
+              expiresAt: new Date(
+                Date.parse(item.createdAt) + 15 * 60_000,
+              ).toISOString(),
+              maskedArgs: {
+                missionId: mission.id,
+                workItemId: item.id,
+                kind: item.kind,
+              },
+              rawArgsRef: null,
+            };
+          },
+        })
+      : undefined;
+    const standaloneInvocationReceiptStore = providerAuthority.state === 'hold'
+      ? new InvocationReceiptStore(root)
+      : null;
+    const invocationReceiptStore = providerAuthority.state === 'ready'
+      ? providerAuthority.service.invocationReceiptLedger
+      : standaloneInvocationReceiptStore!;
+    const workerAuthorityHold = providerAuthority.state === 'hold'
+      ? providerAuthority
+      : {
+          state: 'hold' as const,
+          reasonCode: 'mission_worker_candidate_adapter_unavailable',
+          authorityEvidenceRef: providerAuthority.authorityEvidenceRef,
+        };
     try {
       const summary = await runV2Engine(root, resolvedConfig, {
-        // The coordinator is the only gate to this exact executor. Production
-        // truth/limit/key/usage authorities and route-lock are not composed yet,
-        // so its null authority parks before this callback, Task JSON, or spawn.
-        workerInvocationCoordinator: new MissionWorkerInvocationCoordinator(null),
+        store: missionStore,
+        ...(approvalCoordinator ? { approvalCoordinator } : {}),
+        // The coordinator is the only gate to this exact executor. Provider
+        // adapters are deliberately not bootstrapped before this authority
+        // boundary; typed composition/candidate HOLDs park before Task JSON,
+        // provider CLI discovery, or spawn.
+        workerInvocationCoordinator: new MissionWorkerInvocationCoordinator(workerAuthorityHold),
         workerInvocationRecoveryReconciler:
           new MissionWorkerInvocationRecoveryReconciler(invocationReceiptStore),
         runTask: async () => ({
@@ -894,7 +985,15 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
         runAdmittedTask: async () => {
           throw new Error('MISSION_WORKER_EXACT_ROUTE_LOCK_UNAVAILABLE');
         },
-        runSprint: (projectRoot) => runSprintLifecycle(projectRoot, sprintConfigV2),
+        runSprint: (projectRoot) => runSprintLifecycle(projectRoot, sprintConfigV2, {
+          providerAuthority,
+          ...(approvalAuthority.state === 'ready'
+            ? {
+                attendedExecutionApprovalAuthority:
+                  approvalAuthority.runtime.attendedExecutionApprovalAuthority,
+              }
+            : {}),
+        }),
         // Type-2 goal-driver: real planner + acceptance evaluator (same provider as
         // the JIT planner). Without this, idle `kind='goal'` missions never advance —
         // author/accept stays inert (the live wiring-gap this closes). buildGoalDeps
@@ -904,7 +1003,10 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
         goalDeps: buildLiveGoalDeps(
           realPlannerComplete(resolvePlannerModelIdentity(resolvedConfig, lang)),
           {
-            admitInvocation: makeUnavailableGoalRoleAdmissionGuard(resolvedConfig),
+            admitInvocation: makeGoalRoleAdmissionGuard(
+              resolvedConfig,
+              providerAuthority,
+            ),
             acceptanceReceiptVerifier: (mission, evaluation) =>
               verifyGoalAcceptanceInvocationReceipt(invocationReceiptStore, mission, evaluation),
           },
@@ -918,16 +1020,26 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
         reason: summary.reason,
       }));
     } finally {
-      invocationReceiptStore.close();
+      missionStore.close();
+      if (approvalAuthority.state === 'ready') approvalAuthority.runtime.close();
+      standaloneInvocationReceiptStore?.close();
+      providerAuthority.close();
       process.off('SIGINT', sigintV2);
     }
     return;
   }
 
-  // Gap A fix: register provider adapters (including OllamaAdapter) so that
-  // getProviderAdapterForTask('ollama') resolves correctly for autonomous tasks.
-  // bootstrapProviders is idempotent and safe-no-op when a provider is unreachable.
-  await bootstrapProviders(resolvedConfig);
+  // Rollout-safe v1 adoption: an owner-authored provider-limit layer activates
+  // the shared process authority. Once active, provider bootstrap cannot run
+  // ahead of admission; without the layer, prior v1 behavior is unchanged.
+  const providerAuthority = openLocalProviderAuthorityRuntimeIfConfigured(root, resolvedConfig);
+  let approvalAuthority: ReturnType<typeof bootstrapApprovalAuthority> | undefined;
+  try {
+    // Gap A fix: register provider adapters (including OllamaAdapter) so that
+    // getProviderAdapterForTask('ollama') resolves correctly for autonomous tasks.
+    // bootstrapProviders is idempotent and safe-no-op when a provider is unreachable.
+    if (!providerAuthority) await bootstrapProviders(resolvedConfig);
+    approvalAuthority = bootstrapApprovalAuthority(root, resolvedConfig);
 
   // Clear any stale stop marker before starting.
   const stopFile = stopMarkerPath(root);
@@ -968,12 +1080,70 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
       scope: ctx.scope,
       projectRoot: ctx.projectRoot ?? root,
       autoApprove: true,
+      ...(providerAuthority ? { providerAuthority } : {}),
+      ...(approvalAuthority?.state === 'ready'
+        ? {
+            attendedExecutionApprovalAuthority:
+              approvalAuthority.runtime.attendedExecutionApprovalAuthority,
+          }
+        : {}),
     }, taskConfig),
-    runSprint: (projectRoot) => runSprintLifecycle(projectRoot, sprintConfig),
+    runSprint: (projectRoot) => runSprintLifecycle(projectRoot, sprintConfig, {
+      ...(providerAuthority ? { providerAuthority } : {}),
+      ...(approvalAuthority?.state === 'ready'
+        ? {
+            attendedExecutionApprovalAuthority:
+              approvalAuthority.runtime.attendedExecutionApprovalAuthority,
+          }
+        : {}),
+    }),
     // Gap F: real completion tracking — wire in the CLI's waitForRunResult primitive.
     // Gap B: resultTimeoutMs from config; fallback to 600s (enough for cold ollama load).
     waitForResult: waitForRunResult,
     resultTimeoutMs: (resolvedConfig.autonomous as Record<string, unknown> | undefined)?.result_timeout_ms as number | undefined,
+    ...(providerAuthority
+      ? {
+          admitProviderExecution: (entry: BacklogEntry) => {
+            const requestedModel = entry.model ?? resolveDefaultModel(resolvedConfig);
+            if (entry.provider === 'openrouter') {
+              registerOpenRouterModelFromCache(root, requestedModel);
+            }
+            const identity = resolveExecutionModelIdentity(requestedModel, entry.provider);
+            const workerProviderOrder = orderedRoleProviders('worker', resolvedConfig);
+            const decision = preflightProviderExecutionIngress(providerAuthority, {
+              runId: entry.id,
+              taskId: entry.id,
+              provider: identity.provider,
+              model: identity.model,
+              configuredBackend: resolvedConfig.spawn_backend ?? 'auto',
+              fallbackProviders: [
+                workerProviderOrder.primary,
+                ...workerProviderOrder.fallbacks,
+              ].filter(candidate => candidate !== identity.provider),
+              // ADR-G-037: autonomous/scheduled/reactive execution is always
+              // unattended; provider fallback config cannot relax attendance.
+              unattended: true,
+            });
+            if (decision.decision === 'not-configured') {
+              return { decision: 'allow' as const };
+            }
+            return {
+              decision: 'hold' as const,
+              hold: {
+                schemaVersion: 1 as const,
+                executionId: entry.id,
+                tenantId: entry.tenant ?? entry.actor?.tenantId ?? 'local',
+                projectId: providerAuthority.state === 'ready'
+                  ? providerAuthority.projectId
+                  : null,
+                reasonCode: decision.reasonCode,
+                authorityEvidenceRefs: decision.authorityEvidenceRefs,
+                heldAt: new Date().toISOString(),
+              },
+            };
+          },
+        }
+      : {}),
     // Task 8: goal-planner Phase 2 — dispatched `planned` entries get JIT detail
     // generated by the real provider before they run (title-only fallback on failure).
     // 454-003: canonical configured Brain model, resolved + validated before the loop
@@ -1111,6 +1281,10 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     // that the execute-dispatcher leaves behind — keeps .tasks/ from accumulating
     // run files across autonomous sessions. Best-effort; never throws.
     cleanupAutonomousArtifacts(root);
+  }
+  } finally {
+    if (approvalAuthority?.state === 'ready') approvalAuthority.runtime.close();
+    providerAuthority?.close();
   }
 }
 

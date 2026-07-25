@@ -124,6 +124,40 @@ describe('engine wiring — recurring re-enqueue + work-generator', () => {
     expect(await bundle.deps.triggerSource.next()).toBeNull();
   });
 
+  it('forwards process-root provider admission and parks before task execution', async () => {
+    writeFileSync(backlogPath, JSON.stringify({
+      _version: '1.0',
+      entries: [entry({ id: 'held-task', planned: true, summary: 'bounded work' })],
+    }));
+    const opts = baseOpts(() => new Date('2026-06-09T10:00:00Z'));
+    const admitProviderExecution = vi.fn().mockResolvedValue({
+      decision: 'hold',
+      hold: {
+        schemaVersion: 1,
+        executionId: 'held-task',
+        tenantId: 'local',
+        projectId: null,
+        reasonCode: 'candidate_authority_unavailable',
+        authorityEvidenceRefs: ['provider-authority:test'],
+        heldAt: '2026-07-25T00:00:00.000Z',
+      },
+    });
+    const bundle = buildEngineRuntime({ ...opts, admitProviderExecution });
+
+    await runAutonomousCycle({}, bundle.deps);
+
+    expect(admitProviderExecution).toHaveBeenCalledOnce();
+    expect(opts.runTask).not.toHaveBeenCalled();
+    expect(loadBacklog(backlogPath).entries[0]).toMatchObject({
+      status: 'parked',
+      lastResult: {
+        providerAuthorityHold: {
+          reasonCode: 'candidate_authority_unavailable',
+        },
+      },
+    });
+  });
+
   // ── Seam #3: capability-broker cluster reachable through the live dispatch path ──
 
   it('executes a capability backlog entry end-to-end through a full autonomous cycle', async () => {

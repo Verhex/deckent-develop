@@ -158,6 +158,11 @@ export interface BuildEngineRuntimeOptions {
   /** Gap F: max ms to wait for a task result. Defaults to 600_000 in dispatcher. */
   resultTimeoutMs?: number;
   /**
+   * Optional process-root provider authority admission forwarded to the
+   * execute-dispatcher. Absent preserves the autonomous-v1 rollout default.
+   */
+  admitProviderExecution?: ExecuteDispatcherDeps['admitProviderExecution'];
+  /**
    * Goal-planner Phase 2: when provided, a planned task/sprint entry with no
    * detail is detailed JIT (and persisted) before it runs (forwarded to the
    * execute-dispatcher). Absent → planned entries run title-only (backward-safe).
@@ -338,6 +343,7 @@ export function buildEngineRuntime(
       backlogPath: opts.backlogPath,
       waitForResult: opts.waitForResult,
       resultTimeoutMs: opts.resultTimeoutMs,
+      admitProviderExecution: opts.admitProviderExecution,
       jitComplete: opts.jitComplete,
       flow: opts.flow,
       capabilityRegistry,

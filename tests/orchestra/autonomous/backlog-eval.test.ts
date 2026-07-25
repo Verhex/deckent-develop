@@ -143,6 +143,7 @@ describe('crossVerifyBacklogResult (Component ③ — XVER-1 cross-provider, adv
       spawn_backend: 'docker',
       execution_budget: {
         roles: { auditor: { default: { maxCacheReadTokens: 1_000_000, maxTurns: 12 } } },
+        landing: { reserve_ratio: 0.25 },
         unmetered_backend: { action: 'reroute-or-hold', ordered_backends: ['docker'] },
       },
     } as unknown as ResolvedConfig;

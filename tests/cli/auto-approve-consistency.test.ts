@@ -72,6 +72,7 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
     create: vi.fn(() => ({
       name: 'docker',
       liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
       spawn: hoisted.backendSpawn,
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),
@@ -80,6 +81,7 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
     createAsync: vi.fn(async () => ({
       name: 'docker',
       liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
       spawn: hoisted.backendSpawn,
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),
@@ -102,9 +104,13 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
   SubprocessBackend: class SubprocessBackend {},
 }));
 
-vi.mock('../../src/core/provider.js', () => ({
-  bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
-}));
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/provider.js')>();
+  return {
+    ...actual,
+    bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
+  };
+});
 
 vi.mock('../../src/cli/helpers/output.js', () => ({
   print: vi.fn(),
@@ -129,6 +135,7 @@ vi.mock('../../src/cli/helpers/process.js', () => ({
 import { loadConfig } from '../../src/core/config.js';
 import { runSprint } from '../../src/orchestra/brain.js';
 import { resolveProjectRoot } from '../../src/cli/helpers/process.js';
+import { printError } from '../../src/cli/helpers/output.js';
 import { registerStart } from '../../src/cli/commands/start.js';
 import { registerRun } from '../../src/cli/commands/run.js';
 
@@ -142,7 +149,10 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
     // Drives run.ts's spawn call to SpawnBackendFactory (production default —
     // see src/core/config.ts:1202) instead of the tmux fallback path.
     spawn_backend: 'docker',
-    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
+    execution_budget: {
+      roles: { worker: { default: { maxTurns: 1 } } },
+      landing: { reserve_ratio: 0.25 },
+    },
     ...overrides,
   };
 }
@@ -228,6 +238,7 @@ describe('deckent run — --auto-approve consistency (born-561)', () => {
 
   it('defaults autoApprove to false when --auto-approve is not passed', async () => {
     await runRun();
+    expect(printError).not.toHaveBeenCalled();
     expect(hoisted.backendSpawn).toHaveBeenCalledWith(
       expect.stringMatching(/^run-/),
       'claude-sonnet-5',
@@ -238,6 +249,7 @@ describe('deckent run — --auto-approve consistency (born-561)', () => {
 
   it('honors --auto-approve: sets autoApprove to true', async () => {
     await runRun('--auto-approve');
+    expect(printError).not.toHaveBeenCalled();
     expect(hoisted.backendSpawn).toHaveBeenCalledWith(
       expect.stringMatching(/^run-/),
       'claude-sonnet-5',

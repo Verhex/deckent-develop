@@ -282,6 +282,77 @@ describe('MissionApprovalCoordinator', () => {
     f.store.close();
   });
 
+  it('propagates a signed deny through transitive dependencies before dispatch and preserves it after restart', async () => {
+    const f = fixture();
+    f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });
+    f.store.enqueueItem({ id: 'direct', missionId: 'm', kind: 'task', dependsOn: ['guarded'] });
+    f.store.enqueueItem({ id: 'transitive', missionId: 'm', kind: 'task', dependsOn: ['direct'] });
+    f.store.enqueueItem({ id: 'independent', missionId: 'm', kind: 'task' });
+    const c = coordinator(f);
+    c.tick();
+    const requestId = f.store.listApprovalBindings()[0]!.requestId;
+    await decide(f, requestId, 'deny');
+    const calls: string[] = [];
+
+    const first = await runMissionScheduler(f.store, async (item) => {
+      calls.push(item.id);
+      return { ok: true };
+    }, { poolSize: 2, intervalMs: 1, maxIterations: 4, approvalCoordinator: c });
+
+    expect(first.dispatched).toBe(1);
+    expect(calls).toEqual(['independent']);
+    const byId = new Map(f.store.listItems('m').map((item) => [item.id, item]));
+    expect(byId.get('guarded')).toMatchObject({
+      status: 'blocked',
+      lastResult: {
+        ok: false,
+        reason: `APPROVAL_DENIED: ${requestId}`,
+        approvalDecision: { requestId, decision: 'deny' },
+      },
+    });
+    expect(byId.get('direct')).toMatchObject({
+      status: 'blocked',
+      lastResult: { ok: false, reason: 'DEPENDENCY_FAILED: guarded' },
+    });
+    expect(byId.get('transitive')).toMatchObject({
+      status: 'blocked',
+      lastResult: { ok: false, reason: 'DEPENDENCY_FAILED: direct' },
+    });
+    expect(byId.get('independent')!.status).toBe('done');
+    expect(f.store.getMission('m')!.status).toBe('failed');
+    expect(f.store.listApprovalBindings()).toHaveLength(1);
+    expect(f.store.listApprovalBindings()[0]!.decisionState).toBe('denied');
+    f.store.close();
+
+    const reopened = new SqliteMissionStore(f.root);
+    reopened.migrate();
+    const restartCalls: string[] = [];
+    const restarted = new MissionApprovalCoordinator({
+      store: reopened,
+      publisher: new ApprovalBroker(f.root),
+      decisions: new ApprovalStore(f.root),
+      requestFactory,
+      decisionAuthority: f.decisionAuthority,
+      now: () => NOW,
+    });
+    const second = await runMissionScheduler(reopened, async (item) => {
+      restartCalls.push(item.id);
+      return { ok: true };
+    }, { poolSize: 2, intervalMs: 1, maxIterations: 1, approvalCoordinator: restarted });
+
+    expect(second.dispatched).toBe(0);
+    expect(restartCalls).toEqual([]);
+    expect(reopened.listItems('m').map((item) => [item.id, item.status])).toEqual([
+      ['guarded', 'blocked'],
+      ['direct', 'blocked'],
+      ['transitive', 'blocked'],
+      ['independent', 'done'],
+    ]);
+    expect(reopened.listApprovalBindings()).toHaveLength(1);
+    expect(reopened.listApprovalBindings()[0]!.decisionState).toBe('denied');
+    reopened.close();
+  });
+
   it('sweeps an overdue undecided request before hydration and blocks it durably', () => {
     const f = fixture();
     f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });

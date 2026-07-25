@@ -18,6 +18,37 @@ export type WorkItemRenderAs = 'task' | 'sprint' | 'workflow' | 'action';
 export type WorkItemPolicy = 'auto' | 'approval-required' | 'risk-tagged';
 export type ApprovalPublishState = 'outbox' | 'published';
 export type WorkItemApprovalState = 'pending' | 'allowed' | 'denied' | 'expired' | 'deferred' | 'escalated';
+export type MissionDependencyAuthorityState = 'migration-pending' | 'active' | 'quarantined';
+export type MissionDependencyAuthoritySource = 'new-v1' | 'legacy-json-v1';
+
+export interface MissionDependencyAuthorityV1 {
+  schemaVersion: 1;
+  missionId: string;
+  state: MissionDependencyAuthorityState;
+  graphRevision: number;
+  graphDigest: string;
+  sourceKind: MissionDependencyAuthoritySource;
+  activationRef: string | null;
+  activatedAt: string | null;
+  quarantineReason: string | null;
+  updatedAt: string;
+}
+
+export interface MissionDependencyActivationV1 {
+  schemaVersion: 1;
+  missionId: string;
+  expectedGraphDigest: string;
+  approvedBy: string;
+  approvalRef: string;
+  approvedAt: string;
+}
+
+export interface DependencyReconciliationOptions {
+  /** Global edge-processing ceiling for one scheduler reconciliation call. */
+  maxEdges?: number;
+  /** Fair-share chunk per queue job; must not exceed maxEdges. */
+  maxEdgesPerJob?: number;
+}
 
 export interface Progress { done: number; total: number; phase?: string; step?: string; }
 /**
@@ -197,9 +228,18 @@ export interface MissionStore {
     state: Exclude<WorkItemApprovalState, 'pending'>,
     decision: ApprovalDecision,
   ): ApprovalDecisionTransition | null;
+  /** Validate/backfill a legacy JSON graph without activating it for dispatch. */
+  prepareNormalizedDependencyMigration(missionId: string): MissionDependencyAuthorityV1;
+  /** Explicit digest-bound cutover. No production ingress calls this without owner authority. */
+  activateNormalizedDependencyAuthority(
+    activation: MissionDependencyActivationV1,
+  ): MissionDependencyAuthorityV1;
+  getDependencyAuthority(missionId: string): MissionDependencyAuthorityV1 | null;
   /** Fail invalid/cyclic/failed-upstream pending dependency chains durably.
    * Returns mission ids whose item status changed during reconciliation. */
-  reconcilePendingDependencies(): string[];
+  reconcilePendingDependencies(opts?: DependencyReconciliationOptions): string[];
+  /** Derived queue visibility; never authorizes dispatch, only prevents premature drain. */
+  hasPendingDependencyReconciliation(): boolean;
   /** Quarantine non-terminal rows that cannot execute under the current registry. */
   reconcileRuntimeAdmission(registry: MissionRunnerRegistryV1, itemId?: string): string[];
   queryDue(opts?: { tenant?: string; limit?: number; registry?: MissionRunnerRegistryV1 }): WorkItem[];

@@ -69,6 +69,20 @@ export interface BacklogEntry {
     };
     /** XVER-1 cross-provider verification (advisory; honest-skip → ran:false). */
     crossVerify?: { ran: boolean; verdict?: 'confirmed' | 'refuted' | 'unclear' };
+    /**
+     * Host-authored provider-authority HOLD for an execution that never reached
+     * provider/bootstrap/backend dispatch. This is provenance, not an approval
+     * request and never becomes an execution permit on replay.
+     */
+    providerAuthorityHold?: {
+      readonly schemaVersion: 1;
+      readonly executionId: string;
+      readonly tenantId: string;
+      readonly projectId: string | null;
+      readonly reasonCode: string;
+      readonly authorityEvidenceRefs: readonly string[];
+      readonly heldAt: string;
+    };
   } | null;
 }
 
