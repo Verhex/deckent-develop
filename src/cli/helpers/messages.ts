@@ -42,6 +42,22 @@ const MESSAGES: MessageMap = {
     en: 'Fetching the latest model catalog from models.dev… (set DECKENT_OFFLINE=1 to skip)',
     tr: 'Güncel model kataloğu models.dev üzerinden alınıyor… (atlamak için DECKENT_OFFLINE=1 ayarlayın)',
   },
+  'cli.binary_identity.hold': {
+    en: 'DECKENT_BINARY_IDENTITY_HOLD: this Deckent source checkout is being driven by a different or unverified CLI build (reason: {issue}).',
+    tr: 'DECKENT_BINARY_IDENTITY_HOLD: bu Deckent source checkout farklı veya doğrulanmamış bir CLI build tarafından çalıştırılıyor (neden: {issue}).',
+  },
+  'cli.binary_identity.paths': {
+    en: 'Project checkout: {projectRoot}\nRuntime package: {runtimeRoot}',
+    tr: 'Proje checkout: {projectRoot}\nRuntime paketi: {runtimeRoot}',
+  },
+  'cli.binary_identity.hint': {
+    en: 'Run `npm run build:all`, then use `node dist/cli/entry.js <command>` from this checkout. For an intentional cross-checkout diagnostic only, set DECKENT_ALLOW_CROSS_CHECKOUT_BINARY=1.',
+    tr: 'Bu checkout içinde `npm run build:all` çalıştırın, ardından `node dist/cli/entry.js <komut>` kullanın. Yalnız bilinçli bir cross-checkout teşhisi için DECKENT_ALLOW_CROSS_CHECKOUT_BINARY=1 ayarlayın.',
+  },
+  'cli.binary_identity.override': {
+    en: 'DECKENT_BINARY_IDENTITY_OVERRIDE: explicit cross-checkout override accepted (reason: {issue}); runtime behavior may not match this source checkout.',
+    tr: 'DECKENT_BINARY_IDENTITY_OVERRIDE: açık cross-checkout override kabul edildi (neden: {issue}); runtime davranışı bu source checkout ile eşleşmeyebilir.',
+  },
 
   // ─── start command ──────────────────────────────────────────────────
   'start.sandbox_not_implemented': {
@@ -169,6 +185,12 @@ const MESSAGES: MessageMap = {
       + '(neden: {reason}, gerekli profil: {profile}). Owner tarafından yazılmış bir '
       + 'worker budget profili yapılandırın; provider veya backend başlatılmadı.',
   },
+  'run.provider_authority_hold': {
+    en: 'Run held before task creation: provider execution authority is not ready '
+      + '(reason: {reason}, evidence: {evidence}). No task, provider, or backend was started.',
+    tr: 'Run, görev oluşturulmadan beklemeye alındı: provider execution authority hazır değil '
+      + '(neden: {reason}, kanıt: {evidence}). Görev, provider veya backend başlatılmadı.',
+  },
   // Row 477: E_MODEL_PRICING_UNVERIFIED previously fell into the generic
   // provider_unverified message, which tells the user to "pass --provider" they
   // already passed — misleading. The real remedy is refreshing the verified
@@ -226,15 +248,31 @@ const MESSAGES: MessageMap = {
     en: 'Verdict: {verdict} (verifier: {verifier}) — advisory report: {report}',
     tr: 'Karar: {verdict} (hakem: {verifier}) — tavsiye raporu: {report}',
   },
+  'xverify.report.execution': {
+    en: '**Execution outcome:** {outcome} (initial attempt: {initial}, terminal attempt: {terminal})',
+    tr: '**Çalıştırma sonucu:** {outcome} (ilk deneme: {initial}, terminal deneme: {terminal})',
+  },
+  'xverify.report.cumulative_usage': {
+    en: '**Cumulative host usage:** {turns} turns · {tokens} total tokens · {cacheRead} cache-read tokens',
+    tr: '**Kümülatif host kullanımı:** {turns} turn · {tokens} toplam token · {cacheRead} cache-read token',
+  },
+  'xverify.report.verifier_model': {
+    en: '**Verifier model:** {model}',
+    tr: '**Hakem modeli:** {model}',
+  },
+  'xverify.report.none_dispatched': {
+    en: '(none dispatched)',
+    tr: '(çalıştırma yok)',
+  },
   // Worker-facing prompt fragments (deliberately EN-only content, keyed for
   // single-source maintenance — the VERIFIER reads these, not the operator).
   'xverify.go_criteria': {
-    en: 'The claim is accurate: every stated behavior is verifiable in the actual working tree (run git diff / read the files). End with a VERDICT line.',
-    tr: 'İddia doğrudur: belirtilen her davranış gerçek çalışma ağacında doğrulanabilir (git diff çalıştır / dosyaları oku). VERDICT satırıyla bitir.',
+    en: 'The bounded evidence supports every material factual premise of the claim and, when the claim proposes a dependency order, supports that order without a prerequisite reversal.',
+    tr: 'Sınırlı kanıt, iddianın her maddi olgusal öncülünü ve iddia bir bağımlılık sırası öneriyorsa önkoşul tersine dönmeden bu sırayı destekler.',
   },
   'xverify.nogo_criteria': {
-    en: 'Any stated behavior that the actual code contradicts, or that cannot be evidenced from the working tree.',
-    tr: 'Gerçek kodun yalanladığı veya çalışma ağacından kanıtlanamayan herhangi bir iddia edilen davranış.',
+    en: 'The bounded evidence directly contradicts a material factual premise or proves a concrete safety, correctness, evidence, or dependency-order gap. Missing evidence alone is not NO-GO; it requires UNCLEAR.',
+    tr: 'Sınırlı kanıt, maddi bir olgusal öncülü doğrudan çürütür veya somut bir güvenlik, doğruluk, kanıt ya da bağımlılık-sırası boşluğunu kanıtlar. Eksik kanıt tek başına NO-GO değildir; UNCLEAR gerektirir.',
   },
   'run.model_err.pricing_unverified': {
     en: 'Cannot use model "{model}": its OpenRouter pricing is unverified. '
@@ -343,6 +381,34 @@ const MESSAGES: MessageMap = {
   'runFlow.planPreview.scopeGate.overridden': {
     en: 'Scope gate: overridden via --force-scope — the child will spawn anyway.',
     tr: 'Scope-gate: --force-scope ile bilinçli geçildi — child yine de doğacak.',
+  },
+  'runFlow.planPreview.topology.pass': {
+    en: 'Execution topology: PASS',
+    tr: 'Yürütme topolojisi: GEÇTİ',
+  },
+  'runFlow.planPreview.topology.block': {
+    en: 'Execution topology: BLOCK',
+    tr: 'Yürütme topolojisi: BLOKE',
+  },
+  'runFlow.planPreview.topology.concurrency': {
+    en: 'Concurrency (configured/effective):',
+    tr: 'Eşzamanlılık (yapılandırılmış/etkin):',
+  },
+  'runFlow.planPreview.topology.collisions': {
+    en: 'Shared writers:',
+    tr: 'Ortak yazıcılar:',
+  },
+  'runFlow.planPreview.topology.syntheticEdges': {
+    en: 'Safety edges:',
+    tr: 'Güvenlik kenarları:',
+  },
+  'runFlow.planPreview.topology.waves': {
+    en: 'Effective waves:',
+    tr: 'Etkin dalgalar:',
+  },
+  'runFlow.planPreview.topology.findings': {
+    en: 'Structural findings:',
+    tr: 'Yapısal bulgular:',
   },
 
   // ─── run-flow REPL mount outcomes (TERM-FLOW-UNIFY Sprint-4 mount, 426-002) ─
@@ -749,6 +815,50 @@ const MESSAGES: MessageMap = {
   'doctor.auth_state_unknown': {
     en: '{provider}: unknown',
     tr: '{provider}: bilinmiyor',
+  },
+  'doctor.provider_auth_confirmed': {
+    en: 'authentication confirmed ({method})',
+    tr: 'kimlik doğrulama onaylandı ({method})',
+  },
+  'doctor.provider_auth_method_subscription': {
+    en: 'subscription session',
+    tr: 'abonelik oturumu',
+  },
+  'doctor.provider_auth_method_api_key': {
+    en: 'API key',
+    tr: 'API anahtarı',
+  },
+  'doctor.provider_auth_method_unclassified': {
+    en: 'provider session',
+    tr: 'sağlayıcı oturumu',
+  },
+  'doctor.provider_auth_logged_out': {
+    en: 'CLI present but NOT logged in — run: {command}',
+    tr: 'CLI mevcut ama oturum AÇILMAMIŞ — çalıştırın: {command}',
+  },
+  'doctor.provider_auth_unknown': {
+    en: 'CLI present but authentication could not be verified',
+    tr: 'CLI mevcut ama kimlik doğrulama teyit edilemedi',
+  },
+  'doctor.provider_auth_check_name': {
+    en: '{provider} authentication',
+    tr: '{provider} kimlik doğrulaması',
+  },
+  'doctor.provider_auth_recommendation': {
+    en: '{count} provider authentication warning(s) remain. Start only with providers whose authentication is confirmed.',
+    tr: '{count} sağlayıcı kimlik doğrulama uyarısı sürüyor. Yalnız kimlik doğrulaması onaylanmış sağlayıcılarla başlatın.',
+  },
+  'doctor.provider_local_runtime_available': {
+    en: 'local runtime available (authentication not required)',
+    tr: 'yerel çalışma zamanı kullanılabilir (kimlik doğrulama gerekmiyor)',
+  },
+  'doctor.provider_diagnostics_auth_missing': {
+    en: 'binary OK, authentication missing',
+    tr: 'binary hazır, kimlik doğrulama eksik',
+  },
+  'doctor.provider_diagnostics_auth_unverified': {
+    en: 'binary OK, authentication unverified',
+    tr: 'binary hazır, kimlik doğrulama teyit edilmedi',
   },
 
   // ─── mode command (MODE-HELP-FIX, Sprint 376 — 376-002) ──────────────
@@ -1206,6 +1316,18 @@ const MESSAGES: MessageMap = {
     en: '  2. Run `deckent start` to begin your first run',
     tr: '  2. İlk run\'ı başlatmak için `deckent start` çalıştırın',
   },
+  'init.option_yes': {
+    en: 'Use non-interactive defaults; never install missing prerequisites',
+    tr: 'Etkileşimsiz varsayılanları kullan; eksik önkoşulları asla kurma',
+  },
+  'init.option_install': {
+    en: 'Explicitly install supported missing prerequisites without prompting',
+    tr: 'Desteklenen eksik önkoşulları açık yetkiyle ve sormadan kur',
+  },
+  'init.option_no_install': {
+    en: 'Detect missing prerequisites but never install them',
+    tr: 'Eksik önkoşulları algıla ancak asla kurma',
+  },
 
   // ─── init outcome contract (RC2-A / INIT-01, Sprint 412 — 412-001) ──────
   'init.outcome_header': {
@@ -1542,11 +1664,15 @@ const MESSAGES: MessageMap = {
     en: 'switch failed — "{detail}" has no native tool-use transport; valid: claude, openai, ollama, deepseek, qwen, glm',
     tr: 'geçiş başarısız — "{detail}" için native tool-use transport yok; geçerli: claude, openai, ollama, deepseek, qwen, glm',
   },
+  'native.switch.legacy-model-alias': {
+    en: 'switch failed — "{detail}" is a legacy alias; use an exact provider API model ID such as claude-sonnet-5 or gpt-5.6-sol',
+    tr: 'geçiş başarısız — "{detail}" eski bir takma addır; claude-sonnet-5 veya gpt-5.6-sol gibi tam sağlayıcı API model kimliği kullanın',
+  },
   // REPL-575 K6 — an unrecognized non-claude model id refused instead of shipped
   // at the Anthropic transport with a false 'switched' report.
   'native.switch.unknown-model': {
-    en: 'switch failed — unknown model "{detail}": not a recognized claude model (try opus/sonnet/haiku/fable, or switch provider first)',
-    tr: 'geçiş başarısız — bilinmeyen model "{detail}": tanınan bir claude modeli değil (opus/sonnet/haiku/fable deneyin ya da önce sağlayıcı değiştirin)',
+    en: 'switch failed — unknown model "{detail}": use an exact registered provider API model ID or switch provider first',
+    tr: 'geçiş başarısız — bilinmeyen model "{detail}": tam kayıtlı sağlayıcı API model kimliği kullanın veya önce sağlayıcı değiştirin',
   },
   // native-transport.ts:247 produces errorCode 'no-transport' when detectTransport
   // finds nothing configured at all — this key was missing, so localizeNativeError
@@ -1998,6 +2124,18 @@ const MESSAGES: MessageMap = {
     en: 'Backup failed: {error}',
     tr: 'Yedekleme başarısız: {error}',
   },
+  'memory.export.not_found': {
+    en: 'memory.db not found. Run migration first.',
+    tr: 'memory.db bulunamadı. Önce migration çalıştırın.',
+  },
+  'memory.export.success': {
+    en: 'Exported {count} .md files to .brain/exports/.',
+    tr: '.brain/exports/ dizinine {count} .md dosyası aktarıldı.',
+  },
+  'memory.export.guard_hold': {
+    en: 'Export held: preserved {files} because existing snapshots contain more authority data than this memory.db ({written} safe file(s) written). Reconcile the project database before retrying.',
+    tr: 'Export bekletildi: mevcut snapshot bu memory.db dosyasından daha fazla otorite verisi içerdiği için {files} korundu ({written} güvenli dosya yazıldı). Yeniden denemeden önce proje veritabanını uzlaştırın.',
+  },
 
   // ─── inbound bot command acks (BOT-002, §4G) ───────────────────
   'bot.approve_ack': {
@@ -2173,6 +2311,38 @@ const MESSAGES: MessageMap = {
   'serve.daemon_meta_failed': {
     en: 'Warning: could not write the desktop handshake file (.deckent/serve-daemon.json) — the server runs normally, but a desktop shell cannot auto-adopt this daemon: {error}',
     tr: 'Uyarı: desktop el-sıkışma dosyası (.deckent/serve-daemon.json) yazılamadı — sunucu normal çalışıyor, ancak desktop kabuğu bu daemon\'ı otomatik devralamaz: {error}',
+  },
+  'serve.approval_authority_hold': {
+    en: 'Attended execution approval authority is on HOLD ({reason}/{detail}); API decisions cannot authorize unsupported remote execution.',
+    tr: 'Attended execution approval authority HOLD durumunda ({reason}/{detail}); API kararları desteklenmeyen remote execution için yetki veremez.',
+  },
+  'api.approval.fresh_oidc_required': {
+    en: 'Fresh OIDC step-up authentication is required.',
+    tr: 'Yeni bir OIDC step-up kimlik doğrulaması gereklidir.',
+  },
+  'api.approval.idempotency_required': {
+    en: 'Idempotency-Key header is required.',
+    tr: 'Idempotency-Key başlığı gereklidir.',
+  },
+  'api.approval.authority_unavailable': {
+    en: 'Attended execution approval authority is unavailable.',
+    tr: 'Attended execution approval authority kullanılamıyor.',
+  },
+  'api.approval.decision_rejected': {
+    en: 'Approval decision rejected: {reason}',
+    tr: 'Approval kararı reddedildi: {reason}',
+  },
+  'api.approval.request_expired': {
+    en: 'Approval request expired.',
+    tr: 'Approval isteğinin süresi doldu.',
+  },
+  'api.approval.decision_failed': {
+    en: 'Approval decision failed: {error}',
+    tr: 'Approval kararı başarısız oldu: {error}',
+  },
+  'autonomous.approval_request_summary': {
+    en: 'Approve Goal-v2 item {id}: {title}',
+    tr: 'Goal-v2 iş kalemini onayla {id}: {title}',
   },
   // SEC-03 (415-003): raw-token stderr redaction — a bearer token must never
   // land in a process-log stream (CI/journald/log-shippers capture stderr
@@ -2580,6 +2750,10 @@ const MESSAGES: MessageMap = {
   'resume.stale_item': { en: '    - {workerId} (task {taskId}): {reason}, age {age}min', tr: '    - {workerId} (görev {taskId}): {reason}, yaş {age}dk' },
   'resume.stale_action': { en: '  Proven-stale workers will be stopped and their tasks resumed.', tr: '  Bayatlığı kanıtlanan worker\'lar durdurulacak ve görevleri sürdürülecek.' },
   'resume.crash_completed': { en: '\n  ✓ Tasks completed before crash: {taskIds}', tr: '\n  ✓ Çökmeden önce tamamlanan görevler: {taskIds}' },
+  'resume.settlement_hold': {
+    en: '\nHOLD: host settlement is pending or invalid for {tasks}; no task was reset or spawned.',
+    tr: '\nHOLD: {tasks} için host settlement bekliyor veya geçersiz; hiçbir görev sıfırlanmadı ya da başlatılmadı.',
+  },
   'resume.dry_run': { en: '\n[dry-run] Would resume {count} task(s): {taskIds}. No workers spawned.', tr: '\n[dry-run] {count} görev sürdürülecek: {taskIds}. Worker başlatılmadı.' },
   'resume.none': { en: '(none)', tr: '(yok)' },
   'resume.nothing': { en: '\nAll tasks already completed or are not proven safe to resume.', tr: '\nTüm görevler tamamlanmış veya sürdürmenin güvenli olduğu kanıtlanmamış.' },
@@ -3497,12 +3671,12 @@ const MESSAGES: MessageMap = {
     tr: 'Başlangıç-kapısı: kapalı (limit_gate.enabled = false)',
   },
   'limits.force_bypass': {
-    en: '[limit-gate] Blocked verdict bypassed via --force-limits.',
-    tr: '[limit-gate] Engelleme --force-limits ile aşıldı.',
+    en: '[limit-gate] Blocked verdict bypassed via --force.',
+    tr: '[limit-gate] Engelleme --force ile aşıldı.',
   },
   'limits.start_gate_blocked': {
-    en: '[limit-gate] Run start blocked — {window} usage at {pct}% (resets {reset}). Use --force-limits to override.',
-    tr: '[limit-gate] Run başlatma engellendi — {window} kullanımı %{pct} (sıfırlanma: {reset}). Aşmak için --force-limits kullanın.',
+    en: '[limit-gate] Run start blocked — {window} usage at {pct}% (resets {reset}). Use --force to override.',
+    tr: '[limit-gate] Run başlatma engellendi — {window} kullanımı %{pct} (sıfırlanma: {reset}). Aşmak için --force kullanın.',
   },
   'limits.start_gate_warn': {
     en: '[limit-gate] Warning: {window} usage at {pct}% — proceeding.',

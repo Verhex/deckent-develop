@@ -3,6 +3,9 @@
  * `node:fs`. Real host-authority persistence is covered by the tmpdir-backed
  * task-result-settlement and docker-backend-owned-settlement suites.
  */
+import { createHash } from 'node:crypto';
+import { vi } from 'vitest';
+
 export function createTaskResultSettlementModuleStub(): Record<string, unknown> {
   const labels = {
     managed: 'io.deckent.managed',
@@ -17,6 +20,11 @@ export function createTaskResultSettlementModuleStub(): Record<string, unknown> 
     projectRootSha256: 'a'.repeat(64),
     attemptId: '00000000-0000-4000-8000-000000000001',
   });
+  const promptArtifacts = new Map<string, Record<string, unknown>>();
+  const executionContracts = new Map<string, Record<string, unknown>>();
+  const preparedAttempts = new Map<string, Record<string, unknown>>();
+  const dispatchedAttempts = new Map<string, Record<string, unknown>>();
+  const keyFor = (ref: ReturnType<typeof refFor>) => `${ref.taskId}\0${ref.attemptId}`;
 
   return {
     DOCKER_ATTEMPT_LABELS: labels,
@@ -43,12 +51,67 @@ export function createTaskResultSettlementModuleStub(): Record<string, unknown> 
     }),
     dockerContainerNameForTask: () => `deckent-w-${'d'.repeat(12)}-${'e'.repeat(16)}`,
     listPendingTaskResultSettlementAttempts: () => [],
+    readTaskProviderTerminalBillingReceipt: () => null,
+    readTaskProviderActualCallReceipt: () => null,
+    readTaskProviderTerminalUsageReceipt: () => null,
+    readTaskResultSettlementExecutionContract: vi.fn(
+      (ref: ReturnType<typeof refFor>) =>
+        executionContracts.get(keyFor(ref)) ?? null,
+    ),
     readTaskResultSettlement: () => ({ state: 'settled' }),
     readTaskResultSettlementClosure: () => null,
+    readTaskResultSettlementDispatch: (ref: ReturnType<typeof refFor>) =>
+      dispatchedAttempts.get(keyFor(ref)) ?? null,
+    readTaskResultSettlementPrepared: (ref: ReturnType<typeof refFor>) =>
+      preparedAttempts.get(keyFor(ref)) ?? null,
+    readTaskResultSettlementPrompt: vi.fn((ref: ReturnType<typeof refFor>) =>
+      promptArtifacts.get(keyFor(ref)) ?? null),
+    taskResultSettlementPromptEvidenceRef: (artifact: { promptSha256: string }) =>
+      `task-result-prompt:${artifact.promptSha256}`,
+    taskResultSettlementPromptPath: (ref: ReturnType<typeof refFor>) =>
+      `/host-state/task-result-settlements/${ref.taskId}/${ref.attemptId}/prompt.txt`,
     writeTaskResultSettlementAttemptAtomic: (): void => undefined,
     writeTaskResultSettlementAtomic: (): void => undefined,
     writeTaskResultSettlementClosureAtomic: (): void => undefined,
-    writeTaskResultSettlementDispatchAtomic: (): void => undefined,
-    writeTaskResultSettlementPreparedAtomic: (): void => undefined,
+    writeTaskResultSettlementDispatchAtomic: (
+      ref: ReturnType<typeof refFor>,
+      containerId: string,
+    ) => {
+      const prepared = preparedAttempts.get(keyFor(ref)) ?? {};
+      const dispatch = { ...ref, ...prepared, state: 'dispatched', containerId };
+      dispatchedAttempts.set(keyFor(ref), dispatch);
+      return dispatch;
+    },
+    writeTaskProviderActualCallReceiptAtomic: () => ({}),
+    writeTaskProviderTerminalUsageReceiptAtomic: () => ({}),
+    writeTaskResultSettlementExecutionContractAtomic: (
+      ref: ReturnType<typeof refFor>,
+      contract: Record<string, unknown>,
+    ) => {
+      executionContracts.set(keyFor(ref), contract);
+      return contract;
+    },
+    writeTaskResultSettlementPreparedAtomic: (
+      ref: ReturnType<typeof refFor>,
+      model: string,
+    ) => {
+      const prepared = { ...ref, state: 'prepared', model };
+      preparedAttempts.set(keyFor(ref), prepared);
+      return prepared;
+    },
+    writeTaskResultSettlementPromptAtomic: (
+      ref: ReturnType<typeof refFor>,
+      prompt: string,
+    ) => {
+      const promptSha256 = createHash('sha256').update(prompt).digest('hex');
+      const artifact = {
+        ...ref,
+        state: 'prompt-prepared',
+        promptSha256,
+        byteLength: Buffer.byteLength(prompt),
+      };
+      promptArtifacts.set(keyFor(ref), artifact);
+      return artifact;
+    },
   };
 }

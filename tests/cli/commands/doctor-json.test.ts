@@ -9,6 +9,14 @@ vi.mock('../../../src/core/provider.js', () => ({
   formatDetectedProviders: vi.fn().mockReturnValue('providers'),
 }));
 
+vi.mock('../../../src/core/provider-auth-probe.js', () => ({
+  probeProviderAuth: vi.fn().mockResolvedValue({
+    state: 'logged-out',
+    method: 'none',
+    detail: 'fixture detail must not be serialized',
+  }),
+}));
+
 vi.mock('../../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn().mockReturnValue('/tmp/test-root'),
 }));
@@ -81,6 +89,43 @@ describe('doctor --json', () => {
     await program.parseAsync(['node', 'test', 'doctor', '--json']);
     const parsed = JSON.parse(printOutput[0]!);
     expect(Array.isArray(parsed.providers)).toBe(true);
+  });
+
+  it('projects bounded auth truth without serializing raw probe detail', async () => {
+    const program = buildProgram();
+    await program.parseAsync(['node', 'test', 'doctor', '--json']);
+    const parsed = JSON.parse(printOutput[0]!);
+
+    expect(parsed.providerAuth).toEqual([
+      {
+        provider: 'claude',
+        available: true,
+        state: 'logged-out',
+        method: 'none',
+        ready: false,
+        evidence: 'local-auth-probe',
+      },
+      {
+        provider: 'codex',
+        available: false,
+        state: 'unavailable',
+        method: 'none',
+        ready: false,
+        evidence: 'availability-only',
+      },
+    ]);
+    expect(parsed.providerSummary).toEqual({
+      ready: 0,
+      total: 2,
+      authWarningCount: 1,
+    });
+    expect(parsed.checks).toContainEqual(expect.objectContaining({
+      name: 'Claude authentication',
+      passed: false,
+      required: false,
+    }));
+    expect(parsed.honestSummary.missingCount).toBeGreaterThan(0);
+    expect(JSON.stringify(parsed)).not.toContain('fixture detail must not be serialized');
   });
 
   it('should include profile when --profile is set', async () => {

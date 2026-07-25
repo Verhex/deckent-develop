@@ -16,6 +16,7 @@ import {
   formatDigestShort,
   buildPlanPreviewCardLabels,
   formatScopeGateLines,
+  formatTopologyLines,
   type PlanPreviewCardLabels,
 } from '../../../src/cli/repl/plan-preview-card.js';
 import type { PlanPreview } from '../../../src/core/run-flow-contract.js';
@@ -69,6 +70,8 @@ describe('buildPlanPreviewCardLabels', () => {
       expect(labels.heading.length).toBeGreaterThan(0);
       expect(labels.scopeGateFailLabel).toBeTruthy();
       expect(labels.scopeGateOverriddenLabel).toBeTruthy();
+      expect(labels.topologyPassLabel).toBeTruthy();
+      expect(labels.topologyBlockLabel).toBeTruthy();
     }
   });
 
@@ -77,6 +80,42 @@ describe('buildPlanPreviewCardLabels', () => {
     const tr = buildPlanPreviewCardLabels('tr');
     expect(en.scopeGateFailLabel).not.toBe(tr.scopeGateFailLabel);
     expect(en.scopeGateOverriddenLabel).not.toBe(tr.scopeGateOverriddenLabel);
+  });
+});
+
+describe('formatTopologyLines', () => {
+  it('renders the shared collision, edge, wave, concurrency, and finding projection', () => {
+    const labels = buildPlanPreviewCardLabels('en');
+    const lines = formatTopologyLines({
+      topologyGateResult: 'fail',
+      topology: {
+        schemaVersion: 1,
+        configuredMaxWorkers: 8,
+        effectiveConcurrency: 1,
+        taskSlots: [1, 2],
+        collisions: [{ path: 'src/shared.ts', key: 'src/shared.ts', writerSlots: [1, 2], declared: false }],
+        authoredEdges: [],
+        syntheticEdges: [{ from: 1, to: 2, source: 'collision', paths: ['src/shared.ts'] }],
+        effectiveEdges: [{ from: 1, to: 2, source: 'collision', paths: ['src/shared.ts'] }],
+        waves: [{ wave: 1, slots: [1] }, { wave: 2, slots: [2] }],
+        findings: [{
+          code: 'undeclared-writer-collision',
+          severity: 'block',
+          slots: [1, 2],
+          path: 'src/shared.ts',
+        }],
+        verdict: 'block',
+      },
+    }, labels);
+
+    expect(lines).toEqual(expect.arrayContaining([
+      labels.topologyBlockLabel,
+      expect.stringContaining('8/1'),
+      expect.stringContaining('src/shared.ts [1,2]'),
+      expect.stringContaining('1 -> 2'),
+      expect.stringContaining('1:[1] 2:[2]'),
+      expect.stringContaining('undeclared-writer-collision [1,2] src/shared.ts'),
+    ]));
   });
 });
 

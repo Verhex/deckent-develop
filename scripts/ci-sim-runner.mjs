@@ -60,7 +60,10 @@ function runRunner() {
       if (stopping) return;
       const exitCode = code ?? 1;
       if (process.connected) {
-        process.send?.({ type: 'DONE', code: exitCode }, () => process.exit(exitCode));
+        // The wrapper deliberately remains alive after reporting the nested
+        // outcome. Its parent still owns this admitted process tree and closes
+        // it cross-platform before exposing the outcome or deleting sandbox HOME.
+        process.send?.({ type: 'DONE', code: exitCode });
       } else process.exit(exitCode);
     });
   }

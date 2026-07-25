@@ -5,13 +5,16 @@ import type { Sprint, Task, ResolvedConfig } from '../../../src/core/types.js';
 
 // ─── Mocks ───────────────────────────────────────────────────────────
 
-vi.mock('../../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+vi.mock('../../../src/core/config.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/core/config.js')>()),
+  readAuthMode: vi.fn().mockResolvedValue('subscription'),
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
 }));
 
-vi.mock('../../../src/core/provider.js', () => ({
+vi.mock('../../../src/core/provider.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/core/provider.js')>()),
   bootstrapProviders: vi.fn().mockResolvedValue({
     connector: {},
     registered: ['claude'],
@@ -66,12 +69,18 @@ function makeConfig(): ResolvedConfig {
     modes: {} as any,
     language: 'en', projectName: 'test', projectRoot: '/mock/root',
     version: '1.0.0', auto_docs: { tier1: true, tier2: true, tier3: false },
+    worker_provider: 'claude',
+    spawn_backend: 'docker',
+    execution_budget: {
+      roles: { worker: { default: { maxTurns: 1 } } },
+      landing: { reserve_ratio: 0.25 },
+    },
   };
 }
 
 function makeTask(overrides?: Partial<Task>): Task {
   return {
-    id: '001-001', title: 'Test Task', description: 'desc', model: 'sonnet',
+    id: '001-001', title: 'Test Task', description: 'desc', model: 'claude-sonnet-5',
     effort: 'normal', priority: 'NORMAL', reason: 'test',
     scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
     dependencies: [],
@@ -226,6 +235,29 @@ describe('plan command (isolated)', () => {
     expect(print).toHaveBeenCalledWith(expect.stringContaining('[dry-run]'));
     expect(promptConfirm).not.toHaveBeenCalled();
     expect(confirmDraftTasks).not.toHaveBeenCalled();
+  });
+
+  it('--dry-run preserves pre-existing DRAFT tasks by never invoking cleanupDraftTasks', async () => {
+    setupMocks();
+    await runCommand(['plan', '--structured', '--dry-run']);
+    expect(cleanupDraftTasks).not.toHaveBeenCalled();
+  });
+
+  it('--dry-run surfaces and fails an undeclared shared-writer topology', async () => {
+    setupMocks();
+    vi.mocked(planSprint).mockReturnValue(makeSprint({
+      tasks: [
+        makeTask({ id: 'z', scope: { directories: [], filesRead: [], filesWrite: ['src/shared.ts'] } }),
+        makeTask({ id: 'a', scope: { directories: [], filesRead: [], filesWrite: ['./src/shared.ts'] } }),
+        makeTask({ id: 'm', scope: { directories: [], filesRead: [], filesWrite: ['SRC\\SHARED.ts'] } }),
+      ],
+    }));
+    await runCommand(['plan', '--structured', '--dry-run']);
+
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('Execution topology: BLOCK'));
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('1:[1] 2:[2] 3:[3]'));
+    expect(process.exitCode).toBe(1);
+    expect(cleanupDraftTasks).not.toHaveBeenCalled();
   });
 
   // ─── C) cleanupDraftTasks idempotency ─────────────────────────────

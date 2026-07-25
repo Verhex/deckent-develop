@@ -205,6 +205,8 @@ describe('checkStartLimitGate', () => {
     expect(result.bypassed).toBe(false);
     expect(result.verdict).toBe('block');
     expect(result.message).toContain('blocked');
+    expect(result.message).toContain('--force');
+    expect(result.message).not.toContain('--force-limits');
   });
 
   it('bypasses a block verdict when forceLimits is set', async () => {
@@ -214,6 +216,8 @@ describe('checkStartLimitGate', () => {
     expect(result.blocked).toBe(false);
     expect(result.bypassed).toBe(true);
     expect(result.verdict).toBe('block');
+    expect(result.message).toContain('--force');
+    expect(result.message).not.toContain('--force-limits');
   });
 
   it('does not block on a warn verdict — proceeds with an advisory message', async () => {
@@ -240,6 +244,8 @@ describe('checkStartLimitGate', () => {
     mockedProbe.mockResolvedValue(okProbe({ sessionPct: 85 }));
     const result = await checkStartLimitGate(root, 'tr');
     expect(result.message).toContain('engellendi');
+    expect(result.message).toContain('--force');
+    expect(result.message).not.toContain('--force-limits');
   });
 });
 

@@ -9,7 +9,18 @@
  * Sprint 141 Task 141-SAFE-01 — needed for runtime bundled baseline lookup.
  */
 
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -24,6 +35,36 @@ const ASSET_EXTENSIONS = ['.json', '.md', '.template'];
 
 /** Bin entries from package.json — must have execute bit (Sprint 154 audit A2.F6/A3.F1). */
 export const BIN_FILES = ['dist/cli/entry.js', 'dist/mcp/server.js'];
+export const BUILD_IDENTITY_RELATIVE_PATH = 'dist/build-identity.json';
+
+/**
+ * Bind a compiled dist tree to the exact source checkout that produced it.
+ * The distributable manifest contains only a one-way SHA-256 of the canonical
+ * source root — never the build machine's absolute path.
+ *
+ * @param {string} root project root
+ * @returns {string} written manifest path
+ */
+export function writeBuildIdentity(root) {
+  const canonicalRoot = realpathSync.native(root);
+  const pkg = JSON.parse(readFileSync(join(canonicalRoot, 'package.json'), 'utf-8'));
+  if (pkg.name !== 'deckent') {
+    throw new Error(`Cannot write Deckent build identity: package name is ${String(pkg.name)}`);
+  }
+  if (typeof pkg.version !== 'string' || pkg.version.length === 0) {
+    throw new Error('Cannot write Deckent build identity: package version is missing');
+  }
+  const manifest = {
+    schemaVersion: 1,
+    packageName: 'deckent',
+    packageVersion: pkg.version,
+    sourceRootSha256: createHash('sha256').update(canonicalRoot).digest('hex'),
+  };
+  const manifestPath = join(canonicalRoot, BUILD_IDENTITY_RELATIVE_PATH);
+  mkdirSync(dirname(manifestPath), { recursive: true });
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf-8');
+  return manifestPath;
+}
 
 /**
  * Ensure all BIN_FILES have execute bit (0o755).
@@ -88,6 +129,9 @@ if (isMain) {
     } else {
       console.log(`copy-assets: copied ${copied} file${copied === 1 ? '' : 's'} to dist/`);
     }
+
+    writeBuildIdentity(ROOT);
+    console.log('copy-assets: wrote dist/build-identity.json');
   }
 
   // Sprint 154 A2.F6/A3.F1 fix: tsc does not propagate Unix mode bits, so dist/ bin

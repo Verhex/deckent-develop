@@ -17,7 +17,7 @@ vi.mock('node:fs', () => ({
 }));
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
   validatePartialConfig: vi.fn(),
@@ -25,6 +25,7 @@ vi.mock('../../src/core/config.js', () => ({
 
 vi.mock('../../src/core/utils.js', () => ({
   countBrainLines: vi.fn().mockReturnValue(100),
+  debugLog: vi.fn(),
   ensureDeckentImport: vi.fn(),
   getNextSprintId: vi.fn().mockReturnValue('sprint-061'),
 }));
@@ -247,11 +248,31 @@ describe('MCP Tool Error Format — debt-059-008-fix (sprint-061)', () => {
       const mock = createMockServer();
       registerRunTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
+      vi.mocked(loadConfig).mockResolvedValue({
+        mode: 'max_plan',
+        activeModeConfig: {
+          max_workers: 1,
+          brain_model: 'claude-sonnet-5',
+          default_model: 'claude-sonnet-5',
+          haiku_allowed: false,
+        },
+        modes: {},
+        language: 'en',
+        projectName: 'test',
+        projectRoot: '/tmp/test',
+        version: '1.0.0',
+        worker_provider: 'claude',
+        spawn_backend: 'docker',
+        execution_budget: {
+          roles: { worker: { default: { maxTurns: 1 } } },
+          landing: { reserve_ratio: 0.25 },
+        },
+      } as never);
       vi.mocked(mkdirSync).mockImplementation(() => { throw new Error('mkdir failed'); });
 
       const result = await mock.tools.get('deckent_run')!.handler({
         description: 'some task',
-        model: 'sonnet',
+        model: 'claude-sonnet-5',
       });
       const parsed = JSON.parse(result.content[0]!.text);
 

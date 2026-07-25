@@ -375,10 +375,12 @@ describe('Docker HB Shutdown Bug Fix — worker script SIGTERM trap', () => {
       'utf-8',
     );
 
-    // Assert — script must define fsync_file and use it in traps
+    // Assert — script must define fsync_file and use it in the named TERM handler.
     expect(sourceContent).toContain('fsync_file()');
     expect(sourceContent).toContain('conv=fsync');
-    expect(sourceContent).toContain("trap 'fsync_file");
+    expect(sourceContent).toContain('on_provider_term() {');
+    expect(sourceContent).toContain('fsync_file "$RFILE"');
+    expect(sourceContent).toContain('fsync_file "$HBFILE"');
   });
 
   it('worker script has both EXIT and TERM signal traps', () => {
@@ -391,7 +393,9 @@ describe('Docker HB Shutdown Bug Fix — worker script SIGTERM trap', () => {
     // Assert — EXIT trap for crash safety, TERM trap for graceful shutdown
     // Sprint 145: EXIT trap calls on_exit function (not inline string)
     expect(sourceContent).toMatch(/trap\s+on_exit\s+EXIT/);
-    expect(sourceContent).toMatch(/trap\s+'.*'\s+TERM/);
+    expect(sourceContent).toMatch(/trap\s+on_provider_term\s+TERM/);
+    expect(sourceContent).toContain('kill -TERM "$PROVIDER_PID"');
+    expect(sourceContent).toContain('exit 143');
   });
 });
 

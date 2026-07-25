@@ -30,6 +30,7 @@ vi.mock('../../src/core/config.js', () => ({
   readAuthMode: vi.fn().mockResolvedValue('subscription'),
   resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
+  resolveEffectiveWorkers: () => 8,
   loadConfig: vi.fn(),
 }));
 
@@ -108,7 +109,8 @@ vi.mock('../../src/mcp/tools/job-runner.js', () => ({
   buildTaskSummaries: vi.fn(() => []),
 }));
 
-vi.mock('../../src/core/provider.js', () => ({
+vi.mock('../../src/core/provider.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/provider.js')>()),
   bootstrapProviders: vi.fn(),
 }));
 
@@ -283,6 +285,12 @@ describe('MCP Tools', () => {
         projectName: 'test',
         projectRoot: '/tmp/test',
         version: '0.1.0',
+        worker_provider: 'claude',
+        spawn_backend: 'docker',
+        execution_budget: {
+          roles: { worker: { default: { maxTurns: 1 } } },
+          landing: { reserve_ratio: 0.25 },
+        },
       });
 
       vi.mocked(readContext).mockReturnValue({
@@ -302,11 +310,13 @@ describe('MCP Tools', () => {
       const result = await mock.tools.get('deckent_plan')!.handler({});
       const parsed = JSON.parse(result.content[0]!.text);
 
+      expect(result.isError).not.toBe(true);
       expect(parsed.sprintId).toBe('sprint-007');
       expect(parsed.tasks).toHaveLength(1);
       expect(parsed.tasks[0].title).toBe('Auth API');
       expect(parsed.tasks[0].model).toBe('claude-sonnet-5');
       expect(parsed.recommendation.size).toBe('full');
+      expect(parsed.planDigest).toMatch(/^[0-9a-f]{64}$/);
     });
 
     it('passes mode input to planSprint', async () => {

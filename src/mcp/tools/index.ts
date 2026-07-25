@@ -1,4 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { AttendedExecutionApprovalAuthority } from '../../core/attended-execution-approval.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
 import { registerInitTool } from './init.js';
 import { registerSetDirectivesTool } from './directives.js';
 import { registerPlanTool } from './plan.js';
@@ -120,11 +122,17 @@ export const TOOL_CATALOG: McpToolCatalogEntry[] = [
 /** Canonical count of registered MCP tools, derived from {@link TOOL_CATALOG}. */
 export const MCP_TOOL_COUNT = TOOL_CATALOG.length;
 
-export function registerTools(server: McpServer): void {
+export function registerTools(
+  server: McpServer,
+  runtime: {
+    attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+    providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  } = {},
+): void {
   registerInitTool(server);
   registerSetDirectivesTool(server);
   registerPlanTool(server);
-  registerStartTool(server);
+  registerStartTool(server, runtime);
   registerStatusTool(server);
   registerDoctorTool(server);
   registerRetroTool(server);
@@ -133,7 +141,7 @@ export function registerTools(server: McpServer): void {
   registerSyncTool(server);
   registerConfigTool(server);
   registerReviewTool(server);
-  registerRunTool(server);
+  registerRunTool(server, runtime);
   registerKillTool(server);
   registerCleanupTool(server);
   registerHelpTool(server);
@@ -148,7 +156,7 @@ export function registerTools(server: McpServer): void {
   registerFeatureQueryTool(server);
   // born-640b follow-up kapanışı (2026-07-11): deckent_truth SSOT-yolundan —
   // 404-002 scope-sınırı gereği server.ts'e ad-hoc kaydetmişti; katalog+kayıt+
-  // help+sayaç (47) yeniden tek-kaynaktan türüyor.
+  // help+sayaç yeniden tek-kaynaktan türüyor.
   registerTruthTool(server);
   registerAuditTool(server);
   registerRecoverTool(server);

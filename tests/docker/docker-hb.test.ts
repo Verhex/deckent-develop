@@ -93,11 +93,17 @@ describe('Docker HB Deploy Wire — Script Template', () => {
     expect(source).toContain('fsync_file "$RFILE"');
   });
 
-  it('worker script has TERM trap that fsyncs and exits cleanly', () => {
+  it('worker script TERM trap forwards to the provider, fsyncs, and exits 143', () => {
     const source = readSource('spawn-backend-docker.ts');
-    // TERM trap must fsync .result + .hb then exit 143 (128+SIGTERM — born-466:
-    // exit 0 made on_exit misclassify a docker-stop as a clean run).
-    expect(source).toMatch(/trap\s+'fsync_file "\$RFILE"; fsync_file "\$HBFILE"; exit 143'\s+TERM/);
+    // PID1 must forward TERM to the supervised provider before the wrapper exits
+    // non-zero. An inline fsync-only trap left the paid child running.
+    expect(source).toContain('on_provider_term() {');
+    expect(source).toContain('kill -TERM "$PROVIDER_PID"');
+    expect(source).toContain('wait "$PROVIDER_PID"');
+    expect(source).toContain('fsync_file "$RFILE"');
+    expect(source).toContain('fsync_file "$HBFILE"');
+    expect(source).toContain('exit 143');
+    expect(source).toContain('trap on_provider_term TERM');
   });
 
   it('worker script heartbeat loop interval is 15s (HB gap < 5s from host perspective)', () => {
@@ -115,14 +121,20 @@ describe('Docker HB Deploy Wire — Post-Stop Verification', () => {
   it('verifyResultAfterStop fsyncs .result file from host side', () => {
     const source = readSource('spawn-backend-docker.ts');
 
-    // The method should handle .result file
+    // The method receives the exact execution-owned tasksDir; taskId alone
+    // must not re-derive project state after per-task backend routing.
+    const methodStart = source.indexOf(
+      'verifyResultAfterStop(taskId: string, tasksDir: string)',
+    );
+    expect(methodStart).toBeGreaterThan(-1);
     const verifySection = source.slice(
-      source.indexOf('verifyResultAfterStop(taskId: string)'),
-      source.indexOf('list():'),
+      methodStart,
+      source.indexOf('list():', methodStart),
     );
     expect(verifySection).toContain('task-${taskId}.result');
-    // Should fsync
+    expect(verifySection).toContain('openSync(resultPath');
     expect(verifySection).toContain('fsyncSync(fd)');
+    expect(verifySection).toContain('closeSync(fd)');
   });
 
   it('monitorContainer reconciles exitCode with successful .result (no false FAILED)', () => {

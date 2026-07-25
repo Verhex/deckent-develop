@@ -264,6 +264,7 @@ vi.mock('../../src/cli/helpers/wizard.js', () => ({
 }));
 
 import { writeFileSync, existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { print } from '../../src/cli/helpers/output.js';
 import { registerInit } from '../../src/cli/commands/init.js';
 import { runDoctorChecks } from '../../src/cli/commands/doctor.js';
@@ -271,7 +272,7 @@ import { detectAvailableProviders } from '../../src/core/provider.js';
 import { showSplash } from '../../src/cli/helpers/splash.js';
 import { detectEnvironment } from '../../src/core/environment.js';
 import { createDeckTemplate } from '../../src/core/deck-file.js';
-import { promptSelect, promptText, PromptEOFError } from '../../src/cli/helpers/prompt.js';
+import { promptSelect, promptText, promptConfirm, PromptEOFError } from '../../src/cli/helpers/prompt.js';
 import { detectFullStack } from '../../src/core/stack-detector.js';
 import { buildProviderWizardSteps, runWizard } from '../../src/cli/helpers/wizard.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
@@ -367,6 +368,37 @@ describe('init non-interactive honesty (413-001 / RC2C)', () => {
     expect(runWizard).toHaveBeenCalledWith(expect.anything(), { nonInteractive: true });
     expect(promptSelect).not.toHaveBeenCalled();
     expect(promptText).not.toHaveBeenCalled();
+  });
+
+  it('--yes never treats unattended defaults as npm-global install consent', async () => {
+    vi.mocked(detectAvailableProviders).mockResolvedValue([
+      { name: 'claude', available: false, models: [] } as any,
+    ]);
+
+    await runCommand(['init', '--yes']);
+
+    expect(promptConfirm).not.toHaveBeenCalled();
+    expect(spawnSync).not.toHaveBeenCalledWith(
+      'npm',
+      expect.arrayContaining(['install', '-g']),
+      expect.anything(),
+    );
+    expect(printedText()).toContain('Missing prerequisites: claude');
+  });
+
+  it('--yes --install explicitly authorizes the existing bounded installer', async () => {
+    vi.mocked(detectAvailableProviders).mockResolvedValue([
+      { name: 'claude', available: false, models: [] } as any,
+    ]);
+
+    await runCommand(['init', '--yes', '--install']);
+
+    expect(promptConfirm).not.toHaveBeenCalled();
+    expect(spawnSync).toHaveBeenCalledWith(
+      'npm',
+      ['install', '-g', '@anthropic-ai/claude-code'],
+      expect.objectContaining({ shell: false }),
+    );
   });
 
   // ─── Requirement 2: non-TTY without --yes fails honestly ───────────────

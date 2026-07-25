@@ -40,7 +40,11 @@ import { composeDualStream } from './dual-stream.js';
 import type { ApprovalTerminalChannel } from './approval-terminal-channel.js';
 import type { ApprovalStreamEvent } from '../../core/approval-eventstream.js';
 import type { ApprovalRisk } from '../../core/approval-contract.js';
-import { PlanPreviewCard, type PlanPreviewCardLabels } from './plan-preview-card.js';
+import {
+  PlanPreviewCard,
+  buildPlanPreviewCardLabels,
+  type PlanPreviewCardLabels,
+} from './plan-preview-card.js';
 import { InboxCard } from './inbox-card.js';
 import type { InboxRow, InboxLabels, InboxDecisionVerb } from './run-flow-inbox.js';
 import type { RunFlowContext, PlanPreview } from '../../core/run-flow-contract.js';
@@ -545,15 +549,8 @@ export function resolveStdinOwner(confirmOpen: boolean, approvalPending: boolean
 /** English-default labels for PlanPreviewCard, mirroring DEFAULT_APPROVAL_CARD_LABELS's
  *  fallback-until-real-labels-are-wired precedent (run.tsx wires real en/tr via
  *  buildPlanPreviewCardLabels — plan-preview-card.tsx). */
-export const DEFAULT_PLAN_PREVIEW_CARD_LABELS: PlanPreviewCardLabels = {
-  heading: 'Plan preview — approve to continue',
-  digestLabel: 'Digest:',
-  gateLabels: { pass: 'GATE: PASS', fail: 'GATE: FAIL', skipped: 'GATE: SKIPPED' },
-  policyLabels: { allow: 'POLICY: ALLOW', deny: 'POLICY: DENY', 'needs-approval': 'POLICY: NEEDS APPROVAL' },
-  hint: '(y = approve · n = reject · d = details)',
-  detailsHeading: 'Details',
-  noTasks: '(no tasks)',
-};
+export const DEFAULT_PLAN_PREVIEW_CARD_LABELS: PlanPreviewCardLabels =
+  buildPlanPreviewCardLabels('en');
 
 /** Derive the PlanPreviewCard's `preview` prop from the controller's live
  *  context — null whenever the flow is not AWAITING_APPROVAL (proposed-but-

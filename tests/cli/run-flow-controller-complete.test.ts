@@ -62,7 +62,10 @@ function makeConfig(): ResolvedConfig {
       haiku_allowed: true, brain_planning: 'auto',
     },
     modes: {} as any,
-    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
+    execution_budget: {
+      roles: { worker: { default: { maxTurns: 1 } } },
+      landing: { reserve_ratio: 0.25 },
+    },
     language: 'en', projectName: 'test', projectRoot: '/mock/root',
     version: '1.0.0', auto_docs: { tier1: true, tier2: true, tier3: false },
   } as ResolvedConfig;

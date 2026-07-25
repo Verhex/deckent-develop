@@ -274,7 +274,17 @@ describe('StatusRenderer.snapshot', () => {
     mkdirSync(join(root, '.tasks'), { recursive: true });
     writeFileSync(
       join(root, '.tasks', 'task-001.json'),
-      JSON.stringify({ id: 'task-001', status: 'DONE', sprintId: 'sprint-777' }),
+      JSON.stringify({ id: '001', title: 'Canonical task', status: 'DONE', sprintId: 'sprint-777' }),
+      'utf-8',
+    );
+    writeFileSync(
+      join(root, '.tasks', 'task-001.landing-proposal.json'),
+      JSON.stringify({ sprintId: 'sprint-sidecar', status: 'NO_GO' }),
+      'utf-8',
+    );
+    writeFileSync(
+      join(root, '.tasks', 'task-002.json'),
+      JSON.stringify({}),
       'utf-8',
     );
 

@@ -6,17 +6,12 @@
 //
 // (b) Start-gate logic (`checkStartLimitGate`) — evaluates the same probe
 // against config-driven `limit_gate.{enabled,session_max_pct,weekly_max_pct}`
-// thresholds and returns a block/warn/ok/unknown verdict with a `--force-limits`
-// bypass path. NOT YET WIRED into `deckent start`: src/cli/commands/start.ts
-// and src/core/config.ts/config-types.ts (needed to thread `limit_gate`
-// through loadConfig/mergeConfigs onto ResolvedConfig — see the
-// CONFIG-RESOLVER-FLAG-DROP precedent, commit c513abfb) are outside this
-// task's write scope. `readLimitGateConfig` below reads `.deckent/config.json`
-// directly instead (same established pattern as
+// thresholds and returns a block/warn/ok/unknown verdict with a caller-owned
+// bypass path. Wired into the CLI `deckent start` preflight; MCP, do,
+// autonomous, and every-dispatch parity remain separate work.
+// `readLimitGateConfig` reads `.deckent/config.json` directly (same established pattern as
 // cli/helpers/config-reader.ts#getLangFromConfig and doctor.ts's raw
-// spawn_backend/max_workers reads) so this file's behavior does not depend on
-// those out-of-scope files. See the .result `notes` for the follow-up wiring
-// task this leaves behind.
+// spawn_backend/max_workers reads) so disabled remains a zero-probe no-op.
 //
 // Sprint 361 Task 361-002 (carryover of 360-003, born-475).
 
@@ -202,7 +197,7 @@ function windowLabel(name: string, lang: string): string {
   }
 }
 
-// ─── Part (b): start-gate check (implemented, tested, NOT wired — see header) ─
+// ─── Part (b): start-gate check (wired by CLI start; see header) ──────────
 
 export interface StartLimitGateOptions {
   /** Bypass a 'block' verdict (mirrors `deckent start --force`'s cost-gate override). */
@@ -223,8 +218,7 @@ export interface StartLimitGateResult {
  * Pre-start subscription-limit gate. Disabled by default
  * (`limit_gate.enabled` absent/false) — in that case this makes ZERO probe
  * calls and returns immediately, so a disabled gate is a byte-identical
- * no-op versus the pre-361-002 start flow. See file header for why this is
- * not yet called from `deckent start`.
+ * no-op versus the pre-361-002 start flow.
  */
 export async function checkStartLimitGate(
   root: string,

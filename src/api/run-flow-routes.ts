@@ -83,6 +83,8 @@ import { compileRunProposal, type RunProposalPlanner } from '../orchestra/run-pr
 import { generatePlanPreview } from '../orchestra/plan-preview-service.js';
 import { readContext } from '../orchestra/brain.js';
 import { deriveRequestPrincipal } from './auth-me-endpoint.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
+import { preflightApiBrainProviderAuthority } from './provider-authority-ingress.js';
 
 const RUN_FLOW_PREFIX = '/api/run-flow/';
 const RUN_FLOW_DISABLED_MESSAGE =
@@ -208,6 +210,7 @@ async function handlePropose(
   config: ResolvedConfig,
   body: unknown,
   req: IncomingMessage,
+  providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult,
 ): Promise<boolean> {
   const parsed = ProposeRunSchema.safeParse(body);
   if (!parsed.success) {
@@ -219,6 +222,16 @@ async function handlePropose(
   // from the request body (anti-spoofing, matches process-endpoint.ts).
   const principal = deriveRequestPrincipal(req);
   const flowId = randomUUID();
+  const providerDecision = preflightApiBrainProviderAuthority(
+    projectRoot,
+    config,
+    providerAuthority,
+    `api-run-flow-propose-${flowId}`,
+  );
+  if (providerDecision.decision === 'hold') {
+    sendJson(res, providerDecision.body, providerDecision.statusCode);
+    return true;
+  }
   const revision = 1;
   const proposal: RunProposal = {
     flowId,
@@ -380,6 +393,8 @@ function handleStart(
   projectRoot: string,
   flowId: string,
   req: IncomingMessage,
+  config: ResolvedConfig,
+  providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult,
 ): boolean {
   const existing = lookupFlow(flowId, req, projectRoot);
   if (!existing) {
@@ -389,6 +404,17 @@ function handleStart(
   const snapshot = existing.approvedSnapshot;
   if (existing.state !== 'APPROVED' || !snapshot) {
     sendError(res, 409, `run-flow: flow is ${existing.state}, not APPROVED`);
+    return true;
+  }
+
+  const providerDecision = preflightApiBrainProviderAuthority(
+    projectRoot,
+    config,
+    providerAuthority,
+    `api-run-flow-start-${flowId}`,
+  );
+  if (providerDecision.decision === 'hold') {
+    sendJson(res, providerDecision.body, providerDecision.statusCode);
     return true;
   }
 
@@ -477,6 +503,7 @@ export async function registerRunFlowRoutes(
   body: unknown,
   projectRoot: string,
   req: IncomingMessage,
+  providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult,
 ): Promise<boolean> {
   const path = new URL(url, 'http://localhost').pathname;
   if (!path.startsWith(RUN_FLOW_PREFIX)) return false;
@@ -492,7 +519,7 @@ export async function registerRunFlowRoutes(
   if (segments.length === 0) return false;
 
   if (method === 'POST' && segments.length === 1 && segments[0] === 'propose') {
-    return handlePropose(res, projectRoot, config, body, req);
+    return handlePropose(res, projectRoot, config, body, req, providerAuthority);
   }
   if (method === 'GET' && segments.length === 1 && segments[0] === 'list') {
     return handleFlowList(res, req, projectRoot);
@@ -526,7 +553,7 @@ export async function registerRunFlowRoutes(
     return handleDecision(res, projectRoot, flowId, body, req);
   }
   if (segments.length === 2 && segments[1] === 'start' && method === 'POST') {
-    return handleStart(res, projectRoot, flowId, req);
+    return handleStart(res, projectRoot, flowId, req, config, providerAuthority);
   }
   if (segments.length === 2 && segments[1] === 'cancel' && method === 'POST') {
     return handleCancel(res, projectRoot, flowId, body, req);

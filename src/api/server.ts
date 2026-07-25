@@ -85,12 +85,21 @@ import { handleOutputStream, isOutputStreamRequest } from './output-stream.js';
 import { createOutputCollector, type OutputCollector } from '../core/output-collector.js';
 import { reconcileStatusResponse } from './status-reconcile.js';
 import { ApprovalStore, type ApprovalStoreEntry, type ApprovalStoreCategory } from '../core/approval-store.js';
-import { ApprovalBroker, ApprovalBrokerError } from '../core/approval-broker.js';
+import { ApprovalBroker } from '../core/approval-broker.js';
 import { approvalLookupIdSchema } from '../core/approval-contract.js';
 import { ApprovalExpiryDriver } from '../core/approval-expiry-driver.js';
+import type {
+  ApprovalAuthorityRuntimeService,
+} from '../core/approval-authority-runtime.js';
+import type {
+  ApprovalOidcAssertionVerifier,
+  ApprovalOidcPolicy,
+} from '../core/approval-oidc-authenticator.js';
 import { rpcRequestSchema, dispatchRpcRequest, type RpcHandler, type RpcHandlerMap } from '../core/term-rpc.js';
 import { probeSubscriptionLimits, type SpawnImpl } from '../core/limit-preflight.js';
 import { getMessage, getLanguage } from '../cli/helpers/messages.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
+import { preflightApiBrainProviderAuthority } from './provider-authority-ingress.js';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -610,7 +619,7 @@ function findApprovalEntry(
   store: ApprovalStore,
   id: string,
 ): { category: ApprovalStoreCategory; entry: ApprovalStoreEntry } | undefined {
-  const snapshot = store.load();
+  const snapshot = store.index();
   for (const category of ['pending', 'approved', 'denied', 'expired'] as const) {
     const entry = snapshot[category].find((e) => e.request.id === id);
     if (entry) return { category, entry };
@@ -748,6 +757,12 @@ async function handleRequest(
   serveIndexHtml?: (req: IncomingMessage, res: ServerResponse) => boolean,
   chatAdapter?: ChatProviderAdapter | null,
   terminalManager?: PtySessionManager,
+  approvalAuthority?: {
+    readonly runtime: ApprovalAuthorityRuntimeService;
+    readonly policy: ApprovalOidcPolicy;
+    readonly verifier: ApprovalOidcAssertionVerifier;
+  },
+  providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult,
 ): Promise<void> {
   // Normalize /api/v1/... → /api/... for backward compat
   const rawUrl = req.url ?? '/';
@@ -1185,7 +1200,15 @@ async function handleRequest(
     // false (fall through) for a non-matching path, so order only matters
     // for readability here (the two path shapes are disjoint).
     if (await registerRunFlowEventStreamRoute(url, method, res, projectRoot, req, allowedOrigin)) return;
-    if (await registerRunFlowRoutes(url, method, res, undefined, projectRoot, req)) return;
+    if (await registerRunFlowRoutes(
+      url,
+      method,
+      res,
+      undefined,
+      projectRoot,
+      req,
+      providerAuthority,
+    )) return;
     if (await registerProcessRoutes(url, method, res, undefined, projectRoot, req)) return;
     // Enterprise dashboard data: /api/enterprise/{tenants,rbac,audit,rate} (269-001)
     if (registerEnterpriseRoutes(url, method, res, projectRoot, rateLimiter ? { rateLimiter } : {}, req)) return;
@@ -1344,7 +1367,15 @@ async function handleRequest(
     if (registerNervousRoutes(url, method, res, projectRoot)) return;
     if (registerAutonomousRoutes(url, method, res, projectRoot, req)) return;
     // TERM-FLOW-UNIFY Sprint-7 (429-008, `terminal.run_flow_v2`): propose/decision.
-    if (await registerRunFlowRoutes(url, method, res, body, projectRoot, req)) return;
+    if (await registerRunFlowRoutes(
+      url,
+      method,
+      res,
+      body,
+      projectRoot,
+      req,
+      providerAuthority,
+    )) return;
     if (await registerProcessRoutes(url, method, res, body, projectRoot, req)) return;
     if (registerReactiveRoutes(url, method, res, body, projectRoot)) return;
 
@@ -1381,6 +1412,17 @@ async function handleRequest(
         sendError(res, 409, 'Sprint already running');
         return;
       }
+      const config = await loadConfig(projectRoot);
+      const providerDecision = preflightApiBrainProviderAuthority(
+        projectRoot,
+        config,
+        providerAuthority,
+        `api-start-${randomUUID()}`,
+      );
+      if (providerDecision.decision === 'hold') {
+        sendJson(res, providerDecision.body, providerDecision.statusCode);
+        return;
+      }
       const b = parsed.data;
       const { jobId } = startSprintDetached(
         projectRoot,
@@ -1410,6 +1452,16 @@ async function handleRequest(
         const b = parsed.data;
         void b.directive; // reserved for future use
         const config = await loadConfig(projectRoot);
+        const providerDecision = preflightApiBrainProviderAuthority(
+          projectRoot,
+          config,
+          providerAuthority,
+          `api-plan-${randomUUID()}`,
+        );
+        if (providerDecision.decision === 'hold') {
+          sendJson(res, providerDecision.body, providerDecision.statusCode);
+          return;
+        }
         const context = readContext(projectRoot);
         const maxW = config.activeModeConfig.max_workers;
         const recommendation = {
@@ -1629,11 +1681,13 @@ async function handleRequest(
       return;
     }
 
-    // POST /api/approvals/:id/decision — ApprovalBroker.decide() (356-002,
-    // ADR-G-033/ADR-G-020). Flag-gated: `approval.api_decide` default-off →
-    // 403. GET /api/approvals[/…] above are NEVER gated by this flag — only
-    // the mutation is.
+    // POST /api/approvals/:id/decision — runtime-wide verified ingress.
+    // Static bearer/localhost/RPC identity never authorizes this mutation:
+    // the same Bearer value is verified again as a fresh OIDC step-up at the
+    // decision boundary and the durable decision is MAC-bound by the shared
+    // ApprovalAuthorityRuntimeService.
     if (url.startsWith('/api/approvals/') && url.endsWith('/decision')) {
+      const approvalLang = getLanguage();
       const id = parseApprovalLookupId(url.slice('/api/approvals/'.length, -'/decision'.length));
       if (!id) {
         sendError(res, 400, 'Invalid approval id');
@@ -1655,8 +1709,25 @@ async function handleRequest(
         return;
       }
 
-      const store = new ApprovalStore(projectRoot);
-      const found = findApprovalEntry(store, id);
+      const authorization = req.headers['authorization'];
+      const [scheme, stepUpToken] = typeof authorization === 'string'
+        ? authorization.split(' ', 2)
+        : [];
+      const idempotencyHeader = req.headers['idempotency-key'];
+      const idempotencyKey = Array.isArray(idempotencyHeader)
+        ? idempotencyHeader[0]
+        : idempotencyHeader;
+      if (scheme !== 'Bearer' || !stepUpToken) {
+        sendError(res, 401, getMessage('api.approval.fresh_oidc_required', approvalLang));
+        return;
+      }
+      if (!idempotencyKey || idempotencyKey.trim().length === 0) {
+        sendError(res, 400, getMessage('api.approval.idempotency_required', approvalLang));
+        return;
+      }
+
+      const decisionStore = approvalAuthority?.runtime.store ?? new ApprovalStore(projectRoot);
+      const found = findApprovalEntry(decisionStore, id);
       if (!found) {
         sendError(res, 404, 'Approval not found');
         return;
@@ -1665,25 +1736,46 @@ async function handleRequest(
         sendError(res, 409, `Approval already ${found.category}`);
         return;
       }
+      if (!approvalAuthority) {
+        sendError(res, 503, getMessage('api.approval.authority_unavailable', approvalLang));
+        return;
+      }
 
-      const principal = deriveRequestPrincipal(req);
-      const broker = new ApprovalBroker(projectRoot);
       try {
-        const decision = broker.decide(id, {
-          decision: parsed.data.decision,
-          decidedBy: principal.id,
-          channel: 'api',
-          decidedAt: new Date().toISOString(),
-          reason: parsed.data.reason ?? '',
+        const outcome = await approvalAuthority.runtime.decideOidc({
+          token: stepUpToken,
+          policy: approvalAuthority.policy,
+          verifier: approvalAuthority.verifier,
+          channel: 'api-oidc',
+        }, {
+          requestId: id,
+          action: parsed.data.decision,
+          idempotencyKey: idempotencyKey.trim(),
+          ...(parsed.data.reason ? { reason: parsed.data.reason } : {}),
         });
-        console.log(`[deckent] Approval decided via API: ${id} -> ${decision.decision} (by ${principal.id})`);
-        sendJson(res, { success: true, decision });
-      } catch (err: unknown) {
-        if (err instanceof ApprovalBrokerError) {
-          sendError(res, err.code === 'APR_ALREADY_DECIDED' ? 409 : 400, err.message);
-        } else {
-          sendError(res, 500, err instanceof Error ? err.message : 'Decision failed');
+        if (outcome.kind === 'rejected') {
+          sendError(
+            res,
+            outcome.reason === 'unknown-request' ? 404 : 403,
+            getMessage('api.approval.decision_rejected', approvalLang, {
+              reason: outcome.reason,
+            }),
+          );
+          return;
         }
+        if (outcome.kind === 'expired') {
+          sendError(res, 409, getMessage('api.approval.request_expired', approvalLang));
+          return;
+        }
+        sendJson(res, {
+          success: true,
+          decision: outcome.decision,
+          idempotent: outcome.kind === 'idempotent',
+        });
+      } catch (err: unknown) {
+        sendError(res, 500, getMessage('api.approval.decision_failed', approvalLang, {
+          error: err instanceof Error ? err.message : 'unknown-error',
+        }));
       }
       return;
     }
@@ -1770,6 +1862,22 @@ export interface HttpServerOptions {
    * hardcoded-default resolution chain as `host`/`terminal.bind` above.
    */
   approvalExpirySweepMs?: number;
+  /**
+   * Shared attended-execution authority. The server never opens custody or
+   * constructs a verifier; production composition injects the process-scoped
+   * runtime and its pinned OIDC policy as one unit.
+   */
+  approvalAuthority?: {
+    readonly runtime: ApprovalAuthorityRuntimeService;
+    readonly policy: ApprovalOidcPolicy;
+    readonly verifier: ApprovalOidcAssertionVerifier;
+  };
+  /**
+   * Shared provider execution authority. Production composition owns the
+   * process-scoped lifecycle; the HTTP server only consumes the exact injected
+   * open result at provider-backed orchestration ingress.
+   */
+  providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
 }
 
 // ─── SEC-03: token-fingerprint + runtime token-file persistence ────────────
@@ -1893,6 +2001,8 @@ export function createHttpServer(
   let terminalBackend: SessionBackend | undefined;
   let resolvedOidc: HttpServerOptions['oidc'];
   let approvalExpirySweepMsOpt: number | undefined;
+  let approvalAuthority: HttpServerOptions['approvalAuthority'];
+  let providerAuthority: HttpServerOptions['providerAuthority'];
 
   // TERM-CONFIG-WIRE (357-009): `terminal.bind` fallback for the server's
   // listen host. Same raw sync-read pattern as the token/OIDC blocks below
@@ -1939,6 +2049,8 @@ export function createHttpServer(
     terminalBackend = portOrOpts.terminalBackend;
     resolvedOidc = portOrOpts.oidc;
     approvalExpirySweepMsOpt = portOrOpts.approvalExpirySweepMs;
+    approvalAuthority = portOrOpts.approvalAuthority;
+    providerAuthority = portOrOpts.providerAuthority;
   } else {
     listenPort = portOrOpts ?? DEFAULT_PORT;
     resolvedStaticDir = staticDir;
@@ -2125,8 +2237,8 @@ export function createHttpServer(
   let approvalStore: ApprovalStore | undefined;
   let approvalExpiryDriver: ApprovalExpiryDriver | undefined;
   try {
-    approvalBroker = new ApprovalBroker(projectRoot);
-    approvalStore = new ApprovalStore(projectRoot);
+    approvalBroker = approvalAuthority?.runtime.broker ?? new ApprovalBroker(projectRoot);
+    approvalStore = approvalAuthority?.runtime.store ?? new ApprovalStore(projectRoot);
     approvalExpiryDriver = new ApprovalExpiryDriver({ broker: approvalBroker, store: approvalStore });
     approvalExpiryDriver.start(resolvedApprovalExpirySweepMs);
   } catch {
@@ -2584,7 +2696,24 @@ export function createHttpServer(
         if (serveIndexWithTokenInject(req, res)) return;
       }
 
-      await handleRequest(req, res, projectRoot, dashPath, sseClients, resolvedStaticDir, initWatcher, finalToken, rateLimiter, authMiddleware, outputCollector ?? undefined, serveIndexWithTokenInject, serveChatAdapter, terminalMgr);
+      await handleRequest(
+        req,
+        res,
+        projectRoot,
+        dashPath,
+        sseClients,
+        resolvedStaticDir,
+        initWatcher,
+        finalToken,
+        rateLimiter,
+        authMiddleware,
+        outputCollector ?? undefined,
+        serveIndexWithTokenInject,
+        serveChatAdapter,
+        terminalMgr,
+        approvalAuthority,
+        providerAuthority,
+      );
     })().catch((err: unknown) => {
       sendError(res, 500, err instanceof Error ? err.message : 'Internal server error');
     });

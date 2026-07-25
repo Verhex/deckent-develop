@@ -7,7 +7,7 @@ import * as fs from 'node:fs';
 // ─── Mocks ───────────────────────────────────────────────────────────
 
 vi.mock('../../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
 }));
@@ -36,9 +36,13 @@ vi.mock('../../../src/core/constants.js', async (importOriginal) => {
   return { ...actual, TMUX_SESSION_NAME: 'deckent' };
 });
 
-vi.mock('../../../src/core/provider.js', () => ({
-  bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
-}));
+vi.mock('../../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/core/provider.js')>();
+  return {
+    ...actual,
+    bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
+  };
+});
 
 vi.mock('../../../src/cli/commands/doctor.js', () => ({
   runDoctorChecks: vi.fn(),
@@ -61,6 +65,7 @@ vi.mock('../../../src/cli/commands/quick-start.js', () => ({
 }));
 
 import { loadConfig } from '../../../src/core/config.js';
+import { bootstrapProviders } from '../../../src/core/provider.js';
 import {
   runSprint, readContext, planSprint, BrainError,
 } from '../../../src/orchestra/brain.js';
@@ -111,10 +116,13 @@ function makeDoctorResult(allPass = true) {
   };
 }
 
-async function runCommand(args: string[]): Promise<void> {
+async function runCommand(
+  args: string[],
+  runtime: Parameters<typeof registerStart>[1] = {},
+): Promise<void> {
   const program = new Command();
   program.exitOverride();
-  registerStart(program);
+  registerStart(program, runtime);
   try {
     await program.parseAsync(['node', 'test', ...args]);
   } catch {
@@ -203,6 +211,31 @@ describe('start command (isolated)', () => {
   // ─── Pre-flight ───────────────────────────────────────────────────
 
   describe('pre-flight doctor checks', () => {
+    it('holds configured provider authority before zero-config mutation or provider work', async () => {
+      const authority = {
+        state: 'hold',
+        reasonCode: 'keyring_unavailable',
+        authorityEvidenceRef: `provider-authority:${'a'.repeat(64)}`,
+        retryable: false,
+        close: vi.fn(),
+      } as const;
+
+      await runCommand(['start', 'new bounded task'], {
+        providerAuthority: authority,
+      });
+
+      expect(loadConfig).toHaveBeenCalledOnce();
+      expect(prepareZeroConfig).not.toHaveBeenCalled();
+      expect(bootstrapProviders).not.toHaveBeenCalled();
+      expect(runDoctorChecks).not.toHaveBeenCalled();
+      expect(planSprint).not.toHaveBeenCalled();
+      expect(runSprint).not.toHaveBeenCalled();
+      expect(printError).toHaveBeenCalledWith(expect.objectContaining({
+        message: expect.stringContaining('keyring_unavailable'),
+      }));
+      expect(process.exitCode).toBe(1);
+    });
+
     it('runs doctor checks before starting sprint', async () => {
       await runCommand(['start']);
       expect(runDoctorChecks).toHaveBeenCalledWith('/mock/root', undefined, undefined);

@@ -46,6 +46,7 @@ vi.mock('../../src/core/config.js', () => ({
   resolveDefaultModel: () => 'claude-sonnet-5',
   resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
+  resolveEffectiveWorkers: () => 8,
   loadConfig: vi.fn(),
 }));
 
@@ -115,7 +116,10 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
     language: 'en', projectName: 'test', projectRoot: '/mock/root',
     version: '1.0.0', auto_docs: { tier1: true, tier2: true, tier3: false },
     terminal: { run_flow_v2: true } as any,
-    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
+    execution_budget: {
+      roles: { worker: { default: { maxTurns: 1 } } },
+      landing: { reserve_ratio: 0.25 },
+    },
     ...overrides,
   } as ResolvedConfig;
 }
@@ -202,8 +206,28 @@ function makeGreenSprint(): Sprint {
     status: SprintStatus.PLANNING, phase: SprintPhase.PLAN,
     tasks: [
       makeTask(),
-      makeTask({ id: '001-002', title: 'Export UI button', description: 'Add an Export dropdown to the toolbar.' }),
-      makeTask({ id: '001-003', title: 'Integration tests', description: 'E2E test hitting both export endpoints.' }),
+      makeTask({
+        id: '001-002',
+        title: 'Export UI button',
+        description: 'Add an Export dropdown to the toolbar.',
+        scope: {
+          directories: ['src/dashboard/'],
+          filesRead: [],
+          filesWrite: ['src/dashboard/ExportButton.tsx'],
+        },
+        dependencies: ['Backend export endpoints'],
+      }),
+      makeTask({
+        id: '001-003',
+        title: 'Integration tests',
+        description: 'E2E test hitting both export endpoints.',
+        scope: {
+          directories: ['tests/api/'],
+          filesRead: [],
+          filesWrite: ['tests/api/export.test.ts'],
+        },
+        dependencies: ['Backend export endpoints', 'Export UI button'],
+      }),
     ],
     workers: ['w-001-001', 'w-001-002', 'w-001-003'],
     // no promptGate -> plan-preview-service computes gateResult 'skipped', policyDecision 'allow'.
@@ -336,6 +360,10 @@ describe('deckent do — flag-on, fake-planner-driven real multi-task plan (N678
       const storedSnapshot = loadApprovedSnapshot(tmpRoot, 'flow-rp-1');
       expect(storedSnapshot?.planDigest).toBe(preview.planDigest);
       expect(storedSnapshot?.sprint.tasks).toHaveLength(3);
+      expect(storedSnapshot?.planDigestContext?.executionBudgetPolicy?.landing).toEqual({
+        reserve_ratio: 0.25,
+      });
+      expect(printError).not.toHaveBeenCalled();
       // born-681 tek-yazar: parent disk-handle yazmaz (child persist-before-run).
       expect(loadRunHandle(tmpRoot, 'flow-rp-1')).toBeUndefined();
       expect(process.exitCode).toBeUndefined();

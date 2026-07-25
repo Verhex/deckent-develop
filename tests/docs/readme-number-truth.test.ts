@@ -61,8 +61,8 @@ const DASHBOARD_PAGES = countDashboardPages(join(ROOT, 'src/dashboard/src/pages'
 // commit changes one of these live counts, this assertion (not the doc-content
 // assertions below) is the one that should be updated to match the new reality.
 describe('live counts match the current known-true values', () => {
-  it('47 MCP tools, 8 MCP resources', () => {
-    expect(MCP_TOOLS).toBe(47);
+  it('48 MCP tools, 8 MCP resources', () => {
+    expect(MCP_TOOLS).toBe(48);
     expect(MCP_RESOURCES).toBe(8);
   });
 

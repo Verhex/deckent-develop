@@ -69,7 +69,7 @@ describe('CLI registration harness', () => {
         new RegExp(`import\\s*\\{[^}]*${fnName}[^}]*\\}\\s*from`),
       );
       expect(indexContent).toMatch(
-        new RegExp(`${fnName}\\s*\\(\\s*program\\s*\\)`),
+        new RegExp(`${fnName}\\s*\\(\\s*program\\s*(?:,|\\))`),
       );
     });
   }

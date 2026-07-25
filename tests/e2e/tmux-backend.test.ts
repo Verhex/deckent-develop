@@ -14,7 +14,7 @@
 // Reference: docker-backend.test.ts pattern (Sprint 134).
 
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { tmpdir } from 'node:os';
@@ -65,6 +65,61 @@ function killTestSession(sessionName: string): void {
 
 function waitMs(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function tmuxRunAsync(args: string[]): Promise<{
+  status: number | null;
+  stdout: string;
+  stderr: string;
+}> {
+  return new Promise((resolveRun) => {
+    const child = spawn('tmux', args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    child.stdout.setEncoding('utf-8');
+    child.stderr.setEncoding('utf-8');
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+    const finish = (status: number | null, spawnError?: Error): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolveRun({
+        status,
+        stdout: stdout.trim(),
+        stderr: (spawnError?.message ?? stderr).trim(),
+      });
+    };
+    const timeout = setTimeout(() => {
+      child.kill('SIGKILL');
+      finish(null, new Error('tmux command timed out'));
+    }, 10_000);
+    timeout.unref();
+    child.once('error', error => finish(null, error));
+    child.once('close', status => finish(status));
+  });
+}
+
+async function waitForPaneMarker(
+  target: string,
+  marker: string,
+  timeoutMs = 5_000,
+): Promise<{ status: number | null; stdout: string; stderr: string }> {
+  const deadline = Date.now() + timeoutMs;
+  let capture = { status: null as number | null, stdout: '', stderr: '' };
+  do {
+    capture = await tmuxRunAsync(['capture-pane', '-t', target, '-p']);
+    if (capture.status === 0 && capture.stdout.includes(marker)) return capture;
+    await waitMs(50);
+  } while (Date.now() < deadline);
+  return capture;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -314,22 +369,28 @@ describe.skipIf(!tmuxAvailable)('Tmux Backend E2E Tests (real tmux binary)', () 
     // Arrange — create session + window
     tmuxRun(['new-session', '-d', '-s', TEST_SESSION]);
     const windowName = 'test-sendkeys';
-    tmuxRun(['new-window', '-t', TEST_SESSION, '-n', windowName]);
+    const target = `${TEST_SESSION}:${windowName}`;
+    const readyMarker = 'TMUX_PARITY_SHELL_READY';
+    const create = tmuxRun([
+      'new-window',
+      '-t', TEST_SESSION,
+      '-n', windowName,
+      `sh -c 'printf "${readyMarker}\\n"; exec sh'`,
+    ]);
+    expect(create.status).toBe(0);
+    const ready = await waitForPaneMarker(target, readyMarker);
+    expect(ready.status).toBe(0);
+    expect(ready.stdout).toContain(readyMarker);
 
     // Act — send a simple echo command
     const sendResult = tmuxRun([
-      'send-keys', '-t', `${TEST_SESSION}:${windowName}`,
+      'send-keys', '-t', target,
       'echo TMUX_PARITY_TEST_MARKER', 'Enter',
     ]);
     expect(sendResult.status).toBe(0);
 
-    // Wait for shell to process
-    await waitMs(500);
-
-    // Assert — capture-pane should contain our marker
-    const capture = tmuxRun([
-      'capture-pane', '-t', `${TEST_SESSION}:${windowName}`, '-p',
-    ]);
+    // Assert — observe exactly this command; never resend it.
+    const capture = await waitForPaneMarker(target, 'TMUX_PARITY_TEST_MARKER');
     expect(capture.status).toBe(0);
     expect(capture.stdout).toContain('TMUX_PARITY_TEST_MARKER');
   });

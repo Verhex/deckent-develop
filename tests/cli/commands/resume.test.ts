@@ -7,6 +7,7 @@ const mockHasCheckpoint = vi.fn();
 const mockReadCheckpoint = vi.fn();
 const mockDetectStaleWorkers = vi.fn();
 const mockLoadConfig = vi.fn();
+const mockDeriveResumeDisposition = vi.fn();
 
 vi.mock('../../../src/orchestra/brain.js', () => ({
   runSprint: (...args: unknown[]) => mockRunSprint(...args),
@@ -18,13 +19,7 @@ vi.mock('../../../src/orchestra/sprint-checkpoint.js', () => ({
   hasCheckpoint: (...args: unknown[]) => mockHasCheckpoint(...args),
   readCheckpoint: (...args: unknown[]) => mockReadCheckpoint(...args),
   detectStaleWorkers: (...args: unknown[]) => mockDetectStaleWorkers(...args),
-  // Parity helper: unfinished = pending ∪ active-without-valid-result. The mock
-  // mirrors that shape (no .result on disk in these unit fixtures → all active
-  // count as interrupted) so dry-run and real derive an identical set.
-  deriveResumableTaskIds: (_root: unknown, cp: { pendingTasks?: string[]; activeWorkers?: { taskId: string }[] }) => [
-    ...(cp?.pendingTasks ?? []),
-    ...(cp?.activeWorkers ?? []).map(w => w.taskId),
-  ],
+  deriveResumeDisposition: (...args: unknown[]) => mockDeriveResumeDisposition(...args),
   resetInterruptedWorkersToPending: (...args: unknown[]) => mockResetInterrupted(...args),
   buildPreplannedResumeSprint: (...args: unknown[]) => mockBuildPreplanned(...args),
   hasValidResult: () => false,
@@ -106,6 +101,10 @@ describe('deckent resume CLI — preplanned exactly-once handoff', () => {
     mockReadCheckpoint.mockReturnValue(FAKE_CHECKPOINT);
     mockDetectStaleWorkers.mockReturnValue([]);
     mockLoadConfig.mockResolvedValue({ deckent_style: 'sprint' });
+    mockDeriveResumeDisposition.mockReturnValue({
+      resumableIds: ['321-003', '321-004'],
+      parkedSettlements: [],
+    });
     mockRunSprint.mockResolvedValue({ id: 'sprint-321', tasks: [], status: 'COMPLETE' });
     mockExistsSync.mockReturnValue(false);
     mockMkdirSync.mockReturnValue(undefined);
@@ -169,12 +168,42 @@ describe('deckent resume CLI — preplanned exactly-once handoff', () => {
     expect(mockRunSprint).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { label: 'real', extraArgs: [] },
+    { label: 'dry-run', extraArgs: ['--dry-run'] },
+  ])(
+    'HOLDs before config, reset, or spawn when host settlement is parked ($label)',
+    async ({ extraArgs }) => {
+      mockDeriveResumeDisposition.mockReturnValue({
+        resumableIds: [],
+        parkedSettlements: [
+          { taskId: '321-004', state: 'pending-settlement' },
+        ],
+      });
+
+      await runCommand(['sprint-321', ...extraArgs]);
+
+      expect(process.exitCode).toBe(1);
+      expect(mockPrintError).toHaveBeenCalledWith(
+        expect.stringContaining('321-004 (pending-settlement)'),
+      );
+      expect(mockLoadConfig).not.toHaveBeenCalled();
+      expect(mockResetInterrupted).not.toHaveBeenCalled();
+      expect(mockBuildPreplanned).not.toHaveBeenCalled();
+      expect(mockRunSprint).not.toHaveBeenCalled();
+    },
+  );
+
   it('exits early when all tasks already completed without calling runSprint', async () => {
     mockReadCheckpoint.mockReturnValue({
       ...FAKE_CHECKPOINT,
       completedTasks: ['321-001', '321-002'],
       pendingTasks: [],
       activeWorkers: [],
+    });
+    mockDeriveResumeDisposition.mockReturnValue({
+      resumableIds: [],
+      parkedSettlements: [],
     });
 
     await runCommand(['sprint-321']);

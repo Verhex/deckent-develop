@@ -445,6 +445,17 @@ describe('formatSprintSummary', () => {
 // ─── formatAgentLabel ───────────────────────────────────────────────
 
 describe('formatAgentLabel', () => {
+  const originalNoColor = process.env['NO_COLOR'];
+
+  beforeEach(() => {
+    delete process.env['NO_COLOR'];
+  });
+
+  afterEach(() => {
+    if (originalNoColor === undefined) delete process.env['NO_COLOR'];
+    else process.env['NO_COLOR'] = originalNoColor;
+  });
+
   it('returns dim "generic" for undefined agent', () => {
     const label = formatAgentLabel(undefined);
     expect(label).toContain('generic');
@@ -478,6 +489,17 @@ describe('formatAgentLabel', () => {
 // ─── formatDashboard agent column ───────────────────────────────────
 
 describe('formatDashboard agent column', () => {
+  const originalNoColor = process.env['NO_COLOR'];
+
+  beforeEach(() => {
+    delete process.env['NO_COLOR'];
+  });
+
+  afterEach(() => {
+    if (originalNoColor === undefined) delete process.env['NO_COLOR'];
+    else process.env['NO_COLOR'] = originalNoColor;
+  });
+
   it('shows agent label for worker with assignedAgent', () => {
     const state = makeDashboard({
       agents: [{

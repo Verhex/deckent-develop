@@ -22,13 +22,28 @@ import { normalizeTaskResultShape } from '../../core/task-result-schema.js';
 import type { ExecutionBudget } from '../../core/work-model.js';
 import {
   assertExecutionBudgetShape,
+  assertExecutionLandingSupport,
   assertLiveUsageBudgetSupport,
 } from '../../core/live-execution-budget.js';
-import { resolveTaskExecutionBudget } from '../../orchestra/runtime-budget-monitor.js';
+import type { ExecutionLandingPolicyConfig } from '../../core/config-types.js';
+import type { ExecutionAdmissionMode } from '../../core/execution-admission.js';
+import {
+  attendedExecutionProjectId,
+  type AttendedExecutionApprovalAuthority,
+  type AttendedExecutionApprovalExpectedDispatch,
+} from '../../core/attended-execution-approval.js';
+import {
+  assertAttendedExecutionProposalMaterial,
+  createAttendedExecutionProposalMaterialFromTask,
+  type AttendedExecutionProposalMaterial,
+  type AttendedExecutionProposalReference,
+} from '../../core/attended-execution-proposal.js';
+import { resolveHostExecutionBudget } from '../../orchestra/runtime-budget-monitor.js';
 import { resolveProviderExecutionCostClass } from '../../core/provider-execution-profile.js';
 import {
   assertTaskResultSettlementRef,
   createTaskResultSettlementRef,
+  createTaskResultSettlementRefForAttempt,
   readClosedTaskResultSettlement,
   writeTaskResultSettlementAttemptAtomic,
   type TaskResultSettlementRefV1,
@@ -66,9 +81,65 @@ export async function spawnWorkerMultiProvider(
   model: string,
   prompt: string,
   root: string,
-  opts: { autoApprove?: boolean; allowedTools?: string; spawnBackend?: string; dockerImage?: string; dockerTimeout?: number; provider?: string; modelEffort?: string; executionBudget?: ExecutionBudget; hostTerminalResultContract?: HostTerminalResultContractV1 },
+  opts: {
+    autoApprove?: boolean;
+    allowedTools?: string;
+    availableTools?: string;
+    isolatedContext?: boolean;
+    spawnBackend?: string;
+    dockerImage?: string;
+    dockerTimeout?: number;
+    provider?: string;
+    modelEffort?: string;
+    executionBudget?: ExecutionBudget;
+    executionLandingPolicy?: ExecutionLandingPolicyConfig;
+    executionBudgetProfileRef?: string;
+    executionBudgetPolicyDigest?: string;
+    executionAdmissionMode?: ExecutionAdmissionMode;
+    executionApprovalEvidenceRef?: string;
+    executionApprovalProposal?: AttendedExecutionProposalReference;
+    executionApprovalMaterial?: AttendedExecutionProposalMaterial;
+    attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+    executionTenantId?: string;
+    executionRunId?: string;
+    hostTerminalResultContract?: HostTerminalResultContractV1;
+  },
 ): Promise<{ backend: string; provider: ProviderName; settlementRef?: TaskResultSettlementRefV1 }> {
-  const executionBudget = resolveTaskExecutionBudget(root, taskId, opts.executionBudget);
+  const executionBudget = resolveHostExecutionBudget(root, taskId, opts.executionBudget);
+
+  const attendedExpectedDispatch = (
+    provider: string,
+    backend: string,
+  ): AttendedExecutionApprovalExpectedDispatch | undefined => {
+    if (!executionBudget
+      || !opts.executionLandingPolicy
+      || !opts.executionBudgetProfileRef
+      || !opts.executionBudgetPolicyDigest
+      || !opts.executionApprovalProposal
+      || !opts.executionApprovalMaterial) {
+      return undefined;
+    }
+    assertAttendedExecutionProposalMaterial(
+      opts.executionApprovalMaterial,
+      opts.executionApprovalProposal,
+    );
+    return {
+      ...opts.executionApprovalProposal,
+      tenantId: opts.executionTenantId ?? 'local',
+      projectId: attendedExecutionProjectId(root),
+      runId: opts.executionRunId ?? taskId,
+      taskId,
+      provider,
+      model,
+      backend,
+      budget: executionBudget,
+      policy: {
+        profileRef: opts.executionBudgetProfileRef,
+        policyDigest: opts.executionBudgetPolicyDigest,
+        landing: opts.executionLandingPolicy,
+      },
+    };
+  };
 
   // Resolve provider from registry. Dynamic ollama tags (e.g. qwen3.6:27b) are not in
   // the static registry at process start — the sprint path calls ensureOllamaModelRegistered
@@ -156,12 +227,26 @@ export async function spawnWorkerMultiProvider(
       if (typeof refresh === 'function') {
         await refresh.call(adapter);
       }
+      assertExecutionLandingSupport({
+        budget: executionBudget,
+        policy: opts.executionLandingPolicy,
+        mode: opts.executionAdmissionMode,
+        capability: adapter.executionLandingCapability,
+        executor: adapter.name,
+        approvalEvidenceRef: opts.executionApprovalEvidenceRef,
+        approvalAuthority: opts.attendedExecutionApprovalAuthority,
+        approvalExpectedDispatch: attendedExpectedDispatch(provider, 'host-adapter'),
+        executionCostClass: resolveProviderExecutionCostClass(provider, adapter.executionCostClass),
+      });
       adapter.spawn(taskId, model as ModelType, prompt, {
         allowedTools: opts.allowedTools,
         autoApprove: opts.autoApprove ?? false,
         projectDir: root,
         reasoningEffort,
         executionBudget,
+        executionLandingPolicy: opts.executionLandingPolicy,
+        executionAdmissionMode: opts.executionAdmissionMode,
+        executionApprovalEvidenceRef: opts.executionApprovalEvidenceRef,
       });
       return { backend: 'host-adapter', provider };
     }
@@ -187,8 +272,24 @@ export async function spawnWorkerMultiProvider(
       backend.liveUsageBudgetSupport,
       backend.name,
     );
+    const approvalGrant = assertExecutionLandingSupport({
+      budget: executionBudget,
+      policy: opts.executionLandingPolicy,
+      mode: opts.executionAdmissionMode,
+      capability: backend.executionLandingCapability,
+      executor: backend.name,
+      approvalEvidenceRef: opts.executionApprovalEvidenceRef,
+      approvalAuthority: opts.attendedExecutionApprovalAuthority,
+      approvalExpectedDispatch: attendedExpectedDispatch(provider, backend.name),
+    });
     const settlementRef = backend.name === 'docker'
-      ? createTaskResultSettlementRef(root, taskId)
+      ? approvalGrant
+        ? createTaskResultSettlementRefForAttempt(
+          root,
+          taskId,
+          approvalGrant.receipt.binding.attemptId,
+        )
+        : createTaskResultSettlementRef(root, taskId)
       : undefined;
     if (settlementRef) {
       // Durable attempt identity precedes backend.spawn, whose Docker path can
@@ -199,8 +300,15 @@ export async function spawnWorkerMultiProvider(
       autoApprove: opts.autoApprove ?? false,
       projectDir: root,
       allowedTools: opts.allowedTools,
+      availableTools: opts.availableTools,
+      isolatedContext: opts.isolatedContext,
       reasoningEffort,
       executionBudget,
+      executionLandingPolicy: opts.executionLandingPolicy,
+      executionAdmissionMode: opts.executionAdmissionMode,
+      executionApprovalEvidenceRef: opts.executionApprovalEvidenceRef,
+      executionApprovalGrant: approvalGrant,
+      executionApprovalExpectedDispatch: attendedExpectedDispatch(provider, backend.name),
       settlementRef,
       hostTerminalResultContract: opts.hostTerminalResultContract,
     });
@@ -220,6 +328,16 @@ export async function spawnWorkerMultiProvider(
   }
   if (provider === 'claude') {
     assertLiveUsageBudgetSupport(executionBudget, undefined, 'tmux');
+    assertExecutionLandingSupport({
+      budget: executionBudget,
+      policy: opts.executionLandingPolicy,
+      mode: opts.executionAdmissionMode,
+      capability: 'unsupported',
+      executor: 'tmux',
+      approvalEvidenceRef: opts.executionApprovalEvidenceRef,
+      approvalAuthority: opts.attendedExecutionApprovalAuthority,
+      approvalExpectedDispatch: attendedExpectedDispatch(provider, 'tmux'),
+    });
     ensureSession();
     spawnWorker(taskId, model as ModelType, prompt, root, {
       autoApprove: opts.autoApprove ?? false,
@@ -239,12 +357,25 @@ export async function spawnWorkerMultiProvider(
     backend.liveUsageBudgetSupport,
     backend.name,
   );
+  assertExecutionLandingSupport({
+    budget: executionBudget,
+    policy: opts.executionLandingPolicy,
+    mode: opts.executionAdmissionMode,
+    capability: backend.executionLandingCapability,
+    executor: backend.name,
+    approvalEvidenceRef: opts.executionApprovalEvidenceRef,
+    approvalAuthority: opts.attendedExecutionApprovalAuthority,
+    approvalExpectedDispatch: attendedExpectedDispatch(provider, backend.name),
+  });
   backend.spawn(taskId, model as ModelType, prompt, {
     autoApprove: opts.autoApprove ?? false,
     projectDir: root,
     allowedTools: opts.allowedTools,
     reasoningEffort,
     executionBudget,
+    executionLandingPolicy: opts.executionLandingPolicy,
+    executionAdmissionMode: opts.executionAdmissionMode,
+    executionApprovalEvidenceRef: opts.executionApprovalEvidenceRef,
   });
   return { backend: 'subprocess', provider };
 }
@@ -379,6 +510,16 @@ export function registerSpawn(program: Command): void {
           // manual spawn path emits the provider flag like the sprint path does.
           modelEffort: task.modelEffort,
           executionBudget: task.budget,
+          executionLandingPolicy: task.budgetPolicy?.landingPolicy,
+          executionBudgetProfileRef: task.budgetPolicy?.profileRef,
+          executionBudgetPolicyDigest: task.budgetPolicy?.policyDigest,
+          executionAdmissionMode: task.budgetPolicy?.admissionMode,
+          executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
+          executionApprovalProposal: task.budgetPolicy?.approvalProposal,
+          executionApprovalMaterial: createAttendedExecutionProposalMaterialFromTask(
+            task as unknown as Record<string, unknown>,
+            prompt,
+          ),
           // OPENROUTER-PROVIDER (row 477): forward the task's OWN provider. Without
           // it the on-demand registration branches in spawnWorkerMultiProvider
           // (`opts.provider === 'ollama' | 'openrouter'`) never fired on this path,

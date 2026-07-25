@@ -15,6 +15,7 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
     create: vi.fn(() => ({
       name: backend.name,
       liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: backend.name === 'docker' ? 'checkpoint-stop' : 'unsupported',
       spawn: backend.spawn,
       kill: vi.fn(),
       list: vi.fn(() => []),
@@ -41,6 +42,7 @@ import {
   writeTaskResultSettlementAttemptAtomic,
   writeTaskResultSettlementClosureAtomic,
 } from '../../src/core/task-result-settlement.js';
+import { TEST_DOCKER_EXECUTION_OPTIONS } from '../helpers/budgeted-docker-execution-fixture.js';
 
 const roots: string[] = [];
 const originalDeckentHome = process.env.DECKENT_HOME;
@@ -79,7 +81,7 @@ describe('spawnWorkerMultiProvider Docker settlement attempt', () => {
       {
         provider: 'claude',
         spawnBackend: 'docker',
-        executionBudget: { maxTurns: 1 },
+        ...TEST_DOCKER_EXECUTION_OPTIONS,
         hostTerminalResultContract: {
           version: 1,
           kind: 'terminal-verdict',

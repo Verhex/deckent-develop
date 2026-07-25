@@ -3,7 +3,7 @@
   "sanctioned": [
     {
       "file": "src/agents/worker.ts",
-      "code": "const r = spawnSync('claude', ['--version'], {"
+      "code": "const r = spawnSync('claude', ['auth', 'status', '--json'], {"
     },
     {
       "file": "src/cli/commands/attach.ts",
@@ -254,18 +254,6 @@
       "code": "const ls = spawnSync('git', ['ls-files'], { encoding: 'utf-8', cwd });"
     },
     {
-      "file": "src/orchestra/planner.ts",
-      "code": "const result = spawnSync(command, args, {"
-    },
-    {
-      "file": "src/orchestra/planner.ts",
-      "code": "const retry = spawnSync(c2, a2, { encoding: 'utf-8', timeout: timeout ?? BRAIN_PLAN_TIMEOUT_MS });"
-    },
-    {
-      "file": "src/orchestra/planner.ts",
-      "code": "result = spawnSync(cmdInfo.command, cmdInfo.args, {"
-    },
-    {
       "file": "src/orchestra/rollback.ts",
       "code": "const result = spawnSync('git', ['status', '--porcelain', '--untracked-files=no'], {"
     },
@@ -351,7 +339,7 @@
     },
     {
       "file": "src/providers/codex.ts",
-      "code": "const result = spawnSync('codex', ['auth', 'status'], {"
+      "code": "const result = spawnSync('codex', [...CODEX_AUTH_STATUS_ARGS], {"
     },
     {
       "file": "src/providers/codex.ts",
@@ -428,17 +416,27 @@
     },
     {
       "file": "src/orchestra/spawn-backend-docker.ts",
-      "code": "const logResult = spawnSync('docker', ['logs', containerName], {",
-      "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
-    },
-    {
-      "file": "src/orchestra/spawn-backend-docker.ts",
-      "code": "const logResult = spawnSync('docker', ['logs', containerName], {",
-      "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
-    },
-    {
-      "file": "src/orchestra/spawn-backend-docker.ts",
       "code": "const probe = spawnSync(",
+      "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
+    },
+    {
+      "file": "src/orchestra/spawn-backend-docker.ts",
+      "code": "const probe = spawnSync('docker', ['info'], {",
+      "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
+    },
+    {
+      "file": "src/orchestra/spawn-backend-docker.ts",
+      "code": "const removal = spawnSync('docker', ['rm', containerId], { encoding: 'utf-8', timeout: 10_000 });",
+      "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
+    },
+    {
+      "file": "src/orchestra/spawn-backend-docker.ts",
+      "code": "const removal = spawnSync('docker', ['rm', input.containerId], {",
+      "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
+    },
+    {
+      "file": "src/orchestra/spawn-backend-docker.ts",
+      "code": "const res = spawnSync('git', ['hash-object', '--', rel], {",
       "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
     },
     {
@@ -458,27 +456,27 @@
     },
     {
       "file": "src/orchestra/spawn-backend-docker.ts",
-      "code": "const stopResult = spawnSync('docker', ['stop', `--time=${grace}`, containerName], {",
+      "code": "const result = spawnSync(command, args, options);",
       "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
     },
     {
       "file": "src/orchestra/spawn-backend-docker.ts",
-      "code": "spawnSync('docker', ['kill', '--signal=SIGTERM', containerName], { encoding: 'utf-8', timeout: 10_000 });",
+      "code": "const stopResult = spawnSync('docker', ['stop', `--time=${grace}`, containerId], {",
       "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
     },
     {
       "file": "src/orchestra/spawn-backend-docker.ts",
-      "code": "spawnSync('docker', ['rm', '-f', containerName], {",
+      "code": "inspected = spawnSync(",
       "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
     },
     {
       "file": "src/orchestra/spawn-backend-docker.ts",
-      "code": "spawnSync('docker', ['rm', '-f', containerName], { encoding: 'utf-8', timeout: 10_000 });",
+      "code": "spawnSync('docker', ['kill', '--signal=SIGTERM', containerId], { encoding: 'utf-8', timeout: 10_000 });",
       "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
     },
     {
       "file": "src/orchestra/spawn-backend-docker.ts",
-      "code": "spawnSync('docker', ['rm', '-f', containerName], { encoding: 'utf-8', timeout: 10_000 });",
+      "code": "spawnSync('docker', ['rm', containerId], { encoding: 'utf-8', timeout: 10_000 });",
       "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
     },
     {

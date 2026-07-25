@@ -32,7 +32,7 @@ vi.mock('../../../src/orchestra/sprint-controller.js', () => ({
 }));
 
 vi.mock('../../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
 }));
@@ -98,7 +98,10 @@ describe('deckent_run MCP — WM-1b routing', () => {
     vi.mocked(loadConfig).mockResolvedValue({
       routing_engine: 'v2',
       spawn_backend: 'subprocess',
-      execution_budget: { roles: { worker: { default: { maxTurns: 4 } } } },
+      execution_budget: {
+        roles: { worker: { default: { maxTurns: 4 } } },
+        landing: { reserve_ratio: 0.25 },
+      },
     } as never);
 
     const { registerRunTool } = await import('../../../src/mcp/tools/run.ts');
@@ -106,7 +109,7 @@ describe('deckent_run MCP — WM-1b routing', () => {
     registerRunTool(server);
 
     const handler = server.tools.get('deckent_run')!.handler;
-    await handler({ description: 'fix a bug', model: 'sonnet', autoApprove: true });
+    await handler({ description: 'fix a bug', model: 'claude-sonnet-5', autoApprove: true });
 
     const writtenCall = vi.mocked(writeFileSync).mock.calls.find(
       (c) => typeof c[0] === 'string' && (c[0] as string).endsWith('.json'),
@@ -122,7 +125,10 @@ describe('deckent_run MCP — WM-1b routing', () => {
     vi.mocked(loadConfig).mockResolvedValue({
       routing_engine: 'v2',
       spawn_backend: 'subprocess',
-      execution_budget: { roles: { worker: { default: { maxTurns: 4 } } } },
+      execution_budget: {
+        roles: { worker: { default: { maxTurns: 4 } } },
+        landing: { reserve_ratio: 0.25 },
+      },
     } as never);
 
     const { registerRunTool } = await import('../../../src/mcp/tools/run.ts');
@@ -130,7 +136,7 @@ describe('deckent_run MCP — WM-1b routing', () => {
     registerRunTool(server);
 
     const handler = server.tools.get('deckent_run')!.handler;
-    await handler({ description: 'fix a bug', model: 'sonnet', autoApprove: true });
+    await handler({ description: 'fix a bug', model: 'claude-sonnet-5', autoApprove: true });
 
     expect(vi.mocked(routeSingleTaskV3)).toHaveBeenCalledOnce();
     const callArgs = vi.mocked(routeSingleTaskV3).mock.calls[0]!;
@@ -144,7 +150,10 @@ describe('deckent_run MCP — WM-1b routing', () => {
     vi.mocked(loadConfig).mockResolvedValue({
       routing_engine: 'v2',
       spawn_backend: 'subprocess',
-      execution_budget: { roles: { worker: { default: { maxTurns: 4 } } } },
+      execution_budget: {
+        roles: { worker: { default: { maxTurns: 4 } } },
+        landing: { reserve_ratio: 0.25 },
+      },
     } as never);
     vi.mocked(routeSingleTaskV3).mockImplementationOnce(() => { throw new Error('routing failure'); });
 
@@ -154,7 +163,7 @@ describe('deckent_run MCP — WM-1b routing', () => {
 
     const handler = server.tools.get('deckent_run')!.handler;
     // Should NOT propagate routing error — fail-safe catch swallows it
-    const result = await handler({ description: 'do work', model: 'sonnet', autoApprove: true });
+    const result = await handler({ description: 'do work', model: 'claude-sonnet-5', autoApprove: true });
     expect(result.isError).not.toBe(true);
 
     // Task should still be written (with generic fallback from resolveToTask)
@@ -170,7 +179,10 @@ describe('deckent_run MCP — WM-1b routing', () => {
     vi.mocked(loadConfig).mockResolvedValue({
       routing_engine: 'v2',
       spawn_backend: 'subprocess',
-      execution_budget: { roles: { worker: { default: { maxTurns: 4 } } } },
+      execution_budget: {
+        roles: { worker: { default: { maxTurns: 4 } } },
+        landing: { reserve_ratio: 0.25 },
+      },
     } as never);
 
     const { registerRunTool } = await import('../../../src/mcp/tools/run.ts');
@@ -178,7 +190,7 @@ describe('deckent_run MCP — WM-1b routing', () => {
     registerRunTool(server);
 
     const handler = server.tools.get('deckent_run')!.handler;
-    await handler({ description: 'do work', model: 'sonnet', autoApprove: true });
+    await handler({ description: 'do work', model: 'claude-sonnet-5', autoApprove: true });
 
     expect(vi.mocked(routeSingleTaskV3)).toHaveBeenCalled();
   });

@@ -326,7 +326,7 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
   },
   {
     name: '/model',
-    desc: 'Modeli değiştir (örn: /model sonnet)',
+    desc: 'Modeli değiştir (örn: /model claude-sonnet-5)',
   },
   {
     name: '/provider',

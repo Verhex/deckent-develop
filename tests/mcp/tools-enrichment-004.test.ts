@@ -29,6 +29,7 @@ vi.mock('../../src/core/config.js', () => ({
   readAuthMode: vi.fn().mockResolvedValue('subscription'),
   resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
+  resolveEffectiveWorkers: () => 8,
   loadConfig: vi.fn(),
 }));
 
@@ -86,6 +87,9 @@ vi.mock('../../src/mcp/tools/job-runner.js', () => ({
 
 vi.mock('../../src/core/provider.js', () => ({
   bootstrapProviders: vi.fn(),
+  providerRegistry: {
+    hasProvider: vi.fn(() => false),
+  },
 }));
 
 vi.mock('../../src/mcp/helpers/format.js', () => ({

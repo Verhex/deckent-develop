@@ -14,7 +14,12 @@ import { createAnthropicAdapter } from '../../agent/provider-tooluse/anthropic.j
 import { createOpenAIAdapter } from '../../agent/provider-tooluse/openai.js';
 import { createOllamaAdapter } from '../../agent/provider-tooluse/ollama.js';
 import type { ProviderAdapter } from '../../agent/provider-tooluse/types.js';
-import { inferProviderFromId, modelRegistry, OLLAMA_BUILTIN_MODELS } from '../../core/model-registry.js';
+import {
+  getLegacyModelMigration,
+  inferProviderFromId,
+  modelRegistry,
+  OLLAMA_BUILTIN_MODELS,
+} from '../../core/model-registry.js';
 import { OPENAI_COMPAT_PRESET_META } from '../../providers/openai-compatible.js';
 import { createStreamSegmenter, type Segment } from './stream-segmenter.js';
 
@@ -30,7 +35,7 @@ export interface ProviderError {
   error: string;
   /** Stable id for the failure class so the view can localize:
    *  'missing-api-key' | 'missing-ollama-host' | 'unsupported-native-provider' |
-   *  'unknown-model' | 'no-transport'. */
+   *  'legacy-model-alias' | 'unknown-model' | 'no-transport'. */
   errorCode?: string;
   /** Machine detail for the message (e.g. the key/env var name(s) to set). */
   detail?: string;
@@ -81,13 +86,15 @@ export interface NativeResolveContext {
 export const NATIVE_PROVIDER_NAMES = ['claude', 'openai', 'ollama', 'deepseek', 'qwen', 'glm'] as const;
 
 /** Confidently infer the native provider a bare `/model <id>` implies, or null.
- *  Only unambiguous shapes count — `fable`/`opus` → claude, `name:tag` → ollama,
- *  `gpt-*`/o-series → openai. Anything else returns null and the switch stays on
+ *  Only canonical, unambiguous shapes count — `claude-*` → claude,
+ *  `name:tag` → ollama, `gpt-*`/o-series → openai. Legacy aliases return null
+ *  and are rejected at the shared selection seam. Anything else returns null and the switch stays on
  *  the current provider (no inferProviderFromId here: its unknown-id fallback is
  *  'claude', which would silently re-route vendor models like `deepseek-chat`). */
 export function inferNativeProviderForModel(model: string): string | null {
   const lid = model.toLowerCase().trim();
-  if (/^(claude|opus|sonnet|haiku|fable)/.test(lid)) return 'claude';
+  if (getLegacyModelMigration(lid)) return null;
+  if (/^claude-/.test(lid)) return 'claude';
   if (lid.includes(':')) return 'ollama';
   if (/^(gpt|o\d)/.test(lid)) return 'openai';
   return null;
@@ -135,6 +142,19 @@ export function resolveNativeSelection(
   const provider = sel.provider.toLowerCase().trim();
   const { env, config } = ctx;
   const secrets = ctx.secrets ?? {};
+  const requestedModel = sel.model?.trim() ?? null;
+
+  // Runtime authoring never consumes compatibility metadata. Reject before
+  // credential lookup or adapter construction so an alias cannot change the
+  // provider, leak auth-state differences, or silently become another model.
+  if (requestedModel && getLegacyModelMigration(requestedModel)) {
+    return {
+      error: `legacy model alias "${requestedModel}" is not executable; use an exact provider API model ID`,
+      errorCode: 'legacy-model-alias',
+      detail: requestedModel,
+      provider,
+    };
+  }
 
   if (provider === 'claude') {
     const apiKey = secrets['DECKENT_CLAUDE_API_KEY'] || env['DECKENT_CLAUDE_API_KEY'] || env['ANTHROPIC_API_KEY'];
@@ -147,7 +167,7 @@ export function resolveNativeSelection(
       };
     }
     const configModel = config.native_model && inferProviderFromId(config.native_model) === 'claude' ? config.native_model : null;
-    const wire = resolveClaudeWireModel(sel.model ?? configModel);
+    const wire = resolveClaudeWireModel(requestedModel ?? configModel);
     if ('unresolved' in wire) {
       // REPL-575 K6 — refuse an unrecognized non-claude model instead of
       // shipping it at the Anthropic transport with a false 'switched' report.
@@ -183,7 +203,7 @@ export function resolveNativeSelection(
     if (apiKey) opts.apiKey = apiKey;
     return {
       adapter: createOpenAIAdapter(opts),
-      model: sel.model ?? configModel ?? DEFAULT_MODEL['openai-compatible'],
+      model: requestedModel ?? configModel ?? DEFAULT_MODEL['openai-compatible'],
       providerName: 'openai',
     };
   }
@@ -208,7 +228,7 @@ export function resolveNativeSelection(
     }
     return {
       adapter: createOpenAIAdapter({ baseUrl: meta.baseURL, apiKey, name: meta.name }),
-      model: sel.model ?? meta.models[0]!,
+      model: requestedModel ?? meta.models[0]!,
       providerName: provider,
     };
   }
@@ -225,7 +245,7 @@ export function resolveNativeSelection(
     const configModel = config.native_model && inferProviderFromId(config.native_model) === 'ollama' ? config.native_model : null;
     return {
       adapter: createOllamaAdapter({ host: config.ollama_host }),
-      model: sel.model ?? configModel ?? DEFAULT_MODEL.ollama,
+      model: requestedModel ?? configModel ?? DEFAULT_MODEL.ollama,
       providerName: 'ollama',
     };
   }

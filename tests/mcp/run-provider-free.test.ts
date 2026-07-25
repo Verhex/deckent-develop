@@ -83,7 +83,10 @@ describe('deckent_run — provider-free (Fix A)', () => {
       brain_provider: 'claude',
       spawn_backend: 'subprocess',
       routing_engine: 'v2',
-      execution_budget: { roles: { worker: { default: { maxTurns: 4 } } } },
+      execution_budget: {
+        roles: { worker: { default: { maxTurns: 4 } } },
+        landing: { reserve_ratio: 0.25 },
+      },
     } as never);
 
     const { registerRunTool } = await import('../../src/mcp/tools/run.ts');
@@ -115,7 +118,10 @@ describe('deckent_run — provider-free (Fix A)', () => {
       brain_provider: 'gemini',
       spawn_backend: 'subprocess',
       routing_engine: 'v2',
-      execution_budget: { roles: { worker: { default: { maxTurns: 4 } } } },
+      execution_budget: {
+        roles: { worker: { default: { maxTurns: 4 } } },
+        landing: { reserve_ratio: 0.25 },
+      },
     } as never);
 
     const { registerRunTool } = await import('../../src/mcp/tools/run.ts');
@@ -139,7 +145,10 @@ describe('deckent_run — provider-free (Fix A)', () => {
       brain_provider: undefined,
       spawn_backend: 'subprocess',
       routing_engine: 'v2',
-      execution_budget: { roles: { worker: { default: { maxTurns: 4 } } } },
+      execution_budget: {
+        roles: { worker: { default: { maxTurns: 4 } } },
+        landing: { reserve_ratio: 0.25 },
+      },
     } as never);
 
     const { registerRunTool } = await import('../../src/mcp/tools/run.ts');

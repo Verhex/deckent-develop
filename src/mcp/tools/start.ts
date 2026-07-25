@@ -4,8 +4,11 @@ import { fork } from 'node:child_process';
 import { writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig, readAuthMode } from '../../core/config.js';
-import { bootstrapProviders } from '../../core/provider.js';
+import { loadConfig, readAuthMode, resolveBrainModel } from '../../core/config.js';
+import { bootstrapProviders, orderedRoleProviders } from '../../core/provider.js';
+import { getEquivalentModel } from '../../core/model-equivalence.js';
+import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
+import { resolveExecutionModelIdentity } from '../../orchestra/execution-request-builder.js';
 import { readContext, planSprint, BrainError } from '../../orchestra/brain.js';
 import { estimateSprintFull, type SprintEstimate } from '../../orchestra/sprint-estimator.js';
 import { cleanOrphanIpcDirs } from '../../core/orphan-cleaner.js';
@@ -34,6 +37,9 @@ import {
   type RunHandle,
 } from '../../orchestra/run-job-service.js';
 import { spawnDetachedDeckent } from '../../cli/helpers/detached-start.js';
+import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
+import { preflightProviderRoleExecutionIngress } from '../../core/provider-execution-ingress-authority.js';
 
 /**
  * Format an estimated duration (minutes) into a compact human string for the
@@ -48,7 +54,12 @@ function formatEstimatedDuration(min: number): string {
   return m === 0 ? `~${h}h` : `~${h}h ${m}m`;
 }
 
-export function registerStartTool(server: McpServer): void {
+export function registerStartTool(
+  server: McpServer,
+  runtime: {
+    providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  } = {},
+): void {
   server.registerTool(
     'deckent_start',
     {
@@ -101,6 +112,87 @@ export function registerStartTool(server: McpServer): void {
 
       try {
         const config = await loadConfig(root);
+        if (runtime.providerAuthority) {
+          const order = orderedRoleProviders('brain', config);
+          const requestedModel = getEquivalentModel(
+            resolveBrainModel(config),
+            order.primary,
+          );
+          if (order.primary === 'openrouter') {
+            registerOpenRouterModelFromCache(root, requestedModel);
+          }
+          const identity = resolveExecutionModelIdentity(
+            requestedModel,
+            order.primary,
+          );
+          const executionId = `mcp-start-${process.pid}`;
+          const providerAuthority = preflightProviderRoleExecutionIngress(
+            runtime.providerAuthority,
+            {
+              role: 'brain',
+              purpose: 'sprint-planning',
+              runId: executionId,
+              taskId: executionId,
+              provider: identity.provider,
+              model: identity.model,
+              configuredBackend: 'unresolved-before-provider-bootstrap',
+              fallbackProviders: order.fallbacks,
+              unattended: true,
+            },
+          );
+          if (providerAuthority.decision === 'hold') {
+            writeEvent(
+              root,
+              executionId,
+              'brain',
+              'auditor',
+              'BRAIN→AUDITOR:PROVIDER_AUTHORITY_HOLD',
+              {
+                role: 'brain',
+                purpose: 'sprint-planning',
+                runId: executionId,
+                taskId: executionId,
+                provider: identity.provider,
+                model: identity.model,
+                configuredBackend: 'unresolved-before-provider-bootstrap',
+                fallbackProviders: order.fallbacks,
+                unattended: true,
+                reasonCode: providerAuthority.reasonCode,
+                authorityEvidenceRefs: providerAuthority.authorityEvidenceRefs,
+              },
+            );
+            const message = getMessage(
+              'run.provider_authority_hold',
+              getLanguage(config.language),
+              {
+                reason: providerAuthority.reasonCode,
+                evidence: providerAuthority.authorityEvidenceRefs.join(','),
+              },
+            );
+            const errData = {
+              error: true,
+              success: false,
+              code: 'PROVIDER_EXECUTION_AUTHORITY_HOLD',
+              message,
+              providerAuthorityHold: {
+                role: 'brain',
+                purpose: 'sprint-planning',
+                reasonCode: providerAuthority.reasonCode,
+                authorityEvidenceRefs: providerAuthority.authorityEvidenceRefs,
+              },
+            };
+            return {
+              content: [{
+                type: 'text' as const,
+                text: JSON.stringify(wrapResponse(
+                  errData,
+                  formatErrorResponse({ code: errData.code, message }),
+                )),
+              }],
+              isError: true,
+            };
+          }
+        }
 
         // ─── TERM-FLOW-UNIFY Sprint-4 (426-001): approved-snapshot-consuming
         // start ────────────────────────────────────────────────────────────

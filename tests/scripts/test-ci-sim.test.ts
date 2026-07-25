@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -198,6 +199,28 @@ describe('isolated CI workspace', () => {
     }
   });
 
+  it.skipIf(process.platform === 'win32')(
+    'materializes a symlinked worktree dependency root as an independent directory',
+    async () => {
+      const root = await createDirtyRepository();
+      const dependencyStore = mkdtempSync(join(tmpdir(), 'ci-sim-dependency-store-'));
+      sandboxes.push(dependencyStore);
+      mkdirSync(join(dependencyStore, 'pkg'), { recursive: true });
+      writeFileSync(join(dependencyStore, 'pkg/index.js'), 'store dependency\n');
+      rmSync(join(root, 'node_modules'), { recursive: true });
+      symlinkSync(dependencyStore, join(root, 'node_modules'));
+
+      const workspace = await materializeCiWorkspace(root);
+      liveWorkspaces.push(workspace);
+
+      const materializedRoot = join(workspace.workspaceDir, 'node_modules');
+      expect(lstatSync(materializedRoot).isSymbolicLink()).toBe(false);
+      writeFileSync(join(materializedRoot, 'pkg/index.js'), 'workspace mutation\n');
+      expect(readFileSync(join(dependencyStore, 'pkg/index.js'), 'utf8'))
+        .toBe('store dependency\n');
+    },
+  );
+
   it.skipIf(process.platform === 'win32')('rejects a dependency symlink outside node_modules', async () => {
     const root = await createDirtyRepository();
     const outside = mkdtempSync(join(tmpdir(), 'ci-sim-dependency-outside-'));
@@ -206,7 +229,7 @@ describe('isolated CI workspace', () => {
     symlinkSync(outside, join(root, 'node_modules/outside-package'));
 
     await expect(materializeCiWorkspace(root))
-      .rejects.toThrow('E_CI_SIM_EXTERNAL_DEPENDENCY');
+      .rejects.toThrow('E_CI_SIM_EXTERNAL_DEPENDENCY:outside-package');
   });
 
   it('skips dependency materialization during dry-run and records that fact', async () => {
@@ -477,6 +500,70 @@ describe('process and environment boundaries', () => {
     ]);
     const result = await runProcess('git', ['show', 'HEAD:large.txt'], { cwd: root });
     expect(result.stdout).toHaveLength(size);
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'does not expose completion until an owned delayed grandchild can no longer resurrect HOME',
+    async () => {
+      const root = mkdtempSync(join(tmpdir(), 'ci-sim-tree-finality-'));
+      sandboxes.push(root);
+      const homeDir = join(root, 'home');
+      const nested = join(root, 'nested.mjs');
+      const childCode = [
+        'import { mkdirSync, writeFileSync } from "node:fs";',
+        'import { join } from "node:path";',
+        'setTimeout(() => {',
+        '  mkdirSync(process.env.HOME, { recursive: true });',
+        '  writeFileSync(join(process.env.HOME, "late.txt"), "late\\n");',
+        '}, 350);',
+      ].join('\n');
+      writeFileSync(nested, [
+        'import { spawn } from "node:child_process";',
+        `const childCode = ${JSON.stringify(childCode)};`,
+        'spawn(process.execPath, ["--input-type=module", "-e", childCode], {',
+        '  stdio: "ignore", env: process.env,',
+        '});',
+        'process.exit(7);',
+      ].join('\n'));
+
+      const execution = await spawnGatedRunner(process.execPath, [
+        resolve(REPO_ROOT, 'scripts/ci-sim-runner.mjs'), 'tree-finality', nested,
+      ], {
+        cwd: REPO_ROOT,
+        env: sanitizedCiEnvironment({ homeDir }),
+        stdio: 'pipe',
+        runNonce: 'tree-finality',
+        recordChild: async () => undefined,
+      });
+      const outcome = await execution.outcome;
+
+      expect(outcome).toMatchObject({ code: 7, signal: null });
+      rmSync(homeDir, { recursive: true, force: true });
+      await new Promise(resolveDelay => setTimeout(resolveDelay, 700));
+      expect(existsSync(homeDir)).toBe(false);
+    },
+  );
+
+  it('fails closed on a malformed gated-runner completion message', async () => {
+    const child = await spawnGatedRunner(process.execPath, [
+      '--input-type=module',
+      '-e',
+      [
+        'process.on("message", () => {',
+        '  process.send?.({ type: "DONE", code: "not-an-exit-code" });',
+        '  setInterval(() => {}, 30000);',
+        '});',
+      ].join('\n'),
+    ], {
+      cwd: tmpdir(),
+      env: process.env,
+      stdio: 'pipe',
+      runNonce: 'malformed-completion',
+      recordChild: async () => undefined,
+    });
+
+    await expect(child.outcome)
+      .rejects.toThrow('E_CI_SIM_CHILD_COMPLETION_HOLD:INVALID_OR_CONFLICTING_COMPLETION');
   });
 
   it('does not inherit provider credentials and isolates all temp homes', () => {

@@ -29,7 +29,10 @@ async function sortedEntries(dir) {
 
 async function inspectDependencies(path, rootReal) {
   const actual = await realpath(path);
-  if (!inside(rootReal, actual)) throw new Error(`E_CI_SIM_EXTERNAL_DEPENDENCY:${path}`);
+  const relativePath = relative(rootReal, path).replaceAll('\\', '/') || '.';
+  if (!inside(rootReal, actual)) {
+    throw new Error(`E_CI_SIM_EXTERNAL_DEPENDENCY:${relativePath}`);
+  }
   const stat = await lstat(path);
   if (stat.isSymbolicLink()) return { bytes: Buffer.byteLength(await readlink(path)), files: 1 };
   if (stat.isFile()) return { bytes: stat.size, files: 1 };
@@ -71,11 +74,11 @@ async function hashTree(path, root, hash, visited = new Set()) {
 }
 
 export async function cloneDependencies(root, workspace) {
-  const source = join(root, 'node_modules');
+  const sourceLink = join(root, 'node_modules');
   const destination = join(workspace, 'node_modules');
-  const rootReal = await realpath(source).catch(() => null);
-  if (!rootReal) throw new Error('E_CI_SIM_NODE_MODULES_MISSING');
-  const projection = await inspectDependencies(source, rootReal);
+  const source = await realpath(sourceLink).catch(() => null);
+  if (!source) throw new Error('E_CI_SIM_NODE_MODULES_MISSING');
+  const projection = await inspectDependencies(source, source);
   const filesystem = await statfs(workspace);
   const available = filesystem.bavail * filesystem.bsize;
   if (available < (projection.bytes * 2) + 100_000_000) {

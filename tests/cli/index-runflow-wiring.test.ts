@@ -37,8 +37,8 @@ describe('T6E — do/plan-nl index-registration wiring (source scan)', () => {
     expect(indexContent).toMatch(/import\s*\{[^}]*registerPlanNl[^}]*\}\s*from/);
   });
 
-  it('registerDo is called with program (and nothing else) in index.ts', () => {
-    expect(indexContent).toMatch(/registerDo\s*\(\s*program\s*\)/);
+  it('registerDo is called with program as its first argument in index.ts', () => {
+    expect(indexContent).toMatch(/registerDo\s*\(\s*program\s*(?:,|\))/);
   });
 
   it('registerPlanNl is called with program in index.ts', () => {

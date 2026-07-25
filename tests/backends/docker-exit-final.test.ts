@@ -26,6 +26,21 @@ vi.mock('../../src/core/utils.js', () => ({
   debugLog: vi.fn(),
 }));
 
+vi.mock('../../src/core/task-result-settlement.js', () => {
+  return import('../helpers/task-result-settlement-stub.js')
+    .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
+});
+
+vi.mock('../../src/core/execution-landing-checkpoint.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../src/core/execution-landing-checkpoint.js')>()),
+  readExecutionLandingCheckpointByRef: vi.fn(() => null),
+}));
+
+vi.mock('../../src/orchestra/execution-landing-coordinator.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../src/orchestra/execution-landing-coordinator.js')>()),
+  prepareDockerExecutionLanding: vi.fn(({ prompt }: { prompt: string }) => ({ prompt, context: null })),
+}));
+
 // Spread the real constants so newly-added exports (e.g. SPRINT_ACTIVE_FILE,
 // pulled in transitively by the backend's dependency graph) never break this
 // mock; only TASKS_DIR is overridden to keep the sandbox deterministic.
@@ -37,6 +52,10 @@ vi.mock('../../src/core/constants.js', async (importActual) => ({
 import { spawnSync, spawn } from 'node:child_process';
 import { existsSync, writeFileSync, readFileSync, readdirSync, openSync, fsyncSync, closeSync, unlinkSync } from 'node:fs';
 import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
+import {
+  TEST_DOCKER_EXECUTION_OPTIONS,
+  budgetedDockerTaskJson,
+} from '../helpers/budgeted-docker-execution-fixture.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
 const mockSpawn = vi.mocked(spawn);
@@ -48,14 +67,23 @@ const mockOpenSync = vi.mocked(openSync);
 const mockFsyncSync = vi.mocked(fsyncSync);
 const mockCloseSync = vi.mocked(closeSync);
 const mockUnlinkSync = vi.mocked(unlinkSync);
-const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
+const TEST_EXECUTION_OPTIONS = TEST_DOCKER_EXECUTION_OPTIONS;
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
-function createMockDockerWait(): EventEmitter & { stdout: EventEmitter; stderr: EventEmitter } {
-  const child = new EventEmitter() as EventEmitter & { stdout: EventEmitter; stderr: EventEmitter };
+function createMockDockerWait(): EventEmitter & {
+  stdout: EventEmitter;
+  stderr: EventEmitter;
+  kill: ReturnType<typeof vi.fn>;
+} {
+  const child = new EventEmitter() as EventEmitter & {
+    stdout: EventEmitter;
+    stderr: EventEmitter;
+    kill: ReturnType<typeof vi.fn>;
+  };
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
+  child.kill = vi.fn(() => true);
   (child.stderr as EventEmitter & { resume: () => void }).resume = vi.fn();
   return child;
 }
@@ -92,11 +120,22 @@ function setupSpawnMocks(opts?: {
     },
   );
 
-  mockSpawn.mockReturnValue(waitChild as any);
+  const liveLogsChild = createMockDockerWait();
+  const capturedLogsChild = createMockDockerWait();
+  mockSpawn.mockImplementation((_command, args) => {
+    if (args?.[0] === 'wait') return waitChild as any;
+    if (args?.[0] === 'logs' && args?.[1] === '-f') return liveLogsChild as any;
+    if (args?.[0] === 'logs') {
+      queueMicrotask(() => capturedLogsChild.emit('close', 0, null));
+      return capturedLogsChild as any;
+    }
+    throw new Error(`unexpected docker child subcommand: ${String(args?.[0])}`);
+  });
 
   mockExistsSync.mockImplementation((path: unknown) => {
     const p = path as string;
     if (p.endsWith('.result')) return resultFileExists;
+    if (p.endsWith('.partial-result')) return false;
     if (p.endsWith('.timeout')) return false;
     if (p.endsWith('.claude.json')) return false;
     return true;
@@ -118,7 +157,7 @@ function setupSpawnMocks(opts?: {
     if (typeof path === 'string' && path.includes('/proc/version')) {
       return 'Linux version 6.6';
     }
-    return '';
+    return budgetedDockerTaskJson(path);
   });
 
   mockOpenSync.mockReturnValue(42 as any);
@@ -128,6 +167,17 @@ function setupSpawnMocks(opts?: {
   mockUnlinkSync.mockImplementation(() => {});
 
   return waitChild;
+}
+
+async function finishExit(
+  waitChild: ReturnType<typeof createMockDockerWait>,
+  exitCode: number,
+): Promise<void> {
+  waitChild.stdout.emit('data', Buffer.from(`${exitCode}\n`));
+  waitChild.emit('close', 0, null);
+  await vi.waitFor(() => expect(mockSpawnSync.mock.calls.some(
+    call => call[0] === 'docker' && call[1]?.[0] === 'rm',
+  )).toBe(true));
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────
@@ -140,9 +190,11 @@ describe('Docker Worker Exit Pattern Final Fix (Sprint 149)', () => {
     // Bypass the host-side claude auth health-check (Sprint 194 W-AUTH A-1):
     // these tests exercise the container-exit fallback path, which only runs
     // AFTER spawn — without the bypass the pre-spawn auth gate short-circuits
-    // and no container is ever launched. DECKENT_AUTH_SKIP=1 is the documented
-    // test/local escape hatch (worker.ts authHealthCheck).
+    // and no container is ever launched. The bypass requires explicit Vitest
+    // runtime evidence; a lone inherited DECKENT_AUTH_SKIP is not authority.
     vi.stubEnv('DECKENT_AUTH_SKIP', '1');
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('VITEST', 'true');
     backend = new DockerSpawnBackend('/test/project', {
       image: 'test-image:latest',
       timeoutSeconds: 600,
@@ -154,13 +206,13 @@ describe('Docker Worker Exit Pattern Final Fix (Sprint 149)', () => {
     vi.unstubAllEnvs();
   });
 
-  it('should write fallback .result with signal_info when SIGKILL (exit 137) and no result', () => {
+  it('should write fallback .result with signal_info when SIGKILL (exit 137) and no result', async () => {
     const waitChild = setupSpawnMocks();
 
     backend.spawn('exit-137-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
 
     // Simulate container exit with SIGKILL (137 = 128 + 9)
-    waitChild.stdout.emit('data', Buffer.from('137\n'));
+    await finishExit(waitChild, 137);
 
     const resultWriteCalls = mockWriteFileSync.mock.calls.filter(
       (call) => typeof call[0] === 'string' && (call[0] as string).endsWith('.result'),
@@ -178,13 +230,13 @@ describe('Docker Worker Exit Pattern Final Fix (Sprint 149)', () => {
     expect(result.tokenUsage.provider).toBe('claude');
   });
 
-  it('should NOT write fallback .result when worker wrote result normally (exit 0)', () => {
+  it('should NOT write fallback .result when worker wrote result normally (exit 0)', async () => {
     const waitChild = setupSpawnMocks({ resultExistsOnExit: true });
 
     backend.spawn('normal-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
 
     // Normal exit
-    waitChild.stdout.emit('data', Buffer.from('0\n'));
+    await finishExit(waitChild, 0);
 
     const resultWriteCalls = mockWriteFileSync.mock.calls.filter(
       (call) => typeof call[0] === 'string' && (call[0] as string).endsWith('.result'),
@@ -192,20 +244,20 @@ describe('Docker Worker Exit Pattern Final Fix (Sprint 149)', () => {
     expect(resultWriteCalls.length).toBe(0);
   });
 
-  it('should handle SIGTERM gracefully — result written by container EXIT trap, host reconciles to DONE', () => {
+  it('should handle SIGTERM gracefully — result written by container EXIT trap, host reconciles to DONE', async () => {
     const waitChild = setupSpawnMocks({ resultExistsOnExit: true });
 
     mockReadFileSync.mockImplementation((path: unknown) => {
       if (typeof path === 'string' && path.endsWith('.result')) {
         return JSON.stringify({ selfAssessment: 'DONE', taskId: 'sigterm-001' });
       }
-      return '';
+      return budgetedDockerTaskJson(path);
     });
 
     backend.spawn('sigterm-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
 
     // SIGTERM exit (143 = 128 + 15)
-    waitChild.stdout.emit('data', Buffer.from('143\n'));
+    await finishExit(waitChild, 143);
 
     // No fallback result written — container's EXIT trap handled it
     const resultWriteCalls = mockWriteFileSync.mock.calls.filter(
@@ -224,13 +276,13 @@ describe('Docker Worker Exit Pattern Final Fix (Sprint 149)', () => {
     }
   });
 
-  it('should write fallback .result for OOM kill (exit 137) with signal_info', () => {
+  it('should write fallback .result for OOM kill (exit 137) with signal_info', async () => {
     const waitChild = setupSpawnMocks();
 
     backend.spawn('oom-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
 
     // OOM kill → exit 137 (128 + 9 = SIGKILL)
-    waitChild.stdout.emit('data', Buffer.from('137\n'));
+    await finishExit(waitChild, 137);
 
     const resultWriteCalls = mockWriteFileSync.mock.calls.filter(
       (call) => typeof call[0] === 'string' && (call[0] as string).endsWith('.result'),
@@ -247,7 +299,7 @@ describe('Docker Worker Exit Pattern Final Fix (Sprint 149)', () => {
     expect(result.tokenUsage.cacheReadTokens).toBe(0);
   });
 
-  it('should detect partial write (corrupt .result) and overwrite with NO_GO', () => {
+  it('should detect partial write (corrupt .result) and overwrite with NO_GO', async () => {
     // .result exists but contains truncated/corrupt JSON
     const waitChild = setupSpawnMocks({ resultExistsOnExit: true, resultCorrupt: true });
 
@@ -263,6 +315,7 @@ describe('Docker Worker Exit Pattern Final Fix (Sprint 149)', () => {
     mockExistsSync.mockImplementation((path: unknown) => {
       const p = path as string;
       if (p.endsWith('.result')) return !resultDeleted;
+      if (p.endsWith('.partial-result')) return false;
       if (p.endsWith('.timeout')) return false;
       if (p.endsWith('.claude.json')) return false;
       return true;
@@ -278,7 +331,7 @@ describe('Docker Worker Exit Pattern Final Fix (Sprint 149)', () => {
     backend.spawn('partial-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
 
     // Container exits with error
-    waitChild.stdout.emit('data', Buffer.from('1\n'));
+    await finishExit(waitChild, 1);
 
     // Partial write detection: unlinkSync called to remove corrupt file
     const unlinkCalls = mockUnlinkSync.mock.calls.filter(

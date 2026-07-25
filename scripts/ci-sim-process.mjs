@@ -49,6 +49,17 @@ async function waitForClose(child, timeoutMs) {
   ]);
 }
 
+function processGroupAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0 || process.platform === 'win32') return false;
+  try { process.kill(-pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; }
+}
+
+async function waitForProcessGroupExit(pid, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (processGroupAlive(pid) && Date.now() < deadline) await delay(20);
+  return !processGroupAlive(pid);
+}
+
 async function taskkill(pid, force, run = runProcess) {
   const args = ['/PID', String(pid), '/T'];
   if (force) args.push('/F');
@@ -56,24 +67,30 @@ async function taskkill(pid, force, run = runProcess) {
 }
 
 export async function terminateOwnedChild(child, options = {}) {
-  if (childDone(child)) return;
+  if (!child?.pid) return;
+  const pid = child.pid;
   const graceMs = options.graceMs ?? 2_000;
   if (process.platform === 'win32' || options.platform === 'win32') {
-    const soft = await taskkill(child.pid, false, options.runProcess).catch(error => ({ error }));
-    if (!await waitForClose(child, graceMs)) {
-      const forced = await taskkill(child.pid, true, options.runProcess).catch(error => ({ error }));
-      if (!await waitForClose(child, graceMs)) {
+    if (childDone(child)) return;
+    const soft = await taskkill(pid, false, options.runProcess).catch(error => ({ error }));
+    if (soft.code !== 0 || !await waitForClose(child, graceMs)) {
+      const forced = await taskkill(pid, true, options.runProcess).catch(error => ({ error }));
+      if (forced.code !== 0 || !await waitForClose(child, graceMs)) {
         throw new Error(`E_CI_SIM_CHILD_TERMINATION_HOLD:${JSON.stringify({ soft, forced })}`);
       }
     }
     return;
   }
-  try { process.kill(-child.pid, 'SIGTERM'); } catch { /* already gone */ }
-  if (!await waitForClose(child, graceMs)) {
-    try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
-    if (!await waitForClose(child, graceMs)) {
-      throw new Error('E_CI_SIM_CHILD_TERMINATION_HOLD');
-    }
+  if (!childDone(child) || processGroupAlive(pid)) {
+    try { process.kill(-pid, 'SIGTERM'); } catch { /* already gone */ }
+  }
+  const closed = await waitForClose(child, graceMs);
+  const groupExited = await waitForProcessGroupExit(pid, graceMs);
+  if (!closed || !groupExited) {
+    try { process.kill(-pid, 'SIGKILL'); } catch { /* already gone */ }
+    const killedClosed = await waitForClose(child, graceMs);
+    const killedGroup = await waitForProcessGroupExit(pid, graceMs);
+    if (!killedClosed || !killedGroup) throw new Error('E_CI_SIM_CHILD_TERMINATION_HOLD');
   }
 }
 
@@ -121,21 +138,60 @@ export async function spawnGatedRunner(command, args, options) {
   child.stderr?.on('data', chunk => stderr.push(Buffer.from(chunk)));
   const outcome = new Promise((resolvePromise, rejectPromise) => {
     let settled = false;
+    let reportedCode;
+    let protocolError;
+    let finalization;
+    const finalize = () => {
+      if (!finalization) {
+        finalization = terminateOwnedChild(child, { graceMs: 2_000 });
+        finalization.catch(error => {
+          if (!settled) {
+            settled = true;
+            rejectPromise(error);
+          }
+        });
+      }
+      return finalization;
+    };
+    child.on('message', message => {
+      if (message?.type === 'DONE'
+        && Number.isInteger(message.code) && message.code >= 0 && message.code <= 255
+        && reportedCode === undefined && protocolError === undefined) {
+        reportedCode = message.code;
+        void finalize();
+        return;
+      }
+      const detail = message?.type === 'HOLD'
+        ? `HOLD:${String(message.error ?? 'unknown')}`
+        : 'INVALID_OR_CONFLICTING_COMPLETION';
+      protocolError = new Error(`E_CI_SIM_CHILD_COMPLETION_HOLD:${detail}`);
+      void finalize();
+    });
     child.once('error', error => {
       if (!settled) { settled = true; rejectPromise(error); }
     });
     child.once('exit', async (code, signal) => {
       if (settled) return;
       settled = true;
-      const drained = stream => (!stream || stream.readableEnded)
-        ? Promise.resolve()
-        : new Promise(resolveDrain => stream.once('end', resolveDrain));
-      await Promise.all([drained(child.stdout), drained(child.stderr)]);
-      resolvePromise({
-        code: code ?? 1, signal,
-        stdout: Buffer.concat(stdout).toString('utf8'),
-        stderr: Buffer.concat(stderr).toString('utf8'),
-      });
+      try {
+        if (finalization) await finalization;
+        const drained = stream => (!stream || stream.readableEnded)
+          ? Promise.resolve()
+          : new Promise(resolveDrain => stream.once('end', resolveDrain));
+        await Promise.all([drained(child.stdout), drained(child.stderr)]);
+        if (protocolError) throw protocolError;
+        if (reportedCode === undefined && code === 0 && signal === null) {
+          throw new Error('E_CI_SIM_CHILD_COMPLETION_HOLD:MISSING_COMPLETION');
+        }
+        resolvePromise({
+          code: reportedCode ?? code ?? 1,
+          signal: reportedCode === undefined ? signal : null,
+          stdout: Buffer.concat(stdout).toString('utf8'),
+          stderr: Buffer.concat(stderr).toString('utf8'),
+        });
+      } catch (error) {
+        rejectPromise(error);
+      }
     });
   });
   try {

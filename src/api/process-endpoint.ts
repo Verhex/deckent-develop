@@ -76,17 +76,23 @@ export async function registerProcessRoutes(
     // tenant/actor or forge audit lineage.
     const { actor: _clientActor, tenant: _clientTenant, origin: _clientOrigin, ...safe } = ctx;
     void _clientActor; void _clientTenant; void _clientOrigin;
+    let controller: Awaited<ReturnType<typeof buildProcessController>> | null = null;
     try {
-      const controller = await buildProcessController(projectRoot);
+      controller = await buildProcessController(projectRoot);
       const result = await controller.submit({
         ...safe,
         origin: 'api',
         actor: principal,
         ...(principal.tenantId ? { tenant: principal.tenantId } : {}),
       });
+      const completedController = controller;
+      controller = null;
+      completedController.close();
       sendJson(res, result);
     } catch (err) {
       sendJson(res, { error: err instanceof Error ? err.message : String(err) }, 500);
+    } finally {
+      controller?.close();
     }
     return true;
   }

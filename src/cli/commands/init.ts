@@ -341,6 +341,7 @@ function toErrorMessage(error: unknown): string {
 // ─── registerInit — ADR-012 pattern ────────────────────────────────
 
 export function registerInit(program: Command): void {
+  const optionLang = getLanguage();
   program
     .command('init')
     .description('Initialize a new Deckent project')
@@ -353,8 +354,9 @@ export function registerInit(program: Command): void {
     .option('--upgrade', 'Update existing files while preserving user customizations (merge strategy)')
     .option('--force', 'Force overwrite of existing env files without warning')
     .option('--repair', 'Show which init steps failed and how to fix them')
-    .option('-y, --yes', 'Install all missing prerequisites without prompting (CI)')
-    .option('--no-install', 'Detect missing prerequisites but never install them (legacy hint-only)')
+    .option('-y, --yes', getMessage('init.option_yes', optionLang))
+    .option('--install', getMessage('init.option_install', optionLang))
+    .option('--no-install', getMessage('init.option_no_install', optionLang))
     .option('--no-image', 'Skip the opt-in worker Docker image build offer (no prompt)')
     .action(async (options: { auto?: boolean; manual?: boolean; cursor?: boolean; claudeCode?: boolean; env?: string; allEnvs?: boolean; upgrade?: boolean; force?: boolean; repair?: boolean; yes?: boolean; install?: boolean; image?: boolean }) => {
       const root = resolveProjectRoot();
@@ -573,7 +575,11 @@ export function registerInit(program: Command): void {
           const doctorResult = runDoctorChecks(root);
           const missing = collectMissingTools(providers, doctorResult.checks);
           if (missing.length > 0) {
-            const mode = resolveProvisionMode({ yes: options.yes, noInstall: options.install === false });
+            const mode = resolveProvisionMode({
+              yes: options.yes,
+              install: options.install === true,
+              noInstall: options.install === false,
+            });
             if (mode === 'no-install') {
               print(`\n  Missing prerequisites: ${missing.join(', ')} — run 'deckent doctor' for install hints`);
             } else {
@@ -688,4 +694,3 @@ export function registerInit(program: Command): void {
       }
     });
 }
-

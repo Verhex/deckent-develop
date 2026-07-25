@@ -35,9 +35,13 @@ vi.mock('../../src/core/constants.js', async (importOriginal) => {
   return { ...actual, TMUX_SESSION_NAME: 'deckent' };
 });
 
-vi.mock('../../src/core/provider.js', () => ({
-  bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
-}));
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/provider.js')>();
+  return {
+    ...actual,
+    bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
+  };
+});
 
 vi.mock('../../src/cli/commands/doctor.js', () => ({
   runDoctorChecks: vi.fn().mockReturnValue({ checks: [] }),

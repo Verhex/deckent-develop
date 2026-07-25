@@ -53,8 +53,21 @@ vi.mock('../../src/core/config.js', () => ({
   resolveDefaultModel: () => 'claude-sonnet-5',
   resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
+  resolveEffectiveWorkers: () => 8,
   loadConfig: vi.fn(),
 }));
+
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/provider.js')>();
+  return {
+    ...actual,
+    bootstrapProviders: vi.fn().mockResolvedValue({
+      registered: [],
+      skipped: [],
+      defaultProvider: null,
+    }),
+  };
+});
 
 vi.mock('../../src/orchestra/brain.js', () => ({
   planSprint: vi.fn(),
@@ -71,6 +84,7 @@ vi.mock('../../src/cli/helpers/output.js', () => ({
 }));
 
 import { loadConfig } from '../../src/core/config.js';
+import { bootstrapProviders } from '../../src/core/provider.js';
 import { planSprint, readContext } from '../../src/orchestra/brain.js';
 import { resolveProjectRoot } from '../../src/cli/helpers/process.js';
 import { print, printError } from '../../src/cli/helpers/output.js';
@@ -110,7 +124,10 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
     modes: {} as any,
     language: 'en', projectName: 'test', projectRoot: '/mock/root',
     version: '1.0.0', auto_docs: { tier1: true, tier2: true, tier3: false },
-    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
+    execution_budget: {
+      roles: { worker: { default: { maxTurns: 1 } } },
+      landing: { reserve_ratio: 0.25 },
+    },
     ...overrides,
   } as ResolvedConfig;
 }
@@ -208,6 +225,26 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
   });
 
   describe('flag-off — legacy golden-flow path is untouched', () => {
+    it('keeps the provider-free legacy preview available while authority is held', async () => {
+      mockLoadConfig.mockResolvedValue(makeConfig());
+      const authority = {
+        state: 'hold',
+        reasonCode: 'keyring_unavailable',
+        authorityEvidenceRef: `provider-authority:${'b'.repeat(64)}`,
+        retryable: false,
+        close: vi.fn(),
+      } as const;
+
+      await runCommand(['do', 'inspect the widget'], {
+        providerAuthority: authority,
+      });
+
+      expect(output()).toContain('plan preview');
+      expect(bootstrapProviders).not.toHaveBeenCalled();
+      expect(printError).not.toHaveBeenCalled();
+      expect(process.exitCode).toBeUndefined();
+    });
+
     it('never invokes the RunFlow controller factory; legacy confirm/spawnStart seams still drive the run', async () => {
       mockLoadConfig.mockResolvedValue(makeConfig()); // no `terminal` block at all
       const confirm = vi.fn().mockResolvedValue(true);
@@ -239,6 +276,29 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
   });
 
   describe('flag-on — dry-run (no --run): real preview, structural reject, never starts', () => {
+    it('holds configured provider authority before bootstrap/controller/planner work', async () => {
+      mockLoadConfig.mockResolvedValue(makeFlagOnConfig());
+      const controllerFactory = vi.fn();
+      const authority = {
+        state: 'hold',
+        reasonCode: 'keyring_unavailable',
+        authorityEvidenceRef: `provider-authority:${'a'.repeat(64)}`,
+        retryable: false,
+        close: vi.fn(),
+      } as const;
+
+      await runCommand(['do', 'ship the widget exporter'], {
+        providerAuthority: authority,
+        createRunFlowController: controllerFactory,
+      });
+
+      expect(bootstrapProviders).not.toHaveBeenCalled();
+      expect(controllerFactory).not.toHaveBeenCalled();
+      expect(mockPlanSprint).not.toHaveBeenCalled();
+      expect(printError).toHaveBeenCalledWith(expect.stringContaining('keyring_unavailable'));
+      expect(process.exitCode).toBe(1);
+    });
+
     it('prints the real RunFlow preview and rejects — no controller.approve/startApproved, no legacy seam, no DIRECTIVES.md write', async () => {
       mockLoadConfig.mockResolvedValue(makeFlagOnConfig());
       const legacyConfirm = vi.fn();
@@ -308,6 +368,10 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
       const storedSnapshot = loadApprovedSnapshot(tmpRoot, 'flow-1');
       expect(storedSnapshot).toBeDefined();
       expect(storedSnapshot?.sprint.id).toBe('sprint-001');
+      expect(storedSnapshot?.planDigestContext?.executionBudgetPolicy?.landing).toEqual({
+        reserve_ratio: 0.25,
+      });
+      expect(printError).not.toHaveBeenCalled();
       // born-681 tek-yazar: parent disk-handle yazmaz (child persist-before-run).
       expect(loadRunHandle(tmpRoot, 'flow-1')).toBeUndefined();
 

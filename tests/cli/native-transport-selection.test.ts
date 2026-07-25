@@ -22,7 +22,7 @@ describe('resolveNativeSelection — claude', () => {
   const cfg: NativeTransportConfig = {};
 
   it('refuses without an API key (errorCode missing-api-key, no silent fallback)', () => {
-    const r = resolveNativeSelection({ provider: 'claude', model: 'fable' }, { env: emptyEnv, config: cfg });
+    const r = resolveNativeSelection({ provider: 'claude', model: 'claude-fable-5' }, { env: emptyEnv, config: cfg });
     expect(r).toMatchObject({ errorCode: 'missing-api-key', provider: 'claude' });
   });
 
@@ -42,12 +42,20 @@ describe('resolveNativeSelection — claude', () => {
     expect(r.providerName).toBe('claude');
   });
 
-  it("rejects the legacy 'fable' alias at the native execution boundary", () => {
-    const r = resolveNativeSelection(
-      { provider: 'claude', model: 'fable' },
-      { env: { ANTHROPIC_API_KEY: 'k' }, config: cfg },
-    );
-    expect(r).toMatchObject({ errorCode: 'unknown-model', provider: 'claude', detail: 'fable' });
+  it('rejects every legacy alias before provider credential lookup or adapter construction', () => {
+    for (const provider of ['claude', 'openai', 'ollama', 'deepseek', 'qwen', 'glm']) {
+      for (const alias of ['fable', 'opus', 'sonnet', 'haiku', 'gpt-5', 'gpt-5.6']) {
+        const r = resolveNativeSelection(
+          { provider, model: alias },
+          { env: emptyEnv, config: cfg },
+        );
+        expect(r).toMatchObject({
+          errorCode: 'legacy-model-alias',
+          provider,
+          detail: alias,
+        });
+      }
+    }
   });
 
   it('never ships a non-claude model id at the anthropic transport (incident guard)', () => {
@@ -170,9 +178,10 @@ describe('resolveContextBudgetTokens', () => {
 });
 
 describe('inferNativeProviderForModel — bare /model provider inference', () => {
-  it('maps unambiguous claude ids/aliases to claude', () => {
-    for (const m of ['fable', 'opus', 'sonnet', 'haiku', 'claude-fable-5']) {
-      expect(inferNativeProviderForModel(m)).toBe('claude');
+  it('maps canonical Claude IDs but never infers a provider from legacy aliases', () => {
+    expect(inferNativeProviderForModel('claude-fable-5')).toBe('claude');
+    for (const alias of ['fable', 'opus', 'sonnet', 'haiku', 'gpt-5', 'gpt-5.6']) {
+      expect(inferNativeProviderForModel(alias)).toBeNull();
     }
   });
   it('maps name:tag shapes to ollama and gpt/o-series to openai', () => {

@@ -74,6 +74,7 @@ vi.mock('../../src/core/config.js', () => ({
   resolveDefaultModel: () => 'claude-sonnet-5',
   readAuthMode: () => 'subscription',
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',
+  resolveEffectiveWorkers: () => 8,
   loadConfig: vi.fn(),
 }));
 
@@ -114,7 +115,10 @@ function makeConfig(): ResolvedConfig {
     language: 'en', projectName: 'test', projectRoot: '/mock/root',
     version: '1.0.0', auto_docs: { tier1: true, tier2: true, tier3: false },
     terminal: { run_flow_v2: true } as any,
-    execution_budget: { roles: { worker: { default: { maxTurns: 1 } } } },
+    execution_budget: {
+      roles: { worker: { default: { maxTurns: 1 } } },
+      landing: { reserve_ratio: 0.25 },
+    },
   } as ResolvedConfig;
 }
 

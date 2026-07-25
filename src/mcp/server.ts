@@ -2,7 +2,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { resolve } from 'node:path';
+import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DECKENT_VERSION } from '../core/constants.js';
 import { registerTools } from './tools/index.js';
@@ -15,6 +15,10 @@ import { installWriterLeaseReleaseHooks } from './writer-lease.js';
 import { getLanguage } from '../cli/helpers/messages.js';
 import { loadConfig } from '../core/config.js';
 import { modelRegistry, LEGACY_MODEL_ALIASES } from '../core/model-registry.js';
+import type { AttendedExecutionApprovalAuthority } from '../core/attended-execution-approval.js';
+import { bootstrapApprovalAuthority } from '../core/approval-authority-bootstrap.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
+import { openLocalProviderAuthorityRuntimeIfConfigured } from '../providers/provider-authority-runtime-bootstrap.js';
 
 // 454-004: the DIRECTIVES-format example + Parameters reference below must
 // teach an exact provider API ID + explicit provider ownership — never a
@@ -44,7 +48,7 @@ init → set_directives → plan → start → status → review → retro → c
 ## Run Lifecycle
 PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
-## Tools (47)
+## Tools (48)
 - deckent_init: Initialize Deckent in the current project directory
 - deckent_set_directives: Write run goals and task definitions to DIRECTIVES.md
 - deckent_plan: Generate task plan from DIRECTIVES (mode: ai/structured/auto)
@@ -81,6 +85,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 - deckent_autonomous: Autonomous engine control surface (status/start/stop/backlog list-add-approve-reject, cron support)
 - deckent_process: Process-mode execution surface (submit an ExecutionRequest → policy-gated auto-run or park; status/result by executionId — ERP / business automation)
 - deckent_usage: Show token/limit consumption from Claude Code transcripts (model table or run task breakdown + cache-gate)
+- deckent_xverify: Adversarial cross-verify a claim on a different provider (CONFIRMED/REFUTED/UNCLEAR)
 - deckent_cost: Show cost config: budget limits, per-model pricing (input/output per MTok), and today's spend from the resource log
 - deckent_agent_manage: Manage the agent pool: add/remove/promote agents (CLI parity)
 - deckent_skill_manage: Manage the skill pool: add/remove + marketplace list (CLI parity)
@@ -157,7 +162,12 @@ export function initializeNotifyDispatcher(
   });
 }
 
-export function createServer(ctx?: Partial<WriterLeaseGateContext>): McpServer {
+export interface DeckentMcpServerContext extends Partial<WriterLeaseGateContext> {
+  attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+  providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+}
+
+export function createServer(ctx?: DeckentMcpServerContext): McpServer {
   const server = new McpServer(
     { name: 'deckent', version: DECKENT_VERSION },
     { instructions: DECKENT_MCP_INSTRUCTIONS },
@@ -170,9 +180,16 @@ export function createServer(ctx?: Partial<WriterLeaseGateContext>): McpServer {
   };
   installWriterLeaseGate(server, gateCtx);
 
-  registerTools(server);
+  registerTools(server, {
+    ...(ctx?.attendedExecutionApprovalAuthority
+      ? { attendedExecutionApprovalAuthority: ctx.attendedExecutionApprovalAuthority }
+      : {}),
+    ...(ctx?.providerAuthority
+      ? { providerAuthority: ctx.providerAuthority }
+      : {}),
+  });
   // 404-002 + CC follow-up (2026-07-11): deckent_truth registration moved into
-  // registerTools() (tools/index.ts SSOT) — catalog, count (47) and help all
+  // registerTools() (tools/index.ts SSOT) — catalog, derived count and help all
   // derive from the single source again.
   registerResources(server);
 
@@ -190,23 +207,59 @@ export function createServer(ctx?: Partial<WriterLeaseGateContext>): McpServer {
 async function main(): Promise<void> {
   const root = process.cwd();
   let lang = 'en';
+  let attendedExecutionApprovalAuthority: AttendedExecutionApprovalAuthority | undefined;
+  let providerAuthority: ProviderAuthorityRuntimeServiceOpenResult | undefined;
   try {
     const config = await loadConfig(root);
     lang = getLanguage(config.language);
+    providerAuthority = openLocalProviderAuthorityRuntimeIfConfigured(root, config);
+    const approvalAuthority = bootstrapApprovalAuthority(root, config);
+    if (approvalAuthority.state === 'ready') {
+      attendedExecutionApprovalAuthority =
+        approvalAuthority.runtime.attendedExecutionApprovalAuthority;
+    }
   } catch {
     // default 'en' — config load is best-effort for the denial locale
   }
+  if (providerAuthority) {
+    process.on('exit', () => {
+      try { providerAuthority?.close(); } catch { /* process-exit best effort */ }
+    });
+  }
   installWriterLeaseReleaseHooks(root);
-  const server = createServer({ projectRoot: root, lang });
+  const server = createServer({
+    projectRoot: root,
+    lang,
+    ...(attendedExecutionApprovalAuthority
+      ? { attendedExecutionApprovalAuthority }
+      : {}),
+    ...(providerAuthority ? { providerAuthority } : {}),
+  });
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
 
-const isEntryPoint =
-  process.argv[1] !== undefined &&
-  resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1]);
+/**
+ * Decide whether this module is the invoked executable, resolving npm-style
+ * binary symlinks to the same filesystem identity as the module URL.
+ *
+ * @param moduleUrl - The current module's `import.meta.url`.
+ * @param argvPath - The executable path supplied in `process.argv[1]`.
+ * @returns Whether both paths resolve to the same existing filesystem object.
+ */
+export function isMcpEntryPoint(
+  moduleUrl: string,
+  argvPath: string | undefined,
+): boolean {
+  if (argvPath === undefined) return false;
+  try {
+    return realpathSync(fileURLToPath(moduleUrl)) === realpathSync(argvPath);
+  } catch {
+    return false;
+  }
+}
 
-if (isEntryPoint) {
+if (isMcpEntryPoint(import.meta.url, process.argv[1])) {
   main().catch((err: unknown) => {
     process.stderr.write(`deckent-mcp error: ${err instanceof Error ? err.message : String(err)}\n`);
     process.exit(1);

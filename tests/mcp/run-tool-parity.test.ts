@@ -36,7 +36,7 @@ vi.mock('../../src/orchestra/sprint-controller.js', () => ({
 }));
 
 vi.mock('../../src/core/config.js', () => ({
-  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
+  resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
 }));
@@ -84,7 +84,10 @@ import { resolveReasoningEffort } from '../../src/core/reasoning-effort.js';
 
 const REMOTE_WORKER_CONFIG = {
   spawn_backend: 'subprocess',
-  execution_budget: { roles: { worker: { default: { maxTurns: 4 } } } },
+  execution_budget: {
+    roles: { worker: { default: { maxTurns: 4 } } },
+    landing: { reserve_ratio: 0.25 },
+  },
 } as const;
 
 // ─── Mock Server ────────────────────────────────────────────────────
@@ -146,21 +149,21 @@ describe('deckent_run MCP — modelEffort/timeoutMs/keep parity (269-004)', () =
 
   it('forwards modelEffort to the spawnWorkerMultiProvider opts (spawn wire)', async () => {
     const handler = await getHandler(server);
-    await handler({ description: 'fix a bug', model: 'sonnet', modelEffort: 'xhigh', autoApprove: true });
+    await handler({ description: 'fix a bug', model: 'claude-sonnet-5', modelEffort: 'xhigh', autoApprove: true });
 
     expect(spawnOpts()['modelEffort']).toBe('xhigh');
   });
 
   it('sets task.modelEffort in the written task JSON (ExecutionRequest path)', async () => {
     const handler = await getHandler(server);
-    await handler({ description: 'fix a bug', model: 'sonnet', modelEffort: 'high', autoApprove: true });
+    await handler({ description: 'fix a bug', model: 'claude-sonnet-5', modelEffort: 'high', autoApprove: true });
 
     expect(writtenTaskJson()['modelEffort']).toBe('high');
   });
 
   it('omitted modelEffort → undefined at spawn and absent from the task JSON (no behavior change)', async () => {
     const handler = await getHandler(server);
-    await handler({ description: 'fix a bug', model: 'sonnet', autoApprove: true });
+    await handler({ description: 'fix a bug', model: 'claude-sonnet-5', autoApprove: true });
 
     expect(spawnOpts()['modelEffort']).toBeUndefined();
     expect(writtenTaskJson()['modelEffort']).toBeUndefined();
@@ -168,7 +171,7 @@ describe('deckent_run MCP — modelEffort/timeoutMs/keep parity (269-004)', () =
 
   it('forwards an invalid modelEffort raw to spawn without erroring (validation lives in spawn, CLI parity)', async () => {
     const handler = await getHandler(server);
-    const result = await handler({ description: 'fix a bug', model: 'sonnet', modelEffort: 'bogus-level', autoApprove: true });
+    const result = await handler({ description: 'fix a bug', model: 'claude-sonnet-5', modelEffort: 'bogus-level', autoApprove: true });
 
     expect(result.isError).not.toBe(true);
     // Raw forward — spawnWorkerMultiProvider resolves it via resolveReasoningEffort
@@ -186,13 +189,13 @@ describe('deckent_run MCP — modelEffort/timeoutMs/keep parity (269-004)', () =
 
   it('echoes timeoutMs in the response and defaults to 300000 (CLI --timeout parity)', async () => {
     const handler = await getHandler(server);
-    const res = await handler({ description: 'fix a bug', model: 'sonnet', timeoutMs: 60_000, autoApprove: true });
+    const res = await handler({ description: 'fix a bug', model: 'claude-sonnet-5', timeoutMs: 60_000, autoApprove: true });
     expect(JSON.parse(res.content[0]!.text).timeoutMs).toBe(60_000);
 
     vi.clearAllMocks();
     vi.mocked(loadConfig).mockResolvedValue(REMOTE_WORKER_CONFIG as never);
     vi.mocked(spawnWorkerMultiProvider).mockResolvedValue({ backend: 'subprocess' } as never);
-    const resDefault = await handler({ description: 'fix a bug', model: 'sonnet', autoApprove: true });
+    const resDefault = await handler({ description: 'fix a bug', model: 'claude-sonnet-5', autoApprove: true });
     expect(JSON.parse(resDefault.content[0]!.text).timeoutMs).toBe(300_000);
   });
 
@@ -200,7 +203,7 @@ describe('deckent_run MCP — modelEffort/timeoutMs/keep parity (269-004)', () =
     vi.mocked(waitForRunResult).mockResolvedValue({ taskId: 'x', selfAssessment: 'DONE' } as never);
 
     const handler = await getHandler(server);
-    const res = await handler({ description: 'fix a bug', model: 'sonnet', keep: false, timeoutMs: 45_000, autoApprove: true });
+    const res = await handler({ description: 'fix a bug', model: 'claude-sonnet-5', keep: false, timeoutMs: 45_000, autoApprove: true });
     expect(JSON.parse(res.content[0]!.text).keep).toBe(false);
 
     await vi.waitFor(() => {
@@ -216,7 +219,7 @@ describe('deckent_run MCP — modelEffort/timeoutMs/keep parity (269-004)', () =
 
   it('keep omitted (MCP default: preserve) → no watcher, no cleanup', async () => {
     const handler = await getHandler(server);
-    const res = await handler({ description: 'fix a bug', model: 'sonnet', autoApprove: true });
+    const res = await handler({ description: 'fix a bug', model: 'claude-sonnet-5', autoApprove: true });
     expect(JSON.parse(res.content[0]!.text).keep).toBe(true);
 
     // flush microtasks — a watcher (if wrongly started) would have fired by now
@@ -229,7 +232,7 @@ describe('deckent_run MCP — modelEffort/timeoutMs/keep parity (269-004)', () =
     vi.mocked(waitForRunResult).mockResolvedValue(null); // timeout — no result
 
     const handler = await getHandler(server);
-    await handler({ description: 'fix a bug', model: 'sonnet', keep: false, autoApprove: true });
+    await handler({ description: 'fix a bug', model: 'claude-sonnet-5', keep: false, autoApprove: true });
 
     await vi.waitFor(() => {
       expect(vi.mocked(waitForRunResult)).toHaveBeenCalledOnce();

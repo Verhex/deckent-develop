@@ -78,4 +78,34 @@ describe('formatRunFlowDoPreview — scope-gate rendering (452-003)', () => {
     expect(scopeGateIdx).toBeGreaterThan(-1);
     expect(digestIdx).toBeGreaterThan(scopeGateIdx);
   });
+
+  it('renders the shared structural topology before the digest', () => {
+    const labels = buildPlanPreviewCardLabels('en');
+    const preview = makePreview({
+      topologyGateResult: 'fail',
+      topology: {
+        schemaVersion: 1,
+        configuredMaxWorkers: 8,
+        effectiveConcurrency: 1,
+        taskSlots: [1, 2],
+        collisions: [{ path: 'src/shared.ts', key: 'src/shared.ts', writerSlots: [1, 2], declared: false }],
+        authoredEdges: [],
+        syntheticEdges: [{ from: 1, to: 2, source: 'collision', paths: ['src/shared.ts'] }],
+        effectiveEdges: [{ from: 1, to: 2, source: 'collision', paths: ['src/shared.ts'] }],
+        waves: [{ wave: 1, slots: [1] }, { wave: 2, slots: [2] }],
+        findings: [{
+          code: 'undeclared-writer-collision',
+          severity: 'block',
+          slots: [1, 2],
+          path: 'src/shared.ts',
+        }],
+        verdict: 'block',
+      },
+    });
+    const text = formatRunFlowDoPreview(preview, true, 'en');
+
+    expect(text).toContain(labels.topologyBlockLabel);
+    expect(text).toContain('src/shared.ts [1,2]');
+    expect(text.indexOf(labels.digestLabel)).toBeGreaterThan(text.indexOf(labels.topologyBlockLabel));
+  });
 });

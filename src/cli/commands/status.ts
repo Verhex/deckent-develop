@@ -136,13 +136,21 @@ export function loadTaskFiles(root: string): Task[] {
   const tasksDir = join(root, TASKS_DIR);
   if (!existsSync(tasksDir)) return [];
   const files = readdirSync(tasksDir).filter(
-    (f) => f.startsWith('task-') && f.endsWith('.json'),
+    (f) => /^task-[\w-]+\.json$/.test(f),
   );
   const tasks: Task[] = [];
   for (const f of files) {
     try {
-      const data = JSON.parse(readFileSync(join(tasksDir, f), 'utf-8')) as Task;
-      tasks.push(data);
+      const parsed: unknown = JSON.parse(readFileSync(join(tasksDir, f), 'utf-8'));
+      if (typeof parsed !== 'object' || parsed === null) continue;
+      const data = parsed as Partial<Task>;
+      if (
+        typeof data.id !== 'string'
+        || f !== `task-${data.id}.json`
+        || typeof data.title !== 'string'
+        || typeof data.status !== 'string'
+      ) continue;
+      tasks.push(data as Task);
     } catch {
       // Skip malformed task files
     }

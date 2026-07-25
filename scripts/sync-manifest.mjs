@@ -26,6 +26,7 @@ const rootIdx = args.indexOf('--root');
 const projectRoot = rootIdx !== -1 && args[rootIdx + 1]
   ? resolve(args[rootIdx + 1])
   : process.cwd();
+const manifestPath = join(projectRoot, '.deckent', 'settings', 'features-manifest.json');
 
 // ─── Feature definitions ───────────────────────────────────────────────────
 // Each feature maps to one or more source files and has categorization hints.
@@ -217,9 +218,9 @@ const TRUTH_DEFINITIONS = [
   {
     id: 'routing-decision-journal',
     label: 'Routing decision journal (born-622/641)',
-    entryModule: 'src/core/routing-engine.ts',
-    exportName: 'routeTaskV2',
-    prodCallsitePattern: 'routeTaskV2\\(',
+    entryModule: 'src/core/routing/route-task-v3.ts',
+    exportName: 'routeTaskV3',
+    prodCallsitePattern: 'routeTaskV3\\(',
   },
   {
     id: 'prompt-gate-block',
@@ -307,6 +308,20 @@ function detectCurrentSprint() {
     }
   } catch { /* ignore */ }
 
+  // A clean checkout or isolated worktree intentionally has no runtime config
+  // or numeric task artefacts. Preserve valid last-known generated provenance
+  // instead of degrading durable metadata to the fabricated current value
+  // "unknown". This is historical metadata, not an active-sprint claim.
+  try {
+    if (existsSync(manifestPath)) {
+      const previous = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+      const previousSprintId = previous?._meta?.sprintId;
+      if (typeof previousSprintId === 'string' && /^sprint-\d+$/.test(previousSprintId)) {
+        return previousSprintId;
+      }
+    }
+  } catch { /* malformed/missing prior manifest has no provenance authority */ }
+
   return 'unknown';
 }
 
@@ -314,17 +329,11 @@ function detectCurrentSprint() {
  * Get list of recent sprint IDs for sourceAnalysis metadata.
  */
 function getRecentSprints() {
-  try {
-    const configPath = join(projectRoot, '.deckent', 'config.json');
-    if (existsSync(configPath)) {
-      const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-      const lastNum = parseInt(config.last_sprint_id?.replace('sprint-', '') || '0', 10);
-      if (lastNum > 0) {
-        const start = Math.max(1, lastNum - 9);
-        return Array.from({ length: lastNum - start + 1 }, (_, i) => `sprint-${start + i}`);
-      }
-    }
-  } catch { /* ignore */ }
+  const lastNum = Number.parseInt(detectCurrentSprint().replace('sprint-', ''), 10);
+  if (lastNum > 0) {
+    const start = Math.max(1, lastNum - 9);
+    return Array.from({ length: lastNum - start + 1 }, (_, i) => `sprint-${start + i}`);
+  }
   return ['unknown'];
 }
 
@@ -363,7 +372,6 @@ if (dryRun || outputJson) {
   }
 } else {
   // Write manifest
-  const manifestPath = join(projectRoot, '.deckent', 'settings', 'features-manifest.json');
   mkdirSync(join(projectRoot, '.deckent', 'settings'), { recursive: true });
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
   console.log(`✓ Features manifest written: ${manifestPath} (${totalFeatures} features)`);
