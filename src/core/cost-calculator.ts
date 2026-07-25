@@ -92,6 +92,9 @@ export interface SprintCostEstimate {
 
   warnings: string[];
   recommendations: string[];
+  /** Exact remote model IDs that had no trusted price evidence. Their work is
+   *  intentionally excluded from numeric totals; cost-gate treats this as HOLD. */
+  unpricedModels: string[];
 
   /** Per-task detail for debugging */
   taskDetails?: Array<{
@@ -515,14 +518,29 @@ function calculateTaskCost(
   options: Required<Pick<EstimateOptions, 'cacheHitRatio' | 'retryMultiplier' | 'cacheableContextTokens'>>,
 ): TaskCostResult | null {
   const found = findModel(config, task.model);
-  if (!found) return null;
+  const dynamic = found ? undefined : modelRegistry.get(task.model);
+  if (!found && (!dynamic || typeof dynamic.pricingEvidenceRef !== 'string'
+    || dynamic.pricingEvidenceRef.length === 0)) return null;
 
-  const { provider, modelId, pricing } = found;
+  const provider = found?.provider ?? dynamic!.provider;
+  const modelId = found?.modelId ?? dynamic!.id;
+  const pricing: ModelPricing = found?.pricing ?? {
+    input_cost_per_token: dynamic!.costPerMillion.input / 1_000_000,
+    output_cost_per_token: dynamic!.costPerMillion.output / 1_000_000,
+    max_input_tokens: dynamic!.contextWindow,
+    max_output_tokens: dynamic!.maxOutputTokens,
+    supports_prompt_caching: false,
+    enabled: true,
+    _source: dynamic!.pricingEvidenceRef,
+  };
   const providerConfig = config.providers[provider];
-  if (!providerConfig || !providerConfig.enabled) return null;
+  if (found && (!providerConfig || !providerConfig.enabled)) return null;
 
   const billingMode: BillingMode =
-    task.billingMode ?? providerConfig.default_billing_mode ?? providerConfig.billing_modes_supported[0] ?? 'api';
+    task.billingMode
+      ?? providerConfig?.default_billing_mode
+      ?? providerConfig?.billing_modes_supported[0]
+      ?? (provider === 'ollama' ? 'local' : 'api');
 
   const incrementalInput = task.estimatedInputTokens;
   const output =
@@ -762,6 +780,7 @@ export function estimateSprintCost(
     percentOfBudget,
     warnings,
     recommendations,
+    unpricedModels: [...unknownModels],
     taskDetails: options.includeDetails ? taskDetails : undefined,
   };
 }

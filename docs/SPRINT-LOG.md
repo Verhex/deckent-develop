@@ -11124,3 +11124,102 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 452-005: TERM-slice integration verify and real-binary dry-run proof (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 453 — sprint-453
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-20
+**Duration:** 1861s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1861055ms |
+
+### Tasks
+
+- 453-001: Canonical CLI and MCP one-shot execution boundary (DONE)
+
+---
+## Sprint 454 — sprint-454
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-20
+**Duration:** 1512s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 3 |
+| Tech Debt | 2 |
+| No-Go | 2 |
+| Coverage | NaN% |
+| Duration | 1511720ms |
+
+### Tasks
+
+- 454-001: Canonical equivalence and tier selection (NOT_DISPATCHED)
+- 454-002: Parametric agent model front doors (GO_WITH_TECH_DEBT)
+- 454-003: Canonical autonomous and task-mode producers (NO_GO)
+- 454-004: Canonical generated templates and MCP directives (DONE)
+- 454-005: Canonical estimation, reconciliation, and token-cost keys (NO_GO)
+- 454-006: Remove gpt-5 alias and canonicalize Codex/subscription wire (GO_WITH_TECH_DEBT)
+- 454-007: Role-aware provider fallback resolution contract (NOT_DISPATCHED)
+- 454-008: Docker Worker and Auditor fallback truth hardening (NOT_DISPATCHED)
+
+---
+## Sprint 455 — sprint-455
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-20
+**Duration:** 2490s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2489710ms |
+
+### Tasks
+
+- 455-001: Crash-safe resume and recovery command truth (GO_WITH_TECH_DEBT)
+- 455-002: Evaluator rubric and recovered-result provenance truth (DONE)
+- 455-003: Docker preflight, timeout attribution, and terminal lifecycle truth (GO_WITH_TECH_DEBT)
+
+---
+## Sprint 456 — sprint-456
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-23
+**Duration:** 307s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 3 |
+| Coverage | 0.0% |
+| Duration | 306504ms |
+
+### Tasks
+
+- 456-001: Docker auth and provider-image fixture budget parity (NO_GO)
+- 456-002: Scheduler, adapter, MCP and pricing fixture admission parity (NO_GO)
+- 456-003: CLI dry-run and color hermeticity contract (NO_GO)
+
+---

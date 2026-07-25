@@ -88,7 +88,7 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     id,
     title: `Task ${id}`,
     description: `sched5 ${id}`,
-    model: 'sonnet',
+    model: 'claude-sonnet-5',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'sched5-test',
@@ -99,6 +99,7 @@ function makeTask(id: string, overrides: Partial<Task> = {}): Task {
     sprintId: 'sprint-sched5',
     assignedAgent: 'generic',
     assignedSkills: [],
+    budget: { maxTurns: 1 },
     ...overrides,
   } as Task;
 }
@@ -128,6 +129,7 @@ function makeMockBackend(log?: string[]): SpawnBackend & { calls: MockSpawnCall[
   const calls: MockSpawnCall[] = [];
   return {
     name: 'mock-backend',
+    liveUsageBudgetSupport: 'measured-stream',
     spawn(taskId, model, prompt, opts) {
       calls.push({ taskId, model: model as unknown as string, prompt, opts });
       log?.push(`spawn:${taskId}`);
@@ -209,6 +211,20 @@ describe('createSchedulerDriver — legacy engine (default): pure passthrough', 
     // The driver itself never spawns — everything happens inside runLegacyTick,
     // which this test's closures leave empty of any backend call.
     expect(backend.calls).toHaveLength(0);
+  });
+
+  it('does not invoke the legacy initial tick while the live cost gate is on HOLD', async () => {
+    const sprint = makeSprint([makeTask('cost-held')]);
+    const backend = makeMockBackend();
+    const deps = buildDeps(sprint, backend);
+    deps.getCostStop = () => true;
+    const driver = createSchedulerDriver('legacy', deps);
+    const runLegacyTick = vi.fn(async () => undefined);
+
+    const result = await driver({ trigger: 'initial', completedTaskIds: [], runLegacyTick });
+
+    expect(runLegacyTick).not.toHaveBeenCalled();
+    expect(result).toEqual({ engine: 'legacy', spawnedTaskIds: [], killedWorkerIds: [] });
   });
 
   it('is selected for every engine value other than the literal "reducer" (config absent, {}, and "reducer" typo)', async () => {
@@ -421,49 +437,72 @@ describe('waitForResults — SCHED5 live wiring: initial tick spawns via the inj
 
   it('legacy engine (config.scheduler absent — default): dispatchReadyTasks spawns the dependency-ready task', async () => {
     const { sprint, readyTask } = buildFixture();
+    const backend = makeMockBackend();
     const config = {
       dependency_pipeline_enabled: true,
       activeModeConfig: { max_workers: 3, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: true },
     } as unknown as ResolvedConfig;
 
-    await waitForResults(root, sprint, 300, undefined, undefined, undefined, config);
+    await waitForResults(root, sprint, 300, undefined, { spawnBackend: backend }, undefined, config);
 
-    expect(vi.mocked(spawnWorker)).toHaveBeenCalledWith(
-      '705-001', expect.any(String), expect.any(String), root, expect.any(Object),
-    );
+    expect(backend.calls.map(call => call.taskId)).toContain('705-001');
+    expect(vi.mocked(spawnWorker)).not.toHaveBeenCalled();
     expect(readyTask.status).toBe(TaskStatus.EXECUTING);
   });
 
-  it('reducer engine (config.scheduler.engine="reducer"): the injected driver spawns the same task via the same tmux path', async () => {
+  it('reducer engine (config.scheduler.engine="reducer"): the injected driver spawns the same task via the same measured backend', async () => {
     const { sprint, readyTask } = buildFixture();
+    const backend = makeMockBackend();
     const config = {
       dependency_pipeline_enabled: true,
       scheduler: { engine: 'reducer' },
       activeModeConfig: { max_workers: 3, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: true },
     } as unknown as ResolvedConfig;
 
-    await waitForResults(root, sprint, 300, undefined, undefined, undefined, config);
+    await waitForResults(root, sprint, 300, undefined, { spawnBackend: backend }, undefined, config);
 
-    expect(vi.mocked(spawnWorker)).toHaveBeenCalledWith(
-      '705-001', expect.any(String), expect.any(String), root, expect.any(Object),
-    );
+    expect(backend.calls.map(call => call.taskId)).toContain('705-001');
+    expect(vi.mocked(spawnWorker)).not.toHaveBeenCalled();
     expect(readyTask.status).toBe(TaskStatus.EXECUTING);
   });
 
   it('does not touch the live dogfood default: a config with no scheduler block at all behaves exactly like the explicit legacy case', async () => {
     const { sprint, readyTask } = buildFixture();
+    const backend = makeMockBackend();
     const config = {
       dependency_pipeline_enabled: true,
       activeModeConfig: { max_workers: 3, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: true },
     } as unknown as ResolvedConfig;
     expect((config as { scheduler?: unknown }).scheduler).toBeUndefined();
 
-    await waitForResults(root, sprint, 300, undefined, undefined, undefined, config);
+    await waitForResults(root, sprint, 300, undefined, { spawnBackend: backend }, undefined, config);
 
-    expect(vi.mocked(spawnWorker)).toHaveBeenCalledWith(
-      '705-001', expect.any(String), expect.any(String), root, expect.any(Object),
-    );
+    expect(backend.calls.map(call => call.taskId)).toContain('705-001');
+    expect(vi.mocked(spawnWorker)).not.toHaveBeenCalled();
     expect(readyTask.status).toBe(TaskStatus.EXECUTING);
+  });
+
+  it('timeout without provider usage evidence HOLDs the initial legacy dispatch', async () => {
+    const timedOut = makeTask('705-timeout', { status: TaskStatus.EXECUTING });
+    const pending = makeTask('705-after-timeout');
+    const sprint = makeSprint([timedOut, pending]);
+    const backend = makeMockBackend();
+    writeFileSync(join(root, '.tasks', 'task-705-timeout.timeout'), 'WORKER_TIMEOUT', 'utf-8');
+    const config = {
+      dependency_pipeline_enabled: true,
+      activeModeConfig: {
+        max_workers: 3,
+        brain_model: 'claude-opus-4-8',
+        default_model: 'claude-sonnet-5',
+        haiku_allowed: true,
+      },
+    } as unknown as ResolvedConfig;
+
+    await waitForResults(root, sprint, 50, undefined, { spawnBackend: backend }, undefined, config);
+
+    expect(backend.calls).toHaveLength(0);
+    expect(vi.mocked(spawnWorker)).not.toHaveBeenCalled();
+    expect(pending.status).not.toBe(TaskStatus.EXECUTING);
   });
 });
 

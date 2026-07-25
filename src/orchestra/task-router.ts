@@ -97,7 +97,7 @@ function isProviderName(value: string): value is ProviderName {
 
 /**
  * Infer provider from a model identifier.
- * @param model - A model name (e.g., 'opus', 'gpt-5', 'gemini-2.5-pro')
+ * @param model - An exact model API ID (e.g., 'claude-opus-4-8', 'gpt-5.6-sol')
  * @returns The provider name, or undefined if model is not recognized
  */
 function inferProviderFromModel(model: ModelType | string): ProviderName | undefined {

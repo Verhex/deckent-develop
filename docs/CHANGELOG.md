@@ -9,6 +9,52 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint456] - 2026-07-23
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 3 total, 0 done, 0 tech debt, 3 no-go_
+
+## [1.0.0-beta.1-sprint455] - 2026-07-20
+
+### Added
+
+- Evaluator rubric and recovered-result provenance truth
+
+### Changed
+
+- Crash-safe resume and recovery command truth (completed with tech debt)
+- Docker preflight, timeout attribution, and terminal lifecycle truth (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 2 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint454] - 2026-07-20
+
+### Added
+
+- Canonical generated templates and MCP directives
+
+### Changed
+
+- Parametric agent model front doors (completed with tech debt)
+- Remove gpt-5 alias and canonicalize Codex/subscription wire (completed with tech debt)
+
+
+_Tasks: 8 total, 3 done, 2 tech debt, 2 no-go_
+
+## [1.0.0-beta.1-sprint453] - 2026-07-20
+
+### Added
+
+- Canonical CLI and MCP one-shot execution boundary
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint452] - 2026-07-19
 
 ### Added

@@ -58,6 +58,39 @@ describe('W0 status truth-gate — COMPLETE dashboard never renders as live', ()
   });
 });
 
+describe('455-003 terminal-lifecycle truth — parked/FIXING never renders as completed', () => {
+  it('a PAUSED (parked after a FIX spawn failure) dashboard does NOT print "completed"', () => {
+    // sprint-controller parks the sprint at status=PAUSED / phase=FIX after a FIX
+    // spawn/preflight failure. The human surface must show it is NOT complete.
+    const out = formatHumanStatus({
+      dashboard: makeDashboard(
+        { phase: SprintPhase.FIX, status: SprintStatus.PAUSED },
+        { done: 1, active: 0, blocked: 0, total: 8 },
+      ),
+      tasks: [],
+      projectRoot: '/tmp/nonexistent-w0',
+      nowMs: Date.parse('2026-07-06T12:30:00.000Z'),
+    });
+    expect(out.toLowerCase()).not.toContain('completed');
+    // Honest non-complete view — real progress, zero live workers claimed.
+    expect(out).toContain('Progress: 1/8');
+    expect(out).toContain('Active: 0 workers');
+  });
+
+  it('a FIXING dashboard is not rendered as completed either (no false Complete mid-FIX)', () => {
+    const out = formatHumanStatus({
+      dashboard: makeDashboard(
+        { phase: SprintPhase.FIX, status: SprintStatus.FIXING },
+        { done: 2, active: 0, blocked: 0, total: 8 },
+      ),
+      tasks: [],
+      projectRoot: '/tmp/nonexistent-w0',
+      nowMs: Date.parse('2026-07-06T12:30:00.000Z'),
+    });
+    expect(out.toLowerCase()).not.toContain('completed');
+  });
+});
+
 describe('W0 isDashboardOrphaned — crash-case staleness oracle', () => {
   const base = makeDashboard({ phase: SprintPhase.EXECUTE, status: SprintStatus.ACTIVE });
   const updated = Date.parse('2026-07-06T12:25:12.779Z');

@@ -18,7 +18,18 @@ import { createDefaultConfig } from './config.js';
 import { structuredLog } from './observability.js';
 import type { DeckentConfig } from './types.js';
 import type { ModelTier } from './model-equivalence.js';
-import type { ProviderName } from './task-types.js';
+import { canonicalizeProviderConfigAliases } from './provider-config-canonicalizer.js';
+import { canonicalizeModelConfigAliases, hasLegacyModelConfigAliases } from './model-config-canonicalizer.js';
+import { DeckentError } from './errors.js';
+import { getLegacyModelMigration, modelRegistry } from './model-registry.js';
+
+function replaceObjectContents(
+  target: Record<string, unknown>,
+  replacement: Readonly<Record<string, unknown>>,
+): void {
+  for (const key of Object.keys(target)) delete target[key];
+  Object.assign(target, replacement);
+}
 
 export interface MigrationResult {
   /** Whether any fields were added */
@@ -149,6 +160,7 @@ export function getMissingFields(existing: Record<string, unknown>): string[] {
  * Check whether a config file needs migration (has missing fields).
  */
 export function needsMigration(existing: Record<string, unknown>): boolean {
+  if (hasLegacyModelConfigAliases(existing)) return true;
   if (getMissingFields(existing).length > 0) return true;
   // Legacy mode names need migration
   const legacyModes = ['max_plan', 'max5x_plan', 'pro_plan'];
@@ -166,13 +178,10 @@ export function needsMigration(existing: Record<string, unknown>): boolean {
  */
 export function hasDuplicateKeys(existing: Record<string, unknown>): boolean {
   if (existing['spawn_backend'] !== undefined && existing['claude_backend'] !== undefined) return true;
-  const providers = existing['providers'] as Record<string, unknown> | undefined;
-  if (providers) {
-    if (providers['brain'] !== undefined && existing['brain_provider'] !== undefined) return true;
-    if (providers['worker'] !== undefined && existing['worker_provider'] !== undefined) return true;
-    if (providers['fallback'] !== undefined && existing['fallback_provider'] !== undefined) return true;
-  }
-  return false;
+  return existing['brain_provider'] !== undefined
+    || existing['worker_provider'] !== undefined
+    || existing['fallback_provider'] !== undefined
+    || existing['provider_overrides'] !== undefined;
 }
 
 /**
@@ -215,6 +224,15 @@ export function migrateConfig(
     };
   }
 
+  // Validate all provider aliases before any migration mutates the parsed
+  // object. A conflicting dual definition is authored ambiguity, not a
+  // precedence choice migration may make for the user.
+  const providerCanonicalization = canonicalizeProviderConfigAliases(existing, 'migration');
+  replaceObjectContents(existing, providerCanonicalization.config);
+  const removedProviderAliases = providerCanonicalization.changes.map((change) => change.flatKey);
+  const modelCanonicalization = canonicalizeModelConfigAliases(existing, 'migration');
+  replaceObjectContents(existing, modelCanonicalization.config);
+
   // Rename legacy mode names to canonical names BEFORE checking missing fields
   const LEGACY_MODE_MAP: Record<string, string> = {
     max_plan: 'performance',
@@ -223,7 +241,10 @@ export function migrateConfig(
   };
 
   let legacyRenamed = false;
-  const renamedFields: string[] = [];
+  const renamedFields: string[] = modelCanonicalization.changes.map(
+    (change) => `${change.path}: ${change.from} → ${change.to}`,
+  );
+  if (modelCanonicalization.changes.length > 0) legacyRenamed = true;
 
   // Migrate top-level mode field
   if (typeof existing['mode'] === 'string' && LEGACY_MODE_MAP[existing['mode']]) {
@@ -266,7 +287,7 @@ export function migrateConfig(
 
   // Sprint 150 Decision 3+4: Remove duplicate keys (claude_backend, flat provider fields)
   // This is destructive — it DELETES keys from `existing`, so must run before getMissingFields.
-  const removedDuplicates = removeDuplicateKeys(existing);
+  const removedDuplicates = [...removedProviderAliases, ...removeDuplicateKeys(existing)];
 
   const missingFields = getMissingFields(existing);
 
@@ -394,8 +415,9 @@ export function migrateConfigInMemory(
   existing: Record<string, unknown>,
 ): { config: DeckentConfig; addedFields: string[] } {
   const defaults = createDefaultConfig() as unknown as Record<string, unknown>;
-  const missingFields = getMissingFields(existing);
-  const merged = { ...existing };
+  const canonicalized = canonicalizeModelConfigAliases(existing, 'migration').config;
+  const missingFields = getMissingFields(canonicalized);
+  const merged = { ...canonicalized };
 
   for (const field of missingFields) {
     if (field.startsWith('modes.')) {
@@ -452,25 +474,15 @@ export function migrateConfigFull(
  * Used during config migration to convert brain_model / default_model to tier-based config.
  */
 export function modelToTier(model: string): ModelTier {
-  switch (model) {
-    case 'opus':
-    case 'gpt-5':
-    case 'gemini-2.5-pro':
-      return 'premium';
-    case 'sonnet':
-    case 'gpt-4.1':
-    case 'o3':
-    case 'gemini-2.5-flash':
-      return 'standard';
-    case 'haiku':
-    case 'gpt-5-mini':
-    case 'gpt-4.1-mini':
-    case 'o4-mini':
-    case 'gemini-2.0-flash':
-      return 'economy';
-    default:
-      return 'standard'; // safe fallback
+  const canonical = getLegacyModelMigration(model) ?? model;
+  const definition = modelRegistry.get(canonical);
+  if (!definition) {
+    throw new DeckentError(
+      'E_MODEL_TIER_UNVERIFIED',
+      `Cannot migrate unknown model to a tier without registry evidence: ${model}`,
+    );
   }
+  return definition.tier;
 }
 
 /**
@@ -488,16 +500,6 @@ export interface ConfigModelStrategy {
 }
 
 /**
- * V2 providers shape embedded in config.
- */
-export interface ConfigProviders {
-  brain?: ProviderName;
-  worker?: ProviderName;
-  fallback?: ProviderName;
-  overrides?: Record<string, ProviderName>;
-}
-
-/**
  * Apply v1 → v2 migration rules to a config object in-memory.
  *
  * Migration rules:
@@ -507,14 +509,27 @@ export interface ConfigProviders {
  * - default_model: X     → model_strategy.worker_tier = modelToTier(X)
  * - brain_provider / worker_provider → providers.brain / providers.worker
  *
- * Old fields are PRESERVED for backward compatibility. New fields are ADDED.
- * If new fields already exist, they are NOT overwritten.
+ * Legacy provider aliases are promoted into the canonical grouped form and
+ * removed. Equal dual definitions are deduplicated; differing definitions
+ * throw before any migration mutation. Existing model strategy fields are not
+ * overwritten.
  */
 export function migrateConfigV1ToV2(config: Record<string, unknown>): {
   migrated: boolean;
   changes: string[];
 } {
-  const changes: string[] = [];
+  const providerCanonicalization = canonicalizeProviderConfigAliases(config, 'migration');
+  replaceObjectContents(config, providerCanonicalization.config);
+  const modelCanonicalization = canonicalizeModelConfigAliases(config, 'migration');
+  replaceObjectContents(config, modelCanonicalization.config);
+  const changes: string[] = [
+    ...providerCanonicalization.changes.map(
+    (change) => `${change.flatKey} → ${change.groupedKey}`,
+    ),
+    ...modelCanonicalization.changes.map(
+      (change) => `${change.path}: ${change.from} → ${change.to}`,
+    ),
+  ];
 
   // ── model_strategy migration ──────────────────────────────────────
 
@@ -557,38 +572,6 @@ export function migrateConfigV1ToV2(config: Record<string, unknown>): {
     config['model_strategy'] = strategy;
   }
 
-  // ── providers migration ───────────────────────────────────────────
-
-  const existingProviders = (config['providers'] ?? {}) as Record<string, unknown>;
-  const providers: ConfigProviders = { ...existingProviders } as ConfigProviders;
-  let providersChanged = false;
-
-  const brainProvider = config['brain_provider'] as ProviderName | undefined;
-  const workerProvider = config['worker_provider'] as ProviderName | undefined;
-  const fallbackProvider = config['fallback_provider'] as ProviderName | undefined;
-
-  if (brainProvider && providers.brain === undefined) {
-    providers.brain = brainProvider;
-    providersChanged = true;
-    changes.push(`brain_provider '${brainProvider}' → providers.brain`);
-  }
-
-  if (workerProvider && providers.worker === undefined) {
-    providers.worker = workerProvider;
-    providersChanged = true;
-    changes.push(`worker_provider '${workerProvider}' → providers.worker`);
-  }
-
-  if (fallbackProvider && providers.fallback === undefined) {
-    providers.fallback = fallbackProvider;
-    providersChanged = true;
-    changes.push(`fallback_provider '${fallbackProvider}' → providers.fallback`);
-  }
-
-  if (providersChanged) {
-    config['providers'] = providers;
-  }
-
   return {
     migrated: changes.length > 0,
     changes,
@@ -601,11 +584,8 @@ export function migrateConfigV1ToV2(config: Record<string, unknown>): {
  * if any actual changes would be made.
  */
 export function needsV2Migration(existing: Record<string, unknown>): boolean {
-  // Already has v2 fields → no migration needed
-  if (existing['model_strategy'] && existing['providers']) return false;
-
   // Dry-run: clone and check if migrateConfigV1ToV2 would actually change anything
-  const clone = { ...existing };
+  const clone = structuredClone(existing);
   const result = migrateConfigV1ToV2(clone);
   return result.migrated;
 }
@@ -624,29 +604,17 @@ export function needsV2Migration(existing: Record<string, unknown>): boolean {
  * @returns List of removed keys for audit trail
  */
 export function removeDuplicateKeys(config: Record<string, unknown>): string[] {
-  const removed: string[] = [];
+  // The provider pass validates every alias before mutating provider aliases or
+  // unrelated duplicate keys, so a later-slot conflict cannot leave half a
+  // migration behind.
+  const providerCanonicalization = canonicalizeProviderConfigAliases(config, 'migration');
+  replaceObjectContents(config, providerCanonicalization.config);
+  const removed: string[] = providerCanonicalization.changes.map((change) => change.flatKey);
 
   // Decision 3: claude_backend is duplicate when spawn_backend exists
   if (config['spawn_backend'] !== undefined && config['claude_backend'] !== undefined) {
     delete config['claude_backend'];
     removed.push('claude_backend');
-  }
-
-  // Decision 4: flat provider fields are duplicate when grouped providers exist
-  const providers = config['providers'] as Record<string, unknown> | undefined;
-  if (providers) {
-    if (providers['brain'] !== undefined && config['brain_provider'] !== undefined) {
-      delete config['brain_provider'];
-      removed.push('brain_provider');
-    }
-    if (providers['worker'] !== undefined && config['worker_provider'] !== undefined) {
-      delete config['worker_provider'];
-      removed.push('worker_provider');
-    }
-    if (providers['fallback'] !== undefined && config['fallback_provider'] !== undefined) {
-      delete config['fallback_provider'];
-      removed.push('fallback_provider');
-    }
   }
 
   if (removed.length > 0) {

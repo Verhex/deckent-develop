@@ -11,7 +11,7 @@
 
 // ─── Node Builtins ─────────────────────────────────────────────────
 import { readFile, stat, writeFile } from 'node:fs/promises';
-import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 // ─── Core (value imports) ──────────────────────────────────────────
@@ -1124,6 +1124,69 @@ export function applyCascadeCircuitBreaker(
   return false;
 }
 
+/** Structured evidence of a FIX-phase spawn/preflight failure. */
+export interface FixSpawnFailure {
+  /** The fix task whose spawn failed (e.g. `022-fix`). */
+  taskId: string;
+  /** The stable Docker error code carried by the marker (e.g. `DECKENT_E086`), or `UNKNOWN`. */
+  code: string;
+  /** The full marker text (evidence for triage). */
+  message: string;
+}
+
+/**
+ * 455-003 (TERMINAL-LIFECYCLE-TRUTH): detect a FIX-phase spawn/preflight failure.
+ *
+ * When a fix worker cannot even be SPAWNED — docker daemon down/forbidden, image
+ * or provider-CLI missing — the docker backend writes a
+ * `task-<fixId>.timeout` marker of the shape `container_start_failed:<code>:<msg>`
+ * and never produces a `.result`. Left unhandled, `runSprint` would still march to
+ * COMPLETE and print "completed" while the fix task is stuck FIXING — the exact
+ * lie this task forbids.
+ *
+ * Scans `.tasks/` for a fix-worker (`-fix` in its id) `.timeout` marker that (a)
+ * carries `container_start_failed` and (b) has NO sibling `.result` (a fix that
+ * eventually wrote a result recovered and is NOT a spawn failure). Returns the
+ * first such failure with its structured code/evidence, or `null`.
+ *
+ * Pure (fs + path only) — exported for unit tests. Never throws (fail-open: any
+ * I/O error yields `null`, i.e. "no detected spawn failure", so a read glitch can
+ * never falsely park a healthy sprint).
+ */
+export function detectFixSpawnFailure(projectRoot: string): FixSpawnFailure | null {
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  if (!existsSync(tasksDir)) return null;
+  let files: string[];
+  try {
+    files = readdirSync(tasksDir);
+  } catch {
+    return null;
+  }
+  for (const f of files) {
+    if (!f.endsWith('.timeout')) continue;
+    const taskId = f.replace(/^task-/, '').replace(/\.timeout$/, '');
+    // Fix-worker markers only — a first-attempt worker's spawn failure is handled
+    // by the EVALUATE/FIX pipeline; here we guard the post-FIX COMPLETE seam.
+    if (!taskId.includes('-fix')) continue;
+    let content = '';
+    try {
+      content = readFileSync(join(tasksDir, f), 'utf-8');
+    } catch {
+      continue;
+    }
+    if (!content.includes('container_start_failed')) continue;
+    // A fix worker that later wrote a real .result ultimately recovered — not a
+    // terminal spawn failure.
+    if (existsSync(join(tasksDir, `task-${taskId}.result`))) continue;
+    // Parse the `container_start_failed:<code>:<message>` marker shape.
+    const parts = content.trim().split(':');
+    const code = parts.length >= 2 ? (parts[1]?.trim() || 'UNKNOWN') : 'UNKNOWN';
+    const message = content.trim();
+    return { taskId, code, message };
+  }
+  return null;
+}
+
 /**
  * Execute a full sprint lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP.
  * Supports human checkpoints, configurable timeout, and provider routing.
@@ -1901,6 +1964,70 @@ export async function runSprint(
 
   // Phase-transition checkpoint: FIX complete
   try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:fix', e); }
+
+  // ─── 455-003 (TERMINAL-LIFECYCLE-TRUTH): FIX spawn/preflight failure gate ───
+  // If the FIX phase could not even SPAWN a fix worker (docker daemon down /
+  // forbidden, image or provider-CLI missing → a container_start_failed marker
+  // with no .result), the sprint MUST NOT march on to COMPLETE and print
+  // "completed" while a fix task is stuck FIXING. Persist an honest PAUSED
+  // (parked, resumable) state with FULL coordinator/lock/PID teardown, write a
+  // truthful dashboard that BOTH the human and JSON `deckent status` surfaces
+  // read (so they agree), and return EARLY — BEFORE runCleanupPhase — so the
+  // .timeout / .log forensic artefacts survive for triage (cleanup would erase
+  // the very evidence the operator needs).
+  {
+    const fixSpawnFailure = detectFixSpawnFailure(projectRoot);
+    if (fixSpawnFailure) {
+      debugLog(
+        'runSprint:fix-spawn-failure',
+        `taskId=${fixSpawnFailure.taskId} code=${fixSpawnFailure.code} — parking sprint (not COMPLETE)`,
+      );
+      // Full teardown — mirror the COMPLETE path so NO live coordinator/lock/PID
+      // leaks (goCriteria: "FIX failure leaves no live coordinator/lock/PID").
+      if (heartbeatDaemon) {
+        try { heartbeatDaemon.stop(); } catch (e) { debugLog('runSprint:fixfail:hb-stop', e); }
+        heartbeatDaemon = null;
+      }
+      await stopResourceMonitor(resourceMonitor);
+      resourceMonitor = null;
+      if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+      if (snapshotInterval) { clearInterval(snapshotInterval); snapshotInterval = null; }
+      if (beforeExitHandler) { process.removeListener('beforeExit', beforeExitHandler); beforeExitHandler = null; }
+
+      // Honest parked lifecycle — NOT COMPLETE. Keep phase=FIX so the surfaces
+      // show WHERE it died.
+      sprint.status = SprintStatus.PAUSED;
+      sprint.phase = SprintPhase.FIX;
+
+      emitSprintEvent('SPRINT_PAUSED', {
+        sprintId: sprint.id,
+        reason: 'fix-spawn-failure',
+        taskId: fixSpawnFailure.taskId,
+        code: fixSpawnFailure.code,
+        evidence: fixSpawnFailure.message,
+      });
+
+      // Single dashboard both surfaces read → human + JSON agree on PAUSED, and
+      // neither prints "completed" for a parked FIX lifecycle. active:0 (no live
+      // workers), done reflects the real GO count.
+      const doneCount = sprint.tasks.filter(t => evaluations.get(t.id) === TaskEvaluation.DONE).length;
+      updateDashboard(projectRoot, {
+        sprint: { id: sprint.id, number: sprint.number, phase: SprintPhase.FIX, status: SprintStatus.PAUSED },
+        agents: [],
+        progress: { done: doneCount, active: 0, blocked: 0, total: sprint.tasks.length },
+        alerts: [],
+        updatedAt: now(),
+      });
+
+      releaseSprintLock(projectRoot);
+      clearActiveSprint();
+      clearSprintState(projectRoot);
+      try { clearPid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:fixfail:clearPid', e); }
+
+      // Return BEFORE runCleanupPhase — forensic artefacts preserved.
+      return sprint;
+    }
+  }
 
   // Handoff observability: summarize all handoff states for audit/event-stream
   try {

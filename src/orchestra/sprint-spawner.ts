@@ -559,8 +559,13 @@ export async function spawnWorkers(
     activeTasks = eligibleTasks.slice(0, maxWorkers);
     queuedTasks = eligibleTasks.slice(maxWorkers);
   } else {
-    activeTasks = sprint.tasks.slice(0, maxWorkers);
-    queuedTasks = sprint.tasks.slice(maxWorkers);
+    // Legacy FIFO still obeys the task lifecycle contract. A preplanned
+    // recovery sprint intentionally carries terminal tasks for evaluation and
+    // dependency evidence; spawning the full array here would execute those
+    // DONE/NO_GO tasks a second time.
+    const eligibleTasks = sprint.tasks.filter(t => t.status === TaskStatus.PENDING);
+    activeTasks = eligibleTasks.slice(0, maxWorkers);
+    queuedTasks = eligibleTasks.slice(maxWorkers);
   }
 
   // Pre-check: do any active tasks need tmux?

@@ -316,6 +316,7 @@ export class RuntimeBudgetMonitor {
   private readonly budgetFingerprint: string;
   private stopped = false;
   private lastUsageFingerprint = '';
+  private observationFailureReason: string | null = null;
 
   constructor(private readonly input: {
     projectRoot: string;
@@ -379,8 +380,30 @@ export class RuntimeBudgetMonitor {
   }
 
   settle(): RuntimeBudgetUsageEvidence {
-    const decision = this.guard.snapshot();
+    const decision = this.terminalDecision();
     return this.persistUsage(decision, true);
+  }
+
+  /**
+   * Persist loss of the incremental provider stream as terminally
+   * unmeasurable. Partial counters remain evidence, but they can no longer be
+   * mistaken for complete within-budget usage by a later settle call.
+   */
+  failObservation(error: Error): RuntimeBudgetUsageEvidence {
+    if (!this.observationFailureReason) {
+      this.observationFailureReason = `runtime usage observer failed: ${error.message}`;
+    }
+    return this.persistUsage(this.terminalDecision(), true);
+  }
+
+  private terminalDecision(): LiveBudgetDecision {
+    const snapshot = this.guard.snapshot();
+    if (!this.observationFailureReason) return snapshot;
+    return {
+      ...snapshot,
+      state: 'unmeasurable',
+      reasons: [...snapshot.reasons, this.observationFailureReason],
+    };
   }
 
   private persistUsage(decision: LiveBudgetDecision, terminal: boolean): RuntimeBudgetUsageEvidence {

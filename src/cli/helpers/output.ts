@@ -5,6 +5,9 @@ import { AgentStatus, SprintPhase } from '../../core/types.js';
 import { formatHumanSprintComplete } from '../../orchestra/sprint-reporter.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
+import { ProviderConfigAliasConflictError } from '../../core/provider-config-canonicalizer.js';
+import { detectLang } from './i18n.js';
+import { getMessage } from './messages.js';
 
 /**
  * Returns total memory entry count from the project's SQLite DB.
@@ -85,7 +88,15 @@ export function print(message: string): void {
 }
 
 export function printError(error: unknown): void {
-  const msg = error instanceof Error ? error.message : String(error);
+  const msg = error instanceof ProviderConfigAliasConflictError
+    ? getMessage('config.provider_alias_conflict', detectLang(process.cwd()), {
+        layer: error.conflict.layer,
+        flatKey: error.conflict.flatKey,
+        groupedKey: error.conflict.groupedKey,
+        flatValue: JSON.stringify(error.conflict.flatValue),
+        groupedValue: JSON.stringify(error.conflict.groupedValue),
+      })
+    : error instanceof Error ? error.message : String(error);
   process.stderr.write(`Error: ${msg}\n`);
 }
 

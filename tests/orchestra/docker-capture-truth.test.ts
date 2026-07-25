@@ -255,7 +255,11 @@ describe('captureDockerLogs — exit/error honesty', () => {
 
 describe('usage-patch pin (413-001) — captureDockerLogs feeds patchResultUsageFromEnvelope', () => {
   const USAGE = { input_tokens: 4242, output_tokens: 909, cache_read_input_tokens: 700, cache_creation_input_tokens: 33 };
-  const FINAL_ENVELOPE = JSON.stringify({ type: 'result', subtype: 'success', result: 'done', usage: USAGE });
+  const FINAL_ENVELOPE = JSON.stringify({
+    type: 'result', subtype: 'success', result: 'done', usage: USAGE,
+    total_cost_usd: 1.2345,
+    modelUsage: { 'claude-sonnet-5': { inputTokens: 4242, outputTokens: 909, costUSD: 1.2345 } },
+  });
 
   /** A >1 MiB fake docker-logs stream whose FINAL line is the usage envelope. */
   function buildBigStream(): Buffer[] {
@@ -276,7 +280,7 @@ describe('usage-patch pin (413-001) — captureDockerLogs feeds patchResultUsage
       JSON.stringify({
         taskId,
         selfAssessment: 'DONE',
-        tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model: 'sonnet' },
+        tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model: 'claude-sonnet-5' },
       }),
       'utf-8',
     );
@@ -293,7 +297,7 @@ describe('usage-patch pin (413-001) — captureDockerLogs feeds patchResultUsage
     expect(cap.content).not.toContain('"usage"'); // terminal envelope was cut off
 
     const tasksDir = makeTaskDir('usage-red');
-    patchResultUsageFromEnvelope(tasksDir, 'usage-red', 'sonnet', cap.content);
+    patchResultUsageFromEnvelope(tasksDir, 'usage-red', 'claude-sonnet-5', cap.content);
 
     const r = JSON.parse(readFileSync(join(tasksDir, 'task-usage-red.result'), 'utf-8')) as {
       tokenUsage: Record<string, number>;
@@ -313,14 +317,17 @@ describe('usage-patch pin (413-001) — captureDockerLogs feeds patchResultUsage
     expect(cap.content).toContain('"usage"'); // terminal envelope survived the >1 MiB payload
 
     const tasksDir = makeTaskDir('usage-green');
-    patchResultUsageFromEnvelope(tasksDir, 'usage-green', 'sonnet', cap.content);
+    patchResultUsageFromEnvelope(tasksDir, 'usage-green', 'claude-sonnet-5', cap.content);
 
     const r = JSON.parse(readFileSync(join(tasksDir, 'task-usage-green.result'), 'utf-8')) as {
       tokenUsage: Record<string, number>;
+      providerBilling: { providerReportedUsd: number; modelUsage: Record<string, unknown> };
     };
     // REAL numbers recovered — the fix rescued the patch.
     expect(r.tokenUsage.inputTokens).toBe(4242);
     expect(r.tokenUsage.outputTokens).toBe(909);
     expect(r.tokenUsage.cacheReadTokens).toBe(700);
+    expect(r.providerBilling.providerReportedUsd).toBe(1.2345);
+    expect(r.providerBilling.modelUsage).toHaveProperty('claude-sonnet-5');
   });
 });

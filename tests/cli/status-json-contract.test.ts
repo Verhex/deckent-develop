@@ -108,6 +108,26 @@ function seedPendingNervousApproval(fakeRoot: string, id: string, title: string)
   );
 }
 
+/**
+ * 455-003: seed a COMPLETE-status `.dashboard` carrying the classic "final-scan
+ * garbage" live-shaped progress (active:2/done:0). A fresh updatedAt keeps it out
+ * of the orphan-gate, so the terminal COMPLETE-gate — not staleness — is what
+ * the JSON surface must honor.
+ */
+function seedCompleteDashboard(fakeRoot: string): void {
+  writeFileSync(
+    join(fakeRoot, '.dashboard'),
+    JSON.stringify({
+      sprint: { id: 'sprint-375', number: 375, phase: 'COMPLETE', status: 'COMPLETE' },
+      agents: [],
+      progress: { done: 0, active: 2, blocked: 0, total: 8 },
+      alerts: [],
+      updatedAt: new Date().toISOString(),
+    }),
+    'utf-8',
+  );
+}
+
 // ─── Suite ───────────────────────────────────────────────────────────────────────
 
 describe('deckent status --json — no-active-run contract (433-002 / born-688)', () => {
@@ -189,4 +209,34 @@ describe('deckent status --json — no-active-run contract (433-002 / born-688)'
     expect(result.stdout).toContain('deckent nervous accept appr-1');
     expect(() => JSON.parse(result.stdout.trim())).toThrow();
   }, 15000);
+
+  // ─── 455-003 (TERMINAL-LIFECYCLE-TRUTH): COMPLETE dashboard human/JSON parity ──
+  it('--json with a COMPLETE dashboard: emits the honest no-active shape (JSON twin of the human completed-gate)', async () => {
+    seedCompleteDashboard(fakeRoot);
+
+    const result = await runStatusDriver(driverPath, fakeRoot, ['--json']);
+
+    expect(result.timedOut).toBe(false);
+    expect(result.code).toBe(0);
+    const parsed: unknown = JSON.parse(result.stdout.trim());
+    expect(parsed).toEqual({ active: false, pendingApprovals: [] });
+    // The completed sprint's stale live-shaped progress (active:2) must NOT leak
+    // into the JSON surface (the pre-455-003 divergence).
+    expect(result.stdout).not.toContain('"active": 2');
+  }, 15000);
+
+  it('COMPLETE dashboard: human + JSON agree it is not live (no unqualified Complete-as-active)', async () => {
+    seedCompleteDashboard(fakeRoot);
+
+    const human = await runStatusDriver(driverPath, fakeRoot, []);
+    const json = await runStatusDriver(driverPath, fakeRoot, ['--json']);
+
+    expect(human.code).toBe(0);
+    expect(json.code).toBe(0);
+    // Human renders the honest completed record, never the live Progress/Active lines.
+    expect(human.stdout.toLowerCase()).toContain('completed');
+    expect(human.stdout).not.toContain('Active: 2 workers');
+    // JSON reports active:false — the two surfaces agree the sprint is not live.
+    expect((JSON.parse(json.stdout.trim()) as { active: boolean }).active).toBe(false);
+  }, 20000);
 });

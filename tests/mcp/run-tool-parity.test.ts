@@ -38,6 +38,7 @@ vi.mock('../../src/orchestra/sprint-controller.js', () => ({
 vi.mock('../../src/core/config.js', () => ({
   resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
+  resolveDefaultModel: () => 'claude-opus-4-8',  // 453-001: canonical default-model resolver (omitted model)
   loadConfig: vi.fn(),
 }));
 
@@ -81,6 +82,7 @@ import { waitForRunResult, cleanupRunTask } from '../../src/cli/commands/run.js'
 // REAL import (not mocked) — pins the silent-drop validation contract the spawn
 // path applies to modelEffort (resolveReasoningEffort SSOT, F1-RE 268-003).
 import { resolveReasoningEffort } from '../../src/core/reasoning-effort.js';
+import { buildParametricModel, modelRegistry } from '../../src/core/model-registry.js';
 
 const REMOTE_WORKER_CONFIG = {
   spawn_backend: 'subprocess',
@@ -146,21 +148,21 @@ describe('deckent_run MCP — modelEffort/timeoutMs/keep parity (269-004)', () =
 
   it('forwards modelEffort to the spawnWorkerMultiProvider opts (spawn wire)', async () => {
     const handler = await getHandler(server);
-    await handler({ description: 'fix a bug', model: 'sonnet', modelEffort: 'xhigh', autoApprove: true });
+    await handler({ description: 'fix a bug', model: 'claude-sonnet-5', modelEffort: 'xhigh', autoApprove: true });
 
     expect(spawnOpts()['modelEffort']).toBe('xhigh');
   });
 
   it('sets task.modelEffort in the written task JSON (ExecutionRequest path)', async () => {
     const handler = await getHandler(server);
-    await handler({ description: 'fix a bug', model: 'sonnet', modelEffort: 'high', autoApprove: true });
+    await handler({ description: 'fix a bug', model: 'claude-sonnet-5', modelEffort: 'high', autoApprove: true });
 
     expect(writtenTaskJson()['modelEffort']).toBe('high');
   });
 
   it('omitted modelEffort → undefined at spawn and absent from the task JSON (no behavior change)', async () => {
     const handler = await getHandler(server);
-    await handler({ description: 'fix a bug', model: 'sonnet', autoApprove: true });
+    await handler({ description: 'fix a bug', model: 'claude-sonnet-5', autoApprove: true });
 
     expect(spawnOpts()['modelEffort']).toBeUndefined();
     expect(writtenTaskJson()['modelEffort']).toBeUndefined();
@@ -168,7 +170,7 @@ describe('deckent_run MCP — modelEffort/timeoutMs/keep parity (269-004)', () =
 
   it('forwards an invalid modelEffort raw to spawn without erroring (validation lives in spawn, CLI parity)', async () => {
     const handler = await getHandler(server);
-    const result = await handler({ description: 'fix a bug', model: 'sonnet', modelEffort: 'bogus-level', autoApprove: true });
+    const result = await handler({ description: 'fix a bug', model: 'claude-sonnet-5', modelEffort: 'bogus-level', autoApprove: true });
 
     expect(result.isError).not.toBe(true);
     // Raw forward — spawnWorkerMultiProvider resolves it via resolveReasoningEffort
@@ -186,13 +188,13 @@ describe('deckent_run MCP — modelEffort/timeoutMs/keep parity (269-004)', () =
 
   it('echoes timeoutMs in the response and defaults to 300000 (CLI --timeout parity)', async () => {
     const handler = await getHandler(server);
-    const res = await handler({ description: 'fix a bug', model: 'sonnet', timeoutMs: 60_000, autoApprove: true });
+    const res = await handler({ description: 'fix a bug', model: 'claude-sonnet-5', timeoutMs: 60_000, autoApprove: true });
     expect(JSON.parse(res.content[0]!.text).timeoutMs).toBe(60_000);
 
     vi.clearAllMocks();
     vi.mocked(loadConfig).mockResolvedValue(REMOTE_WORKER_CONFIG as never);
     vi.mocked(spawnWorkerMultiProvider).mockResolvedValue({ backend: 'subprocess' } as never);
-    const resDefault = await handler({ description: 'fix a bug', model: 'sonnet', autoApprove: true });
+    const resDefault = await handler({ description: 'fix a bug', model: 'claude-sonnet-5', autoApprove: true });
     expect(JSON.parse(resDefault.content[0]!.text).timeoutMs).toBe(300_000);
   });
 
@@ -200,7 +202,7 @@ describe('deckent_run MCP — modelEffort/timeoutMs/keep parity (269-004)', () =
     vi.mocked(waitForRunResult).mockResolvedValue({ taskId: 'x', selfAssessment: 'DONE' } as never);
 
     const handler = await getHandler(server);
-    const res = await handler({ description: 'fix a bug', model: 'sonnet', keep: false, timeoutMs: 45_000, autoApprove: true });
+    const res = await handler({ description: 'fix a bug', model: 'claude-sonnet-5', keep: false, timeoutMs: 45_000, autoApprove: true });
     expect(JSON.parse(res.content[0]!.text).keep).toBe(false);
 
     await vi.waitFor(() => {
@@ -216,7 +218,7 @@ describe('deckent_run MCP — modelEffort/timeoutMs/keep parity (269-004)', () =
 
   it('keep omitted (MCP default: preserve) → no watcher, no cleanup', async () => {
     const handler = await getHandler(server);
-    const res = await handler({ description: 'fix a bug', model: 'sonnet', autoApprove: true });
+    const res = await handler({ description: 'fix a bug', model: 'claude-sonnet-5', autoApprove: true });
     expect(JSON.parse(res.content[0]!.text).keep).toBe(true);
 
     // flush microtasks — a watcher (if wrongly started) would have fired by now
@@ -229,12 +231,93 @@ describe('deckent_run MCP — modelEffort/timeoutMs/keep parity (269-004)', () =
     vi.mocked(waitForRunResult).mockResolvedValue(null); // timeout — no result
 
     const handler = await getHandler(server);
-    await handler({ description: 'fix a bug', model: 'sonnet', keep: false, autoApprove: true });
+    await handler({ description: 'fix a bug', model: 'claude-sonnet-5', keep: false, autoApprove: true });
 
     await vi.waitFor(() => {
       expect(vi.mocked(waitForRunResult)).toHaveBeenCalledOnce();
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(vi.mocked(cleanupRunTask)).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Canonical model boundary — full-handler matrix (453-001) ─────────────────
+// Mirrors the CLI matrix (tests/cli/run.test.ts). The handler resolves the model
+// through the canonical registry BEFORE writing the Task JSON or spawning: a
+// known ID infers its provider, an unseen versioned ID needs an explicit provider,
+// and legacy aliases / unknown-no-provider / mismatch fail as an isError response
+// with no disk write and no spawn. Unique unseen IDs avoid within-file registry
+// bleed (registerParametric mutates the shared singleton).
+describe('deckent_run MCP — canonical model boundary (453-001)', () => {
+  let server: MockServer;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(loadConfig).mockResolvedValue(REMOTE_WORKER_CONFIG as never);
+    vi.mocked(spawnWorkerMultiProvider).mockResolvedValue({ backend: 'subprocess' } as never);
+    vi.mocked(waitForRunResult).mockResolvedValue(null);
+    server = createMockServer();
+  });
+
+  /** Parsed contents of every `.json` file written this test (Task JSON writes). */
+  function jsonWrites(): Record<string, unknown>[] {
+    return vi.mocked(writeFileSync).mock.calls
+      .filter((c) => typeof c[0] === 'string' && (c[0] as string).endsWith('.json'))
+      .map((c) => JSON.parse(c[1] as string) as Record<string, unknown>);
+  }
+  /** The exact model ID passed to the spawn wire (2nd positional arg). */
+  function spawnModelArg(): unknown {
+    return vi.mocked(spawnWorkerMultiProvider).mock.calls[0]![1];
+  }
+
+  it('accepts a known exact ID (gpt-5.6-sol); Task JSON + spawn carry the ID + inferred provider', async () => {
+    const handler = await getHandler(server);
+    const res = await handler({ description: 'fix a bug', model: 'gpt-5.6-sol', autoApprove: true });
+
+    expect(res.isError).not.toBe(true);
+    expect(writtenTaskJson()).toMatchObject({ model: 'gpt-5.6-sol', provider: 'codex' });
+    expect(spawnModelArg()).toBe('gpt-5.6-sol');
+    expect(spawnOpts()['provider']).toBe('codex');
+    // User-visible output carries the exact resolved ID too (enrichResponse is identity-mocked).
+    expect(JSON.parse(res.content[0]!.text).model).toBe('gpt-5.6-sol');
+  });
+
+  it('accepts an unseen versioned ID with provider=codex, byte-for-byte through Task JSON + spawn', async () => {
+    modelRegistry.register(buildParametricModel('gpt-5.6-neo-453f', {
+      provider: 'codex',
+      costPerMillion: { input: 2, output: 10 },
+      pricingEvidenceRef: 'catalog:test:gpt-5.6-neo-453f',
+      status: 'ga',
+    }));
+    const handler = await getHandler(server);
+    const res = await handler({ description: 'fix a bug', model: 'gpt-5.6-neo-453f', provider: 'codex', autoApprove: true });
+
+    expect(res.isError).not.toBe(true);
+    expect(writtenTaskJson()).toMatchObject({ model: 'gpt-5.6-neo-453f', provider: 'codex' });
+    expect(spawnModelArg()).toBe('gpt-5.6-neo-453f');
+    expect(spawnOpts()['provider']).toBe('codex');
+  });
+
+  it('omitted model resolves from the canonical config default (never a literal alias)', async () => {
+    const handler = await getHandler(server);
+    const res = await handler({ description: 'fix a bug', autoApprove: true });
+
+    expect(res.isError).not.toBe(true);
+    expect(writtenTaskJson()).toMatchObject({ model: 'claude-opus-4-8', provider: 'claude' });
+    expect(spawnModelArg()).toBe('claude-opus-4-8');
+  });
+
+  it.each([
+    ['legacy alias (gpt-5)', { model: 'gpt-5' }],
+    ['unknown without provider', { model: 'gpt-5.6-ghost-453g' }],
+    ['provider/model mismatch', { model: 'claude-opus-4-8', provider: 'codex' }],
+  ])('fails loudly before disk/spawn: %s', async (_label, extra) => {
+    const handler = await getHandler(server);
+    const res = await handler({ description: 'fix a bug', autoApprove: true, ...extra });
+
+    expect(res.isError).toBe(true);
+    // Alias/mismatch never reached disk or the spawn wire.
+    expect(jsonWrites()).toHaveLength(0);
+    expect(vi.mocked(spawnWorkerMultiProvider)).not.toHaveBeenCalled();
   });
 });

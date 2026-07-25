@@ -28,6 +28,14 @@ vi.mock('../../../src/orchestra/brain.js', () => ({
   cleanupDraftTasks: vi.fn(),
 }));
 
+// --dry-run does not call planSprint directly — it delegates to the shared
+// plan-preview-service (TERM2 424-001). Mock this boundary explicitly instead
+// of relying on it falling through to the real implementation (which pulls in
+// readAuthMode/digest machinery this test file has no business exercising).
+vi.mock('../../../src/orchestra/plan-preview-service.js', () => ({
+  generatePlanPreview: vi.fn(),
+}));
+
 vi.mock('../../../src/cli/helpers/output.js', () => ({
   print: vi.fn(),
   printError: vi.fn(),
@@ -49,6 +57,7 @@ import { bootstrapProviders } from '../../../src/core/provider.js';
 import {
   readContext, planSprint, confirmDraftTasks, cleanupDraftTasks,
 } from '../../../src/orchestra/brain.js';
+import { generatePlanPreview } from '../../../src/orchestra/plan-preview-service.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';
 import { promptConfirm } from '../../../src/cli/helpers/prompt.js';
 import { registerPlan } from '../../../src/cli/commands/plan.js';
@@ -98,6 +107,11 @@ function setupMocks(): void {
     projectState: { gitStatus: '', fileTree: [] },
   });
   vi.mocked(planSprint).mockReturnValue(makeSprint());
+  vi.mocked(generatePlanPreview).mockResolvedValue({
+    sprint: makeSprint({ planningMode: 'structured' }),
+    planDigest: 'test-plan-digest',
+    generatedAt: '2026-07-23T00:00:00.000Z',
+  });
 }
 
 async function runCommand(args: string[]): Promise<void> {
@@ -211,13 +225,14 @@ describe('plan command (isolated)', () => {
 
   // ─── B) --dry-run ────────────────────────────────────────────────
 
-  it('--dry-run passes dryRun option to planSprint', async () => {
+  it('--dry-run delegates to the shared structured plan preview service', async () => {
     setupMocks();
     await runCommand(['plan', '--dry-run', '--no-confirm']);
-    expect(planSprint).toHaveBeenCalledWith(
+    expect(generatePlanPreview).toHaveBeenCalledWith(
       expect.any(String), expect.anything(), expect.anything(), expect.anything(),
-      expect.objectContaining({ dryRun: true }),
+      expect.objectContaining({ mode: 'structured' }),
     );
+    expect(planSprint).not.toHaveBeenCalled();
   });
 
   it('--dry-run prints dry-run message and skips confirmation', async () => {
@@ -226,6 +241,12 @@ describe('plan command (isolated)', () => {
     expect(print).toHaveBeenCalledWith(expect.stringContaining('[dry-run]'));
     expect(promptConfirm).not.toHaveBeenCalled();
     expect(confirmDraftTasks).not.toHaveBeenCalled();
+  });
+
+  it('--dry-run does not clean existing draft tasks', async () => {
+    setupMocks();
+    await runCommand(['plan', '--dry-run', '--no-confirm']);
+    expect(cleanupDraftTasks).not.toHaveBeenCalled();
   });
 
   // ─── C) cleanupDraftTasks idempotency ─────────────────────────────
@@ -294,9 +315,9 @@ describe('plan command (isolated)', () => {
     setupMocks();
     await runCommand(['plan', '--dry-run', '--no-confirm']);
     expect(bootstrapProviders).not.toHaveBeenCalled();
-    expect(planSprint).toHaveBeenCalledWith(
+    expect(generatePlanPreview).toHaveBeenCalledWith(
       expect.any(String), expect.anything(), expect.anything(), expect.anything(),
-      expect.objectContaining({ mode: 'structured', dryRun: true }),
+      expect.objectContaining({ mode: 'structured' }),
     );
   });
 
@@ -304,9 +325,9 @@ describe('plan command (isolated)', () => {
     setupMocks();
     await runCommand(['plan', '--dry-run', '--structured', '--no-confirm']);
     expect(bootstrapProviders).not.toHaveBeenCalled();
-    expect(planSprint).toHaveBeenCalledWith(
+    expect(generatePlanPreview).toHaveBeenCalledWith(
       expect.any(String), expect.anything(), expect.anything(), expect.anything(),
-      expect.objectContaining({ mode: 'structured', dryRun: true }),
+      expect.objectContaining({ mode: 'structured' }),
     );
   });
 

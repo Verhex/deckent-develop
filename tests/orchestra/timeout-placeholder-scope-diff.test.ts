@@ -33,6 +33,7 @@ import { join } from 'node:path';
 import {
   buildOnExitTrap,
   buildScopedDiffPathspec,
+  computeScopeBaselineManifest,
 } from '../../src/orchestra/spawn-backend-docker.js';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -117,13 +118,24 @@ async function runDiffCore(
   repoDir: string,
   script: string,
   exitCode: number,
+  baselineManifest?: string,
 ): Promise<Record<string, unknown>> {
   const rfile = join(repoDir, '.out-result.json');
   const scriptPath = join(repoDir, '.run-core.sh');
+  // 455-003: when a baseline manifest is supplied, write it and point $BASEFILE at
+  // it so the extracted core exercises the task-start-baseline filter. (The real
+  // trap defaults BASEFILE above the extracted region; here we set it explicitly.)
+  let baselineLine = 'BASEFILE="${BASEFILE:-}"';
+  if (baselineManifest !== undefined) {
+    const basePath = join(repoDir, '.scope-baseline');
+    writeFileSync(basePath, baselineManifest, 'utf-8');
+    baselineLine = `BASEFILE=${JSON.stringify(basePath)}`;
+  }
   const wrapped = [
     '#!/bin/sh',
     `RFILE=${JSON.stringify(rfile)}`,
     'HBFILE="/nonexistent-hb-file-for-test"',
+    baselineLine,
     `exit_code=${exitCode}`,
     'run_check() {',
     extractDiffCore(script),
@@ -257,5 +269,108 @@ describe('buildOnExitTrap — real-repo proof-of-function (TT550 phantom-vakası
 
     expect(json.selfAssessment).toBe('TIMEOUT_WITH_WORK');
     expect(json.filesChanged).toEqual(['mine.ts']);
+  });
+});
+
+// ─── 4. computeScopeBaselineManifest — task-start content baseline ────────────
+
+describe('computeScopeBaselineManifest', () => {
+  it('records `<path>\\t<hash>` for existing scoped files and omits absent/blank ones', async () => {
+    const repo = freshTmp();
+    await initRepo(repo);
+    writeFileSync(join(repo, 'a.ts'), 'export const a = 1;\n');
+    const manifest = computeScopeBaselineManifest(repo, ['a.ts', 'missing.ts', '  ', '']);
+    const lines = manifest.trim().split('\n');
+    expect(lines.length).toBe(1);
+    // git hash-object blob id (sha1 = 40 hex; sha256 repo = 64) after a TAB.
+    expect(lines[0]).toMatch(/^a\.ts\t[0-9a-f]{40,64}$/);
+  });
+
+  it('returns an empty string when nothing can be baselined (all entries absent)', async () => {
+    const repo = freshTmp();
+    await initRepo(repo);
+    expect(computeScopeBaselineManifest(repo, ['nope.ts'])).toBe('');
+  });
+});
+
+// ─── 5. Baseline filter — pre-existing dirt vs genuine task-local work ─────────
+// The born-667b scope filter removed SIBLING (different-file) leakage; this block
+// proves the remaining hole is closed: a file that IS in scope but was ALREADY
+// dirty when the worker started must not create a false TIMEOUT_WITH_WORK, while
+// a further edit on top of that dirt (or a brand-new file) is still recoverable.
+
+describe('buildOnExitTrap — task-start baseline filter (455-003 TIMEOUT-BASELINE-TRUTH)', () => {
+  it('pre-existing dirty in-scope file (unchanged since task start) → no false TIMEOUT_WITH_WORK', async () => {
+    const repo = freshTmp();
+    await initRepo(repo);
+    writeFileSync(join(repo, 'mine.ts'), 'export const a = 1;\n');
+    await stageBaseline(repo);
+
+    // A previous task / operator left mine.ts dirty BEFORE this worker started.
+    appendFileSync(join(repo, 'mine.ts'), '// pre-existing dirt from an earlier task\n');
+    // The task-start baseline is captured NOW, with mine.ts already dirty.
+    const manifest = computeScopeBaselineManifest(repo, ['mine.ts']);
+    // The worker itself touches NOTHING, then is killed (exit 1).
+
+    const trap = buildOnExitTrap('t-preexist', 'sonnet', ['mine.ts']);
+    const json = await runDiffCore(repo, trap, 1, manifest);
+
+    // A baseline-less scoped diff would show mine.ts changed → false positive.
+    // With the baseline, mine.ts is byte-identical to task-start → honest no-work.
+    expect(json.selfAssessment).toBe('NO_GO');
+    expect(json.markerType).toBe('EXIT_WITHOUT_RESULT');
+    expect(json.workPresent).toBe(false);
+    expect(json.diffStat).toBe('');
+  });
+
+  it('a further edit ON TOP of pre-existing dirt is still detected (recoverable)', async () => {
+    const repo = freshTmp();
+    await initRepo(repo);
+    writeFileSync(join(repo, 'mine.ts'), 'export const a = 1;\n');
+    await stageBaseline(repo);
+
+    appendFileSync(join(repo, 'mine.ts'), '// pre-existing dirt\n');
+    const manifest = computeScopeBaselineManifest(repo, ['mine.ts']);
+    // The worker DOES do real work on top of the pre-existing dirt.
+    appendFileSync(join(repo, 'mine.ts'), '// genuine task-local edit\n');
+
+    const trap = buildOnExitTrap('t-ontop', 'sonnet', ['mine.ts']);
+    const json = await runDiffCore(repo, trap, 1, manifest);
+
+    expect(json.selfAssessment).toBe('TIMEOUT_WITH_WORK');
+    expect(json.filesChanged).toEqual(['mine.ts']);
+  });
+
+  it('a brand-new file created after the baseline (no baseline entry) is counted as work', async () => {
+    const repo = freshTmp();
+    await initRepo(repo);
+    // Baseline captured BEFORE new-file.ts exists → it has no manifest entry.
+    const manifest = computeScopeBaselineManifest(repo, ['new-file.ts']);
+    writeFileSync(join(repo, 'new-file.ts'), 'export const z = 1;\n');
+
+    const trap = buildOnExitTrap('t-newfile', 'sonnet', ['new-file.ts']);
+    const json = await runDiffCore(repo, trap, 1, manifest);
+
+    expect(json.selfAssessment).toBe('TIMEOUT_WITH_WORK');
+    expect(json.filesChanged).toEqual(['new-file.ts']);
+  });
+
+  it('mixed: pre-existing-dirty file excluded, genuinely-new file kept — only real work counts', async () => {
+    const repo = freshTmp();
+    await initRepo(repo);
+    writeFileSync(join(repo, 'old.ts'), 'export const a = 1;\n');
+    await stageBaseline(repo);
+
+    appendFileSync(join(repo, 'old.ts'), '// pre-existing dirt\n');
+    const manifest = computeScopeBaselineManifest(repo, ['old.ts', 'fresh.ts']);
+    // Worker creates a genuinely new in-scope file; old.ts is left as pre-existing dirt.
+    writeFileSync(join(repo, 'fresh.ts'), 'export const b = 1;\n');
+
+    const trap = buildOnExitTrap('t-mixed', 'sonnet', ['old.ts', 'fresh.ts']);
+    const json = await runDiffCore(repo, trap, 1, manifest);
+
+    expect(json.selfAssessment).toBe('TIMEOUT_WITH_WORK');
+    expect(json.filesChanged).toEqual(['fresh.ts']);
+    expect(json.notes).toContain('git diff shows 1 files modified');
   });
 });

@@ -26,8 +26,9 @@ vi.mock('node:child_process', () => ({
   spawn: vi.fn(() => {
     const stub = {
       stdout: { on: vi.fn() },
-      stderr: { on: vi.fn() },
+      stderr: { on: vi.fn(), resume: vi.fn() },
       on: vi.fn(),
+      once: vi.fn(),
     };
     return stub as unknown as ChildProcess;
   }),
@@ -35,7 +36,9 @@ vi.mock('node:child_process', () => ({
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(() => true),
-  readFileSync: vi.fn(() => '{}'),
+  readFileSync: vi.fn((path: string) => path.endsWith('/.gemini/settings.json')
+    ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
+    : '{}'),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
   unlinkSync: vi.fn(),
@@ -64,6 +67,11 @@ vi.mock('../../src/core/active-workers.js', () => ({
   clearPending: vi.fn(),
 }));
 
+vi.mock('../../src/core/task-result-settlement.js', () => {
+  return import('../helpers/task-result-settlement-stub.js')
+    .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
+});
+
 import { spawnSync } from 'node:child_process';
 import {
   DockerSpawnBackend,
@@ -71,6 +79,7 @@ import {
 } from '../../src/orchestra/spawn-backend-docker.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
+const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
 
 // ─── Spawn-seam router (mirrors spawn-backend-docker.test.ts) ────────────────
 
@@ -111,8 +120,8 @@ function installSpawnRouter(imagePresent: boolean): void {
       outcome = { stdout: 'container-id-x', stderr: '', status: 0 };
     } else if (cmd === 'docker' && sub === 'inspect') {
       outcome = { stdout: 'true|0', stderr: '', status: 0 };
-    } else if (cmd === 'claude' && sub === '--version') {
-      outcome = { stdout: 'claude 1.0.0 (host auth ok)', stderr: '', status: 0 };
+    } else if (cmd === 'claude' && argv.join(' ') === 'auth status --json') {
+      outcome = { stdout: '{"loggedIn":true}', stderr: '', status: 0 };
     }
 
     return {
@@ -129,7 +138,7 @@ function installSpawnRouter(imagePresent: boolean): void {
 /** Run spawn() and return the thrown error message (or '' if it did not throw). */
 function spawnExpectMessage(taskId: string, model: string): string {
   try {
-    new DockerSpawnBackend('/test/project').spawn(taskId, model as never, 'prompt-body');
+    new DockerSpawnBackend('/test/project').spawn(taskId, model as never, 'prompt-body', TEST_EXECUTION_OPTIONS);
     return '';
   } catch (err) {
     return err instanceof Error ? err.message : String(err);
@@ -188,28 +197,30 @@ describe('DockerSpawnBackend: provider-aware image-not-ready honest-fail (F1-005
     installSpawnRouter(/* imagePresent */ false);
   });
 
-  it('codex worker, image absent → throws honest error with `--build-arg INSTALL_CODEX=true`', () => {
-    const msg = spawnExpectMessage('mc-codex', 'gpt-5');
-    expect(msg).toMatch(/not ready for provider 'codex'/);
-    expect(msg).toContain('--build-arg INSTALL_CODEX=true');
+  it('codex worker is held on live metering before image inspection', () => {
+    const msg = spawnExpectMessage('mc-codex', 'gpt-5.6-sol');
+    expect(msg).toMatch(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
+    expect(capturedDockerBuildArgs).toHaveLength(0);
   });
 
   it('codex honest-fail does NOT silently fall back to a claude container (no docker run)', () => {
-    spawnExpectMessage('mc-codex-nofallback', 'gpt-5');
+    spawnExpectMessage('mc-codex-nofallback', 'gpt-5.6-sol');
     // Never spawned a worker container, and never auto-built — honest-fail only.
     expect(capturedDockerRunArgs.length).toBe(0);
     expect(capturedDockerBuildArgs.length).toBe(0);
   });
 
-  it('gemini worker, image absent → throws honest error with `--build-arg INSTALL_GEMINI=true`', () => {
+  it('gemini worker is held on live metering before image inspection', () => {
     const msg = spawnExpectMessage('mc-gemini', 'gemini-2.5-flash');
-    expect(msg).toMatch(/not ready for provider 'gemini'/);
-    expect(msg).toContain('--build-arg INSTALL_GEMINI=true');
+    expect(msg).toMatch(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
+    expect(capturedDockerBuildArgs).toHaveLength(0);
   });
 
   it('claude worker, image absent → throws WITHOUT any `--build-arg` (NONE / default image)', () => {
-    const msg = spawnExpectMessage('mc-claude', 'sonnet');
-    expect(msg).toMatch(/not ready for provider 'claude'/);
+    const msg = spawnExpectMessage('mc-claude', 'claude-sonnet-5');
+    expect(msg).toMatch(/not found locally for provider 'claude'/);
     expect(msg).not.toContain('--build-arg');
     expect(msg).toContain('-f Dockerfile.worker');
   });
@@ -226,7 +237,12 @@ describe('DockerSpawnBackend: claude worker uses the default image unchanged (F1
   });
 
   it('image present → claude worker runs the default image with NO `--build-arg` and NO docker build', () => {
-    new DockerSpawnBackend('/test/project').spawn('mc-claude-ok', 'sonnet' as never, 'prompt-body');
+    new DockerSpawnBackend('/test/project').spawn(
+      'mc-claude-ok',
+      'claude-sonnet-5' as never,
+      'prompt-body',
+      TEST_EXECUTION_OPTIONS,
+    );
     expect(capturedDockerRunArgs.length).toBe(1);
     expect(capturedDockerBuildArgs.length).toBe(0);
     const argv = capturedDockerRunArgs[0]!;

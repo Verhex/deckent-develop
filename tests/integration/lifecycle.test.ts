@@ -95,6 +95,7 @@ import {
   planSprint, writeRetrospective, writeSprintLog, calculateMetrics,
   decay, cleanup,
 } from '../../src/orchestra/brain.js';
+import { detectFixSpawnFailure } from '../../src/orchestra/sprint-controller.js';
 import { providerRegistry } from '../../src/core/provider.js';
 import type { ProviderAdapter } from '../../src/core/provider.js';
 
@@ -910,5 +911,63 @@ describe('Init wizard integration', () => {
     const gitignore = readFileSync(join(root, '.gitignore'), 'utf-8');
     const matches = gitignore.match(/\.deckent\//g);
     expect(matches?.length).toBe(1);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// GROUP 9: FIX Spawn-Failure Detection (455-003 terminal-lifecycle truth)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('detectFixSpawnFailure — FIX spawn/preflight failure gate', () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'deckent-fixfail-'));
+    mkdirSync(join(root, TASKS_DIR), { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('detects a fix worker that left a container_start_failed marker with no .result', () => {
+    writeFileSync(
+      join(root, TASKS_DIR, 'task-022-fix.timeout'),
+      'container_start_failed:DECKENT_E086:permission denied talking to the Docker daemon socket',
+    );
+    const out = detectFixSpawnFailure(root);
+    expect(out).not.toBeNull();
+    expect(out!.taskId).toBe('022-fix');
+    expect(out!.code).toBe('DECKENT_E086');
+    expect(out!.message).toContain('container_start_failed');
+  });
+
+  it('returns null when the fix worker later wrote a .result (spawn ultimately recovered)', () => {
+    writeFileSync(
+      join(root, TASKS_DIR, 'task-022-fix.timeout'),
+      'container_start_failed:DECKENT_E085:cannot connect to the Docker daemon',
+    );
+    writeFileSync(
+      join(root, TASKS_DIR, 'task-022-fix.result'),
+      JSON.stringify({ taskId: '022-fix', selfAssessment: 'DONE' }),
+    );
+    expect(detectFixSpawnFailure(root)).toBeNull();
+  });
+
+  it('ignores a FIRST-attempt (non-fix) task marker — those are handled by EVALUATE/FIX', () => {
+    writeFileSync(
+      join(root, TASKS_DIR, 'task-022.timeout'),
+      'container_start_failed:DECKENT_E086:permission denied',
+    );
+    expect(detectFixSpawnFailure(root)).toBeNull();
+  });
+
+  it('ignores a fix marker that is a plain WORKER_TIMEOUT (not a spawn/preflight failure)', () => {
+    writeFileSync(join(root, TASKS_DIR, 'task-022-fix.timeout'), 'WORKER_TIMEOUT');
+    expect(detectFixSpawnFailure(root)).toBeNull();
+  });
+
+  it('returns null when there are no timeout markers at all', () => {
+    expect(detectFixSpawnFailure(root)).toBeNull();
   });
 });

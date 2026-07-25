@@ -500,6 +500,39 @@ describe('Docker coordinator restart reconciliation', () => {
     });
   });
 
+  it('restores persisted budget and vetoes DONE when recovered usage is unmeasurable', async () => {
+    const taskId = 'restart-budget-unmeasurable';
+    const containerId = 'f'.repeat(64);
+    const { root, tasks, ref } = fixture(taskId);
+    prepare(ref, containerId);
+    writeDone(tasks, taskId);
+    writeFileSync(join(tasks, `task-${taskId}.json`), JSON.stringify({
+      id: taskId,
+      budget: { maxTurns: 1 },
+    }), 'utf-8');
+    installChildRouter(0);
+    mockSpawnSync.mockImplementation((_command, args) => {
+      const argv = args as string[];
+      if (argv[0] === 'inspect') {
+        return spawnResult(0, authorityProjection(ref, containerId, false, 0));
+      }
+      if (argv[0] === 'rm') return spawnResult(0);
+      throw new Error(`unexpected docker sync call: ${argv.join(' ')}`);
+    });
+
+    const report = await new DockerSpawnBackend(root).reconcilePendingAttempts();
+
+    expect(report.adopted).toEqual([taskId]);
+    expect(readTaskResultSettlement(ref)?.result).toMatchObject({
+      selfAssessment: 'NO_GO',
+      testsPassed: false,
+      notes: expect.stringContaining('not terminally measurable'),
+    });
+    expect(readTaskResultSettlementClosure(ref)).toMatchObject({
+      containerDisposition: 'stopped-removed',
+    });
+  });
+
   it('settles a durable result after exact container absence without redrive', async () => {
     const taskId = 'restart-result-absent';
     const containerId = 'c'.repeat(64);

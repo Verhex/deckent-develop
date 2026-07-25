@@ -53,15 +53,15 @@ export function registerStartTool(server: McpServer): void {
     'deckent_start',
     {
       title: 'Start Run',
-      description: 'Start a full run in the background. Runs the complete lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP. Pre-spawn cost gate: if the estimated run cost exceeds cost_limits.sprint_max_usd (.deckent/cost-config.json), the tool returns COST_GATE_EXCEEDED — override with acknowledgeCost=true (or force=true to skip the gate entirely). Returns immediately with a jobId — the run continues asynchronously. Use deckent_status to monitor progress and deckent_review to evaluate results. Prerequisite: deckent_init + deckent_set_directives must have been run.',
+      description: 'Start a full run in the background. Runs the complete lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP. Pre-spawn cost admission always runs: acknowledgeCost=true or force=true may acknowledge a numeric budget overrun, but cannot override unknown pricing or an unavailable gate. Returns immediately with a jobId — the run continues asynchronously. Use deckent_status to monitor progress and deckent_review to evaluate results. Prerequisite: deckent_init + deckent_set_directives must have been run.',
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         autoApprove: z.boolean().optional().default(false).describe('Auto-approve worker tool calls with --dangerously-skip-permissions. CLI default is false; set true only when the caller has confirmed the run is safe (CLI/MCP parity — ADR-022-V2).'),
-        acknowledgeCost: z.boolean().optional().default(false).describe('Bypass the pre-spawn cost gate when the realistic estimate exceeds cost_limits.sprint_max_usd. The caller must explicitly acknowledge the over-budget run; otherwise deckent_start returns COST_GATE_EXCEEDED. Equivalent to CLI --force from the cost-gate perspective.'),
+        acknowledgeCost: z.boolean().optional().default(false).describe('Acknowledge a numeric over-budget estimate. Unknown pricing or an unavailable gate still blocks. Equivalent to CLI --force from the cost-gate perspective.'),
         acknowledgeScopePaths: z.boolean().optional().default(false).describe('Bypass the pre-spawn SCOPE gate (Dimension B). By default a run is blocked before spawn when a task\'s filesWrite path does not exist and looks like a typo/wrong-directory (an orphan-file mode). Set true to allow such paths as intentional new files. Equivalent to CLI --force-scope; independent of acknowledgeCost/force.'),
         acknowledgePromptGate: z.boolean().optional().default(false).describe('Bypass the plan-time G-series prompt gate BLOCK (persona-capability / decision-space / scope-contract findings — born-628). By default a run halts at PLAN when a task\'s finalized (persona × intent) fit fails a hard lint. Set true to allow such tasks to spawn anyway. Equivalent to CLI --force-prompt-gate; independent of acknowledgeCost/force/acknowledgeScopePaths.'),
         dryRun: z.boolean().optional().default(false).describe('Plan the run without spawning workers. Returns the planned tasks list so you can review before committing. No workers are started, no files are changed.'),
-        force: z.boolean().optional().default(false).describe('Skip pre-flight checks AND the cost gate. Use only when the environment is known-ready and the cost has been verified out-of-band. Equivalent to CLI --force.'),
+        force: z.boolean().optional().default(false).describe('Skip the sprint-lock pre-flight and acknowledge a numeric cost overrun. Unknown pricing or an unavailable cost gate still blocks. Equivalent to CLI --force.'),
         timeout: z.number().int().positive().optional().describe('Run maximum duration in milliseconds (default: 30 minutes = 1800000). Run is marked TIMEOUT if workers do not complete within this window.'),
         sandbox: z.boolean().optional().default(false).describe('Run in sandbox mode: stashes local git changes before spawning and restores them after the run completes. Safe experimentation — no permanent changes on failure.'),
         flowId: z.string().optional().describe('TERM-FLOW-UNIFY (426-001): consume an approved RunFlow snapshot instead of planning fresh — requires revision, planDigest and config.terminal.run_flow_v2=true. Must be supplied together with revision + planDigest.'),
@@ -94,9 +94,9 @@ export function registerStartTool(server: McpServer): void {
       //   uses config.spawn_backend automatically. No explicit handling needed here.
       // - timeout: Both pass timeoutMs to runSprint (undefined = 30min default in result-collector).
       //   CLI parses string→int; MCP accepts number directly. Behavior equivalent.
-      // - force: CLI skips sprint lock check, doctor pre-flight checks AND the
-      //   cost gate. MCP force skips sprint lock + cost gate (no doctor check
-      //   by design — non-interactive context).
+      // - force: CLI skips sprint lock/doctor checks and acknowledges a numeric
+      //   overrun. MCP skips its lock check and applies the same acknowledgement
+      //   while unknown/unavailable cost evidence remains blocking.
       //   KNOWN DIVERGENCE: doctor pre-flight not run in MCP, acceptable.
 
       try {
@@ -145,6 +145,63 @@ export function registerStartTool(server: McpServer): void {
           const approvedSnapshot = loadApprovedSnapshot(root, flowId!);
           const existingRunHandle = loadRunHandle(root, flowId!);
 
+          // Only a fresh, CAS-matching start can create new provider spend.
+          // Invalid/stale requests retain run-job-service's typed errors, and
+          // an exact duplicate is a no-op that needs no second admission.
+          const isFreshApprovedStart = approvedSnapshot !== undefined
+            && approvedSnapshot.revision === revision
+            && approvedSnapshot.planDigest === planDigest
+            && existingRunHandle === undefined;
+          if (isFreshApprovedStart) {
+            try {
+              initCostConfig(root);
+              const costConfig = loadCostConfig(root);
+              const cfgAuthMode = await readAuthMode(root);
+              const costTasks: TaskCostInput[] = approvedSnapshot.sprint.tasks.map((t) => ({
+                id: t.id,
+                model: t.model,
+                estimatedInputTokens: t.estimatedTokens ?? 2700,
+                estimatedOutputTokens: t.effort === 'high' ? 4000 : t.effort === 'low' ? 500 : 1500,
+                effort: t.effort as 'low' | 'normal' | 'high' | undefined,
+                billingMode: resolveBillingModeForAuth(t.provider, t.authMode ?? cfgAuthMode),
+              }));
+              const gate = evaluateCostGate({
+                tasks: costTasks,
+                costConfig,
+                acknowledgeCost: acknowledgeCost || force,
+              });
+              if (!gate.ok) {
+                const payload = buildCostGateErrorPayload(gate, force ? 'force' : 'acknowledgeCost');
+                const errData = {
+                  error: true,
+                  success: false,
+                  code: payload.error,
+                  estimated: payload.estimated,
+                  budget: payload.budget,
+                  override: payload.override,
+                  message: payload.message,
+                };
+                return {
+                  content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(
+                    errData,
+                    formatErrorResponse({ code: payload.error, message: payload.message }),
+                  )) }],
+                  isError: true,
+                };
+              }
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              const errData = { error: true, success: false, code: 'COST_GATE_UNAVAILABLE', message };
+              return {
+                content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(
+                  errData,
+                  formatErrorResponse({ code: errData.code, message }),
+                )) }],
+                isError: true,
+              };
+            }
+          }
+
           let handle: RunHandle;
           let status: 'started' | 'noop-duplicate';
           try {
@@ -160,6 +217,7 @@ export function registerStartTool(server: McpServer): void {
                   ...(autoApprove ? ['--auto-approve'] : []),
                   ...(acknowledgeScopePaths ? ['--force-scope'] : []),
                   ...(acknowledgePromptGate ? ['--force-prompt-gate'] : []),
+                  ...((acknowledgeCost || force) ? ['--force'] : []),
                   ...(sandbox ? ['--sandbox-mode'] : []),
                   ...(timeout !== undefined ? ['--timeout', String(timeout)] : []),
                 ];
@@ -283,16 +341,16 @@ export function registerStartTool(server: McpServer): void {
         // Sprint-estimator wire (B11): real duration estimate computed from the
         // planned tasks + worker count during the cost-gate pre-plan (no extra
         // planSprint call). Stays undefined — and the response falls back to the
-        // heuristic range — only when no plan is available (force=true or a
-        // planner failure), so the surface never fabricates a fixed number.
+        // heuristic range only when no plan is available, so the surface
+        // never fabricates a fixed number.
         let sprintEstimate: SprintEstimate | undefined;
 
         // ─── PRE-SPRINT COST GATE (Sprint 189 T-008) ──────────────
         // Mirrors the CLI cost gate via shared evaluateCostGate() helper.
         // Prevents Sprint 140-style $42 overruns originating from the MCP
-        // start path (which previously had no gate). Skipped when force=true.
-        if (!force) {
-          try {
+        // start path (which previously had no gate). `force` acknowledges only
+        // numeric overruns; unknown/unavailable pricing remains fail-closed.
+        try {
             initCostConfig(root);
             const costConfig = loadCostConfig(root);
 
@@ -327,11 +385,11 @@ export function registerStartTool(server: McpServer): void {
             const gate = evaluateCostGate({
               tasks: costTasks,
               costConfig,
-              acknowledgeCost,
+              acknowledgeCost: acknowledgeCost || force,
             });
 
             if (!gate.ok) {
-              const payload = buildCostGateErrorPayload(gate, 'acknowledgeCost');
+              const payload = buildCostGateErrorPayload(gate, force ? 'force' : 'acknowledgeCost');
               const errData = {
                 error: true,
                 success: false,
@@ -386,11 +444,17 @@ export function registerStartTool(server: McpServer): void {
             // can never bypass the cost gate; estimateSprintFull is pure and does
             // not throw on valid planned tasks.
             sprintEstimate = estimateSprintFull(planForCost.tasks, recommendation.maxWorkers, root);
-          } catch (e) {
-            // Non-fatal: cost-config missing or planner failure should not
-            // prevent sprint start (mirrors CLI graceful-degradation).
-            debugLog('start:costGate:error', e);
-          }
+        } catch (error) {
+          debugLog('start:costGate:error', error);
+          const message = error instanceof Error ? error.message : String(error);
+          const errData = { error: true, success: false, code: 'COST_GATE_UNAVAILABLE', message };
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(
+              errData,
+              formatErrorResponse({ code: errData.code, message }),
+            )) }],
+            isError: true,
+          };
         }
 
         const jobId = `sprint-${Date.now()}`;

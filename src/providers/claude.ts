@@ -5,6 +5,7 @@ import type { ModelType } from '../core/types.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { PROVIDER_PACKAGES } from '../core/provider-packages.js';
 import type { ProviderAdapter, ProviderSpawnOptions, ProviderAvailabilityDetail } from '../core/provider.js';
+import type { LiveUsageBudgetSupport } from '../core/live-execution-budget.js';
 import { ProviderError, resolveBinaryPath, parseSemverFromOutput } from '../core/provider.js';
 import {
   spawnWorker,
@@ -95,6 +96,9 @@ export class ClaudeAdapter implements ProviderAdapter {
   /** Live registry view — recomputed on every access so models.dev additions surface immediately. */
   get supportedModels(): readonly ModelType[] {
     return getSupportedClaudeModels();
+  }
+  get liveUsageBudgetSupport(): LiveUsageBudgetSupport | undefined {
+    return this.backend === 'subprocess' ? this.subprocessBackend?.liveUsageBudgetSupport : undefined;
   }
 
   private readonly projectDir: string;

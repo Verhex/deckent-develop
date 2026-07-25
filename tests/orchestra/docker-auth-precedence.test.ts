@@ -12,8 +12,8 @@
  * Forwarding rules tested here:
  * - claude provider + subscription → ANTHROPIC_API_KEY NOT forwarded
  * - claude provider + api authMode → ANTHROPIC_API_KEY forwarded
- * - codex provider               → OPENAI_API_KEY forwarded (no Anthropic)
- * - gemini provider              → GOOGLE_API_KEY forwarded (no Anthropic)
+ * - codex/gemini subscription    → OAuth credential file, no API key
+ * - codex/gemini API authMode    → own API key only
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -26,8 +26,9 @@ vi.mock('node:child_process', () => ({
   spawn: vi.fn(() => {
     const stub = {
       stdout: { on: vi.fn() },
-      stderr: { on: vi.fn() },
+      stderr: { on: vi.fn(), resume: vi.fn() },
       on: vi.fn(),
+      once: vi.fn(),
     };
     return stub as unknown as ChildProcess;
   }),
@@ -37,7 +38,9 @@ vi.mock('node:child_process', () => ({
 // (needed to flip useApiOnly via readTaskAuthMode).
 const fsState = {
   existsSyncImpl: (_path: string): boolean => false,
-  readFileSyncImpl: (_path: string): string => '{}',
+  readFileSyncImpl: (path: string): string => path.endsWith('/.gemini/settings.json')
+    ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
+    : '{}',
 };
 
 vi.mock('node:fs', () => ({
@@ -71,11 +74,17 @@ vi.mock('../../src/core/active-workers.js', () => ({
   clearPending: vi.fn(),
 }));
 
+vi.mock('../../src/core/task-result-settlement.js', () => {
+  return import('../helpers/task-result-settlement-stub.js')
+    .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
+});
+
 import { spawnSync } from 'node:child_process';
 import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
 import type { ModelType } from '../../src/core/types.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
+const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -95,8 +104,8 @@ function installSpawnRouter(): void {
       stdout = 'container-id-abc123';
     } else if (cmd === 'docker' && sub === 'inspect') {
       stdout = 'true|0';
-    } else if (cmd === 'claude' && sub === '--version') {
-      stdout = 'claude 1.0.0 (host auth ok)';
+    } else if (cmd === 'claude' && argv.join(' ') === 'auth status --json') {
+      stdout = '{"loggedIn":true}';
     }
 
     return {
@@ -127,8 +136,15 @@ function hasEnvFlag(argv: string[], key: string): boolean {
  * other existsSync queries (auth mount, .claude.json) default to false to
  * mirror the existing docker-provider-auth.test.ts isolation.
  */
+function isProviderCredentialPath(path: string): boolean {
+  return path.endsWith('/.claude/.credentials.json')
+    || path.endsWith('/.codex/auth.json')
+    || path.endsWith('/.gemini/gemini-credentials.json')
+    || path.endsWith('/.gemini/google_accounts.json');
+}
+
 function stubTaskAuthMode(taskId: string, authMode: 'subscription' | 'api'): void {
-  fsState.existsSyncImpl = (p: string) => p.endsWith(`task-${taskId}.json`);
+  fsState.existsSyncImpl = (p: string) => p.endsWith(`task-${taskId}.json`) || isProviderCredentialPath(p);
   fsState.readFileSyncImpl = (p: string) => {
     if (p.endsWith(`task-${taskId}.json`)) {
       return JSON.stringify({ authMode, scope: { filesWrite: [] } });
@@ -138,8 +154,10 @@ function stubTaskAuthMode(taskId: string, authMode: 'subscription' | 'api'): voi
 }
 
 function resetFsStubs(): void {
-  fsState.existsSyncImpl = () => false;
-  fsState.readFileSyncImpl = () => '{}';
+  fsState.existsSyncImpl = isProviderCredentialPath;
+  fsState.readFileSyncImpl = (path) => path.endsWith('/.gemini/settings.json')
+    ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
+    : '{}';
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -165,7 +183,7 @@ describe('DockerSpawnBackend: env-forwarding auth-precedence (Sprint 214 T-001)'
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-host-leak');
 
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-auth-sub', 'sonnet' as ModelType, 'prompt');
+    backend.spawn('t-auth-sub', 'claude-sonnet-5' as ModelType, 'prompt', TEST_EXECUTION_OPTIONS);
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -177,39 +195,31 @@ describe('DockerSpawnBackend: env-forwarding auth-precedence (Sprint 214 T-001)'
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-api-mode');
 
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-auth-api', 'sonnet' as ModelType, 'prompt');
+    backend.spawn('t-auth-api', 'claude-sonnet-5' as ModelType, 'prompt', TEST_EXECUTION_OPTIONS);
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
     expect(hasEnvFlag(argv, 'ANTHROPIC_API_KEY')).toBe(true);
   });
 
-  it('codex provider (gpt-4.1) → forwards OPENAI_API_KEY, NOT ANTHROPIC_API_KEY', () => {
+  it('codex Docker subscription is held before any credential can be forwarded', () => {
     vi.stubEnv('OPENAI_API_KEY', 'sk-openai');
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-anthropic-irrelevant');
 
-    const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-auth-codex', 'gpt-4.1' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
-    expect(hasEnvFlag(argv, 'OPENAI_API_KEY')).toBe(true);
-    // Non-claude provider must not receive Anthropic's key (cross-provider
-    // confusion guard).
-    expect(hasEnvFlag(argv, 'ANTHROPIC_API_KEY')).toBe(false);
+    expect(() => new DockerSpawnBackend('/test/project')
+      .spawn('t-auth-codex', 'gpt-4.1' as ModelType, 'prompt', TEST_EXECUTION_OPTIONS))
+      .toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 
-  it('gemini provider (gemini-2.5-flash) → forwards GOOGLE_API_KEY, NOT ANTHROPIC_API_KEY', () => {
+  it('gemini Docker subscription is held before any credential can be forwarded', () => {
     vi.stubEnv('GOOGLE_API_KEY', 'ya29-google');
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-anthropic-irrelevant');
 
-    const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-auth-gemini', 'gemini-2.5-flash' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
-    expect(hasEnvFlag(argv, 'GOOGLE_API_KEY')).toBe(true);
-    expect(hasEnvFlag(argv, 'ANTHROPIC_API_KEY')).toBe(false);
+    expect(() => new DockerSpawnBackend('/test/project')
+      .spawn('t-auth-gemini', 'gemini-2.5-flash' as ModelType, 'prompt', TEST_EXECUTION_OPTIONS))
+      .toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 
   it('claude provider + subscription → does NOT forward OPENAI_API_KEY even if set', () => {
@@ -218,10 +228,23 @@ describe('DockerSpawnBackend: env-forwarding auth-precedence (Sprint 214 T-001)'
     vi.stubEnv('OPENAI_API_KEY', 'sk-openai-leak');
 
     const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-auth-claude-pure', 'haiku' as ModelType, 'prompt');
+    backend.spawn('t-auth-claude-pure', 'claude-haiku-4-5-20251001' as ModelType, 'prompt', TEST_EXECUTION_OPTIONS);
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
     expect(hasEnvFlag(argv, 'OPENAI_API_KEY')).toBe(false);
+  });
+
+  it.each([
+    ['t-auth-codex-api', 'gpt-5.6-sol', 'OPENAI_API_KEY'],
+    ['t-auth-gemini-api', 'gemini-2.5-flash', 'GOOGLE_API_KEY'],
+  ] as const)('%s remains held in API mode until incremental Docker usage exists', (taskId, model, envName) => {
+    stubTaskAuthMode(taskId, 'api');
+    vi.stubEnv(envName, 'provider-api-key');
+
+    expect(() => new DockerSpawnBackend('/test/project')
+      .spawn(taskId, model as ModelType, 'prompt', TEST_EXECUTION_OPTIONS))
+      .toThrow(/does not expose incremental measured usage/);
+    expect(capturedDockerRunArgs).toHaveLength(0);
   });
 });

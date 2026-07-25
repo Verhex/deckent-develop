@@ -16,6 +16,7 @@ import {
 } from '../../src/core/config.js';
 import type { SystemProfile, PlanMode } from '../../src/core/types.js';
 import { DEFAULT_MODE } from '../../src/core/constants.js';
+import { ProviderConfigAliasConflictError } from '../../src/core/provider-config-canonicalizer.js';
 
 // Mock fs modules
 vi.mock('node:fs', () => ({
@@ -714,6 +715,32 @@ describe('multi-provider config validation', () => {
     ).toThrow(ConfigValidationError);
   });
 
+  it('accepts a complete role-aware provider fallback policy', () => {
+    expect(() => validatePartialConfig({
+      provider_fallback: {
+        global: ['openrouter', 'codex'],
+        brain: ['claude', 'codex'],
+        worker: ['openrouter', 'claude'],
+        auditor: ['codex', 'gemini'],
+        auditor_provider: 'gemini',
+        unattended: false,
+      },
+    })).not.toThrow();
+  });
+
+  it.each([
+    ['non-object policy', 'claude'],
+    ['string global chain', { global: 'codex' }],
+    ['invalid chain entry', { worker: ['not-a-provider'] }],
+    ['invalid auditor provider', { auditor_provider: 'not-a-provider' }],
+    ['non-boolean unattended gate', { unattended: 'yes' }],
+    ['unknown safety-policy key', { audit: ['codex'] }],
+  ])('rejects malformed provider_fallback: %s', (_label, providerFallback) => {
+    expect(() => validatePartialConfig({
+      provider_fallback: providerFallback as unknown as NonNullable<ReturnType<typeof getDefaultConfig>['provider_fallback']>,
+    })).toThrow(ConfigValidationError);
+  });
+
   it('accepts valid provider_overrides', () => {
     expect(() =>
       validatePartialConfig({ provider_overrides: { docs: 'gemini', tests: 'codex' } }),
@@ -813,6 +840,78 @@ describe('multi-provider config merge', () => {
     const config = await loadConfig('/test/project');
     expect(config).toBeDefined();
     // If invalid, it would have thrown — gemini is valid
+  });
+
+  it('preserves a flat-only global provider through grouped defaults', async () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFile
+      .mockResolvedValueOnce(JSON.stringify({ brain_provider: 'codex' }))
+      .mockResolvedValueOnce(JSON.stringify({}));
+
+    const config = await loadConfig('/test/provider-global', { force: true });
+    expect(config.brain_provider).toBe('codex');
+    expect(config.providers?.brain).toBe('codex');
+  });
+
+  it('preserves a flat-only project provider through grouped defaults', async () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFile
+      .mockResolvedValueOnce(JSON.stringify({}))
+      .mockResolvedValueOnce(JSON.stringify({ worker_provider: 'gemini' }));
+
+    const config = await loadConfig('/test/provider-project', { force: true });
+    expect(config.worker_provider).toBe('gemini');
+    expect(config.providers?.worker).toBe('gemini');
+  });
+
+  it('applies project grouped provider over a canonicalized global flat provider', async () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFile
+      .mockResolvedValueOnce(JSON.stringify({ brain_provider: 'codex' }))
+      .mockResolvedValueOnce(JSON.stringify({ providers: { brain: 'gemini' } }));
+
+    const config = await loadConfig('/test/provider-precedence', { force: true });
+    expect(config.brain_provider).toBe('gemini');
+    expect(config.providers?.brain).toBe('gemini');
+  });
+
+  it('fails loudly with global-layer provenance for differing dual definitions', async () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFile.mockResolvedValueOnce(JSON.stringify({
+      brain_provider: 'codex',
+      providers: { brain: 'claude' },
+    }));
+
+    await expect(loadConfig('/test/provider-global-conflict', { force: true }))
+      .rejects.toMatchObject({
+        name: 'ProviderConfigAliasConflictError',
+        conflict: { layer: 'global', flatKey: 'brain_provider', groupedKey: 'providers.brain' },
+      });
+  });
+
+  it('fails loudly with project-layer provenance for differing dual definitions', async () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFile
+      .mockResolvedValueOnce(JSON.stringify({}))
+      .mockResolvedValueOnce(JSON.stringify({
+        worker_provider: 'codex',
+        providers: { worker: 'gemini' },
+      }));
+
+    await expect(loadConfig('/test/provider-project-conflict', { force: true }))
+      .rejects.toBeInstanceOf(ProviderConfigAliasConflictError);
+  });
+
+  it('keeps environment provider override as the highest precedence', async () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFile
+      .mockResolvedValueOnce(JSON.stringify({ brain_provider: 'codex' }))
+      .mockResolvedValueOnce(JSON.stringify({ providers: { brain: 'gemini' } }));
+    process.env['DECKENT_BRAIN_PROVIDER'] = 'claude';
+
+    const config = await loadConfig('/test/provider-env', { force: true });
+    expect(config.brain_provider).toBe('claude');
+    expect(config.providers?.brain).toBe('gemini');
   });
 });
 

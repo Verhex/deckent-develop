@@ -2,6 +2,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DECKENT_VERSION } from '../core/constants.js';
@@ -202,11 +203,36 @@ async function main(): Promise<void> {
   await server.connect(transport);
 }
 
-const isEntryPoint =
-  process.argv[1] !== undefined &&
-  resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1]);
+/**
+ * Whether an argv entry resolves to this MCP module.
+ *
+ * Package-manager bins are symlinks on POSIX, so lexical path equality alone
+ * can make a valid `deckent-mcp` invocation exit cleanly without starting the
+ * stdio transport. Keep the lexical fast path for direct execution, then
+ * compare canonical paths for linked/global installs. Any malformed or missing
+ * path fails closed so importing this module never starts a server by accident.
+ */
+export function isMcpServerEntryPoint(
+  argvEntry: string | undefined,
+  moduleUrl: string = import.meta.url,
+): boolean {
+  if (!argvEntry) return false;
 
-if (isEntryPoint) {
+  try {
+    const modulePath = fileURLToPath(moduleUrl);
+    if (resolve(modulePath) === resolve(argvEntry)) return true;
+
+    try {
+      return realpathSync(modulePath) === realpathSync(argvEntry);
+    } catch {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+}
+
+if (isMcpServerEntryPoint(process.argv[1])) {
   main().catch((err: unknown) => {
     process.stderr.write(`deckent-mcp error: ${err instanceof Error ? err.message : String(err)}\n`);
     process.exit(1);

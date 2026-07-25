@@ -543,6 +543,21 @@ export function registerStatus(program: Command): void {
           if (pendingOrphan) print(pendingOrphan);
           return;
         }
+        // ─── 455-003 (TERMINAL-LIFECYCLE-TRUTH): JSON COMPLETE-gate ──────────
+        // The human path gates a COMPLETE/terminal dashboard inside
+        // formatHumanStatus (an honest "completed → no active run" block, never
+        // the live Progress/Active lines). The --json surface used to dump the RAW
+        // state instead — presenting a completed sprint's stale, live-shaped
+        // progress (the auditor's final-scan garbage: active:N/done:0) as if it
+        // were live. That is the JSON twin of the 2026-07-06 human lie and makes
+        // the two surfaces DISAGREE. Apply the same terminal gate here so human +
+        // JSON agree: a COMPLETE dashboard reports the honest no-active shape on
+        // BOTH surfaces.
+        const spTerminal = state.sprint as { status?: string; phase?: string };
+        if (opts.json && !opts.raw && (spTerminal.status === 'COMPLETE' || spTerminal.phase === 'COMPLETE')) {
+          output(JSON.stringify(buildNoActiveStatusJson(root), null, 2));
+          return;
+        }
         if (opts.json) {
           // (E) --json + --verbose: include agent/skill info
           const tasks = loadTaskFiles(root);

@@ -1,5 +1,41 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-456 Learnings
+- Sprint sprint-456 Learnings: ## Sprint sprint-456 Learnings
+- Docker auth and provider-image fixture budget parity: NO_GO — Runtime budget circuit breaker stopped the worker: cache-read token budget exceeded (1032095 > 1000000). Runtime budget
+- Scheduler, adapter, MCP and pricing fixture admission parity: NO_GO — Runtime budget circuit breaker stopped the worker: cache-read token budget exceeded (1054925 > 1000000). Runtime budget
+- CLI dry-run and color hermeticity contract: NO_GO — Runtime budget circuit breaker stopped the worker: cache-read token budget exceeded (1103194 > 1000000). Runtime budget
+
+## Sprint sprint-455 Learnings
+- Sprint sprint-455 Learnings: ## Sprint sprint-455 Learnings
+- Crash-safe resume and recovery command truth: GO_WITH_TECH_DEBT — Made the public recovery surfaces truthful within write scope; verified against reality before coding.
+
+DELIVERED (all v
+- Docker preflight, timeout attribution, and terminal lifecycle truth: GO_WITH_TECH_DEBT — Three concerns, all implemented + verified.
+
+CONCERN 1 — Docker preflight truth (spawn-backend-docker.ts): added distinc
+
+## Gains
+- 455-002 — Evaluator rubric and recovered-result provenance truth — Root cause: safeRubricReconcile (sprint-phases.ts) is the single fault-armor wrapper for every ev...
+
+## Sprint sprint-454 Learnings
+- Sprint sprint-454 Learnings: ## Sprint sprint-454 Learnings
+- Parametric agent model front doors: GO_WITH_TECH_DEBT — Worker timeout/killed (exitCode=1) but git diff shows 5 files modified. Brain should reconcile via Spurious NO_GO helper
+- Canonical autonomous and task-mode producers: NO_GO — Removed every hardcoded 'sonnet' alias literal from the autonomous planning/JIT/backlog and task-mode producers, routing
+- Canonical estimation, reconciliation, and token-cost keys: NO_GO — Canonicalized estimation/cost keys off registry ID + tier metadata; eliminated the two silent named-default paths.
+
+toke
+- Remove gpt-5 alias and canonicalize Codex/subscription wire: GO_WITH_TECH_DEBT — Worker timeout/killed (exitCode=1) but git diff shows 6 files modified. Brain should reconcile via Spurious NO_GO helper
+
+## Gains
+- 454-004 — Canonical generated templates and MCP directives — Root cause: task-builder.ts's DirectiveTaskSchema calls resolveCanonicalModelIdentity() on the pa...
+
+## Sprint sprint-453 Learnings
+- Sprint sprint-453 Learnings: ## Sprint sprint-453 Learnings
+
+## Gains
+- 453-001 — Canonical CLI and MCP one-shot execution boundary — Canonical CLI + MCP one-shot execution boundary — all 10 goCriteria items evidenced.
+
 ## Sprint sprint-452 Learnings
 - Sprint sprint-452 Learnings: ## Sprint sprint-452 Learnings
 - Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: ROOT-CAUSE FINDING (read first): the premise that 449-00…: GO_WITH_TECH_DEBT — RETRY of a task whose previous attempt (docker-452-001) was OOM-killed/force-stopped before writing a real result (only 
@@ -2964,3 +3000,7 @@ WHAT WAS DONE:
 
 ## Sprint unknown Learnings
 - help: help
+
+## Sprint unknown Learnings
+- Goal-v2 worker invocation truth — 8bc23db7: 2026-07-22 fact-only closure. Commit 8bc23db7e34fe7ef8d4a8c468b1b688aef69d786 is pushed to origin/main. Delivered: Mission-claim-derived invocation/call/receipt/reservation identity; tenant/project prebinding; known reachability and scoped limit admission before receipt and unique dispatch grant; raw fence and authored provider/model removed from exact executor; actual provider/model/backend/auth evidence match; host-scoped consumed/released settlement; replay consults receipt plus reservation journals and never redrives after durable dispatch; pre-grant HOLD and post-grant reconciliation remain distinct. Evidence: 166/166 focused hermetic tests, npm run lint PASS, npm run build:all PASS, compiled CLI canary mission=pending item=parked authority_unavailable receipt=null taskArtifacts=0. Finite Fable xverify xv-1784716119261 CONFIRMED in one terminal 3-turn run; usage input=3557 output=5973 cacheRead=86290 cacheCreate=35768; provider envelope USD 0.435695 is not an invoice. Nonclaims: production live ALLOW is not wired; exact reachability, authoritative provider/account snapshots, route lock and usage authority remain; this is local durable at-most-once grant, not external exactly-once. Live debt: report CONFIRMED and hb DONE but verifier result NO_GO/EXIT_WITHOUT_RESULT and task JSON PENDING; MASTER-PLAN 609 changed to yellow. Artifact SHA-256: plan 51bc1e221d88ba49ccd76a61bbbe0b49ea1db8da293c30a31aff662b964f444a; result 0c3f17992ad8e6e941b8078234c87fac06ea9aafb13e0d3864638f546644eb18; xverify prompt 6e78511000c5fb6d8b227cccfac22de9822670c75b6325702f8bb31592df644b; wrapper 68d4219c24597c79714ca88c9b63ab7425b4d396252162a5efb74f738406eacf; hb 80d20a360e7abf81763f96a8b12c11f63b589a5a3b3a74dea6ddec1ab16d426b; task 79f4d48c98c796b3a546ee69c2e7586bf8b5d534d6c066d38dbdd9161e16af0d; log d1c9b05ed809228f6f6ed3ccdeebf3f3c3226de871933b65b7b57592541282d0; verifier result 1f522703bcd2e90d2e821f4e4965c35d43af154a6abb4bad19ff723080ee876a; report 255381bc0b89398b58d04b1c17664c1156b2535ab9e5592d6c420fa5ebf5b458.
+- Dogfood truth snapshot 2026-07-22: 2026-07-22 owner-approved dogfood truth snapshot. Evidence archive: /home/alperen/.deckent/recovery-snapshots/deckent-dev/tasks-reset-2026-07-22-8bc23db7; payload manifest SHA-256 1ce6a6d24a20c4193167e9c746422363008fc32065e24b3b848df61403c52273. The reset preserved 655 .tasks files and no active sprint was present. Audited range 105ebc67..5e26a5a7 is 135 files, +15,860/-847. At main 8bc23db7, host-authoritative Docker result settlement is wired for one-shot paths but v1 autonomous, process and sprint paths still consume container-writable result state without settlementRef. Detached Docker loses host live-budget monitoring after host crash until its 1200-second container cap; deterministic task container-name retry can force-remove an orphan, so boot reconciliation and settle-or-refuse are required. Remote provider execution must have an owner-authored measurable budget; MCP run lacks the policy producer, and worker-writable Task JSON must not be the budget authority. Prompt inspection canaries reduced prompt size from 17,481 to 7,683 characters, and a 5M cache-read ceiling would have prevented about 82.4 percent of the 29.6M cache-read Sprint-455 replay. Xverify must remain criteria-only, terminal and finite; report/result/task projection convergence remains open. Goal-v2 production remains honest HOLD until live reachability and limit producers, approval composition and exact execution authorities are wired. Canonical provider API model IDs are the runtime contract; the current dirty migration is incomplete, with 28 failures in the 498-test targeted model matrix, so it must not be committed as-is.

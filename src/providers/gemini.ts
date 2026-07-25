@@ -534,10 +534,15 @@ export class GeminiAdapter implements ProviderAdapter {
    * Build CLI command + args for planner invocations.
    * Uses the Gemini CLI binary with -p flag.
    */
-  buildPlannerCommand(prompt: string, model: ModelType): { command: string; args: string[] } {
+  buildPlannerCommand(prompt: string, model: ModelType): import('../core/provider.js').ProviderPlannerCommand {
+    const calledModel = modelRegistry.get(model)?.apiId ?? model;
     return {
       command: 'gemini',
-      args: this.buildArgs(model, prompt),
+      args: this.buildArgs(calledModel, prompt),
+      calledProvider: 'gemini',
+      calledModel,
+      transport: 'cli',
+      executionBackend: 'host-subprocess',
     };
   }
 

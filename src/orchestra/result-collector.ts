@@ -45,6 +45,14 @@ import {
 import type { SchedulerSnapshot } from './scheduler-reducer.js';
 import { ApprovalBroker } from '../core/approval-broker.js';
 import type { BrainAnswer, WorkerQuestion, TokenUsage } from '../core/task-types.js';
+import { extractProviderBillingEvidence, reconcileProviderBilling } from '../core/provider-billing-evidence.js';
+import { evaluateExecutionBudget, evaluateRunCostBudget } from '../core/execution-budget.js';
+import { applyRuntimeBudgetStopToResult } from './runtime-budget-monitor.js';
+import {
+  readRuntimeBudgetUsage,
+  waitForTerminalRuntimeBudgetUsage,
+} from './runtime-budget-monitor.js';
+import { hasLiveUsageCeiling } from '../core/live-execution-budget.js';
 import {
   readAuthoritativeTaskResult,
   type TaskResultAuthorityRead,
@@ -97,7 +105,7 @@ import {
 import { providerRegistry } from '../core/provider.js';
 import { loadCostConfig } from '../core/cost-config-loader.js';
 import { calculateActualCost } from '../core/cost-calculator.js';
-import { writeFileSync, renameSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 
 // ─── Sprint Spawner (lazy import — avoid module init cycle) ──────
 // ADR-045: respawnEligibleTasks wire — invoked at runtime only, never at
@@ -605,6 +613,7 @@ export function estimateTokenUsage(task: Task, result: TaskResult): TokenUsage {
     inputTokens,
     outputTokens,
     cacheReadTokens,
+    source: 'estimate',
     ...(provider ? { provider } : {}),
     ...(model ? { model } : {}),
   };
@@ -736,7 +745,7 @@ export function enrichResultCost(
     const costConfig = loadCostConfig(projectRoot);
     const model = usage.model ?? task?.forceModel ?? 'unknown';
     const provider = usage.provider ?? task?.provider;
-    result.cost = calculateActualCost(
+    const localCost = calculateActualCost(
       {
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
@@ -750,6 +759,45 @@ export function enrichResultCost(
       provider,
       costConfig,
     );
+    result.cost = localCost;
+    // Provider billing is trusted only when the host re-extracts it from the
+    // captured provider log. The worker-writable .result field is never a
+    // billing authority by itself.
+    const providerName = String(provider ?? usage.provider ?? '');
+    let trustedProviderBilling;
+    if (providerName) {
+      try {
+        const logContent = readFileSync(
+          join(projectRoot, TASKS_DIR, `task-${result.taskId}.log`),
+          'utf-8',
+        );
+        trustedProviderBilling = extractProviderBillingEvidence(providerName, logContent);
+      } catch {
+        trustedProviderBilling = null;
+      }
+    }
+    if (trustedProviderBilling) result.providerBilling = trustedProviderBilling;
+    else delete result.providerBilling;
+
+    if (result.providerBilling) {
+      result.providerBilling = {
+        ...result.providerBilling,
+        reconciliation: reconcileProviderBilling(result.providerBilling, localCost.usd),
+      };
+      // Provider-final billing is authoritative. Preserve the local repricing
+      // and its variance above for diagnosis instead of silently overwriting it.
+      // A zero provider total for a paid model is not enough to erase a nonzero
+      // local estimate (subscription envelopes and incomplete billing payloads
+      // commonly report zero); fail conservatively on the priced evidence.
+      if (result.providerBilling.providerReportedUsd > 0 || localCost.usd === 0) {
+        result.cost = {
+          usd: result.providerBilling.providerReportedUsd,
+          currency: result.providerBilling.currency,
+          pricingSource: 'provider-envelope',
+          isLocal: localCost.isLocal,
+        };
+      }
+    }
   } catch (err) {
     debugLog('enrichResultCost', err);
   }
@@ -918,6 +966,13 @@ export async function waitForResults(
   const taskMap = new Map(sprint.tasks.map(t => [t.id, t]));
   const collected = new Set<string>();
   const remainingQueue: Task[] = queue ? [...queue] : [];
+  const waitForBudgetTerminal = async (task: Task | undefined, taskId: string): Promise<void> => {
+    if (!hasLiveUsageCeiling(task?.budget)) return;
+    // Budgeted workers are not accepted merely because they wrote `.result`;
+    // the host stream must settle first so a late final envelope/turn cannot
+    // race a premature DONE. Same bounded window as Docker's final log capture.
+    await waitForTerminalRuntimeBudgetUsage(projectRoot, taskId, 45_000);
+  };
 
   // ─── Sprint 165 Bug Y — duplicate spawn guard (Bug F) + force re-scan ────
   // Tracks task IDs that have already been TASK_ASSIGN'd in this waitForResults
@@ -1028,8 +1083,10 @@ export async function waitForResults(
             // (returns the instant the .log appears, so prompt dumps cost nothing).
             await waitForCliLog(projectRoot, taskId, 45000);
           }
+          await waitForBudgetTerminal(enrichTask, taskId);
           enrichResultTokenUsage(result, enrichTask, projectRoot);
           enrichResultCost(result, enrichTask, projectRoot);
+          applyBudgetEvidence(enrichTask, result, taskId);
           // LP-10 (2026-07-08): populate filesChanged/linesAdded/linesRemoved from
           // host-side git ground truth, not the worker's self-report (which arrived
           // as filesChanged=[] / linesAdded=null — an LLM cannot count its own diff).
@@ -1096,8 +1153,10 @@ export async function waitForResults(
         const lateAuthority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
         const lateResult = normalizeAuthoritativeTaskResult(lateAuthority, taskId);
         if (lateResult) {
+          await waitForBudgetTerminal(taskMap.get(taskId), taskId);
           enrichResultTokenUsage(lateResult, taskMap.get(taskId), projectRoot);
           enrichResultCost(lateResult, taskMap.get(taskId), projectRoot);
+          applyBudgetEvidence(taskMap.get(taskId), lateResult, taskId);
           sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, lateResult.filesChanged);
           // Persist enriched tokenUsage + cost to the .result FILE (see above).
           persistEnrichedResult(projectRoot, lateResult);
@@ -1161,6 +1220,10 @@ export async function waitForResults(
                 model: (taskForScope?.forceModel ?? taskForScope?.model) as TokenUsage['model'],
               },
             };
+        // No provider envelope survived the timeout. Zero placeholders are not
+        // usage evidence; turn the missing cost into an UNKNOWN run-budget HOLD
+        // before any initial/watcher dispatch can start another task.
+        applyBudgetEvidence(taskForScope, syntheticResult, taskId);
         // Write synthetic result to disk so evaluate phase can also read it
         try {
           await writeFile(
@@ -1324,6 +1387,59 @@ export async function waitForResults(
   // the main-loop dispatch gate, so without this check a nervous respawn would
   // spawn a NEW worker after a cost stop.
   let costGuard: import('./sprint-phases.js').CostGuardMonitor | undefined;
+  // Owner-supplied per-task budgets are enforced independently of the legacy
+  // opt-in transcript cost guard. Unknown evidence and exceeded ceilings both
+  // stop every subsequent dispatch in this run.
+  let taskBudgetHold = false;
+  let cumulativeRunCostUsd = 0;
+  const budgetCountedTaskIds = new Set<string>();
+  let sprintBudgetUsd: number | null = null;
+  try {
+    sprintBudgetUsd = loadCostConfig(projectRoot).cost_limits.sprint_max_usd;
+  } catch (e) {
+    debugLog('waitForResults:sprintBudgetLoad', e);
+  }
+
+  const applyBudgetEvidence = (task: Task | undefined, result: TaskResult, taskId: string): void => {
+    const runtimeStop = applyRuntimeBudgetStopToResult(projectRoot, taskId, result);
+    if (runtimeStop) taskBudgetHold = true;
+    if (!task) return;
+    const runtimeUsage = readRuntimeBudgetUsage(projectRoot, taskId);
+    const taskVerdict = evaluateExecutionBudget(
+      task,
+      result,
+      runtimeUsage?.terminal ? runtimeUsage.decision : undefined,
+    );
+    let runCostState: 'within-budget' | 'exceeded' | 'unknown' = 'within-budget';
+    if (!budgetCountedTaskIds.has(taskId)) {
+      budgetCountedTaskIds.add(taskId);
+      const runVerdict = evaluateRunCostBudget({
+        cumulativeUsd: cumulativeRunCostUsd,
+        nextCost: result.cost,
+        nextUsage: result.tokenUsage,
+        sprintBudgetUsd,
+      });
+      cumulativeRunCostUsd = runVerdict.cumulativeUsd;
+      runCostState = runVerdict.state;
+    }
+    if (taskVerdict.state === 'within-budget' && runCostState === 'within-budget') return;
+
+    taskBudgetHold = true;
+    try {
+      writeEvent(projectRoot, sprint.id, 'brain', 'auditor', 'TASK_BUDGET_HOLD', {
+        taskId,
+        taskBudgetState: taskVerdict.state,
+        reasons: taskVerdict.reasons,
+        consumedTokens: taskVerdict.consumedTokens,
+        consumedUsd: taskVerdict.consumedUsd,
+        taskBudget: task.budget,
+        cumulativeRunCostUsd,
+        sprintBudgetUsd,
+        runCostState,
+        emittedAt: new Date().toISOString(),
+      });
+    } catch (e) { debugLog('collectResults:taskBudgetHold', e); }
+  };
   const drainNervousRespawns = async (): Promise<void> => {
     if (!config?.nervous_system?.worker_respawn) return;
     for (const reqTaskId of drainRespawnRequests(projectRoot)) {
@@ -1351,7 +1467,7 @@ export async function waitForResults(
       // classifies it SYNTHETIC_NO_GO (not NOT_DISPATCHED) and the FIX phase
       // may spawn ONE ungated fix worker afterwards — a bounded, documented
       // leak (FIX-phase cost gating is a separate follow-up).
-      if (costGuard?.shouldStopDispatch()) continue;
+      if (taskBudgetHold || costGuard?.shouldStopDispatch()) continue;
       await spawnIfNotAssigned(task);
     }
   };
@@ -1542,7 +1658,7 @@ export async function waitForResults(
         trigger: { kind: triggerKind, sequence: ++shadowTickSequence },
         strategy: process.env.DECKENT_LEGACY_FIFO === '1' ? 'legacy-fifo' : 'continuous',
         nowMs: Date.now(),
-        costStop: costGuard?.shouldStopDispatch() ?? false,
+        costStop: taskBudgetHold || (costGuard?.shouldStopDispatch() ?? false),
         slotBudget: Math.max(0, maxWorkers - currentlyExecuting),
         dependencyPipelineEnabled: config.dependency_pipeline_enabled === true,
         sprint,
@@ -1585,7 +1701,7 @@ export async function waitForResults(
       const maxWorkers = config ? resolveEffectiveWorkers(config, getSystemProfile()) : 0;
       return Math.max(0, maxWorkers - currentlyExecuting);
     },
-    getCostStop: () => costGuard?.shouldStopDispatch() ?? false,
+    getCostStop: () => taskBudgetHold || (costGuard?.shouldStopDispatch() ?? false),
     spawnDeps: {
       projectRoot,
       sprintFallbackId: sprint.id,
@@ -1739,7 +1855,7 @@ export async function waitForResults(
         // NOT_DISPATCHED via the existing deadline path. Inert when the guard is
         // disabled (costGuard undefined → the condition is always true), so the
         // default dispatch sequence below is byte-for-byte unchanged.
-        if (!costGuard || !costGuard.shouldStopDispatch()) {
+        if (!taskBudgetHold && (!costGuard || !costGuard.shouldStopDispatch())) {
           // SCHED5: same injected schedulerDriver as the initial tick above
           // (see its construction comment). Legacy engine runs the exact
           // ADR-064/Sprint 165/Sprint 272 sequence below unchanged; reducer
@@ -1795,7 +1911,7 @@ export async function waitForResults(
       // classifyMissingResult marks them NOT_DISPATCHED (out of the NO_GO
       // blame-fix pipeline), identical to any un-reached task today. Inert when
       // the guard is disabled (costGuard undefined → condition never true).
-      if (costGuard?.shouldStopDispatch()) {
+      if (taskBudgetHold || costGuard?.shouldStopDispatch()) {
         const stillPending = sprint.tasks.filter(t => t.status === TaskStatus.PENDING).length;
         if (costGuardShouldComplete(true, collected.size, taskIds.size, stillPending)) break;
       }
@@ -1832,8 +1948,10 @@ export async function waitForResults(
     if (finalAuthority.result) {
       const result = normalizeAuthoritativeTaskResult(finalAuthority, taskId);
       if (result) {
+        await waitForBudgetTerminal(taskMap.get(taskId), taskId);
         enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
         enrichResultCost(result, taskMap.get(taskId), projectRoot);
+        applyBudgetEvidence(taskMap.get(taskId), result, taskId);
         // Sprint 201 review-feedback — close the final-sweep race window: a
         // worker whose real .result lands only after the watcher closed is a
         // genuine worker-sourced filesChanged, same source as branches (a)/(b).

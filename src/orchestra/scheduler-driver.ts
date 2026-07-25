@@ -368,6 +368,13 @@ export function createSchedulerDriver(
 
   return async (input: SchedulerDriverTickInput): Promise<SchedulerDriverTickResult> => {
     if (engine !== 'reducer' || !deps.config) {
+      // Cost/usage HOLD is a safety floor shared by initial and watcher ticks.
+      // Legacy passthrough must not run its callback when durable evidence has
+      // already tripped the gate; otherwise an initial tick can spawn one more
+      // wave before the outer watcher guard gets a chance to run.
+      if (deps.getCostStop()) {
+        return { engine: 'legacy', spawnedTaskIds: [], killedWorkerIds: [] };
+      }
       await input.runLegacyTick();
       return { engine: 'legacy', spawnedTaskIds: [], killedWorkerIds: [] };
     }

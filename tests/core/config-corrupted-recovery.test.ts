@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { writeFileSync, readFileSync, existsSync, mkdirSync, rmSync, readdirSync } from 'node:fs';
 import { loadConfig, clearConfigCache } from '../../src/core/config.js';
 import { removeDuplicateKeys } from '../../src/core/config-migration.js';
+import { ProviderConfigAliasConflictError } from '../../src/core/provider-config-canonicalizer.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -84,6 +85,17 @@ describe('corrupted config recovery', () => {
     const backups = files.filter(f => f.includes('.corrupted.'));
     expect(backups.length).toBe(0);
   });
+
+  it('persists a flat-only provider alias in canonical grouped form', async () => {
+    const configPath = join(tmpDir, '.deckent', 'config.json');
+    writeFileSync(configPath, JSON.stringify({ brain_provider: 'codex' }));
+
+    const config = await loadConfig(tmpDir, { force: true });
+    const persisted = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+    expect(config.brain_provider).toBe('codex');
+    expect(persisted['brain_provider']).toBeUndefined();
+    expect(persisted['providers']).toMatchObject({ brain: 'codex' });
+  });
 });
 
 // ─── Duplicate Key Removal Migration ────────────────────────────────
@@ -125,15 +137,16 @@ describe('removeDuplicateKeys', () => {
     expect((config['providers'] as Record<string, unknown>)['brain']).toBe('claude');
   });
 
-  it('preserves flat providers when grouped providers is absent', () => {
+  it('promotes flat providers when grouped providers is absent', () => {
     const config: Record<string, unknown> = {
       brain_provider: 'claude',
       worker_provider: 'codex',
     };
     const removed = removeDuplicateKeys(config);
-    expect(removed).toHaveLength(0);
-    expect(config['brain_provider']).toBe('claude');
-    expect(config['worker_provider']).toBe('codex');
+    expect(removed).toEqual(expect.arrayContaining(['brain_provider', 'worker_provider']));
+    expect(config['brain_provider']).toBeUndefined();
+    expect(config['worker_provider']).toBeUndefined();
+    expect(config['providers']).toMatchObject({ brain: 'claude', worker: 'codex' });
   });
 
   it('preserves top-level max_workers (Decision 1+2)', () => {
@@ -167,6 +180,29 @@ describe('removeDuplicateKeys', () => {
     };
     const removed = removeDuplicateKeys(config);
     expect(removed).toHaveLength(0);
+  });
+
+  it('canonicalizes provider_overrides and compares maps independent of key order', () => {
+    const config: Record<string, unknown> = {
+      provider_overrides: { docs: 'gemini', tests: 'codex' },
+      providers: { overrides: { tests: 'codex', docs: 'gemini' } },
+    };
+    const removed = removeDuplicateKeys(config);
+    expect(removed).toEqual(['provider_overrides']);
+    expect(config['provider_overrides']).toBeUndefined();
+  });
+
+  it('does not mutate any key when a provider alias conflicts', () => {
+    const config: Record<string, unknown> = {
+      spawn_backend: 'docker',
+      claude_backend: 'tmux',
+      brain_provider: 'claude',
+      worker_provider: 'codex',
+      providers: { worker: 'gemini' },
+    };
+    const before = structuredClone(config);
+    expect(() => removeDuplicateKeys(config)).toThrow(ProviderConfigAliasConflictError);
+    expect(config).toEqual(before);
   });
 });
 

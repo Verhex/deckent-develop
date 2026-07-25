@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   describeDockerPartialResultTermination,
+  reconcileDockerUnmeasurableRuntimeBudgetResult,
   reconcileDockerRuntimeBudgetResult,
   reconcileDockerRuntimeBudgetUsage,
   terminateDockerContainerForBudget,
@@ -236,6 +237,39 @@ describe('Docker runtime-budget result reconciliation', () => {
       const result = doneResult();
       const before = JSON.stringify(result);
       expect(reconcileDockerRuntimeBudgetUsage(result, evidence)).toBe(false);
+      expect(JSON.stringify(result)).toBe(before);
+    }
+  });
+
+  it('vetoes success when terminal usage is unmeasurable without claiming zero usage', () => {
+    const result = doneResult();
+    result.cost = { usd: 9, currency: 'USD', pricingSource: 'estimate', isLocal: false };
+    const evidence = budgetUsage('unmeasurable');
+
+    expect(reconcileDockerUnmeasurableRuntimeBudgetResult(result, evidence)).toBe(true);
+    expect(result.selfAssessment).toBe('NO_GO');
+    expect(result.testsPassed).toBe(false);
+    expect(result.notes).toContain('not terminally measurable');
+    expect(result.notes).toContain(`attemptId=${evidence.attemptId}`);
+    expect(result.cost).toBeUndefined();
+    expect(result.tokenUsage).toBeUndefined();
+  });
+
+  it('vetoes nonterminal observer-loss evidence idempotently', () => {
+    const result = doneResult();
+    const evidence = budgetUsage('within-budget', false);
+
+    expect(reconcileDockerUnmeasurableRuntimeBudgetResult(result, evidence)).toBe(true);
+    const once = JSON.stringify(result);
+    expect(reconcileDockerUnmeasurableRuntimeBudgetResult(result, evidence)).toBe(true);
+    expect(JSON.stringify(result)).toBe(once);
+  });
+
+  it('does not overlap terminal within-budget or exceeded reconciliation', () => {
+    for (const evidence of [budgetUsage('within-budget'), budgetUsage('exceeded')]) {
+      const result = doneResult();
+      const before = JSON.stringify(result);
+      expect(reconcileDockerUnmeasurableRuntimeBudgetResult(result, evidence)).toBe(false);
       expect(JSON.stringify(result)).toBe(before);
     }
   });

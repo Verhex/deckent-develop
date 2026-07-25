@@ -62,6 +62,7 @@ function makeMockBackend(): SpawnBackend & { calls: SpawnCall[] } {
   const calls: SpawnCall[] = [];
   return {
     name: 'mock-backend',
+    liveUsageBudgetSupport: 'measured-stream',
     spawn(taskId, model, prompt, opts) {
       calls.push({ taskId, model, prompt, opts });
     },
@@ -84,6 +85,7 @@ function makeMockOllamaAdapter(): MockAdapter {
   let refreshCount = 0;
   const adapter: MockAdapter = {
     name: 'ollama',
+    executionCostClass: 'local',
     supportedModels: ['qwen3.6'] as unknown as readonly ModelType[],
     spawn(taskId, model, prompt, opts) {
       spawnCalls.push({ taskId, model, prompt, opts });
@@ -130,6 +132,7 @@ function createTask(id: string, provider: 'claude' | 'ollama', model: ModelType,
     assignedAgent: 'generic',
     assignedSkills: [],
     provider,
+    ...(provider === 'claude' ? { budget: { maxTurns: 1 } } : {}),
   } as unknown as Task;
 }
 
@@ -297,7 +300,11 @@ describe('spawnWorkers — host-HTTP adapter routing', () => {
     registeredOllamaAdapter = ollamaAdapter;
     providerRegistry.registerProvider(ollamaAdapter);
 
-    const task: Task = { ...createTask('250-BK', 'ollama', 'qwen3.6' as ModelType, ['src/x.ts']), backend: 'docker' };
+    const task: Task = {
+      ...createTask('250-BK', 'ollama', 'qwen3.6' as ModelType, ['src/x.ts']),
+      backend: 'docker',
+      budget: { maxTurns: 1 },
+    };
     persistTasks([task]);
     const sprint = makeSprint('sprint-bk', [task]);
     const backend = makeMockBackend();
@@ -389,9 +396,9 @@ describe('spawn-backend-docker — ollama defensive honest-fail', () => {
     // Call with a registered ollama model id — getProviderForModel maps it to
     // 'ollama'. Layer-2 routing should have prevented this; the defensive
     // fallback now surfaces a loud warning instead of silently picking claude.
-    // 'llama-3.2-3b' is registered by `registerOllamaModels` (side-effect of
+    // 'llama3.2:3b' is the exact Ollama API id registered by `registerOllamaModels`.
     // importing providers/ollama at the top of this file).
-    const binary = getProviderBinaryForModel('llama-3.2-3b' as ModelType);
+    const binary = getProviderBinaryForModel('llama3.2:3b' as ModelType);
 
     // Legacy contract preserved: returns 'claude' so an in-flight container
     // does not crash mid-sprint. But the warning MUST be visible.

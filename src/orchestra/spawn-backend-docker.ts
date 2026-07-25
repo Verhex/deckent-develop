@@ -208,6 +208,23 @@ export function reconcileDockerRuntimeBudgetUsage(
   return true;
 }
 
+/** A missing terminal measurement is a veto, never evidence of zero usage. */
+export function reconcileDockerUnmeasurableRuntimeBudgetResult(
+  result: TaskResult,
+  usage: RuntimeBudgetUsageEvidence | null,
+): boolean {
+  if (!usage || (usage.terminal && usage.decision.state !== 'unmeasurable')) return false;
+  result.selfAssessment = 'NO_GO';
+  result.testsPassed = false;
+  const evidence = `Host runtime-budget evidence is not terminally measurable: state=${usage.decision.state}, terminal=${usage.terminal}, attemptId=${usage.attemptId}, budgetFingerprint=${usage.budgetFingerprint}.`;
+  if (!result.notes?.includes('Host runtime-budget evidence is not terminally measurable')) {
+    result.notes = `${evidence} ${result.notes ?? ''}`.trim();
+  }
+  delete result.tokenUsage;
+  delete result.cost;
+  return true;
+}
+
 interface DockerRecoveryContainment {
   attemptId: string;
   reason: 'host-restart-budget-observer-loss' | 'docker-wait-evidence-loss';
@@ -393,6 +410,31 @@ function reconcileDockerRuntimeBudgetUsageFile(
     model,
   });
   if (!changed) return false;
+  atomicWriteFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
+  return true;
+}
+
+function reconcileDockerUnmeasurableRuntimeBudgetResultFile(
+  resultPath: string,
+  taskId: string,
+  model: ModelType,
+  exitCode: number,
+  usage: RuntimeBudgetUsageEvidence | null,
+): boolean {
+  if (!usage || (usage.terminal && usage.decision.state !== 'unmeasurable')) return false;
+  let result: TaskResult;
+  try {
+    result = JSON.parse(readFileSync(resultPath, 'utf-8')) as TaskResult;
+  } catch {
+    result = buildExitWithoutResultMarker({
+      taskId,
+      model,
+      exitCode,
+      workPresent: false,
+      source: 'host',
+    }) as unknown as TaskResult;
+  }
+  reconcileDockerUnmeasurableRuntimeBudgetResult(result, usage);
   atomicWriteFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
   return true;
 }
@@ -2520,6 +2562,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       tasksDir,
       settlementRef: ref,
     });
+    const recoveryBudget = readRuntimeBudgetExhaustion(this.projectDir, ref.taskId)
+      ? undefined
+      : resolveTaskExecutionBudget(this.projectDir, ref.taskId);
     this.monitorContainer(
       ref.taskId,
       containerId,
@@ -2528,7 +2573,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       this.projectDir,
       computeDistFingerprint(join(this.projectDir, 'dist')),
       undefined,
-      undefined,
+      recoveryBudget,
       ref,
       undefined,
       running
@@ -3869,7 +3914,7 @@ export class DockerSpawnBackend implements SpawnBackend {
           budgetMonitor ? event => budgetMonitor.observe(event) : undefined,
           budgetMonitor
             ? error => {
-                try { budgetMonitor.settle(); } catch (settleError) { debugLog('docker-backend:budget-settle-after-observer-failure', settleError); }
+                try { budgetMonitor.failObservation(error); } catch (settleError) { debugLog('docker-backend:budget-settle-after-observer-failure', settleError); }
                 contain(`budget-observer-failed: ${error.message}`);
               }
             : undefined,
@@ -4140,15 +4185,56 @@ export class DockerSpawnBackend implements SpawnBackend {
       // When live activity tracing is disabled, budget events are observed from
       // the captured provider log above. Re-read after settle so that path gets
       // the same fail-closed result and heartbeat truth as live-follow mode.
+      if (budgetMonitor) {
+        try {
+          budgetMonitor.settle();
+        } catch (e) {
+          debugLog('docker-backend:budget-final-settle-held', e);
+          return;
+        }
+      }
+      const finalRuntimeBudgetUsage = readRuntimeBudgetUsage(projectDir, taskId);
       const finalRuntimeBudgetExhaustion = readRuntimeBudgetExhaustion(projectDir, taskId)
         ?? runtimeBudgetExhaustion;
       try {
-        if (reconcileDockerRuntimeBudgetResultFile(
-          resultPath,
-          taskId,
-          model,
-          exitCode,
-          finalRuntimeBudgetExhaustion,
+        let budgetReconciled = false;
+        if (finalRuntimeBudgetExhaustion) {
+          budgetReconciled = reconcileDockerRuntimeBudgetResultFile(
+            resultPath,
+            taskId,
+            model,
+            exitCode,
+            finalRuntimeBudgetExhaustion,
+          );
+        } else if (finalRuntimeBudgetUsage && (
+          !finalRuntimeBudgetUsage.terminal
+          || finalRuntimeBudgetUsage.decision.state === 'unmeasurable'
+        )) {
+          budgetReconciled = reconcileDockerUnmeasurableRuntimeBudgetResultFile(
+            resultPath,
+            taskId,
+            model,
+            exitCode,
+            finalRuntimeBudgetUsage,
+          );
+        } else if (
+          finalRuntimeBudgetUsage?.terminal
+          && finalRuntimeBudgetUsage.decision.state === 'within-budget'
+        ) {
+          budgetReconciled = reconcileDockerRuntimeBudgetUsageFile(
+            resultPath,
+            model,
+            finalRuntimeBudgetUsage,
+          );
+        }
+
+        if ((budgetMonitor || finalRuntimeBudgetUsage) && !budgetReconciled) {
+          debugLog('docker-backend:budget-final-reconcile-held', `taskId=${taskId} durable budget evidence could not be projected`);
+          return;
+        }
+        if (finalRuntimeBudgetExhaustion || (
+          finalRuntimeBudgetUsage
+          && (!finalRuntimeBudgetUsage.terminal || finalRuntimeBudgetUsage.decision.state === 'unmeasurable')
         )) {
           const hbPath = join(tasksDir, `task-${taskId}.hb`);
           atomicWriteFileSync(hbPath, `${JSON.stringify({
@@ -4162,18 +4248,8 @@ export class DockerSpawnBackend implements SpawnBackend {
           }, null, 2)}\n`);
         }
       } catch (e) {
-        debugLog('docker-backend:budget-final-reconcile', e);
-      }
-      if (!finalRuntimeBudgetExhaustion) {
-        try {
-          reconcileDockerRuntimeBudgetUsageFile(
-            resultPath,
-            model,
-            readRuntimeBudgetUsage(projectDir, taskId),
-          );
-        } catch (e) {
-          debugLog('docker-backend:budget-usage-reconcile', e);
-        }
+        debugLog('docker-backend:budget-final-reconcile-held', e);
+        return;
       }
       try {
         reconcileDockerRecoveryContainmentResultFile(

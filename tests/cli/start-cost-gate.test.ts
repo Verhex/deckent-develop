@@ -229,9 +229,41 @@ describe('cli start — cost gate (Sprint 189 T-008)', () => {
     expect(vi.mocked(runSprint)).not.toHaveBeenCalled();
   });
 
-  it('skips the cost gate entirely when --force is passed (CLI parity with MCP force=true)', async () => {
+  it('runs the cost gate with numeric acknowledgement when --force is passed', async () => {
     await runStart(['start', '--force']);
-    expect(vi.mocked(evaluateCostGate)).not.toHaveBeenCalled();
+    expect(vi.mocked(evaluateCostGate)).toHaveBeenCalledWith(
+      expect.objectContaining({ acknowledgeCost: true }),
+    );
+  });
+
+  it('blocks unknown pricing even when --force is passed', async () => {
+    vi.mocked(evaluateCostGate).mockReturnValue({
+      ok: false,
+      reason: 'COST_PRICING_UNKNOWN',
+      ceilingTripped: 'pricing',
+      estimate: fakeEstimate({ withinBudget: true, cost: 0, budget: 5 }),
+      estimatedUsd: 0,
+      budgetUsd: 5,
+      unpricedModels: ['openrouter/vendor/unknown-paid'],
+      message: 'Pricing evidence is unavailable.',
+    });
+
+    await runStart(['start', '--force']);
+
+    expect(process.exitCode).toBe(1);
+    expect(vi.mocked(runSprint)).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the cost pre-plan is unavailable', async () => {
+    vi.mocked(planSprint).mockRejectedValue(new Error('planner unavailable'));
+
+    await runStart(['start']);
+
+    expect(process.exitCode).toBe(1);
+    expect(vi.mocked(printError)).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'planner unavailable' }),
+    );
+    expect(vi.mocked(runSprint)).not.toHaveBeenCalled();
   });
 
   it('prompts the user when realistic cost is above the auto-confirm threshold', async () => {

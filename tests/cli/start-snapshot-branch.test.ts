@@ -69,6 +69,21 @@ vi.mock('../../src/cli/commands/quick-start.js', () => ({
   cleanupZeroConfig: vi.fn(),
 }));
 
+vi.mock('../../src/core/cost-config-loader.js', () => ({
+  initCostConfig: vi.fn(),
+  loadCostConfig: vi.fn(() => ({
+    _version: '1.0',
+    providers: {},
+    cost_limits: { sprint_max_usd: 5, daily_max_usd: 50, auto_confirm_below_usd: 2 },
+    update_config: { sources_priority: ['bundled'] },
+  })),
+}));
+
+vi.mock('../../src/core/cost-gate.js', async () => {
+  const actual = await vi.importActual<typeof import('../../src/core/cost-gate.js')>('../../src/core/cost-gate.js');
+  return { ...actual, evaluateCostGate: vi.fn() };
+});
+
 import { loadConfig } from '../../src/core/config.js';
 import { runSprint, readContext, planSprint } from '../../src/orchestra/brain.js';
 import { resolveProjectRoot } from '../../src/cli/helpers/process.js';
@@ -77,6 +92,7 @@ import { registerStart } from '../../src/cli/commands/start.js';
 import { saveApprovedSnapshot, loadRunHandle, type StoredApprovedSnapshot } from '../../src/core/run-flow-store.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, ResolvedConfig } from '../../src/core/types.js';
+import { evaluateCostGate } from '../../src/core/cost-gate.js';
 
 const mockLoadConfig = vi.mocked(loadConfig);
 const mockRunSprint = vi.mocked(runSprint);
@@ -162,6 +178,33 @@ describe('start --flow-id branch (427-021)', () => {
     mockReadContext.mockReturnValue({ memory: '', retro: '', debt: '', patterns: [] } as any);
     mockPlanSprint.mockResolvedValue(makeSprint() as any);
     mockRunSprint.mockResolvedValue(makeSprint() as any);
+    vi.mocked(evaluateCostGate).mockReturnValue({
+      ok: true,
+      estimate: {
+        taskCount: 1,
+        retryMultiplier: 1.2,
+        cacheHitRatio: 0.7,
+        perProvider: {},
+        totalUncachedInputTokens: 0,
+        totalCacheCreationTokens: 0,
+        totalCacheReadTokens: 0,
+        totalOutputTokens: 0,
+        totalApiCostUsd: 0.5,
+        subscriptionImpact: {},
+        costNaive: 0.35,
+        costRealistic: 0.5,
+        costWorstCase: 0.8,
+        budgetUsd: 5,
+        withinBudget: true,
+        percentOfBudget: 10,
+        warnings: [],
+        recommendations: [],
+        unpricedModels: [],
+      },
+      autoConfirm: true,
+      autoConfirmThresholdUsd: 2,
+      overrideApplied: false,
+    });
   });
 
   afterEach(() => {
@@ -192,6 +235,34 @@ describe('start --flow-id branch (427-021)', () => {
         expect.anything(),
         expect.objectContaining({ preplannedSprint: snapshot.sprint }),
       );
+      expect(mockPlanSprint).not.toHaveBeenCalled();
+      expect(vi.mocked(evaluateCostGate)).toHaveBeenCalledTimes(1);
+    });
+
+    it('blocks unknown snapshot pricing under --force before persisting or running', async () => {
+      const snapshot = makeApprovedSnapshot();
+      saveApprovedSnapshot(root, snapshot);
+      vi.mocked(evaluateCostGate).mockReturnValue({
+        ok: false,
+        reason: 'COST_PRICING_UNKNOWN',
+        ceilingTripped: 'pricing',
+        estimate: { costRealistic: 0, budgetUsd: 5 } as never,
+        estimatedUsd: 0,
+        budgetUsd: 5,
+        unpricedModels: ['openrouter/vendor/unknown-paid'],
+        message: 'pricing unavailable',
+      });
+
+      await runCommand(root, [
+        'start', '--flow-id', snapshot.flowId,
+        '--revision', String(snapshot.revision),
+        '--plan-digest', snapshot.planDigest,
+        '--force',
+      ]);
+
+      expect(process.exitCode).toBe(1);
+      expect(mockRunSprint).not.toHaveBeenCalled();
+      expect(loadRunHandle(root, snapshot.flowId)).toBeUndefined();
       expect(mockPlanSprint).not.toHaveBeenCalled();
     });
 

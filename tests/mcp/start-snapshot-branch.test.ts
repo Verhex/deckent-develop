@@ -95,6 +95,21 @@ vi.mock('../../src/core/provider.js', () => ({
   bootstrapProviders: vi.fn(),
 }));
 
+vi.mock('../../src/core/cost-config-loader.js', () => ({
+  initCostConfig: vi.fn(),
+  loadCostConfig: vi.fn(() => ({
+    _version: '1.0',
+    providers: {},
+    cost_limits: { sprint_max_usd: 5, daily_max_usd: 50, auto_confirm_below_usd: 2 },
+    update_config: { sources_priority: ['bundled'] },
+  })),
+}));
+
+vi.mock('../../src/core/cost-gate.js', async () => {
+  const actual = await vi.importActual<typeof import('../../src/core/cost-gate.js')>('../../src/core/cost-gate.js');
+  return { ...actual, evaluateCostGate: vi.fn() };
+});
+
 vi.mock('../../src/mcp/helpers/enrich.js', () => ({
   enrichResponse: vi.fn((_toolName, response: Record<string, unknown>) => ({ ...response })),
 }));
@@ -122,6 +137,7 @@ import { readContext, planSprint } from '../../src/orchestra/brain.js';
 import { loadApprovedSnapshot, loadRunHandle, saveRunHandle } from '../../src/core/run-flow-store.js';
 import { spawnDetachedDeckent } from '../../src/cli/helpers/detached-start.js';
 import { fork } from 'node:child_process';
+import { evaluateCostGate } from '../../src/core/cost-gate.js';
 
 // ─── Mock Server Factory ─────────────────────────────────────────────────────
 
@@ -232,6 +248,34 @@ describe('deckent_start — approved-snapshot branch (born-673b)', () => {
     vi.mocked(loadApprovedSnapshot).mockReturnValue(undefined);
     vi.mocked(loadRunHandle).mockReturnValue(undefined);
     vi.mocked(spawnDetachedDeckent).mockReturnValue({ pid: 4242, logPath: '/fake/log.log', flowId: 'flow-1' });
+    vi.mocked(planSprint).mockResolvedValue(makeSprint());
+    vi.mocked(evaluateCostGate).mockReturnValue({
+      ok: true,
+      estimate: {
+        taskCount: 1,
+        retryMultiplier: 1.2,
+        cacheHitRatio: 0.7,
+        perProvider: {},
+        totalUncachedInputTokens: 0,
+        totalCacheCreationTokens: 0,
+        totalCacheReadTokens: 0,
+        totalOutputTokens: 0,
+        totalApiCostUsd: 0.5,
+        subscriptionImpact: {},
+        costNaive: 0.35,
+        costRealistic: 0.5,
+        costWorstCase: 0.8,
+        budgetUsd: 5,
+        withinBudget: true,
+        percentOfBudget: 10,
+        warnings: [],
+        recommendations: [],
+        unpricedModels: [],
+      },
+      autoConfirm: true,
+      autoConfirmThresholdUsd: 2,
+      overrideApplied: false,
+    });
     sandboxRoot = mkdtempSync(join(tmpdir(), 'deckent-start-snapshot-test-'));
     cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(sandboxRoot);
   });
@@ -263,6 +307,7 @@ describe('deckent_start — approved-snapshot branch (born-673b)', () => {
       // from this branch — the sprint is the exact one from the snapshot.
       expect(vi.mocked(readContext)).not.toHaveBeenCalled();
       expect(vi.mocked(planSprint)).not.toHaveBeenCalled();
+      expect(vi.mocked(evaluateCostGate)).toHaveBeenCalledTimes(1);
       // Legacy fork-based spawn path never runs either.
       expect(vi.mocked(fork)).not.toHaveBeenCalled();
 
@@ -288,6 +333,7 @@ describe('deckent_start — approved-snapshot branch (born-673b)', () => {
         autoApprove: true,
         acknowledgeScopePaths: true,
         acknowledgePromptGate: true,
+        acknowledgeCost: true,
         sandbox: true,
         timeout: 60000,
       });
@@ -295,10 +341,36 @@ describe('deckent_start — approved-snapshot branch (born-673b)', () => {
       expect(vi.mocked(spawnDetachedDeckent)).toHaveBeenCalledWith(
         [
           'start', '--flow-id', 'flow-1', '--revision', '1', '--plan-digest', 'digest-abc',
-          '--auto-approve', '--force-scope', '--force-prompt-gate', '--sandbox-mode', '--timeout', '60000',
+          '--auto-approve', '--force-scope', '--force-prompt-gate', '--force', '--sandbox-mode', '--timeout', '60000',
         ],
         { projectRoot: sandboxRoot, flowId: 'flow-1' },
       );
+    });
+
+    it('blocks unknown snapshot pricing before detached spawn, even with force=true', async () => {
+      vi.mocked(loadApprovedSnapshot).mockReturnValue(makeApprovedSnapshot());
+      vi.mocked(evaluateCostGate).mockReturnValue({
+        ok: false,
+        reason: 'COST_PRICING_UNKNOWN',
+        ceilingTripped: 'pricing',
+        estimate: { costRealistic: 0, budgetUsd: 5 } as never,
+        estimatedUsd: 0,
+        budgetUsd: 5,
+        unpricedModels: ['openrouter/vendor/unknown-paid'],
+        message: 'pricing unavailable',
+      });
+
+      const tool = await getStartTool();
+      const result = await tool.handler({
+        flowId: 'flow-1', revision: 1, planDigest: 'digest-abc', force: true,
+      });
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(result.isError).toBe(true);
+      expect(parsed.code).toBe('COST_PRICING_UNKNOWN');
+      expect(parsed.override).toBe('pricingEvidence');
+      expect(vi.mocked(spawnDetachedDeckent)).not.toHaveBeenCalled();
+      expect(vi.mocked(planSprint)).not.toHaveBeenCalled();
     });
 
     it('noop-duplicate: an identical CAS-matching second start does not re-spawn or re-save', async () => {
@@ -402,10 +474,9 @@ describe('deckent_start — approved-snapshot branch (born-673b)', () => {
   describe('branch 3 — flag-off: legacy fork-based path is untouched', () => {
     it('no flow args at all takes the pre-existing spawn path — flow modules never touched', async () => {
       const tool = await getStartTool();
-      // force:true skips the cost-gate/orphan/lock pre-flight entirely — this
-      // branch's job is to prove the flow-only code paths are unreached, not
-      // to re-verify the pre-flight gates (start-cost-gate.test.ts / the
-      // hermetic-run-state tests in tools/start.test.ts already own that).
+      // force:true skips the orphan/lock pre-flight and acknowledges numeric
+      // cost overruns; the cost gate still runs. This branch proves the
+      // flow-only modules remain unreached.
       const result = await tool.handler({ autoApprove: false, force: true });
       const parsed = JSON.parse(result.content[0]!.text);
 

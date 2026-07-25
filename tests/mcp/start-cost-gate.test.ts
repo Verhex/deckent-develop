@@ -5,7 +5,7 @@
  * detached sprint runner is forked. The cost gate must:
  *   - Block over-budget runs by default (return isError with payload)
  *   - Bypass the block when acknowledgeCost=true (overrideApplied set)
- *   - Skip the gate entirely when force=true (CLI parity)
+ *   - Treat force=true as numeric acknowledgement without bypassing unknown pricing
  *   - Surface error.code / error.message via the formatErrorResponse pipeline
  */
 
@@ -321,32 +321,36 @@ describe('deckent_start — cost gate (Sprint 189 T-008)', () => {
     });
   });
 
-  describe('force — full bypass (CLI parity)', () => {
-    it('does not call evaluateCostGate when force=true', async () => {
+  describe('force — numeric acknowledgement only', () => {
+    it('calls evaluateCostGate with acknowledgement when force=true', async () => {
       const tool = await getStartTool();
       await tool.handler({ force: true });
 
-      expect(vi.mocked(evaluateCostGate)).not.toHaveBeenCalled();
+      expect(vi.mocked(evaluateCostGate)).toHaveBeenCalledWith(
+        expect.objectContaining({ acknowledgeCost: true }),
+      );
     });
 
-    it('proceeds to spawn even if the estimate would have blocked (force=true)', async () => {
-      // Even if evaluateCostGate were called, it would block. force=true must
-      // short-circuit the gate entirely.
+    it('blocks unknown pricing even when force=true', async () => {
       vi.mocked(evaluateCostGate).mockReturnValue({
         ok: false,
-        reason: 'COST_GATE_EXCEEDED',
-        estimate: fakeEstimate({ withinBudget: false, cost: 1000, budget: 5 }),
-        estimatedUsd: 1000,
+        reason: 'COST_PRICING_UNKNOWN',
+        ceilingTripped: 'pricing',
+        estimate: fakeEstimate({ withinBudget: true, cost: 0, budget: 5 }),
+        estimatedUsd: 0,
         budgetUsd: 5,
-        message: 'huge overrun',
+        unpricedModels: ['openrouter/vendor/unknown-paid'],
+        message: 'pricing unavailable',
       });
 
       const tool = await getStartTool();
       const result = await tool.handler({ force: true });
       const parsed = JSON.parse(result.content[0]!.text);
 
-      expect(result.isError).toBeUndefined();
-      expect(parsed.success).toBe(true);
+      expect(result.isError).toBe(true);
+      expect(parsed.success).toBe(false);
+      expect(parsed.code).toBe('COST_PRICING_UNKNOWN');
+      expect(parsed.override).toBe('pricingEvidence');
     });
   });
 
@@ -363,16 +367,18 @@ describe('deckent_start — cost gate (Sprint 189 T-008)', () => {
     });
   });
 
-  describe('graceful degradation', () => {
-    it('does not block sprint start when planSprint throws (cost gate silently skipped)', async () => {
+  describe('gate availability', () => {
+    it('fails closed with COST_GATE_UNAVAILABLE when planSprint throws', async () => {
       vi.mocked(planSprint).mockRejectedValue(new Error('planner unavailable'));
 
       const tool = await getStartTool();
       const result = await tool.handler({});
       const parsed = JSON.parse(result.content[0]!.text);
 
-      expect(result.isError).toBeUndefined();
-      expect(parsed.success).toBe(true);
+      expect(result.isError).toBe(true);
+      expect(parsed.success).toBe(false);
+      expect(parsed.code).toBe('COST_GATE_UNAVAILABLE');
+      expect(parsed.message).toBe('planner unavailable');
     });
   });
 });

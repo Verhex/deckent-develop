@@ -318,6 +318,7 @@ describe('cost-calculator', () => {
       const est = estimateSprintCost(tasks, TEST_CONFIG);
       expect(est.warnings.some((w) => /Unknown model/.test(w))).toBe(true);
       expect(est.totalApiCostUsd).toBe(0);
+      expect(est.unpricedModels).toEqual(['fictional-gpt-99']);
     });
 
     it('still counts known models when some are unknown', () => {

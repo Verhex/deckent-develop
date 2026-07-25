@@ -7,6 +7,7 @@ import {
 } from '../../src/core/cost-gate.js';
 import type { CostConfig } from '../../src/core/cost-config-loader.js';
 import type { TaskCostInput } from '../../src/core/cost-calculator.js';
+import { modelRegistry } from '../../src/core/model-registry.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -104,7 +105,12 @@ describe('evaluateCostGate', () => {
     const costConfig = makeCostConfig({ sprintMaxUsd: 0.01 });
     const tasks = Array.from({ length: 20 }, (_, i) => task(`t${i}`, 'opus', 'high'));
 
-    const result = evaluateCostGate({ tasks, costConfig, acknowledgeCost: true });
+    const result = evaluateCostGate({
+      tasks,
+      costConfig,
+      budget: { maxUsd: 0.01 },
+      acknowledgeCost: true,
+    });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -168,6 +174,47 @@ describe('evaluateCostGate', () => {
       expect(result.estimate.withinBudget).toBe(true);
     }
   });
+
+  it('blocks unknown remote pricing even when acknowledgeCost is true', () => {
+    const costConfig = makeCostConfig({ sprintMaxUsd: 100 });
+    const tasks = [task('unpriced', 'vendor/paid-model-v99', 'high')];
+    const result = evaluateCostGate({ tasks, costConfig, acknowledgeCost: true });
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'COST_PRICING_UNKNOWN',
+      ceilingTripped: 'pricing',
+      unpricedModels: ['vendor/paid-model-v99'],
+    });
+  });
+
+  it('estimates a dynamic remote model only with explicit pricing evidence', () => {
+    const modelId = 'vendor/evidence-priced-model-v1';
+    modelRegistry.register({
+      id: modelId,
+      apiId: modelId,
+      provider: 'openrouter',
+      tier: 'standard',
+      contextWindow: 128_000,
+      costPerMillion: { input: 2, output: 8 },
+      pricingEvidenceRef: 'openrouter-model-pricing:paid-evidence-0001',
+      capabilities: {
+        streaming: true, toolUse: true, vision: false, codeExecution: false, reasoning: false,
+      },
+      status: 'ga',
+    });
+    try {
+      const result = evaluateCostGate({
+        tasks: [task('priced', modelId, 'normal')],
+        costConfig: makeCostConfig({ sprintMaxUsd: 100 }),
+      });
+      expect(result.ok).toBe(true);
+      expect(result.estimate.unpricedModels).toEqual([]);
+      expect(result.estimate.costRealistic).toBeGreaterThan(0);
+    } finally {
+      modelRegistry.unregister(modelId);
+    }
+  });
 });
 
 describe('buildCostGateErrorPayload', () => {
@@ -204,6 +251,20 @@ describe('buildCostGateErrorPayload', () => {
     const exceeded = result as CostGateExceeded;
     const payload = buildCostGateErrorPayload(exceeded, 'force');
     expect(payload.override).toBe('force');
+  });
+
+  it('surfaces pricing evidence as the only remedy for unknown remote cost', () => {
+    const result = evaluateCostGate({
+      tasks: [task('unpriced', 'vendor/unpriced-v1')],
+      costConfig: makeCostConfig(),
+      acknowledgeCost: true,
+    });
+    expect(result.ok).toBe(false);
+    const payload = buildCostGateErrorPayload(result as CostGateExceeded, 'force');
+    expect(payload).toMatchObject({
+      error: 'COST_PRICING_UNKNOWN',
+      override: 'pricingEvidence',
+    });
   });
 
   // ─── ENT-5 — per-request budget ceiling (budget.maxUsd) ─────────────────────

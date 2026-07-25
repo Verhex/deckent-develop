@@ -161,6 +161,34 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
     expect(result.provider).toBe('ollama');
   });
 
+  it('rejects a live budget before adapter refresh or provider work when evidence is unsupported', async () => {
+    await expect(spawnWorkerMultiProvider(
+      't-ollama-budgeted',
+      'qwen-coder-32b',
+      'prompt',
+      '/root',
+      { executionBudget: { maxTokens: 100 } },
+    )).rejects.toThrow('Spawn blocked before provider work');
+
+    expect(adapterRefreshSpy).not.toHaveBeenCalled();
+    expect(adapterSpawnSpy).not.toHaveBeenCalled();
+    expect(SpawnBackendFactory.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unregistered OpenRouter model before provider work', async () => {
+    await expect(spawnWorkerMultiProvider(
+      't-openrouter-unpriced',
+      'vendor/paid-model-v1',
+      'prompt',
+      '/definitely/missing/project-root',
+      { provider: 'openrouter', spawnBackend: 'docker' },
+    )).rejects.toThrow('Unknown model: vendor/paid-model-v1');
+
+    expect(adapterRefreshSpy).not.toHaveBeenCalled();
+    expect(adapterSpawnSpy).not.toHaveBeenCalled();
+    expect(SpawnBackendFactory.create).not.toHaveBeenCalled();
+  });
+
   // ── allowedTools forwarded correctly to adapter ────────────────────────────
 
   it('forwards allowedTools to adapter.spawn', async () => {
@@ -240,7 +268,11 @@ describe('spawnWorkerMultiProvider — control: non-adapter providers still use 
     // getProviderAdapterForTask returns null for non-ollama providers
     vi.mocked(getProviderAdapterForTask).mockReturnValue(null as any);
     mockDockerSpawn = vi.fn();
-    vi.mocked(SpawnBackendFactory.create).mockReturnValue({ name: 'docker', spawn: mockDockerSpawn } as any);
+    vi.mocked(SpawnBackendFactory.create).mockReturnValue({
+      name: 'docker',
+      liveUsageBudgetSupport: 'measured-stream',
+      spawn: mockDockerSpawn,
+    } as any);
   });
 
   it('claude model with spawnBackend=docker still uses docker backend (not adapter)', async () => {
@@ -249,7 +281,7 @@ describe('spawnWorkerMultiProvider — control: non-adapter providers still use 
       'claude-sonnet-5',
       'prompt',
       '/root',
-      { spawnBackend: 'docker' },
+      { spawnBackend: 'docker', executionBudget: { maxTurns: 1 } },
     );
 
     // Docker backend IS used for claude

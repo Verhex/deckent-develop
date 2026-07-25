@@ -7,15 +7,34 @@ import { join } from 'node:path';
 import type { Task } from '../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR, DASHBOARD_FILE } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
+import { modelRegistry, inferTierFromId } from '../core/model-registry.js';
+import type { ModelTier } from '../core/model-registry.js';
 
 // ─── Duration Baselines (minutes) ────────────────────────────────────────────
 
-/** Per-task base duration by model */
-const MODEL_BASE_MIN: Record<string, number> = {
-  opus: 30,
-  sonnet: 20,
-  haiku: 10,
+/**
+ * Per-task base duration by registry TIER (minutes), not by alias string. Premium
+ * work is slower, economy faster. Resolving a task's model to its tier (see
+ * {@link baseMinForModel}) means a canonical id, a legacy alias, and a brand-new
+ * model all score off the same tier metadata — never off a hardcoded per-alias number.
+ */
+const TIER_BASE_MIN: Record<ModelTier, number> = {
+  economy: 10,
+  standard: 20,
+  premium: 30,
+  premium_plus: 30,
 };
+
+/**
+ * Resolve a task's model to its base-duration minutes via registry TIER metadata.
+ * A known catalog id uses its authoritative tier; an id the catalog does not carry
+ * falls back to parametric tier inference ({@link inferTierFromId}) — still
+ * metadata-derived classification, never a silent "unknown = sonnet" named default.
+ */
+function baseMinForModel(model: string): number {
+  const tier = modelRegistry.get(model)?.tier ?? inferTierFromId(model);
+  return TIER_BASE_MIN[tier];
+}
 
 /** Effort multiplier */
 const EFFORT_MULTIPLIER: Record<string, number> = {
@@ -64,7 +83,7 @@ export interface SprintEstimate {
  * Combines model base time, effort multiplier, and scope size.
  */
 export function scoreTaskComplexity(task: Task): TaskComplexityScore {
-  const baseMin = MODEL_BASE_MIN[task.model] ?? 20;
+  const baseMin = baseMinForModel(task.model);
   const multiplier = EFFORT_MULTIPLIER[task.effort] ?? 1.0;
   const effortMin = baseMin * multiplier;
 

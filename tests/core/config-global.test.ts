@@ -10,6 +10,7 @@ import {
   loadConfig,
   ConfigValidationError,
 } from '../../src/core/config.js';
+import { ProviderConfigAliasConflictError } from '../../src/core/provider-config-canonicalizer.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -137,6 +138,31 @@ describe('mergeConfigs', () => {
     expect(result.language).toBe('tr');
     expect(result.mode).toBe('economic');
     expect(result.projectName).toBe('from-project');
+  });
+
+  it('canonicalizes global and project model aliases before precedence merge', () => {
+    const global = {
+      modes: { balanced: { brain_model: 'sonnet', default_model: 'opus' } },
+    } as unknown as Partial<DeckentConfig>;
+    const project = {
+      modes: { balanced: { brain_model: 'gpt-5', default_model: 'haiku' } },
+    } as unknown as Partial<DeckentConfig>;
+
+    const result = mergeConfigs(global, project);
+
+    expect(result.modes.balanced.brain_model).toBe('gpt-5.5');
+    expect(result.modes.balanced.default_model).toBe('claude-haiku-4-5-20251001');
+  });
+
+  it('preserves canonical versioned model IDs byte-for-byte', () => {
+    const project = {
+      modes: { balanced: { brain_model: 'gpt-5.6-sol', default_model: 'claude-fable-5' } },
+    } as unknown as Partial<DeckentConfig>;
+
+    const result = mergeConfigs(null, project);
+
+    expect(result.modes.balanced.brain_model).toBe('gpt-5.6-sol');
+    expect(result.modes.balanced.default_model).toBe('claude-fable-5');
   });
 });
 
@@ -359,6 +385,31 @@ describe('mergeConfigs — edge cases', () => {
   it('projectName defaults to "deckent-project" when not provided', () => {
     const result = mergeConfigs(null, null);
     expect(result.projectName).toBe('deckent-project');
+  });
+});
+
+describe('mergeConfigs — provider alias parity', () => {
+  it('canonicalizes each layer before defaults and preserves precedence', () => {
+    const result = mergeConfigs(
+      { brain_provider: 'codex', provider_overrides: { docs: 'gemini' } },
+      { providers: { brain: 'gemini', overrides: { tests: 'codex' } } },
+    );
+
+    expect(result.brain_provider).toBe('gemini');
+    expect(result.providers?.brain).toBe('gemini');
+    expect(result.provider_overrides).toEqual({ docs: 'gemini', tests: 'codex' });
+  });
+
+  it('rejects conflicts within a single layer but not across layers', () => {
+    expect(() => mergeConfigs(
+      { brain_provider: 'codex', providers: { brain: 'claude' } },
+      null,
+    )).toThrow(ProviderConfigAliasConflictError);
+
+    expect(() => mergeConfigs(
+      { brain_provider: 'codex' },
+      { providers: { brain: 'claude' } },
+    )).not.toThrow();
   });
 });
 

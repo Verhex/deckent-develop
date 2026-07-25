@@ -71,6 +71,31 @@ const costSchema = z.object({
   isLocal: z.boolean().default(false),
 });
 
+/** Provider-final billing evidence. This is authoritative; `cost` may be a local estimate. */
+const providerBillingSchema = z.object({
+  source: z.literal('provider-envelope'),
+  provider: z.string().min(1),
+  currency: z.literal('USD'),
+  providerReportedUsd: z.number().nonnegative(),
+  modelUsage: z.record(z.string(), z.object({
+    inputTokens: z.number().nonnegative().optional(),
+    outputTokens: z.number().nonnegative().optional(),
+    cacheReadTokens: z.number().nonnegative().optional(),
+    cacheCreationTokens: z.number().nonnegative().optional(),
+    costUsd: z.number().nonnegative().optional(),
+    contextWindow: z.number().nonnegative().optional(),
+  })),
+  capturedAt: z.string(),
+  reconciliation: z.object({
+    localEstimateUsd: z.number().nonnegative(),
+    providerReportedUsd: z.number().nonnegative(),
+    absoluteVarianceUsd: z.number().nonnegative(),
+    relativeVariance: z.number().nonnegative(),
+    threshold: z.number().nonnegative(),
+    state: z.enum(['matched', 'variance']),
+  }).optional(),
+});
+
 /** Verification — test outcome (worker-run, orchestrator-captured). */
 const testsSchema = z.object({
   passed: z.number().int().nonnegative(),
@@ -159,6 +184,7 @@ export const taskResultSchema = z.object({
   // resource accounting (orchestrator, provider-agnostic)
   tokenUsage: tokenUsageSchema,
   cost: costSchema,
+  providerBilling: providerBillingSchema.optional(),
 
   // verification (worker-run, orchestrator-captured)
   tests: testsSchema,

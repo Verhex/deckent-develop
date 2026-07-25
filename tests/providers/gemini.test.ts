@@ -523,6 +523,8 @@ describe('GeminiAdapter', () => {
   it('buildPlannerCommand uses correct model in args', () => {
     const result = adapter.buildPlannerCommand('Plan', 'gemini-2.5-flash');
     expect(result.args).toContain('gemini-2.5-flash');
+    expect(result.calledProvider).toBe('gemini');
+    expect(result.calledModel).toBe('gemini-2.5-flash');
   });
 
   it('buildPlannerCommand does not throw when API key is missing', () => {

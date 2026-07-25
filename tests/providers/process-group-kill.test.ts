@@ -17,8 +17,8 @@
 //     subprocess.ts), which signals `process.kill(-pid, signal)` on POSIX
 //     (falling back to the direct pid on throw) and arms an unref'd
 //     SIGTERM→SIGKILL escalation cleared on child exit.
-//   - on win32, stay single-pid (no process-group signal semantics there) —
-//     unchanged legacy behavior, same documented residual as subprocess.ts.
+//   - on win32, use taskkill /T and escalate with /F so grandchildren cannot
+//     outlive a budget/timeout stop.
 //
 // Mirrors the proven pattern in tests/providers/pgid-teardown.test.ts
 // (subprocess.ts's own coverage for the identical mechanism).
@@ -61,6 +61,7 @@ function makeFakeChild(pid: number): ChildProcess & { emit: EventEmitter['emit']
   (child as unknown as { stdin: unknown }).stdin = { write: vi.fn(), end: vi.fn() };
   (child as unknown as { stdout: unknown }).stdout = { on: vi.fn() };
   (child as unknown as { stderr: unknown }).stderr = { on: vi.fn() };
+  (child as unknown as { unref: unknown }).unref = vi.fn();
   return child;
 }
 
@@ -196,7 +197,7 @@ describe.each(ADAPTERS)('$label — PROCESS-GROUP-KILL on POSIX', ({ spawnWorker
   });
 });
 
-describe.each(ADAPTERS)('$label — PROCESS-GROUP-KILL win32 residual (unchanged legacy behavior)', ({ spawnWorker }) => {
+describe.each(ADAPTERS)('$label — PROCESS-GROUP-KILL win32 process tree', ({ spawnWorker }) => {
   it('spawn() does NOT set detached on win32', () => {
     const child = makeFakeChild(WORKER_PID);
     spawnWorker('win32', child);
@@ -205,7 +206,7 @@ describe.each(ADAPTERS)('$label — PROCESS-GROUP-KILL win32 residual (unchanged
     expect(spawnOpts.detached).toBe(false);
   });
 
-  it('kill() signals only the direct child pid — the process-group form is never used', () => {
+  it('kill() terminates the whole process tree with taskkill /T', () => {
     const child = makeFakeChild(WORKER_PID);
     const adapter = spawnWorker('win32', child);
     const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
@@ -213,11 +214,17 @@ describe.each(ADAPTERS)('$label — PROCESS-GROUP-KILL win32 residual (unchanged
     adapter.kill('task-pg-1');
 
     expect(killSpy).not.toHaveBeenCalled();
-    expect((child as unknown as { kill: ReturnType<typeof vi.fn> }).kill).toHaveBeenCalledWith('SIGTERM');
+    expect(mockSpawn).toHaveBeenNthCalledWith(
+      2,
+      'taskkill',
+      ['/PID', String(WORKER_PID), '/T'],
+      { stdio: 'ignore', windowsHide: true },
+    );
+    expect((child as unknown as { kill: ReturnType<typeof vi.fn> }).kill).not.toHaveBeenCalled();
     child.emit('exit', 0);
   });
 
-  it('SIGTERM→SIGKILL escalation on win32 also stays single-pid', async () => {
+  it('SIGTERM→SIGKILL escalation on win32 adds taskkill /F for the whole tree', async () => {
     vi.useFakeTimers();
     const child = makeFakeChild(WORKER_PID);
     const adapter = spawnWorker('win32', child);
@@ -227,6 +234,12 @@ describe.each(ADAPTERS)('$label — PROCESS-GROUP-KILL win32 residual (unchanged
     await vi.advanceTimersByTimeAsync(2_000);
 
     expect(killSpy).not.toHaveBeenCalled();
-    expect((child as unknown as { kill: ReturnType<typeof vi.fn> }).kill).toHaveBeenCalledWith('SIGKILL');
+    expect(mockSpawn).toHaveBeenNthCalledWith(
+      3,
+      'taskkill',
+      ['/PID', String(WORKER_PID), '/T', '/F'],
+      { stdio: 'ignore', windowsHide: true },
+    );
+    expect((child as unknown as { kill: ReturnType<typeof vi.fn> }).kill).not.toHaveBeenCalled();
   });
 });

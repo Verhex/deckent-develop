@@ -169,8 +169,10 @@ export function registerPlan(program: Command): void {
           reason: 'No usage constraints',
         };
 
-        // Clean up existing DRAFT tasks before planning (idempotency)
-        cleanupDraftTasks(root);
+        // Clean up existing DRAFT tasks before a mutating plan (idempotency).
+        // A dry-run is a read-only preview across the whole command boundary;
+        // deleting another process's draft tasks here would violate that contract.
+        if (!dryRun) cleanupDraftTasks(root);
 
         const asDraft = opts.confirm !== false;
 
@@ -265,6 +267,14 @@ export function registerPlan(program: Command): void {
               : 'not-attempted',
             reason: sprint.plannerProof.resolutionReason,
           }));
+          const receiptRef = sprint.plannerProof.call.receiptRef;
+          if (receiptRef) {
+            print(getMessage('planning.receipt_ref', lang, {
+              invocationId: receiptRef.invocationId,
+              tenantId: receiptRef.tenantId,
+              projectId: receiptRef.projectId,
+            }));
+          }
         }
 
         if (recommendation.size !== 'full') {
@@ -309,6 +319,14 @@ export function registerPlan(program: Command): void {
               : 'not-attempted',
             reason: plannerProof.resolutionReason,
           }));
+          const receiptRef = plannerProof.call.receiptRef;
+          if (receiptRef) {
+            print(getMessage('planning.receipt_ref', lang, {
+              invocationId: receiptRef.invocationId,
+              tenantId: receiptRef.tenantId,
+              projectId: receiptRef.projectId,
+            }));
+          }
         }
         process.exitCode = 1;
       }

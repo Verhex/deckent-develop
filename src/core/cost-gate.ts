@@ -62,14 +62,14 @@ export interface CostGatePass {
 
 export interface CostGateExceeded {
   ok: false;
-  reason: 'COST_GATE_EXCEEDED';
+  reason: 'COST_GATE_EXCEEDED' | 'COST_PRICING_UNKNOWN';
   /**
    * Which budget ceiling was tripped.
    * - 'sprint'  — config sprint_max_usd was the binding limit
    * - 'usd'     — per-request budget.maxUsd was the binding limit
    * - 'tokens'  — per-request budget.maxTokens was the binding limit
    */
-  ceilingTripped: 'sprint' | 'usd' | 'tokens';
+  ceilingTripped: 'sprint' | 'usd' | 'tokens' | 'pricing';
   estimate: SprintCostEstimate;
   /** Convenience: realistic USD cost. */
   estimatedUsd: number;
@@ -79,6 +79,8 @@ export interface CostGateExceeded {
   estimatedTokens?: number;
   /** Per-request token ceiling (present when ceilingTripped === 'tokens'). */
   budgetTokens?: number;
+  /** Exact model IDs whose remote pricing could not be proven. */
+  unpricedModels?: string[];
   /** Human-readable explanation suitable for error messages. */
   message: string;
 }
@@ -136,6 +138,22 @@ export function evaluateCostGate(input: CostGateInput): CostGateResult {
     estimate.totalOutputTokens;
   const exceedsTokenBudget =
     requestMaxTokens !== undefined && estimatedTotalTokens > requestMaxTokens;
+
+  // Unknown remote pricing is not numeric zero and cannot be acknowledged as
+  // an over-budget estimate. The caller must provide trusted price evidence.
+  if (estimate.unpricedModels.length > 0) {
+    return {
+      ok: false,
+      reason: 'COST_PRICING_UNKNOWN',
+      ceilingTripped: 'pricing',
+      estimate,
+      estimatedUsd,
+      budgetUsd: effectiveBudgetUsd,
+      unpricedModels: estimate.unpricedModels,
+      message: `Pricing evidence is unavailable for model(s): ${estimate.unpricedModels.join(', ')}. `
+        + 'Supply fresh provider/model pricing evidence before execution; acknowledgeCost does not override unknown pricing.',
+    };
+  }
 
   // Token ceiling is checked before USD — provides the most specific reason.
   if (exceedsTokenBudget && !acknowledgeCost) {
@@ -336,10 +354,10 @@ export function evaluateSpendWarnAtSpawn(
 // ─── Convenience: structured error payload for MCP ──────────────────────────
 
 export interface CostGateErrorPayload {
-  error: 'COST_GATE_EXCEEDED';
+  error: 'COST_GATE_EXCEEDED' | 'COST_PRICING_UNKNOWN';
   estimated: number;
   budget: number;
-  override: 'acknowledgeCost' | 'force';
+  override: 'acknowledgeCost' | 'force' | 'pricingEvidence';
   message: string;
 }
 
@@ -352,10 +370,10 @@ export function buildCostGateErrorPayload(
   override: 'acknowledgeCost' | 'force' = 'acknowledgeCost',
 ): CostGateErrorPayload {
   return {
-    error: 'COST_GATE_EXCEEDED',
+    error: result.reason,
     estimated: result.estimatedUsd,
     budget: result.budgetUsd,
-    override,
+    override: result.reason === 'COST_PRICING_UNKNOWN' ? 'pricingEvidence' : override,
     message: result.message,
   };
 }

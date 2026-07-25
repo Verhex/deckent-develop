@@ -14,6 +14,7 @@ import {
   removeDuplicateKeys,
 } from '../../src/core/config-migration.js';
 import { createDefaultConfig } from '../../src/core/config.js';
+import { ProviderConfigAliasConflictError } from '../../src/core/provider-config-canonicalizer.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -243,6 +244,40 @@ describe('migrateConfig', () => {
     }
   });
 
+  it('backs up legacy model aliases and writes canonical API IDs', () => {
+    const existing = {
+      ...createDefaultConfig(),
+      modes: {
+        ...createDefaultConfig().modes,
+        balanced: {
+          ...createDefaultConfig().modes.balanced,
+          brain_model: 'sonnet',
+          default_model: 'gpt-5',
+        },
+      },
+    };
+    const p = writeTmp('model-alias-config.json', existing);
+    try {
+      const result = migrateConfig(p);
+      expect(result.migrated).toBe(true);
+      expect(result.renamedFields).toEqual(expect.arrayContaining([
+        'modes.balanced.brain_model: sonnet → claude-sonnet-5',
+        'modes.balanced.default_model: gpt-5 → gpt-5.5',
+      ]));
+      expect(result.backupPath).not.toBeNull();
+
+      const backup = JSON.parse(readFileSync(result.backupPath!, 'utf-8')) as typeof existing;
+      expect(backup.modes.balanced.brain_model).toBe('sonnet');
+      expect(backup.modes.balanced.default_model).toBe('gpt-5');
+
+      const migrated = JSON.parse(readFileSync(p, 'utf-8')) as typeof existing;
+      expect(migrated.modes.balanced.brain_model).toBe('claude-sonnet-5');
+      expect(migrated.modes.balanced.default_model).toBe('gpt-5.5');
+    } finally {
+      cleanupTmp(p);
+    }
+  });
+
   it('adds rollback_policy and fix_phase_enabled for sprint config', () => {
     const existing = { mode: 'max_plan', modes: {} };
     const p = writeTmp('sprint-config.json', existing);
@@ -352,10 +387,10 @@ describe('modelToTier', () => {
   it('maps OpenAI models to correct tiers', () => {
     expect(modelToTier('gpt-5')).toBe('premium');
     expect(modelToTier('gpt-4.1')).toBe('standard');
-    expect(modelToTier('o3')).toBe('standard');
+    expect(modelToTier('o3')).toBe('premium_plus');
     expect(modelToTier('gpt-5-mini')).toBe('economy');
     expect(modelToTier('gpt-4.1-mini')).toBe('economy');
-    expect(modelToTier('o4-mini')).toBe('economy');
+    expect(modelToTier('o4-mini')).toBe('standard');
   });
 
   it('maps Gemini models to correct tiers', () => {
@@ -364,8 +399,8 @@ describe('modelToTier', () => {
     expect(modelToTier('gemini-2.0-flash')).toBe('economy');
   });
 
-  it('returns standard as fallback for unknown models', () => {
-    expect(modelToTier('unknown-model')).toBe('standard');
+  it('fails loud for unknown models instead of guessing standard', () => {
+    expect(() => modelToTier('unknown-model')).toThrow(/without registry evidence/);
   });
 });
 
@@ -453,7 +488,7 @@ describe('migrateConfigV1ToV2', () => {
     expect(strategy['worker_tier']).toBe('premium');
   });
 
-  it('does not overwrite existing providers fields', () => {
+  it('rejects differing legacy and canonical provider definitions before mutation', () => {
     const config: Record<string, unknown> = {
       mode: 'performance',
       modes: { performance: { brain_model: 'opus', default_model: 'opus', haiku_allowed: false, max_workers: 4 } },
@@ -461,12 +496,31 @@ describe('migrateConfigV1ToV2', () => {
       worker_provider: 'codex',
       providers: { brain: 'gemini' }, // pre-existing
     };
-    migrateConfigV1ToV2(config);
-    const providers = config['providers'] as Record<string, unknown>;
-    // Existing brain preserved
-    expect(providers['brain']).toBe('gemini');
-    // worker added from worker_provider
-    expect(providers['worker']).toBe('codex');
+    const before = structuredClone(config);
+    expect(() => migrateConfigV1ToV2(config)).toThrow(ProviderConfigAliasConflictError);
+    expect(config).toEqual(before);
+  });
+
+  it('deduplicates equal dual definitions and migrates remaining flat aliases', () => {
+    const config: Record<string, unknown> = {
+      brain_provider: 'claude',
+      worker_provider: 'codex',
+      provider_overrides: { docs: 'gemini', tests: 'codex' },
+      providers: {
+        brain: 'claude',
+        overrides: { tests: 'codex', docs: 'gemini' },
+      },
+    };
+    const result = migrateConfigV1ToV2(config);
+    expect(result.migrated).toBe(true);
+    expect(config['brain_provider']).toBeUndefined();
+    expect(config['worker_provider']).toBeUndefined();
+    expect(config['provider_overrides']).toBeUndefined();
+    expect(config['providers']).toMatchObject({
+      brain: 'claude',
+      worker: 'codex',
+      overrides: { docs: 'gemini', tests: 'codex' },
+    });
   });
 
   it('returns migrated=false when no v1 fields to migrate', () => {
@@ -542,6 +596,34 @@ describe('needsV2Migration', () => {
       providers: { brain: 'claude' },
     };
     expect(needsV2Migration(config)).toBe(false);
+  });
+
+  it('still detects a flat alias when grouped v2 fields already exist', () => {
+    const config: Record<string, unknown> = {
+      model_strategy: { brain_tier: 'premium' },
+      providers: { brain: 'claude' },
+      worker_provider: 'codex',
+    };
+    expect(needsV2Migration(config)).toBe(true);
+  });
+});
+
+describe('provider conflict file migration', () => {
+  it('fails without writing or creating a backup', () => {
+    const config = {
+      mode: 'performance',
+      brain_provider: 'codex',
+      providers: { brain: 'claude' },
+    };
+    const path = writeTmp(`provider-conflict-${process.pid}-${Date.now()}.json`, config);
+    const before = readFileSync(path, 'utf-8');
+    try {
+      expect(() => migrateConfig(path)).toThrow(ProviderConfigAliasConflictError);
+      expect(readFileSync(path, 'utf-8')).toBe(before);
+      expect(readdirSync(tmpdir()).filter((entry) => entry.startsWith(path.split('/').pop() + '.bak.'))).toEqual([]);
+    } finally {
+      cleanupTmp(path);
+    }
   });
 });
 

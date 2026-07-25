@@ -4,7 +4,8 @@
  * Tests for provider-aware auth mount in DockerSpawnBackend.
  * Sprint 203 Task 203-002.
  *
- * claude→~/.claude mount, codex→OPENAI_API_KEY env only, gemini→GOOGLE_API_KEY env only.
+ * Each subscription provider receives only its own credential files, never a
+ * complete provider home or a foreign provider credential.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -25,8 +26,10 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('node:fs', () => ({
-  existsSync: vi.fn(() => false),
-  readFileSync: vi.fn(() => '{}'),
+  existsSync: vi.fn((path: string) => /\.(claude|codex|gemini)\/(\.credentials\.json|auth\.json|gemini-credentials\.json|google_accounts\.json)$/.test(path)),
+  readFileSync: vi.fn((path: string) => path.endsWith('/.gemini/settings.json')
+    ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
+    : '{}'),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
   unlinkSync: vi.fn(),
@@ -55,9 +58,13 @@ vi.mock('../../src/core/active-workers.js', () => ({
   clearPending: vi.fn(),
 }));
 
+vi.mock('../../src/core/task-result-settlement.js', () => {
+  return import('../helpers/task-result-settlement-stub.js')
+    .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
+});
+
 import { spawnSync } from 'node:child_process';
-import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
-import type { ModelType } from '../../src/core/types.js';
+import { buildProviderAuthIsolation } from '../../src/orchestra/spawn-backend-docker.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
 
@@ -95,12 +102,12 @@ function installSpawnRouter(): void {
   });
 }
 
-/** Check if any `-v src:dst` in argv has `src` containing the given substring. */
+/** Check if any Docker bind mount source contains the given substring. */
 function hasVolumeMount(argv: string[], srcSubstring: string): boolean {
   for (let i = 0; i < argv.length - 1; i++) {
-    if (argv[i] === '-v') {
+    if (argv[i] === '--mount') {
       const spec = argv[i + 1] ?? '';
-      const [src] = spec.split(':');
+      const src = spec.split(',').find(part => part.startsWith('src='));
       if (src?.includes(srcSubstring)) return true;
     }
   }
@@ -115,57 +122,37 @@ describe('DockerSpawnBackend: provider-aware auth mount (Sprint 203 T-002)', () 
     installSpawnRouter();
   });
 
-  it('mounts ~/.claude for a claude model (sonnet) in subscription mode', () => {
-    const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-auth-claude', 'sonnet' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
-    expect(hasVolumeMount(argv, '.claude')).toBe(true);
+  it('mounts only the Claude credential for claude-sonnet-5 subscription', () => {
+    const argv = buildProviderAuthIsolation('/home/test', 'claude', '.claude', false).mountArgs;
+    expect(hasVolumeMount(argv, '.claude/.credentials.json')).toBe(true);
+    expect(argv.some(arg => arg.includes('/.claude:'))).toBe(false);
   });
 
   it('does NOT mount ~/.claude for a codex model (gpt-4.1)', () => {
-    const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-auth-codex', 'gpt-4.1' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
+    const argv = buildProviderAuthIsolation('/home/test', 'codex', '.codex', false).mountArgs;
     expect(hasVolumeMount(argv, '.claude')).toBe(false);
+    expect(hasVolumeMount(argv, '.codex/auth.json')).toBe(true);
   });
 
   it('does NOT mount ~/.claude for a gemini model (gemini-2.5-flash)', () => {
-    const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-auth-gemini', 'gemini-2.5-flash' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
+    const argv = buildProviderAuthIsolation('/home/test', 'gemini', '.gemini', false).mountArgs;
     expect(hasVolumeMount(argv, '.claude')).toBe(false);
+    expect(hasVolumeMount(argv, '.gemini/gemini-credentials.json')).toBe(true);
   });
 
-  it('mounts ~/.claude for haiku (subscription default)', () => {
-    const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-auth-haiku', 'haiku' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
-    expect(hasVolumeMount(argv, '.claude')).toBe(true);
+  it('mounts only the Claude credential for claude-haiku-4-5-20251001', () => {
+    const argv = buildProviderAuthIsolation('/home/test', 'claude', '.claude', false).mountArgs;
+    expect(hasVolumeMount(argv, '.claude/.credentials.json')).toBe(true);
   });
 
-  it('does NOT mount ~/.claude for gpt-5 (codex model)', () => {
-    const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-auth-gpt5', 'gpt-5' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
+  it('does NOT mount ~/.claude for gpt-5.6-sol (codex model)', () => {
+    const argv = buildProviderAuthIsolation('/home/test', 'codex', '.codex', false).mountArgs;
     expect(hasVolumeMount(argv, '.claude')).toBe(false);
+    expect(hasVolumeMount(argv, '.codex/auth.json')).toBe(true);
   });
 
   it('does NOT mount ~/.claude for gemini-2.5-pro (gemini model)', () => {
-    const backend = new DockerSpawnBackend('/test/project');
-    backend.spawn('t-auth-gemini-pro', 'gemini-2.5-pro' as ModelType, 'prompt');
-
-    expect(capturedDockerRunArgs.length).toBe(1);
-    const argv = capturedDockerRunArgs[0]!;
+    const argv = buildProviderAuthIsolation('/home/test', 'gemini', '.gemini', false).mountArgs;
     expect(hasVolumeMount(argv, '.claude')).toBe(false);
   });
 });

@@ -48,8 +48,9 @@ Dashboard: deckent web
 | truth | `deckent_truth` |
 | usage | `deckent_usage` |
 | watch | `deckent_watch` |
+| xverify | `deckent_xverify` |
 
-_Total: 38 MCP tools_
+_Total: 39 MCP tools_
 
 **Key operational tools:** `deckent_audit`, `deckent_nervous`, `deckent_watch`, `deckent_recover`, `deckent_status`, `deckent_memory_query`
 
@@ -158,5 +159,6 @@ _Total: 38 MCP tools_
 | `usage` | deckent usage |
 | `watch` | deckent watch |
 | `web` | deckent web |
+| `xverify` | deckent xverify |
 
-_Total: 102 CLI command modules_
+_Total: 103 CLI command modules_

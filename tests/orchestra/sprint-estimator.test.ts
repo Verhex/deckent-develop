@@ -61,6 +61,26 @@ describe('scoreTaskComplexity', () => {
     expect(score.baseMin).toBe(10);
   });
 
+  it('derives base minutes from registry TIER for a canonical model id', () => {
+    // claude-opus-4-8 is premium tier → 30 (same as the opus alias), proving the
+    // score keys off registry tier metadata, not an alias string.
+    const score = scoreTaskComplexity(makeTask({ model: 'claude-opus-4-8' }));
+    expect(score.baseMin).toBe(30);
+  });
+
+  it('scores an economy-tier canonical model at the economy baseline', () => {
+    // gemini-2.0-flash is economy tier in the registry → 10 (no alias keyword match).
+    const score = scoreTaskComplexity(makeTask({ model: 'gemini-2.0-flash' }));
+    expect(score.baseMin).toBe(10);
+  });
+
+  it('tier-infers an unknown model (metadata-derived, not a named default)', () => {
+    // An id the catalog does not carry → parametric tier inference (standard) → 20.
+    // The number comes from the tier classification, not a hardcoded unknown=sonnet.
+    const score = scoreTaskComplexity(makeTask({ model: 'brand-new-model-x' }));
+    expect(score.baseMin).toBe(20);
+  });
+
   it('applies low effort multiplier (0.6)', () => {
     const task = makeTask({ model: 'sonnet', effort: 'low' });
     const score = scoreTaskComplexity(task);

@@ -143,6 +143,36 @@ describe('RuntimeBudgetMonitor', () => {
     });
   });
 
+  it('keeps partial usage terminally unmeasurable after observer loss', () => {
+    const projectRoot = root();
+    const monitor = new RuntimeBudgetMonitor({
+      projectRoot,
+      taskId: 'observer-loss',
+      backend: 'docker',
+      budget: { maxTurns: 5 },
+      onStop: vi.fn(),
+    });
+    monitor.observe({
+      type: 'text',
+      content: {
+        type: 'assistant',
+        message: { id: 'msg-partial', usage: { input_tokens: 7, output_tokens: 3 }, content: [] },
+      },
+    });
+
+    monitor.failObservation(new Error('docker log stream disconnected'));
+    monitor.settle();
+
+    expect(readRuntimeBudgetUsage(projectRoot, 'observer-loss')).toMatchObject({
+      terminal: true,
+      decision: {
+        state: 'unmeasurable',
+        reasons: [expect.stringContaining('docker log stream disconnected')],
+        counters: { inputTokens: 7, outputTokens: 3 },
+      },
+    });
+  });
+
   it('restores non-terminal counters and dedupe keys after coordinator restart', () => {
     const projectRoot = root();
     const firstStop = vi.fn();

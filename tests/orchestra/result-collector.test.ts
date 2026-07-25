@@ -369,6 +369,7 @@ describe('estimateTokenUsage', () => {
     expect(usage.inputTokens).toBe(5000);
     expect(usage.outputTokens).toBe(1500); // 100 * 15
     expect(usage.cacheReadTokens).toBe(20000); // 5000 * 4
+    expect(usage.source).toBe('estimate');
     expect(usage.provider).toBe('claude');
     expect(usage.model).toBe('opus');
   });
@@ -425,6 +426,7 @@ describe('enrichResultTokenUsage', () => {
     expect(result.tokenUsage!.inputTokens).toBe(8000);
     expect(result.tokenUsage!.outputTokens).toBe(3000); // 200 * 15
     expect(result.tokenUsage!.provider).toBe('claude');
+    expect(result.tokenUsage!.source).toBe('estimate');
     expect(result.tokenUsage!.model).toBe('sonnet');
   });
 

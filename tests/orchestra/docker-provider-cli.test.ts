@@ -33,8 +33,9 @@ vi.mock('node:child_process', () => ({
   spawn: vi.fn(() => {
     const stub = {
       stdout: { on: vi.fn() },
-      stderr: { on: vi.fn() },
+      stderr: { on: vi.fn(), resume: vi.fn() },
       on: vi.fn(),
+      once: vi.fn(),
     };
     return stub as unknown as ChildProcess;
   }),
@@ -42,7 +43,9 @@ vi.mock('node:child_process', () => ({
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(() => true),
-  readFileSync: vi.fn(() => '{}'),
+  readFileSync: vi.fn((path: string) => path.endsWith('/.gemini/settings.json')
+    ? '{"security":{"auth":{"selectedType":"gemini-api-key"}}}'
+    : '{}'),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
   unlinkSync: vi.fn(),
@@ -71,16 +74,25 @@ vi.mock('../../src/core/active-workers.js', () => ({
   clearPending: vi.fn(),
 }));
 
+vi.mock('../../src/core/task-result-settlement.js', () => {
+  return import('../helpers/task-result-settlement-stub.js')
+    .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub());
+});
+
 import { spawnSync } from 'node:child_process';
 import {
   DockerSpawnBackend,
   probeProviderCliPresentInImage,
-  workerImageBuildCmdForProvider,
 } from '../../src/orchestra/spawn-backend-docker.js';
-import { getProviderCommandSpec, PROMPT_CAT_TOKEN } from '../../src/core/provider-command-spec.js';
+import {
+  buildProviderCommand,
+  getProviderCommandSpec,
+  PROMPT_CAT_TOKEN,
+} from '../../src/core/provider-command-spec.js';
 import type { ModelType } from '../../src/core/types.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
+const TEST_EXECUTION_OPTIONS = { executionBudget: { maxTurns: 1 } } as const;
 
 // ─── Spawn-seam router ───────────────────────────────────────────────────────
 
@@ -119,8 +131,8 @@ function installSpawnRouter(cliPresent: boolean): void {
       outcome = { stdout: 'container-id-x', stderr: '', status: 0 };
     } else if (cmd === 'docker' && sub === 'inspect') {
       outcome = { stdout: 'true|0', stderr: '', status: 0 };
-    } else if (cmd === 'claude' && sub === '--version') {
-      outcome = { stdout: 'claude 1.0.0 (host auth ok)', stderr: '', status: 0 };
+    } else if (cmd === 'claude' && argv.join(' ') === 'auth status --json') {
+      outcome = { stdout: '{"loggedIn":true}', stderr: '', status: 0 };
     }
 
     return {
@@ -144,7 +156,7 @@ async function workerScriptFor(taskId: string): Promise<string> {
 
 function spawnExpectMessage(backend: DockerSpawnBackend, taskId: string, model: string): string {
   try {
-    backend.spawn(taskId, model as ModelType, 'prompt-body');
+    backend.spawn(taskId, model as ModelType, 'prompt-body', TEST_EXECUTION_OPTIONS);
     return '';
   } catch (err) {
     return err instanceof Error ? err.message : String(err);
@@ -161,33 +173,36 @@ describe('DockerSpawnBackend: provider→cmd table (shared PROVIDER_COMMAND_SPEC
 
   it('claude worker script is built from PROVIDER_COMMAND_SPECS.claude (string-assert)', async () => {
     const spec = getProviderCommandSpec('claude')!;
-    new DockerSpawnBackend('/test/project').spawn('cli-table-claude', 'sonnet' as ModelType, 'prompt-body');
+    new DockerSpawnBackend('/test/project').spawn(
+      'cli-table-claude',
+      'claude-sonnet-5' as ModelType,
+      'prompt-body',
+      TEST_EXECUTION_OPTIONS,
+    );
     const script = await workerScriptFor('cli-table-claude');
 
     expect(script).toContain(spec.binary);
     for (const arg of spec.baseArgs) expect(script).toContain(arg);
     expect(script).toContain(spec.modelFlag);
-    expect(script).toContain('claude-sonnet-5'); // apiId, not the 'sonnet' alias
+    expect(script).toContain('claude-sonnet-5');
     for (const arg of spec.approvalArgs) expect(script).toContain(arg);
   });
 
-  it('codex worker script is built from PROVIDER_COMMAND_SPECS.codex (string-assert)', async () => {
+  it('codex command is built from PROVIDER_COMMAND_SPECS.codex (pure contract)', () => {
     const spec = getProviderCommandSpec('codex')!;
-    new DockerSpawnBackend('/test/project').spawn('cli-table-codex', 'gpt-5' as ModelType, 'prompt-body');
-    const script = await workerScriptFor('cli-table-codex');
+    const script = buildProviderCommand(spec, 'gpt-5.6-sol', '/prompt', { autoApprove: true });
 
     expect(script).toContain(spec.binary);
     for (const arg of spec.baseArgs) expect(script).toContain(arg);
     expect(script).toContain(spec.modelFlag);
-    expect(script).toContain('gpt-5.5'); // apiId, not the 'gpt-5' alias
+    expect(script).toContain('gpt-5.6-sol');
     for (const arg of spec.approvalArgs) expect(script).toContain(arg);
     expect(script).not.toContain('--dangerously-skip-permissions'); // claude-only flag
   });
 
-  it('gemini worker script is built from PROVIDER_COMMAND_SPECS.gemini (string-assert)', async () => {
+  it('gemini command is built from PROVIDER_COMMAND_SPECS.gemini (pure contract)', () => {
     const spec = getProviderCommandSpec('gemini')!;
-    new DockerSpawnBackend('/test/project').spawn('cli-table-gemini', 'gemini-2.5-flash' as ModelType, 'prompt-body');
-    const script = await workerScriptFor('cli-table-gemini');
+    const script = buildProviderCommand(spec, 'gemini-2.5-flash', '/prompt', { autoApprove: true });
 
     expect(script).toContain(spec.binary);
     for (const arg of spec.baseArgs) {
@@ -249,34 +264,32 @@ describe('DockerSpawnBackend: image-reality honest-fail (verifyProviderCliInImag
       installSpawnRouter(/* cliPresent */ false);
     });
 
-    it('codex CLI missing → throws honest error with rebuild cmd + `Backend: subprocess` suggestion', () => {
+    it('codex is held on live metering before an image probe', () => {
       const backend = new DockerSpawnBackend('/test/project', { verifyProviderCliInImage: true });
-      const msg = spawnExpectMessage(backend, 'img-real-codex', 'gpt-5');
+      const msg = spawnExpectMessage(backend, 'img-real-codex', 'gpt-5.6-sol');
 
-      expect(msg).toMatch(/does not have the 'codex' CLI installed for provider 'codex'/);
-      expect(msg).toContain(workerImageBuildCmdForProvider('deckent-worker:latest', 'codex'));
-      expect(msg).toContain('Backend: subprocess');
+      expect(msg).toMatch(/does not expose incremental measured usage/);
+      expect(capturedProbeRunArgs).toHaveLength(0);
     });
 
-    it('gemini CLI missing → throws honest error with rebuild cmd + `Backend: subprocess` suggestion', () => {
+    it('gemini is held on live metering before an image probe', () => {
       const backend = new DockerSpawnBackend('/test/project', { verifyProviderCliInImage: true });
       const msg = spawnExpectMessage(backend, 'img-real-gemini', 'gemini-2.5-flash');
 
-      expect(msg).toMatch(/does not have the 'gemini' CLI installed for provider 'gemini'/);
-      expect(msg).toContain(workerImageBuildCmdForProvider('deckent-worker:latest', 'gemini'));
-      expect(msg).toContain('Backend: subprocess');
+      expect(msg).toMatch(/does not expose incremental measured usage/);
+      expect(capturedProbeRunArgs).toHaveLength(0);
     });
 
     it('honest-fail never falls back to silently spawning the container (no real `docker run -d`)', () => {
       const backend = new DockerSpawnBackend('/test/project', { verifyProviderCliInImage: true });
-      spawnExpectMessage(backend, 'img-real-nofallback', 'gpt-5');
+      spawnExpectMessage(backend, 'img-real-nofallback', 'gpt-5.6-sol');
 
       expect(capturedRealRunArgs.length).toBe(0);
     });
 
     it('claude is never probed even with the flag on (always baked in, no build-arg)', () => {
       const backend = new DockerSpawnBackend('/test/project', { verifyProviderCliInImage: true });
-      const msg = spawnExpectMessage(backend, 'img-real-claude', 'sonnet');
+      const msg = spawnExpectMessage(backend, 'img-real-claude', 'claude-sonnet-5');
 
       expect(msg).toBe(''); // did not throw
       expect(capturedProbeRunArgs.length).toBe(0);
@@ -290,13 +303,13 @@ describe('DockerSpawnBackend: image-reality honest-fail (verifyProviderCliInImag
       installSpawnRouter(/* cliPresent */ true);
     });
 
-    it('codex CLI present → probe runs, then spawn proceeds to the real container', () => {
+    it('codex remains held even when the image has its CLI', () => {
       const backend = new DockerSpawnBackend('/test/project', { verifyProviderCliInImage: true });
-      const msg = spawnExpectMessage(backend, 'img-real-codex-ok', 'gpt-5');
+      const msg = spawnExpectMessage(backend, 'img-real-codex-ok', 'gpt-5.6-sol');
 
-      expect(msg).toBe('');
-      expect(capturedProbeRunArgs.length).toBe(1);
-      expect(capturedRealRunArgs.length).toBe(1);
+      expect(msg).toMatch(/does not expose incremental measured usage/);
+      expect(capturedProbeRunArgs).toHaveLength(0);
+      expect(capturedRealRunArgs).toHaveLength(0);
     });
   });
 });
@@ -311,21 +324,21 @@ describe('DockerSpawnBackend: verifyProviderCliInImage defaults to false (364-00
     installSpawnRouter(/* cliPresent */ false);
   });
 
-  it('codex spawn with no opts proceeds to the real container — probe never invoked', () => {
+  it('codex default-off still holds before provider work', () => {
     const backend = new DockerSpawnBackend('/test/project');
-    const msg = spawnExpectMessage(backend, 'img-real-default-off', 'gpt-5');
+    const msg = spawnExpectMessage(backend, 'img-real-default-off', 'gpt-5.6-sol');
 
-    expect(msg).toBe('');
+    expect(msg).toMatch(/does not expose incremental measured usage/);
     expect(capturedProbeRunArgs.length).toBe(0);
-    expect(capturedRealRunArgs.length).toBe(1);
+    expect(capturedRealRunArgs.length).toBe(0);
   });
 
-  it('gemini spawn with { verifyProviderCliInImage: false } explicit proceeds identically', () => {
+  it('gemini explicit probe-off still holds before provider work', () => {
     const backend = new DockerSpawnBackend('/test/project', { verifyProviderCliInImage: false });
     const msg = spawnExpectMessage(backend, 'img-real-explicit-off', 'gemini-2.5-flash');
 
-    expect(msg).toBe('');
+    expect(msg).toMatch(/does not expose incremental measured usage/);
     expect(capturedProbeRunArgs.length).toBe(0);
-    expect(capturedRealRunArgs.length).toBe(1);
+    expect(capturedRealRunArgs.length).toBe(0);
   });
 });

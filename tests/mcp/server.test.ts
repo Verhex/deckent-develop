@@ -136,10 +136,16 @@ describe('DECKENT_MCP_INSTRUCTIONS', () => {
     expect(DECKENT_MCP_INSTRUCTIONS).toContain('Skills:');
   });
 
-  it('instructions contains parameter reference', () => {
-    expect(DECKENT_MCP_INSTRUCTIONS).toContain('opus');
-    expect(DECKENT_MCP_INSTRUCTIONS).toContain('sonnet');
-    expect(DECKENT_MCP_INSTRUCTIONS).toContain('haiku');
+  it('instructions contains parameter reference with exact provider model IDs, not legacy aliases', () => {
+    // 454-004: the Parameters section must teach exact provider API IDs +
+    // explicit Provider ownership — never a bare legacy alias that
+    // resolveCanonicalModelIdentity() now rejects (E_LEGACY_MODEL_ALIAS).
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('claude-opus-4-8');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('claude-sonnet-5');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('claude-haiku-4-5-20251001');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('legacy aliases');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('rejected');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('provider:');
     expect(DECKENT_MCP_INSTRUCTIONS).toContain('ai');
     expect(DECKENT_MCP_INSTRUCTIONS).toContain('structured');
     expect(DECKENT_MCP_INSTRUCTIONS).toContain('auto');

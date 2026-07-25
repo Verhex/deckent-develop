@@ -340,6 +340,40 @@ export function registerStart(program: Command): void {
             return;
           }
 
+          // The approved snapshot is the immutable plan authority for this
+          // branch. Cost-admit those exact tasks before persisting a handle or
+          // invoking runSprint; never re-plan merely to estimate cost.
+          try {
+            initCostConfig(root);
+            const costConfig = loadCostConfig(root);
+            const cfgAuthMode = await readAuthMode(root);
+            const costTasks: TaskCostInput[] = approvedSnapshot!.sprint.tasks.map((t) => ({
+              id: t.id,
+              model: t.model,
+              estimatedInputTokens: t.estimatedTokens ?? 2700,
+              estimatedOutputTokens: t.effort === 'high' ? 4000 : t.effort === 'low' ? 500 : 1500,
+              effort: t.effort as 'low' | 'normal' | 'high' | undefined,
+              billingMode: resolveBillingModeForAuth(t.provider, t.authMode ?? cfgAuthMode),
+            }));
+            const gate = evaluateCostGate({
+              tasks: costTasks,
+              costConfig,
+              acknowledgeCost: opts.force === true,
+            });
+            if (!gate.ok) {
+              const overrideHint = gate.reason === 'COST_PRICING_UNKNOWN'
+                ? ''
+                : ' (CLI: override with --force.)';
+              printError(new Error(gate.message + overrideHint));
+              process.exitCode = 1;
+              return;
+            }
+          } catch (err) {
+            printError(err instanceof Error ? err : new Error(String(err)));
+            process.exitCode = 1;
+            return;
+          }
+
           // Persist the handle BEFORE actually running: idempotency must win
           // over a theoretical crash-mid-sprint retry (a later re-invocation
           // with the same flowId+digest sees this handle and no-ops instead
@@ -588,6 +622,14 @@ export function registerStart(program: Command): void {
                 : 'not-attempted',
               reason: sprint.plannerProof.resolutionReason,
             }));
+            const receiptRef = sprint.plannerProof.call.receiptRef;
+            if (receiptRef) {
+              print(getMessage('planning.receipt_ref', lang, {
+                invocationId: receiptRef.invocationId,
+                tenantId: receiptRef.tenantId,
+                projectId: receiptRef.projectId,
+              }));
+            }
           }
           print(getMessage('start.workers_info', lang, {
             count: String(sprint.tasks.length),
@@ -622,8 +664,7 @@ export function registerStart(program: Command): void {
         // Runs before spawn — prevents Sprint 140 $42 disaster from repeating.
         // Sprint 189 Task 189-008: shared evaluateCostGate() helper — same
         // logic now drives the MCP deckent_start path.
-        if (!opts.force) {
-          try {
+        try {
             initCostConfig(root);
             const costConfig = loadCostConfig(root);
             const context = readContext(root);
@@ -644,12 +685,19 @@ export function registerStart(program: Command): void {
               // F1-CB: billing follows effective auth — subscription/local tasks cost $0
               billingMode: resolveBillingModeForAuth(t.provider, t.authMode ?? cfgAuthMode),
             }));
-            const gate = evaluateCostGate({ tasks: costTasks, costConfig });
+            const gate = evaluateCostGate({
+              tasks: costTasks,
+              costConfig,
+              acknowledgeCost: opts.force === true,
+            });
             print(formatEstimate(gate.estimate));
 
             if (!gate.ok) {
               if (sandboxState) restoreSandbox(root, sandboxState);
-              printError(new Error(gate.message + ' (CLI: override with --force.)'));
+              const overrideHint = gate.reason === 'COST_PRICING_UNKNOWN'
+                ? ''
+                : ' (CLI: override with --force.)';
+              printError(new Error(gate.message + overrideHint));
               process.exitCode = 1;
               return;
             }
@@ -685,9 +733,11 @@ export function registerStart(program: Command): void {
                 return;
               }
             }
-          } catch (err) {
-            print(`⚠ Cost gate unavailable (proceeding anyway): ${err instanceof Error ? err.message : String(err)}`);
-          }
+        } catch (err) {
+          if (sandboxState) restoreSandbox(root, sandboxState);
+          printError(err instanceof Error ? err : new Error(String(err)));
+          process.exitCode = 1;
+          return;
         }
 
         // Set up watch window before runSprint blocks
@@ -764,6 +814,14 @@ export function registerStart(program: Command): void {
                 : 'not-attempted',
               reason: error.plannerProof.resolutionReason,
             }));
+            const receiptRef = error.plannerProof.call.receiptRef;
+            if (receiptRef) {
+              print(getMessage('planning.receipt_ref', lang, {
+                invocationId: receiptRef.invocationId,
+                tenantId: receiptRef.tenantId,
+                projectId: receiptRef.projectId,
+              }));
+            }
           }
         } else {
           printError(error);

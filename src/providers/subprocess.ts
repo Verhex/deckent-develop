@@ -21,6 +21,11 @@ import { modelRegistry } from '../core/model-registry.js';
 import { resolveReasoningEffort } from '../core/reasoning-effort.js';
 import { debugLog } from '../core/utils.js';
 import { normalizeStreamEvent } from '../core/log-event.js';
+import {
+  assertLiveUsageBudgetSupport,
+  hasLiveUsageCeiling,
+  type LiveUsageBudgetSupport,
+} from '../core/live-execution-budget.js';
 import { makeActivityOnEvent } from '../agents/worker-activity.js';
 import type { ProviderDefinition } from '../core/config-types.js';
 import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
@@ -32,6 +37,7 @@ import {
   isGitGuardSupportedPlatform,
   buildGitGuardDir,
 } from '../orchestra/git-worker-guard.js';
+import { createRuntimeBudgetMonitor, resolveTaskExecutionBudget } from '../orchestra/runtime-budget-monitor.js';
 
 /**
  * MOAT-2 (ADR-G-013): grace window between a graceful SIGTERM and the SIGKILL
@@ -56,12 +62,9 @@ export const SIGKILL_ESCALATION_MS = 2_000;
  * group is already gone), fall back to the direct single-pid signal so the
  * worker is still reaped.
  *
- * win32: `process.kill()` has no negative-pid group-signal semantics, and
- * `detached` means something different there (new console, not new process
- * group) — this always falls through to the single-pid `proc.kill(signal)`.
- * This is an intentional, honest residual (not a silent gap): logged via
- * `debugLog` so it is discoverable, with a `taskkill /T` follow-up tracked as
- * a roadmap item rather than solved here.
+ * win32: `process.kill()` has no negative-pid group-signal semantics. Use the
+ * native `taskkill /PID <pid> /T` tree operation; SIGKILL escalation adds `/F`.
+ * If `taskkill` itself cannot start, fall back to the direct child signal.
  *
  * born-568 (PROCESS-GROUP-KILL): exported as a shared primitive so every
  * subprocess-based provider adapter (codex.ts, gemini.ts, …) reuses this
@@ -83,10 +86,16 @@ export function signalProcessGroup(
     }
   }
   if (platform === 'win32') {
-    debugLog(
-      'subprocess:signalProcessGroup',
-      `win32 has no process-group signal semantics — only the direct worker pid (${String(pid)}) is signalled with ${signal}; any grandchild process it spawned may survive (WORKER-PGID-TEARDOWN, ADR-G-013 roadmap: taskkill /T follow-up)`,
-    );
+    if (typeof pid === 'number') {
+      const args = ['/PID', String(pid), '/T'];
+      if (signal === 'SIGKILL') args.push('/F');
+      const killer = spawn('taskkill', args, { stdio: 'ignore', windowsHide: true });
+      killer.once('error', () => {
+        try { proc.kill(signal); } catch { /* process already exited */ }
+      });
+      killer.unref();
+      return;
+    }
   }
   proc.kill(signal);
 }
@@ -166,6 +175,13 @@ export interface SubprocessProviderConfig {
    * Omitted → this provider has no live-stream mode (no behavior change).
    */
   readonly liveStreamArgs?: readonly string[];
+  /**
+   * Live budget evidence is authoritative only when the worker cannot mutate
+   * the host ledger. Same-user production subprocesses must leave this unset;
+   * Docker owns the trusted production path. Test harnesses may opt in with an
+   * isolated fake child to exercise the stream monitor itself.
+   */
+  readonly liveBudgetEvidenceTrust?: 'host-isolated';
 }
 
 /**
@@ -253,6 +269,12 @@ interface SubprocessWorkerEntry {
 export class SubprocessSpawnBackend implements ProviderAdapter {
   readonly name: string;
   readonly supportedModels: readonly ModelType[];
+  get liveUsageBudgetSupport(): LiveUsageBudgetSupport | undefined {
+    return this.providerConfig.liveStreamArgs
+      && this.providerConfig.liveBudgetEvidenceTrust === 'host-isolated'
+      ? 'measured-stream'
+      : undefined;
+  }
 
   private readonly projectDir: string;
   private readonly workers = new Map<string, SubprocessWorkerEntry>();
@@ -321,9 +343,12 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     const dir = opts?.projectDir ?? this.projectDir;
     const tasksDir = join(dir, TASKS_DIR);
     ensureDir(tasksDir);
-
-    const logPath = join(tasksDir, `task-${taskId}.log`);
-    const logFd = openSync(logPath, 'a');
+    const executionBudget = resolveTaskExecutionBudget(dir, taskId, opts?.executionBudget);
+    assertLiveUsageBudgetSupport(
+      executionBudget,
+      this.liveUsageBudgetSupport,
+      this.name,
+    );
 
     // Worker Output Contract: append the provider's usage-emit flag(s) at spawn
     // time only (NOT inside buildArgs) so the per-run usage envelope lands in the
@@ -334,8 +359,12 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     // SURF-3 S2 — live tool-by-tool activity (flag-gated). When on AND this
     // provider declares `liveStreamArgs`, swap the single-envelope usage args for
     // the stream-json args so stdout carries per-tool events; else byte-stable.
+    const budgetMonitoring = hasLiveUsageCeiling(executionBudget);
+    const logPath = join(tasksDir, `task-${taskId}.log`);
+    const logFd = openSync(logPath, 'a');
     const liveActivity = opts?.liveTraceEnabled === true && this.providerConfig.liveStreamArgs !== undefined;
-    const emitArgs = liveActivity ? this.providerConfig.liveStreamArgs : this.providerConfig.usageEmitArgs;
+    const streamCapture = liveActivity || budgetMonitoring;
+    const emitArgs = streamCapture ? this.providerConfig.liveStreamArgs : this.providerConfig.usageEmitArgs;
     const args = emitArgs
       ? [...baseArgs, ...emitArgs]
       : baseArgs;
@@ -426,7 +455,7 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     // FD-redirect exactly as before (byte-identical, no JS read).
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
-      stdio: liveActivity ? ['pipe', 'pipe', logFd] : ['pipe', logFd, logFd],
+      stdio: streamCapture ? ['pipe', 'pipe', logFd] : ['pipe', logFd, logFd],
       env: childEnv,
       shell: inv.shell,
       detached: this.platform !== 'win32',
@@ -439,16 +468,31 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     // per-tool ACTIVITY line for every complete NDJSON line. Fail-soft: a bad
     // line / failed emit never breaks the worker; a write error degrades to
     // activity-only. Only runs when liveActivity (stdout is piped then).
-    if (liveActivity && child.stdout) {
-      const onActivity = makeActivityOnEvent({
+    if (streamCapture && child.stdout) {
+      const onActivity = liveActivity ? makeActivityOnEvent({
         projectRoot: dir,
         taskId,
         workerId: `subprocess-${taskId}`,
-        enabled: true, // liveActivity already gates on opts.liveTraceEnabled
+        enabled: true,
         ...(opts?.sprintId ? { sprintId: opts.sprintId } : {}),
+      }) : undefined;
+      const budgetMonitor = createRuntimeBudgetMonitor({
+        projectRoot: dir,
+        taskId,
+        backend: this.name,
+        budget: executionBudget,
+        onStop: () => {
+          try { killProcessGroupWithEscalation(child, 'SIGTERM', this.platform); } catch { /* already exited */ }
+        },
       });
       const provider = this.name;
       let lineBuf = '';
+      const observeLine = (line: string): void => {
+        if (!line.trim()) return;
+        const event = normalizeStreamEvent(line, provider);
+        try { onActivity?.(event); } catch { /* activity is best-effort */ }
+        try { budgetMonitor?.observe(event); } catch { /* stop callback still ran; marker failure is contained */ }
+      };
       child.stdout.on('data', (chunk: Buffer) => {
         try { writeSync(logFd, chunk); } catch { /* raw-log write best-effort */ }
         lineBuf += chunk.toString('utf-8');
@@ -456,10 +500,12 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
         while ((nl = lineBuf.indexOf('\n')) !== -1) {
           const line = lineBuf.slice(0, nl);
           lineBuf = lineBuf.slice(nl + 1);
-          if (line.trim()) {
-            try { onActivity(normalizeStreamEvent(line, provider)); } catch { /* fail-soft */ }
-          }
+          observeLine(line);
         }
+      });
+      child.stdout.on('end', () => {
+        observeLine(lineBuf);
+        try { budgetMonitor?.settle(); } catch { /* missing durable summary becomes UNKNOWN/HOLD */ }
       });
       child.stdout.on('error', () => { /* stream error never breaks the worker */ });
       // MOAT-2 (ADR-G-013): a flowing Readable holds its OWN event-loop ref that

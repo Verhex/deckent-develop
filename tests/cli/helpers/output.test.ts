@@ -14,6 +14,7 @@ import {
 import type { HumanStatusInput } from '../../../src/cli/helpers/output.js';
 import { AgentStatus, AlertLevel, SprintPhase, SprintStatus } from '../../../src/core/types.js';
 import type { DashboardState, DoctorResult, Sprint, AgentRole, Task } from '../../../src/core/types.js';
+import { ProviderConfigAliasConflictError } from '../../../src/core/provider-config-canonicalizer.js';
 // countBrainLines removed — output.ts now uses MemoryStore
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
@@ -136,6 +137,26 @@ describe('printError', () => {
   it('writes number error correctly', () => {
     printError(42);
     expect(writeSpy).toHaveBeenCalledWith('Error: 42\n');
+  });
+
+  it('renders provider alias conflicts through the localized CLI message map', () => {
+    const previousLang = process.env['LANG'];
+    process.env['LANG'] = 'tr_TR.UTF-8';
+    try {
+      printError(new ProviderConfigAliasConflictError({
+        layer: 'project',
+        slot: 'fallback',
+        flatKey: 'fallback_provider',
+        groupedKey: 'providers.fallback',
+        flatValue: 'codex',
+        groupedValue: 'claude',
+      }));
+      expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining('çakışan provider ayarları'));
+      expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining('fallback_provider="codex"'));
+    } finally {
+      if (previousLang === undefined) delete process.env['LANG'];
+      else process.env['LANG'] = previousLang;
+    }
   });
 });
 
@@ -445,6 +466,24 @@ describe('formatSprintSummary', () => {
 // ─── formatAgentLabel ───────────────────────────────────────────────
 
 describe('formatAgentLabel', () => {
+  // R6-COLOR-HERMETIC: these assertions check literal ANSI codes emitted by
+  // color(), which is gated by isNoColor() (NO_COLOR env / --no-color argv).
+  // Own + restore both triggers explicitly — do not depend on the invoking
+  // shell's NO_COLOR state (same pattern as the `isNoColor` describe below).
+  const originalEnv = process.env.NO_COLOR;
+  const originalArgv = [...process.argv];
+
+  beforeEach(() => {
+    delete process.env.NO_COLOR;
+    process.argv = process.argv.filter((a) => a !== '--no-color');
+  });
+
+  afterEach(() => {
+    if (originalEnv === undefined) delete process.env.NO_COLOR;
+    else process.env.NO_COLOR = originalEnv;
+    process.argv = [...originalArgv];
+  });
+
   it('returns dim "generic" for undefined agent', () => {
     const label = formatAgentLabel(undefined);
     expect(label).toContain('generic');
@@ -478,6 +517,22 @@ describe('formatAgentLabel', () => {
 // ─── formatDashboard agent column ───────────────────────────────────
 
 describe('formatDashboard agent column', () => {
+  // R6-COLOR-HERMETIC: see formatAgentLabel above — own + restore NO_COLOR/argv
+  // rather than depending on the invoking shell for the two ANSI-code assertions.
+  const originalEnv = process.env.NO_COLOR;
+  const originalArgv = [...process.argv];
+
+  beforeEach(() => {
+    delete process.env.NO_COLOR;
+    process.argv = process.argv.filter((a) => a !== '--no-color');
+  });
+
+  afterEach(() => {
+    if (originalEnv === undefined) delete process.env.NO_COLOR;
+    else process.env.NO_COLOR = originalEnv;
+    process.argv = [...originalArgv];
+  });
+
   it('shows agent label for worker with assignedAgent', () => {
     const state = makeDashboard({
       agents: [{
