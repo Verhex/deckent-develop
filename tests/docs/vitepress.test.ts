@@ -83,6 +83,13 @@ describe('docs/.vitepress/config.ts', () => {
     expect(content).toContain('defineConfig');
   });
 
+  it('keeps generated governance projections outside the public docs build', () => {
+    const srcExclude = content.match(/srcExclude:\s*\[([\s\S]*?)\]/)?.[1];
+
+    expect(srcExclude).toBeDefined();
+    expect(srcExclude).toMatch(/^\s*'generated\/\*\*',\s*$/m);
+  });
+
   it('includes all required nav items: Home, Docs, Blog, GitHub', () => {
     expect(content).toContain("text: 'Home'");
     expect(content).toContain("text: 'Docs'");

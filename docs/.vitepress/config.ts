@@ -35,6 +35,9 @@ export default defineConfig({
     'directives/**',
     'analysis/**',
     'archive/**',
+    // Machine-generated governance projections are repository-internal control-plane
+    // artifacts, not localized product documentation.
+    'generated/**',
     // Nested archives under published sections (e.g. adr/archive/ — superseded
     // ADR drafts with same-dir links to their now-parent-dir live versions).
     // `archive/**` only catches top-level; this catches every depth.

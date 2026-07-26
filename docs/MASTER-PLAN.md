@@ -13,6 +13,13 @@
 > retrospective, memory ve evidence belgeleri yeni iş saklayamaz; yürütülebilir her residual
 > aynı gün burada atomik bir Work ID olarak yer alır.
 
+`scripts/lint-master-plan.mjs` ve `docs/generated/master-plan-active.*` yalnız repository-internal
+governance/developer projection'ıdır; product Terminal/Desktop/API yüzeyi değildir.
+`docs/.vitepress/config.ts` bu projection'ları public docs build'inden dışlar ve
+`tests/docs/vitepress.test.ts` sınırı regression-gate eder. Stable English diagnostic/reader
+vocabulary product'a açılmadan `FO-10-I18N` ve `DOCS-I18N-001` message/locale authority'sine
+taşınır.
+
 ## 1. North Star ve bitiş sözleşmesi
 
 Deckent; solo kullanıcıdan dünyanın en büyük kurumlarına kadar aynı çekirdeği kullanan,
@@ -80,7 +87,8 @@ Destructive ve external-state işlemlerinde eski onay yeni disk şekline taşın
 - `G7 LIVE_PROVIDER_CALL` — her paid veya external live provider attempt'i için ayrı,
   expiring ve single-use owner receipt'i. Provider, surface, binary version, exact model,
   auth/account class, tenant/project/task/attempt, prompt/data class, tools, filesystem/network
-  authority, max wall clock, budget, fallback policy ve kill/rollback authority bağlanır.
+  authority, max wall clock, explicit authorization TTL, policy-digest-bound canonical budget
+  quantity, fallback policy ve kill/rollback authority bağlanır.
 
 Canlı sprint Alperen onayı olmadan kill/cleanup edilmez. `.brain/memory.db` silinmez.
 Shared worktree'de her edit öncesi exact file collision guard, commit öncesi `git branch -vv` zorunludur.
@@ -121,18 +129,48 @@ Shared worktree'de her edit öncesi exact file collision guard, commit öncesi `
 ### 3.3 Satır invariants
 
 - Bir satır bir kapanabilir outcome taşır.
+- `Updated` real ve validator'ın UTC as-of gününden ileri olmayan `YYYY-MM-DD` tarihidir;
+  published registry'ye göre geriye alınamaz. Priority/state/truth/evidence/blocker authority
+  eski bir günde değişip `Updated` sabit bırakılamaz; aynı UTC günündeki değişiklikler bu
+  date-granularity alanında birlikte review edilir ve commit/audit event sırası ayrı authority'dir.
 - `ID` immutable ve tekildir; dependency yalnız ID ile kurulur.
+- Generated JSON projection schema-v3 tüm Work identity/state/terminal-closure ve receipt/G7
+  attempt kimliklerini authority registry olarak taşır; normal `--check/--write` önceki tracked
+  registry'den silme, reorder, definition drift, invalid state transition, terminal proof rewrite
+  veya receipt replay'i reddeder. Runtime bootstrap/bypass flag'i yoktur; missing/corrupt registry
+  version control'den exact restore edilir. Schema migration yalnız ayrı reviewed code version'ı,
+  exact prior digest ve owner receipt'iyle yayımlanır. Bu tracked projection bir runtime
+  tamper-evident journal değildir: source+projection'ın aynı patchte rewrite edilmesine karşı
+  trust anchor reviewed Git parent/CI protection'dır; signed/append-only runtime settlement
+  `KERNEL-SETTLEMENT-001`, `AUDIT-001` ve `RECEIPT-001` kapsamındadır.
 - `Parent`, canonical Work ID veya §5'teki `P00`–`P10` program node'udur. Program parent'ı
   yalnız grouping taşır. Canonical Work ID parent'ı child execution'ını bloke etmez fakat
   aggregate closure edge'i üretir: doğrudan child'ların tamamı `DONE`/`DISPOSED` olmadan
-  parent `READY` veya `DONE` olamaz.
+  parent `READY`, `DONE` veya `DISPOSED` olamaz.
 - `DONE` satırında residual veya “KALAN” bulunamaz; yeni child açılır.
+- `DONE` Truth yalnız `1`/`-` taşır, en az bir `1` içerir ve Evidence'ta exact functional
+  `` `proof=<stable-id>` `` token'ı bulunur. Mutation işi ayrıca scope-exact ve `consumed` receipt taşır;
+  receipt izin provenance'ıdır ve tek başına outcome proof değildir.
+- Evidence receipt referansı yalnız exact backticked `` `receipt=GR-YYYY-MM-DD-...` `` token'ıdır.
+  Raw GR ID, negated prose veya serbest metin mutation authority üretmez.
+- Historical mutation provenance tek token'dır:
+  `` `historical-authority=<non-placeholder-id>;historical-gates=<G-list>;proof=<stable-id>` ``.
+  `historical-gates`, satırın tüm non-`G0` gate'lerini kapsar; yalnız `VERIFY` revalidation claim'i
+  olabilir, yeni write yetkisi veya `DONE` closure üretmez.
+- `DEFERRED` Evidence grammar'ı
+  tam ve yalnız `reason=<non-empty>;review-date=<real future YYYY-MM-DD>`; `DISPOSED`
+  grammar'ı tam ve yalnız
+  `owner-approved=<non-empty>;decision-date=<real non-future YYYY-MM-DD>` ile satırı+`G2`yi
+  kapsayan tek owner-approved `` `receipt=GR-...` `` token'ıdır. Unknown/unkeyed/contradictory
+  segment closure authority'sini geçersiz kılar.
 - Evidence, neyi kanıtladığı kadar neyi kanıtlamadığını da belirtir.
 - Historical `✅` bugünkü readiness'i otomatik kanıtlamaz.
 - Program parent'ı child'ların yerine kapanmaz.
 - Gate genişletme değildir; izin yoksa sonuç typed `HOLD` veya `BLOCKED` olur.
 - `DependsOn` yalnız canonical ledger'da bulunan gerçek Work ID'leri taşır; `P00`–`P10`
   program etiketleri dependency yerine kullanılamaz.
+- Dependency satisfaction yalnız `DONE` ile oluşur. Bir prerequisite `DISPOSED` edilirse
+  dependent otomatik ready olmaz; edge için owner-reviewed replan/disposition gerekir.
 
 Canonical satır şeması:
 
@@ -147,21 +185,54 @@ Canonical satır şeması:
 - `VERIFY`, execution admission değildir. Current mutation sonucu `VERIFY`'a alınmışsa
   Evidence ilgili receipt ID'sini taşır; yalnız historical/read-only audit ise yeni write
   yetkisi üretmez.
-- `DONE`, exact receipt veya typed historical authority provenance'ı olmadan mutation
-  iddiası taşıyamaz.
+- `DONE`, scope-exact `consumed` receipt ve standalone functional proof olmadan mutation
+  iddiası taşıyamaz; expired/revoked veya historical receipt execution provenance değildir.
 - Receipt; Work ID'leri, exact target manifesti, baseline hash'i, owner kararını, kayıt
   zamanını, one-shot/expiry sınırını ve tüketim durumunu bağlar.
+- MASTER içindeki bir `active` receipt, kendi receipt satırını veya MASTER mutation'ını
+  self-authorize edemez; self-hash fixed point authority değildir. MASTER'ı kapsayan admission
+  owner-approved immutable external grant/operation ledger'ından gelmek ve burada yalnız
+  projection/settlement olarak görünmek zorundadır. Bu runtime authority
+  `APPROVAL-001`, `RECEIPT-001` ve `KERNEL-SETTLEMENT-001` tamamlanana kadar ilgili execution
+  `HOLD` kalır.
+- Target token yalnız `` `<portable-repository-relative-path>@<raw-byte-SHA-256|ABSENT>` ``
+  biçimindedir. Path NFC-normalized, `.`/`..`/empty segment içermeyen, Windows-reserved
+  karakter/ad taşımayan ve receipt içinde portable case-fold altında tekil bir yoldur.
+  Receipt SHA'sı dosyanın raw byte SHA-256'sıdır; generated view `sourceDigest`i ise yalnız
+  checkout LF/CRLF farkını nötralize eden `sha256(normalized-lf-utf8)` algoritmasıdır.
+- `Owner decision` canonical grammar'ı
+  `owner=<non-placeholder-identity>;decision=APPROVED;scope=<exact-scope>;exclusions=<bounds>`;
+  duplicate/empty/rejected alan receipt'i geçersiz kılar. `Recorded` ve `expiresAt` gerçek
+  RFC3339 instant'larıdır; future-recorded veya expired receipt admission vermez.
+- State yalnız `` `ONE_SHOT|EXPIRING`: active `` veya
+  `` `ONE_SHOT|EXPIRING`: consumed|expired|revoked@<RFC3339> `` grammar'ıdır. Negation/prose
+  substring'i lifecycle değildir; terminal timestamp `Recorded`, `expiresAt` ve current time ile
+  tutarlı olmak zorundadır.
 - `G7` receipt'i §2'deki live-call alanlarının tamamını ve exact canary stage claim'ini
-  taşır; bir stage'in receipt'i başka stage veya retry için kullanılamaz.
+  taşır; exactly one Work ID bağlar, `task` bu Work ID'ye eşittir ve ayrı canonical `stage`
+  kimliği attempt aşamasını bağlar. Placeholder değer, unbounded
+  `maxWallClock`/`authorizationTtl`, unknown/unkeyed segment veya aynı attempt identity'sinin
+  tekrarı geçersizdir. External casing'den bağımsız provider/surface/model/auth/account,
+  tenant/project/attempt ve policy değerleri lowercase canonical internal ID'ye çevrilmeden
+  receipt'e giremez; Work task/stage ise canonical upper-kebab ID'dir.
+  `maxWallClock <= authorizationTtl <= 7d` ve
+  `expiresAt - Recorded = authorizationTtl` zorunludur. Budget
+  `<positive-int64>@<canonical-unit>#<sha256-policy-digest>` grammar'ıyla unit/precision/limit
+  registry'sini bağlar; bir stage'in receipt'i başka stage veya retry için kullanılamaz.
 - Scope, baseline, Work ID, gate veya owner decision drift'i receipt'i otomatik geçersiz
   kılar. Bir receipt komşu dosyaya, sonraki sprinte, default flip'e, canlı provider çağrısına,
   push'a veya destructive adıma genişletilemez.
+- Portable case-fold altında aynı target iki `active` receipt tarafından tutulamaz. Bir Work
+  birden çok gate gerektiriyorsa target-overlap ayrı receipt katmanlarıyla değil, exact Work/scope
+  için bütün gate'leri taşıyan tek receipt ile authorize edilir; consumed history collision sayılmaz.
 
 Current receipt register:
 
 | Receipt ID | Work IDs | Gate | Exact manifest and baseline | Owner decision | Recorded | State |
 |---|---|---|---|---|---|---|
-| `GR-2026-07-26-MASTER-01` | SSOT-001, SSOT-002, SOURCE-MANIFEST-001, LEGACY-RESIDUAL-AUDIT-001 | G1 | `docs/MASTER-PLAN.md@d6a90fc085a5bb7f62804d391840e399f669d4ec4cb67c7214e3480e731333e1` → byte-identical `docs/archive/MASTER-PLAN-archived-2026-07-26.md`; rebuild `docs/MASTER-PLAN.md`; commit exactly these two paths | Alperen approved; no other file, push, sprint, provider call or destructive action | 2026-07-26T16:59:02+03:00 | `ONE_SHOT`: active through the approved isolated commit; consumed by that commit |
+| `GR-2026-07-26-MASTER-01` | SSOT-001, SSOT-002, SOURCE-MANIFEST-001, LEGACY-RESIDUAL-AUDIT-001 | G1 | `docs/MASTER-PLAN.md@d6a90fc085a5bb7f62804d391840e399f669d4ec4cb67c7214e3480e731333e1` → byte-identical `docs/archive/MASTER-PLAN-archived-2026-07-26.md@ABSENT`; rebuild canonical MASTER; commit exactly these two paths | owner=Alperen; decision=APPROVED; scope=exact two-file isolated commit; exclusions=push,sprint,provider-call,destructive-action,other-files | 2026-07-26T16:59:02+03:00 | `ONE_SHOT`: consumed@2026-07-26T17:33:12+03:00 |
+| `GR-2026-07-26-SSOT-003-01` | SSOT-003 | G1 | `docs/MASTER-PLAN.md@34d47c6e9adf7ee8a469acd3c152cea5959a8aed18311fb6e6434a55f9142457`; `package.json@0893f1a62582140d64782089197c8975061586bc4f46ee5dab8bcefe28dce067`; `scripts/lint-master-plan.mjs@ABSENT`; `tests/scripts/lint-master-plan.test.ts@ABSENT`; `docs/generated/master-plan-active.md@ABSENT`; `docs/generated/master-plan-active.json@ABSENT`; commit exactly these six paths | owner=Alperen; decision=APPROVED; scope=exact six-file isolated commit and Goal resume; exclusions=other-files,sprint,provider-call,build,push,destructive-action | 2026-07-26T18:12:21+03:00 | `ONE_SHOT`: consumed@2026-07-26T18:13:00+03:00 |
+| `GR-2026-07-26-SSOT-003-02` | SSOT-003 | G1 | `docs/.vitepress/config.ts@a229c836a81df9ecf5296ce7e8991a12bc75da50fad0c2a5bcbe11ade4f28bd0`; `tests/docs/vitepress.test.ts@a1724114f27958758bf2e732ff29117a731973f17700fc62537bb0ef33dcc87f`; add both paths to the same isolated SSOT-003 commit as the exact eight-path union | owner=Alperen; decision=APPROVED; scope=exact two-file public-docs boundary expansion and Goal resume; exclusions=other-files,sprint,provider-call,build,push,destructive-action | 2026-07-26T20:22:25+03:00 | `ONE_SHOT`: consumed@2026-07-26T20:23:04+03:00 |
 
 ### 3.5 Typed blocker register
 
@@ -323,9 +394,9 @@ provider capacity ve collision topology'den türetilir. Sayı uğruna bağımsı
 
 | Order | ID | Parent | Program | Outcome | Priority | DependsOn | Gate | State | Truth C/W/E/H/L/X/S | Acceptance | Evidence | Updated |
 |---:|---|---|---|---|---|---|---|---|---|---|---|---|
-| 10 | SSOT-001 | P00 | TRUTH | 2026-07-26 legacy MASTER'ı byte-identical archive et | P0 | — | G1 | VERIFY | 1/1/1/1/0/-/- | Archive SHA-256 source hash ile aynı ve tracked fresh-clone proof'u var | `GR-2026-07-26-MASTER-01`; archive hash doğrulandı; commit/fresh-clone evidence bekliyor | 2026-07-26 |
-| 20 | SSOT-002 | P00 | TRUTH | Tüm kaynakları canonical, atomik ve dependency'li ledger'a uzlaştır | P0 | SSOT-001, SOURCE-MANIFEST-001, LEGACY-RESIDUAL-AUDIT-001 | G1 | VERIFY | 1/1/1/1/0/-/- | File-level source catalog, 125 alias exactly-once total mapping, completed residual audit, supersession and finish contract complete | `GR-2026-07-26-MASTER-01`; all reconciliation manifests present; isolated commit proof pending | 2026-07-26 |
-| 30 | SSOT-003 | P00 | TRUTH | MASTER schema validator ve generated active views | P0 | SSOT-001 | G1 | OPEN | 0/0/0/?/0/-/- | Column count, unique ID/order, enum, dependency and aggregate-parent closure integrity, gate receipts, blocker register, DONE evidence and pipe lint CI'da fail-closed | Exact validator files require separate G1 approval | 2026-07-26 |
+| 10 | SSOT-001 | P00 | TRUTH | 2026-07-26 legacy MASTER'ı byte-identical archive et | P0 | — | G1 | VERIFY | 1/1/1/1/0/-/- | Archive SHA-256 source hash ile aynı ve tracked fresh-clone proof'u var | `receipt=GR-2026-07-26-MASTER-01`; archive hash doğrulandı; commit/fresh-clone evidence bekliyor | 2026-07-26 |
+| 20 | SSOT-002 | P00 | TRUTH | Tüm kaynakları canonical, atomik ve dependency'li ledger'a uzlaştır | P0 | SSOT-001, SOURCE-MANIFEST-001, LEGACY-RESIDUAL-AUDIT-001 | G1 | VERIFY | 1/1/1/1/0/-/- | File-level source catalog, 125 alias exactly-once total mapping, completed residual audit, supersession and finish contract complete | `receipt=GR-2026-07-26-MASTER-01`; all reconciliation manifests present; isolated commit proof pending | 2026-07-26 |
+| 30 | SSOT-003 | P00 | TRUTH | MASTER schema validator ve generated active views | P0 | SSOT-001 | G1 | VERIFY | 1/1/1/1/1/?/- | Column count, unique ID/order, enum, dependency and aggregate-parent closure integrity, gate receipts, blocker register, DONE evidence and pipe lint CI'da fail-closed | `receipt=GR-2026-07-26-SSOT-003-01`; `receipt=GR-2026-07-26-SSOT-003-02`; dependency-free validator, deterministic Markdown/JSON projections, 67-case validator suite, 38-case VitePress boundary suite, hermetic matrix and real CLI check; public-docs exclusion is enforced; cross-platform CI, authenticated historical authority, external immutable/self-hosting-safe grant ledger, commit-bound settlement and Git trust-anchor evidence pending under APPROVAL-001, RECEIPT-001, KERNEL-SETTLEMENT-001, AUDIT-001 | 2026-07-26 |
 | 40 | TRUTH-BASELINE-001 | P00 | TRUTH | Current HEAD için tek reference test, build, binary ve environment baseline | P0 | TEST-675, TEST-676, TEST-HERMETIC-001 | G1 | BLOCKED | 0/0/0/?/0/?/? | Hermetic suite, build artifacts stable, binary proofs ayrı provenance ile kaydedilir | Handover ve legacy baseline'ları çelişkili | 2026-07-26 |
 | 50 | TEST-675 | P00 | TRUTH | Testlerin live `.tasks` alanına yazmasını kaldır ve writer discovery ratchet'i kur | P0 | — | G1 | OPEN | 1/0/0/?/0/?/? | Dynamic ve static scan; tüm writers tmpdir; root-write gate fail-loud | Legacy 675; `openrouter.test.ts` current evidence | 2026-07-26 |
 | 60 | TEST-676 | P00 | TRUTH | Test koşumunda `dist` clean çağrısının fail-loud root cause'unu bul ve kapat | P0 | — | G1 | OPEN | 0/0/0/?/0/?/? | Caller trace, deterministic reproduction, forbid-clean guard ve stable binary proof | Legacy 676 | 2026-07-26 |
@@ -358,10 +429,10 @@ provider capacity ve collision topology'den türetilir. Sayı uğruna bağımsı
 | 330 | OPS-RETIRE-001 | P00 | TRUTH | Approved branch and remote retirement | P2 | OPS-BRANCH-001 | G5 | BLOCKED | 0/0/0/?/0/?/? | Exact branch/remote manifest, no active worktree, ancestry and recovery receipt | Historical cleanup approval is insufficient | 2026-07-26 |
 | 340 | XVERIFY-UX-001 | P00 | TRUTH | Xverify optional evidence, bounded path/range/symbol targeting and actionable preflight | P1 | SSOT-003 | G1 | OPEN | 1/~/0/?/0/?/? | `--files` contract honest; empty evidence has remedy; large files target exact range/symbol without operator prompt hacks | Legacy 673 and 660(b) | 2026-07-26 |
 | 350 | XVERIFY-TRUTH-001 | P00 | TRUTH | Dispatch rejection, verifier abstention and semantic `UNCLEAR` remain distinct | P0 | EVALUATION-001, RECEIPT-001 | G1 | BLOCKED | 1/~/0/?/0/?/? | Provider/model rejection never masquerades as verifier judgment; structured cause survives all surfaces | Legacy 671 | 2026-07-26 |
-| 360 | LEGACY-RESIDUAL-AUDIT-001 | P00 | TRUTH | Audit all 199 historical closed claims for hidden residual work | P0 | SSOT-001 | G0,G1 | VERIFY | 1/1/1/1/-/-/- | Every legacy closed row has no residual or maps each residual to exact canonical Work ID with reason | `GR-2026-07-26-MASTER-01`; §8.2 partitions 157+36+6 and promotes all six hidden residuals | 2026-07-26 |
+| 360 | LEGACY-RESIDUAL-AUDIT-001 | P00 | TRUTH | Audit all 199 historical closed claims for hidden residual work | P0 | SSOT-001 | G0,G1 | VERIFY | 1/1/1/1/-/-/- | Every legacy closed row has no residual or maps each residual to exact canonical Work ID with reason | `receipt=GR-2026-07-26-MASTER-01`; §8.2 partitions 157+36+6 and promotes all six hidden residuals | 2026-07-26 |
 | 370 | DOC-IMPACT-001 | P00 | TRUTH | Finalization surfaces Worker `docImpact` as governed follow-up | P1 | KERNEL-SETTLEMENT-001, DOCS-RELEASE-TRUTH-001 | G1 | BLOCKED | 1/0/0/?/0/?/? | Exact doc impact appears in result/finalize and creates no unauthorized worker doc write | Residual from historical closed 440 | 2026-07-26 |
 | 380 | DEBT-GOVERNANCE-001 | P00 | TRUTH | Technical/product/operational debt ingestion, ownership and closure authority | P0 | SSOT-003, KERNEL-SETTLEMENT-001 | G2,G1 | BLOCKED | 1/~/0/?/0/?/? | Every debt has owner, severity, affected outcomes, acceptance, evidence and no silent closure; no fix-only endless loop | Finish contract requires zero unowned debt | 2026-07-26 |
-| 390 | SOURCE-MANIFEST-001 | P00 | TRUTH | File-level digest and disposition manifest for all reconciliation sources | P0 | SSOT-001 | G1 | VERIFY | 1/1/1/1/0/-/- | Handover, code audit, PAEP, archive, 12 alperen-analysis and 15 core-memory sources have digest, class and canonical owner; untracked source marked | `GR-2026-07-26-MASTER-01`; §4 snapshot and manifests | 2026-07-26 |
+| 390 | SOURCE-MANIFEST-001 | P00 | TRUTH | File-level digest and disposition manifest for all reconciliation sources | P0 | SSOT-001 | G1 | VERIFY | 1/1/1/1/0/-/- | Handover, code audit, PAEP, archive, 12 alperen-analysis and 15 core-memory sources have digest, class and canonical owner; untracked source marked | `receipt=GR-2026-07-26-MASTER-01`; §4 snapshot and manifests | 2026-07-26 |
 | 400 | HOST-STATE-001 | P00 | OPS | Provider HOME cache/session/history retention manifest | P2 | MEMORY-AUTHORITY-001 | G2 | BLOCKED | 0/0/0/?/0/?/? | Age, size, active-session and credential exclusions; no mutation | Separate from repo and DB cleanup | 2026-07-26 |
 | 410 | HOST-STATE-APPLY-001 | P00 | OPS | Apply approved recoverable HOME-state prune | P2 | HOST-STATE-001 | G3 | BLOCKED | 0/0/0/?/0/?/? | Exact unchanged manifest, trash/backup first, credentials and active sessions immutable | Fresh owner approval required | 2026-07-26 |
 | 420 | GIT-MAINT-REPORT-001 | P00 | OPS | Read-only git object and pack health report | P2 | OPS-BRANCH-001 | G0 | BLOCKED | 0/0/0/?/0/?/? | Reachable/unreachable and largest objects measured; no mutation | Separate from remote retirement | 2026-07-26 |
@@ -379,7 +450,7 @@ provider capacity ve collision topology'den türetilir. Sayı uğruna bağımsı
 | 1050 | CM-05 | CODEX-MAIN-001 | CODEX | Provider authority inventory and cutover for all execution ingress paths | P0 | CM-01 | G1 | OPEN | ~/~/0/?/0/?/? | Sprint, Goal, do, mission, flow, run, autonomous, process, CLI, MCP, API, terminal and desktop have no bypass | Code-truth audit | 2026-07-26 |
 | 1055 | XVERIFY-WIRE-001 | CODEX-MAIN-001 | CODEX | Sprint and manual xverify share independent provider authority and bounded dispatch | P0 | CM-04, PROVIDER-INGRESS-001, XVERIFY-UX-001 | G1,G7 | BLOCKED | 1/~/0/?/0/?/? | Exact verifier candidate, max-per-sprint, evidence targeting, refusal truth, usage and settlement are one path; live verification uses an independent G7 receipt | Legacy 657,659,609 residuals | 2026-07-26 |
 | 1057 | CODEX-COMPAT-POLICY-001 | CODEX-MAIN-001 | CODEX | Scoped Codex compatibility and integration policy evidence | P0 | CM-01 | G2,G1 | OPEN | 0/0/0/?/0/?/? | Exact surface/auth/account/use-mode, official source digest, owner decision, reviewBy, data/tool boundaries and allowed/blocked conditions; later ingested by P02-649 | Born from 2026-07-26 provider safety review | 2026-07-26 |
-| 1060 | PA-662 | CODEX-MAIN-001 | CODEX | Provider authority keyring provisioning, rotation and doctor proof | P0 | CM-01 | G1 | VERIFY | 1/1/?/?/0/?/- | CLI status/init/rotate and doctor targeted plus real-binary proof; owner key custody preserved | `historical-authority: legacy-662`; current disk keyring exists; no new write authority | 2026-07-26 |
+| 1060 | PA-662 | CODEX-MAIN-001 | CODEX | Provider authority keyring provisioning, rotation and doctor proof | P0 | CM-01 | G1 | VERIFY | 1/1/?/?/0/?/- | CLI status/init/rotate and doctor targeted plus real-binary proof; owner key custody preserved | `historical-authority=legacy-662;historical-gates=G1;proof=current-keyring-disk`; no new write authority | 2026-07-26 |
 | 1070 | CODEX-ADMISSION-001 | CODEX-MAIN-001 | CODEX | Exact attended Codex canary admission projection | P0 | PROVIDER-INGRESS-001, ATTENDED-STOP-001, PA-662 | G1 | BLOCKED | 1/1/0/?/0/?/? | One exact canary attempt receives candidate, reachability, reservation, route lock, termination and receipt authority; no general bypass | Legacy 663 becomes scoped verification, not a second ingress | 2026-07-26 |
 | 1080 | FO-01 | CODEX-MAIN-001 | CODEX | Usage capability contract | P0 | CM-02 | G1 | OPEN | ~/0/0/?/0/?/? | unknown, none, final-authoritative, incremental-observed and incremental-enforceable are distinct | Current adapter lacks live support declaration | 2026-07-26 |
 | 1090 | FO-02 | CODEX-MAIN-001 | CODEX | Per-budget enforcement projection | P0 | FO-01 | G1 | OPEN | 0/0/0/?/0/?/? | Pre-dispatch-hard, inflight-hard, posthoc-only and unsupported truth visible per field | ADR-G-037 | 2026-07-26 |
@@ -425,7 +496,7 @@ specification'ını execute eder. Legacy provider adapter'ının varlığı PAEP
 |---:|---|---|---|---|---|---|---|---|---|---|---|---|
 | 2000 | P02-630 | P02 | PAEP | Provider Authority and Execution Control Plane parent | P0 | P01-TRUTH-GATE | G2,G1 | BLOCKED | ~/~/0/?/0/0/0 | P02-631–656 complete; zero-worker-exposure and rollback live-proven | PAEP spec; legacy 630 | 2026-07-26 |
 | 2010 | P02-631 | P02-630 | PAEP | Accepted PAEP ADR and ownership boundaries | P0 | P01-TRUTH-GATE | G2,G6,G4 | OPEN | 0/0/0/?/0/-/- | Custody, lease, protocol, policy, fallback, migration and lifecycle authority accepted and DB/filesystem projections transactionally consistent | Legacy 631; accepted ADR DB mutation is separately gated | 2026-07-26 |
-| 2020 | P02-632 | P02-630 | PAEP | Broker denial fail-closed on every backend | P0 | CM-05 | G1 | VERIFY | 1/~/0/?/0/?/? | Subprocess, Docker, tmux and host adapter real-child matrix; no secret fallback | `historical/current-disk claim`; subprocess hermetic slice exists; no new write authority; full/live absent | 2026-07-26 |
+| 2020 | P02-632 | P02-630 | PAEP | Broker denial fail-closed on every backend | P0 | CM-05 | G1 | VERIFY | 1/~/0/?/0/?/? | Subprocess, Docker, tmux and host adapter real-child matrix; no secret fallback | `historical-authority=current-disk-P02-632;historical-gates=G1;proof=subprocess-hermetic-slice`; no new write authority; full/live absent | 2026-07-26 |
 | 2030 | P02-633 | P02-630 | PAEP | Runtime-visible credential exposure taxonomy | P0 | P02-632 | G2,G1 | OPEN | 0/0/0/?/0/?/? | Host-only, env, tmpfs-copy, persistent-copy and enterprise custody honestly classified | Current Docker Codex auth copy is not zero-exposure | 2026-07-26 |
 | 2040 | P02-634 | P02-630 | PAEP | Versioned provider surface registry | P0 | P02-631, CAPABILITY-001 | G1 | OPEN | ~/0/0/?/0/?/? | CLI, app-server, API and gateway surfaces carry tested version envelopes | Generic model registry is insufficient | 2026-07-26 |
 | 2050 | P02-635 | P02-630 | PAEP | Auth strategy registry | P0 | P02-631, P02-634 | G1 | OPEN | 0/0/0/?/0/?/? | Native session, API key, OAuth, ADC/WIF and workload identity have explicit custody/exposure/billing contracts | Legacy 635 | 2026-07-26 |
@@ -511,7 +582,7 @@ specification'ını execute eder. Legacy provider adapter'ının varlığı PAEP
 | 4130 | API-SECURITY-001 | AUTHORITY-001 | AUTHORITY | API authentication, authorization and config-secret containment | P0 | PRINCIPAL-001, TENANT-001, APPROVAL-001 | G1 | BLOCKED | 1/~/~/?/0/?/? | No raw config disclosure, IDOR, query-token persistence or unscoped admin action | Waits identity, tenancy and approval authority | 2026-07-26 |
 | 4140 | ENTERPRISE-AUTH-001 | AUTHORITY-001 | AUTHORITY | Community-safe and enterprise fail-closed profiles | P0 | TENANT-001, CAPABILITY-001, APPROVAL-001, AUDIT-001 | G2,G1 | OPEN | 1/~/0/?/0/?/? | Advisory vs enforced is explicit; RBAC, least privilege and org freeze use same core | Legacy 534,570,497 | 2026-07-26 |
 | 4150 | ALP-RUNTIME-001 | AUTHORITY-001 | AUTHORITY | Alp Discipline decision anchor in runtime agents and planners | P1 | OPERATION-001, APPROVAL-001 | G2,G6,G1 | OPEN | 1/0/0/?/0/?/? | Negative-space, authority stop and counterproposal are enforced and evidence-bearing | ESSENCE and memory exist; runtime wire absent | 2026-07-26 |
-| 4160 | MCP-LEASE-001 | AUTHORITY-001 | AUTHORITY | Multi-window MCP writer lease and authority-safe read/write split | P1 | PRINCIPAL-001, OPERATION-001 | G1 | VERIFY | 1/~/~/?/0/?/? | Per-project single writer, graceful denial, process recovery and real multi-window proof | `historical-authority: legacy-578`; delivered claim conflicts with current reverify need; no new write authority | 2026-07-26 |
+| 4160 | MCP-LEASE-001 | AUTHORITY-001 | AUTHORITY | Multi-window MCP writer lease and authority-safe read/write split | P1 | PRINCIPAL-001, OPERATION-001 | G1 | VERIFY | 1/~/~/?/0/?/? | Per-project single writer, graceful denial, process recovery and real multi-window proof | `historical-authority=legacy-578;historical-gates=G1;proof=delivery-claim`; delivered claim conflicts with current reverify need; no new write authority | 2026-07-26 |
 | 4170 | APPROVAL-QOL-001 | AUTHORITY-001 | AUTHORITY | Approval classifier, cross-process expiry and notification dedupe closure | P1 | APPROVAL-001, MCP-LEASE-001 | G1 | BLOCKED | 1/~/0/?/0/?/? | Requests classify risk/action, expired decisions terminate loops across processes, notifications dedupe durably | Residual from historical closed 523 | 2026-07-26 |
 
 ### P05 — Terminal product and native development
