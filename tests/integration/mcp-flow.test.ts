@@ -11,6 +11,7 @@
  * Mocks: tmux, child_process, auditor, worker, doc updates
  */
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
+import { modelRegistry } from '../../src/core/model-registry.js';
 import {
   mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync,
 } from 'node:fs';
@@ -465,9 +466,13 @@ Write tests.
     });
 
     const parsed = JSON.parse(result.content[0]!.text);
+    // Registry-driven: the keys are the designated model per claude tier, so
+    // literals here go stale on every catalog generation (MASTER-PLAN 670).
     expect(parsed.estimatedModels).toBeDefined();
-    expect(parsed.estimatedModels['claude-opus-4-8']).toBeGreaterThanOrEqual(0);
-    expect(parsed.estimatedModels['claude-sonnet-5']).toBeGreaterThanOrEqual(0);
-    expect(parsed.estimatedModels['claude-haiku-4-5-20251001']).toBeGreaterThanOrEqual(0);
+    for (const tier of ['premium', 'standard', 'economy'] as const) {
+      const designated = modelRegistry.getByProviderAndTier('claude', tier);
+      expect(designated).toBeDefined();
+      expect(parsed.estimatedModels[designated!.id]).toBeGreaterThanOrEqual(0);
+    }
   });
 });

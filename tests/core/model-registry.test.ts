@@ -185,10 +185,14 @@ describe('ModelRegistry', () => {
   // ── getByProviderAndTier ──
 
   describe('getByProviderAndTier()', () => {
-    it('returns GA model for claude+premium', () => {
+    it('returns the DESIGNATED GA model for claude+premium', () => {
+      // MASTER-PLAN 670 (owner-approved 2026-07-26): claude/premium holds two GA
+      // models, so this used to return whichever registered first (Opus 4.8).
+      // The tier now names its current generation explicitly.
       const model = registry.getByProviderAndTier('claude', 'premium');
       expect(model).toBeDefined();
-      expect(model!.id).toBe('claude-opus-4-8');
+      expect(model!.id).toBe('claude-opus-5');
+      expect(model!.preferredForTier).toBe(true);
     });
 
     it('returns GA model for codex+standard', () => {
@@ -203,33 +207,100 @@ describe('ModelRegistry', () => {
       // (claude+premium_plus is now GA — claude-fable-5.)
       expect(registry.getByProviderAndTier('gemini', 'premium_plus')).toBeUndefined();
     });
+
+    // ── preferredForTier (MASTER-PLAN 669/670) ──
+    // Registration order must not decide which billed model a tier resolves to.
+    // No BUILTIN entry carries the flag yet (that marking is an owner-approved
+    // default flip), so these exercise the branch on purpose-built catalogs.
+
+    /** Two GA models in one (provider, tier); only the second is preferred. */
+    function tierPair(preferSecond: boolean): ModelDefinition[] {
+      const base = {
+        provider: 'codex' as RegistryProviderName,
+        tier: 'standard' as const,
+        contextWindow: 100_000,
+        costPerMillion: { input: 1, output: 2 },
+        capabilities: { streaming: true, toolUse: true, vision: false, codeExecution: false, reasoning: false },
+        status: 'ga' as const,
+      };
+      return [
+        { ...base, id: 'legacy-first', apiId: 'legacy-first' },
+        { ...base, id: 'current-second', apiId: 'current-second', ...(preferSecond ? { preferredForTier: true } : {}) },
+      ];
+    }
+
+    it('resolves to the designated model even when it registered later', () => {
+      const reg = new ModelRegistry(tierPair(true));
+      expect(reg.getByProviderAndTier('codex', 'standard')?.id).toBe('current-second');
+    });
+
+    it('falls back to first-match when the tier designates nothing', () => {
+      const reg = new ModelRegistry(tierPair(false));
+      expect(reg.getByProviderAndTier('codex', 'standard')?.id).toBe('legacy-first');
+    });
+
+    it('rejects a second designation in the same tier at register() time', () => {
+      const reg = new ModelRegistry(tierPair(true));
+      expect(() => reg.register({
+        ...tierPair(true)[1]!,
+        id: 'rival-third',
+        apiId: 'rival-third',
+      })).toThrow(/registration order/);
+    });
+
+    it('rejects a catalog that designates two models in one tier', () => {
+      const [first, second] = tierPair(true);
+      expect(() => new ModelRegistry([
+        { ...first!, preferredForTier: true },
+        second!,
+      ])).toThrow(/registration order/);
+    });
+
+    it('lets a designation coexist with one in a different tier', () => {
+      const reg = new ModelRegistry([
+        ...tierPair(true),
+        {
+          id: 'premium-pick',
+          apiId: 'premium-pick',
+          provider: 'codex' as RegistryProviderName,
+          tier: 'premium',
+          contextWindow: 100_000,
+          costPerMillion: { input: 5, output: 10 },
+          capabilities: { streaming: true, toolUse: true, vision: false, codeExecution: false, reasoning: false },
+          status: 'ga',
+          preferredForTier: true,
+        },
+      ]);
+      expect(reg.getByProviderAndTier('codex', 'standard')?.id).toBe('current-second');
+      expect(reg.getByProviderAndTier('codex', 'premium')?.id).toBe('premium-pick');
+    });
   });
 
   // ── getEquivalent ──
 
   describe('getEquivalent()', () => {
-    it('maps opus → gpt-5 (claude premium → codex premium)', () => {
-      expect(registry.getEquivalent('claude-opus-4-8', 'codex')).toBe('gpt-5.5');
+    it('maps opus → gpt-5.6-sol (claude premium → codex premium)', () => {
+      expect(registry.getEquivalent('claude-opus-4-8', 'codex')).toBe('gpt-5.6-sol');
     });
 
     it('maps opus → gemini-2.5-pro (claude premium → gemini premium)', () => {
       expect(registry.getEquivalent('claude-opus-4-8', 'gemini')).toBe('gemini-2.5-pro');
     });
 
-    it('maps gpt-5 → opus (codex premium → claude premium)', () => {
-      expect(registry.getEquivalent('gpt-5.5', 'claude')).toBe('claude-opus-4-8');
+    it('maps gpt-5.5 → opus-5 (codex premium → claude premium)', () => {
+      expect(registry.getEquivalent('gpt-5.5', 'claude')).toBe('claude-opus-5');
     });
 
-    it('maps sonnet → gpt-4.1 (claude standard → codex standard)', () => {
-      expect(registry.getEquivalent('claude-sonnet-5', 'codex')).toBe('gpt-4.1');
+    it('maps sonnet → gpt-5.6-terra (claude standard → codex standard)', () => {
+      expect(registry.getEquivalent('claude-sonnet-5', 'codex')).toBe('gpt-5.6-terra');
     });
 
     it('maps sonnet → gemini-2.5-flash (claude standard → gemini standard)', () => {
       expect(registry.getEquivalent('claude-sonnet-5', 'gemini')).toBe('gemini-2.5-flash');
     });
 
-    it('maps haiku → gpt-5-mini (claude economy → codex economy)', () => {
-      expect(registry.getEquivalent('claude-haiku-4-5-20251001', 'codex')).toBe('gpt-5-mini');
+    it('maps haiku → gpt-5.6-luna (claude economy → codex economy)', () => {
+      expect(registry.getEquivalent('claude-haiku-4-5-20251001', 'codex')).toBe('gpt-5.6-luna');
     });
 
     it('maps haiku → gemini-2.0-flash (claude economy → gemini economy)', () => {

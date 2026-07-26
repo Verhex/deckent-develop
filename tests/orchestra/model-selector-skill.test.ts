@@ -40,7 +40,7 @@ describe('resolveTaskModel — skillModels parameter (Layer 4d)', () => {
     );
     // opus from skill, but Layer 3 does not cap here (src/ scope, not docs/test-only)
     // Layer 1 does not downgrade (performance)
-    expect(result).toBe('claude-opus-4-8');
+    expect(result).toBe('claude-opus-5');
   });
 
   it('upgrades from haiku to sonnet when skill requires sonnet', () => {
@@ -60,7 +60,7 @@ describe('resolveTaskModel — skillModels parameter (Layer 4d)', () => {
       undefined, undefined, ['claude-haiku-4-5-20251001'],
     );
     // Skill wants haiku but base model is opus; skill should not downgrade
-    expect(result).toBe('claude-opus-4-8');
+    expect(result).toBe('claude-opus-5');
   });
 
   it('picks highest among multiple skill models', () => {
@@ -69,7 +69,7 @@ describe('resolveTaskModel — skillModels parameter (Layer 4d)', () => {
       'Mixed skills task', 'Some description', scope, config,
       undefined, undefined, ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-4-8'],
     );
-    expect(result).toBe('claude-opus-4-8');
+    expect(result).toBe('claude-opus-5');
   });
 
   it('undefined skillModels has no effect', () => {
@@ -134,6 +134,6 @@ describe('resolveTaskModel — skillModels parameter (Layer 4d)', () => {
     );
     // Pattern upgrade gives opus, skill gives sonnet
     // Pattern upgrade to opus wins (opus > sonnet)
-    expect(result).toBe('claude-opus-4-8');
+    expect(result).toBe('claude-opus-5');
   });
 });

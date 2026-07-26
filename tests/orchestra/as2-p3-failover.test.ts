@@ -157,7 +157,7 @@ describe('applyRateLimitFailover', () => {
     expect(resolution!.task.authMode).toBe('api');
     expect(resolution!.task.provider).toBe('codex');
     // opus is premium tier → codex equivalent premium = gpt-5
-    expect(resolution!.fallbackModel).toBe('gpt-5.5');
+    expect(resolution!.fallbackModel).toBe('gpt-5.6-sol');
     expect(resolution!.fallbackProvider).toBe('codex');
   });
 
@@ -217,7 +217,7 @@ describe('MidSprintAdapter.handleRateLimitFailover', () => {
     expect(newTask).not.toBeNull();
     expect(newTask!.provider).toBe('codex');
     expect(newTask!.authMode).toBe('api');
-    expect(newTask!.model).toBe('gpt-5.5');
+    expect(newTask!.model).toBe('gpt-5.6-sol');
   });
 
   it('returns null when no 429 detected in notes', () => {

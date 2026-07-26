@@ -60,9 +60,9 @@ describe.skipIf(!codexAvailable)('CodexAdapter Integration (real CLI)', () => {
   });
 
   it('should return correct tier models', () => {
-    expect(adapter.getModelForTier('premium')).toBe('gpt-5.5');
-    expect(adapter.getModelForTier('standard')).toBe('gpt-4.1');
-    expect(adapter.getModelForTier('economy')).toBe('gpt-5-mini');
+    expect(adapter.getModelForTier('premium')).toBe('gpt-5.6-sol');
+    expect(adapter.getModelForTier('standard')).toBe('gpt-5.6-terra');
+    expect(adapter.getModelForTier('economy')).toBe('gpt-5.6-luna');
   });
 
   it('should detect CLI variant (rust/node/unknown)', () => {

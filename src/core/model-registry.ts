@@ -108,6 +108,31 @@ export function resolveCanonicalModelIdentity(
   return definition;
 }
 
+/**
+ * MASTER-PLAN 669/670: at most ONE model per (provider, tier) may be designated
+ * `preferredForTier`. A second one would send `getByProviderAndTier` back to
+ * `.find()`-by-registration-order — reintroducing order-as-identity inside the
+ * fix for order-as-identity. Every bulk entry point (constructor, catalog swap)
+ * validates the whole set before admitting it; `register()` checks incrementally
+ * against what is already loaded.
+ */
+function assertSoleTierPreferencePerSet(definitions: readonly ModelDefinition[]): void {
+  const preferred = new Map<string, string>();
+  for (const def of definitions) {
+    if (def.preferredForTier !== true) continue;
+    const pair = `${def.provider}/${def.tier}`;
+    const incumbent = preferred.get(pair);
+    if (incumbent !== undefined && incumbent !== def.id) {
+      throw new DeckentError(
+        'E_MODEL_TIER_PREFERENCE_AMBIGUOUS',
+        `${pair} designates more than one model (${incumbent} and ${def.id}); `
+        + 'tier equivalence would depend on registration order',
+      );
+    }
+    preferred.set(pair, def.id);
+  }
+}
+
 function assertCanonicalModelDefinition(definition: ModelDefinition): void {
   if (!definition.id || definition.id !== definition.apiId) {
     throw new DeckentError(
@@ -156,12 +181,15 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
   },
   {
     // Claude Opus 5 — GA, exact pinned API identity (Anthropic docs 2026-07-25).
-    // Keep after Opus 4.8 so catalog admission does not silently flip existing
-    // tier-based defaults; callers can select Opus 5 by its exact API ID.
+    // MASTER-PLAN 670 (owner-approved 2026-07-26): registration position no
+    // longer decides identity, so this entry stays after Opus 4.8 for catalog
+    // history while `preferredForTier` — not its index — makes it the
+    // claude/premium answer.
     id: 'claude-opus-5',
     apiId: 'claude-opus-5',
     provider: 'claude',
     tier: 'premium',
+    preferredForTier: true,
     contextWindow: 1_000_000,
     costPerMillion: { input: 5, output: 25 },
     // Adaptive thinking is supported, while legacy extended thinking is not.
@@ -331,6 +359,10 @@ export const CODEX_PARITY_MODELS: readonly ModelDefinition[] = [
     apiId: 'gpt-5.6-sol',
     provider: 'codex',
     tier: 'premium',
+    // MASTER-PLAN 670 (owner-approved 2026-07-26). Entitlement live-proven on the
+    // active ChatGPT account: run xv-1785008399857 reached `turn.completed` with
+    // real consumption, unlike `gpt-4.1` which the same account refuses with 400.
+    preferredForTier: true,
     contextWindow: 1_050_000,
     costPerMillion: { input: 5, output: 30 },
     capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: true },
@@ -342,6 +374,11 @@ export const CODEX_PARITY_MODELS: readonly ModelDefinition[] = [
     apiId: 'gpt-5.6-terra',
     provider: 'codex',
     tier: 'standard',
+    // MASTER-PLAN 670 (owner-approved 2026-07-26). This designation replaces
+    // `gpt-4.1`, which THIS account is measured to refuse outright (HTTP 400,
+    // sprint-460). Whether terra itself is entitled is a separate measured fact
+    // that MASTER-PLAN 671(b) records rather than something the catalog asserts.
+    preferredForTier: true,
     contextWindow: 1_050_000,
     costPerMillion: { input: 2.5, output: 15 },
     capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: true },
@@ -353,6 +390,8 @@ export const CODEX_PARITY_MODELS: readonly ModelDefinition[] = [
     apiId: 'gpt-5.6-luna',
     provider: 'codex',
     tier: 'economy',
+    // MASTER-PLAN 670 (owner-approved 2026-07-26), replacing `gpt-5-mini`.
+    preferredForTier: true,
     contextWindow: 1_050_000,
     costPerMillion: { input: 1, output: 6 },
     capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: true },
@@ -526,6 +565,7 @@ export class ModelRegistry {
   private models = new Map<string, ModelDefinition>();
 
   constructor(builtins: readonly ModelDefinition[] = CANONICAL_MODELS) {
+    assertSoleTierPreferencePerSet(builtins);
     for (const model of builtins) {
       assertCanonicalModelDefinition(model);
       this.models.set(model.id, model);
@@ -577,9 +617,14 @@ export class ModelRegistry {
   }
 
   getByProviderAndTier(provider: RegistryProviderNameExt, tier: ModelTier): ModelDefinition | undefined {
-    return [...this.models.values()].find(
+    const candidates = [...this.models.values()].filter(
       m => m.provider === provider && m.tier === tier && m.status === 'ga',
     );
+    // MASTER-PLAN 669: an explicit designation outranks registration order.
+    // Order-as-identity is how a cross-verify dispatch silently landed on
+    // `gpt-4.1` instead of the current-generation standard-tier codex model.
+    // No designation → the historical first-match, unchanged.
+    return candidates.find(m => m.preferredForTier === true) ?? candidates[0];
   }
 
   getEquivalent(modelId: string, targetProvider: RegistryProviderNameExt): string {
@@ -624,7 +669,30 @@ export class ModelRegistry {
 
   register(definition: ModelDefinition): void {
     assertCanonicalModelDefinition(definition);
+    this.assertSoleTierPreference(definition);
     this.models.set(definition.id, definition);
+  }
+
+  /**
+   * MASTER-PLAN 669/670: a second `preferredForTier` in one (provider, tier)
+   * would send `getByProviderAndTier` back to `.find()`-by-registration-order —
+   * reintroducing order-as-identity inside the fix for order-as-identity. Reject
+   * it at registration so the ambiguity can never reach a billed dispatch.
+   */
+  private assertSoleTierPreference(definition: ModelDefinition): void {
+    if (definition.preferredForTier !== true) return;
+    for (const existing of this.models.values()) {
+      if (existing.id === definition.id) continue;
+      if (existing.provider === definition.provider
+        && existing.tier === definition.tier
+        && existing.preferredForTier === true) {
+        throw new DeckentError(
+          'E_MODEL_TIER_PREFERENCE_AMBIGUOUS',
+          `${definition.provider}/${definition.tier} already prefers ${existing.id}; `
+          + `${definition.id} would make tier equivalence depend on registration order`,
+        );
+      }
+    }
   }
 
   unregister(id: string): boolean {
@@ -635,6 +703,9 @@ export class ModelRegistry {
    *  Used by bootstrapFromCatalog() after a successful remote/cache fetch. */
   loadFromCatalog(definitions: readonly ModelDefinition[]): void {
     for (const def of definitions) assertCanonicalModelDefinition(def);
+    // Enforced on the incoming set BEFORE the swap — a catalog with two preferred
+    // models in one tier must not be able to replace a valid one.
+    assertSoleTierPreferencePerSet(definitions);
     this.models.clear();
     for (const def of definitions) {
       this.models.set(def.id, def);

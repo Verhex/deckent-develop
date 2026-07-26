@@ -262,7 +262,7 @@ describe('agent create', () => {
     expect(config.name).toBe('new-agent');
     expect(config.source).toBe('user');
     expect(config.enabled).toBe(true);
-    expect(config.preferredModel).toBe('claude-opus-4-8');
+    expect(config.preferredModel).toBe('claude-opus-5');
     expect(config.stats.totalUses).toBe(0);
     expect(config.stats.successRate).toBe(0);
   });

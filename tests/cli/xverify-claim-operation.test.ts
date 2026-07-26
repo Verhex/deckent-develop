@@ -34,6 +34,57 @@ function makeConfig(): ResolvedConfig {
 }
 
 describe('runXverifyForResult — claim operation contract', () => {
+  it('carries the owner-authored cross_verify block through, overriding only what the invocation forces', async () => {
+    // MASTER-PLAN 674: this surface used to rebuild `cross_verify` from four
+    // literals, silently dropping every other authored key. Measured live on
+    // xv-1785066348203: `verifier_model.codex` was set to gpt-5.6-sol and the run
+    // still dispatched the tier-equivalent model, because the config never
+    // reached the runner. The invocation legitimately forces enabled /
+    // high_stakes_only / enforce_refuted — nothing else.
+    const root = mkdtempSync(join(tmpdir(), 'deckent-xverify-cfg-'));
+    roots.push(root);
+    let passedConfig: { cross_verify?: Record<string, unknown> } | undefined;
+
+    await runXverifyForResult('Assess the bounded evidence.', {
+      author: 'claude',
+      verifier: 'codex',
+      files: 'src/core/a.ts',
+    }, {
+      resolveProjectRootFn: () => root,
+      loadConfigFn: async () => ({
+        ...makeConfig(),
+        cross_verify: {
+          enabled: false,              // must be forced ON by explicit invocation
+          high_stakes_only: true,      // must be forced OFF
+          enforce_refuted: true,       // must be forced OFF (advisory by contract)
+          verifier_priority: ['gemini'], // must lose to the explicit --verifier
+          verifier_model: { codex: 'gpt-5.6-sol' },
+          max_verifications_per_sprint: 1,
+        },
+      } as unknown as ResolvedConfig),
+      bootstrapProvidersFn: async () => undefined,
+      runCrossVerifyFn: vi.fn(async (...args) => {
+        passedConfig = args[4] as { cross_verify?: Record<string, unknown> };
+        return {
+          outcome: 'unavailable' as const,
+          ran: false,
+          skippedReason: 'stub',
+          refuted: false,
+          blocked: false,
+        };
+      }),
+    });
+
+    // Owner-authored keys survive…
+    expect(passedConfig?.cross_verify?.verifier_model).toEqual({ codex: 'gpt-5.6-sol' });
+    expect(passedConfig?.cross_verify?.max_verifications_per_sprint).toBe(1);
+    // …and only the invocation-forced ones are overridden.
+    expect(passedConfig?.cross_verify?.enabled).toBe(true);
+    expect(passedConfig?.cross_verify?.high_stakes_only).toBe(false);
+    expect(passedConfig?.cross_verify?.enforce_refuted).toBe(false);
+    expect(passedConfig?.cross_verify?.verifier_priority).toEqual(['codex']);
+  });
+
   it('routes CLI/MCP session claims as adjudication and keeps the full claim out of Title', async () => {
     const root = mkdtempSync(join(tmpdir(), 'deckent-xverify-claim-'));
     roots.push(root);
@@ -153,16 +204,21 @@ describe('runXverifyForResult — claim operation contract', () => {
 
     expect(runnerOptions?.availableProviders).toBeUndefined();
     expect(onDispatch).not.toHaveBeenCalled();
+    // MASTER-PLAN 672: no verifier was selected, so there is no identity AND no
+    // verdict. This used to report `verdict: 'unclear'`, which asserts a verifier
+    // ran and could not decide — the same overclaim 671 removed from `outcome`.
     expect(result).toMatchObject({
       verifier: null,
       verifierModel: null,
-      verdict: 'unclear',
+      verdict: null,
+      rejection: null,
       outcome: 'unavailable',
       skippedReason: 'verifier-eligibility-evidence-missing',
     });
-    expect(readFileSync(result.report, 'utf-8')).toContain(
-      '**Verifier model:** (none dispatched)',
-    );
+    const report = readFileSync(result.report, 'utf-8');
+    expect(report).toContain('**Verifier model:** (none dispatched)');
+    expect(report).toContain('**Verifier:** (none dispatched)');
+    expect(report).not.toContain('**Verdict:** UNCLEAR');
   });
 
   it('carries --diff as untrusted evidence context instead of a second Description authority', async () => {

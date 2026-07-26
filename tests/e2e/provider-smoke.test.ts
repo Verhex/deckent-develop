@@ -322,7 +322,7 @@ describe('Provider Fallback Chain Smoke Tests', () => {
     expect(result.provider).toBe('codex');
     expect(result.wasOriginal).toBe(false);
     // Claude premium → canonical Codex premium equivalent.
-    expect(result.model).toBe('gpt-5.5');
+    expect(result.model).toBe('gpt-5.6-sol');
   });
 
   it('applies model equivalence during fallback: sonnet → gpt-4.1', async () => {
@@ -338,7 +338,7 @@ describe('Provider Fallback Chain Smoke Tests', () => {
       registry,
     );
 
-    expect(result.model).toBe('gpt-4.1');
+    expect(result.model).toBe('gpt-5.6-terra');
   });
 
   it('applies model equivalence during fallback: haiku → gpt-5-mini', async () => {
@@ -354,7 +354,7 @@ describe('Provider Fallback Chain Smoke Tests', () => {
       registry,
     );
 
-    expect(result.model).toBe('gpt-5-mini');
+    expect(result.model).toBe('gpt-5.6-luna');
   });
 
   it('throws ProviderUnavailableError when no fallback configured', async () => {
@@ -412,11 +412,11 @@ describe('Model Equivalence Smoke Tests', () => {
   });
 
   it('getEquivalentModel maps across providers correctly', () => {
-    expect(getEquivalentModel('claude-opus-4-8', 'codex')).toBe('gpt-5.5');
+    expect(getEquivalentModel('claude-opus-4-8', 'codex')).toBe('gpt-5.6-sol');
     expect(getEquivalentModel('claude-opus-4-8', 'gemini')).toBe('gemini-2.5-pro');
-    expect(getEquivalentModel('claude-sonnet-5', 'codex')).toBe('gpt-4.1');
+    expect(getEquivalentModel('claude-sonnet-5', 'codex')).toBe('gpt-5.6-terra');
     expect(getEquivalentModel('claude-sonnet-5', 'gemini')).toBe('gemini-2.5-flash');
-    expect(getEquivalentModel('claude-haiku-4-5-20251001', 'codex')).toBe('gpt-5-mini');
+    expect(getEquivalentModel('claude-haiku-4-5-20251001', 'codex')).toBe('gpt-5.6-luna');
     expect(getEquivalentModel('claude-haiku-4-5-20251001', 'gemini')).toBe('gemini-2.0-flash');
   });
 

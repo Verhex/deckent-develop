@@ -447,7 +447,7 @@ describe('registerRun — canonical model boundary (453-001)', () => {
 
     expect(hoisted.backendSpawn).toHaveBeenCalledWith(
       expect.stringMatching(/^run-/),
-      'claude-opus-4-8',
+      'claude-opus-5',
       expect.any(String),
       expect.objectContaining({ projectDir: '/project' }),
     );

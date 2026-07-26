@@ -218,8 +218,8 @@ describe('Config integration', () => {
     );
     const config = await loadConfig(root);
     expect(config.activeModeConfig.max_workers).toBe(6);
-    expect(config.activeModeConfig.brain_model).toBe('claude-opus-4-8');
-    expect(config.activeModeConfig.default_model).toBe('claude-opus-4-8');
+    expect(config.activeModeConfig.brain_model).toBe('claude-opus-5');
+    expect(config.activeModeConfig.default_model).toBe('claude-opus-5');
   });
 
   it('throws ConfigValidationError for invalid mode', async () => {

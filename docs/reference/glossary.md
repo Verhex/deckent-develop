@@ -266,7 +266,7 @@ Sprint numarasının geriye gitmemesini garantilemek için `.deckent/config.json
 ## M
 
 ### ModelTier
-Model kalite seviyesi: `premium` (opus, gpt-5, gemini-2.5-pro), `standard` (sonnet, gpt-4.1, gemini-2.5-flash), `economy` (haiku, gpt-5-mini, gemini-2.0-flash). Cross-provider model eşleştirmesinde kullanılır.
+Model kalite seviyesi: `premium` (opus-5, gpt-5.6-sol, gemini-2.5-pro), `standard` (sonnet-5, gpt-5.6-terra, gemini-2.5-flash), `economy` (haiku, gpt-5.6-luna, gemini-2.0-flash). Cross-provider model eşleştirmesinde kullanılır. Bir tier'da birden fazla GA model varsa hangisine çözümlendiği katalogda **açıkça işaretlidir** (`preferredForTier`), kayıt sırası belirlemez.
 **Sprint 037** — `src/core/model-equivalence.ts`
 
 ### max_workers

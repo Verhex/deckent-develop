@@ -191,6 +191,100 @@ const MESSAGES: MessageMap = {
     tr: 'Run, görev oluşturulmadan beklemeye alındı: provider execution authority hazır değil '
       + '(neden: {reason}, kanıt: {evidence}). Görev, provider veya backend başlatılmadı.',
   },
+  /** Actionable remedy appended to a hold the operator can actually resolve. */
+  'run.provider_authority_hold.remedy_keyring': {
+    en: 'Remedy: the provider authority keyring is not provisioned. Inspect it with '
+      + '`deckent provider-authority keyring status`; the owner provisions it with '
+      + '`deckent provider-authority keyring init`.',
+    tr: 'Çözüm: provider authority keyring sağlanmamış. Durumu için '
+      + '`deckent provider-authority keyring status`; sahibi '
+      + '`deckent provider-authority keyring init` ile sağlar.',
+  },
+  // ─── provider-authority keyring (owner-gated integrity material) ──────────
+  'provider_authority.cmd_desc': {
+    en: 'Inspect and provision the host-scoped provider authority keyring (owner-gated)',
+    tr: 'Host kapsamlı provider authority keyring\'ini incele ve sağla (sahip yetkisinde)',
+  },
+  'provider_authority.keyring.cmd_desc': {
+    en: 'Provider authority keyring — status / init / rotate',
+    tr: 'Provider authority keyring — status / init / rotate',
+  },
+  'provider_authority.keyring.status_desc': {
+    en: 'Show keyring location and revision state (never prints key material)',
+    tr: 'Keyring konumunu ve revizyon durumunu göster (anahtar materyali asla yazılmaz)',
+  },
+  'provider_authority.keyring.init_desc': {
+    en: 'Provision the keyring genesis revision (owner action; refuses if one exists)',
+    tr: 'Keyring genesis revizyonunu sağla (sahip işlemi; varsa reddeder)',
+  },
+  'provider_authority.keyring.rotate_desc': {
+    en: 'Rotate the active authority key (requires --expect-revision)',
+    tr: 'Aktif authority anahtarını döndür (--expect-revision gerekir)',
+  },
+  'provider_authority.keyring.opt_expect_revision': {
+    en: 'Revision hash the rotation must apply to (from `status`) — prevents clobbering a concurrent update',
+    tr: 'Rotasyonun uygulanacağı revizyon hash\'i (`status` çıktısından) — eşzamanlı güncellemeyi ezmeyi önler',
+  },
+  'provider_authority.keyring.location': {
+    en: 'Keyring directory: {dir}',
+    tr: 'Keyring dizini: {dir}',
+  },
+  'provider_authority.keyring.absent': {
+    en: 'State: NOT PROVISIONED — every run holds fail-closed with `keyring_unavailable` until the owner runs `deckent provider-authority keyring init`.',
+    tr: 'Durum: SAĞLANMAMIŞ — sahibi `deckent provider-authority keyring init` çalıştırana kadar her run `keyring_unavailable` ile fail-closed bekler.',
+  },
+  'provider_authority.keyring.unreadable': {
+    en: 'State: UNREADABLE ({code}) — {message}',
+    tr: 'Durum: OKUNAMIYOR ({code}) — {message}',
+  },
+  'provider_authority.keyring.present': {
+    en: 'State: PROVISIONED — keyring {keyringId}, revision {revision}, revision hash {revisionHash}, active key {activeKeyId}, {keyCount} key(s).',
+    tr: 'Durum: SAĞLANMIŞ — keyring {keyringId}, revizyon {revision}, revizyon hash {revisionHash}, aktif anahtar {activeKeyId}, {keyCount} anahtar.',
+  },
+  'provider_authority.keyring.key_line': {
+    en: '  - {keyId} [{status}] domains={domains} derivation={derivation} created={createdAt}',
+    tr: '  - {keyId} [{status}] alanlar={domains} türetme={derivation} oluşturma={createdAt}',
+  },
+  'provider_authority.keyring.project_scope_note': {
+    en: 'Note: this material is deliberately stored OUTSIDE the project tree — the project directory is mounted into workers, so a project-scoped authority key would be worker-readable.',
+    tr: 'Not: bu materyal bilinçli olarak proje ağacının DIŞINDA tutulur — proje dizini worker\'lara mount edilir, proje kapsamlı bir authority anahtarı worker tarafından okunabilir olurdu.',
+  },
+  'provider_authority.keyring.init_created': {
+    en: 'Provisioned: keyring {keyringId} revision {revision} (hash {revisionHash}) at {dir}. Key material was generated locally and never printed.',
+    tr: 'Sağlandı: keyring {keyringId} revizyon {revision} (hash {revisionHash}) — {dir}. Anahtar materyali yerel üretildi ve hiç yazdırılmadı.',
+  },
+  'provider_authority.keyring.init_exists': {
+    en: 'Refused: a keyring already exists ({keyringId}, revision {revision}). Use `rotate --expect-revision {revisionHash}` to roll the active key; init never overwrites.',
+    tr: 'Reddedildi: keyring zaten var ({keyringId}, revizyon {revision}). Aktif anahtarı döndürmek için `rotate --expect-revision {revisionHash}`; init asla üzerine yazmaz.',
+  },
+  'provider_authority.keyring.rotated': {
+    en: 'Rotated: revision {revision} (hash {revisionHash}), active key {activeKeyId}. Retired keys stay verifiable.',
+    tr: 'Döndürüldü: revizyon {revision} (hash {revisionHash}), aktif anahtar {activeKeyId}. Emekli anahtarlar doğrulanabilir kalır.',
+  },
+  'provider_authority.keyring.rotate_needs_revision': {
+    en: 'Refused: --expect-revision <hash> is required. Read the current hash from `deckent provider-authority keyring status`.',
+    tr: 'Reddedildi: --expect-revision <hash> zorunludur. Güncel hash\'i `deckent provider-authority keyring status` çıktısından alın.',
+  },
+  'provider_authority.keyring.rotate_absent': {
+    en: 'Refused: no keyring to rotate. Provision one first with `deckent provider-authority keyring init`.',
+    tr: 'Reddedildi: döndürülecek keyring yok. Önce `deckent provider-authority keyring init` ile sağlayın.',
+  },
+  'doctor.provider_authority_keyring_name': {
+    en: 'Provider authority keyring',
+    tr: 'Provider authority keyring',
+  },
+  'doctor.provider_authority_keyring_ok': {
+    en: 'provisioned (revision {revision})',
+    tr: 'sağlanmış (revizyon {revision})',
+  },
+  'doctor.provider_authority_keyring_absent': {
+    en: 'not provisioned — every run will hold with `keyring_unavailable`; owner remedy: `deckent provider-authority keyring init`',
+    tr: 'sağlanmamış — her run `keyring_unavailable` ile bekler; sahip çözümü: `deckent provider-authority keyring init`',
+  },
+  'doctor.provider_authority_keyring_unreadable': {
+    en: 'unreadable ({code}) — runs will hold; inspect with `deckent provider-authority keyring status`',
+    tr: 'okunamıyor ({code}) — run\'lar bekler; `deckent provider-authority keyring status` ile inceleyin',
+  },
   // Row 477: E_MODEL_PRICING_UNVERIFIED previously fell into the generic
   // provider_unverified message, which tells the user to "pass --provider" they
   // already passed — misleading. The real remedy is refreshing the verified
@@ -248,6 +342,10 @@ const MESSAGES: MessageMap = {
     en: 'Verdict: {verdict} (verifier: {verifier}) — advisory report: {report}',
     tr: 'Karar: {verdict} (hakem: {verifier}) — tavsiye raporu: {report}',
   },
+  'xverify.final_only_risk': {
+    en: 'Risk: {verifier} reports usage only when the call ends — token ceilings settle afterwards. Containment for this call is the host wall clock: {seconds}s.',
+    tr: 'Risk: {verifier} kullanımı yalnız çağrı bitince bildirir — token tavanları sonradan hesaplanır. Bu çağrının sınırı host duvar-saati: {seconds}sn.',
+  },
   'xverify.report.execution': {
     en: '**Execution outcome:** {outcome} (initial attempt: {initial}, terminal attempt: {terminal})',
     tr: '**Çalıştırma sonucu:** {outcome} (ilk deneme: {initial}, terminal deneme: {terminal})',
@@ -263,6 +361,12 @@ const MESSAGES: MessageMap = {
   'xverify.report.none_dispatched': {
     en: '(none dispatched)',
     tr: '(çalıştırma yok)',
+  },
+  // A verifier that was never dispatched produced no verdict. An em dash says
+  // that; UNCLEAR would claim the verifier ran and could not decide.
+  'xverify.report.no_verdict': {
+    en: '— (no verdict — verifier produced no output)',
+    tr: '— (karar yok — hakem çıktı üretmedi)',
   },
   // Worker-facing prompt fragments (deliberately EN-only content, keyed for
   // single-source maintenance — the VERIFIER reads these, not the operator).

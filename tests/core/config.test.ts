@@ -111,7 +111,7 @@ describe('getDefaultModes', () => {
   it('performance: max_workers=8, brain_model=opus', () => {
     const modes = getDefaultModes();
     expect(modes.performance.max_workers).toBe(8);
-    expect(modes.performance.brain_model).toBe('claude-opus-4-8');
+    expect(modes.performance.brain_model).toBe('claude-opus-5');
   });
 
   it('api: budget_per_sprint=5.0, requires=ANTHROPIC_API_KEY', () => {
@@ -205,7 +205,7 @@ describe('loadConfig', () => {
 
     const config = await loadConfig('/test/project');
     expect(config.modes.performance.max_workers).toBe(6);
-    expect(config.modes.performance.brain_model).toBe('claude-opus-4-8'); // preserved
+    expect(config.modes.performance.brain_model).toBe('claude-opus-5'); // preserved
   });
 
   it('carries top-level max_workers through resolution (B-MAXWORKERS-WIRE not-a-dead-knob)', async () => {
@@ -587,7 +587,7 @@ describe('resolveMode', () => {
 
 describe('resolveBrainModel', () => {
   it("returns 'opus' for performance mode", () => {
-    expect(resolveBrainModel({ mode: 'performance' })).toBe('claude-opus-4-8');
+    expect(resolveBrainModel({ mode: 'performance' })).toBe('claude-opus-5');
   });
 
   it("returns 'sonnet' for balanced mode", () => {
@@ -599,7 +599,7 @@ describe('resolveBrainModel', () => {
   });
 
   it("returns 'opus' for api mode", () => {
-    expect(resolveBrainModel({ mode: 'api' })).toBe('claude-opus-4-8');
+    expect(resolveBrainModel({ mode: 'api' })).toBe('claude-opus-5');
   });
 
   it('falls back to balanced brain_model for undefined config', () => {
@@ -627,11 +627,11 @@ describe('resolveBrainModel', () => {
 
 describe('resolveDefaultModel', () => {
   it("returns 'opus' for performance mode", () => {
-    expect(resolveDefaultModel({ mode: 'performance' })).toBe('claude-opus-4-8');
+    expect(resolveDefaultModel({ mode: 'performance' })).toBe('claude-opus-5');
   });
 
   it("returns 'opus' for balanced mode", () => {
-    expect(resolveDefaultModel({ mode: 'balanced' })).toBe('claude-opus-4-8');
+    expect(resolveDefaultModel({ mode: 'balanced' })).toBe('claude-opus-5');
   });
 
   it("returns 'sonnet' for economic mode", () => {
@@ -643,21 +643,21 @@ describe('resolveDefaultModel', () => {
   });
 
   it('falls back to balanced default_model for undefined config', () => {
-    expect(resolveDefaultModel(undefined)).toBe('claude-opus-4-8');
+    expect(resolveDefaultModel(undefined)).toBe('claude-opus-5');
   });
 
   it('falls back to balanced default_model for null config', () => {
-    expect(resolveDefaultModel(null)).toBe('claude-opus-4-8');
+    expect(resolveDefaultModel(null)).toBe('claude-opus-5');
   });
 
   it('falls back to balanced default_model for an unknown/corrupt mode string', () => {
     const cfg = { mode: 'totally_unknown_mode' as unknown as PlanMode };
-    expect(resolveDefaultModel(cfg)).toBe('claude-opus-4-8');
+    expect(resolveDefaultModel(cfg)).toBe('claude-opus-5');
   });
 
   it('falls back to balanced default_model when modes is present but missing the referenced mode key', () => {
     const cfg = { mode: 'performance' as PlanMode, modes: {} };
-    expect(resolveDefaultModel(cfg)).toBe('claude-opus-4-8');
+    expect(resolveDefaultModel(cfg)).toBe('claude-opus-5');
   });
 
   it('does not throw for a malformed config object', () => {
@@ -1650,7 +1650,7 @@ describe('Plan tier generalization (sprint-072)', () => {
     const config = await loadConfig('/test/project');
     expect(config.mode).toBe('performance');
     expect(config.activeModeConfig.max_workers).toBe(8);
-    expect(config.activeModeConfig.brain_model).toBe('claude-opus-4-8');
+    expect(config.activeModeConfig.brain_model).toBe('claude-opus-5');
   });
 
   it('DEFAULT_MODES contains all 4 canonical tiers', () => {

@@ -1055,6 +1055,12 @@ export function validateConfig(config: DeckentConfig): string[] {
     if (cv.enforce_refuted !== undefined && typeof cv.enforce_refuted !== 'boolean') {
       errors.push('cross_verify.enforce_refuted must be a boolean');
     }
+    if (cv.max_verifications_per_sprint !== undefined
+      && (typeof cv.max_verifications_per_sprint !== 'number'
+        || !Number.isInteger(cv.max_verifications_per_sprint)
+        || cv.max_verifications_per_sprint < 0)) {
+      errors.push('cross_verify.max_verifications_per_sprint must be a non-negative integer');
+    }
     if (cv.verifier_priority !== undefined) {
       if (!Array.isArray(cv.verifier_priority)) {
         errors.push('cross_verify.verifier_priority must be an array of strings');
@@ -1063,6 +1069,22 @@ export function validateConfig(config: DeckentConfig): string[] {
           if (typeof item !== 'string') {
             errors.push('cross_verify.verifier_priority must be an array of strings');
             break;
+          }
+        }
+      }
+    }
+    if (cv.verifier_model !== undefined) {
+      // Shape only — model identity is validated at resolution time against the
+      // registry, so a typo surfaces as a loud model-resolution skip with the
+      // offending ID, not as a config error that hides which provider it was for.
+      if (typeof cv.verifier_model !== 'object'
+        || cv.verifier_model === null
+        || Array.isArray(cv.verifier_model)) {
+        errors.push('cross_verify.verifier_model must be an object mapping provider → exact model API ID');
+      } else {
+        for (const [provider, model] of Object.entries(cv.verifier_model)) {
+          if (typeof model !== 'string' || model.trim() === '') {
+            errors.push(`cross_verify.verifier_model.${provider} must be a non-empty exact model API ID`);
           }
         }
       }
@@ -1977,6 +1999,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     docker_timeout: config.docker_timeout,
     worker_memory_limit_by_kind: config.worker_memory_limit_by_kind,
     worker_memory_limit: config.worker_memory_limit,
+    worker_memory_swap: config.worker_memory_swap,
     skills: config.skills,
     brain_provider: config.brain_provider,
     worker_provider: config.worker_provider,
@@ -2423,6 +2446,12 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
   },
   worker_memory_limit: {
     description: 'Default per-worker Docker memory limit (docker --memory), e.g. "2g". Falls back to 4g when unset.',
+    type: 'string',
+    default: undefined,
+    category: 'Sprint',
+  },
+  worker_memory_swap: {
+    description: 'Per-worker Docker swap ceiling (docker --memory-swap). Unset derives limit × 1.5; must be >= worker_memory_limit.',
     type: 'string',
     default: undefined,
     category: 'Sprint',

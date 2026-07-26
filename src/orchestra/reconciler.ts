@@ -162,13 +162,22 @@ const DEFAULT_SIGNAL_MIN_USD = 0.01;
  * `ReconcileOptions.downgradeLadder`.
  */
 const DEFAULT_DOWNGRADE_LADDER: Readonly<Record<string, string>> = (() => {
-  const premium = modelRegistry.getByProviderAndTier('claude', 'premium');
   const standard = modelRegistry.getByProviderAndTier('claude', 'standard');
   const economy = modelRegistry.getByProviderAndTier('claude', 'economy');
-  return {
-    ...(premium && standard ? { [premium.id]: standard.id } : {}),
-    ...(standard && economy ? { [standard.id]: economy.id } : {}),
-  };
+  const ladder: Record<string, string> = {};
+  // Key on EVERY model of a tier, not just the tier's designated one. The task
+  // already ran on whatever model it ran on, so a registered model missing from
+  // the ladder silently loses its suggestion while the over-run signal still
+  // fires — an advisory that goes quiet exactly when it has something to say.
+  // Measured when MASTER-PLAN 670 moved the claude/premium designation from
+  // Opus 4.8 to Opus 5: Opus 4.8 is still GA and still dispatchable, and it lost
+  // its downgrade hint. The step-down TARGET stays the designated model, since
+  // that is the tier's current-generation answer.
+  for (const model of modelRegistry.getByProvider('claude')) {
+    if (model.tier === 'premium' && standard) ladder[model.id] = standard.id;
+    else if (model.tier === 'standard' && economy) ladder[model.id] = economy.id;
+  }
+  return ladder;
 })();
 
 // ─── Numeric helpers ─────────────────────────────────────────────────────────

@@ -116,4 +116,48 @@ describe('cross_verify config block', () => {
     expect(errors.length).toBeGreaterThan(0);
     expect(errors[0]).toMatch(/cross_verify\.verifier_priority/);
   });
+
+  // ─── verifier_model (MASTER-PLAN 669) ──────────────────────────────────────
+
+  it('accepts a provider → exact model API ID map', () => {
+    const errors = collectCrossVerifyErrors(
+      minimalConfig({
+        cross_verify: { enabled: true, verifier_model: { codex: 'gpt-5.6-sol' } },
+      }),
+    );
+    expect(errors).toHaveLength(0);
+  });
+
+  it('rejects a bare string instead of a per-provider map', () => {
+    const errors = collectCrossVerifyErrors(
+      minimalConfig({
+        cross_verify: { enabled: true, verifier_model: 'gpt-5.6-sol' },
+      } as unknown as Partial<DeckentConfig>),
+    );
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0]).toMatch(/cross_verify\.verifier_model/);
+  });
+
+  it('names the offending provider when its model ID is empty', () => {
+    const errors = collectCrossVerifyErrors(
+      minimalConfig({
+        cross_verify: { enabled: true, verifier_model: { codex: '   ' } },
+      }),
+    );
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0]).toMatch(/cross_verify\.verifier_model\.codex/);
+  });
+
+  // Shape validation deliberately stops at "non-empty string": an unknown ID is
+  // resolved against the registry at dispatch time so the failure names the model
+  // AND the verifier provider, instead of a config error that hides which
+  // verifier it was meant for.
+  it('leaves unknown model identity to registry resolution, not config shape', () => {
+    const errors = collectCrossVerifyErrors(
+      minimalConfig({
+        cross_verify: { enabled: true, verifier_model: { codex: 'gpt-9.9-nonexistent' } },
+      }),
+    );
+    expect(errors).toHaveLength(0);
+  });
 });

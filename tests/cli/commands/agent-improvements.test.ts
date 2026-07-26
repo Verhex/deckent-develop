@@ -188,7 +188,7 @@ describe('agent improvements', () => {
       const config = JSON.parse(readFileSync(
         join(testRoot, '.deckent/agents/default-model-agent/agent.json'), 'utf-8',
       ));
-      expect(config.preferredModel).toBe('claude-opus-4-8');
+      expect(config.preferredModel).toBe('claude-opus-5');
     });
 
     it('uses opus when --model opus specified', async () => {

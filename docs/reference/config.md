@@ -299,6 +299,8 @@ Capraz-provider tersleyici dogrulama (Sprint 276 XVER-1). Varsayilan devre disi 
 | `cross_verify.high_stakes_only` | `boolean` | `true` | Yalniz yuksek-riskli task'lari dogrula (security/auth/P0/risk-tagged). |
 | `cross_verify.verifier_priority` | `string[]` | `['codex','gemini','claude']` | Dogrulayici provider secim sirasi. |
 | `cross_verify.enforce_refuted` | `boolean` | `false` | `true` ise REFUTED verdict DONE/GO_WITH_TECH_DEBT task'i NO_GO'ya dusurmek icin hard-block olarak uygulanir. `false` = yalnizca advisory (ADR-070 byte-uyumlu). CT:85. |
+| `cross_verify.max_verifications_per_sprint` | `number` | _(tavan yok)_ | Bir sprint'in kac dogrulayici dispatch edebileceginin owner tavani. Her dispatch gercek, faturali bir provider cagrisi; genis acilim once sinirli canary (`1`) olarak baslar. Tavana ulasmak durust + loglanan bir skip'tir, sessiz durma degil. |
+| `cross_verify.verifier_model` | `object` | _(tier esdegerligi)_ | Provider basina **exact** dogrulayici model API ID'si — `{"codex": "gpt-5.6-sol"}`. Yoksa dogrulayici, task'in kendi modeliyle tier esdegerliginden turetilir; bu ise "sunu su modelle yargila"yi ifade EDEMEZ: standard-tier bir task her zaman standard-tier bir hakeme cozulur, premium hakem erisilemez kalir. Provider-anahtarli oldugu icin `verifier_priority`'deki her aday kendi kimligini tasir; haritada olmayan provider tier yolunu birebir korur. Oncelik: caller bayragi (`xverify --verifier-model`) > bu config > tier esdegerligi. Bilinmeyen ID veya baska provider'a ait ID → gurultulu `model-resolution-error` + durust skip; sessiz ikame YOK. |
 
 ---
 

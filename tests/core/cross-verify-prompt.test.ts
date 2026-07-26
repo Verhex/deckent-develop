@@ -4,6 +4,7 @@ import {
   CROSS_VERIFY_EVIDENCE_OUTPUT_MAX_CHARS,
   CROSS_VERIFY_PROMPT_MAX_CHARS,
   CROSS_VERIFY_RATIONALE_MAX_CHARS,
+  extractDispatchRejectionFromLog,
   extractTerminalAssistantVerdictFromLog,
   parseRefuteVerdict,
   type RefutePromptTask,
@@ -413,5 +414,128 @@ describe('cross-verify-prompt · normalized assistant verdict authority', () => 
     ].join('\n');
     expect(extractTerminalAssistantVerdictFromLog(bareFinishLog)).toBe(verdict);
     expect(extractTerminalAssistantVerdictFromLog(explicitEmptyFinishLog)).toBe(verdict);
+  });
+});
+
+// ─── extractDispatchRejectionFromLog (MASTER-PLAN 671) ───────────────────────
+
+describe('cross-verify-prompt · provider dispatch rejection', () => {
+  const event = (seq: number, type: string, content: unknown): string => JSON.stringify({
+    ts: '2026-07-26T00:00:00.000Z',
+    seq,
+    type,
+    content,
+  });
+
+  /**
+   * The seven lines of `.brain/archive/sprints/sprint-460-tasks/task-460-001-xverify.log`,
+   * copied verbatim. This run is the whole reason 671 exists: the verifier was
+   * refused at dispatch and the sprint reported `unclear` — "the verifier ran and
+   * was uninterpretable" — for a model that was never invoked. Keeping the real
+   * bytes here means a future envelope change breaks this test loudly instead of
+   * silently reopening the misclassification.
+   */
+  const SPRINT_460_LOG = [
+    '{"ts":"2026-07-25T23:50:55.062Z","seq":1,"type":"lifecycle","content":{"type":"lifecycle","thread_id":"019f9bb0-3836-76b1-a618-0209cbc13ace","codexEventType":"thread.started"}}',
+    '{"ts":"2026-07-25T23:50:55.062Z","seq":2,"type":"text","content":{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Model metadata for \\`gpt-4.1\\` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."}}}',
+    '{"ts":"2026-07-25T23:50:55.062Z","seq":3,"type":"turn","content":{"type":"turn","codexEventType":"turn.started"}}',
+    '{"ts":"2026-07-25T23:50:55.062Z","seq":4,"type":"text","content":{"type":"error","message":"{\\"type\\":\\"error\\",\\"status\\":400,\\"error\\":{\\"type\\":\\"invalid_request_error\\",\\"message\\":\\"The \'gpt-4.1\' model is not supported when using Codex with a ChatGPT account.\\"}}"}}',
+    '{"ts":"2026-07-25T23:50:55.062Z","seq":5,"type":"text","content":{"type":"turn.failed","error":{"message":"{\\"type\\":\\"error\\",\\"status\\":400,\\"error\\":{\\"type\\":\\"invalid_request_error\\",\\"message\\":\\"The \'gpt-4.1\' model is not supported when using Codex with a ChatGPT account.\\"}}"}}}',
+    '{"ts":"2026-07-25T23:50:55.062Z","seq":6,"type":"text","content":"WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \\"/tmp\\" (codex_home: AbsolutePathBuf(\\"/tmp/deckent-home/.codex\\"))"}',
+    '{"ts":"2026-07-25T23:50:55.062Z","seq":7,"type":"text","content":"Reading prompt from stdin..."}',
+  ].join('\n');
+
+  it('reads the archived sprint-460 refusal as model-not-found, verbatim', () => {
+    const rejection = extractDispatchRejectionFromLog(SPRINT_460_LOG);
+    expect(rejection).toEqual({
+      outcome: 'model-not-found',
+      message: "The 'gpt-4.1' model is not supported when using Codex with a ChatGPT account.",
+      status: 400,
+      errorType: 'invalid_request_error',
+    });
+  });
+
+  it('does not treat the non-fatal codex metadata warning as a refusal', () => {
+    // Line 2 of the same run says metadata was "not found" and that codex is
+    // "Defaulting to fallback metadata" — the run continued. Only the HTTP 400
+    // is a refusal; a keyword match on this line would fabricate one.
+    const warningOnly = SPRINT_460_LOG.split('\n').slice(0, 3).join('\n');
+    expect(extractDispatchRejectionFromLog(warningOnly)).toBeNull();
+  });
+
+  it('yields nothing when the verifier spoke — a run that died is not a refusal', () => {
+    // Gate 1. `unavailable` asserts the verifier never executed; assistant text
+    // anywhere in the log disproves that, whatever failed afterwards.
+    const spoke = [
+      event(1, 'text', {
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'Read the diff, checking the JWT path.' }] },
+      }),
+      ...SPRINT_460_LOG.split('\n'),
+    ].join('\n');
+    expect(extractDispatchRejectionFromLog(spoke)).toBeNull();
+  });
+
+  it('classifies auth and rate-limit refusals from status, not wording', () => {
+    const withStatus = (status: number): string => event(1, 'text', {
+      type: 'error',
+      message: JSON.stringify({
+        type: 'error',
+        status,
+        error: { type: 'invalid_request_error', message: 'refused' },
+      }),
+    });
+    expect(extractDispatchRejectionFromLog(withStatus(401))?.outcome).toBe('auth-rejected');
+    expect(extractDispatchRejectionFromLog(withStatus(403))?.outcome).toBe('auth-rejected');
+    expect(extractDispatchRejectionFromLog(withStatus(429))?.outcome).toBe('rate-limited');
+    // No status arm and no recognizable wording: honest fallback, not a guess.
+    expect(extractDispatchRejectionFromLog(withStatus(500))?.outcome).toBe('transport-error');
+  });
+
+  it('reads a Claude stream-json error result the same way', () => {
+    const log = event(1, 'usage', {
+      type: 'result',
+      is_error: true,
+      status: 401,
+      result: 'invalid x-api-key',
+    });
+    expect(extractDispatchRejectionFromLog(log)).toEqual({
+      outcome: 'auth-rejected',
+      message: 'invalid x-api-key',
+      status: 401,
+    });
+  });
+
+  it('refuses to classify without a status ≥ 400 or a named error class', () => {
+    // Gate 2. Every one of these is a shape we do not have evidence for; the
+    // existing `unclear` classification must survive all of them untouched.
+    const ambiguous = [
+      event(1, 'text', { type: 'error', message: JSON.stringify({ status: 200, message: 'ok' }) }),
+      event(2, 'text', { type: 'turn.failed', error: { message: 'connection reset' } }),
+      event(3, 'text', { type: 'error', message: JSON.stringify({ type: 'notice', message: 'retrying' }) }),
+      event(4, 'text', { type: 'error', message: JSON.stringify({ status: 400, error: { type: 'invalid_request_error', message: '   ' } }) }),
+      event(5, 'text', { type: 'result', is_error: false, status: 500, result: 'fine' }),
+    ].join('\n');
+    expect(extractDispatchRejectionFromLog(ambiguous)).toBeNull();
+  });
+
+  it('survives unparseable input without throwing', () => {
+    expect(extractDispatchRejectionFromLog('')).toBeNull();
+    expect(extractDispatchRejectionFromLog('   \n\n  ')).toBeNull();
+    expect(extractDispatchRejectionFromLog('not json at all\n{oops')).toBeNull();
+    expect(extractDispatchRejectionFromLog(undefined as unknown as string)).toBeNull();
+  });
+
+  it('reports the last refusal when a provider emits several', () => {
+    // The terminal refusal is the one that ended the dispatch; an earlier retry
+    // rejection is history, not the outcome.
+    const log = [
+      event(1, 'text', { type: 'error', message: JSON.stringify({ status: 429, error: { type: 'rate_limit_error', message: 'slow down' } }) }),
+      event(2, 'text', { type: 'error', message: JSON.stringify({ status: 401, error: { type: 'authentication_error', message: 'session expired' } }) }),
+    ].join('\n');
+    expect(extractDispatchRejectionFromLog(log)).toMatchObject({
+      outcome: 'auth-rejected',
+      message: 'session expired',
+    });
   });
 });

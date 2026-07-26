@@ -35,7 +35,7 @@ describe('resolveTaskModel', () => {
     // 2+ directories → +3 score; architectural keyword → +2 score; total 5 → opus
     const scope = makeScope(['src/orchestra/', 'src/core/'], ['src/orchestra/brain.ts', 'src/core/types.ts']);
     const result = resolveTaskModel('Architect migration refactor', 'Cross-cutting refactor', scope, config);
-    expect(result).toBe('claude-opus-4-8');
+    expect(result).toBe('claude-opus-5');
   });
 
   it('returns sonnet for single-dir moderate task', () => {
@@ -154,14 +154,14 @@ describe('resolveTaskModel', () => {
     // 3 directories → +3; architect keyword → +2; score=5 → opus
     const scope = makeScope(['src/orchestra/', 'src/core/', 'src/cli/']);
     const result = resolveTaskModel('Architect cross-cutting redesign', 'Migrate across modules', scope, config);
-    expect(result).toBe('claude-opus-4-8');
+    expect(result).toBe('claude-opus-5');
   });
 
   it('max5x_plan behaves like max (allows opus)', () => {
     const config = makeConfig({ mode: 'max5x_plan' });
     const scope = makeScope(['src/orchestra/', 'src/core/']);
     const result = resolveTaskModel('Architect migration refactor', 'Cross-cutting refactor', scope, config);
-    expect(result).toBe('claude-opus-4-8');
+    expect(result).toBe('claude-opus-5');
   });
 
   it('haiku_allowed=false + simple task that scores haiku → sonnet', () => {
@@ -210,6 +210,6 @@ describe('resolveTaskModel — forceModel override', () => {
     const scope = makeScope(['src/', 'tests/']);
     const result = resolveTaskModel('Big architect redesign task', 'Cross-cutting refactor', scope, config, undefined, undefined);
     // Should be opus (high score from keywords + multi-dir)
-    expect(result).toBe('claude-opus-4-8');
+    expect(result).toBe('claude-opus-5');
   });
 });

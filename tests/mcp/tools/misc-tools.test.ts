@@ -44,6 +44,7 @@ vi.mock('../../../src/core/memory-store.js', () => ({
 import { ensureDeckentImport } from '../../../src/core/utils.js';
 import { analyzeProject } from '../../../src/core/analyzer.js';
 import { enrichResponse } from '../../../src/mcp/helpers/enrich.js';
+import { modelRegistry } from '../../../src/core/model-registry.js';
 
 // ─── Mock Server Factory ─────────────────────────────────────────────────────
 
@@ -613,10 +614,16 @@ describe('registerSetDirectivesTool', () => {
       const result = await tool.handler({ content });
       const parsed = parseToolResult(result);
 
+      // Keys come from the registry's designated model per claude tier, so this
+      // asserts the CONTRACT rather than pinning three literals that go stale on
+      // every catalog generation (MASTER-PLAN 670 moved claude/premium from
+      // Opus 4.8 to Opus 5 and broke exactly such a literal).
       expect(parsed.estimatedModels).toBeDefined();
-      expect(typeof parsed.estimatedModels['claude-opus-4-8']).toBe('number');
-      expect(typeof parsed.estimatedModels['claude-sonnet-5']).toBe('number');
-      expect(typeof parsed.estimatedModels['claude-haiku-4-5-20251001']).toBe('number');
+      for (const tier of ['premium', 'standard', 'economy'] as const) {
+        const designated = modelRegistry.getByProviderAndTier('claude', tier);
+        expect(designated).toBeDefined();
+        expect(typeof parsed.estimatedModels[designated!.id]).toBe('number');
+      }
     });
   });
 

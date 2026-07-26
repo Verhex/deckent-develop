@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { modelRegistry } from '../../src/core/model-registry.js';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import type { ResolvedConfig, Task } from '../../src/core/types.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../../src/core/types.js';
@@ -217,10 +218,15 @@ describe('MCP Enrichment 004 — set_directives', () => {
     const result = await mock.tools.get('deckent_set_directives')!.handler({ content });
     const parsed = JSON.parse(result.content[0]!.text);
 
+    // Keys are the registry's designated model per claude tier, so assert the
+    // CONTRACT instead of three literals that go stale every catalog generation
+    // (MASTER-PLAN 670 moved claude/premium from Opus 4.8 to Opus 5).
     expect(parsed.estimatedModels).toBeDefined();
-    expect(typeof parsed.estimatedModels['claude-opus-4-8']).toBe('number');
-    expect(typeof parsed.estimatedModels['claude-sonnet-5']).toBe('number');
-    expect(typeof parsed.estimatedModels['claude-haiku-4-5-20251001']).toBe('number');
+    for (const tier of ['premium', 'standard', 'economy'] as const) {
+      const designated = modelRegistry.getByProviderAndTier('claude', tier);
+      expect(designated).toBeDefined();
+      expect(typeof parsed.estimatedModels[designated!.id]).toBe('number');
+    }
   });
 
   it('existing fields (success, taskCount) preserved after enrichment', async () => {

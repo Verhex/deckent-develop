@@ -97,8 +97,10 @@ describe('resolveProviderWithFallback', () => {
       registry,
     );
 
-    // opus (premium tier on claude) -> gpt-5 (premium tier on codex)
-    expect(result.model).toBe('gpt-5.5');
+    // opus (premium on claude) -> the DESIGNATED codex premium model.
+    // MASTER-PLAN 670 (owner-approved 2026-07-26): the tier names its current
+    // generation instead of returning whichever GA model registered first.
+    expect(result.model).toBe('gpt-5.6-sol');
   });
 
   it('remaps standard-tier model correctly on fallback', async () => {
@@ -112,8 +114,9 @@ describe('resolveProviderWithFallback', () => {
       registry,
     );
 
-    // sonnet (standard tier on claude) -> gpt-4.1 (standard tier on codex)
-    expect(result.model).toBe('gpt-4.1');
+    // sonnet (standard on claude) -> designated codex standard model, replacing
+    // `gpt-4.1` which this account is measured to refuse (sprint-460, HTTP 400).
+    expect(result.model).toBe('gpt-5.6-terra');
   });
 
   it('remaps economy-tier model correctly on fallback', async () => {
@@ -127,8 +130,8 @@ describe('resolveProviderWithFallback', () => {
       registry,
     );
 
-    // haiku (economy tier on claude) -> gpt-5-mini (economy tier on codex)
-    expect(result.model).toBe('gpt-5-mini');
+    // haiku (economy on claude) -> designated codex economy model.
+    expect(result.model).toBe('gpt-5.6-luna');
   });
 
   // --- Primary unavailable + no fallback configured ---

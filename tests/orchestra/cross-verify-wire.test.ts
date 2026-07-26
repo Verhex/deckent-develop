@@ -25,7 +25,7 @@ import type {
 import { TaskEvaluation, TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskResult, ResolvedConfig, ProviderName, CrossVerifyConfig } from '../../src/core/types.js';
 import { TASKS_DIR } from '../../src/core/constants.js';
-import { ensureOllamaModelRegistered } from '../../src/core/model-registry.js';
+import { ensureOllamaModelRegistered, modelRegistry } from '../../src/core/model-registry.js';
 import {
   claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlement,
@@ -143,6 +143,14 @@ function makeConfig(
       roles: { auditor: { default: { maxCacheReadTokens: 1_000_000, maxTurns: 12 } } },
       landing: { reserve_ratio: 0.25 },
       unmetered_backend: { action: 'reroute-or-hold', ordered_backends: ['docker', 'subprocess'] },
+      // codex/gemini report usage only at call end; the owner authorizes them for
+      // the auditor role under host wall-clock containment (mirrors the project's
+      // authored policy). Tests that assert the fail-closed path drop this block.
+      final_only_usage: {
+        action: 'allow-wall-clock-containment',
+        roles: ['auditor'],
+        max_wall_clock_seconds: 300,
+      },
     },
     cross_verify: crossVerify,
     ...overrides,
@@ -263,12 +271,27 @@ function mandatoryComposition(
 
 const TWO_PROVIDERS: readonly ProviderName[] = ['claude', 'codex'];
 
+/**
+ * The model tier equivalence answers with for the standard-tier fixture task
+ * (`claude-sonnet-5` → codex). These tests audit that the runner HONORS tier
+ * equivalence and persists what it dispatched — not what the answer happens to
+ * be, which MASTER-PLAN 670 redesignated and which
+ * cross-verify-config-verifier-model.test.ts pins explicitly.
+ */
+const TIER_EQUIVALENT_VERIFIER_MODEL = modelRegistry.getEquivalent('claude-sonnet-5', 'codex');
+
 function exactCandidate(
   overrides: Partial<VerifierEligibilityCandidate> = {},
 ): VerifierEligibilityCandidate {
   return {
     provider: 'codex',
-    model: 'gpt-4.1',
+    // Host-supplied eligibility evidence must name the SAME model the runner
+    // resolves, or the 669 contract check fail-louds. Derived from the registry
+    // rather than pinned: these tests audit receipt lifecycle, not which model a
+    // tier answers with, and a literal here went stale the moment MASTER-PLAN
+    // 670 redesignated codex/standard. The identity itself is pinned by
+    // tests/orchestra/cross-verify-config-verifier-model.test.ts.
+    model: modelRegistry.getEquivalent('claude-sonnet-5', 'codex'),
     auth: { mode: 'subscription', accountRefHash: 'a'.repeat(64) },
     backend: {
       transport: 'cli',
@@ -1156,14 +1179,14 @@ describe('runCrossVerify — dispatch + advisory write', () => {
     expect(calls.length).toBe(1);
     expect(calls[0]!.prompt).toMatch(/REFUTE/i);
     expect(calls[0]!.verifierProvider).toBe('codex');
-    expect(calls[0]!.verifierModel).toBe('gpt-4.1');
+    expect(calls[0]!.verifierModel).toBe(TIER_EQUIVALENT_VERIFIER_MODEL);
     expect(calls[0]!.executionBudget).toEqual({ maxCacheReadTokens: 1_000_000, maxTurns: 12 });
     expect(calls[0]!.spawnBackend).toBe('docker');
     // advisory persisted to .result, original fields preserved
     const persisted = readResultFile('276-001');
     expect(persisted.crossVerify?.verdict).toBe('confirmed');
     expect(persisted.crossVerify?.verifier).toBe('codex');
-    expect(persisted.crossVerify?.verifierModel).toBe('gpt-4.1');
+    expect(persisted.crossVerify?.verifierModel).toBe(TIER_EQUIVALENT_VERIFIER_MODEL);
     expect(persisted.selfAssessment).toBe('DONE');
   });
 
@@ -2003,6 +2026,60 @@ describe('runCrossVerify — honest-skip paths', () => {
     expect(calls[0]).toMatchObject({ verifierProvider: 'ollama', executionBudget: undefined });
   });
 
+  it('final-only verifier without owner authorization → durable HOLD before any spend', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED must not run');
+    const config = makeConfig({ enabled: true });
+    // Owner authored no final-only allowance: codex reports usage only at call
+    // end, so its token ceilings could not be enforced in flight.
+    delete (config.execution_budget as { final_only_usage?: unknown }).final_only_usage;
+    const res = await runCrossVerify(
+      root, makeTask(), makeResult(), TaskEvaluation.DONE, config,
+      { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
+    );
+    expect(res.ran).toBe(false);
+    expect(res.outcome).toBe('unavailable');
+    expect(res.skippedReason).toBe('verifier-final-only-usage-hold:codex:final-only');
+    expect(calls).toHaveLength(0);
+    expect(readResultFile('276-001').crossVerify).toMatchObject({
+      outcome: 'unavailable',
+      verifier: 'codex',
+      reason: 'verifier-final-only-usage-hold:codex:final-only',
+    });
+  });
+
+  it('authorized final-only verifier carries the owner wall-clock containment into the spawn', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED codex verified the bounded evidence');
+    const res = await runCrossVerify(
+      root, makeTask(), makeResult(), TaskEvaluation.DONE,
+      makeConfig({ enabled: true }),
+      { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
+    );
+    expect(res.outcome).toBe('confirmed');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      verifierProvider: 'codex',
+      finalOnlyUsageContainment: {
+        maxWallClockSeconds: 300,
+        profileRef: 'execution_budget.final_only_usage',
+      },
+    });
+  });
+
+  it('an incremental-usage verifier never receives a final-only containment grant', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED claude verified the bounded evidence');
+    const res = await runCrossVerify(
+      root, makeTask({ provider: 'codex', model: 'gpt-5.6-sol' }), makeResult(), TaskEvaluation.DONE,
+      makeConfig({ enabled: true, verifier_priority: ['claude'] }),
+      { availableProviders: ['claude', 'codex'], spawnVerifier: fn },
+    );
+    expect(res.outcome).toBe('confirmed');
+    expect(calls[0]?.verifierProvider).toBe('claude');
+    expect(calls[0]?.finalOnlyUsageContainment).toBeUndefined();
+  });
+
   it('missing auditor budget policy → durable HOLD before verifier dispatch', async () => {
     writeResultFile('276-001', makeResult());
     const { fn, calls } = makeSpawnSpy('VERDICT: CONFIRMED must not run');
@@ -2098,7 +2175,10 @@ describe('runCrossVerify — honest-skip paths', () => {
     expect(onVerifierDispatch).toHaveBeenCalledOnce();
     expect(onVerifierDispatch).toHaveBeenCalledWith({
       verifierProvider: 'codex',
-      verifierModel: 'gpt-4.1',
+      verifierModel: TIER_EQUIVALENT_VERIFIER_MODEL,
+      // codex settles usage only at call end — the caller learns the honest
+      // containment window before any spend.
+      finalOnlyContainment: { maxWallClockSeconds: 300 },
     });
   });
 });
@@ -2142,7 +2222,7 @@ describe('runCrossVerify — fail-safe + verifier selection', () => {
     expect(persisted.crossVerify).toEqual({
       outcome: 'unavailable',
       verifier: 'codex',
-      verifierModel: 'gpt-4.1',
+      verifierModel: TIER_EQUIVALENT_VERIFIER_MODEL,
       reason: 'spawn-error',
     });
     expect(persisted.selfAssessment).toBe('DONE');

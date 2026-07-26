@@ -57,7 +57,7 @@ describe('resolveTaskModel — provider parameter backward compat', () => {
     const result = resolveTaskModel(
       'Architect migration refactor', 'Cross-cutting refactor', scope, config, patterns,
     );
-    expect(result).toBe('claude-opus-4-8');
+    expect(result).toBe('claude-opus-5');
   });
 
   it('explicit provider=claude returns same as no provider', () => {
@@ -85,7 +85,7 @@ describe('resolveTaskModel — codex provider', () => {
       'Simple fix', 'A tiny change', scope, config, patterns,
       undefined, undefined, 'codex',
     );
-    expect(result).toBe('gpt-4.1');
+    expect(result).toBe('gpt-5.6-terra');
   });
 
   it('keeps gpt-5-mini for an auto-selected economy DOC task on codex (economy allowed)', () => {
@@ -96,7 +96,7 @@ describe('resolveTaskModel — codex provider', () => {
       'Tiny doc', 'A tiny doc note', scope, config, patterns,
       undefined, undefined, 'codex',
     );
-    expect(result).toBe('gpt-5-mini');
+    expect(result).toBe('gpt-5.6-luna');
   });
 
   it('medium task resolves to gpt-4.1 (standard tier)', () => {
@@ -105,7 +105,7 @@ describe('resolveTaskModel — codex provider', () => {
       'Normal task', 'Some description', scope, config, patterns,
       undefined, undefined, 'codex',
     );
-    expect(result).toBe('gpt-4.1');
+    expect(result).toBe('gpt-5.6-terra');
   });
 
   it('complex task resolves to gpt-5 (premium tier)', () => {
@@ -114,7 +114,7 @@ describe('resolveTaskModel — codex provider', () => {
       'Architect migration refactor', 'Cross-cutting refactor', scope, config, patterns,
       undefined, undefined, 'codex',
     );
-    expect(result).toBe('gpt-5.5');
+    expect(result).toBe('gpt-5.6-sol');
   });
 
 });
@@ -167,7 +167,7 @@ describe('resolveTaskModel — forceModel + provider', () => {
       'Forced task', 'Forced model', scope, config, patterns,
       'claude-opus-4-8', undefined, 'codex',
     );
-    expect(result).toBe('gpt-5.5');
+    expect(result).toBe('gpt-5.6-sol');
   });
 
   it('forceModel=sonnet on gemini returns sonnet (adapter provider — forceModel is authoritative)', () => {
@@ -217,7 +217,7 @@ describe('resolveTaskModel — layer interactions with provider', () => {
       'Architect migration refactor', 'Cross-cutting refactor', scope, proConfig,
       undefined, undefined, undefined, 'codex',
     );
-    expect(result).toBe('gpt-4.1');
+    expect(result).toBe('gpt-5.6-terra');
   });
 
   it('haiku_allowed=false + gemini: haiku->sonnet(filter)->gemini-2.5-flash', () => {
@@ -248,7 +248,7 @@ describe('resolveTaskModel — layer interactions with provider', () => {
       undefined, ['claude-opus-4-8'], 'codex',
     );
     // skill upgrades to opus, Layer 3 caps to sonnet, then codex mapping -> gpt-4.1
-    expect(result).toBe('gpt-4.1');
+    expect(result).toBe('gpt-5.6-terra');
   });
 
   it('skillModels + provider maps correctly', () => {
@@ -260,6 +260,6 @@ describe('resolveTaskModel — layer interactions with provider', () => {
       undefined, ['claude-opus-4-8'], 'codex',
     );
     // skill upgrades to opus, no caps apply, codex mapping -> gpt-5
-    expect(result).toBe('gpt-5.5');
+    expect(result).toBe('gpt-5.6-sol');
   });
 });

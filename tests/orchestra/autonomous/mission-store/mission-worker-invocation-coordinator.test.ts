@@ -60,7 +60,11 @@ const PROVIDERS = {
     endpointRefHash: 'b'.repeat(64), runtimeFingerprint: 'c'.repeat(64),
   },
   codex: {
-    model: 'gpt-5.5', accountRefHash: 'd'.repeat(64),
+    // MASTER-PLAN 670 (owner-approved 2026-07-26): codex/premium designates
+    // gpt-5.6-sol, so this is the model the fallback reservation, the wire call
+    // and the receipt must all agree on. Pinned literally on purpose — this
+    // test audits WHICH billed model a fallback dispatches.
+    model: 'gpt-5.6-sol', accountRefHash: 'd'.repeat(64),
     endpointRefHash: 'e'.repeat(64), runtimeFingerprint: 'f'.repeat(64),
   },
 } as const;
@@ -436,18 +440,18 @@ describe('MissionWorkerInvocationCoordinator', () => {
     const h = await harness({ claude: 0, codex: 100 });
     const executor = vi.fn(async (grant) => {
       expect(grant).toMatchObject({
-        provider: 'codex', model: 'gpt-5.5',
+        provider: 'codex', model: 'gpt-5.6-sol',
         reservationId: TEST_RESERVATIONS.codex.reservationId,
       });
       return successExecution('codex');
     });
     const result = await new MissionWorkerInvocationCoordinator(h.authorities).execute(input(), executor);
-    expect(result).toMatchObject({ ok: true, calledProvider: 'codex', calledModel: 'gpt-5.5' });
+    expect(result).toMatchObject({ ok: true, calledProvider: 'codex', calledModel: 'gpt-5.6-sol' });
     const receipt = h.receiptStore.get({ tenantId: 'tenant-a', projectId: h.receiptStore.projectId }, TEST_IDENTITY.invocationId);
     expect(receipt?.receipt).toMatchObject({
-      resolved: { provider: 'codex', model: 'gpt-5.5', source: 'fallback' },
-      called: { provider: 'codex', model: 'gpt-5.5', source: 'wire' },
-      fallbackChain: [{ fromProvider: 'claude', toProvider: 'codex', toModel: 'gpt-5.5' }],
+      resolved: { provider: 'codex', model: 'gpt-5.6-sol', source: 'fallback' },
+      called: { provider: 'codex', model: 'gpt-5.6-sol', source: 'wire' },
+      fallbackChain: [{ fromProvider: 'claude', toProvider: 'codex', toModel: 'gpt-5.6-sol' }],
     });
     expect(executor).toHaveBeenCalledTimes(1);
     h.close();

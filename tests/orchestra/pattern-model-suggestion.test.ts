@@ -131,7 +131,7 @@ describe('suggestModelFromPatterns', () => {
   it('returns the canonical premium model for file_outside_scope with occurrences >= 2 in src/ scope', () => {
     const scope = makeScope(['src/core/']);
     const patterns = [makePattern('file_outside_scope', 2)];
-    expect(suggestModelFromPatterns(scope, patterns)).toBe('claude-opus-4-8');
+    expect(suggestModelFromPatterns(scope, patterns)).toBe('claude-opus-5');
   });
 
   it('returns null for file_outside_scope with only 1 occurrence', () => {
@@ -143,7 +143,7 @@ describe('suggestModelFromPatterns', () => {
   it('returns the canonical premium model for circular_dependency with occurrences >= 1 in src/ scope', () => {
     const scope = makeScope(['src/orchestra/']);
     const patterns = [makePattern('circular_dependency', 1)];
-    expect(suggestModelFromPatterns(scope, patterns)).toBe('claude-opus-4-8');
+    expect(suggestModelFromPatterns(scope, patterns)).toBe('claude-opus-5');
   });
 
   it('returns null for docs/ scope even with boundary violations', () => {
@@ -172,7 +172,7 @@ describe('suggestModelFromPatterns', () => {
   it('returns the canonical premium model for tests/ scope with circular_dependency', () => {
     const scope = makeScope(['tests/orchestra/']);
     const patterns = [makePattern('circular_dependency', 2)];
-    expect(suggestModelFromPatterns(scope, patterns)).toBe('claude-opus-4-8');
+    expect(suggestModelFromPatterns(scope, patterns)).toBe('claude-opus-5');
   });
 });
 
@@ -186,7 +186,7 @@ describe('resolveTaskModel with patterns', () => {
     const scope = makeScope(['src/core/']);
     const patterns = [makePattern('file_outside_scope', 3)];
     const result = resolveTaskModel('Add utility', 'Simple utility function', scope, config, patterns);
-    expect(result).toBe('claude-opus-4-8');
+    expect(result).toBe('claude-opus-5');
   });
 
   it('does not upgrade when no patterns provided', () => {
@@ -270,7 +270,7 @@ describe('parsePatterns + deduplicatePatterns pipeline', () => {
     const scope = makeScope(['src/orchestra/']);
     const config = makeConfig();
     const result = resolveTaskModel('Refactor module', 'Complex refactor', scope, config, deduped);
-    expect(result).toBe('claude-opus-4-8');
+    expect(result).toBe('claude-opus-5');
   });
 
   it('pipeline: malformed JSON → empty array → no upgrade', () => {
@@ -310,19 +310,19 @@ describe('suggestModelFromPatterns — additional edge cases', () => {
   it('returns the canonical premium model for bare "src" directory (without trailing slash)', () => {
     const scope = makeScope(['src']);
     const patterns = [makePattern('circular_dependency', 1)];
-    expect(suggestModelFromPatterns(scope, patterns)).toBe('claude-opus-4-8');
+    expect(suggestModelFromPatterns(scope, patterns)).toBe('claude-opus-5');
   });
 
   it('returns the canonical premium model for bare "tests" directory', () => {
     const scope = makeScope(['tests']);
     const patterns = [makePattern('file_outside_scope', 3)];
-    expect(suggestModelFromPatterns(scope, patterns)).toBe('claude-opus-4-8');
+    expect(suggestModelFromPatterns(scope, patterns)).toBe('claude-opus-5');
   });
 
   it('mixed scope: one src dir triggers upgrade even with other non-src dirs', () => {
     const scope = makeScope(['docs/', 'src/core/']);
     const patterns = [makePattern('file_outside_scope', 2)];
-    expect(suggestModelFromPatterns(scope, patterns)).toBe('claude-opus-4-8');
+    expect(suggestModelFromPatterns(scope, patterns)).toBe('claude-opus-5');
   });
 
   it('file_outside_scope with exactly 1 occurrence does not trigger upgrade', () => {

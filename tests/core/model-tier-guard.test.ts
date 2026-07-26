@@ -70,7 +70,7 @@ describe('enforceModelTierGuard — economy on code task', () => {
   it('upgrades gpt-5-mini → gpt-4.1 (codex standard) honoring provider', () => {
     const out = enforceModelTierGuard({ taskKind: 'code-development', model: 'gpt-5-mini', targetProvider: 'codex' });
     expect(out.upgraded).toBe(true);
-    expect(out.model).toBe('gpt-4.1');
+    expect(out.model).toBe('gpt-5.6-terra');
   });
 
   it('upgrades gemini-2.0-flash → gemini-2.5-flash (gemini standard) honoring provider', () => {

@@ -69,17 +69,23 @@ describe('model-equivalence', () => {
   });
 
   // ─── getEquivalentModel — Claude → Codex ──────────────────────────
+  //
+  // MASTER-PLAN 670 (owner-approved 2026-07-26): each codex tier now names its
+  // current generation via `preferredForTier` instead of letting catalog
+  // registration order decide. These expectations moved from the older
+  // generation to the designated one — the assertions below are the point of
+  // the change, not collateral of it.
   describe('getEquivalentModel — Claude to Codex', () => {
-    it('opus → gpt-5 for codex (premium tier)', () => {
-      expect(getEquivalentModel('claude-opus-4-8', 'codex')).toBe('gpt-5.5');
+    it('opus → gpt-5.6-sol for codex (premium tier)', () => {
+      expect(getEquivalentModel('claude-opus-4-8', 'codex')).toBe('gpt-5.6-sol');
     });
 
-    it('sonnet → gpt-4.1 for codex (standard tier)', () => {
-      expect(getEquivalentModel('claude-sonnet-5', 'codex')).toBe('gpt-4.1');
+    it('sonnet → gpt-5.6-terra for codex (standard tier)', () => {
+      expect(getEquivalentModel('claude-sonnet-5', 'codex')).toBe('gpt-5.6-terra');
     });
 
-    it('haiku → gpt-5-mini for codex (economy tier)', () => {
-      expect(getEquivalentModel('claude-haiku-4-5-20251001', 'codex')).toBe('gpt-5-mini');
+    it('haiku → gpt-5.6-luna for codex (economy tier)', () => {
+      expect(getEquivalentModel('claude-haiku-4-5-20251001', 'codex')).toBe('gpt-5.6-luna');
     });
   });
 
@@ -100,8 +106,10 @@ describe('model-equivalence', () => {
 
   // ─── getEquivalentModel — Codex → Claude ──────────────────────────
   describe('getEquivalentModel — Codex to Claude', () => {
-    it('gpt-5 → opus for claude (premium)', () => {
-      expect(getEquivalentModel('gpt-5.5', 'claude')).toBe('claude-opus-4-8');
+    it('gpt-5.5 → opus-5 for claude (premium)', () => {
+      // Reverse direction of the same designation: claude/premium now names
+      // Opus 5 rather than resolving to whichever Opus registered first.
+      expect(getEquivalentModel('gpt-5.5', 'claude')).toBe('claude-opus-5');
     });
 
     it('gpt-4.1 → sonnet for claude (standard)', () => {
@@ -154,16 +162,18 @@ describe('model-equivalence', () => {
 
   // ─── getEquivalentModel — Gemini → Codex ──────────────────────────
   describe('getEquivalentModel — Gemini to Codex', () => {
-    it('gemini-2.5-pro → gpt-5 for codex (premium)', () => {
-      expect(getEquivalentModel('gemini-2.5-pro', 'codex')).toBe('gpt-5.5');
+    // Same designation, third source provider: MASTER-PLAN 670 is a property of
+    // the codex tiers, so gemini→codex moves in lockstep with claude→codex.
+    it('gemini-2.5-pro → gpt-5.6-sol for codex (premium)', () => {
+      expect(getEquivalentModel('gemini-2.5-pro', 'codex')).toBe('gpt-5.6-sol');
     });
 
-    it('gemini-2.5-flash → gpt-4.1 for codex (standard)', () => {
-      expect(getEquivalentModel('gemini-2.5-flash', 'codex')).toBe('gpt-4.1');
+    it('gemini-2.5-flash → gpt-5.6-terra for codex (standard)', () => {
+      expect(getEquivalentModel('gemini-2.5-flash', 'codex')).toBe('gpt-5.6-terra');
     });
 
-    it('gemini-2.0-flash → gpt-5-mini for codex (economy)', () => {
-      expect(getEquivalentModel('gemini-2.0-flash', 'codex')).toBe('gpt-5-mini');
+    it('gemini-2.0-flash → gpt-5.6-luna for codex (economy)', () => {
+      expect(getEquivalentModel('gemini-2.0-flash', 'codex')).toBe('gpt-5.6-luna');
     });
   });
 
@@ -196,8 +206,8 @@ describe('model-equivalence', () => {
 
   // ─── getEquivalentModel — Gemini → Claude ─────────────────────────
   describe('getEquivalentModel — Gemini to Claude', () => {
-    it('gemini-2.5-pro → opus for claude (premium)', () => {
-      expect(getEquivalentModel('gemini-2.5-pro', 'claude')).toBe('claude-opus-4-8');
+    it('gemini-2.5-pro → opus-5 for claude (premium)', () => {
+      expect(getEquivalentModel('gemini-2.5-pro', 'claude')).toBe('claude-opus-5');
     });
 
     it('gemini-2.5-flash → sonnet for claude (standard)', () => {

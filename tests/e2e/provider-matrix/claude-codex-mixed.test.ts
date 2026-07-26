@@ -233,8 +233,11 @@ describe('Provider Matrix — Claude + Codex Mixed Mini-Sprint', () => {
     });
 
     it('model equivalence maps gpt-5.5 to Claude canonical premium on fallback', () => {
+      // "Canonical premium" is whichever model claude/premium designates, not
+      // whichever registered first — MASTER-PLAN 670 (owner-approved 2026-07-26)
+      // moved that from Opus 4.8 to Opus 5.
       const equivalent = getEquivalentModel('gpt-5.5', 'claude');
-      expect(equivalent).toBe('claude-opus-4-8');
+      expect(equivalent).toBe('claude-opus-5');
     });
 
     it('throws ProviderUnavailableError when both providers unavailable', async () => {

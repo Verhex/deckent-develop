@@ -45,6 +45,34 @@ export interface ModelDefinition {
   capabilities: ModelCapabilities;
   status: ModelStatus;
   maxOutputTokens?: number;
+  /**
+   * Marks this model as the current generation's answer for its
+   * (provider, tier) pair — the one tier-equivalence should resolve to.
+   *
+   * MASTER-PLAN 669: without it `getByProviderAndTier` returns the FIRST
+   * registered GA model of a tier, so registration order silently decides real
+   * dispatch identity. Measured 2026-07-26: tier equivalence resolved the
+   * standard-tier codex counterpart of `claude-sonnet-5` to `gpt-4.1` — an older
+   * generation — while `gpt-5.6-terra` sat later in the same tier.
+   *
+   * ACTIVE since 2026-07-26 (owner-approved; MASTER-PLAN 670). Four sets had
+   * more than one GA model, so registration order was silently deciding real
+   * dispatch identity; each now names its current generation explicitly:
+   * `claude/premium → claude-opus-5`, `codex/standard → gpt-5.6-terra`,
+   * `codex/premium → gpt-5.6-sol`, `codex/economy → gpt-5.6-luna`. Sets with a
+   * single GA model carry no flag — there is nothing for order to decide.
+   *
+   * The flag designates GENERATION, not entitlement. Whether an account may
+   * actually call the designated model is a separately measured fact, recorded
+   * by the entitlement memory (MASTER-PLAN 671(b)); the catalog must never
+   * assert it, because only a live dispatch can establish it.
+   *
+   * At most ONE model per (provider, tier) may carry the flag — enforced at all
+   * three entry points by `assertSoleTierPreferencePerSet` (constructor,
+   * `loadFromCatalog`, `register`), because a second one would reintroduce
+   * registration-order-as-identity inside the fix for it.
+   */
+  preferredForTier?: boolean;
 }
 
 /**

@@ -282,7 +282,7 @@ describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(c
     const config: DeckentConfig = { mode: 'performance', modes: DEFAULT_MODES };
     await expect(compileRunProposalIntent(proposal, undefined, config)).rejects.toThrow(RunProposalPlanError);
 
-    expect(spy.mock.calls[0]?.[1]).toBe('claude-opus-4-8');
+    expect(spy.mock.calls[0]?.[1]).toBe('claude-opus-5');
   });
 
   it('keeps the Brain invocation model separate from the configured Worker task-model policy', async () => {
@@ -299,7 +299,7 @@ describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(c
     await expect(compileRunProposalIntent(proposal, undefined, config)).rejects.toThrow(RunProposalPlanError);
 
     expect(spy.mock.calls[0]?.[1]).toBe('claude-sonnet-5');
-    expect(spy.mock.calls[0]?.[8]).toMatchObject({ defaultModel: 'gpt-5.5' });
+    expect(spy.mock.calls[0]?.[8]).toMatchObject({ defaultModel: 'gpt-5.6-sol' });
     expect(spy.mock.calls[0]?.[8]?.allowedModels).toEqual(
       expect.arrayContaining(['gpt-5.5', 'gpt-5.6-sol']),
     );

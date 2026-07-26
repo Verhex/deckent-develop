@@ -124,6 +124,31 @@ export interface CrossVerifyConfig {
    * surfaced as an event, just never enforced.
    */
   enforce_refuted?: boolean;
+  /**
+   * Owner ceiling on how many verifiers ONE sprint may dispatch. Each dispatch is
+   * a real, billed provider call, so a broad rollout starts as a bounded canary
+   * (`1`) before it is widened. Absent = no ceiling. Reaching the ceiling is an
+   * honest, logged skip — never a silent stop.
+   */
+  max_verifications_per_sprint?: number;
+  /**
+   * Exact verifier model API ID per verifier provider — `{ codex: 'gpt-5.6-sol' }`.
+   *
+   * Without it the sprint path can only derive the verifier from capability-tier
+   * equivalence with the task's own model, which by construction cannot express
+   * "judge this with a named model": a standard-tier task resolves to a
+   * standard-tier verifier, so a premium judge is unreachable. The CLI/MCP
+   * `xverify --verifier-model` surface already accepted an exact ID; this is the
+   * same authority for the in-sprint path, read from owner config instead of an
+   * ad-hoc flag (MASTER-PLAN 669).
+   *
+   * Keyed by provider so each `verifier_priority` entry carries its own identity.
+   * A provider absent from the map keeps tier equivalence unchanged. Values are
+   * exact registry API IDs — an unknown ID or one owned by a different provider
+   * is a loud model-resolution error and an honest skip, never a silent
+   * substitution.
+   */
+  verifier_model?: Record<string, string>;
 }
 
 // ─── Worker Comms Config ─────────────────────────────────────────────
@@ -637,11 +662,32 @@ export interface ExecutionLandingPolicyConfig {
   attended_unsupported?: 'hold' | 'allow-hard-stop';
 }
 
+/**
+ * Owner authorization for providers whose CLI reports usage only once, at the end
+ * of the call (`ProviderCommandSpec.liveUsage === 'final-only'`, e.g. codex).
+ *
+ * A live token ceiling cannot be enforced in flight against such a provider, so
+ * the default (absent block, or `action: 'hold'`) keeps today's fail-closed
+ * refusal. When the owner explicitly authorizes it, the token ceilings become
+ * POST-HOC settlement evidence and the only in-flight containment is the
+ * host-enforced wall clock declared here — never a fabricated live cap.
+ */
+export interface FinalOnlyUsagePolicyConfig {
+  /** Absent/'hold' = fail closed (current behavior). */
+  action: 'hold' | 'allow-wall-clock-containment';
+  /** Roles the authorization applies to; absent means no role is authorized. */
+  roles?: ExecutionBudgetRole[];
+  /** Hard host-enforced container lifetime for an authorized call. Required. */
+  max_wall_clock_seconds?: number;
+}
+
 /** Owner policy that produces remote invocation budgets before side effects. */
 export interface ExecutionBudgetPolicyConfig {
   roles: Partial<Record<ExecutionBudgetRole, ExecutionBudgetRolePolicyConfig>>;
   /** ADR-G-037: metered work may request landing only from an owner-authored reserve. */
   landing?: ExecutionLandingPolicyConfig;
+  /** Explicit final-only-usage authorization; absence is the fail-closed `hold`. */
+  final_only_usage?: FinalOnlyUsagePolicyConfig;
   /** Missing block defaults to the safe `hold` behavior. Reroute order is owner-authored. */
   unmetered_backend?: {
     action: 'hold' | 'reroute-or-hold';
@@ -790,6 +836,13 @@ export interface DeckentConfig {
    * (B-WORKERMEM): wired into the spawn factory — was previously display-only.
    */
   worker_memory_limit?: string;
+  /**
+   * Per-worker Docker swap ceiling (docker `--memory-swap`). Unset → derived
+   * from `worker_memory_limit` at × 1.5 (the documented ratio). Must be at or
+   * above the limit; docker rejects a smaller value. MASTER-PLAN 666: this key
+   * existed in user configs but was read by nothing until it was wired.
+   */
+  worker_memory_swap?: string;
   /** Skill system configuration */
   skills?: SkillConfig;
   /** Decision engine configuration */
@@ -1605,6 +1658,7 @@ export interface ResolvedConfig {
   worker_memory_limit_by_kind?: Record<string, string>;
   /** Default per-worker Docker memory limit (docker `--memory`), e.g. "2g". Default '4g'. */
   worker_memory_limit?: string;
+  worker_memory_swap?: string;
   /** Skill system configuration */
   skills?: SkillConfig;
   /** Provider for Brain planning (default: 'claude') */

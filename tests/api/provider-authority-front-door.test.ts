@@ -254,7 +254,7 @@ describe('HTTP Brain provider-authority front door', () => {
         role: 'brain',
         purpose: 'sprint-planning',
         provider: 'claude',
-        model: 'claude-opus-4-8',
+        model: 'claude-opus-5',
         configuredBackend: 'unresolved-before-provider-bootstrap',
         fallbackProviders: ['codex', 'gemini'],
         unattended: true,

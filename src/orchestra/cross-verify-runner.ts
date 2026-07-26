@@ -40,7 +40,11 @@ import type {
 import type { ResolvedConfig } from '../core/types.js';
 import type { ExecutionBudget } from '../core/work-model.js';
 import type { ExecutionLandingPolicyConfig } from '../core/config-types.js';
-import { resolveExecutionBudgetPolicy } from '../core/execution-budget-policy.js';
+import {
+  resolveExecutionBudgetPolicy,
+  type FinalOnlyUsageAuthorization,
+} from '../core/execution-budget-policy.js';
+import { getProviderCommandSpec } from '../core/provider-command-spec.js';
 import { resolveProviderExecutionCostClass } from '../core/provider-execution-profile.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { createCrossVerifyContractError, DeckentError } from '../core/errors.js';
@@ -72,11 +76,19 @@ import {
 } from './runtime-budget-monitor.js';
 import {
   buildRefutePrompt,
+  extractDispatchRejectionFromLog,
   extractTerminalAssistantVerdictFromLog,
   parseRefuteVerdict,
   type CrossVerifyOperationClass,
   type RefuteVerdict,
+  type VerifierDispatchRejection,
 } from '../core/cross-verify-prompt.js';
+import {
+  findVerifierRefusal,
+  recordVerifierRefusal,
+  type VerifierRefusalMemoryDeps,
+} from '../core/verifier-entitlement-memory.js';
+import { resolveWorkerAuth } from './task-router.js';
 import {
   INVOCATION_RECEIPT_SCHEMA_VERSION,
   type InvocationEvent,
@@ -132,6 +144,24 @@ export interface CrossVerifyRunResult {
   skippedReason?: string;
   /** Advisory verdict (present only when `ran` is true). */
   advisory?: CrossVerifyAdvisory;
+  /**
+   * Resolved verifier provider — present on EVERY exit taken after selection,
+   * including skips. `advisory` only exists when a verdict was produced, so
+   * before MASTER-PLAN 672 a refused dispatch reported `verifier: null` while
+   * `skippedReason` carried the identity in prose. Any consumer that wants to
+   * aggregate or learn from refusals had to regex it back out.
+   */
+  verifier?: ProviderName;
+  /** Resolved verifier model, on the same terms as {@link verifier}. */
+  verifierModel?: string;
+  /**
+   * Structured provider refusal, present exactly when `outcome === 'unavailable'`
+   * because the provider rejected the dispatch (MASTER-PLAN 671). This is the
+   * machine-readable form of the `verifier-dispatch-rejected:*` reason, and the
+   * input an entitlement-aware selector needs: the (provider, model) pair plus
+   * why it was refused.
+   */
+  rejection?: VerifierDispatchRejection;
   /** Convenience flag: `advisory?.verdict === 'refuted'`. Always false when skipped. */
   refuted: boolean;
   /**
@@ -162,6 +192,8 @@ export interface SpawnVerifierInput {
   executionBudget?: ExecutionBudget;
   executionLandingPolicy?: ExecutionLandingPolicyConfig;
   executionBudgetPolicy?: Task['budgetPolicy'];
+  /** Owner authorization to run a final-only-usage verifier under wall-clock containment. */
+  finalOnlyUsageContainment?: FinalOnlyUsageAuthorization;
   /** Owner-authored metered backend selected for this verification. */
   spawnBackend?: 'docker' | 'subprocess';
   dockerImage?: string;
@@ -257,6 +289,12 @@ export interface RunCrossVerifyOptions {
   spawnVerifier?: SpawnVerifierFn;
   /** Verifier model override. Default = capability-tier equivalent on the target provider. */
   verifierModel?: string;
+  /**
+   * Injectable entitlement-memory seam (MASTER-PLAN 671(b)). Production passes
+   * nothing and the memory resolves under the global state dir; tests point it
+   * at a tmpdir so no host state is read or written.
+   */
+  entitlementMemory?: VerifierRefusalMemoryDeps;
   /** Verifier timeout budget in ms (short by design). Default 120_000. */
   timeoutMs?: number;
   /** Semantic verifier operation. Sprint callers default to implementation verification. */
@@ -265,6 +303,8 @@ export interface RunCrossVerifyOptions {
   onVerifierDispatch?: (input: {
     verifierProvider: ProviderName;
     verifierModel: string;
+    /** Present only when this verifier runs without live token metering. */
+    finalOnlyContainment?: { maxWallClockSeconds: number };
   }) => void;
 }
 
@@ -443,6 +483,26 @@ function beginInvocationReceipt(
   };
 }
 
+/**
+ * Read the verifier's normalized provider log and report a dispatch rejection.
+ *
+ * Best-effort by construction: an absent or unreadable log is simply "no evidence
+ * of rejection" and leaves the existing classification untouched (MASTER-PLAN 671).
+ */
+function readVerifierDispatchRejection(
+  projectRoot: string,
+  verifierTaskId: string,
+): VerifierDispatchRejection | null {
+  try {
+    const logPath = join(projectRoot, TASKS_DIR, `task-${verifierTaskId}.log`);
+    if (!existsSync(logPath)) return null;
+    return extractDispatchRejectionFromLog(readFileSync(logPath, 'utf-8'));
+  } catch (err) {
+    debugLog('cross-verify:dispatch-rejection-read-failed', String(err));
+    return null;
+  }
+}
+
 function hasTerminalVerifierProtocol(output: string): boolean {
   const lastNonEmptyLine = output.trim().split(/\r?\n/)
     .filter(line => line.trim().length > 0)
@@ -607,6 +667,17 @@ function resolveVerifierModel(
         `verifier model ${override} belongs to ${definition.provider}, not ${verifierProvider}`,
       );
     }
+    // The tier path filters `status === 'ga'`; an explicit override bypasses that
+    // floor entirely. A `preview` identity stays allowed — naming one is a
+    // deliberate early-access choice by whoever authored the override. A RETIRED
+    // identity is not a choice, it is decay: dispatching it spends real verifier
+    // budget on a model the catalog has already withdrawn (MASTER-PLAN 669).
+    if (definition.status === 'deprecated') {
+      throw new DeckentError(
+        'DECKENT_E004',
+        `verifier model ${override} is deprecated in the registry and cannot be dispatched`,
+      );
+    }
     return definition.id;
   }
   return modelRegistry.getEquivalent(taskModel, verifierProvider);
@@ -746,6 +817,9 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
       executionBudget: input.executionBudget,
       executionLandingPolicy: input.executionLandingPolicy,
       executionAdmissionMode: 'unattended',
+      ...(input.finalOnlyUsageContainment
+        ? { finalOnlyUsageContainment: input.finalOnlyUsageContainment }
+        : {}),
       spawnBackend: input.spawnBackend,
       dockerImage: input.dockerImage,
       dockerTimeout: input.dockerTimeout,
@@ -932,6 +1006,13 @@ export async function runCrossVerify(
   config: ResolvedConfig | undefined,
   opts: RunCrossVerifyOptions = {},
 ): Promise<CrossVerifyRunResult> {
+  // MASTER-PLAN 672: dispatch identity must survive the skip path. These are set
+  // the moment each fact becomes known, so every subsequent exit — there are two
+  // dozen — carries them structurally without touching a single call site.
+  let dispatchedVerifier: ProviderName | undefined;
+  let dispatchedVerifierModel: string | undefined;
+  let dispatchRejection: VerifierDispatchRejection | undefined;
+
   const skip = (
     reason: string,
     outcome: Extract<CrossVerifyOutcome, 'disabled' | 'not-applicable' | 'unavailable'>,
@@ -944,6 +1025,9 @@ export async function runCrossVerify(
     refuted: false,
     blocked,
     evidencePersisted,
+    ...(dispatchedVerifier !== undefined ? { verifier: dispatchedVerifier } : {}),
+    ...(dispatchedVerifierModel !== undefined ? { verifierModel: dispatchedVerifierModel } : {}),
+    ...(dispatchRejection !== undefined ? { rejection: dispatchRejection } : {}),
   });
 
   // Guard 1 — config-gated default-OFF.
@@ -1085,6 +1169,7 @@ export async function runCrossVerify(
     }
 
     const verifierProvider = decision.verifierProvider;
+    dispatchedVerifier = verifierProvider;
     const prompt = buildRefutePrompt(task, result, {
       verifier: verifierProvider,
       operationClass: opts.operationClass,
@@ -1093,14 +1178,24 @@ export async function runCrossVerify(
 
     let verifierModel: string;
     try {
-      const resolvedModel = resolveVerifierModel(task.model, verifierProvider, opts.verifierModel);
+      // MASTER-PLAN 669: an explicit caller flag still wins; below it the owner's
+      // configured identity for THIS verifier provider; only then tier equivalence.
+      const configuredVerifierModel = xv.verifier_model?.[verifierProvider];
+      const resolvedModel = resolveVerifierModel(
+        task.model,
+        verifierProvider,
+        opts.verifierModel ?? configuredVerifierModel,
+      );
       if (decision.verifierModel && decision.verifierModel !== resolvedModel) {
         throw createCrossVerifyContractError(
           `verifier eligibility model ${decision.verifierModel} does not match capability-equivalent ${resolvedModel}`,
         );
       }
       verifierModel = decision.verifierModel ?? resolvedModel;
+      dispatchedVerifierModel = verifierModel;
     } catch (e) {
+      // Deliberately leaves `dispatchedVerifierModel` unset: no valid identity was
+      // resolved, so there is none to report. The reason names what was asked for.
       const detail = e instanceof Error ? e.message : String(e);
       debugLog('runCrossVerify:model-resolution-error', detail);
       const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
@@ -1114,6 +1209,37 @@ export async function runCrossVerify(
         evidencePersisted,
         verificationRequired,
       );
+    }
+
+    // MASTER-PLAN 671(b) — do not pay twice for the same refusal. If THIS exact
+    // (auth mode, provider, model) triple was live-refused before, dispatching it
+    // again buys nothing: the provider will reject it identically. Skipping here
+    // is honest about the same fact 671(a) reports after the fact, minus the
+    // billed round trip. Nothing is substituted — choosing a different model
+    // would be the approval-gated default flip tracked as MASTER-PLAN 670.
+    const verifierAuthMode = resolveWorkerAuth(task, config);
+    const rememberedRefusal = findVerifierRefusal(
+      { authMode: verifierAuthMode, provider: verifierProvider, model: verifierModel },
+      opts.entitlementMemory,
+    );
+    if (rememberedRefusal) {
+      dispatchRejection = {
+        outcome: rememberedRefusal.outcome,
+        message: rememberedRefusal.message,
+        ...(rememberedRefusal.status !== undefined ? { status: rememberedRefusal.status } : {}),
+        ...(rememberedRefusal.errorType !== undefined ? { errorType: rememberedRefusal.errorType } : {}),
+      };
+      const reason = `verifier-model-known-refused:${rememberedRefusal.outcome}: `
+        + `${verifierAuthMode}/${verifierProvider}/${verifierModel} → ${rememberedRefusal.message} `
+        + `(observed ${rememberedRefusal.observedAt})`;
+      debugLog('runCrossVerify:known-refused', reason);
+      const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
+        outcome: 'unavailable',
+        verifier: verifierProvider,
+        verifierModel,
+        reason,
+      });
+      return skip(reason, 'unavailable', evidencePersisted, verificationRequired);
     }
 
     const admittedCandidate = opts.verifierCandidates?.find(candidate =>
@@ -1176,6 +1302,24 @@ export async function runCrossVerify(
       });
       return skip(reason, 'unavailable', evidencePersisted, verificationRequired);
     }
+    // A verifier whose CLI reports usage only at the end of the call cannot have
+    // its token ceilings enforced in flight. Hold before spending anything unless
+    // the owner explicitly authorized wall-clock containment for the auditor role
+    // (ADR-G-037 amendment proposal XVER-FINAL-ONLY). The spawn backend repeats
+    // this check as its own last gate; this one keeps the reason readable.
+    const verifierLiveUsage = getProviderCommandSpec(verifierProvider)?.liveUsage;
+    const verifierIsFinalOnly = verifierLiveUsage !== undefined && verifierLiveUsage !== 'incremental';
+    // The grant travels ONLY with a verifier that actually needs it — an
+    // incremental-usage verification must carry no final-only evidence.
+    const finalOnlyUsage = verifierIsFinalOnly ? budgetDecision.finalOnlyUsage : undefined;
+    if (verifierIsFinalOnly && !finalOnlyUsage) {
+      const reason = `verifier-final-only-usage-hold:${verifierProvider}:${verifierLiveUsage}`;
+      const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
+        outcome: 'unavailable', verifier: verifierProvider, verifierModel, reason,
+      });
+      return skip(reason, 'unavailable', evidencePersisted, verificationRequired);
+    }
+
     if (needsSpawnBackend && admittedCandidate
       && (admittedCandidate.backend.transport !== 'cli'
         || admittedCandidate.backend.executionBackend !== spawnBackend)) {
@@ -1255,7 +1399,15 @@ export async function runCrossVerify(
     let executionEvidence: CrossVerifyExecutionEvidence | undefined;
     const dispatchStartedAt = Date.now();
     try {
-      opts.onVerifierDispatch?.({ verifierProvider, verifierModel });
+      opts.onVerifierDispatch?.({
+        verifierProvider,
+        verifierModel,
+        // Surface the honest containment story to the caller BEFORE spend: this
+        // verifier's token ceilings settle post-hoc; the wall clock is the cap.
+        ...(finalOnlyUsage
+          ? { finalOnlyContainment: { maxWallClockSeconds: finalOnlyUsage.maxWallClockSeconds } }
+          : {}),
+      });
       output = await spawnVerifier({
         projectRoot,
         task,
@@ -1279,6 +1431,7 @@ export async function runCrossVerify(
             ? { landingPolicy: budgetDecision.landingPolicy }
             : {}),
         },
+        ...(finalOnlyUsage ? { finalOnlyUsageContainment: finalOnlyUsage } : {}),
         spawnBackend,
         dockerImage: config.docker_image,
         dockerTimeout: config.docker_timeout,
@@ -1358,6 +1511,39 @@ export async function runCrossVerify(
           verifierModel,
           reason,
           invocationReceiptRef: invocationSession.ref,
+        });
+        return skip(reason, 'unavailable', evidencePersisted, verificationRequired);
+      }
+    }
+    // MASTER-PLAN 671: `unclear` asserts the verifier RAN and was uninterpretable.
+    // When the provider refused the dispatch outright, the verifier never ran —
+    // that is `unavailable`, and the provider's own wording is the whole
+    // diagnostic. Only an unclear verdict is reconsidered: a real verdict, and any
+    // log that carries assistant text, are left exactly as they were.
+    if (verdict.verdict === 'unclear') {
+      const rejection = readVerifierDispatchRejection(projectRoot, `${task.id}-xverify`);
+      if (rejection) {
+        dispatchRejection = rejection;
+        // MASTER-PLAN 671(b) — close the loop: remember the pair so the next
+        // sprint does not re-pay this rejection. Transient arms are filtered by
+        // the memory itself, and a write failure changes nothing here.
+        recordVerifierRefusal({
+          authMode: verifierAuthMode,
+          provider: verifierProvider,
+          model: verifierModel,
+          outcome: rejection.outcome,
+          message: rejection.message,
+          ...(rejection.status !== undefined ? { status: rejection.status } : {}),
+          ...(rejection.errorType !== undefined ? { errorType: rejection.errorType } : {}),
+        }, opts.entitlementMemory);
+        const reason = `verifier-dispatch-rejected:${rejection.outcome}: `
+          + `${verifierProvider}/${verifierModel} → ${rejection.message}`;
+        debugLog('runCrossVerify:dispatch-rejected', reason);
+        const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
+          outcome: 'unavailable',
+          verifier: verifierProvider,
+          verifierModel,
+          reason,
         });
         return skip(reason, 'unavailable', evidencePersisted, verificationRequired);
       }

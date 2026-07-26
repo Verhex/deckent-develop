@@ -231,16 +231,28 @@ silently rewritten.
 
 ### Tier Mapping
 
+**Bold** = the model cross-provider tier equivalence resolves to for that
+(provider, tier) pair. Where a tier holds several GA models, that choice is an
+explicit catalog designation, not the registration order of the catalog.
+
 | Tier | Claude | Codex | Gemini |
 |------|--------|-------|--------|
-| **Premium+** | `claude-fable-5` | `o3` | `gemini-3.1-pro-preview` |
-| **Premium** | `claude-opus-4-8` | `gpt-5.6-sol` · `gpt-5.5` | `gemini-2.5-pro` |
-| **Standard** | `claude-sonnet-5` | `gpt-5.6-terra` · `gpt-4.1` · `o4-mini` | `gemini-2.5-flash` |
-| **Economy** | `claude-haiku-4-5-20251001` | `gpt-5.6-luna` · `gpt-5-mini` · `gpt-4.1-mini` | `gemini-2.0-flash` |
+| **Premium+** | **`claude-fable-5`** | **`o3`** | `gemini-3.1-pro-preview` |
+| **Premium** | **`claude-opus-5`** · `claude-opus-4-8` | **`gpt-5.6-sol`** · `gpt-5.5` | **`gemini-2.5-pro`** |
+| **Standard** | **`claude-sonnet-5`** | **`gpt-5.6-terra`** · `gpt-4.1` · `o4-mini` | **`gemini-2.5-flash`** |
+| **Economy** | **`claude-haiku-4-5-20251001`** | **`gpt-5.6-luna`** · `gpt-5-mini` · `gpt-4.1-mini` | **`gemini-2.0-flash`** |
 
 These are bundled examples, not a fixed allowlist. Use `deckent models list`
 for the current live/cached catalog. Catalog presence does not prove auth,
 backend/model reachability, limit evidence or execution-budget admission.
+
+The designation states which **generation** a tier answers with — never that
+your account may call it. Entitlement differs per auth mode: a subscription
+account can be refused a model an API key would accept. deckent learns that
+from live refusals rather than assuming it, so a designated model may still
+report `unavailable` with the provider's own wording. Pin an exact identity
+with `cross_verify.verifier_model` (verifiers) or an explicit task model when
+you need to override the tier answer.
 
 ### How It Works
 

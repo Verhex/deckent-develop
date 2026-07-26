@@ -41,8 +41,8 @@ describe('generateSetupRecommendation', () => {
 
     expect(result.mode).toBe('performance');
     expect(result.maxWorkers).toBe(4); // ceil(8 * 0.5)
-    expect(result.brainModel).toBe('claude-opus-4-8');
-    expect(result.defaultModel).toBe('claude-opus-4-8');
+    expect(result.brainModel).toBe('claude-opus-5');
+    expect(result.defaultModel).toBe('claude-opus-5');
     expect(result.planning).toBe('ai');
   });
 

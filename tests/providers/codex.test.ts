@@ -572,15 +572,15 @@ describe('CodexAdapter', () => {
 
   describe('CODEX_TIER_MODELS', () => {
     it('should map premium to gpt-5.5', () => {
-      expect(CODEX_TIER_MODELS.premium).toBe('gpt-5.5');
+      expect(CODEX_TIER_MODELS.premium).toBe('gpt-5.6-sol');
     });
 
     it('should map standard to gpt-4.1', () => {
-      expect(CODEX_TIER_MODELS.standard).toBe('gpt-4.1');
+      expect(CODEX_TIER_MODELS.standard).toBe('gpt-5.6-terra');
     });
 
     it('should map economy to gpt-5-mini', () => {
-      expect(CODEX_TIER_MODELS.economy).toBe('gpt-5-mini');
+      expect(CODEX_TIER_MODELS.economy).toBe('gpt-5.6-luna');
     });
   });
 
@@ -588,9 +588,9 @@ describe('CodexAdapter', () => {
 
   describe('getModelForTier()', () => {
     it('should return correct model for each tier', () => {
-      expect(adapter.getModelForTier('premium')).toBe('gpt-5.5');
-      expect(adapter.getModelForTier('standard')).toBe('gpt-4.1');
-      expect(adapter.getModelForTier('economy')).toBe('gpt-5-mini');
+      expect(adapter.getModelForTier('premium')).toBe('gpt-5.6-sol');
+      expect(adapter.getModelForTier('standard')).toBe('gpt-5.6-terra');
+      expect(adapter.getModelForTier('economy')).toBe('gpt-5.6-luna');
     });
   });
 

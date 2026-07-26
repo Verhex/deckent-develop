@@ -45,7 +45,10 @@ const PROVIDERS = {
     accountRefHash: 'a'.repeat(64), endpointRefHash: 'b'.repeat(64), model: 'claude-opus-4-8',
   },
   codex: {
-    accountRefHash: 'c'.repeat(64), endpointRefHash: 'd'.repeat(64), model: 'gpt-5.5',
+    // codex/premium designates gpt-5.6-sol (MASTER-PLAN 670). Limit + reachability
+    // evidence is keyed by EXACT model, so the fixture must carry it for the
+    // designated one — otherwise admission honestly holds instead of dispatching.
+    accountRefHash: 'c'.repeat(64), endpointRefHash: 'd'.repeat(64), model: 'gpt-5.6-sol',
   },
 } as const;
 
@@ -212,8 +215,8 @@ describe('admitRoleInvocation', () => {
     expect(result.decision, JSON.stringify(result, null, 2)).toBe('allow');
     expect(result).toMatchObject({
       decision: 'allow',
-      reservation: { provider: 'codex', model: 'gpt-5.5', decision: 'allow' },
-      resolution: { selected: { provider: 'codex', model: 'gpt-5.5' } },
+      reservation: { provider: 'codex', model: 'gpt-5.6-sol', decision: 'allow' },
+      resolution: { selected: { provider: 'codex', model: 'gpt-5.6-sol' } },
     });
     expect(result.attempts.map(item => [item.provider, item.reservation?.decision]))
       .toEqual([['claude', 'hold'], ['codex', 'allow']]);

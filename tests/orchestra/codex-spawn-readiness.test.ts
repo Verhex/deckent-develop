@@ -292,8 +292,8 @@ describe('assessCodexSpawnReadiness', () => {
     expect(report.backendRequired).toBe('subprocess');
     expect(report.reason).toBe(report.docker.reason);
     expect(report.modelArgEvidence).toHaveLength(1);
-    expect(report.modelArgEvidence[0]?.model).toBe('gpt-5.5');
-    expect(report.modelArgEvidence[0]?.wireModel).toBe('gpt-5.5');
+    expect(report.modelArgEvidence[0]?.model).toBe('gpt-5.6-sol');
+    expect(report.modelArgEvidence[0]?.wireModel).toBe('gpt-5.6-sol');
 
     // neither the real `codex` nor real `docker` binaries were ever invoked
     expect(hostSpawnImpl).toHaveBeenCalled();

@@ -39,6 +39,7 @@ import { registerOpenRouterModelFromCache, readFreeModelCache } from '../../core
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import type { VerifierDispatchRejection } from '../../core/cross-verify-prompt.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
 import { createCrossVerifyProductionIngressAuthority } from '../../orchestra/cross-verify-production-ingress-authority.js';
 
@@ -75,7 +76,12 @@ export interface XverifyDeps {
   nowFn?: () => Date;
   /** Invoked AFTER validation, BEFORE the verifier spawn — CLI prints its
    *  progress line here; the MCP twin passes nothing and stays silent. */
-  onDispatch?: (info: { author: ProviderName; priority: readonly string[] }) => void;
+  onDispatch?: (info: {
+    author: ProviderName;
+    priority: readonly string[];
+    /** Present only when the verifier runs without live token metering. */
+    finalOnlyContainment?: { maxWallClockSeconds: number };
+  }) => void;
   /** Shared process authority; advisory mode receives it but performs no authority work. */
   providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
 }
@@ -107,11 +113,22 @@ export interface XverifyResult {
   verifier: string | null;
   /** Exact canonical API id evidenced by the dispatched verifier advisory. */
   verifierModel: string | null;
-  verdict: string;
+  /**
+   * Null when no verifier verdict exists (MASTER-PLAN 672). Previously this
+   * defaulted to `'unclear'`, which asserts the verifier ran and could not
+   * decide — indistinguishable from a dispatch the provider refused outright.
+   */
+  verdict: string | null;
   outcome: string;
   skippedReason: string | null;
   reason: string | null;
   execution: CrossVerifyExecutionEvidence | null;
+  /**
+   * Structured provider refusal when the dispatch was rejected — the same
+   * (provider, model, why) triple that `skippedReason` states in prose, in a
+   * form a caller can aggregate on.
+   */
+  rejection: VerifierDispatchRejection | null;
   report: string;
 }
 
@@ -218,6 +235,14 @@ export async function runXverifyForResult(
   const effectiveConfig: ResolvedConfig = {
     ...config,
     cross_verify: {
+      // Carry the owner's authored block forward and override ONLY what an
+      // explicit invocation genuinely forces. Rebuilding this object from
+      // scratch silently dropped every other authored key — measured on
+      // `xv-1785066348203`, where `cross_verify.verifier_model.codex` was set to
+      // gpt-5.6-sol and the run still dispatched the tier-equivalent
+      // gpt-5.6-terra. The old comment claimed config preferences were
+      // respected; exactly one of them was.
+      ...config.cross_verify,
       enabled: true,
       high_stakes_only: false,
       verifier_priority: verifierPriority,
@@ -258,8 +283,15 @@ export async function runXverifyForResult(
       : {}),
     ...(deps.onDispatch
       ? {
-        onVerifierDispatch: ({ verifierProvider }: { verifierProvider: ProviderName }) => {
-          deps.onDispatch?.({ author, priority: [verifierProvider] });
+        onVerifierDispatch: ({ verifierProvider, finalOnlyContainment }: {
+          verifierProvider: ProviderName;
+          finalOnlyContainment?: { maxWallClockSeconds: number };
+        }) => {
+          deps.onDispatch?.({
+            author,
+            priority: [verifierProvider],
+            ...(finalOnlyContainment ? { finalOnlyContainment } : {}),
+          });
         },
       }
       : {}),
@@ -270,8 +302,16 @@ export async function runXverifyForResult(
   const reportDir = join(root, '.analysis', 'xverify');
   mkdirSync(reportDir, { recursive: true });
   const reportPath = join(reportDir, `${id}.md`);
-  const verdict = outcome.advisory?.verdict ?? 'unclear';
-  const verifierModel = outcome.advisory?.verifierModel ?? null;
+  // MASTER-PLAN 672: identity comes from the structured fields, which the runner
+  // fills on the skip path too. `advisory` exists only when a verdict was
+  // produced, so relying on it alone reported "(none dispatched)" for a verifier
+  // whose provider and model were both known.
+  const verifier = outcome.advisory?.verifier ?? outcome.verifier ?? null;
+  const verifierModel = outcome.advisory?.verifierModel ?? outcome.verifierModel ?? null;
+  // A dispatch that never produced a verdict has no verdict to report. Printing
+  // UNCLEAR next to `outcome: unavailable` reads as verifier indecision — the
+  // exact confusion MASTER-PLAN 671 removed from the machine-readable path.
+  const verdict = outcome.advisory?.verdict ?? null;
   const execution = outcome.advisory?.execution ?? null;
   const executionLines = execution
     ? [
@@ -295,11 +335,11 @@ export async function runXverifyForResult(
     `# xverify advisory — ${id}`,
     '',
     `- **Claim author:** ${author}`,
-    `- **Verifier:** ${outcome.advisory?.verifier ?? '(none dispatched)'}`,
+    `- **Verifier:** ${verifier ?? getMessage('xverify.report.none_dispatched', lang)}`,
     `- ${getMessage('xverify.report.verifier_model', lang, {
       model: verifierModel ?? getMessage('xverify.report.none_dispatched', lang),
     })}`,
-    `- **Verdict:** ${verdict.toUpperCase()}`,
+    `- **Verdict:** ${verdict ? verdict.toUpperCase() : getMessage('xverify.report.no_verdict', lang)}`,
     `- **Outcome:** ${outcome.outcome}${outcome.skippedReason ? ` (${outcome.skippedReason})` : ''}`,
     ...executionLines,
     `- **At:** ${now.toISOString()}`,
@@ -320,13 +360,14 @@ export async function runXverifyForResult(
   return {
     id,
     author,
-    verifier: outcome.advisory?.verifier ?? null,
+    verifier,
     verifierModel,
     verdict,
     outcome: outcome.outcome,
     skippedReason: outcome.skippedReason ?? null,
     reason: outcome.advisory?.reason ?? null,
     execution,
+    rejection: outcome.rejection ?? null,
     report: reportPath,
   };
 }
@@ -342,8 +383,15 @@ export async function runXverifyCommand(
   try {
     const result = await runXverifyForResult(claim, opts, {
       ...deps,
-      onDispatch: deps.onDispatch ?? (({ author, priority }) => {
+      onDispatch: deps.onDispatch ?? (({ author, priority, finalOnlyContainment }) => {
         print(getMessage('xverify.dispatching', lang, { author, priority: priority.join(' → ') }));
+        // Visible risk evidence: a final-only verifier has no in-flight token cap.
+        if (finalOnlyContainment) {
+          print(getMessage('xverify.final_only_risk', lang, {
+            verifier: priority.join(' → '),
+            seconds: String(finalOnlyContainment.maxWallClockSeconds),
+          }));
+        }
       }),
     });
     if (opts.json) {
@@ -351,7 +399,9 @@ export async function runXverifyCommand(
       return;
     }
     print(getMessage('xverify.verdict', lang, {
-      verdict: result.verdict.toUpperCase(),
+      verdict: result.verdict
+        ? result.verdict.toUpperCase()
+        : getMessage('xverify.report.no_verdict', lang),
       verifier: result.verifier ?? '-',
       report: result.report,
     }));

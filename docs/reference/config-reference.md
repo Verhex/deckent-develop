@@ -635,6 +635,8 @@ Optional configuration block for Sprint 276 XVER-1: cross-provider adversarial v
 | `cross_verify.high_stakes_only` | boolean | `true` | Only verify high-stakes tasks (security/auth/P0/risk-tagged). When `false`, every completed task gets verified. Default keeps verification lean. |
 | `cross_verify.verifier_priority` | string[] | `["codex", "gemini", "claude"]` | Provider selection order for the verifier. Task provider is excluded; first available alternative is used. If no second provider exists, verification is skipped (honest fail-safe). |
 | `cross_verify.enforce_refuted` | boolean | `false` | When `true`, a REFUTED verdict on a high-stakes DONE/GO_WITH_TECH_DEBT task causes the evaluation layer to downgrade it to NO_GO (triggering the standard FIX path, Task 323-004/A18). When `false` (default), the verdict is advisory-only — persisted + surfaced as an event but never enforced (byte-identical to pre-XVER behavior, ADR-070). CT:85. |
+| `cross_verify.max_verifications_per_sprint` | number | _(no ceiling)_ | Owner ceiling on how many verifiers ONE sprint may dispatch. Every dispatch is a real, billed provider call, so a broad rollout can start as a bounded canary (`1`) before it is widened. Reaching the ceiling is an honest, logged skip — never a silent stop. |
+| `cross_verify.verifier_model` | object | _(tier equivalence)_ | Exact verifier model API ID **per verifier provider** — `{"codex": "gpt-5.6-sol"}`. Without it the verifier is derived from capability-tier equivalence with the task's own model, which cannot express "judge this with a named model": a standard-tier task always resolves to a standard-tier verifier, so a premium judge is unreachable. Keyed by provider so each `verifier_priority` entry carries its own identity; a provider absent from the map keeps tier equivalence unchanged. Precedence: caller flag (`xverify --verifier-model`) > this config > tier equivalence. An unknown ID, or one owned by a different provider, is a loud `model-resolution-error` and an honest skip — never a silent substitution. |
 
 ### Behavior
 
@@ -650,7 +652,9 @@ Optional configuration block for Sprint 276 XVER-1: cross-provider adversarial v
   "cross_verify": {
     "enabled": true,
     "high_stakes_only": true,
-    "verifier_priority": ["codex", "gemini", "claude"]
+    "verifier_priority": ["codex", "gemini", "claude"],
+    "max_verifications_per_sprint": 1,
+    "verifier_model": { "codex": "gpt-5.6-sol" }
   }
 }
 ```

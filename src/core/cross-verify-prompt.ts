@@ -10,6 +10,7 @@
 
 import type { GoNoGoCriteria } from './task-types.js';
 import type { LogEvent } from './log-event.js';
+import type { ReachabilityOutcome } from './provider-truth.js';
 import { createCrossVerifyContractError } from './errors.js';
 
 // ─── Input types ─────────────────────────────────────────────────────────────
@@ -401,6 +402,194 @@ export function extractTerminalAssistantVerdictFromLog(rawLog: string): string |
     terminal = VERDICT_RE.test(lastLine) ? lastLine : null;
   }
   return terminal;
+}
+
+/**
+ * A verifier that the provider REFUSED to dispatch — the model was never invoked.
+ *
+ * MASTER-PLAN 671: sprint-460's codex verifier came back `unclear`, which by
+ * contract means "the verifier ran and its output was uninterpretable". The
+ * archived log said otherwise: HTTP 400 `invalid_request_error` — "The 'gpt-4.1'
+ * model is not supported when using Codex with a ChatGPT account" — then
+ * `turn.failed`. The model was never called. Reporting that as `unclear` buries a
+ * real entitlement failure under a signal that reads like verifier indecision.
+ */
+export interface VerifierDispatchRejection {
+  /** Canonical taxonomy arm (`provider-truth.ts` already maps these to states). */
+  outcome: Extract<
+    ReachabilityOutcome,
+    'model-not-found' | 'auth-rejected' | 'rate-limited' | 'transport-error'
+  >;
+  /** The provider's OWN wording, verbatim — this is the whole diagnostic value. */
+  message: string;
+  /** Numeric status when the provider reported one. */
+  status?: number;
+  /** Provider error class when reported (e.g. `invalid_request_error`). */
+  errorType?: string;
+}
+
+/**
+ * Detect a provider-side dispatch rejection in a normalized verifier log.
+ *
+ * Lives beside `extractTerminalAssistantVerdictFromLog` on purpose: both read the
+ * same normalized envelopes, and splitting them would duplicate provider-shape
+ * knowledge across two modules.
+ *
+ * TWO HARD GATES keep this from becoming a new misclassification source:
+ *
+ *  1. **Any assistant text anywhere ⇒ not a rejection.** `unavailable` asserts the
+ *     verifier never executed. A verifier that spoke and then died is a different
+ *     failure and must keep falling through to the existing `unclear` path.
+ *  2. **Unambiguous evidence only.** A numeric status ≥ 400 or a named provider
+ *     error class. Unrecognized shapes return null and change nothing.
+ *
+ * Evidence coverage is honest, not aspirational: the codex arm is built from a
+ * captured real rejection, and the Claude arm mirrors `claudeFailureOutcome`
+ * (`providers/claude.ts`). No Gemini/Ollama/OpenAI-compat rejection log has been
+ * captured, so those shapes are matched only through the shared generic
+ * status/error-class unwrapping — never through invented envelope keys.
+ */
+export function extractDispatchRejectionFromLog(rawLog: string): VerifierDispatchRejection | null {
+  if (typeof rawLog !== 'string' || rawLog.trim() === '') return null;
+  let rejection: VerifierDispatchRejection | null = null;
+  for (const line of rawLog.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    let event: unknown;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!isRecord(event) || !isRecord(event['content'])) continue;
+
+    // Gate 1 — the verifier spoke, so it was dispatched. Nothing later can make
+    // this an "it never ran" outcome.
+    if (event['type'] === 'text') {
+      const assistant = extractAssistantEnvelope(event as unknown as LogEvent);
+      if (assistant?.text) return null;
+    }
+
+    const candidate = extractRejectionEnvelope(event['content']);
+    if (candidate) rejection = candidate;
+  }
+  return rejection;
+}
+
+/** Provider error payloads arrive either as an object or as an embedded JSON string. */
+function unwrapErrorPayload(value: unknown): Record<string, unknown> | null {
+  if (isRecord(value)) return value;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('{')) return null;
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Map an unambiguous provider error payload onto the canonical taxonomy. */
+function classifyRejectionPayload(
+  payload: Record<string, unknown>,
+  fallbackMessage: string | null,
+): VerifierDispatchRejection | null {
+  // `{status, error: {type, message}}` — the shape codex emits, and the shape
+  // every OpenAI-compatible surface uses.
+  const nested = isRecord(payload['error']) ? payload['error'] : null;
+  const status = typeof payload['status'] === 'number'
+    ? payload['status']
+    : typeof payload['api_error_status'] === 'number'
+      ? payload['api_error_status']
+      : undefined;
+  // Only a NAMED error class counts. A top-level `type` is often the envelope's
+  // own name (`result`, `error`), which would read as a provider error class it
+  // never was, so it has to look like one and not be the bare word.
+  const errorType = typeof nested?.['type'] === 'string'
+    ? nested['type']
+    : typeof payload['type'] === 'string'
+      && payload['type'] !== 'error'
+      && /error$/i.test(payload['type'])
+      ? payload['type']
+      : undefined;
+  const message = typeof nested?.['message'] === 'string'
+    ? nested['message']
+    : typeof payload['message'] === 'string'
+      ? payload['message']
+      : fallbackMessage;
+
+  // Gate 2 — refuse to guess. Either the provider gave a status ≥ 400, or it
+  // named an error class. Anything else is not unambiguous dispatch evidence.
+  const hasStatusEvidence = status !== undefined && status >= 400;
+  const hasClassEvidence = errorType !== undefined && /error$/i.test(errorType);
+  if (!hasStatusEvidence && !hasClassEvidence) return null;
+  if (message === null || message.trim() === '') return null;
+
+  return {
+    outcome: classifyRejectionOutcome(status, errorType, message),
+    message: message.trim(),
+    ...(status !== undefined ? { status } : {}),
+    ...(errorType !== undefined ? { errorType } : {}),
+  };
+}
+
+/**
+ * Status-first classification, mirroring `claudeFailureOutcome`'s precedence so
+ * the two surfaces cannot disagree about what a 401 or a 429 means.
+ */
+function classifyRejectionOutcome(
+  status: number | undefined,
+  errorType: string | undefined,
+  message: string,
+): VerifierDispatchRejection['outcome'] {
+  if (status === 401 || status === 403) return 'auth-rejected';
+  if (status === 429) return 'rate-limited';
+  const haystack = `${errorType ?? ''} ${message}`.toLowerCase();
+  if (haystack.includes('model') && /not (found|supported|available)|unsupported|does not exist/.test(haystack)) {
+    return 'model-not-found';
+  }
+  if (haystack.includes('auth') || haystack.includes('credential') || haystack.includes('unauthorized')) {
+    return 'auth-rejected';
+  }
+  if (haystack.includes('rate limit') || haystack.includes('quota')) return 'rate-limited';
+  return 'transport-error';
+}
+
+/** Recognize the error envelopes we have captured evidence for. */
+function extractRejectionEnvelope(content: Record<string, unknown>): VerifierDispatchRejection | null {
+  // Codex terminal failure: `{type:'turn.failed', error:{message:'<json>'}}`.
+  if (content['type'] === 'turn.failed') {
+    const payload = unwrapErrorPayload(
+      isRecord(content['error']) ? content['error']['message'] : content['error'],
+    );
+    const fallback = isRecord(content['error']) && typeof content['error']['message'] === 'string'
+      ? content['error']['message']
+      : null;
+    if (payload) return classifyRejectionPayload(payload, fallback);
+  }
+
+  // Codex inline error row: `{type:'error', message:'<json or text>'}`.
+  if (content['type'] === 'error') {
+    const payload = unwrapErrorPayload(content['message']);
+    if (payload) return classifyRejectionPayload(payload, null);
+  }
+
+  // Codex item envelope: `item.completed` carrying `{type:'error', message}`.
+  if (content['codexEventType'] === 'item.completed' && isRecord(content['item'])) {
+    const item = content['item'];
+    if (item['type'] === 'error' && typeof item['message'] === 'string') {
+      const payload = unwrapErrorPayload(item['message']);
+      if (payload) return classifyRejectionPayload(payload, item['message']);
+    }
+  }
+
+  // Claude Code stream-json result envelope — same fields `claudeFailureOutcome`
+  // reads, so the two surfaces classify a 401/429 identically.
+  if (content['type'] === 'result' && content['is_error'] === true) {
+    return classifyRejectionPayload(content, typeof content['result'] === 'string' ? content['result'] : null);
+  }
+
+  return null;
 }
 
 interface AssistantEnvelope {

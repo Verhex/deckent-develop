@@ -63,7 +63,7 @@ describe('model-registry: canonical gpt-5.5', () => {
     const registry = new ModelRegistry();
     registerCodexParityModels(registry);
     expect(registry.get('gpt-5')).toBeUndefined();
-    expect(registry.getByProviderAndTier('codex', 'premium')!.id).toBe('gpt-5.5');
+    expect(registry.getByProviderAndTier('codex', 'premium')!.id).toBe('gpt-5.6-sol');
   });
 });
 

@@ -132,8 +132,10 @@ function resolveKind(input: ModelTierGuardInput): string {
  * Enforce the economy-tier floor for code-development tasks.
  *
  * - Economy model + code-bearing kind + NO explicit override → upgrade to the
- *   provider-appropriate STANDARD model (haiku→sonnet, gpt-5-mini→gpt-4.1,
- *   gemini-2.0-flash→gemini-2.5-flash).
+ *   provider-appropriate STANDARD model (haiku→sonnet, gpt-5.6-luna→gpt-5.6-terra,
+ *   gemini-2.0-flash→gemini-2.5-flash). The codex pair follows whichever model the
+ *   tier designates (MASTER-PLAN 670) — this comment illustrates, it never decides:
+ *   the upgrade target comes from `getModelForProviderTier`, never from a literal.
  * - Economy model + doc/audit kind → allowed, unchanged.
  * - Explicit override → honored (kept), but flagged in the result for logging.
  * - Standard/premium/premium_plus model, or an unknown/ollama tag → unchanged.

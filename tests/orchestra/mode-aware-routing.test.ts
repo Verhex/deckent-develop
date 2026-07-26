@@ -199,7 +199,7 @@ describe('Mode-Aware Routing', () => {
       expect(spawnWorkerMultiProvider).toHaveBeenCalledTimes(1);
       expect(spawnWorkerMultiProvider).toHaveBeenCalledWith(
         expect.stringMatching(/^run-test-/),
-        'claude-opus-4-8', // canonical default model
+        'claude-opus-5', // canonical default model (MASTER-PLAN 670 designation)
         'mock-prompt',
         testRoot,
         expect.objectContaining({ autoApprove: false }),

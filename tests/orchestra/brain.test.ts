@@ -2371,7 +2371,7 @@ describe('calculateModelScore + inferModelFromDirective', () => {
       }
     );
     // +3 (cross-module: src, agents, monitor = 3 modules) +2 (refactor) -1 (has 3 dirs, not single) = 4
-    expect(result).toBe('claude-opus-4-8');
+    expect(result).toBe('claude-opus-5');
   });
 
   it('returns opus for score >= 4: many files', () => {
@@ -2385,7 +2385,7 @@ describe('calculateModelScore + inferModelFromDirective', () => {
       }
     );
     // +3 (20 files) +2 (refactor) -1 (single dir) = 4
-    expect(result).toBe('claude-opus-4-8');
+    expect(result).toBe('claude-opus-5');
   });
 
   // ─── Test: Decision logic (haiku <= -1) ──────────────────────────────

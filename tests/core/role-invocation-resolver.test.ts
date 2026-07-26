@@ -101,8 +101,12 @@ describe('resolveRoleInvocation — fallback transitions', () => {
 
     expect(res.selected!.provider).toBe('codex');
     expect(res.selected!.source).toBe('fallback');
-    // exact model equivalence: opus (premium) → gpt-5 (premium on codex)
-    expect(res.selected!.model).toBe('gpt-5.5');
+    // Exact model equivalence: opus (premium) → the DESIGNATED codex premium
+    // model. MASTER-PLAN 670 (owner-approved 2026-07-26) moved this from
+    // `gpt-5.5` — whichever GA premium model registered first — to the tier's
+    // named current generation. Fallback dispatches a billed model, so this
+    // assertion is the audit of which one.
+    expect(res.selected!.model).toBe('gpt-5.6-sol');
     expect(res.resolved.source).toBe('fallback');
     expect(res.resolved.reasonCode).toBe('provider_resolution_fallback');
 
@@ -130,13 +134,15 @@ describe('resolveRoleInvocation — fallback transitions', () => {
 
     expect(res.attempts[0]!.reasonCode).toBe('fallback_limit_hold');
     expect(res.selected!.provider).toBe('codex');
-    // sonnet (standard) → gpt-4.1 (standard on codex)
-    expect(res.selected!.model).toBe('gpt-4.1');
+    // sonnet (standard) → designated codex standard model (MASTER-PLAN 670).
+    // Notably this replaces `gpt-4.1`, which the active ChatGPT account is
+    // measured to refuse outright (sprint-460, HTTP 400).
+    expect(res.selected!.model).toBe('gpt-5.6-terra');
     expect(res.fallbackChain[0]!.reasonCode).toBe('fallback_limit_hold');
     expect(res.fallbackChain[0]!.limitEvidenceRefs).toEqual(['claude:429']);
   });
 
-  it('remaps economy-tier model on fallback (haiku → gpt-5-mini)', () => {
+  it('remaps economy-tier model on fallback (haiku → gpt-5.6-luna)', () => {
     const res = resolveRoleInvocation({
       role: 'worker',
       primaryProvider: 'claude',
@@ -147,7 +153,7 @@ describe('resolveRoleInvocation — fallback transitions', () => {
         codex: healthy(),
       },
     });
-    expect(res.selected!.model).toBe('gpt-5-mini');
+    expect(res.selected!.model).toBe('gpt-5.6-luna');
   });
 });
 
@@ -405,7 +411,7 @@ describe('resolveRoleInvocation — receipt-ready provenance shape', () => {
     });
     // resolved reflects the selected fallback
     expect(res.resolved.provider).toBe('codex');
-    expect(res.resolved.model).toBe('gpt-5.5');
+    expect(res.resolved.model).toBe('gpt-5.6-sol');
     // top-level reachability/limits describe the terminal (selected) candidate
     expect(res.reachability.state).toBe('known');
     expect(res.reachability.evidenceRef).toBe('cx:reach');

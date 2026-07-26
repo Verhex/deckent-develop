@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { modelRegistry } from '../../src/core/model-registry.js';
 import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -183,7 +184,11 @@ describe('DECKENT_MCP_INSTRUCTIONS', () => {
     // 454-004: the Parameters section must teach exact provider API IDs +
     // explicit Provider ownership — never a bare legacy alias that
     // resolveCanonicalModelIdentity() now rejects (E_LEGACY_MODEL_ALIAS).
-    expect(DECKENT_MCP_INSTRUCTIONS).toContain('claude-opus-4-8');
+    // Generated from the registry's designated model per tier, so assert the
+    // designation rather than a literal (MASTER-PLAN 670 moved claude/premium).
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain(
+      modelRegistry.getByProviderAndTier('claude', 'premium')!.id,
+    );
     expect(DECKENT_MCP_INSTRUCTIONS).toContain('claude-sonnet-5');
     expect(DECKENT_MCP_INSTRUCTIONS).toContain('claude-haiku-4-5-20251001');
     expect(DECKENT_MCP_INSTRUCTIONS).toContain('legacy aliases');
