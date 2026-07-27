@@ -94,12 +94,12 @@ export function createScanBudget(
 
 export const UNRESOLVED_BASELINE = Object.freeze({
   count: 9034,
-  digest: '3b956ae782feed4894c860935e420e83749a0e06bc3bd3ed4c812e528683a420',
+  digest: '176bb1316689b1fa3da41d4a6e9d1338664cb0258781e05a056128e6c2602bfd',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  count: 1121,
-  digest: 'ca6a5c17e953658e5f852e5ab84c1713d9f3bb8082e6414ef21ec488b9aeb777',
+  count: 1136,
+  digest: '66d601cf6ecd01693cc467cb1f0f155012bfc1444a4ea23c925cabc383721031',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
@@ -4784,6 +4784,15 @@ function createEagerModulePlan(
       && unwrapped.expression.keywordToken === ts.SyntaxKind.ImportKeyword
     );
   };
+  const isExactImportMetaMain = expression => {
+    const unwrapped = unwrapExpression(expression);
+    return (
+      ts.isPropertyAccessExpression(unwrapped)
+      && unwrapped.name.text === 'main'
+      && ts.isMetaProperty(unwrapped.expression)
+      && unwrapped.expression.keywordToken === ts.SyntaxKind.ImportKeyword
+    );
+  };
   const isExactCurrentModulePath = expression => {
     const unwrapped = unwrapExpression(expression);
     if (!ts.isCallExpression(unwrapped) || unwrapped.arguments.length !== 1) {
@@ -4909,6 +4918,7 @@ function createEagerModulePlan(
   };
   const isModuleMainGuard = (expression, guardStack = new Set()) => {
     const unwrapped = unwrapExpression(expression);
+    if (isExactImportMetaMain(unwrapped)) return true;
     if (ts.isIdentifier(unwrapped)) {
       const binding = context.resolveBinding(unwrapped.text, unwrapped);
       if (!binding || guardStack.has(binding.id)) return false;

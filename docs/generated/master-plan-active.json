@@ -3,25 +3,25 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "12c120ea15e670df372676193a9ca92ed9810860789f3bb2d83cef70d05473c4"
+    "value": "15c58a5e34ec39de8dad6468492cd94d8b0d58fc652b838c2d790fc35b0754af"
   },
   "summary": {
-    "total": 232,
-    "active": 232,
+    "total": 233,
+    "active": 233,
     "terminal": 0,
-    "receipts": 7,
+    "receipts": 8,
     "byState": {
       "OPEN": 156,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
-      "VERIFY": 8,
+      "VERIFY": 9,
       "DONE": 0,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 171,
+      "P0": 172,
       "P1": 45,
       "P2": 16
     },
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 40,
+      "TRUTH": 41,
       "XPLAT": 3
     }
   },
@@ -116,7 +116,7 @@
       "state": "OPEN",
       "updated": "2026-07-27",
       "definitionDigest": "3ef40495e48f6fb5881e2c59ff70ae3e62a82081261a28b338b131eb5e588cc8",
-      "progressDigest": "6f7d72a85ac219ab36a78d1b9b51a22d87bb96db4ba0f47ce0f1e84c90a5798e",
+      "progressDigest": "55abacacbf98e7d3ecfad550773c7265c302ffeb6d3f01c6df80b1b7ab607e47",
       "terminalClosureDigest": null
     },
     {
@@ -138,7 +138,18 @@
       "state": "OPEN",
       "updated": "2026-07-27",
       "definitionDigest": "6ac98c33266e9b97460126d109350d4712295693fa9c68297ae1f806833d53a5",
-      "progressDigest": "4c5cd933d46a8bf3282f40a7ddde4cbe406b286e6173ec3d93cc38439950605f",
+      "progressDigest": "3a6145ca08876ac00091fe4546c9096865cadcb60d35044217267699f42b9537",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 75,
+      "id": "TEST-CONTAINMENT-001",
+      "program": "TRUTH",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-27",
+      "definitionDigest": "dad52565673aaf3f00e5aa0913f1fd7a8cd872b61b9af02541cdd361efb9eefb",
+      "progressDigest": "93f98e55e3213894147de68a0e191b4363cb682e14e2289b6eefe475706f76fe",
       "terminalClosureDigest": null
     },
     {
@@ -2687,6 +2698,16 @@
         "transitionAt": "2026-07-27T08:20:57+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-27-TEST-CONTAINMENT-01",
+      "authorityDigest": "cbe4008ef89b6b2443b9747767978224494ce9327a361c3eaff0d0de97d7e677",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-27T09:38:13+03:00"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -2882,6 +2903,7 @@
         "CODEX-C5",
         "CODEX-MAIN-001",
         "KERNEL-001",
+        "TEST-CONTAINMENT-001",
         "TEST-HERMETIC-001",
         "TRUTH-BASELINE-001"
       ],
@@ -2906,10 +2928,11 @@
         "GR-2026-07-26-TEST-HERMETIC-01",
         "GR-2026-07-27-TEST-HERMETIC-02",
         "GR-2026-07-27-TEST-HERMETIC-03",
-        "GR-2026-07-27-TEST-HERMETIC-04"
+        "GR-2026-07-27-TEST-HERMETIC-04",
+        "GR-2026-07-27-TEST-CONTAINMENT-01"
       ],
       "acceptance": "Dynamic ve static scan; tüm writers tmpdir; root-write gate fail-loud",
-      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-27-TEST-HERMETIC-03`; `receipt=GR-2026-07-27-TEST-HERMETIC-04`; source-derived static/eager writer registry scans 2,439 files with 0 confirmed violations; full SHA-256 ratchets bind 9,034 explicit unresolved effects and 1,121 production modules; the approved 97-event ambient-allocation reduction was independently rejected and fully rolled back because writable global bindings plus missing catch/class-expression binding coverage made `proven-nonwriter` unsound; default gate remains exit 0 and strict mode fails with `E_HERMETIC_UNRESOLVED_STRICT`; runtime guard blocks post-setup project, `.tasks` and `dist` writes across canonical root/dashboard/desktop Vitest surfaces; pristine-realm/process-birth authority, pre-install cached capabilities, inherited/pre-opened descriptors, native/child-process bypass and OS sandbox remain open",
+      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-27-TEST-HERMETIC-03`; `receipt=GR-2026-07-27-TEST-HERMETIC-04`; `receipt=GR-2026-07-27-TEST-CONTAINMENT-01`; source-derived static/eager writer registry scans 2,449 files with 0 confirmed violations; full SHA-256 ratchets bind the unchanged 9,034 explicit unresolved effects and 1,136 production modules, including the exact fifteen-module containment inventory; changed containment scope contributes zero unresolved effects; the approved 97-event ambient-allocation reduction was independently rejected and fully rolled back because writable global bindings plus missing catch/class-expression binding coverage made `proven-nonwriter` unsound; exact `import.meta.main` recognition changes existing callsite positions without reducing or accepting unresolved debt; default gate exits 0 and strict mode fails with `E_HERMETIC_UNRESOLVED_STRICT`; runtime guard blocks post-setup project, `.tasks` and `dist` writes across canonical root/dashboard/desktop Vitest surfaces; authenticated live measurement, native adapter execution, inherited/pre-opened descriptor closure and OS-level canary remain open under TEST-CONTAINMENT-001",
       "updated": "2026-07-27"
     },
     {
@@ -2989,10 +3012,48 @@
         "GR-2026-07-26-TEST-HERMETIC-01",
         "GR-2026-07-27-TEST-HERMETIC-02",
         "GR-2026-07-27-TEST-HERMETIC-03",
-        "GR-2026-07-27-TEST-HERMETIC-04"
+        "GR-2026-07-27-TEST-HERMETIC-04",
+        "GR-2026-07-27-TEST-CONTAINMENT-01"
       ],
       "acceptance": "Source-derived writer registry ve zero unauthorized write ratchet",
-      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-27-TEST-HERMETIC-03`; `receipt=GR-2026-07-27-TEST-HERMETIC-04`; runtime guard, worker setup and bounded global snapshot protect canonical root/dashboard/desktop test surfaces; the attempted 97-event proof contract did not settle and the frozen 9,034 unresolved baseline was restored without accepting false evidence; root 413 pass/10 skip, dashboard 49/49, desktop 13/13, TypeScript and syntax proofs pass; `src/dashboard/vitest.config.ts` remains an unapproved noncanonical uncovered config; real Docker opt-in, native Windows, Node-version CI matrix, external package/process containment, pristine-realm authority, cross-platform and scale proofs remain open",
+      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-27-TEST-HERMETIC-03`; `receipt=GR-2026-07-27-TEST-HERMETIC-04`; `receipt=GR-2026-07-27-TEST-CONTAINMENT-01`; runtime guard, worker setup and bounded global snapshot protect canonical root/dashboard/desktop Vitest surfaces; the attempted 97-event proof contract did not settle and the 9,034 unresolved debt count remains unchanged without accepting false evidence; containment provider-free matrix passes 10 files/89 tests and legacy CI-sim regression passes 35/35; root 413 pass/10 skip, dashboard 49/49, desktop 13/13 and earlier TypeScript proof remain prior-slice evidence; `src/dashboard/vitest.config.ts` remains an unapproved noncanonical uncovered config; authenticated native execution, real Docker/native Windows, Node-version CI matrix, cross-platform and scale proofs remain open under TEST-CONTAINMENT-001",
+      "updated": "2026-07-27"
+    },
+    {
+      "order": 75,
+      "id": "TEST-CONTAINMENT-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Process-birth, descendant ownership ve OS/OCI test containment authority foundation'ı",
+      "priority": "P0",
+      "dependsOn": [
+        "TEST-675"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "~",
+        "E": "0",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "0"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TEST-675"
+      ],
+      "evidenceReceipts": [
+        "GR-2026-07-27-TEST-CONTAINMENT-01"
+      ],
+      "acceptance": "Candidate birth durable claim'den önce imkânsız; enforce mode eksik facet'te typed HOLD; authenticated finality olmadan cleanup ve PASS yok; source/dependency RO, host HOME hidden, scratch-only RW; dependency/runtime projection ve adapter planları fail-closed",
+      "evidence": "`receipt=GR-2026-07-27-TEST-CONTAINMENT-01`; opt-in `test:ci-sim:contained` wrapper, authority/session, supervisor, process bootstrap, owned execution, dependency/runtime projections and Linux/macOS/Windows/WSL/OCI plan adapters are code-present and partially wired without default or CI cutover; provider-free matrix passes 10 files/89 tests, legacy CI-sim passes 35/35 and all 17 touched production MJS files pass syntax; real probe exits 2 with `E_CONTAINMENT_HOLD_PROBE_ONLY` and explicit live request exits 2 with `E_CONTAINMENT_HOLD_LIVE_EVIDENCE_AUTHORITY_REQUIRED`, both `NOT_BORN`; durable prepare-before-birth, HMAC claim/receipt binding, finality cleanup capability, terminal prebirth/finality cleanup CAS, opaque one-shot leases, retry/forgery/replay and 128-bit new-workspace prefix are proven hermetically; static gate scans 2,449 files with 0 violations, unchanged 9,034 unresolved debt, zero scoped unresolved effects and 1,136-module inventory; synthetic same-session facet evidence is structural E1 proof only, not native measurement; live enrollment, authenticated scanner/host observations, native prepare/terminate adapters, crash-rehydratable cleanup authority, stale-lock/high-water recovery, native handle-based hostile-host deletion, actual tmp-workspace projection integration, required CI, cross-platform native and scale/HA proof remain explicit blockers; live Docker/native/provider calls and build were outside this receipt",
       "updated": "2026-07-27"
     },
     {
@@ -12679,6 +12740,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "f93c4a4f6bd29ede3a5bcb2e2d19f7076c2b535e43f6700670590b46e864158b"
+    "value": "dcdaef426c665b9e9d71b2ac83407cc11627c9b5b0563181425175b1ce1a043b"
   }
 }

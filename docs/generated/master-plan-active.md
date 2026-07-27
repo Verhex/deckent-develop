@@ -5,9 +5,9 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):12c120ea15e670df372676193a9ca92ed9810860789f3bb2d83cef70d05473c4`
+**Source digest:** `sha256(normalized-lf-utf8):15c58a5e34ec39de8dad6468492cd94d8b0d58fc652b838c2d790fc35b0754af`
 
-**Rows:** 232 total · 232 active · 0 terminal
+**Rows:** 233 total · 233 active · 0 terminal
 
 ## State summary
 
@@ -17,7 +17,7 @@
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
-| VERIFY | 8 |
+| VERIFY | 9 |
 | DONE | 0 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -33,6 +33,7 @@
 | 50 | `TEST-675` | OPEN | P0 | TRUTH | — | — | Testlerin live `.tasks` alanına yazmasını kaldır ve writer discovery ratchet'i kur |
 | 60 | `TEST-676` | OPEN | P0 | TRUTH | — | — | Test koşumunda `dist` clean çağrısının fail-loud root cause'unu bul ve kapat |
 | 70 | `TEST-HERMETIC-001` | OPEN | P0 | TRUTH | `TEST-675` | — | Project root, HOME, `.tasks` ve tracked-file test writer discovery/migration |
+| 75 | `TEST-CONTAINMENT-001` | VERIFY | P0 | TRUTH | `TEST-675` | — | Process-birth, descendant ownership ve OS/OCI test containment authority foundation'ı |
 | 80 | `TEST-SPAWN-001` | OPEN | P1 | TRUTH | `TEST-HERMETIC-001` | — | Test `spawnSync` policy ve async migration |
 | 90 | `TEST-PLATFORM-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | `tests/PLATFORM.md` ve enforcement'ı source-derived platform registry'ye bağla |
 | 100 | `REPO-DECK-001` | OPEN | P0 | TRUTH | — | — | `.deck` secret'ını Docker context ve image layers'dan dışla |
