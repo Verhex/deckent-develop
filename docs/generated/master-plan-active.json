@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "15c58a5e34ec39de8dad6468492cd94d8b0d58fc652b838c2d790fc35b0754af"
+    "value": "30ff6e21131bfe6ec740d1668b00e849a036f3248cfd29122585728691af6fcd"
   },
   "summary": {
     "total": 233,
     "active": 233,
     "terminal": 0,
-    "receipts": 8,
+    "receipts": 9,
     "byState": {
       "OPEN": 156,
       "READY": 0,
@@ -116,7 +116,7 @@
       "state": "OPEN",
       "updated": "2026-07-27",
       "definitionDigest": "3ef40495e48f6fb5881e2c59ff70ae3e62a82081261a28b338b131eb5e588cc8",
-      "progressDigest": "55abacacbf98e7d3ecfad550773c7265c302ffeb6d3f01c6df80b1b7ab607e47",
+      "progressDigest": "af06ecc8d8ec6716e13cbfcc9b137af4318d933915260eab627da2a058a7fa17",
       "terminalClosureDigest": null
     },
     {
@@ -138,7 +138,7 @@
       "state": "OPEN",
       "updated": "2026-07-27",
       "definitionDigest": "6ac98c33266e9b97460126d109350d4712295693fa9c68297ae1f806833d53a5",
-      "progressDigest": "3a6145ca08876ac00091fe4546c9096865cadcb60d35044217267699f42b9537",
+      "progressDigest": "3ff3cacf7113a4e3e04e3eea5a72f6f9fc55a8c9a65aace8b4cca0b9ae7eae74",
       "terminalClosureDigest": null
     },
     {
@@ -149,7 +149,7 @@
       "state": "VERIFY",
       "updated": "2026-07-27",
       "definitionDigest": "dad52565673aaf3f00e5aa0913f1fd7a8cd872b61b9af02541cdd361efb9eefb",
-      "progressDigest": "93f98e55e3213894147de68a0e191b4363cb682e14e2289b6eefe475706f76fe",
+      "progressDigest": "a0620085f224c1f2c90d86e13491e1f764f94b63c63b6cc32ccc43c5364d05a4",
       "terminalClosureDigest": null
     },
     {
@@ -1423,9 +1423,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "f24e85fc363e2a7115732458863fc5606e2d552df9f10ef80826f55fa735257c",
-      "progressDigest": "0f64115f3079a251c6c1cea753719f836f6b8056cdde78b247b9edf5993087d9",
+      "progressDigest": "24fa2da7e714addb0495fe67d1ea7a5009ab2677ad8288211ed5fc8a1ddfa197",
       "terminalClosureDigest": null
     },
     {
@@ -1434,9 +1434,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "b9cb8784a929efbaee3091061367951abe585f7a7548fa0a49b593f247b11061",
-      "progressDigest": "87747a650071f9a6de5ab2ee33eb2b4301e68b1c08554f7d93bc25ff7ead5726",
+      "progressDigest": "8b8c4a3d14a90951ff438f29e3cf907974f3bbe6e8a813136160be93951ba533",
       "terminalClosureDigest": null
     },
     {
@@ -1445,9 +1445,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "04147d0d2a7650f4f91b4ed7d9edf5f971f1a02e004e011b9b474d5096f7b276",
-      "progressDigest": "80fecbf1d01cb0dd2c6ecc7d147f0313a279b9dfd27add7377ba5563a41f2088",
+      "progressDigest": "fd0e7ba7ec40268c1909b9e26b53d9dedb71e695e18ef3972fbfe8f0140212fa",
       "terminalClosureDigest": null
     },
     {
@@ -1456,9 +1456,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "3708cd18d6c7f3e18cb9f577565c2b6b824db840b2f59506a5fff8334e41dbd1",
-      "progressDigest": "d05902965f5fa0201eeaae8045aae1c02ce3ddc8906d8c853cf779769c109a39",
+      "progressDigest": "b4169040fa20a4b0ca9b92c694446d0c7de8e7e418dcdef3744a7df71ded23dd",
       "terminalClosureDigest": null
     },
     {
@@ -1467,9 +1467,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "39bbd3f2a85126636caca99166563181fd427a28e19fdcaf38b95df1795a2591",
-      "progressDigest": "977795384549b44b639f83a0258c495af564b64b98ef3ee8d084ce95118a6876",
+      "progressDigest": "2c1748b3d52673598ea4f91fb898e5c2b25219258e0ea0f39d6f8e4816682344",
       "terminalClosureDigest": null
     },
     {
@@ -1478,9 +1478,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "738036fe3b3ebfde9530a8ec07f14b11f083a285bd33490462d3188014d64afd",
-      "progressDigest": "576d03ef95ac710eb0aea789dd92ef6a49ae24fc7a1c24908d85d68292357d37",
+      "progressDigest": "10f0d8d4af2f4fb55a5fb655330a7eb01f5c7519a71bc5c811e0ef6c3733b576",
       "terminalClosureDigest": null
     },
     {
@@ -1500,9 +1500,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "d821d2f9a0148fba24cce05da2a7644127402a4862ffa14f266ae3c7baca9536",
-      "progressDigest": "5dedad8cefb62533cc26b17351fe2e18e11a74cf95f48559bd041e9c8c10cef1",
+      "progressDigest": "7d599d9d9f9c20af3eefbfd1013919b6e2b70b75b8be54676e0cdffb59679a02",
       "terminalClosureDigest": null
     },
     {
@@ -1522,9 +1522,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "c023a850f6255145ac253944df402bcfb3645837fc58b596c12737fc4174f5a0",
-      "progressDigest": "d967fe74f648ef2b6b1ce8a53690ece55e4deca9c27b5d93305a875e1c1c707e",
+      "progressDigest": "09ba7530acd8d08431b9481918d896b01779e47ceaa6b46c505b662699f22e7c",
       "terminalClosureDigest": null
     },
     {
@@ -1533,9 +1533,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "986810aaa770acf552c9d95b3a0f44bdf18a24d2495dd2f314158025212700a2",
-      "progressDigest": "d4bb9610b0a06b72f40330e9bad6aa1dd4c1a0d33b10e5b58d1a90b2455b88ae",
+      "progressDigest": "447ad81a6b3ca2cc4643d275b5b7193828bcba10c2346f2e322e0b4873841579",
       "terminalClosureDigest": null
     },
     {
@@ -1544,9 +1544,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "7bc89c617b58557f9f8c3a57ae05826a9e76f5afc8727477faf66f31f87f83d5",
-      "progressDigest": "acd115ac4b300a11bc9300787a4254e35abfa264776bd1c3d45ff28e68005584",
+      "progressDigest": "033fec9b3c04dca5bb71d64c01080d8e52add4a9a5f485eb531cee9dd9c8d408",
       "terminalClosureDigest": null
     },
     {
@@ -1555,9 +1555,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "2654d10214da1406e9835fdb850cc43d455feeef8f10966b95dae2ae8a3db207",
-      "progressDigest": "aa9dc2b0151aeb97983f8243985052fa0ad9819968b244951d11662a24704165",
+      "progressDigest": "8ba7f061384e967c74af2713431b6c4c084b65f3edee9d84f6bb7e78866b7737",
       "terminalClosureDigest": null
     },
     {
@@ -1566,9 +1566,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "60b3a13655a25995824df224f775f4ccf477279e4bafaf9a92189e66dd63e0f2",
-      "progressDigest": "111ebfde6eec87a080f93a5a1def7a3defeb70117d4adf7ae714acc6d32e41cf",
+      "progressDigest": "966a69907ea8111e4fb8e8711c95e1aac40e63fe1a0dbe10d306d074c4cc3a7f",
       "terminalClosureDigest": null
     },
     {
@@ -1577,9 +1577,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "bd13fbd19dc7b82df83e4e4de674ad1f43825cd56a8d1941f9aca0972f2d1c97",
-      "progressDigest": "3d974998c9fcc6fded74e96ff4cbf8c159271398d4e0c87192e00f83bfef62f3",
+      "progressDigest": "630eeb4f72fcd6291bf2db8dd3d35da5e4c6a3340c3f32c287a6e84211a9ff95",
       "terminalClosureDigest": null
     },
     {
@@ -1599,9 +1599,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "e3be4a7014aa705d063e1d425f18722d0d8d532135605afcc68cf7c34c0b15d6",
-      "progressDigest": "4ed4999a2b3f3a8ca5cb8d75c1a194e5a7f028860f2f169ea166961ad2eabe77",
+      "progressDigest": "e85b3d9149b31767a7aba0c38b302dd774998740024df9fddee4f0089770a9cc",
       "terminalClosureDigest": null
     },
     {
@@ -1610,9 +1610,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "a907cf4a3383bdfef0ed693e05da2908ee88477a2ede5e87a5c4d98ee78d6abe",
-      "progressDigest": "220f5ff585f0773479f9e0ce1f24c8f4bb22757c2c607a2c960df204611ac8b5",
+      "progressDigest": "6f80ee3fb65f67285a30db36ceeca64f2606760505fc01d865c3db041431504c",
       "terminalClosureDigest": null
     },
     {
@@ -1621,9 +1621,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "586e3d199ac829d255df56cb160a7d98744b77dfc96a6fe04a0d93df190513e1",
-      "progressDigest": "bd6ece33affb3e39b776d18003a25d124f10d73478f534c036e9e322008a3241",
+      "progressDigest": "7832b2fb97e9adcb8728206c9f3e855d90c8cbc0c03881178e29b643d3235bdd",
       "terminalClosureDigest": null
     },
     {
@@ -1632,9 +1632,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "d04ed5b942844867e9adff1e1d6abaffccb4c33b3cfe1b270d09081f4cf40bd4",
-      "progressDigest": "2b8142d5aefe6e91c69764505ff9e3584a7f2f414a8ef0d94c51e3eb5892fa70",
+      "progressDigest": "e245c188ca3732bd0b8dfbb04c94f8c91d3288327eee9df58120355ab3940b15",
       "terminalClosureDigest": null
     },
     {
@@ -1654,9 +1654,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "2b65e08312116577e0a74758aaa86113f9bd762a059f57704d3004efdf0b26bf",
-      "progressDigest": "bd8acde12daa39899cd86ca29f4010be9710ee9c78e33046e3b26e619c8160f4",
+      "progressDigest": "e4969f00270b195c9f06c6f7c5791fa727c2b1cdda2ea8867ebfb293f8f5a33c",
       "terminalClosureDigest": null
     },
     {
@@ -1687,9 +1687,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "d3edabf6613a56d056af8e3321106fd5a49a755a0312e5ce98e4993d174dc610",
-      "progressDigest": "5c6bd610ceae06aa4aa97dbb25589e601eb26385215737645d3319e2a46ae6f8",
+      "progressDigest": "7b691ee49570d33b84cd75ab087952116fedf2735970812aa082c659976ec86a",
       "terminalClosureDigest": null
     },
     {
@@ -1731,9 +1731,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "fa879e7874c86d428bb4f508ad2284eb8e78ac0c663a8af384bbbcb836759b06",
-      "progressDigest": "328e1cd6b8c9ffbad6acd7242b9faaf0cf232201b5e13325bf8ccc1a6c852c2c",
+      "progressDigest": "22ded47daeb690c6b65c18957afd7cbb55d993fd5df612e75bdfac584a6200aa",
       "terminalClosureDigest": null
     },
     {
@@ -1742,9 +1742,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "7ade16473831b4aeaf6ba4c3c2e23e0278504413a8cbccad5832065e28c1673d",
-      "progressDigest": "9fde8f315f22e32a80e6bc6d515290c5ccae790bc344517981bae8c5fc4ebb77",
+      "progressDigest": "e2db2aeab535744733acb5373266eba4c282556ac7b3db00f02b73cf18177ef9",
       "terminalClosureDigest": null
     },
     {
@@ -1775,9 +1775,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "47995548a67a5d0109cc1a6ccbf61173d100e77e97fe5997ecda1d0873b21481",
-      "progressDigest": "764d41a26e4b616b571e801210ee8242acb6dc2767bbf1e567709ee57cb50c7d",
+      "progressDigest": "8be424c97bd2c18a156d65cbd2298a97aa3a924877f084e614e51be18141fdb2",
       "terminalClosureDigest": null
     },
     {
@@ -1830,9 +1830,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "97dd65885777dc6555cbf9e67b8a5c8e80a1234e75f152603a0f7b6bb5fbc74f",
-      "progressDigest": "e4a16fc3f1bf1c67db06ba04e0b474f6751f5757f3c8c0988375ffb9ac5fa0b6",
+      "progressDigest": "32c4311fe86f7674c68801d15451218775b5e5b899c690b019d2932e862dc6da",
       "terminalClosureDigest": null
     },
     {
@@ -1863,9 +1863,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "1c4e9939ebd9c9173d74783a52f31677c531ccd83dc6edec3b63be525ad8fb4d",
-      "progressDigest": "744fef6204ef39f1a845e06d58b6a1ff2e194db52ff5fe2694f314dba5558d3c",
+      "progressDigest": "b31500ff5e0ba7def27758dda72025bf8c1906338d687c347cce3950bf8c5d21",
       "terminalClosureDigest": null
     },
     {
@@ -2061,9 +2061,9 @@
       "program": "PRODUCT",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "28f6a81929ece822bef8cb9b6ac87c3e681c2955d467d5f4cfd03e816a023d6d",
-      "progressDigest": "0f71ae314a0634bb3bea9fa3eb4e7bd3e629358acce2a877602d7747d04e644f",
+      "progressDigest": "dde09872974a5a5c51c7126c5ebdfdad4b28ed3d1e0897d8756eb9ecc111802d",
       "terminalClosureDigest": null
     },
     {
@@ -2182,9 +2182,9 @@
       "program": "PRODUCT",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "c425df79e974805f143c88587312afd78333a78e269baadf76687848049d5966",
-      "progressDigest": "c0f8150af9738e868c788f56fe6fc1c0bbd1e496560dfacb08294e1e71f195da",
+      "progressDigest": "bf0e9c1ca4d3fb57cd598cd479a7b888f41c625e96485892de40030d12d8f1e6",
       "terminalClosureDigest": null
     },
     {
@@ -2708,6 +2708,16 @@
         "transitionAt": "2026-07-27T09:38:13+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-27-TEST-CONTAINMENT-02",
+      "authorityDigest": "a4f1cd9b6a0aef228b128efcb898219e38206effe0a8eb100fda23011c66fab3",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-27T13:29:48+03:00"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -2932,7 +2942,7 @@
         "GR-2026-07-27-TEST-CONTAINMENT-01"
       ],
       "acceptance": "Dynamic ve static scan; tüm writers tmpdir; root-write gate fail-loud",
-      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-27-TEST-HERMETIC-03`; `receipt=GR-2026-07-27-TEST-HERMETIC-04`; `receipt=GR-2026-07-27-TEST-CONTAINMENT-01`; source-derived static/eager writer registry scans 2,449 files with 0 confirmed violations; full SHA-256 ratchets bind the unchanged 9,034 explicit unresolved effects and 1,136 production modules, including the exact fifteen-module containment inventory; changed containment scope contributes zero unresolved effects; the approved 97-event ambient-allocation reduction was independently rejected and fully rolled back because writable global bindings plus missing catch/class-expression binding coverage made `proven-nonwriter` unsound; exact `import.meta.main` recognition changes existing callsite positions without reducing or accepting unresolved debt; default gate exits 0 and strict mode fails with `E_HERMETIC_UNRESOLVED_STRICT`; runtime guard blocks post-setup project, `.tasks` and `dist` writes across canonical root/dashboard/desktop Vitest surfaces; authenticated live measurement, native adapter execution, inherited/pre-opened descriptor closure and OS-level canary remain open under TEST-CONTAINMENT-001",
+      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-27-TEST-HERMETIC-03`; `receipt=GR-2026-07-27-TEST-HERMETIC-04`; `receipt=GR-2026-07-27-TEST-CONTAINMENT-01`; clean-index source-derived static/eager writer registry scans 2,443 files with 0 confirmed violations; full SHA-256 ratchets bind `8939:350bb34cd2a9517f9a1a1b0a2098e5180b8448592d2449a4fee488d3810bbb5a` unresolved effects and `1134:1abcdc8d8c35a01116bc5d605ca054279b72e1f09398745145feac19c06199c8` production inventory, including the exact nineteen-module containment inventory; dirty shared-worktree scans are intentionally ineligible to advance either ratchet; changed containment scope contributes zero unresolved effects; the approved 97-event ambient-allocation reduction was independently rejected and fully rolled back because writable global bindings plus missing catch/class-expression binding coverage made `proven-nonwriter` unsound; exact `import.meta.main` recognition changes existing callsite positions without reducing or accepting unresolved debt; default gate exits 0 and strict mode fails with `E_HERMETIC_UNRESOLVED_STRICT`; runtime guard blocks post-setup project, `.tasks` and `dist` writes across canonical root/dashboard/desktop Vitest surfaces; authenticated live measurement, native adapter execution, inherited/pre-opened descriptor closure and OS-level canary remain open under TEST-CONTAINMENT-001",
       "updated": "2026-07-27"
     },
     {
@@ -3016,7 +3026,7 @@
         "GR-2026-07-27-TEST-CONTAINMENT-01"
       ],
       "acceptance": "Source-derived writer registry ve zero unauthorized write ratchet",
-      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-27-TEST-HERMETIC-03`; `receipt=GR-2026-07-27-TEST-HERMETIC-04`; `receipt=GR-2026-07-27-TEST-CONTAINMENT-01`; runtime guard, worker setup and bounded global snapshot protect canonical root/dashboard/desktop Vitest surfaces; the attempted 97-event proof contract did not settle and the 9,034 unresolved debt count remains unchanged without accepting false evidence; containment provider-free matrix passes 10 files/89 tests and legacy CI-sim regression passes 35/35; root 413 pass/10 skip, dashboard 49/49, desktop 13/13 and earlier TypeScript proof remain prior-slice evidence; `src/dashboard/vitest.config.ts` remains an unapproved noncanonical uncovered config; authenticated native execution, real Docker/native Windows, Node-version CI matrix, cross-platform and scale proofs remain open under TEST-CONTAINMENT-001",
+      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-27-TEST-HERMETIC-03`; `receipt=GR-2026-07-27-TEST-HERMETIC-04`; `receipt=GR-2026-07-27-TEST-CONTAINMENT-01`; runtime guard, worker setup and bounded global snapshot protect canonical root/dashboard/desktop Vitest surfaces; the attempted 97-event proof contract did not settle, the clean-index ratchet contains 8,939 unresolved effects without accepting false evidence and the previously observed 9,034 dirty-worktree count is ineligible to advance authority; clean-index containment provider-free matrix passes 15 files/159 tests and shared-worktree legacy CI-sim regression passes 35/35; root 413 pass/10 skip, dashboard 49/49, desktop 13/13 and earlier TypeScript proof remain prior-slice evidence; `src/dashboard/vitest.config.ts` remains an unapproved noncanonical uncovered config; authenticated native execution, real Docker/native Windows, Node-version CI matrix, cross-platform and scale proofs remain open under TEST-CONTAINMENT-001",
       "updated": "2026-07-27"
     },
     {
@@ -3050,10 +3060,11 @@
         "TEST-675"
       ],
       "evidenceReceipts": [
-        "GR-2026-07-27-TEST-CONTAINMENT-01"
+        "GR-2026-07-27-TEST-CONTAINMENT-01",
+        "GR-2026-07-27-TEST-CONTAINMENT-02"
       ],
       "acceptance": "Candidate birth durable claim'den önce imkânsız; enforce mode eksik facet'te typed HOLD; authenticated finality olmadan cleanup ve PASS yok; source/dependency RO, host HOME hidden, scratch-only RW; dependency/runtime projection ve adapter planları fail-closed",
-      "evidence": "`receipt=GR-2026-07-27-TEST-CONTAINMENT-01`; opt-in `test:ci-sim:contained` wrapper, authority/session, supervisor, process bootstrap, owned execution, dependency/runtime projections and Linux/macOS/Windows/WSL/OCI plan adapters are code-present and partially wired without default or CI cutover; provider-free matrix passes 10 files/89 tests, legacy CI-sim passes 35/35 and all 17 touched production MJS files pass syntax; real probe exits 2 with `E_CONTAINMENT_HOLD_PROBE_ONLY` and explicit live request exits 2 with `E_CONTAINMENT_HOLD_LIVE_EVIDENCE_AUTHORITY_REQUIRED`, both `NOT_BORN`; durable prepare-before-birth, HMAC claim/receipt binding, finality cleanup capability, terminal prebirth/finality cleanup CAS, opaque one-shot leases, retry/forgery/replay and 128-bit new-workspace prefix are proven hermetically; static gate scans 2,449 files with 0 violations, unchanged 9,034 unresolved debt, zero scoped unresolved effects and 1,136-module inventory; synthetic same-session facet evidence is structural E1 proof only, not native measurement; live enrollment, authenticated scanner/host observations, native prepare/terminate adapters, crash-rehydratable cleanup authority, stale-lock/high-water recovery, native handle-based hostile-host deletion, actual tmp-workspace projection integration, required CI, cross-platform native and scale/HA proof remain explicit blockers; live Docker/native/provider calls and build were outside this receipt",
+      "evidence": "`receipt=GR-2026-07-27-TEST-CONTAINMENT-01`; `receipt=GR-2026-07-27-TEST-CONTAINMENT-02`; opt-in `test:ci-sim:contained` wrapper, authority/session, supervisor, process bootstrap, owned execution, dependency/runtime projections and Linux/macOS/Windows/WSL/OCI plan adapters are code-present and partially wired without default or CI cutover; bounded RFC 8949 §4.2.1 deterministic CBOR and generic-evidence COSE_Sign1 structural contracts reject species/proxy/SAB/resource amplification, expose defensive snapshots, require RFC 9864 fully-specified algorithms and never claim signature verification; the E2 nine-envelope authority binds the full tenant/project/workspace and Goal→Mission→Flow→Run→WorkItem→Attempt→Operation journal, trusted challenge/epochs, exact-one `root-trust`, parent-signed non-root enrollment credentials, full previous outer-envelope digests, receipt measurement sets and stable authority graph; admission is authorized only after committed sequence 3 and consumed at 4, cleanup only after committed sequence 7 and committed at 8, with exact prior-envelope/resource/target/fencing bindings and control-plane/cleanup-authority issuers; Linux, signed/virtualized macOS, Windows, WSL2 and rootless OCI require ordered exact role tuples, matching platform and distinct multi-role authorities; generic macOS terminal is typed unsupported; deterministic CDDL/golden/runtime vectors are frozen while parser-backed cross-language conformance and all production enrollment remain `NOT_BORN`; clean-index provider-free matrix passes 15 files/159 tests; shared-worktree legacy CI-sim passes 35/35, root/dashboard TypeScript no-emit and touched MJS syntax pass; clean-index repository-wide TypeScript closure remains blocked by pre-existing `cross-verify-runner`→`execution-budget-policy` HEAD drift outside this grant; real probe exits 2 with `E_CONTAINMENT_HOLD_PROBE_ONLY` and explicit live request exits 2 with `E_CONTAINMENT_HOLD_LIVE_EVIDENCE_AUTHORITY_REQUIRED`, both `NOT_BORN`; durable prepare-before-birth, HMAC claim/receipt binding, finality cleanup capability, terminal prebirth/finality cleanup CAS, opaque one-shot leases, retry/forgery/replay and 128-bit new-workspace prefix are proven hermetically; clean-index static gate scans 2,443 files with 0 violations, `8939:350bb34cd2a9517f9a1a1b0a2098e5180b8448592d2449a4fee488d3810bbb5a` unresolved debt, zero scoped unresolved effects and `1134:1abcdc8d8c35a01116bc5d605ca054279b72e1f09398745145feac19c06199c8` inventory; dirty shared-worktree state is excluded from ratchet advancement; synthetic signatures/facets are structural protocol proof only, not authenticated native measurement; live key enrollment/signature verification, media-type registration/deployment policy, authenticated scanner/host observations, native prepare/terminate adapters, crash-rehydratable cleanup authority, stale-lock/high-water recovery, native handle-based hostile-host deletion, actual tmp-workspace projection integration, required CI, cross-platform native and scale/HA proof remain explicit blockers; live Docker/native/provider calls and build remain outside the E2 proof boundary",
       "updated": "2026-07-27"
     },
     {
@@ -8108,8 +8119,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "One lifecycle, one state authority, one evidence chain and all-surface cutover",
-      "evidence": "Code-truth audit; legacy 598,544",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: Goal Mission doğrudan WorkItem üretir; RunFlow Mission/WorkItem ownership taşımaz; ScheduledFlow ayrı queue kavramıdır; Attempt claim-local, canonical Operation catalog absent; legacy 598,544",
+      "updated": "2026-07-27"
     },
     {
       "order": 3010,
@@ -8152,8 +8163,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "IDs and state machines are versioned; no competing nouns or implicit conversion",
-      "evidence": "Multiple current stores and terms",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: `Flow` ScheduledFlow, RunFlow lifecycle ve autonomous trace için üç ayrı anlamda kullanılıyor; current entities arasında causal ownership yok",
+      "updated": "2026-07-27"
     },
     {
       "order": 3020,
@@ -8192,8 +8203,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "CAS, transactions, schema migration, bounded reconciliation and no file RMW race",
-      "evidence": "Goal-v2 and RunFlow stores are separate",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: Goal-v2 SQLite, RunFlow JSONL, CLI/REPL in-memory coordinator, sprint files ve ScheduledFlow RAM cursor ayrı authority; cross-process single-writer/fencing yok",
+      "updated": "2026-07-27"
     },
     {
       "order": 3030,
@@ -8239,8 +8250,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Duplicate effect impossible; unknown settlement never auto-replays",
-      "evidence": "Legacy 604,623,584",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: v2 stop marker loop içinde okunmuyor; Mission cancel ingress yok; API RunFlow cancel detached execution'ı durdurmuyor; exact causal cancel/lease/fence closure açık",
+      "updated": "2026-07-27"
     },
     {
       "order": 3040,
@@ -8288,8 +8299,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Exactly-one terminal result, criterion evidence, usage and causal lineage",
-      "evidence": "Legacy 601,667",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 live forensic: pre-provider Codex budget rejectioni `run-1785148266632-0` artifact'ını process/log/result olmadan `PENDING` bıraktı; sprint `COMPLETE` cleanup/finalizer truth'ından önce yayınlanabiliyor",
+      "updated": "2026-07-27"
     },
     {
       "order": 3050,
@@ -8328,8 +8339,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Each kind has versioned admission, execute, recover and settle contract",
-      "evidence": "Legacy 661 supersedes residual 602",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: production registry yalnız `task`; v2 task executor koşulsuz HOLD; sprint/capability/process dispatch code-present fakat production registry'ye unwired; legacy 661/602",
+      "updated": "2026-07-27"
     },
     {
       "order": 3060,
@@ -8406,8 +8417,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Exactly-once request/decision, hydrate on restart, denial propagates",
-      "evidence": "Legacy 599 and completed deny proof",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmediğinden riskli v2 mission approval request fail-closed park eder; v1 API/MCP unknown decision ID'yi doğrulamadan yazabilir",
+      "updated": "2026-07-27"
     },
     {
       "order": 3080,
@@ -8484,8 +8495,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Author, accepter and item dispatch share canonical resolver and HOLD semantics",
-      "evidence": "Legacy 603",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: v2 Goal author/accept ready authorityyi HOLD'a çevirirken one-shot `autonomous plan` provider'ı authority chain dışında çağırıyor; legacy 603",
+      "updated": "2026-07-27"
     },
     {
       "order": 3100,
@@ -8521,8 +8532,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Multi-process and tenant caps survive restart without duplicate side effect",
-      "evidence": "Legacy 604",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: SQLite lease/CAS foundation var; Mission/WorkItem PK'leri tenant-composite değil, per-tenant pool cap absent ve ScheduledFlow cursor restart-durable değil",
+      "updated": "2026-07-27"
     },
     {
       "order": 3110,
@@ -8561,8 +8572,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Transactional enqueue, explicit migration, no stranded mission or dual-write",
-      "evidence": "Legacy 605",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: engine v2 config açıkken CLI/MCP/API status, backlog ve approval v1 store'u yönetiyor; explicit migration/retirement yok",
+      "updated": "2026-07-27"
     },
     {
       "order": 3120,
@@ -8607,8 +8618,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Isolated read-only and docs-only real-binary runs before pool widening",
-      "evidence": "Legacy 606",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 live-state: active/pending v2 Mission, engine lease ve loop PID yok; executor/provider/surface/cancel gates kapanmadan autonomous/Flow provider canary başlatılmaz",
+      "updated": "2026-07-27"
     },
     {
       "order": 3130,
@@ -8647,8 +8658,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "`do`, run, API, terminal and Desktop consume one service; legacy stores migrated",
-      "evidence": "Legacy 544,612; project flag currently on",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: CLI/REPL in-memory controller event log yazmıyor, API/Desktop durable coordinator kullanıyor; child completion empty log'da swallow, cancel execution'a ulaşmıyor, false-start mümkün",
+      "updated": "2026-07-27"
     },
     {
       "order": 3140,
@@ -8683,8 +8694,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Shadow differential, rollback, checkpoint semantics and all dispatch sites",
-      "evidence": "Legacy 527,528",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: reducer enabled fakat tüm typed effects/call sites tek authority değil; ScheduledFlow ilk tick'i epoch nedeniyle hemen due, cursor RAM-only ve durable occurrence/drain yok",
+      "updated": "2026-07-27"
     },
     {
       "order": 3150,
@@ -8764,8 +8775,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Single leader per project/process realm; exact adoption or kill; no duplicate call",
-      "evidence": "Legacy 623",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: automatic sprint recovery `complete` yolu evaluation→cleanup/finalizer'ı atlayabilir; CLI resume ayrı implementation; v2 stop marker ve stale one-shot settlement unwired",
+      "updated": "2026-07-27"
     },
     {
       "order": 3170,
@@ -8801,8 +8812,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Measured protocol-turn baseline sizes each task kind; no landing deadlock; timeout enforces; partial result settles honestly",
-      "evidence": "Legacy 613,664,665",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 live forensic: configured Codex budget, adapter live-usage capability absent olduğu için provider öncesi fail-closed; configured Docker/unmetered reroute ordinary one-shot'a uygulanmadı ve task terminalize olmadı",
+      "updated": "2026-07-27"
     },
     {
       "order": 3180,
@@ -8842,8 +8853,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Golden-flow compatibility retired by evidence; interactive and non-interactive approval exact",
-      "evidence": "Legacy 541,544",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: CLI prompt/topology/scope fail'lerini bloklarken Terminal card/controller yalnız topology gate ediyor; preview dry-run Brain debt state'ini mutate edebilir; execution canonical proof değil",
+      "updated": "2026-07-27"
     },
     {
       "order": 3190,
@@ -8882,8 +8893,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Triggers create governed missions; no alternate backlog/effect engine; bounded safety canary",
-      "evidence": "Current autonomous enabled but not completion proof",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code/live truth: config `enabled=true, engine=v2`; v2 executor/provider authority HOLD, loop fiilen yok; CLI/MCP/API v1 control plane ve Flow bridge yalnız disabled v1 yolunda",
+      "updated": "2026-07-27"
     },
     {
       "order": 3200,
@@ -8967,8 +8978,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "No surface-owned execution/state engine; parity and contract tests",
-      "evidence": "Code-truth audit",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: RunFlow coordinator, approval gates, autonomous status/approve, cancel, review/finalize/cleanup ve recovery semantics surface bazında ayrışıyor; dashboard read-only kalması intentional",
+      "updated": "2026-07-27"
     },
     {
       "order": 3220,
@@ -9087,8 +9098,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Summary includes pre-EVALUATE results; teardown linger root cause measured; no `0/N` false report",
-      "evidence": "Legacy 667",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: `CLEANUP` phase enum'da yok; finalizer decay/COMPLETE/PID-checkpoint temizliğini delayed cleanup'tan önce yapıyor; finalizer failure marker'ı success'e dönebiliyor",
+      "updated": "2026-07-27"
     },
     {
       "order": 3250,
@@ -9288,8 +9299,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "No header-derived or synthetic identity reaches authorization; provenance and assurance explicit",
-      "evidence": "Terminal/API identity audit",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: CLI mission ingress `createdBy` üretmiyor; DO local/synthetic actor ile surface-specific coordinator'a giriyor; Terminal/API identity audit açık",
+      "updated": "2026-07-27"
     },
     {
       "order": 4020,
@@ -9332,8 +9343,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Read, write, event, memory, run, flow and admin paths share fail-closed scope; IDOR tests",
-      "evidence": "Memory tenant half-wire and terminal IDOR findings",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: Flow raw tenant/id'yi path'e katıyor, iki store layout var, registry/scheduler yalnız flow.id ile key ediyor; Mission/WorkItem IDs global ve API strict tenant composition unwired",
+      "updated": "2026-07-27"
     },
     {
       "order": 4030,
@@ -9477,8 +9488,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "CLI, terminal, Desktop, API, connectors, Worker and Nervous share CAS, expiry, relay and audit",
-      "evidence": "Rich components exist; all-ingress cutover incomplete",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: v2 request actor eksikliğinde park; v1 adapter unknown ID decision yazabiliyor ve API/MCP ingress bunu validate etmiyor; DO gate/revision semantics yüzeyler arasında drift",
+      "updated": "2026-07-27"
     },
     {
       "order": 4060,
@@ -9699,8 +9710,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Exact candidate, reservation, route lock, termination and receipt; no hold-only composition",
-      "evidence": "Legacy 616,617,619,629; 629 supersedes 619",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code/live truth: provider wrapper yalnız run/start/do/xverify; resume dışarıda; ordinary Codex adapter route configured Docker/reroute'u bypass edip budget capability HOLD üretti; autonomous plan direct provider bypass açık",
+      "updated": "2026-07-27"
     },
     {
       "order": 4110,
@@ -9828,8 +9839,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "No raw config disclosure, IDOR, query-token persistence or unscoped admin action",
-      "evidence": "Waits identity, tenancy and approval authority",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: autonomous strict-tenant option composition root'a geçmiyor; v1 approval API unknown ID doğrulamıyor; identity/tenancy/approval authority closure bekleniyor",
+      "updated": "2026-07-27"
     },
     {
       "order": 4140,
@@ -10584,8 +10595,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Propose, approve, start, cancel, inspect and settle use cases independent of transport/UI",
-      "evidence": "Legacy 587; server composition currently broad",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: CLI/REPL RunFlow controller, API coordinator, autonomous v1/v2 control ve Flow queue ayrı services; cancel/settle/status canonical use case değil",
+      "updated": "2026-07-27"
     },
     {
       "order": 6020,
@@ -11053,8 +11064,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Each use case names canonical service, supported surfaces and reasoned exclusions",
-      "evidence": "Legacy 566",
-      "updated": "2026-07-26"
+      "evidence": "2026-07-27 code-truth: start/approve/cancel/status/review/finalize/cleanup/resume semantics CLI, MCP, API, Terminal ve Desktop arasında farklı; dashboard read-only intentional negative-space",
+      "updated": "2026-07-27"
     },
     {
       "order": 6130,
@@ -12740,6 +12751,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "dcdaef426c665b9e9d71b2ac83407cc11627c9b5b0563181425175b1ce1a043b"
+    "value": "711173fe1aa2eeebfb3b0b14e704e897e3f4053c578aca6fe69c98374c16d119"
   }
 }

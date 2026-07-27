@@ -1,0 +1,657 @@
+; Deckent containment E2 measurement protocol — R00 authority freeze.
+;
+; Encoding profile:
+; - bounded deterministic RFC 8949 CBOR;
+; - definite lengths and preferred integer/length encodings only;
+; - canonical map-key order;
+; - no tags, floats, undefined, unsupported simple values, duplicate keys,
+;   invalid Unicode, or non-canonical encodings.
+;
+; Cryptographic profile:
+; - RFC 9864 fully-specified ESP256 (-9) for the FIPS profile;
+; - RFC 9864 fully-specified Ed25519 (-19) only for an explicitly authorized
+;   portable profile;
+; - deprecated polymorphic ES256 (-7) and EdDSA (-8) are denied;
+; - Ed448 (-53) is known but explicitly unsupported in R00.
+;
+; CONFORMANCE STATUS: NOT_BORN.
+; No CDDL parser-backed conformance gate is wired in R00. The accompanying
+; protocol-vector test is a lexical synchronization guard plus execution
+; against the deterministic CBOR/COSE/measurement validators. Parser-backed
+; CDDL validation and generated cross-language vectors remain an explicit
+; post-R00 blocker; this file does not claim that proof.
+
+containment-evidence-envelope = {
+  "schemaVersion": 2,
+  "protocol": "deckent.containment.v2",
+  "kind": "CONTAINMENT_EVIDENCE_ENVELOPE",
+  "receipt": signed-item,
+  "componentAttestations": [+ component-attestation],
+  "authorizationArtifacts": [* authorization-artifact],
+  "authorityGraph": authority-graph,
+  "activation": "NOT_BORN",
+  "proofEligible": false
+}
+
+signed-item = {
+  "envelope": bstr .cbor cose-sign1,
+  "externalAad": bstr .cbor external-aad
+}
+
+cose-sign1 = [
+  protected: bstr .cbor protected-headers,
+  unprotected: {},
+  payload: bstr .cbor signed-payload,
+  signature: bstr .size 64
+]
+
+signed-payload =
+  measurement-receipt /
+  component-attestation-payload /
+  enrollment-credential-payload /
+  admission-grant-payload /
+  cleanup-grant-payload
+
+protected-headers = {
+  1 => supported-cose-algorithm,
+  2 => ["deckent-profile"],
+  3 => "application/vnd.deckent.containment-evidence+cbor",
+  4 => key-id,
+  "deckent-profile" => "deckent.containment.cose-sign1.v2"
+}
+
+supported-cose-algorithm = -9 / -19
+deprecated-polymorphic-cose-algorithm = -7 / -8
+known-unsupported-cose-algorithm = -53
+
+external-aad = {
+  "protocol": "deckent.containment.v2",
+  "schemaVersion": 2,
+  "kind": authority-id,
+  "sequence": sequence,
+  "challenge": challenge-256,
+  "bindingsDigest": digest-256,
+  "controlPlaneEpoch": epoch,
+  "issuerRole": aad-role,
+  "componentRole": aad-role,
+  "issuerLineageDigest": digest-256
+}
+
+measurement-receipt =
+  attestor-enrollment /
+  discovery /
+  projection /
+  resource-prepared /
+  admission /
+  birth-bootstrap /
+  running-completion /
+  settlement-finality /
+  cleanup-commit
+
+receipt-core = (
+  "schemaVersion": 2,
+  "protocol": "deckent.containment.v2",
+  "challenge": challenge-256,
+  "epochs": epochs,
+  "issuerLineage": issuer-lineage,
+  "verdict": verdict,
+  "activation": "NOT_BORN",
+  "proofEligible": false
+)
+
+attestor-enrollment = {
+  receipt-core,
+  "kind": "ATTESTOR_ENROLLMENT",
+  "sequence": 0,
+  "previousEnvelopeDigest": null,
+  "bindings": pre-projection-bindings,
+  "artifactRefs": pre-admission-artifact-refs,
+  "measurements": attestor-enrollment-measurements
+}
+
+discovery = {
+  receipt-core,
+  "kind": "DISCOVERY",
+  "sequence": 1,
+  "previousEnvelopeDigest": digest-256,
+  "bindings": pre-projection-bindings,
+  "artifactRefs": pre-admission-artifact-refs,
+  "measurements": discovery-measurements
+}
+
+projection = {
+  receipt-core,
+  "kind": "PROJECTION",
+  "sequence": 2,
+  "previousEnvelopeDigest": digest-256,
+  "bindings": projected-bindings,
+  "artifactRefs": pre-admission-artifact-refs,
+  "measurements": projection-measurements
+}
+
+resource-prepared = {
+  receipt-core,
+  "kind": "RESOURCE_PREPARED",
+  "sequence": 3,
+  "previousEnvelopeDigest": digest-256,
+  "bindings": prepared-bindings,
+  "artifactRefs": pre-admission-artifact-refs,
+  "measurements": resource-prepared-measurements
+}
+
+admission = {
+  receipt-core,
+  "kind": "ADMISSION",
+  "sequence": 4,
+  "previousEnvelopeDigest": digest-256,
+  "bindings": prepared-bindings,
+  "artifactRefs": admission-artifact-refs,
+  "measurements": admission-measurements
+}
+
+birth-bootstrap = {
+  receipt-core,
+  "kind": "BIRTH_BOOTSTRAP",
+  "sequence": 5,
+  "previousEnvelopeDigest": digest-256,
+  "bindings": prepared-bindings,
+  "artifactRefs": admission-artifact-refs,
+  "measurements": birth-bootstrap-measurements
+}
+
+running-completion = {
+  receipt-core,
+  "kind": "RUNNING_COMPLETION",
+  "sequence": 6,
+  "previousEnvelopeDigest": digest-256,
+  "bindings": prepared-bindings,
+  "artifactRefs": admission-artifact-refs,
+  "measurements": running-completion-measurements
+}
+
+settlement-finality = {
+  receipt-core,
+  "kind": "SETTLEMENT_FINALITY",
+  "sequence": 7,
+  "previousEnvelopeDigest": digest-256,
+  "bindings": prepared-bindings,
+  "artifactRefs": admission-artifact-refs,
+  "measurements": settlement-finality-measurements
+}
+
+cleanup-commit = {
+  receipt-core,
+  "kind": "CLEANUP_COMMIT",
+  "sequence": 8,
+  "previousEnvelopeDigest": digest-256,
+  "bindings": prepared-bindings,
+  "artifactRefs": cleanup-authorized-artifact-refs,
+  "measurements": cleanup-commit-measurements
+}
+
+epochs = {
+  "trust": epoch,
+  "key": epoch,
+  "session": epoch,
+  "controlPlane": epoch
+}
+
+scope-tuple = (
+  "tenantId": authority-id,
+  "projectId": authority-id,
+  "workspaceId": authority-id
+)
+
+; Canonical execution journal identity tuple. Every receipt phase binds the
+; same Goal -> Mission -> Flow -> Run -> WorkItem -> Attempt -> Operation ->
+; ExecutionInstance lineage; omission is not represented by an empty field.
+journal-tuple = (
+  "goalId": authority-id,
+  "missionId": authority-id,
+  "flowId": authority-id,
+  "runId": authority-id,
+  "workItemId": authority-id,
+  "attemptId": authority-id,
+  "operationId": authority-id,
+  "executionInstanceId": authority-id
+)
+
+policy-platform-binding = (
+  "platformClass": platform-class,
+  "platformInstanceId": authority-id,
+  "policyId": authority-id,
+  "policyVersion": authority-id
+)
+
+binding-core = (
+  scope-tuple,
+  journal-tuple,
+  policy-platform-binding,
+  "policyDigest": digest-256,
+  "controlPlaneDigest": digest-256,
+  "executionDigest": digest-256
+)
+
+pre-projection-bindings = {
+  binding-core,
+  "fencingTokenDigest": null,
+  "projectionDigest": null,
+  "resourceDigest": null
+}
+
+projected-bindings = {
+  binding-core,
+  "fencingTokenDigest": null,
+  "projectionDigest": digest-256,
+  "resourceDigest": null
+}
+
+prepared-bindings = {
+  binding-core,
+  "fencingTokenDigest": digest-256,
+  "projectionDigest": digest-256,
+  "resourceDigest": digest-256
+}
+
+issuer-lineage = {
+  "issuerId": authority-id,
+  "authorityRole": authority-role,
+  "parentIssuerId": authority-id / null,
+  "enrollmentId": authority-id,
+  "enrollmentDigest": digest-256,
+  "keyId": key-id,
+  "keyEpoch": epoch,
+  "algorithm": "ESP256" / "Ed25519" / "Ed448",
+  "curve": "P-256" / "Ed25519" / "Ed448"
+}
+
+artifact-ref-core = (
+  "authorityGraphDigest": digest-256,
+  "componentAttestationSetDigest": digest-256,
+  "authorizationArtifactSetDigest": digest-256
+)
+
+pre-admission-artifact-refs = {
+  artifact-ref-core,
+  "admissionGrantDigest": null,
+  "cleanupGrantDigest": null
+}
+
+admission-artifact-refs = {
+  artifact-ref-core,
+  "admissionGrantDigest": digest-256,
+  "cleanupGrantDigest": null
+}
+
+cleanup-authorized-artifact-refs = {
+  artifact-ref-core,
+  "admissionGrantDigest": digest-256,
+  "cleanupGrantDigest": digest-256
+}
+
+component-attestation = {
+  "componentId": authority-id,
+  component-platform-role,
+  "authorityId": authority-id,
+  "signed": signed-item
+}
+
+component-attestation-payload = {
+  "schemaVersion": 2,
+  "protocol": "deckent.containment.v2",
+  "kind": "COMPONENT_ATTESTATION",
+  "sequence": sequence,
+  "componentId": authority-id,
+  component-platform-role,
+  "challenge": challenge-256,
+  "bindingsDigest": digest-256,
+  "issuerLineageDigest": digest-256,
+  "measurementDigest": digest-256,
+  "activation": "NOT_BORN",
+  "proofEligible": false
+}
+
+authorization-artifact =
+  enrollment-credential-artifact /
+  admission-grant-artifact /
+  cleanup-grant-artifact
+
+authorization-artifact-core = (
+  "artifactId": authority-id,
+  "issuerId": authority-id,
+  "authorityRole": authority-role,
+  "signed": signed-item
+)
+
+enrollment-credential-artifact = {
+  authorization-artifact-core,
+  "kind": "ENROLLMENT_CREDENTIAL",
+  "subjectAuthorityId": authority-id,
+  "subjectExecutionInstanceId": null
+}
+
+admission-grant-artifact = {
+  authorization-artifact-core,
+  "kind": "ADMISSION_GRANT",
+  "subjectAuthorityId": null,
+  "subjectExecutionInstanceId": authority-id
+}
+
+cleanup-grant-artifact = {
+  authorization-artifact-core,
+  "kind": "CLEANUP_GRANT",
+  "subjectAuthorityId": null,
+  "subjectExecutionInstanceId": authority-id
+}
+
+grant-payload-core = (
+  "schemaVersion": 2,
+  "protocol": "deckent.containment.v2",
+  "artifactId": authority-id,
+  "challenge": challenge-256,
+  "bindingsDigest": digest-256,
+  "subjectAuthorityId": null,
+  "subjectExecutionInstanceId": authority-id,
+  "issuerLineageDigest": digest-256,
+  "authorizedEnvelopeDigest": digest-256,
+  "resourceDigest": digest-256,
+  "targetSetDigest": digest-256,
+  "fencingTokenDigest": digest-256,
+  "activation": "NOT_BORN",
+  "proofEligible": false
+)
+
+admission-grant-payload = {
+  grant-payload-core,
+  "kind": "ADMISSION_GRANT",
+  "sequence": 4,
+  "authorizedAfterSequence": 3
+}
+
+cleanup-grant-payload = {
+  grant-payload-core,
+  "kind": "CLEANUP_GRANT",
+  "sequence": 8,
+  "authorizedAfterSequence": 7
+}
+
+enrollment-credential-payload = {
+  "schemaVersion": 2,
+  "protocol": "deckent.containment.v2",
+  "kind": "ENROLLMENT_CREDENTIAL",
+  "sequence": 0,
+  "artifactId": authority-id,
+  "challenge": challenge-256,
+  "bindingsDigest": digest-256,
+  "subjectAuthorityId": authority-id,
+  "credentialSubjectDigest": digest-256,
+  "issuerLineageDigest": digest-256,
+  "activation": "NOT_BORN",
+  "proofEligible": false
+}
+
+; The credential subject deliberately excludes enrollmentDigest to avoid a
+; digest cycle. The signed credential envelope digest becomes the child
+; authority-node enrollmentDigest.
+credential-subject = {
+  "authorityId": authority-id,
+  "authorityRole": non-root-authority-role,
+  "parentAuthorityId": authority-id,
+  "enrollmentId": authority-id,
+  "keyId": key-id,
+  "keyEpoch": epoch,
+  "algorithm": "ESP256" / "Ed25519" / "Ed448",
+  "curve": "P-256" / "Ed25519" / "Ed448"
+}
+
+authority-graph = {
+  ; Exactly one root-trust/null-parent anchor; every other node is non-root.
+  "nodes": [
+    * non-root-authority-node,
+    root-authority-node,
+    * non-root-authority-node
+  ],
+  "edges": [* authority-edge]
+}
+
+authority-node-core = (
+  "authorityId": authority-id,
+  "platformClass": platform-class,
+  "enrollmentId": authority-id,
+  "enrollmentDigest": digest-256,
+  "keyId": key-id,
+  "keyEpoch": epoch,
+  "algorithm": "ESP256" / "Ed25519" / "Ed448",
+  "curve": "P-256" / "Ed25519" / "Ed448"
+)
+
+root-authority-node = {
+  authority-node-core,
+  "authorityRole": "root-trust",
+  "parentAuthorityId": null
+}
+
+non-root-authority-node = {
+  authority-node-core,
+  "authorityRole": non-root-authority-role,
+  "parentAuthorityId": authority-id
+}
+
+authority-edge = {
+  "parentAuthorityId": authority-id,
+  "childAuthorityId": authority-id,
+  "relationship": "DELEGATES"
+}
+
+; Cross-envelope semantic constraints enforced by the JS authority validator:
+; - the graph contains exactly one root-trust node with a null parent; every
+;   other node has a non-root role, a non-null parent, one matching incoming
+;   DELEGATES edge, and a path to that single root (no forest/cycle);
+; - sequence 0 carries exactly one ENROLLMENT_CREDENTIAL for every non-root
+;   authority node; root anchors carry no credential;
+; - every credential issuer is the subject node's declared parent and the
+;   credential envelope digest equals the subject node enrollmentDigest;
+; - sequences 1..3 carry no authorization grant;
+; - sequence 4 first carries ADMISSION_GRANT, whose authorizedEnvelopeDigest
+;   equals sequence 4 previousEnvelopeDigest (the full sequence 3 outer
+;   envelope), and whose resource/descriptor-set/fencing digests match the
+;   consuming admission receipt; its issuer role is control-plane;
+; - sequences 5..7 retain the exact admission grant envelope;
+; - sequence 7 does not carry CLEANUP_GRANT;
+; - sequence 8 first carries CLEANUP_GRANT, whose authorizedEnvelopeDigest
+;   equals sequence 8 previousEnvelopeDigest (the full sequence 7 outer
+;   envelope), and whose resource/cleanup-target-set/fencing digests match the
+;   consuming cleanup receipt; its issuer role is cleanup-authority;
+; - every component payload measurementDigest equals the canonical digest of
+;   the normalized receipt measurement array;
+; - every component platformClass equals its receipt platformClass, and every
+;   envelope carries exactly the ordered platform role tuple below (no missing,
+;   extra, duplicate, or reordered roles): linux-native=[LINUX_NATIVE],
+;   darwin-signed-app=[MACOS_SIGNED_APP],
+;   darwin-virtualized-kernel=[MACOS_HOST,GUEST_KERNEL],
+;   win32-native=[WINDOWS_NATIVE], wsl2=[WINDOWS_OUTER,LINUX_INNER],
+;   oci-rootless=[LINUX_HOST,OCI_RUNTIME]; every multi-role tuple uses distinct
+;   authorityId values; darwin-terminal=[UNSUPPORTED] is a typed
+;   E_CONTAINMENT_E2_PLATFORM_UNSUPPORTED result, never accepted proof;
+; - authorityGraphDigest and the journal tuple remain stable across all nine
+;   receipts; previousEnvelopeDigest is recomputed from canonical outer bytes.
+
+measurement-core = (
+  "source": measurement-source,
+  "digestAlgorithm": "sha-256",
+  "digest": digest-256,
+  "status": "MEASURED" / "CONTRADICTED"
+)
+
+attestor-enrollment-measurements = [
+  { measurement-core, "type": "attestor-binary" },
+  { measurement-core, "type": "attestor-public-key" },
+  { measurement-core, "type": "platform-boot" }
+]
+
+discovery-measurements = [
+  { measurement-core, "type": "host-identity" },
+  { measurement-core, "type": "kernel-identity" },
+  { measurement-core, "type": "platform-capabilities" }
+]
+
+projection-measurements = [
+  { measurement-core, "type": "dependency-projection" },
+  { measurement-core, "type": "policy" },
+  { measurement-core, "type": "runtime-projection" },
+  { measurement-core, "type": "source-projection" }
+]
+
+resource-prepared-measurements = [
+  { measurement-core, "type": "boundary-plan" },
+  { measurement-core, "type": "resource-handles" },
+  { measurement-core, "type": "scratch-root" }
+]
+
+admission-measurements = [
+  { measurement-core, "type": "admission-decision" },
+  { measurement-core, "type": "admission-grant-consumed" },
+  { measurement-core, "type": "descriptor-set" }
+]
+
+birth-bootstrap-measurements = [
+  { measurement-core, "type": "bootstrap-attestation" },
+  { measurement-core, "type": "boundary-inheritance" },
+  { measurement-core, "type": "process-identity" }
+]
+
+running-completion-measurements = [
+  { measurement-core, "type": "descendant-set" },
+  { measurement-core, "type": "output-set" },
+  { measurement-core, "type": "process-completion" }
+]
+
+settlement-finality-measurements = [
+  { measurement-core, "type": "exit-finality" },
+  { measurement-core, "type": "resource-finality" },
+  { measurement-core, "type": "settlement-ledger" }
+]
+
+cleanup-commit-measurements = [
+  { measurement-core, "type": "cleanup-commit" },
+  { measurement-core, "type": "cleanup-target-set" },
+  { measurement-core, "type": "resource-empty" }
+]
+
+measurement-source =
+  "native-attestor" /
+  "kernel" /
+  "host-control-plane" /
+  "rootless-oci-runtime" /
+  "windows-kernel" /
+  "virtualized-kernel"
+
+platform-class =
+  "linux-native" /
+  "darwin-terminal" /
+  "darwin-signed-app" /
+  "darwin-virtualized-kernel" /
+  "win32-native" /
+  "wsl2" /
+  "oci-rootless"
+
+authority-role =
+  "root-trust" /
+  non-root-authority-role
+
+non-root-authority-role =
+  "control-plane" /
+  "platform-attestor" /
+  "runtime-attestor" /
+  "resource-broker" /
+  "cleanup-authority"
+
+component-platform-role =
+  (
+    "componentRole": "LINUX_NATIVE",
+    "platformClass": "linux-native"
+  ) /
+  (
+    "componentRole": "UNSUPPORTED",
+    "platformClass": "darwin-terminal"
+  ) /
+  (
+    "componentRole": "MACOS_SIGNED_APP",
+    "platformClass": "darwin-signed-app"
+  ) /
+  (
+    "componentRole": "MACOS_HOST",
+    "platformClass": "darwin-virtualized-kernel"
+  ) /
+  (
+    "componentRole": "GUEST_KERNEL",
+    "platformClass": "darwin-virtualized-kernel"
+  ) /
+  (
+    "componentRole": "WINDOWS_NATIVE",
+    "platformClass": "win32-native"
+  ) /
+  (
+    "componentRole": "WINDOWS_OUTER",
+    "platformClass": "wsl2"
+  ) /
+  (
+    "componentRole": "LINUX_INNER",
+    "platformClass": "wsl2"
+  ) /
+  (
+    "componentRole": "LINUX_HOST",
+    "platformClass": "oci-rootless"
+  ) /
+  (
+    "componentRole": "OCI_RUNTIME",
+    "platformClass": "oci-rootless"
+  )
+
+component-role =
+  "LINUX_NATIVE" /
+  "UNSUPPORTED" /
+  "MACOS_SIGNED_APP" /
+  "MACOS_HOST" /
+  "GUEST_KERNEL" /
+  "WINDOWS_NATIVE" /
+  "WINDOWS_OUTER" /
+  "LINUX_INNER" /
+  "LINUX_HOST" /
+  "OCI_RUNTIME"
+
+verdict =
+  { "state": "OBSERVED", "reasonCode": "NONE" } /
+  { "state": "HOLD", "reasonCode": hold-reason }
+
+hold-reason =
+  "E_CONTAINMENT_E2_NOT_BORN" /
+  "E_CONTAINMENT_E2_INPUT_INVALID" /
+  "E_CONTAINMENT_E2_SCHEMA_INVALID" /
+  "E_CONTAINMENT_E2_KIND_INVALID" /
+  "E_CONTAINMENT_E2_SEQUENCE_INVALID" /
+  "E_CONTAINMENT_E2_PREVIOUS_RECEIPT_INVALID" /
+  "E_CONTAINMENT_E2_CHALLENGE_INVALID" /
+  "E_CONTAINMENT_E2_CHALLENGE_MISMATCH" /
+  "E_CONTAINMENT_E2_EPOCH_INVALID" /
+  "E_CONTAINMENT_E2_EPOCH_MISMATCH" /
+  "E_CONTAINMENT_E2_BINDING_INVALID" /
+  "E_CONTAINMENT_E2_BINDING_MISMATCH" /
+  "E_CONTAINMENT_E2_MEASUREMENT_INVALID" /
+  "E_CONTAINMENT_E2_MEASUREMENT_SET_INVALID" /
+  "E_CONTAINMENT_E2_VERDICT_INVALID" /
+  "E_CONTAINMENT_E2_COSE_INVALID" /
+  "E_CONTAINMENT_E2_KEY_LINEAGE_INVALID" /
+  "E_CONTAINMENT_E2_REPLAY_OR_FORK" /
+  "E_CONTAINMENT_E2_CHAIN_INCOMPLETE" /
+  "E_CONTAINMENT_E2_EXTERNAL_AAD_MISMATCH" /
+  "E_CONTAINMENT_E2_PLATFORM_UNSUPPORTED" /
+  "E_CONTAINMENT_E2_TRUST_POLICY_HOLD"
+
+sequence = 0..8
+epoch = 1..9007199254740991
+key-id = bstr .size (16..64)
+digest-256 = bstr .size 32
+challenge-256 = bstr .size 32
+authority-id = tstr .size (1..256)
+aad-role = tstr .size (1..64)
