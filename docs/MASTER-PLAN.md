@@ -1097,7 +1097,7 @@ code/live regressions remain governed by the canonical ledger and code-truth bas
 | Stop line | Current truth | Remedy owner |
 |---|---|---|
 | Shared worktree drift | Multiple dirty files/worktrees and concurrent sessions exist | P00 collision protocol |
-| Config drift | Gitignored config changed during analysis; API mode again requires Anthropic key | CM-01 with exact file approval |
+| Config/runtime policy drift | Owner-approved local config now uses Sol Brain in every mode, hard worker ceiling 6 and Claude→Codex verifier priority; gitignored projection and all-ingress runtime truth remain unproven | CM-01, CM-05 |
 | Test side effects | Suite writes live `.tasks` and has observed `dist` wipe | TEST-675, TEST-676 |
 | Provider ingress | Production composition is HOLD-only; no real ALLOW | PA-662, CODEX-ADMISSION-001, PROVIDER-INGRESS-001 |
 | Codex usage | Worker adapter has no enforceable incremental metering | FO chain, then IM chain |
@@ -1105,8 +1105,9 @@ code/live regressions remain governed by the canonical ledger and code-truth bas
 | Final-only Worker policy | Current scoped authorization covers Auditor, not Worker | FO-12 |
 | Live provider authority | No current `G7` receipt exists; every paid/external stage is HOLD | Exact per-stage G7 receipt, never this plan receipt |
 | Credential isolation | Docker copies Codex auth into worker-private HOME | P02-632, P02-633, P02-642, P02-653 |
-| Independent verification | Current priority can self-verify Codex work | CM-04 |
+| Independent verification | Local config and pure selector now reject same-provider verification; exact Fable/Sol authority, all-ingress wiring and live settlement remain unproven | CM-04, XVERIFY-WIRE-001 |
 | Execution ontology | Goal, mission, autonomous, flow, run, process and sprint remain partially separate | KERNEL-001 |
+| Persistent goal lifecycle | Owner resumed the existing detailed goal, but the session API still reports `blocked` and exposes no truthful active transition; false `complete` is forbidden | KERNEL-STATE-001, GOAL-CRASH-001 |
 | Product surfaces | Terminal/Desktop/API have substantial code but not one application-service cutover | P05, P06 |
 
 No sprint is promoted past its applicable stop line. Bypass, budget removal, fake capability
@@ -1122,13 +1123,42 @@ declaration or silent fallback is not an accepted remedy.
 > evidence ile `DONE` veya
 > owner-approved `DISPOSED` durumuna taşımak.
 
-**Goal activation gate:** ledger validation ve isolated commit sonrasında persistent session goal
-authority'sinde oluşturulur; activation receipt self-referential plan commit'ine yazılmaz.
+**Goal lifecycle truth:** persistent session goal aynı objective ve thread kimliğiyle mevcuttur.
+Owner 2026-07-27'de açıkça resume etmiştir; session API'nin `blocked` projection'ı current owner
+intent'i temsil etmez ve goal'ın tamamlandığı anlamına gelmez. API aktif transition sunana kadar
+aynı objective bu MASTER addendum'u ve current execution plan ile sürdürülür; goal sahte biçimde
+`complete` yapılmaz ve ayrıntısı azaltılmış yeni goal ile değiştirilmez.
 
 **Token budget:** owner tarafından ayrıca verilmedi; artificial token-stop yoktur.
 
+### 11.1 Owner-approved execution addendum — 2026-07-27
+
+1. **Dogfood mandatory.** Her implementation slice Deckent'in kendi
+   Goal/Mission/Flow/Run/Autonomous/Do yüzeyleriyle planlanır, yürütülür, değerlendirilir ve
+   settlement'a taşınır. Manuel müdahale yalnız typed ve kayda alınmış bootstrap/recovery/düzeltme
+   seam'idir; ilk güvenli sınırda yeniden dogfood'a dönmek zorundadır.
+2. **Sol Brain supervision.** GPT-5.6 Sol PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP
+   lifecycle'ının status, heartbeat, usage/limit, Nervous, disk diff, result ve settlement
+   kanıtlarını izler. Sentetik agent verdict'ü disk truth olmadan promotion authority değildir.
+3. **Heterojen six-worker ceiling.** Codex ve Claude worker'lar birlikte kullanılır; hard parallel
+   ceiling 6'dır. Claude Sonnet 5 genel implementation, Opus 5 seçili yüksek-risk inceleme;
+   Codex Terra genel worker ve Sol derin kernel/Brain işi taşır. Slot sayısı hedef değil üst
+   sınırdır: dependency, collision, entitlement, reachability veya finite budget uygun değilse
+   dispatch edilmez.
+4. **Strict provider separation.** XVerify çıktıyı üreten provider'dan farklı provider'da yapılır.
+   Codex/Sol çıktısının default exact verifier'ı Claude Fable 5, seçili derin incelemede Opus 5;
+   Claude çıktısının verifier'ı tier-uygun Codex Terra/Sol'dur. Same-provider self-verify ve sessiz
+   fallback yasaktır; fresh ikinci-provider authority yoksa typed `unavailable/HOLD` üretilir.
+5. **Usage-aware control.** Her provider dispatch'i exact model, auth/account, reachability,
+   limit, finite budget ve settlement authority'sine bağlıdır. Brain kendi ve Claude usage
+   kapasitesini sprint admission'ında ve canlı izleme sırasında değerlendirir; limit zorlanmaz.
+6. **Proof ladder.** Dogfood sonucu ancak
+   code-present→wired→enabled→hermetic-proven→live-proven→cross-platform-proven→scale-proven
+   zinciri ve exact evidence ile promotion alır. Manuel düzeltme veya tek test yeşili `DONE`
+   üretmez.
+
 **Execution method:** bounded Deckent dogfood sprints + GPT-5.6 Sol supervision + disk-truth review +
-exact-file-approved manual repair.
+strict cross-provider XVerify + exact-file-approved typed manual recovery.
 
 **Completion reporting:** “bitti” yalnız §1 finish contract'ı ve ledger closure report'u ile söylenir.
 
@@ -1140,7 +1170,9 @@ Her implementation slice için:
 2. Exact Work ID'ler `DIRECTIVES.md` projection'ına atomik task DAG olarak çıkarılır.
 3. Alperen start gate'i olmadan sprint başlatılmaz.
 4. Supervisor canlı status, heartbeat, budget, logs, diffs ve provider truth'u izler.
+   Parallel worker hard ceiling 6'dır; daha düşük safe concurrency normaldir.
 5. Brain verdict disk truth ile karşılaştırılır; sentetik GO/NO_GO tek başına authority değildir.
+   XVerify provider'ı task producer provider'ından farklı olmak zorundadır.
 6. Sprint, agent veya manual repair fark etmeksizin her write exact `G1 FILE` approval'ına bağlıdır.
 7. Targeted, affected, binary, live ve platform proofs ayrı provenance ile çalıştırılır.
 8. Residual aynı gün yeni child olur; `DONE` hücresine gömülmez.

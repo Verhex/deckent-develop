@@ -59,14 +59,37 @@ Kalite her seferinde kullanıcının prompt'uyla düzeltilmemeli; **ilk seferde 
 ## ⚖️ Bağlayıcı Operasyon Kuralları (memory-promoted — her oturum geçerli)
 Auto-memory lazy yüklenir (topic dosyaları yalnız okunca gelir); bu yüzden gerçekten-bağlayıcı kurallar buraya terfi edildi (her oturum garanti). Detay: proje-memory kayıtları (Claude-oturumları `~/.claude/projects/.../memory/`).
 - **Türkçe konuş** (Alperen) — anlatım TR, kod/komut/teknik terim EN.
+- **DOGFOOD-MANDATORY (Alperen, 2026-07-27).** Deckent'in her implementation slice'ı
+  kendi Goal/Mission/Flow/Run/Autonomous/Do yüzeyleri üzerinden planlanır, yürütülür,
+  değerlendirilir ve settlement'a taşınır. Manuel müdahale yalnız typed, kayda alınmış
+  bootstrap/recovery/düzeltme seam'idir; dogfood'un yerine geçemez ve ilk güvenli sınırda
+  yeniden dogfood akışına dönülür.
+- **SOL-BRAIN SUPERVISION.** GPT-5.6 Sol her Deckent dogfood sürecini PLAN'dan terminal
+  settlement'a kadar status, heartbeat, usage/limit, Nervous, disk diff ve kanıt zinciriyle
+  izler; sentetik agent verdict'ünü tek başına kabul etmez. Host-level effort değiştirilemiyorsa
+  task effort `normal|high` ile risk-temelli ayarlanır.
+- **Heterojen pool, hard ceiling=6.** Codex ve Claude worker'lar birlikte kullanılır;
+  en fazla 6 paralel worker dispatch edilir. Claude Sonnet 5 genel implementation,
+  Opus 5 seçili yüksek-risk inceleme; Codex Terra genel worker ve Sol derin kernel/Brain
+  işleri içindir. Provider usage, entitlement, reachability ve finite budget admission'ı
+  uygun değilse slot boş kalır; limit zorlanmaz.
+- **XVERIFY-PROVIDER-SEPARATION.** XVerify daima çıktıyı üreten provider'dan farklı
+  provider ile yapılır; same-provider doğrulama yasaktır. Codex/Sol çıktısında varsayılan
+  exact verifier Claude Fable 5, seçili derin kontrolde Opus 5; Claude çıktısında
+  tier-uygun Codex Terra/Sol kullanılır. İkinci provider için fresh authority evidence yoksa
+  sonuç typed `unavailable/HOLD` olur, self-verify veya sessiz fallback olmaz.
 - **Sprint'i Alperen onayı olmadan kill/cleanup ETME**; `rm .tasks/*` YASAK.
 - **`.brain/memory.db` ASLA silinmez** — tüm Brain knowledge orada.
-- **Sprint çalışırken `npm run build` ve `/login` YASAK** (ESM cache + worker auth-loss); build sonrası `/mcp restart` Alperen yapar.
+- **Sprint çalışırken `npm run build` ve `/login` YASAK** (ESM cache + worker auth-loss);
+  build sonrası `/mcp restart` Alperen yapar, Codex `deckent bot stop` → `deckent bot start`
+  ile connector akışını yeniden doğrular.
 - **Commit/push öncesi `git branch -vv`** — shared-worktree HEAD-drift; başka oturumun commit'ini bozma; commit yalnız Alperen isteyince.
 - **Sprint'ler CLI'dan** (`env -u ANTHROPIC_API_KEY deckent …`), MCP'den start/run/plan değil.
 - **Disk-verify ground truth** — Brain sentetik NO_GO'ya güvenme; `git diff --stat`/`git ls-files` ile doğrula.
 - **haiku yalnız doc** — kod/tsx'e route etme.
-- **İş-takip SSOT** = `docs/MASTER-PLAN.md` (tek pillar-tablo, 209 madde, Durum+Tarih sütunlu) + memory `work_tracking_ledger`; aktif öncelikler MEMORY.md tepesinde pinned. Eski plan: `docs/archive/MASTER-PLAN-archived-2026-06-29.md`.
+- **İş-takip SSOT** = `docs/MASTER-PLAN.md` (tek canonical ledger; sayı generated
+  projection'dan okunur, metinde hardcode edilmez) + pinned `MEMORY.md`. Eski plan:
+  `docs/archive/MASTER-PLAN-archived-2026-06-29.md`.
 - **🧭 Aktif Yön (2026-06-29 pivot — Hermes-vs-Deckent analiz turu):** terminal = ana yönetim+kullanım yüzeyi (tool-driven, derin, **full-control + yormayan**; iş CLI değil terminalden, CLI/MCP opsiyonel) · dashboard = yalnız izleme. **P0:** training-trace WIRE · runtime-wide ApprovalBroker (çok-ortam canlı onay) · Hermes-rol-model tool + progressive disclosure · global-install+proje-scope · DIRECTIVES 0-kırılganlık. **Koru (yeniden-yazma YOK):** deterministik 8-faz eval-backed orchestration · kapalı outcome→routing→promotion öğrenme · governance-by-construction. Detay: `.analysis/hermes-vs-deckent-direction-decisions.md` + memory `project_hermes_deckent_direction_2026_06`.
 </operating_rules>
 

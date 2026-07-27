@@ -53,7 +53,27 @@ Kalite her seferinde kullanıcının prompt'uyla düzeltilmemeli; **ilk seferde 
 
 <operating_rules>
 ## ⚖️ Bağlayıcı Operasyon Kuralları (sprint-mekaniği — her oturum geçerli)
-Davranış-KANUNLARI tek-yer = auto-memory `MEMORY.md` (11 kalıcı kanun, Alperen-seçimi 2026-07-14; her oturum yüklenir). Buradakiler yalnız sprint-mekaniği:
+Davranış-KANUNLARI tek-yer = auto-memory `MEMORY.md` (14 kalıcı kanun,
+Alperen-seçimi; her oturum yüklenir). Buradakiler sprint-mekaniği + her session için
+zorunlu owner kararlarıdır:
+- **DOGFOOD-MANDATORY (Alperen, 2026-07-27).** Deckent'in her implementation slice'ı
+  kendi Goal/Mission/Flow/Run/Autonomous/Do yüzeyleri üzerinden planlanır, yürütülür,
+  değerlendirilir ve settlement'a taşınır. Manuel müdahale yalnız typed, kayda alınmış
+  bootstrap/recovery/düzeltme seam'idir; dogfood'un yerine geçemez ve ilk güvenli sınırda
+  yeniden dogfood akışına dönülür.
+- **SOL-BRAIN SUPERVISION.** GPT-5.6 Sol her Deckent dogfood sürecini PLAN'dan terminal
+  settlement'a kadar status, heartbeat, usage/limit, Nervous, disk diff ve kanıt zinciriyle
+  izler; sentetik agent verdict'ünü tek başına kabul etmez.
+- **Heterojen pool, hard ceiling=6.** Codex ve Claude worker'lar birlikte kullanılır;
+  en fazla 6 paralel worker dispatch edilir. Claude Sonnet 5 genel implementation,
+  Opus 5 seçili yüksek-risk inceleme; Codex Terra genel worker ve Sol derin kernel/Brain
+  işleri içindir. Provider usage, entitlement, reachability ve finite budget admission'ı
+  uygun değilse slot boş kalır; limit zorlanmaz.
+- **XVERIFY-PROVIDER-SEPARATION.** XVerify daima çıktıyı üreten provider'dan farklı
+  provider ile yapılır; same-provider doğrulama yasaktır. Codex/Sol çıktısında varsayılan
+  exact verifier Claude Fable 5, seçili derin kontrolde Opus 5; Claude çıktısında
+  tier-uygun Codex Terra/Sol kullanılır. İkinci provider için fresh authority evidence yoksa
+  sonuç typed `unavailable/HOLD` olur, self-verify veya sessiz fallback olmaz.
 - **Sprint'i Alperen onayı olmadan kill/cleanup ETME**; `rm .tasks/*` YASAK.
 - **`.brain/memory.db` ASLA silinmez** — tüm Brain knowledge orada.
 - **Sprint çalışırken `npm run build` ve `/login` YASAK** (ESM cache + worker auth-loss); build sonrası `/mcp restart` Alperen yapar, bot stop→start CC yapar.
