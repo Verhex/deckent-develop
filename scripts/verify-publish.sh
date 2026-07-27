@@ -1,95 +1,43 @@
 #!/bin/bash
-# verify-publish.sh - Verify npm package before publishing
-# Checks: npm pack output, dist/ contents, executable permissions, version format
+# Compatibility entrypoint. All checks are read-only and never build or clean
+# the repository. README/LICENSE remain explicit packed-artifact contracts from
+# the retired verifier; the canonical validator owns every other publish gate.
 
-set -e
+set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 
-echo "📦 Verifying publish readiness..."
+node "$PROJECT_ROOT/scripts/validate-publish.mjs" "$PROJECT_ROOT"
 
-# 1. Check version format in package.json
-echo "✓ Checking version format..."
-VERSION=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$PROJECT_ROOT/package.json" | head -1 | cut -d'"' -f4)
-if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$ ]]; then
-  echo "❌ Invalid version format: $VERSION (expected: x.y.z or x.y.z-prerelease.n)"
-  exit 1
-fi
-echo "  Version: $VERSION"
+PACK_OUTPUT="$(
+  cd "$PROJECT_ROOT"
+  npm pack --dry-run --json --ignore-scripts
+)"
 
-# 2. Build dist/
-echo "✓ Building project..."
-if ! npm run build > /dev/null 2>&1; then
-  echo "❌ Build failed"
-  exit 1
-fi
-
-# 3. Check dist/ exists and has content
-echo "✓ Checking dist/ contents..."
-if [ ! -d "$PROJECT_ROOT/dist" ]; then
-  echo "❌ dist/ directory not found"
-  exit 1
-fi
-
-DIST_FILES=$(find "$PROJECT_ROOT/dist" -type f | wc -l)
-if [ "$DIST_FILES" -eq 0 ]; then
-  echo "❌ dist/ is empty"
-  exit 1
-fi
-echo "  Files in dist/: $DIST_FILES"
-
-# 4. Check index.js and index.d.ts exist
-if [ ! -f "$PROJECT_ROOT/dist/index.js" ]; then
-  echo "❌ dist/index.js not found"
-  exit 1
-fi
-
-if [ ! -f "$PROJECT_ROOT/dist/index.d.ts" ]; then
-  echo "❌ dist/index.d.ts not found"
-  exit 1
-fi
-echo "  ✓ index.js and index.d.ts present"
-
-# 5. Run npm pack --dry-run and check output
-echo "✓ Running npm pack --dry-run..."
-if ! PACK_OUTPUT=$(npm pack --dry-run 2>&1); then
-  echo "❌ npm pack --dry-run failed"
-  exit 1
-fi
-
-# Check that essential files are included
-if ! echo "$PACK_OUTPUT" | grep -q "dist/index.js"; then
-  echo "❌ dist/index.js not in npm pack output"
-  exit 1
-fi
-
-if ! echo "$PACK_OUTPUT" | grep -q "dist/index.d.ts"; then
-  echo "❌ dist/index.d.ts not in npm pack output"
-  exit 1
-fi
-
-if ! echo "$PACK_OUTPUT" | grep -q "README.md"; then
-  echo "❌ README.md not in npm pack output"
-  exit 1
-fi
-
-if ! echo "$PACK_OUTPUT" | grep -q "LICENSE"; then
-  echo "❌ LICENSE not in npm pack output"
-  exit 1
-fi
-
-echo "  Files to be published:"
-echo "$PACK_OUTPUT" | grep -E "^\s" | sed 's/^/    /'
-
-# 6. Check for bin files and verify executable permissions (optional)
-if grep -q '"bin"' "$PROJECT_ROOT/package.json"; then
-  echo "✓ Checking executable permissions..."
-  # Note: Full bin parsing would require jq or complex bash
-  # For now, we just check if bin field exists
-  echo "  ✓ Binary field detected in package.json"
-fi
-
-echo ""
-echo "✅ Package verification passed!"
-echo "   Ready to publish version $VERSION"
+printf '%s' "$PACK_OUTPUT" | node --input-type=module -e '
+let input = "";
+for await (const chunk of process.stdin) input += chunk;
+let entries;
+try {
+  entries = JSON.parse(input);
+} catch {
+  process.stderr.write("E_PUBLISH_PACK_JSON_INVALID\n");
+  process.exit(1);
+}
+if (!Array.isArray(entries) || entries.length === 0 || !Array.isArray(entries[0]?.files)) {
+  process.stderr.write("E_PUBLISH_PACK_JSON_INVALID\n");
+  process.exit(1);
+}
+const packed = new Set(
+  entries[0].files
+    .map((entry) => entry?.path)
+    .filter((entry) => typeof entry === "string")
+    .map((entry) => entry.replace(/^\.\//, "")),
+);
+const missing = ["README.md", "LICENSE"].filter((entry) => !packed.has(entry));
+if (missing.length > 0) {
+  process.stderr.write(`E_PUBLISH_REQUIRED_FILE_MISSING:${missing.join(",")}\n`);
+  process.exit(1);
+}
+'

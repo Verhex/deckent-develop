@@ -961,7 +961,7 @@ async function writePackBaseline(projectRoot) {
 }
 
 const entryArg = process.argv[1] ?? '';
-if (entryArg.endsWith('validate-publish.mjs')) {
+if (entryArg !== '' && fileURLToPath(import.meta.url) === resolve(entryArg)) {
   const cliArgs = process.argv.slice(2);
   const writeBaseline = cliArgs.includes('--write-baseline');
   const projectRoot = cliArgs.find((a) => !a.startsWith('--')) ?? '.';

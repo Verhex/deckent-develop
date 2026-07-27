@@ -291,7 +291,8 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   return runCommandsSequential(commands, { cwd: args.root, env: process.env });
 }
 
-const isDirectRun = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'));
+const isDirectRun = process.argv[1] !== undefined
+  && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 if (isDirectRun) {
   try {
     process.exitCode = await main();

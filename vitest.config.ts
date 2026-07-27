@@ -8,7 +8,11 @@ export default defineConfig({
     // SURF-7: endpoint-behavior specs run with the orchestration-control
     // ratchet open (env twin of the default-off api.control_mutations flag);
     // the gate's real default is pinned by control-mutation-ratchet.test.ts.
-    setupFiles: ['./tests/setup-control-mutations.ts'],
+    setupFiles: [
+      './tests/hermeticity/worker-setup.ts',
+      './tests/setup-control-mutations.ts',
+    ],
+    globalSetup: ['./tests/hermeticity/global-setup.ts'],
     // CI-CD stability (Sprint 214): the Coverage job ran on a 2-core GitHub
     // runner; after all tests PASS, every fork serialises v8 coverage data back
     // to the main process at teardown. With unbounded forks competing for 2

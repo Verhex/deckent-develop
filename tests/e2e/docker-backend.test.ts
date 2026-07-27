@@ -32,27 +32,99 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { DockerSpawnBackend, isDockerAvailable } from '../../src/orchestra/spawn-backend-docker.js';
 import { detectOrphans, cleanupOrphanHBs } from '../../src/monitor/auditor.js';
 import { acquireLock, releaseLock, clearStaleLocks, checkLock } from '../../src/core/file-lock.js';
 import { LOCKS_DIR, TASKS_DIR } from '../../src/core/constants.js';
 import { _clearAllPending } from '../../src/core/active-workers.js';
+import {
+  canonicalProjectRoot,
+  DOCKER_ATTEMPT_LABELS,
+  dockerContainerNameForTask,
+  listPendingTaskResultSettlementAttempts,
+} from '../../src/core/task-result-settlement.js';
 
-const PROJECT_ROOT = process.cwd();
-const TEST_TASKS_DIR = path.join(PROJECT_ROOT, '.tasks');
+function createDockerE2eSandbox(parentOwned?: string): string {
+  if (!parentOwned) return fs.mkdtempSync(path.join(tmpdir(), 'deckent-docker-e2e-'));
+  const physicalParent = fs.realpathSync.native(parentOwned);
+  const physicalTemp = fs.realpathSync.native(tmpdir());
+  const comparableParent = process.platform === 'win32'
+    ? physicalParent.toLocaleLowerCase('en-US')
+    : physicalParent;
+  const comparableTemp = process.platform === 'win32'
+    ? physicalTemp.toLocaleLowerCase('en-US')
+    : physicalTemp;
+  const relativeParent = path.relative(comparableTemp, comparableParent);
+  const outsideTemp = relativeParent === '..'
+    || relativeParent.startsWith(`..${path.sep}`)
+    || path.isAbsolute(relativeParent);
+  if (outsideTemp) {
+    throw new Error('E_DOCKER_E2E_SANDBOX_PARENT_OUTSIDE_OS_TEMP');
+  }
+  return fs.mkdtempSync(path.join(physicalParent, 'deckent-docker-child-'));
+}
+
+const TEST_SANDBOX_ROOT = createDockerE2eSandbox(
+  process.env.DECKENT_DOCKER_E2E_SANDBOX_ROOT,
+);
+const TEST_PROJECT_ROOT = path.join(TEST_SANDBOX_ROOT, 'project');
+const TEST_DECKENT_HOME = path.join(TEST_SANDBOX_ROOT, 'authority', 'deckent');
+const TEST_BRAIN_HOME = path.join(TEST_SANDBOX_ROOT, 'authority', 'brain');
+const TEST_AUTHORITY_RECEIPT_PATH = process.env.DECKENT_DOCKER_E2E_AUTHORITY_RECEIPT;
+const PREVIOUS_DECKENT_HOME = process.env.DECKENT_HOME;
+const PREVIOUS_BRAIN_HOME = process.env.BRAIN_HOME;
+const TEST_TASKS_DIR = path.join(TEST_PROJECT_ROOT, '.tasks');
+const ISOLATED_LIVE_SUITE_ROOT = path.join(TEST_SANDBOX_ROOT, 'isolated-live-suite');
+const ISOLATED_LIVE_AUTHORITY_RECEIPT = path.join(
+  ISOLATED_LIVE_SUITE_ROOT,
+  'project-authority.json',
+);
 const TEST_EXECUTION_OPTIONS = {
-  projectDir: PROJECT_ROOT,
+  projectDir: TEST_PROJECT_ROOT,
   executionBudget: { maxTurns: 1 },
 } as const;
+const TEST_BACKENDS = new Set<DockerSpawnBackend>();
+let TEST_AUTHORITY_RECEIPT_VALIDATED = false;
 
-// Suite-level pre-flight: flush any stale test-docker artifacts left by a prior
-// interrupted run (e.g. CI killed mid-suite or monitorContainer wrote after cleanup).
-// This runs ONCE before any describe block — it is the first line of defence against
-// cross-run contamination of the real /workspace/.tasks/ directory.
+if (TEST_AUTHORITY_RECEIPT_PATH) {
+  const parentAuthority = process.env.DECKENT_DOCKER_E2E_SANDBOX_ROOT;
+  if (!parentAuthority) {
+    throw new Error('E_DOCKER_E2E_RECEIPT_PARENT_AUTHORITY_MISSING');
+  }
+  const physicalParent = fs.realpathSync.native(parentAuthority);
+  const physicalReceiptParent = fs.realpathSync.native(
+    path.dirname(path.resolve(TEST_AUTHORITY_RECEIPT_PATH)),
+  );
+  if (
+    physicalReceiptParent !== physicalParent
+    || path.basename(TEST_AUTHORITY_RECEIPT_PATH) !== 'project-authority.json'
+  ) {
+    throw new Error('E_DOCKER_E2E_RECEIPT_BOUNDARY');
+  }
+  const canonicalProject = canonicalProjectRoot(TEST_PROJECT_ROOT);
+  fs.writeFileSync(
+    TEST_AUTHORITY_RECEIPT_PATH,
+    JSON.stringify({
+      version: 1,
+      projectRoot: canonicalProject,
+      projectAuthority: sha256(canonicalProject),
+    }),
+    { encoding: 'utf-8', flag: 'wx', mode: 0o600 },
+  );
+  TEST_AUTHORITY_RECEIPT_VALIDATED = true;
+}
+
+// Suite-level pre-flight initializes and sweeps only this module's nonce-owned
+// project root. A killed run can leave OS-temp residue, but never live `.tasks`.
 beforeAll(() => {
+  process.env.DECKENT_HOME = TEST_DECKENT_HOME;
+  process.env.BRAIN_HOME = TEST_BRAIN_HOME;
   _clearAllPending();
+  fs.mkdirSync(TEST_TASKS_DIR, { recursive: true });
+  fs.mkdirSync(path.join(TEST_PROJECT_ROOT, LOCKS_DIR), { recursive: true });
   try {
     if (fs.existsSync(TEST_TASKS_DIR)) {
       for (const f of fs.readdirSync(TEST_TASKS_DIR)) {
@@ -63,7 +135,7 @@ beforeAll(() => {
     }
   } catch { /* ok */ }
   try {
-    const locksDir = path.join(PROJECT_ROOT, LOCKS_DIR);
+    const locksDir = path.join(TEST_PROJECT_ROOT, LOCKS_DIR);
     if (fs.existsSync(locksDir)) {
       for (const f of fs.readdirSync(locksDir)) {
         if (f.endsWith('.spawnlock') && f.includes('test-docker-')) {
@@ -74,7 +146,32 @@ beforeAll(() => {
   } catch { /* ok */ }
 });
 
-// Docker tests require BOTH: Docker daemon running AND deckent-worker image built
+// Natural-exit / monitorContainer-cleanup tests need a container that reliably
+// exits quickly. The claude worker container does NOT self-exit without auth/input,
+// so the natural-exit cleanup never fires in a general CI/dev env → the container
+// lingers and the removal assertion times out (deterministic failure, not flaky-random).
+// Gate these behind an explicit opt-in so `test:ci-sim` is deterministic; run the full
+// docker-e2e cleanup suite in a controlled env with DECKENT_DOCKER_E2E=1.
+const dockerE2eRequested = process.env.DECKENT_DOCKER_E2E === '1';
+const dockerE2eChild = process.env.DECKENT_DOCKER_E2E_CHILD === '1';
+function resolveDockerE2eChildAuthority(
+  requested: boolean,
+  child: boolean,
+  receiptValidated: boolean,
+): boolean {
+  if (requested && child && !receiptValidated) {
+    throw new Error('E_DOCKER_E2E_CHILD_AUTHORITY_RECEIPT_REQUIRED');
+  }
+  return requested && child && receiptValidated;
+}
+const dockerE2eChildAuthorityBound = resolveDockerE2eChildAuthority(
+  dockerE2eRequested,
+  dockerE2eChild,
+  TEST_AUTHORITY_RECEIPT_VALIDATED,
+);
+
+// Docker tests require BOTH: Docker daemon running AND deckent-worker image built.
+// Resolve child authority first so an unbound child fails before touching Docker.
 function isDockerReady(): boolean {
   if (!isDockerAvailable()) return false;
   const result = spawnSync('docker', ['images', '-q', 'deckent-worker:latest'], {
@@ -83,14 +180,8 @@ function isDockerReady(): boolean {
   return (result.stdout?.trim().length ?? 0) > 0;
 }
 const dockerAvailable = isDockerReady();
-
-// Natural-exit / monitorContainer-cleanup tests need a container that reliably
-// exits quickly. The claude worker container does NOT self-exit without auth/input,
-// so the natural-exit cleanup never fires in a general CI/dev env → the container
-// lingers and the removal assertion times out (deterministic failure, not flaky-random).
-// Gate these behind an explicit opt-in so `test:ci-sim` is deterministic; run the full
-// docker-e2e cleanup suite in a controlled env with DECKENT_DOCKER_E2E=1.
-const dockerE2eEnabled = dockerAvailable && process.env.DECKENT_DOCKER_E2E === '1';
+const dockerE2eEnabled = dockerAvailable
+  && dockerE2eChildAuthorityBound;
 
 /**
  * Check if a container exists (running or exited — before monitorContainer cleanup).
@@ -128,9 +219,649 @@ function cleanupTaskFiles(taskId: string): void {
   }
 }
 
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function assertCommandSucceeded(
+  operation: string,
+  result: DockerCommandResult,
+): string {
+  const stdout = typeof result.stdout === 'string'
+    ? result.stdout
+    : result.stdout?.toString('utf-8') ?? '';
+  const stderr = typeof result.stderr === 'string'
+    ? result.stderr
+    : result.stderr?.toString('utf-8') ?? '';
+  if (result.error || result.signal || result.status !== 0) {
+    throw new Error(
+      `${operation}:status=${String(result.status)}:signal=${String(result.signal)}:`
+      + `${result.error?.message ?? stderr.trim()}`,
+    );
+  }
+  return stdout;
+}
+
+interface DockerCommandResult {
+  status: number | null;
+  signal: NodeJS.Signals | null;
+  stdout?: string | Buffer | null;
+  stderr?: string | Buffer | null;
+  error?: Error;
+}
+
+type DockerCommandRunner = (
+  args: string[],
+  timeoutMs: number,
+) => DockerCommandResult;
+
+const runDockerCommand: DockerCommandRunner = (args, timeoutMs) => spawnSync(
+  'docker',
+  args,
+  {
+    encoding: 'utf-8',
+    timeout: timeoutMs,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  },
+);
+const OWNED_DOCKER_SWEEP_BUDGET_MS = 30_000;
+const MAX_OWNED_DOCKER_SWEEP_CONTAINERS = 64;
+const DOCKER_E2E_MODULE_CLEANUP_TIMEOUT_MS = 120_000;
+
+function boundedCommandTimeout(
+  deadline: number,
+  ceilingMs: number,
+  operation: string,
+): number {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) throw new Error(`E_DOCKER_E2E_SWEEP_DEADLINE:${operation}`);
+  return Math.max(1, Math.min(ceilingMs, remaining));
+}
+
+function childProjectAuthorities(
+  childSandbox: string,
+  authorityReceiptPath?: string,
+): string[] {
+  if (!fs.existsSync(childSandbox)) return [];
+  const physicalSandbox = fs.realpathSync.native(childSandbox);
+  const authorities: string[] = [];
+  if (authorityReceiptPath && fs.existsSync(authorityReceiptPath)) {
+    const receiptParent = fs.realpathSync.native(path.dirname(authorityReceiptPath));
+    if (receiptParent !== physicalSandbox) {
+      throw new Error('E_DOCKER_E2E_RECEIPT_READ_BOUNDARY');
+    }
+    const receipt = JSON.parse(fs.readFileSync(authorityReceiptPath, 'utf-8')) as {
+      version?: unknown;
+      projectRoot?: unknown;
+      projectAuthority?: unknown;
+    };
+    if (
+      receipt.version !== 1
+      || typeof receipt.projectRoot !== 'string'
+      || typeof receipt.projectAuthority !== 'string'
+      || !/^[a-f0-9]{64}$/u.test(receipt.projectAuthority)
+    ) {
+      throw new Error('E_DOCKER_E2E_RECEIPT_INVALID');
+    }
+    const resolvedProject = path.resolve(receipt.projectRoot);
+    const relativeProject = path.relative(physicalSandbox, resolvedProject);
+    if (
+      relativeProject === '..'
+      || relativeProject.startsWith(`..${path.sep}`)
+      || path.isAbsolute(relativeProject)
+      || path.basename(resolvedProject) !== 'project'
+      || !path.basename(path.dirname(resolvedProject)).startsWith('deckent-docker-child-')
+      || sha256(resolvedProject) !== receipt.projectAuthority
+    ) {
+      throw new Error('E_DOCKER_E2E_RECEIPT_AUTHORITY_MISMATCH');
+    }
+    authorities.push(receipt.projectAuthority);
+  }
+  for (const entry of fs.readdirSync(physicalSandbox, { withFileTypes: true })) {
+    if (!entry.name.startsWith('deckent-docker-child-')) continue;
+    if (!entry.isDirectory() || entry.isSymbolicLink()) {
+      throw new Error(`E_DOCKER_E2E_CHILD_AUTHORITY_TYPE:${entry.name}`);
+    }
+    const childRoot = fs.realpathSync.native(path.join(physicalSandbox, entry.name));
+    const relativeChild = path.relative(physicalSandbox, childRoot);
+    if (
+      relativeChild === ''
+      || relativeChild === '..'
+      || relativeChild.startsWith(`..${path.sep}`)
+      || path.isAbsolute(relativeChild)
+    ) {
+      throw new Error(`E_DOCKER_E2E_CHILD_AUTHORITY_BOUNDARY:${childRoot}`);
+    }
+    const projectRoot = path.join(childRoot, 'project');
+    authorities.push(sha256(canonicalProjectRoot(projectRoot)));
+  }
+  return [...new Set(authorities)].sort();
+}
+
+function listOwnedDockerContainerIds(
+  projectAuthority: string,
+  commandRunner: DockerCommandRunner = runDockerCommand,
+  deadline = Date.now() + OWNED_DOCKER_SWEEP_BUDGET_MS,
+): string[] {
+  const output = assertCommandSucceeded(
+    'E_DOCKER_E2E_OWNED_LIST',
+    commandRunner(
+      [
+        'ps',
+        '-aq',
+        '--filter',
+        `label=${DOCKER_ATTEMPT_LABELS.managed}=true`,
+        '--filter',
+        `label=${DOCKER_ATTEMPT_LABELS.project}=${projectAuthority}`,
+      ],
+      boundedCommandTimeout(deadline, 5_000, 'list'),
+    ),
+  );
+  return [...new Set(
+    output.split(/\r?\n/u).map(value => value.trim()).filter(Boolean),
+  )].sort();
+}
+
+function sweepOwnedDockerContainers(
+  childSandbox: string,
+  authorityReceiptPath?: string,
+  commandRunner: DockerCommandRunner = runDockerCommand,
+  budgetMs = OWNED_DOCKER_SWEEP_BUDGET_MS,
+): string[] {
+  const receipts: string[] = [];
+  const deadline = Date.now() + budgetMs;
+  for (const projectAuthority of childProjectAuthorities(
+    childSandbox,
+    authorityReceiptPath,
+  )) {
+    const containerIds = listOwnedDockerContainerIds(
+      projectAuthority,
+      commandRunner,
+      deadline,
+    );
+    if (containerIds.length > MAX_OWNED_DOCKER_SWEEP_CONTAINERS) {
+      throw new Error(
+        `E_DOCKER_E2E_SWEEP_CARDINALITY:${projectAuthority}:${containerIds.length}`,
+      );
+    }
+    for (const containerId of containerIds) {
+      if (!/^[a-f0-9]{12,64}$/u.test(containerId)) {
+        throw new Error(`E_DOCKER_E2E_CONTAINER_ID_INVALID:${containerId}`);
+      }
+      const inspection = assertCommandSucceeded(
+        'E_DOCKER_E2E_OWNED_INSPECT',
+        commandRunner(
+          [
+            'inspect',
+            '--format',
+            `{{.Id}}|{{index .Config.Labels "${DOCKER_ATTEMPT_LABELS.managed}"}}|`
+            + `{{index .Config.Labels "${DOCKER_ATTEMPT_LABELS.project}"}}`,
+            containerId,
+          ],
+          boundedCommandTimeout(deadline, 5_000, 'inspect'),
+        ),
+      ).trim();
+      const [inspectedId, managed, project] = inspection.split('|');
+      if (
+        !inspectedId
+        || !inspectedId.startsWith(containerId)
+        || managed !== 'true'
+        || project !== projectAuthority
+      ) {
+        throw new Error(
+          `E_DOCKER_E2E_OWNERSHIP_MISMATCH:${containerId}:${managed}:${project}`,
+        );
+      }
+      assertCommandSucceeded(
+        'E_DOCKER_E2E_OWNED_REMOVE',
+        commandRunner(
+          ['rm', '-f', inspectedId],
+          boundedCommandTimeout(deadline, 10_000, 'remove'),
+        ),
+      );
+      receipts.push(`${projectAuthority}:${inspectedId}`);
+    }
+    const survivors = listOwnedDockerContainerIds(
+      projectAuthority,
+      commandRunner,
+      deadline,
+    );
+    if (survivors.length > 0) {
+      throw new Error(
+        `E_DOCKER_E2E_OWNED_SURVIVORS:${projectAuthority}:${survivors.join(',')}`,
+      );
+    }
+  }
+  return receipts;
+}
+
+async function sweepOwnedDockerContainersUntilQuiescent(
+  childSandbox: string,
+  authorityReceiptPath?: string,
+  commandRunner: DockerCommandRunner = runDockerCommand,
+  budgetMs = OWNED_DOCKER_SWEEP_BUDGET_MS,
+  quietPeriodMs = 500,
+  pollIntervalMs = 50,
+): Promise<string[]> {
+  const deadline = Date.now() + budgetMs;
+  const receipts = new Set<string>();
+  let quietSince: number | undefined;
+
+  while (Date.now() < deadline) {
+    const cycleReceipts = sweepOwnedDockerContainers(
+      childSandbox,
+      authorityReceiptPath,
+      commandRunner,
+      Math.max(1, deadline - Date.now()),
+    );
+    for (const receipt of cycleReceipts) receipts.add(receipt);
+    if (receipts.size > MAX_OWNED_DOCKER_SWEEP_CONTAINERS) {
+      throw new Error(
+        `E_DOCKER_E2E_SWEEP_TOTAL_CARDINALITY:${receipts.size}`,
+      );
+    }
+
+    if (cycleReceipts.length > 0) {
+      quietSince = undefined;
+    } else {
+      quietSince ??= Date.now();
+      if (Date.now() - quietSince >= quietPeriodMs) {
+        return [...receipts].sort();
+      }
+    }
+
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await waitMs(Math.min(pollIntervalMs, remaining));
+  }
+
+  throw new Error('E_DOCKER_E2E_SWEEP_QUIESCENCE_TIMEOUT');
+}
+
+async function runIsolatedDockerE2eProcess(): Promise<{ code: number | null; output: string }> {
+  const vitestEntry = path.join(process.cwd(), 'node_modules', 'vitest', 'vitest.mjs');
+  const childSandbox = ISOLATED_LIVE_SUITE_ROOT;
+  const authorityReceiptPath = ISOLATED_LIVE_AUTHORITY_RECEIPT;
+  fs.mkdirSync(childSandbox, { recursive: true });
+  return new Promise((resolvePromise, rejectPromise) => {
+    const child = spawn(
+      process.execPath,
+      [
+        vitestEntry,
+        'run',
+        'tests/e2e/docker-backend.test.ts',
+        '--config',
+        'vitest.config.ts',
+      ],
+      {
+        cwd: process.cwd(),
+        detached: process.platform !== 'win32',
+        env: {
+          ...process.env,
+          DECKENT_DOCKER_E2E: '1',
+          DECKENT_DOCKER_E2E_CHILD: '1',
+          DECKENT_DOCKER_E2E_SANDBOX_ROOT: childSandbox,
+          DECKENT_DOCKER_E2E_AUTHORITY_RECEIPT: authorityReceiptPath,
+          DECKENT_HOME: path.join(TEST_SANDBOX_ROOT, 'isolated-parent-authority', 'deckent'),
+          BRAIN_HOME: path.join(TEST_SANDBOX_ROOT, 'isolated-parent-authority', 'brain'),
+          VITEST_MAX_FORKS: '1',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+    let output = '';
+    let timedOut = false;
+    let settled = false;
+    let closeObserved = false;
+    let spawnFailure: string | undefined;
+    let terminationFailure: string | undefined;
+    let treeTerminationSucceeded = false;
+    let closeWatchdog: NodeJS.Timeout | undefined;
+    const cleanupReceipts = new Set<string>();
+
+    const recordTerminationFailure = (failure: string): void => {
+      terminationFailure = terminationFailure
+        ? `${terminationFailure};${failure}`
+        : failure;
+    };
+    const terminateTree = (): void => {
+      if (treeTerminationSucceeded) return;
+      if (process.platform === 'win32') {
+        if (!child.pid) {
+          recordTerminationFailure('E_DOCKER_E2E_WINDOWS_TREE_AUTHORITY_MISSING');
+          return;
+        }
+        const treeKill = spawnSync(
+          'taskkill',
+          ['/PID', String(child.pid), '/T', '/F'],
+          {
+            encoding: 'utf-8',
+            timeout: 10_000,
+            windowsHide: true,
+            stdio: ['ignore', 'pipe', 'pipe'],
+          },
+        );
+        const treeKillStderr = typeof treeKill.stderr === 'string'
+          ? treeKill.stderr
+          : treeKill.stderr?.toString('utf-8') ?? '';
+        if (treeKill.error || treeKill.signal || treeKill.status !== 0) {
+          recordTerminationFailure(
+            'E_DOCKER_E2E_WINDOWS_TREE_KILL_FAILED:'
+            + `status=${String(treeKill.status)}:signal=${String(treeKill.signal)}:`
+            + `${treeKill.error?.message ?? treeKillStderr.trim()}`,
+          );
+          try { child.kill('SIGKILL'); } catch { /* recorded failure remains authoritative */ }
+        } else {
+          treeTerminationSucceeded = true;
+        }
+        return;
+      }
+      try {
+        if (child.pid) {
+          process.kill(-child.pid, 'SIGKILL');
+          treeTerminationSucceeded = true;
+        }
+        else recordTerminationFailure('E_DOCKER_E2E_POSIX_TREE_AUTHORITY_MISSING');
+      } catch (error) {
+        recordTerminationFailure(`E_DOCKER_E2E_POSIX_TREE_KILL_FAILED:${
+          error instanceof Error ? error.message : String(error)
+        }`);
+      }
+    };
+    const performOwnedCleanup = (): void => {
+      for (const receipt of sweepOwnedDockerContainers(
+        childSandbox,
+        authorityReceiptPath,
+      )) {
+        cleanupReceipts.add(receipt);
+      }
+    };
+    const performOwnedCleanupUntilQuiescent = async (): Promise<void> => {
+      for (const receipt of await sweepOwnedDockerContainersUntilQuiescent(
+        childSandbox,
+        authorityReceiptPath,
+      )) {
+        cleanupReceipts.add(receipt);
+      }
+    };
+    const scheduleCloseWatchdog = (): void => {
+      if (closeObserved || closeWatchdog) return;
+      closeWatchdog = setTimeout(() => {
+        if (settled || closeObserved) return;
+        terminateTree();
+        try {
+          performOwnedCleanup();
+        } catch (error) {
+          recordTerminationFailure(
+            `E_DOCKER_E2E_WATCHDOG_CLEANUP:${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
+        child.stdout.destroy();
+        child.stderr.destroy();
+        child.unref();
+        settled = true;
+        rejectPromise(new Error(
+          `E_DOCKER_E2E_CHILD_CLOSE_TIMEOUT${
+            terminationFailure ? `:${terminationFailure}` : ''
+          }\n${output}`,
+        ));
+      }, 5_000);
+    };
+
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      terminateTree();
+      try {
+        performOwnedCleanup();
+      } catch (error) {
+        recordTerminationFailure(
+          `E_DOCKER_E2E_TIMEOUT_CLEANUP:${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+      scheduleCloseWatchdog();
+    }, 10 * 60_000);
+    child.stdout.setEncoding('utf-8');
+    child.stderr.setEncoding('utf-8');
+    child.stdout.on('data', chunk => { output += chunk; });
+    child.stderr.on('data', chunk => { output += chunk; });
+    child.on('error', error => {
+      spawnFailure = `E_DOCKER_E2E_CHILD_SPAWN:${error.message}`;
+      scheduleCloseWatchdog();
+    });
+    child.on('exit', (code, signal) => {
+      if (!timedOut && (code !== 0 || signal !== null)) terminateTree();
+    });
+    child.on('close', async (code, signal) => {
+      if (settled) return;
+      closeObserved = true;
+      settled = true;
+      clearTimeout(timeout);
+      if (closeWatchdog) clearTimeout(closeWatchdog);
+      const abnormalClose = timedOut
+        || spawnFailure !== undefined
+        || code !== 0
+        || signal !== null;
+      if (abnormalClose && !treeTerminationSucceeded) terminateTree();
+      try {
+        if (abnormalClose) await performOwnedCleanupUntilQuiescent();
+        else performOwnedCleanup();
+        if (cleanupReceipts.size > 0) {
+          output += `\n[Docker E2E parent cleanup] ${[...cleanupReceipts].join(',')}\n`;
+        }
+      } catch (error) {
+        rejectPromise(error);
+        return;
+      }
+      if (terminationFailure) {
+        rejectPromise(new Error(`${terminationFailure}\n${output}`));
+        return;
+      }
+      if (spawnFailure) {
+        rejectPromise(new Error(`${spawnFailure}\n${output}`));
+        return;
+      }
+      resolvePromise({
+        code: timedOut ? null : code,
+        output: timedOut ? `${output}\nE_DOCKER_E2E_CHILD_TIMEOUT\n` : output,
+      });
+    });
+  });
+}
+
+async function waitForDockerE2eQuiescence(timeoutMs = 60_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for (const candidate of TEST_BACKENDS) {
+      for (const taskId of candidate.list()) {
+        try { candidate.kill(taskId); } catch { /* reconciliation below remains authoritative */ }
+      }
+    }
+    const active = [...TEST_BACKENDS].flatMap(candidate => candidate.list());
+    const pending = listPendingTaskResultSettlementAttempts(TEST_PROJECT_ROOT);
+    if (active.length === 0 && pending.length === 0) return;
+    for (const candidate of TEST_BACKENDS) {
+      try { await candidate.reconcilePendingAttempts(); } catch { /* retry until bounded deadline */ }
+    }
+    await waitMs(100);
+  }
+  const active = [...TEST_BACKENDS].flatMap(candidate => candidate.list());
+  const pending = listPendingTaskResultSettlementAttempts(TEST_PROJECT_ROOT)
+    .map(entry => `${entry.attempt.taskId}/${entry.attempt.attemptId}`);
+  throw new Error(
+    `E_DOCKER_E2E_QUIESCENCE_TIMEOUT:active=${active.join(',')}:pending=${pending.join(',')}`,
+  );
+}
+
 // Monotonically increasing counter — prevents testTaskId collision when Date.now()
 // returns the same value for consecutive fast tests in the same millisecond.
 let _dockerTestSeq = 0;
+
+describe('Docker E2E process isolation', () => {
+  it('fails closed when live child mode has no parent authority receipt', () => {
+    expect(() => resolveDockerE2eChildAuthority(true, true, false))
+      .toThrow(/E_DOCKER_E2E_CHILD_AUTHORITY_RECEIPT_REQUIRED/);
+    expect(resolveDockerE2eChildAuthority(true, true, true)).toBe(true);
+    expect(resolveDockerE2eChildAuthority(true, false, false)).toBe(false);
+  });
+
+  it('rejects sandbox authority outside the physical OS temp root', () => {
+    expect(() => createDockerE2eSandbox(process.cwd()))
+      .toThrow(/E_DOCKER_E2E_SANDBOX_PARENT_OUTSIDE_OS_TEMP/);
+  });
+
+  it('creates and removes only a child nonce under caller-owned temp authority', () => {
+    const parent = fs.mkdtempSync(path.join(tmpdir(), 'deckent-docker-parent-contract-'));
+    const sentinel = path.join(parent, 'sentinel.txt');
+    fs.writeFileSync(sentinel, 'preserve');
+    let child: string | undefined;
+    try {
+      child = createDockerE2eSandbox(parent);
+      expect(path.dirname(child)).toBe(fs.realpathSync.native(parent));
+      expect(path.basename(child)).toMatch(/^deckent-docker-child-/u);
+      fs.writeFileSync(path.join(child, 'owned.txt'), 'owned');
+      fs.rmSync(child, { recursive: true, force: true });
+      child = undefined;
+      expect(fs.readFileSync(sentinel, 'utf-8')).toBe('preserve');
+      expect(fs.readdirSync(parent)).toEqual(['sentinel.txt']);
+    } finally {
+      if (child) fs.rmSync(child, { recursive: true, force: true });
+      fs.rmSync(parent, { recursive: true, force: true });
+    }
+  });
+
+  it('sweeps only receipt-bound managed containers and proves zero survivors', () => {
+    const parent = fs.mkdtempSync(path.join(tmpdir(), 'deckent-docker-sweep-contract-'));
+    const child = path.join(parent, 'deckent-docker-child-fixture');
+    const projectRoot = path.join(child, 'project');
+    const receiptPath = path.join(parent, 'project-authority.json');
+    const projectAuthority = sha256(path.resolve(projectRoot));
+    const containerId = 'a'.repeat(64);
+    try {
+      fs.mkdirSync(projectRoot, { recursive: true });
+      fs.writeFileSync(
+        receiptPath,
+        JSON.stringify({
+          version: 1,
+          projectRoot: path.resolve(projectRoot),
+          projectAuthority,
+        }),
+      );
+      let containerPresent = true;
+      const fakeInvocations: Array<{ args: string[]; timeoutMs: number }> = [];
+      const success = (stdout: string): DockerCommandResult => ({
+        status: 0,
+        signal: null,
+        stdout,
+        stderr: '',
+      });
+      const fakeRunner: DockerCommandRunner = (args, timeoutMs) => {
+        fakeInvocations.push({ args: [...args], timeoutMs });
+        if (args[0] === 'ps') {
+          return success(containerPresent ? `${containerId}\n` : '');
+        }
+        if (args[0] === 'inspect' && args.at(-1) === containerId) {
+          return success(`${containerId}|true|${projectAuthority}\n`);
+        }
+        if (args[0] === 'rm' && args[1] === '-f' && args[2] === containerId) {
+          containerPresent = false;
+          return success(`${containerId}\n`);
+        }
+        return {
+          status: 64,
+          signal: null,
+          stdout: '',
+          stderr: `unexpected fake Docker argv: ${args.join(' ')}`,
+        };
+      };
+
+      expect(sweepOwnedDockerContainers(parent, receiptPath, fakeRunner))
+        .toEqual([`${projectAuthority}:${containerId}`]);
+      expect(containerPresent).toBe(false);
+      expect(fakeInvocations.map(call => call.args[0]))
+        .toEqual(['ps', 'inspect', 'rm', 'ps']);
+      expect(fakeInvocations.every(call => call.timeoutMs > 0)).toBe(true);
+      expect(fakeInvocations[0]?.args).toContain(
+        `label=${DOCKER_ATTEMPT_LABELS.project}=${projectAuthority}`,
+      );
+    } finally {
+      fs.rmSync(parent, { recursive: true, force: true });
+    }
+  });
+
+  it('waits through a late owned-container arrival before declaring cleanup quiescent', async () => {
+    const parent = fs.mkdtempSync(path.join(tmpdir(), 'deckent-docker-quiescence-contract-'));
+    const child = path.join(parent, 'deckent-docker-child-fixture');
+    const projectRoot = path.join(child, 'project');
+    const receiptPath = path.join(parent, 'project-authority.json');
+    const projectAuthority = sha256(path.resolve(projectRoot));
+    const containerId = 'b'.repeat(64);
+    try {
+      fs.mkdirSync(projectRoot, { recursive: true });
+      fs.writeFileSync(
+        receiptPath,
+        JSON.stringify({
+          version: 1,
+          projectRoot: path.resolve(projectRoot),
+          projectAuthority,
+        }),
+      );
+      let psCalls = 0;
+      let containerPresent = false;
+      const success = (stdout: string): DockerCommandResult => ({
+        status: 0,
+        signal: null,
+        stdout,
+        stderr: '',
+      });
+      const fakeRunner: DockerCommandRunner = args => {
+        if (args[0] === 'ps') {
+          psCalls += 1;
+          if (psCalls === 3) containerPresent = true;
+          return success(containerPresent ? `${containerId}\n` : '');
+        }
+        if (args[0] === 'inspect' && args.at(-1) === containerId) {
+          return success(`${containerId}|true|${projectAuthority}\n`);
+        }
+        if (args[0] === 'rm' && args[1] === '-f' && args[2] === containerId) {
+          containerPresent = false;
+          return success(`${containerId}\n`);
+        }
+        return {
+          status: 64,
+          signal: null,
+          stdout: '',
+          stderr: `unexpected fake Docker argv: ${args.join(' ')}`,
+        };
+      };
+
+      await expect(sweepOwnedDockerContainersUntilQuiescent(
+        parent,
+        receiptPath,
+        fakeRunner,
+        1_000,
+        10,
+        1,
+      )).resolves.toEqual([`${projectAuthority}:${containerId}`]);
+      expect(containerPresent).toBe(false);
+      expect(psCalls).toBeGreaterThan(3);
+    } finally {
+      fs.rmSync(parent, { recursive: true, force: true });
+    }
+  });
+
+  it.skipIf(!dockerAvailable || !dockerE2eRequested || dockerE2eChild)(
+    'runs opt-in live Docker tests in a nonce-authority child process',
+    async () => {
+      const result = await runIsolatedDockerE2eProcess();
+      expect(result.code, result.output).toBe(0);
+    },
+    12 * 60_000,
+  );
+});
 
 describe('Docker Backend Integration', () => {
   let backend: DockerSpawnBackend;
@@ -141,7 +872,7 @@ describe('Docker Backend Integration', () => {
     // Unique ID per test — Date.now() + pid + monotonic counter guarantees no collision
     // even when tests run back-to-back within the same millisecond.
     testTaskId = `test-docker-${Date.now()}-${process.pid}-${++_dockerTestSeq}`;
-    containerName = `deckent-w-${testTaskId}`;
+    containerName = dockerContainerNameForTask(TEST_PROJECT_ROOT, testTaskId);
     _clearAllPending();
     // Broad cleanup BEFORE creating backend: catches stale .hb/.log files that background
     // monitorContainer callbacks from previous tests may have written after afterEach ran.
@@ -155,7 +886,7 @@ describe('Docker Backend Integration', () => {
     } catch { /* ok */ }
     // Belt-and-suspenders: also clear stale spawnlocks from previous runs/crashes.
     try {
-      const locksDir = path.join(PROJECT_ROOT, '.locks');
+      const locksDir = path.join(TEST_PROJECT_ROOT, '.locks');
       if (fs.existsSync(locksDir)) {
         for (const f of fs.readdirSync(locksDir)) {
           if (f.endsWith('.spawnlock') && f.includes('test-docker-')) {
@@ -164,7 +895,8 @@ describe('Docker Backend Integration', () => {
         }
       }
     } catch { /* ok */ }
-    backend = new DockerSpawnBackend(PROJECT_ROOT);
+    backend = new DockerSpawnBackend(TEST_PROJECT_ROOT);
+    TEST_BACKENDS.add(backend);
     forceRemoveContainer(containerName);
     cleanupTaskFiles(testTaskId);
   }, 30_000);
@@ -174,7 +906,6 @@ describe('Docker Backend Integration', () => {
     try { backend.kill(testTaskId); } catch { /* already killed or not spawned */ }
     _clearAllPending();
     forceRemoveContainer(containerName);
-    forceRemoveContainer(`${containerName}-b`);
     // Cleanup ALL test-docker artifacts (any PID/timestamp suffix)
     try {
       const files = fs.readdirSync(TEST_TASKS_DIR);
@@ -186,7 +917,7 @@ describe('Docker Backend Integration', () => {
     } catch { /* ok */ }
     // Clean up any spawnlock files left by this test's task to prevent lock leakage.
     try {
-      const locksDir = path.join(PROJECT_ROOT, '.locks');
+      const locksDir = path.join(TEST_PROJECT_ROOT, '.locks');
       if (fs.existsSync(locksDir)) {
         for (const f of fs.readdirSync(locksDir)) {
           if (f.endsWith('.spawnlock') && f.includes('test-docker-')) {
@@ -333,7 +1064,7 @@ describe('Docker Backend Integration', () => {
 
   it.skipIf(!dockerE2eEnabled)('list() tracks multiple concurrent task IDs', () => {
     const taskId2 = `${testTaskId}-b`;
-    const containerName2 = `deckent-w-${taskId2}`;
+    const containerName2 = dockerContainerNameForTask(TEST_PROJECT_ROOT, taskId2);
 
     try {
       // Arrange — neither specific task must be pre-registered (more robust than length===0
@@ -356,7 +1087,7 @@ describe('Docker Backend Integration', () => {
       expect(backend.list()).toContain(taskId2);
     } finally {
       try { backend.kill(testTaskId); } catch { /* ok — may already be killed */ }
-      backend.kill(taskId2);
+      try { backend.kill(taskId2); } catch { /* fallback removal below remains authoritative */ }
       forceRemoveContainer(containerName2);
       cleanupTaskFiles(taskId2);
     }
@@ -444,8 +1175,8 @@ describe('Docker Backend Integration', () => {
       expect(['DONE', 'GO_WITH_TECH_DEBT', 'NO_GO']).toContain(result.selfAssessment);
     } finally {
       // Cleanup: kill any lingering container and remove files
-      backend.kill(trapTaskId);
-      forceRemoveContainer(`deckent-w-${trapTaskId}`);
+      try { backend.kill(trapTaskId); } catch { /* fallback removal below remains authoritative */ }
+      forceRemoveContainer(dockerContainerNameForTask(TEST_PROJECT_ROOT, trapTaskId));
       cleanupTaskFiles(trapTaskId);
     }
   }, 30_000);
@@ -453,7 +1184,7 @@ describe('Docker Backend Integration', () => {
   // ── Test 10: Docker log extraction writes .log file ───────────────────
   it.skipIf(!dockerE2eEnabled)('monitorContainer extracts container stdout to .log file', async () => {
     const logTaskId = `test-docker-${Date.now()}-${process.pid}-${++_dockerTestSeq}-log`;
-    const containerName = `deckent-w-${logTaskId}`;
+    const containerName = dockerContainerNameForTask(TEST_PROJECT_ROOT, logTaskId);
     const logPath = path.join(TEST_TASKS_DIR, `task-${logTaskId}.log`);
     try {
       backend.spawn(logTaskId, 'claude-sonnet-5', 'echo "log capture test"', {
@@ -475,40 +1206,13 @@ describe('Docker Backend Integration', () => {
         expect(logContent.length).toBeGreaterThan(0);
       }
     } finally {
-      backend.kill(logTaskId);
+      try { backend.kill(logTaskId); } catch { /* fallback removal below remains authoritative */ }
       forceRemoveContainer(containerName);
       cleanupTaskFiles(logTaskId);
       try { fs.unlinkSync(logPath); } catch { /* ok */ }
     }
   }, 30_000);
 
-  // Final cleanup — monitorContainer writes .hb/.timeout asynchronously AFTER afterEach runs.
-  // Wait 3s (up from 2s) to catch slower async callbacks in CI environments, then sweep
-  // all test-docker artifacts plus any residual spawnlocks.
-  afterAll(async () => {
-    _clearAllPending();
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    try {
-      if (fs.existsSync(TEST_TASKS_DIR)) {
-        const files = fs.readdirSync(TEST_TASKS_DIR);
-        for (const f of files) {
-          if (f.startsWith('task-test-docker-') || f.startsWith('.prompt-') || f.startsWith('.worker-test-docker-')) {
-            try { fs.unlinkSync(path.join(TEST_TASKS_DIR, f)); } catch { /* ok */ }
-          }
-        }
-      }
-    } catch { /* ok */ }
-    try {
-      const locksDir = path.join(PROJECT_ROOT, LOCKS_DIR);
-      if (fs.existsSync(locksDir)) {
-        for (const f of fs.readdirSync(locksDir)) {
-          if (f.endsWith('.spawnlock') && f.includes('test-docker-')) {
-            try { fs.unlinkSync(path.join(locksDir, f)); } catch { /* ok */ }
-          }
-        }
-      }
-    } catch { /* ok */ }
-  });
 });
 
 // ─── Parity Unit Tests (no Docker required) ────────────────────────────────
@@ -517,15 +1221,9 @@ describe('Docker Backend Integration', () => {
 //   heartbeat cache invalidation, and state machine transitions.
 
 function makeTmpRoot(): string {
-  // Prefer /tmp but fall back to a workspace-local temp dir if /tmp is full (ENOSPC in CI).
-  let base = tmpdir();
-  try {
-    fs.accessSync(base, fs.constants.W_OK);
-  } catch {
-    base = path.join(PROJECT_ROOT, '.tmp-test');
-    fs.mkdirSync(base, { recursive: true });
-  }
-  const root = fs.mkdtempSync(path.join(base, 'deckent-docker-parity-'));
+  // Fail loudly when the OS temp authority is unavailable; never fall back to
+  // a writable directory inside the source checkout.
+  const root = fs.mkdtempSync(path.join(tmpdir(), 'deckent-docker-parity-'));
   fs.mkdirSync(path.join(root, TASKS_DIR), { recursive: true });
   fs.mkdirSync(path.join(root, LOCKS_DIR), { recursive: true });
   return root;
@@ -1090,3 +1788,29 @@ describe('Docker Backend — Prompt Persistence + Archive', () => {
     expect(fs.existsSync(path.join(tasksDir, 'task-001.json'))).toBe(true);
   });
 });
+
+// Module-level cleanup also runs when Vitest selects only a parity test.
+// Authority restoration is conditional on durable quiescence; a timeout leaves
+// the nonce authority bound and fails the run rather than exposing user state.
+afterAll(async () => {
+  let quiesced = false;
+  try {
+    _clearAllPending();
+    await waitForDockerE2eQuiescence();
+    if (fs.existsSync(ISOLATED_LIVE_SUITE_ROOT)) {
+      await sweepOwnedDockerContainersUntilQuiescent(
+        ISOLATED_LIVE_SUITE_ROOT,
+        ISOLATED_LIVE_AUTHORITY_RECEIPT,
+      );
+    }
+    quiesced = true;
+    fs.rmSync(TEST_SANDBOX_ROOT, { recursive: true, force: true });
+  } finally {
+    if (quiesced) {
+      if (PREVIOUS_DECKENT_HOME === undefined) delete process.env.DECKENT_HOME;
+      else process.env.DECKENT_HOME = PREVIOUS_DECKENT_HOME;
+      if (PREVIOUS_BRAIN_HOME === undefined) delete process.env.BRAIN_HOME;
+      else process.env.BRAIN_HOME = PREVIOUS_BRAIN_HOME;
+    }
+  }
+}, DOCKER_E2E_MODULE_CLEANUP_TIMEOUT_MS);

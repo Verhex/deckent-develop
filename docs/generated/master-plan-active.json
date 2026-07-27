@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "bf797236303b502cc2ba2207caae01fcc3fc5df47726891c5f9e41e1b8f84378"
+    "value": "88c559c492bb7708558415503fe8d33bc0d40d580ea011f46500c405ee6d2c6e"
   },
   "summary": {
     "total": 232,
     "active": 232,
     "terminal": 0,
-    "receipts": 3,
+    "receipts": 5,
     "byState": {
       "OPEN": 156,
       "READY": 0,
@@ -114,9 +114,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "3ef40495e48f6fb5881e2c59ff70ae3e62a82081261a28b338b131eb5e588cc8",
-      "progressDigest": "4dcd3ff67189b5c4f9953a1e1d48fcf43ee20ea7a6bd1c4844a9f341417034ee",
+      "progressDigest": "df92b466e909621e54239a897397023a71feff092e8e7f4dbfbfbd2aa7f680e6",
       "terminalClosureDigest": null
     },
     {
@@ -125,9 +125,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "3b37c301f1bb6534470bdd6bac1860f197f0155583f4c31e1bdc8191965e7dee",
-      "progressDigest": "f0fb2caa0f9fba6c4116f351fe4a112fa5990f8d3ca001d8364bf289c0b0e3eb",
+      "progressDigest": "81d9a363a4fc3be1bff6ff68b53916c839c7e25fb2947dd132ac51c4eabaa1f0",
       "terminalClosureDigest": null
     },
     {
@@ -136,9 +136,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-27",
       "definitionDigest": "6ac98c33266e9b97460126d109350d4712295693fa9c68297ae1f806833d53a5",
-      "progressDigest": "a8d77ae45f50ac71782c4bdb8a5fc1cdb6ee83893b729e6590de82fc527fe354",
+      "progressDigest": "bcf40f2f3e4582155371557dd060dc06780eb58c45ec0f658c82d184d40733a8",
       "terminalClosureDigest": null
     },
     {
@@ -2647,6 +2647,26 @@
         "transitionAt": "2026-07-26T20:23:04+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-26-TEST-HERMETIC-01",
+      "authorityDigest": "58b20d52735a0c3b68cfc104a233afe997a4fc64e00df87f1658bff5068b869b",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-26T22:12:05+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-27-TEST-HERMETIC-02",
+      "authorityDigest": "60a0f23bbb4328415bf1e14fb56bd460a637561a9177c8d53c4888f5484eec77",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-27T06:21:00+03:00"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -2852,9 +2872,9 @@
       "state": "OPEN",
       "truth": {
         "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "W": "1",
+        "E": "~",
+        "H": "~",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -2862,10 +2882,13 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-07-26-TEST-HERMETIC-01",
+        "GR-2026-07-27-TEST-HERMETIC-02"
+      ],
       "acceptance": "Dynamic ve static scan; tüm writers tmpdir; root-write gate fail-loud",
-      "evidence": "Legacy 675; `openrouter.test.ts` current evidence",
-      "updated": "2026-07-26"
+      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; source-derived static/eager writer registry scans 2,439 files with 0 confirmed violations; full SHA-256 ratchets bind 9,034 explicit unresolved effects and 1,121 production modules; default gate exits 0 and strict mode fails with `E_HERMETIC_UNRESOLVED_STRICT`; runtime guard blocks post-setup project, `.tasks` and `dist` writes across canonical root/dashboard/desktop Vitest surfaces; pre-install cached capabilities, inherited/pre-opened descriptors, native/child-process bypass and OS sandbox remain open",
+      "updated": "2026-07-27"
     },
     {
       "order": 60,
@@ -2887,10 +2910,10 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "C": "1",
+        "W": "1",
+        "E": "~",
+        "H": "~",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -2898,10 +2921,13 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-07-26-TEST-HERMETIC-01",
+        "GR-2026-07-27-TEST-HERMETIC-02"
+      ],
       "acceptance": "Caller trace, deterministic reproduction, forbid-clean guard ve stable binary proof",
-      "evidence": "Legacy 676",
-      "updated": "2026-07-26"
+      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; clean authority is bound to the physical script root, rejects symlink/boundary ambiguity and validates all preserved entries before deletion; publish validation no longer build/cleans and uses `npm pack --dry-run --json --ignore-scripts`; async bounded process-tree tests cover POSIX and injected Windows failure paths; combined provider-free proof is 413 pass/10 opt-in live-Docker skip, but real binary/build and native Windows cleanup proof remain absent",
+      "updated": "2026-07-27"
     },
     {
       "order": 70,
@@ -2924,10 +2950,10 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "C": "1",
+        "W": "~",
+        "E": "~",
+        "H": "~",
         "L": "0",
         "X": "?",
         "S": "?"
@@ -2937,10 +2963,13 @@
       "closureBlockedBy": [
         "TEST-675"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-07-26-TEST-HERMETIC-01",
+        "GR-2026-07-27-TEST-HERMETIC-02"
+      ],
       "acceptance": "Source-derived writer registry ve zero unauthorized write ratchet",
-      "evidence": "`tests` analizi; fixed count authority değildir",
-      "updated": "2026-07-26"
+      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; runtime guard, worker setup and bounded global snapshot protect canonical root/dashboard/desktop test surfaces; root 413 pass/10 skip, dashboard 49/49, desktop 13/13, TypeScript and syntax proofs pass; `src/dashboard/vitest.config.ts` remains an unapproved noncanonical uncovered config; real Docker opt-in, native Windows, Node-version CI matrix, external package/process containment, cross-platform and scale proofs remain open",
+      "updated": "2026-07-27"
     },
     {
       "order": 80,
@@ -12626,6 +12655,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "6fc51300e88d012575d260158dedd341915628626360575cebca3fa6a015bcc3"
+    "value": "24f6a5584aaa1a48a56c9841e45cbc78bee08da03184ac988fc1f051d513c5a5"
   }
 }

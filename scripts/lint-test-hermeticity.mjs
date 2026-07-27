@@ -1,34 +1,159 @@
 #!/usr/bin/env node
-// lint-test-hermeticity.mjs — scan tests/ for direct reads of gitignored state.
+// Source-derived test hermeticity registry and fail-loud policy gate.
 //
-// Non-hermetic tests read .deckent/config.json or .brain/memory.db from the LIVE
-// project, causing CI failures on fresh checkouts where those files don't exist.
-//
-// Exit: 0 = clean, 1 = violations found, 2 = scan error
-// Usage: node scripts/lint-test-hermeticity.mjs
+// Exit: 0 = clean, 1 = policy violations, 2 = scan/infrastructure error.
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  statSync,
+} from 'node:fs';
+import {
+  join,
+  dirname,
+  relative,
+  resolve,
+  sep,
+  posix as posixPath,
+  win32 as win32Path,
+} from 'node:path';
+import { builtinModules } from 'node:module';
+import { createHash } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), '..', '..');
+const MAX_SCAN_WALL_MS = 60_000;
+const NODE_BUILTIN_MODULES = new Set(
+  builtinModules.flatMap(name => [
+    name,
+    name.startsWith('node:') ? name.slice(5) : `node:${name}`,
+  ]),
+);
 
-// Files with explicit skip-if-absent guards or meta-test exemptions.
-// Add here when the test has a proper it.skipIf / ctx.skip() / it.skip guard,
-// OR when the file is a meta-test that uses the patterns as fixture data (not real access).
+export function createScanBudget(
+  startedAt = performance.now(),
+  maxMs = MAX_SCAN_WALL_MS,
+  {
+    maxRssBytes = 1024 * 1024 * 1024,
+    maxHeapBytes = 1024 * 1024 * 1024,
+    memorySampler = () => process.memoryUsage(),
+    clock = () => performance.now(),
+  } = {},
+) {
+  let operations = 0;
+  let peakRssBytes = 0;
+  let peakHeapBytes = 0;
+  return {
+    startedAt,
+    maxMs,
+    maxRssBytes,
+    maxHeapBytes,
+    elapsedMs() {
+      return clock() - startedAt;
+    },
+    check(phase, force = false) {
+      operations += 1;
+      if (!force && operations % 512 !== 0) return;
+      const elapsedMs = clock() - startedAt;
+      if (elapsedMs > maxMs) {
+        throw new Error(
+          '[E_HERMETIC_SCAN_BUDGET]'
+          + ` ${phase} exceeded ${maxMs}ms`
+          + ` (elapsedMs=${elapsedMs}, operations=${operations})`,
+        );
+      }
+      const memory = memorySampler();
+      const rssBytes = Number(memory?.rss ?? 0);
+      const heapBytes = Number(memory?.heapUsed ?? 0);
+      peakRssBytes = Math.max(peakRssBytes, rssBytes);
+      peakHeapBytes = Math.max(peakHeapBytes, heapBytes);
+      if (rssBytes > maxRssBytes || heapBytes > maxHeapBytes) {
+        throw new Error(
+          '[E_HERMETIC_SCAN_BUDGET:memory]'
+          + ` ${phase} exceeded memory budget`
+          + ` (rssBytes=${rssBytes}/${maxRssBytes},`
+          + ` heapBytes=${heapBytes}/${maxHeapBytes},`
+          + ` operations=${operations})`,
+        );
+      }
+    },
+    snapshot() {
+      return {
+        elapsedMs: this.elapsedMs(),
+        operations,
+        peakRssBytes,
+        peakHeapBytes,
+      };
+    },
+  };
+}
+
+export const UNRESOLVED_BASELINE = Object.freeze({
+  count: 9034,
+  digest: '3b956ae782feed4894c860935e420e83749a0e06bc3bd3ed4c812e528683a420',
+});
+
+export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
+  count: 1121,
+  digest: 'ca6a5c17e953658e5f852e5ab84c1713d9f3bb8082e6414ef21ec488b9aeb777',
+});
+
+const PROTECTED_ROOT_POLICY = new Map([
+  ['.tasks', {
+    provenance: 'live-tasks',
+    code: 'E_HERMETIC_TASKS_WRITE',
+  }],
+  ['.locks', {
+    provenance: 'live-locks',
+    code: 'E_HERMETIC_PROJECT_WRITE',
+  }],
+  ['dist', {
+    provenance: 'live-dist',
+    code: 'E_HERMETIC_DIST_CLEAN',
+  }],
+  ['.brain', {
+    provenance: 'live-brain',
+    code: 'E_HERMETIC_PROJECT_WRITE',
+  }],
+  ['.deckent', {
+    provenance: 'live-deckent',
+    code: 'E_HERMETIC_PROJECT_WRITE',
+  }],
+]);
+
+// Legacy read exemptions remain narrowly scoped to skip-if-absent or tracked-state
+// readers. They NEVER suppress writer-registry or child-effect findings.
 export const ALLOWLIST = [
-  'tests/scripts/adr-validator.test.ts',              // it.skip blocks around .brain access
-  'tests/core/nervous-enabled-integration.test.ts',   // it.skipIf(!hasProjectConfig) guard
-  'tests/orchestra/spawn-backend-docker.test.ts',     // ctx.skip() after null config check
-  'tests/scripts/lint-test-hermeticity.test.ts',      // meta-test: patterns appear as fixture data
-  'tests/docs/api-md-no-stale-refs.test.ts',          // reads .brain/exports/*.md — git-TRACKED files, present on fresh checkout
-  'tests/cli/helpers/i18n-coverage.test.ts',          // reads .deckent/i18n/ — git-TRACKED files, present on fresh checkout
-  'tests/core/debt-002.test.ts',                      // reads .brain/exports/debt.md — git-TRACKED, present on fresh checkout
-  'tests/core/features-manifest.test.ts',             // reads .deckent/settings/features-manifest.json — git-TRACKED, present on fresh checkout
+  'tests/scripts/adr-validator.test.ts',
+  'tests/core/nervous-enabled-integration.test.ts',
+  'tests/orchestra/spawn-backend-docker.test.ts',
+  'tests/scripts/lint-test-hermeticity.test.ts',
+  'tests/docs/api-md-no-stale-refs.test.ts',
+  'tests/cli/helpers/i18n-coverage.test.ts',
+  'tests/core/debt-002.test.ts',
+  'tests/core/features-manifest.test.ts',
 ];
 
-// Per-line patterns that indicate non-hermetic access to live gitignored state.
-// Each pattern represents a "live root" access that will fail on a fresh CI checkout.
+export const LEGACY_READ_MIGRATION_BASELINE = Object.freeze([
+  'tests/cli/helpers/i18n-coverage.test.ts:9e5e256d837d13b50688ad12b091703d1744e583107d5afd15d0c2355a3e3ed1',
+  'tests/core/debt-002.test.ts:3ad99766549f71dd4975c5136f314bab6305062af608a53de6d31fd180049a33',
+  'tests/core/features-manifest.test.ts:b7b9c3987127fea3ad886be3903adc86e3252966c997c0b1d0e52d11bac065ac',
+  'tests/core/nervous-enabled-integration.test.ts:2a6ad86be5a4e6cade1a7b07c8866d28c3bbde48f0b9207c8acc62aa8871f8ce',
+  'tests/core/nervous-enabled-integration.test.ts:86ab13031d7ee490e260117cf984fb7e9741915e481286a7c9507f95ad688ddf',
+  'tests/core/nervous-enabled-integration.test.ts:a52fe8030f86d8bf3ed544ff39030d4cdea3139e5bf4cc5fdbe08cf3db323804',
+  'tests/docs/api-md-no-stale-refs.test.ts:184a3e5aaae0b00194e82219e6796717755cace61bd6bf1dab822282a2055aec',
+  'tests/docs/api-md-no-stale-refs.test.ts:301f4c688b1b01b1e5dde1b12dd5b5baca1a9c2c54c52f98718ae330423d804f',
+  'tests/docs/api-md-no-stale-refs.test.ts:4f75f8d46fbaaf9187569bf62482ec7b259130e04271c69f43ccee58ffbe383a',
+  'tests/scripts/adr-validator.test.ts:4caf67a0563d8c3648ed6f17a2a56e47b005b19bfad2f26127d99b56bf0e3705',
+  'tests/scripts/adr-validator.test.ts:b5ded85101c0b6a0c8150c04fbea6505ad2b34c104165753f7d884c10ffb7650',
+  'tests/scripts/adr-validator.test.ts:c5e3bb78e99849d549d869fb5105298865eed503f3b90eea01fbc7d990e0356a',
+  'tests/scripts/adr-validator.test.ts:ee0961ec81de08d3d868893b8d586b5d449231e95cf9a12a32e966b4f24ce4f7',
+]);
+
 export const HERMETIC_PATTERNS = [
   { re: /process\.cwd\(\)[^;\n]*\.deckent/, label: 'process.cwd() + .deckent (live root)' },
   { re: /process\.cwd\(\)[^;\n]*\.brain/, label: 'process.cwd() + .brain (live root)' },
@@ -36,8 +161,6 @@ export const HERMETIC_PATTERNS = [
   { re: /readFileSync\s*\([^)]*['"]\.brain\/memory\.db['"]/, label: '.brain/memory.db direct readFileSync' },
 ];
 
-// If any of these appear on the SAME violation line, it is treated as hermetic.
-// (e.g. the path is inside a tmpdir-derived variable on the same expression.)
 export const HERMETIC_LINE_EXEMPTIONS = [
   /tmpdir\s*\(\)/,
   /mkdtempSync\s*\(/,
@@ -45,105 +168,7278 @@ export const HERMETIC_LINE_EXEMPTIONS = [
   /withSandboxHome/,
 ];
 
-/**
- * Check a single test file's content for non-hermetic access patterns.
- * Returns an array of violation objects with file, line, match, label.
- * @param {string} content
- * @param {string} filePath - path used in report output (usually relative)
- * @returns {Array<{file: string, line: number, match: string, label: string}>}
- */
-export function checkFile(content, filePath) {
-  const violations = [];
-  const lines = content.split('\n');
+const WRITE_SINKS = new Map([
+  ['appendFile', [0]],
+  ['appendFileSync', [0]],
+  ['chmod', [0]],
+  ['chmodSync', [0]],
+  ['chown', [0]],
+  ['chownSync', [0]],
+  ['copyFile', [1]],
+  ['copyFileSync', [1]],
+  ['cp', [1]],
+  ['cpSync', [1]],
+  ['createWriteStream', [0]],
+  ['link', [0, 1]],
+  ['linkSync', [0, 1]],
+  ['lchown', [0]],
+  ['lchownSync', [0]],
+  ['lutimes', [0]],
+  ['lutimesSync', [0]],
+  ['mkdir', [0]],
+  ['mkdirSync', [0]],
+  ['mkdtemp', [0]],
+  ['mkdtempDisposable', [0]],
+  ['mkdtempDisposableSync', [0]],
+  ['mkdtempSync', [0]],
+  ['open', [0]],
+  ['openSync', [0]],
+  ['rename', [0, 1]],
+  ['renameSync', [0, 1]],
+  ['rm', [0]],
+  ['rmSync', [0]],
+  ['rmdir', [0]],
+  ['rmdirSync', [0]],
+  ['symlink', [1]],
+  ['symlinkSync', [1]],
+  ['truncate', [0]],
+  ['truncateSync', [0]],
+  ['unlink', [0]],
+  ['unlinkSync', [0]],
+  ['utimes', [0]],
+  ['utimesSync', [0]],
+  ['writeFile', [0]],
+  ['writeFileSync', [0]],
+]);
 
-  for (let i = 0; i < lines.length; i++) {
-    const rawLine = lines[i];
-    const trimmed = rawLine.trim();
+const LEGACY_READ_SINKS = new Set([
+  'access',
+  'accessSync',
+  'createReadStream',
+  'existsSync',
+  'glob',
+  'globSync',
+  'lstat',
+  'lstatSync',
+  'open',
+  'openSync',
+  'opendir',
+  'opendirSync',
+  'readFile',
+  'readFileSync',
+  'readdir',
+  'readdirSync',
+  'readlink',
+  'readlinkSync',
+  'realpath',
+  'realpathSync',
+  'stat',
+  'statSync',
+  'watch',
+]);
 
-    // Skip comment lines
-    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
+const SPAWN_METHODS = new Set(['spawn', 'start', 'run']);
+const SCRIPT_CALLERS = new Set([
+  'runScript',
+  'runScriptAsync',
+  'spawnAsync',
+]);
 
-    for (const { re, label } of HERMETIC_PATTERNS) {
-      if (!re.test(rawLine)) continue;
-      // If the same line carries a hermetic context marker, it is safe
-      if (HERMETIC_LINE_EXEMPTIONS.some((ex) => ex.test(rawLine))) continue;
-      violations.push({ file: filePath, line: i + 1, match: rawLine.trim(), label });
+/** @typedef {'repo'|'repo-scratch'|'live-tasks'|'live-locks'|'live-dist'|'live-brain'|'live-deckent'|'temp'|'fragment'|'deferred'|'unknown'} Provenance */
+/** @typedef {{ kind: 'namespace'|'function'|'builtin-loader', module: string, name?: string }} Trust */
+/** @typedef {{
+ *   id: number,
+ *   name: string,
+ *   declaration: import('typescript').Node,
+ *   initializer?: import('typescript').Expression,
+ *   trust?: Trust,
+ *   projection?: {
+ *     source: import('typescript').Expression,
+ *     property?: string,
+ *     index?: number,
+ *     path?: Array<{ property?: string, index?: number }>,
+ *   },
+ *   deferred?: boolean,
+ *   varScoped?: boolean,
+ *   assignments: Array<{
+ *     position: number,
+ *     operator: import('typescript').SyntaxKind,
+ *     expression: import('typescript').Expression,
+ *     projection?: {
+ *       source: import('typescript').Expression,
+ *       path: Array<{ property?: string, index?: number }>,
+ *     },
+ *     conditional?: boolean,
+ *   }>,
+ *   propertyAssignments: Array<{
+ *     position: number,
+ *     operator: import('typescript').SyntaxKind,
+ *     path: string[],
+ *     expression: import('typescript').Expression,
+ *     conditional?: boolean,
+ *   }>,
+ * }} Binding */
+
+function normalizeRelative(value) {
+  return value.split(sep).join('/');
+}
+
+function canonicalSourceText(value) {
+  return value.replaceAll(/\r\n?/g, '\n');
+}
+
+function sourceKind(filePath) {
+  return filePath.endsWith('.tsx') || filePath.endsWith('.jsx')
+    ? ts.ScriptKind.TSX
+    : ts.ScriptKind.TS;
+}
+
+function lineFor(sourceFile, node) {
+  return sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+}
+
+function calleeName(expression) {
+  if (ts.isIdentifier(expression)) return expression.text;
+  if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
+  return undefined;
+}
+
+function receiverName(expression) {
+  if (!ts.isPropertyAccessExpression(expression)) return undefined;
+  return ts.isIdentifier(expression.expression) ? expression.expression.text : undefined;
+}
+
+function literalText(node) {
+  if (!node) return undefined;
+  if (
+    ts.isStringLiteralLike(node)
+    || ts.isNoSubstitutionTemplateLiteral(node)
+    || ts.isRegularExpressionLiteral(node)
+  ) {
+    return node.text;
+  }
+  return undefined;
+}
+
+function staticPropertyName(expression) {
+  if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
+  if (ts.isElementAccessExpression(expression)) return literalText(expression.argumentExpression);
+  return undefined;
+}
+
+function staticPropertyNames(expression, context) {
+  const direct = staticPropertyName(expression);
+  if (direct !== undefined) return [direct];
+  if (ts.isElementAccessExpression(expression) && context) {
+    return staticTextValues(expression.argumentExpression, context);
+  }
+  return [];
+}
+
+function propertyNameText(name) {
+  if (
+    ts.isIdentifier(name)
+    || ts.isStringLiteralLike(name)
+    || ts.isNumericLiteral(name)
+  ) {
+    return name.text;
+  }
+  if (ts.isComputedPropertyName(name)) return literalText(name.expression);
+  return undefined;
+}
+
+function normalizeBuiltinModule(moduleName) {
+  const normalized = moduleName.startsWith('node:') ? moduleName.slice(5) : moduleName;
+  if (normalized === 'fs/promises') return 'fs';
+  if (
+    ['fs', 'path', 'os', 'child_process', 'crypto', 'util', 'module', 'url']
+      .includes(normalized)
+  ) {
+    return normalized;
+  }
+  return undefined;
+}
+
+function trustForNamedImport(moduleName, importedName) {
+  if (moduleName === 'fs' && importedName === 'promises') {
+    return { kind: 'namespace', module: 'fs' };
+  }
+  if (moduleName === 'module' && importedName === 'createRequire') {
+    return { kind: 'function', module: 'module', name: 'createRequire' };
+  }
+  return { kind: 'function', module: moduleName, name: importedName };
+}
+
+function scopeKind(node) {
+  if (ts.isFunctionLike(node)) return 'function';
+  if (
+    ts.isBlock(node)
+    || ts.isCatchClause(node)
+    || ts.isForStatement(node)
+    || ts.isForInStatement(node)
+    || ts.isForOfStatement(node)
+  ) {
+    return 'block';
+  }
+  return undefined;
+}
+
+function isConditionallyExecuted(node) {
+  let cursor = node.parent;
+  while (cursor && !ts.isFunctionLike(cursor) && !ts.isSourceFile(cursor)) {
+    if (
+      ts.isIfStatement(cursor)
+      || ts.isConditionalExpression(cursor)
+      || ts.isSwitchStatement(cursor)
+      || ts.isCaseClause(cursor)
+      || ts.isDefaultClause(cursor)
+      || ts.isForStatement(cursor)
+      || ts.isForInStatement(cursor)
+      || ts.isForOfStatement(cursor)
+      || ts.isWhileStatement(cursor)
+      || ts.isDoStatement(cursor)
+      || ts.isTryStatement(cursor)
+      || ts.isCatchClause(cursor)
+    ) {
+      return true;
+    }
+    cursor = cursor.parent;
+  }
+  return false;
+}
+
+function createAnalysisContext(sourceFile, scanBudget) {
+  let nextBindingId = 1;
+  const nodeScopes = new WeakMap();
+  const rootScope = { parent: undefined, kind: 'source', bindings: new Map() };
+  const bindings = [];
+  const mockedModules = new Set();
+
+  const addBinding = (
+    scope,
+    name,
+    declaration,
+    initializer,
+    trust,
+    deferred = false,
+    projection,
+    varScoped = false,
+  ) => {
+    /** @type {Binding} */
+    const binding = {
+      id: nextBindingId,
+      name,
+      declaration,
+      initializer,
+      trust,
+      projection,
+      deferred,
+      varScoped,
+      assignments: [],
+      propertyAssignments: [],
+    };
+    nextBindingId += 1;
+    const sameName = scope.bindings.get(name) ?? [];
+    sameName.push(binding);
+    scope.bindings.set(name, sameName);
+    bindings.push(binding);
+    return binding;
+  };
+
+  const visit = (node, inheritedScope) => {
+    scanBudget?.check('analysis-context');
+    const outerScope = inheritedScope;
+    const nextScopeKind = node !== sourceFile ? scopeKind(node) : undefined;
+    const scope = nextScopeKind
+      ? { parent: inheritedScope, kind: nextScopeKind, bindings: new Map() }
+      : inheritedScope;
+    nodeScopes.set(node, scope);
+
+    if (
+      ts.isCallExpression(node)
+      && (
+        ts.isPropertyAccessExpression(node.expression)
+        || ts.isElementAccessExpression(node.expression)
+      )
+      && staticPropertyName(node.expression) === 'mock'
+      && ts.isIdentifier(node.expression.expression)
+      && node.expression.expression.text === 'vi'
+    ) {
+      const mocked = literalText(node.arguments[0]);
+      const normalized = mocked ? normalizeBuiltinModule(mocked) : undefined;
+      if (normalized) mockedModules.add(normalized);
+    }
+
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+      const moduleName = normalizeBuiltinModule(node.moduleSpecifier.text);
+      const clause = node.importClause;
+      if (moduleName && clause) {
+        if (clause.name) {
+          addBinding(scope, clause.name.text, clause.name, undefined, {
+            kind: 'namespace',
+            module: moduleName,
+          });
+        }
+        const namedBindings = clause.namedBindings;
+        if (namedBindings && ts.isNamespaceImport(namedBindings)) {
+          addBinding(scope, namedBindings.name.text, namedBindings.name, undefined, {
+            kind: 'namespace',
+            module: moduleName,
+          });
+        } else if (namedBindings && ts.isNamedImports(namedBindings)) {
+          for (const element of namedBindings.elements) {
+            addBinding(
+              scope,
+              element.name.text,
+              element.name,
+              undefined,
+              trustForNamedImport(moduleName, (element.propertyName ?? element.name).text),
+            );
+          }
+        }
+      } else if (node.moduleSpecifier.text === 'vitest' && clause?.namedBindings) {
+        if (ts.isNamedImports(clause.namedBindings)) {
+          for (const element of clause.namedBindings.elements) {
+            const importedName = (element.propertyName ?? element.name).text;
+            if (importedName === 'expect' || importedName === 'vi') {
+              addBinding(scope, element.name.text, element.name, undefined, {
+                kind: 'function',
+                module: 'vitest',
+                name: importedName,
+              });
+            }
+          }
+        }
+      }
+    } else if (
+      ts.isImportEqualsDeclaration(node)
+      && ts.isExternalModuleReference(node.moduleReference)
+      && ts.isStringLiteral(node.moduleReference.expression)
+    ) {
+      const moduleName = normalizeBuiltinModule(node.moduleReference.expression.text);
+      if (moduleName) {
+        addBinding(scope, node.name.text, node.name, undefined, {
+          kind: 'namespace',
+          module: moduleName,
+        });
+      }
+    }
+
+    if (ts.isFunctionDeclaration(node) && node.name) {
+      addBinding(outerScope, node.name.text, node.name);
+    } else if (ts.isFunctionExpression(node) && node.name) {
+      addBinding(scope, node.name.text, node.name);
+    } else if (ts.isClassDeclaration(node) && node.name) {
+      addBinding(outerScope, node.name.text, node.name);
+    } else if (ts.isVariableDeclaration(node)) {
+      const declarationList = ts.isVariableDeclarationList(node.parent)
+        ? node.parent
+        : undefined;
+      const blockScoped = declarationList === undefined
+        || Boolean(declarationList.flags & ts.NodeFlags.BlockScoped);
+      let declarationScope = scope;
+      if (!blockScoped) {
+        while (
+          declarationScope.parent
+          && declarationScope.kind !== 'function'
+          && declarationScope.kind !== 'source'
+        ) {
+          declarationScope = declarationScope.parent;
+        }
+      }
+
+      const projectedObjectValue = (source, propertyName) => {
+        if (!source || !ts.isObjectLiteralExpression(source)) return undefined;
+        for (const property of source.properties) {
+          if (
+            ts.isPropertyAssignment(property)
+            && propertyNameText(property.name) === propertyName
+          ) {
+            return property.initializer;
+          }
+          if (
+            ts.isShorthandPropertyAssignment(property)
+            && property.name.text === propertyName
+          ) {
+            return property.name;
+          }
+        }
+        return undefined;
+      };
+      const addPattern = (pattern, source, inheritedProjection) => {
+        if (ts.isIdentifier(pattern)) {
+          if (!blockScoped) {
+            const existing = (declarationScope.bindings.get(pattern.text) ?? [])
+              .find(binding => binding.varScoped);
+            if (existing) {
+              if (source) {
+                existing.assignments.push({
+                  position: pattern.getStart(sourceFile),
+                  operator: ts.SyntaxKind.EqualsToken,
+                  expression: source,
+                  conditional: isConditionallyExecuted(pattern),
+                });
+              }
+              return;
+            }
+          }
+          addBinding(
+            declarationScope,
+            pattern.text,
+            pattern,
+            source,
+            undefined,
+            false,
+            inheritedProjection,
+            !blockScoped,
+          );
+          return;
+        }
+        pattern.elements.forEach((element, index) => {
+          if (ts.isOmittedExpression(element)) return;
+          const propertyName = ts.isObjectBindingPattern(pattern)
+            ? (
+              element.propertyName
+                ? propertyNameText(element.propertyName)
+                : ts.isIdentifier(element.name) ? element.name.text : undefined
+            )
+            : undefined;
+          let projected;
+          if (ts.isArrayBindingPattern(pattern) && source && ts.isArrayLiteralExpression(source)) {
+            const arrayElement = source.elements[index];
+            if (arrayElement && !ts.isSpreadElement(arrayElement)) projected = arrayElement;
+          } else if (propertyName) {
+            projected = projectedObjectValue(source, propertyName);
+          }
+          const fallback = projected ?? element.initializer;
+          const step = propertyName === undefined ? { index } : { property: propertyName };
+          const projection = fallback === undefined
+            ? source
+              ? { source, path: [step] }
+              : inheritedProjection
+                ? {
+                  source: inheritedProjection.source,
+                  path: [...(inheritedProjection.path ?? []), step],
+                }
+                : undefined
+            : undefined;
+          if (ts.isIdentifier(element.name)) {
+            addBinding(
+              declarationScope,
+              element.name.text,
+              element.name,
+              fallback,
+              undefined,
+              fallback === undefined,
+              projection,
+              !blockScoped,
+            );
+          } else {
+            addPattern(element.name, fallback, projection);
+          }
+        });
+      };
+      addPattern(node.name, node.initializer);
+    } else if (ts.isParameter(node)) {
+      const addParameterPattern = pattern => {
+        if (ts.isIdentifier(pattern)) {
+          addBinding(scope, pattern.text, pattern, node.initializer, undefined, true);
+          return;
+        }
+        for (const element of pattern.elements) {
+          if (ts.isOmittedExpression(element)) continue;
+          addParameterPattern(element.name);
+        }
+      };
+      addParameterPattern(node.name);
+    }
+
+    node.forEachChild(child => visit(child, scope));
+  };
+  visit(sourceFile, rootScope);
+
+  const context = {
+    sourceFile,
+    nodeScopes,
+    rootScope,
+    bindings,
+    mockedModules,
+    resolveBinding(name, node) {
+      let scope = nodeScopes.get(node) ?? rootScope;
+      while (scope) {
+        const candidates = scope.bindings.get(name);
+        if (candidates?.length) {
+          const preceding = candidates
+            .filter(binding => binding.declaration.getStart(sourceFile) <= node.getStart(sourceFile))
+            .sort((left, right) =>
+              right.declaration.getStart(sourceFile) - left.declaration.getStart(sourceFile));
+          // A lexical declaration shadows its parent for the whole scope. Before
+          // initialization it resolves to unknown (TDZ), never to the outer binding.
+          return preceding[0] ?? candidates[0];
+        }
+        scope = scope.parent;
+      }
+      return undefined;
+    },
+  };
+
+  const assignmentOperators = new Set([
+    ts.SyntaxKind.EqualsToken,
+    ts.SyntaxKind.PlusEqualsToken,
+    ts.SyntaxKind.BarBarEqualsToken,
+    ts.SyntaxKind.AmpersandAmpersandEqualsToken,
+    ts.SyntaxKind.QuestionQuestionEqualsToken,
+  ]);
+  const assignmentIsConditional = node =>
+    isConditionallyExecuted(node)
+    || node.operatorToken.kind === ts.SyntaxKind.BarBarEqualsToken
+    || node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandEqualsToken
+    || node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionEqualsToken;
+  const recordPatternAssignment = (pattern, source, node, path = []) => {
+    const target = unwrapExpression(pattern);
+    if (ts.isIdentifier(target)) {
+      const binding = context.resolveBinding(target.text, target);
+      binding?.assignments.push({
+        position: node.getStart(sourceFile),
+        operator: node.operatorToken.kind,
+        expression: source,
+        ...(path.length > 0 ? { projection: { source, path } } : {}),
+        conditional: assignmentIsConditional(node),
+      });
+      return;
+    }
+    if (ts.isObjectLiteralExpression(target)) {
+      for (const property of target.properties) {
+        if (ts.isPropertyAssignment(property)) {
+          const propertyName = propertyNameText(property.name);
+          if (propertyName !== undefined) {
+            recordPatternAssignment(
+              property.initializer,
+              source,
+              node,
+              [...path, { property: propertyName }],
+            );
+          }
+        } else if (ts.isShorthandPropertyAssignment(property)) {
+          recordPatternAssignment(
+            property.name,
+            source,
+            node,
+            [...path, { property: property.name.text }],
+          );
+        }
+      }
+      return;
+    }
+    if (ts.isArrayLiteralExpression(target)) {
+      target.elements.forEach((element, index) => {
+        if (!ts.isOmittedExpression(element) && !ts.isSpreadElement(element)) {
+          recordPatternAssignment(element, source, node, [...path, { index }]);
+        }
+      });
+    }
+  };
+  const memberAssignmentTarget = expression => {
+    const path = [];
+    let cursor = unwrapExpression(expression);
+    while (
+      ts.isPropertyAccessExpression(cursor)
+      || ts.isElementAccessExpression(cursor)
+    ) {
+      const names = staticPropertyNames(cursor, context);
+      if (names.length !== 1) return undefined;
+      path.unshift(names[0]);
+      cursor = unwrapExpression(cursor.expression);
+    }
+    return ts.isIdentifier(cursor) && path.length > 0
+      ? { root: cursor, path }
+      : undefined;
+  };
+  const collectAssignments = node => {
+    if (ts.isBinaryExpression(node) && assignmentOperators.has(node.operatorToken.kind)) {
+      if (
+        ts.isIdentifier(unwrapExpression(node.left))
+        || ts.isObjectLiteralExpression(unwrapExpression(node.left))
+        || ts.isArrayLiteralExpression(unwrapExpression(node.left))
+      ) {
+        recordPatternAssignment(node.left, node.right, node);
+      } else {
+        const target = memberAssignmentTarget(node.left);
+        const binding = target
+          ? context.resolveBinding(target.root.text, target.root)
+          : undefined;
+        binding?.propertyAssignments.push({
+          position: node.getStart(sourceFile),
+          operator: node.operatorToken.kind,
+          path: target.path,
+          expression: node.right,
+          conditional: assignmentIsConditional(node),
+        });
+      }
+    }
+    node.forEachChild(collectAssignments);
+  };
+  sourceFile.forEachChild(collectAssignments);
+
+  const collectMockedCapabilities = node => {
+    if (
+      ts.isCallExpression(node)
+      && (
+        ts.isPropertyAccessExpression(node.expression)
+        || ts.isElementAccessExpression(node.expression)
+      )
+      && staticPropertyName(node.expression) === 'spyOn'
+      && ts.isIdentifier(node.expression.expression)
+    ) {
+      const viBinding = context.resolveBinding(
+        node.expression.expression.text,
+        node.expression.expression,
+      );
+      const namespace = node.arguments[0]
+        ? trustedNamespace(node.arguments[0], context)
+        : undefined;
+      if (
+        viBinding?.trust?.module === 'vitest'
+        && viBinding.trust.name === 'vi'
+        && namespace
+      ) {
+        mockedModules.add(namespace.module);
+      }
+    }
+    node.forEachChild(collectMockedCapabilities);
+  };
+  sourceFile.forEachChild(collectMockedCapabilities);
+  return context;
+}
+
+function sameTrust(left, right) {
+  return left?.kind === right?.kind
+    && left?.module === right?.module
+    && left?.name === right?.name;
+}
+
+function bindingValuesAtUse(binding, useNode, context) {
+  const usePosition = useNode.getStart(context.sourceFile);
+  let values = (
+    binding.initializer
+    && binding.declaration.getStart(context.sourceFile) <= usePosition
+  )
+    ? [{ expression: binding.initializer }]
+    : [];
+  for (const assignment of [...binding.assignments].sort((left, right) =>
+    left.position - right.position)) {
+    if (assignment.position >= usePosition) continue;
+    const value = assignment.projection
+      ? { projection: assignment.projection }
+      : { expression: assignment.expression };
+    if (assignment.operator === ts.SyntaxKind.EqualsToken) {
+      values = assignment.conditional ? [...values, value] : [value];
+    } else if (assignment.conditional) {
+      values = [...values, value];
+    } else {
+      values = [];
+    }
+  }
+  return values;
+}
+
+function bindingExpressionsAtUse(binding, useNode, context) {
+  return bindingValuesAtUse(binding, useNode, context).flatMap(value =>
+    value.projection
+      ? bindingProjectionExpressions(value.projection, context)
+      : [value.expression]);
+}
+
+function bindingTrust(binding, useNode, context, bindingStack = new Set()) {
+  if (binding.trust && binding.assignments.length === 0) return binding.trust;
+  if (bindingStack.has(binding.id)) return undefined;
+  const nextStack = new Set(bindingStack);
+  nextStack.add(binding.id);
+
+  if (binding.projection) {
+    const projectedTrust = trustForBindingProjection(
+      binding.projection,
+      context,
+      nextStack,
+    );
+    if (projectedTrust) return projectedTrust;
+  }
+
+  const candidates = bindingValuesAtUse(binding, useNode, context)
+    .map(value => value.projection
+      ? trustForBindingProjection(value.projection, context, nextStack)
+      : trustedCapability(value.expression, context, nextStack))
+    .filter(value => value !== undefined);
+  if (
+    candidates.length > 0
+    && candidates.every(candidate => sameTrust(candidate, candidates[0]))
+  ) {
+    return candidates[0];
+  }
+  return undefined;
+}
+
+function trustedBuiltinLoader(expression, context, bindingStack = new Set()) {
+  const unwrapped = unwrapExpression(expression);
+  if (ts.isIdentifier(unwrapped)) {
+    const binding = context.resolveBinding(unwrapped.text, unwrapped);
+    if (!binding) return unwrapped.text === 'require';
+    const ambientDeclaration = ts.isVariableDeclaration(binding.declaration.parent)
+      && !binding.initializer
+      && (
+        ts.getCombinedModifierFlags(binding.declaration.parent.parent.parent)
+        & ts.ModifierFlags.Ambient
+      ) !== 0;
+    if (unwrapped.text === 'require' && ambientDeclaration) return true;
+    return bindingTrust(binding, unwrapped, context, bindingStack)?.kind === 'builtin-loader';
+  }
+  if (
+    (
+      ts.isPropertyAccessExpression(unwrapped)
+      || ts.isElementAccessExpression(unwrapped)
+    )
+    && staticPropertyName(unwrapped) === 'require'
+    && ts.isIdentifier(unwrapped.expression)
+    && unwrapped.expression.text === 'module'
+    && !context.resolveBinding('module', unwrapped.expression)
+  ) {
+    return true;
+  }
+  if (ts.isCallExpression(unwrapped)) {
+    return trustedCapability(unwrapped, context, bindingStack)?.kind === 'builtin-loader';
+  }
+  return false;
+}
+
+function trustedNamespace(expression, context, bindingStack = new Set()) {
+  if (
+    ts.isParenthesizedExpression(expression)
+    || ts.isAsExpression(expression)
+    || ts.isTypeAssertionExpression(expression)
+    || ts.isNonNullExpression(expression)
+    || ts.isAwaitExpression(expression)
+    || ts.isSatisfiesExpression(expression)
+  ) {
+    return trustedNamespace(expression.expression, context, bindingStack);
+  }
+  if (ts.isIdentifier(expression)) {
+    const binding = context.resolveBinding(expression.text, expression);
+    if (!binding) return undefined;
+    const trust = bindingTrust(binding, expression, context, bindingStack);
+    return trust?.kind === 'namespace' ? trust : undefined;
+  }
+  if (ts.isCallExpression(expression)) {
+    let moduleText;
+    if (
+      expression.expression.kind === ts.SyntaxKind.ImportKeyword
+      && expression.arguments.length === 1
+    ) {
+      moduleText = literalText(expression.arguments[0]);
+    } else if (
+      trustedBuiltinLoader(expression.expression, context, bindingStack)
+      && expression.arguments.length === 1
+    ) {
+      moduleText = literalText(expression.arguments[0]);
+      if (moduleText === undefined) {
+        return { kind: 'namespace', module: 'unknown-builtin' };
+      }
+    } else if (
+      (
+        ts.isPropertyAccessExpression(expression.expression)
+        || ts.isElementAccessExpression(expression.expression)
+      )
+      && staticPropertyName(expression.expression) === 'getBuiltinModule'
+      && ts.isIdentifier(expression.expression.expression)
+      && expression.expression.expression.text === 'process'
+      && !context.resolveBinding('process', expression.expression.expression)
+      && expression.arguments.length === 1
+    ) {
+      moduleText = literalText(expression.arguments[0]);
+    }
+    const moduleName = moduleText ? normalizeBuiltinModule(moduleText) : undefined;
+    if (moduleName) return { kind: 'namespace', module: moduleName };
+  }
+  const property = staticPropertyName(expression);
+  if (
+    property === 'promises'
+    && (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression))
+  ) {
+    const receiver = trustedNamespace(expression.expression, context, bindingStack);
+    if (receiver?.module === 'fs') return receiver;
+  }
+  return undefined;
+}
+
+function trustedFunction(expression, context, bindingStack = new Set()) {
+  if (
+    ts.isParenthesizedExpression(expression)
+    || ts.isAsExpression(expression)
+    || ts.isTypeAssertionExpression(expression)
+    || ts.isNonNullExpression(expression)
+    || ts.isSatisfiesExpression(expression)
+  ) {
+    return trustedFunction(expression.expression, context, bindingStack);
+  }
+  if (ts.isIdentifier(expression)) {
+    const binding = context.resolveBinding(expression.text, expression);
+    if (!binding) return undefined;
+    const trust = bindingTrust(binding, expression, context, bindingStack);
+    return trust?.kind === 'function' ? trust : undefined;
+  }
+  if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
+    const receiver = trustedNamespace(expression.expression, context, bindingStack);
+    const names = staticPropertyNames(expression, context);
+    if (receiver && names.length > 0 && names.every(name => name === names[0])) {
+      return { kind: 'function', module: receiver.module, name: names[0] };
+    }
+    const projected = names.flatMap(name =>
+      projectedPropertyExpressions(
+        expression.expression,
+        name,
+        undefined,
+        context,
+        bindingStack,
+      ));
+    const candidates = projected
+      .map(value => trustedCapability(value, context, bindingStack))
+      .filter(value => value?.kind === 'function');
+    if (
+      candidates.length > 0
+      && candidates.every(candidate => sameTrust(candidate, candidates[0]))
+    ) {
+      return candidates[0];
+    }
+  }
+  return undefined;
+}
+
+function trustedCapability(expression, context, bindingStack = new Set()) {
+  if (
+    ts.isConditionalExpression(expression)
+    || (
+      ts.isBinaryExpression(expression)
+      && (
+        expression.operatorToken.kind === ts.SyntaxKind.BarBarToken
+        || expression.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+        || expression.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+      )
+    )
+  ) {
+    const branches = ts.isConditionalExpression(expression)
+      ? [expression.whenTrue, expression.whenFalse]
+      : [expression.left, expression.right];
+    const candidates = branches
+      .map(branch => trustedCapability(branch, context, bindingStack))
+      .filter(value => value !== undefined);
+    if (
+      candidates.length > 0
+      && candidates.every(candidate => sameTrust(candidate, candidates[0]))
+    ) {
+      return candidates[0];
+    }
+  }
+  if (ts.isCallExpression(expression)) {
+    const called = trustedFunction(expression.expression, context, bindingStack);
+    if (called?.module === 'module' && called.name === 'createRequire') {
+      return { kind: 'builtin-loader', module: 'module', name: 'require' };
+    }
+    if (called?.module === 'util' && called.name === 'promisify' && expression.arguments[0]) {
+      return trustedFunction(expression.arguments[0], context, bindingStack);
+    }
+    if (
+      (ts.isPropertyAccessExpression(expression.expression)
+        || ts.isElementAccessExpression(expression.expression))
+      && staticPropertyName(expression.expression) === 'bind'
+    ) {
+      return trustedFunction(expression.expression.expression, context, bindingStack);
+    }
+  }
+  return trustedNamespace(expression, context, bindingStack)
+    ?? trustedFunction(expression, context, bindingStack);
+}
+
+function canonicalPathText(value) {
+  const normalized = value.replaceAll('\\', '/');
+  if (/^[A-Za-z]:\//.test(normalized) || normalized.startsWith('//')) {
+    return win32Path.normalize(value).replaceAll('\\', '/');
+  }
+  return posixPath.normalize(normalized);
+}
+
+function pathComparisonText(value) {
+  const canonical = canonicalPathText(value);
+  return /^[A-Za-z]:\//.test(canonical) || canonical.startsWith('//')
+    ? canonical.toLowerCase()
+    : canonical;
+}
+
+function portablePathSegmentKey(value) {
+  // Windows treats path segments case-insensitively and strips trailing dots
+  // and spaces. A test is hermetic only if it is safe on every supported host.
+  return value.replace(/[ .]+$/g, '').toLowerCase();
+}
+
+function boundaryFromText(value) {
+  const normalized = canonicalPathText(value);
+  const driveRelative = /^[A-Za-z]:(?!\/)/.test(normalized);
+  const effectiveValue = driveRelative ? normalized.slice(2) : normalized;
+  const absolute = effectiveValue.startsWith('/') || /^[A-Za-z]:\//.test(effectiveValue);
+  const segments = [];
+  for (const segment of effectiveValue.split('/')) {
+    if (segment === '' || segment === '.') continue;
+    if (segment === '..') {
+      if (segments.length > 0 && segments.at(-1) !== '..') segments.pop();
+      else segments.push(segment);
+      continue;
+    }
+    segments.push(segment);
+  }
+  let effectiveSegments = segments;
+  if (absolute) {
+    const normalizedRepo = canonicalPathText(REPO_ROOT).replace(/\/+$/, '');
+    const normalizedValue = effectiveValue.replace(/\/+$/, '');
+    const comparedRepo = pathComparisonText(normalizedRepo);
+    const comparedValue = pathComparisonText(normalizedValue);
+    const portableRepo = comparedRepo.toLocaleLowerCase('en-US');
+    const portableValue = comparedValue.toLocaleLowerCase('en-US');
+    if (
+      comparedValue === comparedRepo
+      || comparedValue.startsWith(`${comparedRepo}/`)
+      || portableValue === portableRepo
+      || portableValue.startsWith(`${portableRepo}/`)
+    ) {
+      effectiveSegments = normalizedValue
+        .slice(normalizedRepo.length)
+        .split('/')
+        .filter(Boolean);
+    } else {
+      return undefined;
+    }
+  } else if (segments[0] === REPO_PATH_TOKEN) {
+    effectiveSegments = segments.slice(1);
+  }
+  const first = portablePathSegmentKey(effectiveSegments[0] ?? '');
+  return PROTECTED_ROOT_POLICY.get(first)?.provenance;
+}
+
+function literalPathProvenance(value) {
+  const normalized = canonicalPathText(value);
+  const boundary = boundaryFromText(normalized);
+  if (boundary) return boundary;
+  if (
+    /^\/(?:tmp|var\/tmp)(?:\/|$)/.test(normalized)
+    || /^\/private\/var\/folders(?:\/|$)/.test(normalized)
+    || /^[A-Za-z]:\/Users\/[^/]+\/AppData\/Local\/Temp(?:\/|$)/i.test(normalized)
+  ) {
+    return 'temp';
+  }
+  const absolute = normalized.startsWith('/') || /^[A-Za-z]:\//.test(normalized);
+  if (absolute) return 'unknown';
+  return 'fragment';
+}
+
+function pathBoundaryFromArguments(argumentsList, startIndex, context) {
+  let lastOpaqueIndex = -1;
+  for (let index = startIndex; index < argumentsList.length; index += 1) {
+    if (staticTextValues(argumentsList[index], context).length === 0) {
+      const visible = expressionBoundary(argumentsList[index], context);
+      if (visible) return visible;
+      lastOpaqueIndex = index;
     }
   }
 
-  return violations;
+  let combinations = [''];
+  const effectiveStart = lastOpaqueIndex >= 0 ? lastOpaqueIndex + 1 : startIndex;
+  for (let index = effectiveStart; index < argumentsList.length; index += 1) {
+    const argument = argumentsList[index];
+    const values = staticTextValues(argument, context);
+    if (values.length === 0) continue;
+    combinations = crossStaticValues(
+      combinations,
+      values,
+      (prefix, value) => prefix.length > 0 ? `${prefix}/${value}` : value,
+    );
+  }
+  for (const candidate of combinations) {
+    const boundary = boundaryFromText(candidate);
+    if (boundary) return boundary;
+  }
+  return undefined;
+}
+
+function isDefinitelyRelativeFragment(expression, context) {
+  if (ts.isIdentifier(expression)) {
+    const binding = context.resolveBinding(expression.text, expression);
+    if (binding && ts.isParameter(binding.declaration.parent)) {
+      return context.relativeFragmentOverrides?.has(binding.id)
+        || context.provenanceOverrides?.get(binding.id) === 'fragment';
+    }
+  }
+  const values = staticTextValues(expression, context);
+  if (values.length > 0) {
+    return values.every(value => {
+      const normalized = value.replaceAll('\\', '/');
+      return normalized !== REPO_PATH_TOKEN
+        && !normalized.startsWith(`${REPO_PATH_TOKEN}/`)
+        && !normalized.startsWith('/')
+        && !/^[A-Za-z]:\//.test(normalized)
+        && !normalized.split('/').includes('..');
+    });
+  }
+  if (ts.isTemplateExpression(expression)) {
+    const literalParts = [
+      expression.head.text,
+      ...expression.templateSpans.map(span => span.literal.text),
+    ];
+    return literalParts.every(part => !/[\\/]/.test(part) && !part.includes('..'))
+      && expression.templateSpans.every(span =>
+        isDefinitelyRelativeFragment(span.expression, context));
+  }
+  if (ts.isBinaryExpression(expression) && expression.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    return isDefinitelyRelativeFragment(expression.left, context)
+      && isDefinitelyRelativeFragment(expression.right, context);
+  }
+  if (
+    ts.isPropertyAccessExpression(expression)
+    && ts.isIdentifier(expression.expression)
+    && expression.expression.text === 'process'
+    && expression.name.text === 'pid'
+    && !context.resolveBinding('process', expression.expression)
+  ) {
+    return true;
+  }
+  if (
+    ts.isCallExpression(expression)
+    && ts.isPropertyAccessExpression(expression.expression)
+    && ts.isIdentifier(expression.expression.expression)
+    && (
+      (expression.expression.expression.text === 'Date' && expression.expression.name.text === 'now')
+      || (
+        expression.expression.expression.text === 'Math'
+        && expression.expression.name.text === 'random'
+      )
+    )
+    && !context.resolveBinding(
+      expression.expression.expression.text,
+      expression.expression.expression,
+    )
+  ) {
+    return true;
+  }
+  if (ts.isCallExpression(expression)) {
+    const trust = trustedFunction(expression.expression, context);
+    if (
+      trust?.module === 'crypto'
+      && (trust.name === 'randomBytes' || trust.name === 'randomUUID')
+    ) {
+      return true;
+    }
+  }
+  if (
+    ts.isCallExpression(expression)
+    && ts.isPropertyAccessExpression(expression.expression)
+    && ['slice', 'substring', 'toString'].includes(expression.expression.name.text)
+    && isDefinitelyRelativeFragment(expression.expression.expression, context)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function expressionBoundary(expression, context) {
+  if (context) {
+    const staticValues = staticTextValues(expression, context);
+    if (staticValues.length > 0) {
+      for (const value of staticValues) {
+        const boundary = boundaryFromText(value);
+        if (boundary) return boundary;
+      }
+      return undefined;
+    }
+  }
+  if (ts.isStringLiteralLike(expression) || ts.isNoSubstitutionTemplateLiteral(expression)) {
+    return boundaryFromText(expression.text);
+  }
+  if (ts.isTemplateExpression(expression)) {
+    const parts = [
+      expression.head.text,
+      ...expression.templateSpans.map(span => span.literal.text),
+    ];
+    for (const part of parts) {
+      const boundary = boundaryFromText(part);
+      if (boundary) return boundary;
+    }
+  }
+  if (ts.isBinaryExpression(expression) && expression.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    return expressionBoundary(expression.left, context)
+      ?? expressionBoundary(expression.right, context);
+  }
+  if (ts.isConditionalExpression(expression)) {
+    return expressionBoundary(expression.whenTrue, context)
+      ?? expressionBoundary(expression.whenFalse, context);
+  }
+  if (ts.isCallExpression(expression)) {
+    for (const argument of expression.arguments) {
+      const boundary = expressionBoundary(argument, context);
+      if (boundary) return boundary;
+    }
+  }
+  return undefined;
+}
+
+function mergeProvenances(values) {
+  for (const hazardous of [...PROTECTED_ROOT_POLICY.values()]
+    .map(policy => policy.provenance)) {
+    if (values.includes(hazardous)) return hazardous;
+  }
+  if (values.includes('repo-scratch')) return 'repo-scratch';
+  if (values.includes('repo')) return 'repo';
+  const substantive = values.filter(value => value !== 'fragment');
+  if (substantive.length > 0 && substantive.every(value => value === 'temp')) return 'temp';
+  if (values.length > 0 && substantive.length === 0) return 'fragment';
+  if (values.includes('deferred')) return 'deferred';
+  return 'unknown';
+}
+
+function protectedStaticProvenance(expression, context, bindingStack = new Set()) {
+  const boundaries = staticTextValues(expression, context, bindingStack)
+    .map(boundaryFromText)
+    .filter(value => value !== undefined);
+  return boundaries.length > 0 ? mergeProvenances(boundaries) : undefined;
+}
+
+function bindingExpressions(binding, useNode, context, bindingStack = new Set()) {
+  const usePosition = useNode.getStart(context.sourceFile);
+  const expressions = [];
+  if (
+    binding.initializer
+    && binding.declaration.getStart(context.sourceFile) <= usePosition
+  ) {
+    expressions.push(binding.initializer);
+  }
+  for (const assignment of binding.assignments) {
+    // Test fixtures commonly initialize shared roots in beforeEach declared
+    // later in source order. Keep every assignment attached to this exact
+    // lexical binding; hazardous alternatives still dominate in merge.
+    if (
+      assignment.expression.kind !== ts.SyntaxKind.NullKeyword
+      && !(
+        ts.isIdentifier(assignment.expression)
+        && assignment.expression.text === 'undefined'
+      )
+    ) {
+      expressions.push(...(
+        assignment.projection
+          ? bindingProjectionExpressions(assignment.projection, context, bindingStack)
+          : [assignment.expression]
+      ));
+    }
+  }
+  return expressions;
+}
+
+function projectedPropertyExpressions(
+  expression,
+  propertyName,
+  index,
+  context,
+  bindingStack = new Set(),
+) {
+  if (
+    ts.isParenthesizedExpression(expression)
+    || ts.isAsExpression(expression)
+    || ts.isTypeAssertionExpression(expression)
+    || ts.isNonNullExpression(expression)
+    || ts.isAwaitExpression(expression)
+    || ts.isSatisfiesExpression(expression)
+  ) {
+    return projectedPropertyExpressions(
+      expression.expression,
+      propertyName,
+      index,
+      context,
+      bindingStack,
+    );
+  }
+  if (ts.isIdentifier(expression)) {
+    const binding = context.resolveBinding(expression.text, expression);
+    if (!binding || bindingStack.has(binding.id)) return [];
+    const nextStack = new Set(bindingStack);
+    nextStack.add(binding.id);
+    let values = bindingExpressions(binding, expression, context, nextStack).flatMap(value =>
+      projectedPropertyExpressions(value, propertyName, index, context, nextStack));
+    if (propertyName !== undefined && index === undefined) {
+      for (const assignment of [...binding.propertyAssignments].sort((left, right) =>
+        left.position - right.position)) {
+        if (
+          assignment.position >= expression.getStart(context.sourceFile)
+          || assignment.path.length !== 1
+          || assignment.path[0] !== propertyName
+        ) {
+          continue;
+        }
+        if (
+          assignment.operator === ts.SyntaxKind.EqualsToken
+          && !assignment.conditional
+        ) {
+          values = [assignment.expression];
+        } else {
+          values.push(assignment.expression);
+        }
+      }
+    }
+    return values;
+  }
+  if (ts.isConditionalExpression(expression)) {
+    return [
+      ...projectedPropertyExpressions(
+        expression.whenTrue,
+        propertyName,
+        index,
+        context,
+        bindingStack,
+      ),
+      ...projectedPropertyExpressions(
+        expression.whenFalse,
+        propertyName,
+        index,
+        context,
+        bindingStack,
+      ),
+    ];
+  }
+  if (propertyName !== undefined && ts.isObjectLiteralExpression(expression)) {
+    const values = [];
+    for (const property of expression.properties) {
+      if (
+        ts.isPropertyAssignment(property)
+        && propertyNameText(property.name) === propertyName
+      ) {
+        values.push(property.initializer);
+      } else if (
+        ts.isShorthandPropertyAssignment(property)
+        && property.name.text === propertyName
+      ) {
+        values.push(property.name);
+      } else if (
+        (ts.isMethodDeclaration(property)
+          || ts.isGetAccessorDeclaration(property)
+          || ts.isSetAccessorDeclaration(property))
+        && propertyNameText(property.name) === propertyName
+      ) {
+        values.push(property);
+      } else if (ts.isSpreadAssignment(property)) {
+        values.push(...projectedPropertyExpressions(
+          property.expression,
+          propertyName,
+          undefined,
+          context,
+          bindingStack,
+        ));
+      }
+    }
+    return values;
+  }
+  if (
+    index !== undefined
+    && ts.isArrayLiteralExpression(expression)
+    && expression.elements[index]
+    && !ts.isSpreadElement(expression.elements[index])
+  ) {
+    return [expression.elements[index]];
+  }
+  return [];
+}
+
+function projectionSteps(projection) {
+  if (projection.path) return projection.path;
+  return [{
+    ...(projection.property === undefined ? {} : { property: projection.property }),
+    ...(projection.index === undefined ? {} : { index: projection.index }),
+  }];
+}
+
+function bindingProjectionExpressions(projection, context, bindingStack = new Set()) {
+  let values = [projection.source];
+  for (const step of projectionSteps(projection)) {
+    values = values.flatMap(value => projectedPropertyExpressions(
+      value,
+      step.property,
+      step.index,
+      context,
+      bindingStack,
+    ));
+  }
+  return values;
+}
+
+function trustForBindingProjection(projection, context, bindingStack = new Set()) {
+  let namespace = trustedNamespace(projection.source, context, bindingStack);
+  const steps = projectionSteps(projection);
+  if (namespace) {
+    for (let index = 0; index < steps.length; index += 1) {
+      const property = steps[index].property;
+      if (!property) return undefined;
+      if (namespace.module === 'fs' && property === 'promises') continue;
+      if (index === steps.length - 1) {
+        return { kind: 'function', module: namespace.module, name: property };
+      }
+      return undefined;
+    }
+    return namespace;
+  }
+  const candidates = bindingProjectionExpressions(projection, context, bindingStack)
+    .map(value => trustedCapability(value, context, bindingStack))
+    .filter(value => value !== undefined);
+  if (
+    candidates.length > 0
+    && candidates.every(candidate => sameTrust(candidate, candidates[0]))
+  ) {
+    return candidates[0];
+  }
+  return undefined;
 }
 
 /**
- * Recursively collect .test.ts and .test.tsx files under a directory.
- * @param {string} dir
- * @param {string[]} [results]
- * @returns {string[]} absolute paths
+ * Resolve enough path provenance to distinguish the live repository authority
+ * from nonce-owned OS temp roots. Unknown never becomes trusted.
+ *
+ * @param {import('typescript').Expression} expression
+ * @param {ReturnType<typeof createAnalysisContext>} context
+ * @param {Set<number>} [bindingStack]
+ * @returns {Provenance}
  */
-function collectFiles(dir, results = []) {
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    const st = statSync(full);
-    if (st.isDirectory()) {
-      collectFiles(full, results);
-    } else if (entry.endsWith('.test.ts') || entry.endsWith('.test.tsx')) {
-      results.push(full);
+function expressionProvenance(expression, context, bindingStack = new Set()) {
+  if (ts.isParenthesizedExpression(expression)) {
+    return expressionProvenance(expression.expression, context, bindingStack);
+  }
+  if (
+    ts.isAsExpression(expression)
+    || ts.isTypeAssertionExpression(expression)
+    || ts.isNonNullExpression(expression)
+    || ts.isAwaitExpression(expression)
+    || ts.isSatisfiesExpression(expression)
+  ) {
+    return expressionProvenance(expression.expression, context, bindingStack);
+  }
+  if (ts.isIdentifier(expression)) {
+    const binding = context.resolveBinding(expression.text, expression);
+    if (!binding || bindingStack.has(binding.id)) return 'unknown';
+    const override = context.provenanceOverrides?.get(binding.id);
+    if (override) return override;
+    const staticProtected = protectedStaticProvenance(expression, context, bindingStack);
+    if (staticProtected) return staticProtected;
+    const nextStack = new Set(bindingStack);
+    nextStack.add(binding.id);
+    if (binding.projection) {
+      const projected = bindingProjectionExpressions(
+        binding.projection,
+        context,
+        nextStack,
+      );
+      if (projected.length > 0) {
+        return mergeProvenances(projected.map(value =>
+          expressionProvenance(value, context, nextStack)));
+      }
+      const steps = projectionSteps(binding.projection);
+      if (steps.at(-1)?.property === 'path') {
+        const owner = expressionProvenance(
+          binding.projection.source,
+          context,
+          nextStack,
+        );
+        if (
+          owner === 'temp'
+          || owner === 'repo'
+          || owner === 'repo-scratch'
+          || owner.startsWith('live-')
+        ) {
+          return owner;
+        }
+      }
     }
+    const bindingValues = bindingExpressions(binding, expression, context);
+    if (
+      bindingValues.length === 0
+      && (binding.deferred || ts.isParameter(binding.declaration.parent))
+    ) {
+      return 'deferred';
+    }
+    const values = bindingValues
+      .map(value => expressionProvenance(value, context, nextStack));
+    if (ts.isParameter(binding.declaration.parent)) values.push('deferred');
+    return mergeProvenances(values);
+  }
+
+  if (ts.isStringLiteralLike(expression) || ts.isNoSubstitutionTemplateLiteral(expression)) {
+    return literalPathProvenance(expression.text);
+  }
+
+  if (ts.isCallExpression(expression)) {
+    const trust = trustedFunction(expression.expression, context);
+    if (
+      staticPropertyName(expression.expression) === 'cwd'
+      && ts.isPropertyAccessExpression(expression.expression)
+      && ts.isIdentifier(expression.expression.expression)
+      && expression.expression.expression.text === 'process'
+      && !context.resolveBinding('process', expression.expression.expression)
+    ) {
+      return 'repo';
+    }
+    if (
+      trust?.module === 'url'
+      && trust.name === 'fileURLToPath'
+      && expression.arguments[0]
+      && ts.isPropertyAccessExpression(expression.arguments[0])
+      && expression.arguments[0].name.text === 'url'
+      && ts.isMetaProperty(expression.arguments[0].expression)
+      && expression.arguments[0].expression.keywordToken === ts.SyntaxKind.ImportKeyword
+    ) {
+      return 'repo';
+    }
+    if (
+      trust?.module === 'path'
+      && trust.name === 'dirname'
+      && expression.arguments[0]
+    ) {
+      const owner = expressionProvenance(
+        expression.arguments[0],
+        context,
+        bindingStack,
+      );
+      if (
+        owner === 'repo'
+        || owner === 'repo-scratch'
+        || owner === 'temp'
+        || owner.startsWith('live-')
+      ) {
+        return owner;
+      }
+    }
+    if (trust?.module === 'os' && trust.name === 'tmpdir') return 'temp';
+    if (
+      trust?.module === 'fs'
+      && (
+        trust.name === 'mkdtemp'
+        || trust.name === 'mkdtempSync'
+        || trust.name === 'mkdtempDisposable'
+        || trust.name === 'mkdtempDisposableSync'
+      )
+    ) {
+      const prefix = expression.arguments[0];
+      return prefix ? expressionProvenance(prefix, context, bindingStack) : 'unknown';
+    }
+    if (
+      trust?.module === 'path'
+      && (trust.name === 'join' || trust.name === 'resolve')
+    ) {
+      const provenances = expression.arguments
+        .map(argument => expressionProvenance(argument, context, bindingStack));
+      const textSegments = expression.arguments
+        .map(argument => literalText(argument))
+        .filter(value => value !== undefined);
+
+      if (trust.name === 'resolve') {
+        let rootIndex = -1;
+        for (let index = 0; index < provenances.length; index += 1) {
+          const staticValues = staticTextValues(expression.arguments[index], context);
+          const protectedRelativeFragment = provenances[index].startsWith('live-')
+            && staticValues.length > 0
+            && staticValues.every(value =>
+              value !== REPO_PATH_TOKEN
+              && !value.startsWith(`${REPO_PATH_TOKEN}/`)
+              && !value.startsWith('/')
+              && !/^[A-Za-z]:[\\/]/.test(value));
+          if (
+            provenances[index] === 'repo'
+            || provenances[index] === 'repo-scratch'
+            || provenances[index] === 'temp'
+            || (provenances[index].startsWith('live-') && !protectedRelativeFragment)
+          ) {
+            rootIndex = index;
+          }
+        }
+        const boundary = pathBoundaryFromArguments(
+          expression.arguments,
+          rootIndex >= 0 ? rootIndex + 1 : 0,
+          context,
+        );
+        const root = rootIndex >= 0 ? provenances[rootIndex] : 'unknown';
+        const uncertainAfterRoot = provenances.some((value, index) =>
+          index > rootIndex && (value === 'unknown' || value === 'deferred'));
+        if (root.startsWith('live-')) return root;
+        if (uncertainAfterRoot) return 'unknown';
+        if (root === 'repo-scratch') return 'repo-scratch';
+        if (root === 'repo') return boundary ?? 'repo';
+        const escapesRoot = expression.arguments
+          .slice(rootIndex + 1)
+          .some(argument => staticTextValues(argument, context).some(value =>
+            value.replaceAll('\\', '/').split('/').includes('..')));
+        if (root === 'temp' && escapesRoot) {
+          const escapedBoundary = expression.arguments
+            .slice(rootIndex + 1)
+            .map(argument => expressionBoundary(argument, context))
+            .find(value => value !== undefined);
+          return escapedBoundary ?? 'unknown';
+        }
+        if (root === 'temp') return 'temp';
+        if (boundary) return boundary;
+        return 'unknown';
+      }
+
+      if (provenances.includes('temp')) {
+        const tempIndex = provenances.indexOf('temp');
+        const suffixIsRelative = expression.arguments
+          .slice(tempIndex + 1)
+          .every(argument => isDefinitelyRelativeFragment(argument, context));
+        // path.join never resets on a later absolute segment, but an opaque or
+        // traversal-capable suffix can still escape a nonce-owned subtree.
+        return suffixIsRelative ? 'temp' : 'unknown';
+      }
+      if (provenances.includes('repo-scratch')) return 'repo-scratch';
+      if (provenances.includes('repo')) {
+        const repoIndex = provenances.indexOf('repo');
+        const boundary = pathBoundaryFromArguments(
+          expression.arguments,
+          repoIndex + 1,
+          context,
+        );
+        if (boundary) return boundary;
+        if (
+          textSegments.some(value => /^\.(?:test|tmp)(?:-|$)/.test(value))
+          || /['"]\.(?:test|tmp)(?:-|['"])/.test(expression.getText())
+        ) {
+          return 'repo-scratch';
+        }
+        return 'repo';
+      }
+      if (provenances.includes('deferred')) return 'deferred';
+      if (provenances.includes('unknown') && provenances.includes('temp')) return 'unknown';
+      if (provenances.includes('unknown')) return 'unknown';
+      const boundary = pathBoundaryFromArguments(expression.arguments, 0, context);
+      // A boundary suffix on an unproven base is live-authority-risk, not a
+      // generic unknown that can silently pass the H0 gate.
+      if (boundary) return boundary;
+      return 'unknown';
+    }
+    {
+      let callable;
+      let callableBinding;
+      let callableExpression = expression.expression;
+      while (ts.isParenthesizedExpression(callableExpression)) {
+        callableExpression = callableExpression.expression;
+      }
+      if (ts.isArrowFunction(callableExpression) || ts.isFunctionExpression(callableExpression)) {
+        callable = callableExpression;
+      } else if (ts.isIdentifier(callableExpression)) {
+        const binding = context.resolveBinding(callableExpression.text, callableExpression);
+        callableBinding = binding;
+        if (binding && !bindingStack.has(binding.id)) {
+        if (ts.isFunctionDeclaration(binding.declaration.parent)) {
+          callable = binding.declaration.parent;
+        } else if (
+          binding.initializer
+          && (
+            ts.isArrowFunction(binding.initializer)
+            || ts.isFunctionExpression(binding.initializer)
+          )
+        ) {
+          callable = binding.initializer;
+        }
+        }
+      }
+      if (callable?.body) {
+          const overrides = new Map(context.provenanceOverrides ?? []);
+          const relativeFragmentOverrides = new Set(
+            context.relativeFragmentOverrides ?? [],
+          );
+          callable.parameters.forEach((parameter, index) => {
+            if (!ts.isIdentifier(parameter.name)) return;
+            const parameterBinding = context.resolveBinding(parameter.name.text, parameter.name);
+            if (!parameterBinding) return;
+            const argument = expression.arguments[index] ?? parameter.initializer;
+            overrides.set(
+              parameterBinding.id,
+              argument
+                ? expressionProvenance(argument, context, bindingStack)
+                : 'deferred',
+            );
+            if (argument && isDefinitelyRelativeFragment(argument, context)) {
+              relativeFragmentOverrides.add(parameterBinding.id);
+            }
+          });
+          const nestedContext = {
+            ...context,
+            provenanceOverrides: overrides,
+            relativeFragmentOverrides,
+          };
+          const nextStack = new Set(bindingStack);
+          if (callableBinding) nextStack.add(callableBinding.id);
+          const returns = [];
+          if (!ts.isBlock(callable.body)) {
+            returns.push(callable.body);
+          } else {
+            const collectReturns = node => {
+              if (node !== callable && ts.isFunctionLike(node)) return;
+              if (ts.isReturnStatement(node) && node.expression) {
+                returns.push(node.expression);
+                return;
+              }
+              node.forEachChild(collectReturns);
+            };
+            callable.body.forEachChild(collectReturns);
+          }
+          if (returns.length > 0) {
+            const returned = mergeProvenances(returns.map(returnValue =>
+              expressionProvenance(returnValue, nestedContext, nextStack)));
+            return returned === 'unknown' ? 'deferred' : returned;
+          }
+      }
+    }
+    return expressionBoundary(expression, context) ?? 'unknown';
+  }
+
+  if (ts.isTemplateExpression(expression)) {
+    const provenances = expression.templateSpans.map(span =>
+      expressionProvenance(span.expression, context, bindingStack));
+    const boundary = expressionBoundary(expression, context);
+    const merged = mergeProvenances(provenances);
+    if (merged.startsWith('live-') || merged === 'repo-scratch') return merged;
+    if (merged === 'repo') return boundary ?? 'repo';
+    if (merged === 'temp' && !expression.templateSpans.some(span =>
+      expressionProvenance(span.expression, context, bindingStack) === 'unknown')) {
+      return 'temp';
+    }
+    if (merged === 'deferred') return 'deferred';
+    if (boundary) return boundary;
+  }
+
+  if (ts.isBinaryExpression(expression) && expression.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    const left = expressionProvenance(expression.left, context, bindingStack);
+    const right = expressionProvenance(expression.right, context, bindingStack);
+    const leftStaticBoundary = staticText(expression.left, context);
+    const rightStaticBoundary = staticText(expression.right, context);
+    const merged = mergeProvenances([
+      leftStaticBoundary !== undefined && boundaryFromText(leftStaticBoundary) ? 'unknown' : left,
+      rightStaticBoundary !== undefined && boundaryFromText(rightStaticBoundary) ? 'unknown' : right,
+    ]);
+    const boundary = expressionBoundary(expression, context);
+    if (merged.startsWith('live-') || merged === 'repo-scratch') return merged;
+    if (merged === 'repo') return boundary ?? 'repo';
+    if (merged === 'temp' && left !== 'unknown' && right !== 'unknown') return 'temp';
+    if (merged === 'deferred') return 'deferred';
+    if (boundary) return boundary;
+  }
+
+  if (ts.isConditionalExpression(expression)) {
+    return mergeProvenances([
+      expressionProvenance(expression.whenTrue, context, bindingStack),
+      expressionProvenance(expression.whenFalse, context, bindingStack),
+    ]);
+  }
+
+  if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
+    let receiver = expression.expression;
+    while (
+      ts.isParenthesizedExpression(receiver)
+      || ts.isAsExpression(receiver)
+      || ts.isNonNullExpression(receiver)
+    ) {
+      receiver = receiver.expression;
+    }
+    if (
+      ts.isIdentifier(receiver)
+      && context.resolveBinding(receiver.text, receiver)
+    ) {
+      if (staticPropertyName(expression) === 'path') {
+        const receiverProvenance = expressionProvenance(receiver, context, bindingStack);
+        if (
+          receiverProvenance === 'temp'
+          || receiverProvenance === 'repo'
+          || receiverProvenance === 'repo-scratch'
+          || receiverProvenance.startsWith('live-')
+        ) {
+          return receiverProvenance;
+        }
+      }
+      return 'deferred';
+    }
+  }
+
+  return expressionBoundary(expression, context) ?? 'unknown';
+}
+
+function projectCapabilityFromExpression(
+  expression,
+  useNode,
+  context,
+  bindingStack = new Set(),
+) {
+  if (
+    ts.isParenthesizedExpression(expression)
+    || ts.isAsExpression(expression)
+    || ts.isTypeAssertionExpression(expression)
+    || ts.isNonNullExpression(expression)
+    || ts.isAwaitExpression(expression)
+    || ts.isSatisfiesExpression(expression)
+  ) {
+    return projectCapabilityFromExpression(
+      expression.expression,
+      useNode,
+      context,
+      bindingStack,
+    );
+  }
+  if (ts.isIdentifier(expression)) {
+    const binding = context.resolveBinding(expression.text, expression);
+    if (!binding || bindingStack.has(binding.id)) return 'unknown';
+    const nextStack = new Set(bindingStack);
+    nextStack.add(binding.id);
+    const values = bindingExpressionsAtUse(binding, useNode, context)
+      .map(value => projectCapabilityFromExpression(value, useNode, context, nextStack));
+    return mergeProvenances(values);
+  }
+  if (
+    ts.isPropertyAccessExpression(expression)
+    || ts.isElementAccessExpression(expression)
+  ) {
+    const values = staticPropertyNames(expression, context)
+      .flatMap(property => projectedPropertyExpressions(
+        expression.expression,
+        property,
+        undefined,
+        context,
+        bindingStack,
+      ))
+      .map(value => projectCapabilityFromExpression(
+        value,
+        useNode,
+        context,
+        bindingStack,
+      ));
+    return mergeProvenances(values);
+  }
+  if (ts.isConditionalExpression(expression)) {
+    return mergeProvenances([
+      projectCapabilityFromExpression(expression.whenTrue, useNode, context, bindingStack),
+      projectCapabilityFromExpression(expression.whenFalse, useNode, context, bindingStack),
+    ]);
+  }
+  if (ts.isCallExpression(expression) || ts.isNewExpression(expression)) {
+    const values = [];
+    for (const argument of expression.arguments ?? []) {
+      const projectDirs = projectedPropertyExpressions(
+        argument,
+        'projectDir',
+        undefined,
+        context,
+        bindingStack,
+      );
+      values.push(...projectDirs.map(projectDir =>
+        expressionProvenance(projectDir, context, bindingStack)));
+    }
+    if (ts.isCallExpression(expression)) {
+      let callable;
+      const unwrappedCallee = unwrapExpression(expression.expression);
+      if (ts.isArrowFunction(unwrappedCallee) || ts.isFunctionExpression(unwrappedCallee)) {
+        callable = unwrappedCallee;
+      } else if (ts.isIdentifier(unwrappedCallee)) {
+        const binding = context.resolveBinding(unwrappedCallee.text, unwrappedCallee);
+        if (binding && !bindingStack.has(binding.id)) {
+          if (ts.isFunctionDeclaration(binding.declaration.parent)) {
+            callable = binding.declaration.parent;
+          } else if (
+            binding.initializer
+            && (
+              ts.isArrowFunction(binding.initializer)
+              || ts.isFunctionExpression(binding.initializer)
+            )
+          ) {
+            callable = binding.initializer;
+          }
+        }
+      }
+      if (callable?.body) {
+        const returns = [];
+        if (!ts.isBlock(callable.body)) {
+          returns.push(callable.body);
+        } else {
+          const collectReturns = node => {
+            if (node !== callable && ts.isFunctionLike(node)) return;
+            if (ts.isReturnStatement(node) && node.expression) {
+              returns.push(node.expression);
+              return;
+            }
+            node.forEachChild(collectReturns);
+          };
+          callable.body.forEachChild(collectReturns);
+        }
+        values.push(...returns.map(returnValue =>
+          projectCapabilityFromExpression(
+            returnValue,
+            useNode,
+            context,
+            bindingStack,
+          )));
+      }
+    }
+    return mergeProvenances(values);
+  }
+  return 'unknown';
+}
+
+function projectCapabilityForReceiver(receiver, useNode, context) {
+  return projectCapabilityFromExpression(receiver, useNode, context);
+}
+
+function registryClassification(provenance) {
+  if (provenance.startsWith('live-')) return 'violation';
+  if (
+    provenance === 'repo'
+    || provenance === 'repo-scratch'
+  ) {
+    return 'migration';
+  }
+  if (provenance === 'temp') return 'sandboxed';
+  return 'unresolved';
+}
+
+function errorCodeForProvenance(provenance) {
+  for (const policy of PROTECTED_ROOT_POLICY.values()) {
+    if (policy.provenance === provenance) return policy.code;
+  }
+  return undefined;
+}
+
+function dedupeWriterRegistry(registry) {
+  const groups = new Map();
+  for (const entry of registry) {
+    const key = `${entry.file}\0${entry.effect}\0${entry.callsite}`;
+    const group = groups.get(key) ?? [];
+    group.push(entry);
+    groups.set(key, group);
+  }
+  return [...groups.values()].map(group => {
+    const contextual = group.filter(entry => entry.contextual);
+    const authorities = contextual.length > 0 ? contextual : group;
+    const targetProvenance = mergeProvenances(
+      authorities.map(entry => entry.targetProvenance),
+    );
+    const baseClassification = registryClassification(targetProvenance);
+    let classification = baseClassification;
+    if (authorities.some(entry => entry.classification === 'violation')) {
+      classification = 'violation';
+    } else if (
+      baseClassification === 'violation'
+      && authorities.some(entry => entry.classification === 'guarded-denial')
+    ) {
+      classification = 'guarded-denial';
+    }
+    const { contextual: _contextual, ...representative } = authorities[0];
+    return {
+      ...representative,
+      targetProvenance,
+      classification,
+    };
+  }).sort((left, right) =>
+    left.line - right.line
+    || left.effect.localeCompare(right.effect)
+    || left.callsite.localeCompare(right.callsite));
+}
+
+function unwrapExpression(node) {
+  let current = node;
+  while (
+    ts.isParenthesizedExpression(current)
+    || ts.isAsExpression(current)
+    || ts.isTypeAssertionExpression(current)
+    || ts.isAwaitExpression(current)
+    || ts.isNonNullExpression(current)
+    || ts.isSatisfiesExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function directThunkMutation(thunk, mutation) {
+  if (ts.isBlock(thunk.body)) {
+    if (thunk.body.statements.length !== 1) return false;
+    const [statement] = thunk.body.statements;
+    return ts.isExpressionStatement(statement)
+      && unwrapExpression(statement.expression) === mutation;
+  }
+  return unwrapExpression(thunk.body) === mutation;
+}
+
+function isStablePrimitiveExpression(expression, context, bindingStack = new Set()) {
+  const unwrapped = unwrapExpression(expression);
+  if (
+    ts.isStringLiteralLike(unwrapped)
+    || ts.isNumericLiteral(unwrapped)
+    || ts.isRegularExpressionLiteral(unwrapped)
+    || unwrapped.kind === ts.SyntaxKind.TrueKeyword
+    || unwrapped.kind === ts.SyntaxKind.FalseKeyword
+    || unwrapped.kind === ts.SyntaxKind.NullKeyword
+  ) {
+    return true;
+  }
+  if (ts.isIdentifier(unwrapped)) {
+    if (unwrapped.text === 'undefined' && !context.resolveBinding('undefined', unwrapped)) {
+      return true;
+    }
+    const binding = context.resolveBinding(unwrapped.text, unwrapped);
+    if (!binding || bindingStack.has(binding.id)) return false;
+    const nextStack = new Set(bindingStack);
+    nextStack.add(binding.id);
+    const values = bindingExpressionsAtUse(binding, unwrapped, context);
+    return values.length > 0
+      && values.every(value => isStablePrimitiveExpression(value, context, nextStack));
+  }
+  if (ts.isTemplateExpression(unwrapped)) {
+    return unwrapped.templateSpans.every(span =>
+      isStablePrimitiveExpression(span.expression, context, bindingStack));
+  }
+  if (
+    ts.isConditionalExpression(unwrapped)
+    || (
+      ts.isBinaryExpression(unwrapped)
+      && (
+        unwrapped.operatorToken.kind === ts.SyntaxKind.PlusToken
+        || unwrapped.operatorToken.kind === ts.SyntaxKind.BarBarToken
+        || unwrapped.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+        || unwrapped.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+      )
+    )
+  ) {
+    const branches = ts.isConditionalExpression(unwrapped)
+      ? [unwrapped.condition, unwrapped.whenTrue, unwrapped.whenFalse]
+      : [unwrapped.left, unwrapped.right];
+    return branches.every(branch =>
+      isStablePrimitiveExpression(branch, context, bindingStack));
+  }
+  if (ts.isCallExpression(unwrapped)) {
+    if (
+      staticPropertyName(unwrapped.expression) === 'cwd'
+      && ts.isPropertyAccessExpression(unwrapped.expression)
+      && ts.isIdentifier(unwrapped.expression.expression)
+      && unwrapped.expression.expression.text === 'process'
+      && !context.resolveBinding('process', unwrapped.expression.expression)
+    ) {
+      return true;
+    }
+    const trusted = trustedFunction(unwrapped.expression, context);
+    return (
+      (trusted?.module === 'path' && ['join', 'resolve'].includes(trusted.name))
+      || (trusted?.module === 'os' && trusted.name === 'tmpdir')
+    )
+      && unwrapped.arguments.every(argument =>
+        isStablePrimitiveExpression(argument, context, bindingStack));
+  }
+  if (ts.isArrayLiteralExpression(unwrapped)) {
+    return unwrapped.elements.every(element =>
+      !ts.isSpreadElement(element)
+      && isStablePrimitiveExpression(element, context, bindingStack));
+  }
+  if (ts.isObjectLiteralExpression(unwrapped)) {
+    return unwrapped.properties.every(property =>
+      ts.isPropertyAssignment(property)
+      && !ts.isComputedPropertyName(property.name)
+      && isStablePrimitiveExpression(property.initializer, context, bindingStack));
+  }
+  return false;
+}
+
+function isExpectedGuardDenial(node, provenance, context) {
+  const expectedCode = errorCodeForProvenance(provenance);
+  if (!expectedCode) return false;
+  if (
+    !ts.isCallExpression(node)
+    || !node.arguments.every(argument =>
+      isStablePrimitiveExpression(argument, context))
+    || context.mockedModules.has('fs')
+  ) {
+    return false;
+  }
+
+  let cursor = node.parent;
+  while (cursor && !ts.isFunctionLike(cursor)) cursor = cursor.parent;
+  if (
+    !cursor
+    || (!ts.isArrowFunction(cursor) && !ts.isFunctionExpression(cursor))
+    || !directThunkMutation(cursor, node)
+  ) {
+    return false;
+  }
+
+  const expectCall = cursor.parent;
+  if (
+    !ts.isCallExpression(expectCall)
+    || expectCall.arguments[0] !== cursor
+    || !ts.isIdentifier(expectCall.expression)
+  ) {
+    return false;
+  }
+  const expectBinding = context.resolveBinding(expectCall.expression.text, expectCall.expression);
+  const trustedVitestExpect = expectBinding?.trust?.module === 'vitest'
+    && expectBinding.trust.name === 'expect';
+  if (!trustedVitestExpect) return false;
+
+  const matcherAccess = expectCall.parent;
+  if (
+    !matcherAccess
+    || (!ts.isPropertyAccessExpression(matcherAccess) && !ts.isElementAccessExpression(matcherAccess))
+    || matcherAccess.expression !== expectCall
+    || !['toThrow', 'toThrowError'].includes(staticPropertyName(matcherAccess) ?? '')
+  ) {
+    return false;
+  }
+  const matcherCall = matcherAccess.parent;
+  if (!ts.isCallExpression(matcherCall) || matcherCall.expression !== matcherAccess) return false;
+  const matcher = literalText(matcherCall.arguments[0]);
+  return matcher !== undefined
+    && new RegExp(`(?:^|[^A-Z_])${expectedCode}(?:[^A-Z_]|$)`).test(matcher);
+}
+
+function staticExpressionArray(expression, context, bindingStack = new Set()) {
+  const unwrapped = unwrapExpression(expression);
+  if (ts.isIdentifier(unwrapped)) {
+    const binding = context.resolveBinding(unwrapped.text, unwrapped);
+    if (!binding || bindingStack.has(binding.id)) return undefined;
+    const values = bindingValuesAtUse(binding, unwrapped, context);
+    if (values.length !== 1 || !values[0].expression) return undefined;
+    const nextStack = new Set(bindingStack);
+    nextStack.add(binding.id);
+    return staticExpressionArray(values[0].expression, context, nextStack);
+  }
+  if (!ts.isArrayLiteralExpression(unwrapped)) return undefined;
+  const values = [];
+  for (const element of unwrapped.elements) {
+    if (ts.isSpreadElement(element)) {
+      const spread = staticExpressionArray(element.expression, context, bindingStack);
+      if (!spread) return undefined;
+      values.push(...spread);
+    } else {
+      values.push(element);
+    }
+  }
+  return values;
+}
+
+function normalizedFunctionInvocation(node, context) {
+  if (
+    ts.isPropertyAccessExpression(node.expression)
+    || ts.isElementAccessExpression(node.expression)
+  ) {
+    const wrapper = staticPropertyNames(node.expression, context);
+    if (wrapper.length === 1 && (wrapper[0] === 'call' || wrapper[0] === 'apply')) {
+      const trusted = trustedFunction(node.expression.expression, context);
+      if (!trusted) return undefined;
+      if (wrapper[0] === 'call') {
+        return { trusted, arguments: [...node.arguments.slice(1)] };
+      }
+      const applied = node.arguments[1];
+      const array = applied
+        ? staticExpressionArray(applied, context)
+        : undefined;
+      if (!array) {
+        return { trusted, arguments: [], unresolvedArguments: true };
+      }
+      return {
+        trusted,
+        arguments: array,
+      };
+    }
+  }
+  if (ts.isCallExpression(node.expression)) {
+    const binder = node.expression;
+    if (
+      (ts.isPropertyAccessExpression(binder.expression)
+        || ts.isElementAccessExpression(binder.expression))
+      && staticPropertyNames(binder.expression, context).includes('bind')
+    ) {
+      const trusted = trustedFunction(binder.expression.expression, context);
+      if (trusted) {
+        return {
+          trusted,
+          arguments: [
+            ...binder.arguments.slice(1),
+            ...node.arguments,
+          ],
+        };
+      }
+    }
+  }
+  const trusted = trustedFunction(node.expression, context);
+  return trusted ? { trusted, arguments: [...node.arguments] } : undefined;
+}
+
+/**
+ * Build a deterministic mutation registry from AST call sites.
+ *
+ * @returns {Array<{
+ *   file: string,
+ *   line: number,
+ *   effect: string,
+ *   targetProvenance: Provenance,
+ *   classification: 'violation'|'guarded-denial'|'migration'|'sandboxed'|'unresolved',
+ *   callsite: string,
+ * }>}
+ */
+export function deriveWriterRegistry(content, filePath, scanBudget) {
+  content = canonicalSourceText(content);
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    content,
+    ts.ScriptTarget.Latest,
+    true,
+    sourceKind(filePath),
+  );
+  const context = createAnalysisContext(sourceFile, scanBudget);
+  const registry = [];
+
+  const add = (node, effect, targetProvenance, activeContext) => {
+    const baseClassification = registryClassification(targetProvenance);
+    registry.push({
+      file: filePath,
+      line: lineFor(sourceFile, node),
+      effect,
+      targetProvenance,
+      classification:
+        baseClassification === 'violation' && isExpectedGuardDenial(
+          node,
+          targetProvenance,
+          activeContext,
+        )
+          ? 'guarded-denial'
+          : baseClassification,
+      callsite: createCallsiteHash(
+        filePath,
+        node.getText(sourceFile),
+        node.getStart(sourceFile),
+      ),
+      contextual: Boolean(activeContext.contextual),
+    });
+  };
+
+  const localCallable = (expression, activeContext) => {
+    const unwrapped = unwrapExpression(expression);
+    if (
+      ts.isArrowFunction(unwrapped)
+      || ts.isFunctionExpression(unwrapped)
+      || ts.isMethodDeclaration(unwrapped)
+    ) {
+      return { callable: unwrapped, binding: undefined };
+    }
+    if (
+      ts.isPropertyAccessExpression(unwrapped)
+      || ts.isElementAccessExpression(unwrapped)
+    ) {
+      const candidates = staticPropertyNames(unwrapped, activeContext)
+        .flatMap(property => projectedPropertyExpressions(
+          unwrapped.expression,
+          property,
+          undefined,
+          activeContext,
+        ));
+      for (const candidate of candidates) {
+        const resolved = localCallable(candidate, activeContext);
+        if (resolved) return resolved;
+      }
+      return undefined;
+    }
+    if (!ts.isIdentifier(unwrapped)) return undefined;
+    const binding = activeContext.resolveBinding(unwrapped.text, unwrapped);
+    if (!binding) return undefined;
+    if (ts.isFunctionDeclaration(binding.declaration.parent)) {
+      return { callable: binding.declaration.parent, binding };
+    }
+    if (
+      binding.initializer
+      && (
+        ts.isArrowFunction(binding.initializer)
+        || ts.isFunctionExpression(binding.initializer)
+      )
+    ) {
+      return { callable: binding.initializer, binding };
+    }
+    return undefined;
+  };
+
+  const visit = (node, activeContext = context, callStack = new Set()) => {
+    scanBudget?.check('writer-analysis');
+    if (ts.isCallExpression(node)) {
+      const invocation = normalizedFunctionInvocation(node, activeContext);
+      const trusted = invocation?.trusted;
+      const name = (
+        trusted?.module === 'fs'
+        || trusted?.module === 'unknown-builtin'
+      )
+        ? trusted.name
+        : undefined;
+      const targetIndexes = name ? WRITE_SINKS.get(name) : undefined;
+      if (targetIndexes) {
+        const flags = (name === 'open' || name === 'openSync')
+          ? literalText(invocation.arguments[1])
+          : undefined;
+        if ((name === 'open' || name === 'openSync') && flags && !/[wax+]/.test(flags)) {
+          node.forEachChild(visit);
+          return;
+        }
+        for (const targetIndex of targetIndexes) {
+          const target = invocation.arguments[targetIndex];
+          if (target && trusted.module === 'unknown-builtin') {
+            add(
+              node,
+              `unknown-builtin.${name}`,
+              'unknown',
+              activeContext,
+            );
+          } else if (target) {
+            add(
+              node,
+              `fs.${name}`,
+              expressionProvenance(target, activeContext),
+              activeContext,
+            );
+          } else if (invocation.unresolvedArguments) {
+            add(
+              node,
+              `fs.${name}`,
+              'unknown',
+              activeContext,
+            );
+          }
+        }
+      }
+
+      const methodNames = (
+        ts.isPropertyAccessExpression(node.expression)
+        || ts.isElementAccessExpression(node.expression)
+      )
+        ? staticPropertyNames(node.expression, activeContext)
+        : [];
+      if (
+        methodNames.length === 1
+        && SPAWN_METHODS.has(methodNames[0])
+        && (
+          ts.isPropertyAccessExpression(node.expression)
+          || ts.isElementAccessExpression(node.expression)
+        )
+      ) {
+        const receiver = receiverName(node.expression)
+          ?? node.expression.expression.getText(sourceFile);
+        const capability = projectCapabilityForReceiver(
+          node.expression.expression,
+          node,
+          activeContext,
+        );
+        if (capability !== 'unknown') {
+          add(
+            node,
+            `${receiver}.${methodNames[0]}:project-capability`,
+            capability === 'repo' ? 'live-tasks' : capability,
+            activeContext,
+          );
+        }
+      }
+
+      const resolvedCallable = localCallable(node.expression, activeContext);
+      const callableKey = resolvedCallable?.binding?.id
+        ?? resolvedCallable?.callable.getStart(sourceFile);
+      if (
+        resolvedCallable?.callable.body
+        && !callStack.has(callableKey)
+      ) {
+        const overrides = new Map(activeContext.provenanceOverrides ?? []);
+        const relativeFragmentOverrides = new Set(
+          activeContext.relativeFragmentOverrides ?? [],
+        );
+        resolvedCallable.callable.parameters.forEach((parameter, index) => {
+          const argument = node.arguments[index] ?? parameter.initializer;
+          const applyPatternOverride = (pattern, values) => {
+            if (ts.isIdentifier(pattern)) {
+              const parameterBinding = activeContext.resolveBinding(
+                pattern.text,
+                pattern,
+              );
+              if (!parameterBinding) return;
+              overrides.set(
+                parameterBinding.id,
+                values.length > 0
+                  ? mergeProvenances(values.map(value =>
+                    expressionProvenance(value, activeContext)))
+                  : 'deferred',
+              );
+              if (
+                values.length > 0
+                && values.every(value =>
+                  isDefinitelyRelativeFragment(value, activeContext))
+              ) {
+                relativeFragmentOverrides.add(parameterBinding.id);
+              }
+              return;
+            }
+            pattern.elements.forEach((element, elementIndex) => {
+              if (ts.isOmittedExpression(element)) return;
+              const propertyName = ts.isObjectBindingPattern(pattern)
+                ? (
+                  element.propertyName
+                    ? propertyNameText(element.propertyName)
+                    : ts.isIdentifier(element.name) ? element.name.text : undefined
+                )
+                : undefined;
+              const projected = values.flatMap(value => projectedPropertyExpressions(
+                value,
+                propertyName,
+                propertyName === undefined ? elementIndex : undefined,
+                activeContext,
+              ));
+              applyPatternOverride(
+                element.name,
+                projected.length > 0
+                  ? projected
+                  : element.initializer ? [element.initializer] : [],
+              );
+            });
+          };
+          applyPatternOverride(parameter.name, argument ? [argument] : []);
+        });
+        const nestedContext = {
+          ...activeContext,
+          provenanceOverrides: overrides,
+          relativeFragmentOverrides,
+          contextual: true,
+        };
+        const nextCallStack = new Set(callStack);
+        nextCallStack.add(callableKey);
+        visit(resolvedCallable.callable.body, nestedContext, nextCallStack);
+      }
+    }
+
+    if (ts.isNewExpression(node)) {
+      const trusted = trustedFunction(node.expression, activeContext);
+      if (trusted?.module === 'fs' && trusted.name === 'WriteStream') {
+        const target = node.arguments?.[0];
+        if (target) {
+          add(
+            node,
+            'new fs.WriteStream',
+            expressionProvenance(target, activeContext),
+            activeContext,
+          );
+        }
+      }
+      const name = calleeName(node.expression);
+      if (name && /(?:Database|MemoryStore|Sqlite)/i.test(name)) {
+        const target = node.arguments?.[0];
+        if (target) {
+          add(
+            node,
+            `new ${name}`,
+            expressionProvenance(target, activeContext),
+            activeContext,
+          );
+        }
+      }
+    }
+    node.forEachChild(child => visit(child, activeContext, callStack));
+  };
+  sourceFile.forEachChild(visit);
+
+  return dedupeWriterRegistry(registry);
+}
+
+function deterministicDigest(input) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function policyDigest(input) {
+  return createHash('sha256').update(input).digest('hex');
+}
+
+function canonicalProductionInventoryContent(filePath, content) {
+  content = canonicalSourceText(content);
+  if (
+    !normalizeRelative(filePath)
+      .endsWith('/scripts/lint-test-hermeticity.mjs')
+  ) {
+    return content;
+  }
+  let canonical = content;
+  for (const name of [
+    'UNRESOLVED_BASELINE',
+    'PRODUCTION_INVENTORY_BASELINE',
+  ]) {
+    const declaration = new RegExp(
+      `(export const ${name} = Object\\.freeze\\(\\{)[\\s\\S]*?(\\}\\);)`,
+    );
+    canonical = canonical.replace(
+      declaration,
+      `$1\n  count: <accepted-count>,\n  digest: '<accepted-digest>',\n$2`,
+    );
+  }
+  return canonical;
+}
+
+function createCallsiteHash(filePath, source, position) {
+  return policyDigest(
+    `${filePath}\0${position}\0${source.replaceAll(/\s+/g, ' ').trim()}`,
+  );
+}
+
+export function unresolvedRegistryFingerprint(registry) {
+  const identities = registry
+    .filter(entry => entry.classification === 'unresolved')
+    .map(entry => JSON.stringify([
+      entry.file,
+      entry.effect,
+      entry.targetProvenance,
+      entry.callsite,
+    ]))
+    .sort();
+  return {
+    count: identities.length,
+    digest: policyDigest(identities.join('\n')),
+  };
+}
+
+export function productionInventoryFingerprint(registry) {
+  const modules = new Map();
+  for (const entry of registry) {
+    if (
+      entry.classification !== 'inventory'
+      || entry.effect !== 'test-support:production-dependency'
+    ) {
+      continue;
+    }
+    const current = modules.get(entry.file) ?? {
+      contentDigest: entry.contentDigest,
+      outgoing: new Set(),
+    };
+    for (const edge of entry.outgoing ?? []) current.outgoing.add(edge);
+    modules.set(entry.file, current);
+  }
+  const identities = [...modules.entries()]
+    .map(([file, value]) => JSON.stringify([
+      file,
+      value.contentDigest,
+      [...value.outgoing].sort(),
+    ]))
+    .sort();
+  return {
+    count: identities.length,
+    digest: policyDigest(identities.join('\n')),
+  };
+}
+
+export function evaluateProductionInventoryPolicy(
+  registry,
+  {
+    baseline = PRODUCTION_INVENTORY_BASELINE,
+  } = {},
+) {
+  const fingerprint = productionInventoryFingerprint(registry);
+  if (
+    fingerprint.count !== baseline.count
+    || fingerprint.digest !== baseline.digest
+  ) {
+    return {
+      blocking: true,
+      reason: 'production inventory drift',
+      fingerprint,
+    };
+  }
+  return { blocking: false, reason: undefined, fingerprint };
+}
+
+export function evaluateUnresolvedPolicy(
+  registry,
+  {
+    strictUnresolved = false,
+    baseline = UNRESOLVED_BASELINE,
+  } = {},
+) {
+  const fingerprint = unresolvedRegistryFingerprint(registry);
+  if (strictUnresolved && fingerprint.count > 0) {
+    return { blocking: true, reason: 'strict unresolved policy', fingerprint };
+  }
+  if (
+    fingerprint.count !== baseline.count
+    || fingerprint.digest !== baseline.digest
+  ) {
+    return { blocking: true, reason: 'unresolved registry drift', fingerprint };
+  }
+  return { blocking: false, reason: undefined, fingerprint };
+}
+
+function liveStateReadLabel(expression, context) {
+  for (const value of staticTextValues(expression, context)) {
+    let normalized = normalizedCommandPath(value);
+    if (normalized === REPO_PATH_TOKEN) normalized = '';
+    else if (normalized.startsWith(`${REPO_PATH_TOKEN}/`)) {
+      normalized = normalized.slice(REPO_PATH_TOKEN.length + 1);
+    } else if (normalized.startsWith('/')) {
+      const normalizedRepo = normalizedCommandPath(REPO_ROOT);
+      if (!normalized.startsWith(`${normalizedRepo}/`)) continue;
+      normalized = normalized.slice(normalizedRepo.length + 1);
+    }
+    const segments = normalized.split('/').filter(Boolean);
+    const root = portablePathSegmentKey(segments[0] ?? '');
+    const stateFile = portablePathSegmentKey(segments[1] ?? '');
+    if (root === '.deckent' && stateFile === 'config.json') {
+      return '.deckent/config.json live read';
+    }
+    if (root === '.brain' && stateFile === 'memory.db') {
+      return '.brain/memory.db live read';
+    }
+  }
+  return undefined;
+}
+
+function legacyReadViolations(content, filePath, scanBudget) {
+  content = canonicalSourceText(content);
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    content,
+    ts.ScriptTarget.Latest,
+    true,
+    sourceKind(filePath),
+  );
+  const context = createAnalysisContext(sourceFile, scanBudget);
+  const violations = [];
+  const literalRanges = [];
+  const collectLiteralRanges = node => {
+    scanBudget?.check('legacy-read-literals');
+    if (
+      ts.isStringLiteralLike(node)
+      || ts.isNoSubstitutionTemplateLiteral(node)
+      || ts.isTemplateExpression(node)
+    ) {
+      literalRanges.push([node.getStart(sourceFile), node.getEnd()]);
+    }
+    node.forEachChild(collectLiteralRanges);
+  };
+  sourceFile.forEachChild(collectLiteralRanges);
+  const visit = node => {
+    scanBudget?.check('legacy-read-analysis');
+    if (ts.isCallExpression(node)) {
+      const trusted = trustedFunction(node.expression, context);
+      if (trusted?.module === 'fs' && trusted.name && LEGACY_READ_SINKS.has(trusted.name)) {
+        if (
+          (trusted.name === 'open' || trusted.name === 'openSync')
+          && node.arguments[1]
+          && /[wax+]/.test(literalText(node.arguments[1]) ?? '')
+        ) {
+          node.forEachChild(visit);
+          return;
+        }
+        const target = node.arguments[0];
+        const label = target ? liveStateReadLabel(target, context) : undefined;
+        if (label) {
+          violations.push({
+            file: filePath,
+            line: lineFor(sourceFile, node),
+            match: node.getText(sourceFile),
+            label,
+            code: 'E_HERMETIC_LIVE_STATE_READ',
+            callsite: createCallsiteHash(
+              filePath,
+              node.getText(sourceFile),
+              node.getStart(sourceFile),
+            ),
+          });
+        }
+      }
+    }
+    node.forEachChild(visit);
+  };
+  sourceFile.forEachChild(visit);
+
+  const lines = content.split('\n');
+  let lineOffset = 0;
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawLine = lines[index];
+    const currentLineOffset = lineOffset;
+    lineOffset += rawLine.length + 1;
+    const trimmed = rawLine.trim();
+    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
+    for (const { re, label } of HERMETIC_PATTERNS) {
+      const match = rawLine.match(re);
+      if (!match || match.index === undefined) continue;
+      const absoluteMatch = currentLineOffset + match.index;
+      if (literalRanges.some(([start, end]) =>
+        absoluteMatch >= start && absoluteMatch < end)) {
+        continue;
+      }
+      if (label.startsWith('process.cwd()')) {
+        const cwdIndex = rawLine.indexOf('process.cwd()');
+        const protectedName = label.includes('.deckent') ? '.deckent' : '.brain';
+        const protectedIndex = rawLine.indexOf(protectedName, cwdIndex);
+        const relevantSlice = rawLine.slice(cwdIndex, protectedIndex);
+        if (/tmpdir\s*\(\)|mkdtemp(?:Disposable)?Sync?\s*\(/.test(relevantSlice)) {
+          continue;
+        }
+      }
+      violations.push({
+        file: filePath,
+        line: index + 1,
+        match: rawLine.trim(),
+        label,
+        code: 'E_HERMETIC_LIVE_STATE_READ',
+        callsite: createCallsiteHash(
+          filePath,
+          rawLine.trim(),
+          absoluteMatch,
+        ),
+      });
+    }
+  }
+  const seen = new Set();
+  return violations.filter(violation => {
+    const key = [
+      violation.file,
+      violation.line,
+      violation.code,
+    ].join(':');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function writerViolations(entries) {
+  const violations = [];
+  for (const entry of entries) {
+    if (
+      entry.classification !== 'violation'
+      && entry.classification !== 'guarded-denial'
+    ) {
+      continue;
+    }
+    violations.push({
+      file: entry.file,
+      line: entry.line,
+      match: entry.effect,
+      label: `${entry.effect} targets ${entry.targetProvenance}`,
+      code: errorCodeForProvenance(entry.targetProvenance),
+    });
+  }
+  return violations;
+}
+
+export function checkFile(content, filePath, options = {}) {
+  // Legacy callers may still pass skipLegacyReads, but whole-file suppression
+  // is not an authority boundary and can never waive a newly added live read.
+  const scanBudget = options.scanBudget;
+  return [
+    ...legacyReadViolations(content, filePath, scanBudget),
+    ...writerViolations(deriveWriterRegistry(content, filePath, scanBudget)),
+  ];
+}
+
+function tokenizeShellCommands(command) {
+  command = command.replaceAll(/\\\r?\n/g, '');
+  const commands = [];
+  let tokens = [];
+  let token = '';
+  let quote;
+  let escaping = false;
+
+  const finishToken = () => {
+    if (token.length > 0) tokens.push(token);
+    token = '';
+  };
+  const finishCommand = () => {
+    finishToken();
+    if (tokens.length > 0) commands.push(tokens);
+    tokens = [];
+  };
+
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
+    if (escaping) {
+      token += character;
+      escaping = false;
+      continue;
+    }
+    if (character === '\\' && quote !== "'") {
+      const next = command[index + 1];
+      if (next === '\n') {
+        index += 1;
+        continue;
+      }
+      if (next === '\r' && command[index + 2] === '\n') {
+        index += 2;
+        continue;
+      }
+      if (
+        quote === '"'
+        && next !== undefined
+        && !['$', '`', '"', '\\'].includes(next)
+      ) {
+        // Preserve Windows separators inside quoted executable paths.
+        token += character;
+        continue;
+      }
+      escaping = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = undefined;
+      else token += character;
+      continue;
+    }
+    if (
+      character === '$'
+      && (command[index + 1] === "'" || command[index + 1] === '"')
+    ) {
+      // ANSI-C and locale quotes are still one static shell token for the
+      // hermeticity tracer; expansion semantics do not hide the command.
+      quote = command[index + 1];
+      index += 1;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character === '#') {
+      if (token.length > 0) {
+        token += character;
+      } else {
+        finishCommand();
+        while (index + 1 < command.length && command[index + 1] !== '\n') index += 1;
+      }
+      continue;
+    }
+    if (
+      character === '\n'
+      || character === ';'
+      || character === '|'
+      || character === '&'
+      || character === '('
+      || character === ')'
+      || character === '{'
+      || character === '}'
+      || character === '>'
+      || character === '<'
+    ) {
+      finishCommand();
+      continue;
+    }
+    if (/\s/.test(character)) {
+      finishToken();
+      continue;
+    }
+    token += character;
+  }
+  if (escaping) token += '\\';
+  finishCommand();
+  return commands;
+}
+
+function extractCommandSubstitutions(command) {
+  const substitutions = [];
+  let quote;
+  let escaping = false;
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
+    if (escaping) {
+      escaping = false;
+      continue;
+    }
+    if (character === '\\' && quote !== "'") {
+      escaping = true;
+      continue;
+    }
+    if (character === "'" && quote !== '"') {
+      quote = quote === "'" ? undefined : "'";
+      continue;
+    }
+    if (character === '"' && quote !== "'") {
+      quote = quote === '"' ? undefined : '"';
+      continue;
+    }
+    if (quote === "'") continue;
+
+    if (character === '`') {
+      let cursor = index + 1;
+      let nestedEscaping = false;
+      for (; cursor < command.length; cursor += 1) {
+        if (nestedEscaping) {
+          nestedEscaping = false;
+          continue;
+        }
+        if (command[cursor] === '\\') {
+          nestedEscaping = true;
+          continue;
+        }
+        if (command[cursor] === '`') break;
+      }
+      if (cursor < command.length) {
+        substitutions.push(command.slice(index + 1, cursor));
+        index = cursor;
+      }
+      continue;
+    }
+
+    if (character === '$' && command[index + 1] === '(') {
+      let depth = 1;
+      let nestedQuote;
+      let nestedEscaping = false;
+      const start = index + 2;
+      let cursor = start;
+      for (; cursor < command.length; cursor += 1) {
+        const nested = command[cursor];
+        if (nestedEscaping) {
+          nestedEscaping = false;
+          continue;
+        }
+        if (nested === '\\' && nestedQuote !== "'") {
+          nestedEscaping = true;
+          continue;
+        }
+        if (nested === "'" && nestedQuote !== '"') {
+          nestedQuote = nestedQuote === "'" ? undefined : "'";
+          continue;
+        }
+        if (nested === '"' && nestedQuote !== "'") {
+          nestedQuote = nestedQuote === '"' ? undefined : '"';
+          continue;
+        }
+        if (nestedQuote) continue;
+        if (nested === '(') depth += 1;
+        else if (nested === ')') {
+          depth -= 1;
+          if (depth === 0) break;
+        }
+      }
+      if (depth === 0) {
+        substitutions.push(command.slice(start, cursor));
+        index = cursor;
+      }
+    }
+  }
+  return substitutions;
+}
+
+function executableKind(value) {
+  const normalized = value.replaceAll('\\', '/').split('/').at(-1)?.toLowerCase() ?? '';
+  if (normalized === 'npm' || normalized === 'npm.cmd' || normalized === 'npm.exe') return 'npm';
+  if (normalized === 'npx' || normalized === 'npx.cmd' || normalized === 'npx.exe') return 'npx';
+  if (normalized === 'pnpm' || normalized === 'pnpm.cmd' || normalized === 'pnpm.exe') {
+    return 'pnpm';
+  }
+  if (normalized === 'yarn' || normalized === 'yarn.cmd' || normalized === 'yarn.exe') {
+    return 'yarn';
+  }
+  if (normalized === 'bun' || normalized === 'bun.exe') return 'bun';
+  if (normalized === 'node' || normalized === 'node.exe') return 'node';
+  if (normalized === 'rm' || normalized === 'rm.exe') return 'rm';
+  if (normalized === 'rimraf' || normalized === 'rimraf.cmd') return 'rimraf';
+  if (normalized === 'rmdir' || normalized === 'rmdir.exe' || normalized === 'rd') {
+    return 'rmdir';
+  }
+  if (['sh', 'bash', 'zsh', 'dash'].includes(normalized)) return 'posix-shell';
+  if (normalized === 'cmd' || normalized === 'cmd.exe') return 'cmd-shell';
+  if (['powershell', 'powershell.exe', 'pwsh', 'pwsh.exe'].includes(normalized)) {
+    return 'powershell';
+  }
+  if (['corepack', 'command', 'nohup', 'time'].includes(normalized)) return normalized;
+  return normalized;
+}
+
+function normalizedCommandPath(value) {
+  return canonicalPathText(value);
+}
+
+function unwrapCommandPrefix(argv) {
+  let index = 0;
+  while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(argv[index] ?? '')) index += 1;
+  const kind = executableKind(argv[index] ?? '');
+  if (kind === 'env') {
+    index += 1;
+    while (index < argv.length) {
+      const value = argv[index];
+      if (value === '--') {
+        index += 1;
+        break;
+      }
+      if (value === '-u' || value === '--unset' || value === '-C' || value === '--chdir') {
+        index += 2;
+        continue;
+      }
+      if (
+        value.startsWith('--unset=')
+        || value.startsWith('--chdir=')
+        || value === '-i'
+        || value === '--ignore-environment'
+        || value === '-0'
+        || value === '--null'
+        || value.startsWith('-S')
+        || value.startsWith('--split-string=')
+        || /^[A-Za-z_][A-Za-z0-9_]*=/.test(value)
+      ) {
+        index += 1;
+        continue;
+      }
+      break;
+    }
+  } else if (kind === 'cross-env') {
+    index += 1;
+    while (
+      index < argv.length
+      && /^[A-Za-z_][A-Za-z0-9_]*=/.test(argv[index])
+    ) {
+      index += 1;
+    }
+  }
+  return argv.slice(index);
+}
+
+function tracePackageScript(
+  scriptName,
+  packageScripts,
+  visited,
+  manager,
+  packageContext,
+) {
+  if (!scriptName || visited.has(scriptName)) return [];
+  const lifecycleNames = [`pre${scriptName}`, scriptName, `post${scriptName}`]
+    .filter(name => typeof packageScripts[name] === 'string');
+  if (lifecycleNames.length === 0) {
+    return [{
+      effect: 'unresolved-package-script',
+      chain: [`${manager}:${scriptName}`],
+    }];
+  }
+  const effects = [];
+  for (const lifecycleName of lifecycleNames) {
+    if (lifecycleName !== scriptName && visited.has(lifecycleName)) continue;
+    const nextVisited = new Set(visited);
+    nextVisited.add(scriptName);
+    nextVisited.add(lifecycleName);
+    for (const nested of traceCommandEffects(
+      packageScripts[lifecycleName],
+      packageScripts,
+      nextVisited,
+      packageContext,
+    )) {
+      effects.push({
+        effect: nested.effect,
+        chain: [
+          `${manager}:${scriptName}`,
+          ...(lifecycleName === scriptName ? [] : [`${manager}:${lifecycleName}`]),
+          ...nested.chain,
+        ],
+      });
+    }
+  }
+  return effects;
+}
+
+function nodeScriptArgument(args) {
+  const optionsWithValue = new Set([
+    '-C',
+    '--conditions',
+    '--cpu-prof-dir',
+    '--diagnostic-dir',
+    '--env-file',
+    '--env-file-if-exists',
+    '--experimental-default-config-file',
+    '--experimental-loader',
+    '--import',
+    '--input-type',
+    '--loader',
+    '--openssl-config',
+    '-r',
+    '--require',
+    '--title',
+  ]);
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (argument === '--') return args[index + 1];
+    if (argument === '-e' || argument === '--eval' || argument === '-p' || argument === '--print') {
+      return undefined;
+    }
+    if (optionsWithValue.has(argument)) {
+      index += 1;
+      continue;
+    }
+    if (
+      argument.startsWith('--') && argument.includes('=')
+      || /^-[rC].+/.test(argument)
+    ) {
+      continue;
+    }
+    if (argument.startsWith('-')) continue;
+    return argument;
+  }
+  return undefined;
+}
+
+function nodeEvalArgument(args) {
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (argument === '-e' || argument === '--eval') return args[index + 1];
+    if (argument.startsWith('--eval=')) return argument.slice('--eval='.length);
+    if (/^-e.+/.test(argument)) return argument.slice(2);
+  }
+  return undefined;
+}
+
+const PACKAGE_OPTIONS_WITH_VALUE = new Set([
+  '-C',
+  '-w',
+  '--cache',
+  '--config',
+  '--cwd',
+  '--dir',
+  '--filter',
+  '--prefix',
+  '--registry',
+  '--userconfig',
+  '--workspace',
+]);
+
+function packagePositionals(args) {
+  const positionals = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (argument === '--') {
+      positionals.push(...args.slice(index + 1));
+      break;
+    }
+    if (PACKAGE_OPTIONS_WITH_VALUE.has(argument)) {
+      index += 1;
+      continue;
+    }
+    if (argument.startsWith('-')) continue;
+    positionals.push(argument);
+  }
+  return positionals;
+}
+
+const PACKAGE_SELECTION_CACHE = new Map();
+
+function readPackageManifest(manifestPath) {
+  if (!existsSync(manifestPath)) {
+    return { status: 'absent', manifest: {} };
+  }
+  try {
+    const parsed = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { status: 'malformed', manifest: {} };
+    }
+    return { status: 'valid', manifest: parsed };
+  } catch {
+    // File races, access failures, and invalid JSON all have the same static
+    // analysis outcome: the manifest exists but cannot safely be interpreted.
+    return { status: 'malformed', manifest: {} };
+  }
+}
+
+function packageOptionValues(args, names) {
+  const values = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (names.includes(argument) && args[index + 1]) {
+      values.push(args[index + 1]);
+      index += 1;
+      continue;
+    }
+    for (const name of names.filter(value => value.startsWith('--'))) {
+      if (argument.startsWith(`${name}=`)) values.push(argument.slice(name.length + 1));
+    }
+  }
+  return values;
+}
+
+function readPackageScripts(packageDir, realRoot) {
+  const manifestPath = join(packageDir, 'package.json');
+  if (
+    !existsSync(manifestPath)
+    || !statSync(manifestPath).isFile()
+    || !isWithinRealRoot(manifestPath, realRoot)
+  ) {
+    return undefined;
+  }
+  const outcome = readPackageManifest(manifestPath);
+  if (outcome.status === 'absent') return undefined;
+  const { manifest } = outcome;
+  return {
+    status: outcome.status,
+    dir: realpathSync(packageDir),
+    name: typeof manifest.name === 'string' ? manifest.name : undefined,
+    scripts: manifest.scripts && typeof manifest.scripts === 'object'
+      ? manifest.scripts
+      : {},
+  };
+}
+
+function findWorkspacePackage(rootDir, selector) {
+  const realRoot = realpathSync(rootDir);
+  const cacheKey = `${realRoot}\0${selector}`;
+  if (PACKAGE_SELECTION_CACHE.has(cacheKey)) {
+    return PACKAGE_SELECTION_CACHE.get(cacheKey);
+  }
+  const direct = readPackageScripts(resolve(rootDir, selector), realRoot);
+  if (direct) {
+    PACKAGE_SELECTION_CACHE.set(cacheKey, direct);
+    return direct;
+  }
+  const queue = [realRoot];
+  let visitedDirs = 0;
+  while (queue.length > 0 && visitedDirs < 2000) {
+    const directory = queue.shift();
+    visitedDirs += 1;
+    for (const entry of readdirSync(directory, { withFileTypes: true })
+      .sort((left, right) => left.name.localeCompare(right.name))) {
+      if (
+        !entry.isDirectory()
+        || ['.git', '.brain', '.tasks', 'dist', 'node_modules'].includes(entry.name)
+      ) {
+        continue;
+      }
+      const child = join(directory, entry.name);
+      const candidate = readPackageScripts(child, realRoot);
+      if (
+        candidate
+        && (
+          candidate.name === selector
+          || normalizeRelative(relative(realRoot, candidate.dir)) === selector
+        )
+      ) {
+        PACKAGE_SELECTION_CACHE.set(cacheKey, candidate);
+        return candidate;
+      }
+      queue.push(child);
+    }
+  }
+  PACKAGE_SELECTION_CACHE.set(cacheKey, undefined);
+  return undefined;
+}
+
+function selectedPackageScripts(args, packageScripts, packageContext) {
+  if (!packageContext?.rootDir) return { scripts: packageScripts };
+  const prefixes = packageOptionValues(args, ['--prefix', '-C']);
+  const workspaces = packageOptionValues(args, ['--workspace', '-w']);
+  if (prefixes.length + workspaces.length === 0) return { scripts: packageScripts };
+  if (prefixes.length + workspaces.length !== 1) return { unresolved: true };
+  const realRoot = realpathSync(packageContext.rootDir);
+  if (prefixes.length === 1) {
+    const selected = readPackageScripts(
+      resolve(packageContext.rootDir, prefixes[0]),
+      realRoot,
+    );
+    return selected?.status === 'valid'
+      ? { scripts: selected.scripts }
+      : { unresolved: true };
+  }
+  const selected = findWorkspacePackage(packageContext.rootDir, workspaces[0]);
+  return selected?.status === 'valid'
+    ? { scripts: selected.scripts }
+    : { unresolved: true };
+}
+
+function traceArgvEffects(
+  argv,
+  packageScripts,
+  visited = new Set(),
+  packageContext,
+) {
+  let wrapperIndex = 0;
+  while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(argv[wrapperIndex] ?? '')) wrapperIndex += 1;
+  if (executableKind(argv[wrapperIndex] ?? '') === 'cross-env-shell') {
+    wrapperIndex += 1;
+    while (
+      wrapperIndex < argv.length
+      && /^[A-Za-z_][A-Za-z0-9_]*=/.test(argv[wrapperIndex])
+    ) {
+      wrapperIndex += 1;
+    }
+    return traceCommandEffects(
+      argv.slice(wrapperIndex).join(' '),
+      packageScripts,
+      visited,
+      packageContext,
+    );
+  }
+
+  const command = unwrapCommandPrefix(argv);
+  if (command.length === 0) return [];
+  const kind = executableKind(command[0]);
+  const args = command.slice(1);
+  const effects = [];
+
+  if (kind === 'corepack') {
+    return traceArgvEffects(args, packageScripts, visited, packageContext);
+  }
+  if (kind === 'npx') {
+    const nestedIndex = args.findIndex(argument => !argument.startsWith('-'));
+    return nestedIndex >= 0
+      ? traceArgvEffects(args.slice(nestedIndex), packageScripts, visited, packageContext)
+      : [];
+  }
+  if (kind === 'command' || kind === 'nohup' || kind === 'time') {
+    const nested = args.slice(args.findIndex(argument => !argument.startsWith('-')));
+    return nested.length > 0
+      ? traceArgvEffects(nested, packageScripts, visited, packageContext)
+      : [];
+  }
+  if (kind === 'then' || kind === 'do') {
+    return traceArgvEffects(args, packageScripts, visited, packageContext);
+  }
+  if (kind === 'eval') {
+    return traceCommandEffects(args.join(' '), packageScripts, visited, packageContext);
+  }
+
+  if (kind === 'node') {
+    const evaluated = nodeEvalArgument(args);
+    if (evaluated !== undefined) {
+      const embeddedRegistry = deriveWriterRegistry(evaluated, '<node-eval>');
+      for (const entry of embeddedRegistry.filter(entry =>
+        entry.targetProvenance.startsWith('live-'))) {
+        effects.push(entry.targetProvenance === 'live-dist'
+          ? { effect: 'dist-delete', chain: ['node:eval', 'fs:dist-mutation'] }
+          : {
+            effect: 'protected-mutation',
+            boundary: entry.targetProvenance,
+            chain: ['node:eval', `fs:${entry.targetProvenance}`],
+          });
+      }
+      if (embeddedRegistry.length === 0) {
+        effects.push({
+          effect: 'unresolved-child-effect',
+          chain: ['node:eval'],
+        });
+      }
+    }
+    const script = nodeScriptArgument(args);
+    const normalizedScript = script ? normalizedCommandPath(script) : undefined;
+    if (
+      normalizedScript === 'scripts/clean.mjs'
+      || normalizedScript?.endsWith('/scripts/clean.mjs')
+    ) {
+      effects.push({ effect: 'dist-clean', chain: ['scripts/clean.mjs'] });
+    } else if (script) {
+      effects.push({
+        effect: 'unresolved-child-effect',
+        chain: [`node:${normalizedScript ?? script}`],
+      });
+    }
+  } else if (kind === 'npm' || kind === 'pnpm' || kind === 'yarn' || kind === 'bun') {
+    const selectedPackage = selectedPackageScripts(args, packageScripts, packageContext);
+    if (selectedPackage.unresolved) {
+      return [{
+        effect: 'unresolved-package-script',
+        chain: [`${kind}:package-selection`],
+      }];
+    }
+    const effectivePackageScripts = selectedPackage.scripts;
+    const positionals = packagePositionals(args);
+    const runIndex = positionals.findIndex(argument =>
+      argument === 'run' || argument === 'run-script');
+    let scriptName = runIndex >= 0
+      ? positionals
+        .slice(runIndex + 1)
+        .at(0)
+      : undefined;
+    if (!scriptName) {
+      const direct = positionals[0];
+      if (
+        direct === 'pack'
+        && args.includes('--dry-run')
+        && args.includes('--ignore-scripts')
+      ) {
+        return effects;
+      }
+      if (
+        kind === 'yarn'
+        || [
+          'ci',
+          'install',
+          'pack',
+          'publish',
+          'restart',
+          'start',
+          'stop',
+          'test',
+          'uninstall',
+          'update',
+          'version',
+        ].includes(direct ?? '')
+      ) {
+        scriptName = direct === 'ci' ? 'install' : direct;
+      }
+    }
+    if (scriptName === 'restart' && typeof effectivePackageScripts.restart !== 'string') {
+      effects.push(...tracePackageScript(
+        'stop',
+        effectivePackageScripts,
+        visited,
+        kind,
+        packageContext,
+      ));
+      effects.push(...tracePackageScript(
+        'start',
+        effectivePackageScripts,
+        visited,
+        kind,
+        packageContext,
+      ));
+    } else {
+      effects.push(...tracePackageScript(
+        scriptName,
+        effectivePackageScripts,
+        visited,
+        kind,
+        packageContext,
+      ));
+    }
+  } else if (kind === 'rm' || kind === 'rmdir' || kind === 'rimraf') {
+    for (const argument of args.filter(value => !value.startsWith('-'))) {
+      const boundary = boundaryFromText(normalizedCommandPath(argument));
+      if (boundary === 'live-dist') {
+        effects.push({ effect: 'dist-delete', chain: ['shell:dist-delete'] });
+      } else if (boundary?.startsWith('live-')) {
+        effects.push({
+          effect: 'protected-delete',
+          boundary,
+          chain: [`shell:${boundary}-delete`],
+        });
+      }
+    }
+  } else if (kind === 'posix-shell') {
+    const commandIndex = args.findIndex(argument =>
+      argument === '-c' || /^-[^-]*c[^-]*$/.test(argument));
+    if (commandIndex >= 0 && args[commandIndex + 1]) {
+      effects.push(...traceCommandEffects(
+        args[commandIndex + 1],
+        packageScripts,
+        visited,
+        packageContext,
+      ));
+    }
+  } else if (kind === 'cmd-shell') {
+    const commandIndex = args.findIndex(argument => /^\/c$/i.test(argument));
+    if (commandIndex >= 0 && args[commandIndex + 1]) {
+      const nested = args[commandIndex + 1].replaceAll(/\^(.)/g, '$1');
+      effects.push(...traceCommandEffects(nested, packageScripts, visited, packageContext));
+    }
+  } else if (kind === 'powershell') {
+    const commandIndex = args.findIndex(argument => /^-(?:command|c)$/i.test(argument));
+    if (commandIndex >= 0 && args[commandIndex + 1]) {
+      effects.push(...traceCommandEffects(
+        args[commandIndex + 1],
+        packageScripts,
+        visited,
+        packageContext,
+      ));
+    }
+  } else if (kind === 'remove-item') {
+    for (const argument of args.filter(value => !value.startsWith('-'))) {
+      const boundary = boundaryFromText(normalizedCommandPath(argument));
+      if (boundary === 'live-dist') {
+        effects.push({ effect: 'dist-delete', chain: ['powershell:dist-delete'] });
+      } else if (boundary?.startsWith('live-')) {
+        effects.push({
+          effect: 'protected-delete',
+          boundary,
+          chain: [`powershell:${boundary}-delete`],
+        });
+      }
+    }
+  }
+  return effects;
+}
+
+/**
+ * Trace npm aliases without executing a command. Cycles terminate deterministically.
+ *
+ * @param {string} command
+ * @param {Record<string, string>} packageScripts
+ * @param {Set<string>} [visited]
+ * @returns {Array<{ effect: string, chain: string[] }>}
+ */
+export function traceCommandEffects(
+  command,
+  packageScripts,
+  visited = new Set(),
+  packageContext,
+) {
+  const effects = [];
+  for (const substitution of extractCommandSubstitutions(command)) {
+    effects.push(...traceCommandEffects(
+      substitution,
+      packageScripts,
+      visited,
+      packageContext,
+    ));
+  }
+  const shellVariables = new Map();
+  for (const argv of tokenizeShellCommands(command)) {
+    if (
+      argv.length > 0
+      && argv.every(argument => /^[A-Za-z_][A-Za-z0-9_]*=[^$`]*$/.test(argument))
+    ) {
+      for (const assignment of argv) {
+        const separator = assignment.indexOf('=');
+        shellVariables.set(
+          assignment.slice(0, separator),
+          assignment.slice(separator + 1),
+        );
+      }
+      continue;
+    }
+    const expanded = argv.map(argument => {
+      const match = argument.match(/^\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))$/);
+      return match ? shellVariables.get(match[1] ?? match[2]) ?? argument : argument;
+    });
+    effects.push(...traceArgvEffects(expanded, packageScripts, visited, packageContext));
+  }
+  return effects;
+}
+
+const MAX_STATIC_VARIANTS = 16;
+const REPO_PATH_TOKEN = '__DECKENT_REPO_ROOT__';
+
+function boundedUnique(values) {
+  return [...new Set(values)].slice(0, MAX_STATIC_VARIANTS);
+}
+
+function crossStaticValues(left, right, combine) {
+  const values = [];
+  for (const leftValue of left) {
+    for (const rightValue of right) {
+      values.push(combine(leftValue, rightValue));
+      if (values.length >= MAX_STATIC_VARIANTS) return boundedUnique(values);
+    }
+  }
+  return boundedUnique(values);
+}
+
+function bindingStaticValues(binding, useNode, context, bindingStack) {
+  if (bindingStack.has(binding.id)) return [];
+  const nextStack = new Set(bindingStack);
+  nextStack.add(binding.id);
+  let values = binding.initializer
+    ? staticTextValues(binding.initializer, context, nextStack)
+    : [];
+  const usePosition = useNode.getStart(context.sourceFile);
+  for (const assignment of binding.assignments.sort((left, right) =>
+    left.position - right.position)) {
+    const assigned = staticTextValues(assignment.expression, context, nextStack);
+    if (assignment.operator === ts.SyntaxKind.PlusEqualsToken) {
+      if (assignment.position < usePosition && values.length > 0 && assigned.length > 0) {
+        values = crossStaticValues(values, assigned, (left, right) => left + right);
+      }
+    } else if (assigned.length > 0) {
+      values = boundedUnique([...values, ...assigned]);
+    }
+  }
+  return values;
+}
+
+function staticPathCombination(parts, mode) {
+  let selected = parts;
+  if (mode === 'resolve') {
+    for (let index = parts.length - 1; index >= 0; index -= 1) {
+      const part = parts[index].replaceAll('\\', '/');
+      if (
+        part === REPO_PATH_TOKEN
+        || part.startsWith('/')
+        || /^[A-Za-z]:\//.test(part)
+      ) {
+        selected = parts.slice(index);
+        break;
+      }
+    }
+  }
+  return canonicalPathText(selected.join('/'));
+}
+
+function staticTextValues(expression, context, bindingStack = new Set()) {
+  const literal = literalText(expression);
+  if (literal !== undefined && !ts.isRegularExpressionLiteral(expression)) return [literal];
+  if (
+    ts.isParenthesizedExpression(expression)
+    || ts.isAsExpression(expression)
+    || ts.isTypeAssertionExpression(expression)
+    || ts.isNonNullExpression(expression)
+    || ts.isAwaitExpression(expression)
+    || ts.isSatisfiesExpression(expression)
+  ) {
+    return staticTextValues(expression.expression, context, bindingStack);
+  }
+  if (ts.isIdentifier(expression)) {
+    const binding = context.resolveBinding(expression.text, expression);
+    if (!binding) return [];
+    return bindingStaticValues(binding, expression, context, bindingStack);
+  }
+  if (
+    ts.isPropertyAccessExpression(expression)
+    && ts.isIdentifier(expression.expression)
+    && expression.expression.text === 'process'
+    && expression.name.text === 'execPath'
+    && !context.resolveBinding('process', expression.expression)
+  ) {
+    return [process.execPath];
+  }
+  if (ts.isBinaryExpression(expression) && expression.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    return crossStaticValues(
+      staticTextValues(expression.left, context, bindingStack),
+      staticTextValues(expression.right, context, bindingStack),
+      (left, right) => left + right,
+    );
+  }
+  if (ts.isTemplateExpression(expression)) {
+    let values = [expression.head.text];
+    for (const span of expression.templateSpans) {
+      const substitutions = staticTextValues(span.expression, context, bindingStack);
+      if (substitutions.length === 0) return [];
+      values = crossStaticValues(
+        values,
+        substitutions,
+        (value, substitution) => value + substitution + span.literal.text,
+      );
+    }
+    return values;
+  }
+  if (ts.isConditionalExpression(expression)) {
+    return boundedUnique([
+      ...staticTextValues(expression.whenTrue, context, bindingStack),
+      ...staticTextValues(expression.whenFalse, context, bindingStack),
+    ]);
+  }
+  if (ts.isCallExpression(expression)) {
+    const trust = trustedFunction(expression.expression, context);
+    if (
+      staticPropertyName(expression.expression) === 'cwd'
+      && ts.isPropertyAccessExpression(expression.expression)
+      && ts.isIdentifier(expression.expression.expression)
+      && expression.expression.expression.text === 'process'
+      && !context.resolveBinding('process', expression.expression.expression)
+    ) {
+      return [REPO_PATH_TOKEN];
+    }
+    if (
+      trust?.module === 'path'
+      && (trust.name === 'join' || trust.name === 'resolve')
+    ) {
+      let combinations = [[]];
+      for (const argument of expression.arguments) {
+        const values = staticTextValues(argument, context, bindingStack);
+        if (values.length === 0) return [];
+        const next = [];
+        for (const combination of combinations) {
+          for (const value of values) {
+            next.push([...combination, value]);
+            if (next.length >= MAX_STATIC_VARIANTS) break;
+          }
+          if (next.length >= MAX_STATIC_VARIANTS) break;
+        }
+        combinations = next;
+      }
+      return boundedUnique(combinations.map(parts =>
+        staticPathCombination(parts, trust.name)));
+    }
+  }
+  return [];
+}
+
+function staticText(expression, context, bindingStack = new Set()) {
+  const values = staticTextValues(expression, context, bindingStack);
+  return values.length === 1 ? values[0] : undefined;
+}
+
+function staticStringArray(expression, context, bindingStack = new Set()) {
+  if (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression)) {
+    return staticStringArray(expression.expression, context, bindingStack);
+  }
+  if (ts.isIdentifier(expression)) {
+    const binding = context.resolveBinding(expression.text, expression);
+    if (!binding) return undefined;
+    if (bindingStack.has(binding.id)) return undefined;
+    const expressions = bindingExpressions(binding, expression, context);
+    if (expressions.length !== 1) return undefined;
+    const nextStack = new Set(bindingStack);
+    nextStack.add(binding.id);
+    return staticStringArray(expressions[0], context, nextStack);
+  }
+  if (!ts.isArrayLiteralExpression(expression)) return undefined;
+  const values = [];
+  for (const element of expression.elements) {
+    if (ts.isSpreadElement(element)) return undefined;
+    const value = staticText(element, context, bindingStack);
+    if (value === undefined) return undefined;
+    values.push(value);
+  }
+  return values;
+}
+
+function objectPropertyInitializer(expression, propertyName) {
+  if (!expression || !ts.isObjectLiteralExpression(expression)) return undefined;
+  for (const property of expression.properties) {
+    if (
+      ts.isPropertyAssignment(property)
+      && propertyNameText(property.name) === propertyName
+    ) {
+      return property.initializer;
+    }
+    if (
+      ts.isShorthandPropertyAssignment(property)
+      && property.name.text === propertyName
+    ) {
+      return property.name;
+    }
+  }
+  return undefined;
+}
+
+function childOptionsExpression(node, methodName, context) {
+  if (methodName === 'exec' || methodName === 'execSync') return node.arguments[1];
+  if (
+    methodName === 'spawn'
+    || methodName === 'spawnSync'
+    || methodName === 'execFile'
+    || methodName === 'execFileSync'
+  ) {
+    return node.arguments[1] && staticStringArray(node.arguments[1], context) !== undefined
+      ? node.arguments[2]
+      : node.arguments[1];
+  }
+  return undefined;
+}
+
+function childCwdProvenance(node, methodName, context) {
+  const options = childOptionsExpression(node, methodName, context);
+  const cwd = objectPropertyInitializer(options, 'cwd');
+  return cwd ? expressionProvenance(cwd, context) : 'repo';
+}
+
+function childInvocation(node, trusted, context) {
+  if (!trusted?.name) return [];
+  if (trusted.name === 'exec' || trusted.name === 'execSync') {
+    const commands = node.arguments[0]
+      ? staticTextValues(node.arguments[0], context)
+      : [];
+    return commands.map(command => ({ mode: 'shell', command }));
+  }
+  if (
+    trusted.name === 'execFile'
+    || trusted.name === 'execFileSync'
+    || trusted.name === 'spawn'
+    || trusted.name === 'spawnSync'
+  ) {
+    const executables = node.arguments[0]
+      ? staticTextValues(node.arguments[0], context)
+      : [];
+    if (executables.length === 0) return [];
+    const args = node.arguments[1]
+      ? staticStringArray(node.arguments[1], context) ?? []
+      : [];
+    return executables.map(executable => ({
+      mode: 'argv',
+      argv: [executable, ...args],
+    }));
+  }
+  if (trusted.name === 'fork') {
+    const scripts = node.arguments[0]
+      ? staticTextValues(node.arguments[0], context)
+      : [];
+    const args = node.arguments[1]
+      ? staticStringArray(node.arguments[1], context) ?? []
+      : [];
+    return scripts.map(script => ({
+      mode: 'argv',
+      argv: [process.execPath, script, ...args],
+    }));
+  }
+  return [];
+}
+
+function invokedChildEffects(sourceFile, context, scanBudget) {
+  const calls = [];
+  const isDeferredDefinition = node => {
+    let cursor = node.parent;
+    while (cursor && !ts.isSourceFile(cursor)) {
+      if (ts.isFunctionLike(cursor)) return true;
+      cursor = cursor.parent;
+    }
+    return false;
+  };
+  const visit = node => {
+    scanBudget?.check('child-call-discovery');
+    if (ts.isCallExpression(node)) {
+      const trusted = trustedFunction(node.expression, context);
+      if (trusted?.module === 'child_process') {
+        const invocations = childInvocation(node, trusted, context);
+        const cwd = childCwdProvenance(node, trusted.name, context);
+        if (invocations.length === 0) {
+          calls.push({
+            node,
+            kind: 'unresolved-command',
+            cwd,
+            deferredDefinition: isDeferredDefinition(node),
+          });
+        }
+        for (const invocation of invocations) {
+          calls.push({
+            node,
+            kind: 'command',
+            invocation,
+            cwd,
+            deferredDefinition: isDeferredDefinition(node),
+          });
+          if (invocation.mode === 'argv') {
+            const [executable, ...args] = invocation.argv;
+            const executableType = executableKind(executable);
+            const candidates = executableType === 'posix-shell'
+              ? args.filter(argument => !argument.startsWith('-') && argument.endsWith('.sh'))
+              : executable.endsWith('.sh') ? [executable] : [];
+            for (const value of candidates) {
+              calls.push({
+                node,
+                kind: 'shell-script',
+                value,
+                cwd,
+                wrapper: false,
+                deferredDefinition: isDeferredDefinition(node),
+              });
+            }
+          }
+        }
+      }
+
+      const name = calleeName(node.expression);
+      if (name && SCRIPT_CALLERS.has(name)) {
+        for (const argument of node.arguments) {
+          const value = staticText(argument, context);
+          if (
+            value?.endsWith('.sh')
+            && !value.includes('/')
+            && !value.includes('\\')
+          ) {
+            calls.push({
+              node,
+              kind: 'shell-script',
+              value,
+              cwd: 'repo',
+              wrapper: true,
+              deferredDefinition: isDeferredDefinition(node),
+            });
+          }
+        }
+      }
+    }
+    node.forEachChild(visit);
+  };
+  sourceFile.forEachChild(visit);
+  return calls;
+}
+
+function resolveRootShellScript(call, rootDir) {
+  if (call.cwd === 'temp') return undefined;
+  const normalized = call.value.replaceAll('\\', '/');
+  if (call.wrapper) return join(rootDir, 'scripts', normalized);
+  if (normalized === REPO_PATH_TOKEN || normalized.startsWith(`${REPO_PATH_TOKEN}/`)) {
+    const relativePath = normalized.slice(REPO_PATH_TOKEN.length).replace(/^\/+/, '');
+    const candidate = resolve(rootDir, relativePath);
+    const scriptsRoot = resolve(rootDir, 'scripts');
+    return candidate.startsWith(`${scriptsRoot}${sep}`) ? candidate : undefined;
+  }
+  if (call.cwd === 'repo' && !normalized.startsWith('/') && !/^[A-Za-z]:\//.test(normalized)) {
+    const candidate = resolve(rootDir, normalized);
+    const scriptsRoot = resolve(rootDir, 'scripts');
+    return candidate.startsWith(`${scriptsRoot}${sep}`) ? candidate : undefined;
+  }
+  if (normalized.startsWith('/') || /^[A-Za-z]:\//.test(normalized)) {
+    const candidate = resolve(normalized);
+    const scriptsRoot = resolve(rootDir, 'scripts');
+    return candidate.startsWith(`${scriptsRoot}${sep}`) ? candidate : undefined;
+  }
+  return undefined;
+}
+
+function commandCanEscapeTemp(call, rootDir) {
+  if (call.kind !== 'command') return false;
+  const normalizedRoot = canonicalPathText(rootDir);
+  const values = call.invocation.mode === 'shell'
+    ? [call.invocation.command]
+    : call.invocation.argv;
+  if (values.some(value =>
+    pathComparisonText(value).includes(pathComparisonText(normalizedRoot)))) {
+    return true;
+  }
+  return call.invocation.mode === 'shell'
+    && (
+      /(?:^|[;&|()\s])cd(?:\s|$)/.test(call.invocation.command)
+      || /(?:^|\s)--prefix(?:=|\s)/.test(call.invocation.command)
+      || /(?:^|\s)--cwd(?:=|\s)/.test(call.invocation.command)
+    );
+}
+
+function childEffectAnalysis(
+  content,
+  filePath,
+  rootDir,
+  eagerCallsites,
+  scanBudget,
+) {
+  content = canonicalSourceText(content);
+  const packagePath = join(rootDir, 'package.json');
+  const packageOutcome = readPackageManifest(packagePath);
+  const packageJson = packageOutcome.manifest;
+  const packageScripts = packageJson?.scripts && typeof packageJson.scripts === 'object'
+    ? packageJson.scripts
+    : {};
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    content,
+    ts.ScriptTarget.Latest,
+    true,
+    sourceKind(filePath),
+  );
+  const context = createAnalysisContext(sourceFile, scanBudget);
+  const violations = [];
+  const registry = [];
+  const addUnresolved = (call, effect, label) => {
+    registry.push({
+      file: filePath,
+      line: lineFor(sourceFile, call.node),
+      effect,
+      targetProvenance: 'unknown',
+      classification: 'unresolved',
+      callsite: createCallsiteHash(
+        filePath,
+        call.node.getText(sourceFile),
+        call.node.getStart(sourceFile),
+      ),
+      label,
+    });
+  };
+
+  for (const call of invokedChildEffects(sourceFile, context, scanBudget)) {
+    scanBudget?.check('child-effect-analysis');
+    const callsite = createCallsiteHash(
+      filePath,
+      call.node.getText(sourceFile),
+      call.node.getStart(sourceFile),
+    );
+    if (eagerCallsites && !eagerCallsites.has(callsite)) continue;
+    let effects;
+    if (call.kind === 'unresolved-command') {
+      const label = 'test child command/effect is not statically resolvable';
+      if (call.deferredDefinition && !eagerCallsites) {
+        addUnresolved(call, 'child:unresolved-command', label);
+      } else {
+        violations.push({
+          file: filePath,
+          line: lineFor(sourceFile, call.node),
+          match: call.node.getText(sourceFile),
+          label,
+          code: 'E_HERMETIC_CHILD_EFFECT_UNRESOLVED',
+          callsite,
+        });
+      }
+      continue;
+    }
+    if (call.kind === 'command') {
+      if (call.cwd === 'temp' && !commandCanEscapeTemp(call, rootDir)) continue;
+      effects = call.invocation.mode === 'shell'
+        ? traceCommandEffects(
+          call.invocation.command,
+          packageScripts,
+          new Set(),
+          { rootDir },
+        )
+        : traceArgvEffects(
+          call.invocation.argv,
+          packageScripts,
+          new Set(),
+          { rootDir },
+        );
+    } else {
+      const scriptPath = resolveRootShellScript(call, rootDir);
+      if (!scriptPath || !existsSync(scriptPath)) {
+        addUnresolved(
+          call,
+          'child:unresolved-shell-script',
+          'test shell script/effect is not statically resolvable',
+        );
+        continue;
+      }
+      effects = traceCommandEffects(
+        readFileSync(scriptPath, 'utf-8'),
+        packageScripts,
+        new Set(),
+        { rootDir },
+      );
+    }
+    for (const effect of effects) {
+      if (
+        effect.effect === 'unresolved-child-effect'
+        || effect.effect === 'unresolved-package-script'
+      ) {
+        addUnresolved(
+          call,
+          `child:${effect.effect}`,
+          `test child effect unresolved: ${effect.chain.join(' -> ')}`,
+        );
+        continue;
+      }
+      const targetProvenance = (
+        effect.effect === 'dist-clean'
+        || effect.effect === 'dist-delete'
+      )
+        ? 'live-dist'
+        : effect.boundary;
+      if (!targetProvenance?.startsWith('live-')) continue;
+      if (
+        call.cwd === 'unknown'
+        || call.cwd === 'deferred'
+        || call.cwd === 'repo-scratch'
+      ) {
+        addUnresolved(
+          call,
+          `child:${effect.effect}:${targetProvenance}`,
+          `test child cwd/effect unresolved: ${effect.chain.join(' -> ')}`,
+        );
+        continue;
+      }
+      violations.push({
+        file: filePath,
+        line: lineFor(sourceFile, call.node),
+        match: call.node.getText(sourceFile),
+        label: `test child reaches ${effect.effect}: ${effect.chain.join(' -> ')}`,
+        code: errorCodeForProvenance(targetProvenance),
+        callsite,
+      });
+    }
+  }
+  return {
+    violations,
+    registry: dedupeWriterRegistry(registry),
+  };
+}
+
+function collectFiles(dir, results = [], scanBudget) {
+  scanBudget?.check('test-file-discovery', true);
+  for (const entry of readdirSync(dir).sort()) {
+    const full = join(dir, entry);
+    const stats = statSync(full);
+    if (stats.isDirectory()) collectFiles(full, results, scanBudget);
+    else if (entry.endsWith('.test.ts') || entry.endsWith('.test.tsx')) results.push(full);
   }
   return results;
 }
 
-/**
- * Scan all test files under `testsDir`, skipping files in the allowlist.
- * @param {string} testsDir - directory to scan
- * @param {string[]} [allowlist] - relative paths (from rootDir) to skip
- * @param {string} [rootDir] - project root for computing relative paths
- * @returns {{ violations: Array, checked: number, skipped: number }}
- */
-export function scanTestDir(testsDir, allowlist = ALLOWLIST, rootDir = REPO_ROOT) {
-  const allFiles = collectFiles(testsDir);
+const TEST_SUPPORT_EXTENSIONS = [
+  '.ts',
+  '.tsx',
+  '.mts',
+  '.cts',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+];
+const MAX_TEST_SURFACE_FILES = 5000;
+const MAX_TEST_SURFACE_EDGES = 50_000;
+const MAX_TEST_SURFACE_NODES = 5_000_000;
+const MAX_TEST_SURFACE_DEPTH = 32;
+const MODULE_SPECIFIER_CACHE = new Map();
+const LOCAL_SUPPORT_IMPORT_CACHE = new Map();
+const EAGER_SUMMARY_CACHE = new Map();
+const MAX_EAGER_SUMMARY_CACHE_ENTRIES = 4096;
+const MAX_EAGER_EXPORT_REPLANS_PER_MODULE = 128;
+
+function cacheEagerSummary(key, summary) {
+  if (EAGER_SUMMARY_CACHE.has(key)) EAGER_SUMMARY_CACHE.delete(key);
+  EAGER_SUMMARY_CACHE.set(key, summary);
+  if (EAGER_SUMMARY_CACHE.size > MAX_EAGER_SUMMARY_CACHE_ENTRIES) {
+    EAGER_SUMMARY_CACHE.delete(EAGER_SUMMARY_CACHE.keys().next().value);
+  }
+}
+
+function isWithinRealRoot(candidate, realRoot) {
+  let realCandidate;
+  try {
+    realCandidate = realpathSync(candidate);
+  } catch {
+    return false;
+  }
+  const relativePath = relative(realRoot, realCandidate);
+  return relativePath === ''
+    || (
+      !relativePath.startsWith(`..${sep}`)
+      && relativePath !== '..'
+      && !relativePath.startsWith(sep)
+    );
+}
+
+function resolveLocalSupportImport(fromFile, specifier, realRoot) {
+  if (!specifier.startsWith('.')) return undefined;
+  const cacheKey = `${fromFile}\0${specifier}\0${realRoot}`;
+  if (LOCAL_SUPPORT_IMPORT_CACHE.has(cacheKey)) {
+    return LOCAL_SUPPORT_IMPORT_CACHE.get(cacheKey);
+  }
+  const raw = resolve(fromFile, '..', specifier);
+  const extension = TEST_SUPPORT_EXTENSIONS.find(candidate => raw.endsWith(candidate));
+  const stem = extension ? raw.slice(0, -extension.length) : raw;
+  const candidates = [
+    raw,
+    ...TEST_SUPPORT_EXTENSIONS.map(candidate => `${stem}${candidate}`),
+    ...TEST_SUPPORT_EXTENSIONS.map(candidate => join(raw, `index${candidate}`)),
+  ];
+  for (const candidate of [...new Set(candidates)]) {
+    if (
+      existsSync(candidate)
+      && statSync(candidate).isFile()
+      && isWithinRealRoot(candidate, realRoot)
+    ) {
+      const resolvedFile = realpathSync(candidate);
+      LOCAL_SUPPORT_IMPORT_CACHE.set(cacheKey, resolvedFile);
+      return resolvedFile;
+    }
+  }
+  LOCAL_SUPPORT_IMPORT_CACHE.set(cacheKey, undefined);
+  return undefined;
+}
+
+function staticModuleSpecifiers(
+  content,
+  filePath,
+  providedSourceFile,
+  scanBudget,
+) {
+  content = canonicalSourceText(content);
+  const cacheKey = `${filePath}\0${content.length}\0${deterministicDigest(content)}`;
+  const cached = MODULE_SPECIFIER_CACHE.get(cacheKey);
+  if (cached) return cached;
+  const sourceFile = providedSourceFile ?? ts.createSourceFile(
+    filePath,
+    content,
+    ts.ScriptTarget.Latest,
+    true,
+    sourceKind(filePath),
+  );
+  const values = [];
+  let nodeCount = 0;
+  let analysisContext;
+  const isExpectedMissingImport = importCall => {
+    const expectCall = importCall.parent;
+    if (
+      !ts.isCallExpression(expectCall)
+      || expectCall.arguments[0] !== importCall
+      || !ts.isIdentifier(expectCall.expression)
+    ) {
+      return false;
+    }
+    analysisContext ??= createAnalysisContext(sourceFile, scanBudget);
+    const binding = analysisContext.resolveBinding(
+      expectCall.expression.text,
+      expectCall.expression,
+    );
+    if (
+      binding?.trust?.module !== 'vitest'
+      || binding.trust.name !== 'expect'
+    ) {
+      return false;
+    }
+    const rejects = expectCall.parent;
+    if (
+      !ts.isPropertyAccessExpression(rejects)
+      || rejects.expression !== expectCall
+      || rejects.name.text !== 'rejects'
+    ) {
+      return false;
+    }
+    const matcher = rejects.parent;
+    if (
+      !ts.isPropertyAccessExpression(matcher)
+      || matcher.expression !== rejects
+      || !['toThrow', 'toThrowError'].includes(matcher.name.text)
+    ) {
+      return false;
+    }
+    return ts.isCallExpression(matcher.parent)
+      && matcher.parent.expression === matcher;
+  };
+  const visit = node => {
+    scanBudget?.check('module-edge-analysis');
+    nodeCount += 1;
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
+      && node.moduleSpecifier
+      && ts.isStringLiteralLike(node.moduleSpecifier)
+    ) {
+      const typeOnly = ts.isExportDeclaration(node)
+        ? node.isTypeOnly
+        : Boolean(
+          node.importClause?.isTypeOnly
+          || (
+            node.importClause?.namedBindings
+            && ts.isNamedImports(node.importClause.namedBindings)
+            && node.importClause.namedBindings.elements.length > 0
+            && node.importClause.namedBindings.elements.every(element => element.isTypeOnly)
+          ),
+        );
+      if (!typeOnly) {
+        values.push({
+          specifier: node.moduleSpecifier.text,
+          line: lineFor(sourceFile, node.moduleSpecifier),
+          position: node.moduleSpecifier.getStart(sourceFile),
+          kind: 'static',
+        });
+      }
+    } else if (
+      ts.isImportEqualsDeclaration(node)
+      && !node.isTypeOnly
+      && ts.isExternalModuleReference(node.moduleReference)
+      && node.moduleReference.expression
+      && ts.isStringLiteralLike(node.moduleReference.expression)
+    ) {
+      values.push({
+        specifier: node.moduleReference.expression.text,
+        line: lineFor(sourceFile, node.moduleReference.expression),
+        position: node.moduleReference.expression.getStart(sourceFile),
+        kind: 'static',
+      });
+    } else if (
+      ts.isCallExpression(node)
+      && node.arguments.length === 1
+      && ts.isStringLiteralLike(node.arguments[0])
+      && (
+        node.expression.kind === ts.SyntaxKind.ImportKeyword
+        || (
+          ts.isIdentifier(node.expression)
+          && node.expression.text === 'require'
+        )
+      )
+    ) {
+      values.push({
+        specifier: node.arguments[0].text,
+        line: lineFor(sourceFile, node.arguments[0]),
+        position: node.arguments[0].getStart(sourceFile),
+        kind: node.expression.kind === ts.SyntaxKind.ImportKeyword
+          ? 'dynamic-import'
+          : 'commonjs-require',
+        callsite: createCallsiteHash(
+          filePath,
+          node.getText(sourceFile),
+          node.getStart(sourceFile),
+        ),
+        expectedMissing:
+          node.expression.kind === ts.SyntaxKind.ImportKeyword
+          && isExpectedMissingImport(node),
+      });
+    }
+    node.forEachChild(visit);
+  };
+  sourceFile.forEachChild(visit);
+  const result = {
+    edges: [...new Map(values.map(value => [
+      `${value.position}\0${value.specifier}`,
+      value,
+    ])).values()],
+    nodeCount,
+  };
+  MODULE_SPECIFIER_CACHE.set(cacheKey, result);
+  return result;
+}
+
+function hasSyntaxModifier(node, kind) {
+  return Boolean(node.modifiers?.some(modifier => modifier.kind === kind));
+}
+
+function createEagerModulePlan(
+  content,
+  filePath,
+  identityPath = filePath,
+  scanBudget,
+) {
+  content = canonicalSourceText(content);
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    content,
+    ts.ScriptTarget.Latest,
+    true,
+    sourceKind(filePath),
+  );
+  const context = createAnalysisContext(sourceFile, scanBudget);
+  const callsites = new Set();
+  const importedCalls = [];
+  const eagerLoads = [];
+  const unresolvedLoads = [];
+  const unresolvedAuthorityCalls = [];
+  const unresolvedEagerEvents = [];
+  const writerCandidateCallsites = new Set();
+  const childCandidateCallsites = new Set();
+  const eagerEventAccounting = new Map();
+  const importedBindings = new Map();
+  const localExports = new Map();
+  const reExports = new Map();
+  const starReExports = [];
+  const executedCallables = new Set();
+  let importedCallCursor = 0;
+  let eagerLoadCursor = 0;
+  let unresolvedLoadCursor = 0;
+  let unresolvedAuthorityCursor = 0;
+  let unresolvedEagerEventCursor = 0;
+
+  const registerImportBinding = (name, declaration, descriptor) => {
+    importedBindings.set(name, { declaration, ...descriptor });
+  };
+
+  for (const statement of sourceFile.statements) {
+    if (ts.isImportDeclaration(statement) && ts.isStringLiteralLike(statement.moduleSpecifier)) {
+      const specifier = statement.moduleSpecifier.text;
+      const clause = statement.importClause;
+      if (!clause || clause.isTypeOnly) continue;
+      if (clause.name) {
+        registerImportBinding(clause.name.text, clause.name, {
+          specifier,
+          exportName: 'default',
+        });
+      }
+      const bindings = clause.namedBindings;
+      if (bindings && ts.isNamespaceImport(bindings)) {
+        registerImportBinding(bindings.name.text, bindings.name, {
+          specifier,
+          namespace: true,
+        });
+      } else if (bindings && ts.isNamedImports(bindings)) {
+        for (const element of bindings.elements) {
+          if (element.isTypeOnly) continue;
+          registerImportBinding(element.name.text, element.name, {
+            specifier,
+            exportName: (element.propertyName ?? element.name).text,
+          });
+        }
+      }
+      continue;
+    }
+    if (
+      ts.isImportEqualsDeclaration(statement)
+      && !statement.isTypeOnly
+      && ts.isExternalModuleReference(statement.moduleReference)
+      && statement.moduleReference.expression
+      && ts.isStringLiteralLike(statement.moduleReference.expression)
+    ) {
+      registerImportBinding(statement.name.text, statement.name, {
+        specifier: statement.moduleReference.expression.text,
+        namespace: true,
+      });
+      continue;
+    }
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        const initializer = declaration.initializer
+          ? unwrapExpression(declaration.initializer)
+          : undefined;
+        let specifier;
+        let exportName;
+        if (
+          initializer
+          && ts.isCallExpression(initializer)
+          && trustedBuiltinLoader(initializer.expression, context)
+        ) {
+          specifier = literalText(initializer.arguments[0]);
+        } else if (
+          initializer
+          && (
+            ts.isPropertyAccessExpression(initializer)
+            || ts.isElementAccessExpression(initializer)
+          )
+          && ts.isCallExpression(unwrapExpression(initializer.expression))
+          && trustedBuiltinLoader(
+            unwrapExpression(initializer.expression).expression,
+            context,
+          )
+        ) {
+          const loader = unwrapExpression(initializer.expression);
+          specifier = literalText(loader.arguments[0]);
+          exportName = staticPropertyName(initializer);
+        }
+        if (specifier && ts.isIdentifier(declaration.name)) {
+          registerImportBinding(declaration.name.text, declaration.name, {
+            specifier,
+            exportName,
+            namespace: exportName === undefined,
+          });
+        } else if (
+          specifier
+          && ts.isObjectBindingPattern(declaration.name)
+        ) {
+          for (const element of declaration.name.elements) {
+            if (!ts.isIdentifier(element.name)) continue;
+            registerImportBinding(element.name.text, element.name, {
+              specifier,
+              exportName: propertyNameText(element.propertyName ?? element.name),
+            });
+          }
+        }
+      }
+    }
+
+    const exported = hasSyntaxModifier(statement, ts.SyntaxKind.ExportKeyword);
+    const isDefault = hasSyntaxModifier(statement, ts.SyntaxKind.DefaultKeyword);
+    if (
+      exported
+      && (
+        ts.isFunctionDeclaration(statement)
+        || ts.isClassDeclaration(statement)
+      )
+    ) {
+      if (isDefault) localExports.set('default', statement);
+      if (statement.name) localExports.set(statement.name.text, statement);
+    } else if (exported && ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name)) {
+          localExports.set(
+            declaration.name.text,
+            declaration.initializer ?? declaration.name,
+          );
+        }
+      }
+    } else if (ts.isExportAssignment(statement)) {
+      localExports.set('default', statement.expression);
+    } else if (ts.isExportDeclaration(statement)) {
+      const specifier = statement.moduleSpecifier
+        && ts.isStringLiteralLike(statement.moduleSpecifier)
+        ? statement.moduleSpecifier.text
+        : undefined;
+      if (!statement.exportClause) {
+        if (specifier && !statement.isTypeOnly) starReExports.push(specifier);
+      } else if (ts.isNamedExports(statement.exportClause)) {
+        for (const element of statement.exportClause.elements) {
+          if (element.isTypeOnly) continue;
+          const exportedName = element.name.text;
+          const sourceName = (element.propertyName ?? element.name).text;
+          if (specifier) {
+            reExports.set(exportedName, { specifier, exportName: sourceName });
+          } else {
+            localExports.set(exportedName, element.propertyName ?? element.name);
+          }
+        }
+      }
+    }
+  }
+
+  const localCallableCandidates = (
+    expression,
+    bindingStack = new Set(),
+  ) => {
+    const unwrapped = unwrapExpression(expression);
+    if (
+      ts.isArrowFunction(unwrapped)
+      || ts.isFunctionExpression(unwrapped)
+      || ts.isFunctionDeclaration(unwrapped)
+      || ts.isMethodDeclaration(unwrapped)
+      || ts.isConstructorDeclaration(unwrapped)
+    ) {
+      return { callables: [unwrapped], opaque: false };
+    }
+    if (ts.isConditionalExpression(unwrapped)) {
+      const branches = [
+        localCallableCandidates(unwrapped.whenTrue, bindingStack),
+        localCallableCandidates(unwrapped.whenFalse, bindingStack),
+      ];
+      return {
+        callables: branches.flatMap(branch => branch.callables),
+        opaque: branches.some(branch => branch.opaque),
+      };
+    }
+    if (
+      ts.isBinaryExpression(unwrapped)
+      && (
+        unwrapped.operatorToken.kind === ts.SyntaxKind.BarBarToken
+        || unwrapped.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+        || unwrapped.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+      )
+    ) {
+      const branches = [
+        localCallableCandidates(unwrapped.left, bindingStack),
+        localCallableCandidates(unwrapped.right, bindingStack),
+      ];
+      return {
+        callables: branches.flatMap(branch => branch.callables),
+        opaque: branches.some(branch => branch.opaque),
+      };
+    }
+    if (
+      ts.isCallExpression(unwrapped)
+      && (
+        ts.isPropertyAccessExpression(unwrapped.expression)
+        || ts.isElementAccessExpression(unwrapped.expression)
+      )
+      && staticPropertyName(unwrapped.expression) === 'bind'
+    ) {
+      const bound = localCallableCandidates(
+        unwrapped.expression.expression,
+        bindingStack,
+      );
+      return { callables: bound.callables, opaque: true };
+    }
+    if (
+      ts.isPropertyAccessExpression(unwrapped)
+      || ts.isElementAccessExpression(unwrapped)
+    ) {
+      const candidates = staticPropertyNames(unwrapped, context)
+        .flatMap(property => projectedPropertyExpressions(
+          unwrapped.expression,
+          property,
+          undefined,
+          context,
+        ));
+      if (candidates.length === 0) {
+        const classLike = localClass(unwrapped.expression);
+        const property = staticPropertyName(unwrapped);
+        if (classLike && property) {
+          candidates.push(...classLike.members.filter(member =>
+            propertyNameText(member.name) === property
+            && (
+              ts.isMethodDeclaration(member)
+              || ts.isGetAccessorDeclaration(member)
+              || ts.isSetAccessorDeclaration(member)
+            )));
+        }
+      }
+      if (candidates.length === 0) {
+        return { callables: [], opaque: true };
+      }
+      const resolved = candidates.map(candidate =>
+        localCallableCandidates(candidate, bindingStack));
+      return {
+        callables: resolved.flatMap(candidate => candidate.callables),
+        opaque: resolved.some(candidate => candidate.opaque),
+      };
+    }
+    if (!ts.isIdentifier(unwrapped)) {
+      return { callables: [], opaque: true };
+    }
+    const binding = context.resolveBinding(unwrapped.text, unwrapped);
+    if (!binding || bindingStack.has(binding.id)) {
+      return { callables: [], opaque: true };
+    }
+    if (ts.isFunctionDeclaration(binding.declaration.parent)) {
+      return {
+        callables: [binding.declaration.parent],
+        opaque: false,
+      };
+    }
+    const nextStack = new Set(bindingStack);
+    nextStack.add(binding.id);
+    const candidates = bindingExpressionsAtUse(binding, unwrapped, context);
+    if (candidates.length === 0) {
+      return { callables: [], opaque: true };
+    }
+    const resolved = candidates.map(candidate =>
+      localCallableCandidates(candidate, nextStack));
+    return {
+      callables: [...new Map(resolved.flatMap(candidate =>
+        candidate.callables.map(callable => [
+          callable.getStart(sourceFile),
+          callable,
+        ]))).values()],
+      opaque: resolved.some(candidate => candidate.opaque),
+    };
+  };
+  const localCallable = expression => {
+    const resolved = localCallableCandidates(expression);
+    return resolved.callables.length === 1 && !resolved.opaque
+      ? resolved.callables[0]
+      : undefined;
+  };
+  const localClass = (expression, bindingStack = new Set()) => {
+    const unwrapped = unwrapExpression(expression);
+    if (
+      ts.isClassDeclaration(unwrapped)
+      || ts.isClassExpression(unwrapped)
+    ) {
+      return unwrapped;
+    }
+    if (!ts.isIdentifier(unwrapped)) return undefined;
+    const binding = context.resolveBinding(unwrapped.text, unwrapped);
+    if (!binding || bindingStack.has(binding.id)) return undefined;
+    if (
+      ts.isClassDeclaration(binding.declaration.parent)
+      || ts.isClassExpression(binding.declaration.parent)
+    ) {
+      return binding.declaration.parent;
+    }
+    const nextStack = new Set(bindingStack);
+    nextStack.add(binding.id);
+    for (const candidate of bindingExpressionsAtUse(binding, unwrapped, context)) {
+      const classLike = localClass(candidate, nextStack);
+      if (classLike) return classLike;
+    }
+    return undefined;
+  };
+
+  const expressionContains = (
+    expression,
+    predicate,
+    bindingStack = new Set(),
+  ) => {
+    const unwrapped = unwrapExpression(expression);
+    if (predicate(unwrapped)) return true;
+    if (ts.isIdentifier(unwrapped)) {
+      const binding = context.resolveBinding(unwrapped.text, unwrapped);
+      if (binding && !bindingStack.has(binding.id)) {
+        const nextStack = new Set(bindingStack);
+        nextStack.add(binding.id);
+        return bindingExpressionsAtUse(binding, unwrapped, context)
+          .some(candidate => expressionContains(candidate, predicate, nextStack));
+      }
+    }
+    let found = false;
+    unwrapped.forEachChild(child => {
+      if (!found && expressionContains(child, predicate, bindingStack)) found = true;
+    });
+    return found;
+  };
+  const containsImportMetaUrl = expression => expressionContains(
+    expression,
+    node => (
+      ts.isPropertyAccessExpression(node)
+      && node.name.text === 'url'
+      && ts.isMetaProperty(node.expression)
+      && node.expression.keywordToken === ts.SyntaxKind.ImportKeyword
+    ),
+  );
+  const containsProcessArgv = expression => expressionContains(
+    expression,
+    node => (
+      (
+        ts.isElementAccessExpression(node)
+        && ts.isPropertyAccessExpression(node.expression)
+        && ts.isIdentifier(node.expression.expression)
+        && node.expression.expression.text === 'process'
+        && node.expression.name.text === 'argv'
+        && ts.isNumericLiteral(node.argumentExpression)
+        && node.argumentExpression.text === '1'
+      )
+      || (
+        ts.isPropertyAccessExpression(node)
+        && ts.isIdentifier(node.expression)
+        && node.expression.text === 'process'
+        && node.name.text === 'argv'
+      )
+    ),
+  );
+  const containsRequireMain = expression => expressionContains(
+    expression,
+    node => (
+      ts.isPropertyAccessExpression(node)
+      && ts.isIdentifier(node.expression)
+      && node.expression.text === 'require'
+      && node.name.text === 'main'
+      && !context.resolveBinding('require', node.expression)
+    ),
+  );
+  const containsAmbientModule = expression => expressionContains(
+    expression,
+    node => (
+      ts.isIdentifier(node)
+      && node.text === 'module'
+      && !context.resolveBinding('module', node)
+    ),
+  );
+  const isStaticFalse = expression => {
+    const unwrapped = unwrapExpression(expression);
+    return unwrapped.kind === ts.SyntaxKind.FalseKeyword
+      || (
+        ts.isNumericLiteral(unwrapped)
+        && Number(unwrapped.text) === 0
+      );
+  };
+  const isExactProcessArgvEntry = expression => {
+    const unwrapped = unwrapExpression(expression);
+    return (
+      ts.isElementAccessExpression(unwrapped)
+      && ts.isPropertyAccessExpression(unwrapped.expression)
+      && ts.isIdentifier(unwrapped.expression.expression)
+      && unwrapped.expression.expression.text === 'process'
+      && unwrapped.expression.name.text === 'argv'
+      && ts.isNumericLiteral(unwrapped.argumentExpression)
+      && unwrapped.argumentExpression.text === '1'
+      && !context.resolveBinding('process', unwrapped.expression.expression)
+    );
+  };
+  const isExactImportMetaUrl = expression => {
+    const unwrapped = unwrapExpression(expression);
+    return (
+      ts.isPropertyAccessExpression(unwrapped)
+      && unwrapped.name.text === 'url'
+      && ts.isMetaProperty(unwrapped.expression)
+      && unwrapped.expression.keywordToken === ts.SyntaxKind.ImportKeyword
+    );
+  };
+  const isExactCurrentModulePath = expression => {
+    const unwrapped = unwrapExpression(expression);
+    if (!ts.isCallExpression(unwrapped) || unwrapped.arguments.length !== 1) {
+      return false;
+    }
+    const trusted = trustedFunction(unwrapped.expression, context);
+    if (
+      trusted?.module === 'url'
+      && trusted.name === 'fileURLToPath'
+    ) {
+      return isExactImportMetaUrl(unwrapped.arguments[0]);
+    }
+    if (
+      trusted?.module === 'path'
+      && (
+        trusted.name === 'normalize'
+        || trusted.name === 'resolve'
+      )
+    ) {
+      return isExactCurrentModulePath(unwrapped.arguments[0]);
+    }
+    return false;
+  };
+  const isExactArgvModulePath = (
+    expression,
+    bindingStack = new Set(),
+  ) => {
+    const unwrapped = unwrapExpression(expression);
+    if (isExactProcessArgvEntry(unwrapped)) return true;
+    const isEmptySentinel = candidate =>
+      literalText(unwrapExpression(candidate)) === '';
+    if (ts.isIdentifier(unwrapped)) {
+      const binding = context.resolveBinding(unwrapped.text, unwrapped);
+      if (!binding || bindingStack.has(binding.id)) return false;
+      const nextStack = new Set(bindingStack);
+      nextStack.add(binding.id);
+      const values = bindingExpressionsAtUse(binding, unwrapped, context);
+      return values.length > 0
+        && values.every(value =>
+          isExactArgvModulePath(value, nextStack)
+          || isEmptySentinel(value));
+    }
+    if (
+      ts.isBinaryExpression(unwrapped)
+      && (
+        unwrapped.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+        || unwrapped.operatorToken.kind === ts.SyntaxKind.BarBarToken
+      )
+    ) {
+      return (
+        isExactArgvModulePath(unwrapped.left, bindingStack)
+        && isEmptySentinel(unwrapped.right)
+      );
+    }
+    if (ts.isConditionalExpression(unwrapped)) {
+      return [
+        unwrapped.whenTrue,
+        unwrapped.whenFalse,
+      ].every(branch =>
+        isExactArgvModulePath(branch, bindingStack)
+        || isEmptySentinel(branch));
+    }
+    if (!ts.isCallExpression(unwrapped) || unwrapped.arguments.length !== 1) {
+      return false;
+    }
+    const trusted = trustedFunction(unwrapped.expression, context);
+    return (
+      trusted?.module === 'path'
+      && (
+        trusted.name === 'normalize'
+        || trusted.name === 'resolve'
+      )
+      && isExactArgvModulePath(unwrapped.arguments[0], bindingStack)
+    );
+  };
+  const isExactRequireMain = expression => {
+    const unwrapped = unwrapExpression(expression);
+    return (
+      ts.isPropertyAccessExpression(unwrapped)
+      && ts.isIdentifier(unwrapped.expression)
+      && unwrapped.expression.text === 'require'
+      && unwrapped.name.text === 'main'
+      && !context.resolveBinding('require', unwrapped.expression)
+    );
+  };
+  const isExactAmbientModule = expression => {
+    const unwrapped = unwrapExpression(expression);
+    return (
+      ts.isIdentifier(unwrapped)
+      && unwrapped.text === 'module'
+      && !context.resolveBinding('module', unwrapped)
+    );
+  };
+  const isExactMainEquality = expression => {
+    const unwrapped = unwrapExpression(expression);
+    if (
+      !ts.isBinaryExpression(unwrapped)
+      || (
+        unwrapped.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken
+        && unwrapped.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsToken
+      )
+    ) {
+      return false;
+    }
+    return (
+      (
+        isExactCurrentModulePath(unwrapped.left)
+        && isExactArgvModulePath(unwrapped.right)
+      )
+      || (
+        isExactCurrentModulePath(unwrapped.right)
+        && isExactArgvModulePath(unwrapped.left)
+      )
+      || (
+        isExactRequireMain(unwrapped.left)
+        && isExactAmbientModule(unwrapped.right)
+      )
+      || (
+        isExactRequireMain(unwrapped.right)
+        && isExactAmbientModule(unwrapped.left)
+      )
+    );
+  };
+  const isModuleMainGuard = (expression, guardStack = new Set()) => {
+    const unwrapped = unwrapExpression(expression);
+    if (ts.isIdentifier(unwrapped)) {
+      const binding = context.resolveBinding(unwrapped.text, unwrapped);
+      if (!binding || guardStack.has(binding.id)) return false;
+      const nextStack = new Set(guardStack);
+      nextStack.add(binding.id);
+      const values = bindingExpressionsAtUse(binding, unwrapped, context);
+      return values.length > 0
+        && values.every(value => isModuleMainGuard(value, nextStack));
+    }
+    if (
+      ts.isBinaryExpression(unwrapped)
+      && (
+        unwrapped.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+        || unwrapped.operatorToken.kind === ts.SyntaxKind.EqualsEqualsToken
+      )
+    ) {
+      return isExactMainEquality(unwrapped);
+    }
+    if (
+      ts.isBinaryExpression(unwrapped)
+      && unwrapped.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+    ) {
+      return isModuleMainGuard(unwrapped.left, guardStack)
+        || isModuleMainGuard(unwrapped.right, guardStack);
+    }
+    if (ts.isCallExpression(unwrapped)) {
+      const callable = localCallable(unwrapped.expression);
+      if (!callable?.body) return false;
+      if (
+        callable.asteriskToken
+        || hasSyntaxModifier(callable, ts.SyntaxKind.AsyncKeyword)
+      ) {
+        return false;
+      }
+      const key = callable.getStart(sourceFile);
+      if (guardStack.has(key)) return false;
+      const returns = [];
+      const collectReturns = node => {
+        if (node !== callable.body && ts.isFunctionLike(node)) return;
+        if (ts.isReturnStatement(node) && node.expression) {
+          returns.push(node.expression);
+          return;
+        }
+        node.forEachChild(collectReturns);
+      };
+      collectReturns(callable.body);
+      if (returns.length === 0) return false;
+      const nextStack = new Set(guardStack);
+      nextStack.add(key);
+      return returns.every(value =>
+        isStaticFalse(value) || isModuleMainGuard(value, nextStack));
+    }
+    return false;
+  };
+  const isInexactModuleMainGuard = expression => {
+    const unwrapped = unwrapExpression(expression);
+    if (ts.isCallExpression(unwrapped)) {
+      const callable = localCallable(unwrapped.expression);
+      if (
+        callable?.body
+        && (
+          callable.asteriskToken
+          || hasSyntaxModifier(callable, ts.SyntaxKind.AsyncKeyword)
+        )
+      ) {
+        const returns = [];
+        const collectReturns = node => {
+          if (node !== callable.body && ts.isFunctionLike(node)) return;
+          if (ts.isReturnStatement(node) && node.expression) {
+            returns.push(node.expression);
+            return;
+          }
+          node.forEachChild(collectReturns);
+        };
+        collectReturns(callable.body);
+        if (returns.some(value => isModuleMainGuard(value))) return true;
+      }
+    }
+    if (
+      ts.isBinaryExpression(unwrapped)
+      && (
+        unwrapped.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+        || unwrapped.operatorToken.kind === ts.SyntaxKind.EqualsEqualsToken
+      )
+      && !isExactMainEquality(unwrapped)
+      && (
+        (
+          containsImportMetaUrl(unwrapped)
+          && containsProcessArgv(unwrapped)
+        )
+        || (
+          containsRequireMain(unwrapped)
+          && containsAmbientModule(unwrapped)
+        )
+      )
+    ) {
+      return true;
+    }
+    return (
+      ts.isCallExpression(unwrapped)
+      && (
+        ts.isPropertyAccessExpression(unwrapped.expression)
+        || ts.isElementAccessExpression(unwrapped.expression)
+      )
+      && staticPropertyName(unwrapped.expression) === 'endsWith'
+      && (
+        containsProcessArgv(unwrapped)
+        || containsImportMetaUrl(unwrapped)
+      )
+    );
+  };
+
+  const importedCallee = (expression, bindingStack = new Set()) => {
+    const isDeclaredImportBinding = (binding, descriptor) =>
+      Boolean(
+        !binding
+        || binding.declaration.getStart(sourceFile)
+          === descriptor.declaration.getStart(sourceFile),
+      );
+    const unwrapped = unwrapExpression(expression);
+    if (ts.isIdentifier(unwrapped)) {
+      const descriptor = importedBindings.get(unwrapped.text);
+      const binding = context.resolveBinding(unwrapped.text, unwrapped);
+      if (
+        descriptor
+        && isDeclaredImportBinding(binding, descriptor)
+      ) {
+        return descriptor.namespace
+          ? undefined
+          : descriptor;
+      }
+      if (!binding || bindingStack.has(binding.id)) return undefined;
+      const nextStack = new Set(bindingStack);
+      nextStack.add(binding.id);
+      const candidates = bindingExpressionsAtUse(binding, unwrapped, context)
+        .map(candidate => importedCallee(candidate, nextStack))
+        .filter(Boolean);
+      if (candidates.length === 0) return undefined;
+      const canonical = new Map(candidates.map(candidate => [
+        JSON.stringify([
+          candidate.specifier,
+          candidate.exportName,
+          candidate.unsupportedMember,
+          candidate.boundOpaque,
+        ]),
+        candidate,
+      ]));
+      return canonical.size === 1
+        ? canonical.values().next().value
+        : undefined;
+    }
+    if (
+      ts.isCallExpression(unwrapped)
+      && (
+        ts.isPropertyAccessExpression(unwrapped.expression)
+        || ts.isElementAccessExpression(unwrapped.expression)
+      )
+      && staticPropertyName(unwrapped.expression) === 'bind'
+    ) {
+      const bound = importedCallee(
+        unwrapped.expression.expression,
+        bindingStack,
+      );
+      return bound ? { ...bound, boundOpaque: true } : undefined;
+    }
+    if (
+      ts.isPropertyAccessExpression(unwrapped)
+      || ts.isElementAccessExpression(unwrapped)
+    ) {
+      const receiver = unwrapExpression(unwrapped.expression);
+      if (ts.isIdentifier(receiver)) {
+        const descriptor = importedBindings.get(receiver.text);
+        const binding = descriptor
+          ? context.resolveBinding(receiver.text, receiver)
+          : undefined;
+        const exportName = staticPropertyName(unwrapped);
+        if (
+          descriptor?.namespace
+          && isDeclaredImportBinding(binding, descriptor)
+          && exportName
+        ) {
+          return {
+            specifier: descriptor.specifier,
+            exportName,
+          };
+        }
+        if (
+          descriptor
+          && !descriptor.namespace
+          && isDeclaredImportBinding(binding, descriptor)
+          && exportName
+        ) {
+          return {
+            specifier: descriptor.specifier,
+            exportName: descriptor.exportName,
+            unsupportedMember: exportName,
+          };
+        }
+      }
+      if (
+        ts.isCallExpression(receiver)
+        && trustedBuiltinLoader(receiver.expression, context)
+      ) {
+        const specifier = literalText(receiver.arguments[0]);
+        const exportName = staticPropertyName(unwrapped);
+        if (specifier && exportName) return { specifier, exportName };
+      }
+      const exportName = staticPropertyName(unwrapped);
+      if (exportName) {
+        const projected = projectedPropertyExpressions(
+          unwrapped.expression,
+          exportName,
+          undefined,
+          context,
+          bindingStack,
+        );
+        const candidates = projected
+          .map(candidate => importedCallee(candidate, bindingStack))
+          .filter(Boolean);
+        const canonical = new Map(candidates.map(candidate => [
+          JSON.stringify([
+            candidate.specifier,
+            candidate.exportName,
+            candidate.unsupportedMember,
+            candidate.boundOpaque,
+          ]),
+          candidate,
+        ]));
+        if (canonical.size === 1) return canonical.values().next().value;
+      }
+    }
+    return undefined;
+  };
+
+  const addCallsite = node => {
+    const callsite = createCallsiteHash(
+      identityPath,
+      node.getText(sourceFile),
+      node.getStart(sourceFile),
+    );
+    callsites.add(callsite);
+    return callsite;
+  };
+
+  const beginEagerEvent = (node, kind) => {
+    const callsite = addCallsite(node);
+    const key = `${kind}\0${callsite}`;
+    if (!eagerEventAccounting.has(key)) {
+      eagerEventAccounting.set(key, {
+        kind,
+        callsite,
+        outcome: undefined,
+      });
+    }
+    return { key, callsite };
+  };
+  const accountEagerEvent = (event, outcome) => {
+    const record = eagerEventAccounting.get(event.key);
+    if (!record) {
+      throw new Error(
+        `[E_HERMETIC_EAGER_ACCOUNTING] missing event ${event.key}`,
+      );
+    }
+    if (record.outcome && record.outcome !== outcome) {
+      throw new Error(
+        '[E_HERMETIC_EAGER_ACCOUNTING]'
+        + ` ambiguous outcome ${record.outcome}/${outcome}`
+        + ` for ${event.key}`,
+      );
+    }
+    record.outcome = outcome;
+  };
+
+  const argumentProfile = (expression, bindingStack = new Set()) => {
+    const unwrapped = unwrapExpression(expression);
+    if (
+      (
+        ts.isIdentifier(unwrapped)
+        && unwrapped.text === 'undefined'
+        && !context.resolveBinding('undefined', unwrapped)
+      )
+      || ts.isVoidExpression(unwrapped)
+    ) {
+      return { kind: 'undefined' };
+    }
+    if (ts.isConditionalExpression(unwrapped)) {
+      return {
+        kind: 'union',
+        options: [
+          argumentProfile(unwrapped.whenTrue, bindingStack),
+          argumentProfile(unwrapped.whenFalse, bindingStack),
+        ],
+      };
+    }
+    if (
+      ts.isBinaryExpression(unwrapped)
+      && (
+        unwrapped.operatorToken.kind === ts.SyntaxKind.BarBarToken
+        || unwrapped.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+        || unwrapped.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+      )
+    ) {
+      return {
+        kind: 'union',
+        options: [
+          argumentProfile(unwrapped.left, bindingStack),
+          argumentProfile(unwrapped.right, bindingStack),
+        ],
+      };
+    }
+    if (ts.isIdentifier(unwrapped)) {
+      const binding = context.resolveBinding(unwrapped.text, unwrapped);
+      if (!binding || bindingStack.has(binding.id)) return { kind: 'opaque' };
+      const nextStack = new Set(bindingStack);
+      nextStack.add(binding.id);
+      const values = bindingExpressionsAtUse(binding, unwrapped, context);
+      if (values.length === 0) return { kind: 'opaque' };
+      const options = values.map(value => argumentProfile(value, nextStack));
+      return options.length === 1
+        ? options[0]
+        : { kind: 'union', options };
+    }
+    if (
+      ts.isArrowFunction(unwrapped)
+      || ts.isFunctionExpression(unwrapped)
+      || ts.isFunctionDeclaration(unwrapped)
+      || ts.isMethodDeclaration(unwrapped)
+    ) {
+      return { kind: 'callable' };
+    }
+    if (ts.isObjectLiteralExpression(unwrapped)) {
+      const properties = {};
+      let opaqueRest = false;
+      for (const property of unwrapped.properties) {
+        if (ts.isSpreadAssignment(property)) {
+          opaqueRest = true;
+          continue;
+        }
+        const name = propertyNameText(property.name);
+        if (name === undefined) {
+          opaqueRest = true;
+          continue;
+        }
+        if (ts.isPropertyAssignment(property)) {
+          properties[name] = argumentProfile(property.initializer, bindingStack);
+        } else if (ts.isShorthandPropertyAssignment(property)) {
+          properties[name] = argumentProfile(property.name, bindingStack);
+        } else if (
+          ts.isMethodDeclaration(property)
+          || ts.isGetAccessorDeclaration(property)
+          || ts.isSetAccessorDeclaration(property)
+        ) {
+          properties[name] = { kind: 'callable' };
+        } else {
+          opaqueRest = true;
+        }
+      }
+      return { kind: 'object', properties, opaqueRest };
+    }
+    if (ts.isArrayLiteralExpression(unwrapped)) {
+      const elements = [];
+      let opaqueRest = false;
+      for (const element of unwrapped.elements) {
+        if (ts.isOmittedExpression(element)) {
+          elements.push({ kind: 'undefined' });
+        } else if (ts.isSpreadElement(element)) {
+          const spread = argumentProfile(element.expression, bindingStack);
+          if (spread.kind === 'array' && !spread.opaqueRest) {
+            elements.push(...spread.elements);
+          } else {
+            elements.push({ kind: 'spread' });
+            opaqueRest = true;
+          }
+        } else {
+          elements.push(argumentProfile(element, bindingStack));
+        }
+      }
+      return { kind: 'array', elements, opaqueRest };
+    }
+    if (
+      ts.isStringLiteralLike(unwrapped)
+      || ts.isNumericLiteral(unwrapped)
+      || ts.isBigIntLiteral(unwrapped)
+      || ts.isRegularExpressionLiteral(unwrapped)
+      || ts.isClassExpression(unwrapped)
+      || ts.isNewExpression(unwrapped)
+      || unwrapped.kind === ts.SyntaxKind.TrueKeyword
+      || unwrapped.kind === ts.SyntaxKind.FalseKeyword
+      || unwrapped.kind === ts.SyntaxKind.NullKeyword
+    ) {
+      return { kind: 'defined' };
+    }
+    return { kind: 'opaque' };
+  };
+
+  const invocationProfiles = node => {
+    const profiles = [];
+    for (const argument of node.arguments ?? []) {
+      if (!ts.isSpreadElement(argument)) {
+        profiles.push(argumentProfile(argument));
+        continue;
+      }
+      const spread = argumentProfile(argument.expression);
+      if (spread.kind === 'array' && !spread.opaqueRest) {
+        profiles.push(...spread.elements);
+      } else {
+        profiles.push({ kind: 'spread' });
+      }
+    }
+    return profiles;
+  };
+
+  const profileAtParameter = (profiles, index) => {
+    for (let cursor = 0; cursor <= index && cursor < profiles.length; cursor += 1) {
+      if (profiles[cursor]?.kind === 'spread') return { kind: 'opaque' };
+    }
+    return profiles[index] ?? { kind: 'undefined' };
+  };
+
+  const profileDefaultDecision = profile => {
+    if (profile.kind === 'undefined') return 'execute';
+    if (profile.kind === 'opaque' || profile.kind === 'spread') return 'opaque';
+    if (profile.kind !== 'union') return 'skip';
+    const decisions = profile.options.map(profileDefaultDecision);
+    if (decisions.includes('opaque')) return 'opaque';
+    if (decisions.includes('execute')) return 'execute';
+    return 'skip';
+  };
+
+  const profileAfterDefault = (profile, initializer) => {
+    const decision = profileDefaultDecision(profile);
+    if (decision === 'execute') {
+      const initializerProfile = argumentProfile(initializer);
+      if (profile.kind !== 'union') return initializerProfile;
+      return {
+        kind: 'union',
+        options: [
+          initializerProfile,
+          ...profile.options.filter(option =>
+            profileDefaultDecision(option) === 'skip'),
+        ],
+      };
+    }
+    return profile;
+  };
+
+  const unresolvedEager = (node, effect, callsite = addCallsite(node)) => {
+    unresolvedEagerEvents.push({ node, effect, callsite });
+  };
+
+  const projectedArgumentProfile = (profile, property, index) => {
+    if (profile.kind === 'union') {
+      return {
+        kind: 'union',
+        options: profile.options.map(option =>
+          projectedArgumentProfile(option, property, index)),
+      };
+    }
+    if (property !== undefined) {
+      if (profile.kind === 'object') {
+        if (Object.hasOwn(profile.properties, property)) {
+          return profile.properties[property];
+        }
+        return profile.opaqueRest
+          ? { kind: 'opaque' }
+          : { kind: 'undefined' };
+      }
+      if (profile.kind === 'opaque') return profile;
+      return { kind: 'undefined' };
+    }
+    if (index !== undefined) {
+      if (profile.kind === 'array') {
+        if (profile.elements[index]) return profile.elements[index];
+        return profile.opaqueRest
+          ? { kind: 'opaque' }
+          : { kind: 'undefined' };
+      }
+      return profile.kind === 'opaque'
+        ? profile
+        : { kind: 'opaque' };
+    }
+    return { kind: 'opaque' };
+  };
+
+  const visitBindingDefaults = (
+    pattern,
+    profile,
+    callStack,
+    invocationFrame,
+    invocationNode,
+  ) => {
+    if (ts.isIdentifier(pattern)) {
+      const binding = context.resolveBinding(pattern.text, pattern);
+      if (binding) invocationFrame.set(binding.id, profile);
+      return;
+    }
+    pattern.elements.forEach((element, index) => {
+      if (ts.isOmittedExpression(element)) return;
+      const property = ts.isObjectBindingPattern(pattern)
+        ? propertyNameText(element.propertyName ?? element.name)
+        : undefined;
+      let valueProfile = projectedArgumentProfile(
+        profile,
+        property,
+        ts.isArrayBindingPattern(pattern) ? index : undefined,
+      );
+      if (element.initializer) {
+        const decision = profileDefaultDecision(valueProfile);
+        if (decision === 'execute') {
+          visit(element.initializer, callStack, invocationFrame);
+          valueProfile = profileAfterDefault(valueProfile, element.initializer);
+        } else if (decision === 'opaque') {
+          unresolvedEager(
+            invocationNode,
+            'production:eager-destructured-default-opaque',
+          );
+        }
+      }
+      visitBindingDefaults(
+        element.name,
+        valueProfile,
+        callStack,
+        invocationFrame,
+        invocationNode,
+      );
+    });
+  };
+
+  const executeCallable = (
+    callable,
+    profiles,
+    callStack,
+    invocationNode,
+  ) => {
+    const callableKey = callable.getStart(sourceFile);
+    if (callStack.has(callableKey)) return;
+    const nextStack = new Set(callStack);
+    nextStack.add(callableKey);
+    const invocationFrame = new Map();
+    for (const [index, parameter] of (callable.parameters ?? []).entries()) {
+      let profile = parameter.dotDotDotToken
+        ? {
+          kind: 'array',
+          elements: profiles.slice(index),
+          opaqueRest: profiles.slice(index).some(value => value.kind === 'spread'),
+        }
+        : profileAtParameter(profiles, index);
+      if (parameter.initializer) {
+        const decision = profileDefaultDecision(profile);
+        if (decision === 'execute') {
+          visit(parameter.initializer, nextStack, invocationFrame);
+          profile = profileAfterDefault(profile, parameter.initializer);
+        } else if (decision === 'opaque') {
+          unresolvedEager(
+            invocationNode,
+            'production:eager-default-parameter-opaque',
+          );
+        }
+      }
+      visitBindingDefaults(
+        parameter.name,
+        profile,
+        nextStack,
+        invocationFrame,
+        invocationNode,
+      );
+    }
+    if (callable.body && !callable.asteriskToken) {
+      visit(callable.body, nextStack, invocationFrame);
+    }
+  };
+
+  const executeClassConstruction = (
+    classLike,
+    profiles,
+    callStack,
+    invocationNode,
+  ) => {
+    const classKey = classLike.getStart(sourceFile);
+    if (callStack.has(classKey)) return;
+    const nextStack = new Set(callStack);
+    nextStack.add(classKey);
+    const constructors = classLike.members.filter(member =>
+      ts.isConstructorDeclaration(member));
+    if (constructors.length > 1) {
+      unresolvedEager(
+        invocationNode,
+        'production:eager-class-constructor-ambiguous',
+      );
+    }
+    const constructor = constructors[0];
+    const superCalls = [];
+    if (constructor?.body) {
+      const collectSuperCalls = node => {
+        if (
+          node !== constructor.body
+          && (
+            ts.isFunctionLike(node)
+            || ts.isClassDeclaration(node)
+            || ts.isClassExpression(node)
+          )
+        ) {
+          return;
+        }
+        if (
+          ts.isCallExpression(node)
+          && node.expression.kind === ts.SyntaxKind.SuperKeyword
+        ) {
+          superCalls.push(node);
+          return;
+        }
+        node.forEachChild(collectSuperCalls);
+      };
+      collectSuperCalls(constructor.body);
+    }
+    const constructorArgumentProfile = expression => {
+      const unwrapped = unwrapExpression(expression);
+      if (ts.isIdentifier(unwrapped) && constructor) {
+        const binding = context.resolveBinding(unwrapped.text, unwrapped);
+        const parameterIndex = constructor.parameters.findIndex(parameter =>
+          binding
+          && binding.declaration.getStart(sourceFile)
+            >= parameter.getStart(sourceFile)
+          && binding.declaration.getEnd()
+            <= parameter.getEnd());
+        if (parameterIndex >= 0) {
+          let profile = profileAtParameter(profiles, parameterIndex);
+          const parameter = constructor.parameters[parameterIndex];
+          if (parameter.initializer) {
+            profile = profileAfterDefault(profile, parameter.initializer);
+          }
+          return profile;
+        }
+      }
+      return argumentProfile(expression);
+    };
+    const baseInvocationProfiles = superCalls.length > 0
+      ? superCalls.map(superCall =>
+        (superCall.arguments ?? []).map(argument =>
+          ts.isSpreadElement(argument)
+            ? { kind: 'spread' }
+            : constructorArgumentProfile(argument)))
+      : constructor
+        ? []
+        : [profiles];
+    if (superCalls.length > 1) {
+      unresolvedEager(
+        invocationNode,
+        'production:eager-class-super-flow-ambiguous',
+      );
+    }
+    const extendsTypes = (classLike.heritageClauses ?? [])
+      .filter(clause => clause.token === ts.SyntaxKind.ExtendsKeyword)
+      .flatMap(clause => [...clause.types]);
+    if (extendsTypes.length > 1) {
+      unresolvedEager(
+        invocationNode,
+        'production:eager-class-base-ambiguous',
+      );
+    }
+    for (const baseType of extendsTypes) {
+      const baseClass = localClass(baseType.expression);
+      if (baseClass) {
+        for (const baseProfiles of baseInvocationProfiles) {
+          executeClassConstruction(
+            baseClass,
+            baseProfiles,
+            nextStack,
+            baseType.expression,
+          );
+        }
+        continue;
+      }
+      const imported = importedCallee(baseType.expression);
+      const callsite = addCallsite(baseType.expression);
+      if (imported?.unsupportedMember || imported?.boundOpaque) {
+        unresolvedEager(
+          baseType.expression,
+          imported.unsupportedMember
+            ? 'production:eager-class-base-member-unresolved'
+            : 'production:eager-class-base-bound-unresolved',
+          callsite,
+        );
+      } else if (imported) {
+        for (const baseProfiles of baseInvocationProfiles) {
+          importedCalls.push({
+            node: baseType.expression,
+            callsite,
+            invocationKind: 'construct',
+            argumentProfiles: baseProfiles,
+            ...imported,
+          });
+        }
+      } else {
+        unresolvedEager(
+          baseType.expression,
+          'production:eager-class-base-unresolved',
+          callsite,
+        );
+      }
+    }
+    for (const member of classLike.members) {
+      if (
+        ts.isPropertyDeclaration(member)
+        && !hasSyntaxModifier(member, ts.SyntaxKind.StaticKeyword)
+        && member.initializer
+      ) {
+        visit(member.initializer, nextStack);
+      }
+    }
+    if (constructor) {
+      executeCallable(
+        constructor,
+        profiles,
+        nextStack,
+        invocationNode,
+      );
+    }
+  };
+
+  const eagerCallbackPolicy = expression => {
+    const unwrapped = unwrapExpression(expression);
+    if (ts.isIdentifier(unwrapped)) {
+      if (context.resolveBinding(unwrapped.text, unwrapped)) return undefined;
+      if (
+        [
+          'queueMicrotask',
+          'setImmediate',
+          'setInterval',
+          'setTimeout',
+        ].includes(unwrapped.text)
+      ) {
+        return { callbackIndexes: [0], exact: true };
+      }
+      return undefined;
+    }
+    if (
+      !ts.isPropertyAccessExpression(unwrapped)
+      && !ts.isElementAccessExpression(unwrapped)
+    ) {
+      return undefined;
+    }
+    const method = staticPropertyName(unwrapped);
+    if (
+      method === 'nextTick'
+      && ts.isIdentifier(unwrapped.expression)
+      && unwrapped.expression.text === 'process'
+      && !context.resolveBinding('process', unwrapped.expression)
+    ) {
+      return { callbackIndexes: [0], exact: true };
+    }
+    if (
+      [
+        'every',
+        'filter',
+        'find',
+        'findIndex',
+        'findLast',
+        'findLastIndex',
+        'flatMap',
+        'forEach',
+        'map',
+        'reduce',
+        'reduceRight',
+        'some',
+      ].includes(method ?? '')
+    ) {
+      return { callbackIndexes: [0], exact: false };
+    }
+    if (['catch', 'finally', 'then'].includes(method ?? '')) {
+      return {
+        callbackIndexes: method === 'then' ? [0, 1] : [0],
+        exact: false,
+      };
+    }
+    return undefined;
+  };
+
+  const isProvenSafeEagerCall = expression => {
+    const unwrapped = unwrapExpression(expression);
+    if (
+      !ts.isPropertyAccessExpression(unwrapped)
+      && !ts.isElementAccessExpression(unwrapped)
+    ) {
+      return false;
+    }
+    const receiver = unwrapExpression(unwrapped.expression);
+    return (
+      ts.isIdentifier(receiver)
+      && receiver.text === 'Object'
+      && !context.resolveBinding('Object', receiver)
+      && [
+        'freeze',
+        'isExtensible',
+        'isFrozen',
+        'isSealed',
+        'preventExtensions',
+        'seal',
+      ].includes(staticPropertyName(unwrapped) ?? '')
+    );
+  };
+
+  const executeEagerCallbacks = (
+    node,
+    policy,
+    callStack,
+  ) => {
+    let resolvedAll = true;
+    for (const index of policy.callbackIndexes) {
+      const argument = node.arguments[index];
+      if (!argument) continue;
+      if (ts.isSpreadElement(argument)) {
+        resolvedAll = false;
+        continue;
+      }
+      const resolution = localCallableCandidates(argument);
+      if (resolution.callables.length === 0 || resolution.opaque) {
+        resolvedAll = false;
+      }
+      for (const callable of resolution.callables) {
+        executeCallable(
+          callable,
+          [{ kind: 'opaque' }, { kind: 'opaque' }, { kind: 'opaque' }],
+          callStack,
+          node,
+        );
+      }
+    }
+    if (!policy.exact || !resolvedAll) {
+      unresolvedEager(
+        node,
+        'production:eager-scheduled-callback-boundary',
+      );
+    }
+  };
+
+  const localAccessorCandidates = (expression, setter = false) => {
+    if (
+      !ts.isPropertyAccessExpression(expression)
+      && !ts.isElementAccessExpression(expression)
+    ) {
+      return { accessors: [], resolved: false };
+    }
+    const names = staticPropertyNames(expression, context);
+    if (names.length !== 1) return { accessors: [], resolved: false };
+    const name = names[0];
+    const projected = projectedPropertyExpressions(
+      expression.expression,
+      name,
+      undefined,
+      context,
+    );
+    const accessors = projected.filter(candidate =>
+      setter
+        ? ts.isSetAccessorDeclaration(candidate)
+        : ts.isGetAccessorDeclaration(candidate));
+    if (projected.length > 0) {
+      return { accessors, resolved: true };
+    }
+    const receiver = unwrapExpression(expression.expression);
+    let classLike = localClass(receiver);
+    if (!classLike && ts.isIdentifier(receiver)) {
+      const binding = context.resolveBinding(receiver.text, receiver);
+      const values = binding
+        ? bindingExpressionsAtUse(binding, receiver, context)
+        : [];
+      for (const value of values) {
+        const unwrapped = unwrapExpression(value);
+        if (ts.isNewExpression(unwrapped)) {
+          classLike = localClass(unwrapped.expression);
+          if (classLike) break;
+        }
+      }
+    }
+    if (!classLike) return { accessors: [], resolved: false };
+    const classAccessors = classLike.members.filter(member =>
+      member.name
+      && propertyNameText(member.name) === name
+      && (
+        setter
+          ? ts.isSetAccessorDeclaration(member)
+          : ts.isGetAccessorDeclaration(member)
+      ));
+    return {
+      accessors: classAccessors,
+      resolved: classAccessors.length > 0,
+    };
+  };
+
+  const executeDestructuringGetters = (
+    pattern,
+    sourceExpression,
+    callStack,
+    invocationNode,
+  ) => {
+    pattern.elements.forEach((element, index) => {
+      if (ts.isOmittedExpression(element)) return;
+      const property = ts.isObjectBindingPattern(pattern)
+        ? propertyNameText(element.propertyName ?? element.name)
+        : undefined;
+      const projected = projectedPropertyExpressions(
+        sourceExpression,
+        property,
+        ts.isArrayBindingPattern(pattern) ? index : undefined,
+        context,
+      );
+      const getters = projected.filter(candidate =>
+        ts.isGetAccessorDeclaration(candidate));
+      for (const getter of getters) {
+        executeCallable(getter, [], callStack, invocationNode);
+      }
+      if (
+        projected.length === 0
+        && argumentProfile(sourceExpression).kind === 'opaque'
+      ) {
+        unresolvedEager(
+          invocationNode,
+          'production:eager-destructuring-access-unresolved',
+        );
+      }
+      if (
+        !ts.isIdentifier(element.name)
+        && projected.length === 1
+        && !ts.isGetAccessorDeclaration(projected[0])
+      ) {
+        executeDestructuringGetters(
+          element.name,
+          projected[0],
+          callStack,
+          invocationNode,
+        );
+      }
+    });
+  };
+
+  const decoratorsOf = node =>
+    ts.canHaveDecorators(node)
+      ? (ts.getDecorators(node) ?? [])
+      : [];
+
+  const executeDecorators = (decoratedNode, callStack, invocationFrame) => {
+    for (const decorator of decoratorsOf(decoratedNode)) {
+      visit(decorator.expression, callStack, invocationFrame);
+      const event = beginEagerEvent(decorator, 'decorator');
+      const { callsite } = event;
+      if (ts.isCallExpression(unwrapExpression(decorator.expression))) {
+        unresolvedEager(
+          decorator,
+          'production:eager-decorator-factory-result-unresolved',
+          callsite,
+        );
+        accountEagerEvent(event, 'decorator-accounted');
+        continue;
+      }
+      const imported = importedCallee(decorator.expression);
+      const resolution = imported
+        ? { callables: [], opaque: false }
+        : localCallableCandidates(decorator.expression);
+      if (
+        imported
+        && !imported.unsupportedMember
+        && !imported.boundOpaque
+      ) {
+        importedCalls.push({
+          node: decorator,
+          callsite,
+          invocationKind: 'call',
+          argumentProfiles: [{ kind: 'defined' }],
+          ...imported,
+        });
+      } else if (resolution.callables.length > 0) {
+        for (const callable of resolution.callables) {
+          executeCallable(
+            callable,
+            [{ kind: 'defined' }],
+            callStack,
+            decorator,
+          );
+        }
+        if (resolution.opaque) {
+          unresolvedEager(
+            decorator,
+            'production:eager-decorator-branch-unresolved',
+            callsite,
+          );
+        }
+      } else {
+        unresolvedEager(
+          decorator,
+          'production:eager-decorator-application-unresolved',
+          callsite,
+        );
+      }
+      accountEagerEvent(event, 'decorator-accounted');
+    }
+  };
+
+  const visit = (
+    node,
+    callStack = new Set(),
+    invocationFrame = new Map(),
+  ) => {
+    scanBudget?.check('eager-module-analysis');
+    if (ts.isFunctionLike(node)) return;
+    if (
+      ts.isIfStatement(node)
+      && isInexactModuleMainGuard(node.expression)
+    ) {
+      unresolvedEager(
+        node.expression,
+        'production:eager-main-guard-unresolved',
+      );
+    }
+    if (ts.isIfStatement(node) && isModuleMainGuard(node.expression)) {
+      visit(node.expression, callStack, invocationFrame);
+      if (node.elseStatement) {
+        visit(node.elseStatement, callStack, invocationFrame);
+      }
+      return;
+    }
+    if (
+      ts.isBinaryExpression(node)
+      && node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+      && isModuleMainGuard(node.left)
+    ) {
+      visit(node.left, callStack, invocationFrame);
+      return;
+    }
+    if (
+      ts.isConditionalExpression(node)
+      && isModuleMainGuard(node.condition)
+    ) {
+      visit(node.condition, callStack, invocationFrame);
+      visit(node.whenFalse, callStack, invocationFrame);
+      return;
+    }
+    if (
+      ts.isVariableDeclaration(node)
+      && !ts.isIdentifier(node.name)
+      && node.initializer
+    ) {
+      visit(node.initializer, callStack, invocationFrame);
+      executeDestructuringGetters(
+        node.name,
+        node.initializer,
+        callStack,
+        node,
+      );
+      visitBindingDefaults(
+        node.name,
+        argumentProfile(node.initializer),
+        callStack,
+        invocationFrame,
+        node,
+      );
+      return;
+    }
+    if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) {
+      executeDecorators(node, callStack, invocationFrame);
+      for (const heritage of node.heritageClauses ?? []) {
+        for (const type of heritage.types) {
+          visit(type.expression, callStack, invocationFrame);
+        }
+      }
+      for (const member of node.members) {
+        executeDecorators(member, callStack, invocationFrame);
+        for (const parameter of member.parameters ?? []) {
+          executeDecorators(parameter, callStack, invocationFrame);
+        }
+        if (member.name && ts.isComputedPropertyName(member.name)) {
+          visit(member.name.expression, callStack, invocationFrame);
+        }
+        if (ts.isClassStaticBlockDeclaration(member)) {
+          visit(member.body, callStack, invocationFrame);
+        } else if (
+          ts.isPropertyDeclaration(member)
+          && hasSyntaxModifier(member, ts.SyntaxKind.StaticKeyword)
+          && member.initializer
+        ) {
+          visit(member.initializer, callStack, invocationFrame);
+        }
+      }
+      return;
+    }
+    if (
+      ts.isPropertyAccessExpression(node)
+      || ts.isElementAccessExpression(node)
+    ) {
+      const event = beginEagerEvent(node, 'property');
+      const assignment = ts.isBinaryExpression(node.parent)
+        && node.parent.left === node
+        && node.parent.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+        && node.parent.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+        ? node.parent
+        : undefined;
+      const setter = Boolean(assignment);
+      const accessorResolution = localAccessorCandidates(node, setter);
+      for (const accessor of accessorResolution.accessors) {
+        executeCallable(
+          accessor,
+          assignment ? [argumentProfile(assignment.right)] : [],
+          callStack,
+          node,
+        );
+      }
+      const receiver = unwrapExpression(node.expression);
+      const ambientReceiver = ts.isIdentifier(receiver)
+        && [
+          'Array',
+          'BigInt',
+          'Boolean',
+          'Date',
+          'Error',
+          'JSON',
+          'Math',
+          'Number',
+          'Object',
+          'Promise',
+          'Reflect',
+          'RegExp',
+          'String',
+          'console',
+          'module',
+          'process',
+        ].includes(receiver.text)
+        && !context.resolveBinding(receiver.text, receiver);
+      const importMeta = ts.isMetaProperty(receiver);
+      const resolvedCapability = Boolean(
+        trustedFunction(node, context)
+        || trustedNamespace(node, context)
+        || importedCallee(node)
+      );
+      if (
+        !accessorResolution.resolved
+        && !ambientReceiver
+        && !importMeta
+        && !resolvedCapability
+        && !ts.isLiteralExpression(receiver)
+        && !ts.isArrayLiteralExpression(receiver)
+        && !ts.isObjectLiteralExpression(receiver)
+      ) {
+        unresolvedEager(
+          node,
+          setter
+            ? 'production:eager-property-set-unresolved'
+            : 'production:eager-property-read-unresolved',
+        );
+      }
+      accountEagerEvent(event, 'property-accounted');
+    }
+    if (ts.isTaggedTemplateExpression(node)) {
+      const event = beginEagerEvent(node, 'tag');
+      const { callsite } = event;
+      const profiles = [
+        { kind: 'defined' },
+        ...(
+          ts.isTemplateExpression(node.template)
+            ? node.template.templateSpans.map(span =>
+              argumentProfile(span.expression))
+            : []
+        ),
+      ];
+      const imported = importedCallee(node.tag);
+      const resolution = imported
+        ? { callables: [], opaque: false }
+        : localCallableCandidates(node.tag);
+      if (imported?.unsupportedMember || imported?.boundOpaque) {
+        unresolvedEager(
+          node,
+          'production:eager-imported-tag-unresolved',
+          callsite,
+        );
+      } else if (imported) {
+        importedCalls.push({
+          node,
+          callsite,
+          invocationKind: 'call',
+          argumentProfiles: profiles,
+          ...imported,
+        });
+      } else if (resolution.callables.length > 0) {
+        for (const callable of resolution.callables) {
+          executeCallable(callable, profiles, callStack, node);
+        }
+        if (resolution.opaque) {
+          unresolvedEager(
+            node,
+            'production:eager-tag-branch-unresolved',
+            callsite,
+          );
+        }
+      } else {
+        unresolvedEager(
+          node,
+          'production:eager-tag-unresolved',
+          callsite,
+        );
+      }
+      accountEagerEvent(event, 'tag-accounted');
+    }
+    if (ts.isCallExpression(node)) {
+      const event = beginEagerEvent(node, 'call');
+      const { callsite } = event;
+      const invocation = normalizedFunctionInvocation(node, context);
+      if (
+        (
+          invocation?.trusted
+          && (
+            (
+              invocation.trusted.module === 'fs'
+              || invocation.trusted.module === 'unknown-builtin'
+            )
+            && WRITE_SINKS.has(invocation.trusted.name)
+          )
+        )
+        || (
+          (
+            ts.isPropertyAccessExpression(node.expression)
+            || ts.isElementAccessExpression(node.expression)
+          )
+          && SPAWN_METHODS.has(staticPropertyName(node.expression) ?? '')
+        )
+      ) {
+        writerCandidateCallsites.add(callsite);
+      }
+      if (invocation?.trusted?.module === 'child_process') {
+        childCandidateCallsites.add(callsite);
+      }
+      if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+        const specifier = literalText(node.arguments[0]);
+        if (specifier) {
+          eagerLoads.push({ node, callsite, specifier, kind: 'dynamic-import' });
+        } else {
+          unresolvedLoads.push({ node, callsite, kind: 'dynamic-import' });
+        }
+      } else if (trustedBuiltinLoader(node.expression, context)) {
+        const specifier = literalText(node.arguments[0]);
+        if (specifier) {
+          eagerLoads.push({ node, callsite, specifier, kind: 'commonjs-require' });
+        } else {
+          unresolvedLoads.push({ node, callsite, kind: 'commonjs-require' });
+        }
+      }
+
+      const profiles = invocationProfiles(node);
+      const imported = importedCallee(node.expression);
+      const callableResolution = imported
+        ? { callables: [], opaque: false }
+        : localCallableCandidates(node.expression);
+      let accounted = Boolean(
+        invocation?.trusted
+        || node.expression.kind === ts.SyntaxKind.ImportKeyword
+        || trustedBuiltinLoader(node.expression, context)
+        || isProvenSafeEagerCall(node.expression)
+      );
+      const callbackPolicy = eagerCallbackPolicy(node.expression);
+      if (callbackPolicy) {
+        executeEagerCallbacks(node, callbackPolicy, callStack);
+        accounted = true;
+      } else if (imported?.unsupportedMember || imported?.boundOpaque) {
+        unresolvedEager(
+          node,
+          imported.unsupportedMember
+            ? 'production:eager-imported-member-call-unresolved'
+            : 'production:eager-imported-bound-call-unresolved',
+          callsite,
+        );
+        accounted = true;
+      } else if (imported) {
+        importedCalls.push({
+          node,
+          callsite,
+          invocationKind: 'call',
+          argumentProfiles: profiles,
+          ...imported,
+        });
+        accounted = true;
+      } else if (callableResolution.callables.length > 0) {
+        for (const callable of callableResolution.callables) {
+          executeCallable(
+            callable,
+            profiles,
+            callStack,
+            node,
+          );
+        }
+        accounted = true;
+        if (callableResolution.opaque) {
+          unresolvedEager(
+            node,
+            'production:eager-call-branch-unresolved',
+            callsite,
+          );
+        }
+      }
+
+      if (
+        !invocation?.trusted
+        && node.arguments.some(argument => {
+          const capability = trustedCapability(argument, context);
+          return capability?.module === 'fs'
+            || capability?.module === 'child_process'
+            || capability?.module === 'unknown-builtin';
+        })
+      ) {
+        unresolvedAuthorityCalls.push({ node, callsite });
+      }
+      const parameterBinding = ts.isIdentifier(node.expression)
+        ? context.resolveBinding(node.expression.text, node.expression)
+        : undefined;
+      if (
+        !accounted
+        && parameterBinding
+        && invocationFrame.has(parameterBinding.id)
+      ) {
+        const profile = invocationFrame.get(parameterBinding.id);
+        if (
+          profile.kind === 'callable'
+          || profile.kind === 'opaque'
+          || profile.kind === 'spread'
+          || profile.kind === 'union'
+        ) {
+          unresolvedEager(
+            node,
+            'production:eager-callback-invocation-unresolved',
+            callsite,
+          );
+        }
+        accounted = true;
+      }
+      if (
+        !accounted
+        && node.expression.kind === ts.SyntaxKind.SuperKeyword
+      ) {
+        accounted = true;
+      }
+      if (
+        !accounted
+        && profiles.some(profile =>
+          profile.kind === 'callable'
+          || (
+            profile.kind === 'union'
+            && profile.options.some(option => option.kind === 'callable')
+          ))
+      ) {
+        unresolvedEager(
+          node,
+          'production:eager-hof-callback-unresolved',
+          callsite,
+        );
+        accounted = true;
+      }
+      if (!accounted) {
+        unresolvedEager(
+          node,
+          ts.isCallExpression(unwrapExpression(node.expression))
+            ? 'production:eager-returned-callable-unresolved'
+            : 'production:eager-call-unresolved',
+          callsite,
+        );
+      }
+      accountEagerEvent(event, 'call-accounted');
+    } else if (ts.isNewExpression(node)) {
+      const event = beginEagerEvent(node, 'construct');
+      const { callsite } = event;
+      const trusted = trustedFunction(node.expression, context);
+      const name = calleeName(node.expression);
+      if (
+        (trusted?.module === 'fs' && trusted.name === 'WriteStream')
+        || (name && /(?:Database|MemoryStore|Sqlite)/i.test(name))
+      ) {
+        writerCandidateCallsites.add(callsite);
+      }
+      const profiles = invocationProfiles(node);
+      const imported = importedCallee(node.expression);
+      const ambientPromise = ts.isIdentifier(node.expression)
+        && node.expression.text === 'Promise'
+        && !context.resolveBinding('Promise', node.expression);
+      if (imported?.unsupportedMember || imported?.boundOpaque) {
+        unresolvedEager(
+          node,
+          imported.unsupportedMember
+            ? 'production:eager-imported-member-construction-unresolved'
+            : 'production:eager-imported-bound-construction-unresolved',
+          callsite,
+        );
+      } else if (imported) {
+        importedCalls.push({
+          node,
+          callsite,
+          invocationKind: 'construct',
+          argumentProfiles: profiles,
+          ...imported,
+        });
+      } else if (ambientPromise) {
+        const executor = node.arguments?.[0];
+        const resolution = executor && !ts.isSpreadElement(executor)
+          ? localCallableCandidates(executor)
+          : { callables: [], opaque: true };
+        for (const callable of resolution.callables) {
+          executeCallable(
+            callable,
+            [{ kind: 'opaque' }, { kind: 'opaque' }],
+            callStack,
+            node,
+          );
+        }
+        if (resolution.callables.length === 0 || resolution.opaque) {
+          unresolvedEager(
+            node,
+            'production:eager-promise-executor-unresolved',
+            callsite,
+          );
+        }
+      } else {
+        const classLike = localClass(node.expression);
+        if (classLike) {
+          executeClassConstruction(
+            classLike,
+            profiles,
+            callStack,
+            node,
+          );
+        } else if (!trusted) {
+          unresolvedEager(
+            node,
+            'production:eager-construction-unresolved',
+            callsite,
+          );
+        }
+      }
+      if (
+        node.arguments?.some(argument => {
+          const capability = trustedCapability(argument, context);
+          return capability?.module === 'fs'
+            || capability?.module === 'child_process'
+            || capability?.module === 'unknown-builtin';
+        })
+      ) {
+        unresolvedAuthorityCalls.push({ node, callsite });
+      }
+      accountEagerEvent(event, 'construct-accounted');
+    }
+    node.forEachChild(child => visit(child, callStack, invocationFrame));
+  };
+
+  const executeModule = () => {
+    for (const statement of sourceFile.statements) visit(statement);
+  };
+  const executeExport = (
+    exportName,
+    invocationKind = 'call',
+    argumentProfiles = [],
+  ) => {
+    const exported = localExports.get(exportName);
+    if (!exported) {
+      return {
+        executed: false,
+        reExport: reExports.get(exportName),
+        starReExports: [...starReExports],
+      };
+    }
+    const classLike = localClass(exported);
+    if (classLike) {
+      if (invocationKind !== 'construct') return { executed: false };
+      executeClassConstruction(
+        classLike,
+        argumentProfiles,
+        new Set(),
+        exported,
+      );
+      return { executed: true };
+    }
+    const callableResolution = localCallableCandidates(exported);
+    if (callableResolution.callables.length === 0) return { executed: false };
+    for (const callable of callableResolution.callables) {
+      const key = callable.getStart(sourceFile);
+      if (executedCallables.has(key)) continue;
+      executedCallables.add(key);
+      executeCallable(
+        callable,
+        argumentProfiles,
+        new Set(),
+        exported,
+      );
+    }
+    if (callableResolution.opaque) {
+      unresolvedEager(
+        exported,
+        'production:eager-export-call-branch-unresolved',
+      );
+    }
+    return { executed: true };
+  };
+  const drainEvents = () => {
+    for (const event of eagerEventAccounting.values()) {
+      if (!event.outcome) {
+        throw new Error(
+          '[E_HERMETIC_EAGER_ACCOUNTING]'
+          + ` unaccounted ${event.kind}:${event.callsite}`,
+        );
+      }
+    }
+    const events = {
+      importedCalls: importedCalls.slice(importedCallCursor),
+      eagerLoads: eagerLoads.slice(eagerLoadCursor),
+      unresolvedLoads: unresolvedLoads.slice(unresolvedLoadCursor),
+      unresolvedAuthorityCalls:
+        unresolvedAuthorityCalls.slice(unresolvedAuthorityCursor),
+      unresolvedEagerEvents:
+        unresolvedEagerEvents.slice(unresolvedEagerEventCursor),
+    };
+    importedCallCursor = importedCalls.length;
+    eagerLoadCursor = eagerLoads.length;
+    unresolvedLoadCursor = unresolvedLoads.length;
+    unresolvedAuthorityCursor = unresolvedAuthorityCalls.length;
+    unresolvedEagerEventCursor = unresolvedEagerEvents.length;
+    return events;
+  };
+
+  return {
+    sourceFile,
+    callsites,
+    writerCandidateCallsites,
+    childCandidateCallsites,
+    executeModule,
+    executeExport,
+    drainEvents,
+  };
+}
+
+function summarizeEagerPlan(plan, outcome) {
+  const sourceFile = plan.sourceFile;
+  const events = plan.drainEvents();
+  const location = event => ({
+    line: lineFor(sourceFile, event.node),
+    position: event.node.getStart(sourceFile),
+    callsite: event.callsite,
+  });
+  return {
+    callsites: [...plan.callsites],
+    writerCandidateCallsites: [...plan.writerCandidateCallsites],
+    childCandidateCallsites: [...plan.childCandidateCallsites],
+    events: {
+      eagerLoads: events.eagerLoads.map(event => ({
+        ...location(event),
+        specifier: event.specifier,
+        kind: event.kind,
+      })),
+      unresolvedLoads: events.unresolvedLoads.map(event => ({
+        ...location(event),
+        kind: event.kind,
+      })),
+      unresolvedAuthorityCalls: events.unresolvedAuthorityCalls.map(event =>
+        location(event)),
+      unresolvedEagerEvents: events.unresolvedEagerEvents.map(event => ({
+        ...location(event),
+        effect: event.effect,
+      })),
+      importedCalls: events.importedCalls.map(event => ({
+        ...location(event),
+        specifier: event.specifier,
+        exportName: event.exportName,
+        invocationKind: event.invocationKind,
+        argumentProfiles: event.argumentProfiles ?? [],
+      })),
+    },
+    outcome: outcome
+      ? {
+        executed: outcome.executed,
+        reExport: outcome.reExport,
+        starReExports: outcome.starReExports,
+      }
+      : undefined,
+  };
+}
+
+function collectProductionGraph(
+  roots,
+  rootDir,
+  realRoot,
+  isKnownExternal,
+  scanBudget,
+) {
+  const records = new Map();
+  const queuedModules = new Set();
+  const executedExports = new Set();
+  const exportReplanCounts = new Map();
+  const work = [];
+  const unresolvedEdges = [];
+  let workIndex = 0;
+  let edgeCount = 0;
+
+  const enqueueModule = (file, depth = 0) => {
+    if (records.has(file) || queuedModules.has(file)) return;
+    queuedModules.add(file);
+    work.push({ kind: 'module', file, depth });
+  };
+  for (const root of roots) enqueueModule(root.target, 0);
+
+  const addUnresolved = ({
+    file,
+    specifier,
+    line,
+    position,
+    effect,
+    callsite,
+  }) => {
+    unresolvedEdges.push({
+      file,
+      specifier,
+      line,
+      position,
+      effect,
+      callsite,
+    });
+  };
+  const completeStarBranch = (group, canonicalBinding) => {
+    if (canonicalBinding) group.resolvedBindings.add(canonicalBinding);
+    group.pending -= 1;
+    if (group.pending !== 0 || group.reported) return;
+    group.reported = true;
+    if (group.resolvedBindings.size === 1) return;
+    addUnresolved({
+      ...group.origin,
+      specifier: `${group.origin.specifier}#${group.exportName}`,
+      effect: group.resolvedBindings.size === 0
+        ? 'production:eager-imported-call-unresolved-export'
+        : 'production:eager-ambiguous-star-export',
+    });
+  };
+
+  const resolveGraphEdge = (record, event, depth, effect) => {
+    edgeCount += 1;
+    if (edgeCount > MAX_TEST_SURFACE_EDGES) {
+      throw new Error(
+        '[E_HERMETIC_GRAPH_BUDGET] production edge budget exceeded'
+        + ` (${MAX_TEST_SURFACE_EDGES})`,
+      );
+    }
+    const imported = resolveLocalSupportImport(
+      record.file,
+      event.specifier,
+      realRoot,
+    );
+    if (imported) {
+      record.outgoing.add(normalizeRelative(relative(realRoot, imported)));
+      enqueueModule(imported, depth + 1);
+      return imported;
+    }
+    if (isKnownExternal(event.specifier, record.file)) {
+      record.outgoing.add(`external:${event.specifier}`);
+      return undefined;
+    }
+    record.outgoing.add(`unresolved:${event.specifier}`);
+    addUnresolved({
+      file: record.file,
+      specifier: event.specifier,
+      line: event.line,
+      position: event.position,
+      effect,
+      callsite: event.callsite,
+    });
+    return undefined;
+  };
+
+  const absorbPlanSummary = (record, summary) => {
+    for (const callsite of summary.callsites) record.callsites.add(callsite);
+    for (const callsite of summary.writerCandidateCallsites) {
+      record.writerCandidateCallsites.add(callsite);
+    }
+    for (const callsite of summary.childCandidateCallsites) {
+      record.childCandidateCallsites.add(callsite);
+    }
+  };
+
+  const enqueuePlanEvents = (record, summary, depth) => {
+    const { events } = summary;
+    for (const load of events.eagerLoads) {
+      resolveGraphEdge(
+        record,
+        load,
+        depth,
+        `production:eager-${load.kind}-unresolved`,
+      );
+    }
+    for (const load of events.unresolvedLoads) {
+      addUnresolved({
+        file: record.file,
+        specifier: `<dynamic:${load.kind}>`,
+        line: load.line,
+        position: load.position,
+        effect: `production:eager-${load.kind}-expression`,
+        callsite: load.callsite,
+      });
+    }
+    for (const call of events.unresolvedAuthorityCalls) {
+      addUnresolved({
+        file: record.file,
+        specifier: '<opaque-authority-call>',
+        line: call.line,
+        position: call.position,
+        effect: 'production:eager-opaque-authority-injection',
+        callsite: call.callsite,
+      });
+    }
+    for (const event of events.unresolvedEagerEvents) {
+      addUnresolved({
+        file: record.file,
+        specifier: '<eager-runtime-event>',
+        line: event.line,
+        position: event.position,
+        effect: event.effect,
+        callsite: event.callsite,
+      });
+    }
+    for (const importedCall of events.importedCalls) {
+      const target = resolveGraphEdge(
+        record,
+        importedCall,
+        depth,
+        'production:eager-imported-call-unresolved-module',
+      );
+      if (!target) continue;
+      work.push({
+        kind: 'export-call',
+        file: target,
+        exportName: importedCall.exportName ?? 'default',
+        invocationKind: importedCall.invocationKind,
+        argumentProfiles: importedCall.argumentProfiles ?? [],
+        origin: {
+          file: record.file,
+          specifier: importedCall.specifier,
+          line: importedCall.line,
+          position: importedCall.position,
+          callsite: importedCall.callsite,
+        },
+        depth: depth + 1,
+      });
+    }
+  };
+
+  while (workIndex < work.length) {
+    scanBudget.check('production-graph', true);
+    const task = work[workIndex];
+    workIndex += 1;
+    if (task.depth > MAX_TEST_SURFACE_DEPTH) {
+      throw new Error(
+        '[E_HERMETIC_GRAPH_BUDGET] production graph depth budget exceeded'
+        + ` (${MAX_TEST_SURFACE_DEPTH})`,
+      );
+    }
+    if (task.kind === 'module') {
+      if (records.has(task.file)) continue;
+      if (records.size >= MAX_TEST_SURFACE_FILES) {
+        throw new Error(
+          '[E_HERMETIC_GRAPH_BUDGET] production module budget exceeded'
+          + ` (${MAX_TEST_SURFACE_FILES})`,
+        );
+      }
+      const content = canonicalSourceText(readFileSync(task.file, 'utf-8'));
+      const inventoryContent = canonicalProductionInventoryContent(
+        task.file,
+        content,
+      );
+      const contentDigest =
+        `${inventoryContent.length}:${policyDigest(inventoryContent)}`;
+      const summaryKey = `module\0${task.file}\0${contentDigest}`;
+      let summary = EAGER_SUMMARY_CACHE.get(summaryKey);
+      let parsed;
+      if (!summary) {
+        const plan = createEagerModulePlan(
+          content,
+          task.file,
+          normalizeRelative(relative(rootDir, task.file)),
+          scanBudget,
+        );
+        plan.executeModule();
+        parsed = staticModuleSpecifiers(
+          content,
+          task.file,
+          plan.sourceFile,
+          scanBudget,
+        );
+        summary = summarizeEagerPlan(plan);
+        cacheEagerSummary(summaryKey, summary);
+      } else {
+        parsed = staticModuleSpecifiers(
+          content,
+          task.file,
+          undefined,
+          scanBudget,
+        );
+      }
+      const record = {
+        file: task.file,
+        content,
+        contentDigest,
+        parsed,
+        outgoing: new Set(),
+        callsites: new Set(),
+        writerCandidateCallsites: new Set(),
+        childCandidateCallsites: new Set(),
+      };
+      records.set(task.file, record);
+      for (const edge of parsed.edges.filter(edge => edge.kind === 'static')) {
+        resolveGraphEdge(
+          record,
+          edge,
+          task.depth,
+          'production:unresolved-static-import',
+        );
+      }
+      absorbPlanSummary(record, summary);
+      enqueuePlanEvents(record, summary, task.depth);
+      continue;
+    }
+
+    const record = records.get(task.file);
+    if (!record) {
+      enqueueModule(task.file, task.depth);
+      work.push(task);
+      continue;
+    }
+    const invocationProfileKey = policyDigest(
+      JSON.stringify(task.argumentProfiles ?? []),
+    );
+    const exportKey =
+      `${task.file}\0${record.contentDigest}\0${task.exportName}`
+      + `\0${task.invocationKind ?? 'call'}\0${invocationProfileKey}`;
+    if (task.starGroup) {
+      const starVisitKey = `${task.file}\0${task.exportName}`
+        + `\0${task.invocationKind ?? 'call'}\0${invocationProfileKey}`;
+      if (task.starGroup.visited.has(starVisitKey)) {
+        completeStarBranch(task.starGroup);
+        continue;
+      }
+      task.starGroup.visited.add(starVisitKey);
+    } else {
+      if (executedExports.has(exportKey)) continue;
+      executedExports.add(exportKey);
+    }
+    const summaryKey = `export\0${exportKey}`;
+    let summary = EAGER_SUMMARY_CACHE.get(summaryKey);
+    if (!summary) {
+      const replanCount = (exportReplanCounts.get(record.file) ?? 0) + 1;
+      exportReplanCounts.set(record.file, replanCount);
+      if (replanCount > MAX_EAGER_EXPORT_REPLANS_PER_MODULE) {
+        addUnresolved({
+          ...task.origin,
+          specifier: `${task.origin.specifier}#${task.exportName}`,
+          effect: 'production:eager-export-analysis-budget',
+        });
+        continue;
+      }
+      const plan = createEagerModulePlan(
+        record.content,
+        record.file,
+        normalizeRelative(relative(rootDir, record.file)),
+        scanBudget,
+      );
+      const outcome = plan.executeExport(
+        task.exportName,
+        task.invocationKind ?? 'call',
+        task.argumentProfiles ?? [],
+      );
+      summary = summarizeEagerPlan(plan, outcome);
+      cacheEagerSummary(summaryKey, summary);
+    }
+    const outcome = summary.outcome;
+    absorbPlanSummary(record, summary);
+    if (outcome.executed) {
+      enqueuePlanEvents(record, summary, task.depth);
+      if (task.starGroup) {
+        completeStarBranch(
+          task.starGroup,
+          `${task.file}#${task.exportName}`,
+        );
+      }
+      continue;
+    }
+    if (outcome.reExport) {
+      const target = resolveGraphEdge(
+        record,
+        {
+          ...outcome.reExport,
+          line: task.origin.line,
+          position: task.origin.position,
+          callsite: task.origin.callsite,
+        },
+        task.depth,
+        'production:eager-reexport-unresolved-module',
+      );
+      if (target) {
+        work.push({
+          ...task,
+          file: target,
+          exportName: outcome.reExport.exportName,
+          depth: task.depth + 1,
+        });
+      } else if (task.starGroup) {
+        completeStarBranch(task.starGroup);
+      }
+      continue;
+    }
+    if (outcome.starReExports?.length > 0) {
+      const targets = [];
+      for (const specifier of outcome.starReExports) {
+        const target = resolveGraphEdge(
+          record,
+          {
+            specifier,
+            line: task.origin.line,
+            position: task.origin.position,
+            callsite: task.origin.callsite,
+          },
+          task.depth,
+          'production:eager-star-reexport-unresolved-module',
+        );
+        if (target) {
+          targets.push({
+            ...task,
+            file: target,
+            depth: task.depth + 1,
+          });
+        }
+      }
+      if (task.starGroup) {
+        if (targets.length === 0) {
+          completeStarBranch(task.starGroup);
+        } else {
+          task.starGroup.pending += targets.length - 1;
+        }
+      } else if (targets.length > 0) {
+        const starGroup = {
+          pending: targets.length,
+          resolvedBindings: new Set(),
+          visited: new Set(),
+          reported: false,
+          origin: task.origin,
+          exportName: task.exportName,
+        };
+        for (const targetTask of targets) targetTask.starGroup = starGroup;
+      } else {
+        addUnresolved({
+          ...task.origin,
+          specifier: `${task.origin.specifier}#${task.exportName}`,
+          effect: 'production:eager-imported-call-unresolved-export',
+        });
+      }
+      work.push(...targets);
+      continue;
+    }
+    if (task.starGroup) {
+      completeStarBranch(task.starGroup);
+    } else {
+      addUnresolved({
+        ...task.origin,
+        specifier: `${task.origin.specifier}#${task.exportName}`,
+        effect: 'production:eager-imported-call-unresolved-export',
+      });
+    }
+  }
+
+  return {
+    records: [...records.values()]
+      .sort((left, right) => left.file.localeCompare(right.file)),
+    unresolvedEdges,
+  };
+}
+
+function vitestSetupEntrypoints(rootDir, realRoot, scanBudget) {
+  scanBudget.check('vitest-config-discovery', true);
+  const configs = readdirSync(rootDir)
+    .filter(name => /^vitest(?:\.[^.]+)*\.config\.(?:[cm]?[jt]s)$/.test(name))
+    .sort();
+  const setupFiles = [];
+  const queue = configs.map(configName => realpathSync(join(rootDir, configName)));
+  const seenConfigs = new Set();
+  while (queue.length > 0) {
+    scanBudget.check('vitest-config-graph', true);
+    const configPath = queue.shift();
+    if (seenConfigs.has(configPath)) continue;
+    seenConfigs.add(configPath);
+    const content = canonicalSourceText(readFileSync(configPath, 'utf-8'));
+    const sourceFile = ts.createSourceFile(
+      configPath,
+      content,
+      ts.ScriptTarget.Latest,
+      true,
+      sourceKind(configPath),
+    );
+    const analysisContext = createAnalysisContext(sourceFile, scanBudget);
+    const visit = node => {
+      scanBudget.check('vitest-config-analysis');
+      if (
+        ts.isPropertyAssignment(node)
+        && ['setupFiles', 'globalSetup'].includes(propertyNameText(node.name))
+      ) {
+        const collectStrings = (value, bindingStack = new Set()) => {
+          const unwrapped = unwrapExpression(value);
+          if (ts.isStringLiteralLike(unwrapped)) {
+            const normalized = unwrapped.text.replace('<rootDir>', rootDir);
+            const resolved = resolveLocalSupportImport(
+              configPath,
+              normalized.startsWith('.') ? normalized : `./${normalized}`,
+              realRoot,
+            );
+            if (resolved) setupFiles.push(resolved);
+            return;
+          }
+          if (ts.isIdentifier(unwrapped)) {
+            const binding = analysisContext.resolveBinding(unwrapped.text, unwrapped);
+            if (!binding || bindingStack.has(binding.id)) return;
+            const nextStack = new Set(bindingStack);
+            nextStack.add(binding.id);
+            for (const candidate of bindingExpressionsAtUse(
+              binding,
+              unwrapped,
+              analysisContext,
+            )) {
+              collectStrings(candidate, nextStack);
+            }
+            return;
+          }
+          unwrapped.forEachChild(child => collectStrings(child, bindingStack));
+        };
+        collectStrings(node.initializer);
+        return;
+      }
+      node.forEachChild(visit);
+    };
+    sourceFile.forEachChild(visit);
+    for (const edge of staticModuleSpecifiers(
+      content,
+      configPath,
+      sourceFile,
+      scanBudget,
+    ).edges) {
+      const imported = resolveLocalSupportImport(
+        configPath,
+        edge.specifier,
+        realRoot,
+      );
+      if (imported && !seenConfigs.has(imported)) queue.push(imported);
+    }
+  }
+  return [...new Set(setupFiles)];
+}
+
+function collectTestSurface(testsDir, rootDir, scanBudget) {
+  const realRoot = realpathSync(rootDir);
+  const realTestsDir = realpathSync(testsDir);
+  const setupEntrypoints = vitestSetupEntrypoints(rootDir, realRoot, scanBudget);
+  const setupSet = new Set(setupEntrypoints);
+  const entrypoints = [...collectFiles(testsDir, [], scanBudget), ...setupEntrypoints]
+    .map(file => realpathSync(file));
+  const queue = [...new Set(entrypoints)]
+    .sort()
+    .map(file => ({ file, depth: 0 }));
+  let queueIndex = 0;
+  let edgeCount = 0;
+  let nodeCount = 0;
+  let nextProgressAt = 500;
+  const seen = new Set();
+  const files = [];
+  const unresolvedEdges = [];
+  const productionDependencies = new Map();
+  const rootManifestPath = join(rootDir, 'package.json');
+  const rootManifestOutcome = readPackageManifest(rootManifestPath);
+  const rootManifest = rootManifestOutcome.manifest;
+  if (rootManifestOutcome.status === 'malformed') {
+    unresolvedEdges.push({
+      file: rootManifestPath,
+      specifier: 'package.json',
+      line: 1,
+      position: 0,
+      effect: 'test-support:unresolved-manifest',
+    });
+  }
+  const externalPackages = new Set(Object.keys({
+    ...(rootManifest.dependencies ?? {}),
+    ...(rootManifest.devDependencies ?? {}),
+    ...(rootManifest.optionalDependencies ?? {}),
+    ...(rootManifest.peerDependencies ?? {}),
+  }));
+  const manifestDependencyCache = new Map();
+  const malformedManifests = new Set();
+  const dependenciesForFile = fromFile => {
+    let directory = dirname(fromFile);
+    while (true) {
+      const manifestPath = join(directory, 'package.json');
+      if (manifestPath !== rootManifestPath && existsSync(manifestPath)) {
+        let outcome = manifestDependencyCache.get(manifestPath);
+        if (!outcome) {
+          outcome = readPackageManifest(manifestPath);
+          manifestDependencyCache.set(manifestPath, outcome);
+        }
+        if (
+          outcome.status === 'malformed'
+          && !malformedManifests.has(manifestPath)
+        ) {
+          malformedManifests.add(manifestPath);
+          unresolvedEdges.push({
+            file: manifestPath,
+            specifier: 'package.json',
+            line: 1,
+            position: 0,
+            effect: 'test-support:unresolved-manifest',
+          });
+        }
+        if (outcome.status === 'valid') {
+          return new Set([
+            ...externalPackages,
+            ...Object.keys({
+              ...(outcome.manifest.dependencies ?? {}),
+              ...(outcome.manifest.devDependencies ?? {}),
+              ...(outcome.manifest.optionalDependencies ?? {}),
+              ...(outcome.manifest.peerDependencies ?? {}),
+            }),
+          ]);
+        }
+      }
+      if (directory === realRoot) break;
+      const parent = dirname(directory);
+      if (parent === directory || !isWithinRealRoot(parent, realRoot)) break;
+      directory = parent;
+    }
+    return externalPackages;
+  };
+  const isKnownExternal = (specifier, fromFile = rootManifestPath) => {
+    if (
+      NODE_BUILTIN_MODULES.has(specifier)
+      || specifier.startsWith('node:')
+      || normalizeBuiltinModule(specifier)
+    ) {
+      return true;
+    }
+    const packageName = specifier.startsWith('@')
+      ? specifier.split('/').slice(0, 2).join('/')
+      : specifier.split('/')[0];
+    return dependenciesForFile(fromFile).has(packageName);
+  };
+  const dedicatedTestTree = realTestsDir.split(sep).at(-1) === 'tests';
+  const isSupportFile = file => {
+    if (setupSet.has(file)) return true;
+    const relativeToTests = relative(realTestsDir, file);
+    const insideTests = relativeToTests === ''
+      || (
+        relativeToTests !== '..'
+        && !relativeToTests.startsWith(`..${sep}`)
+        && !relativeToTests.startsWith(sep)
+      );
+    if (dedicatedTestTree && insideTests) return true;
+    const normalized = normalizeRelative(relative(realRoot, file));
+    return /(?:^|\/)(?:__tests__|fixtures?|mocks?|test(?:s|-helpers?|-utils?))(?:\/|$)/i
+      .test(normalized)
+      || /(?:^|[.-])(?:fixture|helper|mock|setup|support|test-util)s?\.[cm]?[jt]sx?$/i
+        .test(file.split(sep).at(-1) ?? '');
+  };
+  while (queueIndex < queue.length) {
+    scanBudget.check('test-support-graph', true);
+    const { file, depth } = queue[queueIndex];
+    queueIndex += 1;
+    if (seen.has(file)) continue;
+    if (seen.size >= MAX_TEST_SURFACE_FILES) {
+      throw new Error(
+        '[E_HERMETIC_GRAPH_BUDGET] test-support file budget exceeded'
+        + ` (${MAX_TEST_SURFACE_FILES})`,
+      );
+    }
+    if (depth > MAX_TEST_SURFACE_DEPTH) {
+      throw new Error(
+        '[E_HERMETIC_GRAPH_BUDGET] test-support depth budget exceeded'
+        + ` (${MAX_TEST_SURFACE_DEPTH})`,
+      );
+    }
+    seen.add(file);
+    files.push(file);
+    const progressElapsedMs = seen.size >= nextProgressAt
+      ? scanBudget.elapsedMs()
+      : 0;
+    if (
+      seen.size >= nextProgressAt
+      && progressElapsedMs >= 3000
+      && process.argv[1]
+      && fileURLToPath(import.meta.url) === resolve(process.argv[1])
+    ) {
+      process.stderr.write(
+        `[hermetic-lint] PROGRESS graph files=${seen.size}`
+        + ` edges=${edgeCount} depth=${depth}`
+        + ` elapsedMs=${Math.round(progressElapsedMs)}\n`,
+      );
+      nextProgressAt += 500;
+    }
+    const imports = [];
+    const parsed = staticModuleSpecifiers(
+      readFileSync(file, 'utf-8'),
+      file,
+      undefined,
+      scanBudget,
+    );
+    nodeCount += parsed.nodeCount;
+    if (nodeCount > MAX_TEST_SURFACE_NODES) {
+      throw new Error(
+        '[E_HERMETIC_GRAPH_BUDGET] test-support AST node budget exceeded'
+        + ` (${MAX_TEST_SURFACE_NODES})`,
+      );
+    }
+    for (const edge of parsed.edges) {
+      edgeCount += 1;
+      if (edgeCount > MAX_TEST_SURFACE_EDGES) {
+        throw new Error(
+          '[E_HERMETIC_GRAPH_BUDGET] test-support edge budget exceeded'
+          + ` (${MAX_TEST_SURFACE_EDGES})`,
+        );
+      }
+      const imported = resolveLocalSupportImport(file, edge.specifier, realRoot);
+      if (imported && isSupportFile(imported)) {
+        if (!seen.has(imported)) imports.push({ file: imported, depth: depth + 1 });
+      } else if (imported) {
+        if (!productionDependencies.has(imported)) {
+          productionDependencies.set(imported, {
+            importer: file,
+            target: imported,
+            ...edge,
+          });
+        }
+      } else if (
+        edge.specifier.startsWith('.')
+        || edge.specifier.startsWith('#')
+        || edge.specifier.startsWith('@/')
+        || edge.specifier.startsWith('~/')
+        || !isKnownExternal(edge.specifier, file)
+      ) {
+        unresolvedEdges.push({
+          file,
+          ...edge,
+          effect: edge.expectedMissing
+            ? 'test-support:expected-missing-import'
+            : undefined,
+          classification: edge.expectedMissing
+            ? 'expected-missing'
+            : undefined,
+        });
+      }
+    }
+    imports.sort((left, right) => left.file.localeCompare(right.file));
+    queue.push(...imports);
+  }
+  const productionGraph = collectProductionGraph(
+    [...productionDependencies.values()],
+    rootDir,
+    realRoot,
+    isKnownExternal,
+    scanBudget,
+  );
+  unresolvedEdges.push(...productionGraph.unresolvedEdges);
+  return {
+    files,
+    unresolvedEdges,
+    productionRecords: productionGraph.records,
+  };
+}
+
+export function scanTestDir(
+  testsDir,
+  allowlist = ALLOWLIST,
+  rootDir = REPO_ROOT,
+  scanState,
+  scanBudget = createScanBudget(),
+) {
+  // Import existence is mutable between exported scanTestDir invocations
+  // (watch mode, generated fixtures, workspace package changes). Keep the
+  // resolver cache scan-local so a previously missing or present edge cannot
+  // survive into a later scan.
+  LOCAL_SUPPORT_IMPORT_CACHE.clear();
+  const surface = collectTestSurface(testsDir, rootDir, scanBudget);
+  const allFiles = scanState
+    ? surface.files.filter(file => {
+      if (scanState.seenFiles.has(file)) return false;
+      scanState.seenFiles.add(file);
+      return true;
+    })
+    : surface.files;
   const violations = [];
+  const registry = surface.unresolvedEdges.filter(edge => {
+    if (!scanState) return true;
+    const key = `${edge.file}\0${edge.position}\0${edge.specifier}`;
+    if (scanState.seenEdges.has(key)) return false;
+    scanState.seenEdges.add(key);
+    return true;
+  }).map(edge => {
+    const relativePath = normalizeRelative(relative(rootDir, edge.file));
+    return {
+      file: relativePath,
+      line: edge.line,
+      effect: edge.effect ?? 'test-support:unresolved-import',
+      targetProvenance: edge.classification === 'expected-missing'
+        ? 'expected-missing'
+        : 'unknown',
+      classification: edge.classification ?? 'unresolved',
+      specifier: edge.specifier,
+      callsite: edge.callsite ?? createCallsiteHash(
+        relativePath,
+        edge.specifier,
+        edge.position,
+      ),
+    };
+  });
+  const seenInventory = scanState?.seenProductionInventory ?? new Set();
+  const seenEffects = scanState?.seenProductionEffects ?? new Set();
+  for (const record of surface.productionRecords) {
+    scanBudget.check('production-effect-scan', true);
+    const target = normalizeRelative(relative(rootDir, record.file));
+    const outgoing = [...record.outgoing].sort();
+    const contentDigest = record.contentDigest;
+    const edgeDigest = policyDigest(outgoing.join('\n'));
+    const inventoryKey = `${target}\0${contentDigest}\0${edgeDigest}`;
+    if (!seenInventory.has(inventoryKey)) {
+      seenInventory.add(inventoryKey);
+      registry.push({
+        file: target,
+        line: 1,
+        effect: 'test-support:production-dependency',
+        targetProvenance: 'repo-production',
+        classification: 'inventory',
+        callsite: createCallsiteHash(
+          target,
+          `${contentDigest}\0${edgeDigest}`,
+          0,
+        ),
+        contentDigest,
+        edgeDigest,
+        outgoing,
+      });
+    }
+
+    const writerEntries = record.writerCandidateCallsites.size > 0
+      ? deriveWriterRegistry(record.content, target, scanBudget)
+        .filter(entry => record.callsites.has(entry.callsite))
+      : [];
+    for (const entry of writerEntries) {
+      const effectKey = `${target}\0${entry.effect}\0${entry.callsite}`;
+      if (seenEffects.has(effectKey)) continue;
+      seenEffects.add(effectKey);
+      registry.push(entry);
+      if (
+        entry.classification === 'violation'
+        || entry.classification === 'guarded-denial'
+      ) {
+        violations.push({
+          file: entry.file,
+          line: entry.line,
+          match: entry.effect,
+          label: `eager production ${entry.effect} targets ${entry.targetProvenance}`,
+          code: errorCodeForProvenance(entry.targetProvenance),
+          callsite: entry.callsite,
+        });
+      }
+    }
+
+    const childAnalysis = record.childCandidateCallsites.size > 0
+      ? childEffectAnalysis(
+        record.content,
+        target,
+        rootDir,
+        record.callsites,
+        scanBudget,
+      )
+      : { violations: [], registry: [] };
+    for (const entry of childAnalysis.registry) {
+      const effectKey = `${target}\0${entry.effect}\0${entry.callsite}`;
+      if (seenEffects.has(effectKey)) continue;
+      seenEffects.add(effectKey);
+      registry.push(entry);
+    }
+    for (const violation of childAnalysis.violations) {
+      const effectKey = `${target}\0${violation.code}\0${violation.callsite}`;
+      if (seenEffects.has(effectKey)) continue;
+      seenEffects.add(effectKey);
+      violations.push({
+        ...violation,
+        label: `eager production: ${violation.label}`,
+      });
+    }
+  }
   let skipped = 0;
   let checked = 0;
 
-  for (const absPath of allFiles) {
-    const relPath = relative(rootDir, absPath);
-    if (allowlist.includes(relPath)) {
-      skipped++;
-      continue;
+  for (const absolutePath of allFiles) {
+    scanBudget.check('test-effect-scan', true);
+    const relativePath = normalizeRelative(relative(rootDir, absolutePath));
+    const legacyAllowlisted = allowlist.includes(relativePath);
+    const content = canonicalSourceText(readFileSync(absolutePath, 'utf-8'));
+    const fileRegistry = deriveWriterRegistry(content, relativePath, scanBudget);
+    registry.push(...fileRegistry);
+    const fileViolations = [
+      ...legacyReadViolations(content, relativePath, scanBudget),
+      ...writerViolations(fileRegistry),
+    ];
+    for (const violation of fileViolations) {
+      const migrationIdentity = `${relativePath}:${violation.callsite ?? ''}`;
+      if (
+        legacyAllowlisted
+        && violation.code === 'E_HERMETIC_LIVE_STATE_READ'
+        && LEGACY_READ_MIGRATION_BASELINE.includes(migrationIdentity)
+      ) {
+        registry.push({
+          file: relativePath,
+          line: violation.line,
+          effect: 'legacy:live-state-read',
+          targetProvenance: 'repo',
+          classification: 'migration',
+          callsite: violation.callsite,
+        });
+      } else {
+        violations.push(violation);
+      }
     }
-    const content = readFileSync(absPath, 'utf-8');
-    const fileViolations = checkFile(content, relPath);
-    violations.push(...fileViolations);
-    checked++;
+    const childAnalysis = childEffectAnalysis(
+      content,
+      relativePath,
+      rootDir,
+      undefined,
+      scanBudget,
+    );
+    registry.push(...childAnalysis.registry);
+    violations.push(...childAnalysis.violations);
+    if (legacyAllowlisted) skipped += 1;
+    else checked += 1;
   }
 
-  return { violations, checked, skipped };
+  return { violations, registry, checked, skipped };
+}
+
+export function scanConfiguredTestRoots(rootDir = REPO_ROOT, allowlist = ALLOWLIST) {
+  const configuredRoots = [
+    join(rootDir, 'tests'),
+    join(rootDir, 'src', 'dashboard', 'src'),
+    join(rootDir, 'src', 'desktop', 'tests'),
+  ].filter(existsSync);
+  const aggregate = { violations: [], registry: [], checked: 0, skipped: 0 };
+  const scanState = {
+    seenFiles: new Set(),
+    seenEdges: new Set(),
+    seenProductionInventory: new Set(),
+    seenProductionEffects: new Set(),
+  };
+  const scanBudget = createScanBudget();
+  for (const testsDir of configuredRoots) {
+    const result = scanTestDir(
+      testsDir,
+      allowlist,
+      rootDir,
+      scanState,
+      scanBudget,
+    );
+    aggregate.violations.push(...result.violations);
+    aggregate.registry.push(...result.registry);
+    aggregate.checked += result.checked;
+    aggregate.skipped += result.skipped;
+  }
+  aggregate.scanBudget = scanBudget.snapshot();
+  return aggregate;
 }
 
 const invokedDirectly =
   process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 
 if (invokedDirectly) {
-  const testsDir = join(REPO_ROOT, 'tests');
   let result;
   try {
-    result = scanTestDir(testsDir);
-  } catch (err) {
-    process.stderr.write(`[hermetic-lint] ERROR: ${err instanceof Error ? err.message : String(err)}\n`);
+    result = scanConfiguredTestRoots();
+  } catch (error) {
+    process.stderr.write(
+      `[hermetic-lint] ERROR: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
     process.exit(2);
   }
 
   if (result.violations.length === 0) {
+    const migrations = result.registry.filter(entry => entry.classification === 'migration').length;
+    const strictUnresolved = process.argv.includes('--strict-unresolved');
+    const unresolvedPolicy = evaluateUnresolvedPolicy(result.registry, { strictUnresolved });
+    const unresolved = unresolvedPolicy.fingerprint;
+    const productionPolicy = evaluateProductionInventoryPolicy(result.registry);
+    const productionInventory = productionPolicy.fingerprint;
+    if (unresolvedPolicy.blocking) {
+      const code = unresolvedPolicy.reason === 'strict unresolved policy'
+        ? 'E_HERMETIC_UNRESOLVED_STRICT'
+        : 'E_HERMETIC_UNRESOLVED_DRIFT';
+      process.stderr.write(
+        `[hermetic-lint] FAIL: ${unresolvedPolicy.reason}`
+        + ` [${code}] current=${unresolved.count}:${unresolved.digest}`
+        + ` baseline=${UNRESOLVED_BASELINE.count}:${UNRESOLVED_BASELINE.digest}\n`,
+      );
+      process.exit(1);
+    }
+    if (productionPolicy.blocking) {
+      process.stderr.write(
+        `[hermetic-lint] FAIL: ${productionPolicy.reason}`
+        + ' [E_HERMETIC_PRODUCTION_INVENTORY_DRIFT]'
+        + ` current=${productionInventory.count}:${productionInventory.digest}`
+        + ` baseline=${PRODUCTION_INVENTORY_BASELINE.count}`
+        + `:${PRODUCTION_INVENTORY_BASELINE.digest}\n`,
+      );
+      process.exit(1);
+    }
+    const status = unresolved.count > 0 ? 'DEBT' : '✓';
     process.stdout.write(
-      `[hermetic-lint] ✓ ${result.checked} files checked, ${result.skipped} allowlisted — 0 violations\n`,
+      `[hermetic-lint] ${status} ${result.checked} files checked,`
+      + ` ${result.skipped} legacy-read allowlisted`
+      + ` — 0 confirmed violations; writer-registry=${result.registry.length}`
+      + ` migration-pending=${migrations}`
+      + ` unresolved-pending=${unresolved.count}:${unresolved.digest}`
+      + ` production-inventory=${productionInventory.count}:${productionInventory.digest}`
+      + ` scan-budget=${result.scanBudget.elapsedMs}ms`
+      + ` peak-rss=${Math.ceil(result.scanBudget.peakRssBytes / (1024 * 1024))}MiB`
+      + ` peak-heap=${Math.ceil(result.scanBudget.peakHeapBytes / (1024 * 1024))}MiB`
+      + ` strict-unresolved=${strictUnresolved ? 'on' : 'off'}\n`,
     );
     process.exit(0);
   }
 
   process.stderr.write(`[hermetic-lint] FAIL: ${result.violations.length} violation(s) found:\n`);
-  for (const v of result.violations) {
-    process.stderr.write(`  ${v.file}:${v.line}: [${v.label}]\n    ${v.match}\n`);
+  for (const violation of result.violations) {
+    process.stderr.write(
+      `  ${violation.file}:${violation.line}: [${violation.code}] ${violation.label}\n`
+      + `    ${violation.match}\n`,
+    );
   }
   process.exit(1);
 }

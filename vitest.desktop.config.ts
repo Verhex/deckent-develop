@@ -14,5 +14,7 @@ export default defineConfig({
   test: {
     include: ['src/desktop/tests/**/*.test.ts'],
     environment: 'node',
+    setupFiles: ['./tests/hermeticity/worker-setup.ts'],
+    globalSetup: ['./tests/hermeticity/global-setup.ts'],
   },
 });

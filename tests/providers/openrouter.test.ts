@@ -10,6 +10,9 @@
  * snapshotted/restored around every test so this suite leaves zero global state.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { OpenRouterProvider, createOpenRouterAdapter } from '../../src/providers/openrouter.js';
 import { ProviderError } from '../../src/core/provider.js';
 
@@ -497,6 +500,7 @@ describe('OpenRouterProvider — reasoning extension (row 477)', () => {
   });
 
   it('forwards reasoning to a spawned worker via ENV, never argv (win32-safe)', () => {
+    const projectDir = mkdtempSync(join(tmpdir(), 'deckent-openrouter-spawn-'));
     const spawnImpl = vi.fn().mockReturnValue({
       pid: 4242,
       on: vi.fn(),
@@ -507,35 +511,46 @@ describe('OpenRouterProvider — reasoning extension (row 477)', () => {
     const provider = makeProvider({
       spawnImpl,
       reasoning: { enabled: false },
-      projectDir: process.cwd(),
+      projectDir,
       workerEntryPath: '/fake/worker-entry.js',
     });
 
-    provider.spawn('t-477', 'some/model:free' as never, 'prompt');
+    try {
+      provider.spawn('t-477', 'some/model:free' as never, 'prompt');
 
-    expect(spawnImpl).toHaveBeenCalledTimes(1);
-    const [, args, spawnOpts] = spawnImpl.mock.calls[0]!;
-    // JSON must NOT ride on argv — it would have to survive a cmd.exe wrapper.
-    expect(args.join(' ')).not.toContain('reasoning');
-    expect(spawnOpts.env['DECKENT_HTTP_EXTRA_BODY']).toBe(
-      JSON.stringify({ reasoning: { enabled: false } }),
-    );
+      expect(spawnImpl).toHaveBeenCalledTimes(1);
+      const [, args, spawnOpts] = spawnImpl.mock.calls[0]!;
+      // JSON must NOT ride on argv — it would have to survive a cmd.exe wrapper.
+      expect(args.join(' ')).not.toContain('reasoning');
+      expect(spawnOpts.env['DECKENT_HTTP_EXTRA_BODY']).toBe(
+        JSON.stringify({ reasoning: { enabled: false } }),
+      );
+    } finally {
+      if (provider.listWorkers().includes('t-477')) provider.kill('t-477');
+      rmSync(projectDir, { recursive: true, force: true });
+    }
   });
 
   it('sets no extra-body env when reasoning is unconfigured', () => {
+    const projectDir = mkdtempSync(join(tmpdir(), 'deckent-openrouter-spawn-'));
     const spawnImpl = vi.fn().mockReturnValue({
       pid: 4243, on: vi.fn(), once: vi.fn(), unref: vi.fn(), kill: vi.fn(),
     });
     const provider = makeProvider({
       spawnImpl,
-      projectDir: process.cwd(),
+      projectDir,
       workerEntryPath: '/fake/worker-entry.js',
     });
 
-    provider.spawn('t-477-b', 'some/model:free' as never, 'prompt');
+    try {
+      provider.spawn('t-477-b', 'some/model:free' as never, 'prompt');
 
-    const [, , spawnOpts] = spawnImpl.mock.calls[0]!;
-    expect(spawnOpts.env['DECKENT_HTTP_EXTRA_BODY']).toBeUndefined();
+      const [, , spawnOpts] = spawnImpl.mock.calls[0]!;
+      expect(spawnOpts.env['DECKENT_HTTP_EXTRA_BODY']).toBeUndefined();
+    } finally {
+      if (provider.listWorkers().includes('t-477-b')) provider.kill('t-477-b');
+      rmSync(projectDir, { recursive: true, force: true });
+    }
   });
 });
 

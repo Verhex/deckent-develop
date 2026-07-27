@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -8,142 +8,546 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '../../');
 const SCRIPTS_DIR = path.join(PROJECT_ROOT, 'scripts');
-// HERMETICITY (dogfood-450 canlı-olay #2 — the 'invalid-version' minifier):
-// this dir used to live at PROJECT_ROOT/.tmp-script-tests; a killed run left
-// junk in the repo root. All test scratch now lives under os.tmpdir().
-const TMP_TEST_DIR = path.join(os.tmpdir(), `deckent-script-tests-${process.pid}`);
 
 const isWindows = process.platform === 'win32';
 
-// ASYNC subprocess runner. A blocking execSync/spawnSync freezes the vitest
-// worker's event loop for the whole subprocess (verify-publish.sh runs npm pack;
-// `npm run build` takes 30–60s on CI). While blocked the worker cannot service
-// the worker→main `onTaskUpdate` RPC heartbeat, which birpc aborts after ~60s →
-// "Timeout calling onTaskUpdate" → vitest exits 1 even though every test passes
-// (the chronic Docs+Scripts / Coverage CI failure). Async spawn keeps the event
-// loop responsive. Mirrors the helper in dead-code-audit.test.ts.
+interface RunScriptOptions {
+  timeoutMs?: number;
+  scriptsDir?: string;
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+}
+
+interface RunScriptRuntime {
+  platform?: typeof process.platform;
+  spawnCommand?: typeof spawn;
+  posixKillDelayMs?: number;
+  taskkillTimeoutMs?: number;
+  childCloseTimeoutMs?: number;
+}
+
 function runScriptAsync(
   scriptName: string,
   args: string[] = [],
-  timeoutMs = 60000,
-  scriptsDir: string = SCRIPTS_DIR,
+  options: RunScriptOptions = {},
+  runtime: RunScriptRuntime = {},
 ): Promise<{ success: boolean; output: string; error?: string }> {
-  return new Promise((resolve) => {
+  return new Promise((resolvePromise) => {
+    const scriptsDir = options.scriptsDir ?? SCRIPTS_DIR;
     const scriptPath = path.join(scriptsDir, scriptName);
-    const child = spawn('bash', [scriptPath, ...args], {
-      cwd: PROJECT_ROOT,
+    const platform = runtime.platform ?? process.platform;
+    const spawnCommand = runtime.spawnCommand ?? spawn;
+    const child = spawnCommand('bash', [scriptPath, ...args], {
+      cwd: options.cwd ?? path.resolve(scriptsDir, '..'),
+      env: options.env ?? process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: platform !== 'win32',
     });
+    const originalPid = child.pid;
     let stdout = '';
+    let timedOut = false;
+    let settled = false;
+    let closeObserved = false;
+    let closeCode: number | null = null;
+    let spawnError: string | undefined;
+    let escalationError: string | undefined;
+    let escalationComplete = true;
+    let killTimer: NodeJS.Timeout | undefined;
+    let taskkillTimer: NodeJS.Timeout | undefined;
+    let childCloseTimer: NodeJS.Timeout | undefined;
+
+    const terminate = (signal: NodeJS.Signals): void => {
+      try {
+        if (platform !== 'win32' && originalPid) process.kill(-originalPid, signal);
+        else child.kill(signal);
+      } catch {
+        // The process tree may already have exited between the timer and signal.
+      }
+    };
+    const finish = (): void => {
+      if (settled) return;
+      if (!closeObserved || (timedOut && !escalationComplete)) return;
+      settled = true;
+      clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
+      if (taskkillTimer) clearTimeout(taskkillTimer);
+      if (childCloseTimer) clearTimeout(childCloseTimer);
+      resolvePromise({
+        success: !timedOut && closeCode === 0,
+        output: stdout,
+        error: timedOut
+          ? escalationError
+            ? `timeout: ${escalationError}`
+            : 'timeout'
+          : spawnError ?? (closeCode === 0 ? undefined : `exit ${closeCode ?? 1}`),
+      });
+    };
+
     child.stdout.setEncoding('utf-8');
     child.stdout.on('data', (d: string) => { stdout += d; });
     child.stderr.setEncoding('utf-8');
-    // stderr is folded into `output` so asserts can see stderr-only scripts
-    // (e.g. the retired bump-version.sh stub prints its notice to >&2).
     child.stderr.on('data', (d: string) => { stdout += d; });
-    const timer = setTimeout(() => { child.kill('SIGKILL'); resolve({ success: false, output: stdout, error: 'timeout' }); }, timeoutMs);
-    child.on('error', (err) => { clearTimeout(timer); resolve({ success: false, output: stdout, error: err.message }); });
-    child.on('close', (code) => { clearTimeout(timer); resolve({ success: code === 0, output: stdout, error: code === 0 ? undefined : `exit ${code}` }); });
+
+    const scheduleChildCloseDeadline = (): void => {
+      if (closeObserved || childCloseTimer) return;
+      childCloseTimer = setTimeout(() => {
+        if (settled || closeObserved) return;
+        const closeError = 'child close timeout after tree termination';
+        escalationError = escalationError
+          ? `${escalationError}; ${closeError}`
+          : closeError;
+        terminate('SIGKILL');
+        child.stdout.destroy();
+        child.stderr.destroy();
+        child.unref();
+        closeObserved = true;
+        closeCode = null;
+        finish();
+      }, runtime.childCloseTimeoutMs ?? 5_000);
+    };
+
+    const completeEscalation = (error?: string): void => {
+      if (escalationComplete) return;
+      if (error) {
+        escalationError = error;
+        // taskkill had first authority; this is a best-effort fallback for the
+        // original process only after the authoritative tree kill failed.
+        terminate('SIGKILL');
+      }
+      escalationComplete = true;
+      scheduleChildCloseDeadline();
+      finish();
+    };
+
+    const invokeWindowsTreeKill = (): void => {
+      if (!originalPid) {
+        completeEscalation('taskkill PID unavailable');
+        return;
+      }
+
+      let taskkill;
+      try {
+        taskkill = spawnCommand(
+          'taskkill',
+          ['/PID', String(originalPid), '/T', '/F'],
+          { windowsHide: true, stdio: 'ignore' },
+        );
+      } catch (error) {
+        completeEscalation(
+          `taskkill error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return;
+      }
+
+      let taskkillSettled = false;
+      const settleTaskkill = (error?: string): void => {
+        if (taskkillSettled) return;
+        taskkillSettled = true;
+        if (taskkillTimer) clearTimeout(taskkillTimer);
+        completeEscalation(error);
+      };
+
+      taskkill.once('error', error => {
+        settleTaskkill(`taskkill error: ${error.message}`);
+      });
+      taskkill.once('close', (code, signal) => {
+        if (code === 0) {
+          settleTaskkill();
+          return;
+        }
+        settleTaskkill(
+          `taskkill exit ${code ?? 'unknown'}${signal ? ` (${signal})` : ''}`,
+        );
+      });
+      taskkillTimer = setTimeout(() => {
+        try {
+          taskkill.kill('SIGKILL');
+        } catch {
+          // The bounded command may have exited between the deadline and kill.
+        }
+        settleTaskkill('taskkill timeout');
+      }, runtime.taskkillTimeoutMs ?? 5_000);
+    };
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      escalationComplete = false;
+      if (platform === 'win32') {
+        invokeWindowsTreeKill();
+      } else {
+        terminate('SIGTERM');
+        killTimer = setTimeout(() => {
+          terminate('SIGKILL');
+          completeEscalation();
+        }, runtime.posixKillDelayMs ?? 500);
+      }
+    }, options.timeoutMs ?? 60_000);
+    child.on('error', err => {
+      if (timedOut) return;
+      closeObserved = true;
+      closeCode = 1;
+      spawnError = err.message;
+      finish();
+    });
+    child.on('close', code => {
+      closeObserved = true;
+      closeCode = code;
+      finish();
+    });
   });
 }
 
-// HERMETICITY (Sprint 272 live incident): this file used to spawn `npm run
-// build` against the REAL project root in beforeAll, with a 120s SIGKILL.
-// `build` inline-cleans dist/ first, so a kill mid-build (slow CI / loaded
-// host) left the repo with dist/ DELETED — it wiped the live CLI under a
-// running session (MF-8 test-hermeticity family). Tests must NEVER mutate the
-// repo: build-dependent tests now skip unless a dist/ already exists.
-function distAvailable(): boolean {
-  return fs.existsSync(path.join(PROJECT_ROOT, 'dist', 'cli', 'entry.js'));
-}
+describe('runScriptAsync timeout authority', () => {
+  const processHasExited = async (pid: number): Promise<boolean> => {
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      try {
+        process.kill(pid, 0);
+      } catch (error) {
+        if (
+          error instanceof Error
+          && 'code' in error
+          && error.code === 'ESRCH'
+        ) {
+          return true;
+        }
+        throw error;
+      }
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    return false;
+  };
+
+  it.each([
+    ['success', 'timeout', false],
+    ['false-success', 'timeout: child close timeout after tree termination', true],
+    ['nonzero', 'timeout: taskkill exit 9', true],
+    ['error', 'timeout: taskkill error:', true],
+    ['timeout', 'timeout: taskkill timeout', true],
+  ] as const)(
+    'uses taskkill first and reports its %s outcome without leaking the original child',
+    async (taskkillOutcome, expectedError, expectsFallback) => {
+      let mainChild: ReturnType<typeof spawn> | undefined;
+      let mainPid: number | undefined;
+      let childKillCountAtTaskkill = -1;
+      let originalPidWasLiveAtTaskkill = false;
+      const childKillSignals: Array<NodeJS.Signals | number | undefined> = [];
+      const taskkillCalls: Array<{ command: string; args: string[] }> = [];
+      const auxiliaryChildren: Array<ReturnType<typeof spawn>> = [];
+
+      const spawnCommand = ((
+        command: string,
+        args: readonly string[] = [],
+      ) => {
+        if (command === 'bash') {
+          mainChild = spawn(
+            process.execPath,
+            ['-e', 'setInterval(() => {}, 1_000)'],
+            { stdio: ['ignore', 'pipe', 'pipe'] },
+          );
+          mainPid = mainChild.pid;
+          const originalKill = mainChild.kill.bind(mainChild);
+          mainChild.kill = ((signal?: NodeJS.Signals | number): boolean => {
+            childKillSignals.push(signal);
+            return originalKill(signal);
+          }) as typeof mainChild.kill;
+          return mainChild;
+        }
+
+        taskkillCalls.push({ command, args: [...args] });
+        childKillCountAtTaskkill = childKillSignals.length;
+        if (mainPid) {
+          try {
+            process.kill(mainPid, 0);
+            originalPidWasLiveAtTaskkill = true;
+          } catch {
+            originalPidWasLiveAtTaskkill = false;
+          }
+        }
+
+        let taskkillChild;
+        if (taskkillOutcome === 'success') {
+          if (mainPid) process.kill(mainPid, 'SIGKILL');
+          taskkillChild = spawn(
+            process.execPath,
+            ['-e', 'process.exit(0)'],
+            { stdio: 'ignore' },
+          );
+        } else if (taskkillOutcome === 'false-success') {
+          taskkillChild = spawn(
+            process.execPath,
+            ['-e', 'process.exit(0)'],
+            { stdio: 'ignore' },
+          );
+        } else if (taskkillOutcome === 'nonzero') {
+          taskkillChild = spawn(
+            process.execPath,
+            ['-e', 'process.exit(9)'],
+            { stdio: 'ignore' },
+          );
+        } else if (taskkillOutcome === 'error') {
+          taskkillChild = spawn(
+            `deckent-missing-taskkill-${process.pid}-${Date.now()}`,
+            [],
+            { stdio: 'ignore' },
+          );
+        } else {
+          taskkillChild = spawn(
+            process.execPath,
+            ['-e', 'setInterval(() => {}, 1_000)'],
+            { stdio: 'ignore' },
+          );
+        }
+        auxiliaryChildren.push(taskkillChild);
+        return taskkillChild;
+      }) as typeof spawn;
+
+      try {
+        const result = await runScriptAsync(
+          'injected-timeout-fixture.sh',
+          [],
+          { timeoutMs: 25 },
+          {
+            platform: 'win32',
+            spawnCommand,
+            taskkillTimeoutMs: 25,
+            childCloseTimeoutMs: 100,
+          },
+        );
+
+        expect(mainPid).toBeTypeOf('number');
+        expect(originalPidWasLiveAtTaskkill).toBe(true);
+        expect(childKillCountAtTaskkill).toBe(0);
+        expect(taskkillCalls).toEqual([{
+          command: 'taskkill',
+          args: ['/PID', String(mainPid), '/T', '/F'],
+        }]);
+        if (expectsFallback) expect(childKillSignals).toContain('SIGKILL');
+        else expect(childKillSignals).toEqual([]);
+        expect(result.success).toBe(false);
+        expect(result.error).toContain(expectedError);
+        expect(await processHasExited(mainPid!)).toBe(true);
+        for (const child of auxiliaryChildren) {
+          if (child.pid) expect(await processHasExited(child.pid)).toBe(true);
+        }
+      } finally {
+        try {
+          mainChild?.kill('SIGKILL');
+        } catch {
+          // Best-effort cleanup keeps a failed assertion from leaking a child.
+        }
+        for (const child of auxiliaryChildren) {
+          try {
+            child.kill('SIGKILL');
+          } catch {
+            // Best-effort cleanup keeps a failed assertion from leaking a child.
+          }
+        }
+      }
+    },
+  );
+});
 
 describe.skipIf(isWindows)('OSS Scripts', () => {
-  // Checked once for the whole file; skipIf can't await, so build-dependent
-  // tests check `canBuild` at runtime via ctx.skip() instead of it.skipIf.
-  let canBuild = false;
-  beforeAll(() => {
-    canBuild = distAvailable();
-  });
+  let testRoot: string;
 
   beforeEach(() => {
-    // Ensure test directory exists
-    if (!fs.existsSync(TMP_TEST_DIR)) {
-      fs.mkdirSync(TMP_TEST_DIR, { recursive: true });
-    }
+    testRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'deckent-script-tests-'));
   });
 
   afterEach(() => {
-    // Cleanup test directory (fs.rmSync — no subprocess needed)
-    if (fs.existsSync(TMP_TEST_DIR)) {
-      fs.rmSync(TMP_TEST_DIR, { recursive: true, force: true });
-    }
+    fs.rmSync(testRoot, { recursive: true, force: true });
   });
 
   describe('verify-publish.sh', () => {
-    it('should verify publish readiness with correct structure', { timeout: 60000 }, async (ctx) => {
-      if (!canBuild) return ctx.skip();
-      const result = await runScriptAsync('verify-publish.sh', []);
-      expect(result.success).toBe(true);
-      expect(result.output).toContain('Package verification passed');
-    });
-
-    it('should check version format in package.json', { timeout: 60000 }, async () => {
-      const result = await runScriptAsync('verify-publish.sh', []);
-      expect(result.output).toMatch(/Version: \d+\.\d+\.\d+/);
-    });
-
-    it('should verify dist/ directory exists after build', { timeout: 60000 }, async (ctx) => {
-      if (!canBuild) return ctx.skip();
-      const result = await runScriptAsync('verify-publish.sh', []);
-      expect(result.output).toContain('Checking dist/ contents');
-      expect(result.output).toContain('Files in dist/');
-    });
-
-    it('should check for required dist files (index.js and index.d.ts)', { timeout: 60000 }, async (ctx) => {
-      if (!canBuild) return ctx.skip();
-      const result = await runScriptAsync('verify-publish.sh', []);
-      expect(result.output).toContain('index.js and index.d.ts present');
-    });
-
-    it('should run npm pack --dry-run and check output', { timeout: 60000 }, async (ctx) => {
-      if (!canBuild) return ctx.skip();
-      const result = await runScriptAsync('verify-publish.sh', []);
-      expect(result.output).toContain('Running npm pack --dry-run');
-      expect(result.output).toContain('Files to be published');
-    });
-
-    it('should verify README.md and LICENSE in package', { timeout: 60000 }, async (ctx) => {
-      if (!canBuild) return ctx.skip();
-      const result = await runScriptAsync('verify-publish.sh', []);
-      expect(result.output).toContain('Ready to publish');
-    });
-
-    it('should fail if version format is invalid', async () => {
-      // HERMETIC REWRITE (dogfood-450 canlı-olay #2): the old version of this
-      // test wrote a MINIFIED, version:'invalid-version' package.json into the
-      // REAL project root and restored it afterwards (not even in a finally).
-      // A vitest-worker hard-kill inside that window (the chronic
-      // "Timeout calling onTaskUpdate" flake) left the corruption behind — it
-      // reached a commit once (f2232791) and poisoned two ci-sim runs with
-      // 12-13 downstream version-assert failures each. verify-publish.sh
-      // resolves PROJECT_ROOT from its own script location, so run a COPY of
-      // the script from a tmp root that carries the corrupted package.json —
-      // the real project root is never written, under any failure mode.
-      const tmpRoot = path.join(TMP_TEST_DIR, 'invalid-version-root');
-      fs.mkdirSync(path.join(tmpRoot, 'scripts'), { recursive: true });
-      const pkgData = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf-8'));
-      pkgData.version = 'invalid-version';
-      fs.writeFileSync(path.join(tmpRoot, 'package.json'), JSON.stringify(pkgData, null, 2) + '\n');
+    function buildCheckOnlyFixture(exitCode = 0): {
+      scriptsDir: string;
+      nodeCapturePath: string;
+      npmCapturePath: string;
+      env: NodeJS.ProcessEnv;
+    } {
+      const scriptsDir = path.join(testRoot, 'scripts');
+      const binDir = path.join(testRoot, 'bin');
+      const nodeCapturePath = path.join(testRoot, 'node-argv.txt');
+      const npmCapturePath = path.join(testRoot, 'npm-argv.txt');
+      const packFixturePath = path.join(testRoot, 'pack.json');
+      fs.mkdirSync(scriptsDir, { recursive: true });
+      fs.mkdirSync(binDir, { recursive: true });
       fs.copyFileSync(
         path.join(SCRIPTS_DIR, 'verify-publish.sh'),
-        path.join(tmpRoot, 'scripts', 'verify-publish.sh'),
+        path.join(scriptsDir, 'verify-publish.sh'),
       );
+      const fakeNode = path.join(binDir, 'node');
+      fs.writeFileSync(
+        fakeNode,
+        [
+          '#!/bin/bash',
+          'if [ "$1" = "--input-type=module" ]; then',
+          '  exec "$DECKENT_REAL_NODE" "$@"',
+          'fi',
+          'printf "%s\\n" "$@" > "$DECKENT_NODE_CAPTURE_FILE"',
+          'exit "$DECKENT_FAKE_NODE_EXIT"',
+          '',
+        ].join('\n'),
+      );
+      fs.chmodSync(fakeNode, 0o755);
+      const fakeNpm = path.join(binDir, 'npm');
+      fs.writeFileSync(
+        fakeNpm,
+        [
+          '#!/bin/bash',
+          'pwd -P > "$DECKENT_NPM_CAPTURE_FILE"',
+          'printf "%s\\n" "$@" >> "$DECKENT_NPM_CAPTURE_FILE"',
+          'if [ "$DECKENT_FAKE_NPM_EXIT" -ne 0 ]; then exit "$DECKENT_FAKE_NPM_EXIT"; fi',
+          'exec "$DECKENT_REAL_NODE" -e \'process.stdout.write(require("node:fs").readFileSync(process.env.DECKENT_PACK_FIXTURE, "utf8"))\'',
+          '',
+        ].join('\n'),
+      );
+      fs.chmodSync(fakeNpm, 0o755);
+      fs.writeFileSync(packFixturePath, JSON.stringify([{
+        files: [{ path: 'README.md' }, { path: 'LICENSE' }],
+      }]));
+      return {
+        scriptsDir,
+        nodeCapturePath,
+        npmCapturePath,
+        env: {
+          ...process.env,
+          PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}`,
+          DECKENT_NODE_CAPTURE_FILE: nodeCapturePath,
+          DECKENT_NPM_CAPTURE_FILE: npmCapturePath,
+          DECKENT_PACK_FIXTURE: packFixturePath,
+          DECKENT_REAL_NODE: process.execPath,
+          DECKENT_FAKE_NODE_EXIT: String(exitCode),
+          DECKENT_FAKE_NPM_EXIT: '0',
+        },
+      };
+    }
 
-      const result = await runScriptAsync('verify-publish.sh', [], 60000, path.join(tmpRoot, 'scripts'));
+    it('delegates once to the canonical check-only validator rooted at the script location', async () => {
+      const fixture = buildCheckOnlyFixture();
+      const callerDir = path.join(testRoot, 'caller');
+      fs.mkdirSync(callerDir);
+      const result = await runScriptAsync('verify-publish.sh', [], {
+        scriptsDir: fixture.scriptsDir,
+        cwd: callerDir,
+        env: fixture.env,
+      });
+
+      expect(result.success).toBe(true);
+      expect(fs.readFileSync(fixture.nodeCapturePath, 'utf-8').trim().split('\n')).toEqual([
+        path.join(testRoot, 'scripts', 'validate-publish.mjs'),
+        testRoot,
+      ]);
+      expect(fs.readFileSync(fixture.npmCapturePath, 'utf-8').trim().split('\n')).toEqual([
+        testRoot,
+        'pack',
+        '--dry-run',
+        '--json',
+        '--ignore-scripts',
+      ]);
+      expect(fs.existsSync(path.join(testRoot, 'dist'))).toBe(false);
+    });
+
+    it('propagates canonical validator failure without starting a build', async () => {
+      const fixture = buildCheckOnlyFixture(17);
+      const result = await runScriptAsync('verify-publish.sh', [], {
+        scriptsDir: fixture.scriptsDir,
+        cwd: testRoot,
+        env: fixture.env,
+      });
 
       expect(result.success).toBe(false);
-      expect(result.output).toContain('Invalid version format');
+      expect(result.error).toBe('exit 17');
+      expect(fs.existsSync(fixture.npmCapturePath)).toBe(false);
+      const source = fs.readFileSync(path.join(fixture.scriptsDir, 'verify-publish.sh'), 'utf-8');
+      expect(source).not.toMatch(/npm\s+run\s+(?:build|clean)/);
+      expect(source).toContain('validate-publish.mjs');
     });
+
+    it.each([
+      ['README.md', [{ path: 'LICENSE' }]],
+      ['LICENSE', [{ path: 'README.md' }]],
+    ])('fails when packed artifact omits %s', async (requiredFile, files) => {
+      const fixture = buildCheckOnlyFixture();
+      fs.writeFileSync(
+        fixture.env.DECKENT_PACK_FIXTURE!,
+        JSON.stringify([{ files }]),
+      );
+
+      const result = await runScriptAsync('verify-publish.sh', [], {
+        scriptsDir: fixture.scriptsDir,
+        cwd: testRoot,
+        env: fixture.env,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.output).toContain(`E_PUBLISH_REQUIRED_FILE_MISSING:${requiredFile}`);
+      expect(fs.readFileSync(fixture.nodeCapturePath, 'utf-8').trim().split('\n')).toEqual([
+        path.join(testRoot, 'scripts', 'validate-publish.mjs'),
+        testRoot,
+      ]);
+    });
+
+    it('fails closed when npm pack does not return the structural JSON contract', async () => {
+      const fixture = buildCheckOnlyFixture();
+      fs.writeFileSync(fixture.env.DECKENT_PACK_FIXTURE!, '{"files":');
+
+      const result = await runScriptAsync('verify-publish.sh', [], {
+        scriptsDir: fixture.scriptsDir,
+        cwd: testRoot,
+        env: fixture.env,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.output).toContain('E_PUBLISH_PACK_JSON_INVALID');
+      expect(fs.readFileSync(fixture.nodeCapturePath, 'utf-8').trim().split('\n')).toEqual([
+        path.join(testRoot, 'scripts', 'validate-publish.mjs'),
+        testRoot,
+      ]);
+    });
+  });
+
+  it('completes SIGKILL escalation for a TERM-ignoring detached descendant', async () => {
+    const scriptsDir = path.join(testRoot, 'timeout-scripts');
+    const pidPath = path.join(testRoot, 'descendant.pid');
+    fs.mkdirSync(scriptsDir);
+    fs.writeFileSync(
+      path.join(scriptsDir, 'process-tree.sh'),
+      [
+        '#!/bin/bash',
+        '(',
+        '  trap "" TERM',
+        '  exec </dev/null >/dev/null 2>&1',
+        '  printf "%s\\n" "$BASHPID" > "$1"',
+        '  while true; do sleep 1; done',
+        ') &',
+        'wait',
+        '',
+      ].join('\n'),
+    );
+
+    const result = await runScriptAsync('process-tree.sh', [pidPath], {
+      scriptsDir,
+      cwd: testRoot,
+      timeoutMs: 100,
+    });
+    const descendantPid = Number(fs.readFileSync(pidPath, 'utf-8').trim());
+
+    try {
+      expect(result).toEqual(expect.objectContaining({ success: false, error: 'timeout' }));
+      let alive = true;
+      for (let attempt = 0; attempt < 20 && alive; attempt += 1) {
+        try {
+          process.kill(descendantPid, 0);
+          await new Promise(resolve => setTimeout(resolve, 25));
+        } catch {
+          alive = false;
+        }
+      }
+      expect(alive).toBe(false);
+    } finally {
+      try { process.kill(descendantPid, 'SIGKILL'); } catch { /* already terminated */ }
+    }
   });
 
   describe('bump-version.sh (retired stub — 414-002 RC4B/REL-04)', () => {

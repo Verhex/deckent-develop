@@ -8,7 +8,11 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     globals: true,
-    setupFiles: ['./tests/dashboard/setup.ts'],
+    setupFiles: [
+      './tests/hermeticity/worker-setup.ts',
+      './tests/dashboard/setup.ts',
+    ],
+    globalSetup: ['./tests/hermeticity/global-setup.ts'],
     include: ['tests/dashboard/**/*.test.tsx', 'tests/dashboard/**/*.test.ts', 'src/dashboard/src/**/*.test.tsx', 'src/dashboard/src/**/*.test.ts'],
     // Inline react/react-dom so the vite alias (single root copy) applies even
     // to CJS deps that would otherwise be externalized and native-required
