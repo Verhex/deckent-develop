@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "88c559c492bb7708558415503fe8d33bc0d40d580ea011f46500c405ee6d2c6e"
+    "value": "12c120ea15e670df372676193a9ca92ed9810860789f3bb2d83cef70d05473c4"
   },
   "summary": {
     "total": 232,
     "active": 232,
     "terminal": 0,
-    "receipts": 5,
+    "receipts": 7,
     "byState": {
       "OPEN": 156,
       "READY": 0,
@@ -116,7 +116,7 @@
       "state": "OPEN",
       "updated": "2026-07-27",
       "definitionDigest": "3ef40495e48f6fb5881e2c59ff70ae3e62a82081261a28b338b131eb5e588cc8",
-      "progressDigest": "df92b466e909621e54239a897397023a71feff092e8e7f4dbfbfbd2aa7f680e6",
+      "progressDigest": "6f7d72a85ac219ab36a78d1b9b51a22d87bb96db4ba0f47ce0f1e84c90a5798e",
       "terminalClosureDigest": null
     },
     {
@@ -138,7 +138,7 @@
       "state": "OPEN",
       "updated": "2026-07-27",
       "definitionDigest": "6ac98c33266e9b97460126d109350d4712295693fa9c68297ae1f806833d53a5",
-      "progressDigest": "bcf40f2f3e4582155371557dd060dc06780eb58c45ec0f658c82d184d40733a8",
+      "progressDigest": "4c5cd933d46a8bf3282f40a7ddde4cbe406b286e6173ec3d93cc38439950605f",
       "terminalClosureDigest": null
     },
     {
@@ -2667,6 +2667,26 @@
         "transitionAt": "2026-07-27T06:21:00+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-27-TEST-HERMETIC-03",
+      "authorityDigest": "c17b70ca5ca057a63975b9eb45042fcf0903d9ad7be45de55d9f0d9dd7b2e6e5",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-27T07:43:41+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-27-TEST-HERMETIC-04",
+      "authorityDigest": "2ad7b1fd76bec4fb92fe94bd66b4c6d5c8b97ebb72493774ebd16887be4d493b",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-27T08:20:57+03:00"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -2884,10 +2904,12 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [
         "GR-2026-07-26-TEST-HERMETIC-01",
-        "GR-2026-07-27-TEST-HERMETIC-02"
+        "GR-2026-07-27-TEST-HERMETIC-02",
+        "GR-2026-07-27-TEST-HERMETIC-03",
+        "GR-2026-07-27-TEST-HERMETIC-04"
       ],
       "acceptance": "Dynamic ve static scan; tüm writers tmpdir; root-write gate fail-loud",
-      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; source-derived static/eager writer registry scans 2,439 files with 0 confirmed violations; full SHA-256 ratchets bind 9,034 explicit unresolved effects and 1,121 production modules; default gate exits 0 and strict mode fails with `E_HERMETIC_UNRESOLVED_STRICT`; runtime guard blocks post-setup project, `.tasks` and `dist` writes across canonical root/dashboard/desktop Vitest surfaces; pre-install cached capabilities, inherited/pre-opened descriptors, native/child-process bypass and OS sandbox remain open",
+      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-27-TEST-HERMETIC-03`; `receipt=GR-2026-07-27-TEST-HERMETIC-04`; source-derived static/eager writer registry scans 2,439 files with 0 confirmed violations; full SHA-256 ratchets bind 9,034 explicit unresolved effects and 1,121 production modules; the approved 97-event ambient-allocation reduction was independently rejected and fully rolled back because writable global bindings plus missing catch/class-expression binding coverage made `proven-nonwriter` unsound; default gate remains exit 0 and strict mode fails with `E_HERMETIC_UNRESOLVED_STRICT`; runtime guard blocks post-setup project, `.tasks` and `dist` writes across canonical root/dashboard/desktop Vitest surfaces; pristine-realm/process-birth authority, pre-install cached capabilities, inherited/pre-opened descriptors, native/child-process bypass and OS sandbox remain open",
       "updated": "2026-07-27"
     },
     {
@@ -2965,10 +2987,12 @@
       ],
       "evidenceReceipts": [
         "GR-2026-07-26-TEST-HERMETIC-01",
-        "GR-2026-07-27-TEST-HERMETIC-02"
+        "GR-2026-07-27-TEST-HERMETIC-02",
+        "GR-2026-07-27-TEST-HERMETIC-03",
+        "GR-2026-07-27-TEST-HERMETIC-04"
       ],
       "acceptance": "Source-derived writer registry ve zero unauthorized write ratchet",
-      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; runtime guard, worker setup and bounded global snapshot protect canonical root/dashboard/desktop test surfaces; root 413 pass/10 skip, dashboard 49/49, desktop 13/13, TypeScript and syntax proofs pass; `src/dashboard/vitest.config.ts` remains an unapproved noncanonical uncovered config; real Docker opt-in, native Windows, Node-version CI matrix, external package/process containment, cross-platform and scale proofs remain open",
+      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-27-TEST-HERMETIC-03`; `receipt=GR-2026-07-27-TEST-HERMETIC-04`; runtime guard, worker setup and bounded global snapshot protect canonical root/dashboard/desktop test surfaces; the attempted 97-event proof contract did not settle and the frozen 9,034 unresolved baseline was restored without accepting false evidence; root 413 pass/10 skip, dashboard 49/49, desktop 13/13, TypeScript and syntax proofs pass; `src/dashboard/vitest.config.ts` remains an unapproved noncanonical uncovered config; real Docker opt-in, native Windows, Node-version CI matrix, external package/process containment, pristine-realm authority, cross-platform and scale proofs remain open",
       "updated": "2026-07-27"
     },
     {
@@ -12655,6 +12679,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "24f6a5584aaa1a48a56c9841e45cbc78bee08da03184ac988fc1f051d513c5a5"
+    "value": "f93c4a4f6bd29ede3a5bcb2e2d19f7076c2b535e43f6700670590b46e864158b"
   }
 }
