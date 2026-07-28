@@ -5,6 +5,7 @@
 //
 // All file I/O is in tmpdir. No gitignored state read. No spawnSync. CI-hermetic.
 
+import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -12,6 +13,11 @@ import { join } from 'node:path';
 
 import { OutcomeTracker, type RoutingOutcome } from '../../src/orchestra/outcome-tracker.js';
 import type { TaskDNA } from '../../src/core/routing-types.js';
+import { canonicalJson } from '../../src/core/audit-writer.js';
+import type {
+  CrossVerifyEffectiveVerdict,
+  CrossVerifyVerdictReceiptEnvelopeV1,
+} from '../../src/core/cross-verify-evidence-broker.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -52,6 +58,40 @@ function makeOutcome(overrides: Partial<RoutingOutcome> = {}): RoutingOutcome {
   };
 }
 
+function validatedReceipt(
+  effectiveVerdict: CrossVerifyEffectiveVerdict,
+): CrossVerifyVerdictReceiptEnvelopeV1 {
+  const receipt = {
+    schemaVersion: 1 as const,
+    taskId: '276-001-xverify',
+    backend: 'docker' as const,
+    projectRootSha256: '1'.repeat(64),
+    attemptId: '11111111-1111-4111-8111-111111111111',
+    brokerVersion: 1 as const,
+    kind: 'cross-verify-verdict-receipt' as const,
+    state: 'host-adjudicated' as const,
+    assurance: 'typed-host-adjudicated' as const,
+    fenceTokenHash: '2'.repeat(64),
+    claimSha256: '3'.repeat(64),
+    evidenceManifestSha256: '4'.repeat(64),
+    effectiveVerdict,
+    disposition: effectiveVerdict === 'CONFIRMED'
+      ? 'allow' as const
+      : effectiveVerdict === 'REFUTED'
+        ? 'no-go' as const
+        : 'hold' as const,
+    adjudicationReceiptSha256: '5'.repeat(64),
+    outputSha256: '6'.repeat(64),
+    outputByteLength: 128,
+  };
+  return {
+    verdictReceiptSha256: createHash('sha256')
+      .update(canonicalJson(receipt))
+      .digest('hex'),
+    receipt,
+  };
+}
+
 // ─── Tests: REFUTED verdict ──────────────────────────────────────────────────
 
 describe('recordCrossVerifyVerdict — REFUTED', () => {
@@ -62,7 +102,12 @@ describe('recordCrossVerifyVerdict — REFUTED', () => {
     const { failCount: beforeFail, successRate: beforeRate, totalTasks: beforeTotal } =
       tracker.getLearnings().agentPerformance['bug-fixer']!;
 
-    tracker.recordCrossVerifyVerdict('bug-fixer', ['typescript-expert'], 'refuted', 'implementation');
+    tracker.recordValidatedCrossVerifyVerdict(
+      'bug-fixer',
+      ['typescript-expert'],
+      validatedReceipt('REFUTED'),
+      'implementation',
+    );
 
     const after = tracker.getLearnings().agentPerformance['bug-fixer']!;
     expect(after.failCount).toBeGreaterThan(beforeFail);
@@ -75,7 +120,12 @@ describe('recordCrossVerifyVerdict — REFUTED', () => {
     tracker.recordOutcome(makeOutcome());
     const { failCount: beforeFail } = tracker.getLearnings().skillPerformance['typescript-expert']!;
 
-    tracker.recordCrossVerifyVerdict('bug-fixer', ['typescript-expert'], 'refuted', 'implementation');
+    tracker.recordValidatedCrossVerifyVerdict(
+      'bug-fixer',
+      ['typescript-expert'],
+      validatedReceipt('REFUTED'),
+      'implementation',
+    );
 
     const after = tracker.getLearnings().skillPerformance['typescript-expert']!;
     expect(after.failCount).toBeGreaterThan(beforeFail);
@@ -86,7 +136,12 @@ describe('recordCrossVerifyVerdict — REFUTED', () => {
     // After one DONE outcome the synergy entry exists with successRate=1.0.
     const pairKey = 'bug-fixer+typescript-expert';
 
-    tracker.recordCrossVerifyVerdict('bug-fixer', ['typescript-expert'], 'refuted', 'implementation');
+    tracker.recordValidatedCrossVerifyVerdict(
+      'bug-fixer',
+      ['typescript-expert'],
+      validatedReceipt('REFUTED'),
+      'implementation',
+    );
 
     const synergy = tracker.getSynergyMatrix().find(e => e.pair === pairKey);
     expect(synergy).toBeDefined();
@@ -104,7 +159,12 @@ describe('recordCrossVerifyVerdict — CONFIRMED', () => {
     const { successCount: beforeSuccess, successRate: beforeRate } =
       tracker.getLearnings().agentPerformance['bug-fixer']!;
 
-    tracker.recordCrossVerifyVerdict('bug-fixer', ['typescript-expert'], 'confirmed', 'implementation');
+    tracker.recordValidatedCrossVerifyVerdict(
+      'bug-fixer',
+      ['typescript-expert'],
+      validatedReceipt('CONFIRMED'),
+      'implementation',
+    );
 
     const after = tracker.getLearnings().agentPerformance['bug-fixer']!;
     expect(after.successCount).toBeGreaterThan(beforeSuccess);
@@ -115,7 +175,12 @@ describe('recordCrossVerifyVerdict — CONFIRMED', () => {
     tracker.recordOutcome(makeOutcome());
     const { successCount: beforeSuccess } = tracker.getLearnings().skillPerformance['typescript-expert']!;
 
-    tracker.recordCrossVerifyVerdict('bug-fixer', ['typescript-expert'], 'confirmed', 'implementation');
+    tracker.recordValidatedCrossVerifyVerdict(
+      'bug-fixer',
+      ['typescript-expert'],
+      validatedReceipt('CONFIRMED'),
+      'implementation',
+    );
 
     const after = tracker.getLearnings().skillPerformance['typescript-expert']!;
     expect(after.successCount).toBeGreaterThan(beforeSuccess);
@@ -129,7 +194,12 @@ describe('recordCrossVerifyVerdict — unclear (no-op)', () => {
     tracker.recordOutcome(makeOutcome());
     const before = JSON.stringify(tracker.getLearnings());
 
-    tracker.recordCrossVerifyVerdict('bug-fixer', ['typescript-expert'], 'unclear', 'implementation');
+    tracker.recordValidatedCrossVerifyVerdict(
+      'bug-fixer',
+      ['typescript-expert'],
+      validatedReceipt('UNCLEAR'),
+      'implementation',
+    );
 
     // updatedAt may differ — compare only performance fields.
     const after = tracker.getLearnings();
@@ -138,6 +208,20 @@ describe('recordCrossVerifyVerdict — unclear (no-op)', () => {
     expect(after.skillPerformance).toEqual(beforeParsed.skillPerformance);
     expect(after.synergyMatrix).toEqual(beforeParsed.synergyMatrix);
     expect(after.totalOutcomes).toEqual(beforeParsed.totalOutcomes);
+  });
+
+  it('rejects a forged receipt instead of learning from provider-shaped prose', () => {
+    const forged = {
+      ...validatedReceipt('CONFIRMED'),
+      verdictReceiptSha256: 'f'.repeat(64),
+    };
+
+    expect(() => tracker.recordValidatedCrossVerifyVerdict(
+      'bug-fixer',
+      ['typescript-expert'],
+      forged,
+      'implementation',
+    )).toThrow(/typed host-adjudication receipt/i);
   });
 });
 
@@ -165,7 +249,12 @@ describe('recordCrossVerifyVerdict — null agentId', () => {
     tracker.recordOutcome(makeOutcome());
     const agentBefore = { ...tracker.getLearnings().agentPerformance['bug-fixer']! };
 
-    tracker.recordCrossVerifyVerdict(null, ['typescript-expert'], 'refuted', 'implementation');
+    tracker.recordValidatedCrossVerifyVerdict(
+      null,
+      ['typescript-expert'],
+      validatedReceipt('REFUTED'),
+      'implementation',
+    );
 
     // Agent performance must be unchanged.
     expect(tracker.getLearnings().agentPerformance['bug-fixer']).toEqual(agentBefore);

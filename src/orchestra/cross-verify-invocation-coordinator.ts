@@ -5,7 +5,7 @@ import { createExecutionAuthorityError } from '../core/errors.js';
 import {
   assertCrossVerifyEnforcedAttemptContract,
   sameCrossVerifyExecutionContract,
-  type CrossVerifyEnforcedAttemptContractV1,
+  type CrossVerifyEnforcedAttemptContract,
 } from '../core/cross-verify-execution-contract.js';
 import {
   type HostRoleInvocationAdmissionRequest,
@@ -63,7 +63,7 @@ export interface CrossVerifyInvocationExecutionGrant extends ProviderLimitExecut
     readonly mode: ProviderLimitReservation['authMode'];
     readonly accountRefHash: string | null;
   };
-  readonly executionContract: Readonly<CrossVerifyEnforcedAttemptContractV1>;
+  readonly executionContract: Readonly<CrossVerifyEnforcedAttemptContract>;
 }
 
 export interface CrossVerifyActualCallEvidence {
@@ -150,7 +150,7 @@ export interface CrossVerifyInvocationCoordinatorAuthorities {
 export interface CrossVerifyInvocationCoordinatorInput {
   readonly projection: ReadyProjection;
   readonly admission: HostRoleInvocationAdmissionRequest;
-  readonly executionContract: Readonly<CrossVerifyEnforcedAttemptContractV1>;
+  readonly executionContract: Readonly<CrossVerifyEnforcedAttemptContract>;
   readonly executionRequest: Readonly<CrossVerifyStrictExecutionRequest>;
   readonly buildDispatchEvent: (admission: ProviderLimitAdmissionAllowed) => DispatchEvent;
   /** Re-read the host claim immediately before each irreversible boundary. */
@@ -331,7 +331,7 @@ function sameSettlementRef(
 
 function sameEstimates(
   left: ProviderLimitReservation['estimates'],
-  right: CrossVerifyEnforcedAttemptContractV1['providerLimitEstimates'],
+  right: CrossVerifyEnforcedAttemptContract['providerLimitEstimates'],
 ): boolean {
   return canonicalJson(left) === canonicalJson(right);
 }
@@ -776,7 +776,7 @@ export class CrossVerifyInvocationCoordinator {
         }),
         executionContract: JSON.parse(
           JSON.stringify(input.executionContract),
-        ) as CrossVerifyEnforcedAttemptContractV1,
+        ) as CrossVerifyEnforcedAttemptContract,
       });
       if (!sameCrossVerifyExecutionContract(grant.executionContract, input.executionContract)) {
         throw createExecutionAuthorityError(

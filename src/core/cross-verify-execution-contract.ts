@@ -24,8 +24,10 @@ import {
 import type { TaskResultSettlementRefV1 } from './task-result-settlement.js';
 import type { ExecutionBudget } from './work-model.js';
 import type { CrossVerifyOperationClass } from './cross-verify-prompt.js';
+import { CROSS_VERIFY_ADJUDICATION_PROTOCOL } from './cross-verify-adjudication.js';
 
 export const CROSS_VERIFY_EXECUTION_CONTRACT_SCHEMA_VERSION = 1 as const;
+export const CROSS_VERIFY_EXECUTION_CONTRACT_V2_SCHEMA_VERSION = 2 as const;
 
 export interface CrossVerifyEnforcedAttemptContractInputV1 {
   readonly tenantId: string;
@@ -72,6 +74,49 @@ export interface CrossVerifyEnforcedAttemptContractV1
   readonly contractSha256: string;
   readonly evidenceRef: string;
 }
+
+/**
+ * Immutable semantic-evidence binding for XVerify v2.
+ *
+ * Runtime identity and resource authority stay in the v1 base contract. This
+ * extension binds that exact attempt to one typed claim, one host-captured
+ * evidence snapshot, one finite prompt, and an attempt-private output channel.
+ */
+export interface CrossVerifyAdjudicationExecutionBindingV2 {
+  readonly protocol: typeof CROSS_VERIFY_ADJUDICATION_PROTOCOL;
+  readonly claimDigest: string;
+  readonly evidenceManifestDigest: string;
+  readonly adjudicationContractDigest: string;
+  readonly evidenceBrokerRef: string;
+  readonly evidenceBrokerManifestSha256: string;
+  readonly evidenceMountPath: '/deckent/xverify-evidence';
+  readonly evidenceManifestRelativePath: 'manifest.json';
+  /** Immutable Docker image ID (`sha256:<64hex>`) used for the actual run. */
+  readonly runtimeImageRef: string;
+  readonly finalPromptDigest: string;
+  readonly finalPromptChars: number;
+  readonly maxPromptChars: number;
+  readonly maxEvidenceOutputChars: number;
+  readonly maxRationaleChars: number;
+  readonly evidenceAccess: 'snapshot-read-only';
+  readonly artifactMutationPolicy: 'attempt-private-output-only';
+}
+
+export interface CrossVerifyEnforcedAttemptContractInputV2
+  extends CrossVerifyEnforcedAttemptContractInputV1 {
+  readonly adjudication: Readonly<CrossVerifyAdjudicationExecutionBindingV2>;
+}
+
+export interface CrossVerifyEnforcedAttemptContractV2
+  extends CrossVerifyEnforcedAttemptContractInputV2 {
+  readonly schemaVersion: typeof CROSS_VERIFY_EXECUTION_CONTRACT_V2_SCHEMA_VERSION;
+  readonly contractSha256: string;
+  readonly evidenceRef: string;
+}
+
+export type CrossVerifyEnforcedAttemptContract =
+  | CrossVerifyEnforcedAttemptContractV1
+  | CrossVerifyEnforcedAttemptContractV2;
 
 const BUDGET_FIELDS = new Set<keyof ExecutionBudget>([
   'maxUsd',
@@ -298,6 +343,102 @@ function contractPayload(
   };
 }
 
+const ADJUDICATION_BINDING_FIELDS = new Set<keyof CrossVerifyAdjudicationExecutionBindingV2>([
+  'protocol',
+  'claimDigest',
+  'evidenceManifestDigest',
+  'adjudicationContractDigest',
+  'evidenceBrokerRef',
+  'evidenceBrokerManifestSha256',
+  'evidenceMountPath',
+  'evidenceManifestRelativePath',
+  'runtimeImageRef',
+  'finalPromptDigest',
+  'finalPromptChars',
+  'maxPromptChars',
+  'maxEvidenceOutputChars',
+  'maxRationaleChars',
+  'evidenceAccess',
+  'artifactMutationPolicy',
+]);
+
+function assertPositiveSafeInteger(label: string, value: number): void {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw createExecutionAdmissionError(`${label} must be a positive integer`);
+  }
+}
+
+function assertSha256Digest(label: string, value: string): void {
+  if (!/^sha256:[a-f0-9]{64}$/u.test(value)) {
+    throw createExecutionAdmissionError(`${label} must be a canonical SHA-256 digest`);
+  }
+}
+
+function assertAdjudicationBinding(
+  value: Readonly<CrossVerifyAdjudicationExecutionBindingV2>,
+): void {
+  for (const field of Object.keys(value) as Array<keyof CrossVerifyAdjudicationExecutionBindingV2>) {
+    if (!ADJUDICATION_BINDING_FIELDS.has(field)) {
+      throw createExecutionAdmissionError(
+        `Unknown xverify adjudication binding field: ${String(field)}`,
+      );
+    }
+  }
+  if (value.protocol !== CROSS_VERIFY_ADJUDICATION_PROTOCOL
+    || value.evidenceAccess !== 'snapshot-read-only'
+    || value.artifactMutationPolicy !== 'attempt-private-output-only'
+    || value.evidenceMountPath !== '/deckent/xverify-evidence'
+    || value.evidenceManifestRelativePath !== 'manifest.json') {
+    throw createExecutionAdmissionError('Unsupported xverify adjudication execution policy');
+  }
+  assertSha256Digest('xverify claimDigest', value.claimDigest);
+  assertSha256Digest(
+    'xverify evidenceManifestDigest',
+    value.evidenceManifestDigest,
+  );
+  assertSha256Digest(
+    'xverify adjudicationContractDigest',
+    value.adjudicationContractDigest,
+  );
+  if (!/^cross-verify-evidence-manifest:sha256:[a-f0-9]{64}$/u.test(
+    value.evidenceBrokerRef,
+  )) {
+    throw createExecutionAdmissionError(
+      'xverify evidenceBrokerRef must identify one immutable broker manifest',
+    );
+  }
+  assertOpaqueSha256(
+    'xverify evidenceBrokerManifestSha256',
+    value.evidenceBrokerManifestSha256,
+    true,
+  );
+  assertSha256Digest('xverify finalPromptDigest', value.finalPromptDigest);
+  assertSha256Digest('xverify runtimeImageRef', value.runtimeImageRef);
+  assertPositiveSafeInteger('xverify finalPromptChars', value.finalPromptChars);
+  assertPositiveSafeInteger('xverify maxPromptChars', value.maxPromptChars);
+  assertPositiveSafeInteger(
+    'xverify maxEvidenceOutputChars',
+    value.maxEvidenceOutputChars,
+  );
+  assertPositiveSafeInteger('xverify maxRationaleChars', value.maxRationaleChars);
+  if (value.finalPromptChars > value.maxPromptChars) {
+    throw createExecutionAdmissionError(
+      'xverify final prompt exceeds its immutable character ceiling',
+    );
+  }
+}
+
+function contractV2Payload(
+  input: CrossVerifyEnforcedAttemptContractInputV2,
+): CrossVerifyEnforcedAttemptContractInputV2 & {
+  readonly schemaVersion: typeof CROSS_VERIFY_EXECUTION_CONTRACT_V2_SCHEMA_VERSION;
+} {
+  return {
+    schemaVersion: CROSS_VERIFY_EXECUTION_CONTRACT_V2_SCHEMA_VERSION,
+    ...input,
+  };
+}
+
 export function createCrossVerifyEnforcedAttemptContract(
   input: CrossVerifyEnforcedAttemptContractInputV1,
 ): Readonly<CrossVerifyEnforcedAttemptContractV1> {
@@ -313,8 +454,12 @@ export function createCrossVerifyEnforcedAttemptContract(
 }
 
 export function assertCrossVerifyEnforcedAttemptContract(
-  contract: CrossVerifyEnforcedAttemptContractV1,
+  contract: CrossVerifyEnforcedAttemptContract,
 ): void {
+  if (contract.schemaVersion === CROSS_VERIFY_EXECUTION_CONTRACT_V2_SCHEMA_VERSION) {
+    assertCrossVerifyEnforcedAttemptContractV2(contract);
+    return;
+  }
   if (contract.schemaVersion !== CROSS_VERIFY_EXECUTION_CONTRACT_SCHEMA_VERSION) {
     throw createExecutionAdmissionError(
       'Unsupported xverify execution contract schema version',
@@ -332,9 +477,55 @@ export function assertCrossVerifyEnforcedAttemptContract(
   }
 }
 
+export function createCrossVerifyEnforcedAttemptContractV2(
+  input: CrossVerifyEnforcedAttemptContractInputV2,
+): Readonly<CrossVerifyEnforcedAttemptContractV2> {
+  const copied = clone(input);
+  const { adjudication, ...base } = copied;
+  assertInput(base);
+  assertAdjudicationBinding(adjudication);
+  const payload = contractV2Payload({ ...base, adjudication });
+  const contractSha256 = sha256(canonicalJson(payload));
+  return deepFreeze({
+    ...payload,
+    contractSha256,
+    evidenceRef: `xverify-contract-v2:${contractSha256}`,
+  }) as Readonly<CrossVerifyEnforcedAttemptContractV2>;
+}
+
+export function assertCrossVerifyEnforcedAttemptContractV2(
+  contract: CrossVerifyEnforcedAttemptContractV2,
+): void {
+  if (contract.schemaVersion !== CROSS_VERIFY_EXECUTION_CONTRACT_V2_SCHEMA_VERSION) {
+    throw createExecutionAdmissionError(
+      'Unsupported xverify v2 execution contract schema version',
+    );
+  }
+  const {
+    schemaVersion: _schemaVersion,
+    contractSha256: _contractSha256,
+    evidenceRef: _evidenceRef,
+    adjudication,
+    ...base
+  } = contract;
+  assertInput(base);
+  assertAdjudicationBinding(adjudication);
+  const expected = sha256(canonicalJson(contractV2Payload({ ...base, adjudication })));
+  assertOpaqueSha256('xverify v2 contractSha256', contract.contractSha256, true);
+  assertOpaqueEvidenceRef(
+    'xverify v2 execution contract evidenceRef',
+    contract.evidenceRef,
+    true,
+  );
+  if (contract.contractSha256 !== expected
+    || contract.evidenceRef !== `xverify-contract-v2:${expected}`) {
+    throw createExecutionAuthorityError('xverify v2 execution contract integrity mismatch');
+  }
+}
+
 export function sameCrossVerifyExecutionContract(
-  left: CrossVerifyEnforcedAttemptContractV1,
-  right: CrossVerifyEnforcedAttemptContractV1,
+  left: CrossVerifyEnforcedAttemptContract,
+  right: CrossVerifyEnforcedAttemptContract,
 ): boolean {
   assertCrossVerifyEnforcedAttemptContract(left);
   assertCrossVerifyEnforcedAttemptContract(right);

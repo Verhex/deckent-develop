@@ -4,8 +4,13 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
+import { createHash } from 'node:crypto';
 import type { TaskDNA, LearningBonus, IntentType } from '../core/routing-types.js';
 import { LEARNING_BONUS_CAP } from '../core/routing-types.js';
+import { canonicalJson } from '../core/audit-writer.js';
+import type {
+  CrossVerifyVerdictReceiptEnvelopeV1,
+} from '../core/cross-verify-evidence-broker.js';
 import { debugLog } from '../core/utils.js';
 import type { LearningConfig } from '../core/decision-config.js';
 import { ErrorRegistry } from '../core/errors.js';
@@ -232,26 +237,45 @@ export class OutcomeTracker {
   }
 
   /**
-   * Feed a cross-verify verdict as a ROUTE-1 learning signal on agent + skill performance.
+   * Feed a broker-validated v2 cross-verify receipt as a ROUTE-1 learning signal.
    *
-   * Advisory: does NOT change the official evaluation, does NOT bump totalOutcomes (the task
+   * This does NOT change the official evaluation, does NOT bump totalOutcomes (the task
    * was already counted by recordOutcome), and does NOT write a sprint outcome file entry.
    * REFUTED  → negative signal (isSuccess=false) to agent + skill performance + synergy.
    * CONFIRMED → positive signal (isSuccess=true) to agent + skill performance + synergy.
    * unclear  → no-op (honest non-result — no signal injected).
    *
-   * ADR-070: purely advisory — no evaluation mutation; Brain/human decides what to do
-   * with repeated REFUTED signals (e.g. reroute the next sprint via reclassifyTaskOutcome).
+   * Raw provider prose and legacy free-form verdicts cannot enter this path.
    */
-  recordCrossVerifyVerdict(
+  recordValidatedCrossVerifyVerdict(
     agentId: string | null,
     skillIds: string[],
-    verdict: 'refuted' | 'confirmed' | 'unclear',
+    authority: CrossVerifyVerdictReceiptEnvelopeV1,
     intent: IntentType = 'implementation',
   ): void {
-    if (verdict === 'unclear') return;
+    const receipt = authority.receipt;
+    const digest = createHash('sha256')
+      .update(canonicalJson(receipt))
+      .digest('hex');
+    const expectedDisposition = receipt.effectiveVerdict === 'CONFIRMED'
+      ? 'allow'
+      : receipt.effectiveVerdict === 'REFUTED'
+        ? 'no-go'
+        : 'hold';
+    if (
+      authority.verdictReceiptSha256 !== digest
+      || receipt.kind !== 'cross-verify-verdict-receipt'
+      || receipt.state !== 'host-adjudicated'
+      || receipt.assurance !== 'typed-host-adjudicated'
+      || receipt.disposition !== expectedDisposition
+    ) {
+      throw new TypeError(
+        'Cross-verify learning requires a valid typed host-adjudication receipt',
+      );
+    }
+    if (receipt.effectiveVerdict === 'UNCLEAR') return;
 
-    const isSuccess = verdict === 'confirmed';
+    const isSuccess = receipt.effectiveVerdict === 'CONFIRMED';
 
     if (agentId && agentId !== 'generic') {
       this.updateEntityPerformance(this.learnings.agentPerformance, agentId, intent, isSuccess);
