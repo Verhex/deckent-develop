@@ -55,6 +55,11 @@
 | user-1784778390241 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-460 Learnings** (sprint-460): ## Sprint sprint-460 Learnings
+
+## Gains
+- 460-001 — [D2] Subscription broker bypass'ını current-truth olarak raporla...
+- **Sprint sprint-459 Learnings** (sprint-459): ## Sprint sprint-459 Learnings
 - **Sprint sprint-456 Learnings** (sprint-456): ## Sprint sprint-456 Learnings
 - Docker auth and provider-image fixture budget parity: NO_GO — Runtime budget circuit...
 - **Sprint sprint-455 Learnings** (sprint-455): ## Sprint sprint-455 Learnings
@@ -73,12 +78,6 @@
 - Integration verification with vitest sweep and real-binary status smoke: GO_WITH_TEC...
 - **Sprint sprint-449 Learnings** (sprint-449): ## Sprint sprint-449 Learnings
 - Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: REAL (non-provisional) v3 capa...
-- **Sprint sprint-448 Learnings** (sprint-448): ## Sprint sprint-448 Learnings
-
-## Gains
-- 448-001 — Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: Investigat...
-- **Sprint sprint-447 Learnings** (sprint-447): ## Sprint sprint-447 Learnings
-- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: Investigated the cross-depende...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -155,4 +154,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: stale_heartbeat
 
-_Total entries: 1618 | Generated: 2026-07-25_
+_Total entries: 1626 | Generated: 2026-07-25_

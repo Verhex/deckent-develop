@@ -5130,6 +5130,29 @@ Land schema/state/capability contracts preserving hard-stop behavior; add host-o
 ACCEPTANCE
 Boundary tests below/at/above landing and hard ceilings; schema/digest and unknown-field tests; provider/backend capability matrix; unattended HOLD and attended explicit hard-only evidence; checkpoint corruption and competing-coordinator tests; cumulative-budget/no-full-replay continuation tests; Docker kill/landing matrix; targeted tests, lint, build:all, real binary proof and one finite Fable-5 verdict.
 
+AMENDMENT 2026-07-25 — §4-a FINAL-ONLY USAGE CONTAINMENT (owner: Alperen, approved 2026-07-25)
+
+4-a. A provider that reports final-only usage MAY execute when the owner has explicitly
+authorized it AND it runs under host-enforced finite wall-clock containment. This authorization:
+  - does NOT claim attendance; admission mode remains unattended. §3 attendance authority is untouched.
+  - demotes token ceilings to POST-HOC settlement evidence; an in-flight token cap is never claimed.
+  - applies only to the roles the owner names.
+  - requires a finite positive wall-clock window, which may only NARROW an existing timeout, never widen it.
+  - is absent by default; absence keeps the existing fail-closed refusal.
+Metering and landing remain independent contracts: this clause adds nothing to
+ExecutionLandingCapability, attended_unsupported or allow-hard-stop.
+
+Rationale: codex exec --json emits a single terminal turn.completed usage envelope, so no owner
+budget shape could satisfy hasLiveUsageCeiling — §4 as written made final-only providers
+unusable in EVERY mode, wider than its own "unattended" wording. The §3 ApprovalBroker route is
+unavailable here (api_oidc unconfigured), so attendance was NOT asserted.
+Implementation: execution_budget.final_only_usage (action/roles/max_wall_clock_seconds);
+authorized in this project as roles=[auditor], max_wall_clock_seconds=600.
+Live proof 2026-07-25: codex/gpt-5.6-sol Docker verifier returned VERDICT: CONFIRMED.
+Revocation gate: MASTER-PLAN 658 (codex incremental metering) must remove this authorization
+from config as part of its completion criteria.
+Proposal record: .analysis/adr-g-037-amendment-final-only-usage.md
+
 ---
 
 ## ADR-G-038: Goal-v2 Normalized Dependency Authority & Bounded Reconciliation

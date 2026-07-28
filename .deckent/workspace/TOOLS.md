@@ -131,6 +131,7 @@ _Total: 39 MCP tools_
 | `plan-nl` | deckent plan-nl |
 | `plugin` | deckent plugin |
 | `process` | deckent process |
+| `provider-authority` | deckent provider-authority |
 | `quick-start` | deckent quick-start |
 | `rbac` | deckent rbac |
 | `recall` | deckent recall |
@@ -161,4 +162,4 @@ _Total: 39 MCP tools_
 | `web` | deckent web |
 | `xverify` | deckent xverify |
 
-_Total: 103 CLI command modules_
+_Total: 104 CLI command modules_

@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-460 Learnings
+- Sprint sprint-460 Learnings: ## Sprint sprint-460 Learnings
+
+## Gains
+- 460-001 — [D2] Subscription broker bypass'ını current-truth olarak raporla — docs/reference/features.md already carried an uncommitted 'Subscription auth path — DeckBroker by...
+
+## Sprint sprint-459 Learnings
+- Sprint sprint-459 Learnings: ## Sprint sprint-459 Learnings
+
 ## Sprint sprint-456 Learnings
 - Sprint sprint-456 Learnings: ## Sprint sprint-456 Learnings
 - Docker auth and provider-image fixture budget parity: NO_GO — Runtime budget circuit breaker stopped the worker: cache-read token budget exceeded (1032095 > 1000000). Runtime budget

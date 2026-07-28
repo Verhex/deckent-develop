@@ -1,7 +1,7 @@
 ---
 name: law_alp_discipline_anchor
 description: Alp Discipline (alp-discipline/ESSENCE.md) karpathy-discipline gibi kalıcı çalışma-çapasıdır — her karar-sınırında uygulanır (Alperen 2026-07-21)
-metadata:
+metadata: 
   node_type: memory
   type: feedback
   originSessionId: ab5d6df1-c4d2-405f-b150-3fcf5ef9d8f1
