@@ -230,3 +230,19 @@ claude-fable-x.md
 
 # Alperen (2026-07-12): bot ses-deneyi — lokal kalir, repoya girmez
 examples/voice-wrapper/
+
+# Alperen (2026-07-28): analiz-notlari lokal kalir, repoya girmez
+.analysis/
+
+# Runtime debris (2026-07-28 temizlik — makine-lokal, asla commit edilmez)
+.deckent-execution-lock-authority.anchor.json
+.deckent/autonomous/autonomous.db-wal
+.deckent/autonomous/autonomous.db-shm
+.deckent/mcp-writer.lease
+.deckent/runtime/invocations.db
+.deckent/runtime/resource-log-dogfood.jsonl
+.deckent/runtime/scheduler-shadow/
+.deckent/recovery-snapshots/
+.deckent/archive/
+# OpenRouter model-listesi TTL cache (provider-cache.json emsali)
+.deckent/settings/openrouter-models.json
