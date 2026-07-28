@@ -1723,20 +1723,17 @@ if (invokedDirectly) {
     const command = parseArguments(process.argv.slice(2));
     let result;
     if (command.operation === 'recover') {
-      const attestationPath = resolve(REPO_ROOT, command.attestationFile);
-      assertContained(
-        REPO_ROOT,
-        attestationPath,
-        'E_BUILD_RECOVERY_ATTESTATION_PATH_OUTSIDE_PROJECT',
+      // The source-level build bootstrap cannot safely depend on a potentially
+      // stale or half-replaced `dist/` ApprovalBroker implementation. A local
+      // JSON file proves data possession, not owner authority, so the direct
+      // entrypoint must never promote it into an unconditional verifier.
+      // Trusted hosts call recoverTransactionalBuild() with their canonical
+      // runtime-wide approval verifier; this standalone surface stays
+      // fail-closed until that verifier is available at the bootstrap layer.
+      throw codedError(
+        'E_BUILD_RECOVERY_VERIFIER_UNAVAILABLE',
+        command.runId,
       );
-      const attestation = JSON.parse(
-        secureReadFile(attestationPath, 64 * 1024).toString('utf8'),
-      );
-      result = recoverTransactionalBuild({
-        runId: command.runId,
-        attestation,
-        recoveryAttestationVerifier: () => true,
-      });
     } else {
       result = await runTransactionalBuild({
         scope: command.scope,

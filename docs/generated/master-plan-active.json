@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "400a633ba560ba439da75efcb8c7daa176db0643343f62f97870a2441b60bab3"
+    "value": "f9a751034ee12aea33efc6fc69ff11604255432844edc9a35cc60b72c8ebb7f4"
   },
   "summary": {
     "total": 233,
     "active": 233,
     "terminal": 0,
-    "receipts": 10,
+    "receipts": 11,
     "byState": {
       "OPEN": 156,
       "READY": 0,
@@ -125,9 +125,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-27",
+      "updated": "2026-07-28",
       "definitionDigest": "3b37c301f1bb6534470bdd6bac1860f197f0155583f4c31e1bdc8191965e7dee",
-      "progressDigest": "81d9a363a4fc3be1bff6ff68b53916c839c7e25fb2947dd132ac51c4eabaa1f0",
+      "progressDigest": "d8d42bd2395a4649e8ebe6a04437fd10307064ef8651061a0a7e1119995f11cd",
       "terminalClosureDigest": null
     },
     {
@@ -1599,9 +1599,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-27",
+      "updated": "2026-07-28",
       "definitionDigest": "e3be4a7014aa705d063e1d425f18722d0d8d532135605afcc68cf7c34c0b15d6",
-      "progressDigest": "e85b3d9149b31767a7aba0c38b302dd774998740024df9fddee4f0089770a9cc",
+      "progressDigest": "790930d85e6862913241acfd43e6da98bf85bc382ba204281f555282870f7771",
       "terminalClosureDigest": null
     },
     {
@@ -2728,6 +2728,16 @@
         "transitionAt": "2026-07-28T14:33:28+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-28-BUILD-RECOVERY-01",
+      "authorityDigest": "95d11c355a5b1be009e402f37bbb31b7d052e0eff81aa1314a1d34606f7410d6",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-28T14:55:56+03:00"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -2988,11 +2998,12 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [
         "GR-2026-07-26-TEST-HERMETIC-01",
-        "GR-2026-07-27-TEST-HERMETIC-02"
+        "GR-2026-07-27-TEST-HERMETIC-02",
+        "GR-2026-07-28-BUILD-RECOVERY-01"
       ],
       "acceptance": "Caller trace, deterministic reproduction, forbid-clean guard ve stable binary proof",
-      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; clean authority is bound to the physical script root, rejects symlink/boundary ambiguity and validates all preserved entries before deletion; publish validation no longer build/cleans and uses `npm pack --dry-run --json --ignore-scripts`; async bounded process-tree tests cover POSIX and injected Windows failure paths; combined provider-free proof is 413 pass/10 opt-in live-Docker skip, but real binary/build and native Windows cleanup proof remain absent",
-      "updated": "2026-07-27"
+      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-28-BUILD-RECOVERY-01`; clean authority is bound to the physical script root, rejects symlink/boundary ambiguity and validates all preserved entries before deletion; publish validation no longer build/cleans and uses `npm pack --dry-run --json --ignore-scripts`; production `build.mjs --recover` no longer promotes possession of a local JSON file into owner authority and exits before mutation with typed `E_BUILD_RECOVERY_VERIFIER_UNAVAILABLE`, while injected canonical verifier recovery remains available; one focused source contract and a real Node entrypoint smoke pass; unresolved hermetic effects decrease 12,170→12,065 with zero new violation and inventory stays 1,149; authenticated runtime-wide ApprovalBroker bootstrap verifier, real committed/rollback recovery canary, native Windows cleanup and full build proof remain open",
+      "updated": "2026-07-28"
     },
     {
       "order": 70,
@@ -8775,7 +8786,7 @@
       "truth": {
         "C": "1",
         "W": "~",
-        "E": "0",
+        "E": "~",
         "H": "?",
         "L": "0",
         "X": "0",
@@ -8787,10 +8798,12 @@
         "KERNEL-ATTEMPT-001",
         "RUNNER-PROTOCOL-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-07-28-BUILD-RECOVERY-01"
+      ],
       "acceptance": "Single leader per project/process realm; exact adoption or kill; no duplicate call",
-      "evidence": "2026-07-27 code-truth: automatic sprint recovery `complete` yolu evaluation→cleanup/finalizer'ı atlayabilir; CLI resume ayrı implementation; v2 stop marker ve stale one-shot settlement unwired",
-      "updated": "2026-07-27"
+      "evidence": "`receipt=GR-2026-07-28-BUILD-RECOVERY-01`; transactional build recovery validates exact journal/disk/quarantine evidence and requires an injected recovery verifier; the standalone bootstrap previously bypassed that seam with `() => true`, now fails before filesystem read or recovery mutation with typed `E_BUILD_RECOVERY_VERIFIER_UNAVAILABLE`; this is an honest HOLD, not recovery closure—runtime-wide ApprovalBroker verification, automatic sprint recovery evaluation→cleanup/finalizer parity, CLI resume unification, v2 stop propagation and stale one-shot settlement remain open",
+      "updated": "2026-07-28"
     },
     {
       "order": 3170,
@@ -12765,6 +12778,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "c1b3b2827c2ae943a0c4072824e02e99b4a1de673170a87db78d19ed3fb479a8"
+    "value": "ca6560ca89a1a12e69bff69bd91d5cbbb0059a80cdedd190bbfd593e937ebea1"
   }
 }

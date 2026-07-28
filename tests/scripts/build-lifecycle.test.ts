@@ -571,5 +571,11 @@ describe('transactional build lifecycle', () => {
       'dashboardBuilder: runDashboardWithVerifiedTool',
     );
     expect(source).toContain('run: runDashboardNodeTool');
+    expect(source).toContain(
+      "'E_BUILD_RECOVERY_VERIFIER_UNAVAILABLE'",
+    );
+    expect(source).not.toContain(
+      'recoveryAttestationVerifier: () => true',
+    );
   });
 });
