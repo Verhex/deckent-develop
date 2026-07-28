@@ -48,7 +48,7 @@ init → set_directives → plan → start → status → review → retro → c
 ## Run Lifecycle
 PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
-## Tools (48)
+## Tools (49)
 - deckent_init: Initialize Deckent in the current project directory
 - deckent_set_directives: Write run goals and task definitions to DIRECTIVES.md
 - deckent_plan: Generate task plan from DIRECTIVES (mode: ai/structured/auto)
@@ -96,6 +96,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 - deckent_nervous_undo: Plan an undo for the last accepted nervous suggestion (honest-unsupported when unavailable)
 - deckent_autonomous_approve: Approve an approval-required autonomous backlog entry
 - deckent_autonomous_reject: Reject an approval-required autonomous backlog entry
+- deckent_execution_authority: Inspect or reconcile namespace-local execution-authority mount metadata
 - deckent_kpi: Show the KPI scorecard for a run — returns { sprintId, kpis } with cost, token, cache, retry, completion, and quality metrics
 
 ## Resources (8)

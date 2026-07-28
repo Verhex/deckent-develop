@@ -39,6 +39,7 @@ import {
   releaseExecutionLock,
   type ExecutionLockInfo,
 } from '../../src/core/file-lock.js';
+import { processStartToken } from '../../src/core/pid-ownership.js';
 
 const REPO_ROOT = process.cwd();
 const temporaryRoots: string[] = [];
@@ -1126,6 +1127,34 @@ describe('clean active-execution admission', () => {
     expect(db.prepare('SELECT COUNT(*) AS count FROM execution_lock_active').get())
       .toEqual({ count: 0 });
     db.close();
+  });
+
+  it('accepts a persistent authority anchor recorded in another mount namespace', () => {
+    const root = fixtureRoot();
+    const lock = acquireCleanMaintenanceLock(root);
+    const anchorPath = join(
+      root,
+      '.deckent-execution-lock-authority.anchor.json',
+    );
+    const anchor = JSON.parse(readFileSync(anchorPath, 'utf8')) as {
+      project: { dev: string; ino: string; mountId: string };
+      locks: { dev: string; ino: string; mountId: string };
+      [key: string]: unknown;
+    };
+    const foreignMountId = anchor.project.mountId === '999999999'
+      ? '999999998'
+      : '999999999';
+    writeFileSync(anchorPath, JSON.stringify({
+      ...anchor,
+      project: { ...anchor.project, mountId: foreignMountId },
+      locks: { ...anchor.locks, mountId: foreignMountId },
+    }), 'utf8');
+
+    expect(reasonCodes(inspectActiveExecutions(root, {
+      processProbe: () => 'alive',
+    }))).toContain('E_CLEAN_PROJECT_MAINTENANCE_ACTIVE');
+    expect(releaseCleanMaintenanceLock(root, lock)).toBe(true);
+    expect(inspectActiveExecutions(root).decision).toBe('ALLOW');
   });
 
   it('validates live quarantine audits with a fixed JOIN query shape', () => {
@@ -2869,7 +2898,13 @@ describe('clean active-execution admission', () => {
         status: 'running',
       }],
     });
-    writeFileSync(join(root, '.deckent', 'bot.pid'), String(process.pid), 'utf-8');
+    writeJson(join(root, '.deckent', 'bot.pid'), {
+      schemaVersion: 1,
+      pid: process.pid,
+      startToken: processStartToken(process.pid),
+      projectRootDigest: sha256(realpathSync.native(root)),
+      recordedAt: '2026-07-27T00:00:00.000Z',
+    });
 
     const report = inspectActiveExecutions(root, { processProbe: () => 'alive' });
 
@@ -3172,6 +3207,37 @@ describe('clean active-execution admission', () => {
 
     expect(report.decision).toBe('ALLOW');
     expect(report.reasons).toEqual([]);
+  });
+
+  it('does not false-HOLD a reused structured bot pid or a foreign legacy pid', () => {
+    const reusedRoot = fixtureRoot();
+    const foreignRoot = fixtureRoot();
+    const liveToken = processStartToken(process.pid);
+    expect(liveToken).not.toBeNull();
+    const reusedToken = `s${BigInt(liveToken!.slice(1)) + 1n}`;
+    writeJson(join(reusedRoot, '.deckent', 'bot.pid'), {
+      schemaVersion: 1,
+      pid: process.pid,
+      startToken: reusedToken,
+      projectRootDigest: sha256(realpathSync.native(reusedRoot)),
+      recordedAt: '2026-07-27T00:00:00.000Z',
+    });
+    mkdirSync(join(foreignRoot, '.deckent'), { recursive: true });
+    writeFileSync(
+      join(foreignRoot, '.deckent', 'bot.pid'),
+      String(process.pid),
+      'utf-8',
+    );
+
+    const reused = inspectActiveExecutions(reusedRoot, {
+      processProbe: () => 'alive',
+    });
+    const foreign = inspectActiveExecutions(foreignRoot, {
+      processProbe: () => 'alive',
+    });
+
+    expect(reused.decision).toBe('ALLOW');
+    expect(foreign.decision).toBe('ALLOW');
   });
 
   it('classifies dead MCP launch anchors and unbound sprint markers as stale HOLDs', () => {

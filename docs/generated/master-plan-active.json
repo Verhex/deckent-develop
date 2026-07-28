@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "4705dd6fabdec29f74e060bbbe7c099558095562b7789b1187b5204884de08ab"
+    "value": "8a0872a5bf9bdcb07734122ef13191b014aabb792b70a3f2a1270479edccc10d"
   },
   "summary": {
     "total": 233,
     "active": 233,
     "terminal": 0,
-    "receipts": 13,
+    "receipts": 15,
     "byState": {
       "OPEN": 156,
       "READY": 0,
@@ -127,7 +127,7 @@
       "state": "OPEN",
       "updated": "2026-07-28",
       "definitionDigest": "3b37c301f1bb6534470bdd6bac1860f197f0155583f4c31e1bdc8191965e7dee",
-      "progressDigest": "d8d42bd2395a4649e8ebe6a04437fd10307064ef8651061a0a7e1119995f11cd",
+      "progressDigest": "818044be813eef350a809e7d395d633ff4ab669054f1ef7e1d62bc9417486980",
       "terminalClosureDigest": null
     },
     {
@@ -1447,7 +1447,7 @@
       "state": "OPEN",
       "updated": "2026-07-28",
       "definitionDigest": "04147d0d2a7650f4f91b4ed7d9edf5f971f1a02e004e011b9b474d5096f7b276",
-      "progressDigest": "b8af307a9ce98adf09fd668dda90ebbfb9e0fd575af2a2f0fdc115d92bc90278",
+      "progressDigest": "041345b012f552f85d6e59e4c62ac25576e8c5a86116211d31b56f1a2cbf14da",
       "terminalClosureDigest": null
     },
     {
@@ -1467,9 +1467,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-27",
+      "updated": "2026-07-28",
       "definitionDigest": "39bbd3f2a85126636caca99166563181fd427a28e19fdcaf38b95df1795a2591",
-      "progressDigest": "2c1748b3d52673598ea4f91fb898e5c2b25219258e0ea0f39d6f8e4816682344",
+      "progressDigest": "50f98bd63ac0750bc38ca273c2d5137737ca02b57e644fa87b36569752701d70",
       "terminalClosureDigest": null
     },
     {
@@ -1654,9 +1654,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-27",
+      "updated": "2026-07-28",
       "definitionDigest": "2b65e08312116577e0a74758aaa86113f9bd762a059f57704d3004efdf0b26bf",
-      "progressDigest": "e4969f00270b195c9f06c6f7c5791fa727c2b1cdda2ea8867ebfb293f8f5a33c",
+      "progressDigest": "563667fa83dc14a4c19f06807d6345f94575a6222dd651d6b9ee36bd2e11fb78",
       "terminalClosureDigest": null
     },
     {
@@ -1821,7 +1821,7 @@
       "state": "OPEN",
       "updated": "2026-07-28",
       "definitionDigest": "6af689eda66f6b9b288a93b76a5bee756215b3bedfb17ad27fe918673ea03fcc",
-      "progressDigest": "4dbafa1301b7dcf76ee91fc1d90065f7b40f71d41d21c617d3a19e867b65c1c4",
+      "progressDigest": "4d42436acf260ce36e463edb44fe691928b406cd735528f6c85e9ca4808d30d2",
       "terminalClosureDigest": null
     },
     {
@@ -2758,6 +2758,26 @@
         "transitionAt": "2026-07-28T15:35:23+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-28-EXECUTION-AUTHORITY-01",
+      "authorityDigest": "3713d46327d42d7825d1ad988778e269b81dd73176cee75c72825cd4cf1e8afb",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-28T16:14:24+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-28-BOT-PID-AUTHORITY-01",
+      "authorityDigest": "a9ea97f58faa3f4a39384c79c1fb41d3e2b7ddeedfb5153e48c688de2e08d4fd",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-28T16:46:07+03:00"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -3009,7 +3029,7 @@
         "W": "1",
         "E": "~",
         "H": "~",
-        "L": "0",
+        "L": "1",
         "X": "?",
         "S": "?"
       },
@@ -3019,10 +3039,12 @@
       "evidenceReceipts": [
         "GR-2026-07-26-TEST-HERMETIC-01",
         "GR-2026-07-27-TEST-HERMETIC-02",
-        "GR-2026-07-28-BUILD-RECOVERY-01"
+        "GR-2026-07-28-BUILD-RECOVERY-01",
+        "GR-2026-07-28-EXECUTION-AUTHORITY-01",
+        "GR-2026-07-28-BOT-PID-AUTHORITY-01"
       ],
       "acceptance": "Caller trace, deterministic reproduction, forbid-clean guard ve stable binary proof",
-      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-28-BUILD-RECOVERY-01`; clean authority is bound to the physical script root, rejects symlink/boundary ambiguity and validates all preserved entries before deletion; publish validation no longer build/cleans and uses `npm pack --dry-run --json --ignore-scripts`; production `build.mjs --recover` no longer promotes possession of a local JSON file into owner authority and exits before mutation with typed `E_BUILD_RECOVERY_VERIFIER_UNAVAILABLE`, while injected canonical verifier recovery remains available; one focused source contract and a real Node entrypoint smoke pass; unresolved hermetic effects decrease 12,170→12,065 with zero new violation and inventory stays 1,149; authenticated runtime-wide ApprovalBroker bootstrap verifier, real committed/rollback recovery canary, native Windows cleanup and full build proof remain open",
+      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-28-BUILD-RECOVERY-01`; `receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; `receipt=GR-2026-07-28-BOT-PID-AUTHORITY-01`; clean authority is bound to the physical script root, rejects symlink/boundary ambiguity and validates all preserved entries before deletion; persistent execution anchors compare stable `dev+ino` generations across Linux mount namespaces while same-process pinned descriptors retain exact mount-ID validation and `.locks` replacement remains fail-closed; bot authority now uses a strict project-digest plus kernel-start-token record, atomic no-clobber publication and generation-bound clear, retires dead/reused/provably-foreign legacy records without signalling and fail-closes ambiguous identity; the exact stale raw PID 2 record was reconciled without signal; focused bot/CLI/clean proof passes 71/71, prior combined execution-authority proof passes 132/132, and full TypeScript/lint gates pass at hermetic identities `12125/1151`; final `npm run build` completed clean `ALLOW`, TypeScript and 111 copied assets at 2026-07-28 16:53 +03:00; authenticated runtime-wide ApprovalBroker bootstrap verifier, real committed/rollback recovery canary, native Windows bot/process ownership adapter and cross-platform proof remain open",
       "updated": "2026-07-28"
     },
     {
@@ -8233,7 +8255,7 @@
         "W": "~",
         "E": "~",
         "H": "?",
-        "L": "0",
+        "L": "1",
         "X": "?",
         "S": "?"
       },
@@ -8243,10 +8265,11 @@
         "KERNEL-ONTOLOGY-001"
       ],
       "evidenceReceipts": [
-        "GR-2026-07-28-FILE-LOCK-01"
+        "GR-2026-07-28-FILE-LOCK-01",
+        "GR-2026-07-28-EXECUTION-AUTHORITY-01"
       ],
       "acceptance": "CAS, transactions, schema migration, bounded reconciliation and no file RMW race",
-      "evidence": "`receipt=GR-2026-07-28-FILE-LOCK-01`; execution-lock v3 uses project/lock-directory generation anchors, SQLite `BEGIN IMMEDIATE`, monotonic fencing, exact projection compensation/reconciliation, atomic v2 quarantine migration and 256-row keyset pages for active, migration, live quarantine and audit scans; projection ownership lookup is O(1), four focused migration/concurrency/release/scale regressions pass and root/dashboard TypeScript compile; this proves the Linux/WSL file-lock authority slice only—Goal-v2, RunFlow, CLI/REPL, sprint and ScheduledFlow remain competing authorities, native macOS/Windows adapters and live/HA scale evidence remain open; Claude Fable 5 XVerify emitted `require is not defined`, exceeded its 300s timeout and was interrupted, therefore cross-provider verification remains unavailable and is not claimed",
+      "evidence": "`receipt=GR-2026-07-28-FILE-LOCK-01`; `receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; execution-lock v3 uses project/lock-directory generation anchors, SQLite `BEGIN IMMEDIATE`, monotonic fencing, exact projection compensation/reconciliation, atomic v2 quarantine migration and 256-row keyset pages for active, migration, live quarantine and audit scans; persistent anchor authority now binds stable `dev+ino` generations because Linux mount IDs are namespace-local, while exact mount-ID checks remain on every in-process pinned descriptor/path validation; optional dry-run-first CLI/MCP metadata reconciliation never changes authority or epoch and writes a redacted immutable audit only under operator+justification apply authority; targeted core/CLI/MCP proof passes 59/59, integrated clean/fence proof passes 102/102 and the real build passes; this proves the Linux/WSL execution-lock and clean slice only—Goal-v2, RunFlow, CLI/REPL, sprint and ScheduledFlow remain competing authorities, native macOS/Windows adapters and live/HA scale evidence remain open; fresh cross-provider verification was not executed in this provider-free recovery and is not claimed",
       "updated": "2026-07-28"
     },
     {
@@ -8329,11 +8352,11 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "~",
+        "C": "1",
         "W": "~",
-        "E": "0",
+        "E": "~",
         "H": "?",
-        "L": "0",
+        "L": "1",
         "X": "?",
         "S": "?"
       },
@@ -8343,10 +8366,12 @@
         "KERNEL-ATTEMPT-001",
         "RECEIPT-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-07-28-EXECUTION-AUTHORITY-01"
+      ],
       "acceptance": "Exactly-one terminal result, criterion evidence, usage and causal lineage",
-      "evidence": "2026-07-27 live forensic: pre-provider Codex budget rejectioni `run-1785148266632-0` artifact'ını process/log/result olmadan `PENDING` bıraktı; sprint `COMPLETE` cleanup/finalizer truth'ından önce yayınlanabiliyor",
-      "updated": "2026-07-27"
+      "evidence": "`receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; operator-authorized reconciliation settled Sprint-461's 24 tasks plus `run-1785148266632-0` and `xv-1785188583830-xverify` from raw `PENDING` to effective `NOT_DISPATCHED` with typed `execution_admission_rejected` immutable invocation receipts after proving heartbeat/log/result/process/backend absence; raw task JSON remained unchanged and build clean consumed all twenty-six projections as canonical receipt authority; general exactly-one provider result/usage settlement, automatic rejected-admission projection and sprint COMPLETE/finalizer ordering remain open",
+      "updated": "2026-07-28"
     },
     {
       "order": 3050,
@@ -9011,9 +9036,9 @@
       "truth": {
         "C": "~",
         "W": "~",
-        "E": "0",
+        "E": "~",
         "H": "?",
-        "L": "0",
+        "L": "1",
         "X": "?",
         "S": "?"
       },
@@ -9024,10 +9049,13 @@
         "AUTONOMY-CUTOVER-001",
         "PROCESS-CUTOVER-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-07-28-EXECUTION-AUTHORITY-01",
+        "GR-2026-07-28-BOT-PID-AUTHORITY-01"
+      ],
       "acceptance": "No surface-owned execution/state engine; parity and contract tests",
-      "evidence": "2026-07-27 code-truth: RunFlow coordinator, approval gates, autonomous status/approve, cancel, review/finalize/cleanup ve recovery semantics surface bazında ayrışıyor; dashboard read-only kalması intentional",
-      "updated": "2026-07-27"
+      "evidence": "`receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; `receipt=GR-2026-07-28-BOT-PID-AUTHORITY-01`; optional namespace-local mount-metadata reconciliation is one canonical service exposed through `deckent execution-authority mount-adopt` and MCP `deckent_execution_authority`, default dry-run on both, apply requiring operator identity and justification, with 49/49 MCP instruction coverage and no new CLI↔MCP parity gap; final build completed and host `deckent bot stop` safely reported not-running before `bot start`; ownership-bound status and host process inspection prove PID 3906922 is the final `dist/cli/entry.js bot listen` daemon, while the pid claim is published only after at least one connector is active; Nervous reports no pending notifications; RunFlow coordinator, approval gates, autonomous status/approve, cancel, review/finalize/cleanup and recovery semantics still diverge across API, terminal and Desktop, while dashboard remains intentionally read-only",
+      "updated": "2026-07-28"
     },
     {
       "order": 3220,
@@ -9718,7 +9746,7 @@
         "GR-2026-07-28-COST-ADMISSION-01"
       ],
       "acceptance": "One host authority for admission, reservation, usage, landing and settlement",
-      "evidence": "`receipt=GR-2026-07-28-COST-ADMISSION-01`; cost admission now separates metered API price authority from registry-known zero-incremental-USD subscription/local/free-tier identity: real project config admits `gpt-5.6-sol` subscription with `unpricedModels=[]`, `$0` and quota `unknown`, while the identical API task remains `COST_PRICING_UNKNOWN` even under acknowledge; 29/29 cost-gate tests and the live-config source reproducer pass with unchanged hermetic counts `12065/1149`; this does not supply remaining-quota evidence, parent `provider_limits`, reservation, settlement or Codex provider-limit source authority, so unified limit-ledger closure remains open",
+      "evidence": "`receipt=GR-2026-07-28-COST-ADMISSION-01`; cost admission separates metered API price authority from registry-known zero-incremental-USD subscription/local/free-tier identity: real project config admits `gpt-5.6-sol` subscription with `unpricedModels=[]`, `$0` and quota `unknown`, while identical API work remains `COST_PRICING_UNKNOWN`; 2026-07-28 live read-only Claude subscription probe reports session 10%, week-all 6%, week-Fable 5% and `ok`, but legacy `limit_gate` is disabled and neither global nor project config contains `provider_limits`; global bootstrap is intentionally not authored because no owner numeric thresholds were supplied and the runtime currently registers only Claude host-subprocess subscription evidence, not Codex main-provider limit source authority—writing it would create a new fail-closed HOLD rather than safe enablement; reservation, settlement and Codex authority remain open",
       "updated": "2026-07-28"
     },
     {
@@ -12801,6 +12829,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "a159033e3145ac779c1102e75fb83d3cde031cdb93c7a1f08261567cdefd4f83"
+    "value": "e41d923c0e36386afea70b3f758c05f9f948a30530e327170e37e7e6a95002de"
   }
 }

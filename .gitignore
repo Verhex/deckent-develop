@@ -240,6 +240,8 @@ examples/voice-wrapper/
 .deckent/autonomous/autonomous.db-shm
 .deckent/mcp-writer.lease
 .deckent/runtime/invocations.db
+.deckent/runtime/invocations.db-shm
+.deckent/runtime/invocations.db-wal
 .deckent/runtime/resource-log-dogfood.jsonl
 .deckent/runtime/scheduler-shadow/
 .deckent/recovery-snapshots/

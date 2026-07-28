@@ -449,6 +449,71 @@ const MESSAGES: MessageMap = {
     en: 'Inspect and rotate host-scoped provider authority integrity keys',
     tr: 'Host kapsamlı provider authority bütünlük anahtarlarını incele ve döndür',
   },
+  'cmdCatalog.execution-authority.summary': {
+    en: 'Inspect and explicitly reconcile execution authority bindings',
+    tr: 'Execution authority bağlarını incele ve açıkça uzlaştır',
+  },
+  // ─── execution-authority mount adoption ─────────────────────────────────
+  'execution_authority.cmd_desc': {
+    en: 'Inspect and reconcile project execution authority bindings',
+    tr: 'Proje execution authority bağlarını incele ve uzlaştır',
+  },
+  'execution_authority.mount_adopt.desc': {
+    en: 'Reconcile namespace-local Linux/WSL mount metadata without changing execution authority',
+    tr: 'Execution authority\'yi değiştirmeden namespace-local Linux/WSL mount metadata\'sını uzlaştır',
+  },
+  'execution_authority.mount_adopt.mcp_title': {
+    en: 'Execution Authority Reconciliation',
+    tr: 'Execution Authority Uzlaştırması',
+  },
+  'execution_authority.mount_adopt.mcp_desc': {
+    en: 'Inspect or explicitly reconcile namespace-local Linux/WSL mount metadata. Stable dev+ino execution authority and its epoch do not change. Dry-run is the default; apply requires operator and justification.',
+    tr: 'Namespace-local Linux/WSL mount metadata\'sını incele veya açıkça uzlaştır. Stable dev+ino execution authority ve epoch değişmez. Varsayılan dry-run\'dır; apply için operator ve justification zorunludur.',
+  },
+  'execution_authority.mount_adopt.mcp_action': {
+    en: 'Execution-authority action; currently mount-adopt',
+    tr: 'Execution-authority işlemi; şu anda mount-adopt',
+  },
+  'execution_authority.mount_adopt.opt_apply': {
+    en: 'Apply eligible observational metadata reconciliation (default: dry-run)',
+    tr: 'Uygun gözlemsel metadata uzlaştırmasını uygula (varsayılan: dry-run)',
+  },
+  'execution_authority.mount_adopt.opt_operator': {
+    en: 'Stable operator identifier; only its SHA-256 digest is persisted',
+    tr: 'Sabit operatör kimliği; yalnız SHA-256 özeti kalıcılaştırılır',
+  },
+  'execution_authority.mount_adopt.opt_justification': {
+    en: 'Operator-authored reconciliation justification; only its SHA-256 digest is persisted',
+    tr: 'Operatörün uzlaştırma gerekçesi; yalnız SHA-256 özeti kalıcılaştırılır',
+  },
+  'execution_authority.mount_adopt.opt_json': {
+    en: 'Emit the stable machine-readable adoption DTO',
+    tr: 'Kararlı makine-okunur adoption DTO çıktısı üret',
+  },
+  'execution_authority.mount_adopt.apply_guard': {
+    en: 'Refused: --apply requires both --operator <id> and --justification <text>. Nothing was changed.',
+    tr: 'Reddedildi: --apply için hem --operator <kimlik> hem --justification <metin> zorunludur. Hiçbir şey değiştirilmedi.',
+  },
+  'execution_authority.mount_adopt.eligible': {
+    en: 'DRY-RUN — authority {authorityEpoch}: namespace-local mount observation {previousMountId} → {currentMountId}; optional audited metadata reconciliation is eligible, authority is unchanged.',
+    tr: 'DRY-RUN — authority {authorityEpoch}: namespace-local mount gözlemi {previousMountId} → {currentMountId}; opsiyonel audit\'li metadata uzlaştırması uygun, authority değişmedi.',
+  },
+  'execution_authority.mount_adopt.adopted': {
+    en: 'RECONCILED — authority {authorityEpoch}: mount observation {previousMountId} → {currentMountId}; stable generation and epoch were unchanged, immutable evidence was recorded.',
+    tr: 'UZLAŞTIRILDI — authority {authorityEpoch}: mount gözlemi {previousMountId} → {currentMountId}; stable generation ve epoch değişmedi, değişmez kanıt kaydedildi.',
+  },
+  'execution_authority.mount_adopt.not_required': {
+    en: 'UNCHANGED — authority {authorityEpoch}: this namespace already records mount observation {currentMountId}; stable dev+ino authority is unchanged.',
+    tr: 'DEĞİŞMEDİ — authority {authorityEpoch}: bu namespace zaten {currentMountId} mount gözlemini kaydediyor; stable dev+ino authority değişmedi.',
+  },
+  'execution_authority.mount_adopt.evidence': {
+    en: 'Evidence: {evidenceRefs}',
+    tr: 'Kanıt: {evidenceRefs}',
+  },
+  'execution_authority.mount_adopt.failed': {
+    en: 'Execution authority mount-metadata reconciliation was refused ({reason}). Nothing was deleted.',
+    tr: 'Execution authority mount-metadata uzlaştırması reddedildi ({reason}). Hiçbir şey silinmedi.',
+  },
   // ─── provider-authority keyring (owner-gated integrity material) ──────────
   'provider_authority.cmd_desc': {
     en: 'Inspect and provision the host-scoped provider authority keyring (owner-gated)',
@@ -2775,6 +2840,22 @@ const MESSAGES: MessageMap = {
     en: 'Run the bot listener as a background daemon',
     tr: 'Bot dinleyicisini arka plan daemon\'ı olarak çalıştır',
   },
+  'bot.stop_desc': {
+    en: 'Stop the bot daemon',
+    tr: 'Bot daemon\'ını durdur',
+  },
+  'bot.status_desc': {
+    en: 'Show whether the bot daemon is running',
+    tr: 'Bot daemon\'ının çalışıp çalışmadığını göster',
+  },
+  'bot.root_option': {
+    en: 'Project root override',
+    tr: 'Proje kökü geçersiz kılma değeri',
+  },
+  'bot.lang_option': {
+    en: 'Language override (en|tr)',
+    tr: 'Dil geçersiz kılma değeri (en|tr)',
+  },
   'bot.daemon_started': {
     en: '🟢 Bot daemon started (pid {pid}). Always-on while this machine is up. Stop with: deckent bot stop',
     tr: '🟢 Bot daemon başladı (pid {pid}). Makine açık olduğu sürece çalışır. Durdurmak için: deckent bot stop',
@@ -2790,6 +2871,14 @@ const MESSAGES: MessageMap = {
   'bot.daemon_spawn_failed': {
     en: '⚠️ Failed to start the bot daemon.',
     tr: '⚠️ Bot daemon başlatılamadı.',
+  },
+  'bot.daemon_pid_record_failed': {
+    en: '⚠️ Bot listener started, but its process ownership record could not be claimed. The listener was stopped safely.',
+    tr: '⚠️ Bot dinleyicisi başladı ancak process ownership kaydı alınamadı. Dinleyici güvenli biçimde durduruldu.',
+  },
+  'bot.daemon_ownership_unknown': {
+    en: '⛔ Bot process ownership cannot be proven (pid {pid}, reason {reason}); no signal or new daemon was issued.',
+    tr: '⛔ Bot process ownership kanıtlanamıyor (pid {pid}, neden {reason}); sinyal gönderilmedi ve yeni daemon başlatılmadı.',
   },
   'bot.daemon_stopped': {
     en: '🛑 Bot daemon stopped (pid {pid}).',

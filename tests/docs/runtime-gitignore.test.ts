@@ -25,6 +25,8 @@ const PROJECT_GITIGNORE = readFileSync(join(PROJECT_ROOT, '.gitignore'), 'utf-8'
 
 const REQUIRED_RUNTIME_IGNORE_ENTRIES = [
   '.deckent/runtime/jobs/',
+  '.deckent/runtime/invocations.db-shm',
+  '.deckent/runtime/invocations.db-wal',
   '.deckent/prompts/',
   '.deckent/traces/',
 ];
@@ -83,6 +85,16 @@ describe('runtime gitignore hygiene (359-014)', () => {
       const relPath = join('.deckent', 'runtime', 'jobs', 'job-abc123.json');
       mkdirSync(join(fixtureDir, '.deckent', 'runtime', 'jobs'), { recursive: true });
       writeFileSync(join(fixtureDir, relPath), '{}', 'utf-8');
+      expect(await isIgnored(fixtureDir, relPath)).toBe(true);
+    });
+
+    it.each([
+      'invocations.db-shm',
+      'invocations.db-wal',
+    ])('ignores SQLite runtime sidecar %s', async (fileName) => {
+      const relPath = join('.deckent', 'runtime', fileName);
+      mkdirSync(join(fixtureDir, '.deckent', 'runtime'), { recursive: true });
+      writeFileSync(join(fixtureDir, relPath), '', 'utf-8');
       expect(await isIgnored(fixtureDir, relPath)).toBe(true);
     });
 

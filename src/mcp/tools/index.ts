@@ -40,6 +40,7 @@ import { registerCatalogParityTools } from './catalog-parity.js';
 import { registerAutonomousSurfaceTools } from './autonomous-surface.js';
 import { registerNervousEditTools } from './nervous-edit.js';
 import { registerAutonomousApprovalTools } from './autonomous-approval.js';
+import { registerExecutionAuthorityTool } from './execution-authority.js';
 
 /**
  * One entry in the canonical MCP tool catalog.
@@ -117,6 +118,7 @@ export const TOOL_CATALOG: McpToolCatalogEntry[] = [
   // DEFER-001 (363-011) — autonomous approval decisions
   { name: 'deckent_autonomous_approve', description: 'Approve an approval-required autonomous backlog entry', readOnly: false },
   { name: 'deckent_autonomous_reject', description: 'Reject an approval-required autonomous backlog entry', readOnly: false },
+  { name: 'deckent_execution_authority', description: 'Inspect or reconcile namespace-local execution-authority mount metadata', readOnly: false },
 ];
 
 /** Canonical count of registered MCP tools, derived from {@link TOOL_CATALOG}. */
@@ -171,4 +173,5 @@ export function registerTools(
   registerAutonomousSurfaceTools(server);
   registerNervousEditTools(server);
   registerAutonomousApprovalTools(server);
+  registerExecutionAuthorityTool(server);
 }

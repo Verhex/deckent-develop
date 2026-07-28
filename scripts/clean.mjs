@@ -2068,11 +2068,14 @@ function inspectTaskExecutionLocks(
         );
         const projectIdentity = cleanExecutionDirectoryIdentity(rootFd);
         const locksIdentity = cleanExecutionDirectoryIdentity(locksFd);
-        if (!cleanExecutionDirectoryIdentityEquals(
+        // Linux mount ids are local to a mount namespace. Persistent authority
+        // binds the stable directory generation (dev+ino); pinned validation
+        // retains exact mount-id checks inside this process.
+        if (!cleanExecutionStableDirectoryIdentityEquals(
           projectIdentity,
           anchor.project,
         )
-          || !cleanExecutionDirectoryIdentityEquals(
+          || !cleanExecutionStableDirectoryIdentityEquals(
             locksIdentity,
             anchor.locks,
           )) {
@@ -3761,19 +3764,160 @@ function inspectMissionState(report, projectRoot, nowMs) {
 
 function inspectBotState(report, projectRoot, processProbe) {
   const botPidPath = join(projectRoot, '.deckent', 'bot.pid');
+  const evidenceRef = [evidencePath(projectRoot, botPidPath)];
+  let raw;
   try {
     if (!evidenceExists(botPidPath)) return;
+    raw = readBoundedText(botPidPath, 4_096);
   } catch (error) {
     addReason(report, {
       code: 'E_CLEAN_BOT_STATE_INVALID',
       surface: 'bot',
       subject: 'telegram-bot',
       detailCode: evidenceErrorKind(error),
-      evidenceRefs: [evidencePath(projectRoot, botPidPath)],
+      evidenceRefs: evidenceRef,
     });
     return;
   }
-  inspectPlainPidFile(report, projectRoot, botPidPath, 'bot', 'telegram-bot', processProbe);
+
+  const addInvalid = detailCode => addReason(report, {
+    code: 'E_CLEAN_BOT_STATE_INVALID',
+    surface: 'bot',
+    subject: 'telegram-bot',
+    detailCode,
+    evidenceRefs: evidenceRef,
+  });
+  const addUnknown = (pid, detailCode) => addReason(report, {
+    code: 'E_CLEAN_BOT_STATE_UNKNOWN',
+    surface: 'bot',
+    subject: 'telegram-bot',
+    observedStatus: 'OWNERSHIP_UNKNOWN',
+    detailCode,
+    evidenceRefs: evidenceRef,
+    ...(pid === null ? {} : { pid }),
+  });
+  const addActive = pid => addReason(report, {
+    code: 'E_CLEAN_BOT_ACTIVE',
+    surface: 'bot',
+    subject: 'telegram-bot',
+    observedStatus: 'OWNED',
+    evidenceRefs: evidenceRef,
+    pid,
+  });
+
+  const legacyPid = parsePid(raw);
+  if (legacyPid !== null) {
+    const state = processProbe(legacyPid);
+    if (state === 'dead') return;
+    if (state !== 'alive') {
+      addUnknown(legacyPid, 'PROCESS_LIVENESS_UNKNOWN');
+      return;
+    }
+    const identity = inspectLegacyBotIdentity(projectRoot, legacyPid);
+    if (identity === 'bot') addActive(legacyPid);
+    else if (identity === 'unknown') addUnknown(legacyPid, 'LEGACY_IDENTITY_UNAVAILABLE');
+    // A live but provably foreign legacy pid is stale evidence, not a bot.
+    return;
+  }
+
+  let record;
+  try {
+    record = JSON.parse(raw);
+  } catch {
+    addInvalid('INVALID_JSON');
+    return;
+  }
+  if (!validBotPidRecord(record)) {
+    addInvalid('INVALID_SHAPE');
+    return;
+  }
+  if (record.projectRootDigest !== sha256(projectRoot)) {
+    addUnknown(record.pid, 'PROJECT_BINDING_MISMATCH');
+    return;
+  }
+  const state = processProbe(record.pid);
+  if (state === 'dead') return;
+  if (state !== 'alive') {
+    addUnknown(record.pid, 'PROCESS_LIVENESS_UNKNOWN');
+    return;
+  }
+  const liveToken = cleanProcessStartToken(record.pid);
+  if (record.startToken !== null && liveToken !== null) {
+    if (record.startToken === liveToken) addActive(record.pid);
+    // A differing token proves PID reuse; stale evidence must not block build.
+    return;
+  }
+  addUnknown(record.pid, 'START_TOKEN_UNAVAILABLE');
+}
+
+function validBotPidRecord(value) {
+  if (!isRecord(value)) return false;
+  const keys = Object.keys(value).sort();
+  if (canonicalJson(keys) !== canonicalJson([
+    'pid',
+    'projectRootDigest',
+    'recordedAt',
+    'schemaVersion',
+    'startToken',
+  ].sort())) return false;
+  return value.schemaVersion === 1
+    && Number.isSafeInteger(value.pid)
+    && value.pid > 0
+    && (value.startToken === null
+      || (typeof value.startToken === 'string' && /^s\d+$/u.test(value.startToken)))
+    && typeof value.projectRootDigest === 'string'
+    && /^[a-f0-9]{64}$/u.test(value.projectRootDigest)
+    && typeof value.recordedAt === 'string'
+    && Number.isFinite(Date.parse(value.recordedAt))
+    && new Date(value.recordedAt).toISOString() === value.recordedAt;
+}
+
+function cleanProcessStartToken(pid) {
+  if (process.platform !== 'linux') return null;
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf-8');
+    const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+    const starttime = fields[19];
+    return starttime && /^\d+$/u.test(starttime) ? `s${starttime}` : null;
+  } catch {
+    return null;
+  }
+}
+
+function inspectLegacyBotIdentity(projectRoot, pid) {
+  if (process.platform !== 'linux') return 'unknown';
+  try {
+    const cwd = realpathSync.native(`/proc/${pid}/cwd`);
+    if (!canonicalPathEquals(cwd, projectRoot)) return 'foreign';
+    const argv = readFileSync(`/proc/${pid}/cmdline`, 'utf-8')
+      .split('\0')
+      .filter(Boolean);
+    if (argv.length < 4 || argv[2] !== 'bot' || argv[3] !== 'listen') {
+      return 'foreign';
+    }
+    let actualEntry;
+    try {
+      actualEntry = realpathSync.native(argv[1]);
+    } catch {
+      return 'foreign';
+    }
+    const expectedEntries = [
+      join(projectRoot, 'dist', 'cli', 'entry.js'),
+      join(projectRoot, 'src', 'cli', 'entry.ts'),
+    ].flatMap(path => {
+      try {
+        return [realpathSync.native(path)];
+      } catch {
+        return [];
+      }
+    });
+    return expectedEntries.some(expected =>
+      canonicalPathEquals(actualEntry, expected))
+      ? 'bot'
+      : 'foreign';
+  } catch {
+    return 'unknown';
+  }
 }
 
 /**
@@ -3951,6 +4095,10 @@ function cleanExecutionDirectoryIdentityEquals(left, right) {
   return left.dev === right.dev
     && left.ino === right.ino
     && left.mountId === right.mountId;
+}
+
+function cleanExecutionStableDirectoryIdentityEquals(left, right) {
+  return left.dev === right.dev && left.ino === right.ino;
 }
 
 function pinCleanExecutionAuthorityDirectories(projectRoot) {
@@ -4459,11 +4607,11 @@ function createCleanExecutionAuthorityAnchor(
 }
 
 function assertCleanExecutionAuthorityAnchorBinding(anchor, pinned) {
-  if (!cleanExecutionDirectoryIdentityEquals(
+  if (!cleanExecutionStableDirectoryIdentityEquals(
     anchor.project,
     pinned.projectIdentity,
   )
-    || !cleanExecutionDirectoryIdentityEquals(
+    || !cleanExecutionStableDirectoryIdentityEquals(
       anchor.locks,
       pinned.locksIdentity,
     )) {

@@ -26,9 +26,11 @@ import {
   vi,
 } from 'vitest';
 import {
+  EXECUTION_LOCK_AUTHORITY_ANCHOR_FILENAME,
   EXECUTION_LOCK_AUTHORITY_SENTINEL_FILENAME,
   EXECUTION_LOCK_DB_META_VERSION,
   EXECUTION_LOCK_COORDINATION_DB_FILENAME,
+  EXECUTION_LOCK_MOUNT_ADOPTION_DIRECTORY,
   EXECUTION_LOCK_RECOVERY_ATTESTATION_SCHEMA_VERSION,
   EXECUTION_LOCK_SCHEMA_VERSION,
   PROJECT_MAINTENANCE_LOCK_TASK_ID,
@@ -37,6 +39,7 @@ import {
   ExecutionLockError,
   acquireExecutionLock,
   acquireProjectMaintenanceLock,
+  adoptExecutionLockAuthorityMount,
   assertExecutionLockFencingProgression,
   beginExecutionLockIrreversibleBoundary,
   checkExecutionLock,
@@ -65,6 +68,25 @@ function readLock(root: string, taskId: string): ExecutionLockInfo {
 
 function executionAuthorityDbPath(root: string): string {
   return join(root, '.locks', EXECUTION_LOCK_COORDINATION_DB_FILENAME);
+}
+
+function simulateExecutionAuthorityRemount(root: string): {
+  readonly originalMountId: string;
+  readonly simulatedMountId: string;
+} {
+  const anchorPath = join(root, EXECUTION_LOCK_AUTHORITY_ANCHOR_FILENAME);
+  const anchor = JSON.parse(readFileSync(anchorPath, 'utf8')) as {
+    project: { mountId: string };
+    locks: { mountId: string };
+  };
+  const originalMountId = anchor.project.mountId;
+  const simulatedMountId = String(BigInt(originalMountId) + 1n);
+  writeFileSync(anchorPath, JSON.stringify({
+    ...anchor,
+    project: { ...anchor.project, mountId: simulatedMountId },
+    locks: { ...anchor.locks, mountId: simulatedMountId },
+  }), 'utf8');
+  return { originalMountId, simulatedMountId };
 }
 
 function seedLegacyV2ExecutionAuthority(
@@ -1298,6 +1320,112 @@ describe('task execution lock authority', () => {
       }));
   });
 
+  it('keeps cross-namespace mount ids observational and can audit an explicit metadata adoption', () => {
+    const first = acquireExecutionLock(root, 'mount-adoption-seed', 'dispatch');
+    releaseExecutionLock(root, first.taskId, first.ownerId);
+    const { originalMountId, simulatedMountId } =
+      simulateExecutionAuthorityRemount(root);
+    const anchorPath = join(root, EXECUTION_LOCK_AUTHORITY_ANCHOR_FILENAME);
+    const before = readFileSync(anchorPath, 'utf8');
+
+    const namespacePeer = acquireExecutionLock(
+      root,
+      'mount-namespace-peer',
+      'dispatch',
+    );
+    expect(namespacePeer.fencingToken.epoch).toBe(first.fencingToken.epoch);
+    releaseExecutionLock(root, namespacePeer.taskId, namespacePeer.ownerId);
+
+    const planned = adoptExecutionLockAuthorityMount(root);
+    expect(planned).toMatchObject({
+      decision: 'eligible',
+      authorityEpoch: first.fencingToken.epoch,
+      previous: { mountId: simulatedMountId },
+      current: { mountId: originalMountId },
+    });
+    expect(readFileSync(anchorPath, 'utf8')).toBe(before);
+    expect(existsSync(join(
+      root,
+      '.locks',
+      EXECUTION_LOCK_MOUNT_ADOPTION_DIRECTORY,
+    ))).toBe(false);
+
+    const operatorId = 'operator-1';
+    const justification = 'verified WSL remount with stable directory identities';
+    const adopted = adoptExecutionLockAuthorityMount(root, {
+      apply: true,
+      operatorId,
+      justification,
+      now: () => BASE_TIME,
+    });
+    expect(adopted).toMatchObject({
+      decision: 'adopted',
+      authorityEpoch: first.fencingToken.epoch,
+      previous: { mountId: simulatedMountId },
+      current: { mountId: originalMountId },
+    });
+    expect(adopted.evidenceRefs).toEqual(expect.arrayContaining([
+      expect.stringMatching(/^execution-lock-mount-adoption:sha256:[a-f0-9]{64}$/u),
+    ]));
+
+    const anchorAfter = JSON.parse(readFileSync(anchorPath, 'utf8')) as {
+      authorityEpoch: string;
+      project: { mountId: string };
+      locks: { mountId: string };
+    };
+    expect(anchorAfter).toMatchObject({
+      authorityEpoch: first.fencingToken.epoch,
+      project: { mountId: originalMountId },
+      locks: { mountId: originalMountId },
+    });
+    const auditDirectory = join(
+      root,
+      '.locks',
+      EXECUTION_LOCK_MOUNT_ADOPTION_DIRECTORY,
+    );
+    const auditFiles = readdirSync(auditDirectory);
+    expect(auditFiles).toHaveLength(1);
+    const auditRaw = readFileSync(join(auditDirectory, auditFiles[0]!), 'utf8');
+    expect(auditRaw).not.toContain(operatorId);
+    expect(auditRaw).not.toContain(justification);
+    expect(auditRaw).toContain(simulatedMountId);
+    expect(auditRaw).toContain(originalMountId);
+
+    expect(adoptExecutionLockAuthorityMount(root)).toMatchObject({
+      decision: 'not-required',
+      authorityEpoch: first.fencingToken.epoch,
+    });
+    const next = acquireExecutionLock(root, 'mount-adoption-next', 'dispatch');
+    expect(next.fencingToken.epoch).toBe(first.fencingToken.epoch);
+    expect(next.fencingToken.counter).toBeGreaterThan(first.fencingToken.counter);
+    releaseExecutionLock(root, next.taskId, next.ownerId);
+  });
+
+  it('refuses mount adoption while a canonical execution is active', () => {
+    const active = acquireExecutionLock(root, 'mount-adoption-active', 'dispatch');
+    simulateExecutionAuthorityRemount(root);
+
+    expect(() => adoptExecutionLockAuthorityMount(root, {
+      apply: true,
+      operatorId: 'operator-1',
+      justification: 'must not adopt while active',
+    })).toThrowError(expect.objectContaining({
+      reason: 'project-active',
+    }));
+    const db = new Database(executionAuthorityDbPath(root), { readonly: true });
+    expect(db.prepare(`
+      SELECT owner_id
+        FROM execution_lock_active
+       WHERE task_id = ?
+    `).get(active.taskId)).toEqual({ owner_id: active.ownerId });
+    db.close();
+    expect(existsSync(join(
+      root,
+      '.locks',
+      EXECUTION_LOCK_MOUNT_ADOPTION_DIRECTORY,
+    ))).toBe(false);
+  });
+
   it('rejects a second authority bootstrap after the bound lock directory is replaced', () => {
     const lock = acquireExecutionLock(
       root,
@@ -1328,6 +1456,13 @@ describe('task execution lock authority', () => {
       join(root, '.deckent-execution-lock-authority.anchor.json'),
       'utf8',
     )).toContain(lock.fencingToken.epoch);
+    expect(() => adoptExecutionLockAuthorityMount(root, {
+      apply: true,
+      operatorId: 'operator-1',
+      justification: 'directory replacement is not a remount',
+    })).toThrowError(expect.objectContaining({
+      reason: 'authority-state-missing',
+    }));
   });
 
   it('surfaces a committed renewal when projection repair loses the lock-directory generation', () => {

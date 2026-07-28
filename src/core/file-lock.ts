@@ -662,10 +662,13 @@ export const EXECUTION_LOCK_BOUNDARY_COMPLETION_SCHEMA_VERSION = 1 as const;
 export const EXECUTION_LOCK_RECOVERY_ATTESTATION_SCHEMA_VERSION = 1 as const;
 export const EXECUTION_LOCK_QUARANTINE_AUDIT_SCHEMA_VERSION = 1 as const;
 export const EXECUTION_LOCK_AUTHORITY_SENTINEL_SCHEMA_VERSION = 1 as const;
+export const EXECUTION_LOCK_MOUNT_ADOPTION_SCHEMA_VERSION = 1 as const;
 export const EXECUTION_LOCK_COORDINATION_DB_FILENAME =
   'execution-lock-authority.sqlite3';
 export const EXECUTION_LOCK_AUTHORITY_SENTINEL_FILENAME =
   'execution-lock-authority.sentinel.json';
+export const EXECUTION_LOCK_MOUNT_ADOPTION_DIRECTORY =
+  'execution-lock-authority-adoptions';
 export const EXECUTION_LOCK_AUTHORITY_ANCHOR_FILENAME =
   '.deckent-execution-lock-authority.anchor.json';
 export const DEFAULT_EXECUTION_LOCK_LEASE_MS = 30_000;
@@ -678,6 +681,7 @@ export const PROJECT_MAINTENANCE_LOCK_TASK_ID =
 const MAX_EXECUTION_LOCK_PROJECTION_BYTES = 16_384;
 const MAX_EXECUTION_LOCK_SENTINEL_BYTES = 1_024;
 const MAX_EXECUTION_LOCK_ANCHOR_BYTES = 2_048;
+const MAX_EXECUTION_LOCK_MOUNT_ADOPTION_BYTES = 8_192;
 const MAX_EXECUTION_LOCK_DB_BYTES = 1_073_741_824;
 const MAX_EXECUTION_LOCK_IDENTITY_BYTES = 128;
 const EXECUTION_LOCK_SQLITE_BUSY_TIMEOUT_MS = 250;
@@ -688,6 +692,7 @@ const EXECUTION_LOCK_IDENTITY_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/u;
 const EXECUTION_LOCK_UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const EXECUTION_LOCK_FENCING_NONCE_PATTERN = /^[0-9a-f]{32}$/u;
+const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/u;
 const MAX_EXECUTION_LOCK_QUARANTINE_REASON_BYTES = 128;
 const MAX_EXECUTION_LOCK_RECOVERY_OPERATOR_BYTES = 128;
 const MAX_EXECUTION_LOCK_RECOVERY_JUSTIFICATION_BYTES = 2_048;
@@ -818,6 +823,34 @@ export interface ExecutionLockRecoveryResult {
   readonly recovered: ExecutionLockQuarantineInfo;
   readonly audit: ExecutionLockQuarantineAuditEvent;
   readonly projectionCleanup: 'completed' | 'uncertain';
+}
+
+export interface ExecutionLockMountIdentity {
+  readonly projectDev: string;
+  readonly projectIno: string;
+  readonly locksDev: string;
+  readonly locksIno: string;
+  readonly mountId: string;
+}
+
+export interface ExecutionLockMountAdoptionOptions {
+  /**
+   * Dry-run by default. Apply reconciles only namespace-local observational
+   * metadata; stable dev+ino authority and the authority epoch never change.
+   */
+  readonly apply?: boolean;
+  readonly operatorId?: string;
+  readonly justification?: string;
+  readonly now?: () => number;
+}
+
+export interface ExecutionLockMountAdoptionResult {
+  readonly schemaVersion: typeof EXECUTION_LOCK_MOUNT_ADOPTION_SCHEMA_VERSION;
+  readonly decision: 'not-required' | 'eligible' | 'adopted';
+  readonly authorityEpoch: string;
+  readonly previous: ExecutionLockMountIdentity;
+  readonly current: ExecutionLockMountIdentity;
+  readonly evidenceRefs: readonly string[];
 }
 
 export interface ExecutionLockRecoveryVerificationContext {
@@ -1838,11 +1871,19 @@ function assertExecutionLockAnchorBinding(
   anchor: ExecutionLockAuthorityAnchor,
   pinned: ExecutionLockPinnedDirectories,
 ): void {
-  if (!executionLockDirectoryIdentityEquals(
+  // Linux mount ids are local to a mount namespace. The same project inode
+  // legitimately has different mount ids in a host shell, sandbox, container,
+  // or WSL process after remount. Persisting that namespace-local number as
+  // cross-process authority causes healthy processes to invalidate each other.
+  //
+  // The durable generation boundary is dev+ino for both the project and
+  // `.locks`; mountId remains mandatory for the pinned descriptors and every
+  // within-process path comparison in validatePinnedExecutionLockDirectories().
+  if (!executionLockStableDirectoryIdentityEquals(
     anchor.project,
     pinned.projectIdentity,
   )
-    || !executionLockDirectoryIdentityEquals(
+    || !executionLockStableDirectoryIdentityEquals(
       anchor.locks,
       pinned.locksIdentity,
     )) {
@@ -2759,6 +2800,457 @@ function withExecutionLockMutation<T>(
   }
 }
 
+/**
+ * Explicitly reconcile a Linux/WSL mount observation when the project and
+ * `.locks` directories retain their exact dev+ino identities but this mount
+ * namespace reports another mount id. Mount ids are namespace-local metadata,
+ * not persistent execution authority; ordinary acquire/check paths authorize
+ * the stable dev+ino generation and never require this seam.
+ *
+ * Apply is allowed only while the canonical DB is exclusively held and both
+ * active and quarantine sets are empty. The old/new observation and hashed
+ * operator attestation are durably published before the anchor replacement,
+ * so a crash leaves either the old observation plus a replayable intent or the
+ * new observation plus its immutable evidence. The authority epoch and stable
+ * directory generation do not change. No task, lock, or authority artifact is
+ * deleted.
+ */
+export function adoptExecutionLockAuthorityMount(
+  projectRoot: string,
+  options: ExecutionLockMountAdoptionOptions = {},
+): ExecutionLockMountAdoptionResult {
+  const pinned = pinExecutionLockDirectories(projectRoot);
+  let db: DatabaseType | undefined;
+  let transactionOpen = false;
+  try {
+    validatePinnedExecutionLockDirectories(pinned);
+    assertSecureExecutionLockFilesystem(pinned.stableLocksPath);
+    const anchorPath =
+      join(pinned.stableRootPath, EXECUTION_LOCK_AUTHORITY_ANCHOR_FILENAME);
+    const anchorRead = readExecutionLockAuthorityAnchor(anchorPath);
+    if (!anchorRead) {
+      throw new ExecutionLockError(
+        'Execution authority mount adoption requires an existing root anchor',
+        'unknown',
+        'authority-state-missing',
+      );
+    }
+    const sentinelPath = join(
+      pinned.stableLocksPath,
+      EXECUTION_LOCK_AUTHORITY_SENTINEL_FILENAME,
+    );
+    const dbPath = join(
+      pinned.stableLocksPath,
+      EXECUTION_LOCK_COORDINATION_DB_FILENAME,
+    );
+    if (!executionLockPathExists(sentinelPath)
+      || !executionLockPathExists(dbPath)) {
+      throw new ExecutionLockError(
+        'Execution authority mount adoption requires complete canonical state',
+        'unknown',
+        'authority-state-missing',
+      );
+    }
+    validateExecutionLockDatabaseSidecars(dbPath);
+    const sentinelRead = readExecutionLockAuthoritySentinel(sentinelPath);
+    const dbIdentity =
+      executionLockPathIdentity(dbPath, MAX_EXECUTION_LOCK_DB_BYTES);
+    if (sentinelRead.sentinel.authorityEpoch
+      !== anchorRead.anchor.authorityEpoch) {
+      throw new ExecutionLockError(
+        'Execution authority mount adoption found an epoch disagreement',
+        'unknown',
+        'authority-epoch-mismatch',
+      );
+    }
+
+    const previous = executionLockMountIdentity(
+      anchorRead.anchor.project,
+      anchorRead.anchor.locks,
+    );
+    const current = executionLockMountIdentity(
+      pinned.projectIdentity,
+      pinned.locksIdentity,
+    );
+    const baseEvidence = executionLockMountAdoptionEvidence(
+      anchorRead.anchor.authorityEpoch,
+      anchorRead.raw,
+      sentinelRead.raw,
+      dbIdentity,
+    );
+    if (executionLockDirectoryIdentityEquals(
+      anchorRead.anchor.project,
+      pinned.projectIdentity,
+    )
+      && executionLockDirectoryIdentityEquals(
+        anchorRead.anchor.locks,
+        pinned.locksIdentity,
+      )) {
+      return {
+        schemaVersion: EXECUTION_LOCK_MOUNT_ADOPTION_SCHEMA_VERSION,
+        decision: 'not-required',
+        authorityEpoch: anchorRead.anchor.authorityEpoch,
+        previous,
+        current,
+        evidenceRefs: baseEvidence,
+      };
+    }
+    if (!executionLockStableDirectoryIdentityEquals(
+      anchorRead.anchor.project,
+      pinned.projectIdentity,
+    )
+      || !executionLockStableDirectoryIdentityEquals(
+        anchorRead.anchor.locks,
+        pinned.locksIdentity,
+      )
+      || anchorRead.anchor.project.mountId
+        !== anchorRead.anchor.locks.mountId
+      || pinned.projectIdentity.mountId
+        !== pinned.locksIdentity.mountId) {
+      throw new ExecutionLockError(
+        'Execution authority mount adoption rejects a directory generation change',
+        'unknown',
+        'authority-epoch-mismatch',
+      );
+    }
+
+    db = new Database(dbPath, {
+      readonly: !options.apply,
+      fileMustExist: true,
+      timeout: EXECUTION_LOCK_SQLITE_BUSY_TIMEOUT_MS,
+    });
+    validateExecutionLockDatabaseReportedPath(db, dbPath);
+    db.pragma(`busy_timeout = ${EXECUTION_LOCK_SQLITE_BUSY_TIMEOUT_MS}`);
+    db.pragma('trusted_schema = OFF');
+    if (!options.apply) db.pragma('query_only = ON');
+    const journalMode = db.pragma('journal_mode', { simple: true });
+    if (journalMode !== 'delete') {
+      throw new ExecutionLockError(
+        `Execution lock database journal mode is unsafe: ${String(journalMode)}`,
+        'unknown',
+        'malformed',
+      );
+    }
+    db.exec(options.apply ? 'BEGIN IMMEDIATE' : 'BEGIN');
+    transactionOpen = true;
+    readExecutionLockMeta(
+      db,
+      sentinelRead.sentinel,
+      EXECUTION_LOCK_DB_META_VERSION,
+    );
+    validateExecutionLockDatabaseSchema(db);
+    const activeCount = db.prepare(
+      'SELECT COUNT(*) AS count FROM execution_lock_active',
+    ).get() as { readonly count?: unknown } | undefined;
+    const quarantineCount = db.prepare(
+      'SELECT COUNT(*) AS count FROM execution_lock_quarantine',
+    ).get() as { readonly count?: unknown } | undefined;
+    if (activeCount?.count !== 0 || quarantineCount?.count !== 0) {
+      throw new ExecutionLockError(
+        'Execution authority mount adoption requires zero active or quarantined executions',
+        'unknown',
+        'project-active',
+      );
+    }
+    const projectionPresent = readdirSync(pinned.stableLocksPath)
+      .some(name => name.endsWith('.executionlock')
+        || name.includes('.executionlock.tmp-'));
+    if (projectionPresent) {
+      throw new ExecutionLockError(
+        'Execution authority mount adoption found unresolved lock projections',
+        'unknown',
+        'project-active',
+      );
+    }
+    if (!options.apply) {
+      db.exec('COMMIT');
+      transactionOpen = false;
+      return {
+        schemaVersion: EXECUTION_LOCK_MOUNT_ADOPTION_SCHEMA_VERSION,
+        decision: 'eligible',
+        authorityEpoch: anchorRead.anchor.authorityEpoch,
+        previous,
+        current,
+        evidenceRefs: baseEvidence,
+      };
+    }
+
+    if (!validBoundedExecutionLockText(
+      options.operatorId,
+      MAX_EXECUTION_LOCK_RECOVERY_OPERATOR_BYTES,
+    )
+      || !EXECUTION_LOCK_IDENTITY_PATTERN.test(options.operatorId!)
+      || !validBoundedExecutionLockText(
+        options.justification,
+        MAX_EXECUTION_LOCK_RECOVERY_JUSTIFICATION_BYTES,
+      )) {
+      throw new ExecutionLockError(
+        'Execution authority mount adoption requires a bounded operator attestation',
+        'unknown',
+        'invalid-input',
+      );
+    }
+    const nowMs = options.now?.() ?? Date.now();
+    if (!Number.isSafeInteger(nowMs)
+      || !Number.isFinite(new Date(nowMs).getTime())) {
+      throw new ExecutionLockError(
+        'Execution authority mount adoption clock is outside the supported range',
+        'unknown',
+        'invalid-input',
+      );
+    }
+    const adoptedAnchor: ExecutionLockAuthorityAnchor = {
+      ...anchorRead.anchor,
+      project: pinned.projectIdentity,
+      locks: pinned.locksIdentity,
+    };
+    const adoptedAnchorRaw = JSON.stringify(adoptedAnchor);
+    const operatorIdSha256 = createHash('sha256')
+      .update(options.operatorId!)
+      .digest('hex');
+    const justificationSha256 = createHash('sha256')
+      .update(options.justification!)
+      .digest('hex');
+    const adoptionId = createHash('sha256').update(JSON.stringify({
+      schemaVersion: EXECUTION_LOCK_MOUNT_ADOPTION_SCHEMA_VERSION,
+      authorityEpoch: anchorRead.anchor.authorityEpoch,
+      previous,
+      current,
+      operatorIdSha256,
+      justificationSha256,
+    })).digest('hex');
+    const audit: ExecutionLockMountAdoptionAudit = {
+      schemaVersion: EXECUTION_LOCK_MOUNT_ADOPTION_SCHEMA_VERSION,
+      adoptionId,
+      authorityEpoch: anchorRead.anchor.authorityEpoch,
+      previous,
+      current,
+      previousAnchorSha256: createHash('sha256')
+        .update(anchorRead.raw)
+        .digest('hex'),
+      adoptedAnchorSha256: createHash('sha256')
+        .update(adoptedAnchorRaw)
+        .digest('hex'),
+      operatorIdSha256,
+      justificationSha256,
+      occurredAt: executionLockTimestamp(nowMs),
+    };
+
+    const auditDirectoryPath = join(
+      pinned.stableLocksPath,
+      EXECUTION_LOCK_MOUNT_ADOPTION_DIRECTORY,
+    );
+    if (!executionLockPathExists(auditDirectoryPath)) {
+      try {
+        mkdirSync(auditDirectoryPath, { recursive: false, mode: 0o700 });
+        fsyncExecutionLockDirectory(pinned.stableLocksPath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      }
+    }
+    const auditDirectoryEntry = lstatSync(auditDirectoryPath);
+    if (!auditDirectoryEntry.isDirectory()
+      || auditDirectoryEntry.isSymbolicLink()) {
+      throw new ExecutionLockError(
+        'Execution authority mount adoption audit directory is unsafe',
+        'unknown',
+        'malformed',
+      );
+    }
+    let auditDirectoryFd: number | undefined;
+    let auditRef: string;
+    try {
+      auditDirectoryFd = openSync(
+        auditDirectoryPath,
+        fsConstants.O_RDONLY
+          | fsConstants.O_DIRECTORY
+          | fsConstants.O_NOFOLLOW,
+      );
+      const auditDirectoryIdentity =
+        executionLockDirectoryIdentity(auditDirectoryFd);
+      if (auditDirectoryIdentity.dev !== pinned.locksIdentity.dev
+        || auditDirectoryIdentity.mountId !== pinned.locksIdentity.mountId) {
+        throw new ExecutionLockError(
+          'Execution authority mount adoption audit crossed a filesystem boundary',
+          'unknown',
+          'malformed',
+        );
+      }
+      const stableAuditDirectory = `/proc/self/fd/${auditDirectoryFd}`;
+      const auditPath = join(stableAuditDirectory, `${adoptionId}.json`);
+      let auditRaw = JSON.stringify(audit);
+      let auditFd: number | undefined;
+      try {
+        try {
+          auditFd = openSync(
+            auditPath,
+            fsConstants.O_WRONLY
+              | fsConstants.O_CREAT
+              | fsConstants.O_EXCL
+              | fsConstants.O_NOFOLLOW,
+            0o600,
+          );
+          writeFileSync(auditFd, auditRaw, 'utf8');
+          fsyncSync(auditFd);
+          closeSync(auditFd);
+          auditFd = undefined;
+          fsyncExecutionLockDirectory(stableAuditDirectory);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+          const existingRaw = readBoundedRegularFile(
+            auditPath,
+            MAX_EXECUTION_LOCK_MOUNT_ADOPTION_BYTES,
+          );
+          const existing = existingRaw
+            ? parseExecutionLockMountAdoptionAudit(existingRaw)
+            : null;
+          if (!existing
+            || existing.adoptionId !== audit.adoptionId
+            || existing.authorityEpoch !== audit.authorityEpoch
+            || JSON.stringify(existing.previous)
+              !== JSON.stringify(audit.previous)
+            || JSON.stringify(existing.current)
+              !== JSON.stringify(audit.current)
+            || existing.previousAnchorSha256
+              !== audit.previousAnchorSha256
+            || existing.adoptedAnchorSha256
+              !== audit.adoptedAnchorSha256
+            || existing.operatorIdSha256 !== audit.operatorIdSha256
+            || existing.justificationSha256
+              !== audit.justificationSha256) {
+            throw new ExecutionLockError(
+              'Execution authority mount adoption audit conflicts with canonical intent',
+              'unknown',
+              'mutation-conflict',
+            );
+          }
+          auditRaw = existingRaw!;
+        }
+      } finally {
+        if (auditFd !== undefined) {
+          try { closeSync(auditFd); } catch { /* preserve audit failure */ }
+        }
+      }
+      executionLockPathIdentity(
+        auditPath,
+        MAX_EXECUTION_LOCK_MOUNT_ADOPTION_BYTES,
+      );
+      auditRef = `execution-lock-mount-adoption:sha256:${createHash('sha256')
+        .update(auditRaw)
+        .digest('hex')}`;
+    } finally {
+      if (auditDirectoryFd !== undefined) {
+        try { closeSync(auditDirectoryFd); } catch { /* preserve adoption failure */ }
+      }
+    }
+
+    const anchorBeforeReplace = readExecutionLockAuthorityAnchor(anchorPath);
+    if (!anchorBeforeReplace
+      || !executionLockPathIdentityEquals(
+        anchorRead.identity,
+        anchorBeforeReplace.identity,
+      )
+      || anchorBeforeReplace.raw !== anchorRead.raw) {
+      throw new ExecutionLockError(
+        'Execution authority root anchor changed during mount adoption',
+        'unknown',
+        'mutation-conflict',
+      );
+    }
+    const stagingPath =
+      `${anchorPath}.mount-adoption-${process.pid}-${randomBytes(6).toString('hex')}`;
+    let stagingFd: number | undefined;
+    try {
+      stagingFd = openSync(
+        stagingPath,
+        fsConstants.O_WRONLY
+          | fsConstants.O_CREAT
+          | fsConstants.O_EXCL
+          | fsConstants.O_NOFOLLOW,
+        0o600,
+      );
+      writeFileSync(stagingFd, adoptedAnchorRaw, 'utf8');
+      fsyncSync(stagingFd);
+      closeSync(stagingFd);
+      stagingFd = undefined;
+      executionLockPathIdentity(stagingPath, MAX_EXECUTION_LOCK_ANCHOR_BYTES);
+      renameSync(stagingPath, anchorPath);
+      fsyncExecutionLockDirectory(pinned.stableRootPath);
+    } finally {
+      if (stagingFd !== undefined) {
+        try { closeSync(stagingFd); } catch { /* preserve adoption failure */ }
+      }
+      try { unlinkSync(stagingPath); } catch { /* renamed or never published */ }
+    }
+
+    const anchorAfterReplace = readExecutionLockAuthorityAnchor(anchorPath);
+    const sentinelAfter =
+      readExecutionLockAuthoritySentinel(sentinelPath);
+    const dbAfter =
+      executionLockPathIdentity(dbPath, MAX_EXECUTION_LOCK_DB_BYTES);
+    validatePinnedExecutionLockDirectories(pinned);
+    if (!anchorAfterReplace
+      || anchorAfterReplace.raw !== adoptedAnchorRaw
+      || !executionLockDirectoryIdentityEquals(
+        anchorAfterReplace.anchor.project,
+        pinned.projectIdentity,
+      )
+      || !executionLockDirectoryIdentityEquals(
+        anchorAfterReplace.anchor.locks,
+        pinned.locksIdentity,
+      )
+      || !executionLockPathIdentityEquals(
+        sentinelRead.identity,
+        sentinelAfter.identity,
+      )
+      || sentinelAfter.raw !== sentinelRead.raw
+      || !executionLockPathIdentityEquals(dbIdentity, dbAfter)) {
+      throw new ExecutionLockError(
+        'Execution authority mount adoption could not verify its canonical commit',
+        'unknown',
+        'mutation-conflict',
+        undefined,
+        undefined,
+        'uncertain',
+      );
+    }
+    db.exec('COMMIT');
+    transactionOpen = false;
+    return {
+      schemaVersion: EXECUTION_LOCK_MOUNT_ADOPTION_SCHEMA_VERSION,
+      decision: 'adopted',
+      authorityEpoch: anchorRead.anchor.authorityEpoch,
+      previous,
+      current,
+      evidenceRefs: Object.freeze([
+        ...baseEvidence,
+        auditRef!,
+        `anchor-after:sha256:${createHash('sha256')
+          .update(adoptedAnchorRaw)
+          .digest('hex')}`,
+      ]),
+    };
+  } catch (error) {
+    if (transactionOpen && db) {
+      try { db.exec('ROLLBACK'); } catch { /* preserve the adoption error */ }
+    }
+    if (error instanceof ExecutionLockError) throw error;
+    const code = (error as NodeJS.ErrnoException).code;
+    throw new ExecutionLockError(
+      code === 'SQLITE_BUSY' || code === 'SQLITE_LOCKED'
+        ? 'Execution authority mount adoption is busy'
+        : 'Execution authority mount adoption failed closed',
+      'unknown',
+      code === 'SQLITE_BUSY' || code === 'SQLITE_LOCKED'
+        ? 'mutation-conflict'
+        : 'malformed',
+    );
+  } finally {
+    try { db?.close(); } catch { /* canonical result was already classified */ }
+    closePinnedExecutionLockDirectories(pinned);
+  }
+}
+
 function withExecutionLockPinnedAuthorityRoot<T>(
   projectRoot: string,
   operation: (authorityRoot: string) => T,
@@ -2816,6 +3308,141 @@ function canonicalExecutionLockTimestamp(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   const epochMs = Date.parse(value);
   return Number.isFinite(epochMs) && new Date(epochMs).toISOString() === value;
+}
+
+interface ExecutionLockMountAdoptionAudit {
+  readonly schemaVersion: typeof EXECUTION_LOCK_MOUNT_ADOPTION_SCHEMA_VERSION;
+  readonly adoptionId: string;
+  readonly authorityEpoch: string;
+  readonly previous: ExecutionLockMountIdentity;
+  readonly current: ExecutionLockMountIdentity;
+  readonly previousAnchorSha256: string;
+  readonly adoptedAnchorSha256: string;
+  readonly operatorIdSha256: string;
+  readonly justificationSha256: string;
+  readonly occurredAt: string;
+}
+
+function executionLockMountIdentity(
+  project: ExecutionLockDirectoryIdentity,
+  locks: ExecutionLockDirectoryIdentity,
+): ExecutionLockMountIdentity {
+  return {
+    projectDev: project.dev,
+    projectIno: project.ino,
+    locksDev: locks.dev,
+    locksIno: locks.ino,
+    mountId: project.mountId,
+  };
+}
+
+function executionLockStableDirectoryIdentityEquals(
+  left: ExecutionLockDirectoryIdentity,
+  right: ExecutionLockDirectoryIdentity,
+): boolean {
+  return left.dev === right.dev && left.ino === right.ino;
+}
+
+function executionLockMountAdoptionEvidence(
+  authorityEpoch: string,
+  previousAnchorRaw: string,
+  sentinelRaw: string,
+  dbIdentity: ExecutionLockPathIdentity,
+): readonly string[] {
+  return Object.freeze([
+    `authority-epoch:${authorityEpoch}`,
+    `anchor-before:sha256:${createHash('sha256').update(previousAnchorRaw).digest('hex')}`,
+    `sentinel:sha256:${createHash('sha256').update(sentinelRaw).digest('hex')}`,
+    `authority-db:${dbIdentity.dev}:${dbIdentity.ino}`,
+  ]);
+}
+
+function parseExecutionLockMountAdoptionAudit(
+  raw: string,
+): ExecutionLockMountAdoptionAudit | null {
+  try {
+    const value = JSON.parse(raw) as unknown;
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return null;
+    }
+    const record = value as Record<string, unknown>;
+    const parseIdentity = (candidate: unknown): ExecutionLockMountIdentity | null => {
+      if (typeof candidate !== 'object'
+        || candidate === null
+        || Array.isArray(candidate)) return null;
+      const identity = candidate as Record<string, unknown>;
+      if (!exactKeys(identity, [
+        'projectDev',
+        'projectIno',
+        'locksDev',
+        'locksIno',
+        'mountId',
+      ])) return null;
+      for (const key of [
+        'projectDev',
+        'projectIno',
+        'locksDev',
+        'locksIno',
+        'mountId',
+      ] as const) {
+        if (typeof identity[key] !== 'string'
+          || !/^[1-9]\d*$/u.test(identity[key] as string)) return null;
+      }
+      return {
+        projectDev: identity.projectDev as string,
+        projectIno: identity.projectIno as string,
+        locksDev: identity.locksDev as string,
+        locksIno: identity.locksIno as string,
+        mountId: identity.mountId as string,
+      };
+    };
+    const previous = parseIdentity(record.previous);
+    const current = parseIdentity(record.current);
+    if (!exactKeys(record, [
+      'schemaVersion',
+      'adoptionId',
+      'authorityEpoch',
+      'previous',
+      'current',
+      'previousAnchorSha256',
+      'adoptedAnchorSha256',
+      'operatorIdSha256',
+      'justificationSha256',
+      'occurredAt',
+    ])
+      || record.schemaVersion !== EXECUTION_LOCK_MOUNT_ADOPTION_SCHEMA_VERSION
+      || typeof record.adoptionId !== 'string'
+      || !SHA256_HEX_PATTERN.test(record.adoptionId)
+      || typeof record.authorityEpoch !== 'string'
+      || !EXECUTION_LOCK_UUID_PATTERN.test(record.authorityEpoch)
+      || !previous
+      || !current
+      || typeof record.previousAnchorSha256 !== 'string'
+      || !SHA256_HEX_PATTERN.test(record.previousAnchorSha256)
+      || typeof record.adoptedAnchorSha256 !== 'string'
+      || !SHA256_HEX_PATTERN.test(record.adoptedAnchorSha256)
+      || typeof record.operatorIdSha256 !== 'string'
+      || !SHA256_HEX_PATTERN.test(record.operatorIdSha256)
+      || typeof record.justificationSha256 !== 'string'
+      || !SHA256_HEX_PATTERN.test(record.justificationSha256)
+      || !canonicalExecutionLockTimestamp(record.occurredAt)) {
+      return null;
+    }
+    return {
+      schemaVersion: EXECUTION_LOCK_MOUNT_ADOPTION_SCHEMA_VERSION,
+      adoptionId: record.adoptionId,
+      authorityEpoch: record.authorityEpoch,
+      previous,
+      current,
+      previousAnchorSha256: record.previousAnchorSha256,
+      adoptedAnchorSha256: record.adoptedAnchorSha256,
+      operatorIdSha256: record.operatorIdSha256,
+      justificationSha256: record.justificationSha256,
+      occurredAt: record.occurredAt,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function parseExecutionLockFencingToken(

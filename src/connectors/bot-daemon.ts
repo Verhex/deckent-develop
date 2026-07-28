@@ -1,83 +1,484 @@
 // ═══ bot-daemon — always-on bot process management (§4G) ═════════════
 //
-// `deckent bot start` runs the inbound listener detached so it survives terminal
-// close (an always-on conversational + approval head). stop/status manage it by a
-// `.deckent/bot.pid` file. NOTE: a detached process does NOT survive a reboot or a
-// crash — that needs an OS supervisor (systemd/pm2). This is "always-on while the
-// machine is up", not "survives reboot"; the CLI says so honestly.
+// A numeric PID alone is never process authority: operating systems reuse PIDs
+// and containers expose namespace-local PID views. Bot management therefore
+// binds the PID to its kernel start token and project root before status/start/
+// stop may trust or signal it. Platforms without a verified start-token adapter
+// fail honestly with `ownership-unknown`.
 
 import { spawn } from 'node:child_process';
-import { writeFileSync, readFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { createHash, randomBytes } from 'node:crypto';
+import {
+  closeSync,
+  constants as fsConstants,
+  existsSync,
+  fsyncSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isPidAlive } from '../core/pid-liveness.js';
+import { processStartToken } from '../core/pid-ownership.js';
 
 const BOT_PID_FILE = 'bot.pid';
+const BOT_PID_SCHEMA_VERSION = 1 as const;
+const MAX_BOT_PID_BYTES = 4_096;
+const SHA256_RE = /^[a-f0-9]{64}$/u;
+const START_TOKEN_RE = /^s\d+$/u;
+
+interface BotPidRecord {
+  readonly schemaVersion: typeof BOT_PID_SCHEMA_VERSION;
+  readonly pid: number;
+  readonly startToken: string | null;
+  readonly projectRootDigest: string;
+  readonly recordedAt: string;
+}
+
+export type BotPidInspection =
+  | { readonly status: 'running'; readonly pid: number }
+  | {
+      readonly status: 'not-running';
+      readonly reason: 'absent' | 'dead' | 'reused' | 'foreign-legacy';
+    }
+  | {
+      readonly status: 'ownership-unknown';
+      readonly pid: number | null;
+      readonly reason:
+        | 'malformed-record'
+        | 'project-binding-mismatch'
+        | 'start-token-unavailable'
+        | 'legacy-identity-unavailable';
+    };
+
+type LegacyIdentity = 'bot' | 'foreign' | 'unknown';
+
+export interface BotPidRuntimeDeps {
+  readonly platform?: NodeJS.Platform;
+  readonly isAlive?: (pid: number) => boolean;
+  readonly startToken?: (pid: number) => string | null;
+  readonly legacyIdentity?: (root: string, pid: number) => LegacyIdentity;
+  readonly kill?: (pid: number, signal: NodeJS.Signals) => void;
+  readonly now?: () => Date;
+}
 
 function botPidPath(root: string): string {
   return join(root, '.deckent', BOT_PID_FILE);
 }
 
-/** Write the listener's pid (default: this process) to the bot pidfile. */
-export function writeBotPid(root: string, pid: number = process.pid): void {
-  const path = botPidPath(root);
+function canonicalPathEquals(left: string, right: string): boolean {
+  return process.platform === 'win32'
+    ? left.toLocaleLowerCase('en-US') === right.toLocaleLowerCase('en-US')
+    : left === right;
+}
+
+function projectRootDigest(root: string): string {
+  return createHash('sha256')
+    .update(realpathSync.native(resolve(root)))
+    .digest('hex');
+}
+
+function validTimestamp(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const epochMs = Date.parse(value);
+  return Number.isFinite(epochMs) && new Date(epochMs).toISOString() === value;
+}
+
+function parseBotPidRecord(raw: string): BotPidRecord | null {
   try {
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, String(pid), 'utf-8');
+    const value = JSON.parse(raw) as unknown;
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return null;
+    }
+    const record = value as Record<string, unknown>;
+    const keys = Object.keys(record).sort();
+    if (JSON.stringify(keys) !== JSON.stringify([
+      'pid',
+      'projectRootDigest',
+      'recordedAt',
+      'schemaVersion',
+      'startToken',
+    ])) return null;
+    if (record.schemaVersion !== BOT_PID_SCHEMA_VERSION
+      || !Number.isSafeInteger(record.pid)
+      || (record.pid as number) <= 0
+      || (record.startToken !== null
+        && (typeof record.startToken !== 'string'
+          || !START_TOKEN_RE.test(record.startToken)))
+      || typeof record.projectRootDigest !== 'string'
+      || !SHA256_RE.test(record.projectRootDigest)
+      || !validTimestamp(record.recordedAt)) {
+      return null;
+    }
+    return {
+      schemaVersion: BOT_PID_SCHEMA_VERSION,
+      pid: record.pid as number,
+      startToken: record.startToken as string | null,
+      projectRootDigest: record.projectRootDigest,
+      recordedAt: record.recordedAt,
+    };
   } catch {
-    // non-fatal — status/stop degrade gracefully without a pidfile
+    return null;
   }
 }
 
-/** Read the bot pid if a live process holds it; clean a stale pidfile and return null. */
-export function readBotPid(root: string): number | null {
-  const path = botPidPath(root);
+function parseLegacyPid(raw: string): number | null {
+  const value = raw.trim();
+  if (!/^[1-9]\d*$/u.test(value)) return null;
+  const pid = Number(value);
+  return Number.isSafeInteger(pid) ? pid : null;
+}
+
+function readBotPidRaw(path: string): string | null {
   if (!existsSync(path)) return null;
+  const entry = lstatSync(path);
+  if (!entry.isFile()
+    || entry.isSymbolicLink()
+    || entry.nlink !== 1
+    || entry.size > MAX_BOT_PID_BYTES) {
+    throw new Error('unsafe-bot-pid-record');
+  }
+  const raw = readFileSync(path, 'utf8');
+  if (Buffer.byteLength(raw, 'utf8') > MAX_BOT_PID_BYTES) {
+    throw new Error('oversized-bot-pid-record');
+  }
+  return raw;
+}
+
+function retireBotPidRecord(path: string, expectedRaw: string): boolean {
   try {
-    const pid = parseInt(readFileSync(path, 'utf-8').trim(), 10);
-    if (Number.isNaN(pid)) return null;
-    if (isPidAlive(pid)) return pid;
-    try { unlinkSync(path); } catch { /* non-fatal */ }
-    return null;
+    if (readBotPidRaw(path) !== expectedRaw) return false;
+    unlinkSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function writeBotPidRecord(
+  root: string,
+  record: BotPidRecord,
+  mode: 'create' | 'replace' = 'create',
+): boolean {
+  const path = botPidPath(root);
+  const directory = dirname(path);
+  const raw = JSON.stringify(record);
+  const staging =
+    `${path}.tmp-${process.pid}-${randomBytes(6).toString('hex')}`;
+  let fd: number | undefined;
+  let directoryFd: number | undefined;
+  try {
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    fd = openSync(
+      staging,
+      fsConstants.O_WRONLY
+        | fsConstants.O_CREAT
+        | fsConstants.O_EXCL
+        | (fsConstants.O_NOFOLLOW ?? 0),
+      0o600,
+    );
+    writeFileSync(fd, raw, 'utf8');
+    fsyncSync(fd);
+    closeSync(fd);
+    fd = undefined;
+    if (mode === 'create') {
+      // link(2) is an atomic no-clobber publication: concurrent listeners can
+      // never overwrite one another's process authority.
+      linkSync(staging, path);
+      unlinkSync(staging);
+    } else {
+      renameSync(staging, path);
+    }
+    directoryFd = openSync(
+      directory,
+      fsConstants.O_RDONLY | (fsConstants.O_DIRECTORY ?? 0),
+    );
+    fsyncSync(directoryFd);
+    closeSync(directoryFd);
+    directoryFd = undefined;
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (fd !== undefined) {
+      try { closeSync(fd); } catch { /* preserve write failure */ }
+    }
+    if (directoryFd !== undefined) {
+      try { closeSync(directoryFd); } catch { /* preserve write failure */ }
+    }
+    try { unlinkSync(staging); } catch { /* renamed or never created */ }
+  }
+}
+
+function createBotPidRecord(
+  root: string,
+  pid: number,
+  deps: BotPidRuntimeDeps,
+): BotPidRecord {
+  const tokenOf = deps.startToken ?? processStartToken;
+  const recordedAt = (deps.now?.() ?? new Date()).toISOString();
+  return {
+    schemaVersion: BOT_PID_SCHEMA_VERSION,
+    pid,
+    startToken: tokenOf(pid),
+    projectRootDigest: projectRootDigest(root),
+    recordedAt,
+  };
+}
+
+function resolveExisting(path: string): string | null {
+  try {
+    return realpathSync.native(path);
   } catch {
     return null;
   }
 }
 
-/** Remove the bot pidfile (called by the listener on clean shutdown). */
-export function clearBotPid(root: string): void {
+function inspectLegacyBotIdentity(root: string, pid: number): LegacyIdentity {
+  if (process.platform !== 'linux') return 'unknown';
   try {
-    const path = botPidPath(root);
-    if (existsSync(path)) unlinkSync(path);
+    const cwd = realpathSync.native(`/proc/${pid}/cwd`);
+    if (!canonicalPathEquals(cwd, realpathSync.native(resolve(root)))) {
+      return 'foreign';
+    }
+    const argv = readFileSync(`/proc/${pid}/cmdline`)
+      .toString('utf8')
+      .split('\0')
+      .filter(Boolean);
+    if (argv.length < 4 || argv[2] !== 'bot' || argv[3] !== 'listen') {
+      return 'foreign';
+    }
+    const actualEntry = resolveExisting(argv[1]!);
+    const expectedEntries = [
+      entryPath(),
+      join(root, 'dist', 'cli', 'entry.js'),
+      join(root, 'src', 'cli', 'entry.ts'),
+    ].map(resolveExisting).filter((value): value is string => value !== null);
+    return actualEntry
+      && expectedEntries.some(expected =>
+        canonicalPathEquals(actualEntry, expected))
+      ? 'bot'
+      : 'foreign';
   } catch {
-    // non-fatal
+    return 'unknown';
   }
 }
 
-export type StopBotResult = { status: 'stopped'; pid: number } | { status: 'not-running' };
+/** Write the listener's ownership-bound pid record. */
+export function writeBotPid(
+  root: string,
+  pid: number = process.pid,
+  deps: BotPidRuntimeDeps = {},
+): boolean {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return false;
+  try {
+    const existing = inspectBotPid(root, deps);
+    if (existing.status === 'ownership-unknown') return false;
+    if (existing.status === 'running') return existing.pid === pid;
+    const record = createBotPidRecord(root, pid, deps);
+    // Never launch an unmanageable daemon. Until a platform adapter can prove
+    // process generations, listener admission fails honestly before waiting.
+    if (record.startToken === null) return false;
+    return writeBotPidRecord(root, record);
+  } catch {
+    return false;
+  }
+}
 
-/** Stop a running bot daemon via SIGTERM. */
-export function stopBot(root: string): StopBotResult {
-  const pid = readBotPid(root);
-  if (pid === null) return { status: 'not-running' };
-  try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
-  return { status: 'stopped', pid };
+/**
+ * Inspect bot process ownership. Dead, reused, or provably foreign legacy
+ * records are retired with compare-before-unlink; ambiguous evidence is kept
+ * and returned as fail-closed `ownership-unknown`.
+ */
+export function inspectBotPid(
+  root: string,
+  deps: BotPidRuntimeDeps = {},
+): BotPidInspection {
+  const path = botPidPath(root);
+  let raw: string | null;
+  try {
+    raw = readBotPidRaw(path);
+  } catch {
+    return {
+      status: 'ownership-unknown',
+      pid: null,
+      reason: 'malformed-record',
+    };
+  }
+  if (raw === null) return { status: 'not-running', reason: 'absent' };
+
+  const isAlive = deps.isAlive ?? isPidAlive;
+  const tokenOf = deps.startToken ?? processStartToken;
+  const platform = deps.platform ?? process.platform;
+  const record = parseBotPidRecord(raw);
+  if (record) {
+    let expectedRootDigest: string;
+    try {
+      expectedRootDigest = projectRootDigest(root);
+    } catch {
+      return {
+        status: 'ownership-unknown',
+        pid: record.pid,
+        reason: 'project-binding-mismatch',
+      };
+    }
+    if (record.projectRootDigest !== expectedRootDigest) {
+      return {
+        status: 'ownership-unknown',
+        pid: record.pid,
+        reason: 'project-binding-mismatch',
+      };
+    }
+    if (!isAlive(record.pid)) {
+      retireBotPidRecord(path, raw);
+      return { status: 'not-running', reason: 'dead' };
+    }
+    const liveToken = tokenOf(record.pid);
+    if (record.startToken && liveToken) {
+      if (record.startToken === liveToken) {
+        return { status: 'running', pid: record.pid };
+      }
+      retireBotPidRecord(path, raw);
+      return { status: 'not-running', reason: 'reused' };
+    }
+    return {
+      status: 'ownership-unknown',
+      pid: record.pid,
+      reason: 'start-token-unavailable',
+    };
+  }
+
+  const legacyPid = parseLegacyPid(raw);
+  if (legacyPid === null) {
+    return {
+      status: 'ownership-unknown',
+      pid: null,
+      reason: 'malformed-record',
+    };
+  }
+  if (!isAlive(legacyPid)) {
+    retireBotPidRecord(path, raw);
+    return { status: 'not-running', reason: 'dead' };
+  }
+  const legacyIdentity = (deps.legacyIdentity ?? inspectLegacyBotIdentity)(
+    root,
+    legacyPid,
+  );
+  if (legacyIdentity === 'foreign') {
+    retireBotPidRecord(path, raw);
+    return { status: 'not-running', reason: 'foreign-legacy' };
+  }
+  if (legacyIdentity !== 'bot' || platform !== 'linux') {
+    return {
+      status: 'ownership-unknown',
+      pid: legacyPid,
+      reason: 'legacy-identity-unavailable',
+    };
+  }
+  const migrated = createBotPidRecord(root, legacyPid, deps);
+  if (!migrated.startToken || !writeBotPidRecord(root, migrated, 'replace')) {
+    return {
+      status: 'ownership-unknown',
+      pid: legacyPid,
+      reason: 'start-token-unavailable',
+    };
+  }
+  return { status: 'running', pid: legacyPid };
+}
+
+/** Compatibility read: only proven-owned processes are returned. */
+export function readBotPid(
+  root: string,
+  deps: BotPidRuntimeDeps = {},
+): number | null {
+  const inspection = inspectBotPid(root, deps);
+  return inspection.status === 'running' ? inspection.pid : null;
+}
+
+/**
+ * Remove only this listener generation's pid record. An older listener cannot
+ * erase a newer daemon's record during overlapping shutdown/start.
+ */
+export function clearBotPid(
+  root: string,
+  pid: number = process.pid,
+  deps: BotPidRuntimeDeps = {},
+): boolean {
+  const path = botPidPath(root);
+  try {
+    const raw = readBotPidRaw(path);
+    if (raw === null) return true;
+    const record = parseBotPidRecord(raw);
+    const tokenOf = deps.startToken ?? processStartToken;
+    if (record
+      && record.pid === pid
+      && record.startToken !== null
+      && record.startToken === tokenOf(pid)) {
+      return retireBotPidRecord(path, raw);
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export type StopBotResult =
+  | { readonly status: 'stopped'; readonly pid: number }
+  | { readonly status: 'not-running' }
+  | {
+      readonly status: 'ownership-unknown';
+      readonly pid: number | null;
+      readonly reason: string;
+    };
+
+/** Stop only a proven-owned bot daemon via SIGTERM. */
+export function stopBot(
+  root: string,
+  deps: BotPidRuntimeDeps = {},
+): StopBotResult {
+  const inspection = inspectBotPid(root, deps);
+  if (inspection.status === 'not-running') return { status: 'not-running' };
+  if (inspection.status === 'ownership-unknown') return inspection;
+  try {
+    (deps.kill ?? process.kill)(inspection.pid, 'SIGTERM');
+  } catch {
+    return { status: 'not-running' };
+  }
+  return { status: 'stopped', pid: inspection.pid };
 }
 
 export type StartBotResult =
-  | { status: 'already-running'; pid: number }
-  | { status: 'started'; pid: number }
-  | { status: 'spawn-failed' };
+  | { readonly status: 'already-running'; readonly pid: number }
+  | { readonly status: 'started'; readonly pid: number }
+  | { readonly status: 'spawn-failed' }
+  | {
+      readonly status: 'ownership-unknown';
+      readonly pid: number | null;
+      readonly reason: string;
+    };
 
-export interface StartBotDaemonOptions {
-  /** Inject the detached spawn for tests; returns the child pid or null. Default: real spawn. */
-  spawnFn?: (root: string) => number | null;
+export interface StartBotDaemonOptions extends BotPidRuntimeDeps {
+  /** Inject the detached spawn for tests; returns the child pid or null. */
+  readonly spawnFn?: (root: string) => number | null;
 }
 
-/** Start the listener as a detached background daemon (no-op if already running). */
-export function startBotDaemon(root: string, opts: StartBotDaemonOptions = {}): StartBotResult {
-  const existing = readBotPid(root);
-  if (existing !== null) return { status: 'already-running', pid: existing };
+/** Start the listener only when prior ownership is absent, never ambiguous. */
+export function startBotDaemon(
+  root: string,
+  opts: StartBotDaemonOptions = {},
+): StartBotResult {
+  const existing = inspectBotPid(root, opts);
+  if (existing.status === 'running') {
+    return { status: 'already-running', pid: existing.pid };
+  }
+  if (existing.status === 'ownership-unknown') return existing;
 
   const spawnFn = opts.spawnFn ?? defaultDetachedSpawn;
   const pid = spawnFn(root);
@@ -87,16 +488,14 @@ export function startBotDaemon(root: string, opts: StartBotDaemonOptions = {}): 
 
 /** Resolve dist/cli/entry.js relative to this compiled module. */
 function entryPath(): string {
-  const here = dirname(fileURLToPath(import.meta.url)); // dist/connectors
+  const here = dirname(fileURLToPath(import.meta.url));
   return join(here, '..', 'cli', 'entry.js');
 }
 
-/** Spawn `node dist/cli/entry.js bot listen` detached; subscription auth (no API key). */
+/** Spawn `node dist/cli/entry.js bot listen` detached; subscription auth. */
 function defaultDetachedSpawn(root: string): number | null {
   try {
     const env = { ...process.env };
-    // Force subscription auth in the daemon (matches how the bot is run) so a
-    // stray ANTHROPIC_API_KEY can't silently switch to billed API mode.
     delete env['ANTHROPIC_API_KEY'];
     const child = spawn(process.execPath, [entryPath(), 'bot', 'listen'], {
       detached: true,
