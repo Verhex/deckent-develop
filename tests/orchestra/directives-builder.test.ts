@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   buildDirectives,
   extractGoNogo,
+  extractStructuredGoNogo,
   reconstructBuildTask,
   type DirectiveBuildIntent,
   type DirectiveBuildTask,
 } from '../../src/orchestra/directives-builder.js';
+import { createGoNoGoCriterionItem } from '../../src/core/task-types.js';
 import { parseStructuredDirectives } from '../../src/orchestra/task-builder.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────
@@ -143,14 +145,48 @@ describe('extractGoNogo', () => {
       '- nogo: first nogo; second nogo',
     ].join('\n');
 
-    expect(extractGoNogo(description)).toEqual({
+    const extracted = extractStructuredGoNogo(description);
+    expect(extracted).toMatchObject({
       goCriteria: ['first criterion', 'second criterion'],
       nogo: ['first nogo', 'second nogo'],
     });
+    expect(extracted.items.map(item => [item.polarity, item.statement])).toEqual([
+      ['go', 'first criterion'],
+      ['go', 'second criterion'],
+      ['no-go', 'first nogo'],
+      ['no-go', 'second nogo'],
+    ]);
+    expect(extracted.items.every(item => item.evidenceRequirements.length === 1)).toBe(true);
   });
 
   it('returns empty arrays when there is no ### goNogo heading', () => {
     expect(extractGoNogo('Just prose, no goNogo section.')).toEqual({ goCriteria: [], nogo: [] });
+    expect(extractStructuredGoNogo('Just prose, no goNogo section.').items).toEqual([]);
+  });
+
+  it('round-trips planner-authored evidence requirements without changing display strings', () => {
+    const intent = makeIntent();
+    intent.tasks[0]!.criteriaItems = [
+      createGoNoGoCriterionItem({
+        polarity: 'go',
+        statement: 'round-trip build→parse→deep-equal holds',
+        evidenceRequirements: ['targeted directives-builder test passes'],
+      }),
+      createGoNoGoCriterionItem({
+        polarity: 'no-go',
+        statement: 'editing the parser',
+        evidenceRequirements: ['git diff shows no task-builder change'],
+      }),
+    ];
+
+    const markdown = buildDirectives(intent);
+    const parsed = parseStructuredDirectives(markdown)[0]!;
+    const reconstructed = reconstructBuildTask(parsed);
+    expect(reconstructed.goCriteria).toEqual(intent.tasks[0]!.goCriteria);
+    expect(reconstructed.nogo).toEqual(intent.tasks[0]!.nogo);
+    expect(reconstructed.criteriaItems).toEqual(intent.tasks[0]!.criteriaItems);
+    expect(extractStructuredGoNogo(parsed.description).items)
+      .toEqual(intent.tasks[0]!.criteriaItems);
   });
 });
 

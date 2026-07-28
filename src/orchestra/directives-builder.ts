@@ -16,6 +16,10 @@
 // understanding. The NL→structured-intent step is an explicit follow-up.
 
 import type { ModelType, TaskEffort } from '../core/types.js';
+import {
+  createGoNoGoCriterionItem,
+  type GoNoGoCriterionItem,
+} from '../core/task-types.js';
 import { DeckentError } from '../core/errors.js';
 import type { ParsedDirectiveTask } from './task-builder.js';
 
@@ -33,6 +37,8 @@ export interface DirectiveBuildTask {
   skills?: string[];
   goCriteria: string[];
   nogo: string[];
+  /** Optional lossless machine-readable projection; display arrays stay unchanged. */
+  criteriaItems?: GoNoGoCriterionItem[];
   /** U1-G2 (PCOMP-8): traceability METADATA (flowId/revision/actor…) — written as
    *  its own `- Meta:` line, NEVER merged into desc (desc feeds intent
    *  classification; a flowId hex once matched the 'cd' devops keyword). */
@@ -52,6 +58,10 @@ export interface DirectiveBuildIntent {
 export interface ExtractedGoNogo {
   goCriteria: string[];
   nogo: string[];
+}
+
+export interface ExtractedStructuredGoNogo extends ExtractedGoNogo {
+  items: GoNoGoCriterionItem[];
 }
 
 // ═══ Fragility guards (0-kırılganlık foundation) ════════════════════════
@@ -186,6 +196,19 @@ function validateTask(task: DirectiveBuildTask): void {
   assertSafeField('desc', task.desc);
   for (const item of task.goCriteria) assertSafeField('goCriteria item', item);
   for (const item of task.nogo) assertSafeField('nogo item', item);
+  for (const item of task.criteriaItems ?? []) {
+    assertSafeField('criteriaItems statement', item.statement);
+    for (const requirement of item.evidenceRequirements) {
+      assertSafeField('criteriaItems evidence requirement', requirement);
+    }
+    const canonical = createGoNoGoCriterionItem(item);
+    if (canonical.id !== item.id) {
+      throw new DeckentError(
+        'DECKENT_E074',
+        `directives-builder: criterion id "${item.id}" is not the canonical host-derived identity`,
+      );
+    }
+  }
 
   assertNoDelimiterCollision('files', task.files, ',');
   assertNoDelimiterCollision('scope', task.scope, ',');
@@ -219,6 +242,9 @@ function buildTaskBlock(task: DirectiveBuildTask, seq: number): string[] {
   lines.push('### goNogo');
   lines.push(`- goCriteria: ${task.goCriteria.map(item => escapeListItem(item, ';')).join('; ')}`);
   lines.push(`- nogo: ${task.nogo.map(item => escapeListItem(item, ';')).join('; ')}`);
+  if (task.criteriaItems && task.criteriaItems.length > 0) {
+    lines.push(`- criteriaItems: ${JSON.stringify(task.criteriaItems)}`);
+  }
   return lines;
 }
 
@@ -260,19 +286,96 @@ function splitCriteriaLine(section: string, label: 'goCriteria' | 'nogo'): strin
     .filter(Boolean);
 }
 
+function canonicalItemsFromStatements(
+  goCriteria: readonly string[],
+  nogo: readonly string[],
+): GoNoGoCriterionItem[] {
+  return [
+    ...goCriteria.map(statement => createGoNoGoCriterionItem({
+      polarity: 'go',
+      statement,
+      evidenceRequirements: [statement],
+    })),
+    ...nogo.map(statement => createGoNoGoCriterionItem({
+      polarity: 'no-go',
+      statement,
+      evidenceRequirements: [statement],
+    })),
+  ];
+}
+
+function parseStructuredCriteriaItems(section: string): GoNoGoCriterionItem[] | null {
+  const match = /^\s*-\s*criteriaItems\s*:\s*(.*)$/im.exec(section);
+  if (!match) return null;
+  try {
+    const value = JSON.parse(match[1] ?? '');
+    if (!Array.isArray(value) || value.length === 0) throw new Error('items must be a non-empty array');
+    return value.map((candidate, index) => {
+      if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+        throw new Error(`item ${index} is not an object`);
+      }
+      const record = candidate as Record<string, unknown>;
+      if (
+        (record['polarity'] !== 'go' && record['polarity'] !== 'no-go')
+        || typeof record['statement'] !== 'string'
+        || !Array.isArray(record['evidenceRequirements'])
+        || record['evidenceRequirements'].some(requirement => typeof requirement !== 'string')
+      ) {
+        throw new Error(`item ${index} has an invalid shape`);
+      }
+      const canonical = createGoNoGoCriterionItem({
+        polarity: record['polarity'],
+        statement: record['statement'],
+        evidenceRequirements: record['evidenceRequirements'] as string[],
+      });
+      if (record['id'] !== canonical.id) {
+        throw new Error(`item ${index} id is not canonical`);
+      }
+      return canonical;
+    });
+  } catch (error) {
+    throw new DeckentError(
+      'DECKENT_E074',
+      `directives-builder: malformed criteriaItems projection (${error instanceof Error ? error.message : String(error)})`,
+    );
+  }
+}
+
+interface ExtractedGoNogoState extends ExtractedStructuredGoNogo {
+  encodedItems: boolean;
+}
+
+function extractGoNogoState(description: string): ExtractedGoNogoState {
+  const headingMatch = GO_NOGO_HEADING_RE.exec(description);
+  if (!headingMatch) {
+    return { goCriteria: [], nogo: [], items: [], encodedItems: false };
+  }
+  const section = description.slice(headingMatch.index + headingMatch[0].length);
+  const goCriteria = splitCriteriaLine(section, 'goCriteria');
+  const nogo = splitCriteriaLine(section, 'nogo');
+  const encoded = parseStructuredCriteriaItems(section);
+  return {
+    goCriteria,
+    nogo,
+    items: encoded ?? canonicalItemsFromStatements(goCriteria, nogo),
+    encodedItems: encoded !== null,
+  };
+}
+
 /**
  * Read the `### goNogo` sub-block back out of a real ParsedDirectiveTask.description
  * string. Symmetric counterpart to buildTaskBlock's own `### goNogo` writer — not a
  * general-purpose markdown parser.
  */
 export function extractGoNogo(description: string): ExtractedGoNogo {
-  const headingMatch = GO_NOGO_HEADING_RE.exec(description);
-  if (!headingMatch) return { goCriteria: [], nogo: [] };
-  const section = description.slice(headingMatch.index + headingMatch[0].length);
-  return {
-    goCriteria: splitCriteriaLine(section, 'goCriteria'),
-    nogo: splitCriteriaLine(section, 'nogo'),
-  };
+  const { goCriteria, nogo } = extractGoNogoState(description);
+  return { goCriteria, nogo };
+}
+
+/** Machine-readable counterpart that preserves the legacy display reader. */
+export function extractStructuredGoNogo(description: string): ExtractedStructuredGoNogo {
+  const { encodedItems: _encodedItems, ...extracted } = extractGoNogoState(description);
+  return extracted;
 }
 
 function extractDescBody(description: string): string {
@@ -288,7 +391,7 @@ function extractDescBody(description: string): string {
  * must deep-equal the original intent task.
  */
 export function reconstructBuildTask(parsed: ParsedDirectiveTask): DirectiveBuildTask {
-  const { goCriteria, nogo } = extractGoNogo(parsed.description);
+  const { goCriteria, nogo, items, encodedItems } = extractGoNogoState(parsed.description);
   return {
     title: parsed.title,
     desc: extractDescBody(parsed.description),
@@ -300,6 +403,7 @@ export function reconstructBuildTask(parsed: ParsedDirectiveTask): DirectiveBuil
     skills: parsed.forceSkills,
     goCriteria,
     nogo,
+    ...(encodedItems ? { criteriaItems: items } : {}),
     ...(parsed.meta ? { meta: parsed.meta } : {}),
   };
 }

@@ -27,8 +27,15 @@ import type { RegistryProviderNameExt } from '../core/model-registry.js';
 import type { RoleInvocationResolution } from '../core/role-invocation-resolver.js';
 import { resolveBrainModel } from '../core/config.js';
 import { debugLog } from '../core/utils.js';
-import type { TaskScope } from '../core/task-types.js';
-import { getProviderForModel } from '../core/task-types.js';
+import type {
+  GoNoGoCriterionItem,
+  GoNoGoCriterionPolarity,
+  TaskScope,
+} from '../core/task-types.js';
+import {
+  createGoNoGoCriterionItem,
+  getProviderForModel,
+} from '../core/task-types.js';
 import {
   INVOCATION_RECEIPT_SCHEMA_VERSION,
   type InvocationAuthMode,
@@ -54,6 +61,12 @@ import { resolveDependencyRef, isPlanSlotId } from './task-builder.js';
 import { normalizePlannerResult } from './planner-normalize.js';
 
 // ─── Zod Schemas ──────────────────────────────────────────────────
+const PlannerCriterionItemSchema = z.object({
+  polarity: z.enum(['go', 'no-go']),
+  statement: z.string().min(1),
+  evidenceRequirements: z.array(z.string().min(1)).min(1),
+});
+
 const PlannerTaskSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
@@ -71,6 +84,7 @@ const PlannerTaskSchema = z.object({
     goCriteria: z.string(),
     noGoCriteria: z.string(),
     techDebtAcceptable: z.string(),
+    items: z.array(PlannerCriterionItemSchema).optional(),
   }),
 });
 
@@ -78,6 +92,32 @@ const PlannerResultSchema = z.object({
   tasks: z.array(PlannerTaskSchema).min(1),
   reasoning: z.string(),
 });
+
+function canonicalPlannerCriteria(
+  goCriteria: string,
+  noGoCriteria: string,
+  authoredItems: readonly z.infer<typeof PlannerCriterionItemSchema>[] | undefined,
+): GoNoGoCriterionItem[] {
+  const items = (authoredItems ?? []).map(item => createGoNoGoCriterionItem(item));
+  const ensurePolarity = (
+    polarity: GoNoGoCriterionPolarity,
+    legacyStatement: string,
+  ): void => {
+    if (items.some(item => item.polarity === polarity)) return;
+    const statement = legacyStatement.trim();
+    if (!statement) return;
+    items.push(createGoNoGoCriterionItem({
+      polarity,
+      statement,
+      evidenceRequirements: [statement],
+    }));
+  };
+  // Older planner envelopes have only display strings. Preserve each complete
+  // string as one typed generic item; punctuation inside it is never decomposed.
+  ensurePolarity('go', goCriteria);
+  ensurePolarity('no-go', noGoCriteria);
+  return [...new Map(items.map(item => [item.id, item])).values()];
+}
 
 // ─── Context Priority Section ─────────────────────────────────────
 
@@ -286,6 +326,9 @@ RULES:
 - Specify dependencies in the dependencies array if any exist
 - Define scope (directories + filesWrite) for each task
 - Write GO/NO-GO criteria for each task
+- Emit one goNogo.items object per authored criterion. Do not split free text on semicolons.
+- Every item needs a polarity, one atomic statement, and concrete evidenceRequirements.
+- Criterion IDs are host-derived after parsing; do not emit an id field.
 
 ${FILE_PATH_RULES}
 
@@ -310,7 +353,15 @@ OUTPUT FORMAT (JSON ONLY, nothing else):
       "reason": "Why this model/effort",
       "scope": { "directories": [...], "filesRead": [...], "filesWrite": [...] },
       "dependencies": [],
-      "goNogo": { "goCriteria": "...", "noGoCriteria": "...", "techDebtAcceptable": "..." }
+      "goNogo": {
+        "goCriteria": "...",
+        "noGoCriteria": "...",
+        "techDebtAcceptable": "...",
+        "items": [
+          { "polarity": "go", "statement": "...", "evidenceRequirements": ["..."] },
+          { "polarity": "no-go", "statement": "...", "evidenceRequirements": ["..."] }
+        ]
+      }
     }
   ],
   "reasoning": "Plan rationale"
@@ -387,7 +438,20 @@ export function parsePlannerResponse(raw: string, adapter?: ProviderAdapter): Pl
         registerParametric: false,
       });
     }
-    return result.data as PlannerResult;
+    return {
+      ...result.data,
+      tasks: result.data.tasks.map(task => ({
+        ...task,
+        goNogo: {
+          ...task.goNogo,
+          items: canonicalPlannerCriteria(
+            task.goNogo.goCriteria,
+            task.goNogo.noGoCriteria,
+            task.goNogo.items,
+          ),
+        },
+      })),
+    } as PlannerResult;
   } catch (e) {
     debugLog('parsePlannerResponse:parse', e);
     return null;
@@ -1238,6 +1302,9 @@ TASK SPLITTING RULES:
 - EVERY task's scope.filesWrite MUST contain at least one file path — an empty filesWrite array is invalid
 - A task's "title" MUST NOT contain a comma (,) character — rephrase with "and"/a dash instead
 - Write GO/NO-GO criteria for each task
+- Emit one goNogo.items object per authored criterion. Do not split free text on semicolons.
+- Every item needs a polarity, one atomic statement, and concrete evidenceRequirements.
+- Criterion IDs are host-derived after parsing; do not emit an id field.
 - The last task MUST be an integration/test task
 
 ${FILE_PATH_RULES}
@@ -1266,7 +1333,15 @@ OUTPUT FORMAT (JSON ONLY, nothing else):
       "reason": "Why this model/effort",
       "scope": { "directories": [...], "filesRead": [...], "filesWrite": [...] },
       "dependencies": [],
-      "goNogo": { "goCriteria": "...", "noGoCriteria": "...", "techDebtAcceptable": "..." }
+      "goNogo": {
+        "goCriteria": "...",
+        "noGoCriteria": "...",
+        "techDebtAcceptable": "...",
+        "items": [
+          { "polarity": "go", "statement": "...", "evidenceRequirements": ["..."] },
+          { "polarity": "no-go", "statement": "...", "evidenceRequirements": ["..."] }
+        ]
+      }
     }
   ],
   "reasoning": "Why you split it this way"
@@ -1616,6 +1691,11 @@ export function buildZeroConfigFallbackPlan(description: string): PlannerResult 
           goCriteria: 'Feature implemented and tests pass',
           noGoCriteria: 'Build fails or tests do not pass',
           techDebtAcceptable: 'Minor style issues acceptable',
+          items: canonicalPlannerCriteria(
+            'Feature implemented and tests pass',
+            'Build fails or tests do not pass',
+            undefined,
+          ),
         },
       },
     ],

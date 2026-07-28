@@ -2,6 +2,8 @@
 // Split from types.ts — Task, planning, and model-related types
 // Model data is now delegated to ModelRegistry (single source of truth).
 
+import { createHash } from 'node:crypto';
+
 import { modelRegistry, registerCodexParityModels } from './model-registry.js';
 import type { TaskKind, ActorContext, ExecutionBudget } from './work-model.js';
 import type { ProviderBillingEvidence } from './provider-billing-evidence.js';
@@ -272,10 +274,67 @@ export interface TaskScope {
 }
 
 // ─── GO / NO-GO Criteria (Blueprint 8) ──────────────────────────────
+export type GoNoGoCriterionPolarity = 'go' | 'no-go';
+
+/**
+ * One machine-addressable acceptance criterion.
+ *
+ * The legacy display strings remain canonical user-facing summaries. `items`
+ * preserve the authored criterion boundaries and evidence contract for host
+ * settlement without guessing that punctuation inside free text is a boundary.
+ */
+export interface GoNoGoCriterionItem {
+  /** Content-addressed host identity; stable across item reordering. */
+  id: string;
+  polarity: GoNoGoCriterionPolarity;
+  statement: string;
+  evidenceRequirements: string[];
+}
+
+export interface GoNoGoCriterionItemInput {
+  polarity: GoNoGoCriterionPolarity;
+  statement: string;
+  evidenceRequirements?: readonly string[];
+}
+
+function normalizeCriterionText(value: string): string {
+  return value.replace(/\r\n?/g, '\n').trim();
+}
+
+/**
+ * Build the canonical criterion item used by every authoring path.
+ *
+ * IDs are derived by the host, never accepted from planner prose. Evidence
+ * requirements are a set for identity purposes, so order-only planner drift
+ * cannot change the criterion ID.
+ */
+export function createGoNoGoCriterionItem(
+  input: GoNoGoCriterionItemInput,
+): GoNoGoCriterionItem {
+  const statement = normalizeCriterionText(input.statement);
+  if (!statement) throw new TypeError('GO/NO-GO criterion statement must not be empty');
+  const evidenceRequirements = [...new Set(
+    (input.evidenceRequirements ?? [])
+      .map(normalizeCriterionText)
+      .filter(Boolean),
+  )].sort();
+  const digest = createHash('sha256')
+    .update(JSON.stringify([input.polarity, statement, evidenceRequirements]))
+    .digest('hex');
+  return {
+    id: `criterion-${input.polarity}-${digest}`,
+    polarity: input.polarity,
+    statement,
+    evidenceRequirements,
+  };
+}
+
 export interface GoNoGoCriteria {
   goCriteria: string;
   noGoCriteria: string;
   techDebtAcceptable: string;
+  /** Additive structured authority; absent only on unmigrated external inputs. */
+  items?: GoNoGoCriterionItem[];
 }
 
 /**
@@ -589,6 +648,8 @@ export type CrossVerifyEvidence =
       execution?: CrossVerifyExecutionEvidence;
       eligibility?: CrossVerifyEligibilityEvidence;
       invocationReceiptRef?: InvocationReceiptRef;
+      assurance?: 'typed-host-adjudicated';
+      adjudicationReceiptRef?: string;
     }
   | {
       outcome: 'unavailable';

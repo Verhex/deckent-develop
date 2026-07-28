@@ -17,10 +17,18 @@ describe('extractGoNogoCriteria — DIRECTIVES escape round-trip (D5)', () => {
     expect(r.goCriteria).not.toContain('\\;');
     expect(r.goCriteria).toContain('ikinci kural korunmuş');
     expect(r.noGoCriteria).not.toContain('\\;');
+    const authoredGo = r.items?.find(item => item.statement.startsWith('birinci kural'));
+    expect(authoredGo?.statement).toBe('birinci kural; ikinci kural korunmuş; üçüncü');
+    expect(authoredGo?.evidenceRequirements).toEqual([
+      'birinci kural; ikinci kural korunmuş; üçüncü',
+    ]);
   });
 
   it('plain lines without escapes are unchanged', () => {
     const r = extractGoNogoCriteria('- goCriteria: tek düz kural');
     expect(r.goCriteria).toContain('tek düz kural');
+    const repeated = extractGoNogoCriteria('- goCriteria: tek düz kural');
+    expect(r.items?.find(item => item.statement === 'tek düz kural')?.id)
+      .toBe(repeated.items?.find(item => item.statement === 'tek düz kural')?.id);
   });
 });

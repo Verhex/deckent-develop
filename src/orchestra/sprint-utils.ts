@@ -2,7 +2,7 @@
 // Extracted from sprint-controller.ts — pure utility functions with
 // minimal state dependencies. Sprint 075: God Object Split Phase 2.
 
-import { unescapeListItem } from './directives-builder.js';
+import { extractStructuredGoNogo, unescapeListItem } from './directives-builder.js';
 import {
   readFileSync, existsSync, writeFileSync,
   mkdirSync, unlinkSync, statSync,
@@ -12,6 +12,12 @@ import { join } from 'node:path';
 import {
   getProviderForModel,
 } from '../core/types.js';
+import {
+  createGoNoGoCriterionItem,
+  type GoNoGoCriteria,
+  type GoNoGoCriterionItem,
+  type GoNoGoCriterionPolarity,
+} from '../core/task-types.js';
 
 import type {
   Task, Sprint, SystemProfile, ResolvedConfig,
@@ -457,6 +463,33 @@ function stripNoGoLabel(line: string): string {
   return line.replace(/^\s*[-*]\s*/, '').trim();
 }
 
+function genericCriterionItem(
+  polarity: GoNoGoCriterionPolarity,
+  statement: string,
+): GoNoGoCriterionItem {
+  return createGoNoGoCriterionItem({
+    polarity,
+    statement,
+    evidenceRequirements: [statement],
+  });
+}
+
+function attachStructuredCriteria(
+  display: Omit<GoNoGoCriteria, 'items'>,
+  base: Pick<GoNoGoCriteria, 'goCriteria' | 'noGoCriteria'>,
+  specificItems: readonly GoNoGoCriterionItem[],
+): GoNoGoCriteria {
+  const items = [
+    genericCriterionItem('go', base.goCriteria),
+    genericCriterionItem('no-go', base.noGoCriteria),
+    ...specificItems,
+  ];
+  return {
+    ...display,
+    items: [...new Map(items.map(item => [item.id, item])).values()],
+  };
+}
+
 /**
  * Extract task-specific GO/NOGO criteria from DIRECTIVES description.
  * Parses "Kanıt:", "Proof:", "Doğrulama:", "Verify:" lines for goCriteria.
@@ -470,7 +503,7 @@ export function extractGoNogoCriteria(
   // code→stack commands, never `tsc` on a non-TS project). When ABSENT, the
   // legacy TypeScript-centric output is preserved verbatim (backward compatible).
   opts?: { kind?: TaskKind; stack?: TechStackKind; commands?: { build?: string; test?: string; typecheck?: string } },
-): { goCriteria: string; noGoCriteria: string; techDebtAcceptable: string } {
+): GoNoGoCriteria {
   const lines = description.split('\n');
   const proofLines: string[] = [];
   const noGoLines: string[] = [];
@@ -508,6 +541,23 @@ export function extractGoNogoCriteria(
     .map(unescapeListItem)
     .join('; ');
   const hasSpecific = proofLines.length > 0 || noGoLines.length > 0;
+  const directiveCriteria = extractStructuredGoNogo(description);
+  const fallbackSpecificItems = [
+    ...proofLines.slice(0, 3).map(line => genericCriterionItem(
+      'go',
+      unescapeListItem(stripProofLabel(line)),
+    )),
+    ...noGoLines.slice(0, 3).map(line => genericCriterionItem(
+      'no-go',
+      unescapeListItem(stripNoGoLabel(line)),
+    )),
+  ];
+  // A canonical `### goNogo` block owns reversible array boundaries and may
+  // carry planner-authored evidence requirements. Otherwise one labelled line
+  // is one item; punctuation inside that line is never treated as structure.
+  const specificItems = directiveCriteria.items.length > 0
+    ? directiveCriteria.items
+    : fallbackSpecificItems;
 
   // ── WM-7 path: kind × stack aware base ──────────────────────────────────
   if (opts?.kind) {
@@ -517,31 +567,45 @@ export function extractGoNogoCriteria(
       // the kind-aware base. For doc/audit/data the base already says "no
       // build/test"; for code it carries the stack commands — neither path glues
       // `tsc` onto a doc task.
-      return {
-        goCriteria: proofLines.length > 0 ? `${base.goCriteria}; ${specificCriteria}` : base.goCriteria,
-        noGoCriteria: specificNoGo ? `${base.noGoCriteria}; ${specificNoGo}` : base.noGoCriteria,
-        techDebtAcceptable: base.techDebtAcceptable,
-      };
+      return attachStructuredCriteria(
+        {
+          goCriteria: proofLines.length > 0 ? `${base.goCriteria}; ${specificCriteria}` : base.goCriteria,
+          noGoCriteria: specificNoGo ? `${base.noGoCriteria}; ${specificNoGo}` : base.noGoCriteria,
+          techDebtAcceptable: base.techDebtAcceptable,
+        },
+        base,
+        specificItems,
+      );
     }
-    return base;
+    return attachStructuredCriteria(base, base, []);
   }
 
   // ── Legacy path (no kind context): preserved verbatim ───────────────────
   const baseCriteria = testTarget ? `${testTarget}; Tests pass` : 'Tests pass; tsc clean';
 
   if (hasSpecific) {
-    return {
-      goCriteria: proofLines.length > 0 ? `${baseCriteria}; ${specificCriteria}` : baseCriteria,
-      noGoCriteria: specificNoGo
-        ? `Build fails or verification commands fail; ${specificNoGo}`
-        : 'Build fails or verification commands fail',
+    const base = {
+      goCriteria: baseCriteria,
+      noGoCriteria: 'Build fails or verification commands fail',
       techDebtAcceptable: 'Minor issues if all verification commands pass',
     };
+    return attachStructuredCriteria(
+      {
+        ...base,
+        goCriteria: proofLines.length > 0 ? `${base.goCriteria}; ${specificCriteria}` : base.goCriteria,
+        noGoCriteria: specificNoGo
+          ? `${base.noGoCriteria}; ${specificNoGo}`
+          : base.noGoCriteria,
+      },
+      base,
+      specificItems,
+    );
   }
 
-  return {
+  const base = {
     goCriteria: baseCriteria,
     noGoCriteria: 'Build fails or tests fail',
     techDebtAcceptable: 'Minor style issues if tests pass',
   };
+  return attachStructuredCriteria(base, base, []);
 }

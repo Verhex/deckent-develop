@@ -231,6 +231,10 @@ Fix the config module.
       const result = extractGoNogoCriteria('Simple description with no proof');
       expect(result.goCriteria).toBe('Tests pass; tsc clean');
       expect(result.noGoCriteria).toBe('Build fails or tests fail');
+      expect(result.items?.map(item => [item.polarity, item.statement])).toEqual([
+        ['go', 'Tests pass; tsc clean'],
+        ['no-go', 'Build fails or tests fail'],
+      ]);
     });
 
     it('should include test target in base criteria', () => {
@@ -282,6 +286,12 @@ Fix the config module.
       const result = extractGoNogoCriteria(description);
       expect(result.goCriteria).toContain('REPL still launches');
       expect(result.goCriteria).not.toMatch(/goCriteria:/i);
+      expect(result.items?.filter(item =>
+        item.polarity === 'go' && !item.statement.startsWith('Tests pass'),
+      ).map(item => item.statement)).toEqual([
+        'empty-string description tool connects and REPL still launches (test)',
+        'registry tests green.',
+      ]);
     });
 
     it('F0.2: recognizes `- nogo:` and surfaces it in noGoCriteria', () => {
@@ -309,6 +319,21 @@ Fix the config module.
       const result = extractGoNogoCriteria(description, undefined, { kind: 'documentation', stack: 'generic' });
       expect(result.goCriteria).toContain('lists all 16 agents');
       expect(result.noGoCriteria).toContain('do not invent counts');
+    });
+
+    it('keeps an escaped semicolon inside one explicit criterion item', () => {
+      const description = [
+        '### goNogo',
+        String.raw`- goCriteria: one statement with \; punctuation`,
+        '- nogo: forbidden regression',
+      ].join('\n');
+      const result = extractGoNogoCriteria(description);
+      expect(result.items?.filter(item =>
+        item.statement.includes('one statement'),
+      )).toHaveLength(1);
+      expect(result.items?.find(item =>
+        item.statement.includes('one statement'),
+      )?.statement).toBe('one statement with ; punctuation');
     });
   });
 

@@ -34,6 +34,7 @@
 
 import type { RunProposal } from '../core/run-flow-contract.js';
 import type { DeckentConfig, PlannerResult, PlannerTask } from '../core/types.js';
+import { createGoNoGoCriterionItem } from '../core/task-types.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import { readAuthMode, resolveBrainModel, resolveDefaultModel } from '../core/config.js';
 import { buildDirectives, type DirectiveBuildIntent, type DirectiveBuildTask } from './directives-builder.js';
@@ -255,6 +256,20 @@ function toDirectiveTask(task: PlannerTask, proposal: RunProposal): DirectiveBui
         `Planner reason: ${task.reason || '(none given)'}. Refusing to fall back to a TODO scaffold.`,
     );
   }
+  const criteriaItems = task.goNogo.items && task.goNogo.items.length > 0
+    ? task.goNogo.items
+    : [
+        createGoNoGoCriterionItem({
+          polarity: 'go',
+          statement: task.goNogo.goCriteria,
+          evidenceRequirements: [task.goNogo.goCriteria],
+        }),
+        createGoNoGoCriterionItem({
+          polarity: 'no-go',
+          statement: task.goNogo.noGoCriteria,
+          evidenceRequirements: [task.goNogo.noGoCriteria],
+        }),
+      ];
   return {
     title: canonicalTaskTitle(task.title),
     // U1-G2 (PCOMP-8): traceability is METADATA, not content — embedding it in
@@ -277,6 +292,7 @@ function toDirectiveTask(task: PlannerTask, proposal: RunProposal): DirectiveBui
     skills: task.forceSkills,
     goCriteria: [task.goNogo.goCriteria],
     nogo: [task.goNogo.noGoCriteria],
+    criteriaItems,
   };
 }
 

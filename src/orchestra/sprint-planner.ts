@@ -38,6 +38,7 @@ import { MemoryStore } from '../core/memory-store.js';
 // ─── Core — utils ─────────────────────────────────────────────────
 import { getNextSprintId, readJsonSafe, debugLog } from '../core/utils.js';
 import { readAuthMode, resolveBrainPlanningMode } from '../core/config.js';
+import { createGoNoGoCriterionItem } from '../core/task-types.js';
 import { isUnconditionalRule } from './rule-evolver.js';
 import { resolveDebt } from './debt-manager.js';
 import { preflightCriticalDebt } from './debt-preflight.js';
@@ -1283,7 +1284,23 @@ export function injectCriticalDebtTasks(
       reason: `Critical debt open for ${item.sprintsOpen} sprints`,
       scope,
       dependencies: [],
-      goNogo: { goCriteria: 'Debt resolved', noGoCriteria: 'Debt still present', techDebtAcceptable: '' },
+      goNogo: {
+        goCriteria: 'Debt resolved',
+        noGoCriteria: 'Debt still present',
+        techDebtAcceptable: '',
+        items: [
+          createGoNoGoCriterionItem({
+            polarity: 'go',
+            statement: 'Debt resolved',
+            evidenceRequirements: ['Debt resolved'],
+          }),
+          createGoNoGoCriterionItem({
+            polarity: 'no-go',
+            statement: 'Debt still present',
+            evidenceRequirements: ['Debt still present'],
+          }),
+        ],
+      },
       sprintId,
       isPriorityFix: true,
       fixForTaskId: item.originTaskId,
