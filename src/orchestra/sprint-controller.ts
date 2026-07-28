@@ -28,7 +28,10 @@ import type {
 import type { PromptGateResult } from '../core/prompt-gate-types.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
 import type { MandatoryCrossVerifyInvocationFactory } from './cross-verify-runner.js';
-import { createCrossVerifyProductionIngressAuthority } from './cross-verify-production-ingress-authority.js';
+import {
+  createCrossVerifyProductionIngressAuthority,
+  createLiveDockerCrossVerifyExecutionProfileAuthority,
+} from './cross-verify-production-ingress-authority.js';
 import { ProviderExecutionIngressHoldError } from '../core/provider-execution-ingress-authority.js';
 
 import { TASKS_DIR } from '../core/constants.js';
@@ -42,6 +45,7 @@ import { debugLog, updateLastSprintId } from '../core/utils.js';
 import {
   DEFAULT_ADAPTIVE_MULTIPLIER,
   DEFAULT_RUNTIME_EXTENSION_MAX,
+  readAuthMode,
 } from '../core/config.js';
 import type { AdaptiveTimeoutFields } from '../core/config.js';
 
@@ -52,6 +56,7 @@ import { providerRegistry } from '../core/provider.js';
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
 import { SpawnBackendFactory } from './spawn-backend.js';
+import { DockerSpawnBackend } from './spawn-backend-docker.js';
 
 // ─── Connector (provider lifecycle) ─────────────────────────────
 import type { Connector } from './connector.js';
@@ -1955,9 +1960,22 @@ export async function runSprint(
     }
   } catch (e) { debugLog('runSprint:computeDeferred', e); }
 
+  const crossVerifyAuthMode = await readAuthMode(projectRoot);
+  const crossVerifyExecutionProfiles =
+    spawnBackend instanceof DockerSpawnBackend
+    && opts?.providerAuthority?.state === 'ready'
+    && crossVerifyAuthMode !== 'hybrid'
+      ? createLiveDockerCrossVerifyExecutionProfileAuthority({
+          projectRoot,
+          backend: spawnBackend,
+          terminationLedger: opts.providerAuthority.service.terminationLedger,
+          authMode: crossVerifyAuthMode,
+        })
+      : undefined;
   const crossVerifyInvocationFactory = opts?.crossVerifyInvocationFactory
     ?? createCrossVerifyProductionIngressAuthority({
       providerAuthority: opts?.providerAuthority,
+      executionProfiles: crossVerifyExecutionProfiles,
     });
   await runEvaluatePhase(
     projectRoot, sprint, results, evaluations, config.coverage_hard_floor,

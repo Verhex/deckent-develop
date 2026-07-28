@@ -13,7 +13,7 @@ import type { ModelType } from '../core/types.js';
 import { canonicalJson } from '../core/audit-writer.js';
 import {
   assertCrossVerifyEnforcedAttemptContract,
-  type CrossVerifyEnforcedAttemptContractV1,
+  type CrossVerifyEnforcedAttemptContract,
 } from '../core/cross-verify-execution-contract.js';
 import { getProviderForModel, TaskStatus, type ProviderName, type Task, type TaskResult } from '../core/task-types.js';
 import { modelRegistry } from '../core/model-registry.js';
@@ -23,11 +23,18 @@ import { createCodexAdapter } from '../providers/codex.js';
 import { createGeminiAdapter } from '../providers/gemini.js';
 import { buildSuggestedImageCmd } from '../core/worker-image-check.js';
 import { LOCKS_DIR, TASKS_DIR } from '../core/constants.js';
+import {
+  crossVerifyEvidenceBrokerDirectory,
+  crossVerifyEvidenceReceiptRef,
+  readCrossVerifyEvidenceReceipt,
+} from '../core/cross-verify-evidence-broker.js';
 import { DECK_FILE_NAME } from '../core/deck-file.js';
 import { debugLog } from '../core/utils.js';
 import { createDockerLifecycleError, DeckentError } from '../core/errors.js';
 import { normalizeStreamEvent, writeLogEvent, type StreamLogEvent } from '../core/log-event.js';
-import { extractTerminalAssistantVerdictFromLog } from '../core/cross-verify-prompt.js';
+import {
+  extractTerminalAssistantOutputFromLog,
+} from '../core/cross-verify-prompt.js';
 import {
   assertExecutionBudgetShape,
   assertExecutionLandingSupport,
@@ -62,6 +69,7 @@ import {
   readTaskResultSettlementPrompt,
   taskResultSettlementPromptEvidenceRef,
   taskResultSettlementPromptPath,
+  taskResultSettlementAttemptPath,
   taskProviderTerminalBillingEvidenceRef,
   writeTaskProviderActualCallReceiptAtomic,
   writeTaskProviderTerminalUsageReceiptAtomic,
@@ -139,7 +147,7 @@ export interface DockerExactCrossVerifySpawnInput {
   readonly taskId: string;
   readonly model: ModelType;
   readonly prompt: string;
-  readonly executionContract: Readonly<CrossVerifyEnforcedAttemptContractV1>;
+  readonly executionContract: Readonly<CrossVerifyEnforcedAttemptContract>;
   readonly settlementRef: TaskResultSettlementRefV1;
   readonly options: SpawnBackendOptions;
   readonly terminationAuthority: DockerExactCrossVerifyTerminationAuthority;
@@ -154,7 +162,7 @@ export interface DockerExactCrossVerifyTerminationBinding {
 export interface DockerExactCrossVerifyTerminationAuthority {
   bindPreparedAttempt(input: {
     readonly settlementRef: Readonly<TaskResultSettlementRefV1>;
-    readonly executionContract: Readonly<CrossVerifyEnforcedAttemptContractV1>;
+    readonly executionContract: Readonly<CrossVerifyEnforcedAttemptContract>;
   }): Readonly<DockerExactCrossVerifyTerminationBinding>;
 }
 
@@ -164,7 +172,7 @@ export interface DockerExactCrossVerifyDispatchHandle {
 }
 
 interface DockerExactCrossVerifyContext {
-  readonly executionContract: Readonly<CrossVerifyEnforcedAttemptContractV1>;
+  readonly executionContract: Readonly<CrossVerifyEnforcedAttemptContract>;
   readonly terminationAuthority: DockerExactCrossVerifyTerminationAuthority;
   readonly promptSha256: string;
   readonly taskSnapshotSha256: string;
@@ -206,6 +214,42 @@ function exactCrossVerifyPromptMountArgs(promptHostPath: string): string[] {
   return [
     '--mount',
     `type=bind,source=${promptHostPath},target=${CONTAINER_EXACT_XVERIFY_PROMPT},readonly`,
+  ];
+}
+
+function exactCrossVerifyEvidenceMountArgs(
+  contract: Readonly<CrossVerifyEnforcedAttemptContract>,
+  projectRoot: string,
+): string[] {
+  if (contract.schemaVersion !== 2) return [];
+  const evidence = readCrossVerifyEvidenceReceipt(
+    projectRoot,
+    contract.settlementAttemptRef,
+  );
+  if (evidence.manifestSha256
+      !== contract.adjudication.evidenceBrokerManifestSha256
+    || crossVerifyEvidenceReceiptRef(evidence)
+      !== contract.adjudication.evidenceBrokerRef) {
+    throw new SpawnBackendError(
+      'Typed xverify evidence broker differs from the execution contract',
+      'docker',
+    );
+  }
+  const evidenceHostPath = crossVerifyEvidenceBrokerDirectory(
+    contract.settlementAttemptRef,
+  );
+  if (!isAbsolute(evidenceHostPath)
+    || /[,\u0000\r\n]/u.test(evidenceHostPath)
+    || !existsSync(evidenceHostPath)
+    || !statSync(evidenceHostPath).isDirectory()) {
+    throw new SpawnBackendError(
+      'Typed xverify evidence broker cannot be represented as a safe Docker bind mount',
+      'docker',
+    );
+  }
+  return [
+    '--mount',
+    `type=bind,source=${evidenceHostPath},target=${contract.adjudication.evidenceMountPath},readonly`,
   ];
 }
 
@@ -538,10 +582,13 @@ export function reconcileDockerHostTerminalResultFile(
     return null;
   }
 
-  const terminalVerdict = extractTerminalAssistantVerdictFromLog(
+  const terminalOutput = extractTerminalAssistantOutputFromLog(
     readFileSync(normalizedLogPath, 'utf-8'),
   );
-  if (!terminalVerdict) return null;
+  if (!terminalOutput) return null;
+  const terminalVerdict = terminalOutput.trim().split(/\r?\n/)
+    .filter(line => line.trim().length > 0)
+    .at(-1)!.trim();
 
   const preTerminalHeartbeat = {
     status: typeof result['lastHbStatus'] === 'string' && result['lastHbStatus'].length > 0
@@ -553,7 +600,7 @@ export function reconcileDockerHostTerminalResultFile(
   };
   result['selfAssessment'] = 'DONE';
   result['testsPassed'] = true;
-  result['notes'] = `Host-observed terminal xverify protocol completed.\n${terminalVerdict}`;
+  result['notes'] = `Host-observed terminal xverify protocol completed.\n${terminalOutput}`;
   result['hostTerminalProjection'] = {
     version: 1,
     protocol: contract.protocol,
@@ -2690,6 +2737,28 @@ export type DockerLogsSpawnImpl = (
   options: SpawnOptionsWithoutStdio,
 ) => DockerLogsChildLike;
 
+export interface DockerCrossVerifyRuntimeCommandResult {
+  readonly status: number | null;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+export type DockerCrossVerifyRuntimeCommandRunner = (
+  command: string,
+  args: readonly string[],
+) => Promise<DockerCrossVerifyRuntimeCommandResult>;
+
+export interface DockerSpawnBackendConstructionOptions {
+  readonly image?: string;
+  readonly timeoutSeconds?: number;
+  readonly gracefulTimeoutSeconds?: number;
+  readonly memoryLimit?: string;
+  readonly memorySwap?: string;
+  readonly kindMemoryLimits?: Record<string, string>;
+  readonly verifyProviderCliInImage?: boolean;
+  readonly crossVerifyRuntimeCommandRunner?: DockerCrossVerifyRuntimeCommandRunner;
+}
+
 /** Result of a streamed docker-logs capture. */
 export interface DockerLogCapture {
   /** Full captured output — stdout THEN stderr, matching the old `(stdout)+(stderr)` concat. */
@@ -2704,6 +2773,130 @@ export interface DockerLogCapture {
   signal: NodeJS.Signals | null;
   /** Bytes retained (equals the ceiling when truncated). */
   bytesCaptured: number;
+}
+
+export type DockerExactCrossVerifyRuntimeIdentity =
+  | {
+      readonly state: 'ready';
+      readonly imageId: string;
+      readonly runtimeFingerprint: string;
+      readonly executionProfileRef: string;
+      readonly toolProfileDigest: string;
+      readonly authorityEvidenceRef: string;
+    }
+  | {
+      readonly state: 'hold';
+      readonly reasonCode:
+        | 'docker_image_identity_unavailable'
+        | 'docker_provider_cli_unavailable'
+        | 'docker_provider_model_mismatch';
+      readonly authorityEvidenceRef: string;
+    };
+
+const CROSS_VERIFY_RUNTIME_COMMAND_TIMEOUT_MS = 15_000;
+const CROSS_VERIFY_RUNTIME_COMMAND_OUTPUT_CEILING_BYTES = 64 * 1024;
+
+function runBoundedCrossVerifyRuntimeCommand(
+  command: string,
+  args: readonly string[],
+): Promise<DockerCrossVerifyRuntimeCommandResult> {
+  return new Promise(resolveCommand => {
+    let settled = false;
+    let stdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+    let stderr: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+    let child: ReturnType<typeof nodeSpawn>;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const finish = (result: DockerCrossVerifyRuntimeCommandResult): void => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolveCommand(Object.freeze(result));
+    };
+    const appendBounded = (
+      current: Buffer<ArrayBufferLike>,
+      chunk: string | Buffer,
+    ): { readonly value: Buffer<ArrayBufferLike>; readonly exceeded: boolean } => {
+      const incoming = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      const remaining = CROSS_VERIFY_RUNTIME_COMMAND_OUTPUT_CEILING_BYTES - current.length;
+      if (remaining <= 0) return { value: current, exceeded: incoming.length > 0 };
+      return {
+        value: Buffer.concat([current, incoming.subarray(0, remaining)]),
+        exceeded: incoming.length > remaining,
+      };
+    };
+
+    try {
+      child = nodeSpawn(command, [...args], {
+        shell: false,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (error) {
+      resolveCommand(Object.freeze({
+        status: null,
+        stdout: '',
+        stderr: error instanceof Error ? error.message : String(error),
+      }));
+      return;
+    }
+
+    child.stdout?.on('data', chunk => {
+      const absorbed = appendBounded(stdout, chunk as string | Buffer);
+      stdout = absorbed.value;
+      if (absorbed.exceeded) {
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          // The process may already have exited.
+        }
+        finish({
+          status: null,
+          stdout: stdout.toString('utf8'),
+          stderr: 'cross-verify runtime command output exceeded the safety ceiling',
+        });
+      }
+    });
+    child.stderr?.on('data', chunk => {
+      const absorbed = appendBounded(stderr, chunk as string | Buffer);
+      stderr = absorbed.value;
+      if (absorbed.exceeded) {
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          // The process may already have exited.
+        }
+        finish({
+          status: null,
+          stdout: stdout.toString('utf8'),
+          stderr: 'cross-verify runtime command output exceeded the safety ceiling',
+        });
+      }
+    });
+    child.once('error', error => {
+      finish({ status: null, stdout: stdout.toString('utf8'), stderr: error.message });
+    });
+    child.once('close', code => {
+      finish({
+        status: code,
+        stdout: stdout.toString('utf8'),
+        stderr: stderr.toString('utf8'),
+      });
+    });
+
+    timer = setTimeout(() => {
+      try {
+        child.kill('SIGKILL');
+      } catch {
+        // The process may already have exited; the bounded result still fails closed.
+      }
+      finish({
+        status: null,
+        stdout: stdout.toString('utf8'),
+        stderr: 'cross-verify runtime command timed out',
+      });
+    }, CROSS_VERIFY_RUNTIME_COMMAND_TIMEOUT_MS);
+    timer.unref();
+  });
 }
 
 /**
@@ -2847,6 +3040,7 @@ export class DockerSpawnBackend implements SpawnBackend {
   private readonly memorySwap: string;
   private readonly kindMemoryLimits: Record<string, string>;
   private readonly verifyProviderCliInImage: boolean;
+  private readonly crossVerifyRuntimeCommandRunner: DockerCrossVerifyRuntimeCommandRunner;
   private readonly containers = new Map<string, {
     containerId: string;
     containerName: string;
@@ -2856,7 +3050,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     settlementRef?: TaskResultSettlementRefV1;
   }>(); // taskId → effective execution context
 
-  constructor(projectDir: string, opts?: { image?: string; timeoutSeconds?: number; gracefulTimeoutSeconds?: number; memoryLimit?: string; memorySwap?: string; kindMemoryLimits?: Record<string, string>; verifyProviderCliInImage?: boolean }) {
+  constructor(projectDir: string, opts?: DockerSpawnBackendConstructionOptions) {
     this.projectDir = resolve(projectDir);
     this.image = opts?.image ?? DEFAULT_IMAGE;
     this.timeoutSeconds = opts?.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS;
@@ -2876,6 +3070,121 @@ export class DockerSpawnBackend implements SpawnBackend {
     // is out of this task's DISTINCT-FILE scope, and several existing docker-backend
     // test suites assert exactly one `docker run` call per spawn).
     this.verifyProviderCliInImage = opts?.verifyProviderCliInImage ?? false;
+    this.crossVerifyRuntimeCommandRunner =
+      opts?.crossVerifyRuntimeCommandRunner ?? runBoundedCrossVerifyRuntimeCommand;
+  }
+
+  /**
+   * Resolve immutable local execution identity without invoking a provider.
+   * Image digest and in-image CLI presence are both fail-closed authority.
+   */
+  async inspectExactCrossVerifyRuntime(
+    provider: ProviderName,
+    model: string,
+  ): Promise<DockerExactCrossVerifyRuntimeIdentity> {
+    const detailDigest = (reasonCode: string, detail: unknown): string =>
+      `docker-xverify-runtime:${createHash('sha256')
+        .update(canonicalJson({ reasonCode, detail }))
+        .digest('hex')}`;
+    if (modelRegistry.get(model)?.provider !== provider) {
+      return {
+        state: 'hold',
+        reasonCode: 'docker_provider_model_mismatch',
+        authorityEvidenceRef: detailDigest(
+          'docker_provider_model_mismatch',
+          { provider, model },
+        ),
+      };
+    }
+    const spec = getProviderCommandSpec(provider);
+    if (!spec) {
+      return {
+        state: 'hold',
+        reasonCode: 'docker_provider_cli_unavailable',
+        authorityEvidenceRef: detailDigest(
+          'docker_provider_cli_unavailable',
+          { provider, model, reason: 'command-spec-missing' },
+        ),
+      };
+    }
+    const inspected = await this.crossVerifyRuntimeCommandRunner(
+      'docker',
+      ['image', 'inspect', '--format', '{{.Id}}', this.image],
+    );
+    const imageId = inspected.status === 0 ? inspected.stdout.trim() : '';
+    if (!/^sha256:[a-f0-9]{64}$/u.test(imageId)) {
+      return {
+        state: 'hold',
+        reasonCode: 'docker_image_identity_unavailable',
+        authorityEvidenceRef: detailDigest(
+          'docker_image_identity_unavailable',
+          { image: this.image, status: inspected.status ?? null },
+        ),
+      };
+    }
+    const binary = await this.crossVerifyRuntimeCommandRunner(
+      'docker',
+      [
+        'run',
+        '--rm',
+        '--network',
+        'none',
+        imageId,
+        'sh',
+        '-c',
+        'command -v "$1"',
+        'deckent-xverify-probe',
+        spec.binary,
+      ],
+    );
+    const binaryPath = binary.status === 0 ? binary.stdout.trim() : '';
+    if (!binaryPath?.startsWith('/')) {
+      return {
+        state: 'hold',
+        reasonCode: 'docker_provider_cli_unavailable',
+        authorityEvidenceRef: detailDigest(
+          'docker_provider_cli_unavailable',
+          { provider, model, imageId, status: binary.status },
+        ),
+      };
+    }
+    const profile = {
+      provider,
+      model,
+      imageId,
+      binary: spec.binary,
+      binaryPath,
+      baseArgs: spec.baseArgs,
+      modelFlag: spec.modelFlag,
+      approvalArgs: spec.approvalArgs,
+      isolatedContextArgs: spec.isolatedContextArgs,
+      promptFeed: spec.promptFeed,
+      liveUsage: spec.liveUsage,
+    };
+    const runtimeFingerprint = createHash('sha256')
+      .update(canonicalJson(profile))
+      .digest('hex');
+    const toolProfileDigest = createHash('sha256')
+      .update(canonicalJson({
+        binary: spec.binary,
+        baseArgs: spec.baseArgs,
+        modelFlag: spec.modelFlag,
+        approvalArgs: spec.approvalArgs,
+        allowedToolsFlag: spec.allowedToolsFlag,
+        availableToolsFlag: spec.availableToolsFlag,
+        isolatedContextArgs: spec.isolatedContextArgs,
+        promptFeed: spec.promptFeed,
+        liveUsage: spec.liveUsage,
+      }))
+      .digest('hex');
+    return Object.freeze({
+      state: 'ready',
+      imageId,
+      runtimeFingerprint,
+      executionProfileRef: `docker-execution-profile:${runtimeFingerprint}`,
+      toolProfileDigest,
+      authorityEvidenceRef: `docker-xverify-runtime:${runtimeFingerprint}`,
+    });
   }
 
   /**
@@ -3421,6 +3730,20 @@ export class DockerSpawnBackend implements SpawnBackend {
         this.name,
       );
     }
+    if (contract.schemaVersion === 2
+      && (
+        `sha256:${contract.dispatchedPromptSha256}`
+          !== contract.adjudication.finalPromptDigest
+        || input.prompt.length !== contract.adjudication.finalPromptChars
+        || contract.adjudication.evidenceAccess !== 'snapshot-read-only'
+        || contract.adjudication.artifactMutationPolicy
+          !== 'attempt-private-output-only'
+      )) {
+      throw new SpawnBackendError(
+        'Typed xverify prompt or isolation policy differs from the execution contract',
+        this.name,
+      );
+    }
     const dir = input.options.projectDir ?? this.projectDir;
     assertTaskResultSettlementRef(dir, input.taskId, input.settlementRef);
     if (input.taskId !== contract.verifierTaskId
@@ -3494,6 +3817,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     // it while tmux/subprocess enforced it: a lethal actionId could spawn here.
     checkLethalGuard(opts?.actionId, this.name);
     const dir = opts?.projectDir ?? this.projectDir;
+    const exactV2 = exact?.executionContract.schemaVersion === 2;
     if (opts?.settlementRef) {
       assertTaskResultSettlementRef(dir, taskId, opts.settlementRef);
     }
@@ -3502,14 +3826,31 @@ export class DockerSpawnBackend implements SpawnBackend {
     if (typeof executionBudget?.maxUsd === 'number') {
       assertLiveUsageBudgetSupport(executionBudget, undefined, this.name);
     }
+    // A final-only provider CLI (codex/gemini) reports usage once, at the end of
+    // the call, so a token ceiling cannot be enforced in flight. Default stays
+    // fail-closed. With an explicit owner authorization the ceilings become
+    // post-hoc settlement evidence and the ONLY in-flight containment is the
+    // host wall clock bounded below — the runtime never claims a live cap it
+    // cannot enforce.
+    let finalOnlyWallClockSeconds: number | undefined;
     if (hasLiveUsageCeiling(executionBudget)) {
       const provider = getProviderForModel(model);
       const spec = getProviderCommandSpec(provider);
       if (spec?.liveUsage !== 'incremental') {
-        throw new SpawnBackendError(
-          `Docker provider "${provider}" does not expose incremental measured usage; live execution budget cannot be enforced. Spawn blocked before provider work.`,
-          this.name,
-        );
+        const containment = opts?.finalOnlyUsageContainment;
+        if (!containment) {
+          throw new SpawnBackendError(
+            `Docker provider "${provider}" does not expose incremental measured usage; live execution budget cannot be enforced. Spawn blocked before provider work.`,
+            this.name,
+          );
+        }
+        if (!Number.isInteger(containment.maxWallClockSeconds) || containment.maxWallClockSeconds <= 0) {
+          throw new SpawnBackendError(
+            `Final-only usage containment for provider "${provider}" requires a positive integer wall clock. Spawn blocked before provider work.`,
+            this.name,
+          );
+        }
+        finalOnlyWallClockSeconds = containment.maxWallClockSeconds;
       }
     }
       assertExecutionLandingSupport({
@@ -3522,22 +3863,58 @@ export class DockerSpawnBackend implements SpawnBackend {
         approvalGrant: opts?.executionApprovalGrant,
         approvalExpectedDispatch: opts?.executionApprovalExpectedDispatch,
       });
-    let gitIsolation: DockerGitIsolation;
-    try {
-      gitIsolation = buildDockerGitIsolation(dir);
-    } catch (error) {
-      throw new SpawnBackendError(
-        `Cannot construct a read-only Docker Git view for task ${taskId}: ${error instanceof Error ? error.message : String(error)}`,
-        this.name,
-      );
+    let gitIsolation: DockerGitIsolation = {
+      available: false,
+      mountArgs: [],
+      envArgs: [],
+    };
+    if (!exactV2) {
+      try {
+        gitIsolation = buildDockerGitIsolation(dir);
+      } catch (error) {
+        throw new SpawnBackendError(
+          `Cannot construct a read-only Docker Git view for task ${taskId}: ${error instanceof Error ? error.message : String(error)}`,
+          this.name,
+        );
+      }
     }
     // Adaptive timeout: prefer per-task override from brainEstimateTimeout(),
-    // fall back to constructor value, then DEFAULT_TIMEOUT_SECONDS
-    const effectiveTimeout = opts?.taskTimeoutSeconds ?? this.timeoutSeconds;
-    const tasksDir = join(dir, TASKS_DIR);
-    mkdirSync(tasksDir, { recursive: true });
+    // fall back to constructor value, then DEFAULT_TIMEOUT_SECONDS. An authorized
+    // final-only call is additionally bounded by the owner's wall clock — that
+    // window IS its containment, so it may only narrow, never widen, the timeout.
+    const requestedTimeout = opts?.taskTimeoutSeconds ?? this.timeoutSeconds;
+    const effectiveTimeout = finalOnlyWallClockSeconds === undefined
+      ? requestedTimeout
+      : Math.min(requestedTimeout, finalOnlyWallClockSeconds);
     const settlementRef = opts?.settlementRef ?? createTaskResultSettlementRef(dir, taskId);
     assertTaskResultSettlementRef(dir, taskId, settlementRef);
+    const projectTasksDir = join(dir, TASKS_DIR);
+    const tasksDir = exactV2
+      ? join(dirname(taskResultSettlementAttemptPath(settlementRef)), 'provider-output')
+      : projectTasksDir;
+    mkdirSync(tasksDir, { recursive: true, mode: exactV2 ? 0o700 : undefined });
+    if (exactV2) {
+      const taskFileName = `task-${taskId}.json`;
+      const sourceTaskPath = join(projectTasksDir, taskFileName);
+      const isolatedTaskPath = join(tasksDir, taskFileName);
+      if (!existsSync(sourceTaskPath)) {
+        throw new SpawnBackendError(
+          'Typed xverify isolated output authority has no immutable task snapshot',
+          this.name,
+        );
+      }
+      const taskBytes = readFileSync(sourceTaskPath);
+      if (existsSync(isolatedTaskPath)) {
+        if (!readFileSync(isolatedTaskPath).equals(taskBytes)) {
+          throw new SpawnBackendError(
+            'Typed xverify isolated task snapshot conflicts with its first writer',
+            this.name,
+          );
+        }
+      } else {
+        writeFileSync(isolatedTaskPath, taskBytes, { flag: 'wx', mode: 0o600 });
+      }
+    }
     writeTaskResultSettlementAttemptAtomic(settlementRef);
     writeTaskResultSettlementExecutionBudgetAuthorityAtomic(settlementRef, {
       model,
@@ -3680,6 +4057,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     gitIsolation: DockerGitIsolation,
     exact?: DockerExactCrossVerifyContext,
   ): void {
+    const exactV2 = exact?.executionContract.schemaVersion === 2;
     // F1-005 (Sprint 332): resolve this worker's provider up-front so the image
     // readiness honest-fail below can name the EXACT provider-aware rebuild
     // command. codex/gemini CLIs are opt-in build-args in Dockerfile.worker; claude
@@ -3734,13 +4112,17 @@ export class DockerSpawnBackend implements SpawnBackend {
     }
 
     // Guard: verify Docker image exists before attempting spawn.
+    const executionImage = exactV2
+      ? exact.executionContract.adjudication.runtimeImageRef
+      : this.image;
     const imageCheck = spawnSync('docker', ['images', '-q', this.image], {
       encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
     });
     // Defensive re-check: if the image query ITSELF reports a daemon/permission/
     // absent failure (the daemon could drop between the preflight and here), honor
     // that distinct classification rather than falling through to image-missing.
-    if (imageCheck.error || (imageCheck.status !== null && imageCheck.status !== 0)) {
+    if (!exactV2
+      && (imageCheck.error || (imageCheck.status !== null && imageCheck.status !== 0))) {
       const pf = classifyDockerPreflight({
         status: imageCheck.status,
         stderr: imageCheck.stderr,
@@ -3753,7 +4135,7 @@ export class DockerSpawnBackend implements SpawnBackend {
         );
       }
     }
-    if (!imageCheck.stdout?.trim()) {
+    if (!exactV2 && !imageCheck.stdout?.trim()) {
       // Distinct IMAGE-MISSING failure (daemon already confirmed healthy above):
       // the image TAG does not exist locally — a genuinely different remedy than a
       // missing provider-CLI (E088 below) or an unreachable daemon (E085/E086).
@@ -4123,7 +4505,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     // missing file would materialize a phantom host `.deck` via the nested bind
     // mount; see buildDeckShadowMountArgs). The shadow source is a regular 0-byte
     // file so docker cannot create a `.deck` directory on the target.
-    const deckExists = existsSync(join(dir, DECK_FILE_NAME));
+    const deckExists = !exactV2 && existsSync(join(dir, DECK_FILE_NAME));
     const deckShadowHostPath = deckExists
       ? ensureDeckShadowFile(tasksDir)
       : join(tasksDir, '.deck-shadow');
@@ -4134,7 +4516,9 @@ export class DockerSpawnBackend implements SpawnBackend {
     // WORKER-GUIDE.md "no build in worker" rule, complementing (not replacing) the
     // post-exit dist-mtime sentinel (distFingerprintBefore/After below).
     const distHostPath = join(dir, 'dist');
-    const distReadOnlyMountArgs = buildDistReadOnlyMountArgs(existsSync(distHostPath), distHostPath);
+    const distReadOnlyMountArgs = exactV2
+      ? []
+      : buildDistReadOnlyMountArgs(existsSync(distHostPath), distHostPath);
 
     const dockerArgs: string[] = [
       'run', '-d',
@@ -4150,8 +4534,11 @@ export class DockerSpawnBackend implements SpawnBackend {
       '--memory-swap', effectiveSwap,
       // Writable HOME via tmpfs — Claude CLI needs to write config/cache here
       '--tmpfs', `${containerHome}:size=100m,uid=${uid},gid=${gid}`,
-      // Project mounted read-write — workers need to create/edit files in scope
-      '-v', `${dir}:${CONTAINER_WORKSPACE}`,
+      // Typed xverify receives an empty ephemeral workspace; implementation
+      // workers retain the project read-write mount.
+      ...(exactV2
+        ? ['--tmpfs', `${CONTAINER_WORKSPACE}:size=64m,uid=${uid},gid=${gid}`]
+        : ['-v', `${dir}:${CONTAINER_WORKSPACE}`]),
       // Git metadata is control-plane state, not worker output. Overlay the
       // worktree's .git entry read-only and expose the common/worktree metadata
       // through container-native paths so linked worktrees work on every host.
@@ -4167,10 +4554,13 @@ export class DockerSpawnBackend implements SpawnBackend {
       // WORKER-GIT-GUARD (381-001): read-only git-shim overlay (see above).
       ...gitGuard.mountArgs,
       ...(exact ? exactCrossVerifyPromptMountArgs(exact.promptHostPath) : []),
+      ...(exact ? exactCrossVerifyEvidenceMountArgs(exact.executionContract, dir) : []),
       // .tasks/ mounted read-write (results, heartbeats, prompts)
       '-v', `${tasksDir}:${CONTAINER_WORKSPACE}/${TASKS_DIR}`,
       // .locks/ mounted read-write (file locking)
-      '-v', `${join(dir, '.locks')}:${CONTAINER_WORKSPACE}/.locks`,
+      ...(!exactV2
+        ? ['-v', `${join(dir, '.locks')}:${CONTAINER_WORKSPACE}/.locks`]
+        : []),
       // Auth-only isolation: never mount the complete host provider home. The
       // worker script copies read-only credential mounts into its private tmpfs
       // HOME before invoking the provider CLI.
@@ -4256,7 +4646,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     }
 
     // Container image and command
-    dockerArgs.push(this.image, 'sh', '-c', containerCmd);
+    dockerArgs.push(executionImage, 'sh', '-c', containerCmd);
 
     debugLog('docker-backend:spawn', `taskId=${taskId} container=${containerName} model=${model}`);
 

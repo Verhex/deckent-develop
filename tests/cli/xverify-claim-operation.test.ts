@@ -56,7 +56,7 @@ describe('runXverifyForResult — claim operation contract', () => {
         cross_verify: {
           enabled: false,              // must be forced ON by explicit invocation
           high_stakes_only: true,      // must be forced OFF
-          enforce_refuted: true,       // must be forced OFF (advisory by contract)
+          enforce_refuted: false,      // must be forced ON (host-adjudicated v2)
           verifier_priority: ['gemini'], // must lose to the explicit --verifier
           verifier_model: { codex: 'gpt-5.6-sol' },
           max_verifications_per_sprint: 1,
@@ -67,6 +67,7 @@ describe('runXverifyForResult — claim operation contract', () => {
         passedConfig = args[4] as { cross_verify?: Record<string, unknown> };
         return {
           outcome: 'unavailable' as const,
+          disposition: 'hold' as const,
           ran: false,
           skippedReason: 'stub',
           refuted: false,
@@ -81,7 +82,7 @@ describe('runXverifyForResult — claim operation contract', () => {
     // …and only the invocation-forced ones are overridden.
     expect(passedConfig?.cross_verify?.enabled).toBe(true);
     expect(passedConfig?.cross_verify?.high_stakes_only).toBe(false);
-    expect(passedConfig?.cross_verify?.enforce_refuted).toBe(false);
+    expect(passedConfig?.cross_verify?.enforce_refuted).toBe(true);
     expect(passedConfig?.cross_verify?.verifier_priority).toEqual(['codex']);
   });
 
@@ -114,6 +115,7 @@ describe('runXverifyForResult — claim operation contract', () => {
         });
         return {
           outcome: 'confirmed',
+          disposition: 'allow',
           ran: true,
           advisory: {
             verifier: 'claude',
@@ -156,17 +158,32 @@ describe('runXverifyForResult — claim operation contract', () => {
     const task = observed[0]![1] as {
       title: string;
       description: string;
-      goNogo: { goCriteria: string; noGoCriteria: string };
+      goNogo: {
+        goCriteria: string;
+        noGoCriteria: string;
+        items: Array<{
+          polarity: string;
+          statement: string;
+          evidenceRequirements: string[];
+        }>;
+      };
     };
     const options = observed[0]![5] as {
       operationClass?: string;
       availableProviders?: string[];
     };
-    expect(task.title).toBe('Session claim xv-1784764800000');
+    expect(task.title).toMatch(/^Session claim xv-1784764800000-/u);
     expect(task.title).not.toContain(claim);
     expect(task.description).toBe(claim);
-    expect(task.goNogo.goCriteria).toContain('material factual premise');
+    expect(task.goNogo.goCriteria).toBe(claim);
     expect(task.goNogo.noGoCriteria).toContain('Missing evidence alone is not NO-GO');
+    expect(task.goNogo.items).toEqual([
+      expect.objectContaining({
+        polarity: 'go',
+        statement: claim,
+        evidenceRequirements: ['docs/plan.md', 'src/core/a.ts'],
+      }),
+    ]);
     expect(options.operationClass).toBe('adjudicate-claim');
     expect(options.availableProviders).toEqual(['claude']);
     const report = readFileSync(result.report, 'utf-8');
@@ -194,6 +211,7 @@ describe('runXverifyForResult — claim operation contract', () => {
         runnerOptions = args[5] as { availableProviders?: string[] };
         return {
           outcome: 'unavailable',
+          disposition: 'hold',
           ran: false,
           skippedReason: 'verifier-eligibility-evidence-missing',
           refuted: false,
@@ -241,6 +259,7 @@ describe('runXverifyForResult — claim operation contract', () => {
         evidenceContext = (result as typeof result & { evidenceContext?: string }).evidenceContext;
         return {
           outcome: 'unclear',
+          disposition: 'hold',
           ran: true,
           advisory: {
             verifier: 'claude',

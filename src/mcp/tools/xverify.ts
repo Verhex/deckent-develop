@@ -9,9 +9,8 @@
  * DIFFER from the author (enforced by `selectVerifierProvider` through the
  * synthetic task's `provider` field; see cli/commands/xverify.ts).
  *
- * Advisory by contract: the tool NEVER blocks or mutates project state beyond
- * the report artifact (`.analysis/xverify/<id>.md`) + the verifier task files.
- * A REFUTED verdict is information for the caller, not an enforcement signal.
+ * Provider output is evidence only. The host derives an authoritative
+ * allow/no-go/hold disposition from typed criteria and immutable evidence.
  *
  * Thin wrapper: all behavior lives in `runXverifyCommandCore` — the same core
  * the CLI action calls — so the two surfaces cannot drift (CLI-MCP parity).
@@ -20,18 +19,22 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod/v4';
 import { ALL_PROVIDER_NAMES } from '../../core/types.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
 import { runXverifyForResult } from '../../cli/commands/xverify.js';
+import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
 
-export function registerXverifyTool(server: McpServer): void {
+export function registerXverifyTool(
+  server: McpServer,
+  runtime: {
+    providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  } = {},
+): void {
+  const lang = getLanguage(undefined);
   server.registerTool(
     'deckent_xverify',
     {
-      title: 'Cross-verify (advisory)',
-      description:
-        'Dispatch an adversarial verifier worker on a DIFFERENT provider to try to refute a claim '
-        + 'about finished work. Advisory only — returns CONFIRMED/REFUTED/UNCLEAR + a report path, '
-        + 'never blocks. The verifier is chosen to differ from `author` '
-        + '(session A authored → session B\'s provider verifies).',
+      title: getMessage('xverify.mcp.title', lang),
+      description: getMessage('xverify.mcp.description', lang),
       annotations: {
         // Spawns a real verifier worker + writes a report file — not read-only.
         readOnlyHint: false,
@@ -39,16 +42,17 @@ export function registerXverifyTool(server: McpServer): void {
         idempotentHint: false,
       },
       inputSchema: z.object({
-        claim: z.string().min(1).describe('The claim about finished work to adversarially verify'),
+        claim: z.string().min(1).describe(getMessage('xverify.mcp.claim', lang)),
         author: z.enum(ALL_PROVIDER_NAMES as unknown as [string, ...string[]])
-          .describe('Provider that authored the claimed work — the verifier must differ'),
+          .describe(getMessage('xverify.mcp.author', lang)),
         verifier: z.enum(ALL_PROVIDER_NAMES as unknown as [string, ...string[]]).optional()
-          .describe('Explicit verifier provider (must differ from author; default: cross_verify.verifier_priority)'),
+          .describe(getMessage('xverify.mcp.verifier', lang)),
         verifierModel: z.string().optional()
-          .describe('Explicit verifier model id (canonical provider API id) — bypasses tier-equivalence'),
-        diff: z.boolean().optional().describe('Attach `git diff HEAD` as evidence context'),
-        files: z.string().optional().describe('Comma-separated files the claim says were changed'),
-        timeoutMs: z.number().int().positive().optional().describe('Verifier timeout in ms (default 300000)'),
+          .describe(getMessage('xverify.mcp.verifier_model', lang)),
+        diff: z.boolean().optional().describe(getMessage('xverify.mcp.diff', lang)),
+        files: z.string().optional().describe(getMessage('xverify.mcp.files', lang)),
+        timeoutMs: z.number().int().positive().optional()
+          .describe(getMessage('xverify.mcp.timeout', lang)),
       }),
     },
     async ({ claim, author, verifier, verifierModel, diff, files, timeoutMs }) => {
@@ -60,6 +64,10 @@ export function registerXverifyTool(server: McpServer): void {
           diff,
           files,
           timeout: timeoutMs !== undefined ? String(timeoutMs) : undefined,
+        }, {
+          ...(runtime.providerAuthority
+            ? { providerAuthority: runtime.providerAuthority }
+            : {}),
         });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
@@ -69,7 +77,9 @@ export function registerXverifyTool(server: McpServer): void {
           isError: true,
           content: [{
             type: 'text' as const,
-            text: `xverify failed: ${err instanceof Error ? err.message : String(err)}`,
+            text: getMessage('xverify.mcp.failed', lang, {
+              error: err instanceof Error ? err.message : String(err),
+            }),
           }],
         };
       }

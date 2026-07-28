@@ -21,6 +21,36 @@ export const TASK_RESULT_SCHEMA_VERSION = '1.0';
 /** The three worker self-assessment verdicts (shared with legacy SelfAssessment). */
 const selfAssessmentSchema = z.enum(['DONE', 'GO_WITH_TECH_DEBT', 'NO_GO']);
 const crossVerifyVerdictSchema = z.enum(['confirmed', 'refuted', 'unclear']);
+const crossVerifyExecutionSchema = z.object({
+  outcome: z.enum(['completed', 'budget-exhausted', 'failed']),
+  initialAttemptId: z.string().min(1),
+  terminalAttemptId: z.string().min(1),
+  reason: z.string().optional(),
+  cumulativeUsage: z.object({
+    turns: z.number().int().nonnegative(),
+    inputTokens: z.number().int().nonnegative(),
+    outputTokens: z.number().int().nonnegative(),
+    cacheReadTokens: z.number().int().nonnegative(),
+    cacheCreationTokens: z.number().int().nonnegative(),
+    totalTokens: z.number().int().nonnegative(),
+    maxContextTokens: z.number().int().nonnegative(),
+  }).optional(),
+});
+const crossVerifyEligibilitySchema = z.object({
+  reachabilityRef: z.string().min(1),
+  limitEvidenceRefs: z.array(z.string().min(1)),
+  accountRefHash: z.string().nullable(),
+  authMode: z.string().min(1),
+  transport: z.string().min(1),
+  executionBackend: z.string().min(1),
+  executionProfileRef: z.string().min(1),
+});
+const invocationReceiptRefSchema = z.object({
+  schemaVersion: z.literal(1),
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  invocationId: z.string().min(1),
+});
 
 /** Downstream orchestrator evidence; additive and absent before cross-verification. */
 export const crossVerifyEvidenceSchema = z.union([
@@ -30,12 +60,19 @@ export const crossVerifyEvidenceSchema = z.union([
     verifierModel: z.string().min(1),
     verdict: crossVerifyVerdictSchema,
     reason: z.string(),
+    execution: crossVerifyExecutionSchema.optional(),
+    eligibility: crossVerifyEligibilitySchema.optional(),
+    invocationReceiptRef: invocationReceiptRefSchema.optional(),
+    assurance: z.literal('typed-host-adjudicated').optional(),
+    adjudicationReceiptRef: z.string().min(1).optional(),
   }),
   z.object({
     outcome: z.literal('unavailable'),
     verifier: z.string().min(1).optional(),
     verifierModel: z.string().min(1).optional(),
     reason: z.string(),
+    invocationReceiptRef: invocationReceiptRefSchema.optional(),
+    authorityEvidenceRef: z.string().min(1).optional(),
   }),
 ]);
 

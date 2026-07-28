@@ -4,8 +4,12 @@ import { join } from 'node:path';
 
 import { canonicalJson } from '../core/audit-writer.js';
 import type { ResolvedConfig } from '../core/config-types.js';
-import { buildRefutePrompt, type CrossVerifyOperationClass } from '../core/cross-verify-prompt.js';
-import { createCrossVerifyEnforcedAttemptContract } from '../core/cross-verify-execution-contract.js';
+import {
+  crossVerifyVerdictReceiptRef,
+  writeCrossVerifyVerdictReceiptAtomic,
+} from '../core/cross-verify-evidence-broker.js';
+import type { CrossVerifyOperationClass } from '../core/cross-verify-prompt.js';
+import { createCrossVerifyEnforcedAttemptContractV2 } from '../core/cross-verify-execution-contract.js';
 import { resolveExecutionBudgetPolicy } from '../core/execution-budget-policy.js';
 import type { ExecutionTerminationLedger } from '../core/execution-termination-ledger.js';
 import { createExecutionAuthorityError } from '../core/errors.js';
@@ -53,6 +57,7 @@ import type {
 } from './cross-verify-runner.js';
 import { prepareDockerExecutionLanding } from './execution-landing-coordinator.js';
 import type { DockerSpawnBackend } from './spawn-backend-docker.js';
+import { bootstrapCrossVerifyRuntimeV2 } from './cross-verify-runtime-bootstrap.js';
 
 const TASKS_DIR = '.tasks';
 const MODEL_EFFORT = 'low';
@@ -62,6 +67,15 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+function deterministicAttemptId(digest: string): string {
+  const bytes = Buffer.from(digest.slice(0, 32), 'hex');
+  bytes[6] = (bytes[6]! & 0x0f) | 0x80;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-`
+    + `${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
 function evidenceRef(kind: string, detail: unknown): string {
   return `xverify-production-ingress:${sha256(`${kind}\0${canonicalJson(detail)}`)}`;
 }
@@ -69,11 +83,16 @@ function evidenceRef(kind: string, detail: unknown): string {
 function hold(
   reasonCode: string,
   detail: unknown,
+  identity?: {
+    readonly verifierProvider?: ProviderName;
+    readonly verifierModel?: string;
+  },
 ): MandatoryCrossVerifyInvocationFactoryResult {
   return {
     state: 'hold',
     reasonCode,
     authorityEvidenceRef: evidenceRef(reasonCode, detail),
+    ...identity,
   };
 }
 
@@ -86,6 +105,7 @@ export interface CrossVerifyExecutionProfileReady {
   readonly executionBackend: 'docker';
   readonly endpointRefHash: string | null;
   readonly runtimeFingerprint: string;
+  readonly immutableImageRef: string;
   readonly executionProfileRef: string;
   readonly authLabel: string;
   readonly toolProfileDigest: string;
@@ -113,7 +133,7 @@ export interface CrossVerifyExecutionProfileAuthority {
     readonly provider: ProviderName;
     readonly model: string;
     readonly projectRoot: string;
-  }): CrossVerifyExecutionProfileResolution;
+  }): CrossVerifyExecutionProfileResolution | Promise<CrossVerifyExecutionProfileResolution>;
 }
 
 export interface CrossVerifyProductionIngressOptions {
@@ -129,6 +149,7 @@ export interface AuthoredDockerCrossVerifyExecutionProfile {
   readonly transport: CrossVerifyExecutionProfileReady['transport'];
   readonly endpointRefHash: string | null;
   readonly runtimeFingerprint: string;
+  readonly immutableImageRef: string;
   readonly executionProfileRef: string;
   readonly authLabel: string;
   readonly toolProfileDigest: string;
@@ -169,6 +190,16 @@ export function createDockerCrossVerifyExecutionProfileAuthority(input: {
         };
       }
       const profile = matches[0]!;
+      if (!/^sha256:[a-f0-9]{64}$/u.test(profile.immutableImageRef)) {
+        return {
+          state: 'hold',
+          reasonCode: 'xverify_execution_profile_invalid',
+          authorityEvidenceRef: evidenceRef('profile-image-identity', {
+            provider: query.provider,
+            model: query.model,
+          }),
+        };
+      }
       const launcher = createCrossVerifyDockerStrictLauncher({
         backend: input.backend,
         terminationLedger: input.terminationLedger,
@@ -211,6 +242,67 @@ export function createDockerCrossVerifyExecutionProfileAuthority(input: {
           { now: input.now },
         ),
       });
+    },
+  });
+}
+
+/**
+ * Production Docker profile authority backed by an immutable image identity and
+ * an in-image provider CLI proof. No provider request is made.
+ */
+export function createLiveDockerCrossVerifyExecutionProfileAuthority(input: {
+  readonly projectRoot: string;
+  readonly backend: DockerSpawnBackend;
+  readonly terminationLedger: ExecutionTerminationLedger;
+  readonly authMode: 'subscription' | 'api';
+  readonly now?: () => Date;
+}): CrossVerifyExecutionProfileAuthority {
+  return Object.freeze({
+    async resolve(query: {
+      readonly provider: ProviderName;
+      readonly model: string;
+      readonly projectRoot: string;
+    }): Promise<CrossVerifyExecutionProfileResolution> {
+      if (query.projectRoot !== input.projectRoot) {
+        return {
+          state: 'hold',
+          reasonCode: 'xverify_execution_profile_project_mismatch',
+          authorityEvidenceRef: evidenceRef('profile-project-mismatch', {
+            expected: input.projectRoot,
+            actual: query.projectRoot,
+          }),
+        };
+      }
+      const inspected = await input.backend.inspectExactCrossVerifyRuntime(
+        query.provider,
+        query.model,
+      );
+      if (inspected.state === 'hold') {
+        return {
+          state: 'hold',
+          reasonCode: inspected.reasonCode,
+          authorityEvidenceRef: inspected.authorityEvidenceRef,
+        };
+      }
+      return createDockerCrossVerifyExecutionProfileAuthority({
+        projectRoot: input.projectRoot,
+        backend: input.backend,
+        terminationLedger: input.terminationLedger,
+        now: input.now,
+        profiles: [{
+          provider: query.provider,
+          model: query.model,
+          authMode: input.authMode,
+          transport: 'cli',
+          endpointRefHash: null,
+          runtimeFingerprint: inspected.runtimeFingerprint,
+          immutableImageRef: inspected.imageId,
+          executionProfileRef: inspected.executionProfileRef,
+          authLabel: input.authMode,
+          toolProfileDigest: inspected.toolProfileDigest,
+          authorityEvidenceRef: inspected.authorityEvidenceRef,
+        }],
+      }).resolve(query);
     },
   });
 }
@@ -282,24 +374,18 @@ implements MandatoryCrossVerifyInvocationFactory {
     this.now = options.now ?? (() => new Date());
   }
 
-  compose(input: {
+  async compose(input: {
     readonly projectRoot: string;
     readonly task: Task;
     readonly result: TaskResult;
     readonly config: ResolvedConfig;
     readonly operationClass: CrossVerifyOperationClass;
     readonly timeoutMs: number;
-  }): MandatoryCrossVerifyInvocationFactoryResult {
+    readonly verifierModel?: string;
+  }): Promise<MandatoryCrossVerifyInvocationFactoryResult> {
     if (input.config.cross_verify?.enabled !== true
       || input.config.cross_verify.enforce_refuted !== true) {
       return hold('xverify_enforcement_disabled', input.task.id);
-    }
-    const opened = this.options.providerAuthority;
-    if (!opened || opened.state !== 'ready') {
-      return hold(
-        'xverify_provider_authority_unavailable',
-        opened?.authorityEvidenceRef ?? input.task.id,
-      );
     }
     const provider = exactVerifierProvider(input.task, input.config);
     if (!provider) {
@@ -307,30 +393,61 @@ implements MandatoryCrossVerifyInvocationFactory {
     }
     let model: string;
     try {
-      model = modelRegistry.getEquivalent(input.task.model, provider);
-      if (modelRegistry.get(model)?.provider !== provider) {
-        return hold('xverify_model_scope_mismatch', { provider, model });
+      const authoredModel =
+        input.verifierModel
+        ?? input.config.cross_verify?.verifier_model?.[provider];
+      const definition = authoredModel
+        ? modelRegistry.getOrThrow(authoredModel)
+        : modelRegistry.getOrThrow(
+            modelRegistry.getEquivalent(input.task.model, provider),
+          );
+      model = definition.id;
+      if (definition.provider !== provider || definition.status === 'deprecated') {
+        return hold(
+          'xverify_model_scope_mismatch',
+          { provider, model },
+          { verifierProvider: provider },
+        );
       }
     } catch (error) {
       return hold(
         'xverify_model_scope_mismatch',
         error instanceof Error ? error.message : String(error),
+        { verifierProvider: provider },
+      );
+    }
+    const selectedHold = (
+      reasonCode: string,
+      detail: unknown,
+    ): MandatoryCrossVerifyInvocationFactoryResult =>
+      hold(reasonCode, detail, {
+        verifierProvider: provider,
+        verifierModel: model,
+      });
+    const opened = this.options.providerAuthority;
+    if (!opened || opened.state !== 'ready') {
+      return selectedHold(
+        'xverify_provider_authority_unavailable',
+        opened?.authorityEvidenceRef ?? input.task.id,
       );
     }
     if (!this.options.executionProfiles) {
-      return hold('xverify_execution_profile_unavailable', { provider, model });
+      return selectedHold('xverify_execution_profile_unavailable', { provider, model });
     }
-    const profile = this.options.executionProfiles.resolve({
+    const profile = await this.options.executionProfiles.resolve({
       provider,
       model,
       projectRoot: input.projectRoot,
     });
     if (profile.state === 'hold') {
-      return hold(profile.reasonCode, profile.authorityEvidenceRef);
+      return selectedHold(profile.reasonCode, profile.authorityEvidenceRef);
     }
     if (profile.provider !== provider || profile.model !== model
       || profile.executionBackend !== 'docker') {
-      return hold('xverify_execution_profile_mismatch', profile.authorityEvidenceRef);
+      return selectedHold(
+        'xverify_execution_profile_mismatch',
+        profile.authorityEvidenceRef,
+      );
     }
 
     const selected = projectExactProviderLimitAuthoritySelector(
@@ -345,7 +462,7 @@ implements MandatoryCrossVerifyInvocationFactory {
       },
     );
     if (selected.state === 'hold') {
-      return hold(selected.reasonCode, selected.authorityEvidenceRef);
+      return selectedHold(selected.reasonCode, selected.authorityEvidenceRef);
     }
     const source = opened.service.preflightUnattendedScope({
       provider,
@@ -354,7 +471,7 @@ implements MandatoryCrossVerifyInvocationFactory {
       executionBackend: profile.executionBackend,
     });
     if (source.decision === 'hold') {
-      return hold(`xverify_${source.reasonCode}`, source.authorityEvidenceRef);
+      return selectedHold(`xverify_${source.reasonCode}`, source.authorityEvidenceRef);
     }
 
     const authority: HostRoleInvocationCandidateAuthority = {
@@ -384,11 +501,14 @@ implements MandatoryCrossVerifyInvocationFactory {
     };
     const candidate = opened.service.roleAdmissionRuntime.projectVerifierCandidate(authority);
     if (candidate.state === 'hold') {
-      return hold(`xverify_${candidate.reasonCode}`, candidate.authorityEvidenceRef);
+      return selectedHold(`xverify_${candidate.reasonCode}`, candidate.authorityEvidenceRef);
     }
     if (candidate.requiredWindows.some(window =>
       !selected.selector.requiredWindowIds.includes(window.windowId))) {
-      return hold('xverify_provider_window_scope_mismatch', candidate.authorityEvidenceRef);
+      return selectedHold(
+        'xverify_provider_window_scope_mismatch',
+        candidate.authorityEvidenceRef,
+      );
     }
 
     const budgetDecision = resolveExecutionBudgetPolicy({
@@ -400,7 +520,7 @@ implements MandatoryCrossVerifyInvocationFactory {
     });
     if (budgetDecision.state === 'hold' || !budgetDecision.budget
       || !budgetDecision.landingPolicy || !budgetDecision.policyDigest) {
-      return hold(
+      return selectedHold(
         `xverify_execution_budget_${budgetDecision.state === 'hold'
           ? budgetDecision.reasonCode
           : 'incomplete'}`,
@@ -409,15 +529,18 @@ implements MandatoryCrossVerifyInvocationFactory {
     }
     const estimates = estimatesFor(candidate.requiredWindows, model, budgetDecision.budget);
     if (!estimates) {
-      return hold('xverify_limit_unit_unreservable', candidate.requiredWindows);
+      return selectedHold('xverify_limit_unit_unreservable', candidate.requiredWindows);
     }
 
-    const basePrompt = buildRefutePrompt(input.task, input.result, {
-      verifier: provider,
-      operationClass: input.operationClass,
-    });
     const runId = input.task.sprintId ?? `xverify-${sha256(input.task.id).slice(0, 16)}`;
     const verifierTaskId = `${input.task.id}-xverify`;
+    const evidencePaths = [...new Set(
+      (input.task.scope.filesRead.length > 0
+        ? input.task.scope.filesRead
+        : input.result.filesChanged ?? [])
+        .map(path => path.trim())
+        .filter(Boolean),
+    )];
     const attemptDigest = sha256(canonicalJson({
       tenantId: opened.tenantId,
       projectId: opened.projectId,
@@ -430,10 +553,11 @@ implements MandatoryCrossVerifyInvocationFactory {
       runtimeFingerprint: profile.runtimeFingerprint,
       budget: budgetDecision.budget,
       policyDigest: budgetDecision.policyDigest,
-      basePromptSha256: sha256(basePrompt),
+      criteria: input.task.goNogo.items ?? null,
+      evidencePaths,
       operationClass: input.operationClass,
     }));
-    const attemptId = `xv-${attemptDigest.slice(0, 48)}`;
+    const attemptId = deterministicAttemptId(attemptDigest);
     const settlementRef = createTaskResultSettlementRefForAttempt(
       input.projectRoot,
       verifierTaskId,
@@ -445,8 +569,20 @@ implements MandatoryCrossVerifyInvocationFactory {
       writeTaskResultSettlementAttemptAtomic(settlementRef, claimedAt);
       claimTaskResultSettlementAttemptAtomic(settlementRef, claimedAt);
       const claim = readTaskResultSettlementActiveClaim(settlementRef);
-      if (!claim) return hold('xverify_attempt_claim_unavailable', attemptId);
+      if (!claim) return selectedHold('xverify_attempt_claim_unavailable', attemptId);
       const fenceTokenHash = taskResultSettlementActiveClaimDigest(settlementRef);
+      const bootstrap = bootstrapCrossVerifyRuntimeV2({
+        projectRoot: input.projectRoot,
+        task: input.task,
+        result: input.result,
+        settlementRef,
+        fenceTokenHash,
+        runtimeImageRef: profile.immutableImageRef,
+      });
+      if (bootstrap.state === 'hold') {
+        return selectedHold(bootstrap.reasonCode, bootstrap.detail);
+      }
+      const basePrompt = bootstrap.prompt;
       const projected = projectCrossVerifyInvocation({
         projection: candidate,
         ledger: opened.service.invocationReceiptLedger,
@@ -460,7 +596,10 @@ implements MandatoryCrossVerifyInvocationFactory {
         createdAt: claim.claimedAt,
       });
       if (projected.state === 'hold') {
-        return hold(`xverify_${projected.reasonCode}`, projected.authorityEvidenceRef);
+        return selectedHold(
+          `xverify_${projected.reasonCode}`,
+          projected.authorityEvidenceRef,
+        );
       }
 
       const verifierTask: Task = {
@@ -476,13 +615,7 @@ implements MandatoryCrossVerifyInvocationFactory {
         reason: 'cross-verify adversarial verification',
         scope: {
           directories: [],
-          filesRead: [...new Set(
-            (input.task.scope.filesRead.length > 0
-              ? input.task.scope.filesRead
-              : input.result.filesChanged ?? [])
-              .map(path => path.trim())
-              .filter(Boolean),
-          )],
+          filesRead: [],
           filesWrite: [],
         },
         dependencies: [],
@@ -513,17 +646,17 @@ implements MandatoryCrossVerifyInvocationFactory {
         calledModel: model,
         auth: profile.authLabel,
         settlementRef,
-        terminalProtocol: 'xverify-v1',
+        terminalProtocol: 'xverify-v2-host-only',
       });
       if (!prepared.context) {
-        return hold('xverify_landing_context_unavailable', attemptId);
+        return selectedHold('xverify_landing_context_unavailable', attemptId);
       }
       const executionRequest = Object.freeze({
         basePrompt,
         dispatchedPrompt: prepared.prompt,
         taskSnapshot: Object.freeze(JSON.parse(JSON.stringify(verifierTask)) as Record<string, unknown>),
       });
-      const executionContract = createCrossVerifyEnforcedAttemptContract({
+      const executionContract = createCrossVerifyEnforcedAttemptContractV2({
         tenantId: opened.tenantId,
         projectId: opened.projectId,
         runId,
@@ -556,6 +689,7 @@ implements MandatoryCrossVerifyInvocationFactory {
         toolProfileDigest: profile.toolProfileDigest,
         isolatedContext: true,
         settlementAttemptRef: settlementRef,
+        adjudication: bootstrap.executionBinding,
       });
       const reservationIdentity = deriveCrossVerifyReservationIdentity(
         projected.identity,
@@ -645,10 +779,37 @@ implements MandatoryCrossVerifyInvocationFactory {
             isClaimActive: () => activeClaimMatches(settlementRef, fenceTokenHash),
           },
           launcher: profile.launcher,
+          adjudication: {
+            contract: bootstrap.adjudicationContract,
+            persist: ({ adjudication, output }) => {
+              const receipt = writeCrossVerifyVerdictReceiptAtomic({
+                projectRoot: input.projectRoot,
+                settlementRef,
+                claimSha256: bootstrap.evidenceClaim.claimSha256,
+                evidenceManifestSha256: bootstrap.evidenceSnapshot.manifestSha256,
+                effectiveVerdict: adjudication.verdict.toUpperCase() as
+                  | 'CONFIRMED'
+                  | 'REFUTED'
+                  | 'UNCLEAR',
+                disposition: adjudication.verdict === 'confirmed'
+                  ? 'allow'
+                  : adjudication.verdict === 'refuted'
+                    ? 'no-go'
+                    : 'hold',
+                adjudicationReceiptSha256: sha256(canonicalJson(adjudication)),
+                outputSha256: sha256(output),
+                outputByteLength: Buffer.byteLength(output, 'utf8'),
+              });
+              return {
+                verdictReceiptRef: crossVerifyVerdictReceiptRef(receipt),
+                validatedReceipt: receipt,
+              };
+            },
+          },
         },
       };
     } catch (error) {
-      return hold(
+      return selectedHold(
         'xverify_attempt_composition_failed',
         error instanceof Error ? error.message : String(error),
       );

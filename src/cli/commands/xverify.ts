@@ -1,6 +1,6 @@
 // ─── `deckent xverify` — session-level adversarial cross-verification (XVERIFY-TOOL) ──
 //
-// Advisory second-opinion tool for INTERACTIVE sessions (Claude Code in one
+// Host-adjudicated second-opinion tool for INTERACTIVE sessions (Claude Code in one
 // terminal, Codex in another): the author session states a claim about work it
 // just finished; this command dispatches an adversarial verifier worker on a
 // DIFFERENT provider to try to refute it, then writes an advisory report both
@@ -14,15 +14,15 @@
 //   - The verifier-must-differ-from-author rule is NOT re-implemented: the
 //     synthetic task carries `provider = --author`, and `selectVerifierProvider`
 //     (core/cross-verify.ts) already refuses to pick the task's own provider.
-//   - ADVISORY by contract: the command never blocks or mutates anything;
-//     exit 0 for every verification outcome (including REFUTED — the caller
-//     decides what to do with the verdict). Non-zero exit is reserved for
-//     invocation errors (unknown provider, author===verifier, spawn failure).
+//   - The provider response is evidence, never decision authority. The host
+//     derives allow/no-go/hold from typed criteria and immutable evidence.
 //
 // Report artifact: `.analysis/xverify/<id>.md` — the shared exchange surface
 // between the two sessions; the path is printed (and returned via --json) so
 // either session can hand it to the other.
 
+import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
@@ -34,14 +34,22 @@ import type {
   CrossVerifyExecutionEvidence,
 } from '../../core/types.js';
 import { TaskStatus, TaskEvaluation, ALL_PROVIDER_NAMES } from '../../core/types.js';
-import { loadConfig, resolveDefaultModel } from '../../core/config.js';
+import { loadConfig, readAuthMode, resolveDefaultModel } from '../../core/config.js';
+import { createGoNoGoCriterionItem } from '../../core/task-types.js';
 import { registerOpenRouterModelFromCache, readFreeModelCache } from '../../core/openrouter-models.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import type { VerifierDispatchRejection } from '../../core/cross-verify-prompt.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
-import { createCrossVerifyProductionIngressAuthority } from '../../orchestra/cross-verify-production-ingress-authority.js';
+import {
+  createCrossVerifyProductionIngressAuthority,
+  createLiveDockerCrossVerifyExecutionProfileAuthority,
+} from '../../orchestra/cross-verify-production-ingress-authority.js';
+import type {
+  MandatoryCrossVerifyInvocationFactory,
+} from '../../orchestra/cross-verify-runner.js';
+import { DockerSpawnBackend } from '../../orchestra/spawn-backend-docker.js';
 
 // ─── Options ────────────────────────────────────────────────────────────
 
@@ -84,14 +92,14 @@ export interface XverifyDeps {
   }) => void;
   /** Shared process authority; advisory mode receives it but performs no authority work. */
   providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  /** Hermetic seam; production composes an exact Docker-backed v2 authority. */
+  mandatoryInvocationFactory?: MandatoryCrossVerifyInvocationFactory;
 }
 
 // ─── Diff capture (default impl) ────────────────────────────────────────
 
 function defaultCaptureDiff(root: string): string {
-  // Lazy import keeps node:child_process out of module-eval for test bundles.
   // execFileSync (argv-array) — no shell interpolation, cross-platform (Law #2).
-  const { execFileSync } = require('node:child_process') as typeof import('node:child_process');
   try {
     const out = execFileSync('git', ['diff', '--stat', 'HEAD'], { cwd: root, encoding: 'utf-8', maxBuffer: 1024 * 1024 });
     const full = execFileSync('git', ['diff', 'HEAD'], { cwd: root, encoding: 'utf-8', maxBuffer: 4 * 1024 * 1024 });
@@ -120,9 +128,13 @@ export interface XverifyResult {
    */
   verdict: string | null;
   outcome: string;
+  disposition: string;
+  blocked: boolean;
   skippedReason: string | null;
   reason: string | null;
   execution: CrossVerifyExecutionEvidence | null;
+  assurance: 'typed-host-adjudicated' | null;
+  adjudicationReceiptRef: string | null;
   /**
    * Structured provider refusal when the dispatch was rejected — the same
    * (provider, model, why) triple that `skippedReason` states in prose, in a
@@ -184,12 +196,17 @@ export async function runXverifyForResult(
   }
 
   // ── Synthetic verification envelope around the claim ──
-  const id = `xv-${now.getTime()}`;
+  const id = `xv-${now.getTime()}-${randomUUID()}`;
   const filesChanged = (opts.files ?? '').split(',').map((f) => f.trim()).filter(Boolean);
   const diffText = opts.diff
     ? (deps.captureDiffFn ?? defaultCaptureDiff)(root)
     : undefined;
 
+  const criterion = createGoNoGoCriterionItem({
+    polarity: 'go',
+    statement: claim,
+    evidenceRequirements: filesChanged,
+  });
   const task: Task = {
     id,
     // The complete claim remains in Description. A host-generated stable title
@@ -207,9 +224,10 @@ export async function runXverifyForResult(
     scope: { directories: ['.'], filesRead: filesChanged, filesWrite: [] },
     dependencies: [],
     goNogo: {
-      goCriteria: getMessage('xverify.go_criteria', 'en', {}), // prompt text stays EN — worker-facing, not user-facing
+      goCriteria: claim,
       noGoCriteria: getMessage('xverify.nogo_criteria', 'en', {}),
       techDebtAcceptable: 'none',
+      items: [criterion],
     },
     status: TaskStatus.DONE,
     createdAt: now.toISOString(),
@@ -225,6 +243,22 @@ export async function runXverifyForResult(
     notes: claim,
     ...(diffText ? { evidenceContext: diffText } : {}),
   } as TaskResult;
+
+  // The parent claim/result are immutable audit inputs for this standalone
+  // operation. The verifier never sees this directory: v2 snapshots only the
+  // exact authored evidence files into its read-only broker mount.
+  const tasksDir = join(root, '.tasks');
+  mkdirSync(tasksDir, { recursive: true });
+  writeFileSync(
+    join(tasksDir, `task-${id}.json`),
+    JSON.stringify(task, null, 2) + '\n',
+    { encoding: 'utf-8', flag: 'wx' },
+  );
+  writeFileSync(
+    join(tasksDir, `task-${id}.result`),
+    JSON.stringify(result, null, 2) + '\n',
+    { encoding: 'utf-8', flag: 'wx' },
+  );
 
   // ── Effective cross_verify config for this invocation ──
   // Explicit invocation IS the enable signal — but existing config preferences
@@ -246,7 +280,7 @@ export async function runXverifyForResult(
       enabled: true,
       high_stakes_only: false,
       verifier_priority: verifierPriority,
-      enforce_refuted: false, // advisory by contract
+      enforce_refuted: true,
     },
   };
 
@@ -265,6 +299,29 @@ export async function runXverifyForResult(
   const runCrossVerify = deps.runCrossVerifyFn
     ?? (await import('../../orchestra/cross-verify-runner.js')).runCrossVerify;
 
+  const authMode = await readAuthMode(root);
+  const dockerBackend = new DockerSpawnBackend(root, {
+    image: config.docker_image,
+    timeoutSeconds: config.docker_timeout,
+    memoryLimit: config.worker_memory_limit,
+    memorySwap: config.worker_memory_swap,
+    kindMemoryLimits: config.worker_memory_limit_by_kind,
+  });
+  const executionProfiles =
+    deps.providerAuthority?.state === 'ready' && authMode !== 'hybrid'
+      ? createLiveDockerCrossVerifyExecutionProfileAuthority({
+          projectRoot: root,
+          backend: dockerBackend,
+          terminationLedger: deps.providerAuthority.service.terminationLedger,
+          authMode,
+        })
+      : undefined;
+  const mandatoryInvocationFactory = deps.mandatoryInvocationFactory
+    ?? createCrossVerifyProductionIngressAuthority({
+      providerAuthority: deps.providerAuthority,
+      executionProfiles,
+    });
+
   // Registry/catalog presence is not live reachability. The interactive surface
   // may carry only an explicit, attended owner selection into the runner. Without
   // `--verifier`, the runner fails closed until the production authority
@@ -275,9 +332,7 @@ export async function runXverifyForResult(
   const outcome = await runCrossVerify(root, task, result, TaskEvaluation.DONE, effectiveConfig, {
     timeoutMs,
     operationClass: 'adjudicate-claim',
-    mandatoryInvocationFactory: createCrossVerifyProductionIngressAuthority({
-      providerAuthority: deps.providerAuthority,
-    }),
+    mandatoryInvocationFactory,
     ...(attendedVerifierCandidates
       ? { availableProviders: attendedVerifierCandidates }
       : {}),
@@ -298,7 +353,7 @@ export async function runXverifyForResult(
     ...(opts.verifierModel ? { verifierModel: opts.verifierModel } : {}),
   });
 
-  // ── Advisory report ──
+  // ── Host-adjudicated report ──
   const reportDir = join(root, '.analysis', 'xverify');
   mkdirSync(reportDir, { recursive: true });
   const reportPath = join(reportDir, `${id}.md`);
@@ -332,7 +387,7 @@ export async function runXverifyForResult(
       ]
     : [];
   const report = [
-    `# xverify advisory — ${id}`,
+    `# xverify host adjudication — ${id}`,
     '',
     `- **Claim author:** ${author}`,
     `- **Verifier:** ${verifier ?? getMessage('xverify.report.none_dispatched', lang)}`,
@@ -341,6 +396,11 @@ export async function runXverifyForResult(
     })}`,
     `- **Verdict:** ${verdict ? verdict.toUpperCase() : getMessage('xverify.report.no_verdict', lang)}`,
     `- **Outcome:** ${outcome.outcome}${outcome.skippedReason ? ` (${outcome.skippedReason})` : ''}`,
+    `- **Host disposition:** ${outcome.disposition.toUpperCase()}`,
+    `- **Blocked:** ${outcome.blocked ? 'yes' : 'no'}`,
+    ...(outcome.advisory?.adjudicationReceiptRef
+      ? [`- **Adjudication receipt:** ${outcome.advisory.adjudicationReceiptRef}`]
+      : []),
     ...executionLines,
     `- **At:** ${now.toISOString()}`,
     '',
@@ -352,7 +412,7 @@ export async function runXverifyForResult(
     '',
     outcome.advisory?.reason?.trim() || '(none — see outcome above)',
     '',
-    `> Advisory only — this report never blocks. Evidence task artifacts: .tasks/task-${id}-xverify.*`,
+    `> Provider output is evidence only. The host-authored disposition is authoritative. Evidence task artifacts: .tasks/task-${id}*`,
     '',
   ].join('\n');
   writeFileSync(reportPath, report, 'utf-8');
@@ -364,9 +424,13 @@ export async function runXverifyForResult(
     verifierModel,
     verdict,
     outcome: outcome.outcome,
+    disposition: outcome.disposition,
+    blocked: outcome.blocked,
     skippedReason: outcome.skippedReason ?? null,
     reason: outcome.advisory?.reason ?? null,
     execution,
+    assurance: outcome.advisory?.assurance ?? null,
+    adjudicationReceiptRef: outcome.advisory?.adjudicationReceiptRef ?? null,
     rejection: outcome.rejection ?? null,
     report: reportPath,
   };

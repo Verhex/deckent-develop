@@ -102,6 +102,37 @@ describe('task-result-schema (Worker Output Contract spine)', () => {
       verifierModel: 'gpt-4.1',
       verdict: 'confirmed',
       reason: 'independent checks passed',
+      execution: {
+        outcome: 'completed',
+        initialAttemptId: '11111111-1111-4111-8111-111111111111',
+        terminalAttemptId: '11111111-1111-4111-8111-111111111111',
+        cumulativeUsage: {
+          turns: 2,
+          inputTokens: 100,
+          outputTokens: 20,
+          cacheReadTokens: 50,
+          cacheCreationTokens: 10,
+          totalTokens: 180,
+          maxContextTokens: 120,
+        },
+      },
+      eligibility: {
+        reachabilityRef: 'provider-reachability:codex-live',
+        limitEvidenceRefs: ['provider-limit:codex-live'],
+        accountRefHash: null,
+        authMode: 'subscription',
+        transport: 'cli',
+        executionBackend: 'docker',
+        executionProfileRef: 'execution-profile:codex-xverify',
+      },
+      invocationReceiptRef: {
+        schemaVersion: 1,
+        tenantId: 'tenant-a',
+        projectId: 'project-a',
+        invocationId: 'invocation-xverify-a',
+      },
+      assurance: 'typed-host-adjudicated',
+      adjudicationReceiptRef: `cross-verify-verdict:sha256:${'a'.repeat(64)}`,
     };
     const res = validateTaskResult({ ...validResult(), crossVerify });
     expect(res.ok).toBe(true);
@@ -113,6 +144,13 @@ describe('task-result-schema (Worker Output Contract spine)', () => {
     const crossVerify = {
       outcome: 'unavailable',
       reason: 'no-second-provider',
+      authorityEvidenceRef: 'xverify-authority:hold-0001',
+      invocationReceiptRef: {
+        schemaVersion: 1,
+        tenantId: 'tenant-a',
+        projectId: 'project-a',
+        invocationId: 'invocation-xverify-hold',
+      },
     };
     const res = validateTaskResult({ ...validResult(), crossVerify });
     expect(res.ok).toBe(true);

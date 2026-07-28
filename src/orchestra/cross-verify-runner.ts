@@ -3,9 +3,10 @@
 //
 // Sprint 276 (XVER-1): when a high-stakes task is evaluated DONE/GO_WITH_TECH_DEBT,
 // this module can dispatch a SECOND provider whose job is to REFUTE the result rather
-// than confirm it. The verdict is written back to the task's `.result` as an advisory
-// `crossVerify` field — it is NEVER a downgrade. Brain/insan decides what to do with a
-// REFUTED signal (ADR-070 evaluation-integrity: no hard-coded evaluation mutation here).
+// than confirm it. The verifier's response is written back to the task's `.result`;
+// host-owned disposition remains separate. Advisory verification never mutates an
+// evaluation, while mandatory verification exposes ALLOW / NO-GO / HOLD for the
+// evaluation authority to apply (ADR-070).
 //
 // Layering (composes the pure layers from Tasks 4 + 6):
 //   • decideCrossVerify / selectVerifierProvider  ← core/cross-verify.ts  (pure decision)
@@ -77,12 +78,21 @@ import {
 import {
   buildRefutePrompt,
   extractDispatchRejectionFromLog,
-  extractTerminalAssistantVerdictFromLog,
+  extractTerminalAssistantOutputFromLog,
   parseRefuteVerdict,
+  parseCrossVerifyAdjudicationOutputV2,
   type CrossVerifyOperationClass,
   type RefuteVerdict,
   type VerifierDispatchRejection,
 } from '../core/cross-verify-prompt.js';
+import {
+  deriveCrossVerifyAdjudicationV2,
+  type CrossVerifyAdjudicationContractV2,
+  type CrossVerifyHostAdjudicationV2,
+} from '../core/cross-verify-adjudication.js';
+import type {
+  CrossVerifyVerdictReceiptEnvelopeV1,
+} from '../core/cross-verify-evidence-broker.js';
 import {
   findVerifierRefusal,
   recordVerifierRefusal,
@@ -105,8 +115,8 @@ import type {
 // ─── Public types ────────────────────────────────────────────────────────────
 
 /**
- * Advisory cross-verify metadata written to a task's `.result` under `crossVerify`.
- * Purely advisory — never alters the task's evaluation.
+ * Cross-verify metadata written to a task's `.result` under `crossVerify`.
+ * Provider output is evidence only; the host-owned disposition remains separate.
  */
 export interface CrossVerifyAdvisory {
   /** Provider that performed the adversarial verification. */
@@ -123,6 +133,10 @@ export interface CrossVerifyAdvisory {
   eligibility?: CrossVerifyEligibilityEvidence;
   /** Immutable provider-call receipt whose lifecycle settled this verdict. */
   invocationReceiptRef?: InvocationReceiptRef;
+  /** Host-only assurance carried by semantic protocol v2. */
+  assurance?: 'typed-host-adjudicated';
+  /** Immutable host verdict receipt; provider prose is not stored here. */
+  adjudicationReceiptRef?: string;
 }
 
 /** Stable truth state for a cross-verification attempt. */
@@ -134,10 +148,26 @@ export type CrossVerifyOutcome =
   | 'refuted'
   | 'unclear';
 
+/**
+ * Host-owned action semantics for a cross-verification outcome.
+ *
+ * Provider text never authors this value. In particular, mandatory verification
+ * can only `allow` after host-observed execution completed and the resulting
+ * evidence was durably persisted.
+ */
+export type CrossVerifyDisposition =
+  | 'allow'
+  | 'no-go'
+  | 'hold'
+  | 'advisory'
+  | 'not-applicable';
+
 /** Outcome of {@link runCrossVerify}. */
 export interface CrossVerifyRunResult {
   /** Machine-readable truth state; never infer availability from `ran`. */
   outcome: CrossVerifyOutcome;
+  /** Host-derived action semantics; never copied from verifier output. */
+  disposition: CrossVerifyDisposition;
   /** True when a verifier was actually dispatched and produced a verdict. */
   ran: boolean;
   /** When `ran` is false, a short diagnostic explaining why it was skipped. */
@@ -165,14 +195,19 @@ export interface CrossVerifyRunResult {
   /** Convenience flag: `advisory?.verdict === 'refuted'`. Always false when skipped. */
   refuted: boolean;
   /**
-   * Enforcement signal (Task 323-004 / A18): true when mandatory verification
-   * is REFUTED or cannot be dispatched from exact eligibility evidence. The
+   * Compatibility enforcement signal (Task 323-004 / A18): true when mandatory
+   * verification resolves to NO-GO or HOLD. The
    * runner NEVER mutates the task's evaluation (ADR-070) — it only surfaces this
    * flag so the evaluation layer can downgrade to NO_GO and trigger FIX.
    */
   blocked: boolean;
   /** Whether the evidence was durably merged into the canonical task result. */
   evidencePersisted?: boolean;
+  /**
+   * Host-only learning authority returned by the typed v2 broker boundary.
+   * This envelope is never copied into the provider-authored TaskResult.
+   */
+  validatedAdjudicationReceipt?: CrossVerifyVerdictReceiptEnvelopeV1;
 }
 
 /** Input passed to a {@link SpawnVerifierFn}. */
@@ -235,6 +270,18 @@ export interface MandatoryCrossVerifyInvocationComposition {
   readonly coordinator: Pick<CrossVerifyInvocationCoordinator, 'execute'>;
   readonly input: CrossVerifyInvocationCoordinatorInput;
   readonly launcher: CrossVerifyStrictLauncher;
+  readonly adjudication?: MandatoryCrossVerifyAdjudicationAuthority;
+}
+
+export interface MandatoryCrossVerifyAdjudicationAuthority {
+  readonly contract: Readonly<CrossVerifyAdjudicationContractV2>;
+  persist(input: {
+    readonly adjudication: Readonly<CrossVerifyHostAdjudicationV2>;
+    readonly output: string;
+  }): {
+    readonly verdictReceiptRef: string;
+    readonly validatedReceipt?: CrossVerifyVerdictReceiptEnvelopeV1;
+  };
 }
 
 export type MandatoryCrossVerifyInvocationFactoryResult =
@@ -247,6 +294,8 @@ export type MandatoryCrossVerifyInvocationFactoryResult =
       readonly state: 'hold';
       readonly reasonCode: string;
       readonly authorityEvidenceRef: string;
+      readonly verifierProvider?: ProviderName;
+      readonly verifierModel?: string;
     };
 
 /** Process-scoped production ingress. Composition itself is provider-free. */
@@ -258,7 +307,9 @@ export interface MandatoryCrossVerifyInvocationFactory {
     readonly config: ResolvedConfig;
     readonly operationClass: CrossVerifyOperationClass;
     readonly timeoutMs: number;
-  }): MandatoryCrossVerifyInvocationFactoryResult;
+    readonly verifierModel?: string;
+  }): MandatoryCrossVerifyInvocationFactoryResult
+    | Promise<MandatoryCrossVerifyInvocationFactoryResult>;
 }
 
 /** Options for {@link runCrossVerify}. */
@@ -517,7 +568,7 @@ async function waitForTerminalVerifierLog(logPath: string, timeoutMs: number): P
   do {
     try {
       if (existsSync(logPath)) {
-        terminalVerdict = extractTerminalAssistantVerdictFromLog(
+        terminalVerdict = extractTerminalAssistantOutputFromLog(
           readFileSync(logPath, 'utf-8'),
         );
       }
@@ -607,12 +658,17 @@ export async function resolveSettledVerifierOutcome(
           };
 
       const notes = result.notes ?? '';
-      const lastNoteLine = notes.trim().split(/\r?\n/)
+      const noteLines = notes.trim().split(/\r?\n/)
         .filter(line => line.trim().length > 0)
-        .at(-1)?.trim() ?? '';
-      let output = /^VERDICT:\s*(?:REFUTED|CONFIRMED|UNCLEAR)\s+.+$/i.test(lastNoteLine)
-        ? lastNoteLine
-        : '';
+        .map(line => line.trim());
+      const lastNoteLine = noteLines.at(-1) ?? '';
+      let output = '';
+      if (/^VERDICT:\s*(?:REFUTED|CONFIRMED|UNCLEAR)\s+.+$/i.test(lastNoteLine)) {
+        const responseLine = noteLines.at(-2);
+        output = responseLine?.startsWith('XVERIFY_RESPONSE_JSON: ')
+          ? `${responseLine}\n${lastNoteLine}`
+          : lastNoteLine;
+      }
       if (!output && matchedExhaustion) {
         const logPath = join(projectRoot, TASKS_DIR, `task-${taskId}.log`);
         output = await waitForTerminalVerifierLog(logPath, Math.max(0, deadline - Date.now())) ?? '';
@@ -995,8 +1051,8 @@ function writeEvidenceToResult(
  * Otherwise it builds the refute prompt, dispatches the verifier (injectable), parses the
  * verdict, and writes the advisory to disk. Any spawn/parse failure degrades to a skip.
  *
- * NEVER mutates the task's evaluation — the `crossVerify` advisory is informational only
- * (ADR-070). The caller decides whether a REFUTED verdict warrants action.
+ * NEVER mutates the task's evaluation. It returns a host-derived disposition and the
+ * caller applies it at the evaluation authority boundary (ADR-070).
  */
 export async function runCrossVerify(
   projectRoot: string,
@@ -1020,6 +1076,11 @@ export async function runCrossVerify(
     blocked = false,
   ): CrossVerifyRunResult => ({
     outcome,
+    disposition: blocked
+      ? 'hold'
+      : outcome === 'unavailable'
+        ? 'advisory'
+        : 'not-applicable',
     ran: false,
     skippedReason: reason,
     refuted: false,
@@ -1050,20 +1111,29 @@ export async function runCrossVerify(
     if (verificationRequired) {
       let mandatory = opts.mandatoryInvocation;
       if (!mandatory && opts.mandatoryInvocationFactory) {
-        const composed = opts.mandatoryInvocationFactory.compose({
+        const composed = await opts.mandatoryInvocationFactory.compose({
           projectRoot,
           task,
           result,
           config,
           operationClass: opts.operationClass ?? 'verify-implementation',
           timeoutMs: opts.timeoutMs ?? CROSS_VERIFY_TIMEOUT_MS,
+          ...(opts.verifierModel ? { verifierModel: opts.verifierModel } : {}),
         });
         if (composed.state === 'hold') {
+          dispatchedVerifier = composed.verifierProvider;
+          dispatchedVerifierModel = composed.verifierModel;
           const reason = `verifier-exact-invocation-composition-hold:${composed.reasonCode}`;
           const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
             outcome: 'unavailable',
             reason,
             authorityEvidenceRef: composed.authorityEvidenceRef,
+            ...(composed.verifierProvider
+              ? { verifier: composed.verifierProvider }
+              : {}),
+            ...(composed.verifierModel
+              ? { verifierModel: composed.verifierModel }
+              : {}),
           });
           return skip(reason, 'unavailable', evidencePersisted, true);
         }
@@ -1102,7 +1172,95 @@ export async function runCrossVerify(
         return skip(reason, 'unavailable', evidencePersisted, true);
       }
       const verifierProvider = coordinated.calledProvider as ProviderName;
-      const verdict = parseRefuteVerdict(coordinated.output);
+      if (mandatory.adjudication) {
+        const parsed = parseCrossVerifyAdjudicationOutputV2(coordinated.output);
+        const adjudication = deriveCrossVerifyAdjudicationV2({
+          contract: mandatory.adjudication.contract,
+          response: parsed.response,
+          executionOutcome: coordinated.execution.outcome,
+          providerDeclaredVerdict: parsed.providerDeclaredVerdict,
+        });
+        let adjudicationReceiptRef: string;
+        let validatedAdjudicationReceipt:
+          | CrossVerifyVerdictReceiptEnvelopeV1
+          | undefined;
+        try {
+          const persisted = mandatory.adjudication.persist({
+            adjudication,
+            output: coordinated.output,
+          });
+          adjudicationReceiptRef = persisted.verdictReceiptRef;
+          validatedAdjudicationReceipt = persisted.validatedReceipt;
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          const reason = `verifier-adjudication-receipt-persistence-failed:${detail}`;
+          const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
+            outcome: 'unavailable',
+            verifier: verifierProvider,
+            verifierModel: coordinated.calledModel,
+            reason,
+            invocationReceiptRef: coordinated.invocationReceiptRef,
+          });
+          return skip(reason, 'unavailable', evidencePersisted, true);
+        }
+        const outcome = adjudication.verdict;
+        const refuted = outcome === 'refuted';
+        const advisory: CrossVerifyAdvisory = {
+          verifier: verifierProvider,
+          verifierModel: coordinated.calledModel,
+          verdict: outcome,
+          reason: adjudication.reason,
+          execution: coordinated.execution,
+          invocationReceiptRef: coordinated.invocationReceiptRef,
+          assurance: 'typed-host-adjudicated',
+          adjudicationReceiptRef,
+        };
+        const disposition: CrossVerifyDisposition = refuted
+          ? 'no-go'
+          : outcome === 'confirmed'
+            ? 'allow'
+            : 'hold';
+        const evidencePersisted = writeEvidenceToResult(
+          projectRoot,
+          task.id,
+          { ...advisory, outcome },
+        );
+        if (!evidencePersisted) {
+          return {
+            outcome: 'unavailable',
+            disposition: 'hold',
+            ran: true,
+            advisory: {
+              ...advisory,
+              verdict: 'unclear',
+              reason: 'verifier-evidence-persistence-failed',
+            },
+            refuted: false,
+            blocked: true,
+            evidencePersisted: false,
+          };
+        }
+        return {
+          outcome,
+          disposition,
+          ran: true,
+          advisory,
+          refuted,
+          blocked: disposition !== 'allow',
+          evidencePersisted,
+          ...(validatedAdjudicationReceipt
+            ? { validatedAdjudicationReceipt }
+            : {}),
+        };
+      }
+      const providerVerdict = parseRefuteVerdict(coordinated.output);
+      const executionCompleted = coordinated.execution.outcome === 'completed';
+      const verdict: RefuteVerdict = executionCompleted
+        ? providerVerdict
+        : {
+            verdict: 'unclear',
+            reason: `host-execution-not-completed:${coordinated.execution.outcome}`,
+          };
       const refuted = verdict.verdict === 'refuted';
       const advisory: CrossVerifyAdvisory = {
         verifier: verifierProvider,
@@ -1118,12 +1276,33 @@ export async function runCrossVerify(
         task.id,
         { ...advisory, outcome },
       );
+      if (!evidencePersisted) {
+        const persistenceAdvisory: CrossVerifyAdvisory = {
+          ...advisory,
+          verdict: 'unclear',
+          reason: 'verifier-evidence-persistence-failed',
+        };
+        return {
+          outcome: 'unavailable',
+          disposition: 'hold',
+          ran: true,
+          advisory: persistenceAdvisory,
+          refuted: false,
+          blocked: true,
+          evidencePersisted: false,
+        };
+      }
       return {
         outcome,
+        disposition: refuted
+          ? 'no-go'
+          : verdict.verdict === 'confirmed'
+            ? 'allow'
+            : 'hold',
         ran: true,
         advisory,
         refuted,
-        blocked: refuted,
+        blocked: verdict.verdict !== 'confirmed',
         evidencePersisted,
       };
     }
@@ -1481,7 +1660,20 @@ export async function runCrossVerify(
       return skip('spawn-error', 'unavailable', evidencePersisted, verificationRequired);
     }
 
-    const verdict = parseRefuteVerdict(output);
+    const providerVerdict = parseRefuteVerdict(output);
+    const verdict: RefuteVerdict = executionEvidence !== undefined
+      && executionEvidence.outcome !== 'completed'
+      ? {
+          verdict: 'unclear',
+          reason: `host-execution-not-completed:${executionEvidence.outcome}`,
+        }
+      : opts.operationClass === 'adjudicate-claim'
+        && providerVerdict.verdict === 'confirmed'
+        ? {
+            verdict: 'unclear',
+            reason: 'legacy-free-form-cannot-confirm',
+          }
+        : providerVerdict;
     if (invocationSession) {
       const protocolAccepted = hasTerminalVerifierProtocol(output);
       const transportFailed = executionEvidence !== undefined
@@ -1569,7 +1761,15 @@ export async function runCrossVerify(
       'runCrossVerify:done',
       `task=${task.id} verifier=${verifierProvider} verdict=${verdict.verdict} blocked=${blocked}`,
     );
-    return { outcome, ran: true, advisory, refuted, blocked, evidencePersisted };
+    return {
+      outcome,
+      disposition: 'advisory',
+      ran: true,
+      advisory,
+      refuted,
+      blocked,
+      evidencePersisted,
+    };
   } catch (e) {
     // Defensive: any unexpected fault degrades to a skip — never throws.
     const detail = e instanceof Error ? e.message : String(e);

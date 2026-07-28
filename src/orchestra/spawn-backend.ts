@@ -143,6 +143,16 @@ export interface SpawnBackendOptions extends ProviderSpawnOptions {
   executionLandingContext?: ExecutionLandingContextEnvelopeV1;
   /** Optional protocol-specific host projection applied before settlement. */
   hostTerminalResultContract?: HostTerminalResultContractV1;
+  /**
+   * Owner authorization to run a final-only-usage provider (no incremental
+   * measured stream) under host wall-clock containment. Absent = fail closed:
+   * a live token ceiling is refused rather than silently unenforced.
+   */
+  finalOnlyUsageContainment?: {
+    readonly maxWallClockSeconds: number;
+    readonly profileRef: string;
+    readonly policyDigest: string;
+  };
 }
 
 // ─── SpawnBackendError ────────────────────────────────────────────────────────

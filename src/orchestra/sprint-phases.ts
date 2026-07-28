@@ -19,7 +19,7 @@ import { execFileSync } from 'node:child_process';
 // ─── Core (value imports — enums used at runtime) ──────────────────
 import {
   TaskStatus, TaskEvaluation, SprintPhase,
-  SprintStatus, AlertLevel,
+  SprintStatus, AlertLevel, ALL_PROVIDER_NAMES,
 } from '../core/types.js';
 import { DeckentError, createExecutionAuthorityError } from '../core/errors.js';
 
@@ -27,7 +27,7 @@ import { DeckentError, createExecutionAuthorityError } from '../core/errors.js';
 import type {
   Task, TaskResult, Sprint, SprintMetrics,
   ResolvedConfig, SprintSizeRecommendation,
-  EvaluationResult,
+  EvaluationResult, ProviderName,
 } from '../core/types.js';
 
 import {
@@ -1539,6 +1539,21 @@ export async function runEvaluatePhase(
     // Resolve CI guardian config once for all tasks
     const ciGuardianConfig = resolveCiGuardianConfig(projectRoot);
 
+    // XVER-SPRINT-WIRE (MASTER-PLAN 659): the owner's `verifier_priority` IS an
+    // explicit verifier selection — the sprint-side counterpart of the CLI's
+    // `--verifier`. It is deliberately NOT registry enumeration: an unauthored
+    // list keeps the runner's fail-closed `verifier-eligibility-evidence-missing`
+    // skip. It is a selection, not live reachability — an unreachable provider
+    // still fails honestly at spawn, after zero fabricated evidence.
+    const ownerVerifierSelection = config?.cross_verify?.verifier_priority
+      ?.map(provider => provider.trim())
+      .filter((provider): provider is ProviderName =>
+        (ALL_PROVIDER_NAMES as readonly string[]).includes(provider));
+    // Each dispatch is a billed provider call; the owner ceiling bounds one
+    // sprint's exposure (canary = 1). Absent = no ceiling.
+    const maxVerificationsPerSprint = config?.cross_verify?.max_verifications_per_sprint;
+    let verificationsDispatched = 0;
+
     for (const task of sprint.tasks) {
       if (collectedIds.has(task.id)) {
         const rawResult = resultsMap.get(task.id);
@@ -1819,21 +1834,43 @@ export async function runEvaluatePhase(
           }
         }
 
-        // ─── Cross-Verify (Sprint 276 advisory + Task 323-004/A18 enforcement) ──
+        // ─── Cross-Verify — typed host adjudication + fail-closed enforcement ──
         // Runs BEFORE the evaluation is committed (handleEvaluation / evaluations.set)
         // so flag-gated enforcement can downgrade a REFUTED DONE/GO_WITH_TECH_DEBT to
         // NO_GO and let the STANDARD NO_GO path (debt + FIX routing + notify) act on
         // it — instead of trying to reverse a committed DONE after the fact. A
-        // high-stakes pass is re-verified by a DIFFERENT provider whose job is to
-        // REFUTE; the verdict is persisted to .result as a `crossVerify` advisory and
-        // surfaced as an event. Advisory-only by default (enforce_refuted off →
-        // ADR-070: evaluation unchanged, byte-for-byte legacy behavior); the runner
-        // only surfaces `blocked`, this evaluation layer owns the downgrade. All
-        // best-effort: any fault is debugLog'd and never drops the EVALUATE loop.
+        // high-stakes pass is re-verified by a DIFFERENT provider. Provider output
+        // is evidence only; the runner returns the host-owned disposition. When
+        // mandatory enforcement is enabled, REFUTED, UNCLEAR, unavailable,
+        // ceiling exhaustion and runtime faults all fail closed into the standard
+        // NO_GO/FIX path. Legacy advisory mode remains isolated behind the flag.
+        const mandatoryCrossVerify =
+          resolvedConfig?.cross_verify?.enforce_refuted === true;
+        const verificationCeilingReached = maxVerificationsPerSprint !== undefined
+          && verificationsDispatched >= maxVerificationsPerSprint;
         if (
           resolvedConfig?.cross_verify?.enabled === true &&
           (evaluation === TaskEvaluation.DONE || evaluation === TaskEvaluation.GO_WITH_TECH_DEBT)
         ) {
+          if (verificationCeilingReached) {
+            // Honest, visible stop — never a silent truncation of coverage.
+            debugLog(
+              'runEvaluatePhase:crossVerify-ceiling',
+              `task=${task.id} skipped: sprint verification ceiling ${maxVerificationsPerSprint} reached`,
+            );
+            if (mandatoryCrossVerify) {
+              evaluation = TaskEvaluation.NO_GO;
+              const ceilingNote = [
+                '[cross-verify:mandatory-hold]',
+                'outcome=unavailable',
+                'reason=xverify_mandatory_sprint_ceiling_reached',
+              ].join(' ');
+              result.notes = result.notes
+                ? `${result.notes}\n${ceilingNote}`
+                : ceilingNote;
+            }
+          } else {
+          verificationsDispatched += 1;
           try {
             const xvResult = await runCrossVerify(
               projectRoot,
@@ -1842,11 +1879,28 @@ export async function runEvaluatePhase(
               evaluation,
               resolvedConfig,
               {
+                ...(ownerVerifierSelection && ownerVerifierSelection.length > 0
+                  ? { availableProviders: ownerVerifierSelection }
+                  : {}),
                 ...(options?.crossVerifyInvocationFactory
                   ? { mandatoryInvocationFactory: options.crossVerifyInvocationFactory }
                   : {}),
               },
             );
+            if (xvResult.validatedAdjudicationReceipt) {
+              try {
+                const { OutcomeTracker } = await import('./outcome-tracker.js');
+                new OutcomeTracker(projectRoot).recordValidatedCrossVerifyVerdict(
+                  result.agentId ?? task.assignedAgent ?? null,
+                  result.skillIds ?? task.assignedSkills ?? [],
+                  xvResult.validatedAdjudicationReceipt,
+                );
+              } catch (e) {
+                // Learning must never invent a signal. A rejected learning receipt
+                // does not replace the already-authoritative evaluation disposition.
+                debugLog('runEvaluatePhase:crossVerify-learning-receipt', e);
+              }
+            }
             if (xvResult.outcome === 'unavailable') {
               try {
                 const sidXv = getCurrentSprintId(projectRoot) ?? sprint.id;
@@ -1884,9 +1938,8 @@ export async function runEvaluatePhase(
                 );
               } catch (e) { debugLog('runEvaluatePhase:crossVerify-event', e); }
             }
-            // Task 323-004 / A18 — flag-gated enforcement: a REFUTED high-stakes
-            // result, or an unavailable mandatory verifier, becomes NO_GO so the
-            // standard FIX path is triggered. Default-off keeps advisory behavior.
+            // Host disposition owns the mandatory decision; the boolean remains
+            // only a compatibility projection for existing evaluation plumbing.
             if (xvResult.blocked) {
               debugLog(
                 'runEvaluatePhase:crossVerify-enforce',
@@ -1901,7 +1954,22 @@ export async function runEvaluatePhase(
               ].join(' ');
               result.notes = result.notes ? `${result.notes}\n${enfNote}` : enfNote;
             }
-          } catch (e) { debugLog('runEvaluatePhase:crossVerify', e); }
+          } catch (e) {
+            debugLog('runEvaluatePhase:crossVerify', e);
+            if (mandatoryCrossVerify) {
+              evaluation = TaskEvaluation.NO_GO;
+              const detail = e instanceof Error ? e.message : String(e);
+              const failureNote = [
+                '[cross-verify:mandatory-hold]',
+                'outcome=unavailable',
+                `reason=xverify_runtime_fault:${detail}`,
+              ].join(' ');
+              result.notes = result.notes
+                ? `${result.notes}\n${failureNote}`
+                : failureNote;
+            }
+          }
+          }
         }
 
         // ─── EVALUATE-phase enforcement gates (DECKENT-TRIAGE A14 + A9) ─────────

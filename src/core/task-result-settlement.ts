@@ -25,7 +25,7 @@ import {
 import {
   assertCrossVerifyEnforcedAttemptContract,
   sameCrossVerifyExecutionContract,
-  type CrossVerifyEnforcedAttemptContractV1,
+  type CrossVerifyEnforcedAttemptContract,
 } from './cross-verify-execution-contract.js';
 import type { ExecutionAdmissionMode } from './execution-admission.js';
 import { assertExecutionLandingPolicyConfig } from './execution-budget-policy.js';
@@ -131,10 +131,10 @@ export interface TaskProviderActualCallReceiptV1 extends TaskResultSettlementRef
   observedAt: string;
   provider: string;
   model: string;
-  authMode: CrossVerifyEnforcedAttemptContractV1['authMode'];
+  authMode: CrossVerifyEnforcedAttemptContract['authMode'];
   accountRefHash: string | null;
-  transport: CrossVerifyEnforcedAttemptContractV1['transport'];
-  executionBackend: CrossVerifyEnforcedAttemptContractV1['executionBackend'];
+  transport: CrossVerifyEnforcedAttemptContract['transport'];
+  executionBackend: CrossVerifyEnforcedAttemptContract['executionBackend'];
   endpointRefHash: string | null;
   executionProfileRef: string;
   executionContractEvidenceRef: string;
@@ -932,8 +932,8 @@ export function readTaskResultSettlementExecutionBudgetAuthority(
 
 export function writeTaskResultSettlementExecutionContractAtomic(
   ref: TaskResultSettlementRefV1,
-  contract: Readonly<CrossVerifyEnforcedAttemptContractV1>,
-): Readonly<CrossVerifyEnforcedAttemptContractV1> {
+  contract: Readonly<CrossVerifyEnforcedAttemptContract>,
+): Readonly<CrossVerifyEnforcedAttemptContract> {
   const attempt = parseTaskResultSettlementAttempt(readJson(taskResultSettlementAttemptPath(ref)));
   if (!attempt || !sameRef(attempt, ref)) {
     throw createExecutionAuthorityError(
@@ -952,7 +952,7 @@ export function writeTaskResultSettlementExecutionContractAtomic(
     contract,
     (existing) => {
       try {
-        const parsed = existing as CrossVerifyEnforcedAttemptContractV1;
+        const parsed = existing as CrossVerifyEnforcedAttemptContract;
         return sameRef(parsed.settlementAttemptRef, ref)
           && sameCrossVerifyExecutionContract(parsed, contract);
       } catch {
@@ -972,12 +972,12 @@ export function writeTaskResultSettlementExecutionContractAtomic(
 
 export function readTaskResultSettlementExecutionContract(
   ref: TaskResultSettlementRefV1,
-): Readonly<CrossVerifyEnforcedAttemptContractV1> | null {
+): Readonly<CrossVerifyEnforcedAttemptContract> | null {
   const path = taskResultSettlementExecutionContractPath(ref);
   try {
     const contract = JSON.parse(
       readFileSync(path, 'utf-8'),
-    ) as CrossVerifyEnforcedAttemptContractV1;
+    ) as CrossVerifyEnforcedAttemptContract;
     assertCrossVerifyEnforcedAttemptContract(contract);
     if (!sameRef(contract.settlementAttemptRef, ref) || !hasPrivateFileMode(path)) {
       return null;

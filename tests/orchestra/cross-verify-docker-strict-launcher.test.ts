@@ -26,16 +26,17 @@ vi.mock('node:child_process', () => ({
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(() => true),
-  readFileSync: vi.fn((path: string) => {
+  readFileSync: vi.fn((path: string, encoding?: unknown) => {
     const normalized = String(path).replaceAll('\\', '/');
     if (normalized.endsWith('/.gemini/settings.json')) {
       return '{"security":{"auth":{"selectedType":"gemini-api-key"}}}';
     }
-    if (/\/task-(.+)\.json$/u.test(normalized)) {
-      const id = normalized.match(/\/task-(.+)\.json$/u)?.[1] ?? 'strict-xverify';
-      return JSON.stringify(strictTaskSnapshot(id));
+    if (/\/task-([^/]+)\.json$/u.test(normalized)) {
+      const id = normalized.match(/\/task-([^/]+)\.json$/u)?.[1] ?? 'strict-xverify';
+      const value = JSON.stringify(strictTaskSnapshot(id));
+      return encoding === undefined ? Buffer.from(value) : value;
     }
-    return '{}';
+    return encoding === undefined ? Buffer.from('{}') : '{}';
   }),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
@@ -47,7 +48,12 @@ vi.mock('node:fs', () => ({
   renameSync: vi.fn(),
   rmdirSync: vi.fn(),
   chmodSync: vi.fn(),
-  statSync: vi.fn(() => ({ isFile: () => true, mtimeMs: 0, size: 0 })),
+  statSync: vi.fn(() => ({
+    isFile: () => true,
+    isDirectory: () => true,
+    mtimeMs: 0,
+    size: 0,
+  })),
 }));
 
 vi.mock('../../src/core/utils.js', () => ({ debugLog: vi.fn() }));
@@ -65,6 +71,15 @@ vi.mock('../../src/core/active-workers.js', () => ({
 vi.mock('../../src/core/task-result-settlement.js', () =>
   import('../helpers/task-result-settlement-stub.js')
     .then(({ createTaskResultSettlementModuleStub }) => createTaskResultSettlementModuleStub()));
+vi.mock('../../src/core/cross-verify-evidence-broker.js', () => ({
+  crossVerifyEvidenceBrokerDirectory: vi.fn(() =>
+    '/host-state/task-result-settlements/strict-xverify/cross-verify-evidence'),
+  readCrossVerifyEvidenceReceipt: vi.fn(() => ({
+    manifestSha256: 'a'.repeat(64),
+  })),
+  crossVerifyEvidenceReceiptRef: vi.fn(() =>
+    `cross-verify-evidence-manifest:sha256:${'a'.repeat(64)}`),
+}));
 vi.mock('../../src/orchestra/execution-landing-coordinator.js', async importActual => ({
   ...(await importActual<typeof import('../../src/orchestra/execution-landing-coordinator.js')>()),
   prepareDockerExecutionLanding: vi.fn(({ prompt }: { prompt: string }) => ({
@@ -83,6 +98,7 @@ import {
 import { canonicalJson } from '../../src/core/audit-writer.js';
 import {
   createCrossVerifyEnforcedAttemptContract,
+  createCrossVerifyEnforcedAttemptContractV2,
   type CrossVerifyEnforcedAttemptContractV1,
 } from '../../src/core/cross-verify-execution-contract.js';
 import type { SpawnBackendOptions } from '../../src/orchestra/spawn-backend.js';
@@ -200,6 +216,43 @@ function exactInput(
   } as const;
 }
 
+function exactV2Input() {
+  const base = exactInput();
+  const v1 = base.executionContract;
+  const {
+    schemaVersion: _schemaVersion,
+    contractSha256: _contractSha256,
+    evidenceRef: _evidenceRef,
+    ...input
+  } = v1;
+  const promptDigest = createHash('sha256').update(base.prompt).digest('hex');
+  return {
+    ...base,
+    executionContract: createCrossVerifyEnforcedAttemptContractV2({
+      ...input,
+      adjudication: {
+        protocol: 'xverify-adjudication-v2',
+        claimDigest: `sha256:${'6'.repeat(64)}`,
+        evidenceManifestDigest: `sha256:${'7'.repeat(64)}`,
+        adjudicationContractDigest: `sha256:${'8'.repeat(64)}`,
+        evidenceBrokerRef:
+          `cross-verify-evidence-manifest:sha256:${'a'.repeat(64)}`,
+        evidenceBrokerManifestSha256: 'a'.repeat(64),
+        evidenceMountPath: '/deckent/xverify-evidence',
+        evidenceManifestRelativePath: 'manifest.json',
+        runtimeImageRef: `sha256:${'9'.repeat(64)}`,
+        finalPromptDigest: `sha256:${promptDigest}`,
+        finalPromptChars: base.prompt.length,
+        maxPromptChars: 16_000,
+        maxEvidenceOutputChars: 12_000,
+        maxRationaleChars: 2_000,
+        evidenceAccess: 'snapshot-read-only',
+        artifactMutationPolicy: 'attempt-private-output-only',
+      },
+    }),
+  } as const;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   installDockerRouter();
@@ -207,6 +260,44 @@ beforeEach(() => {
 });
 
 describe('DockerSpawnBackend exact xverify entrypoint', () => {
+  it('derives an immutable runtime identity from the local image and in-image CLI', async () => {
+    const imageId = `sha256:${'c'.repeat(64)}`;
+    const commands: string[][] = [];
+    const identity = await new DockerSpawnBackend('/test/project', {
+      crossVerifyRuntimeCommandRunner: async (_command, args) => {
+        commands.push([...args]);
+        return {
+          status: 0,
+          stdout: args[0] === 'image' ? imageId : '/usr/local/bin/claude\n',
+          stderr: '',
+        };
+      },
+    })
+      .inspectExactCrossVerifyRuntime('claude', 'claude-fable-5');
+
+    expect(identity).toMatchObject({
+      state: 'ready',
+      executionProfileRef: expect.stringMatching(/^docker-execution-profile:[a-f0-9]{64}$/u),
+      toolProfileDigest: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      authorityEvidenceRef: expect.stringMatching(/^docker-xverify-runtime:[a-f0-9]{64}$/u),
+    });
+    expect(commands[1]).toContain(imageId);
+  });
+
+  it('holds before a provider call when immutable image identity is unavailable', async () => {
+    await expect(new DockerSpawnBackend('/test/project', {
+      crossVerifyRuntimeCommandRunner: async () => ({
+        stdout: 'mutable-tag-only',
+        stderr: '',
+        status: 0,
+      }),
+    }).inspectExactCrossVerifyRuntime('claude', 'claude-fable-5'))
+      .resolves.toMatchObject({
+        state: 'hold',
+        reasonCode: 'docker_image_identity_unavailable',
+      });
+  });
+
   it('leaves the ordinary worker prompt transport unchanged', () => {
     new DockerSpawnBackend('/test/project')
       .spawn('ordinary-worker', 'claude-fable-5', 'ordinary worker prompt', {
@@ -248,6 +339,27 @@ describe('DockerSpawnBackend exact xverify entrypoint', () => {
     expect(mockWriteFileSync.mock.calls.some(
       ([path]) => String(path).includes('.prompt-strict-xverify'),
     )).toBe(false);
+  });
+
+  it('isolates typed v2 from the project and mounts only broker evidence read-only', () => {
+    new DockerSpawnBackend('/test/project')
+      .spawnExactCrossVerify(exactV2Input());
+
+    expect(dockerRuns).toHaveLength(1);
+    const argv = dockerRuns[0]!;
+    const command = argv.join(' ');
+    expect(command).not.toContain('-v /test/project:/workspace');
+    expect(command).toContain('--tmpfs /workspace:size=64m');
+    expect(command).toContain(
+      'source=/host-state/task-result-settlements/strict-xverify/cross-verify-evidence,'
+      + 'target=/deckent/xverify-evidence,readonly',
+    );
+    expect(command).toMatch(
+      /provider-output:\/workspace\/\.tasks/u,
+    );
+    expect(command).not.toContain('/test/project/.locks:/workspace/.locks');
+    expect(command).not.toContain('GIT_WORK_TREE=/workspace');
+    expect(command).toContain(`sha256:${'9'.repeat(64)} sh -c`);
   });
 
   it('holds prompt byte drift before durable preparation or docker run', () => {

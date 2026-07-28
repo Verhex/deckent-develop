@@ -378,6 +378,46 @@ const MESSAGES: MessageMap = {
     en: 'The bounded evidence directly contradicts a material factual premise or proves a concrete safety, correctness, evidence, or dependency-order gap. Missing evidence alone is not NO-GO; it requires UNCLEAR.',
     tr: 'Sınırlı kanıt, maddi bir olgusal öncülü doğrudan çürütür veya somut bir güvenlik, doğruluk, kanıt ya da bağımlılık-sırası boşluğunu kanıtlar. Eksik kanıt tek başına NO-GO değildir; UNCLEAR gerektirir.',
   },
+  'xverify.mcp.title': {
+    en: 'Cross-verify (host adjudicated)',
+    tr: 'Çapraz doğrula (host kararlı)',
+  },
+  'xverify.mcp.description': {
+    en: 'Dispatch an adversarial verifier on a different provider. Provider output is evidence; the host returns CONFIRMED/REFUTED/UNCLEAR plus an authoritative ALLOW/NO-GO/HOLD disposition.',
+    tr: 'Farklı sağlayıcıda adversarial hakem çalıştırır. Sağlayıcı çıktısı kanıttır; host CONFIRMED/REFUTED/UNCLEAR ile yetkili ALLOW/NO-GO/HOLD disposition döndürür.',
+  },
+  'xverify.mcp.claim': {
+    en: 'Exact authored claim to cross-verify',
+    tr: 'Çapraz doğrulanacak exact authored iddia',
+  },
+  'xverify.mcp.author': {
+    en: 'Provider that authored the claim; verifier must differ',
+    tr: 'İddiayı yazan sağlayıcı; hakem farklı olmalıdır',
+  },
+  'xverify.mcp.verifier': {
+    en: 'Explicit verifier provider; must differ from author',
+    tr: 'Açık hakem sağlayıcısı; yazardan farklı olmalıdır',
+  },
+  'xverify.mcp.verifier_model': {
+    en: 'Exact canonical verifier model API id',
+    tr: 'Exact kanonik hakem model API kimliği',
+  },
+  'xverify.mcp.diff': {
+    en: 'Record a bounded host-side git diff context; v2 evidence remains broker-owned',
+    tr: 'Sınırlı host-side git diff bağlamını kaydet; v2 kanıtı broker yönetir',
+  },
+  'xverify.mcp.files': {
+    en: 'Comma-separated exact project-relative evidence files',
+    tr: 'Virgülle ayrılmış exact proje-relative kanıt dosyaları',
+  },
+  'xverify.mcp.timeout': {
+    en: 'Verifier timeout in milliseconds (default 300000)',
+    tr: 'Hakem zaman aşımı, milisaniye (varsayılan 300000)',
+  },
+  'xverify.mcp.failed': {
+    en: 'xverify failed: {error}',
+    tr: 'xverify başarısız: {error}',
+  },
   'run.model_err.pricing_unverified': {
     en: 'Cannot use model "{model}": its OpenRouter pricing is unverified. '
       + 'Run `deckent openrouter-probe` to refresh the verified free-model inventory, '

@@ -81,7 +81,7 @@ export function prepareDockerExecutionLanding(input: {
     readonly continuationFence: string;
   };
   /** Existing closed host protocol; selects a finite checkpoint cadence only. */
-  terminalProtocol?: 'xverify-v1';
+  terminalProtocol?: 'xverify-v1' | 'xverify-v2-host-only';
 }): PreparedDockerExecutionLanding {
   const budgetPolicy = input.task.budgetPolicy;
   const policy = budgetPolicy?.landingPolicy;
@@ -104,12 +104,13 @@ export function prepareDockerExecutionLanding(input: {
     );
   }
   const mode = budgetPolicy.admissionMode;
-  const proposalSegment = buildExecutionLandingProposalPromptSegment(
-    input.task.id,
-    input.settlementRef.attemptId,
-    input.terminalProtocol === 'xverify-v1' ? 'finite-adjudication' : 'continuous',
-  );
-  const prompt = `${proposalSegment}\n\n## Primary Task Prompt\n\n${input.prompt}`;
+  const prompt = input.terminalProtocol === 'xverify-v2-host-only'
+    ? input.prompt
+    : `${buildExecutionLandingProposalPromptSegment(
+        input.task.id,
+        input.settlementRef.attemptId,
+        input.terminalProtocol === 'xverify-v1' ? 'finite-adjudication' : 'continuous',
+      )}\n\n## Primary Task Prompt\n\n${input.prompt}`;
   const requestedProvider = input.task.provider ?? input.calledProvider;
   const requestedModel = input.task.forceModel ?? input.task.model;
   const resolvedProvider = budgetPolicy.resolvedProvider === 'unknown'
