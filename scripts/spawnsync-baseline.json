@@ -553,6 +553,11 @@
       "file": "src/orchestra/worker-liveness.ts",
       "code": "const res = spawnSync(",
       "owner": "HOTPATH-SPAWN-ASYNC (born; EVALUATE-loop docker-ps probe default)"
+    },
+    {
+      "file": "src/orchestra/spawn-backend-docker.ts",
+      "code": "const probe = spawnSync(",
+      "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
     }
   ]
 }

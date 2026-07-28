@@ -487,6 +487,9 @@ const KNOWN_ORPHANS = [
   'src/core/rate-limiter.ts',
   'src/core/skill-registry.ts',
   'src/core/spawn-safety.ts',
+  // Settlement slice (sprint 457-460, committed 2026-07-28): admission core
+  // landed ahead of its consumers — sprint-461 ADMISSION-* tasks wire it.
+  'src/core/task-execution-admission.ts',
   'src/core/telemetry.ts',
   'src/core/token-counter.ts',
   'src/core/tokenizer-fallback.ts',
@@ -532,7 +535,7 @@ const KNOWN_ORPHANS = [
 
 describe('KNOWN_ORPHANS allowlist sanity', () => {
   it('has the expected count and only well-formed src/**/*.ts(x) entries', () => {
-    expect(KNOWN_ORPHANS.length).toBe(82);
+    expect(KNOWN_ORPHANS.length).toBe(83);
     for (const entry of KNOWN_ORPHANS) {
       expect(entry.startsWith('src/')).toBe(true);
       expect(entry.endsWith('.ts') || entry.endsWith('.tsx')).toBe(true);

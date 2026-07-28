@@ -192,6 +192,16 @@
       "count": 1
     },
     {
+      "file": "src/cli/commands/spawn.ts",
+      "fingerprint": "4e205c138ee0991b7410d6f8557ba132ca15055c4b92712c97925a43c014c67f",
+      "count": 1
+    },
+    {
+      "file": "src/cli/commands/status.ts",
+      "fingerprint": "756147122524c7cf67ede58b85325fb36cf551329412823cef13d0330b9726a4",
+      "count": 2
+    },
+    {
       "file": "src/core/agent-pool.ts",
       "fingerprint": "af80eab64329f742b4a105800089a50b3ab8e33a9f259de77474e3d05d8560f8",
       "count": 1
@@ -205,6 +215,36 @@
       "file": "src/core/config.ts",
       "fingerprint": "62d1869b765bd17527d5995fdb0255b16b27672594aaf85adca5374fe725797f",
       "count": 1
+    },
+    {
+      "file": "src/core/cross-verify-evidence-broker.ts",
+      "fingerprint": "5d7da5e6e14a92251a4ce37de75f8fab392876120e621dccde8ad1a851dec370",
+      "count": 1
+    },
+    {
+      "file": "src/core/cross-verify-evidence-broker.ts",
+      "fingerprint": "9d00b0c0cf10cb5fef92a27686e268c6aa99b6b70883158a921bff51a7233ea0",
+      "count": 1
+    },
+    {
+      "file": "src/core/file-lock.ts",
+      "fingerprint": "0c9c7cf14b167059cbdcda7ac2e2c723b6550dc5cd4fa9bc31fce74d02ab4b50",
+      "count": 1
+    },
+    {
+      "file": "src/core/file-lock.ts",
+      "fingerprint": "8aecf479da602946e5fbe64c872eb36e1a3444eea11bc0dc1956fb77a1f7e8d2",
+      "count": 1
+    },
+    {
+      "file": "src/core/file-lock.ts",
+      "fingerprint": "c82e53b10f1ac2e0d514b89bb2b7be21e5ee3f45f42d7241bb22d6f70101c07b",
+      "count": 2
+    },
+    {
+      "file": "src/core/file-lock.ts",
+      "fingerprint": "e68d28c68bec3093ce8c39f7ecd1af218c6cd093f80e8f058991487ab93ddd36",
+      "count": 2
     },
     {
       "file": "src/core/live-execution-budget.ts",
@@ -672,6 +712,11 @@
       "count": 1
     },
     {
+      "file": "src/core/run-flow-store.ts",
+      "fingerprint": "4355090967a4b29cbf5bea330ca0d4412b3c1da9732b6c6036fa94ce10b9af17",
+      "count": 1
+    },
+    {
       "file": "src/core/scheduled-flow.ts",
       "fingerprint": "0582f9d7db5ca4e2dea1543426a077d120a4f633b9d58bd23c85dd59183ce999",
       "count": 1
@@ -804,6 +849,11 @@
     {
       "file": "src/core/task-result-settlement.ts",
       "fingerprint": "81787221895537c4b3d272d5c570b64725bc1b89831c1e3eac5bf4cf4bf17584",
+      "count": 1
+    },
+    {
+      "file": "src/core/task-result-settlement.ts",
+      "fingerprint": "af960aacbc95b69ca4afc115ceda0e70d27e324dbf2710483a3e99adc7df164c",
       "count": 1
     },
     {
@@ -1284,6 +1334,26 @@
     {
       "file": "src/orchestra/cross-verify-runner.ts",
       "fingerprint": "1595d9b1c2555bda99eb417154cdc9615453a42331e1372c755a49001cd8a01a",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/directives-builder.ts",
+      "fingerprint": "0bc9e494d80b3db081e54835fefc08b43b29c2f9208581c017cb99b81450309e",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/directives-builder.ts",
+      "fingerprint": "169a72d94c0f5b0c73bcb8b67185a6393f91791c211d6af8c6bf44be95720b1c",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/directives-builder.ts",
+      "fingerprint": "592bba9950825a7cdf58c15fc48df567d7163b8e54a2e68185fa5fa983c1f25a",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/directives-builder.ts",
+      "fingerprint": "b389cbf3777c814f8de1f8979f854d6786e4660f3b4abf1d7a60babbbe48218b",
       "count": 1
     },
     {
