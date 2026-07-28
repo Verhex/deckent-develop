@@ -645,7 +645,7 @@ describe('Sprint mini-cycle integration', () => {
     const context = readContext(root);
     const recommendation = { size: 'full' as const, maxWorkers: 3, modelConstraint: null, reason: 'OK' };
 
-    const sprint = await planSprint(root, config, context, recommendation);
+    const sprint = await planSprint(root, config, context, recommendation, { mode: 'structured' });
     expect(sprint.tasks.length).toBeGreaterThan(0);
 
     // Verify task files exist on disk
@@ -666,7 +666,7 @@ describe('Sprint mini-cycle integration', () => {
     const context = readContext(root);
     const recommendation = { size: 'full' as const, maxWorkers: 2, modelConstraint: null, reason: 'OK' };
 
-    const sprint = await planSprint(root, config, context, recommendation);
+    const sprint = await planSprint(root, config, context, recommendation, { mode: 'structured' });
     expect(sprint.number).toBe(3);
     expect(sprint.id).toBe('sprint-003');
   });

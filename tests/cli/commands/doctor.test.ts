@@ -69,6 +69,13 @@ vi.mock('../../../src/core/environment.js', () => ({
   detectEnvironment: vi.fn().mockReturnValue('vscode'),
 }));
 
+vi.mock('../../../src/cli/commands/provider-authority.js', () => ({
+  readKeyringState: vi.fn().mockReturnValue({
+    state: 'present',
+    snapshot: { revision: 7 },
+  }),
+}));
+
 vi.mock('../../../src/core/deck-file.js', () => ({
   loadDeckSecrets: vi.fn().mockReturnValue({}),
   validateDeckFile: vi.fn().mockReturnValue({ valid: true, warnings: [], errors: [] }),
@@ -127,6 +134,7 @@ import type { HealthCheckResult } from '../../../src/orchestra/connector.js';
 import type { DetectedProvider } from '../../../src/core/provider.js';
 import { detectEnvironment } from '../../../src/core/environment.js';
 import { loadDeckSecrets, validateDeckFile, isDeckFileCommitted } from '../../../src/core/deck-file.js';
+import { readKeyringState } from '../../../src/cli/commands/provider-authority.js';
 
 // ─── Helper ──────────────────────────────────────────────────────────
 
@@ -143,6 +151,15 @@ async function runCommand(args: string[]): Promise<void> {
 
 function makeSpawnResult(status: number, stdout: string) {
   return { status, stdout, stderr: '', pid: 1, signal: null, output: [] };
+}
+
+function makePassingKeyringCheck(): NonNullable<HumanDoctorInput['keyringCheck']> {
+  return {
+    name: 'Provider authority keyring',
+    passed: true,
+    message: 'Host keyring ready (revision 7)',
+    required: true,
+  };
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────
@@ -197,6 +214,19 @@ describe('registerDoctor', () => {
     await runCommand(['doctor']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     expect(calls.some(c => String(c).includes('Deckent Health Check'))).toBe(true);
+  });
+
+  it('injects the required provider-authority keyring check at the production boundary', async () => {
+    vi.mocked(readKeyringState).mockReturnValueOnce({ state: 'absent' });
+
+    await runCommand(['doctor']);
+
+    expect(readKeyringState).toHaveBeenCalledTimes(1);
+    const humanOutput = vi.mocked(print).mock.calls
+      .map(call => String(call[0]))
+      .find(value => value.includes('Deckent Health Check'));
+    expect(humanOutput).toContain('Status: NOT READY');
+    expect(humanOutput).toContain('Provider authority keyring');
   });
 
   it('does NOT show profile info without --profile flag', async () => {
@@ -869,6 +899,7 @@ describe('formatHumanDoctor', () => {
       makeProvider('codex', true, '1.0', 'api_key'),
       makeProvider('gemini', false),
     ],
+    keyringCheck: makePassingKeyringCheck(),
     brainLines: 347,
     brainBudget: 600,
     lastSprintId: 'sprint-039',
@@ -971,6 +1002,33 @@ describe('formatHumanDoctor', () => {
     const output = formatHumanDoctor(input);
     expect(output).toContain('Fix 1 required issue');
     expect(output).toContain('tmux: not found');
+  });
+
+  it('uses the explicit required keyring check without reading host authority state', () => {
+    vi.mocked(readKeyringState).mockClear();
+    const output = formatHumanDoctor({
+      ...baseInput,
+      keyringCheck: {
+        name: 'Provider authority keyring',
+        passed: false,
+        message: 'Host provider authority keyring is not provisioned',
+        required: true,
+      },
+    });
+
+    expect(readKeyringState).not.toHaveBeenCalled();
+    expect(output).toContain('Status: NOT READY');
+    expect(output).toContain('Provider authority keyring: Host provider authority keyring is not provisioned');
+  });
+
+  it('keeps compatibility fixtures deterministic without an ambient keyring fallback', () => {
+    vi.mocked(readKeyringState).mockClear();
+    const { keyringCheck: _keyringCheck, ...compatibilityInput } = baseInput;
+
+    const output = formatHumanDoctor(compatibilityInput);
+
+    expect(readKeyringState).not.toHaveBeenCalled();
+    expect(output).toContain('Status: READY');
   });
 
   it('shows provider tips for unavailable providers', () => {
@@ -1304,6 +1362,7 @@ describe('formatHumanDoctor enhancements', () => {
       makeProvider('codex', true, '1.0', 'api_key'),
       makeProvider('gemini', false),
     ],
+    keyringCheck: makePassingKeyringCheck(),
     brainLines: 347,
     brainBudget: 600,
     lastSprintId: 'sprint-039',
@@ -1565,6 +1624,7 @@ describe('formatHumanDoctor with provider health', () => {
       makeProvider('codex', false),
       makeProvider('gemini', false),
     ],
+    keyringCheck: makePassingKeyringCheck(),
     brainLines: 347,
     brainBudget: 600,
     lastSprintId: 'sprint-042',
@@ -1840,6 +1900,7 @@ describe('formatHumanDoctor with connectorHealthResults', () => {
       ],
     },
     providers: [makeProvider('claude', true, '2.1', 'session')],
+    keyringCheck: makePassingKeyringCheck(),
     brainLines: 347,
     brainBudget: 600,
     lastSprintId: 'sprint-046',
@@ -2070,6 +2131,7 @@ describe('System Health memory deduplication (F)', () => {
         ],
       },
       providers: [],
+      keyringCheck: makePassingKeyringCheck(),
       brainLines: 200,
       brainBudget: 600,
       lastSprintId: null,
@@ -2087,6 +2149,7 @@ describe('System Health memory deduplication (F)', () => {
     const input = {
       result: { ok: true, checks: [] },
       providers: [],
+      keyringCheck: makePassingKeyringCheck(),
       brainLines: 100,
       brainBudget: 600,
       lastSprintId: null,

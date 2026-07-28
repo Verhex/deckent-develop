@@ -145,6 +145,21 @@ describe('transactional build staging tools', () => {
     ]);
   });
 
+  it('requires a runner before output mutation or toolchain work', async () => {
+    const root = fixtureRoot();
+    const output = join(root, '.deckent', 'build', 'staging', 'dashboard');
+
+    await expect(buildDashboard({
+      root,
+      outputDirectory: output,
+    })).rejects.toMatchObject({
+      code: 'E_DASHBOARD_BUILD_TOOL_RUNNER_UNAVAILABLE',
+    });
+
+    expect(existsSync(join(root, '.deckent'))).toBe(false);
+    expect(existsSync(output)).toBe(false);
+  });
+
   it('fails closed when the local toolchain is unavailable', () => {
     const root = fixtureRoot();
     mkdirSync(join(root, 'src', 'dashboard'), { recursive: true });
@@ -248,5 +263,7 @@ describe('transactional build staging tools', () => {
     expect(source).not.toMatch(/\bnpx\b/u);
     expect(source).not.toMatch(/\bspawnSync\b/u);
     expect(source).toContain('shell: false');
+    expect(source).not.toContain('options.run ?? runDashboardNodeTool');
+    expect(source).toContain('run: runDashboardNodeTool');
   });
 });

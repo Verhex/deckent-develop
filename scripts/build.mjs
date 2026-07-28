@@ -46,7 +46,10 @@ import {
   ensureBinExecutable,
   writeBuildIdentity,
 } from './copy-assets.mjs';
-import { buildDashboard } from './build-dashboard.mjs';
+import {
+  buildDashboard,
+  runDashboardNodeTool,
+} from './build-dashboard.mjs';
 
 const SCRIPT_PATH = realpathSync.native(fileURLToPath(import.meta.url));
 const REPO_ROOT = realpathSync.native(resolve(dirname(SCRIPT_PATH), '..'));
@@ -1144,9 +1147,21 @@ export async function runTransactionalBuild(options = {}) {
     || heartbeatIntervalMs > Math.floor(leaseDurationMs / 3)) {
     throw codedError('E_BUILD_HEARTBEAT_CONFIGURATION_INVALID');
   }
+  const requiresCoreTool = scope === 'core' || scope === 'all';
+  const requiresDashboardBuilder =
+    scope === 'dashboard' || scope === 'all';
+  const runTool = options.runTool;
+  const dashboardBuilder = options.dashboardBuilder;
+  if (requiresCoreTool && typeof runTool !== 'function') {
+    throw codedError('E_BUILD_TOOL_RUNNER_UNAVAILABLE');
+  }
+  if (
+    requiresDashboardBuilder
+    && typeof dashboardBuilder !== 'function'
+  ) {
+    throw codedError('E_BUILD_DASHBOARD_BUILDER_UNAVAILABLE');
+  }
   const authority = options.authority ?? defaultAuthority();
-  const runTool = options.runTool ?? runBuildNodeTool;
-  const dashboardBuilder = options.dashboardBuilder ?? buildDashboard;
   const buildEnvironment = Object.freeze({
     ...(options.env ?? process.env),
   });
@@ -1696,6 +1711,13 @@ const invokedDirectly =
   process.argv[1]
   && realpathSync.native(process.argv[1]) === SCRIPT_PATH;
 
+function runDashboardWithVerifiedTool(options) {
+  return buildDashboard({
+    ...options,
+    run: runDashboardNodeTool,
+  });
+}
+
 if (invokedDirectly) {
   try {
     const command = parseArguments(process.argv.slice(2));
@@ -1716,7 +1738,11 @@ if (invokedDirectly) {
         recoveryAttestationVerifier: () => true,
       });
     } else {
-      result = await runTransactionalBuild({ scope: command.scope });
+      result = await runTransactionalBuild({
+        scope: command.scope,
+        runTool: runBuildNodeTool,
+        dashboardBuilder: runDashboardWithVerifiedTool,
+      });
     }
     console.log(JSON.stringify({
       schemaVersion: BUILD_SCHEMA_VERSION,

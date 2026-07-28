@@ -165,6 +165,13 @@ async function runGuardProbe(root: string): Promise<Record<string, string | bool
     result.dotdotName = await observe(
       () => fs.writeFileSync(join(tasks, '..escape', 'file.txt'), 'x'),
     );
+    const tasksAlias = join(safeDirectory, 'tasks-alias');
+    result.symlinkToProtectedTarget = await observe(
+      () => fs.symlinkSync(tasks, tasksAlias, process.platform === 'win32' ? 'junction' : 'dir'),
+    );
+    result.writeThroughProtectedAlias = await observe(
+      () => fs.writeFileSync(join(tasksAlias, 'blocked.txt'), 'x'),
+    );
     result.tempAllowed = await observe(
       () => fs.writeFileSync(join(safeDirectory, 'allowed.txt'), 'x'),
     );
@@ -241,6 +248,8 @@ describe('runtime hermetic write guard', () => {
       disposableSync: 'E_HERMETIC_TASKS_WRITE',
       disposableAsync: 'E_HERMETIC_TASKS_WRITE',
       dotdotName: 'E_HERMETIC_TASKS_WRITE',
+      symlinkToProtectedTarget: 'ALLOWED',
+      writeThroughProtectedAlias: 'E_HERMETIC_TASKS_WRITE',
       tempAllowed: 'ALLOWED',
       ancestorRemove: 'E_HERMETIC_TASKS_WRITE',
       rootStillExists: true,

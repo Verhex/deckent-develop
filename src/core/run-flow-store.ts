@@ -35,12 +35,18 @@ import type { RunHandle } from '../orchestra/run-job-service.js';
 
 export const RUN_FLOW_STORE_SCHEMA_VERSION = 1;
 const SQLITE_BUSY_TIMEOUT_MS = 60_000;
+const SQLITE_JOURNAL_MODE_TRANSITION_ATTEMPTS = 12;
+const SQLITE_JOURNAL_MODE_BACKOFF_BASE_MS = 5;
+const SQLITE_JOURNAL_MODE_BACKOFF_MAX_MS = 100;
+const SQLITE_JOURNAL_MODE_WAITER = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
 const EVENT_READ_DEFAULT_LIMIT = 1_000;
 
 type RecordKind = 'snapshot' | 'handle' | 'event' | 'plan';
 
 export type RunFlowStoreErrorCode =
   | 'SCHEMA_UNSUPPORTED'
+  | 'JOURNAL_MODE_TRANSITION_BUSY'
+  | 'JOURNAL_MODE_CONFIGURATION_FAILED'
   | 'CANONICAL_CONFLICT'
   | 'IDEMPOTENCY_CONFLICT'
   | 'CANONICAL_WRITE_FAILED'
@@ -499,8 +505,8 @@ function openStore(root: string): Database.Database {
   mkdirSync(dir, { recursive: true });
   const db = new Database(databasePath(root));
   try {
+    configureWalJournalMode(db);
     db.pragma(`busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);
-    db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
     db.pragma('synchronous = FULL');
     initialiseSchema(db);
@@ -510,6 +516,100 @@ function openStore(root: string): Database.Database {
     db.close();
     throw error;
   }
+}
+
+function isSqliteJournalModeContention(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === 'SQLITE_BUSY' || code === 'SQLITE_LOCKED';
+}
+
+function readJournalMode(db: Database.Database): string {
+  const mode = db.pragma('journal_mode', { simple: true });
+  if (typeof mode !== 'string' || mode.trim().length === 0) {
+    throw new RunFlowStoreError(
+      'JOURNAL_MODE_CONFIGURATION_FAILED',
+      `run-flow-store: SQLite returned an invalid journal mode '${String(mode)}'`,
+      'not-committed',
+    );
+  }
+  return mode.trim().toLowerCase();
+}
+
+function configureWalJournalMode(db: Database.Database): void {
+  try {
+    // The transition retry policy is bounded independently from the mutation
+    // busy timeout configured after WAL is established.
+    db.pragma('busy_timeout = 0');
+  } catch (cause) {
+    throw new RunFlowStoreError(
+      'JOURNAL_MODE_CONFIGURATION_FAILED',
+      'run-flow-store: failed to configure the SQLite journal transition policy',
+      'not-committed',
+      undefined,
+      { cause },
+    );
+  }
+
+  let lastContention: unknown;
+  try {
+    if (readJournalMode(db) === 'wal') return;
+  } catch (cause) {
+    if (cause instanceof RunFlowStoreError) throw cause;
+    if (!isSqliteJournalModeContention(cause)) {
+      throw new RunFlowStoreError(
+        'JOURNAL_MODE_CONFIGURATION_FAILED',
+        'run-flow-store: failed to inspect SQLite journal mode',
+        'not-committed',
+        undefined,
+        { cause },
+      );
+    }
+    lastContention = cause;
+  }
+
+  let backoffMs = SQLITE_JOURNAL_MODE_BACKOFF_BASE_MS;
+  for (let attempt = 1; attempt <= SQLITE_JOURNAL_MODE_TRANSITION_ATTEMPTS; attempt += 1) {
+    try {
+      const transitionedMode = db.pragma('journal_mode = WAL', { simple: true });
+      if (
+        typeof transitionedMode !== 'string'
+        || transitionedMode.trim().toLowerCase() !== 'wal'
+      ) {
+        throw new RunFlowStoreError(
+          'JOURNAL_MODE_CONFIGURATION_FAILED',
+          `run-flow-store: SQLite refused WAL journal mode and reported '${String(transitionedMode)}'`,
+          'not-committed',
+        );
+      }
+      return;
+    } catch (cause) {
+      if (cause instanceof RunFlowStoreError) throw cause;
+      if (!isSqliteJournalModeContention(cause)) {
+        throw new RunFlowStoreError(
+          'JOURNAL_MODE_CONFIGURATION_FAILED',
+          'run-flow-store: failed to configure SQLite WAL journal mode',
+          'not-committed',
+          undefined,
+          { cause },
+        );
+      }
+      lastContention = cause;
+      if (attempt === SQLITE_JOURNAL_MODE_TRANSITION_ATTEMPTS) break;
+      Atomics.wait(SQLITE_JOURNAL_MODE_WAITER, 0, 0, backoffMs);
+      const doubledBackoffMs = backoffMs * 2;
+      backoffMs = doubledBackoffMs < SQLITE_JOURNAL_MODE_BACKOFF_MAX_MS
+        ? doubledBackoffMs
+        : SQLITE_JOURNAL_MODE_BACKOFF_MAX_MS;
+    }
+  }
+
+  throw new RunFlowStoreError(
+    'JOURNAL_MODE_TRANSITION_BUSY',
+    'run-flow-store: SQLite WAL journal transition remained busy after bounded retries',
+    'not-committed',
+    undefined,
+    { cause: lastContention },
+  );
 }
 
 function withStore<T>(root: string, operation: (db: Database.Database) => T): T {

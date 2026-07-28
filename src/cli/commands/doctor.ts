@@ -253,6 +253,13 @@ export function readAllCIReports(root: string, count = 5): CIReport[] {
 export interface HumanDoctorInput {
   result: DoctorResult;
   providers: DetectedProvider[];
+  /**
+   * Required host-scoped provider-authority pre-flight, resolved by the
+   * production command boundary so human formatting remains deterministic.
+   * Optional only for compatibility with callers that render an already-built
+   * result; the production doctor command always supplies it.
+   */
+  keyringCheck?: DoctorCheck;
   brainLines: number;
   brainBudget: number;
   lastSprintId: string | null;
@@ -1385,11 +1392,15 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
   const lang = input.lang ?? 'en';
   const providerAuthChecks = buildProviderAuthDoctorChecks(providers, input.authProbes, lang);
   // An unprovisioned provider-authority keyring holds every run before task
-  // creation; surface it in pre-flight instead of leaving it to a failed start.
-  const keyringCheck = buildProviderAuthorityKeyringCheck(lang);
+  // creation. The production boundary supplies this required check so this
+  // formatter never reads host authority state while rendering.
   const presentationResult: DoctorResult = {
     ...result,
-    checks: [...result.checks, ...providerAuthChecks, keyringCheck],
+    checks: [
+      ...result.checks,
+      ...providerAuthChecks,
+      ...(input.keyringCheck ? [input.keyringCheck] : []),
+    ],
   };
   const lines: string[] = [];
 
@@ -2489,9 +2500,11 @@ export function registerDoctor(program: Command): void {
           vocabularyReport = undefined;
         }
 
+        const keyringCheck = buildProviderAuthorityKeyringCheck(lang);
         print(formatHumanDoctor({
           result,
           providers,
+          keyringCheck,
           brainLines,
           brainBudget,
           lastSprintId,

@@ -93,13 +93,13 @@ export function createScanBudget(
 }
 
 export const UNRESOLVED_BASELINE = Object.freeze({
-  count: 8939,
-  digest: '350bb34cd2a9517f9a1a1b0a2098e5180b8448592d2449a4fee488d3810bbb5a',
+  count: 12170,
+  digest: 'ddd461a87256b221706fb9588e1b2f2d9c3e2f633781ddca0cc1f1293465c8e5',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  count: 1134,
-  digest: '1abcdc8d8c35a01116bc5d605ca054279b72e1f09398745145feac19c06199c8',
+  count: 1149,
+  digest: '68441aa30d23d521409f66c719716082594d5c8f7b29fea22244cd905a39bfb1',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
@@ -2581,7 +2581,8 @@ function canonicalProductionInventoryContent(filePath, content) {
     );
     canonical = canonical.replace(
       declaration,
-      `$1\n  count: <accepted-count>,\n  digest: '<accepted-digest>',\n$2`,
+      `$1\n  count: 0,\n`
+        + `  digest: '${'0'.repeat(64)}',\n$2`,
     );
   }
   return canonical;
@@ -6679,13 +6680,13 @@ function collectProductionGraph(
           + ` (${MAX_TEST_SURFACE_FILES})`,
         );
       }
-      const content = canonicalSourceText(readFileSync(task.file, 'utf-8'));
-      const inventoryContent = canonicalProductionInventoryContent(
+      const sourceContent = canonicalSourceText(readFileSync(task.file, 'utf-8'));
+      const content = canonicalProductionInventoryContent(
         task.file,
-        content,
+        sourceContent,
       );
       const contentDigest =
-        `${inventoryContent.length}:${policyDigest(inventoryContent)}`;
+        `${content.length}:${policyDigest(content)}`;
       const summaryKey = `module\0${task.file}\0${contentDigest}`;
       let summary = EAGER_SUMMARY_CACHE.get(summaryKey);
       let parsed;
@@ -7176,7 +7177,9 @@ function collectTestSurface(testsDir, rootDir, scanBudget) {
     isKnownExternal,
     scanBudget,
   );
-  unresolvedEdges.push(...productionGraph.unresolvedEdges);
+  for (const edge of productionGraph.unresolvedEdges) {
+    unresolvedEdges.push(edge);
+  }
   return {
     files,
     unresolvedEdges,

@@ -7,8 +7,9 @@
 //      either way (flag-off byte-identical).
 //  (B) `SubprocessSpawnBackend.spawn()` (src/providers/subprocess.ts) consumes an
 //      injected `opts.deckBroker` to resolve THIS task's own credential — task-
-//      scoped, audited — and falls through to the pre-existing `opts.env`
-//      reinject flow when the broker is absent OR denies, never throwing.
+//      scoped, audited. The pre-existing `opts.env` reinject path remains only
+//      when no broker is injected; a broker denial fail-closes credential
+//      reinjection so an unscoped fallback cannot bypass task authority.
 //
 // Hermetic: node:child_process + deck-file.js are mocked so no real CLI probing
 // or disk I/O happens; node:fs is mocked so SubprocessSpawnBackend.spawn() never
@@ -283,7 +284,7 @@ describe('SubprocessSpawnBackend.spawn() — DeckBroker consumption (354-006, fl
     expect(log.every((e) => e.outcome === 'granted')).toBe(true);
   });
 
-  it('opts.deckBroker denies (taskId already consumed) → falls through to opts.env unchanged, never throws', () => {
+  it('opts.deckBroker denial fail-closes credential reinjection from opts.env', () => {
     vi.mocked(loadDeckSecrets).mockReturnValue({ DECKENT_CLAUDE_API_KEY: 'sk-ant-broker' });
     const broker = new DeckBroker(projectDir);
     // Pre-consume the taskId's grant before spawn() ever runs.
@@ -298,7 +299,11 @@ describe('SubprocessSpawnBackend.spawn() — DeckBroker consumption (354-006, fl
     ).not.toThrow();
 
     const env = spawnedEnv(spawnImpl);
-    expect(env['ANTHROPIC_API_KEY']).toBe('sk-ant-fallback');
+    expect(env['ANTHROPIC_API_KEY']).toBeUndefined();
+    expect(broker.getAuditLog().at(-1)).toMatchObject({
+      taskId: 't-dup',
+      outcome: 'denied',
+    });
   });
 
   it('opts.deckBroker denies (no secret configured) with no opts.env fallback → worker gets no credential, still spawns', () => {

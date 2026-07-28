@@ -182,6 +182,42 @@ afterEach(() => {
 });
 
 describe('transactional build lifecycle', () => {
+  it('requires the core runner before authority or staging mutation', async () => {
+    const root = fixtureRoot();
+    const events: string[] = [];
+
+    await expect(runTransactionalBuild({
+      root,
+      allowFixtureRoot: true,
+      scope: 'core',
+      runId: 'run-missing-core-runner',
+      authority: fakeAuthority(events),
+    })).rejects.toMatchObject({
+      code: 'E_BUILD_TOOL_RUNNER_UNAVAILABLE',
+    });
+
+    expect(events).toEqual([]);
+    expect(existsSync(join(root, '.deckent'))).toBe(false);
+  });
+
+  it('requires the dashboard builder before authority or staging mutation', async () => {
+    const root = fixtureRoot();
+    const events: string[] = [];
+
+    await expect(runTransactionalBuild({
+      root,
+      allowFixtureRoot: true,
+      scope: 'dashboard',
+      runId: 'run-missing-dashboard-builder',
+      authority: fakeAuthority(events),
+    })).rejects.toMatchObject({
+      code: 'E_BUILD_DASHBOARD_BUILDER_UNAVAILABLE',
+    });
+
+    expect(events).toEqual([]);
+    expect(existsSync(join(root, '.deckent'))).toBe(false);
+  });
+
   it('stages, verifies and commits core output under one maintenance boundary', async () => {
     const root = fixtureRoot();
     const events: string[] = [];
@@ -526,5 +562,14 @@ describe('transactional build lifecycle', () => {
     expect(source).not.toMatch(/\bnpm\s+install\b/u);
     expect(source).not.toMatch(/\bnpx\b/u);
     expect(source).toContain('shell: false');
+    expect(source).not.toContain('options.runTool ?? runBuildNodeTool');
+    expect(source).not.toContain(
+      'options.dashboardBuilder ?? buildDashboard',
+    );
+    expect(source).toContain('runTool: runBuildNodeTool');
+    expect(source).toContain(
+      'dashboardBuilder: runDashboardWithVerifiedTool',
+    );
+    expect(source).toContain('run: runDashboardNodeTool');
   });
 });

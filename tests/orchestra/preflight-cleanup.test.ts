@@ -21,11 +21,20 @@ function createProjectRoot(): string {
 }
 
 function writeTask(root: string, taskId: string, status: string): void {
-  const json = { id: taskId, status, title: `Test task ${taskId}` };
+  const canonicalTaskId = taskId.startsWith('task-')
+    ? taskId.slice('task-'.length)
+    : taskId;
+  const json = { id: canonicalTaskId, status, title: `Test task ${canonicalTaskId}` };
   writeFileSync(join(root, '.tasks', `${taskId}.json`), JSON.stringify(json));
-  writeFileSync(join(root, '.tasks', `${taskId}.hb`), JSON.stringify({ taskId }));
+  writeFileSync(
+    join(root, '.tasks', `${taskId}.hb`),
+    JSON.stringify({ taskId: canonicalTaskId }),
+  );
   if (status === 'DONE' || status === 'NO_GO') {
-    writeFileSync(join(root, '.tasks', `${taskId}.result`), JSON.stringify({ taskId, selfAssessment: status }));
+    writeFileSync(
+      join(root, '.tasks', `${taskId}.result`),
+      JSON.stringify({ taskId: canonicalTaskId, selfAssessment: status }),
+    );
   }
 }
 
@@ -62,15 +71,15 @@ describe('preflight-cleanup integration', () => {
     // task-143-003 should still be in .tasks/
     expect(existsSync(join(testRoot, '.tasks', 'task-143-003.json'))).toBe(true);
 
-    // Now sprint-144 starts — preflight should clean remaining task-143-003
+    // Now sprint-144 starts. A previous sprint id is not terminal proof:
+    // preflight must preserve the still-active task until a durable receipt
+    // projects an explicit terminal state.
     const preReport = preflightOrphanCleanup(testRoot, 'sprint-144');
     expect(preReport.performed).toBe(true);
-    expect(preReport.archivedFiles.length).toBeGreaterThan(0);
+    expect(preReport.archivedFiles).toHaveLength(0);
 
-    // .tasks/ should only have archive dirs, no orphan files
-    const remaining = readdirSync(join(testRoot, '.tasks'))
-      .filter(f => f.startsWith('task-') && !f.startsWith('task-144'));
-    expect(remaining.length).toBe(0);
+    expect(existsSync(join(testRoot, '.tasks', 'task-143-003.json'))).toBe(true);
+    expect(existsSync(join(testRoot, '.tasks', 'task-143-003.hb'))).toBe(true);
   });
 
   it('should preserve fresh locks and clean stale ones during post-finalize', () => {

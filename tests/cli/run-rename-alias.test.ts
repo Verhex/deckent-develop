@@ -18,6 +18,10 @@ import { getMessage } from '../../src/cli/helpers/messages.js';
 
 // ─── Mocks (mirror tests/cli/run.test.ts — only needed for the one-shot path) ──
 
+const hoisted = vi.hoisted(() => ({
+  backendSpawn: vi.fn(),
+}));
+
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   mkdirSync: vi.fn(),
@@ -39,7 +43,7 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
       name: 'subprocess',
       liveUsageBudgetSupport: 'measured-stream',
       executionLandingCapability: 'cooperative-landing',
-      spawn: vi.fn(),
+      spawn: hoisted.backendSpawn,
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),
       isAvailable: vi.fn().mockResolvedValue(true),
@@ -48,7 +52,7 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
       name: 'subprocess',
       liveUsageBudgetSupport: 'measured-stream',
       executionLandingCapability: 'cooperative-landing',
-      spawn: vi.fn(),
+      spawn: hoisted.backendSpawn,
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),
       isAvailable: vi.fn().mockResolvedValue(true),
@@ -60,6 +64,19 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
   SpawnBackendError: class SpawnBackendError extends Error {},
   TmuxBackend: class TmuxBackend {},
   SubprocessBackend: class SubprocessBackend {},
+}));
+
+vi.mock('../../src/cli/commands/spawn.js', () => ({
+  spawnWorkerMultiProvider: vi.fn(async (
+    taskId: string,
+    model: string,
+    prompt: string,
+    root: string,
+    opts: Record<string, unknown>,
+  ) => {
+    hoisted.backendSpawn(taskId, model, prompt, { ...opts, projectDir: root });
+    return { backend: 'subprocess', provider: opts.provider ?? 'claude' };
+  }),
 }));
 
 vi.mock('../../src/core/config.js', () => ({
@@ -199,8 +216,8 @@ describe('run "<description>" — legacy one-shot signature unaffected', () => {
   it('spawns worker and reports DONE result for an ordinary description (unchanged end-to-end)', async () => {
     const origExitCode = process.exitCode;
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({
-      taskId: 'run-test',
+    vi.mocked(readFileSync).mockImplementation(() => JSON.stringify({
+      taskId: String(hoisted.backendSpawn.mock.calls.at(-1)?.[0]),
       selfAssessment: 'DONE',
       testsPassed: true,
       filesChanged: ['src/foo.ts'],

@@ -301,8 +301,8 @@ describe('registerRun', () => {
 
     // Return result file on first existsSync call
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({
-      taskId: 'run-test',
+    vi.mocked(readFileSync).mockImplementation(() => JSON.stringify({
+      taskId: String(hoisted.backendSpawn.mock.calls.at(-1)?.[0]),
       selfAssessment: 'DONE',
       testsPassed: true,
       filesChanged: ['src/foo.ts'],
@@ -340,8 +340,8 @@ describe('registerRun', () => {
     vi.mocked(spawnWorker).mockReturnValue(undefined);
     vi.mocked(unlinkSync).mockReturnValue(undefined);
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({
-      taskId: 'run-test',
+    vi.mocked(readFileSync).mockImplementation(() => JSON.stringify({
+      taskId: String(hoisted.backendSpawn.mock.calls.at(-1)?.[0]),
       selfAssessment: 'NO_GO',
       testsPassed: false,
       filesChanged: [],
@@ -368,9 +368,15 @@ describe('registerRun', () => {
 // unseen IDs per test avoid within-file registry bleed (registerParametric mutates
 // the shared singleton).
 describe('registerRun — canonical model boundary (453-001)', () => {
-  const DONE_RESULT = JSON.stringify({
-    taskId: 'run-x', selfAssessment: 'DONE', testsPassed: true, filesChanged: [], notes: 'ok',
-  });
+  function doneResult(): string {
+    return JSON.stringify({
+      taskId: String(hoisted.backendSpawn.mock.calls.at(-1)?.[0]),
+      selfAssessment: 'DONE',
+      testsPassed: true,
+      filesChanged: [],
+      notes: 'ok',
+    });
+  }
 
   /** Parsed contents of every `.json` file written this test (Task JSON writes). */
   function jsonWrites(): Record<string, unknown>[] {
@@ -398,7 +404,7 @@ describe('registerRun — canonical model boundary (453-001)', () => {
   it('accepts a known exact ID (gpt-5.6-sol) and spawns with it unchanged', async () => {
     const orig = process.exitCode;
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(DONE_RESULT);
+    vi.mocked(readFileSync).mockImplementation(doneResult);
 
     await runWith(['--model', 'gpt-5.6-sol']);
 
@@ -415,7 +421,7 @@ describe('registerRun — canonical model boundary (453-001)', () => {
   it('accepts a pricing-verified versioned ID with --provider codex; Task JSON + spawn preserve it', async () => {
     const orig = process.exitCode;
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(DONE_RESULT);
+    vi.mocked(readFileSync).mockImplementation(doneResult);
     modelRegistry.register(buildParametricModel('gpt-5.6-neo-453d', {
       provider: 'codex',
       costPerMillion: { input: 2, output: 10 },
@@ -441,7 +447,7 @@ describe('registerRun — canonical model boundary (453-001)', () => {
   it('omitted --model resolves from the canonical config default (never a literal alias)', async () => {
     const orig = process.exitCode;
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(DONE_RESULT);
+    vi.mocked(readFileSync).mockImplementation(doneResult);
 
     await runWith([]);
 

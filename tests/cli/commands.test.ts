@@ -146,6 +146,34 @@ vi.mock('../../src/orchestra/spawn-backend.js', () => ({
   createSandboxBackend: vi.fn(),
 }));
 
+vi.mock('../../src/core/file-lock.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/file-lock.js')>();
+  return {
+    ...actual,
+    withExecutionLock: vi.fn(async (
+      _projectRoot: string,
+      _taskId: string,
+      _actor: string,
+      operation: () => unknown,
+    ) => operation()),
+  };
+});
+
+vi.mock('../../src/core/task-settlement-authority.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/task-settlement-authority.js')>();
+  return {
+    ...actual,
+    openTaskSettlementProjection: vi.fn(() => ({
+      projectTaskExecutionState: vi.fn(() => ({
+        effectiveStatus: 'PENDING',
+        reasonCode: 'raw-status',
+      })),
+      projectTaskExecutionStates: vi.fn(() => []),
+      close: vi.fn(),
+    })),
+  };
+});
+
 vi.mock('../../src/agents/worker.js', () => ({
   readTask: vi.fn(),
 }));

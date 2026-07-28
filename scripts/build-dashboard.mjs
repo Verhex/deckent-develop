@@ -284,6 +284,10 @@ export function runDashboardNodeTool(
 }
 
 export async function buildDashboard(options = {}) {
+  const run = options.run;
+  if (typeof run !== 'function') {
+    throw codedError('E_DASHBOARD_BUILD_TOOL_RUNNER_UNAVAILABLE');
+  }
   const root = realpathSync.native(options.root ?? REPO_ROOT);
   const sourceDirectory = resolve(
     root,
@@ -297,7 +301,6 @@ export async function buildDashboard(options = {}) {
     root,
     options.toolchainDashboardDirectory,
   );
-  const run = options.run ?? runDashboardNodeTool;
   mkdirSync(outputDirectory, { recursive: true, mode: 0o700 });
   if (readdirSync(outputDirectory).length !== 0) {
     throw codedError(
@@ -402,6 +405,7 @@ if (invokedDirectly) {
   try {
     const result = await buildDashboard({
       outputDirectory: parseOutputDirectory(process.argv.slice(2)),
+      run: runDashboardNodeTool,
     });
     console.log(JSON.stringify({
       schemaVersion: 1,

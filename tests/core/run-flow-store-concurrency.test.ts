@@ -15,6 +15,7 @@ const require = createRequire(import.meta.url);
 const PROCESS_COUNT = 6;
 const RECORDS_PER_PROCESS = 100;
 const PROCESS_TIMEOUT_MS = 60_000;
+const BARRIER_TIMEOUT_MS = 10_000;
 
 let root: string;
 
@@ -50,33 +51,78 @@ async function buildStoreBundle(): Promise<string> {
   return outfile;
 }
 
-function runWriter(workerScript: string, storeBundle: string, workerIndex: number): Promise<void> {
-  return new Promise((resolvePromise, reject) => {
-    const child = spawn(process.execPath, [
-      workerScript,
-      pathToFileURL(storeBundle).href,
-      root,
-      String(workerIndex),
-      String(RECORDS_PER_PROCESS),
-    ], {
-      cwd: process.cwd(),
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let stderr = '';
-    child.stderr.setEncoding('utf8');
-    child.stderr.on('data', (chunk: string) => {
-      stderr += chunk;
-    });
+interface BarrierWriter {
+  readonly ready: Promise<void>;
+  readonly completion: Promise<void>;
+  release(): void;
+}
+
+function startBarrierWriter(workerScript: string, storeBundle: string, workerIndex: number): BarrierWriter {
+  const child = spawn(process.execPath, [
+    workerScript,
+    pathToFileURL(storeBundle).href,
+    root,
+    String(workerIndex),
+    String(RECORDS_PER_PROCESS),
+  ], {
+    cwd: process.cwd(),
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+  });
+  let stderr = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', (chunk: string) => {
+    stderr += chunk;
+  });
+
+  let readySettled = false;
+  let resolveReady!: () => void;
+  let rejectReady!: (error: Error) => void;
+  const ready = new Promise<void>((resolvePromise, reject) => {
+    resolveReady = resolvePromise;
+    rejectReady = reject;
+  });
+  const barrierTimeout = setTimeout(() => {
+    if (readySettled) return;
+    readySettled = true;
+    child.kill('SIGKILL');
+    rejectReady(new Error(`writer ${workerIndex} did not reach the cold-open barrier`));
+  }, BARRIER_TIMEOUT_MS);
+  child.on('message', (message) => {
+    if (
+      readySettled
+      || typeof message !== 'object'
+      || message === null
+      || (message as { type?: unknown }).type !== 'ready'
+    ) return;
+    readySettled = true;
+    clearTimeout(barrierTimeout);
+    resolveReady();
+  });
+
+  const completion = new Promise<void>((resolvePromise, reject) => {
     const timeout = setTimeout(() => {
       child.kill('SIGKILL');
       reject(new Error(`writer ${workerIndex} exceeded ${PROCESS_TIMEOUT_MS}ms`));
     }, PROCESS_TIMEOUT_MS);
     child.once('error', (error) => {
       clearTimeout(timeout);
+      clearTimeout(barrierTimeout);
+      if (!readySettled) {
+        readySettled = true;
+        rejectReady(error);
+      }
       reject(error);
     });
     child.once('exit', (code, signal) => {
       clearTimeout(timeout);
+      clearTimeout(barrierTimeout);
+      if (!readySettled) {
+        readySettled = true;
+        rejectReady(new Error(
+          `writer ${workerIndex} exited before the cold-open barrier `
+          + `(code=${String(code)}, signal=${String(signal)}): ${stderr}`,
+        ));
+      }
       if (code === 0) {
         resolvePromise();
         return;
@@ -86,6 +132,14 @@ function runWriter(workerScript: string, storeBundle: string, workerIndex: numbe
       ));
     });
   });
+
+  return {
+    ready,
+    completion,
+    release() {
+      child.send({ type: 'release' });
+    },
+  };
 }
 
 describe('run-flow-store — canonical cross-process authority', () => {
@@ -97,6 +151,18 @@ describe('run-flow-store — canonical cross-process authority', () => {
       const { savePlannedSprint } = await import(storeUrl);
       const worker = Number(workerRaw);
       const count = Number(countRaw);
+      process.send({ type: 'ready' });
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('cold-open barrier release timed out')),
+          ${BARRIER_TIMEOUT_MS},
+        );
+        process.once('message', (message) => {
+          clearTimeout(timeout);
+          if (message?.type === 'release') resolve();
+          else reject(new Error('invalid cold-open barrier release'));
+        });
+      });
       for (let index = 0; index < count; index += 1) {
         const revision = worker * 100000 + index + 1;
         savePlannedSprint(root, 'shared-flow', {
@@ -108,17 +174,19 @@ describe('run-flow-store — canonical cross-process authority', () => {
       }
     `, 'utf8');
 
-    await Promise.all(
-      Array.from(
-        { length: PROCESS_COUNT },
-        (_, workerIndex) => runWriter(workerScript, storeBundle, workerIndex),
-      ),
+    const writers = Array.from(
+      { length: PROCESS_COUNT },
+      (_, workerIndex) => startBarrierWriter(workerScript, storeBundle, workerIndex),
     );
+    await Promise.all(writers.map((writer) => writer.ready));
+    for (const writer of writers) writer.release();
+    await Promise.all(writers.map((writer) => writer.completion));
 
     const expected = PROCESS_COUNT * RECORDS_PER_PROCESS;
     const dbPath = join(root, '.deckent', 'runtime', 'run-flow-store', 'run-flow-authority.sqlite');
     const db = new Database(dbPath, { readonly: true });
     try {
+      expect(db.pragma('journal_mode', { simple: true })).toBe('wal');
       const count = db.prepare(`
         SELECT COUNT(*) AS count FROM run_flow_records
         WHERE kind = 'plan' AND flow_id = 'shared-flow'

@@ -344,15 +344,6 @@ export function createRuntimeWritePolicy(repoRoot: string): RuntimeWritePolicy {
   };
 }
 
-function symlinkTargetPath(target: unknown, linkPath: unknown): string | undefined {
-  const rawTarget = pathLikeToString(target);
-  const rawLinkPath = pathLikeToString(linkPath);
-  if (rawTarget === undefined || rawLinkPath === undefined) return undefined;
-  return path.isAbsolute(rawTarget)
-    ? rawTarget
-    : path.resolve(path.dirname(path.resolve(rawLinkPath)), rawTarget);
-}
-
 interface PatchRecord {
   target: MutableFunctionMap;
   key: string;
@@ -517,15 +508,16 @@ function installPatches(policy: RuntimeWritePolicy): () => void {
     });
   }
 
+  // symlink(2) mutates only the destination directory entry. The referent is
+  // not written during creation; later writes through the alias are still
+  // canonicalized by assertWritable() and blocked at protected physical roots.
   for (const key of ['symlink', 'symlinkSync'] as const) {
     patchFunction(records, fsFunctions, key, args => {
       policy.assertWritable(`fs.${key}:destination`, args[1]);
-      policy.assertWritable(`fs.${key}:target`, symlinkTargetPath(args[0], args[1]));
     });
   }
   patchFunction(records, promiseFunctions, 'symlink', args => {
     policy.assertWritable('fs.promises.symlink:destination', args[1]);
-    policy.assertWritable('fs.promises.symlink:target', symlinkTargetPath(args[0], args[1]));
   });
 
   for (const key of ['open', 'openSync'] as const) {

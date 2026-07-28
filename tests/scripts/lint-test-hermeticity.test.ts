@@ -1612,6 +1612,60 @@ describe('scanTestDir — sandbox + allowlist', () => {
     }));
   });
 
+  it('merges production-scale unresolved edges without exceeding call argument limits', () => {
+    mkdirSync(join(sandbox, 'tests'));
+    mkdirSync(join(sandbox, 'src'));
+    writeFileSync(
+      join(sandbox, 'package.json'),
+      JSON.stringify({ scripts: {} }),
+    );
+    writeFileSync(
+      join(sandbox, 'tests', 'entry.test.ts'),
+      `import '../src/entry.js';\n`,
+    );
+    writeFileSync(
+      join(sandbox, 'src', 'entry.ts'),
+      [
+        `import { probe } from './probe.js';`,
+        ...Array.from(
+          { length: 128 },
+          (_, profileSize) =>
+            `probe([${Array.from({ length: profileSize }, () => '0').join(',')}]);`,
+        ),
+      ].join('\n'),
+    );
+    writeFileSync(
+      join(sandbox, 'src', 'probe.ts'),
+      [
+        `export function probe(_profile: unknown[]) {`,
+        ...Array.from({ length: 1_150 }, () => `  unknownBoundary();`),
+        `}`,
+      ].join('\n'),
+    );
+    const scanState = {
+      seenFiles: new Set<string>(),
+      seenEdges: new Set<string>(),
+      seenProductionInventory: new Set<string>(),
+      seenProductionEffects: new Set<string>(),
+    };
+
+    const result = scanTestDir(
+      join(sandbox, 'tests'),
+      [],
+      sandbox,
+      scanState,
+    );
+    const unresolved = result.registry.filter(entry =>
+      entry.file === 'src/probe.ts'
+      && entry.effect === 'production:eager-call-unresolved');
+
+    expect(result.violations).toHaveLength(0);
+    expect(unresolved).toHaveLength(1_150);
+    expect(unresolved.map(entry => entry.line)).toEqual(
+      Array.from({ length: 1_150 }, (_, index) => index + 2),
+    );
+  });
+
   it('resolves star exports once and fails loud for missing or ambiguous bindings', () => {
     mkdirSync(join(sandbox, 'tests'));
     mkdirSync(join(sandbox, 'src'));
@@ -1911,6 +1965,47 @@ describe('scanTestDir — sandbox + allowlist', () => {
     const secondFingerprint = productionInventoryFingerprint(second.registry);
     expect(secondFingerprint.count).toBe(firstFingerprint.count + 1);
     expect(secondFingerprint.digest).not.toBe(firstFingerprint.digest);
+  });
+
+  it('keeps its own ratchet fingerprints stable across baseline value widths', () => {
+    mkdirSync(join(sandbox, 'tests'));
+    mkdirSync(join(sandbox, 'scripts'));
+    writeFileSync(
+      join(sandbox, 'package.json'),
+      JSON.stringify({ scripts: {} }),
+    );
+    writeFileSync(
+      join(sandbox, 'tests', 'self-ratchet.test.ts'),
+      `import '../scripts/lint-test-hermeticity.mjs';\n`,
+    );
+    const scannerPath = join(sandbox, 'scripts', 'lint-test-hermeticity.mjs');
+    const scannerSource = (count: string, digest: string): string => [
+      `export const UNRESOLVED_BASELINE = Object.freeze({`,
+      `  count: ${count},`,
+      `  digest: '${digest}',`,
+      `});`,
+      `export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({`,
+      `  count: ${count},`,
+      `  digest: '${digest}',`,
+      `});`,
+      `unknownBoundary();`,
+    ].join('\n');
+
+    writeFileSync(scannerPath, scannerSource('9', 'short'));
+    const narrow = scanTestDir(join(sandbox, 'tests'), [], sandbox);
+
+    writeFileSync(
+      scannerPath,
+      scannerSource('123456789012345', 'f'.repeat(64)),
+    );
+    const wide = scanTestDir(join(sandbox, 'tests'), [], sandbox);
+
+    expect(unresolvedRegistryFingerprint(wide.registry)).toEqual(
+      unresolvedRegistryFingerprint(narrow.registry),
+    );
+    expect(productionInventoryFingerprint(wide.registry)).toEqual(
+      productionInventoryFingerprint(narrow.registry),
+    );
   });
 
   it('keeps scan identities and policy fingerprints equal across LF and CRLF', () => {
