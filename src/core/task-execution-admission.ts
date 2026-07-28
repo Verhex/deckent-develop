@@ -34,6 +34,7 @@ const MAX_ADMISSION_PHASE_EVIDENCE_BYTES = 1_024;
 const MAX_ADMISSION_BOUNDARY_EVIDENCE_BYTES = 5_120;
 const MAX_ADMISSION_PRE_DISPATCH_EVIDENCE_REFS = 14;
 const MAX_ADMISSION_PRE_DISPATCH_EVIDENCE_BYTES = 6_144;
+const MAX_ADMISSION_HEARTBEAT_RENEWALS_PER_TICK = 256;
 
 export type TaskExecutionAdmissionPhase =
   | 'acquire'
@@ -590,19 +591,39 @@ function validateRevalidation<T>(
       { code: 'E_TASK_EXECUTION_ADMISSION_REVALIDATION_INVALID' },
     );
   }
-  validatedEvidenceRefs(value.evidenceRefs, {
+  const evidenceRefs = Object.freeze(validatedEvidenceRefs(value.evidenceRefs, {
     allowEmpty: value.decision !== 'adopt',
     maxRefs: MAX_ADMISSION_REVALIDATION_EVIDENCE_REFS,
     maxTotalBytes: MAX_ADMISSION_REVALIDATION_EVIDENCE_BYTES,
     code: 'E_TASK_EXECUTION_ADMISSION_REVALIDATION_EVIDENCE_INVALID',
-  });
+  }));
   if (value.decision === 'hold' && !validDetailCode(value.detailCode)) {
     throw Object.assign(
       new Error('E_TASK_EXECUTION_ADMISSION_REVALIDATION_INVALID'),
       { code: 'E_TASK_EXECUTION_ADMISSION_REVALIDATION_INVALID' },
     );
   }
-  return value;
+  // Snapshot the decision and its evidence before the next async hook. Without
+  // this copy, a caller-retained array can change after verification and make
+  // adoption/dispatch settle against evidence that was never reviewed.
+  if (value.decision === 'adopt') {
+    return Object.freeze({
+      decision: 'adopt',
+      value: value.value,
+      evidenceRefs,
+    });
+  }
+  if (value.decision === 'hold') {
+    return Object.freeze({
+      decision: 'hold',
+      detailCode: value.detailCode,
+      evidenceRefs,
+    });
+  }
+  return Object.freeze({
+    decision: 'dispatch',
+    evidenceRefs,
+  });
 }
 
 function acquireState<T>(
@@ -1005,6 +1026,7 @@ interface ScheduledAdmissionHeartbeat {
   readonly id: number;
   readonly intervalMs: number;
   nextDueMs: number;
+  heapIndex: number;
   active: boolean;
   failed: boolean;
   error: unknown;
@@ -1033,15 +1055,20 @@ class AdmissionHeartbeatScheduler {
     const jitter = createHash('sha256')
       .update(input.taskKey)
       .digest()
-      .readUInt16BE(0) % 400;
+      .readUInt32BE(0);
+    // Spread first renewal across the entire latter half of the interval.
+    // Fixed-size buckets create a thundering herd as admission cardinality
+    // grows; interval-relative slots preserve the lease safety margin.
+    const spreadWindowMs = Math.max(1, Math.ceil(input.intervalMs / 2));
     const initialDelay = Math.max(
       1,
-      Math.floor(input.intervalMs * (0.5 + (jitter / 1_000))),
+      input.intervalMs - spreadWindowMs + (jitter % spreadWindowMs),
     );
     const entry: ScheduledAdmissionHeartbeat = {
       id,
       intervalMs: input.intervalMs,
       nextDueMs: Date.now() + initialDelay,
+      heapIndex: -1,
       active: true,
       failed: false,
       error: undefined,
@@ -1054,16 +1081,16 @@ class AdmissionHeartbeatScheduler {
     return {
       stop: () => {
         if (!entry.active) return;
+        const wasNext = this.heap[0]?.id === entry.id;
         entry.active = false;
         this.active.delete(entry.id);
+        this.remove(entry);
         if (this.active.size === 0) {
           if (this.timer) clearTimeout(this.timer);
           this.timer = undefined;
           this.scheduledForMs = undefined;
           this.heap.length = 0;
-        } else if (this.peekActive()?.id !== entry.id) {
-          // A lazy heap tombstone is removed when it reaches the root.
-        } else {
+        } else if (wasNext) {
           this.schedule(true);
         }
       },
@@ -1075,11 +1102,18 @@ class AdmissionHeartbeatScheduler {
     readonly activeEntries: number;
     readonly heapEntries: number;
     readonly timerScheduled: boolean;
+    readonly scheduledForMs?: number;
+    readonly nextDueMs?: number;
   } {
+    const nextDueMs = this.heap[0]?.nextDueMs;
     return {
       activeEntries: this.active.size,
       heapEntries: this.heap.length,
       timerScheduled: this.timer !== undefined,
+      ...(this.scheduledForMs === undefined
+        ? {}
+        : { scheduledForMs: this.scheduledForMs }),
+      ...(nextDueMs === undefined ? {} : { nextDueMs }),
     };
   }
 
@@ -1091,22 +1125,28 @@ class AdmissionHeartbeatScheduler {
   }
 
   private push(entry: ScheduledAdmissionHeartbeat): void {
+    entry.heapIndex = this.heap.length;
     this.heap.push(entry);
-    let index = this.heap.length - 1;
+    this.siftUp(entry.heapIndex);
+  }
+
+  private siftUp(startIndex: number): void {
+    let index = startIndex;
+    const entry = this.heap[index]!;
     while (index > 0) {
       const parent = Math.floor((index - 1) / 2);
       if (this.compare(this.heap[parent]!, entry) <= 0) break;
       this.heap[index] = this.heap[parent]!;
+      this.heap[index]!.heapIndex = index;
       index = parent;
     }
     this.heap[index] = entry;
+    entry.heapIndex = index;
   }
 
-  private pop(): ScheduledAdmissionHeartbeat | undefined {
-    const first = this.heap[0];
-    const last = this.heap.pop();
-    if (!first || !last || this.heap.length === 0) return first;
-    let index = 0;
+  private siftDown(startIndex: number): void {
+    let index = startIndex;
+    const entry = this.heap[index]!;
     while (true) {
       const left = (index * 2) + 1;
       if (left >= this.heap.length) break;
@@ -1115,16 +1155,45 @@ class AdmissionHeartbeatScheduler {
         && this.compare(this.heap[right]!, this.heap[left]!) < 0
         ? right
         : left;
-      if (this.compare(last, this.heap[child]!) <= 0) break;
+      if (this.compare(entry, this.heap[child]!) <= 0) break;
       this.heap[index] = this.heap[child]!;
+      this.heap[index]!.heapIndex = index;
       index = child;
     }
+    this.heap[index] = entry;
+    entry.heapIndex = index;
+  }
+
+  private removeAt(index: number): ScheduledAdmissionHeartbeat | undefined {
+    const removed = this.heap[index];
+    if (!removed) return undefined;
+    const last = this.heap.pop()!;
+    removed.heapIndex = -1;
+    if (last === removed) return removed;
     this.heap[index] = last;
-    return first;
+    last.heapIndex = index;
+    const parent = index > 0 ? Math.floor((index - 1) / 2) : -1;
+    if (parent >= 0
+      && this.compare(last, this.heap[parent]!) < 0) {
+      this.siftUp(index);
+    } else {
+      this.siftDown(index);
+    }
+    return removed;
+  }
+
+  private remove(entry: ScheduledAdmissionHeartbeat): void {
+    if (entry.heapIndex >= 0
+      && this.heap[entry.heapIndex] === entry) {
+      this.removeAt(entry.heapIndex);
+    }
+  }
+
+  private pop(): ScheduledAdmissionHeartbeat | undefined {
+    return this.removeAt(0);
   }
 
   private peekActive(): ScheduledAdmissionHeartbeat | undefined {
-    while (this.heap[0] && !this.heap[0].active) this.pop();
     return this.heap[0];
   }
 
@@ -1153,11 +1222,19 @@ class AdmissionHeartbeatScheduler {
     this.timer = undefined;
     this.scheduledForMs = undefined;
     let nowMs = Date.now();
+    let renewals = 0;
     while (true) {
       const entry = this.peekActive();
       if (!entry || entry.nextDueMs > nowMs) break;
+      if (renewals >= MAX_ADMISSION_HEARTBEAT_RENEWALS_PER_TICK) {
+        // Yield between bounded batches so a high-cardinality renewal cohort
+        // cannot monopolize the event loop. schedule() retains one timer.
+        this.schedule();
+        return;
+      }
       this.pop();
       if (!entry.active) continue;
+      renewals += 1;
       try {
         entry.renew();
       } catch (error) {
@@ -1186,6 +1263,8 @@ export function __taskExecutionAdmissionHeartbeatDiagnosticsForTests(): {
   readonly activeEntries: number;
   readonly heapEntries: number;
   readonly timerScheduled: boolean;
+  readonly scheduledForMs?: number;
+  readonly nextDueMs?: number;
 } {
   return admissionHeartbeatScheduler.diagnostics();
 }
@@ -1300,6 +1379,8 @@ export async function executeTaskExecutionAdmission<T>(
           { code: 'E_TASK_EXECUTION_ADMISSION_ADOPTION_UNVERIFIED' },
         );
       }
+      heartbeatFault = heartbeat.failure();
+      if (heartbeatFault.failed) throw heartbeatFault.error;
     } catch (error) {
       heartbeat.stop();
       return handlePreBoundaryFailure(

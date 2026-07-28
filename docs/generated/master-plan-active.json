@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "f9a751034ee12aea33efc6fc69ff11604255432844edc9a35cc60b72c8ebb7f4"
+    "value": "12074de16e91295a437418f707e5d591fa37cab46f9d3c35193a54c20a323259"
   },
   "summary": {
     "total": 233,
     "active": 233,
     "terminal": 0,
-    "receipts": 11,
+    "receipts": 12,
     "byState": {
       "OPEN": 156,
       "READY": 0,
@@ -1458,7 +1458,7 @@
       "state": "OPEN",
       "updated": "2026-07-28",
       "definitionDigest": "3708cd18d6c7f3e18cb9f577565c2b6b824db840b2f59506a5fff8334e41dbd1",
-      "progressDigest": "a65c3ee76aacf755fb0338a40a3573ffd7efc6d9c3d4bac9580d1b993b5cabf7",
+      "progressDigest": "658fd8cf2bb02d21a42b236776aef2dc8f69b9df287f6d1e995e4c121c599c2c",
       "terminalClosureDigest": null
     },
     {
@@ -2736,6 +2736,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-07-28T14:55:56+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-28-ADMISSION-01",
+      "authorityDigest": "53613231c5b9bcf4751affbe400c50bc7fac495d52adbcbe861ec13ddadbc554",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-28T15:13:13+03:00"
       },
       "g7AttemptIdentity": null
     }
@@ -8272,10 +8282,11 @@
         "AUTHORITY-001"
       ],
       "evidenceReceipts": [
-        "GR-2026-07-28-FILE-LOCK-01"
+        "GR-2026-07-28-FILE-LOCK-01",
+        "GR-2026-07-28-ADMISSION-01"
       ],
       "acceptance": "Duplicate effect impossible; unknown settlement never auto-replays",
-      "evidence": "`receipt=GR-2026-07-28-FILE-LOCK-01`; exact-generation acquire/renew/release, liveness-aware stale retirement, irreversible boundary quarantine, terminal audit and completed-outcome preservation are code-present with cross-process and crash/reconciliation proof in the file-lock slice; whole-kernel closure remains open because v2 stop propagation, Mission cancel ingress, detached API RunFlow cancellation, tenant-wide idempotency and native macOS/Windows authority adapters are not yet proven",
+      "evidence": "`receipt=GR-2026-07-28-FILE-LOCK-01`; `receipt=GR-2026-07-28-ADMISSION-01`; exact-generation acquire/renew/release, liveness-aware stale retirement, irreversible boundary quarantine, terminal audit and completed-outcome preservation are code-present with cross-process and crash/reconciliation proof; admission now snapshots validated revalidation evidence before async verification, rejects adoption after heartbeat authority loss, removes stopped heap entries in O(log n), rebinds the sole timer after earliest-stop, spreads initial renewal across the interval-relative safe half and yields after 256 renewals; admission suite passes 26/26, root/dashboard TypeScript and all lint gates pass with unchanged hermetic counts `12065/1149`; whole-kernel closure remains open because cross-provider verification, v2 stop propagation, Mission cancel ingress, detached API RunFlow cancellation, tenant-wide idempotency, live million-scale/HA proof and native macOS/Windows authority adapters are not yet proven",
       "updated": "2026-07-28"
     },
     {
@@ -12778,6 +12789,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "ca6560ca89a1a12e69bff69bd91d5cbbb0059a80cdedd190bbfd593e937ebea1"
+    "value": "b83511c240ed35f642cda34ec7c599fc32c956b006202af556c26b2324ac6261"
   }
 }

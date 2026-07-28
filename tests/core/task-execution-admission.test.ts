@@ -3,6 +3,7 @@ import {
   describe,
   expect,
   it,
+  vi,
 } from 'vitest';
 import {
   mkdirSync,
@@ -1093,6 +1094,7 @@ describe('task execution admission', () => {
     await allPrepared;
     expect(__taskExecutionAdmissionHeartbeatDiagnosticsForTests()).toMatchObject({
       activeEntries: concurrency,
+      heapEntries: concurrency,
       timerScheduled: true,
     });
     releasePrepared();
@@ -1104,6 +1106,86 @@ describe('task execution admission', () => {
       timerScheduled: false,
     });
   }, 30_000);
+
+  it('removes a stopped heap root and rebinds the sole timer to the next admission', async () => {
+    const root = fixtureRoot();
+    const createControlledRun = (taskId: string) => {
+      let markPrepared!: () => void;
+      const prepared = new Promise<void>(resolve => {
+        markPrepared = resolve;
+      });
+      let releasePrepared!: () => void;
+      const barrier = new Promise<void>(resolve => {
+        releasePrepared = resolve;
+      });
+      const run = executeTaskExecutionAdmission(
+        {
+          projectRoot: root,
+          taskId,
+          boundaryEvidenceRefs: [`request:${taskId}`],
+          lockOptions: {
+            leaseDurationMs: 9_000,
+            heartbeatIntervalMs: 3_000,
+          },
+        },
+        {
+          ...recoveryHooks(root, taskId),
+          revalidate: async () => ({
+            decision: 'dispatch',
+            evidenceRefs: [`task-snapshot:${taskId}`],
+          }),
+          persistPrepared: async () => {
+            markPrepared();
+            await barrier;
+            return [`task-projection:${taskId}`];
+          },
+          dispatch: async () => ({ dispatchId: taskId }),
+          persistDispatched: async () => [`dispatch-receipt:${taskId}`],
+          verifyDispatched: async value => value.dispatchId === taskId,
+        },
+      );
+      return { taskId, run, prepared, releasePrepared };
+    };
+
+    const first = createControlledRun('timer-rebind-first');
+    await first.prepared;
+    const firstDue =
+      __taskExecutionAdmissionHeartbeatDiagnosticsForTests().nextDueMs;
+    expect(firstDue).toBeTypeOf('number');
+
+    const second = createControlledRun('timer-rebind-second');
+    await second.prepared;
+    const both =
+      __taskExecutionAdmissionHeartbeatDiagnosticsForTests();
+    expect(both).toMatchObject({
+      activeEntries: 2,
+      heapEntries: 2,
+      timerScheduled: true,
+      scheduledForMs: both.nextDueMs,
+    });
+
+    const earliest = both.nextDueMs === firstDue ? first : second;
+    const remaining = earliest === first ? second : first;
+    earliest.releasePrepared();
+    expect((await earliest.run).state).toBe('dispatched');
+
+    const rebound =
+      __taskExecutionAdmissionHeartbeatDiagnosticsForTests();
+    expect(rebound).toMatchObject({
+      activeEntries: 1,
+      heapEntries: 1,
+      timerScheduled: true,
+      scheduledForMs: rebound.nextDueMs,
+    });
+
+    remaining.releasePrepared();
+    expect((await remaining.run).state).toBe('dispatched');
+    expect(__taskExecutionAdmissionHeartbeatDiagnosticsForTests()).toEqual({
+      activeEntries: 0,
+      heapEntries: 0,
+      timerScheduled: false,
+    });
+  });
 
   it('verifies async adoption from durable evidence without starting heartbeat work', async () => {
     const root = fixtureRoot();
@@ -1154,6 +1236,122 @@ describe('task execution admission', () => {
       heapEntries: 0,
       timerScheduled: false,
     });
+  });
+
+  it('settles async adoption against an immutable revalidation evidence snapshot', async () => {
+    const root = fixtureRoot();
+    const taskId = 'async-adoption-snapshot';
+    const mutableEvidence = ['dispatch-receipt:original'];
+
+    const outcome = await executeTaskExecutionAdmission(
+      {
+        projectRoot: root,
+        taskId,
+        boundaryEvidenceRefs: [`request:${taskId}`],
+      },
+      {
+        ...recoveryHooks(root, taskId),
+        revalidate: async () => ({
+          decision: 'adopt',
+          value: { dispatchId: 'original' },
+          evidenceRefs: mutableEvidence,
+        }),
+        verifyAdopted: async (_value, evidenceRefs) => {
+          mutableEvidence[0] = 'dispatch-receipt:mutated-after-verify';
+          await Promise.resolve();
+          return evidenceRefs.includes('dispatch-receipt:original');
+        },
+        persistPrepared: async () => ['prepared:never'],
+        dispatch: async () => ({ dispatchId: 'duplicate' }),
+        persistDispatched: async () => ['dispatch:never'],
+        verifyDispatched: async () => true,
+      },
+    );
+
+    expect(outcome).toMatchObject({
+      state: 'adopted',
+      evidenceRefs: [
+        'dispatch-receipt:original',
+        `request:${taskId}`,
+      ],
+    });
+    expect(outcome.evidenceRefs).not.toContain(
+      'dispatch-receipt:mutated-after-verify',
+    );
+  });
+
+  it('does not adopt after heartbeat authority fails during verification', async () => {
+    const root = fixtureRoot();
+    const taskId = 'async-adoption-heartbeat-fault';
+    let publishCalls = 0;
+    let markVerificationStarted!: () => void;
+    const verificationStarted = new Promise<void>(resolve => {
+      markVerificationStarted = resolve;
+    });
+    let finishVerification!: () => void;
+    const verificationBarrier = new Promise<void>(resolve => {
+      finishVerification = resolve;
+    });
+    const projectionPath = join(
+      root,
+      '.locks',
+      `${createHash('sha256').update(taskId).digest('hex')}.executionlock`,
+    );
+
+    vi.useFakeTimers();
+    try {
+      const outcomePromise = executeTaskExecutionAdmission(
+        {
+          projectRoot: root,
+          taskId,
+          boundaryEvidenceRefs: [`request:${taskId}`],
+          lockOptions: {
+            leaseDurationMs: 200,
+            heartbeatIntervalMs: 20,
+            projectionPublisher: (_projectRoot, lock) => {
+              publishCalls += 1;
+              durableWrite(projectionPath, JSON.stringify(lock));
+              if (publishCalls >= 2) {
+                throw Object.assign(new Error('fixture'), {
+                  code: 'E_FIXTURE_ADOPTION_HEARTBEAT_FAULT',
+                });
+              }
+            },
+          },
+        },
+        {
+          ...recoveryHooks(root, taskId),
+          revalidate: async () => ({
+            decision: 'adopt',
+            value: { dispatchId: 'existing' },
+            evidenceRefs: ['dispatch-receipt:existing'],
+          }),
+          verifyAdopted: async () => {
+            markVerificationStarted();
+            await verificationBarrier;
+            return true;
+          },
+          persistPrepared: async () => ['prepared:never'],
+          dispatch: async () => ({ dispatchId: 'duplicate' }),
+          persistDispatched: async () => ['dispatch:never'],
+          verifyDispatched: async () => true,
+        },
+      );
+      await verificationStarted;
+      await vi.advanceTimersByTimeAsync(60);
+      finishVerification();
+      const outcome = await outcomePromise;
+
+      expect(publishCalls).toBeGreaterThanOrEqual(2);
+      expect(outcome).toMatchObject({
+        state: 'held',
+        phase: 'revalidate',
+        processState: 'not-started',
+      });
+      expect(checkExecutionLock(root, taskId)).toEqual({ state: 'absent' });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('refreshes a post-commit renewal handle before quarantining heartbeat fault', async () => {
