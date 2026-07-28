@@ -244,4 +244,57 @@ describe('execution budget policy', () => {
       unmetered_backend: { action: 'hold', ordered_backends: ['docker'] },
     })).toThrow('ordered_backends is not allowed');
   });
+
+  it('rejects an unbounded or role-less final-only usage authorization', () => {
+    const base = { roles: { auditor: { default: { maxTurns: 16 } } }, landing: { reserve_ratio: 0.25 } };
+    expect(() => assertExecutionBudgetPolicyConfig({
+      ...base,
+      final_only_usage: { action: 'allow-wall-clock-containment', roles: ['auditor'] },
+    })).toThrow('max_wall_clock_seconds must be a positive integer');
+    expect(() => assertExecutionBudgetPolicyConfig({
+      ...base,
+      final_only_usage: { action: 'allow-wall-clock-containment', max_wall_clock_seconds: 300 },
+    })).toThrow('roles must be a non-empty array');
+    expect(() => assertExecutionBudgetPolicyConfig({
+      ...base,
+      final_only_usage: { action: 'hold', max_wall_clock_seconds: 300 },
+    })).toThrow('are not allowed when action is hold');
+    expect(() => assertExecutionBudgetPolicyConfig({
+      ...base,
+      final_only_usage: { action: 'allow-wall-clock-containment', roles: ['auditor'], max_wall_clock_seconds: 0 },
+    })).toThrow('max_wall_clock_seconds must be a positive integer');
+    expect(() => assertExecutionBudgetPolicyConfig({
+      ...base,
+      final_only_usage: { action: 'allow', roles: ['auditor'], max_wall_clock_seconds: 300 },
+    })).toThrow("action must be 'hold' or 'allow-wall-clock-containment'");
+  });
+
+  it('authorizes final-only usage only for the exact owner-named roles', () => {
+    const authorized: ExecutionBudgetPolicyConfig = {
+      roles: {
+        auditor: { default: { maxTurns: 16, maxCacheReadTokens: 1_000_000 } },
+        worker: { default: { maxTurns: 40 } },
+      },
+      landing: { reserve_ratio: 0.25 },
+      final_only_usage: {
+        action: 'allow-wall-clock-containment',
+        roles: ['auditor'],
+        max_wall_clock_seconds: 300,
+      },
+    };
+    const auditor = resolveExecutionBudgetPolicy({ policy: authorized, role: 'auditor', taskKind: 'audit' });
+    expect(auditor.state).toBe('allow');
+    expect(auditor.state === 'allow' && auditor.finalOnlyUsage).toEqual({
+      maxWallClockSeconds: 300,
+      profileRef: 'execution_budget.final_only_usage',
+      policyDigest: executionBudgetPolicyDigest(authorized),
+    });
+
+    const worker = resolveExecutionBudgetPolicy({ policy: authorized, role: 'worker' });
+    expect(worker.state === 'allow' && worker.finalOnlyUsage).toBeUndefined();
+
+    const held: ExecutionBudgetPolicyConfig = { ...authorized, final_only_usage: { action: 'hold' } };
+    const heldAuditor = resolveExecutionBudgetPolicy({ policy: held, role: 'auditor', taskKind: 'audit' });
+    expect(heldAuditor.state === 'allow' && heldAuditor.finalOnlyUsage).toBeUndefined();
+  });
 });

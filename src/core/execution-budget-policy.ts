@@ -3,6 +3,7 @@ import type {
   ExecutionLandingPolicyConfig,
   ExecutionBudgetPolicyConfig,
   ExecutionBudgetRole,
+  FinalOnlyUsagePolicyConfig,
 } from './config-types.js';
 import { TASK_KINDS, type ExecutionBudget, type TaskKind } from './work-model.js';
 
@@ -26,6 +27,17 @@ export type ExecutionBudgetPolicyHoldReason =
   | 'landing-policy-missing'
   | 'landing-turn-reserve-insufficient';
 
+/**
+ * Owner authorization to run a final-only-usage provider under host wall-clock
+ * containment. Present only when the owner explicitly authorized this role;
+ * absence is the fail-closed hold, never an implicit allowance.
+ */
+export interface FinalOnlyUsageAuthorization {
+  readonly maxWallClockSeconds: number;
+  readonly profileRef: string;
+  readonly policyDigest: string;
+}
+
 export interface ExecutionBudgetPolicyAllowDecision {
   state: 'allow';
   budget?: Readonly<ExecutionBudget>;
@@ -33,6 +45,8 @@ export interface ExecutionBudgetPolicyAllowDecision {
   policyDigest: string;
   requestedNarrowing: boolean;
   landingPolicy?: Readonly<ExecutionLandingPolicyConfig>;
+  /** Absent unless the owner authorized final-only usage for this role. */
+  finalOnlyUsage?: Readonly<FinalOnlyUsageAuthorization>;
 }
 
 export interface ExecutionBudgetPolicyHoldDecision {
@@ -112,6 +126,58 @@ export function assertExecutionLandingPolicyConfig(
   }
 }
 
+/**
+ * Validate the owner's final-only-usage authorization.
+ *
+ * `hold` (or an absent block) is the fail-closed default and may not carry
+ * allowance fields. `allow-wall-clock-containment` must name the roles it covers
+ * and a finite host-enforced wall clock — an authorization without a bounded
+ * containment window would be an unbounded spend grant, never a policy.
+ */
+export function assertFinalOnlyUsagePolicyConfig(
+  value: unknown,
+  path = 'execution_budget.final_only_usage',
+): asserts value is FinalOnlyUsagePolicyConfig {
+  if (!isPlainObject(value)) {
+    throw new ExecutionBudgetPolicyError(`${path} must be an object`);
+  }
+  assertKnownKeys(value, ['action', 'roles', 'max_wall_clock_seconds'], path);
+  if (value.action !== 'hold' && value.action !== 'allow-wall-clock-containment') {
+    throw new ExecutionBudgetPolicyError(
+      `${path}.action must be 'hold' or 'allow-wall-clock-containment'`,
+    );
+  }
+  if (value.action === 'hold') {
+    if (value.roles !== undefined || value.max_wall_clock_seconds !== undefined) {
+      throw new ExecutionBudgetPolicyError(
+        `${path}.roles and ${path}.max_wall_clock_seconds are not allowed when action is hold`,
+      );
+    }
+    return;
+  }
+  if (!Array.isArray(value.roles) || value.roles.length === 0) {
+    throw new ExecutionBudgetPolicyError(
+      `${path}.roles must be a non-empty array for allow-wall-clock-containment`,
+    );
+  }
+  const seen = new Set<string>();
+  for (const role of value.roles) {
+    if (typeof role !== 'string' || !(ROLES as readonly string[]).includes(role)) {
+      throw new ExecutionBudgetPolicyError(`Invalid role '${String(role)}' in ${path}.roles`);
+    }
+    if (seen.has(role)) {
+      throw new ExecutionBudgetPolicyError(`Duplicate role '${role}' in ${path}.roles`);
+    }
+    seen.add(role);
+  }
+  const wallClock = value.max_wall_clock_seconds;
+  if (typeof wallClock !== 'number' || !Number.isInteger(wallClock) || wallClock <= 0) {
+    throw new ExecutionBudgetPolicyError(
+      `${path}.max_wall_clock_seconds must be a positive integer for allow-wall-clock-containment`,
+    );
+  }
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -147,7 +213,11 @@ export function assertExecutionBudgetPolicyConfig(
   if (!isPlainObject(value)) {
     throw new ExecutionBudgetPolicyError('execution_budget must be an object');
   }
-  assertKnownKeys(value, ['roles', 'landing', 'unmetered_backend'], 'execution_budget');
+  assertKnownKeys(
+    value,
+    ['roles', 'landing', 'unmetered_backend', 'final_only_usage'],
+    'execution_budget',
+  );
   if (!isPlainObject(value.roles)) {
     throw new ExecutionBudgetPolicyError('execution_budget.roles must be an object');
   }
@@ -184,6 +254,10 @@ export function assertExecutionBudgetPolicyConfig(
 
   if (value.landing !== undefined) {
     assertExecutionLandingPolicyConfig(value.landing);
+  }
+
+  if (value.final_only_usage !== undefined) {
+    assertFinalOnlyUsagePolicyConfig(value.final_only_usage);
   }
 
   const unmetered = value.unmetered_backend;
@@ -352,6 +426,16 @@ export function resolveExecutionBudgetPolicy(input: {
       };
     }
   }
+  const finalOnly = input.policy.final_only_usage;
+  const finalOnlyUsage = finalOnly?.action === 'allow-wall-clock-containment'
+    && finalOnly.roles?.includes(input.role)
+    && finalOnly.max_wall_clock_seconds !== undefined
+    ? Object.freeze({
+      maxWallClockSeconds: finalOnly.max_wall_clock_seconds,
+      profileRef: 'execution_budget.final_only_usage',
+      policyDigest,
+    })
+    : undefined;
   return {
     state: 'allow',
     budget,
@@ -359,5 +443,6 @@ export function resolveExecutionBudgetPolicy(input: {
     profileRef,
     policyDigest,
     requestedNarrowing: input.requestedBudget !== undefined,
+    ...(finalOnlyUsage ? { finalOnlyUsage } : {}),
   };
 }
