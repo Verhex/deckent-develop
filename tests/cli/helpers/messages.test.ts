@@ -471,6 +471,124 @@ describe('status extended messages', () => {
   });
 });
 
+// ─── task settlement authority messages ──────────────────────────────────────
+
+describe('task settlement authority messages', () => {
+  it('keeps dry-run and mutation guard copy explicit in both languages', () => {
+    for (const lang of ['en', 'tr'] as const) {
+      const dryRun = getMessage('task.settle.dry_run', lang, {
+        taskId: 'run-1',
+        rawStatus: 'PENDING',
+        effectiveStatus: 'NOT_DISPATCHED',
+        decision: 'eligible',
+        reason: 'legacy-attestation-verified',
+      });
+      expect(dryRun).toContain('run-1');
+      expect(dryRun).toContain('PENDING');
+      expect(dryRun).toContain('NOT_DISPATCHED');
+      expect(dryRun).toContain('eligible');
+      expect(dryRun).toContain('--apply');
+
+      const guard = getMessage('task.settle.apply_guard', lang);
+      expect(guard).toContain('--attestation-reason');
+      expect(guard).toContain('--operator');
+    }
+  });
+
+  it('renders raw/effective status and opaque receipt evidence without dropping fields', () => {
+    const vars = {
+      rawStatus: 'PENDING',
+      effectiveStatus: 'NOT_DISPATCHED',
+      receiptId: 'inv-1',
+      reasonCode: 'projected',
+      evidenceRefs: 'invocation-event:hash-1,task-artifact:result:absent:hash-2',
+    };
+    for (const lang of ['en', 'tr'] as const) {
+      const message = getMessage('task.settlement.evidence_line', lang, vars);
+      for (const value of Object.values(vars)) expect(message).toContain(value);
+    }
+  });
+
+  it('localizes the typed pre-dispatch reason option, guards, and rendered value', () => {
+    for (const lang of ['en', 'tr'] as const) {
+      expect(getMessage('task.settle.opt_reason_code', lang, {
+        codes: 'no_provider|command_build_failed',
+      })).toContain('no_provider|command_build_failed');
+      expect(getMessage('task.settle.reason_code_required', lang, {
+        codes: 'no_provider, command_build_failed',
+      })).toContain('--reason-code');
+      expect(getMessage('task.settle.pre_dispatch_reason_line', lang, {
+        reasonCode: 'command_build_failed',
+      })).toContain('command_build_failed');
+      expect(getMessage('task.settle.requested_pre_dispatch_reason_line', lang, {
+        reasonCode: 'command_build_failed',
+      })).toContain('command_build_failed');
+      expect(getMessage('run.settlement_backend_mismatch', lang, {
+        expected: 'docker',
+        actual: 'subprocess',
+      })).toContain('docker');
+      expect(getMessage('run.settlement_dispatch_boundary_mismatch', lang, {
+        taskId: 'run-1',
+      })).toContain('run-1');
+      expect(getMessage('run.settlement_dispatch_boundary_missing', lang, {
+        taskId: 'run-1',
+      })).toContain('run-1');
+      expect(getMessage('run.settlement_terminal_without_dispatch', lang, {
+        taskId: 'run-1',
+      })).toContain('run-1');
+      expect(getMessage('run.result_identity_mismatch', lang, {
+        taskId: 'run-1',
+      })).toContain('run-1');
+      expect(getMessage('task.execution_fence_conflict', lang, {
+        taskId: 'run-1',
+      })).toContain('run-1');
+      expect(getMessage('task.execution_snapshot_invalid', lang, {
+        taskId: 'run-1',
+      })).toContain('run-1');
+      expect(getMessage('task.execution_already_settled', lang, {
+        taskId: 'run-1',
+      })).toContain('run-1');
+      expect(getMessage('task.execution_authority_conflict', lang, {
+        taskId: 'run-1',
+        reasonCode: 'ambiguous-receipts',
+      })).toContain('ambiguous-receipts');
+    }
+  });
+
+  it('localizes every stable settlement decision and reason enum used by the human surface', () => {
+    const decisions = ['eligible', 'hold', 'already-settled'];
+    const reasons = [
+      'receipt-dispatch-rejected',
+      'receipt-ready-for-rejection',
+      'legacy-attestation-verified',
+      'already-settled',
+      'receipt-missing',
+      'receipt-ambiguous',
+      'dispatch-started',
+      'terminal-conflict',
+      'scope-mismatch',
+      'unsupported-task-domain',
+      'task-content-mismatch',
+      'attestation-evidence-mismatch',
+      'attestation-required',
+      'pre-dispatch-reason-required',
+      'absence-evidence-incomplete',
+      'active-execution-evidence',
+      'probe-unsupported',
+    ];
+    for (const lang of ['en', 'tr'] as const) {
+      for (const decision of decisions) {
+        const key = `task.settle.decision.${decision}`;
+        expect(getMessage(key, lang)).not.toBe(key);
+      }
+      for (const reason of reasons) {
+        const key = `task.settle.reason.${reason}`;
+        expect(getMessage(key, lang)).not.toBe(key);
+      }
+    }
+  });
+});
+
 // ─── history command messages ─────────────────────────────────────────────────
 
 describe('history command messages', () => {

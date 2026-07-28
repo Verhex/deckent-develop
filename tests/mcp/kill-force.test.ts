@@ -35,12 +35,21 @@ vi.mock('../../src/core/utils.js', () => ({
   debugLog: vi.fn(),
 }));
 
+vi.mock('../../src/core/file-lock.js', () => ({
+  releaseAllLocks: vi.fn(() => 0),
+  releaseAllSpawnLocks: vi.fn(() => 0),
+}));
+
 vi.mock('../../src/mcp/helpers/enrich.js', () => ({
   enrichResponse: vi.fn((_toolName, response) => ({ ...response })),
 }));
 
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, unlinkSync } from 'node:fs';
 import { debugLog } from '../../src/core/utils.js';
+import {
+  releaseAllLocks,
+  releaseAllSpawnLocks,
+} from '../../src/core/file-lock.js';
 
 // ─── Test Server Harness ───────────────────────────────────────────
 
@@ -216,6 +225,42 @@ describe('deckent_kill — force/userExplicit parity (Sprint 189 T-009)', () => 
       const parsed = JSON.parse(result.content[0]!.text);
       expect(parsed.error).toBe(true);
       expect(parsed.message).toMatch(/taskId.*all/);
+    });
+
+    it('releases only legacy namespaces and never scans execution authority projections', async () => {
+      const taskId = '059-001';
+      vi.mocked(existsSync).mockImplementation(path =>
+        String(path).endsWith('.tasks'));
+      vi.mocked(readdirSync).mockReturnValue(
+        [`task-${taskId}.json`] as unknown as ReturnType<typeof readdirSync>,
+      );
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify({
+        id: taskId,
+        status: 'EXECUTING',
+      }) as unknown as ReturnType<typeof readFileSync>);
+
+      const tool = await getKillTool();
+      const result = await tool.handler({ taskId });
+
+      expect(result.isError).not.toBe(true);
+      expect(releaseAllLocks).toHaveBeenCalledWith(
+        process.cwd(),
+        `w-${taskId}`,
+      );
+      expect(releaseAllSpawnLocks).toHaveBeenCalledWith(
+        process.cwd(),
+        taskId,
+      );
+      expect(vi.mocked(readdirSync).mock.calls).not.toEqual(
+        expect.arrayContaining([
+          [expect.stringContaining('.locks')],
+        ]),
+      );
+      expect(vi.mocked(unlinkSync).mock.calls).not.toEqual(
+        expect.arrayContaining([
+          [expect.stringContaining('.executionlock')],
+        ]),
+      );
     });
   });
 

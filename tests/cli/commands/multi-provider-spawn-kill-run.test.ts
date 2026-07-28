@@ -1,7 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
-vi.mock('node:fs');
+const fixture = vi.hoisted(() => ({ base: '', root: '' }));
+
 vi.mock('../../../src/orchestra/tmux.js', () => ({
   ensureSession: vi.fn(),
   spawnWorker: vi.fn(),
@@ -16,7 +27,7 @@ vi.mock('../../../src/orchestra/sprint-controller.js', () => ({
   resolveSkillPrompts: vi.fn().mockReturnValue([]),
 }));
 vi.mock('../../../src/cli/helpers/process.js', () => ({
-  resolveProjectRoot: vi.fn().mockReturnValue('/test/project'),
+  resolveProjectRoot: vi.fn(() => fixture.root),
 }));
 vi.mock('../../../src/core/config.js', () => ({
   resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
@@ -27,15 +38,19 @@ vi.mock('../../../src/cli/helpers/messages.js', () => ({
   getMessage: vi.fn((_key: string, _lang: string, vars?: Record<string, string>) =>
     vars ? `msg:${_key}:${JSON.stringify(vars)}` : `msg:${_key}`),
 }));
-vi.mock('../../../src/agents/worker.js', () => ({
-  readTask: vi.fn(),
-}));
 
-const mockSubprocessSpawn = vi.fn();
-const mockSubprocessKill = vi.fn();
-const mockSubprocessList = vi.fn().mockReturnValue([]);
-const mockBackendState = vi.hoisted(() => ({
-  landingCapability: 'checkpoint-stop' as 'checkpoint-stop' | 'unsupported',
+const {
+  mockSubprocessSpawn,
+  mockSubprocessKill,
+  mockSubprocessList,
+  mockBackendState,
+} = vi.hoisted(() => ({
+  mockSubprocessSpawn: vi.fn(),
+  mockSubprocessKill: vi.fn(),
+  mockSubprocessList: vi.fn().mockReturnValue([]),
+  mockBackendState: {
+    landingCapability: 'checkpoint-stop' as 'checkpoint-stop' | 'unsupported',
+  },
 }));
 
 vi.mock('../../../src/orchestra/spawn-backend.js', () => ({
@@ -64,9 +79,8 @@ vi.mock('../../../src/orchestra/sprint-utils.js', async (importOriginal) => {
 });
 
 // ─── Imports ────────────────────────────────────────────────────────
-import { ensureSession, spawnWorker } from '../../../src/orchestra/tmux.js';
-import { readTask } from '../../../src/agents/worker.js';
-import type { Task } from '../../../src/core/types.js';
+import { ensureSession, spawnWorker, killWorker } from '../../../src/orchestra/tmux.js';
+import { SpawnBackendFactory } from '../../../src/orchestra/spawn-backend.js';
 
 const TEST_ATTENDED_EXECUTION_OPTIONS = {
   executionBudget: { maxTurns: 1 },
@@ -80,27 +94,21 @@ const TEST_ATTENDED_EXECUTION_OPTIONS = {
   executionApprovalEvidenceRef: 'test-owner-approval://multi-provider-spawn',
 } as const;
 
-function makeTask(overrides: Partial<Task> = {}): Task {
-  return {
-    id: '001-001',
-    title: 'Test task',
-    description: 'Test description',
-    model: 'claude-sonnet-5',
-    effort: 'normal',
-    priority: 'NORMAL',
-    reason: 'test',
-    scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
-    dependencies: [],
-    goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: 'minor' },
-    status: 'PENDING' as import('../../../src/core/types.js').TaskStatusType,
-    createdAt: new Date().toISOString(),
-    sprintId: 'sprint-059',
-    assignedAgent: 'generic',
-    assignedSkills: [],
-    provider: 'claude',
-    ...overrides,
-  } as Task;
-}
+const originalDeckentHome = process.env.DECKENT_HOME;
+
+beforeEach(() => {
+  fixture.base = mkdtempSync(join(tmpdir(), 'multi-provider-spawn-kill-run-'));
+  fixture.root = join(fixture.base, 'project');
+  mkdirSync(join(fixture.root, '.tasks'), { recursive: true });
+  process.env.DECKENT_HOME = join(fixture.base, 'host-state');
+});
+
+afterEach(() => {
+  if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+  else process.env.DECKENT_HOME = originalDeckentHome;
+  rmSync(fixture.base, { recursive: true, force: true });
+  process.exitCode = undefined;
+});
 
 describe('spawn multi-provider', () => {
   beforeEach(() => {
@@ -115,7 +123,7 @@ describe('spawn multi-provider', () => {
       't1',
       'claude-sonnet-5',
       'prompt',
-      '/root',
+      fixture.root,
       { executionBudget: { maxTurns: 1 } },
     )).rejects.toThrow(/does not declare that capability/);
     expect(ensureSession).not.toHaveBeenCalled();
@@ -125,7 +133,7 @@ describe('spawn multi-provider', () => {
   it('rejects raw attended evidence without an exact dispatch binding before subprocess provider work', async () => {
     mockBackendState.landingCapability = 'unsupported';
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    await expect(spawnWorkerMultiProvider('t1', 'gpt-4.1', 'prompt', '/root', {
+    await expect(spawnWorkerMultiProvider('t1', 'gpt-4.1', 'prompt', fixture.root, {
       ...TEST_ATTENDED_EXECUTION_OPTIONS,
     })).rejects.toThrow('exact final dispatch binding');
     expect(mockSubprocessSpawn).not.toHaveBeenCalled();
@@ -134,7 +142,7 @@ describe('spawn multi-provider', () => {
 
   it('spawnWorkerMultiProvider uses subprocess for gemini models', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    const result = await spawnWorkerMultiProvider('t1', 'gemini-2.5-pro', 'prompt', '/root', {
+    const result = await spawnWorkerMultiProvider('t1', 'gemini-2.5-pro', 'prompt', fixture.root, {
       ...TEST_ATTENDED_EXECUTION_OPTIONS,
     });
     expect(result.backend).toBe('subprocess');
@@ -143,7 +151,7 @@ describe('spawn multi-provider', () => {
 
   it('spawnWorkerMultiProvider passes autoApprove to a measured backend', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    await spawnWorkerMultiProvider('t1', 'claude-opus-4-8', 'prompt', '/root', {
+    await spawnWorkerMultiProvider('t1', 'claude-opus-4-8', 'prompt', fixture.root, {
       autoApprove: true,
       spawnBackend: 'subprocess',
       ...TEST_ATTENDED_EXECUTION_OPTIONS,
@@ -158,7 +166,7 @@ describe('spawn multi-provider', () => {
 
   it('spawnWorkerMultiProvider passes autoApprove to subprocess', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    await spawnWorkerMultiProvider('t1', 'o3', 'prompt', '/root', {
+    await spawnWorkerMultiProvider('t1', 'o3', 'prompt', fixture.root, {
       autoApprove: true,
       ...TEST_ATTENDED_EXECUTION_OPTIONS,
     });
@@ -167,13 +175,13 @@ describe('spawn multi-provider', () => {
     }));
   });
 
-  it('registerSpawn prints backend info for codex task', async () => {
-    vi.mocked(readTask).mockReturnValue(makeTask({ model: 'gpt-4.1', id: 'test-codex' }));
+  it('reports the subprocess route after dispatching a codex task', async () => {
     const { spawnWorkerMultiProvider } = await import('../../../src/cli/commands/spawn.js');
-    const result = await spawnWorkerMultiProvider('test-codex', 'gpt-4.1', 'prompt', '/test/project', {
+    const result = await spawnWorkerMultiProvider('test-codex', 'gpt-4.1', 'prompt', fixture.root, {
       ...TEST_ATTENDED_EXECUTION_OPTIONS,
     });
     expect(result.backend).toBe('subprocess');
+    expect(mockSubprocessSpawn).toHaveBeenCalledOnce();
   });
 });
 
@@ -184,26 +192,22 @@ describe('kill multi-provider', () => {
   });
 
   it('killSingle tries subprocess for codex task before tmux', async () => {
-    const fs = await import('node:fs');
-    const tasksDir = '/test/project/.tasks';
-    vi.mocked(fs.existsSync).mockImplementation((p: unknown) => {
-      if (String(p).includes('.tasks')) return true;
-      return false;
-    });
-    vi.mocked(fs.readdirSync).mockImplementation((p: unknown) => {
-      if (String(p) === tasksDir) return ['task-codex-1.json'] as unknown as ReturnType<typeof fs.readdirSync>;
-      return [] as unknown as ReturnType<typeof fs.readdirSync>;
-    });
-    vi.mocked(fs.readFileSync).mockImplementation((p: unknown) => {
-      if (String(p).includes('task-codex-1.json')) {
-        return JSON.stringify({ id: 'codex-1', model: 'gpt-4.1', status: 'EXECUTING' });
-      }
-      return '{}';
-    });
+    const taskPath = join(fixture.root, '.tasks', 'task-codex-1.json');
+    writeFileSync(
+      taskPath,
+      JSON.stringify({ id: 'codex-1', model: 'gpt-4.1', status: 'EXECUTING' }),
+      'utf-8',
+    );
+    const { killSingle } = await import('../../../src/cli/commands/kill.js');
 
-    // The kill module uses internal functions — just verify subprocess backend is created for non-claude
-    const { SpawnBackendFactory } = await import('../../../src/orchestra/spawn-backend.js');
-    expect(SpawnBackendFactory.create).toBeDefined();
+    expect(killSingle(fixture.root, 'codex-1', 'en')).toBe(true);
+    expect(SpawnBackendFactory.create).toHaveBeenCalledWith({
+      backend: 'subprocess',
+      projectDir: fixture.root,
+    });
+    expect(mockSubprocessKill).toHaveBeenCalledWith('codex-1');
+    expect(killWorker).not.toHaveBeenCalled();
+    expect(JSON.parse(readFileSync(taskPath, 'utf-8')).status).toBe('PAUSED');
   });
 
   it('exports registerKill function', async () => {
@@ -239,12 +243,20 @@ describe('run multi-provider', () => {
   });
 
   it('cleanupRunTask removes task files', async () => {
-    const fs = await import('node:fs');
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.unlinkSync).mockImplementation(() => {});
     const { cleanupRunTask } = await import('../../../src/cli/commands/run.js');
-    cleanupRunTask('/test/project', 'run-123');
-    // Should try to remove .json, .hb, .result, .plan, .log
-    expect(fs.unlinkSync).toHaveBeenCalledTimes(5);
+    const extensions = ['.json', '.hb', '.result', '.plan', '.log'];
+    for (const extension of extensions) {
+      writeFileSync(
+        join(fixture.root, '.tasks', `task-run-123${extension}`),
+        'fixture',
+        'utf-8',
+      );
+    }
+
+    cleanupRunTask(fixture.root, 'run-123');
+
+    for (const extension of extensions) {
+      expect(existsSync(join(fixture.root, '.tasks', `task-run-123${extension}`))).toBe(false);
+    }
   });
 });

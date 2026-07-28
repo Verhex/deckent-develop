@@ -22,6 +22,7 @@ import { print, formatDoctorResult, formatCIHealthSection } from '../helpers/out
 import type { CIBaseline, CIReport } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
+import { readKeyringState, type KeyringReadState } from './provider-authority.js';
 import { detectAvailableProviders, formatDetectedProviders } from '../../core/provider.js';
 import { probeProviderAuth, type AuthProbeResult, type AuthProbeState } from '../../core/provider-auth-probe.js';
 import {
@@ -636,6 +637,40 @@ function authProbeConfirmedLine(probe: AuthProbeResult, lang: string): string {
   return getMessage('doctor.provider_auth_confirmed', lang, {
     method: getMessage(methodKey, lang),
   });
+}
+
+/**
+ * Pre-flight the host-scoped provider authority keyring.
+ *
+ * Without it the execution authority refuses to compose and EVERY run holds
+ * with `keyring_unavailable` before a task is written — a state the operator
+ * previously discovered only by starting a run and reading the hold. Reported
+ * as required: an unprovisioned keyring is not a preference, it is a hard stop.
+ */
+export function buildProviderAuthorityKeyringCheck(
+  lang: string,
+  readState: () => KeyringReadState = readKeyringState,
+): DoctorCheck {
+  const name = getMessage('doctor.provider_authority_keyring_name', lang);
+  const read = readState();
+  if (read.state === 'present') {
+    return {
+      name,
+      passed: true,
+      message: getMessage('doctor.provider_authority_keyring_ok', lang, {
+        revision: String(read.snapshot.revision),
+      }),
+      required: true,
+    };
+  }
+  return {
+    name,
+    passed: false,
+    message: read.state === 'absent'
+      ? getMessage('doctor.provider_authority_keyring_absent', lang)
+      : getMessage('doctor.provider_authority_keyring_unreadable', lang, { code: read.code }),
+    required: true,
+  };
 }
 
 function buildProviderAuthDoctorChecks(
@@ -1349,9 +1384,12 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
   const { result, providers, brainLines, brainBudget, lastSprintId, debtItems } = input;
   const lang = input.lang ?? 'en';
   const providerAuthChecks = buildProviderAuthDoctorChecks(providers, input.authProbes, lang);
+  // An unprovisioned provider-authority keyring holds every run before task
+  // creation; surface it in pre-flight instead of leaving it to a failed start.
+  const keyringCheck = buildProviderAuthorityKeyringCheck(lang);
   const presentationResult: DoctorResult = {
     ...result,
-    checks: [...result.checks, ...providerAuthChecks],
+    checks: [...result.checks, ...providerAuthChecks, keyringCheck],
   };
   const lines: string[] = [];
 

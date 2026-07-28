@@ -7,7 +7,8 @@ import { ensureSession, spawnWorker } from '../../orchestra/tmux.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { loadConfig } from '../../core/config.js';
-import { getMessage } from '../helpers/messages.js';
+import { DeckentError } from '../../core/errors.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 import { TaskStatus, getProviderForModel } from '../../core/task-types.js';
 import { TASKS_DIR } from '../../core/constants.js';
 import { readJsonSafe, debugLog } from '../../core/utils.js';
@@ -15,6 +16,8 @@ import { buildWorkerPrompt } from '../../orchestra/task-builder.js';
 import { resolveAgentPrompt, resolveSkillPrompts } from '../../orchestra/sprint-controller.js';
 import { SpawnBackendError, SpawnBackendFactory, type HostTerminalResultContractV1 } from '../../orchestra/spawn-backend.js';
 import { isAdapterProvider, getProviderAdapterForTask } from '../../orchestra/sprint-utils.js';
+import { getProviderCommandSpec } from '../../core/provider-command-spec.js';
+import type { FinalOnlyUsageAuthorization } from '../../core/execution-budget-policy.js';
 import { ensureOllamaModelRegistered } from '../../core/model-registry.js';
 import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
 import { resolveReasoningEffort } from '../../core/reasoning-effort.js';
@@ -48,6 +51,12 @@ import {
   writeTaskResultSettlementAttemptAtomic,
   type TaskResultSettlementRefV1,
 } from '../../core/task-result-settlement.js';
+import {
+  ExecutionLockError,
+  withExecutionLock,
+} from '../../core/file-lock.js';
+import { openTaskSettlementProjection } from '../../core/task-settlement-authority.js';
+import { resolveTenant } from '../../core/tenant-context.js';
 
 /**
  * Build a comma-separated allowedTools string from a task's scope.
@@ -61,6 +70,120 @@ export function buildAllowedToolsFromScope(task: Task): string | undefined {
   const hasFiles = task.scope.filesWrite.length > 0;
   if (!hasDirs && !hasFiles) return undefined;
   return 'Read,Write,Edit,Bash,Glob,Grep';
+}
+
+/**
+ * Last fail-closed boundary before a provider process/container is created.
+ * Callers persist their dispatch authority here; throwing aborts the spawn.
+ */
+export interface WorkerDispatchBoundary {
+  readonly taskId: string;
+  readonly provider: ProviderName;
+  readonly model: string;
+  readonly backend: string;
+  readonly executionEvidenceRef: string;
+  readonly settlementRef?: TaskResultSettlementRefV1;
+}
+
+export type WorkerExecutionRoute =
+  | 'host-adapter'
+  | 'docker'
+  | 'tmux'
+  | 'subprocess'
+  | 'unknown';
+
+export type TaskExecutionFenceActor = 'dispatch' | 'settlement';
+
+/**
+ * Serialize the final dispatch boundary against legacy task reconciliation.
+ * The dedicated leased execution-lock namespace is isolated from worker and
+ * spawn cleanup, while its unique owner prevents same-task re-entry.
+ */
+export async function withTaskExecutionFence<T>(
+  projectRoot: string,
+  taskId: string,
+  actor: TaskExecutionFenceActor,
+  operation: () => Promise<T> | T,
+): Promise<T> {
+  try {
+    return await withExecutionLock(
+      projectRoot,
+      taskId,
+      actor,
+      () => operation(),
+    );
+  } catch (error) {
+    if (error instanceof ExecutionLockError) {
+      throw new Error(getMessage(
+        'task.execution_fence_conflict',
+        getLanguage(undefined),
+        { taskId },
+      ));
+    }
+    throw error;
+  }
+}
+
+export interface SpawnWorkerMultiProviderOptions {
+  autoApprove?: boolean;
+  allowedTools?: string;
+  availableTools?: string;
+  isolatedContext?: boolean;
+  spawnBackend?: string;
+  dockerImage?: string;
+  dockerTimeout?: number;
+  provider?: string;
+  modelEffort?: string;
+  executionBudget?: ExecutionBudget;
+  executionLandingPolicy?: ExecutionLandingPolicyConfig;
+  executionBudgetProfileRef?: string;
+  executionBudgetPolicyDigest?: string;
+  executionAdmissionMode?: ExecutionAdmissionMode;
+  executionApprovalEvidenceRef?: string;
+  executionApprovalProposal?: AttendedExecutionProposalReference;
+  executionApprovalMaterial?: AttendedExecutionProposalMaterial;
+  attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+  executionTenantId?: string;
+  executionRunId?: string;
+  /** Exact open invocation permitted to cross the dispatch boundary. */
+  executionInvocationId?: string;
+  hostTerminalResultContract?: HostTerminalResultContractV1;
+  /** Owner authorization for a final-only-usage provider; absent = fail closed. */
+  finalOnlyUsageContainment?: FinalOnlyUsageAuthorization;
+  /** Persist dispatch authority immediately before the first external spawn side effect. */
+  onDispatchBoundary?: (boundary: WorkerDispatchBoundary) => void | Promise<void>;
+}
+
+/**
+ * Side-effect-free mirror of the live branch order below. Read-only settlement
+ * surfaces consume this same resolver instead of guessing which backend a task
+ * would have reached.
+ */
+export function resolveWorkerExecutionRoute(
+  provider: ProviderName,
+  input: {
+    readonly spawnBackend?: string;
+    readonly requiresImmutableSettlement?: boolean;
+    readonly platform?: NodeJS.Platform;
+  } = {},
+): WorkerExecutionRoute {
+  const requiresImmutableSettlement = input.requiresImmutableSettlement === true;
+  const adapter = isAdapterProvider(provider);
+  const containerRoutableAdapter = input.spawnBackend !== undefined
+    && getProviderCommandSpec(provider) !== null;
+  if (adapter && !requiresImmutableSettlement) return 'host-adapter';
+  if (adapter && requiresImmutableSettlement && !containerRoutableAdapter) return 'unknown';
+  if (input.spawnBackend) {
+    if (input.spawnBackend === 'auto') {
+      return (input.platform ?? process.platform) === 'win32' ? 'subprocess' : 'docker';
+    }
+    return input.spawnBackend === 'docker'
+      || input.spawnBackend === 'tmux'
+      || input.spawnBackend === 'subprocess'
+      ? input.spawnBackend
+      : 'unknown';
+  }
+  return provider === 'claude' ? 'tmux' : 'subprocess';
 }
 
 /**
@@ -81,29 +204,72 @@ export async function spawnWorkerMultiProvider(
   model: string,
   prompt: string,
   root: string,
-  opts: {
-    autoApprove?: boolean;
-    allowedTools?: string;
-    availableTools?: string;
-    isolatedContext?: boolean;
-    spawnBackend?: string;
-    dockerImage?: string;
-    dockerTimeout?: number;
-    provider?: string;
-    modelEffort?: string;
-    executionBudget?: ExecutionBudget;
-    executionLandingPolicy?: ExecutionLandingPolicyConfig;
-    executionBudgetProfileRef?: string;
-    executionBudgetPolicyDigest?: string;
-    executionAdmissionMode?: ExecutionAdmissionMode;
-    executionApprovalEvidenceRef?: string;
-    executionApprovalProposal?: AttendedExecutionProposalReference;
-    executionApprovalMaterial?: AttendedExecutionProposalMaterial;
-    attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
-    executionTenantId?: string;
-    executionRunId?: string;
-    hostTerminalResultContract?: HostTerminalResultContractV1;
-  },
+  opts: SpawnWorkerMultiProviderOptions,
+): Promise<{ backend: string; provider: ProviderName; settlementRef?: TaskResultSettlementRefV1 }> {
+  return withTaskExecutionFence(root, taskId, 'dispatch', () => {
+    assertTaskDispatchSettlementOpen(
+      root,
+      taskId,
+      opts.executionTenantId ?? 'local',
+      opts.executionInvocationId,
+    );
+    return spawnWorkerMultiProviderUnderFence(taskId, model, prompt, root, opts);
+  });
+}
+
+function assertTaskDispatchSettlementOpen(
+  projectRoot: string,
+  taskId: string,
+  tenantId: string,
+  executionInvocationId?: string,
+): void {
+  const taskPath = join(projectRoot, TASKS_DIR, `task-${taskId}.json`);
+  let rawStatus = 'UNKNOWN';
+  if (existsSync(taskPath)) {
+    const task = readJsonSafe<{ id?: unknown; status?: unknown }>(taskPath);
+    if (task?.id !== taskId || typeof task.status !== 'string') {
+      throw new DeckentError(
+        'E_TASK_EXECUTION_SNAPSHOT_INVALID',
+        getMessage('task.execution_snapshot_invalid', getLanguage(undefined), { taskId }),
+      );
+    }
+    rawStatus = task.status;
+  }
+  const opened = openTaskSettlementProjection(projectRoot);
+  try {
+    const projection = opened.projectTaskExecutionState(taskId, rawStatus, tenantId);
+    if (projection.effectiveStatus === 'NOT_DISPATCHED') {
+      throw new DeckentError(
+        'E_TASK_EXECUTION_ALREADY_SETTLED',
+        getMessage('task.execution_already_settled', getLanguage(undefined), { taskId }),
+      );
+    }
+    const ownsOpenReceipt = projection.reasonCode === 'open-receipt'
+      && projection.receiptRef?.invocationId === executionInvocationId;
+    if (
+      projection.reasonCode === 'ambiguous-receipts'
+      || (projection.reasonCode === 'open-receipt' && !ownsOpenReceipt)
+      || projection.reasonCode === 'projected'
+    ) {
+      throw new DeckentError(
+        'E_TASK_EXECUTION_AUTHORITY_CONFLICT',
+        getMessage('task.execution_authority_conflict', getLanguage(undefined), {
+          taskId,
+          reasonCode: projection.reasonCode,
+        }),
+      );
+    }
+  } finally {
+    opened.close();
+  }
+}
+
+async function spawnWorkerMultiProviderUnderFence(
+  taskId: string,
+  model: string,
+  prompt: string,
+  root: string,
+  opts: SpawnWorkerMultiProviderOptions,
 ): Promise<{ backend: string; provider: ProviderName; settlementRef?: TaskResultSettlementRefV1 }> {
   const executionBudget = resolveHostExecutionBudget(root, taskId, opts.executionBudget);
 
@@ -189,13 +355,23 @@ export async function spawnWorkerMultiProvider(
   // spawn() is invoked, otherwise custom tags (qwen3.6:27b) that are not in the static
   // catalog are rejected with ProviderError. The race is deterministic: without await,
   // spawn() executes in the same tick as the unresolved refresh promise.
-  if (isAdapterProvider(provider)) {
-    if (opts.hostTerminalResultContract) {
-      throw new SpawnBackendError(
-        `Host terminal result protocol ${opts.hostTerminalResultContract.protocol} requires an immutable-settlement backend; host-adapter does not provide one.`,
-        'host-adapter',
-      );
-    }
+  //
+  // XVERIFY-CODEX: a host terminal result protocol requires immutable settlement,
+  // which the host adapter cannot produce. An adapter provider that ALSO owns a
+  // container command spec (codex, gemini) is therefore routed to the configured
+  // settlement-capable backend instead of its host adapter — the same route the
+  // Docker backend already resolves a binary for. Host-only providers (ollama,
+  // openrouter) have no container binary authority (`getProviderCommandSpec` →
+  // null) and keep failing honestly here, before any provider work.
+  const containerRoutableAdapter = opts.spawnBackend !== undefined
+    && getProviderCommandSpec(provider) !== null;
+  if (isAdapterProvider(provider) && opts.hostTerminalResultContract && !containerRoutableAdapter) {
+    throw new SpawnBackendError(
+      `Host terminal result protocol ${opts.hostTerminalResultContract.protocol} requires an immutable-settlement backend; host-adapter does not provide one.`,
+      'host-adapter',
+    );
+  }
+  if (isAdapterProvider(provider) && !opts.hostTerminalResultContract) {
     let adapter = getProviderAdapterForTask(provider);
     // OPENROUTER-PROVIDER (row 477): lazy re-bootstrap, mirroring
     // sprint-spawner.ts's `wantsHostAdapter && !adapterRouted` recovery. Unlike the
@@ -237,6 +413,13 @@ export async function spawnWorkerMultiProvider(
         approvalAuthority: opts.attendedExecutionApprovalAuthority,
         approvalExpectedDispatch: attendedExpectedDispatch(provider, 'host-adapter'),
         executionCostClass: resolveProviderExecutionCostClass(provider, adapter.executionCostClass),
+      });
+      await opts.onDispatchBoundary?.({
+        taskId,
+        provider,
+        model,
+        backend: 'host-adapter',
+        executionEvidenceRef: `worker-dispatch-boundary:host-adapter:${taskId}`,
       });
       adapter.spawn(taskId, model as ModelType, prompt, {
         allowedTools: opts.allowedTools,
@@ -291,9 +474,21 @@ export async function spawnWorkerMultiProvider(
         )
         : createTaskResultSettlementRef(root, taskId)
       : undefined;
+    await opts.onDispatchBoundary?.({
+      taskId,
+      provider,
+      model,
+      backend: backend.name,
+      executionEvidenceRef: settlementRef
+        ? `task-result-settlement-attempt:${settlementRef.attemptId}`
+        : `worker-dispatch-boundary:${backend.name}:${taskId}`,
+      ...(settlementRef ? { settlementRef } : {}),
+    });
     if (settlementRef) {
-      // Durable attempt identity precedes backend.spawn, whose Docker path can
-      // run auth checks and start the provider container immediately.
+      // The invocation dispatch receipt is the final authority boundary. Only
+      // after it succeeds may the backend attempt become durable; therefore a
+      // rejected callback leaves neither a provider process nor a false pending
+      // backend-attempt artifact that would block NOT_DISPATCHED settlement.
       writeTaskResultSettlementAttemptAtomic(settlementRef);
     }
     backend.spawn(taskId, model as ModelType, prompt, {
@@ -311,6 +506,7 @@ export async function spawnWorkerMultiProvider(
       executionApprovalExpectedDispatch: attendedExpectedDispatch(provider, backend.name),
       settlementRef,
       hostTerminalResultContract: opts.hostTerminalResultContract,
+      finalOnlyUsageContainment: opts.finalOnlyUsageContainment,
     });
     return {
       backend: backend.name,
@@ -337,6 +533,13 @@ export async function spawnWorkerMultiProvider(
       approvalEvidenceRef: opts.executionApprovalEvidenceRef,
       approvalAuthority: opts.attendedExecutionApprovalAuthority,
       approvalExpectedDispatch: attendedExpectedDispatch(provider, 'tmux'),
+    });
+    await opts.onDispatchBoundary?.({
+      taskId,
+      provider,
+      model,
+      backend: 'tmux',
+      executionEvidenceRef: `worker-dispatch-boundary:tmux:${taskId}`,
     });
     ensureSession();
     spawnWorker(taskId, model as ModelType, prompt, root, {
@@ -366,6 +569,13 @@ export async function spawnWorkerMultiProvider(
     approvalEvidenceRef: opts.executionApprovalEvidenceRef,
     approvalAuthority: opts.attendedExecutionApprovalAuthority,
     approvalExpectedDispatch: attendedExpectedDispatch(provider, backend.name),
+  });
+  await opts.onDispatchBoundary?.({
+    taskId,
+    provider,
+    model,
+    backend: backend.name,
+    executionEvidenceRef: `worker-dispatch-boundary:${backend.name}:${taskId}`,
   });
   backend.spawn(taskId, model as ModelType, prompt, {
     autoApprove: opts.autoApprove ?? false,
@@ -527,6 +737,9 @@ export function registerSpawn(program: Command): void {
           // — ollama tags included. Unlike `deckent run`, this path never calls
           // `resolveExecutionModelIdentity`, so nothing else registers the model here.
           provider: task.provider,
+          executionTenantId: resolveTenant(root, {
+            ...(task.actor?.tenantId ? { tenantId: task.actor.tenantId } : {}),
+          }).tenantId,
         });
 
         print(getMessage('spawn.worker_spawned', lang, { taskId, model: task.model }));

@@ -109,6 +109,15 @@ export function calculateMetrics(
   // of the sprint's own task list and the evaluations map (which can exceed
   // sprint.tasks when injected fix tasks are evaluated).
   const totalTasks = Math.max(sprint.tasks.length, evaluations.size);
+  // MASTER-PLAN 667: the counters above see ONLY the evaluations map. When a run
+  // ends before EVALUATE reaches a task, that task's delivered result is
+  // invisible and the close reads "0/N DONE" even though workers produced real
+  // work (sprint-459 live case: 2 results on disk, summary said 0). Count those
+  // separately — an unevaluated result is not a success (nobody judged it) and
+  // not a failure either. The worker's own self-assessment is deliberately NOT
+  // promoted into completedTasks; only Brain's evaluation may do that.
+  const evaluatedIds = new Set(evaluations.keys());
+  const unevaluatedTasks = results.filter(r => !evaluatedIds.has(r.taskId)).length;
   const coveragePercent = results.length > 0
     ? results.reduce((sum, r) => sum + r.coverage, 0) / results.length
     : 0;
@@ -138,6 +147,7 @@ export function calculateMetrics(
     completedTasks,
     techDebtTasks,
     noGoTasks,
+    unevaluatedTasks,
     durationMs,
     coveragePercent,
     noGoRate,
@@ -225,6 +235,10 @@ function parseSprintLogMetrics(content: string): SprintMetrics | null {
     completedTasks,
     techDebtTasks,
     noGoTasks,
+    // Log-reconstruction path: the sprint log records evaluated counters only,
+    // so an unevaluated count cannot be recovered here. 0 = "unknown from this
+    // source", never a claim that every task was evaluated.
+    unevaluatedTasks: 0,
     durationMs: isNaN(durationMs) ? 0 : durationMs,
     coveragePercent: isNaN(coveragePercent) ? 0 : coveragePercent,
     noGoRate,

@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 import { buildExecutionContinuationPrompt } from '../core/execution-continuation-prompt.js';
-import { deriveExecutionLandingTurnAllocation } from '../core/execution-budget-policy.js';
 import { createExecutionAuthorityError } from '../core/errors.js';
 import {
   claimExecutionContinuationAtomic,
@@ -56,22 +55,35 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+/**
+ * Smallest turn budget in which a continuation can do anything useful AND land:
+ * one bounded work turn plus one turn to write its terminal result. Anything
+ * below this is a dispatch that could only burn budget without settling.
+ *
+ * MASTER-PLAN 664: this deliberately replaces the previous
+ * `remaining >= reservedTurns` rule, which was unsatisfiable by construction.
+ * `reservedTurns` is a fixed fraction of the HARD budget and the reserve exists
+ * precisely to finance the landing, so every landing that actually consumed its
+ * reserve left `remaining < reservedTurns` and made continuation impossible.
+ * Measured on 2026-07-25 (task 457-002): hard=32, used=31, remaining=1,
+ * reservedTurns=8 → permanent hold, sprint hung waiting for a result that no
+ * attempt could ever write. The hard ceiling is still never widened: `remaining`
+ * is derived from hard minus cumulative usage.
+ */
+export const EXECUTION_CONTINUATION_MINIMUM_TURNS = 2;
+
 function assertContinuationTurnReserve(
   checkpoint: ExecutionLandingCheckpointV1,
 ): void {
   const hardMaxTurns = checkpoint.hardBudget.maxTurns;
   if (hardMaxTurns === undefined) return;
   const remainingMaxTurns = checkpoint.remainingBudget.maxTurns;
-  const allocation = deriveExecutionLandingTurnAllocation(
-    hardMaxTurns,
-    checkpoint.landingPolicy.reserve_ratio,
-  );
   if (
     remainingMaxTurns === undefined
-    || remainingMaxTurns < allocation.reservedTurns
+    || remainingMaxTurns < EXECUTION_CONTINUATION_MINIMUM_TURNS
   ) {
     throw createExecutionAuthorityError(
-      `Execution continuation turn reserve is insufficient: remaining=${remainingMaxTurns ?? 'missing'}, required=${allocation.reservedTurns}`,
+      `Execution continuation turn reserve is insufficient: remaining=${remainingMaxTurns ?? 'missing'}, required=${EXECUTION_CONTINUATION_MINIMUM_TURNS}`,
     );
   }
 }

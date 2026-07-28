@@ -1,12 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { Task } from '../../../src/core/types.js';
 import { TaskStatus } from '../../../src/core/types.js';
 
 // ─── Mocks ───────────────────────────────────────────────────────────
 
-const { mockBackendSpawn } = vi.hoisted(() => ({
+const { mockBackendSpawn, fixtureState } = vi.hoisted(() => ({
   mockBackendSpawn: vi.fn(),
+  fixtureState: { base: '', root: '' },
 }));
 
 vi.mock('../../../src/agents/worker.js', () => ({
@@ -38,7 +42,7 @@ vi.mock('../../../src/cli/helpers/output.js', () => ({
 }));
 
 vi.mock('../../../src/cli/helpers/process.js', () => ({
-  resolveProjectRoot: vi.fn().mockReturnValue('/mock/root'),
+  resolveProjectRoot: vi.fn(() => fixtureState.root),
 }));
 
 vi.mock('../../../src/core/config.js', () => ({
@@ -112,8 +116,14 @@ async function runCommand(args: string[]): Promise<void> {
 
 // ─── Tests ───────────────────────────────────────────────────────────
 
+const originalDeckentHome = process.env.DECKENT_HOME;
+
 describe('spawn command enhanced (rich prompt, status checks, flags)', () => {
   beforeEach(() => {
+    fixtureState.base = mkdtempSync(join(tmpdir(), 'spawn-enhanced-'));
+    fixtureState.root = join(fixtureState.base, 'project');
+    mkdirSync(join(fixtureState.root, '.tasks'), { recursive: true });
+    process.env.DECKENT_HOME = join(fixtureState.base, 'host-state');
     vi.clearAllMocks();
     process.exitCode = undefined;
     vi.mocked(loadConfig).mockResolvedValue({ language: 'en', spawn_backend: 'subprocess' } as any);
@@ -125,6 +135,9 @@ describe('spawn command enhanced (rich prompt, status checks, flags)', () => {
   });
 
   afterEach(() => {
+    if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+    else process.env.DECKENT_HOME = originalDeckentHome;
+    rmSync(fixtureState.base, { recursive: true, force: true });
     process.exitCode = undefined;
   });
 
@@ -145,12 +158,12 @@ describe('spawn command enhanced (rich prompt, status checks, flags)', () => {
 
     await runCommand(['spawn', '001-001']);
 
-    expect(mockResolveAgentPrompt).toHaveBeenCalledWith('/mock/root', task);
+    expect(mockResolveAgentPrompt).toHaveBeenCalledWith(fixtureState.root, task);
     expect(mockBuildWorkerPrompt).toHaveBeenCalledWith(
       task,
       'You are a TypeScript expert.',
       expect.any(Array),
-      '/mock/root',
+      fixtureState.root,
     );
   });
 
@@ -164,7 +177,7 @@ describe('spawn command enhanced (rich prompt, status checks, flags)', () => {
 
     await runCommand(['spawn', '001-001']);
 
-    expect(mockResolveSkillPrompts).toHaveBeenCalledWith('/mock/root', task);
+    expect(mockResolveSkillPrompts).toHaveBeenCalledWith(fixtureState.root, task);
     expect(mockBuildWorkerPrompt).toHaveBeenCalledWith(
       task,
       undefined,
@@ -172,7 +185,7 @@ describe('spawn command enhanced (rich prompt, status checks, flags)', () => {
         { name: 'testing', content: 'Testing skill content' },
         { name: 'refactoring', content: 'Refactoring skill content' },
       ],
-      '/mock/root',
+      fixtureState.root,
     );
   });
 

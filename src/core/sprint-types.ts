@@ -90,6 +90,17 @@ export interface SprintMetrics {
   completedTasks: number;
   techDebtTasks: number;
   noGoTasks: number;
+  /**
+   * Tasks that produced a real result on disk but were never evaluated (the run
+   * ended before EVALUATE reached them).
+   *
+   * MASTER-PLAN 667: the counters above are derived ONLY from the evaluations
+   * map, so an aborted run reported "0/3 DONE" while two workers had genuinely
+   * delivered (sprint-459, 2026-07-25). Their work is neither DONE nor NO_GO —
+   * nobody judged it — so it gets its own honest bucket instead of silently
+   * inflating a success count or being reported as failure.
+   */
+  unevaluatedTasks: number;
   durationMs: number;
   coveragePercent: number;
   /** Fraction in [0,1] — NOT a percentage. Multiply by 100 for display. Canonical

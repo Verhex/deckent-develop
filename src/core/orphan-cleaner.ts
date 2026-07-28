@@ -18,6 +18,8 @@ import { join } from 'node:path';
 import { TASKS_DIR } from './constants.js';
 import { clearStaleLocks } from './file-lock.js';
 import { isPidAlive } from './pid-liveness.js';
+import { openTaskSettlementProjection } from './task-settlement-authority.js';
+import { resolveTenant } from './tenant-context.js';
 import { debugLog } from './utils.js';
 
 // ─── Constants ──────────────────────────────────────────────────────
@@ -29,6 +31,11 @@ const ACTIVE_STATUSES = new Set([
 
 /** Only explicit terminal proof is archive-eligible. Unknown is preserved. */
 const TERMINAL_STATUSES = new Set(['DONE', 'NO_GO']);
+const RECEIPT_PROJECTED_TERMINAL_STATUSES = new Set([
+  'DONE',
+  'NO_GO',
+  'NOT_DISPATCHED',
+]);
 
 /** Stale lock threshold: 5 minutes */
 const STALE_LOCK_AGE_MS = 5 * 60 * 1000;
@@ -55,6 +62,29 @@ export interface PreflightReport {
   cleanedSprintIds: string[];
 }
 
+export interface TaskExecutionStateProjection {
+  readonly effectiveStatus: string;
+  readonly evidenceRefs: readonly string[];
+  readonly receiptRef?: {
+    readonly invocationId: string;
+    readonly tenantId: string;
+    readonly projectId: string;
+  };
+}
+
+export interface OrphanCleanerAuthorityOptions {
+  /**
+   * Optional canonical receipt projection. A projected terminal status is
+   * archive-eligible only when the projection also carries an exact receipt
+   * ref and at least one immutable evidence ref.
+   */
+  readonly projectTaskExecutionState?: (
+    taskId: string,
+    rawStatus: string,
+    tenantId?: string,
+  ) => TaskExecutionStateProjection;
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────
 
 function extractSprintNumber(sprintId: string): string | null {
@@ -62,14 +92,74 @@ function extractSprintNumber(sprintId: string): string | null {
   return match?.[1] ?? null;
 }
 
-function readTaskStatus(filePath: string): string | null {
+interface TaskAuthorityIdentity {
+  readonly status: string;
+  readonly tenantId: string;
+}
+
+function readTaskAuthorityIdentity(
+  projectRoot: string,
+  filePath: string,
+  expectedTaskId: string,
+): TaskAuthorityIdentity | null {
   try {
     const raw = readFileSync(filePath, 'utf-8');
-    const parsed = JSON.parse(raw) as { status?: string };
-    return parsed.status ?? null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const task = parsed as Record<string, unknown>;
+    if (
+      task.id !== expectedTaskId
+      || typeof task.status !== 'string'
+      || task.status.trim().length === 0
+    ) return null;
+
+    let tenantId: string | undefined;
+    if (task.actor !== undefined) {
+      if (!task.actor || typeof task.actor !== 'object' || Array.isArray(task.actor)) return null;
+      const actor = task.actor as Record<string, unknown>;
+      if (actor.tenantId !== undefined) {
+        if (typeof actor.tenantId !== 'string') return null;
+        tenantId = actor.tenantId;
+      }
+    }
+    return {
+      status: task.status,
+      tenantId: resolveTenant(projectRoot, {
+        ...(tenantId !== undefined ? { tenantId } : {}),
+      }).tenantId,
+    };
   } catch {
     return null;
   }
+}
+
+function hasReceiptProjectionProof(
+  projection: TaskExecutionStateProjection,
+  tenantId: string,
+): boolean {
+  if (
+    !RECEIPT_PROJECTED_TERMINAL_STATUSES.has(projection.effectiveStatus)
+    || !Array.isArray(projection.evidenceRefs)
+    || projection.evidenceRefs.length < 1
+    || projection.evidenceRefs.length > 32
+    || projection.evidenceRefs.some(ref => (
+      typeof ref !== 'string'
+      || ref !== ref.trim()
+      || ref.length < 1
+      || ref.length > 512
+    ))
+    || new Set(projection.evidenceRefs).size !== projection.evidenceRefs.length
+    || projection.receiptRef === undefined
+  ) return false;
+  const { receiptRef } = projection;
+  return (
+    typeof receiptRef.invocationId === 'string'
+    && receiptRef.invocationId.trim().length > 0
+    && typeof receiptRef.tenantId === 'string'
+    && receiptRef.tenantId === tenantId
+    && typeof receiptRef.projectId === 'string'
+    && receiptRef.projectId.trim().length > 0
+  );
 }
 
 /**
@@ -110,6 +200,7 @@ export interface SprintFileClassification {
 export function classifySprintTaskFiles(
   projectRoot: string,
   sprintId: string,
+  options: OrphanCleanerAuthorityOptions = {},
 ): SprintFileClassification | null {
   const sprintNum = extractSprintNumber(sprintId);
   if (!sprintNum) return null;
@@ -143,16 +234,50 @@ export function classifySprintTaskFiles(
     taskGroups.set(taskId, group);
   }
 
-  for (const [taskId, files] of taskGroups) {
-    const jsonPath = join(tasksDir, `${taskId}.json`);
-    const status = existsSync(jsonPath) ? readTaskStatus(jsonPath) : null;
-    if (!status || ACTIVE_STATUSES.has(status) || !TERMINAL_STATUSES.has(status)) {
-      result.preservedFiles.push(...files);
-      continue;
+  let projectionStore: ReturnType<typeof openTaskSettlementProjection> | null = null;
+  let projectTaskExecutionState = options.projectTaskExecutionState;
+  if (!projectTaskExecutionState) {
+    try {
+      projectionStore = openTaskSettlementProjection(projectRoot);
+      projectTaskExecutionState = (taskId, rawStatus, tenantId) =>
+        projectionStore!.projectTaskExecutionState(taskId, rawStatus, tenantId);
+    } catch {
+      // Missing/corrupt projection authority is not terminal proof.
+      projectionStore = null;
     }
-    // Explicit terminal proof → archive-eligible.
-    result.archivedFiles.push(...files);
-    result.archiveGroups.set(taskId, files);
+  }
+
+  try {
+    for (const [artifactTaskId, files] of taskGroups) {
+      const canonicalTaskId = artifactTaskId.slice('task-'.length);
+      const jsonPath = join(tasksDir, `${artifactTaskId}.json`);
+      const identity = existsSync(jsonPath)
+        ? readTaskAuthorityIdentity(projectRoot, jsonPath, canonicalTaskId)
+        : null;
+      const status = identity?.status ?? null;
+      let terminal = status !== null && TERMINAL_STATUSES.has(status);
+      if (!terminal && status && identity && projectTaskExecutionState) {
+        try {
+          const projection = projectTaskExecutionState(
+            canonicalTaskId,
+            status,
+            identity.tenantId,
+          );
+          terminal = hasReceiptProjectionProof(projection, identity.tenantId);
+        } catch {
+          terminal = false;
+        }
+      }
+      if (!status || (ACTIVE_STATUSES.has(status) && !terminal) || !terminal) {
+        result.preservedFiles.push(...files);
+        continue;
+      }
+      // Explicit terminal proof → archive-eligible.
+      result.archivedFiles.push(...files);
+      result.archiveGroups.set(artifactTaskId, files);
+    }
+  } finally {
+    projectionStore?.close();
   }
 
   return result;
@@ -167,8 +292,9 @@ export function classifySprintTaskFiles(
 export function previewFinalizeCleanup(
   projectRoot: string,
   sprintId: string,
+  options: OrphanCleanerAuthorityOptions = {},
 ): { archivedFiles: string[]; preservedFiles: string[] } {
-  const cls = classifySprintTaskFiles(projectRoot, sprintId);
+  const cls = classifySprintTaskFiles(projectRoot, sprintId, options);
   if (!cls) return { archivedFiles: [], preservedFiles: [] };
   return { archivedFiles: cls.archivedFiles, preservedFiles: cls.preservedFiles };
 }
@@ -187,7 +313,7 @@ export function previewFinalizeCleanup(
 export function postFinalizeCleanup(
   projectRoot: string,
   sprintId: string,
-  opts: { cleanStaleLocks?: boolean } = {},
+  opts: { cleanStaleLocks?: boolean } & OrphanCleanerAuthorityOptions = {},
 ): PostFinalizeReport {
   const report: PostFinalizeReport = {
     archivedFiles: [],
@@ -195,7 +321,7 @@ export function postFinalizeCleanup(
     staleLocksCleaned: 0,
   };
 
-  const cls = classifySprintTaskFiles(projectRoot, sprintId);
+  const cls = classifySprintTaskFiles(projectRoot, sprintId, opts);
   if (!cls) {
     debugLog('orphan-cleaner:postFinalize', `Cannot extract sprint number from ${sprintId}`);
     return report;
@@ -266,6 +392,7 @@ export function postFinalizeCleanup(
 export function preflightOrphanCleanup(
   projectRoot: string,
   currentSprintId: string,
+  options: OrphanCleanerAuthorityOptions = {},
 ): PreflightReport {
   const report: PreflightReport = {
     performed: false,
@@ -337,12 +464,19 @@ export function preflightOrphanCleanup(
     return report;
   }
 
-  // Move orphan files to archive
-  for (const [sprintNum, files] of orphansBySprintNum) {
+  // Move only receipt/raw-terminal orphan files to archive. A previous sprint
+  // id is not completion proof: active or ambiguous task groups remain live.
+  for (const [sprintNum] of orphansBySprintNum) {
+    const classification = classifySprintTaskFiles(
+      projectRoot,
+      `sprint-${sprintNum}`,
+      options,
+    );
+    if (!classification || classification.archivedFiles.length === 0) continue;
     const archiveDir = join(projectRoot, TASKS_DIR, 'archive', `sprint-${sprintNum}`);
     mkdirSync(archiveDir, { recursive: true });
 
-    for (const file of files) {
+    for (const file of classification.archivedFiles) {
       try {
         const src = join(tasksDir, file);
         const dest = join(archiveDir, file);
@@ -354,7 +488,9 @@ export function preflightOrphanCleanup(
       }
     }
 
-    report.cleanedSprintIds.push(`sprint-${sprintNum}`);
+    if (classification.archivedFiles.length > 0) {
+      report.cleanedSprintIds.push(`sprint-${sprintNum}`);
+    }
   }
 
   report.performed = true;

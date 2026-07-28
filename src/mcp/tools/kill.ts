@@ -2,9 +2,13 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from
 import { join } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { TASKS_DIR, LOCKS_DIR } from '../../core/constants.js';
+import { TASKS_DIR } from '../../core/constants.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { debugLog } from '../../core/utils.js';
+import {
+  releaseAllLocks,
+  releaseAllSpawnLocks,
+} from '../../core/file-lock.js';
 
 interface TaskFileData {
   id?: string;
@@ -38,19 +42,11 @@ function killTaskById(root: string, taskId: string): boolean {
     try { unlinkSync(hbPath); } catch { /* ignore */ }
   }
 
-  // Remove locks owned by this task
-  const locksDir = join(root, LOCKS_DIR);
-  if (existsSync(locksDir)) {
-    try {
-      for (const lockFile of readdirSync(locksDir)) {
-        const lockPath = join(locksDir, lockFile);
-        const lock = JSON.parse(readFileSync(lockPath, 'utf-8')) as { taskId?: string };
-        if (lock.taskId === taskId) {
-          unlinkSync(lockPath);
-        }
-      }
-    } catch { /* ignore */ }
-  }
+  // Release only legacy worker/spawn namespaces. Canonical execution
+  // authority is owner+fencing protected and must never be unlinked by an MCP
+  // kill request that does not possess that exact generation.
+  releaseAllLocks(root, `w-${taskId}`);
+  releaseAllSpawnLocks(root, taskId);
 
   return true;
 }

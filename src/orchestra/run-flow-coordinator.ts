@@ -35,13 +35,11 @@
 //   contains it. A successful command returns `{ applied: true, context,
 //   sequence }` (the store-assigned sequence of its last appended event).
 //
-// SINGLE-WRITER ASSUMPTION (binding): `appendFlowEvent` derives the next
-// sequence by reading the flow's current log, so two writers appending to the
-// SAME flow under the SAME `root` concurrently would race on the sequence
-// counter. This coordinator therefore assumes it is the SOLE writer of each
-// flow's event log for a given project root. Multi-writer coordination (leases /
-// cross-process locks) is out of this core's scope; a future durable-lease
-// layer would sit in front of it, not inside it.
+// MULTI-WRITER AUTHORITY: the store appends a command's complete event batch in
+// one SQLite transaction. An expected-head CAS prevents a command reduced on a
+// stale context from landing after another process's transition. On conflict
+// the coordinator folds the durable delta and retries reduction once; durable
+// commandId journaling makes a concurrently committed duplicate a typed no-op.
 //
 // TYPED ERRORS ONLY (no generic throw): every failure path raises a
 // `RunFlowCoordinatorError` subclass — `InvalidTransitionError` (reducer
@@ -82,11 +80,13 @@ import {
 import type { ActorContext } from '../core/work-model.js';
 import { reduceRunFlow } from './run-flow-reducer.js';
 import {
-  appendFlowEvent,
+  appendFlowEvents,
   readFlowEvents,
+  readFlowEventHead,
   listFlowIds,
   loadApprovedSnapshot,
   loadRunHandle,
+  RunFlowStoreError,
 } from '../core/run-flow-store.js';
 
 // ═══ Typed error taxonomy ══════════════════════════════════════════════════
@@ -293,13 +293,13 @@ export interface RunFlowCoordinator {
 interface FlowState {
   context: RunFlowContext;
   readonly commandIds: Set<string>;
-  /** SURF-5 — how many durable log events this cached context reflects. The
-   *  cross-process freshness probe compares this against the on-disk log so a
+  /** Highest canonical event sequence reflected by this cached context. The
+   *  cross-process freshness probe compares this against the indexed store head so a
    *  closure appended by ANOTHER process (the detached run child writing its
    *  own RUN_COMPLETED/RUN_FAILED, start.ts born-698b/G2) becomes visible to a
    *  long-lived reader (the API daemon) instead of leaving the flow cached in
    *  DETACHED_RUNNING limbo forever. */
-  foldedCount: number;
+  headSequence: number;
 }
 
 /** Plain `Omit` collapses `RunFlowEvent`'s discriminated union to its common-key
@@ -327,39 +327,48 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
    * daemon's SSE fan-out) receive closures written by another process (the
    * detached run child) without waiting for a reconnect-backfill.
    */
-  function foldFromDisk(flowId: string, publishFrom?: number): FlowState {
-    let context = createInitialRunFlowContext();
-    const commandIds = new Set<string>();
-    const events = readFlowEvents(root, flowId);
-    for (const event of events) {
-      try {
-        context = reduceRunFlow(context, event);
-      } catch (err) {
-        // A persisted log that no longer folds cleanly is a coordinator-level
-        // fault, never a bare Error — surface it typed. (Cannot occur for a log
-        // this coordinator wrote: every appended event passed the reducer first.)
-        if (err instanceof RunFlowTransitionError) throw new InvalidTransitionError(err);
-        throw new RunFlowCoordinatorError(
-          `run-flow-coordinator: failed to rehydrate flow '${flowId}' from its event log: ` +
-            (err instanceof Error ? err.message : String(err)),
-          { cause: err },
-        );
-      }
-      if (event.commandId !== undefined) commandIds.add(event.commandId);
-    }
+  function foldFromDisk(flowId: string, base?: FlowState, publishDelta = false): FlowState {
+    let context = base?.context ?? createInitialRunFlowContext();
+    const commandIds = new Set(base?.commandIds ?? []);
+    let cursor = base?.headSequence ?? 0;
 
-    const state: FlowState = { context, commandIds, foldedCount: events.length };
-    flows.set(flowId, state);
-
-    if (publishFrom !== undefined && deps.onEvent) {
-      for (const event of events.slice(publishFrom)) {
+    while (true) {
+      const page = readFlowEvents(root, flowId, { afterSequence: cursor, limit: 1_000 });
+      if (page.length === 0) break;
+      for (const event of page) {
+        if (event.sequence !== cursor + 1) {
+          throw new RunFlowCoordinatorError(
+            `run-flow-coordinator: flow '${flowId}' has a non-contiguous canonical event sequence ` +
+              `(expected ${cursor + 1}, observed ${String(event.sequence)})`,
+          );
+        }
         try {
-          deps.onEvent(event); // persisted lines carry their store-assigned sequence
-        } catch {
-          // listener errors are the listener's problem, never the flow's
+          context = reduceRunFlow(context, event);
+        } catch (err) {
+          // A persisted log that no longer folds cleanly is a coordinator-level
+          // fault, never a bare Error.
+          if (err instanceof RunFlowTransitionError) throw new InvalidTransitionError(err);
+          throw new RunFlowCoordinatorError(
+            `run-flow-coordinator: failed to rehydrate flow '${flowId}' from its event log: ` +
+              (err instanceof Error ? err.message : String(err)),
+            { cause: err },
+          );
+        }
+        cursor = event.sequence;
+        if (event.commandId !== undefined) commandIds.add(event.commandId);
+        if (publishDelta && deps.onEvent) {
+          try {
+            deps.onEvent(event);
+          } catch {
+            // listener errors are the listener's problem, never the flow's
+          }
         }
       }
+      if (page.length < 1_000) break;
     }
+
+    const state: FlowState = { context, commandIds, headSequence: cursor };
+    flows.set(flowId, state);
     return state;
   }
 
@@ -383,8 +392,8 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
     const cached = flows.get(flowId);
     if (cached === undefined) return foldFromDisk(flowId);
     if (isTerminalRunFlowState(cached.context.state)) return cached;
-    if (readFlowEvents(root, flowId).length <= cached.foldedCount) return cached;
-    return foldFromDisk(flowId, cached.foldedCount);
+    if (readFlowEventHead(root, flowId) <= cached.headSequence) return cached;
+    return foldFromDisk(flowId, cached, true);
   }
 
   /**
@@ -483,48 +492,63 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
     commandId: string | undefined,
     buildEvents: (context: RunFlowContext) => readonly RunFlowEvent[],
   ): RunFlowCommandResult {
-    const flow = ensureFlowLoaded(flowId);
+    function attempt(retriedAfterConflict: boolean): RunFlowCommandResult {
+      const flow = ensureFlowLoaded(flowId);
 
-    if (commandId !== undefined && flow.commandIds.has(commandId)) {
-      // Restart-safe no-op: the id is in the folded set, so NO event is written.
-      return { applied: false, reason: 'duplicate-command', context: flow.context };
-    }
+      if (commandId !== undefined && flow.commandIds.has(commandId)) {
+        return { applied: false, reason: 'duplicate-command', context: flow.context };
+      }
 
-    let context = flow.context;
-    let sequence = 0;
-    let appended = 0;
-    for (const event of buildEvents(context)) {
-      let next: RunFlowContext;
-      try {
-        next = reduceRunFlow(context, event);
-      } catch (err) {
-        if (err instanceof RunFlowTransitionError) throw new InvalidTransitionError(err);
-        throw err; // never expected — a non-transition throw from the pure reducer
-      }
-      // reduce accepted (including a returned BLOCKED context) => durably append.
-      try {
-        sequence = appendFlowEvent(root, flowId, event);
-      } catch (err) {
-        throw new AppendFailedError(flowId, event.type, err);
-      }
-      appended += 1;
-      context = next;
-      // SURF-1c: live-publish AFTER the durable append (fail-soft — a bad
-      // listener can never break the command or the durable record).
-      if (deps.onEvent) {
+      const events = buildEvents(flow.context);
+      let context = flow.context;
+      for (const event of events) {
         try {
-          deps.onEvent({ ...event, sequence });
-        } catch {
-          // listener errors are the listener's problem, never the flow's
+          context = reduceRunFlow(context, event);
+        } catch (err) {
+          if (err instanceof RunFlowTransitionError) throw new InvalidTransitionError(err);
+          throw err;
         }
       }
+
+      let appendResult;
+      try {
+        appendResult = appendFlowEvents(root, flowId, events, {
+          expectedLastSequence: flow.headSequence,
+        });
+      } catch (err) {
+        if (err instanceof RunFlowStoreError && err.code === 'CANONICAL_CONFLICT' && !retriedAfterConflict) {
+          foldFromDisk(flowId, flow, true);
+          return attempt(true);
+        }
+        if (err instanceof RunFlowStoreError && err.canonicalCommitState === 'committed') {
+          // Canonical state won. Refresh before surfacing projection uncertainty
+          // so this process cannot issue a later command on stale context.
+          foldFromDisk(flowId, flow, true);
+        }
+        throw new AppendFailedError(flowId, events[events.length - 1]!.type, err);
+      }
+
+      if (!appendResult.applied) {
+        const refreshed = foldFromDisk(flowId, flow, true);
+        return { applied: false, reason: 'duplicate-command', context: refreshed.context };
+      }
+
+      flow.context = context;
+      flow.headSequence = appendResult.lastSequence;
+      if (commandId !== undefined) flow.commandIds.add(commandId);
+      if (deps.onEvent) {
+        for (const persistedEvent of appendResult.events) {
+          try {
+            deps.onEvent(persistedEvent);
+          } catch {
+            // listener errors are the listener's problem, never the flow's
+          }
+        }
+      }
+      return { applied: true, context, sequence: appendResult.lastSequence };
     }
 
-    // Commit to the in-memory map only AFTER every append succeeded.
-    flow.context = context;
-    flow.foldedCount += appended;
-    if (commandId !== undefined) flow.commandIds.add(commandId);
-    return { applied: true, context, sequence };
+    return attempt(false);
   }
 
   return {
@@ -611,7 +635,7 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
       //    fold itself (INITIAL context -> sequence-ordered reduce, typed fold
       //    errors, cache-on-load) is `ensureFlowLoaded`'s job, reused verbatim so
       //    the rehydrated context is identical to what a memory-hit would return.
-      if (flows.has(flowId) || readFlowEvents(root, flowId).length > 0) {
+      if (flows.has(flowId) || readFlowEventHead(root, flowId) > 0) {
         return ensureFlowLoaded(flowId).context;
       }
 

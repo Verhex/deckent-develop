@@ -124,6 +124,7 @@ describe('spawnWorkerMultiProvider attended execution authority', () => {
     roots.push(base);
     const root = join(base, 'project');
     mkdirSync(root, { recursive: true });
+    process.env.DECKENT_HOME = join(base, 'host-state');
     const broker = new ApprovalBroker(root, { storeDir: join(base, 'broker') });
     const authenticator = new TestAuthenticator();
     const integrity = new TestIntegrity();

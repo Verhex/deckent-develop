@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, createReadStream, watch as fsWatch } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { ModelType, TaskResult } from '../../core/types.js';
@@ -9,7 +10,11 @@ import { buildWorkerPrompt } from '../../orchestra/brain.js';
 import { resolveAgentPrompt, resolveSkillPrompts } from '../../orchestra/sprint-controller.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { spawnWorkerMultiProvider } from './spawn.js';
+import {
+  spawnWorkerMultiProvider,
+  withTaskExecutionFence,
+  type WorkerDispatchBoundary,
+} from './spawn.js';
 import { loadConfig, resolveDefaultModel } from '../../core/config.js';
 import { buildExecutionRequest, resolveToTask, resolveExecutionModelIdentity } from '../../orchestra/execution-request-builder.js';
 import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
@@ -25,6 +30,18 @@ import {
   readClosedTaskResultSettlement,
   type TaskResultSettlementRefV1,
 } from '../../core/task-result-settlement.js';
+import {
+  type OpenTaskSettlementAuthorityResult,
+  type TaskSettlementInspection,
+  type TaskExecutionDeclaration,
+} from '../../core/task-settlement-authority.js';
+import type {
+  InvocationExecutionBackend,
+  InvocationPreDispatchReasonCode,
+} from '../../core/invocation-receipt.js';
+import { resolveTenant } from '../../core/tenant-context.js';
+import { resolveTaskSettlementBackend } from './task-settlement.js';
+import { canonicalJson } from '../../core/audit-writer.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -50,6 +67,34 @@ export interface SingleTaskResult {
   notes: string;
 }
 
+export interface RunCommandRuntime {
+  readonly attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+  readonly providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  /**
+   * Production injects the immutable authority at the composition root. Keeping
+   * this explicit lets lower-level command tests exercise their legacy mocks
+   * without silently creating project state.
+   */
+  readonly openTaskSettlementAuthority?: (
+    projectRoot: string,
+  ) => OpenTaskSettlementAuthorityResult;
+}
+
+interface RunSettlementContext {
+  readonly projectRoot: string;
+  readonly opened: OpenTaskSettlementAuthorityResult;
+  readonly tenantId: string;
+  readonly runId: string;
+  readonly taskId: string;
+  readonly taskCreatedAt: string;
+  readonly rawStatus: string;
+  readonly taskContent: () => string;
+  readonly taskPublished: () => boolean;
+  readonly executionBackend: ReturnType<typeof resolveTaskSettlementBackend>;
+  readonly invocationId: string;
+  readonly receiptRef: TaskExecutionDeclaration['receiptRef'];
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────
 
 function now(): string {
@@ -64,6 +109,7 @@ import { readJsonSafe, debugLog } from '../../core/utils.js';
 import type { UserOverride } from '../../core/routing-types.js';
 import { normalizeTaskResultShape } from '../../core/task-result-schema.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { providerAuthorityHoldRemedy } from './provider-authority.js';
 
 let _runTaskCounter = 0;
 export function createRunTaskId(): string {
@@ -156,6 +202,88 @@ export function cleanupRunTask(projectRoot: string, taskId: string): void {
   }
 }
 
+async function settleRunBeforeDispatch(
+  context: RunSettlementContext,
+  reasonCode: InvocationPreDispatchReasonCode,
+  occurredAt: string,
+): Promise<TaskSettlementInspection> {
+  return withTaskExecutionFence(
+    context.projectRoot,
+    context.taskId,
+    'settlement',
+    () => context.opened.authority.settleNotDispatched({
+      tenantId: context.tenantId,
+      projectId: context.opened.projectId,
+      taskId: context.taskId,
+      runId: context.runId,
+      executionBackend: context.executionBackend,
+      rawStatus: context.rawStatus,
+      taskContent: context.taskContent(),
+      taskCreatedAt: context.taskCreatedAt,
+      taskSnapshotOrigin: context.taskPublished()
+        ? 'canonical-file'
+        : 'ephemeral-memory',
+      receiptRef: context.receiptRef,
+      reasonCode,
+      occurredAt,
+      apply: true,
+    }),
+  );
+}
+
+function settleRunResult(
+  context: RunSettlementContext,
+  result: TaskResult,
+  durationMs: number,
+  evidenceRefs: readonly string[],
+): TaskSettlementInspection {
+  const accepted = result.selfAssessment === 'DONE'
+    || result.selfAssessment === 'GO_WITH_TECH_DEBT';
+  return context.opened.authority.settleDispatched({
+    tenantId: context.tenantId,
+    projectId: context.opened.projectId,
+    invocationId: context.invocationId,
+    outcome: 'succeeded',
+    exitCode: null,
+    signal: null,
+    reasonCode: accepted ? 'none' : 'validation_failed',
+    durationMs,
+    consumerOutcome: accepted ? 'accepted' : 'rejected',
+    taskDisposition: accepted ? 'done' : 'no_go',
+    evidenceRefs,
+  });
+}
+
+export function runResultEvidenceRef(result: TaskResult): string {
+  const digest = createHash('sha256')
+    .update(canonicalJson(result))
+    .digest('hex');
+  return `task-result:sha256:${digest}`;
+}
+
+export function normalizeWorkerDispatchBackend(
+  backend: string,
+): InvocationExecutionBackend {
+  if (backend === 'docker' || backend === 'tmux') return backend;
+  if (backend === 'host-adapter' || backend === 'subprocess') {
+    return 'host-subprocess';
+  }
+  return 'unknown';
+}
+
+function assertRunResultIdentity(
+  result: TaskResult,
+  expectedTaskId: string,
+): TaskResult {
+  if (result.taskId !== expectedTaskId) {
+    throw new DeckentError(
+      'E_TASK_RESULT_IDENTITY_MISMATCH',
+      'TASK_RESULT_IDENTITY_MISMATCH',
+    );
+  }
+  return result;
+}
+
 /**
  * E) Read the worker heartbeat file. Returns null if file missing or malformed.
  */
@@ -196,17 +324,18 @@ export async function waitForRunResult(
       const settlement = readClosedTaskResultSettlement(settlementRef);
       if (!settlement) return null;
       const result = normalizeTaskResultShape(settlement.result as unknown as TaskResult);
-      return result?.taskId === taskId ? result : null;
+      return result ? assertRunResultIdentity(result, taskId) : null;
     }
     if (!existsSync(resultPath)) return null;
-    return normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
+    const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
+    return result ? assertRunResultIdentity(result, taskId) : null;
   };
 
   // Check immediately first
   const immediate = readAuthoritativeResult();
   if (immediate) return immediate;
 
-  return new Promise<TaskResult | null>((resolve) => {
+  return new Promise<TaskResult | null>((resolve, reject) => {
     let watcher: ReturnType<typeof fsWatch> | null = null;
     let fallbackTimer: ReturnType<typeof setInterval> | null = null;
     let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
@@ -223,10 +352,14 @@ export async function waitForRunResult(
     };
 
     const checkResult = (): void => {
-      const result = readAuthoritativeResult();
-      if (result) {
+      try {
+        const result = readAuthoritativeResult();
+        if (!result) return;
         cleanup();
         resolve(result);
+      } catch (error) {
+        cleanup();
+        reject(error);
       }
     };
 
@@ -317,10 +450,7 @@ export async function streamWorkerLog(
 
 export function registerRun(
   program: Command,
-  runtime: {
-    attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
-    providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
-  } = {},
+  runtime: RunCommandRuntime = {},
 ): void {
   const runCmd = program
     .command('run')
@@ -399,176 +529,391 @@ export function registerRun(
         timeoutMs,
       });
       const task = resolveToTask(execReq, taskId);
+      const taskCreatedAt = task.createdAt ?? now();
+      task.createdAt = taskCreatedAt;
+      const runId = task.sprintId ?? taskId;
+      let settlementOpened: OpenTaskSettlementAuthorityResult | undefined;
+      let settlementContext: RunSettlementContext | undefined;
+      let dispatchBoundary: WorkerDispatchBoundary | undefined;
+      let dispatchStarted = false;
+      let dispatchUncertain = false;
+      let dispatchStartedAt = 0;
+      let rejectionAttempted = false;
+      let reconciliationRequired = false;
+      let taskPublished = false;
+      let preDispatchReason: InvocationPreDispatchReasonCode =
+        'execution_admission_rejected';
 
-      // BUDGET-PRODUCER: `deckent run` is a first-class one-shot producer, so it
-      // must bind the same owner-authored worker policy snapshot as the planner.
-      // The task is still memory-only here: a missing remote policy/profile must
-      // HOLD before a Task JSON exists and before any provider/backend bootstrap.
-      const budgetPolicy = applyWorkerExecutionBudgetPolicy(
-        [task],
-        cfg?.execution_budget,
-        identity.provider,
-      )[0]!; // exactly one in-memory task enters the one-shot producer
-      if (budgetPolicy.state === 'hold') {
-        printError(new Error(getMessage('run.budget_hold', lang, {
-          reason: budgetPolicy.reasonCode ?? 'unknown',
-          profile: budgetPolicy.profileRef,
-        })));
-        process.exitCode = 1;
-        return;
-      }
-
-      const workerProviderOrder = orderedRoleProviders('worker', cfg ?? {});
-      const providerAuthority = preflightProviderExecutionIngress(
-        runtime.providerAuthority,
-        {
-          runId: task.sprintId ?? taskId,
-          taskId,
-          provider: identity.provider,
-          model,
-          configuredBackend: cfg?.spawn_backend ?? 'auto',
-          fallbackProviders: [
-            workerProviderOrder.primary,
-            ...workerProviderOrder.fallbacks,
-          ].filter(candidate => candidate !== identity.provider),
-          unattended: workerProviderOrder.unattended,
-        },
-      );
-      if (providerAuthority.decision === 'hold') {
-        printError(new Error(getMessage('run.provider_authority_hold', lang, {
-          reason: providerAuthority.reasonCode,
-          evidence: providerAuthority.authorityEvidenceRefs.join(','),
-        })));
-        process.exitCode = 1;
-        return;
-      }
-
-      // WM-1b: V2 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
-      try {
-        const routingVersion = cfg?.routing_engine ?? 'v2';
-        if (routingVersion === 'v2') {
-
-          const overrides: UserOverride[] = [];
-          if (task.forceAgent || task.forceSkills || task.excludeSkills || task.excludeAgent) {
-            overrides.push({
-              source: 'task-directive',
-              forceAgent: task.forceAgent,
-              forceSkills: task.forceSkills,
-              excludeSkills: task.excludeSkills,
-              excludeAgents: task.excludeAgent,
-              priority: 3,
-            });
+      const rejectBeforeDispatch = async (
+        reasonCode: InvocationPreDispatchReasonCode,
+      ): Promise<void> => {
+        if (!settlementContext || dispatchStarted || dispatchUncertain || rejectionAttempted) {
+          return;
+        }
+        rejectionAttempted = true;
+        try {
+          const rejectionOccurredAt = now();
+          const inspection = await settleRunBeforeDispatch(
+            settlementContext,
+            reasonCode,
+            rejectionOccurredAt,
+          );
+          if (inspection.effectiveStatus !== 'NOT_DISPATCHED') {
+            reconciliationRequired = true;
+            printError(new Error(getMessage('run.settlement_rejection_incomplete', lang, {
+              receiptId: settlementContext.invocationId,
+              reason: inspection.reasonCode,
+            })));
+            return;
           }
-
-          // ROUTING-V3 (S3 cut-over): vector pipeline, structural content.
-          const { routeSingleTaskV3 } = await import('../../orchestra/routing-plan-adapter.js');
-          const v3 = await routeSingleTaskV3(task, root);
-          task.assignedAgent = v3.agentId;
-          task.assignedSkills = v3.skillIds;
+          print(getMessage('run.settlement_dispatch_rejected', lang, {
+            receiptId: settlementContext.invocationId,
+            reason: reasonCode,
+            evidence: inspection.evidenceRefs.join(','),
+          }));
+        } catch (error) {
+          reconciliationRequired = true;
+          const message = error instanceof Error ? error.message : String(error);
+          printError(new Error(getMessage('run.settlement_rejection_failed', lang, {
+            receiptId: settlementContext.invocationId,
+            message,
+          })));
         }
-      } catch (routingErr) {
-        debugLog('run:routing', `V2 routing failed, using generic fallback: ${routingErr}`);
-      }
+      };
 
-      // Write task file
-      const tasksDir = join(root, TASKS_DIR);
-      mkdirSync(tasksDir, { recursive: true });
-      writeFileSync(join(tasksDir, `task-${taskId}.json`), JSON.stringify(task, null, 2), 'utf-8');
-
-      print(`Running task ${taskId} (model: ${model}, scope: ${scopeDir})`);
-      print(`Description: ${description}`);
-      if (timeoutMs !== 300_000) print(`Timeout: ${timeoutMs}ms`);
-
-      const approvalBootstrap = !runtime.attendedExecutionApprovalAuthority && cfg
-        ? bootstrapApprovalAuthority(root, cfg)
-        : { state: 'disabled' as const };
-      const attendedExecutionApprovalAuthority =
-        runtime.attendedExecutionApprovalAuthority
-        ?? (approvalBootstrap.state === 'ready'
-          ? approvalBootstrap.runtime.attendedExecutionApprovalAuthority
-          : undefined);
       try {
-        // Resolve agent and skill prompts if available (task may have assignedAgent/assignedSkills)
-        const agentPrompt = await resolveAgentPrompt(root, task);
-        const skillPrompts = await resolveSkillPrompts(root, task);
-
-        // Spawn worker via config-aware backend (provider resolved in the request)
-        const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, root);
-        const { backend, settlementRef } = await spawnWorkerMultiProvider(taskId, model, prompt, root, {
-          autoApprove,
-          spawnBackend: cfg?.spawn_backend,
-          dockerImage: cfg?.docker_image,
-          dockerTimeout: cfg?.docker_timeout,
-          provider: execReq.provider,
-          // Exact resolved owner ceiling — the Task JSON and live spawn carry
-          // the same value. The spawn layer remains the final measured-usage
-          // enforcement boundary and independently rejects budgetless remotes.
-          executionBudget: task.budget,
-          executionLandingPolicy: task.budgetPolicy?.landingPolicy,
-          executionBudgetProfileRef: task.budgetPolicy?.profileRef,
-          executionBudgetPolicyDigest: task.budgetPolicy?.policyDigest,
-          executionAdmissionMode: task.budgetPolicy?.admissionMode,
-          executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
-          executionApprovalProposal: task.budgetPolicy?.approvalProposal,
-          executionApprovalMaterial: createAttendedExecutionProposalMaterialFromTask(
-            task as unknown as Record<string, unknown>,
-            prompt,
-          ),
-          attendedExecutionApprovalAuthority,
-          executionTenantId: task.actor?.tenantId ?? 'local',
-          executionRunId: task.sprintId ?? taskId,
-          // F1-RE (268-003): task.modelEffort (from --model-effort) is validated
-          // per-provider inside spawnWorkerMultiProvider via resolveReasoningEffort.
-          modelEffort: task.modelEffort,
-        });
-        print(`Worker spawned via ${backend} (w-${taskId})`);
-
-        // Stream logs or wait for result
-        if (verbose) {
-          print('--- Worker output ---');
-          await streamWorkerLog(root, taskId, timeoutMs, settlementRef);
-          print('--- End of worker output ---');
+        if (runtime.openTaskSettlementAuthority) {
+          const opened = runtime.openTaskSettlementAuthority(root);
+          settlementOpened = opened;
+          const tenantId = resolveTenant(root, {
+            ...(task.actor?.tenantId ? { tenantId: task.actor.tenantId } : {}),
+          }).tenantId;
+          const executionBackend = resolveTaskSettlementBackend(
+            task,
+            cfg?.spawn_backend,
+          );
+          const declaration = opened.authority.declareTaskExecution({
+            tenantId,
+            projectId: opened.projectId,
+            taskId,
+            runId,
+            provider: identity.provider,
+            model,
+            executionBackend,
+            transport: 'cli',
+            createdAt: taskCreatedAt,
+          });
+          settlementContext = {
+            projectRoot: root,
+            opened,
+            tenantId,
+            runId,
+            taskId,
+            taskCreatedAt,
+            rawStatus: task.status,
+            taskContent: () => JSON.stringify(task, null, 2),
+            taskPublished: () => taskPublished,
+            executionBackend,
+            invocationId: declaration.receiptRef.invocationId,
+            receiptRef: declaration.receiptRef,
+          };
+          print(getMessage('run.settlement_declared', lang, {
+            receiptId: declaration.receiptRef.invocationId,
+          }));
         }
 
-        // Wait for result
-        print('Waiting for result...');
-        const result = await waitForRunResult(root, taskId, timeoutMs, { settlementRef });
-
-        if (!result) {
-          print('Task timed out without producing a result.');
-          if (!keepFiles) cleanupRunTask(root, taskId);
+        // BUDGET-PRODUCER: `deckent run` is a first-class one-shot producer, so it
+        // must bind the same owner-authored worker policy snapshot as the planner.
+        // The immutable declaration already exists, but the task remains memory-only:
+        // a HOLD creates dispatch_rejected + consumer_settled without Task JSON.
+        preDispatchReason = 'budget_capability_unsupported';
+        const budgetPolicy = applyWorkerExecutionBudgetPolicy(
+          [task],
+          cfg?.execution_budget,
+          identity.provider,
+        )[0]!; // exactly one in-memory task enters the one-shot producer
+        if (budgetPolicy.state === 'hold') {
+          await rejectBeforeDispatch('budget_capability_unsupported');
+          printError(new Error(getMessage('run.budget_hold', lang, {
+            reason: budgetPolicy.reasonCode ?? 'unknown',
+            profile: budgetPolicy.profileRef,
+          })));
           process.exitCode = 1;
           return;
         }
 
-        // Report
-        const assessment = result.selfAssessment ?? 'NO_GO';
-        print(`\nResult: ${assessment}`);
-        if (result.notes) print(`Notes: ${result.notes}`);
-        if (result.filesChanged?.length) {
-          print(`Files changed: ${result.filesChanged.join(', ')}`);
-        }
-        print(`Tests passed: ${result.testsPassed ? 'yes' : 'no'}`);
-
-        // Cleanup (unless --keep)
-        if (!keepFiles) {
-          cleanupRunTask(root, taskId);
-        } else {
-          print(`Task files preserved (--keep): task-${taskId}.*`);
-        }
-
-        // Exit code
-        if (assessment === 'DONE' || assessment === 'GO_WITH_TECH_DEBT') {
-          process.exitCode = 0;
-        } else {
+        preDispatchReason = 'provider_authority_rejected';
+        const workerProviderOrder = orderedRoleProviders('worker', cfg ?? {});
+        const providerAuthority = preflightProviderExecutionIngress(
+          runtime.providerAuthority,
+          {
+            runId,
+            taskId,
+            provider: identity.provider,
+            model,
+            configuredBackend: cfg?.spawn_backend ?? 'auto',
+            fallbackProviders: [
+              workerProviderOrder.primary,
+              ...workerProviderOrder.fallbacks,
+            ].filter(candidate => candidate !== identity.provider),
+            unattended: workerProviderOrder.unattended,
+          },
+        );
+        if (providerAuthority.decision === 'hold') {
+          await rejectBeforeDispatch('provider_authority_rejected');
+          printError(new Error(getMessage('run.provider_authority_hold', lang, {
+            reason: providerAuthority.reasonCode,
+            evidence: providerAuthority.authorityEvidenceRefs.join(','),
+          })));
+          const remedy = providerAuthorityHoldRemedy(providerAuthority.reasonCode, lang);
+          if (remedy) print(remedy);
           process.exitCode = 1;
+          return;
+        }
+
+        // WM-1b: V2 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
+        try {
+          const routingVersion = cfg?.routing_engine ?? 'v2';
+          if (routingVersion === 'v2') {
+
+            const overrides: UserOverride[] = [];
+            if (task.forceAgent || task.forceSkills || task.excludeSkills || task.excludeAgent) {
+              overrides.push({
+                source: 'task-directive',
+                forceAgent: task.forceAgent,
+                forceSkills: task.forceSkills,
+                excludeSkills: task.excludeSkills,
+                excludeAgents: task.excludeAgent,
+                priority: 3,
+              });
+            }
+
+            // ROUTING-V3 (S3 cut-over): vector pipeline, structural content.
+            const { routeSingleTaskV3 } = await import('../../orchestra/routing-plan-adapter.js');
+            const v3 = await routeSingleTaskV3(task, root);
+            task.assignedAgent = v3.agentId;
+            task.assignedSkills = v3.skillIds;
+          }
+        } catch (routingErr) {
+          debugLog('run:routing', `V2 routing failed, using generic fallback: ${routingErr}`);
+        }
+
+        preDispatchReason = 'execution_admission_rejected';
+        const tasksDir = join(root, TASKS_DIR);
+        mkdirSync(tasksDir, { recursive: true });
+        writeFileSync(
+          join(tasksDir, `task-${taskId}.json`),
+          JSON.stringify(task, null, 2),
+          'utf-8',
+        );
+        taskPublished = true;
+
+        print(`Running task ${taskId} (model: ${model}, scope: ${scopeDir})`);
+        print(`Description: ${description}`);
+        if (timeoutMs !== 300_000) print(`Timeout: ${timeoutMs}ms`);
+
+        const approvalBootstrap = !runtime.attendedExecutionApprovalAuthority && cfg
+          ? bootstrapApprovalAuthority(root, cfg)
+          : { state: 'disabled' as const };
+        const attendedExecutionApprovalAuthority =
+          runtime.attendedExecutionApprovalAuthority
+          ?? (approvalBootstrap.state === 'ready'
+            ? approvalBootstrap.runtime.attendedExecutionApprovalAuthority
+            : undefined);
+        try {
+          preDispatchReason = 'command_build_failed';
+          const agentPrompt = await resolveAgentPrompt(root, task);
+          const skillPrompts = await resolveSkillPrompts(root, task);
+          const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, root);
+
+          preDispatchReason = 'execution_admission_rejected';
+          const spawned = await spawnWorkerMultiProvider(taskId, model, prompt, root, {
+            autoApprove,
+            spawnBackend: cfg?.spawn_backend,
+            dockerImage: cfg?.docker_image,
+            dockerTimeout: cfg?.docker_timeout,
+            provider: execReq.provider,
+            executionBudget: task.budget,
+            executionLandingPolicy: task.budgetPolicy?.landingPolicy,
+            executionBudgetProfileRef: task.budgetPolicy?.profileRef,
+            executionBudgetPolicyDigest: task.budgetPolicy?.policyDigest,
+            executionAdmissionMode: task.budgetPolicy?.admissionMode,
+            executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
+            executionApprovalProposal: task.budgetPolicy?.approvalProposal,
+            executionApprovalMaterial: createAttendedExecutionProposalMaterialFromTask(
+              task as unknown as Record<string, unknown>,
+              prompt,
+            ),
+            attendedExecutionApprovalAuthority,
+            executionTenantId: settlementContext?.tenantId
+              ?? resolveTenant(root, {
+                ...(task.actor?.tenantId ? { tenantId: task.actor.tenantId } : {}),
+              }).tenantId,
+            executionRunId: runId,
+            ...(settlementContext
+              ? { executionInvocationId: settlementContext.invocationId }
+              : {}),
+            modelEffort: task.modelEffort,
+            ...(settlementContext
+              ? {
+                  onDispatchBoundary: async (boundary: WorkerDispatchBoundary): Promise<void> => {
+                    if (
+                      boundary.taskId !== taskId
+                      || boundary.provider !== identity.provider
+                      || boundary.model !== model
+                      || dispatchStarted
+                    ) {
+                      throw new DeckentError(
+                        'E_RUN_DISPATCH_BOUNDARY_MISMATCH',
+                        getMessage('run.settlement_dispatch_boundary_mismatch', lang, {
+                          taskId,
+                        }),
+                      );
+                    }
+                    const actualExecutionBackend =
+                      normalizeWorkerDispatchBackend(boundary.backend);
+                    if (
+                      actualExecutionBackend === 'unknown'
+                      || actualExecutionBackend !== settlementContext!.executionBackend
+                    ) {
+                      throw new DeckentError(
+                        'E_RUN_DISPATCH_BACKEND_MISMATCH',
+                        getMessage('run.settlement_backend_mismatch', lang, {
+                          expected: settlementContext!.executionBackend,
+                          actual: boundary.backend,
+                        }),
+                      );
+                    }
+                    settlementContext!.opened.authority.markDispatchStarted({
+                      tenantId: settlementContext!.tenantId,
+                      projectId: settlementContext!.opened.projectId,
+                      invocationId: settlementContext!.invocationId,
+                      attempt: 1,
+                      executionEvidenceRef: boundary.executionEvidenceRef,
+                      calledProvider: boundary.provider,
+                      calledModel: boundary.model,
+                    });
+                    dispatchBoundary = boundary;
+                    dispatchStartedAt = Date.now();
+                    dispatchStarted = true;
+                  },
+                }
+              : {}),
+          });
+          if (settlementContext && !dispatchStarted) {
+            dispatchUncertain = true;
+            reconciliationRequired = true;
+            throw new DeckentError(
+              'E_RUN_DISPATCH_BOUNDARY_MISSING',
+              getMessage('run.settlement_dispatch_boundary_missing', lang, { taskId }),
+            );
+          }
+          print(`Worker spawned via ${spawned.backend} (w-${taskId})`);
+
+          if (verbose) {
+            print('--- Worker output ---');
+            await streamWorkerLog(root, taskId, timeoutMs, spawned.settlementRef);
+            print('--- End of worker output ---');
+          }
+
+          print('Waiting for result...');
+          const result = await waitForRunResult(root, taskId, timeoutMs, {
+            settlementRef: spawned.settlementRef,
+          });
+
+          if (!result) {
+            print('Task timed out without producing a result.');
+            if (settlementContext && (dispatchStarted || dispatchUncertain)) {
+              reconciliationRequired = true;
+              print(getMessage('run.settlement_reconciliation_required', lang, {
+                receiptId: settlementContext.invocationId,
+                evidence: dispatchBoundary?.executionEvidenceRef ?? 'unknown',
+              }));
+            } else if (!keepFiles) {
+              cleanupRunTask(root, taskId);
+            }
+            process.exitCode = 1;
+            return;
+          }
+
+          const assessment = result.selfAssessment ?? 'NO_GO';
+          if (settlementContext) {
+            if (!dispatchStarted || !dispatchBoundary) {
+              dispatchUncertain = true;
+              reconciliationRequired = true;
+              throw new DeckentError(
+                'E_RUN_TERMINAL_WITHOUT_DISPATCH_BOUNDARY',
+                getMessage('run.settlement_terminal_without_dispatch', lang, { taskId }),
+              );
+            }
+            // The raw `.result` may be cleaned after a successful run. Bind the
+            // receipt to canonical normalized bytes so its evidence remains
+            // independently comparable instead of pointing at a deleted path.
+            const resultEvidenceRef = runResultEvidenceRef(result);
+            const inspection = settleRunResult(
+              settlementContext,
+              result,
+              Math.max(0, Date.now() - dispatchStartedAt),
+              [
+                dispatchBoundary.executionEvidenceRef,
+                resultEvidenceRef,
+                ...(spawned.settlementRef
+                  ? [`task-result-settlement:${spawned.settlementRef.attemptId}`]
+                  : []),
+              ],
+            );
+            print(getMessage('run.settlement_terminal', lang, {
+              receiptId: settlementContext.invocationId,
+              effectiveStatus: inspection.effectiveStatus,
+              evidence: inspection.evidenceRefs.join(','),
+            }));
+          }
+
+          print(`\nResult: ${assessment}`);
+          if (result.notes) print(`Notes: ${result.notes}`);
+          if (result.filesChanged?.length) {
+            print(`Files changed: ${result.filesChanged.join(', ')}`);
+          }
+          print(`Tests passed: ${result.testsPassed ? 'yes' : 'no'}`);
+
+          if (!keepFiles) {
+            cleanupRunTask(root, taskId);
+          } else {
+            print(`Task files preserved (--keep): task-${taskId}.*`);
+          }
+
+          process.exitCode =
+            assessment === 'DONE' || assessment === 'GO_WITH_TECH_DEBT'
+              ? 0
+              : 1;
+        } finally {
+          if (approvalBootstrap.state === 'ready') approvalBootstrap.runtime.close();
         }
       } catch (error) {
-        if (!keepFiles) cleanupRunTask(root, taskId);
-        printError(error);
+        if (settlementContext && !dispatchStarted && !dispatchUncertain) {
+          await rejectBeforeDispatch(preDispatchReason);
+        }
+        if (settlementContext && (dispatchStarted || dispatchUncertain)) {
+          reconciliationRequired = true;
+          print(getMessage('run.settlement_reconciliation_required', lang, {
+            receiptId: settlementContext.invocationId,
+            evidence: dispatchBoundary?.executionEvidenceRef ?? 'unknown',
+          }));
+        }
+        if (!keepFiles && !reconciliationRequired) cleanupRunTask(root, taskId);
+        if (
+          error instanceof DeckentError
+          && error.code === 'E_TASK_RESULT_IDENTITY_MISMATCH'
+        ) {
+          printError(new Error(getMessage('run.result_identity_mismatch', lang, {
+            taskId,
+          })));
+        } else {
+          printError(error);
+        }
         process.exitCode = 1;
       } finally {
-        if (approvalBootstrap.state === 'ready') approvalBootstrap.runtime.close();
+        settlementOpened?.close();
       }
     });
 

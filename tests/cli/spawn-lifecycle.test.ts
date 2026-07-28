@@ -21,7 +21,7 @@ import { Command } from 'commander';
 
 // ─── Mocks (hoisted — only `state` from vi.hoisted may be referenced) ────────
 
-const state = vi.hoisted(() => ({ root: '' }));
+const state = vi.hoisted(() => ({ base: '', root: '' }));
 
 vi.mock('../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: () => state.root,
@@ -166,12 +166,15 @@ async function runCommand(args: string[]): Promise<void> {
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
 let backendSpawn: ReturnType<typeof vi.fn>;
+const originalDeckentHome = process.env.DECKENT_HOME;
 
 beforeEach(() => {
   vi.clearAllMocks();
   process.exitCode = undefined;
-  state.root = mkdtempSync(join(tmpdir(), 'spawn-lifecycle-'));
+  state.base = mkdtempSync(join(tmpdir(), 'spawn-lifecycle-'));
+  state.root = join(state.base, 'project');
   mkdirSync(join(state.root, '.tasks'), { recursive: true });
+  process.env.DECKENT_HOME = join(state.base, 'host-state');
   backendSpawn = vi.fn();
   vi.mocked(SpawnBackendFactory.create).mockReturnValue({
     name: 'docker',
@@ -192,7 +195,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  rmSync(state.root, { recursive: true, force: true });
+  if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+  else process.env.DECKENT_HOME = originalDeckentHome;
+  rmSync(state.base, { recursive: true, force: true });
   process.exitCode = undefined;
 });
 

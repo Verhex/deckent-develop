@@ -610,6 +610,20 @@ export interface SpawnBackendFactoryOptions {
   dockerMemoryLimit?: string;
 
   /**
+   * Per-worker Docker swap ceiling (docker `--memory-swap`). Wired from
+   * `config.worker_memory_swap`. Undefined → the backend derives it from the
+   * memory limit at × 1.5, the documented ratio. Must never be below the limit.
+   */
+  dockerMemorySwap?: string;
+
+  /**
+   * Opt-in per-TaskKind Docker memory limits, wired from
+   * `config.worker_memory_limit_by_kind`. Swap for a kind is auto-derived at
+   * limit × 1.5. Undefined/empty → every kind uses the default limit.
+   */
+  dockerKindMemoryLimits?: Record<string, string>;
+
+  /**
    * Sandbox backend options (memory limit, allowed dirs, network block).
    * Only consulted when backend is 'sandbox'.
    */
@@ -641,6 +655,10 @@ export class SpawnBackendFactory {
           ?? (opts.defaultTimeoutMs ? Math.floor(opts.defaultTimeoutMs / 1000) : undefined),
         gracefulTimeoutSeconds: opts.dockerGracefulTimeoutSeconds,
         memoryLimit: opts.dockerMemoryLimit, // B-WORKERMEM (Sprint 318): config-driven --memory
+        // MASTER-PLAN 666: both were previously unreachable from config — swap
+        // fell back to a fixed constant and per-kind limits were never passed.
+        memorySwap: opts.dockerMemorySwap,
+        kindMemoryLimits: opts.dockerKindMemoryLimits,
       });
     }
 

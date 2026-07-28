@@ -58,6 +58,20 @@ vi.mock('../../src/orchestra/event-bus.js', () => {
   };
 });
 
+const shutdownHookState = vi.hoisted(() => ({
+  hooks: [] as Array<() => Promise<void>>,
+  register: vi.fn(),
+  unregister: vi.fn(),
+}));
+
+vi.mock('../../src/cli/helpers/shutdown-hooks.js', () => ({
+  registerShutdownHook: (hook: () => Promise<void>) => {
+    shutdownHookState.hooks.push(hook);
+    shutdownHookState.register(hook);
+    return shutdownHookState.unregister;
+  },
+}));
+
 // StatusRenderer mock
 vi.mock('../../src/cli/helpers/status-renderer.js', () => {
   const snapshotMock = vi.fn().mockReturnValue('╭──── snapshot ────╮');
@@ -97,25 +111,54 @@ const existsSyncMock = vi.mocked(existsSync);
 const readFileSyncMock = vi.mocked(readFileSync);
 const readdirSyncMock = vi.mocked(readdirSync);
 
+function lastShutdownHook(): () => Promise<void> {
+  const hook = shutdownHookState.hooks[shutdownHookState.hooks.length - 1];
+  if (!hook) throw new Error('no shutdown hook registered');
+  return hook;
+}
+
 describe('status --follow', () => {
   let program: Command;
   let stdoutWriteSpy: ReturnType<typeof vi.spyOn>;
   let processOnSpy: ReturnType<typeof vi.spyOn>;
   let processExitSpy: ReturnType<typeof vi.spyOn>;
+  let setIntervalSpy: ReturnType<typeof vi.spyOn>;
+  let clearIntervalSpy: ReturnType<typeof vi.spyOn>;
+  let originalExitCode: typeof process.exitCode;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    shutdownHookState.hooks.length = 0;
+    originalExitCode = process.exitCode;
+    process.exitCode = undefined;
     program = new Command();
     registerStatus(program);
-    stdoutWriteSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    stdoutWriteSpy = vi.spyOn(process.stdout, 'write').mockImplementation(((
+      _value: string | Uint8Array,
+      ...args: unknown[]
+    ) => {
+      const callback = args.find(
+        (arg): arg is (error?: Error | null) => void => typeof arg === 'function',
+      );
+      callback?.();
+      return true;
+    }) as typeof process.stdout.write);
     processOnSpy = vi.spyOn(process, 'on').mockReturnThis();
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+    setIntervalSpy = vi.spyOn(globalThis, 'setInterval').mockImplementation(((
+      _callback: (...args: unknown[]) => void,
+      _delay?: number,
+    ) => ({}) as ReturnType<typeof setInterval>) as typeof setInterval);
+    clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval').mockImplementation(() => {});
   });
 
   afterEach(() => {
+    process.exitCode = originalExitCode;
     stdoutWriteSpy.mockRestore();
     processOnSpy.mockRestore();
     processExitSpy.mockRestore();
+    setIntervalSpy.mockRestore();
+    clearIntervalSpy.mockRestore();
   });
 
   it('--follow flag is recognized by commander', () => {
@@ -139,10 +182,10 @@ describe('status --follow', () => {
 
     await program.parseAsync(['node', 'test', 'status', '--follow']);
 
-    // hideCursor + clearScreen written before snapshot
-    expect(stdoutWriteSpy).toHaveBeenCalledWith('[hide][clear]');
-    // snapshot content written
-    expect(stdoutWriteSpy).toHaveBeenCalledWith('╭──── snapshot ────╮');
+    expect(stdoutWriteSpy).toHaveBeenCalledWith(
+      '[hide][clear]╭──── snapshot ────╮',
+      expect.any(Function),
+    );
   });
 
   it('follow mode subscribes to eventBus', async () => {
@@ -159,7 +202,7 @@ describe('status --follow', () => {
     expect(eventBus.watchFile).toHaveBeenCalledWith('/mock/root', 'sprint-145');
   });
 
-  it('subscribe callback triggers redraw with new snapshot', async () => {
+  it('subscribed events enqueue ANSI redraw frames', async () => {
     existsSyncMock.mockReturnValue(false);
     readdirSyncMock.mockReturnValue([]);
 
@@ -179,40 +222,158 @@ describe('status --follow', () => {
 
     callback({ timestamp: '', sequence: 1, protocol_version: '1.0', source: 'brain', target: '*', channel: 'test', payload: {} });
 
-    expect(rendererInstance.redraw).toHaveBeenCalledWith('╭──── updated ────╮');
+    await vi.waitFor(() => {
+      expect(stdoutWriteSpy).toHaveBeenCalledWith(
+        '[clear]╭──── updated ────╮',
+        expect.any(Function),
+      );
+    });
+    expect(rendererInstance.redraw).not.toHaveBeenCalled();
   });
 
-  it('SIGINT handler calls showCursor and unsubscribe', async () => {
+  it('registers central shutdown cleanup and no raw signal listeners', async () => {
     existsSyncMock.mockReturnValue(false);
     readdirSyncMock.mockReturnValue([]);
 
     await program.parseAsync(['node', 'test', 'status', '--follow']);
 
-    // Find the SIGINT handler
-    const sigintCalls = processOnSpy.mock.calls.filter(c => c[0] === 'SIGINT');
-    expect(sigintCalls.length).toBeGreaterThan(0);
-
-    const sigintHandler = sigintCalls[sigintCalls.length - 1]![1] as () => void;
-
-    // Call the cleanup
-    sigintHandler();
-
-    // Should write showCursor
-    expect(stdoutWriteSpy).toHaveBeenCalledWith('[show]\n');
-    // Should unwatch all event bus watchers
-    expect(eventBus.unwatchAll).toHaveBeenCalled();
-    // Should exit
-    expect(processExitSpy).toHaveBeenCalledWith(0);
+    expect(shutdownHookState.register).toHaveBeenCalledTimes(1);
+    expect(
+      processOnSpy.mock.calls.filter(
+        ([event]) =>
+          event === 'SIGINT'
+          || event === 'SIGTERM'
+          || event === 'SIGBREAK',
+      ),
+    ).toEqual([]);
+    expect(processExitSpy).not.toHaveBeenCalled();
   });
 
-  it('follow mode sets up SIGTERM handler too', async () => {
+  it('central shutdown cleanup is idempotent and unregisters its hook', async () => {
     existsSyncMock.mockReturnValue(false);
     readdirSyncMock.mockReturnValue([]);
 
     await program.parseAsync(['node', 'test', 'status', '--follow']);
 
-    const sigtermCalls = processOnSpy.mock.calls.filter(c => c[0] === 'SIGTERM');
-    expect(sigtermCalls.length).toBeGreaterThan(0);
+    const hook = lastShutdownHook();
+    await Promise.all([hook(), hook()]);
+
+    expect(shutdownHookState.unregister).toHaveBeenCalledTimes(1);
+    expect(eventBus.unwatchAll).toHaveBeenCalledTimes(1);
+    expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+    expect(stdoutWriteSpy).toHaveBeenCalledWith('[show]\n', expect.any(Function));
+    expect(process.exitCode).toBeUndefined();
+    expect(processExitSpy).not.toHaveBeenCalled();
+  });
+
+  it('coalesces event bursts to one in-flight plus the latest frame and drains on shutdown', async () => {
+    existsSyncMock.mockReturnValue(false);
+    readdirSyncMock.mockReturnValue([]);
+    const pendingWrites: Array<{
+      value: string;
+      callback: (error?: Error | null) => void;
+    }> = [];
+    stdoutWriteSpy.mockImplementation(((
+      value: string | Uint8Array,
+      ...args: unknown[]
+    ) => {
+      const callback = args.find(
+        (arg): arg is (error?: Error | null) => void => typeof arg === 'function',
+      );
+      if (!callback) throw new Error('missing stdout callback');
+      pendingWrites.push({ value: String(value), callback });
+      return false;
+    }) as typeof process.stdout.write);
+
+    await program.parseAsync(['node', 'test', 'status', '--follow']);
+    expect(pendingWrites).toHaveLength(1);
+    const callback = vi.mocked(eventBus.subscribe).mock.calls[0]![2];
+    const rendererInstance = vi.mocked(StatusRenderer).mock.results[0]!.value as {
+      snapshot: ReturnType<typeof vi.fn>;
+    };
+    rendererInstance.snapshot.mockReturnValueOnce('snapshot-a');
+    callback({ timestamp: '', sequence: 1, protocol_version: '1.0', source: 'brain', target: '*', channel: 'test', payload: {} });
+    rendererInstance.snapshot.mockReturnValueOnce('snapshot-b');
+    callback({ timestamp: '', sequence: 2, protocol_version: '1.0', source: 'brain', target: '*', channel: 'test', payload: {} });
+    expect(pendingWrites).toHaveLength(1);
+
+    pendingWrites[0]!.callback();
+    process.stdout.emit('drain');
+    await vi.waitFor(() => {
+      expect(pendingWrites).toHaveLength(2);
+    });
+    expect(pendingWrites[1]!.value).toBe('[clear]snapshot-b');
+    expect(pendingWrites.some(write => write.value.includes('snapshot-a'))).toBe(false);
+
+    let hookResolved = false;
+    const hookPromise = lastShutdownHook()().then(() => {
+      hookResolved = true;
+    });
+    await Promise.resolve();
+    expect(hookResolved).toBe(false);
+    expect(pendingWrites).toHaveLength(2);
+
+    pendingWrites[1]!.callback();
+    process.stdout.emit('drain');
+    await vi.waitFor(() => {
+      expect(pendingWrites).toHaveLength(3);
+    });
+    expect(pendingWrites[2]!.value).toBe('[show]\n');
+    expect(hookResolved).toBe(false);
+
+    pendingWrites[2]!.callback();
+    process.stdout.emit('drain');
+    await hookPromise;
+
+    expect(hookResolved).toBe(true);
+    expect(shutdownHookState.unregister).toHaveBeenCalledTimes(1);
+    expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('JSON shutdown drains an empty sentinel without cursor or ANSI output', async () => {
+    existsSyncMock.mockReturnValue(false);
+    readdirSyncMock.mockReturnValue([]);
+
+    await program.parseAsync(['node', 'test', 'status', '--follow', '--json']);
+    await lastShutdownHook()();
+
+    const frames = stdoutWriteSpy.mock.calls.map(call => String(call[0]));
+    expect(frames.at(-1)).toBe('');
+    expect(frames.some(frame => frame.includes('[hide]'))).toBe(false);
+    expect(frames.some(frame => frame.includes('[show]'))).toBe(false);
+    expect(frames.slice(0, -1).every(frame => {
+      const parsed = JSON.parse(frame.trim()) as unknown;
+      return typeof parsed === 'object' && parsed !== null;
+    })).toBe(true);
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('runtime stdout failure performs bounded cleanup and publishes exit code 1', async () => {
+    existsSyncMock.mockReturnValue(false);
+    readdirSyncMock.mockReturnValue([]);
+    let writeCount = 0;
+    stdoutWriteSpy.mockImplementation(((
+      _value: string | Uint8Array,
+      ...args: unknown[]
+    ) => {
+      const callback = args.find(
+        (arg): arg is (error?: Error | null) => void => typeof arg === 'function',
+      );
+      writeCount += 1;
+      callback?.(writeCount === 1 ? new Error('stream failed') : undefined);
+      return true;
+    }) as typeof process.stdout.write);
+
+    await program.parseAsync(['node', 'test', 'status', '--follow']);
+
+    await vi.waitFor(() => {
+      expect(process.exitCode).toBe(1);
+    });
+    expect(shutdownHookState.unregister).toHaveBeenCalledTimes(1);
+    expect(eventBus.unwatchAll).toHaveBeenCalledTimes(1);
+    expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+    expect(processExitSpy).not.toHaveBeenCalled();
   });
 });
 

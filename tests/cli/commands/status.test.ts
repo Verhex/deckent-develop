@@ -10,6 +10,7 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   readdirSync: vi.fn().mockReturnValue([]),
   watch: vi.fn().mockReturnValue({ close: vi.fn() }),
+  mkdirSync: vi.fn(),
 }));
 
 vi.mock('../../../src/cli/helpers/output.js', () => ({
@@ -35,9 +36,27 @@ vi.mock('../../../src/monitor/sprint-state.js', () => ({
   getCurrentSprintId: vi.fn().mockReturnValue(null),
 }));
 
+const shutdownHookState = vi.hoisted(() => ({
+  hooks: [] as Array<() => Promise<void>>,
+  register: vi.fn(),
+  unregister: vi.fn(),
+}));
+
+vi.mock('../../../src/cli/helpers/shutdown-hooks.js', () => ({
+  registerShutdownHook: (hook: () => Promise<void>) => {
+    shutdownHookState.hooks.push(hook);
+    shutdownHookState.register(hook);
+    return shutdownHookState.unregister;
+  },
+}));
+
 import { readFileSync, existsSync, readdirSync, watch } from 'node:fs';
 import { print, printError, formatDashboard, formatHumanStatus, formatStandaloneStatus, isDashboardOrphaned } from '../../../src/cli/helpers/output.js';
-import { registerStatus, loadDepGraphForSprint } from '../../../src/cli/commands/status.js';
+import {
+  appendTaskSettlementsToFollowSnapshot,
+  registerStatus,
+  loadDepGraphForSprint,
+} from '../../../src/cli/commands/status.js';
 import { getCurrentSprintId } from '../../../src/monitor/sprint-state.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -64,11 +83,18 @@ async function runCommand(args: string[]): Promise<void> {
   }
 }
 
+function lastShutdownHook(): () => Promise<void> {
+  const hook = shutdownHookState.hooks[shutdownHookState.hooks.length - 1];
+  if (!hook) throw new Error('no shutdown hook registered');
+  return hook;
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────
 
 describe('status command (isolated)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    shutdownHookState.hooks.length = 0;
     process.exitCode = undefined;
   });
   afterEach(() => {
@@ -126,6 +152,190 @@ describe('status command (isolated)', () => {
     const parsed = JSON.parse(jsonCall![0]);
     expect(parsed.standalone).toBe(true);
     expect(parsed.sprintId).toBe('sprint-002');
+  });
+
+  it('adds read-only raw/effective receipt evidence to standalone JSON and closes the projection', async () => {
+    vi.mocked(existsSync).mockImplementation((p: any) => {
+      if (String(p).includes('.dashboard')) return false;
+      if (String(p).includes('.tasks')) return true;
+      return false;
+    });
+    vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({
+      id: '001', title: 'Test', status: 'PENDING', sprintId: 'sprint-002',
+      dependencies: [], model: 'claude-sonnet-5', effort: 'normal',
+    }));
+    const close = vi.fn();
+    const projection = {
+      rawStatus: 'PENDING',
+      effectiveStatus: 'DONE' as const,
+      evidenceRefs: ['task-result:sha256:evidence'],
+      receiptRef: {
+        schemaVersion: 1 as const,
+        tenantId: 'local',
+        projectId: 'project-test',
+        invocationId: 'invocation-1',
+      },
+      reasonCode: 'projected' as const,
+    };
+    const program = new Command();
+    program.exitOverride();
+    registerStatus(program, {
+      openTaskSettlementProjection: () => ({
+        projectId: 'project-test',
+        diagnostic: 'ready',
+        projectTaskExecutionState: () => projection,
+        projectTaskExecutionStates: inputs => inputs.map(() => projection),
+        close,
+      }),
+    });
+
+    await program.parseAsync(['node', 'test', 'status', '--json']);
+
+    const jsonOutput = vi.mocked(print).mock.calls.find(c => c[0].includes('taskSettlements'));
+    const parsed = JSON.parse(jsonOutput![0]);
+    expect(parsed.taskSettlements).toEqual([
+      expect.objectContaining({
+        taskId: '001',
+        rawStatus: 'PENDING',
+        effectiveStatus: 'DONE',
+        receiptRef: expect.objectContaining({ invocationId: 'invocation-1' }),
+        evidenceRefs: ['task-result:sha256:evidence'],
+      }),
+    ]);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('projects all status tasks through one bulk read instead of per-task queries', async () => {
+    vi.mocked(existsSync).mockImplementation((path: any) => {
+      if (String(path).includes('.dashboard')) return false;
+      if (String(path).includes('.tasks')) return true;
+      return false;
+    });
+    vi.mocked(readdirSync).mockReturnValue([
+      'task-run-2.json',
+      'task-run-1.json',
+    ] as any);
+    vi.mocked(readFileSync).mockImplementation((path: any) => {
+      const taskId = String(path).includes('task-run-1.json') ? 'run-1' : 'run-2';
+      return JSON.stringify({
+        id: taskId,
+        title: taskId,
+        status: 'PENDING',
+        sprintId: 'sprint-bulk',
+        dependencies: [],
+        model: 'gpt-5.6-sol',
+        effort: 'normal',
+      });
+    });
+    const projectTaskExecutionState = vi.fn();
+    const projectTaskExecutionStates = vi.fn(inputs => inputs.map(input => ({
+      rawStatus: input.rawStatus,
+      effectiveStatus: input.rawStatus,
+      evidenceRefs: [],
+      reasonCode: 'no-terminal-receipt' as const,
+    })));
+    const program = new Command();
+    program.exitOverride();
+    registerStatus(program, {
+      openTaskSettlementProjection: () => ({
+        projectId: 'project-test',
+        diagnostic: 'ready',
+        projectTaskExecutionState,
+        projectTaskExecutionStates,
+        close: vi.fn(),
+      }),
+    });
+
+    await program.parseAsync(['node', 'test', 'status', '--json']);
+
+    expect(projectTaskExecutionState).not.toHaveBeenCalled();
+    expect(projectTaskExecutionStates).toHaveBeenCalledOnce();
+    expect(projectTaskExecutionStates).toHaveBeenCalledWith([
+      { taskId: 'run-1', rawStatus: 'PENDING', tenantId: 'local' },
+      { taskId: 'run-2', rawStatus: 'PENDING', tenantId: 'local' },
+    ]);
+  });
+
+  it('surfaces open receipt reconciliation evidence in human status', async () => {
+    vi.mocked(existsSync).mockImplementation((p: any) => {
+      if (String(p).includes('.dashboard')) return false;
+      if (String(p).includes('.tasks')) return true;
+      return false;
+    });
+    vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({
+      id: '001', title: 'Test', status: 'PENDING', sprintId: 'sprint-002',
+      dependencies: [], model: 'claude-sonnet-5', effort: 'normal',
+    }));
+    const projection = {
+      rawStatus: 'PENDING',
+      effectiveStatus: 'PENDING' as const,
+      evidenceRefs: ['invocation-receipt:invocation-1:open'],
+      reasonCode: 'open-receipt' as const,
+    };
+    const program = new Command();
+    program.exitOverride();
+    registerStatus(program, {
+      openTaskSettlementProjection: () => ({
+        projectId: 'project-test',
+        diagnostic: 'ready',
+        projectTaskExecutionState: () => projection,
+        projectTaskExecutionStates: inputs => inputs.map(() => projection),
+        close: vi.fn(),
+      }),
+    });
+
+    await program.parseAsync(['node', 'test', 'status']);
+
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('open-receipt'));
+    expect(print).toHaveBeenCalledWith(
+      expect.stringContaining('invocation-receipt:invocation-1:open'),
+    );
+  });
+
+  it('adds the same immutable settlement projection to follow snapshots', () => {
+    const close = vi.fn();
+    const projection = {
+      rawStatus: 'PENDING',
+      effectiveStatus: 'NOT_DISPATCHED' as const,
+      evidenceRefs: ['invocation-event:settled'],
+      receiptRef: {
+        schemaVersion: 1 as const,
+        tenantId: 'local',
+        projectId: 'project-test',
+        invocationId: 'invocation-1',
+      },
+      reasonCode: 'projected' as const,
+    };
+    const rendered = appendTaskSettlementsToFollowSnapshot(
+      'LIVE SNAPSHOT',
+      '/mock/root',
+      [{
+        id: '001',
+        title: 'Test',
+        status: 'PENDING',
+        model: 'claude-sonnet-5',
+        effort: 'normal',
+        dependencies: [],
+        scope: { directories: [], filesRead: [], filesWrite: [] },
+      } as never],
+      {
+        openTaskSettlementProjection: () => ({
+          projectId: 'project-test',
+          diagnostic: 'ready',
+          projectTaskExecutionState: () => projection,
+          projectTaskExecutionStates: inputs => inputs.map(() => projection),
+          close,
+        }),
+      },
+      'en',
+    );
+
+    expect(rendered).toContain('LIVE SNAPSHOT');
+    expect(rendered).toContain('NOT_DISPATCHED');
+    expect(rendered).toContain('invocation-event:settled');
+    expect(close).toHaveBeenCalledOnce();
   });
 
   it('renders human-friendly output by default', async () => {
@@ -191,16 +401,33 @@ describe('status command (isolated)', () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));
     const setIntervalSpy = vi.spyOn(global, 'setInterval').mockReturnValue(42 as any);
+    const clearIntervalSpy = vi.spyOn(global, 'clearInterval').mockImplementation(() => {});
     const onSpy = vi.spyOn(process, 'on').mockImplementation(() => process);
     await runCommand(['status', '--watch']);
     // fs.watch should be called
     expect(watch).toHaveBeenCalled();
     // Fallback interval at 5000ms
     expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 5000);
-    // Should register SIGINT and SIGTERM handlers
-    expect(onSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
-    expect(onSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+    expect(shutdownHookState.register).toHaveBeenCalledTimes(1);
+    expect(
+      onSpy.mock.calls.filter(
+        ([event]) =>
+          event === 'SIGINT'
+          || event === 'SIGTERM'
+          || event === 'SIGBREAK',
+      ),
+    ).toEqual([]);
+
+    const watcher = vi.mocked(watch).mock.results.at(-1)?.value;
+    const hook = lastShutdownHook();
+    await hook();
+    await hook();
+
+    expect(watcher?.close).toHaveBeenCalledTimes(1);
+    expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+    expect(shutdownHookState.unregister).toHaveBeenCalledTimes(1);
     setIntervalSpy.mockRestore();
+    clearIntervalSpy.mockRestore();
     onSpy.mockRestore();
   });
 
@@ -209,14 +436,198 @@ describe('status command (isolated)', () => {
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));
     const setIntervalSpy = vi.spyOn(global, 'setInterval').mockReturnValue(42 as any);
     const onSpy = vi.spyOn(process, 'on').mockImplementation(() => process);
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(((
+      _value: string | Uint8Array,
+      ...args: unknown[]
+    ) => {
+      const callback = args.find(
+        (arg): arg is (error?: Error | null) => void => typeof arg === 'function',
+      );
+      callback?.();
+      return true;
+    }) as typeof process.stdout.write);
     await runCommand(['status', '--watch', '--json']);
-    const printCalls = vi.mocked(print).mock.calls;
-    const hasJson = printCalls.some(c => {
-      try { JSON.parse(c[0]); return true; } catch { return false; }
+    const hasJson = stdoutSpy.mock.calls.some(call => {
+      try { JSON.parse(String(call[0]).trim()); return true; } catch { return false; }
     });
     expect(hasJson).toBe(true);
+    await lastShutdownHook()();
+    expect(stdoutSpy.mock.calls.at(-1)?.[0]).toBe('');
     setIntervalSpy.mockRestore();
     onSpy.mockRestore();
+    stdoutSpy.mockRestore();
+  });
+
+  it('--mode json emits one machine document without human settlement suffixes', async () => {
+    vi.mocked(existsSync).mockImplementation((path: any) =>
+      String(path).includes('.dashboard'));
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));
+
+    await runCommand(['status', '--mode', 'json']);
+
+    const calls = vi.mocked(print).mock.calls.map(call => call[0]);
+    expect(calls).toHaveLength(1);
+    expect(JSON.parse(calls[0]!)).toMatchObject({
+      sprint: { id: 'sprint-001' },
+      taskSettlements: [],
+    });
+    expect(formatHumanStatus).not.toHaveBeenCalled();
+  });
+
+  it('--mode json --graph preserves the single-document machine contract', async () => {
+    vi.mocked(getCurrentSprintId).mockReturnValue(null);
+
+    await runCommand(['status', '--mode', 'json', '--graph']);
+
+    const calls = vi.mocked(print).mock.calls.map(call => call[0]);
+    expect(calls).toHaveLength(1);
+    expect(JSON.parse(calls[0]!)).toEqual({
+      schemaVersion: 1,
+      command: 'status.graph',
+      active: false,
+      sprintId: null,
+      graph: null,
+      reasonCode: 'no-active-run',
+    });
+  });
+
+  it('--watch --mode json emits ANSI-free NDJSON records', async () => {
+    vi.mocked(existsSync).mockImplementation((path: any) =>
+      String(path).includes('.dashboard'));
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));
+    const setIntervalSpy = vi.spyOn(global, 'setInterval').mockReturnValue(42 as any);
+    const onSpy = vi.spyOn(process, 'on').mockImplementation(() => process);
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(((
+      _value: string | Uint8Array,
+      ...args: unknown[]
+    ) => {
+      const callback = args.find(
+        (arg): arg is (error?: Error | null) => void => typeof arg === 'function',
+      );
+      callback?.();
+      return true;
+    }) as typeof process.stdout.write);
+
+    await runCommand(['status', '--watch', '--mode', 'json']);
+
+    const records = stdoutSpy.mock.calls
+      .map(call => String(call[0]))
+      .filter(frame => frame.trim().startsWith('{'));
+    expect(records).toHaveLength(1);
+    expect(records[0]).not.toContain('\u001b');
+    expect(JSON.parse(records[0]!.trim())).toMatchObject({
+      sprint: { id: 'sprint-001' },
+      taskSettlements: [],
+    });
+    await lastShutdownHook()();
+    expect(stdoutSpy.mock.calls.at(-1)?.[0]).toBe('');
+    setIntervalSpy.mockRestore();
+    onSpy.mockRestore();
+    stdoutSpy.mockRestore();
+  });
+
+  it('--watch bounds burst output to in-flight plus latest and drains before shutdown', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));
+    const setIntervalSpy = vi.spyOn(global, 'setInterval').mockReturnValue(42 as any);
+    const clearIntervalSpy = vi.spyOn(global, 'clearInterval').mockImplementation(() => {});
+    const pendingWrites: Array<{
+      value: string;
+      callback: (error?: Error | null) => void;
+    }> = [];
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(((
+      value: string | Uint8Array,
+      ...args: unknown[]
+    ) => {
+      const callback = args.find(
+        (arg): arg is (error?: Error | null) => void => typeof arg === 'function',
+      );
+      if (!callback) throw new Error('missing stdout callback');
+      pendingWrites.push({ value: String(value), callback });
+      return false;
+    }) as typeof process.stdout.write);
+
+    await runCommand(['status', '--watch']);
+    expect(pendingWrites).toHaveLength(1);
+    const watchCallback = vi.mocked(watch).mock.calls.at(-1)?.[2] as
+      | (() => void)
+      | undefined;
+    expect(watchCallback).toBeDefined();
+
+    vi.mocked(formatHumanStatus).mockReturnValueOnce('watch-a');
+    watchCallback?.();
+    vi.mocked(formatHumanStatus).mockReturnValueOnce('watch-b');
+    watchCallback?.();
+    expect(pendingWrites).toHaveLength(1);
+
+    pendingWrites[0]!.callback();
+    process.stdout.emit('drain');
+    await vi.waitFor(() => {
+      expect(pendingWrites).toHaveLength(2);
+    });
+    expect(pendingWrites[1]!.value).toBe('\x1Bcwatch-b\n');
+    expect(pendingWrites.some(write => write.value.includes('watch-a'))).toBe(false);
+
+    let hookResolved = false;
+    const hookPromise = lastShutdownHook()().then(() => {
+      hookResolved = true;
+    });
+    await Promise.resolve();
+    expect(hookResolved).toBe(false);
+    expect(pendingWrites).toHaveLength(2);
+
+    pendingWrites[1]!.callback();
+    process.stdout.emit('drain');
+    await vi.waitFor(() => {
+      expect(pendingWrites).toHaveLength(3);
+    });
+    expect(pendingWrites[2]!.value).toBe('\n');
+    expect(hookResolved).toBe(false);
+
+    pendingWrites[2]!.callback();
+    process.stdout.emit('drain');
+    await hookPromise;
+
+    expect(hookResolved).toBe(true);
+    expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+    expect(shutdownHookState.unregister).toHaveBeenCalledTimes(1);
+    setIntervalSpy.mockRestore();
+    clearIntervalSpy.mockRestore();
+    stdoutSpy.mockRestore();
+  });
+
+  it('--follow --json emits ANSI-free NDJSON instead of the human TUI', async () => {
+    vi.mocked(existsSync).mockImplementation((path: any) =>
+      String(path).includes('.dashboard'));
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));
+    const setIntervalSpy = vi.spyOn(global, 'setInterval').mockReturnValue(42 as any);
+    const onSpy = vi.spyOn(process, 'on').mockImplementation(() => process);
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(((
+      _value: string | Uint8Array,
+      ...args: unknown[]
+    ) => {
+      const callback = args.find(
+        (arg): arg is (error?: Error | null) => void => typeof arg === 'function',
+      );
+      callback?.();
+      return true;
+    }) as typeof process.stdout.write);
+
+    await runCommand(['status', '--follow', '--json']);
+
+    const writes = stdoutSpy.mock.calls
+      .map(call => String(call[0]))
+      .filter(value => value.trim().startsWith('{'));
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).not.toContain('\u001b');
+    expect(JSON.parse(writes[0]!.trim())).toMatchObject({
+      sprint: { id: 'sprint-001' },
+      taskSettlements: [],
+    });
+    await lastShutdownHook()();
+    setIntervalSpy.mockRestore();
+    onSpy.mockRestore();
+    stdoutSpy.mockRestore();
   });
 
   it('--watch uses human-friendly output by default', async () => {

@@ -14,7 +14,10 @@
  * Fix: 2026-06-08 — ADR-066/077/027
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // ─── Mocks (hoisted — no top-level variable refs inside factories) ─────────────
 
@@ -82,6 +85,23 @@ import {
 
 // ─── Tests ─────────────────────────────────────────────────────────────────────
 
+let fixtureBase = '';
+let projectRoot = '';
+const originalDeckentHome = process.env.DECKENT_HOME;
+
+beforeEach(() => {
+  fixtureBase = mkdtempSync(join(tmpdir(), 'spawn-multiprovider-'));
+  projectRoot = join(fixtureBase, 'project');
+  mkdirSync(join(projectRoot, '.tasks'), { recursive: true });
+  process.env.DECKENT_HOME = join(fixtureBase, 'host-state');
+});
+
+afterEach(() => {
+  if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+  else process.env.DECKENT_HOME = originalDeckentHome;
+  rmSync(fixtureBase, { recursive: true, force: true });
+});
+
 describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () => {
   let adapterSpawnSpy: ReturnType<typeof vi.fn>;
   let adapterRefreshSpy: ReturnType<typeof vi.fn>;
@@ -112,7 +132,7 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
       't-ollama-001',
       'qwen-coder-32b',
       'solve the task',
-      '/project/root',
+      projectRoot,
       { spawnBackend: 'docker', autoApprove: false },
     );
 
@@ -124,7 +144,7 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
       'solve the task',
       expect.objectContaining({
         autoApprove: false,
-        projectDir: '/project/root',
+        projectDir: projectRoot,
       }),
     );
 
@@ -147,7 +167,7 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
       't-ollama-002',
       'qwen-coder-32b',
       'prompt',
-      '/root',
+      projectRoot,
       { spawnBackend: 'docker' },
     );
 
@@ -161,7 +181,7 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
       't-ollama-003',
       'qwen-coder-32b',
       'prompt',
-      '/root',
+      projectRoot,
       {},
     );
 
@@ -176,7 +196,7 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
       't-ollama-budgeted',
       'qwen-coder-32b',
       'prompt',
-      '/root',
+      projectRoot,
       { executionBudget: { maxTokens: 100 } },
     )).rejects.toThrow('Spawn blocked before provider work');
 
@@ -190,7 +210,7 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
       't-openrouter-unpriced',
       'vendor/paid-model-v1',
       'prompt',
-      '/definitely/missing/project-root',
+      projectRoot,
       { provider: 'openrouter', spawnBackend: 'docker' },
     )).rejects.toThrow('Unknown model: vendor/paid-model-v1');
 
@@ -206,7 +226,7 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
       't-ollama-004',
       'qwen-coder-32b',
       'prompt',
-      '/root',
+      projectRoot,
       { allowedTools: 'Read,Write,Edit,Bash', spawnBackend: 'docker' },
     );
 
@@ -225,7 +245,7 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
       't-ollama-005',
       'qwen-coder-32b',
       'prompt',
-      '/root',
+      projectRoot,
       { autoApprove: true, spawnBackend: 'docker' },
     );
 
@@ -248,7 +268,7 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
       't-ollama-006',
       'qwen-coder-32b',
       'prompt',
-      '/root',
+      projectRoot,
       { provider: 'ollama', spawnBackend: 'docker' },
     );
 
@@ -261,7 +281,7 @@ describe('spawnWorkerMultiProvider — adapter-provider (ollama) routing', () =>
       't-ollama-007',
       'qwen-coder-32b',
       'prompt',
-      '/root',
+      projectRoot,
       { spawnBackend: 'docker' },
     );
 
@@ -290,7 +310,7 @@ describe('spawnWorkerMultiProvider — control: non-adapter providers still use 
       't-claude-001',
       'claude-sonnet-5',
       'prompt',
-      '/root',
+      projectRoot,
       {
         spawnBackend: 'docker',
         ...TEST_DOCKER_EXECUTION_OPTIONS,

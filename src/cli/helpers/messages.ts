@@ -200,6 +200,255 @@ const MESSAGES: MessageMap = {
       + '`deckent provider-authority keyring status`; sahibi '
       + '`deckent provider-authority keyring init` ile sağlar.',
   },
+  // ─── task settlement authority (one-shot execution truth) ───────────────
+  'task.cmd_desc': {
+    en: 'Inspect and reconcile immutable one-shot task settlement evidence',
+    tr: 'Tek seferlik görevlerin değişmez settlement kanıtını incele ve uzlaştır',
+  },
+  'task.settle.desc': {
+    en: 'Inspect a task settlement plan; apply only with explicit operator attestation',
+    tr: 'Görev settlement planını incele; yalnız açık operatör beyanıyla uygula',
+  },
+  'task.settle.opt_apply': {
+    en: 'Apply an evidence-eligible reconciliation (default: dry-run)',
+    tr: 'Kanıtça uygun bir uzlaştırmayı uygula (varsayılan: dry-run)',
+  },
+  'task.settle.opt_attestation_reason': {
+    en: 'Operator-authored reason for the reconciliation (required with --apply)',
+    tr: 'Uzlaştırma için operatörün yazdığı gerekçe (--apply ile zorunlu)',
+  },
+  'task.settle.opt_operator': {
+    en: 'Stable operator identifier; only its hash-bound opaque reference is persisted (required with --apply)',
+    tr: 'Sabit operatör kimliği; yalnız hash-bound opak referansı kalıcılaştırılır (--apply ile zorunlu)',
+  },
+  'task.settle.opt_reason_code': {
+    en: 'Typed pre-dispatch reason for a declared eventless receipt ({codes})',
+    tr: 'Bildirilen eventless receipt için tipli pre-dispatch nedeni ({codes})',
+  },
+  'task.settle.opt_json': {
+    en: 'Emit the stable machine-readable settlement DTO',
+    tr: 'Kararlı makine-okunur settlement DTO çıktısı üret',
+  },
+  'task.settle.apply_guard': {
+    en: 'Refused: --apply requires both --attestation-reason <text> and --operator <id>. No receipt event was appended.',
+    tr: 'Reddedildi: --apply için hem --attestation-reason <metin> hem --operator <kimlik> zorunludur. Receipt event\'i eklenmedi.',
+  },
+  'task.settle.invalid_task_id': {
+    en: 'Refused: "{taskId}" is not a valid task identifier. Nothing was read or changed.',
+    tr: 'Reddedildi: "{taskId}" geçerli bir görev kimliği değil. Hiçbir şey okunmadı veya değiştirilmedi.',
+  },
+  'task.settle.invalid_reason_code': {
+    en: 'Refused: "{reasonCode}" is not an allowed pre-dispatch reason. Allowed values: {codes}. Nothing was changed.',
+    tr: 'Reddedildi: "{reasonCode}" izin verilen bir pre-dispatch nedeni değil. İzin verilen değerler: {codes}. Hiçbir şey değiştirilmedi.',
+  },
+  'task.settle.reason_code_required': {
+    en: 'This declared receipt has no dispatch event. --reason-code is required to settle it; allowed values: {codes}. Nothing was changed.',
+    tr: 'Bu bildirilmiş receipt dispatch event\'i içermiyor. Kapatmak için --reason-code zorunlu; izin verilen değerler: {codes}. Hiçbir şey değiştirilmedi.',
+  },
+  'task.settle.reason_code_not_applicable': {
+    en: 'Refused: --reason-code {reasonCode} is not applicable while settlement authority reports {authorityReason}. Nothing was changed.',
+    tr: 'Reddedildi: settlement authority {authorityReason} bildirirken --reason-code {reasonCode} uygulanamaz. Hiçbir şey değiştirilmedi.',
+  },
+  'task.settle.not_found': {
+    en: 'Task {taskId} or its readable task evidence was not found. Nothing was changed.',
+    tr: '{taskId} görevi veya okunabilir görev kanıtı bulunamadı. Hiçbir şey değiştirilmedi.',
+  },
+  'task.settle.dry_run': {
+    en: 'DRY-RUN — task {taskId}: raw={rawStatus}, effective={effectiveStatus}, decision={decision}, reason={reason}. Re-run with --apply plus explicit attestation only after reviewing the evidence.',
+    tr: 'DRY-RUN — görev {taskId}: ham={rawStatus}, etkin={effectiveStatus}, karar={decision}, neden={reason}. Kanıtı inceledikten sonra yalnız --apply ve açık beyanla yeniden çalıştırın.',
+  },
+  'task.settle.applied': {
+    en: 'SETTLED — task {taskId}: raw={rawStatus}, effective={effectiveStatus}, receipt={receiptId}, evidence={evidenceRef}.',
+    tr: 'SETTLED — görev {taskId}: ham={rawStatus}, etkin={effectiveStatus}, receipt={receiptId}, kanıt={evidenceRef}.',
+  },
+  'task.settle.already_settled': {
+    en: 'UNCHANGED — task {taskId} was already settled: raw={rawStatus}, effective={effectiveStatus}, receipt={receiptId}.',
+    tr: 'DEĞİŞMEDİ — {taskId} görevi zaten kapanmıştı: ham={rawStatus}, etkin={effectiveStatus}, receipt={receiptId}.',
+  },
+  'task.settle.ineligible': {
+    en: 'Refused: task {taskId} is not evidence-eligible for reconciliation ({reason}). Nothing was changed.',
+    tr: 'Reddedildi: {taskId} görevi kanıta dayalı uzlaştırma için uygun değil ({reason}). Hiçbir şey değiştirilmedi.',
+  },
+  'task.settle.failed': {
+    en: 'Task settlement failed: {message}',
+    tr: 'Görev settlement işlemi başarısız: {message}',
+  },
+  'task.settle.pre_dispatch_reason_line': {
+    en: 'Settled typed pre-dispatch reason: {reasonCode}',
+    tr: 'Kalıcılaştırılan tipli pre-dispatch nedeni: {reasonCode}',
+  },
+  'task.settle.requested_pre_dispatch_reason_line': {
+    en: 'Requested typed pre-dispatch reason (not yet settled): {reasonCode}',
+    tr: 'İstenen tipli pre-dispatch nedeni (henüz kalıcı değil): {reasonCode}',
+  },
+  'task.settle.decision.eligible': {
+    en: 'eligible',
+    tr: 'uygun',
+  },
+  'task.settle.decision.hold': {
+    en: 'held',
+    tr: 'beklemede',
+  },
+  'task.settle.decision.already-settled': {
+    en: 'already settled',
+    tr: 'zaten kapanmış',
+  },
+  'task.settle.reason.receipt-dispatch-rejected': {
+    en: 'the immutable receipt proves dispatch was rejected',
+    tr: 'değişmez receipt dispatch işleminin reddedildiğini kanıtlıyor',
+  },
+  'task.settle.reason.receipt-ready-for-rejection': {
+    en: 'the declared receipt has no dispatch event and is ready for a typed pre-dispatch rejection',
+    tr: 'bildirilmiş receipt dispatch event\'i içermiyor ve tipli pre-dispatch reddi için hazır',
+  },
+  'task.settle.reason.legacy-attestation-verified': {
+    en: 'legacy absence evidence and operator attestation were verified',
+    tr: 'legacy yokluk kanıtı ve operatör beyanı doğrulandı',
+  },
+  'task.settle.reason.already-settled': {
+    en: 'an immutable terminal settlement already exists',
+    tr: 'değişmez terminal settlement zaten var',
+  },
+  'task.settle.reason.receipt-missing': {
+    en: 'the expected invocation receipt is missing',
+    tr: 'beklenen invocation receipt eksik',
+  },
+  'task.settle.reason.receipt-ambiguous': {
+    en: 'multiple or conflicting receipts prevent a unique decision',
+    tr: 'birden çok veya çelişkili receipt tekil kararı engelliyor',
+  },
+  'task.settle.reason.dispatch-started': {
+    en: 'dispatch-started evidence exists; NOT_DISPATCHED cannot be asserted',
+    tr: 'dispatch-started kanıtı var; NOT_DISPATCHED beyan edilemez',
+  },
+  'task.settle.reason.terminal-conflict': {
+    en: 'existing terminal evidence conflicts with this reconciliation',
+    tr: 'mevcut terminal kanıt bu uzlaştırmayla çelişiyor',
+  },
+  'task.settle.reason.scope-mismatch': {
+    en: 'tenant or project scope does not match the receipt authority',
+    tr: 'tenant veya proje kapsamı receipt authority ile eşleşmiyor',
+  },
+  'task.settle.reason.unsupported-task-domain': {
+    en: 'this settlement authority is limited to canonical run-* one-shot tasks',
+    tr: 'bu settlement authority yalnız canonical run-* one-shot görevleriyle sınırlı',
+  },
+  'task.settle.reason.task-content-mismatch': {
+    en: 'the attested task bytes do not match the task evidence',
+    tr: 'beyan edilen görev byte\'ları görev kanıtıyla eşleşmiyor',
+  },
+  'task.settle.reason.attestation-evidence-mismatch': {
+    en: 'the attestation does not bind the current absence evidence',
+    tr: 'beyan güncel yokluk kanıtına bağlı değil',
+  },
+  'task.settle.reason.attestation-required': {
+    en: 'explicit operator attestation is required',
+    tr: 'açık operatör beyanı gerekli',
+  },
+  'task.settle.reason.pre-dispatch-reason-required': {
+    en: 'a typed pre-dispatch rejection reason is required for this declared receipt',
+    tr: 'bu bildirilmiş receipt için tipli bir pre-dispatch red nedeni gerekli',
+  },
+  'task.settle.reason.absence-evidence-incomplete': {
+    en: 'absence evidence is incomplete or unknown',
+    tr: 'yokluk kanıtı eksik veya bilinmiyor',
+  },
+  'task.settle.reason.active-execution-evidence': {
+    en: 'live process, backend, or task artifact evidence is present',
+    tr: 'canlı process, backend veya görev artifact kanıtı var',
+  },
+  'task.settle.reason.probe-unsupported': {
+    en: 'this environment cannot prove every required absence signal',
+    tr: 'bu ortam gerekli tüm yokluk sinyallerini kanıtlayamıyor',
+  },
+  'task.settlement.evidence_line': {
+    en: 'Settlement: raw={rawStatus} · effective={effectiveStatus} · receipt={receiptId} · reason={reasonCode} · evidence={evidenceRefs}',
+    tr: 'Settlement: ham={rawStatus} · etkin={effectiveStatus} · receipt={receiptId} · neden={reasonCode} · kanıt={evidenceRefs}',
+  },
+  'task.settlement.no_receipt_line': {
+    en: 'Settlement: raw={rawStatus} · effective={effectiveStatus} · receipt=none · reason={reasonCode} · evidence={evidenceRefs}',
+    tr: 'Settlement: ham={rawStatus} · etkin={effectiveStatus} · receipt=yok · neden={reasonCode} · kanıt={evidenceRefs}',
+  },
+  'task.settlement.none': {
+    en: 'none',
+    tr: 'yok',
+  },
+  'task.execution_fence_conflict': {
+    en: 'Task {taskId} changed execution state concurrently; dispatch or settlement was refused.',
+    tr: '{taskId} görevinin execution durumu eşzamanlı değişti; dispatch veya settlement reddedildi.',
+  },
+  'task.execution_snapshot_invalid': {
+    en: 'Task {taskId} has an invalid canonical execution snapshot; dispatch was refused.',
+    tr: '{taskId} görevinin canonical execution snapshot kaydı geçersiz; dispatch reddedildi.',
+  },
+  'task.execution_already_settled': {
+    en: 'Task {taskId} is immutably settled as NOT_DISPATCHED; dispatch was refused.',
+    tr: '{taskId} görevi değişmez biçimde NOT_DISPATCHED olarak kapatılmış; dispatch reddedildi.',
+  },
+  'task.execution_authority_conflict': {
+    en: 'Task {taskId} has conflicting immutable execution authority ({reasonCode}); dispatch was refused.',
+    tr: '{taskId} görevinin değişmez execution authority kaydı çelişkili ({reasonCode}); dispatch reddedildi.',
+  },
+  'status.task_settlements.header': {
+    en: '\n--- Immutable Task Settlement ---',
+    tr: '\n--- Değişmez Görev Settlement Durumu ---',
+  },
+  'output.invalid_task_id': {
+    en: 'Refused: "{taskId}" is not a valid task identifier. Nothing was read.',
+    tr: 'Reddedildi: "{taskId}" geçerli bir görev kimliği değil. Hiçbir şey okunmadı.',
+  },
+  'run.settlement_declared': {
+    en: 'Invocation receipt declared: {receiptId}',
+    tr: 'Invocation receipt bildirildi: {receiptId}',
+  },
+  'run.settlement_dispatch_rejected': {
+    en: 'Dispatch rejection settled: receipt={receiptId} · reason={reason} · evidence={evidence}',
+    tr: 'Dispatch reddi kapatıldı: receipt={receiptId} · neden={reason} · kanıt={evidence}',
+  },
+  'run.settlement_rejection_incomplete': {
+    en: 'Receipt {receiptId} could not reach NOT_DISPATCHED (reason: {reason}); reconciliation is required.',
+    tr: '{receiptId} receipt\'i NOT_DISPATCHED durumuna ulaşamadı (neden: {reason}); uzlaştırma gerekiyor.',
+  },
+  'run.settlement_rejection_failed': {
+    en: 'Receipt {receiptId} could not persist its pre-dispatch rejection: {message}',
+    tr: '{receiptId} receipt\'inin pre-dispatch reddi kalıcılaştırılamadı: {message}',
+  },
+  'run.settlement_reconciliation_required': {
+    en: 'Dispatch may have started; receipt {receiptId} remains open for reconciliation (evidence: {evidence}). Task evidence was preserved.',
+    tr: 'Dispatch başlamış olabilir; {receiptId} receipt\'i uzlaştırma için açık bırakıldı (kanıt: {evidence}). Görev kanıtı korundu.',
+  },
+  'run.settlement_terminal': {
+    en: 'Terminal settlement persisted: receipt={receiptId} · effective={effectiveStatus} · evidence={evidence}',
+    tr: 'Terminal settlement kalıcılaştırıldı: receipt={receiptId} · etkin={effectiveStatus} · kanıt={evidence}',
+  },
+  'run.settlement_backend_mismatch': {
+    en: 'Dispatch refused before provider work: declared backend {expected} does not match boundary backend {actual}.',
+    tr: 'Dispatch provider çalışmasından önce reddedildi: bildirilen backend {expected}, boundary backend {actual} ile eşleşmiyor.',
+  },
+  'run.settlement_dispatch_boundary_mismatch': {
+    en: 'Dispatch authority mismatch for task {taskId}; provider work was refused.',
+    tr: '{taskId} görevi için dispatch authority eşleşmiyor; provider çalışması reddedildi.',
+  },
+  'run.settlement_dispatch_boundary_missing': {
+    en: 'No dispatch authority boundary was published for task {taskId}; the receipt remains open for reconciliation.',
+    tr: '{taskId} görevi için dispatch authority boundary yayınlanmadı; receipt uzlaştırma için açık.',
+  },
+  'run.settlement_terminal_without_dispatch': {
+    en: 'Task {taskId} produced terminal evidence without a dispatch authority boundary; settlement was refused.',
+    tr: '{taskId} görevi dispatch authority boundary olmadan terminal kanıt üretti; settlement reddedildi.',
+  },
+  'run.result_identity_mismatch': {
+    en: 'Result identity mismatch for task {taskId}. The receipt remains open for reconciliation and task evidence was preserved.',
+    tr: '{taskId} görevi için sonuç kimliği eşleşmiyor. Receipt uzlaştırma için açık ve görev kanıtı korunmuş durumda.',
+  },
+  'cmdCatalog.task.summary': {
+    en: 'Inspect or attest evidence-backed one-shot task settlement',
+    tr: 'Kanıta dayalı tek seferlik görev settlement durumunu incele veya beyanla kapat',
+  },
+  'cmdCatalog.provider-authority.summary': {
+    en: 'Inspect and rotate host-scoped provider authority integrity keys',
+    tr: 'Host kapsamlı provider authority bütünlük anahtarlarını incele ve döndür',
+  },
   // ─── provider-authority keyring (owner-gated integrity material) ──────────
   'provider_authority.cmd_desc': {
     en: 'Inspect and provision the host-scoped provider authority keyring (owner-gated)',
@@ -291,8 +540,8 @@ const MESSAGES: MessageMap = {
   // pricing inventory.
   // ─── xverify — session-level adversarial cross-verification (XVERIFY-TOOL) ──
   'xverify.cmd_desc': {
-    en: 'Dispatch an adversarial verifier on a DIFFERENT provider to try to refute a claim about finished work (advisory — never blocks)',
-    tr: 'Bitmiş bir iş hakkındaki iddiayı çürütmeyi denemesi için FARKLI bir sağlayıcıda hakem çalıştır (tavsiye niteliğinde — asla bloke etmez)',
+    en: 'Cross-verify a claim on a DIFFERENT provider; the host derives ALLOW/NO-GO/HOLD from typed evidence',
+    tr: 'Bir iddiayı FARKLI sağlayıcıda çapraz doğrula; ALLOW/NO-GO/HOLD kararını typed kanıttan host üretir',
   },
   'xverify.opt_author': {
     en: 'Provider that authored the claimed work ({providers}) — the verifier must differ. Required.',
@@ -339,8 +588,8 @@ const MESSAGES: MessageMap = {
     tr: 'Hakem gönderiliyor (iddia sahibi: {author}, öncelik: {priority})…',
   },
   'xverify.verdict': {
-    en: 'Verdict: {verdict} (verifier: {verifier}) — advisory report: {report}',
-    tr: 'Karar: {verdict} (hakem: {verifier}) — tavsiye raporu: {report}',
+    en: 'Verdict: {verdict} (verifier: {verifier}) — host adjudication report: {report}',
+    tr: 'Karar: {verdict} (hakem: {verifier}) — host adjudication raporu: {report}',
   },
   'xverify.final_only_risk': {
     en: 'Risk: {verifier} reports usage only when the call ends — token ceilings settle afterwards. Containment for this call is the host wall clock: {seconds}s.',

@@ -140,6 +140,10 @@ describe('run-flow-store — run handles', () => {
     saveRunHandle(root, makeHandleRecord());
     const dir = join(root, '.deckent', 'runtime', 'run-flow-store');
     const files = readdirSync(dir).sort();
-    expect(files).toEqual(['flow-1.handle.jsonl', 'flow-1.snapshot.jsonl']);
+    expect(files).toEqual([
+      'flow-1.handle.jsonl',
+      'flow-1.snapshot.jsonl',
+      'run-flow-authority.sqlite',
+    ]);
   });
 });

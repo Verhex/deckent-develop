@@ -107,9 +107,21 @@ describe('Docker partial-result termination attribution', () => {
     expect(notes).not.toContain('OOM');
   });
 
-  it('preserves OOM attribution for exit 137 without budget evidence', () => {
+  // MASTER-PLAN 660: this previously asserted that an unexplained exit 137 IS an
+  // OOM. It only means SIGKILL — the 2026-07-25 live run proved a turn-ceiling
+  // kill wearing that label on a host with 31 GB free. Attribution now requires
+  // a measurement; an unmeasured kill says so instead of guessing.
+  it('does not attribute exit 137 to OOM without a measurement', () => {
     const notes = describeDockerPartialResultTermination(137, null);
-    expect(notes).toContain('Container OOM-killed (exit 137, SIGKILL)');
+    expect(notes).toContain('could not be measured');
+    expect(notes).toContain('neither assume nor rule out');
+    expect(notes).not.toContain('circuit breaker');
+    expect(notes).not.toMatch(/OOM-killed/);
+  });
+
+  it('attributes exit 137 to OOM only on a measured OOMKilled=true', () => {
+    const notes = describeDockerPartialResultTermination(137, null, true);
+    expect(notes).toContain('OOMKilled=true');
     expect(notes).not.toContain('circuit breaker');
   });
 });

@@ -1,7 +1,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { createHash } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // ─── Mocks ───────────────────────────────────────────────────────────
+
+const { fixtureState } = vi.hoisted(() => ({
+  fixtureState: { base: '', root: '' },
+}));
 
 vi.mock('../../../src/orchestra/tmux.js', () => ({
   killWorker: vi.fn(),
@@ -19,7 +33,7 @@ vi.mock('../../../src/cli/helpers/output.js', () => ({
 }));
 
 vi.mock('../../../src/cli/helpers/process.js', () => ({
-  resolveProjectRoot: vi.fn().mockReturnValue('/mock/root'),
+  resolveProjectRoot: vi.fn(() => fixtureState.root),
 }));
 
 vi.mock('../../../src/core/config.js', () => ({
@@ -32,6 +46,16 @@ import { killWorker, TmuxError } from '../../../src/orchestra/tmux.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';
 import { loadConfig } from '../../../src/core/config.js';
 import { registerKill } from '../../../src/cli/commands/kill.js';
+import {
+  EXECUTION_LOCK_AUTHORITY_SENTINEL_FILENAME,
+  EXECUTION_LOCK_COORDINATION_DB_FILENAME,
+  acquireExecutionLock,
+  acquireLock,
+  acquireSpawnLock,
+  checkExecutionLock,
+  checkLock,
+  checkSpawnLock,
+} from '../../../src/core/file-lock.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -50,11 +74,15 @@ async function runCommand(args: string[]): Promise<void> {
 
 describe('kill command (isolated)', () => {
   beforeEach(() => {
+    fixtureState.base = mkdtempSync(join(tmpdir(), 'kill-command-'));
+    fixtureState.root = join(fixtureState.base, 'project');
+    mkdirSync(join(fixtureState.root, '.tasks'), { recursive: true });
     vi.clearAllMocks();
     process.exitCode = undefined;
     vi.mocked(loadConfig).mockResolvedValue({ language: 'en' } as any);
   });
   afterEach(() => {
+    rmSync(fixtureState.base, { recursive: true, force: true });
     process.exitCode = undefined;
   });
 
@@ -175,6 +203,55 @@ describe('kill command (isolated)', () => {
   it('calls loadConfig with project root', async () => {
     vi.mocked(killWorker).mockImplementation(() => {});
     await runCommand(['kill', '001-001']);
-    expect(loadConfig).toHaveBeenCalledWith('/mock/root');
+    expect(loadConfig).toHaveBeenCalledWith(fixtureState.root);
+  });
+
+  it('releases only legacy lock namespaces and preserves execution authority bytes', async () => {
+    const taskId = '024-005';
+    const taskPath = join(fixtureState.root, '.tasks', `task-${taskId}.json`);
+    writeFileSync(taskPath, JSON.stringify({
+      id: taskId,
+      provider: 'claude',
+      status: 'EXECUTING',
+    }), 'utf8');
+    acquireLock(
+      fixtureState.root,
+      'src/legacy-file.ts',
+      `w-${taskId}`,
+      taskId,
+    );
+    acquireSpawnLock(
+      fixtureState.root,
+      taskId,
+      'src/spawn-file.ts',
+    );
+    const execution = acquireExecutionLock(
+      fixtureState.root,
+      taskId,
+      'dispatch',
+    );
+    const locksDir = join(fixtureState.root, '.locks');
+    const authorityPaths = [
+      join(locksDir, EXECUTION_LOCK_COORDINATION_DB_FILENAME),
+      join(locksDir, EXECUTION_LOCK_AUTHORITY_SENTINEL_FILENAME),
+      join(
+        locksDir,
+        `${createHash('sha256').update(taskId).digest('hex')}.executionlock`,
+      ),
+    ];
+    const before = authorityPaths.map(path => readFileSync(path));
+
+    vi.mocked(killWorker).mockImplementation(() => {});
+    await runCommand(['kill', taskId]);
+
+    expect(checkLock(fixtureState.root, 'src/legacy-file.ts')).toBeNull();
+    expect(checkSpawnLock(fixtureState.root, 'src/spawn-file.ts')).toBeNull();
+    expect(checkExecutionLock(fixtureState.root, taskId)).toEqual({
+      state: 'held',
+      lock: execution,
+    });
+    authorityPaths.forEach((path, index) => {
+      expect(readFileSync(path)).toEqual(before[index]);
+    });
   });
 });

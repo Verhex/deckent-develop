@@ -25,6 +25,7 @@ import {
   createTaskResultSettlementRef,
   dockerAttemptLabels,
   dockerContainerNameForTask,
+  inspectTaskResultSettlementAuthority,
   listPendingTaskResultSettlementAttempts,
   readTaskProviderActualCallReceipt,
   readTaskProviderTerminalBillingReceipt,
@@ -206,6 +207,26 @@ afterEach(() => {
 });
 
 describe('host-authoritative Docker TaskResult settlement', () => {
+  it('provides a deterministic read-only backend authority inspection', () => {
+    const { root } = fixture();
+    const absent = inspectTaskResultSettlementAuthority(root, 'task-probe');
+    expect(absent).toMatchObject({ state: 'absent' });
+    expect(absent.evidenceRef).toMatch(
+      /^task-result-settlement:absent:sha256:[a-f0-9]{64}$/u,
+    );
+
+    const ref = createTaskResultSettlementRef(root, 'task-probe');
+    writeTaskResultSettlementAttemptAtomic(ref, '2026-07-27T12:00:00.000Z');
+    const pending = inspectTaskResultSettlementAuthority(root, 'task-probe');
+    expect(pending).toMatchObject({
+      state: 'pending',
+      ref,
+    });
+    expect(pending.evidenceRef).toMatch(
+      /^task-result-settlement:pending:sha256:[a-f0-9]{64}$/u,
+    );
+  });
+
   it('publishes one private content-addressed prompt outside the worker project', () => {
     const { root, state } = fixture();
     const ref = createTaskResultSettlementRef(root, 'task-prompt');

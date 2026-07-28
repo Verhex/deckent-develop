@@ -7,7 +7,7 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { loadConfig } from '../../core/config.js';
 import { getMessage } from '../helpers/messages.js';
 import { promptConfirm } from '../helpers/prompt.js';
-import { TASKS_DIR, LOCKS_DIR } from '../../core/constants.js';
+import { TASKS_DIR } from '../../core/constants.js';
 import { SpawnBackendFactory } from '../../orchestra/spawn-backend.js';
 import { getProviderForModel } from '../../core/task-types.js';
 import type { ModelType } from '../../core/types.js';
@@ -16,6 +16,10 @@ import {
 } from '../../orchestra/sprint-pid-manager.js';
 import { cleanupSprintMetadata } from '../../orchestra/sprint-controller.js';
 import { writeEvent } from '../../orchestra/event-stream.js';
+import {
+  releaseAllLocks,
+  releaseAllSpawnLocks,
+} from '../../core/file-lock.js';
 
 /** Find the task JSON file matching a taskId (handles sprint prefix patterns). */
 function findTaskFile(root: string, taskId: string): string | null {
@@ -49,22 +53,13 @@ function updateTaskStatus(root: string, taskId: string, lang: string): void {
 
 /** Release locks owned by the killed worker. */
 function releaseLocks(root: string, taskId: string, lang: string): void {
-  const locksDir = join(root, LOCKS_DIR);
-  if (!existsSync(locksDir)) return;
-  const files = readdirSync(locksDir);
-  let released = 0;
-  for (const file of files) {
-    try {
-      const lockPath = join(locksDir, file);
-      const lock = JSON.parse(readFileSync(lockPath, 'utf-8'));
-      if (lock.ownerWorkerId === `w-${taskId}` || lock.taskId === taskId) {
-        unlinkSync(lockPath);
-        released++;
-      }
-    } catch {
-      // Skip unreadable lock files
-    }
-  }
+  // Namespace-specific APIs deliberately exclude the canonical execution
+  // authority DB, sentinel and `.executionlock` projections. Those artifacts
+  // may only be released through exact owner+fencing CAS by their admission
+  // owner; a kill surface has neither authority.
+  const released =
+    releaseAllLocks(root, `w-${taskId}`)
+    + releaseAllSpawnLocks(root, taskId);
   if (released > 0) {
     print(getMessage('kill.locks_released', lang, { count: String(released), taskId }));
   }

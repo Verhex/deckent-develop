@@ -14,6 +14,7 @@ import { checkStartLimitGate } from './limits.js';
 import { print, printError, formatSprintSummary, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
+import { providerAuthorityHoldRemedy } from './provider-authority.js';
 import { promptConfirm } from '../helpers/prompt.js';
 import { bootstrapNotifyDispatcher, resolveWebhookBootstrapOption } from '../../core/notify-bootstrap.js';
 import { buildConnectorAdapterWithKpiSummary, buildSprintKpiSummaryFn } from '../../connectors/kpi-summary-dispatch.js';
@@ -271,6 +272,8 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
               reason: admission.reasonCode,
               evidence: admission.authorityEvidenceRefs.join(','),
             })));
+            const remedy = providerAuthorityHoldRemedy(admission.reasonCode, authorityConfig.language);
+            if (remedy) print(remedy);
             process.exitCode = 1;
             return;
           }
@@ -879,6 +882,8 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
             reason: error.reasonCode,
             evidence: error.authorityEvidenceRefs.join(','),
           })));
+          const remedy = providerAuthorityHoldRemedy(error.reasonCode, lang);
+          if (remedy) print(remedy);
         } else if (error instanceof BrainError) {
           printError(new Error(`Sprint failed at phase ${error.phase ?? 'unknown'}: ${error.message}`));
           if (error.plannerProof) {

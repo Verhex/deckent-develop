@@ -8,6 +8,8 @@ import { runStep, runSmoke } from '../../scripts/clean-clone-smoke.mjs';
 const __dirname = resolve(fileURLToPath(import.meta.url), '..');
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const SCRIPT_PATH = resolve(REPO_ROOT, 'scripts/clean-clone-smoke.mjs');
+const CLEAN_PATH = resolve(REPO_ROOT, 'scripts/clean.mjs');
+const PACKAGE_PATH = resolve(REPO_ROOT, 'package.json');
 const DOC_PATH = resolve(REPO_ROOT, 'docs/development/smoke-verify.md');
 
 describe('runStep', () => {
@@ -78,6 +80,24 @@ describe('script artifact', () => {
     const mod = await import('../../scripts/clean-clone-smoke.mjs');
     expect(typeof mod.runStep).toBe('function');
     expect(typeof mod.runSmoke).toBe('function');
+  });
+
+  it('keeps clone-smoke build behind the active-execution clean admission', () => {
+    const packageJson = JSON.parse(readFileSync(PACKAGE_PATH, 'utf-8')) as {
+      scripts?: Record<string, string>;
+    };
+    const cleanSource = readFileSync(CLEAN_PATH, 'utf-8');
+
+    expect(packageJson.scripts?.build).toMatch(/^npm run clean(?:\s|&&)/);
+    expect(packageJson.scripts?.clean).toBe('node scripts/clean.mjs');
+    expect(cleanSource).toContain('inspectActiveExecutions');
+    expect(cleanSource).toContain("join(projectRoot, '.tasks')");
+    expect(cleanSource).toContain("'runtime', 'invocations.db'");
+    expect(cleanSource).toContain("'runtime', 'jobs'");
+    expect(cleanSource).toContain("'runtime', 'run-flow-store'");
+    expect(cleanSource).toContain("'autonomous', 'autonomous.db'");
+    expect(cleanSource).toContain('foldRunFlowEvents');
+    expect(cleanSource).toContain('E_CLEAN_ACTIVE_EXECUTION_HOLD');
   });
 });
 

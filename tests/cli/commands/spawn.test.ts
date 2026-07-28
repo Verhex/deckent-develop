@@ -6,8 +6,9 @@ import { join } from 'node:path';
 import type { Task } from '../../../src/core/types.js';
 import { TaskStatus } from '../../../src/core/types.js';
 
-const { mockBackendSpawn } = vi.hoisted(() => ({
+const { mockBackendSpawn, fixtureState } = vi.hoisted(() => ({
   mockBackendSpawn: vi.fn(),
+  fixtureState: { base: '', root: '' },
 }));
 
 // ─── Mocks ───────────────────────────────────────────────────────────
@@ -27,7 +28,7 @@ vi.mock('../../../src/cli/helpers/output.js', () => ({
 }));
 
 vi.mock('../../../src/cli/helpers/process.js', () => ({
-  resolveProjectRoot: vi.fn().mockReturnValue('/mock/root'),
+  resolveProjectRoot: vi.fn(() => fixtureState.root),
 }));
 
 vi.mock('../../../src/core/config.js', () => ({
@@ -128,6 +129,22 @@ async function runCommand(args: string[]): Promise<void> {
   }
 }
 
+const originalDeckentHome = process.env.DECKENT_HOME;
+
+beforeEach(() => {
+  fixtureState.base = mkdtempSync(join(tmpdir(), 'spawn-command-'));
+  fixtureState.root = join(fixtureState.base, 'project');
+  mkdirSync(join(fixtureState.root, '.tasks'), { recursive: true });
+  process.env.DECKENT_HOME = join(fixtureState.base, 'host-state');
+});
+
+afterEach(() => {
+  if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+  else process.env.DECKENT_HOME = originalDeckentHome;
+  rmSync(fixtureState.base, { recursive: true, force: true });
+  process.exitCode = undefined;
+});
+
 // ─── Tests ───────────────────────────────────────────────────────────
 
 describe('spawn command (isolated)', () => {
@@ -163,7 +180,7 @@ describe('spawn command (isolated)', () => {
 
     await runCommand(['spawn', '001-001']);
 
-    expect(readTask).toHaveBeenCalledWith('/mock/root', '001-001');
+    expect(readTask).toHaveBeenCalledWith(fixtureState.root, '001-001');
   });
 
   it('uses the configured measured backend without opening a tmux session', async () => {
@@ -311,7 +328,7 @@ describe('spawn command (isolated)', () => {
 
     await runCommand(['spawn', '001-001']);
 
-    expect(loadConfig).toHaveBeenCalledWith('/mock/root');
+    expect(loadConfig).toHaveBeenCalledWith(fixtureState.root);
   });
 });
 
@@ -373,7 +390,7 @@ describe('spawnWorkerMultiProvider', () => {
       'budgetless-remote',
       'gpt-4.1',
       'prompt',
-      '/root',
+      fixtureState.root,
       {},
     )).rejects.toThrow('Remote execution budget is required');
     expect(SpawnBackendFactory.create).not.toHaveBeenCalled();
@@ -390,6 +407,7 @@ describe('spawnWorkerMultiProvider', () => {
         JSON.stringify({
           id: 'forged-budget',
           model: 'gpt-4.1',
+          status: TaskStatus.PENDING,
           budget: { maxTurns: 999, maxCacheReadTokens: 999_999_999 },
         }),
       );
@@ -415,7 +433,7 @@ describe('spawnWorkerMultiProvider', () => {
       'unmetered-remote',
       'gpt-4.1',
       'prompt',
-      '/root',
+      fixtureState.root,
       { executionBudget: { maxTurns: 2 } },
     )).rejects.toThrow('does not declare that capability');
     expect(backend.spawn).not.toHaveBeenCalled();
@@ -426,7 +444,7 @@ describe('spawnWorkerMultiProvider', () => {
       '001',
       'claude-sonnet-5',
       'prompt',
-      '/root',
+      fixtureState.root,
       { executionBudget: { maxTurns: 2 } },
     )).rejects.toThrow('does not declare that capability');
     expect(ensureSession).not.toHaveBeenCalled();
@@ -440,7 +458,7 @@ describe('spawnWorkerMultiProvider', () => {
       executionLandingCapability: 'cooperative-landing',
     });
     vi.mocked(SpawnBackendFactory.create).mockReturnValue(mockBackend as any);
-    const result = await spawnWorkerMultiProvider('002', 'gpt-4.1', 'prompt', '/root', {
+    const result = await spawnWorkerMultiProvider('002', 'gpt-4.1', 'prompt', fixtureState.root, {
       spawnBackend: 'subprocess',
       executionBudget: { maxTurns: 2 },
       executionLandingPolicy: TEST_LANDING_POLICY,
@@ -458,7 +476,7 @@ describe('spawnWorkerMultiProvider', () => {
       executionLandingCapability: 'cooperative-landing',
     });
     vi.mocked(SpawnBackendFactory.create).mockReturnValue(mockBackend as any);
-    const result = await spawnWorkerMultiProvider('003', 'gemini-2.5-pro', 'prompt', '/root', {
+    const result = await spawnWorkerMultiProvider('003', 'gemini-2.5-pro', 'prompt', fixtureState.root, {
       spawnBackend: 'subprocess',
       executionBudget: { maxTurns: 2 },
       executionLandingPolicy: TEST_LANDING_POLICY,
@@ -477,7 +495,7 @@ describe('spawnWorkerMultiProvider', () => {
       list: vi.fn(),
     };
     vi.mocked(SpawnBackendFactory.create).mockReturnValue(mockBackend as any);
-    await spawnWorkerMultiProvider('004', 'claude-opus-4-8', 'prompt', '/root', {
+    await spawnWorkerMultiProvider('004', 'claude-opus-4-8', 'prompt', fixtureState.root, {
       allowedTools: 'Read,Write,Edit,Bash,Glob,Grep',
       spawnBackend: 'subprocess',
       executionBudget: { maxTurns: 2 },
@@ -499,7 +517,7 @@ describe('spawnWorkerMultiProvider', () => {
       list: vi.fn(),
     };
     vi.mocked(SpawnBackendFactory.create).mockReturnValue(mockBackend as any);
-    await spawnWorkerMultiProvider('005', 'gpt-4.1-mini', 'prompt', '/root', {
+    await spawnWorkerMultiProvider('005', 'gpt-4.1-mini', 'prompt', fixtureState.root, {
       allowedTools: 'Read,Bash',
       spawnBackend: 'subprocess',
       executionBudget: { maxTurns: 2 },

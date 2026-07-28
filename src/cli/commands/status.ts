@@ -13,6 +13,16 @@ import { eventBus } from '../../orchestra/event-bus.js';
 import { StatusRenderer } from '../helpers/status-renderer.js';
 import { readPendingApprovals, sweepRuntimeApprovals, type PendingApproval } from '../../core/pending-approvals.js';
 import { hideCursor, showCursor, clearScreen } from '../helpers/ansi.js';
+import { registerShutdownHook } from '../helpers/shutdown-hooks.js';
+import {
+  type OpenTaskSettlementProjectionResult,
+  type TaskSettlementProjection,
+} from '../../core/task-settlement-authority.js';
+import { resolveTenant } from '../../core/tenant-context.js';
+import {
+  formatTaskSettlementProjection,
+  settlementProjectionDto,
+} from './task-settlement.js';
 
 interface StatusOpts {
   watch?: boolean;
@@ -23,6 +33,235 @@ interface StatusOpts {
   noColor?: boolean;
   graph?: boolean;
   mode?: string;
+}
+
+/**
+ * Write one terminal-control frame and wait until Node confirms both the
+ * frame callback and any backpressure drain. stdout is asynchronous for
+ * Windows pipes, so the shared shutdown authority must await this before it
+ * closes the process.
+ */
+function writeStdoutAndDrain(value: string): Promise<boolean> {
+  const stdout = process.stdout;
+  if (!stdout.writable || stdout.destroyed) return Promise.resolve(false);
+
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    let writeReturned = false;
+    let callbackCompleted = false;
+    let backpressured = false;
+    let drainCompleted = false;
+
+    const removeListeners = (): void => {
+      stdout.off('error', onError);
+      stdout.off('close', onClose);
+      stdout.off('drain', onDrain);
+    };
+    const settle = (drained: boolean): void => {
+      if (settled) return;
+      settled = true;
+      removeListeners();
+      resolve(drained);
+    };
+    const maybeSettle = (): void => {
+      if (
+        writeReturned
+        && callbackCompleted
+        && (!backpressured || drainCompleted)
+      ) {
+        settle(true);
+      }
+    };
+    const onError = (): void => settle(false);
+    const onClose = (): void => settle(false);
+    const onDrain = (): void => {
+      drainCompleted = true;
+      maybeSettle();
+    };
+
+    stdout.once('error', onError);
+    stdout.once('close', onClose);
+    stdout.once('drain', onDrain);
+    try {
+      const accepted = stdout.write(value, (error) => {
+        if (error) {
+          settle(false);
+          return;
+        }
+        callbackCompleted = true;
+        maybeSettle();
+      });
+      backpressured = !accepted;
+      drainCompleted = accepted;
+      writeReturned = true;
+      maybeSettle();
+    } catch {
+      settle(false);
+    }
+  });
+}
+
+interface CoalescingFrameWriter {
+  enqueue(frame: string): void;
+  close(finalFrame: string): Promise<boolean>;
+}
+
+/**
+ * Bounded live-output writer: at most one frame is in flight and one latest
+ * frame is retained. Event bursts replace the pending frame instead of
+ * growing an unbounded stdout queue. Shutdown drains the in-flight frame and
+ * the retained latest frame before writing its terminal sentinel.
+ */
+function createCoalescingFrameWriter(
+  onWriteFailure: () => void,
+): CoalescingFrameWriter {
+  let accepting = true;
+  let failed = false;
+  let inFlight: Promise<void> | undefined;
+  let latestFrame: string | undefined;
+  const idleWaiters = new Set<(drained: boolean) => void>();
+
+  const resolveIdleWaiters = (): void => {
+    if (inFlight || latestFrame !== undefined) return;
+    for (const resolve of idleWaiters) resolve(!failed);
+    idleWaiters.clear();
+  };
+
+  const startWrite = (frame: string): void => {
+    const operation = writeStdoutAndDrain(frame)
+      .then((drained) => {
+        if (drained) return;
+        failed = true;
+        latestFrame = undefined;
+        onWriteFailure();
+      })
+      .catch(() => {
+        failed = true;
+        latestFrame = undefined;
+        onWriteFailure();
+      })
+      .finally(() => {
+        if (inFlight === operation) inFlight = undefined;
+        if (!failed && latestFrame !== undefined) {
+          const next = latestFrame;
+          latestFrame = undefined;
+          startWrite(next);
+          return;
+        }
+        resolveIdleWaiters();
+      });
+    inFlight = operation;
+  };
+
+  const waitForIdle = (): Promise<boolean> => {
+    if (!inFlight && latestFrame === undefined) return Promise.resolve(!failed);
+    return new Promise<boolean>((resolve) => {
+      idleWaiters.add(resolve);
+    });
+  };
+
+  return {
+    enqueue(frame: string): void {
+      if (!accepting || failed) return;
+      if (inFlight) {
+        latestFrame = frame;
+        return;
+      }
+      startWrite(frame);
+    },
+    async close(finalFrame: string): Promise<boolean> {
+      accepting = false;
+      const liveFramesDrained = await waitForIdle();
+      const finalFrameDrained = await writeStdoutAndDrain(finalFrame);
+      return liveFramesDrained && finalFrameDrained;
+    },
+  };
+}
+
+export interface StatusCommandDeps {
+  readonly openTaskSettlementProjection?: (
+    projectRoot: string,
+  ) => OpenTaskSettlementProjectionResult;
+}
+
+export interface StatusTaskSettlementDto
+  extends ReturnType<typeof settlementProjectionDto> {
+  readonly taskId: string;
+}
+
+export function loadStatusTaskSettlements(
+  root: string,
+  tasks: readonly Task[],
+  deps: StatusCommandDeps,
+): readonly StatusTaskSettlementDto[] {
+  if (tasks.length === 0 || !deps.openTaskSettlementProjection) return [];
+  const opened = deps.openTaskSettlementProjection(root);
+  try {
+    const inputs = tasks.map(task => {
+      const tenantId = resolveTenant(root, {
+        ...(task.actor?.tenantId ? { tenantId: task.actor.tenantId } : {}),
+      }).tenantId;
+      return { taskId: task.id, rawStatus: task.status, tenantId };
+    });
+    const projections = opened.projectTaskExecutionStates(inputs);
+    if (projections.length !== tasks.length) {
+      throw new Error('TASK_SETTLEMENT_PROJECTION_CARDINALITY_MISMATCH');
+    }
+    return tasks.map((task, index) => {
+      const projection = projections[index];
+      if (!projection) {
+        throw new Error('TASK_SETTLEMENT_PROJECTION_CARDINALITY_MISMATCH');
+      }
+      return {
+        taskId: task.id,
+        ...settlementProjectionDto(projection),
+      };
+    });
+  } finally {
+    opened.close();
+  }
+}
+
+function formatStatusTaskSettlements(
+  settlements: readonly StatusTaskSettlementDto[],
+  lang: string,
+): string | null {
+  const material = settlements.filter(
+    settlement =>
+      settlement.receiptRef !== null
+      || settlement.rawStatus !== settlement.effectiveStatus
+      || settlement.evidenceRefs.length > 0
+      || settlement.reasonCode === 'open-receipt'
+      || settlement.reasonCode === 'ambiguous-receipts'
+      || settlement.reasonCode === 'binding-absent',
+  );
+  if (material.length === 0) return null;
+  const lines = [getMessage('status.task_settlements.header', lang)];
+  for (const settlement of material) {
+    const projection: TaskSettlementProjection = {
+      rawStatus: settlement.rawStatus,
+      effectiveStatus: settlement.effectiveStatus,
+      evidenceRefs: settlement.evidenceRefs,
+      reasonCode: settlement.reasonCode,
+      ...(settlement.receiptRef ? { receiptRef: settlement.receiptRef } : {}),
+    };
+    lines.push(`  ${settlement.taskId} · ${formatTaskSettlementProjection(projection, lang)}`);
+  }
+  return lines.join('\n');
+}
+
+export function appendTaskSettlementsToFollowSnapshot(
+  snapshot: string,
+  root: string,
+  tasks: readonly Task[],
+  deps: StatusCommandDeps,
+  lang: string,
+): string {
+  const settlements = formatStatusTaskSettlements(
+    loadStatusTaskSettlements(root, tasks, deps),
+    lang,
+  );
+  return settlements ? `${snapshot}\n${settlements}` : snapshot;
 }
 
 /**
@@ -135,9 +374,9 @@ export function getLangFromRoot(root: string): string {
 export function loadTaskFiles(root: string): Task[] {
   const tasksDir = join(root, TASKS_DIR);
   if (!existsSync(tasksDir)) return [];
-  const files = readdirSync(tasksDir).filter(
-    (f) => /^task-[\w-]+\.json$/.test(f),
-  );
+  const files = readdirSync(tasksDir)
+    .filter((f) => /^task-[\w-]+\.json$/.test(f))
+    .sort((left, right) => left.localeCompare(right));
   const tasks: Task[] = [];
   for (const f of files) {
     try {
@@ -155,7 +394,7 @@ export function loadTaskFiles(root: string): Task[] {
       // Skip malformed task files
     }
   }
-  return tasks;
+  return tasks.sort((left, right) => left.id.localeCompare(right.id));
 }
 
 /**
@@ -358,7 +597,96 @@ export function buildNoActiveStatusJson(root: string): { active: false; pendingA
   };
 }
 
-export function registerStatus(program: Command): void {
+function statusFormatterData(
+  state: DashboardState,
+  tasks: readonly Task[],
+): Record<string, unknown> {
+  return {
+    sprintId: state.sprint.id,
+    phase: state.sprint.phase as string | undefined,
+    totalTasks: state.progress?.total ?? tasks.length,
+    completedTasks: state.progress?.done ?? 0,
+    failedTasks: tasks.filter(t => (t.status as string) === 'NO_GO').length,
+    techDebtTasks: tasks.filter(
+      t => ((t as unknown as Record<string, unknown>)['evaluationDecision'] as string)
+        === 'GO_WITH_TECH_DEBT',
+    ).length,
+    activeWorkers: state.agents?.length ?? 0,
+  };
+}
+
+/**
+ * One immutable read-set for every machine status surface. Streaming callers
+ * serialize each returned value as one NDJSON record; one-shot callers pretty
+ * print exactly one document.
+ */
+export function buildStatusJsonSnapshot(
+  root: string,
+  dashPath: string,
+  deps: StatusCommandDeps,
+  verbose = false,
+): Record<string, unknown> {
+  const tasks = loadTaskFiles(root);
+  if (!existsSync(dashPath)) {
+    if (tasks.length === 0) return buildNoActiveStatusJson(root);
+    const sprintId = getCurrentSprintId(root) ?? detectSprintId(tasks);
+    return {
+      standalone: true,
+      sprintId,
+      tasks: tasks.map(task => ({
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        model: task.model,
+      })),
+      taskSettlements: loadStatusTaskSettlements(root, tasks, deps),
+      ...(verbose
+        ? {
+            agents: tasks.map(task => ({
+              taskId: task.id,
+              agent: task.assignedAgent ?? 'generic',
+              skills: task.assignedSkills ?? [],
+            })),
+          }
+        : {}),
+    };
+  }
+
+  const state = JSON.parse(readFileSync(dashPath, 'utf-8')) as DashboardState;
+  const isOrphaned = isDashboardOrphaned(state, {
+    hasLiveSprint: getCurrentSprintId(root) !== null,
+    hasTasks: tasks.length > 0,
+    nowMs: Date.now(),
+  });
+  const sprint = state.sprint as { status?: string; phase?: string };
+  if (
+    isOrphaned
+    || sprint.status === 'COMPLETE'
+    || sprint.phase === 'COMPLETE'
+  ) {
+    return buildNoActiveStatusJson(root);
+  }
+
+  const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
+  return verbose
+    ? {
+        ...state,
+        taskSettlements,
+        _verbose: {
+          agents: tasks.map(task => ({
+            id: task.id,
+            agent: task.assignedAgent ?? 'generic',
+            skills: task.assignedSkills ?? [],
+          })),
+        },
+      }
+    : { ...state, taskSettlements };
+}
+
+export function registerStatus(
+  program: Command,
+  deps: StatusCommandDeps = {},
+): void {
   const registerLang = getLangFromRoot(resolveProjectRoot());
   program
     .command('status')
@@ -375,6 +703,26 @@ export function registerStatus(program: Command): void {
       const root = resolveProjectRoot();
       const dashPath = join(root, DASHBOARD_FILE);
       const lang = getLangFromRoot(root);
+      const resolvedMode = opts.mode ? resolveOutputMode(opts.mode) : undefined;
+      const jsonMode = opts.json === true || resolvedMode === 'json';
+
+      if (opts.graph && jsonMode) {
+        const sprintId = getCurrentSprintId(root);
+        const graph = sprintId ? loadDepGraphForSprint(root, sprintId) : null;
+        output(JSON.stringify({
+          schemaVersion: 1,
+          command: 'status.graph',
+          active: sprintId !== null,
+          sprintId,
+          graph,
+          reasonCode: sprintId === null
+            ? 'no-active-run'
+            : graph === null
+              ? 'graph-not-found'
+              : 'ready',
+        }, null, 2));
+        return;
+      }
 
       // --follow: live event-driven refresh using EventBus
       if (opts.follow) {
@@ -382,42 +730,147 @@ export function registerStatus(program: Command): void {
           projectRoot: root,
           noColor: opts.noColor ?? isNoColor(),
         });
-
-        const sprintId = getCurrentSprintId(root);
-
-        // Initial render
-        process.stdout.write(hideCursor() + clearScreen());
-        const initial = renderer.snapshot();
-        process.stdout.write(initial);
-
-        // Subscribe to event bus for live updates
-        let unsubscribe: (() => void) | undefined;
-        if (sprintId) {
-          // Start watching the JSONL event file for cross-process events
-          eventBus.watchFile(root, sprintId);
-
-          unsubscribe = eventBus.subscribe(sprintId, undefined, () => {
-            const next = renderer.snapshot();
-            renderer.redraw(next);
-          });
-        }
-
-        // Also poll as fallback (in case events are missed)
-        const fallbackTimer = setInterval(() => {
-          const next = renderer.snapshot();
-          renderer.redraw(next);
-        }, 5000);
-
-        const cleanup = (): void => {
-          unsubscribe?.();
-          eventBus.unwatchAll();
-          clearInterval(fallbackTimer);
-          process.stdout.write(showCursor() + '\n');
-          process.exit(0);
+        const followSnapshot = (): string => {
+          const tasks = loadTaskFiles(root);
+          if (opts.raw) {
+            const state = readDashboard(dashPath);
+            const snapshot = state
+              ? formatDashboard(state)
+              : tasks.length > 0
+                ? formatStandaloneStatus(
+                    tasks,
+                    getCurrentSprintId(root) ?? detectSprintId(tasks),
+                  )
+                : getMessage('status.no_active_sprint', lang);
+            return appendTaskSettlementsToFollowSnapshot(
+              snapshot,
+              root,
+              tasks,
+              deps,
+              lang,
+            );
+          }
+          if (resolvedMode && resolvedMode !== 'json') {
+            const state = readDashboard(dashPath);
+            const snapshot = state
+              ? formatStatus(statusFormatterData(state, tasks), resolvedMode)
+              : tasks.length > 0
+                ? formatStandaloneStatus(
+                    tasks,
+                    getCurrentSprintId(root) ?? detectSprintId(tasks),
+                  )
+                : getMessage('status.no_active_sprint', lang);
+            return appendTaskSettlementsToFollowSnapshot(
+              snapshot,
+              root,
+              tasks,
+              deps,
+              lang,
+            );
+          }
+          return appendTaskSettlementsToFollowSnapshot(
+            renderer.snapshot(),
+            root,
+            tasks,
+            deps,
+            lang,
+          );
         };
 
-        process.on('SIGINT', cleanup);
-        process.on('SIGTERM', cleanup);
+        const sprintId = getCurrentSprintId(root);
+        let unsubscribe: (() => void) | undefined;
+        let fallbackTimer: ReturnType<typeof setInterval> | undefined;
+        let unregisterShutdown: (() => void) | undefined;
+        let cleanupPromise: Promise<void> | undefined;
+        let cleanup: (requestedExitCode?: number) => Promise<void>;
+        const writer = createCoalescingFrameWriter(() => {
+          void cleanup(1);
+        });
+        cleanup = (requestedExitCode?: number): Promise<void> => {
+          if (cleanupPromise) return cleanupPromise;
+
+          let finishCleanup: (() => void) | undefined;
+          cleanupPromise = new Promise<void>((resolve) => {
+            finishCleanup = resolve;
+          });
+
+          let cleanupFailed = false;
+          try {
+            unsubscribe?.();
+          } catch {
+            cleanupFailed = true;
+          }
+          try {
+            eventBus.unwatchAll();
+          } catch {
+            cleanupFailed = true;
+          }
+          if (fallbackTimer) clearInterval(fallbackTimer);
+
+          void (async () => {
+            let outputDrained = false;
+            try {
+              outputDrained = await writer.close(
+                jsonMode ? '' : showCursor() + '\n',
+              );
+            } catch {
+            } finally {
+              // Unregister only after the first await: runShutdownHooks() maps
+              // the live registry synchronously, and splicing this hook during
+              // that map could otherwise skip a sibling shutdown hook.
+              try {
+                unregisterShutdown?.();
+              } catch {
+                cleanupFailed = true;
+              }
+              if (requestedExitCode !== undefined) {
+                process.exitCode = cleanupFailed || !outputDrained
+                  ? 1
+                  : requestedExitCode;
+              }
+              finishCleanup?.();
+            }
+          })();
+          return cleanupPromise;
+        };
+
+        const renderFollow = (): void => {
+          if (cleanupPromise) return;
+          try {
+            if (jsonMode) {
+              writer.enqueue(
+                `${JSON.stringify(buildStatusJsonSnapshot(root, dashPath, deps, !!opts.verbose))}\n`,
+              );
+              return;
+            }
+            const next = followSnapshot();
+            writer.enqueue(clearScreen() + next);
+          } catch {
+            printError(new Error(getMessage('status.dashboard_read_failed', lang)));
+            void cleanup(1);
+          }
+        };
+
+        unregisterShutdown = registerShutdownHook(async () => {
+          await cleanup();
+        });
+        try {
+          if (jsonMode) {
+            writer.enqueue(
+              `${JSON.stringify(buildStatusJsonSnapshot(root, dashPath, deps, !!opts.verbose))}\n`,
+            );
+          } else {
+            writer.enqueue(hideCursor() + clearScreen() + followSnapshot());
+          }
+          if (sprintId) {
+            eventBus.watchFile(root, sprintId);
+            unsubscribe = eventBus.subscribe(sprintId, undefined, renderFollow);
+          }
+          fallbackTimer = setInterval(renderFollow, 5000);
+        } catch {
+          printError(new Error(getMessage('status.dashboard_read_failed', lang)));
+          void cleanup(1);
+        }
         return;
       }
 
@@ -440,28 +893,46 @@ export function registerStatus(program: Command): void {
         return;
       }
 
+      if (jsonMode && !opts.watch) {
+        try {
+          output(JSON.stringify(
+            buildStatusJsonSnapshot(root, dashPath, deps, !!opts.verbose),
+            null,
+            2,
+          ));
+        } catch {
+          printError(new Error(getMessage('status.dashboard_read_failed', lang)));
+          process.exitCode = 1;
+        }
+        return;
+      }
+
       // (A) Standalone mode: if no dashboard, try task files
       if (!existsSync(dashPath)) {
         const tasks = loadTaskFiles(root);
         if (tasks.length > 0) {
           // Use canonical sprint-state.json as source of truth; fall back to task file scan
           const sprintId = getCurrentSprintId(root) ?? detectSprintId(tasks);
-          if (opts.json) {
+          const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
+          if (jsonMode) {
             const standaloneData = {
               standalone: true,
               sprintId,
               tasks: tasks.map(t => ({ id: t.id, title: t.title, status: t.status, model: t.model })),
+              taskSettlements,
               ...(opts.verbose ? { agents: tasks.map(t => ({ taskId: t.id, agent: t.assignedAgent ?? 'generic', skills: t.assignedSkills ?? [] })) } : {}),
             };
             output(JSON.stringify(standaloneData, null, 2));
           } else {
             output(formatStandaloneStatus(tasks, sprintId));
+            const settlementsStandalone = formatStatusTaskSettlements(taskSettlements, lang);
+            if (settlementsStandalone) output(settlementsStandalone);
             const commsStandalone = buildWorkerCommsSection(root, lang);
             if (commsStandalone) output(commsStandalone);
           }
           return;
         }
-        if (opts.json) {
+        if (jsonMode) {
           output(JSON.stringify(buildNoActiveStatusJson(root), null, 2));
           return;
         }
@@ -472,77 +943,150 @@ export function registerStatus(program: Command): void {
       }
 
       if (opts.watch) {
-        const render = (): void => {
-          const state = readDashboard(dashPath);
-          if (state) {
-            process.stdout.write('\x1Bc'); // clear screen
-            if (opts.json) {
-              const jsonData = opts.verbose
-                ? { ...state, _verbose: { agents: loadTaskFiles(root).map(t => ({ id: t.id, agent: t.assignedAgent, skills: t.assignedSkills })) } }
-                : state;
-              output(JSON.stringify(jsonData, null, 2));
-            } else if (opts.raw) {
-              output(formatDashboard(state));
-            } else {
-              const tasks = loadTaskFiles(root);
-              const meta = readSprintMeta(root, state.sprint.id);
-              const ci = readCIData(root, state.sprint.id);
-              output(formatHumanStatus({
-                dashboard: state,
-                tasks,
-                sprintTitle: meta.title,
-                sprintStartedAt: meta.startedAt,
-                projectRoot: root,
-                verbose: opts.verbose,
-                ciBaseline: ci.baseline,
-                ciReport: ci.report,
-              }));
-              const commsWatch = buildWorkerCommsSection(root, lang);
-              if (commsWatch) output(commsWatch);
-              const pendingWatch = buildPendingApprovalsSection(root, lang);
-              if (pendingWatch) output(pendingWatch);
+        let watcher: ReturnType<typeof watch> | undefined;
+        let timer: ReturnType<typeof setInterval> | undefined;
+        let unregisterShutdown: (() => void) | undefined;
+        let cleanupPromise: Promise<void> | undefined;
+        let cleanup: (requestedExitCode?: number) => Promise<void>;
+        const writer = createCoalescingFrameWriter(() => {
+          void cleanup(1);
+        });
+
+        cleanup = (requestedExitCode?: number): Promise<void> => {
+          if (cleanupPromise) return cleanupPromise;
+
+          let finishCleanup: (() => void) | undefined;
+          cleanupPromise = new Promise<void>((resolve) => {
+            finishCleanup = resolve;
+          });
+
+          let cleanupFailed = false;
+          try {
+            watcher?.close();
+          } catch {
+            cleanupFailed = true;
+          }
+          if (timer) clearInterval(timer);
+
+          void (async () => {
+            let outputDrained = false;
+            try {
+              outputDrained = await writer.close(jsonMode ? '' : '\n');
+            } catch {
+            } finally {
+              try {
+                unregisterShutdown?.();
+              } catch {
+                cleanupFailed = true;
+              }
+              if (requestedExitCode !== undefined) {
+                process.exitCode = cleanupFailed || !outputDrained
+                  ? 1
+                  : requestedExitCode;
+              }
+              finishCleanup?.();
             }
+          })();
+          return cleanupPromise;
+        };
+
+        const watchFrame = (): string | null => {
+          if (jsonMode) {
+            return `${JSON.stringify(
+              buildStatusJsonSnapshot(root, dashPath, deps, !!opts.verbose),
+            )}\n`;
+          }
+          const state = readDashboard(dashPath);
+          if (!state) return null;
+
+          const tasks = loadTaskFiles(root);
+          const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
+          const sections: string[] = [];
+          if (opts.raw) {
+            sections.push(formatDashboard(state));
+            const settlementsRaw = formatStatusTaskSettlements(taskSettlements, lang);
+            if (settlementsRaw) sections.push(settlementsRaw);
+          } else if (resolvedMode) {
+            sections.push(formatStatus(statusFormatterData(state, tasks), resolvedMode));
+            if (opts.verbose) {
+              sections.push(formatAgentAssignments(tasks, true));
+              sections.push(formatSkillAssignments(tasks, true));
+            }
+            const settlementsMode = formatStatusTaskSettlements(taskSettlements, lang);
+            if (settlementsMode) sections.push(settlementsMode);
+          } else {
+            const meta = readSprintMeta(root, state.sprint.id);
+            const ci = readCIData(root, state.sprint.id);
+            sections.push(formatHumanStatus({
+              dashboard: state,
+              tasks,
+              sprintTitle: meta.title,
+              sprintStartedAt: meta.startedAt,
+              projectRoot: root,
+              verbose: opts.verbose,
+              ciBaseline: ci.baseline,
+              ciReport: ci.report,
+            }));
+            const settlementsWatch = formatStatusTaskSettlements(taskSettlements, lang);
+            if (settlementsWatch) sections.push(settlementsWatch);
+            const commsWatch = buildWorkerCommsSection(root, lang);
+            if (commsWatch) sections.push(commsWatch);
+            const pendingWatch = buildPendingApprovalsSection(root, lang);
+            if (pendingWatch) sections.push(pendingWatch);
+          }
+          const frame = sections
+            .map(section => isNoColor() ? stripAnsi(section) : section)
+            .join('\n');
+          return `\x1Bc${frame}\n`;
+        };
+
+        const render = (): boolean => {
+          if (cleanupPromise) return false;
+          try {
+            const frame = watchFrame();
+            if (frame !== null) writer.enqueue(frame);
+            return true;
+          } catch {
+            printError(new Error(getMessage('status.dashboard_read_failed', lang)));
+            void cleanup(1);
+            return false;
           }
         };
-        render();
+
+        unregisterShutdown = registerShutdownHook(async () => {
+          await cleanup();
+        });
+        if (!render()) return;
 
         // (D) Use fs.watch when available, fallback to setInterval
-        let cleanup: () => void;
         try {
-          const watcher = watch(dashPath, { persistent: true }, () => {
+          watcher = watch(dashPath, { persistent: true }, () => {
             render();
           });
           // Also set a fallback interval for resilience
-          const timer = setInterval(render, 5000);
-          cleanup = (): void => {
-            watcher.close();
-            clearInterval(timer);
-            process.exit(0);
-          };
+          timer = setInterval(render, 5000);
         } catch {
           // Fallback to polling if fs.watch fails
-          const timer = setInterval(render, 2000);
-          cleanup = (): void => { clearInterval(timer); process.exit(0); };
+          timer = setInterval(render, 2000);
         }
-        process.on('SIGINT', cleanup);
-        process.on('SIGTERM', cleanup);
         return;
       }
 
       try {
         const rawData = readFileSync(dashPath, 'utf-8');
         const state = JSON.parse(rawData) as DashboardState;
+        const tasks = loadTaskFiles(root);
         // ─── W0-TRUTH (#491) orphan-gate ─────────────────────────────
         // Crash-case: an ACTIVE-shaped .dashboard whose writer died must not be
         // presented as live. Stale + no live sprint + no task files → honest
         // no-sprint view (the COMPLETE case is handled inside formatHumanStatus).
         const isOrphaned = !opts.raw && isDashboardOrphaned(state, {
           hasLiveSprint: getCurrentSprintId(root) !== null,
-          hasTasks: loadTaskFiles(root).length > 0,
+          hasTasks: tasks.length > 0,
           nowMs: Date.now(),
         });
         if (isOrphaned) {
-          if (opts.json) {
+          if (jsonMode) {
             output(JSON.stringify(buildNoActiveStatusJson(root), null, 2));
             return;
           }
@@ -562,50 +1106,46 @@ export function registerStatus(program: Command): void {
         // JSON agree: a COMPLETE dashboard reports the honest no-active shape on
         // BOTH surfaces.
         const spTerminal = state.sprint as { status?: string; phase?: string };
-        if (opts.json && !opts.raw && (spTerminal.status === 'COMPLETE' || spTerminal.phase === 'COMPLETE')) {
+        if (jsonMode && !opts.raw && (spTerminal.status === 'COMPLETE' || spTerminal.phase === 'COMPLETE')) {
           output(JSON.stringify(buildNoActiveStatusJson(root), null, 2));
           return;
         }
-        if (opts.json) {
+        if (jsonMode) {
           // (E) --json + --verbose: include agent/skill info
-          const tasks = loadTaskFiles(root);
+          const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
           const jsonData = opts.verbose
-            ? { ...state, _verbose: { agents: tasks.map(t => ({ id: t.id, agent: t.assignedAgent ?? 'generic', skills: t.assignedSkills ?? [] })) } }
-            : state;
+            ? { ...state, taskSettlements, _verbose: { agents: tasks.map(t => ({ id: t.id, agent: t.assignedAgent ?? 'generic', skills: t.assignedSkills ?? [] })) } }
+            : { ...state, taskSettlements };
           output(JSON.stringify(jsonData, null, 2));
         } else if (opts.raw) {
           output(formatDashboard(state));
           // Show agent and skill assignments in raw mode
-          const tasks = loadTaskFiles(root);
           if (tasks.length > 0) {
             output(formatAgentAssignments(tasks, !!opts.verbose));
             output(formatSkillAssignments(tasks, !!opts.verbose));
           }
+          const settlementsRaw = formatStatusTaskSettlements(
+            loadStatusTaskSettlements(root, tasks, deps),
+            lang,
+          );
+          if (settlementsRaw) output(settlementsRaw);
         } else {
           // Human-friendly output (default)
-          const tasks = loadTaskFiles(root);
+          const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
           const meta = readSprintMeta(root, state.sprint.id);
           const ci = readCIData(root, state.sprint.id);
 
           // --mode flag: use output-formatter if mode is specified
-          if (opts.mode) {
-            const resolvedMode = resolveOutputMode(opts.mode);
-            const formatterData = {
-              sprintId: state.sprint.id,
-              phase: state.sprint.phase as string | undefined,
-              totalTasks: state.progress?.total ?? tasks.length,
-              completedTasks: state.progress?.done ?? 0,
-              failedTasks: tasks.filter(t => (t.status as string) === 'NO_GO').length,
-              techDebtTasks: tasks.filter(t => ((t as unknown as Record<string, unknown>)['evaluationDecision'] as string) === 'GO_WITH_TECH_DEBT').length,
-              activeWorkers: state.agents?.length ?? 0,
-            };
-            output(formatStatus(formatterData, resolvedMode));
+          if (resolvedMode) {
+            output(formatStatus(statusFormatterData(state, tasks), resolvedMode));
             if (opts.verbose) {
               output(formatAgentAssignments(tasks, true));
               output(formatSkillAssignments(tasks, true));
             }
             const commsMode = buildWorkerCommsSection(root, lang);
             if (commsMode) output(commsMode);
+            const settlementsMode = formatStatusTaskSettlements(taskSettlements, lang);
+            if (settlementsMode) output(settlementsMode);
           } else {
             output(formatHumanStatus({
               dashboard: state,
@@ -621,6 +1161,8 @@ export function registerStatus(program: Command): void {
               output(formatAgentAssignments(tasks, true));
               output(formatSkillAssignments(tasks, true));
             }
+            const settlementsDefault = formatStatusTaskSettlements(taskSettlements, lang);
+            if (settlementsDefault) output(settlementsDefault);
             const commsDefault = buildWorkerCommsSection(root, lang);
             if (commsDefault) output(commsDefault);
             const pendingDefault = buildPendingApprovalsSection(root, lang);

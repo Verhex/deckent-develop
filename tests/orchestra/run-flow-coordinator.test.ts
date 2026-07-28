@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import {
   createRunFlowCoordinator,
   InvalidTransitionError,
@@ -91,25 +92,46 @@ function driveFlowToCompletion(
   };
 }
 
-/** ONLY for the sequence-integrity scenario: swaps two JSONL lines in a
- *  flow's durable events log to simulate a corrupted fold order. Reads the
- *  real on-disk file (sync node:fs — the store itself uses the same
- *  primitive internally; this is not a subprocess, so ADR-D-002's spawnSync
- *  ban does not apply). Path is assembled from the already-exported
- *  `RUNTIME_DIR` constant plus the store's own documented
- *  `run-flow-store/<flowId>.events.jsonl` naming (run-flow-store.ts header). */
-function swapEventLines(root: string, flowId: string, indexA: number, indexB: number): void {
-  const path = join(root, RUNTIME_DIR, 'run-flow-store', `${flowId}.events.jsonl`);
-  const raw = readFileSync(path, 'utf-8');
-  const lines = raw.split('\n').filter((line) => line.trim().length > 0);
-  const a = lines[indexA];
-  const b = lines[indexB];
-  if (a === undefined || b === undefined) {
-    throw new Error(`swapEventLines: index out of range (have ${lines.length} lines)`);
+/** ONLY for the sequence-integrity scenario: corrupt canonical payload order
+ *  while preserving indexed sequence continuity. JSONL is a compatibility
+ *  projection and intentionally cannot override the SQLite authority. */
+function swapCanonicalEventPayloads(root: string, flowId: string, sequenceA: number, sequenceB: number): void {
+  const path = join(root, RUNTIME_DIR, 'run-flow-store', 'run-flow-authority.sqlite');
+  const db = new Database(path);
+  try {
+    const rows = db.prepare(`
+      SELECT sequence, payload_json FROM run_flow_records
+      WHERE kind = 'event' AND flow_id = ? AND sequence IN (?, ?)
+      ORDER BY sequence ASC
+    `).all(flowId, sequenceA, sequenceB) as { sequence: number; payload_json: string }[];
+    if (rows.length !== 2) throw new Error(`expected two canonical events, observed ${rows.length}`);
+    const firstPayload = JSON.parse(rows[0]!.payload_json) as Record<string, unknown>;
+    const secondPayload = JSON.parse(rows[1]!.payload_json) as Record<string, unknown>;
+    db.transaction(() => {
+      const firstCorruptJson = JSON.stringify({ ...secondPayload, sequence: sequenceA });
+      const secondCorruptJson = JSON.stringify({ ...firstPayload, sequence: sequenceB });
+      db.prepare(`
+        UPDATE run_flow_records SET payload_json = ?, payload_hash = ?
+        WHERE kind = 'event' AND flow_id = ? AND sequence = ?
+      `).run(
+        firstCorruptJson,
+        createHash('sha256').update(firstCorruptJson).digest('hex'),
+        flowId,
+        sequenceA,
+      );
+      db.prepare(`
+        UPDATE run_flow_records SET payload_json = ?, payload_hash = ?
+        WHERE kind = 'event' AND flow_id = ? AND sequence = ?
+      `).run(
+        secondCorruptJson,
+        createHash('sha256').update(secondCorruptJson).digest('hex'),
+        flowId,
+        sequenceB,
+      );
+    })();
+  } finally {
+    db.close();
   }
-  lines[indexA] = b;
-  lines[indexB] = a;
-  writeFileSync(path, lines.join('\n') + '\n', 'utf-8');
 }
 
 describe('RunFlowCoordinator — hermetic scenario family (442-003)', () => {
@@ -276,12 +298,12 @@ describe('RunFlowCoordinator — hermetic scenario family (442-003)', () => {
       appendProposalToCompletionChain({ root, flowId, through: 'PREVIEW_READY' });
       expect(readFlowEvents(root, flowId)).toHaveLength(3);
 
-      // Corrupt on-disk fold order: swap PREVIEW_STARTED/PREVIEW_READY so the
-      // file now reads PROPOSAL_SUBMITTED, PREVIEW_READY, PREVIEW_STARTED.
+      // Corrupt canonical fold order: swap PREVIEW_STARTED/PREVIEW_READY so the
+      // authority now reads PROPOSAL_SUBMITTED, PREVIEW_READY, PREVIEW_STARTED.
       // Folding in THAT order applies PREVIEW_READY while the context is
       // still PROPOSAL_READY (not PREVIEWING) — invalid under any
       // circumstance, per the reducer's own state guard.
-      swapEventLines(root, flowId, 1, 2);
+      swapCanonicalEventPayloads(root, flowId, 2, 3);
 
       const coordinator = createRunFlowCoordinator({ root, now: makeClock() });
       expect(() => coordinator.getFlow(flowId)).toThrow(InvalidTransitionError);

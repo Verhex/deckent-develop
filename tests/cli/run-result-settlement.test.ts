@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -141,6 +141,19 @@ describe('waitForRunResult settlement authority', () => {
     await expect(waitForRunResult(root, 'legacy-a', 500)).resolves.toMatchObject({
       selfAssessment: 'DONE',
     });
+  });
+
+  it('rejects a raw result whose embedded task identity does not match the requested task', async () => {
+    const { root, tasks } = fixture();
+    rawResult(tasks, 'other-task', 'DONE');
+    writeFileSync(
+      join(tasks, 'task-expected-task.result'),
+      readFileSync(join(tasks, 'task-other-task.result'), 'utf-8'),
+      'utf-8',
+    );
+
+    await expect(waitForRunResult(root, 'expected-task', 500))
+      .rejects.toMatchObject({ code: 'E_TASK_RESULT_IDENTITY_MISMATCH' });
   });
 
   it('rejects corrupt closure evidence instead of timing out or reading raw output', async () => {

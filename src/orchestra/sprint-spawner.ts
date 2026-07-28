@@ -804,6 +804,8 @@ export async function spawnWorkers(
             dockerImage: config.docker_image,
             dockerTimeoutSeconds: config.docker_timeout,
             dockerMemoryLimit: config.worker_memory_limit,
+            dockerMemorySwap: config.worker_memory_swap,
+            dockerKindMemoryLimits: config.worker_memory_limit_by_kind,
           })
         : backend;
     // F1-RE (Sprint 252): resolve the model reasoning-effort (opt-in, provider-

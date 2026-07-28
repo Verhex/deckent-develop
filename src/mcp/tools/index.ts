@@ -101,7 +101,7 @@ export const TOOL_CATALOG: McpToolCatalogEntry[] = [
   { name: 'deckent_autonomous', description: 'Autonomous engine control surface (status/start/stop/backlog list-add-approve-reject, cron)', readOnly: false },
   { name: 'deckent_process', description: 'Process-mode execution surface (submit an ExecutionRequest → policy-gated auto-run or park; status/result by executionId)', readOnly: false },
   { name: 'deckent_usage', description: 'Show token/limit consumption from Claude Code transcripts (model table or run task breakdown + cache-gate)', readOnly: true },
-  { name: 'deckent_xverify', description: 'Adversarial cross-verify a claim on a DIFFERENT provider (advisory: CONFIRMED/REFUTED/UNCLEAR + report path, never blocks)', readOnly: false },
+  { name: 'deckent_xverify', description: 'Cross-verify a claim on a DIFFERENT provider; host returns typed verdict + ALLOW/NO-GO/HOLD disposition', readOnly: false },
   { name: 'deckent_kpi', description: 'Show the KPI scorecard for a run — returns { sprintId, kpis } with cost, token, cache, retry, completion, and quality metrics', readOnly: true },
   { name: 'deckent_cost', description: 'Show cost config: budget limits, per-model pricing (input/output per MTok), and today\'s spend from the resource log', readOnly: true },
   // PARITY-CLI-MCP (359-011) + AUTONOMOUS-MCP (359-016) — registered by CC debt-payment
@@ -164,7 +164,7 @@ export function registerTools(
   registerAutonomousTool(server);
   registerProcessTool(server);
   registerUsageTool(server);
-  registerXverifyTool(server);
+  registerXverifyTool(server, runtime);
   registerKpiTool(server);
   registerCostTool(server);
   registerCatalogParityTools(server);

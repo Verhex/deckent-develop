@@ -24,12 +24,22 @@ function fixtureRoot(prefix: string): string {
   return root;
 }
 
-function cleanScriptFixture(prefix: string): { root: string; scriptPath: string } {
+function cleanScriptFixture(
+  prefix: string,
+  options: { withDependencies?: boolean } = {},
+): { root: string; scriptPath: string } {
   const root = fixtureRoot(prefix);
   const scriptsDir = join(root, 'scripts');
   const scriptPath = join(scriptsDir, 'clean.mjs');
   mkdirSync(scriptsDir, { recursive: true });
   copyFileSync(join(REPO_ROOT, 'scripts', 'clean.mjs'), scriptPath);
+  if (options.withDependencies !== false) {
+    symlinkSync(
+      join(REPO_ROOT, 'node_modules'),
+      join(root, 'node_modules'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+  }
   return { root, scriptPath };
 }
 
@@ -91,24 +101,38 @@ describe('cleanDist hermetic boundary', () => {
     expect(readFileSync(sentinel, 'utf-8')).toBe('preserve');
   });
 
-  it('ignores caller-supplied authority and cleans only its physical source root', async () => {
+  it('rejects caller-supplied authority without touching either physical root', async () => {
     const fixture = cleanScriptFixture('deckent-clean-call-authority-');
     const unrelatedRoot = fixtureRoot('deckent-clean-victim-authority-');
     const physicalEntry = join(fixture.root, 'dist', 'cli', 'entry.js');
     const victimSentinel = join(unrelatedRoot, 'dist', 'cli', 'entry.js');
+    const authorityResult = join(
+      fixture.root,
+      '.caller-authority-result.json',
+    );
     mkdirSync(join(fixture.root, 'dist', 'cli'), { recursive: true });
     mkdirSync(join(unrelatedRoot, 'dist', 'cli'), { recursive: true });
     writeFileSync(physicalEntry, 'remove-from-physical-source');
     writeFileSync(victimSentinel, 'preserve-victim');
     const source = `
+      import { writeFileSync } from 'node:fs';
       import { cleanDist } from ${JSON.stringify(pathToFileURL(fixture.scriptPath).href)};
       try {
         cleanDist({
           rootDir: ${JSON.stringify(unrelatedRoot)},
         });
+        writeFileSync(
+          ${JSON.stringify(authorityResult)},
+          JSON.stringify({ code: 'unexpected-success' }),
+          'utf8'
+        );
         process.exitCode = 0;
       } catch (error) {
-        process.stderr.write(String(error?.code ?? 'UNTYPED'));
+        writeFileSync(
+          ${JSON.stringify(authorityResult)},
+          JSON.stringify({ code: error?.code ?? 'UNTYPED' }),
+          'utf8'
+        );
         process.exitCode = 19;
       }
     `;
@@ -123,9 +147,29 @@ describe('cleanDist hermetic boundary', () => {
       },
     );
 
-    expect(result.code).toBe(0);
-    expect(existsSync(physicalEntry)).toBe(false);
+    expect(result.code).toBe(19);
+    expect(JSON.parse(readFileSync(authorityResult, 'utf8'))).toEqual({
+      code: 'E_CLEAN_OPERATION_OPTIONS_INVALID',
+    });
+    expect(readFileSync(physicalEntry, 'utf8'))
+      .toBe('remove-from-physical-source');
     expect(readFileSync(victimSentinel, 'utf-8')).toBe('preserve-victim');
+  });
+
+  it('fails closed when the canonical SQLite authority dependency is unavailable', async () => {
+    const fixture = cleanScriptFixture(
+      'deckent-clean-module-unavailable-',
+      { withDependencies: false },
+    );
+    const sentinel = join(fixture.root, 'dist', 'cli', 'entry.js');
+    mkdirSync(join(sentinel, '..'), { recursive: true });
+    writeFileSync(sentinel, 'must-survive', 'utf8');
+
+    const result = await cleanDistFixture(fixture);
+
+    expect(result.code).toBe(1);
+    expect(result.output).toContain('MODULE_UNAVAILABLE');
+    expect(readFileSync(sentinel, 'utf8')).toBe('must-survive');
   });
 
   it('cleans only its physical temp fixture and preserves dashboard', async () => {

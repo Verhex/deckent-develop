@@ -135,6 +135,7 @@ export function runManagedDocUpdates(ctx: DocUpdateContext): DocUpdateResult[] {
 function emptyMetrics(): SprintMetrics {
   return {
     totalTasks: 0, completedTasks: 0, techDebtTasks: 0, noGoTasks: 0,
+    unevaluatedTasks: 0,
     durationMs: 0, coveragePercent: 0, noGoRate: 0,
     newDebtCount: 0, resolvedDebtCount: 0, totalOpenDebt: 0,
     boundaryViolations: 0, crossAssignments: 0, contextLinesUsed: 0,

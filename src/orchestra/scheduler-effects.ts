@@ -412,6 +412,8 @@ export async function executeSpawnTask(
           dockerImage: config?.docker_image,
           dockerTimeoutSeconds: config?.docker_timeout,
           dockerMemoryLimit: config?.worker_memory_limit,
+          dockerMemorySwap: config?.worker_memory_swap,
+          dockerKindMemoryLimits: config?.worker_memory_limit_by_kind,
         })
       : backend;
   const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);

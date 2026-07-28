@@ -1232,6 +1232,14 @@ export function detectFixSpawnFailure(projectRoot: string): FixSpawnFailure | nu
 }
 
 /**
+ * Grace window after sprint teardown before the linger probe reports surviving
+ * handles (MASTER-PLAN 667). Long enough that a normally-draining process exits
+ * first and stays silent; short enough that an operator watching the terminal
+ * learns the cause immediately instead of after a multi-minute hang.
+ */
+const SPRINT_EXIT_LINGER_PROBE_MS = 10_000;
+
+/**
  * Execute a full sprint lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP.
  * Supports human checkpoints, configurable timeout, and provider routing.
  */
@@ -1260,6 +1268,8 @@ export async function runSprint(
           dockerImage: config.docker_image,
           dockerTimeoutSeconds: config.docker_timeout,
           dockerMemoryLimit: config.worker_memory_limit,
+          dockerMemorySwap: config.worker_memory_swap,
+          dockerKindMemoryLimits: config.worker_memory_limit_by_kind,
         })
       : undefined);
 
@@ -1715,6 +1725,18 @@ export async function runSprint(
         if (lateResult) results.push(lateResult);
       }
     } catch (e) { debugLog('postCollect:main', e); }
+
+    // MASTER-PLAN 664/665: a single unsettled Docker attempt used to abort the
+    // WHOLE run here, so healthy independent tasks in later waves never ran
+    // (measured 2026-07-25: sprint-458 died on 458-005's pending settlement and
+    // tasks 003/004 were never spawned). The backend already knows how to
+    // classify an attempt whose container is gone; give it that chance BEFORE
+    // asserting. The assertion itself is unchanged — an attempt that is still
+    // genuinely in flight must still hold, because an unsettled Docker result is
+    // never authoritative.
+    try {
+      await reconcileSpawnBackendBeforeRestore(spawnBackend);
+    } catch (e) { debugLog('postCollect:reconcile', e); }
 
     assertTaskResultAuthoritiesReady(
       projectRoot,
@@ -2244,5 +2266,34 @@ export async function runSprint(
     try {
       debugLog('runSprint:activeResourcesAtExit', process.getActiveResourcesInfo());
     } catch (e) { debugLog('runSprint:activeResourcesAtExit:err', e); }
+
+    // MASTER-PLAN 667: the snapshot above is taken while the process may still
+    // be legitimately draining, and it only ever reached the debug channel — so
+    // three separate multi-minute lingers (sprints 457/458/459, up to 58 min
+    // past a 40-min timeout) were diagnosed by guesswork instead of evidence.
+    //
+    // Probe again AFTER a grace window: if the coordinator is still alive then,
+    // teardown did not release everything and the surviving handles are named
+    // ON THE OPERATOR'S SCREEN, not just in a debug log. The probe timer is
+    // unref'd so it can never itself be the thing keeping the process alive,
+    // and it stays silent on the healthy path (the process exits and the timer
+    // never fires — the normal outcome, proven by sprint-460's clean 2m11s close).
+    try {
+      const lingerProbe = setTimeout(() => {
+        try {
+          const handles = process.getActiveResourcesInfo();
+          const summary = handles.length > 0 ? handles.join(', ') : '(none reported)';
+          console.warn(
+            `[deckent] Sprint teardown finished but this process is still alive `
+            + `${Math.round(SPRINT_EXIT_LINGER_PROBE_MS / 1000)}s later. Handles still holding the `
+            + `event loop: ${summary}. The sprint's own work is complete; this is a teardown leak, `
+            + `not a stuck sprint.`,
+          );
+          debugLog('runSprint:lingerProbe', summary);
+        } catch (e) { debugLog('runSprint:lingerProbe:err', e); }
+      }, SPRINT_EXIT_LINGER_PROBE_MS);
+      // Never let the diagnostic become the defect it diagnoses.
+      lingerProbe.unref();
+    } catch (e) { debugLog('runSprint:lingerProbe:schedule', e); }
   }
 }

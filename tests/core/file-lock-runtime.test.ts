@@ -21,6 +21,10 @@ import {
   acquireSpawnLocks,
   releaseSpawnLocks,
   releaseAllSpawnLocks,
+  clearStaleSpawnLocks,
+  clearOrphanSpawnLocks,
+  acquireExecutionLock,
+  releaseExecutionLock,
   checkLocks,
   SpawnLockError,
   type SpawnLockInfo,
@@ -297,5 +301,25 @@ describe('coexistence with worker-time .lock files', () => {
     expect(allFiles.length).toBe(2);
     expect(allFiles.some(f => f.endsWith('.spawnlock'))).toBe(true);
     expect(allFiles.some(f => f.endsWith('.lock') && !f.endsWith('.spawnlock'))).toBe(true);
+  });
+
+  it('generic spawn cleanup cannot discover or remove .executionlock authority', () => {
+    const execution = acquireExecutionLock(root, 'execution-authority', 'dispatch', {
+      leaseDurationMs: 1,
+      now: () => 0,
+    });
+
+    expect(clearStaleSpawnLocks(root, 0)).toBe(0);
+    expect(clearOrphanSpawnLocks(root, [])).toBe(0);
+    expect(releaseAllSpawnLocks(root, 'execution-authority')).toBe(0);
+    expect(
+      readdirSync(join(root, '.locks')).filter(file => file.endsWith('.executionlock')),
+    ).toHaveLength(1);
+
+    expect(releaseExecutionLock(
+      root,
+      'execution-authority',
+      execution.ownerId,
+    )).toBe(true);
   });
 });

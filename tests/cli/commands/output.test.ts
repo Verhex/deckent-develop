@@ -233,6 +233,52 @@ describe('output command — file exists', () => {
     expect(parsed.lines).toBeDefined();
     expect(Array.isArray(parsed.lines)).toBe(true);
   });
+
+  it('--json includes read-only raw/effective receipt evidence and closes the projection', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockImplementation((path: any) =>
+      String(path).endsWith('.json')
+        ? JSON.stringify({ id: 'task-001', status: 'PENDING' })
+        : 'alpha\nbeta');
+    const close = vi.fn();
+    const program = new Command();
+    program.exitOverride();
+    registerOutput(program, {
+      resolveProjectRootFn: () => '/mock/root',
+      openTaskSettlementProjection: () => ({
+        projectId: 'project-test',
+        diagnostic: 'ready',
+        projectTaskExecutionState: (_taskId, rawStatus) => ({
+          rawStatus,
+          effectiveStatus: 'NO_GO',
+          evidenceRefs: ['task-result:sha256:evidence'],
+          receiptRef: {
+            schemaVersion: 1,
+            tenantId: 'local',
+            projectId: 'project-test',
+            invocationId: 'invocation-1',
+          },
+          reasonCode: 'projected',
+        }),
+        close,
+      }),
+    });
+
+    await program.parseAsync([
+      'node', 'test', 'output', 'task-001', '--json', '--tail', '10',
+    ]);
+
+    const parsed = JSON.parse(vi.mocked(print).mock.calls.at(-1)?.[0] ?? '{}');
+    expect(parsed.lines).toEqual(['alpha', 'beta']);
+    expect(parsed.settlement).toMatchObject({
+      taskId: 'task-001',
+      rawStatus: 'PENDING',
+      effectiveStatus: 'NO_GO',
+      receiptRef: { invocationId: 'invocation-1' },
+      evidenceRefs: ['task-result:sha256:evidence'],
+    });
+    expect(close).toHaveBeenCalledOnce();
+  });
 });
 
 // ─── registerOutput ───────────────────────────────────────────────────────────

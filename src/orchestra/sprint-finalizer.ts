@@ -2151,11 +2151,19 @@ export async function finalizeSprint(
     const total = metrics.totalTasks ?? sprint.tasks.length;
     const noGo = metrics.noGoTasks ?? 0;
     const debt = metrics.techDebtTasks ?? 0;
+    // MASTER-PLAN 667: never let delivered-but-unjudged work read as failure.
+    // A run that ends before EVALUATE reaches a task used to close as
+    // "0/3 DONE, 0 TECH_DEBT, 0 NO_GO" while two workers had produced real
+    // results on disk (sprint-459). Surface that bucket explicitly.
+    const unevaluated = metrics.unevaluatedTasks ?? 0;
+    const unevaluatedSuffix = unevaluated > 0
+      ? `, ${unevaluated} UNEVALUATED (result on disk, never judged)`
+      : '';
     void notify(
       'sprint-finalized',
       sprint.id,
       `Sprint ${sprint.id} kapandı`,
-      `${done}/${total} DONE, ${debt} TECH_DEBT, ${noGo} NO_GO`,
+      `${done}/${total} DONE, ${debt} TECH_DEBT, ${noGo} NO_GO${unevaluatedSuffix}`,
     );
   } catch (e) { debugLog('finalizeSprint:notify:sprint-finalized', e); }
 

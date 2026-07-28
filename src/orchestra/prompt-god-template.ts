@@ -965,6 +965,24 @@ export function buildScopeBlock(
   const tasksExemptionNote =
     `\n\nSeparately, your worker-protocol files under \`.tasks/\` (your \`.plan\`, \`.hb\`, \`.result\`, and a \`.question\` if you escalate) are lifecycle artifacts, NOT project changes — they are always writable and are exempt from this scope audit. Writing them is required and never counts as touching a file outside your scope.`;
 
+  // MASTER-PLAN 668 — bounded discovery. Read scope limits what you may CHANGE;
+  // it never licensed scanning the whole repository to find it. Measured
+  // 2026-07-25: the same documentation task was SIGKILLed (exit 137) three
+  // times — 457-003, 458-005, 459-003 — each time while running repository-wide
+  // discovery, with the last death mid `git log --oneline --all | grep`. Peak
+  // container memory at that moment was 0.20 GB of 6 GB and docker reported no
+  // OOM, so the ceiling was not the cause; the unbounded scan was. The same
+  // task completed DONE in 31 turns once discovery was bounded. The xverify
+  // verifier protocol has carried this rule since its inception; it now applies
+  // to every worker.
+  const boundedDiscoveryNote =
+    `\n\n**Bounded discovery (mandatory).** Search only inside the files and directories listed above.`
+    + ` Do NOT run repository-wide discovery: no \`git log --all\`, no history scan across every ref,`
+    + ` no repo-wide \`grep\`/\`rg\`/\`find\`/\`ls -R\`, no whole-tree \`git status\`. Prefer an exact path`
+    + ` plus a bounded excerpt (\`sed -n 'START,ENDp' path\`) over reading a large file whole. If you`
+    + ` genuinely cannot locate what you need inside your scope, say so in your \`.result\` notes and`
+    + ` return NO_GO — do not widen the search. An unbounded scan has killed real workers here.`;
+
   if (isInspectionOnly) {
     const readFiles = sanitizedRead.filesRead.length > 0
       ? sanitizedRead.filesRead.map(f => `  - ${f}`).join('\n')
@@ -976,7 +994,7 @@ ${scopeDirs}
 Exact project files to inspect:
 ${readFiles}
 
-PROJECT WRITE authority: NONE. No project source, test, config, documentation, credential, or git-metadata file may be created or modified. A directory above never grants Write/Edit permission.${tasksExemptionNote}`;
+PROJECT WRITE authority: NONE. No project source, test, config, documentation, credential, or git-metadata file may be created or modified. A directory above never grants Write/Edit permission.${tasksExemptionNote}${boundedDiscoveryNote}`;
   }
 
   // PCOMP-W1 (single write authority — sprint-348-005 prompt analysis): the old
@@ -1001,7 +1019,7 @@ ${scopeDirs}
 WRITE authority (canonical — the ONLY files you may create or modify):
 ${writeAuthority}
 
-A directory appearing in the read scope does NOT grant write permission there — the write list above is the single authority, and the auditor flags any write outside it. If a change seems needed in a file you cannot write, note it in your .result \`notes\` instead of editing it.${tasksExemptionNote}${hostConfigNote}`;
+A directory appearing in the read scope does NOT grant write permission there — the write list above is the single authority, and the auditor flags any write outside it. If a change seems needed in a file you cannot write, note it in your .result \`notes\` instead of editing it.${tasksExemptionNote}${boundedDiscoveryNote}${hostConfigNote}`;
   }
 
   return `## Scope Rules
@@ -1011,7 +1029,7 @@ ${scopeDirs}
 You may ONLY write to these files:
 ${scopeFiles}
 
-DO NOT touch files outside your scope — the auditor will flag violations.${tasksExemptionNote}${hostConfigNote}`;
+DO NOT touch files outside your scope — the auditor will flag violations.${tasksExemptionNote}${boundedDiscoveryNote}${hostConfigNote}`;
 }
 
 // ─── Dependencies Block Builder ────────────────────────────────────────

@@ -123,6 +123,7 @@ import {
 } from './runtime-budget-monitor.js';
 import {
   dispatchExecutionContinuation,
+  type ExecutionContinuationDispatchResult,
 } from './execution-continuation-runner.js';
 import {
   prepareDockerExecutionLanding,
@@ -276,16 +277,101 @@ export interface GeminiAuthSelectionBootstrap {
 
 /** Attribute a non-zero Docker exit using host-owned budget evidence before
  * falling back to the necessarily ambiguous exit-code heuristic. */
+/**
+ * Settle a task whose attempt LANDED but whose continuation was held.
+ *
+ * MASTER-PLAN 664: a held continuation used to be invisible (debugLog only) AND
+ * non-terminal — the landing checkpoint is by design neither DONE nor NO_GO, so
+ * the sprint waited forever for a `.result` that no attempt could ever write
+ * (measured 2026-07-25: task 457-002 hung the run past its own timeout).
+ *
+ * The checkpoint stays the authoritative attempt evidence; this only gives the
+ * PRODUCT outcome a terminal, typed value so evaluation/FIX can act on it.
+ * Never overwrites an existing result — a real worker result always wins.
+ */
+export function settleHeldExecutionContinuation(
+  projectDir: string,
+  taskId: string,
+  exitCode: number,
+  reason: string,
+): boolean {
+  const resultPath = join(projectDir, TASKS_DIR, `task-${taskId}.result`);
+  if (existsSync(resultPath)) return false;
+  try {
+    writeFileSync(resultPath, `${JSON.stringify({
+      taskId,
+      workerId: `docker-${taskId}`,
+      selfAssessment: 'NO_GO',
+      exitCode,
+      testsPassed: false,
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+      notes: `Execution landed at a host checkpoint but the continuation was held: ${reason}. `
+        + 'No further provider work was dispatched. The landing checkpoint remains the '
+        + 'authoritative attempt evidence; this result only settles the product outcome.',
+      continuationHeld: { version: 1, reason },
+    }, null, 2)}\n`, 'utf-8');
+    const fd = openSync(resultPath, 'r');
+    try { fsyncSync(fd); } finally { closeSync(fd); }
+    return true;
+  } catch (error) {
+    debugLog(
+      'docker-backend:continuation-hold-settle-failed',
+      `taskId=${taskId} ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return false;
+  }
+}
+
+/**
+ * Measure whether the container was actually OOM-killed.
+ *
+ * MASTER-PLAN 660/664: exit 137 only means SIGKILL. It was previously ASSERTED
+ * to be an OOM whenever no budget-stop evidence was matched, which sent a real
+ * 2026-07-25 debugging session toward "raise the memory limit" when the true
+ * cause was a turn-ceiling kill. Docker knows the answer; ask it. A removed or
+ * unreachable container yields `null` = unmeasured, never a guess.
+ */
+export function probeContainerOomKilled(containerId: string): boolean | null {
+  if (!containerId.trim()) return null;
+  try {
+    const probe = spawnSync(
+      'docker',
+      ['inspect', '--format', '{{.State.OOMKilled}}', containerId],
+      { encoding: 'utf-8', timeout: 5_000 },
+    );
+    if (probe.status !== 0) return null;
+    const value = (probe.stdout ?? '').trim();
+    return value === 'true' ? true : value === 'false' ? false : null;
+  } catch {
+    return null;
+  }
+}
+
 export function describeDockerPartialResultTermination(
   exitCode: number,
   budgetStop: RuntimeBudgetStopEvidence | null,
+  /** Measured OOM truth; `null` means it could not be measured. Never assumed. */
+  oomKilled: boolean | null = null,
 ): string {
   if (budgetStop) {
     const reason = budgetStop.decision.reasons.join('; ') || 'execution budget exceeded';
     return `Runtime budget circuit breaker stopped the worker (exitCode=${exitCode}): ${reason}. Partial-result promoted by host monitor. attemptId=${budgetStop.attemptId}; evidenceSource=${budgetStop.evidenceSource ?? 'stop-marker'}.`;
   }
   if (exitCode === 137) {
-    return 'Container OOM-killed (exit 137, SIGKILL). Partial-result promoted by host monitor. No .result was written by worker.';
+    if (oomKilled === true) {
+      return 'Container OOM-killed (exit 137, SIGKILL; docker reported OOMKilled=true). Partial-result promoted by host monitor. No .result was written by worker.';
+    }
+    if (oomKilled === false) {
+      // `OOMKilled` reflects PID 1 only. Under cgroup v2 the kernel OOM killer
+      // frequently kills a CHILD (the provider CLI) while the shell entrypoint
+      // survives and exits 137 — the flag stays false even though memory WAS the
+      // cause. Measured 2026-07-25 (task 458-005, 3 GB limit). So a false flag
+      // narrows the cause, it does not clear memory pressure.
+      return 'Container SIGKILLed (exit 137) with docker OOMKilled=false and no matching budget-stop evidence. That flag only covers PID 1: under cgroup v2 a child process (the provider CLI) can still be OOM-killed while the entrypoint survives. Check the container memory limit against peak worker usage before ruling memory out. Partial-result promoted by host monitor.';
+    }
+    return 'Container SIGKILLed (exit 137). OOM status could not be measured and no budget-stop evidence matched; cause undetermined — neither assume nor rule out memory pressure. Partial-result promoted by host monitor.';
   }
   const signalInfo = exitCode > 128 ? ` signal=${exitCode - 128}` : '';
   return `Container killed (exitCode=${exitCode}${signalInfo}). Partial-result promoted by host monitor.`;
@@ -3056,7 +3142,36 @@ export class DockerSpawnBackend implements SpawnBackend {
     this.timeoutSeconds = opts?.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS;
     this.gracefulTimeoutSeconds = opts?.gracefulTimeoutSeconds ?? DEFAULT_GRACEFUL_TIMEOUT_SECONDS;
     this.memoryLimit = opts?.memoryLimit ?? DEFAULT_WORKER_MEMORY_LIMIT;
-    this.memorySwap = opts?.memorySwap ?? DEFAULT_WORKER_MEMORY_SWAP;
+    // MASTER-PLAN 666: swap must follow the limit, not a fixed constant. The
+    // documented rule (and the 4g/6g default pair) is limit × 1.5; pinning the
+    // constant meant raising `worker_memory_limit` to 6g silently produced
+    // `--memory-swap == --memory`, i.e. swap fully DISABLED, so a transient
+    // spike became an immediate kill (measured 2026-07-25, task 458-005).
+    // An explicit `memorySwap` still wins; it must never be below the limit.
+    const derivedSwap = (() => {
+      // The documented default PAIR stays byte-for-byte ('4g'/'6g'): deriving it
+      // would only reformat the same number ('6144m') and churn every consumer
+      // that asserts the default contract. Derivation exists for the case that
+      // actually broke — a limit the owner changed.
+      if (this.memoryLimit === DEFAULT_WORKER_MEMORY_LIMIT) return DEFAULT_WORKER_MEMORY_SWAP;
+      const limitBytes = parseMemoryString(this.memoryLimit);
+      return limitBytes === null ? DEFAULT_WORKER_MEMORY_SWAP : deriveSwapFromLimitBytes(limitBytes);
+    })();
+    this.memorySwap = opts?.memorySwap ?? derivedSwap;
+    const limitBytesForCheck = parseMemoryString(this.memoryLimit);
+    const swapBytesForCheck = parseMemoryString(this.memorySwap);
+    if (
+      limitBytesForCheck !== null
+      && swapBytesForCheck !== null
+      && swapBytesForCheck < limitBytesForCheck
+    ) {
+      throw new DeckentError(
+        'DECKENT_E004',
+        `Worker memory swap '${this.memorySwap}' is below the memory limit '${this.memoryLimit}'. `
+        + 'Docker requires --memory-swap >= --memory; set worker_memory_swap at or above worker_memory_limit '
+        + '(or leave it unset to derive limit × 1.5).',
+      );
+    }
     const rawKindLimits = opts?.kindMemoryLimits ?? {};
     // Validate kind limits at construction time — fail fast on invalid values
     for (const [kind, limitStr] of Object.entries(rawKindLimits)) {
@@ -3206,11 +3321,34 @@ export class DockerSpawnBackend implements SpawnBackend {
     const continuationRecoveryByKey =
       new Map<string, DockerContinuationRecoveryAuthority>();
     for (const landed of listRetiredExecutionLandings(this.projectDir)) {
-      const continuation = dispatchExecutionContinuation({
-        projectRoot: this.projectDir,
-        checkpointRef: landed.checkpoint.checkpoint,
-        backend: this,
-      });
+      // MASTER-PLAN 664: a landing whose remaining budget can no longer finance
+      // any continuation is permanently un-continuable. Recovery must settle it
+      // and move on — propagating the hold here aborted EVERY later run on the
+      // machine (measured 2026-07-26: sprint-458 died on sprint-457's stale
+      // landing with `remaining=1, required=2`). The in-flight path already
+      // settles this case; recovery now matches it.
+      let continuation: ExecutionContinuationDispatchResult;
+      try {
+        continuation = dispatchExecutionContinuation({
+          projectRoot: this.projectDir,
+          checkpointRef: landed.checkpoint.checkpoint,
+          backend: this,
+        });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        debugLog(
+          'docker-backend:recovery-continuation-held',
+          `taskId=${landed.checkpoint.checkpoint.taskId} ${reason}`,
+        );
+        settleHeldExecutionContinuation(
+          this.projectDir,
+          landed.checkpoint.checkpoint.taskId,
+          137,
+          reason,
+        );
+        report.retiredLanded.push(landed.checkpoint.checkpoint.taskId);
+        continue;
+      }
       const recoveryAuthority: DockerContinuationRecoveryAuthority = {
         executionContinuation: {
           version: 1,
@@ -5412,10 +5550,11 @@ export class DockerSpawnBackend implements SpawnBackend {
         backend: this,
       });
     } catch (error) {
-      debugLog(
-        'docker-backend:landing-continuation-held',
-        `taskId=${input.taskId} ${error instanceof Error ? error.message : String(error)}`,
-      );
+      const reason = error instanceof Error ? error.message : String(error);
+      debugLog('docker-backend:landing-continuation-held', `taskId=${input.taskId} ${reason}`);
+      // MASTER-PLAN 664: never leave a held continuation both silent and
+      // non-terminal — that hangs the run on a result no attempt can write.
+      settleHeldExecutionContinuation(input.projectDir, input.taskId, input.exitCode, reason);
     }
     return true;
   }
@@ -5727,6 +5866,7 @@ export class DockerSpawnBackend implements SpawnBackend {
           partial.notes = describeDockerPartialResultTermination(
             exitCode,
             runtimeBudgetExhaustion,
+            exitCode === 137 ? probeContainerOomKilled(containerId) : null,
           );
           partial.exitCode = exitCode;
           partial.selfAssessment = 'NO_GO';

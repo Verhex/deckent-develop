@@ -16,13 +16,16 @@
 // dedup + unknown-suffix skip, (6) commandId round-trip (present + absent).
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, appendFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, appendFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   appendFlowEvent,
+  appendFlowEvents,
   readFlowEvents,
+  readFlowEventHead,
   listFlowIds,
+  RunFlowStoreError,
   saveApprovedSnapshot,
   saveRunHandle,
   type StoredApprovedSnapshot,
@@ -174,17 +177,66 @@ describe('run-flow-store — event log: torn-line tolerance', () => {
     const nextSeq = appendFlowEvent(root, flowId, makeEvent(flowId, { timestamp: '2026-07-12T00:00:02.000Z' }));
     expect(nextSeq).toBe(3);
 
-    // NOTE (verified, not asserted here — see .result notes / follow-up):
-    // because appendJsonlRecord's `existing + JSON.stringify(record) + '\n'`
-    // concatenation does not normalize a missing trailing newline, the record
-    // just written above physically merges onto the SAME corrupted line as the
-    // torn fragment and becomes itself unparsable — readFlowEvents(root, flowId)
-    // at this point still returns only [1, 2], not [1, 2, 3]. That data-loss
-    // behavior is outside this scenario's literal claim (torn-line READ
-    // tolerance + next-append SEQUENCE correctness, both asserted above) and
-    // outside this task's write scope (src/core/run-flow-store.ts is not in
-    // scope.filesWrite) — flagged for a follow-up FIX task instead of asserted
-    // as passing/failing here.
+    // SQLite remains authoritative and the compatibility projection detects
+    // the incomplete tail, rebuilding all three canonical records.
+    expect(readFlowEvents(root, flowId).map(e => e.sequence)).toEqual([1, 2, 3]);
+    const projected = readFileSync(eventsLogRawPath(root, flowId), 'utf8')
+      .split('\n')
+      .filter(Boolean);
+    expect(projected).toHaveLength(3);
+  });
+});
+
+describe('run-flow-store — event log: atomic command batches', () => {
+  it('commits a multi-event command once and returns a durable idempotent no-op on replay', () => {
+    const flowId = 'flow-command-batch';
+    const events = [
+      makeEvent(flowId, { commandId: 'cmd-batch', timestamp: '2026-07-12T00:00:00.000Z' }),
+      makeEvent(flowId, { commandId: 'cmd-batch', timestamp: '2026-07-12T00:00:01.000Z' }),
+    ];
+
+    const first = appendFlowEvents(root, flowId, events, { expectedLastSequence: 0 });
+    expect(first.applied).toBe(true);
+    expect(first.events.map((event) => event.sequence)).toEqual([1, 2]);
+    expect(readFlowEventHead(root, flowId)).toBe(2);
+
+    const replay = appendFlowEvents(root, flowId, events, { expectedLastSequence: 0 });
+    expect(replay.applied).toBe(false);
+    expect(replay.events.map((event) => event.sequence)).toEqual([1, 2]);
+    expect(readFlowEvents(root, flowId)).toHaveLength(2);
+  });
+
+  it('rejects stale-head and same-command/different-payload conflicts without appending', () => {
+    const flowId = 'flow-command-conflict';
+    const original = makeEvent(flowId, {
+      commandId: 'cmd-conflict',
+      timestamp: '2026-07-12T00:00:00.000Z',
+    });
+    appendFlowEvents(root, flowId, [original], { expectedLastSequence: 0 });
+
+    expect(() => appendFlowEvents(root, flowId, [
+      {
+        ...makeEvent(flowId, {
+          commandId: 'cmd-conflict',
+          timestamp: '2026-07-12T00:00:01.000Z',
+        }),
+        reason: 'different logical payload',
+      },
+    ])).toThrowError(expect.objectContaining<Partial<RunFlowStoreError>>({
+      code: 'IDEMPOTENCY_CONFLICT',
+      canonicalCommitState: 'not-committed',
+    }));
+
+    expect(() => appendFlowEvents(root, flowId, [
+      makeEvent(flowId, {
+        commandId: 'cmd-new',
+        timestamp: '2026-07-12T00:00:02.000Z',
+      }),
+    ], { expectedLastSequence: 0 })).toThrowError(expect.objectContaining<Partial<RunFlowStoreError>>({
+      code: 'CANONICAL_CONFLICT',
+      canonicalCommitState: 'not-committed',
+    }));
+    expect(readFlowEvents(root, flowId)).toHaveLength(1);
   });
 });
 

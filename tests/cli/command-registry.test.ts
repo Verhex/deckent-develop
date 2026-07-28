@@ -192,6 +192,12 @@ describe('Query API', () => {
 
   it('getCommand finds an exact entry by name, undefined otherwise', () => {
     expect(getCommand('status')?.category).toBe('Core');
+    expect(getCommand('task')).toMatchObject({
+      category: 'Run',
+      risk: 'Değiştir',
+      scope: 'core',
+      surfaces: ['cli'],
+    });
     expect(getCommand('does-not-exist')).toBeUndefined();
   });
 

@@ -28,6 +28,7 @@ import {
 } from '../core/live-execution-budget.js';
 import { makeActivityOnEvent } from '../agents/worker-activity.js';
 import type { ProviderDefinition } from '../core/config-types.js';
+import type { DeckBrokerDenial } from '../core/deck-broker.js';
 import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
 import { scrubCrossProviderEnv } from './provider.js';
 import {
@@ -262,6 +263,23 @@ interface SubprocessWorkerEntry {
    * slow) `exit` event to fire the closure-scoped clear.
    */
   hbInterval?: ReturnType<typeof setInterval>;
+  /**
+   * 458-002 (A4): the typed DeckBroker denial that made this spawn fail closed —
+   * present ONLY when a broker was supplied AND refused this task's credential.
+   * Absent both when no broker was passed and when the resolve was granted, so
+   * `undefined` never means "denied for an unknown reason". Lives on the worker
+   * entry (not a side map) so it shares the entry's lifecycle and cannot leak.
+   */
+  deckBrokerDenial?: DeckBrokerDenial;
+  /**
+   * 459-002 (A5): present ONLY when NO broker was supplied at all
+   * (`opts.deckBroker` undefined) — the pre-458-002 legacy `opts.env`
+   * passthrough branch. Mutually exclusive with {@link deckBrokerDenial}: a
+   * spawn is either "broker never given" (this flag) or "broker given and
+   * rejected" ({@link deckBrokerDenial}), never both, so the two are always
+   * separately observable via their own accessor.
+   */
+  deckBrokerLegacy?: true;
 }
 
 // ─── SubprocessSpawnBackend ───────────────────────────────────────────
@@ -401,17 +419,57 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     // only when config.deck_broker.enabled), resolve THIS task's own credential
     // through it instead of the opts.env passthrough below — task-scoped,
     // audited, TTL'd, and the .deck file path itself never reaches this worker.
-    // A denied/absent resolution (no secret configured, TTL expired, taskId
-    // already consumed) is NOT an error — it falls through to opts.env exactly
-    // as if no broker had been passed, so a broker-on-but-keyless spawn still
-    // authenticates via the CLI's own session. opts.deckBroker is undefined by
-    // default (nothing upstream wires it yet), which keeps this whole block
-    // byte-for-byte the pre-existing scrub+reinject flow.
-    const brokered = opts?.deckBroker?.resolveForTask(taskId, this.providerConfig.cliCommand);
-    if (brokered) {
-      Object.assign(childEnv, brokered);
-    } else if (opts?.env) {
-      Object.assign(childEnv, opts.env);
+    //
+    // 458-002 (A4) — the broker is a SECURITY BOUNDARY, so its two negative
+    // outcomes are no longer conflated (they were, while this call site consumed
+    // the nullable `resolveForTask` compat shim and could not tell them apart):
+    //   - broker ABSENT (opts.deckBroker undefined — the default, nothing
+    //     upstream wires it yet) → the pre-existing scrub + opts.env reinject
+    //     flow runs byte-for-byte unchanged.
+    //   - broker PRESENT + DENIED (TTL expired, taskId already consumed, or no
+    //     secret configured) → FAIL CLOSED: the legacy opts.env credential
+    //     passthrough is NEVER taken, so this worker's child env carries no
+    //     credential for this provider at all and the CLI must authenticate via
+    //     its own session. Falling back here would let a revoked/consumed
+    //     task-scoped handoff be silently re-granted from ambient state,
+    //     defeating the broker's TTL + single-use guarantees.
+    // A denial is still not an ERROR — spawn continues in a known, deterministic
+    // state (no credential) rather than throwing mid-setup — but it is never
+    // swallowed either: the typed reason is recorded on the worker entry for the
+    // caller ({@link getDeckBrokerDenial}) and traced via debugLog.
+    //
+    // 459-002 (A5): the "broker never supplied" legacy branch below used to be
+    // silent — same debugLog-free code as pre-458-002 — which conflated it with
+    // "broker supplied and denied" for anyone tailing debugLog/ERRORS.md: both
+    // looked identical (no signal at all vs. a denial signal only on the OTHER
+    // branch). It now gets its own tag ({@link getDeckBrokerLegacy}, debugLog
+    // 'subprocess:deckbroker-legacy') so the two negative-ish outcomes are each
+    // independently observable. `brokered` is `undefined` iff `opts?.deckBroker`
+    // was never supplied at all (resolveForTaskWithReason always returns a
+    // `{state:'granted'|'denied'}` object when a broker IS supplied) — so this
+    // is the precise "broker hiç verilmedi" condition, not merely "opts.env is
+    // present". The env-mutation itself is UNCHANGED: it still only runs when
+    // `opts.env` is truthy, byte-for-byte the same assignment as before.
+    const brokered = opts?.deckBroker?.resolveForTaskWithReason(taskId, this.providerConfig.cliCommand);
+    let deckBrokerDenial: DeckBrokerDenial | undefined;
+    let deckBrokerLegacy: true | undefined;
+    if (brokered?.state === 'granted') {
+      Object.assign(childEnv, brokered.env);
+    } else if (brokered?.state === 'denied') {
+      deckBrokerDenial = brokered;
+      debugLog(
+        'subprocess:deckbroker-denied',
+        `DeckBroker denied the credential for taskId=${taskId} provider="${this.providerConfig.cliCommand}" (reason=${brokered.reason}) — failing closed: no opts.env credential fallback, child spawns with no credential for this provider`,
+      );
+    } else {
+      deckBrokerLegacy = true;
+      debugLog(
+        'subprocess:deckbroker-legacy',
+        `No DeckBroker supplied for taskId=${taskId} provider="${this.providerConfig.cliCommand}" — legacy path: ${opts?.env ? 'reinjecting opts.env credential unchanged' : 'no opts.env credential to reinject'} (unrelated to a fail-closed denial)`,
+      );
+      if (opts?.env) {
+        Object.assign(childEnv, opts.env);
+      }
     }
     // BUG-19: Set UTF-8 encoding environment for Windows (forced last, unchanged).
     childEnv['LANG'] = process.env['LANG'] ?? 'en_US.UTF-8';
@@ -592,6 +650,8 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
       logPath,
       spawnedAt: new Date().toISOString(),
       hbInterval,
+      ...(deckBrokerDenial ? { deckBrokerDenial } : {}),
+      ...(deckBrokerLegacy ? { deckBrokerLegacy } : {}),
     };
 
     // Set up timeout if configured
@@ -737,6 +797,28 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
 
   getWorkerEntry(taskId: string): SubprocessWorkerEntry | undefined {
     return this.workers.get(taskId);
+  }
+
+  /**
+   * 458-002 (A4): the typed reason a brokered spawn failed closed, for the
+   * caller that handed in `opts.deckBroker`. Returns the discriminated
+   * {@link DeckBrokerDenial} (never a bare boolean/string) while the worker is
+   * tracked; `undefined` when no broker was supplied, when the resolve was
+   * granted, or once the worker has been reaped.
+   */
+  getDeckBrokerDenial(taskId: string): DeckBrokerDenial | undefined {
+    return this.workers.get(taskId)?.deckBrokerDenial;
+  }
+
+  /**
+   * 459-002 (A5): the counterpart to {@link getDeckBrokerDenial} — `true` while
+   * the worker is tracked if (and only if) no DeckBroker was supplied for this
+   * spawn at all (legacy `opts.env` passthrough branch); `undefined` when a
+   * broker was supplied (granted or denied), or once the worker has been
+   * reaped. Never both this and {@link getDeckBrokerDenial} at once.
+   */
+  getDeckBrokerLegacy(taskId: string): true | undefined {
+    return this.workers.get(taskId)?.deckBrokerLegacy;
   }
 
   getLogPath(taskId: string): string {

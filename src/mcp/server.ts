@@ -85,7 +85,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 - deckent_autonomous: Autonomous engine control surface (status/start/stop/backlog list-add-approve-reject, cron support)
 - deckent_process: Process-mode execution surface (submit an ExecutionRequest → policy-gated auto-run or park; status/result by executionId — ERP / business automation)
 - deckent_usage: Show token/limit consumption from Claude Code transcripts (model table or run task breakdown + cache-gate)
-- deckent_xverify: Adversarial cross-verify a claim on a different provider (CONFIRMED/REFUTED/UNCLEAR)
+- deckent_xverify: Cross-verify a claim on a different provider; host derives CONFIRMED/REFUTED/UNCLEAR + ALLOW/NO-GO/HOLD
 - deckent_cost: Show cost config: budget limits, per-model pricing (input/output per MTok), and today's spend from the resource log
 - deckent_agent_manage: Manage the agent pool: add/remove/promote agents (CLI parity)
 - deckent_skill_manage: Manage the skill pool: add/remove + marketplace list (CLI parity)

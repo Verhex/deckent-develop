@@ -41,6 +41,7 @@ import { registerChat } from './commands/chat.js';
 import { registerCheckpoint } from './commands/checkpoint.js';
 import { registerDocs } from './commands/docs.js';
 import { registerOutput } from './commands/output.js';
+import { registerTaskSettlement } from './commands/task-settlement.js';
 import { registerCostCommand } from './commands/cost.js';
 import { registerRecall } from './commands/recall.js';
 import { registerRemember } from './commands/remember.js';
@@ -72,10 +73,15 @@ import { registerImage } from './commands/image.js';
 import { registerLimits } from './commands/limits.js';
 import { registerOpenRouterProbe } from './commands/openrouter-probe.js';
 import { registerXverifyCommand } from './commands/xverify.js';
+import { registerProviderAuthorityCommand } from './commands/provider-authority.js';
 import { registerCuStatus } from './commands/cu-status.js';
 import { showSplash } from './helpers/splash.js';
 import { installFatalHandlers } from './helpers/error-handler.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
+import {
+  openTaskSettlementAuthority,
+  openTaskSettlementProjection,
+} from '../core/task-settlement-authority.js';
 
 export interface CliProgramRuntime {
   readonly providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
@@ -115,7 +121,9 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
       : {}),
   });
   registerPlan(program);
-  registerStatus(program);
+  registerStatus(program, {
+    openTaskSettlementProjection,
+  });
   registerAttach(program);
   registerSpawn(program);
   registerKill(program);
@@ -138,6 +146,7 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
     ...(runtime.providerAuthority
       ? { providerAuthority: runtime.providerAuthority }
       : {}),
+    openTaskSettlementAuthority,
   });
   registerRuns(program);
   registerProcess(program);
@@ -167,7 +176,10 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
   registerChat(program);
   registerCheckpoint(program);
   registerDocs(program);
-  registerOutput(program);
+  registerOutput(program, {
+    openTaskSettlementProjection,
+  });
+  registerTaskSettlement(program);
   registerCostCommand(program);
   registerRecall(program);
   registerRemember(program);
@@ -202,6 +214,7 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
       ? { providerAuthority: runtime.providerAuthority }
       : {}),
   });
+  registerProviderAuthorityCommand(program);
   registerCuStatus(program);
   registerHelp(program);
 

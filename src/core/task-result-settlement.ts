@@ -1821,6 +1821,96 @@ export interface PendingTaskResultSettlementAttemptV1 {
   settlement: TaskResultSettlementV1 | null;
 }
 
+export interface TaskResultSettlementAuthorityInspection {
+  readonly state:
+    | 'absent'
+    | 'pending'
+    | 'prepared'
+    | 'dispatched'
+    | 'settled'
+    | 'closed'
+    | 'retired-landed'
+    | 'corrupt';
+  readonly evidenceRef: string;
+  readonly ref?: TaskResultSettlementRefV1;
+}
+
+/**
+ * Read-only, bounded backend authority probe for task reconciliation.
+ *
+ * `absent` means no host-owned Docker attempt was ever minted for the exact
+ * canonical project/task identity. Every other state is conservatively
+ * execution evidence; callers must not infer process absence from it.
+ */
+export function inspectTaskResultSettlementAuthority(
+  projectRoot: string,
+  taskId: string,
+): TaskResultSettlementAuthorityInspection {
+  const projectRootSha256 = sha256(canonicalProjectRoot(projectRoot));
+  const evidence = (
+    state: TaskResultSettlementAuthorityInspection['state'],
+    ref?: TaskResultSettlementRefV1,
+  ): TaskResultSettlementAuthorityInspection => {
+    const content = {
+      state,
+      projectRootSha256,
+      taskIdSha256: sha256(taskId),
+      attemptId: ref?.attemptId ?? null,
+    };
+    return Object.freeze({
+      state,
+      evidenceRef: `task-result-settlement:${state}:sha256:${sha256(JSON.stringify(content))}`,
+      ...(ref ? { ref: Object.freeze({ ...ref }) } : {}),
+    });
+  };
+
+  try {
+    const probeRef = createTaskResultSettlementRef(projectRoot, taskId);
+    const taskDir = settlementTaskDir(probeRef);
+    let attemptNames: string[] = [];
+    if (existsSync(taskDir)) {
+      attemptNames = readdirSync(taskDir).filter(name => name !== 'claims');
+      if (attemptNames.length > 1_024) return evidence('corrupt');
+    }
+    const pending = attemptNames.flatMap(attemptName => {
+      const attemptPath = resolve(taskDir, attemptName, 'attempt.json');
+      const looksLikeAttempt = /^[0-9a-f-]{36}$/iu.test(attemptName);
+      const attempt = parseTaskResultSettlementAttempt(readJson(attemptPath));
+      if (looksLikeAttempt && !attempt) throw new Error('Corrupt task settlement attempt');
+      if (
+        !attempt
+        || attempt.projectRootSha256 !== projectRootSha256
+        || attempt.taskId !== taskId
+        || attempt.attemptId !== attemptName
+      ) return [];
+      if (
+        existsSync(taskResultSettlementClosurePath(attempt))
+        || existsSync(taskResultSettlementLandedRetirementPath(attempt))
+      ) return [];
+      return [attempt];
+    });
+    if (pending.length > 1) return evidence('corrupt');
+    const ref = pending[0]
+      ?? readLatestTaskResultSettlementRef(projectRoot, taskId);
+    if (!ref) return evidence('absent');
+    if (readTaskResultSettlementClosure(ref)) return evidence('closed', ref);
+    if (readTaskResultSettlementLandedRetirement(ref)) {
+      return evidence('retired-landed', ref);
+    }
+    if (readTaskResultSettlement(ref)) return evidence('settled', ref);
+    if (readTaskResultSettlementDispatch(ref)) return evidence('dispatched', ref);
+    if (readTaskResultSettlementPrepared(ref)) return evidence('prepared', ref);
+    const attempt = parseTaskResultSettlementAttempt(
+      readJson(taskResultSettlementAttemptPath(ref)),
+    );
+    return attempt && sameRef(attempt, ref)
+      ? evidence('pending', ref)
+      : evidence('corrupt', ref);
+  } catch {
+    return evidence('corrupt');
+  }
+}
+
 /**
  * Enumerate unsettled attempts for exactly one canonical project. Directory names
  * are never trusted; every record is parsed and matched back to its embedded ref.

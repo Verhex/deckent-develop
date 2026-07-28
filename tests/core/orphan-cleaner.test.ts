@@ -6,6 +6,11 @@ import { mkdirSync, rmSync, writeFileSync, existsSync, readdirSync } from 'node:
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+  INVOCATION_RECEIPT_SCHEMA_VERSION,
+  type InvocationReceipt,
+} from '../../src/core/invocation-receipt.js';
+import { InvocationReceiptStore } from '../../src/core/invocation-receipt-store.js';
+import {
   postFinalizeCleanup,
   preflightOrphanCleanup,
   previewFinalizeCleanup,
@@ -22,7 +27,7 @@ function createTestRoot(): string {
 function writeTaskJson(root: string, taskId: string, status: string): void {
   writeFileSync(
     join(root, '.tasks', `${taskId}.json`),
-    JSON.stringify({ id: taskId, status }),
+    JSON.stringify({ id: taskId.replace(/^task-/, ''), status }),
   );
 }
 
@@ -38,6 +43,61 @@ function writeTaskResult(root: string, taskId: string): void {
     join(root, '.tasks', `${taskId}.result`),
     JSON.stringify({ taskId, selfAssessment: 'DONE' }),
   );
+}
+
+function writeNotDispatchedReceipt(
+  store: InvocationReceiptStore,
+  taskId: string,
+  tenantId: string,
+  invocationId: string,
+): void {
+  const input: InvocationReceipt = {
+    schemaVersion: INVOCATION_RECEIPT_SCHEMA_VERSION,
+    invocationId,
+    idempotencyKey: invocationId,
+    tenantId,
+    projectId: store.projectId,
+    runId: 'sprint-144',
+    taskId,
+    callId: invocationId,
+    role: 'worker',
+    purpose: 'worker-execution',
+    configured: { provider: null, model: null, source: 'none', reasonCode: 'no_provider' },
+    requested: { provider: null, model: null, source: 'none', reasonCode: 'no_provider' },
+    resolved: { provider: null, model: null, source: 'none', reasonCode: 'no_provider' },
+    called: { provider: null, model: null, source: 'none', reasonCode: 'no_provider' },
+    backend: { transport: 'local-runtime', executionBackend: 'unknown' },
+    auth: { mode: 'unknown', accountRefHash: null },
+    fallbackChain: [],
+    reachability: { state: 'unknown', evidenceRef: null },
+    limits: { state: 'unknown', evidenceRefs: [] },
+    createdAt: '2026-07-20T00:00:00.000Z',
+  };
+  store.writeAtomic({
+    receipt: input,
+    events: [
+      {
+        eventId: `${invocationId}:rejected`,
+        type: 'dispatch_rejected',
+        occurredAt: input.createdAt,
+        payload: {
+          reasonCode: 'no_provider',
+          evidenceRefs: [`evidence:${invocationId}`],
+        },
+      },
+      {
+        eventId: `${invocationId}:consumer`,
+        type: 'consumer_settled',
+        occurredAt: input.createdAt,
+        payload: {
+          outcome: 'accepted',
+          reasonCode: 'no_provider',
+          taskDisposition: 'not_dispatched',
+          evidenceRefs: [`evidence:${invocationId}`],
+        },
+      },
+    ],
+  });
 }
 
 // ─── Post-Finalize Tests ───────────────────────────────────────────
@@ -98,6 +158,133 @@ describe('postFinalizeCleanup', () => {
 
     expect(report.archivedFiles.length).toBe(0);
     expect(report.preservedFiles.length).toBe(1);
+  });
+
+  it('archives a raw PENDING task only with exact receipt-backed terminal projection', () => {
+    writeTaskJson(testRoot, 'task-144-004', 'PENDING');
+    const projectedTaskIds: string[] = [];
+    const report = postFinalizeCleanup(testRoot, 'sprint-144', {
+      projectTaskExecutionState: taskId => {
+        projectedTaskIds.push(taskId);
+        return {
+          effectiveStatus: 'NOT_DISPATCHED',
+          evidenceRefs: ['invocation-event:a'],
+          receiptRef: {
+            invocationId: `receipt:${taskId}`,
+            tenantId: 'local',
+            projectId: 'project-a',
+          },
+        };
+      },
+    });
+
+    expect(projectedTaskIds).toEqual(['144-004']);
+    expect(report.archivedFiles).toContain('task-144-004.json');
+    expect(existsSync(join(
+      testRoot,
+      '.tasks',
+      'archive',
+      'sprint-144',
+      'task-144-004.json',
+    ))).toBe(true);
+  });
+
+  it('uses the default read-only receipt projection and raw task tenant identity', () => {
+    writeFileSync(
+      join(testRoot, '.tasks', 'task-144-004.json'),
+      JSON.stringify({
+        id: '144-004',
+        status: 'PENDING',
+        actor: { tenantId: 'acme' },
+      }),
+    );
+    const store = new InvocationReceiptStore(testRoot, {
+      idFactory: () => 'project-a',
+    });
+    writeNotDispatchedReceipt(store, '144-004', 'acme', 'receipt-acme');
+    store.close();
+
+    const report = postFinalizeCleanup(testRoot, 'sprint-144');
+
+    expect(report.archivedFiles).toContain('task-144-004.json');
+    expect(existsSync(join(
+      testRoot,
+      '.tasks',
+      'archive',
+      'sprint-144',
+      'task-144-004.json',
+    ))).toBe(true);
+  });
+
+  it('preserves a PENDING task when receipt authority is ambiguous', () => {
+    writeTaskJson(testRoot, 'task-144-004', 'PENDING');
+    const store = new InvocationReceiptStore(testRoot, {
+      idFactory: () => 'project-a',
+    });
+    writeNotDispatchedReceipt(store, '144-004', 'local', 'receipt-a');
+    writeNotDispatchedReceipt(store, '144-004', 'local', 'receipt-b');
+    store.close();
+
+    const report = postFinalizeCleanup(testRoot, 'sprint-144');
+
+    expect(report.archivedFiles).toEqual([]);
+    expect(report.preservedFiles).toContain('task-144-004.json');
+    expect(existsSync(join(testRoot, '.tasks', 'task-144-004.json'))).toBe(true);
+  });
+
+  it('preserves a PENDING task when the default receipt store is malformed', () => {
+    writeTaskJson(testRoot, 'task-144-004', 'PENDING');
+    mkdirSync(join(testRoot, '.deckent', 'runtime'), { recursive: true });
+    writeFileSync(
+      join(testRoot, '.deckent', 'runtime', 'invocations.db'),
+      'not-a-sqlite-database',
+    );
+
+    const report = postFinalizeCleanup(testRoot, 'sprint-144');
+
+    expect(report.archivedFiles).toEqual([]);
+    expect(report.preservedFiles).toContain('task-144-004.json');
+    expect(existsSync(join(testRoot, '.tasks', 'task-144-004.json'))).toBe(true);
+  });
+
+  it('preserves malformed canonical task identity without calling projection authority', () => {
+    writeFileSync(
+      join(testRoot, '.tasks', 'task-144-004.json'),
+      JSON.stringify({ id: 'task-144-004', status: 'PENDING' }),
+    );
+    const projectedTaskIds: string[] = [];
+
+    const report = postFinalizeCleanup(testRoot, 'sprint-144', {
+      projectTaskExecutionState: taskId => {
+        projectedTaskIds.push(taskId);
+        return {
+          effectiveStatus: 'NOT_DISPATCHED',
+          evidenceRefs: ['evidence:a'],
+          receiptRef: {
+            invocationId: 'receipt:a',
+            tenantId: 'local',
+            projectId: 'project-a',
+          },
+        };
+      },
+    });
+
+    expect(projectedTaskIds).toEqual([]);
+    expect(report.archivedFiles).toEqual([]);
+    expect(report.preservedFiles).toContain('task-144-004.json');
+  });
+
+  it('preserves projected terminal status when receipt/evidence proof is incomplete', () => {
+    writeTaskJson(testRoot, 'task-144-004', 'PENDING');
+    const report = postFinalizeCleanup(testRoot, 'sprint-144', {
+      projectTaskExecutionState: () => ({
+        effectiveStatus: 'NOT_DISPATCHED',
+        evidenceRefs: [],
+      }),
+    });
+
+    expect(report.archivedFiles).toEqual([]);
+    expect(report.preservedFiles).toContain('task-144-004.json');
   });
 
   it('should clean stale locks (>5min)', () => {
@@ -231,6 +418,18 @@ describe('preflightOrphanCleanup', () => {
     expect(report.cleanedSprintIds).toContain('sprint-142');
     expect(report.cleanedSprintIds).toContain('sprint-143');
     expect(existsSync(join(testRoot, '.tasks', 'task-144-001.json'))).toBe(true);
+  });
+
+  it('preserves a previous sprint PENDING task instead of treating age as terminal proof', () => {
+    writeTaskJson(testRoot, 'task-143-001', 'PENDING');
+    writeTaskHb(testRoot, 'task-143-001');
+    writeTaskJson(testRoot, 'task-144-001', 'PENDING');
+
+    const report = preflightOrphanCleanup(testRoot, 'sprint-144');
+
+    expect(report.archivedFiles).toEqual([]);
+    expect(existsSync(join(testRoot, '.tasks', 'task-143-001.json'))).toBe(true);
+    expect(existsSync(join(testRoot, '.tasks', 'task-143-001.hb'))).toBe(true);
   });
 });
 

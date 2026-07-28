@@ -145,6 +145,16 @@ describe('crossVerifyBacklogResult (Component ③ — XVER-1 cross-provider, adv
         roles: { auditor: { default: { maxCacheReadTokens: 1_000_000, maxTurns: 12 } } },
         landing: { reserve_ratio: 0.25 },
         unmetered_backend: { action: 'reroute-or-hold', ordered_backends: ['docker'] },
+        // The verifier selected here is codex, whose CLI reports usage only at
+        // call end. Without an owner authorization that provider now fails
+        // closed before dispatch (MASTER-PLAN 657), so this fixture carries the
+        // same authorization the project's real config does — otherwise the
+        // test would assert an advisory verdict that could never be produced.
+        final_only_usage: {
+          action: 'allow-wall-clock-containment',
+          roles: ['auditor'],
+          max_wall_clock_seconds: 600,
+        },
       },
     } as unknown as ResolvedConfig;
     const xv = await crossVerifyBacklogResult(
