@@ -188,6 +188,54 @@ describe('evaluateCostGate', () => {
     });
   });
 
+  it('admits a registry-known subscription model without API pricing evidence', () => {
+    expect(modelRegistry.get('gpt-5.6-sol')?.pricingEvidenceRef).toBeUndefined();
+    const result = evaluateCostGate({
+      tasks: [{
+        ...task('codex-subscription', 'gpt-5.6-sol', 'high'),
+        billingMode: 'subscription',
+      }],
+      costConfig: makeCostConfig({ sprintMaxUsd: 100 }),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.estimate).toMatchObject({
+      costRealistic: 0,
+      unpricedModels: [],
+      perProvider: {
+        codex: {
+          billingMode: 'subscription',
+          taskCount: 1,
+        },
+      },
+      subscriptionImpact: {
+        codex: {
+          state: 'unknown',
+          dailyPercent: null,
+          reason: 'provider-limit-evidence-not-supplied',
+        },
+      },
+    });
+  });
+
+  it('keeps API billing fail-closed for the same model without pricing evidence', () => {
+    const result = evaluateCostGate({
+      tasks: [{
+        ...task('codex-api', 'gpt-5.6-sol', 'high'),
+        billingMode: 'api',
+      }],
+      costConfig: makeCostConfig({ sprintMaxUsd: 100 }),
+      acknowledgeCost: true,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'COST_PRICING_UNKNOWN',
+      ceilingTripped: 'pricing',
+      unpricedModels: ['gpt-5.6-sol'],
+    });
+  });
+
   it('estimates a dynamic remote model only with explicit pricing evidence', () => {
     const modelId = 'vendor/evidence-priced-model-v1';
     modelRegistry.register({

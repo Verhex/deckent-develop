@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "12074de16e91295a437418f707e5d591fa37cab46f9d3c35193a54c20a323259"
+    "value": "4705dd6fabdec29f74e060bbbe7c099558095562b7789b1187b5204884de08ab"
   },
   "summary": {
     "total": 233,
     "active": 233,
     "terminal": 0,
-    "receipts": 12,
+    "receipts": 13,
     "byState": {
       "OPEN": 156,
       "READY": 0,
@@ -1819,9 +1819,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-28",
       "definitionDigest": "6af689eda66f6b9b288a93b76a5bee756215b3bedfb17ad27fe918673ea03fcc",
-      "progressDigest": "b2a9ef0306744ae56c77e2fdc4ded278623177a2fe54c478f8848f8e48eccfcb",
+      "progressDigest": "4dbafa1301b7dcf76ee91fc1d90065f7b40f71d41d21c617d3a19e867b65c1c4",
       "terminalClosureDigest": null
     },
     {
@@ -2746,6 +2746,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-07-28T15:13:13+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-28-COST-ADMISSION-01",
+      "authorityDigest": "86e90a489e31b4018d73d36807b7968e1d9ca69bbc20d09066931ed48a334985",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-28T15:35:23+03:00"
       },
       "g7AttemptIdentity": null
     }
@@ -9704,10 +9714,12 @@
         "RECEIPT-001",
         "REACHABILITY-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-07-28-COST-ADMISSION-01"
+      ],
       "acceptance": "One host authority for admission, reservation, usage, landing and settlement",
-      "evidence": "Legacy 577 absorbed by 597",
-      "updated": "2026-07-26"
+      "evidence": "`receipt=GR-2026-07-28-COST-ADMISSION-01`; cost admission now separates metered API price authority from registry-known zero-incremental-USD subscription/local/free-tier identity: real project config admits `gpt-5.6-sol` subscription with `unpricedModels=[]`, `$0` and quota `unknown`, while the identical API task remains `COST_PRICING_UNKNOWN` even under acknowledge; 29/29 cost-gate tests and the live-config source reproducer pass with unchanged hermetic counts `12065/1149`; this does not supply remaining-quota evidence, parent `provider_limits`, reservation, settlement or Codex provider-limit source authority, so unified limit-ledger closure remains open",
+      "updated": "2026-07-28"
     },
     {
       "order": 4100,
@@ -12789,6 +12801,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "b83511c240ed35f642cda34ec7c599fc32c956b006202af556c26b2324ac6261"
+    "value": "a159033e3145ac779c1102e75fb83d3cde031cdb93c7a1f08261567cdefd4f83"
   }
 }

@@ -534,20 +534,10 @@ function calculateTaskCost(
 ): TaskCostResult | null {
   const found = findModel(config, task.model);
   const dynamic = found ? undefined : modelRegistry.get(task.model);
-  if (!found && (!dynamic || typeof dynamic.pricingEvidenceRef !== 'string'
-    || dynamic.pricingEvidenceRef.length === 0)) return null;
+  if (!found && !dynamic) return null;
 
   const provider = found?.provider ?? dynamic!.provider;
   const modelId = found?.modelId ?? dynamic!.id;
-  const pricing: ModelPricing = found?.pricing ?? {
-    input_cost_per_token: dynamic!.costPerMillion.input / 1_000_000,
-    output_cost_per_token: dynamic!.costPerMillion.output / 1_000_000,
-    max_input_tokens: dynamic!.contextWindow,
-    max_output_tokens: dynamic!.maxOutputTokens,
-    supports_prompt_caching: false,
-    enabled: true,
-    _source: dynamic!.pricingEvidenceRef,
-  };
   const providerConfig = config.providers[provider];
   if (found && (!providerConfig || !providerConfig.enabled)) return null;
 
@@ -556,6 +546,28 @@ function calculateTaskCost(
       ?? providerConfig?.default_billing_mode
       ?? providerConfig?.billing_modes_supported[0]
       ?? (provider === 'ollama' ? 'local' : 'api');
+
+  // Pricing evidence is an execution prerequisite only for metered API
+  // billing. A registry-known subscription/local/free-tier model has a
+  // verified runtime identity and capability envelope, while its incremental
+  // USD is structurally zero. Requiring a price there incorrectly converts
+  // "quota evidence unknown" into COST_PRICING_UNKNOWN and blocks dogfood.
+  if (!found
+    && billingMode === 'api'
+    && (typeof dynamic!.pricingEvidenceRef !== 'string'
+      || dynamic!.pricingEvidenceRef.length === 0)) {
+    return null;
+  }
+  const pricing: ModelPricing = found?.pricing ?? {
+    input_cost_per_token: dynamic!.costPerMillion.input / 1_000_000,
+    output_cost_per_token: dynamic!.costPerMillion.output / 1_000_000,
+    max_input_tokens: dynamic!.contextWindow,
+    max_output_tokens: dynamic!.maxOutputTokens,
+    supports_prompt_caching: false,
+    enabled: true,
+    _source: dynamic!.pricingEvidenceRef
+      ?? `model-registry-capability:${dynamic!.id}`,
+  };
 
   const incrementalInput = task.estimatedInputTokens;
   const output =

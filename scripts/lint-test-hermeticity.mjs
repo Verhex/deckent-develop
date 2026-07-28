@@ -99,7 +99,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   count: 1149,
-  digest: 'fdb53ef93a974d09512d36bf2016ca304236e2b368132d31a63a24a551d881ae',
+  digest: '03e7ba581da590c2acf2c2654de848a139e42d99d4232fd1da99ff0f4f48c350',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
