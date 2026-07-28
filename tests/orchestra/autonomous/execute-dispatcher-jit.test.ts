@@ -30,7 +30,7 @@ describe('execute-dispatcher — JIT detail', () => {
     const handler = makeExecuteDispatcher({
       projectRoot: dir!, config: {} as any, backlogPath,
       runTask: async (ctx) => { ranWith = ctx.description; return { taskId: 'tid' }; },
-      runSprint: async () => ({}),
+      executeSprint: async () => ({}),
       waitForResult: async () => ({ taskId: 'tid', selfAssessment: 'DONE' } as any),
       jitComplete: async () => 'DETAILED: add roles crud endpoints',
       evaluate: () => ({ decision: 'DONE', quality: 100, reconciled: false, reason: 'ok' }),
@@ -51,7 +51,7 @@ describe('execute-dispatcher — JIT detail', () => {
     const handler = makeExecuteDispatcher({
       projectRoot: dir!, config: {} as any, backlogPath,
       runTask: async () => ({ taskId: 'tid' }),
-      runSprint: async () => ({}),
+      executeSprint: async () => ({}),
       // First poll times out (null); the worker writes its DONE .result moments
       // later, so the grace re-poll finds it (disk-verify outranks the timeout).
       waitForResult: async () => { calls++; return calls === 1 ? null : ({ taskId: 'tid', selfAssessment: 'DONE' } as any); },
@@ -69,7 +69,7 @@ describe('execute-dispatcher — JIT detail', () => {
     const backlogPath = setup({ ...baseEntry, kind: 'process' });
     const handler = makeExecuteDispatcher({
       projectRoot: dir!, config: {} as any, backlogPath,
-      runTask: async () => ({ taskId: 't' }), runSprint: async () => ({}),
+      runTask: async () => ({ taskId: 't' }), executeSprint: async () => ({}),
       waitForResult: async () => null,
     });
     const res = await handler(AUTONOMOUS_EXECUTE_ACTION, { entry: { ...baseEntry, kind: 'process' } });

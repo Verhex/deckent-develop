@@ -12,7 +12,7 @@ describe('engine composition root', () => {
     flows: [],
     policy: { id: 'p', trigger: 'scheduled', action: 'noop', disabled: true, guard: { requiresApproval: true } } as never,
     runTask: vi.fn(),
-    runSprint: vi.fn(),
+    executeSprint: vi.fn(),
     // Gap F: injected mock — composition tests don't exercise completion; non-null keeps
     // the type contract satisfied without requiring real file I/O.
     waitForResult: vi.fn().mockResolvedValue(null),

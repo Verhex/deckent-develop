@@ -25,19 +25,28 @@
 
 import { getRunFlowCoordinator } from './run-flow-coordinator-registry.js';
 import {
+  loadApprovedSnapshot,
   loadPlannedSprint,
-  loadRunHandle,
   saveApprovedSnapshot,
   type StoredApprovedSnapshot,
 } from '../core/run-flow-store.js';
-import { startApprovedRun } from './run-job-service.js';
-import type { RunFlowContext, RunHandle } from '../core/run-flow-contract.js';
+import type {
+  RunFlowContext,
+  StartAttemptRecord,
+} from '../core/run-flow-contract.js';
 import type { ActorContext } from '../core/work-model.js';
 import type { Sprint } from '../core/types.js';
 import {
   computeExecutionPlanDigestByVersion,
 } from '../core/execution-plan-digest.js';
 import type { PlanPreview } from '../core/run-flow-contract.js';
+import {
+  prepareAndSpawnExactRun,
+  type ExactStartCapability,
+  type ExactStartLineageInput,
+  type SpawnExactProcessContext,
+  type SpawnExactProcessResult,
+} from './exact-plan-start-service.js';
 
 // ─── Typed refusals (surfaces map these to 409 / an honest CLI line) ─────────
 
@@ -159,6 +168,8 @@ export function decideRunFlow(
         approvedBy: context.approvedSnapshot.approvedBy,
         approvedAt: context.approvedSnapshot.approvedAt,
         sprint: planned.sprint as Sprint,
+        ...(planned.proposal !== undefined ? { proposal: planned.proposal } : {}),
+        ...(planned.lineage !== undefined ? { planLineage: planned.lineage } : {}),
       };
       saveApprovedSnapshot(projectRoot, stored);
     }
@@ -177,23 +188,24 @@ export function decideRunFlow(
 // ─── start (APPROVED → detached run) ─────────────────────────────────────────
 
 export interface StartRunFlowOptions {
-  /** The ONLY way a real process starts. Injectable for hermetic tests;
-   *  surfaces pass their detached-spawn closure (the CLI-args shape lives
-   *  with the callers — cli/helpers/detached-start.ts — because orchestra/
-   *  must not depend on a surface). */
-  readonly spawnStart: (sprint: Sprint, flowId: string) => RunHandle;
+  /** Start-command principal and idempotency authority. */
+  readonly lineage: ExactStartLineageInput;
+  /** The ONLY process-birth seam. The exact capability is passed to the child
+   *  by the surface-owned detached adapter. */
+  readonly spawnStart: (context: SpawnExactProcessContext) => SpawnExactProcessResult;
 }
 
 export interface StartRunFlowResult {
-  readonly status: 'started' | 'noop-duplicate';
+  readonly status: 'accepted' | 'noop-duplicate';
   readonly context: RunFlowContext;
+  readonly attempt: StartAttemptRecord;
+  readonly capability?: ExactStartCapability;
 }
 
 /**
- * Start an APPROVED flow: START_REQUESTED via the coordinator, detached spawn
- * through the caller's closure, RUN_STARTED recorded — the child stays the
- * single handle-writer (born-681). Double-start is a safe `'noop-duplicate'`
- * (CAS on the existing run handle inside startApprovedRun).
+ * Start an approved exact flow. PREPARED commits before START_REQUESTED;
+ * detached process birth stops at PROCESS_SPAWNED. The child is the only
+ * authority that can publish ADMITTED+handle and then RUN_STARTED.
  */
 export function startRunFlow(
   projectRoot: string,
@@ -203,11 +215,11 @@ export function startRunFlow(
   const coordinator = getRunFlowCoordinator(projectRoot);
   const existing = coordinator.getFlow(flowId);
   const snapshot = existing.approvedSnapshot;
-  if (existing.state !== 'APPROVED' || !snapshot) {
+  if (!snapshot || !['APPROVED', 'STARTING', 'DETACHED_RUNNING'].includes(existing.state)) {
     throw new RunFlowDecisionError('NOT_APPROVED', `run-flow: flow is ${existing.state}, not APPROVED`);
   }
 
-  const planned = loadAndVerifyPlannedSprint(projectRoot, flowId, {
+  loadAndVerifyPlannedSprint(projectRoot, flowId, {
     revision: snapshot.revision,
     planDigest: snapshot.planDigest,
     ...(existing.preview?.planDigestVersion !== undefined
@@ -217,38 +229,55 @@ export function startRunFlow(
       ? { planDigestContext: existing.preview.planDigestContext }
       : {}),
   });
-  coordinator.requestStart({
-    flowId,
-    revision: snapshot.revision,
-    planDigest: snapshot.planDigest,
-    commandId: `start-${flowId}-r${snapshot.revision}`,
-  });
-  const stored: StoredApprovedSnapshot = {
-    flowId,
-    revision: snapshot.revision,
-    planDigest: snapshot.planDigest,
-    ...(existing.preview?.planDigestVersion !== undefined
-      ? { planDigestVersion: existing.preview.planDigestVersion }
-      : {}),
-    ...(planned.planDigestContext !== undefined ? { planDigestContext: planned.planDigestContext } : {}),
-    approvedBy: snapshot.approvedBy,
-    approvedAt: snapshot.approvedAt,
-    sprint: planned.sprint as Sprint,
-  };
-
-  const existingRunHandle = loadRunHandle(projectRoot, flowId);
-  const result = startApprovedRun({
-    flowId,
-    expectedRevision: snapshot.revision,
-    expectedPlanDigest: snapshot.planDigest,
+  const stored = loadApprovedSnapshot(projectRoot, flowId);
+  if (!stored) {
+    throw new RunFlowDecisionError(
+      'PLANNED_SPRINT_MISSING',
+      'run-flow: durable approved exact snapshot is missing',
+    );
+  }
+  const result = prepareAndSpawnExactRun({
+    root: projectRoot,
+    exactRef: {
+      schemaVersion: 1,
+      flowId,
+      revision: snapshot.revision,
+      planDigest: snapshot.planDigest,
+    },
     approvedSnapshot: stored,
-    ...(existingRunHandle ? { existingRunHandle } : {}),
-    spawnStart: options.spawnStart,
+    lineage: options.lineage,
+    onPrepared: () => {
+      coordinator.requestStart({
+        flowId,
+        revision: snapshot.revision,
+        planDigest: snapshot.planDigest,
+        commandId: `start-${flowId}-r${snapshot.revision}`,
+      });
+    },
+    spawnProcess: options.spawnStart,
   });
-
-  const final = coordinator.recordRunStarted({
-    handle: result.handle,
-    commandId: `run-started-${flowId}-r${snapshot.revision}`,
-  });
-  return { status: result.status, context: final.context };
+  if (result.status === 'duplicate-admitted') {
+    const repaired = coordinator.recordRunStarted({
+      handle: result.handle,
+      commandId: `run-started-${flowId}-r${snapshot.revision}`,
+    });
+    return {
+      status: 'noop-duplicate',
+      context: repaired.context,
+      attempt: result.attempt,
+    };
+  }
+  if (result.status === 'duplicate-terminal') {
+    return {
+      status: 'noop-duplicate',
+      context: coordinator.getFlow(flowId),
+      attempt: result.attempt,
+    };
+  }
+  return {
+    status: 'accepted',
+    context: coordinator.getFlow(flowId),
+    attempt: result.attempt,
+    capability: result.capability,
+  };
 }

@@ -134,11 +134,115 @@ export interface ApprovedPlanSnapshot {
   readonly approvedAt: string;
 }
 
+export interface ExactPlanReferenceV1 {
+  readonly schemaVersion: 1;
+  readonly flowId: string;
+  readonly revision: number;
+  readonly planDigest: string;
+}
+
+/** Durable plan-time lineage shared by planner, approval snapshot and start. */
+export interface RunFlowPlanLineageRecord {
+  readonly tenantId: string;
+  readonly actor: ActorContext;
+  readonly origin: RequestOrigin;
+  readonly correlationId: string;
+  readonly idempotencyKey: string;
+  readonly causationId?: string;
+  readonly sourceRef?: string;
+}
+
 /** Correlator for the detached run once it has actually spawned. */
 export interface RunHandle {
   readonly flowId: string;
   readonly jobId: string;
   readonly logRef: string;
+}
+
+// ═══ Exact-start attempt journal ═════════════════════════════════════════
+
+/** Durable start-effect lifecycle. A handle does not exist before ADMITTED. */
+export type StartAttemptState =
+  | 'PREPARED'
+  | 'PROCESS_SPAWNED'
+  | 'ADMITTED'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'CANCELLED'
+  | 'BLOCKED'
+  | 'UNKNOWN';
+
+export const START_ATTEMPT_ACTIVE_STATES: ReadonlySet<StartAttemptState> =
+  new Set<StartAttemptState>(['PREPARED', 'PROCESS_SPAWNED', 'ADMITTED']);
+
+export const START_ATTEMPT_TERMINAL_STATES: ReadonlySet<StartAttemptState> =
+  new Set<StartAttemptState>(['COMPLETED', 'FAILED', 'CANCELLED', 'BLOCKED', 'UNKNOWN']);
+
+export function isTerminalStartAttemptState(state: StartAttemptState): boolean {
+  return START_ATTEMPT_TERMINAL_STATES.has(state);
+}
+
+/**
+ * PID-generation identity. `unavailable` is an honest platform-adapter result:
+ * it can participate in the one-shot fresh capability handoff, but never in a
+ * restart/adoption decision.
+ */
+export interface StartAttemptProcessIdentity {
+  readonly pid: number;
+  readonly startToken: string | null;
+  readonly evidence: 'verified' | 'unavailable';
+}
+
+/** PREPARED ownership prevents a concurrent caller from double-spawning. */
+export interface StartAttemptOwner {
+  readonly process: StartAttemptProcessIdentity;
+  readonly ownerNonce: string;
+  readonly leaseUntil: string;
+}
+
+/** End-to-end authority lineage copied from the approved proposal. */
+export interface StartAttemptLineage {
+  readonly tenantId: string;
+  readonly projectId: string;
+  readonly actor: ActorContext;
+  readonly origin: RequestOrigin;
+  readonly correlationId: string;
+  readonly idempotencyKey: string;
+  readonly parentPlanLineageHash: string;
+  readonly parentCorrelationId: string;
+  readonly authorizationAuthority: string;
+  readonly causationId?: string;
+  readonly sourceId?: string;
+}
+
+export interface StartAttemptSettlement {
+  readonly state: Extract<StartAttemptState, 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'BLOCKED' | 'UNKNOWN'>;
+  /** Stable machine-readable reason, suitable for audit and recovery routing. */
+  readonly code: string;
+  /** Optional operator/developer evidence; never interpreted as authority. */
+  readonly detail?: string;
+  readonly settledAt: string;
+}
+
+/**
+ * Canonical current view reconstructed from the append-only SQLite journal.
+ * `generation` is monotonic per flow; `attemptId` is globally unique.
+ */
+export interface StartAttemptRecord {
+  readonly flowId: string;
+  readonly revision: number;
+  readonly planDigest: string;
+  readonly generation: number;
+  readonly attemptId: string;
+  readonly state: StartAttemptState;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly lineage: StartAttemptLineage;
+  readonly owner: StartAttemptOwner;
+  readonly process?: StartAttemptProcessIdentity;
+  /** Published atomically with the ADMITTED transition, never before it. */
+  readonly handle?: RunHandle;
+  readonly settlement?: StartAttemptSettlement;
 }
 
 // ═══ Events (versioned) ══════════════════════════════════════════════════

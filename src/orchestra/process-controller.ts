@@ -16,7 +16,7 @@
 // Tenant: carried via actor.tenantId → entry.tenant (the flag+field reality; full
 // TenantContext threading is a separate, larger pass — ADR-067 amendment).
 //
-// Deps are injected (runTask / runSprint / waitForResult / capabilityRegistry) so
+// Deps are injected (runTask / exact Sprint executor / waitForResult / capabilityRegistry) so
 // the controller is unit-testable and REST/MCP wire the same primitives the CLI
 // autonomous path already builds.
 
@@ -37,6 +37,7 @@ import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
 import type {
   ProviderAuthorityCompositionHoldReason,
 } from '../core/provider-authority-composition.js';
+import type { RequestOrigin } from '../core/work-model.js';
 
 /** A single execution submission (the ExecutionRequest envelope, process flavor). */
 export interface ProcessSubmitCtx {
@@ -59,7 +60,11 @@ export interface ProcessSubmitCtx {
   /** WHO submitted — RBAC identity + tenant (audit lineage). */
   actor?: { id: string; role?: string; tenantId?: string };
   /** Provenance: 'api' | 'mcp' | 'webhook' | 'scheduled' (audit). */
-  origin?: string;
+  origin?: RequestOrigin;
+  /** Optional caller-authored end-to-end trace id; a durable process-id based
+   *  value is used when omitted (never randomness added during replay). */
+  correlationId?: string;
+  causationId?: string;
 }
 
 export type ProcessStatus = 'completed' | 'failed' | 'held' | 'pending-approval';
@@ -100,7 +105,7 @@ export interface ProcessRecord {
 }
 
 export interface ProcessControllerDeps
-  extends Pick<ExecuteDispatcherDeps, 'projectRoot' | 'config' | 'runTask' | 'runSprint' | 'waitForResult' | 'resultTimeoutMs' | 'capabilityRegistry' | 'evaluate' | 'audit' | 'crossVerify'> {
+  extends Pick<ExecuteDispatcherDeps, 'projectRoot' | 'config' | 'runTask' | 'executeSprint' | 'waitForResult' | 'resultTimeoutMs' | 'capabilityRegistry' | 'evaluate' | 'audit' | 'crossVerify'> {
   /** Durable backlog the submitted entry is appended to (and queried from). */
   backlogPath: string;
   /**
@@ -145,6 +150,7 @@ export function makeProcessController(deps: ProcessControllerDeps): ProcessContr
       // extra spec fields). Cast keeps the entry well-typed for every other consumer.
       const spec = {
         description: ctx.description,
+        ...(kind === 'sprint' ? { intent: ctx.description } : {}),
         ...(ctx.scopeDir ? { scopeDir: ctx.scopeDir } : {}),
         ...(ctx.capabilityTarget ? { capabilityTarget: ctx.capabilityTarget } : {}),
         ...(ctx.steps ? { steps: ctx.steps } : {}),
@@ -166,6 +172,9 @@ export function makeProcessController(deps: ProcessControllerDeps): ProcessContr
         // Persist the full server-derived principal (not just tenant) so the
         // dispatcher can carry the real OIDC sub into the audit hash-chain.
         ...(ctx.actor ? { actor: ctx.actor } : {}),
+        origin: ctx.origin ?? 'api',
+        correlationId: ctx.correlationId ?? `process:${tenant ?? 'local'}:${id}`,
+        ...(ctx.causationId ? { causationId: ctx.causationId } : {}),
         lastRun: null,
         lastResult: null,
       };
@@ -219,7 +228,7 @@ export function makeProcessController(deps: ProcessControllerDeps): ProcessContr
         projectRoot: deps.projectRoot,
         config: deps.config,
         runTask: deps.runTask,
-        runSprint: deps.runSprint,
+        executeSprint: deps.executeSprint,
         backlogPath: deps.backlogPath,
         waitForResult: deps.waitForResult,
         ...(deps.resultTimeoutMs !== undefined ? { resultTimeoutMs: deps.resultTimeoutMs } : {}),

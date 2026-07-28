@@ -17,7 +17,10 @@
 //      i18n label-builder) — no ink-testing-library, same no-Ink-render
 //      approach as approval-card.test.tsx.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -29,6 +32,7 @@ import { loadApprovedSnapshot } from '../../src/core/run-flow-store.js';
 vi.mock('../../src/orchestra/planner.js', () => ({
   resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
   createPlannerTaskModelPolicy: vi.fn((defaultModel: string) => ({ defaultModel, allowedModels: [defaultModel] })),
+  normalizePlannerDependencies: vi.fn(() => ({ resolvedCount: 0, dropped: [] })),
   callZeroConfigPlanner: vi.fn(() => ({
     reasoning: 'canned single-task plan (hermetic planner boundary)',
     tasks: [{
@@ -223,21 +227,29 @@ describe('deckent_propose_run — flag-gated registration (terminal.run_flow_v2)
 
 describe('createRunFlowController — trajectory (propose -> preview -> approve/reject)', () => {
   let tick = 0;
+  let root: string;
   const nowFn = (): string => new Date(Date.UTC(2026, 0, 1, 0, 0, tick++)).toISOString();
 
   beforeEach(() => {
     vi.clearAllMocks();
     tick = 0;
+    root = mkdtempSync(join(tmpdir(), 'run-flow-controller-test-'));
     mockReadContext.mockReturnValue(makeBrainContext());
     mockPlanSprint.mockReturnValue(makeSprint() as any);
   });
 
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
   function makeControllerDeps() {
     return {
-      root: '/mock/root',
+      root,
       config: makeConfig(),
       now: nowFn,
       generateFlowId: () => 'flow-1',
+      forceScope: true,
+      scopeEvidence: { status: 'available' as const, trackedFiles: [] },
     };
   }
 
@@ -304,14 +316,14 @@ describe('createRunFlowController — trajectory (propose -> preview -> approve/
         ...makeControllerDeps(),
         root,
         // Inject a fake spawn so startApproved never launches a real child.
-        spawnStart: (_sprint, fid) => ({ flowId: fid, jobId: `test-job-${fid}`, logRef: 'test-log' }),
+        spawnStart: () => ({ pid: process.pid }),
       });
       await controller.proposeRun(intent);
       controller.approve({ id: 'alperen' });
       // startApproved is an optional interface member (427-005 seam); the concrete
       // controller always defines it, so assert-present matches this file's style.
       const started = controller.startApproved!();
-      expect(started.state).toBe('DETACHED_RUNNING');
+      expect(started.state).toBe('STARTING');
 
       // G1's whole point: a do-flow's ONLY durable trail is this snapshot (the
       // in-process controller never writes events.jsonl), so it must carry the

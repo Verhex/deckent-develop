@@ -9,6 +9,7 @@ import {
   PRODUCTION_V2_RUNNER_REGISTRY,
   admitWorkItemBatch,
   createMissionRunnerRegistry,
+  validateWorkItemAdmission,
 } from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
 import type { NewWorkItem } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 import { settleMissionItem } from '../../../helpers/mission-store.js';
@@ -314,6 +315,103 @@ describe('WorkItems + atomic claim', () => {
       claim_attempt_id: null,
       claim_fence_token_hash: null,
     });
+    s.close();
+  });
+
+  it('atomically adopts a returned exact plan ref with claim, revision, lease, and admission-fence CAS', () => {
+    const s = freshMission();
+    const registry = createMissionRunnerRegistry({
+      registryRevision: 'mission-exact-sprint-v1',
+      runners: [{
+        kind: 'sprint',
+        runnerContract: 'canonical-exact-sprint-executor-v1',
+        runnerRevision: 'exact-sprint-v1',
+      }],
+    });
+    const [admittedSprint] = admitWorkItemBatch([{
+      id: 'exact-sprint',
+      missionId: 'm',
+      kind: 'sprint' as const,
+      spec: { directivesRef: 'DIRECTIVES.md' },
+    }], registry);
+    s.enqueueItem(admittedSprint!);
+    const due = s.queryDue({ registry })[0]!;
+    const lease = s.acquireEngineLease('mission-exact-engine', 30_000)!;
+    const claim = s.claimItemWithAuthority(
+      due.id,
+      'scheduler',
+      {
+        itemRevision: due.revision,
+        admissionFence: due.admissionFence!,
+        registry,
+      },
+      lease,
+    )!;
+    const exactPlanRef = {
+      schemaVersion: 1 as const,
+      flowId: 'mission-flow-r1',
+      revision: 1,
+      planDigest: 'c'.repeat(64),
+    };
+    const before = {
+      item: s.__rawGet(`SELECT status,spec,revision,last_result
+        FROM work_items WHERE id='exact-sprint'`),
+      fence: s.__rawGet(`SELECT * FROM work_item_admission_fences
+        WHERE work_item_id='exact-sprint'`),
+    };
+
+    expect(s.settleClaimedItem(
+      { ...claim, itemRevision: claim.itemRevision + 1 },
+      'parked',
+      { ok: false, reason: 'EXACT_PLAN_APPROVAL_REQUIRED', exactPlanRef },
+      lease,
+    )).toBe(false);
+    expect(s.settleClaimedItem(
+      claim,
+      'parked',
+      { ok: false, reason: 'EXACT_PLAN_APPROVAL_REQUIRED', exactPlanRef },
+      { ...lease, ownerId: 'stale-engine' },
+    )).toBe(false);
+    expect({
+      item: s.__rawGet(`SELECT status,spec,revision,last_result
+        FROM work_items WHERE id='exact-sprint'`),
+      fence: s.__rawGet(`SELECT * FROM work_item_admission_fences
+        WHERE work_item_id='exact-sprint'`),
+    }).toEqual(before);
+
+    expect(s.settleClaimedItem(
+      claim,
+      'parked',
+      { ok: false, reason: 'EXACT_PLAN_APPROVAL_REQUIRED', exactPlanRef },
+      lease,
+    )).toBe(true);
+    const adopted = s.listItems('m')[0]!;
+    expect(adopted).toMatchObject({
+      id: 'exact-sprint',
+      status: 'parked',
+      revision: claim.itemRevision + 1,
+      spec: { exactPlanRef },
+      lastResult: {
+        ok: false,
+        reason: 'EXACT_PLAN_APPROVAL_REQUIRED',
+        exactPlanRef,
+      },
+    });
+    expect(adopted.spec).not.toHaveProperty('directivesRef');
+    expect(adopted.admissionFence).toMatchObject({
+      registryRevision: registry.registryRevision,
+      registryDigest: registry.registryDigest,
+      kind: 'sprint',
+      runnerRevision: 'exact-sprint-v1',
+    });
+    expect(validateWorkItemAdmission(adopted, adopted.admissionFence, registry))
+      .toEqual({ ok: true });
+    expect(s.settleClaimedItem(
+      claim,
+      'done',
+      { ok: true, exactPlanRef },
+      lease,
+    )).toBe(false);
     s.close();
   });
 

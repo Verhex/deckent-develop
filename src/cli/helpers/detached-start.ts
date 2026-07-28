@@ -78,6 +78,12 @@ export interface SpawnDetachedOptions {
    * headless/automation runs keep the zero-cost no-op tap.
    */
   liveTrace?: boolean;
+  /** Exact-start capability handed to the detached child. The helper appends
+   * hidden CLI arguments only after it has created the authoritative logRef. */
+  exactStart?: {
+    readonly attemptId: string;
+    readonly ownerNonce: string;
+  };
 }
 
 export interface DetachedSpawnResult {
@@ -131,11 +137,19 @@ export function spawnDetachedDeckent(
   const flowIdSegment = opts.flowId ? `${opts.flowId.replace(/[^a-zA-Z0-9_-]/g, '_')}-` : '';
   const logPath = join(recentWorksDir, `${cmdLabel}-${flowIdSegment}${Date.now()}.log`);
   const logFd = openSync(logPath, 'a');
+  const childArgv = opts.exactStart
+    ? [
+        ...argv,
+        '--exact-attempt-id', opts.exactStart.attemptId,
+        '--exact-owner-nonce', opts.exactStart.ownerNonce,
+        '--exact-log-ref', logPath,
+      ]
+    : [...argv];
 
   const spawnFn = opts.spawnFn ?? defaultSpawnFn;
   let child: DetachedChildHandle;
   try {
-    child = spawnFn(process.execPath, [resolveEntryPath(), ...argv], {
+    child = spawnFn(process.execPath, [resolveEntryPath(), ...childArgv], {
       detached: true,
       stdio: ['ignore', logFd, logFd],
       cwd: projectRoot,
@@ -176,12 +190,38 @@ export function buildFlowStartSpawn(
   revision: number,
   planDigest: string,
   spawnFn?: DetachedSpawnFn,
-): (sprint: unknown, flowId: string) => { flowId: string; jobId: string; logRef: string } {
-  return (_sprint, flowId) => {
+  extraArgs: readonly string[] = [],
+): (context: {
+  readonly capability: {
+    readonly flowId: string;
+    readonly attemptId: string;
+    readonly ownerNonce: string;
+  };
+}) => { pid: number } {
+  return ({ capability }) => {
+    const flowId = capability.flowId;
     const spawned = spawnDetachedDeckent(
-      ['start', '--flow-id', flowId, '--revision', String(revision), '--plan-digest', planDigest],
-      { projectRoot, flowId, liveTrace: true, ...(spawnFn ? { spawnFn } : {}) },
+      [
+        'start',
+        '--flow-id', flowId,
+        '--revision', String(revision),
+        '--plan-digest', planDigest,
+        ...extraArgs,
+      ],
+      {
+        projectRoot,
+        flowId,
+        liveTrace: true,
+        exactStart: {
+          attemptId: capability.attemptId,
+          ownerNonce: capability.ownerNonce,
+        },
+        ...(spawnFn ? { spawnFn } : {}),
+      },
     );
-    return { flowId, jobId: `flow-${flowId}-r${revision}`, logRef: spawned.logPath };
+    if (spawned.pid === null) {
+      throw new Error('EXACT_START_CHILD_PID_UNAVAILABLE');
+    }
+    return { pid: spawned.pid };
   };
 }

@@ -149,7 +149,7 @@ export interface BuildEngineRuntimeOptions {
   flows: ScheduledFlow[];
   policy: SelfDispatchPolicy;
   runTask: ExecuteDispatcherDeps['runTask'];
-  runSprint: ExecuteDispatcherDeps['runSprint'];
+  executeSprint: ExecuteDispatcherDeps['executeSprint'];
   /**
    * Gap F: wait for a task result file (injected for hermetic tests;
    * live wire passes waitForRunResult from run.ts).
@@ -339,7 +339,7 @@ export function buildEngineRuntime(
       projectRoot: opts.projectRoot,
       config: opts.config,
       runTask: opts.runTask,
-      runSprint: opts.runSprint,
+      executeSprint: opts.executeSprint,
       backlogPath: opts.backlogPath,
       waitForResult: opts.waitForResult,
       resultTimeoutMs: opts.resultTimeoutMs,

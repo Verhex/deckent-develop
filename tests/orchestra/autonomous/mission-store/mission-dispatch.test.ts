@@ -8,8 +8,7 @@ import type {
 } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 import type { ResolvedConfig } from '../../../../src/core/config-types.js';
 
-// Minimal ResolvedConfig stand-in — the dispatch only forwards it to runSprint,
-// it never reads fields. Cast keeps the test free of the full 700-field shape.
+// Minimal ResolvedConfig stand-in; the dispatch never reads its fields.
 const CONFIG = {} as ResolvedConfig;
 const CLAIM: MissionDispatchClaim = {
   schemaVersion: 1,
@@ -42,7 +41,7 @@ function baseDeps(over: Partial<MissionDispatchDeps> = {}): MissionDispatchDeps 
     projectRoot: '/proj',
     config: CONFIG,
     runTask: async () => ({ ok: true }),
-    runSprint: async () => undefined,
+    executeSprint: async () => ({ ok: true }),
     ...over,
   };
 }
@@ -120,19 +119,30 @@ describe('buildMissionDispatch — task', () => {
 });
 
 describe('buildMissionDispatch — sprint', () => {
-  it('returns { ok: true } when runSprint resolves, forwarding projectRoot + config', async () => {
-    const args: Array<[string, ResolvedConfig]> = [];
+  it('forwards the exact item + dispatch claim and preserves the typed result', async () => {
+    const args: Array<[WorkItem, MissionDispatchClaim]> = [];
+    const item = mkItem('sprint', {
+      exactPlanRef: {
+        schemaVersion: 1,
+        flowId: 'flow-1',
+        revision: 1,
+        planDigest: 'a'.repeat(64),
+      },
+    });
     const dispatch = buildMissionDispatch(baseDeps({
-      runSprint: async (root, cfg) => { args.push([root, cfg]); return { sprintId: 's-1' }; },
+      executeSprint: async (exactItem, claim) => {
+        args.push([exactItem as WorkItem, claim]);
+        return { ok: true, reason: 'exact sprint completed' };
+      },
     }));
-    const res = await dispatch(mkItem('sprint'), CLAIM);
-    expect(res).toEqual({ ok: true, reason: 'sprint completed' });
-    expect(args).toEqual([['/proj', CONFIG]]);
+    const res = await dispatch(item, CLAIM);
+    expect(res).toEqual({ ok: true, reason: 'exact sprint completed' });
+    expect(args).toEqual([[item, CLAIM]]);
   });
 
-  it('returns { ok: false } with the error message when runSprint throws', async () => {
+  it('returns { ok: false } with the error message when exact execution throws', async () => {
     const dispatch = buildMissionDispatch(baseDeps({
-      runSprint: async () => { throw new Error('boom'); },
+      executeSprint: async () => { throw new Error('boom'); },
     }));
     const res = await dispatch(mkItem('sprint'), CLAIM);
     expect(res).toEqual({ ok: false, reason: 'boom' });

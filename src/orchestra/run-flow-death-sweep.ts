@@ -8,8 +8,18 @@
 // closure (system-authored narrative) — never a silent limbo.
 
 import { getRunFlowCoordinator } from './run-flow-coordinator-registry.js';
-import { loadRunHandle, readFlowEvents } from '../core/run-flow-store.js';
+import {
+  loadLatestStartAttempt,
+  loadRunHandle,
+  readFlowEvents,
+  settleStartAttempt,
+} from '../core/run-flow-store.js';
 import { isPidAlive } from '../core/pid-liveness.js';
+import { verifyPidOwnership } from '../core/pid-ownership.js';
+import {
+  isTerminalStartAttemptState,
+  type StartAttemptRecord,
+} from '../core/run-flow-contract.js';
 import { debugLog } from '../core/utils.js';
 
 /** Flow states that claim a live external process. */
@@ -17,7 +27,14 @@ const LIVE_RUN_STATES = new Set(['STARTING', 'DETACHED_RUNNING']);
 
 export interface DeathSweepEntry {
   flowId: string;
-  outcome: 'closed-dead' | 'alive' | 'no-pid-record' | 'jobs-terminal' | 'error';
+  outcome:
+    | 'closed-dead'
+    | 'alive'
+    | 'no-pid-record'
+    | 'ownership-unknown'
+    | 'reconciled-admitted'
+    | 'jobs-terminal'
+    | 'error';
   detail: string;
 }
 
@@ -35,6 +52,23 @@ function deadRunClosure(flowId: string, pid: number, state: string): { commandId
   return {
     commandId: `death-sweep-${flowId}-pid${pid}`,
     error: `run process died without completion (pid ${pid} not alive; state was ${state}) — closed by death-sweep`,
+  };
+}
+
+function attemptOwnership(attempt: StartAttemptRecord): 'owned' | 'dead' | 'reused' | 'unknown' {
+  const identity = attempt.state === 'PREPARED' ? attempt.owner.process : attempt.process;
+  if (!identity || identity.evidence === 'unavailable' || identity.startToken === null) return 'unknown';
+  return verifyPidOwnership({ pid: identity.pid, startToken: identity.startToken });
+}
+
+function attemptCas(attempt: StartAttemptRecord) {
+  return {
+    flowId: attempt.flowId,
+    revision: attempt.revision,
+    planDigest: attempt.planDigest,
+    generation: attempt.generation,
+    attemptId: attempt.attemptId,
+    ownerNonce: attempt.owner.ownerNonce,
   };
 }
 
@@ -58,8 +92,81 @@ export function sweepDeadDetachedRuns(projectRoot: string): DeathSweepReport {
   for (const flowId of flowIds) {
     report.scanned += 1;
     try {
-      const context = coordinator.getFlow(flowId);
+      let context = coordinator.getFlow(flowId);
       if (!LIVE_RUN_STATES.has(context.state)) continue;
+
+      const attempt = loadLatestStartAttempt(projectRoot, flowId);
+      if (attempt) {
+        if (attempt.state === 'ADMITTED' && attempt.handle && context.state === 'STARTING') {
+          coordinator.recordRunStarted({
+            handle: attempt.handle,
+            commandId: `run-started-attempt-${attempt.attemptId}`,
+          });
+          context = coordinator.getFlow(flowId);
+          report.skipped.push({
+            flowId,
+            outcome: 'reconciled-admitted',
+            detail: `ADMITTED attempt ${attempt.attemptId} repaired RUN_STARTED publication`,
+          });
+        }
+
+        if (isTerminalStartAttemptState(attempt.state)) {
+          if (LIVE_RUN_STATES.has(context.state)) {
+            const detail = attempt.settlement?.detail
+              ?? `start attempt ${attempt.attemptId} settled ${attempt.state}`;
+            coordinator.recordRunFailure({
+              flowId,
+              error: detail,
+              commandId: `attempt-terminal-reconcile-${attempt.attemptId}`,
+            });
+            report.closed.push({ flowId, outcome: 'closed-dead', detail });
+          }
+          continue;
+        }
+
+        const ownership = attemptOwnership(attempt);
+        const identity = attempt.state === 'PREPARED' ? attempt.owner.process : attempt.process;
+        if (ownership === 'owned') {
+          report.skipped.push({
+            flowId,
+            outcome: 'alive',
+            detail: `attempt ${attempt.attemptId} process ${identity!.pid} owned`,
+          });
+          continue;
+        }
+        if (ownership === 'unknown') {
+          report.skipped.push({
+            flowId,
+            outcome: 'ownership-unknown',
+            detail: `attempt ${attempt.attemptId} process ownership unavailable — fail-closed`,
+          });
+          continue;
+        }
+
+        const settledAt = new Date().toISOString();
+        const settlement = settleStartAttempt(projectRoot, {
+          ...attemptCas(attempt),
+          settlement: {
+            state: 'FAILED',
+            code: ownership === 'dead' ? 'START_PROCESS_DEAD' : 'START_PROCESS_REUSED',
+            detail: `start attempt process is ${ownership}`,
+            settledAt,
+          },
+          authority: {
+            kind: attempt.state === 'PREPARED' ? 'preparer-recovery' : 'process-recovery',
+            observedOwnership: ownership,
+            observedAt: settledAt,
+          },
+        }).attempt;
+        const detail = settlement.settlement!.detail!;
+        coordinator.recordRunFailure({
+          flowId,
+          error: detail,
+          commandId: `attempt-death-sweep-${attempt.attemptId}`,
+        });
+        report.closed.push({ flowId, outcome: 'closed-dead', detail });
+        continue;
+      }
 
       const handleRecord = loadRunHandle(projectRoot, flowId);
       const pid = handleRecord?.pid;

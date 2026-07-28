@@ -32,7 +32,10 @@ vi.mock('../../src/orchestra/pre-start-guards.js', () => ({
   runPreStartGuards: (...args: unknown[]) => mockRunPreStartGuards(...args),
 }));
 
-import { resolvePlanPhaseResult } from '../../src/orchestra/sprint-controller.js';
+import {
+  resolvePlanPhaseResult,
+  runExactPlanAdmissionHooks,
+} from '../../src/orchestra/sprint-controller.js';
 import { BrainError } from '../../src/orchestra/sprint-lifecycle.js';
 import { SprintPhase } from '../../src/core/types.js';
 import type { ResolvedConfig, Sprint } from '../../src/core/types.js';
@@ -55,6 +58,44 @@ const fakeSafetyPoint = {
   id: 'sprint-flow-9', branchName: 'deckent-backup-sprint-flow-9',
   commitSha: 'abc123', createdAt: '2026-01-01T00:00:00.000Z', wasClean: true,
 };
+
+describe('exact plan admission hooks', () => {
+  it('materializes before publishing exact execution admission', async () => {
+    const order: string[] = [];
+    await runExactPlanAdmissionHooks(makePreplannedSprint(), {
+      exactPlanAuthority: {
+        flowId: 'flow-exact',
+        revision: 1,
+        planDigest: 'digest-exact',
+      },
+      onExactPlanMaterialize: () => {
+        order.push('materialized');
+      },
+      onExecutionAdmitted: () => {
+        order.push('admitted');
+      },
+    });
+
+    expect(order).toEqual(['materialized', 'admitted']);
+  });
+
+  it('does not publish admission when exact materialization fails', async () => {
+    const admitted = vi.fn();
+    await expect(runExactPlanAdmissionHooks(makePreplannedSprint(), {
+      exactPlanAuthority: {
+        flowId: 'flow-exact',
+        revision: 1,
+        planDigest: 'digest-exact',
+      },
+      onExactPlanMaterialize: () => {
+        throw new Error('materialization failed');
+      },
+      onExecutionAdmitted: admitted,
+    })).rejects.toThrow('materialization failed');
+
+    expect(admitted).not.toHaveBeenCalled();
+  });
+});
 
 describe('resolvePlanPhaseResult (born-672b GUARD-WIRE)', () => {
   beforeEach(() => {

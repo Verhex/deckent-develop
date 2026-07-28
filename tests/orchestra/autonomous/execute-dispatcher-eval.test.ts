@@ -30,7 +30,7 @@ describe('execute-dispatcher — Brain+Auditor+CrossVerify wire', () => {
     const handler = makeExecuteDispatcher({
       projectRoot: dir!, config: {} as any, backlogPath,
       runTask: async () => ({ taskId: 'run-1' }),
-      runSprint: async () => ({}),
+      executeSprint: async () => ({}),
       waitForResult: async () => ({ taskId: 'run-1', selfAssessment: 'NO_GO' } as any),
       evaluate: () => ({ decision: 'GO_WITH_TECH_DEBT', quality: 78, reconciled: true, reason: 'low coverage' }),
       audit: async () => ({ boundary: 'clean', adr: 'ok', functional: 'pass' }),
@@ -59,7 +59,7 @@ describe('execute-dispatcher — Brain+Auditor+CrossVerify wire', () => {
     const handler = makeExecuteDispatcher({
       projectRoot: dir!, config: {} as any, backlogPath,
       runTask: async () => ({ taskId: 'run-1' }),
-      runSprint: async () => ({}),
+      executeSprint: async () => ({}),
       waitForResult: async () => ({ taskId: 'run-1', selfAssessment: 'NO_GO' } as any),
       evaluate: () => ({ decision: 'NO_GO', quality: 10, reconciled: false, reason: 'tests failed' }),
       audit: async () => ({ boundary: 'clean', adr: 'ok', functional: 'fail' }),
@@ -75,7 +75,7 @@ describe('execute-dispatcher — Brain+Auditor+CrossVerify wire', () => {
     const handler = makeExecuteDispatcher({
       projectRoot: dir!, config: {} as any, backlogPath,
       runTask: async () => ({ taskId: 'run-1' }),
-      runSprint: async () => ({}),
+      executeSprint: async () => ({}),
       waitForResult: async () => ({ taskId: 'run-1', selfAssessment: 'DONE', filesChanged: ['src/cli/helpers/output.ts'] } as any),
       evaluate: () => ({ decision: 'NO_GO', quality: 0, reconciled: false, reason: 'Schema violation: missing required fields [coverage]', schemaRejected: true }),
       audit: async () => ({ boundary: 'clean', adr: 'ok', functional: 'pass' }),
@@ -94,7 +94,7 @@ describe('execute-dispatcher — Brain+Auditor+CrossVerify wire', () => {
     const handler = makeExecuteDispatcher({
       projectRoot: dir!, config: {} as any, backlogPath,
       runTask: async () => ({ taskId: 'run-1' }),
-      runSprint: async () => ({}),
+      executeSprint: async () => ({}),
       waitForResult: async () => ({ taskId: 'run-1', selfAssessment: 'DONE' } as any),
       evaluate: () => ({ decision: 'DONE', quality: 95, reconciled: false, reason: 'ok' }),
       audit: async () => ({ boundary: [{ type: 'file_outside_scope', agentId: 'w', detail: 'File outside scope: x.ts', timestamp: 'T' }], adr: 'ok', functional: 'pass' }),
@@ -117,7 +117,7 @@ describe('execute-dispatcher — Brain+Auditor+CrossVerify wire', () => {
     const handler = makeExecuteDispatcher({
       projectRoot: dir!, config: {} as any, backlogPath,
       runTask: async () => ({ taskId: 'run-1' }),
-      runSprint: async () => ({}),
+      executeSprint: async () => ({}),
       waitForResult: async () => ({ taskId: 'run-1', selfAssessment: 'DONE', filesChanged: ['src/api/x.ts'] } as any),
       evaluate: () => ({ decision: 'DONE', quality: 95, reconciled: false, reason: 'ok' }),
       audit: async () => ({ boundary: 'clean', adr: 'ok', functional: 'pass' }),

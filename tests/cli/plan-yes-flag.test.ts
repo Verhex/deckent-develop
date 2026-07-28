@@ -4,12 +4,12 @@
  * Without `--yes`, `deckent plan` plans tasks as DRAFT and then blocks on an
  * interactive `promptConfirm('Approve this plan?')`. In a non-interactive
  * context (CI, pipe, MCP) that confirm gets EOF → returns false → the DRAFT
- * tasks are NEVER transitioned to PENDING (`confirmDraftTasks` is skipped), so
- * `deckent start` finds nothing runnable.
+ * compatibility tasks are never published as PENDING, so `deckent start`
+ * finds nothing runnable.
  *
  * The fix: `--yes` (alias `-y`) skips the interactive confirm and approves the
- * DRAFT tasks directly (DRAFT → PENDING via `confirmDraftTasks`), so the
- * lifecycle completes without a human at the keyboard.
+ * exact plan directly and publishes its PENDING compatibility projection, so
+ * the lifecycle completes without a human at the keyboard.
  *
  * Hermetic: fs / readline / config / brain / prompt all mocked, no disk I/O.
  */
@@ -66,9 +66,67 @@ vi.mock('../../src/orchestra/brain.js', () => ({
     reasoning: undefined,
     planningMode: 'structured',
   }),
-  confirmDraftTasks: vi.fn().mockResolvedValue(undefined),
-  cleanupDraftTasks: vi.fn(),
 }));
+
+vi.mock('../../src/orchestra/run-flow-plan-service.js', () => ({
+  planRunFlow: vi.fn().mockResolvedValue({
+    flowId: 'flow-cli-1',
+    revision: 1,
+    planDigest: 'digest-cli-1',
+    sprint: {
+      id: 'sprint-291',
+      number: 291,
+      tasks: [{ id: '291-001', title: 'T', model: 'sonnet', priority: 'NORMAL', status: 'PENDING', dependencies: [], scope: { directories: [], filesRead: [], filesWrite: [] } }],
+      reasoning: undefined,
+      planningMode: 'structured',
+    },
+    preview: {
+      flowId: 'flow-cli-1',
+      revision: 1,
+      planDigest: 'digest-cli-1',
+      taskSummaries: [],
+      policyDecision: 'allow',
+      gateResult: 'skipped',
+      topology: {
+        schemaVersion: 1,
+        configuredMaxWorkers: 4,
+        effectiveConcurrency: 1,
+        taskSlots: [1],
+        collisions: [],
+        authoredEdges: [],
+        syntheticEdges: [],
+        effectiveEdges: [],
+        verdict: 'pass',
+        waves: [{ wave: 1, slots: [1] }],
+        findings: [],
+      },
+      topologyGateResult: 'pass',
+      scopeGateResult: 'skipped',
+    },
+    context: { state: 'AWAITING_APPROVAL' },
+    sourceAuthority: {},
+    approval: 'awaiting',
+    reusedDurablePlan: false,
+  }),
+  decideRunFlowPlan: vi.fn().mockReturnValue({ state: 'APPROVED' }),
+}));
+
+vi.mock('../../src/orchestra/task-artifact-projection.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/orchestra/task-artifact-projection.js')>();
+  return {
+    ...actual,
+    inspectTaskArtifactsNoClobber: vi.fn().mockReturnValue({
+      taskIds: ['291-001'],
+      idempotent: [],
+      missing: ['291-001'],
+    }),
+    publishTaskArtifactsNoClobber: vi.fn().mockReturnValue({
+      taskIds: ['291-001'],
+      created: ['291-001'],
+      idempotent: [],
+    }),
+  };
+});
 
 vi.mock('../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn().mockReturnValue('/project'),
@@ -87,7 +145,14 @@ vi.mock('../../src/cli/helpers/prompt.js', () => ({
 // ─── Imports (after mocks) ───────────────────────────────────────────
 
 import { registerPlan } from '../../src/cli/commands/plan.js';
-import { confirmDraftTasks, planSprint } from '../../src/orchestra/brain.js';
+import {
+  decideRunFlowPlan,
+  planRunFlow,
+} from '../../src/orchestra/run-flow-plan-service.js';
+import {
+  inspectTaskArtifactsNoClobber,
+  publishTaskArtifactsNoClobber,
+} from '../../src/orchestra/task-artifact-projection.js';
 import { promptConfirm } from '../../src/cli/helpers/prompt.js';
 
 // ─── Tests ───────────────────────────────────────────────────────────
@@ -106,22 +171,31 @@ describe('PLAN-W1 Bug 2 — deckent plan --yes auto-approves (PENDING, not DRAFT
     expect(hasYes).toBe(true);
   });
 
-  it('--yes approves DRAFT tasks without prompting → confirmDraftTasks called, promptConfirm NOT', async () => {
+  it('--yes approves the exact plan and publishes PENDING tasks without prompting', async () => {
     const program = new Command();
     program.exitOverride();
     registerPlan(program);
 
     await program.parseAsync(['node', 'test', 'plan', '--yes']).catch(() => {});
 
-    // planSprint must have planned as DRAFT (asDraft true) so the lifecycle runs…
-    expect(vi.mocked(planSprint)).toHaveBeenCalledOnce();
-    const planArgs = vi.mocked(planSprint).mock.calls[0]!;
-    const planOpts = planArgs[planArgs.length - 1] as { asDraft?: boolean };
-    expect(planOpts.asDraft).toBe(true);
+    expect(vi.mocked(planRunFlow)).toHaveBeenCalledOnce();
+    expect(vi.mocked(planRunFlow)).toHaveBeenCalledWith(expect.objectContaining({
+      source: expect.objectContaining({ sourceKind: 'directives' }),
+    }));
 
-    // …then auto-approved (DRAFT → PENDING) WITHOUT the interactive confirm.
-    expect(vi.mocked(confirmDraftTasks)).toHaveBeenCalledOnce();
+    // …then auto-approved and no-clobber-published WITHOUT the interactive confirm.
+    expect(vi.mocked(decideRunFlowPlan)).toHaveBeenCalledWith(
+      '/project',
+      'flow-cli-1',
+      expect.objectContaining({ decision: 'approve' }),
+    );
+    expect(vi.mocked(inspectTaskArtifactsNoClobber)).toHaveBeenCalledOnce();
+    expect(vi.mocked(publishTaskArtifactsNoClobber)).toHaveBeenCalledOnce();
+    expect(vi.mocked(publishTaskArtifactsNoClobber).mock.invocationCallOrder[0])
+      .toBeGreaterThan(vi.mocked(decideRunFlowPlan).mock.invocationCallOrder[0]!);
     expect(vi.mocked(promptConfirm)).not.toHaveBeenCalled();
+    const canonical = await vi.mocked(planRunFlow).mock.results[0]!.value;
+    expect(canonical.sprint.tasks[0].status).toBe('PENDING');
   });
 
   it('without --yes, the interactive confirm still gates approval (regression baseline)', async () => {
@@ -131,8 +205,13 @@ describe('PLAN-W1 Bug 2 — deckent plan --yes auto-approves (PENDING, not DRAFT
 
     await program.parseAsync(['node', 'test', 'plan']).catch(() => {});
 
-    // promptConfirm is the gate; mocked to false (EOF) → confirmDraftTasks NOT called.
+    // promptConfirm is the gate; mocked to false (EOF) → no publication.
     expect(vi.mocked(promptConfirm)).toHaveBeenCalledOnce();
-    expect(vi.mocked(confirmDraftTasks)).not.toHaveBeenCalled();
+    expect(vi.mocked(publishTaskArtifactsNoClobber)).not.toHaveBeenCalled();
+    expect(vi.mocked(decideRunFlowPlan)).toHaveBeenCalledWith(
+      '/project',
+      'flow-cli-1',
+      expect.objectContaining({ decision: 'reject' }),
+    );
   });
 });

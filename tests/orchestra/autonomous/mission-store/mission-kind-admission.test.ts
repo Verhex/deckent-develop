@@ -9,7 +9,6 @@ import {
   assertWorkItemBatchAdmitted,
   admitWorkItemBatch,
   bindMissionRunnerRegistry,
-  computeSprintSnapshotDigest,
   createMissionRunnerRegistry,
   isCanonicalWorkItemKind,
   listRuntimeAdmittedKinds,
@@ -168,26 +167,45 @@ describe('mission kind admission registry', () => {
     }], PRODUCTION_V2_ADMISSION)).toThrow('PROCESS_RUNNER_UNWIRED');
   });
 
-  it('validates the immutable sprint snapshot digest before runner admission', () => {
-    const payload = {
-      version: 1 as const,
-      revision: 'runflow-r7',
-      approvalEvidenceRef: 'audit://approval/42',
-      directives: '# Approved directives',
-      executionPlan: { tasks: [{ id: 'one' }], concurrency: 1 },
+  it('requires exactly one canonical exact-plan or unplanned source before runner admission', () => {
+    const exactPlanRef = {
+      schemaVersion: 1 as const,
+      flowId: 'runflow-r7',
+      revision: 7,
+      planDigest: 'a'.repeat(64),
     };
-    const snapshot = { ...payload, digest: computeSprintSnapshotDigest(payload) };
     expect(() => assertWorkItemBatchAdmitted([
-      { id: 'sprint-ok', kind: 'sprint', spec: { sprintSnapshot: snapshot } },
+      { id: 'sprint-ok', kind: 'sprint', spec: { exactPlanRef } },
     ], allWired)).not.toThrow();
     expect(() => assertWorkItemBatchAdmitted([
-      { id: 'sprint-mutated', kind: 'sprint', spec: { sprintSnapshot: { ...snapshot, directives: '# Changed' } } },
-    ], allWired)).toThrow('SPRINT_SNAPSHOT_DIGEST_MISMATCH');
+      { id: 'sprint-directives', kind: 'sprint', spec: { directivesRef: 'DIRECTIVES.md' } },
+    ], allWired)).not.toThrow();
     expect(() => assertWorkItemBatchAdmitted([
-      { id: 'sprint-extra-mutated', kind: 'sprint', spec: { sprintSnapshot: { ...snapshot, hiddenMutation: true } } },
-    ], allWired)).toThrow('SPRINT_SNAPSHOT_DIGEST_MISMATCH');
+      { id: 'sprint-intent', kind: 'sprint', spec: { intent: 'Execute the accepted goal' } },
+    ], allWired)).not.toThrow();
     expect(() => assertWorkItemBatchAdmitted([
-      { id: 'sprint-unwired', kind: 'sprint', spec: { sprintSnapshot: snapshot } },
-    ], PRODUCTION_V2_ADMISSION)).toThrow('SPRINT_SNAPSHOT_RUNNER_UNWIRED');
+      { id: 'sprint-missing', kind: 'sprint', spec: {} },
+    ], allWired)).toThrow('SPRINT_EXECUTION_SOURCE_REQUIRED');
+    expect(() => assertWorkItemBatchAdmitted([
+      { id: 'sprint-conflict', kind: 'sprint', spec: { exactPlanRef, directivesRef: 'DIRECTIVES.md' } },
+    ], allWired)).toThrow('SPRINT_EXECUTION_SOURCE_CONFLICT');
+    expect(() => assertWorkItemBatchAdmitted([
+      { id: 'sprint-invalid-unplanned', kind: 'sprint', spec: { directivesRef: ' DIRECTIVES.md ' } },
+    ], allWired)).toThrow('SPRINT_UNPLANNED_SOURCE_INVALID');
+    expect(() => assertWorkItemBatchAdmitted([
+      { id: 'sprint-mutated', kind: 'sprint', spec: { exactPlanRef: { ...exactPlanRef, planDigest: 'A'.repeat(64) } } },
+    ], allWired)).toThrow('SPRINT_EXACT_PLAN_REF_INVALID');
+    expect(() => assertWorkItemBatchAdmitted([
+      { id: 'sprint-extra-mutated', kind: 'sprint', spec: { exactPlanRef: { ...exactPlanRef, hiddenMutation: true } } },
+    ], allWired)).toThrow('SPRINT_EXACT_PLAN_REF_INVALID');
+    expect(() => assertWorkItemBatchAdmitted([
+      { id: 'sprint-unwired', kind: 'sprint', spec: { exactPlanRef } },
+    ], PRODUCTION_V2_ADMISSION)).toThrow('SPRINT_RUNNER_UNWIRED');
+    expect(() => assertWorkItemBatchAdmitted([
+      { id: 'sprint-unwired-directives', kind: 'sprint', spec: { directivesRef: 'DIRECTIVES.md' } },
+    ], PRODUCTION_V2_ADMISSION)).toThrow('SPRINT_RUNNER_UNWIRED');
+    expect(() => assertWorkItemBatchAdmitted([
+      { id: 'sprint-embedded', kind: 'sprint', spec: { directivesRef: 'DIRECTIVES.md', sprintSnapshot: {} } },
+    ], allWired)).toThrow('SPRINT_EMBEDDED_SNAPSHOT_RETIRED');
   });
 });

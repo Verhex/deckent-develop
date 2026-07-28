@@ -183,7 +183,7 @@ describe('execute-dispatcher — post-item lifecycle wired (no artifact leakage)
 
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask: vi.fn(), runSprint: vi.fn(),
+      runTask: vi.fn(), executeSprint: vi.fn(),
       backlogPath, waitForResult: vi.fn(),
       capabilityRegistry: createDefaultRegistry(),
       runBudgetedDecay: decay,

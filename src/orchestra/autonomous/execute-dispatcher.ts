@@ -1,7 +1,7 @@
 // src/orchestra/autonomous/execute-dispatcher.ts
 // The real ActionHandler that fills buildAutonomousRuntime's empty handler map.
-// kind=task → runTaskMode (single worker); kind=sprint → runSprint (full lifecycle).
-// runTask/runSprint injected for hermetic tests; composition root passes the real fns.
+// kind=task → runTaskMode (single worker); kind=sprint → canonical exact-plan executor.
+// Execution primitives are injected for hermetic tests; composition root passes the real fns.
 //
 // Phase-1b gaps B+F:
 //   Gap B: status-writeback — updateStatus('running') before, ('done'/'failed') after.
@@ -36,12 +36,17 @@ import type { PolicyActivationInput, PolicyConditionInput, PolicyRbacInput, Poli
 import { resolveRiskClass } from '../../core/work-model.js';
 import type { Capability } from '../../core/work-model.js';
 import type { TaskResultSettlementRefV1 } from '../../core/task-result-settlement.js';
+import { createHash } from 'node:crypto';
+import { readContext } from '../sprint-planner.js';
+import type {
+  CanonicalExactSprintExecutionInput,
+  CanonicalExactSprintExecutionOutcome,
+  CanonicalExactSprintExecutor,
+} from '../exact-plan-start-service.js';
+import type { ExactPlanReferenceV1 } from '../../core/run-flow-contract.js';
 
 /** Action id the backlog-trigger sets on every entry-driven trigger. */
 export const AUTONOMOUS_EXECUTE_ACTION = 'autonomous.execute';
-
-/** ENT-3: BacklogEntry extended with optional causal-lineage fields (runtime-only). */
-type EntryMeta = BacklogEntry & { correlationId?: string };
 
 export type AutonomousProviderAuthorityHold = NonNullable<
   NonNullable<BacklogEntry['lastResult']>['providerAuthorityHold']
@@ -86,8 +91,9 @@ export interface ExecuteDispatcherDeps {
     ctx: { projectRoot: string; description: string; model?: string; provider?: string; scope?: { directories: string[] } },
     config: ResolvedConfig,
   ) => Promise<{ taskId?: string; settlementRef?: TaskResultSettlementRefV1 } | null | undefined>;
-  /** Injected runSprint (kind=sprint). */
-  runSprint: (projectRoot: string, config: ResolvedConfig) => Promise<unknown>;
+  /** Canonical plan-authoring + exact-start authority (kind=sprint). A fresh
+   *  lifecycle function is intentionally not accepted at this boundary. */
+  executeSprint: CanonicalExactSprintExecutor['execute'];
   /** Durable backlog path — used for Gap B status writeback. */
   backlogPath: string;
   /**
@@ -229,6 +235,152 @@ export async function postItemLifecycle(deps: {
   }
 }
 
+function sameExactPlanRef(
+  left: ExactPlanReferenceV1 | undefined,
+  right: ExactPlanReferenceV1,
+): boolean {
+  return left?.schemaVersion === right.schemaVersion
+    && left.flowId === right.flowId
+    && left.revision === right.revision
+    && left.planDigest === right.planDigest;
+}
+
+/**
+ * Persist the facade-produced exact tuple before any autonomous settlement.
+ * This is an exact row/source CAS: a concurrent status/source edit refuses the
+ * write instead of adopting a plan produced for stale intent.
+ */
+function persistAutonomousExactPlanRef(
+  deps: Pick<ExecuteDispatcherDeps, 'backlogPath'>,
+  expected: Readonly<BacklogEntry>,
+  exactRef: ExactPlanReferenceV1,
+): boolean {
+  const backlog = loadBacklog(deps.backlogPath);
+  const current = backlog.entries.find(candidate => candidate.id === expected.id);
+  if (!current || current.status !== 'running') return false;
+  if (current.spec.exactPlanRef) return sameExactPlanRef(current.spec.exactPlanRef, exactRef);
+  if (
+    current.spec.directivesRef !== expected.spec.directivesRef
+    || current.spec.intent !== expected.spec.intent
+  ) return false;
+  current.spec = { ...current.spec, exactPlanRef: exactRef };
+  delete current.spec.directivesRef;
+  delete current.spec.intent;
+  saveBacklogFile(deps.backlogPath, backlog);
+  return true;
+}
+
+function exactSprintFlowId(entry: Readonly<BacklogEntry>, tenantId: string): string {
+  const digest = createHash('sha256')
+    .update(['autonomous', tenantId, entry.id].join('\0'))
+    .digest('hex')
+    .slice(0, 32);
+  return `autonomous-${digest}`;
+}
+
+function buildAutonomousExactSprintInput(
+  deps: Pick<ExecuteDispatcherDeps, 'projectRoot' | 'config'>,
+  entry: Readonly<BacklogEntry>,
+): CanonicalExactSprintExecutionInput {
+  const tenantId = entry.tenant ?? entry.actor?.tenantId ?? 'local';
+  const actor = entry.actor ?? { id: 'autonomous-engine', tenantId };
+  const origin = entry.origin ?? 'autonomous';
+  const correlationId = entry.correlationId
+    ?? `autonomous:${tenantId}:${entry.id}`;
+  const lineage = {
+    tenantId,
+    actor,
+    origin,
+    correlationId,
+    idempotencyKey: `autonomous:${tenantId}:${entry.id}:exact-plan-v1`,
+    ...(entry.causationId !== undefined ? { causationId: entry.causationId } : {}),
+    sourceId: entry.id,
+    authorization: { kind: 'approved-actor' as const },
+  };
+  const ingress = {
+    kind: origin === 'api' ? 'api' as const : origin === 'cli' ? 'cli' as const : 'autonomous' as const,
+    id: entry.id,
+    ...(entry.spec.intent !== undefined ? { intent: entry.spec.intent } : {}),
+    ...(entry.spec.directivesRef !== undefined ? { directives: entry.spec.directivesRef } : {}),
+  };
+  if (entry.spec.exactPlanRef) {
+    return {
+      projectRoot: deps.projectRoot,
+      config: deps.config,
+      source: { kind: 'exact-ref', ref: entry.spec.exactPlanRef, ingress },
+      lineage,
+      executionMode: 'in-process',
+    };
+  }
+  const unplannedIntent = entry.spec.intent ?? entry.title;
+  const context = readContext(deps.projectRoot);
+  const activeModeConfig = deps.config.activeModeConfig as { max_workers?: number } | undefined;
+  const maxWorkers = typeof activeModeConfig?.max_workers === 'number'
+    ? activeModeConfig.max_workers
+    : 4;
+  const flowId = exactSprintFlowId(entry, tenantId);
+  return {
+    projectRoot: deps.projectRoot,
+    config: deps.config,
+    source: {
+      kind: 'unplanned',
+      proposal: {
+        flowId,
+        tenant: tenantId,
+        project: deps.config.projectName || 'deckent-project',
+        actor,
+        origin,
+        revision: 1,
+        intentSummary: unplannedIntent,
+      },
+      planSource: entry.spec.directivesRef !== undefined
+        ? { sourceKind: 'directives', brainContext: context }
+        : { sourceKind: 'intent', baseContext: context },
+      recommendation: {
+        size: 'full',
+        maxWorkers,
+        modelConstraint: null,
+        reason: 'canonical exact-sprint ingress',
+      },
+      ingress,
+    },
+    lineage,
+    executionMode: 'in-process',
+  };
+}
+
+function classifyExactSprintOutcome(
+  outcome: CanonicalExactSprintExecutionOutcome,
+): { ok: boolean; parked: boolean; reason: string } {
+  if (outcome.status === 'settled') {
+    return {
+      ok: outcome.settlement.state === 'COMPLETED',
+      parked: outcome.settlement.state === 'BLOCKED',
+      reason: outcome.settlement.code,
+    };
+  }
+  if (outcome.status === 'duplicate') {
+    const terminalState = outcome.attempt.settlement?.state;
+    if (terminalState === 'COMPLETED') {
+      return { ok: true, parked: false, reason: 'EXACT_SPRINT_DUPLICATE_COMPLETED' };
+    }
+    return {
+      ok: false,
+      parked: true,
+      reason: terminalState
+        ? `EXACT_SPRINT_DUPLICATE_${terminalState}`
+        : 'EXACT_SPRINT_DUPLICATE_RECONCILIATION_REQUIRED',
+    };
+  }
+  if (outcome.status === 'awaiting-approval' || outcome.status === 'held') {
+    return { ok: false, parked: true, reason: outcome.reasonCode };
+  }
+  if (outcome.status === 'accepted') {
+    return { ok: false, parked: true, reason: 'EXACT_SPRINT_DETACHED_ACCEPTED_RECONCILIATION_REQUIRED' };
+  }
+  return { ok: false, parked: false, reason: outcome.reasonCode };
+}
+
 /**
  * Derive the capability set of a BacklogEntry for risk classification.
  * Mirrors runtime-loop.ts `deriveEntryCapabilities`; duplicated here to avoid
@@ -368,10 +520,29 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
         let richResult: BacklogEntry['lastResult'] = null;
 
         if (entry.kind === 'sprint') {
-          // Sprint: runSprint awaits the full lifecycle — success unless it throws.
-          await deps.runSprint(deps.projectRoot, deps.config);
-          ok = true;
-          reason = 'sprint completed';
+          const outcome = await deps.executeSprint(
+            buildAutonomousExactSprintInput(deps, live),
+          );
+          if (
+            outcome.exactRef
+            && !persistAutonomousExactPlanRef(deps, live, outcome.exactRef)
+          ) {
+            ok = false;
+            reason = 'EXACT_SPRINT_REFERENCE_PERSISTENCE_CONFLICT';
+          } else {
+            const classified = classifyExactSprintOutcome(outcome);
+            ok = classified.ok;
+            reason = classified.reason;
+            if (classified.parked) {
+              const blPark = loadBacklog(deps.backlogPath);
+              updateStatus(deps.backlogPath, blPark, entry.id, 'parked', {
+                ok: false,
+                reason,
+              });
+              deps.flow?.step('parked', entry.id, reason);
+              return { outcome: 'failure', error: reason };
+            }
+          }
         } else if (entry.kind === 'capability') {
           // F8 broker dispatch: non-code work resolved through the capability
           // registry. The broker never throws — every path is a CapabilityResult.
@@ -391,7 +562,7 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
               actor: entry.actor ?? (entry.tenant ? { id: 'system', tenantId: entry.tenant } : { id: 'system' }),
               // ENT-3: propagate causal-lineage correlationId through the capability invocation
               // context so the audit bridge and handlers can carry it into downstream events.
-              correlationId: (entry as EntryMeta).correlationId,
+              correlationId: entry.correlationId,
             });
             ok = result.ok;
             reason = result.ok
@@ -442,7 +613,7 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
 
             // ENT-3: write a spawn audit event so downstream result events can reference
             // this event's hmac as their causationId (causal-lineage chain A→B).
-            const entryCorrelationId = (entry as EntryMeta).correlationId;
+            const entryCorrelationId = entry.correlationId;
             const auditSprintId = getCurrentSprintId(deps.projectRoot) ?? 'autonomous';
             writeAuditEvent(deps.projectRoot, auditSprintId, {
               tenantId: entry.tenant ?? entry.actor?.tenantId ?? 'local',

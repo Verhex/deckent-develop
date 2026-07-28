@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "8a0872a5bf9bdcb07734122ef13191b014aabb792b70a3f2a1270479edccc10d"
+    "value": "021a50d3bd3b46e406f7ccba9240dbcf0458b68fac5480d2dd771ef93eac5c05"
   },
   "summary": {
     "total": 233,
     "active": 233,
     "terminal": 0,
-    "receipts": 15,
+    "receipts": 16,
     "byState": {
       "OPEN": 156,
       "READY": 0,
@@ -1458,7 +1458,7 @@
       "state": "OPEN",
       "updated": "2026-07-28",
       "definitionDigest": "3708cd18d6c7f3e18cb9f577565c2b6b824db840b2f59506a5fff8334e41dbd1",
-      "progressDigest": "658fd8cf2bb02d21a42b236776aef2dc8f69b9df287f6d1e995e4c121c599c2c",
+      "progressDigest": "4ee4e2ab24be06b5998c8ebb5c05b2e285e01878929f3f0ccf0dc7260477390f",
       "terminalClosureDigest": null
     },
     {
@@ -1478,9 +1478,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-27",
+      "updated": "2026-07-28",
       "definitionDigest": "738036fe3b3ebfde9530a8ec07f14b11f083a285bd33490462d3188014d64afd",
-      "progressDigest": "10f0d8d4af2f4fb55a5fb655330a7eb01f5c7519a71bc5c811e0ef6c3733b576",
+      "progressDigest": "bb349860714f3d1648c2b68abffabb2d4a614c2f41ee07c75123c934a37a7e6f",
       "terminalClosureDigest": null
     },
     {
@@ -1566,9 +1566,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-27",
+      "updated": "2026-07-28",
       "definitionDigest": "60b3a13655a25995824df224f775f4ccf477279e4bafaf9a92189e66dd63e0f2",
-      "progressDigest": "966a69907ea8111e4fb8e8711c95e1aac40e63fe1a0dbe10d306d074c4cc3a7f",
+      "progressDigest": "f8b7271105719ad37d243c37809f95770bfb923b72e8960d904ac73c184dc3bb",
       "terminalClosureDigest": null
     },
     {
@@ -2776,6 +2776,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-07-28T16:46:07+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-28-RUNFLOW-EXACT-01",
+      "authorityDigest": "ea0570518864e40a3f8d697ee17a55b394c83d04ae685b9835800dee726cdb2d",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-28T20:55:00+03:00"
       },
       "g7AttemptIdentity": null
     }
@@ -8316,10 +8326,11 @@
       ],
       "evidenceReceipts": [
         "GR-2026-07-28-FILE-LOCK-01",
-        "GR-2026-07-28-ADMISSION-01"
+        "GR-2026-07-28-ADMISSION-01",
+        "GR-2026-07-28-RUNFLOW-EXACT-01"
       ],
       "acceptance": "Duplicate effect impossible; unknown settlement never auto-replays",
-      "evidence": "`receipt=GR-2026-07-28-FILE-LOCK-01`; `receipt=GR-2026-07-28-ADMISSION-01`; exact-generation acquire/renew/release, liveness-aware stale retirement, irreversible boundary quarantine, terminal audit and completed-outcome preservation are code-present with cross-process and crash/reconciliation proof; admission now snapshots validated revalidation evidence before async verification, rejects adoption after heartbeat authority loss, removes stopped heap entries in O(log n), rebinds the sole timer after earliest-stop, spreads initial renewal across the interval-relative safe half and yields after 256 renewals; admission suite passes 26/26, root/dashboard TypeScript and all lint gates pass with unchanged hermetic counts `12065/1149`; whole-kernel closure remains open because cross-provider verification, v2 stop propagation, Mission cancel ingress, detached API RunFlow cancellation, tenant-wide idempotency, live million-scale/HA proof and native macOS/Windows authority adapters are not yet proven",
+      "evidence": "`receipt=GR-2026-07-28-FILE-LOCK-01`; `receipt=GR-2026-07-28-ADMISSION-01`; `receipt=GR-2026-07-28-RUNFLOW-EXACT-01`; exact-generation lock/admission authority is joined by a SQLite-backed exact RunFlow start-attempt journal with PREPARED→PROCESS_SPAWNED→ADMITTED/terminal CAS, generation+owner nonce fencing, process-start identity, same-transaction child admission+handle publication, bounded death repair and idempotent terminal settlement; exact plan/start/projection suites pass 78/78, TypeScript and real build pass, and independent Claude Fable 5 review confirms the finite P1–P5 claims; whole-kernel closure remains open because sprint-461 legacy projection adoption, default legacy-start retirement, v2 stop propagation, Mission cancel ingress, tenant-wide idempotency, live million-scale/HA proof and native macOS/Windows authority adapters are not yet proven",
       "updated": "2026-07-28"
     },
     {
@@ -8408,10 +8419,12 @@
         "KERNEL-ONTOLOGY-001",
         "KERNEL-ATTEMPT-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-07-28-RUNFLOW-EXACT-01"
+      ],
       "acceptance": "Each kind has versioned admission, execute, recover and settle contract",
-      "evidence": "2026-07-27 code-truth: production registry yalnız `task`; v2 task executor koşulsuz HOLD; sprint/capability/process dispatch code-present fakat production registry'ye unwired; legacy 661/602",
-      "updated": "2026-07-27"
+      "evidence": "`receipt=GR-2026-07-28-RUNFLOW-EXACT-01`; autonomous/process/sprint dispatch now routes exact planning and start through shared services, and Mission WorkItem claim atomically adopts `exactPlanRef` with mission revision/lease/claim CAS plus admission-fence digest; focused Mission/autonomous tests and TypeScript pass; production Goal-v2 enablement, provider authority, cancel/recovery parity and live Mission dogfood remain open, so this is not runner-kind closure",
+      "updated": "2026-07-28"
     },
     {
       "order": 3060,
@@ -8727,10 +8740,12 @@
         "KERNEL-STATE-001",
         "KERNEL-SETTLEMENT-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-07-28-RUNFLOW-EXACT-01"
+      ],
       "acceptance": "`do`, run, API, terminal and Desktop consume one service; legacy stores migrated",
-      "evidence": "2026-07-27 code-truth: CLI/REPL in-memory controller event log yazmıyor, API/Desktop durable coordinator kullanıyor; child completion empty log'da swallow, cancel execution'a ulaşmıyor, false-start mümkün",
-      "updated": "2026-07-27"
+      "evidence": "`receipt=GR-2026-07-28-RUNFLOW-EXACT-01`; one canonical service now generates/persists the exact `Sprint+revision+planDigest+source/topology/scope lineage`, approves that same record without replanning, and drives a durable start-attempt CAS consumed by CLI, MCP, API, Terminal, Autonomous and Process ingress; parent surfaces report STARTING until child admission, exact cost consumes the same snapshot, compatibility task files are post-approval atomic no-clobber projections and conflicting files HOLD without overwrite; targeted exact plan/start/projection proof passes 78/78, TypeScript and build pass, real binary structured dry-run returns sprint-461 digest `3c7edcd35451c36d15e867e4e081a995d473467a862f6e9dc317714edd016c49`, bot restarted as PID 4153923, strict Deckent XVerify correctly HOLDs on unavailable production authority while owner-approved read-only Fable 5 recovery independently returns CONFIRMED in `.analysis/xverify/xv-manual-20260728-exact-plan-fable5.md`; live truth remains open because sprint-461 has no canonical adoption record, default non-exact `start` still owns legacy planning paths, Desktop live parity/cancel/recovery/migration and every-environment/scale proof are incomplete",
+      "updated": "2026-07-28"
     },
     {
       "order": 3140,
@@ -12829,6 +12844,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "e41d923c0e36386afea70b3f758c05f9f948a30530e327170e37e7e6a95002de"
+    "value": "e7bacd5e0804339d8d6183907fd3813579c76b55a57531d6759a6d90dd0fe0c7"
   }
 }

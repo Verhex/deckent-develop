@@ -3,11 +3,10 @@
 // Covers: (1) a static import-scan guard proving run-job-service.ts can
 // never trigger a fresh plan — "flag-açıkken fresh-replan ölür (yeni
 // plan-fazı çağrılmaz)" is structural, not a runtime if-check; (2) the CAS
-// digest-mismatch refusal; (3) not-approved refusal; (4) double-start
-// idempotency (spawnStart called exactly once across two identical calls);
-// (5) a stale-handle conflict is a typed error, not a silent fallback.
+// digest-mismatch refusal; (3) not-approved refusal; (4) budget/topology
+// refusal; (5) success returns the immutable Sprint without a side effect.
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   startApprovedRun,
@@ -15,11 +14,8 @@ import {
   RunJobDigestMismatchError,
   RunJobBudgetHoldError,
   RunJobTopologyHoldError,
-  RunJobStaleHandleConflictError,
   type ApprovedRunSnapshotInput,
-  type ExistingRunHandleInput,
   type StartApprovedRunDeps,
-  type RunHandle,
 } from '../../src/orchestra/run-job-service.js';
 import type { Sprint } from '../../src/core/types.js';
 import { SprintPhase, SprintStatus } from '../../src/core/sprint-types.js';
@@ -57,18 +53,12 @@ function makeApprovedSnapshot(overrides: Partial<ApprovedRunSnapshotInput> = {})
   };
 }
 
-function makeHandle(overrides: Partial<RunHandle> = {}): RunHandle {
-  return { flowId: 'flow-1', jobId: 'job-1', logRef: 'log-1', ...overrides };
-}
-
 function makeDeps(overrides: Partial<StartApprovedRunDeps> = {}): StartApprovedRunDeps {
-  const spawnStart = vi.fn((_sprint: Sprint, flowId: string): RunHandle => makeHandle({ flowId }));
   return {
     flowId: 'flow-1',
     expectedRevision: 1,
     expectedPlanDigest: 'digest-abc',
     approvedSnapshot: makeApprovedSnapshot(),
-    spawnStart,
     ...overrides,
   };
 }
@@ -114,7 +104,6 @@ describe('startApprovedRun', () => {
   it('throws RunJobFlowNotApprovedError when no snapshot was ever approved', () => {
     const deps = makeDeps({ approvedSnapshot: undefined });
     expect(() => startApprovedRun(deps)).toThrow(RunJobFlowNotApprovedError);
-    expect(deps.spawnStart).not.toHaveBeenCalled();
   });
 
   it('throws RunJobDigestMismatchError when expected revision/digest does not CAS-match the approved snapshot', () => {
@@ -128,13 +117,11 @@ describe('startApprovedRun', () => {
     expect(caught).toBeInstanceOf(RunJobDigestMismatchError);
     expect((caught as RunJobDigestMismatchError).code).toBe('RUN_JOB_DIGEST_MISMATCH');
     expect((caught as RunJobDigestMismatchError).actualPlanDigest).toBe('digest-abc');
-    expect(deps.spawnStart).not.toHaveBeenCalled();
   });
 
   it('throws RunJobDigestMismatchError on a revision mismatch even when the digest string matches', () => {
     const deps = makeDeps({ expectedRevision: 2 });
     expect(() => startApprovedRun(deps)).toThrow(RunJobDigestMismatchError);
-    expect(deps.spawnStart).not.toHaveBeenCalled();
   });
 
   it('refuses every budget HOLD before spawnStart and reports held tasks deterministically', () => {
@@ -171,7 +158,6 @@ describe('startApprovedRun', () => {
     }
     expect(caught).toBeInstanceOf(RunJobBudgetHoldError);
     expect((caught as RunJobBudgetHoldError).heldTasks.map(task => [task.slot, task.title])).toEqual([[1, 'B'], [2, 'A']]);
-    expect(deps.spawnStart).not.toHaveBeenCalled();
   });
 
   it('derives v2 HOLD from the canonical projection even when raw task budgetPolicy is absent', () => {
@@ -203,7 +189,6 @@ describe('startApprovedRun', () => {
     });
 
     expect(() => startApprovedRun(deps)).toThrow(RunJobBudgetHoldError);
-    expect(deps.spawnStart).not.toHaveBeenCalled();
   });
 
   it('keeps explicit local-exempt and legacy-v1 tasks startable', () => {
@@ -219,12 +204,10 @@ describe('startApprovedRun', () => {
       },
     }];
     const local = makeDeps({ approvedSnapshot: makeApprovedSnapshot({ sprint: allowedSprint }) });
-    expect(startApprovedRun(local).status).toBe('started');
-    expect(local.spawnStart).toHaveBeenCalledTimes(1);
+    expect(startApprovedRun(local).status).toBe('validated');
 
     const legacy = makeDeps();
-    expect(startApprovedRun(legacy).status).toBe('started');
-    expect(legacy.spawnStart).toHaveBeenCalledTimes(1);
+    expect(startApprovedRun(legacy).status).toBe('validated');
   });
 
   it('refuses a digest-valid v3 snapshot with an undeclared writer collision before spawnStart', () => {
@@ -265,81 +248,12 @@ describe('startApprovedRun', () => {
     });
 
     expect(() => startApprovedRun(deps)).toThrow(RunJobTopologyHoldError);
-    expect(deps.spawnStart).not.toHaveBeenCalled();
   });
 
-  it('calls spawnStart exactly once with the approved Sprint and returns status=started', () => {
+  it('returns the exact approved Sprint without executing a start side effect', () => {
     const deps = makeDeps();
     const result = startApprovedRun(deps);
-    expect(deps.spawnStart).toHaveBeenCalledTimes(1);
-    expect(deps.spawnStart).toHaveBeenCalledWith(deps.approvedSnapshot!.sprint, 'flow-1');
-    expect(result.status).toBe('started');
-    if (result.status === 'started') {
-      expect(result.handle.flowId).toBe('flow-1');
-      expect(result.sprint).toBe(deps.approvedSnapshot!.sprint);
-    }
-  });
-
-  it('is idempotent on a matching double-start: spawnStart is NOT called again, existing handle is returned', () => {
-    const existingRunHandle: ExistingRunHandleInput = {
-      flowId: 'flow-1',
-      revision: 1,
-      planDigest: 'digest-abc',
-      handle: makeHandle({ jobId: 'job-original' }),
-      startedAt: '2026-07-12T00:01:00.000Z',
-    };
-    const deps = makeDeps({ existingRunHandle });
-    const result = startApprovedRun(deps);
-    expect(deps.spawnStart).not.toHaveBeenCalled();
-    expect(result).toEqual({ status: 'noop-duplicate', handle: existingRunHandle.handle });
-  });
-
-  it('throws RunJobStaleHandleConflictError when an existing handle was recorded against a different digest', () => {
-    const existingRunHandle: ExistingRunHandleInput = {
-      flowId: 'flow-1',
-      revision: 1,
-      planDigest: 'stale-digest',
-      handle: makeHandle({ jobId: 'job-stale' }),
-      startedAt: '2026-07-12T00:01:00.000Z',
-    };
-    const deps = makeDeps({ existingRunHandle });
-    expect(() => startApprovedRun(deps)).toThrow(RunJobStaleHandleConflictError);
-    expect(deps.spawnStart).not.toHaveBeenCalled();
-  });
-
-  it('two sequential calls with the SAME flowId+digest across separate store-reads only ever spawn once (double-start dies)', () => {
-    const spawnStart = vi.fn((_sprint: Sprint, flowId: string): RunHandle => makeHandle({ flowId, jobId: 'job-real' }));
-    const approvedSnapshot = makeApprovedSnapshot();
-
-    // First start: no existing handle yet.
-    const first = startApprovedRun({
-      flowId: 'flow-1',
-      expectedRevision: 1,
-      expectedPlanDigest: 'digest-abc',
-      approvedSnapshot,
-      existingRunHandle: undefined,
-      spawnStart,
-    });
-    expect(first.status).toBe('started');
-
-    // Second start: caller re-reads the store, finds the handle just persisted.
-    const persistedHandle: ExistingRunHandleInput = {
-      flowId: 'flow-1',
-      revision: 1,
-      planDigest: 'digest-abc',
-      handle: first.status === 'started' ? first.handle : makeHandle(),
-      startedAt: '2026-07-12T00:02:00.000Z',
-    };
-    const second = startApprovedRun({
-      flowId: 'flow-1',
-      expectedRevision: 1,
-      expectedPlanDigest: 'digest-abc',
-      approvedSnapshot,
-      existingRunHandle: persistedHandle,
-      spawnStart,
-    });
-
-    expect(second).toEqual({ status: 'noop-duplicate', handle: persistedHandle.handle });
-    expect(spawnStart).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe('validated');
+    expect(result.sprint).toBe(deps.approvedSnapshot!.sprint);
   });
 });

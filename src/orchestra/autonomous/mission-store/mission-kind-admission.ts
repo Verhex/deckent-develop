@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 
 import type {
+  ExactPlanReferenceV1,
+} from '../../../core/run-flow-contract.js';
+import type {
   MissionDispatchClaim,
   NewWorkItem,
   ResultLike,
@@ -59,6 +62,11 @@ type AdmissionItem = {
   spec?: Record<string, unknown> | null;
 };
 
+export type MissionSprintExecutionSource =
+  | { readonly kind: 'exact-ref'; readonly ref: ExactPlanReferenceV1 }
+  | { readonly kind: 'directives'; readonly directivesRef: string }
+  | { readonly kind: 'intent'; readonly intent: string };
+
 type DefinitionItem = AdmissionItem & {
   missionId: string;
   policy?: NewWorkItem['policy'];
@@ -71,10 +79,13 @@ export type MissionAdmissionCode =
   | 'UNKNOWN_KIND'
   | 'TASK_DESCRIPTION_REQUIRED'
   | 'TASK_RUNNER_UNWIRED'
-  | 'SPRINT_SNAPSHOT_REQUIRED'
-  | 'SPRINT_SNAPSHOT_INVALID'
-  | 'SPRINT_SNAPSHOT_DIGEST_MISMATCH'
-  | 'SPRINT_SNAPSHOT_RUNNER_UNWIRED'
+  | 'SPRINT_EXECUTION_SOURCE_REQUIRED'
+  | 'SPRINT_EXECUTION_SOURCE_CONFLICT'
+  | 'SPRINT_UNPLANNED_SOURCE_INVALID'
+  | 'SPRINT_EXACT_PLAN_REF_INVALID'
+  | 'SPRINT_EMBEDDED_SNAPSHOT_RETIRED'
+  | 'SPRINT_LINEAGE_REQUIRED'
+  | 'SPRINT_RUNNER_UNWIRED'
   | 'CAPABILITY_TARGET_REQUIRED'
   | 'CAPABILITY_BROKER_UNWIRED'
   | 'PROCESS_DEFINITION_REQUIRED'
@@ -94,19 +105,25 @@ export class MissionAdmissionError extends Error {
   }
 }
 
-export interface SprintExecutionSnapshot {
-  version: 1;
-  revision: string;
-  approvalEvidenceRef: string;
-  directives: string;
-  executionPlan: Record<string, unknown>;
-  digest: string;
-}
-
-type SnapshotPayload = Omit<SprintExecutionSnapshot, 'digest'>;
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isExactPlanReference(value: unknown): value is ExactPlanReferenceV1 {
+  if (!isRecord(value)) return false;
+  return value['schemaVersion'] === 1
+    && nonEmptyCanonicalString(value['flowId'])
+    && /^[a-zA-Z0-9_-]+$/.test(value['flowId'])
+    && Number.isSafeInteger(value['revision'])
+    && (value['revision'] as number) >= 1
+    && typeof value['planDigest'] === 'string'
+    && /^[a-f0-9]{64}$/.test(value['planDigest'])
+    && Object.keys(value).every(key => [
+      'schemaVersion',
+      'flowId',
+      'revision',
+      'planDigest',
+    ].includes(key));
 }
 
 function nonEmptyString(value: unknown): value is string {
@@ -216,15 +233,6 @@ function runnerForKind(
   return registry.runners.find((entry) => entry.kind === kind);
 }
 
-export function computeSprintSnapshotDigest(snapshot: SnapshotPayload): string {
-  return createHash('sha256').update(canonicalJson(snapshot)).digest('hex');
-}
-
-function computeRawSnapshotDigest(snapshot: Record<string, unknown>): string {
-  const payload = Object.fromEntries(Object.entries(snapshot).filter(([key]) => key !== 'digest'));
-  return createHash('sha256').update(canonicalJson(payload)).digest('hex');
-}
-
 export function assertCanonicalWorkItemKind(kind: unknown, itemId: string): asserts kind is WorkItemKind {
   if (!isCanonicalWorkItemKind(kind)) {
     throw new MissionAdmissionError('UNKNOWN_KIND', itemId, String(kind));
@@ -245,26 +253,52 @@ function assertTask(item: AdmissionItem, admission: MissionRuntimeAdmission): vo
   }
 }
 
-function assertSprint(item: AdmissionItem, admission: MissionRuntimeAdmission): void {
-  const raw = item.spec?.['sprintSnapshot'];
-  if (!isRecord(raw)) {
-    throw new MissionAdmissionError('SPRINT_SNAPSHOT_REQUIRED', item.id, item.kind);
+export function resolveMissionSprintExecutionSource(
+  item: AdmissionItem,
+): MissionSprintExecutionSource {
+  const spec = item.spec ?? {};
+  if (spec['sprintSnapshot'] !== undefined) {
+    throw new MissionAdmissionError('SPRINT_EMBEDDED_SNAPSHOT_RETIRED', item.id, item.kind);
+  }
+  const rawExactRef = spec['exactPlanRef'];
+  const rawDirectivesRef = spec['directivesRef'];
+  const rawIntent = spec['intent'];
+  const hasExactRef = rawExactRef !== undefined;
+  const hasDirectives = rawDirectivesRef !== undefined;
+  const hasIntent = rawIntent !== undefined;
+  const sourceCount = Number(hasExactRef) + Number(hasDirectives) + Number(hasIntent);
+  if (sourceCount === 0) {
+    throw new MissionAdmissionError('SPRINT_EXECUTION_SOURCE_REQUIRED', item.id, item.kind);
+  }
+  if (sourceCount !== 1) {
+    throw new MissionAdmissionError('SPRINT_EXECUTION_SOURCE_CONFLICT', item.id, item.kind);
+  }
+  if (hasExactRef && !isExactPlanReference(rawExactRef)) {
+    throw new MissionAdmissionError('SPRINT_EXACT_PLAN_REF_INVALID', item.id, item.kind);
   }
   if (
-    raw['version'] !== 1
-    || !nonEmptyString(raw['revision'])
-    || !nonEmptyString(raw['approvalEvidenceRef'])
-    || !nonEmptyString(raw['directives'])
-    || !isRecord(raw['executionPlan'])
-    || !nonEmptyString(raw['digest'])
+    (hasDirectives && (!nonEmptyCanonicalString(rawDirectivesRef) || rawDirectivesRef.includes('\0')))
+    || (hasIntent && !nonEmptyCanonicalString(rawIntent))
   ) {
-    throw new MissionAdmissionError('SPRINT_SNAPSHOT_INVALID', item.id, item.kind);
+    throw new MissionAdmissionError('SPRINT_UNPLANNED_SOURCE_INVALID', item.id, item.kind);
   }
-  if (raw['digest'] !== computeRawSnapshotDigest(raw)) {
-    throw new MissionAdmissionError('SPRINT_SNAPSHOT_DIGEST_MISMATCH', item.id, item.kind);
+  // Mission + item ids are the durable source of correlation and idempotency.
+  // A runner must never invent random lineage when either identity is absent.
+  if (!nonEmptyCanonicalString(item.id)
+    || ('missionId' in item && !nonEmptyCanonicalString(item['missionId']))) {
+    throw new MissionAdmissionError('SPRINT_LINEAGE_REQUIRED', item.id, item.kind);
   }
+  if (isExactPlanReference(rawExactRef)) return { kind: 'exact-ref', ref: rawExactRef };
+  if (nonEmptyCanonicalString(rawDirectivesRef)) {
+    return { kind: 'directives', directivesRef: rawDirectivesRef };
+  }
+  return { kind: 'intent', intent: rawIntent as string };
+}
+
+function assertSprint(item: AdmissionItem, admission: MissionRuntimeAdmission): void {
+  resolveMissionSprintExecutionSource(item);
   if (!runnerForKind(admission, 'sprint')) {
-    throw new MissionAdmissionError('SPRINT_SNAPSHOT_RUNNER_UNWIRED', item.id, item.kind);
+    throw new MissionAdmissionError('SPRINT_RUNNER_UNWIRED', item.id, item.kind);
   }
 }
 

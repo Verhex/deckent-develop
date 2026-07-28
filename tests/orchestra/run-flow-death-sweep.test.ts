@@ -12,8 +12,15 @@ import { spawnSync } from 'node:child_process';
 
 import { sweepDeadDetachedRuns, sweepStaleRuns } from '../../src/orchestra/run-flow-death-sweep.js';
 import { getRunFlowCoordinator, _resetRunFlowCoordinatorsForTests } from '../../src/orchestra/run-flow-coordinator-registry.js';
-import { saveApprovedSnapshot, saveRunHandle } from '../../src/core/run-flow-store.js';
+import {
+  admitStartAttempt,
+  prepareStartAttempt,
+  recordStartAttemptProcessSpawned,
+  saveApprovedSnapshot,
+  saveRunHandle,
+} from '../../src/core/run-flow-store.js';
 import type { RunProposal, PlanPreview } from '../../src/core/run-flow-contract.js';
+import { processStartToken } from '../../src/core/pid-ownership.js';
 
 function proposal(flowId: string): RunProposal {
   return {
@@ -115,6 +122,69 @@ describe('run-flow death sweep (born-698c)', () => {
     c.recordCompletion({ flowId: 'flow-done', summary: 'ok' });
     const report = sweepDeadDetachedRuns(root);
     expect(report.closed).toHaveLength(0);
+  });
+
+  it('repairs ADMITTED+handle → RUN_STARTED after a crash between canonical commits', () => {
+    const flowId = 'flow-admission-gap';
+    const c = getRunFlowCoordinator(root);
+    c.proposeFlow({ proposal: proposal(flowId) });
+    c.recordPreview({ preview: preview(flowId) });
+    c.grantApproval({ flowId, revision: 1, planDigest: 'd-1', approvedBy: { id: 'u' } });
+    c.requestStart({ flowId, revision: 1, planDigest: 'd-1' });
+    const token = processStartToken(process.pid);
+    const processIdentity = token === null
+      ? { pid: process.pid, startToken: null, evidence: 'unavailable' as const }
+      : { pid: process.pid, startToken: token, evidence: 'verified' as const };
+    const prepared = prepareStartAttempt(root, {
+      flowId,
+      revision: 1,
+      planDigest: 'd-1',
+      attemptId: 'attempt-admission-gap',
+      preparedAt: '2026-07-28T10:00:00.000Z',
+      lineage: {
+        tenantId: 'local',
+        projectId: 'p',
+        actor: { id: 'u' },
+        origin: 'api',
+        correlationId: 'correlation-admission-gap',
+        idempotencyKey: 'idempotency-admission-gap',
+        parentPlanLineageHash: 'a'.repeat(64),
+        parentCorrelationId: 'plan-admission-gap',
+        authorizationAuthority: 'approved-actor:u',
+      },
+      owner: {
+        process: processIdentity,
+        ownerNonce: 'nonce-admission-gap',
+        leaseUntil: '2099-07-28T10:01:00.000Z',
+      },
+    }).attempt;
+    const cas = {
+      flowId,
+      revision: 1,
+      planDigest: 'd-1',
+      generation: prepared.generation,
+      attemptId: prepared.attemptId,
+      ownerNonce: prepared.owner.ownerNonce,
+    };
+    recordStartAttemptProcessSpawned(root, {
+      ...cas,
+      process: processIdentity,
+      spawnedAt: '2026-07-28T10:00:10.000Z',
+    });
+    admitStartAttempt(root, {
+      ...cas,
+      process: processIdentity,
+      handle: { flowId, jobId: 'job-admission-gap', logRef: 'log-admission-gap' },
+      admittedAt: '2026-07-28T10:00:20.000Z',
+    });
+
+    expect(c.getFlow(flowId).state).toBe('STARTING');
+    const report = sweepDeadDetachedRuns(root);
+    expect(report.skipped).toContainEqual(expect.objectContaining({
+      flowId,
+      outcome: 'reconciled-admitted',
+    }));
+    expect(c.getFlow(flowId).state).toBe('DETACHED_RUNNING');
   });
 });
 

@@ -51,6 +51,13 @@ import { atomicWriteFileSync } from '../../agents/worker-lifecycle.js';
 import type { BacklogEntry } from '../../orchestra/autonomous/backlog-types.js';
 import { runTaskMode } from '../../orchestra/task-mode-runner.js';
 import { runSprint as runSprintLifecycle } from '../../orchestra/sprint-controller.js';
+import {
+  createCanonicalExactSprintExecutor,
+  type CanonicalExactSprintExecutionOutcome,
+  type ExactStartAuthorizationVerifier,
+} from '../../orchestra/exact-plan-start-service.js';
+import { captureGitBase } from '../../orchestra/run-diff-service.js';
+import { createRunFlowCoordinator } from '../../orchestra/run-flow-coordinator.js';
 import { waitForRunResult, formatModelError } from './run.js';
 import { resolveExecutionModelIdentity } from '../../orchestra/execution-request-builder.js';
 import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
@@ -83,7 +90,7 @@ import { loadConfig, resolveBrainModel, resolveDefaultModel } from '../../core/c
 import { PROJECT_CONFIG_PATH, RECENT_WORKS_DIR } from '../../core/constants.js';
 import { bootstrapProviders, orderedRoleProviders } from '../../core/provider.js';
 import type { ModelType, ResolvedConfig } from '../../core/types.js';
-import { ALL_PROVIDER_NAMES } from '../../core/types.js';
+import { ALL_PROVIDER_NAMES, SprintStatus } from '../../core/types.js';
 import { getEquivalentModel } from '../../core/model-equivalence.js';
 import { defaultRoleInvocationPolicy } from '../../core/role-invocation-resolver.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
@@ -111,6 +118,107 @@ import { MissionWorkerInvocationCoordinator } from '../../orchestra/autonomous/m
 import { MissionWorkerInvocationRecoveryReconciler } from '../../orchestra/autonomous/mission-store/mission-worker-invocation-recovery.js';
 import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
 import { MissionApprovalCoordinator } from '../../orchestra/autonomous/mission-store/mission-approval-coordinator.js';
+
+function createLiveAutonomousExactSprintExecutor(input: {
+  providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  approvalAuthority?: ReturnType<typeof bootstrapApprovalAuthority>;
+  verifyStartAuthorization?: ExactStartAuthorizationVerifier;
+}) {
+  return createCanonicalExactSprintExecutor({
+    executeInProcess: async (context) => {
+      const gitBase = await captureGitBase(context.projectRoot);
+      const sprint = await runSprintLifecycle(
+        context.projectRoot,
+        { ...context.config, deckent_style: 'sprint' },
+        {
+          preplannedSprint: context.sprint,
+          exactPlanAuthority: context.exactRef,
+          flowId: context.exactRef.flowId,
+          onExactPlanMaterialize: () => {
+            context.onExactPlanMaterialize();
+          },
+          onExecutionAdmitted: (admittedSprint) => {
+            context.onExecutionAdmitted({
+              flowId: context.exactRef.flowId,
+              jobId: admittedSprint.id,
+              logRef: admittedSprint.id,
+            }, gitBase);
+          },
+          ...(input.providerAuthority ? { providerAuthority: input.providerAuthority } : {}),
+          ...(input.approvalAuthority?.state === 'ready'
+            ? {
+                attendedExecutionApprovalAuthority:
+                  input.approvalAuthority.runtime.attendedExecutionApprovalAuthority,
+              }
+            : {}),
+        },
+      );
+      return sprint.status === SprintStatus.COMPLETE
+        ? { terminalState: 'COMPLETED', reasonCode: 'SPRINT_COMPLETE' }
+        : sprint.status === SprintStatus.ABORTED
+          ? { terminalState: 'CANCELLED', reasonCode: 'SPRINT_ABORTED' }
+          : { terminalState: 'BLOCKED', reasonCode: `SPRINT_${sprint.status}` };
+    },
+    spawnDetached: () => {
+      throw new Error('AUTONOMOUS_EXACT_SPRINT_DETACHED_EXECUTOR_UNWIRED');
+    },
+    ...(input.verifyStartAuthorization
+      ? { verifyStartAuthorization: input.verifyStartAuthorization }
+      : {}),
+    lifecycle: {
+      publishStartRequested: ({ projectRoot, exactRef, attempt }) => {
+        createRunFlowCoordinator({ root: projectRoot }).requestStart({
+          flowId: exactRef.flowId,
+          revision: exactRef.revision,
+          planDigest: exactRef.planDigest,
+          commandId: `exact-start:${attempt.attemptId}:requested`,
+        });
+      },
+      publishRunStarted: ({ projectRoot, attempt, handle }) => {
+        createRunFlowCoordinator({ root: projectRoot }).recordRunStarted({
+          handle,
+          commandId: `exact-start:${attempt.attemptId}:admitted`,
+        });
+      },
+    },
+  });
+}
+
+function missionExactOutcomeResult(
+  outcome: CanonicalExactSprintExecutionOutcome,
+): import('../../orchestra/autonomous/mission-store/mission-types.js').ResultLike {
+  if (outcome.status === 'settled') {
+    return {
+      ok: outcome.settlement.state === 'COMPLETED',
+      ...(outcome.settlement.state === 'BLOCKED'
+        ? { dispatchDisposition: 'parked' as const }
+        : {}),
+      reason: outcome.settlement.code,
+      exactPlanRef: outcome.exactRef,
+    };
+  }
+  if (outcome.status === 'duplicate') {
+    const completed = outcome.attempt.settlement?.state === 'COMPLETED';
+    return {
+      ok: completed,
+      ...(!completed ? { dispatchDisposition: 'reconciliation-required' as const } : {}),
+      reason: completed
+        ? 'EXACT_SPRINT_DUPLICATE_COMPLETED'
+        : 'EXACT_SPRINT_DUPLICATE_RECONCILIATION_REQUIRED',
+      exactPlanRef: outcome.exactRef,
+    };
+  }
+  return {
+    ok: false,
+    dispatchDisposition: outcome.status === 'failed' || outcome.status === 'denied'
+      ? 'reconciliation-required'
+      : 'parked',
+    reason: outcome.status === 'accepted'
+      ? 'EXACT_SPRINT_DETACHED_ACCEPTED_RECONCILIATION_REQUIRED'
+      : outcome.reasonCode,
+    ...(outcome.exactRef ? { exactPlanRef: outcome.exactRef } : {}),
+  };
+}
 
 // ─── Filesystem layout helpers ────────────────────────────────────────
 
@@ -899,7 +1007,6 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     const controllerV2 = new AbortController();
     const sigintV2 = (): void => controllerV2.abort();
     process.on('SIGINT', sigintV2);
-    const sprintConfigV2 = { ...resolvedConfig, deckent_style: 'sprint' as const };
     const maxIterationsV2 = opts.maxIterations !== undefined
       ? Math.max(0, parseInt(opts.maxIterations, 10) || 0)
       : undefined;
@@ -985,15 +1092,29 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
         runAdmittedTask: async () => {
           throw new Error('MISSION_WORKER_EXACT_ROUTE_LOCK_UNAVAILABLE');
         },
-        runSprint: (projectRoot) => runSprintLifecycle(projectRoot, sprintConfigV2, {
-          providerAuthority,
-          ...(approvalAuthority.state === 'ready'
-            ? {
-                attendedExecutionApprovalAuthority:
-                  approvalAuthority.runtime.attendedExecutionApprovalAuthority,
+        executeSprint: async (context) => {
+          const exactExecutor = createLiveAutonomousExactSprintExecutor({
+            providerAuthority,
+            approvalAuthority,
+            verifyStartAuthorization: (authorization) => {
+              const expectedAuthorityId = `mission-engine:${context.mission.id}`;
+              if (
+                authorization.authorityId !== expectedAuthorityId
+                || authorization.decisionId !== context.claim.attemptId
+                || !missionStore.isDispatchClaimActive(context.claim)
+              ) {
+                return { allowed: false, reasonCode: 'MISSION_EXACT_START_AUTHORITY_STALE' };
               }
-            : {}),
-        }),
+              return {
+                allowed: true,
+                authorityRef: `${expectedAuthorityId}:${context.claim.attemptId}`,
+              };
+            },
+          });
+          return missionExactOutcomeResult(
+            await exactExecutor.execute(context.execution),
+          );
+        },
         // Type-2 goal-driver: real planner + acceptance evaluator (same provider as
         // the JIT planner). Without this, idle `kind='goal'` missions never advance —
         // author/accept stays inert (the live wiring-gap this closes). buildGoalDeps
@@ -1052,11 +1173,13 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
   const flows = loadFlows(root);
   const policy = defaultPolicy();
 
-  // runTaskMode requires task-style config; runSprint requires sprint-style.
-  // Clone the resolved config per execution kind (shallow override is enough —
-  // nested config is read-only here).
+  // runTaskMode requires task-style config. Exact Sprint execution receives
+  // its style-scoped config inside the canonical executor.
   const taskConfig = { ...resolvedConfig, deckent_style: 'task' as const };
-  const sprintConfig = { ...resolvedConfig, deckent_style: 'sprint' as const };
+  const exactSprintExecutor = createLiveAutonomousExactSprintExecutor({
+    ...(providerAuthority ? { providerAuthority } : {}),
+    ...(approvalAuthority ? { approvalAuthority } : {}),
+  });
 
   // Work-generator wire (flag-gated, default-off): active tech-debt records
   // become backlog candidates, throttled to work_generator.interval_ms.
@@ -1088,15 +1211,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
           }
         : {}),
     }, taskConfig),
-    runSprint: (projectRoot) => runSprintLifecycle(projectRoot, sprintConfig, {
-      ...(providerAuthority ? { providerAuthority } : {}),
-      ...(approvalAuthority?.state === 'ready'
-        ? {
-            attendedExecutionApprovalAuthority:
-              approvalAuthority.runtime.attendedExecutionApprovalAuthority,
-          }
-        : {}),
-    }),
+    executeSprint: exactSprintExecutor.execute,
     // Gap F: real completion tracking — wire in the CLI's waitForRunResult primitive.
     // Gap B: resultTimeoutMs from config; fallback to 600s (enough for cold ollama load).
     waitForResult: waitForRunResult,

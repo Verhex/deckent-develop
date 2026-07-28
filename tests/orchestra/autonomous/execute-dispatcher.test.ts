@@ -88,7 +88,7 @@ describe('execute-dispatcher — provider authority admission', () => {
     const planned = { ...entry, planned: true, summary: 'bounded work' };
     const backlogPath = seedBacklog(tmpDir, planned);
     const runTask = vi.fn();
-    const runSprint = vi.fn();
+    const executeSprint = vi.fn();
     const waitForResult = vi.fn();
     const jitComplete = vi.fn();
     const hold = {
@@ -109,7 +109,7 @@ describe('execute-dispatcher — provider authority admission', () => {
       projectRoot: tmpDir,
       config: {} as never,
       runTask,
-      runSprint,
+      executeSprint,
       backlogPath,
       waitForResult,
       jitComplete,
@@ -126,7 +126,7 @@ describe('execute-dispatcher — provider authority admission', () => {
     expect(admitProviderExecution).toHaveBeenCalledWith(planned);
     expect(jitComplete).not.toHaveBeenCalled();
     expect(runTask).not.toHaveBeenCalled();
-    expect(runSprint).not.toHaveBeenCalled();
+    expect(executeSprint).not.toHaveBeenCalled();
     expect(waitForResult).not.toHaveBeenCalled();
     expect(loadBacklog(backlogPath).entries[0]).toMatchObject({
       status: 'parked',
@@ -145,7 +145,7 @@ describe('execute-dispatcher — provider authority admission', () => {
       projectRoot: tmpDir,
       config: {} as never,
       runTask: vi.fn(),
-      runSprint: vi.fn(),
+      executeSprint: vi.fn(),
       backlogPath,
       waitForResult: vi.fn(),
       capabilityRegistry: createDefaultRegistry(),
@@ -162,13 +162,13 @@ describe('execute-dispatcher — provider authority admission', () => {
     const planned = { ...taskEntry, planned: true, summary: 'bounded work' };
     const backlogPath = seedBacklog(tmpDir, planned);
     const runTask = vi.fn();
-    const runSprint = vi.fn();
+    const executeSprint = vi.fn();
     const jitComplete = vi.fn();
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir,
       config: {} as never,
       runTask,
-      runSprint,
+      executeSprint,
       backlogPath,
       waitForResult: vi.fn(),
       jitComplete,
@@ -184,7 +184,7 @@ describe('execute-dispatcher — provider authority admission', () => {
     expect(result.error).toContain('E_PROVIDER_MODEL_MISMATCH');
     expect(jitComplete).not.toHaveBeenCalled();
     expect(runTask).not.toHaveBeenCalled();
-    expect(runSprint).not.toHaveBeenCalled();
+    expect(executeSprint).not.toHaveBeenCalled();
     expect(loadBacklog(backlogPath).entries[0]).toMatchObject({
       status: 'failed',
       lastResult: {
@@ -200,11 +200,11 @@ describe('execute-dispatcher — capability branch (F8 broker dispatch)', () => 
     const backlogPath = seedBacklog(tmpDir, capabilityEntry);
     const registry = createDefaultRegistry(); // echo + fs.read preinstalled
     const runTask = vi.fn();
-    const runSprint = vi.fn();
+    const executeSprint = vi.fn();
 
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask, runSprint,
+      runTask, executeSprint,
       backlogPath, waitForResult: vi.fn(),
       capabilityRegistry: registry,
     });
@@ -213,7 +213,7 @@ describe('execute-dispatcher — capability branch (F8 broker dispatch)', () => 
 
     expect(res.outcome).toBe('success');
     expect(runTask).not.toHaveBeenCalled();
-    expect(runSprint).not.toHaveBeenCalled();
+    expect(executeSprint).not.toHaveBeenCalled();
     const e = loadBacklog(backlogPath).entries.find((x) => x.id === 'e-cap');
     expect(e?.status).toBe('done');
     expect(e?.lastResult?.ok).toBe(true);
@@ -228,7 +228,7 @@ describe('execute-dispatcher — capability branch (F8 broker dispatch)', () => 
     const backlogPath = seedBacklog(tmpDir, entry);
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask: vi.fn(), runSprint: vi.fn(),
+      runTask: vi.fn(), executeSprint: vi.fn(),
       backlogPath, waitForResult: vi.fn(),
       capabilityRegistry: createDefaultRegistry(),
     });
@@ -244,7 +244,7 @@ describe('execute-dispatcher — capability branch (F8 broker dispatch)', () => 
     const backlogPath = seedBacklog(tmpDir, capabilityEntry);
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask: vi.fn(), runSprint: vi.fn(),
+      runTask: vi.fn(), executeSprint: vi.fn(),
       backlogPath, waitForResult: vi.fn(),
     });
 
@@ -263,7 +263,7 @@ describe('execute-dispatcher — capability branch (F8 broker dispatch)', () => 
     const broken = { ...capabilityEntry, spec: {} } as BacklogEntry;
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask: vi.fn(), runSprint: vi.fn(),
+      runTask: vi.fn(), executeSprint: vi.fn(),
       backlogPath, waitForResult: vi.fn(),
       capabilityRegistry: createDefaultRegistry(),
     });
@@ -288,7 +288,7 @@ describe('execute-dispatcher — capability branch (F8 broker dispatch)', () => 
 
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask: vi.fn(), runSprint: vi.fn(),
+      runTask: vi.fn(), executeSprint: vi.fn(),
       backlogPath, waitForResult: vi.fn(),
       capabilityRegistry: registry,
     });
@@ -303,11 +303,11 @@ describe('execute-dispatcher', () => {
     const backlogPath = seedBacklog(tmpDir, taskEntry);
     const runTask = vi.fn().mockResolvedValue({ taskId: 't' });
     const waitForResult = vi.fn().mockResolvedValue(doneResult);
-    const runSprint = vi.fn();
+    const executeSprint = vi.fn();
 
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask, runSprint,
+      runTask, executeSprint,
       backlogPath, waitForResult,
       evaluate: okEval, audit: okAudit, crossVerify: skipXVerify,
     });
@@ -316,7 +316,7 @@ describe('execute-dispatcher', () => {
 
     expect(res.outcome).toBe('success');
     expect(runTask).toHaveBeenCalledOnce();
-    expect(runSprint).not.toHaveBeenCalled();
+    expect(executeSprint).not.toHaveBeenCalled();
     const ctx = runTask.mock.calls[0]![0];
     expect(ctx.model).toBe('qwen3.6:27b');
     expect(ctx.provider).toBe('ollama');
@@ -335,7 +335,7 @@ describe('execute-dispatcher', () => {
 
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask, runSprint: vi.fn(),
+      runTask, executeSprint: vi.fn(),
       backlogPath, waitForResult,
     });
 
@@ -358,7 +358,7 @@ describe('execute-dispatcher', () => {
       projectRoot: tmpDir,
       config: {} as never,
       runTask: vi.fn().mockResolvedValue({ taskId: 't', settlementRef: ref }),
-      runSprint: vi.fn(),
+      executeSprint: vi.fn(),
       backlogPath,
       waitForResult,
       evaluate: okEval,
@@ -382,7 +382,7 @@ describe('execute-dispatcher', () => {
 
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask, runSprint: vi.fn(),
+      runTask, executeSprint: vi.fn(),
       backlogPath, waitForResult,
     });
 
@@ -403,7 +403,7 @@ describe('execute-dispatcher', () => {
 
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask, runSprint: vi.fn(),
+      runTask, executeSprint: vi.fn(),
       backlogPath, waitForResult,
       evaluate: () => ({ decision: 'GO_WITH_TECH_DEBT', quality: 80, reconciled: false, reason: 'tech debt' }),
       audit: okAudit, crossVerify: skipXVerify,
@@ -423,7 +423,7 @@ describe('execute-dispatcher', () => {
 
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask, runSprint: vi.fn(),
+      runTask, executeSprint: vi.fn(),
       backlogPath, waitForResult,
     });
 
@@ -440,30 +440,102 @@ describe('execute-dispatcher', () => {
   it('kind=sprint success → entry done, outcome=success', async () => {
     const backlogPath = seedBacklog(tmpDir, sprintEntry);
     const runTask = vi.fn();
-    const runSprint = vi.fn().mockResolvedValue({});
+    const exactRef = {
+      schemaVersion: 1 as const,
+      flowId: 'flow-sprint',
+      revision: 1,
+      planDigest: 'a'.repeat(64),
+    };
+    const executeSprint = vi.fn().mockResolvedValue({
+      status: 'settled',
+      exactRef,
+      attempt: {},
+      handle: { flowId: exactRef.flowId, jobId: 'job-1', logRef: 'job-1' },
+      settlement: {
+        state: 'COMPLETED',
+        code: 'SPRINT_COMPLETE',
+        settledAt: '2026-07-28T00:00:00.000Z',
+      },
+    });
     const waitForResult = vi.fn();
 
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask, runSprint,
+      runTask, executeSprint,
       backlogPath, waitForResult,
     });
 
     const res = await handler('autonomous.execute', { entry: sprintEntry });
     expect(res.outcome).toBe('success');
-    expect(runSprint).toHaveBeenCalledOnce();
+    expect(executeSprint).toHaveBeenCalledOnce();
+    expect(executeSprint).toHaveBeenCalledWith(expect.objectContaining({
+      projectRoot: tmpDir,
+      executionMode: 'in-process',
+      source: expect.objectContaining({
+        kind: 'unplanned',
+        ingress: expect.objectContaining({
+          kind: 'autonomous',
+          id: 'e-sprint',
+          directives: 'D.md',
+        }),
+      }),
+      lineage: expect.objectContaining({
+        tenantId: 'local',
+        actor: { id: 'autonomous-engine', tenantId: 'local' },
+        origin: 'autonomous',
+        correlationId: 'autonomous:local:e-sprint',
+        idempotencyKey: 'autonomous:local:e-sprint:exact-plan-v1',
+        authorization: { kind: 'approved-actor' },
+      }),
+    }));
     expect(waitForResult).not.toHaveBeenCalled(); // sprint doesn't use waitForResult
 
     const bl = loadBacklog(backlogPath);
     const e = bl.entries.find((x) => x.id === 'e-sprint');
     expect(e?.status).toBe('done');
+    expect(e?.spec).toEqual({ exactPlanRef: exactRef });
+  });
+
+  it('persists an authored exact ref and parks while digest-bound approval is pending', async () => {
+    const backlogPath = seedBacklog(tmpDir, sprintEntry);
+    const exactRef = {
+      schemaVersion: 1 as const,
+      flowId: 'flow-awaiting',
+      revision: 1,
+      planDigest: 'b'.repeat(64),
+    };
+    const executeSprint = vi.fn().mockResolvedValue({
+      status: 'awaiting-approval',
+      exactRef,
+      reasonCode: 'EXACT_PLAN_APPROVAL_REQUIRED',
+    });
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir,
+      config: {} as never,
+      runTask: vi.fn(),
+      executeSprint,
+      backlogPath,
+      waitForResult: vi.fn(),
+    });
+
+    const result = await handler('autonomous.execute', { entry: sprintEntry });
+
+    expect(result).toEqual({
+      outcome: 'failure',
+      error: 'EXACT_PLAN_APPROVAL_REQUIRED',
+    });
+    expect(loadBacklog(backlogPath).entries[0]).toMatchObject({
+      status: 'parked',
+      spec: { exactPlanRef: exactRef },
+      lastResult: { ok: false, reason: 'EXACT_PLAN_APPROVAL_REQUIRED' },
+    });
   });
 
   it('missing entry payload → failure (no silent success)', async () => {
     const backlogPath = seedBacklog(tmpDir, taskEntry);
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask: vi.fn(), runSprint: vi.fn(),
+      runTask: vi.fn(), executeSprint: vi.fn(),
       backlogPath, waitForResult: vi.fn(),
     });
     const res = await handler('autonomous.execute', {});
@@ -477,7 +549,7 @@ describe('execute-dispatcher', () => {
 
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask, runSprint: vi.fn(),
+      runTask, executeSprint: vi.fn(),
       backlogPath, waitForResult: vi.fn(),
     });
     const res = await handler('autonomous.execute', { entry: taskEntry });
@@ -494,7 +566,7 @@ describe('execute-dispatcher', () => {
 
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask, runSprint: vi.fn(),
+      runTask, executeSprint: vi.fn(),
       backlogPath, waitForResult: vi.fn(),
     });
     const res = await handler('autonomous.execute', { entry: taskEntry });
@@ -502,13 +574,13 @@ describe('execute-dispatcher', () => {
     expect(res.error).toContain('async-boom');
   });
 
-  it('runSprint rejecting → failure with error, entry becomes failed', async () => {
+  it('executeSprint rejecting → failure with error, entry becomes failed', async () => {
     const backlogPath = seedBacklog(tmpDir, sprintEntry);
-    const runSprint = vi.fn().mockRejectedValue(new Error('sprint-fail'));
+    const executeSprint = vi.fn().mockRejectedValue(new Error('sprint-fail'));
 
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask: vi.fn(), runSprint,
+      runTask: vi.fn(), executeSprint,
       backlogPath, waitForResult: vi.fn(),
     });
     const res = await handler('autonomous.execute', { entry: sprintEntry });
@@ -527,7 +599,7 @@ describe('execute-dispatcher', () => {
 
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask, runSprint: vi.fn(),
+      runTask, executeSprint: vi.fn(),
       backlogPath, waitForResult,
       evaluate: okEval, audit: okAudit, crossVerify: skipXVerify,
     });
@@ -547,7 +619,7 @@ describe('execute-dispatcher', () => {
 
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask, runSprint: vi.fn(),
+      runTask, executeSprint: vi.fn(),
       backlogPath, waitForResult,
       evaluate: okEval, audit: okAudit, crossVerify: skipXVerify,
       resultTimeoutMs: 42_000,
@@ -567,7 +639,7 @@ describe('execute-dispatcher', () => {
 
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask, runSprint: vi.fn(),
+      runTask, executeSprint: vi.fn(),
       backlogPath, waitForResult,
       evaluate: okEval, audit: okAudit, crossVerify: skipXVerify,
       pool: mockPool,
@@ -587,7 +659,7 @@ describe('execute-dispatcher', () => {
     // No pool provided — must behave exactly like before
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask, runSprint: vi.fn(),
+      runTask, executeSprint: vi.fn(),
       backlogPath, waitForResult,
       evaluate: okEval, audit: okAudit, crossVerify: skipXVerify,
     });

@@ -3,7 +3,7 @@
 // (capability-maturity top-5 #1 + #2):
 //   1. reenqueueRecurring → buildEngineRuntime backlog loader (recurring cadence live)
 //   2. makeWorkGeneratorSource → buildEngineRuntime trigger composition (self-generated work)
-// Hermetic: tmpdir backlog file, injected clock, mock runTask/runSprint.
+// Hermetic: tmpdir backlog file, injected clock, mock runTask/executeSprint.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -39,7 +39,7 @@ describe('engine wiring — recurring re-enqueue + work-generator', () => {
       flows: [],
       policy: { id: 'p', trigger: 'scheduled', action: 'noop', disabled: true, guard: { requiresApproval: true } } as never,
       runTask: vi.fn(),
-      runSprint: vi.fn(),
+      executeSprint: vi.fn(),
       waitForResult: vi.fn().mockResolvedValue(null),
       clock,
     };

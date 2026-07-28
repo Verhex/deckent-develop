@@ -1,11 +1,14 @@
+import { randomUUID } from 'node:crypto';
+import { basename } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { loadConfig } from '../../core/config.js';
 import { readContext } from '../../orchestra/brain.js';
-import { generatePlanPreview } from '../../orchestra/plan-preview-service.js';
+import { planRunFlow } from '../../orchestra/run-flow-plan-service.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import { debugLog } from '../../core/utils.js';
 import type { BrainPlanningMode, PlannerProof, SprintSizeRecommendation } from '../../core/types.js';
+import { getMessage } from '../../cli/helpers/messages.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatPlanResponse, wrapResponse } from '../helpers/format.js';
 
@@ -35,9 +38,16 @@ export function registerPlanTool(server: McpServer): void {
       inputSchema: z.object({
         dryRun: z.boolean().optional().default(true).describe('Always dry-run for plan tool — tasks are never written to disk'),
         mode: z.enum(['ai', 'structured', 'auto']).optional().describe('Planning mode: "ai" uses Claude to interpret directives creatively (requires API access), "structured" parses DIRECTIVES.md task blocks directly (deterministic, no AI call), "auto" picks ai if available else falls back to structured'),
+        approve: z.boolean().optional().default(false).describe(getMessage('plan.mcp_approve_option', 'en')),
+        acknowledgeScopePaths: z.boolean().optional().default(false).describe(getMessage('plan.mcp_ack_scope_option', 'en')),
       }),
     },
-    async (input: { dryRun?: boolean; mode?: 'ai' | 'structured' | 'auto' }) => {
+    async (input: {
+      dryRun?: boolean;
+      mode?: 'ai' | 'structured' | 'auto';
+      approve?: boolean;
+      acknowledgeScopePaths?: boolean;
+    }) => {
       const root = process.cwd();
 
       try {
@@ -59,15 +69,62 @@ export function registerPlanTool(server: McpServer): void {
         modelConstraint: null,
         reason: 'No usage constraints',
       };
-      // The plan tool is a PREVIEW only — its schema documents "Always dry-run …
-      // tasks are never written to disk", and execution is deckent_start's job.
-      // generatePlanPreview (TERM2 424-001) is the shared read-only preview
-      // service CLI `plan --dry-run` also delegates to — it always forces
-      // planSprint's dryRun so .tasks/task-*.json is never written here.
-      const preview = await generatePlanPreview(root, config, context, recommendation, {
-        mode: input.mode as BrainPlanningMode | undefined,
+      // MCP plan never writes legacy task JSON. It does persist the canonical
+      // exact plan/event authority so a later start can consume this digest
+      // without re-planning; optional approval snapshots the same object.
+      const projectName = config.projectName || basename(root);
+      const heading = context.directives
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .find(line => line.length > 0)
+        ?.replace(/^#+\s*/, '')
+        .trim();
+      const flowId = randomUUID();
+      const revision = 1;
+      const planned = await planRunFlow({
+        projectRoot: root,
+        config,
+        recommendation,
+        proposal: {
+          flowId,
+          tenant: 'local',
+          project: projectName,
+          actor: { id: 'mcp-operator' },
+          origin: 'mcp',
+          revision,
+          intentSummary: heading || projectName,
+        },
+        lineage: {
+          tenantId: 'local',
+          actor: { id: 'mcp-operator' },
+          origin: 'mcp',
+          correlationId: flowId,
+          idempotencyKey: `plan:${flowId}:r${revision}`,
+          sourceRef: 'DIRECTIVES.md',
+        },
+        source: {
+          sourceKind: 'directives',
+          brainContext: context,
+        },
+        previewOptions: {
+          mode: input.mode as BrainPlanningMode | undefined,
+        },
+        acknowledgeScopePaths: input.acknowledgeScopePaths === true,
+        ...(input.approve === true
+          ? {
+              approval: {
+                actor: { id: 'mcp-operator' },
+                ...(input.acknowledgeScopePaths === true
+                  ? { acknowledgeScopePaths: true }
+                  : {}),
+              },
+            }
+          : {}),
       });
-      const sprint = preview.sprint;
+      const sprint = planned.sprint;
+      const preview = planned.preview;
+      const topology = preview.topology;
+      if (!topology) throw new Error('E_PLAN_TOPOLOGY_MISSING');
 
       const tasks = sprint.tasks.map((t) => ({
         id: t.id,
@@ -77,7 +134,7 @@ export function registerPlanTool(server: McpServer): void {
       }));
 
       const waveBreakdown = Object.fromEntries(
-        preview.topology.waves.map(wave => [`wave${wave.wave}`, wave.slots.length]),
+        topology.waves.map(wave => [`wave${wave.wave}`, wave.slots.length]),
       );
       const modelDistribution = computeModelDistribution(tasks);
       const riskAssessment = computeRiskAssessment(tasks.length);
@@ -101,7 +158,7 @@ export function registerPlanTool(server: McpServer): void {
         tasks,
         recommendation: {
           size: recommendation.size,
-          maxWorkers: preview.topology.configuredMaxWorkers,
+          maxWorkers: topology.configuredMaxWorkers,
           reason: recommendation.reason,
         },
         reasoning: sprint.reasoning,
@@ -111,12 +168,22 @@ export function registerPlanTool(server: McpServer): void {
         modelDistribution,
         riskAssessment,
         promptGate,
-        executionTopology: preview.topology,
+        scopeGate: {
+          result: preview.scopeGateResult ?? 'skipped',
+          ...(preview.scopeGateMessage !== undefined
+            ? { message: preview.scopeGateMessage }
+            : {}),
+          overridden: preview.scopeGateOverridden === true,
+        },
+        executionTopology: topology,
         topologyGate: preview.topologyGateResult,
         // planDigest (TERM2 424-001) — content hash of the real plan preview
         // (task summaries + gate/policy outcome), for future digest-bound
         // approval flows (design doc "Net Öneri"). Additive field only.
-        planDigest: preview.planDigest,
+        flowId: planned.flowId,
+        revision: planned.revision,
+        approval: planned.approval,
+        planDigest: planned.planDigest,
         planDigestVersion: preview.planDigestVersion,
       };
 

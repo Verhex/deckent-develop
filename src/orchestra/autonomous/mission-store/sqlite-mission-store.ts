@@ -24,6 +24,7 @@ import {
   computeWorkItemDefinitionDigest,
   isCanonicalWorkItemKind,
   listRuntimeAdmittedKinds,
+  resolveMissionSprintExecutionSource,
   validateWorkItemAdmission,
   type MissionRunnerRegistryV1,
   type WorkItemAdmissionFenceV1,
@@ -2489,29 +2490,102 @@ export class SqliteMissionStore implements MissionStore {
       || claim.attemptId.length === 0
       || claim.fenceToken.length === 0
       || claim.fenceTokenHash !== this.claimTokenHash(claim.fenceToken)) return false;
-    const engineAuthority = this.engineLeasePredicate(engineLease, Date.now());
-    if (!engineAuthority) return false;
-    const info = this.db.prepare(`UPDATE work_items SET status=@status,
-      last_result=COALESCE(@result,last_result), revision=revision+1,
-      claim_attempt_id=NULL, claim_fence_token_hash=NULL, updated_at=@ts
-      WHERE id=@id AND mission_id=@missionId AND status='running'
-        AND claimed_by=@claimedBy AND claimed_at=@claimedAt AND revision=@itemRevision
-        AND claim_attempt_id=@attemptId AND claim_fence_token_hash=@fenceTokenHash
-        ${engineAuthority.sql}`)
-      .run({
-        ...engineAuthority.bindings,
-        id: claim.workItemId,
-        missionId: claim.missionId,
-        claimedBy: claim.claimedBy,
-        claimedAt: claim.claimedAt,
-        itemRevision: claim.itemRevision,
-        attemptId: claim.attemptId,
-        fenceTokenHash: claim.fenceTokenHash,
-        status,
-        result: result ? JSON.stringify(result) : null,
-        ts: this.now(),
-      });
-    return info.changes === 1;
+    const transaction = this.db.transaction((): boolean => {
+      const engineAuthority = this.engineLeasePredicate(engineLease, Date.now());
+      if (!engineAuthority) return false;
+
+      let adoptedSpec: Record<string, unknown> | null = null;
+      let priorFence: WorkItemAdmissionFenceV1 | null = null;
+      let adoptedDefinitionDigest: string | null = null;
+      const exactPlanRef = result?.exactPlanRef;
+      if (exactPlanRef !== undefined) {
+        const current = this.selectItem(claim.workItemId);
+        if (!current
+          || current.kind !== 'sprint'
+          || current.missionId !== claim.missionId
+          || current.status !== 'running'
+          || current.revision !== claim.itemRevision
+          || current.admissionFence === null) return false;
+        let currentSource;
+        let returnedSource;
+        try {
+          currentSource = resolveMissionSprintExecutionSource(current);
+          returnedSource = resolveMissionSprintExecutionSource({
+            id: current.id,
+            kind: 'sprint',
+            spec: { exactPlanRef },
+          });
+        } catch {
+          return false;
+        }
+        if (returnedSource.kind !== 'exact-ref') return false;
+        if (
+          currentSource.kind === 'exact-ref'
+          && (
+            currentSource.ref.flowId !== returnedSource.ref.flowId
+            || currentSource.ref.revision !== returnedSource.ref.revision
+            || currentSource.ref.planDigest !== returnedSource.ref.planDigest
+          )
+        ) return false;
+        adoptedSpec = { ...(current.spec ?? {}), exactPlanRef: returnedSource.ref };
+        delete adoptedSpec['directivesRef'];
+        delete adoptedSpec['intent'];
+        priorFence = current.admissionFence;
+        adoptedDefinitionDigest = computeWorkItemDefinitionDigest({
+          ...current,
+          spec: adoptedSpec,
+        });
+      }
+
+      const info = this.db.prepare(`UPDATE work_items SET status=@status,
+        spec=COALESCE(@spec,spec),
+        last_result=COALESCE(@result,last_result), revision=revision+1,
+        claim_attempt_id=NULL, claim_fence_token_hash=NULL, updated_at=@ts
+        WHERE id=@id AND mission_id=@missionId AND status='running'
+          AND claimed_by=@claimedBy AND claimed_at=@claimedAt AND revision=@itemRevision
+          AND claim_attempt_id=@attemptId AND claim_fence_token_hash=@fenceTokenHash
+          ${engineAuthority.sql}`)
+        .run({
+          ...engineAuthority.bindings,
+          id: claim.workItemId,
+          missionId: claim.missionId,
+          claimedBy: claim.claimedBy,
+          claimedAt: claim.claimedAt,
+          itemRevision: claim.itemRevision,
+          attemptId: claim.attemptId,
+          fenceTokenHash: claim.fenceTokenHash,
+          status,
+          spec: adoptedSpec === null ? null : JSON.stringify(adoptedSpec),
+          result: result ? JSON.stringify(result) : null,
+          ts: this.now(),
+        });
+      if (info.changes !== 1) return false;
+      if (priorFence && adoptedDefinitionDigest) {
+        const fenceUpdate = this.db.prepare(`UPDATE work_item_admission_fences
+          SET item_definition_digest=@adoptedDefinitionDigest
+          WHERE work_item_id=@id
+            AND schema_version=@schemaVersion
+            AND registry_revision=@registryRevision
+            AND registry_digest=@registryDigest
+            AND item_kind=@kind
+            AND runner_revision=@runnerRevision
+            AND item_definition_digest=@priorDefinitionDigest`).run({
+          id: claim.workItemId,
+          schemaVersion: priorFence.schemaVersion,
+          registryRevision: priorFence.registryRevision,
+          registryDigest: priorFence.registryDigest,
+          kind: priorFence.kind,
+          runnerRevision: priorFence.runnerRevision,
+          priorDefinitionDigest: priorFence.itemDefinitionDigest,
+          adoptedDefinitionDigest,
+        });
+        if (fenceUpdate.changes !== 1) {
+          throw new Error(`MISSION_EXACT_PLAN_FENCE_CAS_CONFLICT: ${claim.workItemId}`);
+        }
+      }
+      return true;
+    });
+    return transaction.immediate();
   }
 
   backfillLegacyTerminalResult(

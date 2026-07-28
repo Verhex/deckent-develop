@@ -25,6 +25,7 @@ import { join } from 'node:path';
 vi.mock('../../src/orchestra/planner.js', () => ({
   resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
   createPlannerTaskModelPolicy: vi.fn((defaultModel: string) => ({ defaultModel, allowedModels: [defaultModel] })),
+  normalizePlannerDependencies: vi.fn(() => ({ resolvedCount: 0, dropped: [] })),
   callZeroConfigPlanner: vi.fn(() => ({
     reasoning: 'canned single-task plan (hermetic planner boundary)',
     tasks: [{
@@ -277,6 +278,8 @@ describe('createRunFlowController — startApproved() (426-002)', () => {
       config: makeConfig(),
       now: nowFn,
       generateFlowId: () => 'flow-1',
+      forceScope: true,
+      scopeEvidence: { status: 'available' as const, trackedFiles: [] },
       ...(spawnStart ? { spawnStart } : {}),
     };
   }
@@ -288,25 +291,24 @@ describe('createRunFlowController — startApproved() (426-002)', () => {
   });
 
   it('drives APPROVED -> STARTING -> DETACHED_RUNNING via a fake spawnStart — no real sprint spawn', async () => {
-    const spawnStart = vi.fn((_sprint: Sprint, flowId: string): RunHandle => ({
-      flowId, jobId: `fake-job-${flowId}`, logRef: '/fake/log.log',
-    }));
+    const spawnStart = vi.fn(() => ({ pid: process.pid }));
     const controller = createRunFlowController(makeControllerDeps(spawnStart));
     await controller.proposeRun('Ship the thing');
     controller.approve({ id: 'alperen' });
 
     const started = controller.startApproved!();
 
-    expect(started.state).toBe('DETACHED_RUNNING');
-    expect(started.handle?.jobId).toBe('fake-job-flow-1');
+    expect(started.state).toBe('STARTING');
+    expect(started.handle).toBeUndefined();
     expect(spawnStart).toHaveBeenCalledTimes(1);
-    expect(spawnStart).toHaveBeenCalledWith(expect.objectContaining({ id: 'sprint-001' }), 'flow-1');
+    expect(spawnStart).toHaveBeenCalledWith(expect.objectContaining({
+      capability: expect.objectContaining({ flowId: 'flow-1' }),
+      sprint: expect.objectContaining({ id: 'sprint-001' }),
+    }));
   });
 
   it('persists the approved snapshot durably via Task-1 run-flow-store.ts (not just in-memory)', async () => {
-    const spawnStart = vi.fn((_sprint: Sprint, flowId: string): RunHandle => ({
-      flowId, jobId: 'job-durable', logRef: '/fake/log.log',
-    }));
+    const spawnStart = vi.fn(() => ({ pid: process.pid }));
     const controller = createRunFlowController(makeControllerDeps(spawnStart));
     const previewed = await controller.proposeRun('Ship the thing');
     controller.approve({ id: 'alperen' });
@@ -317,16 +319,14 @@ describe('createRunFlowController — startApproved() (426-002)', () => {
     expect(storedSnapshot?.planDigest).toBe(previewed.preview!.planDigest);
     expect(storedSnapshot?.sprint.id).toBe('sprint-001');
 
-    // born-681 tek-yazar sözleşmesi: parent handle'ı DİSKE YAZMAZ (child yazar,
-    // persist-before-run) — in-memory context.handle iş-kimliğini taşır.
+    // Parent handle yayımlamaz; child ancak execution admission sonrası
+    // attempt journal + compatibility handle'ı atomik yazar.
     expect(loadRunHandle(root, 'flow-1')).toBeUndefined();
-    expect(controller.getContext().handle?.jobId).toBe('job-durable');
+    expect(controller.getContext().handle).toBeUndefined();
   });
 
   it('is idempotent: calling startApproved() twice does not spawn a second time', async () => {
-    const spawnStart = vi.fn((_sprint: Sprint, flowId: string): RunHandle => ({
-      flowId, jobId: 'job-once', logRef: '/fake/log.log',
-    }));
+    const spawnStart = vi.fn(() => ({ pid: process.pid }));
     const controller = createRunFlowController(makeControllerDeps(spawnStart));
     await controller.proposeRun('Ship the thing');
     controller.approve({ id: 'alperen' });
@@ -334,9 +334,9 @@ describe('createRunFlowController — startApproved() (426-002)', () => {
     const first = controller.startApproved!();
     const second = controller.startApproved!();
 
-    expect(first.state).toBe('DETACHED_RUNNING');
-    expect(second.state).toBe('DETACHED_RUNNING');
-    expect(second.handle?.jobId).toBe('job-once');
+    expect(first.state).toBe('STARTING');
+    expect(second.state).toBe('STARTING');
+    expect(second.handle).toBeUndefined();
     expect(spawnStart).toHaveBeenCalledTimes(1);
   });
 

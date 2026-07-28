@@ -141,25 +141,30 @@ describe('buildFlowStartSpawn — argv contract + interactive live-trace (583/N5
     rmSync(projectRoot, { recursive: true, force: true });
   });
 
-  it('spawns the canonical start argv, carries the live-trace twin, and returns the flow/job handle', () => {
+  it('spawns the canonical exact-start argv, carries the live-trace twin, and returns the child pid', () => {
     const unref = vi.fn();
     const spawnFn = vi.fn().mockReturnValue({ pid: 11, unref }) as unknown as DetachedSpawnFn;
 
     const spawnStart = buildFlowStartSpawn(projectRoot, 3, 'digest-abc', spawnFn);
-    const handle = spawnStart(null, 'flow-xyz');
+    const result = spawnStart({
+      capability: {
+        flowId: 'flow-xyz',
+        attemptId: 'attempt-1',
+        ownerNonce: 'owner-1',
+      },
+    });
 
     const [command, args, options] = (spawnFn as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(command).toBe(process.execPath);
     expect(args.slice(1)).toEqual([
       'start', '--flow-id', 'flow-xyz', '--revision', '3', '--plan-digest', 'digest-abc',
+      '--exact-attempt-id', 'attempt-1',
+      '--exact-owner-nonce', 'owner-1',
+      '--exact-log-ref', expect.stringMatching(/recently-works[/\\]start-flow-xyz-\d+\.log$/),
     ]);
     // Flow-start IS the human seal — every spawn built here streams live.
     expect(options.env[LIVE_TRACE_ENV]).toBe('1');
-    expect(handle).toEqual({
-      flowId: 'flow-xyz',
-      jobId: 'flow-flow-xyz-r3',
-      logRef: expect.stringMatching(/recently-works[/\\]start-flow-xyz-\d+\.log$/),
-    });
+    expect(result).toEqual({ pid: 11 });
   });
 });
 

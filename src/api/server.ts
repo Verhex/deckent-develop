@@ -1,6 +1,6 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync, existsSync, readdirSync, writeFileSync, mkdirSync, renameSync, unlinkSync, chmodSync } from 'node:fs';
-import { join, extname, resolve } from 'node:path';
+import { basename, join, extname, resolve } from 'node:path';
 import { platform as osPlatform } from 'node:os';
 import { spawn as nodeSpawn } from 'node:child_process';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
@@ -44,10 +44,8 @@ import { readSprintLive, readSprintTaskDetail, SPRINT_TASK_ID_RE } from '../orch
 import { loadConfig, createDefaultConfig, validatePartialConfig, ConfigValidationError } from '../core/config.js';
 import { readWorkerLog } from '../agents/worker.js';
 import { AgentPoolManager } from '../core/agent-pool.js';
-import {
-  readContext, planSprint, cleanup,
-} from '../orchestra/brain.js';
-import { startSprintDetached } from './sprint-job-runner.js';
+import { readContext, cleanup } from '../orchestra/brain.js';
+import { planRunFlow } from '../orchestra/run-flow-plan-service.js';
 import {
   IncomingMessageRouter,
   isValidConnectorId,
@@ -285,13 +283,6 @@ const activeJobs = new Map<string, ActiveJob>();
 /** Exported for testing — resets all job state */
 export function _resetActiveJob(): void {
   activeJobs.clear();
-}
-
-function getRunningJob(): ActiveJob | undefined {
-  for (const job of activeJobs.values()) {
-    if (job.status === 'running') return job;
-  }
-  return undefined;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -1408,37 +1399,15 @@ async function handleRequest(
         sendError(res, 400, parsed.error.message);
         return;
       }
-      if (getRunningJob()) {
-        sendError(res, 409, 'Sprint already running');
-        return;
-      }
-      const config = await loadConfig(projectRoot);
-      const providerDecision = preflightApiBrainProviderAuthority(
-        projectRoot,
-        config,
-        providerAuthority,
-        `api-start-${randomUUID()}`,
-      );
-      if (providerDecision.decision === 'hold') {
-        sendJson(res, providerDecision.body, providerDecision.statusCode);
-        return;
-      }
-      const b = parsed.data;
-      const { jobId } = startSprintDetached(
-        projectRoot,
-        { autoApprove: b.autoApprove },
-        (code) => {
-          const j = activeJobs.get(jobId);
-          if (j) {
-            if (code === 0) { j.status = 'completed'; }
-            else { j.status = 'failed'; j.error = `Sprint exited with code ${code ?? 'null'}`; }
-          }
-        },
-      );
-      const job: ActiveJob = { id: jobId, status: 'running' };
-      activeJobs.set(jobId, job);
-      console.log(`[deckent] Sprint started via dashboard (jobId: ${jobId})`);
-      sendJson(res, { jobId, status: 'started' }, 202);
+      sendJson(res, {
+        error: 'LEGACY_START_RETIRED',
+        code: 'LEGACY_START_RETIRED',
+        canonicalFlow: [
+          'POST /api/plan',
+          'POST /api/run-flow/:flowId/decision',
+          'POST /api/run-flow/:flowId/start',
+        ],
+      }, 410);
       return;
     }
 
@@ -1450,19 +1419,30 @@ async function handleRequest(
       }
       try {
         const b = parsed.data;
-        void b.directive; // reserved for future use
         const config = await loadConfig(projectRoot);
+        const flowId = randomUUID();
         const providerDecision = preflightApiBrainProviderAuthority(
           projectRoot,
           config,
           providerAuthority,
-          `api-plan-${randomUUID()}`,
+          `api-plan-${flowId}`,
         );
         if (providerDecision.decision === 'hold') {
           sendJson(res, providerDecision.body, providerDecision.statusCode);
           return;
         }
-        const context = readContext(projectRoot);
+        const principal = deriveRequestPrincipal(req);
+        const tenantId = principal.tenantId ?? 'local';
+        const actor = {
+          id: principal.id,
+          ...(principal.role ? { role: principal.role } : {}),
+          ...(principal.tenantId ? { tenantId: principal.tenantId } : {}),
+        };
+        const baseContext = readContext(projectRoot);
+        const directive = b.directive?.trim();
+        const context = directive
+          ? { ...baseContext, directives: directive }
+          : baseContext;
         const maxW = config.activeModeConfig.max_workers;
         const recommendation = {
           size: 'full' as const,
@@ -1470,11 +1450,46 @@ async function handleRequest(
           modelConstraint: null,
           reason: 'No usage constraints',
         };
-        const plan = await planSprint(projectRoot, config, context, recommendation, {
-          mode: b.mode,
+        const plan = await planRunFlow({
+          projectRoot,
+          config,
+          recommendation,
+          proposal: {
+            flowId,
+            tenant: tenantId,
+            project: config.projectName || basename(projectRoot),
+            actor,
+            origin: 'api',
+            revision: 1,
+            intentSummary: directive || config.projectName || basename(projectRoot),
+          },
+          lineage: {
+            tenantId,
+            actor,
+            origin: 'api',
+            correlationId: flowId,
+            idempotencyKey: `api-plan:${flowId}:r1`,
+            sourceRef: 'api:/api/plan',
+          },
+          source: {
+            sourceKind: 'directives',
+            brainContext: context,
+          },
+          previewOptions: {
+            ...(b.mode !== undefined ? { mode: b.mode } : {}),
+          },
         });
         console.log(`[deckent] Plan requested via dashboard (mode: ${b.mode ?? 'auto'})`);
-        sendJson(res, plan);
+        sendJson(res, {
+          ...plan.sprint,
+          runFlow: {
+            flowId: plan.flowId,
+            revision: plan.revision,
+            planDigest: plan.planDigest,
+            approval: plan.approval,
+          },
+          preview: plan.preview,
+        });
       } catch (err: unknown) {
         sendError(res, 500, err instanceof Error ? err.message : 'Plan failed');
       }

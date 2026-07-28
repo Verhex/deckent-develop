@@ -205,7 +205,7 @@ describe('runV2Engine', () => {
       runTask: legacyRunTask,
       runAdmittedTask,
       workerInvocationCoordinator: coordinator,
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       store,
       maxIterations: BOUNDED,
     });
@@ -228,7 +228,7 @@ describe('runV2Engine', () => {
     const summary = await runV2Engine(r, cfg({ engine: 'v2' }), {
       runTask: async () => ({ ok: true }),
       workerInvocationCoordinator: coordinator,
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       store,
       maxIterations: BOUNDED,
     });
@@ -251,7 +251,7 @@ describe('runV2Engine', () => {
     const runTask = vi.fn(async () => ({ ok: true }));
     const summary = await runV2EngineRuntime(r, cfg({ engine: 'v2' }), {
       runTask,
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       store,
       maxIterations: BOUNDED,
     });
@@ -306,7 +306,7 @@ describe('runV2Engine', () => {
     const runTask = vi.fn(async (): Promise<{ ok: boolean }> => ({ ok: true }));
     const deps: RunV2EngineDeps = {
       runTask,
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       approvalCoordinator: coordinator,
       store,
       maxIterations: BOUNDED,
@@ -350,7 +350,7 @@ describe('runV2Engine', () => {
         expect(JSON.stringify(ctx)).not.toContain(claim.fenceToken);
         return { ok: true };
       },
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       store,
       maxIterations: BOUNDED,
     };
@@ -382,7 +382,7 @@ describe('runV2Engine', () => {
         settleDetail: 'failed',
         reason: 'MISSION_WORKER_INVOCATION_AUTHORITY_UNAVAILABLE',
       }),
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       notify,
       store,
       maxIterations: BOUNDED,
@@ -427,7 +427,7 @@ describe('runV2Engine', () => {
     }));
     const deps: RunV2EngineDeps = {
       runTask: async (ctx: MissionTaskContext) => { seen.push(ctx.description); return { ok: true }; },
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       workerInvocationRecoveryReconciler: { reconcile },
       store,
       maxIterations: BOUNDED,
@@ -460,7 +460,7 @@ describe('runV2Engine', () => {
 
     const summary = await runV2Engine(r, cfg({ engine: 'v2' }), {
       runTask,
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       goalDeps: buildGoalDeps({ planner, accepter }),
       store,
       maxIterations: BOUNDED,
@@ -483,7 +483,7 @@ describe('runV2Engine', () => {
 
     const deps: RunV2EngineDeps = {
       runTask: async () => ({ ok: false, reason: 'nope' }),
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       store,
       maxIterations: BOUNDED,
     };
@@ -491,7 +491,7 @@ describe('runV2Engine', () => {
     expect(store.getMission('mF')!.status).toBe('failed');
   });
 
-  it('parks a persisted sprint item even when generic runSprint is injected', async () => {
+  it('parks an unfenced sprint item before the exact executor is reachable', async () => {
     const r = root();
     const store = openStore(r);
     store.createMission({ id: 'mS', kind: 'list', title: 'Sprint', renderAs: 'checklist' });
@@ -500,7 +500,7 @@ describe('runV2Engine', () => {
     let sprintCalls = 0;
     const deps: RunV2EngineDeps = {
       runTask: async () => ({ ok: true }),
-      runSprint: async () => { sprintCalls++; return undefined; },
+      executeSprint: async () => { sprintCalls++; return { ok: true }; },
       store,
       maxIterations: BOUNDED,
     };
@@ -527,7 +527,7 @@ describe('runV2Engine', () => {
     const store = openStore(r);
     const deps: RunV2EngineDeps = {
       runTask: async () => ({ ok: true }),
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       store,
       maxIterations: BOUNDED,
     };
@@ -553,11 +553,11 @@ describe('runV2Engine', () => {
     }), 'utf-8');
     const store = openStore(r);
     const runTask = vi.fn(async () => ({ ok: true }));
-    const runSprint = vi.fn(async () => undefined);
+    const executeSprint = vi.fn(async () => ({ ok: true }));
 
     await expect(runV2Engine(r, cfg({ engine: 'v2' }), {
       runTask,
-      runSprint,
+      executeSprint,
       store,
       maxIterations: BOUNDED,
     })).resolves.toMatchObject({ reason: 'drained', dispatched: 1 });
@@ -570,7 +570,7 @@ describe('runV2Engine', () => {
     expect(store.listItems('legacy').find((item) => item.id === 'legacy-deploy')?.lastResult)
       .toMatchObject({ missionAdmission: { code: 'UNKNOWN_KIND', decision: 'failed-closed' } });
     expect(runTask).toHaveBeenCalledOnce();
-    expect(runSprint).not.toHaveBeenCalled();
+    expect(executeSprint).not.toHaveBeenCalled();
   });
 
   it('fires the settle-delivery notify when a mission settles', async () => {
@@ -582,7 +582,7 @@ describe('runV2Engine', () => {
     const payloads: MissionNotifyPayload[] = [];
     const deps: RunV2EngineDeps = {
       runTask: async () => ({ ok: true }),
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       notify: (p) => { payloads.push(p); },
       store,
       maxIterations: BOUNDED,
@@ -604,7 +604,7 @@ describe('runV2Engine', () => {
 
     const deps: RunV2EngineDeps = {
       runTask: async () => ({ ok: true }),
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       maxIterations: BOUNDED,
       // no `store` → runV2Engine opens SqliteMissionStore(r) itself.
     };
@@ -630,7 +630,7 @@ describe('runV2Engine', () => {
 
     await expect(runV2EngineRuntime(r, cfg({ engine: 'v2' }), {
       runTask,
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       store: contender,
       maxIterations: BOUNDED,
     })).rejects.toBeInstanceOf(MissionEngineLeaseUnavailableError);
@@ -653,7 +653,7 @@ describe('runV2Engine', () => {
         await new Promise((resolve) => setTimeout(resolve, 180));
         return { ok: true };
       },
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       store,
       maxIterations: BOUNDED,
       engineLeaseOwnerId: 'heartbeat-engine',
@@ -684,7 +684,7 @@ describe('runV2Engine — goal-driven (Type-2)', () => {
 
     await runV2Engine(r, cfg({ engine: 'v2' }), {
       runTask: async () => ({ ok: true }),
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       approvalCoordinator: { tick },
       goalDeps: buildGoalDeps({ planner: async () => [], accepter: async () => true }),
       store,
@@ -711,7 +711,7 @@ describe('runV2Engine — goal-driven (Type-2)', () => {
     const payloads: MissionNotifyPayload[] = [];
     const deps: RunV2EngineDeps = {
       runTask: async (ctx: MissionTaskContext) => { ran.push(ctx.description); return { ok: true }; },
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       notify: (p) => { payloads.push(p); },
       goalDeps: buildGoalDeps({ planner, accepter }),
       store,
@@ -749,7 +749,7 @@ describe('runV2Engine — goal-driven (Type-2)', () => {
     const runTask = vi.fn(async () => ({ ok: true }));
     const first = await runV2Engine(r, cfg({ engine: 'v2' }), {
       runTask,
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       notify,
       goalDeps: buildGoalDeps({
         planner: async () => { throw new GoalInvocationHeldError({
@@ -777,7 +777,7 @@ describe('runV2Engine — goal-driven (Type-2)', () => {
     const accepter = vi.fn(async () => true);
     const second = await runV2Engine(r, cfg({ engine: 'v2' }), {
       runTask,
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       notify,
       goalDeps: buildGoalDeps({ planner: async () => [], accepter }),
       store,
@@ -803,7 +803,7 @@ describe('runV2Engine — goal-driven (Type-2)', () => {
 
     const deps: RunV2EngineDeps = {
       runTask: async () => ({ ok: true }),
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       goalDeps: buildGoalDeps({ planner, accepter }),
       store,
       maxIterations: BOUNDED,
@@ -828,7 +828,7 @@ describe('runV2Engine — goal-driven (Type-2)', () => {
     const payloads: MissionNotifyPayload[] = [];
     const deps: RunV2EngineDeps = {
       runTask: async () => ({ ok: true }),
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       notify: (payload) => { payloads.push(payload); },
       goalDeps: buildGoalDeps({
         planner: async () => [],
@@ -858,7 +858,7 @@ describe('runV2Engine — goal-driven (Type-2)', () => {
     const ran: string[] = [];
     const deps: RunV2EngineDeps = {
       runTask: async (ctx: MissionTaskContext) => { ran.push(ctx.description); return { ok: true }; },
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       goalDeps: buildGoalDeps({ planner, accepter }),
       store,
       maxIterations: BOUNDED,

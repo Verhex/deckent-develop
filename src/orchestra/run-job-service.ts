@@ -5,12 +5,9 @@
 // The approved-snapshot-CONSUMING start path: given a caller-supplied
 // (flowId, expectedRevision, expectedPlanDigest) CAS key plus the snapshot
 // the caller already loaded from a durable store, this decides whether the
-// actual run may proceed — and, critically, NEVER decides to re-plan. There
-// is no branch here that calls `planSprint`/`runPlanPhase`/`runSprint` at
-// all; the only way work actually happens is the caller-injected
-// `spawnStart` callback (dependency injection, same shape as
-// plan-preview-service.ts/run-proposal-compiler.ts's pure, caller-supplies-
-// everything convention).
+// actual run may proceed — and, critically, NEVER decides to re-plan or
+// perform a start side effect. Process birth/idempotency/admission lives in
+// exact-plan-start-service.ts; this module is the pure exact-plan guard.
 //
 // PURITY-ADJACENT CONTRACT (binding — mirrors run-flow-reducer.ts's
 // "structural not procedural" discipline): this module imports NOTHING from
@@ -30,14 +27,9 @@
 // (same field shape) without importing that module, so TypeScript's
 // structural typing accepts a store record directly with zero adapter code.
 //
-// DOUBLE-START IDEMPOTENCY (design-doc risk: "flowId + planDigest atomic
-// idempotency olmadan cutover yapılmamalı"): a second startApprovedRun() call
-// for the SAME flowId+revision+planDigest, when an existingRunHandle for that
-// exact CAS key is already on record, returns the EXISTING handle as a
-// no-op — spawnStart is never invoked a second time. A handle recorded
-// against a DIFFERENT digest is a genuine conflict (a stale start attempt
-// racing a re-approval), not a retry — that throws, mirroring the reducer's
-// own BLOCKED-vs-idempotent-replay split for APPROVAL_GRANTED/START_REQUESTED.
+// START EFFECT AUTHORITY: deliberately absent. A guard that also spawns cannot
+// atomically journal PREPARED before birth or defer handle publication until
+// admission. exact-plan-start-service.ts owns those transitions.
 
 import type { ActorContext } from '../core/work-model.js';
 import type { Sprint } from '../core/types.js';
@@ -78,22 +70,13 @@ export interface ApprovedRunSnapshotInput {
   readonly sprint: Sprint;
 }
 
-export interface ExistingRunHandleInput {
-  readonly flowId: string;
-  readonly revision: number;
-  readonly planDigest: string;
-  readonly handle: RunHandle;
-  readonly startedAt: string;
-}
-
 // ─── Typed errors (never a silent no-op — see run-flow-reducer.ts precedent) ─
 
 export type RunJobErrorCode =
   | 'RUN_JOB_FLOW_NOT_APPROVED'
   | 'RUN_JOB_DIGEST_MISMATCH'
   | 'RUN_JOB_BUDGET_HOLD'
-  | 'RUN_JOB_TOPOLOGY_HOLD'
-  | 'RUN_JOB_STALE_HANDLE_CONFLICT';
+  | 'RUN_JOB_TOPOLOGY_HOLD';
 
 export abstract class RunJobError extends Error {
   abstract readonly code: RunJobErrorCode;
@@ -180,23 +163,6 @@ export class RunJobTopologyHoldError extends RunJobError {
   }
 }
 
-/** A run-handle already exists for this flowId but was recorded against a
- *  DIFFERENT (revision, planDigest) than the one being started now — this is
- *  a genuine conflict (stale attempt racing a re-approval), not a safe
- *  idempotent replay. */
-export class RunJobStaleHandleConflictError extends RunJobError {
-  readonly code = 'RUN_JOB_STALE_HANDLE_CONFLICT' as const;
-
-  constructor(flowId: string, existing: ExistingRunHandleInput, expectedRevision: number, expectedPlanDigest: string) {
-    super(
-      flowId,
-      `run-job-service: an existing run-handle for flowId=${flowId} was recorded against ` +
-      `revision=${existing.revision}/digest=${existing.planDigest}, but this start targets ` +
-      `revision=${expectedRevision}/digest=${expectedPlanDigest} — refusing a mismatched duplicate-start`,
-    );
-  }
-}
-
 // ─── startApprovedRun ───────────────────────────────────────────────────
 
 export interface StartApprovedRunDeps {
@@ -206,18 +172,12 @@ export interface StartApprovedRunDeps {
   /** Already loaded by the caller (e.g. cli/repl/run-flow-store.ts's
    *  loadApprovedSnapshot) — undefined when nothing was ever approved. */
   readonly approvedSnapshot: ApprovedRunSnapshotInput | undefined;
-  /** Already loaded by the caller — undefined when this flow was never
-   *  started before. Presence + a matching CAS key is what makes a second
-   *  startApprovedRun() call for the same flow a safe no-op. */
-  readonly existingRunHandle?: ExistingRunHandleInput;
-  /** The ONLY way this function can cause a real run to happen. Receives the
-   *  exact approved Sprint — never re-derives or re-plans it. */
-  readonly spawnStart: (sprint: Sprint, flowId: string) => RunHandle;
 }
 
-export type StartApprovedRunResult =
-  | { readonly status: 'started'; readonly handle: RunHandle; readonly sprint: Sprint }
-  | { readonly status: 'noop-duplicate'; readonly handle: RunHandle };
+export interface StartApprovedRunResult {
+  readonly status: 'validated';
+  readonly sprint: Sprint;
+}
 
 function matchesCasKey(
   a: { readonly revision: number; readonly planDigest: string },
@@ -229,14 +189,12 @@ function matchesCasKey(
 
 /**
  * Consume an approved plan snapshot and start it — CAS-verified,
- * double-start-idempotent, and structurally incapable of triggering a fresh
- * plan (see file header). Throws a typed {@link RunJobError} subclass for
- * every refusal path; the only success outcomes are `'started'` (spawnStart
- * was invoked exactly once) and `'noop-duplicate'` (an identical start was
- * already recorded — spawnStart is NOT invoked again).
+ * side-effect-free, and structurally incapable of triggering a fresh plan.
+ * Throws a typed {@link RunJobError} subclass for every refusal path and
+ * returns the exact approved Sprint on success.
  */
 export function startApprovedRun(deps: StartApprovedRunDeps): StartApprovedRunResult {
-  const { flowId, expectedRevision, expectedPlanDigest, approvedSnapshot, existingRunHandle } = deps;
+  const { flowId, expectedRevision, expectedPlanDigest, approvedSnapshot } = deps;
 
   if (!approvedSnapshot) {
     throw new RunJobFlowNotApprovedError(flowId);
@@ -301,13 +259,5 @@ export function startApprovedRun(deps: StartApprovedRunDeps): StartApprovedRunRe
     throw new RunJobBudgetHoldError(flowId, heldTasks);
   }
 
-  if (existingRunHandle) {
-    if (matchesCasKey(existingRunHandle, expectedRevision, expectedPlanDigest)) {
-      return { status: 'noop-duplicate', handle: existingRunHandle.handle };
-    }
-    throw new RunJobStaleHandleConflictError(flowId, existingRunHandle, expectedRevision, expectedPlanDigest);
-  }
-
-  const handle = deps.spawnStart(approvedSnapshot.sprint, flowId);
-  return { status: 'started', handle, sprint: approvedSnapshot.sprint };
+  return { status: 'validated', sprint: approvedSnapshot.sprint };
 }

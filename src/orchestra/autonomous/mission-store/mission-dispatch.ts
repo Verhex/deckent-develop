@@ -2,7 +2,7 @@
 //
 // The scheduler (mission-scheduler.ts) consumes a `DispatchFn` as an injected
 // dependency. This builder wires that DispatchFn over real execution primitives
-// (runTask / runSprint / a capability broker) that are themselves INJECTED — the
+// (runTask / exact Sprint executor / a capability broker) that are themselves INJECTED — the
 // composition root (Task 7 cutover) passes the live functions; tests pass fakes.
 //
 // Kind-branch logic mirrors execute-dispatcher.ts (the v1 ActionHandler) but is a
@@ -27,15 +27,20 @@ export interface MissionTaskContext {
 }
 
 /** Injected execution primitives. Live wire (cutover) passes the real runTask /
- *  runSprint / capability broker; hermetic tests pass fakes and assert the calls. */
+ *  exact-sprint executor / capability broker; hermetic tests pass fakes. */
 export interface MissionDispatchDeps {
   projectRoot: string;
   config: ResolvedConfig;
   /** kind='task' — run a single worker for the item's description. Returns a ResultLike. */
   /** Claim remains a host-private argument and must never enter Task JSON/prompt context. */
   runTask: (ctx: MissionTaskContext, claim: MissionDispatchClaim) => Promise<ResultLike>;
-  /** kind='sprint' — run the full sprint lifecycle. Success unless it throws. */
-  runSprint: (projectRoot: string, config: ResolvedConfig) => Promise<unknown>;
+  /** kind='sprint' — consume the item's canonical exact-plan reference under
+   *  this exact dispatch claim. The adapter returns a typed ResultLike; it may
+   *  park for digest-bound approval but can never trigger a fresh plan here. */
+  executeSprint: (
+    item: Readonly<WorkItem>,
+    claim: MissionDispatchClaim,
+  ) => Promise<ResultLike>;
   /** kind='capability' — non-code work (mail/db/http/erp) via a broker. Optional:
    *  when absent, capability items fail with a clear 'no capability broker' reason. */
   runCapability?: (target: unknown) => Promise<ResultLike>;
@@ -81,14 +86,14 @@ function buildTaskContext(
  *
  * Map (WorkItem.kind → execution):
  *   - 'task'       → runTask({ description, model?, provider?, scopeDir? } from spec)
- *   - 'sprint'     → runSprint(projectRoot, config); resolves → { ok: true }, throws → { ok: false }
+ *   - 'sprint'     → canonical exact-plan executor adapter; fresh lifecycle access is impossible here
  *   - 'capability' → runCapability(spec.capabilityTarget); no broker → { ok: false, 'no capability broker' }
  *   - 'process'    → runProcess(spec) if injected; else inline spec.steps[] run sequentially
  *                    via runTask (fail-stop); else { ok: false, <reason> } (NOT a silent task-fallback)
  *   - default      → { ok: false, 'unknown work item kind: <k>' } (runtime-malformed guard)
  */
 export function buildMissionDispatch(deps: MissionDispatchDeps): DispatchFn {
-  const { projectRoot, config, runTask, runSprint, runCapability, runProcess } = deps;
+  const { projectRoot, runTask, executeSprint, runCapability, runProcess } = deps;
 
   return async (item: WorkItem, claim: MissionDispatchClaim): Promise<ResultLike> => {
     const spec = item.spec ?? {};
@@ -98,10 +103,7 @@ export function buildMissionDispatch(deps: MissionDispatchDeps): DispatchFn {
       }
 
       if (item.kind === 'sprint') {
-        // Sprint: the full lifecycle is a success unless it throws (the throw is
-        // caught below and reported as { ok: false }).
-        await runSprint(projectRoot, config);
-        return { ok: true, reason: 'sprint completed' };
+        return await executeSprint(item, claim);
       }
 
       if (item.kind === 'capability') {
@@ -149,8 +151,8 @@ export function buildMissionDispatch(deps: MissionDispatchDeps): DispatchFn {
       // but a corrupt persisted row could carry an unknown kind.
       return { ok: false, reason: `unknown work item kind: ${String(item.kind)}` };
     } catch (e) {
-      // Contract: a DispatchFn resolves (never rejects). A thrown primitive
-      // (e.g. runSprint failure) is reported as a failed ResultLike.
+      // Contract: a DispatchFn resolves (never rejects). A thrown execution
+      // primitive is reported as a failed ResultLike.
       return { ok: false, reason: e instanceof Error ? e.message : String(e) };
     }
   };

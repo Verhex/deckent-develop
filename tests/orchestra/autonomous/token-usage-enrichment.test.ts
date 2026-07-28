@@ -91,7 +91,7 @@ describe('execute-dispatcher — tokenUsage enrichment (TOK-AUT)', () => {
       config: {} as never,
       backlogPath,
       runTask: async () => ({ taskId: 'run-tok' }),
-      runSprint: async () => ({}),
+      executeSprint: async () => ({}),
       waitForResult: async (_root, _taskId, _timeout) => makeResult('run-tok'),
       evaluate: capturingEval,
       audit: okAudit,
@@ -124,7 +124,7 @@ describe('execute-dispatcher — tokenUsage enrichment (TOK-AUT)', () => {
       config: {} as never,
       backlogPath,
       runTask: async () => ({ taskId: 'run-empty' }),
-      runSprint: async () => ({}),
+      executeSprint: async () => ({}),
       // Worker stub: tokenUsage 0/0/0 — the honest worker pattern.
       waitForResult: async () => makeResult('run-empty', {
         tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model: 'sonnet' },

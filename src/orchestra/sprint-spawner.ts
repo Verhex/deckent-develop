@@ -19,6 +19,7 @@ import type {
 } from '../core/types.js';
 
 import { TASKS_DIR } from '../core/constants.js';
+import { canonicalJson } from '../core/audit-writer.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { debugLog } from '../core/utils.js';
@@ -140,6 +141,96 @@ import { buildWorkerPrompt } from './task-builder.js';
 
 // ─── Planner dependency normalization (323-031 wire) ──────────────
 import { normalizePlannerDependencies } from './planner.js';
+
+export interface ExactPlanSpawnAuthority {
+  readonly flowId: string;
+  readonly revision: number;
+  readonly planDigest: string;
+}
+
+export class ExactPlanSpawnAuthorityError extends Error {
+  readonly code:
+    | 'EXACT_PLAN_DEPENDENCY_DRIFT'
+    | 'EXACT_PLAN_TASK_ARTIFACT_MISSING'
+    | 'EXACT_PLAN_TASK_ARTIFACT_DRIFT'
+    | 'EXACT_PLAN_RUNTIME_ROUTE_DRIFT';
+  readonly taskId?: string;
+
+  constructor(
+    code: ExactPlanSpawnAuthorityError['code'],
+    taskId?: string,
+  ) {
+    super(code);
+    this.name = 'ExactPlanSpawnAuthorityError';
+    this.code = code;
+    this.taskId = taskId;
+  }
+}
+
+export function assertExactPlanDependencies(tasks: readonly Task[]): void {
+  const normalized: Task[] = structuredClone([...tasks]);
+  const before = canonicalJson(normalized);
+  const result = normalizePlannerDependencies(normalized);
+  if (
+    result.dropped.length > 0
+    || canonicalJson(normalized) !== before
+  ) {
+    throw new ExactPlanSpawnAuthorityError('EXACT_PLAN_DEPENDENCY_DRIFT');
+  }
+}
+
+export function readSpawnTaskAuthority(
+  projectRoot: string,
+  task: Task,
+  exactPlanAuthority?: ExactPlanSpawnAuthority,
+): Task {
+  const freshPath = join(projectRoot, TASKS_DIR, `task-${task.id}.json`);
+  try {
+    const diskTask = JSON.parse(readFileSync(freshPath, 'utf-8')) as Task;
+    if (
+      exactPlanAuthority
+      && canonicalJson(diskTask) !== canonicalJson(task)
+    ) {
+      throw new ExactPlanSpawnAuthorityError(
+        'EXACT_PLAN_TASK_ARTIFACT_DRIFT',
+        task.id,
+      );
+    }
+    return diskTask;
+  } catch (error) {
+    if (error instanceof ExactPlanSpawnAuthorityError) throw error;
+    if (exactPlanAuthority) {
+      throw new ExactPlanSpawnAuthorityError(
+        'EXACT_PLAN_TASK_ARTIFACT_MISSING',
+        task.id,
+      );
+    }
+    debugLog('spawnWorkers:freshTaskRead', error);
+    return task;
+  }
+}
+
+export function assertExactPlanTaskUnchanged(
+  task: Task,
+  canonicalTaskBefore: string | null,
+): void {
+  if (
+    canonicalTaskBefore !== null
+    && canonicalJson(task) !== canonicalTaskBefore
+  ) {
+    throw new ExactPlanSpawnAuthorityError(
+      'EXACT_PLAN_RUNTIME_ROUTE_DRIFT',
+      task.id,
+    );
+  }
+}
+
+export function captureExactPlanTaskAuthority(
+  task: Task,
+  exactPlanAuthority?: ExactPlanSpawnAuthority,
+): string | null {
+  return exactPlanAuthority ? canonicalJson(task) : null;
+}
 
 // ─── Parallel Pipeline ───────────────────────────────────────────
 import { ParallelPipelineManager } from './parallel-pipeline.js';
@@ -424,6 +515,7 @@ export async function spawnWorkers(
     spawnBackend?: SpawnBackend;
     attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
     providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+    exactPlanAuthority?: ExactPlanSpawnAuthority;
   },
 ): Promise<Task[]> {
   const backend = spawnOpts?.spawnBackend;
@@ -445,7 +537,12 @@ export async function spawnWorkers(
   // the single SPAWN entry so every downstream graph build sees clean ids;
   // self-healing on resume (re-runs each spawn from the persisted title-deps).
   // Until this wire the 323-031 normalizer had ZERO production callers.
-  const depNorm = normalizePlannerDependencies(sprint.tasks);
+  if (spawnOpts?.exactPlanAuthority) {
+    assertExactPlanDependencies(sprint.tasks);
+  }
+  const depNorm = spawnOpts?.exactPlanAuthority
+    ? { resolvedCount: 0, dropped: [] }
+    : normalizePlannerDependencies(sprint.tasks);
   if (depNorm.resolvedCount > 0 || depNorm.dropped.length > 0) {
     debugLog(
       'spawnWorkers:normalizeDeps',
@@ -670,13 +767,15 @@ export async function spawnWorkers(
     // fresh read; on missing/corrupt file we fall back to the in-memory
     // task to preserve resilience (fail-safe per ADR-035).
     let freshTask: Task = task;
-    try {
-      const freshPath = join(projectRoot, TASKS_DIR, `task-${task.id}.json`);
-      const raw = readFileSync(freshPath, 'utf-8');
-      freshTask = JSON.parse(raw) as Task;
-    } catch (e) {
-      debugLog('spawnWorkers:freshTaskRead', e);
-    }
+    const exactTaskBefore = captureExactPlanTaskAuthority(
+      task,
+      spawnOpts?.exactPlanAuthority,
+    );
+    freshTask = readSpawnTaskAuthority(
+      projectRoot,
+      task,
+      spawnOpts?.exactPlanAuthority,
+    );
 
     // Sprint 361 Task 361-005 (FIX-MODEL-PRESERVE, born-476): a fix-task must
     // inherit the original task's provider/backend/modelEffort/forceModel pins
@@ -723,6 +822,8 @@ export async function spawnWorkers(
         debugLog('spawnWorkers:overflow', `Task ${task.id}: ${decision.advisory}`);
       }
     }
+
+    assertExactPlanTaskUnchanged(task, exactTaskBefore);
 
     assertSprintWorkerProviderAuthority({
       authority: spawnOpts?.providerAuthority,

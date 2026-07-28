@@ -1,4 +1,4 @@
-import type { Command } from 'commander';
+import { Option, type Command } from 'commander';
 import { loadConfig, readAuthMode } from '../../core/config.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import type { BootstrapResult } from '../../core/provider.js';
@@ -6,7 +6,7 @@ import {
   runSprint, readContext, planSprint,
   BrainError,
 } from '../../orchestra/brain.js';
-import type { SprintSizeRecommendation } from '../../core/types.js';
+import type { ResolvedConfig, SprintSizeRecommendation } from '../../core/types.js';
 import { isSessionActive, setupWatchWindow } from '../../orchestra/tmux.js';
 import { TMUX_SESSION_NAME } from '../../core/constants.js';
 import { runDoctorChecks } from './doctor.js';
@@ -32,15 +32,22 @@ import { isSprintLocked } from '../../core/multi-ide.js';
 import { detectOrphan, archiveOrphan, listPidFiles } from '../../orchestra/sprint-pid-manager.js';
 import { createSandboxBackend } from '../../orchestra/spawn-backend.js';
 import { captureGitBase } from '../../orchestra/run-diff-service.js';
-import { loadApprovedSnapshot, loadRunHandle, saveRunHandle } from '../../core/run-flow-store.js';
+import { loadApprovedSnapshot, loadStartAttempt } from '../../core/run-flow-store.js';
 import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
 import {
   startApprovedRun,
   RunJobFlowNotApprovedError,
   RunJobDigestMismatchError,
-  RunJobStaleHandleConflictError,
-  type RunHandle,
 } from '../../orchestra/run-job-service.js';
+import type { RunHandle, StartAttemptProcessIdentity } from '../../core/run-flow-contract.js';
+import {
+  admitExactRunAttempt,
+  materializeExactPlanTaskArtifacts,
+  settleExactRunAttempt,
+  type ExactStartCapability,
+} from '../../orchestra/exact-plan-start-service.js';
+import { processStartToken } from '../../core/pid-ownership.js';
+import { getRunFlowCoordinator } from '../../orchestra/run-flow-coordinator-registry.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
 import { preflightCliBrainProviderAuthority } from '../provider-authority-process-runtime.js';
 import { ProviderExecutionIngressHoldError } from '../../core/provider-execution-ingress-authority.js';
@@ -232,10 +239,76 @@ interface StartCommandOpts {
   flowId?: string;
   revision?: string;
   planDigest?: string;
+  exactAttemptId?: string;
+  exactOwnerNonce?: string;
+  exactLogRef?: string;
 }
 
 export interface StartCommandRuntime {
   readonly providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+}
+
+async function runStartEnvironmentPreflight(input: {
+  readonly root: string;
+  readonly config: ResolvedConfig;
+  readonly opts: StartCommandOpts;
+  readonly lang: string;
+  readonly sandboxState: SandboxState | null;
+}): Promise<boolean> {
+  const { root, config, opts, lang, sandboxState } = input;
+  if (opts.force) return true;
+
+  const pidSprintIds = listPidFiles(root);
+  const lastSprintId = (config as unknown as Record<string, unknown>).last_sprint_id as string | undefined;
+  if (lastSprintId && !pidSprintIds.includes(lastSprintId)) {
+    pidSprintIds.push(lastSprintId);
+  }
+  for (const sprintId of pidSprintIds) {
+    const orphan = detectOrphan(root, sprintId);
+    if (!orphan) continue;
+    if (opts.autoApprove) {
+      archiveOrphan(root, orphan);
+      print(`Orphan sprint ${sprintId} (PID ${orphan.pid}) auto-archived.`);
+      continue;
+    }
+    printError(new Error(
+      `Orphan sprint detected: ${sprintId} (PID ${orphan.pid} is dead). ` +
+      'Run with --auto-approve to auto-archive, or use --force to skip this check.',
+    ));
+    if (sandboxState) restoreSandbox(root, sandboxState);
+    process.exitCode = 2;
+    return false;
+  }
+
+  const lockInfo = isSprintLocked(root);
+  if (lockInfo.locked) {
+    if (sandboxState) restoreSandbox(root, sandboxState);
+    printError(new Error(
+      `Sprint already running (PID ${lockInfo.pid}, env: ${lockInfo.env}, sprint: ${lockInfo.sprintId}, started: ${lockInfo.acquiredAt}). Use --force to override.`,
+    ));
+    process.exitCode = 1;
+    return false;
+  }
+
+  const spawnBackend = (config as unknown as Record<string, unknown>).spawn_backend as string | undefined;
+  const doctorResult = runDoctorChecks(root, undefined, spawnBackend);
+  const requiredFailed = doctorResult.checks.filter(check => check.required && !check.passed);
+  if (requiredFailed.length > 0) {
+    if (sandboxState) restoreSandbox(root, sandboxState);
+    printError(new Error(`Pre-flight failed: ${requiredFailed.map(check => `${check.name}: ${check.message}`).join('; ')}`));
+    print(getMessage('start.use_force', lang));
+    process.exitCode = 1;
+    return false;
+  }
+
+  const limitGate = await checkStartLimitGate(root, lang);
+  if (limitGate.message) print(limitGate.message);
+  if (limitGate.blocked && !opts.dryRun) {
+    if (sandboxState) restoreSandbox(root, sandboxState);
+    process.exitCode = 1;
+    return false;
+  }
+  return true;
 }
 
 export function registerStart(program: Command, runtime: StartCommandRuntime = {}): void {
@@ -255,6 +328,9 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
     .option('--flow-id <id>', 'TERM-FLOW-UNIFY (426-001): consume an approved RunFlow snapshot instead of planning fresh — requires --revision, --plan-digest and config.terminal.run_flow_v2=true')
     .option('--revision <n>', 'RunFlow proposal revision to CAS-verify against the approved snapshot (used with --flow-id)')
     .option('--plan-digest <digest>', 'RunFlow planDigest to CAS-verify against the approved snapshot (used with --flow-id)')
+    .addOption(new Option('--exact-attempt-id <id>').hideHelp())
+    .addOption(new Option('--exact-owner-nonce <nonce>').hideHelp())
+    .addOption(new Option('--exact-log-ref <path>').hideHelp())
     .action(async (description: string | undefined, opts: StartCommandOpts) => {
       const root = resolveProjectRoot();
       let authorityConfig: Awaited<ReturnType<typeof loadConfig>> | undefined;
@@ -319,8 +395,9 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
         // this branch NEVER calls planSprint/runPlanPhase — see
         // orchestra/run-job-service.ts (CAS/idempotency, structurally
         // replan-free) + RunSprintOptions.preplannedSprint. Completely
-        // self-contained and returns before any of the legacy zero-config /
-        // sandbox / doctor / cost-gate / dry-run logic below is reached.
+        // self-contained and returns before any legacy re-planning path is
+        // reached. Environment and cost admission use the same authorities as
+        // legacy start, but consume only the approved exact Sprint.
         // Absent flow flags (every existing invocation) never enters this
         // branch at all — zero behavior change for the legacy path.
         const flowFlagsGiven = [opts.flowId, opts.revision, opts.planDigest].filter(v => v !== undefined).length;
@@ -336,7 +413,7 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
             return;
           }
           const expectedRevision = Number(opts.revision);
-          if (!Number.isFinite(expectedRevision)) {
+          if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1) {
             printError(new Error(`--revision must be a number, got: ${opts.revision}`));
             process.exitCode = 1;
             return;
@@ -344,27 +421,29 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
           const flowId = opts.flowId!;
           const expectedPlanDigest = opts.planDigest!;
           const approvedSnapshot = loadApprovedSnapshot(root, flowId);
-          const existingRunHandle = loadRunHandle(root, flowId);
+          const capabilityParts = [
+            opts.exactAttemptId,
+            opts.exactOwnerNonce,
+            opts.exactLogRef,
+          ].filter(value => value !== undefined).length;
+          if (capabilityParts !== 3) {
+            printError(new Error(getMessage('start.exact_capability_required', lang)));
+            process.exitCode = 1;
+            return;
+          }
 
-          let handle: RunHandle;
-          let status: 'started' | 'noop-duplicate';
+          let exactSprint;
           try {
-            const jobId = `flow-${flowId}-r${expectedRevision}`;
-            const result = startApprovedRun({
+            exactSprint = startApprovedRun({
               flowId,
               expectedRevision,
               expectedPlanDigest,
               approvedSnapshot,
-              existingRunHandle,
-              spawnStart: (_sprint, fid) => ({ flowId: fid, jobId, logRef: jobId }),
-            });
-            handle = result.handle;
-            status = result.status;
+            }).sprint;
           } catch (err) {
             if (
               err instanceof RunJobFlowNotApprovedError ||
-              err instanceof RunJobDigestMismatchError ||
-              err instanceof RunJobStaleHandleConflictError
+              err instanceof RunJobDigestMismatchError
             ) {
               printError(err);
               process.exitCode = 1;
@@ -373,19 +452,95 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
             throw err;
           }
 
-          if (status === 'noop-duplicate') {
-            print(`Run ${flowId} (revision ${expectedRevision}) already started as job ${handle.jobId} — no-op.`);
+          const attempt = loadStartAttempt(root, opts.exactAttemptId!);
+          if (
+            !attempt
+            || attempt.flowId !== flowId
+            || attempt.revision !== expectedRevision
+            || attempt.planDigest !== expectedPlanDigest
+            || attempt.owner.ownerNonce !== opts.exactOwnerNonce
+            || attempt.state !== 'PROCESS_SPAWNED'
+          ) {
+            printError(new Error(getMessage('start.exact_attempt_mismatch', lang)));
+            process.exitCode = 1;
+            return;
+          }
+          const capability: ExactStartCapability = {
+            schemaVersion: 1,
+            flowId,
+            revision: expectedRevision,
+            planDigest: expectedPlanDigest,
+            generation: attempt.generation,
+            attemptId: attempt.attemptId,
+            ownerNonce: attempt.owner.ownerNonce,
+          };
+          const liveStartToken = processStartToken(process.pid);
+          const processIdentity: StartAttemptProcessIdentity = liveStartToken === null
+            ? { pid: process.pid, startToken: null, evidence: 'unavailable' }
+            : { pid: process.pid, startToken: liveStartToken, evidence: 'verified' };
+          if (
+            attempt.process?.pid !== processIdentity.pid
+            || attempt.process.startToken !== processIdentity.startToken
+            || attempt.process.evidence !== processIdentity.evidence
+          ) {
+            printError(new Error(getMessage('start.exact_attempt_mismatch', lang)));
+            process.exitCode = 1;
+            return;
+          }
+          const freshCapability = {
+            attemptId: capability.attemptId,
+            ownerNonce: capability.ownerNonce,
+          };
+          const handle: RunHandle = {
+            flowId,
+            jobId: `flow-${flowId}-r${expectedRevision}`,
+            logRef: opts.exactLogRef!,
+          };
+          const coordinator = getRunFlowCoordinator(root);
+          const settleBlocked = (code: string, detail: string): void => {
+            settleExactRunAttempt({
+              root,
+              capability,
+              process: processIdentity,
+              freshCapability,
+              settlement: {
+                state: 'BLOCKED',
+                code,
+                detail,
+                settledAt: new Date().toISOString(),
+              },
+            });
+            try {
+              coordinator.recordRunFailure({
+                flowId,
+                error: detail,
+                commandId: `child-blocked-${flowId}-${code}`,
+              });
+            } catch { /* attempt journal remains canonical */ }
+          };
+
+          if (!await runStartEnvironmentPreflight({
+            root,
+            config,
+            opts,
+            lang,
+            sandboxState: null,
+          })) {
+            settleBlocked(
+              'EXACT_CHILD_ENVIRONMENT_PREFLIGHT_HOLD',
+              'Exact child environment preflight refused execution before provider bootstrap.',
+            );
             return;
           }
 
           // The approved snapshot is the immutable plan authority for this
-          // branch. Cost-admit those exact tasks before persisting a handle or
-          // invoking runSprint; never re-plan merely to estimate cost.
+          // branch. Cost-admit those exact tasks before invoking runSprint;
+          // never re-plan merely to estimate cost.
           try {
             initCostConfig(root);
             const costConfig = loadCostConfig(root);
             const cfgAuthMode = await readAuthMode(root);
-            const costTasks: TaskCostInput[] = approvedSnapshot!.sprint.tasks.map((t) => ({
+            const costTasks: TaskCostInput[] = exactSprint.tasks.map((t) => ({
               id: t.id,
               model: t.model,
               estimatedInputTokens: t.estimatedTokens ?? 2700,
@@ -403,41 +558,25 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
                 ? ''
                 : ' (CLI: override with --force.)';
               printError(new Error(gate.message + overrideHint));
+              settleBlocked('EXACT_CHILD_COST_HOLD', gate.message);
               process.exitCode = 1;
               return;
             }
           } catch (err) {
-            printError(err instanceof Error ? err : new Error(String(err)));
+            const error = err instanceof Error ? err : new Error(String(err));
+            printError(error);
+            settleBlocked('EXACT_CHILD_COST_GATE_UNAVAILABLE', error.message);
             process.exitCode = 1;
             return;
           }
 
-          // Persist the handle BEFORE actually running: idempotency must win
-          // over a theoretical crash-mid-sprint retry (a later re-invocation
-          // with the same flowId+digest sees this handle and no-ops instead
-          // of double-starting).
-          // 583/N1: the diff base — captured BEFORE any worker writes a file,
-          // so `runs --diff` shows exactly this run's footprint. Fail-soft
-          // (non-git project → absent field → honest no-base fallback).
-          const gitBase = await captureGitBase(root);
-          saveRunHandle(root, {
-            flowId,
-            revision: expectedRevision,
-            planDigest: expectedPlanDigest,
-            handle,
-            startedAt: new Date().toISOString(),
-            // born-698c: liveness anchor — the child IS the run process.
-            pid: process.pid,
-            ...(gitBase !== undefined ? { gitBase } : {}),
-          });
-
-          const bootstrap = await bootstrapProviders(config);
-          bootstrapNotifyDispatcher({
-            projectRoot: root,
-            webhook: resolveWebhookBootstrapOption(config),
-          });
           let sprintResult;
           try {
+            const bootstrap = await bootstrapProviders(config);
+            bootstrapNotifyDispatcher({
+              projectRoot: root,
+              webhook: resolveWebhookBootstrapOption(config),
+            });
             sprintResult = await runSprint(root, config, {
               connector: bootstrap.connector,
               autoApprove: opts.autoApprove === true,
@@ -445,7 +584,39 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
               acknowledgePromptGate: opts.forcePromptGate === true,
               sandboxMode: opts.sandboxMode,
               timeoutMs: opts.timeout ? parseInt(opts.timeout, 10) : undefined,
-              preplannedSprint: approvedSnapshot!.sprint,
+              preplannedSprint: exactSprint,
+              exactPlanAuthority: {
+                flowId,
+                revision: expectedRevision,
+                planDigest: expectedPlanDigest,
+              },
+              onExactPlanMaterialize: () => {
+                materializeExactPlanTaskArtifacts(root, {
+                  capability,
+                  approvedSnapshot: approvedSnapshot!,
+                });
+              },
+              onExecutionAdmitted: async () => {
+                const gitBase = await captureGitBase(root);
+                const admitted = admitExactRunAttempt({
+                  root,
+                  capability,
+                  approvedSnapshot: approvedSnapshot!,
+                  process: processIdentity,
+                  handle,
+                  freshCapability,
+                  ...(gitBase !== undefined ? { gitBase } : {}),
+                  onAdmitted: ({ handle: admittedHandle }) => {
+                    coordinator.recordRunStarted({
+                      handle: admittedHandle,
+                      commandId: `run-started-${flowId}-r${expectedRevision}`,
+                    });
+                  },
+                });
+                if (admitted.lifecyclePublication.status === 'uncertain') {
+                  throw new Error('EXACT_START_RUN_STARTED_PUBLICATION_UNCERTAIN');
+                }
+              },
               ...(runtime.providerAuthority
                 ? { providerAuthority: runtime.providerAuthority }
                 : {}),
@@ -461,36 +632,47 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
               flowId,
             });
           } catch (err) {
-            // born-698b: a catchable child death writes its OWN honest closure —
-            // the flow never sits in DETACHED_RUNNING limbo behind a crash the
-            // parent already stopped watching. (SIGKILL-class deaths are covered
-            // by the read-path death-sweep, born-698c.)
             try {
-              const { getRunFlowCoordinator } = await import('../../orchestra/run-flow-coordinator-registry.js');
-              getRunFlowCoordinator(root).recordRunFailure({
+              settleExactRunAttempt({
+                root,
+                capability,
+                process: processIdentity,
+                freshCapability,
+                settlement: {
+                  state: 'FAILED',
+                  code: 'EXACT_CHILD_RUNTIME_FAILED',
+                  detail: err instanceof Error ? err.message : String(err),
+                  settledAt: new Date().toISOString(),
+                },
+              });
+            } catch { /* death sweep/reconciliation owns an uncertain settlement */ }
+            try {
+              coordinator.recordRunFailure({
                 flowId,
                 error: `run crashed before completion: ${err instanceof Error ? err.message : String(err)}`,
                 commandId: `child-crash-${flowId}`,
               });
-            } catch { /* closure is best-effort — the original error is what matters */ }
+            } catch { /* attempt journal remains canonical */ }
             throw err;
           }
-          // G2 durable-fix (SURF-3): the successful run writes its OWN durable
-          // RUN_COMPLETED closure so the flow leaves DETACHED_RUNNING in the
-          // event-log (symmetric to the born-698b crash-closure above). For an
-          // API-origin flow whose events.jsonl is at DETACHED_RUNNING this folds
-          // cleanly to COMPLETED; for a do-origin flow (empty events.jsonl) the
-          // reduce throws and the best-effort wrap swallows it (harmless no-op) —
-          // that path stays covered by the read-side deriveLegacyContext + inbox
-          // jobs-dir join until the do→coordinator migration (deferred).
+          settleExactRunAttempt({
+            root,
+            capability,
+            process: processIdentity,
+            freshCapability,
+            settlement: {
+              state: 'COMPLETED',
+              code: 'EXACT_CHILD_COMPLETED',
+              settledAt: new Date().toISOString(),
+            },
+          });
           try {
-            const { getRunFlowCoordinator } = await import('../../orchestra/run-flow-coordinator-registry.js');
-            getRunFlowCoordinator(root).recordCompletion({
+            coordinator.recordCompletion({
               flowId,
               summary: `run ${sprintResult.id} completed`,
               commandId: `child-complete-${flowId}`,
             });
-          } catch { /* closure is best-effort — a folding error must never fail the run */ }
+          } catch { /* terminal attempt journal remains canonical */ }
           print(formatSprintSummary(sprintResult));
           return;
         }
@@ -527,76 +709,16 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
           // Continue with sprint in sandbox mode (does not abort)
         }
 
-        // ─── Orphan Detection (Sprint 135 — coordinator resilience) ──
-        if (!opts.force) {
-          // Check all PID files for orphaned sprints
-          const pidSprintIds = listPidFiles(root);
-          // Also check last_sprint_id from config
-          const lastSprintId = (config as unknown as Record<string, unknown>).last_sprint_id as string | undefined;
-          if (lastSprintId && !pidSprintIds.includes(lastSprintId)) {
-            pidSprintIds.push(lastSprintId);
-          }
-          for (const sid of pidSprintIds) {
-            const orphan = detectOrphan(root, sid);
-            if (orphan) {
-              if (opts.autoApprove) {
-                // Auto-archive: move orphan artifacts to .brain/archive/
-                archiveOrphan(root, orphan);
-                print(`Orphan sprint ${sid} (PID ${orphan.pid}) auto-archived.`);
-              } else {
-                printError(new Error(
-                  `Orphan sprint detected: ${sid} (PID ${orphan.pid} is dead). ` +
-                  'Run with --auto-approve to auto-archive, or use --force to skip this check.',
-                ));
-                if (sandboxState) restoreSandbox(root, sandboxState);
-                process.exitCode = 2;
-                return;
-              }
-            }
-          }
-        }
-
-        // ─── Sprint Lock Check ─────────────────────────────────────
-        if (!opts.force) {
-          const lockInfo = isSprintLocked(root);
-          if (lockInfo.locked) {
-            if (sandboxState) restoreSandbox(root, sandboxState);
-            printError(new Error(
-              `Sprint already running (PID ${lockInfo.pid}, env: ${lockInfo.env}, sprint: ${lockInfo.sprintId}, started: ${lockInfo.acquiredAt}). Use --force to override.`
-            ));
-            process.exitCode = 1;
-            return;
-          }
-        }
-
-        // Pre-flight doctor check (unless --force)
-        if (!opts.force) {
-          const spawnBackend = (config as unknown as Record<string, unknown>).spawn_backend as string | undefined;
-          const doctorResult = runDoctorChecks(root, undefined, spawnBackend);
-          const requiredFailed = doctorResult.checks.filter(c => c.required && !c.passed);
-          if (requiredFailed.length > 0) {
-            if (sandboxState) restoreSandbox(root, sandboxState);
-            printError(new Error(`Pre-flight failed: ${requiredFailed.map(c => `${c.name}: ${c.message}`).join('; ')}`));
-            print(getMessage('start.use_force', lang));
-            process.exitCode = 1;
-            return;
-          }
-        }
-
-        // LIMIT-GATE-WIRE: the existing config-gated subscription probe is
-        // evaluated after environment health checks and before any planning,
-        // cost work, or worker spawn. Disabled remains a zero-probe no-op.
-        // Dry-run surfaces the would-block verdict but continues the
-        // non-spawning preview; --force preserves the existing preflight
-        // bypass shared with doctor and cost checks.
-        if (!opts.force) {
-          const limitGate = await checkStartLimitGate(root, lang);
-          if (limitGate.message) print(limitGate.message);
-          if (limitGate.blocked && !opts.dryRun) {
-            if (sandboxState) restoreSandbox(root, sandboxState);
-            process.exitCode = 1;
-            return;
-          }
+        // Orphan, sprint-lock, doctor and provider-limit authority is shared
+        // with exact-snapshot children; neither ingress can bypass it.
+        if (!await runStartEnvironmentPreflight({
+          root,
+          config,
+          opts,
+          lang,
+          sandboxState,
+        })) {
+          return;
         }
 
         // WIRE-002 (MASTER-PLAN §4G): wire DECKENT→USER:NOTIFY to this terminal.

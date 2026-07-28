@@ -135,7 +135,7 @@ describe('Gap C — trusted-internal authority wrap in buildEngineRuntime', () =
       flows: [],
       policy: { id: 'p', trigger: 'scheduled', action: 'start', guard: { requiresApproval: false } },
       runTask: vi.fn().mockResolvedValue({ taskId: 't' }),
-      runSprint: vi.fn().mockResolvedValue({}),
+      executeSprint: vi.fn().mockResolvedValue({}),
       waitForResult: vi.fn().mockResolvedValue(doneResult),
     });
   }

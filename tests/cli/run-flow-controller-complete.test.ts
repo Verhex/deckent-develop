@@ -24,6 +24,7 @@ import { join } from 'node:path';
 vi.mock('../../src/orchestra/planner.js', () => ({
   resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
   createPlannerTaskModelPolicy: vi.fn((defaultModel: string) => ({ defaultModel, allowedModels: [defaultModel] })),
+  normalizePlannerDependencies: vi.fn(() => ({ resolvedCount: 0, dropped: [] })),
   callZeroConfigPlanner: vi.fn(() => ({
     reasoning: 'canned single-task plan (hermetic planner boundary)',
     tasks: [{
@@ -44,7 +45,7 @@ vi.mock('../../src/orchestra/brain.js', () => ({
 
 import { planSprint, readContext } from '../../src/orchestra/brain.js';
 import { createRunFlowController, type RunFlowControllerDeps } from '../../src/cli/repl/run-flow-controller.js';
-import type { RunHandle } from '../../src/orchestra/run-job-service.js';
+import { getRunFlowCoordinator } from '../../src/orchestra/run-flow-coordinator-registry.js';
 import type { RunCompletionInfo } from '../../src/cli/repl/run-completion-watch.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, ResolvedConfig, BrainContext } from '../../src/core/types.js';
@@ -129,19 +130,23 @@ describe('createRunFlowController — applyRunCompletion() (TERM5-CTRL, 427-005)
       config: makeConfig(),
       now: nowFn,
       generateFlowId: () => 'flow-1',
+      forceScope: true,
+      scopeEvidence: { status: 'available' as const, trackedFiles: [] },
       ...(spawnStart ? { spawnStart } : {}),
     };
   }
 
   async function driveToDetachedRunning(jobId = 'fake-job-1') {
-    const spawnStart = vi.fn((_sprint: Sprint, flowId: string): RunHandle => ({
-      flowId, jobId, logRef: '/fake/log.log',
-    }));
+    const spawnStart = vi.fn(() => ({ pid: process.pid }));
     const controller = createRunFlowController(makeControllerDeps(spawnStart));
     await controller.proposeRun('Ship the thing');
     controller.approve({ id: 'alperen' });
     const started = controller.startApproved!();
-    expect(started.state).toBe('DETACHED_RUNNING');
+    expect(started.state).toBe('STARTING');
+    getRunFlowCoordinator(root).recordRunStarted({
+      handle: { flowId: 'flow-1', jobId, logRef: '/fake/log.log' },
+      commandId: `test-admitted-${jobId}`,
+    });
     return controller;
   }
 

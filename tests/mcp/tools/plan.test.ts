@@ -16,6 +16,10 @@ vi.mock('../../../src/orchestra/brain.js', () => ({
   planSprint: vi.fn(),
 }));
 
+vi.mock('../../../src/orchestra/run-flow-plan-service.js', () => ({
+  planRunFlow: vi.fn(),
+}));
+
 vi.mock('../../../src/core/provider.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../src/core/provider.js')>()),
   bootstrapProviders: vi.fn().mockResolvedValue({
@@ -48,11 +52,13 @@ vi.mock('../../../src/mcp/helpers/format.js', () => ({
 import { loadConfig } from '../../../src/core/config.js';
 import { bootstrapProviders } from '../../../src/core/provider.js';
 import { readContext, planSprint } from '../../../src/orchestra/brain.js';
+import { planRunFlow } from '../../../src/orchestra/run-flow-plan-service.js';
 import { enrichResponse } from '../../../src/mcp/helpers/enrich.js';
 
 const mockLoadConfig = vi.mocked(loadConfig);
 const mockReadContext = vi.mocked(readContext);
 const mockPlanSprint = vi.mocked(planSprint);
+const mockPlanRunFlow = vi.mocked(planRunFlow);
 
 function makeServer() {
   const handlers: Map<string, { schema: unknown; handler: Function }> = new Map();
@@ -87,7 +93,7 @@ function makeDefaultMocks(overrides: Partial<{
     activeModeConfig: { max_workers: overrides.presetMaxWorkers ?? maxWorkers },
   } as any);
   mockReadContext.mockReturnValue({ directives: 'some directives', memory: '', retro: '', debt: '', patterns: [] } as any);
-  mockPlanSprint.mockReturnValue({
+  const plannedSprint = {
     id: 'sprint-001',
     number: 1,
     tasks: tasks.map((t) => ({
@@ -118,7 +124,64 @@ function makeDefaultMocks(overrides: Partial<{
         failureReason: null,
       },
     },
-  } as any);
+  } as any;
+  mockPlanSprint.mockReturnValue(plannedSprint);
+  mockPlanRunFlow.mockImplementation(async (serviceInput: any) => {
+    const generatedSprint = await mockPlanSprint(
+      serviceInput.projectRoot,
+      serviceInput.config,
+      serviceInput.source.brainContext,
+      serviceInput.recommendation,
+      {
+        mode: serviceInput.previewOptions?.mode,
+        dryRun: true,
+      },
+    ) as any;
+    const configuredMaxWorkers = maxWorkers;
+    const waves = [];
+    for (let offset = 0, wave = 1; offset < generatedSprint.tasks.length; offset += configuredMaxWorkers, wave += 1) {
+      waves.push({
+        wave,
+        slots: generatedSprint.tasks
+          .slice(offset, offset + configuredMaxWorkers)
+          .map((_task: unknown, index: number) => offset + index + 1),
+      });
+    }
+    const executionTopology = {
+      schemaVersion: 1,
+      configuredMaxWorkers,
+      effectiveConcurrency: Math.min(configuredMaxWorkers, generatedSprint.tasks.length),
+      verdict: 'pass',
+      waves,
+    };
+    return {
+      flowId: 'flow-mcp-1',
+      revision: 1,
+      planDigest: 'digest-mcp-1',
+      sprint: generatedSprint,
+      preview: {
+        flowId: 'flow-mcp-1',
+        revision: 1,
+        planDigest: 'digest-mcp-1',
+        planDigestVersion: 3,
+        taskSummaries: generatedSprint.tasks.map((item: any) => ({
+          title: item.title,
+          summary: item.description,
+        })),
+        policyDecision: 'allow',
+        gateResult: 'skipped',
+        topology: executionTopology,
+        topologyGateResult: 'pass',
+        scopeGateResult: 'pass',
+      },
+      context: {
+        state: serviceInput.approval ? 'APPROVED' : 'AWAITING_APPROVAL',
+      },
+      sourceAuthority: {},
+      approval: serviceInput.approval ? 'approved' : 'awaiting',
+      reusedDurablePlan: false,
+    } as any;
+  });
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -148,6 +211,19 @@ describe('registerPlanTool', () => {
       // Validate shape accepts expected inputs
       const result = schema.safeParse({ dryRun: true, mode: 'ai' });
       expect(result.success).toBe(true);
+    });
+
+    it('schema exposes exact-plan approval and scope acknowledgement', () => {
+      const server = makeServer();
+      registerPlanTool(server as any);
+      const [, schemaObj] = server.registerTool.mock.calls[0];
+      const schema = (schemaObj as any).inputSchema;
+      const result = schema.safeParse({ approve: true, acknowledgeScopePaths: true });
+      expect(result.success).toBe(true);
+      expect(result.data).toMatchObject({
+        approve: true,
+        acknowledgeScopePaths: true,
+      });
     });
 
     it('mode parameter accepts ai, structured, auto values', () => {
@@ -310,6 +386,36 @@ describe('registerPlanTool', () => {
   // ── Task list response ─────────────────────────────────────────────────────
 
   describe('task list response', () => {
+    it('returns and optionally approves the durable exact flow tuple', async () => {
+      const server = makeServer();
+      registerPlanTool(server as any);
+      makeDefaultMocks();
+
+      const result = await server.callTool('deckent_plan', {
+        approve: true,
+        acknowledgeScopePaths: true,
+      });
+      const content = JSON.parse(result.content[0].text);
+
+      expect(content).toMatchObject({
+        flowId: 'flow-mcp-1',
+        revision: 1,
+        planDigest: 'digest-mcp-1',
+        approval: 'approved',
+      });
+      expect(mockPlanRunFlow).toHaveBeenCalledWith(expect.objectContaining({
+        lineage: expect.objectContaining({
+          tenantId: 'local',
+          actor: { id: 'mcp-operator' },
+          origin: 'mcp',
+        }),
+        approval: expect.objectContaining({
+          actor: { id: 'mcp-operator' },
+          acknowledgeScopePaths: true,
+        }),
+      }));
+    });
+
     it('returns tasks with id, title, model, priority fields', async () => {
       const server = makeServer();
       registerPlanTool(server as any);

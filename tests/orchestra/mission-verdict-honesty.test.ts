@@ -174,7 +174,7 @@ describe('runV2Engine — honest DEBT never counts as mission failure (mission-w
 
     const deps: RunV2EngineDeps = {
       runTask: fakeRunTaskFor({ 'item-1': 'DONE', 'item-2': 'GO_WITH_TECH_DEBT' }),
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       store,
       maxIterations: BOUNDED,
     };
@@ -200,7 +200,7 @@ describe('runV2Engine — honest DEBT never counts as mission failure (mission-w
 
     const deps: RunV2EngineDeps = {
       runTask: fakeRunTaskFor({ boom: 'NO_GO' }),
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       store,
       maxIterations: BOUNDED,
     };
@@ -221,7 +221,7 @@ describe('runV2Engine — honest DEBT never counts as mission failure (mission-w
 
     const deps: RunV2EngineDeps = {
       runTask: fakeRunTaskFor({ 'ok-item': 'DONE', 'bad-item': 'NO_GO' }),
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       store,
       maxIterations: BOUNDED,
     };
@@ -239,7 +239,7 @@ describe('runV2Engine — honest DEBT never counts as mission failure (mission-w
     const deps: RunV2EngineDeps = {
       // No settleDetail on the returned ResultLike — mirrors autonomous.ts:535 today.
       runTask: async () => ({ ok: true, reason: 'plain ok' }),
-      runSprint: async () => undefined,
+      executeSprint: async () => ({ ok: true }),
       store,
       maxIterations: BOUNDED,
     };

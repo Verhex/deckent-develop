@@ -4,11 +4,13 @@
 // `config.autonomous.engine === 'v2'` (see `isV2Engine`). The default (engine
 // absent or 'v1') leaves the existing v1 loop untouched — a safe cutover.
 //
-// All execution primitives (runTask / runSprint / runCapability / notify) are
+// All execution primitives (runTask / exact Sprint executor / runCapability / notify) are
 // INJECTED so this module is hermetically testable: the live CLI passes the real
 // spawn+wait wiring; tests pass fakes and a real SqliteMissionStore at a tmpdir.
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { ResolvedConfig } from '../../../core/config-types.js';
+import type { CanonicalExactSprintExecutionInput } from '../../exact-plan-start-service.js';
+import { readContext } from '../../sprint-planner.js';
 import { SqliteMissionStore } from './sqlite-mission-store.js';
 import { buildMissionDispatch, type MissionTaskContext } from './mission-dispatch.js';
 import { makeMissionDeliver, type MissionNotifyPayload } from './mission-deliver.js';
@@ -16,6 +18,7 @@ import { migrateBacklogJson } from './mission-migrate.js';
 import {
   PRODUCTION_V2_RUNNER_REGISTRY,
   bindMissionRunnerRegistry,
+  resolveMissionSprintExecutionSource,
   type BoundMissionRunnerRegistryV1,
 } from './mission-kind-admission.js';
 import {
@@ -44,7 +47,94 @@ import type {
   MissionStore,
   ResultLike,
   SettleDetail,
+  WorkItem,
 } from './mission-types.js';
+
+export interface MissionSprintExecutionContext {
+  readonly projectRoot: string;
+  readonly config: ResolvedConfig;
+  readonly mission: Mission;
+  readonly item: Readonly<WorkItem>;
+  readonly claim: MissionDispatchClaim;
+  readonly execution: CanonicalExactSprintExecutionInput;
+}
+
+function buildMissionExactSprintExecution(
+  projectRoot: string,
+  config: ResolvedConfig,
+  mission: Readonly<Mission>,
+  item: Readonly<WorkItem>,
+  claim: MissionDispatchClaim,
+): CanonicalExactSprintExecutionInput {
+  const source = resolveMissionSprintExecutionSource(item);
+  const actor = {
+    id: mission.createdBy ?? 'mission-engine',
+    tenantId: mission.tenant,
+  };
+  const correlationId = `mission:${mission.tenant}:${mission.id}:${item.id}`;
+  const ingress = {
+    kind: 'mission' as const,
+    id: item.id,
+    ...(source.kind === 'intent' ? { intent: source.intent } : {}),
+    ...(source.kind === 'directives' ? { directives: source.directivesRef } : {}),
+  };
+  const common = {
+    projectRoot,
+    config,
+    lineage: {
+      tenantId: mission.tenant,
+      actor,
+      origin: 'autonomous' as const,
+      correlationId,
+      idempotencyKey: `${correlationId}:revision:${item.revision}`,
+      sourceId: item.id,
+      authorization: {
+        kind: 'delegated' as const,
+        authorityId: `mission-engine:${mission.id}`,
+        decisionId: claim.attemptId,
+      },
+    },
+    executionMode: 'in-process' as const,
+  };
+  if (source.kind === 'exact-ref') {
+    return {
+      ...common,
+      source: { kind: 'exact-ref', ref: source.ref, ingress },
+    };
+  }
+  const flowDigest = createHash('sha256')
+    .update(['mission', mission.tenant, mission.id, item.id].join('\0'))
+    .digest('hex')
+    .slice(0, 32);
+  const context = readContext(projectRoot);
+  return {
+    ...common,
+    source: {
+      kind: 'unplanned',
+      proposal: {
+        flowId: `mission-${flowDigest}`,
+        tenant: mission.tenant,
+        project: config.projectName || 'deckent-project',
+        actor,
+        origin: 'autonomous',
+        revision: 1,
+        intentSummary: source.kind === 'intent' ? source.intent : mission.title,
+      },
+      planSource: source.kind === 'directives'
+        ? { sourceKind: 'directives', brainContext: context }
+        : { sourceKind: 'intent', baseContext: context },
+      recommendation: {
+        size: 'full',
+        maxWorkers: typeof config.activeModeConfig.max_workers === 'number'
+          ? config.activeModeConfig.max_workers
+          : 4,
+        modelConstraint: null,
+        reason: 'canonical mission exact-sprint ingress',
+      },
+      ingress,
+    },
+  };
+}
 
 /**
  * Pure flag predicate — true only when the project config opts into the v2
@@ -69,8 +159,12 @@ export interface RunV2EngineDeps {
     claim: MissionWorkerInvocationClaimBinding,
     grant: Readonly<MissionWorkerInvocationExecutionGrant>,
   ) => Promise<MissionWorkerInvocationExecution>;
-  /** kind='sprint' — run the full sprint lifecycle (success unless it throws). */
-  runSprint: (projectRoot: string, config: ResolvedConfig) => Promise<unknown>;
+  /** kind='sprint' — thin adapter to the canonical exact-sprint executor.
+   *  Mission identity and exact claim authority are included; no fresh-plan
+   *  lifecycle function is accepted at this boundary. */
+  executeSprint: (
+    input: MissionSprintExecutionContext,
+  ) => Promise<ResultLike>;
   /** kind='capability' — optional broker; absent → capability items fail clearly. */
   runCapability?: (target: unknown) => Promise<ResultLike>;
   /** Settle-delivery channel. Absent → no-op (mission still settles silently). */
@@ -280,7 +374,7 @@ function resolvePerTenantPoolSize(config: ResolvedConfig): number | undefined {
  *
  * 1. Open + migrate the durable mission store (SqliteMissionStore @ projectRoot).
  * 2. One-time backlog.json → store import (no-op if missions already exist).
- * 3. Build the real DispatchFn (kind → injected runTask/runSprint/runCapability).
+ * 3. Build the real DispatchFn (kind → injected runTask/exact Sprint executor/runCapability).
  * 4. Build the settle → notify delivery handler.
  * 5. Run the concurrent, race-free scheduler with a config-resolved pool size.
  */
@@ -312,7 +406,30 @@ export async function runV2Engine(
         deps.workerInvocationCoordinator,
         deps.runAdmittedTask,
       ),
-      runSprint: deps.runSprint,
+      executeSprint: async (item, claim) => {
+        const mission = store.getMission(claim.missionId);
+        if (!mission || mission.id !== item.missionId) {
+          return {
+            ok: false,
+            dispatchDisposition: 'parked',
+            reason: 'MISSION_EXACT_SPRINT_HOLD:mission_not_found',
+          };
+        }
+        return deps.executeSprint({
+          projectRoot,
+          config,
+          mission,
+          item,
+          claim,
+          execution: buildMissionExactSprintExecution(
+            projectRoot,
+            config,
+            mission,
+            item,
+            claim,
+          ),
+        });
+      },
       ...(deps.runCapability ? { runCapability: deps.runCapability } : {}),
     });
     // A generic primitive merely being injected does not admit its kind. The

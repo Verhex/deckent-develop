@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { SqliteMissionStore } from '../../../../src/orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import { migrateBacklogJson } from '../../../../src/orchestra/autonomous/mission-store/mission-migrate.js';
 import {
-  computeSprintSnapshotDigest,
   PRODUCTION_V2_ADMISSION,
 } from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
 import type {
@@ -211,7 +210,7 @@ describe('migrateBacklogJson', () => {
     expect(valid).toMatchObject({ status: 'pending', kind: 'task' });
     expect(valid.admissionFence?.registryDigest).toBe(PRODUCTION_V2_ADMISSION.registryDigest);
     expect(quarantined).toMatchObject({
-      status: 'failed',
+      status: 'parked',
       kind: 'sprint',
       spec: { directivesRef: 'D' },
     });
@@ -219,10 +218,10 @@ describe('migrateBacklogJson', () => {
     expect(quarantined.lastResult).toMatchObject({
       ok: false,
       missionAdmission: {
-        code: 'SPRINT_SNAPSHOT_REQUIRED',
+        code: 'SPRINT_RUNNER_UNWIRED',
         itemId: 'unwired',
         persistedKind: 'sprint',
-        decision: 'failed-closed',
+        decision: 'parked-hold',
         source: 'legacy-backlog-import',
       },
     });
@@ -277,23 +276,17 @@ describe('migrateBacklogJson', () => {
     const r = root();
     const path = join(r, '.deckent', 'autonomous', 'backlog.json');
     mkdirSync(join(r, '.deckent', 'autonomous'), { recursive: true });
-    const snapshotPayload = {
-      version: 1 as const,
-      revision: 'legacy-sprint-revision-1',
-      approvalEvidenceRef: 'approval:legacy-sprint-1',
-      directives: '# Legacy sprint directives',
-      executionPlan: { tasks: [] },
+    const exactPlanRef = {
+      schemaVersion: 1 as const,
+      flowId: 'legacy-sprint-flow-1',
+      revision: 1,
+      planDigest: 'b'.repeat(64),
     };
     const source = JSON.stringify({
       _version: '1.0',
       entries: [{
         id: 'valid-unwired-sprint', title: 'Unwired sprint', kind: 'sprint',
-        spec: {
-          sprintSnapshot: {
-            ...snapshotPayload,
-            digest: computeSprintSnapshotDigest(snapshotPayload),
-          },
-        },
+        spec: { exactPlanRef },
         policy: 'auto', trigger: { type: 'one-off' }, status: 'pending',
       }],
     });
@@ -307,7 +300,7 @@ describe('migrateBacklogJson', () => {
     expect(quarantined.lastResult).toMatchObject({
       ok: false,
       missionAdmission: {
-        code: 'SPRINT_SNAPSHOT_RUNNER_UNWIRED',
+        code: 'SPRINT_RUNNER_UNWIRED',
         itemId: 'valid-unwired-sprint',
         persistedKind: 'sprint',
         decision: 'parked-hold',
@@ -318,7 +311,7 @@ describe('migrateBacklogJson', () => {
     expect(s.claimItem('valid-unwired-sprint', 'bypass')).toBe(false);
     expect(s.listItems('legacy')[0]!.lastResult).toMatchObject({
       missionAdmission: {
-        code: 'SPRINT_SNAPSHOT_RUNNER_UNWIRED',
+        code: 'SPRINT_RUNNER_UNWIRED',
         authorityRevision: PRODUCTION_V2_ADMISSION.registryRevision,
         authorityDigest: PRODUCTION_V2_ADMISSION.registryDigest,
         source: 'legacy-backlog-import',

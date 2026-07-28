@@ -1094,6 +1094,9 @@ export async function runSpawnPhase(
         spawnBackend,
         attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
         providerAuthority: opts?.providerAuthority,
+        ...(opts?.exactPlanAuthority
+          ? { exactPlanAuthority: opts.exactPlanAuthority }
+          : {}),
       });
       // Spawn succeeded — promote to ACTIVE and re-persist.
       persistPhaseTransition(projectRoot, sprint, SprintPhase.SPAWN, SprintStatus.ACTIVE);

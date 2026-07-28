@@ -70,11 +70,21 @@ export function executeInboxDecision(
 
     // 'start' or the full-ahead tail — same spawn builder as the API route.
     const snapshot = getRunFlowCoordinator(root).getFlow(flowId).approvedSnapshot;
+    const flow = getRunFlowCoordinator(root).getFlow(flowId);
     const result = startRunFlow(root, flowId, {
+      lineage: {
+        tenantId: flow.proposal?.tenant ?? 'local',
+        actor,
+        origin: 'cli',
+        correlationId: flowId,
+        idempotencyKey: `start:${flowId}:r${snapshot?.revision ?? 0}`,
+        sourceId: 'terminal:run-flow-inbox',
+        authorization: { kind: 'approved-actor' },
+      },
       spawnStart: buildFlowStartSpawn(root, snapshot?.revision ?? 0, snapshot?.planDigest ?? ''),
     });
-    const startLine = result.status === 'started'
-      ? getMessage('runs.decide.started', lang, { jobId: result.context.handle?.jobId ?? `flow-${flowId}` })
+    const startLine = result.status === 'accepted'
+      ? getMessage('runs.decide.started', lang, { jobId: result.attempt.attemptId })
       : getMessage('runs.decide.start_duplicate', lang);
     return approvedLine !== undefined ? `${approvedLine} · ${startLine}` : startLine;
   } catch (error) {
@@ -145,13 +155,23 @@ function runDecide(root: string, flowId: string, flags: DecideFlags, lang: strin
 
   if (flags.start && !flags.reject) {
     const snapshot = getRunFlowCoordinator(root).getFlow(flowId).approvedSnapshot;
+    const flow = getRunFlowCoordinator(root).getFlow(flowId);
     // A missing snapshot falls through to the service, which refuses with the
     // honest `not APPROVED` message — same wording the API answers with.
     const result = startRunFlow(root, flowId, {
+      lineage: {
+        tenantId: flow.proposal?.tenant ?? 'local',
+        actor: CLI_OPERATOR_ACTOR,
+        origin: 'cli',
+        correlationId: flowId,
+        idempotencyKey: `start:${flowId}:r${snapshot?.revision ?? 0}`,
+        sourceId: 'cli:runs',
+        authorization: { kind: 'approved-actor' },
+      },
       spawnStart: buildFlowStartSpawn(root, snapshot?.revision ?? 0, snapshot?.planDigest ?? ''),
     });
-    print(result.status === 'started'
-      ? getMessage('runs.decide.started', lang, { jobId: result.context.handle?.jobId ?? `flow-${flowId}` })
+    print(result.status === 'accepted'
+      ? getMessage('runs.decide.started', lang, { jobId: result.attempt.attemptId })
       : getMessage('runs.decide.start_duplicate', lang));
   }
 

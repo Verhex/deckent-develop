@@ -3,6 +3,7 @@
 // Spec: docs/superpowers/specs/2026-06-07-autonomous-execution-engine-design.md §5
 
 import type { CapabilityTarget, ActorContext } from '../../core/work-model.js';
+import type { ExactPlanReferenceV1 } from '../../core/run-flow-contract.js';
 
 export type BacklogKind = 'task' | 'sprint' | 'capability' | 'process';
 export type BacklogPolicy = 'auto' | 'approval-required' | 'risk-tagged';
@@ -23,8 +24,14 @@ export interface BacklogEntry {
   spec: {
     description?: string;
     directivesRef?: string;
+    /** Domain-general unplanned Sprint intent. Mutually exclusive with
+     *  directivesRef and exactPlanRef at exact-plan admission. */
+    intent?: string;
     scopeDir?: string;
     capabilityTarget?: CapabilityTarget;
+    /** Canonical RunFlow snapshot identity for kind=sprint. The executable
+     *  Sprint remains in RunFlowStore; backlog JSON never embeds a second plan. */
+    exactPlanRef?: ExactPlanReferenceV1;
   };
   policy: BacklogPolicy;
   provider?: string;
@@ -37,6 +44,14 @@ export interface BacklogEntry {
    *  hash-chain records the actual principal instead of a constant 'system'.
    *  Optional + additive: actor-less entries keep the prior 'system' fallback. */
   actor?: ActorContext;
+  /** Stable end-to-end lineage for plan, approval, execution and settlement.
+   *  Ingresses should author this once; legacy rows without one fail closed at
+   *  exact-sprint execution rather than receiving a new identity on replay. */
+  correlationId?: string;
+  /** Optional parent event/effect reference within the same correlation chain. */
+  causationId?: string;
+  /** Durable ingress provenance used by exact plan/start lineage. */
+  origin?: 'cli' | 'mcp' | 'chat' | 'autonomous' | 'webhook' | 'scheduled' | 'api' | 'ide';
   /** Goal-planner (Phase 1): a lightweight, not-yet-detailed item. The full
    *  spec.description is generated just-in-time at dispatch (Phase 2). */
   planned?: boolean;

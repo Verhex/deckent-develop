@@ -93,6 +93,8 @@ vi.mock('../../src/mcp/tools/job-runner.js', () => ({
 
 vi.mock('../../src/core/provider.js', () => ({
   bootstrapProviders: vi.fn(),
+  orderedRoleProviders: vi.fn(() => ({ primary: 'claude', fallbacks: [] })),
+  ProviderError: class ProviderError extends Error {},
 }));
 
 vi.mock('../../src/core/cost-config-loader.js', () => ({
@@ -132,10 +134,15 @@ vi.mock('../../src/cli/helpers/detached-start.js', () => ({
   spawnDetachedDeckent: vi.fn(),
 }));
 
+vi.mock('../../src/orchestra/run-flow-decision-service.js', () => ({
+  startRunFlow: vi.fn(),
+}));
+
 import { loadConfig } from '../../src/core/config.js';
 import { readContext, planSprint } from '../../src/orchestra/brain.js';
 import { loadApprovedSnapshot, loadRunHandle, saveRunHandle } from '../../src/core/run-flow-store.js';
 import { spawnDetachedDeckent } from '../../src/cli/helpers/detached-start.js';
+import { startRunFlow } from '../../src/orchestra/run-flow-decision-service.js';
 import { fork } from 'node:child_process';
 import { evaluateCostGate } from '../../src/core/cost-gate.js';
 
@@ -248,6 +255,26 @@ describe('deckent_start — approved-snapshot branch (born-673b)', () => {
     vi.mocked(loadApprovedSnapshot).mockReturnValue(undefined);
     vi.mocked(loadRunHandle).mockReturnValue(undefined);
     vi.mocked(spawnDetachedDeckent).mockReturnValue({ pid: 4242, logPath: '/fake/log.log', flowId: 'flow-1' });
+    vi.mocked(startRunFlow).mockImplementation((_root, flowId, options) => {
+      options.spawnStart({
+        capability: {
+          schemaVersion: 1,
+          flowId,
+          revision: 1,
+          planDigest: 'digest-abc',
+          generation: 1,
+          attemptId: 'attempt-1',
+          ownerNonce: 'owner-1',
+        },
+        sprint: makeSprint(),
+        lineage: {} as never,
+      });
+      return {
+        status: 'accepted',
+        context: {} as never,
+        attempt: { attemptId: 'attempt-1' } as never,
+      };
+    });
     vi.mocked(planSprint).mockResolvedValue(makeSprint());
     vi.mocked(evaluateCostGate).mockReturnValue({
       ok: true,
@@ -300,8 +327,8 @@ describe('deckent_start — approved-snapshot branch (born-673b)', () => {
 
       expect(result.isError).toBeUndefined();
       expect(parsed.success).toBe(true);
-      expect(parsed.status).toBe('RUNNING');
-      expect(parsed.jobId).toBe('flow-flow-1-r1');
+      expect(parsed.status).toBe('STARTING');
+      expect(parsed.jobId).toBe('attempt-1');
 
       // Fresh-replan öldü: neither readContext nor planSprint is reachable
       // from this branch — the sprint is the exact one from the snapshot.
@@ -314,7 +341,11 @@ describe('deckent_start — approved-snapshot branch (born-673b)', () => {
       expect(vi.mocked(spawnDetachedDeckent)).toHaveBeenCalledTimes(1);
       expect(vi.mocked(spawnDetachedDeckent)).toHaveBeenCalledWith(
         ['start', '--flow-id', 'flow-1', '--revision', '1', '--plan-digest', 'digest-abc'],
-        { projectRoot: sandboxRoot, flowId: 'flow-1' },
+        {
+          projectRoot: sandboxRoot,
+          flowId: 'flow-1',
+          exactStart: { attemptId: 'attempt-1', ownerNonce: 'owner-1' },
+        },
       );
 
       // born-681 tek-yazar sözleşmesi: MCP-parent handle'ı PERSIST ETMEZ —
@@ -343,7 +374,11 @@ describe('deckent_start — approved-snapshot branch (born-673b)', () => {
           'start', '--flow-id', 'flow-1', '--revision', '1', '--plan-digest', 'digest-abc',
           '--auto-approve', '--force-scope', '--force-prompt-gate', '--force', '--sandbox-mode', '--timeout', '60000',
         ],
-        { projectRoot: sandboxRoot, flowId: 'flow-1' },
+        {
+          projectRoot: sandboxRoot,
+          flowId: 'flow-1',
+          exactStart: { attemptId: 'attempt-1', ownerNonce: 'owner-1' },
+        },
       );
     });
 
@@ -376,7 +411,11 @@ describe('deckent_start — approved-snapshot branch (born-673b)', () => {
     it('noop-duplicate: an identical CAS-matching second start does not re-spawn or re-save', async () => {
       const snapshot = makeApprovedSnapshot();
       vi.mocked(loadApprovedSnapshot).mockReturnValue(snapshot);
-      vi.mocked(loadRunHandle).mockReturnValue(makeRunHandleRecord());
+      vi.mocked(startRunFlow).mockReturnValue({
+        status: 'noop-duplicate',
+        context: {} as never,
+        attempt: { attemptId: 'attempt-1' } as never,
+      });
 
       const tool = await getStartTool();
       const result = await tool.handler({ flowId: 'flow-1', revision: 1, planDigest: 'digest-abc' });
@@ -385,7 +424,7 @@ describe('deckent_start — approved-snapshot branch (born-673b)', () => {
       expect(result.isError).toBeUndefined();
       expect(parsed.success).toBe(true);
       expect(parsed.status).toBe('ALREADY_RUNNING');
-      expect(parsed.jobId).toBe('flow-flow-1-r1');
+      expect(parsed.jobId).toBe('attempt-1');
 
       expect(vi.mocked(spawnDetachedDeckent)).not.toHaveBeenCalled();
       expect(vi.mocked(saveRunHandle)).not.toHaveBeenCalled();
@@ -427,11 +466,11 @@ describe('deckent_start — approved-snapshot branch (born-673b)', () => {
       expect(vi.mocked(saveRunHandle)).not.toHaveBeenCalled();
     });
 
-    it('RUN_JOB_STALE_HANDLE_CONFLICT: an existing run-handle was recorded against a different CAS key', async () => {
+    it('EXACT_START_REFERENCE_MISMATCH: the durable attempt journal owns stale-start conflicts', async () => {
       vi.mocked(loadApprovedSnapshot).mockReturnValue(makeApprovedSnapshot());
-      vi.mocked(loadRunHandle).mockReturnValue(
-        makeRunHandleRecord({ revision: 0, planDigest: 'digest-stale' }),
-      );
+      const conflict = new Error('exact start reference mismatch') as Error & { code: string };
+      conflict.code = 'EXACT_START_REFERENCE_MISMATCH';
+      vi.mocked(startRunFlow).mockImplementation(() => { throw conflict; });
 
       const tool = await getStartTool();
       const result = await tool.handler({ flowId: 'flow-1', revision: 1, planDigest: 'digest-abc' });
@@ -439,7 +478,7 @@ describe('deckent_start — approved-snapshot branch (born-673b)', () => {
 
       expect(result.isError).toBe(true);
       expect(parsed.success).toBe(false);
-      expect(parsed.code).toBe('RUN_JOB_STALE_HANDLE_CONFLICT');
+      expect(parsed.code).toBe('EXACT_START_REFERENCE_MISMATCH');
       expect(vi.mocked(spawnDetachedDeckent)).not.toHaveBeenCalled();
       expect(vi.mocked(saveRunHandle)).not.toHaveBeenCalled();
     });

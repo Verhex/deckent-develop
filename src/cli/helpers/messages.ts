@@ -68,6 +68,22 @@ const MESSAGES: MessageMap = {
     en: 'Use --force to skip pre-flight checks.',
     tr: 'Ön kontrolleri atlamak için --force kullanın.',
   },
+  'start.exact_capability_required': {
+    en: 'Exact approved-plan execution requires a complete detached-child capability.',
+    tr: 'Exact onaylı-plan yürütmesi eksiksiz detached-child capability gerektirir.',
+  },
+  'start.exact_attempt_mismatch': {
+    en: 'Exact start attempt does not match the approved plan or detached-child capability.',
+    tr: 'Exact start attempt, onaylı plan veya detached-child capability ile eşleşmiyor.',
+  },
+  'start.exact_accepted': {
+    en: 'Exact run {flowId} revision {revision} was accepted as attempt {attemptId}; admission is pending.',
+    tr: 'Exact run {flowId} revision {revision}, {attemptId} attempt kimliğiyle kabul edildi; admission bekleniyor.',
+  },
+  'start.exact_duplicate': {
+    en: 'Exact run {flowId} revision {revision} is already admitted or terminal as attempt {attemptId}; no duplicate process was started.',
+    tr: 'Exact run {flowId} revision {revision}, {attemptId} attempt kimliğiyle zaten admitted veya terminal durumda; duplicate process başlatılmadı.',
+  },
   'start.watch_ignored_dry_run': {
     en: 'Note: --watch ignored in dry-run mode (no workers spawned).',
     tr: 'Not: Dry-run modunda --watch görmezden gelindi (worker başlatılmadı).',
@@ -765,6 +781,34 @@ const MESSAGES: MessageMap = {
   'plan.rejected': {
     en: 'Plan rejected.',
     tr: 'Plan reddedildi.',
+  },
+  'plan.force_scope_option': {
+    en: 'Acknowledge suspect scope paths for this exact plan',
+    tr: 'Bu exact plan için şüpheli kapsam yollarını açıkça kabul et',
+  },
+  'plan.task_projection_invalid_id': {
+    en: 'Exact plan task "{taskId}" cannot be represented as a portable task artifact. The canonical plan was not executed.',
+    tr: 'Exact plandaki "{taskId}" görevi portable bir task artifact olarak temsil edilemiyor. Canonical plan yürütülmedi.',
+  },
+  'plan.task_projection_conflict': {
+    en: 'Task artifact "{taskId}" conflicts with the exact plan. Existing files were preserved; explicit reconciliation is required.',
+    tr: '"{taskId}" task artifact’i exact planla çakışıyor. Mevcut dosyalar korundu; açık reconciliation gerekiyor.',
+  },
+  'plan.task_projection_directory_hold': {
+    en: 'The project task-artifact directory is outside the verified project boundary or is not a regular directory. Planning is on HOLD.',
+    tr: 'Projenin task-artifact dizini doğrulanmış proje sınırının dışında veya regular directory değil. Planlama HOLD durumunda.',
+  },
+  'plan.task_projection_durability_hold': {
+    en: 'The platform could not prove durable atomic publication of the exact plan task artifacts. Existing files were preserved; planning is on HOLD.',
+    tr: 'Platform, exact plan task artifact’lerinin durable atomic yayımını kanıtlayamadı. Mevcut dosyalar korundu; planlama HOLD durumunda.',
+  },
+  'plan.mcp_approve_option': {
+    en: 'Approve and durably bind the generated exact plan',
+    tr: 'Üretilen exact planı onayla ve durable olarak bağla',
+  },
+  'plan.mcp_ack_scope_option': {
+    en: 'Acknowledge suspect scope paths for this exact plan',
+    tr: 'Bu exact plan için şüpheli kapsam yollarını açıkça kabul et',
   },
   'plan.prompt_gate_header': {
     en: 'Prompt-gate — {count} finding(s) (persona × intent / decision-space / scope-contract):',

@@ -1,6 +1,6 @@
 // src/cli/helpers/process-runtime.ts
 // ═══ Process Mode runtime wiring — builds a live ProcessController ════════════
-// The heavy DI assembly (real runTaskMode / runSprint closures with style-scoped
+// The heavy DI assembly (real runTaskMode / exact Sprint executor with style-scoped
 // configs, waitForRunResult, an audited capability registry) shared by the REST
 // endpoint (api/process-endpoint) and the MCP tool (mcp/tools/process), so neither
 // duplicates it. Lives in cli/ (the layer allowed to import run.ts + the runners),
@@ -14,8 +14,11 @@ import { writeAuditEvent } from '../../core/audit-writer.js';
 import { runTaskMode } from '../../orchestra/task-mode-runner.js';
 import { runSprint as runSprintLifecycle } from '../../orchestra/sprint-controller.js';
 import { makeProcessController, type ProcessController } from '../../orchestra/process-controller.js';
+import { createCanonicalExactSprintExecutor } from '../../orchestra/exact-plan-start-service.js';
+import { captureGitBase } from '../../orchestra/run-diff-service.js';
+import { createRunFlowCoordinator } from '../../orchestra/run-flow-coordinator.js';
 import { waitForRunResult } from '../commands/run.js';
-import type { ModelType } from '../../core/types.js';
+import { SprintStatus, type ModelType } from '../../core/types.js';
 import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
 import { openLocalProviderAuthorityRuntime } from '../../providers/provider-authority-runtime-bootstrap.js';
 
@@ -23,7 +26,7 @@ import { openLocalProviderAuthorityRuntime } from '../../providers/provider-auth
  * Assemble a live ProcessController for `projectRoot`. Wires the same execution
  * primitives the autonomous engine uses:
  *   - kind=task     → runTaskMode (style-scoped 'task' config, autoApprove)
- *   - kind=sprint   → runSprint  (style-scoped 'sprint' config)
+ *   - kind=sprint   → canonical exact-plan executor (style-scoped lifecycle)
  *   - kind=capability → audited capability registry (ERP/db/mail handlers; every
  *     invocation lands on the ENT-3 audit hash-chain — the training-data trail)
  * Provider execution remains fail-closed until the shared authority can admit
@@ -51,11 +54,9 @@ export async function buildProcessController(projectRoot: string): Promise<Proce
     if (closeError) throw closeError;
   };
 
-  // runTaskMode requires a 'task'-style config; runSprint a 'sprint'-style one —
+  // runTaskMode requires a 'task'-style config; exact Sprint runtime a 'sprint'-style one —
   // clone per kind so the style guards pass regardless of deckent_style='process'.
   const taskConfig = { ...config, deckent_style: 'task' as const };
-  const sprintConfig = { ...config, deckent_style: 'sprint' as const };
-
   const backlogPath = join(projectRoot, config.autonomous?.backlog_path ?? '.deckent/autonomous/backlog.json');
 
   // Opt-in ERP connector (config.erp.enabled) → installs the live `erp.read`
@@ -72,6 +73,62 @@ export async function buildProcessController(projectRoot: string): Promise<Proce
       metadata: { timestamp: record.timestamp, error: record.error },
     });
   }, erpConnector ? { erp: { connector: erpConnector } } : {});
+
+  const exactSprintExecutor = createCanonicalExactSprintExecutor({
+    executeInProcess: async (context) => {
+      const gitBase = await captureGitBase(context.projectRoot);
+      const result = await runSprintLifecycle(
+        context.projectRoot,
+        { ...context.config, deckent_style: 'sprint' },
+        {
+          preplannedSprint: context.sprint,
+          exactPlanAuthority: context.exactRef,
+          flowId: context.exactRef.flowId,
+          onExactPlanMaterialize: () => {
+            context.onExactPlanMaterialize();
+          },
+          onExecutionAdmitted: (sprint) => {
+            context.onExecutionAdmitted({
+              flowId: context.exactRef.flowId,
+              jobId: sprint.id,
+              logRef: sprint.id,
+            }, gitBase);
+          },
+          providerAuthority,
+          ...(approvalAuthority.state === 'ready'
+            ? {
+                attendedExecutionApprovalAuthority:
+                  approvalAuthority.runtime.attendedExecutionApprovalAuthority,
+              }
+            : {}),
+        },
+      );
+      return result.status === SprintStatus.COMPLETE
+        ? { terminalState: 'COMPLETED', reasonCode: 'SPRINT_COMPLETE' }
+        : result.status === SprintStatus.ABORTED
+          ? { terminalState: 'CANCELLED', reasonCode: 'SPRINT_ABORTED' }
+          : { terminalState: 'BLOCKED', reasonCode: `SPRINT_${result.status}` };
+    },
+    spawnDetached: () => {
+      throw new Error('PROCESS_EXACT_SPRINT_DETACHED_EXECUTOR_UNWIRED');
+    },
+    lifecycle: {
+      publishStartRequested: ({ projectRoot: root, exactRef, attempt }) => {
+        createRunFlowCoordinator({ root }).requestStart({
+          flowId: exactRef.flowId,
+          revision: exactRef.revision,
+          planDigest: exactRef.planDigest,
+          commandId: `exact-start:${attempt.attemptId}:requested`,
+        });
+      },
+      publishRunStarted: ({ projectRoot: root, attempt, handle }) => {
+        createRunFlowCoordinator({ root }).recordRunStarted({
+          handle,
+          commandId: `exact-start:${attempt.attemptId}:admitted`,
+        });
+      },
+    },
+  });
 
   try {
     return makeProcessController({
@@ -114,15 +171,7 @@ export async function buildProcessController(projectRoot: string): Promise<Proce
             }
           : {}),
       }, taskConfig),
-      runSprint: (root) => runSprintLifecycle(root, sprintConfig, {
-        providerAuthority,
-        ...(approvalAuthority.state === 'ready'
-          ? {
-              attendedExecutionApprovalAuthority:
-                approvalAuthority.runtime.attendedExecutionApprovalAuthority,
-            }
-          : {}),
-      }),
+      executeSprint: exactSprintExecutor.execute,
       waitForResult: waitForRunResult,
       close: closeAuthorities,
     });

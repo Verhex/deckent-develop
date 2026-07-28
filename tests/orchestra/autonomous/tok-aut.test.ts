@@ -99,7 +99,7 @@ describe('execute-dispatcher — TOK-AUT: Task-stub enrichment', () => {
       config: {} as never,
       backlogPath,
       runTask: async () => ({ taskId: 'run-tok-a' }),
-      runSprint: async () => ({}),
+      executeSprint: async () => ({}),
       waitForResult: async () => makeResult('run-tok-a'),
       evaluate: capturingEval,
       audit: okAudit,
@@ -131,7 +131,7 @@ describe('execute-dispatcher — TOK-AUT: Task-stub enrichment', () => {
       config: {} as never,
       backlogPath,
       runTask: async () => ({ taskId: 'run-tok-b' }),
-      runSprint: async () => ({}),
+      executeSprint: async () => ({}),
       // Worker zero-stub — the honest "fill me" pattern.
       waitForResult: async () => makeResult('run-tok-b', {
         tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: PROVIDER, model: MODEL },
@@ -170,7 +170,7 @@ describe('execute-dispatcher — TOK-AUT: Task-stub enrichment', () => {
       config: {} as never,
       backlogPath,
       runTask: async () => ({ taskId: 'run-tok-c' }),
-      runSprint: async () => ({}),
+      executeSprint: async () => ({}),
       waitForResult: async () => makeResult('run-tok-c'),
       evaluate: capturingEval,
       audit: okAudit,
@@ -198,7 +198,7 @@ describe('execute-dispatcher — TOK-AUT: Task-stub enrichment', () => {
       config: {} as never,
       backlogPath,
       runTask: async () => ({ taskId: 'run-tok-d' }),
-      runSprint: async () => ({}),
+      executeSprint: async () => ({}),
       waitForResult: async () => makeResult('run-tok-d', {
         tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model: 'sonnet' },
       }),

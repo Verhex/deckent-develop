@@ -26,7 +26,7 @@ function deps(overrides: Partial<ProcessControllerDeps> = {}): ProcessController
     config: { deckent_style: 'process' } as unknown as ResolvedConfig,
     backlogPath: backlogPath(),
     runTask: async () => ({ taskId: 'task-1' }),
-    runSprint: async () => undefined,
+    executeSprint: async () => undefined,
     waitForResult: async () => ({ selfAssessment: 'DONE' } as unknown as TaskResult),
     capabilityRegistry: {
       invoke: async (target: { capability: string }) => ({
@@ -149,10 +149,10 @@ describe('makeProcessController.submit', () => {
     }],
   ])('holds an auto %s entry before task or sprint execution', async (_kind, request) => {
     const runTask = vi.fn();
-    const runSprint = vi.fn();
+    const executeSprint = vi.fn();
     const ctl = makeProcessController(deps({
       runTask,
-      runSprint,
+      executeSprint,
       admitProviderExecution: (entry) => ({
         decision: 'hold',
         hold: {
@@ -174,7 +174,7 @@ describe('makeProcessController.submit', () => {
       },
     });
     expect(runTask).not.toHaveBeenCalled();
-    expect(runSprint).not.toHaveBeenCalled();
+    expect(executeSprint).not.toHaveBeenCalled();
   });
 
   it('parks a task with no recognizable scope (fail-safe → critical-irreversible)', async () => {

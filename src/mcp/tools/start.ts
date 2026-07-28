@@ -28,14 +28,13 @@ import {
   IPC_CONFIG_FILE,
   type SprintRunnerConfig,
 } from '../../orchestra/sprint-runner-entry.js';
-import { loadApprovedSnapshot, loadRunHandle } from '../../core/run-flow-store.js';
+import { loadApprovedSnapshot } from '../../core/run-flow-store.js';
 import {
   startApprovedRun,
   RunJobFlowNotApprovedError,
   RunJobDigestMismatchError,
-  RunJobStaleHandleConflictError,
-  type RunHandle,
 } from '../../orchestra/run-job-service.js';
+import { startRunFlow } from '../../orchestra/run-flow-decision-service.js';
 import { spawnDetachedDeckent } from '../../cli/helpers/detached-start.js';
 import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
@@ -235,16 +234,33 @@ export function registerStartTool(
           }
 
           const approvedSnapshot = loadApprovedSnapshot(root, flowId!);
-          const existingRunHandle = loadRunHandle(root, flowId!);
 
-          // Only a fresh, CAS-matching start can create new provider spend.
-          // Invalid/stale requests retain run-job-service's typed errors, and
-          // an exact duplicate is a no-op that needs no second admission.
-          const isFreshApprovedStart = approvedSnapshot !== undefined
-            && approvedSnapshot.revision === revision
-            && approvedSnapshot.planDigest === planDigest
-            && existingRunHandle === undefined;
-          if (isFreshApprovedStart) {
+          // Fail closed on a caller-supplied stale exact reference before cost
+          // admission or process birth. This guard is pure and never replans.
+          try {
+            startApprovedRun({
+              flowId: flowId!,
+              expectedRevision: revision!,
+              expectedPlanDigest: planDigest!,
+              approvedSnapshot,
+            });
+          } catch (err) {
+            const code =
+              err instanceof RunJobFlowNotApprovedError ? 'RUN_JOB_FLOW_NOT_APPROVED' :
+              err instanceof RunJobDigestMismatchError ? 'RUN_JOB_DIGEST_MISMATCH' :
+              null;
+            if (code === null) throw err;
+            const message = err instanceof Error ? err.message : String(err);
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(
+                { error: true, success: false, code, message },
+                formatErrorResponse({ code, message }),
+              )) }],
+              isError: true,
+            };
+          }
+
+          if (approvedSnapshot !== undefined) {
             try {
               initCostConfig(root);
               const costConfig = loadCostConfig(root);
@@ -294,61 +310,59 @@ export function registerStartTool(
             }
           }
 
-          let handle: RunHandle;
-          let status: 'started' | 'noop-duplicate';
-          try {
-            const result = startApprovedRun({
-              flowId: flowId!,
-              expectedRevision: revision!,
-              expectedPlanDigest: planDigest!,
-              approvedSnapshot,
-              existingRunHandle,
-              spawnStart: (_sprint, fid) => {
-                const cliArgs = [
-                  'start', '--flow-id', fid, '--revision', String(revision), '--plan-digest', planDigest!,
-                  ...(autoApprove ? ['--auto-approve'] : []),
-                  ...(acknowledgeScopePaths ? ['--force-scope'] : []),
-                  ...(acknowledgePromptGate ? ['--force-prompt-gate'] : []),
-                  ...((acknowledgeCost || force) ? ['--force'] : []),
-                  ...(sandbox ? ['--sandbox-mode'] : []),
-                  ...(timeout !== undefined ? ['--timeout', String(timeout)] : []),
-                ];
-                const spawned = spawnDetachedDeckent(cliArgs, { projectRoot: root, flowId: fid });
-                return { flowId: fid, jobId: `flow-${fid}-r${revision}`, logRef: spawned.logPath };
-              },
-            });
-            handle = result.handle;
-            status = result.status;
-          } catch (err) {
-            const code =
-              err instanceof RunJobFlowNotApprovedError ? 'RUN_JOB_FLOW_NOT_APPROVED' :
-              err instanceof RunJobDigestMismatchError ? 'RUN_JOB_DIGEST_MISMATCH' :
-              err instanceof RunJobStaleHandleConflictError ? 'RUN_JOB_STALE_HANDLE_CONFLICT' :
-              null;
-            if (code === null) throw err;
-            const message = err instanceof Error ? err.message : String(err);
-            return {
-              content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(
-                { error: true, success: false, code, message },
-                formatErrorResponse({ code, message }),
-              )) }],
-              isError: true,
-            };
-          }
-
-          // born-681: parent handle-persist ETMEZ — tek-yazar CHILD'dır
-          // (cli/commands/start.ts --flow-id dalı, persist-before-run).
-          // Spawn-sonrası parent-yazımı child'ın duplicate-check'ini
-          // zehirliyordu (kendi handle'ını görüp no-op). Gerçek duplicate'ler
-          // loadRunHandle'daki child-persist'lerle yakalanır.
+          const result = startRunFlow(root, flowId!, {
+            lineage: {
+              tenantId: approvedSnapshot?.proposal?.tenant ?? 'local',
+              actor: { id: 'mcp-operator' },
+              origin: 'mcp',
+              correlationId: flowId!,
+              idempotencyKey: `start:${flowId}:r${revision}`,
+              sourceId: 'mcp:deckent_start',
+              authorization: { kind: 'approved-actor' },
+            },
+            spawnStart: ({ capability }) => {
+              const cliArgs = [
+                'start',
+                '--flow-id', capability.flowId,
+                '--revision', String(revision),
+                '--plan-digest', planDigest!,
+                ...(autoApprove ? ['--auto-approve'] : []),
+                ...(acknowledgeScopePaths ? ['--force-scope'] : []),
+                ...(acknowledgePromptGate ? ['--force-prompt-gate'] : []),
+                ...((acknowledgeCost || force) ? ['--force'] : []),
+                ...(sandbox ? ['--sandbox-mode'] : []),
+                ...(timeout !== undefined ? ['--timeout', String(timeout)] : []),
+              ];
+              const spawned = spawnDetachedDeckent(cliArgs, {
+                projectRoot: root,
+                flowId: capability.flowId,
+                exactStart: {
+                  attemptId: capability.attemptId,
+                  ownerNonce: capability.ownerNonce,
+                },
+              });
+              if (spawned.pid === null) {
+                throw new Error('EXACT_START_CHILD_PID_UNAVAILABLE');
+              }
+              return { pid: spawned.pid };
+            },
+          });
 
           const startData = {
             success: true,
-            jobId: handle.jobId,
-            status: status === 'noop-duplicate' ? 'ALREADY_RUNNING' : 'RUNNING',
-            message: status === 'noop-duplicate'
-              ? `Run ${flowId} (revision ${revision}) was already started as job ${handle.jobId} — no-op.`
-              : 'Run started in background from an approved RunFlow snapshot (no re-plan). Use deckent_status to track progress.',
+            jobId: result.attempt.attemptId,
+            status: result.status === 'noop-duplicate' ? 'ALREADY_RUNNING' : 'STARTING',
+            message: getMessage(
+              result.status === 'noop-duplicate'
+                ? 'start.exact_duplicate'
+                : 'start.exact_accepted',
+              getLanguage(config.language),
+              {
+                flowId: flowId!,
+                revision: String(revision),
+                attemptId: result.attempt.attemptId,
+              },
+            ),
             activeWorkers: 0,
             queuedTasks: 0,
           };
@@ -654,16 +668,25 @@ export function registerStartTool(
         const message = error instanceof BrainError
           ? `Run failed at phase ${error.phase ?? 'unknown'}: ${error.message}`
           : error instanceof Error ? error.message : String(error);
+        const code = (
+          typeof error === 'object'
+          && error !== null
+          && 'code' in error
+          && typeof error.code === 'string'
+        )
+          ? error.code
+          : undefined;
 
         const errData = {
           error: true,
           success: false,
           message,
+          ...(code !== undefined ? { code } : {}),
           ...(error instanceof BrainError && error.plannerProof
             ? { plannerProof: error.plannerProof }
             : {}),
         };
-        const errSummary = formatErrorResponse({ message });
+        const errSummary = formatErrorResponse({ ...(code !== undefined ? { code } : {}), message });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(errData, errSummary)) }],
           isError: true,

@@ -41,7 +41,7 @@ describe('execute-dispatcher — kind=process (F3-008)', () => {
     const backlogPath = seed(entry);
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask: vi.fn(), runSprint: vi.fn(),
+      runTask: vi.fn(), executeSprint: vi.fn(),
       backlogPath, waitForResult: vi.fn(),
       capabilityRegistry: createDefaultRegistry(),
     });
@@ -70,7 +70,7 @@ describe('execute-dispatcher — kind=process (F3-008)', () => {
     const backlogPath = seed(entry);
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask, runSprint: vi.fn(), backlogPath, waitForResult,
+      runTask, executeSprint: vi.fn(), backlogPath, waitForResult,
     });
 
     const res = await handler('autonomous.execute', { entry });
@@ -86,7 +86,7 @@ describe('execute-dispatcher — kind=process (F3-008)', () => {
     const backlogPath = seed(entry);
     const handler = makeExecuteDispatcher({
       projectRoot: tmpDir, config: {} as never,
-      runTask: vi.fn(), runSprint: vi.fn(), backlogPath, waitForResult: vi.fn(),
+      runTask: vi.fn(), executeSprint: vi.fn(), backlogPath, waitForResult: vi.fn(),
     });
 
     const res = await handler('autonomous.execute', { entry });

@@ -1,5 +1,6 @@
 // Autonomous v2 — durable mission/work-item model + store/view contracts.
 import type { ApprovalDecision, ApprovalRequest } from '../../../core/approval-contract.js';
+import type { ExactPlanReferenceV1 } from '../../../core/run-flow-contract.js';
 import type {
   MissionAcceptanceDecisionRecord,
   MissionAcceptanceDecisionV1,
@@ -64,6 +65,9 @@ export interface ResultLike {
   ok: boolean;
   reason?: string;
   settleDetail?: SettleDetail;
+  /** Host-authored canonical plan identity. SqliteMissionStore adopts this
+   *  into a sprint item's spec only in the exact claim settlement transaction. */
+  exactPlanRef?: ExactPlanReferenceV1;
   /** Host HOLD=no provider grant; reconciliation-required=grant/effect may exist. Both park the item. */
   dispatchDisposition?: 'parked' | 'reconciliation-required';
   [k: string]: unknown;

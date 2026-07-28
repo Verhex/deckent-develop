@@ -1,15 +1,24 @@
+import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import type { Command } from 'commander';
 import { loadConfig } from '../../core/config.js';
 import { bootstrapProviders } from '../../core/provider.js';
-import {
-  readContext, planSprint, confirmDraftTasks, cleanupDraftTasks,
-} from '../../orchestra/brain.js';
+import { readContext } from '../../orchestra/brain.js';
 import { collectOverrideWarnings } from '../../orchestra/sprint-planner.js';
 import { generatePlanPreview } from '../../orchestra/plan-preview-service.js';
-import type { SprintSizeRecommendation } from '../../core/types.js';
+import {
+  decideRunFlowPlan,
+  planRunFlow,
+  type PlanRunFlowResult,
+} from '../../orchestra/run-flow-plan-service.js';
+import {
+  inspectTaskArtifactsNoClobber,
+  publishTaskArtifactsNoClobber,
+  TaskArtifactProjectionError,
+} from '../../orchestra/task-artifact-projection.js';
+import { TaskStatus, type Sprint, type SprintSizeRecommendation } from '../../core/types.js';
 import type { BrainPlanningMode, PlannerProof } from '../../core/types.js';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { promptConfirm } from '../helpers/prompt.js';
@@ -24,6 +33,7 @@ import { createSpinner } from './chat-spinner.js';
 import type { ExecutionTopology } from '../../core/execution-topology.js';
 import {
   buildPlanPreviewCardLabels,
+  formatScopeGateLines,
   formatTopologyLines,
 } from '../repl/plan-preview-card.js';
 
@@ -31,6 +41,23 @@ export type RlFactory = () => {
   question: (q: string) => Promise<string>;
   close: () => void;
 };
+
+function directivePlanSummary(directives: string, projectName: string): string {
+  const heading = directives
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .find(line => line.length > 0)
+    ?.replace(/^#+\s*/, '')
+    .trim();
+  return heading || projectName;
+}
+
+function approvedTaskProjection(sprint: Sprint): Sprint {
+  return {
+    ...sprint,
+    tasks: sprint.tasks.map(task => ({ ...task, status: TaskStatus.PENDING })),
+  };
+}
 
 /**
  * Run the pre-plan directive interrogation flow (PLAN-INT-1).
@@ -96,6 +123,7 @@ export function registerPlan(program: Command): void {
     .option('--dry-run', 'Show plan without writing task files to disk')
     .option('--interrogate', 'Challenge directives with structural questions before planning')
     .option('--force-prompt-gate', 'Bypass the plan-time prompt-gate BLOCK (persona-capability mismatch)')
+    .option('--force-scope', getMessage('plan.force_scope_option', 'en'))
     .action(async (opts: {
       confirm?: boolean;
       yes?: boolean;
@@ -103,6 +131,7 @@ export function registerPlan(program: Command): void {
       dryRun?: boolean;
       interrogate?: boolean;
       forcePromptGate?: boolean;
+      forceScope?: boolean;
     }) => {
       const root = resolveProjectRoot();
       let lang = 'en';
@@ -174,16 +203,13 @@ export function registerPlan(program: Command): void {
           reason: 'No usage constraints',
         };
 
-        // Clean up existing DRAFT tasks before a mutating plan (idempotency).
-        // A dry-run is a read-only preview across the whole command boundary;
-        // deleting another process's draft tasks here would violate that contract.
-        if (!dryRun) cleanupDraftTasks(root);
         const asDraft = opts.confirm !== false;
 
         const spinnerLabel = lang === 'tr' ? 'Planlanıyor…' : 'Planning…';
         const spinner = createSpinner(spinnerLabel);
         spinner.start();
         let sprint;
+        let flowPlan: PlanRunFlowResult | undefined;
         let planDigest: string | undefined;
         let topology: ExecutionTopology | undefined;
         try {
@@ -200,15 +226,43 @@ export function registerPlan(program: Command): void {
             planDigest = preview.planDigest;
             topology = preview.topology;
           } else {
-            // A mutating plan replaces prior drafts. Read-only dry-run must
-            // preserve them byte-for-byte.
-            cleanupDraftTasks(root);
-            sprint = await planSprint(root, config, context, recommendation, {
-              mode: planMode,
-              asDraft,
-              dryRun,
-              acknowledgePromptGate: opts.forcePromptGate === true,
+            const projectName = config.projectName || basename(root);
+            const flowId = randomUUID();
+            const revision = 1;
+            flowPlan = await planRunFlow({
+              projectRoot: root,
+              config,
+              recommendation,
+              proposal: {
+                flowId,
+                tenant: 'local',
+                project: projectName,
+                actor: { id: 'cli-operator' },
+                origin: 'cli',
+                revision,
+                intentSummary: directivePlanSummary(context.directives, projectName),
+              },
+              lineage: {
+                tenantId: 'local',
+                actor: { id: 'cli-operator' },
+                origin: 'cli',
+                correlationId: flowId,
+                idempotencyKey: `plan:${flowId}:r${revision}`,
+                sourceRef: 'DIRECTIVES.md',
+              },
+              source: {
+                sourceKind: 'directives',
+                brainContext: context,
+              },
+              previewOptions: {
+                mode: planMode,
+                acknowledgePromptGate: opts.forcePromptGate === true,
+              },
+              acknowledgeScopePaths: opts.forceScope === true,
             });
+            sprint = flowPlan.sprint;
+            planDigest = flowPlan.planDigest;
+            topology = flowPlan.preview.topology;
           }
         } finally {
           spinner.stop();
@@ -242,17 +296,29 @@ export function registerPlan(program: Command): void {
         // advisory; an unacknowledged BLOCK (persona-capability mismatch) halts the
         // plan before the approval prompt, mirroring the cost/scope-gate UX.
         const gate = sprint.promptGate;
+        const previewLabels = buildPlanPreviewCardLabels(lang);
         if (topology) {
           print('');
-          const labels = buildPlanPreviewCardLabels(lang);
           for (const line of formatTopologyLines({
             topology,
             topologyGateResult: topology.verdict === 'block' ? 'fail' : 'pass',
-          }, labels)) {
+          }, previewLabels)) {
             print(line);
           }
           if (topology.verdict === 'block') {
             process.exitCode = 1;
+            return;
+          }
+        }
+        if (flowPlan) {
+          const scopeLines = formatScopeGateLines(flowPlan.preview, previewLabels);
+          if (scopeLines.length > 0) {
+            print('');
+            for (const line of scopeLines) print(line);
+          }
+          if (flowPlan.preview.scopeGateResult === 'fail') {
+            process.exitCode = 1;
+            return;
           }
         }
         if (gate && gate.findings.length > 0) {
@@ -314,6 +380,31 @@ export function registerPlan(program: Command): void {
           return;
         }
 
+        if (!flowPlan) {
+          throw new Error('E_PLAN_DURABLE_RESULT_MISSING');
+        }
+
+        // Compatibility files are never a plan input or a pre-approval side
+        // effect. Preflight the full approved projection before the approval
+        // CAS, then publish it atomically/no-clobber only after that CAS wins.
+        const taskProjection = approvedTaskProjection(sprint);
+        inspectTaskArtifactsNoClobber(root, taskProjection.tasks);
+        const publishTaskProjection = (): void => {
+          publishTaskArtifactsNoClobber(
+            root,
+            taskProjection.tasks,
+            `plan:${flowPlan.flowId}:r${flowPlan.revision}`,
+          );
+        };
+        const approve = (): void => {
+          decideRunFlowPlan(root, flowPlan.flowId, {
+            decision: 'approve',
+            actor: { id: 'cli-operator' },
+            acknowledgePromptGate: opts.forcePromptGate === true,
+            acknowledgeScopePaths: opts.forceScope === true,
+          });
+        };
+
         // Approval flow for DRAFT tasks
         if (asDraft) {
           // PLAN-W1 Bug 2: --yes skips the interactive prompt and approves directly
@@ -321,14 +412,47 @@ export function registerPlan(program: Command): void {
           // EOF → false → tasks stranded in DRAFT.
           const confirmed = autoApprove ? true : await promptConfirm('Approve this plan?');
           if (confirmed) {
-            await confirmDraftTasks(root, sprint);
+            approve();
+            publishTaskProjection();
             print(getMessage('plan.approved', lang));
+            print(JSON.stringify({
+              flowId: flowPlan.flowId,
+              revision: flowPlan.revision,
+              planDigest: flowPlan.planDigest,
+            }));
           } else {
+            decideRunFlowPlan(root, flowPlan.flowId, {
+              decision: 'reject',
+              actor: { id: 'cli-operator' },
+            });
             print(getMessage('plan.rejected', lang));
           }
+        } else {
+          // --no-confirm retains its historical auto-approval semantics while
+          // now producing the same durable exact snapshot as --yes.
+          approve();
+          publishTaskProjection();
+          print(JSON.stringify({
+            flowId: flowPlan.flowId,
+            revision: flowPlan.revision,
+            planDigest: flowPlan.planDigest,
+          }));
         }
       } catch (error) {
-        printError(error);
+        const surfacedError = error instanceof TaskArtifactProjectionError
+          ? new Error(getMessage(
+            error.code === 'TASK_ARTIFACT_ID_INVALID'
+              ? 'plan.task_projection_invalid_id'
+              : error.code === 'TASK_ARTIFACT_CONTENT_CONFLICT'
+                ? 'plan.task_projection_conflict'
+                : error.code === 'TASK_ARTIFACT_DIRECTORY_DRIFT'
+                  ? 'plan.task_projection_directory_hold'
+                  : 'plan.task_projection_durability_hold',
+            lang,
+            { taskId: String(error.details.taskId ?? 'unknown') },
+          ), { cause: error })
+          : error;
+        printError(surfacedError);
         const plannerProof = error instanceof Error
           ? (error as Error & { plannerProof?: PlannerProof }).plannerProof
           : undefined;

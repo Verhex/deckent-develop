@@ -743,6 +743,28 @@ export interface RunSprintOptions {
    */
   preplannedSprint?: Sprint;
   /**
+   * Digest-bound runtime authority for an approved exact plan. Presence makes
+   * preplannedSprint mandatory and forbids spawn-time task/dependency drift.
+   */
+  exactPlanAuthority?: {
+    readonly flowId: string;
+    readonly revision: number;
+    readonly planDigest: string;
+  };
+  /**
+   * Materializes the exact approved task artifacts while project leadership is
+   * held and after every start gate has passed. It runs before admission is
+   * published, so an uncertain write cannot produce a false RUN_STARTED.
+   */
+  onExactPlanMaterialize?: (sprint: Sprint) => void | Promise<void>;
+  /**
+   * Called exactly once after project leadership, all pre-start/scope/prompt
+   * gates and any configured human checkpoint have succeeded, but before the
+   * first worker side effect. The exact-start journal publishes ADMITTED and
+   * RUN_STARTED from this seam.
+   */
+  onExecutionAdmitted?: (sprint: Sprint) => void | Promise<void>;
+  /**
    * SURF-0.1 (Task 432-001): optional correlation id for the originating
    * run-flow. Additive only -- no generation, defaulting, or routing
    * behavior is attached here; absent (undefined) for every existing
@@ -754,6 +776,18 @@ export interface RunSprintOptions {
    * command within `flowId`. Additive only -- see `flowId` above.
    */
   commandId?: string;
+}
+
+export async function runExactPlanAdmissionHooks(
+  sprint: Sprint,
+  opts: Pick<
+    RunSprintOptions,
+    'exactPlanAuthority' | 'onExactPlanMaterialize' | 'onExecutionAdmitted'
+  > | undefined,
+): Promise<void> {
+  if (!opts?.exactPlanAuthority) return;
+  await opts.onExactPlanMaterialize!(sprint);
+  await opts.onExecutionAdmitted!(sprint);
 }
 
 /**
@@ -1248,6 +1282,25 @@ export async function runSprint(
   config: ResolvedConfig,
   opts?: RunSprintOptions,
 ): Promise<Sprint> {
+  if (opts?.exactPlanAuthority) {
+    if (!opts.preplannedSprint) {
+      throw new BrainError('EXACT_PLAN_PREPLANNED_SPRINT_REQUIRED', SprintPhase.PLAN);
+    }
+    if (!opts.onExactPlanMaterialize) {
+      throw new BrainError('EXACT_PLAN_MATERIALIZER_REQUIRED', SprintPhase.PLAN);
+    }
+    if (!opts.onExecutionAdmitted) {
+      throw new BrainError('EXACT_PLAN_ADMISSION_SETTLEMENT_REQUIRED', SprintPhase.PLAN);
+    }
+    if (
+      opts.flowId !== undefined
+      && opts.flowId !== opts.exactPlanAuthority.flowId
+    ) {
+      throw new BrainError('EXACT_PLAN_FLOW_ID_MISMATCH', SprintPhase.PLAN);
+    }
+  } else if (opts?.onExactPlanMaterialize || opts?.onExecutionAdmitted) {
+    throw new BrainError('EXACT_PLAN_AUTHORITY_REQUIRED_FOR_ADMISSION_HOOKS', SprintPhase.PLAN);
+  }
   // Mode guard: task mode cannot use sprint lifecycle
   if (config.deckent_style === 'task') {
     throw new BrainError(
@@ -1434,7 +1487,10 @@ export async function runSprint(
           // did-you-mean is provable (duplicate-in-task / sole-basename-candidate)
           // is fixed in place instead of forcing the whole sprint through
           // --force-scope; only genuinely ambiguous suspects still block.
-          resolveSuggestions: true,
+          // Exact plans resolve deterministic scope suggestions before their
+          // approval digest is committed. Runtime may validate that snapshot,
+          // but must never mutate it after approval.
+          resolveSuggestions: opts?.exactPlanAuthority ? false : true,
         });
         if (!scopeGate.ok) {
           releaseSprintLock(projectRoot);
@@ -1531,6 +1587,20 @@ export async function runSprint(
 
     // PID + Snapshot Setup
     try { writePid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:writePid', e); }
+    try {
+      await runExactPlanAdmissionHooks(sprint, opts);
+    } catch (error) {
+      // Exact admission is still pre-execution. A failed materialization/CAS
+      // must release every leadership projection created above or a safe retry
+      // would be rejected as a phantom live sprint.
+      releaseSprintLock(projectRoot);
+      clearActiveSprint();
+      clearSprintState(projectRoot);
+      try { clearPid(projectRoot, sprint.id); } catch (e) {
+        debugLog('runSprint:exactAdmission:clearPid', e);
+      }
+      throw error;
+    }
 
     const writePeriodicSnapshot = async (): Promise<void> => {
       try {

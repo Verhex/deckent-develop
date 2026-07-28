@@ -61,26 +61,25 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { getRunFlowCoordinator, _resetRunFlowCoordinatorsForTests } from '../orchestra/run-flow-coordinator-registry.js';
 import { FlowNotFoundError, InvalidTransitionError } from '../orchestra/run-flow-coordinator.js';
-import { savePlannedSprint } from '../core/run-flow-store.js';
 import { RunJobError } from '../orchestra/run-job-service.js';
 import { decideRunFlow, startRunFlow, RunFlowDecisionError } from '../orchestra/run-flow-decision-service.js';
+import { ExactPlanStartError } from '../orchestra/exact-plan-start-service.js';
 import { computeRunDiff } from '../orchestra/run-diff-service.js';
 import { buildFlowStartSpawn } from '../cli/helpers/detached-start.js';
 import { publishRunFlowEvent } from './run-flow-event-stream.js';
 import { basename } from 'node:path';
 import { z } from 'zod';
 import { loadConfig } from '../core/config.js';
-import type { ResolvedConfig, Sprint, SprintSizeRecommendation } from '../core/types.js';
+import type { ResolvedConfig, SprintSizeRecommendation } from '../core/types.js';
 import {
   RunFlowTransitionError,
   isTerminalRunFlowState,
-  type PlanPreview,
   type RunFlowContext,
   type RunProposal,
 } from '../core/run-flow-contract.js';
 import { readTerminalJobClosures } from '../core/run-jobs-read.js';
-import { compileRunProposal, type RunProposalPlanner } from '../orchestra/run-proposal-compiler.js';
-import { generatePlanPreview } from '../orchestra/plan-preview-service.js';
+import type { RunProposalPlanner } from '../orchestra/run-proposal-compiler.js';
+import { planRunFlow } from '../orchestra/run-flow-plan-service.js';
 import { readContext } from '../orchestra/brain.js';
 import { deriveRequestPrincipal } from './auth-me-endpoint.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
@@ -243,30 +242,31 @@ async function handlePropose(
     intentSummary: parsed.data.intentSummary.trim(),
   };
 
-  const coordinator = coordinatorFor(projectRoot);
-
-  let plannedSprint: Sprint;
-  let preview: PlanPreview;
   try {
-    // born-690: forward the live config (same contract as the terminal
-    // controller) so brain-model resolution never falls back to balanced-mode.
-    const compiled = await compileRunProposal(proposal, proposalPlannerOverride, config);
-    const brainContext = { ...readContext(projectRoot), directives: compiled.directivesMarkdown };
-    const recommendation = defaultRecommendation(config);
-    const result = await generatePlanPreview(projectRoot, config, brainContext, recommendation, {
-      mode: 'structured',
+    const result = await planRunFlow({
+      projectRoot,
+      config,
+      recommendation: defaultRecommendation(config),
+      proposal,
+      lineage: {
+        tenantId: proposal.tenant,
+        actor: proposal.actor,
+        origin: proposal.origin,
+        correlationId: proposal.flowId,
+        idempotencyKey: `plan:${proposal.flowId}:r${proposal.revision}`,
+        sourceRef: 'api:run-flow',
+      },
+      source: {
+        sourceKind: 'intent',
+        baseContext: readContext(projectRoot),
+        ...(proposalPlannerOverride ? { planner: proposalPlannerOverride } : {}),
+      },
+      previewOptions: {
+        mode: 'structured',
+      },
     });
-    plannedSprint = result.sprint;
-    preview = {
-      flowId,
-      revision,
-      planDigest: result.planDigest,
-      planDigestVersion: result.planDigestVersion,
-      planDigestContext: result.planDigestContext,
-      taskSummaries: result.taskSummaries,
-      policyDecision: result.policyDecision,
-      gateResult: result.gateResult,
-    };
+    sendJson(res, result.context, 201);
+    return true;
   } catch (err) {
     // A proposal that cannot be planned is a typed failure, never a
     // silently degraded scaffold (mirrors RunProposalPlanError's own
@@ -274,22 +274,6 @@ async function handlePropose(
     sendError(res, 502, err instanceof Error ? err.message : 'run-flow: preview generation failed');
     return true;
   }
-
-  // Durable command chain: PROPOSAL_SUBMITTED + PREVIEW_STARTED, then the
-  // captured plan (restart-safe), then PREVIEW_READY — each event appended
-  // to <flowId>.events.jsonl BEFORE it is visible anywhere.
-  coordinator.proposeFlow({ proposal, commandId: `propose-${flowId}-r${revision}` });
-  savePlannedSprint(projectRoot, flowId, {
-    revision,
-    sprint: plannedSprint,
-    planDigest: preview.planDigest,
-    ...(preview.planDigestVersion !== undefined ? { planDigestVersion: preview.planDigestVersion } : {}),
-    ...(preview.planDigestContext !== undefined ? { planDigestContext: preview.planDigestContext } : {}),
-  });
-  const result = coordinator.recordPreview({ preview, commandId: `preview-${flowId}-r${revision}` });
-
-  sendJson(res, result.context, 201);
-  return true;
 }
 
 // ─── GET /api/run-flow/:flowId ──────────────────────────────────────────
@@ -421,10 +405,29 @@ function handleStart(
   try {
     // START_REQUESTED → spawn → RUN_STARTED lives in the shared decision
     // service; the argv shape comes from the ONE builder both surfaces use.
+    const principal = deriveRequestPrincipal(req);
+    const actor = {
+      id: principal.id,
+      ...(principal.role ? { role: principal.role } : {}),
+    };
     const result = startRunFlow(projectRoot, flowId, {
+      lineage: {
+        tenantId: existing.proposal?.tenant ?? 'local',
+        actor,
+        origin: 'api',
+        correlationId: flowId,
+        idempotencyKey: `start:${flowId}:r${snapshot.revision}`,
+        sourceId: 'api:run-flow',
+        authorization: { kind: 'approved-actor' },
+      },
       spawnStart: buildFlowStartSpawn(projectRoot, snapshot.revision, snapshot.planDigest),
     });
-    sendJson(res, { started: result.status === 'started', duplicate: result.status === 'noop-duplicate', context: result.context }, 202);
+    sendJson(res, {
+      accepted: result.status === 'accepted',
+      duplicate: result.status === 'noop-duplicate',
+      attemptId: result.attempt.attemptId,
+      context: result.context,
+    }, 202);
     return true;
   } catch (err) {
     if (
@@ -434,6 +437,10 @@ function handleStart(
       err instanceof RunFlowDecisionError
     ) {
       sendError(res, 409, err.message);
+      return true;
+    }
+    if (err instanceof ExactPlanStartError) {
+      sendJson(res, { error: err.message, code: err.code }, 409);
       return true;
     }
     throw err;
