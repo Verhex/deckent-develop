@@ -163,7 +163,7 @@ function makeDefaultMocks(overrides: Partial<{
         flowId: 'flow-mcp-1',
         revision: 1,
         planDigest: 'digest-mcp-1',
-        planDigestVersion: 3,
+        planDigestVersion: 4,
         taskSummaries: generatedSprint.tasks.map((item: any) => ({
           title: item.title,
           summary: item.description,
@@ -503,7 +503,7 @@ describe('registerPlanTool', () => {
       const result = await server.callTool('deckent_plan', {});
       const content = JSON.parse(result.content[0].text);
 
-      expect(content.planDigestVersion).toBe(3);
+      expect(content.planDigestVersion).toBe(4);
       expect(content.topologyGate).toBe('pass');
       expect(content.executionTopology).toMatchObject({
         schemaVersion: 1,

@@ -33,6 +33,7 @@ import {
   type RunFlowEvent,
   type RunHandle as ContractRunHandle,
   type RunFlowPlanLineageRecord,
+  type RunFlowProjectionAdoptionRecord,
   type RunProposal,
   type StartAttemptLineage,
   type StartAttemptOwner,
@@ -105,6 +106,7 @@ export interface StoredApprovedSnapshot {
   readonly sprint: Sprint;
   readonly proposal?: RunProposal;
   readonly planLineage?: RunFlowPlanLineageRecord;
+  readonly projectionAdoption?: RunFlowProjectionAdoptionRecord;
 }
 
 /** Durable record of an actual start attempt for a flow. */
@@ -129,6 +131,7 @@ export interface StoredPlannedSprint {
   readonly planDigestContext?: ExecutionPlanDigestContext;
   readonly proposal?: RunProposal;
   readonly lineage?: RunFlowPlanLineageRecord;
+  readonly projectionAdoption?: RunFlowProjectionAdoptionRecord;
 }
 
 export interface PrepareStartAttemptInput {

@@ -29,7 +29,7 @@ import { readAuthMode, resolveEffectiveWorkers } from '../core/config.js';
 import { getSystemProfile } from '../core/system-profile.js';
 import {
   buildExecutionPlanDigestContext,
-  computeExecutionPlanDigestV3,
+  computeExecutionPlanDigestV4,
   type ExecutionPlanDigestContext,
   EXECUTION_PLAN_DIGEST_VERSION,
 } from '../core/execution-plan-digest.js';
@@ -116,7 +116,7 @@ export async function generatePlanPreview(
     await readAuthMode(root),
     effectiveRecommendation.maxWorkers,
   );
-  const digest = computeExecutionPlanDigestV3(sprint, planDigestContext);
+  const digest = computeExecutionPlanDigestV4(sprint, planDigestContext);
   const topology = digest.topology!;
   const topologyGateResult: RunFlowGateResult = topology.verdict === 'pass' ? 'pass' : 'fail';
   const policyDecision = computePolicyDecision(promptGateResult, topologyGateResult);

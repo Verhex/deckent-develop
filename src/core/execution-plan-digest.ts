@@ -25,9 +25,11 @@ import {
 import { createExecutionAuthorityError } from './errors.js';
 
 export const EXECUTION_PLAN_DIGEST_VERSION_V2 = 2 as const;
-export const EXECUTION_PLAN_DIGEST_VERSION = 3 as const;
+export const EXECUTION_PLAN_DIGEST_VERSION_V3 = 3 as const;
+export const EXECUTION_PLAN_DIGEST_VERSION = 4 as const;
 export type ExecutionPlanDigestVersion =
   | typeof EXECUTION_PLAN_DIGEST_VERSION_V2
+  | typeof EXECUTION_PLAN_DIGEST_VERSION_V3
   | typeof EXECUTION_PLAN_DIGEST_VERSION;
 
 export type ExecutionPlanAuthMode = 'subscription' | 'api' | 'hybrid';
@@ -41,7 +43,7 @@ export interface ExecutionPlanDigestContext {
   readonly fallbackProvider: ProviderName | null;
   readonly fallbackPolicy: ProviderFallbackPolicyConfig | null;
   readonly executionBudgetPolicy: ExecutionBudgetPolicyConfig | null;
-  /** V3-only topology input. V2 projection deliberately excludes this field. */
+  /** Topology-aware digest input. V2 projection deliberately excludes this field. */
   readonly configuredMaxWorkers?: number;
 }
 
@@ -386,7 +388,7 @@ export function computeExecutionPlanDigestV3(
   sprint: Sprint,
   context: ExecutionPlanDigestContext,
 ): ExecutionPlanDigestResult & {
-  readonly version: typeof EXECUTION_PLAN_DIGEST_VERSION;
+  readonly version: typeof EXECUTION_PLAN_DIGEST_VERSION_V3;
   readonly topology: ExecutionTopology;
 } {
   const maxWorkers = context.configuredMaxWorkers;
@@ -398,7 +400,7 @@ export function computeExecutionPlanDigestV3(
   const v2 = computeExecutionPlanDigestV2(sprint, context);
   const topology = deriveExecutionTopology(sprint.tasks, { maxWorkers: maxWorkers! });
   const projection = deepFreeze({
-    version: EXECUTION_PLAN_DIGEST_VERSION,
+    version: EXECUTION_PLAN_DIGEST_VERSION_V3,
     context: {
       ...projectDigestContextV2(context),
       configuredMaxWorkers: topology.configuredMaxWorkers,
@@ -408,11 +410,62 @@ export function computeExecutionPlanDigestV3(
     topology: cloneJson(topology),
   }) as Readonly<Record<string, unknown>>;
   return {
-    version: EXECUTION_PLAN_DIGEST_VERSION,
+    version: EXECUTION_PLAN_DIGEST_VERSION_V3,
     digest: createHash('sha256').update(canonicalJson(projection)).digest('hex'),
     projection,
     budgetHolds: v2.budgetHolds,
     topology,
+  };
+}
+
+function projectStructuredCriteria(task: Task): readonly Record<string, unknown>[] {
+  return (task.goNogo.items ?? []).map(item => ({
+    id: normalizeText(item.id),
+    polarity: item.polarity,
+    statement: normalizeText(item.statement),
+    evidenceRequirements: sortedUnique(item.evidenceRequirements, normalizeText),
+  }));
+}
+
+/**
+ * V4 closes a V3 approval-CAS gap: structured criterion boundaries are consumed
+ * by XVerify v2 and settlement, but V3 bound only their legacy display strings.
+ * V3 remains byte-frozen for persisted records; every newly planned exact flow
+ * uses V4 and therefore cannot add/remove/rewrite structured criteria without a
+ * new owner approval digest.
+ */
+export function computeExecutionPlanDigestV4(
+  sprint: Sprint,
+  context: ExecutionPlanDigestContext,
+): ExecutionPlanDigestResult & {
+  readonly version: typeof EXECUTION_PLAN_DIGEST_VERSION;
+  readonly topology: ExecutionTopology;
+} {
+  const v3 = computeExecutionPlanDigestV3(sprint, context);
+  const priorTasks = v3.projection.tasks as readonly Record<string, unknown>[];
+  const tasks = priorTasks.map((taskProjection, index) => {
+    const acceptance = taskProjection.acceptance as Record<string, unknown>;
+    return {
+      ...cloneJson(taskProjection),
+      acceptance: {
+        ...cloneJson(acceptance),
+        structuredItems: projectStructuredCriteria(sprint.tasks[index]!),
+      },
+    };
+  });
+  const projection = deepFreeze({
+    version: EXECUTION_PLAN_DIGEST_VERSION,
+    context: cloneJson(v3.projection.context),
+    tasks,
+    promptGate: cloneJson(v3.projection.promptGate),
+    topology: cloneJson(v3.topology),
+  }) as Readonly<Record<string, unknown>>;
+  return {
+    version: EXECUTION_PLAN_DIGEST_VERSION,
+    digest: createHash('sha256').update(canonicalJson(projection)).digest('hex'),
+    projection,
+    budgetHolds: v3.budgetHolds,
+    topology: v3.topology,
   };
 }
 
@@ -424,8 +477,11 @@ export function computeExecutionPlanDigestByVersion(
   if (version === EXECUTION_PLAN_DIGEST_VERSION_V2) {
     return computeExecutionPlanDigestV2(sprint, context);
   }
-  if (version === EXECUTION_PLAN_DIGEST_VERSION) {
+  if (version === EXECUTION_PLAN_DIGEST_VERSION_V3) {
     return computeExecutionPlanDigestV3(sprint, context);
+  }
+  if (version === EXECUTION_PLAN_DIGEST_VERSION) {
+    return computeExecutionPlanDigestV4(sprint, context);
   }
   throw createExecutionAuthorityError(
     `execution-plan-digest: unsupported version ${version}`,

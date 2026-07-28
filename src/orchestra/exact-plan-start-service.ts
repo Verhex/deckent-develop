@@ -50,6 +50,7 @@ import {
 } from './run-flow-plan-service.js';
 import type { PlanPreviewOptions } from './plan-preview-service.js';
 import {
+  migrateStructuredCriteriaProjection,
   publishTaskArtifactsNoClobber,
   TaskArtifactProjectionError,
 } from './task-artifact-projection.js';
@@ -623,6 +624,7 @@ export interface ExactPlanTaskMaterialization {
   readonly taskIds: readonly string[];
   readonly created: readonly string[];
   readonly idempotent: readonly string[];
+  readonly migrated?: readonly string[];
 }
 
 /**
@@ -655,11 +657,35 @@ export function materializeExactPlanTaskArtifacts(
   }
 
   try {
-    return publishTaskArtifactsNoClobber(
+    let migrated: readonly string[] | undefined;
+    const adoption = approvedSnapshot.projectionAdoption;
+    if (adoption) {
+      if (
+        adoption.schemaVersion !== 1
+        || adoption.kind !== 'structured-criteria-projection'
+        || adoption.sprintId !== approvedSnapshot.sprint.id
+        || adoption.taskCount !== approvedSnapshot.sprint.tasks.length
+        || adoption.expectedPlanDigest !== approvedSnapshot.planDigest
+      ) {
+        throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+          reason: 'approved_adoption_record_invalid',
+        });
+      }
+      migrated = migrateStructuredCriteriaProjection(
+        root,
+        approvedSnapshot.sprint.tasks,
+        adoption.legacyProjectionDigest,
+      ).migrated;
+    }
+    const published = publishTaskArtifactsNoClobber(
       root,
       approvedSnapshot.sprint.tasks,
       `exact-start:${capability.attemptId}`,
     );
+    return {
+      ...published,
+      ...(migrated !== undefined ? { migrated } : {}),
+    };
   } catch (cause) {
     if (cause instanceof TaskArtifactProjectionError) {
       const code = cause.code === 'TASK_ARTIFACT_ID_INVALID'

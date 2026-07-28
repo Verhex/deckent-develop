@@ -21,6 +21,9 @@ import {
   settleExactRunAttempt,
   type ExactStartLineageInput,
 } from '../../src/orchestra/exact-plan-start-service.js';
+import {
+  inspectStructuredCriteriaProjectionAdoption,
+} from '../../src/orchestra/task-artifact-projection.js';
 
 function snapshot(root: string, flowId = 'flow-1'): StoredApprovedSnapshot {
   const approved: StoredApprovedSnapshot = {
@@ -203,6 +206,72 @@ describe('exact-plan start attempt lifecycle', () => {
       approvedSnapshot: approved,
     })).toThrow(ExactPlanStartError);
     expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({ id: 'drift' });
+  });
+
+  it('migrates only an adoption-bound missing structured-criteria projection before admission', () => {
+    const root = mkdtempSync(join(tmpdir(), 'exact-start-adoption-'));
+    const base = snapshot(root);
+    const canonicalTask = {
+      ...base.sprint.tasks[0]!,
+      sprintId: base.sprint.id,
+      createdAt: '2026-07-27T00:00:00.000Z',
+      goNogo: {
+        ...base.sprint.tasks[0]!.goNogo,
+        items: [{
+          id: 'criterion-go-proof',
+          polarity: 'go' as const,
+          statement: 'pass',
+          evidenceRequirements: ['pass'],
+        }],
+      },
+    };
+    const canonicalSprint = { ...base.sprint, tasks: [canonicalTask] };
+    const tasksDir = join(root, '.tasks');
+    mkdirSync(tasksDir, { recursive: true });
+    const legacyTask = structuredClone(canonicalTask);
+    delete legacyTask.goNogo.items;
+    const path = join(tasksDir, 'task-1-001.json');
+    writeFileSync(path, JSON.stringify(legacyTask, null, 2), 'utf8');
+    const inspected = inspectStructuredCriteriaProjectionAdoption(
+      root,
+      canonicalSprint.id,
+      canonicalSprint.tasks,
+    );
+    const approved: StoredApprovedSnapshot = {
+      ...base,
+      sprint: canonicalSprint,
+      projectionAdoption: {
+        schemaVersion: 1,
+        kind: 'structured-criteria-projection',
+        sprintId: canonicalSprint.id,
+        taskCount: 1,
+        expectedPlanDigest: base.planDigest,
+        legacyProjectionDigest: inspected.legacyProjectionDigest,
+        canonicalProjectionDigest: inspected.canonicalProjectionDigest,
+        authorizedBy: base.approvedBy,
+        authorizedAt: base.approvedAt,
+        justification: 'Owner-approved additive criteria recovery',
+      },
+    };
+    const prepared = prepareAndSpawnExactRun({
+      root,
+      exactRef: { schemaVersion: 1, flowId: 'flow-1', revision: 1, planDigest: 'digest-1' },
+      approvedSnapshot: approved,
+      lineage: lineage(),
+      preparerProcess: { pid: 100, startToken: 's100', evidence: 'verified' },
+      identityDeps,
+      spawnProcess: () => ({ pid: 200, startToken: 's200' }),
+    });
+    if (prepared.status !== 'process-spawned') throw new Error('unexpected fixture result');
+
+    expect(materializeExactPlanTaskArtifacts(root, {
+      capability: prepared.capability,
+      approvedSnapshot: approved,
+    })).toMatchObject({
+      migrated: ['1-001'],
+      idempotent: ['1-001'],
+    });
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(canonicalTask);
   });
 
   it('facade returns settled only after admission and terminal settlement', async () => {

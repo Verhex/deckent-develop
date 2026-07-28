@@ -35,9 +35,8 @@ import {
 import type { Sprint } from '../../src/core/types.js';
 import { SprintPhase, SprintStatus } from '../../src/core/sprint-types.js';
 import { TaskStatus } from '../../src/core/task-types.js';
-import type { RunHandle } from '../../src/core/run-flow-contract.js';
 import {
-  computeExecutionPlanDigestV3,
+  computeExecutionPlanDigestV4,
   EXECUTION_PLAN_DIGEST_VERSION,
   type ExecutionPlanDigestContext,
 } from '../../src/core/execution-plan-digest.js';
@@ -153,7 +152,7 @@ describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
       executionBudgetPolicy: null,
       configuredMaxWorkers: 4,
     } satisfies ExecutionPlanDigestContext;
-    const digest = computeExecutionPlanDigestV3(sprint, digestContext);
+    const digest = computeExecutionPlanDigestV4(sprint, digestContext);
     const coordinator = getRunFlowCoordinator(root);
     coordinator.proposeFlow({
       proposal: {
@@ -214,35 +213,48 @@ describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
     expect(events.at(-1)?.type).toBe('APPROVAL_REJECTED');
   });
 
-  it('start spawns exactly once, records RUN_STARTED, then refuses a re-start honestly', () => {
+  it('start spawns exactly once, remains STARTING until child admission, and refuses an active re-start', () => {
     const flowId = generateFlowId('decide-start');
-    appendProposalToCompletionChain({ root, flowId, through: 'APPROVAL_GRANTED' });
-    savePlannedSprint(root, flowId, { revision: 1, sprint: testSprint() });
+    const chain = appendProposalToCompletionChain({ root, flowId, through: 'PREVIEW_READY' });
+    savePlannedSprint(root, flowId, {
+      revision: 1,
+      sprint: testSprint(),
+      proposal: chain.proposal,
+      lineage: {
+        tenantId: chain.proposal.tenant,
+        actor: chain.proposal.actor,
+        origin: chain.proposal.origin,
+        correlationId: flowId,
+        idempotencyKey: `plan:${flowId}:r1`,
+        sourceRef: 'test-directives',
+      },
+    });
+    decideRunFlow(root, flowId, { decision: 'approve', actor: ACTOR });
 
     const spawns: string[] = [];
-    const spawnStart = (_sprint: Sprint, fid: string): RunHandle => {
-      spawns.push(fid);
-      return { flowId: fid, jobId: `job-${fid}`, logRef: `log-${fid}` };
+    const spawnStart = (context: { capability: { flowId: string } }) => {
+      spawns.push(context.capability.flowId);
+      return { pid: process.pid };
+    };
+    const lineage = {
+      tenantId: 'local',
+      actor: ACTOR,
+      origin: 'cli' as const,
+      correlationId: flowId,
+      idempotencyKey: `start:${flowId}`,
+      authorization: { kind: 'approved-actor' as const },
     };
 
-    const result = startRunFlow(root, flowId, { spawnStart });
-    expect(result.status).toBe('started');
-    expect(result.context.state).toBe('DETACHED_RUNNING');
+    const result = startRunFlow(root, flowId, { spawnStart, lineage });
+    expect(result.status).toBe('accepted');
+    expect(result.context.state).toBe('STARTING');
     expect(spawns).toEqual([flowId]);
     const types = readFlowEvents(root, flowId).map((e) => e.type);
     expect(types).toContain('START_REQUESTED');
-    expect(types).toContain('RUN_STARTED');
+    expect(types).not.toContain('RUN_STARTED');
 
-    // The flow left APPROVED — a second start is a typed state-refusal, and
-    // no second process is ever spawned.
-    let caught: unknown;
-    try {
-      startRunFlow(root, flowId, { spawnStart });
-    } catch (err) {
-      caught = err;
-    }
-    expect(caught).toBeInstanceOf(RunFlowDecisionError);
-    expect((caught as RunFlowDecisionError).code).toBe('NOT_APPROVED');
+    expect(() => startRunFlow(root, flowId, { spawnStart, lineage }))
+      .toThrow(/active|PROCESS_SPAWNED|in flight/i);
     expect(spawns).toEqual([flowId]);
   });
 
@@ -252,6 +264,14 @@ describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
 
     expect(() =>
       startRunFlow(root, flowId, {
+        lineage: {
+          tenantId: 'local',
+          actor: ACTOR,
+          origin: 'cli',
+          correlationId: flowId,
+          idempotencyKey: `start:${flowId}`,
+          authorization: { kind: 'approved-actor' },
+        },
         spawnStart: () => {
           throw new Error('spawnStart must never run for a non-approved flow');
         },

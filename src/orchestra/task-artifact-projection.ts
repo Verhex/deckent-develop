@@ -7,7 +7,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import {
   closeSync,
+  constants,
   existsSync,
+  fstatSync,
   fsyncSync,
   linkSync,
   lstatSync,
@@ -16,6 +18,7 @@ import {
   readFileSync,
   realpathSync,
   readdirSync,
+  renameSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -52,6 +55,23 @@ export interface TaskArtifactProjectionInspection {
   readonly missing: readonly string[];
 }
 
+export interface TaskArtifactProjectionSet<T extends { readonly id: string }> {
+  readonly taskIds: readonly string[];
+  readonly tasks: readonly T[];
+  /** Canonical exact-content root in caller-supplied task order. */
+  readonly projectionDigest: string;
+  readonly contentDigests: Readonly<Record<string, string>>;
+}
+
+export interface StructuredCriteriaProjectionAdoption<T extends { readonly id: string }> {
+  readonly sprintId: string;
+  readonly legacyProjectionDigest: string;
+  readonly canonicalProjectionDigest: string;
+  readonly canonicalTasks: readonly T[];
+  readonly alreadyCanonical: readonly string[];
+  readonly requiresMigration: readonly string[];
+}
+
 interface TaskTarget<T extends { readonly id: string }> {
   readonly task: T;
   readonly fileName: string;
@@ -75,6 +95,20 @@ function canonicalJson(value: unknown): string {
     .sort()
     .map((key) => `${JSON.stringify(key)}:${canonicalJson(object[key])}`)
     .join(',')}}`;
+}
+
+function projectionDigest(
+  tasks: readonly { readonly id: string }[],
+  contentDigests: Readonly<Record<string, string>>,
+): string {
+  return createHash('sha256').update(canonicalJson({
+    schemaVersion: 1,
+    slots: tasks.map((task, index) => ({
+      slot: index + 1,
+      taskId: task.id,
+      contentSha256: contentDigests[task.id],
+    })),
+  })).digest('hex');
 }
 
 function taskPayloadMatches(path: string, task: unknown): boolean {
@@ -113,36 +147,439 @@ function safeTaskFileName(taskId: string): string {
   return fileName;
 }
 
+function resolveTasksDirectory(root: string, create: boolean): string {
+  const tasksDir = join(root, TASKS_DIR);
+  if (create) mkdirSync(tasksDir, { recursive: true });
+  if (!existsSync(tasksDir)) {
+    throw new TaskArtifactProjectionError('TASK_ARTIFACT_DURABILITY_HOLD', {
+      reason: 'task_directory_missing',
+    });
+  }
+  const rootReal = realpathSync(root);
+  const tasksStat = lstatSync(tasksDir);
+  const tasksReal = realpathSync(tasksDir);
+  const tasksRelative = relative(rootReal, tasksReal);
+  const outsideRoot = tasksRelative === '..'
+    || tasksRelative.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`)
+    || isAbsolute(tasksRelative);
+  if (!tasksStat.isDirectory() || tasksStat.isSymbolicLink() || outsideRoot) {
+    throw new TaskArtifactProjectionError('TASK_ARTIFACT_DIRECTORY_DRIFT');
+  }
+  return tasksReal;
+}
+
+function assertPortableTargetSet(taskIds: readonly string[]): readonly string[] {
+  const fileNames = taskIds.map(safeTaskFileName);
+  const uniqueTargets = new Set(
+    fileNames.map(fileName => fileName.toLocaleLowerCase('en-US')),
+  );
+  if (uniqueTargets.size !== fileNames.length) {
+    throw new TaskArtifactProjectionError('TASK_ARTIFACT_ID_INVALID', {
+      reason: 'duplicate_or_case_fold_collision',
+    });
+  }
+  return fileNames;
+}
+
+function readStableTaskArtifact<T extends { readonly id: string }>(
+  target: string,
+  expectedTaskId: string,
+): { readonly task: T; readonly contentDigest: string } {
+  let fd: number | undefined;
+  try {
+    const before = lstatSync(target);
+    if (!before.isFile() || before.isSymbolicLink()) {
+      throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+        taskId: expectedTaskId,
+        reason: 'artifact_not_regular_file',
+      });
+    }
+    fd = openSync(target, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const opened = fstatSync(fd);
+    if (opened.dev !== before.dev || opened.ino !== before.ino) {
+      throw new TaskArtifactProjectionError('TASK_ARTIFACT_DIRECTORY_DRIFT', {
+        taskId: expectedTaskId,
+        reason: 'artifact_generation_changed_before_read',
+      });
+    }
+    const raw = readFileSync(fd, 'utf8');
+    const after = lstatSync(target);
+    if (after.dev !== opened.dev || after.ino !== opened.ino) {
+      throw new TaskArtifactProjectionError('TASK_ARTIFACT_DIRECTORY_DRIFT', {
+        taskId: expectedTaskId,
+        reason: 'artifact_generation_changed_after_read',
+      });
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (
+      parsed === null
+      || typeof parsed !== 'object'
+      || Array.isArray(parsed)
+      || (parsed as { id?: unknown }).id !== expectedTaskId
+    ) {
+      throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+        taskId: expectedTaskId,
+        reason: 'artifact_identity_mismatch',
+      });
+    }
+    const task = parsed as T;
+    return {
+      task,
+      contentDigest: createHash('sha256').update(canonicalJson(task)).digest('hex'),
+    };
+  } catch (cause) {
+    if (cause instanceof TaskArtifactProjectionError) throw cause;
+    throw new TaskArtifactProjectionError(
+      'TASK_ARTIFACT_DURABILITY_HOLD',
+      { taskId: expectedTaskId, reason: 'artifact_read_unavailable' },
+      { cause },
+    );
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
+/**
+ * Read an exact, caller-enumerated legacy projection set without creating files
+ * or trusting directory enumeration as plan authority.
+ */
+export function readTaskArtifactProjectionSet<T extends { readonly id: string }>(
+  root: string,
+  expectedTaskIds: readonly string[],
+): TaskArtifactProjectionSet<T> {
+  const tasksReal = resolveTasksDirectory(root, false);
+  const fileNames = assertPortableTargetSet(expectedTaskIds);
+  const existingNames = new Map(
+    readdirSync(tasksReal).map(name => [name.toLocaleLowerCase('en-US'), name] as const),
+  );
+  const tasks: T[] = [];
+  const contentDigests: Record<string, string> = {};
+  for (let index = 0; index < expectedTaskIds.length; index++) {
+    const taskId = expectedTaskIds[index]!;
+    const fileName = fileNames[index]!;
+    const caseFoldMatch = existingNames.get(fileName.toLocaleLowerCase('en-US'));
+    if (caseFoldMatch !== fileName) {
+      throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+        taskId,
+        reason: caseFoldMatch === undefined
+          ? 'expected_artifact_missing'
+          : 'portable_case_fold_collision',
+      });
+    }
+    const observed = readStableTaskArtifact<T>(join(tasksReal, fileName), taskId);
+    tasks.push(observed.task);
+    contentDigests[taskId] = observed.contentDigest;
+  }
+  return {
+    taskIds: [...expectedTaskIds],
+    tasks,
+    projectionDigest: projectionDigest(tasks, contentDigests),
+    contentDigests: Object.freeze({ ...contentDigests }),
+  };
+}
+
+function withoutStructuredCriteria<T extends { readonly id: string }>(task: T): T {
+  const copy = structuredClone(task) as T & {
+    goNogo?: { items?: unknown };
+  };
+  if (copy.goNogo && typeof copy.goNogo === 'object') delete copy.goNogo.items;
+  return copy;
+}
+
+/**
+ * Validate the one supported legacy migration: retain the existing task
+ * timestamp, add fresh structured acceptance criteria, and change nothing else.
+ */
+export function inspectStructuredCriteriaProjectionAdoption<
+  T extends {
+    readonly id: string;
+    readonly sprintId?: string;
+    readonly createdAt?: string;
+    readonly goNogo?: { readonly items?: readonly unknown[] };
+  },
+>(
+  root: string,
+  sprintId: string,
+  freshTasks: readonly T[],
+): StructuredCriteriaProjectionAdoption<T> {
+  const observed = readTaskArtifactProjectionSet<T>(
+    root,
+    freshTasks.map(task => task.id),
+  );
+  const canonicalTasks: T[] = [];
+  const alreadyCanonical: string[] = [];
+  const requiresMigration: string[] = [];
+  for (let index = 0; index < freshTasks.length; index++) {
+    const fresh = freshTasks[index]!;
+    const current = observed.tasks[index]!;
+    if (current.sprintId !== sprintId || fresh.sprintId !== sprintId) {
+      throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+        taskId: fresh.id,
+        reason: 'sprint_identity_mismatch',
+      });
+    }
+    const canonical = {
+      ...structuredClone(fresh),
+      ...(current.createdAt !== undefined ? { createdAt: current.createdAt } : {}),
+    } as T;
+    if (canonicalJson(current) === canonicalJson(canonical)) {
+      alreadyCanonical.push(fresh.id);
+    } else if (
+      (current.goNogo?.items === undefined || current.goNogo.items.length === 0)
+      && canonicalJson(current) === canonicalJson(withoutStructuredCriteria(canonical))
+    ) {
+      requiresMigration.push(fresh.id);
+    } else {
+      throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+        taskId: fresh.id,
+        reason: 'unsupported_legacy_projection_drift',
+      });
+    }
+    canonicalTasks.push(canonical);
+  }
+  const canonicalDigests = Object.fromEntries(canonicalTasks.map(task => [
+    task.id,
+    createHash('sha256').update(canonicalJson(task)).digest('hex'),
+  ]));
+  const legacyTasks = canonicalTasks.map(withoutStructuredCriteria);
+  const legacyDigests = Object.fromEntries(legacyTasks.map(task => [
+    task.id,
+    createHash('sha256').update(canonicalJson(task)).digest('hex'),
+  ]));
+  return {
+    sprintId,
+    legacyProjectionDigest: projectionDigest(legacyTasks, legacyDigests),
+    canonicalProjectionDigest: projectionDigest(canonicalTasks, canonicalDigests),
+    canonicalTasks,
+    alreadyCanonical,
+    requiresMigration,
+  };
+}
+
+export interface StructuredCriteriaProjectionMigrationResult {
+  readonly migrated: readonly string[];
+  readonly idempotent: readonly string[];
+}
+
+function migrationBackupPrefix(taskId: string): string {
+  return `.task-migration-${taskId}-`;
+}
+
+function listMigrationBackups(
+  tasksReal: string,
+  taskId: string,
+): readonly string[] {
+  const prefix = migrationBackupPrefix(taskId);
+  return readdirSync(tasksReal)
+    .filter(name => name.startsWith(prefix) && name.endsWith('.previous'))
+    .sort()
+    .map(name => join(tasksReal, name));
+}
+
+function matchesTaskPayload(
+  observed: { readonly task: unknown },
+  expected: unknown,
+): boolean {
+  return canonicalJson(observed.task) === canonicalJson(expected);
+}
+
+function fsyncDirectory(path: string): void {
+  const fd = openSync(path, 'r');
+  try {
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * Explicit additive schema migration used only by an approved adoption record.
+ * The legacy target is first moved to a durable predecessor artifact. The
+ * canonical payload is then linked into the now-empty target with no-clobber
+ * semantics. A writer that wins either boundary is preserved and turns the
+ * migration into a typed HOLD instead of being silently overwritten.
+ *
+ * Predecessors are deliberately retained as recovery/audit evidence. A crash
+ * after the move but before publication resumes from the one exact predecessor;
+ * admission has not yet committed and mixed legacy/canonical task sets remain
+ * retry-safe.
+ */
+export function migrateStructuredCriteriaProjection(
+  root: string,
+  canonicalTasks: readonly {
+    readonly id: string;
+    readonly sprintId?: string;
+    readonly createdAt?: string;
+    readonly goNogo?: { readonly items?: readonly unknown[] };
+  }[],
+  expectedLegacyProjectionDigest: string,
+): StructuredCriteriaProjectionMigrationResult {
+  const sprintId = String(canonicalTasks[0]?.sprintId ?? '');
+  if (
+    sprintId.length === 0
+    || canonicalTasks.some(task => task.sprintId !== sprintId)
+  ) {
+    throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+      reason: 'sprint_identity_mismatch',
+    });
+  }
+  assertPortableTargetSet(canonicalTasks.map(task => task.id));
+  const legacyTasks = canonicalTasks.map(withoutStructuredCriteria);
+  const legacyDigests = Object.fromEntries(legacyTasks.map(task => [
+    task.id,
+    createHash('sha256').update(canonicalJson(task)).digest('hex'),
+  ]));
+  const computedLegacyProjectionDigest = projectionDigest(
+    legacyTasks,
+    legacyDigests,
+  );
+  if (computedLegacyProjectionDigest !== expectedLegacyProjectionDigest) {
+    throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+      reason: 'legacy_projection_digest_mismatch',
+      expectedProjectionDigest: expectedLegacyProjectionDigest,
+      actualProjectionDigest: computedLegacyProjectionDigest,
+    });
+  }
+
+  const tasksReal = resolveTasksDirectory(root, false);
+  const migrated: string[] = [];
+  const idempotent: string[] = [];
+  for (let index = 0; index < canonicalTasks.length; index++) {
+    const task = canonicalTasks[index]!;
+    const legacyTask = legacyTasks[index]!;
+    const taskId = task.id;
+    const target = join(tasksReal, safeTaskFileName(taskId));
+    const backups = listMigrationBackups(tasksReal, taskId);
+    if (existsSync(target)) {
+      const current = readStableTaskArtifact<typeof task>(target, taskId);
+      if (matchesTaskPayload(current, task)) {
+        idempotent.push(taskId);
+        continue;
+      }
+      if (!matchesTaskPayload(current, legacyTask)) {
+        throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+          taskId,
+          reason: 'migration_cas_mismatch',
+        });
+      }
+      if (backups.length > 0) {
+        throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+          taskId,
+          reason: 'migration_predecessor_ambiguous',
+        });
+      }
+    } else if (backups.length !== 1) {
+      throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+        taskId,
+        reason: backups.length === 0
+          ? 'migration_target_missing'
+          : 'migration_predecessor_ambiguous',
+      });
+    }
+
+    const stagePath = join(tasksReal, `.task-migration-${randomUUID()}.tmp`);
+    let predecessorPath = backups[0];
+    let staged = false;
+    try {
+      const fd = openSync(stagePath, 'wx', 0o600);
+      try {
+        writeFileSync(fd, JSON.stringify(task, null, 2), 'utf8');
+        fsyncSync(fd);
+      } finally {
+        closeSync(fd);
+      }
+      staged = true;
+
+      if (existsSync(target)) {
+        predecessorPath = join(
+          tasksReal,
+          `${migrationBackupPrefix(taskId)}${randomUUID()}.previous`,
+        );
+        renameSync(target, predecessorPath);
+      }
+      if (predecessorPath === undefined) {
+        throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+          taskId,
+          reason: 'migration_predecessor_missing',
+        });
+      }
+
+      const predecessor = readStableTaskArtifact<typeof task>(
+        predecessorPath,
+        taskId,
+      );
+      if (!matchesTaskPayload(predecessor, legacyTask)) {
+        try {
+          linkSync(predecessorPath, target);
+          fsyncDirectory(tasksReal);
+        } catch {
+          // Preserve both artifacts. A concurrent target is authority and HOLDs.
+        }
+        throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+          taskId,
+          reason: 'migration_cas_changed',
+        });
+      }
+
+      try {
+        linkSync(stagePath, target);
+      } catch (cause) {
+        throw new TaskArtifactProjectionError(
+          'TASK_ARTIFACT_CONTENT_CONFLICT',
+          {
+            taskId,
+            reason: existsSync(target)
+              ? 'migration_target_recreated'
+              : 'migration_no_clobber_publish_failed',
+          },
+          { cause },
+        );
+      }
+      fsyncDirectory(tasksReal);
+      const published = readStableTaskArtifact<typeof task>(target, taskId);
+      if (!matchesTaskPayload(published, task)) {
+        throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+          taskId,
+          reason: 'migration_publication_drift',
+        });
+      }
+      migrated.push(taskId);
+    } catch (cause) {
+      if (cause instanceof TaskArtifactProjectionError) throw cause;
+      throw new TaskArtifactProjectionError(
+        'TASK_ARTIFACT_DURABILITY_HOLD',
+        { taskId, reason: 'migration_replace_unavailable' },
+        { cause },
+      );
+    } finally {
+      if (staged) {
+        try {
+          unlinkSync(stagePath);
+        } catch {
+          // Private staged content is never target authority.
+        }
+      }
+    }
+  }
+  fsyncDirectory(tasksReal);
+  return {
+    migrated,
+    idempotent,
+  };
+}
+
 function inspectInternal<T extends { readonly id: string }>(
   root: string,
   tasks: readonly T[],
 ): ProjectionInspectionInternal<T> {
-  const tasksDir = join(root, TASKS_DIR);
   try {
-    mkdirSync(tasksDir, { recursive: true });
-    const rootReal = realpathSync(root);
-    const tasksStat = lstatSync(tasksDir);
-    const tasksReal = realpathSync(tasksDir);
-    const tasksRelative = relative(rootReal, tasksReal);
-    const outsideRoot = tasksRelative === '..'
-      || tasksRelative.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`)
-      || isAbsolute(tasksRelative);
-    if (!tasksStat.isDirectory() || tasksStat.isSymbolicLink() || outsideRoot) {
-      throw new TaskArtifactProjectionError('TASK_ARTIFACT_DIRECTORY_DRIFT');
-    }
+    const tasksReal = resolveTasksDirectory(root, true);
 
     const targets = tasks.map((task) => {
       const fileName = safeTaskFileName(task.id);
       return { task, fileName, target: join(tasksReal, fileName) };
     });
-    const uniqueTargets = new Set(
-      targets.map(({ fileName }) => fileName.toLocaleLowerCase('en-US')),
-    );
-    if (uniqueTargets.size !== targets.length) {
-      throw new TaskArtifactProjectionError('TASK_ARTIFACT_ID_INVALID', {
-        reason: 'duplicate_or_case_fold_collision',
-      });
-    }
+    assertPortableTargetSet(tasks.map(task => task.id));
 
     const existingNames = new Map(
       readdirSync(tasksReal).map((name) => [name.toLocaleLowerCase('en-US'), name] as const),

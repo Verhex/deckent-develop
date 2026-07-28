@@ -233,7 +233,7 @@ describe('generatePlanPreview', () => {
     }) as any);
     const preview = await generatePlanPreview('/mock/root', makeConfig(), makeContext(), makeRecommendation());
 
-    expect(preview.planDigestVersion).toBe(3);
+    expect(preview.planDigestVersion).toBe(4);
     expect(preview.topologyGateResult).toBe('fail');
     expect(preview.policyDecision).toBe('deny');
     expect(preview.gateResult).toBe('fail');

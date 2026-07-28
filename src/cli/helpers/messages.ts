@@ -786,6 +786,50 @@ const MESSAGES: MessageMap = {
     en: 'Acknowledge suspect scope paths for this exact plan',
     tr: 'Bu exact plan için şüpheli kapsam yollarını açıkça kabul et',
   },
+  'plan.adopt_existing_option': {
+    en: 'Explicitly reconcile an existing legacy Sprint projection into this exact plan',
+    tr: 'Mevcut legacy Sprint projection’ını bu exact planla açıkça reconcile et',
+  },
+  'plan.expected_plan_digest_option': {
+    en: 'Owner-observed V4 execution-plan digest required for adoption',
+    tr: 'Adoption için gerekli, owner tarafından gözlemlenmiş V4 execution-plan digest’i',
+  },
+  'plan.expected_projection_digest_option': {
+    en: 'Owner-observed legacy task-projection digest required for adoption',
+    tr: 'Adoption için gerekli, owner tarafından gözlemlenmiş legacy task-projection digest’i',
+  },
+  'plan.expected_canonical_projection_digest_option': {
+    en: 'Owner-observed post-reconciliation task-projection digest required for adoption',
+    tr: 'Adoption için gerekli, owner tarafından gözlemlenmiş reconciliation-sonrası task-projection digest’i',
+  },
+  'plan.adoption_actor_option': {
+    en: 'Stable owner/principal identity authorizing projection adoption',
+    tr: 'Projection adoption’ını yetkilendiren kalıcı owner/principal kimliği',
+  },
+  'plan.adoption_justification_option': {
+    en: 'Bound operator justification for the one-time projection adoption',
+    tr: 'Tek seferlik projection adoption için bağlanan operator gerekçesi',
+  },
+  'plan.adoption_authority_required': {
+    en: 'Exact adoption requires all three expected digests, an adoption actor, and a justification. Run the adoption dry-run first.',
+    tr: 'Exact adoption üç expected digest’in tamamını, adoption actor’ını ve gerekçeyi gerektirir. Önce adoption dry-run çalıştırın.',
+  },
+  'plan.adoption_dependency_hold': {
+    en: 'Projection adoption is on HOLD because the fresh plan contains unresolved dependencies.',
+    tr: 'Fresh plan çözümlenmemiş dependency içerdiği için projection adoption HOLD durumunda.',
+  },
+  'plan.adoption_inspection_ready': {
+    en: 'Adoption inspection for {sprintId} is ready with {count} exact tasks; no task file or canonical plan was changed.',
+    tr: '{sprintId} için adoption incelemesi {count} exact task ile hazır; hiçbir task dosyası veya canonical plan değiştirilmedi.',
+  },
+  'plan.adoption_approved': {
+    en: 'Legacy projection {sprintId} is bound to the approved exact plan. Its additive schema migration remains admission-gated until exact start.',
+    tr: 'Legacy projection {sprintId} onaylı exact plana bağlandı. Additive schema migration, exact start’a kadar admission-gated kalacak.',
+  },
+  'plan.adoption_hold': {
+    en: 'Exact projection adoption is on HOLD: {reason}. Existing task files were preserved.',
+    tr: 'Exact projection adoption HOLD durumunda: {reason}. Mevcut task dosyaları korundu.',
+  },
   'plan.task_projection_invalid_id': {
     en: 'Exact plan task "{taskId}" cannot be represented as a portable task artifact. The canonical plan was not executed.',
     tr: 'Exact plandaki "{taskId}" görevi portable bir task artifact olarak temsil edilemiyor. Canonical plan yürütülmedi.',

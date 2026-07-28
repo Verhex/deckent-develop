@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "021a50d3bd3b46e406f7ccba9240dbcf0458b68fac5480d2dd771ef93eac5c05"
+    "value": "1e02cdbbdf21de12764d13cc664c233d501580d3e713d3de1e49199fd6e82189"
   },
   "summary": {
     "total": 233,
     "active": 233,
     "terminal": 0,
-    "receipts": 16,
+    "receipts": 17,
     "byState": {
       "OPEN": 156,
       "READY": 0,
@@ -1458,7 +1458,7 @@
       "state": "OPEN",
       "updated": "2026-07-28",
       "definitionDigest": "3708cd18d6c7f3e18cb9f577565c2b6b824db840b2f59506a5fff8334e41dbd1",
-      "progressDigest": "4ee4e2ab24be06b5998c8ebb5c05b2e285e01878929f3f0ccf0dc7260477390f",
+      "progressDigest": "1ab8136c2e21fecba646af3f02902ea793071ae37bf1bbfbb0295acde2edf3d4",
       "terminalClosureDigest": null
     },
     {
@@ -1568,7 +1568,7 @@
       "state": "OPEN",
       "updated": "2026-07-28",
       "definitionDigest": "60b3a13655a25995824df224f775f4ccf477279e4bafaf9a92189e66dd63e0f2",
-      "progressDigest": "f8b7271105719ad37d243c37809f95770bfb923b72e8960d904ac73c184dc3bb",
+      "progressDigest": "72c17ac75761b5c5e4e6ef476eecfb3b3fc29cb05ec26bce75cea784f3bb1d1a",
       "terminalClosureDigest": null
     },
     {
@@ -2786,6 +2786,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-07-28T20:55:00+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-28-RUNFLOW-ADOPTION-01",
+      "authorityDigest": "fc270339e55c6e9d9e6a4a3011c8d55aa426cdf8727d06064a66179d11cec52b",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-28T21:37:34+03:00"
       },
       "g7AttemptIdentity": null
     }
@@ -8327,10 +8337,11 @@
       "evidenceReceipts": [
         "GR-2026-07-28-FILE-LOCK-01",
         "GR-2026-07-28-ADMISSION-01",
-        "GR-2026-07-28-RUNFLOW-EXACT-01"
+        "GR-2026-07-28-RUNFLOW-EXACT-01",
+        "GR-2026-07-28-RUNFLOW-ADOPTION-01"
       ],
       "acceptance": "Duplicate effect impossible; unknown settlement never auto-replays",
-      "evidence": "`receipt=GR-2026-07-28-FILE-LOCK-01`; `receipt=GR-2026-07-28-ADMISSION-01`; `receipt=GR-2026-07-28-RUNFLOW-EXACT-01`; exact-generation lock/admission authority is joined by a SQLite-backed exact RunFlow start-attempt journal with PREPARED→PROCESS_SPAWNED→ADMITTED/terminal CAS, generation+owner nonce fencing, process-start identity, same-transaction child admission+handle publication, bounded death repair and idempotent terminal settlement; exact plan/start/projection suites pass 78/78, TypeScript and real build pass, and independent Claude Fable 5 review confirms the finite P1–P5 claims; whole-kernel closure remains open because sprint-461 legacy projection adoption, default legacy-start retirement, v2 stop propagation, Mission cancel ingress, tenant-wide idempotency, live million-scale/HA proof and native macOS/Windows authority adapters are not yet proven",
+      "evidence": "`receipt=GR-2026-07-28-FILE-LOCK-01`; `receipt=GR-2026-07-28-ADMISSION-01`; `receipt=GR-2026-07-28-RUNFLOW-EXACT-01`; `receipt=GR-2026-07-28-RUNFLOW-ADOPTION-01`; exact-generation lock/admission authority is joined by a SQLite-backed exact RunFlow start-attempt journal with PREPARED→PROCESS_SPAWNED→ADMITTED/terminal CAS, generation+owner nonce fencing, process-start identity, same-transaction child admission+handle publication, bounded death repair and idempotent terminal settlement; digest V4 now binds structured acceptance criteria and exact-start migration preserves a concurrent writer through durable predecessor plus no-clobber publication; 9 focused files pass 107/107 and TypeScript is green; Fable 5 first refuted the overwrite race and a fresh post-repair pass confirmed P1–P5; whole-kernel closure remains open because sprint-461 has an approved adoption record but no start attempt or live admission yet, while default legacy-start retirement, v2 stop propagation, Mission cancel ingress, tenant-wide idempotency, live million-scale/HA proof and native macOS/Windows authority adapters remain unproven",
       "updated": "2026-07-28"
     },
     {
@@ -8741,10 +8752,11 @@
         "KERNEL-SETTLEMENT-001"
       ],
       "evidenceReceipts": [
-        "GR-2026-07-28-RUNFLOW-EXACT-01"
+        "GR-2026-07-28-RUNFLOW-EXACT-01",
+        "GR-2026-07-28-RUNFLOW-ADOPTION-01"
       ],
       "acceptance": "`do`, run, API, terminal and Desktop consume one service; legacy stores migrated",
-      "evidence": "`receipt=GR-2026-07-28-RUNFLOW-EXACT-01`; one canonical service now generates/persists the exact `Sprint+revision+planDigest+source/topology/scope lineage`, approves that same record without replanning, and drives a durable start-attempt CAS consumed by CLI, MCP, API, Terminal, Autonomous and Process ingress; parent surfaces report STARTING until child admission, exact cost consumes the same snapshot, compatibility task files are post-approval atomic no-clobber projections and conflicting files HOLD without overwrite; targeted exact plan/start/projection proof passes 78/78, TypeScript and build pass, real binary structured dry-run returns sprint-461 digest `3c7edcd35451c36d15e867e4e081a995d473467a862f6e9dc317714edd016c49`, bot restarted as PID 4153923, strict Deckent XVerify correctly HOLDs on unavailable production authority while owner-approved read-only Fable 5 recovery independently returns CONFIRMED in `.analysis/xverify/xv-manual-20260728-exact-plan-fable5.md`; live truth remains open because sprint-461 has no canonical adoption record, default non-exact `start` still owns legacy planning paths, Desktop live parity/cancel/recovery/migration and every-environment/scale proof are incomplete",
+      "evidence": "`receipt=GR-2026-07-28-RUNFLOW-EXACT-01`; `receipt=GR-2026-07-28-RUNFLOW-ADOPTION-01`; one canonical service now generates and approves the same exact `Sprint+revision+planDigest+source/topology/scope lineage` and drives durable start-attempt CAS across CLI, MCP, API, Terminal, Autonomous and Process; execution digest V4 closes the structured-criteria authority gap; owner `Alperen` approved canonical sprint-461 flow `adoption-3b945d6a1400dc3687a55b68f036b0e4` at revision 1 with plan `dfa5882f793082a045ce623a49db09c1209560e8576b17c5ede3b5297fa1f596`, legacy projection `0e6e6b941d29bfb88c404984572f7a19048705b54b31a8c0f2c35fbff4ca2cb7` and canonical projection `a1989eb1876285500688f2cd78dfbbab970b1e103a8f77a6650a72c64317c6a6`; durable events are exactly PROPOSAL_SUBMITTED→PREVIEW_STARTED→PREVIEW_READY→APPROVAL_GRANTED, task byte-set remains `495410164414c24fe3c765dedab0e87c4db48e0ee6e0b267bf2dea1dc454b6a8`, structured items remain 0/24 and start-attempts remain empty, proving approval did not mutate or start; built binary reproduces all three digests, 9 focused files pass 107/107, build succeeds, bot runs as PID 72923 and Nervous is empty; Fable 5 first returned REFUTED on a real migration TOCTOU, then confirmed the no-clobber predecessor repair in `.analysis/xverify/xv-manual-20260728-exact-adoption-fable5.md`; live truth remains open until exact start executes this approved record, provider authority admits its heterogeneous workers, default non-exact start retires and Desktop/cancel/recovery/every-environment/scale proof completes",
       "updated": "2026-07-28"
     },
     {
@@ -12844,6 +12856,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "e7bacd5e0804339d8d6183907fd3813579c76b55a57531d6759a6d90dd0fe0c7"
+    "value": "b024026ebef793115ad72ca4af53f7df44a0c7966d4c8309cee1ed1286959153"
   }
 }

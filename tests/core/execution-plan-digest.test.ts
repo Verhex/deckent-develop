@@ -5,8 +5,10 @@ import {
   computeExecutionPlanDigest,
   computeExecutionPlanDigestByVersion,
   computeExecutionPlanDigestV3,
+  computeExecutionPlanDigestV4,
   EXECUTION_PLAN_DIGEST_VERSION,
   EXECUTION_PLAN_DIGEST_VERSION_V2,
+  EXECUTION_PLAN_DIGEST_VERSION_V3,
 } from '../../src/core/execution-plan-digest.js';
 import type { ExecutionBudgetPolicyConfig, ResolvedConfig } from '../../src/core/config-types.js';
 import type { Sprint, Task } from '../../src/core/types.js';
@@ -153,7 +155,7 @@ describe('execution plan digest v3 topology binding', () => {
     expect(v3(remapped).digest).toBe(v3(base).digest);
     expect(v3(base, 2).digest).not.toBe(v3(base, 1).digest);
     expect(v3(base).topology.verdict).toBe('block');
-    expect(v3(base).version).toBe(EXECUTION_PLAN_DIGEST_VERSION);
+    expect(v3(base).version).toBe(EXECUTION_PLAN_DIGEST_VERSION_V3);
   });
 
   it('keeps v2 byte semantics independent from the new optional concurrency context', () => {
@@ -164,14 +166,65 @@ describe('execution plan digest v3 topology binding', () => {
       .toBe(computeExecutionPlanDigest(planned, oldContext).digest);
   });
 
-  it('dispatches persisted v2 and v3 explicitly and rejects unknown versions', () => {
+  it('dispatches persisted v2, v3 and v4 explicitly and rejects unknown versions', () => {
     const planned = sprint();
     const context = buildExecutionPlanDigestContext(config(), 'subscription', 4);
     expect(computeExecutionPlanDigestByVersion(EXECUTION_PLAN_DIGEST_VERSION_V2, planned, context).version)
       .toBe(EXECUTION_PLAN_DIGEST_VERSION_V2);
+    expect(computeExecutionPlanDigestByVersion(EXECUTION_PLAN_DIGEST_VERSION_V3, planned, context).version)
+      .toBe(EXECUTION_PLAN_DIGEST_VERSION_V3);
     expect(computeExecutionPlanDigestByVersion(EXECUTION_PLAN_DIGEST_VERSION, planned, context).version)
       .toBe(EXECUTION_PLAN_DIGEST_VERSION);
     expect(() => computeExecutionPlanDigestByVersion(99, planned, context)).toThrow('unsupported version 99');
+  });
+});
+
+describe('execution plan digest v4 structured-criterion binding', () => {
+  const context = buildExecutionPlanDigestContext(config(), 'subscription', 4);
+
+  it('binds criterion identity, polarity, statement and evidence without changing frozen v3 bytes', () => {
+    const base = sprint();
+    const enriched = structuredClone(base);
+    enriched.tasks[0]!.goNogo.items = [{
+      id: 'criterion-go-proof',
+      polarity: 'go',
+      statement: 'target passes',
+      evidenceRequirements: ['tests/core/example.test.ts', 'npm test'],
+    }];
+
+    expect(computeExecutionPlanDigestV3(enriched, context).digest)
+      .toBe(computeExecutionPlanDigestV3(base, context).digest);
+    expect(computeExecutionPlanDigestV4(enriched, context).digest)
+      .not.toBe(computeExecutionPlanDigestV4(base, context).digest);
+    expect(computeExecutionPlanDigestV4(enriched, context).version)
+      .toBe(EXECUTION_PLAN_DIGEST_VERSION);
+  });
+
+  it('treats evidence requirements as a canonical set but preserves criterion order', () => {
+    const left = sprint();
+    left.tasks[0]!.goNogo.items = [
+      {
+        id: 'criterion-go-a',
+        polarity: 'go',
+        statement: 'A',
+        evidenceRequirements: ['z', 'a', 'a'],
+      },
+      {
+        id: 'criterion-no-go-b',
+        polarity: 'no-go',
+        statement: 'B',
+        evidenceRequirements: ['b'],
+      },
+    ];
+    const reorderedEvidence = structuredClone(left);
+    reorderedEvidence.tasks[0]!.goNogo.items![0]!.evidenceRequirements = ['a', 'z'];
+    const reorderedCriteria = structuredClone(left);
+    reorderedCriteria.tasks[0]!.goNogo.items!.reverse();
+
+    expect(computeExecutionPlanDigestV4(reorderedEvidence, context).digest)
+      .toBe(computeExecutionPlanDigestV4(left, context).digest);
+    expect(computeExecutionPlanDigestV4(reorderedCriteria, context).digest)
+      .not.toBe(computeExecutionPlanDigestV4(left, context).digest);
   });
 });
 

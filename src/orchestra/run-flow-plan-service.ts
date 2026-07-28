@@ -16,7 +16,8 @@ import { createHash } from 'node:crypto';
 
 import { canonicalJson } from '../core/audit-writer.js';
 import {
-  computeExecutionPlanDigestV3,
+  computeExecutionPlanDigestByVersion,
+  computeExecutionPlanDigestV4,
   type ExecutionPlanDigestContext,
 } from '../core/execution-plan-digest.js';
 import type {
@@ -25,6 +26,7 @@ import type {
   RunFlowGateResult,
   RunFlowPlanLineageRecord,
   RunFlowPolicyDecision,
+  RunFlowProjectionAdoptionRecord,
   RunProposal,
 } from '../core/run-flow-contract.js';
 import {
@@ -60,6 +62,10 @@ import {
   compileRunProposal,
   type RunProposalPlanner,
 } from './run-proposal-compiler.js';
+import {
+  inspectStructuredCriteriaProjectionAdoption,
+  TaskArtifactProjectionError,
+} from './task-artifact-projection.js';
 
 export const RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION = 1 as const;
 
@@ -67,6 +73,7 @@ export type RunFlowPlanServiceErrorCode =
   | 'FLOW_ID_CONFLICT'
   | 'UNRESOLVED_DEPENDENCY'
   | 'PERSISTED_PLAN_INVALID'
+  | 'PROJECTION_ADOPTION_HOLD'
   | 'TOPOLOGY_HOLD'
   | 'PROMPT_GATE_HOLD'
   | 'SCOPE_GATE_HOLD';
@@ -114,6 +121,17 @@ export type RunFlowPlanSource =
   | IntentRunFlowPlanSource
   | DirectivesRunFlowPlanSource;
 
+export interface RunFlowProjectionAdoptionInput {
+  readonly kind: 'structured-criteria-projection';
+  readonly sprintId: string;
+  readonly expectedPlanDigest: string;
+  readonly expectedLegacyProjectionDigest: string;
+  readonly expectedCanonicalProjectionDigest: string;
+  readonly authorizedBy: ActorContext;
+  readonly authorizedAt: string;
+  readonly justification: string;
+}
+
 export interface PlanRunFlowInput {
   readonly projectRoot: string;
   readonly config: ResolvedConfig;
@@ -127,6 +145,11 @@ export interface PlanRunFlowInput {
    * and use the bounded git adapter; hermetic hosts can inject an equivalent
    * authoritative snapshot without spawning a subprocess. */
   readonly scopeEvidence?: RunFlowScopeEvidence;
+  /**
+   * Explicit one-time recovery authority for a legacy task-file projection.
+   * Omitting it keeps exact planning strictly no-clobber.
+   */
+  readonly projectionAdoption?: RunFlowProjectionAdoptionInput;
   /** Optional owner decision. Omit when a surface must render before asking. */
   readonly approval?: {
     readonly actor: ActorContext;
@@ -146,6 +169,7 @@ export interface PlanRunFlowResult {
   readonly context: RunFlowContext;
   readonly sourceAuthority: RunFlowPlanSourceAuthority;
   readonly lineage: RunFlowPlanLineage;
+  readonly projectionAdoption?: RunFlowProjectionAdoptionRecord;
   readonly approval: 'awaiting' | 'approved';
   /** True when an idempotent retry reused the already-durable exact plan. */
   readonly reusedDurablePlan: boolean;
@@ -160,6 +184,7 @@ interface DurableRunFlowPlanRecord extends StoredPlannedSprint {
   readonly preview: PlanPreview;
   readonly sourceAuthority: RunFlowPlanSourceAuthority;
   readonly lineage: RunFlowPlanLineage;
+  readonly projectionAdoption?: RunFlowProjectionAdoptionRecord;
 }
 
 export interface RunFlowScopeEvidence {
@@ -173,6 +198,19 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+function isCanonicalIsoTimestamp(value: string): boolean {
+  const epoch = Date.parse(value);
+  return Number.isFinite(epoch) && new Date(epoch).toISOString() === value;
+}
+
+function stableProjectionAdoptionAuthority(
+  input: RunFlowProjectionAdoptionInput | undefined,
+): Omit<RunFlowProjectionAdoptionInput, 'authorizedAt'> | null {
+  if (!input) return null;
+  const { authorizedAt: _authorizedAt, ...stable } = input;
+  return stable;
+}
+
 function buildSourceAuthority(
   proposal: RunProposal,
   source: RunFlowPlanSource,
@@ -182,6 +220,7 @@ function buildSourceAuthority(
   acknowledgeScopePaths: boolean,
   scopeInput: ScopeInput,
   lineage: RunFlowPlanLineage,
+  projectionAdoption: RunFlowProjectionAdoptionInput | undefined,
 ): RunFlowPlanSourceAuthority {
   const content = source.sourceKind === 'intent'
     ? proposal.intentSummary
@@ -205,6 +244,7 @@ function buildSourceAuthority(
       acknowledgeScopePaths,
       scopeInput,
       lineage,
+      projectionAdoption: stableProjectionAdoptionAuthority(projectionAdoption),
     })),
     scopeInputSha256: sha256(canonicalJson(scopeInput)),
     lineageSha256: sha256(canonicalJson(lineage)),
@@ -351,6 +391,9 @@ function buildResult(
     context,
     sourceAuthority: record.sourceAuthority,
     lineage: record.lineage,
+    ...(record.projectionAdoption !== undefined
+      ? { projectionAdoption: record.projectionAdoption }
+      : {}),
     approval: context.state === 'APPROVED' ? 'approved' : 'awaiting',
     reusedDurablePlan,
   };
@@ -371,6 +414,22 @@ function verifyReusableRecord(
     || record.preview.revision !== record.revision
     || record.preview.planDigest !== record.planDigest
     || record.preview.planDigestVersion !== record.planDigestVersion
+    || (
+      input.projectionAdoption === undefined
+        ? record.projectionAdoption !== undefined
+        : record.projectionAdoption === undefined
+          || record.projectionAdoption.sprintId !== input.projectionAdoption.sprintId
+          || record.projectionAdoption.expectedPlanDigest
+            !== input.projectionAdoption.expectedPlanDigest
+          || record.projectionAdoption.legacyProjectionDigest
+            !== input.projectionAdoption.expectedLegacyProjectionDigest
+          || record.projectionAdoption.canonicalProjectionDigest
+            !== input.projectionAdoption.expectedCanonicalProjectionDigest
+          || canonicalJson(record.projectionAdoption.authorizedBy)
+            !== canonicalJson(input.projectionAdoption.authorizedBy)
+          || record.projectionAdoption.justification
+            !== input.projectionAdoption.justification.trim()
+    )
   ) {
     throw new RunFlowPlanServiceError(
       'FLOW_ID_CONFLICT',
@@ -379,7 +438,11 @@ function verifyReusableRecord(
   }
   assertCanonicalDependencies(record.sprint);
   assertExecutableStatuses(record.sprint);
-  const recomputed = computeExecutionPlanDigestV3(record.sprint, record.planDigestContext);
+  const recomputed = computeExecutionPlanDigestByVersion(
+    record.planDigestVersion,
+    record.sprint,
+    record.planDigestContext,
+  );
   if (recomputed.digest !== record.planDigest) {
     throw new RunFlowPlanServiceError(
       'PERSISTED_PLAN_INVALID',
@@ -396,6 +459,16 @@ function assertApprovalAuthority(
   record: DurableRunFlowPlanRecord,
   approval: NonNullable<PlanRunFlowInput['approval']>,
 ): void {
+  if (
+    record.projectionAdoption
+    && canonicalJson(record.projectionAdoption.authorizedBy)
+      !== canonicalJson(approval.actor)
+  ) {
+    throw new RunFlowPlanServiceError('PROJECTION_ADOPTION_HOLD', {
+      flowId: record.flowId,
+      reason: 'approval_actor_mismatch',
+    });
+  }
   if (
     record.preview.scopeGateResult === 'fail'
     && record.preview.scopeGateOverridden !== true
@@ -489,6 +562,7 @@ export async function planRunFlow(input: PlanRunFlowInput): Promise<PlanRunFlowR
     input.acknowledgeScopePaths === true,
     scopeInput,
     input.lineage,
+    input.projectionAdoption,
   );
   const latest = loadPlannedSprint(input.projectRoot, input.proposal.flowId);
   const reusable = asDurableRecord(latest);
@@ -609,10 +683,89 @@ export async function planRunFlow(input: PlanRunFlowInput): Promise<PlanRunFlowR
     }
   }
 
-  const digest = computeExecutionPlanDigestV3(
+  const digest = computeExecutionPlanDigestV4(
     generated.sprint,
     generated.planDigestContext,
   );
+  let canonicalSprint = generated.sprint;
+  let projectionAdoption: RunFlowProjectionAdoptionRecord | undefined;
+  if (input.projectionAdoption) {
+    const requested = input.projectionAdoption;
+    const justification = requested.justification.trim();
+    if (
+      requested.kind !== 'structured-criteria-projection'
+      || requested.sprintId !== generated.sprint.id
+      || !/^[a-f0-9]{64}$/.test(requested.expectedPlanDigest)
+      || !/^[a-f0-9]{64}$/.test(requested.expectedLegacyProjectionDigest)
+      || !/^[a-f0-9]{64}$/.test(requested.expectedCanonicalProjectionDigest)
+      || requested.expectedPlanDigest !== digest.digest
+      || requested.authorizedBy.id.trim().length === 0
+      || !isCanonicalIsoTimestamp(requested.authorizedAt)
+      || justification.length < 8
+      || justification.length > 2_000
+    ) {
+      throw new RunFlowPlanServiceError('PROJECTION_ADOPTION_HOLD', {
+        flowId: input.proposal.flowId,
+        reason: 'adoption_authority_invalid',
+      });
+    }
+    let inspected;
+    try {
+      inspected = inspectStructuredCriteriaProjectionAdoption(
+        input.projectRoot,
+        requested.sprintId,
+        generated.sprint.tasks,
+      );
+    } catch (cause) {
+      if (cause instanceof TaskArtifactProjectionError) {
+        throw new RunFlowPlanServiceError('PROJECTION_ADOPTION_HOLD', {
+          flowId: input.proposal.flowId,
+          reason: cause.code,
+          ...cause.details,
+        });
+      }
+      throw cause;
+    }
+    if (
+      inspected.legacyProjectionDigest !== requested.expectedLegacyProjectionDigest
+      || inspected.canonicalProjectionDigest !== requested.expectedCanonicalProjectionDigest
+    ) {
+      throw new RunFlowPlanServiceError('PROJECTION_ADOPTION_HOLD', {
+        flowId: input.proposal.flowId,
+        reason: 'projection_digest_mismatch',
+        actualLegacyProjectionDigest: inspected.legacyProjectionDigest,
+        actualCanonicalProjectionDigest: inspected.canonicalProjectionDigest,
+      });
+    }
+    canonicalSprint = {
+      ...generated.sprint,
+      tasks: [...inspected.canonicalTasks],
+    };
+    const adoptedDigest = computeExecutionPlanDigestV4(
+      canonicalSprint,
+      generated.planDigestContext,
+    );
+    if (adoptedDigest.digest !== digest.digest) {
+      throw new RunFlowPlanServiceError('PROJECTION_ADOPTION_HOLD', {
+        flowId: input.proposal.flowId,
+        reason: 'canonical_projection_execution_drift',
+        expectedPlanDigest: digest.digest,
+        actualPlanDigest: adoptedDigest.digest,
+      });
+    }
+    projectionAdoption = {
+      schemaVersion: 1,
+      kind: requested.kind,
+      sprintId: requested.sprintId,
+      taskCount: canonicalSprint.tasks.length,
+      expectedPlanDigest: requested.expectedPlanDigest,
+      legacyProjectionDigest: requested.expectedLegacyProjectionDigest,
+      canonicalProjectionDigest: requested.expectedCanonicalProjectionDigest,
+      authorizedBy: requested.authorizedBy,
+      authorizedAt: requested.authorizedAt,
+      justification,
+    };
+  }
   const topologyGateResult: RunFlowGateResult =
     digest.topology.verdict === 'pass' ? 'pass' : 'fail';
   const promptGateResult: RunFlowGateResult = generated.sprint.promptGate
@@ -649,7 +802,7 @@ export async function planRunFlow(input: PlanRunFlowInput): Promise<PlanRunFlowR
   const record: DurableRunFlowPlanRecord = {
     flowId: input.proposal.flowId,
     revision: input.proposal.revision,
-    sprint: generated.sprint,
+    sprint: canonicalSprint,
     planDigest: digest.digest,
     planDigestVersion: digest.version,
     planDigestContext: generated.planDigestContext,
@@ -657,6 +810,7 @@ export async function planRunFlow(input: PlanRunFlowInput): Promise<PlanRunFlowR
     preview,
     sourceAuthority: authority,
     lineage: input.lineage,
+    ...(projectionAdoption !== undefined ? { projectionAdoption } : {}),
   };
 
   // Persist the exact normalized plan before publishing PREVIEW_READY. A

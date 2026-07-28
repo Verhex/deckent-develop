@@ -152,6 +152,24 @@ export interface RunFlowPlanLineageRecord {
   readonly sourceRef?: string;
 }
 
+/**
+ * Explicit owner authority for adopting an already-projected legacy Sprint.
+ * The record binds both the pre-migration file set and the exact canonical
+ * projection produced from the same fresh V4 plan.
+ */
+export interface RunFlowProjectionAdoptionRecord {
+  readonly schemaVersion: 1;
+  readonly kind: 'structured-criteria-projection';
+  readonly sprintId: string;
+  readonly taskCount: number;
+  readonly expectedPlanDigest: string;
+  readonly legacyProjectionDigest: string;
+  readonly canonicalProjectionDigest: string;
+  readonly authorizedBy: ActorContext;
+  readonly authorizedAt: string;
+  readonly justification: string;
+}
+
 /** Correlator for the detached run once it has actually spawned. */
 export interface RunHandle {
   readonly flowId: string;

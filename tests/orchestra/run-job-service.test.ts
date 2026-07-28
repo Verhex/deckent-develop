@@ -22,7 +22,7 @@ import { SprintPhase, SprintStatus } from '../../src/core/sprint-types.js';
 import { TaskStatus } from '../../src/core/task-types.js';
 import {
   computeExecutionPlanDigest,
-  computeExecutionPlanDigestV3,
+  computeExecutionPlanDigestV4,
   EXECUTION_PLAN_DIGEST_VERSION,
   EXECUTION_PLAN_DIGEST_VERSION_V2,
   type ExecutionPlanDigestContext,
@@ -236,7 +236,7 @@ describe('startApprovedRun', () => {
       executionBudgetPolicy: null,
       configuredMaxWorkers: 4,
     } satisfies ExecutionPlanDigestContext;
-    const planDigest = computeExecutionPlanDigestV3(blockedSprint, context).digest;
+    const planDigest = computeExecutionPlanDigestV4(blockedSprint, context).digest;
     const deps = makeDeps({
       expectedPlanDigest: planDigest,
       approvedSnapshot: makeApprovedSnapshot({

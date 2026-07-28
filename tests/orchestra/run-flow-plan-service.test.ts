@@ -6,7 +6,9 @@ const mocks = vi.hoisted(() => ({
   generatePlanPreview: vi.fn(),
   compileRunProposal: vi.fn(),
   normalizePlannerDependencies: vi.fn(),
-  computeExecutionPlanDigestV3: vi.fn(),
+  computeExecutionPlanDigestV4: vi.fn(),
+  computeExecutionPlanDigestByVersion: vi.fn(),
+  inspectStructuredCriteriaProjectionAdoption: vi.fn(),
   evaluateScopeGate: vi.fn(),
   applyScopeResolutions: vi.fn(),
   proposeFlow: vi.fn(),
@@ -49,7 +51,14 @@ vi.mock('../../src/orchestra/planner.js', () => ({
 }));
 
 vi.mock('../../src/core/execution-plan-digest.js', () => ({
-  computeExecutionPlanDigestV3: mocks.computeExecutionPlanDigestV3,
+  computeExecutionPlanDigestV4: mocks.computeExecutionPlanDigestV4,
+  computeExecutionPlanDigestByVersion: mocks.computeExecutionPlanDigestByVersion,
+}));
+
+vi.mock('../../src/orchestra/task-artifact-projection.js', () => ({
+  inspectStructuredCriteriaProjectionAdoption:
+    mocks.inspectStructuredCriteriaProjectionAdoption,
+  TaskArtifactProjectionError: class TaskArtifactProjectionError extends Error {},
 }));
 
 vi.mock('../../src/core/scope-gate.js', () => ({
@@ -136,7 +145,7 @@ function preview(plannedSprint = sprint()) {
   return {
     sprint: plannedSprint,
     planDigest: 'digest-before-normalization',
-    planDigestVersion: 3,
+    planDigestVersion: 4,
     planDigestContext: { configuredMaxWorkers: 2 },
     taskSummaries: plannedSprint.tasks.map(item => ({
       title: item.title,
@@ -213,16 +222,20 @@ describe('run-flow-plan-service', () => {
       }
       return { resolvedCount: 0, dropped: [] };
     });
-    mocks.computeExecutionPlanDigestV3.mockImplementation((plannedSprint: any) => {
+    mocks.computeExecutionPlanDigestV4.mockImplementation((plannedSprint: any) => {
       mocks.operationOrder.push(`digest:${plannedSprint.tasks.flatMap((item: any) => item.dependencies).join(',')}`);
       return {
         digest: 'digest-final',
-        version: 3,
+        version: 4,
         projection: {},
         budgetHolds: [],
         topology,
       };
     });
+    mocks.computeExecutionPlanDigestByVersion.mockImplementation(
+      (_version: number, plannedSprint: any) =>
+        mocks.computeExecutionPlanDigestV4(plannedSprint),
+    );
     mocks.evaluateScopeGate.mockReturnValue({
       ok: true,
       verdicts: [],
@@ -233,6 +246,16 @@ describe('run-flow-plan-service', () => {
       filesWrite: [...filesWrite],
       applied: [],
     }));
+    mocks.inspectStructuredCriteriaProjectionAdoption.mockImplementation(
+      (_root, sprintId, tasks) => ({
+        sprintId,
+        legacyProjectionDigest: 'a'.repeat(64),
+        canonicalProjectionDigest: 'b'.repeat(64),
+        canonicalTasks: tasks,
+        alreadyCanonical: [],
+        requiresMigration: tasks.map((item: any) => item.id),
+      }),
+    );
     mocks.proposeFlow.mockImplementation(() => {
       mocks.operationOrder.push('proposal-event');
       return { applied: true, context: { state: 'PREVIEWING' }, sequence: 2 };
@@ -383,9 +406,9 @@ describe('run-flow-plan-service', () => {
   });
 
   it('keeps topology-denied plans unapproved even when an approval actor is supplied', async () => {
-    mocks.computeExecutionPlanDigestV3.mockReturnValue({
+    mocks.computeExecutionPlanDigestV4.mockReturnValue({
       digest: 'digest-blocked',
-      version: 3,
+      version: 4,
       projection: {},
       budgetHolds: [],
       topology: { ...topology, verdict: 'block' },
@@ -413,5 +436,65 @@ describe('run-flow-plan-service', () => {
       policyDecision: 'deny',
       scopeGateResult: 'fail',
     });
+  });
+
+  it('binds an explicit owner-authorized legacy projection without writing through it', async () => {
+    const actor = { id: 'owner-1' };
+    mocks.computeExecutionPlanDigestV4.mockReturnValue({
+      digest: 'c'.repeat(64),
+      version: 4,
+      projection: {},
+      budgetHolds: [],
+      topology,
+    });
+    const result = await planRunFlow(input({
+      projectionAdoption: {
+        kind: 'structured-criteria-projection',
+        sprintId: 'sprint-001',
+        expectedPlanDigest: 'c'.repeat(64),
+        expectedLegacyProjectionDigest: 'a'.repeat(64),
+        expectedCanonicalProjectionDigest: 'b'.repeat(64),
+        authorizedBy: actor,
+        authorizedAt: '2026-07-28T21:00:00.000Z',
+        justification: 'Owner-approved legacy projection recovery',
+      },
+      approval: { actor },
+    }));
+
+    expect(result.projectionAdoption).toMatchObject({
+      schemaVersion: 1,
+      sprintId: 'sprint-001',
+      taskCount: 1,
+      expectedPlanDigest: 'c'.repeat(64),
+    });
+    expect(mocks.inspectStructuredCriteriaProjectionAdoption).toHaveBeenCalledOnce();
+    expect(mocks.decideRunFlow).toHaveBeenCalledOnce();
+  });
+
+  it('holds adoption when its approval actor differs from the bound owner', async () => {
+    mocks.computeExecutionPlanDigestV4.mockReturnValue({
+      digest: 'c'.repeat(64),
+      version: 4,
+      projection: {},
+      budgetHolds: [],
+      topology,
+    });
+    await expect(planRunFlow(input({
+      projectionAdoption: {
+        kind: 'structured-criteria-projection',
+        sprintId: 'sprint-001',
+        expectedPlanDigest: 'c'.repeat(64),
+        expectedLegacyProjectionDigest: 'a'.repeat(64),
+        expectedCanonicalProjectionDigest: 'b'.repeat(64),
+        authorizedBy: { id: 'owner-1' },
+        authorizedAt: '2026-07-28T21:00:00.000Z',
+        justification: 'Owner-approved legacy projection recovery',
+      },
+      approval: { actor: { id: 'different-operator' } },
+    }))).rejects.toMatchObject({
+      code: 'PROJECTION_ADOPTION_HOLD',
+      details: { reason: 'approval_actor_mismatch' },
+    });
+    expect(mocks.decideRunFlow).not.toHaveBeenCalled();
   });
 });

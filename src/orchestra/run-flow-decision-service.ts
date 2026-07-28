@@ -32,8 +32,10 @@ import {
 } from '../core/run-flow-store.js';
 import type {
   RunFlowContext,
+  RunFlowProjectionAdoptionRecord,
   StartAttemptRecord,
 } from '../core/run-flow-contract.js';
+import { canonicalJson } from '../core/audit-writer.js';
 import type { ActorContext } from '../core/work-model.js';
 import type { Sprint } from '../core/types.js';
 import {
@@ -55,6 +57,7 @@ export type RunFlowDecisionRefusalCode =
   | 'PLANNED_SPRINT_MISSING'
   | 'PLANNED_SPRINT_DIGEST_MISMATCH'
   | 'TOPOLOGY_BLOCKED'
+  | 'ADOPTION_AUTHORITY_MISMATCH'
   | 'NOT_APPROVED';
 
 /** A refusal that is a state-of-the-world fact, not a transition bug —
@@ -148,6 +151,18 @@ export function decideRunFlow(
     }
     // Verify the durable exact snapshot BEFORE emitting APPROVAL_GRANTED.
     const planned = loadAndVerifyPlannedSprint(projectRoot, flowId, preview);
+    const adoption = planned.projectionAdoption as
+      | RunFlowProjectionAdoptionRecord
+      | undefined;
+    if (
+      adoption
+      && canonicalJson(adoption.authorizedBy) !== canonicalJson(input.actor)
+    ) {
+      throw new RunFlowDecisionError(
+        'ADOPTION_AUTHORITY_MISMATCH',
+        'run-flow: adoption approval actor does not match the bound owner authority',
+      );
+    }
     const result = coordinator.grantApproval({
       flowId,
       revision: preview.revision,
@@ -170,6 +185,7 @@ export function decideRunFlow(
         sprint: planned.sprint as Sprint,
         ...(planned.proposal !== undefined ? { proposal: planned.proposal } : {}),
         ...(planned.lineage !== undefined ? { planLineage: planned.lineage } : {}),
+        ...(adoption !== undefined ? { projectionAdoption: adoption } : {}),
       };
       saveApprovedSnapshot(projectRoot, stored);
     }

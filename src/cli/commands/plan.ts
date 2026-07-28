@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
@@ -12,12 +12,16 @@ import {
   decideRunFlowPlan,
   planRunFlow,
   type PlanRunFlowResult,
+  RunFlowPlanServiceError,
 } from '../../orchestra/run-flow-plan-service.js';
 import {
   inspectTaskArtifactsNoClobber,
+  inspectStructuredCriteriaProjectionAdoption,
   publishTaskArtifactsNoClobber,
+  type StructuredCriteriaProjectionAdoption,
   TaskArtifactProjectionError,
 } from '../../orchestra/task-artifact-projection.js';
+import { computeExecutionPlanDigestV4 } from '../../core/execution-plan-digest.js';
 import { TaskStatus, type Sprint, type SprintSizeRecommendation } from '../../core/types.js';
 import type { BrainPlanningMode, PlannerProof } from '../../core/types.js';
 import { print, printError, formatTable } from '../helpers/output.js';
@@ -31,6 +35,7 @@ import {
 import type { InterrogationAnswer } from '../../core/directive-interrogator.js';
 import { createSpinner } from './chat-spinner.js';
 import type { ExecutionTopology } from '../../core/execution-topology.js';
+import { normalizePlannerDependencies } from '../../orchestra/planner.js';
 import {
   buildPlanPreviewCardLabels,
   formatScopeGateLines,
@@ -124,6 +129,15 @@ export function registerPlan(program: Command): void {
     .option('--interrogate', 'Challenge directives with structural questions before planning')
     .option('--force-prompt-gate', 'Bypass the plan-time prompt-gate BLOCK (persona-capability mismatch)')
     .option('--force-scope', getMessage('plan.force_scope_option', 'en'))
+    .option('--adopt-existing <sprintId>', getMessage('plan.adopt_existing_option', 'en'))
+    .option('--expected-plan-digest <sha256>', getMessage('plan.expected_plan_digest_option', 'en'))
+    .option('--expected-projection-digest <sha256>', getMessage('plan.expected_projection_digest_option', 'en'))
+    .option(
+      '--expected-canonical-projection-digest <sha256>',
+      getMessage('plan.expected_canonical_projection_digest_option', 'en'),
+    )
+    .option('--adoption-actor <actorId>', getMessage('plan.adoption_actor_option', 'en'))
+    .option('--adoption-justification <text>', getMessage('plan.adoption_justification_option', 'en'))
     .action(async (opts: {
       confirm?: boolean;
       yes?: boolean;
@@ -132,6 +146,12 @@ export function registerPlan(program: Command): void {
       interrogate?: boolean;
       forcePromptGate?: boolean;
       forceScope?: boolean;
+      adoptExisting?: string;
+      expectedPlanDigest?: string;
+      expectedProjectionDigest?: string;
+      expectedCanonicalProjectionDigest?: string;
+      adoptionActor?: string;
+      adoptionJustification?: string;
     }) => {
       const root = resolveProjectRoot();
       let lang = 'en';
@@ -145,6 +165,21 @@ export function registerPlan(program: Command): void {
         // gates (interrogation + final approval), but still plan as DRAFT so the
         // normal DRAFT → PENDING lifecycle runs (just without a human at the keyboard).
         const autoApprove = opts.yes === true;
+        const dryRun = opts.dryRun === true;
+        const adoptionRequested = typeof opts.adoptExisting === 'string';
+        if (
+          adoptionRequested
+          && !dryRun
+          && (
+            !opts.expectedPlanDigest
+            || !opts.expectedProjectionDigest
+            || !opts.expectedCanonicalProjectionDigest
+            || !opts.adoptionActor
+            || !opts.adoptionJustification
+          )
+        ) {
+          throw new Error(getMessage('plan.adoption_authority_required', lang));
+        }
 
         // ─── Interrogation (PLAN-INT-1) ──────────────────────────────────
         // Run BEFORE readContext so planSprint sees the revised DIRECTIVES.md.
@@ -165,7 +200,6 @@ export function registerPlan(program: Command): void {
         // Provider bootstrap — follows start.ts pattern
         // For --dry-run, providers are optional (structured parse suffices)
         let planMode: BrainPlanningMode | undefined = opts.structured ? 'structured' : undefined;
-        const dryRun = opts.dryRun === true;
 
         if (dryRun) {
           // --dry-run: force structured mode, no provider needed
@@ -212,6 +246,9 @@ export function registerPlan(program: Command): void {
         let flowPlan: PlanRunFlowResult | undefined;
         let planDigest: string | undefined;
         let topology: ExecutionTopology | undefined;
+        let adoptionInspection:
+          | StructuredCriteriaProjectionAdoption<Sprint['tasks'][number]>
+          | undefined;
         try {
           if (dryRun) {
             // --dry-run is already a pure preview (never writes task files) —
@@ -223,12 +260,43 @@ export function registerPlan(program: Command): void {
               acknowledgePromptGate: opts.forcePromptGate === true,
             });
             sprint = preview.sprint;
-            planDigest = preview.planDigest;
-            topology = preview.topology;
+            if (adoptionRequested) {
+              const dependencyNormalization = normalizePlannerDependencies(sprint.tasks);
+              if (dependencyNormalization.dropped.length > 0) {
+                throw new Error(getMessage('plan.adoption_dependency_hold', lang));
+              }
+              const taskProjection = approvedTaskProjection(sprint);
+              adoptionInspection = inspectStructuredCriteriaProjectionAdoption(
+                root,
+                opts.adoptExisting!,
+                taskProjection.tasks,
+              );
+              sprint = {
+                ...taskProjection,
+                tasks: [...adoptionInspection.canonicalTasks],
+              };
+              const digest = computeExecutionPlanDigestV4(
+                sprint,
+                preview.planDigestContext,
+              );
+              planDigest = digest.digest;
+              topology = digest.topology;
+            } else {
+              planDigest = preview.planDigest;
+              topology = preview.topology;
+            }
           } else {
             const projectName = config.projectName || basename(root);
-            const flowId = randomUUID();
+            const flowId = adoptionRequested
+              ? `adoption-${createHash('sha256').update([
+                  opts.adoptExisting,
+                  opts.expectedProjectionDigest,
+                ].join('\0')).digest('hex').slice(0, 32)}`
+              : randomUUID();
             const revision = 1;
+            const planActor = adoptionRequested
+              ? { id: opts.adoptionActor! }
+              : { id: 'cli-operator' };
             flowPlan = await planRunFlow({
               projectRoot: root,
               config,
@@ -237,14 +305,14 @@ export function registerPlan(program: Command): void {
                 flowId,
                 tenant: 'local',
                 project: projectName,
-                actor: { id: 'cli-operator' },
+                actor: planActor,
                 origin: 'cli',
                 revision,
                 intentSummary: directivePlanSummary(context.directives, projectName),
               },
               lineage: {
                 tenantId: 'local',
-                actor: { id: 'cli-operator' },
+                actor: planActor,
                 origin: 'cli',
                 correlationId: flowId,
                 idempotencyKey: `plan:${flowId}:r${revision}`,
@@ -259,6 +327,21 @@ export function registerPlan(program: Command): void {
                 acknowledgePromptGate: opts.forcePromptGate === true,
               },
               acknowledgeScopePaths: opts.forceScope === true,
+              ...(adoptionRequested
+                ? {
+                    projectionAdoption: {
+                      kind: 'structured-criteria-projection' as const,
+                      sprintId: opts.adoptExisting!,
+                      expectedPlanDigest: opts.expectedPlanDigest!,
+                      expectedLegacyProjectionDigest: opts.expectedProjectionDigest!,
+                      expectedCanonicalProjectionDigest:
+                        opts.expectedCanonicalProjectionDigest!,
+                      authorizedBy: planActor,
+                      authorizedAt: new Date().toISOString(),
+                      justification: opts.adoptionJustification!,
+                    },
+                  }
+                : {}),
             });
             sprint = flowPlan.sprint;
             planDigest = flowPlan.planDigest;
@@ -377,6 +460,20 @@ export function registerPlan(program: Command): void {
           if (planDigest) {
             print(`[dry-run] Plan digest: ${planDigest}`);
           }
+          if (adoptionInspection) {
+            print(getMessage('plan.adoption_inspection_ready', lang, {
+              sprintId: adoptionInspection.sprintId,
+              count: String(adoptionInspection.canonicalTasks.length),
+            }));
+            print(JSON.stringify({
+              sprintId: adoptionInspection.sprintId,
+              planDigest,
+              legacyProjectionDigest: adoptionInspection.legacyProjectionDigest,
+              canonicalProjectionDigest: adoptionInspection.canonicalProjectionDigest,
+              requiresMigration: adoptionInspection.requiresMigration,
+              alreadyCanonical: adoptionInspection.alreadyCanonical,
+            }));
+          }
           return;
         }
 
@@ -388,8 +485,27 @@ export function registerPlan(program: Command): void {
         // effect. Preflight the full approved projection before the approval
         // CAS, then publish it atomically/no-clobber only after that CAS wins.
         const taskProjection = approvedTaskProjection(sprint);
-        inspectTaskArtifactsNoClobber(root, taskProjection.tasks);
+        if (flowPlan.projectionAdoption) {
+          const inspected = inspectStructuredCriteriaProjectionAdoption(
+            root,
+            flowPlan.projectionAdoption.sprintId,
+            taskProjection.tasks,
+          );
+          if (
+            inspected.legacyProjectionDigest
+              !== flowPlan.projectionAdoption.legacyProjectionDigest
+            || inspected.canonicalProjectionDigest
+              !== flowPlan.projectionAdoption.canonicalProjectionDigest
+          ) {
+            throw new RunFlowPlanServiceError('PROJECTION_ADOPTION_HOLD', {
+              reason: 'pre_approval_projection_drift',
+            });
+          }
+        } else {
+          inspectTaskArtifactsNoClobber(root, taskProjection.tasks);
+        }
         const publishTaskProjection = (): void => {
+          if (flowPlan!.projectionAdoption) return;
           publishTaskArtifactsNoClobber(
             root,
             taskProjection.tasks,
@@ -399,7 +515,7 @@ export function registerPlan(program: Command): void {
         const approve = (): void => {
           decideRunFlowPlan(root, flowPlan.flowId, {
             decision: 'approve',
-            actor: { id: 'cli-operator' },
+            actor: flowPlan.projectionAdoption?.authorizedBy ?? { id: 'cli-operator' },
             acknowledgePromptGate: opts.forcePromptGate === true,
             acknowledgeScopePaths: opts.forceScope === true,
           });
@@ -415,6 +531,11 @@ export function registerPlan(program: Command): void {
             approve();
             publishTaskProjection();
             print(getMessage('plan.approved', lang));
+            if (flowPlan.projectionAdoption) {
+              print(getMessage('plan.adoption_approved', lang, {
+                sprintId: flowPlan.projectionAdoption.sprintId,
+              }));
+            }
             print(JSON.stringify({
               flowId: flowPlan.flowId,
               revision: flowPlan.revision,
@@ -451,6 +572,11 @@ export function registerPlan(program: Command): void {
             lang,
             { taskId: String(error.details.taskId ?? 'unknown') },
           ), { cause: error })
+          : error instanceof RunFlowPlanServiceError
+            && error.code === 'PROJECTION_ADOPTION_HOLD'
+            ? new Error(getMessage('plan.adoption_hold', lang, {
+                reason: String(error.details.reason ?? error.code),
+              }), { cause: error })
           : error;
         printError(surfacedError);
         const plannerProof = error instanceof Error
