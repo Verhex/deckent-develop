@@ -278,20 +278,41 @@ describe('task execution lock authority', () => {
     db.close();
   });
 
-  it('scopes hot-path audit validation to live quarantine ids with a fixed query shape', () => {
+  it('keeps migration, projection, and quarantine reconciliation bounded by keyset pages', () => {
     const source = readFileSync(
       join(process.cwd(), 'src', 'core', 'file-lock.ts'),
       'utf8',
     );
-    const loader = source.slice(
-      source.indexOf('function loadExecutionLockQuarantineAuditRows'),
-      source.indexOf('function loadExecutionLockQuarantineRows'),
+    const auditLoader = source.slice(
+      source.indexOf('function loadExecutionLockQuarantineAuditPage'),
+      source.indexOf('function loadExecutionLockQuarantinePage'),
     );
-    expect(loader).toContain(
+    expect(auditLoader).toContain(
       'JOIN execution_lock_quarantine AS quarantine',
     );
-    expect(loader).not.toContain(' IN (');
-    expect(loader).not.toContain('.all(...');
+    expect(auditLoader).toContain('WHERE quarantine.task_id > ?');
+    expect(auditLoader).toContain('LIMIT ?');
+    expect(auditLoader).not.toContain(' IN (');
+    expect(auditLoader).not.toContain('.all(...');
+    const quarantineLoader = source.slice(
+      source.indexOf('function loadExecutionLockQuarantinePage'),
+      source.indexOf('function loadExecutionLockQuarantineRows'),
+    );
+    expect(quarantineLoader).toContain('WHERE task_id > ?');
+    expect(quarantineLoader).toContain('LIMIT ?');
+    const migrationLoader = source.slice(
+      source.indexOf('function loadLegacyV2ExecutionLockActivePage'),
+      source.indexOf('function executionLockGenerationEquals'),
+    );
+    expect(migrationLoader).toContain('WHERE task_id > ?');
+    expect(migrationLoader).toContain('LIMIT ?');
+    const projectionScanner = source.slice(
+      source.indexOf('function scanExecutionLockProjections'),
+      source.indexOf('function loadExecutionLockActivePage'),
+    );
+    expect(projectionScanner).toContain('activeByOwner.get(');
+    expect(projectionScanner).toContain('activeByTask.get(');
+    expect(projectionScanner).not.toContain('active.find(');
 
     const seed = acquireExecutionLock(root, 'audit-history-seed', 'dispatch');
     releaseExecutionLock(root, seed.taskId, seed.ownerId);

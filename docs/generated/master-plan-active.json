@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "7a47d1babce51c40e77acfd4570a351ffd810ca5afd159c4a98954f49ca94877"
+    "value": "400a633ba560ba439da75efcb8c7daa176db0643343f62f97870a2441b60bab3"
   },
   "summary": {
     "total": 233,
     "active": 233,
     "terminal": 0,
-    "receipts": 9,
+    "receipts": 10,
     "byState": {
       "OPEN": 156,
       "READY": 0,
@@ -1445,9 +1445,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-27",
+      "updated": "2026-07-28",
       "definitionDigest": "04147d0d2a7650f4f91b4ed7d9edf5f971f1a02e004e011b9b474d5096f7b276",
-      "progressDigest": "fd0e7ba7ec40268c1909b9e26b53d9dedb71e695e18ef3972fbfe8f0140212fa",
+      "progressDigest": "b8af307a9ce98adf09fd668dda90ebbfb9e0fd575af2a2f0fdc115d92bc90278",
       "terminalClosureDigest": null
     },
     {
@@ -1456,9 +1456,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-27",
+      "updated": "2026-07-28",
       "definitionDigest": "3708cd18d6c7f3e18cb9f577565c2b6b824db840b2f59506a5fff8334e41dbd1",
-      "progressDigest": "b4169040fa20a4b0ca9b92c694446d0c7de8e7e418dcdef3744a7df71ded23dd",
+      "progressDigest": "a65c3ee76aacf755fb0338a40a3573ffd7efc6d9c3d4bac9580d1b993b5cabf7",
       "terminalClosureDigest": null
     },
     {
@@ -2716,6 +2716,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-07-27T13:29:48+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-28-FILE-LOCK-01",
+      "authorityDigest": "fb75b2f0c4820f0a3e45e638e4768235d4ee12a2e07a6a327156d80ec7057137",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-28T14:33:28+03:00"
       },
       "g7AttemptIdentity": null
     }
@@ -8188,9 +8198,9 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "~",
+        "C": "1",
         "W": "~",
-        "E": "0",
+        "E": "~",
         "H": "?",
         "L": "0",
         "X": "?",
@@ -8201,10 +8211,12 @@
       "closureBlockedBy": [
         "KERNEL-ONTOLOGY-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-07-28-FILE-LOCK-01"
+      ],
       "acceptance": "CAS, transactions, schema migration, bounded reconciliation and no file RMW race",
-      "evidence": "2026-07-27 code-truth: Goal-v2 SQLite, RunFlow JSONL, CLI/REPL in-memory coordinator, sprint files ve ScheduledFlow RAM cursor ayrı authority; cross-process single-writer/fencing yok",
-      "updated": "2026-07-27"
+      "evidence": "`receipt=GR-2026-07-28-FILE-LOCK-01`; execution-lock v3 uses project/lock-directory generation anchors, SQLite `BEGIN IMMEDIATE`, monotonic fencing, exact projection compensation/reconciliation, atomic v2 quarantine migration and 256-row keyset pages for active, migration, live quarantine and audit scans; projection ownership lookup is O(1), four focused migration/concurrency/release/scale regressions pass and root/dashboard TypeScript compile; this proves the Linux/WSL file-lock authority slice only—Goal-v2, RunFlow, CLI/REPL, sprint and ScheduledFlow remain competing authorities, native macOS/Windows adapters and live/HA scale evidence remain open; Claude Fable 5 XVerify emitted `require is not defined`, exceeded its 300s timeout and was interrupted, therefore cross-provider verification remains unavailable and is not claimed",
+      "updated": "2026-07-28"
     },
     {
       "order": 3030,
@@ -8234,9 +8246,9 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "~",
+        "C": "1",
         "W": "~",
-        "E": "0",
+        "E": "~",
         "H": "?",
         "L": "0",
         "X": "?",
@@ -8248,10 +8260,12 @@
         "KERNEL-STATE-001",
         "AUTHORITY-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-07-28-FILE-LOCK-01"
+      ],
       "acceptance": "Duplicate effect impossible; unknown settlement never auto-replays",
-      "evidence": "2026-07-27 code-truth: v2 stop marker loop içinde okunmuyor; Mission cancel ingress yok; API RunFlow cancel detached execution'ı durdurmuyor; exact causal cancel/lease/fence closure açık",
-      "updated": "2026-07-27"
+      "evidence": "`receipt=GR-2026-07-28-FILE-LOCK-01`; exact-generation acquire/renew/release, liveness-aware stale retirement, irreversible boundary quarantine, terminal audit and completed-outcome preservation are code-present with cross-process and crash/reconciliation proof in the file-lock slice; whole-kernel closure remains open because v2 stop propagation, Mission cancel ingress, detached API RunFlow cancellation, tenant-wide idempotency and native macOS/Windows authority adapters are not yet proven",
+      "updated": "2026-07-28"
     },
     {
       "order": 3040,
@@ -12751,6 +12765,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "54a0efbbb30df9ccb7e7d2b421376648adfb95b8cd099ce802c225018779aa79"
+    "value": "c1b3b2827c2ae943a0c4072824e02e99b4a1de673170a87db78d19ed3fb479a8"
   }
 }

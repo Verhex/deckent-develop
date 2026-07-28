@@ -94,12 +94,12 @@ export function createScanBudget(
 
 export const UNRESOLVED_BASELINE = Object.freeze({
   count: 12170,
-  digest: 'ddd461a87256b221706fb9588e1b2f2d9c3e2f633781ddca0cc1f1293465c8e5',
+  digest: '4a50f6b54fa2feb305464b2e5826ddb5d57c2acbe962971ac6a23a5a8a7ab93a',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   count: 1149,
-  digest: '68441aa30d23d521409f66c719716082594d5c8f7b29fea22244cd905a39bfb1',
+  digest: '59384b0aea73803725a7fcafac2d34a1709c390c59713f685305985ee0f61b54',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

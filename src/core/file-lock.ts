@@ -3523,7 +3523,8 @@ function staleExecutionLockCanRetire(
 
 function scanExecutionLockProjections(
   projectRoot: string,
-  active: readonly ExecutionLockInfo[],
+  activeByTask: ReadonlyMap<string, ExecutionLockInfo>,
+  activeByOwner: ReadonlyMap<string, ExecutionLockInfo>,
   options: ExecutionLockOptions,
 ): Array<{ readonly raw: string; readonly lock: ExecutionLockInfo; readonly path: string }> {
   const locksDir = ensureExecutionLockDirectory(projectRoot);
@@ -3539,7 +3540,7 @@ function scanExecutionLockProjections(
       /^[0-9a-f]{64}\.executionlock\.tmp-([0-9a-f-]{36})$/iu,
     );
     if (staging) {
-      const owner = active.find(candidate => candidate.ownerId === staging[1]);
+      const owner = activeByOwner.get(staging[1]!);
       if (!owner) {
         if (!entry.isFile() || entry.isSymbolicLink()) {
           throw new ExecutionLockError(
@@ -3594,12 +3595,14 @@ function scanExecutionLockProjections(
     let lock = raw === null ? null : parseExecutionLock(raw);
     if (raw !== null && lock === null) {
       const legacy = parseLegacyV2ExecutionLock(raw);
-      const canonical = legacy
-        ? active.find(candidate =>
-          executionLockGenerationEquals(candidate, legacy)
-          && JSON.stringify(candidate) === JSON.stringify(legacy))
-        : undefined;
-      lock = canonical ?? null;
+      if (legacy) {
+        const canonical = activeByTask.get(legacy.taskId);
+        lock = canonical
+          && executionLockGenerationEquals(canonical, legacy)
+          && JSON.stringify(canonical) === JSON.stringify(legacy)
+          ? canonical
+          : null;
+      }
     }
     if (!raw || !lock
       || basename(executionLockPathFor(projectRoot, lock.taskId)) !== entry.name) {
@@ -3674,8 +3677,9 @@ function loadExecutionLockActiveRow(
   return row ? parseExecutionLockActiveRow(row) : undefined;
 }
 
-function loadLegacyV2ExecutionLockActiveRows(
+function loadLegacyV2ExecutionLockActivePage(
   db: DatabaseType,
+  afterTaskId: string,
 ): Array<{
   readonly lock: ExecutionLockInfo;
   readonly originalPayload: string;
@@ -3684,8 +3688,13 @@ function loadLegacyV2ExecutionLockActiveRows(
     SELECT task_id, owner_id, fencing_epoch, fencing_counter, fencing_nonce,
            payload_json
       FROM execution_lock_active
+     WHERE task_id > ?
      ORDER BY task_id
-  `).all() as ExecutionLockActiveRow[];
+     LIMIT ?
+  `).all(
+    afterTaskId,
+    EXECUTION_LOCK_QUERY_PAGE_SIZE,
+  ) as ExecutionLockActiveRow[];
   return rows.map(row => {
     const lock = parseLegacyV2ExecutionLock(row.payload_json, row.task_id);
     if (!lock
@@ -3703,6 +3712,26 @@ function loadLegacyV2ExecutionLockActiveRows(
   });
 }
 
+function loadLegacyV2ExecutionLockActiveRows(
+  db: DatabaseType,
+): Array<{
+  readonly lock: ExecutionLockInfo;
+  readonly originalPayload: string;
+}> {
+  const active: Array<{
+    readonly lock: ExecutionLockInfo;
+    readonly originalPayload: string;
+  }> = [];
+  let afterTaskId = '';
+  while (true) {
+    const page =
+      loadLegacyV2ExecutionLockActivePage(db, afterTaskId);
+    active.push(...page);
+    if (page.length < EXECUTION_LOCK_QUERY_PAGE_SIZE) return active;
+    afterTaskId = page[page.length - 1]!.lock.taskId;
+  }
+}
+
 function executionLockGenerationEquals(
   left: Pick<ExecutionLockInfo, 'taskId' | 'ownerId' | 'fencingToken'>,
   right: Pick<ExecutionLockInfo, 'taskId' | 'ownerId' | 'fencingToken'>,
@@ -3715,8 +3744,33 @@ function executionLockGenerationEquals(
     );
 }
 
-function loadExecutionLockQuarantineAuditRows(
+function parseExecutionLockQuarantineAuditRow(
+  row: ExecutionLockQuarantineAuditRow,
+): ExecutionLockQuarantineAuditEvent {
+  const event = parseExecutionLockQuarantineAudit(row.payload_json);
+  if (!event
+    || event.eventId !== row.event_id
+    || event.action !== row.action
+    || event.quarantineId !== row.quarantine_id
+    || event.taskId !== row.task_id
+    || event.ownerId !== row.owner_id
+    || event.fencingToken.epoch !== row.fencing_epoch
+    || event.fencingToken.counter !== row.fencing_counter
+    || event.fencingToken.nonce !== row.fencing_nonce
+    || event.occurredAt !== row.occurred_at
+    || JSON.stringify(event) !== row.payload_json) {
+    throw new ExecutionLockError(
+      `Execution lock quarantine audit row is invalid: ${row.event_id}`,
+      typeof row.task_id === 'string' ? row.task_id : 'unknown',
+      'malformed',
+    );
+  }
+  return event;
+}
+
+function loadExecutionLockQuarantineAuditPage(
   db: DatabaseType,
+  afterTaskId: string,
 ): ExecutionLockQuarantineAuditEvent[] {
   const rows = db.prepare(`
     SELECT audit.event_id, audit.action, audit.quarantine_id, audit.task_id,
@@ -3725,76 +3779,95 @@ function loadExecutionLockQuarantineAuditRows(
       FROM execution_lock_quarantine_audit AS audit
       JOIN execution_lock_quarantine AS quarantine
         ON quarantine.quarantine_id = audit.quarantine_id
-     WHERE (
-       quarantine.state = 'in-flight'
-       AND audit.action = 'boundary-entered'
-     ) OR (
-       quarantine.state = 'quarantined'
-       AND audit.action = 'quarantined'
-     )
-     ORDER BY audit.occurred_at, audit.event_id
-  `).all() as ExecutionLockQuarantineAuditRow[];
-  return rows.map(row => {
-    const event = parseExecutionLockQuarantineAudit(row.payload_json);
-    if (!event
-      || event.eventId !== row.event_id
-      || event.action !== row.action
-      || event.quarantineId !== row.quarantine_id
-      || event.taskId !== row.task_id
-      || event.ownerId !== row.owner_id
-      || event.fencingToken.epoch !== row.fencing_epoch
-      || event.fencingToken.counter !== row.fencing_counter
-      || event.fencingToken.nonce !== row.fencing_nonce
-      || event.occurredAt !== row.occurred_at
-      || JSON.stringify(event) !== row.payload_json) {
-      throw new ExecutionLockError(
-        `Execution lock quarantine audit row is invalid: ${row.event_id}`,
-        typeof row.task_id === 'string' ? row.task_id : 'unknown',
-        'malformed',
-      );
-    }
-    return event;
-  });
+     WHERE quarantine.task_id > ?
+       AND (
+         (
+           quarantine.state = 'in-flight'
+           AND audit.action = 'boundary-entered'
+         ) OR (
+           quarantine.state = 'quarantined'
+           AND audit.action = 'quarantined'
+         )
+       )
+     ORDER BY quarantine.task_id
+     LIMIT ?
+  `).all(
+    afterTaskId,
+    EXECUTION_LOCK_QUERY_PAGE_SIZE,
+  ) as ExecutionLockQuarantineAuditRow[];
+  return rows.map(parseExecutionLockQuarantineAuditRow);
+}
+
+function loadExecutionLockQuarantineAuditRows(
+  db: DatabaseType,
+): ExecutionLockQuarantineAuditEvent[] {
+  const audits: ExecutionLockQuarantineAuditEvent[] = [];
+  let afterTaskId = '';
+  while (true) {
+    const page =
+      loadExecutionLockQuarantineAuditPage(db, afterTaskId);
+    audits.push(...page);
+    if (page.length < EXECUTION_LOCK_QUERY_PAGE_SIZE) return audits;
+    afterTaskId = page[page.length - 1]!.taskId;
+  }
+}
+
+function loadExecutionLockQuarantinePage(
+  db: DatabaseType,
+  afterTaskId: string,
+): ExecutionLockQuarantineRow[] {
+  return db.prepare(`
+    SELECT task_id, quarantine_id, owner_id, fencing_epoch, fencing_counter,
+           fencing_nonce, state, reason, entered_at, quarantined_at,
+           payload_json
+      FROM execution_lock_quarantine
+     WHERE task_id > ?
+     ORDER BY task_id
+     LIMIT ?
+  `).all(
+    afterTaskId,
+    EXECUTION_LOCK_QUERY_PAGE_SIZE,
+  ) as ExecutionLockQuarantineRow[];
 }
 
 function loadExecutionLockQuarantineRows(
   db: DatabaseType,
   active: readonly ExecutionLockInfo[],
 ): ExecutionLockQuarantineInfo[] {
-  const rows = db.prepare(`
-    SELECT task_id, quarantine_id, owner_id, fencing_epoch, fencing_counter,
-           fencing_nonce, state, reason, entered_at, quarantined_at,
-           payload_json
-      FROM execution_lock_quarantine
-     ORDER BY task_id
-  `).all() as ExecutionLockQuarantineRow[];
   const activeByTask = new Map(active.map(lock => [lock.taskId, lock]));
-  const quarantines = rows.map(row => {
-    const quarantine =
-      parseExecutionLockQuarantine(row.payload_json, row.task_id);
-    const activeLock = activeByTask.get(row.task_id);
-    if (!quarantine
-      || quarantine.quarantineId !== row.quarantine_id
-      || quarantine.lock.ownerId !== row.owner_id
-      || quarantine.lock.fencingToken.epoch !== row.fencing_epoch
-      || quarantine.lock.fencingToken.counter !== row.fencing_counter
-      || quarantine.lock.fencingToken.nonce !== row.fencing_nonce
-      || quarantine.state !== row.state
-      || quarantine.reason !== row.reason
-      || quarantine.enteredAt !== row.entered_at
-      || quarantine.quarantinedAt !== row.quarantined_at
-      || JSON.stringify(quarantine) !== row.payload_json
-      || !activeLock
-      || !executionLockGenerationEquals(quarantine.lock, activeLock)
-      || JSON.stringify(quarantine.lock) !== JSON.stringify(activeLock)) {
-      throw new ExecutionLockError(
-        `Canonical execution quarantine row is invalid for task ${row.task_id}`,
-        row.task_id,
-        'malformed',
-      );
+  const quarantines: ExecutionLockQuarantineInfo[] = [];
+  let afterTaskId = '';
+  while (true) {
+    const page = loadExecutionLockQuarantinePage(db, afterTaskId);
+    for (const row of page) {
+      const quarantine =
+        parseExecutionLockQuarantine(row.payload_json, row.task_id);
+      const activeLock = activeByTask.get(row.task_id);
+      if (!quarantine
+        || quarantine.quarantineId !== row.quarantine_id
+        || quarantine.lock.ownerId !== row.owner_id
+        || quarantine.lock.fencingToken.epoch !== row.fencing_epoch
+        || quarantine.lock.fencingToken.counter !== row.fencing_counter
+        || quarantine.lock.fencingToken.nonce !== row.fencing_nonce
+        || quarantine.state !== row.state
+        || quarantine.reason !== row.reason
+        || quarantine.enteredAt !== row.entered_at
+        || quarantine.quarantinedAt !== row.quarantined_at
+        || JSON.stringify(quarantine) !== row.payload_json
+        || !activeLock
+        || !executionLockGenerationEquals(quarantine.lock, activeLock)
+        || JSON.stringify(quarantine.lock) !== JSON.stringify(activeLock)) {
+        throw new ExecutionLockError(
+          `Canonical execution quarantine row is invalid for task ${row.task_id}`,
+          row.task_id,
+          'malformed',
+        );
+      }
+      quarantines.push(quarantine);
     }
-    return quarantine;
-  });
+    if (page.length < EXECUTION_LOCK_QUERY_PAGE_SIZE) break;
+    afterTaskId = page[page.length - 1]!.task_id;
+  }
   const audits = loadExecutionLockQuarantineAuditRows(db);
   const auditsByQuarantineId = new Map(
     audits.map(audit => [audit.quarantineId, audit]),
@@ -3977,8 +4050,14 @@ function reconcileExecutionLockProjections(
 ): ExecutionLockInfo[] {
   const active = loadExecutionLockActiveRows(db);
   loadExecutionLockQuarantineRows(db, active);
-  const projections = scanExecutionLockProjections(projectRoot, active, options);
   const activeByTask = new Map(active.map(lock => [lock.taskId, lock]));
+  const activeByOwner = new Map(active.map(lock => [lock.ownerId, lock]));
+  const projections = scanExecutionLockProjections(
+    projectRoot,
+    activeByTask,
+    activeByOwner,
+    options,
+  );
   const projectionByTask =
     new Map(projections.map(projection => [projection.lock.taskId, projection]));
 
