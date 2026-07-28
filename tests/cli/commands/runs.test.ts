@@ -12,7 +12,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 
-import { registerRuns, executeInboxDecision } from '../../../src/cli/commands/runs.js';
+import {
+  registerRuns,
+  executeInboxDecision,
+  resolveStartLineageActor,
+} from '../../../src/cli/commands/runs.js';
 import { getRunFlowCoordinator, _resetRunFlowCoordinatorsForTests } from '../../../src/orchestra/run-flow-coordinator-registry.js';
 import { saveApprovedSnapshot, saveRunHandle, savePlannedSprint } from '../../../src/core/run-flow-store.js';
 import { appendProposalToCompletionChain } from '../../orchestra/run-flow-coordinator-harness.js';
@@ -132,6 +136,22 @@ describe('deckent runs — CLI inbox + --close-stale (F-3)', () => {
   });
 
   // ─── SURF-6 — `runs <n> --approve|--reject|--start` (cross-surface decide) ──
+
+  it('binds exact start lineage to the durable approval actor, not the surface label', () => {
+    const approvedBy = {
+      id: 'Alperen',
+      role: 'owner',
+      tenantId: 'local',
+    };
+    expect(resolveStartLineageActor(
+      { approvedBy },
+      { id: 'cli-operator' },
+    )).toEqual(approvedBy);
+    expect(resolveStartLineageActor(
+      undefined,
+      { id: 'cli-operator' },
+    )).toEqual({ id: 'cli-operator' });
+  });
 
   /** A flow durably at AWAITING_APPROVAL (real event log via the store) whose
    *  planned sprint is persisted — exactly what a Desktop propose leaves on

@@ -28,12 +28,27 @@ import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
+import type { ActorContext } from '../../core/work-model.js';
 
 const SHORT_ID_LEN = 8;
 
 /** Actor identity for decisions issued via `deckent runs` (parity with the
  *  REPL's `{id:'repl-user'}` and do's `{id:'cli-non-interactive'}`). */
 const CLI_OPERATOR_ACTOR = { id: 'cli-operator' } as const;
+
+/**
+ * Exact-start's `approved-actor` authorization represents the durable approval
+ * principal, not the surface adapter label that happened to issue START.
+ * Terminal already follows this rule. The fallback is consulted only when no
+ * snapshot exists; the shared start service then refuses NOT_APPROVED before
+ * process birth.
+ */
+export function resolveStartLineageActor(
+  snapshot: { readonly approvedBy: ActorContext } | undefined,
+  surfaceActor: ActorContext,
+): ActorContext {
+  return snapshot?.approvedBy ?? surfaceActor;
+}
 
 /**
  * SURF-6 REPL-card glue: execute ONE in-card decision verb through the shared
@@ -74,7 +89,7 @@ export function executeInboxDecision(
     const result = startRunFlow(root, flowId, {
       lineage: {
         tenantId: flow.proposal?.tenant ?? 'local',
-        actor,
+        actor: resolveStartLineageActor(snapshot, actor),
         origin: 'cli',
         correlationId: flowId,
         idempotencyKey: `start:${flowId}:r${snapshot?.revision ?? 0}`,
@@ -161,7 +176,7 @@ function runDecide(root: string, flowId: string, flags: DecideFlags, lang: strin
     const result = startRunFlow(root, flowId, {
       lineage: {
         tenantId: flow.proposal?.tenant ?? 'local',
-        actor: CLI_OPERATOR_ACTOR,
+        actor: resolveStartLineageActor(snapshot, CLI_OPERATOR_ACTOR),
         origin: 'cli',
         correlationId: flowId,
         idempotencyKey: `start:${flowId}:r${snapshot?.revision ?? 0}`,
