@@ -80,6 +80,39 @@ These features are implemented but not yet wired into the sprint lifecycle:
 |---------|------------|
 | multi-agent-pipeline | No sprint integration |
 | human-checkpoint-cli | Opt-in config, rarely set |
+| deck-broker | Implemented (`src/core/deck-broker.ts`) but no `src/orchestra/` spawn call site (spawn-backend.ts, spawn-backend-docker.ts, tmux backend, sprint-spawner.ts) ever sets `ProviderSpawnOptions.deckBroker` — see current-truth note below. |
+
+### Subscription auth path — DeckBroker bypass (current-truth, 2026-07-25)
+
+The subscription auth path does **not** go through DeckBroker today, and this is not "zero
+exposure completed" — it is an unwired, dormant credential broker, and subscription mode is
+excluded from it at two independent points, not one.
+
+**Kapatılan (closed today):** in `src/providers/subprocess.ts:417-473`, the ONE call site of
+`DeckBroker`'s resolve API (`const brokered = opts?.deckBroker?.resolveForTaskWithReason(taskId,
+this.providerConfig.cliCommand)` at line 453) already fails closed on a `denied` outcome — the
+`denied` branch (lines 458-463) assigns no credential and never falls through to the legacy
+`opts.env` reinjection, which only runs in the separate terminal `else` arm (lines 464-473, taken
+solely when `brokered` is `undefined` — i.e. no broker was supplied at all). So a denied
+resolution can no longer be silently re-granted from the legacy passthrough. This is shipped
+code, not planned work.
+
+**Kapatılmayan (still open):** the subscription path never reaches that logic in the first
+place, for two independent reasons. First, `bootstrapProviders`
+(`src/core/provider.ts:1348`) mints a `DeckBroker` only when `config.deck_broker?.enabled &&
+config.auth_mode !== 'subscription'` (provider.ts:1410-1413) — a subscription-mode sprint gets
+`deckBroker: null` straight out of bootstrap, regardless of the `deck_broker.enabled` flag;
+subscription mode also skips loading `.deck` secrets entirely (provider.ts:1396-1402), since
+session/OAuth auth has no API-key credential to broker at all. Second, and independent of that
+mint-time gate, no caller under `src/orchestra/` (spawn-backend.ts, spawn-backend-docker.ts, the
+tmux backend, sprint-spawner.ts, scheduler-effects.ts) ever reads `BootstrapResult.deckBroker`
+and threads it into a real `ProviderSpawnOptions.deckBroker` at spawn time — so even an
+api/hybrid-mode sprint with `deck_broker.enabled: true` never actually reaches
+`resolveForTaskWithReason` in practice. In every real sprint today, `opts.deckBroker` is
+`undefined`, and subscription-mode workers authenticate exactly as before (env scrub + `opts.env`
+reinjection) — the same ambient-credential model the Docker backend's separate `.deck`-mount-
+shadow path already uses, and neither the Docker nor the tmux backend ever asks the broker
+either.
 
 ## Dead Features
 

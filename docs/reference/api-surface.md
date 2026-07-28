@@ -222,6 +222,194 @@ literal actors and MCP stdio cannot decide an attended execution request.
 
 ---
 
+## Build/Clean Active-Execution Admission
+
+`npm run clean` and every `npm run build` are protected by the read-only
+admission in `scripts/clean.mjs`. The admission runs before any `dist/` entry is
+removed. There is no force flag, environment bypass, or caller-selected
+destructive root.
+
+The admission authority is
+`deckent.clean.active-execution.v1`. It inspects the physical project root with
+bounded reads from:
+
+- `.tasks/task-*.json`, task heartbeats, and durable worker PID records;
+- `.deckent/sprint-state.json`, `.deckent/sprint-active.json`, sprint
+  coordinator PID records, and the MCP launch anchor at
+  `.deckent/state/active-sprint.json`;
+- the config-resolved autonomous backlog (default
+  `.deckent/autonomous/backlog.json`);
+- the mixed-writer `.deckent/runtime/jobs/*.json` store and
+  `.deckent/runtime/run-flow-store/*.{events,handle}.jsonl`;
+- Mission v2 state and engine lease truth in
+  `.deckent/autonomous/autonomous.db`;
+- `.deckent/bot.pid`;
+- `.deckent/runtime/invocations.db`, opened read-only only when a raw `PENDING`
+  task needs settlement reconciliation.
+
+Missing optional runtime directories are clear evidence for a clean clone.
+Unreadable, malformed, symlinked, oversized, unsupported, or contradictory
+evidence is a `HOLD`; permission errors are not treated as absence. The
+inspection never repairs state, deletes stale markers, starts/stops a process,
+or creates/migrates either SQLite database. Approval-only RunFlow snapshots and
+the pending flow/event-dispatch queues do not claim an execution and are not
+active-execution authorities; the event/handle logs become relevant at
+`START_REQUESTED`.
+
+### Stable decision envelope
+
+The read-only `inspectActiveExecutions(projectRoot)` export and direct clean
+entrypoint use this versioned projection:
+
+```json
+{
+  "schemaVersion": 1,
+  "authority": "deckent.clean.active-execution.v1",
+  "decision": "ALLOW",
+  "code": "CLEAN_ACTIVE_EXECUTION_CLEAR",
+  "projectRootDigest": "<sha256(realpath(projectRoot))>",
+  "reasons": [],
+  "projections": [],
+  "inspected": {
+    "taskFiles": 0,
+    "heartbeatFiles": 0,
+    "workerPidFiles": 0,
+    "sprintPidFiles": 0,
+    "processEntries": 0,
+    "receiptRows": 0,
+    "jobFiles": 0,
+    "runFlowFiles": 0,
+    "missionRows": 0
+  }
+}
+```
+
+A refusal has `decision: "HOLD"` and top-level code
+`E_CLEAN_ACTIVE_EXECUTION_HOLD`. Each reason has a stable `code`, `surface`,
+`subject`, optional `observedStatus`/`detailCode`, and project-relative
+`evidenceRefs`. Reason and projection arrays are deterministically ordered.
+The envelope is output-bounded to 256 reasons and 512 projections; exceeding
+either bound produces a typed fail-closed limit reason instead of an unbounded
+payload.
+Direct successful clean emits `CLEAN_COMPLETED` and embeds the admission
+envelope; direct refusal emits the HOLD envelope to stderr and exits non-zero.
+
+Representative reason families:
+
+| Family | Meaning |
+|---|---|
+| `E_CLEAN_TASK_*` | Raw task is active, invalid, receipt-less, non-terminal, ambiguous, or conflicts with disk artifacts |
+| `E_CLEAN_RECEIPT_*` | Receipt DB/binding/schema/integrity/evidence bound is unavailable or invalid |
+| `E_CLEAN_WORKER_*` | Heartbeat/PID says active or cannot be interpreted safely |
+| `E_CLEAN_SPRINT_*` | Lifecycle state, marker, MCP launch anchor, or coordinator is active/stale/ambiguous |
+| `E_CLEAN_PROCESS_*` | Autonomous/process backlog is running, invalid, or cannot be located safely |
+| `E_CLEAN_RUN_JOB_*` | Mixed job record is malformed or a fresh RUNNING launch cannot yet be reconciled |
+| `E_CLEAN_RUN_FLOW_*` | Canonical event fold/handle is invalid, starting, live, or liveness is unknown |
+| `E_CLEAN_MISSION_*` | Mission v2 work/lease is active, incoherent, unreadable, or unsupported |
+| `E_CLEAN_BOT_*` | Bot PID is alive or cannot be interpreted safely |
+
+### Raw-to-effective task status projection
+
+Raw `DRAFT`, `DONE`, and `NO_GO` task files do not by themselves represent a
+live execution. `CLAIMED`, `EXECUTING`, `TESTING`, `DOCUMENTING`, `PAUSED`, and
+`MANUAL_REVIEW_REQUIRED` are resumable/active and therefore HOLD.
+
+A raw `PENDING` task remains HOLD unless the invocation ledger proves the
+canonical effective status `NOT_DISPATCHED`. That projection requires all of
+the following:
+
+1. `sha256(realpath(projectRoot))` resolves to exactly one project binding and
+   the reverse project binding resolves to the same root.
+2. The bounded, newest-first task receipt view has a fully shaped schema-v1
+   `worker-execution` receipt for the exact task and project. Its canonical
+   payload JSON, persisted payload hash, IDs, timestamps, selection/backend/auth
+   fields, fallback chain, reachability, and limit evidence must validate.
+3. Its complete ordered event stream is exactly
+   `dispatch_rejected -> consumer_settled`; sequence, canonical semantic payload
+   hashes, previous hashes, and final event hash must all validate. Both events
+   preserve the same canonical settlement `occurredAt`; a caller-supplied
+   conflicting consumer timestamp is not a terminal settlement.
+4. The consumer event is
+   `outcome: "accepted"`, `taskDisposition: "not_dispatched"`, has a known
+   non-`none` reason code, and carries bounded canonical evidence references.
+5. Exactly one view is settled `NOT_DISPATCHED`. More than one settled view is
+   ambiguous. To stay aligned with `TaskSettlementAuthority`, one settled view
+   remains authoritative when another view is only a rejected, unsettled head;
+   dispatch-started or transport-settled conflicts remain HOLD.
+6. No heartbeat exists for the task; such an artifact contradicts a
+   never-dispatched settlement.
+
+A receipt database is not required when no raw `PENDING` task needs this
+projection. A missing database or binding for such a task is fail-closed.
+
+### Sprint/process interpretation
+
+- A live sprint state or live coordinator PID is HOLD.
+- A `.deckent/sprint-active.json` marker is correlated with the same sprint's
+  active state/PID. An unbound or terminal marker is reported as a typed stale
+  HOLD, not silently trusted as live and not silently discarded.
+- The MCP launch anchor must carry a valid job/source/child-PID/IPC-path/time
+  envelope. A live child is active; a dead child is a stale HOLD.
+- `running` autonomous backlog entries are active. `pending`, `parked`, `done`,
+  and `failed` entries are not by themselves active.
+- A live bot PID is active. A provably dead PID is stale evidence and does not
+  by itself HOLD; an invalid or unprobeable PID does.
+
+### Job, RunFlow, and Mission v2 reconciliation
+
+`.deckent/runtime/jobs/` has two SSOT writers and is discriminated before
+validation:
+
+- `sprint-finalizer` owns terminal `<sprintId>.json` completion summaries.
+  These intentionally omit `jobId`/`startedAt`; sprint-state remains their
+  lifecycle authority. A terminal `completionRecord.flowId`, when present, is
+  also a RunFlow closure.
+- MCP `JobState` records carry a filename-matching `jobId`, status, and
+  `startedAt`. Legacy epoch-millisecond strings and current ISO timestamps are
+  both recognized. The row is a polling/notification projection, not a
+  process handle: a `RUNNING` row inside the 15-minute launch-race window is an
+  unknown-authority HOLD; an older uncorroborated row projects to `STALE`.
+  Actual task, sprint/IPC, PID, or RunFlow evidence independently decides
+  whether execution is live.
+
+RunFlow event logs are sequence- and timestamp-checked and folded with the
+canonical state-machine transitions and revision/plan-digest CAS rules.
+`STARTING` is active. A detached handle with a live PID is active; an unknown
+probe or missing PID remains fail-closed. A provably dead PID projects to
+`STALE_DEAD` and does not alone block a build. A canonical terminal event or
+terminal job closure wins over an older handle, matching the user-facing
+jobs-directory reconciliation. Contradictory terminal closures, invalid
+transitions, and event/handle job conflicts HOLD.
+
+Mission v2 inspection opens `autonomous.db` read-only and validates the
+`missions`, `work_items`, and singleton `mission_engine_lease` schema. A
+`running` work item or unexpired engine lease is active. `pending`/`parked`
+work is queued, while `done`/`failed`/`blocked` is terminal. The store
+deliberately retains `claimed_at`/`claimed_by` as historical audit fields after
+claimed work settles, so a coherent pair on terminal work is valid; running
+work without the pair, or queued work retaining a pair, is incoherent and
+HOLD. Mission status `pending`/`active` alone is not execution proof.
+
+### Surface and authority boundary
+
+This admission is currently authoritative only for the local
+`scripts/clean.mjs` → `npm run clean` → `npm run build` chain.
+`GET /api/status` reconciles dashboard presentation state; it is not a build
+admission endpoint. CLI/MCP status, desktop, dashboard, and remote API clients
+do not currently expose or override this exact decision envelope and must not
+claim that a project is build-safe. A future surface must consume the same
+authority contract rather than recreate a weaker projection.
+
+External container/tmux/process enumeration without corresponding durable
+Deckent evidence is not represented as an independent cross-platform authority.
+Unsupported or contradictory durable evidence is HOLD; this contract does not
+invent a platform-specific “no external process exists” claim. Test
+hermeticity is a separate unconditional refusal:
+`DECKENT_TEST_HERMETICITY=1` returns `E_HERMETIC_DIST_CLEAN` before runtime
+evidence can change that result.
+
+---
+
 ## .tasks/ File Format (JSON)
 
 Each task is stored as `.tasks/task-{id}.json`:

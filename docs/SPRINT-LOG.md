@@ -11223,3 +11223,122 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 456-003: CLI dry-run and color hermeticity contract (NO_GO)
 
 ---
+## Sprint 457 — sprint-457
+
+**Status:** COMPLETE
+**Date:** 2026-07-25
+**Duration:** 3694s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 18 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 8 |
+| Coverage | NaN% |
+| Duration | 3693619ms |
+
+### Tasks
+
+- 457-001: [A1] Typed broker resolution sonucu (DONE)
+- undefined: undefined (NO_GO)
+- 457-002: [A2] Durable + redacted credential-decision audit sink (DONE)
+- 457-003: [D2] Subscription broker bypass'ını current-truth olarak raporla (NO_GO)
+- undefined: undefined (NO_GO)
+- xv-1784828451467-xverify: Adversarial cross-verify of xv-1784828451467 (DONE)
+- xv-1784828511383-xverify: Adversarial cross-verify of xv-1784828511383 (DONE)
+- xv-1784998332778-xverify: Adversarial cross-verify of xv-1784998332778 (NO_GO)
+- xv-1784998492105-xverify: Adversarial cross-verify of xv-1784998492105 (NO_GO)
+- undefined: undefined (NO_GO)
+- xv-1784998602884-xverify: Adversarial cross-verify of xv-1784998602884 (NO_GO)
+- undefined: undefined (NO_GO)
+- xv-1785006305849-xverify: Adversarial cross-verify of xv-1785006305849 (NO_GO)
+- undefined: undefined (NO_GO)
+- xv-1785006366737-xverify: Adversarial cross-verify of xv-1785006366737 (NO_GO)
+- undefined: undefined (NO_GO)
+- xv-1785008399857-xverify: Adversarial cross-verify of xv-1785008399857 (NO_GO)
+- undefined: undefined (NO_GO)
+
+---
+## Sprint 458 — sprint-458
+
+**Status:** COMPLETE
+**Date:** 2026-07-25
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 13 |
+| Completed | 6 |
+| Tech Debt | 1 |
+| No-Go | 3 |
+| Coverage | NaN% |
+| Duration | 0ms |
+
+### Tasks
+
+- 458-001: [A3] Broker kararlarını durable sink'e bağla (DONE)
+- undefined: undefined (NO_GO)
+- 458-002: [A4] subprocess: deny → legacy env fallback'ini kapat (GO_WITH_TECH_DEBT)
+- undefined: undefined (NO_GO)
+- 458-003: [A5] Explicit no-broker legacy yolunu görünür ayır (DONE)
+- 458-004: [B1] Hermetic kanıt — üç red nedeninde child env secret=0 (DONE)
+- 458-005: [D2] Subscription broker bypass'ını current-truth olarak raporla (NO_GO)
+- 459-001: [B1] Hermetic kanıt — üç red nedeninde child env secret=0 (DONE)
+- undefined: undefined (NO_GO)
+- 459-002: [A5] Explicit no-broker legacy yolunu görünür ayır (DONE)
+- undefined: undefined (NO_GO)
+- 459-003: [D2] Subscription broker bypass'ını current-truth olarak raporla (NO_GO)
+- undefined: undefined (NO_GO)
+
+---
+## Sprint 459 — sprint-459
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-25
+**Duration:** 860s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 860365ms |
+
+### Tasks
+
+- 459-001: [B1] Hermetic kanıt — üç red nedeninde child env secret=0 (DONE)
+- 459-002: [A5] Explicit no-broker legacy yolunu görünür ayır (DONE)
+- 459-003: [D2] Subscription broker bypass'ını current-truth olarak raporla (NO_GO)
+
+---
+## Sprint 460 — sprint-460
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-25
+**Duration:** 131s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 131027ms |
+
+### Tasks
+
+- 460-001: [D2] Subscription broker bypass'ını current-truth olarak raporla (DONE)
+
+---

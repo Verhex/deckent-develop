@@ -9,6 +9,51 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint460] - 2026-07-25
+
+### Added
+
+- [D2] Subscription broker bypass'ını current-truth olarak raporla
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint459] - 2026-07-25
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 3 total, 0 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint458] - 2026-07-25
+
+### Added
+
+- [A3] Broker kararlarını durable sink'e bağla
+- [A5] Explicit no-broker legacy yolunu görünür ayır
+- [B1] Hermetic kanıt — üç red nedeninde child env secret=0
+
+### Changed
+
+- [A4] subprocess: deny → legacy env fallback'ini kapat (completed with tech debt)
+
+
+_Tasks: 13 total, 6 done, 1 tech debt, 3 no-go_
+
+## [1.0.0-beta.1-sprint457] - 2026-07-25
+
+### Added
+
+- [A1] Typed broker resolution sonucu
+- [A2] Durable + redacted credential-decision audit sink
+- Adversarial cross-verify of xv-1784828451467
+- Adversarial cross-verify of xv-1784828511383
+
+
+_Tasks: 18 total, 4 done, 0 tech debt, 8 no-go_
+
 ## [1.0.0-beta.1-sprint456] - 2026-07-23
 
 ### Added
