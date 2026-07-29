@@ -55,7 +55,6 @@ import {
   readRuntimeBudgetUsage,
 } from '../../src/orchestra/runtime-budget-monitor.js';
 import { DockerSpawnBackend, type DistFingerprint } from '../../src/orchestra/spawn-backend-docker.js';
-import { readRuntimeBudgetUsage } from '../../src/orchestra/runtime-budget-monitor.js';
 
 const roots: string[] = [];
 const originalDeckentHome = process.env.DECKENT_HOME;
@@ -1149,6 +1148,130 @@ describe('Docker monitor settlement authority wiring', () => {
       }),
     );
     expect(backend.executionLandingCapability).toBe('checkpoint-stop');
+  });
+
+  it('closes a terminal landing-requested attempt when its proposal never advances', async () => {
+    const taskId = 'monitor-landing-stale-proposal';
+    const { root, tasks, ref, containerId } = fixture(taskId);
+    writeFileSync(join(root, 'source.ts'), 'export const value = 1;\n');
+    const task: Task = {
+      id: taskId,
+      title: 'Contain an uncheckpointable landing',
+      description: 'Preserve usage and close the exact failed attempt.',
+      model: 'claude-fable-5',
+      effort: 'normal',
+      priority: 'NORMAL',
+      reason: 'sprint-462-recovery',
+      type: 'code-development',
+      scope: { directories: [], filesRead: ['source.ts'], filesWrite: ['source.ts'] },
+      dependencies: [],
+      goNogo: {
+        goCriteria: 'exact attempt closes as NO_GO',
+        noGoCriteria: 'settlement remains pending',
+        techDebtAcceptable: 'none',
+      },
+      status: TaskStatus.EXECUTING,
+      provider: 'claude',
+      authMode: 'subscription',
+      budget: { maxCacheReadTokens: 1_000 },
+      budgetPolicy: {
+        state: 'allow',
+        role: 'worker',
+        taskKind: 'code-development',
+        resolvedProvider: 'claude',
+        executionCostClass: 'remote',
+        profileRef: 'execution_budget.roles.worker.default',
+        policyDigest: 'a'.repeat(64),
+        admissionMode: 'unattended',
+        landingPolicy: { reserve_ratio: 0.25 },
+      },
+    };
+    const prepared = prepareDockerExecutionLanding({
+      projectRoot: root,
+      task,
+      prompt: 'DO NOT REPLAY',
+      calledProvider: 'claude',
+      calledModel: 'claude-fable-5',
+      auth: 'subscription',
+      settlementRef: ref,
+    });
+    // Sequence 1 is the pre-work bootstrap proposal. It deliberately never
+    // advances, reproducing Sprint 462's uncheckpointable terminal landing.
+    writeFileSync(executionLandingProposalPath(root, taskId), JSON.stringify({
+      version: 1,
+      taskId,
+      attemptId: ref.attemptId,
+      sequence: 1,
+      summary: 'The current logical step is still in flight.',
+      completedWork: [],
+      remainingWork: ['finish the coherent step'],
+      nextAction: 'advance the proposal',
+      unresolvedRisks: [],
+      updatedAt: new Date().toISOString(),
+    }));
+    writeFileSync(join(root, 'source.ts'), 'export const value = 2;\n');
+
+    const { waitChild, followChild } = installChildRouter();
+    mockSpawnSync.mockImplementation((_command, args) => {
+      if (
+        args?.[0] === 'pause'
+        || args?.[0] === 'kill'
+        || args?.[0] === 'stop'
+        || args?.[0] === 'rm'
+      ) return spawnResult(0);
+      if (args?.[0] === 'inspect') return { ...spawnResult(0), stdout: 'false|137\n' };
+      throw new Error(`unexpected docker sync command: ${args?.join(' ')}`);
+    });
+
+    const backend = new DockerSpawnBackend(root);
+    const continuationSpawn = vi.spyOn(backend, 'spawn').mockImplementation(() => undefined);
+    registerAuthority(backend, taskId, containerId, root, tasks, ref);
+    (backend as unknown as MonitorHarness).monitorContainer(
+      taskId,
+      containerId,
+      tasks,
+      'claude-fable-5',
+      root,
+      null,
+      undefined,
+      task.budget,
+      task.budgetPolicy!.landingPolicy,
+      undefined,
+      prepared.context!,
+      ref,
+    );
+    followChild.stdout.write(`${JSON.stringify({
+      type: 'assistant',
+      message: {
+        id: 'landing-threshold',
+        usage: { cache_read_input_tokens: 750 },
+        content: [],
+      },
+    })}\n`);
+    await vi.waitFor(() => expect(readRuntimeBudgetUsage(root, taskId)?.decision.state)
+      .toBe('landing-requested'));
+
+    waitChild.stdout.write('137\n');
+    waitChild.emit('close', 0, null);
+
+    await vi.waitFor(() => expect(readTaskResultSettlementClosure(ref)).not.toBeNull());
+    expect(readTaskResultSettlement(ref)).toMatchObject({
+      result: {
+        selfAssessment: 'NO_GO',
+        testsPassed: false,
+        tokenUsage: {
+          cacheReadTokens: 750,
+          source: 'host-runtime-budget',
+        },
+      },
+    });
+    expect(readExecutionLandingCheckpoint(root, {
+      schemaVersion: 1,
+      projectId: ref.projectRootSha256,
+      taskId,
+      attemptId: ref.attemptId,
+    })).toBeNull();
+    expect(continuationSpawn).not.toHaveBeenCalled();
   });
 
   it('vetoes LANDED and continuation when provider shutdown crosses the hard ceiling', async () => {

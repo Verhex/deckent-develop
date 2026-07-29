@@ -7,6 +7,7 @@ import type {
 } from './config-types.js';
 import { resolveExecutionBudgetPolicy } from './execution-budget-policy.js';
 import { resolveProviderExecutionCostClass } from './provider-execution-profile.js';
+import { getProviderCommandSpec } from './provider-command-spec.js';
 import { providerRegistry } from './provider.js';
 import { getProviderForModel } from './task-types.js';
 import type {
@@ -123,6 +124,7 @@ function budgetSnapshotFor(
     ? providerRegistry.getProvider(resolvedProvider).executionCostClass
     : undefined;
   const executionCostClass = resolveProviderExecutionCostClass(resolvedProvider, adapterDeclaration);
+  const liveUsageMode = getProviderCommandSpec(resolvedProvider)?.liveUsage;
   const requestedBudget = task.budgetPolicy?.requestedBudget ?? task.budget;
   const decision = resolveExecutionBudgetPolicy({
     policy,
@@ -130,6 +132,7 @@ function budgetSnapshotFor(
     taskKind: task.type,
     requestedBudget,
     executionCostClass,
+    ...(liveUsageMode !== undefined ? { liveUsageMode } : {}),
   });
   return deepFreeze({
     state: decision.state,
@@ -149,6 +152,9 @@ function budgetSnapshotFor(
       : {}),
     ...(decision.state === 'allow' && decision.landingPolicy
       ? { landingPolicy: cloneJson(decision.landingPolicy) }
+      : {}),
+    ...(decision.state === 'allow' && decision.finalOnlyUsage
+      ? { finalOnlyUsage: cloneJson(decision.finalOnlyUsage) }
       : {}),
     ...(admission?.approvalEvidenceRef
       ? { approvalEvidenceRef: admission.approvalEvidenceRef }
@@ -178,12 +184,14 @@ export function applyWorkerExecutionBudgetPolicy(
   return tasks.map((task) => {
     const requestedBudget = task.budgetPolicy?.requestedBudget ?? task.budget;
     const snapshot = budgetSnapshotFor(task, policy, configuredProvider, admission);
+    const liveUsageMode = getProviderCommandSpec(snapshot.resolvedProvider)?.liveUsage;
     const decision = resolveExecutionBudgetPolicy({
       policy,
       role: 'worker',
       taskKind: task.type,
       requestedBudget,
       executionCostClass: snapshot.executionCostClass,
+      ...(liveUsageMode !== undefined ? { liveUsageMode } : {}),
     });
     if (decision.state === 'allow') {
       if (decision.budget) task.budget = cloneJson(decision.budget);
@@ -325,6 +333,9 @@ function buildTaskProjection(
       policyDigest: budgetPolicy.policyDigest ?? null,
       reasonCode: budgetPolicy.reasonCode ?? null,
       executionCostClass: budgetPolicy.executionCostClass,
+      ...(budgetPolicy.finalOnlyUsage
+        ? { finalOnlyUsage: cloneJson(budgetPolicy.finalOnlyUsage) }
+        : {}),
     },
     smoke: task.smoke
       ? { command: normalizeText(task.smoke.command), expect: normalizeText(task.smoke.expect) }

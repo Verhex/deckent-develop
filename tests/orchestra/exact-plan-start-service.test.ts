@@ -2,9 +2,11 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import Database from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  loadRunFlowRecoveryManifest,
   loadRunHandle,
   loadStartAttempt,
   saveApprovedSnapshot,
@@ -154,6 +156,104 @@ describe('exact-plan start attempt lifecycle', () => {
       identityDeps,
     });
     expect(terminal.attempt.state).toBe('COMPLETED');
+  });
+
+  it('commits a canonical recovery manifest before a retry process can be born', () => {
+    const root = mkdtempSync(join(tmpdir(), 'exact-start-recovery-manifest-'));
+    const approved = snapshot(root);
+    const first = prepareAndSpawnExactRun({
+      root,
+      exactRef: { schemaVersion: 1, flowId: 'flow-1', revision: 1, planDigest: 'digest-1' },
+      approvedSnapshot: approved,
+      lineage: lineage('first-attempt'),
+      attemptId: 'attempt-one',
+      preparedAt: '2026-07-28T10:00:00.000Z',
+      spawnedAt: '2026-07-28T10:00:10.000Z',
+      leaseUntil: '2026-07-28T10:01:00.000Z',
+      preparerProcess: { pid: 100, startToken: 's100', evidence: 'verified' },
+      identityDeps,
+      spawnProcess: () => ({ pid: 200, startToken: 's200' }),
+    });
+    if (first.status !== 'process-spawned') throw new Error('unexpected fixture result');
+    settleExactRunAttempt({
+      root,
+      capability: first.capability,
+      process: first.attempt.process!,
+      settlement: {
+        state: 'FAILED',
+        code: 'FIRST_ATTEMPT_FAILED',
+        settledAt: '2026-07-28T10:02:00.000Z',
+      },
+      identityDeps,
+    });
+
+    let manifestObservedBeforeSpawn = false;
+    const second = prepareAndSpawnExactRun({
+      root,
+      exactRef: { schemaVersion: 1, flowId: 'flow-1', revision: 1, planDigest: 'digest-1' },
+      approvedSnapshot: approved,
+      lineage: lineage('retry-attempt'),
+      retryFromAttemptId: first.attempt.attemptId,
+      attemptId: 'attempt-two',
+      preparedAt: '2026-07-28T10:03:00.000Z',
+      spawnedAt: '2026-07-28T10:03:10.000Z',
+      leaseUntil: '2026-07-28T10:04:00.000Z',
+      preparerProcess: { pid: 101, startToken: 's101', evidence: 'verified' },
+      identityDeps,
+      onPrepared: ({ attempt }) => {
+        const manifest = loadRunFlowRecoveryManifest(root, attempt.flowId, attempt.generation);
+        expect(manifest).toMatchObject({
+          attemptId: 'attempt-two',
+          predecessorAttemptId: 'attempt-one',
+          predecessorState: 'FAILED',
+          predecessorSettlement: {
+            state: 'FAILED',
+            code: 'FIRST_ATTEMPT_FAILED',
+          },
+        });
+        manifestObservedBeforeSpawn = true;
+      },
+      spawnProcess: () => {
+        expect(manifestObservedBeforeSpawn).toBe(true);
+        return { pid: 201, startToken: 's201' };
+      },
+    });
+
+    expect(second.status).toBe('process-spawned');
+    if (second.status === 'process-spawned') {
+      expect(second.attempt.generation).toBe(2);
+    }
+
+    const db = new Database(join(
+      root,
+      '.deckent',
+      'runtime',
+      'run-flow-store',
+      'run-flow-authority.sqlite',
+    ));
+    try {
+      db.exec('DROP TRIGGER run_flow_recovery_manifests_no_delete');
+      db.prepare(`
+        DELETE FROM run_flow_recovery_manifests
+        WHERE flow_id = ? AND generation = ?
+      `).run('flow-1', 2);
+    } finally {
+      db.close();
+    }
+
+    const forbiddenSpawn = vi.fn(() => ({ pid: 202, startToken: 's202' }));
+    expect(() => prepareAndSpawnExactRun({
+      root,
+      exactRef: { schemaVersion: 1, flowId: 'flow-1', revision: 1, planDigest: 'digest-1' },
+      approvedSnapshot: approved,
+      lineage: lineage('manifest-missing-replay'),
+      preparerProcess: { pid: 102, startToken: 's102', evidence: 'verified' },
+      identityDeps,
+      spawnProcess: forbiddenSpawn,
+    })).toThrowError(expect.objectContaining({
+      code: 'EXACT_START_RECOVERY_MANIFEST_HOLD',
+    }));
+    expect(forbiddenSpawn).not.toHaveBeenCalled();
   });
 
   it('permits unavailable-token immediate capability admission but refuses adoption without it', () => {

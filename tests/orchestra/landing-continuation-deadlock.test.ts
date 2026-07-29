@@ -24,8 +24,10 @@ import { join } from 'node:path';
 
 import {
   describeDockerPartialResultTermination,
+  reconcileDockerLandingRequestedRuntimeBudgetUsage,
   settleHeldExecutionContinuation,
 } from '../../src/orchestra/spawn-backend-docker.js';
+import type { RuntimeBudgetUsageEvidence } from '../../src/orchestra/runtime-budget-monitor.js';
 import { EXECUTION_CONTINUATION_MINIMUM_TURNS } from '../../src/orchestra/execution-continuation-runner.js';
 
 const roots: string[] = [];
@@ -42,6 +44,45 @@ afterEach(() => {
 });
 
 describe('landing → continuation deadlock (MASTER-PLAN 664)', () => {
+  it('preserves real terminal landing counters without fabricating billing or success', () => {
+    const result = {
+      taskId: '462-002',
+      selfAssessment: 'DONE',
+      testsPassed: true,
+      cost: 99,
+    } as unknown as Parameters<typeof reconcileDockerLandingRequestedRuntimeBudgetUsage>[0];
+    const usage = {
+      terminal: true,
+      decision: {
+        state: 'landing-requested',
+        counters: {
+          turns: 34,
+          inputTokens: 7111,
+          outputTokens: 450,
+          cacheReadTokens: 3_813_862,
+          cacheCreationTokens: 134_883,
+        },
+      },
+    } as RuntimeBudgetUsageEvidence;
+
+    expect(reconcileDockerLandingRequestedRuntimeBudgetUsage(result, usage, {
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+    })).toBe(true);
+    expect(result.selfAssessment).toBe('DONE');
+    expect(result.tokenUsage).toMatchObject({
+      inputTokens: 7111,
+      outputTokens: 450,
+      cacheReadTokens: 3_813_862,
+      cacheCreationTokens: 134_883,
+      source: 'host-runtime-budget',
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+    });
+    expect(result.providerBilling).toBeUndefined();
+    expect(result.cost).toBeUndefined();
+  });
+
   it('admits a continuation on a small absolute turn minimum, not the hard-budget reserve', () => {
     // The measured deadlock: hard 32 with reserve_ratio 0.25 reserves 8 turns,
     // and a real landing left 1. A rule requiring 8 could never be met again.

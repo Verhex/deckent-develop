@@ -8,6 +8,8 @@ const mockReadCheckpoint = vi.fn();
 const mockDetectStaleWorkers = vi.fn();
 const mockLoadConfig = vi.fn();
 const mockDeriveResumeDisposition = vi.fn();
+const mockReadSprintState = vi.fn();
+const mockClearSprintState = vi.fn();
 
 vi.mock('../../../src/orchestra/brain.js', () => ({
   runSprint: (...args: unknown[]) => mockRunSprint(...args),
@@ -47,6 +49,11 @@ vi.mock('node:fs', () => ({
 
 vi.mock('../../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: () => '/fake/project',
+}));
+
+vi.mock('../../../src/orchestra/sprint-utils.js', () => ({
+  readSprintState: (...args: unknown[]) => mockReadSprintState(...args),
+  clearSprintState: (...args: unknown[]) => mockClearSprintState(...args),
 }));
 
 const mockPrint = vi.fn();
@@ -106,6 +113,7 @@ describe('deckent resume CLI — preplanned exactly-once handoff', () => {
       parkedSettlements: [],
     });
     mockRunSprint.mockResolvedValue({ id: 'sprint-321', tasks: [], status: 'COMPLETE' });
+    mockReadSprintState.mockReturnValue(null);
     mockExistsSync.mockReturnValue(false);
     mockMkdirSync.mockReturnValue(undefined);
     mockWriteFileSync.mockReturnValue(undefined);
@@ -168,12 +176,7 @@ describe('deckent resume CLI — preplanned exactly-once handoff', () => {
     expect(mockRunSprint).not.toHaveBeenCalled();
   });
 
-  it.each([
-    { label: 'real', extraArgs: [] },
-    { label: 'dry-run', extraArgs: ['--dry-run'] },
-  ])(
-    'HOLDs before config, reset, or spawn when host settlement is parked ($label)',
-    async ({ extraArgs }) => {
+  it('keeps dry-run read-only when host settlement is pending', async () => {
       mockDeriveResumeDisposition.mockReturnValue({
         resumableIds: [],
         parkedSettlements: [
@@ -181,7 +184,7 @@ describe('deckent resume CLI — preplanned exactly-once handoff', () => {
         ],
       });
 
-      await runCommand(['sprint-321', ...extraArgs]);
+      await runCommand(['sprint-321', '--dry-run']);
 
       expect(process.exitCode).toBe(1);
       expect(mockPrintError).toHaveBeenCalledWith(
@@ -191,8 +194,44 @@ describe('deckent resume CLI — preplanned exactly-once handoff', () => {
       expect(mockResetInterrupted).not.toHaveBeenCalled();
       expect(mockBuildPreplanned).not.toHaveBeenCalled();
       expect(mockRunSprint).not.toHaveBeenCalled();
-    },
-  );
+  });
+
+  it('runs settlement-first recovery without reset or preplanned spawn', async () => {
+    mockDeriveResumeDisposition.mockReturnValue({
+      resumableIds: [],
+      parkedSettlements: [
+        { taskId: '321-004', state: 'pending-settlement' },
+      ],
+    });
+    mockReadSprintState.mockReturnValue({ sprintId: 'sprint-321' });
+
+    await runCommand(['sprint-321']);
+
+    expect(mockLoadConfig).toHaveBeenCalledWith('/fake/project');
+    expect(mockResetInterrupted).not.toHaveBeenCalled();
+    expect(mockBuildPreplanned).not.toHaveBeenCalled();
+    expect(mockClearSprintState).not.toHaveBeenCalled();
+    expect(mockRunSprint).toHaveBeenCalledWith(
+      '/fake/project',
+      { deckent_style: 'sprint' },
+      { autoApprove: false },
+    );
+  });
+
+  it('HOLDs an invalid settlement without invoking recovery', async () => {
+    mockDeriveResumeDisposition.mockReturnValue({
+      resumableIds: [],
+      parkedSettlements: [
+        { taskId: '321-004', state: 'invalid-settlement' },
+      ],
+    });
+
+    await runCommand(['sprint-321']);
+
+    expect(process.exitCode).toBe(1);
+    expect(mockLoadConfig).not.toHaveBeenCalled();
+    expect(mockRunSprint).not.toHaveBeenCalled();
+  });
 
   it('exits early when all tasks already completed without calling runSprint', async () => {
     mockReadCheckpoint.mockReturnValue({

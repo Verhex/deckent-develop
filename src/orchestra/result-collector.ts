@@ -17,6 +17,7 @@ import type {
 
 // ─── Core (value imports — TaskStatus used at runtime for in-memory sync) ─
 import { TaskStatus } from '../core/types.js';
+import { applyTerminalTaskOutcome } from '../core/task-terminal-outcome.js';
 
 import { TASKS_DIR } from '../core/constants.js';
 
@@ -590,13 +591,7 @@ export function findReadyUndispatchedTasks(
  * `waitForResults::collectResults`. Mutates the task ref in place.
  */
 export function applyStatusMutation(taskRef: Task, result: TaskResult): void {
-  if (result.selfAssessment === 'DONE') {
-    taskRef.status = TaskStatus.DONE;
-  } else if (result.selfAssessment === 'GO_WITH_TECH_DEBT') {
-    taskRef.status = TaskStatus.DONE;
-  } else if (result.selfAssessment === 'NO_GO') {
-    taskRef.status = TaskStatus.NO_GO;
-  }
+  applyTerminalTaskOutcome(taskRef, result);
 }
 
 // ═══ Token Usage Enrichment ═══════════════════════════════════════

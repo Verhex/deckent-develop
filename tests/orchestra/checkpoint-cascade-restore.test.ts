@@ -47,8 +47,11 @@ import { SprintPhase, SprintStatus, TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, TaskResult } from '../../src/core/types.js';
 import {
   claimTaskResultSettlementAttemptAtomic,
+  createTaskResultSettlement,
   createTaskResultSettlementRef,
+  writeTaskResultSettlementAtomic,
   writeTaskResultSettlementAttemptAtomic,
+  writeTaskResultSettlementClosureAtomic,
 } from '../../src/core/task-result-settlement.js';
 
 // ─── Helpers (mirrors checkpoint-mrr-restore.test.ts's fixture idiom) ────────
@@ -245,6 +248,72 @@ describe('restoreSprintFromCheckpoint — host settlement fence for cascade comm
       expect(thrown).toMatchObject({ code: 'DECKENT_E077' });
       expect(readTaskFile(root, dependent.id).status).toBe(TaskStatus.PENDING);
       expect(JSON.parse(readFileSync(rawResultPath, 'utf-8'))).toEqual(rawClaim);
+    } finally {
+      if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+      else process.env.DECKENT_HOME = originalDeckentHome;
+      rmSync(root, { recursive: true, force: true });
+      rmSync(hostRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('restoreSprintFromCheckpoint — all-task terminal authority sync', () => {
+  it('projects a closed NO_GO outside activeWorkers before cascading descendants', () => {
+    const root = makeTempDir();
+    const hostRoot = makeTempDir('checkpoint-terminal-sync-host');
+    const originalDeckentHome = process.env.DECKENT_HOME;
+    process.env.DECKENT_HOME = hostRoot;
+    try {
+      const sprintId = 'sprint-1007';
+      const upstream = makeTask('1007-001', sprintId, { status: TaskStatus.PENDING });
+      const dependent = makeTask('1007-002', sprintId, {
+        status: TaskStatus.PENDING,
+        dependencies: [upstream.id],
+      });
+      [upstream, dependent].forEach(task => writeTaskFile(root, task));
+
+      const ref = createTaskResultSettlementRef(root, upstream.id);
+      writeTaskResultSettlementAttemptAtomic(ref);
+      claimTaskResultSettlementAttemptAtomic(ref);
+      writeTaskResultSettlementAtomic(createTaskResultSettlement({
+        ref,
+        exitCode: 137,
+        result: {
+          taskId: upstream.id,
+          selfAssessment: 'NO_GO',
+          testsPassed: false,
+        },
+      }));
+      writeTaskResultSettlementClosureAtomic(ref, {
+        containerDisposition: 'stopped-removed',
+        locksReleased: true,
+      });
+
+      const checkpoint: SprintCheckpoint = {
+        schemaVersion: 2,
+        sprintId,
+        checkpointNumber: 1,
+        timestamp: new Date().toISOString(),
+        completedTasks: [],
+        pendingTasks: [upstream.id, dependent.id],
+        activeWorkers: [],
+        taskStates: [
+          { id: upstream.id, status: TaskStatus.PENDING },
+          { id: dependent.id, status: TaskStatus.PENDING },
+        ],
+        brainPhase: SprintPhase.EXECUTE,
+        eventStreamOffset: 0,
+      };
+      writeFileSync(
+        join(root, '.deckent', `${sprintId}-checkpoint.json`),
+        JSON.stringify(checkpoint, null, 2),
+        'utf-8',
+      );
+
+      const restored = restoreSprintFromCheckpoint(root, sprintId);
+      expect(readTaskFile(root, upstream.id).status).toBe(TaskStatus.NO_GO);
+      expect(restored.cascadeSkippedTasks).toEqual([dependent.id]);
+      expect(readTaskFile(root, dependent.id).status).toBe(TaskStatus.NO_GO);
     } finally {
       if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
       else process.env.DECKENT_HOME = originalDeckentHome;

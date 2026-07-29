@@ -131,6 +131,76 @@ describe('plan-time worker budget projection', () => {
     expect(snapshot).toMatchObject({ state: 'allow', executionCostClass: 'local', profileRef: 'local-exempt' });
     expect(planned.budget).toBeUndefined();
   });
+
+  it('binds final-only provider usage to a fail-closed plan HOLD before process birth', () => {
+    const planned = task('001-001', {
+      provider: 'codex',
+      model: 'gpt-5.6-terra',
+      budget: { maxTurns: 12 },
+    });
+    const [snapshot] = applyWorkerExecutionBudgetPolicy([planned], policy());
+
+    expect(snapshot).toMatchObject({
+      state: 'hold',
+      resolvedProvider: 'codex',
+      reasonCode: 'final-only-usage-authorization-missing',
+      profileRef: 'execution_budget.final_only_usage',
+      requestedBudget: { maxTurns: 12 },
+    });
+    expect(planned.budget).toBeUndefined();
+
+    const projection = computeExecutionPlanDigest(
+      sprint({ tasks: [planned], workers: ['w-001-001'] }),
+      buildExecutionPlanDigestContext(config({ worker_provider: 'codex' }), 'subscription'),
+    );
+    expect(projection.budgetHolds).toEqual([
+      expect.objectContaining({
+        slot: 1,
+        resolvedProvider: 'codex',
+        reasonCode: 'final-only-usage-authorization-missing',
+      }),
+    ]);
+  });
+
+  it('binds an exact owner-authorized final-only containment grant into the task and digest', () => {
+    const authorizedPolicy: ExecutionBudgetPolicyConfig = {
+      ...policy(),
+      final_only_usage: {
+        action: 'allow-wall-clock-containment',
+        roles: ['worker'],
+        max_wall_clock_seconds: 300,
+      },
+    };
+    const planned = task('001-001', {
+      provider: 'codex',
+      model: 'gpt-5.6-terra',
+      budget: { maxTurns: 12 },
+    });
+    const [snapshot] = applyWorkerExecutionBudgetPolicy([planned], authorizedPolicy);
+
+    expect(snapshot).toMatchObject({
+      state: 'allow',
+      resolvedProvider: 'codex',
+      finalOnlyUsage: {
+        maxWallClockSeconds: 300,
+        profileRef: 'execution_budget.final_only_usage',
+      },
+    });
+    expect(planned.budget).toEqual({ maxTurns: 12, maxCacheReadTokens: 5_000_000 });
+
+    const authorizedDigest = computeExecutionPlanDigest(
+      sprint({ tasks: [planned], workers: ['w-001-001'] }),
+      buildExecutionPlanDigestContext(config({ execution_budget: authorizedPolicy }), 'subscription'),
+    );
+    expect(JSON.stringify(authorizedDigest.projection)).toContain('"maxWallClockSeconds":300');
+
+    const changedGrant = structuredClone(authorizedPolicy);
+    changedGrant.final_only_usage!.max_wall_clock_seconds = 301;
+    expect(computeExecutionPlanDigest(
+      sprint({ tasks: [structuredClone(planned)], workers: ['w-001-001'] }),
+      buildExecutionPlanDigestContext(config({ execution_budget: changedGrant }), 'subscription'),
+    ).digest).not.toBe(authorizedDigest.digest);
+  });
 });
 
 describe('execution plan digest v3 topology binding', () => {

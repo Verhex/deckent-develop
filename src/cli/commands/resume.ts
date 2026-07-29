@@ -97,10 +97,51 @@ export function registerResume(program: Command): void {
       // invalid Docker settlement is neither success nor permission to redrive.
       const resumeDisposition = deriveResumeDisposition(projectRoot, checkpoint);
       if (resumeDisposition.parkedSettlements.length > 0) {
+        const parkedTasks = resumeDisposition.parkedSettlements
+          .map(item => `${item.taskId} (${item.state})`)
+          .join(', ');
+        const hasInvalidSettlement = resumeDisposition.parkedSettlements
+          .some(item => item.state === 'invalid-settlement');
+        if (!opts.dryRun && !hasInvalidSettlement) {
+          let config;
+          try {
+            config = await loadConfig(projectRoot);
+          } catch (e) {
+            printError(getMessage('resume.config_failed', lang, { error: e instanceof Error ? e.message : String(e) }));
+            process.exit(1);
+          }
+          const existingState = readSprintState(projectRoot);
+          if (existingState?.sprintId !== checkpoint.sprintId) {
+            printError(getMessage('resume.settlement_state_required', lang, {
+              sprintId: checkpoint.sprintId,
+            }));
+            process.exitCode = 1;
+            return;
+          }
+          print(getMessage('resume.settlement_reconciling', lang, { tasks: parkedTasks }));
+          try {
+            // Preserve checkpoint, sprint-state and task artifacts. runSprint
+            // acquires project leadership, reconciles host-owned backend attempts
+            // before restore, and must never preplan/reset parked task IDs.
+            const resumed = await runSprint(projectRoot, config, {
+              autoApprove: opts.autoApprove,
+            });
+            if (resumed.status !== SprintStatus.COMPLETE) {
+              printError(getMessage('resume.not_complete', lang, { status: String(resumed.status) }));
+              process.exitCode = 1;
+              return;
+            }
+            print(getMessage('resume.completed', lang));
+            print(getMessage('resume.retro_hint', lang));
+            return;
+          } catch (e) {
+            printError(getMessage('resume.failed', lang, { error: e instanceof Error ? e.message : String(e) }));
+            process.exitCode = 1;
+            return;
+          }
+        }
         printError(getMessage('resume.settlement_hold', lang, {
-          tasks: resumeDisposition.parkedSettlements
-            .map(item => `${item.taskId} (${item.state})`)
-            .join(', '),
+          tasks: parkedTasks,
         }));
         process.exitCode = 1;
         return;

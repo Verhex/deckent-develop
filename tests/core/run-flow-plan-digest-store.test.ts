@@ -6,6 +6,7 @@ import {
   admitStartAttempt,
   listStartAttempts,
   loadPlannedSprint,
+  loadRunFlowRecoveryManifest,
   loadRunHandle,
   prepareStartAttempt,
   recordStartAttemptProcessSpawned,
@@ -142,6 +143,7 @@ describe('run-flow canonical start-attempt journal', () => {
   it('requires explicit terminal predecessor CAS and a fresh idempotency key for a new generation', () => {
     const root = mkdtempSync(join(tmpdir(), 'deckent-start-generation-'));
     const first = prepareStartAttempt(root, prepareInput('flow-b', 'idem-b1')).attempt;
+    expect(loadRunFlowRecoveryManifest(root, first.flowId, first.generation)).toBeUndefined();
     settleStartAttempt(root, {
       flowId: first.flowId,
       revision: first.revision,
@@ -157,15 +159,43 @@ describe('run-flow canonical start-attempt journal', () => {
       authority: { kind: 'owner-capability' },
     });
 
-    const second = prepareStartAttempt(root, {
+    expect(() => prepareStartAttempt(root, {
       ...prepareInput('flow-b', 'idem-b2'),
       attemptId: 'attempt-flow-b-retry',
       expectedPrevious: {
         generation: first.generation,
         attemptId: first.attemptId,
       },
+    })).toThrowError(expect.objectContaining({
+      code: 'START_ATTEMPT_RECOVERY_MANIFEST_CONFLICT',
+    }));
+
+    const second = prepareStartAttempt(root, {
+      ...prepareInput('flow-b', 'idem-b2'),
+      attemptId: 'attempt-flow-b-retry',
+      preparedAt: '2026-07-28T10:00:40.000Z',
+      expectedPrevious: {
+        generation: first.generation,
+        attemptId: first.attemptId,
+      },
     });
     expect(second.attempt.generation).toBe(2);
+    expect(loadRunFlowRecoveryManifest(root, second.attempt.flowId, second.attempt.generation))
+      .toEqual({
+        schemaVersion: 1,
+        flowId: 'flow-b',
+        generation: 2,
+        attemptId: 'attempt-flow-b-retry',
+        predecessorGeneration: 1,
+        predecessorAttemptId: first.attemptId,
+        predecessorState: 'BLOCKED',
+        predecessorSettlement: {
+          state: 'BLOCKED',
+          code: 'GATE_HOLD',
+          settledAt: '2026-07-28T10:00:30.000Z',
+        },
+        recordedAt: '2026-07-28T10:00:40.000Z',
+      });
 
     const replayOldSpend = prepareStartAttempt(root, {
       ...prepareInput('flow-b', 'idem-b1'),

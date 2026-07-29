@@ -21,6 +21,7 @@ import {
   admitStartAttempt,
   loadApprovedSnapshot,
   loadLatestStartAttempt,
+  loadRunFlowRecoveryManifest,
   loadStartAttempt,
   prepareStartAttempt,
   recordStartAttemptProcessSpawned,
@@ -75,6 +76,7 @@ export type ExactPlanStartErrorCode =
   | 'EXACT_START_LINEAGE_DENIED'
   | 'EXACT_START_ATTEMPT_ACTIVE'
   | 'EXACT_START_ATTEMPT_TERMINAL'
+  | 'EXACT_START_RECOVERY_MANIFEST_HOLD'
   | 'EXACT_START_PROCESS_EFFECT_UNKNOWN'
   | 'EXACT_START_PROCESS_OWNERSHIP_HOLD'
   | 'EXACT_START_PROCESS_IDENTITY_MISMATCH'
@@ -372,6 +374,24 @@ function assertAttemptCapability(
   }
 }
 
+function assertRecoveryManifestAuthority(root: string, attempt: StartAttemptRecord): void {
+  if (attempt.generation === 1) return;
+  try {
+    const manifest = loadRunFlowRecoveryManifest(root, attempt.flowId, attempt.generation);
+    if (!manifest || manifest.attemptId !== attempt.attemptId) {
+      throw new Error('missing or mismatched recovery manifest');
+    }
+  } catch (cause) {
+    throw new ExactPlanStartError(
+      'EXACT_START_RECOVERY_MANIFEST_HOLD',
+      `exact-plan-start: generation ${attempt.generation} for attempt '${attempt.attemptId}' has no valid recovery authority`,
+      attempt.flowId,
+      attempt.attemptId,
+      { cause },
+    );
+  }
+}
+
 function classifyExisting(
   current: StartAttemptRecord,
   input: PrepareExactRunBase,
@@ -384,6 +404,7 @@ function classifyExisting(
       current.attemptId,
     );
   }
+  assertRecoveryManifestAuthority(input.root, current);
   const capability = capabilityFor(current);
   if (current.state === 'ADMITTED' && current.handle) {
     return {
@@ -646,6 +667,7 @@ export function materializeExactPlanTaskArtifacts(
       capability.attemptId,
     );
   }
+  assertRecoveryManifestAuthority(root, attempt);
   assertAttemptCapability(attempt, capability);
   if (attempt.state !== 'PROCESS_SPAWNED') {
     throw new ExactPlanStartError(
@@ -798,6 +820,7 @@ export function admitExactRunAttempt(
       input.capability.attemptId,
     );
   }
+  assertRecoveryManifestAuthority(input.root, attempt);
   assertAttemptCapability(attempt, input.capability);
   if (attempt.state === 'ADMITTED' && attempt.handle) {
     assertProcessCanMutate(
@@ -912,6 +935,7 @@ export function settleExactRunAttempt(
       input.capability.attemptId,
     );
   }
+  assertRecoveryManifestAuthority(input.root, attempt);
   assertAttemptCapability(attempt, input.capability);
   if (isTerminalStartAttemptState(attempt.state)) {
     return { applied: false, attempt };

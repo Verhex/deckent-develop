@@ -6,6 +6,14 @@ import type {
   FinalOnlyUsagePolicyConfig,
 } from './config-types.js';
 import { TASK_KINDS, type ExecutionBudget, type TaskKind } from './work-model.js';
+import type { ProviderCommandSpec } from './provider-command-spec.js';
+
+/**
+ * Provider-declared usage-reporting granularity (`ProviderCommandSpec.liveUsage`),
+ * re-exported here so budget-policy resolution can become provider-aware without
+ * duplicating the literal union.
+ */
+export type ExecutionBudgetLiveUsageMode = ProviderCommandSpec['liveUsage'];
 
 const BUDGET_FIELDS = [
   'maxUsd',
@@ -25,7 +33,8 @@ export type ExecutionBudgetPolicyHoldReason =
   | 'budget-policy-missing'
   | 'role-profile-missing'
   | 'landing-policy-missing'
-  | 'landing-turn-reserve-insufficient';
+  | 'landing-turn-reserve-insufficient'
+  | 'final-only-usage-authorization-missing';
 
 /**
  * Owner authorization to run a final-only-usage provider under host wall-clock
@@ -324,6 +333,17 @@ function cloneLandingPolicy(
   };
 }
 
+/**
+ * `maxUsd` is excluded: live USD enforcement needs an immutable pricing snapshot
+ * (a separate, already fail-closed concern — see `assertLiveUsageBudgetSupport` in
+ * `live-execution-budget.ts`), not incremental provider usage reporting.
+ */
+const LIVE_CEILING_FIELDS = BUDGET_FIELDS.filter(field => field !== 'maxUsd');
+
+function hasLiveCeiling(budget: ExecutionBudget): boolean {
+  return LIVE_CEILING_FIELDS.some(field => typeof budget[field] === 'number');
+}
+
 function narrowBudget(authority: ExecutionBudget, requested?: ExecutionBudget): ExecutionBudget {
   const result = cloneBudget(authority);
   if (!requested) return result;
@@ -350,6 +370,13 @@ export function resolveExecutionBudgetPolicy(input: {
   requestedBudget?: ExecutionBudget;
   executionCostClass?: 'remote' | 'local';
   minimumContinuationTurns?: number;
+  /**
+   * The resolved provider's usage-reporting granularity. Absent (all pre-existing
+   * callers) preserves current behavior exactly. When present and not
+   * `'incremental'`, a live ceiling requires an owner `finalOnlyUsage` grant for
+   * this role or the route resolves to `hold` before any budget is authorized.
+   */
+  liveUsageMode?: ExecutionBudgetLiveUsageMode;
 }): ExecutionBudgetPolicyDecision {
   if (
     input.minimumContinuationTurns !== undefined
@@ -436,6 +463,24 @@ export function resolveExecutionBudgetPolicy(input: {
       policyDigest,
     })
     : undefined;
+  // A route with a live ceiling and no incremental usage reporting has no in-flight
+  // enforcement mechanism unless the owner explicitly authorized wall-clock
+  // containment for THIS role. Never fabricate the grant or silently drop the
+  // ceiling — hold before any budget is authorized (ADR-G-037 final-only-usage gap,
+  // closed here for every role instead of per call-site).
+  if (
+    input.liveUsageMode !== undefined
+    && input.liveUsageMode !== 'incremental'
+    && hasLiveCeiling(budget)
+    && !finalOnlyUsage
+  ) {
+    return {
+      state: 'hold',
+      reasonCode: 'final-only-usage-authorization-missing',
+      profileRef: 'execution_budget.final_only_usage',
+      policyDigest,
+    };
+  }
   return {
     state: 'allow',
     budget,

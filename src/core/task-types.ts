@@ -11,6 +11,7 @@ import type { ExecutionBudgetRole, ExecutionLandingPolicyConfig } from './config
 import type { ExecutionAdmissionMode } from './execution-admission.js';
 import type { AttendedExecutionProposalReference } from './attended-execution-proposal.js';
 import type { InvocationReceiptRef } from './invocation-receipt.js';
+import type { FinalOnlyUsageAuthorization } from './execution-budget-policy.js';
 
 // ─── Models ──────────────────────────────────────────────────────────
 
@@ -354,9 +355,12 @@ export interface TaskExecutionBudgetPolicySnapshot {
     | 'budget-policy-missing'
     | 'role-profile-missing'
     | 'landing-policy-missing'
-    | 'landing-turn-reserve-insufficient';
+    | 'landing-turn-reserve-insufficient'
+    | 'final-only-usage-authorization-missing';
   readonly requiredContinuationTurns?: number;
   readonly guaranteedContinuationTurns?: number;
+  /** Exact owner grant for a final-only provider; absent means no such execution authority. */
+  readonly finalOnlyUsage?: Readonly<FinalOnlyUsageAuthorization>;
   /** ADR-G-037 attendance is explicit; missing producer evidence resolves to unattended. */
   readonly admissionMode: ExecutionAdmissionMode;
   /** Owner-authored landing contract included in the execution-policy digest. */

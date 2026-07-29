@@ -33,6 +33,7 @@ import {
   checkWorkerQuestions,
   estimateTokenUsage,
   enrichResultTokenUsage,
+  applyStatusMutation,
 } from '../../src/orchestra/result-collector.js';
 import {
   writeQuestionFile,
@@ -40,6 +41,24 @@ import {
   getAnswerPath,
 } from '../../src/agents/worker-ipc.js';
 import type { WorkerQuestion } from '../../src/core/task-types.js';
+
+describe('result-collector terminal outcome delegation', () => {
+  it('uses the shared debt-DONE and NO_GO projection', () => {
+    const debtDone = makeTask('terminal-debt');
+    applyStatusMutation(debtDone, {
+      taskId: debtDone.id,
+      selfAssessment: 'GO_WITH_TECH_DEBT',
+    } as TaskResult);
+    expect(debtDone.status).toBe(TaskStatus.DONE);
+
+    const noGo = makeTask('terminal-no-go');
+    applyStatusMutation(noGo, {
+      taskId: noGo.id,
+      selfAssessment: 'NO_GO',
+    } as TaskResult);
+    expect(noGo.status).toBe(TaskStatus.NO_GO);
+  });
+});
 
 function makeTmpDir(): string {
   const dir = join(tmpdir(), `deckent-test-${randomBytes(4).toString('hex')}`);

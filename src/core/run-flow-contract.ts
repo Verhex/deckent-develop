@@ -193,10 +193,15 @@ export type StartAttemptState =
 export const START_ATTEMPT_ACTIVE_STATES: ReadonlySet<StartAttemptState> =
   new Set<StartAttemptState>(['PREPARED', 'PROCESS_SPAWNED', 'ADMITTED']);
 
+export type StartAttemptTerminalState = Extract<
+  StartAttemptState,
+  'COMPLETED' | 'FAILED' | 'CANCELLED' | 'BLOCKED' | 'UNKNOWN'
+>;
+
 export const START_ATTEMPT_TERMINAL_STATES: ReadonlySet<StartAttemptState> =
   new Set<StartAttemptState>(['COMPLETED', 'FAILED', 'CANCELLED', 'BLOCKED', 'UNKNOWN']);
 
-export function isTerminalStartAttemptState(state: StartAttemptState): boolean {
+export function isTerminalStartAttemptState(state: StartAttemptState): state is StartAttemptTerminalState {
   return START_ATTEMPT_TERMINAL_STATES.has(state);
 }
 
@@ -234,7 +239,7 @@ export interface StartAttemptLineage {
 }
 
 export interface StartAttemptSettlement {
-  readonly state: Extract<StartAttemptState, 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'BLOCKED' | 'UNKNOWN'>;
+  readonly state: StartAttemptTerminalState;
   /** Stable machine-readable reason, suitable for audit and recovery routing. */
   readonly code: string;
   /** Optional operator/developer evidence; never interpreted as authority. */
@@ -261,6 +266,30 @@ export interface StartAttemptRecord {
   /** Published atomically with the ADMITTED transition, never before it. */
   readonly handle?: RunHandle;
   readonly settlement?: StartAttemptSettlement;
+}
+
+// ═══ Generation-recovery manifest ════════════════════════════════════════
+
+export const RUN_FLOW_RECOVERY_MANIFEST_SCHEMA_VERSION = 1 as const;
+
+/**
+ * Durable fence committed atomically with a new generation's PREPARED row,
+ * before any process/task birth can occur under that generation. Binds the
+ * new generation to the exact terminal predecessor it supersedes, so a
+ * recovery reader can prove which generation is current without treating
+ * stale predecessor evidence (e.g. an old NOT_DISPATCHED receipt) as if it
+ * belonged to the new one.
+ */
+export interface RunFlowRecoveryManifest {
+  readonly schemaVersion: typeof RUN_FLOW_RECOVERY_MANIFEST_SCHEMA_VERSION;
+  readonly flowId: string;
+  readonly generation: number;
+  readonly attemptId: string;
+  readonly predecessorGeneration: number;
+  readonly predecessorAttemptId: string;
+  readonly predecessorState: StartAttemptTerminalState;
+  readonly predecessorSettlement: StartAttemptSettlement;
+  readonly recordedAt: string;
 }
 
 // ═══ Events (versioned) ══════════════════════════════════════════════════

@@ -430,6 +430,28 @@ export function reconcileDockerRuntimeBudgetUsage(
   identity?: { provider: ProviderName; model: ModelType },
 ): boolean {
   if (!usage?.terminal || usage.decision.state !== 'within-budget') return false;
+  return projectDockerRuntimeBudgetUsage(result, usage, identity);
+}
+
+/**
+ * Preserve terminal host counters when an attempt exited during graceful
+ * landing but could not mint an immutable landing checkpoint. This is usage
+ * truth only; the recovery-containment projection below owns the NO_GO verdict.
+ */
+export function reconcileDockerLandingRequestedRuntimeBudgetUsage(
+  result: TaskResult,
+  usage: RuntimeBudgetUsageEvidence | null,
+  identity?: { provider: ProviderName; model: ModelType },
+): boolean {
+  if (!usage?.terminal || usage.decision.state !== 'landing-requested') return false;
+  return projectDockerRuntimeBudgetUsage(result, usage, identity);
+}
+
+function projectDockerRuntimeBudgetUsage(
+  result: TaskResult,
+  usage: RuntimeBudgetUsageEvidence,
+  identity?: { provider: ProviderName; model: ModelType },
+): boolean {
   const counters = usage.decision.counters;
   const measurableTokens = counters.inputTokens
     + counters.outputTokens
@@ -1084,6 +1106,29 @@ function reconcileDockerRuntimeBudgetUsageFile(
     return false;
   }
   const changed = reconcileDockerRuntimeBudgetUsage(result, usage, {
+    provider: getProviderForModel(model),
+    model,
+  });
+  if (!changed) return false;
+  atomicWriteFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
+  return true;
+}
+
+function reconcileDockerLandingRequestedRuntimeBudgetUsageFile(
+  resultPath: string,
+  model: ModelType,
+  usage: RuntimeBudgetUsageEvidence | null,
+): boolean {
+  if (!usage?.terminal || usage.decision.state !== 'landing-requested' || !existsSync(resultPath)) {
+    return false;
+  }
+  let result: TaskResult;
+  try {
+    result = JSON.parse(readFileSync(resultPath, 'utf-8')) as TaskResult;
+  } catch {
+    return false;
+  }
+  const changed = reconcileDockerLandingRequestedRuntimeBudgetUsage(result, usage, {
     provider: getProviderForModel(model),
     model,
   });
@@ -6107,6 +6152,24 @@ export class DockerSpawnBackend implements SpawnBackend {
       const finalRuntimeBudgetUsage = readRuntimeBudgetUsage(projectDir, taskId);
       const finalRuntimeBudgetExhaustion = readRuntimeBudgetExhaustion(projectDir, taskId)
         ?? runtimeBudgetExhaustion;
+      if (
+        settlementRef
+        && finalRuntimeBudgetUsage?.terminal
+        && finalRuntimeBudgetUsage.decision.state === 'landing-requested'
+        && !effectiveRecoveryContainment
+        && !readExecutionLandingCheckpointByRef({
+          schemaVersion: 1,
+          projectId: settlementRef.projectRootSha256,
+          taskId,
+          attemptId: settlementRef.attemptId,
+        })
+      ) {
+        effectiveRecoveryContainment = {
+          attemptId: settlementRef.attemptId,
+          reason: 'landing-checkpoint-unavailable',
+          evidence: 'Terminal runtime usage remained landing-requested without an immutable landing checkpoint.',
+        };
+      }
       try {
         let budgetReconciled = false;
         if (finalRuntimeBudgetExhaustion) {
@@ -6137,13 +6200,22 @@ export class DockerSpawnBackend implements SpawnBackend {
             model,
             finalRuntimeBudgetUsage,
           );
+        } else if (
+          finalRuntimeBudgetUsage?.terminal
+          && finalRuntimeBudgetUsage.decision.state === 'landing-requested'
+        ) {
+          budgetReconciled = reconcileDockerLandingRequestedRuntimeBudgetUsageFile(
+            resultPath,
+            model,
+            finalRuntimeBudgetUsage,
+          );
         }
 
         if ((budgetMonitor || finalRuntimeBudgetUsage) && !budgetReconciled) {
           debugLog('docker-backend:budget-final-reconcile-held', `taskId=${taskId} durable budget evidence could not be projected`);
           return;
         }
-        if (finalRuntimeBudgetExhaustion || (
+        if (finalRuntimeBudgetExhaustion || effectiveRecoveryContainment || (
           finalRuntimeBudgetUsage
           && (!finalRuntimeBudgetUsage.terminal || finalRuntimeBudgetUsage.decision.state === 'unmeasurable')
         )) {

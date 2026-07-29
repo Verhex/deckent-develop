@@ -3324,6 +3324,14 @@ const MESSAGES: MessageMap = {
     en: '\nHOLD: host settlement is pending or invalid for {tasks}; no task was reset or spawned.',
     tr: '\nHOLD: {tasks} için host settlement bekliyor veya geçersiz; hiçbir görev sıfırlanmadı ya da başlatılmadı.',
   },
+  'resume.settlement_reconciling': {
+    en: '\nReconciling host settlement before checkpoint restore: {tasks}.',
+    tr: '\nCheckpoint restore öncesinde host settlement uzlaştırılıyor: {tasks}.',
+  },
+  'resume.settlement_state_required': {
+    en: 'Resume HOLD: settlement-first recovery for {sprintId} requires its matching durable run state.',
+    tr: 'Resume HOLD: {sprintId} için settlement-first recovery eşleşen kalıcı run durumunu gerektirir.',
+  },
   'resume.dry_run': { en: '\n[dry-run] Would resume {count} task(s): {taskIds}. No workers spawned.', tr: '\n[dry-run] {count} görev sürdürülecek: {taskIds}. Worker başlatılmadı.' },
   'resume.none': { en: '(none)', tr: '(yok)' },
   'resume.nothing': { en: '\nAll tasks already completed or are not proven safe to resume.', tr: '\nTüm görevler tamamlanmış veya sürdürmenin güvenli olduğu kanıtlanmamış.' },

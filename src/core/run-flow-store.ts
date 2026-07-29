@@ -30,10 +30,12 @@ import { RUNTIME_DIR } from './constants.js';
 import type { ExecutionPlanDigestContext } from './execution-plan-digest.js';
 import {
   isTerminalStartAttemptState,
+  RUN_FLOW_RECOVERY_MANIFEST_SCHEMA_VERSION,
   type RunFlowEvent,
   type RunHandle as ContractRunHandle,
   type RunFlowPlanLineageRecord,
   type RunFlowProjectionAdoptionRecord,
+  type RunFlowRecoveryManifest,
   type RunProposal,
   type StartAttemptLineage,
   type StartAttemptOwner,
@@ -45,7 +47,7 @@ import {
 import type { Sprint } from './types.js';
 import type { ActorContext } from './work-model.js';
 
-export const RUN_FLOW_STORE_SCHEMA_VERSION = 2;
+export const RUN_FLOW_STORE_SCHEMA_VERSION = 3;
 const SQLITE_BUSY_TIMEOUT_MS = 60_000;
 const SQLITE_JOURNAL_MODE_TRANSITION_ATTEMPTS = 12;
 const SQLITE_JOURNAL_MODE_BACKOFF_BASE_MS = 5;
@@ -79,7 +81,9 @@ export type RunFlowStoreErrorCode =
   | 'START_ATTEMPT_NOT_FOUND'
   | 'START_ATTEMPT_CAS_MISMATCH'
   | 'START_ATTEMPT_ID_CONFLICT'
-  | 'START_ATTEMPT_STATE_CONFLICT';
+  | 'START_ATTEMPT_STATE_CONFLICT'
+  | 'START_ATTEMPT_RECOVERY_MANIFEST_MISSING'
+  | 'START_ATTEMPT_RECOVERY_MANIFEST_CONFLICT';
 
 export class RunFlowStoreError extends Error {
   constructor(
@@ -451,6 +455,30 @@ function initialiseSchema(db: Database.Database): void {
         ON run_flow_start_attempt_journal(attempt_id, sequence DESC);
       CREATE UNIQUE INDEX IF NOT EXISTS run_flow_start_attempt_idempotency_uq
         ON run_flow_start_attempt_identities(tenant_id, idempotency_key);
+      CREATE UNIQUE INDEX IF NOT EXISTS run_flow_start_attempt_identity_binding_uq
+        ON run_flow_start_attempt_identities(flow_id, generation, attempt_id);
+
+      CREATE TABLE IF NOT EXISTS run_flow_recovery_manifests (
+        flow_id TEXT NOT NULL,
+        generation INTEGER NOT NULL CHECK (generation > 1),
+        attempt_id TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        payload_hash TEXT NOT NULL,
+        recorded_at TEXT NOT NULL,
+        PRIMARY KEY (flow_id, generation),
+        UNIQUE (attempt_id),
+        FOREIGN KEY (flow_id, generation, attempt_id)
+          REFERENCES run_flow_start_attempt_identities(flow_id, generation, attempt_id)
+      ) WITHOUT ROWID;
+
+      CREATE TRIGGER IF NOT EXISTS run_flow_recovery_manifests_no_update
+        BEFORE UPDATE ON run_flow_recovery_manifests BEGIN
+          SELECT RAISE(ABORT, 'recovery manifests are immutable');
+        END;
+      CREATE TRIGGER IF NOT EXISTS run_flow_recovery_manifests_no_delete
+        BEFORE DELETE ON run_flow_recovery_manifests BEGIN
+          SELECT RAISE(ABORT, 'recovery manifests are immutable');
+        END;
     `);
 
     if (version < RUN_FLOW_STORE_SCHEMA_VERSION) {
@@ -948,6 +976,13 @@ interface StartAttemptPayloadRow {
   readonly payload_hash: string;
 }
 
+interface RecoveryManifestRow extends StartAttemptPayloadRow {
+  readonly flow_id: string;
+  readonly generation: number;
+  readonly attempt_id: string;
+  readonly recorded_at: string;
+}
+
 function assertNonEmptyBounded(value: string, label: string, maxLength = 4_096): void {
   if (value.trim().length === 0 || value.length > maxLength) {
     throw new RunFlowStoreError(
@@ -1065,6 +1100,21 @@ function sameProcessIdentity(
     && left.evidence === right.evidence;
 }
 
+function startAttemptByGenerationInDb(
+  db: Database.Database,
+  flowId: string,
+  generation: number,
+): StartAttemptRecord | undefined {
+  const row = db.prepare(`
+    SELECT payload_json, payload_hash
+    FROM run_flow_start_attempt_journal
+    WHERE flow_id = ? AND generation = ?
+    ORDER BY sequence DESC
+    LIMIT 1
+  `).get(flowId, generation) as StartAttemptPayloadRow | undefined;
+  return row ? parsePayload<StartAttemptRecord>(row, 'start-attempt generation journal') : undefined;
+}
+
 function latestStartAttemptInDb(db: Database.Database, flowId: string): StartAttemptRecord | undefined {
   const row = db.prepare(`
     SELECT payload_json, payload_hash
@@ -1108,6 +1158,101 @@ function startAttemptByIdempotencyInDb(
   return row ? parsePayload<StartAttemptRecord>(row, 'start-attempt idempotency journal') : undefined;
 }
 
+function recoveryManifestForGenerationInDb(
+  db: Database.Database,
+  flowId: string,
+  generation: number,
+): RunFlowRecoveryManifest | undefined {
+  const row = db.prepare(`
+    SELECT flow_id, generation, attempt_id, payload_json, payload_hash, recorded_at
+    FROM run_flow_recovery_manifests
+    WHERE flow_id = ? AND generation = ?
+  `).get(flowId, generation) as RecoveryManifestRow | undefined;
+  if (!row) return undefined;
+
+  const manifest = parsePayload<RunFlowRecoveryManifest>(row, 'recovery manifest');
+  const settlement = manifest.predecessorSettlement;
+  if (
+    manifest.schemaVersion !== RUN_FLOW_RECOVERY_MANIFEST_SCHEMA_VERSION
+    || manifest.flowId !== row.flow_id
+    || manifest.generation !== row.generation
+    || manifest.attemptId !== row.attempt_id
+    || manifest.recordedAt !== row.recorded_at
+    || !Number.isSafeInteger(manifest.generation)
+    || manifest.generation <= 1
+    || !Number.isSafeInteger(manifest.predecessorGeneration)
+    || manifest.predecessorGeneration !== manifest.generation - 1
+    || typeof manifest.predecessorAttemptId !== 'string'
+    || manifest.predecessorAttemptId.trim().length === 0
+    || !START_ATTEMPT_STATES.has(manifest.predecessorState)
+    || !isTerminalStartAttemptState(manifest.predecessorState)
+    || typeof settlement !== 'object'
+    || settlement === null
+    || settlement.state !== manifest.predecessorState
+    || typeof settlement.code !== 'string'
+    || settlement.code.trim().length === 0
+    || (settlement.detail !== undefined && typeof settlement.detail !== 'string')
+    || typeof settlement.settledAt !== 'string'
+    || !Number.isFinite(Date.parse(settlement.settledAt))
+    || typeof manifest.recordedAt !== 'string'
+    || !Number.isFinite(Date.parse(manifest.recordedAt))
+  ) {
+    throw new RunFlowStoreError(
+      'CORRUPT_RECORD',
+      `run-flow-store: recovery manifest for flow '${flowId}' generation ${generation} is structurally invalid`,
+      'not-committed',
+    );
+  }
+
+  const currentIdentity = db.prepare(`
+    SELECT attempt_id
+    FROM run_flow_start_attempt_identities
+    WHERE flow_id = ? AND generation = ?
+  `).get(flowId, generation) as { attempt_id: string } | undefined;
+  const predecessor = startAttemptByGenerationInDb(
+    db,
+    manifest.flowId,
+    manifest.predecessorGeneration,
+  );
+  if (
+    currentIdentity?.attempt_id !== manifest.attemptId
+    || !predecessor
+    || predecessor.attemptId !== manifest.predecessorAttemptId
+    || predecessor.state !== manifest.predecessorState
+    || !predecessor.settlement
+    || hashPayload(predecessor.settlement) !== hashPayload(manifest.predecessorSettlement)
+  ) {
+    throw new RunFlowStoreError(
+      'START_ATTEMPT_RECOVERY_MANIFEST_CONFLICT',
+      `run-flow-store: recovery manifest binding conflicts with canonical attempt authority for flow '${flowId}' generation ${generation}`,
+      'not-committed',
+    );
+  }
+  return manifest;
+}
+
+function requireRecoveryManifestForAttemptInDb(
+  db: Database.Database,
+  attempt: StartAttemptRecord,
+): RunFlowRecoveryManifest {
+  const manifest = recoveryManifestForGenerationInDb(db, attempt.flowId, attempt.generation);
+  if (!manifest) {
+    throw new RunFlowStoreError(
+      'START_ATTEMPT_RECOVERY_MANIFEST_MISSING',
+      `run-flow-store: generation ${attempt.generation} for flow '${attempt.flowId}' has no durable recovery manifest`,
+      'not-committed',
+    );
+  }
+  if (manifest.attemptId !== attempt.attemptId) {
+    throw new RunFlowStoreError(
+      'START_ATTEMPT_RECOVERY_MANIFEST_CONFLICT',
+      `run-flow-store: recovery manifest does not bind attempt '${attempt.attemptId}'`,
+      'not-committed',
+    );
+  }
+  return manifest;
+}
+
 function assertAttemptMatches(actual: StartAttemptRecord | undefined, expected: StartAttemptCas): StartAttemptRecord {
   if (!actual) {
     throw new RunFlowStoreError(
@@ -1145,6 +1290,9 @@ function assertLatestAttemptGeneration(
       `run-flow-store: generation ${expected.generation} is no longer current for flow '${expected.flowId}'`,
       'not-committed',
     );
+  }
+  if (byId.generation > 1) {
+    requireRecoveryManifestForAttemptInDb(db, byId);
   }
   return byId;
 }
@@ -1326,6 +1474,9 @@ export function prepareStartAttempt(
               'not-committed',
             );
           }
+          if (idempotencyReplay.generation > 1) {
+            requireRecoveryManifestForAttemptInDb(db, idempotencyReplay);
+          }
           return { applied: false, attempt: idempotencyReplay };
         }
 
@@ -1343,11 +1494,15 @@ export function prepareStartAttempt(
               'not-committed',
             );
           }
+          if (replay.generation > 1) {
+            requireRecoveryManifestForAttemptInDb(db, replay);
+          }
           return { applied: false, attempt: replay };
         }
 
         const previous = latestStartAttemptInDb(db, input.flowId);
         let generation = 1;
+        let recoveryManifest: RunFlowRecoveryManifest | undefined;
         if (!previous) {
           if (input.expectedPrevious !== undefined) {
             throw new RunFlowStoreError(
@@ -1374,7 +1529,32 @@ export function prepareStartAttempt(
               'not-committed',
             );
           }
+          if (!previous.settlement) {
+            throw new RunFlowStoreError(
+              'START_ATTEMPT_RECOVERY_MANIFEST_CONFLICT',
+              `run-flow-store: terminal predecessor '${previous.attemptId}' has no canonical settlement`,
+              'not-committed',
+            );
+          }
+          if (Date.parse(input.preparedAt) < Date.parse(previous.updatedAt)) {
+            throw new RunFlowStoreError(
+              'START_ATTEMPT_RECOVERY_MANIFEST_CONFLICT',
+              `run-flow-store: recovery generation timestamp precedes terminal predecessor '${previous.attemptId}'`,
+              'not-committed',
+            );
+          }
           generation = previous.generation + 1;
+          recoveryManifest = {
+            schemaVersion: RUN_FLOW_RECOVERY_MANIFEST_SCHEMA_VERSION,
+            flowId: input.flowId,
+            generation,
+            attemptId: input.attemptId,
+            predecessorGeneration: previous.generation,
+            predecessorAttemptId: previous.attemptId,
+            predecessorState: previous.state,
+            predecessorSettlement: { ...previous.settlement },
+            recordedAt: input.preparedAt,
+          };
         }
 
         db.prepare(`
@@ -1394,6 +1574,21 @@ export function prepareStartAttempt(
           startAttemptLineageHash(input.lineage),
           input.preparedAt,
         );
+        if (recoveryManifest) {
+          const payloadJson = JSON.stringify(recoveryManifest);
+          db.prepare(`
+            INSERT INTO run_flow_recovery_manifests(
+              flow_id, generation, attempt_id, payload_json, payload_hash, recorded_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+          `).run(
+            recoveryManifest.flowId,
+            recoveryManifest.generation,
+            recoveryManifest.attemptId,
+            payloadJson,
+            hashSerializedPayload(payloadJson),
+            recoveryManifest.recordedAt,
+          );
+        }
         const attempt: StartAttemptRecord = {
           flowId: input.flowId,
           revision: input.revision,
@@ -1437,6 +1632,28 @@ export function loadLatestStartAttempt(root: string, flowId: string): StartAttem
 export function loadStartAttempt(root: string, attemptId: string): StartAttemptRecord | undefined {
   if (!hasStoreEvidence(root)) return undefined;
   return withStore(root, (db) => startAttemptByIdInDb(db, attemptId));
+}
+
+/**
+ * Read and verify the immutable recovery fence for one exact generation.
+ * Generation one intentionally has no manifest. A present manifest is checked
+ * against both its current identity and the canonical terminal predecessor.
+ */
+export function loadRunFlowRecoveryManifest(
+  root: string,
+  flowId: string,
+  generation: number,
+): RunFlowRecoveryManifest | undefined {
+  assertNonEmptyBounded(flowId, 'recovery-manifest flowId');
+  if (!Number.isSafeInteger(generation) || generation <= 0) {
+    throw new RunFlowStoreError(
+      'CANONICAL_WRITE_FAILED',
+      'run-flow-store: recovery-manifest generation must be a positive safe integer',
+      'not-committed',
+    );
+  }
+  if (!hasStoreEvidence(root)) return undefined;
+  return withStore(root, (db) => recoveryManifestForGenerationInDb(db, flowId, generation));
 }
 
 /** Bounded, deterministic latest-attempt scan for recovery/sweep callers. */

@@ -48,6 +48,7 @@ import {
 } from './task-result-authority.js';
 import { readLatestTaskResultSettlementRef } from '../core/task-result-settlement.js';
 import { createExecutionAuthorityError } from '../core/errors.js';
+import { applyTerminalTaskOutcome } from '../core/task-terminal-outcome.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -1399,6 +1400,37 @@ export function restoreSprintFromCheckpoint(
       catch (e) { debugLog('restoreSprintFromCheckpoint:unlinkPaused', e); }
     }
     tasks.push(t);
+  }
+
+  // Reconcile every task — not only checkpoint.activeWorkers — against the
+  // authoritative terminal result after backend settlement recovery. A crash
+  // can leave checkpoint buckets stale while a host-owned settlement is already
+  // closed; syncing before cascade prevents both duplicate spawn and stranded
+  // descendants. Pending/corrupt settlement remains a typed HOLD.
+  for (const task of tasks) {
+    const authority = requireRestorableTaskResultAuthority(
+      projectRoot,
+      task.id,
+      'active-worker',
+    );
+    if (authority.state !== 'terminal' || !authority.result) continue;
+    // Legacy raw results retain their existing restore/cascade semantics. This
+    // eager projection is specifically for a host-owned settlement that closed
+    // after the checkpoint snapshot became stale.
+    if (!readLatestTaskResultSettlementRef(projectRoot, task.id)) continue;
+    if (!applyTerminalTaskOutcome(task, authority.result)) continue;
+    try {
+      writeFileSync(
+        join(projectRoot, TASKS_DIR, `task-${task.id}.json`),
+        JSON.stringify(task, null, 2),
+        'utf-8',
+      );
+    } catch (e) {
+      debugLog('restoreSprintFromCheckpoint:terminalOutcomePersist', e);
+      throw createExecutionAuthorityError(
+        `Checkpoint restore HOLD for task ${task.id}: terminal outcome could not be persisted`,
+      );
+    }
   }
 
   // DUAL-READER honest-warn: only meaningful for the legacy path — a v2

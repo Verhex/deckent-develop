@@ -15,7 +15,12 @@ import {
   listFlowIds,
   loadApprovedSnapshot,
   loadPlannedSprint,
+  loadRunFlowRecoveryManifest,
+  prepareStartAttempt,
+  recordStartAttemptProcessSpawned,
+  RunFlowStoreError,
   saveApprovedSnapshot,
+  settleStartAttempt,
   type StoredApprovedSnapshot,
 } from '../../src/core/run-flow-store.js';
 import { SprintPhase, SprintStatus } from '../../src/core/sprint-types.js';
@@ -117,5 +122,120 @@ describe('run-flow-store — legacy migration and projection recovery', () => {
     expect(records).toEqual([first, second]);
     expect(existsSync(intentPath)).toBe(false);
     expect(loadApprovedSnapshot(root, 'recovery-flow')).toEqual(second);
+  });
+
+  it('upgrades v2 atomically and keeps generation recovery manifests immutable', () => {
+    mkdirSync(storeDir(), { recursive: true });
+    const dbPath = join(storeDir(), 'run-flow-authority.sqlite');
+    const legacy = new Database(dbPath);
+    legacy.pragma('user_version = 2');
+    legacy.close();
+
+    expect(loadApprovedSnapshot(root, 'never-written')).toBeUndefined();
+
+    const first = prepareStartAttempt(root, {
+      flowId: 'manifest-flow',
+      revision: 1,
+      planDigest: 'manifest-digest',
+      attemptId: 'manifest-attempt-1',
+      preparedAt: '2026-07-28T10:00:00.000Z',
+      lineage: {
+        tenantId: 'tenant-1',
+        projectId: 'project-1',
+        actor: { id: 'actor-1' },
+        origin: 'api',
+        correlationId: 'manifest-correlation-1',
+        idempotencyKey: 'manifest-idempotency-1',
+        parentPlanLineageHash: 'a'.repeat(64),
+        parentCorrelationId: 'manifest-plan-correlation',
+        authorizationAuthority: 'approved-actor:actor-1',
+      },
+      owner: {
+        process: { pid: 4101, startToken: 'start-4101', evidence: 'verified' },
+        ownerNonce: 'manifest-owner-1',
+        leaseUntil: '2026-07-28T10:01:00.000Z',
+      },
+    }).attempt;
+    settleStartAttempt(root, {
+      flowId: first.flowId,
+      revision: first.revision,
+      planDigest: first.planDigest,
+      generation: first.generation,
+      attemptId: first.attemptId,
+      ownerNonce: first.owner.ownerNonce,
+      settlement: {
+        state: 'BLOCKED',
+        code: 'OWNER_HOLD',
+        settledAt: '2026-07-28T10:00:30.000Z',
+      },
+      authority: { kind: 'owner-capability' },
+    });
+    const second = prepareStartAttempt(root, {
+      flowId: 'manifest-flow',
+      revision: 1,
+      planDigest: 'manifest-digest',
+      attemptId: 'manifest-attempt-2',
+      preparedAt: '2026-07-28T10:02:00.000Z',
+      lineage: {
+        ...first.lineage,
+        correlationId: 'manifest-correlation-2',
+        idempotencyKey: 'manifest-idempotency-2',
+      },
+      owner: {
+        process: { pid: 4102, startToken: 'start-4102', evidence: 'verified' },
+        ownerNonce: 'manifest-owner-2',
+        leaseUntil: '2026-07-28T10:03:00.000Z',
+      },
+      expectedPrevious: {
+        generation: first.generation,
+        attemptId: first.attemptId,
+      },
+    }).attempt;
+
+    expect(loadRunFlowRecoveryManifest(root, second.flowId, second.generation))
+      .toMatchObject({
+        attemptId: second.attemptId,
+        predecessorAttemptId: first.attemptId,
+        predecessorSettlement: { state: 'BLOCKED', code: 'OWNER_HOLD' },
+      });
+
+    const upgraded = new Database(dbPath);
+    try {
+      expect(upgraded.pragma('user_version', { simple: true })).toBe(3);
+      expect(() => upgraded.prepare(`
+        UPDATE run_flow_recovery_manifests
+        SET recorded_at = '2030-01-01T00:00:00.000Z'
+        WHERE flow_id = 'manifest-flow' AND generation = 2
+      `).run()).toThrow(/immutable/);
+      expect(() => upgraded.prepare(`
+        DELETE FROM run_flow_recovery_manifests
+        WHERE flow_id = 'manifest-flow' AND generation = 2
+      `).run()).toThrow(/immutable/);
+    } finally {
+      upgraded.close();
+    }
+
+    const legacyMissingManifest = new Database(dbPath);
+    try {
+      legacyMissingManifest.exec('DROP TRIGGER run_flow_recovery_manifests_no_delete');
+      legacyMissingManifest.prepare(`
+        DELETE FROM run_flow_recovery_manifests
+        WHERE flow_id = 'manifest-flow' AND generation = 2
+      `).run();
+    } finally {
+      legacyMissingManifest.close();
+    }
+    expect(() => recordStartAttemptProcessSpawned(root, {
+      flowId: second.flowId,
+      revision: second.revision,
+      planDigest: second.planDigest,
+      generation: second.generation,
+      attemptId: second.attemptId,
+      ownerNonce: second.owner.ownerNonce,
+      process: { pid: 4202, startToken: 'start-4202', evidence: 'verified' },
+      spawnedAt: '2026-07-28T10:02:30.000Z',
+    })).toThrowError(expect.objectContaining<Partial<RunFlowStoreError>>({
+      code: 'START_ATTEMPT_RECOVERY_MANIFEST_MISSING',
+    }));
   });
 });
