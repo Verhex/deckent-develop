@@ -29,7 +29,7 @@ const ROLES = ['brain', 'auditor', 'worker-default'] as const;
 export type RuleRole = typeof ROLES[number];
 
 // Sprint 168 C0a-2: cursor adapter added for 4-rules-dir parity
-// (`.claude/`, `.codex/`, `.gemini/`, `.cursor/`). ADR-046 references
+// (`.claude/`, `.codex/`, `.gemini/`, `.cursor/`). ADR-G-035 references
 // `.cursor/rules/` as a required target — previously the generator skipped
 // it, leaving cursor rules permanently stale.
 const PROVIDERS = ['claude', 'codex', 'gemini', 'cursor'] as const;
@@ -257,14 +257,25 @@ export function loadTemplate(role: RuleRole, templateDir?: string): string {
  *
  * Anti-regression preserved: every accepted ADR still appears as `**ADR-NNN**`
  * (the Sprint-167 "44/50 ADRs, 11 missing" data-loss guard, pinned by
- * `rule-regen-db-query.test.ts` + the ADR-046 step-ordering invariant). Only
+ * `rule-regen-db-query.test.ts` + the ADR-G-035 step-ordering invariant). Only
  * the verbose title/summary is dropped — look any id up via `deckent recall`.
  */
 export function formatAdrSection(adrs: MemoryEntryV2[]): string {
   if (adrs.length === 0) return '';
 
-  const accepted = adrs.filter(a => a.status === 'accepted');
+  const accepted = adrs
+    .filter(a => a.status === 'accepted')
+    .sort((a, b) =>
+      a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }),
+    );
   if (accepted.length === 0) return '';
+
+  const invalid = accepted
+    .map(a => a.id)
+    .filter(id => !/^adr-(?:(?:g|d|ug|up)-)?\d{3,}$/iu.test(id));
+  if (invalid.length > 0) {
+    throw new Error(`E_NON_CANONICAL_ADR_ID: ${invalid.join(', ')}`);
+  }
 
   const ids = accepted.map(a => `**${a.id.toUpperCase()}**`).join(', ');
 
@@ -343,7 +354,7 @@ export interface RenderRulesFromStoreOptions {
 /**
  * Pure-function rendering of the three rule role templates from a
  * MemoryStore. Reads `store.getByType('adr')` at invocation time — this is
- * the freshness guarantee referenced by ADR-046 Step Ordering Contract.
+ * the freshness guarantee referenced by ADR-G-035 Step Ordering Contract.
  *
  * Step 3 (adrInsert) MUST run before Step 4 (ruleRegen) so that any ADR
  * inserted via `store.insert({ type: 'adr', ... })` is visible to this

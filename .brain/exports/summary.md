@@ -52,9 +52,23 @@
 | adr-g-036 | Zero-Hardcode Model & Flow Values (Parametric-Only) | accepted |
 | ADR-G-037 | Execution Budget Landing, Continuation & Metering Authority | accepted |
 | ADR-G-038 | Goal-v2 Normalized Dependency Authority & Bounded Reconciliation | accepted |
-| user-1784778390241 | Provider Authority Key Custody, Rotation & Composition | accepted |
+| adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-473 Learnings** (sprint-473): ## Sprint sprint-473 Learnings
+- undefined: NO_GO
+- LOCK-BIND — bind project root and lock-directory generation: GO_W...
+- **Sprint sprint-471 Learnings** (sprint-471): ## Sprint sprint-471 Learnings
+- S470-RECOVERY — restore four lifecycle invariants only: NO_GO — Runtime budget circu...
+- **Sprint sprint-470 Learnings** (sprint-470): ## Sprint sprint-470 Learnings
+- PROMPT-AUDIT-ENTRY — audit the actual initial dispatch: NO_GO — Host runtime-budget ...
+- **Sprint sprint-465 Learnings** (sprint-465): ## Sprint sprint-465 Learnings
+- TERMINAL-CANARY-AUDIT — reconcile the complete chain: GO_WITH_TECH_DEBT — TERMINAL-C...
+- **Sprint sprint-464 Learnings** (sprint-464): ## Sprint sprint-464 Learnings
+- DEPENDENCY-RELEASE-WITNESS — prove the child is born only after Task 1: NO_GO — Casc...
+- **Sprint sprint-463 Learnings** (sprint-463): ## Sprint sprint-463 Learnings
+- undefined: NO_GO
+- DEPENDENCY-RELEASE-WITNESS — prove the child is born only after T...
 - **Sprint sprint-460 Learnings** (sprint-460): ## Sprint sprint-460 Learnings
 
 ## Gains
@@ -64,20 +78,6 @@
 - Docker auth and provider-image fixture budget parity: NO_GO — Runtime budget circuit...
 - **Sprint sprint-455 Learnings** (sprint-455): ## Sprint sprint-455 Learnings
 - Crash-safe resume and recovery command truth: GO_WITH_TECH_DEBT — Made the public re...
-- **Sprint sprint-454 Learnings** (sprint-454): ## Sprint sprint-454 Learnings
-- Parametric agent model front doors: GO_WITH_TECH_DEBT — Worker timeout/killed (exitC...
-- **Sprint sprint-453 Learnings** (sprint-453): ## Sprint sprint-453 Learnings
-
-## Gains
-- 453-001 — Canonical CLI and MCP one-shot execution boundary — Canonical CL...
-- **Sprint sprint-452 Learnings** (sprint-452): ## Sprint sprint-452 Learnings
-- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: ROOT-CAUSE FINDING (read first...
-- **Sprint sprint-451 Learnings** (sprint-451): ## Sprint sprint-451 Learnings
-- Wire builtins drift-check into the validate-publish gate: GO_WITH_TECH_DEBT — Found ...
-- **Sprint sprint-450 Learnings** (sprint-450): ## Sprint sprint-450 Learnings
-- Integration verification with vitest sweep and real-binary status smoke: GO_WITH_TEC...
-- **Sprint sprint-449 Learnings** (sprint-449): ## Sprint sprint-449 Learnings
-- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: REAL (non-provisional) v3 capa...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -153,5 +153,6 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 1626 | Generated: 2026-07-25_
+_Total entries: 1655 | Generated: 2026-07-29_

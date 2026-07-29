@@ -89,6 +89,12 @@ interface FtsResultRow {
   lang: string;
   decay_exempt: number;
   metadata: string;
+  tenant_id: string | null;
+  adr_class: string | null;
+  scope: string | null;
+  immutable: number | null;
+  source_authority: string | null;
+  enforcement_level: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -117,6 +123,12 @@ interface StructuredResultRow {
   lang: string;
   decay_exempt: number;
   metadata: string;
+  tenant_id: string | null;
+  adr_class: string | null;
+  scope: string | null;
+  immutable: number | null;
+  source_authority: string | null;
+  enforcement_level: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -142,6 +154,12 @@ function rowToEntry(row: StructuredResultRow | FtsResultRow): MemoryEntryV2 {
     lang: row.lang,
     decay_exempt: row.decay_exempt === 1,
     metadata: row.metadata,
+    tenant_id: row.tenant_id,
+    adr_class: row.adr_class,
+    scope: row.scope,
+    immutable: row.immutable,
+    source_authority: row.source_authority,
+    enforcement_level: row.enforcement_level,
     created_at: row.created_at,
     updated_at: row.updated_at,
     deleted_at: row.deleted_at,
@@ -361,6 +379,22 @@ function buildFilterClauses(
     clauses.push(`${alias}.status IN (${placeholders.join(', ')})`);
     for (let i = 0; i < params.status.length; i++) {
       binds[`status_${i}`] = params.status[i];
+    }
+  }
+
+  if (params.adr_class && params.adr_class.length > 0) {
+    const placeholders = params.adr_class.map((_, i) => `@adr_class_${i}`);
+    clauses.push(`${alias}.adr_class IN (${placeholders.join(', ')})`);
+    for (let i = 0; i < params.adr_class.length; i++) {
+      binds[`adr_class_${i}`] = params.adr_class[i];
+    }
+  }
+
+  if (params.adr_scope && params.adr_scope.length > 0) {
+    const placeholders = params.adr_scope.map((_, i) => `@adr_scope_${i}`);
+    clauses.push(`${alias}.scope IN (${placeholders.join(', ')})`);
+    for (let i = 0; i < params.adr_scope.length; i++) {
+      binds[`adr_scope_${i}`] = params.adr_scope[i];
     }
   }
 

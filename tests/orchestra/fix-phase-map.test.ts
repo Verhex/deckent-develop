@@ -153,7 +153,7 @@ import { runFixPhase } from '../../src/orchestra/sprint-phases.js';
 import { existsSync, readdirSync } from 'node:fs';
 import { readJsonSafe } from '../../src/core/utils.js';
 import { evaluateWithRubric } from '../../src/orchestra/result-evaluator.js';
-import { waitForResults } from '../../src/orchestra/sprint-controller.js';
+import { spawnWorkers, waitForResults } from '../../src/orchestra/sprint-controller.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -220,6 +220,15 @@ function makeConfig(): ResolvedConfig {
     projectName: 'test',
     projectRoot: '/tmp/test-project',
     version: '0.4.0',
+    worker_provider: 'claude',
+    execution_budget: {
+      roles: {
+        worker: {
+          default: { maxCacheReadTokens: 5_000_000, maxTurns: 48 },
+        },
+      },
+      landing: { reserve_ratio: 0.25 },
+    },
   } as ResolvedConfig;
 }
 
@@ -237,6 +246,135 @@ function makeEvalResult(decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO'): Evalu
 describe('FIX Phase — evaluations Map mutation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('re-authorizes a dynamic Codex FIX task from owner policy before dispatch', async () => {
+    const originalTask = makeTask({ id: '129-budget-origin', status: TaskStatus.NO_GO });
+    const fixTask = makeFixTask('129-budget-origin', {
+      id: '129-budget-origin-fix',
+      model: 'gpt-5.6-sol',
+      forceModel: 'gpt-5.6-sol',
+      provider: 'codex',
+    });
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue(
+      [`task-${fixTask.id}.json`] as unknown as ReturnType<typeof readdirSync>,
+    );
+    vi.mocked(readJsonSafe).mockReturnValue(fixTask);
+    vi.mocked(waitForResults).mockResolvedValue([]);
+
+    const config = {
+      ...makeConfig(),
+      worker_provider: 'codex',
+      execution_budget: {
+        roles: {
+          worker: {
+            default: { maxCacheReadTokens: 5_000_000, maxTurns: 48 },
+          },
+        },
+        landing: { reserve_ratio: 0.25 },
+        final_only_usage: {
+          action: 'allow-wall-clock-containment',
+          roles: ['worker'],
+          max_wall_clock_seconds: 600,
+        },
+      },
+    } as ResolvedConfig;
+
+    await runFixPhase(
+      '/tmp/test-project',
+      makeSprint([originalTask]),
+      new Map([['129-budget-origin', TaskEvaluation.NO_GO]]),
+      [],
+      config,
+      undefined,
+      'v1',
+      undefined,
+    );
+
+    const dispatchedSprint = vi.mocked(spawnWorkers).mock.calls[0]?.[1];
+    expect(dispatchedSprint?.tasks[0]).toMatchObject({
+      id: fixTask.id,
+      budget: { maxCacheReadTokens: 5_000_000, maxTurns: 48 },
+      budgetPolicy: {
+        state: 'allow',
+        role: 'worker',
+        resolvedProvider: 'codex',
+        finalOnlyUsage: {
+          maxWallClockSeconds: 600,
+          profileRef: 'execution_budget.final_only_usage',
+        },
+      },
+    });
+  });
+
+  it('returns a typed FIX failure instead of swallowing missing budget authority', async () => {
+    const fixTask = makeFixTask('129-hold-origin', {
+      id: '129-hold-origin-fix',
+      model: 'gpt-5.6-sol',
+      provider: 'codex',
+    });
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue(
+      [`task-${fixTask.id}.json`] as unknown as ReturnType<typeof readdirSync>,
+    );
+    vi.mocked(readJsonSafe).mockReturnValue(fixTask);
+
+    const config = { ...makeConfig(), execution_budget: undefined } as ResolvedConfig;
+    const outcome = await runFixPhase(
+      '/tmp/test-project',
+      makeSprint([]),
+      new Map(),
+      [],
+      config,
+      undefined,
+      'v1',
+      undefined,
+    );
+
+    expect(outcome).toEqual({
+      failed: true,
+      code: 'DECKENT_E077',
+      message: expect.stringContaining(
+        `FIX_EXECUTION_BUDGET_HOLD:${fixTask.id}:budget-policy-missing`,
+      ),
+      taskId: fixTask.id,
+    });
+    expect(spawnWorkers).not.toHaveBeenCalled();
+  });
+
+  it('dispatches only pending fix tasks owned by the current sprint namespace', async () => {
+    const current = makeFixTask('129-current', {
+      id: '129-current-fix',
+      sprintId: 'sprint-129',
+    });
+    const foreign = makeFixTask('128-foreign', {
+      id: '128-foreign-fix',
+      sprintId: 'sprint-128',
+    });
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([
+      `task-${foreign.id}.json`,
+      `task-${current.id}.json`,
+    ] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(readJsonSafe).mockImplementation(path =>
+      String(path).includes(foreign.id) ? foreign : current,
+    );
+    vi.mocked(waitForResults).mockResolvedValue([]);
+
+    await runFixPhase(
+      '/tmp/test-project',
+      makeSprint([]),
+      new Map(),
+      [],
+      makeConfig(),
+      undefined,
+      'v1',
+      undefined,
+    );
+
+    const dispatchedSprint = vi.mocked(spawnWorkers).mock.calls[0]?.[1];
+    expect(dispatchedSprint?.tasks.map(task => task.id)).toEqual([current.id]);
   });
 
   it('fix task DONE → original task evaluation updated to DONE in Map', async () => {

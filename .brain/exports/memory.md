@@ -1,5 +1,70 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-473 Learnings
+- Sprint sprint-473 Learnings: ## Sprint sprint-473 Learnings
+- undefined: NO_GO
+- LOCK-BIND — bind project root and lock-directory generation: GO_WITH_TECH_DEBT — Implemented a Linux/WSL platform-adapter-backed root-generation binding in the pinned parent directory. The immutable bi
+- undefined: NO_GO
+- CLEAN-BIND — consume stable lock paths in clean maintenance: NO_GO
+- CLEAN-RECOVERY — terminal uncertainty and interrupted staging: NO_GO
+- CLEAN-PROOF — clean recovery and scale tests: NO_GO
+- ADMISSION-TYPE — compile admission against canonical lock: NO_GO
+- ADMISSION-EVIDENCE — bounded durable recovery chain: NO_GO
+- ADMISSION-CRASH — real child-process replay proof: NO_GO
+- ADMISSION-HEARTBEAT — shared scheduler and scale proof: NO_GO
+
+## Gains
+- 473-001-xfix — Cross-fix: LOCK-PARSE — restore the canonical lock module parse boundary — Code physically verified despite missing .result (Sprint 135 docker HB shutdown bug pattern).
+- 473-001 — LOCK-PARSE — restore the canonical lock module parse boundary — Investigated src/core/file-lock.ts (HEAD 67f0a1cd) for the described TS1434/TS1011 parse/incomple...
+- 473-002-fix — Fix: LOCK-BIND — bind project root and lock-directory generation — Code physically verified despite missing .result (Sprint 135 docker HB shutdown bug pattern).
+- 473-003 — LOCK-COMMIT — reconcile transaction completion and live handles — Code physically verified despite missing .result (Sprint 135 docker HB shutdown bug pattern).
+- 473-004 — LOCK-PROOF — cross-process lock and migration tests — Code physically verified despite missing .result (Sprint 135 docker HB shutdown bug pattern).
+- 473-008 — LOCK-CLEAN-GATE — integrated authority verdict — Code physically verified despite missing .result (Sprint 135 docker HB shutdown bug pattern).
+- 473-019 — DOCTOR-DOCKER — diagnose the Docker false-negative — DIAGNOSIS (read-only, no src mutation).
+- 473-020 — GOAL-LIFECYCLE — diagnose blocked-resume truth — Read-only lifecycle diagnosis.
+- …and 2 more delivered
+
+## Sprint sprint-471 Learnings
+- Sprint sprint-471 Learnings: ## Sprint sprint-471 Learnings
+- S470-RECOVERY — restore four lifecycle invariants only: NO_GO — Runtime budget circuit breaker stopped the worker: turn budget exceeded (19 > 12). Runtime budget circuit breaker invali
+
+## Sprint sprint-470 Learnings
+- Sprint sprint-470 Learnings: ## Sprint sprint-470 Learnings
+- PROMPT-AUDIT-ENTRY — audit the actual initial dispatch: NO_GO — Host runtime-budget evidence is not terminally measurable: state=unmeasurable, terminal=true, attemptId=722941bb-c74b-4c
+- LIFE-CONTRACT — establish the versioned lifecycle vocabulary: NO_GO — Host runtime-budget evidence is not terminally measurable: state=unmeasurable, terminal=true, attemptId=8a14814f-cc80-45
+- GENERATION-AUTHORITY — make recovery generation-safe: NO_GO — Host runtime-budget evidence is not terminally measurable: state=unmeasurable, terminal=true, attemptId=c6b698ec-0741-44
+- EVENT-AUTHORITY — make observability cross-process truthful: NO_GO — Host runtime-budget evidence is not terminally measurable: state=unmeasurable, terminal=true, attemptId=f60d222a-072e-43
+- SPAWN-AUTHORITY — unify initial, dependency and FIX worker birth: NO_GO — Cascade-skipped (lifecycle-robustness P0-A): dependency 470-003 ended NO_GO/MANUAL_REVIEW, so this dependent was never d
+- LIFECYCLE-WIRE — enforce CLEANUP and honest terminal transitions: NO_GO — Cascade-skipped (lifecycle-robustness P0-A): dependency 470-005 ended NO_GO/MANUAL_REVIEW, so this dependent was never d
+- PROJECTION-EXIT — reconcile results, projections and user surfaces: NO_GO — Cascade-skipped (lifecycle-robustness P0-A): dependency 470-003 ended NO_GO/MANUAL_REVIEW, so this dependent was never d
+- PROVIDER-FREE-INTEGRATION-PROOF — prove the complete lifecycle: NO_GO — Cascade-skipped (lifecycle-robustness P0-A): dependency 470-003 ended NO_GO/MANUAL_REVIEW, so this dependent was never d
+- TERMINAL-PROMPT-AUDIT — reconcile prompts, results and runtime truth: GO_WITH_TECH_DEBT — Cascade-skipped (lifecycle-robustness P0-A): dependency 470-008 ended NO_GO/MANUAL_REVIEW, so this dependent was never d
+
+## Sprint sprint-465 Learnings
+- Sprint sprint-465 Learnings: ## Sprint sprint-465 Learnings
+- TERMINAL-CANARY-AUDIT — reconcile the complete chain: GO_WITH_TECH_DEBT — TERMINAL-CANARY-AUDIT of sprint-465. Read-only: no project file created, modified or deleted. Only lifecycle artifacts (
+
+## Gains
+- 465-001 — LIVE-PROMPT-AUDIT — inspect the actual first dispatch — LIVE-PROMPT-AUDIT of the actual first dispatch.
+- 465-002 — DEPENDENCY-RELEASE-WITNESS — prove the child is born only after Task 1 — PREDECESSOR TERMINAL EVIDENCE: .tasks/task-465-001.result has taskId=465-001, selfAssessment=DONE...
+
+## Sprint sprint-464 Learnings
+- Sprint sprint-464 Learnings: ## Sprint sprint-464 Learnings
+- DEPENDENCY-RELEASE-WITNESS — prove the child is born only after Task 1: NO_GO — Cascade-skipped (SCHED6-EFF persist-before-commit executor): dependency 464-001 ended NO_GO/MANUAL_REVIEW, so this depen
+- TERMINAL-CANARY-AUDIT — reconcile the complete chain: NO_GO — Cascade-skipped (SCHED6-EFF persist-before-commit executor): dependency 464-002 ended NO_GO/MANUAL_REVIEW, so this depen
+
+## Gains
+- 464-001 — LIVE-PROMPT-AUDIT — inspect the actual first dispatch — METHODOLOGY: Located artifacts by exact runtime identity (task 464-001, attempt d2172c81-6a6e-421...
+
+## Sprint sprint-463 Learnings
+- Sprint sprint-463 Learnings: ## Sprint sprint-463 Learnings
+- undefined: NO_GO
+- DEPENDENCY-RELEASE-WITNESS — prove the child is born only after Task 1: NO_GO
+- TERMINAL-CANARY-AUDIT — reconcile the complete chain: NO_GO
+
+## Gains
+- 463-001 — LIVE-PROMPT-AUDIT — inspect the actual first dispatch — LIVE-PROMPT-AUDIT of the actual first dispatch.
+
 ## Sprint sprint-460 Learnings
 - Sprint sprint-460 Learnings: ## Sprint sprint-460 Learnings
 

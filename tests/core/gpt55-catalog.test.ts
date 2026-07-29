@@ -74,7 +74,7 @@ describe('model-registry: gpt-5.6 family (Alperen 2026-07-11, feed-verified)', (
     { id: 'gpt-5.6-luna', tier: 'economy', cost: { input: 1, output: 6 } },
   ] as const;
 
-  it('declares all three pinned API IDs outside the 14 core entries', () => {
+  it('declares all three pinned API IDs with official pricing evidence', () => {
     for (const { id, tier, cost } of FAMILY) {
       expect(BUILTIN_MODELS.some(m => m.id === id)).toBe(false);
       const def = CODEX_PARITY_MODELS.find(m => m.id === id);
@@ -85,6 +85,7 @@ describe('model-registry: gpt-5.6 family (Alperen 2026-07-11, feed-verified)', (
       expect(def!.contextWindow).toBe(1_050_000);
       expect(def!.maxOutputTokens).toBe(128_000);
       expect(def!.costPerMillion).toEqual(cost);
+      expect(def!.pricingEvidenceRef).toBe('https://platform.openai.com/docs/pricing');
       expect(def!.capabilities.reasoning).toBe(true);
     }
   });
@@ -124,7 +125,7 @@ describe('pricing-data-baseline.json: providers.openai.models gpt-5.6 family', (
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('ships feed-verified entries with per-model aliases', () => {
+  it('ships official Standard-pricing entries with per-model aliases', () => {
     const config = loadCostConfig(tmpDir, { forceReload: true });
     const cases: Array<[string, number, number, string, string[]]> = [
       ['gpt-5.6', 0.000005, 0.00003, 'premium', ['gpt-5.6', 'gpt56']],
@@ -139,6 +140,12 @@ describe('pricing-data-baseline.json: providers.openai.models gpt-5.6 family', (
       expect(pricing!.output_cost_per_token).toBe(outCost);
       expect(pricing!.deckent_tier).toBe(tier);
       expect(pricing!.deckent_aliases).toEqual(aliases);
+      if (id !== 'gpt-5.6') {
+        expect(pricing!._source).toBe('openai-official-pricing');
+        expect(pricing!._verified_at).toBe('2026-07-29');
+        expect(pricing!.cache_creation_input_token_cost)
+          .toBeCloseTo(inCost * 1.25, 12);
+      }
       // unit-safety pin (per-token, not per-MTok)
       expect(pricing!.input_cost_per_token).toBeLessThan(0.01);
     }

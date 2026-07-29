@@ -6,6 +6,7 @@ import {
   extractLiveUsageObservation,
   hasLiveUsageCeiling,
 } from '../../src/core/live-execution-budget.js';
+import { normalizeStreamEvent } from '../../src/core/log-event.js';
 
 function claudeBlock(id: string, usage: Record<string, number>, blockType = 'text') {
   return {
@@ -163,6 +164,56 @@ describe('LiveExecutionBudgetGuard', () => {
       },
     });
     expect(guard.snapshot().counters).toMatchObject({ turns: 3, totalTokens: 375, maxContextTokens: 325 });
+  });
+
+  it('measures and deterministically deduplicates an id-less Codex terminal replay', () => {
+    const guard = new LiveExecutionBudgetGuard({ maxTurns: 2, maxTokens: 1_000 });
+    const terminal = normalizeStreamEvent({
+      type: 'usage',
+      providerEventType: 'turn.completed',
+      codexEventType: 'turn.completed',
+      usage: {
+        input_tokens: 100,
+        output_tokens: 20,
+        cached_input_tokens: 30,
+      },
+    }, 'codex');
+
+    expect(guard.observe(terminal).state).toBe('within-budget');
+    const duplicate = guard.observe(terminal);
+
+    expect(duplicate.appliedDelta).toBeUndefined();
+    expect(guard.exportState()).toMatchObject({
+      measurableEvents: 1,
+      counters: {
+        turns: 1,
+        inputTokens: 100,
+        outputTokens: 20,
+        cacheReadTokens: 30,
+        totalTokens: 150,
+      },
+    });
+  });
+
+  it('measures Gemini final-only usageMetadata including cached content', () => {
+    const guard = new LiveExecutionBudgetGuard({ maxTurns: 2, maxTokens: 100 });
+    const terminal = normalizeStreamEvent({
+      response: 'done',
+      usageMetadata: {
+        promptTokenCount: 10,
+        candidatesTokenCount: 3,
+        cachedContentTokenCount: 5,
+      },
+    }, 'gemini');
+
+    expect(guard.observe(terminal).state).toBe('within-budget');
+    expect(guard.snapshot().counters).toMatchObject({
+      turns: 1,
+      inputTokens: 10,
+      outputTokens: 3,
+      cacheReadTokens: 5,
+      totalTokens: 18,
+    });
   });
 
   it('tracks per-call context separately from cumulative usage', () => {

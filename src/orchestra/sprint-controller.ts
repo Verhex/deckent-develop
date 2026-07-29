@@ -39,7 +39,7 @@ import { CascadeDetector } from '../core/cascade-detector.js';
 import { DeckentError } from '../core/errors.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
-import { debugLog, updateLastSprintId } from '../core/utils.js';
+import { debugLog, readJsonSafe, updateLastSprintId } from '../core/utils.js';
 
 // ─── Core — adaptive timeout defaults (Sprint 192 Task 192-011) ────
 import {
@@ -1187,6 +1187,14 @@ export function applyCascadeCircuitBreaker(
   for (const task of sprint.tasks) {
     const ev = evaluations.get(task.id);
     if (ev === undefined) continue;
+    // A cascade-skipped task was never dispatched and consumed no provider
+    // attempt. The persisted synthetic result is the cross-process authority;
+    // excluding it prevents dependency fan-out from pausing before the real
+    // root failure can enter FIX.
+    const result = readJsonSafe<TaskResult>(
+      join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
+    );
+    if (result?.cascadeSkipped === true) continue;
     const outcome = ev === TaskEvaluation.DONE
       ? 'DONE'
       : ev === TaskEvaluation.GO_WITH_TECH_DEBT
@@ -2166,7 +2174,16 @@ export async function runSprint(
   emitPhaseChange(SprintPhase.EVALUATE, SprintPhase.FIX, sprint.id);
 
   // Phase 5: FIX
-  await runFixPhase(projectRoot, sprint, evaluations, results, config, opts, routingVersionForFix, spawnBackend);
+  const fixPhaseFailure = await runFixPhase(
+    projectRoot,
+    sprint,
+    evaluations,
+    results,
+    config,
+    opts,
+    routingVersionForFix,
+    spawnBackend,
+  );
 
   // Phase-transition checkpoint: FIX complete
   try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:fix', e); }
@@ -2182,7 +2199,13 @@ export async function runSprint(
   // .timeout / .log forensic artefacts survive for triage (cleanup would erase
   // the very evidence the operator needs).
   {
-    const fixSpawnFailure = detectFixSpawnFailure(projectRoot);
+    const fixSpawnFailure = fixPhaseFailure
+      ? {
+          taskId: fixPhaseFailure.taskId ?? 'fix-phase',
+          code: fixPhaseFailure.code,
+          message: fixPhaseFailure.message,
+        }
+      : detectFixSpawnFailure(projectRoot);
     if (fixSpawnFailure) {
       debugLog(
         'runSprint:fix-spawn-failure',

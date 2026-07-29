@@ -9,6 +9,32 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint473] - 2026-07-29
+
+### Added
+
+- LOCK-PARSE — restore the canonical lock module parse boundary
+- LOCK-COMMIT — reconcile transaction completion and live handles
+- LOCK-PROOF — cross-process lock and migration tests
+- LOCK-CLEAN-GATE — integrated authority verdict
+- DOCTOR-DOCKER — diagnose the Docker false-negative
+- GOAL-LIFECYCLE — diagnose blocked-resume truth
+- MAIN-TRUTH — branch/worktree integration inventory
+- R0-COMBINED-GATE — targeted compiler and test composition
+
+### Changed
+
+- LOCK-BIND — bind project root and lock-directory generation (completed with tech debt)
+- XVERIFY-SEPARATION — verify provider independence and exact identity (completed with tech debt)
+
+### Fixed
+
+- Cross-fix: LOCK-PARSE — restore the canonical lock module parse boundary
+- Fix: LOCK-BIND — bind project root and lock-directory generation
+
+
+_Tasks: 34 total, 12 done, 2 tech debt, 16 no-go_
+
 ## [1.0.0-beta.1-sprint460] - 2026-07-25
 
 ### Added

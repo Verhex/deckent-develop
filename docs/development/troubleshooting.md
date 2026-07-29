@@ -664,7 +664,7 @@ deckent start --force  # skip pre-flight checks
 - **Memory System:** `.brain/memory.db` (SQLite, single source of truth) — exports at `.brain/exports/`; see `docs/architecture/memory-system.md`
 - **Agent Rules:** `.claude/rules/brain.md`, `.claude/rules/worker-default.md`, `.claude/rules/auditor.md`
 - **API Contract:** `docs/reference/api-surface.md`
-- **ADR Index:** `docs/adr-index.md` — accepted architecture decisions (89 ADRs)
+- **ADR Index:** `docs/adr/README.md` — generated index of canonical accepted architecture decisions
 
 For bug reports, open an issue at [deckent.ai](https://deckent.ai).
 
@@ -834,7 +834,7 @@ npm run lint:adr
 deckent memory rebuild
 
 # Check ADR index
-cat docs/adr-index.md
+cat docs/adr/README.md
 ```
 
 ---

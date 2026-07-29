@@ -6,11 +6,11 @@
  * Coverage (3 TDD tests):
  *   1. complete export — N ADRs in DB, empty docs/adr → N .md files written
  *   2. partial placeholder — missing sprint/content → `_To be backfilled_` emitted
- *   3. idempotent — file mtime newer than DB updated_at → skipped (manual edit wins)
+ *   3. DB authority — byte-identical projection skips; drift is overwritten
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync, readdirSync, utimesSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { MemoryStore } from '../../src/core/memory-store.js';
@@ -117,10 +117,10 @@ describe('exportAdrsToFs — partial placeholder', () => {
   });
 });
 
-// ─── Test 3 — idempotency (file mtime newer than DB) ───────────────
+// ─── Test 3 — DB authority + idempotency ───────────────────────────
 
 describe('exportAdrsToFs — idempotent', () => {
-  it('skips files whose mtime is newer than the DB updated_at', () => {
+  it('skips byte-identical files and overwrites filesystem drift', () => {
     store.insert({
       id: 'adr-050',
       type: 'adr',
@@ -137,23 +137,89 @@ describe('exportAdrsToFs — idempotent', () => {
 
     const files = readdirSync(adrDir);
     expect(files).toHaveLength(1);
-    const filePath = join(adrDir, files[0]!);
+    const filePath = join(adrDir, '050-idempotent-probe.md');
+    expect(files).toEqual(['050-idempotent-probe.md']);
 
-    // Bump the file mtime far into the future so it definitely wins over
-    // any conceivable DB updated_at.
-    const future = new Date(Date.now() + 60 * 60 * 1000); // +1h
-    utimesSync(filePath, future, future);
-    const mtimeBefore = statSync(filePath).mtimeMs;
-
-    // Second export — should detect manual edit and skip.
+    // Second export — byte-identical projection is a no-op.
     const second = exportAdrsToFs(store, adrDir);
     expect(second.errors).toEqual([]);
     expect(second.skipped).toBe(1);
     expect(second.written).toBe(0);
     expect(second.updated).toBe(0);
 
-    // mtime must NOT have changed (file was not rewritten).
-    const mtimeAfter = statSync(filePath).mtimeMs;
-    expect(mtimeAfter).toBe(mtimeBefore);
+    writeFileSync(filePath, 'filesystem drift\n', 'utf-8');
+    const third = exportAdrsToFs(store, adrDir);
+    expect(third.errors).toEqual([]);
+    expect(third.updated).toBe(1);
+    expect(readFileSync(filePath, 'utf-8')).toContain('# ADR-050: Idempotent Probe');
+  });
+
+  it('projects canonical G/D ids to taxonomy filenames', () => {
+    store.insert({
+      id: 'ADR-G-037',
+      type: 'adr',
+      title: 'Execution Budget Landing',
+      content: 'Canonical decision body.',
+      status: 'accepted',
+      adr_class: 'G',
+      scope: 'global+project',
+      immutable: true,
+      source_authority: 'publisher',
+      enforcement_level: 'runtime',
+    });
+
+    const result = exportAdrsToFs(store, adrDir);
+    expect(result.errors).toEqual([]);
+    expect(readdirSync(adrDir)).toContain('adr-g-037-execution-budget-landing.md');
+    const projection = readFileSync(
+      join(adrDir, 'adr-g-037-execution-budget-landing.md'),
+      'utf-8',
+    );
+    expect(projection).toContain('**Class:** ADR-G');
+    expect(projection).toContain('**Scope:** global+project');
+    expect(projection).toContain('**Immutable:** yes');
+    expect(projection).toContain('**Source:** publisher');
+    expect(projection).toContain('**Enforcement-Level:** runtime');
+  });
+
+  it('reuses an existing ID-matched projection even when its slug differs from the title', () => {
+    store.insert({
+      id: 'adr-g-020',
+      type: 'adr',
+      title: 'A Much Longer Canonical Architecture Title',
+      content: '# ADR-G-020: A Much Longer Canonical Architecture Title\n\n**Status:** accepted\n',
+      status: 'accepted',
+      adr_class: 'G',
+    });
+    const existingPath = join(adrDir, 'adr-g-020-short-stable-slug.md');
+    rmSync(adrDir, { recursive: true, force: true });
+    // exportAdrsToFs owns directory creation, but this fixture needs an
+    // existing projection with a stable, intentionally non-derived slug.
+    exportAdrsToFs(store, adrDir);
+    const generated = join(adrDir, 'adr-g-020-a-much-longer-canonical-architecture-title.md');
+    const content = readFileSync(generated, 'utf-8');
+    rmSync(generated);
+    writeFileSync(existingPath, content, 'utf-8');
+
+    const result = exportAdrsToFs(store, adrDir);
+
+    expect(result.skipped).toBe(1);
+    expect(readdirSync(adrDir)).toEqual(['adr-g-020-short-stable-slug.md']);
+  });
+
+  it('surfaces a typed error for a non-canonical ADR id instead of inventing a filename', () => {
+    store.insert({
+      id: 'user-123',
+      type: 'adr',
+      title: 'Unclassified Decision',
+      content: 'decision',
+      status: 'accepted',
+    });
+
+    const result = exportAdrsToFs(store, adrDir);
+    expect(result.written).toBe(0);
+    expect(result.errors).toEqual([
+      'user-123: non-canonical ADR id: user-123',
+    ]);
   });
 });

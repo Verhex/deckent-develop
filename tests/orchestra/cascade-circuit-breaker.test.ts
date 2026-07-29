@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { applyCascadeCircuitBreaker } from '../../src/orchestra/sprint-controller.js';
@@ -63,6 +63,40 @@ describe('applyCascadeCircuitBreaker (Sprint 140 cost-cascade circuit-breaker wi
     const sprint = makeSprint(8);
     // 4 NO_GO, DONE (reset), then 3 NO_GO — never reaches 5 consecutive.
     const paused = applyCascadeCircuitBreaker(r, sprint, evalsFor(sprint, [NG, NG, NG, NG, OK, NG, NG, NG]));
+    expect(paused).toBe(false);
+    expect(sprint.status).toBe(SprintStatus.EVALUATING);
+  });
+
+  it('does not count cascade-skipped tasks that never consumed a provider attempt', () => {
+    const r = root();
+    const tasksDir = join(r, '.tasks');
+    mkdirSync(tasksDir, { recursive: true });
+    const sprint = makeSprint(8);
+    for (let index = 3; index < sprint.tasks.length; index += 1) {
+      const task = sprint.tasks[index]!;
+      writeFileSync(
+        join(tasksDir, `task-${task.id}.result`),
+        JSON.stringify({
+          taskId: task.id,
+          workerId: `cascade-skip-${task.id}`,
+          filesChanged: [],
+          linesAdded: 0,
+          linesRemoved: 0,
+          testsPassed: false,
+          selfAssessment: 'NO_GO',
+          notes: 'dependency was never dispatched',
+          cascadeSkipped: true,
+        }),
+        'utf-8',
+      );
+    }
+
+    const paused = applyCascadeCircuitBreaker(
+      r,
+      sprint,
+      evalsFor(sprint, Array.from({ length: 8 }, () => NG)),
+    );
+
     expect(paused).toBe(false);
     expect(sprint.status).toBe(SprintStatus.EVALUATING);
   });

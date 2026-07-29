@@ -1,5 +1,6 @@
 import type { Task, TaskResult } from './task-types.js';
 import type { LiveBudgetDecision } from './live-execution-budget.js';
+import type { BillingMode } from './cost-config-loader.js';
 
 export interface ExecutionBudgetVerdict {
   state: 'within-budget' | 'exceeded' | 'unknown';
@@ -18,6 +19,11 @@ const MEASURED_USAGE_SOURCES = new Set([
   'session-store',
   'envelope',
   'cli-log',
+  // Host-owned runtime ledgers are written from provider event streams, not
+  // worker-authored result claims. Their terminal projection is therefore
+  // admissible evidence for token ceilings and locally repriced API cost.
+  'host-runtime-budget',
+  'host-runtime-budget-lineage',
 ]);
 
 /** Budget enforcement accepts only provider/host-measured usage, never estimates or worker claims. */
@@ -31,7 +37,24 @@ export function evaluateRunCostBudget(input: {
   nextCost?: TaskResult['cost'];
   nextUsage?: TaskResult['tokenUsage'];
   sprintBudgetUsd: number | null;
+  /**
+   * USD scope follows the effective execution billing mode:
+   * api → enforce the USD ceiling; subscription/free-tier → quota scope;
+   * local → on-device zero USD. Undefined fails closed.
+   */
+  billingMode: BillingMode | undefined;
 }): RunCostBudgetVerdict {
+  if (
+    input.billingMode === 'subscription'
+    || input.billingMode === 'free_tier'
+    || input.billingMode === 'local'
+  ) {
+    return { state: 'within-budget', cumulativeUsd: input.cumulativeUsd };
+  }
+  if (input.billingMode !== 'api') {
+    return { state: 'unknown', cumulativeUsd: input.cumulativeUsd };
+  }
+
   const nextUsd = input.nextCost?.usd;
   const costEvidenceTrusted = !!input.nextCost
     && !input.nextCost.pricingSource.startsWith('unknown-model:')
@@ -62,6 +85,7 @@ export function evaluateExecutionBudget(
   task: Pick<Task, 'budget'>,
   result: Pick<TaskResult, 'tokenUsage' | 'cost'>,
   terminalLiveDecision?: LiveBudgetDecision,
+  billingMode?: BillingMode,
 ): ExecutionBudgetVerdict {
   const budget = task.budget;
   const hasAnyCeiling = !!budget && Object.values(budget).some(
@@ -82,7 +106,10 @@ export function evaluateExecutionBudget(
     || !Number.isFinite(result.cost.usd)
     || result.cost.usd < 0
     || (result.cost.pricingSource !== 'provider-envelope' && !usageEvidenceMeasured);
-  const consumedUsd = costEvidenceUnknown ? null : result.cost!.usd;
+  const usdBudgetApplies = billingMode === 'api';
+  const consumedUsd = billingMode === 'local'
+    ? 0
+    : (usdBudgetApplies && !costEvidenceUnknown ? result.cost!.usd : null);
   const reasons: string[] = [];
   let missingEvidence = false;
   let exceeded = false;
@@ -135,7 +162,15 @@ export function evaluateExecutionBudget(
     }
   }
   if (budget.maxUsd !== undefined) {
-    if (consumedUsd === null) {
+    if (
+      billingMode === 'subscription'
+      || billingMode === 'free_tier'
+      || billingMode === 'local'
+    ) {
+      // USD is not this execution's governing budget: subscription/free-tier
+      // capacity is quota-governed, while local inference has no provider USD.
+    }
+    else if (consumedUsd === null) {
       missingEvidence = true;
       reasons.push('authoritative cost evidence unavailable');
     }

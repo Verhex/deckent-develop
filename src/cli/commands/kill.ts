@@ -7,10 +7,11 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { loadConfig } from '../../core/config.js';
 import { getMessage } from '../helpers/messages.js';
 import { promptConfirm } from '../helpers/prompt.js';
-import { TASKS_DIR } from '../../core/constants.js';
-import { SpawnBackendFactory } from '../../orchestra/spawn-backend.js';
+import { DASHBOARD_FILE, TASKS_DIR } from '../../core/constants.js';
+import { SpawnBackendFactory, type BackendType } from '../../orchestra/spawn-backend.js';
 import { getProviderForModel } from '../../core/task-types.js';
 import type { ModelType } from '../../core/types.js';
+import { SprintPhase, SprintStatus } from '../../core/sprint-types.js';
 import {
   listPidFiles, readPid, isProcessAlive, verifySprintOwnership,
 } from '../../orchestra/sprint-pid-manager.js';
@@ -105,62 +106,77 @@ function detectTaskProvider(root: string, taskId: string): string {
   return 'claude';
 }
 
+function detectTaskBackend(
+  root: string,
+  taskId: string,
+  configuredBackend?: BackendType,
+): BackendType {
+  const taskFile = findTaskFile(root, taskId);
+  if (taskFile) {
+    try {
+      const data = JSON.parse(readFileSync(taskFile, 'utf-8')) as { backend?: string };
+      if (
+        data.backend === 'docker'
+        || data.backend === 'tmux'
+        || data.backend === 'subprocess'
+      ) {
+        return data.backend;
+      }
+    } catch { /* fall through to effective config */ }
+  }
+  if (configuredBackend) return configuredBackend;
+  return detectTaskProvider(root, taskId) === 'claude' ? 'tmux' : 'subprocess';
+}
+
 /** Kill a single worker and clean up its resources. Exported (born-610): the
  * finalize --force worker-sweep reuses this SAME backend-aware composition
  * (subprocess/docker-first for non-claude, tmux with subprocess-fallback, plus
  * status/lock/prompt cleanup) instead of a tmux-only kill that silently no-ops
  * on other backends (Law #2 — every environment). */
-export function killSingle(root: string, taskId: string, lang: string): boolean {
-  const provider = detectTaskProvider(root, taskId);
-
-  // For non-claude providers, try subprocess kill first
-  if (provider !== 'claude') {
-    try {
-      const backend = SpawnBackendFactory.create({
-        backend: 'subprocess',
-        projectDir: root,
-      });
-      backend.kill(taskId);
-      print(getMessage('kill.worker_killed', lang, { taskId }));
-      updateTaskStatus(root, taskId, lang);
-      releaseLocks(root, taskId, lang);
-      cleanPromptFiles(root, taskId, lang);
-      return true;
-    } catch {
-      // Subprocess kill failed, fall through to tmux attempt
-    }
-  }
-
-  // Try tmux kill (default for claude or fallback)
+export function killSingle(
+  root: string,
+  taskId: string,
+  lang: string,
+  configuredBackend?: BackendType,
+): boolean {
+  const backendName = detectTaskBackend(root, taskId, configuredBackend);
+  let attemptedBackendName: string = backendName;
   try {
-    killWorker(taskId);
+    const backend = SpawnBackendFactory.create({
+      backend: backendName,
+      projectDir: root,
+    });
+    attemptedBackendName = backend.name;
+    backend.kill(taskId);
     print(getMessage('kill.worker_killed', lang, { taskId }));
     updateTaskStatus(root, taskId, lang);
     releaseLocks(root, taskId, lang);
     cleanPromptFiles(root, taskId, lang);
     return true;
   } catch (error) {
-    if (error instanceof TmuxError) {
-      // Last resort: try subprocess kill if we haven't already
-      if (provider === 'claude') {
-        try {
-          const backend = SpawnBackendFactory.create({
-            backend: 'subprocess',
-            projectDir: root,
-          });
-          backend.kill(taskId);
-          print(getMessage('kill.worker_killed', lang, { taskId }));
-          updateTaskStatus(root, taskId, lang);
-          releaseLocks(root, taskId, lang);
-          cleanPromptFiles(root, taskId, lang);
-          return true;
-        } catch { /* subprocess also failed */ }
+    // Tmux is the resolved authority for this task. Only its typed
+    // "window not found" error may be translated into the CLI's not-found
+    // result; permission/programming errors must retain their original type.
+    if (attemptedBackendName === 'tmux' && !(error instanceof TmuxError)) throw error;
+
+    // Compatibility fallback for historical task records that did not persist
+    // their effective backend. Exact task IDs keep this fallback bounded.
+    if (attemptedBackendName !== 'tmux') {
+      try {
+        killWorker(taskId);
+        print(getMessage('kill.worker_killed', lang, { taskId }));
+        updateTaskStatus(root, taskId, lang);
+        releaseLocks(root, taskId, lang);
+        cleanPromptFiles(root, taskId, lang);
+        return true;
+      } catch (tmuxError) {
+        if (!(tmuxError instanceof TmuxError)) throw tmuxError;
       }
-      printError(new Error(getMessage('kill.worker_not_found', lang, { taskId })));
-      process.exitCode = 1;
-      return false;
     }
-    throw error;
+    if (!(error instanceof Error)) throw error;
+    printError(new Error(getMessage('kill.worker_not_found', lang, { taskId })));
+    process.exitCode = 1;
+    return false;
   }
 }
 
@@ -182,6 +198,74 @@ function findActiveTaskIds(root: string): string[] {
     }
   }
   return ids;
+}
+
+function readDashboardSprintId(root: string): string | null {
+  try {
+    const dashboard = JSON.parse(
+      readFileSync(join(root, DASHBOARD_FILE), 'utf-8'),
+    ) as { sprint?: { id?: string; phase?: string; status?: string } };
+    const sprint = dashboard.sprint;
+    if (
+      typeof sprint?.id === 'string'
+      && sprint.id.length > 0
+      && sprint.phase !== SprintPhase.COMPLETE
+      && sprint.status !== SprintStatus.COMPLETE
+      && sprint.status !== SprintStatus.ABORTED
+    ) {
+      return sprint.id;
+    }
+  } catch { /* missing/corrupt dashboard is not kill-fatal */ }
+  return null;
+}
+
+export function writeKilledDashboardSnapshot(root: string, sprintId: string): void {
+  const tasksDir = join(root, TASKS_DIR);
+  const taskPrefix = `task-${sprintId.replace(/^sprint-/, '')}-`;
+  let total = 0;
+  let done = 0;
+  let blocked = 0;
+  try {
+    for (const file of readdirSync(tasksDir)) {
+      if (!file.startsWith(taskPrefix) || !file.endsWith('.json')) continue;
+      try {
+        const task = JSON.parse(
+          readFileSync(join(tasksDir, file), 'utf-8'),
+        ) as { id?: string; status?: string };
+        if (
+          typeof task.id !== 'string'
+          || file !== `task-${task.id}.json`
+          || !task.id.startsWith(`${sprintId.replace(/^sprint-/, '')}-`)
+        ) {
+          continue;
+        }
+        total++;
+        if (task.status === 'DONE' || task.status === 'TECH_DEBT' || task.status === 'NO_GO') done++;
+        else blocked++;
+      } catch { /* auxiliary/corrupt JSON is not a task projection */ }
+    }
+  } catch { /* task evidence may be absent; terminal truth still applies */ }
+
+  const rawNumber = Number.parseInt(sprintId.replace(/^sprint-/, ''), 10);
+  const snapshot = {
+    sprint: {
+      id: sprintId,
+      number: Number.isFinite(rawNumber) ? rawNumber : 0,
+      phase: SprintPhase.COMPLETE,
+      status: SprintStatus.ABORTED,
+    },
+    agents: [],
+    progress: { done, active: 0, blocked, total },
+    alerts: [],
+    updatedAt: new Date().toISOString(),
+    completedAt: new Date().toISOString(),
+    termination: 'killed',
+  };
+  writeFileSync(
+    join(root, DASHBOARD_FILE),
+    JSON.stringify(snapshot, null, 2),
+    'utf-8',
+  );
 }
 
 // ═══ Sprint 177 Task 177-003 — Kill Cascade ═══════════════════════════
@@ -269,27 +353,26 @@ export async function killSprintById(
 async function killAllCascade(
   root: string,
   lang: string,
+  configuredBackend?: BackendType,
 ): Promise<void> {
   // ─── Phase 1: SIGTERM workers ─────────────────────────────────────
   const activeIds = findActiveTaskIds(root);
   let workersKilled = 0;
   for (const id of activeIds) {
-    try {
-      killWorker(id);
-      print(getMessage('kill.worker_killed', lang, { taskId: id }));
-      workersKilled++;
-    } catch {
-      // Worker may have already exited (tmux window gone, docker container
-      // already stopped, subprocess exited) — not a cascade failure.
-    }
-    updateTaskStatus(root, id, lang);
-    releaseLocks(root, id, lang);
-    cleanPromptFiles(root, id, lang);
+    const previousExitCode = process.exitCode;
+    if (killSingle(root, id, lang, configuredBackend)) workersKilled++;
+    // One already-exited worker must not make a successful controller cascade
+    // report a command-level failure.
+    process.exitCode = previousExitCode;
   }
 
   // ─── Phase 2: SIGTERM controllers ─────────────────────────────────
   let sprintIds: string[] = [];
   try { sprintIds = listPidFiles(root); } catch { sprintIds = []; }
+  const dashboardSprintId = readDashboardSprintId(root);
+  if (dashboardSprintId && !sprintIds.includes(dashboardSprintId)) {
+    sprintIds.push(dashboardSprintId);
+  }
   const sigTermedPids: number[] = [];
   for (const sid of sprintIds) {
     try {
@@ -325,6 +408,7 @@ async function killAllCascade(
   // ─── Phase 5: Per-sprint metadata cleanup ─────────────────────────
   for (const sid of sprintIds) {
     try { cleanupSprintMetadata(root, sid); } catch { /* fail-safe */ }
+    try { writeKilledDashboardSnapshot(root, sid); } catch { /* fail-safe */ }
   }
 
   // ─── Phase 6: tmux socket cleanup ─────────────────────────────────
@@ -348,6 +432,8 @@ async function killAllCascade(
 
   if (workersKilled > 0) {
     print(getMessage('kill.all_killed', lang, { count: String(workersKilled) }));
+  } else if (sprintIds.length > 0) {
+    print(getMessage('kill.sprints_aborted', lang, { count: String(sprintIds.length) }));
   } else if (sprintIds.length === 0) {
     print(getMessage('kill.no_active_workers', lang));
   }
@@ -387,7 +473,10 @@ export function registerKill(program: Command): void {
     .option('--user-explicit', 'Explicit user confirmation for panic kill override')
     .action(async (taskId: string | undefined, opts: { all?: boolean; force?: boolean; userExplicit?: boolean }) => {
       const root = resolveProjectRoot();
-      const config = await loadConfig(root).catch(() => ({ language: 'en' }));
+      const config = await loadConfig(root).catch(() => ({
+        language: 'en',
+        spawn_backend: undefined,
+      }));
       const lang = config.language ?? 'en';
 
       if (opts.all) {
@@ -398,7 +487,7 @@ export function registerKill(program: Command): void {
           print(getMessage('kill.all_aborted', lang));
           return;
         }
-        await killAllCascade(root, lang);
+        await killAllCascade(root, lang, config.spawn_backend);
         return;
       }
 
@@ -408,6 +497,6 @@ export function registerKill(program: Command): void {
         return;
       }
 
-      killSingle(root, taskId, lang);
+      killSingle(root, taskId, lang, config.spawn_backend);
     });
 }

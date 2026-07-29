@@ -128,6 +128,7 @@ import {
   getDeckFileStatus, formatProviderHealthSection,
   getProviderInstallHint, buildConnectorHealthResults, formatConnectorHealthLines,
   checkTmux, checkClaude, checkDeckSecurity, checkWritePermissions, checkGitignore,
+  checkDocker,
 } from '../../../src/cli/commands/doctor.js';
 import type { HumanDoctorInput } from '../../../src/cli/commands/doctor.js';
 import type { HealthCheckResult } from '../../../src/orchestra/connector.js';
@@ -2023,6 +2024,87 @@ describe('checkClaude auth check (C)', () => {
     // Only one spawnSync call (version check)
     expect(vi.mocked(spawnSync)).toHaveBeenCalledTimes(1);
     expect(check.passed).toBe(true);
+  });
+});
+
+// ─── checkDocker false-negative reproducer (473-019 DOCTOR-DOCKER diagnosis) ──
+//
+// checkDocker() probes availability with `spawnSync('docker', ['info'], ...)`
+// ONLY — it never calls `docker version`/`docker --version`, and it only
+// inspects `result.status`, never `result.error` (ENOENT vs ETIMEDOUT) or
+// `result.signal`. These two tests separate "direct Docker evidence" (what a
+// user sees running `docker version` themselves) from "doctor call-path
+// evidence" (what checkDocker's own `docker info` probe reports), and prove
+// the classification collapse that makes the two diverge.
+describe('checkDocker false-negative (473-019 diagnosis reproducer)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('collapses a docker-info timeout into the same message as a genuinely missing binary', () => {
+    // A timed-out `docker info` (spawnOpts.timeout=5000 killed the process):
+    // Node sets status=null, signal='SIGTERM', and does NOT set error.code to
+    // ENOENT the way a missing binary would — but checkDocker only reads
+    // `result.status !== 0`, so both cases produce identical output text.
+    vi.mocked(spawnSync).mockImplementation((_cmd, args) => {
+      if (Array.isArray(args) && args[0] === 'info') {
+        return { status: null, signal: 'SIGTERM', stdout: '', stderr: '', pid: 1, output: [] } as unknown as ReturnType<typeof spawnSync>;
+      }
+      return makeSpawnResult(0, '') as ReturnType<typeof spawnSync>;
+    });
+    const timedOut = checkDocker(undefined);
+
+    vi.mocked(spawnSync).mockImplementation((_cmd, args) => {
+      if (Array.isArray(args) && args[0] === 'info') {
+        const err = Object.assign(new Error('spawn docker ENOENT'), { code: 'ENOENT' });
+        return { status: null, signal: null, stdout: '', stderr: '', pid: 0, output: [], error: err } as unknown as ReturnType<typeof spawnSync>;
+      }
+      return makeSpawnResult(0, '') as ReturnType<typeof spawnSync>;
+    });
+    const missingBinary = checkDocker(undefined);
+
+    // Both surface the exact same advisory text — a daemon timeout is
+    // indistinguishable from "docker isn't installed" in doctor's own output.
+    expect(timedOut.message).toBe(missingBinary.message);
+    expect(timedOut.message).toBe('not installed (optional — enables isolated worker containers)');
+  });
+
+  it('reports Docker unavailable via `docker info` even while direct `docker version` (client+server) succeeds', () => {
+    vi.mocked(spawnSync).mockImplementation((cmd, args) => {
+      if (cmd === 'docker' && Array.isArray(args) && args[0] === 'version') {
+        // Direct Docker evidence: a user (or the sprint's tool inventory) runs
+        // this and sees both Client and Server sections — Docker IS reachable.
+        return makeSpawnResult(0, 'Client:\n Version: 24.0.7\nServer:\n Version: 24.0.7') as ReturnType<typeof spawnSync>;
+      }
+      if (cmd === 'docker' && Array.isArray(args) && args[0] === 'info') {
+        // Doctor's actual call-path: `docker info` fails independently of the
+        // `version` handshake above (heavier daemon call — storage driver,
+        // plugin, and cgroup introspection; more failure/timeout surface).
+        return makeSpawnResult(1, '') as ReturnType<typeof spawnSync>;
+      }
+      return makeSpawnResult(0, '') as ReturnType<typeof spawnSync>;
+    });
+
+    const directEvidence = spawnSync('docker', ['version'], { encoding: 'utf-8' });
+    expect(directEvidence.status).toBe(0);
+    expect(String(directEvidence.stdout)).toContain('Server:');
+
+    const doctorCallPath = checkDocker('docker');
+    expect(doctorCallPath.passed).toBe(false);
+    expect(doctorCallPath.required).toBe(true);
+    expect(doctorCallPath.message).toContain('Docker not available');
+
+    // checkDocker never issues a `version` call of its own — confirms the
+    // call-path is `info`-only, the root of the direct-vs-doctor divergence.
+    const infoCalls = vi.mocked(spawnSync).mock.calls.filter(
+      ([cmd, args]) => cmd === 'docker' && Array.isArray(args) && args[0] === 'info',
+    );
+    const versionCallsFromCheckDocker = vi.mocked(spawnSync).mock.calls.filter(
+      ([cmd, args]) => cmd === 'docker' && Array.isArray(args) && args[0] === 'version',
+    );
+    expect(infoCalls.length).toBeGreaterThan(0);
+    // The only `version` call was the direct-evidence call this test made itself.
+    expect(versionCallsFromCheckDocker.length).toBe(1);
   });
 });
 

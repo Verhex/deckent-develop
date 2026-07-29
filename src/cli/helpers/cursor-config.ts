@@ -32,7 +32,7 @@ export function generateCursorConfig(projectRoot: string): { mcpPath: string; ru
   const rulesPath = join(projectRoot, '.cursor', 'rules', 'deckent.mdc');
 
   upsertCursorMcp(mcpPath);
-  upsertCursorRules(rulesPath);
+  ensureCursorRules(rulesPath);
 
   return { mcpPath, rulesPath };
 }
@@ -77,13 +77,43 @@ function upsertCursorMcp(filePath: string): void {
 }
 
 /**
- * Write the Cursor rules file for Deckent. Always overwrites — rules are canonical.
+ * Ensure the Cursor rules file references DECKENT.md without replacing
+ * owner-authored content. Deckent owns the integration reference, not the file.
  */
-function upsertCursorRules(filePath: string): void {
+export function ensureCursorRules(filePath: string): 'created' | 'updated' | 'unchanged' {
   const dir = dirname(filePath);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
 
-  writeFileSync(filePath, DECKENT_RULES_CONTENT, 'utf-8');
+  if (!existsSync(filePath)) {
+    writeFileSync(filePath, DECKENT_RULES_CONTENT, 'utf-8');
+    return 'created';
+  }
+
+  const existing = readFileSync(filePath, 'utf-8');
+  if (/(?:^|\n)\s*@DECKENT\.md\s*(?:\n|$)/u.test(existing)) {
+    return 'unchanged';
+  }
+
+  const reference = '@DECKENT.md';
+  let updated: string;
+  if (existing.startsWith('---\n')) {
+    const frontmatterEnd = existing.indexOf('\n---\n', 4);
+    if (frontmatterEnd >= 0) {
+      const insertionPoint = frontmatterEnd + '\n---\n'.length;
+      updated =
+        existing.slice(0, insertionPoint)
+        + reference
+        + '\n\n'
+        + existing.slice(insertionPoint);
+    } else {
+      updated = `${reference}\n\n${existing}`;
+    }
+  } else {
+    updated = `${reference}\n\n${existing}`;
+  }
+
+  writeFileSync(filePath, updated, 'utf-8');
+  return 'updated';
 }

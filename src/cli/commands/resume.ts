@@ -1,7 +1,7 @@
 // ═══ Resume Command ═══════════════════════════════════════════════════
 // Resume a sprint from a saved checkpoint.
-// MVP: reads checkpoint, respawns pending tasks, skips completed ones.
-// Sprint 140+ will add mid-worker resume and heartbeat daemon integration.
+// Reads durable checkpoint authority, reconciles interrupted work, and resumes
+// only the task set proven safe for re-dispatch.
 
 import { existsSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';

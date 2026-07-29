@@ -1,9 +1,7 @@
 // ═══ Sprint Checkpoint ════════════════════════════════════════════════
 // Sprint state persistence for long-running sprint resume capability.
-// MVP: write/read checkpoint — resume from middle of sprint.
+// Durable checkpoint and recovery support for interrupted sprint lifecycles.
 // Sprint 139 Task 030: dep graph embedded in checkpoint for resume restore.
-// Sprint 140+ will add mid-worker resume and heartbeat daemon integration.
-// Sprint 145+ will add external state store.
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -800,7 +798,7 @@ export function deriveResumeDisposition(
   const ids: string[] = [];
   const parkedSettlements: ResumeDisposition['parkedSettlements'] = [];
   const seen = new Set<string>();
-  const consider = (id: string): void => {
+  const consider = (id: string, checkpointProvesPaused = false): void => {
     if (seen.has(id)) return;
     seen.add(id);
     const authority = readResumeTaskResultAuthority(projectRoot, id);
@@ -819,7 +817,8 @@ export function deriveResumeDisposition(
       || task.status === TaskStatus.CLAIMED
       || task.status === TaskStatus.EXECUTING
       || (task.status === TaskStatus.PAUSED
-        && existsSync(join(projectRoot, TASKS_DIR, `task-${id}.paused`)));
+        && (checkpointProvesPaused
+          || existsSync(join(projectRoot, TASKS_DIR, `task-${id}.paused`))));
     if (resumableStatus) ids.push(id);
   };
 
@@ -830,7 +829,7 @@ export function deriveResumeDisposition(
   if (checkpoint.taskStates && checkpoint.taskStates.length > 0) {
     for (const state of checkpoint.taskStates) {
       if (pendingIds.has(state.id) || staleActiveIds.has(state.id) || state.status === TaskStatus.PAUSED) {
-        consider(state.id);
+        consider(state.id, state.status === TaskStatus.PAUSED);
       }
     }
   } else {
@@ -1021,10 +1020,13 @@ export function buildPreplannedResumeSprint(
     ) {
       throw createExecutionAuthorityError(`Task ${taskId} resume authority is ${authority.state}`);
     }
-    const result = authority.result;
-    if (result?.selfAssessment === 'DONE' || result?.selfAssessment === 'GO_WITH_TECH_DEBT') {
+    const result = authority.result as
+      | (TaskResult & { brainEvaluation?: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO' })
+      | null;
+    const terminalVerdict = result?.brainEvaluation ?? result?.selfAssessment;
+    if (terminalVerdict === 'DONE' || terminalVerdict === 'GO_WITH_TECH_DEBT') {
       task.status = TaskStatus.DONE;
-    } else if (result?.selfAssessment === 'NO_GO') {
+    } else if (terminalVerdict === 'NO_GO') {
       task.status = TaskStatus.NO_GO;
     }
     return task;

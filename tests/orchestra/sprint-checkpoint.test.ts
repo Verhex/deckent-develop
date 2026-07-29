@@ -504,6 +504,49 @@ describe('resetInterruptedWorkersToPending + deriveResumableTaskIds (455-001)', 
     rmSync(root, { recursive: true, force: true });
   });
 
+  it('re-queues markerless cascade PAUSED tasks proven by the v2 checkpoint', () => {
+    const root = setupRoot();
+    writeTaskJson(root, '455-003b', TaskStatus.PAUSED);
+    const cp = baseCp({
+      schemaVersion: 2,
+      taskStates: [{ id: '455-003b', status: TaskStatus.PAUSED }],
+    });
+    writeCp(root, cp);
+
+    expect(deriveResumableTaskIds(root, cp)).toEqual(['455-003b']);
+    const reset = resetInterruptedWorkersToPending(root, cp);
+    expect(reset).toMatchObject({
+      resetIds: ['455-003b'],
+      committed: true,
+    });
+    expect(statusOf(root, '455-003b')).toBe(TaskStatus.PENDING);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('restores terminal status from Brain verdict instead of worker self-assessment', () => {
+    const root = setupRoot();
+    writeTaskJson(root, '455-003c', TaskStatus.DONE);
+    writeFileSync(
+      join(root, '.tasks', 'task-455-003c.result'),
+      JSON.stringify({
+        taskId: '455-003c',
+        selfAssessment: 'DONE',
+        brainEvaluation: 'NO_GO',
+      }),
+      'utf-8',
+    );
+    const cp = baseCp({
+      completedTasks: ['455-003c'],
+      schemaVersion: 2,
+      taskStates: [{ id: '455-003c', status: TaskStatus.DONE }],
+    });
+
+    const restored = buildPreplannedResumeSprint(root, cp, []);
+    expect(restored.tasks).toHaveLength(1);
+    expect(restored.tasks[0]?.status).toBe(TaskStatus.NO_GO);
+    rmSync(root, { recursive: true, force: true });
+  });
+
   it('updates the v2 taskStates entry to PENDING when present', () => {
     const root = setupRoot();
     writeTaskJson(root, '455-004', TaskStatus.CLAIMED);

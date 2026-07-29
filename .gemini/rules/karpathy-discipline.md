@@ -39,7 +39,7 @@ philosophy as adapted for AI-agent workflows.
 - Prefer flat code over nested abstractions. Each layer of indirection must earn its existence by making the call-site simpler AND reducing duplication.
 - When in doubt between two approaches, choose the one with fewer new lines of code — all else equal.
 - Do NOT introduce new runtime dependencies unless the task explicitly requires it and the dependency is already in package.json.
-- Follow ADR-010 (Tek Runtime Dependency): if you need a new package, check if an existing one or a Node.js built-in can fill the need.
+- Follow ADR-D-005 (Dependency Policy & Inventory): dependencies are admitted on merit, not by count; prefer a Node.js built-in when it genuinely suffices.
 
 **Anti-patterns to avoid:**
 - Creating a helper function used exactly once
@@ -119,7 +119,7 @@ Adapted from Andrej Karpathy software engineering philosophy for AI-agent workfl
 Canonical reference: multica-ai/andrej-karpathy-skills (external, public domain principles).
 Deckent-specific adaptations: Sprint 191, Worker Discipline Anchor project.
 
-See also: .claude/rules/worker-default.md, .brain/exports/decisions.md (ADR-037, ADR-035).
+See also: .gemini/rules/worker-default.md, docs/adr/README.md (ADR-G-020, ADR-G-018).
 
 
 ---
@@ -151,4 +151,3 @@ Rules:
 Routing: CI tasks (test infra, pipeline fixes, hermetic reproducer) should use
 **ci-guardian agent** + **ci-testing skill**. This ensures the routing engine selects
 the right specialization for CI hygiene work.
-

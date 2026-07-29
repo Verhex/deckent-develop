@@ -1,481 +1,663 @@
-# DIRECTIVES — R0 Dogfood Bootstrap Recovery
+# DIRECTIVES — Deneme 50-Task File-Creation Sprint
 
 ## Goal
+Create a root-level `deneme/` fixture tree through 50 independent tasks. Every task owns one isolated subdirectory and produces exactly one simple Markdown document plus one valid Vitest code file.
 
-Resume the existing persistent Deckent goal without replacing or reducing it. Restore the current
-`main` checkout to a compile-green, authority-consistent baseline through Deckent's own lifecycle,
-then prove that canonical execution admission, transactional build preparation, strict
-cross-provider XVerify and goal supervision are ready for the first provider-free C0/C1 promotion.
+## Execution Contract
+- This sprint is intentionally provider-neutral at the product level; concrete worker provider/model values below are the current effective-config projection required by the structured planner.
+- Concurrency and worker count are resolved from effective config; they are not prescribed here.
+- Tasks are independent and may run in any wave/order.
+- Each task may write only its declared `deneme/task-NNN/` scope.
+- No task may modify product source, configuration, memory, ADRs, lockfiles, or existing tests.
+- Every `example.test.ts` must import from `vitest`, contain exactly one meaningful passing test, and be runnable by its declared test command.
+- Planning is performed now; sprint start remains an explicit user action.
 
-GPT-5.6 Sol is the supervising Brain. Deckent dogfooding is mandatory; manual intervention is
-permitted only as a typed and recorded recovery seam, followed by immediate re-entry into dogfood.
-
-## Owner Decisions — Binding
-
-- Branch/worktree: `/home/alperen/deckent-dev`, `main` only. Do not create a worktree.
-- Parallel worker hard ceiling: **6**. Lower concurrency is correct when dependencies, file
-  collisions, provider capacity or finite budget prevent safe dispatch.
-- Worker providers: Codex and Claude both participate. Use only exact registry API IDs.
-- XVerify: verifier provider must differ from producer provider.
-  - Codex/Sol output → Claude Fable 5 by default; Claude Opus 5 for selected deep review.
-  - Claude output → tier-appropriate Codex Terra/Sol.
-  - Missing fresh second-provider authority → typed `unavailable/HOLD`; never self-verify.
-- Every provider dispatch requires exact model, auth/account, reachability, limit, finite budget
-  and settlement authority. Start remains subject to the CLI admission/cost checkpoint and exact
-  attempt receipt; this document does not fabricate a `G7` receipt.
-- No task may mark a work item `DONE`; workers produce bounded evidence and a recommendation.
-
-## Global Negative Space
-
-- Do not kill or cleanup a live sprint. Never delete `.tasks/*` or `.brain/memory.db`.
-- Do not run `npm run build`, `npm run build:all`, `/login`, publish, push, dependency install,
-  destructive git, repository cleanup or bot restart inside the sprint.
-- Do not modify `.deckent/config.json`, MASTER, generated projections, memory, AGENTS/CLAUDE,
-  package wiring, native adapter files or any path not explicitly assigned below.
-- Do not weaken execution admission, fencing, quarantine, evidence, fsync, path-binding,
-  provider-separation, budget or settlement behavior to make a test pass.
-- Do not use `spawnSync`; hermetic subprocess tests use bounded async spawn and tmpdir state.
-- Do not run an unbounded full suite. Set `VITEST_MAX_FORKS=2`; use targeted/affected gates.
-- Do not rewrite another task's file. Same-file tasks are dependency-serialized below.
-- No silent fallback: uncertainty becomes typed `HOLD`, `unavailable`, `quarantined` or
-  reconciliation-required state.
-
-## Inherited Evidence — Do Not Re-run as a Task
-
-The superseded D2 directive at SHA-256
-`a69dc4fb7fb2460bb91fbeea38f0c4f358f8705f821bcdbd0e26c997a77928c5` recorded three
-`exit 137` runs. Last measured peak was 0.20 GB/6 GB, turn 35/40, cache-read 131k/1.5M,
-`OOMKilled=false`; the last observed broad command was `git log --oneline --all | grep ...`.
-That task is not part of R0 and must not be dispatched again. Its current-truth documentation
-result remains attributable on disk.
-
-## Batch Acceptance
-
-- 24 microtasks with an explicit dependency DAG; at most 6 workers in parallel.
-- All mutation scopes are previously owner-approved paths. Read-only tasks must remain byte-clean.
-- Root supervisor re-checks branch, target hashes, disk diff, task results, heartbeat, usage,
-  Nervous notifications and settlement evidence independently of Brain verdict.
-- R0 can recommend C0/C1 only when compile and targeted gates are green and every uncertainty has a
-  typed owner. Native/live/cross-platform/scale proof remains separate; no premature promotion.
-
----
-
-## Task 1: LOCK-PARSE — restore the canonical lock module parse boundary
-
-- Provider: claude
-- Model: claude-sonnet-5
-- Effort: normal
-- Files: src/core/file-lock.ts
-- Scope: src/core/file-lock.ts
-- Dependencies: none
-
-### Description
-
-Repair only the current TypeScript parse/incomplete-hunk defects in `file-lock.ts`. Preserve all
-existing v3 state, migration, audit and projection work. Stop after the file parses and type errors
-are enumerated; do not broaden behavior in this task.
-
-**Proof:** target hash before/after, exact diff, TypeScript parser no longer reports TS1434/TS1011.
-**Test:** `npx tsc --noEmit --pretty false`
-
-## Task 2: LOCK-BIND — bind project root and lock-directory generation
-
-- Provider: codex
-- Model: gpt-5.6-sol
-- Effort: high
-- Files: src/core/file-lock.ts
-- Scope: src/core/file-lock.ts
-- Dependencies: Task 1
-
-### Description
-
-Complete the platform-adapter-backed root and `.locks` generation binding so a replaced parent
-directory cannot bootstrap a second canonical lock domain. Linux/WSL must use stable verified
-handles; unsupported native platforms fail honestly without pretending parity.
-
-**Proof:** one project/task cannot obtain two live owners after parent-directory replacement.
-**Test:** targeted cross-process lock tests prepared by Task 4.
-
-## Task 3: LOCK-COMMIT — reconcile transaction completion and live handles
-
-- Provider: claude
-- Model: claude-sonnet-5
-- Effort: high
-- Files: src/core/file-lock.ts
-- Scope: src/core/file-lock.ts
-- Dependencies: Task 2
-
-### Description
-
-Complete post-commit reconciliation for acquire/renew/release/quarantine mutations. Heartbeat and
-release paths must operate on the current verified handle and distinguish committed canonical state
-from projection cleanup uncertainty.
-
-**Proof:** terminal canonical commit is never converted into a retryable failure.
-**Test:** targeted lock runtime and fence suites from Task 4.
-
-## Task 4: LOCK-PROOF — cross-process lock and migration tests
-
+## Task 1: DENEME-001 — simple document and test
 - Provider: codex
 - Model: gpt-5.6-terra
-- Effort: high
-- Files: tests/core/task-execution-fence.test.ts, tests/core/file-lock-runtime.test.ts
-- Scope: tests/core/task-execution-fence.test.ts, tests/core/file-lock-runtime.test.ts
-- Dependencies: Task 3
+- Effort: low
+- Files: deneme/task-001/README.md, deneme/task-001/example.test.ts
+- Scope: deneme/task-001/
 
 ### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 001` and a valid Vitest file with one passing test whose identity is `001`. Do not modify files outside this task scope.
 
-Add or repair hermetic cross-process tests for directory-generation replacement, chronology,
-v2→v3 migration, post-commit ambiguity, stale-handle rejection and high-cardinality task lookup.
+**Proof:** `test -f deneme/task-001/README.md && test -f deneme/task-001/example.test.ts`
+**Test:** `npx vitest run deneme/task-001/example.test.ts`
 
-**Proof:** tests reproduce the pre-fix failure and pass only under one canonical owner.
-**Test:** `npx vitest run tests/core/task-execution-fence.test.ts tests/core/file-lock-runtime.test.ts`
-
-## Task 5: CLEAN-BIND — consume stable lock paths in clean maintenance
-
-- Provider: claude
-- Model: claude-sonnet-5
-- Effort: high
-- Files: scripts/clean.mjs
-- Scope: scripts/clean.mjs
-- Dependencies: Task 2
-
-### Description
-
-Wire clean authority preparation and projection operations to the verified stable root/lock binding.
-Do not re-open canonical paths after validation and do not treat a changed path as the same domain.
-
-**Proof:** clean cannot observe or mutate a replacement lock directory.
-**Test:** Task 7 clean suites.
-
-## Task 6: CLEAN-RECOVERY — terminal uncertainty and interrupted staging
-
-- Provider: codex
-- Model: gpt-5.6-sol
-- Effort: high
-- Files: scripts/clean.mjs
-- Scope: scripts/clean.mjs
-- Dependencies: Task 5
-
-### Description
-
-Complete interrupted staging recovery, durability preflight, quarantine attestation chronology,
-terminal projection uncertainty and paginated/indexed maintenance behavior. A committed clean with
-uncertain projection cleanup must not be reported as an ordinary success or retried destructively.
-
-**Proof:** every crash boundary has one typed recover/reconcile outcome.
-**Test:** Task 7 clean suites.
-
-## Task 7: CLEAN-PROOF — clean recovery and scale tests
-
-- Provider: claude
-- Model: claude-sonnet-5
-- Effort: high
-- Files: tests/scripts/clean-active-execution-guard.test.ts, tests/scripts/dist-clean-guard.test.ts
-- Scope: tests/scripts/clean-active-execution-guard.test.ts, tests/scripts/dist-clean-guard.test.ts
-- Dependencies: Task 6
-
-### Description
-
-Cover parent replacement, crashed staging, fresh attestation, terminal uncertainty, pagination and
-large active-lock populations with tmpdir-owned hermetic tests.
-
-**Proof:** no live authority or unowned path is removed; pagination has deterministic boundaries.
-**Test:** `npx vitest run tests/scripts/clean-active-execution-guard.test.ts tests/scripts/dist-clean-guard.test.ts`
-
-## Task 8: LOCK-CLEAN-GATE — integrated authority verdict
-
-- Provider: claude
-- Model: claude-opus-5
-- Effort: high
-- Files: src/core/file-lock.ts, scripts/clean.mjs, tests/core/task-execution-fence.test.ts, tests/core/file-lock-runtime.test.ts, tests/scripts/clean-active-execution-guard.test.ts, tests/scripts/dist-clean-guard.test.ts
-- Scope: src/core/file-lock.ts, scripts/clean.mjs, tests/core/task-execution-fence.test.ts, tests/core/file-lock-runtime.test.ts, tests/scripts/clean-active-execution-guard.test.ts, tests/scripts/dist-clean-guard.test.ts
-- Dependencies: Task 4, Task 7
-
-### Description
-
-Read-only independent review of the combined lock/clean authority. Report P0/P1 findings and exact
-evidence; do not edit files.
-
-**Proof:** byte hashes remain unchanged during review; every claimed invariant maps to a test.
-**Test:** rerun all four targeted suites with `VITEST_MAX_FORKS=2`.
-
-## Task 9: ADMISSION-TYPE — compile admission against canonical lock
-
+## Task 2: DENEME-002 — simple document and test
 - Provider: codex
 - Model: gpt-5.6-terra
-- Effort: normal
-- Files: src/core/task-execution-admission.ts
-- Scope: src/core/task-execution-admission.ts
-- Dependencies: Task 4
+- Effort: low
+- Files: deneme/task-002/README.md, deneme/task-002/example.test.ts
+- Scope: deneme/task-002/
 
 ### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 002` and a valid Vitest file with one passing test whose identity is `002`. Do not modify files outside this task scope.
 
-Reconcile admission types and lock outcomes with the stabilized lock API. Preserve request snapshot,
-recovery intent, process-state and projection-cleanup distinctions.
+**Proof:** `test -f deneme/task-002/README.md && test -f deneme/task-002/example.test.ts`
+**Test:** `npx vitest run deneme/task-002/example.test.ts`
 
-**Proof:** no acquire outcome collapses `in-flight`/`quarantined` into retryable not-started state.
-**Test:** TypeScript plus Task 10–12 admission suite.
-
-## Task 10: ADMISSION-EVIDENCE — bounded durable recovery chain
-
-- Provider: claude
-- Model: claude-sonnet-5
-- Effort: high
-- Files: src/core/task-execution-admission.ts, tests/core/task-execution-admission.test.ts
-- Scope: src/core/task-execution-admission.ts, tests/core/task-execution-admission.test.ts
-- Dependencies: Task 9
-
-### Description
-
-Verify count/byte budgets across request, recovery-intent, prepared, dispatched and terminal
-evidence. Reserve terminal failure capacity before process birth and require durable adoption
-evidence with fresh verification.
-
-**Proof:** no admitted dispatch can make terminal persistence structurally impossible.
-**Test:** targeted evidence-budget and adoption cases.
-
-## Task 11: ADMISSION-CRASH — real child-process replay proof
-
-- Provider: codex
-- Model: gpt-5.6-sol
-- Effort: high
-- Files: tests/core/task-execution-admission.test.ts
-- Scope: tests/core/task-execution-admission.test.ts
-- Dependencies: Task 10
-
-### Description
-
-Complete the bounded async child-process crash fixture after durable dispatch evidence and before
-completion. A retry must observe one recoverable in-flight boundary and produce zero duplicate
-process calls.
-
-**Proof:** child exits at the injected checkpoint; durable locator survives process death.
-**Test:** exact crash/replay test plus complete admission suite.
-
-## Task 12: ADMISSION-HEARTBEAT — shared scheduler and scale proof
-
-- Provider: claude
-- Model: claude-sonnet-5
-- Effort: high
-- Files: src/core/task-execution-admission.ts, tests/core/task-execution-admission.test.ts
-- Scope: src/core/task-execution-admission.ts, tests/core/task-execution-admission.test.ts
-- Dependencies: Task 11
-
-### Description
-
-Prove one shared scheduler, bounded timer count, deterministic staggering, live-handle renewal,
-`throw undefined` capture, teardown and task isolation at meaningful concurrency.
-
-**Proof:** timer diagnostics return to zero and no admission renews another task.
-**Test:** complete admission suite with high-cardinality case.
-
-## Task 13: ADMISSION-AUDIT — independent final admission verdict
-
-- Provider: claude
-- Model: claude-opus-5
-- Effort: high
-- Files: src/core/task-execution-admission.ts, tests/core/task-execution-admission.test.ts
-- Scope: src/core/task-execution-admission.ts, tests/core/task-execution-admission.test.ts
-- Dependencies: Task 8, Task 12
-
-### Description
-
-Read-only final review for duplicate process birth, irrecoverable in-flight state, evidence
-exhaustion, mutable request drift, unhandled thenables and million-scale timer behavior.
-
-**Proof:** review hashes are recorded and no review mutation occurs.
-**Test:** admission suite and relevant lock suites.
-
-## Task 14: BUILD-BASELINE — revalidate the transactional build slice
-
+## Task 3: DENEME-003 — simple document and test
 - Provider: codex
 - Model: gpt-5.6-terra
-- Effort: normal
-- Files: scripts/build.mjs, scripts/build-dashboard.mjs, scripts/copy-assets.mjs, tests/scripts/build-lifecycle.test.ts, tests/scripts/build-staging-tools.test.ts
-- Scope: scripts/build.mjs, scripts/build-dashboard.mjs, scripts/copy-assets.mjs, tests/scripts/build-lifecycle.test.ts, tests/scripts/build-staging-tools.test.ts
-- Dependencies: none
+- Effort: low
+- Files: deneme/task-003/README.md, deneme/task-003/example.test.ts
+- Scope: deneme/task-003/
 
 ### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 003` and a valid Vitest file with one passing test whose identity is `003`. Do not modify files outside this task scope.
 
-Run the existing build/copy/dashboard lifecycle tests without performing a real build. Attribute
-any regression to current disk state before changing code.
+**Proof:** `test -f deneme/task-003/README.md && test -f deneme/task-003/example.test.ts`
+**Test:** `npx vitest run deneme/task-003/example.test.ts`
 
-**Proof:** exact script hashes and test counts; no `dist` mutation.
-**Test:** targeted build lifecycle/staging suites and `node --check` for all three scripts.
-
-## Task 15: BUILD-RECOVERY — close journal and durability residuals
-
-- Provider: claude
-- Model: claude-sonnet-5
-- Effort: high
-- Files: scripts/build.mjs, scripts/build-dashboard.mjs, scripts/copy-assets.mjs, tests/scripts/build-lifecycle.test.ts, tests/scripts/build-staging-tools.test.ts
-- Scope: scripts/build.mjs, scripts/build-dashboard.mjs, scripts/copy-assets.mjs, tests/scripts/build-lifecycle.test.ts, tests/scripts/build-staging-tools.test.ts
-- Dependencies: Task 14
-
-### Description
-
-Repair only demonstrated residuals in immutable snapshot, journal recovery, recursive fsync,
-source/tool/output identity binding, dashboard core integrity and retention. Do not wire
-`package.json` or perform directory publication.
-
-**Proof:** every journal state has deterministic recovery and no live-output absent window is claimed.
-**Test:** targeted build suites.
-
-## Task 16: BUILD-PUBLISH-SCOPE — every-environment adapter contract
-
-- Provider: codex
-- Model: gpt-5.6-sol
-- Effort: high
-- Files: scripts/build.mjs, src/cli/worktree-binary-authority.ts
-- Scope: scripts/build.mjs, src/cli/worktree-binary-authority.ts
-- Dependencies: Task 15
-
-### Description
-
-Read-only design review. Produce the exact additional file/technology manifest needed for gap-free
-Linux, macOS, Windows-native and WSL directory publication plus checkout-content build identity.
-Do not create or edit the unapproved adapter/authority files.
-
-**Proof:** report names platform semantics, packaging, rollback, crash matrix and tests.
-**Test:** no file mutation; design is independently reviewable.
-
-## Task 17: XVERIFY-SEPARATION — verify provider independence and exact identity
-
-- Provider: claude
-- Model: claude-opus-5
-- Effort: high
-- Files: src/core/cross-verify.ts, src/orchestra/cross-verify-runner.ts, src/orchestra/cross-verify-production-ingress-authority.ts, src/core/model-equivalence.ts, .deckent/config.json
-- Scope: src/core/cross-verify.ts, src/orchestra/cross-verify-runner.ts, src/orchestra/cross-verify-production-ingress-authority.ts, src/core/model-equivalence.ts, .deckent/config.json
-- Dependencies: none
-
-### Description
-
-Read-only audit that same-provider candidates are always excluded and local policy resolves
-Codex/Sol→Claude/Fable 5, optional Opus 5 override, and Claude→Codex Terra/Sol without silent
-fallback.
-
-**Proof:** exact selection table and config/model registry evidence; all files byte-identical.
-**Test:** targeted cross-verify selector/config tests only.
-
-## Task 18: PROVIDER-CAPACITY — usage and admission readiness
-
+## Task 4: DENEME-004 — simple document and test
 - Provider: codex
 - Model: gpt-5.6-terra
-- Effort: normal
-- Files: .deckent/config.json, .deckent/settings/resource-log.jsonl, .deckent/runtime/resource-log-dogfood.jsonl
-- Scope: .deckent/config.json, .deckent/settings/resource-log.jsonl, .deckent/runtime/resource-log-dogfood.jsonl
-- Dependencies: Task 17
+- Effort: low
+- Files: deneme/task-004/README.md, deneme/task-004/example.test.ts
+- Scope: deneme/task-004/
 
 ### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 004` and a valid Vitest file with one passing test whose identity is `004`. Do not modify files outside this task scope.
 
-Read-only assessment of current Codex/Claude availability, historical usage evidence, finite
-budget capability and six-slot safe concurrency. Do not infer subscription quota remaining from
-historical token totals.
+**Proof:** `test -f deneme/task-004/README.md && test -f deneme/task-004/example.test.ts`
+**Test:** `npx vitest run deneme/task-004/example.test.ts`
 
-**Proof:** distinguish observed usage, reachability, entitlement and unknown remaining quota.
-**Test:** `deckent usage`, `deckent doctor --json`, model catalog inspection.
-
-## Task 19: DOCTOR-DOCKER — diagnose the Docker false-negative
-
-- Provider: claude
-- Model: claude-sonnet-5
-- Effort: normal
-- Files: src/cli/commands/doctor.ts, src/cli/commands/doctor-checks.ts, tests/cli/commands/doctor.test.ts
-- Scope: src/cli/commands/doctor.ts, src/cli/commands/doctor-checks.ts, tests/cli/commands/doctor.test.ts
-- Dependencies: none
-
-### Description
-
-Read-only diagnosis of why `deckent doctor` reports Docker unavailable while direct client/server
-version succeeds. Identify stale-binary, PATH, probe or classification cause and exact repair scope.
-
-**Proof:** direct Docker evidence and doctor call-path evidence are separated.
-**Test:** no mutation; provide one bounded reproducer.
-
-## Task 20: GOAL-LIFECYCLE — diagnose blocked-resume truth
-
-- Provider: codex
-- Model: gpt-5.6-sol
-- Effort: high
-- Files: src/orchestra/autonomous/goal-planner.ts, src/orchestra/autonomous/goal-planner-types.ts, src/orchestra/autonomous/mission-store/goal-mission.ts, docs/MASTER-PLAN.md
-- Scope: src/orchestra/autonomous/goal-planner.ts, src/orchestra/autonomous/goal-planner-types.ts, src/orchestra/autonomous/mission-store/goal-mission.ts, docs/MASTER-PLAN.md
-- Dependencies: none
-
-### Description
-
-Read-only map of persistent goal status/resume semantics. Separate host session-goal API behavior
-from Deckent Goal v2 behavior; do not mark the unfinished goal complete and do not create a reduced
-replacement.
-
-**Proof:** exact state-transition gap and proposed canonical owner are named.
-**Test:** no mutation; current goal objective/status evidence retained.
-
-## Task 21: MAIN-TRUTH — branch/worktree integration inventory
-
-- Provider: claude
-- Model: claude-sonnet-5
-- Effort: normal
-- Files: .git
-- Scope: .git
-- Dependencies: none
-
-### Description
-
-Read-only inventory of current main HEAD, dirty paths, already-merged worktree commits, unique
-approval/release commits and stale prunable metadata. Do not merge, prune, commit or modify refs.
-
-**Proof:** ancestry and dirty-overlap table with exact SHAs.
-**Test:** `git branch -vv`, `git worktree list --porcelain`, bounded ancestry checks.
-
-## Task 22: R0-COMBINED-GATE — targeted compiler and test composition
-
+## Task 5: DENEME-005 — simple document and test
 - Provider: codex
 - Model: gpt-5.6-terra
-- Effort: high
-- Files: src/core/file-lock.ts, scripts/clean.mjs, src/core/task-execution-admission.ts, scripts/build.mjs, scripts/build-dashboard.mjs, scripts/copy-assets.mjs, tests/core/task-execution-fence.test.ts, tests/core/file-lock-runtime.test.ts, tests/core/task-execution-admission.test.ts, tests/scripts/clean-active-execution-guard.test.ts, tests/scripts/dist-clean-guard.test.ts, tests/scripts/build-lifecycle.test.ts, tests/scripts/build-staging-tools.test.ts
-- Scope: src/core/file-lock.ts, scripts/clean.mjs, src/core/task-execution-admission.ts, scripts/build.mjs, scripts/build-dashboard.mjs, scripts/copy-assets.mjs, tests/core/task-execution-fence.test.ts, tests/core/file-lock-runtime.test.ts, tests/core/task-execution-admission.test.ts, tests/scripts/clean-active-execution-guard.test.ts, tests/scripts/dist-clean-guard.test.ts, tests/scripts/build-lifecycle.test.ts, tests/scripts/build-staging-tools.test.ts
-- Dependencies: Task 8, Task 13, Task 16, Task 17, Task 19
+- Effort: low
+- Files: deneme/task-005/README.md, deneme/task-005/example.test.ts
+- Scope: deneme/task-005/
 
 ### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 005` and a valid Vitest file with one passing test whose identity is `005`. Do not modify files outside this task scope.
 
-Run the combined bounded compiler and targeted tests from a stable disk snapshot. Do not repair
-inside this task; attribute every failure to an owning predecessor or new typed residual.
+**Proof:** `test -f deneme/task-005/README.md && test -f deneme/task-005/example.test.ts`
+**Test:** `npx vitest run deneme/task-005/example.test.ts`
 
-**Proof:** command, exit status, test count, hashes and failure ownership.
-**Test:** TypeScript no-emit plus all R0 targeted suites with `VITEST_MAX_FORKS=2`.
-
-## Task 23: R0-SETTLEMENT — evidence and retry-safety review
-
-- Provider: claude
-- Model: claude-opus-5
-- Effort: high
-- Files: .tasks, .brain/archive, .deckent/runtime
-- Scope: .tasks, .brain/archive, .deckent/runtime
-- Dependencies: Task 18, Task 20, Task 21, Task 22
+## Task 6: DENEME-006 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-006/README.md, deneme/task-006/example.test.ts
+- Scope: deneme/task-006/
 
 ### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 006` and a valid Vitest file with one passing test whose identity is `006`. Do not modify files outside this task scope.
 
-Read-only review of R0 task results, attempts, usage, heartbeats, cross-verify evidence and terminal
-settlement. Identify missing or ambiguous receipts; never synthesize evidence or delete artifacts.
+**Proof:** `test -f deneme/task-006/README.md && test -f deneme/task-006/example.test.ts`
+**Test:** `npx vitest run deneme/task-006/example.test.ts`
 
-**Proof:** every task has one terminal/reconciliation owner and duplicate attempts are explained.
-**Test:** disk artifact inventory and Deckent status/history output.
-
-## Task 24: R0-PROMOTION — independent final recommendation
-
-- Provider: claude
-- Model: claude-opus-5
-- Effort: high
-- Files: docs/MASTER-PLAN.md, DIRECTIVES.md
-- Scope: docs/MASTER-PLAN.md, DIRECTIVES.md
-- Dependencies: Task 16, Task 23
+## Task 7: DENEME-007 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-007/README.md, deneme/task-007/example.test.ts
+- Scope: deneme/task-007/
 
 ### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 007` and a valid Vitest file with one passing test whose identity is `007`. Do not modify files outside this task scope.
 
-Read-only final assessment against the persistent goal and §11.1 execution addendum. Recommend
-`GO`, `NO_GO` or `GO_WITH_TECH_DEBT` for the next provider-free C0/C1 slice, with exact residual
-owners. Do not edit MASTER or DIRECTIVES.
+**Proof:** `test -f deneme/task-007/README.md && test -f deneme/task-007/example.test.ts`
+**Test:** `npx vitest run deneme/task-007/example.test.ts`
 
-**Proof:** recommendation cites compiler, tests, disk truth, usage, provider separation and settlement.
-**Test:** files remain byte-identical; root supervisor independently re-verifies the recommendation.
+## Task 8: DENEME-008 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-008/README.md, deneme/task-008/example.test.ts
+- Scope: deneme/task-008/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 008` and a valid Vitest file with one passing test whose identity is `008`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-008/README.md && test -f deneme/task-008/example.test.ts`
+**Test:** `npx vitest run deneme/task-008/example.test.ts`
+
+## Task 9: DENEME-009 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-009/README.md, deneme/task-009/example.test.ts
+- Scope: deneme/task-009/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 009` and a valid Vitest file with one passing test whose identity is `009`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-009/README.md && test -f deneme/task-009/example.test.ts`
+**Test:** `npx vitest run deneme/task-009/example.test.ts`
+
+## Task 10: DENEME-010 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-010/README.md, deneme/task-010/example.test.ts
+- Scope: deneme/task-010/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 010` and a valid Vitest file with one passing test whose identity is `010`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-010/README.md && test -f deneme/task-010/example.test.ts`
+**Test:** `npx vitest run deneme/task-010/example.test.ts`
+
+## Task 11: DENEME-011 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-011/README.md, deneme/task-011/example.test.ts
+- Scope: deneme/task-011/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 011` and a valid Vitest file with one passing test whose identity is `011`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-011/README.md && test -f deneme/task-011/example.test.ts`
+**Test:** `npx vitest run deneme/task-011/example.test.ts`
+
+## Task 12: DENEME-012 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-012/README.md, deneme/task-012/example.test.ts
+- Scope: deneme/task-012/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 012` and a valid Vitest file with one passing test whose identity is `012`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-012/README.md && test -f deneme/task-012/example.test.ts`
+**Test:** `npx vitest run deneme/task-012/example.test.ts`
+
+## Task 13: DENEME-013 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-013/README.md, deneme/task-013/example.test.ts
+- Scope: deneme/task-013/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 013` and a valid Vitest file with one passing test whose identity is `013`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-013/README.md && test -f deneme/task-013/example.test.ts`
+**Test:** `npx vitest run deneme/task-013/example.test.ts`
+
+## Task 14: DENEME-014 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-014/README.md, deneme/task-014/example.test.ts
+- Scope: deneme/task-014/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 014` and a valid Vitest file with one passing test whose identity is `014`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-014/README.md && test -f deneme/task-014/example.test.ts`
+**Test:** `npx vitest run deneme/task-014/example.test.ts`
+
+## Task 15: DENEME-015 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-015/README.md, deneme/task-015/example.test.ts
+- Scope: deneme/task-015/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 015` and a valid Vitest file with one passing test whose identity is `015`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-015/README.md && test -f deneme/task-015/example.test.ts`
+**Test:** `npx vitest run deneme/task-015/example.test.ts`
+
+## Task 16: DENEME-016 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-016/README.md, deneme/task-016/example.test.ts
+- Scope: deneme/task-016/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 016` and a valid Vitest file with one passing test whose identity is `016`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-016/README.md && test -f deneme/task-016/example.test.ts`
+**Test:** `npx vitest run deneme/task-016/example.test.ts`
+
+## Task 17: DENEME-017 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-017/README.md, deneme/task-017/example.test.ts
+- Scope: deneme/task-017/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 017` and a valid Vitest file with one passing test whose identity is `017`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-017/README.md && test -f deneme/task-017/example.test.ts`
+**Test:** `npx vitest run deneme/task-017/example.test.ts`
+
+## Task 18: DENEME-018 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-018/README.md, deneme/task-018/example.test.ts
+- Scope: deneme/task-018/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 018` and a valid Vitest file with one passing test whose identity is `018`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-018/README.md && test -f deneme/task-018/example.test.ts`
+**Test:** `npx vitest run deneme/task-018/example.test.ts`
+
+## Task 19: DENEME-019 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-019/README.md, deneme/task-019/example.test.ts
+- Scope: deneme/task-019/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 019` and a valid Vitest file with one passing test whose identity is `019`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-019/README.md && test -f deneme/task-019/example.test.ts`
+**Test:** `npx vitest run deneme/task-019/example.test.ts`
+
+## Task 20: DENEME-020 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-020/README.md, deneme/task-020/example.test.ts
+- Scope: deneme/task-020/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 020` and a valid Vitest file with one passing test whose identity is `020`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-020/README.md && test -f deneme/task-020/example.test.ts`
+**Test:** `npx vitest run deneme/task-020/example.test.ts`
+
+## Task 21: DENEME-021 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-021/README.md, deneme/task-021/example.test.ts
+- Scope: deneme/task-021/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 021` and a valid Vitest file with one passing test whose identity is `021`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-021/README.md && test -f deneme/task-021/example.test.ts`
+**Test:** `npx vitest run deneme/task-021/example.test.ts`
+
+## Task 22: DENEME-022 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-022/README.md, deneme/task-022/example.test.ts
+- Scope: deneme/task-022/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 022` and a valid Vitest file with one passing test whose identity is `022`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-022/README.md && test -f deneme/task-022/example.test.ts`
+**Test:** `npx vitest run deneme/task-022/example.test.ts`
+
+## Task 23: DENEME-023 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-023/README.md, deneme/task-023/example.test.ts
+- Scope: deneme/task-023/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 023` and a valid Vitest file with one passing test whose identity is `023`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-023/README.md && test -f deneme/task-023/example.test.ts`
+**Test:** `npx vitest run deneme/task-023/example.test.ts`
+
+## Task 24: DENEME-024 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-024/README.md, deneme/task-024/example.test.ts
+- Scope: deneme/task-024/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 024` and a valid Vitest file with one passing test whose identity is `024`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-024/README.md && test -f deneme/task-024/example.test.ts`
+**Test:** `npx vitest run deneme/task-024/example.test.ts`
+
+## Task 25: DENEME-025 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-025/README.md, deneme/task-025/example.test.ts
+- Scope: deneme/task-025/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 025` and a valid Vitest file with one passing test whose identity is `025`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-025/README.md && test -f deneme/task-025/example.test.ts`
+**Test:** `npx vitest run deneme/task-025/example.test.ts`
+
+## Task 26: DENEME-026 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-026/README.md, deneme/task-026/example.test.ts
+- Scope: deneme/task-026/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 026` and a valid Vitest file with one passing test whose identity is `026`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-026/README.md && test -f deneme/task-026/example.test.ts`
+**Test:** `npx vitest run deneme/task-026/example.test.ts`
+
+## Task 27: DENEME-027 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-027/README.md, deneme/task-027/example.test.ts
+- Scope: deneme/task-027/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 027` and a valid Vitest file with one passing test whose identity is `027`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-027/README.md && test -f deneme/task-027/example.test.ts`
+**Test:** `npx vitest run deneme/task-027/example.test.ts`
+
+## Task 28: DENEME-028 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-028/README.md, deneme/task-028/example.test.ts
+- Scope: deneme/task-028/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 028` and a valid Vitest file with one passing test whose identity is `028`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-028/README.md && test -f deneme/task-028/example.test.ts`
+**Test:** `npx vitest run deneme/task-028/example.test.ts`
+
+## Task 29: DENEME-029 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-029/README.md, deneme/task-029/example.test.ts
+- Scope: deneme/task-029/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 029` and a valid Vitest file with one passing test whose identity is `029`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-029/README.md && test -f deneme/task-029/example.test.ts`
+**Test:** `npx vitest run deneme/task-029/example.test.ts`
+
+## Task 30: DENEME-030 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-030/README.md, deneme/task-030/example.test.ts
+- Scope: deneme/task-030/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 030` and a valid Vitest file with one passing test whose identity is `030`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-030/README.md && test -f deneme/task-030/example.test.ts`
+**Test:** `npx vitest run deneme/task-030/example.test.ts`
+
+## Task 31: DENEME-031 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-031/README.md, deneme/task-031/example.test.ts
+- Scope: deneme/task-031/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 031` and a valid Vitest file with one passing test whose identity is `031`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-031/README.md && test -f deneme/task-031/example.test.ts`
+**Test:** `npx vitest run deneme/task-031/example.test.ts`
+
+## Task 32: DENEME-032 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-032/README.md, deneme/task-032/example.test.ts
+- Scope: deneme/task-032/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 032` and a valid Vitest file with one passing test whose identity is `032`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-032/README.md && test -f deneme/task-032/example.test.ts`
+**Test:** `npx vitest run deneme/task-032/example.test.ts`
+
+## Task 33: DENEME-033 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-033/README.md, deneme/task-033/example.test.ts
+- Scope: deneme/task-033/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 033` and a valid Vitest file with one passing test whose identity is `033`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-033/README.md && test -f deneme/task-033/example.test.ts`
+**Test:** `npx vitest run deneme/task-033/example.test.ts`
+
+## Task 34: DENEME-034 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-034/README.md, deneme/task-034/example.test.ts
+- Scope: deneme/task-034/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 034` and a valid Vitest file with one passing test whose identity is `034`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-034/README.md && test -f deneme/task-034/example.test.ts`
+**Test:** `npx vitest run deneme/task-034/example.test.ts`
+
+## Task 35: DENEME-035 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-035/README.md, deneme/task-035/example.test.ts
+- Scope: deneme/task-035/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 035` and a valid Vitest file with one passing test whose identity is `035`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-035/README.md && test -f deneme/task-035/example.test.ts`
+**Test:** `npx vitest run deneme/task-035/example.test.ts`
+
+## Task 36: DENEME-036 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-036/README.md, deneme/task-036/example.test.ts
+- Scope: deneme/task-036/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 036` and a valid Vitest file with one passing test whose identity is `036`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-036/README.md && test -f deneme/task-036/example.test.ts`
+**Test:** `npx vitest run deneme/task-036/example.test.ts`
+
+## Task 37: DENEME-037 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-037/README.md, deneme/task-037/example.test.ts
+- Scope: deneme/task-037/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 037` and a valid Vitest file with one passing test whose identity is `037`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-037/README.md && test -f deneme/task-037/example.test.ts`
+**Test:** `npx vitest run deneme/task-037/example.test.ts`
+
+## Task 38: DENEME-038 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-038/README.md, deneme/task-038/example.test.ts
+- Scope: deneme/task-038/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 038` and a valid Vitest file with one passing test whose identity is `038`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-038/README.md && test -f deneme/task-038/example.test.ts`
+**Test:** `npx vitest run deneme/task-038/example.test.ts`
+
+## Task 39: DENEME-039 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-039/README.md, deneme/task-039/example.test.ts
+- Scope: deneme/task-039/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 039` and a valid Vitest file with one passing test whose identity is `039`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-039/README.md && test -f deneme/task-039/example.test.ts`
+**Test:** `npx vitest run deneme/task-039/example.test.ts`
+
+## Task 40: DENEME-040 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-040/README.md, deneme/task-040/example.test.ts
+- Scope: deneme/task-040/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 040` and a valid Vitest file with one passing test whose identity is `040`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-040/README.md && test -f deneme/task-040/example.test.ts`
+**Test:** `npx vitest run deneme/task-040/example.test.ts`
+
+## Task 41: DENEME-041 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-041/README.md, deneme/task-041/example.test.ts
+- Scope: deneme/task-041/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 041` and a valid Vitest file with one passing test whose identity is `041`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-041/README.md && test -f deneme/task-041/example.test.ts`
+**Test:** `npx vitest run deneme/task-041/example.test.ts`
+
+## Task 42: DENEME-042 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-042/README.md, deneme/task-042/example.test.ts
+- Scope: deneme/task-042/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 042` and a valid Vitest file with one passing test whose identity is `042`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-042/README.md && test -f deneme/task-042/example.test.ts`
+**Test:** `npx vitest run deneme/task-042/example.test.ts`
+
+## Task 43: DENEME-043 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-043/README.md, deneme/task-043/example.test.ts
+- Scope: deneme/task-043/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 043` and a valid Vitest file with one passing test whose identity is `043`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-043/README.md && test -f deneme/task-043/example.test.ts`
+**Test:** `npx vitest run deneme/task-043/example.test.ts`
+
+## Task 44: DENEME-044 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-044/README.md, deneme/task-044/example.test.ts
+- Scope: deneme/task-044/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 044` and a valid Vitest file with one passing test whose identity is `044`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-044/README.md && test -f deneme/task-044/example.test.ts`
+**Test:** `npx vitest run deneme/task-044/example.test.ts`
+
+## Task 45: DENEME-045 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-045/README.md, deneme/task-045/example.test.ts
+- Scope: deneme/task-045/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 045` and a valid Vitest file with one passing test whose identity is `045`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-045/README.md && test -f deneme/task-045/example.test.ts`
+**Test:** `npx vitest run deneme/task-045/example.test.ts`
+
+## Task 46: DENEME-046 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-046/README.md, deneme/task-046/example.test.ts
+- Scope: deneme/task-046/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 046` and a valid Vitest file with one passing test whose identity is `046`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-046/README.md && test -f deneme/task-046/example.test.ts`
+**Test:** `npx vitest run deneme/task-046/example.test.ts`
+
+## Task 47: DENEME-047 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-047/README.md, deneme/task-047/example.test.ts
+- Scope: deneme/task-047/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 047` and a valid Vitest file with one passing test whose identity is `047`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-047/README.md && test -f deneme/task-047/example.test.ts`
+**Test:** `npx vitest run deneme/task-047/example.test.ts`
+
+## Task 48: DENEME-048 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-048/README.md, deneme/task-048/example.test.ts
+- Scope: deneme/task-048/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 048` and a valid Vitest file with one passing test whose identity is `048`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-048/README.md && test -f deneme/task-048/example.test.ts`
+**Test:** `npx vitest run deneme/task-048/example.test.ts`
+
+## Task 49: DENEME-049 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-049/README.md, deneme/task-049/example.test.ts
+- Scope: deneme/task-049/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 049` and a valid Vitest file with one passing test whose identity is `049`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-049/README.md && test -f deneme/task-049/example.test.ts`
+**Test:** `npx vitest run deneme/task-049/example.test.ts`
+
+## Task 50: DENEME-050 — simple document and test
+- Provider: codex
+- Model: gpt-5.6-terra
+- Effort: low
+- Files: deneme/task-050/README.md, deneme/task-050/example.test.ts
+- Scope: deneme/task-050/
+
+### Description
+Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 050` and a valid Vitest file with one passing test whose identity is `050`. Do not modify files outside this task scope.
+
+**Proof:** `test -f deneme/task-050/README.md && test -f deneme/task-050/example.test.ts`
+**Test:** `npx vitest run deneme/task-050/example.test.ts`

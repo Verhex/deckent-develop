@@ -47,6 +47,7 @@ import { recordSprintWorkerTrace } from './output-collector.js';
 import { createOutputCollector } from '../core/output-collector.js';
 import { loadWorkerPromptMeta } from '../core/trace-schema.js';
 import { isDependencySatisfying } from './scheduler-truth.js';
+import { applyWorkerExecutionBudgetPolicy } from '../core/execution-plan-digest.js';
 
 // ─── Notify (DECKENT→USER:NOTIFY — Hot Fix H6) ──────────────────
 import { notify } from '../core/notify.js';
@@ -2662,7 +2663,7 @@ export async function runFixPhase(
   opts: RunSprintOptions | undefined,
   routingVersionForFix: string,
   spawnBackend: SpawnBackend | undefined,
-): Promise<void> {
+): Promise<FixPhaseFailureOutcome | undefined> {
   try {
     // Sprint 161 Task 2 (T-003): FIX entry — phase reaches disk so
     // observers see the EVALUATE→FIX transition.
@@ -2813,11 +2814,40 @@ export async function runFixPhase(
     if (existsSync(tasksPath)) {
       for (const file of readdirSync(tasksPath).filter(f => f.startsWith('task-') && f.endsWith('.json'))) {
         const task = readJsonSafe<Task>(join(tasksPath, file));
-        if (task?.isPriorityFix && task.status === TaskStatus.PENDING) fixTasks.push(task);
+        if (
+          task?.isPriorityFix
+          && task.status === TaskStatus.PENDING
+          && task.sprintId === sprint.id
+        ) {
+          fixTasks.push(task);
+        }
       }
     }
 
     if (fixTasks.length > 0) {
+      // Dynamic FIX tasks are born after plan approval. Re-evaluate every one
+      // against the same owner-authored worker policy before prompt creation or
+      // provider dispatch, then persist that exact policy snapshot.
+      const fixBudgetPolicies = applyWorkerExecutionBudgetPolicy(
+        fixTasks,
+        config.execution_budget,
+        config.worker_provider,
+      );
+      for (let index = 0; index < fixTasks.length; index += 1) {
+        const fixTask = fixTasks[index]!;
+        writeFileSync(
+          join(tasksPath, `task-${fixTask.id}.json`),
+          JSON.stringify(fixTask, null, 2),
+          'utf-8',
+        );
+        const policy = fixBudgetPolicies[index];
+        if (policy?.state === 'hold') {
+          throw createExecutionAuthorityError(
+            `FIX_EXECUTION_BUDGET_HOLD:${fixTask.id}:${policy.reasonCode ?? 'unknown'}:${policy.profileRef}`,
+          );
+        }
+      }
+
       // ─── Verify-and-Complete FIX Enrichment (Sprint 272 — Task 272-004) ──
       // Reframe the fix prompt for tasks whose original worker left an
       // EXIT_WITHOUT_RESULT marker with work on disk: audit-and-finish the
@@ -3246,9 +3276,29 @@ export async function runFixPhase(
       debugLog('runFixPhase:postFixPendingScan', e);
     }
   } catch (err) {
-    if (err instanceof ProviderExecutionIngressHoldError) throw err;
-    safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
+    const message = err instanceof Error ? err.message : String(err);
+    const taskIdMatch = /FIX_EXECUTION_BUDGET_HOLD:([^:]+):/.exec(message);
+    const code = err instanceof ProviderExecutionIngressHoldError
+      ? err.code
+      : err instanceof DeckentError
+        ? err.code
+        : 'FIX_PHASE_FAILED';
+    safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${message}`);
+    return {
+      failed: true,
+      code,
+      message,
+      ...(taskIdMatch?.[1] ? { taskId: taskIdMatch[1] } : {}),
+    };
   }
+}
+
+/** Typed, provider/backend-neutral FIX failure returned to the lifecycle owner. */
+export interface FixPhaseFailureOutcome {
+  readonly failed: true;
+  readonly code: string;
+  readonly message: string;
+  readonly taskId?: string;
 }
 
 

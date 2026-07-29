@@ -61,7 +61,7 @@ vi.mock('../../src/cli/helpers/process.js', () => ({
 vi.mock('../../src/core/config.js', () => ({
   resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
-  loadConfig: vi.fn().mockResolvedValue({ language: 'en' }),
+  loadConfig: vi.fn().mockResolvedValue({ language: 'en', spawn_backend: 'tmux' }),
 }));
 
 // fs mock — kill cascade reads .tasks/ for active workers
@@ -231,5 +231,66 @@ describe('kill --all cascade (Sprint 177 Task 177-003)', () => {
     // No PID files → no per-sprint cleanup
     expect(cleanupSprintMetadata).not.toHaveBeenCalled();
     expect(clearPid).not.toHaveBeenCalled();
+  });
+
+  it('terminalizes a stale active dashboard even when the controller PID file is already gone', async () => {
+    const fs = await import('node:fs');
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockImplementation((p: any) => {
+      if (String(p).endsWith('.tasks')) {
+        return [
+          'task-474-001.json',
+          'task-474-001.landing-proposal.json',
+        ] as any;
+      }
+      return [] as any;
+    });
+    vi.mocked(fs.readFileSync).mockImplementation((p: any) => {
+      const path = String(p);
+      if (path.endsWith('.dashboard')) {
+        return JSON.stringify({
+          sprint: { id: 'sprint-474', number: 474, phase: 'EXECUTE', status: 'ACTIVE' },
+          agents: [{ id: 'stale-worker' }],
+          progress: { done: 0, active: 1, blocked: 0, total: 50 },
+          alerts: [],
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      if (path.endsWith('task-474-001.json')) {
+        return JSON.stringify({ id: '474-001', status: 'PAUSED' });
+      }
+      if (path.endsWith('task-474-001.landing-proposal.json')) {
+        return JSON.stringify({ taskId: '474-001', status: 'proposed' });
+      }
+      return '{}';
+    });
+    vi.mocked(listPidFiles).mockReturnValue([]);
+
+    await runKillAll();
+
+    expect(cleanupSprintMetadata).toHaveBeenCalledWith('/mock/root', 'sprint-474');
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      '/mock/root/.dashboard',
+      expect.stringContaining('"status": "ABORTED"'),
+      'utf-8',
+    );
+    const dashboardWrite = vi.mocked(fs.writeFileSync).mock.calls.find(
+      ([path]) => path === '/mock/root/.dashboard',
+    );
+    const dashboard = JSON.parse(String(dashboardWrite?.[1]));
+    expect(dashboard.progress).toEqual({
+      done: 0,
+      active: 0,
+      blocked: 1,
+      total: 1,
+    });
+    expect(writeEvent).toHaveBeenCalledWith(
+      '/mock/root',
+      'sprint-474',
+      'brain',
+      '*',
+      'BRAIN→*:SPRINT_KILLED',
+      expect.any(Object),
+    );
   });
 });

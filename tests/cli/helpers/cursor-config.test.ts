@@ -110,6 +110,26 @@ describe('cursor-config', () => {
     expect(first).toBe(second);
   });
 
+  it('preserves owner-authored Cursor rules and adds only the Deckent reference', () => {
+    const rulesDir = join(tempDir, '.cursor', 'rules');
+    const rulesPath = join(rulesDir, 'deckent.mdc');
+    mkdirSync(rulesDir, { recursive: true });
+    writeFileSync(
+      rulesPath,
+      '---\ndescription: Owner rules\nglobs: **/*\n---\n# Owner Policy\nNever replace this.\n',
+      'utf-8',
+    );
+
+    generateCursorConfig(tempDir);
+
+    const content = readFileSync(rulesPath, 'utf-8');
+    expect(content).toContain('description: Owner rules');
+    expect(content).toContain('# Owner Policy');
+    expect(content).toContain('Never replace this.');
+    expect(content.indexOf('@DECKENT.md')).toBeGreaterThan(content.indexOf('\n---\n'));
+    expect(content.match(/@DECKENT\.md/g)).toHaveLength(1);
+  });
+
   // ─── Invalid existing file ───────────────────────────────────────
 
   it('handles invalid JSON in mcp.json gracefully', () => {

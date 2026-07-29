@@ -125,6 +125,12 @@ describe('rule-generator', () => {
       expect(section).toContain('deckent recall');
       expect(section).toContain('.brain/memory.db');
     });
+
+    it('fails typed when an accepted ADR has a non-canonical identity', () => {
+      expect(() => formatAdrSection([
+        makeAdr({ id: 'user-1784778390241', status: 'accepted' }),
+      ])).toThrow('E_NON_CANONICAL_ADR_ID: user-1784778390241');
+    });
   });
 
   // ── Worker Paths (stack-aware) ─────────────────────────────────

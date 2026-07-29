@@ -156,7 +156,8 @@
     "openai": {
       "enabled": true,
       "billing_modes_supported": [
-        "api"
+        "api",
+        "subscription"
       ],
       "default_billing_mode": "api",
       "api_endpoint": "https://api.openai.com",
@@ -236,6 +237,75 @@
           "enabled": true,
           "_source": "litellm",
           "_verified_at": "2026-04-15"
+        },
+        "gpt-5.6-sol": {
+          "input_cost_per_token": 5e-06,
+          "output_cost_per_token": 3e-05,
+          "cache_creation_input_token_cost": 6.25e-06,
+          "cache_creation_input_token_cost_above_1hr": null,
+          "cache_read_input_token_cost": 5e-07,
+          "max_input_tokens": 1050000,
+          "max_output_tokens": 128000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": true,
+          "supports_vision": true,
+          "supports_tool_choice": true,
+          "deckent_tier": "premium",
+          "deckent_aliases": [
+            "gpt-5.6-sol",
+            "gpt56-sol",
+            "sol"
+          ],
+          "enabled": true,
+          "_source": "openai-official-pricing",
+          "_verified_at": "2026-07-29",
+          "_notes": "OpenAI Standard short-context API pricing: input $5.00/MTok, cached input $0.50/MTok, cache write $6.25/MTok, output $30.00/MTok. Subscription/Business execution is quota-governed and excluded from USD budgets. Source: https://platform.openai.com/docs/pricing"
+        },
+        "gpt-5.6-terra": {
+          "input_cost_per_token": 2.5e-06,
+          "output_cost_per_token": 1.5e-05,
+          "cache_creation_input_token_cost": 3.125e-06,
+          "cache_creation_input_token_cost_above_1hr": null,
+          "cache_read_input_token_cost": 2.5e-07,
+          "max_input_tokens": 1050000,
+          "max_output_tokens": 128000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": true,
+          "supports_vision": true,
+          "supports_tool_choice": true,
+          "deckent_tier": "standard",
+          "deckent_aliases": [
+            "gpt-5.6-terra",
+            "gpt56-terra",
+            "terra"
+          ],
+          "enabled": true,
+          "_source": "openai-official-pricing",
+          "_verified_at": "2026-07-29",
+          "_notes": "OpenAI Standard short-context API pricing: input $2.50/MTok, cached input $0.25/MTok, cache write $3.125/MTok, output $15.00/MTok. Subscription/Business execution is quota-governed and excluded from USD budgets. Source: https://platform.openai.com/docs/pricing"
+        },
+        "gpt-5.6-luna": {
+          "input_cost_per_token": 1e-06,
+          "output_cost_per_token": 6e-06,
+          "cache_creation_input_token_cost": 1.25e-06,
+          "cache_creation_input_token_cost_above_1hr": null,
+          "cache_read_input_token_cost": 1e-07,
+          "max_input_tokens": 1050000,
+          "max_output_tokens": 128000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": true,
+          "supports_vision": true,
+          "supports_tool_choice": true,
+          "deckent_tier": "economy",
+          "deckent_aliases": [
+            "gpt-5.6-luna",
+            "gpt56-luna",
+            "luna"
+          ],
+          "enabled": true,
+          "_source": "openai-official-pricing",
+          "_verified_at": "2026-07-29",
+          "_notes": "OpenAI Standard short-context API pricing: input $1.00/MTok, cached input $0.10/MTok, cache write $1.25/MTok, output $6.00/MTok. Subscription/Business execution is quota-governed and excluded from USD budgets. Source: https://platform.openai.com/docs/pricing"
         }
       },
       "rate_limits": {
@@ -258,7 +328,7 @@
       "subscription_tracking": {
         "method": "none",
         "supported": false,
-        "reason": "ChatGPT Plus/Pro/Enterprise is web UI access. API billing is separate. Architectural impossibility \u2014 use API key for cost tracking."
+        "reason": "Codex subscription/Business usage is plan-quota governed; it has no per-task USD charge. Quota availability requires authoritative provider-limit evidence and is not inferred from token prices."
       }
     },
     "google": {
@@ -443,7 +513,7 @@
     }
   },
   "cost_limits": {
-    "sprint_max_usd": 3.5,
+    "sprint_max_usd": 1000,
     "daily_max_usd": 50,
     "monthly_max_usd": 500,
     "auto_confirm_below_usd": 2,

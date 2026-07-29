@@ -1484,6 +1484,10 @@ const MESSAGES: MessageMap = {
     en: '{count} worker(s) killed.',
     tr: '{count} worker durduruldu.',
   },
+  'kill.sprints_aborted': {
+    en: '{count} sprint(s) aborted; no active workers remained.',
+    tr: '{count} sprint sonlandırıldı; aktif worker kalmamıştı.',
+  },
   'kill.no_active_workers': {
     en: 'No active workers found.',
     tr: 'Aktif worker bulunamadı.',

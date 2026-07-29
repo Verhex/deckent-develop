@@ -19,6 +19,7 @@
 
 import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { getProviderCommandSpec } from './provider-command-spec.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -36,6 +37,28 @@ export const LOG_EVENT_TYPES = [
 /** One of the seven structured log-event kinds. */
 export type LogEventType = (typeof LOG_EVENT_TYPES)[number];
 
+/**
+ * Provider-neutral usage semantics derived once at the host normalization
+ * boundary. Budget and settlement consumers use this bounded metadata instead
+ * of independently interpreting provider-specific discriminator fields.
+ */
+export interface UsageEventSemantics {
+  /** Provider identity supplied to the normalizer. */
+  provider: string;
+  /** Original provider event discriminator, when the envelope declares one. */
+  providerEventType?: string;
+  /** Incremental call delta or cumulative attempt/session snapshot. */
+  mode: 'incremental' | 'cumulative';
+  /** True only for an envelope known to close the provider's usage stream. */
+  terminal: boolean;
+  /** Stable provider call/session identity when the envelope supplies one. */
+  identity?: string;
+  /** Whether this envelope proves one completed logical provider turn. */
+  countsAsTurn: boolean;
+  /** Provider-reported cumulative turn count, when available. */
+  reportedTurns?: number;
+}
+
 /** A single structured log line (one per JSONL row). */
 export interface LogEvent {
   /** ISO 8601 timestamp (UTC), stamped at write time. */
@@ -46,6 +69,8 @@ export interface LogEvent {
   type: LogEventType;
   /** Type-specific payload (the raw provider chunk or a derived shape). */
   content: unknown;
+  /** Canonical host-derived semantics, present only on normalized usage events. */
+  usageSemantics?: UsageEventSemantics;
 }
 
 /**
@@ -85,6 +110,7 @@ export function writeLogEvent(
       seq,
       type: ev.type,
       content: ev.content,
+      ...(ev.usageSemantics ? { usageSemantics: ev.usageSemantics } : {}),
     };
     appendFileSync(logPath, JSON.stringify(event) + '\n', 'utf-8');
   } catch (err) {
@@ -150,7 +176,70 @@ export function normalizeStreamEvent(
   const event = detected ?? normalizeGeneric(obj);
 
   // Never drop: an unrecognized object is preserved as text.
-  return event ?? { type: 'text', content: obj };
+  const normalized = event ?? { type: 'text' as const, content: obj };
+  return normalized.type === 'usage'
+    ? {
+        ...normalized,
+        usageSemantics: deriveUsageEventSemantics(obj, provider),
+      }
+    : normalized;
+}
+
+function readNonNegativeInteger(value: unknown): number | undefined {
+  return typeof value === 'number'
+    && Number.isFinite(value)
+    && value >= 0
+    && Number.isInteger(value)
+    ? value
+    : undefined;
+}
+
+/**
+ * Translate provider envelopes once at the normalization boundary. Unknown
+ * usage shapes remain non-terminal and identity-less so downstream budget
+ * authority fails closed instead of guessing.
+ */
+function deriveUsageEventSemantics(
+  o: Record<string, unknown>,
+  provider: string,
+): UsageEventSemantics {
+  const normalizedProvider = provider.trim().toLowerCase() || 'unknown';
+  const rawType = typeof o.providerEventType === 'string'
+    ? o.providerEventType
+    : typeof o.codexEventType === 'string'
+      ? o.codexEventType
+      : typeof o.type === 'string'
+        ? o.type
+        : undefined;
+  const declaredUsageMode = getProviderCommandSpec(normalizedProvider)?.liveUsage;
+  const terminal = rawType === 'result'
+    || rawType === 'turn.completed'
+    || rawType === 'response.completed'
+    || o.done === true
+    || declaredUsageMode === 'final-only';
+  const identityCandidates = [
+    o.request_id,
+    o.requestId,
+    o.turn_id,
+    o.turnId,
+    o.id,
+    o.uuid,
+    ...(terminal ? [o.session_id, o.created_at] : []),
+  ];
+  const identity = identityCandidates.find(
+    value => typeof value === 'string' && value.length > 0,
+  );
+  const reportedTurns = readNonNegativeInteger(o.num_turns);
+  return {
+    provider: normalizedProvider,
+    ...(rawType ? { providerEventType: rawType } : {}),
+    mode: terminal ? 'cumulative' : 'incremental',
+    terminal,
+    ...(typeof identity === 'string' ? { identity } : {}),
+    countsAsTurn: rawType === 'turn.completed'
+      || (declaredUsageMode === 'final-only' && terminal),
+    ...(reportedTurns !== undefined ? { reportedTurns } : {}),
+  };
 }
 
 // ─── Provider-specific helpers ───────────────────────────────────────
@@ -243,11 +332,16 @@ function normalizeGeneric(o: Record<string, unknown>): StreamLogEvent | null {
     return hasUsageShape(o) ? { type: 'usage', content: o } : { type: 'text', content: o };
   }
 
-  // Gemini candidates.
-  if (Array.isArray(o.candidates)) return { type: 'text', content: o };
+  // Gemini's terminal response may carry candidates and usageMetadata in the
+  // same envelope. Preserve the whole payload and expose its measured usage.
+  if (Array.isArray(o.candidates)) {
+    return hasUsageShape(o) ? { type: 'usage', content: o } : { type: 'text', content: o };
+  }
 
   // Bare text-bearing shapes leaking through a non-specific provider.
-  if (typeof o.response === 'string') return { type: 'text', content: o };
+  if (typeof o.response === 'string') {
+    return hasUsageShape(o) ? { type: 'usage', content: o } : { type: 'text', content: o };
+  }
   if (isRecord(o.message) && typeof (o.message as Record<string, unknown>).content === 'string') {
     return { type: 'text', content: o };
   }

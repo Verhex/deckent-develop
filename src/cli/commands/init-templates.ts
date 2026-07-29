@@ -10,26 +10,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { FullStackResult } from '../../core/stack-detector.js';
-import { modelRegistry } from '../../core/model-registry.js';
 
-// ─── Canonical Model IDs (454-004) ──────────────────────────────────
-// Generated templates must teach exact provider API IDs + explicit provider
-// ownership — never the retired opus/sonnet/haiku/gpt-5 aliases (see
-// LEGACY_MODEL_ALIASES in core/model-registry.ts; resolveCanonicalModelIdentity()
-// throws E_LEGACY_MODEL_ALIAS on those). Derived from the registry so the
-// examples track the live catalog instead of drifting hardcodes.
-function requireTemplateModel(provider: 'claude' | 'codex' | 'gemini', tier: 'economy' | 'standard' | 'premium'): string {
-  const model = modelRegistry.getByProviderAndTier(provider, tier);
-  if (!model) throw new Error(`E_TEMPLATE_MODEL_UNAVAILABLE: provider=${provider} tier=${tier}`);
-  return model.id;
-}
-const CLAUDE_PREMIUM = requireTemplateModel('claude', 'premium');
-const CLAUDE_STANDARD = requireTemplateModel('claude', 'standard');
-const CLAUDE_ECONOMY = requireTemplateModel('claude', 'economy');
-const CODEX_PREMIUM = requireTemplateModel('codex', 'premium');
-const CODEX_STANDARD = requireTemplateModel('codex', 'standard');
-const GEMINI_PREMIUM = requireTemplateModel('gemini', 'premium');
-const GEMINI_STANDARD = requireTemplateModel('gemini', 'standard');
+// Template docs intentionally avoid freezing the live provider/model catalog.
+// Exact identities are selected from effective config + runtime capability.
+const TEMPLATE_MODEL_ID = '<provider-model-id>';
+const TEMPLATE_PROVIDER_ID = '<provider-id>';
 
 // ─── Small Helpers ──────────────────────────────────────────────────
 
@@ -79,8 +64,8 @@ export function generateDeckentContentTR(projectName: string, buildCmd: string, 
 Her task şu yapıda olmalı:
 \`\`\`
 ## Task N: Başlık
-- Model: ${CLAUDE_STANDARD}  (tam provider API ID — deckent_models canlı katalog; opus/sonnet/haiku alias'ları KABUL EDİLMEZ)
-- Provider: claude  (opsiyonel — ID prefiksinden çıkarılamıyorsa zorunlu)
+- Model: ${TEMPLATE_MODEL_ID}
+- Provider: ${TEMPLATE_PROVIDER_ID}
 - Effort: low/normal/high
 - Skills: typescript-expert, testing-expert, vb.
 - Files: değişecek dosyalar
@@ -90,14 +75,13 @@ Detaylı açıklama...
 \`\`\`
 Detaylı rehber: .deckent/docs/directives-guide.md
 
-## Providers
-- Claude (varsayılan), Codex (OPENAI_API_KEY), Gemini (GOOGLE_API_KEY)
-- Model eşdeğerleri (tam API ID'leri): ${CLAUDE_PREMIUM}↔${CODEX_PREMIUM}↔${GEMINI_PREMIUM}, ${CLAUDE_STANDARD}↔${CODEX_STANDARD}↔${GEMINI_STANDARD}
+## Provider ve Model Çözümleme
+- Provider/model seçimi effective \`.deckent/config.json\`, model registry ve canlı capability kanıtından çözülür.
+- Bu dosya provider katalogu, varsayılan model veya concurrency değeri dondurmaz.
 
 ## Agent Instructions
-Brain rolü için: @.claude/rules/brain.md
-Auditor rolü için: @.claude/rules/auditor.md
-Worker rolü için: @.claude/rules/worker-default.md
+Brain, Auditor ve Worker kuralları seçilen host adapterının generated rule projection'ından
+yüklenir. DECKENT.md provider'a özel rule yolu dondurmaz.
 
 ## Context
 @DIRECTIVES.md
@@ -141,8 +125,8 @@ export function generateDeckentContentEN(projectName: string, buildCmd: string, 
 Each task should follow this structure:
 \`\`\`
 ## Task N: Title
-- Model: ${CLAUDE_STANDARD}  (exact provider API ID — see deckent_models for the live catalog; opus/sonnet/haiku aliases are REJECTED)
-- Provider: claude  (optional — required when the ID's provider can't be inferred from its prefix)
+- Model: ${TEMPLATE_MODEL_ID}
+- Provider: ${TEMPLATE_PROVIDER_ID}
 - Effort: low/normal/high
 - Skills: typescript-expert, testing-expert, etc.
 - Files: files to modify
@@ -152,14 +136,13 @@ Detailed description...
 \`\`\`
 Detailed guide: .deckent/docs/directives-guide.md
 
-## Providers
-- Claude (default), Codex (OPENAI_API_KEY), Gemini (GOOGLE_API_KEY)
-- Model equivalence (exact API IDs): ${CLAUDE_PREMIUM}↔${CODEX_PREMIUM}↔${GEMINI_PREMIUM}, ${CLAUDE_STANDARD}↔${CODEX_STANDARD}↔${GEMINI_STANDARD}
+## Provider and Model Resolution
+- Provider/model selection resolves from effective \`.deckent/config.json\`, the model registry, and live capability evidence.
+- This file does not freeze a provider catalog, default model, or concurrency value.
 
 ## Agent Instructions
-When acting as Brain: @.claude/rules/brain.md
-When acting as Auditor: @.claude/rules/auditor.md
-When acting as Worker: @.claude/rules/worker-default.md
+Brain, Auditor, and Worker rules load from the selected host adapter's generated
+rule projection. DECKENT.md does not freeze provider-specific rule paths.
 
 ## Context
 @DIRECTIVES.md
@@ -189,8 +172,8 @@ export function generateDirectivesTemplateTR(stack: FullStackResult, projectName
 ---
 
 ## Task 1: Örnek — Bu task'ı düzenleyin veya silin
-- Model: ${CLAUDE_STANDARD}
-- Provider: claude
+- Model: ${TEMPLATE_MODEL_ID}
+- Provider: ${TEMPLATE_PROVIDER_ID}
 - Effort: normal
 - Skills: ${skill}
 - Files: ${files}
@@ -200,8 +183,8 @@ export function generateDirectivesTemplateTR(stack: FullStackResult, projectName
 Bu örnek task'tır. Kendi hedefinize göre düzenleyin.
 
 Her task şunları içermelidir:
-- **Model:** tam provider API ID — ${CLAUDE_PREMIUM} (karmaşık), ${CLAUDE_STANDARD} (genel), ${CLAUDE_ECONOMY} (basit). Legacy alias'lar (opus/sonnet/haiku) REDDEDİLİR — bkz. deckent_models.
-- **Provider:** claude | codex | gemini — Model ID'nin sahibi provider (ID prefiksinden çıkarılamıyorsa zorunlu)
+- **Model:** Effective config ve canlı model registry'den seçilen tam provider API ID.
+- **Provider:** Model kimliğinin sahibi olan ve effective config/capability çözümlemesinden seçilen provider.
 - **Effort:** low (<1 saat), normal (1-3 saat), high (3+ saat)
 - **Skills:** Uzmanlık alanı (typescript-expert, testing-expert, vb.)
 - **Files:** Değiştirilecek dosyalar
@@ -232,8 +215,8 @@ export function generateDirectivesTemplateEN(stack: FullStackResult, projectName
 ---
 
 ## Task 1: Example — Edit or delete this task
-- Model: ${CLAUDE_STANDARD}
-- Provider: claude
+- Model: ${TEMPLATE_MODEL_ID}
+- Provider: ${TEMPLATE_PROVIDER_ID}
 - Effort: normal
 - Skills: ${skill}
 - Files: ${files}
@@ -243,8 +226,8 @@ export function generateDirectivesTemplateEN(stack: FullStackResult, projectName
 This is an example task. Edit it to match your goals.
 
 Each task should include:
-- **Model:** exact provider API ID — ${CLAUDE_PREMIUM} (complex), ${CLAUDE_STANDARD} (general), ${CLAUDE_ECONOMY} (simple). Legacy aliases (opus/sonnet/haiku) are REJECTED — see deckent_models.
-- **Provider:** claude | codex | gemini — the ID's owning provider (required when it can't be inferred from the ID's prefix)
+- **Model:** Exact provider API ID selected from effective config and the live model registry.
+- **Provider:** Owning provider selected through effective config and capability resolution.
 - **Effort:** low (<1 hour), normal (1-3 hours), high (3+ hours)
 - **Skills:** Expertise area (typescript-expert, testing-expert, etc.)
 - **Files:** Files to be modified
@@ -310,9 +293,9 @@ deckent cleanup   # Temizle ve yeniden başla
 \`\`\`
 
 ## MCP Entegrasyonu
-Claude Code, Cursor veya VS Code'da MCP server olarak kullanabilirsiniz:
+Seçilen MCP-compatible host içinde \`deckent-mcp\` server'ını kaydedin:
 \`\`\`bash
-claude mcp add deckent -- npx deckent-mcp
+npx deckent-mcp
 \`\`\`
 `;
   }
@@ -358,9 +341,9 @@ deckent cleanup     # Clean up and restart
 \`\`\`
 
 ## MCP Integration
-Use as MCP server in Claude Code, Cursor, or VS Code:
+Register Deckent as an MCP server in the selected host:
 \`\`\`bash
-claude mcp add deckent -- npx deckent-mcp
+npx deckent-mcp
 \`\`\`
 `;
 }
@@ -376,8 +359,8 @@ export function generateDirectivesGuideDoc(lang: string): string {
 ## Goal: Sprint amacını bir paragrafta açıkla.
 
 ## Task 1: Task Başlığı
-- Model: ${CLAUDE_STANDARD}
-- Provider: claude
+- Model: ${TEMPLATE_MODEL_ID}
+- Provider: ${TEMPLATE_PROVIDER_ID}
 - Effort: normal
 - Skills: typescript-expert
 - Files: src/core/config.ts
@@ -394,8 +377,8 @@ Task'ın ne yapacağını detaylı açıkla.
 
 | Alan | Değerler | Açıklama |
 |------|----------|----------|
-| Model | tam provider API ID (örn. ${CLAUDE_PREMIUM}, ${CLAUDE_STANDARD}, ${CLAUDE_ECONOMY}) | AI modeli — legacy alias'lar (opus/sonnet/haiku) REDDEDİLİR; canlı katalog için deckent_models |
-| Provider | claude, codex, gemini | Model ID'nin sahibi provider — ID prefiksinden (claude-*/gpt-*/gemini-*) çıkarılamıyorsa zorunlu |
+| Model | effective config/model registry'den tam API ID | Çalışma anında seçilen model kimliği |
+| Provider | effective config/capability sonucu | Model kimliğinin sahibi provider |
 | Effort | low, normal, high | İş yükü — low: <1 saat, normal: 1-3 saat, high: 3+ saat |
 | Skills | skill-id listesi | Uzmanlık alanı (virgülle ayır) |
 | Files | dosya yolları | Değiştirilecek dosyalar |
@@ -424,8 +407,8 @@ Task'ın ne yapacağını detaylı açıkla.
 ## Goal: Describe the sprint goal in one paragraph.
 
 ## Task 1: Task Title
-- Model: ${CLAUDE_STANDARD}
-- Provider: claude
+- Model: ${TEMPLATE_MODEL_ID}
+- Provider: ${TEMPLATE_PROVIDER_ID}
 - Effort: normal
 - Skills: typescript-expert
 - Files: src/core/config.ts
@@ -442,8 +425,8 @@ Describe what the task will do in detail.
 
 | Field | Values | Description |
 |-------|--------|-------------|
-| Model | exact provider API ID (e.g. ${CLAUDE_PREMIUM}, ${CLAUDE_STANDARD}, ${CLAUDE_ECONOMY}) | AI model — legacy aliases (opus/sonnet/haiku) are REJECTED; see deckent_models for the live catalog |
-| Provider | claude, codex, gemini | The ID's owning provider — required when it can't be inferred from the ID's prefix (claude-*/gpt-*/gemini-*) |
+| Model | exact API ID from effective config/model registry | Runtime-selected model identity |
+| Provider | effective config/capability result | Provider that owns the model identity |
 | Effort | low, normal, high | Workload — low: <1h, normal: 1-3h, high: 3+h |
 | Skills | skill-id list | Expertise area (comma-separated) |
 | Files | file paths | Files to be modified |
@@ -478,16 +461,16 @@ CLI ile okuma/yazma: \`deckent config read\` / \`deckent config set key value\`
 | mode | performance, balanced, economic, api | balanced | Plan modu |
 | language | en, tr | en | Arayüz dili |
 | projectName | string | dizin adı | Proje adı |
-| max_workers | 1-10 | mode'a göre | Eş zamanlı worker sayısı |
+| max_workers | runtime policy'nin kabul ettiği sayı | effective config/mode | Eş zamanlı worker üst sınırı |
 
 ## Provider Ayarları
 
 | Ayar | Değerler | Varsayılan | Açıklama |
 |------|----------|-----------|----------|
-| brain_provider | claude, codex, gemini | claude | Brain provider'ı |
-| worker_provider | claude, codex, gemini | claude | Worker provider'ı |
-| fallback_provider | claude, codex, gemini | - | Yedek provider |
-| spawn_backend | tmux, subprocess | tmux | Worker başlatma (Windows: subprocess) |
+| brain_provider | registered provider ID | effective config | Brain provider'ı |
+| worker_provider | registered provider ID | effective config | Worker provider'ı |
+| fallback_provider | registered provider ID | effective config | Yedek provider |
+| spawn_backend | registered backend ID | platform adapter/config | Worker başlatma backend'i |
 
 ## Routing Ayarları
 
@@ -526,16 +509,16 @@ CLI read/write: \`deckent config read\` / \`deckent config set key value\`
 | mode | performance, balanced, economic, api | balanced | Plan mode |
 | language | en, tr | en | UI language |
 | projectName | string | dir name | Project name |
-| max_workers | 1-10 | per mode | Concurrent worker count |
+| max_workers | number accepted by runtime policy | effective config/mode | Concurrent worker ceiling |
 
 ## Provider Settings
 
 | Setting | Values | Default | Description |
 |---------|--------|---------|-------------|
-| brain_provider | claude, codex, gemini | claude | Brain provider |
-| worker_provider | claude, codex, gemini | claude | Worker provider |
-| fallback_provider | claude, codex, gemini | - | Fallback provider |
-| spawn_backend | tmux, subprocess | tmux | Worker spawn (Windows: subprocess) |
+| brain_provider | registered provider ID | effective config | Brain provider |
+| worker_provider | registered provider ID | effective config | Worker provider |
+| fallback_provider | registered provider ID | effective config | Fallback provider |
+| spawn_backend | registered backend ID | platform adapter/config | Worker spawn backend |
 
 ## Routing Settings
 

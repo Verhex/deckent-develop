@@ -172,6 +172,45 @@ describe('spawnWorkers — C0c wire (Sprint 168 W2.5)', () => {
     expect(backend.calls).toHaveLength(0);
   });
 
+  it('routes an owner-authorized final-only Codex budget through Docker containment', async () => {
+    const task = createTask('469-FINAL-ONLY', []);
+    task.model = 'gpt-5.6-sol';
+    task.provider = 'codex';
+    task.budgetPolicy = {
+      ...task.budgetPolicy!,
+      resolvedProvider: 'codex',
+      finalOnlyUsage: {
+        maxWallClockSeconds: 600,
+        profileRef: 'execution_budget.final_only_usage',
+        policyDigest: 'a'.repeat(64),
+      },
+    };
+    persistTasks([task]);
+    const backend = makeMockBackend();
+    Object.defineProperties(backend, {
+      name: { value: 'docker' },
+      liveUsageBudgetSupport: { value: undefined },
+    });
+
+    const origCwd = process.cwd();
+    process.chdir(testRoot);
+    try {
+      await spawnWorkers(
+        testRoot,
+        makeSprint('sprint-469', [task]),
+        { ...makeConfig(), spawn_backend: 'docker' } as ResolvedConfig,
+        { spawnBackend: backend },
+      );
+    } finally {
+      process.chdir(origCwd);
+    }
+
+    expect(backend.calls).toHaveLength(1);
+    expect(backend.calls[0]?.opts?.finalOnlyUsageContainment).toEqual(
+      task.budgetPolicy.finalOnlyUsage,
+    );
+  });
+
   it('does not retry a provider-authority HOLD and never reaches prompt/task assignment/backend', async () => {
     const task = createTask('168-PROVIDER-AUTH-HOLD', []);
     persistTasks([task]);

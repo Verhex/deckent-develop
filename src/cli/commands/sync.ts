@@ -15,12 +15,13 @@ import { BUILTIN_DOMAINS } from '../../core/routing/vocabulary-builtin.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { ensureCursorRules } from '../helpers/cursor-config.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
 const GEMINI_FILE = 'GEMINI.md';
 const CURSOR_RULES_DIR = '.cursor';
-const CURSOR_RULES_FILE = join(CURSOR_RULES_DIR, 'rules');
+const CURSOR_RULES_FILE = join(CURSOR_RULES_DIR, 'rules', 'deckent.mdc');
 const CODEX_DIR = '.codex';
 const CODEX_AGENTS_FILE = join(CODEX_DIR, 'AGENTS.md');
 const MAX_FILE_LIST = 50;
@@ -412,10 +413,11 @@ export function syncGeminiAdapter(root: string, dryRun = false, onError?: (err: 
 }
 
 /**
- * Sync .cursor/rules — ensure @DECKENT.md reference, creating dir if needed.
+ * Sync .cursor/rules/deckent.mdc — ensure @DECKENT.md reference without
+ * replacing owner-authored Cursor rules.
  */
 export function syncCursorAdapter(root: string, dryRun = false, onError?: (err: AdapterSyncError) => void): boolean {
-  const dirPath = join(root, CURSOR_RULES_DIR);
+  const dirPath = join(root, CURSOR_RULES_DIR, 'rules');
   if (!existsSync(dirPath)) {
     if (dryRun) return true; // would create
     try {
@@ -425,9 +427,14 @@ export function syncCursorAdapter(root: string, dryRun = false, onError?: (err: 
     }
   }
   if (!dryRun) {
-    const err = applyDeckentImport(join(root, CURSOR_RULES_FILE), '.cursor/rules');
-    if (err) {
-      onError?.(err);
+    try {
+      ensureCursorRules(join(root, CURSOR_RULES_FILE));
+    } catch (cause) {
+      onError?.({
+        label: '.cursor/rules/deckent.mdc',
+        file: join(root, CURSOR_RULES_FILE),
+        reason: cause instanceof Error ? cause.message : String(cause),
+      });
       return false;
     }
   }
@@ -454,10 +461,10 @@ export function syncCodexAdapter(root: string, dryRun = false, onError?: (err: A
 }
 
 /**
- * Build provider-specific config entries for sync output.
- * Returns a map of provider → { file, synced }.
+ * Build host-adapter entries for sync output.
+ * The keys identify supported host surfaces, not execution providers.
  */
-export function buildProviderSyncMap(root: string, dryRun = false): Record<string, { file: string; synced: boolean }> {
+export function buildHostAdapterSyncMap(root: string, dryRun = false): Record<string, { file: string; synced: boolean }> {
   return {
     claude: {
       file: CLAUDE_FILE,
@@ -480,6 +487,12 @@ export function buildProviderSyncMap(root: string, dryRun = false): Record<strin
     },
   };
 }
+
+/**
+ * @deprecated Compatibility alias. Use buildHostAdapterSyncMap: Cursor and
+ * similar integrations are host adapters, not execution providers.
+ */
+export const buildProviderSyncMap = buildHostAdapterSyncMap;
 
 /**
  * Sync adapter files: CLAUDE.md, AGENTS.md, GEMINI.md, .cursor/rules, .codex/AGENTS.md

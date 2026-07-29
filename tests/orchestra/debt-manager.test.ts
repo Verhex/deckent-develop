@@ -384,6 +384,25 @@ describe('handleCrossDependencies', () => {
     expect(result[0]!.priority).toBe('CRITICAL');
   });
 
+  it('does not create a concurrent cross-fix while the NO_GO task direct fix is pending', () => {
+    const task1 = makeTask({ id: 'task-001', dependencies: [] });
+    const task2 = makeTask({ id: 'task-002', dependencies: ['task-001'] });
+    const sprint: Sprint = {
+      id: 'sprint-001', number: 1, status: 'ACTIVE' as any, phase: 'EXECUTE' as any,
+      tasks: [task1, task2], workers: [],
+    };
+    const evaluations = new Map([
+      ['task-001', TaskEvaluation.DONE],
+      ['task-002', TaskEvaluation.NO_GO],
+    ]);
+    vi.mocked(existsSync).mockImplementation(path =>
+      String(path).endsWith('task-task-002-fix.json'),
+    );
+
+    expect(handleCrossDependencies('/root', sprint, evaluations)).toEqual([]);
+    expect(writeFileSync).not.toHaveBeenCalled();
+  });
+
   it('creates cross-fix task when NO_GO depends on GO_WITH_TECH_DEBT task', () => {
     const task1 = makeTask({ id: 'task-001', dependencies: [] });
     const task2 = makeTask({ id: 'task-002', dependencies: ['task-001'] });

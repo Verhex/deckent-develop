@@ -1,188 +1,139 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, utimesSync } from 'node:fs';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { spawnSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function makeTempDirs(prefix: string) {
-  const base = join(tmpdir(), `sync-mem-test-${prefix}-${Date.now()}`);
-  const userDir = join(base, 'user');
-  const coreDir = join(base, 'core');
-  mkdirSync(userDir, { recursive: true });
-  mkdirSync(coreDir, { recursive: true });
-  return { base, userDir, coreDir };
-}
-
-function runSync(args: string[], env: Record<string, string> = {}) {
-  return spawnSync('node', [join(process.cwd(), 'scripts/sync-core-memory.mjs'), ...args], {
-    encoding: 'utf-8',
-    env: { ...process.env, ...env },
+function runSync(
+  args: string[],
+  env: Record<string, string> = {},
+): Promise<{ status: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      process.execPath,
+      [join(process.cwd(), 'scripts/sync-core-memory.mjs'), ...args],
+      {
+        env: { ...process.env, ...env },
+        encoding: 'utf-8',
+      },
+      (error, stdout, stderr) => {
+        if (error && typeof error.code !== 'number') {
+          reject(error);
+          return;
+        }
+        resolve({
+          status: error && typeof error.code === 'number' ? error.code : 0,
+          stdout,
+          stderr,
+        });
+      },
+    );
   });
-}
-
-function writeEntry(dir: string, name: string, content: string) {
-  writeFileSync(join(dir, name), content, 'utf-8');
 }
 
 function readEntry(dir: string, name: string): string | null {
-  const p = join(dir, name);
-  if (!existsSync(p)) return null;
-  return readFileSync(p, 'utf-8');
+  const path = join(dir, name);
+  return existsSync(path) ? readFileSync(path, 'utf-8') : null;
 }
 
-function setMtime(path: string, msSinceEpoch: number) {
-  const t = new Date(msSinceEpoch);
-  utimesSync(path, t, t);
-}
+describe('sync-core-memory one-way projection', () => {
+  let tempRoot: string;
+  let authorityDir: string;
+  let projectionDir: string;
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
+  beforeEach(() => {
+    tempRoot = mkdtempSync(join(tmpdir(), 'sync-mem-test-'));
+    authorityDir = join(tempRoot, 'authority');
+    projectionDir = join(tempRoot, 'projection');
+    mkdirSync(authorityDir, { recursive: true });
+    mkdirSync(projectionDir, { recursive: true });
+    writeFileSync(join(authorityDir, 'MEMORY.md'), '# Canonical memory\n', 'utf-8');
+  });
 
-describe('sync-core-memory --backup', () => {
-  let dirs: ReturnType<typeof makeTempDirs>;
+  afterEach(() => {
+    rmSync(tempRoot, { recursive: true, force: true });
+  });
 
-  beforeEach(() => { dirs = makeTempDirs('backup'); });
-  afterEach(() => { rmSync(dirs.base, { recursive: true, force: true }); });
+  it('projects repo authority to the configured host directory', async () => {
+    writeFileSync(join(authorityDir, 'law.md'), '# Law\n', 'utf-8');
 
-  it('(a) copies user entries to core on backup', () => {
-    writeEntry(dirs.userDir, 'note_a.md', '# Note A\nContent A');
-    writeEntry(dirs.userDir, 'note_b.md', '# Note B\nContent B');
-
-    const result = runSync(['--backup'], {
-      DECKENT_USER_MEMORY_PATH: dirs.userDir,
-      DECKENT_CORE_MEMORY_PATH: dirs.coreDir,
+    const result = await runSync(['--target', projectionDir], {
+      DECKENT_CORE_MEMORY_PATH: authorityDir,
     });
 
     expect(result.status).toBe(0);
-    expect(readEntry(dirs.coreDir, 'note_a.md')).toBe('# Note A\nContent A');
-    expect(readEntry(dirs.coreDir, 'note_b.md')).toBe('# Note B\nContent B');
-    expect(result.stdout).toContain('Synced 2 entries');
+    expect(readEntry(projectionDir, 'MEMORY.md')).toBe('# Canonical memory\n');
+    expect(readEntry(projectionDir, 'law.md')).toBe('# Law\n');
   });
 
-  it('skips identical files on backup (idempotent)', () => {
-    writeEntry(dirs.userDir, 'note_a.md', '# Same content');
-    writeEntry(dirs.coreDir, 'note_a.md', '# Same content');
+  it('overwrites projection drift and removes projection-only markdown', async () => {
+    writeFileSync(join(authorityDir, 'law.md'), 'authority', 'utf-8');
+    writeFileSync(join(projectionDir, 'law.md'), 'host drift', 'utf-8');
+    writeFileSync(join(projectionDir, 'stale.md'), 'stale', 'utf-8');
 
-    const result = runSync(['--backup'], {
-      DECKENT_USER_MEMORY_PATH: dirs.userDir,
-      DECKENT_CORE_MEMORY_PATH: dirs.coreDir,
+    const result = await runSync(['--target', projectionDir], {
+      DECKENT_CORE_MEMORY_PATH: authorityDir,
     });
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('Synced 0 entries');
-    expect(result.stdout).toContain('1 unchanged');
+    expect(readEntry(projectionDir, 'law.md')).toBe('authority');
+    expect(existsSync(join(projectionDir, 'stale.md'))).toBe(false);
   });
-});
 
-describe('sync-core-memory --restore', () => {
-  let dirs: ReturnType<typeof makeTempDirs>;
+  it('is idempotent when authority and projection are equal', async () => {
+    writeFileSync(join(projectionDir, 'MEMORY.md'), '# Canonical memory\n', 'utf-8');
+    const beforeMtime = statSync(join(projectionDir, 'MEMORY.md')).mtimeMs;
 
-  beforeEach(() => { dirs = makeTempDirs('restore'); });
-  afterEach(() => { rmSync(dirs.base, { recursive: true, force: true }); });
-
-  it('(b) restores core entries to user dir', () => {
-    writeEntry(dirs.coreDir, 'feedback_a.md', '# Feedback A');
-    writeEntry(dirs.coreDir, 'feedback_b.md', '# Feedback B');
-
-    const result = runSync(['--restore'], {
-      DECKENT_USER_MEMORY_PATH: dirs.userDir,
-      DECKENT_CORE_MEMORY_PATH: dirs.coreDir,
+    const result = await runSync(['--target', projectionDir], {
+      DECKENT_CORE_MEMORY_PATH: authorityDir,
     });
 
     expect(result.status).toBe(0);
-    expect(readEntry(dirs.userDir, 'feedback_a.md')).toBe('# Feedback A');
-    expect(readEntry(dirs.userDir, 'feedback_b.md')).toBe('# Feedback B');
-    expect(result.stdout).toContain('Synced 2 entries');
+    expect(statSync(join(projectionDir, 'MEMORY.md')).mtimeMs).toBe(beforeMtime);
   });
 
-  it('(c) idempotent re-run reports no changes', () => {
-    writeEntry(dirs.coreDir, 'feedback_a.md', '# Feedback A');
-    writeEntry(dirs.userDir, 'feedback_a.md', '# Feedback A');
+  it('check mode reports drift without mutating the projection', async () => {
+    writeFileSync(join(authorityDir, 'law.md'), 'authority', 'utf-8');
+    writeFileSync(join(projectionDir, 'law.md'), 'host drift', 'utf-8');
 
-    const result = runSync(['--restore'], {
-      DECKENT_USER_MEMORY_PATH: dirs.userDir,
-      DECKENT_CORE_MEMORY_PATH: dirs.coreDir,
+    const result = await runSync(['--target', projectionDir, '--check'], {
+      DECKENT_CORE_MEMORY_PATH: authorityDir,
     });
 
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('All entries present');
-    expect(result.stdout).toContain('Synced 0 entries');
+    expect(result.status).toBe(1);
+    expect(readEntry(projectionDir, 'law.md')).toBe('host drift');
   });
 
-  it('(e) warns about user-only entries not in core', () => {
-    writeEntry(dirs.coreDir, 'core_only.md', '# Core entry');
-    writeEntry(dirs.userDir, 'user_only.md', '# User only');
-
-    const result = runSync(['--restore'], {
-      DECKENT_USER_MEMORY_PATH: dirs.userDir,
-      DECKENT_CORE_MEMORY_PATH: dirs.coreDir,
+  it('rejects removed host-to-authority modes', async () => {
+    const result = await runSync(['--backup', '--target', projectionDir], {
+      DECKENT_CORE_MEMORY_PATH: authorityDir,
     });
 
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('WARN');
-    expect(result.stdout).toContain('user_only.md');
-  });
-});
-
-describe('sync-core-memory --bidirectional', () => {
-  let dirs: ReturnType<typeof makeTempDirs>;
-
-  beforeEach(() => { dirs = makeTempDirs('bidir'); });
-  afterEach(() => { rmSync(dirs.base, { recursive: true, force: true }); });
-
-  it('(d) newer-wins: user newer → updates core', () => {
-    writeEntry(dirs.userDir, 'shared.md', 'User version');
-    writeEntry(dirs.coreDir, 'shared.md', 'Core version');
-
-    // Make user file newer
-    const now = Date.now();
-    setMtime(join(dirs.coreDir, 'shared.md'), now - 5000);
-    setMtime(join(dirs.userDir, 'shared.md'), now);
-
-    const result = runSync(['--bidirectional'], {
-      DECKENT_USER_MEMORY_PATH: dirs.userDir,
-      DECKENT_CORE_MEMORY_PATH: dirs.coreDir,
-    });
-
-    expect(result.status).toBe(0);
-    expect(readEntry(dirs.coreDir, 'shared.md')).toBe('User version');
-    expect(result.stdout).toContain('user newer');
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('repo-local core-memory is the only authority');
   });
 
-  it('(d) newer-wins: core newer → updates user', () => {
-    writeEntry(dirs.userDir, 'shared.md', 'User version');
-    writeEntry(dirs.coreDir, 'shared.md', 'Core version');
-
-    const now = Date.now();
-    setMtime(join(dirs.userDir, 'shared.md'), now - 5000);
-    setMtime(join(dirs.coreDir, 'shared.md'), now);
-
-    const result = runSync(['--bidirectional'], {
-      DECKENT_USER_MEMORY_PATH: dirs.userDir,
-      DECKENT_CORE_MEMORY_PATH: dirs.coreDir,
+  it('requires an explicit absolute projection target', async () => {
+    const missing = await runSync([], {
+      DECKENT_CORE_MEMORY_PATH: authorityDir,
+      DECKENT_MEMORY_PROJECTION_PATH: '',
+      DECKENT_USER_MEMORY_PATH: '',
     });
+    expect(missing.status).not.toBe(0);
+    expect(missing.stderr).toContain('No projection target configured');
 
-    expect(result.status).toBe(0);
-    expect(readEntry(dirs.userDir, 'shared.md')).toBe('Core version');
-    expect(result.stdout).toContain('core newer');
-  });
-});
-
-describe('sync-core-memory --dry-run', () => {
-  let dirs: ReturnType<typeof makeTempDirs>;
-
-  beforeEach(() => { dirs = makeTempDirs('dryrun'); });
-  afterEach(() => { rmSync(dirs.base, { recursive: true, force: true }); });
-
-  it('dry-run does not write files', () => {
-    writeEntry(dirs.userDir, 'note.md', '# Note');
-
-    runSync(['--backup', '--dry-run'], {
-      DECKENT_USER_MEMORY_PATH: dirs.userDir,
-      DECKENT_CORE_MEMORY_PATH: dirs.coreDir,
+    const relative = await runSync(['--target', 'relative/path'], {
+      DECKENT_CORE_MEMORY_PATH: authorityDir,
     });
-
-    expect(existsSync(join(dirs.coreDir, 'note.md'))).toBe(false);
+    expect(relative.status).not.toBe(0);
+    expect(relative.stderr).toContain('must be absolute');
   });
 });

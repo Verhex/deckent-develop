@@ -1,6 +1,6 @@
 # Brain Guide — Deckent Orchestrator Internals
 
-> Reference: [Architecture](../architecture/architecture.md) | [ADRs](../adr-index.md) | [.claude/rules/brain.md](../../.claude/rules/brain.md)
+> Reference: [Architecture](../architecture/architecture.md) | [ADRs](../adr/README.md) | [.claude/rules/brain.md](../../.claude/rules/brain.md)
 
 ---
 

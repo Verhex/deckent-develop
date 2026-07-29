@@ -1995,6 +1995,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     model_strategy: resolvedModelStrategy,
     auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
     spawn_backend: config.spawn_backend,
+    auth_mode: config.auth_mode,
     docker_image: config.docker_image,
     docker_timeout: config.docker_timeout,
     worker_memory_limit_by_kind: config.worker_memory_limit_by_kind,

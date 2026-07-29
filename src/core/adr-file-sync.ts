@@ -41,6 +41,8 @@ export interface ParsedAdr {
   immutable: boolean | null;
   /** `publisher`|`contributor`|`user` (from `**Source:**`, null if absent). */
   sourceAuthority: string | null;
+  /** `advisory`|`runtime`|`hard` when declared as a discrete metadata value. */
+  enforcementLevel: string | null;
 }
 
 /** Result of a sync run over a directory of ADR files. */
@@ -70,6 +72,8 @@ const CLASS_META_PATTERN = /\*\*Class:\*\*\s*ADR-(G|D|UG|UP)\b/i;
 const SCOPE_META_PATTERN = /\*\*Scope:\*\*\s*([A-Za-z+]+)/i;
 const IMMUTABLE_META_PATTERN = /\*\*Immutable:\*\*\s*(yes|no|true|false)/i;
 const SOURCE_META_PATTERN = /\*\*Source:\*\*\s*([A-Za-z+]+)/i;
+const ENFORCEMENT_LEVEL_PATTERN =
+  /\*\*(?:Enforcement-Level|Enforcement level|Enforcement):\*\*\s*(advisory|runtime|hard)\b/i;
 
 /**
  * Parse a single ADR markdown file.
@@ -129,11 +133,21 @@ export function parseAdrFile(filePath: string): ParsedAdr | null {
     if (cm) adrClass = cm[1]!.toUpperCase();
   }
   const scopeMatch = content.match(SCOPE_META_PATTERN);
-  const scope = scopeMatch ? scopeMatch[1]!.trim().toLowerCase() : null;
+  const scope = scopeMatch
+    ? scopeMatch[1]!.trim().toLowerCase()
+    : adrClass === 'D'
+      ? 'dev'
+      : adrClass === 'G'
+        ? 'global+project'
+        : null;
   const immMatch = content.match(IMMUTABLE_META_PATTERN);
   const immutable = immMatch ? /^(?:yes|true)$/i.test(immMatch[1]!) : null;
   const srcMatch = content.match(SOURCE_META_PATTERN);
   const sourceAuthority = srcMatch ? srcMatch[1]!.trim().toLowerCase() : null;
+  const enforcementMatch = content.match(ENFORCEMENT_LEVEL_PATTERN);
+  const enforcementLevel = enforcementMatch
+    ? enforcementMatch[1]!.trim().toLowerCase()
+    : null;
 
   // Sprint extraction — prefer `**Sprint:** Sprint NNN`, fallback to first
   // `Sprint NNN` token in body.
@@ -160,6 +174,7 @@ export function parseAdrFile(filePath: string): ParsedAdr | null {
     scope,
     immutable,
     sourceAuthority,
+    enforcementLevel,
   };
 }
 
@@ -191,6 +206,7 @@ export function adrToEntryInput(adr: ParsedAdr): CreateEntryInput {
   if (adr.scope) input.scope = adr.scope;
   if (adr.immutable != null) input.immutable = adr.immutable;
   if (adr.sourceAuthority) input.source_authority = adr.sourceAuthority;
+  if (adr.enforcementLevel) input.enforcement_level = adr.enforcementLevel;
   return input;
 }
 
@@ -264,32 +280,52 @@ export function syncAdrFilesToDb(
 
     const input = adrToEntryInput(parsed);
 
+    // Existing historical rows may use uppercase IDs (for example ADR-G-037).
+    // Resolve identity case-insensitively so a lowercase canonical projection
+    // updates the authoritative row instead of creating a duplicate.
+    let existing = store.getById(parsed.id, { includeDeleted: true });
+    if (!existing) {
+      const caseVariant = store.getRawDb().prepare(
+        'SELECT id FROM entries WHERE lower(id) = lower(?) LIMIT 1',
+      ).get(parsed.id) as { id: string } | undefined;
+      if (caseVariant) {
+        existing = store.getById(caseVariant.id, { includeDeleted: true });
+        input.id = caseVariant.id;
+      }
+    }
+    const resolvedId = input.id ?? parsed.id;
+
     // Idempotency check — compare against existing row if any.
-    const existing = store.getById(parsed.id, { includeDeleted: true });
     if (existing) {
       const sameTitle = existing.title === parsed.title;
       const sameContent = existing.content === parsed.content;
       const sameStatus = existing.status === parsed.status;
       const sameSprint = (existing.sprint_id ?? null) === (parsed.sprintId ?? null);
-      if (sameTitle && sameContent && sameStatus && sameSprint) {
+      const sameTaxonomy =
+        (existing.adr_class ?? null) === parsed.adrClass
+        && (existing.scope ?? null) === parsed.scope
+        && (existing.immutable == null ? null : existing.immutable === 1) === parsed.immutable
+        && (existing.source_authority ?? null) === parsed.sourceAuthority
+        && (existing.enforcement_level ?? null) === parsed.enforcementLevel;
+      if (sameTitle && sameContent && sameStatus && sameSprint && sameTaxonomy) {
         result.skipped++;
-        result.ids.push(parsed.id);
+        result.ids.push(resolvedId);
         continue;
       }
       try {
         store.upsert(input, changedBy);
         result.updated++;
-        result.ids.push(parsed.id);
+        result.ids.push(resolvedId);
       } catch (e) {
-        result.errors.push(`upsert ${parsed.id}: ${e}`);
+        result.errors.push(`upsert ${resolvedId}: ${e}`);
       }
     } else {
       try {
         store.upsert(input, changedBy);
         result.inserted++;
-        result.ids.push(parsed.id);
+        result.ids.push(resolvedId);
       } catch (e) {
-        result.errors.push(`insert ${parsed.id}: ${e}`);
+        result.errors.push(`insert ${resolvedId}: ${e}`);
       }
     }
   }

@@ -2070,7 +2070,14 @@ function normalizeDockerLogLine(line: string, provider: string): string | Record
  */
 export function bridgeCodexEvent(obj: Record<string, unknown>): Record<string, unknown> {
   const t = obj['type'];
-  const remap = (logType: string): Record<string, unknown> => ({ ...obj, type: logType, codexEventType: t });
+  const remap = (logType: string): Record<string, unknown> => ({
+    ...obj,
+    type: logType,
+    // Generic consumers use providerEventType. codexEventType remains as a
+    // compatibility alias for persisted logs and external trace readers.
+    providerEventType: t,
+    codexEventType: t,
+  });
   if (t === 'thread.started') return remap('lifecycle');
   if (t === 'turn.started') return remap('turn');
   if (t === 'turn.completed') return remap('usage');
@@ -2086,6 +2093,28 @@ export function bridgeCodexEvent(obj: Record<string, unknown>): Record<string, u
 /** Narrow to a plain object (not null, not array). */
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/**
+ * A retired landing is restart-relevant only while its exact top-level task
+ * projection still exists. Landing journals intentionally outlive task
+ * cleanup for audit; absence, malformed JSON, or an id mismatch makes the
+ * journal historical evidence rather than current recovery authority.
+ */
+function hasCurrentTaskProjection(tasksDir: string, taskId: string): boolean {
+  const taskPath = join(tasksDir, `task-${taskId}.json`);
+  if (!existsSync(taskPath)) return false;
+  try {
+    const projection = JSON.parse(readFileSync(taskPath, 'utf-8')) as unknown;
+    return (
+      typeof projection === 'object'
+      && projection !== null
+      && !Array.isArray(projection)
+      && (projection as Record<string, unknown>)['id'] === taskId
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -3366,6 +3395,14 @@ export class DockerSpawnBackend implements SpawnBackend {
     const continuationRecoveryByKey =
       new Map<string, DockerContinuationRecoveryAuthority>();
     for (const landed of listRetiredExecutionLandings(this.projectDir)) {
+      const taskId = landed.checkpoint.checkpoint.taskId;
+      if (!hasCurrentTaskProjection(tasksDir, taskId)) {
+        debugLog(
+          'docker-backend:historical-landing-skipped',
+          `taskId=${taskId} reason=no-current-task-projection`,
+        );
+        continue;
+      }
       // MASTER-PLAN 664: a landing whose remaining budget can no longer finance
       // any continuation is permanently un-continuable. Recovery must settle it
       // and move on — propagating the hold here aborted EVERY later run on the
@@ -3383,15 +3420,15 @@ export class DockerSpawnBackend implements SpawnBackend {
         const reason = error instanceof Error ? error.message : String(error);
         debugLog(
           'docker-backend:recovery-continuation-held',
-          `taskId=${landed.checkpoint.checkpoint.taskId} ${reason}`,
+          `taskId=${taskId} ${reason}`,
         );
         settleHeldExecutionContinuation(
           this.projectDir,
-          landed.checkpoint.checkpoint.taskId,
+          taskId,
           137,
           reason,
         );
-        report.retiredLanded.push(landed.checkpoint.checkpoint.taskId);
+        report.retiredLanded.push(taskId);
         continue;
       }
       const recoveryAuthority: DockerContinuationRecoveryAuthority = {

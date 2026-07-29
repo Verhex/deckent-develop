@@ -671,6 +671,8 @@ export const EXECUTION_LOCK_MOUNT_ADOPTION_DIRECTORY =
   'execution-lock-authority-adoptions';
 export const EXECUTION_LOCK_AUTHORITY_ANCHOR_FILENAME =
   '.deckent-execution-lock-authority.anchor.json';
+const EXECUTION_LOCK_ROOT_BINDING_PREFIX =
+  '.deckent-execution-lock-root-binding';
 export const DEFAULT_EXECUTION_LOCK_LEASE_MS = 30_000;
 export const DEFAULT_EXECUTION_LOCK_HEARTBEAT_MS = 10_000;
 export const MAX_EXECUTION_LOCK_LEASE_MS = 86_400_000;
@@ -1082,8 +1084,10 @@ interface ExecutionLockAuthorityAnchor {
 interface ExecutionLockPinnedDirectories {
   readonly adapter: 'linux' | 'wsl';
   readonly inputProjectRoot: string;
+  readonly parentFd: number;
   readonly rootFd: number;
   readonly locksFd: number;
+  readonly stableParentPath: string;
   readonly stableRootPath: string;
   readonly stableLocksPath: string;
   readonly projectIdentity: ExecutionLockDirectoryIdentity;
@@ -1092,6 +1096,8 @@ interface ExecutionLockPinnedDirectories {
 
 interface ExecutionLockAuthorityFiles {
   readonly pinned: ExecutionLockPinnedDirectories;
+  readonly rootBindingPath: string;
+  readonly rootBindingIdentity: ExecutionLockPathIdentity;
   readonly anchorPath: string;
   readonly anchorIdentity: ExecutionLockPathIdentity;
   readonly anchorRaw: string;
@@ -1520,10 +1526,17 @@ function pinExecutionLockDirectories(
   projectRoot: string,
 ): ExecutionLockPinnedDirectories {
   const adapter = executionLockPlatformAdapter();
+  let parentFd: number | undefined;
   let rootFd: number | undefined;
   let locksFd: number | undefined;
   try {
     const canonicalRoot = realpathSync(projectRoot);
+    parentFd = openSync(
+      dirname(canonicalRoot),
+      fsConstants.O_RDONLY
+        | fsConstants.O_DIRECTORY
+        | fsConstants.O_NOFOLLOW,
+    );
     rootFd = openSync(
       canonicalRoot,
       fsConstants.O_RDONLY
@@ -1531,6 +1544,7 @@ function pinExecutionLockDirectories(
         | fsConstants.O_NOFOLLOW,
     );
     const stableRootPath = `/proc/self/fd/${rootFd}`;
+    const stableParentPath = `/proc/self/fd/${parentFd}`;
     const projectIdentity = executionLockDirectoryIdentity(rootFd);
     const inputIdentity = executionLockStatsIdentity(
       statSync(projectRoot, { bigint: true }) as unknown as ReturnType<typeof statSync>,
@@ -1593,8 +1607,10 @@ function pinExecutionLockDirectories(
     return {
       adapter,
       inputProjectRoot: projectRoot,
+      parentFd,
       rootFd,
       locksFd,
+      stableParentPath,
       stableRootPath,
       stableLocksPath,
       projectIdentity,
@@ -1606,6 +1622,9 @@ function pinExecutionLockDirectories(
     }
     if (rootFd !== undefined) {
       try { closeSync(rootFd); } catch { /* preserve pin failure */ }
+    }
+    if (parentFd !== undefined) {
+      try { closeSync(parentFd); } catch { /* preserve pin failure */ }
     }
     if (error instanceof ExecutionLockError) throw error;
     throw new ExecutionLockError(
@@ -1624,6 +1643,8 @@ function validatePinnedExecutionLockDirectories(
   let inputIdentity: ExecutionLockDirectoryIdentity;
   let namedLocks: ReturnType<typeof lstatSync> | undefined;
   try {
+    const parentEntry = fstatSync(pinned.parentFd);
+    if (!parentEntry.isDirectory()) throw new Error('parent-not-directory');
     inputIdentity = executionLockStatsIdentity(
       statSync(pinned.inputProjectRoot, { bigint: true }) as unknown as ReturnType<typeof statSync>,
       projectIdentity.mountId,
@@ -1674,7 +1695,7 @@ function closePinnedExecutionLockDirectories(
 ): boolean {
   EXECUTION_LOCK_PINNED_LOCK_DIRECTORIES.delete(pinned.stableRootPath);
   let closed = true;
-  for (const fd of [pinned.locksFd, pinned.rootFd]) {
+  for (const fd of [pinned.locksFd, pinned.rootFd, pinned.parentFd]) {
     try {
       closeSync(fd);
     } catch {
@@ -1867,6 +1888,59 @@ function createExecutionLockAuthorityAnchor(
   }
 }
 
+function executionLockRootBindingPath(
+  pinned: ExecutionLockPinnedDirectories,
+): string {
+  const rootName = basename(pinned.inputProjectRoot);
+  const key = createHash('sha256').update(rootName, 'utf8').digest('hex');
+  return join(
+    pinned.stableParentPath,
+    `${EXECUTION_LOCK_ROOT_BINDING_PREFIX}.${key}.json`,
+  );
+}
+
+function createExecutionLockRootBinding(
+  pinned: ExecutionLockPinnedDirectories,
+  bindingPath: string,
+  anchor: ExecutionLockAuthorityAnchor,
+): boolean {
+  const raw = JSON.stringify(anchor);
+  let fd: number | undefined;
+  try {
+    fd = openSync(
+      bindingPath,
+      fsConstants.O_WRONLY
+        | fsConstants.O_CREAT
+        | fsConstants.O_EXCL
+        | fsConstants.O_NOFOLLOW,
+      0o600,
+    );
+    writeFileSync(fd, raw, 'utf8');
+    fsyncSync(fd);
+    const opened = fstatSync(fd);
+    if (!opened.isFile()
+      || opened.nlink !== 1
+      || opened.size !== Buffer.byteLength(raw, 'utf8')) {
+      throw new ExecutionLockError(
+        'Execution authority root binding creation is unsafe',
+        'unknown',
+        'malformed',
+      );
+    }
+    closeSync(fd);
+    fd = undefined;
+    fsyncExecutionLockDirectory(pinned.stableParentPath);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
+    throw error;
+  } finally {
+    if (fd !== undefined) {
+      try { closeSync(fd); } catch { /* preserve creation failure */ }
+    }
+  }
+}
+
 function assertExecutionLockAnchorBinding(
   anchor: ExecutionLockAuthorityAnchor,
   pinned: ExecutionLockPinnedDirectories,
@@ -1893,6 +1967,17 @@ function assertExecutionLockAnchorBinding(
       'authority-epoch-mismatch',
     );
   }
+}
+
+function executionLockAuthorityAnchorEquals(
+  left: ExecutionLockAuthorityAnchor,
+  right: ExecutionLockAuthorityAnchor,
+): boolean {
+  return left.schemaVersion === right.schemaVersion
+    && left.authorityEpoch === right.authorityEpoch
+    && left.createdAt === right.createdAt
+    && executionLockStableDirectoryIdentityEquals(left.project, right.project)
+    && executionLockStableDirectoryIdentityEquals(left.locks, right.locks);
 }
 
 function readExecutionLockAuthoritySentinel(
@@ -2075,6 +2160,7 @@ function prepareExecutionLockAuthority(
       join(locksDir, EXECUTION_LOCK_AUTHORITY_SENTINEL_FILENAME);
     const anchorPath =
       join(pinned.stableRootPath, EXECUTION_LOCK_AUTHORITY_ANCHOR_FILENAME);
+    const rootBindingPath = executionLockRootBindingPath(pinned);
     let dbExists = executionLockPathExists(dbPath);
     let sentinelExists = executionLockPathExists(sentinelPath);
     let initializeDatabase = false;
@@ -2126,6 +2212,34 @@ function prepareExecutionLockAuthority(
       );
     }
     assertExecutionLockAnchorBinding(anchorRead.anchor, pinned);
+    const createdRootBinding = createExecutionLockRootBinding(
+      pinned,
+      rootBindingPath,
+      anchorRead.anchor,
+    );
+    const rootBindingRead =
+      readExecutionLockAuthorityAnchor(rootBindingPath);
+    if (!rootBindingRead) {
+      throw new ExecutionLockError(
+        'Execution authority root binding is unavailable',
+        'unknown',
+        'authority-state-missing',
+      );
+    }
+    assertExecutionLockAnchorBinding(rootBindingRead.anchor, pinned);
+    if (!executionLockAuthorityAnchorEquals(
+      rootBindingRead.anchor,
+      anchorRead.anchor,
+    )) {
+      throw new ExecutionLockError(
+        'Execution authority root binding disagrees with the project anchor',
+        'unknown',
+        'authority-epoch-mismatch',
+      );
+    }
+    if (createdRootBinding) {
+      fsyncExecutionLockDirectory(pinned.stableParentPath);
+    }
 
     if (!dbExists && !sentinelExists && createdAnchor) {
       const createdSentinel = createExecutionLockAuthoritySentinel(
@@ -2184,6 +2298,8 @@ function prepareExecutionLockAuthority(
     validatePinnedExecutionLockDirectories(pinned);
     return {
       pinned,
+      rootBindingPath,
+      rootBindingIdentity: rootBindingRead.identity,
       anchorPath,
       anchorIdentity: anchorRead.identity,
       anchorRaw: anchorRead.raw,
@@ -2215,9 +2331,19 @@ function validateExecutionLockAuthorityFiles(
     executionLockPathIdentity(files.dbPath, MAX_EXECUTION_LOCK_DB_BYTES);
   const anchorRead =
     readExecutionLockAuthorityAnchor(files.anchorPath);
+  const rootBindingRead =
+    readExecutionLockAuthorityAnchor(files.rootBindingPath);
   const sentinelRead =
     readExecutionLockAuthoritySentinel(files.sentinelPath);
   if (!anchorRead
+    || !rootBindingRead
+    || !executionLockPathIdentityEquals(
+      files.rootBindingIdentity,
+      rootBindingRead.identity,
+    )
+    || rootBindingRead.raw !== files.anchorRaw
+    || JSON.stringify(rootBindingRead.anchor)
+      !== JSON.stringify(files.anchor)
     || !executionLockPathIdentityEquals(
       files.anchorIdentity,
       anchorRead.identity,

@@ -62,7 +62,6 @@ import {
   generateQuickStartDoc,
   generateDirectivesGuideDoc,
   generateConfigReferenceDoc,
-  generateCursorDeckentMd,
   generateVscodeMcpJson,
 } from './init-templates.js';
 
@@ -114,14 +113,10 @@ export function applyIdeAdapters(
   const cursorDir = join(root, '.cursor');
   if (opts.allEnvs || existsSync(cursorDir)) {
     const rulesDir = join(cursorDir, 'rules');
-    const adapterPath = join(rulesDir, 'deckent.md');
-    if (!existsSync(adapterPath) || opts.force) {
-      mkdirSync(rulesDir, { recursive: true });
-      writeFileSync(adapterPath, generateCursorDeckentMd());
-      results.push({ path: adapterPath, action: 'created' });
-    } else {
-      results.push({ path: adapterPath, action: 'exists' });
-    }
+    const adapterPath = join(rulesDir, 'deckent.mdc');
+    const existed = existsSync(adapterPath);
+    generateCursorConfig(root);
+    results.push({ path: adapterPath, action: existed ? 'exists' : 'created' });
   }
 
   // 2. VS Code: .vscode/ dir exists OR --all-envs flag
@@ -151,7 +146,7 @@ export function applyIdeAdapters(
 /**
  * Apply per-environment IDE config for a single environment.
  *
- * Non-destructive (ADR-013 thin-adapter): deckent only injects a `@DECKENT.md`
+ * Non-destructive (ADR-G-004 thin-adapter): deckent only injects a `@DECKENT.md`
  * reference into the user's AGENTS.md / GEMINI.md via ensureDeckentImport — it
  * NEVER overwrites the user's existing adapter files or their own agents.
  * Greenfield → the thin adapter is created; brownfield → the reference is
@@ -354,7 +349,7 @@ globs: ["**/*"]
     for (const r of ideResults) {
       if (r.action === 'created') {
         if (r.path.includes('.cursor')) {
-          print('  Created .cursor/rules/deckent.md for Cursor integration');
+          print('  Created .cursor/rules/deckent.mdc for Cursor integration');
         } else if (r.path.includes('.vscode')) {
           print('  Created .vscode/mcp.json for VS Code MCP registration');
         }

@@ -54,11 +54,13 @@ const file = 'src/example/fake-path.ts';
     expect(filesWrite).not.toContain('src/example/fake-path.ts');
   });
 
-  // Test 4: Placeholder path detection (example.ts)
-  it('rejects example.ts as placeholder', () => {
+  // Test 4: shallow placeholders are rejected; deep exact targets are preserved
+  it('rejects shallow example.ts but preserves deeply qualified targets', () => {
     expect(isPlaceholderPath('src/example.ts')).toBe(true);
     expect(isPlaceholderPath('example.ts')).toBe(true);
     expect(isPlaceholderPath('tests/example.test.ts')).toBe(true);
+    expect(isPlaceholderPath('deneme/task-001/example.test.ts')).toBe(false);
+    expect(isPlaceholderPath('deneme\\task-001\\example.test.ts')).toBe(false);
   });
 
   // Test 5: Real scope paths preserved
@@ -125,9 +127,21 @@ Line 6`;
 describe('isPlaceholderPath edge cases', () => {
   it('rejects foo, bar, baz, qux, test as base names', () => {
     expect(isPlaceholderPath('foo.ts')).toBe(true);
+    expect(isPlaceholderPath('bar.js')).toBe(true);
+    expect(isPlaceholderPath('baz.test.ts')).toBe(true);
+    expect(isPlaceholderPath('qux.md')).toBe(true);
+  });
+
+  it('preserves deeply qualified conventional filenames', () => {
     expect(isPlaceholderPath('src/bar.js')).toBe(true);
     expect(isPlaceholderPath('tests/baz.test.ts')).toBe(true);
-    expect(isPlaceholderPath('qux.md')).toBe(true);
+    expect(sanitizeScope([
+      'deneme/task-001/README.md',
+      'deneme/task-001/example.test.ts',
+    ]).filesWrite).toEqual([
+      'deneme/task-001/README.md',
+      'deneme/task-001/example.test.ts',
+    ]);
   });
 
   it('preserves real filenames that are not placeholders', () => {

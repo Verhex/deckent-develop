@@ -47,11 +47,16 @@ const KNOWN_DOTFILES = new Set([
 ]);
 
 /**
- * Check if a path uses a placeholder filename (foo.ts, bar.js, example.test.ts).
- * Only rejects exact base-name matches — composite names like foo-bar.ts are preserved.
+ * Check if a shallow path uses a placeholder filename (foo.ts, src/foo.ts).
+ * Deep, intent-qualified targets may legitimately use conventional names (for
+ * example `deneme/task-001/example.test.ts`). Fenced-code extraction is handled
+ * earlier; silently deleting that exact authored target breaks new-file tasks.
  */
 export function isPlaceholderPath(path: string): boolean {
-  const basename = path.split('/').pop() ?? '';
+  const normalized = path.replaceAll('\\', '/');
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments.length >= 3) return false;
+  const basename = segments.at(-1) ?? '';
   // Strip all extensions: "foo.test.ts" → "foo"
   const base = basename.split('.')[0] ?? '';
   return PLACEHOLDER_NAMES.has(base.toLowerCase());

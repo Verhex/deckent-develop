@@ -26,7 +26,9 @@ import { debugLog } from '../core/utils.js';
 import {
   assertExecutionLandingSupport,
   assertLiveUsageBudgetSupport,
+  hasLiveUsageCeiling,
 } from '../core/live-execution-budget.js';
+import { getProviderCommandSpec } from '../core/provider-command-spec.js';
 import {
   attendedExecutionProjectId,
   type AttendedExecutionApprovalAuthority,
@@ -890,7 +892,6 @@ export async function spawnWorkers(
     // OAuth mount in the container. Uses the existing backend vocabulary (no
     // invented 'host' value; host-vs-cloud is a separate axis). Default
     // (undefined) keeps host-adapter routing unchanged.
-    const wantsHostAdapter = isAdapterProvider(taskProvider) && !task.backend;
     // Honest per-task backend resolution: when `- Backend:` is set and DIFFERS
     // from the configured spawn_backend, resolve THAT backend (so the override is
     // truthful, not silently the configured one). When it matches config (the
@@ -909,6 +910,19 @@ export async function spawnWorkers(
             dockerKindMemoryLimits: config.worker_memory_limit_by_kind,
           })
         : backend;
+    const finalOnlyUsageContainment =
+      effectiveBackend?.name === 'docker'
+      && getProviderCommandSpec(taskProvider)?.liveUsage === 'final-only'
+      && hasLiveUsageCeiling(task.budget)
+        ? task.budgetPolicy?.finalOnlyUsage
+        : undefined;
+    // An owner grant for a final-only provider is executable only inside the
+    // Docker wall-clock containment boundary. Without that exact grant, the
+    // normal host-adapter path remains fail-closed at live-usage admission.
+    const wantsHostAdapter =
+      isAdapterProvider(taskProvider)
+      && !task.backend
+      && !finalOnlyUsageContainment;
     // F1-RE (Sprint 252): resolve the model reasoning-effort (opt-in, provider-
     // validated) once; passed to every spawn path below. undefined → no flag.
     const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
@@ -1031,11 +1045,13 @@ export async function spawnWorkers(
       } catch (e) { debugLog('spawnWorkers:honestFailWrite', e); }
       continue;
     } else if (effectiveBackend) {
-      assertLiveUsageBudgetSupport(
-        task.budget,
-        effectiveBackend.liveUsageBudgetSupport,
-        effectiveBackend.name,
-      );
+      if (!finalOnlyUsageContainment) {
+        assertLiveUsageBudgetSupport(
+          task.budget,
+          effectiveBackend.liveUsageBudgetSupport,
+          effectiveBackend.name,
+        );
+      }
       const approvalGrant = assertExecutionLandingSupport({
         budget: task.budget,
         policy: task.budgetPolicy?.landingPolicy,
@@ -1067,6 +1083,7 @@ export async function spawnWorkers(
         executionApprovalGrant: approvalGrant,
         executionApprovalExpectedDispatch: approvalExpectedDispatch(effectiveBackend.name),
         settlementRef,
+        ...(finalOnlyUsageContainment ? { finalOnlyUsageContainment } : {}),
         // SURF-3 S2/S3 — live tool-by-tool activity (flag-gated; no-op when
         // off). 583/N5: env-twin aware — an interactive-origin coordinator
         // (DECKENT_LIVE_TRACE=1) streams live without a global config flip.

@@ -12,34 +12,36 @@
 - Workers stay within assigned scope (directories + filesWrite)
 - Auditor never writes source code
 - Sprint is NEVER left incomplete
-- Memory budget: 900 lines max in .brain/ (MEMORY 300, RETRO 120, PATTERNS 150, sprint log 100 per file)
+- `DIRECTIVES.md` is the binding execution contract for an active run after owner/system instructions
+- Runtime limits and retention budgets come from effective config; this document does not freeze live values
 
 ## Providers
-- Core provider identities: `claude`, `codex`, `gemini`, `ollama`, `openrouter`; config-driven provider definitions can extend the runtime registry
-- Default config: `providers: { brain: "claude", worker: "claude" }`; Claude workers use the Docker backend unless explicitly configured otherwise
+- Deckent's product contract is provider-neutral. Provider identities and adapters are discovered from effective config + the runtime registry; this file is not a provider catalog
+- Brain/worker/auditor provider, exact model, effort and backend are resolved per role from effective config, registry and capability evidence
 - Role-aware fallback: `provider_fallback.brain|worker|auditor` → `provider_fallback.global` → legacy single `fallback_provider`; `provider_fallback.auditor_provider` selects the Auditor primary
 - Configured order is authoritative, but fallback is never an availability claim: auth, backend/model reachability, limit evidence and execution-budget admission must still pass
 - Model Registry: live/cached catalog plus bundled offline fallback — `src/core/model-registry.ts`; inspect with `deckent models list`
-- Runtime model identity is the exact provider API ID (`id === apiId`). Legacy names such as `opus`, `sonnet`, `haiku` and `gpt-5` are migration inputs only and are rejected in authored tasks
+- Runtime model identity is the exact registered provider API ID (`id === apiId`); aliases are migration inputs only and are rejected in authored tasks
 - Provider-agnostic selection uses `model_strategy.brain_tier` / `model_strategy.worker_tier`; tier resolution returns a registered exact API ID
 - Planning mode: brain_planning = 'ai' | 'structured' | 'auto'
 
 ## Agents & Skills
-- 21 built-in agents + 31 built-in skills (src/core/builtins/{agents,skills} — canlı-sayım kaynağı) — aşağıdaki **Built-in Agents** / **Built-in Skills** bölümleri örnek/temsili bir alt-küme gösterir; tam liste `docs/reference/agents.md` + `src/core/builtins/skills/`.
-- Agent pool: .deckent/agents/*/agent.json — LRU eviction (max 50 temp, 5 sprint age)
+- Canlı agent listesi `docs/reference/agents.md` ve `deckent agents`; canlı skill listesi registry/`deckent skills` yüzeyidir. Bu belgede sayı tutulmaz
+- Agent pool: `.deckent/agents/*/agent.json`; retention/eviction effective config ve policy'den çözülür
 - Skill registry: .deckent/skills/*/skill.json — AST sandbox validation
 - Task routing: task-router.ts assigns agent + skills + provider per task
 
 ## MCP Integration
-- 47 tools — canlı/tam liste `docs/reference/mcp-tools.md` (AUTOGEN, `npm run docs:ref`); örnekler: init, set_directives, plan, start, status, doctor, retro, history, sync, config, review, run, kill, cleanup, help, **memory_query**, **autonomous**, **models**, nervous_subscribe, nervous_accept, nervous_reject, nervous_status, nervous_config, **process**, vb.
-- 8 resources: dashboard, directives, memory, debt, config, retro, tasks, agents
-- Canonical tool list is auto-generated — see `docs/reference/mcp-tools.md` (`npm run docs:ref`)
-- Registration: `claude mcp add deckent -- npx deckent-mcp`
+- Tool/resource sayıları bu belgede tutulmaz. Canonical canlı liste koddan auto-generated
+  `docs/reference/mcp-tools.md` içindedir (`npm run docs:ref`)
+- MCP server entrypoint provider/host bağımsızdır: `npx deckent-mcp`; registration şekli seçili
+  host adapterının capability/config yüzeyinden gelir
 
 ## Memory V2 — DB-First Architecture
 - **Storage:** SQLite (better-sqlite3) — single source of truth, .md files are generated exports
 - **Search:** FTS5 full-text search with dual-layer Turkish normalize (TR/EN/DE %100 recall)
-- **DB path:** `.brain/memory.db` (gitignored, rebuilt from exports)
+- **Product/user memory authority:** `.brain/memory.db` (gitignored; asla routine cleanup hedefi değildir)
+- **Deckent-dev dogfood core-memory authority:** `.deckent/docs/core-memory/MEMORY.md` + aynı dizindeki referanslar; product memory değildir
 - **Exports:** `.brain/exports/summary.md`, `decisions.md`, `memory.md`, `debt.md` (git-tracked)
 - **Schema:** 5 tables (entries, tags, relations, entry_history, schema_version) + FTS5 virtual table
 - **Brain auto-query:** Task DNA → ilgili ADR/pattern/memory otomatik sorgulanır (PLAN, SPAWN, EVALUATE)
@@ -51,9 +53,11 @@
 @.brain/exports/summary.md
 
 ## Architecture Decision Records
-- `.brain/exports/decisions.md` = **ADR** (Architecture Decision Record) — generated export from memory.db, MADR v3 hibrit format, mandatory read for all agents
+- `.brain/memory.db` = accepted ADR authority; `docs/adr/*.md` ve `.brain/exports/decisions.md` review/search projectionlarıdır
 - `.deckent/decisions/*.json` = **SDL** (Sprint Decision Log) — tactical decisions, audit trail, optional
-- **`dependency_pipeline_enabled`:** kod default `true` (Sprint 156 eklendi). **deckent-dev'de de artık `true`** (`.deckent/config.json`, flip 2026-06-10) — otomatik multi-wave canlı-kanıtlı (Sprint 279/280 kademeli wave yürütme; ADR-045 amendment). Kullanıcı projelerinde de default `true`. ADR-047 Brain-manuel wave artık fallback. Dependency-tatmin seti: `DONE ∪ MANUAL_REVIEW_REQUIRED` (Sprint 280, MRR-deadlock fix).
+- Dependency execution davranışı effective config'ten okunur; dependency-aware scheduling
+  ADR-G-026'ya, manuel dogfood recovery yalnız ADR-D-007'ye tabidir. Bu belge canlı
+  boolean/default veya worker sayısı stamp etmez
 
 ## Context
 @DIRECTIVES.md
@@ -203,7 +207,8 @@ DIRECTIVES.md dosyasi sprint hedeflerini tanimlar. Her task asagidaki formati iz
 ---
 
 ## Task 1: Task Basligi
-- Model: claude-sonnet-5
+- Model: <exact-registered-model-api-id>
+- Provider: <registered-provider-id>
 - Effort: normal
 - Skills: typescript-expert
 - Files: src/core/config.ts, src/core/types.ts
@@ -220,7 +225,8 @@ hangi fonksiyonlar eklenecek/degistirilecek, neden gerekli oldugunu belirt.
 ---
 
 ## Task 2: Diger Task
-- Model: claude-haiku-4-5-20251001
+- Model: <exact-registered-model-api-id>
+- Provider: <registered-provider-id>
 - Effort: low
 - Skills: documentation-writer
 - Files: README.md, docs/guide.md
@@ -234,12 +240,12 @@ hangi fonksiyonlar eklenecek/degistirilecek, neden gerekli oldugunu belirt.
 
 | Alan | Gecerli Degerler | Aciklama |
 |------|-----------------|----------|
-| Model | Kayitli tam provider API ID (örn. claude-sonnet-5, gpt-5.6-sol) | Kullanilacak AI modeli; legacy alias'lar reddedilir, canli katalog icin `deckent models list` |
-| Provider | claude, codex, gemini, ollama, openrouter veya kayitli provider | Bu task'i hangi provider kossun (per-task override; erisilebilirlik kaniti degildir) |
+| Model | Kayıtlı tam provider API ID | Kullanılacak exact model; legacy alias'lar reddedilir, canlı katalog için `deckent models list` |
+| Provider | Kayıtlı provider ID | Bu task'ı hangi provider adapterı koşsun (per-task override; erişilebilirlik kanıtı değildir) |
 | Effort | low, normal, high | Tahmini **is YUKU** (timeout/butce/token-tahmin). Reasoning-derinligi DEGIL — onun icin ModelEffort |
-| ModelEffort | claude: low/medium/high/xhigh/max · codex: minimal/low/medium/high | Modelin **reasoning DERINLIGI** (claude `--effort`, codex `model_reasoning_effort`). Opt-in; gemini/ollama desteklemez. Effort (is-yuku) ile karistirma. |
-| Backend | docker, tmux, subprocess | Task'i belirli spawn-backend'e zorlar — host-adapter provider'i (codex/gemini/ollama) docker container'da kosturmak icin (varsayilan: codex/gemini/ollama host CLI, claude docker) |
-| Auth | subscription, api | Per-task auth modu (api => ANTHROPIC_API_KEY zorunlu, ~/.claude mount atlanir) |
+| ModelEffort | Adapter capability'sinin kabul ettiği değer | Modelin **reasoning DERİNLİĞİ**; supported değer registry/adapter metadata'sından gelir. Effort (iş-yükü) ile karıştırma |
+| Backend | Kayıtlı execution-backend ID | Task'ı belirli backend'e zorlar; provider/backend compatibility ve capability admission ayrıca doğrulanır |
+| Auth | Kayıtlı auth-mode ID | Per-task auth modu; gerekli credential/entitlement adapter contractından çözülür |
 | Skills | skill-id listesi | Uzmanlik alani (virgul ile ayir) |
 | Files | dosya yollari | Degistirilecek dosyalar |
 | Scope | dizin yollari | Izin verilen dizinler |
@@ -286,7 +292,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
 // deckent_plan
 { mode: "ai", root: "/path/to/project" }
-// mode: "ai" → AI tabanli planlama (GPT/Claude)
+// mode: "ai" → registered provider/model ile LLM-assisted planlama
 // mode: "structured" → Kural tabanli, deterministik
 // mode: "auto" → Proje boyutuna gore otomatik sec
 
@@ -298,7 +304,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
 // deckent_config
 { action: "read", root: "/path/to/project" }
-{ action: "set", key: "max_workers", value: "4", root: "/path/to/project" }
+{ action: "set", key: "max_workers", value: "<positive-integer-or-auto>", root: "/path/to/project" }
 
 // deckent_kill
 { target: "all", root: "/path/to/project" }
@@ -326,40 +332,19 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
 ### Model
 
-Bu tablo bundled offline catalog'dan örnekler gösterir; sabit bir allowlist değildir.
-Canonical kimlik `id === apiId`'dir. Güncel catalog presence için `deckent models list`,
-gerçek kullanılabilirlik için ayrıca auth/backend/model reachability ve limit evidence kontrol edilir.
-
-| Deger | Provider | Tier | Kullanim |
-|-------|----------|------|---------|
-| `claude-fable-5` | Claude | Premium+ | Karmasik mimari, kritik karar, multi-file refactor |
-| `claude-opus-4-8` | Claude | Premium | Karmasik uygulama ve denetim |
-| `claude-sonnet-5` | Claude | Standard | Genel gelistirme, bug fix, test yazimi |
-| `claude-haiku-4-5-20251001` | Claude | Economy | Dokumantasyon ve dusuk-riskli degisiklik |
-| `o3` | Codex | Premium+ | En yuksek seviye reasoning |
-| `gpt-5.6-sol` | Codex | Premium | Cross-verify ve kapsamli reasoning |
-| `gpt-5.6-terra` | Codex | Standard | Genel gelistirme ve reasoning |
-| `gpt-5.6-luna` | Codex | Economy | Dusuk-maliyetli reasoning |
-| `gpt-5.5` | Codex | Premium | Karmasik gorevler |
-| `gpt-4.1` | Codex | Standard | Genel gelistirme |
-| `o4-mini` | Codex | Standard | Hafif reasoning modeli |
-| `gpt-5-mini` | Codex | Economy | Dusuk-maliyetli gorevler |
-| `gpt-4.1-mini` | Codex | Economy | Dusuk maliyetli genel kullanim |
-| `gemini-3.1-pro-preview` | Gemini | Premium+ | En yuksek seviye Gemini (preview) |
-| `gemini-2.5-pro` | Gemini | Premium | Karmasik gorevler |
-| `gemini-2.5-flash` | Gemini | Standard | Genel gelistirme |
-| `gemini-2.0-flash` | Gemini | Economy | Dusuk-maliyetli gorevler |
-| `vendor/model-id` | OpenRouter | Catalog/probe belirler | Exact vendor/model API ID; pricing evidence olmadan remote admission yok |
-| `name:tag` | Ollama | Registry/inference belirler | Local model tag'i; canli endpoint ve model varligi ayrica dogrulanir |
+Model adları ve catalog üyeleri bu dosyada tutulmaz. Canonical kimlik `id === apiId`'dir.
+Güncel catalog presence için `deckent models list`; gerçek kullanılabilirlik için auth/account,
+backend/model reachability, entitlement, limit ve finite-budget evidence birlikte doğrulanır.
+Authored task exact registry ID kullanır; tier-based seçim exact ID'yi runtime'da çözer.
 
 ### Tier
 
-| Tier | Aciklama | Ornek Modeller |
-|------|----------|----------------|
-| `premium_plus` | En yuksek seviye, ileri reasoning | claude-fable-5, o3, gemini-3.1-pro-preview |
-| `premium` | Karmasik gorevler, mimari kararlar | claude-opus-4-8, gpt-5.6-sol, gpt-5.5, gemini-2.5-pro |
-| `standard` | Genel gelistirme, dengeli maliyet | claude-sonnet-5, gpt-5.6-terra, gpt-4.1, o4-mini, gemini-2.5-flash |
-| `economy` | Basit gorevler, dusuk maliyet | claude-haiku-4-5-20251001, gpt-5.6-luna, gpt-5-mini, gpt-4.1-mini, gemini-2.0-flash |
+| Tier | Aciklama |
+|------|----------|
+| `premium_plus` | En yüksek capability sınıfı; exact model registry'den çözülür |
+| `premium` | Karmaşık görev/mimari sınıfı; exact model registry'den çözülür |
+| `standard` | Genel geliştirme sınıfı; exact model registry'den çözülür |
+| `economy` | Düşük-maliyet/düşük-risk sınıfı; exact model registry'den çözülür |
 
 ### Effort
 
@@ -379,28 +364,25 @@ gerçek kullanılabilirlik için ayrıca auth/backend/model reachability ve limi
 
 ### Provider
 
-| Deger | Execution surface | Admission notu |
-|-------|-------------------|---------------|
-| `claude` | Claude CLI; backend config'e gore Docker/tmux/subprocess | Session/API auth ve exact model reachability dogrulanir |
-| `codex` | Codex CLI adapter | Auth, exact model reachability, limit ve budget evidence gerekir |
-| `gemini` | Gemini CLI adapter | Auth, exact model reachability, limit ve budget evidence gerekir |
-| `ollama` | Local Ollama adapter | Local endpoint ve exact model tag'i canli olmali |
-| `openrouter` | OpenRouter API adapter | Exact `vendor/model` ID ve pricing evidence gerekir |
+Provider listesi registry/effective config'ten gelir. Her provider adapterı aynı contractı
+karşılar: exact identity, auth/account, reachability, entitlement/limit, usage/metering,
+execution backend, settlement ve gerektiğinde landing capability. Eksik capability sessiz
+fallback değil typed `HOLD/UNSUPPORTED` üretir.
 
 Brain, Worker ve Auditor icin fallback sirasi ayri tanimlanabilir:
 
 ```json
 {
   "providers": {
-    "brain": "claude",
-    "worker": "codex"
+    "brain": "<registered-provider-id>",
+    "worker": "<registered-provider-id>"
   },
   "provider_fallback": {
-    "brain": ["codex", "gemini"],
-    "worker": ["claude", "openrouter"],
-    "auditor_provider": "codex",
-    "auditor": ["claude", "gemini"],
-    "global": ["ollama"],
+    "brain": ["<registered-fallback-id>"],
+    "worker": ["<registered-fallback-id>"],
+    "auditor_provider": "<registered-provider-id>",
+    "auditor": ["<registered-fallback-id>"],
+    "global": ["<registered-fallback-id>"],
     "unattended": false
   }
 }
@@ -445,9 +427,9 @@ deckent_doctor → { root: "." }
 deckent config read
 
 # Belirli bir degeri guncelle
-deckent config set max_workers 4
-deckent config set brain_provider claude
-deckent config set routing_engine v2
+deckent config set max_workers <positive-integer-or-auto>
+deckent config set providers.brain <registered-provider-id>
+deckent config set routing_engine <registered-routing-engine-id>
 ```
 
 ### Build Hatasi (tsc --noEmit)
@@ -478,14 +460,14 @@ deckent config set routing_engine v2
 tsc
 
 # MCP server'i yeniden baslat (long-lived process cache'i temizler)
-# Claude Code'da: /mcp restart veya Claude'u yeniden baslat
+# Seçilen host adapterının documented MCP restart/reconnect akışını uygula
 ```
 
 ---
 
-## Built-in Agents (örnek — toplam 20, tam liste: `docs/reference/agents.md`)
+## Built-in Agents (temsili alt-küme; canlı liste: `docs/reference/agents.md`)
 
-> ADR-041 (Sprint 166 reconfirmed): Tüm testing agent'ları kaldırıldı — test görevi task-bazlı yönetiliyor.
+> ADR-G-023: Agent/skill taxonomy; test görevi task-bazlı yönetilir.
 
 | Agent | Uzmanlik | Aktivasyon |
 |-------|----------|------------|
@@ -505,7 +487,7 @@ tsc
 | `frontend-designer` | UI/UX, component tasarimi, responsive | frontend/ui/design anahtar kelimeleri |
 | `migration-specialist` | Versiyon gecisi, framework migration | migration/upgrade/deprecation anahtar kelimeleri |
 
-## Built-in Skills (örnek — toplam 31, tam liste: `src/core/builtins/skills/`)
+## Built-in Skills (temsili alt-küme; canlı liste: registry + `src/core/builtins/skills/`)
 
 | Skill | Aciklama |
 |-------|----------|
@@ -521,7 +503,6 @@ tsc
 | `python-expert` | Python ekosistemi, FastAPI, veri islemleri |
 | `ci-testing` | CI ortaminda test yurutme, regresyon algilama |
 | `accessibility-expert` | WCAG standartlari, a11y test, erisilebilirlik |
-| `anthropic-sdk` | Claude API, Anthropic SDK, tool use, agent SDK |
 | `code-simplifier` | Kod sadestirme, karmasiklik azaltma, temizlik |
 | `docker-expert` | Dockerfile, compose, container optimizasyon |
 | `frontend-design` | UI component, CSS, responsive tasarim |

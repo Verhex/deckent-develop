@@ -39,7 +39,9 @@ import { debugLog } from '../core/utils.js';
 import {
   assertExecutionLandingSupport,
   assertLiveUsageBudgetSupport,
+  hasLiveUsageCeiling,
 } from '../core/live-execution-budget.js';
+import { getProviderCommandSpec } from '../core/provider-command-spec.js';
 import {
   attendedExecutionProjectId,
   type AttendedExecutionApprovalAuthority,
@@ -403,7 +405,6 @@ export async function executeSpawnTask(
     : 'Read,Write,Edit,Bash,Glob,Grep';
 
   const taskProvider = resolveTaskProvider(task);
-  const wantsHostAdapter = isAdapterProvider(taskProvider) && !task.backend;
   const effectiveBackend: SpawnBackend | undefined =
     task.backend && task.backend !== config?.spawn_backend
       ? SpawnBackendFactory.create({
@@ -414,8 +415,18 @@ export async function executeSpawnTask(
           dockerMemoryLimit: config?.worker_memory_limit,
           dockerMemorySwap: config?.worker_memory_swap,
           dockerKindMemoryLimits: config?.worker_memory_limit_by_kind,
-        })
+          })
       : backend;
+  const finalOnlyUsageContainment =
+    effectiveBackend?.name === 'docker'
+    && getProviderCommandSpec(taskProvider)?.liveUsage === 'final-only'
+    && hasLiveUsageCeiling(task.budget)
+      ? task.budgetPolicy?.finalOnlyUsage
+      : undefined;
+  const wantsHostAdapter =
+    isAdapterProvider(taskProvider)
+    && !task.backend
+    && !finalOnlyUsageContainment;
   const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
   const excludeDynamicPromptSections = config?.prompt?.exclude_dynamic_system_prompt_sections !== false;
   const approvalExpectedDispatch = (
@@ -502,11 +513,13 @@ export async function executeSpawnTask(
     persistTask(projectRoot, task);
     return { kind: 'provider-unavailable', taskId: task.id, provider: String(task.provider) };
   } else if (effectiveBackend) {
-    assertLiveUsageBudgetSupport(
-      task.budget,
-      effectiveBackend.liveUsageBudgetSupport,
-      effectiveBackend.name,
-    );
+    if (!finalOnlyUsageContainment) {
+      assertLiveUsageBudgetSupport(
+        task.budget,
+        effectiveBackend.liveUsageBudgetSupport,
+        effectiveBackend.name,
+      );
+    }
     const approvalGrant = assertExecutionLandingSupport({
       budget: task.budget,
       policy: task.budgetPolicy?.landingPolicy,
@@ -538,6 +551,7 @@ export async function executeSpawnTask(
       executionApprovalGrant: approvalGrant,
       executionApprovalExpectedDispatch: approvalExpectedDispatch(effectiveBackend.name),
       settlementRef,
+      ...(finalOnlyUsageContainment ? { finalOnlyUsageContainment } : {}),
       // SURF-3 S2/S3 — live tool-by-tool activity (flag-gated; no-op when
       // off). 583/N5: env-twin aware — an interactive-origin coordinator
       // (DECKENT_LIVE_TRACE=1) streams live without a global config flip.

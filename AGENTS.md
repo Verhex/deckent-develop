@@ -1,11 +1,13 @@
 <!-- Dil: TR (operasyon/zanaat) · 🔒 IMMUTABLE LAWS: EN (anayasa) · teknik terimler EN -->
 > Tam iş-akışı + agent/skill kataloğu + MCP referansı: **DECKENT.md** — auto-load dışı bırakıldı (oturum context'ini hafif tutmak için, F1-TOK); gerektiğinde oku.
 
-# Project: deckent — Codex CLI Adapter (AGENTS.md)
+# Project: deckent — Codex Host Adapter (AGENTS.md)
 
-> **CLAUDE.md-eş format (W7, 2026-07-07):** Bu dosya CLAUDE.md ile AYNI iskeleti taşır;
-> tek fark ajan-kural yolları (`.codex/`). `@file`-import çözmeyen CLI'lar için:
-> referans verilen dosyaları doğrudan aç-oku. `deckent sync` bu dosyayı günceller.
+> Bu dosya Deckent geliştirme reposunun Codex host girişidir; `CLAUDE.md` ile aynı
+> repository contractını taşır ancak byte/semantic-parity zorunluluğu yoktur. Host'a özgü
+> ayrıntılar yalnız `.codex/` yolları ve host capability notlarıdır. `@file` import çözmeyen
+> istemciler referans verilen dosyaları doğrudan açıp okur. `deckent sync` kullanıcı metnini
+> değiştirmez; yalnız eksik Deckent referanslarını additive biçimde sağlar (ADR-G-004).
 
 <immutable_laws>
 ## 🔒 IMMUTABLE LAWS (3) — never violate, change, or propose to change
@@ -57,36 +59,43 @@ Kalite her seferinde kullanıcının prompt'uyla düzeltilmemeli; **ilk seferde 
 
 <operating_rules>
 ## ⚖️ Bağlayıcı Operasyon Kuralları (memory-promoted — her oturum geçerli)
-Auto-memory lazy yüklenir (topic dosyaları yalnız okunca gelir); bu yüzden gerçekten-bağlayıcı kurallar buraya terfi edildi (her oturum garanti). Detay: proje-memory kayıtları (Claude-oturumları `~/.claude/projects/.../memory/`).
+Dogfood core-memory authority yalnız
+`.deckent/docs/core-memory/MEMORY.md` ve onun aynı dizindeki referanslarıdır. Host-global veya
+provider'a özgü memory dizinleri authority değildir; varsa yalnız bu repo-local kaynağın
+projection'ıdır. Ürün kullanıcı belleği bundan ayrıdır ve `.brain/memory.db` üzerinden yürür
+(ADR-G-035).
 - **Türkçe konuş** (Alperen) — anlatım TR, kod/komut/teknik terim EN.
 - **DOGFOOD-MANDATORY (Alperen, 2026-07-27).** Deckent'in her implementation slice'ı
   kendi Goal/Mission/Flow/Run/Autonomous/Do yüzeyleri üzerinden planlanır, yürütülür,
   değerlendirilir ve settlement'a taşınır. Manuel müdahale yalnız typed, kayda alınmış
   bootstrap/recovery/düzeltme seam'idir; dogfood'un yerine geçemez ve ilk güvenli sınırda
   yeniden dogfood akışına dönülür.
-- **SOL-BRAIN SUPERVISION.** GPT-5.6 Sol her Deckent dogfood sürecini PLAN'dan terminal
-  settlement'a kadar status, heartbeat, usage/limit, Nervous, disk diff ve kanıt zinciriyle
-  izler; sentetik agent verdict'ünü tek başına kabul etmez. Host-level effort değiştirilemiyorsa
-  task effort `normal|high` ile risk-temelli ayarlanır.
-- **Heterojen pool, hard ceiling=6.** Codex ve Claude worker'lar birlikte kullanılır;
-  en fazla 6 paralel worker dispatch edilir. Claude Sonnet 5 genel implementation,
-  Opus 5 seçili yüksek-risk inceleme; Codex Terra genel worker ve Sol derin kernel/Brain
-  işleri içindir. Provider usage, entitlement, reachability ve finite budget admission'ı
-  uygun değilse slot boş kalır; limit zorlanmaz.
+- **CONFIG-RESOLVED SUPERVISION.** Brain provider/model/effort ve worker pool'u metinden
+  seçilmez. Her run'da effective config, model registry, role policy, auth/account,
+  reachability, usage/limit ve finite-budget admission birlikte çözülür. Seçilen Brain
+  PLAN'dan terminal settlement'a kadar status, heartbeat, Nervous, disk diff ve kanıt
+  zincirini izler; sentetik agent verdict'ünü tek başına kabul etmez.
+- **CONFIG-RESOLVED CONCURRENCY.** Provider/model/worker sayısı için bu dosyada sabit değer
+  yoktur. Effective concurrency; effective config, dependency DAG, file-collision,
+  host/tenant resource policy ve provider capacity'nin kesişimidir. Admission uygun değilse
+  slot boş kalır; sayı veya provider zorlanmaz.
 - **XVERIFY-PROVIDER-SEPARATION.** XVerify daima çıktıyı üreten provider'dan farklı
-  provider ile yapılır; same-provider doğrulama yasaktır. Codex/Sol çıktısında varsayılan
-  exact verifier Claude Fable 5, seçili derin kontrolde Opus 5; Claude çıktısında
-  tier-uygun Codex Terra/Sol kullanılır. İkinci provider için fresh authority evidence yoksa
-  sonuç typed `unavailable/HOLD` olur, self-verify veya sessiz fallback olmaz.
+  provider ile yapılır; same-provider doğrulama yasaktır. Verifier provider/model effective
+  config + registry + capability evidence'dan çözülür; instruction metni model kataloğu
+  değildir. Fresh ikinci-provider authority yoksa sonuç typed `unavailable/HOLD` olur,
+  self-verify veya sessiz fallback olmaz.
 - **Sprint'i Alperen onayı olmadan kill/cleanup ETME**; `rm .tasks/*` YASAK.
 - **`.brain/memory.db` ASLA silinmez** — tüm Brain knowledge orada.
-- **Sprint çalışırken `npm run build` ve `/login` YASAK** (ESM cache + worker auth-loss);
-  build sonrası `/mcp restart` Alperen yapar, Codex `deckent bot stop` → `deckent bot start`
-  ile connector akışını yeniden doğrular.
+- **Sprint çalışırken `npm run build` ve provider login/auth mutation YASAK** (ESM cache +
+  worker auth-loss); build sonrası aktif host adapterının documented restart/reconnect akışı
+  owner koordinasyonuyla uygulanır.
 - **Commit/push öncesi `git branch -vv`** — shared-worktree HEAD-drift; başka oturumun commit'ini bozma; commit yalnız Alperen isteyince.
-- **Sprint'ler CLI'dan** (`env -u ANTHROPIC_API_KEY deckent …`), MCP'den start/run/plan değil.
+- **Sprint'ler CLI'dan** (effective config/auth environment korunarak `deckent …`), MCP'den
+  start/run/plan değil; instruction metni provider'a özel credential mutation dayatmaz.
 - **Disk-verify ground truth** — Brain sentetik NO_GO'ya güvenme; `git diff --stat`/`git ls-files` ile doğrula.
-- **haiku yalnız doc** — kod/tsx'e route etme.
+- **Task/provider policy routing.** Economy/standard/premium tier ve task-kind uygunluğu
+  effective config/routing policy'den gelir; model-family adına göre instruction-level
+  routing yapılmaz.
 - **İş-takip SSOT** = `docs/MASTER-PLAN.md` (tek canonical ledger; sayı generated
   projection'dan okunur, metinde hardcode edilmez) + pinned `MEMORY.md`. Eski plan:
   `docs/archive/MASTER-PLAN-archived-2026-06-29.md`.
@@ -95,7 +104,7 @@ Auto-memory lazy yüklenir (topic dosyaları yalnız okunca gelir); bu yüzden g
 
 <rules>
 ## Rules
-@DIRECTIVES.md
+@DIRECTIVES.md — aktif run sırasında owner/system talimatlarından sonra bağlayıcı execution contractıdır.
 @.brain/exports/summary.md
 </rules>
 
@@ -105,10 +114,10 @@ Auto-memory lazy yüklenir (topic dosyaları yalnız okunca gelir); bu yüzden g
 - **orchestra/** — sprint lifecycle / planning / evaluation / routing. Key: `brain.ts` (orchestrator), `sprint-controller.ts` (PLAN→…→CLEANUP), `planner.ts`, `task-router.ts`, `result-evaluator.ts`, `debt-manager.ts`, `managed-docs/` (CLAUDE.md auto-section'ları).
 - **core/** — types, config, agent/skill pool, routing, memory. Key: `config.ts` (3-layer merge), `memory-store.ts`+`memory-query.ts` (DB-first SQLite/FTS5), `routing-engine.ts` (routeTaskV2), `model-registry.ts`, `agent-pool.ts`, `skill-pool.ts`.
 - **agents/** — worker execution. Key: `worker.ts` (task claim, file lock, heartbeat, result), `adaptive-agent.ts`.
-- **nervous/** — proactive meta-orchestrator (ADR-040).
+- **nervous/** — proactive meta-orchestrator (ADR-G-022).
 - **monitor/** — auditor scan loop, dashboard manager, sprint-state tracking.
 - **connectors/** — messaging adapters (Telegram/Discord/WhatsApp) + `gateway/` (project-scoped session/pairing).
-- **providers/** — Claude / Codex / Gemini adapters.
+- **providers/** — provider-neutral runtime contractı ve seçili provider adapterları.
 - **api/** — HTTP API server, SSE, rate limiting.
 - **mcp/** — MCP server (stdio transport): `tools/` + resources.
 - **cli/** — CLI commands, helpers, entry point.
@@ -146,9 +155,9 @@ When acting as Worker: @.codex/rules/worker-default.md
 <gotchas>
 ## Gotchas
 - **ESM imports**: `.js` uzantısı zorunlu (Node16 resolution). `import { foo } from './bar'` çalışmaz, `'./bar.js'` gerekir.
-- **MCP server restart**: `dist/` rebuild sonrası long-lived MCP process eski kodu cache'ler. `/mcp restart` veya Claude Code yeniden başlat.
+- **MCP server restart**: `dist/` rebuild sonrası long-lived MCP process eski kodu cache'ler. Aktif host adapterının restart/reconnect akışını kullan.
 - **`deckent_start` fire-and-forget**: MCP stdio aynı process'te runSprint Promise event loop'u bloke edebilir. Long sprint için CLI `deckent start` tercih edilir.
-- **Scope enforcement**: Worker `scope.filesWrite` dışına yazamaz — ADR-037 RBAC **compile-time lint + audit-trail**; runtime **advisory/soft** (V1.0 Layer-2 kasıtlı eksik — ihlal `git diff --stat` ile Auditor tarafından izlenir + warn/emit edilir, **bloke ETMEZ**; hard-flip post-GA V2). Honest-gate worker tarafında self-flag eder (örn. BOUNDARY_VIOLATION → NO_GO), Brain FIX/cascade uygular.
+- **Scope enforcement**: Worker `scope.filesWrite` dışına yazamaz — ADR-G-020 authority contractı **compile-time lint + audit-trail**; runtime policy effective config'ten çözülür. Advisory modda ihlal `git diff --stat` ile Auditor tarafından izlenir + warn/emit edilir; enforce modunda bloklanır. Honest-gate worker tarafında self-flag eder (örn. BOUNDARY_VIOLATION → NO_GO), Brain FIX/cascade uygular.
 - **Sprint kill/cleanup**: Alperen onayı olmadan `deckent_kill`, `deckent_cleanup` (canlı sprint), `rm .tasks/*` YASAK (memory: feedback_deckent_kill_approval_required).
 </gotchas>
 

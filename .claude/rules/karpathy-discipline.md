@@ -119,7 +119,7 @@ Adapted from Andrej Karpathy software engineering philosophy for AI-agent workfl
 Canonical reference: multica-ai/andrej-karpathy-skills (external, public domain principles).
 Deckent-specific adaptations: Sprint 191, Worker Discipline Anchor project.
 
-See also: .claude/rules/worker-default.md, .brain/exports/decisions.md (ADR-037, ADR-035).
+See also: .claude/rules/worker-default.md, docs/adr/README.md (ADR-G-020, ADR-G-018).
 
 
 ---
@@ -151,4 +151,3 @@ Rules:
 Routing: CI tasks (test infra, pipeline fixes, hermetic reproducer) should use
 **ci-guardian agent** + **ci-testing skill**. This ensures the routing engine selects
 the right specialization for CI hygiene work.
-

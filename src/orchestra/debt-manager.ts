@@ -569,6 +569,17 @@ export function handleCrossDependencies(
       join(projectRoot, TASKS_DIR, `task-${noGoTask.id}.result`),
     );
     if (isCascadeSkippedResult(noGoResult)) continue;
+    // A direct fix is the first recovery authority for an observed task
+    // failure. Do not concurrently blame and rewrite its already-successful
+    // dependencies while that direct fix is still pending: that creates
+    // redundant xfix work, overlapping write scopes, and ambiguous causality.
+    // A later FIX cycle may consider dependency repair only after the direct
+    // attempt has produced terminal evidence.
+    const directFixPath =
+      join(projectRoot, TASKS_DIR, `task-${noGoTask.id}-fix.json`);
+    const directFixResultPath =
+      join(projectRoot, TASKS_DIR, `task-${noGoTask.id}-fix.result`);
+    if (existsSync(directFixPath) && !existsSync(directFixResultPath)) continue;
     for (const depId of noGoTask.dependencies) {
       const depEval = evaluations.get(depId);
       if (depEval === TaskEvaluation.DONE || depEval === TaskEvaluation.GO_WITH_TECH_DEBT) {

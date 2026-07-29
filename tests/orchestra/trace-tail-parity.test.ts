@@ -177,6 +177,7 @@ describe('GREEN — writeNormalizedDockerLog(codex): bridged real trace, no data
   it('bridgeCodexEvent preserves the original discriminator under codexEventType (no data loss on override)', () => {
     const bridged = bridgeCodexEvent({ type: 'thread.started', thread_id: 'abc' });
     expect(bridged.type).toBe('lifecycle');
+    expect(bridged.providerEventType).toBe('thread.started');
     expect(bridged.codexEventType).toBe('thread.started');
     expect(bridged.thread_id).toBe('abc');
   });
@@ -197,7 +198,13 @@ describe('GREEN — writeNormalizedDockerLog(gemini): single-envelope fast path,
     const collector = new OutputCollector(root);
     const events = collector.readLogEvents('999-gemini-compact');
     expect(events).toHaveLength(1);
-    expect(events[0]!.type).toBe('text');
+    expect(events[0]!.type).toBe('usage');
+    expect(events[0]!.usageSemantics).toMatchObject({
+      provider: 'gemini',
+      mode: 'cumulative',
+      terminal: true,
+      countsAsTurn: true,
+    });
     expect((events[0]!.content as Record<string, unknown>).usageMetadata).toEqual(GEMINI_USAGE_METADATA);
     collector.dispose();
   });

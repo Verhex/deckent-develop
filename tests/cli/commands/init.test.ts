@@ -1362,7 +1362,7 @@ describe('human-friendly init output', () => {
     it('--env codex wires AGENTS.md additively, never overwrites', async () => {
       vi.mocked(existsSync).mockReturnValue(false);
       await runCommand(['init', '--auto', '--env', 'codex']);
-      // ADR-013 thin-adapter: applyEnvConfig injects @DECKENT.md via
+      // ADR-G-004 thin-adapter: applyEnvConfig injects @DECKENT.md via
       // ensureDeckentImport — it does NOT overwrite AGENTS.md with a fat template.
       expect(generateAgentsMd).not.toHaveBeenCalled();
       expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('AGENTS.md'));
@@ -2114,18 +2114,11 @@ describe('human-friendly init output', () => {
       vi.mocked(existsSync).mockReturnValue(false);
     });
 
-    it('creates .cursor/rules/deckent.md when .cursor/ dir exists', () => {
+    it('creates .cursor/rules/deckent.mdc when .cursor/ dir exists', () => {
       vi.mocked(existsSync).mockImplementation((p) => String(p).endsWith('.cursor'));
       const results = applyIdeAdapters('/mock/root');
-      expect(results.some(r => r.path.includes('.cursor') && r.path.endsWith('deckent.md') && r.action === 'created')).toBe(true);
-      expect(mkdirSync).toHaveBeenCalledWith(
-        expect.stringContaining('.cursor'),
-        expect.objectContaining({ recursive: true }),
-      );
-      expect(writeFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('deckent.md'),
-        expect.stringContaining('@DECKENT.md'),
-      );
+      expect(results.some(r => r.path.includes('.cursor') && r.path.endsWith('deckent.mdc') && r.action === 'created')).toBe(true);
+      expect(generateCursorConfig).toHaveBeenCalledWith('/mock/root');
     });
 
     it('creates .vscode/mcp.json when .vscode/ dir exists', () => {
@@ -2162,28 +2155,25 @@ describe('human-friendly init output', () => {
       expect(results.some(r => r.path.includes('.vscode') && r.action === 'created')).toBe(true);
     });
 
-    it('returns exists action when .cursor/rules/deckent.md already exists', () => {
+    it('returns exists action when .cursor/rules/deckent.mdc already exists', () => {
       vi.mocked(existsSync).mockImplementation((p) => {
         const ps = String(p);
-        return ps.endsWith('.cursor') || ps.endsWith('deckent.md');
+        return ps.endsWith('.cursor') || ps.endsWith('deckent.mdc');
       });
       const results = applyIdeAdapters('/mock/root');
       const cursorResult = results.find(r => r.path.includes('.cursor'));
       expect(cursorResult?.action).toBe('exists');
     });
 
-    it('--force overwrites existing .cursor/rules/deckent.md', () => {
+    it('--force preserves an existing .cursor/rules/deckent.mdc through additive upsert', () => {
       vi.mocked(existsSync).mockImplementation((p) => {
         const ps = String(p);
-        return ps.endsWith('.cursor') || ps.endsWith('deckent.md');
+        return ps.endsWith('.cursor') || ps.endsWith('deckent.mdc');
       });
       const results = applyIdeAdapters('/mock/root', { force: true });
       const cursorResult = results.find(r => r.path.includes('.cursor'));
-      expect(cursorResult?.action).toBe('created');
-      expect(writeFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('deckent.md'),
-        expect.any(String),
-      );
+      expect(cursorResult?.action).toBe('exists');
+      expect(generateCursorConfig).toHaveBeenCalledWith('/mock/root');
     });
   });
 
@@ -2208,7 +2198,7 @@ describe('human-friendly init output', () => {
       vi.mocked(existsSync).mockReturnValue(false);
       await runCommand(['init', '--auto', '--all-envs']);
       const writeCalls = vi.mocked(writeFileSync).mock.calls;
-      expect(writeCalls.some(c => String(c[0]).includes('deckent.md') && String(c[0]).includes('.cursor'))).toBe(true);
+      expect(generateCursorConfig).toHaveBeenCalledWith('/mock/root');
       expect(writeCalls.some(c => String(c[0]).includes('mcp.json') && String(c[0]).includes('.vscode'))).toBe(true);
     });
   });

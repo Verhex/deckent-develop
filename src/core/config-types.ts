@@ -1650,6 +1650,8 @@ export interface ResolvedConfig {
   risk_gate_enabled?: boolean;
   /** Spawn backend: 'docker' | 'tmux' | 'subprocess' | 'auto' (default: 'auto') */
   spawn_backend?: 'docker' | 'tmux' | 'subprocess' | 'auto';
+  /** Effective provider billing/auth regime used by runtime USD admission. */
+  auth_mode?: 'subscription' | 'api' | 'hybrid';
   /** Docker image for worker containers (default: 'deckent-worker:latest') */
   docker_image?: string;
   /** Docker container timeout in seconds (default: 1200 = 20 minutes) */

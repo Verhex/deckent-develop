@@ -6,7 +6,7 @@
  * a markdown string.
  *
  * Also exports `exportAdrsToFs` for DB→FS reverse sync (Sprint 169 H1,
- * bi-directional hook contract per ADR-046 Amendment 2026-05-15).
+ * DB-authority projection contract per ADR-G-035.
  *
  * `writeGuardedExports` (Sprint 227 task 227-002) is the sanity-checked
  * writer: it refuses to overwrite an existing .md with an empty render
@@ -15,7 +15,7 @@
  * 8518→2 lines while the DB held 75 ADRs).
  */
 
-import { mkdirSync, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { MemoryStore } from './memory-store.js';
 import type { MemoryEntryV2, EntryType } from './memory-types.js';
@@ -35,11 +35,21 @@ function truncate(text: string, maxLen: number): string {
 }
 
 /**
- * Sort entries by natural ID ordering (ADR-001 < ADR-005 < ADR-010).
+ * Sort entries by natural ID ordering (ADR-G-001 < ADR-G-005 < ADR-G-010).
  * Falls back to string comparison for non-numeric IDs.
  */
 function sortById(a: MemoryEntryV2, b: MemoryEntryV2): number {
   return a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function normalizeAdrProjectionSections(content: string): string {
+  return content
+    .replace(
+      /^(CONTEXT|DECISION|CONSEQUENCES?|ROLLOUT|ACCEPTANCE)$/gmu,
+      (_match, section: string) =>
+        `## ${section.charAt(0)}${section.slice(1).toLowerCase()}`,
+    )
+    .replace(/^Decision:\s*/gimu, '**Decision:** ');
 }
 
 // ─── exportSummaryMd ────────────────────────────────────────────────
@@ -138,7 +148,7 @@ export function exportDecisionsMd(store: MemoryStore): string {
     lines.push('');
 
     // If the content already starts with **Status:** strip it to avoid duplication
-    let content = adr.content;
+    let content = normalizeAdrProjectionSections(adr.content);
     const statusLineRegex = /^\*\*Status:\*\*\s*\S+\s*\n*/;
     if (statusLineRegex.test(content)) {
       content = content.replace(statusLineRegex, '').trimStart();
@@ -263,19 +273,32 @@ export interface AdrFsExportResult {
 
 /**
  * Compute the filesystem filename for an ADR entry.
- * adr-001  + "TypeScript ESM"            → "001-typescript-esm.md"
- * adr-022-v2 + "CLI/MCP Feature Parity"  → "022-v2-cli-mcp-feature-parity.md"
+ * adr-001   + "TypeScript ESM" → "001-typescript-esm.md"
+ * ADR-G-037 + "Execution..."   → "adr-g-037-execution.md"
  */
 function adrToFilename(id: string, title: string): string {
-  const numPart = id.replace(/^adr-/i, '');
-  const numMatch = numPart.match(/^(\d+)/);
-  const numStr = numMatch ? numMatch[1]!.padStart(3, '0') : numPart;
-  const suffix = numMatch ? numPart.slice(numMatch[1]!.length) : '';
+  const match = id.match(/^adr-(?:(g|d|ug|up)-)?(\d+)$/i);
+  if (!match) {
+    throw new Error(`non-canonical ADR id: ${id}`);
+  }
+  const adrClass = match[1]?.toLowerCase() ?? null;
+  const number = match[2]!.padStart(3, '0');
+  const idPrefix = adrClass ? `adr-${adrClass}-${number}` : number;
   const slug = title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return `${numStr}${suffix}-${slug}.md`;
+  return `${idPrefix}-${slug}.md`;
+}
+
+function adrFilenamePrefix(id: string): string {
+  const match = id.match(/^adr-(?:(g|d|ug|up)-)?(\d+)$/i);
+  if (!match) {
+    throw new Error(`non-canonical ADR id: ${id}`);
+  }
+  const adrClass = match[1]?.toLowerCase() ?? null;
+  const number = match[2]!.padStart(3, '0');
+  return adrClass ? `adr-${adrClass}-${number}-` : `${number}-`;
 }
 
 /**
@@ -291,29 +314,44 @@ function buildAdrMarkdown(entry: MemoryEntryV2): string {
   }
 
   const sprintField = entry.sprint_id ?? '_To be backfilled_';
-  const bodyContent = content || '_To be backfilled_';
+  const bodyContent = normalizeAdrProjectionSections(content) || '_To be backfilled_';
+  const idClass = entry.id.match(/^adr-(g|d|ug|up)-\d+$/i)?.[1]?.toUpperCase();
+  const taxonomyParts: string[] = [];
+  const adrClass = entry.adr_class ?? idClass;
+  if (adrClass) taxonomyParts.push(`**Class:** ADR-${adrClass.toUpperCase()}`);
+  if (entry.scope) taxonomyParts.push(`**Scope:** ${entry.scope}`);
+  if (entry.immutable != null) taxonomyParts.push(`**Immutable:** ${entry.immutable === 1 ? 'yes' : 'no'}`);
+  if (entry.source_authority) taxonomyParts.push(`**Source:** ${entry.source_authority}`);
+  if (entry.enforcement_level) taxonomyParts.push(`**Enforcement-Level:** ${entry.enforcement_level}`);
 
-  return [
+  const lines = [
     `# ${entry.id.toUpperCase()}: ${entry.title}`,
     '',
     `**Status:** ${entry.status || '_To be backfilled_'}`,
     '',
     `**Sprint:** ${sprintField}`,
     '',
+  ];
+  if (taxonomyParts.length > 0) {
+    lines.push(taxonomyParts.join(' · '), '');
+  }
+  lines.push(
     '---',
     '',
     bodyContent,
     '',
-  ].join('\n');
+  );
+  return lines.join('\n');
 }
 
 /**
  * Export all ADR entries from the memory DB to individual markdown files
  * in `adrDir`. Implements the reverse (DB→FS) direction of the bi-directional
- * hook contract introduced by ADR-046 Amendment 2026-05-15.
+ * projection contract governed by ADR-G-035.
  *
- * Idempotency: if a file's mtime is newer than the DB `updated_at` the file
- * is considered a manual edit and left untouched (manual edit wins).
+ * Idempotency: byte-identical projections are left untouched. When content
+ * differs, DB authority wins and the projection is rewritten. Human edits must
+ * enter through the DB-authoring path; filesystem mtime is not authority.
  */
 export function exportAdrsToFs(
   store: MemoryStore,
@@ -334,24 +372,29 @@ export function exportAdrsToFs(
   }
 
   const adrs = store.getByType('adr').sort(sortById);
+  const existingFiles = existsSync(adrDir)
+    ? readdirSync(adrDir).filter(name => name.endsWith('.md'))
+    : [];
 
   for (const adr of adrs) {
     try {
-      const filename = adrToFilename(adr.id, adr.title);
+      const prefix = adrFilenamePrefix(adr.id);
+      const existingMatches = existingFiles.filter(name =>
+        name.toLowerCase().startsWith(prefix.toLowerCase()),
+      );
+      if (existingMatches.length > 1) {
+        throw new Error(
+          `ambiguous ADR projection for ${adr.id}: ${existingMatches.join(', ')}`,
+        );
+      }
+      const filename = existingMatches[0] ?? adrToFilename(adr.id, adr.title);
       const filePath = join(adrDir, filename);
       const markdown = buildAdrMarkdown(adr);
 
       const fileExists = existsSync(filePath);
 
       if (fileExists) {
-        const fileMtime = statSync(filePath).mtimeMs;
-        // SQLite datetime() returns 'YYYY-MM-DD HH:MM:SS' (UTC). Parse safely.
-        const dbTs = adr.updated_at.includes('T')
-          ? adr.updated_at
-          : adr.updated_at.replace(' ', 'T') + 'Z';
-        const dbUpdatedAt = new Date(dbTs).getTime();
-
-        if (fileMtime > dbUpdatedAt) {
+        if (readFileSync(filePath, 'utf-8') === markdown) {
           result.skipped++;
           continue;
         }

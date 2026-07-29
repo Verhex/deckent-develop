@@ -21,6 +21,11 @@ beforeEach(() => {
     content: 'All shell commands use spawnSync with args array. No shell interpretation.',
     tags: ['security', 'spawnSync', 'shell-injection'],
     status: 'accepted',
+    adr_class: 'G',
+    scope: 'global+project',
+    immutable: true,
+    source_authority: 'publisher',
+    enforcement_level: 'hard',
   });
 
   store.insert({
@@ -31,6 +36,11 @@ beforeEach(() => {
     tags: ['brain', 'import', 'circular'],
     status: 'accepted',
     lang: 'tr',
+    adr_class: 'D',
+    scope: 'dev',
+    immutable: false,
+    source_authority: 'publisher',
+    enforcement_level: 'runtime',
   });
 
   store.insert({
@@ -107,6 +117,18 @@ describe('searchMemory — FTS', () => {
     for (const r of results) {
       expect(r.entry.status).toBe('accepted');
     }
+  });
+
+  it('returns ADR taxonomy fields on FTS results', () => {
+    const result = searchMemory(store, { text: 'spawnSync', adr_class: ['G'] })[0];
+    expect(result?.entry).toMatchObject({
+      id: 'ADR-006',
+      adr_class: 'G',
+      scope: 'global+project',
+      immutable: 1,
+      source_authority: 'publisher',
+      enforcement_level: 'hard',
+    });
   });
 
   it('filters by sprint range (sprint_range.min=139 → only >=139)', () => {
@@ -209,6 +231,22 @@ describe('searchMemory — structured (no text)', () => {
     const results = searchMemory(store, { type: ['debt'] });
     expect(results.length).toBe(1);
     expect(results[0].entry.id).toBe('debt-001');
+  });
+
+  it('filters ADRs by class and scope without text', () => {
+    const global = searchMemory(store, {
+      type: ['adr'],
+      adr_class: ['G'],
+      adr_scope: ['global+project'],
+    });
+    expect(global.map(result => result.entry.id)).toEqual(['ADR-006']);
+
+    const dogfood = searchMemory(store, {
+      type: ['adr'],
+      adr_class: ['D'],
+      adr_scope: ['dev'],
+    });
+    expect(dogfood.map(result => result.entry.id)).toEqual(['ADR-008']);
   });
 
   it('filters by tags_contain (entries must have ALL specified tags)', () => {

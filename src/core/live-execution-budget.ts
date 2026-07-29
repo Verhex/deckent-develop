@@ -97,7 +97,14 @@ function firstCount(record: Record<string, unknown>, ...keys: string[]): number 
 function usageCounts(usage: Record<string, unknown>): LiveUsageObservation['counts'] {
   const inputTokens = firstCount(usage, 'input_tokens', 'inputTokens', 'prompt_tokens', 'promptTokenCount', 'prompt_eval_count');
   const outputTokens = firstCount(usage, 'output_tokens', 'outputTokens', 'completion_tokens', 'candidatesTokenCount', 'eval_count');
-  const cacheReadTokens = firstCount(usage, 'cache_read_input_tokens', 'cacheReadTokens', 'cache_read_tokens', 'cached_input_tokens');
+  const cacheReadTokens = firstCount(
+    usage,
+    'cache_read_input_tokens',
+    'cacheReadTokens',
+    'cache_read_tokens',
+    'cached_input_tokens',
+    'cachedContentTokenCount',
+  );
   const cacheCreationTokens = firstCount(usage, 'cache_creation_input_tokens', 'cacheCreationTokens', 'cache_write_tokens');
   return { inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens };
 }
@@ -158,24 +165,59 @@ export function extractLiveUsageObservation(event: StreamLogEvent): LiveUsageObs
   if (!hasCounts(counts)) return null;
 
   const rootType = typeof root.type === 'string' ? root.type : '';
+  // New logs carry provider-neutral semantics derived once at the host
+  // normalization boundary. Provider-field fallback keeps historical evidence
+  // replayable without making those field names the live contract.
+  const providerEventType = event.usageSemantics?.providerEventType
+    ?? (typeof root.providerEventType === 'string'
+      ? root.providerEventType
+      : typeof root.codexEventType === 'string'
+        ? root.codexEventType
+        : rootType);
   const isAssistantMessage = rootType === 'assistant' && message !== null;
-  const isCumulative = rootType === 'result'
-    || rootType === 'turn.completed'
-    || rootType === 'response.completed';
+  const isCumulative = event.usageSemantics?.mode === 'cumulative'
+    || rootType === 'result'
+    || providerEventType === 'turn.completed'
+    || providerEventType === 'response.completed';
   // A session id identifies many calls and is unsafe for incremental dedupe.
   // It is accepted only for the single cumulative/final session snapshot.
+  // Codex's terminal turn.completed envelope has no call/session id. One
+  // attempt emits one such cumulative envelope, so a stable provider/type/
+  // counter tuple deduplicates live-follow and post-exit replay without
+  // admitting arbitrary id-less usage objects as measured evidence.
+  const terminalCounterKey = (
+    event.usageSemantics?.terminal === true
+    || providerEventType === 'turn.completed'
+  )
+    ? [
+        event.usageSemantics?.provider ?? 'provider',
+        providerEventType,
+        counts.inputTokens,
+        counts.outputTokens,
+        counts.cacheReadTokens,
+        counts.cacheCreationTokens,
+      ].join(':')
+    : null;
   const key = observationKey(root, message)
-    ?? (isCumulative && typeof root.session_id === 'string' ? root.session_id : null);
+    ?? event.usageSemantics?.identity
+    ?? (isCumulative && typeof root.session_id === 'string' ? root.session_id : null)
+    ?? terminalCounterKey;
   if (!key) return null;
   const contextTokens = counts.inputTokens + counts.cacheReadTokens + counts.cacheCreationTokens;
+  const reportsCompletedTurn = event.usageSemantics?.countsAsTurn === true
+    || providerEventType === 'turn.completed';
 
   return {
     dedupeKey: `${isCumulative ? 'snapshot' : 'call'}:${key}`,
     mode: isCumulative ? 'cumulative' : 'incremental',
     counts,
     contextTokens,
-    countsAsTurn: isAssistantMessage || !isCumulative,
-    ...(isCumulative && count(root.num_turns) > 0 ? { reportedTurns: count(root.num_turns) } : {}),
+    countsAsTurn: isAssistantMessage || !isCumulative || reportsCompletedTurn,
+    ...(event.usageSemantics?.reportedTurns !== undefined
+      ? { reportedTurns: event.usageSemantics.reportedTurns }
+      : isCumulative && count(root.num_turns) > 0
+        ? { reportedTurns: count(root.num_turns) }
+        : {}),
   };
 }
 

@@ -75,7 +75,7 @@ features:
 - [Authority Matrix](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/authority-matrix.md)
 - [Memory System](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/memory-system.md)
 - [Run Lifecycle](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/sprint-lifecycle.md)
-- [ADR Index](adr-index.md)
+- [ADR Index](adr/README.md)
 
 ### Cookbook
 

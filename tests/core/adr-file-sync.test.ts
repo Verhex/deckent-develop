@@ -76,6 +76,16 @@ const ADR_MALFORMED_NO_STATUS = `# ADR-099: Missing Status
 No status declaration.
 `;
 
+const ADR_G_019 = `# ADR-G-019: Governance Taxonomy
+
+**Class:** ADR-G · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement-Level:** hard
+**Status:** accepted
+
+## Decision
+
+Taxonomy metadata is queryable.
+`;
+
 // ─── Helpers ───────────────────────────────────────────────────────
 
 function makeTmpAdrDir(): string {
@@ -152,6 +162,20 @@ This ADR was implemented in Sprint 155 — see commit.
     expect(parsed).not.toBeNull();
     expect(parsed!.sprintId).toBe('sprint-155');
     expect(parsed!.sprintNum).toBe(155);
+  });
+
+  it('parses canonical taxonomy and discrete enforcement metadata', () => {
+    const filePath = writeAdr(adrDir, 'adr-g-019-governance-taxonomy.md', ADR_G_019);
+    const parsed = parseAdrFile(filePath);
+
+    expect(parsed).toMatchObject({
+      id: 'adr-g-019',
+      adrClass: 'G',
+      scope: 'global+project',
+      immutable: true,
+      sourceAuthority: 'publisher',
+      enforcementLevel: 'hard',
+    });
   });
 });
 
@@ -276,6 +300,51 @@ describe('syncAdrFilesToDb', () => {
     expect(row).not.toBeNull();
     expect(row!.sprint_id).toBe('sprint-163');
     expect(row!.sprint_num).toBe(163);
+  });
+
+  it('updates taxonomy fields even when title/content/status/sprint are unchanged', () => {
+    writeAdr(adrDir, 'adr-g-019-governance-taxonomy.md', ADR_G_019);
+    syncAdrFilesToDb(store, adrDir);
+
+    store.getRawDb().prepare(`
+      UPDATE entries
+      SET adr_class = NULL, scope = NULL, immutable = NULL,
+          source_authority = NULL, enforcement_level = NULL
+      WHERE id = 'adr-g-019'
+    `).run();
+
+    const result = syncAdrFilesToDb(store, adrDir);
+    expect(result.updated).toBe(1);
+    expect(store.getById('adr-g-019')).toMatchObject({
+      adr_class: 'G',
+      scope: 'global+project',
+      immutable: 1,
+      source_authority: 'publisher',
+      enforcement_level: 'hard',
+    });
+  });
+
+  it('updates an uppercase historical ID without inserting a case-variant duplicate', () => {
+    store.upsert({
+      id: 'ADR-G-019',
+      type: 'adr',
+      title: 'Governance Taxonomy',
+      content: 'historical projection',
+      source: 'user',
+      status: 'accepted',
+    });
+    writeAdr(adrDir, 'adr-g-019-governance-taxonomy.md', ADR_G_019);
+
+    const result = syncAdrFilesToDb(store, adrDir);
+
+    expect(result.updated).toBe(1);
+    expect(result.inserted).toBe(0);
+    expect(result.ids).toEqual(['ADR-G-019']);
+    expect(store.getById('ADR-G-019')?.content).toBe(ADR_G_019);
+    const variants = store.getRawDb().prepare(
+      "SELECT id FROM entries WHERE lower(id) = 'adr-g-019'",
+    ).all() as Array<{ id: string }>;
+    expect(variants).toEqual([{ id: 'ADR-G-019' }]);
   });
 
   it('reports error and returns empty result when adrDir does not exist', () => {

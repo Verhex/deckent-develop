@@ -73,6 +73,27 @@ describe('normalizeStreamEvent — provider-agnostic (never drops)', () => {
     expect(normalizeStreamEvent(claudeResult, 'claude').type).toBe('usage');
   });
 
+  it('attaches canonical terminal semantics to an id-less Codex turn.completed envelope', () => {
+    const event = normalizeStreamEvent({
+      type: 'usage',
+      providerEventType: 'turn.completed',
+      codexEventType: 'turn.completed',
+      usage: { input_tokens: 100, output_tokens: 25, cached_input_tokens: 40 },
+    }, 'codex');
+
+    expect(event).toMatchObject({
+      type: 'usage',
+      usageSemantics: {
+        provider: 'codex',
+        providerEventType: 'turn.completed',
+        mode: 'cumulative',
+        terminal: true,
+        countsAsTurn: true,
+      },
+    });
+    expect(event.usageSemantics?.identity).toBeUndefined();
+  });
+
   it('maps a Claude system/init event → lifecycle', () => {
     const init = { type: 'system', subtype: 'init', session_id: 's1' };
     expect(normalizeStreamEvent(init, 'claude').type).toBe('lifecycle');
@@ -116,6 +137,25 @@ describe('normalizeStreamEvent — provider-agnostic (never drops)', () => {
   it('maps a Gemini candidates chunk → text', () => {
     const gemini = { candidates: [{ content: { parts: [{ text: 'hi' }], role: 'model' } }] };
     expect(normalizeStreamEvent(gemini, 'gemini').type).toBe('text');
+  });
+
+  it('maps a Gemini terminal envelope with usageMetadata → canonical usage', () => {
+    const event = normalizeStreamEvent({
+      candidates: [{ content: { parts: [{ text: 'done' }], role: 'model' } }],
+      usageMetadata: {
+        promptTokenCount: 20,
+        candidatesTokenCount: 5,
+        cachedContentTokenCount: 7,
+      },
+    }, 'gemini');
+
+    expect(event.type).toBe('usage');
+    expect(event.usageSemantics).toMatchObject({
+      provider: 'gemini',
+      mode: 'cumulative',
+      terminal: true,
+      countsAsTurn: true,
+    });
   });
 
   it('NEVER drops an unknown-shape object → text, content preserved', () => {
@@ -205,5 +245,29 @@ describe('writeLogEvent — JSONL, monotonic seq, ISO ts', () => {
     expect(parsed[1].type).toBe('text');
     expect(parsed[2].type).toBe('text');
     expect(parsed.map((p) => p.seq)).toEqual([1, 2, 3]);
+  });
+
+  it('persists canonical usage semantics beside the lossless provider payload', () => {
+    const logPath = join(tmpDir, 'codex-usage.log');
+    const event = normalizeStreamEvent({
+      type: 'usage',
+      providerEventType: 'turn.completed',
+      usage: { input_tokens: 4, output_tokens: 2 },
+    }, 'codex');
+
+    writeLogEvent(logPath, event, 1);
+
+    expect(readEvents(logPath)[0]).toMatchObject({
+      type: 'usage',
+      content: {
+        providerEventType: 'turn.completed',
+        usage: { input_tokens: 4, output_tokens: 2 },
+      },
+      usageSemantics: {
+        provider: 'codex',
+        providerEventType: 'turn.completed',
+        terminal: true,
+      },
+    });
   });
 });

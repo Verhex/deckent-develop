@@ -1465,6 +1465,39 @@ describe('task execution lock authority', () => {
     }));
   });
 
+  it('rejects a second authority bootstrap after the bound project directory is replaced', () => {
+    const lock = acquireExecutionLock(
+      root,
+      'project-generation-split',
+      'dispatch',
+    );
+    const retiredRoot = `${root}-generation-retired`;
+    renameSync(root, retiredRoot);
+    mkdirSync(root);
+
+    expect(() => acquireExecutionLock(
+      root,
+      'project-generation-contender',
+      'dispatch',
+    )).toThrowError(expect.objectContaining({
+      reason: 'authority-epoch-mismatch',
+    }));
+    expect(existsSync(join(
+      root,
+      '.locks',
+      EXECUTION_LOCK_COORDINATION_DB_FILENAME,
+    ))).toBe(false);
+    expect(existsSync(join(
+      root,
+      '.locks',
+      EXECUTION_LOCK_AUTHORITY_SENTINEL_FILENAME,
+    ))).toBe(false);
+
+    rmSync(root, { recursive: true, force: true });
+    renameSync(retiredRoot, root);
+    releaseExecutionLock(root, lock.taskId, lock.ownerId);
+  });
+
   it('surfaces a committed renewal when projection repair loses the lock-directory generation', () => {
     const lock = acquireExecutionLock(
       root,

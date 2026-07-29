@@ -24,6 +24,7 @@ Dashboard: deckent web
 | directives | `deckent_directives` |
 | docs | `deckent_docs` |
 | doctor | `deckent_doctor` |
+| execution-authority | `deckent_execution_authority` |
 | explain | `deckent_explain` |
 | feature-query | `deckent_feature_query` |
 | help | `deckent_help` |
@@ -50,7 +51,7 @@ Dashboard: deckent web
 | watch | `deckent_watch` |
 | xverify | `deckent_xverify` |
 
-_Total: 39 MCP tools_
+_Total: 40 MCP tools_
 
 **Key operational tools:** `deckent_audit`, `deckent_nervous`, `deckent_watch`, `deckent_recover`, `deckent_status`, `deckent_memory_query`
 
@@ -103,6 +104,7 @@ _Total: 39 MCP tools_
 | `doctor` | deckent doctor |
 | `doctor-checks` | deckent doctor-checks |
 | `evolve` | deckent evolve |
+| `execution-authority` | deckent execution-authority |
 | `explain` | deckent explain |
 | `features` | deckent features |
 | `finalize` | deckent finalize |
@@ -153,6 +155,7 @@ _Total: 39 MCP tools_
 | `start` | deckent start |
 | `status` | deckent status |
 | `sync` | deckent sync |
+| `task-settlement` | deckent task-settlement |
 | `test-run` | deckent test-run |
 | `trace-extract` | deckent trace-extract |
 | `truth` | deckent truth |
@@ -162,4 +165,4 @@ _Total: 39 MCP tools_
 | `web` | deckent web |
 | `xverify` | deckent xverify |
 
-_Total: 104 CLI command modules_
+_Total: 106 CLI command modules_

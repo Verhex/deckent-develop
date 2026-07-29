@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -154,6 +154,11 @@ function persistedContinuation(
   continuationRef: TaskResultSettlementRefV1;
 } {
   const taskId = parentRef.taskId;
+  writeFileSync(
+    join(tasks, `task-${taskId}.json`),
+    JSON.stringify({ id: taskId, status: TaskStatus.EXECUTING }),
+    'utf-8',
+  );
   prepare(parentRef, 'f'.repeat(64));
   const checkpoint = createExecutionLandingCheckpoint(root, {
     taskId,
@@ -289,6 +294,85 @@ beforeEach(() => {
 });
 
 describe('Docker coordinator restart reconciliation', () => {
+  it('keeps historical retired landings out of the current task workspace', async () => {
+    const taskId = '457-002';
+    const base = mkdtempSync(join(tmpdir(), 'deckent-docker-history-'));
+    roots.push(base);
+    const root = join(base, 'project');
+    const tasks = join(root, '.tasks');
+    mkdirSync(tasks, { recursive: true });
+    process.env.DECKENT_HOME = join(base, 'host-state');
+    const checkpoint = createExecutionLandingCheckpoint(root, {
+      taskId,
+      attemptId: randomUUID(),
+      tenantId: 'tenant-history',
+      originalRequestDigest: '1'.repeat(64),
+      taskDigest: '2'.repeat(64),
+      role: 'worker',
+      kind: 'code-development',
+      admissionMode: 'unattended',
+      identity: {
+        configuredProvider: 'claude',
+        configuredModel: 'claude-sonnet-5',
+        requestedProvider: 'claude',
+        requestedModel: 'claude-sonnet-5',
+        resolvedProvider: 'claude',
+        resolvedModel: 'claude-sonnet-5',
+        calledProvider: 'claude',
+        calledModel: 'claude-sonnet-5',
+        backend: 'docker',
+        auth: 'subscription',
+        fallbackReason: null,
+      },
+      policyDigest: '3'.repeat(64),
+      landingPolicy: { reserve_ratio: 0.25 },
+      hardBudget: { maxTurns: 1 },
+      cumulativeUsage: {
+        turns: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+        totalTokens: 0,
+        maxContextTokens: 0,
+      },
+      attemptFence: 'historical-attempt-fence',
+      providerSequence: {
+        firstSequence: 1,
+        lastSequence: 1,
+        eventCount: 1,
+        eventDigest: '4'.repeat(64),
+      },
+      semanticState: {
+        summary: 'Historical landing evidence.',
+        completedWork: [],
+        remainingWork: ['No current run owns this task.'],
+        nextAction: 'Remain archived as host evidence.',
+        unresolvedRisks: [],
+      },
+      scope: { filesRead: ['historical-evidence.md'], filesWrite: [] },
+      diskDiffRefs: [`disk-diff:sha256:${'5'.repeat(64)}`],
+      evidenceRefs: [`landing-evidence:sha256:${'6'.repeat(64)}`],
+      acceptanceCriteria: 'Historical evidence must not leak into a later run.',
+      landingRequestedAt: '2026-07-25T20:44:23.000Z',
+      landedAt: '2026-07-25T20:44:24.000Z',
+    });
+    writeExecutionLandingCheckpointAtomic(root, checkpoint);
+    writeExecutionAttemptRetirementAtomic(root, checkpoint.checkpoint, {
+      checkpointSha256: checkpoint.checkpointSha256,
+      runtimeDisposition: 'stopped-removed',
+      resourcesReleased: true,
+      evidenceRefs: ['historical-runtime-retired'],
+    });
+
+    const report = await new DockerSpawnBackend(root).reconcilePendingAttempts();
+
+    expect(report.retiredLanded).toEqual([]);
+    expect(report.resumedContinuations).toEqual([]);
+    expect(existsSync(join(tasks, `task-${taskId}.result`))).toBe(false);
+    expect(mockSpawnSync).not.toHaveBeenCalled();
+  });
+
   it('adopts and closes a valid pre-lifecycle settlement without rewriting its receipt', async () => {
     const taskId = 'restart-legacy-settled';
     const { root, tasks, ref } = fixture(taskId);
@@ -991,7 +1075,12 @@ describe('Docker coordinator restart reconciliation', () => {
 
   it('resumes a retired checkpoint when the host crashed before creating its continuation claim', async () => {
     const taskId = 'restart-retired-before-continuation';
-    const { root, ref } = fixture(taskId);
+    const { root, tasks, ref } = fixture(taskId);
+    writeFileSync(
+      join(tasks, `task-${taskId}.json`),
+      JSON.stringify({ id: taskId, status: TaskStatus.EXECUTING }),
+      'utf-8',
+    );
     prepare(ref, 'e'.repeat(64));
     const checkpoint = createExecutionLandingCheckpoint(root, {
       taskId,

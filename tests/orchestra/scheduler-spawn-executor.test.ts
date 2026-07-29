@@ -344,6 +344,41 @@ describe('executeSpawnTask — fix-task routing-lineage inheritance', () => {
     expect(backend.calls).toHaveLength(1);
   });
 
+  it('preserves final-only Codex containment on dependency-triggered Docker dispatch', async () => {
+    const task = makeTask('700-FINAL-ONLY', {
+      model: 'gpt-5.6-sol',
+      provider: 'codex',
+      budgetPolicy: {
+        ...makeTask('final-only-template').budgetPolicy!,
+        resolvedProvider: 'codex',
+        finalOnlyUsage: {
+          maxWallClockSeconds: 600,
+          profileRef: 'execution_budget.final_only_usage',
+          policyDigest: '9'.repeat(64),
+        },
+      },
+    });
+    const backend = makeMockBackend();
+    Object.defineProperties(backend, {
+      name: { value: 'docker' },
+      liveUsageBudgetSupport: { value: undefined },
+    });
+
+    const disposition = await executeSpawnTask(
+      { task },
+      baseDeps(root, {
+        backend,
+        config: { spawn_backend: 'docker' } as ResolvedConfig,
+      }),
+    );
+
+    expect(disposition.kind).toBe('spawned');
+    expect(backend.calls).toHaveLength(1);
+    expect(backend.calls[0]?.opts?.finalOnlyUsageContainment).toEqual(
+      task.budgetPolicy?.finalOnlyUsage,
+    );
+  });
+
   it('blocks queued/respawn dispatch when attended authority is only a raw reference', async () => {
     const task = makeTask('700-008', {
       budgetPolicy: {
@@ -534,6 +569,7 @@ describe('waitForResults — queue-completion trigger (processQueue) delegates t
     const backend = makeMockBackend();
     const config = {
       dependency_pipeline_enabled: false,
+      auth_mode: 'api',
       worker_provider: 'claude',
       provider_fallback: { worker: ['codex'] },
       activeModeConfig: { max_workers: 1 },

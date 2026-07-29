@@ -11342,3 +11342,58 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 460-001: [D2] Subscription broker bypass'ını current-truth olarak raporla (DONE)
 
 ---
+## Sprint 473 — sprint-473
+
+**Status:** COMPLETE
+**Date:** 2026-07-29
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 34 |
+| Completed | 12 |
+| Tech Debt | 2 |
+| No-Go | 16 |
+| Coverage | NaN% |
+| Duration | 0ms |
+
+### Tasks
+
+- 473-001-xfix: Cross-fix: LOCK-PARSE — restore the canonical lock module parse boundary (DONE)
+- 473-001: LOCK-PARSE — restore the canonical lock module parse boundary (DONE)
+- undefined: undefined (NO_GO)
+- 473-002-fix: Fix: LOCK-BIND — bind project root and lock-directory generation (DONE)
+- 473-002: LOCK-BIND — bind project root and lock-directory generation (GO_WITH_TECH_DEBT)
+- undefined: undefined (NO_GO)
+- 473-003: LOCK-COMMIT — reconcile transaction completion and live handles (DONE)
+- 473-004: LOCK-PROOF — cross-process lock and migration tests (DONE)
+- 473-005: CLEAN-BIND — consume stable lock paths in clean maintenance (NO_GO)
+- 473-006: CLEAN-RECOVERY — terminal uncertainty and interrupted staging (NO_GO)
+- 473-007: CLEAN-PROOF — clean recovery and scale tests (NO_GO)
+- 473-008: LOCK-CLEAN-GATE — integrated authority verdict (DONE)
+- 473-009: ADMISSION-TYPE — compile admission against canonical lock (NO_GO)
+- 473-010: ADMISSION-EVIDENCE — bounded durable recovery chain (NO_GO)
+- 473-011: ADMISSION-CRASH — real child-process replay proof (NO_GO)
+- 473-012: ADMISSION-HEARTBEAT — shared scheduler and scale proof (NO_GO)
+- 473-013: ADMISSION-AUDIT — independent final admission verdict (NO_GO)
+- 473-014-fix: Fix: BUILD-BASELINE — revalidate the transactional build slice (NO_GO)
+- 473-014: BUILD-BASELINE — revalidate the transactional build slice (NO_GO)
+- undefined: undefined (NO_GO)
+- 473-015: BUILD-RECOVERY — close journal and durability residuals (NO_GO)
+- 473-016: BUILD-PUBLISH-SCOPE — every-environment adapter contract (NO_GO)
+- 473-017: XVERIFY-SEPARATION — verify provider independence and exact identity (GO_WITH_TECH_DEBT)
+- undefined: undefined (NO_GO)
+- 473-018: PROVIDER-CAPACITY — usage and admission readiness (NO_GO)
+- 473-019: DOCTOR-DOCKER — diagnose the Docker false-negative (DONE)
+- undefined: undefined (NO_GO)
+- 473-020: GOAL-LIFECYCLE — diagnose blocked-resume truth (DONE)
+- undefined: undefined (NO_GO)
+- 473-021: MAIN-TRUTH — branch/worktree integration inventory (DONE)
+- undefined: undefined (NO_GO)
+- 473-022: R0-COMBINED-GATE — targeted compiler and test composition (DONE)
+- 473-023: R0-SETTLEMENT — evidence and retry-safety review (NO_GO)
+- 473-024: R0-PROMOTION — independent final recommendation (NO_GO)
+
+---

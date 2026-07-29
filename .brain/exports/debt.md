@@ -9,6 +9,15 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-473-017 | Tech debt from 473-017: READ-ONLY AUDIT — zero source mutation. All 4 in-scope s | normal | sprint-473 | resolved |
+| rollback-sprint-472 | Sprint sprint-472 rollback SUCCESS | normal | sprint-472 | resolved |
+| rollback-sprint-471 | Sprint sprint-471 rollback SUCCESS | normal | sprint-471 | resolved |
+| debt-470-009 | Tech debt from 470-009: Cascade-skipped (lifecycle-robustness P0-A): dependency  | normal | sprint-470 | resolved |
+| debt-467-009 | Tech debt from 467-009: Cascade-skipped (SCHED6-EFF persist-before-commit execut | normal | sprint-467 | resolved |
+| debt-466-001 | Tech debt from 466-001: READ-ONLY PROMPT AUDIT OF THE ACTUAL INITIAL DISPATCH (4 | normal | sprint-466 | resolved |
+| debt-466-009 | Tech debt from 466-009: Cascade-skipped (SCHED6-EFF persist-before-commit execut | normal | sprint-466 | resolved |
+| debt-465-003 | Tech debt from 465-003: TERMINAL-CANARY-AUDIT of sprint-465. Read-only: no proje | normal | sprint-465 | resolved |
+| debt-462-001 | Tech debt from 462-001: PROMPT-BOOTSTRAP-AUDIT receipt appended to DIRECTIVES.md | normal | sprint-462 | resolved |
 | rollback-sprint-456 | Sprint sprint-456 rollback SUCCESS | normal | sprint-456 | resolved |
 | debt-455-001 | Tech debt from 455-001: Made the public recovery surfaces truthful within write  | normal | sprint-455 | resolved |
 | debt-455-003 | Tech debt from 455-003: Three concerns, all implemented + verified.

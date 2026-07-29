@@ -466,7 +466,7 @@ The 2026-06-30 review made the drift official policy: **artificially constrainin
 ## Intent / Roadmap (Tomorrow)
 
 - **DEP-POLICY-WIRE (P0) — ✅ DONE (2026-07-01).** Retired the legacy ADR-010 enforcement that was live and wrong: removed `ADR010_DEPS_WHITELIST` + `checkAdr010` from `authority-enforcer.ts` (it NO_GO'd any dep outside a 4-package whitelist — most of the 13 real deps false-failed) and the `count_check maxCount:3` rule + case from `auditor.ts`. Replaced with a standalone, non-DB-gated **inventory-drift advisory** (`checkDependencyInventoryDrift`) that warns (never NO_GO) iff a `package.json` dep lacks a rationale entry in `dependencies.md` — verified **zero warnings** on the live tree (all 13+3 deps documented). Updated `karpathy-discipline.md` (`.claude` + `.codex`) to merit-based and rewrote `layer4-runtime.test.ts` + `auditor.test.ts`. **Side-finding (not fixed here):** the auditor's DB-gated `PILOT_ADR_RULES` copy in `checkADRCompliance` is dead/**redundant** — its `ADR-006/008` keys no longer match any DB id after the taxonomy rename, so that copy never fires. This is **not** a security gap: ADR-006 (shell:true) + ADR-008 (core→orchestra) are still enforced **live** by `authority-enforcer.ts` (`checkAdr006`/`checkAdr008`, non-DB-gated NO_GO). Pure dead-redundant-code → AUDITOR-PILOT-DEDUP born-item (P2). Also: `checkDependencyInventoryDrift` is currently reached only via `checkADRCompliance` → `backlog-eval.ts` (the autonomous path), so wiring it into every sprint's evaluation is a follow-up.
-- **DEPS-DOC-SYNC (P1) — single live inventory.** Update `docs/reference/dependencies.md` to the merit-based policy + the real `package.json` set (13 + 3); redirect `docs/adr-index.md` / `docs/adr/README.md` ADR-010 rows to ADR-D-005; add a sync-check so `dependencies.md` cannot silently drift from `package.json`.
+- **DEPS-DOC-SYNC (P1) — single live inventory.** Update `docs/reference/dependencies.md` to the merit-based policy + the real `package.json` set (13 + 3); keep `docs/adr/README.md` canonical; add a sync-check so `dependencies.md` cannot silently drift from `package.json`.
 - **Automated audit / SBOM hard-gate** — promote CI `npm audit` from `continue-on-error: true` (advisory) to a blocking gate + SBOM generation, enforcing the security discipline mechanically instead of by review.
 - **Unblocks POLICY-ENGINE-EVAL** — removing the minimal-dep dogma unblocks evaluating a centralized policy engine (OPA/Rego or embedded) for ADR-G enforcement; the old "can't add a dependency" objection no longer applies (ADR-G-019 / ADR-G-020).
 
@@ -5110,10 +5110,10 @@ ADR-G-037 — Execution Budget Landing, Continuation & Metering Authority
 
 Owner: Alperen. Approved: 2026-07-23. Status: accepted.
 
-CONTEXT
+## Context
 Hard runtime ceilings contain spend but do not preserve useful work. Sprint-456 proved the double loss: three workers spent about 3.19M cache-read tokens and about USD 2.17 API-equivalent, crossed the hard ceiling, and produced zero successful outcomes. Docker SIGTERM can fsync an existing result but cannot cause a native provider CLI to create a semantic checkpoint. Live metering, hard containment, terminal task-result settlement and sprint-level checkpoint/resume are necessary but distinct authorities.
 
-DECISION
+## Decision
 1. The immutable owner-authored hard budget remains the primary ceiling across an execution lineage. Landing never widens, resets or replaces it; all continuation-attempt consumption is cumulative.
 2. execution_budget.landing is owner-authored. reserve_ratio is finite and strictly between 0 and 1, is included in the policy digest, and has no product default. The approved 0.25 value is canary configuration only. Unknown fields fail loudly. attended_unsupported is hold|allow-hard-stop and defaults to hold. allow-hard-stop is valid only for explicitly attended execution and requires visible approval/risk evidence. Missing landing policy never manufactures reserve or capability; remote unattended dispatch HOLDs.
 3. attended|unattended is explicit common-admission authority, never inferred from TTY, autoApprove, backend name or provider fallback. Autonomous/scheduled/webhook are unattended. Interactive terminal/CLI is attended only with a runtime-wide ApprovalBroker capable of durable decision evidence. MCP/API/IDE carries authenticated mode and approval evidence. Missing/contradictory evidence resolves to unattended. provider_fallback.unattended may govern reachability policy but is not attendance SSOT.
@@ -5124,10 +5124,10 @@ DECISION
 8. Each applied provider observation records token deltas and a neutral consecutive distinct cache-read-event count. Ordinary cache reuse is not labelled waste. Duplicate/replayed events do not increment counters or streaks.
 9. Brain, worker and auditor share policy, attendance, capability, receipt and fallback authorities. CLI/MCP/terminal/API/process/autonomous are thin producers/consumers. Subscription and API paths share token/cache truth; pricing evidence may add USD truth but cannot replace measured ceilings.
 
-ROLLOUT
+## Rollout
 Land schema/state/capability contracts preserving hard-stop behavior; add host-owned checkpoint and attempt-retirement authority; add bounded continuation and crash/restart tests; enable reserve_ratio 0.25 only in explicit canary config; run one low-risk real-binary Docker canary only after separate owner approval; no default flip is authorized.
 
-ACCEPTANCE
+## Acceptance
 Boundary tests below/at/above landing and hard ceilings; schema/digest and unknown-field tests; provider/backend capability matrix; unattended HOLD and attended explicit hard-only evidence; checkpoint corruption and competing-coordinator tests; cumulative-budget/no-full-replay continuation tests; Docker kill/landing matrix; targeted tests, lint, build:all, real binary proof and one finite Fable-5 verdict.
 
 AMENDMENT 2026-07-25 — §4-a FINAL-ONLY USAGE CONTAINMENT (owner: Alperen, approved 2026-07-25)
@@ -5163,10 +5163,10 @@ ADR-G-038 — Goal-v2 Normalized Dependency Authority & Bounded Reconciliation
 
 Owner: Alperen. Approved: 2026-07-25. Status: accepted.
 
-CONTEXT
+## Context
 Goal-v2 dependency correctness existed for bounded graphs, but JSON arrays in work_items.depends_on remained the runtime graph authority. Six approval/due/claim seams executed json_each, and every reconciliation tick rebuilt complete pending mission graphs. That design preserved correctness at small scale but could not provide indexed reverse traversal, bounded per-tick work, durable cursor fairness or an explicit migration cutover.
 
-DECISION
+## Decision
 1. A mission has exactly one dependency authority. No mission_graph_authorities row means legacy JSON authority. migration-pending and quarantined are HOLD. active means work_item_dependencies is the sole runtime authority; JSON cannot authorize query, approval or claim.
 2. New normalized missions require explicit composition authority and atomically write mission, items, admission fences, normalized edges, readiness projection and graph digest. Normalized mode remains default-off until a separately approved flip.
 3. work_item_dependency_readiness and mission_dependency_reconcile_queue are durable scheduler projections, never final execution authority. Final claim rechecks exact normalized upstream statuses and the existing item revision, admission fence and engine lease in the same transaction.
@@ -5175,18 +5175,18 @@ DECISION
 6. All six store seams consume the same per-mission predicate: approval candidates, invalid-approval parking, approval-request parking, due query, registry-fenced claim and compatibility claim. Compatibility claim remains test/migration-only after cutover.
 7. SQLite WAL plus IMMEDIATE transaction, engine lease, fences and CAS is the single-host authority across Linux, WSL, macOS and Windows. A multi-host implementation requires a transactional graph-store adapter with server-side ordering/lease semantics; an unsupported adapter HOLDs.
 
-ROLLOUT
+## Rollout
 Ship additive schema and provider-free tests/proofs first. Existing autonomous DB migration activation, live/paid canary, default flip, commit/push, publish and Desktop implementation require separate owner gates. Rollback disables normalized admission/dispatch and preserves graph history; it never reauthorizes stale JSON.
 
-ACCEPTANCE
+## Acceptance
 No active normalized mission authorizes from JSON; atomic intake and replay conflict tests; corrupt migration quarantine; all six seams share authority; stale readiness cannot win final claim; bounded direct/transitive propagation survives restart; 1K/10K/100K deterministic graph proofs remain within configured work bounds; legacy behavior, targeted hermetic tests, lint, build:all and compiled provider-free proof pass before any live canary.
 
 ---
 
-## user-1784778390241: Provider Authority Key Custody, Rotation & Composition
+## adr-g-039: Provider Authority Key Custody, Rotation & Composition
 
 **Status:** accepted
 
 Status: accepted. Owner: Alperen. Date: 2026-07-23.
 
-Decision: Provider dispatch authority is host-global and versioned. Secret keyring revisions live only below the platform dataDir; ProviderTruth and ProviderLimit ledgers live below stateDir. The keyring has one active signing key, retired verify-only keys, an immutable account-pseudonym root, content-chained append-only revisions, and exact key IDs on every signed store record. HKDF-SHA256 domain separation is mandatory for truth integrity, limit integrity, and account pseudonymization. Raw account identity is never persisted; correlation is tenant/provider/auth-mode scoped HMAC. A missing or unsafe keyring, missing tenant/policy/account/producer authority, unknown historical key, or unverifiable schema causes a typed pre-dispatch HOLD; it never selects another key or fallback provider. Solo mode may default tenant to local; enterprise mode without an explicit verified tenant must HOLD. Legacy Truth/Limit schema migration is explicit, transactional, owner-run, and never constructor-implicit. Composition may boot the control plane unavailable, but cannot grant provider dispatch until all authorities are present. Key rotation and schema key-id support are one coherent delivery boundary. Approval ingress, recurring-trigger occurrence ledger, and sealed evidence archive remain separate dependent slices under their already approved contracts.
+**Decision:** Provider dispatch authority is host-global and versioned. Secret keyring revisions live only below the platform dataDir; ProviderTruth and ProviderLimit ledgers live below stateDir. The keyring has one active signing key, retired verify-only keys, an immutable account-pseudonym root, content-chained append-only revisions, and exact key IDs on every signed store record. HKDF-SHA256 domain separation is mandatory for truth integrity, limit integrity, and account pseudonymization. Raw account identity is never persisted; correlation is tenant/provider/auth-mode scoped HMAC. A missing or unsafe keyring, missing tenant/policy/account/producer authority, unknown historical key, or unverifiable schema causes a typed pre-dispatch HOLD; it never selects another key or fallback provider. Solo mode may default tenant to local; enterprise mode without an explicit verified tenant must HOLD. Legacy Truth/Limit schema migration is explicit, transactional, owner-run, and never constructor-implicit. Composition may boot the control plane unavailable, but cannot grant provider dispatch until all authorities are present. Key rotation and schema key-id support are one coherent delivery boundary. Approval ingress, recurring-trigger occurrence ledger, and sealed evidence archive remain separate dependent slices under their already approved contracts.

@@ -48,6 +48,7 @@ import { ApprovalBroker } from '../core/approval-broker.js';
 import type { BrainAnswer, WorkerQuestion, TokenUsage } from '../core/task-types.js';
 import { extractProviderBillingEvidence, reconcileProviderBilling } from '../core/provider-billing-evidence.js';
 import { evaluateExecutionBudget, evaluateRunCostBudget } from '../core/execution-budget.js';
+import { resolveBillingModeForAuth } from '../core/cost-calculator.js';
 import { applyRuntimeBudgetStopToResult } from './runtime-budget-monitor.js';
 import {
   readRuntimeBudgetUsage,
@@ -1439,11 +1440,21 @@ export async function waitForResults(
     const runtimeStop = applyRuntimeBudgetStopToResult(projectRoot, taskId, result);
     if (runtimeStop) taskBudgetHold = true;
     if (!task) return;
+    const resolvedBillingMode = resolveBillingModeForAuth(
+      task.provider,
+      task.authMode ?? config?.auth_mode,
+    );
+    // Legacy/library callers may invoke waitForResults without a ResolvedConfig.
+    // Preserve their historical metered-cost semantics; a real configured
+    // hybrid/unknown mode still remains unresolved and therefore fails closed.
+    const billingMode = resolvedBillingMode
+      ?? (config === undefined ? (result.cost?.isLocal ? 'local' : 'api') : undefined);
     const runtimeUsage = readRuntimeBudgetUsage(projectRoot, taskId);
     const taskVerdict = evaluateExecutionBudget(
       task,
       result,
       runtimeUsage?.terminal ? runtimeUsage.decision : undefined,
+      billingMode,
     );
     let runCostState: 'within-budget' | 'exceeded' | 'unknown' = 'within-budget';
     if (!budgetCountedTaskIds.has(taskId)) {
@@ -1453,6 +1464,7 @@ export async function waitForResults(
         nextCost: result.cost,
         nextUsage: result.tokenUsage,
         sprintBudgetUsd,
+        billingMode,
       });
       cumulativeRunCostUsd = runVerdict.cumulativeUsd;
       runCostState = runVerdict.state;
@@ -1471,6 +1483,7 @@ export async function waitForResults(
         cumulativeRunCostUsd,
         sprintBudgetUsd,
         runCostState,
+        billingMode: billingMode ?? 'unknown',
         emittedAt: new Date().toISOString(),
       });
     } catch (e) { debugLog('collectResults:taskBudgetHold', e); }

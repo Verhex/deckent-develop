@@ -188,8 +188,9 @@ describe('evaluateCostGate', () => {
     });
   });
 
-  it('admits a registry-known subscription model without API pricing evidence', () => {
-    expect(modelRegistry.get('gpt-5.6-sol')?.pricingEvidenceRef).toBeUndefined();
+  it('admits a registry-known subscription model without charging the USD budget', () => {
+    expect(modelRegistry.get('gpt-5.6-sol')?.pricingEvidenceRef)
+      .toBe('https://platform.openai.com/docs/pricing');
     const result = evaluateCostGate({
       tasks: [{
         ...task('codex-subscription', 'gpt-5.6-sol', 'high'),
@@ -218,7 +219,7 @@ describe('evaluateCostGate', () => {
     });
   });
 
-  it('keeps API billing fail-closed for the same model without pricing evidence', () => {
+  it('admits API billing for the same model with official pricing evidence', () => {
     const result = evaluateCostGate({
       tasks: [{
         ...task('codex-api', 'gpt-5.6-sol', 'high'),
@@ -228,12 +229,9 @@ describe('evaluateCostGate', () => {
       acknowledgeCost: true,
     });
 
-    expect(result).toMatchObject({
-      ok: false,
-      reason: 'COST_PRICING_UNKNOWN',
-      ceilingTripped: 'pricing',
-      unpricedModels: ['gpt-5.6-sol'],
-    });
+    expect(result.ok).toBe(true);
+    expect(result.estimate.unpricedModels).toEqual([]);
+    expect(result.estimate.totalApiCostUsd).toBeGreaterThan(0);
   });
 
   it('estimates a dynamic remote model only with explicit pricing evidence', () => {

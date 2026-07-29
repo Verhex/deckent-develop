@@ -157,7 +157,8 @@
     "openai": {
       "enabled": true,
       "billing_modes_supported": [
-        "api"
+        "api",
+        "subscription"
       ],
       "default_billing_mode": "api",
       "api_endpoint": "https://api.openai.com",
@@ -285,7 +286,7 @@
         "gpt-5.6-sol": {
           "input_cost_per_token": 5e-06,
           "output_cost_per_token": 3e-05,
-          "cache_creation_input_token_cost": null,
+          "cache_creation_input_token_cost": 6.25e-06,
           "cache_creation_input_token_cost_above_1hr": null,
           "cache_read_input_token_cost": 5e-07,
           "max_input_tokens": 1050000,
@@ -301,14 +302,14 @@
             "sol"
           ],
           "enabled": true,
-          "_source": "litellm",
-          "_verified_at": "2026-07-02",
-          "_notes": "Sprint 360 task 360-004 — live-fetched+disk-verified from the LiteLLM feed (raw.githubusercontent.com/BerriAI/litellm/main/litellm/model_prices_and_context_window_backup.json) key \"gpt-5.5\" (litellm_provider=openai, mode=chat) on 2026-07-02: input=$5.00/MTok, output=$30.00/MTok, cache_read=$0.50/MTok, max_input_tokens=1,050,000, max_output_tokens=128,000, supports_reasoning/vision/tool_choice/prompt_caching all true — not fabricated. Distinct from the registry's 'gpt-5' apiId-shim (Sprint 248); registry counterpart is CODEX_PARITY_MODELS in model-registry.ts (opt-in via registerCodexParityModels(), not yet auto-wired into a Codex provider bootstrap)."
+          "_source": "openai-official-pricing",
+          "_verified_at": "2026-07-29",
+          "_notes": "OpenAI Standard short-context API pricing: input $5.00/MTok, cached input $0.50/MTok, cache write $6.25/MTok, output $30.00/MTok. Subscription/Business execution is quota-governed and excluded from USD budgets. Source: https://platform.openai.com/docs/pricing"
         },
         "gpt-5.6-terra": {
           "input_cost_per_token": 2.5e-06,
           "output_cost_per_token": 1.5e-05,
-          "cache_creation_input_token_cost": null,
+          "cache_creation_input_token_cost": 3.125e-06,
           "cache_creation_input_token_cost_above_1hr": null,
           "cache_read_input_token_cost": 2.5e-07,
           "max_input_tokens": 1050000,
@@ -324,14 +325,14 @@
             "terra"
           ],
           "enabled": true,
-          "_source": "litellm",
-          "_verified_at": "2026-07-02",
-          "_notes": "Sprint 360 task 360-004 — live-fetched+disk-verified from the LiteLLM feed (raw.githubusercontent.com/BerriAI/litellm/main/litellm/model_prices_and_context_window_backup.json) key \"gpt-5.5\" (litellm_provider=openai, mode=chat) on 2026-07-02: input=$5.00/MTok, output=$30.00/MTok, cache_read=$0.50/MTok, max_input_tokens=1,050,000, max_output_tokens=128,000, supports_reasoning/vision/tool_choice/prompt_caching all true — not fabricated. Distinct from the registry's 'gpt-5' apiId-shim (Sprint 248); registry counterpart is CODEX_PARITY_MODELS in model-registry.ts (opt-in via registerCodexParityModels(), not yet auto-wired into a Codex provider bootstrap)."
+          "_source": "openai-official-pricing",
+          "_verified_at": "2026-07-29",
+          "_notes": "OpenAI Standard short-context API pricing: input $2.50/MTok, cached input $0.25/MTok, cache write $3.125/MTok, output $15.00/MTok. Subscription/Business execution is quota-governed and excluded from USD budgets. Source: https://platform.openai.com/docs/pricing"
         },
         "gpt-5.6-luna": {
           "input_cost_per_token": 1e-06,
           "output_cost_per_token": 6e-06,
-          "cache_creation_input_token_cost": null,
+          "cache_creation_input_token_cost": 1.25e-06,
           "cache_creation_input_token_cost_above_1hr": null,
           "cache_read_input_token_cost": 1e-07,
           "max_input_tokens": 1050000,
@@ -347,9 +348,9 @@
             "luna"
           ],
           "enabled": true,
-          "_source": "litellm",
-          "_verified_at": "2026-07-02",
-          "_notes": "Sprint 360 task 360-004 — live-fetched+disk-verified from the LiteLLM feed (raw.githubusercontent.com/BerriAI/litellm/main/litellm/model_prices_and_context_window_backup.json) key \"gpt-5.5\" (litellm_provider=openai, mode=chat) on 2026-07-02: input=$5.00/MTok, output=$30.00/MTok, cache_read=$0.50/MTok, max_input_tokens=1,050,000, max_output_tokens=128,000, supports_reasoning/vision/tool_choice/prompt_caching all true — not fabricated. Distinct from the registry's 'gpt-5' apiId-shim (Sprint 248); registry counterpart is CODEX_PARITY_MODELS in model-registry.ts (opt-in via registerCodexParityModels(), not yet auto-wired into a Codex provider bootstrap)."
+          "_source": "openai-official-pricing",
+          "_verified_at": "2026-07-29",
+          "_notes": "OpenAI Standard short-context API pricing: input $1.00/MTok, cached input $0.10/MTok, cache write $1.25/MTok, output $6.00/MTok. Subscription/Business execution is quota-governed and excluded from USD budgets. Source: https://platform.openai.com/docs/pricing"
         }
       },
       "rate_limits": {
@@ -372,7 +373,7 @@
       "subscription_tracking": {
         "method": "none",
         "supported": false,
-        "reason": "ChatGPT Plus/Pro/Enterprise is web UI access. API billing is separate. Architectural impossibility — use API key for cost tracking."
+        "reason": "Codex subscription/Business usage is plan-quota governed; it has no per-task USD charge. Quota availability requires authoritative provider-limit evidence and is not inferred from token prices."
       }
     },
     "google": {

@@ -32,7 +32,7 @@ export interface TaskRouterConfig {
   provider_fallback?: ResolvedConfig['provider_fallback'];
   providers?: ResolvedConfig['providers'];
   /** Config-level auth mode — resolved after task.authMode override (ADR-076) */
-  auth_mode?: 'subscription' | 'api';
+  auth_mode?: ResolvedConfig['auth_mode'];
 }
 
 /** Result of routing a task to a provider, agent, and skills */
