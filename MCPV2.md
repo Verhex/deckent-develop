@@ -2,6 +2,7 @@
 
 > **Durum:** PLAN (owner-onaylı analiz, 2026-07-28) · **Sahip:** Alperen · **Analiz:** Claude Fable 5
 > **Kaynak analiz oturumu:** 2026-07-28 — protokol araştırması (Context7 + birincil kaynaklar) + tam repo taraması.
+> **Doğrulama:** 2026-07-29 — §2'deki tüm repo bulguları dosya-dosya, GA/SDK durumu birincil kaynaktan yeniden doğrulandı; satır referansları 2026-07-29 HEAD'ine göredir (drift'e açık).
 > **Ledger notu:** Bu doküman iş-planı taslağıdır; canonical iş-takibi için `docs/MASTER-PLAN.md`
 > ledger'ına Work ID'ler gate-receipt akışıyla eklenmelidir (P02/P03 programlarına aday).
 
@@ -28,12 +29,14 @@
 | Hata kodları | `-32020`…`-32099` spec'e rezerve; resource-not-found `-32002` → `-32602` | — |
 | Stateful sunucular | Cross-call state için server-minted **explicit handle**'lar normal tool argümanı olarak taşınır | SEP-2567 |
 
-**GA/rollout durumu (2026-07-28 itibarıyla):** Spec deposunda son stable `2025-11-25`;
-`2026-07-28-RC` pre-release. GA bugün hedefli, ancak resmi blog: *"bu tarih normatif metnin yayın
-tarihidir, hiçbir implementer için switch-off değildir."* TS SDK v2 stable-line (yeni paketler:
-`@modelcontextprotocol/server` + `client`; eski `@modelcontextprotocol/sdk` = v1 hattı), Python
-`2.0.0rc1`, Go `v1.7.0-pre.1`, C# `v2.0.0-preview.1`. TS client default'u `legacy`; v2 server iki
-era'yı birden servis eder. **Acil kırılma yok — planlı geçiş.**
+**GA/rollout durumu (son doğrulama: 2026-07-29):** `2026-07-28` revizyonu spec deposunda
+**stable (GA) yayınlandı** (28 Temmuz 2026); önceki stable `2025-11-25`. Resmi blog: *"bu tarih
+normatif metnin yayın tarihidir, hiçbir implementer için switch-off değildir."* SDK durumu:
+TypeScript v2 stable-line (yeni paketler: `@modelcontextprotocol/server` + `client`; eski
+`@modelcontextprotocol/sdk` = v1 hattı), Python `mcp` **2.0.0 final**, Go `v1.7.0-pre.1`,
+C# `v2.0.0-preview.1` (son ikisi GA anında hâlâ pre-release). TS client default'u `legacy`;
+v2 server iki era'yı birden servis eder. **Acil kırılma yok — planlı geçiş** (12-ay deprecation
+penceresi + Tier-1 SDK geriye-uyumluluk taahhütleri).
 
 ## 2. Deckent maruziyet özeti
 
@@ -41,7 +44,7 @@ Tam envanter: 2026-07-28 analiz oturumu. Kilit sonuçlar:
 
 | Alan | Durum | Risk |
 |---|---|---|
-| `Mcp-Session-Id` / handshake | Deckent kodunda hiç yok; server stdio-only, handshake SDK'ya devredilmiş (`src/mcp/server.ts:238`, `src/mcp-client/broker.ts:67`) | 🟢 |
+| `Mcp-Session-Id` / handshake | Deckent kodunda hiç yok; server stdio-only, handshake SDK'ya devredilmiş (`src/mcp/server.ts:239`, `src/mcp-client/broker.ts:67`) | 🟢 |
 | Execution state | Tamamen disk-first (`.deckent/jobs/`, backlog, `.brain/memory.db`); `deckent_start` zaten fire-and-forget detached fork | 🟢 |
 | Tool listesi | Tamamen statik `TOOL_CATALOG` (`src/mcp/tools/index.ts`) — yeni caching modeli için avantaj | 🟢 |
 | `server/discover` | Capability beyanı hiç yok (`server.ts:171-174`); `listChanged` yanlış-reklamı (ilan ediliyor, hiç gönderilmiyor) | 🟡 |
@@ -65,7 +68,7 @@ Deckent gibi control plane'lere itiyor — değer önerimizi güçlendiriyor.
 - **DoD:** Gerçek-binary koşuda watch event'i client'a ulaşıyor; mevcut testler yeşil.
 
 ### P1 — Dual-era hazırlık — M
-- [ ] SDK v2 geçişi için ADR amendment (SDK, `src/core/adr-seed.ts:130` ile ADR'ye çivili; metin bayat: "22 tool" → 48)
+- [ ] SDK v2 geçişi için ADR amendment (SDK, `src/core/adr-seed.ts:130`'daki legacy `adr-010` "Minimal Runtime Dependencies" kaydıyla ADR'ye çivili; kayıt metni bayat: "22 tool" diyor — gerçek sayının SSOT'u `MCP_TOOL_COUNT` (`src/mcp/tools/index.ts:125`, 2026-07-29 itibarıyla 49))
 - [ ] `versionNegotiation` politikasının config/Brain policy'ye bağlanması: `auto` / `pin-modern` / `pin-legacy` / `reject-unsupported`
 - [ ] Conformance test matrisi (bugün gerçek-transport E2E testi YOK): legacy↔legacy, modern↔modern, modern→legacy fallback, legacy→modern-only açık hata, stateless retry idempotency, instance-değişimi state-korunumu, cache-scope invalidation, subscription reconnect+reconciliation
 - [ ] `writer-lease-gate.ts` monkey-patch'inin SDK-resmi API'ye taşınması
