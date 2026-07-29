@@ -673,6 +673,19 @@ export const EXECUTION_LOCK_AUTHORITY_ANCHOR_FILENAME =
   '.deckent-execution-lock-authority.anchor.json';
 const EXECUTION_LOCK_ROOT_BINDING_PREFIX =
   '.deckent-execution-lock-root-binding';
+
+/**
+ * True when a `.locks/` entry belongs to canonical task-execution authority.
+ * Generic sprint cleanup may remove legacy `.lock`/`.spawnlock` files, but
+ * these artifacts are retired only by fenced execution-authority APIs.
+ */
+export function isExecutionLockAuthorityArtifactName(name: string): boolean {
+  return name === EXECUTION_LOCK_COORDINATION_DB_FILENAME
+    || name.startsWith(`${EXECUTION_LOCK_COORDINATION_DB_FILENAME}-`)
+    || name === EXECUTION_LOCK_AUTHORITY_SENTINEL_FILENAME
+    || name === EXECUTION_LOCK_MOUNT_ADOPTION_DIRECTORY
+    || name.includes('.executionlock');
+}
 export const DEFAULT_EXECUTION_LOCK_LEASE_MS = 30_000;
 export const DEFAULT_EXECUTION_LOCK_HEARTBEAT_MS = 10_000;
 export const MAX_EXECUTION_LOCK_LEASE_MS = 86_400_000;

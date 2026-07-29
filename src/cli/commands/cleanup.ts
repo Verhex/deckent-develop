@@ -18,6 +18,7 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import { pruneExpiredNervousPending } from '../../core/pending-approvals.js';
+import { isExecutionLockAuthorityArtifactName } from '../../core/file-lock.js';
 
 /** DB-first memory entry count — replaces legacy countBrainLines. */
 function getMemoryEntryCount(projectRoot: string): number {
@@ -90,7 +91,11 @@ export function registerCleanup(program: Command): void {
         const allTaskFiles = existsSync(tasksDir) ? (readdirSync(tasksDir) as string[]) : [];
         const taskFiles = allTaskFiles.filter(f => /\.(json|plan|hb|result|paused|log|timeout)$/.test(f));
         const promptFiles = allTaskFiles.filter(f => f.startsWith('.prompt-'));
-        const lockFiles = existsSync(locksDir) ? (readdirSync(locksDir) as string[]) : [];
+        const lockFiles = existsSync(locksDir)
+          ? (readdirSync(locksDir) as string[]).filter(
+            file => !isExecutionLockAuthorityArtifactName(file),
+          )
+          : [];
 
         print('[dry-run] Would archive:');
         for (const f of promptFiles) print(`  prompt → archive: ${f}`);

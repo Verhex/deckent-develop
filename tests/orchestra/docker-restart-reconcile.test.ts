@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import type { ChildProcess } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -114,12 +114,16 @@ function prepare(ref: TaskResultSettlementRefV1, containerId?: string): void {
   if (containerId) writeTaskResultSettlementDispatchAtomic(ref, containerId);
 }
 
+function writeRawResult(tasks: string, taskId: string, raw: string): void {
+  writeFileSync(join(tasks, `task-${taskId}.result`), raw, 'utf-8');
+}
+
 function writeDone(tasks: string, taskId: string): void {
-  writeFileSync(join(tasks, `task-${taskId}.result`), JSON.stringify({
+  writeRawResult(tasks, taskId, JSON.stringify({
     taskId,
     selfAssessment: 'DONE',
     testsPassed: true,
-  }), 'utf-8');
+  }));
 }
 
 function providerUsageLog(totalUsd: number, cacheReadTokens: number): string {
@@ -599,19 +603,115 @@ describe('Docker coordinator restart reconciliation', () => {
     });
   });
 
-  it('holds prepared-without-dispatch ambiguity when the container is proven absent', async () => {
+  it('contains a prepared attempt as NO_GO when the exact container is proven absent and its result is missing', async () => {
     const taskId = 'restart-prepared-absent';
-    const { root, ref } = fixture(taskId);
+    const { root, tasks, ref } = fixture(taskId);
     prepare(ref);
     mockSpawnSync.mockReturnValue(spawnResult(1, '', 'Error: No such container'));
 
-    await expect(new DockerSpawnBackend(root).reconcilePendingAttempts())
-      .rejects.toThrow(/DECKENT_E091:ambiguous-dispatch-container-absent/);
+    const report = await new DockerSpawnBackend(root).reconcilePendingAttempts();
 
+    expect(report.closedAbsentAfterExit).toEqual([taskId]);
+    expect(readTaskResultSettlement(ref)?.result).toMatchObject({
+      taskId,
+      selfAssessment: 'NO_GO',
+      markerType: 'RECOVERY_RESULT_UNAVAILABLE',
+      recovery: {
+        attemptId: ref.attemptId,
+        resultArtifactState: 'missing',
+      },
+    });
+    expect(readTaskResultSettlementClosure(ref)).toMatchObject({
+      containerDisposition: 'absent-after-exit',
+      locksReleased: true,
+    });
+    expect(JSON.parse(readFileSync(join(tasks, `task-${taskId}.result`), 'utf-8')))
+      .toMatchObject({
+        selfAssessment: 'NO_GO',
+        markerType: 'RECOVERY_RESULT_UNAVAILABLE',
+      });
+    expect(mockReleaseAllSpawnLocks).toHaveBeenCalledWith(root, taskId);
+    expect(mockSpawnSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves malformed result bytes and closes the proven-absent attempt with a host NO_GO', async () => {
+    const taskId = 'restart-malformed-result';
+    const { root, tasks, ref } = fixture(taskId);
+    prepare(ref, 'b'.repeat(64));
+    const malformed = `{"taskId":"${taskId}","selfAssessment":"NO_GO","notes":"line one\nline two"}`;
+    writeRawResult(tasks, taskId, malformed);
+    mockSpawnSync.mockReturnValue(spawnResult(1, '', 'Error: No such container'));
+
+    const report = await new DockerSpawnBackend(root).reconcilePendingAttempts();
+
+    expect(report.closedAbsentAfterExit).toEqual([taskId]);
+    const settlement = readTaskResultSettlement(ref);
+    expect(settlement?.result).toMatchObject({
+      taskId,
+      selfAssessment: 'NO_GO',
+      markerType: 'RECOVERY_RESULT_UNAVAILABLE',
+      recovery: {
+        attemptId: ref.attemptId,
+        resultArtifactState: 'malformed',
+      },
+    });
+    const forensic = JSON.parse(readFileSync(
+      join(dirname(taskResultSettlementPath(ref)), 'invalid-worker-result.json'),
+      'utf-8',
+    ));
+    expect(forensic).toMatchObject({
+      taskId,
+      attemptId: ref.attemptId,
+      artifactState: 'malformed',
+      rawBytes: Buffer.byteLength(malformed),
+      truncated: false,
+    });
+    expect(Buffer.from(forensic.rawBase64, 'base64').toString('utf-8')).toBe(malformed);
+    expect(readTaskResultSettlementClosure(ref)).toMatchObject({
+      containerDisposition: 'absent-after-exit',
+      locksReleased: true,
+    });
+  });
+
+  it('terminal-only ingress closes a dispatched absent attempt without project leadership', async () => {
+    const taskId = 'ingress-terminal-only-absent';
+    const { root, ref } = fixture(taskId);
+    prepare(ref, 'c'.repeat(64));
+    mockSpawnSync.mockReturnValue(spawnResult(1, '', 'Error: No such container'));
+
+    const report = await new DockerSpawnBackend(root).reconcilePendingAttempts({
+      mode: 'terminal-only',
+    });
+
+    expect(report.closedAbsentAfterExit).toEqual([taskId]);
+    expect(readTaskResultSettlement(ref)?.result).toMatchObject({
+      selfAssessment: 'NO_GO',
+      markerType: 'RECOVERY_RESULT_UNAVAILABLE',
+    });
+    expect(readTaskResultSettlementClosure(ref)).toMatchObject({
+      containerDisposition: 'absent-after-exit',
+    });
+  });
+
+  it('terminal-only ingress never closes a prepare-without-dispatch race', async () => {
+    const taskId = 'ingress-terminal-only-prepared';
+    const { root, ref } = fixture(taskId);
+    prepare(ref);
+
+    const report = await new DockerSpawnBackend(root).reconcilePendingAttempts({
+      mode: 'terminal-only',
+    });
+
+    expect(report).toEqual({
+      adopted: [],
+      closedNotDispatched: [],
+      closedAbsentAfterExit: [],
+      retiredLanded: [],
+      resumedContinuations: [],
+    });
+    expect(mockSpawnSync).not.toHaveBeenCalled();
     expect(readTaskResultSettlement(ref)).toBeNull();
     expect(readTaskResultSettlementClosure(ref)).toBeNull();
-    expect(mockReleaseAllSpawnLocks).not.toHaveBeenCalled();
-    expect(mockSpawnSync).toHaveBeenCalledTimes(1);
   });
 
   it('adopts a running exact attempt, contains it, and awaits normal monitor settlement', async () => {

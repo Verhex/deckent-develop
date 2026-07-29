@@ -46,6 +46,14 @@ export interface SpawnBackendRecoveryReport {
   resumedContinuations: string[];
 }
 
+export interface SpawnBackendRecoveryOptions {
+  /**
+   * `resume` restores interrupted execution where safe. `contain` is used by
+   * destructive shutdown surfaces and must never dispatch replacement work.
+   */
+  mode?: 'resume' | 'contain' | 'terminal-only';
+}
+
 // ─── SpawnBackend Interface ───────────────────────────────────────────────────
 
 /**
@@ -95,7 +103,9 @@ export interface SpawnBackend {
    * leadership and before checkpoint state is interpreted. Backends without a
    * host-owned attempt journal omit this method.
    */
-  reconcilePendingAttempts?(): Promise<SpawnBackendRecoveryReport>;
+  reconcilePendingAttempts?(
+    options?: SpawnBackendRecoveryOptions,
+  ): Promise<SpawnBackendRecoveryReport>;
 }
 
 // ─── SpawnBackendOptions ──────────────────────────────────────────────────────

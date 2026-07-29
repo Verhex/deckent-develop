@@ -45,6 +45,7 @@ import {
 // ─── Core — sprint lock ───────────────────────────────────────────
 import { releaseSprintLock } from '../core/multi-ide.js';
 import { pruneExpiredNervousPending } from '../core/pending-approvals.js';
+import { isExecutionLockAuthorityArtifactName } from '../core/file-lock.js';
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
@@ -449,7 +450,10 @@ export function cleanup(
   // when the Brain runner crashed mid-sprint without releasing them.
   const locksDir = join(projectRoot, LOCKS_DIR);
   if (existsSync(locksDir)) {
-    for (const file of readdirSync(locksDir).filter(f => f.endsWith('.lock') || f.endsWith('.spawnlock'))) {
+    for (const file of readdirSync(locksDir).filter(
+      f => (f.endsWith('.lock') || f.endsWith('.spawnlock'))
+        && !isExecutionLockAuthorityArtifactName(f),
+    )) {
       try { unlinkSync(join(locksDir, file)); } catch (e) { debugLog('cleanup:unlinkLockFile', e); }
     }
   }

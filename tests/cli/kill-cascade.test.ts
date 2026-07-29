@@ -83,6 +83,7 @@ import {
 } from '../../src/orchestra/sprint-pid-manager.js';
 import { cleanupSprintMetadata } from '../../src/orchestra/sprint-controller.js';
 import { writeEvent } from '../../src/orchestra/event-stream.js';
+import { SpawnBackendFactory } from '../../src/orchestra/spawn-backend.js';
 import { registerKill } from '../../src/cli/commands/kill.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -231,6 +232,39 @@ describe('kill --all cascade (Sprint 177 Task 177-003)', () => {
     // No PID files → no per-sprint cleanup
     expect(cleanupSprintMetadata).not.toHaveBeenCalled();
     expect(clearPid).not.toHaveBeenCalled();
+  });
+
+  it('reconciles host-owned Docker settlements after containment before reporting success', async () => {
+    const fs = await import('node:fs');
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fs.readdirSync).mockReturnValue([] as any);
+    vi.mocked(listPidFiles).mockReturnValue([]);
+    vi.mocked(readPid).mockReturnValue(null);
+    const reconcilePendingAttempts = vi.fn().mockResolvedValue({
+      adopted: [],
+      closedNotDispatched: [],
+      closedAbsentAfterExit: ['474-004'],
+      retiredLanded: [],
+      resumedContinuations: [],
+    });
+    const factory = vi.spyOn(SpawnBackendFactory, 'create').mockReturnValue({
+      name: 'docker',
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      list: vi.fn(() => []),
+      isAvailable: vi.fn().mockResolvedValue(true),
+      reconcilePendingAttempts,
+    });
+
+    await runKillAll();
+
+    expect(factory).toHaveBeenCalledWith(expect.objectContaining({
+      backend: 'docker',
+      projectDir: '/mock/root',
+    }));
+    expect(reconcilePendingAttempts).toHaveBeenCalledWith({ mode: 'contain' });
+    expect(process.exitCode).toBeUndefined();
+    factory.mockRestore();
   });
 
   it('terminalizes a stale active dashboard even when the controller PID file is already gone', async () => {

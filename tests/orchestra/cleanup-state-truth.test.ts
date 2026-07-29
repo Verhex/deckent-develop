@@ -57,4 +57,23 @@ describe('W0 cleanup state-truth — per-sprint display artifacts die with the s
     expect(existsSync(join(root, '.dashboard'))).toBe(true);
     expect(existsSync(join(root, '.deckent', 'ci-baseline.json'))).toBe(true);
   });
+
+  it("cleanup('sprint-end') removes legacy locks but preserves execution authority", () => {
+    const locks = join(root, '.locks');
+    mkdirSync(locks, { recursive: true });
+    writeFileSync(join(locks, 'src__legacy.lock'), '{}');
+    writeFileSync(join(locks, 'src__spawn.spawnlock'), '{}');
+    writeFileSync(join(locks, 'execution-lock-authority.sqlite3'), 'authority');
+    writeFileSync(join(locks, 'execution-lock-authority.sentinel.json'), '{}');
+    const projection = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.executionlock';
+    writeFileSync(join(locks, projection), '{}');
+
+    cleanup(root, makeSprint(), undefined, 'sprint-end');
+
+    expect(existsSync(join(locks, 'src__legacy.lock'))).toBe(false);
+    expect(existsSync(join(locks, 'src__spawn.spawnlock'))).toBe(false);
+    expect(existsSync(join(locks, 'execution-lock-authority.sqlite3'))).toBe(true);
+    expect(existsSync(join(locks, 'execution-lock-authority.sentinel.json'))).toBe(true);
+    expect(existsSync(join(locks, projection))).toBe(true);
+  });
 });

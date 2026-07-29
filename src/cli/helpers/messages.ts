@@ -1065,6 +1065,14 @@ const MESSAGES: MessageMap = {
     en: 'Cleanup complete. Removed artifacts for {count} tasks.',
     tr: 'Temizlik tamamlandı. {count} görevin artifaktları silindi.',
   },
+  'kill.settlements_reconciled': {
+    en: 'Closed {count} host-owned execution settlement(s) after containment.',
+    tr: 'Containment sonrası {count} host-owned execution settlement kapatıldı.',
+  },
+  'kill.settlement_recovery_failed': {
+    en: 'Workers were contained, but host-owned execution settlement recovery failed: {reason}',
+    tr: 'Worker containment tamamlandı ancak host-owned execution settlement recovery başarısız oldu: {reason}',
+  },
 
   // ─── finalize command ────────────────────────────────────────────────
   'finalize.no_tasks': {

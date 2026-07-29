@@ -206,6 +206,18 @@ export async function spawnWorkerMultiProvider(
   root: string,
   opts: SpawnWorkerMultiProviderOptions,
 ): Promise<{ backend: string; provider: ProviderName; settlementRef?: TaskResultSettlementRefV1 }> {
+  // Leadership-free ingress recovery shared by run/do/autonomous/task-mode.
+  // It can close only dispatched attempts whose exact Docker container is
+  // authoritatively absent; it never adopts/stops live containers, resumes
+  // continuations, or touches prepare-without-dispatch races.
+  const recoveryBackend = SpawnBackendFactory.create({
+    backend: 'docker',
+    projectDir: root,
+    dockerImage: opts.dockerImage,
+    dockerTimeoutSeconds: opts.dockerTimeout,
+  });
+  await recoveryBackend.reconcilePendingAttempts?.({ mode: 'terminal-only' });
+
   return withTaskExecutionFence(root, taskId, 'dispatch', () => {
     assertTaskDispatchSettlementOpen(
       root,

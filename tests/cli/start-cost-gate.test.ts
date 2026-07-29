@@ -230,6 +230,20 @@ describe('cli start — cost gate (Sprint 189 T-008)', () => {
       .toBeLessThan(vi.mocked(evaluateCostGate).mock.invocationCallOrder[0]!);
   });
 
+  it('keeps the pre-sprint cost plan read-only until runSprint owns recovery and materialization', async () => {
+    await runStart(['start']);
+
+    expect(vi.mocked(planSprint)).toHaveBeenCalledWith(
+      '/mock/root',
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      { dryRun: true },
+    );
+    expect(vi.mocked(planSprint).mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(runSprint).mock.invocationCallOrder[0]!);
+  });
+
   it('blocks before cost planning and worker spawn when the subscription limit gate blocks', async () => {
     vi.mocked(checkStartLimitGate).mockResolvedValue({
       blocked: true,

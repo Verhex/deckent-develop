@@ -861,7 +861,14 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
               modelConstraint: null,
               reason: 'Cost gate pre-plan',
             };
-            const planForCost = await planSprint(root, config, context, recommendation);
+            // Cost admission is a preview boundary. Writing task artifacts here
+            // used to happen before runSprint acquired leadership and reconciled
+            // host-owned backend attempts; a stale Docker settlement could then
+            // block startup after the new sprint had already polluted `.tasks/`.
+            // The authoritative live plan remains runSprint's post-recovery PLAN.
+            const planForCost = await planSprint(root, config, context, recommendation, {
+              dryRun: true,
+            });
             const cfgAuthMode = await readAuthMode(root);
             const costTasks: TaskCostInput[] = planForCost.tasks.map((t) => ({
               id: t.id,

@@ -102,6 +102,26 @@ describe('cleanup --dry-run', () => {
     expect(readdirSync(locksDir)).toHaveLength(2);
   });
 
+  it('does not advertise canonical execution-authority artifacts as cleanup targets', () => {
+    const locksDir = join(testRoot, '.locks');
+    mkdirSync(locksDir, { recursive: true });
+    writeFileSync(join(locksDir, 'src__cli__config.lock'), '{}');
+    writeFileSync(join(locksDir, 'execution-lock-authority.sqlite3'), 'authority');
+    writeFileSync(join(locksDir, 'execution-lock-authority.sqlite3-wal'), 'wal');
+    writeFileSync(join(locksDir, 'execution-lock-authority.sentinel.json'), '{}');
+    writeFileSync(join(locksDir, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.executionlock'), '{}');
+    mkdirSync(join(locksDir, 'execution-lock-authority-adoptions'));
+
+    runCleanup('--dry-run');
+
+    const joined = output.join('\n');
+    expect(joined).toContain('1 lock file(s)');
+    expect(joined).toContain('src__cli__config.lock');
+    expect(joined).not.toContain('execution-lock-authority.sqlite3');
+    expect(joined).not.toContain('.executionlock');
+    expect(readdirSync(locksDir)).toHaveLength(6);
+  });
+
   it('should list prompt files correctly', () => {
     const tasksDir = join(testRoot, '.tasks');
     mkdirSync(tasksDir, { recursive: true });

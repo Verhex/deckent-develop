@@ -70,6 +70,7 @@ import {
   taskResultSettlementPromptEvidenceRef,
   taskResultSettlementPromptPath,
   taskResultSettlementAttemptPath,
+  taskResultSettlementPath,
   taskProviderTerminalBillingEvidenceRef,
   writeTaskProviderActualCallReceiptAtomic,
   writeTaskProviderTerminalUsageReceiptAtomic,
@@ -87,6 +88,7 @@ import {
   type TaskProviderTerminalUsageSourceV1,
   type TaskResultSettlementRefV1,
 } from '../core/task-result-settlement.js';
+import { normalizeTaskResultShape } from '../core/task-result-schema.js';
 import {
   listRetiredExecutionLandings,
   readExecutionLandingCheckpointByRef,
@@ -99,6 +101,7 @@ import type {
   HostTerminalResultContractV1,
   SpawnBackend,
   SpawnBackendOptions,
+  SpawnBackendRecoveryOptions,
   SpawnBackendRecoveryReport,
 } from './spawn-backend.js';
 import { SpawnBackendError, checkLethalGuard } from './spawn-backend.js';
@@ -644,10 +647,136 @@ export function persistDockerTaskResultSettlement(
   assertTaskResultSettlementRef(projectRoot, ref.taskId, ref);
   const resultPath = join(tasksDir, `task-${ref.taskId}.result`);
   if (!existsSync(resultPath)) return false;
-  const result = JSON.parse(readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
+  const parsed = JSON.parse(readFileSync(resultPath, 'utf-8')) as unknown;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`Docker result settlement is not a JSON object: ${resultPath}`);
+  }
+  const result = normalizeTaskResultShape(
+    parsed as Record<string, unknown> & { notes?: unknown },
+  ) as Record<string, unknown>;
+  atomicWriteFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
   const settlement = createTaskResultSettlement({ ref, exitCode, result });
   writeTaskResultSettlementAtomic(settlement);
   return true;
+}
+
+const MAX_RECOVERY_FORENSIC_BYTES = 1024 * 1024;
+
+/**
+ * Make a proven-absent Docker attempt settleable without inventing success.
+ *
+ * A worker result can be missing when the host dies between container exit and
+ * result flush, or malformed when a provider shell emitted unescaped text.
+ * Neither condition is operational ambiguity once Docker authoritatively
+ * proves the exact container absent. Preserve malformed bytes under the
+ * host-owned attempt journal, then project an explicit host-authored NO_GO
+ * result so recovery can settle, close and release locks automatically.
+ */
+export function ensureDockerRecoveryResultFile(input: {
+  readonly projectRoot: string;
+  readonly tasksDir: string;
+  readonly ref: TaskResultSettlementRefV1;
+  readonly model: string;
+}): 'worker-result' | 'recovered-missing' | 'recovered-malformed' {
+  assertTaskResultSettlementRef(input.projectRoot, input.ref.taskId, input.ref);
+  const resultPath = join(input.tasksDir, `task-${input.ref.taskId}.result`);
+  let artifactState: 'missing' | 'malformed' = 'missing';
+  let rawSha256: string | null = null;
+  let forensicEvidenceRef: string | null = null;
+
+  if (existsSync(resultPath)) {
+    const raw = readFileSync(resultPath);
+    rawSha256 = createHash('sha256').update(raw).digest('hex');
+    try {
+      const parsed = JSON.parse(raw.toString('utf-8')) as unknown;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new SyntaxError('worker result root is not a JSON object');
+      }
+      const record = parsed as Record<string, unknown> & { notes?: unknown };
+      if (record.taskId !== input.ref.taskId) {
+        throw new SpawnBackendError(
+          `DECKENT_E091:recovery-result-task-mismatch:${input.ref.taskId}/${input.ref.attemptId}`,
+          'docker',
+        );
+      }
+      const normalized = normalizeTaskResultShape(record) as Record<string, unknown>;
+      atomicWriteFileSync(resultPath, `${JSON.stringify(normalized, null, 2)}\n`);
+      return 'worker-result';
+    } catch (error) {
+      if (error instanceof SpawnBackendError) throw error;
+      artifactState = 'malformed';
+      const captured = raw.subarray(0, MAX_RECOVERY_FORENSIC_BYTES);
+      const forensicReceipt = {
+        schemaVersion: 1,
+        taskId: input.ref.taskId,
+        attemptId: input.ref.attemptId,
+        artifactState,
+        rawSha256,
+        rawBytes: raw.byteLength,
+        capturedBytes: captured.byteLength,
+        truncated: captured.byteLength !== raw.byteLength,
+        rawBase64: captured.toString('base64'),
+        capturedAt: new Date().toISOString(),
+      };
+      const forensicPath = join(
+        dirname(taskResultSettlementPath(input.ref)),
+        'invalid-worker-result.json',
+      );
+      if (existsSync(forensicPath)) {
+        const existing = JSON.parse(readFileSync(forensicPath, 'utf-8')) as {
+          rawSha256?: string;
+          taskId?: string;
+          attemptId?: string;
+        };
+        if (
+          existing.rawSha256 !== rawSha256
+          || existing.taskId !== input.ref.taskId
+          || existing.attemptId !== input.ref.attemptId
+        ) {
+          throw new SpawnBackendError(
+            `DECKENT_E091:recovery-forensic-conflict:${input.ref.taskId}/${input.ref.attemptId}`,
+            'docker',
+          );
+        }
+      } else {
+        atomicWriteFileSync(forensicPath, `${JSON.stringify(forensicReceipt, null, 2)}\n`);
+      }
+      forensicEvidenceRef = `invalid-worker-result:sha256:${rawSha256}`;
+    }
+  }
+
+  const provider = modelRegistry.get(input.model)?.provider ?? 'unknown';
+  const recoveryResult = {
+    taskId: input.ref.taskId,
+    workerId: `docker-recovery-${input.ref.taskId}`,
+    filesChanged: [],
+    linesAdded: 0,
+    linesRemoved: 0,
+    testsPassed: false,
+    coverage: 0,
+    selfAssessment: 'NO_GO',
+    markerType: 'RECOVERY_RESULT_UNAVAILABLE',
+    exitCode: null,
+    recovery: {
+      attemptId: input.ref.attemptId,
+      resultArtifactState: artifactState,
+      resultArtifactSha256: rawSha256,
+      forensicEvidenceRef,
+    },
+    notes:
+      `Host recovery proved the exact Docker container absent, but its worker result was ${artifactState}. `
+      + `The attempt was contained as NO_GO; no successful outcome was inferred. attemptId=${input.ref.attemptId}.`
+      + (forensicEvidenceRef ? ` evidence=${forensicEvidenceRef}.` : ''),
+    tokenUsage: {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      provider,
+      model: input.model,
+    },
+  };
+  atomicWriteFileSync(resultPath, `${JSON.stringify(recoveryResult, null, 2)}\n`);
+  return artifactState === 'missing' ? 'recovered-missing' : 'recovered-malformed';
 }
 
 export function closeDockerTaskResultSettlement(
@@ -3382,7 +3511,9 @@ export class DockerSpawnBackend implements SpawnBackend {
    * monitor before containment, and a second coordinator must never install a
    * competing monitor for the same attempt.
    */
-  async reconcilePendingAttempts(): Promise<SpawnBackendRecoveryReport> {
+  async reconcilePendingAttempts(
+    options: SpawnBackendRecoveryOptions = {},
+  ): Promise<SpawnBackendRecoveryReport> {
     const report: SpawnBackendRecoveryReport = {
       adopted: [],
       closedNotDispatched: [],
@@ -3401,6 +3532,19 @@ export class DockerSpawnBackend implements SpawnBackend {
           'docker-backend:historical-landing-skipped',
           `taskId=${taskId} reason=no-current-task-projection`,
         );
+        continue;
+      }
+      if (options.mode === 'terminal-only') {
+        continue;
+      }
+      if (options.mode === 'contain') {
+        settleHeldExecutionContinuation(
+          this.projectDir,
+          taskId,
+          143,
+          'operator kill requested containment; continuation dispatch is forbidden',
+        );
+        report.retiredLanded.push(taskId);
         continue;
       }
       // MASTER-PLAN 664: a landing whose remaining budget can no longer finance
@@ -3464,6 +3608,15 @@ export class DockerSpawnBackend implements SpawnBackend {
     for (const pending of listPendingTaskResultSettlementAttempts(this.projectDir)) {
       const { attempt, prepared, dispatch, settlement } = pending;
       if (resumedAttemptIds.has(attempt.attemptId)) continue;
+      if (
+        options.mode === 'terminal-only'
+        && (!pending.claim || !prepared || !dispatch)
+      ) {
+        // This mode runs without project leadership at task/run/do/autonomous
+        // ingress. Only a dispatched exact attempt can be proven terminal
+        // without racing a live coordinator between prepare and docker run.
+        continue;
+      }
       const continuationRecovery = continuationRecoveryByKey.get(
         `${attempt.taskId}\0${attempt.attemptId}`,
       );
@@ -3662,11 +3815,13 @@ export class DockerSpawnBackend implements SpawnBackend {
       if (authority.state === 'absent') {
         const resultPath = join(tasksDir, `task-${attempt.taskId}.result`);
         const terminalReceipt = readTaskProviderTerminalBillingReceipt(attempt);
-        if (!settlement && !existsSync(resultPath)) {
-          throw new SpawnBackendError(
-            `DECKENT_E091:ambiguous-dispatch-container-absent:${attempt.taskId}/${attempt.attemptId}`,
-            this.name,
-          );
+        if (!settlement) {
+          ensureDockerRecoveryResultFile({
+            projectRoot: this.projectDir,
+            tasksDir,
+            ref: attempt,
+            model: prepared.model,
+          });
         }
         if (continuationRecovery) {
           if (settlement) {
@@ -3717,6 +3872,12 @@ export class DockerSpawnBackend implements SpawnBackend {
         }
         this.settleRecoveredAttempt(attempt, tasksDir, settlement?.exitCode ?? null, 'absent-after-exit');
         report.closedAbsentAfterExit.push(attempt.taskId);
+        continue;
+      }
+
+      if (options.mode === 'terminal-only') {
+        // A present container still belongs to its live/recovering coordinator.
+        // Never adopt, stop or resume it from a leadership-free ingress sweep.
         continue;
       }
 

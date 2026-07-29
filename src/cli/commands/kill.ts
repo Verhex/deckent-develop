@@ -22,6 +22,13 @@ import {
   releaseAllSpawnLocks,
 } from '../../core/file-lock.js';
 
+interface KillRuntimeConfig {
+  readonly spawn_backend?: BackendType;
+  readonly docker_image?: string;
+  readonly docker_timeout?: number;
+  readonly worker_memory_limit?: string;
+}
+
 /** Find the task JSON file matching a taskId (handles sprint prefix patterns). */
 function findTaskFile(root: string, taskId: string): string | null {
   const tasksDir = join(root, TASKS_DIR);
@@ -353,14 +360,14 @@ export async function killSprintById(
 async function killAllCascade(
   root: string,
   lang: string,
-  configuredBackend?: BackendType,
+  config: KillRuntimeConfig,
 ): Promise<void> {
   // ─── Phase 1: SIGTERM workers ─────────────────────────────────────
   const activeIds = findActiveTaskIds(root);
   let workersKilled = 0;
   for (const id of activeIds) {
     const previousExitCode = process.exitCode;
-    if (killSingle(root, id, lang, configuredBackend)) workersKilled++;
+    if (killSingle(root, id, lang, config.spawn_backend)) workersKilled++;
     // One already-exited worker must not make a successful controller cascade
     // report a command-level failure.
     process.exitCode = previousExitCode;
@@ -405,19 +412,53 @@ async function killAllCascade(
     }
   }
 
-  // ─── Phase 5: Per-sprint metadata cleanup ─────────────────────────
+  // ─── Phase 5: Host-owned Docker settlement reconciliation ─────────
+  // Worker/controller containment is not terminal until the immutable
+  // host-global attempt journal is settled and closed. Only compose Docker
+  // in contain mode: it scans host authority without dispatching continuations
+  // and performs no Docker probe when the project has no pending attempts.
+  let settlementRecoveryError: Error | null = null;
+  try {
+    const recoveryBackend = SpawnBackendFactory.create({
+      backend: 'docker',
+      projectDir: root,
+      dockerImage: config.docker_image,
+      dockerTimeoutSeconds: config.docker_timeout,
+      dockerMemoryLimit: config.worker_memory_limit,
+    });
+    const report = await recoveryBackend.reconcilePendingAttempts?.({
+      mode: 'contain',
+    });
+    const reconciled = report
+      ? report.closedNotDispatched.length
+        + report.closedAbsentAfterExit.length
+        + report.adopted.length
+        + report.retiredLanded.length
+      : 0;
+    if (reconciled > 0) {
+      print(getMessage('kill.settlements_reconciled', lang, {
+        count: String(reconciled),
+      }));
+    }
+  } catch (error) {
+    settlementRecoveryError = error instanceof Error
+      ? error
+      : new Error(String(error));
+  }
+
+  // ─── Phase 6: Per-sprint metadata cleanup ─────────────────────────
   for (const sid of sprintIds) {
     try { cleanupSprintMetadata(root, sid); } catch { /* fail-safe */ }
     try { writeKilledDashboardSnapshot(root, sid); } catch { /* fail-safe */ }
   }
 
-  // ─── Phase 6: tmux socket cleanup ─────────────────────────────────
+  // ─── Phase 7: tmux socket cleanup ─────────────────────────────────
   // Always run — even with no active sprint — so residual sockets from
   // prior aborted sessions are cleared. Fail-safe so a missing tmux
   // binary or mock surface doesn't abort the cascade's final reporting.
   try { cleanupTmuxSocket(); } catch { /* fail-safe */ }
 
-  // ─── Phase 7: SPRINT_KILLED event emission ────────────────────────
+  // ─── Phase 8: SPRINT_KILLED event emission ────────────────────────
   for (const sid of sprintIds) {
     try {
       writeEvent(root, sid, 'brain', '*', 'BRAIN→*:SPRINT_KILLED', {
@@ -436,6 +477,12 @@ async function killAllCascade(
     print(getMessage('kill.sprints_aborted', lang, { count: String(sprintIds.length) }));
   } else if (sprintIds.length === 0) {
     print(getMessage('kill.no_active_workers', lang));
+  }
+  if (settlementRecoveryError) {
+    printError(new Error(getMessage('kill.settlement_recovery_failed', lang, {
+      reason: settlementRecoveryError.message,
+    })));
+    process.exitCode = 1;
   }
 }
 
@@ -487,7 +534,7 @@ export function registerKill(program: Command): void {
           print(getMessage('kill.all_aborted', lang));
           return;
         }
-        await killAllCascade(root, lang, config.spawn_backend);
+        await killAllCascade(root, lang, config);
         return;
       }
 
