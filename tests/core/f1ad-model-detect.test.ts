@@ -3,7 +3,7 @@
 // Covers: probeProviderModels, reconcileModels, detectAndRegisterModels.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ModelRegistry, BUILTIN_MODELS } from '../../src/core/model-registry.js';
@@ -12,6 +12,7 @@ import {
   reconcileModels,
   detectAndRegisterModels,
   parseCliModelOutput,
+  supportsModelInventoryProbe,
   type SpawnFn,
   type AutoDetectProvider,
 } from '../../src/core/model-auto-detect.js';
@@ -77,43 +78,46 @@ describe('parseCliModelOutput', () => {
 // ─── probeProviderModels ──────────────────────────────────────────────────────
 
 describe('probeProviderModels', () => {
-  it('returns model ids from mock CLI JSON output', async () => {
-    const output = JSON.stringify({ models: [{ id: 'claude-opus-4-8' }, { id: 'claude-mythos-5' }] });
+  it('returns model ids from the supported Ollama inventory command', async () => {
+    const output = 'NAME ID SIZE\nllama3.2:latest sha256:abc 2GB\n';
     const spawnFn = makeSpawnFn(output);
 
-    const result = await probeProviderModels('claude', { spawnFn });
+    const result = await probeProviderModels('ollama', { spawnFn });
 
-    expect(result).toContain('claude-opus-4-8');
-    expect(result).toContain('claude-mythos-5');
+    expect(result).toEqual(['llama3.2:latest']);
+    expect(spawnFn).toHaveBeenCalledWith('ollama', ['list'], undefined);
   });
 
   it('returns empty array when CLI exits with non-zero code', async () => {
     const spawnFn = makeFailSpawnFn();
-    const result = await probeProviderModels('codex', { spawnFn });
+    const result = await probeProviderModels('ollama', { spawnFn });
     expect(result).toEqual([]);
   });
 
   it('returns empty array when spawn throws', async () => {
     const spawnFn = vi.fn().mockRejectedValue(new Error('ENOENT'));
-    const result = await probeProviderModels('gemini', { spawnFn });
+    const result = await probeProviderModels('ollama', { spawnFn });
     expect(result).toEqual([]);
   });
 
-  it('calls correct command for each provider', async () => {
-    const spawnFn = makeSpawnFn('[]');
+  it.each(['claude', 'codex', 'gemini'] as const)(
+    'does not birth an interactive %s process without inventory capability',
+    async provider => {
+      const spawnFn = makeSpawnFn(JSON.stringify({ models: [{ id: 'fabricated' }] }));
+      expect(supportsModelInventoryProbe(provider)).toBe(false);
+      await expect(probeProviderModels(provider, { spawnFn })).resolves.toEqual([]);
+      expect(spawnFn).not.toHaveBeenCalled();
+    },
+  );
 
-    await probeProviderModels('claude', { spawnFn });
-    expect(vi.mocked(spawnFn)).toHaveBeenCalledWith('claude', ['models', 'list'], undefined);
-
-    vi.mocked(spawnFn).mockClear();
-    await probeProviderModels('ollama', { spawnFn });
-    expect(vi.mocked(spawnFn)).toHaveBeenCalledWith('ollama', ['list'], undefined);
+  it('declares Ollama inventory capability explicitly', () => {
+    expect(supportsModelInventoryProbe('ollama')).toBe(true);
   });
 
-  it('passes timeoutMs to spawnFn', async () => {
+  it('passes timeoutMs to the supported inventory spawn', async () => {
     const spawnFn = makeSpawnFn('[]');
-    await probeProviderModels('claude', { spawnFn, timeoutMs: 3000 });
-    expect(vi.mocked(spawnFn)).toHaveBeenCalledWith('claude', ['models', 'list'], 3000);
+    await probeProviderModels('ollama', { spawnFn, timeoutMs: 3000 });
+    expect(vi.mocked(spawnFn)).toHaveBeenCalledWith('ollama', ['list'], 3000);
   });
 });
 
@@ -156,11 +160,9 @@ describe('reconcileModels', () => {
 // ─── detectAndRegisterModels ──────────────────────────────────────────────────
 
 describe('detectAndRegisterModels', () => {
-  it('keeps an unpriced cloud discovery as reachability evidence only', async () => {
+  it('uses catalog authority for cloud providers without birthing a CLI process', async () => {
     const registry = new ModelRegistry();
-    // CLI returns a model NOT in BUILTIN_MODELS
-    const output = JSON.stringify({ models: [{ id: 'claude-mythos-5' }] });
-    const spawnFn = makeSpawnFn(output);
+    const spawnFn = makeSpawnFn(JSON.stringify({ models: [{ id: 'claude-mythos-5' }] }));
 
     const [result] = await detectAndRegisterModels(registry, {
       providers: ['claude'],
@@ -169,14 +171,15 @@ describe('detectAndRegisterModels', () => {
     });
 
     expect(registry.has('claude-mythos-5')).toBe(false);
-    expect(result?.discovered).toContain('claude-mythos-5');
+    expect(result?.discovered).not.toContain('claude-mythos-5');
     expect(result?.registered).toBe(0);
+    expect(result?.source).toBe('catalog');
+    expect(spawnFn).not.toHaveBeenCalled();
   });
 
-  it('discovered models do not break existing builtin models', async () => {
+  it('keeps existing builtin models when cloud inventory is unsupported', async () => {
     const registry = new ModelRegistry();
-    const output = JSON.stringify({ models: [{ id: 'claude-mythos-5' }, { id: 'claude-opus-4-8' }] });
-    const spawnFn = makeSpawnFn(output);
+    const spawnFn = makeFailSpawnFn();
 
     await detectAndRegisterModels(registry, {
       providers: ['claude'],
@@ -188,12 +191,38 @@ describe('detectAndRegisterModels', () => {
     for (const id of BUILTIN_CLAUDE_IDS) {
       expect(registry.has(id)).toBe(true);
     }
+    expect(spawnFn).not.toHaveBeenCalled();
   });
 
-  it('unknown cloud model remains non-selectable without pricing evidence', async () => {
+  it('ignores stale cloud auto-detect caches', async () => {
     const registry = new ModelRegistry();
-    const newModel = 'claude-future-unknown-xyz';
-    const output = JSON.stringify({ models: [{ id: newModel }] });
+    const staleModel = 'claude-stale-cache-model';
+    writeFileSync(
+      join(workDir, 'model-auto-detect-claude-session.json'),
+      JSON.stringify({
+        ts: Date.now(),
+        provider: 'claude',
+        authMode: 'session',
+        modelIds: [staleModel],
+      }),
+    );
+    const spawnFn = makeSpawnFn('[]');
+
+    const [result] = await detectAndRegisterModels(registry, {
+      providers: ['claude'],
+      spawnFn,
+      cacheDir: workDir,
+    });
+
+    expect(result?.discovered).not.toContain(staleModel);
+    expect(result?.source).toBe('catalog');
+    expect(spawnFn).not.toHaveBeenCalled();
+  });
+
+  it('does not mint a cloud identity from injected fake inventory output', async () => {
+    const registry = new ModelRegistry();
+    const unknown = 'claude-mythos-9000';
+    const output = JSON.stringify({ models: [{ id: unknown }] });
     const spawnFn = makeSpawnFn(output);
 
     await detectAndRegisterModels(registry, {
@@ -202,74 +231,50 @@ describe('detectAndRegisterModels', () => {
       cacheDir: workDir,
     });
 
-    expect(registry.has(newModel)).toBe(false);
-    expect(() => registry.resolve(newModel)).toThrow(/pricing evidence is required/i);
+    expect(registry.has(unknown)).toBe(false);
+    expect(() => registry.resolve(unknown)).toThrow(/pricing evidence is required/i);
+    expect(spawnFn).not.toHaveBeenCalled();
   });
 
-  it('does not turn provider inference into cloud catalog authority', async () => {
-    const registry = new ModelRegistry();
-    const output = JSON.stringify({ models: [{ id: 'claude-mythos-9000' }] });
-    const spawnFn = makeSpawnFn(output);
-
-    await detectAndRegisterModels(registry, {
-      providers: ['claude'],
-      spawnFn,
-      cacheDir: workDir,
-    });
-
-    expect(registry.has('claude-mythos-9000')).toBe(false);
-    expect(() => registry.resolve('claude-mythos-9000')).toThrow(/pricing evidence is required/i);
-  });
-
-  it('gracefully handles provider CLI failure', async () => {
+  it('gracefully handles Ollama inventory failure', async () => {
     const registry = new ModelRegistry();
     const spawnFn = makeFailSpawnFn();
 
     const results = await detectAndRegisterModels(registry, {
-      providers: ['codex'],
+      providers: ['ollama'],
       spawnFn,
       cacheDir: workDir,
     });
 
     expect(results).toHaveLength(1);
-    // No discovered models from failed CLI; registry unchanged (only builtins)
     expect(results[0]?.registered).toBe(0);
   });
 
-  it('probes multiple providers while keeping unpriced cloud IDs evidence-only', async () => {
+  it('registers discovered local Ollama tags', async () => {
     const registry = new ModelRegistry();
-    const spawnFn: SpawnFn = vi.fn().mockImplementation((cmd: string) => {
-      if (cmd === 'claude') {
-        return Promise.resolve({ stdout: JSON.stringify({ models: [{ id: 'claude-mythos-5' }] }), exitCode: 0 });
-      }
-      if (cmd === 'codex') {
-        return Promise.resolve({ stdout: JSON.stringify({ models: [{ id: 'gpt-6-turbo' }] }), exitCode: 0 });
-      }
-      return Promise.resolve({ stdout: '', exitCode: 1 });
-    });
+    const spawnFn = makeSpawnFn('NAME ID SIZE\nllama3.2:latest sha256:abc 2GB\n');
 
-    const results = await detectAndRegisterModels(registry, {
-      providers: ['claude', 'codex'],
+    const [result] = await detectAndRegisterModels(registry, {
+      providers: ['ollama'],
       spawnFn,
       cacheDir: workDir,
     });
 
-    expect(registry.has('claude-mythos-5')).toBe(false);
-    expect(registry.has('gpt-6-turbo')).toBe(false);
-    expect(results.find(r => r.provider === 'claude')?.discovered).toContain('claude-mythos-5');
-    expect(results.find(r => r.provider === 'codex')?.discovered).toContain('gpt-6-turbo');
+    expect(result?.source).toBe('cli');
+    expect(result?.registered).toBe(1);
+    expect(registry.has('llama3.2:latest')).toBe(true);
   });
 
-  it('uses cache when available and within TTL', async () => {
+  it('uses Ollama inventory cache when available and within TTL', async () => {
     const registry = new ModelRegistry();
-    const output = JSON.stringify({ models: [{ id: 'claude-cached-model' }] });
+    const output = 'NAME ID SIZE\nllama3.2:latest sha256:abc 2GB\n';
     const spawnFn = makeSpawnFn(output);
 
     const fixedNow = 1_700_000_000_000;
 
     // First call — populates cache
     await detectAndRegisterModels(registry, {
-      providers: ['claude'],
+      providers: ['ollama'],
       spawnFn,
       cacheDir: workDir,
       now: () => fixedNow,
@@ -281,7 +286,7 @@ describe('detectAndRegisterModels', () => {
     // Second call — same ts, cache is warm (within 1h TTL)
     const registry2 = new ModelRegistry();
     const [cachedResult] = await detectAndRegisterModels(registry2, {
-      providers: ['claude'],
+      providers: ['ollama'],
       spawnFn,
       cacheDir: workDir,
       now: () => fixedNow + 60_000, // 1 minute later
@@ -289,25 +294,25 @@ describe('detectAndRegisterModels', () => {
 
     // spawn should NOT be called again (cache hit)
     expect(vi.mocked(spawnFn)).not.toHaveBeenCalled();
-    expect(registry2.has('claude-cached-model')).toBe(false);
+    expect(registry2.has('llama3.2:latest')).toBe(true);
     expect(cachedResult?.source).toBe('cache');
-    expect(cachedResult?.discovered).toContain('claude-cached-model');
+    expect(cachedResult?.discovered).toContain('llama3.2:latest');
   });
 
   it('returns DetectResult with correct shape', async () => {
     const registry = new ModelRegistry();
-    const output = JSON.stringify({ models: [{ id: 'claude-new-model' }] });
+    const output = 'NAME ID SIZE\nllama3.2:latest sha256:abc 2GB\n';
     const spawnFn = makeSpawnFn(output);
 
     const results = await detectAndRegisterModels(registry, {
-      providers: ['claude'],
+      providers: ['ollama'],
       spawnFn,
       cacheDir: workDir,
     });
 
     expect(results).toHaveLength(1);
     const r = results[0]!;
-    expect(r.provider).toBe('claude');
+    expect(r.provider).toBe('ollama');
     expect(typeof r.authMode).toBe('string');
     expect(Array.isArray(r.discovered)).toBe(true);
     expect(typeof r.registered).toBe('number');

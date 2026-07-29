@@ -1,21 +1,20 @@
-// ─── F1-AD Integration: reachability discovery + cache + timeout ─────────────
-// Hermetic tests — no real CLI calls, no disk I/O in the home dir.
-// Tests the three goCriteria that are distinct from the unit-level f1ad-model-detect tests:
-//   1. bootstrap wiring: cloud CLI discovery never mints executable identities
-//   2. cache-hit: second call returns instantly without invoking the spawnFn again
-//   3. probe-timeout does not block: slow spawnFn resolves within timeout margin
+// F1-AD integration: honest inventory capability, cache, and real process-tree
+// timeout. No provider CLI or home-directory state is touched.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import {
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ModelRegistry } from '../../src/core/model-registry.js';
 import {
+  defaultSpawnFn,
   detectAndRegisterModels,
   type SpawnFn,
 } from '../../src/core/model-auto-detect.js';
-
-// ─── Test scratch dir ─────────────────────────────────────────────────────────
 
 let workDir: string;
 
@@ -27,61 +26,51 @@ afterEach(() => {
   rmSync(workDir, { recursive: true, force: true });
 });
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 function makeSpawnFn(stdout: string, exitCode = 0): SpawnFn {
   return vi.fn().mockResolvedValue({ stdout, exitCode });
 }
 
-// ─── Test 1: bootstrap keeps cloud reachability separate from catalog authority ─
+function processIsAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-describe('bootstrap → cloud probe is reachability evidence only', () => {
-  it('discovers but does not register a cloud model missing priced catalog evidence', async () => {
+async function waitForProcessExit(pid: number, timeoutMs = 2_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!processIsAlive(pid)) return true;
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+  return !processIsAlive(pid);
+}
+
+describe('bootstrap cloud inventory capability', () => {
+  it('does not execute an interactive cloud CLI as model enumeration', async () => {
     const registry = new ModelRegistry();
-    const externalModel = 'claude-mythos-99';
-    const output = JSON.stringify({ models: [{ id: externalModel }] });
-    const spawnFn = makeSpawnFn(output);
+    const spawnFn = makeSpawnFn(JSON.stringify({
+      models: [{ id: 'claude-fabricated-by-interactive-output' }],
+    }));
 
-    // This mirrors what bootstrapProviders does: call detectAndRegisterModels
-    // with the injected registry and mock spawnFn (the _hooks pattern).
     const results = await detectAndRegisterModels(registry, {
-      providers: ['claude'],
+      providers: ['claude', 'codex', 'gemini'],
       spawnFn,
       cacheDir: workDir,
     });
 
-    expect(results[0]?.discovered).toContain(externalModel);
-    expect(results[0]?.registered).toBe(0);
-    expect(registry.has(externalModel)).toBe(false);
+    expect(spawnFn).not.toHaveBeenCalled();
+    expect(results).toHaveLength(3);
+    expect(results.every(result => result.source === 'catalog')).toBe(true);
+    expect(registry.has('claude-fabricated-by-interactive-output')).toBe(false);
   });
 
-  it('probe-mock result is accessible via modelAutoDetectPromise', async () => {
-    // Simulate the bootstrapProviders _hooks injection path
-    const registry = new ModelRegistry();
-    const externalModel = 'claude-atlas-7';
-    const spawnFn = makeSpawnFn(JSON.stringify({ models: [{ id: externalModel }] }));
-
-    const promise = detectAndRegisterModels(registry, {
-      providers: ['claude'],
-      spawnFn,
-      cacheDir: workDir,
-    });
-
-    const results = await promise;
-
-    expect(results).toHaveLength(1);
-    expect(results[0]?.discovered).toContain(externalModel);
-    expect(results[0]?.registered).toBe(0);
-    expect(registry.has(externalModel)).toBe(false);
-  });
-
-  it('bootstrapProviders wires detectAndRegisterModels and resolves promise', async () => {
-    // Import bootstrapProviders and verify the _hooks injection path
+  it('bootstrapProviders resolves modelAutoDetectPromise without a cloud process birth', async () => {
     const { bootstrapProviders } = await import('../../src/core/provider.js');
-
     const registry = new ModelRegistry();
-    const externalModel = 'claude-mythos-99';
-    const spawnFn = makeSpawnFn(JSON.stringify({ models: [{ id: externalModel }] }));
+    const spawnFn = makeSpawnFn('interactive output must never be consumed');
 
     const result = await bootstrapProviders(
       {
@@ -104,126 +93,68 @@ describe('bootstrap → cloud probe is reachability evidence only', () => {
       },
     );
 
-    // modelAutoDetectPromise must be present (wire verified)
-    expect(result.modelAutoDetectPromise).toBeInstanceOf(Promise);
-
-    // Await the background detection
-    await result.modelAutoDetectPromise;
-
-    // Reachability must not become an executable cloud identity without pricing evidence.
-    expect(registry.has(externalModel)).toBe(false);
+    await expect(result.modelAutoDetectPromise).resolves.toHaveLength(1);
+    expect(spawnFn).not.toHaveBeenCalled();
   });
 });
 
-// ─── Test 2: cache-hit is instant ─────────────────────────────────────────────
-
-describe('cache-hit: second call does not invoke spawnFn', () => {
-  it('second call within TTL uses cache, skips spawnFn', async () => {
-    const registry1 = new ModelRegistry();
-    const cachedModel = 'claude-cached-7';
-    const spawnFn = makeSpawnFn(JSON.stringify({ models: [{ id: cachedModel }] }));
-
+describe('supported inventory cache', () => {
+  it('replays Ollama inventory within TTL without a second process birth', async () => {
     const fixedNow = 1_700_000_000_000;
+    const spawnFn = makeSpawnFn('NAME ID SIZE\nllama3.2:latest sha256:abc 2GB\n');
 
-    // First call — populates cache, invokes spawnFn once
-    await detectAndRegisterModels(registry1, {
-      providers: ['claude'],
+    await detectAndRegisterModels(new ModelRegistry(), {
+      providers: ['ollama'],
       spawnFn,
       cacheDir: workDir,
       now: () => fixedNow,
     });
-
-    expect(vi.mocked(spawnFn)).toHaveBeenCalledTimes(1);
+    expect(spawnFn).toHaveBeenCalledTimes(1);
     vi.mocked(spawnFn).mockClear();
 
-    // Second call — same cache dir, within TTL (1 minute later)
-    const registry2 = new ModelRegistry();
-    await detectAndRegisterModels(registry2, {
-      providers: ['claude'],
+    const registry = new ModelRegistry();
+    const [result] = await detectAndRegisterModels(registry, {
+      providers: ['ollama'],
       spawnFn,
       cacheDir: workDir,
       now: () => fixedNow + 60_000,
     });
 
-    // spawnFn must NOT be called (cache hit)
-    expect(vi.mocked(spawnFn)).not.toHaveBeenCalled();
-    // Cached reachability remains discoverable without becoming catalog authority.
-    expect(registry2.has(cachedModel)).toBe(false);
-  });
-
-  it('cache-hit returns source=cache in DetectResult', async () => {
-    const registry = new ModelRegistry();
-    const spawnFn = makeSpawnFn(JSON.stringify({ models: [{ id: 'claude-cache-test' }] }));
-    const fixedNow = 1_700_000_000_000;
-
-    // Populate cache
-    await detectAndRegisterModels(registry, {
-      providers: ['claude'],
-      spawnFn,
-      cacheDir: workDir,
-      now: () => fixedNow,
-    });
-
-    vi.mocked(spawnFn).mockClear();
-
-    // Second call — should return source='cache'
-    const registry2 = new ModelRegistry();
-    const results = await detectAndRegisterModels(registry2, {
-      providers: ['claude'],
-      spawnFn,
-      cacheDir: workDir,
-      now: () => fixedNow + 30_000,
-    });
-
-    expect(results[0]?.source).toBe('cache');
-    expect(vi.mocked(spawnFn)).not.toHaveBeenCalled();
+    expect(spawnFn).not.toHaveBeenCalled();
+    expect(result?.source).toBe('cache');
+    expect(result?.discovered).toContain('llama3.2:latest');
+    expect(registry.has('llama3.2:latest')).toBe(true);
   });
 });
 
-// ─── Test 3: probe-timeout does not block ─────────────────────────────────────
+describe.runIf(process.platform !== 'win32')('real process-tree timeout', () => {
+  it('waits for close and leaves neither the parent nor its signal-ignoring child alive', async () => {
+    const pidReceipt = join(workDir, 'probe-tree.json');
+    const grandchildSource = [
+      "process.on('SIGTERM', () => {});",
+      'setInterval(() => {}, 1000);',
+    ].join('');
+    const parentSource = [
+      "const { spawn } = require('node:child_process');",
+      "const { writeFileSync } = require('node:fs');",
+      `const child = spawn(process.execPath, ['-e', ${JSON.stringify(grandchildSource)}], { stdio: 'ignore' });`,
+      'writeFileSync(process.argv[1], JSON.stringify({ parent: process.pid, child: child.pid }));',
+      "process.on('SIGTERM', () => {});",
+      'setInterval(() => {}, 1000);',
+    ].join('');
 
-describe('probe-timeout does not block bootstrap', () => {
-  it('detectAndRegisterModels resolves within timeout + margin when probe hangs', async () => {
-    const registry = new ModelRegistry();
+    const startedAt = Date.now();
+    const result = await defaultSpawnFn(process.execPath, ['-e', parentSource, pidReceipt], 40);
+    const elapsedMs = Date.now() - startedAt;
+    const receipt = JSON.parse(readFileSync(pidReceipt, 'utf8')) as {
+      parent: number;
+      child: number;
+    };
 
-    // spawnFn that resolves after a delay longer than timeoutMs — simulates a hanging probe
-    const TIMEOUT_MS = 50;
-    const spawnFn: SpawnFn = vi.fn().mockImplementation(
-      () => new Promise(resolve => setTimeout(() => resolve({ stdout: '', exitCode: null }), TIMEOUT_MS * 3)),
-    );
-
-    const start = Date.now();
-    await detectAndRegisterModels(registry, {
-      providers: ['claude'],
-      spawnFn,
-      cacheDir: workDir,
-      timeoutMs: TIMEOUT_MS,
-    });
-    const elapsed = Date.now() - start;
-
-    // Should complete well within 10× the timeout (not hang indefinitely)
-    expect(elapsed).toBeLessThan(TIMEOUT_MS * 10);
-  });
-
-  it('when probe times out, no models are registered but function does not throw', async () => {
-    const registry = new ModelRegistry();
-    const initialCount = registry.getAllModels().length;
-
-    // spawnFn that returns empty (timeout-killed behaviour)
-    const spawnFn: SpawnFn = vi.fn().mockResolvedValue({ stdout: '', exitCode: null });
-
-    await expect(
-      detectAndRegisterModels(registry, {
-        providers: ['claude'],
-        spawnFn,
-        cacheDir: workDir,
-        timeoutMs: 50,
-      }),
-    ).resolves.toHaveLength(1);
-
-    // No new models beyond what was already in registry (empty CLI response)
-    // The CLI ids are empty, but catalog+bundled models are still reconciled
-    // so count may be >= initialCount; the key is: no throw.
-    expect(registry.getAllModels().length).toBeGreaterThanOrEqual(initialCount);
-  });
+    expect(result).toEqual({ stdout: '', exitCode: null });
+    expect(elapsedMs).toBeGreaterThanOrEqual(40);
+    expect(elapsedMs).toBeLessThan(4_000);
+    expect(await waitForProcessExit(receipt.parent)).toBe(true);
+    expect(await waitForProcessExit(receipt.child)).toBe(true);
+  }, 8_000);
 });

@@ -39,93 +39,17 @@ import {
   buildGitGuardDir,
 } from '../orchestra/git-worker-guard.js';
 import { createRuntimeBudgetMonitor, resolveHostExecutionBudget } from '../orchestra/runtime-budget-monitor.js';
+import {
+  killProcessGroupWithEscalation,
+} from '../core/process-tree-termination.js';
 
-/**
- * MOAT-2 (ADR-G-013): grace window between a graceful SIGTERM and the SIGKILL
- * escalation in {@link killProcessGroupWithEscalation}. Long enough for a
- * well-behaved worker to flush + exit on SIGTERM, short enough that a signal-
- * ignoring worker cannot survive as an orphan once `child.unref()` lets the
- * coordinator drain.
- */
-export const SIGKILL_ESCALATION_MS = 2_000;
-
-/**
- * PGID-TEARDOWN (ADR-G-013, MOAT-2 residual): signal a worker's WHOLE
- * process group, not just its own pid — a worker that forks its own
- * subprocess (e.g. a CLI agent's bash tool) would otherwise leave that
- * grandchild orphaned, since a single-pid signal never reaches it.
- *
- * POSIX: the caller must have spawned `proc` with `detached: true`, making it
- * the LEADER of its own process group (its pid IS the group id). Signalling
- * the negative pid (`process.kill(-pid, signal)`) is POSIX kill(2)'s
- * documented "signal the entire process group" form, reaching the worker and
- * everything it spawned. If the group-form call throws (e.g. ESRCH — the
- * group is already gone), fall back to the direct single-pid signal so the
- * worker is still reaped.
- *
- * win32: `process.kill()` has no negative-pid group-signal semantics. Use the
- * native `taskkill /PID <pid> /T` tree operation; SIGKILL escalation adds `/F`.
- * If `taskkill` itself cannot start, fall back to the direct child signal.
- *
- * born-568 (PROCESS-GROUP-KILL): exported as a shared primitive so every
- * subprocess-based provider adapter (codex.ts, gemini.ts, …) reuses this
- * exact POSIX-group / win32-fallback branching instead of re-deriving it.
- */
-export function signalProcessGroup(
-  proc: ChildProcess,
-  signal: NodeJS.Signals,
-  platform: NodeJS.Platform,
-): void {
-  const pid = proc.pid;
-  if (platform !== 'win32' && typeof pid === 'number') {
-    try {
-      process.kill(-pid, signal);
-      return;
-    } catch {
-      // Group already reaped, or pid is not (or no longer) a group leader —
-      // fall back to signalling the direct child below.
-    }
-  }
-  if (platform === 'win32') {
-    if (typeof pid === 'number') {
-      const args = ['/PID', String(pid), '/T'];
-      if (signal === 'SIGKILL') args.push('/F');
-      const killer = spawn('taskkill', args, { stdio: 'ignore', windowsHide: true });
-      killer.once('error', () => {
-        try { proc.kill(signal); } catch { /* process already exited */ }
-      });
-      killer.unref();
-      return;
-    }
-  }
-  proc.kill(signal);
-}
-
-/**
- * born-568 (PROCESS-GROUP-KILL): SIGTERM→(grace)→SIGKILL escalation against a
- * worker's process group — the shared kill entrypoint every subprocess-based
- * provider adapter calls. Sends `signal` via {@link signalProcessGroup}
- * immediately; when `signal` is SIGTERM, also arms a SIGKILL follow-up after
- * `graceMs` so a signal-ignoring worker cannot survive as an orphan. The
- * escalation timer is unref'd (never pins the coordinator's event loop) and
- * is cleared the moment the child actually exits. Mirrors the docker
- * backend's `docker stop --time` graceful→force stop.
- */
-export function killProcessGroupWithEscalation(
-  proc: ChildProcess,
-  signal: NodeJS.Signals,
-  platform: NodeJS.Platform,
-  graceMs: number = SIGKILL_ESCALATION_MS,
-): void {
-  signalProcessGroup(proc, signal, platform);
-  if (signal === 'SIGTERM') {
-    const escalation = setTimeout(() => {
-      try { signalProcessGroup(proc, 'SIGKILL', platform); } catch { /* already exited */ }
-    }, graceMs);
-    escalation.unref?.();
-    proc.once('exit', () => clearTimeout(escalation));
-  }
-}
+// Compatibility exports: provider adapters and public imports keep one stable
+// surface while the platform-neutral primitive lives in core.
+export {
+  killProcessGroupWithEscalation,
+  signalProcessGroup,
+  SIGKILL_ESCALATION_MS,
+} from '../core/process-tree-termination.js';
 
 // ─── SubprocessProviderConfig ───────────────────────────────────────
 /**

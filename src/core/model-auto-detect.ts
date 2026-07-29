@@ -1,11 +1,12 @@
 // ─── Model Auto-Detect (F1-AD first-slice) ───────────────────────────────────
-// Runtime-probe each connected provider CLI → discover accessible model-ids →
-// reconcile reachability with catalog and bundled identities.
+// Probe provider CLIs that explicitly expose a non-interactive inventory
+// command, then reconcile that reachability with catalog/bundled identities.
 //
-// Priority: CLI > models.dev catalog > bundled BUILTIN_MODELS. A cloud CLI
-// probe is reachability evidence, never pricing/catalog authority: an unknown
-// cloud identity is not executable until a priced catalog producer admits it.
-// Local Ollama tags are the only zero-cost dynamic registration path.
+// Priority: inventory CLI > models.dev catalog > bundled BUILTIN_MODELS.
+// Claude, Codex, and Gemini currently expose no supported inventory command;
+// exact-model reachability belongs to provider-truth probes, never an
+// interactive CLI invocation masquerading as enumeration. Local Ollama tags
+// are the only zero-cost dynamic registration path.
 //
 // Cache: ~/.deckent/cache/model-auto-detect-{provider}-{authMode}.json (1h TTL)
 // Spawn: async child_process.spawn, injected for tests (no spawnSync, ADR-087).
@@ -17,6 +18,7 @@ import { join, dirname } from 'node:path';
 import { BUILTIN_MODELS } from './model-registry.js';
 import type { ModelRegistry, ModelDefinition, RegistryProviderName } from './model-registry.js';
 import { buildParametricModel, inferProviderFromId } from './model-registry.js';
+import { killProcessGroupWithEscalation } from './process-tree-termination.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -48,7 +50,7 @@ export interface DetectResult {
   authMode: string;
   discovered: string[];
   registered: number;
-  source: 'cli' | 'cache' | 'empty';
+  source: 'cli' | 'cache' | 'catalog' | 'empty';
 }
 
 export interface DetectAndRegisterOptions extends ProbeOptions {
@@ -80,45 +82,59 @@ export function defaultSpawnFn(
   return new Promise(resolve => {
     const chunks: Buffer[] = [];
     let settled = false;
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const child = spawn(cmd, args, { shell: false });
+    const settle = (stdout: string, exitCode: number | null): void => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve({ stdout, exitCode });
+    };
 
-    const timer = setTimeout(() => {
-      if (!settled) {
-        settled = true;
-        child.kill();
-        resolve({ stdout: '', exitCode: null });
-      }
-    }, timeoutMs);
+    try {
+      const child = spawn(cmd, args, {
+        shell: false,
+        detached: process.platform !== 'win32',
+        windowsHide: true,
+      });
 
-    child.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
+      child.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
 
-    child.on('error', () => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timer);
-        resolve({ stdout: '', exitCode: null });
-      }
-    });
+      child.once('error', () => {
+        settle('', null);
+      });
 
-    child.on('close', (code) => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timer);
-        resolve({ stdout: Buffer.concat(chunks).toString('utf-8'), exitCode: code });
-      }
-    });
+      child.once('close', code => {
+        settle(
+          timedOut ? '' : Buffer.concat(chunks).toString('utf-8'),
+          timedOut ? null : code,
+        );
+      });
+
+      timer = setTimeout(() => {
+        if (settled) return;
+        timedOut = true;
+        // Do not resolve before `close`: early settlement leaves the child
+        // handle (and possibly descendants) alive inside the host event loop.
+        killProcessGroupWithEscalation(child, 'SIGTERM', process.platform);
+      }, Math.max(0, timeoutMs));
+      timer.unref?.();
+    } catch {
+      settle('', null);
+    }
   });
 }
 
 // ─── CLI Probe Commands per Provider ─────────────────────────────────────────
 
-const PROBE_COMMANDS: Record<AutoDetectProvider, { cmd: string; args: string[] }> = {
-  claude: { cmd: 'claude', args: ['models', 'list'] },
-  codex:  { cmd: 'codex',  args: ['models', 'list'] },
-  gemini: { cmd: 'gemini', args: ['models', 'list'] },
+const PROBE_COMMANDS: Partial<Record<AutoDetectProvider, { cmd: string; args: string[] }>> = {
   ollama: { cmd: 'ollama', args: ['list'] },
 };
+
+export function supportsModelInventoryProbe(provider: AutoDetectProvider): boolean {
+  return PROBE_COMMANDS[provider] !== undefined;
+}
 
 // ─── Output Parsers ──────────────────────────────────────────────────────────
 
@@ -198,11 +214,13 @@ export async function probeProviderModels(
   provider: AutoDetectProvider,
   opts: ProbeOptions = {},
 ): Promise<string[]> {
+  const command = PROBE_COMMANDS[provider];
+  if (!command) return [];
+
   const spawnFn = opts.spawnFn ?? defaultSpawnFn;
-  const { cmd, args } = PROBE_COMMANDS[provider];
 
   try {
-    const { stdout, exitCode } = await spawnFn(cmd, args, opts.timeoutMs);
+    const { stdout, exitCode } = await spawnFn(command.cmd, command.args, opts.timeoutMs);
     if (exitCode !== 0 && exitCode !== null) return [];
     return parseCliModelOutput(stdout, provider);
   } catch {
@@ -315,45 +333,47 @@ export async function detectAndRegisterModels(
   for (const provider of providers) {
     const authMode = inferAuthMode(provider);
     const path = cachePath(cacheDir, provider, authMode);
+    const inventorySupported = supportsModelInventoryProbe(provider);
+    const catalogIds = registry.getAllModels()
+      .filter(m => m.provider === (provider as RegistryProviderName))
+      .map(m => m.id);
+    const builtinIds = BUILTIN_MODELS
+      .filter(m => m.provider === (provider as RegistryProviderName))
+      .map(m => m.id);
 
     let discovered: string[] = [];
     let source: DetectResult['source'] = 'empty';
 
-    if (!opts.offline) {
-      // Check cache first
+    if (opts.offline || !inventorySupported) {
+      // Cloud CLI inventory is explicitly unsupported. Do not read a stale
+      // cloud auto-detect cache and, critically, do not birth an interactive
+      // provider process. The in-memory catalog remains honest authority.
+      discovered = reconcileModels([], catalogIds, builtinIds);
+      source = discovered.length > 0 ? 'catalog' : 'empty';
+    } else {
+      let inventoryIds: string[] = [];
       const cached = await readCacheEntry(path);
       if (cached && now() - cached.ts < ttl) {
-        discovered = cached.modelIds;
+        inventoryIds = cached.modelIds;
         source = 'cache';
       } else {
-        // Probe CLI
-        const cliIds = await probeProviderModels(provider, {
+        inventoryIds = await probeProviderModels(provider, {
           spawnFn: opts.spawnFn,
           timeoutMs: opts.timeoutMs,
         });
-
-        // Get catalog ids for this provider from the registry (already in registry = catalog/bundled)
-        const catalogIds = registry.getAllModels()
-          .filter(m => m.provider === (provider as RegistryProviderName))
-          .map(m => m.id);
-
-        // Bundled ids for this provider
-        const builtinIds = BUILTIN_MODELS
-          .filter(m => m.provider === (provider as RegistryProviderName))
-          .map(m => m.id);
-
-        discovered = reconcileModels(cliIds, catalogIds, builtinIds);
-
-        if (discovered.length > 0) {
-          source = cliIds.length > 0 ? 'cli' : 'cache';
+        if (inventoryIds.length > 0) {
+          source = 'cli';
           await writeCacheEntry(path, {
             ts: now(),
             provider,
             authMode,
-            modelIds: discovered,
+            modelIds: inventoryIds,
           });
         }
       }
+
+      discovered = reconcileModels(inventoryIds, catalogIds, builtinIds);
+      if (source === 'empty' && discovered.length > 0) source = 'catalog';
     }
 
     // A CLI discovery is reachability evidence, not pricing/catalog authority.
