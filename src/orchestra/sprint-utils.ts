@@ -26,6 +26,8 @@ import type {
 
 import {
   TASKS_DIR,
+  SPRINT_PAUSE_STATE_FILE,
+  SPRINT_STATE_FILE,
 } from '../core/constants.js';
 
 import { readJsonSafe, debugLog } from '../core/utils.js';
@@ -43,13 +45,13 @@ import { listWorkers } from './tmux.js';
 
 // ═══ Constants ════════════════════════════════════════════════════════
 
-const PAUSE_STATE_FILE = '.deckent/pause-state.json';
-const SPRINT_STATE_FILE = '.deckent/sprint-state.json';
-
 /** Source code directory prefixes -- anything outside these is treated as a doc task */
 const SOURCE_CODE_PREFIXES = ['src/', 'src\\', 'tests/', 'tests\\', 'lib/', 'lib\\'];
 
-export { PAUSE_STATE_FILE, SPRINT_STATE_FILE };
+export {
+  SPRINT_PAUSE_STATE_FILE as PAUSE_STATE_FILE,
+  SPRINT_STATE_FILE,
+};
 
 
 // ═══ Pure Helpers ═════════════════════════════════════════════════════

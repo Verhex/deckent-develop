@@ -8,12 +8,13 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { NERVOUS_PENDING_FILE } from './constants.js';
+import { DECKENT_DIR, NERVOUS_PENDING_FILE } from './constants.js';
 import { ApprovalStore } from './approval-store.js';
+import { readCanonicalRunStatus } from './run-status-authority.js';
 
 export interface PendingApproval {
   /** Which gate parked this approval. */
-  kind: 'nervous' | 'autonomous';
+  kind: 'nervous' | 'autonomous' | 'recovery';
   /** Stable id used by the accept/reject command. */
   id: string;
   /** Human-readable title for display. */
@@ -84,6 +85,29 @@ function readAutonomous(projectRoot: string): PendingApproval[] {
   }
 }
 
+/** Project a parked run into the same actionable approval hub as Nervous and
+ * autonomous asks. The approval action is the guarded continuation command
+ * itself; rejection is the existing explicit force-finalize path. */
+function readRecovery(projectRoot: string): PendingApproval[] {
+  const authority = readCanonicalRunStatus(projectRoot);
+  if (
+    authority.lifecycle !== 'PAUSED'
+    || !authority.sprintId
+    || !authority.resumable
+    || !authority.recoveryCommand
+    || !authority.finalizeCommand
+  ) {
+    return [];
+  }
+  return [{
+    kind: 'recovery',
+    id: `resume:${authority.sprintId}`,
+    title: authority.sprintId,
+    acceptCommand: authority.recoveryCommand,
+    rejectCommand: authority.finalizeCommand,
+  }];
+}
+
 // ─── Runtime-wide sweep hook (EXPIRE-SWEEP wiring) ───────────────────────────
 // `readPendingApprovals` is the acknowledged single source of truth every
 // pending-approval surface (`deckent status`, `status --follow`, the dashboard,
@@ -106,6 +130,11 @@ export interface RuntimeApprovalSweepStore {
 }
 
 function defaultRuntimeApprovalStore(projectRoot: string): RuntimeApprovalSweepStore {
+  // A read-only status/pending query must not create an empty approval store.
+  // There is nothing to expire until the broker has materialized this
+  // directory, so an absent store is an honest no-op.
+  const storeDir = join(projectRoot, DECKENT_DIR, 'approvals');
+  if (!existsSync(storeDir)) return { sweepExpired: () => [] };
   return new ApprovalStore(projectRoot);
 }
 
@@ -136,7 +165,7 @@ export function sweepRuntimeApprovals(
  */
 export function readPendingApprovals(projectRoot: string): PendingApproval[] {
   sweepRuntimeApprovals(projectRoot);
-  return [...readNervous(projectRoot), ...readAutonomous(projectRoot)];
+  return [...readNervous(projectRoot), ...readAutonomous(projectRoot), ...readRecovery(projectRoot)];
 }
 
 // ─── Write-side lifecycle (W0-TRUTH, #491) ───────────────────────────────────

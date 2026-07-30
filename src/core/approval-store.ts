@@ -151,6 +151,10 @@ function scanStoreDir(dir: string, now: Date): ApprovalStoreSnapshot {
   } catch {
     return snapshot;
   }
+  // Defensive boundary for virtual/mocked filesystem adapters. Node's native
+  // implementation always returns an array in this overload, but a malformed
+  // adapter must degrade to an empty snapshot rather than break status reads.
+  if (!Array.isArray(files)) return snapshot;
 
   const requestsById = new Map<string, ApprovalRequest>();
   const decisionsById = new Map<string, ApprovalDecision>();

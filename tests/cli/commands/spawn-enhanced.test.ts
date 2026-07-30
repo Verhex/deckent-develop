@@ -164,6 +164,7 @@ describe('spawn command enhanced (rich prompt, status checks, flags)', () => {
       'You are a TypeScript expert.',
       expect.any(Array),
       fixtureState.root,
+      undefined,
     );
   });
 
@@ -186,6 +187,7 @@ describe('spawn command enhanced (rich prompt, status checks, flags)', () => {
         { name: 'refactoring', content: 'Refactoring skill content' },
       ],
       fixtureState.root,
+      undefined,
     );
   });
 

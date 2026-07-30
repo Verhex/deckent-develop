@@ -5106,6 +5106,16 @@ yaşam bununla bağdaşmaz.
 
 **Status:** accepted
 
+# ADR-G-037: Execution Budget Landing, Continuation & Metering Authority
+
+**Status:** accepted
+
+**Sprint:** _To be backfilled_
+
+**Class:** ADR-G · **Scope:** global+project · **Immutable:** no · **Source:** user · **Enforcement-Level:** hard
+
+---
+
 ADR-G-037 — Execution Budget Landing, Continuation & Metering Authority
 
 Owner: Alperen. Approved: 2026-07-23. Status: accepted.
@@ -5153,11 +5163,22 @@ Revocation gate: MASTER-PLAN 658 (codex incremental metering) must remove this a
 from config as part of its completion criteria.
 Proposal record: .analysis/adr-g-037-amendment-final-only-usage.md
 
+
 ---
 
 ## ADR-G-038: Goal-v2 Normalized Dependency Authority & Bounded Reconciliation
 
 **Status:** accepted
+
+# ADR-G-038: Goal-v2 Normalized Dependency Authority & Bounded Reconciliation
+
+**Status:** accepted
+
+**Sprint:** _To be backfilled_
+
+**Class:** ADR-G · **Scope:** global+project · **Immutable:** yes · **Source:** user · **Enforcement-Level:** runtime
+
+---
 
 ADR-G-038 — Goal-v2 Normalized Dependency Authority & Bounded Reconciliation
 
@@ -5181,11 +5202,22 @@ Ship additive schema and provider-free tests/proofs first. Existing autonomous D
 ## Acceptance
 No active normalized mission authorizes from JSON; atomic intake and replay conflict tests; corrupt migration quarantine; all six seams share authority; stale readiness cannot win final claim; bounded direct/transitive propagation survives restart; 1K/10K/100K deterministic graph proofs remain within configured work bounds; legacy behavior, targeted hermetic tests, lint, build:all and compiled provider-free proof pass before any live canary.
 
+
 ---
 
 ## adr-g-039: Provider Authority Key Custody, Rotation & Composition
 
 **Status:** accepted
+
+# ADR-G-039: Provider Authority Key Custody, Rotation & Composition
+
+**Status:** accepted
+
+**Sprint:** _To be backfilled_
+
+**Class:** ADR-G · **Scope:** global+project · **Immutable:** no · **Source:** user · **Enforcement-Level:** hard
+
+---
 
 Status: accepted. Owner: Alperen. Date: 2026-07-23.
 

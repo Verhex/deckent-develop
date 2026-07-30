@@ -2868,8 +2868,8 @@ export async function runFixPhase(
         }
       } catch (e) { debugLog('runFixPhase:verifyAndComplete', e); }
 
-      // V2: Reroute fix tasks with MidSprintAdapter (exclude failed agent/skills)
-      if (routingVersionForFix === 'v2') {
+      // V3: reroute FIX tasks with fresh-eyes exclusions through MidSprintAdapter.
+      if (routingVersionForFix === 'v3') {
         try {
           const { MidSprintAdapter } = await import('./mid-sprint-adapter.js');
           const fixAgentPool = new AgentPoolManager(projectRoot);

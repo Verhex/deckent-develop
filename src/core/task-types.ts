@@ -458,8 +458,18 @@ export interface Task {
   /** Routing metadata for debugging and learning */
   routingMeta?: {
     taskDNA?: unknown;
-    confidence?: string;
-    routingVersion?: 'v2';
+    confidence?: string | number;
+    routingVersion?: 'v2' | 'v3';
+    /** Routing Engine v3 semantic work classification. */
+    workType?: string;
+    /** Decision provenance emitted by the v3 vector pipeline. */
+    provenance?: string;
+    /** Persona guidance slices selected in the same decision as agent + skills. */
+    personaSlices?: string[];
+    /** Human-readable compact decision story for status/audit surfaces. */
+    storySummary?: string;
+    /** Typed escalation reason when v3 cannot make an unambiguous selection. */
+    escalation?: string;
     /** Number of mid-sprint reroute attempts applied to this task */
     rerouteCount?: number;
     /**

@@ -20,6 +20,7 @@ import { TaskStatus } from '../core/types.js';
 import { applyTerminalTaskOutcome } from '../core/task-terminal-outcome.js';
 
 import { TASKS_DIR } from '../core/constants.js';
+import { resolveTaskProvider } from './sprint-utils.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { debugLog } from '../core/utils.js';
@@ -48,6 +49,14 @@ import { ApprovalBroker } from '../core/approval-broker.js';
 import type { BrainAnswer, WorkerQuestion, TokenUsage } from '../core/task-types.js';
 import { extractProviderBillingEvidence, reconcileProviderBilling } from '../core/provider-billing-evidence.js';
 import { evaluateExecutionBudget, evaluateRunCostBudget } from '../core/execution-budget.js';
+import {
+  classifyProviderFailure,
+} from '../core/provider-failure-classifier.js';
+import {
+  PROVIDER_EXECUTION_HOLD_CHANNEL,
+  readProviderExecutionHolds,
+  type ProviderExecutionHold,
+} from '../core/provider-execution-hold.js';
 import { resolveBillingModeForAuth } from '../core/cost-calculator.js';
 import { applyRuntimeBudgetStopToResult } from './runtime-budget-monitor.js';
 import {
@@ -115,7 +124,7 @@ import {
 import { providerRegistry } from '../core/provider.js';
 import { loadCostConfig } from '../core/cost-config-loader.js';
 import { calculateActualCost } from '../core/cost-calculator.js';
-import { readFileSync, writeFileSync, renameSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 
 // ─── Sprint Spawner (lazy import — avoid module init cycle) ──────
 // ADR-045: respawnEligibleTasks wire — invoked at runtime only, never at
@@ -177,6 +186,42 @@ export function costGuardShouldComplete(
   return stopped && collectedCount >= totalCount - stillPendingCount;
 }
 
+export function isProviderDispatchHoldFailure(
+  result: Pick<TaskResult, 'notes' | 'filesChanged' | 'linesAdded' | 'linesRemoved'>,
+  workerLog?: string,
+): 'auth' | 'usage-limit' | null {
+  const producedWork =
+    (result.filesChanged?.length ?? 0) > 0
+    || (result.linesAdded ?? 0) > 0
+    || (result.linesRemoved ?? 0) > 0;
+  const kind = classifyProviderFailure({
+    workerLog,
+    resultNotes: result.notes,
+    exitCode: undefined,
+    producedWork,
+  });
+  return kind === 'auth' || kind === 'usage-limit' ? kind : null;
+}
+
+export function providerDispatchHoldShouldComplete(
+  collectedCount: number,
+  totalCount: number,
+  providerHeldPendingCount: number,
+): boolean {
+  return providerHeldPendingCount > 0
+    && collectedCount >= totalCount - providerHeldPendingCount;
+}
+
+function hasMalformedRawResult(path: string): boolean {
+  if (!existsSync(path)) return false;
+  try {
+    JSON.parse(readFileSync(path, 'utf-8'));
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 /**
  * born-562 enabled-path — injectable cost-guard options for hermetic tests:
  * `getLimitCost` replaces the real transcript-ledger read, `intervalMs` shrinks
@@ -232,6 +277,12 @@ import { resolveEffectiveWorkers } from '../core/config.js';
 // Sprint 183 W1-2 — DEPENDENCY_BLOCKED debounce cleanup helper
 // Sprint 280 PLANOBS-001 — emitProgress emit-sites
 import { clearDependencyBlockedState, writeEvent, emitProgress } from './event-stream.js';
+
+export {
+  PROVIDER_EXECUTION_HOLD_CHANNEL,
+  readProviderExecutionHolds,
+};
+export type { ProviderExecutionHold };
 
 // Sprint 195 195-001 (W-INTEGRITY) — disk-verify gate before synthetic NO_GO.
 import { verifyDiskAgainstClaim, computeScopedDiskChanges, DISK_VS_CLAIM_MISMATCH_CHANNEL } from './disk-verify.js';
@@ -975,11 +1026,48 @@ export async function waitForResults(
   const taskMap = new Map(sprint.tasks.map(t => [t.id, t]));
   const collected = new Set<string>();
   const remainingQueue: Task[] = queue ? [...queue] : [];
+  const providerDispatchHolds = new Map<string, {
+    kind: 'auth' | 'usage-limit';
+    sourceTaskId: string;
+  }>();
+  const recordProviderDispatchHold = (
+    task: Task | undefined,
+    taskId: string,
+    result: TaskResult,
+  ): boolean => {
+    let workerLog: string | undefined;
+    try {
+      const logPath = join(projectRoot, TASKS_DIR, `task-${taskId}.log`);
+      if (existsSync(logPath)) workerLog = readFileSync(logPath, 'utf-8');
+    } catch (e) {
+      debugLog('collectResults:providerFailureLogRead', e);
+    }
+    const kind = isProviderDispatchHoldFailure(result, workerLog);
+    const provider = task ? resolveTaskProvider(task) : undefined;
+    if (!kind || !provider) return false;
+    if (!providerDispatchHolds.has(provider)) {
+      providerDispatchHolds.set(provider, { kind, sourceTaskId: taskId });
+      try {
+        writeEvent(projectRoot, sprint.id, 'brain', 'auditor', PROVIDER_EXECUTION_HOLD_CHANNEL, {
+          provider,
+          kind,
+          sourceTaskId: taskId,
+          reason: result.notes ?? null,
+          emittedAt: new Date().toISOString(),
+        });
+      } catch (e) { debugLog('collectResults:providerExecutionHold', e); }
+    }
+    return true;
+  };
   const waitForBudgetTerminal = async (
     task: Task | undefined,
     taskId: string,
     result: TaskResult,
   ): Promise<void> => {
+    // Provider availability and consumption budget are separate authorities.
+    // An auth/quota failure parks only that provider; it must never become a
+    // global TASK_BUDGET_HOLD or suppress healthy providers.
+    if (recordProviderDispatchHold(task, taskId, result)) return;
     if (
       !hasLiveUsageCeiling(task?.budget)
       || spawnOpts?.spawnBackend?.liveUsageBudgetSupport !== 'measured-stream'
@@ -1039,9 +1127,24 @@ export async function waitForResults(
   const collectResults = async (): Promise<string[]> => {
     const collectStart = Date.now();
     const newlyCollected: string[] = [];
+    let terminalRecoveryAttempted = false;
     for (const taskId of taskIds) {
       if (collected.has(taskId)) continue;
-      const authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+      let authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+      if (
+        !terminalRecoveryAttempted
+        && authority.state === 'pending-settlement'
+        && hasMalformedRawResult(authority.rawResultPath)
+        && spawnOpts?.spawnBackend?.reconcilePendingAttempts
+      ) {
+        terminalRecoveryAttempted = true;
+        try {
+          await spawnOpts.spawnBackend.reconcilePendingAttempts({ mode: 'terminal-only' });
+          authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+        } catch (e) {
+          debugLog('collectResults:liveTerminalRecovery', e);
+        }
+      }
       const resultPath = authority.rawResultPath;
       if (authority.result) {
         const result = normalizeAuthoritativeTaskResult(authority, taskId);
@@ -1311,6 +1414,10 @@ export async function waitForResults(
   const maybeRespawn = async (): Promise<void> => {
     if (process.env.DECKENT_LEGACY_FIFO === '1') return;
     if (!config?.dependency_pipeline_enabled) return;
+    // The heavyweight respawn path cannot yet filter by provider. Once one
+    // provider is parked, keep dispatch on the local single-task path below,
+    // which applies the exact provider hold without suppressing healthy peers.
+    if (providerDispatchHolds.size > 0) return;
     try {
       const respawnEligibleTasks = await loadRespawn();
       await respawnEligibleTasks(projectRoot, sprint, config, spawnOpts);
@@ -1354,6 +1461,7 @@ export async function waitForResults(
   // Returns true when a new spawn was emitted, false on guard hit or error.
   const spawnIfNotAssigned = async (nextTask: Task): Promise<boolean> => {
     if (assignedTaskIds.has(nextTask.id)) return false;
+    if (providerDispatchHolds.has(resolveTaskProvider(nextTask))) return false;
     assignedTaskIds.add(nextTask.id);
     // born-452 THROW-ADAYLARI: the try/catch used to start only at the backend-spawn
     // call below, leaving prompt resolution + template rendering (resolveAgentPrompt /
@@ -1437,6 +1545,7 @@ export async function waitForResults(
   }
 
   const applyBudgetEvidence = (task: Task | undefined, result: TaskResult, taskId: string): void => {
+    if (recordProviderDispatchHold(task, taskId, result)) return;
     const runtimeStop = applyRuntimeBudgetStopToResult(projectRoot, taskId, result);
     if (runtimeStop) taskBudgetHold = true;
     if (!task) return;
@@ -1969,6 +2078,15 @@ export async function waitForResults(
         const stillPending = sprint.tasks.filter(t => t.status === TaskStatus.PENDING).length;
         if (costGuardShouldComplete(true, collected.size, taskIds.size, stillPending)) break;
       }
+      const providerHeldPending = sprint.tasks.filter(
+        task => task.status === TaskStatus.PENDING
+          && providerDispatchHolds.has(resolveTaskProvider(task)),
+      ).length;
+      if (providerDispatchHoldShouldComplete(
+        collected.size,
+        taskIds.size,
+        providerHeldPending,
+      )) break;
       // Check for pending worker questions and auto-answer them
       // (sprintId → NPM-ADVISORY questions surface a human notification)
       checkWorkerQuestions(projectRoot, taskIds, collected, {

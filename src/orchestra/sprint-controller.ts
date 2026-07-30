@@ -95,6 +95,7 @@ import { checkWorkerLiveness } from './worker-liveness.js';
 // ─── Result Collector ─────────────────────────────────────────────
 import {
   waitForResults as waitForResultsImpl,
+  readProviderExecutionHolds,
 } from './result-collector.js';
 import {
   assertTaskResultAuthoritiesReady,
@@ -156,6 +157,8 @@ import {
   setActiveSprint, clearActiveSprint, safeDashboardUpdate,
   waitForHumanApproval, pauseSprint,
 } from './sprint-lifecycle.js';
+import { getMessage } from '../cli/helpers/messages.js';
+import { detectLang } from '../cli/helpers/i18n.js';
 
 // ─── IPC Registry ─────────────────────────────────────────────────
 import { getChannelRegistry } from './ipc-registry.js';
@@ -1203,7 +1206,7 @@ export function applyCascadeCircuitBreaker(
     const action = cascade.onResult(outcome);
     if (action.action === 'PAUSE_SPRINT') {
       debugLog('runSprint:cascade-circuit-breaker', action.reason);
-      pauseSprint(projectRoot, sprint, action.reason);
+      pauseSprint(projectRoot, sprint, action.reason, 'cascade-no-go');
       return true;
     }
   }
@@ -1319,7 +1322,7 @@ export async function runSprint(
   }
 
   // ROUTE-V1-PURGE (ADR-G-006): default 'v2' (was the latent-bug 'v1' default).
-  const routingVersionForFix = config.routing_engine ?? 'v2';
+  const routingVersionForFix = config.routing_engine ?? 'v3';
 
   const spawnBackend: SpawnBackend | undefined = opts?.spawnBackend
     ?? (config.spawn_backend
@@ -2109,10 +2112,69 @@ export async function runSprint(
     },
   );
 
+  // Provider admission failures are not execution-budget failures and are not
+  // retryable FIX input. Healthy providers finish normally in the collector;
+  // once only held-provider work remains, park the run with a durable recovery
+  // authority instead of burning retries or globally closing dispatch.
+  const providerExecutionHolds = readProviderExecutionHolds(projectRoot, sprint.id);
+  if (providerExecutionHolds.length > 0) {
+    const lang = detectLang(projectRoot);
+    const reason = providerExecutionHolds
+      .map(hold => getMessage(
+        hold.kind === 'auth' ? 'pause.provider_auth_hold' : 'pause.provider_usage_hold',
+        lang,
+        {
+          provider: hold.provider,
+          taskId: hold.sourceTaskId,
+        },
+      ))
+      .join(' ');
+    pauseSprint(projectRoot, sprint, reason, 'provider-execution-hold');
+    emitSprintEvent('SPRINT_PAUSED', {
+      sprintId: sprint.id,
+      reason: 'provider-execution-hold',
+      holds: providerExecutionHolds,
+    });
+    if (heartbeatDaemon) {
+      try { heartbeatDaemon.stop(); } catch (e) { debugLog('runSprint:provider-pause:hb-stop', e); }
+      heartbeatDaemon = null;
+    }
+    await stopResourceMonitor(resourceMonitor);
+    resourceMonitor = null;
+    if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+    if (snapshotInterval) { clearInterval(snapshotInterval); snapshotInterval = null; }
+    if (beforeExitHandler) {
+      process.removeListener('beforeExit', beforeExitHandler);
+      beforeExitHandler = null;
+    }
+    releaseSprintLock(projectRoot);
+    clearActiveSprint();
+    try { clearPid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:provider-pause:clearPid', e); }
+    return sprint;
+  }
+
   // Sprint 140 cost-cascade circuit-breaker (B11 wire): N consecutive NO_GO →
   // auto-pause before FIX/RETRO so a runaway sprint cannot burn the $42-disaster
   // cost. Paused state is persisted; resume via `deckent resume`.
   if (applyCascadeCircuitBreaker(projectRoot, sprint, evaluations)) {
+    // PAUSED is a durable terminal-for-this-coordinator state, not a live
+    // process state. Release every runtime owner while retaining sprint-state,
+    // pause-state, checkpoint, task and result evidence for recover --resume.
+    if (heartbeatDaemon) {
+      try { heartbeatDaemon.stop(); } catch (e) { debugLog('runSprint:cascade-pause:hb-stop', e); }
+      heartbeatDaemon = null;
+    }
+    await stopResourceMonitor(resourceMonitor);
+    resourceMonitor = null;
+    if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+    if (snapshotInterval) { clearInterval(snapshotInterval); snapshotInterval = null; }
+    if (beforeExitHandler) {
+      process.removeListener('beforeExit', beforeExitHandler);
+      beforeExitHandler = null;
+    }
+    releaseSprintLock(projectRoot);
+    clearActiveSprint();
+    try { clearPid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:cascade-pause:clearPid', e); }
     return sprint;
   }
 
@@ -2224,9 +2286,15 @@ export async function runSprint(
       if (beforeExitHandler) { process.removeListener('beforeExit', beforeExitHandler); beforeExitHandler = null; }
 
       // Honest parked lifecycle — NOT COMPLETE. Keep phase=FIX so the surfaces
-      // show WHERE it died.
-      sprint.status = SprintStatus.PAUSED;
+      // show WHERE it died, and use the same durable continuation authority as
+      // cascade pauses (pause-state + checkpoint + notification + status).
       sprint.phase = SprintPhase.FIX;
+      pauseSprint(
+        projectRoot,
+        sprint,
+        `${fixSpawnFailure.code}: ${fixSpawnFailure.message}`,
+        'fix-spawn-failure',
+      );
 
       emitSprintEvent('SPRINT_PAUSED', {
         sprintId: sprint.id,
@@ -2250,7 +2318,6 @@ export async function runSprint(
 
       releaseSprintLock(projectRoot);
       clearActiveSprint();
-      clearSprintState(projectRoot);
       try { clearPid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:fixfail:clearPid', e); }
 
       // Return BEFORE runCleanupPhase — forensic artefacts preserved.

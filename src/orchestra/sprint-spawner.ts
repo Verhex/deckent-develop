@@ -838,7 +838,7 @@ export async function spawnWorkers(
 
     const agentPrompt = await resolveAgentPrompt(projectRoot, task);
     const taskSkillPrompts = await resolveSkillPrompts(projectRoot, task);
-    const prompt = buildWorkerPrompt(task, agentPrompt, taskSkillPrompts, projectRoot);
+    const prompt = buildWorkerPrompt(task, agentPrompt, taskSkillPrompts, projectRoot, config);
     const model = task.model;
     const writeTargets = buildAllowedWriteTargets(task);
     const allowedTools = writeTargets.length > 0

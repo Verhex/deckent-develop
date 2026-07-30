@@ -15,7 +15,8 @@ export type PromptGateLint =
   | 'decision-space'     // goCriteria offers a false choice (X VEYA/OR Y)
   | 'premise'            // description claims a symbol is absent but it exists in the repo (stale)
   | 'scope-silent-drop'      // SAN-1: render-time sanitizeScope would silently drop a declared write path
-  | 'scope-satisfiability';  // G1b: task text ↔ write-authority consistency (mentioned/proof/unchanged)
+  | 'scope-satisfiability'   // G1b: task text ↔ write-authority consistency (mentioned/proof/unchanged)
+  | 'test-discoverability';  // explicit planned test path is excluded by the configured runner
 
 /** Emitted severity. `pass` findings are never materialized (absence = pass). */
 export type PromptGateLevel = 'pass' | 'warn' | 'block';

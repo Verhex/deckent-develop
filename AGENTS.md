@@ -84,6 +84,12 @@ projection'ıdır. Ürün kullanıcı belleği bundan ayrıdır ve `.brain/memor
   config + registry + capability evidence'dan çözülür; instruction metni model kataloğu
   değildir. Fresh ikinci-provider authority yoksa sonuç typed `unavailable/HOLD` olur,
   self-verify veya sessiz fallback olmaz.
+- **XVERIFY-CLARIFICATION OPTION.** Codex/Brain, kök-neden veya tasarım kararı ciddi biçimde
+  belirsiz kaldığında `deckent xverify` ile cross-provider ikinci görüş isteyebilir. Tercih
+  edilen verifier Fable 5'tir; exact provider/model effective config + registry +
+  reachability/entitlement evidence'dan çözülür. Bu opsiyon otomatik karar, kod değiştirme
+  veya authority devri değildir; verifier erişilemiyorsa sonuç typed `unavailable/HOLD`
+  kalır ve same-provider fallback yapılmaz.
 - **Sprint'i Alperen onayı olmadan kill/cleanup ETME**; `rm .tasks/*` YASAK.
 - **`.brain/memory.db` ASLA silinmez** — tüm Brain knowledge orada.
 - **Sprint çalışırken `npm run build` ve provider login/auth mutation YASAK** (ESM cache +

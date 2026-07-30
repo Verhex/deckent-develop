@@ -146,10 +146,10 @@ export function registerRunTool(
           ));
         }
 
-        // WM-1b: V2 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
+        // WM-1b: V3 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
         try {
-          const routingVersion = cfg?.routing_engine ?? 'v2';
-          if (routingVersion === 'v2') {
+          const routingVersion = cfg?.routing_engine ?? 'v3';
+          if (routingVersion === 'v3') {
 
             const overrides: UserOverride[] = [];
             if (task.forceAgent || task.forceSkills || task.excludeSkills || task.excludeAgent) {
@@ -170,7 +170,7 @@ export function registerRunTool(
             task.assignedSkills = v3.skillIds;
           }
         } catch (routingErr) {
-          debugLog('run:mcp:routing', `V2 routing failed, using generic fallback: ${routingErr}`);
+          debugLog('run:mcp:routing', `V3 routing failed, using generic fallback: ${routingErr}`);
         }
 
         mkdirSync(tasksDir, { recursive: true });
@@ -179,7 +179,7 @@ export function registerRunTool(
         // Build worker prompt with agent/skill context
         const agentPrompt = await resolveAgentPrompt(root, task);
         const skillPrompts = await resolveSkillPrompts(root, task);
-        const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, root);
+        const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, root, cfg);
         const { backend, settlementRef } = await spawnWorkerMultiProvider(taskId, identity.model as ModelType, prompt, root, {
           autoApprove,
           spawnBackend: cfg.spawn_backend,

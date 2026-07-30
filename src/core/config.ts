@@ -1190,9 +1190,9 @@ export function validateConfig(config: DeckentConfig): string[] {
   }
 
   // ─── Routing Engine validation ──────────────────────────────────────
-  // V1 removed (ROUTE-V1-PURGE / ADR-G-006): only 'v2' is a valid value.
+  // V1/V2 retired: only the provider-independent vector pipeline is valid.
   if (config.routing_engine !== undefined) {
-    const validRoutingEngines = ['v2'] as const;
+    const validRoutingEngines = ['v3'] as const;
     if (!(validRoutingEngines as readonly string[]).includes(config.routing_engine)) {
       errors.push(`Invalid value '${config.routing_engine}' for field 'routing_engine'. Valid: ${validRoutingEngines.join(', ')}`);
     }
@@ -1607,8 +1607,8 @@ export function createDefaultConfig(): DeckentConfig {
     adaptive_thresholds: false,
     agent_min_score: 5,
     adaptive_config: { min_samples: 3, no_go_threshold: 0.3, coverage_lookback: 3 },
-    // Routing Engine v2 (default since sprint-067)
-    routing_engine: 'v2',
+    // Routing Engine v3
+    routing_engine: 'v3',
     // Cleanup delay: wait before deleting .tasks/ files (ms)
     cleanup_delay_ms: 180_000,
     // Dependency pipeline enabled — see DeckentConfig.dependency_pipeline_enabled
@@ -1896,14 +1896,10 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
   // Resolve legacy mode aliases so 'max_plan' → 'performance' etc.
   config.mode = resolveMode(config.mode) as PlanMode;
 
-  // ROUTE-V1-PURGE (ADR-G-006): coerce the retired routing_engine 'v1' → 'v2'.
-  // V1 routing is deleted, and validateConfig now REJECTS 'v1' — so an existing
-  // install with a legacy on-disk `routing_engine: 'v1'` would throw here and fail
-  // every sprint. Silently upgrade the in-memory value (the on-disk file is
-  // migrated by migrateConfig / `deckent config migrate`). Also stops a literal
-  // 'v1' from reaching the finalizer's legacy stats path (`??` won't catch it).
-  if ((config as { routing_engine?: string }).routing_engine === 'v1') {
-    (config as { routing_engine?: string }).routing_engine = 'v2';
+  // V3 cut-over: old v1/v2 labels both point at retired implementations.
+  // Upgrade them before validation; migrateConfig persists the same projection.
+  if (['v1', 'v2'].includes((config as { routing_engine?: string }).routing_engine ?? '')) {
+    (config as { routing_engine?: string }).routing_engine = 'v3';
   }
 
   // ─── Grouped providers → flat provider fields ──────────────────────
@@ -2059,7 +2055,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // Rubric-Based Evaluation
     evaluation_rubric: config.evaluation_rubric,
     rubric_max_retries: config.rubric_max_retries,
-    // Routing Engine v2
+    // Routing Engine v3
     routing_engine: config.routing_engine,
     routing_config: config.routing_config,
     routing: config.routing,
@@ -2266,8 +2262,8 @@ export function validatePartialConfig(partial: Partial<DeckentConfig>): void {
   }
   // ROUTE-V1-PURGE (ADR-G-006): same legacy-normalize for routing_engine — a
   // stale on-disk 'v1' must not reject an unrelated `config set` write.
-  if ((partial as { routing_engine?: string }).routing_engine === 'v1') {
-    (partial as { routing_engine?: string }).routing_engine = 'v2';
+  if (['v1', 'v2'].includes((partial as { routing_engine?: string }).routing_engine ?? '')) {
+    (partial as { routing_engine?: string }).routing_engine = 'v3';
   }
   const merged = deepMerge(createDefaultConfig(), partial);
   validateConfig(merged);
@@ -2848,10 +2844,9 @@ export function mergeConfigs(
   // Resolve legacy mode aliases so 'max_plan' → 'performance' etc.
   config.mode = resolveMode(config.mode) as PlanMode;
 
-  // ROUTE-V1-PURGE (ADR-G-006): coerce the retired routing_engine 'v1' → 'v2'
-  // (legacy on-disk value; validateConfig now rejects 'v1'). Mirror of loadConfig.
-  if ((config as { routing_engine?: string }).routing_engine === 'v1') {
-    (config as { routing_engine?: string }).routing_engine = 'v2';
+  // V3 cut-over: normalize legacy v1/v2 labels before validation.
+  if (['v1', 'v2'].includes((config as { routing_engine?: string }).routing_engine ?? '')) {
+    (config as { routing_engine?: string }).routing_engine = 'v3';
   }
 
   validateConfig(config);

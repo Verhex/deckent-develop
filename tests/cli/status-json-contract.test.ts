@@ -4,7 +4,7 @@
 // contract (born-688 / sibling task 433-001, which added `buildNoActiveStatusJson`
 // to src/cli/commands/status.ts). Guards:
 //   1. `--json` with no `.dashboard` and no `.tasks/task-*.json` → stdout is exactly
-//      one JSON.parse-able object: `{ active: false, pendingApprovals: [] }`.
+//      one JSON.parse-able canonical IDLE authority object.
 //   2. Same state but with a parked nervous approval → `pendingApprovals` carries the
 //      full `{kind,id,title,acceptCommand,rejectCommand}` shape from
 //      `readPendingApprovals` (core/pending-approvals.ts), not a truncated summary.
@@ -154,7 +154,7 @@ describe('deckent status --json — no-active-run contract (433-002 / born-688)'
     rmSync(fakeRoot, { recursive: true, force: true });
   });
 
-  it('--json with no dashboard and no tasks: stdout is exactly one JSON object, {active:false, pendingApprovals:[]}, exit 0', async () => {
+  it('--json with no dashboard and no tasks: stdout is exactly one canonical IDLE object, exit 0', async () => {
     const result = await runStatusDriver(driverPath, fakeRoot, ['--json']);
 
     expect(result.timedOut).toBe(false);
@@ -164,7 +164,20 @@ describe('deckent status --json — no-active-run contract (433-002 / born-688)'
     // Single-object contract: the whole stdout is one JSON blob, no leading/trailing prose.
     expect(trimmed).toMatch(/^\{[\s\S]*\}$/);
     const parsed: unknown = JSON.parse(trimmed);
-    expect(parsed).toEqual({ active: false, pendingApprovals: [] });
+    expect(parsed).toMatchObject({
+      active: false,
+      lifecycle: 'IDLE',
+      resumable: false,
+      sprintId: null,
+      pendingApprovals: [],
+      authority: {
+        schemaVersion: 1,
+        lifecycle: 'IDLE',
+        active: false,
+        resumable: false,
+        sprintId: null,
+      },
+    });
   }, 15000);
 
   it('--json with a parked nervous approval: pendingApprovals carries the full PendingApproval shape', async () => {
@@ -218,8 +231,20 @@ describe('deckent status --json — no-active-run contract (433-002 / born-688)'
 
     expect(result.timedOut).toBe(false);
     expect(result.code).toBe(0);
-    const parsed: unknown = JSON.parse(result.stdout.trim());
-    expect(parsed).toEqual({ active: false, pendingApprovals: [] });
+    const parsed = JSON.parse(result.stdout.trim()) as {
+      active: boolean;
+      lifecycle: string;
+      pendingApprovals: unknown[];
+    };
+    expect(parsed).toMatchObject({
+      active: false,
+      lifecycle: 'COMPLETE',
+      pendingApprovals: [],
+      authority: {
+        lifecycle: 'COMPLETE',
+        active: false,
+      },
+    });
     // The completed sprint's stale live-shaped progress (active:2) must NOT leak
     // into the JSON surface (the pre-455-003 divergence).
     expect(result.stdout).not.toContain('"active": 2');

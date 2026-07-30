@@ -261,12 +261,12 @@ describe('validateConfig', () => {
   // ─── routing_engine validation ────────────────────────────────────
 
   it('rejects routing_engine = v1 (ROUTE-V1-PURGE / ADR-G-006)', () => {
-    const config = buildConfig({ routing_engine: 'v1' as 'v2' });
+    const config = buildConfig({ routing_engine: 'v1' as 'v3' });
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
   });
 
-  it('accepts routing_engine = v2', () => {
-    const config = buildConfig({ routing_engine: 'v2' });
+  it('accepts routing_engine = v3', () => {
+    const config = buildConfig({ routing_engine: 'v3' });
     expect(() => validateConfig(config)).not.toThrow();
   });
 
@@ -277,19 +277,19 @@ describe('validateConfig', () => {
   });
 
   it('throws ConfigValidationError for invalid routing_engine', () => {
-    const config = buildConfig({ routing_engine: 'v3' as 'v2' });
+    const config = buildConfig({ routing_engine: 'v4' as 'v3' });
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
     try {
       validateConfig(config);
     } catch (e) {
       const err = e as ConfigValidationError;
       expect(err.errors).toContainEqual(expect.stringContaining('routing_engine'));
-      expect(err.errors).toContainEqual(expect.stringContaining('v3'));
+      expect(err.errors).toContainEqual(expect.stringContaining('v4'));
     }
   });
 
-  it('createDefaultConfig includes routing_engine = v2', () => {
+  it('createDefaultConfig includes routing_engine = v3', () => {
     const config = createDefaultConfig();
-    expect(config.routing_engine).toBe('v2');
+    expect(config.routing_engine).toBe('v3');
   });
 });

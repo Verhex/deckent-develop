@@ -3,7 +3,7 @@
 // Reads durable checkpoint authority, reconciles interrupted work, and resumes
 // only the task set proven safe for re-dispatch.
 
-import { existsSync, readdirSync, unlinkSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
@@ -21,11 +21,77 @@ import { clearSprintState, readSprintState } from '../../orchestra/sprint-utils.
 import { SprintStatus } from '../../core/types.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { DECKENT_DIR, TASKS_DIR } from '../../core/constants.js';
+import { DECKENT_DIR, SPRINT_PAUSE_STATE_FILE, TASKS_DIR } from '../../core/constants.js';
 import { getMessage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
+import {
+  clearProviderExecutionHolds,
+  readProviderExecutionHolds,
+  restoreProviderExecutionHolds,
+  type ProviderExecutionHold,
+} from '../../core/provider-execution-hold.js';
 
 // ─── Register ───────────────────────────────────────────────────────
+
+export function clearMatchingPauseAuthority(projectRoot: string, sprintId: string): boolean {
+  return beginPauseAuthorityResume(projectRoot, sprintId).ok;
+}
+
+export interface PauseAuthorityLease {
+  readonly path: string;
+  readonly content: string;
+  readonly projectRoot: string;
+  readonly sprintId: string;
+  readonly providerHolds: readonly ProviderExecutionHold[];
+}
+
+export function beginPauseAuthorityResume(
+  projectRoot: string,
+  sprintId: string,
+): { ok: true; lease: PauseAuthorityLease | null } | { ok: false; lease: null } {
+  const path = join(projectRoot, SPRINT_PAUSE_STATE_FILE);
+  if (!existsSync(path)) return { ok: true, lease: null };
+  let content: string | null = null;
+  let providerHolds: readonly ProviderExecutionHold[] = [];
+  try {
+    content = readFileSync(path, 'utf-8');
+    const state = JSON.parse(content) as { sprintId?: unknown };
+    if (state.sprintId !== sprintId) return { ok: false, lease: null };
+    providerHolds = readProviderExecutionHolds(projectRoot, sprintId);
+    unlinkSync(path);
+    if (existsSync(path)) return { ok: false, lease: null };
+    clearProviderExecutionHolds(projectRoot, sprintId);
+    if (readProviderExecutionHolds(projectRoot, sprintId).length > 0) {
+      writeFileSync(path, content, 'utf-8');
+      return { ok: false, lease: null };
+    }
+    return {
+      ok: true,
+      lease: { path, content, projectRoot, sprintId, providerHolds },
+    };
+  } catch {
+    try {
+      if (content !== null && !existsSync(path)) writeFileSync(path, content, 'utf-8');
+      restoreProviderExecutionHolds(projectRoot, sprintId, providerHolds);
+    } catch {
+      // Caller receives ok=false and reports the authority transition failure.
+    }
+    return { ok: false, lease: null };
+  }
+}
+
+export function restorePauseAuthority(lease: PauseAuthorityLease | null): boolean {
+  if (!lease) return true;
+  try {
+    restoreProviderExecutionHolds(lease.projectRoot, lease.sprintId, lease.providerHolds);
+    // Never overwrite a newer pause authority produced by the resumed run.
+    if (existsSync(lease.path)) return true;
+    writeFileSync(lease.path, lease.content, 'utf-8');
+    return existsSync(lease.path);
+  } catch {
+    return false;
+  }
+}
 
 export function registerResume(program: Command): void {
   program
@@ -119,6 +185,12 @@ export function registerResume(program: Command): void {
             return;
           }
           print(getMessage('resume.settlement_reconciling', lang, { tasks: parkedTasks }));
+          const pauseLease = beginPauseAuthorityResume(projectRoot, checkpoint.sprintId);
+          if (!pauseLease.ok) {
+            printError(getMessage('resume.pause_clear_failed', lang, { sprintId: checkpoint.sprintId }));
+            process.exitCode = 1;
+            return;
+          }
           try {
             // Preserve checkpoint, sprint-state and task artifacts. runSprint
             // acquires project leadership, reconciles host-owned backend attempts
@@ -127,6 +199,9 @@ export function registerResume(program: Command): void {
               autoApprove: opts.autoApprove,
             });
             if (resumed.status !== SprintStatus.COMPLETE) {
+              if (!restorePauseAuthority(pauseLease.lease)) {
+                printError(getMessage('resume.pause_restore_failed', lang, { sprintId: checkpoint.sprintId }));
+              }
               printError(getMessage('resume.not_complete', lang, { status: String(resumed.status) }));
               process.exitCode = 1;
               return;
@@ -135,6 +210,9 @@ export function registerResume(program: Command): void {
             print(getMessage('resume.retro_hint', lang));
             return;
           } catch (e) {
+            if (!restorePauseAuthority(pauseLease.lease)) {
+              printError(getMessage('resume.pause_restore_failed', lang, { sprintId: checkpoint.sprintId }));
+            }
             printError(getMessage('resume.failed', lang, { error: e instanceof Error ? e.message : String(e) }));
             process.exitCode = 1;
             return;
@@ -274,6 +352,11 @@ export function registerResume(program: Command): void {
           process.exit(1);
         }
       }
+      const pauseLease = beginPauseAuthorityResume(projectRoot, checkpoint.sprintId);
+      if (!pauseLease.ok) {
+        printError(getMessage('resume.pause_clear_failed', lang, { sprintId: checkpoint.sprintId }));
+        process.exit(1);
+      }
 
       try {
         const resumed = await runSprint(projectRoot, config, {
@@ -281,6 +364,9 @@ export function registerResume(program: Command): void {
           preplannedSprint,
         });
         if (resumed.status !== SprintStatus.COMPLETE) {
+          if (!restorePauseAuthority(pauseLease.lease)) {
+            printError(getMessage('resume.pause_restore_failed', lang, { sprintId: checkpoint.sprintId }));
+          }
           printError(getMessage('resume.not_complete', lang, { status: String(resumed.status) }));
           process.exitCode = 1;
           return;
@@ -288,6 +374,9 @@ export function registerResume(program: Command): void {
         print(getMessage('resume.completed', lang));
         print(getMessage('resume.retro_hint', lang));
       } catch (e) {
+        if (!restorePauseAuthority(pauseLease.lease)) {
+          printError(getMessage('resume.pause_restore_failed', lang, { sprintId: checkpoint.sprintId }));
+        }
         printError(getMessage('resume.failed', lang, { error: e instanceof Error ? e.message : String(e) }));
         process.exit(1);
       }

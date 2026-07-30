@@ -65,6 +65,8 @@ export interface PromptGateInput {
    * text ↔ write-authority consistency). Absent → both lints are skipped.
    */
   trackedFiles?: readonly string[];
+  /** Pre-localized, adapter-backed findings produced by planner I/O preflight. */
+  preflightFindings?: readonly PromptGateFinding[];
 }
 
 /**
@@ -383,7 +385,7 @@ function lintSatisfiability(task: Task, trackedFiles: readonly string[]): Prompt
  * acknowledged. Runs source-agnostically on each task's final `assignedAgent`.
  */
 export function evaluatePromptGate(input: PromptGateInput): PromptGateResult {
-  const findings: PromptGateFinding[] = [];
+  const findings: PromptGateFinding[] = [...(input.preflightFindings ?? [])];
 
   // Built once for the whole plan (hoisted — advisor hygiene note, sprint-399).
   const trackedRootFiles = input.trackedFiles

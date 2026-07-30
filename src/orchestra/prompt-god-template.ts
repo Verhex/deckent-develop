@@ -191,10 +191,10 @@ export interface SprintContext {
    * slice + a `[full persona: <path>]` pointer instead of the full PROMPT.md body — an
    * agent whose PROMPT.md carries no guidance markers at all still falls back to the
    * full body (no content ever dropped from the render, per ADR-G-027 no-truncation).
-   * `undefined`/'full' (the default until a caller wires the config flag through) →
+   * `undefined`/'full' →
    * full body, byte-identical to the pre-443-003 output. Threading `config.prompt.
-   * persona_render` into this field at the task-builder call site is a tracked
-   * follow-up (U4 integration task); this compiler only needs to OBEY the value.
+   * persona_render` into this field is owned by the task-builder call site; this
+   * compiler only needs to OBEY the resolved value.
    */
   personaRenderMode?: 'full' | 'guidance';
   /**
@@ -440,9 +440,12 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
   const scopeWarnings: string[] = [];
 
   // ── 1. Agent Block ──────────────────────────────────────────────────
+  // V3 selects persona slices in the same atomic routing decision as the
+  // agent and skills. Prefer that decision over the legacy V2 task-DNA
+  // intent so prompt compilation cannot silently diverge from routing.
   const agentBlock = buildAgentBlock(agentId, ctx.agentPrompt, {
     mode: ctx.personaRenderMode,
-    intent: getTaskPrimaryIntent(task),
+    intent: getTaskPersonaGuidanceKey(task),
   });
 
   // ── 2. Skill Block ──────────────────────────────────────────────────
@@ -1506,6 +1509,25 @@ export function buildVerifyPrecedenceNote(verificationMode: 'targeted' | 'doc' =
  */
 function getTaskPrimaryIntent(task: Pick<Task, 'routingMeta'>): string | undefined {
   return (task.routingMeta?.taskDNA as { intent?: { primary?: string } } | undefined)?.intent?.primary;
+}
+
+/**
+ * Canonical persona-guidance key for the task.
+ *
+ * Routing Engine V3 emits the ordered `personaSlices` selected from the
+ * winning agent's declared capabilities. That decision is more specific than
+ * the broad work type, so the prompt compiler must consume its first slice.
+ * Legacy V2 tasks continue to use their task-DNA primary intent.
+ */
+function getTaskPersonaGuidanceKey(task: Pick<Task, 'routingMeta'>): string | undefined {
+  const routing = task.routingMeta;
+  if (routing?.routingVersion === 'v3') {
+    const selectedSlice = routing.personaSlices?.find(
+      (slice): slice is string => typeof slice === 'string' && slice.length > 0,
+    );
+    return selectedSlice ?? routing.workType;
+  }
+  return getTaskPrimaryIntent(task);
 }
 
 /**

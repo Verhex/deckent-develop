@@ -11,7 +11,7 @@ import { getCurrentSprintId } from '../../monitor/sprint-state.js';
 import { formatStatus, resolveOutputMode } from '../../core/output-formatter.js';
 import { eventBus } from '../../orchestra/event-bus.js';
 import { StatusRenderer } from '../helpers/status-renderer.js';
-import { readPendingApprovals, sweepRuntimeApprovals, type PendingApproval } from '../../core/pending-approvals.js';
+import { readPendingApprovals } from '../../core/pending-approvals.js';
 import { hideCursor, showCursor, clearScreen } from '../helpers/ansi.js';
 import { registerShutdownHook } from '../helpers/shutdown-hooks.js';
 import {
@@ -23,6 +23,7 @@ import {
   formatTaskSettlementProjection,
   settlementProjectionDto,
 } from './task-settlement.js';
+import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
 
 interface StatusOpts {
   watch?: boolean;
@@ -558,13 +559,6 @@ export function buildWorkerCommsSection(root: string, lang: string): string | nu
  * never has to guess what to run. Returns null when nothing is parked.
  */
 export function buildPendingApprovalsSection(root: string, lang: string): string | null {
-  // EXPIRE-SWEEP wiring (Task-1's ApprovalStore.sweepExpired()): sweep the
-  // runtime-wide approval store before the pending list is read, so a
-  // TTL-overdue entry never surfaces as pending here. readPendingApprovals()
-  // already sweeps internally (it is the shared hub every surface reads
-  // through) — this call is redundant-but-harmless (idempotent, fail-soft)
-  // and makes the wiring visible at this named call site too.
-  sweepRuntimeApprovals(root);
   // born-698c: same read-path pattern for detached-run deaths — a flow whose
   // run process died without finalizing gets an honest RUN_FAILED closure
   // the moment ANY surface reads status (never a silent limbo).
@@ -589,10 +583,19 @@ export function buildPendingApprovalsSection(root: string, lang: string): string
  * Both call sites must emit this exact shape so a JSON consumer never has to
  * special-case which branch produced it (born-688 contract).
  */
-export function buildNoActiveStatusJson(root: string): { active: false; pendingApprovals: PendingApproval[] } {
-  sweepRuntimeApprovals(root); // see buildPendingApprovalsSection — same redundant-but-harmless sweep
+export function buildNoActiveStatusJson(root: string): Record<string, unknown> {
+  const authority = readCanonicalRunStatus(root);
   return {
-    active: false,
+    active: authority.active,
+    lifecycle: authority.lifecycle,
+    resumable: authority.resumable,
+    sprintId: authority.sprintId,
+    phase: authority.phase,
+    status: authority.status,
+    reason: authority.reason,
+    recoveryCommand: authority.recoveryCommand,
+    finalizeCommand: authority.finalizeCommand,
+    authority,
     pendingApprovals: readPendingApprovals(root),
   };
 }
@@ -627,12 +630,18 @@ export function buildStatusJsonSnapshot(
   verbose = false,
 ): Record<string, unknown> {
   const tasks = loadTaskFiles(root);
+  const authority = readCanonicalRunStatus(root);
   if (!existsSync(dashPath)) {
     if (tasks.length === 0) return buildNoActiveStatusJson(root);
-    const sprintId = getCurrentSprintId(root) ?? detectSprintId(tasks);
+    const sprintId = authority.sprintId ?? getCurrentSprintId(root) ?? detectSprintId(tasks);
     return {
       standalone: true,
+      active: authority.active,
+      lifecycle: authority.lifecycle,
+      resumable: authority.resumable,
       sprintId,
+      authority,
+      pendingApprovals: readPendingApprovals(root),
       tasks: tasks.map(task => ({
         id: task.id,
         title: task.title,
@@ -668,7 +677,7 @@ export function buildStatusJsonSnapshot(
   }
 
   const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
-  return verbose
+  const snapshot = verbose
     ? {
         ...state,
         taskSettlements,
@@ -681,6 +690,16 @@ export function buildStatusJsonSnapshot(
         },
       }
     : { ...state, taskSettlements };
+  return {
+    ...snapshot,
+    active: authority.active,
+    lifecycle: authority.lifecycle,
+    resumable: authority.resumable,
+    recoveryCommand: authority.recoveryCommand,
+    finalizeCommand: authority.finalizeCommand,
+    authority,
+    pendingApprovals: readPendingApprovals(root),
+  };
 }
 
 export function registerStatus(
@@ -929,6 +948,8 @@ export function registerStatus(
             if (settlementsStandalone) output(settlementsStandalone);
             const commsStandalone = buildWorkerCommsSection(root, lang);
             if (commsStandalone) output(commsStandalone);
+            const pendingStandalone = buildPendingApprovalsSection(root, lang);
+            if (pendingStandalone) output(pendingStandalone);
           }
           return;
         }
@@ -1129,6 +1150,8 @@ export function registerStatus(
             lang,
           );
           if (settlementsRaw) output(settlementsRaw);
+          const pendingRaw = buildPendingApprovalsSection(root, lang);
+          if (pendingRaw) output(pendingRaw);
         } else {
           // Human-friendly output (default)
           const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
@@ -1146,6 +1169,8 @@ export function registerStatus(
             if (commsMode) output(commsMode);
             const settlementsMode = formatStatusTaskSettlements(taskSettlements, lang);
             if (settlementsMode) output(settlementsMode);
+            const pendingMode = buildPendingApprovalsSection(root, lang);
+            if (pendingMode) output(pendingMode);
           } else {
             output(formatHumanStatus({
               dashboard: state,

@@ -1,4 +1,4 @@
-# Memory — 13 KALICI KANUN (Alperen-seçimi; genişletme yalnız Alperen-onayıyla)
+# Memory — 14 KALICI KANUN (Alperen-seçimi; genişletme yalnız Alperen-onayıyla)
 
 > Bu repo için canonical dogfood core-memory authority bu dosya ve aynı dizindeki referanslarıdır.
 > Provider/host HOME kopyaları yalnız projection'dır; product/user memory değildir.
@@ -20,3 +20,4 @@
 11. **[Memory-iş ayrımı](law_memory_vs_work_separation.md)** — memory-adayı her kayıtta sor: iş mi (→MASTER-PLAN) kalıcı-durum mu (→memory)? Mutlaka Alperen'e danış.
 12. **[Kod+iş-özeti birlikte](feedback_code_plus_business_summary.md)** — her işi/seçeneği/raporu hem kod-detayı hem düz-Türkçe iş-tanımıyla sun; Alperen kodu açmadan karar verebilsin (Alperen 2026-07-16).
 13. **[Alp Discipline = karar-çapası](law_alp_discipline_anchor.md)** — `alp-discipline/ESSENCE.md` karpathy-discipline gibi kalıcı tempo-parçası; negative-space → sınır-içi-alternatif → kayıpta-dur → irtifa-ilanı her karar-sınırında (Alperen 2026-07-21).
+14. **[Cross-provider xverify = netleştirme seçeneği](feedback_xverify_clarification_option.md)** — Codex/Brain ciddi kök-neden veya tasarım belirsizliğinde farklı provider Fable 5 ile ikinci görüş alabilir; sonuç karar/authority devri değildir.

@@ -74,6 +74,7 @@ const USAGE_LIMIT_PATTERNS: readonly RegExp[] = [
  */
 const AUTH_PATTERNS: readonly RegExp[] = [
   /authentication_error/i, // Anthropic API error type
+  /oauth\s+access\s+token\s+has\s+been\s+revoked/i, // Claude CLI OAuth 401 (run 475)
   /invalid\s+(x-)?api[\s_-]?key/i, // Anthropic invalid key
   /\b401\b/, // HTTP 401 Unauthorized
   /unauthorized/i,

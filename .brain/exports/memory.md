@@ -1,5 +1,18 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-475 Learnings
+- Sprint sprint-475 Learnings: ## Sprint sprint-475 Learnings
+- DENEME-001 — simple document and test: NO_GO — Required verification failed: tsc=0, vitest=1, existence=0.
+- undefined: NO_GO
+- DENEME-002 — simple document and test: NO_GO — npx tsc --noEmit passed. The requested file-existence proof passed. The exact required command npx vitest run deneme/tas
+- undefined: NO_GO
+- DENEME-003 — simple document and test: NO_GO — Existence proof and npx tsc --noEmit passed. Required command npx vitest run deneme/task-003/example.test.ts failed: No
+- undefined: NO_GO
+- DENEME-004 — simple document and test: NO_GO — npx tsc --noEmit and required-file proof passed. npx vitest run deneme/task-004/example.test.ts failed before executing
+- undefined: NO_GO
+- DENEME-005 — simple document and test: NO_GO — Verification failure: proof=0; tsc=0; targetedTest=1.
+- undefined: NO_GO
+
 ## Sprint sprint-473 Learnings
 - Sprint sprint-473 Learnings: ## Sprint sprint-473 Learnings
 - undefined: NO_GO

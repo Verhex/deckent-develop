@@ -49,6 +49,8 @@ export const PANIC_IPC_DIR = join(NERVOUS_DIR, 'panic-ipc');
 // (core/monitor/cli) derives the same paths from DECKENT_DIR.
 export const SPRINT_STATE_FILE = join(DECKENT_DIR, 'sprint-state.json');
 export const SPRINT_ACTIVE_FILE = join(DECKENT_DIR, 'sprint-active.json');
+/** Durable parked-run continuation authority. Shared by lifecycle, status, and recovery surfaces. */
+export const SPRINT_PAUSE_STATE_FILE = join(DECKENT_DIR, 'pause-state.json');
 // ─── Per-sprint ephemeral artifacts (events, metrics, gate, archives) ──
 export const RECENT_WORKS_DIR = join(DECKENT_DIR, 'recently-works');
 export const MEMORY_DB_FILE = 'memory.db' as const;

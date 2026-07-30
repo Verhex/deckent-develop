@@ -117,7 +117,7 @@ function detectState(root: string): HelpState {
   if (initialized) {
     try {
       const cfg = JSON.parse(readFileSync(configPath, 'utf-8')) as { routing_engine?: string };
-      routingEngine = cfg.routing_engine ?? 'v2';
+      routingEngine = cfg.routing_engine ?? 'v3';
     } catch {
       routingEngine = 'v2';
     }

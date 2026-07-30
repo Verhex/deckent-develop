@@ -494,9 +494,14 @@ describe('buildWorkerPrompt', () => {
   });
 
   it('warns about auditor boundary violations', () => {
+    const emptyRoot = makeEmptyProjectRoot();
     const task = makeTask();
-    const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('auditor will flag violations');
+    try {
+      const prompt = buildWorkerPrompt(task, undefined, undefined, emptyRoot);
+      expect(prompt).toContain('the auditor flags any write outside it');
+    } finally {
+      rmSync(emptyRoot, { recursive: true, force: true });
+    }
   });
 
   it('includes heartbeat file path', () => {
@@ -846,6 +851,44 @@ describe('buildWorkerPrompt — agentPrompt parameter', () => {
     const prompt = buildWorkerPrompt(task, 'Bug fixing specialist.');
     expect(prompt).toContain('=== Agent: bug-fixer ===');
     expect(prompt).toContain('Bug fixing specialist.');
+  });
+
+  it('threads effective persona_render config into the V3-selected guidance slice', () => {
+    const emptyRoot = makeEmptyProjectRoot();
+    const agentPrompt = [
+      '# Implementer',
+      'Full persona body.',
+      '<!-- guidance:implementation-start -->',
+      'Implementation-specific guidance.',
+      '<!-- guidance:implementation-end -->',
+      '<!-- guidance:default-start -->',
+      'Default guidance.',
+      '<!-- guidance:default-end -->',
+    ].join('\n');
+    const task = makeTask({
+      assignedAgent: 'implementer',
+      routingMeta: {
+        routingVersion: 'v3',
+        workType: 'build',
+        personaSlices: ['implementation', 'default'],
+      },
+    });
+
+    try {
+      const prompt = buildWorkerPrompt(
+        task,
+        agentPrompt,
+        undefined,
+        emptyRoot,
+        { prompt: { persona_render: 'guidance' } } as Parameters<typeof buildWorkerPrompt>[4],
+      );
+
+      expect(prompt).toContain('Implementation-specific guidance.');
+      expect(prompt).not.toContain('Default guidance.');
+      expect(prompt).not.toContain('Full persona body.');
+    } finally {
+      rmSync(emptyRoot, { recursive: true, force: true });
+    }
   });
 });
 

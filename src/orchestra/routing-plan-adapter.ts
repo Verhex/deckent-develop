@@ -148,12 +148,11 @@ export async function routeTasksV3ForPlan(
 
       task.assignedAgent = decision.agentId;
       task.assignedSkills = [...decision.skillIds];
-      // routingMeta's declared type is V2-shaped ('v2' literal + string
-      // confidence); V3 writes its own richer record through the untyped
-      // channel until the Slice-3 cut-over retypes the field.
-      (task as unknown as { routingMeta?: unknown }).routingMeta = {
+      const storyWorkType = decision.story.steps[0]?.detail['workType'];
+      task.routingMeta = {
         routingVersion: 'v3',
-        workType: requirement?.content.workType ?? decision.story.steps[0]?.detail['workType'] ?? 'build',
+        workType: requirement?.content.workType
+          ?? (typeof storyWorkType === 'string' ? storyWorkType : 'build'),
         confidence: decision.confidence,
         provenance: decision.provenance,
         personaSlices: decision.personaSlices,
@@ -249,7 +248,7 @@ export async function routeSingleTaskV3(
     (await import('../core/routing/config.js')).resolveRoutingV3Config(null, {}),
     { journal: false },
   );
-  const meta = (task as unknown as { routingMeta?: { workType?: string; confidence?: number; escalation?: string; storySummary?: string } }).routingMeta;
+  const meta = task.routingMeta;
   if (!task.assignedAgent) {
     // routeTasksV3ForPlan leaves gap tasks unassigned and reports the
     // escalation; single-task callers need the typed error directly.
@@ -260,7 +259,7 @@ export async function routeSingleTaskV3(
   return {
     agentId: task.assignedAgent,
     skillIds: task.assignedSkills ?? [],
-    confidence: meta?.confidence ?? 0,
+    confidence: typeof meta?.confidence === 'number' ? meta.confidence : 0,
     workType: meta?.workType ?? 'build',
     escalation: meta?.escalation ?? null,
     storySummary: meta?.storySummary ?? '',

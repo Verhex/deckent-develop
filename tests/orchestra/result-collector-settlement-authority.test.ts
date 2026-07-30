@@ -183,4 +183,62 @@ describe('result collector settlement authority wire', () => {
     await expect(pollForResultFile(root, taskId, 20, 5))
       .rejects.toThrow(/Corrupt host-owned Docker result settlement/);
   });
+
+  it('repairs a malformed raw result through terminal-only reconciliation during the live wait', async () => {
+    const taskId = 'collector-live-malformed';
+    const { root, tasksDir, sprint } = fixture(taskId);
+    writeFileSync(
+      join(tasksDir, `task-${taskId}.result`),
+      `${JSON.stringify(result(taskId, 'DONE', 'raw'))}\\n`,
+      'utf-8',
+    );
+    const ref = createTaskResultSettlementRef(root, taskId);
+    writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
+
+    const reconcilePendingAttempts = vi.fn(async () => {
+      const hostResult = result(taskId, 'NO_GO', 'host repaired malformed raw result');
+      writeTaskResultSettlementAtomic(createTaskResultSettlement({
+        ref,
+        exitCode: 1,
+        result: hostResult as unknown as Record<string, unknown>,
+      }));
+      writeTaskResultSettlementClosureAtomic(ref, {
+        containerDisposition: 'stopped-removed',
+        locksReleased: true,
+      });
+      return {
+        adopted: [],
+        closedNotDispatched: [],
+        closedAbsentAfterExit: [taskId],
+        retiredLanded: [],
+        resumedContinuations: [],
+      };
+    });
+    const backend = {
+      name: 'test-recovery',
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      list: vi.fn(() => []),
+      isAvailable: vi.fn(async () => true),
+      reconcilePendingAttempts,
+    };
+
+    const results = await waitForResults(
+      root,
+      sprint,
+      1_000,
+      [],
+      { spawnBackend: backend },
+    );
+
+    expect(reconcilePendingAttempts).toHaveBeenCalledWith({ mode: 'terminal-only' });
+    expect(results).toEqual([
+      expect.objectContaining({
+        taskId,
+        selfAssessment: 'NO_GO',
+        notes: 'host repaired malformed raw result',
+      }),
+    ]);
+  });
 });

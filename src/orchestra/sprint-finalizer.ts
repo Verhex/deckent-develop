@@ -1432,13 +1432,9 @@ export async function finalizeSprint(
     } catch (e) { debugLog('finalizeSprint:afterSprintHook', e); }
   }
 
-  // 8b. Update agent/skill stats — V2/learnings.json is the SOLE path
-  // (ROUTE-V1-DEADBRANCH-COLLAPSE, ADR-G-006 follow-up). The V1 branch
-  // (`routing_engine !== 'v2'`, writing stats directly to agent.json) is
-  // removed: config validation has accepted only 'v2' since ROUTE-V1-PURGE,
-  // so the guard was permanently false-taken (V1 code could never run) and
-  // is collapsed rather than left dead. routeTaskV2's `'v3'`-vs-`'v2'`-stamp
-  // reconcile remains open separately as ROUTING-VERSION-LABEL.
+  // 8b. Update prompt-version stats for every routed task. Legacy V2 DNA
+  // outcomes and V3 learning cells are separated below so no task is credited
+  // twice and the live V3 router consumes only its own cell ledger.
 
   // F5 evolution wire (B11): record per-task use of each agent's CURRENT prompt
   // version so prompt-analytics / /api/evolution/prompt-metrics see real
@@ -1488,22 +1484,27 @@ export async function finalizeSprint(
           } catch (e) { debugLog('finalizeSprint:assessQuality', e); }
         }
 
-        tracker.recordOutcome({
-          taskId: task.id,
-          sprintId: sprint.id,
-          taskDNA: (task.routingMeta?.taskDNA ?? { intent: { primary: 'unknown', secondary: [], confidence: 0 }, domains: [], operations: [], complexity: { fileCount: 0, moduleCount: 0, crossCutting: false, estimatedSize: 'small' }, scope: { writeRatio: {}, primaryWriteTarget: '', testWriteRatio: 0 } }) as TaskDNA,
-          agentId: task.assignedAgent ?? null,
-          skillIds: task.assignedSkills ?? [],
-          evaluation: evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
-          coverage: taskResult?.coverage ?? 0,
-          qualityScore,
-          routingVersion: 'v2',
-        });
+        // V2's DNA outcome ledger is legacy-only. Feeding V3 tasks into both
+        // ledgers double-credited agents/skills and polluted a learner the live
+        // router no longer consumes.
+        if (task.routingMeta?.routingVersion !== 'v3') {
+          tracker.recordOutcome({
+            taskId: task.id,
+            sprintId: sprint.id,
+            taskDNA: (task.routingMeta?.taskDNA ?? { intent: { primary: 'unknown', secondary: [], confidence: 0 }, domains: [], operations: [], complexity: { fileCount: 0, moduleCount: 0, crossCutting: false, estimatedSize: 'small' }, scope: { writeRatio: {}, primaryWriteTarget: '', testWriteRatio: 0 } }) as TaskDNA,
+            agentId: task.assignedAgent ?? null,
+            skillIds: task.assignedSkills ?? [],
+            evaluation: evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
+            coverage: taskResult?.coverage ?? 0,
+            qualityScore,
+            routingVersion: 'v2',
+          });
+        }
 
         // ROUTING-V3 learning cells (Slice-2): tasks routed by V3 also feed
         // the workType×domain×agent cell ledger — PER-TASK DNA by contract
         // (the tasks[0] class cannot recur), ghost-gated at the source.
-        const v3Meta = (task as unknown as { routingMeta?: { routingVersion?: string; workType?: string } }).routingMeta;
+        const v3Meta = task.routingMeta;
         if (v3Meta?.routingVersion === 'v3' && task.assignedAgent && evaluation !== TaskEvaluation.DEFERRED) {
           try {
             const { recordOutcome: recordCell } = await import('../core/routing/learning-cells.js');

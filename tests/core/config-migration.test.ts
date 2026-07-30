@@ -335,29 +335,29 @@ describe('routing_engine migration', () => {
     expect(missing).toContain('routing_engine');
   });
 
-  it('migrateConfigInMemory adds routing_engine = v2 for old config without it', () => {
+  it('migrateConfigInMemory adds routing_engine = v3 for old config without it', () => {
     const oldConfig: Record<string, unknown> = {
       mode: 'max_plan',
       modes: {},
     };
     const { config, addedFields } = migrateConfigInMemory(oldConfig);
     expect(addedFields).toContain('routing_engine');
-    expect(config.routing_engine).toBe('v2');
+    expect(config.routing_engine).toBe('v3');
   });
 
-  it('migrateConfigInMemory preserves existing routing_engine = v2', () => {
+  it('migrateConfigInMemory upgrades existing routing_engine = v2 to v3', () => {
     const existing: Record<string, unknown> = {
       ...createDefaultConfig() as unknown as Record<string, unknown>,
       routing_engine: 'v2',
     };
     const { config, addedFields } = migrateConfigInMemory(existing);
     expect(addedFields).not.toContain('routing_engine');
-    expect(config.routing_engine).toBe('v2');
+    expect(config.routing_engine).toBe('v3');
   });
 
-  it('createDefaultConfig includes routing_engine = v2', () => {
+  it('createDefaultConfig includes routing_engine = v3', () => {
     const defaults = createDefaultConfig();
-    expect(defaults.routing_engine).toBe('v2');
+    expect(defaults.routing_engine).toBe('v3');
   });
 
   it('migrateConfig file adds routing_engine to on-disk config', () => {
@@ -368,7 +368,7 @@ describe('routing_engine migration', () => {
       expect(result.migrated).toBe(true);
       expect(result.addedFields).toContain('routing_engine');
       const written = JSON.parse(readFileSync(p, 'utf-8')) as Record<string, unknown>;
-      expect(written['routing_engine']).toBe('v2');
+      expect(written['routing_engine']).toBe('v3');
     } finally {
       cleanupTmp(p);
     }

@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import type { Command } from 'commander';
 import { postFinalizeCleanup, previewFinalizeCleanup } from '../../core/orphan-cleaner.js';
 import { runSelfAuditGate } from '../../orchestra/sprint-finalizer.js';
@@ -10,6 +11,55 @@ import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
+import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
+
+export interface ResumeRecoveryProcessOptions {
+  autoApprove?: boolean;
+  dryRun?: boolean;
+}
+
+/**
+ * Re-enter the canonical resume command in a fresh process. Recovery owns
+ * diagnosis/selection; resume remains the single mutation authority for
+ * checkpoint restoration and worker re-dispatch.
+ */
+export async function runResumeRecoveryProcess(
+  root: string,
+  sprintId: string,
+  opts: ResumeRecoveryProcessOptions,
+  runtime: {
+    execPath?: string;
+    entryPath?: string;
+    spawnProcess?: typeof spawn;
+  } = {},
+  lang = 'en',
+): Promise<number> {
+  const authority = readCanonicalRunStatus(root);
+  if (
+    authority.sprintId !== sprintId
+    || !authority.resumable
+    || (authority.lifecycle !== 'PAUSED' && authority.lifecycle !== 'ORPHANED')
+  ) {
+    throw new Error(getMessage('recover.resume_authority_missing', lang, { sprintId }));
+  }
+  const execPath = runtime.execPath ?? process.execPath;
+  const entryPath = runtime.entryPath ?? process.argv[1];
+  if (!entryPath) throw new Error(getMessage('recover.resume_entry_missing', lang));
+  const args = [entryPath, 'resume', sprintId, '--root', root];
+  if (opts.autoApprove) args.push('--auto-approve');
+  if (opts.dryRun) args.push('--dry-run');
+  const spawnProcess = runtime.spawnProcess ?? spawn;
+  return await new Promise<number>((resolve, reject) => {
+    const child = spawnProcess(execPath, args, {
+      cwd: root,
+      stdio: 'inherit',
+      env: process.env,
+      shell: false,
+    });
+    child.once('error', reject);
+    child.once('close', code => resolve(code ?? 1));
+  });
+}
 
 function assertCanonicalSprintId(sprintId: string): void {
   if (!/^sprint-\d+$/.test(sprintId)) {
@@ -118,6 +168,7 @@ async function runRecovery(
 }
 
 export function registerRecover(program: Command): void {
+  const registerLang = detectLang(resolveProjectRoot());
   program
     .command('recover <sprint-id>')
     .description('Recover from a crashed or stuck sprint (audit + cleanup + archive)')
@@ -125,8 +176,10 @@ export function registerRecover(program: Command): void {
     .option('--force', 'Skip interactive confirmation')
     .option('--skip-audit', 'Skip the audit step')
     .option('--restore-tasks', 'Roll back: restore task files from the pre-archive snapshot instead of cleaning forward (born-562)')
+    .option('--resume', getMessage('recover.resume_option', registerLang))
+    .option('--auto-approve', getMessage('recover.auto_approve_option', registerLang), false)
     .option('--json', 'Output recovery result as JSON')
-    .action(async (sprintId: string, opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; restoreTasks?: boolean; json?: boolean }) => {
+    .action(async (sprintId: string, opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; restoreTasks?: boolean; resume?: boolean; autoApprove?: boolean; json?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);
 
@@ -134,6 +187,20 @@ export function registerRecover(program: Command): void {
         assertCanonicalSprintId(sprintId);
         if (opts.dryRun && opts.restoreTasks) {
           throw new Error(getMessage('recover.dry_run_restore_conflict', lang));
+        }
+        if (opts.resume && opts.restoreTasks) {
+          throw new Error(getMessage('recover.resume_restore_conflict', lang));
+        }
+        if (opts.resume && opts.json) {
+          throw new Error(getMessage('recover.resume_json_conflict', lang));
+        }
+        if (opts.resume) {
+          const exitCode = await runResumeRecoveryProcess(root, sprintId, {
+            autoApprove: opts.autoApprove,
+            dryRun: opts.dryRun,
+          }, {}, lang);
+          if (exitCode !== 0) process.exitCode = exitCode;
+          return;
         }
         if (!opts.dryRun && opts.json && !opts.force) {
           throw new Error(getMessage('recover.json_requires_force', lang));

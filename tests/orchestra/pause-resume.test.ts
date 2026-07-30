@@ -437,6 +437,20 @@ describe('resumeSprint', () => {
     expect(sprint.status).toBe(SprintStatus.ACTIVE);
   });
 
+  it('persists ACTIVE to the canonical sprint-state authority', () => {
+    const tasks = [makeTask('001', TaskStatus.PAUSED)];
+    const sprint = makeSprint(tasks);
+    sprint.status = SprintStatus.PAUSED;
+
+    resumeSprint(projectRoot, sprint);
+
+    expect(mockedWriteFileSync).toHaveBeenCalledWith(
+      expect.stringContaining('sprint-state.json'),
+      expect.stringContaining('"status": "ACTIVE"'),
+      'utf-8',
+    );
+  });
+
   it('writes updated task JSON for resumed tasks', () => {
     const tasks = [makeTask('001', TaskStatus.PAUSED)];
     const sprint = makeSprint(tasks);

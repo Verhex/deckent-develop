@@ -1180,10 +1180,10 @@ export interface DeckentConfig {
   /** Adaptive threshold tuning parameters */
   adaptive_config?: AdaptiveConfig;
 
-  // ─── Routing Engine v2 ─────────────────────────────────────────────
-  /** Routing engine version. Only 'v2' (intent-based, `routeTaskV2`) exists — V1
-   *  (keyword-based) was removed by ROUTE-V1-PURGE (ADR-G-006). Default: 'v2'. */
-  routing_engine?: 'v2';
+  // ─── Routing Engine v3 ─────────────────────────────────────────────
+  /** Routing engine version. Only provider-independent vector routing v3 is
+   * supported. Legacy v1/v2 config values migrate to v3. Default: 'v3'. */
+  routing_engine?: 'v3';
   /** Routing behaviour tuning flags (all default-off, opt-in). `effort_tiering` is the sole
    *  surviving flag — skill_agent_affinity/agent_cache/kindAffinity/languagePenalty were removed
    *  with the V2 routing engine (S3 cut-over 2026-07-15); their consumer (core/routing-engine.ts)
@@ -1757,8 +1757,8 @@ export interface ResolvedConfig {
   // Rubric-Based Evaluation
   evaluation_rubric?: Partial<EvaluationRubric>;
   rubric_max_retries?: number;
-  // Routing Engine v2 (V1 removed — ROUTE-V1-PURGE / ADR-G-006)
-  routing_engine?: 'v2';
+  // Routing Engine v3 (legacy v1/v2 values migrate at config ingress)
+  routing_engine?: 'v3';
   routing_config?: {
     agentMinScore?: number;
     skillMinScore?: number;

@@ -39,13 +39,21 @@ import { notify } from '../core/notify.js';
 import {
   now, isStaleTaskFile,
   isTmuxProvider, resolveTaskProvider, getProviderAdapterForTask,
-  PAUSE_STATE_FILE,
+  PAUSE_STATE_FILE, writeSprintState,
 } from './sprint-utils.js';
+import {
+  computeEventStreamOffset,
+  writeCheckpoint,
+} from './sprint-checkpoint.js';
+import { writeEvent, CHANNELS } from './event-stream.js';
+import { getMessage } from '../cli/helpers/messages.js';
+import { detectLang } from '../cli/helpers/i18n.js';
 
 // ─── Core — sprint lock ───────────────────────────────────────────
 import { releaseSprintLock } from '../core/multi-ide.js';
 import { pruneExpiredNervousPending } from '../core/pending-approvals.js';
 import { isExecutionLockAuthorityArtifactName } from '../core/file-lock.js';
+import { clearProviderExecutionHolds } from '../core/provider-execution-hold.js';
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
@@ -83,10 +91,16 @@ export class BrainError extends Error {
 }
 
 export interface PauseState {
+  schemaVersion: 2;
   sprintId: string;
   pausedAt: string;
   pausedTaskIds: string[];
   reason: string;
+  reasonCode: string;
+  phase: SprintPhase;
+  status: 'PAUSED';
+  recoveryCommand: string;
+  finalizeCommand: string;
 }
 
 /** Valid checkpoint phases that can require human approval. */
@@ -630,6 +644,7 @@ export function pauseSprint(
   projectRoot: string,
   sprint: Sprint,
   reason: string = 'Manual pause',
+  reasonCode: string = 'manual-pause',
 ): PauseState {
   const tasksPath = join(projectRoot, TASKS_DIR);
   const pausedTaskIds: string[] = [];
@@ -679,10 +694,16 @@ export function pauseSprint(
   sprint.status = SprintStatus.PAUSED;
 
   const pauseState: PauseState = {
+    schemaVersion: 2,
     sprintId: sprint.id,
     pausedAt: now(),
     pausedTaskIds,
     reason,
+    reasonCode,
+    phase: sprint.phase,
+    status: 'PAUSED',
+    recoveryCommand: `deckent recover ${sprint.id} --resume`,
+    finalizeCommand: `deckent finalize --sprint ${sprint.id} --force`,
   };
 
   // Persist pause state
@@ -696,6 +717,13 @@ export function pauseSprint(
     );
   } catch (e) { debugLog('pauseSprint:writePauseState', e); }
 
+  // Persist the same PAUSED truth to the canonical run-state authority and
+  // capture a continuation checkpoint after task markers are committed.
+  try { writeSprintState(projectRoot, sprint); } catch (e) { debugLog('pauseSprint:writeSprintState', e); }
+  try {
+    writeCheckpoint(projectRoot, sprint, computeEventStreamOffset(projectRoot, sprint.id));
+  } catch (e) { debugLog('pauseSprint:writeCheckpoint', e); }
+
   // Update dashboard to reflect PAUSED status
   try {
     updateDashboard(projectRoot, {
@@ -707,10 +735,45 @@ export function pauseSprint(
         blocked: pausedTaskIds.length,
         total: sprint.tasks.length,
       },
-        alerts: [{ level: AlertLevel.WARNING, message: `Sprint paused: ${reason}`, timestamp: now() }],
+        alerts: [{ level: AlertLevel.WARNING, message: reason, timestamp: now() }],
       updatedAt: now(),
     });
   } catch (e) { debugLog('pauseSprint:updateDashboard', e); }
+
+  // A parked run is an actionable human gate. Emit through both the general
+  // notification dispatcher and Nervous live channel; plain status projects
+  // the durable pause-state into its pending-approval list.
+  const lang = detectLang(projectRoot);
+  const title = getMessage('pause.notification_title', lang, { sprintId: sprint.id });
+  const summary = getMessage('pause.notification_summary', lang, {
+    reason,
+    command: pauseState.recoveryCommand,
+  });
+  try {
+    void notify('human-checkpoint-required', sprint.id, title, summary, undefined, {
+      actions: [
+        {
+          label: getMessage('pause.action_resume', lang),
+          cliCommand: pauseState.recoveryCommand,
+        },
+        {
+          label: getMessage('pause.action_finalize', lang),
+          cliCommand: pauseState.finalizeCommand,
+        },
+      ],
+    });
+  } catch (e) { debugLog('pauseSprint:notify', e); }
+  try {
+    writeEvent(projectRoot, sprint.id, 'deckent', 'user', CHANNELS.NERVOUS_NOTIFICATION, {
+      kind: 'recovery',
+      id: `resume:${sprint.id}`,
+      title,
+      acceptCommand: pauseState.recoveryCommand,
+      rejectCommand: pauseState.finalizeCommand,
+      reason,
+      reasonCode,
+    });
+  } catch (e) { debugLog('pauseSprint:nervousNotification', e); }
 
   return pauseState;
 }
@@ -762,11 +825,28 @@ export function resumeSprint(
 
   sprint.status = SprintStatus.ACTIVE;
 
+  // A deliberate resume is the authority transition that re-opens provider
+  // admission after the operator fixed auth/quota. Preserve the historical hold
+  // evidence and append explicit clear events; never make old evidence disappear.
+  if (pauseState?.reasonCode === 'provider-execution-hold') {
+    try {
+      clearProviderExecutionHolds(projectRoot, sprint.id);
+    } catch (e) { debugLog('resumeSprint:clearProviderExecutionHolds', e); }
+  }
+
   // Remove pause state file
   const pauseStatePath = join(projectRoot, PAUSE_STATE_FILE);
   if (existsSync(pauseStatePath)) {
     try { unlinkSync(pauseStatePath); } catch (e) { debugLog('resumeSprint:unlinkPauseState', e); }
   }
+
+  // Persist ACTIVE to the same canonical authorities that pauseSprint writes.
+  // Without this, deleting pause-state exposed a stale PAUSED sprint-state and
+  // status/recover disagreed immediately after a successful resume.
+  try { writeSprintState(projectRoot, sprint); } catch (e) { debugLog('resumeSprint:writeSprintState', e); }
+  try {
+    writeCheckpoint(projectRoot, sprint, computeEventStreamOffset(projectRoot, sprint.id));
+  } catch (e) { debugLog('resumeSprint:writeCheckpoint', e); }
 
   // Update dashboard to reflect ACTIVE status
   try {

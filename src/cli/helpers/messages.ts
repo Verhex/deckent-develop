@@ -1011,6 +1011,22 @@ const MESSAGES: MessageMap = {
     en: '… and {count} more (run `deckent nervous` to see all)',
     tr: '… ve {count} tane daha (hepsi için: `deckent nervous`)',
   },
+  'pause.notification_title': {
+    en: 'Run {sprintId} is paused and awaiting a continuation decision',
+    tr: '{sprintId} run’ı duraklatıldı ve devam kararı bekliyor',
+  },
+  'pause.notification_summary': {
+    en: '{reason}. Verify the recovery preview, then continue with: {command}',
+    tr: '{reason}. Kurtarma önizlemesini doğrulayıp şu komutla devam edin: {command}',
+  },
+  'pause.action_resume': {
+    en: 'Resume',
+    tr: 'Sürdür',
+  },
+  'pause.action_finalize': {
+    en: 'Force finalize',
+    tr: 'Zorla sonlandır',
+  },
   'status.dashboard_read_failed': {
     en: 'Failed to read dashboard file.',
     tr: 'Dashboard dosyası okunamadı.',
@@ -3322,10 +3338,36 @@ const MESSAGES: MessageMap = {
   'recover.json_requires_force': { en: 'Mutating JSON recovery requires explicit --force.', tr: 'Değişiklik yapan JSON kurtarma açıkça --force gerektirir.' },
   'recover.restore_requires_force': { en: 'Snapshot restoration requires explicit --force.', tr: 'Snapshot geri yükleme açıkça --force gerektirir.' },
   'recover.archive_incomplete': { en: 'Recovery stopped: archive evidence is incomplete (expected {expected}, archived {actual}).', tr: 'Kurtarma durduruldu: arşiv kanıtı eksik (beklenen {expected}, arşivlenen {actual}).' },
+  'recover.resume_restore_conflict': { en: '--resume and --restore-tasks are mutually exclusive.', tr: '--resume ve --restore-tasks birlikte kullanılamaz.' },
+  'recover.resume_json_conflict': { en: '--resume streams the canonical resume command and cannot be combined with --json.', tr: '--resume canonical resume komutunun çıktısını aktarır ve --json ile birlikte kullanılamaz.' },
+  'recover.resume_option': { en: 'Resume a canonically PAUSED/ORPHANED run through its durable checkpoint', tr: 'Canonical PAUSED/ORPHANED run’ı kalıcı checkpoint üzerinden sürdür' },
+  'recover.auto_approve_option': { en: 'Forward auto-approval to the resumed worker run', tr: 'Otomatik onayı sürdürülen worker run’ına aktar' },
+  'recover.resume_authority_missing': { en: 'Run {sprintId} has no canonical resumable PAUSED/ORPHANED authority.', tr: '{sprintId} için canonical, sürdürülebilir PAUSED/ORPHANED authority bulunamadı.' },
+  'recover.resume_entry_missing': { en: 'Deckent CLI entry path is unavailable.', tr: 'Deckent CLI giriş yolu kullanılamıyor.' },
+  'pause.provider_auth_hold': {
+    en: 'Provider {provider} authentication failed at task {taskId}; healthy providers were not stopped. Re-authenticate, then resume this run.',
+    tr: '{provider} provider kimlik doğrulaması {taskId} görevinde başarısız oldu; sağlıklı provider\'lar durdurulmadı. Yeniden giriş yapıp bu run\'ı sürdürün.',
+  },
+  'pause.provider_usage_hold': {
+    en: 'Provider {provider} usage authority stopped dispatch at task {taskId}; healthy providers were not stopped. Restore provider availability, then resume this run.',
+    tr: '{provider} provider kullanım authority\'si {taskId} görevinde dispatch\'i durdurdu; sağlıklı provider\'lar durdurulmadı. Provider erişimini yenileyip bu run\'ı sürdürün.',
+  },
+  'prompt_gate.test_not_discoverable': {
+    en: 'Planned test path "{path}" is not discoverable by {runner}: {config} includes only [{include}].',
+    tr: 'Planlanan "{path}" test yolu {runner} tarafından keşfedilemiyor: {config} yalnız [{include}] desenlerini kapsıyor.',
+  },
+  'prompt_gate.test_not_discoverable_fix': {
+    en: 'Move the test under a configured include path or amend {config}; do not dispatch workers with a proof command the runner cannot discover.',
+    tr: 'Testi yapılandırılmış bir include yoluna taşıyın veya {config} dosyasını düzenleyin; runner\'ın keşfedemediği proof komutuyla worker dispatch etmeyin.',
+  },
   'resume.invalid_sprint_id': { en: 'Invalid run id: {sprintId}', tr: 'Geçersiz run kimliği: {sprintId}' },
   'resume.checkpoint_missing': { en: 'No checkpoint found for run "{sprintId}".', tr: '"{sprintId}" run\'ı için checkpoint bulunamadı.' },
   'resume.status_hint': { en: 'Run "deckent status" to see available runs.', tr: 'Kullanılabilir run\'ları görmek için "deckent status" çalıştırın.' },
   'resume.checkpoint_unreadable': { en: 'Checkpoint for run "{sprintId}" is malformed or unreadable.', tr: '"{sprintId}" run\'ının checkpoint\'i bozuk veya okunamıyor.' },
+  'resume.pause_restore_failed': {
+    en: 'Run {sprintId} failed to resume and its prior pause authority could not be restored; use deckent status before taking further action.',
+    tr: '{sprintId} run\'ı sürdürülemedi ve önceki pause authority geri yüklenemedi; başka işlem yapmadan önce deckent status çalıştırın.',
+  },
   'resume.header': { en: '\nResuming run {sprintId} from checkpoint #{checkpoint}', tr: '\n{sprintId} run\'ı checkpoint #{checkpoint} üzerinden sürdürülüyor' },
   'resume.summary': { en: '  Written: {timestamp}\n  Phase: {phase}\n  Completed tasks: {completed}\n  Pending tasks: {pending}\n  Active workers: {active}', tr: '  Yazım: {timestamp}\n  Faz: {phase}\n  Tamamlanan görev: {completed}\n  Bekleyen görev: {pending}\n  Aktif worker: {active}' },
   'resume.stale_header': { en: '\n  ⚠ Stale workers detected: {count}', tr: '\n  ⚠ Bayat worker tespit edildi: {count}' },
@@ -3358,6 +3400,7 @@ const MESSAGES: MessageMap = {
   'resume.preplanned_failed': { en: 'Resume HOLD: preplanned run could not be rebuilt: {error}', tr: 'Resume HOLD: preplanned run yeniden oluşturulamadı: {error}' },
   'resume.other_sprint_active': { en: 'Resume HOLD: another run owns the runtime state: {sprintId}', tr: 'Resume HOLD: runtime durumu başka bir run\'a ait: {sprintId}' },
   'resume.state_clear_failed': { en: 'Resume HOLD: stale state for {sprintId} could not be cleared.', tr: 'Resume HOLD: {sprintId} için bayat durum temizlenemedi.' },
+  'resume.pause_clear_failed': { en: 'Resume HOLD: pause authority for {sprintId} could not be cleared safely.', tr: 'Resume HOLD: {sprintId} pause authority güvenli biçimde temizlenemedi.' },
   'resume.not_complete': { en: 'Run resumed but did not complete (status: {status}).', tr: 'Run sürdürüldü ancak tamamlanmadı (durum: {status}).' },
   'resume.completed': { en: '\nRun resumed and completed.', tr: '\nRun sürdürüldü ve tamamlandı.' },
   'resume.failed': { en: 'Run resume failed: {error}', tr: 'Run sürdürme başarısız: {error}' },

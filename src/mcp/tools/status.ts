@@ -10,6 +10,8 @@ import { getCurrentSprintId } from '../../monitor/sprint-state.js';
 import { readDashboardSafe } from '../../monitor/dashboard-manager.js';
 import { debugLog } from '../../core/utils.js';
 import { formatStatus, resolveOutputMode, type OutputMode } from '../../core/output-formatter.js';
+import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
+import { readPendingApprovals } from '../../core/pending-approvals.js';
 
 /**
  * Read the last N events from the event stream JSONL file.
@@ -315,23 +317,28 @@ export function registerStatusTool(server: McpServer): void {
     async ({ json, verbose, outputMode }) => {
       const root = process.cwd();
       const dashPath = join(root, DASHBOARD_FILE);
-
-      const latestJob = readLatestJobState(root);
-
       // Use canonical sprint-state.json as single source of truth for sprintId
       const canonicalSprintId = getCurrentSprintId(root);
+      const authority = readCanonicalRunStatus(root, { sprintIdHint: canonicalSprintId });
+      const pendingApprovals = readPendingApprovals(root);
+
+      const latestJob = readLatestJobState(root);
 
       if (!existsSync(dashPath)) {
         // Part C: when .tasks/ files are unavailable but job is COMPLETE with task data,
         // surface completed sprint results from the job file
         if (latestJob?.status === 'COMPLETE' && latestJob.tasks && latestJob.tasks.length > 0) {
           const completedData = {
-            active: false,
+            active: authority.active,
             completed: true,
             message: `Run ${canonicalSprintId ?? latestJob.sprintId ?? ''} completed.`,
             sprintId: canonicalSprintId ?? latestJob.sprintId,
             completedAt: latestJob.completedAt,
             job: latestJob,
+            lifecycle: authority.lifecycle,
+            resumable: authority.resumable,
+            authority,
+            pendingApprovals,
           };
           if (json) {
             return { content: [{ type: 'text' as const, text: JSON.stringify(completedData) }] };
@@ -345,10 +352,16 @@ export function registerStatusTool(server: McpServer): void {
           };
         }
         const noSprintData = {
-          active: false,
+          active: authority.active,
           message: 'No active run.',
-          sprintId: canonicalSprintId,
+          sprintId: authority.sprintId ?? canonicalSprintId,
           job: latestJob,
+          lifecycle: authority.lifecycle,
+          resumable: authority.resumable,
+          recoveryCommand: authority.recoveryCommand,
+          finalizeCommand: authority.finalizeCommand,
+          authority,
+          pendingApprovals,
         };
         if (json) {
           return { content: [{ type: 'text' as const, text: JSON.stringify(noSprintData) }] };
@@ -397,7 +410,7 @@ export function registerStatusTool(server: McpServer): void {
       const sprint = state['sprint'] as { id?: string; startedAt?: string } | undefined;
 
       // Prefer canonical sprint-state.json sprintId over potentially stale .dashboard sprint.id
-      const resolvedSprintId = canonicalSprintId ?? sprint?.id;
+      const resolvedSprintId = authority.sprintId ?? sprint?.id;
 
       const progressBar = buildProgressBar(done, total);
       const eta = computeEta(done, total, sprint?.startedAt);
@@ -460,6 +473,13 @@ export function registerStatusTool(server: McpServer): void {
         metricSnapshot,
         phaseCountdown,
         backendBreakdown,
+        active: authority.active,
+        lifecycle: authority.lifecycle,
+        resumable: authority.resumable,
+        recoveryCommand: authority.recoveryCommand,
+        finalizeCommand: authority.finalizeCommand,
+        authority,
+        pendingApprovals,
         ...verboseFields,
       };
 
@@ -503,7 +523,7 @@ export function registerStatusTool(server: McpServer): void {
         agents: agents as StatusData['agents'],
         alerts: alerts as StatusData['alerts'],
         eta,
-        active: true,
+        active: authority.active,
       });
 
       return {

@@ -7,7 +7,7 @@
 // DISTRIBUTED artifact: it spawns `node dist/cli/entry.js status --json` as a real
 // subprocess (async spawn, never spawnSync — this project's Hermeticity rule) inside
 // an isolated, empty-state tmpdir workspace, JSON.parses the ENTIRE stdout in one
-// call, and asserts the exact `{active:false, pendingApprovals:[...]}` shape + exit 0.
+// call, and asserts the canonical IDLE authority shape + exit 0.
 //
 // `resolveProjectRoot()` (src/cli/helpers/process.ts) is just `process.cwd()`, so
 // passing `cwd: fakeRoot` to `spawn` isolates the CHILD process's view of the project
@@ -77,7 +77,7 @@ describe.skipIf(!DIST_AVAILABLE)('deckent status --json — real dist/ binary co
     expect(existsSync(DIST_ENTRY)).toBe(true);
   });
 
-  it('real binary, isolated empty-state workspace: stdout is exactly one JSON object, {active:false, pendingApprovals:[]}, exit 0', async () => {
+  it('real binary, isolated empty-state workspace: stdout is exactly one canonical IDLE object, exit 0', async () => {
     const fakeRoot = mkdtempSync(join(tmpdir(), 'deckent-status-json-dist-'));
     try {
       const result = await runRealBinaryStatus(fakeRoot, ['--json']);
@@ -100,7 +100,20 @@ describe.skipIf(!DIST_AVAILABLE)('deckent status --json — real dist/ binary co
       const parsed = JSON.parse(trimmed) as { active: unknown; pendingApprovals: unknown };
       expect(parsed.active).toBe(false);
       expect(Array.isArray(parsed.pendingApprovals)).toBe(true);
-      expect(parsed).toEqual({ active: false, pendingApprovals: [] });
+      expect(parsed).toMatchObject({
+        active: false,
+        lifecycle: 'IDLE',
+        resumable: false,
+        sprintId: null,
+        pendingApprovals: [],
+        authority: {
+          schemaVersion: 1,
+          lifecycle: 'IDLE',
+          active: false,
+          resumable: false,
+          sprintId: null,
+        },
+      });
     } finally {
       rmSync(fakeRoot, { recursive: true, force: true });
     }

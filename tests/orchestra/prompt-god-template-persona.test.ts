@@ -115,6 +115,22 @@ describe('buildAgentBlock persona render modes (U4 443-003)', () => {
     expect(prompt).not.toContain('General-purpose guidance for any intent.');
   });
 
+  it('guidance mode consumes the persona slice selected by Routing Engine V3', () => {
+    const task = makeTask({
+      routingMeta: {
+        routingVersion: 'v3',
+        workType: 'repair',
+        personaSlices: ['bugfix', 'default'],
+      },
+    });
+    const ctx = makeCtx({ agentPrompt: MARKED_PROMPT, personaRenderMode: 'guidance' });
+    const { prompt } = buildTaskPrompt(task, ctx);
+
+    expect(prompt).toContain('Reproduce first. Write a failing test before touching the fix.');
+    expect(prompt).not.toContain('General-purpose guidance for any intent.');
+    expect(prompt).not.toContain('Deep-dive section that only belongs in the full persona render.');
+  });
+
   it('guidance mode falls back to the default slice when the intent has no dedicated section', () => {
     const task = makeTask({ routingMeta: withIntent('security') });
     const ctx = makeCtx({ agentPrompt: MARKED_PROMPT, personaRenderMode: 'guidance' });

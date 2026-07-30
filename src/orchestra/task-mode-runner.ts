@@ -291,8 +291,8 @@ export async function runTaskMode(
 
   // WM-1b: V2 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
   try {
-    const routingVersion = config.routing_engine ?? 'v2';
-    if (routingVersion === 'v2') {
+    const routingVersion = config.routing_engine ?? 'v3';
+    if (routingVersion === 'v3') {
 
       const overrides: UserOverride[] = [];
       if (task.forceAgent || task.forceSkills || task.excludeSkills || task.excludeAgent) {
@@ -326,7 +326,7 @@ export async function runTaskMode(
   // Both resolve to undefined/[] for 'generic' agent or empty skills — backward-safe fallback.
   const agentPrompt = await resolveAgentPrompt(projectRoot, task);
   const skillPrompts = await resolveSkillPrompts(projectRoot, task);
-  const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, projectRoot);
+  const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, projectRoot, config);
 
   // Emit event for nervous system / observers
   try {

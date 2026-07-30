@@ -221,8 +221,8 @@ export class MidSprintAdapter {
       });
       void result;
       if (!probe.assignedAgent) return null;
-      const meta = (probe as unknown as { routingMeta?: { confidence?: number } }).routingMeta;
-      const confidence = meta?.confidence ?? 0;
+      const meta = probe.routingMeta;
+      const confidence = typeof meta?.confidence === 'number' ? meta.confidence : 0;
       return {
         agentId: probe.assignedAgent,
         skillIds: probe.assignedSkills ?? [],
@@ -262,8 +262,9 @@ export class MidSprintAdapter {
     task.assignedAgent = decision.agentId;
     task.assignedSkills = decision.skillIds;
     task.routingMeta = {
+      ...task.routingMeta,
       confidence: decision.agentConfidence,
-      routingVersion: 'v2', // field union widens to 'v3' at the type-level cut (S3 wave-4)
+      routingVersion: 'v3',
     };
 
     // MODEL-GUARD: re-routing must NOT leave a code-development task on an

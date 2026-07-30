@@ -476,7 +476,7 @@ CLI ile okuma/yazma: \`deckent config read\` / \`deckent config set key value\`
 
 | Ayar | Değerler | Varsayılan | Açıklama |
 |------|----------|-----------|----------|
-| routing_engine | v1, v2 | v2 | Routing motoru |
+| routing_engine | v3 | v3 | Routing motoru |
 | brain_planning | ai, structured, auto | auto | Planlama modu |
 
 ## Memory + Decay
@@ -524,7 +524,7 @@ CLI read/write: \`deckent config read\` / \`deckent config set key value\`
 
 | Setting | Values | Default | Description |
 |---------|--------|---------|-------------|
-| routing_engine | v1, v2 | v2 | Routing engine |
+| routing_engine | v3 | v3 | Routing engine |
 | brain_planning | ai, structured, auto | auto | Planning mode |
 
 ## Memory + Decay

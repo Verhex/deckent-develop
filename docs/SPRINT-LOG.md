@@ -11397,3 +11397,108 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 473-024: R0-PROMOTION — independent final recommendation (NO_GO)
 
 ---
+## Sprint 475 — sprint-475
+
+**Status:** COMPLETE
+**Date:** 2026-07-30
+**Duration:** 26084s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 84 |
+| Completed | 1 |
+| Tech Debt | 1 |
+| No-Go | 50 |
+| Coverage | NaN% |
+| Duration | 26083965ms |
+
+### Tasks
+
+- 475-001: DENEME-001 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-002: DENEME-002 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-003: DENEME-003 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-004: DENEME-004 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-005: DENEME-005 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-006: DENEME-006 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-007: DENEME-007 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-008: DENEME-008 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-009: DENEME-009 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-010: DENEME-010 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-011: DENEME-011 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-012: DENEME-012 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-013: DENEME-013 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-014: DENEME-014 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-015: DENEME-015 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-016: DENEME-016 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-017: DENEME-017 — simple document and test (NO_GO)
+- 475-018: DENEME-018 — simple document and test (NO_GO)
+- 475-019: DENEME-019 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-020: DENEME-020 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-021: DENEME-021 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-022: DENEME-022 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-023: DENEME-023 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-024: DENEME-024 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-025: DENEME-025 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-026: DENEME-026 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-027: DENEME-027 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-028: DENEME-028 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-029: DENEME-029 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-030: DENEME-030 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-031: DENEME-031 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-032: DENEME-032 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-033: DENEME-033 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-034: DENEME-034 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-035: DENEME-035 — simple document and test (NO_GO)
+- undefined: undefined (NO_GO)
+- 475-036: DENEME-036 — simple document and test (GO_WITH_TECH_DEBT)
+- undefined: undefined (NO_GO)
+- 475-037: DENEME-037 — simple document and test (NO_GO)
+- 475-038: DENEME-038 — simple document and test (NO_GO)
+- 475-039: DENEME-039 — simple document and test (NO_GO)
+- 475-040: DENEME-040 — simple document and test (NO_GO)
+- 475-041: DENEME-041 — simple document and test (NO_GO)
+- 475-042: DENEME-042 — simple document and test (NO_GO)
+- 475-043: DENEME-043 — simple document and test (NO_GO)
+- 475-044: DENEME-044 — simple document and test (NO_GO)
+- 475-045: DENEME-045 — simple document and test (NO_GO)
+- 475-046: DENEME-046 — simple document and test (NO_GO)
+- 475-047: DENEME-047 — simple document and test (NO_GO)
+- 475-048: DENEME-048 — simple document and test (NO_GO)
+- 475-049: DENEME-049 — simple document and test (NO_GO)
+- 475-050: DENEME-050 — simple document and test (NO_GO)
+
+---

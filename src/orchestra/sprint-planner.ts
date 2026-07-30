@@ -127,6 +127,12 @@ import { evaluatePromptGate } from './prompt-gate.js';
 import type { PromptGateResult } from '../core/prompt-gate-types.js';
 import type { InvocationReceiptRef } from '../core/invocation-receipt.js';
 import { applyWorkerExecutionBudgetPolicy } from '../core/execution-plan-digest.js';
+import {
+  evaluateTestDiscoverability,
+  resolveTestDiscoveryContracts,
+} from '../core/test-discovery-contract.js';
+import { getMessage } from '../cli/helpers/messages.js';
+import { detectLang } from '../cli/helpers/i18n.js';
 
 // ─── BrainError ──────────────────────────────────────────────────
 import { BrainError } from './sprint-lifecycle.js';
@@ -703,14 +709,7 @@ export async function planSprint(
     );
   }
 
-  // ─── Routing: V2 intent-based engine (routeTaskV2) ────────────────────────
-  // V1 (keyword-based DecisionOrchestrator) was removed by ROUTE-V1-PURGE
-  // (ADR-G-006); config validation accepts only 'v2', so the former
-  // `if (routingVersion === 'v2')` guard was permanently true and was
-  // collapsed here (ROUTE-V1-DEADBRANCH-COLLAPSE). routeTaskV2's returned
-  // `decision.routingVersion` and the routing-meta stamp below are both
-  // `'v2'` (ROUTING-VERSION-LABEL, ADR-G-006 P2 — reconciled).
-  // V2: Unified intent-based routing via routeTaskV2
+  // ─── Routing Engine v3: provider-independent requirement/capability vectors ─
   try {
     const agentPool = new AgentPoolManager(projectRoot);
     const pool = agentPool.loadAgents();
@@ -925,11 +924,30 @@ export async function planSprint(
         gateTrackedFiles = ls.stdout.split('\n').filter(Boolean);
       }
     }
+    const testDiscoveryContracts = resolveTestDiscoveryContracts(projectRoot);
+    const testDiscoverabilityIssues = evaluateTestDiscoverability(tasks, testDiscoveryContracts);
+    const gateLang = detectLang(projectRoot);
     promptGate = evaluatePromptGate({
       tasks,
       agentPool: pool,
       acknowledgePromptGate: options?.acknowledgePromptGate,
       trackedFiles: gateTrackedFiles,
+      preflightFindings: testDiscoverabilityIssues.map(issue => ({
+        taskId: issue.taskId,
+        lint: 'test-discoverability' as const,
+        level: 'block' as const,
+        agentId: tasks.find(task => task.id === issue.taskId)?.assignedAgent ?? 'generic',
+        message: getMessage('prompt_gate.test_not_discoverable', gateLang, {
+          path: issue.testPath,
+          runner: issue.runner,
+          config: issue.configPath,
+          include: issue.include.join(', '),
+        }),
+        suggestion: getMessage('prompt_gate.test_not_discoverable_fix', gateLang, {
+          path: issue.testPath,
+          config: issue.configPath,
+        }),
+      })),
       // G1c: bounded, fail-soft repo probe — count tracked files containing a symbol.
       // spawnSync git-grep exits 1 on no-match (→ status !== 0 → 0), so a missing symbol
       // or any error never invents a finding.

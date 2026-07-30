@@ -1364,56 +1364,56 @@ describe('loadConfig resolves new fields', () => {
   });
 });
 
-// ─── A) routing_engine V2 — Config Propagation (Sprint 068) ──────────
-// Verifies that routing_engine: 'v2' is properly defaulted and propagated
+// ─── A) routing_engine V3 — Config Propagation ───────────────────────
+// Verifies that routing_engine: 'v3' is properly defaulted and propagated
 // from DeckentConfig → ResolvedConfig.
 
-describe('routing_engine config — V2 default and propagation', () => {
-  it('A) default config has routing_engine=v2', () => {
+describe('routing_engine config — V3 default and propagation', () => {
+  it('A) default config has routing_engine=v3', () => {
     const config = getDefaultConfig();
-    expect(config.routing_engine).toBe('v2');
+    expect(config.routing_engine).toBe('v3');
   });
 
-  it('A) loadConfig returns routing_engine=v2 from defaults (no config file)', async () => {
+  it('A) loadConfig returns routing_engine=v3 from defaults (no config file)', async () => {
     const config = await loadConfig('/test/project');
-    expect(config.routing_engine).toBe('v2');
+    expect(config.routing_engine).toBe('v3');
   });
 
-  it('A) project config can set routing_engine to v2 explicitly', async () => {
+  it('A) project config migrates routing_engine v2 to v3', async () => {
     mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
     mockedReadFile.mockResolvedValue(JSON.stringify({ routing_engine: 'v2' }));
 
     const config = await loadConfig('/test/project');
-    expect(config.routing_engine).toBe('v2');
+    expect(config.routing_engine).toBe('v3');
   });
 
-  it('A) validateConfig accepts routing_engine=v2', () => {
+  it('A) validateConfig accepts routing_engine=v3', () => {
     const config = getDefaultConfig();
-    config.routing_engine = 'v2';
+    config.routing_engine = 'v3';
     expect(() => validateConfig(config)).not.toThrow();
   });
 
   it('A) validateConfig rejects routing_engine=v1 (ROUTE-V1-PURGE / ADR-G-006)', () => {
     const config = getDefaultConfig();
-    config.routing_engine = 'v1' as 'v2';
+    config.routing_engine = 'v1' as 'v3';
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
   });
 
   it('A) validateConfig rejects invalid routing_engine value', () => {
     const config = getDefaultConfig();
-    config.routing_engine = 'v3' as 'v2';
+    config.routing_engine = 'v4' as 'v3';
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
   });
 
   it('A) routing_config is propagated to ResolvedConfig when set', async () => {
     mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
     mockedReadFile.mockResolvedValue(JSON.stringify({
-      routing_engine: 'v2',
+      routing_engine: 'v3',
       routing_config: { agentMinScore: 8, skillMinScore: 4 },
     }));
 
     const config = await loadConfig('/test/project');
-    expect(config.routing_engine).toBe('v2');
+    expect(config.routing_engine).toBe('v3');
     expect(config.routing_config?.agentMinScore).toBe(8);
     expect(config.routing_config?.skillMinScore).toBe(4);
   });

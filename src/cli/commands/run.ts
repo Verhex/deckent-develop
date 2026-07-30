@@ -673,8 +673,8 @@ export function registerRun(
 
         // WM-1b: V2 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
         try {
-          const routingVersion = cfg?.routing_engine ?? 'v2';
-          if (routingVersion === 'v2') {
+          const routingVersion = cfg?.routing_engine ?? 'v3';
+          if (routingVersion === 'v3') {
 
             const overrides: UserOverride[] = [];
             if (task.forceAgent || task.forceSkills || task.excludeSkills || task.excludeAgent) {
@@ -724,7 +724,7 @@ export function registerRun(
           preDispatchReason = 'command_build_failed';
           const agentPrompt = await resolveAgentPrompt(root, task);
           const skillPrompts = await resolveSkillPrompts(root, task);
-          const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, root);
+          const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, root, cfg);
 
           preDispatchReason = 'execution_admission_rejected';
           const spawned = await spawnWorkerMultiProvider(taskId, model, prompt, root, {

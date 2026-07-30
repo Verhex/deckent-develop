@@ -3,7 +3,7 @@
 // the durable hub files so `deckent status`, `deckent watch`, and the dashboard
 // all show the SAME "N pending, run this command" from one source of truth.
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readPendingApprovals } from '../../src/core/pending-approvals.js';
@@ -20,7 +20,9 @@ const nervousPath = (d: string) => join(d, '.deckent', 'nervous', 'nervous-pendi
 
 describe('readPendingApprovals', () => {
   it('returns [] when no pending file exists (fail-safe)', () => {
-    expect(readPendingApprovals(sandbox())).toEqual([]);
+    const d = sandbox();
+    expect(readPendingApprovals(d)).toEqual([]);
+    expect(existsSync(join(d, '.deckent', 'approvals'))).toBe(false);
   });
 
   it('reads parked nervous approvals and emits the exact accept/reject commands', () => {
@@ -85,5 +87,32 @@ describe('readPendingApprovals — autonomous (W5 cross-surface unification)', (
     writeFileSync(nervousPath(d), JSON.stringify([{ id: 'n1', title: 'T' }]));
     writeFileSync(autonomousPath(d), '{ not json');
     expect(readPendingApprovals(d).map((p) => p.kind)).toEqual(['nervous']);
+  });
+});
+
+describe('readPendingApprovals — paused run recovery', () => {
+  it('projects canonical PAUSED authority into actionable resume/finalize commands', () => {
+    const d = sandbox();
+    const sprintId = 'sprint-906';
+    writeFileSync(join(d, '.deckent', 'sprint-state.json'), JSON.stringify({
+      sprintId,
+      phase: 'EVALUATE',
+      status: 'PAUSED',
+    }));
+    writeFileSync(join(d, '.deckent', 'pause-state.json'), JSON.stringify({
+      sprintId,
+      phase: 'EVALUATE',
+      status: 'PAUSED',
+      reason: 'provider auth',
+    }));
+    writeFileSync(join(d, '.deckent', `${sprintId}-checkpoint.json`), '{}');
+
+    expect(readPendingApprovals(d)).toContainEqual({
+      kind: 'recovery',
+      id: `resume:${sprintId}`,
+      title: sprintId,
+      acceptCommand: `deckent recover ${sprintId} --resume`,
+      rejectCommand: `deckent finalize --sprint ${sprintId} --force`,
+    });
   });
 });

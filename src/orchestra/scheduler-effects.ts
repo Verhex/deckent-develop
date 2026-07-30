@@ -397,7 +397,7 @@ export async function executeSpawnTask(
   // ─── 3. Prompt / provider / backend / reasoning-effort resolution ───────
   const agentPrompt = await deps.resolveAgentPrompt(projectRoot, task);
   const skillPrompts = await deps.resolveSkillPrompts(projectRoot, task);
-  const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, projectRoot);
+  const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, projectRoot, config);
   const model = task.model;
   const writeTargets = deps.buildWriteTargets(task);
   const allowedTools = writeTargets.length > 0

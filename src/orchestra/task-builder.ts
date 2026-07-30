@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import type {
   Task, TaskScope, GoNoGoCriteria, ModelType, TaskEffort, TaskPriority,
-  PlannerTask, ProviderName, TaskResult,
+  PlannerTask, ProviderName, TaskResult, ResolvedConfig,
 } from '../core/types.js';
 import { TaskStatus, PROVIDER_MODEL_MAP } from '../core/types.js';
 import { VALID_PROVIDERS_ALL } from '../core/config.js';
@@ -1675,6 +1675,7 @@ export function buildWorkerPrompt(
   agentPrompt?: string,
   skillPrompts?: Array<{ name: string; content: string }>,
   projectRoot: string = process.cwd(),
+  effectiveConfig?: Pick<ResolvedConfig, 'prompt'>,
 ): string {
   const effort = resolveWorkerEffort(task);
 
@@ -1806,6 +1807,7 @@ export function buildWorkerPrompt(
     toolInventory,
     verifyCommands,
     toolAllowlist,
+    personaRenderMode: effectiveConfig?.prompt?.persona_render,
   };
   const artifact = buildTaskPrompt(task, ctx);
 

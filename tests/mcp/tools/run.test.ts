@@ -97,7 +97,7 @@ describe('deckent_run MCP — WM-1b routing', () => {
 
   it('sets assignedAgent and assignedSkills from routeSingleTaskV3 decision', async () => {
     vi.mocked(loadConfig).mockResolvedValue({
-      routing_engine: 'v2',
+      routing_engine: 'v3',
       spawn_backend: 'subprocess',
       execution_budget: {
         roles: { worker: { default: { maxTurns: 4 } } },
@@ -124,7 +124,7 @@ describe('deckent_run MCP — WM-1b routing', () => {
 
   it('calls routeSingleTaskV3 with the task and projectRoot (V3 signature)', async () => {
     vi.mocked(loadConfig).mockResolvedValue({
-      routing_engine: 'v2',
+      routing_engine: 'v3',
       spawn_backend: 'subprocess',
       execution_budget: {
         roles: { worker: { default: { maxTurns: 4 } } },
@@ -149,7 +149,7 @@ describe('deckent_run MCP — WM-1b routing', () => {
 
   it('falls back to generic when routeSingleTaskV3 throws (fail-safe)', async () => {
     vi.mocked(loadConfig).mockResolvedValue({
-      routing_engine: 'v2',
+      routing_engine: 'v3',
       spawn_backend: 'subprocess',
       execution_budget: {
         roles: { worker: { default: { maxTurns: 4 } } },
@@ -178,7 +178,7 @@ describe('deckent_run MCP — WM-1b routing', () => {
     // Previously this asserted routing_engine=v1 SKIPPED routeSingleTaskV3. V1 is gone,
     // so routing now always flows through routeSingleTaskV3 regardless of config.
     vi.mocked(loadConfig).mockResolvedValue({
-      routing_engine: 'v2',
+      routing_engine: 'v3',
       spawn_backend: 'subprocess',
       execution_budget: {
         roles: { worker: { default: { maxTurns: 4 } } },

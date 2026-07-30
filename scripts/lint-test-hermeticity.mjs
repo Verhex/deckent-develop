@@ -93,13 +93,13 @@ export function createScanBudget(
 }
 
 export const UNRESOLVED_BASELINE = Object.freeze({
-  count: 12136,
-  digest: '2e3fb12f2e37fa888d60b0d95038f021570677d9abf7d4e3f82b71515f1ba260',
+  count: 12142,
+  digest: 'b7764a6c7310db0db18a52c97731184bd1d208f815603ce6d4c87ee0f219ab50',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
-  count: 1156,
-  digest: 'ec0e43d4ecc65e7ad1411f025146012dd6d90958871df33acf38bd76da007229',
+  count: 1159,
+  digest: 'e500821b52b032f67188c23f038edd9716bac4d5067aa8230fcf1cb831df4067',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

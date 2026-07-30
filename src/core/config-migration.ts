@@ -102,7 +102,7 @@ function setNestedValue(obj: Record<string, unknown>, path: string, value: unkno
  * Returns a list of missing top-level field names (and `modes.<mode>.<field>` paths).
  *
  * Fields added since sprint-066 that old configs will receive on migration:
- * - routing_engine: 'v2' (routing engine version; V1 removed by ROUTE-V1-PURGE / ADR-G-006)
+ * - routing_engine: 'v3' (provider-independent vector routing)
  */
 export function getMissingFields(existing: Record<string, unknown>): string[] {
   const defaults = createDefaultConfig() as unknown as Record<string, unknown>;
@@ -160,6 +160,7 @@ export function getMissingFields(existing: Record<string, unknown>): string[] {
  */
 export function needsMigration(existing: Record<string, unknown>): boolean {
   if (hasLegacyModelConfigAliases(existing)) return true;
+  if (existing['routing_engine'] === 'v1' || existing['routing_engine'] === 'v2') return true;
   if (getMissingFields(existing).length > 0) return true;
   // Legacy mode names need migration
   const legacyModes = ['max_plan', 'max5x_plan', 'pro_plan'];
@@ -275,13 +276,12 @@ export function migrateConfig(
     }
   }
 
-  // ROUTE-V1-PURGE (ADR-G-006): rewrite the retired routing_engine 'v1' → 'v2' on
-  // disk. V1 routing is deleted and validateConfig now rejects 'v1', so a legacy
-  // value must be upgraded for the migrated file to load.
-  if (existing['routing_engine'] === 'v1') {
-    existing['routing_engine'] = 'v2';
+  // V3 cut-over: both historical labels are migrated to the sole live engine.
+  if (existing['routing_engine'] === 'v1' || existing['routing_engine'] === 'v2') {
+    const prior = existing['routing_engine'];
+    existing['routing_engine'] = 'v3';
     legacyRenamed = true;
-    renamedFields.push('routing_engine: v1 → v2');
+    renamedFields.push(`routing_engine: ${prior} → v3`);
   }
 
   // Sprint 150 Decision 3+4: Remove duplicate keys (claude_backend, flat provider fields)
@@ -417,6 +417,9 @@ export function migrateConfigInMemory(
   const canonicalized = canonicalizeModelConfigAliases(existing, 'migration').config;
   const missingFields = getMissingFields(canonicalized);
   const merged = { ...canonicalized };
+  if (merged['routing_engine'] === 'v1' || merged['routing_engine'] === 'v2') {
+    merged['routing_engine'] = 'v3';
+  }
 
   for (const field of missingFields) {
     if (field.startsWith('modes.')) {
@@ -444,6 +447,9 @@ export function migrateConfigFull(
 ): { config: DeckentConfig; addedFields: string[]; v2Changes: string[] } {
   const defaults = createDefaultConfig() as unknown as Record<string, unknown>;
   const merged = { ...existing };
+  if (merged['routing_engine'] === 'v1' || merged['routing_engine'] === 'v2') {
+    merged['routing_engine'] = 'v3';
+  }
 
   // Apply v1→v2 migration (model_strategy + providers)
   const v2Result = migrateConfigV1ToV2(merged);
