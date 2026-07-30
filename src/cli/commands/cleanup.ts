@@ -19,6 +19,30 @@ import { getMessage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import { pruneExpiredNervousPending } from '../../core/pending-approvals.js';
 import { isExecutionLockAuthorityArtifactName } from '../../core/file-lock.js';
+import {
+  readCanonicalRunStatus,
+  type CanonicalRunStatus,
+} from '../../core/run-status-authority.js';
+import { cleanupSprintMetadata } from '../../orchestra/sprint-controller.js';
+
+export function cleanupAuthorityHoldReason(
+  authority: CanonicalRunStatus,
+): string | null {
+  if (authority.active || authority.coordinator === 'alive') {
+    return 'coordinator-active';
+  }
+  if (authority.coordinator === 'unknown') {
+    return 'coordinator-ownership-unknown';
+  }
+  if (
+    authority.resumable
+    || authority.lifecycle === 'PAUSED'
+    || authority.lifecycle === 'ORPHANED'
+  ) {
+    return `run-${authority.lifecycle.toLowerCase()}`;
+  }
+  return null;
+}
 
 /** DB-first memory entry count — replaces legacy countBrainLines. */
 function getMemoryEntryCount(projectRoot: string): number {
@@ -84,6 +108,16 @@ export function registerCleanup(program: Command): void {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);
       const tasksDir = join(root, TASKS_DIR);
+      const authority = readCanonicalRunStatus(root);
+      const holdReason = cleanupAuthorityHoldReason(authority);
+      if (holdReason) {
+        printError(new Error(getMessage('cleanup.authority_hold', lang, {
+          sprintId: authority.sprintId ?? 'unknown',
+          reason: holdReason,
+        })));
+        process.exitCode = 1;
+        return;
+      }
 
       if (opts.dryRun) {
         const locksDir = join(root, LOCKS_DIR);
@@ -222,6 +256,9 @@ export function registerCleanup(program: Command): void {
         }
 
         cleanup(root, sprint);
+        // Once quiescence was proven above, retire only this run's mutable
+        // lifecycle projections. Immutable job/receipt/forensic archives stay.
+        if (sprintId) cleanupSprintMetadata(root, sprintId);
 
         // Restore .log files whose archiving failed (archive-fail → live-RETAIN per §2.4)
         for (const [liveLogPath, content] of logFilesToRestore) {

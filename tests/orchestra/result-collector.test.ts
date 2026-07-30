@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node
 import { tmpdir } from 'node:os';
 import { randomBytes } from 'node:crypto';
 
-import type { Task, Sprint, TaskResult } from '../../src/core/types.js';
+import type { Task, Sprint, TaskResult, ResolvedConfig } from '../../src/core/types.js';
 import { TaskStatus, SprintPhase, SprintStatus } from '../../src/core/types.js';
 
 // We test the timeout-detection logic in collectResults by calling waitForResults
@@ -236,6 +236,69 @@ describe('result-collector timeout detection', () => {
     expect(bRes!.selfAssessment).toBe('NO_GO');
     expect(bRes!.notes).toContain('Cascade-skipped'); // pre-fix: 'Worker timeout' (RED)
     expect(elapsed).toBeLessThan(4000);               // pre-fix: ~5000 ms (RED)
+  });
+});
+
+describe('waitForResults — repairable dependency parking', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTmpDir();
+  });
+
+  afterEach(() => {
+    try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* noop */ }
+  });
+
+  it('yields to FIX with the dependent PAUSED and no synthetic result', async () => {
+    const rootTask = makeTask('repair-root');
+    rootTask.status = TaskStatus.NO_GO;
+    const dependent = makeTask('repair-dependent');
+    dependent.status = TaskStatus.PENDING;
+    dependent.dependencies = [rootTask.id];
+    const sprint = makeSprint([rootTask, dependent]);
+    writeFileSync(
+      join(tmpDir, '.tasks', `task-${rootTask.id}.result`),
+      JSON.stringify({
+        taskId: rootTask.id,
+        workerId: `w-${rootTask.id}`,
+        filesChanged: [],
+        linesAdded: 0,
+        linesRemoved: 0,
+        testsPassed: false,
+        coverage: 0,
+        selfAssessment: 'NO_GO',
+      }),
+      'utf-8',
+    );
+    writeFileSync(
+      join(tmpDir, '.tasks', `task-${dependent.id}.json`),
+      JSON.stringify(dependent),
+      'utf-8',
+    );
+    const config = {
+      dependency_pipeline_enabled: true,
+      fix_phase_enabled: true,
+      max_fix_retries: 2,
+    } as unknown as ResolvedConfig;
+
+    const results = await waitForResults(
+      tmpDir,
+      sprint,
+      5_000,
+      undefined,
+      undefined,
+      undefined,
+      config,
+    );
+
+    expect(results.map(result => result.taskId)).toEqual([rootTask.id]);
+    expect(dependent.status).toBe(TaskStatus.PAUSED);
+    expect(existsSync(join(tmpDir, '.tasks', `task-${dependent.id}.result`))).toBe(false);
+    const persisted = JSON.parse(
+      readFileSync(join(tmpDir, '.tasks', `task-${dependent.id}.json`), 'utf-8'),
+    ) as Task;
+    expect(persisted.status).toBe(TaskStatus.PAUSED);
   });
 });
 

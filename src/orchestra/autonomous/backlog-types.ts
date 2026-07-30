@@ -98,6 +98,15 @@ export interface BacklogEntry {
       readonly authorityEvidenceRefs: readonly string[];
       readonly heldAt: string;
     };
+    /** Boot-time recovery could not prove the prior attempt dead or safe to
+     * redrive. `parked` + this evidence is the autonomous surface's typed
+     * HOLD; it prevents duplicate side effects until a recovery authority can
+     * classify the exact attempt. */
+    recoveryHold?: {
+      readonly schemaVersion: 1;
+      readonly reasonCode: 'attempt-authority-unavailable';
+      readonly heldAt: string;
+    };
   } | null;
 }
 

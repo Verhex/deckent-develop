@@ -1,5 +1,57 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-479 Learnings
+- Sprint sprint-479 Learnings: ## Sprint sprint-479 Learnings
+- Fix: CHAIN-01-ROOT — controlled NO_GO then repair: NO_GO — DECKENT_E091:coordinator-crashed-before-docker-prepare:ca33071c-ef47-43f1-9df1-395a3bfda361 | Host runtime budget eviden
+- CHAIN-01-ROOT — controlled NO_GO then repair: NO_GO — CONTROLLED_FIX_INJECTION chain-01
+Declared test exited 1 as intended: BROKEN-01 does not equal READY-01. File proof exit
+- CHAIN-02-ROOT — controlled NO_GO then repair: NO_GO — CONTROLLED_FIX_INJECTION chain-02
+Baseline: declared target files were absent, so no baseline test could run.
+TypeScript
+- CHAIN-03-ROOT — controlled NO_GO then repair: NO_GO — CONTROLLED_FIX_INJECTION chain-03
+Original attempt intentionally exports chainState = BROKEN-03 and asserts equality wit
+- CHAIN-04-ROOT — controlled NO_GO then repair: NO_GO — CONTROLLED_FIX_INJECTION chain-04. Proof passed: both declared files exist. Exact test `node --experimental-strip-types
+- CHAIN-05-ROOT — controlled NO_GO then repair: NO_GO — CONTROLLED_FIX_INJECTION chain-05
+Original task confirmed (no -fix identity, no fixForTaskId present in task-479-005.jso
+- CHAIN-06-ROOT — controlled NO_GO then repair: NO_GO — CONTROLLED_FIX_INJECTION chain-06
+Original-attempt identity confirmed (no -fix suffix, no fixForTaskId in task.json). Cr
+
+## Sprint sprint-478 Learnings
+- Sprint sprint-478 Learnings: ## Sprint sprint-478 Learnings
+- Fix: CHAIN-01-ROOT — controlled NO_GO then repair: NO_GO
+- CHAIN-01-ROOT — controlled NO_GO then repair: NO_GO — CONTROLLED_FIX_INJECTION chain-01
+Proof command exit: 0.
+Exact test command exit: 1; AssertionError: actual BROKEN-01, e
+- Fix: CHAIN-02-ROOT — controlled NO_GO then repair: NO_GO
+- CHAIN-02-ROOT — controlled NO_GO then repair: NO_GO — CONTROLLED_FIX_INJECTION chain-02
+Baseline: declared targets were absent.
+npx tsc --noEmit exit: 0.
+File proof exit: 0.
+
+- Fix: CHAIN-03-ROOT — controlled NO_GO then repair: NO_GO
+- CHAIN-03-ROOT — controlled NO_GO then repair: NO_GO — CONTROLLED_FIX_INJECTION chain-03
+Proof passed: both declared files exist.
+Exact test exited non-zero because chainState
+- Fix: CHAIN-04-ROOT — controlled NO_GO then repair: NO_GO
+- CHAIN-04-ROOT — controlled NO_GO then repair: NO_GO — CONTROLLED_FIX_INJECTION chain-04. Original attempt intentionally preserves chainState = BROKEN-04 and asserts READY-04;
+- Fix: CHAIN-05-ROOT — controlled NO_GO then repair: NO_GO
+- CHAIN-05-ROOT — controlled NO_GO then repair: NO_GO — CONTROLLED_FIX_INJECTION chain-05
+Original (non-fix) attempt for CHAIN-05-ROOT, per the attempt-aware recovery contract
+
+## Sprint sprint-477 Learnings
+- Sprint sprint-477 Learnings: ## Sprint sprint-477 Learnings
+
+## Gains
+- 477-001 — DENEME-001 — simple document and test — Verified: file-existence proof passed; npx tsc --noEmit passed; node --experimental-strip-types d...
+- 477-002 — DENEME-002 — simple document and test — Confirmed deneme/task-002 was absent before creation.
+- 477-003 — DENEME-003 — simple document and test — Verified npx tsc --noEmit, required file existence, and node --experimental-strip-types deneme/ta...
+- 477-004 — DENEME-004 — simple document and test — Verified npx tsc --noEmit, the declared Node assertion example, and required file presence.
+- 477-005 — DENEME-005 — simple document and test — Baseline: assigned paths were absent before creation.
+- 477-006 — DENEME-006 — simple document and test — Created the scoped Markdown document and passing identity assertion.
+- 477-007 — DENEME-007 — simple document and test — Baseline: deneme/task-007 did not exist before this task.
+- 477-008 — DENEME-008 — simple document and test — npx tsc --noEmit: passed.
+- …and 42 more delivered
+
 ## Sprint sprint-476 Learnings
 - Sprint sprint-476 Learnings: ## Sprint sprint-476 Learnings
 - Fix: DENEME-001 — simple document and test: NO_GO

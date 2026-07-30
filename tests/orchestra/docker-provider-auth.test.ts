@@ -41,6 +41,8 @@ vi.mock('node:fs', () => ({
   closeSync: vi.fn(),
   renameSync: vi.fn(),
   rmdirSync: vi.fn(),
+  chmodSync: vi.fn(),
+  statSync: vi.fn(() => ({ mtimeMs: 1 })),
 }));
 
 vi.mock('../../src/core/utils.js', () => ({
@@ -213,7 +215,8 @@ describe('DockerSpawnBackend: provider-aware auth mount (Sprint 203 T-002)', () 
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
-    expect(hasCredentialMount(argv, '/.claude/.credentials.json')).toBe(true);
+    expect(hasCredentialMount(argv, '/claude/.credentials.json')).toBe(true);
+    expect(argv.some(arg => arg.includes('dst=/run/deckent-auth-claude-.credentials.json'))).toBe(true);
     expect(argv.some(arg => arg.includes('/.claude,dst='))).toBe(false);
   });
 
@@ -233,7 +236,8 @@ describe('DockerSpawnBackend: provider-aware auth mount (Sprint 203 T-002)', () 
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
-    expect(hasCredentialMount(argv, '/.claude/.credentials.json')).toBe(true);
+    expect(hasCredentialMount(argv, '/claude/.credentials.json')).toBe(true);
+    expect(argv.some(arg => arg.includes('dst=/run/deckent-auth-claude-.credentials.json'))).toBe(true);
     expect(argv.some(arg => arg.includes('/.claude,dst='))).toBe(false);
   });
 

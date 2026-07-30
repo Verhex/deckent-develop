@@ -9,10 +9,10 @@ alwaysApply: false
 - All brain knowledge is in `.brain/memory.db` (SQLite) — query via MemoryStore, never parse .md files
 - ADR compliance: load ADRs from `store.getByType('adr')`, not from DECISIONS.md
 - Write patterns to DB (upsert semantics): `store.insert({ type: 'pattern', ... })`
-- Scan every 30 seconds
-- Read all heartbeat files → detect stale agents (>2min = alert)
+- Scan at the interval resolved from effective runtime policy
+- Read all heartbeat files → detect stale agents using the configured lease/heartbeat thresholds
 - Run `git diff --stat` → detect boundary violations
-- Check `.locks/` → detect stale locks (>5min)
+- Check `.locks/` → detect stale locks using the configured lock lease
 - Detect circular dependencies / deadlocks
 - Monitor usage thresholds
 - Overwrite `.dashboard` on every scan (never append)
@@ -26,12 +26,12 @@ alwaysApply: false
 ## Provider Health
 - Check provider availability during scan
 - Flag provider failures or timeouts in dashboard alerts
-- Track mixed-provider sprint status (Claude + Codex/Gemini)
+- Track heterogeneous provider/model/backend assignments without assuming a fixed provider catalog
 
-## Sprint Phase Tracking
-- Track current sprint phase in dashboard
+## Run Phase Tracking
+- Track the current run and adapter lifecycle phase in the dashboard projection
 - Alert if phase duration exceeds expected thresholds
-- Detect orphan workers from previous sprints
+- Detect orphan workers from previous runs
 
 
 ## Active ADR Constraints

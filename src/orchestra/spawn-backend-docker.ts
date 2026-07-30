@@ -8,7 +8,7 @@ import type { SpawnOptionsWithoutStdio } from 'node:child_process';
 import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSync, fsyncSync, closeSync, readdirSync, renameSync, rmdirSync, chmodSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
-import { homedir, totalmem } from 'node:os';
+import { homedir, tmpdir, totalmem } from 'node:os';
 import type { ModelType } from '../core/types.js';
 import { canonicalJson } from '../core/audit-writer.js';
 import {
@@ -269,8 +269,16 @@ const PROVIDER_AUTH_FILES: Readonly<Record<string, readonly { file: string; requ
 export interface ProviderAuthIsolation {
   mountArgs: string[];
   bootstrapLines: string[];
+  writebackLines?: string[];
   credentialCount: number;
   missingRequiredFiles: string[];
+}
+
+export interface ProviderAuthIsolationOptions {
+  /** Host-owned runtime credential broker files keyed by allowlisted filename. */
+  credentialSources?: Readonly<Record<string, string>>;
+  /** Shared host lock file serializing refresh-capable provider sessions. */
+  lockPath?: string;
 }
 
 export interface GeminiAuthSelectionBootstrap {
@@ -1411,18 +1419,28 @@ export function buildProviderAuthIsolation(
   oauthHomeDir: string | undefined,
   useApiOnly: boolean,
   fileExists: (path: string) => boolean = existsSync,
+  options: ProviderAuthIsolationOptions = {},
 ): ProviderAuthIsolation {
   if (useApiOnly || !oauthHomeDir) {
     return { mountArgs: [], bootstrapLines: [], credentialCount: 0, missingRequiredFiles: [] };
   }
   const mountArgs: string[] = [];
   const bootstrapLines: string[] = [];
+  const writebackLines: string[] = [];
   const missingRequiredFiles: string[] = [];
   let credentialCount = 0;
+  const lockTarget = `/run/deckent-auth-${provider}.lock`;
+  if (options.lockPath) {
+    mountArgs.push('--mount', `type=bind,src=${options.lockPath},dst=${lockTarget}`);
+    bootstrapLines.push('command -v flock >/dev/null 2>&1 || exit 78');
+    bootstrapLines.push(`exec 8<>"${lockTarget}" || exit 78`);
+    bootstrapLines.push('flock -x 8 || exit 78');
+  }
   for (const entry of PROVIDER_AUTH_FILES[provider] ?? []) {
     const { file } = entry;
     const hostPath = join(home, oauthHomeDir, file);
-    if (!fileExists(hostPath)) {
+    const credentialSource = options.credentialSources?.[file] ?? hostPath;
+    if (!options.credentialSources?.[file] && !fileExists(credentialSource)) {
       if (entry.required) missingRequiredFiles.push(file);
       continue;
     }
@@ -1430,13 +1448,79 @@ export function buildProviderAuthIsolation(
     const destination = `$HOME/${oauthHomeDir}/${file}`;
     // `--mount` handles Windows drive-letter colons correctly; legacy `-v
     // C:\\...:/target:ro` is ambiguous on native Windows Docker clients.
-    mountArgs.push('--mount', `type=bind,src=${hostPath},dst=${source},readonly`);
+    mountArgs.push(
+      '--mount',
+      options.credentialSources?.[file]
+        ? `type=bind,src=${credentialSource},dst=${source}`
+        : `type=bind,src=${credentialSource},dst=${source},readonly`,
+    );
     bootstrapLines.push(`mkdir -p "$HOME/${oauthHomeDir}" || exit 78`);
     bootstrapLines.push(`cp "${source}" "${destination}" || exit 78`);
     bootstrapLines.push(`chmod 600 "${destination}" || exit 78`);
+    if (options.credentialSources?.[file]) {
+      writebackLines.push(
+        `[ ! -s "${destination}" ] || cp "${destination}" "${source}" || exit 78`,
+      );
+      writebackLines.push(`chmod 600 "${source}" || exit 78`);
+    }
     credentialCount += 1;
   }
-  return { mountArgs, bootstrapLines, credentialCount, missingRequiredFiles };
+  if (writebackLines.length > 0) {
+    bootstrapLines.push('sync_provider_auth() {');
+    bootstrapLines.push(...writebackLines.map(line => `  ${line}`));
+    bootstrapLines.push('}');
+  }
+  return {
+    mountArgs,
+    bootstrapLines,
+    ...(writebackLines.length > 0 ? { writebackLines: ['sync_provider_auth'] } : {}),
+    credentialCount,
+    missingRequiredFiles,
+  };
+}
+
+/**
+ * Create a project-scoped, host-owned credential broker outside the repository.
+ *
+ * Concurrent containers share this broker under an exclusive lease, allowing
+ * refresh-token rotation to flow from one worker to the next without exposing
+ * the complete provider home. A newer explicit host login supersedes an older
+ * broker snapshot; a newer broker is retained so a stale host file cannot
+ * revoke the session mid-sprint.
+ */
+function prepareProviderAuthBroker(
+  projectDir: string,
+  home: string,
+  provider: string,
+  oauthHomeDir: string | undefined,
+): ProviderAuthIsolationOptions {
+  if (!oauthHomeDir) return {};
+  const projectKey = createHash('sha256').update(resolve(projectDir)).digest('hex').slice(0, 24);
+  const brokerDir = join(tmpdir(), 'deckent-provider-auth', projectKey, provider);
+  mkdirSync(brokerDir, { recursive: true, mode: 0o700 });
+  chmodSync(brokerDir, 0o700);
+
+  const credentialSources: Record<string, string> = {};
+  for (const entry of PROVIDER_AUTH_FILES[provider] ?? []) {
+    const hostPath = join(home, oauthHomeDir, entry.file);
+    if (!existsSync(hostPath)) continue;
+    const safeName = entry.file.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const brokerPath = join(brokerDir, safeName);
+    const hostStat = statSync(hostPath);
+    const brokerStat = existsSync(brokerPath) ? statSync(brokerPath) : null;
+    if (!brokerStat || hostStat.mtimeMs > brokerStat.mtimeMs) {
+      const tmpPath = `${brokerPath}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
+      writeFileSync(tmpPath, readFileSync(hostPath), { mode: 0o600 });
+      renameSync(tmpPath, brokerPath);
+    }
+    chmodSync(brokerPath, 0o600);
+    credentialSources[entry.file] = brokerPath;
+  }
+
+  const lockPath = join(brokerDir, 'refresh.lock');
+  if (!existsSync(lockPath)) writeFileSync(lockPath, '', { mode: 0o600 });
+  chmodSync(lockPath, 0o600);
+  return { credentialSources, lockPath };
 }
 
 /**
@@ -4734,6 +4818,14 @@ export class DockerSpawnBackend implements SpawnBackend {
         'docker',
       );
     }
+    const providerAuthBroker = useApiOnly
+      ? {}
+      : prepareProviderAuthBroker(
+          dir,
+          home,
+          providerBinary,
+          spec.oauthHomeDir ?? undefined,
+        );
     const providerAuth = buildProviderAuthIsolation(
       home,
       providerBinary,
@@ -4743,6 +4835,8 @@ export class DockerSpawnBackend implements SpawnBackend {
       // Surfaced by the row-477 ProviderName widening, but pre-existing.
       spec.oauthHomeDir ?? undefined,
       useApiOnly,
+      existsSync,
+      providerAuthBroker,
     );
     if (!useApiOnly && spec.oauthHomeDir && providerAuth.missingRequiredFiles.length > 0) {
       throw new SpawnBackendError(
@@ -4833,6 +4927,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       '    wait "$PROVIDER_PID" 2>/dev/null || true',
       '  fi',
       '  CLAUDE_EXIT=143',
+      ...(providerAuth.writebackLines ?? []).map(line => `  ${line}`),
       '  fsync_file "$RFILE"',
       '  fsync_file "$HBFILE"',
       '  exit 143',
@@ -4857,6 +4952,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       'wait "$PROVIDER_PID"',
       'CLAUDE_EXIT=$?',
       'PROVIDER_PID=""',
+      ...(providerAuth.writebackLines ?? []),
       `if [ "$CLAUDE_EXIT" -eq 124 ] || [ "$CLAUDE_EXIT" -eq 137 ]; then [ ! -f "$RFILE" ] && echo "WORKER_TIMEOUT" > "${timeoutPath}"; fi`,
       // Sprint 151: Clean up .partial-result on normal exit — on_exit/EXIT trap handles abnormal exit
       'rm -f "$PRFILE" 2>/dev/null',

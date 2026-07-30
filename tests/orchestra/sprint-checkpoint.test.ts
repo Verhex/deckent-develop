@@ -115,6 +115,31 @@ describe('writeCheckpoint + readCheckpoint', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  it('includes same-sprint dynamic FIX tasks persisted after PLAN', () => {
+    const root = makeTempDir();
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    const original = makeMinimalTask('138-001', TaskStatus.NO_GO);
+    original.sprintId = 'sprint-138';
+    const fix = makeMinimalTask('138-001-fix', TaskStatus.PENDING);
+    fix.sprintId = 'sprint-138';
+    fix.fixForTaskId = original.id;
+    writeFileSync(
+      join(root, '.tasks', 'task-138-001-fix.json'),
+      JSON.stringify(fix),
+      'utf-8',
+    );
+
+    const written = writeCheckpoint(root, makeMinimalSprint([original]), 7);
+
+    expect(written?.pendingTasks).toContain('138-001-fix');
+    expect(written?.taskStates).toContainEqual({
+      id: '138-001-fix',
+      status: TaskStatus.PENDING,
+      fixForTaskId: '138-001',
+    });
+    rmSync(root, { recursive: true, force: true });
+  });
+
   it('latest checkpoint overwrites previous (only one file)', () => {
     const root = makeTempDir();
     const sprint = makeMinimalSprint([makeMinimalTask('001', TaskStatus.DONE)]);
@@ -428,6 +453,27 @@ describe('resetInterruptedWorkersToPending + deriveResumableTaskIds (455-001)', 
     mkdirSync(join(root, '.tasks'), { recursive: true });
     return root;
   }
+
+  it('discovers a pending dynamic FIX omitted by an older v2 checkpoint', () => {
+    const root = setupRoot();
+    const fix = makeMinimalTask('455-001-fix', TaskStatus.PENDING);
+    fix.sprintId = SID;
+    fix.fixForTaskId = '455-001';
+    writeFileSync(
+      join(root, '.tasks', 'task-455-001-fix.json'),
+      JSON.stringify(fix),
+      'utf-8',
+    );
+    const checkpoint = {
+      sprintId: SID,
+      pendingTasks: [],
+      activeWorkers: [],
+      taskStates: [{ id: '455-001', status: TaskStatus.NO_GO }],
+    };
+
+    expect(deriveResumableTaskIds(root, checkpoint)).toEqual(['455-001-fix']);
+    rmSync(root, { recursive: true, force: true });
+  });
   function writeTaskJson(root: string, id: string, status: TaskStatus): void {
     writeFileSync(
       join(root, '.tasks', `task-${id}.json`),
@@ -703,6 +749,74 @@ describe('resetInterruptedWorkersToPending + deriveResumableTaskIds (455-001)', 
       expect(disposition.parkedSettlements).toEqual([
         { taskId: '455-042', state: 'invalid-settlement' },
       ]);
+    } finally {
+      if (previousDeckentHome === undefined) delete process.env.DECKENT_HOME;
+      else process.env.DECKENT_HOME = previousDeckentHome;
+      rmSync(root, { recursive: true, force: true });
+      rmSync(hostState, { recursive: true, force: true });
+    }
+  });
+
+  it('redrives a closed not-dispatched Docker attempt instead of counting recovery synthesis as task NO_GO', () => {
+    const root = setupRoot();
+    const hostState = join(tmpdir(), `deckent-host-state-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const previousDeckentHome = process.env.DECKENT_HOME;
+    process.env.DECKENT_HOME = hostState;
+    try {
+      const taskId = '455-043';
+      writeTaskJson(root, taskId, TaskStatus.EXECUTING);
+      const result = {
+        taskId,
+        workerId: `docker-recovery-${taskId}`,
+        filesChanged: [],
+        linesAdded: 0,
+        linesRemoved: 0,
+        testsPassed: false,
+        coverage: 0,
+        selfAssessment: 'NO_GO' as const,
+        notes: 'DECKENT_E091:coordinator-crashed-before-docker-prepare:44444444-4444-4444-8444-444444444444',
+      };
+      writeFileSync(
+        join(root, '.tasks', `task-${taskId}.result`),
+        JSON.stringify(result),
+        'utf-8',
+      );
+      const ref = createTaskResultSettlementRefForAttempt(
+        root,
+        taskId,
+        '44444444-4444-4444-8444-444444444444',
+      );
+      writeTaskResultSettlementAttemptAtomic(ref);
+      claimTaskResultSettlementAttemptAtomic(ref);
+      writeTaskResultSettlementAtomic(createTaskResultSettlement({
+        ref,
+        exitCode: null,
+        result,
+      }));
+      writeTaskResultSettlementClosureAtomic(ref, {
+        containerDisposition: 'not-dispatched',
+        locksReleased: true,
+      });
+      const cp = baseCp({ activeWorkers: [activeWorker(taskId)] });
+
+      expect(readResumeTaskResultAuthority(root, taskId)).toMatchObject({
+        state: 'resumable',
+        result: { taskId, selfAssessment: 'NO_GO' },
+      });
+      expect(hasValidResult(root, taskId)).toBe(false);
+      expect(deriveResumableTaskIds(root, cp)).toEqual([taskId]);
+
+      const reset = resetInterruptedWorkersToPending(root, cp);
+      expect(reset).toMatchObject({ committed: true, resetIds: [taskId] });
+      expect(existsSync(join(root, '.tasks', `task-${taskId}.result`))).toBe(false);
+      expect(existsSync(join(
+        root,
+        '.deckent',
+        'recently-works',
+        'recovery-not-dispatched',
+        `${taskId}-${ref.attemptId}.result.json`,
+      ))).toBe(true);
+      expect(statusOf(root, taskId)).toBe(TaskStatus.PENDING);
     } finally {
       if (previousDeckentHome === undefined) delete process.env.DECKENT_HOME;
       else process.env.DECKENT_HOME = previousDeckentHome;

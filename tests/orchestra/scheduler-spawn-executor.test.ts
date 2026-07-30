@@ -242,7 +242,12 @@ describe('executeSpawnTask — fix-task routing-lineage inheritance', () => {
   afterEach(() => { rmSync(root, { recursive: true, force: true }); vi.clearAllMocks(); });
 
   it('inherits forceModel/provider/modelEffort from the original when the fix-task left them unset (behavior a)', async () => {
-    const original = makeTask('700-001', { forceModel: 'claude-opus-4-8', provider: 'claude', modelEffort: 'high' });
+    const original = makeTask('700-001', {
+      forceModel: 'claude-opus-4-8',
+      provider: 'claude',
+      modelEffort: 'high',
+      type: 'code-development',
+    });
     writeOriginalTask(root, original);
 
     const fixTask = makeTask('700-001-fix', { isPriorityFix: true, fixForTaskId: '700-001' });
@@ -254,6 +259,7 @@ describe('executeSpawnTask — fix-task routing-lineage inheritance', () => {
     expect(fixTask.forceModel).toBe('claude-opus-4-8');
     expect(fixTask.provider).toBe('claude');
     expect(fixTask.modelEffort).toBe('high');
+    expect(fixTask.type).toBe('code-development');
     // reasoning-effort resolution runs AFTER inheritance, so the inherited
     // modelEffort ('high') must be what's actually sent to the backend.
     expect(backend.calls).toHaveLength(1);

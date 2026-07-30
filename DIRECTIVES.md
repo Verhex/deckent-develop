@@ -1,717 +1,248 @@
-# DIRECTIVES — Run 475: Deneme 50-Task Heterogeneous File-Creation Sprint
+# DIRECTIVES — Universal Execution Recovery Kernel · Foundation Dogfood
 
 ## Goal
-Create a root-level `deneme/` fixture tree through 50 independent tasks. Every task owns one isolated subdirectory and produces exactly one simple Markdown document plus one directly runnable TypeScript example.
+Implement the first production-grade slice of `RECOVERY-001` as one provider-neutral,
+cold-lane recovery authority shared by Sprint, Run, Flow, Do, Autonomous, Mission and
+Process. Preserve the healthy execution hot path, forbid duplicate effects, and make every
+ambiguous recovery outcome a typed HOLD.
+
+## Governing Work IDs
+- `RECOVERY-DECISION-001`
+- `RECOVERY-MODE-ADAPTERS-001`
+- `RECOVERY-COMMAND-SERVICE-001`
+- `RECOVERY-TERMINATION-001`
+- `RECOVERY-STALE-PROJECTION-001`
+- `RECOVERY-ASSURANCE-001`
+- `RECOVERY-DOGFOOD-BORN-001`
 
 ## Execution Contract
-- This sprint is intentionally provider-neutral at the product level; concrete worker provider/model values below are the current effective-config projection required by the structured planner.
-- Concurrency and worker count are resolved from effective config; they are not prescribed here.
-- Effective billing is explicitly `subscription` for every task; subscription workers are governed by provider quota evidence, not the API/USD sprint ledger.
-- Worker projection is heterogeneous: Codex Terra handles tasks 001–020, Codex Luna handles tasks 021–035, and Claude Sonnet handles tasks 036–050.
-- Claude Haiku is intentionally excluded: the active performance config has `haiku_allowed=false`, and every task writes TypeScript while the project contract restricts Haiku to documentation-only work.
-- Tasks are independent and may run in any wave/order.
-- Each task may write only its declared `deneme/task-NNN/` scope.
-- A task may replace a partial file left in its own scope by an earlier aborted run, but must not inspect or modify another task's directory.
-- No task may modify product source, configuration, memory, ADRs, lockfiles, or existing tests.
-- Every `example.ts` must use `node:assert/strict`, contain exactly one meaningful passing assertion, and be runnable by its declared Node 24 type-stripping command.
-- The owner has explicitly authorized both planning and sprint start for this run.
+- ADR-G-025 and `docs/MASTER-PLAN.md` are authority. Workers may read them but must not
+  modify MASTER, generated projections, ADRs, memory, config or DIRECTIVES.
+- Recovery is a cold lane. No task may add a repository-wide scan, provider probe,
+  synchronous process sweep or recovery lock to the healthy scheduler/dispatch tick.
+- `executionId + generation + attemptId + leaseFence + processIdentity + settlement`
+  is the recovery identity. Dashboard, PID, heartbeat, task files and job files are evidence
+  projections, never independent state authorities.
+- Unknown ownership, missing settlement, PID reuse, generation conflict and ambiguous
+  process liveness produce typed HOLD. They never silently replay a provider, filesystem,
+  ERP, payment or connector side effect.
+- All public types and decisions are provider-, model-, surface- and language-neutral.
+- All user-facing text uses the existing i18n message authority. Mechanism modules remain
+  string-free.
+- Cross-platform behavior is expressed through explicit platform/process adapters; Linux-only
+  behavior must not masquerade as universal support.
+- Every task must preserve existing behavior outside its declared files and dependencies.
+- Every test is hermetic, tmpdir-based and async; `spawnSync`, real provider calls and writes
+  to repository runtime authority are forbidden.
+- Dogfood findings are not silently fixed. The supervising Sol session records each new,
+  non-duplicate defect as a `RECOVERY-BORN-*` child with exact evidence before any follow-up
+  task is admitted.
+- Concrete provider/model assignments below are this run's effective-config projection, not
+  product policy. Product code must not contain these identities.
+- Worker count and concurrency are resolved from effective config with a hard ceiling of six.
 
-## Task 1: DENEME-001 — simple document and test
+## Expected Settlement
+- Eight logical tasks, with dependency-gated dispatch.
+- Task 2 starts only after Task 1 is aggregate DONE so the adapter imports one canonical
+  decision schema instead of creating a temporary duplicate.
+- Task 3 starts only after Tasks 1 and 2 are aggregate DONE.
+- Tasks 4 and 5 start only after Task 3 is aggregate DONE.
+- Task 6 starts only after Tasks 4 and 5 are aggregate DONE.
+- Task 7 starts only after Task 6 is aggregate DONE because both surfaces extend the same
+  i18n message authority.
+- Task 8 starts only after Task 7 is aggregate DONE.
+- A generated FIX belongs to the same logical task and does not increase logical task count.
+- Provider/auth/admission failure is `NOT_DISPATCHED` or provider HOLD, not worker NO_GO.
+- No MASTER outcome is marked DONE by this sprint unless its complete acceptance and truth
+  matrix is independently proven.
+
+## Task 1: RECOVERY-DECISION — canonical cold-lane decision engine
 - Provider: codex
-- Model: gpt-5.6-terra
+- Model: gpt-5.6-sol
 - Auth: subscription
-- Effort: low
-- Files: deneme/task-001/README.md, deneme/task-001/example.ts
-- Scope: deneme/task-001/
+- Effort: high
+- Files: src/core/execution-recovery.ts, tests/core/execution-recovery.test.ts
+- Scope: src/core/, tests/core/
+- Dependencies: none
 
 ### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 001` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `001`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-001/README.md && test -f deneme/task-001/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-001/example.ts`
-
-## Task 2: DENEME-002 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-002/README.md, deneme/task-002/example.ts
-- Scope: deneme/task-002/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 002` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `002`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-002/README.md && test -f deneme/task-002/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-002/example.ts`
-
-## Task 3: DENEME-003 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-003/README.md, deneme/task-003/example.ts
-- Scope: deneme/task-003/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 003` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `003`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-003/README.md && test -f deneme/task-003/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-003/example.ts`
-
-## Task 4: DENEME-004 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-004/README.md, deneme/task-004/example.ts
-- Scope: deneme/task-004/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 004` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `004`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-004/README.md && test -f deneme/task-004/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-004/example.ts`
-
-## Task 5: DENEME-005 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-005/README.md, deneme/task-005/example.ts
-- Scope: deneme/task-005/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 005` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `005`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-005/README.md && test -f deneme/task-005/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-005/example.ts`
-
-## Task 6: DENEME-006 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-006/README.md, deneme/task-006/example.ts
-- Scope: deneme/task-006/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 006` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `006`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-006/README.md && test -f deneme/task-006/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-006/example.ts`
-
-## Task 7: DENEME-007 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-007/README.md, deneme/task-007/example.ts
-- Scope: deneme/task-007/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 007` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `007`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-007/README.md && test -f deneme/task-007/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-007/example.ts`
-
-## Task 8: DENEME-008 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-008/README.md, deneme/task-008/example.ts
-- Scope: deneme/task-008/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 008` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `008`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-008/README.md && test -f deneme/task-008/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-008/example.ts`
-
-## Task 9: DENEME-009 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-009/README.md, deneme/task-009/example.ts
-- Scope: deneme/task-009/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 009` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `009`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-009/README.md && test -f deneme/task-009/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-009/example.ts`
-
-## Task 10: DENEME-010 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-010/README.md, deneme/task-010/example.ts
-- Scope: deneme/task-010/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 010` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `010`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-010/README.md && test -f deneme/task-010/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-010/example.ts`
-
-## Task 11: DENEME-011 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-011/README.md, deneme/task-011/example.ts
-- Scope: deneme/task-011/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 011` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `011`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-011/README.md && test -f deneme/task-011/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-011/example.ts`
-
-## Task 12: DENEME-012 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-012/README.md, deneme/task-012/example.ts
-- Scope: deneme/task-012/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 012` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `012`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-012/README.md && test -f deneme/task-012/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-012/example.ts`
-
-## Task 13: DENEME-013 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-013/README.md, deneme/task-013/example.ts
-- Scope: deneme/task-013/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 013` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `013`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-013/README.md && test -f deneme/task-013/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-013/example.ts`
-
-## Task 14: DENEME-014 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-014/README.md, deneme/task-014/example.ts
-- Scope: deneme/task-014/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 014` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `014`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-014/README.md && test -f deneme/task-014/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-014/example.ts`
-
-## Task 15: DENEME-015 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-015/README.md, deneme/task-015/example.ts
-- Scope: deneme/task-015/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 015` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `015`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-015/README.md && test -f deneme/task-015/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-015/example.ts`
-
-## Task 16: DENEME-016 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-016/README.md, deneme/task-016/example.ts
-- Scope: deneme/task-016/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 016` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `016`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-016/README.md && test -f deneme/task-016/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-016/example.ts`
-
-## Task 17: DENEME-017 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-017/README.md, deneme/task-017/example.ts
-- Scope: deneme/task-017/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 017` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `017`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-017/README.md && test -f deneme/task-017/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-017/example.ts`
-
-## Task 18: DENEME-018 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-018/README.md, deneme/task-018/example.ts
-- Scope: deneme/task-018/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 018` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `018`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-018/README.md && test -f deneme/task-018/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-018/example.ts`
-
-## Task 19: DENEME-019 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-019/README.md, deneme/task-019/example.ts
-- Scope: deneme/task-019/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 019` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `019`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-019/README.md && test -f deneme/task-019/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-019/example.ts`
-
-## Task 20: DENEME-020 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-terra
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-020/README.md, deneme/task-020/example.ts
-- Scope: deneme/task-020/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 020` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `020`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-020/README.md && test -f deneme/task-020/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-020/example.ts`
-
-## Task 21: DENEME-021 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-luna
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-021/README.md, deneme/task-021/example.ts
-- Scope: deneme/task-021/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 021` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `021`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-021/README.md && test -f deneme/task-021/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-021/example.ts`
-
-## Task 22: DENEME-022 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-luna
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-022/README.md, deneme/task-022/example.ts
-- Scope: deneme/task-022/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 022` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `022`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-022/README.md && test -f deneme/task-022/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-022/example.ts`
-
-## Task 23: DENEME-023 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-luna
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-023/README.md, deneme/task-023/example.ts
-- Scope: deneme/task-023/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 023` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `023`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-023/README.md && test -f deneme/task-023/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-023/example.ts`
-
-## Task 24: DENEME-024 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-luna
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-024/README.md, deneme/task-024/example.ts
-- Scope: deneme/task-024/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 024` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `024`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-024/README.md && test -f deneme/task-024/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-024/example.ts`
-
-## Task 25: DENEME-025 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-luna
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-025/README.md, deneme/task-025/example.ts
-- Scope: deneme/task-025/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 025` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `025`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-025/README.md && test -f deneme/task-025/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-025/example.ts`
-
-## Task 26: DENEME-026 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-luna
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-026/README.md, deneme/task-026/example.ts
-- Scope: deneme/task-026/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 026` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `026`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-026/README.md && test -f deneme/task-026/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-026/example.ts`
-
-## Task 27: DENEME-027 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-luna
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-027/README.md, deneme/task-027/example.ts
-- Scope: deneme/task-027/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 027` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `027`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-027/README.md && test -f deneme/task-027/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-027/example.ts`
-
-## Task 28: DENEME-028 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-luna
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-028/README.md, deneme/task-028/example.ts
-- Scope: deneme/task-028/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 028` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `028`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-028/README.md && test -f deneme/task-028/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-028/example.ts`
-
-## Task 29: DENEME-029 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-luna
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-029/README.md, deneme/task-029/example.ts
-- Scope: deneme/task-029/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 029` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `029`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-029/README.md && test -f deneme/task-029/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-029/example.ts`
-
-## Task 30: DENEME-030 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-luna
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-030/README.md, deneme/task-030/example.ts
-- Scope: deneme/task-030/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 030` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `030`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-030/README.md && test -f deneme/task-030/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-030/example.ts`
-
-## Task 31: DENEME-031 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-luna
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-031/README.md, deneme/task-031/example.ts
-- Scope: deneme/task-031/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 031` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `031`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-031/README.md && test -f deneme/task-031/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-031/example.ts`
-
-## Task 32: DENEME-032 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-luna
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-032/README.md, deneme/task-032/example.ts
-- Scope: deneme/task-032/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 032` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `032`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-032/README.md && test -f deneme/task-032/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-032/example.ts`
-
-## Task 33: DENEME-033 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-luna
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-033/README.md, deneme/task-033/example.ts
-- Scope: deneme/task-033/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 033` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `033`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-033/README.md && test -f deneme/task-033/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-033/example.ts`
-
-## Task 34: DENEME-034 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-luna
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-034/README.md, deneme/task-034/example.ts
-- Scope: deneme/task-034/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 034` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `034`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-034/README.md && test -f deneme/task-034/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-034/example.ts`
-
-## Task 35: DENEME-035 — simple document and test
-- Provider: codex
-- Model: gpt-5.6-luna
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-035/README.md, deneme/task-035/example.ts
-- Scope: deneme/task-035/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 035` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `035`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-035/README.md && test -f deneme/task-035/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-035/example.ts`
-
-## Task 36: DENEME-036 — simple document and test
+Create the provider-neutral recovery evidence and decision contract. The public API must be
+pure and deterministic, require the exact attempt/fence identity, distinguish monotonic
+progress from stale wall-clock projections, and return only the canonical decisions:
+`HEALTHY`, `STALLED`, `ORPHANED`, `NOT_DISPATCHED`, `PAUSED`, `HELD`,
+`SAFE_TO_RESUME`, `SAFE_TO_FINALIZE`.
+
+The decision must include typed reason codes, evidence references, allowed next operations,
+and a fail-closed explanation when evidence is incomplete or contradictory. Healthy input
+must take an O(1) bounded path with no filesystem, provider, process or network access.
+
+**Proof:** `test -f src/core/execution-recovery.ts && test -f tests/core/execution-recovery.test.ts`
+**Test:** `npx vitest run tests/core/execution-recovery.test.ts`
+**NO-GO:** Any provider/model literal, time-only orphan verdict, implicit replay permission,
+unbounded evidence collection or second lifecycle authority.
+
+## Task 2: RECOVERY-ADAPTER-CONTRACT — mode and platform adapter boundary
 - Provider: claude
 - Model: claude-sonnet-5
 - Auth: subscription
-- Effort: low
-- Files: deneme/task-036/README.md, deneme/task-036/example.ts
-- Scope: deneme/task-036/
+- Effort: high
+- Files: src/orchestra/execution-recovery-adapter.ts, tests/orchestra/execution-recovery-adapter.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+- Dependencies: Task 1
 
 ### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 036` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `036`. Do not modify files outside this task scope.
+Define the mode/platform adapter boundary that translates native Sprint, Run, Flow, Do,
+Autonomous, Mission and Process evidence into the canonical decision input and applies only
+explicit, fenced effects returned by the application service. Include capability declarations
+for inspect, resume, settle, abort and terminate; unsupported operations fail honestly with
+typed results.
 
-**Proof:** `test -f deneme/task-036/README.md && test -f deneme/task-036/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-036/example.ts`
+The contract must prevent adapters from inventing lifecycle state, clearing foreign authority,
+or mutating evidence during inspection. Cover POSIX, Windows-native, WSL and OCI process
+identity capabilities without pretending unsupported primitives exist.
 
-## Task 37: DENEME-037 — simple document and test
+**Proof:** `test -f src/orchestra/execution-recovery-adapter.ts && test -f tests/orchestra/execution-recovery-adapter.test.ts`
+**Test:** `npx vitest run tests/orchestra/execution-recovery-adapter.test.ts`
+**NO-GO:** Surface-specific decision enums, inspection-side writes, silent unsupported fallback
+or adapter-owned retry loops.
+
+## Task 3: RECOVERY-SERVICE — canonical inspect/resume/settle/abort service
+- Provider: codex
+- Model: gpt-5.6-sol
+- Auth: subscription
+- Effort: high
+- Files: src/orchestra/execution-recovery-service.ts, tests/orchestra/execution-recovery-service.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+- Dependencies: Task 1, Task 2
+
+### Description
+Implement the application service consuming the canonical decision engine and registered
+adapters. It must support read-only inspect plus approval/fence-bound resume, settle, abort
+and terminate operations. Every mutation uses exact execution/generation/attempt identity,
+idempotency key and lease fence; a failed continuation preserves the previous resumable
+authority.
+
+The service must separate decision from effect, produce immutable audit-ready receipts,
+refuse duplicate or out-of-order effects, and expose dependency injection seams for clock,
+process identity and persistence. Do not wire user-facing CLI text here.
+
+**Proof:** `test -f src/orchestra/execution-recovery-service.ts && test -f tests/orchestra/execution-recovery-service.test.ts`
+**Test:** `npx vitest run tests/orchestra/execution-recovery-service.test.ts`
+**NO-GO:** Direct CLI/MCP dependency, global singleton state, blind retry, mutation during
+inspect or success without durable settlement evidence.
+
+## Task 4: RECOVERY-SPRINT-ADAPTER — migrate Sprint containment to shared service
 - Provider: claude
 - Model: claude-sonnet-5
 - Auth: subscription
-- Effort: low
-- Files: deneme/task-037/README.md, deneme/task-037/example.ts
-- Scope: deneme/task-037/
+- Effort: high
+- Files: src/orchestra/recovery-adapters/sprint-recovery-adapter.ts, src/cli/commands/recover.ts, src/cli/commands/finalize.ts, src/cli/commands/cleanup.ts, tests/orchestra/sprint-recovery-adapter.test.ts, tests/cli/recover-resume.test.ts, tests/cli/finalize-orphan-normal.test.ts, tests/cli/cleanup-authority.test.ts
+- Scope: src/orchestra/recovery-adapters/, src/cli/commands/, tests/orchestra/, tests/cli/
+- Dependencies: Task 3
 
 ### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 037` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `037`. Do not modify files outside this task scope.
+Implement and wire the Sprint adapter over the existing canonical status, checkpoint, PID
+ownership and verified termination foundations. Preserve the proven SIGTERM → configured wait
+→ ownership recheck → SIGKILL → death-proof contract. Finalize and cleanup must remain HOLD
+when coordinator death or ownership is unverified.
 
-**Proof:** `test -f deneme/task-037/README.md && test -f deneme/task-037/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-037/example.ts`
+Move decision ownership into the shared service without duplicating process logic or weakening
+current CLI behavior. Existing public CLI messages remain i18n-backed.
 
-## Task 38: DENEME-038 — simple document and test
+**Proof:** `test -f src/orchestra/recovery-adapters/sprint-recovery-adapter.ts`
+**Test:** `npx vitest run tests/orchestra/sprint-recovery-adapter.test.ts tests/cli/recover-resume.test.ts tests/cli/finalize-orphan-normal.test.ts tests/cli/cleanup-authority.test.ts`
+**NO-GO:** Regression of current death-proof finalize/cleanup, PID-only identity, status
+projection becoming mutation authority or direct hardcoded user text.
+
+## Task 5: RECOVERY-RUN-ADAPTERS — RunFlow and RunJob recovery evidence
+- Provider: codex
+- Model: gpt-5.6-terra
+- Auth: subscription
+- Effort: high
+- Files: src/orchestra/recovery-adapters/run-flow-recovery-adapter.ts, src/orchestra/recovery-adapters/run-job-recovery-adapter.ts, tests/orchestra/run-flow-recovery-adapter.test.ts, tests/orchestra/run-job-recovery-adapter.test.ts
+- Scope: src/orchestra/recovery-adapters/, tests/orchestra/
+- Dependencies: Task 3
+
+### Description
+Implement read/effect adapters for durable RunFlow handles and RunJob records. Translate raw
+`DETACHED_RUNNING`, `RUNNING`, stale/dead process evidence and terminal receipts into the
+shared decision contract. A raw running flag without matching process/attempt authority must
+never become live truth or automatic replay permission.
+
+Retain forensic records and return explicit reconciliation proposals. This task must not
+bulk-mutate the current repository's historical runtime records; tests use isolated fixtures.
+
+**Proof:** `test -f src/orchestra/recovery-adapters/run-flow-recovery-adapter.ts && test -f src/orchestra/recovery-adapters/run-job-recovery-adapter.ts`
+**Test:** `npx vitest run tests/orchestra/run-flow-recovery-adapter.test.ts tests/orchestra/run-job-recovery-adapter.test.ts`
+**NO-GO:** Destructive stale-file deletion, raw-status trust, automatic provider replay or
+repository runtime-state mutation from tests.
+
+## Task 6: RECOVERY-SURFACES — CLI and MCP shared recovery commands
+- Provider: codex
+- Model: gpt-5.6-terra
+- Auth: subscription
+- Effort: high
+- Files: src/cli/commands/recover.ts, src/cli/helpers/messages.ts, src/mcp/tools/recover.ts, src/mcp/tools/index.ts, tests/cli/recover-resume.test.ts, tests/mcp/recover.test.ts, tests/mcp/tools/index.test.ts
+- Scope: src/cli/, src/mcp/, tests/cli/, tests/mcp/
+- Dependencies: Task 4, Task 5
+
+### Description
+Expose the shared service through typed inspect, resume, settle and abort operations while
+preserving the existing Sprint command compatibility. CLI and MCP must consume the same
+application service and decision schema. CLI text is fully localized; MCP returns stable
+structured fields and never re-derives lifecycle.
+
+Mutating operations require exact execution identity, expected generation/fence and explicit
+approval authority. Inspection stays read-only.
+
+**Proof:** `test -f src/mcp/tools/recover.ts && test -f tests/mcp/recover.test.ts`
+**Test:** `npx vitest run tests/cli/recover-resume.test.ts tests/mcp/recover.test.ts tests/mcp/tools/index.test.ts`
+**NO-GO:** CLI/MCP semantic divergence, surface-owned decision logic, mutation without fence,
+hardcoded natural-language output or breaking current Sprint recovery syntax.
+
+## Task 7: RECOVERY-NERVOUS — durable notification and continuation approval
 - Provider: claude
 - Model: claude-sonnet-5
 - Auth: subscription
-- Effort: low
-- Files: deneme/task-038/README.md, deneme/task-038/example.ts
-- Scope: deneme/task-038/
+- Effort: high
+- Files: src/nervous/recovery-notification.ts, src/core/pending-approvals.ts, src/cli/commands/nervous.ts, src/cli/helpers/messages.ts, tests/nervous/recovery-notification.test.ts, tests/core/pending-approvals.test.ts, tests/cli/nervous.test.ts
+- Scope: src/nervous/, src/core/, src/cli/, tests/nervous/, tests/core/, tests/cli/
+- Dependencies: Task 6
 
 ### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 038` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `038`. Do not modify files outside this task scope.
+Create durable, deduplicated Nervous notifications for `STALLED`, `ORPHANED`, `PAUSED` and
+actionable `HELD` decisions. Bind approval to execution/generation/attempt, decision digest,
+operation, expiry and single-use idempotency key. Acceptance invokes the shared recovery
+service; rejection and expiry preserve evidence and produce terminal approval state.
 
-**Proof:** `test -f deneme/task-038/README.md && test -f deneme/task-038/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-038/example.ts`
+Notifications must identify product impact, dogfood impact, root evidence and safe operations
+without exposing secrets or inventing provider availability.
 
-## Task 39: DENEME-039 — simple document and test
-- Provider: claude
-- Model: claude-sonnet-5
+**Proof:** `test -f src/nervous/recovery-notification.ts && test -f tests/nervous/recovery-notification.test.ts`
+**Test:** `npx vitest run tests/nervous/recovery-notification.test.ts tests/core/pending-approvals.test.ts tests/cli/nervous.test.ts`
+**NO-GO:** Duplicate notification storms, unbound approval, approval replay, secret leakage,
+same-provider inference or direct effect execution outside the shared service.
+
+## Task 8: RECOVERY-ASSURANCE — adversarial contract and hot-path proof
+- Provider: codex
+- Model: gpt-5.6-sol
 - Auth: subscription
-- Effort: low
-- Files: deneme/task-039/README.md, deneme/task-039/example.ts
-- Scope: deneme/task-039/
+- Effort: high
+- Files: tests/orchestra/execution-recovery-assurance.test.ts, tests/cli/recovery-lifecycle-binary.integration.test.ts, scripts/verify-recovery-hot-path.mjs
+- Scope: tests/orchestra/, tests/cli/, scripts/
+- Dependencies: Task 6, Task 7
 
 ### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 039` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `039`. Do not modify files outside this task scope.
+Build the adversarial assurance harness for auth absence, provider unreachability,
+pre-dispatch death, partial/malformed result, no-progress coordinator, ignored SIGTERM, PID
+reuse, stale dashboard, generation conflict and cleanup-during-live. Prove that healthy
+dispatch does not invoke recovery scans/probes/locks and that each failure yields one typed,
+idempotent decision without duplicate external effects.
 
-**Proof:** `test -f deneme/task-039/README.md && test -f deneme/task-039/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-039/example.ts`
+The binary integration test uses isolated tmpdirs and async subprocesses. The verification
+script is deterministic, bounded and read-only against production source.
 
-## Task 40: DENEME-040 — simple document and test
-- Provider: claude
-- Model: claude-sonnet-5
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-040/README.md, deneme/task-040/example.ts
-- Scope: deneme/task-040/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 040` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `040`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-040/README.md && test -f deneme/task-040/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-040/example.ts`
-
-## Task 41: DENEME-041 — simple document and test
-- Provider: claude
-- Model: claude-sonnet-5
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-041/README.md, deneme/task-041/example.ts
-- Scope: deneme/task-041/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 041` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `041`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-041/README.md && test -f deneme/task-041/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-041/example.ts`
-
-## Task 42: DENEME-042 — simple document and test
-- Provider: claude
-- Model: claude-sonnet-5
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-042/README.md, deneme/task-042/example.ts
-- Scope: deneme/task-042/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 042` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `042`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-042/README.md && test -f deneme/task-042/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-042/example.ts`
-
-## Task 43: DENEME-043 — simple document and test
-- Provider: claude
-- Model: claude-sonnet-5
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-043/README.md, deneme/task-043/example.ts
-- Scope: deneme/task-043/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 043` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `043`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-043/README.md && test -f deneme/task-043/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-043/example.ts`
-
-## Task 44: DENEME-044 — simple document and test
-- Provider: claude
-- Model: claude-sonnet-5
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-044/README.md, deneme/task-044/example.ts
-- Scope: deneme/task-044/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 044` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `044`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-044/README.md && test -f deneme/task-044/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-044/example.ts`
-
-## Task 45: DENEME-045 — simple document and test
-- Provider: claude
-- Model: claude-sonnet-5
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-045/README.md, deneme/task-045/example.ts
-- Scope: deneme/task-045/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 045` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `045`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-045/README.md && test -f deneme/task-045/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-045/example.ts`
-
-## Task 46: DENEME-046 — simple document and test
-- Provider: claude
-- Model: claude-sonnet-5
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-046/README.md, deneme/task-046/example.ts
-- Scope: deneme/task-046/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 046` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `046`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-046/README.md && test -f deneme/task-046/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-046/example.ts`
-
-## Task 47: DENEME-047 — simple document and test
-- Provider: claude
-- Model: claude-sonnet-5
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-047/README.md, deneme/task-047/example.ts
-- Scope: deneme/task-047/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 047` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `047`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-047/README.md && test -f deneme/task-047/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-047/example.ts`
-
-## Task 48: DENEME-048 — simple document and test
-- Provider: claude
-- Model: claude-sonnet-5
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-048/README.md, deneme/task-048/example.ts
-- Scope: deneme/task-048/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 048` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `048`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-048/README.md && test -f deneme/task-048/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-048/example.ts`
-
-## Task 49: DENEME-049 — simple document and test
-- Provider: claude
-- Model: claude-sonnet-5
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-049/README.md, deneme/task-049/example.ts
-- Scope: deneme/task-049/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 049` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `049`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-049/README.md && test -f deneme/task-049/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-049/example.ts`
-
-## Task 50: DENEME-050 — simple document and test
-- Provider: claude
-- Model: claude-sonnet-5
-- Auth: subscription
-- Effort: low
-- Files: deneme/task-050/README.md, deneme/task-050/example.ts
-- Scope: deneme/task-050/
-
-### Description
-Create only the assigned directory and files. Write a short Markdown document titled `# Deneme Task 050` and a directly runnable TypeScript example using `node:assert/strict` with one passing assertion whose identity is `050`. Do not modify files outside this task scope.
-
-**Proof:** `test -f deneme/task-050/README.md && test -f deneme/task-050/example.ts`
-**Test:** `node --experimental-strip-types deneme/task-050/example.ts`
+**Proof:** `test -f tests/orchestra/execution-recovery-assurance.test.ts && test -f tests/cli/recovery-lifecycle-binary.integration.test.ts && test -f scripts/verify-recovery-hot-path.mjs`
+**Test:** `npx vitest run tests/orchestra/execution-recovery-assurance.test.ts tests/cli/recovery-lifecycle-binary.integration.test.ts`
+**NO-GO:** Mock-only binary claim, unbounded chaos loop, repository-state mutation, provider
+call, hidden platform skip or healthy-path recovery work.

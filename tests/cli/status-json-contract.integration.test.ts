@@ -21,7 +21,14 @@
 
 import { describe, it, expect } from 'vitest';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,14 +43,26 @@ interface StatusRunResult {
   timedOut: boolean;
 }
 
-async function runRealBinaryStatus(
+async function runRealBinary(
   fakeRoot: string,
+  command: string,
   args: string[],
   timeoutMs = 10000,
 ): Promise<StatusRunResult> {
   return await new Promise<StatusRunResult>((resolve, reject) => {
-    const child = spawn(process.execPath, [DIST_ENTRY, 'status', ...args], {
+    const childEnv = { ...process.env };
+    // The subprocess is a production-binary proof, not another Vitest worker.
+    // Do not leak the runner's process-mode markers into the distributed CLI.
+    delete childEnv['VITEST'];
+    delete childEnv['VITEST_POOL_ID'];
+    delete childEnv['VITEST_WORKER_ID'];
+    delete childEnv['NODE_ENV'];
+    delete childEnv['DECKENT_TEST_HERMETICITY'];
+    delete childEnv['NODE_CHANNEL_FD'];
+    delete childEnv['NODE_CHANNEL_SERIALIZATION_MODE'];
+    const child = spawn(process.execPath, [DIST_ENTRY, command, ...args], {
       cwd: fakeRoot,
+      env: childEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -65,14 +84,82 @@ async function runRealBinaryStatus(
   });
 }
 
+function runRealBinaryStatus(
+  fakeRoot: string,
+  args: string[],
+  timeoutMs = 10000,
+): Promise<StatusRunResult> {
+  return runRealBinary(fakeRoot, 'status', args, timeoutMs);
+}
+
+function seedActiveDashboardWithoutAuthority(fakeRoot: string): void {
+  writeFileSync(
+    join(fakeRoot, '.dashboard'),
+    JSON.stringify({
+      sprint: {
+        id: 'sprint-479',
+        number: 479,
+        phase: 'EXECUTE',
+        status: 'ACTIVE',
+      },
+      agents: [{ id: 'w-479-001-fix', status: 'EXECUTING' }],
+      progress: { done: 0, active: 0, blocked: 18, total: 18 },
+      alerts: [],
+      updatedAt: new Date().toISOString(),
+    }),
+    'utf-8',
+  );
+}
+
+function seedLiveCoordinatorAuthority(fakeRoot: string): {
+  statePath: string;
+  sentinelPath: string;
+} {
+  const deckentDir = join(fakeRoot, '.deckent');
+  const pidsDir = join(deckentDir, 'pids');
+  const tasksDir = join(fakeRoot, '.tasks');
+  mkdirSync(pidsDir, { recursive: true });
+  mkdirSync(tasksDir, { recursive: true });
+
+  const sprintId = 'sprint-980';
+  const statePath = join(deckentDir, 'sprint-state.json');
+  const sentinelPath = join(tasksDir, 'task-980-001.log');
+  writeFileSync(
+    statePath,
+    JSON.stringify({
+      sprintId,
+      phase: 'EXECUTE',
+      status: 'ACTIVE',
+    }),
+    'utf-8',
+  );
+  writeFileSync(
+    join(pidsDir, `${sprintId}.pid`),
+    JSON.stringify({
+      pid: process.pid,
+      sprintId,
+      startedAt: new Date().toISOString(),
+    }),
+    'utf-8',
+  );
+  writeFileSync(sentinelPath, 'must-survive-authority-hold\n', 'utf-8');
+  return { statePath, sentinelPath };
+}
+
 // born-694: CI test jobs run on a FRESH CHECKOUT with no dist/ build artifact
 // (hermeticity contract — karpathy-discipline CUSTOM: "CI=fresh checkout").
 // This suite's entire point is the REAL compiled binary, so when dist/ is
 // absent it SKIPS loudly instead of failing; it runs locally post-build and
 // in any pipeline stage that builds first (release rehearsal, packed smoke).
 const DIST_AVAILABLE = existsSync(DIST_ENTRY);
+// The repository's default Vitest pool is `forks`. On this host, launching a
+// second Node CLI from inside that IPC child returns the correct exit code but
+// loses both captured stdio streams (the sibling worktree-binary live suite
+// exhibits the same host/runtime behavior). The distributed-binary gate runs
+// this file with `--pool=threads`; fresh-checkout/unit runs skip it honestly.
+const NESTED_FORK_RUNNER = typeof process.send === 'function';
 
-describe.skipIf(!DIST_AVAILABLE)('deckent status --json — real dist/ binary contract (433-003 / born-688)', () => {
+describe.skipIf(!DIST_AVAILABLE || NESTED_FORK_RUNNER)('deckent status --json — real dist/ binary contract (433-003 / born-688)', () => {
   it('dist/cli/entry.js is present (build artifact required for this suite)', () => {
     expect(existsSync(DIST_ENTRY)).toBe(true);
   });
@@ -114,6 +201,53 @@ describe.skipIf(!DIST_AVAILABLE)('deckent status --json — real dist/ binary co
           sprintId: null,
         },
       });
+    } finally {
+      rmSync(fakeRoot, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('real binary ignores a fresh ACTIVE dashboard when no lifecycle authority exists', async () => {
+    const fakeRoot = mkdtempSync(join(tmpdir(), 'deckent-status-json-dist-stale-'));
+    try {
+      seedActiveDashboardWithoutAuthority(fakeRoot);
+      const result = await runRealBinaryStatus(fakeRoot, ['--json']);
+
+      expect(result.timedOut).toBe(false);
+      expect(result.stderr).toBe('');
+      expect(result.code).toBe(0);
+      const parsed = JSON.parse(result.stdout.trim()) as {
+        active: boolean;
+        lifecycle: string;
+        sprint?: unknown;
+        authority: { conflicts: Array<{ surface: string; value: string }> };
+      };
+      expect(parsed).toMatchObject({ active: false, lifecycle: 'IDLE' });
+      expect(parsed.sprint).toBeUndefined();
+      expect(parsed.authority.conflicts).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          surface: 'dashboard',
+          value: 'ACTIVE-while-canonical-IDLE',
+        }),
+      ]));
+    } finally {
+      rmSync(fakeRoot, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('real binary cleanup HOLD preserves projections while coordinator authority is live', async () => {
+    const fakeRoot = mkdtempSync(join(tmpdir(), 'deckent-cleanup-dist-active-'));
+    try {
+      const { statePath, sentinelPath } = seedLiveCoordinatorAuthority(fakeRoot);
+      const stateBefore = readFileSync(statePath, 'utf-8');
+      const sentinelBefore = readFileSync(sentinelPath, 'utf-8');
+
+      const result = await runRealBinary(fakeRoot, 'cleanup', []);
+
+      expect(result.timedOut).toBe(false);
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain('coordinator-active');
+      expect(readFileSync(statePath, 'utf-8')).toBe(stateBefore);
+      expect(readFileSync(sentinelPath, 'utf-8')).toBe(sentinelBefore);
     } finally {
       rmSync(fakeRoot, { recursive: true, force: true });
     }

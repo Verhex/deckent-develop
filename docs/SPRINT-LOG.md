@@ -11623,3 +11623,209 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 476-050: DENEME-050 — simple document and test (DONE)
 
 ---
+## Sprint 477 — sprint-477
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-30
+**Duration:** 1076s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 50 |
+| Completed | 50 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1075585ms |
+
+### Tasks
+
+- 477-001: DENEME-001 — simple document and test (DONE)
+- 477-002: DENEME-002 — simple document and test (DONE)
+- 477-003: DENEME-003 — simple document and test (DONE)
+- 477-004: DENEME-004 — simple document and test (DONE)
+- 477-005: DENEME-005 — simple document and test (DONE)
+- 477-006: DENEME-006 — simple document and test (DONE)
+- 477-007: DENEME-007 — simple document and test (DONE)
+- 477-008: DENEME-008 — simple document and test (DONE)
+- 477-009: DENEME-009 — simple document and test (DONE)
+- 477-010: DENEME-010 — simple document and test (DONE)
+- 477-011: DENEME-011 — simple document and test (DONE)
+- 477-012: DENEME-012 — simple document and test (DONE)
+- 477-013: DENEME-013 — simple document and test (DONE)
+- 477-014: DENEME-014 — simple document and test (DONE)
+- 477-015: DENEME-015 — simple document and test (DONE)
+- 477-016: DENEME-016 — simple document and test (DONE)
+- 477-017: DENEME-017 — simple document and test (DONE)
+- 477-018: DENEME-018 — simple document and test (DONE)
+- 477-019: DENEME-019 — simple document and test (DONE)
+- 477-020: DENEME-020 — simple document and test (DONE)
+- 477-021: DENEME-021 — simple document and test (DONE)
+- 477-022: DENEME-022 — simple document and test (DONE)
+- 477-023: DENEME-023 — simple document and test (DONE)
+- 477-024: DENEME-024 — simple document and test (DONE)
+- 477-025: DENEME-025 — simple document and test (DONE)
+- 477-026: DENEME-026 — simple document and test (DONE)
+- 477-027: DENEME-027 — simple document and test (DONE)
+- 477-028: DENEME-028 — simple document and test (DONE)
+- 477-029: DENEME-029 — simple document and test (DONE)
+- 477-030: DENEME-030 — simple document and test (DONE)
+- 477-031: DENEME-031 — simple document and test (DONE)
+- 477-032: DENEME-032 — simple document and test (DONE)
+- 477-033: DENEME-033 — simple document and test (DONE)
+- 477-034: DENEME-034 — simple document and test (DONE)
+- 477-035: DENEME-035 — simple document and test (DONE)
+- 477-036: DENEME-036 — simple document and test (DONE)
+- 477-037: DENEME-037 — simple document and test (DONE)
+- 477-038: DENEME-038 — simple document and test (DONE)
+- 477-039: DENEME-039 — simple document and test (DONE)
+- 477-040: DENEME-040 — simple document and test (DONE)
+- 477-041: DENEME-041 — simple document and test (DONE)
+- 477-042: DENEME-042 — simple document and test (DONE)
+- 477-043: DENEME-043 — simple document and test (DONE)
+- 477-044: DENEME-044 — simple document and test (DONE)
+- 477-045: DENEME-045 — simple document and test (DONE)
+- 477-046: DENEME-046 — simple document and test (DONE)
+- 477-047: DENEME-047 — simple document and test (DONE)
+- 477-048: DENEME-048 — simple document and test (DONE)
+- 477-049: DENEME-049 — simple document and test (DONE)
+- 477-050: DENEME-050 — simple document and test (DONE)
+
+---
+## Sprint 478 — sprint-478
+
+**Status:** COMPLETE
+**Date:** 2026-07-30
+**Duration:** 403s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 18 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 18 |
+| Coverage | 0.0% |
+| Duration | 402659ms |
+
+### Tasks
+
+- 478-001-fix: Fix: CHAIN-01-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-001: CHAIN-01-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-002-fix: Fix: CHAIN-02-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-002: CHAIN-02-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-003-fix: Fix: CHAIN-03-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-003: CHAIN-03-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-004-fix: Fix: CHAIN-04-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-004: CHAIN-04-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-005-fix: Fix: CHAIN-05-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-005: CHAIN-05-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-006-fix: Fix: CHAIN-06-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-006: CHAIN-06-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-007: CHAIN-01-CONSUMER — consume repaired root (NO_GO)
+- 478-008: CHAIN-02-CONSUMER — consume repaired root (NO_GO)
+- 478-009: CHAIN-03-CONSUMER — consume repaired root (NO_GO)
+- 478-010: CHAIN-04-CONSUMER — consume repaired root (NO_GO)
+- 478-011: CHAIN-05-CONSUMER — consume repaired root (NO_GO)
+- 478-012: CHAIN-06-CONSUMER — consume repaired root (NO_GO)
+- 478-013: CHAIN-01-VERIFIER — verify consumer (NO_GO)
+- 478-014: CHAIN-02-VERIFIER — verify consumer (NO_GO)
+- 478-015: CHAIN-03-VERIFIER — verify consumer (NO_GO)
+- 478-016: CHAIN-04-VERIFIER — verify consumer (NO_GO)
+- 478-017: CHAIN-05-VERIFIER — verify consumer (NO_GO)
+- 478-018: CHAIN-06-VERIFIER — verify consumer (NO_GO)
+
+---
+## Sprint 478 — sprint-478
+
+**Status:** COMPLETE
+**Date:** 2026-07-30
+**Duration:** 7281s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 18 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 18 |
+| Coverage | 0.0% |
+| Duration | 7280924ms |
+
+### Tasks
+
+- 478-001-fix: Fix: CHAIN-01-ROOT — controlled NO_GO then repair (DEFERRED)
+- 478-001: CHAIN-01-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-002-fix: Fix: CHAIN-02-ROOT — controlled NO_GO then repair (DEFERRED)
+- 478-002: CHAIN-02-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-003-fix: Fix: CHAIN-03-ROOT — controlled NO_GO then repair (DEFERRED)
+- 478-003: CHAIN-03-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-004-fix: Fix: CHAIN-04-ROOT — controlled NO_GO then repair (DEFERRED)
+- 478-004: CHAIN-04-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-005-fix: Fix: CHAIN-05-ROOT — controlled NO_GO then repair (DEFERRED)
+- 478-005: CHAIN-05-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-006-fix: Fix: CHAIN-06-ROOT — controlled NO_GO then repair (DEFERRED)
+- 478-006: CHAIN-06-ROOT — controlled NO_GO then repair (NO_GO)
+- 478-007: CHAIN-01-CONSUMER — consume repaired root (NO_GO)
+- 478-008: CHAIN-02-CONSUMER — consume repaired root (NO_GO)
+- 478-009: CHAIN-03-CONSUMER — consume repaired root (NO_GO)
+- 478-010: CHAIN-04-CONSUMER — consume repaired root (NO_GO)
+- 478-011: CHAIN-05-CONSUMER — consume repaired root (NO_GO)
+- 478-012: CHAIN-06-CONSUMER — consume repaired root (NO_GO)
+- 478-013: CHAIN-01-VERIFIER — verify consumer (NO_GO)
+- 478-014: CHAIN-02-VERIFIER — verify consumer (NO_GO)
+- 478-015: CHAIN-03-VERIFIER — verify consumer (NO_GO)
+- 478-016: CHAIN-04-VERIFIER — verify consumer (NO_GO)
+- 478-017: CHAIN-05-VERIFIER — verify consumer (NO_GO)
+- 478-018: CHAIN-06-VERIFIER — verify consumer (NO_GO)
+
+---
+## Sprint 479 — sprint-479
+
+**Status:** COMPLETE
+**Date:** 2026-07-30
+**Duration:** 5735s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 18 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 6 |
+| Coverage | NaN% |
+| Duration | 5735145ms |
+
+### Tasks
+
+- 479-001-fix: Fix: CHAIN-01-ROOT — controlled NO_GO then repair (NO_GO)
+- 479-001: CHAIN-01-ROOT — controlled NO_GO then repair (NO_GO)
+- 479-002-fix: Fix: CHAIN-02-ROOT — controlled NO_GO then repair (DEFERRED)
+- 479-002: CHAIN-02-ROOT — controlled NO_GO then repair (NO_GO)
+- 479-003-fix: Fix: CHAIN-03-ROOT — controlled NO_GO then repair (DEFERRED)
+- 479-003: CHAIN-03-ROOT — controlled NO_GO then repair (NO_GO)
+- 479-004-fix: Fix: CHAIN-04-ROOT — controlled NO_GO then repair (DEFERRED)
+- 479-004: CHAIN-04-ROOT — controlled NO_GO then repair (NO_GO)
+- 479-005-fix: Fix: CHAIN-05-ROOT — controlled NO_GO then repair (DEFERRED)
+- 479-005: CHAIN-05-ROOT — controlled NO_GO then repair (NO_GO)
+- 479-006-fix: Fix: CHAIN-06-ROOT — controlled NO_GO then repair (DEFERRED)
+- 479-006: CHAIN-06-ROOT — controlled NO_GO then repair (NO_GO)
+- 479-007: CHAIN-01-CONSUMER — consume repaired root (DEFERRED)
+- 479-008: CHAIN-02-CONSUMER — consume repaired root (DEFERRED)
+- 479-009: CHAIN-03-CONSUMER — consume repaired root (DEFERRED)
+- 479-010: CHAIN-04-CONSUMER — consume repaired root (DEFERRED)
+- 479-011: CHAIN-05-CONSUMER — consume repaired root (DEFERRED)
+- 479-012: CHAIN-06-CONSUMER — consume repaired root (DEFERRED)
+- 479-013: CHAIN-01-VERIFIER — verify consumer (DEFERRED)
+- 479-014: CHAIN-02-VERIFIER — verify consumer (DEFERRED)
+- 479-015: CHAIN-03-VERIFIER — verify consumer (DEFERRED)
+- 479-016: CHAIN-04-VERIFIER — verify consumer (DEFERRED)
+- 479-017: CHAIN-05-VERIFIER — verify consumer (DEFERRED)
+- 479-018: CHAIN-06-VERIFIER — verify consumer (DEFERRED)
+
+---

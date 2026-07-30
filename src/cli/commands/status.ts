@@ -694,6 +694,17 @@ export function buildStatusJsonSnapshot(
         : {}),
     };
   }
+  if (
+    !authority.active
+    && !authority.resumable
+    && (
+      authority.lifecycle === 'IDLE'
+      || authority.lifecycle === 'COMPLETE'
+      || authority.lifecycle === 'ABORTED'
+    )
+  ) {
+    return buildNoActiveStatusJson(root);
+  }
 
   const state = JSON.parse(readFileSync(dashPath, 'utf-8')) as DashboardState;
   const isOrphaned = isDashboardOrphaned(state, {

@@ -335,8 +335,13 @@ export function registerStatusTool(server: McpServer): void {
       const pendingApprovals = readPendingApprovals(root);
 
       const latestJob = readLatestJobState(root);
+      const canonicalHasLiveProjection =
+        authority.active
+        || authority.resumable
+        || authority.lifecycle === 'PAUSED'
+        || authority.lifecycle === 'ORPHANED';
 
-      if (!existsSync(dashPath)) {
+      if (!existsSync(dashPath) || !canonicalHasLiveProjection) {
         // Part C: when .tasks/ files are unavailable but job is COMPLETE with task data,
         // surface completed sprint results from the job file
         if (latestJob?.status === 'COMPLETE' && latestJob.tasks && latestJob.tasks.length > 0) {

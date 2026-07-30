@@ -2149,6 +2149,30 @@ export async function runEvaluatePhase(
           resolveDebt(projectRoot, `debt-${task.id}`, sprint.id);
         }
       } else {
+        // A dependency descendant parked by EXECUTE is intentionally
+        // result-less until its failed lineage has exhausted FIX/XFIX.
+        // Treating it as a worker failure here would create a phantom fix,
+        // double-count the logical task, and poison routing statistics.
+        if (task.status === TaskStatus.PAUSED) {
+          evaluations.set(task.id, TaskEvaluation.DEFERRED);
+          debugLog(
+            'runEvaluatePhase:dependency-repair-deferred',
+            `task=${task.id} parked behind repairable dependency — deferred to FIX unblock`,
+          );
+          try {
+            const sidDeferred = getCurrentSprintId(projectRoot) ?? sprint.id;
+            writeEvent(
+              projectRoot,
+              sidDeferred,
+              'brain',
+              'worker',
+              'BRAIN→WORKER:DEPENDENCY_REPAIR_DEFERRED',
+              { taskId: task.id, dependencies: task.dependencies ?? [] },
+            );
+          } catch (e) { debugLog('runEvaluatePhase:dependencyDeferredEvent', e); }
+          continue;
+        }
+
         // ─── Explicit DEFERRED skip (Sprint 192 — Task 192-009 — W-INTEGRITY I-3) ──
         // Caller has signalled this task was never dispatched and should
         // not be force-NO_GO'd here — let retro (192-010 enum surface)
@@ -3270,18 +3294,18 @@ export async function runFixPhase(
     // respawnEligibleTasks call (result-collector.ts normally invokes it
     // after every finalizeTaskResult), leaving a PENDING+dependency-
     // eligible task with no dispatch attempt ever made. This is a single
-    // safety-net pass at the very end of FIX: reuse respawnEligibleTasks
+    // safety-net wave drain at the very end of FIX: reuse respawnEligibleTasks
     // (the SAME wave mechanism spawnWorkers/EVALUATE use elsewhere — no new
     // scheduler), spawn whatever it finds still-eligible, and wait for those
     // results. If nothing is eligible this is a no-op — behavior stays
-    // byte-identical to before this block existed. Single-pass by
-    // construction: it does not loop back to re-scan after spawning. Any
-    // NEW NO_GO produced by this pass goes through the standard
-    // handleEvaluation NO_GO path (creates a normal "-fix" task on disk),
-    // picked up by a LATER sprint's FIX phase like any other NO_GO — never
-    // a second immediate respawn attempt within this call.
+    // byte-identical to before this block existed. Re-scan after every
+    // completed wave so a root→consumer→verifier chain drains in the same
+    // lifecycle. The loop is structurally bounded by the number of original
+    // tasks; each successful iteration must dispatch at least one previously
+    // PENDING/PAUSED id.
     try {
-      const postFixSpawnedIds = await respawnEligibleTasks(
+      for (let postFixWave = 1; postFixWave <= sprint.tasks.length; postFixWave++) {
+        const postFixSpawnedIds = await respawnEligibleTasks(
         projectRoot,
         sprint,
         config,
@@ -3291,8 +3315,9 @@ export async function runFixPhase(
           attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
           providerAuthority: opts?.providerAuthority,
         },
-      );
-      if (postFixSpawnedIds.length > 0) {
+        );
+        if (postFixSpawnedIds.length === 0) break;
+        {
         debugLog(
           'runFixPhase:postFixPendingScan',
           `spawned ${postFixSpawnedIds.length} previously-stalled eligible task(s): ${postFixSpawnedIds.join(', ')}`,
@@ -3347,6 +3372,7 @@ export async function runFixPhase(
           projectRoot, sidForPostFix, 'brain', 'worker',
           'BRAIN→WORKER:POSTFIX_PENDING_SCAN',
           {
+            wave: postFixWave,
             spawned: postFixSpawnedIds.length,
             taskIds: postFixSpawnedIds,
             succeeded,
@@ -3354,6 +3380,7 @@ export async function runFixPhase(
             timestamp: new Date().toISOString(),
           },
         );
+        }
       }
     } catch (e) {
       if (e instanceof ProviderExecutionIngressHoldError) throw e;

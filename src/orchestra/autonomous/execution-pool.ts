@@ -56,12 +56,31 @@ export function makeBoundedPool(maxConcurrency: number): ExecutionPool {
   };
 }
 
-/** Reset any `running` entry (interrupted by a crash) back to `pending`. */
+/**
+ * Fail-closed boot recovery for legacy autonomous entries.
+ *
+ * A `running` JSON flag does not prove that its external worker is dead. Blind
+ * `running → pending` can duplicate API/ERP/file side effects when the original
+ * attempt is still alive. Until an entry carries exact attempt authority, park
+ * it with typed HOLD evidence. Healthy/non-running entries are untouched and
+ * no recovery scan enters the execution-pool hot path.
+ */
 export function recoverBacklog(path: string): void {
   const bl = loadBacklog(path);
   let changed = false;
   for (const e of bl.entries) {
-    if (e.status === 'running') { e.status = 'pending'; changed = true; }
+    if (e.status !== 'running') continue;
+    e.status = 'parked';
+    e.lastResult = {
+      ok: false,
+      reason: 'RECOVERY_HOLD_ATTEMPT_AUTHORITY_UNAVAILABLE',
+      recoveryHold: {
+        schemaVersion: 1,
+        reasonCode: 'attempt-authority-unavailable',
+        heldAt: new Date().toISOString(),
+      },
+    };
+    changed = true;
   }
   if (changed) atomicWriteFileSync(path, JSON.stringify(bl, null, 2));
 }

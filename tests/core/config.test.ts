@@ -20,7 +20,8 @@ import { DEFAULT_MODE } from '../../src/core/constants.js';
 import { ProviderConfigAliasConflictError } from '../../src/core/provider-config-canonicalizer.js';
 
 // Mock fs modules
-vi.mock('node:fs', () => ({
+vi.mock('node:fs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:fs')>()),
   existsSync: vi.fn().mockReturnValue(false),
   statSync: vi.fn().mockReturnValue({ mtimeMs: 0 }),
 }));
@@ -1227,6 +1228,15 @@ describe('sprint config defaults', () => {
       min_unresolved_ratio_percent: 50,
     });
   });
+
+  it('default config has bounded lifecycle recovery containment', () => {
+    const config = getDefaultConfig();
+    expect(config.lifecycle_recovery).toEqual({
+      coordinator_termination_grace_ms: 5_000,
+      termination_poll_interval_ms: 100,
+      forced_termination_verify_ms: 5_000,
+    });
+  });
 });
 
 describe('rollback config defaults', () => {
@@ -1297,6 +1307,26 @@ describe('new config validation', () => {
     })).not.toThrow();
   });
 
+  it('accepts valid lifecycle recovery timings', () => {
+    expect(() => validatePartialConfig({
+      lifecycle_recovery: {
+        coordinator_termination_grace_ms: 10_000,
+        termination_poll_interval_ms: 250,
+        forced_termination_verify_ms: 10_000,
+      },
+    })).not.toThrow();
+  });
+
+  it('rejects lifecycle polling wider than its containment window', () => {
+    expect(() => validatePartialConfig({
+      lifecycle_recovery: {
+        coordinator_termination_grace_ms: 100,
+        termination_poll_interval_ms: 500,
+        forced_termination_verify_ms: 100,
+      },
+    })).toThrow(ConfigValidationError);
+  });
+
   it('rejects invalid rollback_policy', () => {
     expect(() => validatePartialConfig({ rollback_policy: 'maybe' as 'never' } as Partial<import('../../src/core/types.js').DeckentConfig>)).toThrow(ConfigValidationError);
   });
@@ -1315,7 +1345,8 @@ describe('CONFIG_METADATA', () => {
     const newFields = [
       'memory_budget', 'decay_after_sprints', 'patterns_enabled', 'project_identity_enabled',
       'scan_interval', 'heartbeat_timeout', 'boundary_enforcement',
-      'fix_phase_enabled', 'max_fix_retries', 'fix_circuit_breaker', 'rollback_policy',
+      'fix_phase_enabled', 'max_fix_retries', 'fix_circuit_breaker',
+      'lifecycle_recovery', 'rollback_policy',
     ];
     for (const field of newFields) {
       expect(CONFIG_METADATA[field]).toBeDefined();
@@ -1387,6 +1418,15 @@ describe('loadConfig resolves new fields', () => {
       enabled: true,
       max_unresolved_tasks: 5,
       min_unresolved_ratio_percent: 50,
+    });
+  });
+
+  it('resolved config includes lifecycle recovery containment from defaults', async () => {
+    const config = await loadConfig('/test/project');
+    expect(config.lifecycle_recovery).toEqual({
+      coordinator_termination_grace_ms: 5_000,
+      termination_poll_interval_ms: 100,
+      forced_termination_verify_ms: 5_000,
     });
   });
 

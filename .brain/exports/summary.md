@@ -55,6 +55,15 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-479 Learnings** (sprint-479): ## Sprint sprint-479 Learnings
+- Fix: CHAIN-01-ROOT — controlled NO_GO then repair: NO_GO — DECKENT_E091:coordinator-...
+- **Sprint sprint-478 Learnings** (sprint-478): ## Sprint sprint-478 Learnings
+- Fix: CHAIN-01-ROOT — controlled NO_GO then repair: NO_GO
+- CHAIN-01-ROOT — controlle...
+- **Sprint sprint-477 Learnings** (sprint-477): ## Sprint sprint-477 Learnings
+
+## Gains
+- 477-001 — DENEME-001 — simple document and test — Verified: file-existence...
 - **Sprint sprint-476 Learnings** (sprint-476): ## Sprint sprint-476 Learnings
 - Fix: DENEME-001 — simple document and test: NO_GO
 - DENEME-001 — simple document and...
@@ -71,90 +80,14 @@
 - TERMINAL-CANARY-AUDIT — reconcile the complete chain: GO_WITH_TECH_DEBT — TERMINAL-C...
 - **Sprint sprint-464 Learnings** (sprint-464): ## Sprint sprint-464 Learnings
 - DEPENDENCY-RELEASE-WITNESS — prove the child is born only after Task 1: NO_GO — Casc...
-- **Sprint sprint-463 Learnings** (sprint-463): ## Sprint sprint-463 Learnings
-- undefined: NO_GO
-- DEPENDENCY-RELEASE-WITNESS — prove the child is born only after T...
-- **Sprint sprint-460 Learnings** (sprint-460): ## Sprint sprint-460 Learnings
-
-## Gains
-- 460-001 — [D2] Subscription broker bypass'ını current-truth olarak raporla...
-- **Sprint sprint-459 Learnings** (sprint-459): ## Sprint sprint-459 Learnings
 
 ## Active Technical Debt
 _No active technical debt._
 
 ## Active Patterns
-- Violation pattern: stale_heartbeat
-- Violation pattern: file_outside_scope
-- Violation pattern: file_outside_scope
-- Violation pattern: file_outside_scope
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: file_outside_scope
-- Violation pattern: file_outside_scope
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: file_outside_scope
-- Violation pattern: file_outside_scope
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: file_outside_scope
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: file_outside_scope
-- Violation pattern: stale_heartbeat
-- Violation pattern: file_outside_scope
-- Violation pattern: stale_heartbeat
-- Violation pattern: file_outside_scope
-- Violation pattern: file_outside_scope
-- Violation pattern: file_outside_scope
-- Violation pattern: doc_sync_ground_truth_mismatch
-- Violation pattern: stale_heartbeat
-- Violation pattern: file_outside_scope
-- Violation pattern: stale_heartbeat
-- Violation pattern: file_outside_scope
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: doc_sync_ground_truth_mismatch
-- Violation pattern: doc_sync_ground_truth_mismatch
-- Violation pattern: doc_sync_ground_truth_mismatch
-- Violation pattern: doc_sync_ground_truth_mismatch
-- Violation pattern: file_outside_scope
-- Violation pattern: stale_heartbeat
-- Violation pattern: doc_sync_ground_truth_mismatch
-- Violation pattern: doc_sync_ground_truth_mismatch
-- Violation pattern: doc_sync_ground_truth_mismatch
-- Violation pattern: stale_heartbeat
-- Violation pattern: doc_sync_ground_truth_mismatch
-- Violation pattern: file_outside_scope
-- Violation pattern: file_outside_scope
-- Violation pattern: doc_sync_ground_truth_mismatch
-- Violation pattern: file_outside_scope
-- Violation pattern: stale_heartbeat
-- Violation pattern: file_outside_scope
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
-- Violation pattern: file_outside_scope
-- Violation pattern: doc_sync_ground_truth_mismatch
-- Violation pattern: stale_heartbeat
-- Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat (×39 sprints)
+- Violation pattern: file_outside_scope (×21 sprints)
+- Violation pattern: doc_sync_ground_truth_mismatch (×11 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 1680 | Generated: 2026-07-30_
+_Total entries: 1689 | Generated: 2026-07-30_

@@ -38,6 +38,7 @@ import type {
 } from './types.js';
 import {
   DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG,
+  DEFAULT_LIFECYCLE_RECOVERY_CONFIG,
   getAllKnownModelIds,
   PROVIDER_MODEL_MAP,
 } from './types.js';
@@ -897,6 +898,46 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  if (config.lifecycle_recovery !== undefined) {
+    const policy = config.lifecycle_recovery;
+    if (!policy || typeof policy !== 'object' || Array.isArray(policy)) {
+      errors.push('lifecycle_recovery must be an object');
+    } else {
+      const boundedMs = (
+        key: keyof typeof policy,
+        min: number,
+        max: number,
+      ): void => {
+        const value = policy[key];
+        if (
+          typeof value !== 'number'
+          || !Number.isInteger(value)
+          || value < min
+          || value > max
+        ) {
+          errors.push(`lifecycle_recovery.${key} must be an integer between ${min} and ${max}`);
+        }
+      };
+      boundedMs('coordinator_termination_grace_ms', 100, 60_000);
+      boundedMs('termination_poll_interval_ms', 10, 5_000);
+      boundedMs('forced_termination_verify_ms', 100, 60_000);
+      if (
+        typeof policy.termination_poll_interval_ms === 'number'
+        && typeof policy.coordinator_termination_grace_ms === 'number'
+        && policy.termination_poll_interval_ms > policy.coordinator_termination_grace_ms
+      ) {
+        errors.push('lifecycle_recovery.termination_poll_interval_ms must not exceed coordinator_termination_grace_ms');
+      }
+      if (
+        typeof policy.termination_poll_interval_ms === 'number'
+        && typeof policy.forced_termination_verify_ms === 'number'
+        && policy.termination_poll_interval_ms > policy.forced_termination_verify_ms
+      ) {
+        errors.push('lifecycle_recovery.termination_poll_interval_ms must not exceed forced_termination_verify_ms');
+      }
+    }
+  }
+
   // ─── Rollback config validation ────────────────────────────────────
   if (config.rollback_policy !== undefined) {
     const validPolicies = ['never', 'on_failure', 'always'] as const;
@@ -1587,6 +1628,7 @@ export function createDefaultConfig(): DeckentConfig {
     fix_phase_enabled: true,
     max_fix_retries: 2,
     fix_circuit_breaker: { ...DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG },
+    lifecycle_recovery: { ...DEFAULT_LIFECYCLE_RECOVERY_CONFIG },
     // @deprecated retained as the aspirational seed for legacy configs.
     coverage_threshold: 90,
     // Sprint 179 W2-4 — split single threshold into immutable floor +
@@ -2064,6 +2106,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     fix_phase_enabled: config.fix_phase_enabled,
     max_fix_retries: config.max_fix_retries,
     fix_circuit_breaker: config.fix_circuit_breaker,
+    lifecycle_recovery: config.lifecycle_recovery,
     // Sprint 179 W2-4: coverage gate split.
     // - hard_floor (default 50) is the immutable EVALUATE gate.
     // - aspirational (default 90) is auto-learned by the finalizer.
@@ -2744,6 +2787,12 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     type: 'object',
     default: { ...DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG },
     category: 'Sprint',
+  },
+  lifecycle_recovery: {
+    description: 'Mode-independent coordinator containment timings used by finalize and recovery.',
+    type: 'LifecycleRecoveryConfig',
+    default: { ...DEFAULT_LIFECYCLE_RECOVERY_CONFIG },
+    category: 'Lifecycle',
   },
   // ─── Rollback ───────────────────────────────────────────────────────
   rollback_policy: {

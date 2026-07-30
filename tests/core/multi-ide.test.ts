@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { acquireSprintLock, isSprintLocked, releaseSprintLock } from '../../src/core/multi-ide.js';
+import {
+  acquireSprintLock,
+  bindSprintLockToExecution,
+  isSprintLocked,
+  releaseSprintLock,
+} from '../../src/core/multi-ide.js';
 
 describe('multi-ide conflict prevention', () => {
   let tempDir: string;
@@ -102,6 +107,17 @@ describe('multi-ide conflict prevention', () => {
     expect(existsSync(join(tempDir, '.deckent', 'sprint.lock'))).toBe(true);
     releaseSprintLock(tempDir);
     expect(existsSync(join(tempDir, '.deckent', 'sprint.lock'))).toBe(false);
+  });
+
+  it('atomically binds a planning leadership lock to the canonical execution id', () => {
+    acquireSprintLock(tempDir, 'planning', 'vscode');
+
+    expect(bindSprintLockToExecution(tempDir, 'sprint-479')).toBe(true);
+
+    const raw = JSON.parse(
+      readFileSync(join(tempDir, '.deckent', 'sprint.lock'), 'utf-8'),
+    ) as { sprintId: string; pid: number };
+    expect(raw).toMatchObject({ sprintId: 'sprint-479', pid: process.pid });
   });
 
   it('releaseSprintLock only works for owning PID', () => {

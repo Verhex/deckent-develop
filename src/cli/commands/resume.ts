@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 
 import { loadConfig } from '../../core/config.js';
+import { bootstrapProviders } from '../../core/provider.js';
 import { runSprint } from '../../orchestra/brain.js';
 import {
   readCheckpoint, hasCheckpoint,
@@ -99,8 +100,9 @@ export function registerResume(program: Command): void {
     .description('Resume a sprint from its latest checkpoint')
     .option('--auto-approve', 'Auto-approve all worker actions (skip permission prompts)', false)
     .option('--dry-run', 'Show what would be resumed without actually running', false)
+    .option('--force-scope', getMessage('recover.force_scope_option', detectLang(resolveProjectRoot())), false)
     .option('--root <path>', 'Project root directory (defaults to cwd)')
-    .action(async (sprintId: string, opts: { autoApprove: boolean; dryRun: boolean; root?: string }) => {
+    .action(async (sprintId: string, opts: { autoApprove: boolean; dryRun: boolean; forceScope: boolean; root?: string }) => {
       const projectRoot = opts.root ?? resolveProjectRoot();
       const lang = detectLang(projectRoot);
 
@@ -192,11 +194,14 @@ export function registerResume(program: Command): void {
             return;
           }
           try {
+            const bootstrap = await bootstrapProviders(config, projectRoot);
             // Preserve checkpoint, sprint-state and task artifacts. runSprint
             // acquires project leadership, reconciles host-owned backend attempts
             // before restore, and must never preplan/reset parked task IDs.
             const resumed = await runSprint(projectRoot, config, {
+              connector: bootstrap.connector,
               autoApprove: opts.autoApprove,
+              acknowledgeScopePaths: opts.forceScope,
             });
             if (resumed.status !== SprintStatus.COMPLETE) {
               if (!restorePauseAuthority(pauseLease.lease)) {
@@ -359,8 +364,11 @@ export function registerResume(program: Command): void {
       }
 
       try {
+        const bootstrap = await bootstrapProviders(config, projectRoot);
         const resumed = await runSprint(projectRoot, config, {
+          connector: bootstrap.connector,
           autoApprove: opts.autoApprove,
+          acknowledgeScopePaths: opts.forceScope,
           preplannedSprint,
         });
         if (resumed.status !== SprintStatus.COMPLETE) {

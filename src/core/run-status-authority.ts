@@ -20,7 +20,13 @@ export type CanonicalRunLifecycle =
   | 'ABORTED';
 
 export interface RunStatusConflict {
-  readonly surface: 'active-marker' | 'sprint-state' | 'pause-state' | 'dashboard' | 'coordinator-pid';
+  readonly surface:
+    | 'active-marker'
+    | 'sprint-state'
+    | 'pause-state'
+    | 'dashboard'
+    | 'coordinator-pid'
+    | 'sprint-lock';
   readonly sprintId: string | null;
   readonly value: string;
 }
@@ -71,6 +77,11 @@ interface RawCoordinatorSnapshot {
   sprintId?: unknown;
   pid?: unknown;
   lastHeartbeat?: unknown;
+}
+
+interface RawSprintLock {
+  pid?: unknown;
+  sprintId?: unknown;
 }
 
 function readJson<T>(path: string): T | null {
@@ -169,11 +180,15 @@ export function readCanonicalRunStatus(
   const sprintState = readJson<RawSprintState>(join(projectRoot, SPRINT_STATE_FILE));
   const pauseState = readJson<RawPauseState>(join(projectRoot, SPRINT_PAUSE_STATE_FILE));
   const dashboard = readJson<RawDashboard>(join(projectRoot, DASHBOARD_FILE));
+  const sprintLock = readJson<RawSprintLock>(
+    join(projectRoot, DECKENT_DIR, 'sprint.lock'),
+  );
 
   const activeId = text(active?.sprintId);
   const stateId = text(sprintState?.sprintId);
   const pauseId = text(pauseState?.sprintId);
   const dashboardId = text(dashboard?.sprint?.id);
+  const sprintLockId = text(sprintLock?.sprintId);
   // sprint-state is the durable lifecycle authority written on every
   // pause/resume transition. A pause record may refine that SAME run, but a
   // stale pause from an older run must never hide the current state/marker.
@@ -210,6 +225,13 @@ export function readCanonicalRunStatus(
     if (sprintId !== id) {
       conflicts.push({ surface, sprintId: id, value });
     }
+  }
+  if (sprintLockId && sprintLockId !== 'planning' && sprintLockId !== sprintId) {
+    conflicts.push({
+      surface: 'sprint-lock',
+      sprintId: sprintLockId,
+      value: `identity-mismatch:${sprintLockId}`,
+    });
   }
   if (sprintId && coordinator !== 'alive' && activeId === sprintId) {
     conflicts.push({
@@ -326,6 +348,16 @@ export function readCanonicalRunStatus(
       coordinator,
       conflicts,
     };
+  }
+
+  const dashboardStatus = text(dashboard?.sprint?.status)
+    ?? text(dashboard?.sprint?.phase);
+  if (dashboardId && dashboardStatus && !isTerminal(dashboardStatus)) {
+    conflicts.push({
+      surface: 'dashboard',
+      sprintId: dashboardId,
+      value: `${dashboardStatus}-while-canonical-IDLE`,
+    });
   }
 
   return {

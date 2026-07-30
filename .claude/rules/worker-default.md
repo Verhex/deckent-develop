@@ -1,17 +1,17 @@
-<!-- AUTO-START -->
 ---
 paths: ["src/**","tests/**"]
 ---
+<!-- AUTO-START -->
 # Worker Rules
 - Read your task file first (`.tasks/task-XXX.json`)
-- ADRs are injected into your prompt automatically from `.brain/memory.db` — they are mandatory constraints
+- ADR constraints included in the task prompt or resolved from `.brain/memory.db` are mandatory; absence from a prompt is not permission to violate accepted ADRs
 - If you need to query project memory: relevant ADRs and past learnings are provided by Brain via MemoryStore
 - If your implementation would violate an accepted ADR → stop, write NO_GO, propose ADR amendment
 - Write execution plan to `.tasks/task-XXX.plan` before coding
 - Check `.locks/` before writing any file
 - Update heartbeat (`.tasks/task-XXX.hb`) on every file change
 - Stay within your assigned scope — do not touch files outside it
-- Run project-specific lint/build and test suite before marking done
+- Run the exact scoped verification declared by the task and effective policy; do not launch a full build or full suite unless the run explicitly permits and requires it
 - Document changes in relevant docs
 - Write result to `.tasks/task-XXX.result` with:
   - files_changed, lines_added/removed
@@ -25,10 +25,12 @@ paths: ["src/**","tests/**"]
 - Do not ignore skill instructions even if they seem overly detailed
 
 ## Verify Loop
-> **Note:** The Verify Loop is guidance for you to follow, not a hard-enforced gate. Run your project's own lint/build/test commands yourself and report results honestly.
-- Run lint/build check after code changes — fix errors (max 3 attempts; use project-specific command)
-- Run test suite after code changes — fix failures (max 3 attempts; use project-specific command)
-- If both fail after 3 attempts → write NO_GO result with error details
+> **Note:** Verification is evidence, not a self-issued verdict. Obey task scope, active-run
+> prohibitions, resource admission, and the effective bounded retry policy; report every command
+> and result honestly.
+- Run task-declared lint/type/build checks only when admitted; fix failures within the configured attempt budget
+- Run task-declared scoped tests; fix failures within the configured attempt budget
+- When the admitted verification budget is exhausted, write a typed NO_GO result with error details and executed evidence
 - If blocked by another task → write NO_GO result explaining the dependency
 
 ## Agent Context

@@ -31,6 +31,14 @@ import { join } from 'node:path';
 
 // ─── Mocks (heavy / dangerous bits only — fs + sprint-pid-manager stay REAL) ──
 
+const { mockVerifiedTerminate } = vi.hoisted(() => ({
+  mockVerifiedTerminate: vi.fn(),
+}));
+vi.mock('../../src/orchestra/sprint-pid-manager.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/orchestra/sprint-pid-manager.js')>()),
+  terminateOwnedSprintProcessAndWait: mockVerifiedTerminate,
+}));
+
 // CLI root resolution → per-test tmpdir.
 let currentRoot = '/tmp/unset';
 vi.mock('../../src/cli/helpers/process.js', async (importOriginal) => ({
@@ -147,20 +155,15 @@ async function runFinalizeCli(args: string[]): Promise<void> {
 // ─── Suite ───────────────────────────────────────────────────────────
 
 let root: string;
-let killSpy: ReturnType<typeof vi.spyOn>;
-
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'deckent-334-003-'));
   currentRoot = root;
   printed.length = 0;
   process.exitCode = undefined;
-  // Hijack process.kill so the test never signals a real process (e.g. the
-  // genuinely-alive parent pid we use as the "external owned coordinator").
-  killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+  mockVerifiedTerminate.mockReset();
 });
 
 afterEach(() => {
-  killSpy.mockRestore();
   try { rmSync(root, { recursive: true, force: true }); } catch { /* non-fatal */ }
   vi.clearAllMocks();
 });
@@ -173,13 +176,22 @@ describe('finalize (normal path) — orphan coordinator termination (334-003)', 
     const externalPid = process.ppid;
     expect(externalPid).not.toBe(process.pid);
     const pidPath = seedPid(root, externalPid);
+    mockVerifiedTerminate.mockResolvedValue({
+      action: 'terminated',
+      pid: externalPid,
+      escalation: 'sigterm',
+    });
 
     await runFinalizeCli([]); // no --force → NORMAL path
 
-    expect(killSpy).toHaveBeenCalledTimes(1);
-    expect(killSpy).toHaveBeenCalledWith(externalPid, 'SIGTERM');
+    expect(mockVerifiedTerminate).toHaveBeenCalledTimes(1);
+    expect(mockVerifiedTerminate).toHaveBeenCalledWith(
+      root,
+      SPRINT_ID,
+      expect.objectContaining({ coordinator_termination_grace_ms: 5_000 }),
+    );
     expect(existsSync(pidPath)).toBe(false); // pid file cleared
-    expect(printed.some(m => m.includes(`Terminated orphan sprint process (PID ${externalPid})`))).toBe(true);
+    expect(printed.some(m => m.includes(`Coordinator PID ${externalPid}`))).toBe(true);
     expect(process.exitCode).not.toBe(1);
   });
 
@@ -189,8 +201,8 @@ describe('finalize (normal path) — orphan coordinator termination (334-003)', 
 
     await runFinalizeCli([]);
 
-    expect(killSpy).not.toHaveBeenCalled();
-    expect(printed.some(m => m.includes('Terminated orphan sprint process'))).toBe(false);
+    expect(mockVerifiedTerminate).not.toHaveBeenCalled();
+    expect(printed.some(m => m.includes('Coordinator PID'))).toBe(false);
   });
 
   it('does NOT signal a recorded-but-dead pid', async () => {
@@ -199,11 +211,16 @@ describe('finalize (normal path) — orphan coordinator termination (334-003)', 
     const deadPid = 2147483646;
     expect(deadPid).not.toBe(process.pid);
     seedPid(root, deadPid);
+    mockVerifiedTerminate.mockResolvedValue({
+      action: 'already-stopped',
+      pid: deadPid,
+      escalation: 'none',
+    });
 
     await runFinalizeCli([]);
 
-    expect(killSpy).not.toHaveBeenCalled();
-    expect(printed.some(m => m.includes('Terminated orphan sprint process'))).toBe(false);
+    expect(mockVerifiedTerminate).toHaveBeenCalledTimes(1);
+    expect(printed.some(m => m.includes('Coordinator PID'))).toBe(false);
   });
 
   it('does nothing when no pid file is recorded', async () => {
@@ -212,7 +229,7 @@ describe('finalize (normal path) — orphan coordinator termination (334-003)', 
 
     await runFinalizeCli([]);
 
-    expect(killSpy).not.toHaveBeenCalled();
+    expect(mockVerifiedTerminate).not.toHaveBeenCalled();
   });
 
   it('--force path is byte-for-byte: it still terminates the orphan exactly once (no double-fire from the new normal block)', async () => {
@@ -220,14 +237,32 @@ describe('finalize (normal path) — orphan coordinator termination (334-003)', 
     seedCompleteSprint(root, { status: 'EXECUTING' });
     const externalPid = process.ppid;
     const pidPath = seedPid(root, externalPid);
+    mockVerifiedTerminate.mockResolvedValue({
+      action: 'terminated',
+      pid: externalPid,
+      escalation: 'sigterm',
+    });
 
     await runFinalizeCli(['--force']);
 
-    // Exactly one SIGTERM (from the --force branch); the new `!opts.force`
-    // normal block is skipped → no double termination.
-    expect(killSpy).toHaveBeenCalledTimes(1);
-    expect(killSpy).toHaveBeenCalledWith(externalPid, 'SIGTERM');
+    expect(mockVerifiedTerminate).toHaveBeenCalledTimes(1);
     expect(existsSync(pidPath)).toBe(false);
-    expect(printed.some(m => m.includes(`Terminated orphan sprint process (PID ${externalPid})`))).toBe(true);
+    expect(printed.some(m => m.includes(`Coordinator PID ${externalPid}`))).toBe(true);
+  });
+
+  it('HOLDs finalize and preserves PID authority when termination is unverified', async () => {
+    seedCompleteSprint(root, { status: 'EXECUTING' });
+    const externalPid = process.ppid;
+    const pidPath = seedPid(root, externalPid);
+    mockVerifiedTerminate.mockResolvedValue({
+      action: 'still-alive',
+      pid: externalPid,
+      escalation: 'sigkill',
+    });
+
+    await runFinalizeCli(['--force']);
+
+    expect(existsSync(pidPath)).toBe(true);
+    expect(process.exitCode).toBe(1);
   });
 });

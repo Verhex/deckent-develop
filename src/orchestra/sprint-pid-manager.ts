@@ -169,6 +169,136 @@ export interface TerminateDeps {
   kill?: (pid: number, signal: NodeJS.Signals) => void;
 }
 
+export interface VerifiedTerminateDeps extends TerminateDeps {
+  wait?: (ms: number) => Promise<void>;
+  verifyOwnership?: typeof verifySprintOwnership;
+}
+
+export interface CoordinatorTerminationPolicy {
+  readonly coordinator_termination_grace_ms: number;
+  readonly termination_poll_interval_ms: number;
+  readonly forced_termination_verify_ms: number;
+}
+
+export type VerifiedCoordinatorTermination =
+  | {
+      readonly action: 'terminated';
+      readonly pid: number;
+      readonly escalation: 'sigterm' | 'sigkill';
+    }
+  | {
+      readonly action: 'already-stopped' | 'skipped-reused' | 'ownership-unverified' | 'self';
+      readonly pid: number | null;
+      readonly escalation: 'none';
+    }
+  | {
+      readonly action: 'still-alive';
+      readonly pid: number;
+      readonly escalation: 'sigkill';
+    };
+
+async function waitForProcessExit(
+  pid: number,
+  timeoutMs: number,
+  pollIntervalMs: number,
+  isAlive: (pid: number) => boolean,
+  wait: (ms: number) => Promise<void>,
+): Promise<boolean> {
+  if (!isAlive(pid)) return true;
+  let elapsedMs = 0;
+  while (elapsedMs < timeoutMs) {
+    const sliceMs = Math.min(pollIntervalMs, timeoutMs - elapsedMs);
+    await wait(sliceMs);
+    elapsedMs += sliceMs;
+    if (!isAlive(pid)) return true;
+  }
+  return !isAlive(pid);
+}
+
+/**
+ * Ownership-fenced, bounded coordinator containment.
+ *
+ * Unlike the legacy best-effort helper below, this function does not report a
+ * successful termination merely because SIGTERM was sent. It waits for death,
+ * re-checks PID ownership before escalation, verifies SIGKILL outcome, and
+ * leaves PID authority intact on every unverified outcome so callers cannot
+ * stamp COMPLETE over a live/ambiguous process.
+ */
+export async function terminateOwnedSprintProcessAndWait(
+  root: string,
+  sprintId: string,
+  policy: CoordinatorTerminationPolicy,
+  deps: VerifiedTerminateDeps = {},
+): Promise<VerifiedCoordinatorTermination> {
+  const isAlive = deps.isAlive ?? isProcessAlive;
+  const signal = deps.kill
+    ?? ((pid: number, value: NodeJS.Signals): void => { process.kill(pid, value); });
+  const wait = deps.wait
+    ?? ((ms: number): Promise<void> => new Promise(resolve => { setTimeout(resolve, ms); }));
+  const verifyOwnership = deps.verifyOwnership ?? verifySprintOwnership;
+
+  const pid = readPid(root, sprintId);
+  if (pid === null || !isAlive(pid)) {
+    return { action: 'already-stopped', pid, escalation: 'none' };
+  }
+  if (pid === process.pid) {
+    return { action: 'self', pid, escalation: 'none' };
+  }
+
+  const initialOwnership = verifyOwnership(root, sprintId);
+  if (initialOwnership === 'reused') {
+    return { action: 'skipped-reused', pid, escalation: 'none' };
+  }
+  if (initialOwnership !== 'owned') {
+    return { action: 'ownership-unverified', pid, escalation: 'none' };
+  }
+
+  try {
+    signal(pid, 'SIGTERM');
+  } catch {
+    if (!isAlive(pid)) {
+      return { action: 'terminated', pid, escalation: 'sigterm' };
+    }
+  }
+  if (await waitForProcessExit(
+    pid,
+    policy.coordinator_termination_grace_ms,
+    policy.termination_poll_interval_ms,
+    isAlive,
+    wait,
+  )) {
+    return { action: 'terminated', pid, escalation: 'sigterm' };
+  }
+
+  // The PID may have exited and been reused during the grace window. Never
+  // escalate unless the original start-token still owns it.
+  const escalationOwnership = verifyOwnership(root, sprintId);
+  if (escalationOwnership === 'reused') {
+    return { action: 'skipped-reused', pid, escalation: 'none' };
+  }
+  if (escalationOwnership !== 'owned') {
+    return { action: 'ownership-unverified', pid, escalation: 'none' };
+  }
+
+  try {
+    signal(pid, 'SIGKILL');
+  } catch {
+    if (!isAlive(pid)) {
+      return { action: 'terminated', pid, escalation: 'sigkill' };
+    }
+  }
+  if (await waitForProcessExit(
+    pid,
+    policy.forced_termination_verify_ms,
+    policy.termination_poll_interval_ms,
+    isAlive,
+    wait,
+  )) {
+    return { action: 'terminated', pid, escalation: 'sigkill' };
+  }
+  return { action: 'still-alive', pid, escalation: 'sigkill' };
+}
+
 /**
  * P0-C (orphan-on-finalize-force, sprint-323): terminate a sprint's recorded
  * start-process when it is provably (or unprovably-but-alive) still running, so a

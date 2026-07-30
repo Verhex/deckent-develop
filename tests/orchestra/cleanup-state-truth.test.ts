@@ -76,4 +76,36 @@ describe('W0 cleanup state-truth — per-sprint display artifacts die with the s
     expect(existsSync(join(locks, 'execution-lock-authority.sentinel.json'))).toBe(true);
     expect(existsSync(join(locks, projection))).toBe(true);
   });
+
+  it("cleanup('sprint-end') clears a dead coordinator sprint.lock", () => {
+    writeFileSync(
+      join(root, '.deckent', 'sprint.lock'),
+      JSON.stringify({
+        pid: 2_147_483_647,
+        sprintId: 'sprint-999',
+        env: 'test',
+        acquiredAt: new Date().toISOString(),
+      }),
+    );
+
+    cleanup(root, makeSprint(), undefined, 'sprint-end');
+
+    expect(existsSync(join(root, '.deckent', 'sprint.lock'))).toBe(false);
+  });
+
+  it("cleanup('sprint-end') preserves another live process sprint.lock", () => {
+    writeFileSync(
+      join(root, '.deckent', 'sprint.lock'),
+      JSON.stringify({
+        pid: process.ppid,
+        sprintId: 'sprint-other',
+        env: 'test',
+        acquiredAt: new Date().toISOString(),
+      }),
+    );
+
+    cleanup(root, makeSprint(), undefined, 'sprint-end');
+
+    expect(existsSync(join(root, '.deckent', 'sprint.lock'))).toBe(true);
+  });
 });

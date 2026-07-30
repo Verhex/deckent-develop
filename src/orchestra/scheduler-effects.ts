@@ -81,8 +81,14 @@ import type { SchedulerDecision } from './scheduler-reducer.js';
 // in sprint-spawner.ts for spawnWorkers' unrelated call (initial spawn wave
 // is not one of the two executors this slice unifies).
 
-type FixRoutingField = 'forceModel' | 'provider' | 'backend' | 'modelEffort';
-const FIX_ROUTING_FIELDS: readonly FixRoutingField[] = ['forceModel', 'provider', 'backend', 'modelEffort'];
+type FixExecutionField = 'forceModel' | 'provider' | 'backend' | 'modelEffort' | 'type';
+const FIX_EXECUTION_FIELDS: readonly FixExecutionField[] = [
+  'forceModel',
+  'provider',
+  'backend',
+  'modelEffort',
+  'type',
+];
 
 interface FixRoutingLineageResult {
   missing: boolean;
@@ -120,13 +126,13 @@ function applyFixRoutingLineage(
     };
   }
 
-  const taskRecord = task as unknown as Record<FixRoutingField, unknown>;
-  const originalRecord = original as unknown as Record<FixRoutingField, unknown>;
+  const taskRecord = task as unknown as Record<FixExecutionField, unknown>;
+  const originalRecord = original as unknown as Record<FixExecutionField, unknown>;
 
-  const inherited: Partial<Record<FixRoutingField, unknown>> = {};
-  const overridden: Partial<Record<FixRoutingField, { from: unknown; to: unknown }>> = {};
+  const inherited: Partial<Record<FixExecutionField, unknown>> = {};
+  const overridden: Partial<Record<FixExecutionField, { from: unknown; to: unknown }>> = {};
 
-  for (const field of FIX_ROUTING_FIELDS) {
+  for (const field of FIX_EXECUTION_FIELDS) {
     const originalValue = originalRecord[field];
     if (originalValue === undefined) continue; // nothing pinned on the original to inherit
     const fixValue = taskRecord[field];

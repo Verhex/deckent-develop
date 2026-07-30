@@ -77,6 +77,7 @@ function buildSnapshot(opts: {
   assignedTaskIds?: Set<string>;
   collectedIds?: Set<string>;
   completedTaskIds?: string[];
+  deferTerminalDependencyFailure?: boolean;
 }): SchedulerSnapshot {
   const sprint = makeSprint(opts.tasks);
   const assignedTaskIds = opts.assignedTaskIds ?? new Set<string>();
@@ -94,6 +95,7 @@ function buildSnapshot(opts: {
     costStop: false,
     slotBudget,
     dependencyPipelineEnabled: opts.dependencyPipelineEnabled,
+    deferTerminalDependencyFailure: opts.deferTerminalDependencyFailure,
     orderedQueue: [],
     tasks: sprint.tasks.map(toSchedulerTaskSnapshot),
     assignedTaskIds,
@@ -146,6 +148,24 @@ describe('reduceSchedulerTick — direct cascade-skip', () => {
 
     expect(cascadeSkipEffects(decision).map(e => e.taskId)).toEqual(['dep']);
     expect(decision.dispositions.get('dep')).toBe('cascade-skip');
+  });
+
+  it('parks repairable dependency failures for FIX instead of terminal cascade', () => {
+    const tasks = [
+      makeTask('root', { status: TaskStatus.NO_GO }),
+      makeTask('dep', { dependencies: ['root'] }),
+    ];
+    const snapshot = buildSnapshot({
+      tasks,
+      maxWorkers: 5,
+      dependencyPipelineEnabled: true,
+      deferTerminalDependencyFailure: true,
+    });
+
+    const decision = reduceSchedulerTick(snapshot);
+
+    expect(cascadeSkipEffects(decision)).toEqual([]);
+    expect(spawnedIds(decision)).not.toContain('dep');
   });
 
   it('a healthy (DONE) upstream never produces a CascadeSkip for its dependent', () => {

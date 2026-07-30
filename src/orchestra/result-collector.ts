@@ -95,6 +95,11 @@ export function getSharedMemory(projectRoot: string, ttlMs?: number): SharedMemo
 // ─── DNA skill filtering (born-593 DNA-FILTER-STAT-CREDIT) ───────
 import { filterSkillPromptsByDNA } from './prompt-token-optimizer.js';
 import type { TaskDNA } from '../core/routing-types.js';
+import { detectProjectStack } from '../core/stack-detector.js';
+import {
+  generateProjectConventionsSkill,
+  getGeneratedContent,
+} from './temp-skill-generator.js';
 
 // ─── Agent prompt single-source resolution (ADR-048, Sprint 182 F4) ──
 import { getAgentPrompt } from '../core/agent-pool.js';
@@ -124,7 +129,7 @@ import {
 import { providerRegistry } from '../core/provider.js';
 import { loadCostConfig } from '../core/cost-config-loader.js';
 import { calculateActualCost } from '../core/cost-calculator.js';
-import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
 
 // ─── Sprint Spawner (lazy import — avoid module init cycle) ──────
 // ADR-045: respawnEligibleTasks wire — invoked at runtime only, never at
@@ -918,14 +923,31 @@ export async function resolveSkillPrompts(
       const content = await readFile(skillPath, 'utf-8');
       results.push({ name: skillId, content });
     } catch (e) {
+      if (skillId === 'project-conventions') {
+        try {
+          const generated = generateProjectConventionsSkill(detectProjectStack(projectRoot));
+          const content = getGeneratedContent(generated);
+          if (content) {
+            results.push({ name: skillId, content });
+            metric('skill.prompt_generated', 1, { skillId, taskId: task.id });
+            continue;
+          }
+        } catch (generationError) {
+          debugLog('resolveSkillPrompts:generateProjectConventions', generationError);
+        }
+      }
       // A skill assigned to the task whose SKILL.md could not be loaded is NOT
       // injected into the worker prompt — yet downstream outcome tracking still
       // credits it. Surface it (observability) rather than dropping it silently so
       // a missing/unsynced skill file is visible, not an invisible phantom credit.
       // (Phantom/typo'd ids are already stopped upstream at routing-engine's
       // forceSkills validation; this catches the residual "valid id, missing file".)
-      metric('skill.prompt_load_failed', 1, { skillId });
+      metric('skill.prompt_load_failed', 1, { skillId, taskId: task.id });
       debugLog('resolveSkillPrompts:readSkillFile', e);
+      // Outcome learning may only credit prompts actually delivered to the
+      // worker. Remove an unreadable assignment from the persisted in-memory
+      // task contract at this single resolution choke point.
+      task.assignedSkills = task.assignedSkills?.filter(id => id !== skillId);
     }
   }
 
@@ -1026,6 +1048,10 @@ export async function waitForResults(
   const taskMap = new Map(sprint.tasks.map(t => [t.id, t]));
   const collected = new Set<string>();
   const remainingQueue: Task[] = queue ? [...queue] : [];
+  const deferRepairableDependencyFailures =
+    config !== undefined
+    && config.fix_phase_enabled !== false
+    && (config.max_fix_retries ?? 2) > 0;
   const providerDispatchHolds = new Map<string, {
     kind: 'auth' | 'usage-limit';
     sourceTaskId: string;
@@ -1737,6 +1763,7 @@ export async function waitForResults(
   const cascadeSkipDeadBlocked = async (): Promise<number> => {
     let totalSkipped = 0;
     let changed = true;
+    const blockedLineageIds = new Set<string>();
     while (changed) {
       changed = false;
       const failedIds = new Set<string>();
@@ -1745,6 +1772,7 @@ export async function waitForResults(
           failedIds.add(t.id);
         }
       }
+      for (const id of blockedLineageIds) failedIds.add(id);
       if (failedIds.size === 0) break;
       for (const t of sprint.tasks) {
         if (collected.has(t.id)) continue;
@@ -1752,6 +1780,39 @@ export async function waitForResults(
         if (assignedTaskIds.has(t.id)) continue;          // not actively running
         const failedDep = (t.dependencies ?? []).find(d => failedIds.has(d));
         if (!failedDep) continue;
+        if (deferRepairableDependencyFailures) {
+          t.status = TaskStatus.PAUSED;
+          blockedLineageIds.add(t.id);
+          const taskPath = join(projectRoot, TASKS_DIR, `task-${t.id}.json`);
+          const tmpPath = `${taskPath}.dependency-paused.tmp`;
+          try {
+            writeFileSync(tmpPath, JSON.stringify(t, null, 2), 'utf-8');
+            renameSync(tmpPath, taskPath);
+          } catch (e) {
+            debugLog('cascadeSkipDeadBlocked:park', e);
+            try {
+              if (existsSync(tmpPath)) unlinkSync(tmpPath);
+            } catch { /* best-effort temp cleanup */ }
+            throw e;
+          }
+          try {
+            writeEvent(
+              projectRoot,
+              sprint.id,
+              'brain',
+              'worker',
+              'BRAIN→WORKER:DEPENDENCY_REPAIR_PENDING',
+              { taskId: t.id, failedDependencyId: failedDep, status: TaskStatus.PAUSED },
+            );
+          } catch (e) { debugLog('cascadeSkipDeadBlocked:parkEvent', e); }
+          totalSkipped++;
+          changed = true;
+          debugLog(
+            'cascadeSkipDeadBlocked',
+            `task ${t.id} parked pending repair of dependency lineage ${failedDep}`,
+          );
+          continue;
+        }
         const skip: TaskResult = {
           taskId: t.id,
           workerId: `w-${t.id}`,
@@ -1792,6 +1853,23 @@ export async function waitForResults(
     return totalSkipped;
   };
 
+  /**
+   * EXECUTE must yield to EVALUATE/FIX once every unfinished task is parked
+   * behind a repairable dependency. Waiting for result count equality would
+   * deadlock because parked tasks intentionally have no synthetic result.
+   */
+  const shouldYieldToDependencyRepair = (): boolean => {
+    if (!deferRepairableDependencyFailures) return false;
+    const unfinished = sprint.tasks.filter(task => !collected.has(task.id));
+    if (unfinished.length === 0) return false;
+    if (!unfinished.every(task => task.status === TaskStatus.PAUSED)) return false;
+    return !sprint.tasks.some(task =>
+      task.status === TaskStatus.EXECUTING
+      || task.status === TaskStatus.CLAIMED
+      || task.status === TaskStatus.TESTING,
+    );
+  };
+
   // ─── SCHED4 (born-634/635, docs/analysis/scheduler-unify-design-2026-07-11.md
   // Sprint-4 dilimi) — full-reducer SHADOW-only observation hook. Flag-gated
   // (config.scheduler.shadow_reducer, default false); OFF is byte-identical to
@@ -1819,6 +1897,7 @@ export async function waitForResults(
         costStop: taskBudgetHold || (costGuard?.shouldStopDispatch() ?? false),
         slotBudget: Math.max(0, maxWorkers - currentlyExecuting),
         dependencyPipelineEnabled: config.dependency_pipeline_enabled === true,
+        deferTerminalDependencyFailure: deferRepairableDependencyFailures,
         sprint,
         remainingQueue,
         assignedTaskIds,
@@ -1900,6 +1979,7 @@ export async function waitForResults(
   });
   await cascadeSkipDeadBlocked();
   await finalizeShadowTick(shadowTickInitial);
+  if (shouldYieldToDependencyRepair()) return results;
   if (collected.size === taskIds.size) return results;
 
   // IPC dual-mode: register HEARTBEAT listeners for any channels in registry
@@ -2065,6 +2145,7 @@ export async function waitForResults(
         }
       }
       if (collected.size === taskIds.size) break;
+      if (shouldYieldToDependencyRepair()) break;
       // born-562 — cost-guard completion: once the guard has stopped new
       // dispatch, complete as soon as every already-dispatched (in-flight) task
       // has reported. The still-PENDING tasks were never dispatched and never

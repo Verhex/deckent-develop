@@ -272,4 +272,19 @@ describe('runRetention — combined pipeline', () => {
     expect(result.countersDeleted).toEqual([]);
     expect(existsSync(join(tmpDir, '.deckent', 'recently-works', 'sprint-150-seq'))).toBe(true);
   });
+
+  it('can defer counter cleanup until after the terminal event is emitted', () => {
+    seedSprintFile(tmpDir, 'sprint-151-events.jsonl');
+    seedSprintFile(tmpDir, 'sprint-151-seq', '63');
+
+    const result = runRetention(
+      tmpDir,
+      'sprint-151',
+      DEFAULT_RETENTION_CONFIG,
+      { deferCounterCleanup: true },
+    );
+
+    expect(result.countersDeleted).toEqual([]);
+    expect(existsSync(join(tmpDir, '.deckent', 'recently-works', 'sprint-151-seq'))).toBe(true);
+  });
 });

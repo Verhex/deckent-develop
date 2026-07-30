@@ -46,6 +46,13 @@ vi.mock('../../../src/monitor/dashboard-manager.js', () => ({
   readDashboardSafe: vi.fn(),
 }));
 
+const { mockReadCanonicalRunStatus } = vi.hoisted(() => ({
+  mockReadCanonicalRunStatus: vi.fn(),
+}));
+vi.mock('../../../src/core/run-status-authority.js', () => ({
+  readCanonicalRunStatus: mockReadCanonicalRunStatus,
+}));
+
 import { readLatestJobState } from '../../../src/mcp/tools/job-runner.js';
 import { readDashboardSafe } from '../../../src/monitor/dashboard-manager.js';
 import { getCurrentSprintId } from '../../../src/monitor/sprint-state.js';
@@ -116,6 +123,23 @@ describe('deckent_status — dependencyGraph field (Task 139-031)', () => {
     vi.clearAllMocks();
     vi.mocked(readLatestJobState).mockReturnValue(null);
     vi.mocked(getCurrentSprintId).mockReturnValue('sprint-139');
+    mockReadCanonicalRunStatus.mockImplementation(() => {
+      const sprintId = vi.mocked(getCurrentSprintId)();
+      return {
+        schemaVersion: 1,
+        lifecycle: sprintId ? 'ACTIVE' : 'IDLE',
+        active: sprintId !== null,
+        resumable: false,
+        sprintId,
+        phase: sprintId ? 'EXECUTE' : null,
+        status: sprintId ? 'ACTIVE' : null,
+        reason: null,
+        recoveryCommand: null,
+        finalizeCommand: null,
+        coordinator: sprintId ? 'alive' : 'absent',
+        conflicts: [],
+      };
+    });
 
     // Default: valid dashboard
     vi.mocked(existsSync).mockReturnValue(true);

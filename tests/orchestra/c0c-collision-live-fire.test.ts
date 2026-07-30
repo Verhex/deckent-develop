@@ -299,4 +299,26 @@ describe('spawnWorkers C0c live wire (Sprint 169 W3.1)', () => {
 
     expect(backend.calls).toEqual([]);
   });
+
+  it('allows a FIX writer after its colliding original reached terminal NO_GO', async () => {
+    const original = createTask('479-001', ['deneme/chain-01/example.ts']);
+    original.status = TaskStatus.NO_GO;
+    const fix = createTask('479-001-fix', ['deneme/chain-01/example.ts']);
+    fix.isPriorityFix = true;
+    fix.fixForTaskId = original.id;
+    persistTasks([original, fix]);
+    const sprint = makeSprint('sprint-479', [original, fix]);
+    const backend = makeMockBackend();
+
+    const origCwd = process.cwd();
+    process.chdir(testRoot);
+    try {
+      await spawnWorkers(testRoot, sprint, makeConfig(), { spawnBackend: backend });
+    } finally {
+      process.chdir(origCwd);
+    }
+
+    expect(backend.calls.map(call => call.taskId)).toEqual([fix.id]);
+    expect(fix.status).toBe(TaskStatus.EXECUTING);
+  });
 });

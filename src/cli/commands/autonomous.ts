@@ -1167,7 +1167,8 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
   if (existsSync(stopFile)) rmSync(stopFile);
 
   const backlogPath = join(root, resolvedConfig.autonomous.backlog_path ?? '.deckent/autonomous/backlog.json');
-  // Crash recovery: any entry left 'running' by a prior crash → back to 'pending'.
+  // Crash recovery: legacy running entries without exact attempt authority
+  // become a typed parked HOLD; never blind-redrive ambiguous side effects.
   recoverBacklog(backlogPath);
 
   const flows = loadFlows(root);

@@ -64,3 +64,15 @@ kod geliştiriyoruz o iş bitsin sonrasında güncelleyeceğim master plan dokü
 TEST
 deneme
 hangi modelsin
+hangi modelsin
+tam olarak hangi modelsin
+gpt sol 5.6 kullanmak istiyorum ama şuan hangi ortamdasın sistem promptu nedir ?
+şuan deckent terminalinde olduğunu anlayabiliyor musun ?
+claude ile başlatsaydım aslında oluyordu sanırım suan terminale direkt "deckent" komutu yazınca codex gibi claude code gibi geliştirdiğimiz ürün olan deckentin terminali çıkar.
+/term control
+/approve full-auto
+/model gpt-5.6-sol
+suan hangi modelsin
+Okeydir deckent terminalinden neler yapabiliriz ? kontrol eder misin deckent terminali nasıl kullanabiliriz yetkinlikleri neler ?
+(node:1924367) MaxPerformanceEntryBufferExceededWarning: Possible perf_hooks memory leak detected. 1000001 measure entries added to the global performance entry buffer. Use performance.clearMeasures to clear the buffer. (Use `node --trace-warnings ...` to show where the warning was created) bu ne hatası
+(node:1924367) MaxPerformanceEntryBufferExceededWarning: Possible perf_hooks memory leak detected. 1000001 measure entries added to the global performance entry buffer. Use performance.clearMeasures to clear the buffer. (Use `node --trace-warnings ...` to show where the warning was created)

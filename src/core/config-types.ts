@@ -803,6 +803,29 @@ export const DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG: Readonly<FixCircuitBreakerConfi
   min_unresolved_ratio_percent: 50,
 });
 
+/**
+ * Mode-independent lifecycle containment used by finalize/recovery.
+ *
+ * Values are effective-config authority: callers must not invent a separate
+ * grace/poll constant. Platform adapters may implement the signals
+ * differently, but they preserve these bounded timings and the same
+ * death-proof contract.
+ */
+export interface LifecycleRecoveryConfig {
+  /** Grace after graceful termination before escalation. */
+  coordinator_termination_grace_ms: number;
+  /** Liveness observation cadence during graceful/forced containment. */
+  termination_poll_interval_ms: number;
+  /** Bounded proof window after forced containment. */
+  forced_termination_verify_ms: number;
+}
+
+export const DEFAULT_LIFECYCLE_RECOVERY_CONFIG: Readonly<LifecycleRecoveryConfig> = Object.freeze({
+  coordinator_termination_grace_ms: 5_000,
+  termination_poll_interval_ms: 100,
+  forced_termination_verify_ms: 5_000,
+});
+
 export interface DeckentConfig {
   mode: PlanMode;
   modes: Record<string, PlanModeConfig>;
@@ -1165,6 +1188,8 @@ export interface DeckentConfig {
   max_fix_retries?: number;
   /** Post-FIX logical-task circuit breaker. */
   fix_circuit_breaker?: FixCircuitBreakerConfig;
+  /** Mode-independent recovery/finalize containment timings. */
+  lifecycle_recovery?: LifecycleRecoveryConfig;
   /** AI planner subprocess timeout in milliseconds (default: 60000) */
   ai_planner_timeout?: number;
   /** @deprecated Use `coverage_aspirational` (auto-learn target) +
@@ -1755,6 +1780,8 @@ export interface ResolvedConfig {
   max_fix_retries?: number;
   /** Post-FIX logical-task circuit breaker. */
   fix_circuit_breaker?: FixCircuitBreakerConfig;
+  /** Resolved mode-independent recovery/finalize containment timings. */
+  lifecycle_recovery?: LifecycleRecoveryConfig;
   /** AI planner subprocess timeout in milliseconds (default: 60000) */
   ai_planner_timeout?: number;
   /** @deprecated Use `coverage_aspirational` + `coverage_hard_floor`.

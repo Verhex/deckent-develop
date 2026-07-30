@@ -341,6 +341,7 @@ export function runRetention(
   root: string,
   completedSprintId: string | null,
   config: Partial<SprintFileRetentionConfig> = {},
+  options: { deferCounterCleanup?: boolean } = {},
 ): RetentionResult {
   const result: RetentionResult = {
     archived: [],
@@ -351,7 +352,7 @@ export function runRetention(
   };
 
   // 1. Clean counters for completed sprint
-  if (completedSprintId) {
+  if (completedSprintId && options.deferCounterCleanup !== true) {
     result.countersDeleted = cleanupCounters(root, completedSprintId);
   }
 

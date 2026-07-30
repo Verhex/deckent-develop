@@ -16,6 +16,7 @@ import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
 export interface ResumeRecoveryProcessOptions {
   autoApprove?: boolean;
   dryRun?: boolean;
+  acknowledgeScopePaths?: boolean;
 }
 
 /**
@@ -48,6 +49,7 @@ export async function runResumeRecoveryProcess(
   const args = [entryPath, 'resume', sprintId, '--root', root];
   if (opts.autoApprove) args.push('--auto-approve');
   if (opts.dryRun) args.push('--dry-run');
+  if (opts.acknowledgeScopePaths) args.push('--force-scope');
   const spawnProcess = runtime.spawnProcess ?? spawn;
   return await new Promise<number>((resolve, reject) => {
     const child = spawnProcess(execPath, args, {
@@ -178,8 +180,9 @@ export function registerRecover(program: Command): void {
     .option('--restore-tasks', 'Roll back: restore task files from the pre-archive snapshot instead of cleaning forward (born-562)')
     .option('--resume', getMessage('recover.resume_option', registerLang))
     .option('--auto-approve', getMessage('recover.auto_approve_option', registerLang), false)
+    .option('--force-scope', getMessage('recover.force_scope_option', registerLang), false)
     .option('--json', 'Output recovery result as JSON')
-    .action(async (sprintId: string, opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; restoreTasks?: boolean; resume?: boolean; autoApprove?: boolean; json?: boolean }) => {
+    .action(async (sprintId: string, opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; restoreTasks?: boolean; resume?: boolean; autoApprove?: boolean; forceScope?: boolean; json?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);
 
@@ -198,6 +201,7 @@ export function registerRecover(program: Command): void {
           const exitCode = await runResumeRecoveryProcess(root, sprintId, {
             autoApprove: opts.autoApprove,
             dryRun: opts.dryRun,
+            acknowledgeScopePaths: opts.forceScope,
           }, {}, lang);
           if (exitCode !== 0) process.exitCode = exitCode;
           return;

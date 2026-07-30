@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "37e4573b12cd4f3457d22bd8ce9954c252d8f1d10bd406a1c5388cfe33218846"
+    "value": "61d8186f2f010c1347586333949e09a684323ef5b753922d7f4a39cc07bb4b16"
   },
   "summary": {
-    "total": 244,
-    "active": 244,
+    "total": 252,
+    "active": 252,
     "terminal": 0,
-    "receipts": 20,
+    "receipts": 21,
     "byState": {
-      "OPEN": 158,
+      "OPEN": 166,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 181,
+      "P0": 189,
       "P1": 47,
       "P2": 16
     },
@@ -41,7 +41,7 @@
       "ENTERPRISE": 1,
       "EVAL": 1,
       "EVOLUTION": 1,
-      "KERNEL": 32,
+      "KERNEL": 39,
       "LEARNING": 4,
       "OBS": 1,
       "ONBOARDING": 1,
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 42,
+      "TRUTH": 43,
       "XPLAT": 3
     }
   },
@@ -290,9 +290,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-30",
       "definitionDigest": "90234d8c92771eaf35c44a6b87d41c53bff4cd3d86f8ba7c0193327b09ba6d99",
-      "progressDigest": "8d90f812deaf45e90687a989883ca469a0ab7cba27453215f103e3e63fe53660",
+      "progressDigest": "af052bf9d28bcdb74397830b366d91a7460167985df4797e0dc6c4344d66fb93",
       "terminalClosureDigest": null
     },
     {
@@ -334,9 +334,20 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-07-30",
       "definitionDigest": "d000a7c6da2bb9eac19a3cfeaf1a1349af4dcf4b2ffb29441c634f112bab3de0",
-      "progressDigest": "8e200c2c11cffefd77231aac6ec02454571467288fb011818af75c5296d2f378",
+      "progressDigest": "516831ab3be5d408dda943dac6438000b288c4516828f2398154ef483514f057",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 235,
+      "id": "MEMORY-SURFACE-PROJECTION-001",
+      "program": "TRUTH",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-30",
+      "definitionDigest": "36a97f54170ebbb07fd05fe9aace6ae944198b7feeab24b811d440a974fecf35",
+      "progressDigest": "e496ee80b9f60f78480b8f4f76428ff47e8442dd45d8730f6b5675b3549b3b62",
       "terminalClosureDigest": null
     },
     {
@@ -1621,9 +1632,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-28",
+      "updated": "2026-07-30",
       "definitionDigest": "e3be4a7014aa705d063e1d425f18722d0d8d532135605afcc68cf7c34c0b15d6",
-      "progressDigest": "790930d85e6862913241acfd43e6da98bf85bc382ba204281f555282870f7771",
+      "progressDigest": "c18a7e9383ea927f657860dd9ca63a5b93d5c17922ef6bebbdd6f7bcc0889e84",
       "terminalClosureDigest": null
     },
     {
@@ -1646,6 +1657,83 @@
       "updated": "2026-07-30",
       "definitionDigest": "d28e2b40b71553096c9f0fc8df5e656d14e75d607fcf156abc56fcf82b87bd75",
       "progressDigest": "5a88f5da021af1c161d3956dcb3b8e39cbde7b3b4e4e0a0f34458f338624ead1",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3163,
+      "id": "RECOVERY-DECISION-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-30",
+      "definitionDigest": "d6baf02b1e771a4bd9a8ae2db9d1e2efb7d7cf056a0b543857e51e80f2cbb98f",
+      "progressDigest": "9241f0cac0b5b9136a4c080f62e0b0815807ca93f28d42d6a8c56e48ab1f331e",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3164,
+      "id": "RECOVERY-MODE-ADAPTERS-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-30",
+      "definitionDigest": "2228db76b71ae0f677add80fe8d88cbdb198451edb25002c78bc50dacaf38f29",
+      "progressDigest": "95081ae9066adab227ba8baf077441a23905b0a4812323075fd0d5cacdde51d1",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3165,
+      "id": "RECOVERY-COMMAND-SERVICE-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-30",
+      "definitionDigest": "eb2938a81f0da3f5267d4e313e4f53cbb81ef998c85029823f4bea6fe2d6accf",
+      "progressDigest": "4dfb33208813cfce08083f1dc8071deb02033734db92a7eea0d59631d8548159",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3166,
+      "id": "RECOVERY-TERMINATION-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-30",
+      "definitionDigest": "cbfbc373a66ac144043e4994e9ba6554d1399d143a86910ad0b2d08c44921475",
+      "progressDigest": "89cada68f850115e1a36661968f04dd684d8f1b89f0b0e35aac18fe461be3c78",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3167,
+      "id": "RECOVERY-STALE-PROJECTION-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-30",
+      "definitionDigest": "84621ab8444fdbc47f803238d14e7e3dc605f28dbbcb941c61c55bc47aa9015d",
+      "progressDigest": "c472e23423b6bfc658ae447bcca8b036eb0007501914e3cd6b56e7a4f34ef0a3",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3168,
+      "id": "RECOVERY-ASSURANCE-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-30",
+      "definitionDigest": "53c78c82e17ad7fade798fdf959e7ca0b5abb308fe80caafac7cb01c33ddad7e",
+      "progressDigest": "9d924ffa4d85d3a614f7b38fa8f2c1602a8996222b595d15f5f06feade5ce217",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3169,
+      "id": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-30",
+      "definitionDigest": "471131c799a8485ca429a748508eda1dc73b931c26bd6c7273ca3a6d563e2cc8",
+      "progressDigest": "2ddf1bb297486c85f96f60bf1c2b3d4332f4a6fe360f2e262fc608e60e613b6c",
       "terminalClosureDigest": null
     },
     {
@@ -2949,6 +3037,16 @@
         "transitionAt": "2026-07-30T10:53:35+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01",
+      "authorityDigest": "a159f0510af2e68e56e7dfef2d4ce7f96ddef800490be93c9712f66081f3d174",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-30T21:59:32+03:00"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -3756,6 +3854,7 @@
         "HOST-STATE-001",
         "INSTALL-SCOPE-001",
         "MEMORY-DB-001",
+        "MEMORY-SURFACE-PROJECTION-001",
         "MEMORY-SYNC-001",
         "MEMORY-TRUTH-001",
         "REPO-MIGRATION-001"
@@ -3782,8 +3881,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Revision/hash conflict journal; no silent delete; Claude, Codex, Gemini parity",
-      "evidence": "`sync-core-memory.mjs` currently Claude-authoritative",
-      "updated": "2026-07-26"
+      "evidence": "Stop hook single-target fix 2026-07-30; design `docs/superpowers/specs/2026-07-30-provider-agnostic-memory-projection-design.md` + analysis `docs/alperen-analysis/2026-07-30-memory-projection-rev3-yuzey-analizi.md`; Cursor+Copilot extension carried by MEMORY-SURFACE-PROJECTION-001",
+      "updated": "2026-07-30"
     },
     {
       "order": 200,
@@ -3907,7 +4006,9 @@
       "dependsOn": [
         "MEMORY-AUTHORITY-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "MEMORY-SURFACE-PROJECTION-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -3929,8 +4030,46 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Hash/revision conflict journal, no silent delete, dry-run, backup/restore and platform adapters",
-      "evidence": "Current script mirrors Claude HOME destructively",
-      "updated": "2026-07-26"
+      "evidence": "Rev-2 design approved 2026-07-30: backup/restore acceptance item is owner-retired (one-way decision) — retirement + Cursor/Copilot scope carried by successor MEMORY-SURFACE-PROJECTION-001; rev-3 pending D1-D3 (analysis 2026-07-30)",
+      "updated": "2026-07-30"
+    },
+    {
+      "order": 235,
+      "id": "MEMORY-SURFACE-PROJECTION-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Rev-3 provider-agnostic core-memory projection across five assistant surfaces via shared workspace-sync service",
+      "priority": "P0",
+      "dependsOn": [
+        "MEMORY-AUTHORITY-001",
+        "MEMORY-SYNC-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "MEMORY-AUTHORITY-001",
+        "MEMORY-SYNC-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "ADR-G-004-compliant surface contract (pointer-adapter or approved amendment per D1), ownership-manifest-only delete, shared runWorkspaceSync CLI/MCP/finalizer/hook parity, native-memory guard with owner-declared exception (D2), five-surface fresh-session proof with typed unavailable/HOLD",
+      "evidence": "Plan `docs/superpowers/plans/2026-07-30-provider-agnostic-memory-projection.md` (rev-3 revision pending D1-D3); smoke sprint = T14 slice; feeds SURFACE-PARITY-001 canonical-service evidence",
+      "updated": "2026-07-30"
     },
     {
       "order": 240,
@@ -8537,6 +8676,7 @@
         "KERNEL-SETTLEMENT-001",
         "MISSION-KIND-001",
         "RECOVERY-001",
+        "RECOVERY-DECISION-001",
         "RUNNER-PROTOCOL-001",
         "SCHEDULER-001",
         "WORKER-REGISTRY-001"
@@ -8590,6 +8730,8 @@
         "DOC-IMPACT-001",
         "EVALUATION-001",
         "GOAL-ACCEPTANCE-001",
+        "RECOVERY-DECISION-001",
+        "RECOVERY-STALE-PROJECTION-001",
         "RESULT-INGEST-001",
         "RUNFLOW-001",
         "SPRINT-HONESTY-001",
@@ -8636,7 +8778,8 @@
       ],
       "dependents": [
         "GOAL-CUTOVER-001",
-        "PROCESS-CUTOVER-001"
+        "PROCESS-CUTOVER-001",
+        "RECOVERY-MODE-ADAPTERS-001"
       ],
       "children": [],
       "gates": [
@@ -8956,7 +9099,8 @@
         "KERNEL-SETTLEMENT-001"
       ],
       "dependents": [
-        "DO-CUTOVER-001"
+        "DO-CUTOVER-001",
+        "RECOVERY-MODE-ADAPTERS-001"
       ],
       "children": [],
       "gates": [
@@ -9038,7 +9182,8 @@
       "dependents": [
         "BUDGET-CONTINUATION-001",
         "DESKTOP-RUNTIME-001",
-        "RECOVERY-001"
+        "RECOVERY-001",
+        "RECOVERY-TERMINATION-001"
       ],
       "children": [],
       "gates": [
@@ -9082,7 +9227,14 @@
       ],
       "children": [
         "RECOVERY-RESUME-001",
-        "PAUSED-FINALIZE-001"
+        "PAUSED-FINALIZE-001",
+        "RECOVERY-DECISION-001",
+        "RECOVERY-MODE-ADAPTERS-001",
+        "RECOVERY-COMMAND-SERVICE-001",
+        "RECOVERY-TERMINATION-001",
+        "RECOVERY-STALE-PROJECTION-001",
+        "RECOVERY-ASSURANCE-001",
+        "RECOVERY-DOGFOOD-BORN-001"
       ],
       "gates": [
         "G1"
@@ -9103,14 +9255,22 @@
         "KERNEL-ATTEMPT-001",
         "RUNNER-PROTOCOL-001",
         "RECOVERY-RESUME-001",
-        "PAUSED-FINALIZE-001"
+        "PAUSED-FINALIZE-001",
+        "RECOVERY-DECISION-001",
+        "RECOVERY-MODE-ADAPTERS-001",
+        "RECOVERY-COMMAND-SERVICE-001",
+        "RECOVERY-TERMINATION-001",
+        "RECOVERY-STALE-PROJECTION-001",
+        "RECOVERY-ASSURANCE-001",
+        "RECOVERY-DOGFOOD-BORN-001"
       ],
       "evidenceReceipts": [
-        "GR-2026-07-28-BUILD-RECOVERY-01"
+        "GR-2026-07-28-BUILD-RECOVERY-01",
+        "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
       ],
       "acceptance": "Single leader per project/process realm; exact adoption or kill; no duplicate call",
-      "evidence": "`receipt=GR-2026-07-28-BUILD-RECOVERY-01`; transactional build recovery validates exact journal/disk/quarantine evidence and requires an injected recovery verifier; the standalone bootstrap previously bypassed that seam with `() => true`, now fails before filesystem read or recovery mutation with typed `E_BUILD_RECOVERY_VERIFIER_UNAVAILABLE`; this is an honest HOLD, not recovery closure—runtime-wide ApprovalBroker verification, automatic sprint recovery evaluation→cleanup/finalizer parity, CLI resume unification, v2 stop propagation and stale one-shot settlement remain open",
-      "updated": "2026-07-28"
+      "evidence": "`receipt=GR-2026-07-28-BUILD-RECOVERY-01`; `receipt=GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01`; ADR-G-025 2026-07-30 Universal Execution Recovery Lane amendment is accepted; transactional build recovery validates exact journal/disk/quarantine evidence and requires an injected recovery verifier; Sprint finalize/cleanup/status containment foundations exist, but runtime-wide decision authority, mode adapters, Nervous continuation, stale projection settlement, every-environment assurance and scale proof remain open; dogfood findings may only expand work through RECOVERY-DOGFOOD-BORN-001",
+      "updated": "2026-07-30"
     },
     {
       "order": 3161,
@@ -9122,7 +9282,9 @@
       "dependsOn": [
         "RUN-STATUS-AUTHORITY-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-COMMAND-SERVICE-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -9184,6 +9346,294 @@
       ],
       "acceptance": "Explicit matching sprint ve force authority, durable pause/checkpoint evidence'ini terminal ABORTED settlement'a taşır; task evidence yokken COMPLETE veya başarı metriği üretmez; pause/checkpoint/PID/dashboard/status aynı terminal truth'a gelir",
       "evidence": "`receipt=GR-2026-07-30-RECOVERY-RESIDUALS-01`; real CLI `deckent finalize --sprint sprint-467 --force` exits zero with “no tasks” and leaves matching pause plus checkpoint untouched, so canonical status remains PAUSED/resumable; manual deletion was refused and no terminal claim is made",
+      "updated": "2026-07-30"
+    },
+    {
+      "order": 3163,
+      "id": "RECOVERY-DECISION-001",
+      "parent": "RECOVERY-001",
+      "program": "KERNEL",
+      "outcome": "Provider-neutral cold-lane recovery decision engine",
+      "priority": "P0",
+      "dependsOn": [
+        "KERNEL-ATTEMPT-001",
+        "KERNEL-SETTLEMENT-001"
+      ],
+      "dependents": [
+        "RECOVERY-COMMAND-SERVICE-001",
+        "RECOVERY-MODE-ADAPTERS-001",
+        "RECOVERY-STALE-PROJECTION-001",
+        "RECOVERY-TERMINATION-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "KERNEL-ATTEMPT-001",
+        "KERNEL-SETTLEMENT-001"
+      ],
+      "evidenceReceipts": [
+        "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
+      ],
+      "acceptance": "One pure decision authority maps exact attempt, lease, process, progress and settlement evidence to HEALTHY, STALLED, ORPHANED, NOT_DISPATCHED, PAUSED, HELD, SAFE_TO_RESUME or SAFE_TO_FINALIZE; healthy scheduling performs no global scan, provider probe or recovery lock",
+      "evidence": "`receipt=GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01`; accepted ADR-G-025 amendment defines the state vocabulary and cold-lane trigger boundary; implementation and proof are intentionally unclaimed",
+      "updated": "2026-07-30"
+    },
+    {
+      "order": 3164,
+      "id": "RECOVERY-MODE-ADAPTERS-001",
+      "parent": "RECOVERY-001",
+      "program": "KERNEL",
+      "outcome": "Sprint, Run, Flow, Do, Autonomous, Mission and Process recovery adapters",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-DECISION-001",
+        "MISSION-KIND-001",
+        "RUNFLOW-001"
+      ],
+      "dependents": [
+        "RECOVERY-ASSURANCE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-DECISION-001",
+        "MISSION-KIND-001",
+        "RUNFLOW-001"
+      ],
+      "evidenceReceipts": [
+        "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
+      ],
+      "acceptance": "Every execution mode translates native evidence into the shared decision contract and applies only fenced mode effects; no adapter owns a competing lifecycle state machine or silently replays an unknown attempt",
+      "evidence": "`receipt=GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01`; Sprint authority foundations exist, while the shared adapter contract and non-Sprint adapters are not born in code",
+      "updated": "2026-07-30"
+    },
+    {
+      "order": 3165,
+      "id": "RECOVERY-COMMAND-SERVICE-001",
+      "parent": "RECOVERY-001",
+      "program": "KERNEL",
+      "outcome": "Shared inspect, resume, settle and abort recovery application service",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-DECISION-001",
+        "RECOVERY-RESUME-001",
+        "APPROVAL-001"
+      ],
+      "dependents": [
+        "RECOVERY-ASSURANCE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-DECISION-001",
+        "RECOVERY-RESUME-001",
+        "APPROVAL-001"
+      ],
+      "evidenceReceipts": [
+        "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
+      ],
+      "acceptance": "CLI, MCP, Terminal, Desktop, API, connectors and Nervous invoke one typed service; resume always creates or adopts an exact fenced generation and failed continuation preserves prior authority",
+      "evidence": "`receipt=GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01`; current sprint-specific recover/resume and status surfaces are evidence inputs, not cross-surface closure",
+      "updated": "2026-07-30"
+    },
+    {
+      "order": 3166,
+      "id": "RECOVERY-TERMINATION-001",
+      "parent": "RECOVERY-001",
+      "program": "KERNEL",
+      "outcome": "Ownership-fenced termination shared by kill, finalize, cleanup and mode shutdown",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-DECISION-001",
+        "RUNNER-PROTOCOL-001"
+      ],
+      "dependents": [
+        "RECOVERY-ASSURANCE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "~",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-DECISION-001",
+        "RUNNER-PROTOCOL-001"
+      ],
+      "evidenceReceipts": [
+        "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
+      ],
+      "acceptance": "Exact process identity is revalidated before SIGTERM and escalation; terminal lifecycle and mutable authority retire only after proof of death; unknown or reused ownership yields typed HOLD on every platform adapter",
+      "evidence": "`receipt=GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01`; Sprint finalize real-binary proof covers SIGTERM→bounded wait→SIGKILL→death verification and cleanup HOLD, but kill plus Run/Flow/Do/Autonomous/Process consumers and native platform adapters remain open",
+      "updated": "2026-07-30"
+    },
+    {
+      "order": 3167,
+      "id": "RECOVERY-STALE-PROJECTION-001",
+      "parent": "RECOVERY-001",
+      "program": "KERNEL",
+      "outcome": "Evidence-honest reconciliation of stale Run, Flow, job and dashboard projections",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-DECISION-001",
+        "KERNEL-SETTLEMENT-001"
+      ],
+      "dependents": [
+        "RECOVERY-ASSURANCE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "~",
+        "E": "1",
+        "H": "1",
+        "L": "~",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-DECISION-001",
+        "KERNEL-SETTLEMENT-001"
+      ],
+      "evidenceReceipts": [
+        "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
+      ],
+      "acceptance": "Stale projections never imply live execution or worker quality; each record becomes an immutable terminal settlement, a resumable fenced HOLD or an explicit unavailable decision without deleting forensic evidence",
+      "evidence": "`receipt=GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01`; real build admission observed three STALE_DEAD RunFlow and sixteen STALE RunJob records; Sprint dashboard-only ACTIVE is already canonicalized to IDLE, while cross-mode settlement remains open",
+      "updated": "2026-07-30"
+    },
+    {
+      "order": 3168,
+      "id": "RECOVERY-ASSURANCE-001",
+      "parent": "RECOVERY-001",
+      "program": "KERNEL",
+      "outcome": "Recovery failure-injection, every-environment and million-scale assurance matrix",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-MODE-ADAPTERS-001",
+        "RECOVERY-COMMAND-SERVICE-001",
+        "RECOVERY-TERMINATION-001",
+        "RECOVERY-STALE-PROJECTION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-MODE-ADAPTERS-001",
+        "RECOVERY-COMMAND-SERVICE-001",
+        "RECOVERY-TERMINATION-001",
+        "RECOVERY-STALE-PROJECTION-001"
+      ],
+      "evidenceReceipts": [
+        "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
+      ],
+      "acceptance": "Auth absence, provider unreachability, pre-dispatch death, malformed/partial result, stalled coordinator, ignored SIGTERM, PID reuse, stale dashboard, generation conflict and cleanup-during-live cases have deterministic hermetic and real-binary proof across Linux, macOS, Windows native, WSL and declared OCI/remote adapters with bounded load thresholds",
+      "evidence": "`receipt=GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01`; targeted Sprint Linux/WSL-host evidence exists, but the declared assurance matrix is unproven",
+      "updated": "2026-07-30"
+    },
+    {
+      "order": 3169,
+      "id": "RECOVERY-DOGFOOD-BORN-001",
+      "parent": "RECOVERY-001",
+      "program": "KERNEL",
+      "outcome": "Mandatory born ledger for recovery dogfood discoveries",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "-",
+        "S": "-"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
+      ],
+      "acceptance": "Before any emergent dogfood defect is fixed, one immutable `RECOVERY-BORN-*` child records trigger, affected product and dogfood surfaces, exact evidence, priority, dependencies, acceptance and negative scope; duplicates link to the canonical born ID instead of creating parallel patches",
+      "evidence": "`receipt=GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01`; owner explicitly requires born-first continuation for every finding from this dogfood program; generated projections and execution prompts must retain the Work ID lineage",
       "updated": "2026-07-30"
     },
     {
@@ -9944,6 +10394,7 @@
         "ENTERPRISE-AUTH-001",
         "GOAL-POLICY-001",
         "KERNEL-001",
+        "RECOVERY-COMMAND-SERVICE-001",
         "TERMINAL-COLLAB-001",
         "TOOL-AUTHORITY-001"
       ],
@@ -13432,6 +13883,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "1eb78e583dba29a7746795093db3fafb352cb7d6ddb97c614c5830e0989bc3b9"
+    "value": "5b2ae526a40c8a41a716eb2420939c86d85cf3ce5f3e69666f0b10c683b51ed8"
   }
 }

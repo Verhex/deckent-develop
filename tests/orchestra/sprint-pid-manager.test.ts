@@ -26,6 +26,7 @@ import {
   archiveOrphan,
   listPidFiles,
   terminateOwnedSprintProcess,
+  terminateOwnedSprintProcessAndWait,
 } from '../../src/orchestra/sprint-pid-manager.js';
 import type { SprintStateSnapshot, OrphanInfo } from '../../src/orchestra/sprint-pid-manager.js';
 
@@ -374,6 +375,113 @@ describe('sprint-pid-manager', () => {
       });
       expect(res.action).toBe('not-alive');
       expect(killed).toHaveLength(0);
+    });
+  });
+
+  describe('terminateOwnedSprintProcessAndWait — verified containment', () => {
+    const sprintId = 'sprint-verified';
+    const pid = 424_242;
+    const policy = {
+      coordinator_termination_grace_ms: 200,
+      termination_poll_interval_ms: 100,
+      forced_termination_verify_ms: 200,
+    };
+
+    function seedRecordedPid(): void {
+      const pidDir = join(tmpRoot, '.deckent', 'pids');
+      mkdirSync(pidDir, { recursive: true });
+      writeFileSync(
+        join(pidDir, `${sprintId}.pid`),
+        JSON.stringify({ pid, sprintId, startToken: 's-fixture' }),
+        'utf-8',
+      );
+    }
+
+    it('proves graceful SIGTERM exit before reporting terminated', async () => {
+      seedRecordedPid();
+      let alive = true;
+      const signals: NodeJS.Signals[] = [];
+
+      const result = await terminateOwnedSprintProcessAndWait(
+        tmpRoot,
+        sprintId,
+        policy,
+        {
+          isAlive: () => alive,
+          verifyOwnership: () => 'owned',
+          kill: (_pid, signal) => { signals.push(signal); },
+          wait: async () => { alive = false; },
+        },
+      );
+
+      expect(result).toEqual({ action: 'terminated', pid, escalation: 'sigterm' });
+      expect(signals).toEqual(['SIGTERM']);
+    });
+
+    it('escalates after grace and proves SIGKILL exit', async () => {
+      seedRecordedPid();
+      let alive = true;
+      const signals: NodeJS.Signals[] = [];
+      let waits = 0;
+
+      const result = await terminateOwnedSprintProcessAndWait(
+        tmpRoot,
+        sprintId,
+        policy,
+        {
+          isAlive: () => alive,
+          verifyOwnership: () => 'owned',
+          kill: (_pid, signal) => {
+            signals.push(signal);
+            if (signal === 'SIGKILL') alive = false;
+          },
+          wait: async () => { waits++; },
+        },
+      );
+
+      expect(result).toEqual({ action: 'terminated', pid, escalation: 'sigkill' });
+      expect(signals).toEqual(['SIGTERM', 'SIGKILL']);
+      expect(waits).toBeGreaterThanOrEqual(2);
+    });
+
+    it('holds without signalling when ownership is unverified', async () => {
+      seedRecordedPid();
+      const signals: NodeJS.Signals[] = [];
+
+      const result = await terminateOwnedSprintProcessAndWait(
+        tmpRoot,
+        sprintId,
+        policy,
+        {
+          isAlive: () => true,
+          verifyOwnership: () => 'unknown',
+          kill: (_pid, signal) => { signals.push(signal); },
+        },
+      );
+
+      expect(result).toEqual({
+        action: 'ownership-unverified',
+        pid,
+        escalation: 'none',
+      });
+      expect(signals).toEqual([]);
+    });
+
+    it('does not claim success while the PID remains alive after SIGKILL', async () => {
+      seedRecordedPid();
+      const result = await terminateOwnedSprintProcessAndWait(
+        tmpRoot,
+        sprintId,
+        policy,
+        {
+          isAlive: () => true,
+          verifyOwnership: () => 'owned',
+          kill: () => undefined,
+          wait: async () => undefined,
+        },
+      );
+
+      expect(result).toEqual({ action: 'still-alive', pid, escalation: 'sigkill' });
     });
   });
 });

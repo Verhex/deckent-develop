@@ -44,7 +44,10 @@ import {
   readAuthoritativeTaskResult,
   type TaskResultAuthorityRead,
 } from './task-result-authority.js';
-import { readLatestTaskResultSettlementRef } from '../core/task-result-settlement.js';
+import {
+  readLatestTaskResultSettlementRef,
+  readTaskResultSettlementClosure,
+} from '../core/task-result-settlement.js';
 import { createExecutionAuthorityError } from '../core/errors.js';
 import { applyTerminalTaskOutcome } from '../core/task-terminal-outcome.js';
 
@@ -153,6 +156,36 @@ function checkpointCounterPath(projectRoot: string, sprintId: string): string {
   return join(projectRoot, DECKENT_DIR, `${sprintId}-checkpoint-seq`);
 }
 
+/**
+ * Build the complete durable task universe for a checkpoint.
+ *
+ * PLAN-time tasks live in `sprint.tasks`; FIX/XFIX attempts are created later
+ * and persisted as `task-*.json`. In-memory tasks remain authoritative for
+ * ids they contain and same-sprint dynamic tasks are appended in lexical order
+ * so recovery is deterministic on every filesystem.
+ */
+function collectCheckpointTasks(projectRoot: string, sprint: Sprint): Task[] {
+  const tasks = [...sprint.tasks];
+  const knownIds = new Set(tasks.map(task => task.id));
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  let entries: string[];
+  try {
+    entries = readdirSync(tasksDir).sort((a, b) => a.localeCompare(b));
+  } catch (e) {
+    debugLog('sprint-checkpoint:collectTasks:readdir', e);
+    return tasks;
+  }
+
+  for (const entry of entries) {
+    if (!entry.startsWith('task-') || !entry.endsWith('.json')) continue;
+    const task = readJsonSafe<Task>(join(tasksDir, entry));
+    if (!task || task.sprintId !== sprint.id || knownIds.has(task.id)) continue;
+    knownIds.add(task.id);
+    tasks.push(task);
+  }
+  return tasks;
+}
+
 // ─── Sequence Counter ────────────────────────────────────────────────
 
 function readCheckpointCounter(projectRoot: string, sprintId: string): number {
@@ -244,8 +277,9 @@ export function writeCheckpoint(
     mkdirSync(join(projectRoot, DECKENT_DIR), { recursive: true });
 
     const checkpointNumber = incrementCheckpointCounter(projectRoot, sprint.id);
+    const checkpointTasks = collectCheckpointTasks(projectRoot, sprint);
 
-    const completedTasks = sprint.tasks
+    const completedTasks = checkpointTasks
       .filter(t => isTerminalStatus(t.status))
       .map(t => t.id);
 
@@ -253,11 +287,11 @@ export function writeCheckpoint(
     // separately in `activeWorkers` so the three sets stay disjoint.
     // Resume logic should union pendingTasks ∪ activeWorkers.taskId to get
     // the full set of non-terminal work.
-    const pendingTasks = sprint.tasks
+    const pendingTasks = checkpointTasks
       .filter(t => t.status === TaskStatus.PENDING)
       .map(t => t.id);
 
-    const activeWorkers: WorkerState[] = sprint.tasks
+    const activeWorkers: WorkerState[] = checkpointTasks
       .filter(t => t.status === TaskStatus.EXECUTING || t.status === TaskStatus.CLAIMED)
       .map(t => ({
         workerId: `w-${t.id}`,
@@ -291,7 +325,7 @@ export function writeCheckpoint(
     // stays on regardless of this env — it must keep reading both shapes.
     if (process.env.DECKENT_CHECKPOINT_V1 !== '1') {
       checkpoint.schemaVersion = 2;
-      checkpoint.taskStates = sprint.tasks.map(t => {
+      checkpoint.taskStates = checkpointTasks.map(t => {
         const state: CheckpointTaskState = { id: t.id, status: t.status };
         if (t.fixForTaskId) state.fixForTaskId = t.fixForTaskId;
         return state;
@@ -697,6 +731,57 @@ const TERMINAL_SELF_ASSESSMENTS = new Set([
   'NO_GO',
 ]);
 
+function isRecoverableNotDispatchedResult(
+  projectRoot: string,
+  taskId: string,
+  result: TaskResult | null,
+): boolean {
+  if (
+    !result
+    || result.taskId !== taskId
+    || result.workerId !== `docker-recovery-${taskId}`
+    || !result.notes.startsWith('DECKENT_E091:coordinator-crashed-before-docker-prepare:')
+  ) {
+    return false;
+  }
+  try {
+    const ref = readLatestTaskResultSettlementRef(projectRoot, taskId);
+    return ref !== null
+      && readTaskResultSettlementClosure(ref)?.containerDisposition === 'not-dispatched';
+  } catch {
+    return false;
+  }
+}
+
+function archiveNotDispatchedResultProjection(
+  projectRoot: string,
+  taskId: string,
+  result: TaskResult,
+): void {
+  if (!isRecoverableNotDispatchedResult(projectRoot, taskId, result)) return;
+  const source = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
+  if (!existsSync(source)) return;
+  const ref = readLatestTaskResultSettlementRef(projectRoot, taskId);
+  if (!ref) {
+    throw new Error(`Missing not-dispatched settlement reference for ${taskId}`);
+  }
+  const archiveDir = join(projectRoot, RECENT_WORKS_DIR, 'recovery-not-dispatched');
+  mkdirSync(archiveDir, { recursive: true });
+  const safeAttemptId = ref.attemptId.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const destination = join(
+    archiveDir,
+    `${taskId}-${safeAttemptId}.result.json`,
+  );
+  if (existsSync(destination)) {
+    if (readFileSync(destination, 'utf-8') !== readFileSync(source, 'utf-8')) {
+      throw new Error(`Conflicting not-dispatched recovery archive for ${taskId}`);
+    }
+    unlinkSync(source);
+    return;
+  }
+  renameSync(source, destination);
+}
+
 /**
  * Project one canonical result authority into the resume state machine.
  * A Docker claim makes a closed host receipt mandatory; its absence or invalid
@@ -727,6 +812,9 @@ export function readResumeTaskResultAuthority(
   const result = authority.result;
   const terminal = result?.taskId === taskId
     && TERMINAL_SELF_ASSESSMENTS.has(String(result.selfAssessment));
+  if (terminal && isRecoverableNotDispatchedResult(projectRoot, taskId, result)) {
+    return { state: 'resumable', result };
+  }
   if (terminal) return { state: 'terminal', result };
   if (authority.state === 'settled') {
     return { state: 'invalid-settlement', result: null };
@@ -786,14 +874,16 @@ export interface ResumeDisposition {
  */
 export function deriveResumableTaskIds(
   projectRoot: string,
-  checkpoint: Pick<SprintCheckpoint, 'pendingTasks' | 'activeWorkers' | 'taskStates'>,
+  checkpoint: Pick<SprintCheckpoint, 'pendingTasks' | 'activeWorkers' | 'taskStates'>
+    & Partial<Pick<SprintCheckpoint, 'sprintId'>>,
 ): string[] {
   return deriveResumeDisposition(projectRoot, checkpoint).resumableIds;
 }
 
 export function deriveResumeDisposition(
   projectRoot: string,
-  checkpoint: Pick<SprintCheckpoint, 'pendingTasks' | 'activeWorkers' | 'taskStates'>,
+  checkpoint: Pick<SprintCheckpoint, 'pendingTasks' | 'activeWorkers' | 'taskStates'>
+    & Partial<Pick<SprintCheckpoint, 'sprintId'>>,
 ): ResumeDisposition {
   const ids: string[] = [];
   const parkedSettlements: ResumeDisposition['parkedSettlements'] = [];
@@ -837,6 +927,14 @@ export function deriveResumeDisposition(
     for (const worker of checkpoint.activeWorkers ?? []) {
       if (staleActiveIds.has(worker.taskId)) consider(worker.taskId);
     }
+  }
+
+  // Dynamic FIX/XFIX tasks can post-date a checkpoint. Merge only persisted
+  // records owned by this sprint before concluding that recovery has no work.
+  if (checkpoint.sprintId) {
+    const durableTaskIds = new Set<string>();
+    supplementLegacyCheckpointTaskIds(projectRoot, checkpoint.sprintId, durableTaskIds);
+    for (const id of durableTaskIds) consider(id);
   }
   return { resumableIds: ids, parkedSettlements };
 }
@@ -898,6 +996,18 @@ export function resetInterruptedWorkersToPending(
         committed: false,
         error: `Task ${taskId} resume authority changed to ${authority.state} while preparing`,
       };
+    }
+    if (authority.result) {
+      try {
+        archiveNotDispatchedResultProjection(projectRoot, taskId, authority.result);
+      } catch (e) {
+        return {
+          resetIds,
+          checkpoint,
+          committed: false,
+          error: `Failed to archive not-dispatched recovery result for ${taskId}: ${e instanceof Error ? e.message : String(e)}`,
+        };
+      }
     }
     const taskPath = join(projectRoot, TASKS_DIR, `task-${taskId}.json`);
     const t = readJsonSafe<Task>(taskPath);
@@ -1371,8 +1481,9 @@ export function restoreSprintFromCheckpoint(
     for (const id of cp.completedTasks ?? []) taskIds.add(id);
     for (const id of cp.pendingTasks ?? []) taskIds.add(id);
     for (const w of cp.activeWorkers ?? []) taskIds.add(w.taskId);
-    supplementLegacyCheckpointTaskIds(projectRoot, sprintId, taskIds);
   }
+  // Dynamic FIX/XFIX attempts may be newer than either checkpoint schema.
+  supplementLegacyCheckpointTaskIds(projectRoot, sprintId, taskIds);
 
   const tasks: Task[] = [];
   for (const id of taskIds) {

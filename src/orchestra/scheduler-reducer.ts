@@ -86,6 +86,12 @@ export interface SchedulerSnapshot {
   /** Newly-collected task IDs this tick — drives legacy-fifo's one-pop-per-completion. */
   readonly completedTaskIds: readonly string[];
   readonly dependencyPipelineEnabled: boolean;
+  /**
+   * Keep descendants of a repairable failed dependency non-terminal so the
+   * lifecycle can enter EVALUATE/FIX and reopen them after lineage repair.
+   * False preserves terminal cascade semantics for runs with no FIX budget.
+   */
+  readonly deferTerminalDependencyFailure?: boolean;
   /** From `computeEffectiveDependencyState` (scheduler-state.ts, sprint-411 helper) —
    *  the driver computes this once per tick and passes the result in as data. */
   readonly effectiveDependencyState: EffectiveDependencyState;
@@ -191,7 +197,7 @@ export function reduceSchedulerTick(snapshot: SchedulerSnapshot): SchedulerDecis
   // have received pre-crash, so the executor layer can recognize a retry.
   const failedIds = new Set<string>(snapshot.effectiveDependencyState.terminalFailureIds);
   const cascadeSkippedIds = new Set<string>();
-  let changed = true;
+  let changed = !snapshot.deferTerminalDependencyFailure;
   while (changed) {
     changed = false;
     for (const t of snapshot.tasks) {

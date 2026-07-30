@@ -5,7 +5,14 @@
  * @module
  */
 
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { detectEnvironment } from './environment.js';
 import { isPidAlive } from './pid-liveness.js';
@@ -98,6 +105,31 @@ export function acquireSprintLock(projectRoot: string, sprintId: string, env?: s
 
   writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
   return true;
+}
+
+/**
+ * Atomically bind a planning-time project leadership lease to the canonical
+ * execution id once planning materializes it. Only the owning process may
+ * mutate the lease; another process receives false and must not proceed as the
+ * execution owner.
+ */
+export function bindSprintLockToExecution(
+  projectRoot: string,
+  sprintId: string,
+): boolean {
+  const filePath = lockPath(projectRoot);
+  if (!existsSync(filePath)) return false;
+  try {
+    const data = JSON.parse(readFileSync(filePath, 'utf-8')) as LockFileData;
+    if (data.pid !== process.pid) return false;
+    const next: LockFileData = { ...data, sprintId };
+    const tempPath = `${filePath}.tmp.${process.pid}`;
+    writeFileSync(tempPath, JSON.stringify(next, null, 2), 'utf-8');
+    renameSync(tempPath, filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

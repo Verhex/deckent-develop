@@ -9,6 +9,42 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint479] - 2026-07-30
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 18 total, 0 done, 0 tech debt, 6 no-go_
+
+## [1.0.0-beta.1-sprint478] - 2026-07-30
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 18 total, 0 done, 0 tech debt, 18 no-go_
+
+## [1.0.0-beta.1-sprint477] - 2026-07-30
+
+### Added
+
+- DENEME-001 — simple document and test
+- DENEME-002 — simple document and test
+- DENEME-003 — simple document and test
+- DENEME-004 — simple document and test
+- DENEME-005 — simple document and test
+- DENEME-006 — simple document and test
+- DENEME-007 — simple document and test
+- DENEME-008 — simple document and test
+- DENEME-009 — simple document and test
+- DENEME-010 — simple document and test
+
+
+_Tasks: 50 total, 50 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint476] - 2026-07-30
 
 ### Added

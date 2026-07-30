@@ -54,7 +54,7 @@ import {
 } from '../nervous/recommendation-log.js';
 
 // ─── Core — sprint lock ───────────────────────────────────────────
-import { releaseSprintLock } from '../core/multi-ide.js';
+import { isSprintLocked, releaseSprintLock } from '../core/multi-ide.js';
 import { pruneExpiredNervousPending } from '../core/pending-approvals.js';
 import { isExecutionLockAuthorityArtifactName } from '../core/file-lock.js';
 import { clearProviderExecutionHolds } from '../core/provider-execution-hold.js';
@@ -478,6 +478,19 @@ export function cleanup(
 
   // Release sprint lock on cleanup
   try { releaseSprintLock(projectRoot); } catch (e) { debugLog('cleanup:releaseSprintLock', e); }
+  // A finalize/cleanup command runs in a different process from the original
+  // coordinator, so owner-only release is intentionally a no-op there. Follow
+  // it with the canonical liveness check: it removes only a dead/corrupt stale
+  // lock and preserves a genuinely live foreign owner.
+  try {
+    const lock = isSprintLocked(projectRoot);
+    if (lock.locked) {
+      debugLog(
+        'cleanup:preserveLiveSprintLock',
+        `Preserved live sprint lock ${lock.sprintId} owned by PID ${lock.pid}`,
+      );
+    }
+  } catch (e) { debugLog('cleanup:clearStaleSprintLock', e); }
 
   // Clear plugin hooks so they don't persist across sprints
   clearHooks();

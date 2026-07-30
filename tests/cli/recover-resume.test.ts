@@ -37,6 +37,7 @@ describe('recover --resume process handoff', () => {
     await expect(runResumeRecoveryProcess(root, sprintId, {
       autoApprove: true,
       dryRun: true,
+      acknowledgeScopePaths: true,
     }, {
       execPath: '/usr/bin/node',
       entryPath: '/opt/deckent/entry.js',
@@ -53,6 +54,7 @@ describe('recover --resume process handoff', () => {
         root,
         '--auto-approve',
         '--dry-run',
+        '--force-scope',
       ],
       expect.objectContaining({ cwd: root, shell: false, stdio: 'inherit' }),
     );

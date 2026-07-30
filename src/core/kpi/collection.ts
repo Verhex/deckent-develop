@@ -26,6 +26,10 @@ export interface UsageTotals {
    * authoritative value (e.g. an all-local/ollama sprint), never a "missing" marker.
    */
   costUsd: number;
+  /** Catalog/reference value of consumed tokens; not an amount billed. */
+  referenceCostUsd?: number;
+  /** Results whose billing regime could not be resolved authoritatively. */
+  unknownBillingTaskCount?: number;
   inputTokens: number;
   outputTokens: number;
   cacheRead: number;

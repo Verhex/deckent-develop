@@ -56,6 +56,7 @@ export interface CaptureShadowSchedulerSnapshotInput {
   readonly costStop: boolean;
   readonly slotBudget: number;
   readonly dependencyPipelineEnabled: boolean;
+  readonly deferTerminalDependencyFailure?: boolean;
   /** Live sprint — read synchronously at call time only, never stored by reference. */
   readonly sprint: Sprint;
   /** Live FIFO overflow queue — read synchronously at call time only, cloned immediately. */
@@ -116,6 +117,7 @@ export function captureShadowSchedulerSnapshot(input: CaptureShadowSchedulerSnap
     costStop: input.costStop,
     slotBudget: input.slotBudget,
     dependencyPipelineEnabled: input.dependencyPipelineEnabled,
+    deferTerminalDependencyFailure: input.deferTerminalDependencyFailure,
     // COPY — a fresh array of fresh literals, never the live Task[] references
     // (planDispatch-style shift/splice on the live array would otherwise leak
     // into this snapshot; see the design doc's "queue MUST be cloned" risk).
@@ -390,6 +392,9 @@ export function createSchedulerDriver(
         costStop: deps.getCostStop(),
         slotBudget: deps.getSlotBudget(),
         dependencyPipelineEnabled: deps.config.dependency_pipeline_enabled === true,
+        deferTerminalDependencyFailure:
+          deps.config.fix_phase_enabled !== false
+          && (deps.config.max_fix_retries ?? 2) > 0,
         sprint: deps.sprint,
         remainingQueue: deps.remainingQueue,
         assignedTaskIds: deps.assignedTaskIds,

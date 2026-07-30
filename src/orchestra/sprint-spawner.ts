@@ -582,7 +582,10 @@ export async function spawnWorkers(
       if (!task || task.status !== TaskStatus.PENDING) continue;
       const predecessorIncomplete = collision.writerSlots
         .slice(0, index)
-        .some(slot => sprint.tasks[slot - 1]?.status !== TaskStatus.DONE);
+        .some(slot => {
+          const status = sprint.tasks[slot - 1]?.status;
+          return status !== TaskStatus.DONE && status !== TaskStatus.NO_GO;
+        });
       if (predecessorIncomplete) blockedTaskIds.add(task.id);
     }
   }
@@ -1240,7 +1243,7 @@ export async function respawnEligibleTasks(
   // Build dependency graph for enforcement (Sprint 139 Task 028)
   const graph = buildDependencyGraph(sprint.tasks, /* includeCollisions */ true);
   const pendingIds = sprint.tasks
-    .filter(t => t.status === TaskStatus.PENDING)
+    .filter(t => t.status === TaskStatus.PENDING || t.status === TaskStatus.PAUSED)
     .map(t => t.id);
 
   const enforcement = enforceWaveDependency(graph, pendingIds, new Set(doneTasks));
@@ -1268,6 +1271,28 @@ export async function respawnEligibleTasks(
 
   const toSpawn = nowEligible.slice(0, slotsAvailable);
   if (toSpawn.length === 0) return [];
+
+  // Dependency descendants are parked PAUSED while their failed lineage is
+  // repaired. Once every dependency is satisfying, reopening is an explicit
+  // durable transition before dispatch — never an implicit spawn of a paused
+  // task.
+  for (const task of toSpawn) {
+    if (task.status !== TaskStatus.PAUSED) continue;
+    task.status = TaskStatus.PENDING;
+    writeFileSync(
+      join(projectRoot, TASKS_DIR, `task-${task.id}.json`),
+      JSON.stringify(task, null, 2),
+      'utf-8',
+    );
+    writeEvent(
+      projectRoot,
+      sprintIdForDeps,
+      'brain',
+      'worker',
+      'BRAIN→WORKER:DEPENDENCY_REPAIR_UNBLOCKED',
+      { taskId: task.id, dependencies: task.dependencies ?? [] },
+    );
+  }
 
   const backend = spawnOpts?.spawnBackend;
 
@@ -1958,9 +1983,15 @@ export function applyUnblockToSprint(
 
 // ─── Fix-Task Routing-Field Inheritance (Sprint 361 Task 361-005, born-476) ──
 
-/** Task fields a fix-task must inherit from its original when left unset. */
-type FixRoutingField = 'forceModel' | 'provider' | 'backend' | 'modelEffort';
-const FIX_ROUTING_FIELDS: readonly FixRoutingField[] = ['forceModel', 'provider', 'backend', 'modelEffort'];
+/** Execution-identity fields a fix-task must inherit from its original when left unset. */
+type FixExecutionField = 'forceModel' | 'provider' | 'backend' | 'modelEffort' | 'type';
+const FIX_EXECUTION_FIELDS: readonly FixExecutionField[] = [
+  'forceModel',
+  'provider',
+  'backend',
+  'modelEffort',
+  'type',
+];
 
 /**
  * Ensure a fix-task inherits its original task's `forceModel` / `provider` /
@@ -2000,13 +2031,13 @@ export function preserveFixTaskRoutingFields(
     const raw = readFileSafely(originalPath);
     if (!raw) return;
     const original = JSON.parse(raw) as Task;
-    const taskRecord = task as unknown as Record<FixRoutingField, unknown>;
-    const originalRecord = original as unknown as Record<FixRoutingField, unknown>;
+    const taskRecord = task as unknown as Record<FixExecutionField, unknown>;
+    const originalRecord = original as unknown as Record<FixExecutionField, unknown>;
 
-    const inherited: Partial<Record<FixRoutingField, unknown>> = {};
-    const overridden: Partial<Record<FixRoutingField, { from: unknown; to: unknown }>> = {};
+    const inherited: Partial<Record<FixExecutionField, unknown>> = {};
+    const overridden: Partial<Record<FixExecutionField, { from: unknown; to: unknown }>> = {};
 
-    for (const field of FIX_ROUTING_FIELDS) {
+    for (const field of FIX_EXECUTION_FIELDS) {
       const originalValue = originalRecord[field];
       if (originalValue === undefined) continue; // nothing pinned on the original to inherit
       const fixValue = taskRecord[field];

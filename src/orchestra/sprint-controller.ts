@@ -62,7 +62,11 @@ import { DockerSpawnBackend } from './spawn-backend-docker.js';
 import type { Connector } from './connector.js';
 
 // ─── Core — sprint lock ───────────────────────────────────────────
-import { acquireSprintLock, releaseSprintLock } from '../core/multi-ide.js';
+import {
+  acquireSprintLock,
+  bindSprintLockToExecution,
+  releaseSprintLock,
+} from '../core/multi-ide.js';
 
 // ─── Core — pre-spawn scope gate (Dimension B, born-573/518) ──────
 import { spawnSync } from 'node:child_process';
@@ -1359,7 +1363,13 @@ export async function runSprint(
   } catch (e) { debugLog('runSprint:loadPluginHooks', e); }
 
   // Sprint Lock
-  const sprintLockId = `sprint-${Date.now()}`;
+  // Planning needs project leadership before a fresh sprint id exists. Use an
+  // explicit non-execution lease label (never a timestamp-shaped fake sprint
+  // id), then atomically bind it to the canonical id immediately after PLAN.
+  const sprintLockId =
+    opts?.preplannedSprint?.id
+    ?? readSprintState(projectRoot)?.sprintId
+    ?? 'planning';
   const lockAcquired = acquireSprintLock(projectRoot, sprintLockId);
   if (!lockAcquired) {
     throw new BrainError(
@@ -1470,6 +1480,14 @@ export async function runSprint(
   if (isResumeEvaluate && recoveredSprint) {
     // ─── Resume Path: skip PLAN/SPAWN/EXECUTE, jump to EVALUATE ─────
     sprint = recoveredSprint;
+    if (!bindSprintLockToExecution(projectRoot, sprint.id)) {
+      throw new BrainError(
+        getMessage('lifecycle.execution_lock_bind_failed', config.language, {
+          sprintId: sprint.id,
+        }),
+        SprintPhase.PLAN,
+      );
+    }
     setObservabilitySprintId(sprint.id, { perSprintFile: true });
     setActiveSprint(projectRoot, sprint, spawnBackend);
     try { writePid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:writePid', e); }
@@ -1484,6 +1502,14 @@ export async function runSprint(
     );
     sprint = planResult.sprint;
     safetyPoint = planResult.safetyPoint;
+    if (!bindSprintLockToExecution(projectRoot, sprint.id)) {
+      throw new BrainError(
+        getMessage('lifecycle.execution_lock_bind_failed', config.language, {
+          sprintId: sprint.id,
+        }),
+        SprintPhase.PLAN,
+      );
+    }
 
     // Set sprint ID for observability tagging (sprintId available after plan phase)
     setObservabilitySprintId(sprint.id, { perSprintFile: true });

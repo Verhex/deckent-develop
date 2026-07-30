@@ -287,6 +287,28 @@ describe('buildSprintFromTasks — evaluationDecision ?? selfAssessment success 
     const { evaluations } = buildSprintFromTasks(root);
     expect(evaluations.get('900-001')).toBe(TaskEvaluation.NO_GO);
   });
+
+  it('missing result for a dependency-parked task remains DEFERRED', () => {
+    const tasksDir = join(root, '.tasks');
+    writeTaskFixture(tasksDir, makeTask('900-001', { status: 'PAUSED' as Task['status'] }));
+
+    const { evaluations } = buildSprintFromTasks(root);
+
+    expect(evaluations.get('900-001')).toBe(TaskEvaluation.DEFERRED);
+  });
+
+  it('legacy cascade-skip evidence is DEFERRED, not a worker NO_GO', () => {
+    const tasksDir = join(root, '.tasks');
+    writeTaskFixture(tasksDir, makeTask('900-001', { status: 'NO_GO' as Task['status'] }));
+    writeResultFixture(tasksDir, makeResult('900-001', {
+      selfAssessment: 'NO_GO',
+      cascadeSkipped: true,
+    }));
+
+    const { evaluations } = buildSprintFromTasks(root);
+
+    expect(evaluations.get('900-001')).toBe(TaskEvaluation.DEFERRED);
+  });
 });
 
 describe('buildSprintFromTasks — archive-aware collection (FINALIZE-ARCHIVE-BLIND)', () => {
@@ -473,6 +495,34 @@ describe('persistFinalSprintState — orphan-state cleanup (bug 3)', () => {
     expect(state.status).toBe('ACTIVE');
     // …while THIS sprint's pid marker is still cleaned.
     expect(existsSync(pidPath)).toBe(false);
+  });
+
+  it('clears only the finalized sprint pause authority', () => {
+    seedState(SPRINT_ID);
+    const pausePath = join(root, '.deckent', 'pause-state.json');
+    writeFileSync(
+      pausePath,
+      JSON.stringify({ sprintId: SPRINT_ID, status: 'PAUSED', phase: 'FIX' }),
+      'utf-8',
+    );
+
+    persistFinalSprintState(root, makeSprint([]));
+
+    expect(existsSync(pausePath)).toBe(false);
+  });
+
+  it('preserves a different sprint pause authority', () => {
+    seedState(SPRINT_ID);
+    const pausePath = join(root, '.deckent', 'pause-state.json');
+    writeFileSync(
+      pausePath,
+      JSON.stringify({ sprintId: 'sprint-901', status: 'PAUSED', phase: 'EXECUTE' }),
+      'utf-8',
+    );
+
+    persistFinalSprintState(root, makeSprint([]));
+
+    expect(readJson<{ sprintId: string }>(pausePath).sprintId).toBe('sprint-901');
   });
 });
 

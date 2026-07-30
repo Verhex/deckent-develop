@@ -158,4 +158,51 @@ describe('canonical run status authority', () => {
       expect.objectContaining({ surface: 'pause-state', sprintId: 'sprint-467' }),
     );
   });
+
+  it('reports a dashboard-only ACTIVE projection as canonical IDLE conflict', () => {
+    const root = fixture();
+    json(root, '.dashboard', {
+      sprint: { id: 'sprint-479', phase: 'EXECUTE', status: 'ACTIVE' },
+    });
+
+    const status = readCanonicalRunStatus(root);
+
+    expect(status).toMatchObject({
+      lifecycle: 'IDLE',
+      active: false,
+      sprintId: null,
+    });
+    expect(status.conflicts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        surface: 'dashboard',
+        sprintId: 'sprint-479',
+        value: 'ACTIVE-while-canonical-IDLE',
+      }),
+    ]));
+  });
+
+  it('surfaces a sprint.lock identity that differs from canonical execution', () => {
+    const root = fixture();
+    const sprintId = 'sprint-479';
+    json(root, '.deckent/sprint-state.json', {
+      sprintId,
+      phase: 'EXECUTE',
+      status: 'ACTIVE',
+    });
+    json(root, `.deckent/pids/${sprintId}.pid`, { pid: process.pid });
+    json(root, '.deckent/sprint.lock', {
+      pid: process.pid,
+      sprintId: 'sprint-1785432115882',
+    });
+
+    const status = readCanonicalRunStatus(root);
+
+    expect(status.conflicts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        surface: 'sprint-lock',
+        sprintId: 'sprint-1785432115882',
+        value: 'identity-mismatch:sprint-1785432115882',
+      }),
+    ]));
+  });
 });

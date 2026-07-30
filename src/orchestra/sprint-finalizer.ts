@@ -5,7 +5,7 @@
 // ─── Node Builtins ─────────────────────────────────────────────────
 import {
   readFileSync, writeFileSync, existsSync,
-  mkdirSync, readdirSync,
+  mkdirSync, readdirSync, unlinkSync,
 } from 'node:fs';
 import { promises as fsPromises } from 'node:fs';
 import { join } from 'node:path';
@@ -18,17 +18,19 @@ import {
 
 // ─── Core (type imports) ───────────────────────────────────────────
 import type {
-  TaskResult, Sprint, SprintMetrics,
+  Task, TaskResult, Sprint, SprintMetrics,
   ResolvedConfig,
 } from '../core/types.js';
+import { resolveBillingModeForAuth } from '../core/cost-calculator.js';
 
 import type { TaskDNA } from '../core/routing-types.js';
 
 import {
   BRAIN_DIR, JOBS_DIR, DASHBOARD_FILE, RECENT_WORKS_DIR, TASKS_DIR,
+  SPRINT_PAUSE_STATE_FILE,
 } from '../core/constants.js';
 
-import { runRetention } from '../core/sprint-file-retention.js';
+import { cleanupCounters, runRetention } from '../core/sprint-file-retention.js';
 import { archiveStaleSchedulerShadowJournals } from '../core/scheduler-shadow-retention.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
@@ -701,11 +703,18 @@ function estimateResultCost(usage: TaskResult['tokenUsage']): number {
  * 0 (so a sprint with no usage telemetry yields all-zero totals, never a crash), and
  * the function never throws.
  */
-export function buildUsageTotals(results: readonly TaskResult[]): UsageTotals {
+export function buildUsageTotals(
+  results: readonly TaskResult[],
+  tasks: readonly Task[] = [],
+  defaultAuthMode?: 'subscription' | 'api' | 'hybrid',
+): UsageTotals {
   let inputTokens = 0;
   let outputTokens = 0;
   let cacheRead = 0;
   let costUsd = 0;
+  let referenceCostUsd = 0;
+  let unknownBillingTaskCount = 0;
+  const tasksById = new Map(tasks.map(task => [task.id, task]));
 
   for (const result of results) {
     const usage = result.tokenUsage;
@@ -717,13 +726,40 @@ export function buildUsageTotals(results: readonly TaskResult[]): UsageTotals {
 
     // REAL provider-reported cost wins (provider-agnostic ground truth); the
     // Opus-tier estimate is used only when this result reports no `cost`.
-    const realCost = result.cost?.usd;
-    costUsd += typeof realCost === 'number' && Number.isFinite(realCost)
-      ? realCost
+    const reportedCost = result.cost?.usd;
+    const referenceCost = typeof reportedCost === 'number' && Number.isFinite(reportedCost)
+      ? reportedCost
       : estimateResultCost(usage);
+    referenceCostUsd += referenceCost;
+
+    // KPI `cost_usd` means billed/API spend. Subscription, free-tier and
+    // local regimes may retain a catalog-equivalent reference value for
+    // comparison, but that value is never money owed.
+    const task = tasksById.get(result.taskId);
+    if (task) {
+      const billingMode = resolveBillingModeForAuth(
+        task.provider,
+        task.authMode ?? defaultAuthMode,
+      );
+      if (billingMode === 'api') costUsd += referenceCost;
+      else if (billingMode === undefined) unknownBillingTaskCount++;
+    } else {
+      // Backward-compatible library/test path: absent task authority retains
+      // the historical metered interpretation.
+      costUsd += referenceCost;
+    }
   }
 
-  return { costUsd, inputTokens, outputTokens, cacheRead };
+  return tasks.length > 0
+    ? {
+        costUsd,
+        referenceCostUsd,
+        unknownBillingTaskCount,
+        inputTokens,
+        outputTokens,
+        cacheRead,
+      }
+    : { costUsd, inputTokens, outputTokens, cacheRead };
 }
 
 
@@ -753,6 +789,8 @@ export function recordSprintKpis(
   sprintId: string,
   metrics: Pick<SprintMetrics, 'totalTasks' | 'completedTasks' | 'noGoTasks' | 'boundaryViolations'>,
   results: readonly TaskResult[],
+  tasks: readonly Task[] = [],
+  defaultAuthMode?: 'subscription' | 'api' | 'hybrid',
 ): boolean {
   try {
     recordKpiMeasurements(
@@ -766,7 +804,7 @@ export function recordSprintKpis(
         boundaryViolations: metrics.boundaryViolations,
       },
       results,
-      buildUsageTotals(results),
+      buildUsageTotals(results, tasks, defaultAuthMode),
     );
     return true;
   } catch (e) {
@@ -1186,7 +1224,14 @@ export async function finalizeSprint(
   // recordSprintKpis so the success path is an independently unit-testable seam
   // (finalizeSprint spawns subprocesses → not hermetically callable). Best-effort
   // + fail-safe: NEVER blocks or fails finalize; finalize behavior is unchanged.
-  recordSprintKpis(projectRoot, sprint.id, metrics, results);
+  recordSprintKpis(
+    projectRoot,
+    sprint.id,
+    metrics,
+    results,
+    sprint.tasks,
+    opts?.config?.auth_mode,
+  );
 
   // ─── Cumulative spend advisory (B6 — warn-only, Sprint 333 333-005) ──
   // Project this sprint's realized cost (buildUsageTotals → the same usage/cost
@@ -1197,7 +1242,11 @@ export async function finalizeSprint(
   // default-off, so the flag-off common path is a no-op and finalize is byte-for-byte
   // unchanged. The HARD spend gate (enforce_spend_gate as a real block) is a
   // deliberate POST-BETA follow-up — NOT flipped here.
-  emitFinalizeSpendAdvisory(projectRoot, sprint.id, buildUsageTotals(results).costUsd);
+  emitFinalizeSpendAdvisory(
+    projectRoot,
+    sprint.id,
+    buildUsageTotals(results, sprint.tasks, opts?.config?.auth_mode).costUsd,
+  );
 
   // ─── METRIC_EMITTED: sprint summary metrics ──────────────────────
   // Emitted in parallel with metrics.jsonl so Auditor and Dashboard
@@ -1469,11 +1518,20 @@ export async function finalizeSprint(
       for (const task of sprint.tasks) {
         const evaluation = evaluations.get(task.id);
         if (!evaluation) continue;
+        const taskResult = resultsMap.get(task.id);
+        const learningEligible =
+          taskResult !== undefined
+          && taskResult.cascadeSkipped !== true
+          && (
+            evaluation === TaskEvaluation.DONE
+            || evaluation === TaskEvaluation.GO_WITH_TECH_DEBT
+            || evaluation === TaskEvaluation.NO_GO
+          );
+        if (!learningEligible) continue;
         // F5: record use against the agent's current prompt version (V2 path).
-        if (task.assignedAgent && evaluation !== TaskEvaluation.DEFERRED) {
+        if (task.assignedAgent) {
           promptVersionMgr.recordCurrentVersionUse(task.assignedAgent, evaluation);
         }
-        const taskResult = resultsMap.get(task.id);
 
         // Quality assessment — multi-dimensional scoring beyond GO/NO_GO
         let qualityScore: number | undefined;
@@ -1505,7 +1563,7 @@ export async function finalizeSprint(
         // the workType×domain×agent cell ledger — PER-TASK DNA by contract
         // (the tasks[0] class cannot recur), ghost-gated at the source.
         const v3Meta = task.routingMeta;
-        if (v3Meta?.routingVersion === 'v3' && task.assignedAgent && evaluation !== TaskEvaluation.DEFERRED) {
+        if (v3Meta?.routingVersion === 'v3' && task.assignedAgent) {
           try {
             const { recordOutcome: recordCell } = await import('../core/routing/learning-cells.js');
             const { producePositional } = await import('../core/routing/requirement-vector.js');
@@ -1675,7 +1733,14 @@ export async function finalizeSprint(
     const outputMode = (rawConfig?.['output_mode'] as string) ?? 'normal';
     const richInput = { id: sprint.id, number: sprint.number, tasks: sprint.tasks.map(t => ({ id: t.id, title: t.title })), metrics: sprint.metrics ? { ...sprint.metrics } : undefined };
     // Build agent performance data for the performance table
-    const agentRows = buildAgentPerformance(sprint, evaluations, results);
+    const attemptedSprint: Sprint = {
+      ...sprint,
+      tasks: sprint.tasks.filter(task => {
+        const result = resultsMap.get(task.id);
+        return result !== undefined && result.cascadeSkipped !== true;
+      }),
+    };
+    const agentRows = buildAgentPerformance(attemptedSprint, evaluations, results);
     const agentPerf = agentRows.map(row => ({
       agentId: row.agent,
       totalTasks: row.tasks,
@@ -1920,7 +1985,12 @@ export async function finalizeSprint(
       }
     } catch { /* use defaults */ }
 
-    const retentionResult = runRetention(projectRoot, sprint.id, retentionConfig);
+    const retentionResult = runRetention(
+      projectRoot,
+      sprint.id,
+      retentionConfig,
+      { deferCounterCleanup: true },
+    );
     debugLog('finalizeSprint:sprintFileRetention',
       `Retention complete: archived=${retentionResult.archived.length}, countersDeleted=${retentionResult.countersDeleted.length}, forensicMoved=${retentionResult.forensicMoved.length}, bytesFreed=${retentionResult.bytesFreed}`);
   } catch (e) { debugLog('finalizeSprint:sprintFileRetention', e); }
@@ -1964,6 +2034,8 @@ export async function finalizeSprint(
     // Build agent breakdown
     const agentBreakdown: Record<string, number> = {};
     for (const task of sprint.tasks) {
+      const result = resultsMap.get(task.id);
+      if (!result || result.cascadeSkipped === true) continue;
       const agent = task.assignedAgent ?? 'generic';
       agentBreakdown[agent] = (agentBreakdown[agent] ?? 0) + 1;
     }
@@ -1979,6 +2051,11 @@ export async function finalizeSprint(
     const durationStr = !sprint.startedAt
       ? 'unknown'
       : mins > 0 ? `${mins}dk ${secs}sn` : `${secs}sn`;
+    const usageTotals = buildUsageTotals(
+      results,
+      sprint.tasks,
+      opts?.config?.auth_mode,
+    );
 
     // completedTasks already includes TECH_DEBT (see calculateMetrics), so use it directly
     const donePure = metrics.completedTasks - metrics.techDebtTasks;
@@ -2037,6 +2114,9 @@ export async function finalizeSprint(
         noGo: metrics.noGoTasks,
         duration: durationStr,
         durationMs: metrics.durationMs,
+        billedCostUsd: usageTotals.costUsd,
+        referenceCostUsd: usageTotals.referenceCostUsd ?? 0,
+        unknownBillingTaskCount: usageTotals.unknownBillingTaskCount ?? 0,
       },
       agentBreakdown,
       evaluations: richEvaluations,
@@ -2180,6 +2260,13 @@ export async function finalizeSprint(
   } catch (e) { debugLog('finalizeSprint:terminalDashboard', e); }
   debugLog('finalizeSprint:breadcrumb', 'Step 16 (terminalDashboardSnapshot) — done');
 
+  // Counter cleanup must be the final filesystem action after the terminal
+  // event. Deleting `<sprint>-seq` during retention and then emitting
+  // RETRO→CLEANUP recreated the sequence at 1, breaking monotonicity.
+  try {
+    cleanupCounters(projectRoot, sprint.id);
+  } catch (e) { debugLog('finalizeSprint:cleanupCountersFinal', e); }
+
   return metrics;
 }
 
@@ -2232,6 +2319,17 @@ export function persistFinalSprintState(projectRoot: string, sprint: Sprint): vo
   try {
     cleanupCheckpointFiles(projectRoot, sprint.id);
   } catch (e) { debugLog('persistFinalSprintState:cleanupCheckpointFiles', e); }
+  // A pause record is a refining authority only while its run is resumable.
+  // Once the same sprint is terminal it must be removed, otherwise canonical
+  // status correctly keeps reporting PAUSED over the newly-written COMPLETE
+  // sprint-state. Never touch a pause record owned by another sprint.
+  try {
+    const pausePath = join(projectRoot, SPRINT_PAUSE_STATE_FILE);
+    if (existsSync(pausePath)) {
+      const pause = JSON.parse(readFileSync(pausePath, 'utf-8')) as { sprintId?: unknown };
+      if (pause.sprintId === sprint.id) unlinkSync(pausePath);
+    }
+  } catch (e) { debugLog('persistFinalSprintState:clearPauseState', e); }
 }
 
 /**

@@ -318,7 +318,7 @@ describe('handleEvaluation', () => {
   });
 
   it('NO_GO: fix task has isPriorityFix=true and CRITICAL priority', () => {
-    const task = makeTask();
+    const task = makeTask({ type: 'code-development' });
     const result = makeTaskResult({ selfAssessment: 'NO_GO', notes: 'failed' });
     handleEvaluation('/root', task, TaskEvaluation.NO_GO, result);
     const writtenContent = JSON.parse(vi.mocked(writeFileSync).mock.calls[0]![1] as string);
@@ -326,6 +326,7 @@ describe('handleEvaluation', () => {
     expect(writtenContent.priority).toBe('CRITICAL');
     expect(writtenContent.status).toBe(TaskStatus.PENDING);
     expect(writtenContent.fixForTaskId).toBe('task-001');
+    expect(writtenContent.type).toBe('code-development');
   });
 
   it('NO_GO: does not release locks', () => {
@@ -367,7 +368,11 @@ describe('handleCrossDependencies', () => {
   });
 
   it('creates cross-fix task when NO_GO depends on DONE task', () => {
-    const task1 = makeTask({ id: 'task-001', dependencies: [] });
+    const task1 = makeTask({
+      id: 'task-001',
+      dependencies: [],
+      type: 'code-development',
+    });
     const task2 = makeTask({ id: 'task-002', dependencies: ['task-001'] });
     const sprint: Sprint = {
       id: 'sprint-001', number: 1, status: 'ACTIVE' as any, phase: 'EXECUTE' as any,
@@ -382,6 +387,7 @@ describe('handleCrossDependencies', () => {
     expect(result[0]!.id).toBe('task-001-xfix');
     expect(result[0]!.isPriorityFix).toBe(true);
     expect(result[0]!.priority).toBe('CRITICAL');
+    expect(result[0]!.type).toBe('code-development');
   });
 
   it('does not create a concurrent cross-fix while the NO_GO task direct fix is pending', () => {

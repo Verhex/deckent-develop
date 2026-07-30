@@ -24,6 +24,7 @@ import { buildUsageTotals, recordSprintKpis } from '../../src/orchestra/sprint-f
 import { KpiStore } from '../../src/core/kpi/kpi-store.js';
 import type { TaskResult, TokenUsage } from '../../src/core/task-types.js';
 import type { SprintMetrics } from '../../src/core/sprint-types.js';
+import type { Task } from '../../src/core/types.js';
 
 const TENANT = 'default';
 const SPRINT = 'sprint-332';
@@ -132,6 +133,24 @@ describe('buildUsageTotals — REAL provider cost wins over the Opus estimate', 
     expect(totals.costUsd).toBe(0); // estimate would have been > 0 — but real wins
     expect(totals.inputTokens).toBe(5000);
     expect(totals.outputTokens).toBe(4000);
+  });
+
+  it('separates subscription reference value from billed/API spend', () => {
+    const result = mkResult(
+      { inputTokens: 5_000, outputTokens: 1_000 },
+      mkCost(1.93),
+    );
+    const task = {
+      id: result.taskId,
+      provider: 'claude',
+      authMode: 'subscription',
+    } as unknown as Task;
+
+    const totals = buildUsageTotals([result], [task], 'subscription');
+
+    expect(totals.costUsd).toBe(0);
+    expect(totals.referenceCostUsd).toBe(1.93);
+    expect(totals.unknownBillingTaskCount).toBe(0);
   });
 
   it('falls back to the Opus estimate when NO result carries cost (legacy behavior)', () => {

@@ -93,6 +93,7 @@ describe('preserveFixTaskRoutingFields — inheritance', () => {
       provider: 'codex',
       backend: 'subprocess',
       modelEffort: 'high',
+      type: 'code-development',
     });
     seedOriginal(PROJECT_ROOT, '360-014', original);
 
@@ -111,6 +112,7 @@ describe('preserveFixTaskRoutingFields — inheritance', () => {
     expect(fixTask.provider).toBe('codex');
     expect(fixTask.backend).toBe('subprocess');
     expect(fixTask.modelEffort).toBe('high');
+    expect(fixTask.type).toBe('code-development');
   });
 
   it('old no-inheritance behavior no longer occurs (negative test): fields are never left undefined when the original pinned them', () => {

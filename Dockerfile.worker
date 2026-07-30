@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     ca-certificates \
+    util-linux \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Claude Code CLI globally (always present — default lean image)

@@ -128,9 +128,28 @@ function seedCompleteDashboard(fakeRoot: string): void {
   );
 }
 
+function seedStaleActiveDashboard(fakeRoot: string): void {
+  writeFileSync(
+    join(fakeRoot, '.dashboard'),
+    JSON.stringify({
+      sprint: { id: 'sprint-479', number: 479, phase: 'EXECUTE', status: 'ACTIVE' },
+      agents: [{ id: 'w-479-001-fix', status: 'EXECUTING' }],
+      progress: { done: 0, active: 0, blocked: 18, total: 18 },
+      alerts: [],
+      updatedAt: new Date().toISOString(),
+    }),
+    'utf-8',
+  );
+}
+
 // ─── Suite ───────────────────────────────────────────────────────────────────────
 
-describe('deckent status --json — no-active-run contract (433-002 / born-688)', () => {
+// This suite launches vite-node subprocesses. The host's nested Vitest `forks`
+// pool loses their captured stdio while returning exit 0; execute this file
+// with `--pool=threads` for the real source-process contract.
+const NESTED_FORK_RUNNER = typeof process.send === 'function';
+
+describe.skipIf(NESTED_FORK_RUNNER)('deckent status --json — no-active-run contract (433-002 / born-688)', () => {
   let driverDir: string;
   let driverPath: string;
 
@@ -159,6 +178,7 @@ describe('deckent status --json — no-active-run contract (433-002 / born-688)'
 
     expect(result.timedOut).toBe(false);
     expect(result.code).toBe(0);
+    expect(result.stderr).toBe('');
 
     const trimmed = result.stdout.trim();
     // Single-object contract: the whole stdout is one JSON blob, no leading/trailing prose.
@@ -248,6 +268,32 @@ describe('deckent status --json — no-active-run contract (433-002 / born-688)'
     // The completed sprint's stale live-shaped progress (active:2) must NOT leak
     // into the JSON surface (the pre-455-003 divergence).
     expect(result.stdout).not.toContain('"active": 2');
+  }, 15000);
+
+  it('--json ignores a fresh ACTIVE dashboard when no lifecycle authority exists', async () => {
+    seedStaleActiveDashboard(fakeRoot);
+
+    const result = await runStatusDriver(driverPath, fakeRoot, ['--json']);
+
+    expect(result.timedOut).toBe(false);
+    expect(result.code).toBe(0);
+    const parsed = JSON.parse(result.stdout.trim()) as {
+      active: boolean;
+      lifecycle: string;
+      sprint?: unknown;
+      authority: { conflicts: Array<{ surface: string; value: string }> };
+    };
+    expect(parsed).toMatchObject({
+      active: false,
+      lifecycle: 'IDLE',
+    });
+    expect(parsed.sprint).toBeUndefined();
+    expect(parsed.authority.conflicts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        surface: 'dashboard',
+        value: 'ACTIVE-while-canonical-IDLE',
+      }),
+    ]));
   }, 15000);
 
   it('COMPLETE dashboard: human + JSON agree it is not live (no unqualified Complete-as-active)', async () => {

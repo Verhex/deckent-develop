@@ -43,6 +43,8 @@ vi.mock('node:fs', () => ({
   closeSync: vi.fn(),
   renameSync: vi.fn(),
   rmdirSync: vi.fn(),
+  chmodSync: vi.fn(),
+  statSync: vi.fn(() => ({ mtimeMs: 1 })),
 }));
 
 vi.mock('../../src/core/utils.js', () => ({
@@ -228,6 +230,32 @@ describe('buildProviderAuthIsolation', () => {
       'type=bind,src=/host/home/.gemini/google_accounts.json,dst=/run/deckent-auth-gemini-google_accounts.json,readonly',
     ]);
     expect([...codex.mountArgs, ...gemini.mountArgs].some(arg => /\.(codex|gemini):\//.test(arg))).toBe(false);
+  });
+
+  it('leases a writable host-owned broker and writes refreshed auth back', () => {
+    const isolated = buildProviderAuthIsolation(
+      '/host/home',
+      'claude',
+      '.claude',
+      false,
+      allExist,
+      {
+        credentialSources: {
+          '.credentials.json': '/runtime/auth/claude/.credentials.json',
+        },
+        lockPath: '/runtime/auth/claude/refresh.lock',
+      },
+    );
+
+    expect(isolated.mountArgs).toContain(
+      'type=bind,src=/runtime/auth/claude/refresh.lock,dst=/run/deckent-auth-claude.lock',
+    );
+    expect(isolated.mountArgs).toContain(
+      'type=bind,src=/runtime/auth/claude/.credentials.json,dst=/run/deckent-auth-claude-.credentials.json',
+    );
+    expect(isolated.bootstrapLines).toContain('flock -x 8 || exit 78');
+    expect(isolated.bootstrapLines).toContain('sync_provider_auth() {');
+    expect(isolated.writebackLines).toEqual(['sync_provider_auth']);
   });
 
   it('fails closed when a required credential is missing but optional metadata exists', () => {
@@ -434,7 +462,7 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
-    expect(argv.some(arg => arg.includes('src=/home/') && arg.includes('/.claude/.credentials.json,dst=/run/deckent-auth-claude-'))).toBe(true);
+    expect(argv.some(arg => arg.includes('/deckent-provider-auth/') && arg.includes('/claude/.credentials.json,dst=/run/deckent-auth-claude-'))).toBe(true);
     expect(argv.some(arg => arg.includes('/.claude:'))).toBe(false);
     const authEnvIdx = argv.indexOf('DECKENT_AUTH_MODE=subscription');
     expect(authEnvIdx).toBeGreaterThan(-1);
@@ -616,7 +644,7 @@ describe('DockerSpawnBackend: provider-aware command + isolated OAuth credential
     expect(script).toContain('--dangerously-skip-permissions');
     expect(script).toContain('--model claude-sonnet-5');
     expect(script).toContain('cp "/run/deckent-auth-claude-.credentials.json"');
-    expect(capturedDockerRunArgs[0]!.some(a => a.includes('/.claude/.credentials.json,dst='))).toBe(true);
+    expect(capturedDockerRunArgs[0]!.some(a => a.includes('/claude/.credentials.json,dst=/run/deckent-auth-claude-'))).toBe(true);
     expect(capturedDockerRunArgs[0]!.some(a => a.includes('/.claude:'))).toBe(false);
   });
 

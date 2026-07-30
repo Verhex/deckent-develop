@@ -41,6 +41,13 @@ vi.mock('../../src/core/config.js', () => ({
   loadConfig: vi.fn().mockResolvedValue({ language: 'en' }),
 }));
 
+const { mockConnector } = vi.hoisted(() => ({
+  mockConnector: { getAvailableProviders: vi.fn().mockReturnValue(['claude', 'codex']) },
+}));
+vi.mock('../../src/core/provider.js', () => ({
+  bootstrapProviders: vi.fn().mockResolvedValue({ connector: mockConnector }),
+}));
+
 vi.mock('../../src/cli/helpers/output.js', () => ({
   print: vi.fn(),
   printError: vi.fn(),

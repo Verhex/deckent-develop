@@ -14,10 +14,20 @@ describe('crash recovery', () => {
   beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'rec-')); path = join(dir, 'backlog.json'); });
   afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
-  it('resets running entries to pending on restart', () => {
+  it('parks an authority-less running entry instead of blind-redriving it', () => {
     writeFileSync(path, JSON.stringify({ _version: '1.0', entries: [entryJson('a', 'running')] }));
     recoverBacklog(path);
-    expect(loadBacklog(path).entries[0]!.status).toBe('pending');
+    expect(loadBacklog(path).entries[0]).toMatchObject({
+      status: 'parked',
+      lastResult: {
+        ok: false,
+        reason: 'RECOVERY_HOLD_ATTEMPT_AUTHORITY_UNAVAILABLE',
+        recoveryHold: {
+          schemaVersion: 1,
+          reasonCode: 'attempt-authority-unavailable',
+        },
+      },
+    });
   });
 
   it('leaves non-running entries untouched', () => {

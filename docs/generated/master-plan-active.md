@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):37e4573b12cd4f3457d22bd8ce9954c252d8f1d10bd406a1c5388cfe33218846`
+**Source digest:** `sha256(normalized-lf-utf8):61d8186f2f010c1347586333949e09a684323ef5b753922d7f4a39cc07bb4b16`
 
-**Rows:** 244 total · 244 active · 0 terminal
+**Rows:** 252 total · 252 active · 0 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 158 |
+| OPEN | 166 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -51,6 +51,7 @@
 | 210 | `REPO-CLEANUP-001` | OPEN | P2 | TRUTH | `SSOT-002` | — | Repository filesystem, tracked-ephemeral and orphan disposition manifest |
 | 220 | `REPO-CLEANUP-APPLY-001` | BLOCKED | P2 | TRUTH | `REPO-CLEANUP-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Apply approved repository-filesystem cleanup manifest |
 | 230 | `MEMORY-SYNC-001` | OPEN | P0 | TRUTH | `MEMORY-AUTHORITY-001` | — | Provider-neutral revisioned memory sync and projections |
+| 235 | `MEMORY-SURFACE-PROJECTION-001` | OPEN | P0 | TRUTH | `MEMORY-AUTHORITY-001`, `MEMORY-SYNC-001` | — | Rev-3 provider-agnostic core-memory projection across five assistant surfaces via shared workspace-sync service |
 | 240 | `MEMORY-DB-001` | BLOCKED | P2 | TRUTH | `MEMORY-AUTHORITY-001` | `FRESH_DB_APPROVAL_REQUIRED` | Memory DB maintenance manifest and transactional apply |
 | 250 | `ZERO-HARDCODE-PROVIDER-001` | OPEN | P1 | TRUTH | `CM-01` | — | Provider identity literal registry and lint ratchet |
 | 260 | `ZERO-HARDCODE-FLOW-001` | OPEN | P1 | TRUTH | `KERNEL-ONTOLOGY-001` | — | Flow/state/action literal schema and lint ratchet |
@@ -170,6 +171,13 @@
 | 3160 | `RECOVERY-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `RUNNER-PROTOCOL-001` | — | Cross-surface recovery leadership and orphan containment |
 | 3161 | `RECOVERY-RESUME-001` | VERIFY | P0 | KERNEL | `RUN-STATUS-AUTHORITY-001` | — | Durable pause notification, approval and lease-safe resume continuation |
 | 3162 | `PAUSED-FINALIZE-001` | OPEN | P0 | KERNEL | `RUN-STATUS-AUTHORITY-001` | — | Task projection'ı kayıp paused sprint için evidence-honest force-finalize settlement |
+| 3163 | `RECOVERY-DECISION-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `KERNEL-SETTLEMENT-001` | — | Provider-neutral cold-lane recovery decision engine |
+| 3164 | `RECOVERY-MODE-ADAPTERS-001` | OPEN | P0 | KERNEL | `RECOVERY-DECISION-001`, `MISSION-KIND-001`, `RUNFLOW-001` | — | Sprint, Run, Flow, Do, Autonomous, Mission and Process recovery adapters |
+| 3165 | `RECOVERY-COMMAND-SERVICE-001` | OPEN | P0 | KERNEL | `RECOVERY-DECISION-001`, `RECOVERY-RESUME-001`, `APPROVAL-001` | — | Shared inspect, resume, settle and abort recovery application service |
+| 3166 | `RECOVERY-TERMINATION-001` | OPEN | P0 | KERNEL | `RECOVERY-DECISION-001`, `RUNNER-PROTOCOL-001` | — | Ownership-fenced termination shared by kill, finalize, cleanup and mode shutdown |
+| 3167 | `RECOVERY-STALE-PROJECTION-001` | OPEN | P0 | KERNEL | `RECOVERY-DECISION-001`, `KERNEL-SETTLEMENT-001` | — | Evidence-honest reconciliation of stale Run, Flow, job and dashboard projections |
+| 3168 | `RECOVERY-ASSURANCE-001` | OPEN | P0 | KERNEL | `RECOVERY-MODE-ADAPTERS-001`, `RECOVERY-COMMAND-SERVICE-001`, `RECOVERY-TERMINATION-001`, `RECOVERY-STALE-PROJECTION-001` | — | Recovery failure-injection, every-environment and million-scale assurance matrix |
+| 3169 | `RECOVERY-DOGFOOD-BORN-001` | OPEN | P0 | KERNEL | — | — | Mandatory born ledger for recovery dogfood discoveries |
 | 3170 | `BUDGET-CONTINUATION-001` | OPEN | P0 | KERNEL | `LIMIT-001`, `RUNNER-PROTOCOL-001` | — | Landing, continuation reserve, task-kind budget sizing, timeout and measured termination contract |
 | 3180 | `DO-CUTOVER-001` | BLOCKED | P0 | KERNEL | `RUNFLOW-001`, `PLANNER-001` | `DEPENDENCY_UNSATISFIED` | `do` becomes canonical intent→preview→approval→run journey |
 | 3190 | `AUTONOMY-CUTOVER-001` | BLOCKED | P0 | KERNEL | `GOAL-CANARY-001`, `RECOVERY-001` | `DEPENDENCY_UNSATISFIED` | Autonomous and Nervous execution through canonical kernel |

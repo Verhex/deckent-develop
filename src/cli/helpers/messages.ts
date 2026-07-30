@@ -1085,6 +1085,14 @@ const MESSAGES: MessageMap = {
     en: 'Cleanup complete. Removed artifacts for {count} tasks.',
     tr: 'Temizlik tamamlandı. {count} görevin artifaktları silindi.',
   },
+  'cleanup.authority_hold': {
+    en: 'Cleanup held for {sprintId}: {reason}. Recover or finalize the run before removing mutable projections.',
+    tr: '{sprintId} cleanup işlemi beklemeye alındı: {reason}. Değişebilir projection kayıtlarını kaldırmadan önce run’ı recover veya finalize edin.',
+  },
+  'lifecycle.execution_lock_bind_failed': {
+    en: 'Project leadership could not be bound to execution {sprintId}.',
+    tr: 'Project leadership execution {sprintId} ile bağlanamadı.',
+  },
   'kill.settlements_reconciled': {
     en: 'Closed {count} host-owned execution settlement(s) after containment.',
     tr: 'Containment sonrası {count} host-owned execution settlement kapatıldı.',
@@ -1102,6 +1110,14 @@ const MESSAGES: MessageMap = {
   'finalize.complete': {
     en: 'Run {sprintId} (sprint) finalized: {total} tasks ({done} done, {debt} debt, {noGo} no-go). MEMORY.md, RETRO.md, and config updated.',
     tr: 'Run {sprintId} (sprint) sonlandırıldı: {total} görev ({done} tamam, {debt} borç, {noGo} no-go). MEMORY.md, RETRO.md ve config güncellendi.',
+  },
+  'finalize.coordinator_terminated': {
+    en: 'Coordinator PID {pid} reached verified termination ({escalation}).',
+    tr: 'Coordinator PID {pid} doğrulanmış biçimde sonlandı ({escalation}).',
+  },
+  'finalize.coordinator_hold': {
+    en: 'Finalize held: coordinator PID {pid} could not reach verified termination ({reason}). PID authority was preserved.',
+    tr: 'Finalize beklemeye alındı: coordinator PID {pid} doğrulanmış biçimde sonlandırılamadı ({reason}). PID authority korundu.',
   },
 
   // ─── doctor command ──────────────────────────────────────────────────
@@ -3346,6 +3362,7 @@ const MESSAGES: MessageMap = {
   'recover.resume_json_conflict': { en: '--resume streams the canonical resume command and cannot be combined with --json.', tr: '--resume canonical resume komutunun çıktısını aktarır ve --json ile birlikte kullanılamaz.' },
   'recover.resume_option': { en: 'Resume a canonically PAUSED/ORPHANED run through its durable checkpoint', tr: 'Canonical PAUSED/ORPHANED run’ı kalıcı checkpoint üzerinden sürdür' },
   'recover.auto_approve_option': { en: 'Forward auto-approval to the resumed worker run', tr: 'Otomatik onayı sürdürülen worker run’ına aktar' },
+  'recover.force_scope_option': { en: 'Preserve explicit approval for intentional new write paths while resuming', tr: 'Sürdürürken bilinçli yeni yazma yolları için açık onayı koru' },
   'recover.resume_authority_missing': { en: 'Run {sprintId} has no canonical resumable PAUSED/ORPHANED authority.', tr: '{sprintId} için canonical, sürdürülebilir PAUSED/ORPHANED authority bulunamadı.' },
   'recover.resume_entry_missing': { en: 'Deckent CLI entry path is unavailable.', tr: 'Deckent CLI giriş yolu kullanılamıyor.' },
   'pause.provider_auth_hold': {

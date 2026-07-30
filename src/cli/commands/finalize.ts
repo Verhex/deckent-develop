@@ -2,12 +2,23 @@ import { readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { Task, TaskResult } from '../../core/types.js';
-import { TaskEvaluation, SprintStatus, SprintPhase } from '../../core/types.js';
+import {
+  DEFAULT_LIFECYCLE_RECOVERY_CONFIG,
+  TaskEvaluation,
+  TaskStatus,
+  SprintStatus,
+  SprintPhase,
+} from '../../core/types.js';
 import { TASKS_DIR, BRAIN_DIR, DECKENT_DIR } from '../../core/constants.js';
 import { finalizeSprint } from '../../orchestra/brain.js';
 import { evaluateResultSync } from '../../orchestra/sprint-controller.js';
-import { terminateOwnedSprintProcess, clearPid, readPid } from '../../orchestra/sprint-pid-manager.js';
+import {
+  terminateOwnedSprintProcessAndWait,
+  clearPid,
+  readPid,
+} from '../../orchestra/sprint-pid-manager.js';
 import { loadConfig } from '../../core/config.js';
+import { createExecutionAuthorityError } from '../../core/errors.js';
 import { debugLog } from '../../core/utils.js';
 import { print, printError } from '../helpers/output.js';
 import { killSingle } from './kill.js';
@@ -130,6 +141,10 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string): {
     }
     const result = results.find(r => r.taskId === task.id);
     if (result) {
+      if (result.cascadeSkipped === true) {
+        evaluations.set(task.id, TaskEvaluation.DEFERRED);
+        continue;
+      }
       // FINALIZE-RECOUNT fix (Sprint 268, 1a): a .result that went through
       // Brain EVALUATE carries the authoritative decision in
       // `evaluationDecision`; crash-recovered/manual results only carry the
@@ -146,8 +161,16 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string): {
         evaluations.set(task.id, evaluateResultSync(result, task));
       }
     } else {
-      // No result file = NO_GO (timeout or incomplete)
-      evaluations.set(task.id, TaskEvaluation.NO_GO);
+      // Never-dispatched/repair-parked work has no worker verdict. Finalize
+      // must preserve that truth instead of inventing a failed attempt.
+      const unexecuted =
+        task.status === TaskStatus.DRAFT
+        || task.status === TaskStatus.PENDING
+        || task.status === TaskStatus.PAUSED;
+      evaluations.set(
+        task.id,
+        unexecuted ? TaskEvaluation.DEFERRED : TaskEvaluation.NO_GO,
+      );
     }
   }
 
@@ -198,6 +221,39 @@ export function detectMixedSprints(tasks: Task[]): string[] {
   return [...ids];
 }
 
+async function quiesceExternalCoordinator(
+  root: string,
+  sprintId: string,
+  lang: string,
+  policy: {
+    coordinator_termination_grace_ms: number;
+    termination_poll_interval_ms: number;
+    forced_termination_verify_ms: number;
+  },
+): Promise<void> {
+  const recordedPid = readPid(root, sprintId);
+  if (recordedPid === null || recordedPid === process.pid) return;
+
+  const outcome = await terminateOwnedSprintProcessAndWait(root, sprintId, policy);
+  if (outcome.action === 'terminated') {
+    print(getMessage('finalize.coordinator_terminated', lang, {
+      pid: String(outcome.pid),
+      escalation: outcome.escalation,
+    }));
+    clearPid(root, sprintId);
+    return;
+  }
+  if (outcome.action === 'already-stopped') {
+    clearPid(root, sprintId);
+    return;
+  }
+
+  throw createExecutionAuthorityError(getMessage('finalize.coordinator_hold', lang, {
+    pid: String(outcome.pid ?? recordedPid),
+    reason: outcome.action,
+  }));
+}
+
 export function registerFinalize(program: Command): void {
   program
     .command('finalize')
@@ -217,6 +273,9 @@ export function registerFinalize(program: Command): void {
           print(getMessage('finalize.no_tasks', lang));
           return;
         }
+        const config = await loadConfig(root);
+        const terminationPolicy =
+          config.lifecycle_recovery ?? DEFAULT_LIFECYCLE_RECOVERY_CONFIG;
 
         // (G) Mixed sprint detection
         const sprintIds = detectMixedSprints(tasks);
@@ -237,15 +296,12 @@ export function registerFinalize(program: Command): void {
           // needed). Left alive it races this finalize — re-clobbering results or
           // re-finalizing on its own timeout (sprint-323). Terminate it (ownership-
           // guarded — never signals a recycled PID).
-          try {
-            const term = terminateOwnedSprintProcess(root, sprintId);
-            if (term.action === 'killed') {
-              print(`Terminated orphan sprint process (PID ${term.pid}) so it cannot race this finalize.`);
-            } else if (term.action === 'skipped-reused') {
-              print(`Note: the PID recorded for ${sprintId} was recycled by the OS — not signalling; check for a stray process manually.`);
-            }
-            clearPid(root, sprintId);
-          } catch (e) { debugLog('finalize:orphanTerminate', e); }
+          await quiesceExternalCoordinator(
+            root,
+            sprintId,
+            lang,
+            terminationPolicy,
+          );
           // born-610: kill the sprint's live WORKERS too — COMPLETE may not be
           // stamped while worker subprocesses are alive (COMPLETE&active truth).
           try {
@@ -270,31 +326,20 @@ export function registerFinalize(program: Command): void {
         // P0-C RECURRENCE (sprint-333, task 334-003): on a NORMAL (non-force)
         // finalize the owned `deckent start` coordinator can still be alive and
         // linger post-close (idle event-loop — observed ~27min in sprint-333).
-        // The `--force` branch above already terminates it; mirror that here for
-        // the normal path so a lingering coordinator cannot keep running / re-
-        // finalize on its own timeout. ORDERING: this MUST run before
-        // `finalizeSprint`, whose step-15 persistFinalSprintState→clearPid wipes
-        // the pid file the ownership-guarded terminator reads. SELF-GUARD: never
-        // signal ourselves when finalize runs IN the coordinator (recorded pid
-        // === process.pid); verifySprintOwnership already refuses a recycled
-        // ('reused') pid. The terminator is delegated to sprint-pid-manager — not
-        // re-implemented here.
-        // TODO(phase2): the deeper "why does an idle coordinator linger ~27min"
-        //   (unref'd-handle audit) is out of scope here — this delivers the
-        //   requested SIGTERM-at-finalize mitigation only.
+        // The `--force` branch above already contains it; mirror that here so a
+        // lingering coordinator cannot keep running or re-finalize on timeout.
+        // ORDERING: this MUST run before `finalizeSprint`, whose step-15
+        // persistFinalSprintState→clearPid removes the ownership evidence.
+        // The shared helper verifies exact ownership, sends SIGTERM, waits using
+        // config-driven deadlines, escalates to SIGKILL when needed, and requires
+        // proof of death before the PID authority or lifecycle can be retired.
         if (!opts.force) {
-          try {
-            const recordedPid = readPid(root, sprintId);
-            if (recordedPid !== null && recordedPid !== process.pid) {
-              const term = terminateOwnedSprintProcess(root, sprintId);
-              if (term.action === 'killed') {
-                print(`Terminated orphan sprint process (PID ${term.pid}) so it cannot race this finalize.`);
-              } else if (term.action === 'skipped-reused') {
-                print(`Note: the PID recorded for ${sprintId} was recycled by the OS — not signalling; check for a stray process manually.`);
-              }
-              clearPid(root, sprintId);
-            }
-          } catch (e) { debugLog('finalize:normalOrphanTerminate', e); }
+          await quiesceExternalCoordinator(
+            root,
+            sprintId,
+            lang,
+            terminationPolicy,
+          );
         }
 
         // FINALIZE Duration fix (Sprint 268): the CLI-built sprint object had
@@ -327,8 +372,6 @@ export function registerFinalize(program: Command): void {
           startedAt,
           completedAt: new Date().toISOString(),
         };
-
-        const config = await loadConfig(root);
 
         // Bug N fix (Sprint 166-T2): wire onRuleRegen to regenerateRules so manual
         // finalize regenerates .claude/rules/*.md just like the Brain-driven path
