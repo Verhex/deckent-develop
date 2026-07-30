@@ -55,6 +55,9 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-476 Learnings** (sprint-476): ## Sprint sprint-476 Learnings
+- Fix: DENEME-001 — simple document and test: NO_GO
+- DENEME-001 — simple document and...
 - **Sprint sprint-475 Learnings** (sprint-475): ## Sprint sprint-475 Learnings
 - DENEME-001 — simple document and test: NO_GO — Required verification failed: tsc=0, ...
 - **Sprint sprint-473 Learnings** (sprint-473): ## Sprint sprint-473 Learnings
@@ -76,8 +79,6 @@
 ## Gains
 - 460-001 — [D2] Subscription broker bypass'ını current-truth olarak raporla...
 - **Sprint sprint-459 Learnings** (sprint-459): ## Sprint sprint-459 Learnings
-- **Sprint sprint-456 Learnings** (sprint-456): ## Sprint sprint-456 Learnings
-- Docker auth and provider-image fixture budget parity: NO_GO — Runtime budget circuit...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -154,5 +155,6 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- FIX lineage and post-FIX pause contract
 
-_Total entries: 1674 | Generated: 2026-07-30_
+_Total entries: 1680 | Generated: 2026-07-30_

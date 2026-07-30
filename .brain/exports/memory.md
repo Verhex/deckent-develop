@@ -1,5 +1,30 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-476 Learnings
+- Sprint sprint-476 Learnings: ## Sprint sprint-476 Learnings
+- Fix: DENEME-001 — simple document and test: NO_GO
+- DENEME-001 — simple document and test: NO_GO — Verification failed: tsc=0, vitest=1, fileProof=0, node=0.
+- Fix: DENEME-002 — simple document and test: NO_GO
+- Fix: DENEME-003 — simple document and test: NO_GO
+- Fix: DENEME-004 — simple document and test: NO_GO
+- Fix: DENEME-005 — simple document and test: NO_GO
+- Fix: DENEME-006 — simple document and test: NO_GO
+- DENEME-006 — simple document and test: NO_GO — npx tsc --noEmit passed. File existence proof passed. Direct Node execution passed. Required scoped command npx vitest r
+- Fix: DENEME-007 — simple document and test: NO_GO
+- DENEME-007 — simple document and test: NO_GO — npx tsc --noEmit: passed
+Targeted vitest attempts (3): failed; current config includes only tests/**/*.test.ts, while wr
+
+## Gains
+- 476-002 — DENEME-002 — simple document and test — npx tsc --noEmit passed.
+- 476-003 — DENEME-003 — simple document and test — Baseline: deneme/task-003 was absent before work.
+- 476-004 — DENEME-004 — simple document and test — Created only the two assigned files.
+- 476-005 — DENEME-005 — simple document and test — No separate Vitest target exists within the assigned write scope; the directly runnable assertion...
+- 476-009 — DENEME-009 — simple document and test — All required checks passed.
+- 476-010 — DENEME-010 — simple document and test — All required verification commands passed.
+- 476-011 — DENEME-011 — simple document and test — All four required checks are satisfied.
+- 476-014 — DENEME-014 — simple document and test — Baseline: assigned directory did not exist.
+- …and 33 more delivered
+
 ## Sprint sprint-475 Learnings
 - Sprint sprint-475 Learnings: ## Sprint sprint-475 Learnings
 - DENEME-001 — simple document and test: NO_GO — Required verification failed: tsc=0, vitest=1, existence=0.
@@ -3091,3 +3116,4 @@ WHAT WAS DONE:
 ## Sprint unknown Learnings
 - Goal-v2 worker invocation truth — 8bc23db7: 2026-07-22 fact-only closure. Commit 8bc23db7e34fe7ef8d4a8c468b1b688aef69d786 is pushed to origin/main. Delivered: Mission-claim-derived invocation/call/receipt/reservation identity; tenant/project prebinding; known reachability and scoped limit admission before receipt and unique dispatch grant; raw fence and authored provider/model removed from exact executor; actual provider/model/backend/auth evidence match; host-scoped consumed/released settlement; replay consults receipt plus reservation journals and never redrives after durable dispatch; pre-grant HOLD and post-grant reconciliation remain distinct. Evidence: 166/166 focused hermetic tests, npm run lint PASS, npm run build:all PASS, compiled CLI canary mission=pending item=parked authority_unavailable receipt=null taskArtifacts=0. Finite Fable xverify xv-1784716119261 CONFIRMED in one terminal 3-turn run; usage input=3557 output=5973 cacheRead=86290 cacheCreate=35768; provider envelope USD 0.435695 is not an invoice. Nonclaims: production live ALLOW is not wired; exact reachability, authoritative provider/account snapshots, route lock and usage authority remain; this is local durable at-most-once grant, not external exactly-once. Live debt: report CONFIRMED and hb DONE but verifier result NO_GO/EXIT_WITHOUT_RESULT and task JSON PENDING; MASTER-PLAN 609 changed to yellow. Artifact SHA-256: plan 51bc1e221d88ba49ccd76a61bbbe0b49ea1db8da293c30a31aff662b964f444a; result 0c3f17992ad8e6e941b8078234c87fac06ea9aafb13e0d3864638f546644eb18; xverify prompt 6e78511000c5fb6d8b227cccfac22de9822670c75b6325702f8bb31592df644b; wrapper 68d4219c24597c79714ca88c9b63ab7425b4d396252162a5efb74f738406eacf; hb 80d20a360e7abf81763f96a8b12c11f63b589a5a3b3a74dea6ddec1ab16d426b; task 79f4d48c98c796b3a546ee69c2e7586bf8b5d534d6c066d38dbdd9161e16af0d; log d1c9b05ed809228f6f6ed3ccdeebf3f3c3226de871933b65b7b57592541282d0; verifier result 1f522703bcd2e90d2e821f4e4965c35d43af154a6abb4bad19ff723080ee876a; report 255381bc0b89398b58d04b1c17664c1156b2535ab9e5592d6c420fa5ebf5b458.
 - Dogfood truth snapshot 2026-07-22: 2026-07-22 owner-approved dogfood truth snapshot. Evidence archive: /home/alperen/.deckent/recovery-snapshots/deckent-dev/tasks-reset-2026-07-22-8bc23db7; payload manifest SHA-256 1ce6a6d24a20c4193167e9c746422363008fc32065e24b3b848df61403c52273. The reset preserved 655 .tasks files and no active sprint was present. Audited range 105ebc67..5e26a5a7 is 135 files, +15,860/-847. At main 8bc23db7, host-authoritative Docker result settlement is wired for one-shot paths but v1 autonomous, process and sprint paths still consume container-writable result state without settlementRef. Detached Docker loses host live-budget monitoring after host crash until its 1200-second container cap; deterministic task container-name retry can force-remove an orphan, so boot reconciliation and settle-or-refuse are required. Remote provider execution must have an owner-authored measurable budget; MCP run lacks the policy producer, and worker-writable Task JSON must not be the budget authority. Prompt inspection canaries reduced prompt size from 17,481 to 7,683 characters, and a 5M cache-read ceiling would have prevented about 82.4 percent of the 29.6M cache-read Sprint-455 replay. Xverify must remain criteria-only, terminal and finite; report/result/task projection convergence remains open. Goal-v2 production remains honest HOLD until live reachability and limit producers, approval composition and exact execution authorities are wired. Canonical provider API model IDs are the runtime contract; the current dirty migration is incomplete, with 28 failures in the 498-test targeted model matrix, so it must not be committed as-is.
+- Takılma ve tasarım netleştirmede cross-provider xverify opsiyonu: Alperen onayı (2026-07-30): Deckent geliştirmesinde Codex/Sol gerçekten takıldığında, iki güçlü tasarım/authority yorumu arasında netleştirme gerektiğinde veya kritik bir bulgunun bağımsız görüşe ihtiyacı olduğunda `deckent xverify` üzerinden farklı provider olan Claude Fable 5 kullanılabilir. Bu bir opsiyondur; rutin işlerde zorunlu değildir. XVERIFY-PROVIDER-SEPARATION korunur: çıktıyı üreten provider ile verifier aynı olamaz. Fable 5 görüşü tek başına authority veya otomatik değişiklik izni değildir; kanıt zincirine eklenen çapraz doğrulama girdisidir.
