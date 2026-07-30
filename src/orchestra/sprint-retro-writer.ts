@@ -560,7 +560,10 @@ export function buildSprintMemoryContent(
     if (ev === TaskEvaluation.NO_GO || ev === TaskEvaluation.GO_WITH_TECH_DEBT) {
       const result = results?.find(r => r.taskId === task.id);
       const notes = result?.notes ? ` — ${result.notes.slice(0, 120)}` : '';
-      lines.push(`- ${task.title}: ${ev}${notes}`);
+      // Runtime task JSON can arrive without a title — fall back to the id so
+      // the learnings line never renders "- undefined: NO_GO".
+      const label = (task.title ?? '').trim() || task.id;
+      lines.push(`- ${label}: ${ev}${notes}`);
       problemCount++;
     }
   }

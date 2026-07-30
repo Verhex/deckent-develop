@@ -1,7 +1,7 @@
-<!-- AUTO-START -->
 ---
 paths: ["DIRECTIVES.md",".tasks/*",".brain/*"]
 ---
+<!-- AUTO-START -->
 # Brain Rules
 
 > **How you operate (read this first):** You are the orchestrator. You DRIVE a sprint through

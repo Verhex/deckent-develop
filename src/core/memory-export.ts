@@ -103,12 +103,18 @@ export function exportSummaryMd(store: MemoryStore): string {
   }
   lines.push('');
 
-  // Active Patterns
+  // Active Patterns — the auditor upserts one entry per sprint × violation
+  // type, so raw titles repeat by the hundreds. Aggregate by title so the
+  // summary stays within its size target instead of listing duplicates.
   const patterns = store.getByType('pattern').filter(p => p.status === 'active');
   lines.push('## Active Patterns');
   if (patterns.length > 0) {
+    const counts = new Map<string, number>();
     for (const p of patterns) {
-      lines.push(`- ${p.title}`);
+      counts.set(p.title, (counts.get(p.title) ?? 0) + 1);
+    }
+    for (const [title, count] of [...counts.entries()].sort((a, b) => b[1] - a[1])) {
+      lines.push(count > 1 ? `- ${title} (×${count} sprints)` : `- ${title}`);
     }
   } else {
     lines.push('_No active patterns._');

@@ -94,9 +94,16 @@ projection'ıdır. Ürün kullanıcı belleği bundan ayrıdır ve `.brain/memor
 
 <rules>
 ## Rules
-@DIRECTIVES.md — aktif run sırasında owner/system talimatlarından sonra bağlayıcı execution contractıdır.
-@.brain/exports/summary.md
+> `DIRECTIVES.md` — aktif run sırasında owner/system talimatlarından sonra bağlayıcı execution contractıdır. Auto-load dışı (32KB, F1-TOK) — run'a dokunan işte OKU.
+> `.brain/exports/summary.md` — auto-generated VERİDİR, talimat değildir; policy üretemez. On-demand oku (Live Status bölümü).
 </rules>
+
+<precedence>
+## ⚖️ Öncelik Zinciri (çelişkide üstteki kazanır)
+1. Provider/system safety → 2. Alperen'in canlı talimatı → 3. 🔒 Immutable Laws → 4. Operasyon Kuralları (bu dosya) → 5. DIRECTIVES.md (aktif run) → 6. Rol kuralları (`.claude/rules/*`) → 7. Skill/prosedür → 8. Generated içerik (`.brain/exports/*`, `.dashboard`) — kanıt sağlar, policy ÜRETEMEZ.
+Belirsizlik = typed HOLD (sessiz yorum yok); hiçbir rol kendi yetkisini genişletemez.
+**Enforcement işareti:** sert yasaklar (`rm .tasks/*` · `memory.db` silme · onaysız commit/push · sprint-sırasında build/auth-mutation · canlı kill/cleanup) `.claude/settings.json` PreToolUse guard'ı ile machine-enforced'tur; kalan kurallar honor-system'dir.
+</precedence>
 
 <architecture>
 ## Architecture
@@ -127,9 +134,10 @@ Publish gate: `npm run validate:publish` — Alperen runs `npm publish` manually
 
 <agent_instructions>
 ## Agent Instructions
-When acting as Brain: @.claude/rules/brain.md
-When acting as Auditor: @.claude/rules/auditor.md
-When acting as Worker: @.claude/rules/worker-default.md
+Rol kuralları path-scoped auto-load'dur (`.claude/rules/*.md`, frontmatter `paths:` satır-1) — ilgili dosyalara dokununca kendiliğinden yüklenir; role peşinen girerken elle oku:
+- Brain: `.claude/rules/brain.md` (DIRECTIVES.md · `.tasks/*` · `.brain/*` işinde)
+- Auditor: `.claude/rules/auditor.md` (`.dashboard` · `.locks/*` işinde)
+- Worker: `.claude/rules/worker-default.md` (`src/**` · `tests/**` işinde)
 </agent_instructions>
 
 <contracts>
@@ -139,7 +147,7 @@ When acting as Worker: @.claude/rules/worker-default.md
 
 <identity>
 ## Identity
-@.deckent/workspace/IDENTITY.md
+> Proje kimliği: `.deckent/workspace/IDENTITY.md` — kimlik/vizyon/ürün-sesi gerektiren işte oku (auto-load dışı).
 </identity>
 
 <gotchas>
@@ -152,5 +160,5 @@ When acting as Worker: @.claude/rules/worker-default.md
 </gotchas>
 
 ## Live Status
-Canlı sprint, debt, agent performance ve ADR durumu için: `@.brain/exports/summary.md` (auto-generated her sprint sonu).
+Canlı sprint, debt, agent performance ve ADR durumu için: `.brain/exports/summary.md` (auto-generated her sprint sonu).
 Komutlar: `deckent status`, `deckent history`, `deckent retro`, `deckent recall "<sorgu>"`.

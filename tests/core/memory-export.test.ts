@@ -147,6 +147,32 @@ describe('exportSummaryMd', () => {
     expect(md).toContain('Docker Container Lifecycle');
   });
 
+  it('aggregates same-title patterns into one line with a sprint count', () => {
+    // The auditor upserts one pattern entry per sprint × violation type
+    // (`pattern-<sprint>-<type>`), so identical titles repeat across sprints.
+    for (const sprintNum of [140, 141, 142]) {
+      store.insert({
+        id: `pattern-sprint-${sprintNum}-stale_heartbeat`,
+        type: 'pattern',
+        title: 'Violation pattern: stale_heartbeat',
+        content: `1 occurrence(s) of stale_heartbeat detected in sprint-${sprintNum}`,
+        source: 'system',
+        status: 'active',
+        priority: 'normal',
+        sprint_id: `sprint-${sprintNum}`,
+        sprint_num: sprintNum,
+        tags: ['auditor', 'pattern', 'stale_heartbeat'],
+      });
+    }
+    const md = exportSummaryMd(store);
+    const occurrences = md.match(/Violation pattern: stale_heartbeat/g) ?? [];
+    expect(occurrences.length).toBe(1);
+    expect(md).toContain('Violation pattern: stale_heartbeat (×3 sprints)');
+    // Singleton patterns keep their plain form — no count suffix.
+    expect(md).toContain('- Docker Container Lifecycle');
+    expect(md).not.toContain('Docker Container Lifecycle (×');
+  });
+
   it('contains total entry count and generation marker', () => {
     const md = exportSummaryMd(store);
     // 6 entries total (2 adr + 2 memory + 1 debt + 1 pattern)

@@ -127,10 +127,8 @@ function claudeAdapter(workerPaths?: string[]): ProviderAdapter {
   };
 
   return {
-    format(role: RuleRole, content: string): string {
-      const paths = pathsMap[role] ?? [];
-      const frontmatter = `---\npaths: ${JSON.stringify(paths)}\n---\n`;
-      return frontmatter + content;
+    format(_role: RuleRole, content: string): string {
+      return content;
     },
     rulesDir(): string {
       return join('.claude', 'rules');
@@ -138,8 +136,13 @@ function claudeAdapter(workerPaths?: string[]): ProviderAdapter {
     fileExt(): string {
       return 'md';
     },
-    preamble(): string {
-      return '';
+    preamble(role: RuleRole): string {
+      // Claude Code parses `paths:` frontmatter only when `---` is the very
+      // first line of the file. Emitting it inside the AUTO block (after the
+      // `<!-- AUTO-START -->` marker) leaves it unparsed → the rule loads
+      // unconditionally in every session instead of path-scoped.
+      const paths = pathsMap[role] ?? [];
+      return `---\npaths: ${JSON.stringify(paths)}\n---\n`;
     },
   };
 }

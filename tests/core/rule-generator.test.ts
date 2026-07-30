@@ -229,6 +229,11 @@ describe('rule-generator', () => {
       const content = readFileSync(result.filesWritten[0]!, 'utf-8');
       expect(content).toContain('---');
       expect(content).toContain('paths:');
+      // Claude Code requirement: frontmatter must be the very first line —
+      // if anything (e.g. the AUTO-START comment) precedes `---`, the
+      // frontmatter is not parsed and the rule loads unconditionally.
+      expect(content.startsWith('---\n')).toBe(true);
+      expect(content.indexOf('paths:')).toBeLessThan(content.indexOf('<!-- AUTO-START -->'));
     });
 
     it('codex adapter generates plain markdown', () => {

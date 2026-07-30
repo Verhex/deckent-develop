@@ -167,6 +167,18 @@ describe('buildSprintMemoryContent — captures gains, not only problems', () =>
     expect(out.indexOf('## Gains')).toBeGreaterThan(out.indexOf('broken thing'));
   });
 
+  it('falls back to the task id when the title is missing — never "- undefined:"', () => {
+    // Runtime task JSON can arrive without a title (observed in exported
+    // learnings as "- undefined: NO_GO" lines, e.g. sprint-463/473).
+    const titleless = makeSprint({
+      tasks: [{ ...makeTask({ id: '463-001' }), title: undefined as unknown as string }],
+    });
+    const e = new Map([['463-001', TaskEvaluation.NO_GO]]);
+    const out = buildSprintMemoryContent(titleless, e);
+    expect(out).toContain('- 463-001: NO_GO');
+    expect(out).not.toContain('undefined');
+  });
+
   it('produces a non-empty Gains section even when all tasks are DONE', () => {
     const allDone = makeSprint({
       tasks: [makeTask({ id: 'a1', title: 'a1 — alpha' }), makeTask({ id: 'b2', title: 'b2 — beta' })],

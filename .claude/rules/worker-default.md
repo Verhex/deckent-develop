@@ -1,7 +1,7 @@
-<!-- AUTO-START -->
 ---
 paths: ["src/**","tests/**"]
 ---
+<!-- AUTO-START -->
 # Worker Rules
 - Read your task file first (`.tasks/task-XXX.json`)
 - ADRs are injected into your prompt automatically from `.brain/memory.db` — they are mandatory constraints
