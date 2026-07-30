@@ -1,17 +1,18 @@
-# deckent — Deckent Orchestrated
+# deckent — Product and Runtime Reference
 
 ## Identity
-@.deckent/workspace/IDENTITY.md
+Canonical ürün kimliği ve execution-authority tanımı: `.deckent/workspace/IDENTITY.md`.
+`@file` import çözmeyen host'lar bu dosyayı doğrudan açıp okur.
 
 > **Aktif yön kararları taşındı** — bu iç-pivot notu artık `.analysis/hermes-vs-deckent-direction-decisions.md`
 > içinde tutuluyor (CLAUDE.md operating_rules'ta da özetlenir); DECKENT.md yalnız mekanik/işlevsel
 > referans kalır, tekrar-eden iç-strateji notu barındırmaz.
 
 ## Rules
-- Brain is the ONLY orchestrator — workers never plan
+- Canonical authority chain Goal → Mission → Flow → Run → WorkItem → Attempt → Operation'dır; Brain bu authority'yi supervise eder, worker kendi scope veya authority'sini genişletemez
 - Workers stay within assigned scope (directories + filesWrite)
 - Auditor never writes source code
-- Sprint is NEVER left incomplete
+- Her run typed terminal veya resumable settlement'a ulaşır; `PAUSED`/`HOLD` geçerli durumlar, belirsiz/stale `running` değildir
 - `DIRECTIVES.md` is the binding execution contract for an active run after owner/system instructions
 - Runtime limits and retention budgets come from effective config; this document does not freeze live values
 
@@ -50,7 +51,8 @@
 - **Config:** `.deckent/config.json` → `memory.backend`, `memory.search`, `memory.decay_after_sprints`
 
 ## Mandatory Architecture Rules
-@.brain/exports/summary.md
+Generated canlı durum projection'ı: `.brain/exports/summary.md` (gerektiğinde doğrudan oku;
+runtime authority değildir).
 
 ## Architecture Decision Records
 - `.brain/memory.db` = accepted ADR authority; `docs/adr/*.md` ve `.brain/exports/decisions.md` review/search projectionlarıdır
@@ -60,9 +62,9 @@
   boolean/default veya worker sayısı stamp etmez
 
 ## Context
-@DIRECTIVES.md
-@.brain/exports/summary.md
-@docs/reference/api-surface.md
+- `DIRECTIVES.md` — yalnız DIRECTIVES-backed aktif run için bağlayıcı execution contract
+- `.brain/exports/summary.md` — generated status/knowledge projection
+- `docs/reference/api-surface.md` — transport ve runtime contract haritası
 
 ## Environment
 Build: `npm run build` (tsc + copy-assets) | Full: `npm run build:all` (+ dashboard vite) | Dev: `npm run dev` (tsc --watch)
@@ -70,15 +72,17 @@ Test: `npm test` (vitest run) | Watch: `npm run test:watch` | Coverage: `npm run
 Lint: `npm run lint` (tsc --noEmit) | ADR: `npm run lint:adr` | Errors: `npm run lint:errors` | Links: `npm run lint:link`
 
 ## Boot
-@.deckent/workspace/BOOT.md
+Bootstrap rehberi: `.deckent/workspace/BOOT.md` (host import çözmüyorsa doğrudan aç-oku).
 
 ---
 
 ## Workflow Guide — Is Akisi Rehberi
 
-Deckent ile tipik bir sprint akisi asagidaki adimlari izler:
+Deckent'in Goal → Mission → Flow → Run authority zinciri çeşitli adapter yüzeylerinden
+yürütülebilir. Aşağıdaki sprint akışı, DIRECTIVES-backed CLI/MCP adapterının compatibility
+workflow'udur; ürünün bütünü veya tek execution authority'si değildir:
 
-1. **`deckent_init`** — Projeyi baslat. `.deckent/`, `.brain/`, `.tasks/` dizinlerini olusturur. CLAUDE.md, DECKENT.md, DIRECTIVES.md referanslarini ekler. Her ortamda (Claude Code, Cursor, VS Code) bir kez calistirilir.
+1. **`deckent_init`** — Projeyi başlat. `.deckent/`, `.brain/`, `.tasks/` dizinlerini ve seçili host adapterının provider-neutral kural/reference projection'larını oluşturur. Desteklenen her environment/project scope'unda bir kez çalıştırılır.
 
 2. **`deckent_set_directives`** — Sprint hedeflerini yaz. DIRECTIVES.md dosyasini gunceller. Asagidaki DIRECTIVES Format Rehberini kullanarak task'lari tanimla.
 

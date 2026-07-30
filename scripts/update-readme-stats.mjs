@@ -201,6 +201,7 @@ export function collectStats({ root = DEFAULT_ROOT, coverage } = {}) {
   return {
     version: pkg.version ?? '0.0.0',
     tests: countTestDescriptors(join(root, 'tests')),
+    dashboardTests: countTestDescriptors(join(root, 'src/dashboard/src')),
     coverage: cov,
     sprint: detectActiveSprint(root),
     mcpTools: countMcpRegistrations(join(root, 'src/mcp/tools'), TOOL_REGISTER_RE),
@@ -212,7 +213,6 @@ export function collectStats({ root = DEFAULT_ROOT, coverage } = {}) {
     skills: skills.length,
     dashboardPages: countDashboardPages(join(root, 'src/dashboard/src/pages')),
     cliCommands: countCliCommands(join(root, 'src/cli/commands')),
-    providersCount: 3, // Claude, Codex, Gemini — single fact, not derivable
   };
 }
 
@@ -279,7 +279,6 @@ export function renderStatCounts({
 
 export function renderIdentityStatus({
   version,
-  sprint,
   mcpTools,
   mcpResources,
   cliCommands,
@@ -287,37 +286,40 @@ export function renderIdentityStatus({
   agents,
   agentsTotal,
   skills,
-  providersCount,
 }) {
   const customNote =
     typeof agentsTotal === 'number' && agentsTotal > agents
       ? ` + ${agentsTotal - agents} custom`
       : '';
   const cli = typeof cliCommands === 'number' && cliCommands > 0 ? `${cliCommands}+` : '0';
-  const sprintLabel = typeof sprint === 'number' ? `sprint-${sprint}` : 'unknown';
   return [
     '| Metric | Value |',
     '|--------|-------|',
     `| Version | ${version} |`,
-    `| Sprint | ${sprintLabel} |`,
     `| MCP Tools | ${mcpTools} |`,
     `| MCP Resources | ${mcpResources} |`,
     `| CLI Commands | ${cli} |`,
     `| Dashboard Pages | ${dashboardPages} |`,
     `| Agents | ${agents} built-in${customNote} |`,
     `| Skills | ${skills} built-in |`,
-    `| Providers | ${providersCount} (Claude, Codex, Gemini) |`,
   ].join('\n');
 }
 
-export function renderIdentityTests({ tests, coverage }) {
+export function renderIdentityTests({ tests, dashboardTests, coverage }) {
   const formatted = typeof tests === 'number' ? tests.toLocaleString('en-US') : String(tests);
+  const dashboardFormatted =
+    typeof dashboardTests === 'number'
+      ? dashboardTests.toLocaleString('en-US')
+      : String(dashboardTests);
   const cov = typeof coverage === 'number' ? `${coverage}%` : 'N/A';
-  return [`Tests: ${formatted} descriptors (parsed from tests/**/*.test.ts(x))`, `Coverage: ${cov}`].join('\n');
+  return [
+    `Tests: ${formatted} descriptors (parsed from tests/**/*.test.ts(x))`,
+    `Dashboard Tests: ${dashboardFormatted} descriptors (parsed from src/dashboard/src/**/*.test.tsx)`,
+    `Coverage: ${cov}`,
+  ].join('\n');
 }
 
 export function renderIdentitySummary({
-  sprint,
   cliCommands,
   mcpTools,
   mcpResources,
@@ -330,14 +332,11 @@ export function renderIdentitySummary({
       ? ` + ${agentsTotal - agents} custom`
       : '';
   const cli = typeof cliCommands === 'number' && cliCommands > 0 ? `${cliCommands}+` : '0';
-  const sprintLabel = typeof sprint === 'number' ? `${sprint}+ (active)` : 'unknown';
   return [
-    `Sprints: ${sprintLabel}`,
     `CLI Commands: ${cli}`,
     `MCP: ${mcpTools} tools, ${mcpResources} resources`,
     `Agents: ${agents} built-in${customNote}`,
     `Skills: ${skills} built-in`,
-    `Providers: Claude, Codex, Gemini`,
   ].join('\n');
 }
 

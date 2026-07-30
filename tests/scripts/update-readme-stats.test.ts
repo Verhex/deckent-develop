@@ -219,7 +219,7 @@ describe('renderIdentityStatus', () => {
       providersCount: 3,
     });
     expect(md).toContain('| Version | 1.0.0-beta.1 |');
-    expect(md).toContain('| Sprint | sprint-172 |');
+    expect(md).not.toContain('| Sprint |'); // none!
     expect(md).toContain('| MCP Tools | 31 |');
     expect(md).toContain('| Skills | 21 built-in |');
   });

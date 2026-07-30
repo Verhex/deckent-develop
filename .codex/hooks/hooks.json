@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/pretooluse-guard.mjs\"",
+            "commandWindows": "powershell -NoProfile -NonInteractive -Command \"$root = git rev-parse --show-toplevel; node (Join-Path $root '.codex/hooks/pretooluse-guard.mjs')\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

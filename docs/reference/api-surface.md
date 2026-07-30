@@ -1,6 +1,12 @@
 # API Surface Contract
 
-*This file defines inter-agent contracts. Brain creates, all agents read.*
+*Canonical transport/runtime contract map. Code types and schemas linked by each section are the
+machine authority; this document is their reviewable projection, not a second state authority.*
+
+Deckent is a provider-neutral Agent OS / AI runtime ecosystem. Goal → Mission → Flow → Run →
+WorkItem → Attempt → Operation is the canonical execution ontology. Legacy sprint/task/process
+surfaces remain adapters or projections while they converge on that kernel; HTTP, Terminal,
+Desktop, CLI, MCP, connectors, dashboard, Brain, and workers must not invent parallel authority.
 
 ---
 
@@ -418,7 +424,7 @@ Each task is stored as `.tasks/task-{id}.json`:
   "id": "001-001",
   "title": "string",
   "description": "string",
-  "model": "opus | sonnet | haiku | gpt-5 | gpt-4.1 | gpt-5-mini | gemini-2.5-pro | gemini-2.5-flash",
+  "model": "string (exact registry-validated provider API model ID)",
   "effort": "low | normal | high",
   "priority": "CRITICAL | HIGH | NORMAL | LOW",
   "reason": "string",
@@ -434,32 +440,51 @@ Each task is stored as `.tasks/task-{id}.json`:
     "techDebtAcceptable": "string"
   },
   "status": "DRAFT | PENDING | CLAIMED | EXECUTING | TESTING | DOCUMENTING | DONE | NO_GO | PAUSED | MANUAL_REVIEW_REQUIRED",
-  "sprintId": "sprint-NNN",
-  "createdAt": "ISO 8601",
-  "assignedAgent": "string (agent id or 'generic')",
-  "assignedSkills": ["string[] (skill ids)"],
-  "provider": "claude | codex | gemini",
-  "forceModel": "opus | sonnet | haiku (optional — set when DIRECTIVES specifies model)",
+  "sprintId": "string (optional legacy adapter identity)",
+  "createdAt": "ISO 8601 (optional)",
+  "updatedAt": "ISO 8601 (optional)",
+  "assignedWorker": "string (optional)",
+  "assignedAgent": "string (optional — agent id or 'generic')",
+  "assignedSkills": ["string (optional skill ids)"],
+  "provider": "string (optional registered ProviderName; resolved and validated at runtime)",
+  "forceModel": "string (optional exact registry model ID)",
   "forceEffort": "low | normal | high (optional — set when DIRECTIVES specifies effort)",
   "forceAgent": "string (optional — agent id override from DIRECTIVES or AI planner)",
-  "forceSkills": ["string[] (optional — skill id overrides from DIRECTIVES or AI planner)"],
-  "excludeAgent": ["string[] (optional — agent ids to exclude from routing, forceSkills still apply)"],
-  "excludeSkills": ["string[] (optional — skill ids to exclude from routing)"],
-  "authMode": "'subscription' | 'api' (optional — DIRECTIVES `- Auth:` override; 'api' skips ~/.claude mount and REQUIRES ANTHROPIC_API_KEY; default falls back to config auth_mode)",
+  "forceSkills": ["string (optional skill id overrides from DIRECTIVES or AI planner)"],
+  "excludeAgent": ["string (optional agent ids to exclude from routing)"],
+  "excludeSkills": ["string (optional skill ids to exclude from routing)"],
+  "authMode": "subscription | api (optional; credential custody is resolved by effective config and the selected provider adapter)",
   "routingMeta": {
-    "taskDNA": "object (optional — TaskDNA used for v2 routing decisions)",
-    "confidence": "string (optional — routing confidence score)",
-    "routingVersion": "v1 | v2 (optional — routing engine version used)",
-    "rerouteCount": "number (optional — number of times this task has been rerouted)"
+    "taskDNA": "object (optional)",
+    "confidence": "string | number (optional)",
+    "routingVersion": "v2 | v3 (optional)",
+    "workType": "string (optional)",
+    "provenance": "string (optional)",
+    "personaSlices": ["string (optional)"],
+    "storySummary": "string (optional)",
+    "escalation": "string (optional)",
+    "rerouteCount": "number (optional)",
+    "overrideWarnings": ["string (optional)"],
+    "scopeDerivation": {
+      "extraFiles": ["string"],
+      "extraDirs": ["string"],
+      "reason": "string"
+    }
   },
   "type": "TaskKind (optional — WM-2a per-task kind override)",
-  "backend": "'docker' | 'tmux' | 'subprocess' (optional — per-task spawn backend, Sprint 252)",
-  "modelEffort": "string (optional — reasoning effort override, Sprint 252 F1-RE)",
-  "fixMode": "'verify-only' | 'amend' | 're-implement' (optional — Sprint 196 FIX-phase strategy)",
-  "smoke": "{ command: string; expect: string } (optional — Tier-1 proof-of-function directive, ADR-079)",
-  "actor": "ActorContext (optional — Sprint 196 task actor context)"
+  "backend": "docker | tmux | subprocess (optional registered execution backend override)",
+  "modelEffort": "string (optional; validated against selected provider/model capability)",
+  "fixMode": "verify-only | amend | re-implement (optional)",
+  "smoke": "{ command: string; expect: string } (optional Tier-1 proof-of-function directive, ADR-G-009)",
+  "actor": "ActorContext (optional)",
+  "budget": "ExecutionBudget (optional durable per-task ceiling)",
+  "budgetPolicy": "TaskExecutionBudgetPolicySnapshot (optional plan-time provenance; never an execution permit)"
 }
 ```
+
+The normative field types are `Task`, `TaskExecutionBudgetPolicySnapshot`, and their imported
+work-model types in `src/core/task-types.ts`. Model/provider values are runtime-registry data and
+must not be copied into this document as a static catalog.
 
 ## Result File Format
 
@@ -484,13 +509,14 @@ Each completed task writes `.tasks/task-{id}.result`:
     "inputTokens": 15420,
     "outputTokens": 3200,
     "cacheReadTokens": 89000,
-    "provider": "claude",
-    "model": "opus"
+    "cacheCreationTokens": 1200,
+    "provider": "registered-provider-id",
+    "model": "exact-provider-api-model-id"
   },
   "cost": {
     "usd": 0.042,
     "currency": "USD",
-    "pricingSource": "anthropic",
+    "pricingSource": "runtime-pricing-source",
     "isLocal": false
   },
   "rubricScores": {
@@ -508,9 +534,16 @@ Each completed task writes `.tasks/task-{id}.result`:
   ],
   "handoffNotes": "string (optional message for downstream tasks)",
   "crossVerify": {
-    "verifier": "string (provider name that performed the verification)",
-    "verdict": "refuted | confirmed | unclear (adversarial verification outcome)",
-    "reason": "string (explanation of the verdict)"
+    "outcome": "confirmed | refuted | unclear",
+    "verifier": "registered provider different from the producer provider",
+    "verifierModel": "exact provider API model ID",
+    "verdict": "confirmed | refuted | unclear",
+    "reason": "string",
+    "execution": "CrossVerifyExecutionEvidence (optional)",
+    "eligibility": "CrossVerifyEligibilityEvidence (optional)",
+    "invocationReceiptRef": "InvocationReceiptRef (optional)",
+    "assurance": "typed-host-adjudicated (optional)",
+    "adjudicationReceiptRef": "string (optional)"
   }
 }
 ```
@@ -521,7 +554,13 @@ Each completed task writes `.tasks/task-{id}.result`:
 
 **Note on `crossVerify` field:**
 
-- **Advisory only.** The `crossVerify` field is not a typed field in the `TaskResult` interface (`src/core/task-types.ts`) — it is written at runtime when `config.cross_verify.enabled: true` and a verifier provider is available. Task `selfAssessment` and `evaluationDecision` are NOT automatically downgraded based on this field; human/Brain review decides next steps.
+- `crossVerify` is the typed `CrossVerifyEvidence` union on `TaskResult`
+  (`src/core/task-types.ts`). A completed verifier carries semantic outcome plus optional
+  host-observed execution, eligibility, invocation, and adjudication evidence. When independent
+  verification cannot be admitted, the typed variant is `{ outcome: "unavailable", reason, ... }`;
+  Deckent does not self-verify or silently fall back to the producer provider.
+- This field is durable evidence, not a worker-issued final verdict. Host/Brain evaluation remains
+  the task decision authority and applies the configured cross-provider policy.
 
 **Note on `sharedNotes` field:**
 
@@ -536,23 +575,13 @@ Each completed task writes `.tasks/task-{id}.result`:
 - **When absent:** Omitted from the result entirely if worker communications is disabled or no handoff message was generated.
 - **Usage:** When the sprint controller creates a handoff from this task to dependent tasks, the `handoffNotes` are included in the handoff record and injected into dependent workers' prompts under the "Upstream Handoffs" section.
 
-**Note on `crossVerify` field:**
-
-- **When present:** Only written to `.result` when `config.cross_verify.enabled: true` AND the task was high-stakes (or any task if `high_stakes_only: false`) AND a verifier provider was available.
-- **When absent:** Omitted from the result entirely if cross-verify is disabled or verification was skipped.
-- **Verdict meanings:**
-  - `refuted` — The verifier found issues with the task result; advisory warning that the task may need review.
-  - `confirmed` — The verifier independently validated the task result; advisory confirmation.
-  - `unclear` — The verifier output was inconclusive or uninterpretable; no strong signal either way.
-- **Impact on decision:** The `crossVerify` field is advisory only. Task `selfAssessment` and `evaluationDecision` are NOT downgraded based on this field. Human/Brain review decides next steps (FIX retry, approval, or acceptance as-is).
-
 ## Sprint Phases
 
 Sprint lifecycle phases — canonical values from `SprintPhase` enum (`src/core/sprint-types.ts`):
 
 1. **DIRECTIVE** — Initial directive-reading phase before planning
 2. **PLAN** — Brain reads DIRECTIVES, plans tasks, writes task JSON files
-3. **SPAWN** — Workers spawned via tmux, subprocess, or Docker; auditor scan loop starts. When `dependency_pipeline_enabled: true` (ADR-045), tasks are sorted into dependency waves via Kahn's topological algorithm and each wave executes before subsequent waves unblock.
+3. **SPAWN** — Workers spawned via the admitted execution backend; auditor scan loop starts. When dependency-pipeline policy is enabled (ADR-G-026), tasks are sorted into dependency waves via Kahn's topological algorithm and each wave executes before subsequent waves unblock.
 4. **EXECUTE** — Workers execute tasks, write heartbeats (.hb files)
 5. **EVALUATE** — Brain waits for results, evaluates (GO/NO-GO/TECH_DEBT)
 6. **FIX** — Failed tasks retried (optional, configurable timeout)
@@ -576,7 +605,7 @@ Sprint lifecycle phases — canonical values from `SprintPhase` enum (`src/core/
 All memory operations go through SQLite DB. Markdown files are generated exports.
 
 - `memory.db`: SQLite database — **single source of truth** for all brain knowledge
-- `exports/summary.md`: Auto-generated context summary (loaded via @ reference, ~4K chars)
+- `exports/summary.md`: Auto-generated context/status projection (read on demand; not runtime authority)
 - `exports/decisions.md`: Auto-generated ADR list for git diff/review
 - `exports/memory.md`: Auto-generated sprint learnings
 - `exports/debt.md`: Auto-generated debt table
@@ -610,10 +639,10 @@ searchMemory(store, {
 - `archive/pre-v2/DECISIONS.md`: Original 96K ADR file (backup)
 - `archive/pre-v2/MEMORY.md`: Original sprint learnings (backup)
 - `ERRORS.md`: Error log (still file-based, not in DB)
-- `PROJECT-IDENTITY.md`: **Removed** — deprecated since Sprint 166 (ADR-046), superseded by `.deckent/workspace/IDENTITY.md` (managed-docs `identity-md` in `docs.json`). Identity remains in `memory.db` (decay_exempt).
+- Legacy project-identity export: **Removed** — superseded by `.deckent/workspace/IDENTITY.md` under ADR-G-015. Identity knowledge remains in `memory.db` (decay_exempt).
 - `sprints/sprint-NNN.md`: Sprint logs (in DB + file)
 
-## doc_tracking Table (ADR-090)
+## doc_tracking Table (ADR-G-015)
 
 Separate `better-sqlite3` connection to `.brain/memory.db` (does NOT touch `entries` / MemoryStore). Created idempotently (`CREATE TABLE IF NOT EXISTS`) by `DocTrackingStore`.
 
@@ -635,7 +664,7 @@ Separate `better-sqlite3` connection to `.brain/memory.db` (does NOT touch `entr
 
 CLI: `deckent docs track scan [--no-write] [--prune] [--check] [--max-rank <n>]` · `docs track status [--stale] [--rank <n>] [--json]` · `docs track sync`.
 
-### Doc-Tracking Faz 2 surfaces (ADR-090)
+### Doc-Tracking Faz 2 surfaces (ADR-G-015)
 
 - **`GET /api/docs/health`** (auth-gated, read-only) → `{ rows: DocStatusRow[], heatmap: {bucket,state,count}[], generatedAt }`. Buckets: `0` / `1-10` / `11-50` / `51-94` / `95+`. Consumed by the dashboard "Docs Health" page (`/docs-health`).
 - **MCP `deckent_docs`** actions: `track-scan` (DB-only scan → `{count,stale}`), `track-status` (→ `{docs:[...]}`).
@@ -697,7 +726,7 @@ as an empty backlog (`{ "_version": "1.0", "entries": [] }`).
 
 ### Validation Rules (`validateBacklogEntry`)
 
-Hand-written validation (ADR-010, no schema dependency) — returns the first violation:
+Host-side validation returns the first violation:
 - `id` and `title` must be non-empty strings
 - `kind` ∈ `task | sprint | capability | process`; `policy` ∈ `auto | approval-required | risk-tagged`; `status` ∈ valid set
 - `trigger.type` ∈ `recurring | one-off | reactive`
@@ -726,7 +755,7 @@ recurring: done → pending (re-enqueue when next cron cadence after lastRun arr
 - `purgeCompletedBacklog` keeps the 5 most recently completed `done`/`failed` entries (by
   `lastRun`, default `keepRuns = 5`); `pending`/`running`/`parked` entries are never touched.
 
-## Module Import Rules (ADR-008)
+## Module Import Rules (ADR-D-004)
 
 - Brain (sprint-controller) is the ONLY module that imports from tmux, auditor, worker
 - Planner imports ONLY from core/ (types, constants) — never from brain
