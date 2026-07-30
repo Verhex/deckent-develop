@@ -5,19 +5,19 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):396bd29c1484b44c09f139e7fcebeec56c18459597a22c5cd0a98b690099956f`
+**Source digest:** `sha256(normalized-lf-utf8):37e4573b12cd4f3457d22bd8ce9954c252d8f1d10bd406a1c5388cfe33218846`
 
-**Rows:** 233 total · 233 active · 0 terminal
+**Rows:** 244 total · 244 active · 0 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 156 |
+| OPEN | 158 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
-| VERIFY | 9 |
+| VERIFY | 18 |
 | DONE | 0 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -29,6 +29,7 @@
 | 10 | `SSOT-001` | VERIFY | P0 | TRUTH | — | — | 2026-07-26 legacy MASTER'ı byte-identical archive et |
 | 20 | `SSOT-002` | VERIFY | P0 | TRUTH | `SSOT-001`, `SOURCE-MANIFEST-001`, `LEGACY-RESIDUAL-AUDIT-001` | — | Tüm kaynakları canonical, atomik ve dependency'li ledger'a uzlaştır |
 | 30 | `SSOT-003` | VERIFY | P0 | TRUTH | `SSOT-001` | — | MASTER schema validator ve generated active views |
+| 31 | `MASTER-CLI-SYMLINK-FLAKE-001` | OPEN | P1 | TRUTH | — | — | MASTER validator real-entry symlink contract'ını deterministic yap |
 | 40 | `TRUTH-BASELINE-001` | BLOCKED | P0 | TRUTH | `TEST-675`, `TEST-676`, `TEST-HERMETIC-001` | `BASELINE_CONFLICT` | Current HEAD için tek reference test, build, binary ve environment baseline |
 | 50 | `TEST-675` | OPEN | P0 | TRUTH | — | — | Testlerin live `.tasks` alanına yazmasını kaldır ve writer discovery ratchet'i kur |
 | 60 | `TEST-676` | OPEN | P0 | TRUTH | — | — | Test koşumunda `dist` clean çağrısının fail-loud root cause'unu bul ve kapat |
@@ -152,6 +153,7 @@
 | 3000 | `KERNEL-001` | BLOCKED | P0 | KERNEL | `SSOT-003`, `TEST-675`, `TEST-676`, `CODEX-C5`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `DEPENDENCY_UNSATISFIED` | Goal→Mission→Flow→Run→WorkItem→Attempt→Operation canonical kernel parent |
 | 3010 | `KERNEL-ONTOLOGY-001` | OPEN | P0 | KERNEL | `SSOT-003`, `OPERATION-001` | — | Canonical entity identities, ownership, transitions and invariants |
 | 3020 | `KERNEL-STATE-001` | OPEN | P0 | KERNEL | `KERNEL-ONTOLOGY-001` | — | Durable event, snapshot and projection authority |
+| 3021 | `RUN-STATUS-AUTHORITY-001` | VERIFY | P0 | KERNEL | — | — | Canonical sprint runtime status authority and stale-state reconciliation |
 | 3030 | `KERNEL-ATTEMPT-001` | OPEN | P0 | KERNEL | `KERNEL-STATE-001`, `AUTHORITY-001` | — | Claim, lease, fencing, retry, cancellation and idempotency contract |
 | 3040 | `KERNEL-SETTLEMENT-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `RECEIPT-001` | — | Canonical result, evidence, acceptance and terminal settlement |
 | 3050 | `MISSION-KIND-001` | OPEN | P0 | KERNEL | `KERNEL-ONTOLOGY-001`, `KERNEL-ATTEMPT-001` | — | First-class task, sprint, capability and process runners |
@@ -166,6 +168,8 @@
 | 3140 | `SCHEDULER-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001` | — | Pure reducer and typed effect executor scheduler cutover |
 | 3150 | `RUNNER-PROTOCOL-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `FO-06` | — | SpawnBackend protocol v2 |
 | 3160 | `RECOVERY-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `RUNNER-PROTOCOL-001` | — | Cross-surface recovery leadership and orphan containment |
+| 3161 | `RECOVERY-RESUME-001` | VERIFY | P0 | KERNEL | `RUN-STATUS-AUTHORITY-001` | — | Durable pause notification, approval and lease-safe resume continuation |
+| 3162 | `PAUSED-FINALIZE-001` | OPEN | P0 | KERNEL | `RUN-STATUS-AUTHORITY-001` | — | Task projection'ı kayıp paused sprint için evidence-honest force-finalize settlement |
 | 3170 | `BUDGET-CONTINUATION-001` | OPEN | P0 | KERNEL | `LIMIT-001`, `RUNNER-PROTOCOL-001` | — | Landing, continuation reserve, task-kind budget sizing, timeout and measured termination contract |
 | 3180 | `DO-CUTOVER-001` | BLOCKED | P0 | KERNEL | `RUNFLOW-001`, `PLANNER-001` | `DEPENDENCY_UNSATISFIED` | `do` becomes canonical intent→preview→approval→run journey |
 | 3190 | `AUTONOMY-CUTOVER-001` | BLOCKED | P0 | KERNEL | `GOAL-CANARY-001`, `RECOVERY-001` | `DEPENDENCY_UNSATISFIED` | Autonomous and Nervous execution through canonical kernel |
@@ -175,18 +179,22 @@
 | 3230 | `WORKER-REGISTRY-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `PRINCIPAL-001` | — | Durable Worker identity, claim, heartbeat, capability and settlement registry |
 | 3240 | `SPRINT-HONESTY-001` | OPEN | P0 | KERNEL | `KERNEL-SETTLEMENT-001`, `WORKER-REGISTRY-001` | — | Sprint completion metrics, linger and partial-result truth |
 | 3250 | `WORKER-DISCOVERY-001` | OPEN | P1 | KERNEL | `PLANNER-001`, `PROMPT-001` | — | Bounded discovery and scope-aware Worker prompt contract |
+| 3251 | `TEST-DISCOVERY-001` | VERIFY | P0 | KERNEL | — | — | Pre-dispatch test discovery contract for declared test paths |
 | 3260 | `RESULT-INGEST-001` | BLOCKED | P0 | KERNEL | `KERNEL-SETTLEMENT-001` | `DEPENDENCY_UNSATISFIED` | Result identity normalization, quarantine and missing-trace root-cause closure |
+| 3261 | `RESULT-RECONCILIATION-001` | VERIFY | P0 | KERNEL | — | — | Terminal-only atomic result ingestion and malformed-result reconciliation |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4010 | `PRINCIPAL-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | VerifiedPrincipal across local, OIDC, workload and connector identities |
 | 4020 | `TENANT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |
 | 4030 | `OPERATION-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Versioned canonical operation catalog |
 | 4040 | `CAPABILITY-001` | OPEN | P0 | AUTHORITY | `OPERATION-001`, `PRINCIPAL-001` | — | Capability authority and progressive disclosure contract |
 | 4050 | `APPROVAL-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `OPERATION-001`, `CAPABILITY-001` | — | Runtime-wide durable ApprovalBroker |
+| 4051 | `APPROVAL-READ-PURITY-001` | VERIFY | P1 | AUTHORITY | — | — | Approval status reads are filesystem-pure and virtual-filesystem safe |
 | 4060 | `TOOL-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `CAPABILITY-001`, `APPROVAL-001` | — | Task/operation-scoped tool and MCP allowlist |
 | 4070 | `RECEIPT-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001` | — | Immutable InvocationReceipt for every provider call |
 | 4080 | `REACHABILITY-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001` | — | Capability and account-scoped reachability truth |
 | 4090 | `LIMIT-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001`, `REACHABILITY-001` | — | Unified provider/account/tenant/project budget and limit ledger |
 | 4100 | `PROVIDER-INGRESS-001` | BLOCKED | P0 | AUTHORITY | `RECEIPT-001`, `REACHABILITY-001`, `LIMIT-001` | `PROVIDER_INGRESS_HOLD` | Provider authority composition for all production ingress |
+| 4101 | `PROVIDER-HOLD-001` | VERIFY | P0 | AUTHORITY | `LIMIT-001` | — | Provider-scoped execution holds are independent from task and USD budget exhaustion |
 | 4110 | `ATTENDED-STOP-001` | OPEN | P0 | AUTHORITY | `APPROVAL-001`, `LIMIT-001` | — | Exact attended hard-stop approval authority |
 | 4120 | `AUDIT-001` | OPEN | P0 | AUTHORITY | `RECEIPT-001`, `OPERATION-001` | — | Tamper-evident, tenant-scoped causal audit |
 | 4130 | `API-SECURITY-001` | BLOCKED | P0 | AUTHORITY | `PRINCIPAL-001`, `TENANT-001`, `APPROVAL-001` | `DEPENDENCY_UNSATISFIED` | API authentication, authorization and config-secret containment |
@@ -219,6 +227,7 @@
 | 6100 | `CONNECTOR-IDENTITY-001` | OPEN | P0 | CONNECTOR | `PRINCIPAL-001`, `APPROVAL-001`, `APP-SERVICE-001` | — | Gateway and connector session identity, pairing and approval authority |
 | 6110 | `DASHBOARD-OBS-001` | OPEN | P1 | DASHBOARD | `SURFACE-CONTRACT-001`, `AUDIT-001` | — | Dashboard as honest, read-oriented observability projection |
 | 6120 | `SURFACE-PARITY-001` | BLOCKED | P0 | PRODUCT | `DESKTOP-REBORN-001`, `API-CONTRACT-001`, `CONNECTOR-IDENTITY-001`, `DASHBOARD-OBS-001` | `DEPENDENCY_UNSATISFIED` | Capability-by-capability parity and intentional negative-space matrix |
+| 6121 | `STATUS-SURFACE-PARITY-001` | VERIFY | P0 | PRODUCT | `RUN-STATUS-AUTHORITY-001` | — | CLI and MCP consume the same canonical sprint status projection |
 | 6130 | `API-EVENT-001` | OPEN | P0 | API | `API-CONTRACT-001`, `KERNEL-SETTLEMENT-001`, `STORAGE-001` | — | Durable asynchronous jobs, event streams, webhooks and outbox delivery |
 | 6140 | `API-DEVELOPER-001` | OPEN | P1 | API | `API-CONTRACT-001`, `SURFACE-PARITY-001` | — | OpenAPI, generated SDKs, CLI/MCP parity and compatibility lifecycle |
 | 6150 | `API-OPERATIONS-001` | OPEN | P0 | API | `API-IDENTITY-001`, `LIMIT-001`, `API-EVENT-001` | — | Quotas, pagination, bulk operations, idempotency and regional operations |
@@ -245,7 +254,9 @@
 | 9000 | `LEARNING-001` | OPEN | P0 | LEARNING | `KERNEL-001`, `AUDIT-001` | — | Closed, governed learning and evolution parent |
 | 9010 | `TRAINING-TRACE-001` | OPEN | P0 | LEARNING | `KERNEL-SETTLEMENT-001`, `RECEIPT-001` | — | Training trace wired from attempt to accepted outcome |
 | 9020 | `PROMPT-001` | OPEN | P0 | PROMPT | `KERNEL-ONTOLOGY-001`, `ALP-RUNTIME-001` | — | Compiled prompt contract and conflict-free task instructions |
+| 9021 | `PROMPT-V3-001` | VERIFY | P0 | PROMPT | — | — | Effective-config-derived Routing V3 persona and task prompt slices |
 | 9030 | `ROUTING-001` | OPEN | P0 | ROUTING | `PROMPT-001`, `AGENT-SKILL-001`, `REACHABILITY-001` | — | Routing V3 quality, diversity and evidence-driven adaptation |
+| 9031 | `ROUTING-V3-CUTOVER-001` | VERIFY | P0 | ROUTING | `PROMPT-V3-001` | — | Routing V3 is the sole effective routing schema with explicit legacy migration |
 | 9040 | `EVALUATION-001` | OPEN | P0 | EVAL | `KERNEL-SETTLEMENT-001`, `CM-04` | — | Canonical evaluator, adversarial verification and proof boundary |
 | 9050 | `PROMOTION-001` | OPEN | P0 | EVOLUTION | `TRAINING-TRACE-001`, `ROUTING-001`, `EVALUATION-001` | — | Outcome→routing→agent/skill/model promotion and rollback |
 | 9060 | `LEARNING-DOGFOOD-001` | OPEN | P1 | LEARNING | `PROMPT-001`, `ROUTING-001`, `KERNEL-001` | — | Historical dogfood findings atomized and regression-proofed |

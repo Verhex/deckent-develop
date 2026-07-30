@@ -504,6 +504,52 @@ describe('scoreDocumentation', () => {
 });
 
 describe('evaluateWithRubric', () => {
+  it('does not schema-NO_GO a passing direct-test task when coverage is structurally absent', () => {
+    const task = makeTask(['src/core/'], {
+      description: 'Implement the smoke module.\n\n**Test:** `node src/core/foo.ts`',
+      scope: {
+        directories: ['src/core/'],
+        filesRead: [],
+        filesWrite: ['src/core/foo.ts'],
+      },
+    });
+    const result = makeResult({
+      testsPassed: true,
+      coverage: undefined as unknown as number,
+      filesChanged: ['src/core/foo.ts'],
+      selfAssessment: 'DONE',
+      notes: 'The declared direct test passed.',
+    });
+
+    const evaluation = evaluateWithRubric(result, task);
+
+    expect(evaluation.decision).not.toBe('NO_GO');
+    expect(evaluation.rubricScores[0]?.criterion).not.toBe('schema_validation');
+  });
+
+  it('treats the result-contract coverage=0 sentinel as unmeasured for a direct-test task', () => {
+    const task = makeTask(['src/core/'], {
+      description: 'Implement the smoke module.\n\n**Test:** `node src/core/foo.ts`',
+      scope: {
+        directories: ['src/core/'],
+        filesRead: [],
+        filesWrite: ['src/core/foo.ts'],
+      },
+    });
+    const result = makeResult({
+      testsPassed: true,
+      coverage: 0,
+      filesChanged: ['src/core/foo.ts'],
+      selfAssessment: 'DONE',
+      notes: 'The declared direct test passed.',
+    });
+
+    const evaluation = evaluateWithRubric(result, task);
+
+    expect(evaluation.decision).toBe('DONE');
+    expect(evaluation.totalScore).toBeGreaterThanOrEqual(DEFAULT_RUBRIC.passingScore);
+  });
+
   it('returns DONE with default rubric for perfect result', () => {
     const task = makeTask(['src/core/']);
     const result = makeResult({

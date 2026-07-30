@@ -69,6 +69,14 @@ describe('worker-prompt result-shape source guard (born-484)', () => {
     expect(prompt).toMatch(/`filesChanged`.*array of file-path strings/);
   });
 
+  it('states workerId, testsPassed, and coverage with parser-safe scalar shapes', () => {
+    const prompt = buildTaskPrompt(makeTask(), makeCtx()).prompt;
+    expect(prompt).toContain('workerId ("w-367-003-fixture")');
+    expect(prompt).toMatch(/`testsPassed`.*boolean.*true.*false/);
+    expect(prompt).toMatch(/`coverage`.*finite number from 0 to 100/);
+    expect(prompt).toMatch(/use `0` to mean "not measured"/);
+  });
+
   it('reaches the prompt identically across claude/codex/gemini provider paths', () => {
     const claudePrompt = buildTaskPrompt(makeTask({ provider: 'claude' }), makeCtx()).prompt;
     const codexPrompt = buildTaskPrompt(makeTask({ provider: 'codex' }), makeCtx()).prompt;

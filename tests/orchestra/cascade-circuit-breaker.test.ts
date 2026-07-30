@@ -4,10 +4,10 @@
  * The CascadeDetector + pauseSprint were both fully built and unit-tested, but the
  * detector had ZERO callers — the $42-disaster circuit-breaker (197 workers × 100%
  * NO_GO) was never connected to the sprint lifecycle. applyCascadeCircuitBreaker
- * wires it into the EVALUATE→FIX seam: N consecutive NO_GO → auto-pause.
+ * now evaluates unresolved logical roots only AFTER the configured FIX budget.
  *
- * These tests assert the protective contract (5 consecutive NO_GO pauses; fewer or a
- * reset streak do not) — a guard against the circuit-breaker silently regressing.
+ * These tests assert the scale-aware count + ratio policy instead of pinning a
+ * production-only magic number.
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
@@ -40,29 +40,48 @@ function evalsFor(sprint: Sprint, seq: TaskEvaluation[]): Map<string, TaskEvalua
 
 const NG = TaskEvaluation.NO_GO;
 const OK = TaskEvaluation.DONE;
+const POLICY = {
+  enabled: true,
+  max_unresolved_tasks: 5,
+  min_unresolved_ratio_percent: 50,
+} as const;
 
 describe('applyCascadeCircuitBreaker (Sprint 140 cost-cascade circuit-breaker wire)', () => {
-  it('pauses the sprint after 5 consecutive NO_GO (default threshold)', () => {
+  it('pauses when post-FIX unresolved roots meet both count and ratio gates', () => {
     const r = root();
     const sprint = makeSprint(6);
-    const paused = applyCascadeCircuitBreaker(r, sprint, evalsFor(sprint, [NG, NG, NG, NG, NG, NG]));
+    const paused = applyCascadeCircuitBreaker(
+      r,
+      sprint,
+      evalsFor(sprint, [NG, NG, NG, NG, NG, NG]),
+      POLICY,
+    );
     expect(paused).toBe(true);
     expect(sprint.status).toBe(SprintStatus.PAUSED);
   });
 
-  it('does NOT pause below the threshold (4 consecutive NO_GO)', () => {
+  it('scales the absolute gate for a three-task sprint', () => {
     const r = root();
-    const sprint = makeSprint(4);
-    const paused = applyCascadeCircuitBreaker(r, sprint, evalsFor(sprint, [NG, NG, NG, NG]));
-    expect(paused).toBe(false);
-    expect(sprint.status).toBe(SprintStatus.EVALUATING);
+    const sprint = makeSprint(3);
+    const paused = applyCascadeCircuitBreaker(
+      r,
+      sprint,
+      evalsFor(sprint, [NG, NG, OK]),
+      POLICY,
+    );
+    expect(paused).toBe(true);
+    expect(sprint.status).toBe(SprintStatus.PAUSED);
   });
 
-  it('a DONE resets the consecutive-NO_GO streak (no false pause)', () => {
+  it('does not pause when the unresolved ratio is below policy', () => {
     const r = root();
     const sprint = makeSprint(8);
-    // 4 NO_GO, DONE (reset), then 3 NO_GO — never reaches 5 consecutive.
-    const paused = applyCascadeCircuitBreaker(r, sprint, evalsFor(sprint, [NG, NG, NG, NG, OK, NG, NG, NG]));
+    const paused = applyCascadeCircuitBreaker(
+      r,
+      sprint,
+      evalsFor(sprint, [NG, NG, NG, OK, OK, OK, OK, OK]),
+      POLICY,
+    );
     expect(paused).toBe(false);
     expect(sprint.status).toBe(SprintStatus.EVALUATING);
   });
@@ -94,7 +113,8 @@ describe('applyCascadeCircuitBreaker (Sprint 140 cost-cascade circuit-breaker wi
     const paused = applyCascadeCircuitBreaker(
       r,
       sprint,
-      evalsFor(sprint, Array.from({ length: 8 }, () => NG)),
+      evalsFor(sprint, [NG, OK, OK, NG, NG, NG, NG, NG]),
+      POLICY,
     );
 
     expect(paused).toBe(false);

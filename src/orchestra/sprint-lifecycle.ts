@@ -48,6 +48,10 @@ import {
 import { writeEvent, CHANNELS } from './event-stream.js';
 import { getMessage } from '../cli/helpers/messages.js';
 import { detectLang } from '../cli/helpers/i18n.js';
+import {
+  dismissRecommendationByKey,
+  recordRecommendationOnce,
+} from '../nervous/recommendation-log.js';
 
 // ─── Core — sprint lock ───────────────────────────────────────────
 import { releaseSprintLock } from '../core/multi-ide.js';
@@ -774,6 +778,20 @@ export function pauseSprint(
       reasonCode,
     });
   } catch (e) { debugLog('pauseSprint:nervousNotification', e); }
+  try {
+    recordRecommendationOnce(
+      projectRoot,
+      'SPRINT_START',
+      `resume:${sprint.id}`,
+      {
+        operation: 'resume-paused-run',
+        sprintId: sprint.id,
+        reasonCode,
+        recoveryCommand: pauseState.recoveryCommand,
+        finalizeCommand: pauseState.finalizeCommand,
+      },
+    );
+  } catch (e) { debugLog('pauseSprint:nervousRecommendation', e); }
 
   return pauseState;
 }
@@ -863,6 +881,13 @@ export function resumeSprint(
       updatedAt: now(),
     });
   } catch (e) { debugLog('resumeSprint:updateDashboard', e); }
+  try {
+    dismissRecommendationByKey(
+      projectRoot,
+      'SPRINT_START',
+      `resume:${sprint.id}`,
+    );
+  } catch (e) { debugLog('resumeSprint:dismissNervousRecommendation', e); }
 
   return pauseState;
 }

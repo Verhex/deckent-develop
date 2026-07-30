@@ -98,6 +98,11 @@ import {
   resolveDebt, runDecay,
 } from './debt-manager.js';
 import { resolveDebtChain } from './debt-chain.js';
+import {
+  resolveFixAncestorIds,
+  resolveFixAttemptDepth,
+  selectPendingFixTasks,
+} from '../core/task-lineage.js';
 
 // ─── Agent/Skill Pools ───────────────────────────────────────────
 import { AgentPoolManager } from '../core/agent-pool.js';
@@ -1465,6 +1470,11 @@ export async function runEvaluatePhase(
       debugLog('runEvaluatePhase:loadConfig', e);
     }
   }
+  const initialFixPolicy = {
+    allowPriorityFixCreation:
+      resolvedConfig?.fix_phase_enabled !== false
+      && (resolvedConfig?.max_fix_retries ?? 2) > 0,
+  };
   try {
     assertTaskResultAuthoritiesReady(
       projectRoot,
@@ -2066,7 +2076,7 @@ export async function runEvaluatePhase(
           : undefined;
 
         debugLog('runEvaluatePhase:task', `task=${task.id} selfAssessment=${result.selfAssessment} evaluation=${evaluation} testsPassed=${result.testsPassed}`);
-        handleEvaluation(projectRoot, task, evaluation, result);
+        handleEvaluation(projectRoot, task, evaluation, result, initialFixPolicy);
         evaluations.set(task.id, evaluation);
 
         // Sprint 207 P1-2 (forensic Sprint 206): persist Brain's verdict back to the
@@ -2200,7 +2210,7 @@ export async function runEvaluatePhase(
             );
             const rubricResult = await safeRubricReconcile(projectRoot, sprint.id, task, lateResult);
             const evaluation = toTaskEvaluation(rubricResult);
-            handleEvaluation(projectRoot, task, evaluation, lateResult);
+            handleEvaluation(projectRoot, task, evaluation, lateResult, initialFixPolicy);
             evaluations.set(task.id, evaluation);
             writeTaskEvaluationAudit(projectRoot, sprint.id, task, evaluation, rubricResult);
             continue;
@@ -2291,7 +2301,7 @@ export async function runEvaluatePhase(
             );
             const graceRubric = await safeRubricReconcile(projectRoot, sprint.id, task, graceResult);
             const graceEval = toTaskEvaluation(graceRubric);
-            handleEvaluation(projectRoot, task, graceEval, graceResult);
+            handleEvaluation(projectRoot, task, graceEval, graceResult, initialFixPolicy);
             evaluations.set(task.id, graceEval);
             writeTaskEvaluationAudit(projectRoot, sprint.id, task, graceEval, graceRubric);
             continue;
@@ -2325,7 +2335,13 @@ export async function runEvaluatePhase(
         );
         const syntheticResult = gated.result;
         debugLog('runEvaluatePhase:timeout', `task=${task.id} — no result collected, marking NO_GO (timeout/missing) liveness=${liveness.status} reclassified=${gated.reclassified}`);
-        handleEvaluation(projectRoot, task, TaskEvaluation.NO_GO, syntheticResult);
+        handleEvaluation(
+          projectRoot,
+          task,
+          TaskEvaluation.NO_GO,
+          syntheticResult,
+          initialFixPolicy,
+        );
         evaluations.set(task.id, TaskEvaluation.NO_GO);
         // 352-003 (EVAL-AUDIT-REVIVE): no .result was ever collected, so no
         // rubric ever ran — the "rubric'siz" path. writeTaskEvaluationAudit
@@ -2590,6 +2606,10 @@ export function recordFixEvaluationAudit(
   fixRubricResult: EvaluationResult,
   fixEval: TaskEvaluation,
   originalReconciled: boolean,
+  lineage?: {
+    rootTaskId: string;
+    logicalAttempt: number;
+  },
 ): void {
   try {
     const auditCriteria = toAuditCriterionScores(fixTask, fixRubricResult.rubricScores);
@@ -2607,8 +2627,14 @@ export function recordFixEvaluationAudit(
       decisionRationale: rationale,
     };
     writeEvaluationAudit(projectRoot, sprintId, fixTask.id, 1, payload);
-    if (originalReconciled && fixTask.fixForTaskId) {
-      writeEvaluationAudit(projectRoot, sprintId, fixTask.fixForTaskId, 2, payload);
+    if (originalReconciled && (lineage?.rootTaskId ?? fixTask.fixForTaskId)) {
+      writeEvaluationAudit(
+        projectRoot,
+        sprintId,
+        lineage?.rootTaskId ?? fixTask.fixForTaskId!,
+        lineage?.logicalAttempt ?? 2,
+        payload,
+      );
     }
   } catch (e) { debugLog('recordFixEvaluationAudit', e); }
 }
@@ -2668,6 +2694,10 @@ export async function runFixPhase(
     // Sprint 161 Task 2 (T-003): FIX entry — phase reaches disk so
     // observers see the EVALUATE→FIX transition.
     persistPhaseTransition(projectRoot, sprint, SprintPhase.FIX, SprintStatus.FIXING);
+    const maxFixRetries =
+      config.fix_phase_enabled === false
+        ? 0
+        : Math.max(0, Math.floor(config.max_fix_retries ?? 2));
 
     // ─── FIX-PHASE TRACE-WIRE (TT551 / 416-003) ──────────────────────────
     // runEvaluatePhase records only the attempt-1 verdict (this file, ~L2106).
@@ -2807,24 +2837,49 @@ export async function runFixPhase(
       }
     } catch (e) { debugLog('runFixPhase:reDispatchCandidates', e); }
 
-    handleCrossDependencies(projectRoot, sprint, evaluations);
-
-    const fixTasks: Task[] = [];
-    const tasksPath = join(projectRoot, TASKS_DIR);
-    if (existsSync(tasksPath)) {
-      for (const file of readdirSync(tasksPath).filter(f => f.startsWith('task-') && f.endsWith('.json'))) {
-        const task = readJsonSafe<Task>(join(tasksPath, file));
-        if (
-          task?.isPriorityFix
-          && task.status === TaskStatus.PENDING
-          && task.sprintId === sprint.id
-        ) {
-          fixTasks.push(task);
-        }
-      }
+    if (maxFixRetries > 0) {
+      handleCrossDependencies(projectRoot, sprint, evaluations);
     }
 
-    if (fixTasks.length > 0) {
+    const tasksPath = join(projectRoot, TASKS_DIR);
+    const attemptedFixIds = new Set<string>();
+
+    // Each loop consumes one admitted FIX round. A NO_GO fix can mint its
+    // `-fix` child through handleEvaluation; the next scan picks that child up
+    // in the SAME run. The attempted-id guard makes stale PENDING reads
+    // idempotent and the depth gate enforces max_fix_retries per lineage.
+    for (let fixRound = 1; fixRound <= maxFixRetries; fixRound += 1) {
+      const allSprintTasksById = new Map(
+        sprint.tasks.map(task => [task.id, task]),
+      );
+      if (existsSync(tasksPath)) {
+        for (const file of readdirSync(tasksPath).filter(f => f.startsWith('task-') && f.endsWith('.json'))) {
+          const task = readJsonSafe<Task>(join(tasksPath, file));
+          // Explicit foreign ownership is rejected. Missing sprintId remains a
+          // compatibility seam for pre-namespace FIX JSONs; lineage/root
+          // membership and the current sprint object still bound selection.
+          if (task && (task.sprintId === undefined || task.sprintId === sprint.id)) {
+            allSprintTasksById.set(task.id, task);
+          }
+        }
+      }
+      const allSprintTasks = [...allSprintTasksById.values()];
+      const taskIndex = new Map(allSprintTasks.map(task => [task.id, task]));
+      const currentRootIds = new Set(
+        sprint.tasks.filter(task => !task.isPriorityFix).map(task => task.id),
+      );
+      const fixTasks = [...selectPendingFixTasks(
+        allSprintTasks,
+        maxFixRetries,
+        attemptedFixIds,
+      )].filter(task =>
+        resolveFixAncestorIds(task, taskIndex).some(ancestorId =>
+          currentRootIds.has(ancestorId),
+        ),
+      );
+      if (fixTasks.length === 0) break;
+      for (const task of fixTasks) attemptedFixIds.add(task.id);
+
       // Dynamic FIX tasks are born after plan approval. Re-evaluate every one
       // against the same owner-authored worker policy before prompt creation or
       // provider dispatch, then persist that exact policy snapshot.
@@ -2922,6 +2977,7 @@ export async function runFixPhase(
         },
         config,
       );
+      const tasksById = new Map(allSprintTasks.map(task => [task.id, task]));
       const sprintIdForUnblock = getCurrentSprintId(projectRoot) ?? sprint.id;
       for (const fixTask of fixTasks) {
         const fixResult = fixResults.find(r => r.taskId === fixTask.id);
@@ -2929,14 +2985,31 @@ export async function runFixPhase(
           // Sprint 191 P191-1: projectRoot for spurious NO_GO reconcile (fix-task too)
           const fixRubricResult = await safeRubricReconcile(projectRoot, sprint.id, fixTask, fixResult);
           const fixEval = toTaskEvaluation(fixRubricResult);
-          handleEvaluation(projectRoot, fixTask, fixEval, fixResult);
+          const fixAttempt = resolveFixAttemptDepth(fixTask, tasksById);
+          handleEvaluation(
+            projectRoot,
+            fixTask,
+            fixEval,
+            fixResult,
+            { allowPriorityFixCreation: fixAttempt < maxFixRetries },
+          );
           evaluations.set(fixTask.id, fixEval);
+          if (!results.some(result => result.taskId === fixResult.taskId)) {
+            results.push(fixResult);
+          }
 
-          // TT551: record the fix attempt as its OWN trace entry (attempt-2),
+          // TT551: record the fix attempt as its OWN trace entry,
           // labeled apart from the original via retryOf=fixForTaskId. This is
           // the must-have wire: when fixEval is NO_GO the intermediate NO_GO
           // verdict — previously never recorded — reaches the corpus.
-          recordFixWorkerTrace(fixTask, fixResult, fixEval, 'fix', 2, fixTask.fixForTaskId);
+          recordFixWorkerTrace(
+            fixTask,
+            fixResult,
+            fixEval,
+            'fix',
+            fixAttempt + 1,
+            fixTask.fixForTaskId,
+          );
 
           // MF-5 (Sprint 331 — Task 331-014): mirror the EVALUATE-phase
           // brain-verdict enrichment onto the `-fix.result` file so a fix-result
@@ -2984,13 +3057,17 @@ export async function runFixPhase(
             // so the two paths can never diverge again (they were hand-re-synced twice).
             resolveDebtChain(projectRoot, fixTask.id, fixTask.fixForTaskId, sprint.id);
           }
-          // Update original task evaluation if fix succeeded
+          // A successful attempt resolves the WHOLE logical lineage. A
+          // fix-of-a-fix is attempt 3 of the root task, not a second task whose
+          // success leaves the original NO_GO projection behind.
+          const ancestorIds = resolveFixAncestorIds(fixTask, tasksById);
           const originalReconciled =
-            !!fixTask.fixForTaskId &&
-            fixEval !== TaskEvaluation.NO_GO &&
-            evaluations.has(fixTask.fixForTaskId);
-          if (originalReconciled && fixTask.fixForTaskId) {
-            evaluations.set(fixTask.fixForTaskId, fixEval);
+            fixEval !== TaskEvaluation.NO_GO && ancestorIds.length > 0;
+          if (originalReconciled) {
+            // Project the resolved verdict onto the logical root only. Keep
+            // intermediate attempt verdicts intact (NO_GO remains NO_GO) so
+            // attempt analytics and training traces do not rewrite history.
+            evaluations.set(ancestorIds.at(-1)!, fixEval);
           }
 
           // Sprint 171 Bug B: persist FIX re-evaluation to forensic ledger
@@ -3000,6 +3077,12 @@ export async function runFixPhase(
           recordFixEvaluationAudit(
             projectRoot, sprint.id, fixTask, fixRubricResult, fixEval,
             originalReconciled,
+            ancestorIds.length > 0
+              ? {
+                  rootTaskId: ancestorIds.at(-1)!,
+                  logicalAttempt: fixAttempt + 1,
+                }
+              : undefined,
           );
 
           // ─── Sprint 156 Task 003: Unblock dependents on fix DONE ────
@@ -3009,16 +3092,17 @@ export async function runFixPhase(
           // whose dependencies are all satisfied.
           if (
             fixEval !== TaskEvaluation.NO_GO &&
-            fixTask.fixForTaskId
+            ancestorIds.length > 0
           ) {
-            const originalTask = sprint.tasks.find(t => t.id === fixTask.fixForTaskId);
+            const rootTaskId = ancestorIds.at(-1)!;
+            const originalTask = sprint.tasks.find(t => t.id === rootTaskId);
             if (originalTask && originalTask.status !== TaskStatus.DONE) {
               originalTask.status = TaskStatus.DONE;
               persistTaskStatus(projectRoot, sprint, originalTask.id);
             }
             try {
               const unblockedTaskIds = applyUnblockToSprint(
-                projectRoot, sprint, fixTask.fixForTaskId,
+                projectRoot, sprint, rootTaskId,
               );
               for (const unblockedId of unblockedTaskIds) {
                 persistTaskStatus(projectRoot, sprint, unblockedId);
@@ -3027,7 +3111,7 @@ export async function runFixPhase(
                 projectRoot, sprintIdForUnblock, 'brain', '*',
                 'BRAIN→*:DEPENDENCY_UNBLOCK_APPLIED',
                 {
-                  resolvedTaskId: fixTask.fixForTaskId,
+                  resolvedTaskId: rootTaskId,
                   fixTaskId: fixTask.id,
                   unblockedTaskIds,
                   totalUnblocked: unblockedTaskIds.length,

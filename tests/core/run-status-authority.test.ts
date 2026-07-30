@@ -86,6 +86,53 @@ describe('canonical run status authority', () => {
     });
   });
 
+  it('uses a fresh coordinator snapshot when the host PID is namespace-invisible', () => {
+    const root = fixture();
+    const sprintId = 'sprint-namespace';
+    const nowMs = Date.parse('2026-07-30T12:00:00.000Z');
+    const hostPid = 2_147_483_647;
+    json(root, '.deckent/sprint-active.json', { sprintId });
+    json(root, '.deckent/sprint-state.json', { sprintId, phase: 'EXECUTE', status: 'ACTIVE' });
+    json(root, '.deckent/config.json', { heartbeat_timeout: 90 });
+    json(root, `.deckent/pids/${sprintId}.pid`, { pid: hostPid });
+    json(root, `.deckent/pids/${sprintId}.snapshot.json`, {
+      sprintId,
+      pid: hostPid,
+      lastHeartbeat: '2026-07-30T11:59:30.000Z',
+    });
+
+    expect(readCanonicalRunStatus(root, { nowMs })).toMatchObject({
+      lifecycle: 'ACTIVE',
+      active: true,
+      coordinator: 'alive',
+      sprintId,
+    });
+  });
+
+  it('expires stale namespace-fallback evidence to ORPHANED', () => {
+    const root = fixture();
+    const sprintId = 'sprint-stale-lease';
+    const nowMs = Date.parse('2026-07-30T12:00:00.000Z');
+    const hostPid = 2_147_483_647;
+    json(root, '.deckent/sprint-active.json', { sprintId });
+    json(root, '.deckent/sprint-state.json', { sprintId, phase: 'EXECUTE', status: 'ACTIVE' });
+    json(root, '.deckent/config.json', { heartbeat_timeout: 90 });
+    json(root, `.deckent/pids/${sprintId}.pid`, { pid: hostPid });
+    json(root, `.deckent/pids/${sprintId}.snapshot.json`, {
+      sprintId,
+      pid: hostPid,
+      lastHeartbeat: '2026-07-30T11:57:00.000Z',
+    });
+    json(root, `.deckent/${sprintId}-checkpoint.json`, { sprintId });
+
+    expect(readCanonicalRunStatus(root, { nowMs })).toMatchObject({
+      lifecycle: 'ORPHANED',
+      active: false,
+      coordinator: 'dead',
+      sprintId,
+    });
+  });
+
   it('does not let a stale pause from another run hide a live current run', () => {
     const root = fixture();
     const sprintId = 'sprint-904';

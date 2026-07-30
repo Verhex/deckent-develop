@@ -64,6 +64,31 @@ export function recordRecommendation(
 }
 
 /**
+ * Append one open recommendation for a stable operational condition.
+ *
+ * `dedupeKey` is stored in the structured payload and compared only against
+ * open entries with the same action. Re-entering the same pause/recovery gate
+ * therefore refreshes notifications without flooding the Brain inbox.
+ */
+export function recordRecommendationOnce(
+  projectRoot: string,
+  actionId: string,
+  dedupeKey: string,
+  payload: Record<string, unknown> = {},
+): NervousRecommendation {
+  const existing = readRecommendations(projectRoot).find(rec =>
+    rec.status === 'open'
+    && rec.actionId === actionId
+    && rec.payload['dedupeKey'] === dedupeKey,
+  );
+  if (existing) return existing;
+  return recordRecommendation(projectRoot, actionId, {
+    ...payload,
+    dedupeKey,
+  });
+}
+
+/**
  * Read every recommendation from the durable feed (newest last). Malformed lines
  * are skipped, never thrown — a corrupt tail must not blind the Brain to the rest.
  * Returns `[]` when the feed does not exist yet.
@@ -104,4 +129,18 @@ export function dismissRecommendation(projectRoot: string, id: string): boolean 
   const path = join(projectRoot, RECOMMENDATIONS_FILE);
   writeFileSync(path, next.map((r) => JSON.stringify(r)).join('\n') + '\n', 'utf-8');
   return true;
+}
+
+/** Close an open operational recommendation by its structured dedupe key. */
+export function dismissRecommendationByKey(
+  projectRoot: string,
+  actionId: string,
+  dedupeKey: string,
+): boolean {
+  const match = readRecommendations(projectRoot).find(rec =>
+    rec.status === 'open'
+    && rec.actionId === actionId
+    && rec.payload['dedupeKey'] === dedupeKey,
+  );
+  return match ? dismissRecommendation(projectRoot, match.id) : false;
 }

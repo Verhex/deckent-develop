@@ -264,13 +264,46 @@ describe('totalTasks honest denominator (born-484)', () => {
     expect(metrics.completedTasks).toBe(1);
   });
 
-  it('covers evaluations that exceed sprint.tasks (injected fix tasks)', () => {
+  it('does not count an injected fix attempt as a second task', () => {
     const sprint = makeSprintFixture(['t1']);
     const evaluations = new Map([
       ['t1', TaskEvaluation.DONE],
-      ['t1-fix', TaskEvaluation.DONE],
+      ['t1-fix', TaskEvaluation.NO_GO],
     ]);
     const metrics = calculateMetrics(sprint, evaluations, []);
-    expect(metrics.totalTasks).toBe(2);
+    expect(metrics.totalTasks).toBe(1);
+    expect(metrics.completedTasks).toBe(1);
+    expect(metrics.noGoTasks).toBe(0);
+  });
+
+  it('settles root + fix + fix-fix as one successful logical task', () => {
+    const sprint = makeSprintFixture(['t1']);
+    const root = sprint.tasks[0]!;
+    sprint.tasks.push(
+      {
+        ...root,
+        id: 't1-fix',
+        isPriorityFix: true,
+        fixForTaskId: 't1',
+      },
+      {
+        ...root,
+        id: 't1-fix-fix',
+        isPriorityFix: true,
+        fixForTaskId: 't1-fix',
+      },
+    );
+    const evaluations = new Map([
+      ['t1', TaskEvaluation.DONE],
+      ['t1-fix', TaskEvaluation.NO_GO],
+      ['t1-fix-fix', TaskEvaluation.DONE],
+    ]);
+
+    const metrics = calculateMetrics(sprint, evaluations, []);
+
+    expect(metrics.totalTasks).toBe(1);
+    expect(metrics.completedTasks).toBe(1);
+    expect(metrics.noGoTasks).toBe(0);
+    expect(metrics.noGoRate).toBe(0);
   });
 });

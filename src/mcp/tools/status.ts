@@ -12,6 +12,11 @@ import { debugLog } from '../../core/utils.js';
 import { formatStatus, resolveOutputMode, type OutputMode } from '../../core/output-formatter.js';
 import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
 import { readPendingApprovals } from '../../core/pending-approvals.js';
+import { TaskStatus, type Task } from '../../core/types.js';
+import {
+  computeLogicalTaskProgress,
+  foldTaskLineages,
+} from '../../core/task-lineage.js';
 
 /**
  * Read the last N events from the event stream JSONL file.
@@ -175,25 +180,32 @@ function buildBackendBreakdown(root: string): Record<string, number> {
  * Count tasks with status NO_GO from .tasks/*.json files.
  * File-system based to avoid ADR-008 import cycle (status.ts must not import orchestra/).
  */
-function countNoGoTasks(root: string): number {
-  let count = 0;
+function loadLogicalTaskLineages(root: string, sprintId?: string) {
   try {
     const tasksDir = join(root, TASKS_DIR);
-    if (!existsSync(tasksDir)) return 0;
+    if (!existsSync(tasksDir)) return [];
     const entries = readdirSync(tasksDir);
     const files = (Array.isArray(entries) ? entries : []).filter(
       f => typeof f === 'string' && f.startsWith('task-') && f.endsWith('.json'),
     );
+    const explicitlyScoped: Task[] = [];
+    const legacyUnscoped: Task[] = [];
     for (const f of files) {
       try {
-        const data = JSON.parse(readFileSync(join(tasksDir, f), 'utf-8')) as { status?: string };
-        if (data.status === 'NO_GO') count++;
+        const task = JSON.parse(readFileSync(join(tasksDir, f), 'utf-8')) as Task;
+        if (!sprintId || task.sprintId === sprintId) explicitlyScoped.push(task);
+        else if (task.sprintId === undefined) legacyUnscoped.push(task);
       } catch { /* skip */ }
     }
+    // Modern task files carry sprintId. If any current-sprint records exist,
+    // they are authoritative and stale legacy files cannot contaminate status.
+    // A fully legacy directory falls back as a set for backward compatibility.
+    return foldTaskLineages(
+      explicitlyScoped.length > 0 ? explicitlyScoped : legacyUnscoped,
+    );
   } catch {
-    // ignore
+    return [];
   }
-  return count;
 }
 
 /**
@@ -444,7 +456,13 @@ export function registerStatusTool(server: McpServer): void {
 
       const phaseCountdown = computePhaseCountdown(state);
       const backendBreakdown = buildBackendBreakdown(root);
-      const noGoCount = countNoGoTasks(root);
+      const logicalTaskLineages = loadLogicalTaskLineages(root, resolvedSprintId);
+      const noGoCount = logicalTaskLineages.filter(
+        lineage => lineage.resolvedTask.status === TaskStatus.NO_GO,
+      ).length;
+      const logicalProgress = logicalTaskLineages.length > 0
+        ? computeLogicalTaskProgress(logicalTaskLineages.flatMap(lineage => lineage.attempts))
+        : undefined;
 
       const verboseFields = verbose ? {
         phase: state['phase'],
@@ -455,6 +473,7 @@ export function registerStatusTool(server: McpServer): void {
 
       const rawData = {
         ...state,
+        ...(logicalProgress ? { progress: logicalProgress } : {}),
         // Override sprint.id with canonical source-of-truth value so dashboard
         // and MCP always report the same sprint, even when .dashboard is stale.
         sprint: sprint ? { ...sprint, id: resolvedSprintId } : { id: resolvedSprintId },
@@ -467,6 +486,13 @@ export function registerStatusTool(server: McpServer): void {
         agentAssignments,
         skillAssignments,
         failedTasks: noGoCount,
+        taskLineages: logicalTaskLineages.map(lineage => ({
+          taskId: lineage.rootId,
+          resolvedTaskId: lineage.resolvedTask.id,
+          status: lineage.resolvedTask.status,
+          attemptIds: lineage.attemptIds,
+          attemptCount: lineage.attempts.length,
+        })),
         // Rich output fields (Sprint 139 T-047)
         eventStreamTail,
         lastOutputs,

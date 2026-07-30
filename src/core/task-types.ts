@@ -686,6 +686,8 @@ export interface TaskResult {
   linesAdded: number;
   linesRemoved: number;
   testsPassed: boolean;
+  /** Provider compatibility evidence: commands recovered from a legacy testsPassed string array. */
+  testCommands?: string[];
   coverage: number;
   selfAssessment: SelfAssessment;
   notes: string;

@@ -21,6 +21,7 @@ import {
   buildTaskPrompt,
   buildCheckCommandLine,
   buildTestCommandLine,
+  extractDeclaredTestCommands,
 } from '../../src/orchestra/prompt-god-template.js';
 import type { SprintContext } from '../../src/orchestra/prompt-god-template.js';
 import type { Task } from '../../src/core/task-types.js';
@@ -166,5 +167,42 @@ describe('born-670b (a): CRITICAL VERIFY STEPS injects concrete stack commands e
     );
     expect(prompt).not.toContain('CRITICAL VERIFY STEPS');
     expect(prompt).not.toContain('Run: `npx tsc --noEmit`');
+  });
+});
+
+describe('task-declared verification authority', () => {
+  it('extracts and de-duplicates explicit **Test:** commands', () => {
+    const commands = extractDeclaredTestCommands(makeTask({
+      description: [
+        '**Test:** `node --experimental-strip-types deneme/task-001/example.ts`',
+        '**Test:** `node --experimental-strip-types deneme/task-001/example.ts`',
+        '**Test:** `node deneme/task-001/secondary.ts`',
+      ].join('\n'),
+    }));
+
+    expect(commands).toEqual([
+      'node --experimental-strip-types deneme/task-001/example.ts',
+      'node deneme/task-001/secondary.ts',
+    ]);
+  });
+
+  it('uses the task-declared command without injecting unrelated tsc/vitest checks', () => {
+    const { prompt } = buildTaskPrompt(
+      makeTask({
+        type: 'code-development',
+        description: [
+          'Create a standalone smoke example.',
+          '**Test:** `node --experimental-strip-types deneme/task-001/example.ts`',
+        ].join('\n'),
+      }),
+      makeCtx({ verifyCommands: { check: 'npx tsc --noEmit', test: 'npx vitest run' } }),
+    );
+
+    expect(prompt).toContain('CRITICAL VERIFY STEPS (TASK-DECLARED AUTHORITY)');
+    expect(prompt).toContain(
+      '`node --experimental-strip-types deneme/task-001/example.ts`',
+    );
+    expect(prompt).not.toContain('Run: `npx tsc --noEmit`');
+    expect(prompt).not.toContain('npx vitest run <path-to-the-test-file(s)-you-changed>');
   });
 });

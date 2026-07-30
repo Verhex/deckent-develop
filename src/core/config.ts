@@ -36,7 +36,11 @@ import type {
   TerminalConfig,
   TimeoutConfig,
 } from './types.js';
-import { getAllKnownModelIds, PROVIDER_MODEL_MAP } from './types.js';
+import {
+  DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG,
+  getAllKnownModelIds,
+  PROVIDER_MODEL_MAP,
+} from './types.js';
 import type { ProviderName } from './types.js';
 import { MODE_PRESETS } from './mode-presets.js';
 import type { ModelStrategy } from './mode-presets.js';
@@ -867,6 +871,32 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  if (config.fix_circuit_breaker !== undefined) {
+    const policy = config.fix_circuit_breaker;
+    if (!policy || typeof policy !== 'object' || Array.isArray(policy)) {
+      errors.push('fix_circuit_breaker must be an object');
+    } else {
+      if (typeof policy.enabled !== 'boolean') {
+        errors.push('fix_circuit_breaker.enabled must be a boolean');
+      }
+      if (
+        typeof policy.max_unresolved_tasks !== 'number'
+        || !Number.isInteger(policy.max_unresolved_tasks)
+        || policy.max_unresolved_tasks < 1
+        || policy.max_unresolved_tasks > 10_000
+      ) {
+        errors.push('fix_circuit_breaker.max_unresolved_tasks must be an integer between 1 and 10000');
+      }
+      if (
+        typeof policy.min_unresolved_ratio_percent !== 'number'
+        || policy.min_unresolved_ratio_percent <= 0
+        || policy.min_unresolved_ratio_percent > 100
+      ) {
+        errors.push('fix_circuit_breaker.min_unresolved_ratio_percent must be a number greater than 0 and at most 100');
+      }
+    }
+  }
+
   // ─── Rollback config validation ────────────────────────────────────
   if (config.rollback_policy !== undefined) {
     const validPolicies = ['never', 'on_failure', 'always'] as const;
@@ -1556,6 +1586,7 @@ export function createDefaultConfig(): DeckentConfig {
     // Sprint
     fix_phase_enabled: true,
     max_fix_retries: 2,
+    fix_circuit_breaker: { ...DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG },
     // @deprecated retained as the aspirational seed for legacy configs.
     coverage_threshold: 90,
     // Sprint 179 W2-4 — split single threshold into immutable floor +
@@ -2032,6 +2063,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     retry_transient_failures: config.retry_transient_failures,
     fix_phase_enabled: config.fix_phase_enabled,
     max_fix_retries: config.max_fix_retries,
+    fix_circuit_breaker: config.fix_circuit_breaker,
     // Sprint 179 W2-4: coverage gate split.
     // - hard_floor (default 50) is the immutable EVALUATE gate.
     // - aspirational (default 90) is auto-learned by the finalizer.
@@ -2705,6 +2737,12 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     description: 'Maximum number of fix retries per task during the fix phase.',
     type: 'number',
     default: 2,
+    category: 'Sprint',
+  },
+  fix_circuit_breaker: {
+    description: 'Post-FIX circuit breaker evaluated over logical task lineages, not raw attempts.',
+    type: 'object',
+    default: { ...DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG },
     category: 'Sprint',
   },
   // ─── Rollback ───────────────────────────────────────────────────────

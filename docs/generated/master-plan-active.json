@@ -3,32 +3,32 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "396bd29c1484b44c09f139e7fcebeec56c18459597a22c5cd0a98b690099956f"
+    "value": "37e4573b12cd4f3457d22bd8ce9954c252d8f1d10bd406a1c5388cfe33218846"
   },
   "summary": {
-    "total": 233,
-    "active": 233,
+    "total": 244,
+    "active": 244,
     "terminal": 0,
-    "receipts": 18,
+    "receipts": 20,
     "byState": {
-      "OPEN": 156,
+      "OPEN": 158,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
-      "VERIFY": 9,
+      "VERIFY": 18,
       "DONE": 0,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 172,
-      "P1": 45,
+      "P0": 181,
+      "P1": 47,
       "P2": 16
     },
     "byProgram": {
       "API": 5,
       "ASSURANCE": 2,
-      "AUTHORITY": 18,
+      "AUTHORITY": 20,
       "CODEX": 44,
       "CONNECTOR": 1,
       "COST": 1,
@@ -41,25 +41,25 @@
       "ENTERPRISE": 1,
       "EVAL": 1,
       "EVOLUTION": 1,
-      "KERNEL": 27,
+      "KERNEL": 32,
       "LEARNING": 4,
       "OBS": 1,
       "ONBOARDING": 1,
       "OPS": 5,
       "PAEP": 35,
-      "PRODUCT": 5,
-      "PROMPT": 1,
+      "PRODUCT": 6,
+      "PROMPT": 2,
       "PROVIDER": 1,
       "RELEASE": 2,
       "REPO": 1,
       "RESILIENCE": 1,
-      "ROUTING": 1,
+      "ROUTING": 2,
       "SCALE": 1,
       "SECURITY": 3,
       "SURFACE": 1,
       "TERMINAL": 12,
       "TOOL": 1,
-      "TRUTH": 41,
+      "TRUTH": 42,
       "XPLAT": 3
     }
   },
@@ -95,6 +95,17 @@
       "updated": "2026-07-26",
       "definitionDigest": "f4571d810e206c7ff2a63e46433273e751c4bccfcc7b3b11bdf51adfe674ca38",
       "progressDigest": "99153dc13c235241019d7d8d5b34796f05af3fa8e42e500d36e5fecf5ad9aadd",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 31,
+      "id": "MASTER-CLI-SYMLINK-FLAKE-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-07-30",
+      "definitionDigest": "374341049d52f5c4d0874c4a6b6588c16aa2ff7be9009c09755611ca7f60e9dd",
+      "progressDigest": "06f9e15af4003cf094dc84f1cad52ad3d867ddacadf5c62533b262e2380d79f2",
       "terminalClosureDigest": null
     },
     {
@@ -1451,6 +1462,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 3021,
+      "id": "RUN-STATUS-AUTHORITY-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-30",
+      "definitionDigest": "2db2c82e9653adf4b2261e847525e5cc4f676c8c2dccd3270786076c7066b63a",
+      "progressDigest": "8c84c4fd62d6b49b387ad326ef50c05e833aa28e3edf0dd217ca6fb20ec303bd",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 3030,
       "id": "KERNEL-ATTEMPT-001",
       "program": "KERNEL",
@@ -1605,6 +1627,28 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 3161,
+      "id": "RECOVERY-RESUME-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-30",
+      "definitionDigest": "7c70dcccece8522974e6a127516e04707cfb0981ea513b8b50ee7200876e12db",
+      "progressDigest": "53d1aba87772ab71772600c486dd33df64583d740d83eb952daa22573ed2b1f8",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3162,
+      "id": "PAUSED-FINALIZE-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-30",
+      "definitionDigest": "d28e2b40b71553096c9f0fc8df5e656d14e75d607fcf156abc56fcf82b87bd75",
+      "progressDigest": "5a88f5da021af1c161d3956dcb3b8e39cbde7b3b4e4e0a0f34458f338624ead1",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 3170,
       "id": "BUDGET-CONTINUATION-001",
       "program": "KERNEL",
@@ -1704,6 +1748,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 3251,
+      "id": "TEST-DISCOVERY-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-30",
+      "definitionDigest": "91c6c44d0602c7b894aac354473919cc70d705d3dde71e9ed09bbf67221bc360",
+      "progressDigest": "34575f7e14a0ef69a9d67f5234f7821639b56dd0f19fbdd215598f0ce1b1db27",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 3260,
       "id": "RESULT-INGEST-001",
       "program": "KERNEL",
@@ -1712,6 +1767,17 @@
       "updated": "2026-07-26",
       "definitionDigest": "8bbee05a464eac3a30d7c4b065847499ad9312d3290f3718523ad1680896a539",
       "progressDigest": "34d62cf5eb687109c0c9ef2e091a81980a7e07e54c0e15fcd3c50ef833ed2eab",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3261,
+      "id": "RESULT-RECONCILIATION-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-30",
+      "definitionDigest": "d4aa106c67d528313dd65022a92ca5fc9af77bafe996edbe4f3d3d9e7bf7f26b",
+      "progressDigest": "52879431d50f1eed207d01872057d77563802b271bab48ed1fa14221d46c155e",
       "terminalClosureDigest": null
     },
     {
@@ -1781,6 +1847,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 4051,
+      "id": "APPROVAL-READ-PURITY-001",
+      "program": "AUTHORITY",
+      "priority": "P1",
+      "state": "VERIFY",
+      "updated": "2026-07-30",
+      "definitionDigest": "444dca9f1f8a214afedbd510133cd33d6fe1d89ed1ba55b625031c479fda891a",
+      "progressDigest": "51b15c76e85f7da4dca837b107a1f77124a6412830a60befe96501e1246ae6db",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 4060,
       "id": "TOOL-AUTHORITY-001",
       "program": "AUTHORITY",
@@ -1833,6 +1910,17 @@
       "updated": "2026-07-27",
       "definitionDigest": "97dd65885777dc6555cbf9e67b8a5c8e80a1234e75f152603a0f7b6bb5fbc74f",
       "progressDigest": "32c4311fe86f7674c68801d15451218775b5e5b899c690b019d2932e862dc6da",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4101,
+      "id": "PROVIDER-HOLD-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-30",
+      "definitionDigest": "2d7006f54b89502c85f40e6be491b4725df5be0f39203846e548fcf8d6bbc2a9",
+      "progressDigest": "190b22a988b3d55acc89279d1e6b61019cb9416fcf8b775d19604c5b01c0cd3d",
       "terminalClosureDigest": null
     },
     {
@@ -2188,6 +2276,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 6121,
+      "id": "STATUS-SURFACE-PARITY-001",
+      "program": "PRODUCT",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-30",
+      "definitionDigest": "f600b19e95b3680622cbb6186f441fefd7ee9b583acb8e0590c190c93c21394b",
+      "progressDigest": "4ac9c5fd6f0ed333c26f252a431f2fb361747bda585f4b1d545ccde38cb201f4",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 6130,
       "id": "API-EVENT-001",
       "program": "API",
@@ -2474,6 +2573,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 9021,
+      "id": "PROMPT-V3-001",
+      "program": "PROMPT",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-30",
+      "definitionDigest": "ce1276a029fdc86a6394627cb0a626ae39e0f6e7a14a0d0982232ff96e3e1be0",
+      "progressDigest": "6300b5b0266b529ede8a2e3963fcc43bfdaea84982b65d7b722f922bc1e2f731",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 9030,
       "id": "ROUTING-001",
       "program": "ROUTING",
@@ -2482,6 +2592,17 @@
       "updated": "2026-07-26",
       "definitionDigest": "7e4f477128414bde8c1f72eef58533ae1ce83be957a3e8cf2a1715f4e13393c5",
       "progressDigest": "c67bd1b7bc26565595451119f53b9c3b9dc557a33d1eb52e3928e41f9a678836",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 9031,
+      "id": "ROUTING-V3-CUTOVER-001",
+      "program": "ROUTING",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-07-30",
+      "definitionDigest": "699729e6e1731c7d51ab3afb1a3085f5cdcea31e3bcfb2a9f224319cbdb3d977",
+      "progressDigest": "4c7ab3d565e3fef6b82396e76bd4f38dfac31e73767606b0470c73be3ce54ae6",
       "terminalClosureDigest": null
     },
     {
@@ -2808,6 +2929,26 @@
         "transitionAt": "2026-07-28T21:56:17+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01",
+      "authorityDigest": "4f9678f171ad7f79ad1c569ef62da8a1a6c98a026456a60efb1116023292478c",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-30T10:43:12+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-07-30-RECOVERY-RESIDUALS-01",
+      "authorityDigest": "76342d1af998628d1d91fb27d8e7052635c11787e0ac96d44d79bf378a45df20",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-07-30T10:53:35+03:00"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -2922,7 +3063,9 @@
         "TEST-PLATFORM-001",
         "XVERIFY-UX-001"
       ],
-      "children": [],
+      "children": [
+        "MASTER-CLI-SYMLINK-FLAKE-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -2939,7 +3082,8 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "SSOT-001"
+        "SSOT-001",
+        "MASTER-CLI-SYMLINK-FLAKE-001"
       ],
       "evidenceReceipts": [
         "GR-2026-07-26-SSOT-003-01",
@@ -2948,6 +3092,39 @@
       "acceptance": "Column count, unique ID/order, enum, dependency and aggregate-parent closure integrity, gate receipts, blocker register, DONE evidence and pipe lint CI'da fail-closed",
       "evidence": "`receipt=GR-2026-07-26-SSOT-003-01`; `receipt=GR-2026-07-26-SSOT-003-02`; dependency-free validator, deterministic Markdown/JSON projections, 67-case validator suite, 38-case VitePress boundary suite, hermetic matrix and real CLI check; public-docs exclusion is enforced; cross-platform CI, authenticated historical authority, external immutable/self-hosting-safe grant ledger, commit-bound settlement and Git trust-anchor evidence pending under APPROVAL-001, RECEIPT-001, KERNEL-SETTLEMENT-001, AUDIT-001",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 31,
+      "id": "MASTER-CLI-SYMLINK-FLAKE-001",
+      "parent": "SSOT-003",
+      "program": "TRUTH",
+      "outcome": "MASTER validator real-entry symlink contract'ını deterministic yap",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "~",
+        "L": "0",
+        "X": "0",
+        "S": "-"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-07-30-RECOVERY-RESIDUALS-01"
+      ],
+      "acceptance": "Full-file ve isolated test koşuları aynı stdout/exit sonucunu üretir; symlink entrypoint fail-open veya sessiz exit yapmaz; root cause ve hermetic regression proof kayıtlıdır",
+      "evidence": "`receipt=GR-2026-07-30-RECOVERY-RESIDUALS-01`; 2026-07-30 proof: canonical validator and projection checks pass, 67-case full-file run intermittently returns empty stdout only for the real symlink entry test while the exact isolated test and manual real command pass; no deterministic closure claimed",
+      "updated": "2026-07-30"
     },
     {
       "order": 40,
@@ -8275,7 +8452,9 @@
         "RUNFLOW-001",
         "STORAGE-001"
       ],
-      "children": [],
+      "children": [
+        "RUN-STATUS-AUTHORITY-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -8292,7 +8471,8 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "KERNEL-ONTOLOGY-001"
+        "KERNEL-ONTOLOGY-001",
+        "RUN-STATUS-AUTHORITY-001"
       ],
       "evidenceReceipts": [
         "GR-2026-07-28-FILE-LOCK-01",
@@ -8301,6 +8481,43 @@
       "acceptance": "CAS, transactions, schema migration, bounded reconciliation and no file RMW race",
       "evidence": "`receipt=GR-2026-07-28-FILE-LOCK-01`; `receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; execution-lock v3 uses project/lock-directory generation anchors, SQLite `BEGIN IMMEDIATE`, monotonic fencing, exact projection compensation/reconciliation, atomic v2 quarantine migration and 256-row keyset pages for active, migration, live quarantine and audit scans; persistent anchor authority now binds stable `dev+ino` generations because Linux mount IDs are namespace-local, while exact mount-ID checks remain on every in-process pinned descriptor/path validation; optional dry-run-first CLI/MCP metadata reconciliation never changes authority or epoch and writes a redacted immutable audit only under operator+justification apply authority; targeted core/CLI/MCP proof passes 59/59, integrated clean/fence proof passes 102/102 and the real build passes; this proves the Linux/WSL execution-lock and clean slice only—Goal-v2, RunFlow, CLI/REPL, sprint and ScheduledFlow remain competing authorities, native macOS/Windows adapters and live/HA scale evidence remain open; fresh cross-provider verification was not executed in this provider-free recovery and is not claimed",
       "updated": "2026-07-28"
+    },
+    {
+      "order": 3021,
+      "id": "RUN-STATUS-AUTHORITY-001",
+      "parent": "KERNEL-STATE-001",
+      "program": "KERNEL",
+      "outcome": "Canonical sprint runtime status authority and stale-state reconciliation",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [
+        "PAUSED-FINALIZE-001",
+        "RECOVERY-RESUME-001",
+        "STATUS-SURFACE-PARITY-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
+      ],
+      "acceptance": "One resolver distinguishes IDLE, ACTIVE, PAUSED, ORPHANED, COMPLETE and ABORTED from durable PID, checkpoint, pause and terminal evidence without a surface-owned competing state machine",
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=run-status-authority-targeted-and-binary`; focused core and subprocess status proofs pass and the real binary projects sprint-467 as PAUSED/resumable; native macOS/Windows, multi-process contention and scale evidence remain absent",
+      "updated": "2026-07-30"
     },
     {
       "order": 3030,
@@ -8863,7 +9080,10 @@
         "AUTONOMY-CUTOVER-001",
         "PROCESS-CUTOVER-001"
       ],
-      "children": [],
+      "children": [
+        "RECOVERY-RESUME-001",
+        "PAUSED-FINALIZE-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -8881,7 +9101,9 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "KERNEL-ATTEMPT-001",
-        "RUNNER-PROTOCOL-001"
+        "RUNNER-PROTOCOL-001",
+        "RECOVERY-RESUME-001",
+        "PAUSED-FINALIZE-001"
       ],
       "evidenceReceipts": [
         "GR-2026-07-28-BUILD-RECOVERY-01"
@@ -8889,6 +9111,80 @@
       "acceptance": "Single leader per project/process realm; exact adoption or kill; no duplicate call",
       "evidence": "`receipt=GR-2026-07-28-BUILD-RECOVERY-01`; transactional build recovery validates exact journal/disk/quarantine evidence and requires an injected recovery verifier; the standalone bootstrap previously bypassed that seam with `() => true`, now fails before filesystem read or recovery mutation with typed `E_BUILD_RECOVERY_VERIFIER_UNAVAILABLE`; this is an honest HOLD, not recovery closure—runtime-wide ApprovalBroker verification, automatic sprint recovery evaluation→cleanup/finalizer parity, CLI resume unification, v2 stop propagation and stale one-shot settlement remain open",
       "updated": "2026-07-28"
+    },
+    {
+      "order": 3161,
+      "id": "RECOVERY-RESUME-001",
+      "parent": "RECOVERY-001",
+      "program": "KERNEL",
+      "outcome": "Durable pause notification, approval and lease-safe resume continuation",
+      "priority": "P0",
+      "dependsOn": [
+        "RUN-STATUS-AUTHORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "~",
+        "E": "1",
+        "H": "1",
+        "L": "~",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RUN-STATUS-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [
+        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
+      ],
+      "acceptance": "Pause persists checkpoint, sprint state, dashboard and Nervous event; recover/resume restores or clears only matching holds and never loses the prior pause on failed continuation",
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=pause-resume-targeted-and-dry-run`; targeted pause/resume and recover tests pass; real binary `recover sprint-467 --resume --dry-run` reads the checkpoint without spawning a worker; authenticated mixed-provider resume through second wave, FIX and terminal settlement remains unproven",
+      "updated": "2026-07-30"
+    },
+    {
+      "order": 3162,
+      "id": "PAUSED-FINALIZE-001",
+      "parent": "RECOVERY-001",
+      "program": "KERNEL",
+      "outcome": "Task projection'ı kayıp paused sprint için evidence-honest force-finalize settlement",
+      "priority": "P0",
+      "dependsOn": [
+        "RUN-STATUS-AUTHORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "1",
+        "H": "0",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RUN-STATUS-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [
+        "GR-2026-07-30-RECOVERY-RESIDUALS-01"
+      ],
+      "acceptance": "Explicit matching sprint ve force authority, durable pause/checkpoint evidence'ini terminal ABORTED settlement'a taşır; task evidence yokken COMPLETE veya başarı metriği üretmez; pause/checkpoint/PID/dashboard/status aynı terminal truth'a gelir",
+      "evidence": "`receipt=GR-2026-07-30-RECOVERY-RESIDUALS-01`; real CLI `deckent finalize --sprint sprint-467 --force` exits zero with “no tasks” and leaves matching pause plus checkpoint untouched, so canonical status remains PAUSED/resumable; manual deletion was refused and no terminal claim is made",
+      "updated": "2026-07-30"
     },
     {
       "order": 3170,
@@ -9229,7 +9525,9 @@
         "PROMPT-001"
       ],
       "dependents": [],
-      "children": [],
+      "children": [
+        "TEST-DISCOVERY-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -9248,12 +9546,46 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "PLANNER-001",
-        "PROMPT-001"
+        "PROMPT-001",
+        "TEST-DISCOVERY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Repo-wide scans require explicit scope; task-local discovery remains sufficient; violation evidence typed",
       "evidence": "Legacy 668",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 3251,
+      "id": "TEST-DISCOVERY-001",
+      "parent": "WORKER-DISCOVERY-001",
+      "program": "KERNEL",
+      "outcome": "Pre-dispatch test discovery contract for declared test paths",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "~",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
+      ],
+      "acceptance": "A provable runner-include mismatch blocks before worker dispatch with typed evidence; dynamically undecidable discovery remains explicit and fail-open without a false pass claim",
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=vitest-discovery-contract-targeted`; static Vitest include/exclude contract and task-builder integration tests pass; Jest, Pytest, other-language adapters and live heterogeneous-project proof remain open",
+      "updated": "2026-07-30"
     },
     {
       "order": 3260,
@@ -9266,7 +9598,9 @@
         "KERNEL-SETTLEMENT-001"
       ],
       "dependents": [],
-      "children": [],
+      "children": [
+        "RESULT-RECONCILIATION-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -9283,12 +9617,46 @@
       "blockerCode": "DEPENDENCY_UNSATISFIED",
       "blockerRemedy": "exact ledger `DependsOn` IDs",
       "closureBlockedBy": [
-        "KERNEL-SETTLEMENT-001"
+        "KERNEL-SETTLEMENT-001",
+        "RESULT-RECONCILIATION-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Expected task ID normalized/validated; malformed result quarantined; third missing-trace cause proven and fixed",
       "evidence": "Residual from historical closed 550",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 3261,
+      "id": "RESULT-RECONCILIATION-001",
+      "parent": "RESULT-INGEST-001",
+      "program": "KERNEL",
+      "outcome": "Terminal-only atomic result ingestion and malformed-result reconciliation",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
+      ],
+      "acceptance": "Temporary or partial result artifacts never become terminal truth; collector rereads the canonical result and emits typed malformed recovery without double settlement",
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=result-reconciliation-targeted`; settlement-authority and result-collector tests pass against the observed sprint-475 artifact class; a fresh live sprint replay and every-filesystem atomicity matrix remain unproven",
+      "updated": "2026-07-30"
     },
     {
       "order": 4000,
@@ -9579,7 +9947,9 @@
         "TERMINAL-COLLAB-001",
         "TOOL-AUTHORITY-001"
       ],
-      "children": [],
+      "children": [
+        "APPROVAL-READ-PURITY-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -9600,12 +9970,46 @@
         "PRINCIPAL-001",
         "TENANT-001",
         "OPERATION-001",
-        "CAPABILITY-001"
+        "CAPABILITY-001",
+        "APPROVAL-READ-PURITY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "CLI, terminal, Desktop, API, connectors, Worker and Nervous share CAS, expiry, relay and audit",
       "evidence": "2026-07-27 code-truth: v2 request actor eksikliğinde park; v1 adapter unknown ID decision yazabiliyor ve API/MCP ingress bunu validate etmiyor; DO gate/revision semantics yüzeyler arasında drift",
       "updated": "2026-07-27"
+    },
+    {
+      "order": 4051,
+      "id": "APPROVAL-READ-PURITY-001",
+      "parent": "APPROVAL-001",
+      "program": "AUTHORITY",
+      "outcome": "Approval status reads are filesystem-pure and virtual-filesystem safe",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
+      ],
+      "acceptance": "Read-only status and pending-approval queries do not create `.deckent/approvals`, mutate state or assume host-only filesystem behavior",
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=approval-read-purity-targeted`; approval-store and pending-approval tests pass, including virtual filesystem cases; cross-platform real-binary proof remains open",
+      "updated": "2026-07-30"
     },
     {
       "order": 4060,
@@ -9759,6 +10163,7 @@
         "COST-001",
         "GOAL-PROVIDER-001",
         "KERNEL-001",
+        "PROVIDER-HOLD-001",
         "PROVIDER-INGRESS-001"
       ],
       "children": [],
@@ -9805,7 +10210,9 @@
         "CODEX-ADMISSION-001",
         "XVERIFY-WIRE-001"
       ],
-      "children": [],
+      "children": [
+        "PROVIDER-HOLD-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -9824,12 +10231,50 @@
       "closureBlockedBy": [
         "RECEIPT-001",
         "REACHABILITY-001",
-        "LIMIT-001"
+        "LIMIT-001",
+        "PROVIDER-HOLD-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Exact candidate, reservation, route lock, termination and receipt; no hold-only composition",
       "evidence": "2026-07-27 code/live truth: provider wrapper yalnız run/start/do/xverify; resume dışarıda; ordinary Codex adapter route configured Docker/reroute'u bypass edip budget capability HOLD üretti; autonomous plan direct provider bypass açık",
       "updated": "2026-07-27"
+    },
+    {
+      "order": 4101,
+      "id": "PROVIDER-HOLD-001",
+      "parent": "PROVIDER-INGRESS-001",
+      "program": "AUTHORITY",
+      "outcome": "Provider-scoped execution holds are independent from task and USD budget exhaustion",
+      "priority": "P0",
+      "dependsOn": [
+        "LIMIT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "~",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "LIMIT-001"
+      ],
+      "evidenceReceipts": [
+        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
+      ],
+      "acceptance": "Auth, usage and reachability failures create typed provider holds; unaffected providers retain admission and a matching recovered provider can continue without resetting unrelated budget or hold state",
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=provider-hold-targeted`; provider-hold, result-collector and pause/resume tests pass; live Claude-login recovery, mixed-provider continuation, expiry and authoritative usage-source proof remain open",
+      "updated": "2026-07-30"
     },
     {
       "order": 4110,
@@ -11157,7 +11602,9 @@
         "API-DEVELOPER-001",
         "DOCS-PRODUCT-001"
       ],
-      "children": [],
+      "children": [
+        "STATUS-SURFACE-PARITY-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -11178,12 +11625,50 @@
         "DESKTOP-REBORN-001",
         "API-CONTRACT-001",
         "CONNECTOR-IDENTITY-001",
-        "DASHBOARD-OBS-001"
+        "DASHBOARD-OBS-001",
+        "STATUS-SURFACE-PARITY-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Each use case names canonical service, supported surfaces and reasoned exclusions",
       "evidence": "2026-07-27 code-truth: start/approve/cancel/status/review/finalize/cleanup/resume semantics CLI, MCP, API, Terminal ve Desktop arasında farklı; dashboard read-only intentional negative-space",
       "updated": "2026-07-27"
+    },
+    {
+      "order": 6121,
+      "id": "STATUS-SURFACE-PARITY-001",
+      "parent": "SURFACE-PARITY-001",
+      "program": "PRODUCT",
+      "outcome": "CLI and MCP consume the same canonical sprint status projection",
+      "priority": "P0",
+      "dependsOn": [
+        "RUN-STATUS-AUTHORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RUN-STATUS-AUTHORITY-001"
+      ],
+      "evidenceReceipts": [
+        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
+      ],
+      "acceptance": "CLI text/JSON and MCP status expose equivalent state, resumability and pending recovery approval without either adapter inferring lifecycle independently",
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=cli-mcp-status-parity`; CLI/MCP contract tests, i18n gate and real CLI subprocess status pass; API, Terminal, Desktop and connector parity remain open, so SURFACE-PARITY-001 stays BLOCKED",
+      "updated": "2026-07-30"
     },
     {
       "order": 6130,
@@ -12254,7 +12739,9 @@
         "ROUTING-001",
         "WORKER-DISCOVERY-001"
       ],
-      "children": [],
+      "children": [
+        "PROMPT-V3-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -12273,12 +12760,48 @@
       "blockerRemedy": null,
       "closureBlockedBy": [
         "KERNEL-ONTOLOGY-001",
-        "ALP-RUNTIME-001"
+        "ALP-RUNTIME-001",
+        "PROMPT-V3-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Canonical acceptance, authority, context budget and role sections; no append-only contradiction; representative 10-task golden set",
       "evidence": "Legacy 573/580; residual from historical closed 442",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 9021,
+      "id": "PROMPT-V3-001",
+      "parent": "PROMPT-001",
+      "program": "PROMPT",
+      "outcome": "Effective-config-derived Routing V3 persona and task prompt slices",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [
+        "ROUTING-V3-CUTOVER-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [
+        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
+      ],
+      "acceptance": "Worker prompt receives effective provider/model/role configuration and bounded persona sections without hardcoded provider identity or contradictory legacy routing instructions",
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=prompt-v3-persona-targeted`; prompt persona, task-builder and config migration tests pass; representative ten-task golden evaluation, real heterogeneous workers and cost/quality thresholds remain open",
+      "updated": "2026-07-30"
     },
     {
       "order": 9030,
@@ -12296,7 +12819,9 @@
         "LEARNING-DOGFOOD-001",
         "PROMOTION-001"
       ],
-      "children": [],
+      "children": [
+        "ROUTING-V3-CUTOVER-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -12316,12 +12841,50 @@
       "closureBlockedBy": [
         "PROMPT-001",
         "AGENT-SKILL-001",
-        "REACHABILITY-001"
+        "REACHABILITY-001",
+        "ROUTING-V3-CUTOVER-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Intent, role, skills, model, cost, capability and anti-collapse decisions measured; all fallback chains avoid role/tool mismatch; rollbackable",
       "evidence": "Legacy 581; residual from historical closed 537; routing_engine removal superseded",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 9031,
+      "id": "ROUTING-V3-CUTOVER-001",
+      "parent": "ROUTING-001",
+      "program": "ROUTING",
+      "outcome": "Routing V3 is the sole effective routing schema with explicit legacy migration",
+      "priority": "P0",
+      "dependsOn": [
+        "PROMPT-V3-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PROMPT-V3-001"
+      ],
+      "evidenceReceipts": [
+        "GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01"
+      ],
+      "acceptance": "Config V1/V2 migrates deterministically to V3; runtime routing and finalizer learning consume V3 while legacy V2 DNA cannot contaminate V3 decisions",
+      "evidence": "`receipt=GR-2026-07-30-ORCHESTRATION-RECONCILIATION-01`; `historical-authority=commit-d5f1836b;historical-gates=G1;proof=routing-v3-cutover-targeted`; config, migration, routing-plan, finalizer and prompt integration tests pass; live heterogeneous routing quality, anti-collapse distribution, rollback rehearsal and cross-platform evidence remain open",
+      "updated": "2026-07-30"
     },
     {
       "order": 9040,
@@ -12869,6 +13432,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "a753364e0177382616ed7d5479a7b466d89fb4f8489f0987d9cb36cd26b20878"
+    "value": "1eb78e583dba29a7746795093db3fafb352cb7d6ddb97c614c5830e0989bc3b9"
   }
 }

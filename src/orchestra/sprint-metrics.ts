@@ -10,6 +10,7 @@ import {
   BRAIN_DIR, SPRINTS_DIR,
 } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
+import { foldTaskLineages } from '../core/task-lineage.js';
 import { buildResultsMap } from './result-collector.js';
 import { findBoundaryViolations } from './result-evaluator.js';
 
@@ -96,19 +97,24 @@ export function calculateMetrics(
   let techDebtTasks = 0;
   let noGoTasks = 0;
 
-  for (const ev of evaluations.values()) {
+  const logicalLineages = foldTaskLineages(sprint.tasks);
+  const evaluatedLogicalIds = new Set<string>();
+  for (const lineage of logicalLineages) {
+    const ev =
+      evaluations.get(lineage.rootId)
+      ?? evaluations.get(lineage.resolvedTask.id);
+    if (ev === undefined) continue;
+    evaluatedLogicalIds.add(lineage.rootId);
     if (ev === TaskEvaluation.DONE) completedTasks++;
     else if (ev === TaskEvaluation.GO_WITH_TECH_DEBT) { completedTasks++; techDebtTasks++; }
     else if (ev === TaskEvaluation.NO_GO) noGoTasks++;
   }
 
-  // born-484 honest denominator: an unevaluated task is still a task. When
-  // EVALUATE faults mid-loop the evaluations map is TRUNCATED — reporting
-  // `evaluations.size` as the total hid a whole sprint's delivered work behind
-  // "0/0" (sprint-366 live case; the honest close is "0/8"). Take the larger
-  // of the sprint's own task list and the evaluations map (which can exceed
-  // sprint.tasks when injected fix tasks are evaluated).
-  const totalTasks = Math.max(sprint.tasks.length, evaluations.size);
+  // One planned root is one task regardless of how many repair attempts it
+  // consumed. `task → fix → fix-fix` therefore contributes one denominator
+  // and one final outcome; attempt counts remain available in the reporter's
+  // separate attempts projection.
+  const totalTasks = logicalLineages.length;
   // MASTER-PLAN 667: the counters above see ONLY the evaluations map. When a run
   // ends before EVALUATE reaches a task, that task's delivered result is
   // invisible and the close reads "0/N DONE" even though workers produced real
@@ -116,8 +122,11 @@ export function calculateMetrics(
   // separately — an unevaluated result is not a success (nobody judged it) and
   // not a failure either. The worker's own self-assessment is deliberately NOT
   // promoted into completedTasks; only Brain's evaluation may do that.
-  const evaluatedIds = new Set(evaluations.keys());
-  const unevaluatedTasks = results.filter(r => !evaluatedIds.has(r.taskId)).length;
+  const resultIds = new Set(results.map(result => result.taskId));
+  const unevaluatedTasks = logicalLineages.filter(lineage =>
+    !evaluatedLogicalIds.has(lineage.rootId)
+    && lineage.attemptIds.some(attemptId => resultIds.has(attemptId)),
+  ).length;
   const coveragePercent = results.length > 0
     ? results.reduce((sum, r) => sum + r.coverage, 0) / results.length
     : 0;

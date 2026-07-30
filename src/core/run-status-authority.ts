@@ -67,6 +67,12 @@ interface RawPidRecord {
   pid?: unknown;
 }
 
+interface RawCoordinatorSnapshot {
+  sprintId?: unknown;
+  pid?: unknown;
+  lastHeartbeat?: unknown;
+}
+
 function readJson<T>(path: string): T | null {
   if (!existsSync(path)) return null;
   try {
@@ -103,6 +109,7 @@ function hasTaskProjection(projectRoot: string, sprintId: string): boolean {
 function readCoordinatorState(
   projectRoot: string,
   sprintId: string | null,
+  nowMs: number,
 ): CanonicalRunStatus['coordinator'] {
   if (!sprintId) return 'absent';
   const path = join(projectRoot, DECKENT_DIR, 'pids', `${sprintId}.pid`);
@@ -111,7 +118,39 @@ function readCoordinatorState(
   if (!record || typeof record.pid !== 'number' || !Number.isInteger(record.pid) || record.pid <= 0) {
     return 'unknown';
   }
-  return isPidAlive(record.pid) ? 'alive' : 'dead';
+  if (isPidAlive(record.pid)) return 'alive';
+
+  // A PID can be alive on the host yet invisible from a container/WSL PID
+  // namespace. The coordinator already writes a same-PID snapshot every 30s;
+  // treat that fresh lease as liveness evidence instead of publishing a false
+  // ORPHANED state. A genuinely dead process ages out to `dead`.
+  const snapshot = readJson<RawCoordinatorSnapshot>(
+    join(projectRoot, DECKENT_DIR, 'pids', `${sprintId}.snapshot.json`),
+  );
+  const config = readJson<{ heartbeat_timeout?: unknown }>(
+    join(projectRoot, DECKENT_DIR, 'config.json'),
+  );
+  const configuredTimeout = config?.heartbeat_timeout;
+  const leaseTimeoutMs =
+    typeof configuredTimeout === 'number'
+    && Number.isFinite(configuredTimeout)
+    && configuredTimeout >= 30
+      ? configuredTimeout * 1_000
+      : 120_000;
+  const heartbeatAt =
+    typeof snapshot?.lastHeartbeat === 'string'
+      ? Date.parse(snapshot.lastHeartbeat)
+      : Number.NaN;
+  if (
+    snapshot?.sprintId === sprintId
+    && snapshot.pid === record.pid
+    && Number.isFinite(heartbeatAt)
+    && nowMs >= heartbeatAt
+    && nowMs - heartbeatAt <= leaseTimeoutMs
+  ) {
+    return 'alive';
+  }
+  return 'dead';
 }
 
 /**
@@ -124,7 +163,7 @@ function readCoordinatorState(
  */
 export function readCanonicalRunStatus(
   projectRoot: string,
-  options: { sprintIdHint?: string | null } = {},
+  options: { sprintIdHint?: string | null; nowMs?: number } = {},
 ): CanonicalRunStatus {
   const active = readJson<{ sprintId?: unknown }>(join(projectRoot, SPRINT_ACTIVE_FILE));
   const sprintState = readJson<RawSprintState>(join(projectRoot, SPRINT_STATE_FILE));
@@ -139,7 +178,11 @@ export function readCanonicalRunStatus(
   // pause/resume transition. A pause record may refine that SAME run, but a
   // stale pause from an older run must never hide the current state/marker.
   const sprintId = stateId ?? activeId ?? options.sprintIdHint ?? pauseId ?? dashboardId;
-  const coordinator = readCoordinatorState(projectRoot, sprintId);
+  const coordinator = readCoordinatorState(
+    projectRoot,
+    sprintId,
+    options.nowMs ?? Date.now(),
+  );
   const phase = pauseId === sprintId
     ? text(pauseState?.phase) ?? text(sprintState?.phase) ?? text(dashboard?.sprint?.phase)
     : stateId === sprintId

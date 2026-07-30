@@ -152,12 +152,11 @@ describe('deckent_status — failedTasks reflects live NO_GO count (333-006)', (
     ] as unknown as ReturnType<typeof readdirSync>);
     vi.mocked(readFileSync).mockImplementation((p: unknown) => {
       const path = String(p);
-      if (path.includes('task-001') || path.includes('task-004')) {
-        return JSON.stringify(makeTaskFile('x', 'NO_GO'));
-      }
-      if (path.includes('task-')) {
-        return JSON.stringify(makeTaskFile('x', 'DONE'));
-      }
+      if (path.includes('task-001')) return JSON.stringify(makeTaskFile('001', 'NO_GO'));
+      if (path.includes('task-002')) return JSON.stringify(makeTaskFile('002', 'DONE'));
+      if (path.includes('task-003')) return JSON.stringify(makeTaskFile('003', 'DONE'));
+      if (path.includes('task-004')) return JSON.stringify(makeTaskFile('004', 'NO_GO'));
+      if (path.includes('task-005')) return JSON.stringify(makeTaskFile('005', 'DONE'));
       return JSON.stringify(sampleDashboard);
     });
 

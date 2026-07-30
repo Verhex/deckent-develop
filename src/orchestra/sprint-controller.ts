@@ -23,8 +23,9 @@ import {
 // ─── Core (type imports) ───────────────────────────────────────────
 import type {
   Task, TaskResult, Sprint,
-  ResolvedConfig, ProviderName,
+  ResolvedConfig, ProviderName, FixCircuitBreakerConfig,
 } from '../core/types.js';
+import { DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG } from '../core/types.js';
 import type { PromptGateResult } from '../core/prompt-gate-types.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
 import type { MandatoryCrossVerifyInvocationFactory } from './cross-verify-runner.js';
@@ -35,7 +36,6 @@ import {
 import { ProviderExecutionIngressHoldError } from '../core/provider-execution-ingress-authority.js';
 
 import { TASKS_DIR } from '../core/constants.js';
-import { CascadeDetector } from '../core/cascade-detector.js';
 import { DeckentError } from '../core/errors.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
@@ -85,6 +85,7 @@ import {
   runCleanupPhase, pollForResultFile,
 } from './sprint-phases.js';
 import type { PlanPhaseResult } from './sprint-phases.js';
+import { evaluateFixCircuitBreaker } from '../core/task-lineage.js';
 
 // ─── Pre-Start Guards (born-672a/672b — snapshot-start guard wiring) ─
 import { runPreStartGuards } from './pre-start-guards.js';
@@ -1169,48 +1170,58 @@ export async function retryEvaluateIfEmpty(
 }
 
 /**
- * Sprint 140 cost-cascade circuit-breaker (B11 wire) — disaster prevention.
+ * Post-FIX logical-lineage circuit breaker.
  *
- * Feeds the EVALUATE-phase outcomes to the {@link CascadeDetector} in task order.
- * After N consecutive NO_GO (default 5, DEFAULT_CASCADE_CONFIG) the detector returns
- * PAUSE_SPRINT and we pause the sprint — exactly the Sprint 140 real-world pattern
- * (197 workers × 100% NO_GO in 14 min = $42 deadweight). The detector + pauseSprint
- * were both fully built and unit-tested, but the detector had ZERO callers: the
- * circuit-breaker was never connected. This wires it into the EVALUATE→FIX seam so a
- * runaway sprint auto-pauses (resume via `deckent resume`) instead of burning cost.
+ * The initial EVALUATE verdict is never a pause authority while an admitted FIX
+ * budget remains. This gate runs after FIX and evaluates only planned root tasks:
+ * `task → fix → fix-fix` is one logical task, not three failures. Both the
+ * absolute count and unresolved-ratio thresholds come from effective config and
+ * scale down for small runs.
  *
- * Returns true when the sprint was paused (caller must skip FIX/RETRO).
+ * Returns true when the sprint was paused after FIX exhaustion (caller skips
+ * RETRO/CLEANUP and preserves recovery evidence).
  */
 export function applyCascadeCircuitBreaker(
   projectRoot: string,
   sprint: Sprint,
   evaluations: Map<string, TaskEvaluation>,
+  policy: FixCircuitBreakerConfig = DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG,
+  lang = 'en',
 ): boolean {
-  const cascade = new CascadeDetector();
-  for (const task of sprint.tasks) {
-    const ev = evaluations.get(task.id);
-    if (ev === undefined) continue;
-    // A cascade-skipped task was never dispatched and consumed no provider
-    // attempt. The persisted synthetic result is the cross-process authority;
-    // excluding it prevents dependency fan-out from pausing before the real
-    // root failure can enter FIX.
+  const eligibleRootTasks = sprint.tasks.filter(task => {
     const result = readJsonSafe<TaskResult>(
       join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
     );
-    if (result?.cascadeSkipped === true) continue;
-    const outcome = ev === TaskEvaluation.DONE
-      ? 'DONE'
-      : ev === TaskEvaluation.GO_WITH_TECH_DEBT
-        ? 'GO_WITH_TECH_DEBT'
-        : 'NO_GO';
-    const action = cascade.onResult(outcome);
-    if (action.action === 'PAUSE_SPRINT') {
-      debugLog('runSprint:cascade-circuit-breaker', action.reason);
-      pauseSprint(projectRoot, sprint, action.reason, 'cascade-no-go');
-      return true;
-    }
+    return result?.cascadeSkipped !== true;
+  });
+  const decision = evaluateFixCircuitBreaker(eligibleRootTasks, evaluations, policy);
+  if (!decision.shouldPause) return false;
+
+  const reason = getMessage('pause.post_fix_circuit_breaker_reason', lang, {
+    unresolved: String(decision.unresolvedTasks),
+    total: String(decision.totalTasks),
+    ratio: decision.unresolvedRatioPercent.toFixed(1),
+    countThreshold: String(decision.effectiveCountThreshold),
+    ratioThreshold: String(policy.min_unresolved_ratio_percent),
+  });
+  debugLog('runSprint:fix-circuit-breaker', reason);
+  pauseSprint(projectRoot, sprint, reason, 'post-fix-unresolved-lineages');
+  try {
+    writeEvent(
+      projectRoot,
+      getCurrentSprintId(projectRoot) ?? sprint.id,
+      'brain',
+      'user',
+      'BRAIN→USER:POST_FIX_CIRCUIT_BREAKER',
+      {
+        ...decision,
+        timestamp: new Date().toISOString(),
+      },
+    );
+  } catch (e) {
+    debugLog('runSprint:fix-circuit-breaker:event', e);
   }
-  return false;
+  return true;
 }
 
 /** Structured evidence of a FIX-phase spawn/preflight failure. */
@@ -2153,31 +2164,6 @@ export async function runSprint(
     return sprint;
   }
 
-  // Sprint 140 cost-cascade circuit-breaker (B11 wire): N consecutive NO_GO →
-  // auto-pause before FIX/RETRO so a runaway sprint cannot burn the $42-disaster
-  // cost. Paused state is persisted; resume via `deckent resume`.
-  if (applyCascadeCircuitBreaker(projectRoot, sprint, evaluations)) {
-    // PAUSED is a durable terminal-for-this-coordinator state, not a live
-    // process state. Release every runtime owner while retaining sprint-state,
-    // pause-state, checkpoint, task and result evidence for recover --resume.
-    if (heartbeatDaemon) {
-      try { heartbeatDaemon.stop(); } catch (e) { debugLog('runSprint:cascade-pause:hb-stop', e); }
-      heartbeatDaemon = null;
-    }
-    await stopResourceMonitor(resourceMonitor);
-    resourceMonitor = null;
-    if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-    if (snapshotInterval) { clearInterval(snapshotInterval); snapshotInterval = null; }
-    if (beforeExitHandler) {
-      process.removeListener('beforeExit', beforeExitHandler);
-      beforeExitHandler = null;
-    }
-    releaseSprintLock(projectRoot);
-    clearActiveSprint();
-    try { clearPid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:cascade-pause:clearPid', e); }
-    return sprint;
-  }
-
   // Mark pending handoffs from NO_GO tasks as failed (downstream integrity)
   try {
     failHandoffsForNoGoTasks(projectRoot, sprint, evaluations);
@@ -2323,6 +2309,35 @@ export async function runSprint(
       // Return BEFORE runCleanupPhase — forensic artefacts preserved.
       return sprint;
     }
+  }
+
+  // Exhaust the configured FIX lineage budget before considering a cascade
+  // pause. The decision folds every retry into its planned root task and uses
+  // the effective config's count + ratio thresholds, so small and large runs
+  // share one scale-aware contract.
+  if (applyCascadeCircuitBreaker(
+    projectRoot,
+    sprint,
+    evaluations,
+    config.fix_circuit_breaker ?? DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG,
+    config.language,
+  )) {
+    if (heartbeatDaemon) {
+      try { heartbeatDaemon.stop(); } catch (e) { debugLog('runSprint:post-fix-pause:hb-stop', e); }
+      heartbeatDaemon = null;
+    }
+    await stopResourceMonitor(resourceMonitor);
+    resourceMonitor = null;
+    if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+    if (snapshotInterval) { clearInterval(snapshotInterval); snapshotInterval = null; }
+    if (beforeExitHandler) {
+      process.removeListener('beforeExit', beforeExitHandler);
+      beforeExitHandler = null;
+    }
+    releaseSprintLock(projectRoot);
+    clearActiveSprint();
+    try { clearPid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:post-fix-pause:clearPid', e); }
+    return sprint;
   }
 
   // Handoff observability: summarize all handoff states for audit/event-stream

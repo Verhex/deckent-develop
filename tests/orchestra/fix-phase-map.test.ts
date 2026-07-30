@@ -154,6 +154,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { readJsonSafe } from '../../src/core/utils.js';
 import { evaluateWithRubric } from '../../src/orchestra/result-evaluator.js';
 import { spawnWorkers, waitForResults } from '../../src/orchestra/sprint-controller.js';
+import { handleEvaluation } from '../../src/orchestra/debt-manager.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -309,6 +310,10 @@ describe('FIX Phase — evaluations Map mutation', () => {
   });
 
   it('returns a typed FIX failure instead of swallowing missing budget authority', async () => {
+    const originalTask = makeTask({
+      id: '129-hold-origin',
+      status: TaskStatus.NO_GO,
+    });
     const fixTask = makeFixTask('129-hold-origin', {
       id: '129-hold-origin-fix',
       model: 'gpt-5.6-sol',
@@ -323,8 +328,8 @@ describe('FIX Phase — evaluations Map mutation', () => {
     const config = { ...makeConfig(), execution_budget: undefined } as ResolvedConfig;
     const outcome = await runFixPhase(
       '/tmp/test-project',
-      makeSprint([]),
-      new Map(),
+      makeSprint([originalTask]),
+      new Map([['129-hold-origin', TaskEvaluation.NO_GO]]),
       [],
       config,
       undefined,
@@ -344,6 +349,10 @@ describe('FIX Phase — evaluations Map mutation', () => {
   });
 
   it('dispatches only pending fix tasks owned by the current sprint namespace', async () => {
+    const currentRoot = makeTask({
+      id: '129-current',
+      status: TaskStatus.NO_GO,
+    });
     const current = makeFixTask('129-current', {
       id: '129-current-fix',
       sprintId: 'sprint-129',
@@ -364,8 +373,46 @@ describe('FIX Phase — evaluations Map mutation', () => {
 
     await runFixPhase(
       '/tmp/test-project',
-      makeSprint([]),
-      new Map(),
+      makeSprint([currentRoot]),
+      new Map([['129-current', TaskEvaluation.NO_GO]]),
+      [],
+      makeConfig(),
+      undefined,
+      'v1',
+      undefined,
+    );
+
+    const dispatchedSprint = vi.mocked(spawnWorkers).mock.calls[0]?.[1];
+    expect(dispatchedSprint?.tasks.map(task => task.id)).toEqual([current.id]);
+  });
+
+  it('does not dispatch a legacy unscoped orphan fix from another run', async () => {
+    const currentRoot = makeTask({
+      id: '129-current',
+      status: TaskStatus.NO_GO,
+    });
+    const current = makeFixTask('129-current', {
+      id: '129-current-fix',
+      sprintId: 'sprint-129',
+    });
+    const orphan = makeFixTask('legacy-missing-root', {
+      id: 'legacy-missing-root-fix',
+      sprintId: undefined,
+    });
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([
+      `task-${orphan.id}.json`,
+      `task-${current.id}.json`,
+    ] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(readJsonSafe).mockImplementation(path =>
+      String(path).includes(orphan.id) ? orphan : current,
+    );
+    vi.mocked(waitForResults).mockResolvedValue([]);
+
+    await runFixPhase(
+      '/tmp/test-project',
+      makeSprint([currentRoot]),
+      new Map([['129-current', TaskEvaluation.NO_GO]]),
       [],
       makeConfig(),
       undefined,
@@ -408,7 +455,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
 
   it('fix task GO_WITH_TECH_DEBT → original task evaluation updated to GO_WITH_TECH_DEBT in Map', async () => {
     // Arrange
-    const originalTask = makeTask({ id: '129-002' });
+    const originalTask = makeTask({ id: '129-002', status: TaskStatus.NO_GO });
     const fixTask = makeFixTask('129-002');
     const sprint = makeSprint([originalTask]);
     const evaluations = new Map<string, TaskEvaluation>();
@@ -432,7 +479,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
 
   it('fix task NO_GO → original task evaluation remains unchanged (still NO_GO)', async () => {
     // Arrange
-    const originalTask = makeTask({ id: '129-003' });
+    const originalTask = makeTask({ id: '129-003', status: TaskStatus.NO_GO });
     const fixTask = makeFixTask('129-003');
     const sprint = makeSprint([originalTask]);
     const evaluations = new Map<string, TaskEvaluation>();
@@ -455,7 +502,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
     expect(evaluations.get(fixTask.id)).toBe(TaskEvaluation.NO_GO);
   });
 
-  it('fixForTaskId undefined → Map does not crash, graceful handle', async () => {
+  it('fixForTaskId undefined → orphan is ignored without crashing', async () => {
     // Arrange — fix task with no fixForTaskId (orphan fix)
     const fixTask = makeFixTask(undefined);
     const sprint = makeSprint([]);
@@ -474,17 +521,17 @@ describe('FIX Phase — evaluations Map mutation', () => {
       runFixPhase('/tmp/test-project', sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined),
     ).resolves.not.toThrow();
 
-    // Assert — fix task itself should be recorded, no phantom original entry
-    expect(evaluations.get(fixTask.id)).toBe(TaskEvaluation.DONE);
-    // Map should only contain the fix task entry, not an undefined key
-    expect(evaluations.size).toBe(1);
+    // An orphan has no current-sprint root authority and must not dispatch.
+    expect(spawnWorkers).not.toHaveBeenCalled();
+    expect(evaluations.size).toBe(0);
     expect(evaluations.has(undefined as unknown as string)).toBe(false);
   });
 
   it('evaluations Map starts empty, fix task populates correct key-value pairs', async () => {
     // Arrange — empty evaluations Map, original task not pre-registered
+    const originalTask = makeTask({ id: '129-005', status: TaskStatus.NO_GO });
     const fixTask = makeFixTask('129-005');
-    const sprint = makeSprint([]);
+    const sprint = makeSprint([originalTask]);
     const evaluations = new Map<string, TaskEvaluation>();
     // Note: original task '129-005' is NOT in the Map (empty start)
 
@@ -501,10 +548,89 @@ describe('FIX Phase — evaluations Map mutation', () => {
 
     // Assert — fix task itself is recorded
     expect(evaluations.get(fixTask.id)).toBe(TaskEvaluation.DONE);
-    // Original task is NOT updated because evaluations.has('129-005') was false
-    // (line 511 guard: evaluations.has(fixTask.fixForTaskId))
-    expect(evaluations.has('129-005')).toBe(false);
-    // Map should contain exactly 1 entry (the fix task only)
-    expect(evaluations.size).toBe(1);
+    // The resolved attempt projects to its logical root even if the caller's
+    // Map did not pre-seed that root.
+    expect(evaluations.get('129-005')).toBe(TaskEvaluation.DONE);
+    expect(evaluations.size).toBe(2);
+  });
+
+  it('dispatches a fix-of-a-fix in the same run and settles one logical root', async () => {
+    const originalTask = makeTask({ id: '129-chain', status: TaskStatus.NO_GO });
+    const firstFix = makeFixTask(originalTask.id, {
+      id: '129-chain-fix',
+      sprintId: 'sprint-129',
+    });
+    const secondFix = makeFixTask(firstFix.id, {
+      id: '129-chain-fix-fix',
+      sprintId: 'sprint-129',
+    });
+    const evaluations = new Map([[originalTask.id, TaskEvaluation.NO_GO]]);
+    const results: TaskResult[] = [];
+
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockImplementation(() => (
+      vi.mocked(handleEvaluation).mock.calls.length === 0
+        ? [`task-${firstFix.id}.json`]
+        : [
+            `task-${firstFix.id}.json`,
+            `task-${secondFix.id}.json`,
+          ]
+    ) as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(readJsonSafe).mockImplementation(path =>
+      String(path).includes(secondFix.id) ? secondFix : firstFix,
+    );
+    vi.mocked(handleEvaluation).mockImplementation((_root, task, evaluation) => {
+      task.status = evaluation === TaskEvaluation.NO_GO
+        ? TaskStatus.NO_GO
+        : TaskStatus.DONE;
+      return undefined as never;
+    });
+    vi.mocked(waitForResults)
+      .mockResolvedValueOnce([
+        makeResult(firstFix.id, { testsPassed: false, selfAssessment: 'NO_GO' }),
+      ])
+      .mockResolvedValueOnce([
+        makeResult(secondFix.id, { testsPassed: true, selfAssessment: 'DONE' }),
+      ]);
+    vi.mocked(evaluateWithRubric)
+      .mockReturnValueOnce(makeEvalResult('NO_GO'))
+      .mockReturnValueOnce(makeEvalResult('DONE'));
+
+    await runFixPhase(
+      '/tmp/test-project',
+      makeSprint([originalTask]),
+      evaluations,
+      results,
+      { ...makeConfig(), max_fix_retries: 2 } as ResolvedConfig,
+      undefined,
+      'v1',
+      undefined,
+    );
+
+    expect(spawnWorkers).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(spawnWorkers).mock.calls[0]?.[1].tasks.map(task => task.id))
+      .toEqual([firstFix.id]);
+    expect(vi.mocked(spawnWorkers).mock.calls[1]?.[1].tasks.map(task => task.id))
+      .toEqual([secondFix.id]);
+    expect(handleEvaluation).toHaveBeenNthCalledWith(
+      1,
+      '/tmp/test-project',
+      firstFix,
+      TaskEvaluation.NO_GO,
+      expect.objectContaining({ taskId: firstFix.id }),
+      { allowPriorityFixCreation: true },
+    );
+    expect(handleEvaluation).toHaveBeenNthCalledWith(
+      2,
+      '/tmp/test-project',
+      secondFix,
+      TaskEvaluation.DONE,
+      expect.objectContaining({ taskId: secondFix.id }),
+      { allowPriorityFixCreation: false },
+    );
+    expect(evaluations.get(originalTask.id)).toBe(TaskEvaluation.DONE);
+    expect(evaluations.get(firstFix.id)).toBe(TaskEvaluation.NO_GO);
+    expect(evaluations.get(secondFix.id)).toBe(TaskEvaluation.DONE);
+    expect(results.map(result => result.taskId)).toEqual([firstFix.id, secondFix.id]);
   });
 });

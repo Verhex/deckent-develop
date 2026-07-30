@@ -1218,6 +1218,15 @@ describe('sprint config defaults', () => {
     const config = getDefaultConfig();
     expect(config.max_fix_retries).toBe(2);
   });
+
+  it('default config has a scale-aware post-FIX circuit breaker', () => {
+    const config = getDefaultConfig();
+    expect(config.fix_circuit_breaker).toEqual({
+      enabled: true,
+      max_unresolved_tasks: 5,
+      min_unresolved_ratio_percent: 50,
+    });
+  });
 });
 
 describe('rollback config defaults', () => {
@@ -1268,6 +1277,26 @@ describe('new config validation', () => {
     expect(() => validatePartialConfig({ max_fix_retries: 15 } as Partial<import('../../src/core/types.js').DeckentConfig>)).toThrow(ConfigValidationError);
   });
 
+  it('rejects invalid post-FIX circuit-breaker thresholds', () => {
+    expect(() => validatePartialConfig({
+      fix_circuit_breaker: {
+        enabled: true,
+        max_unresolved_tasks: 0,
+        min_unresolved_ratio_percent: 101,
+      },
+    })).toThrow(ConfigValidationError);
+  });
+
+  it('accepts a valid post-FIX circuit-breaker override', () => {
+    expect(() => validatePartialConfig({
+      fix_circuit_breaker: {
+        enabled: true,
+        max_unresolved_tasks: 12,
+        min_unresolved_ratio_percent: 35,
+      },
+    })).not.toThrow();
+  });
+
   it('rejects invalid rollback_policy', () => {
     expect(() => validatePartialConfig({ rollback_policy: 'maybe' as 'never' } as Partial<import('../../src/core/types.js').DeckentConfig>)).toThrow(ConfigValidationError);
   });
@@ -1286,7 +1315,7 @@ describe('CONFIG_METADATA', () => {
     const newFields = [
       'memory_budget', 'decay_after_sprints', 'patterns_enabled', 'project_identity_enabled',
       'scan_interval', 'heartbeat_timeout', 'boundary_enforcement',
-      'fix_phase_enabled', 'max_fix_retries', 'rollback_policy',
+      'fix_phase_enabled', 'max_fix_retries', 'fix_circuit_breaker', 'rollback_policy',
     ];
     for (const field of newFields) {
       expect(CONFIG_METADATA[field]).toBeDefined();
@@ -1336,6 +1365,7 @@ describe('listConfigByCategory', () => {
   it('Sprint category has fix_phase_enabled and rollback_policy', () => {
     const grouped = listConfigByCategory();
     expect(grouped['Sprint']).toContain('fix_phase_enabled');
+    expect(grouped['Sprint']).toContain('fix_circuit_breaker');
     expect(grouped['Sprint']).toContain('rollback_policy');
   });
 });
@@ -1349,6 +1379,15 @@ describe('loadConfig resolves new fields', () => {
   it('resolved config includes fix_phase_enabled from defaults', async () => {
     const config = await loadConfig('/test/project');
     expect(config.fix_phase_enabled).toBe(true);
+  });
+
+  it('resolved config includes the post-FIX circuit breaker from defaults', async () => {
+    const config = await loadConfig('/test/project');
+    expect(config.fix_circuit_breaker).toEqual({
+      enabled: true,
+      max_unresolved_tasks: 5,
+      min_unresolved_ratio_percent: 50,
+    });
   });
 
   it('resolved config includes rollback_policy from defaults', async () => {

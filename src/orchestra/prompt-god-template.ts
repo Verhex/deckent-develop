@@ -1724,6 +1724,23 @@ export function buildTestCommandLine(
 }
 
 /**
+ * Extract owner/planner-authored verification commands from explicit
+ * `**Test:** `command`` clauses. These commands outrank stack-generic
+ * tsc/vitest guidance: adding an unrelated runner changes the task contract and
+ * can turn a valid standalone proof into a false NO_GO.
+ */
+export function extractDeclaredTestCommands(task: Pick<Task, 'description'>): readonly string[] {
+  const source = task.description ?? '';
+  const commands: string[] = [];
+  const pattern = /\*\*Test:\*\*\s*`([^`\r\n]+)`/gi;
+  for (const match of source.matchAll(pattern)) {
+    const command = match[1]?.trim();
+    if (command && !commands.includes(command)) commands.push(command);
+  }
+  return Object.freeze(commands);
+}
+
+/**
  * PCOMP-6 D1a — resolve the EXACT targeted-test set for a task, purely from
  * plan-time data (no I/O; `trackedFiles` is the caller-injected `git ls-files`
  * snapshot, same source `buildScopeBlock` already uses):
@@ -1909,6 +1926,7 @@ ${dodBlock}${idempotencyBlock}`);
   // task verifies via targeted tests, which is also the mode whose guidance must
   // take precedence over a persona's conflicting full-suite test-mandate.
   const verificationMode: 'targeted' | 'doc' = isDocOnlyTask ? 'doc' : 'targeted';
+  const declaredTestCommands = extractDeclaredTestCommands(task);
   if (isInspectionOnlyTask) {
     push('T0', 'verify-steps', `## VERIFY STEPS (inspection-only)
 This task has no project write authority. Do not run a build, type check, test suite, package-manager command, or other mutation-oriented verification unless the task's written acceptance criteria explicitly name that exact read-only command.
@@ -1921,6 +1939,18 @@ This is a Tier-0 documentation task: there is no source code to type-check or te
 1. Read your file back from disk (the path in your scope) and confirm its content satisfies the goCriteria above.
 2. You MAY run a fast doc/markdown lint if one exists, but a passing test suite is NOT required and NOT expected.
 Mark selfAssessment = "DONE" when the file exists and matches the goCriteria. Use "GO_WITH_TECH_DEBT" only if the content is genuinely partial; use "NO_GO" only if you could not create the file at all. Do NOT mark NO_GO because an unrelated test suite failed.`);
+  } else if (declaredTestCommands.length > 0) {
+    const commandList = declaredTestCommands
+      .map((command, index) => `${index + 1}. \`${command}\``)
+      .join('\n');
+    push('T0', 'verify-steps', `## CRITICAL VERIFY STEPS (TASK-DECLARED AUTHORITY)
+This task declares its verification command(s) explicitly. Run exactly these commands:
+${commandList}
+
+Do not add a project-wide type check, test runner, or substitute command unless the task's own goCriteria explicitly requires it. A failure from an unrelated command is not evidence against this task.
+If every declared command passes and every goCriteria checklist item is genuinely satisfied → selfAssessment = "DONE"
+If a declared command cannot run or fails after repair attempts → selfAssessment = "NO_GO" with the exact evidence
+${buildVerifyPrecedenceNote(verificationMode)}${buildBehaviorPrecedenceNote(task)}`);
   } else {
     push('T0', 'verify-steps', `## CRITICAL VERIFY STEPS (DO NOT SKIP)
 You MUST run the project's type check and TARGETED tests before marking your task as done.
@@ -1979,11 +2009,13 @@ At EVERY significant step, also update the \`currentAction\` field to a short hu
   // worker token-usage instructions.
   const provider = task.provider ?? getDefaultProviderName();
   push('T2', 'result-contract', `## Result & Self-Assessment
-Write .tasks/task-${task.id}.result with: taskId, filesChanged, testsPassed, selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), notes, and tokenUsage { "inputTokens": 0, "outputTokens": 0, "cacheReadTokens": 0, "provider": "${provider}", "model": "${task.model}" }. Set provider/model as shown (you know these); leave inputTokens, outputTokens and cacheReadTokens at 0 — do NOT estimate them. An LLM cannot count its own token usage, so any guess only adds noise: the orchestrator fills the real token counts server-side after you finish. tokenUsage is optional — if you omit it the orchestrator still fills it.
+Write .tasks/task-${task.id}.result with: taskId, workerId ("w-${task.id}"), filesChanged (string[]), linesAdded (integer), linesRemoved (integer), testsPassed (BOOLEAN), coverage (number; use 0 when not measured), selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), notes, and tokenUsage { "inputTokens": 0, "outputTokens": 0, "cacheReadTokens": 0, "provider": "${provider}", "model": "${task.model}" }. The orchestrator replaces measurable file/line/token/cost fields with host-authoritative evidence; your values are ingress claims, never billing truth. Set provider/model as shown (you know these); leave inputTokens, outputTokens and cacheReadTokens at 0 — do NOT estimate them. An LLM cannot count its own token usage, so any guess only adds noise: the orchestrator fills the real token counts server-side after you finish. tokenUsage is optional — if you omit it the orchestrator still fills it.
 Field shapes (strict — a wrong shape here breaks the orchestrator's result parser for the whole sprint):
 - \`notes\`: a SINGLE string, never an array or object. For multiple points, join them into ONE string using \`\\n\` newlines — do NOT write \`["point one", "point two"]\` or \`{"a": "..."}\`.
 - \`selfAssessment\`: exactly one of the three string literals \`"DONE"\`, \`"GO_WITH_TECH_DEBT"\`, \`"NO_GO"\` — never an array, never any other value.
 - \`filesChanged\`: an array of file-path strings, e.g. \`["src/foo.ts", "tests/foo.test.ts"]\`.
+- \`testsPassed\`: one boolean (\`true\` or \`false\`), never a command array.
+- \`coverage\`: one finite number from 0 to 100; use \`0\` to mean "not measured", never omit the field.
 ${isInspectionOnlyTask ? 'Assess against the single Definition of Done above and attach evidence for every clause; do not repeat or rewrite the criteria.' : buildDodChecklist(task.goNogo?.goCriteria)}
 CRITICAL: never exit without writing the .result file — even on failure, write selfAssessment "NO_GO" with error details. A missing result file stalls the entire sprint.`);
 

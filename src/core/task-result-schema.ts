@@ -331,16 +331,37 @@ function safeJsonStringify(value: unknown): string {
 
 /**
  * Normalize a legacy `TaskResult` freshly read from disk to the shapes its
- * consumers assume. Applied at every `readJsonSafe<TaskResult>` call site so a
- * provider-CLI shape drift can never reach the evaluator/collector string ops.
+ * consumers assume. Applied at every result-ingest call site so provider-CLI
+ * shape drift cannot turn real work into a parser-level NO_GO.
+ *
+ * Some CLIs emitted `testsPassed` as the list of commands they ran. Preserve
+ * those commands in `testCommands` and recover the boolean from the worker's
+ * explicit assessment: NO_GO means false; DONE/GO_WITH_TECH_DEBT means true.
+ * This does not elevate the final verdict — Brain still applies disk, scope,
+ * rubric, and honesty gates — it only restores the intended scalar claim.
  * Mutates in place (results are plain parsed JSON) and passes `null` through
  * so it composes with `readJsonSafe`'s miss contract.
  */
 export function normalizeTaskResultShape<T extends { notes?: unknown }>(result: T | null): T | null {
   if (result === null || typeof result !== 'object') return result;
-  const coerced = coerceNotesToString((result as { notes?: unknown }).notes);
-  if (coerced !== (result as { notes?: unknown }).notes) {
-    (result as { notes: string }).notes = coerced;
+  const record = result as Record<string, unknown>;
+  const coerced = coerceNotesToString(record['notes']);
+  if (coerced !== record['notes']) {
+    record['notes'] = coerced;
+  }
+  if (
+    Array.isArray(record['testsPassed'])
+    && record['testsPassed'].every(command => typeof command === 'string')
+  ) {
+    record['testCommands'] = [...record['testsPassed']];
+    const assessment = record['selfAssessment'];
+    if (
+      assessment === 'DONE'
+      || assessment === 'GO_WITH_TECH_DEBT'
+      || assessment === 'NO_GO'
+    ) {
+      record['testsPassed'] = assessment !== 'NO_GO';
+    }
   }
   return result;
 }

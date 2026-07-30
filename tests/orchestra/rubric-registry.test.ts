@@ -394,4 +394,20 @@ describe('coverageOptional', () => {
 
     expect(coverageOptional(task)).toBe(false);
   });
+
+  it('honors an owner-declared direct test command for code without coverage output', () => {
+    const task = makeTask({
+      description: 'Implement the smoke module.\n\n**Test:** `node src/X.ts`',
+      scope: {
+        directories: ['src/'],
+        filesRead: [],
+        filesWrite: ['src/X.ts'],
+      },
+    });
+
+    expect(coverageOptional(task, {
+      filesChanged: ['src/X.ts'],
+      testsPassed: true,
+    })).toBe(true);
+  });
 });

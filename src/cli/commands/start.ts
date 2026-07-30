@@ -51,6 +51,7 @@ import { getRunFlowCoordinator } from '../../orchestra/run-flow-coordinator-regi
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
 import { preflightCliBrainProviderAuthority } from '../provider-authority-process-runtime.js';
 import { ProviderExecutionIngressHoldError } from '../../core/provider-execution-ingress-authority.js';
+import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
 
 // ─── Provider Cache ───────────────────────────────────────────────
 
@@ -62,6 +63,20 @@ interface ProviderCache {
   defaultProvider: string | null;
   cachedAt: string;
   configHash: string;
+}
+
+function renderPausedRun(
+  projectRoot: string,
+  sprintId: string,
+  lang: string,
+): string {
+  const authority = readCanonicalRunStatus(projectRoot, { sprintIdHint: sprintId });
+  const title = getMessage('pause.notification_title', lang, { sprintId });
+  const summary = getMessage('pause.notification_summary', lang, {
+    reason: authority.reason ?? authority.status ?? '',
+    command: authority.recoveryCommand ?? `deckent recover ${sprintId} --resume`,
+  });
+  return `${title}\n${summary}`;
 }
 
 function makeConfigHash(config: { brain_provider?: string; worker_provider?: string; fallback_provider?: string }): string {
@@ -655,6 +670,32 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
             } catch { /* attempt journal remains canonical */ }
             throw err;
           }
+          if (sprintResult.status === 'PAUSED') {
+            const authority = readCanonicalRunStatus(root, { sprintIdHint: sprintResult.id });
+            const detail = authority.reason ?? authority.status ?? '';
+            settleExactRunAttempt({
+              root,
+              capability,
+              process: processIdentity,
+              freshCapability,
+              settlement: {
+                state: 'BLOCKED',
+                code: 'EXACT_CHILD_PAUSED',
+                detail,
+                settledAt: new Date().toISOString(),
+              },
+            });
+            try {
+              coordinator.recordRunFailure({
+                flowId,
+                error: detail,
+                commandId: `child-paused-${flowId}`,
+              });
+            } catch { /* terminal attempt journal remains canonical */ }
+            print(renderPausedRun(root, sprintResult.id, lang));
+            process.exitCode = 2;
+            return;
+          }
           settleExactRunAttempt({
             root,
             capability,
@@ -980,6 +1021,11 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
           });
         } finally {
           if (stopSubprocessWatch) stopSubprocessWatch();
+        }
+        if (sprintResult.status === 'PAUSED') {
+          print(renderPausedRun(root, sprintResult.id, lang));
+          process.exitCode = 2;
+          return;
         }
         print(formatSprintSummary(sprintResult));
 

@@ -71,6 +71,11 @@ export interface DeckentConfig {
   // Sprint
   fix_phase_enabled?: boolean;
   max_fix_retries?: number;
+  fix_circuit_breaker?: {
+    enabled?: boolean;
+    max_unresolved_tasks?: number;
+    min_unresolved_ratio_percent?: number;
+  };
   // Rollback
   rollback_policy?: string;
   // Output

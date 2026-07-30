@@ -152,6 +152,9 @@ describe("dashboard page — ConfigPage.tsx", () => {
     const content = readFileSync(filePath, "utf-8");
     expect(content).toContain('fix_phase_enabled');
     expect(content).toContain('max_fix_retries');
+    expect(content).toContain('fix_circuit_breaker.enabled');
+    expect(content).toContain('fix_circuit_breaker.max_unresolved_tasks');
+    expect(content).toContain('fix_circuit_breaker.min_unresolved_ratio_percent');
   });
 
   it("CATEGORIES array has 14 categories", () => {

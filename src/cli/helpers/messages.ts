@@ -1019,6 +1019,10 @@ const MESSAGES: MessageMap = {
     en: '{reason}. Verify the recovery preview, then continue with: {command}',
     tr: '{reason}. Kurtarma önizlemesini doğrulayıp şu komutla devam edin: {command}',
   },
+  'pause.post_fix_circuit_breaker_reason': {
+    en: '{unresolved}/{total} logical tasks remain NO_GO after the admitted FIX budget ({ratio}%; count threshold {countThreshold}, ratio threshold {ratioThreshold}%). The run was paused to prevent an unbounded repair cascade.',
+    tr: 'Kabul edilen FIX bütçesi sonrasında {unresolved}/{total} logical task hâlâ NO_GO ({ratio}%; sayı eşiği {countThreshold}, oran eşiği %{ratioThreshold}). Sınırsız bir düzeltme zincirini önlemek için run duraklatıldı.',
+  },
   'pause.action_resume': {
     en: 'Resume',
     tr: 'Sürdür',

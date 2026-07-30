@@ -263,6 +263,11 @@ const COVERAGE_OPTIONAL_AGENTS = new Set([
   'refactorer-temp',
 ]);
 
+/** True when the owner/planner supplied an exact direct verification command. */
+export function hasDeclaredTestCommand(task: Pick<Task, 'description'>): boolean {
+  return /\*\*Test:\*\*\s*`[^`\r\n]+`/i.test(task.description ?? '');
+}
+
 /**
  * Returns true when the task's rubric treats coverage as optional.
  *
@@ -279,6 +284,12 @@ const COVERAGE_OPTIONAL_AGENTS = new Set([
  */
 export function coverageOptional(task: Task, result?: { filesChanged?: string[]; testsPassed?: boolean }): boolean {
   if (detectTaskType(task) !== 'code-development') return true;
+  // An owner-authored `**Test:** `command`` clause defines a direct proof
+  // contract that may not produce v8/istanbul coverage (standalone Node smoke,
+  // compiler invocation, CLI exit-path proof, etc.). Requiring a numeric
+  // JavaScript coverage percentage in addition would silently replace the
+  // task's declared acceptance authority with a different test system.
+  if (hasDeclaredTestCommand(task)) return true;
   const agent = task.assignedAgent;
   if (agent && COVERAGE_OPTIONAL_AGENTS.has(agent)) return true;
   // Sprint 207 P0-1 (forensic Sprint 206): signal-based, agent-independent path.

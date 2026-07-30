@@ -101,6 +101,28 @@ describe('normalizeTaskResultShape (disk-read boundary)', () => {
     const r = { ...makeCodexResult(), notes: 'plain' };
     expect(normalizeTaskResultShape(r)!.notes).toBe('plain');
   });
+
+  it('preserves legacy command arrays and restores a DONE boolean claim', () => {
+    const r = {
+      ...makeCodexResult(),
+      testsPassed: ['node example.ts', 'test -f README.md'] as unknown as boolean,
+    };
+    const normalized = normalizeTaskResultShape(r)!;
+    expect(normalized.testsPassed).toBe(true);
+    expect((normalized as TaskResult).testCommands).toEqual([
+      'node example.ts',
+      'test -f README.md',
+    ]);
+  });
+
+  it('maps a legacy command array to false when the worker reported NO_GO', () => {
+    const r = {
+      ...makeCodexResult(),
+      testsPassed: ['node example.ts'] as unknown as boolean,
+      selfAssessment: 'NO_GO' as const,
+    };
+    expect(normalizeTaskResultShape(r)!.testsPassed).toBe(false);
+  });
 });
 
 describe('evaluator belt-and-braces (in-memory array notes must not throw)', () => {

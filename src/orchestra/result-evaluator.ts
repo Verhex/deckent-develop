@@ -14,7 +14,11 @@ import { debugLog } from '../core/utils.js';
 import { coerceNotesToString } from '../core/task-result-schema.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
 import { reconcileSpuriousNoGo, reconcileRubricNoGo } from './mid-sprint-adapter.js';
-import { getRubric, coverageOptional } from './rubric-registry.js';
+import {
+  getRubric,
+  coverageOptional,
+  hasDeclaredTestCommand,
+} from './rubric-registry.js';
 import type { DiskVerifyResult } from './disk-verify.js';
 import { verifyDiskAgainstClaim } from './disk-verify.js';
 import {
@@ -505,8 +509,16 @@ export function validateResultSchema(result: TaskResult, task?: Task): ResultSch
  * the rubric math can reweight (`coverageAbsent` path) rather than silently
  * pull the total down.
  */
-function isCoverageStructurallyAbsent(result: TaskResult): boolean {
-  return !(typeof result.coverage === 'number' && Number.isFinite(result.coverage));
+function isCoverageStructurallyAbsent(result: TaskResult, task: Task): boolean {
+  if (!(typeof result.coverage === 'number' && Number.isFinite(result.coverage))) {
+    return true;
+  }
+  // The worker result contract uses numeric 0 as the provider-neutral
+  // "not measured" sentinel. For an owner-declared direct command (standalone
+  // Node smoke, compiler, CLI exit proof, etc.) there may be no coverage
+  // instrument at all, so 0 is structural absence rather than measured 0%.
+  // Ordinary code tasks keep the existing numeric-0 quality signal.
+  return result.coverage === 0 && hasDeclaredTestCommand(task);
 }
 
 /** Default rubric used when no custom rubric is provided */
@@ -1023,7 +1035,7 @@ export function evaluateWithRubric(
     scored.passed = scored.score >= criterion.threshold;
     rubricScores.push(scored);
 
-    if (criterion.name === 'test_coverage' && isCoverageStructurallyAbsent(result)) {
+    if (criterion.name === 'test_coverage' && isCoverageStructurallyAbsent(result, task)) {
       // Skip from weighted sum; reweight remaining criteria below.
       absentWeight += criterion.weight;
       continue;

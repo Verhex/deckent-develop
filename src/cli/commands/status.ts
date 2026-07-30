@@ -24,6 +24,10 @@ import {
   settlementProjectionDto,
 } from './task-settlement.js';
 import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
+import {
+  computeLogicalTaskProgress,
+  foldTaskLineages,
+} from '../../core/task-lineage.js';
 
 interface StatusOpts {
   watch?: boolean;
@@ -187,7 +191,12 @@ export interface StatusCommandDeps {
 
 export interface StatusTaskSettlementDto
   extends ReturnType<typeof settlementProjectionDto> {
+  /** Logical root task id; FIX attempts never create a second status row. */
   readonly taskId: string;
+  /** Attempt whose current raw/effective settlement is projected. */
+  readonly resolvedTaskId: string;
+  readonly attemptIds: readonly string[];
+  readonly attemptCount: number;
 }
 
 export function loadStatusTaskSettlements(
@@ -196,25 +205,30 @@ export function loadStatusTaskSettlements(
   deps: StatusCommandDeps,
 ): readonly StatusTaskSettlementDto[] {
   if (tasks.length === 0 || !deps.openTaskSettlementProjection) return [];
+  const lineages = foldTaskLineages(tasks);
   const opened = deps.openTaskSettlementProjection(root);
   try {
-    const inputs = tasks.map(task => {
+    const inputs = lineages.map(lineage => {
+      const task = lineage.resolvedTask;
       const tenantId = resolveTenant(root, {
         ...(task.actor?.tenantId ? { tenantId: task.actor.tenantId } : {}),
       }).tenantId;
       return { taskId: task.id, rawStatus: task.status, tenantId };
     });
     const projections = opened.projectTaskExecutionStates(inputs);
-    if (projections.length !== tasks.length) {
+    if (projections.length !== lineages.length) {
       throw new Error('TASK_SETTLEMENT_PROJECTION_CARDINALITY_MISMATCH');
     }
-    return tasks.map((task, index) => {
+    return lineages.map((lineage, index) => {
       const projection = projections[index];
       if (!projection) {
         throw new Error('TASK_SETTLEMENT_PROJECTION_CARDINALITY_MISMATCH');
       }
       return {
-        taskId: task.id,
+        taskId: lineage.rootId,
+        resolvedTaskId: lineage.resolvedTask.id,
+        attemptIds: lineage.attemptIds,
+        attemptCount: lineage.attempts.length,
         ...settlementProjectionDto(projection),
       };
     });
@@ -395,7 +409,11 @@ export function loadTaskFiles(root: string): Task[] {
       // Skip malformed task files
     }
   }
-  return tasks.sort((left, right) => left.id.localeCompare(right.id));
+  const activeSprintId = getCurrentSprintId(root);
+  const scopedTasks = activeSprintId
+    ? tasks.filter(task => task.sprintId === activeSprintId)
+    : tasks;
+  return scopedTasks.sort((left, right) => left.id.localeCompare(right.id));
 }
 
 /**
@@ -604,14 +622,25 @@ function statusFormatterData(
   state: DashboardState,
   tasks: readonly Task[],
 ): Record<string, unknown> {
+  const lineages = foldTaskLineages(tasks);
+  const progress = tasks.length > 0
+    ? computeLogicalTaskProgress(tasks)
+    : {
+        done: state.progress?.done ?? 0,
+        active: state.progress?.active ?? 0,
+        blocked: state.progress?.blocked ?? 0,
+        total: state.progress?.total ?? 0,
+      };
   return {
     sprintId: state.sprint.id,
     phase: state.sprint.phase as string | undefined,
-    totalTasks: state.progress?.total ?? tasks.length,
-    completedTasks: state.progress?.done ?? 0,
-    failedTasks: tasks.filter(t => (t.status as string) === 'NO_GO').length,
-    techDebtTasks: tasks.filter(
-      t => ((t as unknown as Record<string, unknown>)['evaluationDecision'] as string)
+    totalTasks: progress.total,
+    completedTasks: progress.done,
+    failedTasks: lineages.filter(
+      lineage => (lineage.resolvedTask.status as string) === 'NO_GO',
+    ).length,
+    techDebtTasks: lineages.filter(
+      lineage => ((lineage.resolvedTask as unknown as Record<string, unknown>)['evaluationDecision'] as string)
         === 'GO_WITH_TECH_DEBT',
     ).length,
     activeWorkers: state.agents?.length ?? 0,
@@ -634,6 +663,7 @@ export function buildStatusJsonSnapshot(
   if (!existsSync(dashPath)) {
     if (tasks.length === 0) return buildNoActiveStatusJson(root);
     const sprintId = authority.sprintId ?? getCurrentSprintId(root) ?? detectSprintId(tasks);
+    const lineages = foldTaskLineages(tasks);
     return {
       standalone: true,
       active: authority.active,
@@ -642,11 +672,15 @@ export function buildStatusJsonSnapshot(
       sprintId,
       authority,
       pendingApprovals: readPendingApprovals(root),
-      tasks: tasks.map(task => ({
-        id: task.id,
-        title: task.title,
-        status: task.status,
-        model: task.model,
+      progress: computeLogicalTaskProgress(tasks),
+      tasks: lineages.map(lineage => ({
+        id: lineage.rootId,
+        title: lineage.rootTask.title,
+        status: lineage.resolvedTask.status,
+        model: lineage.resolvedTask.model,
+        resolvedTaskId: lineage.resolvedTask.id,
+        attemptIds: lineage.attemptIds,
+        attemptCount: lineage.attempts.length,
       })),
       taskSettlements: loadStatusTaskSettlements(root, tasks, deps),
       ...(verbose
@@ -677,9 +711,13 @@ export function buildStatusJsonSnapshot(
   }
 
   const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
+  const logicalProgress = tasks.length > 0
+    ? computeLogicalTaskProgress(tasks)
+    : state.progress;
   const snapshot = verbose
     ? {
         ...state,
+        progress: logicalProgress,
         taskSettlements,
         _verbose: {
           agents: tasks.map(task => ({
@@ -689,7 +727,7 @@ export function buildStatusJsonSnapshot(
           })),
         },
       }
-    : { ...state, taskSettlements };
+    : { ...state, progress: logicalProgress, taskSettlements };
   return {
     ...snapshot,
     active: authority.active,

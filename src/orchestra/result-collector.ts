@@ -1043,8 +1043,9 @@ export async function waitForResults(
       debugLog('collectResults:providerFailureLogRead', e);
     }
     const kind = isProviderDispatchHoldFailure(result, workerLog);
+    if (!kind) return false;
     const provider = task ? resolveTaskProvider(task) : undefined;
-    if (!kind || !provider) return false;
+    if (!provider) return false;
     if (!providerDispatchHolds.has(provider)) {
       providerDispatchHolds.set(provider, { kind, sourceTaskId: taskId });
       try {

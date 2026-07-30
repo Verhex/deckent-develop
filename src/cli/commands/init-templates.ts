@@ -492,6 +492,9 @@ CLI ile okuma/yazma: \`deckent config read\` / \`deckent config set key value\`
 |------|----------|-----------|----------|
 | fix_phase_enabled | true/false | true | Başarısız task'ları tekrar dene |
 | max_fix_retries | sayı | 2 | Maksimum tekrar deneme |
+| fix_circuit_breaker.enabled | true/false | true | Fix bütçesi sonrası parametrik duraklatma |
+| fix_circuit_breaker.max_unresolved_tasks | sayı | 5 | Çözülemeyen mantıksal task sayı eşiği |
+| fix_circuit_breaker.min_unresolved_ratio_percent | sayı | 50 | Çözülemeyen mantıksal task oran eşiği (%) |
 | scan_interval | saniye | 30 | Auditor tarama aralığı |
 | heartbeat_timeout | saniye | 120 | Worker heartbeat zaman aşımı |
 | cleanup_delay_ms | ms | 180000 | Cleanup öncesi bekleme |
@@ -540,6 +543,9 @@ CLI read/write: \`deckent config read\` / \`deckent config set key value\`
 |---------|--------|---------|-------------|
 | fix_phase_enabled | true/false | true | Retry failed tasks |
 | max_fix_retries | number | 2 | Max retry attempts |
+| fix_circuit_breaker.enabled | true/false | true | Parametric pause after the fix budget |
+| fix_circuit_breaker.max_unresolved_tasks | number | 5 | Unresolved logical-task count threshold |
+| fix_circuit_breaker.min_unresolved_ratio_percent | number | 50 | Unresolved logical-task ratio threshold (%) |
 | scan_interval | seconds | 30 | Auditor scan interval |
 | heartbeat_timeout | seconds | 120 | Worker heartbeat timeout |
 | cleanup_delay_ms | ms | 180000 | Wait before cleanup |

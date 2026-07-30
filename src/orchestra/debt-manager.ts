@@ -397,6 +397,7 @@ export function handleEvaluation(
   task: Task,
   evaluation: TaskEvaluation,
   result: TaskResult,
+  policy: { allowPriorityFixCreation?: boolean } = {},
 ): void {
   const workerId = task.assignedWorker ?? `w-${task.id}`;
 
@@ -436,6 +437,20 @@ export function handleEvaluation(
   // sprint, after the upstream is reviewed/fixed.
   if (isCascadeSkippedResult(result)) {
     debugLog('handleEvaluation:cascadeSkipExempt', `task=${task.id} — no fix task for a never-dispatched skip`);
+    return;
+  }
+
+  // A NO_GO on the final admitted FIX attempt is terminal for this run. The
+  // caller owns the configured retry budget and passes this explicit gate so
+  // handleEvaluation cannot mint an unbounded `-fix-fix-...` chain. Release
+  // the completed worker's locks; the logical root remains NO_GO and the
+  // post-FIX circuit breaker decides PAUSED vs normal settlement.
+  if (policy.allowPriorityFixCreation === false) {
+    releaseAllLocks(projectRoot, workerId);
+    debugLog(
+      'handleEvaluation:fixBudgetExhausted',
+      `task=${task.id} — NO_GO persisted without creating another priority fix`,
+    );
     return;
   }
 

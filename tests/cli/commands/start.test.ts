@@ -90,6 +90,15 @@ vi.mock('../../../src/cli/commands/quick-start.js', () => ({
   cleanupZeroConfig: vi.fn(),
 }));
 
+vi.mock('../../../src/core/run-status-authority.js', () => ({
+  readCanonicalRunStatus: vi.fn(() => ({
+    status: 'PAUSED',
+    lifecycle: 'paused',
+    reason: 'post-fix-unresolved-lineages',
+    recoveryCommand: 'deckent recover sprint-001 --resume',
+  })),
+}));
+
 import { loadConfig } from '../../../src/core/config.js';
 import { bootstrapProviders } from '../../../src/core/provider.js';
 import {
@@ -455,6 +464,16 @@ describe('start command (isolated)', () => {
 
       expect(formatSprintSummary).toHaveBeenCalled();
       expect(print).toHaveBeenCalledWith('Sprint summary');
+    });
+
+    it('reports a PAUSED run as blocked instead of completed', async () => {
+      vi.mocked(runSprint).mockResolvedValue(makeSprint({ status: 'PAUSED' }) as any);
+
+      await runCommand(['start']);
+
+      expect(formatSprintSummary).not.toHaveBeenCalled();
+      expect(print).toHaveBeenCalledWith(expect.stringContaining('sprint-001'));
+      expect(process.exitCode).toBe(2);
     });
 
     it('handles loadConfig failure gracefully', async () => {

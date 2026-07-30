@@ -10,8 +10,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   recordRecommendation,
+  recordRecommendationOnce,
   readRecommendations,
   dismissRecommendation,
+  dismissRecommendationByKey,
   RECOMMENDATIONS_FILE,
   type NervousRecommendation,
 } from '../../src/nervous/recommendation-log.js';
@@ -67,6 +69,33 @@ describe('nervous recommendation-log', () => {
   it('readRecommendations returns [] when the feed is absent', () => {
     const r = makeRoot();
     expect(readRecommendations(r)).toEqual([]);
+  });
+
+  it('deduplicates an open operational recommendation by action and key', () => {
+    const r = makeRoot();
+    const first = recordRecommendationOnce(
+      r,
+      'SPRINT_START',
+      'resume:sprint-476',
+      { operation: 'resume-paused-run', sprintId: 'sprint-476' },
+    );
+    const second = recordRecommendationOnce(
+      r,
+      'SPRINT_START',
+      'resume:sprint-476',
+      { operation: 'resume-paused-run', sprintId: 'sprint-476' },
+    );
+
+    expect(second.id).toBe(first.id);
+    expect(readRecommendations(r)).toHaveLength(1);
+    expect(readRecommendations(r)[0]?.payload).toMatchObject({
+      dedupeKey: 'resume:sprint-476',
+      operation: 'resume-paused-run',
+    });
+    expect(
+      dismissRecommendationByKey(r, 'SPRINT_START', 'resume:sprint-476'),
+    ).toBe(true);
+    expect(readRecommendations(r)[0]?.status).toBe('dismissed');
   });
 
   it('dismissRecommendation flips an open entry to dismissed (by full id)', () => {
