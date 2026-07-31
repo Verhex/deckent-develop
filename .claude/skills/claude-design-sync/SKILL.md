@@ -23,12 +23,17 @@ patterns/<kebab-ad>.html                  (imza etkileşimler: command-scene, ap
 surfaces/terminal/<ad>.html               (ANSI-görünüm simülasyonlu preview)
 surfaces/dashboard/<ad>.html
 surfaces/desktop/<ad>.html
+rounds/<konu>-<varyant>.html              (karar-turu kartları: font/accent aday setleri)
 ```
 
 - Her preview HTML'in **ilk satırı** `@dsCard` marker'ıdır:
   `<!-- @dsCard group="Foundations" -->` (grup adları: `Foundations` · `Components` ·
-  `Patterns` · `Terminal` · `Dashboard` · `Desktop`). Kart indeksi bu marker'dan derlenir;
-  `register_assets` legacy'dir, kullanma.
+  `Patterns` · `Terminal` · `Dashboard` · `Desktop` · `Rounds`). Kart indeksi bu marker'dan
+  derlenir; `register_assets` legacy'dir, kullanma.
+- **Karar-turu tooling'i** `design/claude-design/rounds/tools/` altında yaşar (örn.
+  `fetch-fonts.mjs` + `generate-font-round.mjs`): turun tüm adayları TEK şablondan üretilir ki
+  aynı spesimenle adil karşılaştırılsın; karar verilince kazanan set token'lara işlenir, turun
+  kartları projeden silinir (repo tarihçesi kalır).
 
 ## 3 · Preview HTML kuralları
 
