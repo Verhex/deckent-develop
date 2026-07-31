@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "61d8186f2f010c1347586333949e09a684323ef5b753922d7f4a39cc07bb4b16"
+    "value": "7bb1d9f18d38720cf932119b11488dd3febdd3d8b08c8f59c7bfc31cb839a555"
   },
   "summary": {
-    "total": 252,
-    "active": 252,
+    "total": 253,
+    "active": 253,
     "terminal": 0,
     "receipts": 21,
     "byState": {
-      "OPEN": 166,
+      "OPEN": 167,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 189,
+      "P0": 190,
       "P1": 47,
       "P2": 16
     },
@@ -47,7 +47,7 @@
       "ONBOARDING": 1,
       "OPS": 5,
       "PAEP": 35,
-      "PRODUCT": 6,
+      "PRODUCT": 7,
       "PROMPT": 2,
       "PROVIDER": 1,
       "RELEASE": 2,
@@ -2416,6 +2416,17 @@
       "updated": "2026-07-26",
       "definitionDigest": "a88c8c76297c1a4d676c9b6cd47b5012702334b20b3aa8a22328a2ff4735c993",
       "progressDigest": "cf2cc77718fe4e586ee1c6af06de051f6394e83efb803bb213cebc3984ee4048",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 6170,
+      "id": "DESIGN-SYSTEM-001",
+      "program": "PRODUCT",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "2259a00760ec554081a886e622a4b4c09a4f2db77351a17570d904a61da2878f",
+      "progressDigest": "357df382d37db85b94224074625b5593e2d3c4e642b73789c2758b22c6111869",
       "terminalClosureDigest": null
     },
     {
@@ -11529,7 +11540,8 @@
         "API-EVENT-001",
         "API-DEVELOPER-001",
         "API-OPERATIONS-001",
-        "SURFACE-ADAPTER-001"
+        "SURFACE-ADAPTER-001",
+        "DESIGN-SYSTEM-001"
       ],
       "gates": [
         "G2",
@@ -11561,7 +11573,8 @@
         "API-EVENT-001",
         "API-DEVELOPER-001",
         "API-OPERATIONS-001",
-        "SURFACE-ADAPTER-001"
+        "SURFACE-ADAPTER-001",
+        "DESIGN-SYSTEM-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Desktop, API, connectors and dashboard consume common services and identity",
@@ -12280,6 +12293,38 @@
       "acceptance": "Each adapter is capability-declared, identity-bound, accessible and contains no alternate core",
       "evidence": "“Every surface” product target",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 6170,
+      "id": "DESIGN-SYSTEM-001",
+      "parent": "SURFACES-001",
+      "program": "PRODUCT",
+      "outcome": "Three-surface Deckent Design System (terminal, dashboard, desktop) with NOVA-core identity",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "~",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Single DTCG token source builds all three surfaces; Claude Design project stays component-synced; design-critic and a11y-contrast gates pass before approval; DT-5 terminal design-language SSOT closed; no AI-template regression",
+      "evidence": "2026-07-31 Alperen approval: identity=A (NOVA-core); Claude-side roster committed (.claude/skills: deckent-design-dna, design-tokens-pipeline, claude-design-sync; .claude/agents: design-critic, a11y-contrast-auditor, component-smith); Claude Design project 7dcf190e created",
+      "updated": "2026-07-31"
     },
     {
       "order": 7000,
@@ -13883,6 +13928,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "5b2ae526a40c8a41a716eb2420939c86d85cf3ce5f3e69666f0b10c683b51ed8"
+    "value": "6601abbfe9b9702b4467767ea64994ca53b0395334acd9fb9cd9448d5571733b"
   }
 }
