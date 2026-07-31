@@ -1,0 +1,15 @@
+{
+  "$description": "Terminal semantic rol haritası — src/cli/helpers/theme.ts Theme sınıfının rol sözlüğünü NOVA primitive'lerine bağlar (DT-5 kapanışının kod-ayağı). ansi16 = bugünkü SGR kodu (davranış değişmez — 16-renk kademesinde terminal kendi paletini uygular); hex = truecolor kademesi için NOVA değeri; ansi256 build'de en-yakın-xterm hesabıyla üretilir. NO_COLOR/FORCE_COLOR/TTY kapıları theme.ts'te kalır.",
+  "roles": {
+    "success": { "primitive": "novaGo", "ansi16": "32" },
+    "error": { "primitive": "novaAbort", "ansi16": "31" },
+    "warning": { "primitive": "novaAmber", "ansi16": "33" },
+    "info": {
+      "primitive": "novaGlow",
+      "ansi16": "34",
+      "note": "hex ADAY — NOVA accent-ailesi prototip turunda netleşir; ansi16 bugünkü mavi davranışını korur"
+    },
+    "muted": { "primitive": "novaTextMuted", "ansi16": "2" },
+    "accent": { "primitive": "novaGlow", "ansi16": "36" }
+  }
+}

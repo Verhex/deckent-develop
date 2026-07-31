@@ -1,0 +1,77 @@
+{
+  "$description": "Semantic + component indirection haritası — src/desktop/src/shared/theme-tokens.ts WATCHES ve COMPONENT_TOKENS ile bire-bir (drift testi: theme-tokens-gen-sync.test.ts). Semantic katman saf yönlendirmedir: her rol bir color.chart.* primitive ADI gösterir; watch değişimi bu katmanın yeniden-işaretlenmesidir. Rol ekleme/çıkarma = tasarım kararı → Alperen onayı.",
+  "semanticTokenNames": [
+    "bg", "surface", "border", "text", "text-muted", "accent",
+    "accent-text", "brass", "go", "caution", "abort", "focus-ring"
+  ],
+  "watches": {
+    "nova": {
+      "bg": "novaDeep",
+      "surface": "novaRaised",
+      "border": "novaLine",
+      "text": "novaText",
+      "text-muted": "novaTextMuted",
+      "accent": "novaGlow",
+      "accent-text": "novaGlowDeep",
+      "brass": "novaAmber",
+      "go": "novaGo",
+      "caution": "novaAmber",
+      "abort": "novaAbort",
+      "focus-ring": "novaGlow"
+    },
+    "day-watch": {
+      "bg": "buff",
+      "surface": "buffRaised",
+      "border": "buffLine",
+      "text": "ink",
+      "text-muted": "inkMuted",
+      "accent": "magenta",
+      "accent-text": "paperOnMagenta",
+      "brass": "brass",
+      "go": "go",
+      "caution": "caution",
+      "abort": "abort",
+      "focus-ring": "magenta"
+    },
+    "night-watch": {
+      "bg": "night",
+      "surface": "nightRaised",
+      "border": "nightLine",
+      "text": "nightText",
+      "text-muted": "nightTextMuted",
+      "accent": "nightAccent",
+      "accent-text": "nightAccentText",
+      "brass": "brass",
+      "go": "nightGo",
+      "caution": "nightCaution",
+      "abort": "nightAbort",
+      "focus-ring": "nightAccent"
+    },
+    "open-sea": {
+      "bg": "deepSea",
+      "surface": "deepSeaRaised",
+      "border": "deepSeaLine",
+      "text": "seaText",
+      "text-muted": "seaTextMuted",
+      "accent": "magentaSea",
+      "accent-text": "seaAccentText",
+      "brass": "brass",
+      "go": "seaGo",
+      "caution": "seaCaution",
+      "abort": "seaAbort",
+      "focus-ring": "magentaSea"
+    }
+  },
+  "componentTokens": {
+    "btn-bg": "accent",
+    "btn-text": "accent-text",
+    "card-bg": "surface",
+    "card-border": "border",
+    "input-bg": "surface",
+    "input-border": "border",
+    "input-text": "text",
+    "statuspill-go": "go",
+    "statuspill-caution": "caution",
+    "statuspill-abort": "abort"
+  }
+}

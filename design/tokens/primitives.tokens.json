@@ -1,0 +1,124 @@
+{
+  "$description": "Deckent Design System — primitive katmanı (DTCG). SSOT: renk/font/radius/motion literal'lerinin TEK evi (design-tokens-pipeline skill kontratı, DESIGN-SYSTEM-001). Değerler 2026-07-31'de mevcut onaylı kaynaklardan bire-bir çıkarıldı: color.chart.* = src/desktop/src/shared/theme-tokens.ts PRIMITIVES (anahtar adları verbatim); color.decko.* = src/dashboard/src/index.css @theme. Yeni değer eklemek = tasarım kararı → Alperen onayı gerekir.",
+  "color": {
+    "$type": "color",
+    "chart": {
+      "$description": "Desktop watch primitives — theme-tokens.ts PRIMITIVES ile bire-bir (drift testi: src/desktop/tests/theme-tokens-gen-sync.test.ts).",
+      "novaDeep": { "$value": "#04080D" },
+      "novaRaised": { "$value": "#0A141D" },
+      "novaLine": { "$value": "#14242F" },
+      "novaText": { "$value": "#D7E7EE" },
+      "novaTextMuted": { "$value": "#6E8A98" },
+      "novaGlow": { "$value": "#38D3FF" },
+      "novaGlowDeep": { "$value": "#04202B" },
+      "novaAmber": { "$value": "#E8B34C" },
+      "novaGo": { "$value": "#43E39A" },
+      "novaAbort": { "$value": "#FF6B5E" },
+      "buff": { "$value": "#F2EDDC" },
+      "buffRaised": { "$value": "#FBF8EC" },
+      "buffLine": { "$value": "#DDD5BC" },
+      "shallowWater": { "$value": "#BDD7E2" },
+      "deepSea": { "$value": "#0E2430" },
+      "deepSeaRaised": { "$value": "#13303F" },
+      "deepSeaLine": { "$value": "#235064" },
+      "seaText": { "$value": "#D8E4E9" },
+      "seaTextMuted": { "$value": "#7FA3B2" },
+      "seaAccentText": { "$value": "#0E2430" },
+      "night": { "$value": "#12151A" },
+      "nightRaised": { "$value": "#181C23" },
+      "nightLine": { "$value": "#2A303A" },
+      "nightText": { "$value": "#E3DAD2" },
+      "nightTextMuted": { "$value": "#9B948B" },
+      "nightAccent": { "$value": "#E2766B" },
+      "nightAccentText": { "$value": "#1C0F0D" },
+      "ink": { "$value": "#2B2F33" },
+      "inkMuted": { "$value": "#6B6F72" },
+      "magenta": { "$value": "#BD4278" },
+      "magentaSea": { "$value": "#E88FB9" },
+      "brass": { "$value": "#A98F54" },
+      "paperOnMagenta": { "$value": "#FBF8EC" },
+      "go": { "$value": "#2F7D46" },
+      "caution": { "$value": "#A8741A" },
+      "abort": { "$value": "#C0453E" },
+      "nightGo": { "$value": "#7FA06A" },
+      "nightCaution": { "$value": "#C99A55" },
+      "nightAbort": { "$value": "#E2766B" },
+      "seaGo": { "$value": "#7FC78F" },
+      "seaCaution": { "$value": "#E0B368" },
+      "seaAbort": { "$value": "#F08A80" }
+    },
+    "decko": {
+      "$description": "Dashboard (Decko handoff) primitives — src/dashboard/src/index.css @theme değerleri.",
+      "zinc50": { "$value": "#fafafa" },
+      "zinc400": { "$value": "#a1a1aa" },
+      "zinc800": { "$value": "#27272a" },
+      "zinc900": { "$value": "#18181b" },
+      "zinc950": { "$value": "#09090b" },
+      "red500": { "$value": "#ef4444" },
+      "teal50": { "$value": "#eaf4ef" },
+      "teal100": { "$value": "#d9ece5" },
+      "teal200": { "$value": "#b6d8ce" },
+      "teal300": { "$value": "#8fcdbe" },
+      "teal400": { "$value": "#6fbcae" },
+      "teal500": { "$value": "#54a89c" },
+      "teal600": { "$value": "#3e9384" },
+      "teal700": { "$value": "#2f7568" },
+      "teal800": { "$value": "#246060" },
+      "teal900": { "$value": "#1a4a45" },
+      "tealBg": { "$value": "#11332d" },
+      "tealFg": { "$value": "#bfe6dc" },
+      "tealOnPrimary": { "$value": "#0d2420" },
+      "gold": { "$value": "#c0b46c" },
+      "goldSoft": { "$value": "#d6cb8c" },
+      "goldDeep": { "$value": "#9a8736" },
+      "goldTint": { "$value": "#1e1b0e" }
+    }
+  },
+  "font": {
+    "$type": "fontFamily",
+    "display": {
+      "$value": ["Bricolage Grotesque", "system-ui", "sans-serif"],
+      "$description": "Display — D4-0 onayı: teknolojik ama eli-değmiş grotesk."
+    },
+    "body": {
+      "$value": ["Hanken Grotesk", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
+      "$description": "Gövde — desktop + dashboard ortak (index.css --font-sans ile aynı stack)."
+    },
+    "data": {
+      "$value": ["Geist Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+      "$description": "Veri/mono — desktop onaylı set."
+    },
+    "dashboardMono": {
+      "$value": ["IBM Plex Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+      "$description": "Dashboard'un bugünkü mono'su. AÇIK KARAR: Geist Mono'ya birleşim onay bekliyor (design-tokens-pipeline skill §6) — onaylanınca bu token font.data'ya alias'lanır."
+    }
+  },
+  "radius": {
+    "$type": "dimension",
+    "control": {
+      "$value": "0.25rem",
+      "$description": "Squared-technical görünüm (index.css --radius)."
+    }
+  },
+  "space": {
+    "$type": "dimension",
+    "unit": {
+      "$value": "0.25rem",
+      "$description": "4px taban artımı — Tailwind v4 spacing artımlarıyla uyumlu; desktop el-CSS'i bu ritme yakınsar (wiring dilimi)."
+    }
+  },
+  "duration": {
+    "$type": "duration",
+    "glide": {
+      "$value": "240ms",
+      "$description": "«Süzülme, sıçrama değil» — D4-0/NOVA belgeli geçiş süresi. reduced-motion: 0ms."
+    }
+  },
+  "easing": {
+    "$type": "cubicBezier",
+    "glide": {
+      "$value": [0, 0, 0.58, 1],
+      "$description": "CSS ease-out eşdeğeri (D4-0: «uzun ease-out»). Daha uzun-kuyruk varyant kararı accent-prototip turuna bağlı — sessiz değiştirme yok."
+    }
+  }
+}

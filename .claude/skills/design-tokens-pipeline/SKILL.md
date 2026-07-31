@@ -72,3 +72,15 @@ description: Use when creating or changing ANY design token (color, typography, 
 - Dashboard mono fontu: IBM Plex Mono → **Geist Mono** birleşimi (öneri: birleştir; onay bekler).
 - NOVA accent-ailesi: prototip-turunda Alperen'le seçilir; seçime kadar aday-token olarak işaretli.
 - Dashboard light-tema: var mı yok mu — ADR-G-033 observability-lens'iyle birlikte karar.
+- **`state-on-*` rolleri** (2026-07-31 a11y denetimi, BLOCKER kökü): durum-renk-ÜSTÜ mürekkep için
+  semantic rol yok; day-watch'ta hiçbir mevcut token state zemininde AA-normal veremiyor. Öneri:
+  `state-on-go/caution/abort` rolleri eklensin — rol eklemesi Alperen onayı bekler.
+- **Terminal wiring (slice-2) ön-şartları** (2026-07-31 a11y denetimi, MAJOR ×2): (a) açık-zemin
+  stratejisi — palette hex'leri dark-optimize; açık terminalde 1.6–2.8:1. Seçenekler: çift-varyant
+  hex, COLORFGBG/OSC-11 zemin-sezgisi, ya da açık temada ansi16'ya düşüş. (b) renk-gating SSOT
+  birleşimi — bugün `theme.ts shouldUseColor` ≠ `output.ts isNoColor` ≠ `splash.ts` lokal kontrol;
+  tek kapıya bağlanmadan palette tellenmez.
+- **day-watch muted/focus kullanım kuralı**: muted/bg 4.33 · focus/bg 4.25 — küçük-punto gövdede
+  AA-normal altı; ya kullanım kuralı (yalnız ≥large/ikincil glif) ya inkMuted koyulaştırma.
+- **Rol örtüşmeleri**: nova `caution`≡`brass` (novaAmber) ve terminal `info`≡`accent` (novaGlow,
+  ansi16'da 34/36 ayrık) — bilinçli mi ayrıştırılacak mı, accent-ailesi turunda karara bağlanır.

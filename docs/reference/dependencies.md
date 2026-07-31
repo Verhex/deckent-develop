@@ -22,6 +22,7 @@ For the full history and amendment log, see [ADR-D-005](../adr/adr-d-005-depende
 | `react-dom` | `^19.2.7` | Web dashboard render | ADR-080: Dashboard God-Level |
 | `cli-highlight` | `^2.1.11` | REPL syntax highlighting | ADR-081 / ADR-083: sub-feature of Native Agentic REPL — REPL UX syntax coloring; governed by the REPL ADR family |
 | `ink-testing-library` *(dev-only)* | `^4.0.0` | Render + drive Ink REPL components in tests (mount, read frames, simulate keypress via stdin) — closes the "Ink components are manual-verify-only" gap (Alperen-authorized 2026-07-16). | ADR-081 / ADR-083: test tooling for the Native Agentic REPL — same REPL ADR family as `ink` |
+| `style-dictionary` *(dev-only)* | `^5.5.0` | Design-token build — `design/tokens/` (DTCG) → dashboard `@theme` CSS + desktop `theme-tokens.gen.ts` + CLI `palette.ts` (`npm run build:tokens`; drift-gate `lint:design-tokens`). Build-time only, runtime bundle'a girmez. | DESIGN-SYSTEM-001 (Alperen-onaylı 2026-07-31, MASTER-PLAN P06/6170); ADR-G-036 0-hardcode ailesiyle hizalı |
 | `discord.js` *(optional)* | `^14.26.3` | Discord connector (lazy/optional) | ADR-016: External Messaging Connectors |
 | `react` *(desktop sub-pkg)* | `19.2.7` (exact) | Desktop shell component model (SURF-4 D4-3) | SURF-4 onaylı-yığın (Alperen 2026-07-16, `docs/analysis/surf4-desktop-foundation-plan-2026-07-16.md` §2) — Context7-doğrulanmış stabil-major |
 | `react-dom` *(desktop sub-pkg)* | `19.2.7` (exact) | Desktop shell render | SURF-4 onaylı-yığın §2 |
