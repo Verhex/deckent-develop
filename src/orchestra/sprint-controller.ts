@@ -170,8 +170,9 @@ import { getChannelRegistry } from './ipc-registry.js';
 
 // ─── Spawner ──────────────────────────────────────────────────────
 import {
-  routeSprintTasks as routeSprintTasksImpl,
+  routeSprintTasksForExecution as routeSprintTasksImpl,
 } from './sprint-spawner.js';
+import { retireFailedSpawnAuthority } from './spawn-failure-authority.js';
 
 // ─── Task Mode Runner ─────────────────────────────────────────────
 export { runTaskMode } from './task-mode-runner.js';
@@ -1698,6 +1699,7 @@ export async function runSprint(
         config,
         availableProviders,
         { projectRoot, sprintId: sprint.id },
+        opts?.exactPlanAuthority,
       );
     } catch (e) {
       writeEvent(projectRoot, sprint.id, 'brain', 'auditor', 'BRAIN→AUDITOR:PROVIDER_ROUTING_HOLD', {
@@ -1750,9 +1752,29 @@ export async function runSprint(
     } catch (e) { debugLog('runSprint:notify:sprint-started', e); }
 
     // Phase 2: SPAWN
-    const { taskQueue, scanInterval: initialScanInterval } = await runSpawnPhase(
-      projectRoot, sprint, config, opts, spawnBackend,
-    );
+    let spawnPhaseResult: Awaited<ReturnType<typeof runSpawnPhase>>;
+    try {
+      spawnPhaseResult = await runSpawnPhase(
+        projectRoot, sprint, config, opts, spawnBackend,
+      );
+    } catch (error) {
+      // runSpawnPhase exhausts its retry budget only after `cleanup(...,
+      // 'spawn-fail')` has contained partial Worker effects. The coordinator
+      // has no remaining work at that point, so retaining its PID/leadership
+      // files manufactures an ACTIVE lease for up to heartbeat_timeout even
+      // after the exact RunFlow journal has durably published RUN_FAILED.
+      //
+      // Preserve sprint-state, checkpoint and task artifacts: they are the
+      // resumable/forensic evidence that canonical status projects as
+      // ORPHANED. Retire only live leadership authority.
+      try {
+        retireFailedSpawnAuthority(projectRoot, sprint.id);
+      } catch (authorityError) {
+        debugLog('runSprint:spawn-failure:retireAuthority', authorityError);
+      }
+      throw error;
+    }
+    const { taskQueue, scanInterval: initialScanInterval } = spawnPhaseResult;
     scanInterval = initialScanInterval;
 
     // Start heartbeat daemon for sprint duration (opt-out: opts.enableHeartbeatDaemon === false)

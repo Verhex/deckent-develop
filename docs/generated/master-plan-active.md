@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):61d8186f2f010c1347586333949e09a684323ef5b753922d7f4a39cc07bb4b16`
+**Source digest:** `sha256(normalized-lf-utf8):968fe085cca11813e231d081ec392b4c0ec4797ebfc5a28eb7676f2c26f1c6dd`
 
-**Rows:** 252 total · 252 active · 0 terminal
+**Rows:** 270 total · 270 active · 0 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 166 |
+| OPEN | 184 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 68 |
@@ -179,7 +179,25 @@
 | 3168 | `RECOVERY-ASSURANCE-001` | OPEN | P0 | KERNEL | `RECOVERY-MODE-ADAPTERS-001`, `RECOVERY-COMMAND-SERVICE-001`, `RECOVERY-TERMINATION-001`, `RECOVERY-STALE-PROJECTION-001` | — | Recovery failure-injection, every-environment and million-scale assurance matrix |
 | 3169 | `RECOVERY-DOGFOOD-BORN-001` | OPEN | P0 | KERNEL | — | — | Mandatory born ledger for recovery dogfood discoveries |
 | 3170 | `BUDGET-CONTINUATION-001` | OPEN | P0 | KERNEL | `LIMIT-001`, `RUNNER-PROTOCOL-001` | — | Landing, continuation reserve, task-kind budget sizing, timeout and measured termination contract |
+| 3171 | `RECOVERY-BORN-480-HEARTBEAT-001` | OPEN | P0 | KERNEL | `WORKER-REGISTRY-001`, `RECOVERY-DECISION-001` | — | Worker-writable heartbeat can regress monotonic recovery evidence |
+| 3172 | `RECOVERY-BORN-480-SCOPE-001` | OPEN | P0 | KERNEL | `PLANNER-001`, `RECOVERY-COMMAND-SERVICE-001` | — | Dependency output is unreachable from downstream recovery surface read scope |
+| 3173 | `RECOVERY-BORN-480-HOLD-CLASSIFICATION-001` | OPEN | P0 | KERNEL | `PROVIDER-HOLD-001`, `RECOVERY-COMMAND-SERVICE-001` | — | Scope failure is misclassified as provider usage-limit hold |
+| 3174 | `RECOVERY-BORN-480-EVALUATE-ORPHAN-001` | OPEN | P0 | KERNEL | `RECOVERY-DECISION-001`, `RECOVERY-STALE-PROJECTION-001`, `KERNEL-SETTLEMENT-001` | — | EVALUATE lock can strand NO_GO without FIX or truthful recovery command |
+| 3175 | `RECOVERY-BORN-480-ATTRIBUTION-001` | OPEN | P0 | KERNEL | `KERNEL-SETTLEMENT-001`, `WORKER-REGISTRY-001` | — | Shared-worktree predecessor diff is attributed to a later failed attempt |
+| 3176 | `RECOVERY-BORN-480-FIX-PRIORITY-001` | OPEN | P0 | KERNEL | `SCHEDULER-001`, `RECOVERY-BORN-480-EVALUATE-ORPHAN-001` | — | Priority FIX must outrank blocked dependants in collision and slot admission |
+| 3177 | `RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001` | OPEN | P0 | KERNEL | `RECOVERY-TERMINATION-001`, `PAUSED-FINALIZE-001` | — | Force-finalize must retire or contain every matching recovery coordinator |
+| 3178 | `RECOVERY-DO-DOGFOOD-001` | OPEN | P0 | KERNEL | `RECOVERY-COMMAND-SERVICE-001`, `DO-CUTOVER-001`, `RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001` | — | Next recovery slice through canonical `do` journey before Autonomous widening |
+| 3179 | `RECOVERY-BORN-480-POSTBUILD-BINARY-001` | OPEN | P0 | ASSURANCE | `RECOVERY-ASSURANCE-001`, `TEST-676` | — | Immediate post-build recovery binary proof can exit zero with empty stdout |
 | 3180 | `DO-CUTOVER-001` | BLOCKED | P0 | KERNEL | `RUNFLOW-001`, `PLANNER-001` | `DEPENDENCY_UNSATISFIED` | `do` becomes canonical intent→preview→approval→run journey |
+| 3181 | `RECOVERY-BORN-481-EXACT-PROVIDER-PROJECTION-001` | OPEN | P0 | KERNEL | `RUNFLOW-001`, `DO-CUTOVER-001`, `AUTHORITY-001` | — | Digest-bound provider derivation cannot create post-approval task artifact drift |
+| 3182 | `RECOVERY-BORN-481-FAILED-RUN-STATUS-001` | OPEN | P0 | KERNEL | `RUN-STATUS-AUTHORITY-001`, `RECOVERY-STALE-PROJECTION-001`, `RUNFLOW-001` | — | RUN_FAILED and dead coordinator reconcile to one truthful terminal or recoverable status |
+| 3183 | `RECOVERY-BORN-481-DO-PREVIEW-APPROVAL-001` | OPEN | P0 | AUTHORITY | `DO-CUTOVER-001`, `RUNFLOW-001`, `APPROVAL-001` | — | Do preview approval executes the same immutable proposal instead of replanning |
+| 3184 | `RECOVERY-BORN-481-GATE-TRUTH-001` | OPEN | P1 | KERNEL | `DO-CUTOVER-001`, `PLANNER-001`, `ZERO-HARDCODE-FLOW-001` | — | Scope-gate rejection cannot be reported as a zero-blocker prompt-gate failure |
+| 3185 | `RECOVERY-BORN-482-CLOSED-SCOPE-001` | OPEN | P0 | AUTHORITY | `PLANNER-001`, `AUTHORITY-001`, `DO-CUTOVER-001` | — | Exact closed write allowlist is enforced before task artifact creation or dispatch |
+| 3186 | `RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001` | OPEN | P0 | KERNEL | `KERNEL-SETTLEMENT-001`, `SCHEDULER-001`, `RECOVERY-BORN-480-FIX-PRIORITY-001` | — | Dependency release consumes aggregate evaluated settlement, not raw result presence |
+| 3187 | `RECOVERY-BORN-482-FIX-AUTHORITY-001` | OPEN | P0 | KERNEL | `PLANNER-001`, `ROUTING-001`, `RECOVERY-BORN-480-SCOPE-001`, `RECOVERY-BORN-480-FIX-PRIORITY-001` | — | FIX projection carries the bounded authority and capable persona required by its diagnosed repair |
+| 3188 | `RECOVERY-BORN-482-REPAIR-SETTLEMENT-001` | OPEN | P0 | KERNEL | `KERNEL-SETTLEMENT-001`, `RECOVERY-COMMAND-SERVICE-001`, `RUNFLOW-001`, `PAUSED-FINALIZE-001` | — | Exhausted repair lineage becomes resumable PAUSE/HOLD instead of false COMPLETE |
+| 3189 | `RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001` | OPEN | P0 | COST | `LIMIT-001`, `KERNEL-SETTLEMENT-001` | — | Subscription reference price cannot become billed USD or API budget consumption |
 | 3190 | `AUTONOMY-CUTOVER-001` | BLOCKED | P0 | KERNEL | `GOAL-CANARY-001`, `RECOVERY-001` | `DEPENDENCY_UNSATISFIED` | Autonomous and Nervous execution through canonical kernel |
 | 3200 | `PROCESS-CUTOVER-001` | OPEN | P1 | KERNEL | `MISSION-KIND-001`, `RECOVERY-001` | — | Process mode through canonical WorkItem and Attempt authority |
 | 3210 | `SURFACE-CUTOVER-001` | BLOCKED | P0 | KERNEL | `DO-CUTOVER-001`, `AUTONOMY-CUTOVER-001`, `PROCESS-CUTOVER-001` | `DEPENDENCY_UNSATISFIED` | CLI, MCP, API, terminal, Desktop and connector adapters share use cases |

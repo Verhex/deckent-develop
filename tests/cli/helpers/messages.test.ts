@@ -37,6 +37,14 @@ const KNOWN_KEYS = [
   'cleanup.archived_sprints',
   'cleanup.removed_items',
   'cleanup.complete',
+  'finalize.description',
+  'finalize.mixed_sprints',
+  'finalize.incomplete_tasks',
+  'finalize.already_finalized',
+  'recover.description',
+  'recover.dry_run_option',
+  'recover.separator',
+  'recover.internal_error',
   'doctor.checks_passed',
   'init.auto_detecting',
   'init.recommendation',
@@ -115,6 +123,13 @@ describe('getMessage', () => {
     it('interpolates {taskCount} in status.tasks_running', () => {
       const result = getMessage('status.tasks_running', 'en', { taskCount: '5' });
       expect(result).toBe('5 tasks running');
+    });
+
+    it('localizes finalize and recovery adapter text in both supported languages', () => {
+      expect(getMessage('finalize.incomplete_tasks', 'en', { count: '2', ids: '482-001, 482-002' })).toContain('2 task');
+      expect(getMessage('finalize.incomplete_tasks', 'tr', { count: '2', ids: '482-001, 482-002' })).toContain('2 görev');
+      expect(getMessage('recover.description', 'en')).not.toBe('recover.description');
+      expect(getMessage('recover.description', 'tr')).not.toBe('recover.description');
     });
 
     it('interpolates {taskCount} in Turkish status.tasks_running', () => {

@@ -192,13 +192,20 @@ export function costGuardShouldComplete(
 }
 
 export function isProviderDispatchHoldFailure(
-  result: Pick<TaskResult, 'notes' | 'filesChanged' | 'linesAdded' | 'linesRemoved'>,
+  result: Pick<
+    TaskResult,
+    'notes' | 'filesChanged' | 'linesAdded' | 'linesRemoved' | 'tokenUsage'
+  >,
   workerLog?: string,
 ): 'auth' | 'usage-limit' | null {
   const producedWork =
     (result.filesChanged?.length ?? 0) > 0
     || (result.linesAdded ?? 0) > 0
-    || (result.linesRemoved ?? 0) > 0;
+    || (result.linesRemoved ?? 0) > 0
+    || (result.tokenUsage?.inputTokens ?? 0) > 0
+    || (result.tokenUsage?.outputTokens ?? 0) > 0
+    || (result.tokenUsage?.cacheReadTokens ?? 0) > 0
+    || (result.tokenUsage?.cacheCreationTokens ?? 0) > 0;
   const kind = classifyProviderFailure({
     workerLog,
     resultNotes: result.notes,

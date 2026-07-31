@@ -67,6 +67,7 @@ vi.mock('../../src/orchestra/planner.js', () => ({
       goNogo: { goCriteria: 'The planned change works.', noGoCriteria: 'The planned change breaks.', techDebtAcceptable: '' },
     }],
   })),
+  normalizePlannerDependencies: vi.fn(() => ({ resolvedCount: 0, dropped: [] })),
 }));
 
 vi.mock('../../src/core/config.js', () => ({
@@ -222,12 +223,12 @@ describe('Dogfood-449 B1 — run-flow scope-gate mirror', () => {
     expect(ctx.preview?.scopeGateOverridden).toBeUndefined();
   });
 
-  it('git unavailable → skipped (fail-open, the child decides)', async () => {
+  it('git unavailable → fail-closed for exact authority', async () => {
     gitState.fail = true;
     mockPlanSprint.mockReturnValue(makeSprint(SUSPECT_WRITE) as any);
     const controller = createRunFlowController(makeControllerDeps(tmpRoot));
     const ctx = await controller.proposeRun('rename the worker module');
-    expect(ctx.preview?.scopeGateResult).toBe('skipped');
+    expect(ctx.preview?.scopeGateResult).toBe('fail');
   });
 
   // ─── `do` front door ─────────────────────────────────────────────────────
@@ -239,7 +240,7 @@ describe('Dogfood-449 B1 — run-flow scope-gate mirror', () => {
         ...deps,
         now: () => new Date(Date.UTC(2026, 0, 1)).toISOString(),
         generateFlowId: () => 'flow-1',
-        spawnStart: () => ({ flowId: 'flow-1', jobId: 'job-1', logRef: '/dev/null' }),
+        spawnStart: () => ({ pid: process.pid }),
         ...overrides,
       });
       return created;
@@ -268,7 +269,7 @@ describe('Dogfood-449 B1 — run-flow scope-gate mirror', () => {
     await runDoRunFlow(tmpRoot, makeConfig(), 'rename the worker module', { run: true, yes: true, forceScope: true }, deps);
     expect(process.exitCode).toBeUndefined();
     const out = vi.mocked(print).mock.calls.map((c) => c[0] as string).join('\n');
-    expect(out).toContain('job-1'); // runFlow.mount.started
+    expect(out).toContain('flow-1'); // runFlow.mount.started
   });
 
   it('dry-run preview surfaces the scope-gate fail so the operator sees it before ever passing --run', async () => {
@@ -286,6 +287,6 @@ describe('Dogfood-449 B1 — run-flow scope-gate mirror', () => {
 
   it('source pin: default spawnStart forwards --force-scope to the detached child', () => {
     const src = readFileSync('src/cli/repl/run-flow-controller.ts', 'utf-8');
-    expect(src).toContain("if (deps.forceScope === true) cliArgs.push('--force-scope');");
+    expect(src).toContain("deps.forceScope === true ? ['--force-scope'] : []");
   });
 });

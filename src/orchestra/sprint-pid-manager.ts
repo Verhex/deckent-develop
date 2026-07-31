@@ -172,6 +172,7 @@ export interface TerminateDeps {
 export interface VerifiedTerminateDeps extends TerminateDeps {
   wait?: (ms: number) => Promise<void>;
   verifyOwnership?: typeof verifySprintOwnership;
+  verifyGeneration?: () => boolean;
 }
 
 export interface CoordinatorTerminationPolicy {
@@ -187,7 +188,13 @@ export type VerifiedCoordinatorTermination =
       readonly escalation: 'sigterm' | 'sigkill';
     }
   | {
-      readonly action: 'already-stopped' | 'skipped-reused' | 'ownership-unverified' | 'self';
+      readonly action:
+        | 'already-stopped'
+        | 'skipped-reused'
+        | 'ownership-unverified'
+        | 'stale-fence'
+        | 'termination-failed'
+        | 'self';
       readonly pid: number | null;
       readonly escalation: 'none';
     }
@@ -196,6 +203,17 @@ export type VerifiedCoordinatorTermination =
       readonly pid: number;
       readonly escalation: 'sigkill';
     };
+
+type SprintPidRecord = NonNullable<ReturnType<typeof readPidRecord>>;
+
+function samePidFence(left: SprintPidRecord, right: SprintPidRecord | null): boolean {
+  return right !== null
+    && left.pid === right.pid
+    && left.sprintId === right.sprintId
+    && left.startToken !== null
+    && left.startToken !== undefined
+    && left.startToken === right.startToken;
+}
 
 async function waitForProcessExit(
   pid: number,
@@ -236,9 +254,14 @@ export async function terminateOwnedSprintProcessAndWait(
   const wait = deps.wait
     ?? ((ms: number): Promise<void> => new Promise(resolve => { setTimeout(resolve, ms); }));
   const verifyOwnership = deps.verifyOwnership ?? verifySprintOwnership;
+  const verifyGeneration = deps.verifyGeneration ?? (() => true);
 
-  const pid = readPid(root, sprintId);
-  if (pid === null || !isAlive(pid)) {
+  const initialRecord = readPidRecord(root, sprintId);
+  if (initialRecord === null) {
+    return { action: 'already-stopped', pid: null, escalation: 'none' };
+  }
+  const pid = initialRecord.pid;
+  if (!isAlive(pid)) {
     return { action: 'already-stopped', pid, escalation: 'none' };
   }
   if (pid === process.pid) {
@@ -259,6 +282,7 @@ export async function terminateOwnedSprintProcessAndWait(
     if (!isAlive(pid)) {
       return { action: 'terminated', pid, escalation: 'sigterm' };
     }
+    return { action: 'termination-failed', pid, escalation: 'none' };
   }
   if (await waitForProcessExit(
     pid,
@@ -270,8 +294,15 @@ export async function terminateOwnedSprintProcessAndWait(
     return { action: 'terminated', pid, escalation: 'sigterm' };
   }
 
-  // The PID may have exited and been reused during the grace window. Never
-  // escalate unless the original start-token still owns it.
+  // The PID file and process may both have changed during the grace window.
+  // Re-read the durable fence first, then independently revalidate kernel
+  // ownership. Never escalate a stale generation/process record.
+  if (!samePidFence(initialRecord, readPidRecord(root, sprintId))) {
+    return { action: 'stale-fence', pid, escalation: 'none' };
+  }
+  if (!verifyGeneration()) {
+    return { action: 'stale-fence', pid, escalation: 'none' };
+  }
   const escalationOwnership = verifyOwnership(root, sprintId);
   if (escalationOwnership === 'reused') {
     return { action: 'skipped-reused', pid, escalation: 'none' };
@@ -286,6 +317,7 @@ export async function terminateOwnedSprintProcessAndWait(
     if (!isAlive(pid)) {
       return { action: 'terminated', pid, escalation: 'sigkill' };
     }
+    return { action: 'termination-failed', pid, escalation: 'none' };
   }
   if (await waitForProcessExit(
     pid,

@@ -15,6 +15,7 @@ import {
   captureExactPlanTaskAuthority,
   ExactPlanSpawnAuthorityError,
   readSpawnTaskAuthority,
+  routeSprintTasksForExecution,
 } from '../../src/orchestra/sprint-spawner.js';
 
 const roots: string[] = [];
@@ -130,5 +131,29 @@ describe('exact plan spawn authority', () => {
         taskId: approved.id,
       }),
     );
+  });
+
+  it('does not re-route or mutate a digest-bound exact task at the execution boundary', () => {
+    const approved = task({
+      model: 'gpt-5.6-terra',
+      provider: undefined,
+      assignedAgent: 'core-architect',
+      assignedSkills: ['typescript-expert'],
+    });
+    const before = JSON.stringify(approved);
+
+    routeSprintTasksForExecution(
+      [approved],
+      {
+        worker_provider: 'claude',
+        skill_routing: { default: 'claude' },
+      } as never,
+      ['claude'],
+      { projectRoot: '/unused', sprintId: 'sprint-481' },
+      authority,
+    );
+
+    expect(JSON.stringify(approved)).toBe(before);
+    expect(approved.provider).toBeUndefined();
   });
 });

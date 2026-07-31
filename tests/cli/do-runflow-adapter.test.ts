@@ -46,6 +46,7 @@ vi.mock('../../src/orchestra/planner.js', () => ({
       goNogo: { goCriteria: 'The planned change works.', noGoCriteria: 'The planned change breaks.', techDebtAcceptable: '' },
     }],
   })),
+  normalizePlannerDependencies: vi.fn(() => ({ resolvedCount: 0, dropped: [] })),
 }));
 
 vi.mock('../../src/core/config.js', () => ({
@@ -100,7 +101,10 @@ import {
   type RunFlowControllerDeps,
 } from '../../src/cli/repl/run-flow-controller.js';
 import { loadApprovedSnapshot, loadRunHandle } from '../../src/core/run-flow-store.js';
-import type { RunHandle } from '../../src/orchestra/run-job-service.js';
+import type {
+  SpawnExactProcessContext,
+  SpawnExactProcessResult,
+} from '../../src/orchestra/exact-plan-start-service.js';
 import { DIRECTIVES_FILE } from '../../src/core/constants.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, ResolvedConfig, BrainContext } from '../../src/core/types.js';
@@ -176,6 +180,7 @@ function makeControllerFactory(spawnStart?: RunFlowControllerDeps['spawnStart'])
       ...deps,
       now: () => new Date(Date.UTC(2026, 0, 1)).toISOString(),
       generateFlowId: () => 'flow-1',
+      scopeEvidence: { status: 'available', trackedFiles: [] },
       ...(spawnStart ? { spawnStart } : {}),
     });
     return created;
@@ -275,7 +280,7 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
     });
   });
 
-  describe('flag-on — dry-run (no --run): real preview, structural reject, never starts', () => {
+  describe('flag-on — dry-run (no --run): durable exact preview remains approvable, never starts', () => {
     it('holds configured provider authority before bootstrap/controller/planner work', async () => {
       mockLoadConfig.mockResolvedValue(makeFlagOnConfig());
       const controllerFactory = vi.fn();
@@ -299,7 +304,7 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
       expect(process.exitCode).toBe(1);
     });
 
-    it('prints the real RunFlow preview and rejects — no controller.approve/startApproved, no legacy seam, no DIRECTIVES.md write', async () => {
+    it('prints the real RunFlow preview and exact continuation command without approving, starting or replanning', async () => {
       mockLoadConfig.mockResolvedValue(makeFlagOnConfig());
       const legacyConfirm = vi.fn();
       const legacySpawnStart = vi.fn();
@@ -313,11 +318,12 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
       const out = output();
       expect(out).toContain('Do the thing'); // real taskSummaries title from the mocked planSprint sprint
       expect(out).toContain(getMessage('do.dry_run_complete', 'en'));
+      expect(out).toContain('deckent runs flow-1 --approve --start');
       expect(legacyConfirm).not.toHaveBeenCalled();
       expect(legacySpawnStart).not.toHaveBeenCalled();
       expect(spawnStart).not.toHaveBeenCalled();
       expect(existsSync(join(tmpRoot, DIRECTIVES_FILE))).toBe(false);
-      expect(getController().getContext().state).toBe('CANCELLED');
+      expect(getController().getContext().state).toBe('AWAITING_APPROVAL');
       expect(loadApprovedSnapshot(tmpRoot, 'flow-1')).toBeUndefined();
       expect(process.exitCode).toBeUndefined();
     });
@@ -348,8 +354,8 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
       mockLoadConfig.mockResolvedValue(makeFlagOnConfig());
       const legacyConfirm = vi.fn();
       const legacySpawnStart = vi.fn();
-      const spawnStart = vi.fn((_sprint: Sprint, flowId: string): RunHandle => ({
-        flowId, jobId: `job-${flowId}`, logRef: '/fake/log.log',
+      const spawnStart = vi.fn((_context: SpawnExactProcessContext): SpawnExactProcessResult => ({
+        pid: process.pid,
       }));
       const { factory, getController } = makeControllerFactory(spawnStart);
 
@@ -358,11 +364,14 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
       });
 
       expect(spawnStart).toHaveBeenCalledTimes(1);
-      expect(spawnStart).toHaveBeenCalledWith(expect.objectContaining({ id: 'sprint-001' }), 'flow-1');
+      expect(spawnStart).toHaveBeenCalledWith(expect.objectContaining({
+        sprint: expect.objectContaining({ id: 'sprint-001' }),
+        capability: expect.objectContaining({ flowId: 'flow-1' }),
+      }));
       expect(legacyConfirm).not.toHaveBeenCalled();
       expect(legacySpawnStart).not.toHaveBeenCalled();
-      expect(getController().getContext().state).toBe('DETACHED_RUNNING');
-      expect(output()).toContain(getMessage('runFlow.mount.started', 'en', { jobId: 'job-flow-1' }));
+      expect(getController().getContext().state).toBe('STARTING');
+      expect(output()).toContain(getMessage('runFlow.mount.started', 'en', { jobId: 'flow-1' }));
 
       // Durably persisted via the REAL run-flow-store.ts (core/), not just in-memory.
       const storedSnapshot = loadApprovedSnapshot(tmpRoot, 'flow-1');

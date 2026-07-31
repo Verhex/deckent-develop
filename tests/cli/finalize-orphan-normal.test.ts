@@ -24,19 +24,31 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync,
+  mkdtempSync, mkdirSync, writeFileSync, rmSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 // ─── Mocks (heavy / dangerous bits only — fs + sprint-pid-manager stay REAL) ──
 
-const { mockVerifiedTerminate } = vi.hoisted(() => ({
-  mockVerifiedTerminate: vi.fn(),
+const {
+  mockContainCoordinator,
+  mockReadRecoveryIdentity,
+  mockRunSprintRecoveryOperation,
+  mockKillSingle,
+} = vi.hoisted(() => ({
+  mockContainCoordinator: vi.fn(),
+  mockReadRecoveryIdentity: vi.fn(),
+  mockRunSprintRecoveryOperation: vi.fn(),
+  mockKillSingle: vi.fn(),
 }));
-vi.mock('../../src/orchestra/sprint-pid-manager.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../src/orchestra/sprint-pid-manager.js')>()),
-  terminateOwnedSprintProcessAndWait: mockVerifiedTerminate,
+vi.mock('../../src/orchestra/sprint-recovery-operation.js', () => ({
+  containSprintRecoveryCoordinator: mockContainCoordinator,
+  readSprintRecoverySettlementIdentity: mockReadRecoveryIdentity,
+  runSprintRecoveryOperation: mockRunSprintRecoveryOperation,
+}));
+vi.mock('../../src/cli/commands/kill.js', () => ({
+  killSingle: mockKillSingle,
 }));
 
 // CLI root resolution → per-test tmpdir.
@@ -160,7 +172,32 @@ beforeEach(() => {
   currentRoot = root;
   printed.length = 0;
   process.exitCode = undefined;
-  mockVerifiedTerminate.mockReset();
+  mockContainCoordinator.mockReset();
+  mockContainCoordinator.mockResolvedValue({
+    action: 'already-stopped',
+    pid: null,
+    escalation: 'none',
+  });
+  mockReadRecoveryIdentity.mockReset();
+  mockReadRecoveryIdentity.mockReturnValue({
+    executionId: SPRINT_ID,
+    generation: 0,
+    taskId: SPRINT_ID,
+    attemptId: `${SPRINT_ID}:recovery:0`,
+    fenceToken: 'test-fence',
+  });
+  mockRunSprintRecoveryOperation.mockReset();
+  mockRunSprintRecoveryOperation.mockResolvedValue({
+    identity: mockReadRecoveryIdentity(),
+    audit: { overallGate: 'SKIPPED' },
+    orphanIpcDirs: [],
+    staleLocksCleaned: 0,
+    staleSpawnLocksCleaned: 0,
+    taskFilesArchived: 0,
+    taskFilesPreserved: 0,
+  });
+  mockKillSingle.mockReset();
+  mockKillSingle.mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -175,8 +212,8 @@ describe('finalize (normal path) — orphan coordinator termination (334-003)', 
     // ownership-guarded terminator classifies it 'unknown'+alive → SIGTERM.
     const externalPid = process.ppid;
     expect(externalPid).not.toBe(process.pid);
-    const pidPath = seedPid(root, externalPid);
-    mockVerifiedTerminate.mockResolvedValue({
+    seedPid(root, externalPid);
+    mockContainCoordinator.mockResolvedValue({
       action: 'terminated',
       pid: externalPid,
       escalation: 'sigterm',
@@ -184,13 +221,18 @@ describe('finalize (normal path) — orphan coordinator termination (334-003)', 
 
     await runFinalizeCli([]); // no --force → NORMAL path
 
-    expect(mockVerifiedTerminate).toHaveBeenCalledTimes(1);
-    expect(mockVerifiedTerminate).toHaveBeenCalledWith(
+    expect(mockContainCoordinator).toHaveBeenCalledTimes(1);
+    expect(mockContainCoordinator).toHaveBeenCalledWith(
       root,
       SPRINT_ID,
-      expect.objectContaining({ coordinator_termination_grace_ms: 5_000 }),
+      expect.objectContaining({
+        allowSelf: true,
+        expectedIdentity: expect.objectContaining({ fenceToken: 'test-fence' }),
+        terminationPolicy: expect.objectContaining({
+          coordinator_termination_grace_ms: 5_000,
+        }),
+      }),
     );
-    expect(existsSync(pidPath)).toBe(false); // pid file cleared
     expect(printed.some(m => m.includes(`Coordinator PID ${externalPid}`))).toBe(true);
     expect(process.exitCode).not.toBe(1);
   });
@@ -198,10 +240,15 @@ describe('finalize (normal path) — orphan coordinator termination (334-003)', 
   it('does NOT self-signal when finalize runs IN the coordinator (recorded pid === process.pid)', async () => {
     seedCompleteSprint(root);
     seedPid(root, process.pid); // in-process finalize
+    mockContainCoordinator.mockResolvedValue({
+      action: 'self',
+      pid: process.pid,
+      escalation: 'none',
+    });
 
     await runFinalizeCli([]);
 
-    expect(mockVerifiedTerminate).not.toHaveBeenCalled();
+    expect(mockContainCoordinator).toHaveBeenCalledTimes(1);
     expect(printed.some(m => m.includes('Coordinator PID'))).toBe(false);
   });
 
@@ -211,7 +258,7 @@ describe('finalize (normal path) — orphan coordinator termination (334-003)', 
     const deadPid = 2147483646;
     expect(deadPid).not.toBe(process.pid);
     seedPid(root, deadPid);
-    mockVerifiedTerminate.mockResolvedValue({
+    mockContainCoordinator.mockResolvedValue({
       action: 'already-stopped',
       pid: deadPid,
       escalation: 'none',
@@ -219,7 +266,7 @@ describe('finalize (normal path) — orphan coordinator termination (334-003)', 
 
     await runFinalizeCli([]);
 
-    expect(mockVerifiedTerminate).toHaveBeenCalledTimes(1);
+    expect(mockContainCoordinator).toHaveBeenCalledTimes(1);
     expect(printed.some(m => m.includes('Coordinator PID'))).toBe(false);
   });
 
@@ -229,40 +276,77 @@ describe('finalize (normal path) — orphan coordinator termination (334-003)', 
 
     await runFinalizeCli([]);
 
-    expect(mockVerifiedTerminate).not.toHaveBeenCalled();
+    expect(mockContainCoordinator).toHaveBeenCalledTimes(1);
   });
 
   it('--force path is byte-for-byte: it still terminates the orphan exactly once (no double-fire from the new normal block)', async () => {
     // An in-progress task forces the `--force` branch (which already terminates).
     seedCompleteSprint(root, { status: 'EXECUTING' });
     const externalPid = process.ppid;
-    const pidPath = seedPid(root, externalPid);
-    mockVerifiedTerminate.mockResolvedValue({
-      action: 'terminated',
-      pid: externalPid,
-      escalation: 'sigterm',
-    });
+    seedPid(root, externalPid);
 
     await runFinalizeCli(['--force']);
 
-    expect(mockVerifiedTerminate).toHaveBeenCalledTimes(1);
-    expect(existsSync(pidPath)).toBe(false);
-    expect(printed.some(m => m.includes(`Coordinator PID ${externalPid}`))).toBe(true);
+    expect(mockContainCoordinator).not.toHaveBeenCalled();
+    expect(mockRunSprintRecoveryOperation).toHaveBeenCalledTimes(1);
+    expect(mockRunSprintRecoveryOperation).toHaveBeenCalledWith(
+      root,
+      SPRINT_ID,
+      expect.objectContaining({
+        skipAudit: true,
+        intent: 'FINALIZE_CONTAINMENT',
+        terminationPolicy: expect.objectContaining({
+          coordinator_termination_grace_ms: 5_000,
+        }),
+        approval: expect.objectContaining({
+          approvalRef: 'cli:force-finalize',
+          identity: expect.objectContaining({ fenceToken: 'test-fence' }),
+        }),
+      }),
+    );
   });
 
   it('HOLDs finalize and preserves PID authority when termination is unverified', async () => {
     seedCompleteSprint(root, { status: 'EXECUTING' });
     const externalPid = process.ppid;
-    const pidPath = seedPid(root, externalPid);
-    mockVerifiedTerminate.mockResolvedValue({
-      action: 'still-alive',
-      pid: externalPid,
-      escalation: 'sigkill',
-    });
+    seedPid(root, externalPid);
+    mockRunSprintRecoveryOperation.mockRejectedValueOnce(new Error('typed coordinator HOLD'));
 
     await runFinalizeCli(['--force']);
 
-    expect(existsSync(pidPath)).toBe(true);
+    expect(process.exitCode).toBe(1);
+    expect(mockRunSprintRecoveryOperation).toHaveBeenCalledTimes(1);
+  });
+
+  it('HOLDs before terminal settlement when an in-progress worker cannot be contained', async () => {
+    seedCompleteSprint(root, { status: 'EXECUTING' });
+    mockKillSingle.mockReturnValue(false);
+
+    await runFinalizeCli(['--force']);
+
+    expect(process.exitCode).toBe(1);
+    expect(mockRunSprintRecoveryOperation).not.toHaveBeenCalled();
+    expect(printed.some(message => message.includes('Complete'))).toBe(false);
+  });
+
+  it('--force settles a pre-dispatch PENDING sprint through the shared recovery operation', async () => {
+    seedCompleteSprint(root, { status: 'PENDING' });
+
+    await runFinalizeCli(['--force']);
+
+    expect(mockContainCoordinator).not.toHaveBeenCalled();
+    expect(mockRunSprintRecoveryOperation).toHaveBeenCalledTimes(1);
+    expect(process.exitCode).not.toBe(1);
+  });
+
+  it('does not print terminal success when shared force settlement fails', async () => {
+    seedCompleteSprint(root, { status: 'PENDING' });
+    mockRunSprintRecoveryOperation.mockRejectedValueOnce(new Error('typed settlement HOLD'));
+
+    await runFinalizeCli(['--force']);
+
+    expect(mockRunSprintRecoveryOperation).toHaveBeenCalledTimes(1);
+    expect(printed.some(m => m.includes('Complete'))).toBe(false);
     expect(process.exitCode).toBe(1);
   });
 });

@@ -500,6 +500,19 @@ function writeProviderUnavailableNoGo(task: Task, projectRoot: string): void {
 // ═══ Exported Functions ════════════════════════════════════════════
 
 /**
+ * Stable priority order for pending work. Generated fixes lead ordinary
+ * pending tasks so a dependency-blocked dependant cannot win a shared-write
+ * collision against the fix that would unblock it.
+ */
+export function prioritizePendingFixTasks(tasks: readonly Task[]): Task[] {
+  const pending = tasks.filter(task => task.status === TaskStatus.PENDING);
+  return [
+    ...pending.filter(task => task.isPriorityFix === true && Boolean(task.fixForTaskId)),
+    ...pending.filter(task => task.isPriorityFix !== true || !task.fixForTaskId),
+  ];
+}
+
+/**
  * Spawn worker agents for sprint tasks via the configured backend.
  * Respects max_workers limit; excess tasks are returned as a queue.
  * @param projectRoot - Project root directory
@@ -564,29 +577,31 @@ export async function spawnWorkers(
   // so equivalence-class variants (./src/foo.ts vs src/foo.ts, double slashes,
   // trailing slash) resolve to the same canonical key and trigger the >=2
   // writer threshold correctly.
-  const pendingTasks = sprint.tasks.filter(t => t.status === TaskStatus.PENDING);
+  const pendingTasks = prioritizePendingFixTasks(sprint.tasks);
   const normalizedPendingTasks = pendingTasks.map(t => ({
     ...t,
     scope: { ...t.scope, filesWrite: normalizeScopeFiles(t.scope.filesWrite) },
   }));
   const blockedTaskIds = new Set<string>();
   // Runtime serialization must account for writers that already left PENDING.
-  // Looking only at pending tasks lets the second writer spawn while the first
-  // is still EXECUTING. The full-plan topology provides the same stable slot
-  // order preview/approval used; a later writer is eligible only after every
-  // earlier writer for that collision is DONE.
+  // A genuinely active writer blocks every pending writer for that path.
+  // Pending-vs-pending order is resolved below from `pendingTasks`; applying
+  // original plan slot order here would let a blocked dependant pre-block its
+  // own dynamically appended fix.
   const fullRuntimeTopology = deriveExecutionTopology(sprint.tasks, { maxWorkers });
   for (const collision of fullRuntimeTopology.collisions) {
-    for (let index = 1; index < collision.writerSlots.length; index++) {
-      const task = sprint.tasks[collision.writerSlots[index]! - 1];
-      if (!task || task.status !== TaskStatus.PENDING) continue;
-      const predecessorIncomplete = collision.writerSlots
-        .slice(0, index)
-        .some(slot => {
-          const status = sprint.tasks[slot - 1]?.status;
-          return status !== TaskStatus.DONE && status !== TaskStatus.NO_GO;
-        });
-      if (predecessorIncomplete) blockedTaskIds.add(task.id);
+    const hasActiveWriter = collision.writerSlots.some(slot => {
+      const status = sprint.tasks[slot - 1]?.status;
+      return status === TaskStatus.EXECUTING
+        || status === TaskStatus.CLAIMED
+        || status === TaskStatus.TESTING
+        || status === TaskStatus.DOCUMENTING;
+    });
+    if (hasActiveWriter) {
+      for (const slot of collision.writerSlots) {
+        const task = sprint.tasks[slot - 1];
+        if (task?.status === TaskStatus.PENDING) blockedTaskIds.add(task.id);
+      }
     }
   }
   const runtimeTopology = deriveExecutionTopology(pendingTasks, { maxWorkers });
@@ -709,21 +724,24 @@ export async function spawnWorkers(
     const doneTasks = new Set(
       sprint.tasks.filter(t => t.status === TaskStatus.DONE).map(t => t.id),
     );
-    const eligibleTasks = sprint.tasks.filter(t => {
-      if (t.status !== TaskStatus.PENDING) return false;
+    const eligibleTasks = pendingTasks.filter(t => {
       if (!t.dependencies || t.dependencies.length === 0) return true;
       return t.dependencies.every(dep => doneTasks.has(dep));
     });
-    activeTasks = eligibleTasks.slice(0, maxWorkers);
-    queuedTasks = eligibleTasks.slice(maxWorkers);
+    const dispatchableTasks = eligibleTasks.filter(task => !blockedTaskIds.has(task.id));
+    activeTasks = dispatchableTasks.slice(0, maxWorkers);
+    const activeIds = new Set(activeTasks.map(task => task.id));
+    queuedTasks = eligibleTasks.filter(task => !activeIds.has(task.id));
   } else {
     // Legacy FIFO still obeys the task lifecycle contract. A preplanned
     // recovery sprint intentionally carries terminal tasks for evaluation and
     // dependency evidence; spawning the full array here would execute those
     // DONE/NO_GO tasks a second time.
-    const eligibleTasks = sprint.tasks.filter(t => t.status === TaskStatus.PENDING);
-    activeTasks = eligibleTasks.slice(0, maxWorkers);
-    queuedTasks = eligibleTasks.slice(maxWorkers);
+    const eligibleTasks = pendingTasks;
+    const dispatchableTasks = eligibleTasks.filter(task => !blockedTaskIds.has(task.id));
+    activeTasks = dispatchableTasks.slice(0, maxWorkers);
+    const activeIds = new Set(activeTasks.map(task => task.id));
+    queuedTasks = eligibleTasks.filter(task => !activeIds.has(task.id));
   }
 
   // Pre-check: do any active tasks need tmux?
@@ -748,6 +766,7 @@ export async function spawnWorkers(
   // per wave (file I/O); feeds the historyFactor in emitTimeoutEvents below.
   const sprintHistory = aggregateSprintHistory(projectRoot);
   let spawnedThisWave = 0;
+  const spawnedTasks: Task[] = [];
 
   for (const task of activeTasks) {
     // Sprint 168 W2.5 — C0c wire: skip blocked tasks (collision spawn-block).
@@ -1178,9 +1197,10 @@ export async function spawnWorkers(
     } catch (e) { debugLog('spawnWorkers:writeTaskFile', e); }
 
     spawnedThisWave++;
+    spawnedTasks.push(task);
   }
 
-  const agents: AgentInfo[] = activeTasks.map(task => ({
+  const agents: AgentInfo[] = spawnedTasks.map(task => ({
     id: `w-${task.id}`,
     role: 'worker' as const,
     status: AgentStatus.EXECUTING,
@@ -1194,7 +1214,12 @@ export async function spawnWorkers(
   updateDashboard(projectRoot, {
     sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
     agents,
-    progress: { done: 0, active: activeTasks.length, blocked: 0, total: sprint.tasks.length },
+    progress: {
+      done: 0,
+      active: spawnedTasks.length,
+      blocked: queuedTasks.filter(task => blockedTaskIds.has(task.id)).length,
+      total: sprint.tasks.length,
+    },
     alerts: [],
     updatedAt: now(),
   });
@@ -1644,6 +1669,30 @@ export function routeSprintTasks(
     }
     if (routing.skills.length > 0) task.assignedSkills = routing.skills;
   }
+}
+
+/**
+ * Apply the legacy PLAN→SPAWN routing projection only when execution is not
+ * bound to an approved exact plan.
+ *
+ * Exact plans already bind the effective provider/model/backend/auth tuple in
+ * their execution-plan digest. Their approved task artifacts are materialized
+ * before this boundary and must remain byte/semantic stable. Re-running the
+ * mutable legacy router here would turn a digest-derived provider into a new
+ * task field after approval (or select a fallback from transient availability),
+ * causing the runtime to reject its own artifact as drift. Exact execution
+ * therefore consumes the approved task as-is; provider ingress resolves the
+ * bound provider from the task/model and fails closed if it cannot execute.
+ */
+export function routeSprintTasksForExecution(
+  tasks: Task[],
+  config: ResolvedConfig,
+  availableProviders: ProviderName[],
+  journalContext: { projectRoot: string; sprintId: string },
+  exactPlanAuthority?: ExactPlanSpawnAuthority,
+): void {
+  if (exactPlanAuthority) return;
+  routeSprintTasks(tasks, config, availableProviders, journalContext);
 }
 
 // ─── State-Aware Worker Stop (Sprint 139 Task 015) ──────────────

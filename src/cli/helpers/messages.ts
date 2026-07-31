@@ -1119,6 +1119,20 @@ const MESSAGES: MessageMap = {
     en: 'Finalize held: coordinator PID {pid} could not reach verified termination ({reason}). PID authority was preserved.',
     tr: 'Finalize beklemeye alındı: coordinator PID {pid} doğrulanmış biçimde sonlandırılamadı ({reason}). PID authority korundu.',
   },
+  'finalize.description': {
+    en: 'Finalize a sprint: update MEMORY.md, RETRO.md, IDENTITY.md, config, and run decay',
+    tr: 'Bir sprinti sonlandır: MEMORY.md, RETRO.md, IDENTITY.md, config ve run decay güncelle',
+  },
+  'finalize.sprint_option': { en: 'Specific sprint ID to finalize (e.g. sprint-063); defaults to task auto-detection', tr: 'Sonlandırılacak belirli sprint kimliği (örn. sprint-063); varsayılan görevlerden otomatik algılamadır' },
+  'finalize.skip_decay_option': { en: 'Skip the memory/debt decay phase', tr: 'Memory/debt decay aşamasını atla' },
+  'finalize.skip_hooks_option': { en: 'Skip plugin afterSprint hooks', tr: 'Plugin afterSprint hooklarını atla' },
+  'finalize.force_option': { en: 'Finalize even if tasks are in progress or the sprint is already finalized', tr: 'Görevler sürüyorsa veya sprint zaten sonlandıysa da sonlandır' },
+  'finalize.mixed_sprints': { en: 'Warning: mixed sprint IDs detected: {sprintIds}. Proceeding with {sprintId}.', tr: 'Uyarı: karışık sprint kimlikleri algılandı: {sprintIds}. {sprintId} ile devam ediliyor.' },
+  'finalize.incomplete_tasks': { en: 'Cannot finalize: {count} task(s) are still in progress ({ids}). Use --force to override.', tr: 'Sonlandırılamaz: {count} görev hâlâ sürüyor ({ids}). Geçersiz kılmak için --force kullanın.' },
+  'finalize.force_incomplete_tasks': { en: 'Warning: forcing finalize with {count} in-progress task(s).', tr: 'Uyarı: {count} sürmekte olan görevle sonlandırma zorlanıyor.' },
+  'finalize.workers_terminated': { en: 'Terminated {count} live worker(s): {ids}', tr: '{count} canlı worker sonlandırıldı: {ids}' },
+  'finalize.workers_termination_failed': { en: 'Cannot finalize: {count} worker(s) could not be terminated ({ids}); terminal settlement is on HOLD.', tr: 'Sonlandırılamaz: {count} worker sonlandırılamadı ({ids}); terminal settlement HOLD durumunda.' },
+  'finalize.already_finalized': { en: 'Sprint {sprintId} has already been finalized. Use --force to re-finalize.', tr: 'Sprint {sprintId} zaten sonlandırıldı. Yeniden sonlandırmak için --force kullanın.' },
 
   // ─── doctor command ──────────────────────────────────────────────────
   'doctor.checks_passed': {
@@ -3365,6 +3379,21 @@ const MESSAGES: MessageMap = {
   'recover.force_scope_option': { en: 'Preserve explicit approval for intentional new write paths while resuming', tr: 'Sürdürürken bilinçli yeni yazma yolları için açık onayı koru' },
   'recover.resume_authority_missing': { en: 'Run {sprintId} has no canonical resumable PAUSED/ORPHANED authority.', tr: '{sprintId} için canonical, sürdürülebilir PAUSED/ORPHANED authority bulunamadı.' },
   'recover.resume_entry_missing': { en: 'Deckent CLI entry path is unavailable.', tr: 'Deckent CLI giriş yolu kullanılamıyor.' },
+  'recover.invalid_sprint_id': { en: 'Invalid sprint id: {sprintId}', tr: 'Geçersiz sprint kimliği: {sprintId}' },
+  'recover.active_authority_refused': { en: 'Recovery refused: run {sprintId} still has live coordinator authority.', tr: 'Kurtarma reddedildi: {sprintId} run’ının canlı coordinator authority kaydı sürüyor.' },
+  'recover.approval_required': { en: 'Recovery mutation requires an explicit exact-identity approval for {sprintId}.', tr: '{sprintId} recovery mutation işlemi açık ve exact-identity bağlı onay gerektirir.' },
+  'recover.approval_mismatch': { en: 'Recovery approval no longer matches the exact generation or fence for {sprintId}.', tr: 'Recovery onayı artık {sprintId} için exact generation veya fence ile eşleşmiyor.' },
+  'recover.settlement_authority_missing': { en: 'Recovery stopped: no canonical settlement authority was derived for {sprintId}.', tr: 'Kurtarma durduruldu: {sprintId} için canonical settlement authority üretilemedi.' },
+  'recover.settlement_failed': { en: 'Recovery settlement failed for {sprintId} ({code}).', tr: '{sprintId} recovery settlement işlemi başarısız ({code}).' },
+  'recover.description': { en: 'Recover a crashed or stuck sprint through the canonical recovery operation', tr: 'Çökmüş veya takılmış bir sprinti canonical recovery operation ile kurtar' },
+  'recover.dry_run_option': { en: 'Preview recovery without making changes', tr: 'Değişiklik yapmadan kurtarmayı önizle' },
+  'recover.force_option': { en: 'Skip interactive confirmation', tr: 'Etkileşimli onayı atla' },
+  'recover.skip_audit_option': { en: 'Skip the audit gate', tr: 'Denetim kapısını atla' },
+  'recover.restore_tasks_option': { en: 'Restore task files from the pre-archive snapshot instead of recovering forward', tr: 'İleri kurtarma yerine görev dosyalarını pre-archive snapshot’tan geri yükle' },
+  'recover.json_option': { en: 'Output the stable recovery result as JSON', tr: 'Kararlı kurtarma sonucunu JSON olarak çıktıla' },
+  'recover.separator': { en: '  ─────────────────────────────────────────', tr: '  ─────────────────────────────────────────' },
+  'recover.internal_error': { en: 'Recovery failed due to an internal operation error.', tr: 'Kurtarma dahili bir operation hatası nedeniyle başarısız oldu.' },
+  'recover.unknown_error': { en: 'unknown error', tr: 'bilinmeyen hata' },
   'pause.provider_auth_hold': {
     en: 'Provider {provider} authentication failed at task {taskId}; healthy providers were not stopped. Re-authenticate, then resume this run.',
     tr: '{provider} provider kimlik doğrulaması {taskId} görevinde başarısız oldu; sağlıklı provider\'lar durdurulmadı. Yeniden giriş yapıp bu run\'ı sürdürün.',
@@ -4152,8 +4181,12 @@ const MESSAGES: MessageMap = {
     tr: 'Devam edilsin ve run şimdi başlatılsın mı?',
   },
   'do.dry_run_complete': {
-    en: 'Dry-run complete — nothing was started. Re-run with --run to execute this plan.',
-    tr: 'Dry-run tamamlandı — hiçbir şey başlatılmadı. Bu planı çalıştırmak için --run ile tekrar çalıştırın.',
+    en: 'Dry-run complete — nothing was started. The exact proposal remains awaiting approval.',
+    tr: 'Dry-run tamamlandı — hiçbir şey başlatılmadı. Exact öneri onay beklemeye devam ediyor.',
+  },
+  'do.dry_run_approve_hint': {
+    en: 'Approve and start this exact proposal ({flowId}) without replanning: {command}',
+    tr: 'Bu exact öneriyi ({flowId}) yeniden planlamadan onaylayıp başlatın: {command}',
   },
   // F-2 — planning-phase heartbeat (the propose/plan step is a real LLM call).
   'do.planning_started': {

@@ -9,6 +9,37 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint482] - 2026-07-31
+
+### Added
+
+- Enforce ownership-fenced coordinator death settlement
+
+
+_Tasks: 3 total, 1 done, 0 tech debt, 1 no-go_
+
+## [1.0.0-beta.1-sprint481] - 2026-07-31
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 3 total, 0 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint480] - 2026-07-30
+
+### Added
+
+- RECOVERY-DECISION — canonical cold-lane decision engine
+- RECOVERY-ADAPTER-CONTRACT — mode and platform adapter boundary
+- RECOVERY-SERVICE — canonical inspect/resume/settle/abort service
+- RECOVERY-SPRINT-ADAPTER — migrate Sprint containment to shared service
+- RECOVERY-RUN-ADAPTERS — RunFlow and RunJob recovery evidence
+
+
+_Tasks: 8 total, 5 done, 0 tech debt, 1 no-go_
+
 ## [1.0.0-beta.1-sprint479] - 2026-07-30
 
 ### Added

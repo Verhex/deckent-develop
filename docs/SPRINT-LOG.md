@@ -11829,3 +11829,81 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 479-018: CHAIN-06-VERIFIER — verify consumer (DEFERRED)
 
 ---
+## Sprint 480 — sprint-480
+
+**Status:** COMPLETE
+**Date:** 2026-07-30
+**Duration:** 1964s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 1963557ms |
+
+### Tasks
+
+- 480-001: RECOVERY-DECISION — canonical cold-lane decision engine (DONE)
+- 480-002: RECOVERY-ADAPTER-CONTRACT — mode and platform adapter boundary (DONE)
+- 480-003: RECOVERY-SERVICE — canonical inspect/resume/settle/abort service (DONE)
+- 480-004: RECOVERY-SPRINT-ADAPTER — migrate Sprint containment to shared service (DONE)
+- 480-005: RECOVERY-RUN-ADAPTERS — RunFlow and RunJob recovery evidence (DONE)
+- 480-006-fix: Fix: RECOVERY-SURFACES — CLI and MCP shared recovery commands (DEFERRED)
+- 480-006: RECOVERY-SURFACES — CLI and MCP shared recovery commands (NO_GO)
+- 480-007: RECOVERY-NERVOUS — durable notification and continuation approval (DEFERRED)
+- 480-008: RECOVERY-ASSURANCE — adversarial contract and hot-path proof (DEFERRED)
+
+---
+## Sprint 481 — sprint-481
+
+**Status:** COMPLETE
+**Date:** 2026-07-31
+**Duration:** 4280s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 4279691ms |
+
+### Tasks
+
+- 481-001: Ownership fenced force finalize çekirdeği (DEFERRED)
+- 481-002: Finalize ve recover adapter birleştirmesi (DEFERRED)
+- 481-003: Recovery assurance ve yüzey parity doğrulaması (DEFERRED)
+
+---
+## Sprint 482 — sprint-482
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-31
+**Duration:** 1705s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 1705080ms |
+
+### Tasks
+
+- 482-001: Enforce ownership-fenced coordinator death settlement (DONE)
+- 482-002: Unify finalize and recover adapters (NO_GO)
+- 482-003: Prove adversarial recovery and surface parity (NOT_DISPATCHED)
+
+---

@@ -11,6 +11,7 @@ describe('production provider-routing boundary', () => {
 
     const boundary = source.slice(start, end);
     expect(boundary).toContain('{ projectRoot, sprintId: sprint.id }');
+    expect(boundary).toContain('opts?.exactPlanAuthority');
     expect(boundary).toContain('BRAIN→AUDITOR:PROVIDER_ROUTING_HOLD');
     expect(boundary).toContain('releaseSprintLock(projectRoot)');
     expect(boundary).toContain('clearActiveSprint()');

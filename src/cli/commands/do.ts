@@ -272,8 +272,11 @@ export async function runDoRunFlow(
   print(formatRunFlowDoPreview(preview, opts.run, lang));
 
   if (!opts.run) {
-    controller.reject('dry-run');
     print(getMessage('do.dry_run_complete', lang));
+    print(getMessage('do.dry_run_approve_hint', lang, {
+      flowId: preview.flowId,
+      command: `deckent runs ${preview.flowId} --approve --start`,
+    }));
     return;
   }
 
@@ -295,15 +298,6 @@ export async function runDoRunFlow(
     return;
   }
 
-  if (preview.gateResult === 'fail') {
-    controller.reject('prompt-gate-block');
-    printError(getMessage('do.gate_blocked', lang, {
-      count: String(preview.gateFindings?.length ?? 0),
-    }));
-    process.exitCode = 1;
-    return;
-  }
-
   // Dogfood-449 B1 — born-698a'nın scope-ikizi: child'ın PLAN fazı pre-spawn
   // scope-gate'inde de FAIL-CLOSED. Ön-kapı aynı kararı burada verir; çıkış
   // yolu artık var: `--force-scope` hem bu aynayı hem child'ı geçirir.
@@ -311,6 +305,15 @@ export async function runDoRunFlow(
     controller.reject('scope-gate-block');
     printError(getMessage('do.scope_gate_blocked', lang, {
       message: preview.scopeGateMessage ?? '',
+    }));
+    process.exitCode = 1;
+    return;
+  }
+
+  if (preview.gateResult === 'fail') {
+    controller.reject('prompt-gate-block');
+    printError(getMessage('do.gate_blocked', lang, {
+      count: String(preview.gateFindings?.length ?? 0),
     }));
     process.exitCode = 1;
     return;

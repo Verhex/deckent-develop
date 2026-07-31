@@ -321,4 +321,55 @@ describe('spawnWorkers C0c live wire (Sprint 169 W3.1)', () => {
     expect(backend.calls.map(call => call.taskId)).toEqual([fix.id]);
     expect(fix.status).toBe(TaskStatus.EXECUTING);
   });
+
+  it('prioritizes an appended priority fix over a dependency-blocked colliding dependant', async () => {
+    const original = createTask('480-006', ['src/shared.ts']);
+    original.status = TaskStatus.NO_GO;
+    const dependant = createTask('480-007', ['src/shared.ts']);
+    dependant.dependencies = [original.id];
+    const fix = createTask('480-006-fix', ['src/shared.ts']);
+    fix.isPriorityFix = true;
+    fix.fixForTaskId = original.id;
+    persistTasks([original, dependant, fix]);
+    const sprint = makeSprint('sprint-480', [original, dependant, fix]);
+    const backend = makeMockBackend();
+    const config = { ...makeConfig(), dependency_pipeline_enabled: true } as ResolvedConfig;
+
+    const origCwd = process.cwd();
+    process.chdir(testRoot);
+    try {
+      const queued = await spawnWorkers(testRoot, sprint, config, { spawnBackend: backend });
+      expect(queued.map(task => task.id)).not.toContain(fix.id);
+    } finally {
+      process.chdir(origCwd);
+    }
+
+    expect(backend.calls.map(call => call.taskId)).toEqual([fix.id]);
+    expect(fix.status).toBe(TaskStatus.EXECUTING);
+    expect(dependant.status).toBe(TaskStatus.PENDING);
+  });
+
+  it('fills a free slot instead of letting a blocked writer consume the worker ceiling', async () => {
+    const first = createTask('slot-1', ['src/shared.ts']);
+    const blocked = createTask('slot-2', ['src/shared.ts']);
+    const independent = createTask('slot-3', ['src/independent.ts']);
+    persistTasks([first, blocked, independent]);
+    const sprint = makeSprint('sprint-slot-fill', [first, blocked, independent]);
+    const backend = makeMockBackend();
+    const config = {
+      ...makeConfig(),
+      activeModeConfig: { max_workers: 2 },
+    } as ResolvedConfig;
+
+    const origCwd = process.cwd();
+    process.chdir(testRoot);
+    try {
+      await spawnWorkers(testRoot, sprint, config, { spawnBackend: backend });
+    } finally {
+      process.chdir(origCwd);
+    }
+
+    expect(backend.calls.map(call => call.taskId)).toEqual(['slot-1', 'slot-3']);
+    expect(blocked.status).toBe(TaskStatus.PENDING);
+  });
 });

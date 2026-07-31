@@ -55,6 +55,12 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-482 Learnings** (sprint-482): ## Sprint sprint-482 Learnings
+- Unify finalize and recover adapters: NO_GO — npx tsc --noEmit passed.
+The mandated t...
+- **Sprint sprint-481 Learnings** (sprint-481): ## Sprint sprint-481 Learnings
+- **Sprint sprint-480 Learnings** (sprint-480): ## Sprint sprint-480 Learnings
+- RECOVERY-SURFACES — CLI and MCP shared recovery commands: NO_GO — Bounded scope bloc...
 - **Sprint sprint-479 Learnings** (sprint-479): ## Sprint sprint-479 Learnings
 - Fix: CHAIN-01-ROOT — controlled NO_GO then repair: NO_GO — DECKENT_E091:coordinator-...
 - **Sprint sprint-478 Learnings** (sprint-478): ## Sprint sprint-478 Learnings
@@ -74,12 +80,6 @@
 - LOCK-BIND — bind project root and lock-directory generation: GO_W...
 - **Sprint sprint-471 Learnings** (sprint-471): ## Sprint sprint-471 Learnings
 - S470-RECOVERY — restore four lifecycle invariants only: NO_GO — Runtime budget circu...
-- **Sprint sprint-470 Learnings** (sprint-470): ## Sprint sprint-470 Learnings
-- PROMPT-AUDIT-ENTRY — audit the actual initial dispatch: NO_GO — Host runtime-budget ...
-- **Sprint sprint-465 Learnings** (sprint-465): ## Sprint sprint-465 Learnings
-- TERMINAL-CANARY-AUDIT — reconcile the complete chain: GO_WITH_TECH_DEBT — TERMINAL-C...
-- **Sprint sprint-464 Learnings** (sprint-464): ## Sprint sprint-464 Learnings
-- DEPENDENCY-RELEASE-WITNESS — prove the child is born only after Task 1: NO_GO — Casc...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -90,4 +90,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×11 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 1689 | Generated: 2026-07-30_
+_Total entries: 1698 | Generated: 2026-07-31_

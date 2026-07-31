@@ -1,17 +1,17 @@
-import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import type { Command } from 'commander';
-import { postFinalizeCleanup, previewFinalizeCleanup } from '../../core/orphan-cleaner.js';
-import { runSelfAuditGate } from '../../orchestra/sprint-finalizer.js';
-import { createPreArchiveSnapshot, restoreFromSnapshot, verifySnapshot } from '../../orchestra/task-restoration.js';
-import { cleanupCheckpointFiles } from '../../orchestra/sprint-checkpoint.js';
-import { clearPid } from '../../orchestra/sprint-pid-manager.js';
-import { readSprintState, clearSprintState } from '../../orchestra/sprint-utils.js';
+import { restoreFromSnapshot } from '../../orchestra/task-restoration.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
 import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
+import {
+  readSprintRecoverySettlementIdentity,
+  runSprintRecoveryOperation,
+  SprintRecoveryOperationError,
+  type SprintRecoveryReport,
+} from '../../orchestra/sprint-recovery-operation.js';
 
 export interface ResumeRecoveryProcessOptions {
   autoApprove?: boolean;
@@ -63,131 +63,73 @@ export async function runResumeRecoveryProcess(
   });
 }
 
-function assertCanonicalSprintId(sprintId: string): void {
+function assertCanonicalSprintId(sprintId: string, lang: string): void {
   if (!/^sprint-\d+$/.test(sprintId)) {
-    throw new Error(`Invalid sprint id: ${sprintId}`);
+    throw new Error(getMessage('recover.invalid_sprint_id', lang, { sprintId }));
   }
 }
 
-export interface RecoveryReport {
-  audit: { overallGate: 'PASS' | 'GATE_FAILURE' | 'SKIPPED' };
-  orphanIpcDirs: string[];
-  staleLocksCleaned: number;
-  staleSpawnLocksCleaned: number;
-  taskFilesArchived: number;
-  taskFilesPreserved: number;
-}
+export type RecoveryReport = SprintRecoveryReport;
 
-async function runRecovery(
+export async function runRecovery(
   root: string,
   sprintId: string,
   opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean },
   lang: string,
 ): Promise<RecoveryReport> {
-  assertCanonicalSprintId(sprintId);
-  const report: RecoveryReport = {
-    audit: { overallGate: 'SKIPPED' },
-    orphanIpcDirs: [],
-    staleLocksCleaned: 0,
-    staleSpawnLocksCleaned: 0,
-    taskFilesArchived: 0,
-    taskFilesPreserved: 0,
-  };
-
-  // ─── Dry-run: READ-ONLY preview — zero audit/subprocess, zero bytes ──────
-  // No runSelfAuditGate (spawns tsc/vitest), no createPreArchiveSnapshot
-  // (spawns tar), no fs mutation. Reports the requested sprint's EXACT
-  // archive/preserve set (previewFinalizeCleanup shares postFinalizeCleanup's
-  // sprint-scoped classifier). Targeted recovery deliberately does NOT inspect
-  // or clean repo-global IPC/lock state.
-  if (opts.dryRun) {
-    // Sprint-scoped, not a blanket count of every sprint's files.
-    const preview = previewFinalizeCleanup(root, sprintId);
-    report.taskFilesArchived = preview.archivedFiles.length;
-    report.taskFilesPreserved = preview.preservedFiles.length;
-
-    return report;
-  }
-
-  // ─── Real recovery (mutating) ────────────────────────────────────────────
-  // Step 1: establish and verify the rollback anchor BEFORE any audit/cleanup
-  // side effect. A target with task artefacts may never proceed without it.
-  const preview = previewFinalizeCleanup(root, sprintId);
-  const targetFileCount = preview.archivedFiles.length + preview.preservedFiles.length;
-  let snapshotOk = targetFileCount === 0;
-  if (targetFileCount > 0) {
-    const snapshot = createPreArchiveSnapshot(root, sprintId);
-    snapshotOk = snapshot !== null &&
-      existsSync(snapshot.hashPath) &&
-      verifySnapshot(snapshot.snapshotPath, snapshot.hash);
-    if (!snapshotOk) {
-      throw new Error(getMessage('recover.snapshot_required', lang, { sprintId }));
-    }
-  }
-
-  // Step 2: Run audit (unless skipped)
-  if (!opts.skipAudit) {
-    try {
-      const auditResult = await runSelfAuditGate(sprintId, root);
-      report.audit = { overallGate: auditResult.overallGate };
-    } catch {
-      report.audit = { overallGate: 'SKIPPED' };
-    }
-  }
-
-  // Step 3: Archive terminal task files. PENDING (incl. pending fix) and other
-  // active tasks are preserved as independent ids by the shared classifier.
-  const cleanupResult = postFinalizeCleanup(root, sprintId, { cleanStaleLocks: false });
-  report.taskFilesArchived = cleanupResult.archivedFiles.length;
-  report.taskFilesPreserved = cleanupResult.preservedFiles.length;
-  if (report.taskFilesArchived !== preview.archivedFiles.length) {
-    throw new Error(getMessage('recover.archive_incomplete', lang, {
-      expected: String(preview.archivedFiles.length),
-      actual: String(report.taskFilesArchived),
+  try {
+    const identity = readSprintRecoverySettlementIdentity(root, sprintId);
+    return await runSprintRecoveryOperation(root, sprintId, {
+      dryRun: opts.dryRun,
+      skipAudit: opts.skipAudit,
+      ...(!opts.dryRun
+        ? {
+            approval: {
+              approvalRef: opts.force ? 'cli:force' : 'cli:interactive',
+              idempotencyKey: `cli:${sprintId}:${identity.generation}:${identity.fenceToken}`,
+              identity,
+            },
+          }
+        : {}),
+    });
+  } catch (error) {
+    if (!(error instanceof SprintRecoveryOperationError)) throw error;
+    const key = {
+      INVALID_SPRINT_ID: 'recover.invalid_sprint_id',
+      ACTIVE_AUTHORITY: 'recover.active_authority_refused',
+      APPROVAL_REQUIRED: 'recover.approval_required',
+      APPROVAL_MISMATCH: 'recover.approval_mismatch',
+      SNAPSHOT_REQUIRED: 'recover.snapshot_required',
+      ARCHIVE_INCOMPLETE: 'recover.archive_incomplete',
+      SETTLEMENT_AUTHORITY_MISSING: 'recover.settlement_authority_missing',
+      SETTLEMENT_FAILED: 'recover.settlement_failed',
+    }[error.code] ?? 'recover.internal_error';
+    throw new Error(getMessage(key, lang, {
+      ...error.details,
+      code: error.details.code ?? error.details.reason ?? error.code,
     }));
   }
-
-  // Step 4: Clear ONLY the target sprint's stale checkpoint/PID/state metadata,
-  // now that the archive evidence is durable. Each helper is sprint-scoped by
-  // construction (filename / sprintId match) — no broad `.tasks` delete, and no
-  // other sprint's metadata is touched. sprint-state is cleared only when it
-  // still names THIS sprint (never clobbers a different active sprint).
-  //
-  // Guard: only clear once the evidence is genuinely durable — a snapshot was
-  // written, OR nothing was archived (no rollback anchor is needed). If files
-  // WERE archived but the snapshot failed, the checkpoint/PID/state are retained
-  // so the operator keeps a recovery handle instead of losing the anchor.
-  if (snapshotOk || report.taskFilesArchived === 0) {
-    try { cleanupCheckpointFiles(root, sprintId); } catch { /* best-effort */ }
-    try { clearPid(root, sprintId); } catch { /* best-effort */ }
-    try {
-      const st = readSprintState(root);
-      if (st && st.sprintId === sprintId) clearSprintState(root);
-    } catch { /* best-effort */ }
-  }
-
-  return report;
 }
 
 export function registerRecover(program: Command): void {
   const registerLang = detectLang(resolveProjectRoot());
   program
     .command('recover <sprint-id>')
-    .description('Recover from a crashed or stuck sprint (audit + cleanup + archive)')
-    .option('--dry-run', 'Preview what would be cleaned without making changes')
-    .option('--force', 'Skip interactive confirmation')
-    .option('--skip-audit', 'Skip the audit step')
-    .option('--restore-tasks', 'Roll back: restore task files from the pre-archive snapshot instead of cleaning forward (born-562)')
+    .description(getMessage('recover.description', registerLang))
+    .option('--dry-run', getMessage('recover.dry_run_option', registerLang))
+    .option('--force', getMessage('recover.force_option', registerLang))
+    .option('--skip-audit', getMessage('recover.skip_audit_option', registerLang))
+    .option('--restore-tasks', getMessage('recover.restore_tasks_option', registerLang))
     .option('--resume', getMessage('recover.resume_option', registerLang))
     .option('--auto-approve', getMessage('recover.auto_approve_option', registerLang), false)
     .option('--force-scope', getMessage('recover.force_scope_option', registerLang), false)
-    .option('--json', 'Output recovery result as JSON')
+    .option('--json', getMessage('recover.json_option', registerLang))
     .action(async (sprintId: string, opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; restoreTasks?: boolean; resume?: boolean; autoApprove?: boolean; forceScope?: boolean; json?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);
 
       try {
-        assertCanonicalSprintId(sprintId);
+        assertCanonicalSprintId(sprintId, lang);
         if (opts.dryRun && opts.restoreTasks) {
           throw new Error(getMessage('recover.dry_run_restore_conflict', lang));
         }
@@ -229,7 +171,10 @@ export function registerRecover(program: Command): void {
           } else if (result.success) {
             print(getMessage('recover.restore_success', lang, { count: String(result.restoredFiles.length), sprintId }));
           } else {
-            printError(new Error(getMessage('recover.restore_failed', lang, { error: result.error ?? 'unknown', sprintId })));
+            printError(new Error(getMessage('recover.restore_failed', lang, {
+              error: result.error ?? getMessage('recover.unknown_error', lang),
+              sprintId,
+            })));
             process.exitCode = 1;
           }
           return;
@@ -240,6 +185,7 @@ export function registerRecover(program: Command): void {
           print(JSON.stringify({
             sprintId,
             dryRun: Boolean(opts.dryRun),
+            identity: report.identity,
             auditGate: report.audit.overallGate,
             orphanIpcDirs: report.orphanIpcDirs.length,
             staleLocksCleaned: report.staleLocksCleaned,
@@ -252,7 +198,7 @@ export function registerRecover(program: Command): void {
 
         if (opts.dryRun) {
           print(getMessage('recover.preview_header', lang, { sprintId }));
-          print(`  ─────────────────────────────────────────`);
+          print(getMessage('recover.separator', lang));
 
           const report = await runRecovery(root, sprintId, { ...opts, dryRun: true }, lang);
 
@@ -263,7 +209,7 @@ export function registerRecover(program: Command): void {
           print(getMessage('recover.preview_stale_locks', lang, { count: String(report.staleLocksCleaned) }));
           print(getMessage('recover.preview_stale_spawnlocks', lang, { count: String(report.staleSpawnLocksCleaned) }));
           print(getMessage('recover.preview_task_files', lang, { count: String(report.taskFilesArchived) }));
-          print(`  ─────────────────────────────────────────`);
+          print(getMessage('recover.separator', lang));
           print(getMessage('recover.preview_run_to_execute', lang));
           return;
         }
@@ -291,7 +237,7 @@ export function registerRecover(program: Command): void {
         print(getMessage('recover.recovering', lang, { sprintId }));
         const report = await runRecovery(root, sprintId, opts, lang);
 
-        print(`  ─────────────────────────────────────────`);
+        print(getMessage('recover.separator', lang));
         if (report.audit.overallGate !== 'SKIPPED') {
           print(getMessage('recover.audit_gate', lang, { gate: report.audit.overallGate }));
         }
@@ -302,7 +248,7 @@ export function registerRecover(program: Command): void {
           archived: String(report.taskFilesArchived),
           preserved: String(report.taskFilesPreserved),
         }));
-        print(`  ─────────────────────────────────────────`);
+        print(getMessage('recover.separator', lang));
         print(getMessage('recover.complete', lang, { sprintId }));
       } catch (error) {
         printError(error);

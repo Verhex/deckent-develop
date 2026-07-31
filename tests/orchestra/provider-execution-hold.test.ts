@@ -24,6 +24,22 @@ describe('provider execution hold authority', () => {
     }, 'OAuth token has been revoked. Please run /login again.')).toBe('auth');
   });
 
+  it('never reclassifies a worker that produced tokens and files as a provider hold', () => {
+    expect(isProviderDispatchHoldFailure({
+      notes: 'Scope blocker mentioned rate limit guidance; no provider failure occurred',
+      filesChanged: ['src/cli/commands/recover.ts'],
+      linesAdded: 24,
+      linesRemoved: 6,
+      tokenUsage: {
+        inputTokens: 242_454,
+        outputTokens: 5_293,
+        cacheReadTokens: 198_144,
+        cacheCreationTokens: 0,
+        source: 'host-runtime-budget',
+      },
+    }, 'The worker completed and wrote a bounded NO_GO result.')).toBeNull();
+  });
+
   it('completes collection when every uncollected task belongs to a held provider', () => {
     expect(providerDispatchHoldShouldComplete(35, 50, 15)).toBe(true);
     expect(providerDispatchHoldShouldComplete(35, 50, 14)).toBe(false);

@@ -1,156 +1,185 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// ─── Mocks ───────────────────────────────────────────────────────────────────
-
-const mockRunSelfAuditGate = vi.fn();
-const mockCleanOrphanIpcDirs = vi.fn();
-const mockClearStaleLocks = vi.fn();
-const mockPostFinalizeCleanup = vi.fn();
-
-vi.mock('../../../src/orchestra/sprint-finalizer.js', () => ({
-  runSelfAuditGate: (...args: unknown[]) => mockRunSelfAuditGate(...args),
+const {
+  mockRunRecoveryOperation,
+  MockSprintRecoveryOperationError,
+} = vi.hoisted(() => ({
+  mockRunRecoveryOperation: vi.fn(),
+  MockSprintRecoveryOperationError: class MockSprintRecoveryOperationError extends Error {
+    constructor(
+      public readonly code: string,
+      public readonly details: Readonly<Record<string, string>>,
+    ) {
+      super(code);
+    }
+  },
 }));
 
-vi.mock('../../../src/core/orphan-cleaner.js', () => ({
-  cleanOrphanIpcDirs: (...args: unknown[]) => mockCleanOrphanIpcDirs(...args),
-  postFinalizeCleanup: (...args: unknown[]) => mockPostFinalizeCleanup(...args),
+vi.mock('../../../src/orchestra/sprint-recovery-operation.js', () => ({
+  runSprintRecoveryOperation: mockRunRecoveryOperation,
+  SprintRecoveryOperationError: MockSprintRecoveryOperationError,
 }));
-
-vi.mock('../../../src/core/file-lock.js', () => ({
-  clearStaleLocks: (...args: unknown[]) => mockClearStaleLocks(...args),
-}));
-
-vi.mock('node:fs', () => ({
-  existsSync: vi.fn().mockReturnValue(false),
-  readdirSync: vi.fn().mockReturnValue([]),
-  statSync: vi.fn().mockReturnValue({ mtimeMs: 0 }),
-}));
-
-vi.mock('../../../src/core/constants.js', async () => {
-  const actual = await vi.importActual('../../../src/core/constants.js') as Record<string, unknown>;
-  return {
-    ...actual,
-    TASKS_DIR: '.tasks',
-    LOCKS_DIR: '.locks',
-  };
-});
-
 vi.mock('../../../src/mcp/helpers/enrich.js', () => ({
-  enrichResponse: (_tool: string, data: Record<string, unknown>) => ({
-    ...data,
-    _meta: { summary: 'test', hints: [], timestamp: '2026-04-21T00:00:00.000Z' },
-  }),
+  enrichResponse: (_tool: string, data: Record<string, unknown>) => data,
 }));
 
-// ─── Mock Server ─────────────────────────────────────────────────────────────
+import { registerRecoverTool } from '../../../src/mcp/tools/recover.js';
 
 type ToolHandler = (args: Record<string, unknown>) => Promise<{
   content: Array<{ type: string; text: string }>;
   isError?: boolean;
 }>;
 
-interface MockServer {
-  tools: Map<string, { config: Record<string, unknown>; handler: ToolHandler }>;
-  registerTool: (name: string, config: Record<string, unknown>, handler: ToolHandler) => void;
-}
-
-function createMockServer(): MockServer {
-  const tools = new Map<string, { config: Record<string, unknown>; handler: ToolHandler }>();
+function createServer() {
+  const tools = new Map<string, {
+    config: Record<string, unknown>;
+    handler: ToolHandler;
+  }>();
   return {
     tools,
-    registerTool(name, config, handler) {
+    registerTool(
+      name: string,
+      config: Record<string, unknown>,
+      handler: ToolHandler,
+    ) {
       tools.set(name, { config, handler });
     },
   };
 }
 
-function parseResult(result: { content: Array<{ type: string; text: string }> }) {
-  return JSON.parse(result.content[0].text);
+function parse(response: { content: Array<{ text: string }> }): Record<string, unknown> {
+  return JSON.parse(response.content[0]!.text) as Record<string, unknown>;
 }
 
-import { registerRecoverTool } from '../../../src/mcp/tools/recover.js';
+const identity = {
+  executionId: 'sprint-150',
+  generation: 2,
+  taskId: 'sprint-150',
+  attemptId: 'sprint-150:recovery:2',
+  fenceToken: 'mcp-fence',
+};
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
-
-describe('deckent_recover MCP tool', () => {
-  let server: MockServer;
-
+describe('deckent_recover MCP application adapter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    server = createMockServer();
-    registerRecoverTool(server as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
-
-    mockRunSelfAuditGate.mockResolvedValue({
-      overallGate: 'PASS',
-      tsc: { status: 'PASS', errors: [] },
-      vitest: { status: 'PASS', delta: { files: 0, pass: 0, fail: 0, skipped: 0 } },
-      honesty: { violations: 0, flaggedTasks: [] },
-      observability: { metricsJsonlExists: true, lineCount: 10 },
-    });
-    mockCleanOrphanIpcDirs.mockReturnValue(['sprint-149-ipc']);
-    mockClearStaleLocks.mockReturnValue(3);
-    mockPostFinalizeCleanup.mockReturnValue({
-      archivedFiles: ['task-150-001.json'],
-      preservedFiles: [],
+    mockRunRecoveryOperation.mockResolvedValue({
+      identity,
+      audit: { overallGate: 'PASS' },
+      orphanIpcDirs: [],
       staleLocksCleaned: 0,
+      staleSpawnLocksCleaned: 0,
+      taskFilesArchived: 3,
+      taskFilesPreserved: 1,
     });
   });
 
-  it('should register deckent_recover tool', () => {
-    expect(server.tools.has('deckent_recover')).toBe(true);
-  });
+  it('registers a destructive, non-idempotent mutation surface', () => {
+    const server = createServer();
+    registerRecoverTool(server as never);
 
-  it('should have destructive annotation', () => {
-    const tool = server.tools.get('deckent_recover')!;
-    expect((tool.config as Record<string, unknown>).annotations).toEqual(
-      expect.objectContaining({ readOnlyHint: false, destructiveHint: true }),
+    expect(server.tools.get('deckent_recover')?.config.annotations).toEqual(
+      expect.objectContaining({
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+      }),
     );
   });
 
-  it('should run full recovery pipeline', async () => {
-    const handler = server.tools.get('deckent_recover')!.handler;
-    const result = await handler({ sprintId: 'sprint-150', dryRun: false, skipAudit: false });
-    const parsed = parseResult(result);
+  it('keeps dry-run read-only and delegates exactly once', async () => {
+    const server = createServer();
+    registerRecoverTool(server as never);
+    const response = await server.tools.get('deckent_recover')!.handler({
+      sprintId: 'sprint-150',
+      dryRun: true,
+      skipAudit: false,
+    });
 
-    expect(parsed.success).toBe(true);
-    expect(parsed.auditGate).toBe('PASS');
-    expect(parsed.orphanIpcDirsRemoved).toBe(1);
-    expect(parsed.staleLocksCleaned).toBe(3);
-    expect(parsed.taskFilesArchived).toBe(1);
-    expect(mockCleanOrphanIpcDirs).toHaveBeenCalled();
-    expect(mockClearStaleLocks).toHaveBeenCalled();
-    expect(mockPostFinalizeCleanup).toHaveBeenCalled();
+    expect(mockRunRecoveryOperation).toHaveBeenCalledTimes(1);
+    expect(mockRunRecoveryOperation).toHaveBeenCalledWith(
+      process.cwd(),
+      'sprint-150',
+      { dryRun: true, skipAudit: false },
+    );
+    expect(parse(response)).toMatchObject({
+      success: true,
+      dryRun: true,
+      identity: { generation: 2, fenceToken: 'mcp-fence' },
+      taskFilesArchived: 3,
+    });
   });
 
-  it('should run dry-run without modifications', async () => {
-    const handler = server.tools.get('deckent_recover')!.handler;
-    const result = await handler({ sprintId: 'sprint-150', dryRun: true, skipAudit: false });
-    const parsed = parseResult(result);
+  it('passes an exact approval through without MCP-owned lifecycle logic', async () => {
+    const server = createServer();
+    registerRecoverTool(server as never);
+    const approval = {
+      approvalRef: 'approval:mcp',
+      idempotencyKey: 'mcp-once',
+      identity,
+    };
 
-    expect(parsed.dryRun).toBe(true);
-    expect(mockCleanOrphanIpcDirs).not.toHaveBeenCalled();
-    expect(mockClearStaleLocks).not.toHaveBeenCalled();
-    expect(mockPostFinalizeCleanup).not.toHaveBeenCalled();
+    await server.tools.get('deckent_recover')!.handler({
+      sprintId: 'sprint-150',
+      dryRun: false,
+      skipAudit: true,
+      approval,
+    });
+
+    expect(mockRunRecoveryOperation).toHaveBeenCalledWith(
+      process.cwd(),
+      'sprint-150',
+      { dryRun: false, skipAudit: true, approval },
+    );
   });
 
-  it('should skip audit when requested', async () => {
-    const handler = server.tools.get('deckent_recover')!.handler;
-    const result = await handler({ sprintId: 'sprint-150', dryRun: false, skipAudit: true });
-    const parsed = parseResult(result);
+  it('returns the same typed HOLD code and details to MCP readers', async () => {
+    mockRunRecoveryOperation.mockRejectedValueOnce(
+      new MockSprintRecoveryOperationError('SETTLEMENT_FAILED', {
+        sprintId: 'sprint-150',
+        disposition: 'HOLD',
+        reason: 'ownership-unverified',
+      }),
+    );
+    const server = createServer();
+    registerRecoverTool(server as never);
+    const response = await server.tools.get('deckent_recover')!.handler({
+      sprintId: 'sprint-150',
+      dryRun: false,
+      skipAudit: true,
+      approval: {
+        approvalRef: 'approval:mcp',
+        idempotencyKey: 'mcp-once',
+        identity,
+      },
+    });
 
-    expect(mockRunSelfAuditGate).not.toHaveBeenCalled();
-    expect(parsed.auditGate).toBe('SKIPPED');
+    expect(response.isError).toBe(true);
+    expect(parse(response)).toEqual({
+      error: true,
+      errorCode: 'SETTLEMENT_FAILED',
+      details: {
+        sprintId: 'sprint-150',
+        disposition: 'HOLD',
+        reason: 'ownership-unverified',
+      },
+    });
   });
 
-  it('should handle errors gracefully', async () => {
-    mockCleanOrphanIpcDirs.mockImplementation(() => { throw new Error('permission denied'); });
+  it('does not translate unknown implementation failures into success', async () => {
+    mockRunRecoveryOperation.mockRejectedValueOnce(new TypeError('adapter bug'));
+    const server = createServer();
+    registerRecoverTool(server as never);
+    const response = await server.tools.get('deckent_recover')!.handler({
+      sprintId: 'sprint-150',
+      dryRun: true,
+      skipAudit: true,
+    });
 
-    const handler = server.tools.get('deckent_recover')!.handler;
-    const result = await handler({ sprintId: 'sprint-150', dryRun: false, skipAudit: false });
-    const parsed = parseResult(result);
-
-    // Should still succeed — individual steps are best-effort
-    expect(parsed.success).toBe(true);
-    expect(parsed.orphanIpcDirsRemoved).toBe(0);
+    expect(response.isError).toBe(true);
+    expect(parse(response)).toEqual({
+      error: true,
+      errorCode: 'RECOVERY_INTERNAL_ERROR',
+      details: {},
+    });
   });
 });

@@ -1,5 +1,27 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-482 Learnings
+- Sprint sprint-482 Learnings: ## Sprint sprint-482 Learnings
+- Unify finalize and recover adapters: NO_GO — npx tsc --noEmit passed.
+The mandated targeted command ran and failed: tests/cli/commands/recover.test.ts has 9 failures
+
+## Gains
+- 482-001 — Enforce ownership-fenced coordinator death settlement — npx tsc --noEmit passed.
+
+## Sprint sprint-481 Learnings
+- Sprint sprint-481 Learnings: ## Sprint sprint-481 Learnings
+
+## Sprint sprint-480 Learnings
+- Sprint sprint-480 Learnings: ## Sprint sprint-480 Learnings
+- RECOVERY-SURFACES — CLI and MCP shared recovery commands: NO_GO — Bounded scope blocker: the allowed CLI/MCP source files contain an existing direct MCP lifecycle implementation but no r
+
+## Gains
+- 480-001 — RECOVERY-DECISION — canonical cold-lane decision engine — All 4/4 Definition-of-Done checks passed: npx tsc --noEmit; required file-existence proof; and np...
+- 480-002 — RECOVERY-ADAPTER-CONTRACT — mode and platform adapter boundary — Defined the mode/platform adapter boundary contract in src/orchestra/execution-recovery-adapter.ts.
+- 480-003 — RECOVERY-SERVICE — canonical inspect/resume/settle/abort service — All 4/4 Definition-of-Done checks passed: npx tsc --noEmit; required file-existence proof; and np...
+- 480-004 — RECOVERY-SPRINT-ADAPTER — migrate Sprint containment to shared service — Built src/orchestra/recovery-adapters/sprint-recovery-adapter.ts: a concrete ExecutionRecoveryMod...
+- 480-005 — RECOVERY-RUN-ADAPTERS — RunFlow and RunJob recovery evidence — Evidence: npx tsc --noEmit passed; required adapter file proof passed; npx vitest run tests/orche...
+
 ## Sprint sprint-479 Learnings
 - Sprint sprint-479 Learnings: ## Sprint sprint-479 Learnings
 - Fix: CHAIN-01-ROOT — controlled NO_GO then repair: NO_GO — DECKENT_E091:coordinator-crashed-before-docker-prepare:ca33071c-ef47-43f1-9df1-395a3bfda361 | Host runtime budget eviden

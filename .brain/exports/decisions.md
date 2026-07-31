@@ -4007,6 +4007,163 @@ A formal procedure for Brain death: fallback/retry **steps at system AND user le
 
 ---
 
+## Amendment — 2026-07-30: Universal Execution Recovery Lane
+
+**Owner:** Alperen · **Status:** accepted · **Reason:** Sprint 479 proved that
+checkpoint recovery alone is insufficient. A coordinator may remain alive while making
+no progress; a task may fail before dispatch yet be projected as worker `NO_GO`; a stale
+dashboard may report workers that were never born; and finalize may clear PID authority
+before the owned process actually exits. A sprint-only repair would reproduce the same
+failure in Run, Flow, Do, Autonomous, Mission and Process.
+
+### A. Dual-lens scope
+
+This amendment applies simultaneously to:
+
+1. deckent's development repository and dogfood operation; and
+2. the shipped product across solo, team and enterprise deployments.
+
+Dogfood may enable additional diagnostics and failure injection, but it MUST NOT define a
+different lifecycle truth. Product and dogfood consume the same recovery contract through
+environment/platform adapters.
+
+### B. One execution-attempt authority
+
+Every executable mode binds work to one provider-neutral identity:
+
+```xml
+<execution-attempt-identity>
+  tenantId · projectId · executionId · generation · attemptId
+  · taskId? · role · processIdentity? · leaseFence
+</execution-attempt-identity>
+```
+
+`executionId` is the identity used by admission, lock, PID/process ownership, checkpoint,
+status, settlement and recovery. A timestamp-generated lock alias is not a second run
+identity. Dashboard, `.tasks`, PID files and status documents are projections; they never
+override the attempt/settlement authority.
+
+The lifecycle is:
+
+```text
+PREPARED → ADMITTED → DISPATCHED → RUNNING → LANDED → COMPLETED
+               └→ NOT_DISPATCHED
+                                      ├→ FAILED
+                                      ├→ PAUSED
+                                      ├→ HELD
+                                      └→ CANCELLED
+```
+
+`NOT_DISPATCHED` is infrastructure/admission truth, not a worker verdict. It retires the
+attempt while leaving the logical task eligible for a fenced next generation. Auth,
+provider reachability, coordinator recovery and dispatch failures do not consume a worker
+quality verdict and do not become task-budget usage without provider-measured execution.
+
+### C. Recovery is a cold lane, not the healthy hot path
+
+Healthy execution performs only its ordinary atomic admission/lease write and append-only
+progress/settlement events. It MUST NOT synchronously run a global recovery scan, provider
+probe, topology sweep or recovery lock on every scheduler tick or worker dispatch.
+
+The recovery lane opens only from typed evidence:
+
+- explicit `PAUSED` or `HELD`;
+- coordinator ownership proven dead;
+- lease expiry plus no monotonic progress change across a bounded observation window;
+- typed pre-dispatch/admission failure; or
+- explicit operator recovery request.
+
+Health classification is `HEALTHY | STALLED | ORPHANED | RECOVERABLE |
+UNRECOVERABLE`. Alive-without-progress is `STALLED`, never silently treated as either
+healthy or orphaned.
+
+Recovery follows:
+
+```text
+inspect → classify → propose → approve/auto-authorize-safe-case
+→ CAS recovery claim → quiesce exact attempt → reconcile receipts
+→ redrive recoverable units → resume
+```
+
+Only provably idempotent cases, such as failure before dispatch/side effect, may auto-redrive.
+Unknown process ownership, ambiguous external side effects or competing progress resolve to
+`HOLD`. A recovery owner is fenced; if the original attempt progresses or wins settlement,
+the recovery claim aborts rather than duplicate execution.
+
+### D. Mode adapters
+
+- **Sprint:** adapts checkpoint task graph, FIX lineage and dependency waves. A terminal
+  original attempt is not an active writer; FIX attempts retain canonical kind, provider,
+  backend, scope and budget lineage.
+- **Run / Flow / Do:** Run Flow generation, immutable recovery manifest and CAS settlement
+  are the reference authority. `do` is an ingress adapter, not a separate recovery engine.
+- **Autonomous / Mission:** boot recovery MUST NOT blindly rewrite every `running` item to
+  `pending`. It inspects the bound attempt: live remains running, proven-dead receives a new
+  generation, unknown becomes `HOLD`.
+- **Process:** each backlog/process step binds to the same attempt authority. Resumption
+  starts at the exact next durable step; external effects require idempotency keys or a
+  typed compensation contract.
+
+CLI, terminal, MCP, API and connector surfaces are thin ingress/status adapters per
+ADR-G-011. They call the same runtime preparation and recovery services.
+
+### E. Runtime preparation and deadlines
+
+Initial start and recovery use one shared runtime preparation contract carrying effective
+config digest, provider/auth authority, attendance and approval evidence, acknowledged
+scope, prompt gate, backend, budget and routing decision. Recovery revalidates time-sensitive
+auth/reachability/budget evidence while preserving durable operator decisions; it never
+silently changes provider or widens authority.
+
+Deadlines are distinct and effective-config-driven:
+
+- dispatch deadline: prepared/admitted work that never obtains a dispatch receipt;
+- provider-auth deadline;
+- progress-stall deadline: no monotonic progress/receipt change;
+- execution-budget deadline: legitimate running-worker containment.
+
+A long execution ceiling cannot make a never-dispatched attempt appear active for hours.
+
+### F. Settlement, shutdown and cleanup
+
+Finalize may stamp terminal state only after exact coordinator/worker quiescence is proven.
+Owned termination is bounded `SIGTERM → configured grace → ownership recheck → SIGKILL →
+death proof`. PID/lease authority is cleared only after death proof. PID reuse or
+unverifiable ownership is `HOLD`, not success.
+
+Cleanup is terminal-only. It must reject a live/resumable execution, clear only stale
+ownership-verified projections, preserve immutable receipts/forensics and leave unrelated
+executions untouched. Raw task-directory deletion is not a recovery protocol.
+
+### G. Observability and Nervous
+
+One canonical status joins authority with projections and exposes conflicts. Candidate,
+dependency-blocked, admitted, dispatched and running are different states; only actually
+dispatched workers consume capacity or appear as running.
+
+`STALLED` emits a Nervous recovery proposal containing evidence, proposed actions, risk and
+the exact approval surface. Pause thresholds and retry budgets are effective-config values
+over logical task lineages; attempts/FIX attempts do not inflate task counts.
+
+### H. Acceptance
+
+The cross-mode acceptance matrix covers healthy and injected failures for Sprint, Run,
+Flow, Do, Autonomous and Process:
+
+- pre-prepare and post-prepare/pre-dispatch death;
+- provider auth/reachability failure;
+- alive-but-stalled and proven-dead coordinator;
+- result written with settlement missing;
+- PID reuse / namespace-invisible ownership;
+- competing recovery claimant;
+- external side-effect ambiguity;
+- normal healthy execution with unchanged outcome and no recovery scan/lock on its hot path.
+
+No default recovery automation is enabled until duplicate-write prevention, authority
+fencing, platform adapters and healthy-flow non-regression are binary-proven.
+
+---
+
 ## Consequences
 
 **(+)** Process state is durable, observable, recoverable, and (tomorrow) provider-resilient — the orchestration survives crashes, sleeps, and provider failures. Per-worker live-trace closes the #1 observability gap ("x is doing what, right now?"). Battle-tested core (Sprint 267/270).

@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "61d8186f2f010c1347586333949e09a684323ef5b753922d7f4a39cc07bb4b16"
+    "value": "968fe085cca11813e231d081ec392b4c0ec4797ebfc5a28eb7676f2c26f1c6dd"
   },
   "summary": {
-    "total": 252,
-    "active": 252,
+    "total": 270,
+    "active": 270,
     "terminal": 0,
     "receipts": 21,
     "byState": {
-      "OPEN": 166,
+      "OPEN": 184,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 68,
@@ -21,17 +21,17 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 189,
-      "P1": 47,
+      "P0": 206,
+      "P1": 48,
       "P2": 16
     },
     "byProgram": {
       "API": 5,
-      "ASSURANCE": 2,
-      "AUTHORITY": 20,
+      "ASSURANCE": 3,
+      "AUTHORITY": 22,
       "CODEX": 44,
       "CONNECTOR": 1,
-      "COST": 1,
+      "COST": 2,
       "DASHBOARD": 1,
       "DATA": 1,
       "DESKTOP": 5,
@@ -41,7 +41,7 @@
       "ENTERPRISE": 1,
       "EVAL": 1,
       "EVOLUTION": 1,
-      "KERNEL": 39,
+      "KERNEL": 53,
       "LEARNING": 4,
       "OBS": 1,
       "ONBOARDING": 1,
@@ -1667,7 +1667,7 @@
       "state": "OPEN",
       "updated": "2026-07-30",
       "definitionDigest": "d6baf02b1e771a4bd9a8ae2db9d1e2efb7d7cf056a0b543857e51e80f2cbb98f",
-      "progressDigest": "9241f0cac0b5b9136a4c080f62e0b0815807ca93f28d42d6a8c56e48ab1f331e",
+      "progressDigest": "20ba668c2951e0003e199757e8280301176e98b197329942d563dd737ca0d0a2",
       "terminalClosureDigest": null
     },
     {
@@ -1678,7 +1678,7 @@
       "state": "OPEN",
       "updated": "2026-07-30",
       "definitionDigest": "2228db76b71ae0f677add80fe8d88cbdb198451edb25002c78bc50dacaf38f29",
-      "progressDigest": "95081ae9066adab227ba8baf077441a23905b0a4812323075fd0d5cacdde51d1",
+      "progressDigest": "3450ca13ee7143b1d93fe55f8b37807f082c636e6bb180d880ace094c439446a",
       "terminalClosureDigest": null
     },
     {
@@ -1689,7 +1689,7 @@
       "state": "OPEN",
       "updated": "2026-07-30",
       "definitionDigest": "eb2938a81f0da3f5267d4e313e4f53cbb81ef998c85029823f4bea6fe2d6accf",
-      "progressDigest": "4dfb33208813cfce08083f1dc8071deb02033734db92a7eea0d59631d8548159",
+      "progressDigest": "1907f5eaa23097339be8c0f024fe3b405bead4767cd0ebe47fc9fa24891d0575",
       "terminalClosureDigest": null
     },
     {
@@ -1722,7 +1722,7 @@
       "state": "OPEN",
       "updated": "2026-07-30",
       "definitionDigest": "53c78c82e17ad7fade798fdf959e7ca0b5abb308fe80caafac7cb01c33ddad7e",
-      "progressDigest": "9d924ffa4d85d3a614f7b38fa8f2c1602a8996222b595d15f5f06feade5ce217",
+      "progressDigest": "12677e551194e9b6cf4fa22a79e31ee2aebe31d45d00dab9c8fa388f58e4ce7d",
       "terminalClosureDigest": null
     },
     {
@@ -1748,6 +1748,105 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 3171,
+      "id": "RECOVERY-BORN-480-HEARTBEAT-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "f8a1ee26033cacb909049942436782bd0147057cdfd49f2cdbfa430a30023273",
+      "progressDigest": "043b6818bca42cb620e8eed0cf2723447eea8321525d905eb411b543cb598dd5",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3172,
+      "id": "RECOVERY-BORN-480-SCOPE-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-30",
+      "definitionDigest": "3e7a724cb2444077e3a80da6fc7f9d4e58442755bc96a43fdf9a51c3ac936865",
+      "progressDigest": "323e6859bf72e75524c439d363c7b96167efafef970bcce2ff66064deba0bc66",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3173,
+      "id": "RECOVERY-BORN-480-HOLD-CLASSIFICATION-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-30",
+      "definitionDigest": "eb9e7b2872955c1ca557efdbcdc473e4b6b128f2d3d5f1dcc34bffbffd265abe",
+      "progressDigest": "1693357963b535373e367fce90437012780630a9b9fabc9d7e88eec174942758",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3174,
+      "id": "RECOVERY-BORN-480-EVALUATE-ORPHAN-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-30",
+      "definitionDigest": "04f432bd563e118a818d966a21c02157a398fe00abd172bafbcb8e89ffb64706",
+      "progressDigest": "9ff68a97ae768d38cde8854b17cd485e5e12cbf95fca867af3f1e2ca5797aea3",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3175,
+      "id": "RECOVERY-BORN-480-ATTRIBUTION-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "b6dd8ceed649e391a98858b21a9376a0d148c9a3d6907a1d8f192707483a19be",
+      "progressDigest": "34bd2a2fff5aa989d1657be3490f3b3f87b8bfef956a6d5d10a16840a16fb7a5",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3176,
+      "id": "RECOVERY-BORN-480-FIX-PRIORITY-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-30",
+      "definitionDigest": "cceda5aa6c2d102b4024f6f1a1837f3ec0c9b150d79eee4c4f1119a65db93609",
+      "progressDigest": "4364e2140d775ebe06ae6675943bd613e3290cbdec4e56779d03a16cae7a377c",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3177,
+      "id": "RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "249359322a5ceafe327ff34ca26c54dd760e6d3843b0ff1fe37eed9f51b95fcb",
+      "progressDigest": "b35981a767116abb978cb526ee89749aea0f3b942ff9cc5d159df9524d7f1630",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3178,
+      "id": "RECOVERY-DO-DOGFOOD-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-30",
+      "definitionDigest": "eb3c4e7d495fd76e57ba08766033a3377e6e5c28d132a2dd38fa62fd2051c273",
+      "progressDigest": "b5cbd3478b7752f7d474f672983cf7b8f35a4670288250f26e2fa178be6ffd62",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3179,
+      "id": "RECOVERY-BORN-480-POSTBUILD-BINARY-001",
+      "program": "ASSURANCE",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "fb79d5712b9aee64f230d4dd343eaac6392296f148de30c680ec6a107eab2b25",
+      "progressDigest": "4afef1502b5a055d24cbd3aa82ee08e705096523c9914fc42e78d52f9dc7d840",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 3180,
       "id": "DO-CUTOVER-001",
       "program": "KERNEL",
@@ -1756,6 +1855,105 @@
       "updated": "2026-07-27",
       "definitionDigest": "586e3d199ac829d255df56cb160a7d98744b77dfc96a6fe04a0d93df190513e1",
       "progressDigest": "7832b2fb97e9adcb8728206c9f3e855d90c8cbc0c03881178e29b643d3235bdd",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3181,
+      "id": "RECOVERY-BORN-481-EXACT-PROVIDER-PROJECTION-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "96d73d15d16dbfa660aaf62b60bacbcfa5cb5cc4eb1f6179fd552cf6d04c80da",
+      "progressDigest": "138db2c5d66455b4639b3acf6b9f10b77d5e47dca8efe031fc511156b74c5cb6",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3182,
+      "id": "RECOVERY-BORN-481-FAILED-RUN-STATUS-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "15a2ea2964e399c41d8188aa25cb58d0e89ab1931d02a4aba81424487cee0f02",
+      "progressDigest": "59de3c408f401bab1ed76fb3ac0b9fbae8bfa470d6760ec699d6425fdb5486e1",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3183,
+      "id": "RECOVERY-BORN-481-DO-PREVIEW-APPROVAL-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "17bfe806343bc4d6143d5bc3e930086d97fb8a10a4e63c321a809beb43f46689",
+      "progressDigest": "5c5ba87e10f5eec7163e9587d27199b8483f2c75b27dfd104a7988f325718678",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3184,
+      "id": "RECOVERY-BORN-481-GATE-TRUTH-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "7683b8edda4dc89d9cc7062e7767ef7739f235a999e1dfe121a356b2aea0b45b",
+      "progressDigest": "d25c733feaa7b0c2e9e78916ff10b3a24ff32830365b323cc06e16ecd08e8920",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3185,
+      "id": "RECOVERY-BORN-482-CLOSED-SCOPE-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "130286ccf29f59d9d19b4d05ce2b45788a7dd5477bf822eeb7b9170790cf9e98",
+      "progressDigest": "333d5b90d8eb0478f3b79c3a3f090995ee7329742843c893e4027fac9617d63c",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3186,
+      "id": "RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "880625fb14f34c4b8ea398812fe66dbf862de1346e5a2d111b6c88faabc33fa3",
+      "progressDigest": "4b740ac6878dc32f4fbdf93398a1cbee7e9afd92da9a9e1b5ffba16d3e99f73e",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3187,
+      "id": "RECOVERY-BORN-482-FIX-AUTHORITY-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "f83bcf67f4a1cb8f7df5db21c035f003be719d5c0b597221c2406fa5822fc52b",
+      "progressDigest": "a0682a891568dde8135ae454a36e23867ffe6b9ef000ca13e52f5349aa7dcb09",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3188,
+      "id": "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "02e1471242c78b687f7148492c97457b2e526de5533817b18d0f804fca9f567c",
+      "progressDigest": "6a42aafd256a02ab251ce021c8260b8c35fcabbf7da98e272374f201c13d3a00",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3189,
+      "id": "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001",
+      "program": "COST",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-07-31",
+      "definitionDigest": "34cb1021a6e863e7734b8643eb7e56553bd35b05e6c37d2f383844ddfdc88450",
+      "progressDigest": "186312d8c561006e70f87730074119b4a9f5bbb7eac466328ef665865de94da3",
       "terminalClosureDigest": null
     },
     {
@@ -3322,6 +3520,7 @@
         "CODEX-C5",
         "CODEX-MAIN-001",
         "KERNEL-001",
+        "RECOVERY-BORN-480-POSTBUILD-BINARY-001",
         "TRUTH-BASELINE-001"
       ],
       "children": [],
@@ -4151,7 +4350,9 @@
       "dependsOn": [
         "KERNEL-ONTOLOGY-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-BORN-481-GATE-TRUTH-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -8631,6 +8832,7 @@
       "dependsOn": [],
       "dependents": [
         "PAUSED-FINALIZE-001",
+        "RECOVERY-BORN-481-FAILED-RUN-STATUS-001",
         "RECOVERY-RESUME-001",
         "STATUS-SURFACE-PARITY-001"
       ],
@@ -8730,6 +8932,11 @@
         "DOC-IMPACT-001",
         "EVALUATION-001",
         "GOAL-ACCEPTANCE-001",
+        "RECOVERY-BORN-480-ATTRIBUTION-001",
+        "RECOVERY-BORN-480-EVALUATE-ORPHAN-001",
+        "RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001",
+        "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
+        "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001",
         "RECOVERY-DECISION-001",
         "RECOVERY-STALE-PROJECTION-001",
         "RESULT-INGEST-001",
@@ -9100,6 +9307,10 @@
       ],
       "dependents": [
         "DO-CUTOVER-001",
+        "RECOVERY-BORN-481-DO-PREVIEW-APPROVAL-001",
+        "RECOVERY-BORN-481-EXACT-PROVIDER-PROJECTION-001",
+        "RECOVERY-BORN-481-FAILED-RUN-STATUS-001",
+        "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
         "RECOVERY-MODE-ADAPTERS-001"
       ],
       "children": [],
@@ -9142,7 +9353,10 @@
       "dependsOn": [
         "KERNEL-ATTEMPT-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-BORN-480-FIX-PRIORITY-001",
+        "RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001"
+      ],
       "children": [],
       "gates": [
         "G2",
@@ -9321,7 +9535,10 @@
       "dependsOn": [
         "RUN-STATUS-AUTHORITY-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001",
+        "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -9360,6 +9577,8 @@
         "KERNEL-SETTLEMENT-001"
       ],
       "dependents": [
+        "RECOVERY-BORN-480-EVALUATE-ORPHAN-001",
+        "RECOVERY-BORN-480-HEARTBEAT-001",
         "RECOVERY-COMMAND-SERVICE-001",
         "RECOVERY-MODE-ADAPTERS-001",
         "RECOVERY-STALE-PROJECTION-001",
@@ -9371,12 +9590,12 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
-        "X": "?",
+        "X": "0",
         "S": "?"
       },
       "blockerCode": null,
@@ -9385,11 +9604,9 @@
         "KERNEL-ATTEMPT-001",
         "KERNEL-SETTLEMENT-001"
       ],
-      "evidenceReceipts": [
-        "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
-      ],
+      "evidenceReceipts": [],
       "acceptance": "One pure decision authority maps exact attempt, lease, process, progress and settlement evidence to HEALTHY, STALLED, ORPHANED, NOT_DISPATCHED, PAUSED, HELD, SAFE_TO_RESUME or SAFE_TO_FINALIZE; healthy scheduling performs no global scan, provider probe or recovery lock",
-      "evidence": "`receipt=GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01`; accepted ADR-G-025 amendment defines the state vocabulary and cold-lane trigger boundary; implementation and proof are intentionally unclaimed",
+      "evidence": "Sprint-480 manual recovery completed the pure bounded decision vocabulary, exact attempt/fence contradiction checks, paused permit ordering, abort/terminate authorization and effect derivation; targeted core/adapter/service proof plus `scripts/verify-recovery-hot-path.mjs` pass. Fresh live provider, every-environment and scale proof remain open, so this remains OPEN rather than claiming closure",
       "updated": "2026-07-30"
     },
     {
@@ -9413,12 +9630,12 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
-        "X": "?",
+        "X": "0",
         "S": "?"
       },
       "blockerCode": null,
@@ -9428,11 +9645,9 @@
         "MISSION-KIND-001",
         "RUNFLOW-001"
       ],
-      "evidenceReceipts": [
-        "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
-      ],
+      "evidenceReceipts": [],
       "acceptance": "Every execution mode translates native evidence into the shared decision contract and applies only fenced mode effects; no adapter owns a competing lifecycle state machine or silently replays an unknown attempt",
-      "evidence": "`receipt=GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01`; Sprint authority foundations exist, while the shared adapter contract and non-Sprint adapters are not born in code",
+      "evidence": "Sprint, RunFlow and RunJob adapters plus identity/capability guards and typed async effect failure are code-present and hermetically proven. Do, Autonomous, Mission and Process production adapters, native Windows/OCI effect adapters and live cutover remain open",
       "updated": "2026-07-30"
     },
     {
@@ -9448,7 +9663,11 @@
         "APPROVAL-001"
       ],
       "dependents": [
-        "RECOVERY-ASSURANCE-001"
+        "RECOVERY-ASSURANCE-001",
+        "RECOVERY-BORN-480-HOLD-CLASSIFICATION-001",
+        "RECOVERY-BORN-480-SCOPE-001",
+        "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
+        "RECOVERY-DO-DOGFOOD-001"
       ],
       "children": [],
       "gates": [
@@ -9456,12 +9675,12 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
-        "L": "0",
-        "X": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "0",
         "S": "?"
       },
       "blockerCode": null,
@@ -9471,11 +9690,9 @@
         "RECOVERY-RESUME-001",
         "APPROVAL-001"
       ],
-      "evidenceReceipts": [
-        "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
-      ],
+      "evidenceReceipts": [],
       "acceptance": "CLI, MCP, Terminal, Desktop, API, connectors and Nervous invoke one typed service; resume always creates or adopts an exact fenced generation and failed continuation preserves prior authority",
-      "evidence": "`receipt=GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01`; current sprint-specific recover/resume and status surfaces are evidence inputs, not cross-surface closure",
+      "evidence": "Sprint-480 recovery added an exact identity/generation/fence/idempotency application service, canonical CLI/MCP Sprint settlement operation and durable Nervous recovery request/accept/reject API. CLI and MCP no longer maintain competing cleanup algorithms; real compiled CLI dry-run is read-only. Terminal/Desktop/API/connectors, durable production persistence composition and all-mode continuation remain open",
       "updated": "2026-07-30"
     },
     {
@@ -9490,7 +9707,8 @@
         "RUNNER-PROTOCOL-001"
       ],
       "dependents": [
-        "RECOVERY-ASSURANCE-001"
+        "RECOVERY-ASSURANCE-001",
+        "RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001"
       ],
       "children": [],
       "gates": [
@@ -9531,7 +9749,9 @@
         "KERNEL-SETTLEMENT-001"
       ],
       "dependents": [
-        "RECOVERY-ASSURANCE-001"
+        "RECOVERY-ASSURANCE-001",
+        "RECOVERY-BORN-480-EVALUATE-ORPHAN-001",
+        "RECOVERY-BORN-481-FAILED-RUN-STATUS-001"
       ],
       "children": [],
       "gates": [
@@ -9573,18 +9793,20 @@
         "RECOVERY-TERMINATION-001",
         "RECOVERY-STALE-PROJECTION-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-BORN-480-POSTBUILD-BINARY-001"
+      ],
       "children": [],
       "gates": [
         "G1"
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
-        "L": "0",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
         "X": "0",
         "S": "?"
       },
@@ -9596,11 +9818,9 @@
         "RECOVERY-TERMINATION-001",
         "RECOVERY-STALE-PROJECTION-001"
       ],
-      "evidenceReceipts": [
-        "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
-      ],
+      "evidenceReceipts": [],
       "acceptance": "Auth absence, provider unreachability, pre-dispatch death, malformed/partial result, stalled coordinator, ignored SIGTERM, PID reuse, stale dashboard, generation conflict and cleanup-during-live cases have deterministic hermetic and real-binary proof across Linux, macOS, Windows native, WSL and declared OCI/remote adapters with bounded load thresholds",
-      "evidence": "`receipt=GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01`; targeted Sprint Linux/WSL-host evidence exists, but the declared assurance matrix is unproven",
+      "evidence": "Sprint-480 adds deterministic adversarial classification, PID-reuse/ignored-termination fail-closed proof, live-cleanup refusal, healthy-hot-path zero-effect proof, read-only verifier and isolated async real-binary CLI evidence on the current Linux/WSL host. Native macOS/Windows, OCI/remote, HA/load and million-scale proof remain open",
       "updated": "2026-07-30"
     },
     {
@@ -9612,7 +9832,26 @@
       "priority": "P0",
       "dependsOn": [],
       "dependents": [],
-      "children": [],
+      "children": [
+        "RECOVERY-BORN-480-HEARTBEAT-001",
+        "RECOVERY-BORN-480-SCOPE-001",
+        "RECOVERY-BORN-480-HOLD-CLASSIFICATION-001",
+        "RECOVERY-BORN-480-EVALUATE-ORPHAN-001",
+        "RECOVERY-BORN-480-ATTRIBUTION-001",
+        "RECOVERY-BORN-480-FIX-PRIORITY-001",
+        "RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001",
+        "RECOVERY-DO-DOGFOOD-001",
+        "RECOVERY-BORN-480-POSTBUILD-BINARY-001",
+        "RECOVERY-BORN-481-EXACT-PROVIDER-PROJECTION-001",
+        "RECOVERY-BORN-481-FAILED-RUN-STATUS-001",
+        "RECOVERY-BORN-481-DO-PREVIEW-APPROVAL-001",
+        "RECOVERY-BORN-481-GATE-TRUTH-001",
+        "RECOVERY-BORN-482-CLOSED-SCOPE-001",
+        "RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001",
+        "RECOVERY-BORN-482-FIX-AUTHORITY-001",
+        "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
+        "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -9628,7 +9867,26 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [],
+      "closureBlockedBy": [
+        "RECOVERY-BORN-480-HEARTBEAT-001",
+        "RECOVERY-BORN-480-SCOPE-001",
+        "RECOVERY-BORN-480-HOLD-CLASSIFICATION-001",
+        "RECOVERY-BORN-480-EVALUATE-ORPHAN-001",
+        "RECOVERY-BORN-480-ATTRIBUTION-001",
+        "RECOVERY-BORN-480-FIX-PRIORITY-001",
+        "RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001",
+        "RECOVERY-DO-DOGFOOD-001",
+        "RECOVERY-BORN-480-POSTBUILD-BINARY-001",
+        "RECOVERY-BORN-481-EXACT-PROVIDER-PROJECTION-001",
+        "RECOVERY-BORN-481-FAILED-RUN-STATUS-001",
+        "RECOVERY-BORN-481-DO-PREVIEW-APPROVAL-001",
+        "RECOVERY-BORN-481-GATE-TRUTH-001",
+        "RECOVERY-BORN-482-CLOSED-SCOPE-001",
+        "RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001",
+        "RECOVERY-BORN-482-FIX-AUTHORITY-001",
+        "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
+        "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001"
+      ],
       "evidenceReceipts": [
         "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
       ],
@@ -9674,6 +9932,353 @@
       "updated": "2026-07-27"
     },
     {
+      "order": 3171,
+      "id": "RECOVERY-BORN-480-HEARTBEAT-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Worker-writable heartbeat can regress monotonic recovery evidence",
+      "priority": "P0",
+      "dependsOn": [
+        "WORKER-REGISTRY-001",
+        "RECOVERY-DECISION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "WORKER-REGISTRY-001",
+        "RECOVERY-DECISION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Heartbeat publication has one fenced writer or monotonic CAS; a worker cannot lower sequence, forge wall time or overwrite wrapper authority; regressions become typed contradictory evidence without hiding a live process",
+      "evidence": "Sprint-480 task 480-004 overwrote wrapper heartbeat sequence `80+` with `sequence=1` and hardcoded `2026-07-30T00:10:00.000Z` while host time was approximately `2026-07-30T19:47Z`; wrapper later projected sequence `111`, proving split writers. Sprint-482 reproduced the same split writer: Docker wrapper heartbeats reached sequence `7+`, worker-authored task heartbeats restarted at sequence `1`, and the wrapper later advanced again. Affected product and dogfood surfaces: Worker registry, status, recovery decision and Docker wrapper. Negative scope: no PID/time-only orphan verdict, no broad `.tasks` cleanup, no provider replay",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3172,
+      "id": "RECOVERY-BORN-480-SCOPE-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Dependency output is unreachable from downstream recovery surface read scope",
+      "priority": "P0",
+      "dependsOn": [
+        "PLANNER-001",
+        "RECOVERY-COMMAND-SERVICE-001"
+      ],
+      "dependents": [
+        "RECOVERY-BORN-482-FIX-AUTHORITY-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PLANNER-001",
+        "RECOVERY-COMMAND-SERVICE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Planner derives an explicit bounded read grant for canonical dependency outputs while preserving the authored write set; CLI/MCP recovery tasks can import the exact shared service they depend on without repository-wide discovery or inferred symbols",
+      "evidence": "Sprint-480 task 480-006 depends transitively on task 480-003's `src/orchestra/execution-recovery-service.ts` but its read scope contains only CLI/MCP directories; `.tasks/task-480-006.result` therefore records an honest scope blocker and `NO_GO` at `2026-07-30T19:51:15Z`. Affected product and dogfood surfaces: planner, dependency graph, worker prompt and CLI/MCP recovery. Negative scope: no unrestricted repo read/write, no write-scope widening, no surface-owned recovery decision",
+      "updated": "2026-07-30"
+    },
+    {
+      "order": 3173,
+      "id": "RECOVERY-BORN-480-HOLD-CLASSIFICATION-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Scope failure is misclassified as provider usage-limit hold",
+      "priority": "P0",
+      "dependsOn": [
+        "PROVIDER-HOLD-001",
+        "RECOVERY-COMMAND-SERVICE-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PROVIDER-HOLD-001",
+        "RECOVERY-COMMAND-SERVICE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Failure classification is evidence-typed before hold publication; planner/scope/code failures remain task or dependency repair outcomes and never quarantine an otherwise reachable provider; only authoritative provider usage evidence can emit `usage-limit`",
+      "evidence": "Sprint-480 event sequence 18 emitted a false Codex usage hold for 480-006 despite 242,454 input tokens, 5,293 output tokens and a written source diff. Result classification now treats any real token/file/line production as executed work before provider-failure classification; focused regression passes. Fresh live mixed-provider replay remains open",
+      "updated": "2026-07-30"
+    },
+    {
+      "order": 3174,
+      "id": "RECOVERY-BORN-480-EVALUATE-ORPHAN-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "EVALUATE lock can strand NO_GO without FIX or truthful recovery command",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-DECISION-001",
+        "RECOVERY-STALE-PROJECTION-001",
+        "KERNEL-SETTLEMENT-001"
+      ],
+      "dependents": [
+        "RECOVERY-BORN-480-FIX-PRIORITY-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-DECISION-001",
+        "RECOVERY-STALE-PROJECTION-001",
+        "KERNEL-SETTLEMENT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Exact coordinator/process identity and evaluate-lock progress decide HEALTHY, STALLED or ORPHANED; a durable NO_GO produces exactly one repair decision or resumable HOLD; status never reports coordinator alive or active non-resumable execution from stale PID/state alone",
+      "evidence": "Sprint-480 root cause was a priority inversion: dependency-blocked 480-007 preceded appended 480-006-fix in shared-write serialization, consumed the collision winner and prevented every fix spawn. Pending priority fixes now lead collision arbitration, blocked writers no longer consume worker slots and dashboard agents derive only from successful spawns; focused live-wire proof passes. Full EVALUATE no-progress→Nervous→resume settlement and fresh dogfood replay remain open",
+      "updated": "2026-07-30"
+    },
+    {
+      "order": 3175,
+      "id": "RECOVERY-BORN-480-ATTRIBUTION-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Shared-worktree predecessor diff is attributed to a later failed attempt",
+      "priority": "P0",
+      "dependsOn": [
+        "KERNEL-SETTLEMENT-001",
+        "WORKER-REGISTRY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "KERNEL-SETTLEMENT-001",
+        "WORKER-REGISTRY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Attempt settlement binds files and bytes to its claim-time baseline and exact writer evidence; unchanged predecessor work is excluded from `filesChanged`; ambiguous ownership yields typed HOLD rather than a fabricated author claim",
+      "evidence": "Sprint-480 task 480-006 reports `src/cli/commands/recover.ts` with 24 additions/6 removals although that diff was authored by completed predecessor 480-004 before 006 dispatch; 006 produced no required MCP/test artifact and self-assessed `NO_GO`. Sprint-482 task 482-002-fix made no source change yet claimed the same six predecessor files and `213/289` lines; 482-002-fix-fix again inherited the whole shared diff and claimed `257/289`. Affected product and dogfood surfaces: result wrapper, scope baseline, evaluator, cost/quality metrics and promotion memory. Negative scope: no rewriting predecessor results, no ownership inference from final `git diff`, no shared-tree cleanup",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3176,
+      "id": "RECOVERY-BORN-480-FIX-PRIORITY-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Priority FIX must outrank blocked dependants in collision and slot admission",
+      "priority": "P0",
+      "dependsOn": [
+        "SCHEDULER-001",
+        "RECOVERY-BORN-480-EVALUATE-ORPHAN-001"
+      ],
+      "dependents": [
+        "RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001",
+        "RECOVERY-BORN-482-FIX-AUTHORITY-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "SCHEDULER-001",
+        "RECOVERY-BORN-480-EVALUATE-ORPHAN-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Appended priority FIX wins shared-write serialization before its blocked dependants; blocked tasks remain queued, free slots fill from dispatchable work and dashboard never projects an unspawned worker as EXECUTING",
+      "evidence": "Sprint-480 480-006-fix existed but never spawned because 480-007 won the shared `messages.ts` collision while its dependency was unsatisfied. Scheduler now stable-partitions priority fixes, filters blocked work before worker-ceiling slicing, retains blocked queue entries and renders only successfully spawned agents; focused collision/slot tests pass; fresh live replay remains open",
+      "updated": "2026-07-30"
+    },
+    {
+      "order": 3177,
+      "id": "RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Force-finalize must retire or contain every matching recovery coordinator",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-TERMINATION-001",
+        "PAUSED-FINALIZE-001"
+      ],
+      "dependents": [
+        "RECOVERY-DO-DOGFOOD-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-TERMINATION-001",
+        "PAUSED-FINALIZE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Force-finalize exact-sprint settlement cannot return terminal while a matching resume/recovery coordinator remains alive; death, ownership-HOLD or explicit external authority is part of the same receipt",
+      "evidence": "Sprint-480 force-finalize produced canonical COMPLETE but left the exact `deckent resume sprint-480` coordinator alive until the supervising session sent SIGINT and verified exit. Sprint-481 recurrence proved the other polarity: `deckent finalize --sprint sprint-481 --force` printed Complete and generated terminal docs/dashboard, but canonical status remained ORPHANED/resumable because `.deckent/sprint-state.json` stayed `PLANNING:SPAWN`; the build clean gate then correctly HOLDed on that authority plus three missing task receipts. Sprint-482 normal auto-finalization published canonical COMPLETE with `coordinator=absent` at `07:39:37Z` while exact PID 4159580 remained alive during the configured 180-second delayed cleanup and exited only at `07:42:37Z`; `runSprint:activeResourcesAtExit` and `lingerProbe` both reported `Timeout`, extending the same containment defect beyond the force surface. The finalize adapter and controller settlement must use the same ownership-fenced recovery operation and real-binary proof must show process death precedes terminal/non-active publication. Negative scope: no broad process-name kill, no PID-only signal, no clearing foreign generation authority, no second recovery service/store",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3178,
+      "id": "RECOVERY-DO-DOGFOOD-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Next recovery slice through canonical `do` journey before Autonomous widening",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-COMMAND-SERVICE-001",
+        "DO-CUTOVER-001",
+        "RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-COMMAND-SERVICE-001",
+        "DO-CUTOVER-001",
+        "RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "One bounded provider-neutral recovery slice is proposed, previewed, approved, executed and settled through `deckent do`; Sol supervision captures authority, prompt, usage, diff, Nervous and receipt evidence; any finding is born-first; no direct Sprint start fallback unless typed recovery is required",
+      "evidence": "Next dogfood choice is `do`, not Autonomous: current AUTONOMY-CUTOVER-001 is blocked by Goal-v2/provider authority, while `do` is the narrower canonical intent→preview→approval journey. First slice targets force-finalize coordinator containment plus CLI/MCP/Nervous parity; after successful settlement, a separate Autonomous docs-only canary may be admitted",
+      "updated": "2026-07-30"
+    },
+    {
+      "order": 3179,
+      "id": "RECOVERY-BORN-480-POSTBUILD-BINARY-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "ASSURANCE",
+      "outcome": "Immediate post-build recovery binary proof can exit zero with empty stdout",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-ASSURANCE-001",
+        "TEST-676"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-ASSURANCE-001",
+        "TEST-676"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "`npm run build` followed immediately by the isolated recovery binary test deterministically emits the typed JSON payload; exit-zero/empty-output is forbidden; no sleep, retry masking or mock-only substitution",
+      "evidence": "The initial dogfood saw two same-shell `build && vitest` observations return child exit 0 with empty stdout before a standalone rerun passed. On 2026-07-31, after a clean successful build, the isolated test failed twice consecutively with the same `code=0/stdout=\"\"/stderr=\"\"`, while an exact manual fixture using the same built `dist/cli/entry.js`, cwd shape and sanitized environment emitted the expected typed JSON. This narrows the unresolved authority interaction to the Vitest child-entry context rather than the recovery command itself. Negative scope: no timing sleep, no retry masking, no accepting empty output, no provider call",
+      "updated": "2026-07-31"
+    },
+    {
       "order": 3180,
       "id": "DO-CUTOVER-001",
       "parent": "KERNEL-001",
@@ -9685,6 +10290,11 @@
         "PLANNER-001"
       ],
       "dependents": [
+        "RECOVERY-BORN-481-DO-PREVIEW-APPROVAL-001",
+        "RECOVERY-BORN-481-EXACT-PROVIDER-PROJECTION-001",
+        "RECOVERY-BORN-481-GATE-TRUTH-001",
+        "RECOVERY-BORN-482-CLOSED-SCOPE-001",
+        "RECOVERY-DO-DOGFOOD-001",
         "SURFACE-CUTOVER-001",
         "TERMINAL-DEV-001"
       ],
@@ -9713,6 +10323,365 @@
       "acceptance": "Golden-flow compatibility retired by evidence; interactive and non-interactive approval exact",
       "evidence": "2026-07-27 code-truth: CLI prompt/topology/scope fail'lerini bloklarken Terminal card/controller yalnız topology gate ediyor; preview dry-run Brain debt state'ini mutate edebilir; execution canonical proof değil",
       "updated": "2026-07-27"
+    },
+    {
+      "order": 3181,
+      "id": "RECOVERY-BORN-481-EXACT-PROVIDER-PROJECTION-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Digest-bound provider derivation cannot create post-approval task artifact drift",
+      "priority": "P0",
+      "dependsOn": [
+        "RUNFLOW-001",
+        "DO-CUTOVER-001",
+        "AUTHORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RUNFLOW-001",
+        "DO-CUTOVER-001",
+        "AUTHORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "The approved task projection materializes every digest-bound execution field needed at spawn; routing the exact plan is canonical-idempotent and preserves byte/semantic equality; any non-derived provider change still fails `EXACT_PLAN_TASK_ARTIFACT_DRIFT` before dispatch",
+      "evidence": "Do job `dfe8c9e3-cdb0-4bd1-9f44-cf6d061db487`, plan digest `fb8351204e7b15398abc8d69e58f234a434ba6cea79e6b24a1462c420d094cbf`, created sprint-481 and failed at SPAWN before worker birth. Approved snapshot and disk tasks were equal; `routeSprintTasks` then added `provider=codex` to all three in-memory tasks, making spawn authority reject its own deterministic derivation. The execution boundary now bypasses the mutable legacy router only for digest-bound exact authority; legacy routing/fallback remains unchanged. Focused exact/legacy/provider tests pass 20/20, controller tests pass 166/166 and the full TypeScript/lint gate passes. Fresh built-binary Do replay remains required. Affected product and dogfood surfaces: RunFlow exact approval, Do, routing, task artifacts and spawn. Negative scope: no ignored provider field, no weakened equality, no post-approval mutation exemption, no provider-specific contract",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3182,
+      "id": "RECOVERY-BORN-481-FAILED-RUN-STATUS-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "RUN_FAILED and dead coordinator reconcile to one truthful terminal or recoverable status",
+      "priority": "P0",
+      "dependsOn": [
+        "RUN-STATUS-AUTHORITY-001",
+        "RECOVERY-STALE-PROJECTION-001",
+        "RUNFLOW-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RUN-STATUS-AUTHORITY-001",
+        "RECOVERY-STALE-PROJECTION-001",
+        "RUNFLOW-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "A pre-dispatch coordinator failure atomically publishes one exact failed settlement and retires live PID/dashboard projections; CLI, MCP, RunFlow and recovery inspect agree on dead/alive, ACTIVE/terminal and resumability without deleting forensic task artifacts",
+      "evidence": "Sprint-481 flow events contain `RUN_STARTED` then `RUN_FAILED`; coordinator PID 4088220 with start token `s42674743` died with no heartbeat, result, log or worker container, but its fresh PID snapshot kept status falsely ACTIVE for the 120-second namespace lease. After lease expiry the existing compiled CLI correctly projects ORPHANED/resumable and recovery dry-run preserves all three task artifacts. SPAWN retry exhaustion now calls one authority-retirement seam after partial-worker containment: owned sprint lock plus PID/snapshot are retired immediately, while sprint-state/checkpoint/dashboard/task evidence remains for ORPHANED recovery. Focused authority/status/exact wire tests pass 15/15 and TypeScript passes; fresh built-binary immediate-failure replay and real MCP parity remain required. Affected product and dogfood surfaces: status, RunFlow settlement, PID projection, dashboard and recovery. Negative scope: no PID-only success inference, no synthetic COMPLETE, no cleanup or evidence deletion",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3183,
+      "id": "RECOVERY-BORN-481-DO-PREVIEW-APPROVAL-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "AUTHORITY",
+      "outcome": "Do preview approval executes the same immutable proposal instead of replanning",
+      "priority": "P0",
+      "dependsOn": [
+        "DO-CUTOVER-001",
+        "RUNFLOW-001",
+        "APPROVAL-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "DO-CUTOVER-001",
+        "RUNFLOW-001",
+        "APPROVAL-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "A dry-run preview yields a durable exact proposal reference that the owner can approve and run unchanged; revision, digest, scope, topology, lineage and task bytes remain identical, while expiry or source change requires an explicit new proposal",
+      "evidence": "The refined valid host preview produced digest `4a7e487845b0…`, but `deckent do --run --yes` replanned to `4564ee…`, and the next corrected run replanned again to `fb8351204e7b…`. The RunFlow Do adapter no longer rejects a dry-run proposal; it leaves the durable flow in `AWAITING_APPROVAL` and prints `deckent runs <flowId> --approve --start`, whose shared decision/start services consume the same stored revision and digest. The legacy flag-off golden-flow path is unchanged. Focused Do/RunFlow tests pass 22/22; fresh built-binary cross-invocation proof remains required. Affected product and dogfood surfaces: Do CLI, ApprovalBroker, RunFlow proposal store and operator trust. Negative scope: no implicit approval of a replacement digest, no text-intent equivalence, no surface-local approval cache",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3184,
+      "id": "RECOVERY-BORN-481-GATE-TRUTH-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Scope-gate rejection cannot be reported as a zero-blocker prompt-gate failure",
+      "priority": "P1",
+      "dependsOn": [
+        "DO-CUTOVER-001",
+        "PLANNER-001",
+        "ZERO-HARDCODE-FLOW-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "DO-CUTOVER-001",
+        "PLANNER-001",
+        "ZERO-HARDCODE-FLOW-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Every rejected Do plan returns one typed primary gate, non-contradictory policy verdict, localized evidence and actionable remediation across CLI and machine-readable surfaces; zero blockers is never printed for a blocking scope decision",
+      "evidence": "The first host `--run --yes` attempt emitted `GATE: BAŞARISIZ`, `POLİTİKA: REDDET` and three scope findings, then terminated with `Prompt-gate: 0 engelleyici bulgu`. The CLI now evaluates the typed scope result before the aggregate gate result, so scope denial emits `do.scope_gate_blocked` with its exact message and `--force-scope` remedy instead of a fabricated zero-finding prompt verdict; unavailable scope evidence remains fail-closed for exact authority. Focused scope/Do tests pass 22/22; fresh built-binary TR/EN and machine-surface proof remain required. Affected product and dogfood surfaces: Do CLI, scope/prompt gates, policy receipt, i18n and automation parsing. Negative scope: no string-only masking, no collapsing distinct gates, no success exit on rejection",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3185,
+      "id": "RECOVERY-BORN-482-CLOSED-SCOPE-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "AUTHORITY",
+      "outcome": "Exact closed write allowlist is enforced before task artifact creation or dispatch",
+      "priority": "P0",
+      "dependsOn": [
+        "PLANNER-001",
+        "AUTHORITY-001",
+        "DO-CUTOVER-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PLANNER-001",
+        "AUTHORITY-001",
+        "DO-CUTOVER-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "A digest-bound proposal that forbids new paths can materialize only existing allowlisted `filesWrite` entries; any planner-added absent path blocks preview or requires a new explicitly approved revision, and prompt-lint cannot downgrade the violation to a warning",
+      "evidence": "Flow `64b619e2-2ced-4c20-b162-e4c9c914c475`, revision 1, digest `581fc20e…` explicitly closed the write set and forbade new files. Scope gate still passed; prompt-lint only warned for absent `tests/orchestra/sprint-recovery-operation.test.ts` and `tests/cli/commands/finalize.test.ts`, then workers created both. Affected product and dogfood surfaces: Do preview, exact-plan digest, planner, scope gate, worker authority and operator approval. Negative scope: no repository-wide existence scan on healthy dispatch, no implicit `--force-scope`, no post-approval allowlist mutation",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3186,
+      "id": "RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Dependency release consumes aggregate evaluated settlement, not raw result presence",
+      "priority": "P0",
+      "dependsOn": [
+        "KERNEL-SETTLEMENT-001",
+        "SCHEDULER-001",
+        "RECOVERY-BORN-480-FIX-PRIORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "KERNEL-SETTLEMENT-001",
+        "SCHEDULER-001",
+        "RECOVERY-BORN-480-FIX-PRIORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "A child becomes dispatchable only after every dependency logical lineage has one aggregate terminal receipt accepted as DONE or allowed debt; raw `.result`, worker exit and pre-evaluation status cannot release the edge; generated FIX attempts remain inside the parent lineage",
+      "evidence": "Sprint-482 task 482-002 spawned at `07:14:46Z` immediately after 482-001 raw result/worker exit, while Brain did not persist 482-001 aggregate evaluation DONE until `07:19:05Z`. The exact proposal required Task 2 to start only after Task 1 aggregate DONE. Affected product and dogfood surfaces: dependency scheduler, result collector, evaluator, exact topology and shared-worktree safety. Negative scope: no global wave barrier, no polling delay, no treating worker self-assessment as authority",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3187,
+      "id": "RECOVERY-BORN-482-FIX-AUTHORITY-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "FIX projection carries the bounded authority and capable persona required by its diagnosed repair",
+      "priority": "P0",
+      "dependsOn": [
+        "PLANNER-001",
+        "ROUTING-001",
+        "RECOVERY-BORN-480-SCOPE-001",
+        "RECOVERY-BORN-480-FIX-PRIORITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PLANNER-001",
+        "ROUTING-001",
+        "RECOVERY-BORN-480-SCOPE-001",
+        "RECOVERY-BORN-480-FIX-PRIORITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "A generated FIX derives a minimal reviewed write-set delta from typed failure evidence, routes to an implementation-capable persona, de-duplicates bounded verification targets and refuses dispatch when the repair cannot be performed within authority; retries never repeat an unchanged impossible contract",
+      "evidence": "482-002 diagnosed stale `tests/cli/commands/recover.test.ts` and `tests/mcp/tools/recover.test.ts`; both FIX descriptions named them, but neither FIX `filesWrite` included them and prompt-lint emitted `mentioned-file-outside-write-authority` as warning. First FIX was routed to read-only `code-reviewer`; second to `bug-fixer` but with the same impossible scope. Each ran a duplicated-directory host reconciliation for about four minutes and remained NO_GO. Affected product and dogfood surfaces: FIX builder, Routing Engine v3, prompt contract, evaluator cost and dependency repair. Negative scope: no automatic broad directory write grant, no persona instruction override, no infinite retry, no legacy-test compatibility logic in production adapters",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3188,
+      "id": "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Exhausted repair lineage becomes resumable PAUSE/HOLD instead of false COMPLETE",
+      "priority": "P0",
+      "dependsOn": [
+        "KERNEL-SETTLEMENT-001",
+        "RECOVERY-COMMAND-SERVICE-001",
+        "RUNFLOW-001",
+        "PAUSED-FINALIZE-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "KERNEL-SETTLEMENT-001",
+        "RECOVERY-COMMAND-SERVICE-001",
+        "RUNFLOW-001",
+        "PAUSED-FINALIZE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "When a logical task exhausts its configured FIX budget and blocks unfinished dependants, Sprint and outer RunFlow publish one typed PAUSED/HELD or failed settlement with exact recovery command and preserved task authority; `RUN_COMPLETED` and canonical COMPLETE require every logical task to have an allowed aggregate terminal receipt",
+      "evidence": "Sprint-482 logical 482-002 exhausted original plus two FIX attempts as NO_GO; dependent 482-003 never dispatched. Controller logged `handleEvaluation:fixBudgetExhausted`, then immediately classified 482-003 NOT_DISPATCHED, finalized canonical COMPLETE and RunFlow emitted `RUN_COMPLETED`; status was non-resumable and no Nervous approval/recovery command existed. Job summary counted `1/3` success yet status and flow advertised completion. Affected product and dogfood surfaces: FIX phase, Sprint settlement, RunFlow/Do, status, Nervous and operator recovery. Negative scope: no infinite retries, no counting FIX as a second logical task, no synthetic DONE, no destructive auto-cleanup of unfinished authority",
+      "updated": "2026-07-31"
+    },
+    {
+      "order": 3189,
+      "id": "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "COST",
+      "outcome": "Subscription reference price cannot become billed USD or API budget consumption",
+      "priority": "P0",
+      "dependsOn": [
+        "LIMIT-001",
+        "KERNEL-SETTLEMENT-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "LIMIT-001",
+        "KERNEL-SETTLEMENT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Subscription/local/free-tier attempts retain token and quota/reference-cost observability while incremental billed USD and API budget charge remain zero unless authoritative metered billing evidence exists; job, task, status, KPI and admission projections agree",
+      "evidence": "Effective cost authority states OpenAI Codex subscription has no per-task USD charge, yet Sprint-482 task results wrote `$3.750067`, `$1.7327185`, `$1.21926` and `$1.266667`; terminal job recorded `billedCostUsd=2.485927` and `referenceCostUsd=7.9687125`. `deckent usage --sprint 482` simultaneously reported that no run data could be mapped, while runtime resource rows used container hashes rather than logical task IDs. Affected product and dogfood surfaces: result wrapper, job summary, budget admission, usage/KPI and enterprise cost reporting. Negative scope: no fabricated provider quota, no discarding token usage, no treating reference price as invoice evidence",
+      "updated": "2026-07-31"
     },
     {
       "order": 3190,
@@ -9856,6 +10825,10 @@
       ],
       "dependents": [
         "DO-CUTOVER-001",
+        "RECOVERY-BORN-480-SCOPE-001",
+        "RECOVERY-BORN-481-GATE-TRUTH-001",
+        "RECOVERY-BORN-482-CLOSED-SCOPE-001",
+        "RECOVERY-BORN-482-FIX-AUTHORITY-001",
         "WORKER-DISCOVERY-001"
       ],
       "children": [],
@@ -9896,6 +10869,8 @@
       ],
       "dependents": [
         "CODEX-C7",
+        "RECOVERY-BORN-480-ATTRIBUTION-001",
+        "RECOVERY-BORN-480-HEARTBEAT-001",
         "SPRINT-HONESTY-001",
         "TERMINAL-LIVE-001"
       ],
@@ -10122,6 +11097,8 @@
         "ENV-ADAPTER-001",
         "KERNEL-ATTEMPT-001",
         "PLANNER-001",
+        "RECOVERY-BORN-481-EXACT-PROVIDER-PROJECTION-001",
+        "RECOVERY-BORN-482-CLOSED-SCOPE-001",
         "SURFACES-001",
         "TERMINAL-001"
       ],
@@ -10394,6 +11371,7 @@
         "ENTERPRISE-AUTH-001",
         "GOAL-POLICY-001",
         "KERNEL-001",
+        "RECOVERY-BORN-481-DO-PREVIEW-APPROVAL-001",
         "RECOVERY-COMMAND-SERVICE-001",
         "TERMINAL-COLLAB-001",
         "TOOL-AUTHORITY-001"
@@ -10615,7 +11593,8 @@
         "GOAL-PROVIDER-001",
         "KERNEL-001",
         "PROVIDER-HOLD-001",
-        "PROVIDER-INGRESS-001"
+        "PROVIDER-INGRESS-001",
+        "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001"
       ],
       "children": [],
       "gates": [
@@ -10700,7 +11679,9 @@
       "dependsOn": [
         "LIMIT-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-BORN-480-HOLD-CLASSIFICATION-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -13268,7 +14249,8 @@
       ],
       "dependents": [
         "LEARNING-DOGFOOD-001",
-        "PROMOTION-001"
+        "PROMOTION-001",
+        "RECOVERY-BORN-482-FIX-AUTHORITY-001"
       ],
       "children": [
         "ROUTING-V3-CUTOVER-001"
@@ -13883,6 +14865,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "5b2ae526a40c8a41a716eb2420939c86d85cf3ce5f3e69666f0b10c683b51ed8"
+    "value": "945af089cdc9cb0b35db080ab5a007cae1706d7af50c9ac120839f83e2e8f570"
   }
 }
