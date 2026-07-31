@@ -19,7 +19,7 @@ export function TerminalView({ sessionId }: TerminalViewProps) {
     const term = new Terminal({
       convertEol: true,
       fontSize: 13,
-      fontFamily: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+      fontFamily: '"Spline Sans Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
       // deckent teal/gold logbook theme (handoff §5)
       theme: {
         background: '#0a0f0e',

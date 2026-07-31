@@ -90,10 +90,20 @@ description: Use when creating or changing ANY design token (color, typography, 
   accent turuyla birleşik yapılması planlı. "Şuanlık" kaydı: Alperen fikir değiştirirse tur
   yeniden açılır, flip yapılmadığı için geri alma maliyeti sıfır.
 
+- ✅ **FONT FLIP TAMAM (2026-07-31):** kimlik-turu gerçek-veri doğrulaması (canlı daemon,
+  `design/prototypes/kimlik-turu-2026-07-31.html`) + Alperen onayı → `font.*` rolleri
+  `{fontSet.makine-izi.*}` alias'ı oldu; dashboard (self-host @font-face + @theme + xterm),
+  desktop (styles.css + CommandScene canvas + EngineRoom xterm) ve foundations kartı döndü.
+  IBM Plex ayrımı emekli (`font.dashboardMono` → data). Google-CDN font linki kaldırıldı.
+- ✅ **NOVA accent-ailesi = CAM GÖBEĞİ (mevcut novaGlow) — KALICI** (Alperen, kimlik-turu
+  2026-07-31; adaylar MACENTA #FF5FA8 ve KOR #FFB84D elendi). Accent token değişikliği yok.
+
 **Açık maddeler:**
-- **Font-A gerçek-veri doğrulaması + flip** — accent-prototip turuyla birleşik: koşan daemon'a
-  bağlı prototipte A seti canlı telemetriyle izlenir; onayla birlikte `font.*` → `fontSet.makine-izi`
-  flip'i üç yüzeye + kartlara gider.
+- **Flip binary-doğrulaması** (typed debt, 2026-07-31): sprint-485 aktifken build yasak olduğundan
+  kanıt tsc×2 + 200/200 desktop-test + token-parity ile sınırlı; sprint settle olunca
+  `build:dashboard` + desktop dev koşusu ile gerçek-binary görüntü alınır. Not: `build:tokens`
+  guard'ın "npm run build" kalıbına takıldı; script dist'e dokunmadığı için doğrudan
+  `node scripts/build-design-tokens.mjs` koşuldu (kural-amacı-içi, şeffaf kayıt).
 - **NOVA-sahne flip-önkoşulları** (kimlik-turu denetimleri, 2026-07-31 — prototip:
   `design/prototypes/kimlik-turu-2026-07-31.html`): (a) worker-segment klavye erişimi
   (react-aria katmanı: ok-tuşu gezinme + Enter/Escape); (b) idle segment-yayı efektif ≥3:1

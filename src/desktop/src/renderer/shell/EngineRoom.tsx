@@ -166,7 +166,7 @@ export default function EngineRoom(): React.JSX.Element {
     const term = new Terminal({
       convertEol: true,
       fontSize: 13,
-      fontFamily: 'ui-monospace, "IBM Plex Mono", SFMono-Regular, Menlo, Consolas, monospace',
+      fontFamily: '"Spline Sans Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
       theme: deriveXtermTheme(documentVarReader()),
     });
     const fit = new FitAddon();

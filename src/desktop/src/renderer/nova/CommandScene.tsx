@@ -293,12 +293,12 @@ export default function CommandScene(): React.JSX.Element {
       ctx.textAlign = 'center';
       const centerLabel = sceneRef.current.visibility.centerLabel;
       if (centerLabel !== 'none') {
-        ctx.fillStyle = ink; ctx.font = `${11 * dp}px "Geist Mono", monospace`;
+        ctx.fillStyle = ink; ctx.font = `${11 * dp}px "Spline Sans Mono", monospace`;
         const label = centerLabel === 'phase' ? (live?.phase ?? '…') : centerLabel === 'ellipsis' ? '…' : t(MSG.ready);
         ctx.fillText(label, cx, cy + 4 * dp);
       }
       if (live?.sprintId) {
-        ctx.fillStyle = muted; ctx.font = `${8.5 * dp}px "Geist Mono", monospace`;
+        ctx.fillStyle = muted; ctx.font = `${8.5 * dp}px "Spline Sans Mono", monospace`;
         ctx.fillText(live.sprintId, cx, cy + 18 * dp);
       }
       // yörünge-segmentleri
@@ -323,16 +323,16 @@ export default function CommandScene(): React.JSX.Element {
         }
         const lx = cx + Math.cos(segment.mid) * (R + 32 * dp);
         const ly = cy + Math.sin(segment.mid) * (R + 32 * dp);
-        ctx.fillStyle = color; ctx.font = `${10 * dp}px "Geist Mono", monospace`;
+        ctx.fillStyle = color; ctx.font = `${10 * dp}px "Spline Sans Mono", monospace`;
         ctx.fillText(segment.taskId, lx, ly);
-        ctx.fillStyle = muted; ctx.font = `${8.5 * dp}px "Geist Mono", monospace`;
+        ctx.fillStyle = muted; ctx.font = `${8.5 * dp}px "Spline Sans Mono", monospace`;
         ctx.fillText(worker.hb ? `${Math.round(worker.hb.ageMs / 1000)}s` : worker.status, lx, ly + 12 * dp);
         // P18: segment-altı CANLI-EYLEM — sahne artık ne yapıldığını anlatır.
         const action = worker.hb?.currentAction;
         if (action !== undefined && action.length > 0) {
           const short = action.length > 34 ? `${action.slice(0, 33)}…` : action;
           ctx.fillStyle = ink; ctx.globalAlpha = 0.75;
-          ctx.font = `${8 * dp}px "Geist Mono", monospace`;
+          ctx.font = `${8 * dp}px "Spline Sans Mono", monospace`;
           ctx.fillText(short, lx, ly + 24 * dp);
           ctx.globalAlpha = 1;
         }

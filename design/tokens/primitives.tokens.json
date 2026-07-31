@@ -79,26 +79,26 @@
   },
   "font": {
     "$type": "fontFamily",
-    "$description": "REDDEDİLEN mevcut-durum envanteri (Alperen 2026-07-31: 'çok klasik') — kod flip'e kadar bunları kullanır; yeni kimlik fontSet.* altında stage'li.",
+    "$description": "AKTİF font-rolleri — seçili sete alias (kimlik seçimi = set seçimi). FLIP 2026-07-31: eski set (Bricolage/Hanken/Geist/IBM Plex) reddedildi, «MAKİNE İZİ» canlı gerçek-veri doğrulamasıyla seçildi (kimlik-turu prototipi + Alperen onayı). Set değişimi = alias'ları başka fontSet'e çevirmek.",
     "display": {
-      "$value": ["Bricolage Grotesque", "system-ui", "sans-serif"],
-      "$description": "Display envanteri (D4-0 mirası; 2026-07-31 reddiyle emekliye ayrılacak)."
+      "$value": "{fontSet.makine-izi.display}",
+      "$description": "Display rolü → seçili set."
     },
     "body": {
-      "$value": ["Hanken Grotesk", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
-      "$description": "Gövde — desktop + dashboard ortak (index.css --font-sans ile aynı stack)."
+      "$value": "{fontSet.makine-izi.body}",
+      "$description": "Gövde rolü → seçili set (desktop + dashboard ortak)."
     },
     "data": {
-      "$value": ["Geist Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
-      "$description": "Veri/mono — desktop onaylı set."
+      "$value": "{fontSet.makine-izi.data}",
+      "$description": "Veri/mono rolü → seçili set."
     },
     "dashboardMono": {
-      "$value": ["IBM Plex Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
-      "$description": "Dashboard'un bugünkü mono'su (envanter; 2026-07-31 reddi tüm setle birlikte kapsar)."
+      "$value": "{fontSet.makine-izi.data}",
+      "$description": "2026-07-31 birleşimi: dashboard mono'su artık data rolüyle aynı (IBM Plex ayrımı emekli)."
     }
   },
   "fontSet": {
-    "$description": "Seçilebilir font-setleri (kişiselleştirme kuralı: kimlik seçimi = token-seti; DESKTOP-CUSTOMIZE-001). makine-izi = Alperen seçimi 2026-07-31 ('şuanlık a ok'); kalıcı flip (font.* rollerinin bu sete dönmesi) gerçek-veri prototip doğrulaması SONRASI. Dosyalar: design/fonts/makine-izi/ (OFL, latin+latin-ext, cmap-doğrulandı).",
+    "$description": "Seçilebilir font-setleri (kişiselleştirme kuralı: kimlik seçimi = token-seti; DESKTOP-CUSTOMIZE-001). makine-izi = SEÇİLİ set (Alperen 2026-07-31: aday-turu + gerçek-veri kimlik-turu doğrulaması + flip onayı). Dosyalar: design/fonts/makine-izi/ (OFL, latin+latin-ext, cmap-doğrulandı).",
     "makine-izi": {
       "$type": "fontFamily",
       "display": {

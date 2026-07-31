@@ -37,7 +37,7 @@
   --color-gold-soft: #d6cb8c;
   --color-gold-deep: #9a8736;
   --color-gold-tint: #1e1b0e;
-  --font-sans: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: "Chakra Petch", system-ui, sans-serif;
+  --font-mono: "Spline Sans Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --radius: 0.25rem;
 }

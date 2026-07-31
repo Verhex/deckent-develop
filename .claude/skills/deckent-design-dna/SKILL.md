@@ -29,17 +29,16 @@ description: Use FIRST in any deckent design session — UI/UX work on terminal 
 
 ## 2 · Tipografi
 
-> **DURUM (Alperen, 2026-07-31):** eski set REDDEDİLDİ ("çok klasik") → aday turundan
-> **Yön A «MAKİNE İZİ» seçildi ("şuanlık a ok")**: **Tektur** (display) · **Chakra Petch** (gövde) ·
-> **Spline Sans Mono** (veri). Set `fontSet.makine-izi` token'larında + `design/fonts/makine-izi/`
-> vendored; **kalıcı flip gerçek-veri prototip doğrulaması sonrası** (accent turuyla birleşik).
-> Yeni tasarım işi A setiyle çalışır; aşağıdaki envanter yalnız kodun flip-öncesi bugünü.
+> **FLIP TAMAM (Alperen, 2026-07-31):** eski set reddedildi → aday turu → **«MAKİNE İZİ»**
+> gerçek-veri kimlik-turu doğrulamasıyla KALICI seçildi ve üç yüzeye işlendi. Ayrıca aynı turda
+> **NOVA accent = CAM GÖBEĞİ (novaGlow #38D3FF) kalıcı** onaylandı. Kaynak:
+> `font.* → fontSet.makine-izi` alias'ları; dosyalar `design/fonts/makine-izi/`.
 
-| Rol | Seçim (A — şuanlık) | Kod envanteri (flip'e kadar) |
+| Rol | Font (aktif) | Not |
 |---|---|---|
-| Display | Tektur 700 | Bricolage Grotesque |
-| Gövde | Chakra Petch 400/600 | Hanken Grotesk |
-| Veri/mono | Spline Sans Mono 400/600 | Geist Mono (desktop) · IBM Plex Mono (dashboard) |
+| Display | **Tektur 700** | kesik köşeli enstrümantal otorite |
+| Gövde | **Chakra Petch 400/600** | aynı DNA düşük dozda |
+| Veri/mono | **Spline Sans Mono 400/600** | keskin-sakin, tabular; dashboard-mono ile birleşik |
 
 ## 3 · Renk & token authority
 
