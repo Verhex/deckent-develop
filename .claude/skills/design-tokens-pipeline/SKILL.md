@@ -98,12 +98,14 @@ description: Use when creating or changing ANY design token (color, typography, 
 - ✅ **NOVA accent-ailesi = CAM GÖBEĞİ (mevcut novaGlow) — KALICI** (Alperen, kimlik-turu
   2026-07-31; adaylar MACENTA #FF5FA8 ve KOR #FFB84D elendi). Accent token değişikliği yok.
 
+- ✅ **Flip binary-doğrulaması KAPANDI (2026-07-31, sprint-485 settle sonrası):**
+  `build:dashboard` yeşil (10 woff2 bundle'da), daemon-servisli dashboard canlı tarayıcıda
+  yeni setle görüntülendi (Playwright screenshot — Chakra Petch UI + Spline Sans Mono mono,
+  TR glifler temiz); `build:desktop` (electron-vite) yeşil. Guard-notu: sprint sırasında
+  `build:tokens` kalıba takılmıştı → doğrudan `node scripts/build-design-tokens.mjs`
+  koşulmuştu (dist'e dokunmaz; kural-amacı-içi, şeffaf kayıt).
+
 **Açık maddeler:**
-- **Flip binary-doğrulaması** (typed debt, 2026-07-31): sprint-485 aktifken build yasak olduğundan
-  kanıt tsc×2 + 200/200 desktop-test + token-parity ile sınırlı; sprint settle olunca
-  `build:dashboard` + desktop dev koşusu ile gerçek-binary görüntü alınır. Not: `build:tokens`
-  guard'ın "npm run build" kalıbına takıldı; script dist'e dokunmadığı için doğrudan
-  `node scripts/build-design-tokens.mjs` koşuldu (kural-amacı-içi, şeffaf kayıt).
 - **NOVA-sahne flip-önkoşulları** (kimlik-turu denetimleri, 2026-07-31 — prototip:
   `design/prototypes/kimlik-turu-2026-07-31.html`): (a) worker-segment klavye erişimi
   (react-aria katmanı: ok-tuşu gezinme + Enter/Escape); (b) idle segment-yayı efektif ≥3:1
