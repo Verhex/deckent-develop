@@ -270,9 +270,10 @@ describe('handleEvaluation NO_GO with fresh-eyes rotation', () => {
     expect(writtenPath).toContain('task-task-001-fix.json');
 
     const writtenContent = JSON.parse(callArgs[1] as string) as Record<string, unknown>;
-    // C-03: model preserved (opus), fresh-eyes via agent rotation
+    // C-03: model preserved (opus); reviewer-only rotation is re-gated to an
+    // implementation-capable repair persona.
     expect(writtenContent['model']).toBe('opus');
-    expect(writtenContent['assignedAgent']).toBe('code-reviewer');
+    expect(writtenContent['assignedAgent']).toBe('bug-fixer');
   });
 
   it('fix task carries rotationStrategy field', () => {
@@ -303,7 +304,7 @@ describe('handleEvaluation NO_GO with fresh-eyes rotation', () => {
     const callArgs = vi.mocked(writeFileSync).mock.calls[0]!;
     const writtenContent = JSON.parse(callArgs[1] as string) as Record<string, unknown>;
     expect(writtenContent['forceModel']).toBe('opus'); // C-03: model preserved
-    expect(writtenContent['forceAgent']).toBe('code-reviewer');
+    expect(writtenContent['forceAgent']).toBe('bug-fixer');
   });
 
   it('fix task preserves isPriorityFix, CRITICAL priority, and PENDING status', () => {

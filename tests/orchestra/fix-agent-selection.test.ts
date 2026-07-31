@@ -124,11 +124,10 @@ describe('selectFixAgent — unit', () => {
     expect(fixAgent).toBe('frontend-designer');
   });
 
-  it('generic task → falls back to fresh-eyes rotation (not original)', () => {
+  it('generic task → refuses a read-only fresh-eyes persona and routes to an implementer', () => {
     const task = makeTask({ assignedAgent: 'architect', title: 'redesign module boundaries' });
     const fixAgent = selectFixAgent(task, false);
-    // architect rotates to code-reviewer via AGENT_FRESH_EYES_MAP
-    expect(fixAgent).toBe('code-reviewer');
+    expect(fixAgent).toBe('bug-fixer');
   });
 });
 

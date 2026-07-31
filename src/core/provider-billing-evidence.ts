@@ -1,6 +1,11 @@
 import { createExecutionAuthorityError } from './errors.js';
 
-/** Durable billing evidence captured from a provider's final response envelope. */
+/**
+ * Durable provider price/usage evidence captured from a final response envelope.
+ * `providerReportedUsd` becomes billed spend only when the exact execution's
+ * effective billing authority is metered API; subscription/free-tier envelopes
+ * retain it as reference value.
+ */
 export interface ProviderModelBillingUsage {
   inputTokens?: number;
   outputTokens?: number;
@@ -101,7 +106,7 @@ function normalizeModelUsage(value: unknown): Record<string, ProviderModelBillin
 }
 
 /**
- * Extract the last provider envelope carrying an authoritative billed total.
+ * Extract the last provider envelope carrying an authoritative provider total.
  * Raw output may be one pretty JSON object or mixed stdout/stderr JSONL.
  */
 export function extractProviderBillingEvidence(

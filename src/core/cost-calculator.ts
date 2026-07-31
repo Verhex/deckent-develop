@@ -419,13 +419,45 @@ export function calculateRegimeCost(
  * The assembler/reconciler drop this straight into a `TaskResult`.
  */
 export interface ResultCost {
-  /** Metered USD at per-token API rates. Always `0` for local/self-hosted inference. */
+  /** Incremental billed USD. Zero for subscription/free-tier/local inference. */
   usd: number;
   currency: 'USD';
+  /**
+   * Catalog/provider-equivalent value retained for quota and comparison
+   * observability when {@link usd} is structurally zero.
+   */
+  referenceUsd?: number;
+  /** Effective billing authority used to settle billed versus reference value. */
+  billingMode?: BillingMode;
   /** Price provenance — `cost-config:<provider>/<modelId>`, `local`, or `unknown-model:<m>`. */
   pricingSource: string;
   /** True for on-device / self-hosted inference (no metered third-party billing). */
   isLocal: boolean;
+}
+
+/**
+ * Resolve post-run billing authority without coupling it to a provider name.
+ *
+ * Explicit execution auth wins. `hybrid` is intentionally unresolved: choosing
+ * API or subscription without a per-attempt authority receipt would fabricate a
+ * charge. When no auth was supplied at all (library/task-mode compatibility),
+ * the model's configured provider billing mode is used.
+ */
+export function resolveActualBillingMode(
+  config: CostConfig,
+  model: string,
+  provider: string | undefined,
+  effectiveAuthMode: 'subscription' | 'api' | 'hybrid' | undefined,
+): BillingMode | undefined {
+  const authResolved = resolveBillingModeForAuth(provider, effectiveAuthMode);
+  if (authResolved) return authResolved;
+  if (effectiveAuthMode === 'hybrid') return undefined;
+
+  const found = findModel(config, model);
+  if (!found) return undefined;
+  const providerConfig = config.providers[found.provider];
+  return providerConfig?.default_billing_mode
+    ?? providerConfig?.billing_modes_supported[0];
 }
 
 /**

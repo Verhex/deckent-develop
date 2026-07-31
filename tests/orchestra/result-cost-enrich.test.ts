@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { enrichResultCost } from '../../src/orchestra/result-collector.js';
-import type { TaskResult } from '../../src/core/task-types.js';
+import type { Task, TaskResult } from '../../src/core/task-types.js';
 
 // Worker Output Contract — Step 2 wiring: a monetary `cost` on every result,
 // computed orchestrator-side from the captured tokenUsage + per-model pricing.
@@ -23,6 +23,22 @@ function makeResult(tokenUsage?: TaskResult['tokenUsage']): TaskResult {
   } as TaskResult;
 }
 
+function apiTask(): Task {
+  return {
+    id: 'T1',
+    provider: 'claude',
+    authMode: 'api',
+  } as Task;
+}
+
+function subscriptionTask(): Task {
+  return {
+    id: 'T1',
+    provider: 'claude',
+    authMode: 'subscription',
+  } as Task;
+}
+
 describe('enrichResultCost — cost in every result', () => {
   const dirs: string[] = [];
   afterEach(() => {
@@ -39,10 +55,11 @@ describe('enrichResultCost — cost in every result', () => {
     const r = makeResult({
       inputTokens: 1_000_000,
       outputTokens: 500_000,
+      source: 'provider-adapter',
       provider: 'claude' as never,
       model: 'claude-opus-4-6' as never,
     });
-    enrichResultCost(r, undefined, root());
+    enrichResultCost(r, apiTask(), root());
     expect(r.cost).toBeDefined();
     expect(typeof r.cost!.usd).toBe('number');
     expect(r.cost!.usd).toBeGreaterThan(0);
@@ -53,16 +70,18 @@ describe('enrichResultCost — cost in every result', () => {
     const withCacheWrite = makeResult({
       inputTokens: 100_000,
       cacheCreationTokens: 1_000_000, // 1M cache-write ≈ 1.25×$5 = $6.25
+      source: 'provider-adapter',
       provider: 'claude' as never,
       model: 'claude-opus-4-6' as never,
     });
     const withoutCacheWrite = makeResult({
       inputTokens: 100_000,
+      source: 'provider-adapter',
       provider: 'claude' as never,
       model: 'claude-opus-4-6' as never,
     });
-    enrichResultCost(withCacheWrite, undefined, root());
-    enrichResultCost(withoutCacheWrite, undefined, root());
+    enrichResultCost(withCacheWrite, apiTask(), root());
+    enrichResultCost(withoutCacheWrite, apiTask(), root());
     // Pre-G6 enrichResultCost dropped cacheCreationTokens → the two costs were EQUAL.
     // After the fix the cache-write is priced in → the cache-writing run costs strictly more.
     expect(withCacheWrite.cost!.usd).toBeGreaterThan(withoutCacheWrite.cost!.usd);
@@ -79,6 +98,22 @@ describe('enrichResultCost — cost in every result', () => {
     expect(r.cost).toBeDefined();
     expect(r.cost!.usd).toBe(0);
     expect(r.cost!.isLocal).toBe(true);
+  });
+
+  it('subscription usage keeps reference value but records zero incremental billed USD', () => {
+    const r = makeResult({
+      inputTokens: 1_000_000,
+      outputTokens: 500_000,
+      provider: 'claude' as never,
+      model: 'claude-opus-4-6' as never,
+    });
+
+    enrichResultCost(r, subscriptionTask(), root());
+
+    expect(r.cost?.usd).toBe(0);
+    expect(r.cost?.referenceUsd).toBeGreaterThan(0);
+    expect(r.cost?.billingMode).toBe('subscription');
+    expect(r.cost?.pricingSource).toMatch(/^subscription-reference:/);
   });
 
   it('no tokenUsage → no cost (no-op)', () => {
@@ -126,11 +161,13 @@ describe('enrichResultCost — cost in every result', () => {
       },
     }), 'utf-8');
 
-    enrichResultCost(r, undefined, projectRoot);
+    enrichResultCost(r, apiTask(), projectRoot);
 
     expect(r.cost).toEqual({
       usd: 19.57630525,
       currency: 'USD',
+      referenceUsd: 19.57630525,
+      billingMode: 'api',
       pricingSource: 'provider-envelope',
       isLocal: false,
     });
@@ -142,6 +179,7 @@ describe('enrichResultCost — cost in every result', () => {
     const r = makeResult({
       inputTokens: 100_000,
       outputTokens: 10_000,
+      source: 'provider-adapter',
       provider: 'claude' as never,
       model: 'claude-sonnet-5' as never,
     });
@@ -154,14 +192,14 @@ describe('enrichResultCost — cost in every result', () => {
       capturedAt: '2026-07-20T00:00:00.000Z',
     };
 
-    enrichResultCost(r, undefined, root());
+    enrichResultCost(r, apiTask(), root());
 
     expect(r.providerBilling).toBeUndefined();
     expect(r.cost!.pricingSource).not.toBe('provider-envelope');
     expect(r.cost!.usd).toBeGreaterThan(0.000001);
   });
 
-  it('does not let a zero provider total erase a nonzero paid-model estimate', () => {
+  it('keeps a zero API provider total billed as zero while retaining the catalog reference', () => {
     const projectRoot = root();
     mkdirSync(join(projectRoot, '.tasks'), { recursive: true });
     writeFileSync(join(projectRoot, '.tasks', 'task-T1.log'), JSON.stringify({
@@ -172,14 +210,16 @@ describe('enrichResultCost — cost in every result', () => {
     const r = makeResult({
       inputTokens: 100_000,
       outputTokens: 10_000,
+      source: 'provider-adapter',
       provider: 'claude' as never,
       model: 'claude-sonnet-5' as never,
     });
 
-    enrichResultCost(r, undefined, projectRoot);
+    enrichResultCost(r, apiTask(), projectRoot);
 
     expect(r.providerBilling?.providerReportedUsd).toBe(0);
-    expect(r.cost!.pricingSource).not.toBe('provider-envelope');
-    expect(r.cost!.usd).toBeGreaterThan(0);
+    expect(r.cost!.pricingSource).toBe('provider-envelope');
+    expect(r.cost!.usd).toBe(0);
+    expect(r.cost!.referenceUsd).toBeGreaterThan(0);
   });
 });

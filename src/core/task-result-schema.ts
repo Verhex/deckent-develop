@@ -104,11 +104,16 @@ const tokenUsageSchema = z.object({
 const costSchema = z.object({
   usd: z.number().nonnegative(),
   currency: z.literal('USD').default('USD'),
+  referenceUsd: z.number().nonnegative().optional(),
+  billingMode: z.enum(['api', 'subscription', 'free_tier', 'local']).optional(),
   pricingSource: z.string(),
   isLocal: z.boolean().default(false),
 });
 
-/** Provider-final billing evidence. This is authoritative; `cost` may be a local estimate. */
+/**
+ * Provider-final price/usage evidence. Effective execution auth decides whether
+ * its USD-equivalent is billed or reference-only.
+ */
 const providerBillingSchema = z.object({
   source: z.literal('provider-envelope'),
   provider: z.string().min(1),

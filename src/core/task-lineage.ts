@@ -28,6 +28,8 @@ export interface FixCircuitBreakerDecision {
   readonly unresolvedRatioPercent: number;
   readonly effectiveCountThreshold: number;
   readonly unresolvedTaskIds: readonly string[];
+  readonly blockedDependentTaskIds: readonly string[];
+  readonly forcedByBlockedDependents: boolean;
 }
 
 export interface LogicalTaskProgress {
@@ -218,11 +220,40 @@ export function evaluateFixCircuitBreaker(
     : 0;
   const effectiveCountThreshold =
     totalTasks > 0 ? Math.min(policy.max_unresolved_tasks, ratioCount) : 0;
-  const shouldPause =
+  const unresolvedSet = new Set(unresolvedTaskIds);
+  const rootsById = new Map(logicalRoots.map(task => [task.id, task]));
+  const dependsOnUnresolvedLineage = (task: Task): boolean => {
+    const pending = [...(task.dependencies ?? [])];
+    const seen = new Set<string>();
+    while (pending.length > 0) {
+      const dependencyId = pending.pop();
+      if (!dependencyId || seen.has(dependencyId)) continue;
+      seen.add(dependencyId);
+      if (unresolvedSet.has(dependencyId)) return true;
+      const dependency = rootsById.get(dependencyId);
+      if (dependency?.dependencies) pending.push(...dependency.dependencies);
+    }
+    return false;
+  };
+  const blockedDependentTaskIds = logicalRoots
+    .filter(task =>
+      (
+        task.status === TaskStatus.PENDING
+        || task.status === TaskStatus.PAUSED
+        || evaluations.get(task.id) === TaskEvaluation.DEFERRED
+        || evaluations.get(task.id) === TaskEvaluation.NOT_DISPATCHED
+      )
+      && dependsOnUnresolvedLineage(task),
+    )
+    .map(task => task.id);
+  const forcedByBlockedDependents =
+    unresolvedTasks > 0 && blockedDependentTaskIds.length > 0;
+  const shouldPause = forcedByBlockedDependents || (
     policy.enabled
     && unresolvedTasks > 0
     && unresolvedTasks >= effectiveCountThreshold
-    && unresolvedRatioPercent >= policy.min_unresolved_ratio_percent;
+    && unresolvedRatioPercent >= policy.min_unresolved_ratio_percent
+  );
 
   return {
     shouldPause,
@@ -231,5 +262,7 @@ export function evaluateFixCircuitBreaker(
     unresolvedRatioPercent,
     effectiveCountThreshold,
     unresolvedTaskIds: Object.freeze(unresolvedTaskIds),
+    blockedDependentTaskIds: Object.freeze(blockedDependentTaskIds),
+    forcedByBlockedDependents,
   };
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   estimateSprintCost,
   formatEstimate,
+  resolveActualBillingMode,
   resolveBillingModeForAuth,
   type TaskCostInput,
   type SprintCostEstimate,
@@ -505,6 +506,29 @@ describe('cost-calculator', () => {
       const est = estimateSprintCost(tasks, TEST_CONFIG, {});
       expect(est.costRealistic).toBeGreaterThan(0);
       expect(est.perProvider.openai.billingMode).toBe('api');
+    });
+  });
+
+  describe('resolveActualBillingMode — post-run billing authority', () => {
+    it('uses explicit per-attempt auth before the provider catalog default', () => {
+      expect(resolveActualBillingMode(TEST_CONFIG, 'gpt-5', 'openai', 'subscription'))
+        .toBe('subscription');
+      expect(resolveActualBillingMode(TEST_CONFIG, 'gemini-2-5-flash', 'gemini', 'api'))
+        .toBe('api');
+    });
+
+    it('uses configured free-tier/local authority only when attempt auth is absent', () => {
+      expect(resolveActualBillingMode(TEST_CONFIG, 'gemini-2-5-flash', 'gemini', undefined))
+        .toBe('free_tier');
+      expect(resolveActualBillingMode(TEST_CONFIG, 'unknown-local-model', 'ollama', undefined))
+        .toBe('local');
+    });
+
+    it('keeps hybrid and unknown-model billing unresolved instead of fabricating API spend', () => {
+      expect(resolveActualBillingMode(TEST_CONFIG, 'gpt-5', 'openai', 'hybrid'))
+        .toBeUndefined();
+      expect(resolveActualBillingMode(TEST_CONFIG, 'unknown-model', 'custom', undefined))
+        .toBeUndefined();
     });
   });
 });

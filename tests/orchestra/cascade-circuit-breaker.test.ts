@@ -86,6 +86,25 @@ describe('applyCascadeCircuitBreaker (Sprint 140 cost-cascade circuit-breaker wi
     expect(sprint.status).toBe(SprintStatus.EVALUATING);
   });
 
+  it('pauses when one exhausted root below the ratio gate blocks an unfinished dependant', () => {
+    const r = root();
+    const sprint = makeSprint(3);
+    sprint.tasks[0]!.status = TaskStatus.NO_GO;
+    sprint.tasks[1]!.status = TaskStatus.DONE;
+    sprint.tasks[2]!.status = TaskStatus.PENDING;
+    sprint.tasks[2]!.dependencies = ['t-0'];
+
+    const paused = applyCascadeCircuitBreaker(
+      r,
+      sprint,
+      evalsFor(sprint, [NG, OK, TaskEvaluation.NOT_DISPATCHED]),
+      POLICY,
+    );
+
+    expect(paused).toBe(true);
+    expect(sprint.status).toBe(SprintStatus.PAUSED);
+  });
+
   it('does not count cascade-skipped tasks that never consumed a provider attempt', () => {
     const r = root();
     const tasksDir = join(r, '.tasks');

@@ -12,7 +12,7 @@ import { metric } from '../core/observability.js';
 
 // ─── Core Types ────────────────────────────────────────────────────
 import type {
-  Task, TaskResult, Sprint, ResolvedConfig,
+  Task, TaskResult, Sprint, ResolvedConfig, TaskEvaluation,
 } from '../core/types.js';
 
 // ─── Core (value imports — TaskStatus used at runtime for in-memory sync) ─
@@ -48,7 +48,11 @@ import type { SchedulerSnapshot } from './scheduler-reducer.js';
 import { ApprovalBroker } from '../core/approval-broker.js';
 import type { BrainAnswer, WorkerQuestion, TokenUsage } from '../core/task-types.js';
 import { extractProviderBillingEvidence, reconcileProviderBilling } from '../core/provider-billing-evidence.js';
-import { evaluateExecutionBudget, evaluateRunCostBudget } from '../core/execution-budget.js';
+import {
+  evaluateExecutionBudget,
+  evaluateRunCostBudget,
+  isMeasuredUsageEvidence,
+} from '../core/execution-budget.js';
 import {
   classifyProviderFailure,
 } from '../core/provider-failure-classifier.js';
@@ -57,7 +61,10 @@ import {
   readProviderExecutionHolds,
   type ProviderExecutionHold,
 } from '../core/provider-execution-hold.js';
-import { resolveBillingModeForAuth } from '../core/cost-calculator.js';
+import {
+  resolveActualBillingMode,
+  resolveBillingModeForAuth,
+} from '../core/cost-calculator.js';
 import { applyRuntimeBudgetStopToResult } from './runtime-budget-monitor.js';
 import {
   readRuntimeBudgetUsage,
@@ -804,6 +811,7 @@ export function enrichResultCost(
   result: TaskResult,
   task: Task | undefined,
   projectRoot?: string,
+  defaultAuthMode?: 'subscription' | 'api' | 'hybrid',
 ): void {
   const usage = result.tokenUsage;
   if (!projectRoot || !usage) return;
@@ -826,7 +834,12 @@ export function enrichResultCost(
       provider,
       costConfig,
     );
-    result.cost = localCost;
+    const billingMode = resolveActualBillingMode(
+      costConfig,
+      model,
+      provider,
+      task?.authMode ?? defaultAuthMode,
+    );
     // Provider billing is trusted only when the host re-extracts it from the
     // captured provider log. The worker-writable .result field is never a
     // billing authority by itself.
@@ -846,24 +859,57 @@ export function enrichResultCost(
     if (trustedProviderBilling) result.providerBilling = trustedProviderBilling;
     else delete result.providerBilling;
 
+    let referenceUsd = localCost.usd;
+    let referenceSource = localCost.pricingSource;
     if (result.providerBilling) {
       result.providerBilling = {
         ...result.providerBilling,
         reconciliation: reconcileProviderBilling(result.providerBilling, localCost.usd),
       };
-      // Provider-final billing is authoritative. Preserve the local repricing
-      // and its variance above for diagnosis instead of silently overwriting it.
-      // A zero provider total for a paid model is not enough to erase a nonzero
-      // local estimate (subscription envelopes and incomplete billing payloads
-      // commonly report zero); fail conservatively on the priced evidence.
       if (result.providerBilling.providerReportedUsd > 0 || localCost.usd === 0) {
-        result.cost = {
-          usd: result.providerBilling.providerReportedUsd,
-          currency: result.providerBilling.currency,
-          pricingSource: 'provider-envelope',
-          isLocal: localCost.isLocal,
-        };
+        referenceUsd = result.providerBilling.providerReportedUsd;
+        referenceSource = 'provider-envelope';
       }
+    }
+
+    // A provider envelope's `total_cost_usd` is a pricing-equivalent usage
+    // total, not proof that a subscription/free-tier execution incurred a new
+    // invoice. Effective execution billing authority determines whether that
+    // value is billed or reference-only.
+    if (billingMode === 'api') {
+      const providerReportedUsd = result.providerBilling?.providerReportedUsd;
+      const hasProviderBilling = typeof providerReportedUsd === 'number'
+        && Number.isFinite(providerReportedUsd)
+        && providerReportedUsd >= 0;
+      const hasMeasuredUsage = isMeasuredUsageEvidence(usage.source);
+      const hasPricedModel = !localCost.pricingSource.startsWith('unknown-model:');
+      const billedUsd = hasProviderBilling
+        ? providerReportedUsd
+        : (hasMeasuredUsage && hasPricedModel ? localCost.usd : 0);
+      const billedSource = hasProviderBilling
+        ? 'provider-envelope'
+        : (hasMeasuredUsage && hasPricedModel
+            ? localCost.pricingSource
+            : `unverified-api-reference:${localCost.pricingSource}`);
+      result.cost = {
+        usd: billedUsd,
+        currency: 'USD',
+        referenceUsd,
+        billingMode,
+        pricingSource: billedSource,
+        isLocal: false,
+      };
+    } else {
+      result.cost = {
+        usd: 0,
+        currency: 'USD',
+        referenceUsd,
+        billingMode,
+        pricingSource: billingMode
+          ? `${billingMode}-reference:${referenceSource}`
+          : `unknown-billing:${referenceSource}`,
+        isLocal: billingMode === 'local' || localCost.isLocal,
+      };
     }
   } catch (err) {
     debugLog('enrichResultCost', err);
@@ -1036,6 +1082,16 @@ export async function waitForResults(
     spawnBackend?: SpawnBackend;
     attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
     providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+    /**
+     * Host-owned aggregate evaluation seam. Production injects the Brain
+     * evaluator so a worker self-claim can never release dependents. Legacy
+     * and isolated collector callers may omit it and retain the historical
+     * projection behavior.
+     */
+    evaluateCollectedResult?: (
+      task: Task,
+      result: TaskResult,
+    ) => Promise<TaskEvaluation>;
   },
   channelRegistry?: ChannelRegistry,
   config?: ResolvedConfig,
@@ -1148,13 +1204,27 @@ export async function waitForResults(
   let lastSpawnAttempt = Date.now();
   const FORCE_RESCAN_IDLE_MS = 5 * 60 * 1000; // 5 minutes
 
-  // ─── In-memory status sync (ADR-045 Decision 1) ─────────────────
-  // Mutate the task object referenced by sprint.tasks so that
-  // respawnEligibleTasks sees up-to-date `t.status === TaskStatus.DONE`
-  // before EVALUATE phase persists status to disk.
-  const syncTaskStatusFromResult = (taskId: string, result: TaskResult): void => {
+  // ─── In-memory aggregate settlement sync ─────────────────────────
+  // Dependency scheduling is authorized by Brain's host-owned evaluation,
+  // never by the worker's mutable selfAssessment. Production injects the
+  // evaluator above; the fallback exists only for backwards-compatible,
+  // isolated collector callers that do not own the sprint lifecycle.
+  const syncTaskStatusFromResult = async (
+    taskId: string,
+    result: TaskResult,
+  ): Promise<void> => {
     const taskRef = taskMap.get(taskId);
     if (!taskRef) return;
+    if (spawnOpts?.evaluateCollectedResult) {
+      const evaluation = await spawnOpts.evaluateCollectedResult(taskRef, result);
+      taskRef.status =
+        evaluation === 'DONE' || evaluation === 'GO_WITH_TECH_DEBT'
+          ? TaskStatus.DONE
+          : evaluation === 'NO_GO'
+            ? TaskStatus.NO_GO
+            : TaskStatus.PAUSED;
+      return;
+    }
     applyStatusMutation(taskRef, result);
   };
 
@@ -1254,7 +1324,7 @@ export async function waitForResults(
           }
           await waitForBudgetTerminal(enrichTask, taskId, result);
           enrichResultTokenUsage(result, enrichTask, projectRoot);
-          enrichResultCost(result, enrichTask, projectRoot);
+          enrichResultCost(result, enrichTask, projectRoot, config?.auth_mode);
           applyBudgetEvidence(enrichTask, result, taskId);
           // LP-10 (2026-07-08): populate filesChanged/linesAdded/linesRemoved from
           // host-side git ground truth, not the worker's self-report (which arrived
@@ -1285,7 +1355,7 @@ export async function waitForResults(
           results.push(result);
           collected.add(taskId);
           newlyCollected.push(taskId);
-          syncTaskStatusFromResult(taskId, result);
+          await syncTaskStatusFromResult(taskId, result);
           // Sprint 278 COMM-1 — write sharedNotes to SharedMemory (best-effort, opt-in)
           if (
             config?.worker_comms?.enabled
@@ -1324,7 +1394,7 @@ export async function waitForResults(
         if (lateResult) {
           await waitForBudgetTerminal(taskMap.get(taskId), taskId, lateResult);
           enrichResultTokenUsage(lateResult, taskMap.get(taskId), projectRoot);
-          enrichResultCost(lateResult, taskMap.get(taskId), projectRoot);
+          enrichResultCost(lateResult, taskMap.get(taskId), projectRoot, config?.auth_mode);
           applyBudgetEvidence(taskMap.get(taskId), lateResult, taskId);
           sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, lateResult.filesChanged);
           // Persist enriched tokenUsage + cost to the .result FILE (see above).
@@ -1333,7 +1403,7 @@ export async function waitForResults(
           results.push(lateResult);
           collected.add(taskId);
           newlyCollected.push(taskId);
-          syncTaskStatusFromResult(taskId, lateResult);
+          await syncTaskStatusFromResult(taskId, lateResult);
           debugLog('collectResults:lateResult', `taskId=${taskId} EXIT trap wrote .result (${lateResult.selfAssessment}), skipping synthetic NO_GO`);
           continue;
         }
@@ -1404,7 +1474,7 @@ export async function waitForResults(
         results.push(syntheticResult);
         collected.add(taskId);
         newlyCollected.push(taskId);
-        syncTaskStatusFromResult(taskId, syntheticResult);
+        await syncTaskStatusFromResult(taskId, syntheticResult);
 
         if (diskVerify.hasDiskEvidence) {
           // Override the status mutation: NO_GO → MANUAL_REVIEW_REQUIRED so the
@@ -1851,7 +1921,7 @@ export async function waitForResults(
         } catch (e) { debugLog('cascadeSkipDeadBlocked:write', e); }
         results.push(skip);
         collected.add(t.id);
-        syncTaskStatusFromResult(t.id, skip);
+        await syncTaskStatusFromResult(t.id, skip);
         totalSkipped++;
         changed = true;
         debugLog('cascadeSkipDeadBlocked', `task ${t.id} skipped (dep ${failedDep} failed)`);
@@ -2211,7 +2281,7 @@ export async function waitForResults(
       if (result) {
         await waitForBudgetTerminal(taskMap.get(taskId), taskId, result);
         enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
-        enrichResultCost(result, taskMap.get(taskId), projectRoot);
+        enrichResultCost(result, taskMap.get(taskId), projectRoot, config?.auth_mode);
         applyBudgetEvidence(taskMap.get(taskId), result, taskId);
         // Sprint 201 review-feedback — close the final-sweep race window: a
         // worker whose real .result lands only after the watcher closed is a
@@ -2222,7 +2292,7 @@ export async function waitForResults(
         persistEnrichedResult(projectRoot, result);
         results.push(result);
         collected.add(taskId);
-        syncTaskStatusFromResult(taskId, result);
+        await syncTaskStatusFromResult(taskId, result);
       }
     }
   }

@@ -707,8 +707,18 @@ export interface TaskResult {
    * self-hosted models (ollama) → `{ usd: 0, isLocal: true }`. Inline type avoids a
    * task-types ↔ cost-calculator import cycle; structurally equals `ResultCost`.
    */
-  cost?: { usd: number; currency: string; pricingSource: string; isLocal: boolean };
-  /** Provider-final billing total and per-model evidence; authoritative over local repricing. */
+  cost?: {
+    usd: number;
+    currency: string;
+    referenceUsd?: number;
+    billingMode?: 'api' | 'subscription' | 'free_tier' | 'local';
+    pricingSource: string;
+    isLocal: boolean;
+  };
+  /**
+   * Provider-final price/usage evidence. It is authoritative over local
+   * repricing, but effective execution auth still decides billed vs reference.
+   */
   providerBilling?: ProviderBillingEvidence;
   /**
    * Worker self-reported rubric scores.

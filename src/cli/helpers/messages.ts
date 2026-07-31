@@ -1023,6 +1023,10 @@ const MESSAGES: MessageMap = {
     en: '{unresolved}/{total} logical tasks remain NO_GO after the admitted FIX budget ({ratio}%; count threshold {countThreshold}, ratio threshold {ratioThreshold}%). The run was paused to prevent an unbounded repair cascade.',
     tr: 'Kabul edilen FIX bütçesi sonrasında {unresolved}/{total} logical task hâlâ NO_GO ({ratio}%; sayı eşiği {countThreshold}, oran eşiği %{ratioThreshold}). Sınırsız bir düzeltme zincirini önlemek için run duraklatıldı.',
   },
+  'pause.exhausted_repair_blocks_dependents_reason': {
+    en: 'The admitted FIX budget is exhausted for {unresolvedTasks}, and unfinished dependent tasks remain blocked: {blockedTasks}. The run was paused with its recovery authority preserved; COMPLETE is not an allowed settlement.',
+    tr: '{unresolvedTasks} için kabul edilen FIX bütçesi tükendi ve tamamlanmamış bağımlı task’lar bloke kaldı: {blockedTasks}. Recovery authority korunarak run duraklatıldı; COMPLETE geçerli bir settlement değildir.',
+  },
   'pause.action_resume': {
     en: 'Resume',
     tr: 'Sürdür',

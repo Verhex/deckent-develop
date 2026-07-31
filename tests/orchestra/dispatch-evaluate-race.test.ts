@@ -34,7 +34,9 @@ vi.mock('../../src/orchestra/result-watcher.js', () => ({
   }),
 }));
 
-import { TaskStatus, SprintPhase, SprintStatus } from '../../src/core/types.js';
+import {
+  TaskEvaluation, TaskStatus, SprintPhase, SprintStatus,
+} from '../../src/core/types.js';
 import type { Task, Sprint, ResolvedConfig, TaskResult } from '../../src/core/types.js';
 import type { SpawnBackend } from '../../src/orchestra/spawn-backend.js';
 import {
@@ -100,6 +102,7 @@ function makeConfig(depPipeline: boolean): ResolvedConfig {
     projectName: 'test',
     projectRoot: '/tmp/test',
     version: '0.1.0',
+    auth_mode: 'api',
     dependency_pipeline_enabled: depPipeline,
   } as ResolvedConfig;
 }
@@ -130,6 +133,14 @@ function doneResult(id: string): TaskResult {
       isLocal: false,
     },
   };
+}
+
+function writeDoneResult(root: string, taskId: string): void {
+  writeFileSync(
+    join(root, '.tasks', `task-${taskId}.result`),
+    JSON.stringify(doneResult(taskId)),
+    'utf-8',
+  );
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -227,14 +238,22 @@ describe('findReadyUndispatchedTaskIds (sprint-phases)', () => {
 
 describe('waitForResults — dispatch/EVALUATE race fix', () => {
   let root: string;
+  let hostStateRoot: string;
+  let originalDeckentHome: string | undefined;
 
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'deckent-wfr-race-'));
     mkdirSync(join(root, '.tasks'), { recursive: true });
+    hostStateRoot = `${root}-host-state`;
+    originalDeckentHome = process.env.DECKENT_HOME;
+    process.env.DECKENT_HOME = hostStateRoot;
   });
 
   afterEach(() => {
+    if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+    else process.env.DECKENT_HOME = originalDeckentHome;
     rmSync(root, { recursive: true, force: true });
+    rmSync(hostStateRoot, { recursive: true, force: true });
   });
 
   it('dispatches a dependency-just-satisfied PENDING task before returning (no synthetic NO_GO)', async () => {
@@ -246,7 +265,7 @@ describe('waitForResults — dispatch/EVALUATE race fix', () => {
     const b = makeTask('b', { status: TaskStatus.PENDING, dependencies: ['a'] });
     const sprint = makeSprint([a, b]);
     settleTestRuntimeBudget(root, 'a');
-    writeFileSync(join(root, '.tasks', 'task-a.result'), JSON.stringify(doneResult('a')), 'utf-8');
+    writeDoneResult(root, 'a');
 
     const spawned: string[] = [];
     const backend: SpawnBackend = {
@@ -255,11 +274,7 @@ describe('waitForResults — dispatch/EVALUATE race fix', () => {
       spawn: (taskId: string) => {
         spawned.push(taskId);
         settleTestRuntimeBudget(root, taskId);
-        writeFileSync(
-          join(root, '.tasks', `task-${taskId}.result`),
-          JSON.stringify(doneResult(taskId)),
-          'utf-8',
-        );
+        writeDoneResult(root, taskId);
       },
       kill: () => {},
       list: () => [],
@@ -271,11 +286,96 @@ describe('waitForResults — dispatch/EVALUATE race fix', () => {
       { spawnBackend: backend, autoApprove: true }, undefined, makeConfig(false),
     );
 
-    expect(spawned).toContain('b'); // b was dispatched, not deferred
+    expect({ spawned, a: a.status, b: b.status }).toEqual({
+      spawned: ['b'],
+      a: TaskStatus.DONE,
+      b: TaskStatus.DONE,
+    }); // b was dispatched, not deferred
     expect(results).toHaveLength(2);
     const rb = results.find(r => r.taskId === 'b');
     expect(rb).toBeDefined();
     expect(rb!.selfAssessment).toBe('DONE'); // ran for real — never a synthetic NO_GO
+  });
+
+  it('does not release a dependent from a raw worker DONE when host aggregate evaluation is NO_GO', async () => {
+    const a = makeTask('a', { status: TaskStatus.EXECUTING });
+    const b = makeTask('b', { status: TaskStatus.PENDING, dependencies: ['a'] });
+    const sprint = makeSprint([a, b]);
+    settleTestRuntimeBudget(root, 'a');
+    writeDoneResult(root, 'a');
+
+    const spawned: string[] = [];
+    const backend: SpawnBackend = {
+      ...TEST_MEASURED_LANDING_CAPABILITIES,
+      name: 'mock',
+      spawn: (taskId: string) => { spawned.push(taskId); },
+      kill: () => {},
+      list: () => [],
+      isAvailable: async () => true,
+    };
+
+    const results = await waitForResults(
+      root,
+      sprint,
+      3_000,
+      undefined,
+      {
+        spawnBackend: backend,
+        autoApprove: true,
+        evaluateCollectedResult: async () => TaskEvaluation.NO_GO,
+      },
+      undefined,
+      makeConfig(true),
+    );
+
+    expect(results.map(result => result.taskId)).toEqual(['a']);
+    expect(spawned).toEqual([]);
+    expect(a.status).toBe(TaskStatus.NO_GO);
+    expect(b.status).toBe(TaskStatus.PAUSED);
+  });
+
+  it('releases a dependent only after host aggregate evaluation accepts DONE', async () => {
+    const a = makeTask('a', { status: TaskStatus.EXECUTING });
+    const b = makeTask('b', { status: TaskStatus.PENDING, dependencies: ['a'] });
+    const sprint = makeSprint([a, b]);
+    settleTestRuntimeBudget(root, 'a');
+    writeDoneResult(root, 'a');
+
+    const evaluated: string[] = [];
+    const spawned: string[] = [];
+    const backend: SpawnBackend = {
+      ...TEST_MEASURED_LANDING_CAPABILITIES,
+      name: 'mock',
+      spawn: (taskId: string) => {
+        spawned.push(taskId);
+        settleTestRuntimeBudget(root, taskId);
+        writeDoneResult(root, taskId);
+      },
+      kill: () => {},
+      list: () => [],
+      isAvailable: async () => true,
+    };
+
+    const results = await waitForResults(
+      root,
+      sprint,
+      3_000,
+      undefined,
+      {
+        spawnBackend: backend,
+        autoApprove: true,
+        evaluateCollectedResult: async (task) => {
+          evaluated.push(task.id);
+          return TaskEvaluation.DONE;
+        },
+      },
+      undefined,
+      makeConfig(true),
+    );
+
+    expect(evaluated).toEqual(['a', 'b']);
+    expect(spawned).toEqual(['b']);
+    expect(results.map(result => result.taskId)).toEqual(['a', 'b']);
   });
 
   it('closes honestly via timeout when a ready task cannot be spawned (spawn error) — no infinite wait', async () => {
@@ -283,7 +383,7 @@ describe('waitForResults — dispatch/EVALUATE race fix', () => {
     const b = makeTask('b', { status: TaskStatus.PENDING, dependencies: ['a'] });
     const sprint = makeSprint([a, b]);
     settleTestRuntimeBudget(root, 'a');
-    writeFileSync(join(root, '.tasks', 'task-a.result'), JSON.stringify(doneResult('a')), 'utf-8');
+    writeDoneResult(root, 'a');
 
     const attempts: string[] = [];
     const backend: SpawnBackend = {
@@ -317,7 +417,7 @@ describe('waitForResults — dispatch/EVALUATE race fix', () => {
     const a = makeTask('a', { status: TaskStatus.EXECUTING, budget: undefined });
     const b = makeTask('b', { status: TaskStatus.PENDING, dependencies: ['a'] });
     const sprint = makeSprint([a, b]);
-    writeFileSync(join(root, '.tasks', 'task-a.result'), JSON.stringify(doneResult('a')), 'utf-8');
+    writeDoneResult(root, 'a');
 
     const spawned: string[] = [];
     const backendWithoutLanding: SpawnBackend = {

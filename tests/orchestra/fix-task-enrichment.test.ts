@@ -13,6 +13,8 @@ import type { Task, TaskResult } from '../../src/core/types.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
+const spawnSyncMock = vi.hoisted(() => vi.fn());
+
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(() => { throw new Error('ENOENT: no such file'); }),
   writeFileSync: vi.fn(),
@@ -28,6 +30,11 @@ vi.mock('node:fs', () => ({
     access: vi.fn(async () => undefined),
     stat: vi.fn(async () => ({ size: 0 })),
   },
+}));
+
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...await importOriginal<typeof import('node:child_process')>(),
+  spawnSync: spawnSyncMock,
 }));
 
 vi.mock('../../src/agents/worker.js', () => ({
@@ -98,6 +105,7 @@ function readWrittenFixTask(callIdx = 0): { path: string; payload: any } {
 describe('FIX prompt enrichment — handleEvaluation NO_GO', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    spawnSyncMock.mockReturnValue({ status: 1, stdout: '' });
   });
 
   it('description-inject: fix-task.description contains the ORIGINAL task description', () => {
@@ -162,5 +170,61 @@ describe('FIX prompt enrichment — handleEvaluation NO_GO', () => {
     expect(stripVolatile(second.payload)).toEqual(stripVolatile(first.payload));
     // Spot-check the enrichment payload itself is deterministic.
     expect(second.payload.description).toBe(first.payload.description);
+  });
+
+  it('adds only tracked failure-evidence files inside the reviewed scope boundary', () => {
+    spawnSyncMock.mockReturnValue({
+      status: 0,
+      stdout: 'tests/cli/recover.test.ts\ntests/mcp/recover.test.ts\n',
+    });
+    const task = makeTask({
+      scope: {
+        directories: ['src/', 'tests/cli/', 'tests/mcp/'],
+        filesRead: [],
+        filesWrite: ['src/recover.ts'],
+      },
+    });
+    const result = makeNoGoResult({
+      notes:
+        'Targeted failures require tests/cli/recover.test.ts and tests/mcp/recover.test.ts updates.',
+    });
+
+    handleEvaluation('/root', task, TaskEvaluation.NO_GO, result);
+
+    const { payload } = readWrittenFixTask();
+    expect(payload.scope.filesWrite).toEqual([
+      'src/recover.ts',
+      'tests/cli/recover.test.ts',
+      'tests/mcp/recover.test.ts',
+    ]);
+    expect(payload.repairAuthority).toMatchObject({
+      state: 'accepted',
+      addedWritePaths: [
+        'tests/cli/recover.test.ts',
+        'tests/mcp/recover.test.ts',
+      ],
+    });
+  });
+
+  it('parks an impossible FIX contract instead of dispatching unchanged authority', () => {
+    const task = makeTask({
+      scope: {
+        directories: ['src/'],
+        filesRead: [],
+        filesWrite: ['src/recover.ts'],
+      },
+    });
+    const result = makeNoGoResult({
+      notes: 'Repair requires tests/cli/recover.test.ts, which is outside the reviewed boundary.',
+    });
+
+    handleEvaluation('/root', task, TaskEvaluation.NO_GO, result);
+
+    const { payload } = readWrittenFixTask();
+    expect(payload.status).toBe(TaskStatus.PAUSED);
+    expect(payload.repairAuthority).toMatchObject({
+      state: 'hold',
+      evidenceWritePaths: ['tests/cli/recover.test.ts'],
+    });
   });
 });

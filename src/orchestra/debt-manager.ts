@@ -19,6 +19,7 @@ import { MemoryStore } from '../core/memory-store.js';
 import type { MemoryEntryV2, CreateEntryInput } from '../core/memory-types.js';
 import { extractSprintFromDebtId } from '../core/memory-import.js';
 import { readJsonSafe, debugLog } from '../core/utils.js';
+import { getAgentRole } from '../core/agent-role-contract.js';
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
 
@@ -59,6 +60,81 @@ function regateInheritedScope(
     return { ...scope, filesWrite };
   } catch {
     return scope; // fail-open: inherited scope is used unchanged
+  }
+}
+
+const FAILURE_EVIDENCE_PATH_RE =
+  /(?:src|tests|scripts)\/[\w\-/.]+\.(?:ts|tsx|mjs|cjs|js)/g;
+
+export interface FixWriteAuthorityReview {
+  readonly state: 'accepted' | 'hold';
+  readonly inheritedWritePaths: readonly string[];
+  readonly evidenceWritePaths: readonly string[];
+  readonly addedWritePaths: readonly string[];
+  readonly unresolvedPromptFindings: readonly string[];
+}
+
+/**
+ * Derive the smallest additional FIX write set from bounded failure evidence.
+ *
+ * A path is admitted only when it is:
+ * - explicitly named in the typed TaskResult notes envelope,
+ * - inside one of the original task's reviewed scope directories, and
+ * - tracked by the current repository.
+ *
+ * Directory entries are used only as a review boundary; they are never copied
+ * into filesWrite as a broad grant.
+ */
+export function deriveFixWriteAuthority(
+  projectRoot: string,
+  task: Task,
+  result: TaskResult,
+): Pick<
+  FixWriteAuthorityReview,
+  'inheritedWritePaths' | 'evidenceWritePaths' | 'addedWritePaths'
+> {
+  const inheritedWritePaths = [...new Set(task.scope?.filesWrite ?? [])].sort();
+  const inherited = new Set(inheritedWritePaths);
+  const directories = (task.scope?.directories ?? [])
+    .map(directory => directory.replace(/\\/g, '/').replace(/^\.\/+/, '').replace(/\/+$/, ''))
+    .filter(Boolean);
+  const evidenceWritePaths = [...new Set((result.notes ?? '').match(FAILURE_EVIDENCE_PATH_RE) ?? [])]
+    .map(candidate => candidate.replace(/\\/g, '/').replace(/^\.\/+/, ''))
+    .filter(candidate =>
+      !candidate.startsWith('/')
+      && !candidate.split('/').includes('..'),
+    )
+    .sort();
+  const mentioned = evidenceWritePaths
+    .filter(candidate =>
+      directories.some(directory =>
+        candidate === directory || candidate.startsWith(`${directory}/`)),
+    )
+    .filter(candidate => !inherited.has(candidate));
+  if (mentioned.length === 0) {
+    return { inheritedWritePaths, evidenceWritePaths, addedWritePaths: [] };
+  }
+
+  try {
+    const tracked = spawnSync('git', ['ls-files', '--', ...mentioned], {
+      cwd: projectRoot,
+      encoding: 'utf-8',
+      maxBuffer: 4 * 1024 * 1024,
+      timeout: 5_000,
+    });
+    if (tracked.status !== 0 || typeof tracked.stdout !== 'string') {
+      return { inheritedWritePaths, evidenceWritePaths, addedWritePaths: [] };
+    }
+    const trackedPaths = new Set(
+      tracked.stdout.split('\n').map(path => path.trim()).filter(Boolean),
+    );
+    return {
+      inheritedWritePaths,
+      evidenceWritePaths,
+      addedWritePaths: mentioned.filter(candidate => trackedPaths.has(candidate)),
+    };
+  } catch {
+    return { inheritedWritePaths, evidenceWritePaths, addedWritePaths: [] };
   }
 }
 
@@ -330,9 +406,13 @@ export function selectFixAgent(task: Task, exitedWithoutResult: boolean): string
   if (isTestTask) return originalAgent || 'ci-guardian';
   if (isDocTask) return 'doc-writer';
   if (isBugTask) return 'bug-fixer';
-  // Everything else (architect, refactorer, security-auditor, generic) falls
-  // through to fresh-eyes rotation so the retry gets a different lens.
-  return rotateAgentForFix(originalAgent);
+  // Everything else gets a fresh lens only when that persona can actually
+  // produce the requested repair. Reviewer/analyst personas are valid
+  // evaluators but impossible FIX workers; route those retries to the canonical
+  // implementation-capable repair persona.
+  const rotated = rotateAgentForFix(originalAgent);
+  const rotatedRole = getAgentRole({ id: rotated });
+  return rotatedRole === 'implementer' ? rotated : 'bug-fixer';
 }
 
 /**
@@ -519,6 +599,11 @@ export function handleEvaluation(
     ...(task.assignedSkills ?? []),
     ...rotationStrategy.addedSkills,
   ]));
+  const authorityDelta = deriveFixWriteAuthority(projectRoot, task, result);
+  const reviewedFilesWrite = [
+    ...authorityDelta.inheritedWritePaths,
+    ...authorityDelta.addedWritePaths,
+  ];
 
   const fixTask: Task = {
     id: `${task.id}-fix`,
@@ -529,7 +614,10 @@ export function handleEvaluation(
     effort: task.effort,
     priority: 'CRITICAL',
     reason: enrichedReason,
-    scope: regateInheritedScope(projectRoot, `${task.id}-fix`, task.scope),
+    scope: regateInheritedScope(projectRoot, `${task.id}-fix`, {
+      ...task.scope,
+      filesWrite: reviewedFilesWrite,
+    }),
     dependencies: [],
     goNogo: task.goNogo,
     status: TaskStatus.PENDING,
@@ -544,12 +632,29 @@ export function handleEvaluation(
     createdAt: now(),
   };
 
+  const admittedWritePaths = new Set(fixTask.scope.filesWrite);
+  const unresolvedEvidencePaths = authorityDelta.evidenceWritePaths
+    .filter(path => !admittedWritePaths.has(path));
+  const repairAuthority: FixWriteAuthorityReview = {
+    state: unresolvedEvidencePaths.length === 0 ? 'accepted' : 'hold',
+    inheritedWritePaths: authorityDelta.inheritedWritePaths,
+    evidenceWritePaths: authorityDelta.evidenceWritePaths,
+    addedWritePaths: authorityDelta.addedWritePaths,
+    unresolvedPromptFindings: unresolvedEvidencePaths.map(
+      path => `repair evidence path lacks reviewed write authority: ${path}`,
+    ),
+  };
+  if (repairAuthority.state === 'hold') {
+    fixTask.status = TaskStatus.PAUSED;
+  }
+
   // rotationStrategy lives on the JSON payload but is not part of the
   // formal Task interface (kept out of core/ per task scope). Spread
   // through an unknown-cast so TS doesn't widen Task with this field.
   const fixTaskPayload: unknown = {
     ...fixTask,
     rotationStrategy,
+    repairAuthority,
   };
 
   mkdirSync(join(projectRoot, TASKS_DIR), { recursive: true });

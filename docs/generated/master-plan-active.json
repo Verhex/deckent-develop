@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "968fe085cca11813e231d081ec392b4c0ec4797ebfc5a28eb7676f2c26f1c6dd"
+    "value": "3377951d4855ac627197cb93b2d7822d8b32e04a8f8cbd404955a6e9b6b04482"
   },
   "summary": {
     "total": 270,
@@ -1920,7 +1920,7 @@
       "state": "OPEN",
       "updated": "2026-07-31",
       "definitionDigest": "880625fb14f34c4b8ea398812fe66dbf862de1346e5a2d111b6c88faabc33fa3",
-      "progressDigest": "4b740ac6878dc32f4fbdf93398a1cbee7e9afd92da9a9e1b5ffba16d3e99f73e",
+      "progressDigest": "e86cfff57554f40387cf7504ad4b5603edd16a485e80eb95797863cd49d36d9d",
       "terminalClosureDigest": null
     },
     {
@@ -1931,7 +1931,7 @@
       "state": "OPEN",
       "updated": "2026-07-31",
       "definitionDigest": "f83bcf67f4a1cb8f7df5db21c035f003be719d5c0b597221c2406fa5822fc52b",
-      "progressDigest": "a0682a891568dde8135ae454a36e23867ffe6b9ef000ca13e52f5349aa7dcb09",
+      "progressDigest": "23c8f5dfad3a0a8ef60f0d70052b65ba8e8119fb86498f8bb9a00674a7ea8a5a",
       "terminalClosureDigest": null
     },
     {
@@ -1942,7 +1942,7 @@
       "state": "OPEN",
       "updated": "2026-07-31",
       "definitionDigest": "02e1471242c78b687f7148492c97457b2e526de5533817b18d0f804fca9f567c",
-      "progressDigest": "6a42aafd256a02ab251ce021c8260b8c35fcabbf7da98e272374f201c13d3a00",
+      "progressDigest": "945033a1790609d0658cd2197a26411df82b718dec2e8a896f439450ee92e145",
       "terminalClosureDigest": null
     },
     {
@@ -1953,7 +1953,7 @@
       "state": "OPEN",
       "updated": "2026-07-31",
       "definitionDigest": "34cb1021a6e863e7734b8643eb7e56553bd35b05e6c37d2f383844ddfdc88450",
-      "progressDigest": "186312d8c561006e70f87730074119b4a9f5bbb7eac466328ef665865de94da3",
+      "progressDigest": "281f7c43ce2b45f329262382693f2b43e9c9010bf66374fb4fbef0ab05130d80",
       "terminalClosureDigest": null
     },
     {
@@ -10542,10 +10542,10 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "0",
         "S": "?"
@@ -10559,7 +10559,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "A child becomes dispatchable only after every dependency logical lineage has one aggregate terminal receipt accepted as DONE or allowed debt; raw `.result`, worker exit and pre-evaluation status cannot release the edge; generated FIX attempts remain inside the parent lineage",
-      "evidence": "Sprint-482 task 482-002 spawned at `07:14:46Z` immediately after 482-001 raw result/worker exit, while Brain did not persist 482-001 aggregate evaluation DONE until `07:19:05Z`. The exact proposal required Task 2 to start only after Task 1 aggregate DONE. Affected product and dogfood surfaces: dependency scheduler, result collector, evaluator, exact topology and shared-worktree safety. Negative scope: no global wave barrier, no polling delay, no treating worker self-assessment as authority",
+      "evidence": "Sprint-482 task 482-002 spawned at `07:14:46Z` immediately after 482-001 raw result/worker exit, while Brain did not persist 482-001 aggregate evaluation DONE until `07:19:05Z`. Manual recovery now injects host evaluation into result collection, persists the aggregate verdict before status mutation/dependency release, reuses the same receipt in the full EVALUATE phase and fails typed when that receipt is absent. Hermetic race, dependency-pipeline and evaluator suites pass; fresh live replay remains required before DONE. Negative scope: no global wave barrier, no polling delay, no treating worker self-assessment as authority",
       "updated": "2026-07-31"
     },
     {
@@ -10582,10 +10582,10 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "0",
         "S": "?"
@@ -10600,7 +10600,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "A generated FIX derives a minimal reviewed write-set delta from typed failure evidence, routes to an implementation-capable persona, de-duplicates bounded verification targets and refuses dispatch when the repair cannot be performed within authority; retries never repeat an unchanged impossible contract",
-      "evidence": "482-002 diagnosed stale `tests/cli/commands/recover.test.ts` and `tests/mcp/tools/recover.test.ts`; both FIX descriptions named them, but neither FIX `filesWrite` included them and prompt-lint emitted `mentioned-file-outside-write-authority` as warning. First FIX was routed to read-only `code-reviewer`; second to `bug-fixer` but with the same impossible scope. Each ran a duplicated-directory host reconciliation for about four minutes and remained NO_GO. Affected product and dogfood surfaces: FIX builder, Routing Engine v3, prompt contract, evaluator cost and dependency repair. Negative scope: no automatic broad directory write grant, no persona instruction override, no infinite retry, no legacy-test compatibility logic in production adapters",
+      "evidence": "482-002 diagnosed stale `tests/cli/commands/recover.test.ts` and `tests/mcp/tools/recover.test.ts`; both FIX descriptions named them, but neither FIX `filesWrite` included them and prompt-lint emitted `mentioned-file-outside-write-authority` as warning. Manual recovery now admits only exact Git-tracked paths explicitly named by failure evidence and already inside reviewed directories, records the authority receipt, PAUSEs impossible contracts and re-gates reviewer/analyst rotation to an implementation-capable persona. Enrichment, agent-selection and fresh-eyes suites pass; fresh live replay remains required before DONE. Negative scope: no automatic broad directory write grant, no persona instruction override, no infinite retry, no legacy-test compatibility logic in production adapters",
       "updated": "2026-07-31"
     },
     {
@@ -10624,10 +10624,10 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "0",
         "S": "?"
@@ -10642,7 +10642,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "When a logical task exhausts its configured FIX budget and blocks unfinished dependants, Sprint and outer RunFlow publish one typed PAUSED/HELD or failed settlement with exact recovery command and preserved task authority; `RUN_COMPLETED` and canonical COMPLETE require every logical task to have an allowed aggregate terminal receipt",
-      "evidence": "Sprint-482 logical 482-002 exhausted original plus two FIX attempts as NO_GO; dependent 482-003 never dispatched. Controller logged `handleEvaluation:fixBudgetExhausted`, then immediately classified 482-003 NOT_DISPATCHED, finalized canonical COMPLETE and RunFlow emitted `RUN_COMPLETED`; status was non-resumable and no Nervous approval/recovery command existed. Job summary counted `1/3` success yet status and flow advertised completion. Affected product and dogfood surfaces: FIX phase, Sprint settlement, RunFlow/Do, status, Nervous and operator recovery. Negative scope: no infinite retries, no counting FIX as a second logical task, no synthetic DONE, no destructive auto-cleanup of unfinished authority",
+      "evidence": "Sprint-482 logical 482-002 exhausted original plus two FIX attempts as NO_GO; dependent 482-003 never dispatched. Manual recovery now folds transitive blocked dependants into the logical lineage circuit-breaker and forces typed PAUSE even when the ordinary configurable failure ratio is below threshold; independent failures retain the configured policy. Core lineage, controller integration and i18n message suites pass; fresh live RunFlow replay remains required before DONE. Negative scope: no infinite retries, no counting FIX as a second logical task, no synthetic DONE, no destructive auto-cleanup of unfinished authority",
       "updated": "2026-07-31"
     },
     {
@@ -10664,10 +10664,10 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "0",
         "S": "?"
@@ -10680,7 +10680,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Subscription/local/free-tier attempts retain token and quota/reference-cost observability while incremental billed USD and API budget charge remain zero unless authoritative metered billing evidence exists; job, task, status, KPI and admission projections agree",
-      "evidence": "Effective cost authority states OpenAI Codex subscription has no per-task USD charge, yet Sprint-482 task results wrote `$3.750067`, `$1.7327185`, `$1.21926` and `$1.266667`; terminal job recorded `billedCostUsd=2.485927` and `referenceCostUsd=7.9687125`. `deckent usage --sprint 482` simultaneously reported that no run data could be mapped, while runtime resource rows used container hashes rather than logical task IDs. Affected product and dogfood surfaces: result wrapper, job summary, budget admission, usage/KPI and enterprise cost reporting. Negative scope: no fabricated provider quota, no discarding token usage, no treating reference price as invoice evidence",
+      "evidence": "Effective cost authority states OpenAI Codex subscription has no per-task USD charge, yet Sprint-482 task results wrote phantom billed values. Manual recovery separates `cost.usd` (incremental billed/API spend) from `cost.referenceUsd`, persists effective `billingMode`, treats subscription/free-tier/local provider totals as reference-only, leaves hybrid/unknown billing unresolved, and makes finalizer/KPI/job/reporter/reconciler consume the same settled fields. Cost, enrichment, budget, reporter and schema suites pass; fresh multi-provider live replay remains required before DONE. Negative scope: no fabricated provider quota, no discarding token usage, no treating reference price as invoice evidence",
       "updated": "2026-07-31"
     },
     {
@@ -14865,6 +14865,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "945af089cdc9cb0b35db080ab5a007cae1706d7af50c9ac120839f83e2e8f570"
+    "value": "4993e1c8dd6eeaaca31c1acf3e657d039fc7e5491aae9918ff849d2f0381aba3"
   }
 }

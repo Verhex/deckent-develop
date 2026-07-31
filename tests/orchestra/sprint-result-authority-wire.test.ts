@@ -48,6 +48,24 @@ describe('production sprint result-authority boundary', () => {
     expect(grace).toBeLessThan(evaluate);
   });
 
+  it('evaluates collected results before dependency dispatch and reuses the durable verdict', async () => {
+    const source = await readFile('src/orchestra/sprint-controller.ts', 'utf-8');
+    const executeStart = source.indexOf('// Phase 3: EXECUTE');
+    const phaseEvaluate = source.indexOf('// Phase 4: EVALUATE', executeStart);
+    const executeBoundary = source.slice(executeStart, phaseEvaluate);
+    const evaluatorWire = executeBoundary.indexOf('evaluateCollectedResult: async');
+    const incrementalEvaluate = executeBoundary.indexOf('await runEvaluatePhase(', evaluatorWire);
+    const receiptRead = executeBoundary.indexOf('evaluations.get(task.id)', incrementalEvaluate);
+
+    expect(evaluatorWire).toBeGreaterThan(-1);
+    expect(incrementalEvaluate).toBeGreaterThan(evaluatorWire);
+    expect(receiptRead).toBeGreaterThan(incrementalEvaluate);
+
+    const phaseBoundary = source.slice(phaseEvaluate);
+    expect(phaseBoundary).toContain('skipPreviouslyEvaluated: true');
+    expect(phaseBoundary).toContain('runtimeState: evaluationRuntimeState');
+  });
+
   it('makes EVALUATE authority failure terminal and checks RETRO before mutation', async () => {
     const source = await readFile('src/orchestra/sprint-phases.ts', 'utf-8');
     const evaluateStart = source.indexOf('export async function runEvaluatePhase(');

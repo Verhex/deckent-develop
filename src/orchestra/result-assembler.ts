@@ -42,6 +42,8 @@ import { getDefaultProviderName } from './sprint-utils.js';
 export interface CostInput {
   usd: number;
   currency?: 'USD';
+  referenceUsd?: number;
+  billingMode?: 'api' | 'subscription' | 'free_tier' | 'local';
   pricingSource: string;
   isLocal?: boolean;
 }

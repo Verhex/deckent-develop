@@ -12,6 +12,12 @@ import { readJsonSafe, debugLog } from './utils.js';
 import { capabilityVectorSchema } from './routing/capability-vector.js';
 import type { CapabilityVector } from './routing/capability-vector.js';
 import { modelRegistry, resolveCanonicalModelIdentity } from './model-registry.js';
+import type { AgentRole } from './agent-role-contract.js';
+export {
+  BUILTIN_AGENT_ROLES,
+  getAgentRole,
+  type AgentRole,
+} from './agent-role-contract.js';
 
 // ─── Builtin Fallback (371-001 CATALOG-MATERIALIZE) ─────────────────────────
 //
@@ -202,8 +208,6 @@ export type AgentDomain = 'cli' | 'react' | 'system' | 'test' | 'doc' | 'devops'
  * `getRoleMismatchPenalty` in routing-engine.ts). Bridges to ADR-G-006 V3's
  * task-kind vector-select axis.
  */
-export type AgentRole = 'implementer' | 'reviewer' | 'analyst';
-
 // Module augmentation: adds domain?/role?/capabilities? to AgentDefinition
 // (backward compat — undefined → 'generic' / 'implementer' / no capability vector).
 // `capabilities` (445-012, routing-v3 Slice-0) is purely additive: the V2 scoring
@@ -255,41 +259,6 @@ export function getAgentDomain(agent: AgentDefinition): AgentDomain | 'generic' 
   const temp = TEMP_AGENT_DOMAINS[agent.id];
   if (temp) return temp;
   return 'generic';
-}
-
-/**
- * PCOMP-W5: hardcoded role map for built-in agents (mirrors BUILTIN_AGENT_DOMAINS —
- * agent.json role field population stays optional). Grounding from the live census:
- * code-reviewer (18 severity/output-format refs), security-auditor (3),
- * accessibility-auditor (2) are review personas; performance-analyzer and
- * architecture-planner produce analyses/plans, not diffs; everything else ships code.
- */
-export const BUILTIN_AGENT_ROLES: Readonly<Record<string, AgentRole>> = {
-  'architect': 'implementer',
-  'architecture-planner': 'analyst',
-  'bug-fixer': 'implementer',
-  'code-reviewer': 'reviewer',
-  'refactorer': 'implementer',
-  'api-builder': 'implementer',
-  'frontend-designer': 'implementer',
-  'accessibility-auditor': 'reviewer',
-  'doc-writer': 'implementer',
-  'ci-guardian': 'implementer',
-  'security-auditor': 'reviewer',
-  'performance-analyzer': 'analyst',
-  'data-engineer': 'implementer',
-  'devops-engineer': 'implementer',
-  'migration-specialist': 'implementer',
-};
-
-/**
- * Get the role for an agent. Reads agent.role if set (from agent.json), falls
- * back to BUILTIN_AGENT_ROLES by id, then 'implementer' (safe default: most
- * work is implementation and an unknown persona should not be penalized).
- */
-export function getAgentRole(agent: AgentDefinition): AgentRole {
-  if (agent.role) return agent.role;
-  return BUILTIN_AGENT_ROLES[agent.id] ?? 'implementer';
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────

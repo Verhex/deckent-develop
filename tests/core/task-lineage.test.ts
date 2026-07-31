@@ -169,6 +169,26 @@ describe('post-FIX circuit breaker', () => {
     expect(evaluateFixCircuitBreaker(tasks, evaluations, policy).shouldPause).toBe(false);
   });
 
+  it('pauses below the ratio gate when an exhausted lineage still blocks unfinished dependants', () => {
+    const tasks = [
+      task('blocked-root', TaskStatus.NO_GO),
+      task('independent', TaskStatus.DONE),
+      task('dependent', TaskStatus.PENDING, { dependencies: ['blocked-root'] }),
+    ];
+    const evaluations = new Map([
+      ['blocked-root', TaskEvaluation.NO_GO],
+      ['independent', TaskEvaluation.DONE],
+      ['dependent', TaskEvaluation.NOT_DISPATCHED],
+    ]);
+
+    expect(evaluateFixCircuitBreaker(tasks, evaluations, policy)).toMatchObject({
+      shouldPause: true,
+      unresolvedTasks: 1,
+      blockedDependentTaskIds: ['dependent'],
+      forcedByBlockedDependents: true,
+    });
+  });
+
   it('does not pause a large run merely because five roots failed when the ratio is low', () => {
     const tasks = Array.from({ length: 50 }, (_, index) =>
       task(`large-${index + 1}`, index < 5 ? TaskStatus.NO_GO : TaskStatus.DONE),

@@ -1444,6 +1444,15 @@ export async function runEvaluatePhase(
     enforceDispatchGate?: boolean;
     providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
     crossVerifyInvocationFactory?: MandatoryCrossVerifyInvocationFactory;
+    /**
+     * EXECUTE-time aggregate settlement evaluates only newly collected task
+     * ids without publishing a sprint-wide phase transition.
+     */
+    incrementalTaskIds?: ReadonlySet<string>;
+    /** Do not re-run policy gates for durable verdicts already in the map. */
+    skipPreviouslyEvaluated?: boolean;
+    /** Sprint-wide billed verification counter shared across incremental calls. */
+    runtimeState?: { verificationsDispatched: number };
   },
 ): Promise<void> {
   // ─── Idempotency Guard (Sprint 157 Task 002) ───────────────────
@@ -1476,9 +1485,14 @@ export async function runEvaluatePhase(
       && (resolvedConfig?.max_fix_retries ?? 2) > 0,
   };
   try {
+    const authorityTaskIds = options?.incrementalTaskIds
+      ? sprint.tasks
+          .filter(task => options.incrementalTaskIds?.has(task.id))
+          .map(task => task.id)
+      : sprint.tasks.map(task => task.id);
     assertTaskResultAuthoritiesReady(
       projectRoot,
-      sprint.tasks.map(task => task.id),
+      authorityTaskIds,
       'evaluate-entry',
     );
 
@@ -1545,9 +1559,12 @@ export async function runEvaluatePhase(
     // Sprint 161 Task 2 (T-003): EVALUATE entry — phase reaches disk so
     // observers see the EXECUTE→EVALUATE transition. Previously sprint-
     // state.json froze on SPAWN through to CLEANUP (Sprint 159 forensic).
-    persistPhaseTransition(projectRoot, sprint, SprintPhase.EVALUATE, SprintStatus.EVALUATING);
+    if (!options?.incrementalTaskIds) {
+      persistPhaseTransition(projectRoot, sprint, SprintPhase.EVALUATE, SprintStatus.EVALUATING);
+    }
     const resultsMap = buildResultsMap(results);
     const collectedIds = new Set(results.map(r => r.taskId));
+    const evaluatedThisInvocation = new Set<string>();
     debugLog('runEvaluatePhase:start', `totalTasks=${sprint.tasks.length} collectedResults=${results.length} collectedIds=[${[...collectedIds].join(',')}]`);
 
     // Resolve CI guardian config once for all tasks
@@ -1566,9 +1583,11 @@ export async function runEvaluatePhase(
     // Each dispatch is a billed provider call; the owner ceiling bounds one
     // sprint's exposure (canary = 1). Absent = no ceiling.
     const maxVerificationsPerSprint = config?.cross_verify?.max_verifications_per_sprint;
-    let verificationsDispatched = 0;
+    const runtimeState = options?.runtimeState ?? { verificationsDispatched: 0 };
 
     for (const task of sprint.tasks) {
+      if (options?.incrementalTaskIds && !options.incrementalTaskIds.has(task.id)) continue;
+      if (options?.skipPreviouslyEvaluated && evaluations.has(task.id)) continue;
       if (collectedIds.has(task.id)) {
         const rawResult = resultsMap.get(task.id);
         if (!rawResult) continue; // narrowed: collectedIds contains task.id
@@ -1861,7 +1880,7 @@ export async function runEvaluatePhase(
         const mandatoryCrossVerify =
           resolvedConfig?.cross_verify?.enforce_refuted === true;
         const verificationCeilingReached = maxVerificationsPerSprint !== undefined
-          && verificationsDispatched >= maxVerificationsPerSprint;
+          && runtimeState.verificationsDispatched >= maxVerificationsPerSprint;
         if (
           resolvedConfig?.cross_verify?.enabled === true &&
           (evaluation === TaskEvaluation.DONE || evaluation === TaskEvaluation.GO_WITH_TECH_DEBT)
@@ -1884,7 +1903,7 @@ export async function runEvaluatePhase(
                 : ceilingNote;
             }
           } else {
-          verificationsDispatched += 1;
+          runtimeState.verificationsDispatched += 1;
           try {
             const xvResult = await runCrossVerify(
               projectRoot,
@@ -2078,6 +2097,7 @@ export async function runEvaluatePhase(
         debugLog('runEvaluatePhase:task', `task=${task.id} selfAssessment=${result.selfAssessment} evaluation=${evaluation} testsPassed=${result.testsPassed}`);
         handleEvaluation(projectRoot, task, evaluation, result, initialFixPolicy);
         evaluations.set(task.id, evaluation);
+        evaluatedThisInvocation.add(task.id);
 
         // Sprint 207 P1-2 (forensic Sprint 206): persist Brain's verdict back to the
         // .result file so a .result shows WHY a FIX was spawned, not just the worker's
@@ -2155,6 +2175,7 @@ export async function runEvaluatePhase(
         // double-count the logical task, and poison routing statistics.
         if (task.status === TaskStatus.PAUSED) {
           evaluations.set(task.id, TaskEvaluation.DEFERRED);
+          evaluatedThisInvocation.add(task.id);
           debugLog(
             'runEvaluatePhase:dependency-repair-deferred',
             `task=${task.id} parked behind repairable dependency — deferred to FIX unblock`,
@@ -2236,6 +2257,7 @@ export async function runEvaluatePhase(
             const evaluation = toTaskEvaluation(rubricResult);
             handleEvaluation(projectRoot, task, evaluation, lateResult, initialFixPolicy);
             evaluations.set(task.id, evaluation);
+            evaluatedThisInvocation.add(task.id);
             writeTaskEvaluationAudit(projectRoot, sprint.id, task, evaluation, rubricResult);
             continue;
           }
@@ -2283,6 +2305,7 @@ export async function runEvaluatePhase(
             );
           } catch (e) { debugLog('runEvaluatePhase:nd-event', e); }
           evaluations.set(task.id, TaskEvaluation.NOT_DISPATCHED);
+          evaluatedThisInvocation.add(task.id);
           continue;
         }
         if (liveness.status === 'dead') {
@@ -2306,6 +2329,7 @@ export async function runEvaluatePhase(
               );
             } catch (e) { debugLog('runEvaluatePhase:nd2-event', e); }
             evaluations.set(task.id, TaskEvaluation.NOT_DISPATCHED);
+            evaluatedThisInvocation.add(task.id);
             continue;
           }
         }
@@ -2327,6 +2351,7 @@ export async function runEvaluatePhase(
             const graceEval = toTaskEvaluation(graceRubric);
             handleEvaluation(projectRoot, task, graceEval, graceResult, initialFixPolicy);
             evaluations.set(task.id, graceEval);
+            evaluatedThisInvocation.add(task.id);
             writeTaskEvaluationAudit(projectRoot, sprint.id, task, graceEval, graceRubric);
             continue;
           }
@@ -2367,6 +2392,7 @@ export async function runEvaluatePhase(
           initialFixPolicy,
         );
         evaluations.set(task.id, TaskEvaluation.NO_GO);
+        evaluatedThisInvocation.add(task.id);
         // 352-003 (EVAL-AUDIT-REVIVE): no .result was ever collected, so no
         // rubric ever ran — the "rubric'siz" path. writeTaskEvaluationAudit
         // still writes a decision + rationale record (no rubricResult arg),
@@ -2426,6 +2452,7 @@ export async function runEvaluatePhase(
       if (config?.training_trace?.enabled === true) {
         const traceCollector = createOutputCollector(projectRoot);
         for (const [traceTaskId, verdict] of evaluations) {
+          if (!evaluatedThisInvocation.has(traceTaskId)) continue;
           const traceResult = resultsMap.get(traceTaskId);
           if (!traceResult) continue;
           const traceTask = sprint.tasks.find(t => t.id === traceTaskId);
@@ -2494,6 +2521,7 @@ export async function runEvaluatePhase(
       const sprintId = getCurrentSprintId(projectRoot) ?? sprint.id;
       const resultsMapForCascade = buildResultsMap(results);
       for (const [taskId, evaluation] of evaluations.entries()) {
+        if (!evaluatedThisInvocation.has(taskId)) continue;
         if (evaluation !== TaskEvaluation.NO_GO) continue;
         const result = resultsMapForCascade.get(taskId);
         if (!result) continue; // skip timeout NO_GOs — root failures only

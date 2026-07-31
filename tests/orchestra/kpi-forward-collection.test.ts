@@ -153,6 +153,50 @@ describe('buildUsageTotals — REAL provider cost wins over the Opus estimate', 
     expect(totals.unknownBillingTaskCount).toBe(0);
   });
 
+  it('uses the settled billed field for API spend and the separate reference field for comparison', () => {
+    const result = mkResult(
+      { inputTokens: 5_000, outputTokens: 1_000 },
+      {
+        ...mkCost(0),
+        referenceUsd: 1.93,
+        billingMode: 'subscription',
+      },
+    );
+    const task = {
+      id: result.taskId,
+      provider: 'claude',
+      authMode: 'subscription',
+    } as unknown as Task;
+
+    const totals = buildUsageTotals([result], [task], 'subscription');
+
+    expect(totals.costUsd).toBe(0);
+    expect(totals.referenceCostUsd).toBe(1.93);
+  });
+
+  it('marks API billing unknown when only an unverified catalog reference exists', () => {
+    const result = mkResult(
+      { inputTokens: 5_000, outputTokens: 1_000 },
+      {
+        ...mkCost(0),
+        referenceUsd: 1.93,
+        billingMode: 'api',
+        pricingSource: 'unverified-api-reference:cost-config:openai/gpt',
+      },
+    );
+    const task = {
+      id: result.taskId,
+      provider: 'openai',
+      authMode: 'api',
+    } as unknown as Task;
+
+    const totals = buildUsageTotals([result], [task], 'api');
+
+    expect(totals.costUsd).toBe(0);
+    expect(totals.referenceCostUsd).toBe(1.93);
+    expect(totals.unknownBillingTaskCount).toBe(1);
+  });
+
   it('falls back to the Opus estimate when NO result carries cost (legacy behavior)', () => {
     const results: TaskResult[] = [
       mkResult({ inputTokens: 1000, outputTokens: 500, cacheReadTokens: 200 }),

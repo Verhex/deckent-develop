@@ -690,12 +690,10 @@ function estimateResultCost(usage: TaskResult['tokenUsage']): number {
  * Aggregate per-task usage across a sprint's results into the provider-agnostic
  * {@link UsageTotals} consumed by the KPI collection pipeline.
  *
- * Cost is REAL-cost-first (Sprint 332 332-002, fix #3): each result contributes its
- * provider-reported `result.cost.usd` when present — the F1-TOK/cost-config
- * ground-truth landed sprint-330 — and falls back to the Opus-tier token estimate
- * ONLY for a result that carries no `cost`. Fully provider-agnostic: a
- * Codex/Gemini/local result's real spend is summed verbatim, and `cost.usd === 0`
- * (local/ollama) is an authoritative zero, never re-estimated.
+ * Billing-authority-first: `result.cost.usd` is incremental billed/API spend,
+ * while `result.cost.referenceUsd` retains catalog/provider-equivalent value for
+ * subscription, free-tier and local attempts. A legacy result without the
+ * separated reference field falls back to its historical cost or token estimate.
  *
  * Token counts are still summed across all results regardless of cost source.
  *
@@ -724,11 +722,12 @@ export function buildUsageTotals(
       cacheRead += usage.cacheReadTokens ?? 0;
     }
 
-    // REAL provider-reported cost wins (provider-agnostic ground truth); the
-    // Opus-tier estimate is used only when this result reports no `cost`.
-    const reportedCost = result.cost?.usd;
-    const referenceCost = typeof reportedCost === 'number' && Number.isFinite(reportedCost)
-      ? reportedCost
+    // Reference value keeps provider/catalog equivalence; the legacy Opus-tier
+    // estimate is used only when this result reports no cost authority.
+    const reportedReferenceCost = result.cost?.referenceUsd ?? result.cost?.usd;
+    const referenceCost = typeof reportedReferenceCost === 'number'
+      && Number.isFinite(reportedReferenceCost)
+      ? reportedReferenceCost
       : estimateResultCost(usage);
     referenceCostUsd += referenceCost;
 
@@ -737,11 +736,27 @@ export function buildUsageTotals(
     // comparison, but that value is never money owed.
     const task = tasksById.get(result.taskId);
     if (task) {
+      const effectiveAuthMode = task.authMode ?? defaultAuthMode;
       const billingMode = resolveBillingModeForAuth(
         task.provider,
-        task.authMode ?? defaultAuthMode,
-      );
-      if (billingMode === 'api') costUsd += referenceCost;
+        effectiveAuthMode,
+      ) ?? (effectiveAuthMode === undefined ? result.cost?.billingMode : undefined);
+      if (billingMode === 'api') {
+        const billedCost = result.cost?.usd;
+        const billedEvidenceKnown = result.cost !== undefined
+          && !result.cost.pricingSource.startsWith('unknown-model:')
+          && !result.cost.pricingSource.startsWith('unknown-billing:')
+          && !result.cost.pricingSource.startsWith('unverified-api-reference:');
+        if (
+          billedEvidenceKnown
+          && typeof billedCost === 'number'
+          && Number.isFinite(billedCost)
+        ) {
+          costUsd += billedCost;
+        } else {
+          unknownBillingTaskCount++;
+        }
+      }
       else if (billingMode === undefined) unknownBillingTaskCount++;
     } else {
       // Backward-compatible library/test path: absent task authority retains

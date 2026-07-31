@@ -1054,6 +1054,10 @@ export async function waitForResults(
     spawnBackend?: SpawnBackend;
     attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
     providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+    evaluateCollectedResult?: (
+      task: Task,
+      result: TaskResult,
+    ) => Promise<TaskEvaluation>;
   },
   config?: ResolvedConfig,
 ): Promise<TaskResult[]> {
@@ -1202,13 +1206,18 @@ export function applyCascadeCircuitBreaker(
   const decision = evaluateFixCircuitBreaker(eligibleRootTasks, evaluations, policy);
   if (!decision.shouldPause) return false;
 
-  const reason = getMessage('pause.post_fix_circuit_breaker_reason', lang, {
-    unresolved: String(decision.unresolvedTasks),
-    total: String(decision.totalTasks),
-    ratio: decision.unresolvedRatioPercent.toFixed(1),
-    countThreshold: String(decision.effectiveCountThreshold),
-    ratioThreshold: String(policy.min_unresolved_ratio_percent),
-  });
+  const reason = decision.forcedByBlockedDependents
+    ? getMessage('pause.exhausted_repair_blocks_dependents_reason', lang, {
+        unresolvedTasks: decision.unresolvedTaskIds.join(', '),
+        blockedTasks: decision.blockedDependentTaskIds.join(', '),
+      })
+    : getMessage('pause.post_fix_circuit_breaker_reason', lang, {
+        unresolved: String(decision.unresolvedTasks),
+        total: String(decision.totalTasks),
+        ratio: decision.unresolvedRatioPercent.toFixed(1),
+        countThreshold: String(decision.effectiveCountThreshold),
+        ratioThreshold: String(policy.min_unresolved_ratio_percent),
+      });
   debugLog('runSprint:fix-circuit-breaker', reason);
   pauseSprint(projectRoot, sprint, reason, 'post-fix-unresolved-lineages');
   try {
@@ -1477,6 +1486,29 @@ export async function runSprint(
   let sprint: Sprint;
   let safetyPoint: SafetyPoint | null = null;
   let results: TaskResult[] = [];
+  const evaluations = new Map<string, TaskEvaluation>();
+  const evaluationRuntimeState = { verificationsDispatched: 0 };
+  let crossVerifyInvocationFactory = opts?.crossVerifyInvocationFactory;
+  const ensureCrossVerifyInvocationFactory = async (): Promise<MandatoryCrossVerifyInvocationFactory> => {
+    if (crossVerifyInvocationFactory) return crossVerifyInvocationFactory;
+    const crossVerifyAuthMode = await readAuthMode(projectRoot);
+    const crossVerifyExecutionProfiles =
+      spawnBackend instanceof DockerSpawnBackend
+      && opts?.providerAuthority?.state === 'ready'
+      && crossVerifyAuthMode !== 'hybrid'
+        ? createLiveDockerCrossVerifyExecutionProfileAuthority({
+            projectRoot,
+            backend: spawnBackend,
+            terminationLedger: opts.providerAuthority.service.terminationLedger,
+            authMode: crossVerifyAuthMode,
+          })
+        : undefined;
+    crossVerifyInvocationFactory = createCrossVerifyProductionIngressAuthority({
+      providerAuthority: opts?.providerAuthority,
+      executionProfiles: crossVerifyExecutionProfiles,
+    });
+    return crossVerifyInvocationFactory;
+  };
 
   if (isResumeEvaluate && recoveredSprint) {
     // ─── Resume Path: skip PLAN/SPAWN/EXECUTE, jump to EVALUATE ─────
@@ -1816,6 +1848,12 @@ export async function runSprint(
     // Nervous System: SPAWN→EXECUTE
     emitPhaseChange(SprintPhase.SPAWN, SprintPhase.EXECUTE, sprint.id);
 
+    // Dependency release authority is established at result-ingest time. The
+    // same map and runtime state are then reused by the phase-level EVALUATE
+    // pass, so rubric/xverify/gates run exactly once per task.
+    const aggregateCrossVerifyInvocationFactory =
+      await ensureCrossVerifyInvocationFactory();
+
     // Phase 3: EXECUTE
     try {
       sprint.phase = SprintPhase.EXECUTE;
@@ -1833,6 +1871,32 @@ export async function runSprint(
           spawnBackend,
           attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
           providerAuthority: opts?.providerAuthority,
+          evaluateCollectedResult: async (task, result) => {
+            await runEvaluatePhase(
+              projectRoot,
+              sprint,
+              [result],
+              evaluations,
+              config.coverage_hard_floor,
+              config,
+              undefined,
+              undefined,
+              {
+                incrementalTaskIds: new Set([task.id]),
+                providerAuthority: opts?.providerAuthority,
+                crossVerifyInvocationFactory: aggregateCrossVerifyInvocationFactory,
+                runtimeState: evaluationRuntimeState,
+              },
+            );
+            const evaluation = evaluations.get(task.id);
+            if (!evaluation) {
+              throw new DeckentError(
+                'DECKENT_E091',
+                `aggregate-evaluation-receipt-absent:${task.id}`,
+              );
+            }
+            return evaluation;
+          },
         },
         config,
       );
@@ -2080,8 +2144,6 @@ export async function runSprint(
   // Sprint 179 W2-4: EVALUATE gates on the immutable hard floor, not the
   // adaptive aspirational target. Finalizer auto-learn may lower
   // `coverage_aspirational` over time; the gate must not slide with it.
-  const evaluations = new Map<string, TaskEvaluation>();
-
   // ─── Sprint 192 Task 192-009 — Dispatcher deadline → DEFERRED set ───
   // W-INTEGRITY I-3: by the time waitForResults returns, the dispatcher has
   // exhausted its wait window (effort×2-3x via existing timeout config).
@@ -2122,23 +2184,8 @@ export async function runSprint(
     }
   } catch (e) { debugLog('runSprint:computeDeferred', e); }
 
-  const crossVerifyAuthMode = await readAuthMode(projectRoot);
-  const crossVerifyExecutionProfiles =
-    spawnBackend instanceof DockerSpawnBackend
-    && opts?.providerAuthority?.state === 'ready'
-    && crossVerifyAuthMode !== 'hybrid'
-      ? createLiveDockerCrossVerifyExecutionProfileAuthority({
-          projectRoot,
-          backend: spawnBackend,
-          terminationLedger: opts.providerAuthority.service.terminationLedger,
-          authMode: crossVerifyAuthMode,
-        })
-      : undefined;
-  const crossVerifyInvocationFactory = opts?.crossVerifyInvocationFactory
-    ?? createCrossVerifyProductionIngressAuthority({
-      providerAuthority: opts?.providerAuthority,
-      executionProfiles: crossVerifyExecutionProfiles,
-    });
+  const aggregateCrossVerifyInvocationFactory =
+    await ensureCrossVerifyInvocationFactory();
   await runEvaluatePhase(
     projectRoot, sprint, results, evaluations, config.coverage_hard_floor,
     // born-614 yarım-wire dersi (a778151a tool_surface'ın ölüm-biçimi): opsiyonel
@@ -2149,7 +2196,9 @@ export async function runSprint(
       ...(opts?.providerAuthority
         ? { providerAuthority: opts.providerAuthority }
         : {}),
-      crossVerifyInvocationFactory,
+      crossVerifyInvocationFactory: aggregateCrossVerifyInvocationFactory,
+      skipPreviouslyEvaluated: true,
+      runtimeState: evaluationRuntimeState,
     },
   );
 
@@ -2167,7 +2216,7 @@ export async function runSprint(
       ...(opts?.providerAuthority
         ? { providerAuthority: opts.providerAuthority }
         : {}),
-      crossVerifyInvocationFactory,
+      crossVerifyInvocationFactory: aggregateCrossVerifyInvocationFactory,
     },
   );
 
