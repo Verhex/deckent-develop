@@ -115,6 +115,14 @@ description: Use when creating or changing ANY design token (color, typography, 
   koşulmuştu (dist'e dokunmaz; kural-amacı-içi, şeffaf kayıt).
 
 **Açık maddeler:**
+- **Component token-adayları** (2026-07-31 dilim-3 denetimleri; onay bekler): `brightness-hover/active`
+  (1.18/.85) · `accent-alpha-hover` (.28) · `glow-focus` (.14) · `opacity-disabled` (.45 — disabled
+  efektif-kontrast eşiği bu kararla sabitlenir; bugün danger 2.21:1) · `statuspill-pad-sm`.
+- **Component ürünleşme-önkoşulları** (a11y 2026-07-31): forced-colors focus `outline` yedeği
+  (react-aria focus-ring) · error `aria-describedby` bağı · `:has()` yerine `isFocusVisible` ·
+  input-kenarlık 1.4.11 muafiyeti = "alan daima prefix/label ile tanınır" sözleşmesi.
+- **Kart-şablonu kuralı** (critic #6): component kartlarında state-başlık yazımı ve component-adı
+  biçimi tek kurala bağlanacak (şablonlaştırma — sonraki kart üretiminde).
 - **NOVA-sahne flip-önkoşulları** (kimlik-turu denetimleri, 2026-07-31 — prototip:
   `design/prototypes/kimlik-turu-2026-07-31.html`): (a) worker-segment klavye erişimi
   (react-aria katmanı: ok-tuşu gezinme + Enter/Escape); (b) idle segment-yayı efektif ≥3:1

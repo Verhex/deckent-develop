@@ -13,7 +13,7 @@
  * commit'li çıktılarla byte-karşılaştır; sapma = exit 1).
  */
 import StyleDictionary from 'style-dictionary';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -157,11 +157,23 @@ function dashboardParity(generatedCss) {
   return problems;
 }
 
-// ── Foundations kart parity (design-critic 2026-07-31 bulgu #3) ─────────────
+// ── Kart parity: foundations + components (design-critic 2026-07-31 #3) ────
 // Kartlardaki her renk-literal'i token kümesinin üyesi olmak zorunda; ayrıca
 // colors.html'in PRIM sözlüğü chart primitives ile bire-bir kalmalı. Token
 // değişince kartlar sessiz bayatlayamaz — build kırmızıya döner.
 const FOUNDATION_CARDS = ['typography.html', 'colors.html', 'spacing.html', 'motion.html'];
+function componentCardPaths() {
+  const base = join(ROOT, 'design', 'claude-design', 'components');
+  try {
+    return readdirSync(base)
+      .map((d) => join(base, d, 'index.html'))
+      .filter((p) => {
+        try { readFileSync(p); return true; } catch { return false; }
+      });
+  } catch {
+    return [];
+  }
+}
 function foundationsParity() {
   const problems = [];
   const prim = JSON.parse(readFileSync(join(ROOT, 'design', 'tokens', 'primitives.tokens.json'), 'utf8'));
@@ -174,18 +186,30 @@ function foundationsParity() {
     }
   })(prim);
   const allowedTriplets = new Set([...allowed].map((h) => hexToRgb(h).join(',')));
-  for (const card of FOUNDATION_CARDS) {
+  const cardPaths = [
+    ...FOUNDATION_CARDS.map((c) => ({ label: c, path: join(ROOT, 'design', 'claude-design', 'foundations', c) })),
+    ...componentCardPaths().map((p) => ({ label: p.split('claude-design')[1] ?? p, path: p })),
+  ];
+  for (const { label: card, path } of cardPaths) {
     let html;
     try {
-      html = readFileSync(join(ROOT, 'design', 'claude-design', 'foundations', card), 'utf8');
+      html = readFileSync(path, 'utf8');
     } catch {
       problems.push(`${card}: dosya yok`);
       continue;
     }
+    // Tipli muafiyet: kart, temsilî (token-olmayan ama marka-iddiası taşımayan)
+    // hex'leri AÇIKÇA beyan edebilir: <!-- @parity-allow #AABBCC #DDEEFF (gerekçe) -->
+    // Beyansız token-dışı hex yine kırmızıdır — sessiz istisna yok.
+    const cardAllow = new Set(
+      [...html.matchAll(/@parity-allow\s+([^>]*?)(?:\(|-->)/g)]
+        .flatMap((m) => m[1].match(/#[0-9a-fA-F]{6}\b/g) ?? [])
+        .map((h) => h.toLowerCase()),
+    );
     for (const m of html.matchAll(/#[0-9a-fA-F]{3,6}\b/g)) {
       const hex = m[0].toLowerCase();
       if (hex.length !== 7) problems.push(`${card}: kısa/geçersiz hex "${m[0]}"`);
-      else if (!allowed.has(hex)) problems.push(`${card}: token-dışı hex "${m[0]}"`);
+      else if (!allowed.has(hex) && !cardAllow.has(hex)) problems.push(`${card}: token-dışı hex "${m[0]}"`);
     }
     for (const m of html.matchAll(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/g)) {
       if (!allowedTriplets.has(`${m[1]},${m[2]},${m[3]}`)) problems.push(`${card}: token-dışı rgb(${m[1]},${m[2]},${m[3]})`);
