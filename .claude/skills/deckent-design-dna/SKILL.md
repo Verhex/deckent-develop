@@ -29,17 +29,17 @@ description: Use FIRST in any deckent design session — UI/UX work on terminal 
 
 ## 2 · Tipografi
 
-> **DURUM (Alperen, 2026-07-31): mevcut set REDDEDİLDİ** — "hiçbiri kabul edilmedi; çok klasik;
-> tamamen değişmeli". Aşağıdaki tablo yalnız kodun bugünkü envanteridir; YENİ tasarım işinde bu
-> fontlar referans alınmaz. Yeni font-yönü aday turu (özgün, klasik-dışı; TR tam destek; OFL
-> self-host edilebilir; display+gövde+mono üçlüsü) Alperen seçimine sunulacak — seçim sonrası
-> `font.*` token'ları ve tüm yüzeyler birlikte döner.
+> **DURUM (Alperen, 2026-07-31):** eski set REDDEDİLDİ ("çok klasik") → aday turundan
+> **Yön A «MAKİNE İZİ» seçildi ("şuanlık a ok")**: **Tektur** (display) · **Chakra Petch** (gövde) ·
+> **Spline Sans Mono** (veri). Set `fontSet.makine-izi` token'larında + `design/fonts/makine-izi/`
+> vendored; **kalıcı flip gerçek-veri prototip doğrulaması sonrası** (accent turuyla birleşik).
+> Yeni tasarım işi A setiyle çalışır; aşağıdaki envanter yalnız kodun flip-öncesi bugünü.
 
-| Rol | Font (REDDEDİLEN mevcut-durum) | Not |
+| Rol | Seçim (A — şuanlık) | Kod envanteri (flip'e kadar) |
 |---|---|---|
-| Display | Bricolage Grotesque | kod envanteri |
-| Gövde | Hanken Grotesk | kod envanteri; dashboard'la ortak |
-| Veri/mono | Geist Mono (desktop) · IBM Plex Mono (dashboard) | kod envanteri |
+| Display | Tektur 700 | Bricolage Grotesque |
+| Gövde | Chakra Petch 400/600 | Hanken Grotesk |
+| Veri/mono | Spline Sans Mono 400/600 | Geist Mono (desktop) · IBM Plex Mono (dashboard) |
 
 ## 3 · Renk & token authority
 

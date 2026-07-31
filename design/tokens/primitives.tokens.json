@@ -79,9 +79,10 @@
   },
   "font": {
     "$type": "fontFamily",
+    "$description": "REDDEDİLEN mevcut-durum envanteri (Alperen 2026-07-31: 'çok klasik') — kod flip'e kadar bunları kullanır; yeni kimlik fontSet.* altında stage'li.",
     "display": {
       "$value": ["Bricolage Grotesque", "system-ui", "sans-serif"],
-      "$description": "Display — D4-0 onayı: teknolojik ama eli-değmiş grotesk."
+      "$description": "Display envanteri (D4-0 mirası; 2026-07-31 reddiyle emekliye ayrılacak)."
     },
     "body": {
       "$value": ["Hanken Grotesk", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
@@ -93,7 +94,25 @@
     },
     "dashboardMono": {
       "$value": ["IBM Plex Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
-      "$description": "Dashboard'un bugünkü mono'su. AÇIK KARAR: Geist Mono'ya birleşim onay bekliyor (design-tokens-pipeline skill §6) — onaylanınca bu token font.data'ya alias'lanır."
+      "$description": "Dashboard'un bugünkü mono'su (envanter; 2026-07-31 reddi tüm setle birlikte kapsar)."
+    }
+  },
+  "fontSet": {
+    "$description": "Seçilebilir font-setleri (kişiselleştirme kuralı: kimlik seçimi = token-seti; DESKTOP-CUSTOMIZE-001). makine-izi = Alperen seçimi 2026-07-31 ('şuanlık a ok'); kalıcı flip (font.* rollerinin bu sete dönmesi) gerçek-veri prototip doğrulaması SONRASI. Dosyalar: design/fonts/makine-izi/ (OFL, latin+latin-ext, cmap-doğrulandı).",
+    "makine-izi": {
+      "$type": "fontFamily",
+      "display": {
+        "$value": ["Tektur", "system-ui", "sans-serif"],
+        "$description": "Kesik köşeli enstrümantal display (700)."
+      },
+      "body": {
+        "$value": ["Chakra Petch", "system-ui", "sans-serif"],
+        "$description": "Aynı DNA düşük dozda; gövde (400/600). Yaygınlık riski kartta beyanlı."
+      },
+      "data": {
+        "$value": ["Spline Sans Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        "$description": "Keskin ama sakin veri yüzü (400/600, tabular)."
+      }
     }
   },
   "radius": {

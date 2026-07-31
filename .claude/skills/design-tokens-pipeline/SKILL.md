@@ -83,9 +83,17 @@ description: Use when creating or changing ANY design token (color, typography, 
   (DESKTOP-CUSTOMIZE-001) → font token'ları da vardiya gibi **set-değiştirilebilir** modellenir
   (tek sabit üçlü değil, seçilebilir font-setleri).
 
+- ✅ **Font yönü A «MAKİNE İZİ» seçildi (Alperen 2026-07-31, "şuanlık")**: Tektur (display 700) ·
+  Chakra Petch (gövde 400/600) · Spline Sans Mono (veri 400/600). Set `fontSet.makine-izi`
+  token'larında stage'li, dosyalar `design/fonts/makine-izi/` (OFL, vendored). **Kalıcı flip
+  (font.* rolleri + üç yüzey + foundations kartı) gerçek-veri prototip doğrulaması SONRASI** —
+  accent turuyla birleşik yapılması planlı. "Şuanlık" kaydı: Alperen fikir değiştirirse tur
+  yeniden açılır, flip yapılmadığı için geri alma maliyeti sıfır.
+
 **Açık maddeler:**
-- **Yeni font-yönü** — aday turu: özgün/klasik-dışı, TR tam, OFL self-host, display+gövde+mono;
-  Alperen seçer; seçim `font.*` token-setine işlenir, tüm yüzeyler + foundations kartı birlikte döner.
+- **Font-A gerçek-veri doğrulaması + flip** — accent-prototip turuyla birleşik: koşan daemon'a
+  bağlı prototipte A seti canlı telemetriyle izlenir; onayla birlikte `font.*` → `fontSet.makine-izi`
+  flip'i üç yüzeye + kartlara gider.
 - **NOVA accent-ailesi**: gerçek-veri prototip turunda seçilir; seçime kadar aday-token.
 - **Dashboard light-tema**: var mı yok mu — ADR-G-033 lens'iyle karar.
 - **day-watch muted/focus**: 4.33/4.25 — küçük-punto kullanım kuralı ya da inkMuted koyulaştırma.
