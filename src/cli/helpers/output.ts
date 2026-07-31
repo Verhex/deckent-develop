@@ -6,6 +6,7 @@ import { formatHumanSprintComplete } from '../../orchestra/sprint-reporter.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { ProviderConfigAliasConflictError } from '../../core/provider-config-canonicalizer.js';
+import { isColorSuppressed } from './theme.js';
 import { detectLang } from './i18n.js';
 import { getMessage } from './messages.js';
 
@@ -54,14 +55,14 @@ export interface CIReport {
 
 /**
  * Returns true if color output should be suppressed.
- * Canonical SSOT (R4-ISNOCOLOR) — superset of all former copies:
- *  - `flagValue === true` (explicit `--no-color` option already parsed by commander),
- *  - NO_COLOR env var (https://no-color.org/),
- *  - `--no-color` present in raw argv.
+ * SSOT artık `helpers/theme.ts` renk-kapısıdır (DESIGN-SYSTEM-001 slice-2,
+ * 2026-07-31 — eski R4-ISNOCOLOR gövdesi oraya katlandı): `--no-color`
+ * flag/argv + NO_COLOR (no-color.org) + FORCE_COLOR ezmesi (FORCE_COLOR=0
+ * bastırır, >0 NO_COLOR'ı ezer). TTY'ye bakmaz — pipe davranışı değişmez.
  * @param flagValue Optional pre-parsed flag (e.g. commander's `opts.noColor`).
  */
 export function isNoColor(flagValue?: boolean): boolean {
-  return flagValue === true || process.env.NO_COLOR !== undefined || process.argv.includes('--no-color');
+  return isColorSuppressed(flagValue);
 }
 
 /** Strip ANSI escape codes from text when NO_COLOR is active. */

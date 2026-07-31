@@ -9,23 +9,27 @@ export const KRAKEN_ASCII = `        ▄████▄
     ▐▌ ▐▌ ▐▌ ▐▌ ▐▌
     ▀  ▀  ▀  ▀  ▀`;
 
-const TEAL = '\x1b[38;2;77;184;164m';
-const BOLD_GOLD = '\x1b[1;38;2;196;168;85m';
+import { suppressionTier } from './theme.js';
+
+const TEAL_TRUECOLOR = '\x1b[38;2;77;184;164m';
+const BOLD_GOLD_TRUECOLOR = '\x1b[1;38;2;196;168;85m';
+const TEAL_16 = '\x1b[36m';
+const BOLD_GOLD_16 = '\x1b[1;33m';
 const DIM = '\x1b[2m';
 const RESET = '\x1b[0m';
 
 /**
  * Render colored splash screen with Kraken, title, version, and tagline.
- * Kraken body: teal \x1b[38;2;77;184;164m
- * DECKENT text: bold gold \x1b[1;38;2;196;168;85m
- * Version: dim \x1b[2m
- * Tagline: dim \x1b[2m "AI Agent Orchestrator"
- * Respects NO_COLOR env var — returns plain text when set.
+ * Renk-kapısı SSOT'u theme.ts'tir (DESIGN-SYSTEM-001 slice-2): NO_COLOR artık
+ * spec-uyumlu (boş string dahil VARLIĞI bastırır — eski lokal kontrol
+ * `NO_COLOR=""` iken renk basıyordu, düzeltildi) ve kademe-dürüst degrade
+ * yapılır: truecolor yalnız kapı izin verirse; aksi halde 16-renk (cyan/gold),
+ * `none` kademesinde düz metin.
  */
 export function showSplash(version: string): string {
-  const noColor = process.env.NO_COLOR != null && process.env.NO_COLOR !== '';
+  const tier = suppressionTier();
 
-  if (noColor) {
+  if (tier === 'none') {
     return [
       KRAKEN_ASCII,
       '',
@@ -34,6 +38,8 @@ export function showSplash(version: string): string {
     ].join('\n');
   }
 
+  const TEAL = tier === 'truecolor' ? TEAL_TRUECOLOR : TEAL_16;
+  const BOLD_GOLD = tier === 'truecolor' ? BOLD_GOLD_TRUECOLOR : BOLD_GOLD_16;
   const coloredKraken = KRAKEN_ASCII.split('\n')
     .map((line) => `${TEAL}${line}${RESET}`)
     .join('\n');

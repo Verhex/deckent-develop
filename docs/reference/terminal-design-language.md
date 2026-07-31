@@ -63,6 +63,42 @@ Terminal renkleri SEMANTİK üçlüde kalır: **go/yeşil** (tamam/ileri) · **c
 · **abort/kırmızı** (hata/red). Vurgu tek-renk (accent) yalnız SEÇİM ve CANLILIK için. Süs-rengi
 yasak; renk körü-güvenliği için renk hiçbir yerde TEK taşıyıcı değildir (yanında sözcük/sembol olur).
 
+### 6.1 · Renk-kapısı SSOT (DESIGN-SYSTEM-001 slice-2, 2026-07-31)
+
+Tek otorite `src/cli/helpers/theme.ts`; yeni kod kendi env-kontrolünü YAZAMAZ, kapıdan import eder.
+Öncelik zinciri: **`--no-color` (flag/argv) > FORCE_COLOR > NO_COLOR > TTY** — `NO_COLOR` değeri
+ne olursa olsun (boş string dahil, no-color.org) bastırır; `FORCE_COLOR>0` NO_COLOR'ı ezer,
+`FORCE_COLOR=0` bastırır. İki kapı fonksiyonu (ikisi de bastırmayı dinler):
+
+- `shouldUseColor()`/`colorTier()` — TTY-farkındalı: `Theme` ve genel çıktı.
+- `isColorSuppressed()`/`suppressionTier()` — TTY şartı YOK: interaktif-TUI yardımcıları
+  (`ansi.ts`→status-renderer, `splash.ts`) tarihsel davranışı korur. `output.ts isNoColor()`
+  buna delege eder (API sabit).
+
+Tarihî borç: ~24 dosyada çıplak `\x1b[` escape'i — dokunulan her dosya kapıya göçürülür
+(big-bang sweep yok).
+
+### 6.2 · Kademe merdiveni (işlevsellik-önce)
+
+`none → ansi16 → ansi256 → truecolor`. **Taban = ansi16** — SGR kodları terminalin kendi
+şemasında çözülür; flip-öncesi davranışla birebir parite `tests/cli/color-gate.test.ts` ile
+kilitli. Tırmanma yalnız: (a) `FORCE_COLOR=2/3` açık-istek, ya da (b) yetenek
+(`COLORTERM`/`TERM`) + **koyu zemin güvenle biliniyorsa** (`COLORFGBG` son alan 0-6|8) — çünkü
+palet hex'leri NOVA koyu-zemin optimize; açık terminalde 1.6–2.8:1'e düşer (a11y ölçümü).
+`none` kademesinde bilgi kaybı sıfır.
+
+### 6.3 · Palet rolleri (üretilmiş — elle SGR yazmak yasak)
+
+Kaynak `design/tokens/terminal.map.json` → `npm run build:tokens` → `src/cli/helpers/generated/palette.ts`
+→ tüketici `Theme`: success `32`/novaGo · error `31`/novaAbort · warning `33`/novaAmber ·
+info `34`/novaGlow(aday) · muted `2`/novaTextMuted · accent `36`/novaGlow. Yeni rol = önce token
+kaynağına. Splash marka-renkleri tarihîdir ve kademe-degrade'e tabidir.
+
+### 6.4 · Test sözleşmesi
+
+Renkli çıktı doğrulayan test `FORCE_COLOR=1/2/3` ile açık-istek yapar; bastırma `NO_COLOR`/
+`--no-color` ile test edilir; TTY-varsayılanına yaslanan assert yazılmaz (CI'da TTY yok).
+
 ## 7 · Girdi-yüzeyi kuralları
 
 - `/` = komut-menüsü, `@` = dosya-menüsü — iki menü AYNI etkileşim-gramerini paylaşır

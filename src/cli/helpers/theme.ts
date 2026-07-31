@@ -1,93 +1,163 @@
-// ─── CLI Theme (ANSI color helpers) ─────────────────────────────────
+// ─── CLI Color Gate (SSOT) + Palette-backed Theme ───────────────────
+// DESIGN-SYSTEM-001 slice-2 (2026-07-31): tek renk-kapısı + kademe (tier)
+// çözümü + design/tokens'tan üretilen palet rollerinin tüketimi.
+//
+// Karar (Alperen, işlevsellik-önce): 16-renk bugünkü davranış BİREBİR korunur;
+// truecolor/256 yalnız zemin güvenle koyu bilindiğinde (COLORFGBG) ya da
+// kullanıcı FORCE_COLOR=2/3 ile açıkça istediğinde. Palet hex'leri koyu-zemin
+// optimize olduğundan bilinmeyen/açık zeminde 16-renge düşülür — terminalin
+// kendi şeması okunabilirliği garantiler (a11y denetimi 2026-07-31).
+//
+// Öncelik zinciri: --no-color (flag/argv) > FORCE_COLOR > NO_COLOR > TTY.
+// NO_COLOR spec (no-color.org): değeri ne olursa olsun VARLIĞI yeterlidir
+// (boş string dahil). FORCE_COLOR, NO_COLOR'ı ezer (Node ekosistem teamülü).
 
-// ─── Color detection ────────────────────────────────────────────────
+import { PALETTE, type PaletteRole } from './generated/palette.js';
 
-function shouldUseColor(): boolean {
-  // FORCE_COLOR takes precedence
-  if (process.env['FORCE_COLOR'] !== undefined) {
-    const val = process.env['FORCE_COLOR'];
-    // FORCE_COLOR=0 means no color; anything else means color
-    return val !== '0';
-  }
-  // NO_COLOR disables color
-  if (process.env['NO_COLOR'] !== undefined) {
-    return false;
-  }
-  // Default: color if stdout is a TTY
+export type ColorTier = 'none' | 'ansi16' | 'ansi256' | 'truecolor';
+
+// ─── Gate ───────────────────────────────────────────────────────────
+
+/**
+ * Kullanıcı rengi açıkça bastırdı mı? (TTY'ye BAKMAZ — mevcut `isNoColor`
+ * çağıranlarının pipe-davranışını korur; output.ts buna delege eder.)
+ */
+export function isColorSuppressed(noColorFlag?: boolean): boolean {
+  if (noColorFlag === true || process.argv.includes('--no-color')) return true;
+  const force = process.env['FORCE_COLOR'];
+  if (force !== undefined) return force === '0';
+  return process.env['NO_COLOR'] !== undefined;
+}
+
+/**
+ * Renk basılmalı mı? Bastırma zinciri + TTY varsayılanı.
+ */
+export function shouldUseColor(noColorFlag?: boolean): boolean {
+  if (isColorSuppressed(noColorFlag)) return false;
+  if (process.env['FORCE_COLOR'] !== undefined) return true; // '0' üstte elendi
   return process.stdout.isTTY === true;
 }
 
-// ─── ANSI escape helpers ────────────────────────────────────────────
+/** COLORFGBG (örn. "15;0") son alanı 0-6|8 → koyu zemin GÜVENLE biliniyor. */
+function darkBackgroundKnown(): boolean {
+  const fgbg = process.env['COLORFGBG'];
+  if (fgbg === undefined) return false;
+  const bg = Number.parseInt(fgbg.split(';').pop() ?? '', 10);
+  return Number.isInteger(bg) && (bg === 8 || (bg >= 0 && bg <= 6));
+}
 
-function wrap(code: string, reset: string, text: string): string {
-  if (!shouldUseColor()) {
-    return text;
+function resolveCapability(): ColorTier {
+  const force = process.env['FORCE_COLOR'];
+  if (force === '3') return 'truecolor';
+  if (force === '2') return 'ansi256';
+  const colorterm = (process.env['COLORTERM'] ?? '').toLowerCase();
+  const capability: ColorTier =
+    colorterm.includes('truecolor') || colorterm.includes('24bit')
+      ? 'truecolor'
+      : (process.env['TERM'] ?? '').includes('256')
+        ? 'ansi256'
+        : 'ansi16';
+  if (capability === 'ansi16') return 'ansi16';
+  return darkBackgroundKnown() ? capability : 'ansi16';
+}
+
+/**
+ * Etkin renk kademesi (TTY-farkındalı — Theme bunun üstünde çalışır).
+ * FORCE_COLOR=2/3 açık kullanıcı isteğidir ve zemin sezgisini ezer; onun
+ * dışında truecolor/256 yeteneği ancak koyu-zemin biliniyorsa kullanılır
+ * (işlevsellik-önce degrade).
+ */
+export function colorTier(noColorFlag?: boolean): ColorTier {
+  if (!shouldUseColor(noColorFlag)) return 'none';
+  return resolveCapability();
+}
+
+/**
+ * Yalnız-bastırma kademesi (TTY şartı YOK): interaktif-TUI yardımcıları
+ * (status-renderer/ansi, splash) tarihsel olarak TTY'siz ortamda da renk
+ * basar — bu davranış korunur; kullanıcı bastırması (NO_COLOR/--no-color/
+ * FORCE_COLOR=0) artık burada da geçerlidir (a11y 2026-07-31 kapanışı).
+ */
+export function suppressionTier(noColorFlag?: boolean): ColorTier {
+  if (isColorSuppressed(noColorFlag)) return 'none';
+  return resolveCapability();
+}
+
+// ─── Palet → SGR ────────────────────────────────────────────────────
+
+function hexChannels(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+}
+
+/**
+ * Bir palet rolünün etkin kademedeki SGR parametresi (renk kapalıysa null).
+ * ansi16 kademesinde üretilmiş paletin SGR kodu = flip-öncesi davranış birebir.
+ */
+export function paletteSgr(role: PaletteRole, noColorFlag?: boolean): string | null {
+  const tier = colorTier(noColorFlag);
+  if (tier === 'none') return null;
+  const entry = PALETTE[role];
+  if (tier === 'truecolor') {
+    const [r, g, b] = hexChannels(entry.hex);
+    return `38;2;${r};${g};${b}`;
   }
-  return `\x1b[${code}m${text}\x1b[${reset}m`;
+  if (tier === 'ansi256') return `38;5;${entry.ansi256}`;
+  return entry.ansi16;
 }
 
 // ─── Theme class ────────────────────────────────────────────────────
 
+function wrap(code: string | null, text: string): string {
+  if (code === null) return text;
+  return `\x1b[${code}m${text}\x1b[0m`;
+}
+
 export class Theme {
-  /**
-   * Green text (success, DONE, PASS).
-   */
+  /** Green text (success, DONE, PASS). */
   success(text: string): string {
-    return wrap('32', '0', text);
+    return wrap(paletteSgr('success'), text);
   }
 
-  /**
-   * Red text (error, NO_GO, FAIL).
-   */
+  /** Red text (error, NO_GO, FAIL). */
   error(text: string): string {
-    return wrap('31', '0', text);
+    return wrap(paletteSgr('error'), text);
   }
 
-  /**
-   * Yellow text (warning, TECH_DEBT).
-   */
+  /** Yellow text (warning, TECH_DEBT). */
   warning(text: string): string {
-    return wrap('33', '0', text);
+    return wrap(paletteSgr('warning'), text);
   }
 
-  /**
-   * Blue text (info, hints).
-   */
+  /** Blue text (info, hints). */
   info(text: string): string {
-    return wrap('34', '0', text);
+    return wrap(paletteSgr('info'), text);
   }
 
-  /**
-   * Gray/dim text (muted, secondary info).
-   */
+  /** Gray/dim text (muted, secondary info). */
   muted(text: string): string {
-    return wrap('2', '0', text);
+    return wrap(paletteSgr('muted'), text);
   }
 
-  /**
-   * Cyan text (accent, links, highlights).
-   */
+  /** Cyan text (accent, links, highlights). */
   accent(text: string): string {
-    return wrap('36', '0', text);
+    return wrap(paletteSgr('accent'), text);
   }
 
-  /**
-   * Bold text.
-   */
+  /** Bold text (kademe-bağımsız; renk değil vurgu). */
   bold(text: string): string {
-    return wrap('1', '0', text);
+    return wrap(shouldUseColor() ? '1' : null, text);
   }
 
-  /**
-   * Strip all ANSI escape codes from a string.
-   */
+  /** Strip all ANSI escape codes from a string (compound SGR dahil). */
   strip(text: string): string {
     // eslint-disable-next-line no-control-regex
     return text.replace(/\x1b\[[0-9;]*m/g, '');
   }
 }
 
-/**
- * Singleton theme instance.
- */
+/** Singleton theme instance. */
 export const theme = new Theme();

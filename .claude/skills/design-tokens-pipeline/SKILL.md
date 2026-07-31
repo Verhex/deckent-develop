@@ -97,6 +97,15 @@ description: Use when creating or changing ANY design token (color, typography, 
   IBM Plex ayrımı emekli (`font.dashboardMono` → data). Google-CDN font linki kaldırıldı.
 - ✅ **NOVA accent-ailesi = CAM GÖBEĞİ (mevcut novaGlow) — KALICI** (Alperen, kimlik-turu
   2026-07-31; adaylar MACENTA #FF5FA8 ve KOR #FFB84D elendi). Accent token değişikliği yok.
+- ✅ **Terminal wiring slice-2 TAMAM (2026-07-31):** renk-gating tek SSOT (`theme.ts` çift-kapı:
+  TTY-farkındalı `shouldUseColor/colorTier` + TUI için `isColorSuppressed/suppressionTier`);
+  `output.ts isNoColor` delege, `splash.ts` boş-NO_COLOR bug'ı + kademe-degrade, `ansi.ts`
+  kapıya bağlandı; `Theme` palet-tüketici (ansi16 parite testli — flip-öncesi birebir), tier
+  merdiveni COLORFGBG işlevsellik-önce. DT-5 dokümanına §6.1-6.4 eklendi
+  (`docs/reference/terminal-design-language.md`). Kanıt: color-gate 23/23, etkilenen TUI
+  testleri yeşil (fail-delta=0 baseline'a karşı), root tsc, tsx source-smoke. Kalan: dist
+  rebuild + host-adapter restart (owner-koordinasyonlu) sonrası binary-koşu; çıplak-escape
+  24-dosya göçü dokunuldukça.
 
 - ✅ **Flip binary-doğrulaması KAPANDI (2026-07-31, sprint-485 settle sonrası):**
   `build:dashboard` yeşil (10 woff2 bundle'da), daemon-servisli dashboard canlı tarayıcıda
