@@ -40,24 +40,12 @@ describe("AppShell — render", () => {
   });
 });
 
-describe("AppShell — theme toggle", () => {
-  it("integrates useTheme hook for dark/light control", () => {
+describe("AppShell — dark tek-kimlik (Alperen 2026-07-31, DESIGN-SYSTEM-001)", () => {
+  it("theme toggle söküldü — useTheme/testid/data-theme yok", () => {
     const content = src();
-    expect(content).toContain("useTheme");
-    expect(content).toContain('theme === "dark" ? "light" : "dark"');
-  });
-
-  it("has theme toggle buttons with testId attributes", () => {
-    const content = src();
-    // ThemeToggleButton receives testId prop which is forwarded to data-testid
-    expect(content).toContain('testId="app-shell-theme-toggle"');
-    expect(content).toContain('testId="app-shell-theme-toggle-mobile"');
-    expect(content).toContain("data-testid={testId}");
-  });
-
-  it("exposes data-theme attribute on shell root for CSS targeting", () => {
-    const content = src();
-    expect(content).toContain("data-theme={theme}");
+    expect(content).not.toContain("useTheme");
+    expect(content).not.toContain("app-shell-theme-toggle");
+    expect(content).not.toContain("data-theme={theme}");
   });
 });
 

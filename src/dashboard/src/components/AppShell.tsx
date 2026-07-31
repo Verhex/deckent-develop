@@ -1,5 +1,5 @@
 // AppShell — top-level layout shell with responsive grid, dark/light token consistency.
-// Builds on Sidebar navItems + ThemeProvider. Use as an alternative to Layout.tsx
+// Builds on Sidebar navItems. Use as an alternative to Layout.tsx (dark tek-kimlik)
 // when you need a composable shell without SSE/DockPanel dependencies.
 //
 // Responsive breakpoints:
@@ -12,9 +12,8 @@
 
 import { type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { Sun, Moon, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { cn } from "../lib/utils.js";
-import { useTheme } from "./ThemeProvider.js";
 import { navItems } from "./Sidebar.js";
 import { useTranslation } from "../i18n/LanguageProvider.js";
 import { AuthStatus } from "./AuthStatus.js";
@@ -26,49 +25,17 @@ export interface AppShellProps {
   className?: string;
 }
 
-function ThemeToggleButton({
-  theme,
-  onToggle,
-  testId,
-  compact,
-}: {
-  theme: string;
-  onToggle: () => void;
-  testId: string;
-  compact?: boolean;
-}) {
-  return (
-    <button
-      data-testid={testId}
-      onClick={onToggle}
-      className={cn(
-        "flex items-center gap-2 rounded-md transition-all duration-200",
-        "text-zinc-500 dark:text-zinc-400",
-        "hover:bg-zinc-200/70 dark:hover:bg-zinc-800/50",
-        "hover:text-zinc-800 dark:hover:text-zinc-200",
-        compact ? "px-2 py-1.5" : "px-3 py-1.5 text-xs w-full",
-      )}
-      aria-label="Toggle dark/light theme"
-    >
-      {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-      {!compact && (theme === "dark" ? "Light mode" : "Dark mode")}
-    </button>
-  );
-}
 
 /** AppShell — responsive grid shell. Wrap page content as children. */
 export function AppShell({ children, headerContent, className }: AppShellProps) {
-  const { theme, setTheme } = useTheme();
   const { t } = useTranslation();
 
-  const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
 
   return (
     // Shell grid: responsive 1-col mobile → sidebar+content desktop
     // dark/light background token applied at shell root
     <div
       data-testid="app-shell"
-      data-theme={theme}
       className={cn(
         "app-shell grid h-screen overflow-hidden",
         // Responsive grid breakpoint: single-col → 2-col at md
@@ -123,14 +90,6 @@ export function AppShell({ children, headerContent, className }: AppShellProps) 
           ))}
         </nav>
 
-        {/* Sidebar footer: theme toggle */}
-        <div className="mt-auto pt-4 border-t border-zinc-200 dark:border-zinc-800">
-          <ThemeToggleButton
-            theme={theme}
-            onToggle={toggleTheme}
-            testId="app-shell-theme-toggle"
-          />
-        </div>
       </aside>
 
       {/* Content zone: header + scrollable main */}
@@ -168,13 +127,6 @@ export function AppShell({ children, headerContent, className }: AppShellProps) 
           {/* Auth identity chip — shows when authenticated (OIDC or static) */}
           <AuthStatus className="hidden md:flex" />
 
-          {/* Mobile theme toggle in header (desktop toggle lives in sidebar) */}
-          <ThemeToggleButton
-            theme={theme}
-            onToggle={toggleTheme}
-            testId="app-shell-theme-toggle-mobile"
-            compact
-          />
         </header>
 
         {/* Main scrollable content area */}

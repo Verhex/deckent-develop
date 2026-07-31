@@ -9,7 +9,6 @@ describe("dashboard layout + router + navigation", () => {
   describe("file existence", () => {
     const requiredFiles = [
       "src/components/Layout.tsx",
-      "src/components/ThemeProvider.tsx",
       "src/components/ui/sheet.tsx",
       "src/components/ui/scroll-area.tsx",
     ];
@@ -118,42 +117,16 @@ describe("dashboard layout + router + navigation", () => {
     });
   });
 
-  describe("ThemeProvider.tsx", () => {
-    const theme = () => readFileSync(join(SRC, "components/ThemeProvider.tsx"), "utf-8");
-
-    it("exports ThemeProvider", () => {
-      expect(theme()).toContain("export function ThemeProvider");
+  describe("dark tek-kimlik (Alperen 2026-07-31, DESIGN-SYSTEM-001 + ADR-G-033)", () => {
+    it("ThemeProvider söküldü", () => {
+      expect(existsSync(join(SRC, "components/ThemeProvider.tsx"))).toBe(false);
     });
 
-    it("exports useTheme hook", () => {
-      expect(theme()).toContain("export function useTheme");
-    });
-
-    it("sets dark class on html element", () => {
-      const content = theme();
-      expect(content).toContain("documentElement");
-      expect(content).toContain("classList");
-      expect(content).toContain('"dark"');
-    });
-
-    it("uses createContext and useContext", () => {
-      const content = theme();
-      expect(content).toContain("createContext");
-      expect(content).toContain("useContext");
-    });
-
-    it("supports dark and light theme types", () => {
-      const content = theme();
-      expect(content).toContain('"dark"');
-      expect(content).toContain('"light"');
-    });
-
-    it("defaults to dark theme", () => {
-      expect(theme()).toContain('useState<Theme>("dark")');
-    });
-
-    it("uses useEffect to apply theme changes", () => {
-      expect(theme()).toContain("useEffect");
+    it("dark: utilities html.dark ile always-on", () => {
+      const css = readFileSync(join(SRC, "index.css"), "utf-8");
+      expect(css).toContain("@custom-variant dark");
+      const html = readFileSync(join(SRC, "..", "index.html"), "utf-8");
+      expect(html).toContain('<html lang="en" class="dark">');
     });
   });
 
@@ -244,9 +217,8 @@ describe("dashboard layout + router + navigation", () => {
   describe("App.tsx updates", () => {
     const app = () => readFileSync(join(SRC, "App.tsx"), "utf-8");
 
-    it("wraps app in ThemeProvider", () => {
-      expect(app()).toContain("ThemeProvider");
-      expect(app()).toContain("<ThemeProvider>");
+    it("dark tek-kimlik: App ThemeProvider sarmalamaz (2026-07-31)", () => {
+      expect(app()).not.toContain("ThemeProvider");
     });
 
     it("uses Layout as route element", () => {

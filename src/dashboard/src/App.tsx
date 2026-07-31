@@ -1,6 +1,5 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { ThemeProvider } from "./components/ThemeProvider";
 import { LanguageProvider } from "./i18n/LanguageProvider";
 import { AuthProvider } from "./hooks/useAuth";
 import { Layout } from "./components/Layout";
@@ -91,8 +90,7 @@ function DashboardWithObservability() {
 
 function App() {
   return (
-    <ThemeProvider>
-      <LanguageProvider>
+    <LanguageProvider>
         <AuthProvider>
           <UnauthorizedBanner />
           <BrowserRouter>
@@ -122,8 +120,7 @@ function App() {
             </Routes>
           </BrowserRouter>
         </AuthProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    </LanguageProvider>
   );
 }
 

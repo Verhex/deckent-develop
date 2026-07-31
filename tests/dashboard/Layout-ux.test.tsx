@@ -14,13 +14,10 @@ describe("Layout-ux: F7-003 UI/UX pass", () => {
     expect(content).toContain("flex h-screen");
   });
 
-  it("theme toggle: ThemeToggle with useTheme hook, dark/light Sun/Moon icons, testid", () => {
+  it("dark tek-kimlik: toggle/Sun/Moon söküldü (Alperen 2026-07-31)", () => {
     const content = layout();
-    expect(content).toContain("ThemeToggle");
-    expect(content).toContain("useTheme");
-    expect(content).toContain('data-testid="theme-toggle"');
-    expect(content).toContain("Sun");
-    expect(content).toContain("Moon");
+    expect(content).not.toContain("useTheme");
+    expect(content).not.toContain('data-testid="theme-toggle"');
   });
 
   it("responsive: uses md: and lg: breakpoints for sidebar and mobile layout", () => {
@@ -30,11 +27,10 @@ describe("Layout-ux: F7-003 UI/UX pass", () => {
     expect(content).toContain("lg:");
   });
 
-  it("layout: SidebarContent with NavLinks and footer ThemeToggle + LanguageSwitcher", () => {
+  it("layout: SidebarContent with NavLinks and footer LanguageSwitcher (dark tek-kimlik)", () => {
     const content = layout();
     expect(content).toContain("SidebarContent");
     expect(content).toContain("NavLinks");
-    expect(content).toContain("<ThemeToggle />");
     expect(content).toContain("<LanguageSwitcher />");
   });
 });

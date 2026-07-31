@@ -435,9 +435,6 @@ export const en = {
   'settings.language_label': 'Interface Language',
   'settings.language_en': 'English',
   'settings.language_tr': 'Turkish',
-  'settings.theme_label': 'Color Theme',
-  'settings.theme_dark': 'Dark',
-  'settings.theme_light': 'Light',
 
   // Enterprise — Tenant management (282-010)
   'enterprise.new_tenant': 'New tenant',

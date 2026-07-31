@@ -1,11 +1,9 @@
-import { Globe, Moon, Sun } from "lucide-react";
+import { Globe } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { useTranslation } from "../i18n/LanguageProvider";
-import { useTheme } from "../components/ThemeProvider";
 
 export default function SettingsPage() {
   const { t, lang, setLang } = useTranslation();
-  const { theme, setTheme } = useTheme();
 
   return (
     <div data-testid="settings-page" className="space-y-6">
@@ -52,40 +50,6 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Theme */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-zinc-200">{t('settings.theme_label')}</p>
-            </div>
-            <div className="flex rounded-md overflow-hidden border border-zinc-700">
-              <button
-                data-testid="settings-theme-dark"
-                onClick={() => setTheme('dark')}
-                className={`flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium transition-colors ${
-                  theme === 'dark'
-                    ? 'bg-brand-fg text-brand-bg'
-                    : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'
-                }`}
-                aria-pressed={theme === 'dark'}
-              >
-                <Moon className="w-3.5 h-3.5" />
-                {t('settings.theme_dark')}
-              </button>
-              <button
-                data-testid="settings-theme-light"
-                onClick={() => setTheme('light')}
-                className={`flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium transition-colors ${
-                  theme === 'light'
-                    ? 'bg-brand-fg text-brand-bg'
-                    : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'
-                }`}
-                aria-pressed={theme === 'light'}
-              >
-                <Sun className="w-3.5 h-3.5" />
-                {t('settings.theme_light')}
-              </button>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>

@@ -1,8 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useState } from "react";
-import { Menu, Globe, Sun, Moon } from "lucide-react";
+import { Menu, Globe } from "lucide-react";
 import { cn } from "../lib/utils";
-import { useTheme } from "./ThemeProvider";
 import { Sheet, SheetTrigger, SheetContent } from "./ui/sheet";
 import { ScrollArea } from "./ui/scroll-area";
 import { Badge } from "./ui/badge";
@@ -80,20 +79,6 @@ function LanguageSwitcher() {
   );
 }
 
-function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  return (
-    <button
-      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs text-zinc-400 dark:text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 dark:hover:text-zinc-200 transition-all duration-200"
-      aria-label="Toggle dark/light theme"
-      data-testid="theme-toggle"
-    >
-      {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-      {theme === "dark" ? "Light" : "Dark"}
-    </button>
-  );
-}
 
 const SSE_COLORS: Record<SSEStatus, string> = {
   connected: "bg-green-500",
@@ -147,7 +132,6 @@ function SidebarContent({ onNavigate, sseState, sseStatus }: { onNavigate?: () =
           <span className="text-xs text-zinc-500">{t(SSE_LABEL_KEYS[sseStatus])}</span>
         </div>
         <LanguageSwitcher />
-        <ThemeToggle />
       </div>
     </>
   );
@@ -160,7 +144,7 @@ export function Layout() {
   // God-level shell hierarchy (Sprint 218 task 218-007, builds on AppShell Sprint 215):
   //   header (desktop banner + mobile menu) + sidebar (md+) + content grid + dock terminal.
   // Layout strategy: responsive grid — sidebar breakpoint md+ (hidden mobile), lg+ wider sidebar.
-  // Dark/light theme: dark:bg-zinc-950 / dark:bg-zinc-900 — ThemeProvider controls html class.
+  // Dark tek-kimlik: dark: utilities html.dark ile always-on (index.css @custom-variant).
   // Loading-state: when SSE has no data yet (connecting+null), render a branded
   //   "Connecting" panel — NOT a skeleton-freeze — so the user sees a meaningful state
   //   instead of an empty/pulsing layout. Honors `motion-safe:` for prefers-reduced-motion.

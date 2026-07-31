@@ -1,94 +1,44 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const THEME_PATH = join(process.cwd(), "src", "dashboard", "src", "lib", "theme.ts");
-const src = () => readFileSync(THEME_PATH, "utf-8");
+/**
+ * Dark TEK-KİMLİK tutarlılık kontratı (Alperen 2026-07-31, DESIGN-SYSTEM-001 +
+ * ADR-G-033). Eski hali silinmiş lib/theme.ts'in (ölü dark/light token ikizi)
+ * sözleşmesiydi — o dünya söküldü: dashboard'un light yolu YOKTUR, tema authority
+ * design/tokens → @theme zinciridir.
+ */
+const DASH = join(process.cwd(), "src", "dashboard");
+const css = () => readFileSync(join(DASH, "src", "index.css"), "utf-8");
 
-describe("theme.ts — dark token", () => {
-  it("file exists", () => {
-    expect(existsSync(THEME_PATH)).toBe(true);
+describe("dashboard dark tek-kimlik tutarlılığı", () => {
+  it("ölü token-ikizi lib/theme.ts yok", () => {
+    expect(existsSync(join(DASH, "src", "lib", "theme.ts"))).toBe(false);
   });
 
-  it("exports darkTokens with color sub-object", () => {
-    const content = src();
-    expect(content).toContain("export const darkTokens");
-    expect(content).toContain("darkColorTokens");
+  it("ThemeProvider ve light yolu söküldü", () => {
+    expect(existsSync(join(DASH, "src", "components", "ThemeProvider.tsx"))).toBe(false);
+    const settings = readFileSync(join(DASH, "src", "pages", "SettingsPage.tsx"), "utf-8");
+    expect(settings).not.toContain("settings-theme-light");
   });
 
-  it("dark color tokens include background and foreground", () => {
-    const content = src();
-    expect(content).toContain('"#09090b"');
-    expect(content).toContain('"#fafafa"');
+  it("dark: utilities deterministik always-on (OS-tercihinden bağımsız)", () => {
+    expect(css()).toContain("@custom-variant dark");
+    const html = readFileSync(join(DASH, "index.html"), "utf-8");
+    expect(html).toContain('<html lang="en" class="dark">');
   });
 
-  it("dark shadow tokens present", () => {
-    const content = src();
-    expect(content).toContain("darkShadowTokens");
-  });
-});
-
-describe("theme.ts — light token", () => {
-  it("exports lightTokens with color sub-object", () => {
-    const content = src();
-    expect(content).toContain("export const lightTokens");
-    expect(content).toContain("lightColorTokens");
+  it("koyu zemin/mürekkep tek kaynaktan: @theme background/foreground", () => {
+    const c = css();
+    expect(c).toContain("--color-background: #09090b");
+    expect(c).toContain("--color-foreground: #fafafa");
+    expect(c).toContain("color-scheme: dark");
   });
 
-  it("light color tokens include light background", () => {
-    const content = src();
-    expect(content).toContain('"#ffffff"');
-  });
-
-  it("light shadow tokens present", () => {
-    const content = src();
-    expect(content).toContain("lightShadowTokens");
-  });
-});
-
-describe("theme.ts — toggle (getThemeTokens)", () => {
-  it("exports getThemeTokens function", () => {
-    const content = src();
-    expect(content).toContain("export function getThemeTokens");
-  });
-
-  it("getThemeTokens returns darkTokens for 'dark' mode", () => {
-    const content = src();
-    expect(content).toContain('mode === "dark" ? darkTokens : lightTokens');
-  });
-
-  it("ThemeMode type exported as 'dark' | 'light'", () => {
-    const content = src();
-    expect(content).toContain('export type ThemeMode = "dark" | "light"');
-  });
-});
-
-describe("theme.ts — token consistency", () => {
-  it("both dark and light tokens include spacing sub-object", () => {
-    const content = src();
-    expect(content).toContain("SpacingTokens");
-    expect(content).toContain("spacingScale");
-  });
-
-  it("both dark and light tokens include radius sub-object", () => {
-    const content = src();
-    expect(content).toContain("RadiusTokens");
-    expect(content).toContain("radiusScale");
-  });
-
-  it("ColorTokens interface defines same keys for dark and light", () => {
-    const content = src();
-    expect(content).toContain("export interface ColorTokens");
-    // Both token objects reference the same ColorTokens interface shape
-    expect(content).toContain("background:");
-    expect(content).toContain("foreground:");
-    expect(content).toContain("border:");
-    expect(content).toContain("destructive:");
-  });
-
-  it("themeClasses exported for component-level consistency", () => {
-    const content = src();
-    expect(content).toContain("export const themeClasses");
-    expect(content).toContain("dark:bg-background");
+  it("tema i18n anahtarları kaldırıldı (en + tr)", () => {
+    for (const f of ["en.ts", "tr.ts"]) {
+      const i18n = readFileSync(join(DASH, "src", "i18n", f), "utf-8");
+      expect(i18n).not.toContain("settings.theme_label");
+    }
   });
 });

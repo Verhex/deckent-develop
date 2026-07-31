@@ -13,12 +13,10 @@ describe("Layout.tsx UI/UX polish", () => {
     expect(content).toContain("ScrollArea");
   });
 
-  it("theme toggle: integrates useTheme and ThemeToggle component", () => {
+  it("dark tek-kimlik: theme toggle söküldü (Alperen 2026-07-31)", () => {
     const content = layout();
-    expect(content).toContain("useTheme");
-    expect(content).toContain("ThemeToggle");
-    expect(content).toContain('setTheme(theme === "dark" ? "light" : "dark")');
-    expect(content).toContain('data-testid="theme-toggle"');
+    expect(content).not.toContain("useTheme");
+    expect(content).not.toContain('data-testid="theme-toggle"');
   });
 
   it("responsive: uses md: breakpoints for desktop/mobile layout", () => {
@@ -28,13 +26,6 @@ describe("Layout.tsx UI/UX polish", () => {
     expect(content).toContain("responsive:");
   });
 
-  it("sidebar: SidebarContent with NavLinks and ThemeToggle in bottom section", () => {
-    const content = layout();
-    expect(content).toContain("SidebarContent");
-    expect(content).toContain("NavLinks");
-    expect(content).toContain("<ThemeToggle />");
-    expect(content).toContain("<LanguageSwitcher />");
-  });
 
   it("dark mode: has dark: variant classes for light/dark theme consistency", () => {
     const content = layout();
@@ -44,10 +35,4 @@ describe("Layout.tsx UI/UX polish", () => {
     expect(content).toContain("dark:border-zinc-800");
   });
 
-  it("theme toggle: imports Sun and Moon icons for dark/light indicator", () => {
-    const content = layout();
-    expect(content).toContain("Sun");
-    expect(content).toContain("Moon");
-    expect(content).toContain("lucide-react");
-  });
 });

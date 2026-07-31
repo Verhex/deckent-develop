@@ -437,9 +437,6 @@ export const tr: Record<TranslationKey, string> = {
   'settings.language_label': 'Arayüz Dili',
   'settings.language_en': 'İngilizce',
   'settings.language_tr': 'Türkçe',
-  'settings.theme_label': 'Renk Teması',
-  'settings.theme_dark': 'Koyu',
-  'settings.theme_light': 'Açık',
 
   // Enterprise — Kiracı yönetimi (282-010)
   'enterprise.new_tenant': 'Yeni kiracı',

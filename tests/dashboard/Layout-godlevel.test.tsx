@@ -93,11 +93,10 @@ describe("Layout — meaningful loading-state (not skeleton-freeze)", () => {
 });
 
 describe("Layout — navigation hierarchy + semantic landmarks", () => {
-  it("preserves existing SidebarContent + NavLinks + ThemeToggle + LanguageSwitcher composition", () => {
+  it("preserves existing SidebarContent + NavLinks + LanguageSwitcher composition (dark tek-kimlik: ThemeToggle yok)", () => {
     const content = layout();
     expect(content).toContain("SidebarContent");
     expect(content).toContain("NavLinks");
-    expect(content).toContain("<ThemeToggle />");
     expect(content).toContain("<LanguageSwitcher />");
   });
 
@@ -126,11 +125,9 @@ describe("Layout — theme + dark mode tokens preserved", () => {
     expect(content).toContain("dark:border-zinc-800");
   });
 
-  it("useTheme integration + Sun/Moon icons + theme-toggle testid preserved", () => {
+  it("dark tek-kimlik: theme-toggle yüzeyden kalktı (Alperen 2026-07-31)", () => {
     const content = layout();
-    expect(content).toContain("useTheme");
-    expect(content).toContain("Sun");
-    expect(content).toContain("Moon");
-    expect(content).toContain('data-testid="theme-toggle"');
+    expect(content).not.toContain("useTheme");
+    expect(content).not.toContain('data-testid="theme-toggle"');
   });
 });

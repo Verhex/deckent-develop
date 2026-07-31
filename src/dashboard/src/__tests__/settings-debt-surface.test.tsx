@@ -48,19 +48,20 @@ describe("settings-debt-surface — route and nav wiring", () => {
     // writes localStorage ('deckent.dashboard.lang'); it never POSTs /api/config.
     expect(src).toContain("useTranslation");
     expect(src).toContain("setLang");
-    // Theme is applied via ThemeProvider.setTheme
-    expect(src).toContain("useTheme");
-    expect(src).toContain("setTheme");
+    // Dark tek-kimlik (Alperen 2026-07-31, DESIGN-SYSTEM-001): tema-seçimi
+    // dashboard'dan söküldü — ADR-G-033 observability-lens + NOVA koyu tek-kimlik.
+    expect(src).not.toContain("useTheme");
+    expect(src).not.toContain("settings-theme-light");
     // No Navigate redirect — it is a real page now
     expect(src).not.toContain('Navigate to="/config"');
   });
 
-  it("i18n keys are complete: nav.debt, settings.appearance, settings.language_label, settings.theme_label in en.ts", () => {
+  it("i18n keys are complete: nav.debt, settings.appearance, settings.language_label in en.ts (theme keys removed — dark single-identity)", () => {
     const en = readFileSync(join(SRC, "i18n", "en.ts"), "utf-8");
     expect(en).toContain("'nav.debt'");
     expect(en).toContain("'settings.appearance'");
     expect(en).toContain("'settings.language_label'");
-    expect(en).toContain("'settings.theme_label'");
+    expect(en).not.toContain("'settings.theme_label'");
   });
 
   it("tr.ts has all new settings keys translated (no missing entries)", () => {
@@ -68,6 +69,6 @@ describe("settings-debt-surface — route and nav wiring", () => {
     expect(tr).toContain("'nav.debt'");
     expect(tr).toContain("'settings.appearance'");
     expect(tr).toContain("'settings.language_label'");
-    expect(tr).toContain("'settings.theme_label'");
+    expect(tr).not.toContain("'settings.theme_label'"); // dark tek-kimlik
   });
 });

@@ -100,7 +100,7 @@ describe("dashboard scaffold", () => {
   it("App.tsx uses Layout wrapper and routes", () => {
     const app = readFileSync(join(DASHBOARD_DIR, "src/App.tsx"), "utf-8");
     expect(app).toContain("Layout");
-    expect(app).toContain("ThemeProvider");
+    expect(app).not.toContain("ThemeProvider"); // dark tek-kimlik 2026-07-31
     expect(app).toContain("BrowserRouter");
     expect(app).toContain('path="/"');
     expect(app).toContain('path="/settings"');
