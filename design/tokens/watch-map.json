@@ -2,7 +2,8 @@
   "$description": "Semantic + component indirection haritası — src/desktop/src/shared/theme-tokens.ts WATCHES ve COMPONENT_TOKENS ile bire-bir (drift testi: theme-tokens-gen-sync.test.ts). Semantic katman saf yönlendirmedir: her rol bir color.chart.* primitive ADI gösterir; watch değişimi bu katmanın yeniden-işaretlenmesidir. Rol ekleme/çıkarma = tasarım kararı → Alperen onayı.",
   "semanticTokenNames": [
     "bg", "surface", "border", "text", "text-muted", "accent",
-    "accent-text", "brass", "go", "caution", "abort", "focus-ring"
+    "accent-text", "brass", "go", "caution", "abort",
+    "go-text", "caution-text", "abort-text", "focus-ring"
   ],
   "watches": {
     "nova": {
@@ -17,6 +18,9 @@
       "go": "novaGo",
       "caution": "novaAmber",
       "abort": "novaAbort",
+      "go-text": "novaDeep",
+      "caution-text": "novaDeep",
+      "abort-text": "novaDeep",
       "focus-ring": "novaGlow"
     },
     "day-watch": {
@@ -31,6 +35,9 @@
       "go": "go",
       "caution": "caution",
       "abort": "abort",
+      "go-text": "buffRaised",
+      "caution-text": "buffRaised",
+      "abort-text": "buffRaised",
       "focus-ring": "magenta"
     },
     "night-watch": {
@@ -45,6 +52,9 @@
       "go": "nightGo",
       "caution": "nightCaution",
       "abort": "nightAbort",
+      "go-text": "night",
+      "caution-text": "night",
+      "abort-text": "night",
       "focus-ring": "nightAccent"
     },
     "open-sea": {
@@ -59,6 +69,9 @@
       "go": "seaGo",
       "caution": "seaCaution",
       "abort": "seaAbort",
+      "go-text": "deepSea",
+      "caution-text": "deepSea",
+      "abort-text": "deepSea",
       "focus-ring": "magentaSea"
     }
   },
@@ -72,6 +85,9 @@
     "input-text": "text",
     "statuspill-go": "go",
     "statuspill-caution": "caution",
-    "statuspill-abort": "abort"
+    "statuspill-abort": "abort",
+    "statuspill-go-text": "go-text",
+    "statuspill-caution-text": "caution-text",
+    "statuspill-abort-text": "abort-text"
   }
 }

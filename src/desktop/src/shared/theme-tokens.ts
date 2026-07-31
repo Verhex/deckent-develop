@@ -88,7 +88,9 @@ export const PRIMITIVES = {
   paperOnMagenta: '#FBF8EC',
   // states (chart-honest: gündüz mürekkepleri; gece varyantları kırmızıya kaçar)
   go: '#2F7D46',
-  caution: '#A8741A',
+  // 2026-07-31 a11y ölçümü (DESIGN-SYSTEM-001): #A8741A idi; caution-text (buffRaised)
+  // 3.81:1 ve bg-üstü 3.46:1 kalıyordu — #8F6212 ikisini de AA'ya çıkarır (5.03 / 4.57).
+  caution: '#8F6212',
   abort: '#C0453E',
   nightGo: '#7FA06A',
   nightCaution: '#C99A55',
@@ -116,6 +118,9 @@ export const SEMANTIC_TOKEN_NAMES = [
   'go',           // state: underway/ok
   'caution',      // state: tech-debt/warn
   'abort',        // state: failed/danger
+  'go-text',      // ink ON go surfaces (pills/badges) — Alperen-onaylı rol, 2026-07-31
+  'caution-text', // ink ON caution surfaces
+  'abort-text',   // ink ON abort surfaces
   'focus-ring',   // keyboard focus indicator
 ] as const;
 
@@ -139,6 +144,9 @@ export const WATCHES: Record<WatchName, WatchDefinition> = {
     go: 'novaGo',
     caution: 'novaAmber',
     abort: 'novaAbort',
+    'go-text': 'novaDeep',
+    'caution-text': 'novaDeep',
+    'abort-text': 'novaDeep',
     'focus-ring': 'novaGlow',
   },
   'day-watch': {
@@ -153,6 +161,9 @@ export const WATCHES: Record<WatchName, WatchDefinition> = {
     go: 'go',
     caution: 'caution',
     abort: 'abort',
+    'go-text': 'buffRaised',
+    'caution-text': 'buffRaised',
+    'abort-text': 'buffRaised',
     'focus-ring': 'magenta',
   },
   'night-watch': {
@@ -167,6 +178,9 @@ export const WATCHES: Record<WatchName, WatchDefinition> = {
     go: 'nightGo',
     caution: 'nightCaution',
     abort: 'nightAbort',
+    'go-text': 'night',
+    'caution-text': 'night',
+    'abort-text': 'night',
     'focus-ring': 'nightAccent',
   },
   'open-sea': {
@@ -181,6 +195,9 @@ export const WATCHES: Record<WatchName, WatchDefinition> = {
     go: 'seaGo',
     caution: 'seaCaution',
     abort: 'seaAbort',
+    'go-text': 'deepSea',
+    'caution-text': 'deepSea',
+    'abort-text': 'deepSea',
     'focus-ring': 'magentaSea',
   },
 };
@@ -201,6 +218,9 @@ export const COMPONENT_TOKENS = {
   'statuspill-go': 'go',
   'statuspill-caution': 'caution',
   'statuspill-abort': 'abort',
+  'statuspill-go-text': 'go-text',
+  'statuspill-caution-text': 'caution-text',
+  'statuspill-abort-text': 'abort-text',
 } as const satisfies Record<string, SemanticTokenName>;
 
 export type ComponentTokenName = keyof typeof COMPONENT_TOKENS;
@@ -331,6 +351,9 @@ const CONTRAST_REQUIREMENTS: Array<{ fg: SemanticTokenName; bg: SemanticTokenNam
   { fg: 'text', bg: 'surface', min: 4.5 },
   { fg: 'text-muted', bg: 'bg', min: 3 },
   { fg: 'accent-text', bg: 'accent', min: 4.5 },
+  { fg: 'go-text', bg: 'go', min: 4.5 },
+  { fg: 'caution-text', bg: 'caution', min: 4.5 },
+  { fg: 'abort-text', bg: 'abort', min: 4.5 },
 ];
 
 /**

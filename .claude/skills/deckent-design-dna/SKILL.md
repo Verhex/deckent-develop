@@ -29,14 +29,17 @@ description: Use FIRST in any deckent design session — UI/UX work on terminal 
 
 ## 2 · Tipografi
 
-| Rol | Font | Not |
-|---|---|---|
-| Display | **Bricolage Grotesque** | "teknolojik ama yapay olmayan"ın tipografik karşılığı |
-| Gövde | **Hanken Grotesk** | hümanist; dashboard'la ortak |
-| Veri/mono | **Geist Mono** | tabular; harita-etiketi kökü |
+> **DURUM (Alperen, 2026-07-31): mevcut set REDDEDİLDİ** — "hiçbiri kabul edilmedi; çok klasik;
+> tamamen değişmeli". Aşağıdaki tablo yalnız kodun bugünkü envanteridir; YENİ tasarım işinde bu
+> fontlar referans alınmaz. Yeni font-yönü aday turu (özgün, klasik-dışı; TR tam destek; OFL
+> self-host edilebilir; display+gövde+mono üçlüsü) Alperen seçimine sunulacak — seçim sonrası
+> `font.*` token'ları ve tüm yüzeyler birlikte döner.
 
-Dashboard bugün mono olarak IBM Plex Mono kullanıyor — Geist Mono'ya birleştirme
-**design-tokens-pipeline işinde açık karar maddesidir**; sessiz değiştirme yapılmaz.
+| Rol | Font (REDDEDİLEN mevcut-durum) | Not |
+|---|---|---|
+| Display | Bricolage Grotesque | kod envanteri |
+| Gövde | Hanken Grotesk | kod envanteri; dashboard'la ortak |
+| Veri/mono | Geist Mono (desktop) · IBM Plex Mono (dashboard) | kod envanteri |
 
 ## 3 · Renk & token authority
 
@@ -64,6 +67,11 @@ Dashboard bugün mono olarak IBM Plex Mono kullanıyor — Geist Mono'ya birleş
 
 Ortak omurga: i18n (`src/cli/helpers/messages.ts` — desktop dahil; dashboard kendi `i18n/`'i) —
 **i18n-FIRST**: kullanıcıya görünen string hardcode edilmez; mekanizma modülleri string-free.
+
+**Kişiselleştirme birinci-sınıf (Alperen, 2026-07-31):** Desktop «Ayarlar» sahnesi tema/vardiya +
+**font** + accent kullanıcı-seçimi sunar (MASTER-PLAN: DESKTOP-CUSTOMIZE-001). Sonuç-kural: her
+kimlik seçimi — font dahil — token katmanından **runtime-switchable** tasarlanır; hiçbir yüzeyde
+hardcoded `font-family`/renk olamaz, seçenek eklemek = token-set eklemek olmalıdır.
 
 ## 6 · Anti-şablon YASAK listesi ("uniq"liğin negatif-uzayı)
 

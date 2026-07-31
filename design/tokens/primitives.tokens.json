@@ -38,7 +38,10 @@
       "brass": { "$value": "#A98F54" },
       "paperOnMagenta": { "$value": "#FBF8EC" },
       "go": { "$value": "#2F7D46" },
-      "caution": { "$value": "#A8741A" },
+      "caution": {
+        "$value": "#8F6212",
+        "$description": "2026-07-31 a11y koyulaştırması (#A8741A idi): caution-text/caution 5.03 ve caution/bg 4.57 — AA."
+      },
       "abort": { "$value": "#C0453E" },
       "nightGo": { "$value": "#7FA06A" },
       "nightCaution": { "$value": "#C99A55" },

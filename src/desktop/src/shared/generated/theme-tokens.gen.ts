@@ -39,7 +39,7 @@ export const GEN_PRIMITIVES = {
   brass: '#A98F54',
   paperOnMagenta: '#FBF8EC',
   go: '#2F7D46',
-  caution: '#A8741A',
+  caution: '#8F6212',
   abort: '#C0453E',
   nightGo: '#7FA06A',
   nightCaution: '#C99A55',
@@ -62,6 +62,9 @@ export const GEN_WATCHES = {
     go: 'novaGo',
     caution: 'novaAmber',
     abort: 'novaAbort',
+    'go-text': 'novaDeep',
+    'caution-text': 'novaDeep',
+    'abort-text': 'novaDeep',
     'focus-ring': 'novaGlow',
   },
   'day-watch': {
@@ -76,6 +79,9 @@ export const GEN_WATCHES = {
     go: 'go',
     caution: 'caution',
     abort: 'abort',
+    'go-text': 'buffRaised',
+    'caution-text': 'buffRaised',
+    'abort-text': 'buffRaised',
     'focus-ring': 'magenta',
   },
   'night-watch': {
@@ -90,6 +96,9 @@ export const GEN_WATCHES = {
     go: 'nightGo',
     caution: 'nightCaution',
     abort: 'nightAbort',
+    'go-text': 'night',
+    'caution-text': 'night',
+    'abort-text': 'night',
     'focus-ring': 'nightAccent',
   },
   'open-sea': {
@@ -104,6 +113,9 @@ export const GEN_WATCHES = {
     go: 'seaGo',
     caution: 'seaCaution',
     abort: 'seaAbort',
+    'go-text': 'deepSea',
+    'caution-text': 'deepSea',
+    'abort-text': 'deepSea',
     'focus-ring': 'magentaSea',
   },
 } as const;
@@ -119,4 +131,7 @@ export const GEN_COMPONENT_TOKENS = {
   'statuspill-go': 'go',
   'statuspill-caution': 'caution',
   'statuspill-abort': 'abort',
+  'statuspill-go-text': 'go-text',
+  'statuspill-caution-text': 'caution-text',
+  'statuspill-abort-text': 'abort-text',
 } as const;

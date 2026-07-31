@@ -67,20 +67,27 @@ description: Use when creating or changing ANY design token (color, typography, 
 4. `design-critic` + `a11y-contrast-auditor` pass (typed verdict).
 5. Alperen onayı → commit (kaynak + üç çıktı aynı commit'te).
 
-## 6 · Açık karar maddeleri (sessiz kapatma yasak)
+## 6 · Karar günlüğü + açık maddeler (sessiz kapatma yasak)
 
-- Dashboard mono fontu: IBM Plex Mono → **Geist Mono** birleşimi (öneri: birleştir; onay bekler).
-- NOVA accent-ailesi: prototip-turunda Alperen'le seçilir; seçime kadar aday-token olarak işaretli.
-- Dashboard light-tema: var mı yok mu — ADR-G-033 observability-lens'iyle birlikte karar.
-- **`state-on-*` rolleri** (2026-07-31 a11y denetimi, BLOCKER kökü): durum-renk-ÜSTÜ mürekkep için
-  semantic rol yok; day-watch'ta hiçbir mevcut token state zemininde AA-normal veremiyor. Öneri:
-  `state-on-go/caution/abort` rolleri eklensin — rol eklemesi Alperen onayı bekler.
-- **Terminal wiring (slice-2) ön-şartları** (2026-07-31 a11y denetimi, MAJOR ×2): (a) açık-zemin
-  stratejisi — palette hex'leri dark-optimize; açık terminalde 1.6–2.8:1. Seçenekler: çift-varyant
-  hex, COLORFGBG/OSC-11 zemin-sezgisi, ya da açık temada ansi16'ya düşüş. (b) renk-gating SSOT
-  birleşimi — bugün `theme.ts shouldUseColor` ≠ `output.ts isNoColor` ≠ `splash.ts` lokal kontrol;
-  tek kapıya bağlanmadan palette tellenmez.
-- **day-watch muted/focus kullanım kuralı**: muted/bg 4.33 · focus/bg 4.25 — küçük-punto gövdede
-  AA-normal altı; ya kullanım kuralı (yalnız ≥large/ikincil glif) ya inkMuted koyulaştırma.
-- **Rol örtüşmeleri**: nova `caution`≡`brass` (novaAmber) ve terminal `info`≡`accent` (novaGlow,
-  ansi16'da 34/36 ayrık) — bilinçli mi ayrıştırılacak mı, accent-ailesi turunda karara bağlanır.
+**Kararlaştırıldı (Alperen, 2026-07-31):**
+- ✅ **`go-text`/`caution-text`/`abort-text` rolleri eklendi** (durum-üstü mürekkep; a11y BLOCKER
+  kapanışı). day-watch `caution` primitive'i ölçümle `#A8741A → #8F6212` (caution-text 5.03 ·
+  caution/bg 4.57 — AA).
+- ✅ **Terminal stratejisi = işlevsellik-önce:** zemin bilinmiyorsa ansi16 (terminal şeması çözer);
+  truecolor yalnız zemin güvenle biliniyorsa (OSC-11/COLORFGBG sezgisi). Gating SSOT birleşimi
+  (`theme.ts` ≠ `output.ts` ≠ `splash.ts`) slice-2'nin İLK işi — birleşmeden palette tellenmez.
+- ❌ **FONT SETİ REDDEDİLDİ** ("hiçbiri; çok klasik; tamamen değişmeli"): Bricolage + Hanken +
+  Geist/IBM Plex tamamı. `font.*` token'ları mevcut-durum envanteri statüsünde; YENİ font-yönü
+  aday turu açık. Eski "IBM Plex → Geist birleşimi" maddesi geçersiz (ikisi de gidiyor).
+- ✅ **Kişiselleştirme gereksinimi:** desktop «Ayarlar» sahnesinde tema + font + accent seçimi
+  (DESKTOP-CUSTOMIZE-001) → font token'ları da vardiya gibi **set-değiştirilebilir** modellenir
+  (tek sabit üçlü değil, seçilebilir font-setleri).
+
+**Açık maddeler:**
+- **Yeni font-yönü** — aday turu: özgün/klasik-dışı, TR tam, OFL self-host, display+gövde+mono;
+  Alperen seçer; seçim `font.*` token-setine işlenir, tüm yüzeyler + foundations kartı birlikte döner.
+- **NOVA accent-ailesi**: gerçek-veri prototip turunda seçilir; seçime kadar aday-token.
+- **Dashboard light-tema**: var mı yok mu — ADR-G-033 lens'iyle karar.
+- **day-watch muted/focus**: 4.33/4.25 — küçük-punto kullanım kuralı ya da inkMuted koyulaştırma.
+- **Rol örtüşmeleri**: nova `caution`≡`brass`; terminal `info`≡`accent` (truecolor'da) — accent
+  turunda ayrıştır/belgele.
