@@ -94,6 +94,13 @@ description: Use when creating or changing ANY design token (color, typography, 
 - **Font-A gerçek-veri doğrulaması + flip** — accent-prototip turuyla birleşik: koşan daemon'a
   bağlı prototipte A seti canlı telemetriyle izlenir; onayla birlikte `font.*` → `fontSet.makine-izi`
   flip'i üç yüzeye + kartlara gider.
+- **NOVA-sahne flip-önkoşulları** (kimlik-turu denetimleri, 2026-07-31 — prototip:
+  `design/prototypes/kimlik-turu-2026-07-31.html`): (a) worker-segment klavye erişimi
+  (react-aria katmanı: ok-tuşu gezinme + Enter/Escape); (b) idle segment-yayı efektif ≥3:1
+  (bugün alfa .30 → 1.6–1.9:1); (c) bayatlığa renk-dışı ikinci taşıyıcı (kesikli stroke +
+  STALE etiketi) — accent=KOR seçilirse ZORUNLU (KOR vs amber 1.11:1); (d) picker/panel
+  kenarlık ≥3:1; (e) worker-kategorik WCOL paletinin (4 token-dışı renk) primitives'e
+  token olarak önerilmesi; (f) canvas mikro-metin ≥10px.
 - **NOVA accent-ailesi**: gerçek-veri prototip turunda seçilir; seçime kadar aday-token.
 - **Dashboard light-tema**: var mı yok mu — ADR-G-033 lens'iyle karar.
 - **day-watch muted/focus**: 4.33/4.25 — küçük-punto kullanım kuralı ya da inkMuted koyulaştırma.
