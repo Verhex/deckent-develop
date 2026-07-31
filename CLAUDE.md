@@ -124,12 +124,8 @@ Belirsizlik = typed HOLD (sessiz yorum yok); hiçbir rol kendi yetkisini genişl
 
 <commands>
 ## Commands
-Build: `npm run build` (tsc + copy-assets) | Full: `npm run build:all` (+ dashboard vite build)
-Test: `npm test` (vitest run) | Watch: `npm run test:watch` | Coverage: `npm run test:coverage`
-Test Dashboard: `npm run test:dashboard` (vitest.dashboard.config.ts)
-Lint: `npm run lint` (tsc --noEmit) | ADR: `npm run lint:adr` | Errors: `npm run lint:errors` | Links: `npm run lint:link`
-Dev: `npm run dev` (tsc --watch)
-Publish gate: `npm run validate:publish` — Alperen runs `npm publish` manually (npm publish'i Alperen elle yapar)
+Standart komutlar `package.json` scripts'inde (`npm run <script>`). Tek istisna: `npm publish` her zaman
+Alperen tarafından elle çalıştırılır — CI/agent asla publish etmez.
 </commands>
 
 <agent_instructions>
@@ -161,4 +157,4 @@ Rol kuralları path-scoped auto-load'dur (`.claude/rules/*.md`, frontmatter `pat
 
 ## Live Status
 Canlı sprint, debt, agent performance ve ADR durumu için: `.brain/exports/summary.md` (auto-generated her sprint sonu).
-Komutlar: `deckent status`, `deckent history`, `deckent retro`, `deckent recall "<sorgu>"`.
+İlgili komutlar için `deckent --help`.

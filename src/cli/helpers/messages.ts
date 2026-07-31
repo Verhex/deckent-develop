@@ -4209,6 +4209,18 @@ const MESSAGES: MessageMap = {
     en: 'Scope gate: run NOT started (the detached child would die at PLAN with the same verdict). Fix the write paths, or acknowledge intentional new paths with --force-scope.\n{message}',
     tr: 'Scope-gate: koşu BAŞLATILMADI (detached-child PLAN fazında aynı kararla ölecekti). Yazma-yollarını düzeltin ya da bilinçli yeni-yolları --force-scope ile onaylayın.\n{message}',
   },
+  'do.write_allowlist_option': {
+    en: 'Bind the exact plan to an existing-file closed write allowlist; repeat paths after the option',
+    tr: 'Exact planı mevcut dosyalardan oluşan kapalı write allowlist’e bağla; option sonrasında path’leri sıralayın',
+  },
+  'do.write_allowlist_requires_run_flow': {
+    en: '--write-allowlist requires the canonical RunFlow path (terminal.run_flow_v2=true); no plan was created.',
+    tr: '--write-allowlist canonical RunFlow yolunu gerektirir (terminal.run_flow_v2=true); plan oluşturulmadı.',
+  },
+  'do.closed_write_scope_blocked': {
+    en: 'Closed write scope blocked the plan before approval. Every allowed path must already be tracked and every task write must be allowlisted; --force-scope cannot override this authority. Violations: {violations}',
+    tr: 'Kapalı write scope planı onaydan önce durdurdu. İzin verilen her path zaten tracked olmalı ve her task write allowlist içinde bulunmalı; --force-scope bu authority’yi aşamaz. İhlaller: {violations}',
+  },
   // do.scope_gate_preview_fail / do.scope_gate_overridden (the preview-only
   // renderings) were retired by 452-003 — the preview verdict text now comes
   // from runFlow.planPreview.scopeGate.* (see above), shared verbatim with

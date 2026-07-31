@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "170cc6f19a956d575dc8ec29441e2324724136f02873b309ac85590c96957057"
+    "value": "cacc7efb4ca9859fb5a8a9c94c7257dfd5f9a599d26ade3fab8d3f7a709871ef"
   },
   "summary": {
     "total": 271,
@@ -1909,7 +1909,7 @@
       "state": "OPEN",
       "updated": "2026-07-31",
       "definitionDigest": "130286ccf29f59d9d19b4d05ce2b45788a7dd5477bf822eeb7b9170790cf9e98",
-      "progressDigest": "333d5b90d8eb0478f3b79c3a3f090995ee7329742843c893e4027fac9617d63c",
+      "progressDigest": "9d66fc90e1b3efd3235b472d13cda1ce3e7d6a5e4edd97ba5f1f34651f755ce8",
       "terminalClosureDigest": null
     },
     {
@@ -10514,10 +10514,10 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
         "L": "0",
         "X": "0",
         "S": "?"
@@ -10531,7 +10531,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "A digest-bound proposal that forbids new paths can materialize only existing allowlisted `filesWrite` entries; any planner-added absent path blocks preview or requires a new explicitly approved revision, and prompt-lint cannot downgrade the violation to a warning",
-      "evidence": "Flow `64b619e2-2ced-4c20-b162-e4c9c914c475`, revision 1, digest `581fc20e…` explicitly closed the write set and forbade new files. Scope gate still passed; prompt-lint only warned for absent `tests/orchestra/sprint-recovery-operation.test.ts` and `tests/cli/commands/finalize.test.ts`, then workers created both. Affected product and dogfood surfaces: Do preview, exact-plan digest, planner, scope gate, worker authority and operator approval. Negative scope: no repository-wide existence scan on healthy dispatch, no implicit `--force-scope`, no post-approval allowlist mutation",
+      "evidence": "Flow `64b619e2-2ced-4c20-b162-e4c9c914c475`, revision 1, digest `581fc20e…` proved the original defect: scope gate passed, prompt-lint only warned for two absent test paths and workers created both. Recovery implementation now introduces a provider-neutral `closed-allowlist` authority, canonicalizes it into the V4 plan digest while preserving byte-frozen V2/V3 projections, rejects untracked allowlist entries and planner-added writes before durable preview/event/artifact publication, and revalidates file presence plus task scope at exact-start before `.tasks` materialization. `--force-scope` cannot widen this authority; CLI `do --write-allowlist <paths...>` is explicit and legacy `do` fails closed instead of ignoring it. Focused tests pass 200/200, broader RunFlow/exact/Do regressions pass 156/156, TypeScript/lint/build pass and built-binary help exposes the option. Fresh live closed-scope Do replay remains required before DONE. Affected product and dogfood surfaces: Do preview, exact-plan digest, planner, scope gate, exact-start, worker authority and operator approval. Negative scope: no natural-language authority inference, no repository-wide existence scan on healthy dispatch, no implicit `--force-scope`, no post-approval allowlist mutation",
       "updated": "2026-07-31"
     },
     {
@@ -14910,6 +14910,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "f909da46788b1198c60ccbb59920d143d892cc5469b765a1118de4b19b6ab0ce"
+    "value": "4b550ed2d4d21cac4160a4c39337200f1a49c08a111cf94b5b58e54524975cb8"
   }
 }

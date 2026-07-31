@@ -66,6 +66,10 @@ import {
   inspectStructuredCriteriaProjectionAdoption,
   TaskArtifactProjectionError,
 } from './task-artifact-projection.js';
+import {
+  evaluateExecutionWriteScopePolicy,
+  normalizeExecutionWriteScopePolicy,
+} from '../core/execution-write-scope-policy.js';
 
 export const RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION = 1 as const;
 
@@ -76,7 +80,8 @@ export type RunFlowPlanServiceErrorCode =
   | 'PROJECTION_ADOPTION_HOLD'
   | 'TOPOLOGY_HOLD'
   | 'PROMPT_GATE_HOLD'
-  | 'SCOPE_GATE_HOLD';
+  | 'SCOPE_GATE_HOLD'
+  | 'CLOSED_WRITE_SCOPE_HOLD';
 
 export class RunFlowPlanServiceError extends Error {
   constructor(
@@ -552,13 +557,30 @@ export async function planRunFlow(input: PlanRunFlowInput): Promise<PlanRunFlowR
       reason: 'lineage_identity_missing',
     });
   }
+  let previewOptions = input.previewOptions;
+  if (input.previewOptions?.writeScopePolicy) {
+    try {
+      previewOptions = {
+        ...input.previewOptions,
+        writeScopePolicy: normalizeExecutionWriteScopePolicy(
+          input.previewOptions.writeScopePolicy,
+        ),
+      };
+    } catch (error) {
+      throw new RunFlowPlanServiceError('CLOSED_WRITE_SCOPE_HOLD', {
+        flowId: input.proposal.flowId,
+        reason: 'closed_write_scope_invalid',
+        diagnostic: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
   const scopeInput = input.scopeEvidence ?? await listTrackedFiles(input.projectRoot);
   const authority = buildSourceAuthority(
     input.proposal,
     input.source,
     input.config,
     input.recommendation,
-    input.previewOptions,
+    previewOptions,
     input.acknowledgeScopePaths === true,
     scopeInput,
     input.lineage,
@@ -606,7 +628,7 @@ export async function planRunFlow(input: PlanRunFlowInput): Promise<PlanRunFlowR
     input.config,
     brainContext,
     input.recommendation,
-    input.previewOptions,
+    previewOptions,
   );
 
   // The scheduler historically normalized these references at spawn time,
@@ -629,6 +651,28 @@ export async function planRunFlow(input: PlanRunFlowInput): Promise<PlanRunFlowR
   assertCanonicalDependencies(generated.sprint);
   normalizeExecutableStatuses(generated.sprint);
   assertExecutableStatuses(generated.sprint);
+
+  const writeScopePolicy = previewOptions?.writeScopePolicy;
+  if (writeScopePolicy) {
+    if (scopeInput.status !== 'available') {
+      throw new RunFlowPlanServiceError('CLOSED_WRITE_SCOPE_HOLD', {
+        flowId: input.proposal.flowId,
+        reason: 'tracked_scope_evidence_unavailable',
+      });
+    }
+    const closedScope = evaluateExecutionWriteScopePolicy({
+      policy: writeScopePolicy,
+      tasks: generated.sprint.tasks,
+      trackedFiles: scopeInput.trackedFiles,
+    });
+    if (!closedScope.ok) {
+      throw new RunFlowPlanServiceError('CLOSED_WRITE_SCOPE_HOLD', {
+        flowId: input.proposal.flowId,
+        reason: 'closed_write_scope_violation',
+        violations: closedScope.violations,
+      });
+    }
+  }
 
   // Exact authority is fail-closed when repository scope evidence cannot be
   // acquired. `skipped` is reserved for legacy/non-exact projections.

@@ -353,6 +353,27 @@ describe('execution plan digest v2', () => {
     expect(digest(value, config({ execution_budget: policy(20) }))).not.toBe(digest(value));
   });
 
+  it('binds a normalized closed write allowlist only in the current V4 projection', () => {
+    const value = sprint();
+    const baseline = buildExecutionPlanDigestContext(config(), 'subscription', 4);
+    const first = buildExecutionPlanDigestContext(config(), 'subscription', 4, {
+      mode: 'closed-allowlist',
+      filesWrite: ['./src/b.ts', 'src/a.ts', 'src/a.ts'],
+    });
+    const reordered = buildExecutionPlanDigestContext(config(), 'subscription', 4, {
+      mode: 'closed-allowlist',
+      filesWrite: ['src/a.ts', 'src/b.ts'],
+    });
+
+    expect(first.writeScopePolicy?.filesWrite).toEqual(['src/a.ts', 'src/b.ts']);
+    expect(computeExecutionPlanDigestV4(value, first).digest)
+      .toBe(computeExecutionPlanDigestV4(value, reordered).digest);
+    expect(computeExecutionPlanDigestV4(value, first).digest)
+      .not.toBe(computeExecutionPlanDigestV4(value, baseline).digest);
+    expect(computeExecutionPlanDigestV3(value, first).digest)
+      .toBe(computeExecutionPlanDigestV3(value, baseline).digest);
+  });
+
   it('returns a versioned deep-frozen canonical projection', () => {
     const result = computeExecutionPlanDigest(
       sprint(),

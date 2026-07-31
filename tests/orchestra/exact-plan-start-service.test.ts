@@ -308,6 +308,46 @@ describe('exact-plan start attempt lifecycle', () => {
     expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({ id: 'drift' });
   });
 
+  it('blocks closed-scope drift before creating any task artifact', () => {
+    const root = mkdtempSync(join(tmpdir(), 'exact-start-closed-scope-'));
+    const base = snapshot(root);
+    const approved: StoredApprovedSnapshot = {
+      ...base,
+      planDigestContext: {
+        configuredProvider: null,
+        configuredModel: null,
+        configuredBackend: null,
+        configuredAuthMode: 'subscription',
+        fallbackProvider: null,
+        fallbackPolicy: null,
+        executionBudgetPolicy: null,
+        configuredMaxWorkers: 1,
+        writeScopePolicy: {
+          mode: 'closed-allowlist',
+          filesWrite: ['src/a.ts'],
+        },
+      },
+    };
+    const prepared = prepareAndSpawnExactRun({
+      root,
+      exactRef: { schemaVersion: 1, flowId: 'flow-1', revision: 1, planDigest: 'digest-1' },
+      approvedSnapshot: approved,
+      lineage: lineage(),
+      preparerProcess: { pid: 100, startToken: 's100', evidence: 'verified' },
+      identityDeps,
+      spawnProcess: () => ({ pid: 200, startToken: 's200' }),
+    });
+    if (prepared.status !== 'process-spawned') throw new Error('unexpected fixture result');
+
+    expect(() => materializeExactPlanTaskArtifacts(root, {
+      capability: prepared.capability,
+      approvedSnapshot: approved,
+    })).toThrowError(expect.objectContaining({
+      code: 'EXACT_START_TASK_ARTIFACT_DRIFT',
+    }));
+    expect(() => readFileSync(join(root, '.tasks', 'task-1-001.json'), 'utf8')).toThrow();
+  });
+
   it('migrates only an adoption-bound missing structured-criteria projection before admission', () => {
     const root = mkdtempSync(join(tmpdir(), 'exact-start-adoption-'));
     const base = snapshot(root);

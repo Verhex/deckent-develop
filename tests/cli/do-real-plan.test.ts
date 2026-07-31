@@ -65,6 +65,13 @@ vi.mock('../../src/orchestra/planner.js', () => ({
     defaultModel,
     allowedModels: [defaultModel],
   })),
+  normalizePlannerDependencies: vi.fn((tasks: Task[]) => {
+    const byTitle = new Map(tasks.map(task => [task.title, task.id]));
+    for (const task of tasks) {
+      task.dependencies = task.dependencies.map(ref => byTitle.get(ref) ?? ref);
+    }
+    return { resolvedCount: 0, dropped: [] };
+  }),
   callZeroConfigPlanner: vi.fn(),
 }));
 
@@ -89,7 +96,6 @@ import {
   type RunFlowControllerDeps,
 } from '../../src/cli/repl/run-flow-controller.js';
 import { loadApprovedSnapshot, loadRunHandle } from '../../src/core/run-flow-store.js';
-import type { RunHandle } from '../../src/orchestra/run-job-service.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../../src/core/types.js';
 import type {
   Sprint, Task, ResolvedConfig, BrainContext, PlannerResult, PlannerTask,
@@ -264,6 +270,14 @@ function makeControllerFactory(spawnStart?: RunFlowControllerDeps['spawnStart'])
       ...deps,
       now: () => new Date(Date.UTC(2026, 0, 1)).toISOString(),
       generateFlowId: () => 'flow-rp-1',
+      scopeEvidence: {
+        status: 'available',
+        trackedFiles: [
+          'src/api/export.ts',
+          'src/dashboard/ExportButton.tsx',
+          'tests/api/export.test.ts',
+        ],
+      },
       ...(spawnStart ? { spawnStart } : {}),
     });
     return created;
@@ -309,9 +323,7 @@ describe('deckent do — flag-on, fake-planner-driven real multi-task plan (N678
     it('drives the fake-planner plan through the REAL compileRunProposal/buildDirectives chain, then approves + starts via the real RunFlow services (runSprint mock)', async () => {
       mockCallZeroConfigPlanner.mockReturnValue(makeRealMultiTaskPlan());
       mockPlanSprint.mockReturnValue(makeGreenSprint() as any);
-      const spawnStart = vi.fn((_sprint: Sprint, flowId: string): RunHandle => ({
-        flowId, jobId: `job-${flowId}`, logRef: '/fake/log.log',
-      }));
+      const spawnStart = vi.fn(() => ({ pid: process.pid }));
       const { factory, getController } = makeControllerFactory(spawnStart);
       const goal = 'Ship the CSV+JSON exporter feature end to end';
 
@@ -353,9 +365,12 @@ describe('deckent do — flag-on, fake-planner-driven real multi-task plan (N678
       // ── digest-bound-approval -> exact-snapshot -> detached job (mocked spawnStart
       // stands in for the real `deckent start`/runSprint subprocess) ──
       expect(spawnStart).toHaveBeenCalledTimes(1);
-      expect(spawnStart).toHaveBeenCalledWith(expect.objectContaining({ id: 'sprint-rp-1' }), 'flow-rp-1');
-      expect(controller.getContext().state).toBe('DETACHED_RUNNING');
-      expect(out).toContain(getMessage('runFlow.mount.started', 'en', { jobId: 'job-flow-rp-1' }));
+      expect(spawnStart).toHaveBeenCalledWith(expect.objectContaining({
+        sprint: expect.objectContaining({ id: 'sprint-rp-1' }),
+        capability: expect.objectContaining({ flowId: 'flow-rp-1' }),
+      }));
+      expect(controller.getContext().state).toBe('STARTING');
+      expect(out).toContain(getMessage('runFlow.mount.started', 'en', { jobId: 'flow-rp-1' }));
 
       const storedSnapshot = loadApprovedSnapshot(tmpRoot, 'flow-rp-1');
       expect(storedSnapshot?.planDigest).toBe(preview.planDigest);

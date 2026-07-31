@@ -41,6 +41,7 @@ import {
 } from '../../core/run-flow-contract.js';
 import type { ActorContext, RequestOrigin } from '../../core/work-model.js';
 import type { BrainPlanningMode, ResolvedConfig, SprintSizeRecommendation } from '../../core/types.js';
+import type { ExecutionWriteScopePolicy } from '../../core/execution-write-scope-policy.js';
 import {
   decideRunFlowPlan,
   planRunFlow,
@@ -94,6 +95,8 @@ export interface RunFlowControllerDeps {
    * child's own PLAN-phase gate makes the SAME decision. Default: false.
    */
   forceScope?: boolean;
+  /** Digest-bound owner authority. When present, `forceScope` cannot widen it. */
+  writeScopePolicy?: ExecutionWriteScopePolicy;
   /** Hermetic/platform scope-evidence adapter forwarded to the canonical
    * plan service. Production normally uses its bounded git adapter. */
   scopeEvidence?: RunFlowScopeEvidence;
@@ -216,6 +219,7 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
       },
       previewOptions: {
         mode: deps.mode ?? 'structured',
+        ...(deps.writeScopePolicy ? { writeScopePolicy: deps.writeScopePolicy } : {}),
       },
       acknowledgeScopePaths: deps.forceScope === true,
       ...(deps.scopeEvidence ? { scopeEvidence: deps.scopeEvidence } : {}),

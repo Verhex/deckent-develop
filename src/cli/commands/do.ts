@@ -61,6 +61,7 @@ import {
 import { resolvePlanTimeoutMs } from '../../orchestra/planner.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
 import { preflightCliBrainProviderAuthority } from '../provider-authority-process-runtime.js';
+import { RunFlowPlanServiceError } from '../../orchestra/run-flow-plan-service.js';
 
 export interface DoCommandOptions {
   run?: boolean;
@@ -70,6 +71,8 @@ export interface DoCommandOptions {
   /** Dogfood-449 B1 — forwarded to the detached child as `--force-scope` AND
    *  acknowledged in the front-door scope-gate mirror. RunFlow path only. */
   forceScope?: boolean;
+  /** Explicit closed write allowlist. Natural-language scope is not authority. */
+  writeAllowlist?: string[];
 }
 
 /** Outcome of spawning `deckent start` for real. */
@@ -225,7 +228,7 @@ export async function runDoRunFlow(
   root: string,
   config: ResolvedConfig,
   goal: string,
-  opts: { run: boolean; yes: boolean; forceScope?: boolean },
+  opts: { run: boolean; yes: boolean; forceScope?: boolean; writeAllowlist?: readonly string[] },
   deps: DoSeamDeps,
 ): Promise<void> {
   const lang = config.language;
@@ -239,6 +242,14 @@ export async function runDoRunFlow(
     // Dogfood-449 B1: consent flows into the controller — gate-ayna acknowledge
     // + child'a `--force-scope` argv'si (bkz. RunFlowControllerDeps.forceScope).
     ...(opts.forceScope === true ? { forceScope: true } : {}),
+    ...(opts.writeAllowlist !== undefined
+      ? {
+          writeScopePolicy: {
+            mode: 'closed-allowlist' as const,
+            filesWrite: opts.writeAllowlist,
+          },
+        }
+      : {}),
   });
 
   let context: RunFlowContext;
@@ -251,9 +262,22 @@ export async function runDoRunFlow(
   try {
     context = await controller.proposeRun(goal);
   } catch (error) {
-    printError(getMessage('runFlow.mount.error', lang, {
-      error: error instanceof Error ? error.message : String(error),
-    }));
+    if (error instanceof RunFlowPlanServiceError && error.code === 'CLOSED_WRITE_SCOPE_HOLD') {
+      const violations = Array.isArray(error.details.violations)
+        ? error.details.violations
+          .map(item => {
+            if (!item || typeof item !== 'object') return String(item);
+            const entry = item as { code?: unknown; path?: unknown; taskId?: unknown };
+            return [entry.code, entry.path, entry.taskId].filter(Boolean).join(':');
+          })
+          .join(', ')
+        : String(error.details.reason ?? error.code);
+      printError(getMessage('do.closed_write_scope_blocked', lang, { violations }));
+    } else {
+      printError(getMessage('runFlow.mount.error', lang, {
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    }
     process.exitCode = 1;
     return;
   } finally {
@@ -420,6 +444,10 @@ export function registerDo(program: Command, deps: DoSeamDeps = {}): void {
     .option('--run', 'Approve and start the sprint for real (default is a dry-run preview only)')
     .option('--yes', 'Non-interactive approval when RunFlow (terminal.run_flow_v2) is enabled — required together with --run to actually start; otherwise an honest reject (no interactive prompt)')
     .option('--force-scope', 'Bypass the pre-spawn scope gate (front-door mirror AND the detached child) — same consent as `deckent start --force-scope`')
+    .option(
+      '--write-allowlist <paths...>',
+      getMessage('do.write_allowlist_option', 'en'),
+    )
     .action(async (goal: string, opts: DoCommandOptions) => {
       const trimmedGoal = goal.trim();
       if (!trimmedGoal) {
@@ -432,6 +460,11 @@ export function registerDo(program: Command, deps: DoSeamDeps = {}): void {
       try {
         const root = resolveProjectRoot();
         const config = await loadConfig(root);
+        if (opts.writeAllowlist !== undefined && config.terminal?.run_flow_v2 !== true) {
+          printError(getMessage('do.write_allowlist_requires_run_flow', config.language));
+          process.exitCode = 1;
+          return;
+        }
 
         // TERM-6 (428-006) — flag-on: delegate to the 426/427 RunFlow chain
         // instead of golden-flow. See runDoRunFlow's own doc comment for why
@@ -452,7 +485,14 @@ export function registerDo(program: Command, deps: DoSeamDeps = {}): void {
             process.exitCode = 1;
             return;
           }
-          await runDoRunFlow(root, config, trimmedGoal, { run, yes: !!opts.yes, forceScope: !!opts.forceScope }, deps);
+          await runDoRunFlow(root, config, trimmedGoal, {
+            run,
+            yes: !!opts.yes,
+            forceScope: !!opts.forceScope,
+            ...(opts.writeAllowlist !== undefined
+              ? { writeAllowlist: opts.writeAllowlist }
+              : {}),
+          }, deps);
           return;
         }
 

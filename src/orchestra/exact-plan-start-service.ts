@@ -6,6 +6,8 @@
 // hook. No function in this module plans or mutates an approved Sprint.
 
 import { createHash, randomUUID } from 'node:crypto';
+import { statSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   isTerminalStartAttemptState,
   type ExactPlanReferenceV1,
@@ -55,6 +57,10 @@ import {
   publishTaskArtifactsNoClobber,
   TaskArtifactProjectionError,
 } from './task-artifact-projection.js';
+import {
+  evaluateExecutionWriteScopePolicy,
+  normalizeExecutionWriteScopePolicy,
+} from '../core/execution-write-scope-policy.js';
 
 const DEFAULT_PREPARE_LEASE_MS = 60_000;
 
@@ -676,6 +682,44 @@ export function materializeExactPlanTaskArtifacts(
       capability.flowId,
       capability.attemptId,
     );
+  }
+
+  const rawWriteScopePolicy = approvedSnapshot.planDigestContext?.writeScopePolicy;
+  if (rawWriteScopePolicy) {
+    let writeScopePolicy;
+    try {
+      writeScopePolicy = normalizeExecutionWriteScopePolicy(rawWriteScopePolicy);
+    } catch (error) {
+      throw new ExactPlanStartError(
+        'EXACT_START_TASK_ARTIFACT_DRIFT',
+        'exact-plan-start: approved closed write scope is invalid',
+        capability.flowId,
+        capability.attemptId,
+        { cause: error },
+      );
+    }
+    const presentFiles = writeScopePolicy.filesWrite.filter((path) => {
+      try {
+        return statSync(join(root, path)).isFile();
+      } catch {
+        return false;
+      }
+    });
+    const closedScope = evaluateExecutionWriteScopePolicy({
+      policy: writeScopePolicy,
+      tasks: approvedSnapshot.sprint.tasks,
+      presentFiles,
+    });
+    if (!closedScope.ok) {
+      throw new ExactPlanStartError(
+        'EXACT_START_TASK_ARTIFACT_DRIFT',
+        `exact-plan-start: approved closed write scope drift (${closedScope.violations
+          .map(violation => `${violation.code}:${violation.path}`)
+          .join(',')})`,
+        capability.flowId,
+        capability.attemptId,
+      );
+    }
   }
 
   try {

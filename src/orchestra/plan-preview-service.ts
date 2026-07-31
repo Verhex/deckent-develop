@@ -40,10 +40,13 @@ import type {
 import type {
   RunFlowGateResult, RunFlowPolicyDecision, RunFlowTaskSummary,
 } from '../core/run-flow-contract.js';
+import type { ExecutionWriteScopePolicy } from '../core/execution-write-scope-policy.js';
 
 export interface PlanPreviewOptions {
   mode?: BrainPlanningMode;
   acknowledgePromptGate?: boolean;
+  /** Explicit owner-authored closed write authority; natural language is not authority. */
+  writeScopePolicy?: ExecutionWriteScopePolicy;
 }
 
 export interface PlanPreviewResult {
@@ -115,6 +118,7 @@ export async function generatePlanPreview(
     config,
     await readAuthMode(root),
     effectiveRecommendation.maxWorkers,
+    options?.writeScopePolicy,
   );
   const digest = computeExecutionPlanDigestV4(sprint, planDigestContext);
   const topology = digest.topology!;

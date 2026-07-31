@@ -180,7 +180,7 @@ function makeControllerFactory(spawnStart?: RunFlowControllerDeps['spawnStart'])
       ...deps,
       now: () => new Date(Date.UTC(2026, 0, 1)).toISOString(),
       generateFlowId: () => 'flow-1',
-      scopeEvidence: { status: 'available', trackedFiles: [] },
+      scopeEvidence: { status: 'available', trackedFiles: ['src/a.ts'] },
       ...(spawnStart ? { spawnStart } : {}),
     });
     return created;
@@ -326,6 +326,52 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
       expect(getController().getContext().state).toBe('AWAITING_APPROVAL');
       expect(loadApprovedSnapshot(tmpRoot, 'flow-1')).toBeUndefined();
       expect(process.exitCode).toBeUndefined();
+    });
+
+    it('threads --write-allowlist into the digest-bound exact plan authority', async () => {
+      mockLoadConfig.mockResolvedValue(makeFlagOnConfig());
+      const { factory, getController } = makeControllerFactory();
+
+      await runCommand(['do', 'ship safely', '--write-allowlist', './src/a.ts', 'src/a.ts'], {
+        createRunFlowController: factory,
+      });
+
+      expect(getController().getContext().preview?.planDigestContext?.writeScopePolicy).toEqual({
+        mode: 'closed-allowlist',
+        filesWrite: ['src/a.ts'],
+      });
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    it('renders an actionable closed-scope HOLD and does not persist a preview', async () => {
+      mockLoadConfig.mockResolvedValue(makeFlagOnConfig());
+      const { factory } = makeControllerFactory();
+
+      await runCommand([
+        'do',
+        'ship safely',
+        '--force-scope',
+        '--write-allowlist',
+        'tests/not-yet-created.test.ts',
+      ], { createRunFlowController: factory });
+
+      expect(printError).toHaveBeenCalledWith(expect.stringContaining(
+        'ALLOWLIST_PATH_NOT_TRACKED:tests/not-yet-created.test.ts',
+      ));
+      expect(process.exitCode).toBe(1);
+      expect(loadApprovedSnapshot(tmpRoot, 'flow-1')).toBeUndefined();
+    });
+
+    it('fails closed instead of ignoring --write-allowlist on the legacy path', async () => {
+      mockLoadConfig.mockResolvedValue(makeConfig());
+
+      await runCommand(['do', 'ship safely', '--write-allowlist', 'src/a.ts']);
+
+      expect(printError).toHaveBeenCalledWith(
+        getMessage('do.write_allowlist_requires_run_flow', 'en'),
+      );
+      expect(mockPlanSprint).not.toHaveBeenCalled();
+      expect(process.exitCode).toBe(1);
     });
   });
 

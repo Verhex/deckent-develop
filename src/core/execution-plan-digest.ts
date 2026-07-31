@@ -24,6 +24,10 @@ import {
   type ExecutionTopology,
 } from './execution-topology.js';
 import { createExecutionAuthorityError } from './errors.js';
+import {
+  normalizeExecutionWriteScopePolicy,
+  type ExecutionWriteScopePolicy,
+} from './execution-write-scope-policy.js';
 
 export const EXECUTION_PLAN_DIGEST_VERSION_V2 = 2 as const;
 export const EXECUTION_PLAN_DIGEST_VERSION_V3 = 3 as const;
@@ -46,6 +50,8 @@ export interface ExecutionPlanDigestContext {
   readonly executionBudgetPolicy: ExecutionBudgetPolicyConfig | null;
   /** Topology-aware digest input. V2 projection deliberately excludes this field. */
   readonly configuredMaxWorkers?: number;
+  /** V4-only owner authority. V2/V3 projections remain byte-frozen. */
+  readonly writeScopePolicy?: ExecutionWriteScopePolicy;
 }
 
 export interface ExecutionPlanDigestResult {
@@ -211,6 +217,7 @@ export function buildExecutionPlanDigestContext(
   config: ResolvedConfig,
   configuredAuthMode: ExecutionPlanAuthMode,
   configuredMaxWorkers?: number,
+  writeScopePolicy?: ExecutionWriteScopePolicy,
 ): ExecutionPlanDigestContext {
   return deepFreeze({
     configuredProvider: config.worker_provider ?? null,
@@ -221,6 +228,9 @@ export function buildExecutionPlanDigestContext(
     fallbackPolicy: config.provider_fallback ? cloneJson(config.provider_fallback) : null,
     executionBudgetPolicy: config.execution_budget ? cloneJson(config.execution_budget) : null,
     ...(configuredMaxWorkers !== undefined ? { configuredMaxWorkers } : {}),
+    ...(writeScopePolicy !== undefined
+      ? { writeScopePolicy: normalizeExecutionWriteScopePolicy(writeScopePolicy) }
+      : {}),
   });
 }
 
@@ -466,7 +476,12 @@ export function computeExecutionPlanDigestV4(
   });
   const projection = deepFreeze({
     version: EXECUTION_PLAN_DIGEST_VERSION,
-    context: cloneJson(v3.projection.context),
+    context: {
+      ...(cloneJson(v3.projection.context) as Record<string, unknown>),
+      ...(context.writeScopePolicy !== undefined
+        ? { writeScopePolicy: cloneJson(context.writeScopePolicy) }
+        : {}),
+    },
     tasks,
     promptGate: cloneJson(v3.projection.promptGate),
     topology: cloneJson(v3.topology),

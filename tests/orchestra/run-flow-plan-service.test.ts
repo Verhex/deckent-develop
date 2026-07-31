@@ -438,6 +438,99 @@ describe('run-flow-plan-service', () => {
     });
   });
 
+  it('rejects planner-added writes outside a closed allowlist even with force-scope consent', async () => {
+    mocks.generatePlanPreview.mockResolvedValue(preview(sprint([
+      task({
+        scope: {
+          directories: ['src', 'tests'],
+          filesRead: [],
+          filesWrite: ['src/a.ts', 'tests/planner-added.test.ts'],
+        },
+      }),
+    ])));
+
+    await expect(planRunFlow(input({
+      previewOptions: {
+        mode: 'structured',
+        writeScopePolicy: {
+          mode: 'closed-allowlist',
+          filesWrite: ['./src/a.ts'],
+        },
+      },
+      acknowledgeScopePaths: true,
+      scopeEvidence: {
+        status: 'available',
+        trackedFiles: ['src/a.ts', 'src/b.ts'],
+      },
+    }))).rejects.toMatchObject({
+      code: 'CLOSED_WRITE_SCOPE_HOLD',
+      details: {
+        reason: 'closed_write_scope_violation',
+        violations: [{
+          code: 'TASK_WRITE_OUTSIDE_ALLOWLIST',
+          path: 'tests/planner-added.test.ts',
+          taskId: '001-001',
+        }],
+      },
+    });
+
+    expect(mocks.evaluateScopeGate).not.toHaveBeenCalled();
+    expect(mocks.storedPlans.size).toBe(0);
+    expect(mocks.proposeFlow).not.toHaveBeenCalled();
+  });
+
+  it('normalizes and accepts an exact closed allowlist backed by tracked evidence', async () => {
+    await planRunFlow(input({
+      previewOptions: {
+        mode: 'structured',
+        writeScopePolicy: {
+          mode: 'closed-allowlist',
+          filesWrite: ['src/a.ts', './src/a.ts'],
+        },
+      },
+      scopeEvidence: {
+        status: 'available',
+        trackedFiles: ['src/a.ts', 'src/b.ts'],
+      },
+    }));
+
+    expect(mocks.generatePlanPreview.mock.calls[0]?.[4]).toMatchObject({
+      writeScopePolicy: {
+        mode: 'closed-allowlist',
+        filesWrite: ['src/a.ts'],
+      },
+    });
+    expect(mocks.evaluateScopeGate).toHaveBeenCalledOnce();
+    expect(mocks.storedPlans.size).toBe(1);
+  });
+
+  it('rejects an untracked closed-allowlist entry before durable preview publication', async () => {
+    await expect(planRunFlow(input({
+      previewOptions: {
+        mode: 'structured',
+        writeScopePolicy: {
+          mode: 'closed-allowlist',
+          filesWrite: ['src/a.ts', 'tests/not-yet-created.test.ts'],
+        },
+      },
+      acknowledgeScopePaths: true,
+      scopeEvidence: {
+        status: 'available',
+        trackedFiles: ['src/a.ts'],
+      },
+    }))).rejects.toMatchObject({
+      code: 'CLOSED_WRITE_SCOPE_HOLD',
+      details: {
+        violations: [{
+          code: 'ALLOWLIST_PATH_NOT_TRACKED',
+          path: 'tests/not-yet-created.test.ts',
+        }],
+      },
+    });
+    expect(mocks.storedPlans.size).toBe(0);
+    expect(mocks.recordPreview).not.toHaveBeenCalled();
+  });
+
   it('binds an explicit owner-authorized legacy projection without writing through it', async () => {
     const actor = { id: 'owner-1' };
     mocks.computeExecutionPlanDigestV4.mockReturnValue({
