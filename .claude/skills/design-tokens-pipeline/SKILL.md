@@ -130,13 +130,19 @@ description: Use when creating or changing ANY design token (color, typography, 
   input-kenarlık 1.4.11 muafiyeti = "alan daima prefix/label ile tanınır" sözleşmesi.
 - **Kart-şablonu kuralı** (critic #6): component kartlarında state-başlık yazımı ve component-adı
   biçimi tek kurala bağlanacak (şablonlaştırma — sonraki kart üretiminde).
-- **NOVA-sahne flip-önkoşulları** (kimlik-turu denetimleri, 2026-07-31 — prototip:
-  `design/prototypes/kimlik-turu-2026-07-31.html`): (a) worker-segment klavye erişimi
-  (react-aria katmanı: ok-tuşu gezinme + Enter/Escape); (b) idle segment-yayı efektif ≥3:1
-  (bugün alfa .30 → 1.6–1.9:1); (c) bayatlığa renk-dışı ikinci taşıyıcı (kesikli stroke +
-  STALE etiketi) — accent=KOR seçilirse ZORUNLU (KOR vs amber 1.11:1); (d) picker/panel
-  kenarlık ≥3:1; (e) worker-kategorik WCOL paletinin (4 token-dışı renk) primitives'e
-  token olarak önerilmesi; (f) canvas mikro-metin ≥10px.
+- **NOVA-sahne flip-önkoşulları** (kimlik-turu denetimleri, 2026-07-31; pattern-denetimleriyle
+  genişletildi 2026-08-01 — prototip: `design/prototypes/kimlik-turu-2026-07-31.html`, spec:
+  `patterns/command-scene.html`): (a) worker-segment klavye erişimi (react-aria: ok-tuşu +
+  Enter/Escape); (b) idle segment-yayı efektif ≥3:1 (bugün .30 → 1.9:1; ölçüm: .53 → 3.75);
+  (c) bayatlığa renk-dışı ikinci taşıyıcı (kesikli stroke + STALE); (d) kenarlıklar ≥3:1 —
+  KAPSAM: picker/panel + komuta-girdisi (2.23) + odak-paneli (1.67) + approval metin-eşle input
+  (kartta kapatıldı); (e) worker-kategorik palet token'laması (geçici bağlayıcı sözleşme:
+  telemetry-river rotasyonu accent→novaGlowBright→go→amber); (f) canvas mikro-metin ≥10px;
+  (g) Canvas/CSS nefes-tempo senkronu (≈6.3s vs 4s — tek ritim); (h) transport: poll ölür →
+  birleşik `/api/live` SSE (anayasa Teknik); (i) nehir WCAG 2.2.2 pause/freeze + `role="log"`.
+- **Pattern-turu token-adayları (onay bekler):** `duration.riverArrive` 450ms ·
+  `alpha.glowText` .14 · `opacity.riverText` .86 · `selection-overlay` (prototipte token-dışı
+  beyaz .55) · `radius.panel` 10px · `radius.pill` 999px.
 - **NOVA accent-ailesi**: gerçek-veri prototip turunda seçilir; seçime kadar aday-token.
 - **Dashboard light-tema**: var mı yok mu — ADR-G-033 lens'iyle karar.
 - **day-watch muted/focus**: 4.33/4.25 — küçük-punto kullanım kuralı ya da inkMuted koyulaştırma.

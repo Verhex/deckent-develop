@@ -10,6 +10,10 @@
       "novaText": { "$value": "#D7E7EE" },
       "novaTextMuted": { "$value": "#6E8A98" },
       "novaGlow": { "$value": "#38D3FF" },
+      "novaGlowBright": {
+        "$value": "#7BE8FF",
+        "$description": "589-A bright-glow; CAM GÖBEĞİ ailesi kalıcı seçimiyle (kimlik-turu 2026-07-31) kayıtlandı."
+      },
       "novaGlowDeep": { "$value": "#04202B" },
       "novaAmber": { "$value": "#E8B34C" },
       "novaGo": { "$value": "#43E39A" },

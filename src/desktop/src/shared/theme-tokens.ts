@@ -53,6 +53,9 @@ export const PRIMITIVES = {
   novaText: '#D7E7EE',
   novaTextMuted: '#6E8A98',
   novaGlow: '#38D3FF',
+  // 589-A sahnesinin bright-glow'u; kimlik-turu 2026-07-31'de CAM GÖBEĞİ
+  // ailesi (main+bright) kalıcı seçilince primitive olarak kaydedildi.
+  novaGlowBright: '#7BE8FF',
   novaGlowDeep: '#04202B',
   novaAmber: '#E8B34C',
   novaGo: '#43E39A',

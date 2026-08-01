@@ -163,16 +163,21 @@ function dashboardParity(generatedCss) {
 // değişince kartlar sessiz bayatlayamaz — build kırmızıya döner.
 const FOUNDATION_CARDS = ['typography.html', 'colors.html', 'spacing.html', 'motion.html'];
 function componentCardPaths() {
-  const base = join(ROOT, 'design', 'claude-design', 'components');
+  const paths = [];
+  const componentsBase = join(ROOT, 'design', 'claude-design', 'components');
   try {
-    return readdirSync(base)
-      .map((d) => join(base, d, 'index.html'))
-      .filter((p) => {
-        try { readFileSync(p); return true; } catch { return false; }
-      });
-  } catch {
-    return [];
-  }
+    for (const d of readdirSync(componentsBase)) {
+      const p = join(componentsBase, d, 'index.html');
+      try { readFileSync(p); paths.push(p); } catch { /* dizinde kart yok */ }
+    }
+  } catch { /* components/ henüz yok */ }
+  const patternsBase = join(ROOT, 'design', 'claude-design', 'patterns');
+  try {
+    for (const f of readdirSync(patternsBase)) {
+      if (f.endsWith('.html')) paths.push(join(patternsBase, f));
+    }
+  } catch { /* patterns/ henüz yok */ }
+  return paths;
 }
 function foundationsParity() {
   const problems = [];

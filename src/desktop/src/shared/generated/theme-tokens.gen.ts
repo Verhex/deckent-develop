@@ -11,6 +11,7 @@ export const GEN_PRIMITIVES = {
   novaText: '#D7E7EE',
   novaTextMuted: '#6E8A98',
   novaGlow: '#38D3FF',
+  novaGlowBright: '#7BE8FF',
   novaGlowDeep: '#04202B',
   novaAmber: '#E8B34C',
   novaGo: '#43E39A',
