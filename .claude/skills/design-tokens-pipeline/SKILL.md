@@ -166,6 +166,13 @@ description: Use when creating or changing ANY design token (color, typography, 
   önkoşul-(e) kapsamında.
 
 **Açık maddeler:**
+- **Docs-reset sonrası bağımlılık kontrolü** (Alperen 2026-08-01: docs/ baştan yazılıyor,
+  eski hali `docs/archive/docs-pre-reset-2026-08-03/`): yeni yapı inince şu SSOT'ların yerini
+  doğrula, kayıpsa archive'dan taşınmasını iste + skill-pointer'ları güncelle —
+  (1) DT-5 `docs/reference/terminal-design-language.md`; (2) NOVA TASARIM-ANAYASASI
+  `docs/analysis/desktop-reborn-soru-seti-2026-07-18.md` (deckent-design-dna skill'inin SSOT
+  işaretçisi); (3) D4-0 art-direction `docs/analysis/surf4-d4-0-art-direction-2026-07-16.md`
+  (theme-tokens.ts başlığı + DT-5 refere eder); (4) MASTER-PLAN 6165/6170 kanıt-satırları.
 - ✅ **DT-5 `⚡` sembolü KAPANDI** (Alperen 2026-08-01: ASCII'ye çevir): `»Live` +
   chat-nervous-bridge ve repl approval-işareti dahil 3 kaynak-nokta `»` oldu; ADR-G-010
   istisnasız. Aynı mini-turda: MASTER-PLAN 6165/6170 kanıtı filtreli-patch ayrı commit;
