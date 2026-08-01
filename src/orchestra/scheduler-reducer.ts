@@ -99,6 +99,9 @@ export interface SchedulerSnapshot {
    *  matrix row "Collision edges") — precomputed by the driver via buildDependencyGraph,
    *  isolated from real `dependencies` edges. */
   readonly collisionBlockedIds: ReadonlySet<string>;
+  /** Exact approved synthetic edge for each collision-blocked writer. Optional
+   *  for backward-compatible snapshots; the set remains the blocking authority. */
+  readonly collisionBlockingIds?: ReadonlyMap<string, string>;
 }
 
 // ─── Decision (output) ───────────────────────────────────────────────────
@@ -255,7 +258,11 @@ interface BlockClassification {
 
 function classifyBlock(task: SchedulerTaskSnapshot, snapshot: SchedulerSnapshot): BlockClassification | null {
   if (snapshot.collisionBlockedIds.has(task.id)) {
-    return { reason: 'scope-collision', disposition: 'blocked-collision' };
+    return {
+      reason: 'scope-collision',
+      disposition: 'blocked-collision',
+      blockingId: snapshot.collisionBlockingIds?.get(task.id),
+    };
   }
   if (!snapshot.effectiveDependencyState.retryEligibleIds.has(task.id)) {
     return { reason: 'retry-backoff', disposition: 'blocked-retry' };

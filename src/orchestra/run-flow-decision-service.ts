@@ -183,6 +183,9 @@ export function decideRunFlow(
         approvedBy: context.approvedSnapshot.approvedBy,
         approvedAt: context.approvedSnapshot.approvedAt,
         sprint: planned.sprint as Sprint,
+        ...(planned.sourceAuthority !== undefined
+          ? { sourceAuthority: planned.sourceAuthority }
+          : {}),
         ...(planned.proposal !== undefined ? { proposal: planned.proposal } : {}),
         ...(planned.lineage !== undefined ? { planLineage: planned.lineage } : {}),
         ...(adoption !== undefined ? { projectionAdoption: adoption } : {}),
@@ -216,6 +219,9 @@ export interface StartRunFlowResult {
   readonly context: RunFlowContext;
   readonly attempt: StartAttemptRecord;
   readonly capability?: ExactStartCapability;
+  /** Canonical terminal settlement when replay discovers an already-settled
+   * attempt. Adapters may format it, but must not infer a replacement verdict. */
+  readonly settlement?: StartAttemptRecord['settlement'];
 }
 
 /**
@@ -288,6 +294,9 @@ export function startRunFlow(
       status: 'noop-duplicate',
       context: coordinator.getFlow(flowId),
       attempt: result.attempt,
+      ...(result.attempt.settlement !== undefined
+        ? { settlement: result.attempt.settlement }
+        : {}),
     };
   }
   return {

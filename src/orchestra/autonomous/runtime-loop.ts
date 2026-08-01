@@ -339,6 +339,9 @@ export function buildEngineRuntime(
       projectRoot: opts.projectRoot,
       config: opts.config,
       runTask: opts.runTask,
+      // Preserve the canonical exact-executor outcome verbatim. In particular,
+      // its outer-wiring BLOCKED settlement must reach the dispatcher as HOLD;
+      // this composition root must never evaluate or replace that authority.
       executeSprint: opts.executeSprint,
       backlogPath: opts.backlogPath,
       waitForResult: opts.waitForResult,

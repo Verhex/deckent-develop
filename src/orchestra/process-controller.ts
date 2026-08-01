@@ -244,6 +244,20 @@ export function makeProcessController(deps: ProcessControllerDeps): ProcessContr
         outcome: 'success' | 'failure';
         error?: string;
       };
+      // The shared dispatcher persists canonical exact-executor HOLDs as
+      // `parked`. Preserve that authority at the Process/Do adapter boundary;
+      // a generic failure projection would turn a repairable HOLD into a false
+      // terminal failure.
+      const settledEntry = loadBacklog(deps.backlogPath).entries.find(
+        candidate => candidate.id === id,
+      );
+      if (settledEntry?.status === 'parked') {
+        return {
+          executionId: id,
+          status: 'held',
+          reason: settledEntry.lastResult?.reason ?? outcome.error ?? 'execution-held',
+        };
+      }
       return {
         executionId: id,
         status: outcome.outcome === 'success' ? 'completed' : 'failed',

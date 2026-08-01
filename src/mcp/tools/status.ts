@@ -10,13 +10,14 @@ import { getCurrentSprintId } from '../../monitor/sprint-state.js';
 import { readDashboardSafe } from '../../monitor/dashboard-manager.js';
 import { debugLog } from '../../core/utils.js';
 import { formatStatus, resolveOutputMode, type OutputMode } from '../../core/output-formatter.js';
-import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
+import { readCanonicalRunStatus, type CanonicalRunStatus } from '../../core/run-status-authority.js';
 import { readPendingApprovals } from '../../core/pending-approvals.js';
 import { TaskStatus, type Task } from '../../core/types.js';
 import {
   computeLogicalTaskProgress,
   foldTaskLineages,
 } from '../../core/task-lineage.js';
+import { projectTerminalPublicationStatus as projectSharedTerminalPublicationStatus } from '../../core/sprint-terminal-publication-status.js';
 
 /**
  * Read the last N events from the event stream JSONL file.
@@ -313,6 +314,24 @@ function loadAgentSkillAssignments(root: string): {
   return { agentAssignments, skillAssignments };
 }
 
+/**
+ * Terminal-publication awareness (487-005). MCP status observes the SAME
+ * canonical lifecycle authority (`readCanonicalRunStatus`) the CLI's
+ * `projectTerminalPublicationStatus` already consumes — completion is never
+ * re-derived here from a directory scan or MCP-local lifecycle logic.
+ * Receipt persistence remains the finalizer/controller's authority
+ * (487-002/487-003); a status surface never re-parses that artifact itself,
+ * so `receipt` stays explicitly `null` rather than silently fabricated.
+ * ADR-D-004 forbids `mcp/` importing `cli/` internals, so this mirrors the
+ * CLI projection locally instead of importing it.
+ */
+export function projectTerminalPublicationStatus(
+  root: string,
+  authority: CanonicalRunStatus,
+): ReturnType<typeof projectSharedTerminalPublicationStatus> {
+  return projectSharedTerminalPublicationStatus(root, authority);
+}
+
 export function registerStatusTool(server: McpServer): void {
   server.registerTool(
     'deckent_status',
@@ -355,6 +374,7 @@ export function registerStatusTool(server: McpServer): void {
             lifecycle: authority.lifecycle,
             resumable: authority.resumable,
             authority,
+            terminalPublication: projectTerminalPublicationStatus(root, authority),
             pendingApprovals,
           };
           if (json) {
@@ -378,6 +398,7 @@ export function registerStatusTool(server: McpServer): void {
           recoveryCommand: authority.recoveryCommand,
           finalizeCommand: authority.finalizeCommand,
           authority,
+          terminalPublication: projectTerminalPublicationStatus(root, authority),
           pendingApprovals,
         };
         if (json) {
@@ -510,6 +531,7 @@ export function registerStatusTool(server: McpServer): void {
         recoveryCommand: authority.recoveryCommand,
         finalizeCommand: authority.finalizeCommand,
         authority,
+        terminalPublication: projectTerminalPublicationStatus(root, authority),
         pendingApprovals,
         ...verboseFields,
       };

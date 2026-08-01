@@ -24,6 +24,7 @@ import {
   type CanonicalRunStatus,
 } from '../../core/run-status-authority.js';
 import { cleanupSprintMetadata } from '../../orchestra/sprint-controller.js';
+import { classifyTaskArtifact } from '../../core/task-artifact-classifier.js';
 
 export function cleanupAuthorityHoldReason(
   authority: CanonicalRunStatus,
@@ -187,8 +188,11 @@ export function registerCleanup(program: Command): void {
           );
           for (const f of files) {
             try {
-              const task = JSON.parse(readFileSync(join(tasksDir, f), 'utf-8')) as Task;
-              tasks.push(task);
+              const content = readFileSync(join(tasksDir, f), 'utf-8');
+              const classification = classifyTaskArtifact(f, content);
+              if (classification.kind !== 'task-record') continue;
+              const task = JSON.parse(content) as Task;
+              if (task.id === classification.taskId) tasks.push(task);
             } catch {
               // skip malformed task files
             }

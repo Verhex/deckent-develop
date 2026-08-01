@@ -8,6 +8,7 @@ import {
   type ProviderLimitAdmissionAttempt,
   type ProviderLimitAdmissionHeld,
 } from './provider-limit-admission.js';
+import type { ProviderConcurrencyCapabilityRequest } from './provider-concurrency-capability.js';
 import type {
   ProviderLimitDispatchClaim,
   ProviderLimitReservationView,
@@ -55,6 +56,7 @@ export interface HostRoleInvocationCandidateAuthority {
 export interface HostRoleInvocationAdmissionRequest {
   readonly invocation: Omit<RoleInvocationRequest, 'evidence'>;
   readonly candidates: Readonly<Record<string, HostRoleInvocationCandidateAuthority>>;
+  readonly concurrencyCapabilities?: Readonly<Record<string, ProviderConcurrencyCapabilityRequest>>;
   readonly buildReservation: (selected: RoleInvocationSelected) => ProviderLimitReservationRequest;
 }
 
@@ -430,6 +432,9 @@ export class HostRoleInvocationAdmissionRuntime {
       const result = admitRoleInvocation(limitStore, {
         invocation: { ...request.invocation, evidence },
         candidateScopes,
+        ...(request.concurrencyCapabilities
+          ? { concurrencyCapabilities: request.concurrencyCapabilities }
+          : {}),
         buildReservation: selected => {
           const reservation = request.buildReservation(selected);
           const candidate = request.candidates[String(selected.provider)];

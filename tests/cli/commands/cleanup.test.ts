@@ -19,6 +19,23 @@ vi.mock('node:child_process', () => ({
 
 vi.mock('../../../src/core/utils.js', () => ({}));
 
+vi.mock('../../../src/core/run-status-authority.js', () => ({
+  readCanonicalRunStatus: vi.fn(() => ({
+    schemaVersion: 1,
+    lifecycle: 'IDLE',
+    active: false,
+    resumable: false,
+    sprintId: null,
+    phase: null,
+    status: null,
+    reason: null,
+    recoveryCommand: null,
+    finalizeCommand: null,
+    coordinator: 'absent',
+    conflicts: [],
+  })),
+}));
+
 const mockCleanupMemStore = {
   totalCount: vi.fn().mockReturnValue(100),
   close: vi.fn(),
@@ -30,6 +47,10 @@ vi.mock('../../../src/core/memory-store.js', () => ({
 vi.mock('../../../src/orchestra/brain.js', () => ({
   cleanup: vi.fn(),
   runDecay: vi.fn(),
+}));
+
+vi.mock('../../../src/orchestra/sprint-controller.js', () => ({
+  cleanupSprintMetadata: vi.fn(),
 }));
 
 vi.mock('../../../src/orchestra/spawn-backend-docker.js', () => ({
@@ -113,9 +134,9 @@ describe('cleanup command (isolated)', () => {
 
   it('reads task files from .tasks/ directory', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue(['task-001.json', 'task-002.json'] as any);
+    vi.mocked(readdirSync).mockReturnValue(['task-001-001.json', 'task-001-002.json'] as any);
     vi.mocked(readFileSync).mockImplementation((path: any) => {
-      if (String(path).includes('task-001')) return JSON.stringify(makeTask({ id: '001-001' }));
+      if (String(path).includes('task-001-001')) return JSON.stringify(makeTask({ id: '001-001' }));
       return JSON.stringify(makeTask({ id: '001-002' }));
     });
     vi.mocked(cleanup).mockImplementation(() => {});
@@ -163,12 +184,31 @@ describe('cleanup command (isolated)', () => {
   it('filters only task-*.json files from .tasks/', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([
-      'task-001.json', 'task-001.hb', 'task-001.result', 'README.md',
+      'task-001-001.json', 'task-001-001.hb', 'task-001-001.result', 'README.md',
     ] as any);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeTask()));
     vi.mocked(cleanup).mockImplementation(() => {});
     await runCommand(['cleanup']);
     expect(print).toHaveBeenCalledWith(expect.stringContaining('1 tasks'));
+  });
+
+  it('does not treat a landing proposal as a task record', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([
+      'task-001-001.landing-proposal.json',
+    ] as any);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({
+      taskId: '001-001', attemptId: 'attempt-1', sequence: 1,
+    }));
+    vi.mocked(cleanup).mockImplementation(() => {});
+
+    await runCommand(['cleanup']);
+
+    expect(cleanup).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ tasks: [] }),
+    );
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('0 tasks'));
   });
 
   it('sets exitCode=1 when cleanup throws', async () => {
@@ -226,7 +266,7 @@ describe('cleanup command (isolated)', () => {
   it('warns when EXECUTING tasks are present', async () => {
     const executingTask = makeTask({ id: '001-001', status: 'EXECUTING' as any });
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
+    vi.mocked(readdirSync).mockReturnValue(['task-001-001.json'] as any);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(executingTask));
     vi.mocked(cleanup).mockImplementation(() => {});
     await runCommand(['cleanup']);
@@ -237,7 +277,7 @@ describe('cleanup command (isolated)', () => {
   it('warns when CLAIMED tasks are present', async () => {
     const claimedTask = makeTask({ id: '001-002', status: 'CLAIMED' as any });
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue(['task-002.json'] as any);
+    vi.mocked(readdirSync).mockReturnValue(['task-001-002.json'] as any);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(claimedTask));
     vi.mocked(cleanup).mockImplementation(() => {});
     await runCommand(['cleanup']);
@@ -290,7 +330,7 @@ describe('cleanup command (isolated)', () => {
 
   it('B) sprint ID falls back to task sprintId when sprint-state.json is missing', async () => {
     vi.mocked(existsSync).mockImplementation((p: any) => String(p).includes('.tasks'));
-    vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
+    vi.mocked(readdirSync).mockReturnValue(['task-001-001.json'] as any);
     vi.mocked(readFileSync).mockReturnValue(
       JSON.stringify(makeTask({ sprintId: 'sprint-099' })),
     );

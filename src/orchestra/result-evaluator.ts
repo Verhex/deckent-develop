@@ -12,6 +12,9 @@ import { TaskEvaluation } from '../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, ARCHIVE_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import { coerceNotesToString } from '../core/task-result-schema.js';
+import { createProductionWiringPlanEvidence } from '../core/task-types.js';
+import type { ProductionWiringResultSettlementDecision } from '../core/task-result-settlement.js';
+import { resolveProductionWiringContract } from '../core/production-wiring-contract.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
 import { reconcileSpuriousNoGo, reconcileRubricNoGo } from './mid-sprint-adapter.js';
 import {
@@ -88,6 +91,41 @@ export function isBashUnavailable(result: TaskResult): boolean {
   return BASH_UNAVAILABLE_PATTERNS.some(pattern => pattern.test(notes));
 }
 
+// ─── Verification Isolation HOLD Detection (488-011) ────────────────
+
+/**
+ * Reason text the worker-visible verification isolation gate (488-010:
+ * core/verification-isolation-authority.ts's `decideVerificationIsolation`,
+ * core/verification-typescript-adapter.ts's `TypeScriptScopedVerificationAdapter`,
+ * and agents/worker-verify.ts's `enforceVerifyLoop`) surfaces when the gate
+ * itself holds — an isolation-authority admission gap or a concurrent foreign
+ * observation bleeding into this attempt's compiler run. None of these are
+ * this task's own code failing; they are the environment failing to grant a
+ * clean verification surface for the attempt.
+ */
+const VERIFICATION_ISOLATION_HOLD_PATTERNS = [
+  /verification isolation admission is required/i,
+  /verification isolation is on hold/i,
+  /foreign verification diagnostics/i,
+  /outside the admitted verification surface/i,
+  /scoped typescript verification request is invalid/i,
+  /verification exceeded its deadline/i,
+];
+
+/**
+ * Detects whether a worker result carries verification isolation HOLD evidence —
+ * the isolation authority (488-010) could not grant this attempt an exclusive
+ * verification surface, or a concurrent attempt's diagnostics were observed
+ * ambiently. This is an admission/environment gap, never a scoped code failure,
+ * so it must never manufacture a NO_GO and must never spend FIX/retry budget
+ * (see `decideFixRepairAuthority` in fix-repair-authority.ts).
+ */
+export function isVerificationIsolationHold(result: TaskResult): boolean {
+  const notes = coerceNotesToString(result.notes);
+  if (notes.length === 0) return false;
+  return VERIFICATION_ISOLATION_HOLD_PATTERNS.some(pattern => pattern.test(notes));
+}
+
 // ─── isDocTask ────────────────────────────────────────────────────────
 
 /**
@@ -124,6 +162,14 @@ export function isDocTask(task: Task): boolean {
  * for backward compatibility with CLI finalize command.
  */
 export async function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string, coverageThreshold = 90, projectRoot?: string): Promise<TaskEvaluation> {
+  // Step 0 (488-011): Verification isolation HOLD — an admission/environment gap,
+  // never this task's own scoped failure. Checked before every other hard-failure
+  // path (including an honest worker self-NO_GO) so it always parks as tech debt
+  // instead of manufacturing a NO_GO or consuming FIX/retry budget.
+  if (isVerificationIsolationHold(result)) {
+    return TaskEvaluation.GO_WITH_TECH_DEBT;
+  }
+
   // Step 1a: Sprint 145 — TIMEOUT_WITH_WORK: worker was killed but has partial work
   // Attempt reconciliation via Spurious NO_GO helper if projectRoot available
   if ((result.selfAssessment as string) === 'TIMEOUT_WITH_WORK') {
@@ -953,6 +999,261 @@ function scoreCriterion(name: string, result: TaskResult, task: Task): RubricSco
   }
 }
 
+// ─── Acceptance-Bound Semantic Verdict Gate (486-016) ─────────────────
+
+/** Stable reference to an exported production symbol. */
+export interface SemanticVerdictSymbolEvidence {
+  readonly moduleId: string;
+  readonly exportName: string;
+  readonly identity: 'production-export' | 'fixture-local';
+}
+
+/** Host-observed assertion receipt for the exact proof target. */
+export interface SemanticVerdictAssertionEvidence {
+  readonly receiptRef: string;
+  readonly outcome: 'passed' | 'failed' | 'skipped';
+  readonly executedAssertions: number;
+  readonly failedAssertions: number;
+  readonly skippedAssertions: number;
+}
+
+/**
+ * Structured evidence required to preserve a candidate semantic DONE verdict.
+ *
+ * The contract/observation split prevents an unrelated green projection from
+ * satisfying the gate: the host-observed symbols and proof target must exactly
+ * match the acceptance contract. Prose, rubric score, and worker notes are not
+ * represented and therefore cannot become authority accidentally.
+ */
+export interface SemanticVerdictAcceptanceEvidence {
+  readonly version: 1;
+  readonly taskId: string;
+  readonly authority: {
+    readonly kind: 'host-observed';
+    readonly receiptRef: string;
+  };
+  readonly contract: {
+    readonly producer: SemanticVerdictSymbolEvidence;
+    readonly consumer: SemanticVerdictSymbolEvidence;
+    readonly proofTarget: string;
+  };
+  readonly observation: {
+    readonly producer: SemanticVerdictSymbolEvidence;
+    readonly consumer: SemanticVerdictSymbolEvidence;
+    readonly proofTarget: string;
+    readonly assertions: SemanticVerdictAssertionEvidence;
+  };
+  readonly acceptance: {
+    readonly outcome: 'accepted' | 'rejected' | 'unknown';
+    readonly receiptRef: string;
+  };
+}
+
+export type SemanticVerdictGateReason =
+  | 'semantic_evidence_missing'
+  | 'semantic_evidence_version_invalid'
+  | 'semantic_task_mismatch'
+  | 'semantic_authority_missing'
+  | 'semantic_acceptance_not_accepted'
+  | 'semantic_symbol_missing'
+  | 'semantic_producer_mismatch'
+  | 'semantic_consumer_mismatch'
+  | 'semantic_proof_target_missing'
+  | 'semantic_proof_target_mismatch'
+  | 'semantic_fixture_symbol'
+  | 'semantic_assertion_receipt_missing'
+  | 'semantic_suite_not_passed'
+  | 'semantic_assertions_not_executed'
+  | 'semantic_assertions_failed'
+  | 'semantic_assertions_skipped';
+
+function isNonEmptyEvidenceRef(value: string): boolean {
+  return value.trim().length > 0;
+}
+
+function sameSemanticSymbol(
+  expected: SemanticVerdictSymbolEvidence,
+  observed: SemanticVerdictSymbolEvidence,
+): boolean {
+  return expected.moduleId === observed.moduleId
+    && expected.exportName === observed.exportName;
+}
+
+function semanticVerdictGateReasons(
+  taskId: string,
+  evidence: SemanticVerdictAcceptanceEvidence | null | undefined,
+): SemanticVerdictGateReason[] {
+  if (!evidence) return ['semantic_evidence_missing'];
+
+  const reasons: SemanticVerdictGateReason[] = [];
+  if (evidence.version !== 1) reasons.push('semantic_evidence_version_invalid');
+  if (evidence.taskId !== taskId) reasons.push('semantic_task_mismatch');
+  if (
+    evidence.authority.kind !== 'host-observed'
+    || !isNonEmptyEvidenceRef(evidence.authority.receiptRef)
+    || !isNonEmptyEvidenceRef(evidence.acceptance.receiptRef)
+  ) {
+    reasons.push('semantic_authority_missing');
+  }
+  if (evidence.acceptance.outcome !== 'accepted') {
+    reasons.push('semantic_acceptance_not_accepted');
+  }
+  const symbols = [
+    evidence.contract.producer,
+    evidence.contract.consumer,
+    evidence.observation.producer,
+    evidence.observation.consumer,
+  ];
+  if (symbols.some(symbol => (
+    !isNonEmptyEvidenceRef(symbol.moduleId)
+    || !isNonEmptyEvidenceRef(symbol.exportName)
+  ))) {
+    reasons.push('semantic_symbol_missing');
+  }
+  if (!sameSemanticSymbol(evidence.contract.producer, evidence.observation.producer)) {
+    reasons.push('semantic_producer_mismatch');
+  }
+  if (!sameSemanticSymbol(evidence.contract.consumer, evidence.observation.consumer)) {
+    reasons.push('semantic_consumer_mismatch');
+  }
+  if (
+    !isNonEmptyEvidenceRef(evidence.contract.proofTarget)
+    || !isNonEmptyEvidenceRef(evidence.observation.proofTarget)
+  ) {
+    reasons.push('semantic_proof_target_missing');
+  }
+  if (evidence.contract.proofTarget !== evidence.observation.proofTarget) {
+    reasons.push('semantic_proof_target_mismatch');
+  }
+  if (
+    evidence.contract.producer.identity !== 'production-export'
+    || evidence.contract.consumer.identity !== 'production-export'
+    || evidence.observation.producer.identity !== 'production-export'
+    || evidence.observation.consumer.identity !== 'production-export'
+  ) {
+    reasons.push('semantic_fixture_symbol');
+  }
+
+  const assertions = evidence.observation.assertions;
+  if (!isNonEmptyEvidenceRef(assertions.receiptRef)) {
+    reasons.push('semantic_assertion_receipt_missing');
+  }
+  if (assertions.outcome !== 'passed') reasons.push('semantic_suite_not_passed');
+  if (!Number.isSafeInteger(assertions.executedAssertions) || assertions.executedAssertions <= 0) {
+    reasons.push('semantic_assertions_not_executed');
+  }
+  if (!Number.isSafeInteger(assertions.failedAssertions) || assertions.failedAssertions !== 0) {
+    reasons.push('semantic_assertions_failed');
+  }
+  if (!Number.isSafeInteger(assertions.skippedAssertions) || assertions.skippedAssertions !== 0) {
+    reasons.push('semantic_assertions_skipped');
+  }
+  return reasons;
+}
+
+/**
+ * Apply the deterministic acceptance barrier to a semantic candidate verdict.
+ * Evidence can only preserve a DONE; it can never promote DEBT/NO_GO upward.
+ */
+export function gateSemanticVerdictByAcceptance(
+  candidate: EvaluationResult,
+  taskId: string,
+  evidence: SemanticVerdictAcceptanceEvidence | null | undefined,
+): EvaluationResult {
+  if (candidate.decision !== 'DONE') return candidate;
+
+  const reasons = semanticVerdictGateReasons(taskId, evidence);
+  if (reasons.length === 0) {
+    return {
+      ...candidate,
+      rubricScores: [
+        ...candidate.rubricScores,
+        {
+          criterion: 'semantic_acceptance',
+          score: 100,
+          passed: true,
+          reason: 'semantic_acceptance_verified',
+        },
+      ],
+    };
+  }
+
+  return {
+    ...candidate,
+    decision: 'NO_GO',
+    rubricScores: [
+      ...candidate.rubricScores,
+      {
+        criterion: 'semantic_acceptance',
+        score: 0,
+        passed: false,
+        reason: reasons.join(','),
+      },
+    ],
+  };
+}
+
+/**
+ * Keep production-mutation completion subordinate to host-settled wiring
+ * evidence. The rubric score is evidence input only: this gate never promotes
+ * a lower verdict and never rewrites the score to manufacture acceptance.
+ *
+ * Tasks without a wiring authority are legacy/non-production inputs and retain
+ * their candidate verdict. A staged foundation remains HOLD here even when its
+ * own consumer executed; its exact closure DAG is settled by the outer barrier.
+ */
+export function gateProductionWiringVerdict(
+  candidate: EvaluationResult,
+  task: Task,
+  settlement: ProductionWiringResultSettlementDecision | null | undefined,
+): EvaluationResult {
+  const plan = task.productionWiring;
+  if (!plan || candidate.decision !== 'DONE') return candidate;
+
+  const expectedPlan = createProductionWiringPlanEvidence(plan.contract);
+  const contractDecision = resolveProductionWiringContract(plan.contract);
+  let reason: string | null = null;
+
+  if (plan.version !== expectedPlan.version || plan.contractDigest !== expectedPlan.contractDigest) {
+    reason = 'invalid-plan-contract';
+  } else if (contractDecision.decision === 'staged-foundation') {
+    reason = 'staged-foundation-pending-exact-closure';
+  } else if (contractDecision.decision !== 'complete') {
+    reason = `contract-${contractDecision.decision}`;
+  } else if (!settlement) {
+    reason = 'missing-host-settlement';
+  } else if (settlement.state !== 'PRODUCTION_WIRED') {
+    reason = settlement.reason;
+  } else if (settlement.contractDigest !== expectedPlan.contractDigest) {
+    reason = 'host-settlement-contract-mismatch';
+  } else if (
+    settlement.evidenceRefs.length === 0
+    || settlement.evidenceRefs.some(ref => typeof ref !== 'string' || ref.trim().length === 0)
+  ) {
+    reason = 'invalid-host-settlement-evidence';
+  }
+
+  const productionWiringScore: RubricScore = reason === null
+    ? {
+        criterion: 'production_wiring',
+        score: 100,
+        passed: true,
+        reason: 'host-settled production wiring verified',
+      }
+    : {
+        criterion: 'production_wiring',
+        score: 0,
+        passed: false,
+        reason: `HOLD:${reason}`,
+      };
+
+  return {
+    ...candidate,
+    decision: reason === null ? candidate.decision : 'NO_GO',
+    rubricScores: [...candidate.rubricScores, productionWiringScore],
+  };
+}
+
 /**
  * Evaluate a task result using rubric-based grading.
  * Accepts an optional partial rubric that is merged with DEFAULT_RUBRIC.
@@ -986,6 +1287,27 @@ export function evaluateWithRubric(
         score: 0,
         passed: false,
         reason: schemaCheck.reason,
+      }],
+      retryCount: 0,
+    };
+  }
+
+  // 488-011: Verification isolation HOLD fast-path — checked before the
+  // verification-task fast-path and every rubric criterion. This is an
+  // admission/environment gap (488-010's isolation gate could not grant this
+  // attempt an exclusive verification surface, or observed a concurrent
+  // foreign attempt's diagnostics), never this task's own scoped failure.
+  // Decision is capped at GO_WITH_TECH_DEBT — never DONE (nothing was
+  // actually verified) and never NO_GO (nothing to blame this task for).
+  if (isVerificationIsolationHold(result)) {
+    return {
+      decision: 'GO_WITH_TECH_DEBT',
+      totalScore: 75,
+      rubricScores: [{
+        criterion: 'verification_isolation',
+        score: 75,
+        passed: true,
+        reason: 'verification isolation HOLD — environment admission gap, not a scoped task failure; attempt parked without spending FIX/retry budget',
       }],
       retryCount: 0,
     };
@@ -1108,6 +1430,25 @@ export function evaluateWithRubric(
 }
 
 /**
+ * Canonical production consumer for acceptance-bound semantic evaluation.
+ *
+ * Callers that make a semantic completion decision use this entrypoint rather
+ * than consuming a naked rubric score. Keeping the reducer here guarantees the
+ * same rubric implementation is exercised; there is no fixture-local copy and
+ * missing evidence fails closed.
+ */
+export function evaluateAcceptanceBoundSemanticVerdict(
+  result: TaskResult,
+  task: Task,
+  evidence: SemanticVerdictAcceptanceEvidence | null | undefined,
+  rubric?: Partial<EvaluationRubric>,
+  projectRoot?: string,
+): EvaluationResult {
+  const candidate = evaluateWithRubric(result, task, rubric, projectRoot);
+  return gateSemanticVerdictByAcceptance(candidate, task.id, evidence);
+}
+
+/**
  * Spurious NO_GO recovery for the rubric EVALUATE path (Sprint 191 P191-1).
  *
  * Extracted from evaluateWithRubric (R8/ADR-087): the git-diff/scope/tsc/vitest
@@ -1131,6 +1472,7 @@ export async function reconcileEvaluationSpuriousNoGo(
   projectRoot?: string,
 ): Promise<EvaluationResult> {
   if (evaluation.decision !== 'NO_GO' || !projectRoot) return evaluation;
+  if (result.workAttribution?.state === 'HOLD') return evaluation;
 
   const oomNotes = coerceNotesToString(result.notes);
   const isOomKilled =
@@ -1968,7 +2310,8 @@ export type HonestyViolation =
   // worker reported filesChanged=[] but on-disk evidence (git numstat /
   // ls-files --others) shows real partial work; honest-gate carries the
   // signal so result-evaluator can route it through the same downgrade path.
-  | 'MISSING_RESULT_BUT_DISK_HAS_WORK';
+  | 'MISSING_RESULT_BUT_DISK_HAS_WORK'
+  | 'WORK_ATTRIBUTION_HOLD';
 
 /**
  * Result of running enforceHonestResultGate.
@@ -2154,6 +2497,15 @@ export function enforceHonestResultGate(
 ): HonestGateResult {
   if (!result) {
     return { result, honest: true };
+  }
+
+  if (result.workAttribution?.state === 'HOLD') {
+    const detail = `claim-time work attribution unavailable (${result.workAttribution.reasonCode ?? 'unknown'})`;
+    return {
+      result: downgradeToNoGo(result, 'WORK_ATTRIBUTION_HOLD', detail),
+      honest: false,
+      violation: 'WORK_ATTRIBUTION_HOLD',
+    };
   }
 
   // MF-8 (Sprint 252): the stub/empty-write checks below trigger on

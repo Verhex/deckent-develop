@@ -5,7 +5,12 @@
 // starts false (nothing tripped yet) and can be stopped. The trip→stop machinery
 // itself is covered by mid-sprint-cost-abort.test.ts; this covers the wire entry.
 import { describe, it, expect, afterEach } from 'vitest';
-import { loadCostGuardMonitor, costGuardShouldComplete } from '../../src/orchestra/result-collector.js';
+import {
+  loadCostGuardMonitor,
+  costGuardShouldComplete,
+  dispatchHoldShouldComplete,
+  shouldYieldExecuteToRepair,
+} from '../../src/orchestra/result-collector.js';
 import type { ResolvedConfig } from '../../src/core/config-types.js';
 import type { CostGuardMonitor } from '../../src/orchestra/sprint-phases.js';
 
@@ -69,5 +74,46 @@ describe('born-562 — cost-guard completion condition (costGuardShouldComplete)
   it('stopped with no PENDING left (all dispatched) mirrors the normal all-collected break', () => {
     expect(costGuardShouldComplete(true, 5, 5, 0)).toBe(true);
     expect(costGuardShouldComplete(true, 4, 5, 0)).toBe(false);
+  });
+});
+
+describe('Sprint 486 — run hold quiescence and EXECUTE → FIX authority', () => {
+  it('does not require PAUSED/PENDING tasks to manufacture results after a run-wide hold', () => {
+    expect(dispatchHoldShouldComplete(true, 0)).toBe(true);
+    expect(dispatchHoldShouldComplete(true, 1)).toBe(false);
+    expect(dispatchHoldShouldComplete(false, 0)).toBe(false);
+  });
+
+  it('yields to repair when all remaining PENDING work is admission-held', () => {
+    expect(shouldYieldExecuteToRepair({
+      repairEnabled: true,
+      inFlightCount: 0,
+      pausedCount: 2,
+      admittedPendingCount: 0,
+      heldPendingCount: 1,
+      repairCandidateCount: 3,
+    })).toBe(true);
+  });
+
+  it('keeps EXECUTE open while an independently admitted task can still run', () => {
+    expect(shouldYieldExecuteToRepair({
+      repairEnabled: true,
+      inFlightCount: 0,
+      pausedCount: 2,
+      admittedPendingCount: 1,
+      heldPendingCount: 0,
+      repairCandidateCount: 3,
+    })).toBe(false);
+  });
+
+  it('never enters repair while a worker is still in flight', () => {
+    expect(shouldYieldExecuteToRepair({
+      repairEnabled: true,
+      inFlightCount: 1,
+      pausedCount: 2,
+      admittedPendingCount: 0,
+      heldPendingCount: 1,
+      repairCandidateCount: 3,
+    })).toBe(false);
   });
 });

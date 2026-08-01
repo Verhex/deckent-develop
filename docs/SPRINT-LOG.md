@@ -11907,3 +11907,325 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 482-003: Prove adversarial recovery and surface parity (NOT_DISPATCHED)
 
 ---
+## Sprint 483 — sprint-483
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-31
+**Duration:** 387s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 387001ms |
+
+### Tasks
+
+- 483-001: Validate DOGFOOD-3175 claim-time work attribution (DONE)
+- 483-002: Validate DOGFOOD-3177 force-finalize coordinator containment (DONE)
+- 483-003: Integrate DOGFOOD-3178 bounded validation evidence (GO_WITH_TECH_DEBT)
+
+---
+## Sprint 484 — sprint-484
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-31
+**Duration:** 340s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 340322ms |
+
+### Tasks
+
+- 484-001: Enforce recovery-born evaluation honesty with regression coverage (DONE)
+
+---
+## Sprint 485 — sprint-485
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-31
+**Duration:** 1241s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1240829ms |
+
+### Tasks
+
+- 485-001: Provider concurrency capability authority (DONE)
+- 485-002: Exact-attempt provider execution observation (DONE)
+- 485-003: Parametric XVerify admission policy (DONE)
+- 485-004: Evaluation honesty negative-replay fixture (DONE)
+- 485-005: Exact prompt authority drift-race assurance (DONE)
+- 485-006: Multi-attempt attribution summary replay (DONE)
+- 485-007: Monotonic status closure-window stress contract (DONE)
+- 485-008: Sprint terminal evidence assembler (DONE)
+
+---
+## Sprint 486 — sprint-486
+
+**Status:** COMPLETE
+**Date:** 2026-07-31
+**Duration:** 1837s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 32 |
+| Completed | 10 |
+| Tech Debt | 0 |
+| No-Go | 10 |
+| Coverage | NaN% |
+| Duration | 1837437ms |
+
+### Tasks
+
+- 486-001: Fenced terminal publication contract (DONE)
+- 486-002: Strict task artifact classifier (DONE)
+- 486-003: Logical progress projection contract (DONE)
+- 486-004: Lineage-aware usage and billing authority (DONE)
+- 486-005: Monotonic heartbeat authority (DONE)
+- 486-006: Typed FIX repair-authority resolver (DONE)
+- 486-007-fix: Fix: Finalizer terminal-evidence wiring (DEFERRED)
+- 486-007: Finalizer terminal-evidence wiring (NO_GO)
+- 486-008-fix: Fix: Controller terminal publication ordering (DEFERRED)
+- 486-008: Controller terminal publication ordering (NO_GO)
+- 486-009-fix: Fix: CLI status closure-race wiring (DEFERRED)
+- 486-009: CLI status closure-race wiring (NO_GO)
+- 486-010-fix: Fix: CLI usage lineage projection (DEFERRED)
+- 486-010: CLI usage lineage projection (NO_GO)
+- 486-011: MCP usage lineage parity (DONE)
+- 486-012-fix: Fix: Reporter logical lineage summary (DEFERRED)
+- 486-012: Reporter logical lineage summary (NO_GO)
+- 486-013: Scoped self-audit policy (DEFERRED)
+- 486-014-fix: Fix: Debt manager FIX authority wiring (DEFERRED)
+- 486-014: Debt manager FIX authority wiring (NO_GO)
+- 486-015: FIX retry circuit-breaker wiring (DEFERRED)
+- 486-016: Acceptance-bound semantic verdict gate (DONE)
+- 486-017-fix: Fix: Run-wide prompt policy propagation (DEFERRED)
+- 486-017: Run-wide prompt policy propagation (NO_GO)
+- 486-018-fix: Fix: Forced skill preservation through exact routing (DEFERRED)
+- 486-018: Forced skill preservation through exact routing (NO_GO)
+- 486-019: Provider concurrency admission wiring (DONE)
+- 486-020-fix: Fix: Docker provider execution observation wire (DEFERRED)
+- 486-020: Docker provider execution observation wire (NO_GO)
+- 486-021: Admitted-versus-attained sprint metrics (DEFERRED)
+- 486-022-fix: Fix: Parametric XVerify admission runtime wire (DEFERRED)
+- 486-022: Parametric XVerify admission runtime wire (NO_GO)
+- 486-023: Docker heartbeat single-writer wire (DEFERRED)
+- 486-024: MCP canonical status parity after terminal publication (DEFERRED)
+- 486-025: Production wiring contract foundation (DONE)
+- 486-026: Task wiring authority and DIRECTIVES projection (DEFERRED)
+- 486-027: All-ingress wiring contract planning (DEFERRED)
+- 486-028: Worker prompt wiring closure contract (DEFERRED)
+- 486-029: Structured worker wiring evidence result (DEFERRED)
+- 486-030: Language-neutral wiring verifier adapters (DEFERRED)
+- 486-031: Sprint Brain wiring settlement gate (DEFERRED)
+- 486-032: Non-Sprint execution-mode wiring parity (DEFERRED)
+
+---
+## Sprint 487 — sprint-487
+
+**Status:** COMPLETE
+**Date:** 2026-07-31
+**Duration:** 5470s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 32 |
+| Completed | 29 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 5470187ms |
+
+### Tasks
+
+- 487-001: Finalizer terminal truth consumer (DONE)
+- 487-002: Fenced receipt before archive (DONE)
+- 487-003: Controller terminal handoff (DONE)
+- 487-004-xfix: Cross-fix: CLI receipt-aware status (DONE)
+- 487-004: CLI receipt-aware status (DONE)
+- 487-005-xfix: Cross-fix: MCP receipt-aware status (DONE)
+- 487-005: MCP receipt-aware status (DONE)
+- 487-006-fix-fix: Fix: Fix: Terminal publication real-binary contract (DEFERRED)
+- 487-006-fix: Fix: Terminal publication real-binary contract (NO_GO)
+- 487-006: Terminal publication real-binary contract (NO_GO)
+- 487-007: Self-audit adapter contract (DONE)
+- 487-008: Vitest scoped adapter (DONE)
+- 487-009: Finalizer audit adapter consumer (GO_WITH_TECH_DEBT)
+- 487-010: Non-Vitest honest matrix (DONE)
+- 487-011-fix: Fix: Heartbeat authority store (DONE)
+- 487-011: Heartbeat authority store (NO_GO)
+- 487-012: Docker heartbeat single writer (DONE)
+- 487-013: In-process worker heartbeat writer (DONE)
+- 487-014: Auditor heartbeat consumer (DONE)
+- 487-015: Provider execution observation store (DONE)
+- 487-016: Docker provider observation emission (DONE)
+- 487-017-fix: Fix: Admitted-versus-attained projection (DEFERRED)
+- 487-017: Admitted-versus-attained projection (NO_GO)
+- 487-018: FIX fingerprint circuit breaker (DONE)
+- 487-019-xfix: Cross-fix: FIX dispatch and dependency continuation (DONE)
+- 487-019: FIX dispatch and dependency continuation (DONE)
+- 487-020-fix: Fix: Sprint-486 quiescence replay (DONE)
+- 487-020: Sprint-486 quiescence replay (NO_GO)
+- 487-021: Nervous executable collision decision (DONE)
+- 487-022: Scheduler collision serialization consumer (DONE)
+- 487-023-fix: Fix: Forced skill lineage preservation (DONE)
+- 487-023: Forced skill lineage preservation (NO_GO)
+- 487-024-xfix-fix: Fix: Cross-fix: Wiring evidence schema (DONE)
+- 487-024-xfix: Cross-fix: Wiring evidence schema (NO_GO)
+- 487-024: Wiring evidence schema (DONE)
+- 487-025: Planner and task-builder wiring authority (DONE)
+- 487-026: Prompt wiring closure block (DONE)
+- 487-027-fix: Fix: Result wiring evidence settlement (DONE)
+- 487-027: Result wiring evidence settlement (NO_GO)
+- 487-028: Brain production wiring gate (DONE)
+- 487-029: Language-neutral wiring adapters (DONE)
+- 487-030: Outer staged-settlement barrier (DONE)
+- 487-031: RunFlow, Do, Autonomous and Process parity (DONE)
+- 487-032: Canonical closure canary (DEFERRED)
+
+---
+## Sprint 487 — sprint-487
+
+**Status:** COMPLETE
+**Date:** 2026-07-31
+**Duration:** 6053s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 32 |
+| Completed | 32 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 9.4% |
+| Duration | 6052713ms |
+
+### Tasks
+
+- 487-001: Finalizer terminal truth consumer (DONE)
+- 487-002: Fenced receipt before archive (DONE)
+- 487-003: Controller terminal handoff (DONE)
+- 487-004-xfix: Cross-fix: CLI receipt-aware status (DONE)
+- 487-004: CLI receipt-aware status (DONE)
+- 487-005-xfix: Cross-fix: MCP receipt-aware status (DONE)
+- 487-005: MCP receipt-aware status (DONE)
+- 487-006-fix-fix: Fix: Fix: Terminal publication real-binary contract (DONE)
+- 487-006-fix: Fix: Terminal publication real-binary contract (NO_GO)
+- 487-006: Terminal publication real-binary contract (NO_GO)
+- 487-007: Self-audit adapter contract (DONE)
+- 487-008: Vitest scoped adapter (DONE)
+- 487-009: Finalizer audit adapter consumer (GO_WITH_TECH_DEBT)
+- 487-010: Non-Vitest honest matrix (DONE)
+- 487-011-fix: Fix: Heartbeat authority store (DONE)
+- 487-011: Heartbeat authority store (NO_GO)
+- 487-012: Docker heartbeat single writer (DONE)
+- 487-013: In-process worker heartbeat writer (DONE)
+- 487-014: Auditor heartbeat consumer (DONE)
+- 487-015: Provider execution observation store (DONE)
+- 487-016: Docker provider observation emission (DONE)
+- 487-017-fix: Fix: Admitted-versus-attained projection (DONE)
+- 487-017: Admitted-versus-attained projection (NO_GO)
+- 487-018: FIX fingerprint circuit breaker (DONE)
+- 487-019-xfix: Cross-fix: FIX dispatch and dependency continuation (DONE)
+- 487-019: FIX dispatch and dependency continuation (DONE)
+- 487-020-fix: Fix: Sprint-486 quiescence replay (DONE)
+- 487-020: Sprint-486 quiescence replay (NO_GO)
+- 487-021: Nervous executable collision decision (DONE)
+- 487-022: Scheduler collision serialization consumer (DONE)
+- 487-023-fix: Fix: Forced skill lineage preservation (DONE)
+- 487-023: Forced skill lineage preservation (NO_GO)
+- 487-024-xfix-fix: Fix: Cross-fix: Wiring evidence schema (DONE)
+- 487-024-xfix: Cross-fix: Wiring evidence schema (NO_GO)
+- 487-024: Wiring evidence schema (DONE)
+- 487-025: Planner and task-builder wiring authority (DONE)
+- 487-026: Prompt wiring closure block (DONE)
+- 487-027-fix: Fix: Result wiring evidence settlement (DONE)
+- 487-027: Result wiring evidence settlement (NO_GO)
+- 487-028: Brain production wiring gate (DONE)
+- 487-029: Language-neutral wiring adapters (DONE)
+- 487-030: Outer staged-settlement barrier (DONE)
+- 487-031: RunFlow, Do, Autonomous and Process parity (DONE)
+- 487-032: Canonical closure canary (DONE)
+
+---
+## Sprint 488 — sprint-488
+
+**Status:** COMPLETE
+**Date:** 2026-08-01
+**Duration:** 2025s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 20 |
+| Completed | 8 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 2024874ms |
+
+### Tasks
+
+- 488-001-xfix-fix: Fix: Cross-fix: Canonical logical-progress identity contract (DEFERRED)
+- 488-001-xfix: Cross-fix: Canonical logical-progress identity contract (NO_GO)
+- 488-001: Canonical logical-progress identity contract (DONE)
+- 488-002-fix: Fix: Finalizer canonical logical-ID producer (DONE)
+- 488-002: Finalizer canonical logical-ID producer (NO_GO)
+- 488-003-fix: Fix: Logical-ID cross-surface consumers (DEFERRED)
+- 488-003: Logical-ID cross-surface consumers (NO_GO)
+- 488-004-fix: Fix: Structured landing-proposal schema and atomic writer (DONE)
+- 488-004: Structured landing-proposal schema and atomic writer (NO_GO)
+- 488-005-fix: Fix: Docker landing writer integration (DEFERRED)
+- 488-005: Docker landing writer integration (NO_GO)
+- 488-006-fix: Fix: Host worker landing writer parity (DEFERRED)
+- 488-006: Host worker landing writer parity (NO_GO)
+- 488-007: Landing diagnostics and cleanup compatibility (DEFERRED)
+- 488-008: Verification isolation authority contract (DONE)
+- 488-009: TypeScript scoped verification adapter (DONE)
+- 488-010-xfix-fix: Fix: Cross-fix: Worker verification consumer (NO_GO)
+- 488-010-xfix: Cross-fix: Worker verification consumer (NO_GO)
+- 488-010: Worker verification consumer (DONE)
+- 488-011-fix: Fix: Evaluator and FIX-budget isolation semantics (DONE)
+- 488-011: Evaluator and FIX-budget isolation semantics (NO_GO)
+- 488-012: Concurrent verification two-writer canary (DONE)
+- 488-013-xfix: Cross-fix: Post-settlement verification stage contract (DONE)
+- 488-013: Post-settlement verification stage contract (DONE)
+- 488-014-fix: Fix: Planner projection for post-settlement proof (DONE)
+- 488-014: Planner projection for post-settlement proof (NO_GO)
+- 488-015-fix: Fix: Controller post-settlement transition (DEFERRED)
+- 488-015: Controller post-settlement transition (NO_GO)
+- 488-016: Post-settlement CLI and recovery surfaces (DEFERRED)
+- 488-017: Hermetic post-settlement lifecycle contract (DEFERRED)
+- 488-018: Every-environment authority matrix (DEFERRED)
+- 488-019: Canonical closure integration canary (DEFERRED)
+- 488-020: Negative replay and regression ledger evidence (DEFERRED)
+
+---

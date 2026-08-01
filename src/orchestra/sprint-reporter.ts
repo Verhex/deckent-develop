@@ -662,6 +662,7 @@ export interface FilesChangedCostContributor {
   linesAdded?: number;
   linesRemoved?: number;
   cost?: { usd?: number };
+  workAttribution?: { state?: 'VERIFIED' | 'HOLD' };
 }
 
 /** Ground-truth files-changed + cost aggregates for the sprint metrics table. */
@@ -674,6 +675,8 @@ export interface FilesChangedCostSummary {
   linesRemoved: number;
   /** Total real USD across results that carry a `cost.usd` (host-side enriched). */
   costUsd: number;
+  /** Claims excluded because exact attempt attribution was not VERIFIED. */
+  attributionExcluded: number;
 }
 
 /**
@@ -691,21 +694,33 @@ export interface FilesChangedCostSummary {
  */
 export function computeFilesChangedAndCost(
   results: readonly FilesChangedCostContributor[],
+  opts: { requireVerifiedAttribution?: boolean } = {},
 ): FilesChangedCostSummary {
   const files = new Set<string>();
   let linesAdded = 0;
   let linesRemoved = 0;
   let costUsd = 0;
+  let attributionExcluded = 0;
   for (const r of results) {
-    for (const f of r?.filesChanged ?? []) {
-      if (typeof f === 'string' && f) files.add(f);
+    const attributionAccepted = opts.requireVerifiedAttribution !== true
+      || r?.workAttribution?.state === 'VERIFIED';
+    if (attributionAccepted) {
+      for (const f of r?.filesChanged ?? []) {
+        if (typeof f === 'string' && f) files.add(f);
+      }
+      if (typeof r?.linesAdded === 'number' && Number.isFinite(r.linesAdded)) linesAdded += r.linesAdded;
+      if (typeof r?.linesRemoved === 'number' && Number.isFinite(r.linesRemoved)) linesRemoved += r.linesRemoved;
+    } else if (
+      (r?.filesChanged?.length ?? 0) > 0
+      || (typeof r?.linesAdded === 'number' && r.linesAdded > 0)
+      || (typeof r?.linesRemoved === 'number' && r.linesRemoved > 0)
+    ) {
+      attributionExcluded += 1;
     }
-    if (typeof r?.linesAdded === 'number' && Number.isFinite(r.linesAdded)) linesAdded += r.linesAdded;
-    if (typeof r?.linesRemoved === 'number' && Number.isFinite(r.linesRemoved)) linesRemoved += r.linesRemoved;
     const usd = r?.cost?.usd;
     if (typeof usd === 'number' && Number.isFinite(usd)) costUsd += usd;
   }
-  return { filesChanged: files.size, linesAdded, linesRemoved, costUsd };
+  return { filesChanged: files.size, linesAdded, linesRemoved, costUsd, attributionExcluded };
 }
 
 // ═══ MET668B Task 419-002 — Files-Changed / Cost live retro section ═══════════
@@ -729,6 +744,8 @@ export interface FilesChangedCostSectionOptions {
    * line plus a combined total — omitted (no helper/total lines) when absent or ≤ 0.
    */
   helperCostUsd?: number;
+  requireVerifiedAttribution?: boolean;
+  attributionWarning?: string;
 }
 
 /**
@@ -742,7 +759,9 @@ export function buildFilesChangedCostSection(
   results: readonly FilesChangedCostContributor[],
   opts?: FilesChangedCostSectionOptions,
 ): string {
-  const s = computeFilesChangedAndCost(results);
+  const s = computeFilesChangedAndCost(results, {
+    requireVerifiedAttribution: opts?.requireVerifiedAttribution,
+  });
   const lines = [
     '## Files Changed & Cost',
     '',
@@ -750,6 +769,9 @@ export function buildFilesChangedCostSection(
     `- Lines: +${s.linesAdded} / -${s.linesRemoved}`,
     `- Task cost: $${s.costUsd.toFixed(4)}`,
   ];
+  if (s.attributionExcluded > 0 && opts?.attributionWarning) {
+    lines.push(`- ${opts.attributionWarning}`);
+  }
   const helper = opts?.helperCostUsd;
   if (typeof helper === 'number' && Number.isFinite(helper) && helper > 0) {
     lines.push(`- Helper-call cost (auxiliary, was off-ledger): $${helper.toFixed(4)}`);
@@ -763,4 +785,119 @@ export function buildFilesChangedCostSection(
     );
   }
   return lines.join('\n') + '\n';
+}
+
+// ═══ Sprint 486 Task 486-012 — Reporter Logical Lineage Summary ═══════════
+//
+// A sprint can have several execution attempts for one logical outcome: an
+// original task, a FIX, and a FIX-FIX. Reporting must preserve both truths:
+// logical outcome progress and the exact attempt evidence behind it. This
+// reporter seam composes the canonical core projections rather than inspecting
+// the final tree or re-resolving lineage/attribution locally.
+
+import {
+  projectAttributedTaskWork,
+  projectSprintWorkAttribution,
+} from '../core/sprint-work-attribution.js';
+import type { SprintWorkAttributionProjection } from '../core/sprint-work-attribution.js';
+import { projectLogicalProgress } from '../core/logical-progress-projection.js';
+import type {
+  LogicalProgressProjection,
+  LogicalProgressProjectionInput,
+  LogicalProgressProjectionResult,
+} from '../core/logical-progress-projection.js';
+import { aggregateLineageUsageAuthority } from '../core/lineage-usage-authority.js';
+import type {
+  LineageUsageAuthorityAggregate,
+  LineageUsageAuthorityInput,
+} from '../core/lineage-usage-authority.js';
+import type { TaskResult } from '../core/task-types.js';
+
+/** Coverage is intentionally tagged so unavailable evidence cannot become NaN. */
+export type ReporterCoverageProjection =
+  | { readonly state: 'available'; readonly percent: number }
+  | { readonly state: 'unavailable'; readonly reason: 'no-verified-finite-coverage' };
+
+/** Inputs are raw attempt evidence consumed only through canonical projections. */
+export interface ReporterLogicalLineageSummaryInput {
+  readonly results: readonly TaskResult[];
+  readonly logicalProgress: LogicalProgressProjectionInput;
+  readonly usageAuthority: LineageUsageAuthorityInput;
+}
+
+/** A valid logical-progress projection rendered with separately named attempts. */
+export interface AvailableReporterLogicalLineageSummary {
+  readonly state: 'available';
+  /** Logical task outcomes; `total` never means raw execution attempts. */
+  readonly logicalOutcomes: LogicalProgressProjection;
+  /** Exact observed execution attempts, retained separately from logical outcomes. */
+  readonly exactAttempts: { readonly count: number };
+  readonly attribution: SprintWorkAttributionProjection;
+  readonly usageByLogicalRoot: readonly LineageUsageAuthorityAggregate[];
+  readonly coverage: ReporterCoverageProjection;
+}
+
+/** Invalid progress input remains diagnostic evidence instead of being repaired. */
+export interface UnavailableReporterLogicalLineageSummary {
+  readonly state: 'unavailable';
+  readonly progress: Extract<LogicalProgressProjectionResult, { readonly ok: false }>;
+  readonly attribution: SprintWorkAttributionProjection;
+  readonly usageByLogicalRoot: readonly LineageUsageAuthorityAggregate[];
+  readonly coverage: ReporterCoverageProjection;
+}
+
+export type ReporterLogicalLineageSummary =
+  | AvailableReporterLogicalLineageSummary
+  | UnavailableReporterLogicalLineageSummary;
+
+function projectVerifiedCoverage(results: readonly TaskResult[]): ReporterCoverageProjection {
+  let sum = 0;
+  let count = 0;
+
+  for (const result of results) {
+    if (projectAttributedTaskWork(result).state !== 'VERIFIED') continue;
+    if (typeof result.coverage !== 'number' || !Number.isFinite(result.coverage)) continue;
+    sum += result.coverage;
+    count += 1;
+  }
+
+  return count === 0
+    ? Object.freeze({ state: 'unavailable', reason: 'no-verified-finite-coverage' } as const)
+    : Object.freeze({ state: 'available', percent: sum / count } as const);
+}
+
+/**
+ * Build a reporter-safe summary of logical outcomes and exact attempt evidence.
+ *
+ * Attribution is delegated to `projectSprintWorkAttribution`; usage remains the
+ * canonical root-keyed attempt aggregate; and progress is delegated to
+ * `projectLogicalProgress`. No result file, final-tree diff, or task-array
+ * membership is used to infer ownership.
+ */
+export function buildReporterLogicalLineageSummary(
+  input: ReporterLogicalLineageSummaryInput,
+): ReporterLogicalLineageSummary {
+  const attribution = projectSprintWorkAttribution(input.results);
+  const usageByLogicalRoot = aggregateLineageUsageAuthority(input.usageAuthority);
+  const coverage = projectVerifiedCoverage(input.results);
+  const progress = projectLogicalProgress(input.logicalProgress);
+
+  if (!progress.ok) {
+    return Object.freeze({
+      state: 'unavailable',
+      progress,
+      attribution,
+      usageByLogicalRoot,
+      coverage,
+    });
+  }
+
+  return Object.freeze({
+    state: 'available',
+    logicalOutcomes: progress.projection,
+    exactAttempts: Object.freeze({ count: progress.projection.attemptCount }),
+    attribution,
+    usageByLogicalRoot,
+    coverage,
+  });
 }

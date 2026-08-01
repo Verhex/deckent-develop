@@ -208,11 +208,20 @@ describe('buildProviderAuthIsolation', () => {
     expect(isolated.bootstrapLines.every(line => line.endsWith('|| exit 78'))).toBe(true);
     expect(isolated.credentialCount).toBe(1);
     expect(isolated.missingRequiredFiles).toEqual([]);
+    expect(isolated.executionConcurrency).toBe('isolated-parallel');
+    expect(isolated.credentialMutationLockScope).toBe('none');
   });
 
   it('does not mount subscription credentials in API mode', () => {
     expect(buildProviderAuthIsolation('/host/home', 'claude', '.claude', true, allExist))
-      .toEqual({ mountArgs: [], bootstrapLines: [], credentialCount: 0, missingRequiredFiles: [] });
+      .toEqual({
+        mountArgs: [],
+        bootstrapLines: [],
+        credentialCount: 0,
+        missingRequiredFiles: [],
+        executionConcurrency: 'not-applicable',
+        credentialMutationLockScope: 'none',
+      });
   });
 
   it('uses each provider credential allowlist without mounting provider homes', () => {
@@ -254,8 +263,17 @@ describe('buildProviderAuthIsolation', () => {
       'type=bind,src=/runtime/auth/claude/.credentials.json,dst=/run/deckent-auth-claude-.credentials.json',
     );
     expect(isolated.bootstrapLines).toContain('flock -x 8 || exit 78');
+    expect(isolated.bootstrapLines).toContain('flock -u 8 || exit 78');
     expect(isolated.bootstrapLines).toContain('sync_provider_auth() {');
-    expect(isolated.writebackLines).toEqual(['sync_provider_auth']);
+    expect(isolated.bootstrapLines).toContain('  flock -x 8 || return 78');
+    expect(isolated.bootstrapLines).toContain('  flock -u 8 || return 78');
+    expect(isolated.writebackLines).toEqual(['sync_provider_auth || exit 78']);
+    expect(isolated.executionConcurrency).toBe('isolated-parallel');
+    expect(isolated.credentialMutationLockScope).toBe('bootstrap-and-writeback');
+    const unlockIndex = isolated.bootstrapLines.indexOf('flock -u 8 || exit 78');
+    const syncFunctionIndex = isolated.bootstrapLines.indexOf('sync_provider_auth() {');
+    expect(unlockIndex).toBeGreaterThan(isolated.bootstrapLines.indexOf('flock -x 8 || exit 78'));
+    expect(syncFunctionIndex).toBeGreaterThan(unlockIndex);
   });
 
   it('fails closed when a required credential is missing but optional metadata exists', () => {

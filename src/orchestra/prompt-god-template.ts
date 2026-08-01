@@ -7,7 +7,16 @@
 
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import type { Task, TaskScope } from '../core/task-types.js';
+import type { ProductionWiringPlanEvidence, Task, TaskScope } from '../core/task-types.js';
+import {
+  PRODUCTION_WIRING_EVIDENCE_VERSION,
+  createProductionWiringPlanEvidence,
+} from '../core/task-types.js';
+import {
+  resolveProductionWiringContract,
+  type ProductionWiringContract,
+  type ProductionWiringEvidence,
+} from '../core/production-wiring-contract.js';
 import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
 import { personaCoreBody, selectGuidanceSlice } from '../core/persona-guidance.js';
@@ -222,6 +231,67 @@ export interface SprintContext {
    * so every existing caller and the prompt-determinism guard are unaffected.
    */
   trackedFiles?: string[];
+  /** Digest-bound execution directive for an approved exact RunFlow. */
+  exactExecutionAuthority?: WorkerExactExecutionAuthority;
+  /**
+   * Digest-addressed evidence of this RUN's binding execution constraints
+   * (486-017 — e.g. a DIRECTIVES-backed sprint's `## Execution Contract`).
+   *
+   * Unlike {@link exactExecutionAuthority} (a per-flow/per-task exact-plan
+   * binding), this is the SAME value for every task compiled from this run —
+   * caller-resolved and injected exactly like {@link toolAllowlist} /
+   * {@link verifyCommands}, so this compiler stays pure and never reads
+   * DIRECTIVES.md or any repository file itself. `undefined` (until the caller
+   * wire lands) → no block, byte-identical to the pre-486-017 prompt.
+   */
+  runPolicyAuthority?: RunPolicyAuthority;
+}
+
+export interface WorkerExactExecutionAuthority {
+  readonly flowId: string;
+  readonly revision: number;
+  readonly planDigest: string;
+  readonly sourceKind: 'intent' | 'directives' | 'unavailable';
+  readonly sourceContentSha256?: string;
+  readonly directivesProjection:
+    | 'MATCHED_CONTENT_ADDRESSED_POINTER'
+    | 'EXCLUDED_SOURCE_KIND'
+    | 'EXCLUDED_DIGEST_MISMATCH'
+    | 'EXCLUDED_MISSING'
+    | 'EXCLUDED_AUTHORITY_UNAVAILABLE';
+  readonly observedDirectivesSha256?: string;
+}
+
+/** Schema version for {@link RunPolicyAuthority} — bump on any shape change. */
+export const RUN_POLICY_AUTHORITY_SCHEMA_VERSION = 1 as const;
+
+/**
+ * Digest-addressed evidence of a run's binding execution constraints (486-017 —
+ * "Run-wide prompt policy propagation").
+ *
+ * For a DIRECTIVES-backed sprint this is the sprint's `## Execution Contract`
+ * (no build/full-suite, FIX-lineage rules, scope authority, concurrency ceiling,
+ * …), but the shape is source-neutral: any run may supply it. The caller (out of
+ * this file's write scope) computes `policyDigest` — a content hash of the
+ * canonical constraint set — and a BOUNDED list of short constraint summaries.
+ * The digest is the addressing mechanism: a worker or auditor can verify these
+ * summaries against the run's recorded policy by digest without this prompt ever
+ * reproducing the source document's raw bytes (486-017 NO-GO: "Copying arbitrary
+ * DIRECTIVES bytes... unbounded prompt dump").
+ *
+ * Shared across EVERY task compiled from this run — the same value renders for
+ * an original task and every one of its FIX attempts, because both flow through
+ * the single {@link buildTaskPromptSegmented} entry point (task-builder.ts has
+ * no separate FIX-prompt path), so a FIX prompt can never silently drop or
+ * override this policy (486-017 NO-GO: "auto-FIX policy override").
+ */
+export interface RunPolicyAuthority {
+  readonly schemaVersion: typeof RUN_POLICY_AUTHORITY_SCHEMA_VERSION;
+  readonly policyDigest: string;
+  /** Short, human-readable constraint summaries — never the raw source text. */
+  readonly constraints: readonly string[];
+  /** Human-readable pointer to the digest's source (e.g. a file/section name) — never the source content itself. */
+  readonly sourceRef?: string;
 }
 
 /**
@@ -491,6 +561,14 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
   // sharedNotes/handoffNotes to their .result. Without this instruction
   // workers never know these fields exist (Tasks 1-5 path stays empty).
   const commsInstructionBlock = buildWorkerCommsInstructionBlock(ctx.workerCommsEnabled);
+  const executionAuthorityBlock = buildExactExecutionAuthorityBlock(ctx.exactExecutionAuthority);
+  const runPolicyBlock = buildRunPolicyAuthorityBlock(ctx.runPolicyAuthority);
+  // ── 5f. Production Wiring Authority (487-026) ───────────────────────
+  // Consumer of the 487-025 plan-time authority carried on the task itself. It is
+  // rendered from `task.productionWiring` (never from ctx) so the SAME block is
+  // compiled on every ingress that compiles this task — the initial attempt and
+  // every FIX attempt alike — and can never be gated off by caller wiring drift.
+  const productionWiringBlock = buildProductionWiringAuthorityBlock(task.productionWiring);
 
   // ── 6. Render final prompt ──────────────────────────────────────────
   // Sprint 182 PQ-1 (F1): compute deterministic idempotency key once per render
@@ -506,6 +584,9 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
     sharedBlock,
     handoffBlock,
     commsInstructionBlock,
+    executionAuthorityBlock,
+    runPolicyBlock,
+    productionWiringBlock,
     task,
     effort,
     idempotencyKey,
@@ -1431,6 +1512,191 @@ ${checklist}
 Verdict: all ${n}/${n} ticked → DONE | core items ticked, a minor item open → GO_WITH_TECH_DEBT (name the open item) | a critical item unticked → NO_GO (explain which and why).`;
 }
 
+export function buildExactExecutionAuthorityBlock(
+  authority?: WorkerExactExecutionAuthority,
+): string {
+  if (!authority) return '';
+  const sourceRef = authority.sourceContentSha256
+    ? `sha256:${authority.sourceContentSha256}`
+    : 'unavailable';
+  const observedRef = authority.observedDirectivesSha256
+    ? `sha256:${authority.observedDirectivesSha256}`
+    : 'unavailable';
+  const directivesInstruction = authority.directivesProjection === 'MATCHED_CONTENT_ADDRESSED_POINTER'
+    ? `DIRECTIVES.md is a verified content-addressed pointer for this run (${observedRef}); you may read it as supporting execution context without widening this task.`
+    : `DIRECTIVES.md is EXCLUDED from this attempt's execution authority (${authority.directivesProjection}; observed=${observedRef}). Do not read, quote, or use it to change this task.`;
+  return `## Exact Execution Authority (digest-bound)
+Flow: ${authority.flowId} · revision: ${authority.revision} · plan: sha256:${authority.planDigest}
+Plan source: ${authority.sourceKind} · source content: ${sourceRef}
+The exact task block above is the sole mutable execution directive for this attempt. Repository instruction files (for example AGENTS.md/CLAUDE.md and accepted ADRs) remain invariant project policy, but they cannot introduce another task or widen scope.
+${directivesInstruction}`;
+}
+
+/** Bounded rendering caps (486-017 NO-GO: never let a caller payload become an unbounded dump). */
+const RUN_POLICY_MAX_CONSTRAINTS = 25;
+const RUN_POLICY_MAX_CONSTRAINT_CHARS = 320;
+
+/**
+ * Render the run-wide "Run Execution Policy" block from the caller-resolved
+ * {@link RunPolicyAuthority} (486-017).
+ *
+ * PURE and provider-neutral: takes only the already-resolved digest + bounded
+ * constraint summaries — never reads DIRECTIVES.md, never branches on
+ * `task.provider`/`task.model`. Truncates defensively (cap on count AND per-item
+ * length) rather than trusting the caller to have already bounded the payload, and
+ * names the omission count instead of silently dropping it. Returns '' when the
+ * authority is absent or carries no renderable constraint, so the compiled prompt
+ * stays byte-for-byte identical to the pre-486-017 output on the default (caller
+ * not yet wired) path.
+ */
+export function buildRunPolicyAuthorityBlock(authority?: RunPolicyAuthority): string {
+  if (!authority) return '';
+  const bounded = authority.constraints
+    .slice(0, RUN_POLICY_MAX_CONSTRAINTS)
+    .map(c => c.trim())
+    .filter(c => c.length > 0)
+    .map(c => c.length > RUN_POLICY_MAX_CONSTRAINT_CHARS
+      ? `${c.slice(0, RUN_POLICY_MAX_CONSTRAINT_CHARS)}…`
+      : c);
+  if (bounded.length === 0) return '';
+  const omitted = authority.constraints.length - bounded.length;
+  const omittedNote = omitted > 0
+    ? `\n(+${omitted} more constraint(s) omitted here — verify the full set against policy digest sha256:${authority.policyDigest} before assuming an omitted constraint does not apply.)`
+    : '';
+  const sourceLine = authority.sourceRef
+    ? `\nSource: ${authority.sourceRef} (addressed by digest above, not reproduced verbatim).`
+    : '';
+  const list = bounded.map(c => `- ${c}`).join('\n');
+  return `## Run Execution Policy (digest-bound)
+Policy digest: sha256:${authority.policyDigest}${sourceLine}
+This run's binding execution constraints — they apply to THIS task and to every original and FIX attempt in this run:
+${list}${omittedNote}
+Generated goCriteria and Definition-of-Done checklist items may ADD proof obligations for this task, but they never authorize a build, a repository-wide/full-suite test run, or any other action forbidden above, and they can never override or contradict a constraint listed here. Where a generated criterion conflicts with this policy, this policy governs — report the conflict in your result notes rather than silently resolving it either way.`;
+}
+
+// ─── Production Wiring Authority Block (487-026) ────────────────────────
+
+/** Bounded rendering caps — a contract list is never allowed to become a dump. */
+const PRODUCTION_WIRING_MAX_INGRESSES = 12;
+const PRODUCTION_WIRING_MAX_PROOF_TARGETS = 12;
+/** Evidence references are provenance, not a payload: render a bounded head only. */
+const PRODUCTION_WIRING_MAX_REFS = 3;
+
+/** Stable heading — the single anchor the protected-block guard keys on. */
+export const PRODUCTION_WIRING_BLOCK_HEADING = '## Production Wiring Authority (digest-bound)';
+/** Stable heading for the fail-closed rendering; never carries wired identities. */
+export const PRODUCTION_WIRING_UNWIRED_HEADING = '## Production Wiring Authority (UNWIRED — hold)';
+
+/**
+ * Render one evidence node as `state/basis` (or `state/reasonCode`) plus a bounded
+ * head of its evidence references. Presence in source or tests is deliberately NOT
+ * collapsed into "wired" here — the state string is reproduced exactly as declared.
+ */
+function formatWiringEvidence(evidence: ProductionWiringEvidence): string {
+  const qualifier = evidence.state === 'complete' || evidence.state === 'presence-only'
+    ? evidence.basis
+    : evidence.reasonCode;
+  const refs = evidence.evidenceRefs
+    .map(ref => ref.trim())
+    .filter(ref => ref.length > 0);
+  const shown = refs.slice(0, PRODUCTION_WIRING_MAX_REFS);
+  const omitted = refs.length - shown.length;
+  const refsText = shown.length > 0
+    ? ` refs: ${shown.join(', ')}${omitted > 0 ? ` (+${omitted} more)` : ''}`
+    : '';
+  return `[${evidence.state}/${qualifier}]${refsText}`;
+}
+
+/** Render the exact producer→consumer→ingress→enablement→proof identity chain. */
+function formatWiringChain(contract: ProductionWiringContract): string {
+  const lines: string[] = [
+    `- Producer: \`${contract.producer.producerId}\` ${formatWiringEvidence(contract.producer.evidence)}`,
+    `- Canonical consumer: \`${contract.canonicalConsumer.consumerId}\` (${contract.canonicalConsumer.relationship}) ${formatWiringEvidence(contract.canonicalConsumer.evidence)}`,
+  ];
+  const ingresses = contract.affectedIngresses.slice(0, PRODUCTION_WIRING_MAX_INGRESSES);
+  for (const ingress of ingresses) {
+    lines.push(`- Affected ingress: \`${ingress.ingressId}\` (${ingress.kind}) ${formatWiringEvidence(ingress.evidence)}`);
+  }
+  const omittedIngresses = contract.affectedIngresses.length - ingresses.length;
+  if (omittedIngresses > 0) {
+    lines.push(`- (+${omittedIngresses} further affected ingress(es) bound by the contract digest above but not reproduced here — they are still in scope.)`);
+  }
+  lines.push(`- Enablement authority: \`${contract.enablementAuthority.authorityId}\` (${contract.enablementAuthority.mechanism}) ${formatWiringEvidence(contract.enablementAuthority.evidence)}`);
+  const proofTargets = contract.proofTargets.slice(0, PRODUCTION_WIRING_MAX_PROOF_TARGETS);
+  for (const target of proofTargets) {
+    lines.push(`- Proof target: \`${target.proofTargetId}\` (${target.kind}) ${formatWiringEvidence(target.evidence)}`);
+  }
+  const omittedTargets = contract.proofTargets.length - proofTargets.length;
+  if (omittedTargets > 0) {
+    lines.push(`- (+${omittedTargets} further proof target(s) bound by the contract digest above but not reproduced here — they are still in scope.)`);
+  }
+  return lines.join('\n');
+}
+
+/** The typed UNWIRED/NO_GO reporting contract — identical wording on every path. */
+const PRODUCTION_WIRING_REPORTING_CONTRACT = `If you cannot close this exact chain inside your write authority, do NOT substitute a near-by symbol, a test-only import, or a fixture-local reimplementation, and do NOT report DONE. Write selfAssessment "NO_GO" and, in your result notes, one line per unmet link starting \`UNWIRED:\` naming (a) the exact identity above that is not closed and (b) the exact missing authority — file path, symbol, ingress, or configuration key — that would close it. Reporting that exact delta IS the successful outcome for a task that cannot reach closure; a silent widening of scope is not.
+Settlement is host-owned: this block records the wiring authority, it never marks this task complete and it never overrides the task's own verification steps.`;
+
+/**
+ * Render the single digest-bound production-wiring block for the compiled worker
+ * prompt (487-026 — consumer of the 487-025 `Task.productionWiring` authority).
+ *
+ * PURE. The block is emitted from the bound contract ONLY:
+ *  - absent authority → `''`, so the compiled prompt is byte-for-byte unchanged
+ *    on every task that carries no wiring contract;
+ *  - a re-derived digest that does not match the bound `contractDigest` (or an
+ *    unsupported evidence version) → a fail-closed UNWIRED rendering that
+ *    deliberately reproduces NO identity from the unverified contract, so a
+ *    tampered or drifted contract can never introduce a new target name;
+ *  - a resolver `hold` decision → an UNWIRED rendering whose delta lines are the
+ *    resolver's own typed issues (`target/targetId/reasonCode`).
+ *
+ * Identities are reproduced verbatim from the contract and never inferred from the
+ * task title, description, scope, or file names. The block restates no mutable
+ * directive: it addresses the contract by digest instead of repeating it.
+ */
+export function buildProductionWiringAuthorityBlock(
+  evidence?: ProductionWiringPlanEvidence,
+): string {
+  if (!evidence) return '';
+
+  const boundDigest = evidence.contractDigest;
+  const rederived = createProductionWiringPlanEvidence(evidence.contract).contractDigest;
+  if (evidence.version !== PRODUCTION_WIRING_EVIDENCE_VERSION || rederived !== boundDigest) {
+    const reason = evidence.version !== PRODUCTION_WIRING_EVIDENCE_VERSION
+      ? `unsupported-evidence-version (bound version ${String(evidence.version)}, supported ${PRODUCTION_WIRING_EVIDENCE_VERSION})`
+      : 'contract-digest-mismatch';
+    return `${PRODUCTION_WIRING_UNWIRED_HEADING}
+Bound digest: sha256:${boundDigest} · re-derived digest: sha256:${rederived}
+This task's wiring authority failed its own integrity check (${reason}), so no producer, consumer, ingress, enablement or proof identity is reproduced here — an unverified contract must never name your target.
+Stop before mutating production code: write selfAssessment "NO_GO" with one \`UNWIRED:\` line naming this integrity failure and the exact plan-time authority that must re-issue the contract.
+Settlement is host-owned: this block never marks this task complete.`;
+  }
+
+  const decision = resolveProductionWiringContract(evidence.contract);
+  if (decision.decision === 'incomplete' || decision.decision === 'unsupported' || decision.decision === 'contradictory') {
+    const delta = decision.issues
+      .map(issue => `- ${issue.target}: \`${issue.targetId ?? '(identity missing)'}\` → ${issue.reasonCode}`)
+      .join('\n');
+    return `${PRODUCTION_WIRING_UNWIRED_HEADING}
+Contract digest: sha256:${boundDigest} · decision: ${decision.decision} · outer settlement: ${decision.outerSettlement}
+The bound wiring authority does not resolve to a closed chain. Exact delta (typed, from the contract resolver — treat each line as a required closure, not a suggestion):
+${delta}
+${PRODUCTION_WIRING_REPORTING_CONTRACT}`;
+  }
+
+  const stagedLine = decision.decision === 'staged-foundation'
+    ? `\nStaged foundation: dag \`${decision.dagId}\` · foundation task \`${decision.foundationTaskId}\` · exact closure task(s): ${decision.closureTaskIds.map(id => `\`${id}\``).join(', ')} · outer settlement: ${decision.outerSettlement}. This slice settles as an intermediate artifact only; the outer run cannot complete until those exact closure tasks settle.`
+    : '';
+
+  return `${PRODUCTION_WIRING_BLOCK_HEADING}
+Contract digest: sha256:${boundDigest} · contract version: ${evidence.contract.version} · change kind: ${evidence.contract.changeKind} · disposition: ${decision.disposition}
+This block is the sole authority for what "wired" means for THIS task, addressed by the digest above rather than by repeating any directive text. The identities below are exact: match them symbol-for-symbol and never substitute a similarly named one.${stagedLine}
+Producer → canonical consumer → affected ingress → enablement authority → proof target:
+${formatWiringChain(evidence.contract)}
+${PRODUCTION_WIRING_REPORTING_CONTRACT}`;
+}
+
 // ─── Template Renderer ─────────────────────────────────────────────────
 
 interface RenderInput {
@@ -1445,6 +1711,12 @@ interface RenderInput {
   handoffBlock: string;
   /** Worker comms instruction block (Sprint 278 COMM-1 / 278-006) — appended LAST when non-empty. */
   commsInstructionBlock: string;
+  /** Exact RunFlow execution directive provenance; empty on legacy/directives sprint paths. */
+  executionAuthorityBlock: string;
+  /** Run-wide execution policy evidence (486-017); empty until the caller wires runPolicyAuthority. */
+  runPolicyBlock: string;
+  /** Digest-bound production-wiring authority (487-026); empty when the task carries none. */
+  productionWiringBlock: string;
   task: Task;
   effort: string;
   /**
@@ -1778,7 +2050,7 @@ export function resolveTargetedTestPaths(
 }
 
 function renderSegments(input: RenderInput): PromptSegment[] {
-  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, task, effort, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory, verifyCommands, toolAllowlist, targetedTestPaths } = input;
+  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, executionAuthorityBlock, runPolicyBlock, productionWiringBlock, task, effort, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory, verifyCommands, toolAllowlist, targetedTestPaths } = input;
 
   // Tier-tagged assembly (Sprint 330 330-019). Push order below IS the default
   // production order — `buildTaskPromptSegmented` joins these contents with
@@ -1808,6 +2080,9 @@ function renderSegments(input: RenderInput): PromptSegment[] {
   if (skillBlock) push('T1', 'skills', skillBlock);
   if (agentBlock) push('T1', 'persona', agentBlock);
   if (adrBlock) push('T1', 'adr', adrBlock);
+  // Run-wide policy (486-017): same digest-bound content for every task in this
+  // run (original or FIX), so it shares the T1 (project/run-stable) tier with ADRs.
+  if (runPolicyBlock) push('T1', 'run-policy', runPolicyBlock);
 
   // Main worker preamble
   // Sprint 182 PQ-4 (F6): title and description live on separate lines/paragraphs.
@@ -1840,6 +2115,13 @@ ${taskDescription}
 - Model: ${task.model}
 - Effort: ${effort}
 ${dodBlock}${idempotencyBlock}`);
+  if (executionAuthorityBlock) push('T2', 'execution-authority', executionAuthorityBlock);
+  // 487-026: exactly ONE production-wiring segment, emitted immediately after the
+  // execution-authority block so the wiring closure obligation sits with the other
+  // digest-bound authorities rather than among the volatile task prose. Per-task
+  // volatile → T2 ('production-wiring' is an unregistered kind: classifyTier maps it
+  // to T2, so it never poisons the shared T0/T1 cache prefix).
+  if (productionWiringBlock) push('T2', 'production-wiring', productionWiringBlock);
 
   const requestedBudget = task.budgetPolicy?.requestedBudget;
   const effectiveBudget = task.budget;

@@ -1105,10 +1105,16 @@ export async function runCrossVerify(
     && ((config.cross_verify.high_stakes_only ?? true) === false || isHighStakesTask(task));
 
   try {
-    // Mandatory verification has exactly one executable authority: the exact
-    // invocation coordinator composition. The compatibility candidate/receipt
-    // and string-spawn seams below remain advisory-only.
-    if (verificationRequired) {
+    // Production verification has exactly one transport authority: the typed,
+    // content-addressed invocation composition. Enforcement is a separate
+    // config-derived policy: advisory and required verification share the exact
+    // same payload/evidence protocol, while only required verification may
+    // block settlement. Compatibility string-spawn seams below remain available
+    // solely to isolated callers/tests that did not compose production ingress.
+    const exactCompositionRequested = verificationRequired
+      || opts.mandatoryInvocation !== undefined
+      || opts.mandatoryInvocationFactory !== undefined;
+    if (exactCompositionRequested) {
       let mandatory = opts.mandatoryInvocation;
       if (!mandatory && opts.mandatoryInvocationFactory) {
         const composed = await opts.mandatoryInvocationFactory.compose({
@@ -1135,7 +1141,7 @@ export async function runCrossVerify(
               ? { verifierModel: composed.verifierModel }
               : {}),
           });
-          return skip(reason, 'unavailable', evidencePersisted, true);
+          return skip(reason, 'unavailable', evidencePersisted, verificationRequired);
         }
         mandatory = composed.composition;
       }
@@ -1145,7 +1151,7 @@ export async function runCrossVerify(
           outcome: 'unavailable',
           reason,
         });
-        return skip(reason, 'unavailable', evidencePersisted, true);
+        return skip(reason, 'unavailable', evidencePersisted, verificationRequired);
       }
       const coordinated = await mandatory.coordinator.execute(
         mandatory.input,
@@ -1160,7 +1166,7 @@ export async function runCrossVerify(
             ? { invocationReceiptRef: coordinated.invocationReceiptRef }
             : {}),
         });
-        return skip(reason, 'unavailable', evidencePersisted, true);
+        return skip(reason, 'unavailable', evidencePersisted, verificationRequired);
       }
       if (!(ALL_PROVIDER_NAMES as readonly string[]).includes(coordinated.calledProvider)) {
         const reason = 'verifier-exact-invocation-called-provider-unsupported';
@@ -1169,7 +1175,7 @@ export async function runCrossVerify(
           reason,
           invocationReceiptRef: coordinated.invocationReceiptRef,
         });
-        return skip(reason, 'unavailable', evidencePersisted, true);
+        return skip(reason, 'unavailable', evidencePersisted, verificationRequired);
       }
       const verifierProvider = coordinated.calledProvider as ProviderName;
       if (mandatory.adjudication) {
@@ -1201,7 +1207,7 @@ export async function runCrossVerify(
             reason,
             invocationReceiptRef: coordinated.invocationReceiptRef,
           });
-          return skip(reason, 'unavailable', evidencePersisted, true);
+          return skip(reason, 'unavailable', evidencePersisted, verificationRequired);
         }
         const outcome = adjudication.verdict;
         const refuted = outcome === 'refuted';
@@ -1215,11 +1221,14 @@ export async function runCrossVerify(
           assurance: 'typed-host-adjudicated',
           adjudicationReceiptRef,
         };
-        const disposition: CrossVerifyDisposition = refuted
+        const requiredDisposition: CrossVerifyDisposition = refuted
           ? 'no-go'
           : outcome === 'confirmed'
             ? 'allow'
             : 'hold';
+        const disposition: CrossVerifyDisposition = verificationRequired
+          ? requiredDisposition
+          : 'advisory';
         const evidencePersisted = writeEvidenceToResult(
           projectRoot,
           task.id,
@@ -1228,7 +1237,7 @@ export async function runCrossVerify(
         if (!evidencePersisted) {
           return {
             outcome: 'unavailable',
-            disposition: 'hold',
+            disposition: verificationRequired ? 'hold' : 'advisory',
             ran: true,
             advisory: {
               ...advisory,
@@ -1236,7 +1245,7 @@ export async function runCrossVerify(
               reason: 'verifier-evidence-persistence-failed',
             },
             refuted: false,
-            blocked: true,
+            blocked: verificationRequired,
             evidencePersisted: false,
           };
         }
@@ -1246,7 +1255,7 @@ export async function runCrossVerify(
           ran: true,
           advisory,
           refuted,
-          blocked: disposition !== 'allow',
+          blocked: verificationRequired && requiredDisposition !== 'allow',
           evidencePersisted,
           ...(validatedAdjudicationReceipt
             ? { validatedAdjudicationReceipt }
@@ -1284,25 +1293,27 @@ export async function runCrossVerify(
         };
         return {
           outcome: 'unavailable',
-          disposition: 'hold',
+          disposition: verificationRequired ? 'hold' : 'advisory',
           ran: true,
           advisory: persistenceAdvisory,
           refuted: false,
-          blocked: true,
+          blocked: verificationRequired,
           evidencePersisted: false,
         };
       }
       return {
         outcome,
-        disposition: refuted
-          ? 'no-go'
-          : verdict.verdict === 'confirmed'
-            ? 'allow'
-            : 'hold',
+        disposition: verificationRequired
+          ? refuted
+            ? 'no-go'
+            : verdict.verdict === 'confirmed'
+              ? 'allow'
+              : 'hold'
+          : 'advisory',
         ran: true,
         advisory,
         refuted,
-        blocked: verdict.verdict !== 'confirmed',
+        blocked: verificationRequired && verdict.verdict !== 'confirmed',
         evidencePersisted,
       };
     }

@@ -124,7 +124,7 @@ describe('CrossVerifyProductionIngressAuthority', () => {
 
       const bootstrapped = bootstrapCrossVerifyRuntimeV2({
         projectRoot,
-        task: task(),
+        task: { ...task(), description: 'untrusted-worker-context '.repeat(4_000) },
         result: result(),
         settlementRef: ref,
         fenceTokenHash: taskResultSettlementActiveClaimDigest(ref),
@@ -149,6 +149,8 @@ describe('CrossVerifyProductionIngressAuthority', () => {
         ]));
       expect(bootstrapped.evidenceSnapshot.manifest.entries).toHaveLength(1);
       expect(bootstrapped.prompt).toContain('XVerify Typed Adjudication Protocol v2');
+      expect(bootstrapped.prompt).not.toContain('material field host-truncated');
+      expect(bootstrapped.prompt).not.toContain('untrusted-worker-context');
     } finally {
       if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
       else process.env.DECKENT_HOME = originalDeckentHome;
@@ -156,7 +158,7 @@ describe('CrossVerifyProductionIngressAuthority', () => {
     }
   });
 
-  it('touches no provider authority while enforcement is default-off', async () => {
+  it('touches no provider authority while cross-verification is disabled', async () => {
     const providerAuthority = new Proxy({}, {
       get() {
         throw new Error('default-off touched provider authority');
@@ -167,12 +169,44 @@ describe('CrossVerifyProductionIngressAuthority', () => {
       projectRoot: '/tmp/provider-free-xverify',
       task: task(),
       result: result(),
+      config: {
+        ...config(false),
+        cross_verify: { ...config(false).cross_verify!, enabled: false },
+      },
+      operationClass: 'verify-implementation',
+      timeoutMs: 120_000,
+    })).resolves.toMatchObject({
+      state: 'hold',
+      reasonCode: 'xverify_disabled',
+    });
+  });
+
+  it('resolves exact production authority in advisory mode without changing policy', async () => {
+    const providerAuthority = {
+      state: 'ready',
+      tenantId: 'tenant-a',
+      projectId: 'project-a',
+      authorityEvidenceRef: 'provider-authority:test',
+      service: new Proxy({}, {
+        get() {
+          throw new Error('advisory transport advanced beyond missing profile authority');
+        },
+      }),
+      close() {},
+    } as unknown as ProviderAuthorityRuntimeServiceOpenResult;
+    const ingress = new CrossVerifyProductionIngressAuthority({ providerAuthority });
+    await expect(ingress.compose({
+      projectRoot: '/tmp/provider-free-xverify',
+      task: task(),
+      result: result(),
       config: config(false),
       operationClass: 'verify-implementation',
       timeoutMs: 120_000,
     })).resolves.toMatchObject({
       state: 'hold',
-      reasonCode: 'xverify_enforcement_disabled',
+      reasonCode: 'xverify_execution_profile_unavailable',
+      verifierProvider: 'codex',
+      verifierModel: expect.any(String),
     });
   });
 

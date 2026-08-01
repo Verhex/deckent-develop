@@ -132,7 +132,12 @@ function createLiveAutonomousExactSprintExecutor(input: {
         { ...context.config, deckent_style: 'sprint' },
         {
           preplannedSprint: context.sprint,
-          exactPlanAuthority: context.exactRef,
+          exactPlanAuthority: {
+            ...context.exactRef,
+            ...(context.snapshot.sourceAuthority !== undefined
+              ? { sourceAuthority: context.snapshot.sourceAuthority }
+              : {}),
+          },
           flowId: context.exactRef.flowId,
           onExactPlanMaterialize: () => {
             context.onExactPlanMaterialize();

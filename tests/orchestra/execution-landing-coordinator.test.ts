@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -511,6 +511,18 @@ describe('Docker execution landing coordinator', () => {
       expect.stringMatching(/^execution-landing-context:sha256:[a-f0-9]{64}$/),
       expect.stringMatching(/^runtime-budget-terminal:/),
     ]));
+    expect(JSON.parse(readFileSync(executionLandingProposalPath(root, task.id), 'utf-8'))).toMatchObject({
+      version: 2,
+      taskId: task.id,
+      attemptId: settlementRef.attemptId,
+      generation: 1,
+      resultReference: {
+        taskId: task.id,
+        attemptId: settlementRef.attemptId,
+        generation: 1,
+        relativePath: `.tasks/task-${task.id}.result`,
+      },
+    });
     expect(readExecutionLandingCheckpoint(root, ref)).toEqual(checkpoint);
   });
 

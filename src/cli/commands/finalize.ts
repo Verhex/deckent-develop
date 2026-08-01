@@ -1,4 +1,4 @@
-import { readdirSync, existsSync } from 'node:fs';
+import { readdirSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { Task, TaskResult } from '../../core/types.js';
@@ -21,6 +21,7 @@ import { getLangFromConfig } from '../helpers/config-reader.js';
 import { readJsonSafe } from '../../core/utils.js';
 import { loadReviewState } from './review.js';
 import { normalizeTaskResultShape } from '../../core/task-result-schema.js';
+import { classifyTaskArtifact } from '../../core/task-artifact-classifier.js';
 import { DEFAULT_LIFECYCLE_RECOVERY_CONFIG } from '../../core/config-types.js';
 import {
   containSprintRecoveryCoordinator,
@@ -55,6 +56,18 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string): {
   const results: TaskResult[] = [];
   const evaluations = new Map<string, TaskEvaluation>();
 
+  const readCanonicalTaskArtifact = (dir: string, filename: string): Task | null => {
+    try {
+      const content = readFileSync(join(dir, filename), 'utf-8');
+      const classification = classifyTaskArtifact(filename, content);
+      if (classification.kind !== 'task-record') return null;
+      const task = JSON.parse(content) as Task;
+      return task.id === classification.taskId ? task : null;
+    } catch {
+      return null;
+    }
+  };
+
   const tasksDirExists = existsSync(tasksDir);
   // Without a .tasks/ dir AND without an explicit --sprint filter there is no
   // way to locate the per-sprint archive dir either — nothing to finalize.
@@ -65,9 +78,9 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string): {
   // Read all task JSON files from .tasks/ (priority location)
   const seenTaskIds = new Set<string>();
   if (tasksDirExists) {
-    const taskFiles = readdirSync(tasksDir).filter(f => f.startsWith('task-') && f.endsWith('.json'));
+    const taskFiles = readdirSync(tasksDir).filter(f => /^task-[\w-]{1,100}\.json$/u.test(f));
     for (const file of taskFiles) {
-      const task = readJsonSafe<Task>(join(tasksDir, file));
+      const task = readCanonicalTaskArtifact(tasksDir, file);
       if (task) {
         // If a sprint filter is provided, only include tasks matching that sprint
         if (!sprintFilter || task.sprintId === sprintFilter) {
@@ -87,9 +100,9 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string): {
   const archiveTasksDir = existsSync(archiveNewDir) ? archiveNewDir : join(root, BRAIN_DIR, 'archive', `${sprintId}-tasks`);
   const archiveDirExists = sprintId !== 'sprint-unknown' && existsSync(archiveTasksDir);
   if (archiveDirExists) {
-    const archivedTaskFiles = readdirSync(archiveTasksDir).filter(f => f.startsWith('task-') && f.endsWith('.json'));
+    const archivedTaskFiles = readdirSync(archiveTasksDir).filter(f => /^task-[\w-]{1,100}\.json$/u.test(f));
     for (const file of archivedTaskFiles) {
-      const task = readJsonSafe<Task>(join(archiveTasksDir, file));
+      const task = readCanonicalTaskArtifact(archiveTasksDir, file);
       if (task && !seenTaskIds.has(task.id) && (!sprintFilter || task.sprintId === sprintFilter)) {
         tasks.push(task);
         seenTaskIds.add(task.id);

@@ -1,6 +1,7 @@
 // ─── Task Creation & Directive Parsing ─────────────────────────────
 // Extracted from brain.ts — task construction, scope extraction, directive parsing
 import { z } from 'zod';
+import { createHash } from 'node:crypto';
 import { DeckentError } from '../core/errors.js';
 import { existsSync, readdirSync, readFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -8,7 +9,22 @@ import { join, dirname } from 'node:path';
 import type {
   Task, TaskScope, GoNoGoCriteria, ModelType, TaskEffort, TaskPriority,
   PlannerTask, ProviderName, TaskResult, ResolvedConfig,
+  ProductionWiringPlanEvidence,
+  PostSettlementPlanProjection,
+  PostSettlementPlatformCapability,
 } from '../core/types.js';
+import { createProductionWiringPlanEvidence } from '../core/task-types.js';
+import { createPostSettlementPlanProjection } from '../core/task-types.js';
+import type { PostSettlementIngress } from '../core/post-settlement-verification.js';
+import {
+  POST_SETTLEMENT_MAX_ARG_BYTES,
+  POST_SETTLEMENT_MAX_COMMAND_ARGS,
+} from '../core/post-settlement-verification.js';
+import {
+  resolveProductionWiringContract,
+  type ProductionWiringDecision,
+} from '../core/production-wiring-contract.js';
+import { shellSplit } from './proof-of-function.js';
 import { TaskStatus, PROVIDER_MODEL_MAP } from '../core/types.js';
 import { VALID_PROVIDERS_ALL } from '../core/config.js';
 import { detectTaskType } from './rubric-registry.js';
@@ -25,6 +41,8 @@ import { searchMemory } from '../core/memory-query.js';
 import { BRAIN_DIR, MEMORY_DB_FILE, PROJECT_CONFIG_PATH } from '../core/constants.js';
 import { selectRelevantAdrs, buildAdrPromptSection, classifyInjectionTier } from './adr-selector.js';
 import type { AdrRelevance } from './adr-selector.js';
+import type { RunFlowPlanSourceAuthority } from '../core/run-flow-contract.js';
+import type { WorkerExactExecutionAuthority } from './prompt-god-template.js';
 
 /**
  * PCOMP-W3 (injection audit): persist every ADR-injection decision so a false
@@ -180,6 +198,58 @@ export interface CreateTaskParams {
   fixMode?: 'verify-only' | 'amend' | 're-implement';
   /** Tier-1 Proof-of-Function smoke directive propagated from ParsedDirectiveTask (216-004). */
   smoke?: { command: string; expect: string };
+  /**
+   * Explicit planner-authored production-mutation authority. Absence is never
+   * inferred from filenames, prose, or scope; producer-side classification is
+   * responsible for supplying this digest-bound contract.
+   */
+  productionWiring?: ProductionWiringPlanEvidence;
+  /**
+   * Digest-bound post-settlement promotion-proof declaration parsed from a
+   * `- PromotionProof:` directive line (488-014). Absent unless explicitly declared.
+   */
+  postSettlementProjection?: PostSettlementPlanProjection;
+}
+
+/** Fail-closed planner/build boundary outcome; dispatchers must treat it as HOLD. */
+export class ProductionWiringTaskHoldError extends DeckentError {
+  readonly decision: Exclude<ProductionWiringDecision, { readonly decision: 'complete' | 'staged-foundation' }>;
+
+  constructor(
+    taskTitle: string,
+    decision: Exclude<ProductionWiringDecision, { readonly decision: 'complete' | 'staged-foundation' }>,
+  ) {
+    super(
+      'E_PRODUCTION_WIRING_HOLD',
+      `Production mutation task "${taskTitle}" is on HOLD: ${decision.decision}.`,
+    );
+    this.name = 'ProductionWiringTaskHoldError';
+    this.decision = decision;
+  }
+}
+
+function validateProductionWiringAuthority(
+  title: string,
+  authority: ProductionWiringPlanEvidence | undefined,
+): ProductionWiringPlanEvidence | undefined {
+  if (!authority) return undefined;
+
+  const canonical = createProductionWiringPlanEvidence(authority.contract);
+  if (
+    authority.version !== canonical.version
+    || authority.contractDigest !== canonical.contractDigest
+  ) {
+    throw new DeckentError(
+      'E_PRODUCTION_WIRING_DIGEST_MISMATCH',
+      `Production mutation task "${title}" has stale or malformed plan wiring authority.`,
+    );
+  }
+
+  const decision = resolveProductionWiringContract(authority.contract);
+  if (decision.decision !== 'complete' && decision.decision !== 'staged-foundation') {
+    throw new ProductionWiringTaskHoldError(title, decision);
+  }
+  return canonical;
 }
 
 export interface ParsedDirectiveTask {
@@ -208,6 +278,12 @@ export interface ParsedDirectiveTask {
   smoke?: { command: string; expect: string };
   /** U1-G2: parsed `- Meta:` line (flowId/revision/…) — content-dışı taşınır. */
   meta?: Record<string, string>;
+  /**
+   * Digest-bound post-settlement promotion-proof declaration (488-014), parsed
+   * from a `- PromotionProof: <ingress>[/<platform>] <executable> [args...]`
+   * directive line via {@link extractPromotionProofDeclaration}.
+   */
+  postSettlementProjection?: PostSettlementPlanProjection;
 }
 
 /**
@@ -225,6 +301,63 @@ export function extractSmoke(text: string): { command: string; expect: string } 
   const expect = rest.slice(arrowIdx + 1).trim();
   if (!command || !expect) return undefined;
   return { command, expect };
+}
+
+const POST_SETTLEMENT_INGRESS_VALUES: readonly PostSettlementIngress[] =
+  ['sprint', 'run-flow', 'do', 'autonomous', 'process'];
+const POST_SETTLEMENT_PLATFORM_VALUES: readonly PostSettlementPlatformCapability[] =
+  ['linux', 'darwin', 'win32', 'wsl', 'any'];
+
+/**
+ * Extract a post-settlement promotion-proof declaration from a task block:
+ * `- PromotionProof: <ingress>[/<platform>] <executable> [args...]`
+ * (e.g. `- PromotionProof: sprint/linux npm run verify`).
+ *
+ * The command is tokenized with {@link shellSplit} into a bounded argv array —
+ * the joined directive text is never retained or spawned as a shell string
+ * (ADR-006 no-shell discipline, same reasoning as the Smoke runner). Returns
+ * undefined (never throws) when the line is absent, malformed, declares an
+ * unknown ingress/platform, or exceeds the bounded-command limits shared with
+ * the runtime reducer (post-settlement-verification.ts, 488-013) — a bad
+ * declaration is silently absent rather than corrupting the whole directive
+ * parse, mirroring {@link extractSmoke}'s contract.
+ */
+export function extractPromotionProofDeclaration(
+  text: string,
+  scope: TaskScope,
+): PostSettlementPlanProjection | undefined {
+  const m = text.match(/(?:[-*]\s*)?\*{0,2}PromotionProof:?\*{0,2}\s*(.+)/i);
+  if (!m) return undefined;
+  const rest = m[1]!.trim();
+  const firstSpace = rest.indexOf(' ');
+  if (firstSpace === -1) return undefined;
+  const head = rest.slice(0, firstSpace);
+  const commandText = rest.slice(firstSpace + 1).trim();
+  if (!commandText) return undefined;
+
+  const [ingressRaw, platformRaw] = head.split('/');
+  if (!POST_SETTLEMENT_INGRESS_VALUES.includes(ingressRaw as PostSettlementIngress)) return undefined;
+  const ingress = ingressRaw as PostSettlementIngress;
+  const platformCapability = (platformRaw ?? 'any') as PostSettlementPlatformCapability;
+  if (!POST_SETTLEMENT_PLATFORM_VALUES.includes(platformCapability)) return undefined;
+
+  const argv = shellSplit(commandText);
+  if (argv.length === 0) return undefined;
+  const [executable, ...args] = argv;
+  if (!executable) return undefined;
+  if (args.length > POST_SETTLEMENT_MAX_COMMAND_ARGS) return undefined;
+  if ([executable, ...args].some(value => Buffer.byteLength(value, 'utf8') > POST_SETTLEMENT_MAX_ARG_BYTES)) {
+    return undefined;
+  }
+  if (args.some(arg => arg.includes('\0')) || executable.includes('\0')) return undefined;
+
+  const cwdRef = scope.directories[0] ?? '.';
+  return createPostSettlementPlanProjection({
+    ingress,
+    scope,
+    platformCapability,
+    command: { executable, args, cwdRef },
+  });
 }
 
 // ═══ Functions ════════════════════════════════════════════════════
@@ -640,6 +773,7 @@ export function createTask(params: CreateTaskParams, sequence: number): Task & {
   }
 
   const provider = params.provider;
+  const productionWiring = validateProductionWiringAuthority(params.title, params.productionWiring);
 
   // Sprint 196 WP-3: Derive test scope for audit trail (scopeDerivation).
   // Actual scope.filesWrite enrichment happens in enrichScopeWithTestFiles at parse-time.
@@ -688,6 +822,8 @@ export function createTask(params: CreateTaskParams, sequence: number): Task & {
     createdAt: now(),
     routingMeta: scopeDerivation !== undefined ? { scopeDerivation } : undefined,
     smoke: params.smoke,
+    productionWiring,
+    postSettlementProjection: params.postSettlementProjection,
   };
 }
 
@@ -1231,7 +1367,7 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
       .trim();
 
     const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
-    tasks.push({ title, description, meta: parsedMeta, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority, authMode: parsedAuthMode, backend: parsedBackend, modelEffort: parsedModelEffort, smoke: extractSmoke(block) });
+    tasks.push({ title, description, meta: parsedMeta, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority, authMode: parsedAuthMode, backend: parsedBackend, modelEffort: parsedModelEffort, smoke: extractSmoke(block), postSettlementProjection: extractPromotionProofDeclaration(block, enrichedScope) });
   }
   return tasks;
 }
@@ -1394,7 +1530,10 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
  * @returns Parameters suitable for passing to createTask
  */
 export function plannerTaskToParams(
-  pt: PlannerTask & { smoke?: { command: string; expect: string } },
+  pt: PlannerTask & {
+    smoke?: { command: string; expect: string };
+    productionWiring?: ProductionWiringPlanEvidence;
+  },
   sprintId: string,
   modelOverride: ModelType,
   initialStatus?: TaskStatus,
@@ -1416,6 +1555,7 @@ export function plannerTaskToParams(
     excludeAgent: pt.excludeAgent,
     excludeSkills: pt.excludeSkills,
     smoke: pt.smoke,
+    productionWiring: pt.productionWiring,
   };
 }
 
@@ -1676,6 +1816,12 @@ export function buildWorkerPrompt(
   skillPrompts?: Array<{ name: string; content: string }>,
   projectRoot: string = process.cwd(),
   effectiveConfig?: Pick<ResolvedConfig, 'prompt'>,
+  exactPlanAuthority?: {
+    readonly flowId: string;
+    readonly revision: number;
+    readonly planDigest: string;
+    readonly sourceAuthority?: RunFlowPlanSourceAuthority;
+  },
 ): string {
   const effort = resolveWorkerEffort(task);
 
@@ -1690,9 +1836,35 @@ export function buildWorkerPrompt(
   // an empty list (empty skill block is a valid render), so every V2 task
   // with any skills goes through it.
   if (isV2 && rawDNA && skillPrompts && skillPrompts.length > 0) {
-    effectiveSkillPrompts = filterSkillPromptsByDNA(skillPrompts, rawDNA as TaskDNA, {
+    const dnaFiltered = filterSkillPromptsByDNA(skillPrompts, rawDNA as TaskDNA, {
       filesWrite: task.scope?.filesWrite,
       taskText: `${task.title ?? ''}\n${task.description ?? ''}`,
+    });
+    // 487-023 FORCED-SKILL-LINEAGE: filterSkillPromptsByDNA scores each skill
+    // body by keyword affinity and drops anything scoring 0 — a narrow-domain
+    // forced skill can legitimately score 0 against task text/scope that never
+    // mentions its domain, and be silently dropped from the RENDERED prompt
+    // even though task.assignedSkills (and sprint-spawner's routing union)
+    // still lists it as assigned. An operator's explicit forceSkills id must
+    // always reach the actual worker prompt text, not just the task record.
+    const forcedIds = new Set(task.forceSkills ?? []);
+    const forcedDropped = forcedIds.size > 0
+      ? skillPrompts.filter(sp => forcedIds.has(sp.name) && !dnaFiltered.some(d => d.name === sp.name))
+      : [];
+    effectiveSkillPrompts = forcedDropped.length > 0 ? [...dnaFiltered, ...forcedDropped] : dnaFiltered;
+  }
+
+  // 486-018 FORCED-SKILL-PRESERVE: forced + routing-added skill ids are
+  // Set-deduped upstream (sprint-spawner.ts routeSprintTasks), but this render
+  // boundary defends independently — an upstream duplicate id (any caller,
+  // not just sprint-spawner) must never inject the same skill's persona
+  // content twice into one worker prompt.
+  if (effectiveSkillPrompts && effectiveSkillPrompts.length > 1) {
+    const seenSkillNames = new Set<string>();
+    effectiveSkillPrompts = effectiveSkillPrompts.filter(sp => {
+      if (seenSkillNames.has(sp.name)) return false;
+      seenSkillNames.add(sp.name);
+      return true;
     });
   }
 
@@ -1793,6 +1965,29 @@ export function buildWorkerPrompt(
     debugLog('buildWorkerPrompt:computeToolAllowlist', e);
   }
 
+  const exactExecutionAuthority = resolveWorkerExactExecutionAuthority(
+    projectRoot,
+    exactPlanAuthority,
+  );
+  if (exactExecutionAuthority) {
+    try {
+      const auditDir = join(projectRoot, '.deckent', 'runtime', 'prompt-authority');
+      mkdirSync(auditDir, { recursive: true });
+      appendFileSync(
+        join(auditDir, 'execution-authority.jsonl'),
+        `${JSON.stringify({
+          schemaVersion: 1,
+          taskId: task.id,
+          ...exactExecutionAuthority,
+          recordedAt: new Date().toISOString(),
+        })}\n`,
+        'utf-8',
+      );
+    } catch (e) {
+      debugLog('buildWorkerPrompt:executionAuthorityAudit', e);
+    }
+  }
+
   const ctx: SprintContext = {
     agentPrompt,
     agentId: task.assignedAgent ?? 'generic',
@@ -1808,6 +2003,7 @@ export function buildWorkerPrompt(
     verifyCommands,
     toolAllowlist,
     personaRenderMode: effectiveConfig?.prompt?.persona_render,
+    exactExecutionAuthority,
   };
   const artifact = buildTaskPrompt(task, ctx);
 
@@ -1846,6 +2042,75 @@ export function buildWorkerPrompt(
   }
 
   return artifact.prompt;
+}
+
+/**
+ * Resolve whether the mutable root DIRECTIVES projection belongs to this exact
+ * approved run. Project policy files remain applicable; this decision controls
+ * execution-directive authority only.
+ */
+export function resolveWorkerExactExecutionAuthority(
+  projectRoot: string,
+  exactPlanAuthority?: {
+    readonly flowId: string;
+    readonly revision: number;
+    readonly planDigest: string;
+    readonly sourceAuthority?: RunFlowPlanSourceAuthority;
+  },
+): WorkerExactExecutionAuthority | undefined {
+  if (!exactPlanAuthority) return undefined;
+  const base = {
+    flowId: exactPlanAuthority.flowId,
+    revision: exactPlanAuthority.revision,
+    planDigest: exactPlanAuthority.planDigest,
+  } as const;
+  const source = exactPlanAuthority.sourceAuthority;
+  if (!source) {
+    return {
+      ...base,
+      sourceKind: 'unavailable',
+      directivesProjection: 'EXCLUDED_AUTHORITY_UNAVAILABLE',
+    };
+  }
+  if (source.sourceKind !== 'directives') {
+    return {
+      ...base,
+      sourceKind: source.sourceKind,
+      sourceContentSha256: source.contentSha256,
+      directivesProjection: 'EXCLUDED_SOURCE_KIND',
+    };
+  }
+  const directivesPath = join(projectRoot, 'DIRECTIVES.md');
+  if (!existsSync(directivesPath)) {
+    return {
+      ...base,
+      sourceKind: source.sourceKind,
+      sourceContentSha256: source.contentSha256,
+      directivesProjection: 'EXCLUDED_MISSING',
+    };
+  }
+  let observedDirectivesSha256: string;
+  try {
+    observedDirectivesSha256 = createHash('sha256')
+      .update(readFileSync(directivesPath))
+      .digest('hex');
+  } catch {
+    return {
+      ...base,
+      sourceKind: source.sourceKind,
+      sourceContentSha256: source.contentSha256,
+      directivesProjection: 'EXCLUDED_MISSING',
+    };
+  }
+  return {
+    ...base,
+    sourceKind: source.sourceKind,
+    sourceContentSha256: source.contentSha256,
+    observedDirectivesSha256,
+    directivesProjection: observedDirectivesSha256 === source.contentSha256
+      ? 'MATCHED_CONTENT_ADDRESSED_POINTER'
+      : 'EXCLUDED_DIGEST_MISMATCH',
+  };
 }
 
 // ─── Persona-Task Domain Matcher (WP-1) ────────────────────────────────────

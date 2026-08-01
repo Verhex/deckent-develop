@@ -12,6 +12,18 @@ import type { ExecutionAdmissionMode } from './execution-admission.js';
 import type { AttendedExecutionProposalReference } from './attended-execution-proposal.js';
 import type { InvocationReceiptRef } from './invocation-receipt.js';
 import type { FinalOnlyUsageAuthorization } from './execution-budget-policy.js';
+import type {
+  ProductionWiringContract,
+  ProductionWiringEvidence,
+} from './production-wiring-contract.js';
+import {
+  POST_SETTLEMENT_MAX_ARG_BYTES,
+  POST_SETTLEMENT_MAX_COMMAND_ARGS,
+} from './post-settlement-verification.js';
+import type {
+  BoundedVerificationCommand,
+  PostSettlementIngress,
+} from './post-settlement-verification.js';
 
 // ─── Models ──────────────────────────────────────────────────────────
 
@@ -338,6 +350,123 @@ export interface GoNoGoCriteria {
   items?: GoNoGoCriterionItem[];
 }
 
+export const PRODUCTION_WIRING_EVIDENCE_VERSION = 1 as const;
+
+/** Plan-time wiring authority bound to the exact canonical contract bytes. */
+export interface ProductionWiringPlanEvidence {
+  readonly version: typeof PRODUCTION_WIRING_EVIDENCE_VERSION;
+  readonly contractDigest: string;
+  readonly contract: ProductionWiringContract;
+}
+
+/**
+ * Worker-observed evidence is deliberately incapable of claiming completion.
+ * Host settlement may promote it only after independently verifying the bound
+ * plan contract and attaching canonical consumer execution evidence.
+ */
+export interface ProductionWiringResultEvidence {
+  readonly version: typeof PRODUCTION_WIRING_EVIDENCE_VERSION;
+  readonly contractDigest: string;
+  readonly observedBy: 'worker';
+  readonly evidence: Exclude<ProductionWiringEvidence, { readonly state: 'complete' }>;
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/** Build the only supported plan evidence shape; callers never author its digest. */
+export function createProductionWiringPlanEvidence(
+  contract: ProductionWiringContract,
+): ProductionWiringPlanEvidence {
+  const contractDigest = createHash('sha256').update(canonicalJson(contract)).digest('hex');
+  return {
+    version: PRODUCTION_WIRING_EVIDENCE_VERSION,
+    contractDigest,
+    contract,
+  };
+}
+
+export const POST_SETTLEMENT_PLAN_PROJECTION_VERSION = 1 as const;
+export const POST_SETTLEMENT_PLAN_PROJECTION_KIND = 'post-settlement-plan-projection' as const;
+
+/**
+ * Platform this task's post-settlement command adapter is declared to run on.
+ * Mirrors the exact platform set from Immutable Law 2 (EVERY ENVIRONMENT), plus
+ * an explicit platform-agnostic value for adapters with no OS dependency.
+ */
+export type PostSettlementPlatformCapability = 'linux' | 'darwin' | 'win32' | 'wsl' | 'any';
+
+/** Author-supplied (pre-digest) content of a post-settlement plan projection. */
+export interface PostSettlementPlanProjectionContract {
+  readonly ingress: PostSettlementIngress;
+  readonly scope: TaskScope;
+  readonly platformCapability: PostSettlementPlatformCapability;
+  readonly command: BoundedVerificationCommand;
+}
+
+/**
+ * Digest-bound plan-time declaration of the post-settlement promotion proof a
+ * task requires (488-014). Represented separately from the task's own
+ * executable work (`goNogo`/`scope`/`description`) — a projection is proof
+ * metadata carried alongside a Task, never a Task of its own: attaching it
+ * never adds an entry to `Sprint.tasks` and never changes `sprint.tasks.length`.
+ */
+export interface PostSettlementPlanProjection extends PostSettlementPlanProjectionContract {
+  readonly version: typeof POST_SETTLEMENT_PLAN_PROJECTION_VERSION;
+  readonly kind: typeof POST_SETTLEMENT_PLAN_PROJECTION_KIND;
+  readonly contractDigest: string;
+}
+
+/** Thrown when a promotion-proof declaration exceeds the bounded-command limits. */
+export class PostSettlementPlanProjectionBoundsError extends TypeError {
+  constructor(reason: string) {
+    super(`Post-settlement plan projection command out of bounds: ${reason}`);
+    this.name = 'PostSettlementPlanProjectionBoundsError';
+  }
+}
+
+/**
+ * Build the only supported post-settlement plan projection shape; callers
+ * never author its digest. Enforces the same bounded-argv limits as the
+ * runtime reducer (post-settlement-verification.ts) so a plan-time
+ * declaration can never smuggle an unbounded or malformed command through.
+ */
+export function createPostSettlementPlanProjection(
+  contract: PostSettlementPlanProjectionContract,
+): PostSettlementPlanProjection {
+  const { command } = contract;
+  if (command.args.length > POST_SETTLEMENT_MAX_COMMAND_ARGS) {
+    throw new PostSettlementPlanProjectionBoundsError(
+      `command has ${command.args.length} args (max ${POST_SETTLEMENT_MAX_COMMAND_ARGS})`,
+    );
+  }
+  for (const value of [command.executable, command.cwdRef, ...command.args]) {
+    if (Buffer.byteLength(value, 'utf8') > POST_SETTLEMENT_MAX_ARG_BYTES) {
+      throw new PostSettlementPlanProjectionBoundsError(
+        `argument exceeds ${POST_SETTLEMENT_MAX_ARG_BYTES} bytes`,
+      );
+    }
+  }
+  if (command.args.some(arg => arg.includes('\0')) || command.executable.includes('\0')) {
+    throw new PostSettlementPlanProjectionBoundsError('argument contains a NUL byte');
+  }
+  const contractDigest = createHash('sha256').update(canonicalJson(contract)).digest('hex');
+  return {
+    ...contract,
+    version: POST_SETTLEMENT_PLAN_PROJECTION_VERSION,
+    kind: POST_SETTLEMENT_PLAN_PROJECTION_KIND,
+    contractDigest,
+  };
+}
+
 /**
  * Immutable plan-time provenance for the worker budget carried by `Task.budget`.
  * This is a policy snapshot, not an executable permit: final provider/model/auth/
@@ -494,6 +623,15 @@ export interface Task {
   budget?: ExecutionBudget;
   /** Plan-time owner-policy provenance for `budget`; never an execution permit. */
   budgetPolicy?: TaskExecutionBudgetPolicySnapshot;
+  /** Digest-bound production-wiring authority supplied by the planner/host. */
+  productionWiring?: ProductionWiringPlanEvidence;
+  /**
+   * Digest-bound post-settlement promotion-proof declaration (488-014),
+   * parsed from a `- PromotionProof:` directive line. Represented separately
+   * from this task's own executable work — never a hidden Task, never counted
+   * toward `sprint.tasks.length`. Absent unless explicitly declared.
+   */
+  postSettlementProjection?: PostSettlementPlanProjection;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -685,6 +823,16 @@ export interface TaskResult {
   filesChanged: string[];
   linesAdded: number;
   linesRemoved: number;
+  /** Host-authored claim-time work attribution. Worker prose is never authority. */
+  workAttribution?: {
+    state: 'VERIFIED' | 'HOLD';
+    attemptId: string;
+    baselineRef: string;
+    baselineSha256?: string;
+    scopeDigest: string;
+    reasonCode?: string;
+    claimedOutsideScope?: string[];
+  };
   testsPassed: boolean;
   /** Provider compatibility evidence: commands recovered from a legacy testsPassed string array. */
   testCommands?: string[];
@@ -736,6 +884,8 @@ export interface TaskResult {
   evaluationDecision?: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
   /** Cross-provider verification truth; absent means not requested or legacy result. */
   crossVerify?: CrossVerifyEvidence;
+  /** Non-authoritative worker observations bound to the task's plan contract. */
+  productionWiringEvidence?: ProductionWiringResultEvidence;
 }
 
 // ─── TaskPlan ────────────────────────────────────────────────────────

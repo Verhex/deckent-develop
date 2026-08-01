@@ -10,7 +10,7 @@
  *   - worker-lifecycle.ts: State machine, shutdown, verify-delta, feedback loop
  *   - worker-log.ts: Structured log formatting & I/O
  */
-import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, realpathSync, openSync, closeSync, fsyncSync, fstatSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, realpathSync, openSync, closeSync, fsyncSync, fstatSync, lstatSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join, normalize, sep } from 'node:path';
 import { TaskStatus, AgentStatus } from '../core/types.js';
@@ -22,11 +22,26 @@ import type {
   LockInfo,
   TaskScope,
 } from '../core/types.js';
-import { TASKS_DIR } from '../core/constants.js';
+import { TASKS_DIR, RUNTIME_DIR } from '../core/constants.js';
 import { resolveLiveTraceEnabled } from '../core/config.js';
-import { ErrorRegistry } from '../core/errors.js';
+import { ErrorRegistry, createExecutionAuthorityError } from '../core/errors.js';
+import type { ExecutionLandingCapability } from '../core/live-execution-budget.js';
+import {
+  EXECUTION_LANDING_PROPOSAL_MAX_BYTES,
+  executionLandingProposalPath,
+  parseLandingProposalV2,
+  readExecutionLandingProposal,
+  writeExecutionLandingProposal,
+} from '../core/execution-landing-proposal.js';
 import { buildProviderChildEnv } from '../core/provider.js';
 import { resolveCrossProviderCredentialKeys } from '../providers/cross-provider-keys.js';
+import {
+  WorkerHeartbeatAuthorityStore,
+  type WorkerHeartbeatAuthorityWrite,
+  type WorkerHeartbeatAuthorityStoreWriteResult,
+  type WorkerHeartbeatAuthorityStoreOptions,
+} from '../core/worker-heartbeat-authority-store.js';
+import type { WorkerHeartbeatAuthorityIdentity } from '../core/worker-heartbeat-authority.js';
 import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-enforcer.js';
 import { writeEvent, getCurrentSprintId, CHANNELS } from '../orchestra/event-stream.js';
 import { emitWorkerActivity } from './worker-activity.js';
@@ -240,6 +255,10 @@ function resultFilePath(projectRoot: string, taskId: string): string {
   return join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
 }
 
+function inProcessHeartbeatAuthorityRoot(projectRoot: string): string {
+  return join(projectRoot, RUNTIME_DIR, 'worker-heartbeat-authority');
+}
+
 function now(): string {
   return new Date().toISOString();
 }
@@ -415,6 +434,56 @@ export function __resetLiveTraceCacheForTests(): void {
   liveTraceEnabledCache = null;
 }
 
+// ─── In-Process Heartbeat Observation (487-013) ─────────────────────
+//
+// `writeHeartbeat` above is the IPC path: exactly one process (a spawned
+// subprocess/Docker worker) owns `.tasks/task-{id}.hb` and freely picks its
+// own `sequence`. That is unchanged and still correct there — the file has a
+// single writer.
+//
+// An in-process worker path (worker logic running inside the same Node
+// process as the host, alongside other in-process call sites for the same
+// exact attempt) has no such single-writer guarantee, so it must not write
+// competing heartbeat state the same way. It submits a *bounded* observation
+// — no self-chosen sequence, no self-supplied timestamp — to the 487-011
+// `WorkerHeartbeatAuthorityStore`, which owns sequencing/timestamps and
+// serializes concurrent writers via its exclusive hard-link + lock-file
+// protocol, returning a typed HOLD instead of silently racing.
+
+/** Bounded observation fields an in-process worker path may report. Sequence and timestamp are host/store-owned, never worker-authored. */
+export type InProcessWorkerHeartbeatObservation = Omit<
+  WorkerHeartbeatAuthorityWrite,
+  'identity' | 'expectedHostSequence'
+>;
+
+/**
+ * Submit a bounded in-process heartbeat observation for one exact attempt.
+ * The caller never supplies a sequence number — this reads the authority
+ * store's own current state and computes `expectedHostSequence` itself
+ * before calling `observe()`, so the store remains the sole sequence
+ * authority even when multiple in-process call sites report for the same
+ * attempt.
+ */
+export function submitInProcessWorkerHeartbeatObservation(
+  projectRoot: string,
+  identity: WorkerHeartbeatAuthorityIdentity,
+  observation: InProcessWorkerHeartbeatObservation,
+  options?: WorkerHeartbeatAuthorityStoreOptions,
+): WorkerHeartbeatAuthorityStoreWriteResult {
+  const store = new WorkerHeartbeatAuthorityStore(inProcessHeartbeatAuthorityRoot(projectRoot), options);
+  const init = store.initialize(identity);
+  if (init.state === 'HOLD') return init;
+
+  const expectedHostSequence = init.authority.latest?.hostSequence ?? 0;
+  return store.observe({
+    identity,
+    expectedHostSequence,
+    hostProcessOutcome: observation.hostProcessOutcome,
+    workerTaskVerdict: observation.workerTaskVerdict,
+    liveness: observation.liveness,
+  });
+}
+
 /**
  * Write a task result to disk and update task status.
  *
@@ -519,6 +588,116 @@ export function verifyResultPersisted(
   } catch {
     return { persisted: false, size: 0 };
   }
+}
+
+// ─── Host Worker Landing Writer (488-006 — non-Docker settlement parity) ──
+//
+// ADR-G-037's checkpoint has two coordinator families: Docker's own
+// (`orchestra/execution-landing-coordinator.ts`, container-mount + stop
+// semantics) and this one — the host-observed counterpart for a worker whose
+// settlement the host watches directly on its own filesystem: in-process
+// (embedded SDK execution), subprocess, and tmux. Both families end at the
+// exact same atomic writer (`writeExecutionLandingProposal`, core/) — no
+// backend constructs the proposal JSON by hand — so a `'checkpoint-stop'`
+// capability is deliberately refused here (Docker's coordinator owns that
+// republish) rather than silently duplicated.
+
+export type HostWorkerLandingWriteResult =
+  | { state: 'written'; proposalSha256: string; observedMtime: string; sequence: number }
+  | { state: 'hold'; reason: string };
+
+/** True only for the capability this host writer republishes through. */
+export function isCooperativeExecutionLandingCapability(
+  capability: ExecutionLandingCapability | undefined,
+): capability is 'cooperative-landing' {
+  return capability === 'cooperative-landing';
+}
+
+/**
+ * Republish a host-observed (non-Docker) worker's self-authored landing
+ * proposal through the shared atomic writer, giving in-process/subprocess/
+ * tmux settlement the same durable, re-validated evidence Docker gets from
+ * `writeDockerLandingProposal`. Accepts both the legacy attempt-bound V1
+ * shape and the structured V2 shape the worker may have written.
+ *
+ * A capability other than `'cooperative-landing'` never touches disk — it
+ * returns a typed HOLD so an unsupported backend can never construct or
+ * publish proposal state through this writer.
+ */
+export function writeHostWorkerLandingProposal(input: {
+  projectRoot: string;
+  taskId: string;
+  attemptId: string;
+  capability: ExecutionLandingCapability | undefined;
+  /** Reject a proposal file that predates this ISO-8601 instant (e.g. dispatch time). */
+  notBefore: string;
+}): HostWorkerLandingWriteResult {
+  if (!isCooperativeExecutionLandingCapability(input.capability)) {
+    return {
+      state: 'hold',
+      reason: `Host worker landing writer does not accept capability "${input.capability ?? 'unsupported'}" — `
+        + 'only "cooperative-landing" backends republish through it; "checkpoint-stop" is owned by the Docker '
+        + 'execution landing coordinator.',
+    };
+  }
+  const { projectRoot, taskId, attemptId, notBefore } = input;
+  const path = executionLandingProposalPath(projectRoot, taskId);
+  const stat = lstatSync(path);
+  if (
+    !stat.isFile()
+    || stat.isSymbolicLink()
+    || stat.size <= 0
+    || stat.size > EXECUTION_LANDING_PROPOSAL_MAX_BYTES
+  ) {
+    throw createExecutionAuthorityError(
+      'Host worker execution landing proposal file is absent, unsafe, empty, or exceeds its byte ceiling',
+    );
+  }
+  const notBeforeMs = Date.parse(notBefore);
+  if (!Number.isFinite(notBeforeMs) || stat.mtimeMs + 1 < notBeforeMs) {
+    throw createExecutionAuthorityError('Host worker execution landing proposal file predates the current attempt');
+  }
+  const candidate = JSON.parse(readFileSync(path, 'utf-8')) as unknown;
+  const semanticState = (
+    candidate !== null
+    && typeof candidate === 'object'
+    && !Array.isArray(candidate)
+    && (candidate as Record<string, unknown>).version === 2
+  )
+    ? parseLandingProposalV2(candidate)
+    : readExecutionLandingProposal(projectRoot, { taskId, attemptId, notBefore }).proposal;
+
+  if (semanticState.taskId !== taskId || semanticState.attemptId !== attemptId) {
+    throw createExecutionAuthorityError(
+      'Host worker execution landing proposal conflicts with the settlement attempt',
+    );
+  }
+
+  const written = writeExecutionLandingProposal(projectRoot, {
+    version: 2,
+    taskId,
+    attemptId,
+    generation: 1,
+    sequence: semanticState.sequence,
+    resultReference: {
+      taskId,
+      attemptId,
+      generation: 1,
+      relativePath: `${TASKS_DIR}/task-${taskId}.result`,
+    },
+    summary: semanticState.summary,
+    completedWork: semanticState.completedWork,
+    remainingWork: semanticState.remainingWork,
+    nextAction: semanticState.nextAction,
+    unresolvedRisks: semanticState.unresolvedRisks,
+    updatedAt: semanticState.updatedAt,
+  });
+  return {
+    state: 'written',
+    proposalSha256: written.proposalSha256,
+    observedMtime: written.observedMtime,
+    sequence: semanticState.sequence,
+  };
 }
 
 /**

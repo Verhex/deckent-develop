@@ -221,4 +221,36 @@ describe('post-FIX circuit breaker', () => {
       min_unresolved_ratio_percent: 20,
     }).shouldPause).toBe(true);
   });
+
+  it('excludes repaired roots while retaining an unresolved FIX lineage and its blocked dependant', () => {
+    const tasks = [
+      task('repaired', TaskStatus.NO_GO),
+      task('repaired-fix', TaskStatus.DONE, {
+        isPriorityFix: true,
+        fixForTaskId: 'repaired',
+      }),
+      task('unresolved', TaskStatus.NO_GO),
+      task('unresolved-fix', TaskStatus.PAUSED, {
+        isPriorityFix: true,
+        fixForTaskId: 'unresolved',
+      }),
+      task('dependent', TaskStatus.PENDING, { dependencies: ['unresolved'] }),
+    ];
+    const evaluations = new Map([
+      ['repaired', TaskEvaluation.NO_GO],
+      ['repaired-fix', TaskEvaluation.DONE],
+      ['unresolved', TaskEvaluation.NO_GO],
+      ['unresolved-fix', TaskEvaluation.NOT_DISPATCHED],
+      ['dependent', TaskEvaluation.NOT_DISPATCHED],
+    ]);
+
+    expect(evaluateFixCircuitBreaker(tasks, evaluations, policy)).toMatchObject({
+      totalTasks: 3,
+      unresolvedTasks: 1,
+      unresolvedTaskIds: ['unresolved'],
+      blockedDependentTaskIds: ['dependent'],
+      forcedByBlockedDependents: true,
+      shouldPause: true,
+    });
+  });
 });

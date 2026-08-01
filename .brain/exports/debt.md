@@ -9,6 +9,16 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-487-018 | Tech debt from 487-018: Production wiring: repair authority fingerprint -> handl | normal | sprint-487 | resolved |
+| debt-487-001 | Tech debt from 487-001: Producer buildFinalizerTerminalTruth is production-wired | normal | sprint-487 | resolved |
+| debt-487-002 | Tech debt from 487-002: Production wiring: publishFencedSprintTerminalReceipt is | normal | sprint-487 | resolved |
+| debt-487-009 | Tech debt from 487-009: Finalizer now consumes the scoped self-audit adapter reg | normal | sprint-487 | resolved |
+| debt-487-003 | Tech debt from 487-003: Controller terminal handoff wired: finalizer receipt ->  | normal | sprint-487 | resolved |
+| debt-487-004 | Tech debt from 487-004: Production wiring: terminal receipt projection is consum | normal | sprint-487 | resolved |
+| debt-487-005 | Tech debt from 487-005: Added exported projectTerminalPublicationStatus(authorit | normal | sprint-487 | resolved |
+| debt-486-004 | Tech debt from 486-004: Verified: test -f src/core/lineage-usage-authority.ts && | normal | sprint-486 | resolved |
+| debt-486-025 | Tech debt from 486-025: Implemented the versioned provider/language-neutral prod | normal | sprint-486 | resolved |
+| debt-483-003 | Tech debt from 483-003: Budget Landing Checkpoint Protocol blocked execution: th | normal | sprint-483 | resolved |
 | debt-473-017 | Tech debt from 473-017: READ-ONLY AUDIT — zero source mutation. All 4 in-scope s | normal | sprint-473 | resolved |
 | rollback-sprint-472 | Sprint sprint-472 rollback SUCCESS | normal | sprint-472 | resolved |
 | rollback-sprint-471 | Sprint sprint-471 rollback SUCCESS | normal | sprint-471 | resolved |

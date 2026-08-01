@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { canonicalJson } from '../core/audit-writer.js';
@@ -21,7 +21,11 @@ import {
 } from '../core/execution-landing-checkpoint.js';
 import {
   buildExecutionLandingProposalPromptSegment,
+  executionLandingProposalPath,
+  EXECUTION_LANDING_PROPOSAL_MAX_BYTES,
+  parseLandingProposalV2,
   readExecutionLandingProposal,
+  writeExecutionLandingProposal,
 } from '../core/execution-landing-proposal.js';
 import { hasLiveUsageCeiling } from '../core/live-execution-budget.js';
 import {
@@ -58,6 +62,102 @@ function acceptanceCriteria(task: Task): string {
 export interface PreparedDockerExecutionLanding {
   prompt: string;
   context: ExecutionLandingContextEnvelopeV1 | null;
+}
+
+interface DockerLandingProposalEvidence {
+  readonly proposalSha256: string;
+  readonly observedMtime: string;
+  readonly sequence: number;
+  readonly semanticState: {
+    readonly summary: string;
+    readonly completedWork: string[];
+    readonly remainingWork: string[];
+    readonly nextAction: string;
+    readonly unresolvedRisks: string[];
+  };
+}
+
+/**
+ * Docker workers may propose semantic progress, but never publish the durable
+ * landing envelope themselves. The host validates the bounded proposal and
+ * atomically re-publishes it with the exact settled attempt identity.
+ */
+function writeDockerLandingProposal(input: {
+  readonly projectRoot: string;
+  readonly settlementRef: TaskResultSettlementRefV1;
+  readonly notBefore: string;
+}): DockerLandingProposalEvidence {
+  const path = executionLandingProposalPath(input.projectRoot, input.settlementRef.taskId);
+  const stat = lstatSync(path);
+  if (
+    !stat.isFile()
+    || stat.isSymbolicLink()
+    || stat.size <= 0
+    || stat.size > EXECUTION_LANDING_PROPOSAL_MAX_BYTES
+  ) {
+    throw createExecutionAuthorityError(
+      'Docker execution landing proposal file is absent, unsafe, empty, or exceeds its byte ceiling',
+    );
+  }
+  const notBeforeMs = Date.parse(input.notBefore);
+  if (!Number.isFinite(notBeforeMs) || stat.mtimeMs + 1 < notBeforeMs) {
+    throw createExecutionAuthorityError('Docker execution landing proposal file predates the current attempt');
+  }
+
+  const candidate = JSON.parse(readFileSync(path, 'utf-8')) as unknown;
+  const semanticState = (
+    candidate !== null
+    && typeof candidate === 'object'
+    && !Array.isArray(candidate)
+    && (candidate as Record<string, unknown>).version === 2
+  )
+    ? parseLandingProposalV2(candidate)
+    : readExecutionLandingProposal(input.projectRoot, {
+        taskId: input.settlementRef.taskId,
+        attemptId: input.settlementRef.attemptId,
+        notBefore: input.notBefore,
+      }).proposal;
+
+  if (
+    semanticState.taskId !== input.settlementRef.taskId
+    || semanticState.attemptId !== input.settlementRef.attemptId
+  ) {
+    throw createExecutionAuthorityError(
+      'Docker execution landing proposal conflicts with the host-owned settlement attempt',
+    );
+  }
+
+  const written = writeExecutionLandingProposal(input.projectRoot, {
+    version: 2,
+    taskId: input.settlementRef.taskId,
+    attemptId: input.settlementRef.attemptId,
+    generation: 1,
+    sequence: semanticState.sequence,
+    resultReference: {
+      taskId: input.settlementRef.taskId,
+      attemptId: input.settlementRef.attemptId,
+      generation: 1,
+      relativePath: `.tasks/task-${input.settlementRef.taskId}.result`,
+    },
+    summary: semanticState.summary,
+    completedWork: semanticState.completedWork,
+    remainingWork: semanticState.remainingWork,
+    nextAction: semanticState.nextAction,
+    unresolvedRisks: semanticState.unresolvedRisks,
+    updatedAt: semanticState.updatedAt,
+  });
+  return {
+    proposalSha256: written.proposalSha256,
+    observedMtime: written.observedMtime,
+    sequence: semanticState.sequence,
+    semanticState: {
+      summary: semanticState.summary,
+      completedWork: semanticState.completedWork,
+      remainingWork: semanticState.remainingWork,
+      nextAction: semanticState.nextAction,
+      unresolvedRisks: semanticState.unresolvedRisks,
+    },
+  };
 }
 
 /**
@@ -212,9 +312,9 @@ export function stampDockerExecutionLandingCheckpoint(input: {
       );
     }
   }
-  const proposalEnvelope = readExecutionLandingProposal(input.projectRoot, {
-    taskId: ref.taskId,
-    attemptId: ref.attemptId,
+  const proposalEnvelope = writeDockerLandingProposal({
+    projectRoot: input.projectRoot,
+    settlementRef: input.settlementRef,
     notBefore: context.preparedAt,
   });
   const diskEvidence = writeExecutionLandingDiskEvidenceAtomic(
@@ -223,7 +323,7 @@ export function stampDockerExecutionLandingCheckpoint(input: {
     input.landing.requestedAt,
   );
   if (diskEvidence.changedPaths.length > 0) {
-    if (proposalEnvelope.proposal.sequence < 2) {
+    if (proposalEnvelope.sequence < 2) {
       throw createExecutionAuthorityError(
         'Execution landing proposal did not advance after scoped disk changes',
       );
@@ -262,11 +362,11 @@ export function stampDockerExecutionLandingCheckpoint(input: {
     attemptFence: taskResultSettlementActiveClaimDigest(input.settlementRef),
     providerSequence: input.landing.providerSequence,
     semanticState: {
-      summary: proposalEnvelope.proposal.summary,
-      completedWork: proposalEnvelope.proposal.completedWork,
-      remainingWork: proposalEnvelope.proposal.remainingWork,
-      nextAction: proposalEnvelope.proposal.nextAction,
-      unresolvedRisks: proposalEnvelope.proposal.unresolvedRisks,
+      summary: proposalEnvelope.semanticState.summary,
+      completedWork: proposalEnvelope.semanticState.completedWork,
+      remainingWork: proposalEnvelope.semanticState.remainingWork,
+      nextAction: proposalEnvelope.semanticState.nextAction,
+      unresolvedRisks: proposalEnvelope.semanticState.unresolvedRisks,
     },
     scope: context.scope,
     diskDiffRefs: [

@@ -139,7 +139,9 @@ describe('scanHeartbeats', () => {
   });
 
   it('parses valid heartbeat files', () => {
-    mockedExistsSync.mockReturnValue(true);
+    mockedExistsSync.mockImplementation(
+      path => !String(path).includes('worker-heartbeat-authority'),
+    );
     mockedReaddirSync.mockReturnValue(['task-001.hb', 'task-002.hb'] as never);
 
     const freshTimestamp = new Date().toISOString();
@@ -196,7 +198,9 @@ describe('scanHeartbeats', () => {
   });
 
   it('skips invalid JSON (1 valid + 1 invalid → 1 heartbeat)', () => {
-    mockedExistsSync.mockReturnValue(true);
+    mockedExistsSync.mockImplementation(
+      path => !String(path).includes('worker-heartbeat-authority'),
+    );
     mockedReaddirSync.mockReturnValue(['task-001.hb', 'task-002.hb'] as never);
 
     const validHb: Heartbeat = {
@@ -977,6 +981,54 @@ describe('writeScanToDashboard', () => {
     const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
     expect(written.agents[0].lastHeartbeat).toBe(hbTimestamp);
     expect(written.agents[0].currentAction).toBe('writing tests');
+  });
+
+  it('adds a dynamically born worker from heartbeat plus exact task routing metadata', () => {
+    const task = {
+      id: '001-fix',
+      title: 'Fix task',
+      description: 'repair',
+      model: 'gpt-5.6-terra',
+      effort: 'normal',
+      priority: 'NORMAL',
+      reason: 'test',
+      scope: { directories: [], filesRead: [], filesWrite: [] },
+      dependencies: [],
+      goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: 'none' },
+      status: 'EXECUTING',
+      sprintId: 'sprint-001',
+      assignedAgent: 'recovery-worker',
+    };
+    mockedExistsSync
+      .mockReturnValueOnce(true)   // dashboard exists
+      .mockReturnValueOnce(false); // no result directory projection in this fixture
+    mockedReadFileSync
+      .mockReturnValueOnce(JSON.stringify({
+        sprint: { id: 'sprint-001', number: 1, phase: 'EXECUTE', status: 'ACTIVE' },
+        agents: [],
+        progress: { done: 0, active: 0, blocked: 0, total: 1 },
+        alerts: [],
+        updatedAt: new Date().toISOString(),
+      }) as never)
+      .mockReturnValueOnce(JSON.stringify(task) as never);
+
+    writeScanToDashboard('/project', sprintInfo, {
+      heartbeats: [{
+        workerId: 'w-001-fix', taskId: '001-fix', status: 'CODING' as never,
+        currentAction: 'repairing', timestamp: new Date().toISOString(),
+        filesChangedCount: 1, sequence: 1, progress: 50,
+      }],
+      violations: [], alerts: [], locks: [],
+    });
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written.agents).toEqual([expect.objectContaining({
+      id: 'w-001-fix',
+      taskId: '001-fix',
+      model: 'gpt-5.6-terra',
+      assignedAgent: 'recovery-worker',
+      status: 'CODING',
+    })]);
   });
 
   it('handles no existing dashboard (fresh start)', () => {

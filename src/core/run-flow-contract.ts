@@ -20,6 +20,20 @@
 
 import type { ActorContext, RequestOrigin } from './work-model.js';
 
+/** Content-addressed identity of the exact input that produced a RunFlow plan. */
+export const RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION = 1 as const;
+
+export interface RunFlowPlanSourceAuthority {
+  readonly schemaVersion: typeof RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION;
+  readonly sourceKind: 'intent' | 'directives';
+  readonly contentSha256: string;
+  readonly configSha256: string;
+  readonly proposalSha256: string;
+  readonly planningInputSha256: string;
+  readonly scopeInputSha256: string;
+  readonly lineageSha256: string;
+}
+
 // ═══ State ═══════════════════════════════════════════════════════════════
 
 /**

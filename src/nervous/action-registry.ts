@@ -326,3 +326,18 @@ export function getActionsByCategory(
 export function isSafetyFloorAction(id: string): boolean {
   return SAFETY_FLOOR_IDS.has(id);
 }
+
+// ─── Fenced Scheduler-Effect Action IDs ──────────────────────────────────────
+// Actions whose ACCEPTED (or autonomous/timeout-auto-applied) decision must be
+// turned into an identity-fenced scheduler effect — exact sprint/task/file
+// identity re-validated at execution time — instead of a free-form payload
+// pass-through to the action handler. See Executor.invokeAction /
+// fenceSchedulerEffect (executor.ts).
+
+const FENCED_SCHEDULER_IDS: ReadonlySet<string> = new Set<string>([
+  'SCOPE_COLLISION_REORDER',
+]);
+
+export function isFencedSchedulerAction(id: string): boolean {
+  return FENCED_SCHEDULER_IDS.has(id);
+}

@@ -94,6 +94,33 @@ describe('enforceHonestResultGate — Scenario (a): real DONE preserved', () => 
   });
 });
 
+describe('enforceHonestResultGate — claim-time attribution authority', () => {
+  it('forces a typed HOLD to remain NO_GO even when final-disk evidence exists', () => {
+    const task = makeTask();
+    const result = makeResult({
+      selfAssessment: 'DONE',
+      workAttribution: {
+        state: 'HOLD',
+        attemptId: 'attempt-1',
+        baselineRef: '.tasks/task-165-001.scope-baseline',
+        scopeDigest: 'b'.repeat(64),
+        reasonCode: 'ATTRIBUTION_AUTHORITY_MISMATCH',
+      },
+    });
+
+    const gated = enforceHonestResultGate(result, task, {
+      hasDiskEvidence: true,
+      linesAdded: 999,
+      untrackedFiles: ['src/orchestra/result-evaluator.ts'],
+    });
+
+    expect(gated.honest).toBe(false);
+    expect(gated.violation).toBe('WORK_ATTRIBUTION_HOLD');
+    expect(gated.result.selfAssessment).toBe('NO_GO');
+    expect(gated.result.notes).toContain('WORK_ATTRIBUTION_HOLD');
+  });
+});
+
 // ─── Scenario (b) — Real work + tests fail → not downgraded by gate ──────
 // (Rubric eval decides — NO_GO or GO_WITH_TECH_DEBT — not the honest gate.)
 

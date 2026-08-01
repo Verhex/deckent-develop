@@ -34,6 +34,7 @@ import {
   type RunFlowEvent,
   type RunHandle as ContractRunHandle,
   type RunFlowPlanLineageRecord,
+  type RunFlowPlanSourceAuthority,
   type RunFlowProjectionAdoptionRecord,
   type RunFlowRecoveryManifest,
   type RunProposal,
@@ -108,6 +109,7 @@ export interface StoredApprovedSnapshot {
   readonly approvedBy: ActorContext;
   readonly approvedAt: string;
   readonly sprint: Sprint;
+  readonly sourceAuthority?: RunFlowPlanSourceAuthority;
   readonly proposal?: RunProposal;
   readonly planLineage?: RunFlowPlanLineageRecord;
   readonly projectionAdoption?: RunFlowProjectionAdoptionRecord;
@@ -134,6 +136,7 @@ export interface StoredPlannedSprint {
   readonly planDigestVersion?: number;
   readonly planDigestContext?: ExecutionPlanDigestContext;
   readonly proposal?: RunProposal;
+  readonly sourceAuthority?: RunFlowPlanSourceAuthority;
   readonly lineage?: RunFlowPlanLineageRecord;
   readonly projectionAdoption?: RunFlowProjectionAdoptionRecord;
 }

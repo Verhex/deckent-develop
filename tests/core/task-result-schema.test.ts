@@ -95,6 +95,46 @@ describe('task-result-schema (Worker Output Contract spine)', () => {
     expect(TASK_RESULT_SCHEMA_VERSION).toBe('1.0');
   });
 
+  it('preserves host-authored claim-time work attribution evidence', () => {
+    const workAttribution = {
+      state: 'VERIFIED',
+      attemptId: '11111111-1111-4111-8111-111111111111',
+      baselineRef: `task-result-work-attribution-baseline:sha256:${'a'.repeat(64)}`,
+      baselineSha256: 'a'.repeat(64),
+      scopeDigest: 'b'.repeat(64),
+    };
+    const res = validateTaskResult({ ...validResult(), workAttribution });
+
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error(res.errors.join('; '));
+    expect(res.value.workAttribution).toEqual(workAttribution);
+  });
+
+  it('preserves HOLD attribution details and rejects malformed attribution digests', () => {
+    const workAttribution = {
+      state: 'HOLD',
+      attemptId: '22222222-2222-4222-8222-222222222222',
+      baselineRef: 'task-result-work-attribution-baseline:sha256:pending',
+      scopeDigest: 'c'.repeat(64),
+      reasonCode: 'SCOPE_MISMATCH',
+      claimedOutsideScope: ['src/unowned.ts'],
+    };
+    const accepted = validateTaskResult({ ...validResult(), workAttribution });
+
+    expect(accepted.ok).toBe(true);
+    if (!accepted.ok) throw new Error(accepted.errors.join('; '));
+    expect(accepted.value.workAttribution).toEqual(workAttribution);
+
+    const rejected = validateTaskResult({
+      ...validResult(),
+      workAttribution: { ...workAttribution, scopeDigest: 'not-a-sha256' },
+    });
+    expect(rejected.ok).toBe(false);
+    if (rejected.ok) return;
+    expect(rejected.missingFields).not.toContain('workAttribution.scopeDigest');
+    expect(rejected.errors.some((error) => error.startsWith('workAttribution.scopeDigest:'))).toBe(true);
+  });
+
   it('preserves provider-native cross-verify evidence through canonical validation', () => {
     const crossVerify = {
       outcome: 'confirmed',

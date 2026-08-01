@@ -152,6 +152,24 @@ describe('reconcileEvaluationSpuriousNoGo — Sprint 191 P191-1 spurious reconci
     expect(evaluation.decision).toBe('NO_GO');
   });
 
+  it('typed attribution HOLD cannot be promoted from the final shared-worktree diff', async () => {
+    const held = {
+      ...ooMResult,
+      workAttribution: {
+        state: 'HOLD' as const,
+        attemptId: 'attempt-1',
+        baselineRef: '.tasks/task-190-004.scope-baseline',
+        scopeDigest: 'c'.repeat(64),
+        reasonCode: 'ATTRIBUTION_AUTHORITY_UNAVAILABLE',
+      },
+    };
+
+    const evaluation = await evaluateWithSpuriousRecovery(held, baseTask, '/tmp/fake-root');
+
+    expect(reconcileSpy).not.toHaveBeenCalled();
+    expect(evaluation.decision).toBe('NO_GO');
+  });
+
   it('reconcileSpuriousNoGo returning NO_GO leaves evaluation NO_GO (no false positive)', async () => {
     reconcileSpy.mockResolvedValue({
       decision: 'NO_GO',

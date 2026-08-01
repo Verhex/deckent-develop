@@ -207,11 +207,21 @@ export function evaluateFixCircuitBreaker(
   evaluations: ReadonlyMap<string, TaskEvaluation>,
   policy: FixCircuitBreakerConfig,
 ): FixCircuitBreakerDecision {
-  const logicalRoots = rootTasks.filter(task => !task.isPriorityFix);
-  const totalTasks = logicalRoots.length;
-  const unresolvedTaskIds = logicalRoots
-    .filter(task => evaluations.get(task.id) === TaskEvaluation.NO_GO)
-    .map(task => task.id);
+  const lineages = foldTaskLineages(rootTasks);
+  const logicalRoots = lineages.map(lineage => lineage.rootTask);
+  const totalTasks = lineages.length;
+  const unresolvedTaskIds = lineages
+    .filter((lineage) => {
+      const latestEvaluation = evaluations.get(lineage.resolvedTask.id);
+      const latestResolved = lineage.resolvedTask.status === TaskStatus.DONE
+        || latestEvaluation === TaskEvaluation.DONE
+        || latestEvaluation === TaskEvaluation.GO_WITH_TECH_DEBT;
+      if (latestResolved) return false;
+      return lineage.attemptIds.some(
+        attemptId => evaluations.get(attemptId) === TaskEvaluation.NO_GO,
+      );
+    })
+    .map(lineage => lineage.rootId);
   const unresolvedTasks = unresolvedTaskIds.length;
   const unresolvedRatioPercent =
     totalTasks > 0 ? (unresolvedTasks / totalTasks) * 100 : 0;

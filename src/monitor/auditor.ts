@@ -32,6 +32,12 @@ import { MEMORY_DB_FILE } from '../core/constants.js';
 import { ACTIVE_EXECUTION_STATUSES, COMPLETED_STATUSES } from '../core/heartbeat-types.js';
 import { DEFAULT_HEARTBEAT_TIMEOUT_MS } from '../core/config.js';
 import { validateTaskResult } from '../core/task-result-schema.js';
+import { RUNTIME_DIR } from '../core/constants.js';
+import { WorkerHeartbeatAuthorityStore } from '../core/worker-heartbeat-authority-store.js';
+import type {
+  WorkerHeartbeatAuthorityIdentity,
+  WorkerHeartbeatAuthorityState,
+} from '../core/worker-heartbeat-authority.js';
 import {
   closeFinding,
   getFinding,
@@ -58,6 +64,68 @@ export interface HeartbeatCacheEntry {
 
 /** Module-level heartbeat cache keyed by file path */
 const heartbeatCache = new Map<string, HeartbeatCacheEntry>();
+
+/**
+ * A read-only view of the host-fenced heartbeat authority for one exact worker
+ * attempt. The auditor never writes this store and never turns a worker verdict
+ * into a host process outcome (or the reverse).
+ */
+export interface HeartbeatAuthoritySnapshot {
+  readonly identity: WorkerHeartbeatAuthorityIdentity;
+  readonly authority: WorkerHeartbeatAuthorityState;
+}
+
+const HEARTBEAT_AUTHORITY_DIRECTORY = 'worker-heartbeat-authority';
+
+function heartbeatAuthorityRoot(projectRoot: string): string {
+  return join(projectRoot, RUNTIME_DIR, HEARTBEAT_AUTHORITY_DIRECTORY);
+}
+
+function isHeartbeatAuthorityIdentity(value: unknown): value is WorkerHeartbeatAuthorityIdentity {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return ['runId', 'taskId', 'attemptId', 'workerId', 'fence']
+    .every(key => typeof candidate[key] === 'string');
+}
+
+/**
+ * Reads every immutable, exact-attempt authority snapshot for this project.
+ * There is intentionally no cache: a newly published fence must be visible to
+ * the next scan even when the legacy `.hb` file mtime is unchanged.
+ */
+export function readHeartbeatAuthoritySnapshots(projectRoot: string): HeartbeatAuthoritySnapshot[] {
+  const root = heartbeatAuthorityRoot(projectRoot);
+  if (!existsSync(root)) return [];
+
+  const store = new WorkerHeartbeatAuthorityStore(root);
+  const snapshots: HeartbeatAuthoritySnapshot[] = [];
+  let entries: string[];
+  try {
+    entries = readdirSync(root);
+  } catch {
+    return snapshots;
+  }
+
+  for (const entry of entries) {
+    const record = readJsonSafe<{ identity?: unknown }>(join(root, entry, 'identity.json'));
+    if (!isHeartbeatAuthorityIdentity(record?.identity)) continue;
+    try {
+      const authority = store.read(record.identity);
+      if (authority !== null) snapshots.push({ identity: record.identity, authority });
+    } catch (error: unknown) {
+      debugLog('auditor:heartbeat-authority', error instanceof Error ? error.message : 'unreadable authority snapshot');
+    }
+  }
+  return snapshots;
+}
+
+function snapshotsForHeartbeat(
+  snapshots: readonly HeartbeatAuthoritySnapshot[],
+  hb: Heartbeat,
+): HeartbeatAuthoritySnapshot[] {
+  return snapshots.filter(snapshot =>
+    snapshot.identity.taskId === hb.taskId && snapshot.identity.workerId === hb.workerId);
+}
 
 /**
  * Read a heartbeat file with mtime-based cache invalidation.
@@ -367,8 +435,22 @@ export function isWorkerStale(
   projectRoot: string,
   heartbeatTimeoutMs: number,
   hbPath?: string,
+  authoritySnapshot?: HeartbeatAuthoritySnapshot,
 ): boolean {
   const currentTime = Date.now();
+
+  // A fenced host snapshot supersedes the legacy worker-authored heartbeat for
+  // liveness, stale and terminal decisions. Process outcome and task verdict
+  // remain independent fields; only the reported verdict establishes terminal
+  // task completion.
+  if (authoritySnapshot) {
+    const latest = authoritySnapshot.authority.latest;
+    if (latest === null) return true;
+    if (latest.workerTaskVerdict === 'done') return false;
+    if (latest.liveness === 'alive') return false;
+    const observedAt = Date.parse(latest.hostObservedAt);
+    return !Number.isFinite(observedAt) || currentTime - observedAt > heartbeatTimeoutMs;
+  }
 
   // Bug-1: freshness from the host filesystem mtime (set on every write through
   // the docker bind-mount) — clock-skew-proof. The worker's self-reported in-file
@@ -516,6 +598,7 @@ export function scanHeartbeats(projectRoot: string, heartbeatTimeoutMs = DEFAULT
 
   const files = readdirSync(tasksDir).filter((f) => f.endsWith('.hb'));
   const currentTime = Date.now();
+  const authoritySnapshots = readHeartbeatAuthoritySnapshots(projectRoot);
 
   for (const file of files) {
     const hbPath = join(tasksDir, file);
@@ -525,12 +608,22 @@ export function scanHeartbeats(projectRoot: string, heartbeatTimeoutMs = DEFAULT
 
     heartbeats.push(hb);
 
+    const matchingSnapshots = snapshotsForHeartbeat(authoritySnapshots, hb);
+    if (matchingSnapshots.length > 1 || matchingSnapshots.some(snapshot => snapshot.authority.holds.length > 0)) {
+      const detail = matchingSnapshots.length > 1
+        ? `heartbeat authority HOLD: multiple fenced snapshots for worker ${hb.workerId} (task: ${hb.taskId})`
+        : `heartbeat authority HOLD for worker ${hb.workerId} (task: ${hb.taskId})`;
+      alerts.push(createAlert(AlertLevel.WARNING, detail, hb.workerId));
+      continue;
+    }
+    const authoritySnapshot = matchingSnapshots[0];
+
     // Skip stale check for heartbeats with DONE status — worker already completed
     if (hb.status === AgentStatus.DONE) continue;
 
     // Sprint 139: Multi-signal stale detection replaces simple elapsed-time check
     // Checks HB freshness + .result existence + process/container alive + sequence monotonicity
-    if (!isWorkerStale(hb, projectRoot, heartbeatTimeoutMs, hbPath)) {
+    if (!isWorkerStale(hb, projectRoot, heartbeatTimeoutMs, hbPath, authoritySnapshot)) {
       continue; // Worker is alive by multi-signal consensus — skip stale reporting
     }
 
@@ -1503,18 +1596,39 @@ export function writeScanToDashboard(
     (hb) => !doneTaskIds.has(hb.taskId),
   ).length;
 
-  // Update agent statuses from heartbeats and .result files
+  // Update known agents, then append workers that were born after the initial
+  // dashboard snapshot (FIX/XFIX/dependency waves). The task artifact is the
+  // model/persona authority; a heartbeat never invents routing metadata.
   const agents = (existing?.agents ?? []).map(agent => {
     // If agent's task has a result file, mark as DONE
     if (agent.taskId && doneTaskIds.has(agent.taskId)) {
       return { ...agent, status: AgentStatus.DONE };
     }
-    const hb = scanResult.heartbeats.find(h => h.workerId === agent.id);
+    const hb = scanResult.heartbeats.find(
+      h => h.workerId === agent.id || (agent.taskId !== undefined && h.taskId === agent.taskId),
+    );
     if (hb) {
       return { ...agent, status: hb.status, currentAction: hb.currentAction, lastHeartbeat: hb.timestamp };
     }
     return agent;
   });
+  for (const hb of scanResult.heartbeats) {
+    if (agents.some(agent => agent.id === hb.workerId || agent.taskId === hb.taskId)) continue;
+    const task = readJsonSafe<Task>(join(projectRoot, TASKS_DIR, `task-${hb.taskId}.json`));
+    if (!task) continue;
+    agents.push({
+      id: hb.workerId,
+      role: 'worker',
+      status: doneTaskIds.has(hb.taskId) ? AgentStatus.DONE : hb.status,
+      model: task.model,
+      tmuxWindow: hb.workerId,
+      taskId: hb.taskId,
+      currentAction: hb.currentAction,
+      spawnedAt: task.createdAt,
+      lastHeartbeat: hb.timestamp,
+      assignedAgent: task.assignedAgent ?? 'generic',
+    });
+  }
 
   const existingProgress = existing?.progress ?? { done: 0, active: 0, blocked: 0, total: 0 };
 

@@ -72,9 +72,31 @@ export interface CaptureShadowSchedulerSnapshotInput {
  * declared `dependencies` — the design doc's gap-matrix "Collision edges"
  * row, which `planDispatch` today has no notion of at all.
  */
-function computeCollisionBlockedIds(tasks: readonly Task[], satisfyingIds: ReadonlySet<string>): Set<string> {
+interface CollisionBlockingState {
+  readonly blockedIds: ReadonlySet<string>;
+  readonly blockingIds: ReadonlyMap<string, string>;
+}
+
+function resolveLineageRoot(task: Task, tasksById: ReadonlyMap<string, Task>): string {
+  const visited = new Set<string>();
+  let current = task;
+  while (current.fixForTaskId && !visited.has(current.id)) {
+    visited.add(current.id);
+    const parent = tasksById.get(current.fixForTaskId);
+    if (!parent) return current.fixForTaskId;
+    current = parent;
+  }
+  return current.id;
+}
+
+function computeCollisionBlockingState(
+  tasks: readonly Task[],
+  satisfyingIds: ReadonlySet<string>,
+): CollisionBlockingState {
   const graph = buildDependencyGraph(tasks as Task[], true);
   const blocked = new Set<string>();
+  const blockingIds = new Map<string, string>();
+  const tasksById = new Map(tasks.map(task => [task.id, task]));
   for (const t of tasks) {
     if (t.status !== TaskStatus.PENDING) continue;
     const graphDeps = graph.dependencies.get(t.id);
@@ -82,13 +104,21 @@ function computeCollisionBlockedIds(tasks: readonly Task[], satisfyingIds: Reado
     const ownDeps = new Set(t.dependencies ?? []);
     for (const dep of graphDeps) {
       if (ownDeps.has(dep)) continue; // a real declared dependency edge, not a collision edge
+      const blockingTask = tasksById.get(dep);
+      // Original/FIX and FIX/FIX siblings are one logical task. Their shared
+      // write scope is repair lineage, not competing ownership, so a synthetic
+      // edge between them would deadlock the repair behind its failed original.
+      if (blockingTask && resolveLineageRoot(t, tasksById) === resolveLineageRoot(blockingTask, tasksById)) {
+        continue;
+      }
       if (!satisfyingIds.has(dep)) {
         blocked.add(t.id);
+        blockingIds.set(t.id, dep);
         break;
       }
     }
   }
-  return blocked;
+  return { blockedIds: blocked, blockingIds };
 }
 
 function cloneTaskForSnapshot(task: Task): SchedulerTaskSnapshot {
@@ -108,7 +138,10 @@ function cloneTaskForSnapshot(task: Task): SchedulerTaskSnapshot {
  */
 export function captureShadowSchedulerSnapshot(input: CaptureShadowSchedulerSnapshotInput): SchedulerSnapshot {
   const effectiveDependencyState = computeEffectiveDependencyState(input.sprint.tasks, input.nowMs);
-  const collisionBlockedIds = computeCollisionBlockedIds(input.sprint.tasks, effectiveDependencyState.satisfyingIds);
+  const collisionBlockingState = computeCollisionBlockingState(
+    input.sprint.tasks,
+    effectiveDependencyState.satisfyingIds,
+  );
 
   return {
     trigger: input.trigger,
@@ -127,7 +160,8 @@ export function captureShadowSchedulerSnapshot(input: CaptureShadowSchedulerSnap
     collectedIds: new Set(input.collectedIds),
     completedTaskIds: [...input.completedTaskIds],
     effectiveDependencyState,
-    collisionBlockedIds,
+    collisionBlockedIds: collisionBlockingState.blockedIds,
+    collisionBlockingIds: collisionBlockingState.blockingIds,
   };
 }
 

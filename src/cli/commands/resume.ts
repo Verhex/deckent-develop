@@ -3,12 +3,16 @@
 // Reads durable checkpoint authority, reconciles interrupted work, and resumes
 // only the task set proven safe for re-dispatch.
 
-import { existsSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
 import { loadConfig } from '../../core/config.js';
+import type { ResolvedConfig } from '../../core/config-types.js';
 import { bootstrapProviders } from '../../core/provider.js';
+import { applyWorkerExecutionBudgetPolicy } from '../../core/execution-plan-digest.js';
 import { runSprint } from '../../orchestra/brain.js';
 import {
   readCheckpoint, hasCheckpoint,
@@ -19,10 +23,16 @@ import {
   buildPreplannedResumeSprint,
 } from '../../orchestra/sprint-checkpoint.js';
 import { clearSprintState, readSprintState } from '../../orchestra/sprint-utils.js';
-import { SprintStatus } from '../../core/types.js';
+import { SprintStatus, TaskStatus, type Sprint } from '../../core/types.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { DECKENT_DIR, SPRINT_PAUSE_STATE_FILE, TASKS_DIR } from '../../core/constants.js';
+import {
+  DASHBOARD_FILE,
+  DECKENT_DIR,
+  SPRINT_PAUSE_STATE_FILE,
+  SPRINT_STATE_FILE,
+  TASKS_DIR,
+} from '../../core/constants.js';
 import { getMessage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
 import {
@@ -41,6 +51,10 @@ export function clearMatchingPauseAuthority(projectRoot: string, sprintId: strin
 export interface PauseAuthorityLease {
   readonly path: string;
   readonly content: string;
+  readonly dashboardPath: string;
+  readonly dashboardContent: string | null;
+  readonly sprintStatePath: string;
+  readonly sprintStateContent: string | null;
   readonly projectRoot: string;
   readonly sprintId: string;
   readonly providerHolds: readonly ProviderExecutionHold[];
@@ -52,12 +66,18 @@ export function beginPauseAuthorityResume(
 ): { ok: true; lease: PauseAuthorityLease | null } | { ok: false; lease: null } {
   const path = join(projectRoot, SPRINT_PAUSE_STATE_FILE);
   if (!existsSync(path)) return { ok: true, lease: null };
+  const dashboardPath = join(projectRoot, DASHBOARD_FILE);
+  const sprintStatePath = join(projectRoot, SPRINT_STATE_FILE);
   let content: string | null = null;
+  let dashboardContent: string | null = null;
+  let sprintStateContent: string | null = null;
   let providerHolds: readonly ProviderExecutionHold[] = [];
   try {
     content = readFileSync(path, 'utf-8');
     const state = JSON.parse(content) as { sprintId?: unknown };
     if (state.sprintId !== sprintId) return { ok: false, lease: null };
+    dashboardContent = existsSync(dashboardPath) ? readFileSync(dashboardPath, 'utf-8') : null;
+    sprintStateContent = existsSync(sprintStatePath) ? readFileSync(sprintStatePath, 'utf-8') : null;
     providerHolds = readProviderExecutionHolds(projectRoot, sprintId);
     unlinkSync(path);
     if (existsSync(path)) return { ok: false, lease: null };
@@ -68,7 +88,17 @@ export function beginPauseAuthorityResume(
     }
     return {
       ok: true,
-      lease: { path, content, projectRoot, sprintId, providerHolds },
+      lease: {
+        path,
+        content,
+        dashboardPath,
+        dashboardContent,
+        sprintStatePath,
+        sprintStateContent,
+        projectRoot,
+        sprintId,
+        providerHolds,
+      },
     };
   } catch {
     try {
@@ -88,9 +118,64 @@ export function restorePauseAuthority(lease: PauseAuthorityLease | null): boolea
     // Never overwrite a newer pause authority produced by the resumed run.
     if (existsSync(lease.path)) return true;
     writeFileSync(lease.path, lease.content, 'utf-8');
-    return existsSync(lease.path);
+    if (lease.sprintStateContent !== null) {
+      writeFileSync(lease.sprintStatePath, lease.sprintStateContent, 'utf-8');
+    }
+    if (lease.dashboardContent !== null) {
+      writeFileSync(lease.dashboardPath, lease.dashboardContent, 'utf-8');
+    }
+    return existsSync(lease.path)
+      && (lease.sprintStateContent === null || existsSync(lease.sprintStatePath))
+      && (lease.dashboardContent === null || existsSync(lease.dashboardPath));
   } catch {
     return false;
+  }
+}
+
+/**
+ * Re-authorize every task that recovery is about to dispatch against the
+ * current owner-authored execution-budget policy, then durably persist the
+ * exact snapshot consumed by SPAWN. Dynamic FIX tasks are created after PLAN,
+ * so their first-run budget is normally attached by runFixPhase; a checkpoint
+ * resume enters the ordinary SPAWN path instead and must perform the same
+ * authorization explicitly.
+ *
+ * Validation is completed for the whole set before any task file is replaced.
+ * A HOLD leaves the canonical PAUSED authority intact and performs no writes.
+ */
+export function authorizePreplannedResumeTasks(
+  projectRoot: string,
+  sprint: Sprint,
+  config: ResolvedConfig,
+): void {
+  const pendingTasks = sprint.tasks.filter(task => task.status === TaskStatus.PENDING);
+  const policies = applyWorkerExecutionBudgetPolicy(
+    pendingTasks,
+    config.execution_budget,
+    config.worker_provider,
+  );
+  const heldIndex = policies.findIndex(policy => policy.state === 'hold');
+  if (heldIndex >= 0) {
+    const task = pendingTasks[heldIndex]!;
+    const policy = policies[heldIndex]!;
+    throw new Error(
+      `RESUME_EXECUTION_BUDGET_HOLD:${task.id}:${policy.reasonCode ?? 'unknown'}:${policy.profileRef}`,
+    );
+  }
+
+  for (const task of pendingTasks) {
+    const taskPath = join(projectRoot, TASKS_DIR, `task-${task.id}.json`);
+    const tmpPath = `${taskPath}.resume-budget.${process.pid}.tmp`;
+    writeFileSync(tmpPath, JSON.stringify(task, null, 2), 'utf-8');
+    renameSync(tmpPath, taskPath);
+  }
+}
+
+/** Remove only the stale PLANNING projection left by a failed resume spawn. */
+export function clearFailedResumePlanningState(projectRoot: string, sprintId: string): void {
+  const state = readSprintState(projectRoot);
+  if (state?.sprintId === sprintId && state.status === SprintStatus.PLANNING) {
+    clearSprintState(projectRoot);
   }
 }
 
@@ -336,6 +421,7 @@ export function registerResume(program: Command): void {
       let preplannedSprint;
       try {
         preplannedSprint = buildPreplannedResumeSprint(projectRoot, resumeCheckpoint, resumableIds);
+        authorizePreplannedResumeTasks(projectRoot, preplannedSprint, config);
       } catch (e) {
         printError(getMessage('resume.preplanned_failed', lang, { error: e instanceof Error ? e.message : String(e) }));
         process.exit(1);
@@ -350,17 +436,18 @@ export function registerResume(program: Command): void {
         printError(getMessage('resume.other_sprint_active', lang, { sprintId: existingState.sprintId }));
         process.exit(1);
       }
-      if (existingState?.sprintId === checkpoint.sprintId) {
-        clearSprintState(projectRoot);
-        if (readSprintState(projectRoot)?.sprintId === checkpoint.sprintId) {
-          printError(getMessage('resume.state_clear_failed', lang, { sprintId: checkpoint.sprintId }));
-          process.exit(1);
-        }
-      }
       const pauseLease = beginPauseAuthorityResume(projectRoot, checkpoint.sprintId);
       if (!pauseLease.ok) {
         printError(getMessage('resume.pause_clear_failed', lang, { sprintId: checkpoint.sprintId }));
         process.exit(1);
+      }
+      if (existingState?.sprintId === checkpoint.sprintId) {
+        clearSprintState(projectRoot);
+        if (readSprintState(projectRoot)?.sprintId === checkpoint.sprintId) {
+          restorePauseAuthority(pauseLease.lease);
+          printError(getMessage('resume.state_clear_failed', lang, { sprintId: checkpoint.sprintId }));
+          process.exit(1);
+        }
       }
 
       try {
@@ -375,6 +462,7 @@ export function registerResume(program: Command): void {
           if (!restorePauseAuthority(pauseLease.lease)) {
             printError(getMessage('resume.pause_restore_failed', lang, { sprintId: checkpoint.sprintId }));
           }
+          clearFailedResumePlanningState(projectRoot, checkpoint.sprintId);
           printError(getMessage('resume.not_complete', lang, { status: String(resumed.status) }));
           process.exitCode = 1;
           return;
@@ -385,6 +473,7 @@ export function registerResume(program: Command): void {
         if (!restorePauseAuthority(pauseLease.lease)) {
           printError(getMessage('resume.pause_restore_failed', lang, { sprintId: checkpoint.sprintId }));
         }
+        clearFailedResumePlanningState(projectRoot, checkpoint.sprintId);
         printError(getMessage('resume.failed', lang, { error: e instanceof Error ? e.message : String(e) }));
         process.exit(1);
       }

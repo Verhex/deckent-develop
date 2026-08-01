@@ -2470,7 +2470,7 @@ describe('runCrossVerify — fail-safe + verifier selection', () => {
     expect(res.evidencePersisted).toBe(false);
   });
 
-  it('uses the production factory only for mandatory verification and persists typed HOLD', async () => {
+  it('uses the production factory in both policy modes and preserves typed HOLD semantics', async () => {
     writeResultFile('276-001', makeResult());
     const compose = vi.fn(() => ({
       state: 'hold' as const,
@@ -2521,8 +2521,44 @@ describe('runCrossVerify — fail-safe + verifier selection', () => {
       makeConfig({ enabled: true, enforce_refuted: false }),
       { mandatoryInvocationFactory: { compose }, availableProviders: [] },
     );
-    expect(compose).not.toHaveBeenCalled();
-    expect(advisory.outcome).toBe('unavailable');
+    expect(compose).toHaveBeenCalledTimes(1);
+    expect(advisory).toMatchObject({
+      outcome: 'unavailable',
+      disposition: 'advisory',
+      blocked: false,
+      verifier: 'codex',
+      verifierModel: 'gpt-5.6-sol',
+    });
+  });
+
+  it('records exact advisory UNCLEAR without allowing it to block settlement', async () => {
+    writeResultFile('276-001', makeResult());
+    const exact = mandatoryComposition(
+      exactCoordinatorSettled('VERDICT: UNCLEAR exact bounded evidence is insufficient'),
+    );
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: false }),
+      { mandatoryInvocation: exact.composition },
+    );
+
+    expect(res).toMatchObject({
+      outcome: 'unclear',
+      disposition: 'advisory',
+      ran: true,
+      blocked: false,
+      advisory: {
+        verdict: 'unclear',
+        reason: 'exact bounded evidence is insufficient',
+      },
+    });
+    expect(readResultFile('276-001').crossVerify).toMatchObject({
+      outcome: 'unclear',
+      verdict: 'unclear',
+    });
   });
 
   it('verifier_priority config is respected when several providers qualify', async () => {

@@ -1,6 +1,18 @@
-import { createHash } from 'node:crypto';
-import { readFileSync, statSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 
 import { canonicalJson } from './audit-writer.js';
 import { TASKS_DIR } from './constants.js';
@@ -8,6 +20,7 @@ import { createExecutionAuthorityError } from './errors.js';
 import type { ExecutionLandingSemanticStateV1 } from './execution-landing-checkpoint.js';
 
 export const EXECUTION_LANDING_PROPOSAL_SCHEMA_VERSION = 1 as const;
+export const LANDING_PROPOSAL_SCHEMA_VERSION = 2 as const;
 export const EXECUTION_LANDING_PROPOSAL_MAX_BYTES = 64 * 1024;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -27,6 +40,30 @@ export interface ExecutionLandingProposalEnvelopeV1 {
   observedMtime: string;
 }
 
+export interface LandingProposalResultReferenceV2 {
+  taskId: string;
+  attemptId: string;
+  generation: number;
+  relativePath: string;
+}
+
+/** Provider-neutral, untrusted worker progress proposed to the host finalizer. */
+export interface LandingProposalV2 extends ExecutionLandingSemanticStateV1 {
+  version: typeof LANDING_PROPOSAL_SCHEMA_VERSION;
+  taskId: string;
+  attemptId: string;
+  generation: number;
+  sequence: number;
+  resultReference: LandingProposalResultReferenceV2;
+  updatedAt: string;
+}
+
+export interface WriteExecutionLandingProposalResult {
+  relativePath: string;
+  proposalSha256: string;
+  observedMtime: string;
+}
+
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
@@ -39,6 +76,9 @@ function assertTaskId(taskId: string): void {
   if (
     !taskId
     || taskId.length > 200
+    || taskId.includes('/')
+    || taskId.includes('\\')
+    || taskId.includes('\0')
     || basename(taskId) !== taskId
     || taskId === '.'
     || taskId === '..'
@@ -59,6 +99,160 @@ function boundedList(value: unknown, field: string): string[] {
     throw createExecutionAuthorityError(`Execution landing proposal ${field} must contain at most 50 items`);
   }
   return value.map((item, index) => boundedText(item, `${field}[${index}]`, 1_000));
+}
+
+function positiveInteger(value: unknown, field: string): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 1) {
+    throw createExecutionAuthorityError(`Execution landing proposal ${field} must be a positive safe integer`);
+  }
+  return value as number;
+}
+
+function assertSerializable(value: unknown, seen = new Set<object>(), field = 'proposal'): void {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
+  if (typeof value === 'number') {
+    if (Number.isFinite(value)) return;
+    throw createExecutionAuthorityError(`Execution landing proposal ${field} contains a non-serializable number`);
+  }
+  if (typeof value !== 'object') {
+    throw createExecutionAuthorityError(`Execution landing proposal ${field} contains non-serializable data`);
+  }
+  if (seen.has(value)) {
+    throw createExecutionAuthorityError(`Execution landing proposal ${field} contains a cycle`);
+  }
+  const record = value as Record<string, unknown>;
+  if (Object.getPrototypeOf(value) !== Object.prototype && !Array.isArray(value)) {
+    throw createExecutionAuthorityError(`Execution landing proposal ${field} must contain only plain JSON values`);
+  }
+  if ('toJSON' in record) {
+    throw createExecutionAuthorityError(`Execution landing proposal ${field} must not use toJSON serialization`);
+  }
+  seen.add(value);
+  if (Array.isArray(value)) {
+    if (Object.keys(value).length !== value.length) {
+      throw createExecutionAuthorityError(`Execution landing proposal ${field} contains a sparse array`);
+    }
+    value.forEach((item, index) => assertSerializable(item, seen, `${field}[${index}]`));
+  } else {
+    for (const [key, item] of Object.entries(record)) assertSerializable(item, seen, `${field}.${key}`);
+  }
+  seen.delete(value);
+}
+
+function assertRelativeResultPath(value: unknown, taskId: string): string {
+  const path = boundedText(value, 'resultReference.relativePath', 1_000);
+  if (path !== `${TASKS_DIR}/task-${taskId}.result`) {
+    throw createExecutionAuthorityError('Execution landing proposal result reference escapes or conflicts with task identity');
+  }
+  return path;
+}
+
+export function parseLandingProposalV2(value: unknown): LandingProposalV2 {
+  assertSerializable(value);
+  const keys = new Set([
+    'version', 'taskId', 'attemptId', 'generation', 'sequence', 'resultReference',
+    'summary', 'completedWork', 'remainingWork', 'nextAction', 'unresolvedRisks', 'updatedAt',
+  ]);
+  if (!isRecord(value) || Object.keys(value).length !== keys.size || Object.keys(value).some(key => !keys.has(key))) {
+    throw createExecutionAuthorityError('Execution landing proposal does not match the exact V2 schema');
+  }
+  if (value.version !== LANDING_PROPOSAL_SCHEMA_VERSION || typeof value.taskId !== 'string') {
+    throw createExecutionAuthorityError('Execution landing proposal does not match the exact V2 schema');
+  }
+  assertTaskId(value.taskId);
+  if (typeof value.attemptId !== 'string' || !UUID.test(value.attemptId)) {
+    throw createExecutionAuthorityError('Execution landing proposal attemptId is invalid');
+  }
+  const generation = positiveInteger(value.generation, 'generation');
+  const sequence = positiveInteger(value.sequence, 'sequence');
+  if (!isRecord(value.resultReference)) {
+    throw createExecutionAuthorityError('Execution landing proposal resultReference is invalid');
+  }
+  const referenceKeys = new Set(['taskId', 'attemptId', 'generation', 'relativePath']);
+  if (
+    Object.keys(value.resultReference).length !== referenceKeys.size
+    || Object.keys(value.resultReference).some(key => !referenceKeys.has(key))
+    || value.resultReference.taskId !== value.taskId
+    || value.resultReference.attemptId !== value.attemptId
+    || value.resultReference.generation !== generation
+  ) {
+    throw createExecutionAuthorityError('Execution landing proposal contains duplicate or conflicting identity');
+  }
+  if (typeof value.updatedAt !== 'string' || !Number.isFinite(Date.parse(value.updatedAt))) {
+    throw createExecutionAuthorityError('Execution landing proposal updatedAt is invalid');
+  }
+  return {
+    version: LANDING_PROPOSAL_SCHEMA_VERSION,
+    taskId: value.taskId,
+    attemptId: value.attemptId,
+    generation,
+    sequence,
+    resultReference: {
+      taskId: value.taskId,
+      attemptId: value.attemptId,
+      generation,
+      relativePath: assertRelativeResultPath(value.resultReference.relativePath, value.taskId),
+    },
+    summary: boundedText(value.summary, 'summary', 4_000),
+    completedWork: boundedList(value.completedWork, 'completedWork'),
+    remainingWork: boundedList(value.remainingWork, 'remainingWork'),
+    nextAction: boundedText(value.nextAction, 'nextAction', 1_000),
+    unresolvedRisks: boundedList(value.unresolvedRisks, 'unresolvedRisks'),
+    updatedAt: value.updatedAt,
+  };
+}
+
+export function writeExecutionLandingProposal(
+  projectRoot: string,
+  value: LandingProposalV2,
+): WriteExecutionLandingProposalResult {
+  const proposal = parseLandingProposalV2(value);
+  const root = resolve(projectRoot);
+  const tasksDirectory = resolve(root, TASKS_DIR);
+  if (relative(root, tasksDirectory).startsWith('..')) {
+    throw createExecutionAuthorityError('Execution landing proposal directory escapes project root');
+  }
+  if (!existsSync(tasksDirectory)) mkdirSync(tasksDirectory, { mode: 0o700 });
+  if (!lstatSync(tasksDirectory).isDirectory() || lstatSync(tasksDirectory).isSymbolicLink()) {
+    throw createExecutionAuthorityError('Execution landing proposal directory must not be a symlink');
+  }
+  const path = resolve(root, executionLandingProposalRelativePath(proposal.taskId));
+  if (dirname(path) !== tasksDirectory) {
+    throw createExecutionAuthorityError('Execution landing proposal path escapes its task directory');
+  }
+  if (existsSync(path) && lstatSync(path).isSymbolicLink()) {
+    throw createExecutionAuthorityError('Execution landing proposal target must not be a symlink');
+  }
+  const raw = `${JSON.stringify(proposal, null, 2)}\n`;
+  if (Buffer.byteLength(raw) > EXECUTION_LANDING_PROPOSAL_MAX_BYTES) {
+    throw createExecutionAuthorityError('Execution landing proposal exceeds its byte ceiling');
+  }
+  const temporary = join(tasksDirectory, `.${basename(path)}.${randomUUID()}.tmp`);
+  let descriptor: number | undefined;
+  try {
+    descriptor = openSync(temporary, 'wx', 0o600);
+    writeFileSync(descriptor, raw, 'utf8');
+    fsyncSync(descriptor);
+    closeSync(descriptor);
+    descriptor = undefined;
+    renameSync(temporary, path);
+    try {
+      const directoryDescriptor = openSync(tasksDirectory, 'r');
+      try { fsyncSync(directoryDescriptor); } finally { closeSync(directoryDescriptor); }
+    } catch { /* directory fsync is not supported by every platform adapter */ }
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+    try { if (existsSync(temporary)) unlinkSync(temporary); } catch { /* preserve the primary diagnostic */ }
+  }
+  const stat = lstatSync(path);
+  if (!stat.isFile() || stat.isSymbolicLink()) {
+    throw createExecutionAuthorityError('Execution landing proposal atomic publication did not produce a regular file');
+  }
+  return {
+    relativePath: executionLandingProposalRelativePath(proposal.taskId),
+    proposalSha256: sha256(canonicalJson(proposal)),
+    observedMtime: stat.mtime.toISOString(),
+  };
 }
 
 export function executionLandingProposalRelativePath(taskId: string): string {

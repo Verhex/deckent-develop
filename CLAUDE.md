@@ -46,6 +46,13 @@ Kalite her seferinde kullanıcının prompt'uyla düzeltilmemeli; **ilk seferde 
   açıkça işaretle + nedenini söyle; sessizce borç bırakma.
 - **Proof-of-function.** User-surface değişiklik → gerçek-binary run-verify (mock-only yetmez).
   Test hermetik (tmpdir, async spawn, no spawnSync), CI yeşil korunur.
+- **Production wiring closure.** Yeni/değişen üretim kodu; canonical producer → consumer →
+  entrypoint/ingress → policy/config enablement zinciri ve bu zinciri gerçekten çalıştıran kanıt
+  olmadan `DONE` değildir. Test-only import, izole module, fixture-local reimplementation veya
+  yalnız unit-green sonuç `UNWIRED/HOLD` sayılır. Task scope zinciri bağlamaya yetmiyorsa kodu
+  sahte tamamlamak yerine exact eksik authority/consumer raporlanır. Atomik foundation işi ancak
+  aynı approved DAG'da exact closure task'ına dependency-bound ise ara-artifact olarak settle olur;
+  closure başarısızken outer run/capability `COMPLETE` olamaz.
 - **Surgical + mevcut-pattern.** Var olan i18n/config/routing sistemlerini kullan, yeniden icat etme.
 - **Riskli/görsel kod kör-default-on edilmez** — flag-gated + doğrula, sonra default.
 - Şüphe varsa: "Bu god-level/enterprise mi, i18n-temiz mi, borç bırakıyor mu?" diye sor — sonra yaz.

@@ -27,6 +27,11 @@
 import { spawn } from 'node:child_process';
 import { detectFullStack } from '../core/stack-detector.js';
 import type { FullStackResult } from '../core/stack-detector.js';
+import type {
+  TypeScriptScopedVerificationExecutor,
+  TypeScriptScopedVerificationInvocation,
+  TypeScriptScopedVerificationProcessResult,
+} from '../core/verification-typescript-adapter.js';
 
 // ─── Command resolution ─────────────────────────────────────────────────────
 
@@ -114,6 +119,44 @@ export const spawnCommandRunner: CommandRunner = (command, cwd) =>
       resolve({ exitCode, stdout, stderr });
     });
   });
+
+/**
+ * Production process boundary for an already-admitted TypeScript invocation.
+ * The adapter owns what may run; this function only executes its fixed argv
+ * without a shell, so it cannot widen verification to the live project.
+ */
+export const executeAdmittedTypeScriptVerification: TypeScriptScopedVerificationExecutor = (
+  invocation: TypeScriptScopedVerificationInvocation,
+) => new Promise<TypeScriptScopedVerificationProcessResult>((resolve) => {
+  const child = spawn(invocation.executable, [...invocation.argv], {
+    cwd: invocation.cwd,
+    shell: invocation.shell,
+  });
+  let stdout = '';
+  let stderr = '';
+  let timedOut = false;
+  let settled = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    child.kill('SIGTERM');
+  }, invocation.timeoutMs);
+  const finish = (exitCode: number | null): void => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timeout);
+    resolve({ exitCode, stdout, stderr, timedOut });
+  };
+
+  child.stdout?.setEncoding('utf-8');
+  child.stderr?.setEncoding('utf-8');
+  child.stdout?.on('data', (chunk: string) => { stdout += chunk; });
+  child.stderr?.on('data', (chunk: string) => { stderr += chunk; });
+  child.on('error', (error: Error) => {
+    stderr += error.message;
+    finish(null);
+  });
+  child.on('close', (code) => finish(code));
+});
 
 // ─── verify_task ────────────────────────────────────────────────────────────
 

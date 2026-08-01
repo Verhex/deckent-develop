@@ -47,9 +47,18 @@ import {
   releaseStaleSpawnLocksForTask,
   SpawnLockError,
 } from '../core/file-lock.js';
+import { ProviderExecutionObservationStore } from '../core/provider-execution-observation-store.js';
+import {
+  parseProviderExecutionObservationInput,
+  type ProviderExecutionObservationInput,
+} from '../core/provider-execution-observation.js';
 import { markPending, markActive, clearPending } from '../core/active-workers.js';
 import { authHealthCheck } from '../agents/worker.js';
 import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
+import {
+  WorkerHeartbeatAuthorityStore,
+  type WorkerHeartbeatAuthorityWrite,
+} from '../core/worker-heartbeat-authority-store.js';
 import {
   claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlement,
@@ -67,9 +76,11 @@ import {
   readTaskResultSettlementDispatch,
   readTaskResultSettlementPrepared,
   readTaskResultSettlementPrompt,
+  taskResultSettlementActiveClaimDigest,
   taskResultSettlementPromptEvidenceRef,
   taskResultSettlementPromptPath,
   taskResultSettlementAttemptPath,
+  taskResultSettlementWorkAttributionBaselinePath,
   taskResultSettlementPath,
   taskProviderTerminalBillingEvidenceRef,
   writeTaskProviderActualCallReceiptAtomic,
@@ -83,6 +94,7 @@ import {
   writeTaskResultSettlementExecutionContractAtomic,
   writeTaskResultSettlementPreparedAtomic,
   writeTaskResultSettlementPromptAtomic,
+  writeTaskResultSettlementWorkAttributionBaselineAtomic,
   writeTaskResultSettlementAtomic,
   type TaskProviderTerminalBillingReceiptV1,
   type TaskProviderTerminalUsageSourceV1,
@@ -146,6 +158,211 @@ const DEFAULT_GRACEFUL_TIMEOUT_SECONDS = 15;
 // (heartbeat-monitor.ts) derives `deckent-w-<taskId>` from the SAME constant the
 // backend uses to `docker run --name` / `docker wait` — no drifting duplicate.
 export const CONTAINER_PREFIX = 'deckent-w-';
+
+/** Shared by the in-container producer and the host ingestion seam. */
+export const PROVIDER_EXECUTION_OBSERVATION_DIR_NAME = 'provider-execution-observations';
+const CONTAINER_PROVIDER_EXECUTION_OBSERVATION_DIR =
+  `${CONTAINER_WORKSPACE}/${TASKS_DIR}/${PROVIDER_EXECUTION_OBSERVATION_DIR_NAME}`;
+export const DOCKER_PROVIDER_EXECUTION_CLOSED_RETENTION_LIMIT = 256;
+
+export interface DockerProviderExecutionObservationBinding {
+  readonly executionId: string;
+  readonly taskId: string;
+  readonly attemptId: string;
+  readonly providerPrincipalDigest: string;
+}
+
+/**
+ * Deterministic execution id for the exact Docker attempt. The spawn site and
+ * the host ingestion seam derive it from the SAME settlement identity, so a
+ * container-emitted observation can never be attributed to another attempt.
+ */
+export function dockerProviderExecutionId(input: {
+  readonly projectRootSha256: string;
+  readonly taskId: string;
+  readonly attemptId: string;
+}): string {
+  return createHash('sha256').update(canonicalJson({
+    backend: 'docker',
+    projectRootSha256: input.projectRootSha256,
+    taskId: input.taskId,
+    attemptId: input.attemptId,
+  })).digest('hex');
+}
+
+export interface DockerProviderPrincipalDigestInput {
+  readonly provider: string;
+  readonly authMode: 'api' | 'subscription';
+  readonly accountRefHash?: string | null;
+  readonly apiCredential?: string;
+  readonly credentialSources?: Readonly<Record<string, string>>;
+}
+
+function shellSingleQuote(value: string): string {
+  return `'${value.replace(/'/gu, `'"'"'`)}'`;
+}
+
+function assertObservationIdentityField(name: string, value: string): void {
+  if (!/^[A-Za-z0-9._:-]{1,512}$/u.test(value)) {
+    throw new SpawnBackendError(
+      `Docker provider execution observation ${name} is not a safe canonical identity`,
+      'docker',
+    );
+  }
+}
+
+/**
+ * Derive a stable, secret-free principal pseudonym from the exact auth material
+ * selected by the host. Raw credentials and host paths never enter an
+ * observation. An exact admission account hash wins when one exists.
+ */
+export function resolveDockerProviderPrincipalDigest(
+  input: DockerProviderPrincipalDigestInput,
+): string {
+  assertObservationIdentityField('provider', input.provider);
+  if (input.accountRefHash !== undefined && input.accountRefHash !== null) {
+    if (!/^[a-f0-9]{64}$/u.test(input.accountRefHash)) {
+      throw new SpawnBackendError(
+        'Docker provider execution accountRefHash is malformed',
+        'docker',
+      );
+    }
+    return createHash('sha256').update(canonicalJson({
+      provider: input.provider,
+      authMode: input.authMode,
+      accountRefHash: input.accountRefHash,
+    })).digest('hex');
+  }
+
+  const materialDigests: string[] = [];
+  if (input.authMode === 'api' && input.apiCredential) {
+    materialDigests.push(
+      createHash('sha256').update(input.apiCredential).digest('hex'),
+    );
+  }
+  if (input.authMode === 'subscription') {
+    for (const [name, path] of Object.entries(input.credentialSources ?? {})
+      .sort(([left], [right]) => left.localeCompare(right))) {
+      if (!existsSync(path) || !statSync(path).isFile()) continue;
+      materialDigests.push(`${name}:${createHash('sha256').update(readFileSync(path)).digest('hex')}`);
+    }
+  }
+  if (materialDigests.length === 0) {
+    throw new SpawnBackendError(
+      `Authenticated Docker provider process has no host-resolved principal material for ${input.provider}`,
+      'docker',
+    );
+  }
+  return createHash('sha256').update(canonicalJson({
+    provider: input.provider,
+    authMode: input.authMode,
+    materialDigests,
+  })).digest('hex');
+}
+
+/**
+ * Host-authored POSIX wrapper fragment for the provider process boundary.
+ *
+ * The caller installs these functions after auth bootstrap, calls
+ * `record_provider_execution_start` immediately before launching the provider,
+ * and calls `record_provider_execution_end` immediately after its wait returns.
+ * Files are immutable first-writer events. Closed pairs have a finite retention
+ * ceiling; start-only intervals are deliberately never selected for pruning so
+ * settlement diagnostics retain provider processes whose end was not observed.
+ */
+export function buildDockerProviderExecutionObservationShell(
+  binding: Readonly<DockerProviderExecutionObservationBinding>,
+  options: {
+    readonly observationDirectory?: string;
+    readonly closedRetentionLimit?: number;
+  } = {},
+): readonly string[] {
+  assertObservationIdentityField('executionId', binding.executionId);
+  assertObservationIdentityField('taskId', binding.taskId);
+  assertObservationIdentityField('attemptId', binding.attemptId);
+  if (!/^[a-f0-9]{64}$/u.test(binding.providerPrincipalDigest)) {
+    throw new SpawnBackendError(
+      'Docker provider execution principal digest is malformed',
+      'docker',
+    );
+  }
+  const retentionLimit = options.closedRetentionLimit
+    ?? DOCKER_PROVIDER_EXECUTION_CLOSED_RETENTION_LIMIT;
+  if (!Number.isSafeInteger(retentionLimit) || retentionLimit < 1) {
+    throw new SpawnBackendError(
+      'Docker provider execution closed retention limit must be a positive safe integer',
+      'docker',
+    );
+  }
+  const directory = options.observationDirectory
+    ?? CONTAINER_PROVIDER_EXECUTION_OBSERVATION_DIR;
+  if (!directory || /[\u0000\r\n]/u.test(directory)) {
+    throw new SpawnBackendError(
+      'Docker provider execution observation directory is malformed',
+      'docker',
+    );
+  }
+  const prefix = `${directory}/${binding.executionId}`;
+  const startJson = `{"type":"start","executionId":"${binding.executionId}",`
+    + `"taskId":"${binding.taskId}","attemptId":"${binding.attemptId}",`
+    + `"providerPrincipalDigest":"${binding.providerPrincipalDigest}",`
+    + `"fence":"$DECKENT_PROVIDER_EXECUTION_FENCE","sequence":1,`
+    + `"observedAt":"$PROVIDER_OBSERVED_AT"}`;
+  const endJson = `{"type":"end","executionId":"${binding.executionId}",`
+    + `"taskId":"${binding.taskId}","attemptId":"${binding.attemptId}",`
+    + `"providerPrincipalDigest":"${binding.providerPrincipalDigest}",`
+    + `"fence":"$DECKENT_PROVIDER_EXECUTION_FENCE","sequence":2,`
+    + `"observedAt":"$PROVIDER_OBSERVED_AT","outcome":"$PROVIDER_OBSERVATION_OUTCOME"}`;
+  const startPayload = startJson.replace(/"/gu, '\\"');
+  const endPayload = endJson.replace(/"/gu, '\\"');
+  return [
+    `PROVIDER_OBSERVATION_DIR=${shellSingleQuote(directory)}`,
+    `PROVIDER_OBSERVATION_PREFIX=${shellSingleQuote(prefix)}`,
+    `PROVIDER_OBSERVATION_CLOSED_RETENTION=${retentionLimit}`,
+    'PROVIDER_OBSERVATION_STARTED=0',
+    'persist_provider_execution_observation() {',
+    '  PROVIDER_OBSERVATION_TARGET="$1"',
+    '  PROVIDER_OBSERVATION_PAYLOAD="$2"',
+    '  mkdir -p "$PROVIDER_OBSERVATION_DIR" || return 79',
+    '  chmod 700 "$PROVIDER_OBSERVATION_DIR" 2>/dev/null || true',
+    '  [ ! -e "$PROVIDER_OBSERVATION_TARGET" ] || return 0',
+    '  PROVIDER_OBSERVATION_TMP="$PROVIDER_OBSERVATION_TARGET.tmp.$$"',
+    '  (umask 077; printf "%s\\n" "$PROVIDER_OBSERVATION_PAYLOAD" > "$PROVIDER_OBSERVATION_TMP") || return 79',
+    '  if ln "$PROVIDER_OBSERVATION_TMP" "$PROVIDER_OBSERVATION_TARGET" 2>/dev/null; then',
+    '    fsync_file "$PROVIDER_OBSERVATION_TARGET"',
+    '  fi',
+    '  rm -f "$PROVIDER_OBSERVATION_TMP" 2>/dev/null',
+    '}',
+    'prune_closed_provider_execution_observations() {',
+    '  PROVIDER_OBSERVATION_COUNT=0',
+    '  for PROVIDER_OBSERVATION_END in "$PROVIDER_OBSERVATION_DIR"/*.end.json; do',
+    '    [ -f "$PROVIDER_OBSERVATION_END" ] || continue',
+    '    PROVIDER_OBSERVATION_COUNT=$((PROVIDER_OBSERVATION_COUNT + 1))',
+    '  done',
+    '  [ "$PROVIDER_OBSERVATION_COUNT" -le "$PROVIDER_OBSERVATION_CLOSED_RETENTION" ] && return 0',
+    '  for PROVIDER_OBSERVATION_END in $(ls -1tr "$PROVIDER_OBSERVATION_DIR"/*.end.json 2>/dev/null); do',
+    '    [ "$PROVIDER_OBSERVATION_COUNT" -le "$PROVIDER_OBSERVATION_CLOSED_RETENTION" ] && break',
+    '    PROVIDER_OBSERVATION_START="${PROVIDER_OBSERVATION_END%.end.json}.start.json"',
+    '    rm -f "$PROVIDER_OBSERVATION_END" "$PROVIDER_OBSERVATION_START" 2>/dev/null || return 79',
+    '    PROVIDER_OBSERVATION_COUNT=$((PROVIDER_OBSERVATION_COUNT - 1))',
+    '  done',
+    '}',
+    'record_provider_execution_start() {',
+    '  [ -n "$DECKENT_PROVIDER_EXECUTION_FENCE" ] || return 79',
+    '  PROVIDER_OBSERVED_AT="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" || return 79',
+    `  persist_provider_execution_observation "$PROVIDER_OBSERVATION_PREFIX.start.json" "${startPayload}" || return 79`,
+    '  PROVIDER_OBSERVATION_STARTED=1',
+    '}',
+    'record_provider_execution_end() {',
+    '  [ "$PROVIDER_OBSERVATION_STARTED" -eq 1 ] || return 0',
+    '  PROVIDER_OBSERVATION_OUTCOME="$1"',
+    '  case "$PROVIDER_OBSERVATION_OUTCOME" in completed|failed|aborted) ;; *) return 79 ;; esac',
+    '  PROVIDER_OBSERVED_AT="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" || return 79',
+    `  persist_provider_execution_observation "$PROVIDER_OBSERVATION_PREFIX.end.json" "${endPayload}" || return 79`,
+    '  prune_closed_provider_execution_observations || return 79',
+    '}',
+  ];
+}
 
 export interface DockerExactCrossVerifySpawnInput {
   readonly taskId: string;
@@ -272,6 +489,10 @@ export interface ProviderAuthIsolation {
   writebackLines?: string[];
   credentialCount: number;
   missingRequiredFiles: string[];
+  /** Provider execution never owns the shared credential-mutation lease. */
+  executionConcurrency: 'isolated-parallel' | 'not-applicable';
+  /** Exact shared-state critical section guarded by the broker lease. */
+  credentialMutationLockScope: 'bootstrap-and-writeback' | 'none';
 }
 
 export interface ProviderAuthIsolationOptions {
@@ -1422,7 +1643,14 @@ export function buildProviderAuthIsolation(
   options: ProviderAuthIsolationOptions = {},
 ): ProviderAuthIsolation {
   if (useApiOnly || !oauthHomeDir) {
-    return { mountArgs: [], bootstrapLines: [], credentialCount: 0, missingRequiredFiles: [] };
+    return {
+      mountArgs: [],
+      bootstrapLines: [],
+      credentialCount: 0,
+      missingRequiredFiles: [],
+      executionConcurrency: 'not-applicable',
+      credentialMutationLockScope: 'none',
+    };
   }
   const mountArgs: string[] = [];
   const bootstrapLines: string[] = [];
@@ -1465,17 +1693,33 @@ export function buildProviderAuthIsolation(
     }
     credentialCount += 1;
   }
+  if (options.lockPath) {
+    // The provider runs against its task-private HOME. Keeping fd 8 open is
+    // harmless, but retaining the exclusive lease here serializes the entire
+    // model invocation and makes advertised worker concurrency fictitious.
+    // Release immediately after the bounded broker -> private copy.
+    bootstrapLines.push('flock -u 8 || exit 78');
+  }
   if (writebackLines.length > 0) {
     bootstrapLines.push('sync_provider_auth() {');
-    bootstrapLines.push(...writebackLines.map(line => `  ${line}`));
+    if (options.lockPath) bootstrapLines.push('  flock -x 8 || return 78');
+    bootstrapLines.push(...writebackLines.map((line) => {
+      const operation = line.replace(/ \|\| exit 78$/u, '');
+      return options.lockPath
+        ? `  ${operation} || { flock -u 8; return 78; }`
+        : `  ${line}`;
+    }));
+    if (options.lockPath) bootstrapLines.push('  flock -u 8 || return 78');
     bootstrapLines.push('}');
   }
   return {
     mountArgs,
     bootstrapLines,
-    ...(writebackLines.length > 0 ? { writebackLines: ['sync_provider_auth'] } : {}),
+    ...(writebackLines.length > 0 ? { writebackLines: ['sync_provider_auth || exit 78'] } : {}),
     credentialCount,
     missingRequiredFiles,
+    executionConcurrency: 'isolated-parallel',
+    credentialMutationLockScope: options.lockPath ? 'bootstrap-and-writeback' : 'none',
   };
 }
 
@@ -1717,8 +1961,9 @@ export const SCOPE_BASELINE_DELIM = '\t';
  *
  * For each scoped entry that exists on disk at spawn, records
  * `<path>\t<gitHashObject>` — the SAME `git hash-object` blob id the in-container
- * trap recomputes at exit (git is present in both places; hash-object is
- * read-only and NOT on the worker git-guard denylist). A file that does not yet
+ * trap recomputes at exit. The host writes the content-addressed blob into Git's
+ * object store so post-exit numstat can compare exact claim-time bytes without a
+ * worktree copy. A file that does not yet
  * exist is omitted (no entry ⇒ "created by the worker" at exit ⇒ counted as work,
  * so genuine new task-local work stays recoverable).
  *
@@ -1736,7 +1981,7 @@ export function computeScopeBaselineManifest(dir: string, scopeFilesWrite: reado
     try { abs = resolve(dir, rel); } catch { continue; }
     if (!existsSync(abs)) continue;
     try {
-      const res = spawnSync('git', ['hash-object', '--', rel], {
+      const res = spawnSync('git', ['hash-object', '-w', '--', rel], {
         cwd: dir, encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
       });
       const hash = (res.stdout ?? '').trim();
@@ -1748,6 +1993,264 @@ export function computeScopeBaselineManifest(dir: string, scopeFilesWrite: reado
     }
   }
   return lines.length ? lines.join('\n') + '\n' : '';
+}
+
+export const SCOPE_ATTRIBUTION_HEADER = '#deckent-scope-attribution-v1';
+
+function normalizedScopeFiles(values: readonly string[]): string[] {
+  const normalized = values
+    .map(value => value.trim().replace(/\\/g, '/').replace(/^\.\//, ''))
+    .filter(Boolean);
+  for (const value of normalized) {
+    if (
+      value.startsWith('/')
+      || /^[A-Za-z]:\//.test(value)
+      || value.split('/').some(segment => segment === '..' || segment.length === 0)
+    ) {
+      throw new TypeError(`invalid attribution scope path:${value}`);
+    }
+  }
+  return [...new Set(normalized)]
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function scopeAttributionDigest(values: readonly string[]): string {
+  return createHash('sha256').update(canonicalJson(normalizedScopeFiles(values))).digest('hex');
+}
+
+export function buildScopeAttributionManifest(
+  attemptId: string,
+  scopeFilesWrite: readonly string[],
+  contentManifest: string,
+): string {
+  const header = [
+    SCOPE_ATTRIBUTION_HEADER,
+    attemptId,
+    scopeAttributionDigest(scopeFilesWrite),
+  ].join(SCOPE_BASELINE_DELIM);
+  return `${header}\n${contentManifest}`;
+}
+
+export function captureScopeAttributionManifest(
+  projectRoot: string,
+  attemptId: string,
+  scopeFilesWrite: readonly string[],
+): string {
+  const scopeFiles = normalizedScopeFiles(scopeFilesWrite);
+  const contentManifest = computeScopeBaselineManifest(projectRoot, scopeFiles);
+  const captured = new Set(contentManifest
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map(line => line.slice(0, line.indexOf(SCOPE_BASELINE_DELIM))));
+  for (const path of scopeFiles) {
+    if (existsSync(resolve(projectRoot, path)) && !captured.has(path)) {
+      throw new Error(`attribution-baseline-capture-failed:${path}`);
+    }
+  }
+  return buildScopeAttributionManifest(attemptId, scopeFiles, contentManifest);
+}
+
+export interface ReconcileDockerResultWorkAttributionInput {
+  readonly projectRoot: string;
+  readonly resultPath: string;
+  readonly baselinePath: string;
+  readonly attemptId: string | undefined;
+  readonly scopeFilesWrite: readonly string[];
+}
+
+export interface DockerResultWorkAttributionOutcome {
+  readonly state: 'VERIFIED' | 'HOLD';
+  readonly filesChanged: readonly string[];
+  readonly linesAdded: number;
+  readonly linesRemoved: number;
+  readonly reasonCode?: string;
+}
+
+function gitBlobHash(projectRoot: string, path: string): string | null {
+  if (!existsSync(resolve(projectRoot, path))) return null;
+  const result = spawnSync('git', ['hash-object', '-w', '--', path], {
+    cwd: projectRoot,
+    encoding: 'utf-8',
+    timeout: 5_000,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  const hash = (result.stdout ?? '').trim();
+  if (result.status !== 0 || !/^[0-9a-f]{40,64}$/.test(hash)) {
+    throw new Error(`blob-hash-unavailable:${path}`);
+  }
+  return hash;
+}
+
+function countTextLines(bytes: Buffer): number {
+  if (bytes.includes(0)) throw new Error('binary-or-unmeasurable-numstat');
+  if (bytes.length === 0) return 0;
+  let lines = 0;
+  for (const byte of bytes) if (byte === 0x0a) lines++;
+  return bytes[bytes.length - 1] === 0x0a ? lines : lines + 1;
+}
+
+function gitBlobLineCount(projectRoot: string, hash: string): number {
+  const result = spawnSync('git', ['cat-file', 'blob', hash], {
+    cwd: projectRoot,
+    encoding: null,
+    timeout: 5_000,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  if (result.status !== 0 || !Buffer.isBuffer(result.stdout)) {
+    throw new Error('baseline-blob-unavailable');
+  }
+  return countTextLines(result.stdout);
+}
+
+function blobNumstat(
+  projectRoot: string,
+  beforeHash: string,
+  afterHash: string,
+): { added: number; removed: number } {
+  const result = spawnSync('git', ['diff', '--numstat', beforeHash, afterHash], {
+    cwd: projectRoot,
+    encoding: 'utf-8',
+    timeout: 5_000,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  const first = (result.stdout ?? '').trim().split(/\r?\n/, 1)[0] ?? '';
+  const [addedRaw, removedRaw] = first.split('\t');
+  if (
+    result.status !== 0
+    || !/^\d+$/.test(addedRaw ?? '')
+    || !/^\d+$/.test(removedRaw ?? '')
+  ) {
+    throw new Error('binary-or-unmeasurable-numstat');
+  }
+  return { added: Number(addedRaw), removed: Number(removedRaw) };
+}
+
+function resultClaimedPaths(result: Record<string, unknown>): string[] {
+  if (!Array.isArray(result.filesChanged)) return [];
+  return result.filesChanged.flatMap((entry) => {
+    if (typeof entry === 'string') return [entry];
+    if (entry && typeof entry === 'object' && typeof (entry as { path?: unknown }).path === 'string') {
+      return [(entry as { path: string }).path];
+    }
+    return [];
+  }).map(path => path.replace(/\\/g, '/').replace(/^\.\//, ''));
+}
+
+function writeAttributionResult(
+  input: ReconcileDockerResultWorkAttributionInput,
+  result: Record<string, unknown>,
+  outcome: DockerResultWorkAttributionOutcome,
+  scopeDigest: string,
+  claimedOutsideScope: readonly string[],
+  changes: readonly { path: string; status: 'added' | 'modified' | 'deleted'; linesAdded: number; linesRemoved: number }[],
+  baselineSha256?: string,
+): void {
+  const canonicalShape = result.schemaVersion === '1.0' || result.schemaVersion === 1
+    || (Array.isArray(result.filesChanged) && result.filesChanged.some(entry => entry && typeof entry === 'object'));
+  result.filesChanged = canonicalShape ? changes : [...outcome.filesChanged];
+  result.linesAdded = outcome.linesAdded;
+  result.linesRemoved = outcome.linesRemoved;
+  result.totalLinesAdded = outcome.linesAdded;
+  result.totalLinesRemoved = outcome.linesRemoved;
+  result.workAttribution = {
+    state: outcome.state,
+    attemptId: input.attemptId ?? 'unbound',
+    baselineRef: baselineSha256
+      ? `task-result-work-attribution-baseline:sha256:${baselineSha256}`
+      : 'task-result-work-attribution-baseline:unavailable',
+    ...(baselineSha256 ? { baselineSha256 } : {}),
+    scopeDigest,
+    ...(outcome.reasonCode ? { reasonCode: outcome.reasonCode } : {}),
+    ...(claimedOutsideScope.length > 0 ? { claimedOutsideScope } : {}),
+  };
+  if (outcome.state === 'HOLD') {
+    result.selfAssessment = 'NO_GO';
+    const existing = typeof result.notes === 'string' ? result.notes : '';
+    result.notes = `${existing}${existing ? '\n' : ''}WORK_ATTRIBUTION_HOLD:${outcome.reasonCode ?? 'unknown'}`;
+  }
+  atomicWriteFileSync(input.resultPath, `${JSON.stringify(result, null, 2)}\n`);
+}
+
+/**
+ * Replace worker-authored shared-tree diff claims with claim-time-baseline
+ * evidence. Missing/foreign authority is a durable HOLD, never an authorship
+ * guess from the final repository diff.
+ */
+export function reconcileDockerResultWorkAttribution(
+  input: ReconcileDockerResultWorkAttributionInput,
+): DockerResultWorkAttributionOutcome {
+  const result = JSON.parse(readFileSync(input.resultPath, 'utf-8')) as Record<string, unknown>;
+  const scopeFiles = normalizedScopeFiles(input.scopeFilesWrite);
+  const scopeSet = new Set(scopeFiles);
+  const scopeDigest = scopeAttributionDigest(scopeFiles);
+  const claimedOutsideScope = resultClaimedPaths(result).filter(path => !scopeSet.has(path));
+  const baselineSha256 = existsSync(input.baselinePath)
+    ? createHash('sha256').update(readFileSync(input.baselinePath)).digest('hex')
+    : undefined;
+  const hold = (reasonCode: string): DockerResultWorkAttributionOutcome => {
+    const outcome = { state: 'HOLD' as const, filesChanged: [], linesAdded: 0, linesRemoved: 0, reasonCode };
+    writeAttributionResult(input, result, outcome, scopeDigest, claimedOutsideScope, [], baselineSha256);
+    return outcome;
+  };
+  if (!input.attemptId || !existsSync(input.baselinePath)) return hold('ATTRIBUTION_AUTHORITY_UNAVAILABLE');
+
+  const lines = readFileSync(input.baselinePath, 'utf-8').split(/\r?\n/);
+  const [marker, manifestAttemptId, manifestScopeDigest] = (lines.shift() ?? '').split(SCOPE_BASELINE_DELIM);
+  if (
+    marker !== SCOPE_ATTRIBUTION_HEADER
+    || manifestAttemptId !== input.attemptId
+    || manifestScopeDigest !== scopeDigest
+  ) return hold('ATTRIBUTION_AUTHORITY_MISMATCH');
+
+  const baseline = new Map<string, string>();
+  for (const line of lines) {
+    if (!line) continue;
+    const delimiter = line.indexOf(SCOPE_BASELINE_DELIM);
+    if (delimiter <= 0) return hold('ATTRIBUTION_BASELINE_INVALID');
+    baseline.set(line.slice(0, delimiter), line.slice(delimiter + 1));
+  }
+
+  const changes: Array<{ path: string; status: 'added' | 'modified' | 'deleted'; linesAdded: number; linesRemoved: number }> = [];
+  try {
+    for (const path of scopeFiles) {
+      const beforeHash = baseline.get(path) ?? null;
+      const afterHash = gitBlobHash(input.projectRoot, path);
+      if (beforeHash === afterHash) continue;
+      const counts = beforeHash === null
+        ? {
+            added: countTextLines(readFileSync(resolve(input.projectRoot, path))),
+            removed: 0,
+          }
+        : afterHash === null
+          ? { added: 0, removed: gitBlobLineCount(input.projectRoot, beforeHash) }
+          : blobNumstat(input.projectRoot, beforeHash, afterHash);
+      changes.push({
+        path,
+        status: beforeHash === null ? 'added' : afterHash === null ? 'deleted' : 'modified',
+        linesAdded: counts.added,
+        linesRemoved: counts.removed,
+      });
+    }
+  } catch (error) {
+    debugLog('docker-backend:work-attribution', error);
+    return hold('ATTRIBUTION_DIFF_UNMEASURABLE');
+  }
+  const outcome: DockerResultWorkAttributionOutcome = {
+    state: claimedOutsideScope.length > 0 ? 'HOLD' : 'VERIFIED',
+    filesChanged: changes.map(change => change.path),
+    linesAdded: changes.reduce((sum, change) => sum + change.linesAdded, 0),
+    linesRemoved: changes.reduce((sum, change) => sum + change.linesRemoved, 0),
+    ...(claimedOutsideScope.length > 0 ? { reasonCode: 'CLAIM_OUTSIDE_WRITE_SCOPE' } : {}),
+  };
+  writeAttributionResult(input, result, outcome, scopeDigest, claimedOutsideScope, changes, baselineSha256);
+  return outcome;
+}
+
+function publishWorkAttributionBaseline(
+  ref: TaskResultSettlementRefV1,
+  manifest: string,
+): string {
+  return writeTaskResultSettlementWorkAttributionBaselineAtomic(ref, manifest);
 }
 
 /**
@@ -2854,14 +3357,10 @@ export function buildDistReadOnlyMountArgs(distExists: boolean, distHostPath: st
   return ['-v', `${distHostPath}:${CONTAINER_WORKSPACE}/dist:ro`];
 }
 
-// ─── born-468: WRAPPER-HB-GATE (heartbeat staleness gate) ──────────────────
-// The wrapper's background heartbeat tick used to unconditionally overwrite
-// $HBFILE every 15s with a skeletal {workerId,taskId,status,sequence,
-// timestamp,backend} payload — clobbering any richer heartbeat the worker
-// itself just wrote. Gate the write on staleness: only refresh $HBFILE when
-// it is missing or older than WRAPPER_HB_STALE_THRESHOLD_SECONDS, and write
-// it atomically (tmp+mv — same directory ⇒ a single rename syscall) so a
-// concurrent reader (auditor stale-worker scan) never observes a torn write.
+// ─── Docker heartbeat wrapper compatibility ────────────────────────────────
+// Host observations are now published only through WorkerHeartbeatAuthorityStore.
+// Keep exported wrapper builders as inert compatibility seams; they must never
+// supply a shell timestamp or write a competing raw heartbeat.
 
 /**
  * Build the POSIX `sh` `write_hb_if_stale()` function definition. Extracted
@@ -2870,24 +3369,8 @@ export function buildDistReadOnlyMountArgs(distExists: boolean, distHostPath: st
  * running the real 15s-interval background loop.
  */
 export function buildHeartbeatGateFn(taskId: string): string {
-  return [
-    'write_hb_if_stale() {',
-    '  hb_seq="$1"',
-    '  if [ -f "$HBFILE" ]; then',
-    '    hb_mtime=$(stat -c %Y "$HBFILE" 2>/dev/null || echo 0)',
-    '    hb_now=$(date -u +%s)',
-    '    hb_age=$((hb_now - hb_mtime))',
-    `    if [ "$hb_age" -lt ${WRAPPER_HB_STALE_THRESHOLD_SECONDS} ]; then`,
-    // Fresh heartbeat already on disk — the worker itself is writing it.
-    // Do NOT touch it (born-468: this is the fix — the old loop always wrote).
-    '      return 0',
-    '    fi',
-    '  fi',
-    '  hb_tmp="$HBFILE.hbwrap.$$"',
-    `  echo "{\\"workerId\\":\\"docker-${taskId}\\",\\"taskId\\":\\"${taskId}\\",\\"status\\":\\"EXECUTING\\",\\"sequence\\":$hb_seq,\\"timestamp\\":\\"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\\",\\"backend\\":\\"docker\\"}" > "$hb_tmp"`,
-    '  mv "$hb_tmp" "$HBFILE"',
-    '}',
-  ].join('\n');
+  void taskId;
+  return 'write_hb_if_stale() { return 0; }';
 }
 
 /**
@@ -2896,10 +3379,132 @@ export function buildHeartbeatGateFn(taskId: string): string {
  * generated worker script.
  */
 export function buildHeartbeatWrapperLoop(taskId: string): string {
-  return [
-    buildHeartbeatGateFn(taskId),
-    '( SEQ=2; while true; do sleep 15; SEQ=$((SEQ+1)); write_hb_if_stale "$SEQ"; done ) &',
-  ].join('\n');
+  return buildHeartbeatGateFn(taskId);
+}
+
+/**
+ * Persist one host-observed Docker heartbeat.  The authority store owns the
+ * sequence and timestamp; Docker, the wrapper, and worker result only supply
+ * independently observable process and verdict facts.
+ */
+export function observeDockerHeartbeatAuthority(input: {
+  readonly tasksDir: string;
+  readonly settlementRef: TaskResultSettlementRefV1;
+  readonly hostProcessOutcome: WorkerHeartbeatAuthorityWrite['hostProcessOutcome'];
+  readonly workerTaskVerdict: WorkerHeartbeatAuthorityWrite['workerTaskVerdict'];
+  readonly liveness: WorkerHeartbeatAuthorityWrite['liveness'];
+}): void {
+  const { settlementRef } = input;
+  const identity = {
+    runId: settlementRef.projectRootSha256,
+    taskId: settlementRef.taskId,
+    attemptId: settlementRef.attemptId,
+    workerId: `docker-${settlementRef.taskId}`,
+    fence: taskResultSettlementActiveClaimDigest(settlementRef),
+  };
+  const store = new WorkerHeartbeatAuthorityStore(join(input.tasksDir, 'worker-heartbeat-authority'));
+  const initialized = store.initialize(identity);
+  if (initialized.state === 'HOLD') {
+    debugLog('docker-backend:heartbeat-authority-hold', initialized.detail);
+    return;
+  }
+  const expectedHostSequence = store.read(identity)?.latest?.hostSequence ?? 0;
+  const observed = store.observe({
+    identity,
+    expectedHostSequence,
+    hostProcessOutcome: input.hostProcessOutcome,
+    workerTaskVerdict: input.workerTaskVerdict,
+    liveness: input.liveness,
+  });
+  if (observed.state === 'HOLD') {
+    debugLog('docker-backend:heartbeat-authority-hold', observed.detail);
+  }
+}
+
+export interface DockerProviderExecutionObservationIngest {
+  readonly ingested: number;
+  readonly duplicates: number;
+  readonly contradictions: number;
+  /** Files that did not belong to this exact attempt, or were unreadable/malformed. */
+  readonly rejected: number;
+}
+
+/**
+ * Host ingestion of the provider execution window a container emitted.
+ *
+ * The container is the only producer: it writes one immutable `.start.json` at
+ * the exact provider invocation and one `.end.json` at exact process
+ * settlement. The host copies those files into the provider observation store
+ * and NOTHING else — a missing `.end.json` stays an open interval rather than
+ * being closed from container exit, and a missing `.start.json` never yields a
+ * synthesized start. Every file is bound to the exact attempt identity before
+ * it is forwarded, so a stale or foreign emission cannot manufacture overlap.
+ */
+export function ingestDockerProviderExecutionObservations(input: {
+  readonly tasksDir: string;
+  readonly settlementRef: TaskResultSettlementRefV1;
+  readonly store: ProviderExecutionObservationStore;
+}): DockerProviderExecutionObservationIngest {
+  const executionId = dockerProviderExecutionId({
+    projectRootSha256: input.settlementRef.projectRootSha256,
+    taskId: input.settlementRef.taskId,
+    attemptId: input.settlementRef.attemptId,
+  });
+  const directory = join(input.tasksDir, PROVIDER_EXECUTION_OBSERVATION_DIR_NAME);
+  let ingested = 0;
+  let duplicates = 0;
+  let contradictions = 0;
+  let rejected = 0;
+  // Start before end: the reducer rejects an end that precedes its start.
+  for (const suffix of ['start', 'end'] as const) {
+    const path = join(directory, `${executionId}.${suffix}.json`);
+    if (!existsSync(path)) continue;
+    let observation: ProviderExecutionObservationInput;
+    try {
+      observation = parseProviderExecutionObservationInput(
+        JSON.parse(readFileSync(path, 'utf-8')),
+      );
+    } catch (error) {
+      debugLog('docker-backend:provider-observation-malformed', error);
+      rejected += 1;
+      continue;
+    }
+    if (
+      observation.type !== suffix
+      || observation.executionId !== executionId
+      || observation.taskId !== input.settlementRef.taskId
+      || observation.attemptId !== input.settlementRef.attemptId
+    ) {
+      debugLog(
+        'docker-backend:provider-observation-foreign',
+        `expected ${executionId} ${suffix}, got ${observation.executionId} ${observation.type}`,
+      );
+      rejected += 1;
+      continue;
+    }
+    try {
+      const written = input.store.put({ source: 'provider-runtime', observation });
+      if (written.contradiction !== null) contradictions += 1;
+      else if (written.duplicate) duplicates += 1;
+      else ingested += 1;
+    } catch (error) {
+      debugLog('docker-backend:provider-observation-hold', error);
+      rejected += 1;
+    }
+  }
+  return { ingested, duplicates, contradictions, rejected };
+}
+
+function workerTaskVerdictFromDockerResult(resultPath: string): WorkerHeartbeatAuthorityWrite['workerTaskVerdict'] {
+  if (!existsSync(resultPath)) return 'no-go';
+  try {
+    const result = JSON.parse(readFileSync(resultPath, 'utf-8')) as { selfAssessment?: unknown };
+    if (result.selfAssessment === 'DONE' || result.selfAssessment === 'GO_WITH_TECH_DEBT') return 'done';
+    if (result.selfAssessment === 'HOLD') return 'hold';
+    return 'no-go';
+  } catch {
+    return 'no-go';
+  }
 }
 
 // ─── born-471: ALLOWLIST-SSOT ───────────────────────────────────────────────
@@ -4818,7 +5423,7 @@ export class DockerSpawnBackend implements SpawnBackend {
         'docker',
       );
     }
-    const providerAuthBroker = useApiOnly
+    const providerAuthBroker: ProviderAuthIsolationOptions = useApiOnly
       ? {}
       : prepareProviderAuthBroker(
           dir,
@@ -4857,6 +5462,27 @@ export class DockerSpawnBackend implements SpawnBackend {
       }
       providerAuth.bootstrapLines.push(...geminiAuthSelection.bootstrapLines);
     }
+    const providerPrincipalDigest = resolveDockerProviderPrincipalDigest({
+      provider,
+      authMode: useApiOnly ? 'api' : 'subscription',
+      accountRefHash: exact?.executionContract.accountRefHash,
+      apiCredential: providerCredentialEnv
+        ? process.env[providerCredentialEnv]
+        : undefined,
+      credentialSources: providerAuthBroker.credentialSources,
+    });
+    const providerExecutionObservationBinding: DockerProviderExecutionObservationBinding = {
+      executionId: dockerProviderExecutionId({
+        projectRootSha256: attemptRef.projectRootSha256,
+        taskId,
+        attemptId: attemptRef.attemptId,
+      }),
+      taskId,
+      attemptId: attemptRef.attemptId,
+      providerPrincipalDigest,
+    };
+    const providerExecutionObservationShell =
+      buildDockerProviderExecutionObservationShell(providerExecutionObservationBinding);
 
     // Write worker script to .tasks/ — avoids shell quoting issues with allowedTools parentheses
     const scriptFileName = `.worker-${taskId}.sh`;
@@ -4898,6 +5524,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       // POSIX-portable fsync: copy file to itself via dd conv=fsync
       // This forces OS buffer cache → disk. Survives SIGKILL after return.
       'fsync_file() { [ -f "$1" ] && dd if="$1" of="$1.fsync" bs=4096 conv=fsync 2>/dev/null && mv "$1.fsync" "$1" 2>/dev/null; }',
+      ...providerExecutionObservationShell,
       // Sprint 145: git-diff-aware EXIT trap function
       onExitFn,
       // Claude CLI stores per-session state below session-env/<session-id>.
@@ -4927,17 +5554,13 @@ export class DockerSpawnBackend implements SpawnBackend {
       '    wait "$PROVIDER_PID" 2>/dev/null || true',
       '  fi',
       '  CLAUDE_EXIT=143',
+      '  record_provider_execution_end aborted || CLAUDE_EXIT=79',
       ...(providerAuth.writebackLines ?? []).map(line => `  ${line}`),
       '  fsync_file "$RFILE"',
       '  fsync_file "$HBFILE"',
       '  exit 143',
       '}',
       'trap on_provider_term TERM',
-      // born-468: heartbeat update loop (every 15s) — staleness-gated so it
-      // never clobbers a richer heartbeat the worker itself just wrote; the
-      // fallback write itself is atomic (tmp+mv). See buildHeartbeatWrapperLoop.
-      buildHeartbeatWrapperLoop(taskId),
-      'HB_PID=$!',
       `TIMEOUT=\${TASK_TIMEOUT:-${effectiveTimeout}}`,
       // PSL-1 (Sprint 252): feed the prompt per the spec's promptFeed — 'stdin'
       // providers (claude `-p -`, codex `exec`) read the prompt FILE via `< …`;
@@ -4947,11 +5570,14 @@ export class DockerSpawnBackend implements SpawnBackend {
       // `|| echo` + the trailing rm. The .timeout marker is timeout-PURE now:
       // only 124 (TERM-timeout) / 137 (KILL) qualify — a crash/CLI-arg error is
       // NOT a timeout — and never when a real .result already exists.
+      'record_provider_execution_start || exit 79',
       `timeout -k 30 $TIMEOUT ${workerCmd}${spec.promptFeed === 'stdin' ? ` < "${containerPromptPath}"` : ''} &`,
       'PROVIDER_PID=$!',
       'wait "$PROVIDER_PID"',
       'CLAUDE_EXIT=$?',
       'PROVIDER_PID=""',
+      'if [ "$CLAUDE_EXIT" -eq 0 ]; then PROVIDER_OBSERVATION_OUTCOME=completed; elif [ "$CLAUDE_EXIT" -eq 124 ] || [ "$CLAUDE_EXIT" -eq 137 ] || [ "$CLAUDE_EXIT" -eq 143 ]; then PROVIDER_OBSERVATION_OUTCOME=aborted; else PROVIDER_OBSERVATION_OUTCOME=failed; fi',
+      'record_provider_execution_end "$PROVIDER_OBSERVATION_OUTCOME" || CLAUDE_EXIT=79',
       ...(providerAuth.writebackLines ?? []),
       `if [ "$CLAUDE_EXIT" -eq 124 ] || [ "$CLAUDE_EXIT" -eq 137 ]; then [ ! -f "$RFILE" ] && echo "WORKER_TIMEOUT" > "${timeoutPath}"; fi`,
       // Sprint 151: Clean up .partial-result on normal exit — on_exit/EXIT trap handles abnormal exit
@@ -5122,9 +5748,6 @@ export class DockerSpawnBackend implements SpawnBackend {
       dockerArgs.push('-e', `DECKENT_DEBUG=${process.env.DECKENT_DEBUG}`);
     }
 
-    // Container image and command
-    dockerArgs.push(executionImage, 'sh', '-c', containerCmd);
-
     debugLog('docker-backend:spawn', `taskId=${taskId} container=${containerName} model=${model}`);
 
     // born-644 (BUILD-VIOLATION-GUARD): snapshot dist/ BEFORE the container starts — see the
@@ -5137,14 +5760,22 @@ export class DockerSpawnBackend implements SpawnBackend {
     // this task's scoped files — SAME host-side checkpoint as the dist snapshot,
     // the last moment before the container can write to the shared bind-mount. The
     // in-container EXIT-trap reads it via $BASEFILE to subtract pre-existing /
-    // sibling dirt from the TIMEOUT_WITH_WORK / workPresent signal. Fail-soft: a
-    // write error only loses the baseline (trap degrades to its unfiltered legacy
-    // behavior), never blocks the spawn.
+    // sibling dirt from the TIMEOUT_WITH_WORK / workPresent signal. Attribution
+    // authority is mandatory: capture failure blocks before provider process
+    // birth instead of degrading to a final shared-tree diff.
     try {
-      const baselineManifest = computeScopeBaselineManifest(dir, scopeFilesWrite);
+      const baselineManifest = captureScopeAttributionManifest(
+        dir,
+        attemptRef.attemptId,
+        scopeFilesWrite,
+      );
+      publishWorkAttributionBaseline(attemptRef, baselineManifest);
       writeFileSync(join(tasksDir, `task-${taskId}.scope-baseline`), baselineManifest, 'utf-8');
     } catch (e) {
-      debugLog('docker-backend:scope-baseline-write', e);
+      throw new SpawnBackendError(
+        `Task ${taskId} attribution baseline could not be captured: ${e instanceof Error ? e.message : String(e)}`,
+        this.name,
+      );
     }
 
     // Sprint 163 T-002: retry spawn with health check.
@@ -5199,6 +5830,11 @@ export class DockerSpawnBackend implements SpawnBackend {
         );
       }
     }
+    const providerExecutionFence = taskResultSettlementActiveClaimDigest(attemptRef);
+    dockerArgs.push('-e', `DECKENT_PROVIDER_EXECUTION_FENCE=${providerExecutionFence}`);
+    // Image and command must remain last: Docker treats every following token as
+    // container argv, so the host-owned fence is injected before this boundary.
+    dockerArgs.push(executionImage, 'sh', '-c', containerCmd);
     const spawnOutcome = this.runDockerWithRetry(taskId, attemptIdentity, dockerArgs);
 
     if (!spawnOutcome.ok) {
@@ -5259,25 +5895,15 @@ export class DockerSpawnBackend implements SpawnBackend {
       `taskId=${taskId} containerId=${containerId.slice(0, 12)} instantExit=${instantExitSuccess}`,
     );
 
-    // Write initial heartbeat.
-    // TT553 (task 418-002): `livenessSource:'host'` is an ADDITIVE marker — this
-    // worker's liveness is decided by the HOST (`docker wait`/`docker inspect`
-    // container-state, see monitorContainer + heartbeat-monitor.ts's `container-state`
-    // signal), NOT by this `.hb`'s freshness. The `.hb` remains a currentAction
-    // carrier only; a stale/hardcoded timestamp here can never justify a kill.
-    // Backward-compatible: legacy readers ignore the extra key.
-    const hbPath = join(tasksDir, `task-${taskId}.hb`);
-    writeFileSync(hbPath, JSON.stringify({
-      workerId: `docker-${taskId}`,
-      taskId,
-      status: 'EXECUTING',
-      sequence: 1,
-      timestamp: new Date().toISOString(),
-      startedAt: new Date().toISOString(),
-      backend: 'docker',
-      containerId: containerId.slice(0, 12),
-      livenessSource: 'host',
-    }, null, 2), 'utf-8');
+    // The host authority store, rather than a raw .hb file, owns the initial
+    // sequence and timestamp for this exact Docker attempt.
+    observeDockerHeartbeatAuthority({
+      tasksDir,
+      settlementRef: attemptRef,
+      hostProcessOutcome: { state: 'running', exitCode: null },
+      workerTaskVerdict: 'pending',
+      liveness: 'alive',
+    });
 
     // Sprint 170 P0-5: .hb is now on disk — heartbeat is authoritative, race window closed
     markActive(taskId);
@@ -5856,7 +6482,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       return false;
     }
 
-    const retirement = writeExecutionAttemptRetirementAtomic(
+    writeExecutionAttemptRetirementAtomic(
       input.projectDir,
       landingRef,
       {
@@ -5871,16 +6497,13 @@ export class DockerSpawnBackend implements SpawnBackend {
       },
     );
     writeTaskResultSettlementLandedRetirementAtomic(input.settlementRef);
-    atomicWriteFileSync(join(input.tasksDir, `task-${input.taskId}.hb`), `${JSON.stringify({
-      workerId: `docker-${input.taskId}`,
-      taskId: input.taskId,
-      status: 'LANDED',
-      sequence: 100,
-      timestamp: retirement.retiredAt,
-      exitCode: input.exitCode,
-      backend: 'docker',
-      checkpointSha256: checkpoint.checkpointSha256,
-    }, null, 2)}\n`);
+    observeDockerHeartbeatAuthority({
+      tasksDir: input.tasksDir,
+      settlementRef: input.settlementRef,
+      hostProcessOutcome: { state: 'exited', exitCode: input.exitCode },
+      workerTaskVerdict: 'hold',
+      liveness: 'not-alive',
+    });
     this.containers.delete(input.taskId);
     try {
       dispatchExecutionContinuation({
@@ -6129,51 +6752,6 @@ export class DockerSpawnBackend implements SpawnBackend {
         debugLog('docker-backend:budget-result-reconcile', e);
       }
 
-      // Determine heartbeat status: check .result file for reconciliation
-      // If .result exists with DONE/GO_WITH_TECH_DEBT, treat as DONE regardless of exitCode
-      // This prevents false "FAILED exitCode 137" alerts when container was SIGKILL'd
-      // after worker already wrote a successful result
-      let hbStatus: string = exitCode === 0 ? 'DONE' : 'FAILED';
-      let hbExitCode = exitCode;
-
-      if (exitCode !== 0) {
-        try {
-          if (existsSync(resultPath)) {
-            const raw = readFileSync(resultPath, 'utf-8');
-            // safe: result files written by writeResult with TaskResult shape
-            const result = JSON.parse(raw) as { selfAssessment?: string };
-            if (
-              !runtimeBudgetExhaustion
-              && (result.selfAssessment === 'DONE' || result.selfAssessment === 'GO_WITH_TECH_DEBT')
-            ) {
-              hbStatus = 'DONE';
-              hbExitCode = 0;
-              debugLog('docker-backend:reconcile', `taskId=${taskId} exitCode=${exitCode} but .result=${result.selfAssessment} → HB DONE`);
-            } else if (result.selfAssessment === 'TIMEOUT_WITH_WORK') {
-              // Sprint 145: partial work detected — not DONE but not a clean failure either
-              hbStatus = 'TIMEOUT_WITH_WORK';
-              debugLog('docker-backend:reconcile', `taskId=${taskId} exitCode=${exitCode} .result=TIMEOUT_WITH_WORK → partial work, Brain reconciles`);
-            }
-          }
-        } catch {
-          // JSON parse fail or fs error → keep honest FAILED status
-        }
-      }
-
-      // Update heartbeat
-      const hbPath = join(tasksDir, `task-${taskId}.hb`);
-      try {
-        writeFileSync(hbPath, JSON.stringify({
-          workerId: `docker-${taskId}`,
-          taskId,
-          status: hbStatus,
-          sequence: 99,
-          timestamp: new Date().toISOString(),
-          exitCode: hbExitCode,
-          backend: 'docker',
-        }, null, 2), 'utf-8');
-      } catch (e) { debugLog('docker-backend:hb-update', e); }
-
       // If no .result file and exit != 0, write fallback result + timeout marker.
       // Sprint 148 root cause fix: SIGKILL (exit 137, OOM kill) bypasses all shell
       // traps — the container's EXIT trap never runs. The host-side monitor must
@@ -6256,17 +6834,54 @@ export class DockerSpawnBackend implements SpawnBackend {
         if (!existsSync(timeoutPath)) {
           writeFileSync(timeoutPath, `container_exit_${exitCode}`, 'utf-8');
         }
+      }
+
+      if (settlementRef) {
+        observeDockerHeartbeatAuthority({
+          tasksDir,
+          settlementRef,
+          hostProcessOutcome: { state: 'exited', exitCode },
+          workerTaskVerdict: workerTaskVerdictFromDockerResult(resultPath),
+          liveness: 'not-alive',
+        });
+        // Container exit is NOT provider settlement: only the window the
+        // container itself emitted around the provider process is persisted.
         try {
-          atomicWriteFileSync(hbPath, `${JSON.stringify({
-            workerId: `docker-${taskId}`,
-            taskId,
-            status: 'FAILED',
-            sequence: 100,
-            timestamp: new Date().toISOString(),
-            exitCode,
-            backend: 'docker',
-          }, null, 2)}\n`);
-        } catch (e) { debugLog('docker-backend:hb-missing-result', e); }
+          const observationStore = new ProviderExecutionObservationStore(projectDir);
+          try {
+            ingestDockerProviderExecutionObservations({
+              tasksDir,
+              settlementRef,
+              store: observationStore,
+            });
+          } finally {
+            observationStore.close();
+          }
+        } catch (error) {
+          debugLog('docker-backend:provider-observation-ingest-hold', error);
+        }
+      }
+
+      // RECOVERY-BORN-480-ATTRIBUTION-001: a normal worker result is still a
+      // claim until the host compares scoped bytes with the exact attempt's
+      // spawn-time baseline. This runs before any result enrichment or
+      // settlement receipt. A missing/mismatched baseline becomes a durable
+      // NO_GO/HOLD; it never falls back to the final shared-worktree diff.
+      try {
+        reconcileDockerResultWorkAttribution({
+          projectRoot: projectDir,
+          resultPath,
+          baselinePath: settlementRef
+            ? taskResultSettlementWorkAttributionBaselinePath(settlementRef)
+            : join(tasksDir, `task-${taskId}.scope-baseline`),
+          attemptId: settlementRef?.attemptId,
+          scopeFilesWrite: this.readTaskFilesWrite(projectDir, taskId),
+        });
+      } catch (e) {
+        debugLog('docker-backend:work-attribution-held', e);
+        // Preserve container/claim/locks for typed recovery. Settling the raw
+        // worker diff after losing attribution authority would fabricate work.
+        return;
       }
 
       // born-644 (BUILD-VIOLATION-GUARD): advisory-only dist/ mutation check — compares
@@ -6513,16 +7128,15 @@ export class DockerSpawnBackend implements SpawnBackend {
           finalRuntimeBudgetUsage
           && (!finalRuntimeBudgetUsage.terminal || finalRuntimeBudgetUsage.decision.state === 'unmeasurable')
         )) {
-          const hbPath = join(tasksDir, `task-${taskId}.hb`);
-          atomicWriteFileSync(hbPath, `${JSON.stringify({
-            workerId: `docker-${taskId}`,
-            taskId,
-            status: 'FAILED',
-            sequence: 99,
-            timestamp: new Date().toISOString(),
-            exitCode,
-            backend: 'docker',
-          }, null, 2)}\n`);
+          if (settlementRef) {
+            observeDockerHeartbeatAuthority({
+              tasksDir,
+              settlementRef,
+              hostProcessOutcome: { state: 'exited', exitCode },
+              workerTaskVerdict: 'no-go',
+              liveness: 'not-alive',
+            });
+          }
         }
       } catch (e) {
         debugLog('docker-backend:budget-final-reconcile-held', e);

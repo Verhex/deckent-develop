@@ -1,6 +1,7 @@
 import { readFileSync, existsSync, readdirSync, watch } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
+import { SprintPhase, SprintStatus, TaskStatus } from '../../core/types.js';
 import type { DashboardState, Task } from '../../core/types.js';
 import { DASHBOARD_FILE, TASKS_DIR, DECKENT_DIR } from '../../core/constants.js';
 import { print, printError, formatDashboard, formatTable, formatHumanStatus, formatStandaloneStatus, isNoColor, stripAnsi , isDashboardOrphaned } from '../helpers/output.js';
@@ -24,10 +25,17 @@ import {
   settlementProjectionDto,
 } from './task-settlement.js';
 import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
+import type { CanonicalRunStatus } from '../../core/run-status-authority.js';
 import {
-  computeLogicalTaskProgress,
   foldTaskLineages,
 } from '../../core/task-lineage.js';
+import { classifyTaskArtifact } from '../../core/task-artifact-classifier.js';
+import {
+  projectLogicalProgress,
+  type LogicalProgressStatus,
+} from '../../core/logical-progress-projection.js';
+import { projectTerminalPublicationStatus as projectSharedTerminalPublicationStatus } from '../../core/sprint-terminal-publication-status.js';
+import type { ProviderConcurrencyRuntimeProjection } from '../../core/provider-limit-admission.js';
 
 interface StatusOpts {
   watch?: boolean;
@@ -187,6 +195,17 @@ export interface StatusCommandDeps {
   readonly openTaskSettlementProjection?: (
     projectRoot: string,
   ) => OpenTaskSettlementProjectionResult;
+  /** Canonical provider admission plus direct execution-observation projection. */
+  readonly providerConcurrencyRuntime?: (
+    projectRoot: string,
+  ) => readonly ProviderConcurrencyRuntimeProjection[];
+}
+
+function projectProviderConcurrencyStatus(
+  root: string,
+  deps: StatusCommandDeps,
+): readonly ProviderConcurrencyRuntimeProjection[] {
+  return deps.providerConcurrencyRuntime?.(root) ?? [];
 }
 
 export interface StatusTaskSettlementDto
@@ -390,19 +409,20 @@ export function loadTaskFiles(root: string): Task[] {
   const tasksDir = join(root, TASKS_DIR);
   if (!existsSync(tasksDir)) return [];
   const files = readdirSync(tasksDir)
-    .filter((f) => /^task-[\w-]+\.json$/.test(f))
     .sort((left, right) => left.localeCompare(right));
   const tasks: Task[] = [];
   for (const f of files) {
     try {
-      const parsed: unknown = JSON.parse(readFileSync(join(tasksDir, f), 'utf-8'));
+      const content = readFileSync(join(tasksDir, f), 'utf-8');
+      const artifact = classifyTaskArtifact(f, content);
+      if (artifact.kind !== 'task-record') continue;
+      const parsed: unknown = JSON.parse(content);
       if (typeof parsed !== 'object' || parsed === null) continue;
       const data = parsed as Partial<Task>;
       if (
-        typeof data.id !== 'string'
-        || f !== `task-${data.id}.json`
+        data.id !== artifact.taskId
         || typeof data.title !== 'string'
-        || typeof data.status !== 'string'
+        || data.status !== artifact.record.status
       ) continue;
       tasks.push(data as Task);
     } catch {
@@ -414,6 +434,60 @@ export function loadTaskFiles(root: string): Task[] {
     ? tasks.filter(task => task.sprintId === activeSprintId)
     : tasks;
   return scopedTasks.sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function logicalProgressStatus(status: Task['status']): LogicalProgressStatus {
+  if (status === TaskStatus.DONE) return 'done';
+  if (status === TaskStatus.CLAIMED
+    || status === TaskStatus.EXECUTING
+    || status === TaskStatus.TESTING
+    || status === TaskStatus.DOCUMENTING) return 'active';
+  return 'blocked';
+}
+
+function taskSequence(task: Task): number | undefined {
+  const timestamp = task.updatedAt ?? task.createdAt;
+  if (!timestamp) return undefined;
+  const value = Date.parse(timestamp);
+  return Number.isSafeInteger(value) ? value : undefined;
+}
+
+/**
+ * Status consumes the canonical logical-task projection rather than counting
+ * directory entries or raw attempts. A malformed lineage is an explicit read
+ * failure, never a presentation-time clamp.
+ */
+export function projectStatusLogicalProgress(tasks: readonly Task[]): {
+  readonly done: number;
+  readonly active: number;
+  readonly blocked: number;
+  readonly total: number;
+  readonly attemptCount: number;
+} {
+  const result = projectLogicalProgress({
+    attempts: tasks.map(task => {
+      const sequence = taskSequence(task);
+      return {
+        id: task.id,
+        status: logicalProgressStatus(task.status),
+        ...(task.isPriorityFix && task.fixForTaskId
+          ? { fixForAttemptId: task.fixForTaskId }
+          : {}),
+        ...(sequence !== undefined ? { sequence } : {}),
+      };
+    }),
+  });
+  if (!result.ok) {
+    throw new Error(`STATUS_LOGICAL_PROGRESS_${result.diagnostic}`);
+  }
+  return result.projection;
+}
+
+export function projectTerminalPublicationStatus(
+  root: string,
+  authority: CanonicalRunStatus,
+): ReturnType<typeof projectSharedTerminalPublicationStatus> {
+  return projectSharedTerminalPublicationStatus(root, authority);
 }
 
 /**
@@ -601,7 +675,10 @@ export function buildPendingApprovalsSection(root: string, lang: string): string
  * Both call sites must emit this exact shape so a JSON consumer never has to
  * special-case which branch produced it (born-688 contract).
  */
-export function buildNoActiveStatusJson(root: string): Record<string, unknown> {
+export function buildNoActiveStatusJson(
+  root: string,
+  deps: StatusCommandDeps = {},
+): Record<string, unknown> {
   const authority = readCanonicalRunStatus(root);
   return {
     active: authority.active,
@@ -614,7 +691,104 @@ export function buildNoActiveStatusJson(root: string): Record<string, unknown> {
     recoveryCommand: authority.recoveryCommand,
     finalizeCommand: authority.finalizeCommand,
     authority,
+    terminalPublication: projectTerminalPublicationStatus(root, authority),
+    providerConcurrency: projectProviderConcurrencyStatus(root, deps),
     pendingApprovals: readPendingApprovals(root),
+  };
+}
+
+export interface CanonicalDashboardProjection {
+  readonly dashboard: DashboardState;
+  readonly metadata: {
+    readonly schemaVersion: 1;
+    readonly lifecycleAuthority: 'run-status-authority-v1';
+    readonly dashboardLifecycleNormalized: boolean;
+    readonly progressAdjusted: boolean;
+  };
+}
+
+/**
+ * A dashboard is not lifecycle authority when durable authority exists. When
+ * no durable run identity exists at all, however, retain the dashboard's
+ * display data as an explicitly lower-priority discovery fallback. This keeps
+ * legacy status consumers useful without allowing stale residue to override a
+ * terminal, paused, orphaned, or otherwise identified canonical run.
+ */
+function hasNoDurableRunIdentity(authority: CanonicalRunStatus): boolean {
+  return authority.lifecycle === 'IDLE' && authority.sprintId === null;
+}
+
+function boundedDashboardProgress(
+  progress: DashboardState['progress'],
+): DashboardState['progress'] {
+  const total = Math.max(0, Math.trunc(progress.total));
+  const done = Math.min(total, Math.max(0, Math.trunc(progress.done)));
+  const active = Math.min(total - done, Math.max(0, Math.trunc(progress.active)));
+  const blocked = Math.min(
+    total - done - active,
+    Math.max(0, Math.trunc(progress.blocked)),
+  );
+  return { done, active, blocked, total };
+}
+
+/**
+ * Project presentation-only dashboard bytes through the canonical lifecycle
+ * authority. Every status renderer consumes this shape, so a stale dashboard
+ * can be recorded as a conflict but can never publish a competing phase/status
+ * or an impossible `done > total` aggregate.
+ */
+export function projectDashboardThroughRunAuthority(
+  state: DashboardState,
+  tasks: readonly Task[],
+  authority: CanonicalRunStatus,
+): CanonicalDashboardProjection {
+  const taskProgress = tasks.length > 0
+    ? projectStatusLogicalProgress(tasks)
+    : state.progress;
+  const progress = boundedDashboardProgress(taskProgress);
+  const phase = authority.phase
+    && Object.values(SprintPhase).includes(authority.phase as SprintPhase)
+      ? authority.phase as SprintPhase
+      : state.sprint.phase;
+  const status = authority.status
+    && Object.values(SprintStatus).includes(authority.status as SprintStatus)
+      ? authority.status as SprintStatus
+      : state.sprint.status;
+  const sprintId = authority.sprintId ?? state.sprint.id;
+  const dashboardLifecycleNormalized = sprintId !== state.sprint.id
+    || phase !== state.sprint.phase
+    || status !== state.sprint.status;
+  const progressAdjusted = progress.done !== taskProgress.done
+    || progress.active !== taskProgress.active
+    || progress.blocked !== taskProgress.blocked
+    || progress.total !== taskProgress.total;
+
+  return {
+    dashboard: {
+      ...state,
+      sprint: {
+        ...state.sprint,
+        id: sprintId,
+        number: Number.parseInt(sprintId.replace(/^sprint-/u, ''), 10)
+          || state.sprint.number,
+        phase,
+        status,
+      },
+      // Orphaned agents remain observable residue; lifecycle still comes from
+      // canonical authority and terminal runs never render live workers.
+      agents: authority.active
+        || authority.lifecycle === 'ORPHANED'
+        || hasNoDurableRunIdentity(authority)
+        ? state.agents
+        : [],
+      progress,
+    },
+    metadata: {
+      schemaVersion: 1,
+      lifecycleAuthority: 'run-status-authority-v1',
+      dashboardLifecycleNormalized,
+      progressAdjusted,
+    },
   };
 }
 
@@ -624,7 +798,7 @@ function statusFormatterData(
 ): Record<string, unknown> {
   const lineages = foldTaskLineages(tasks);
   const progress = tasks.length > 0
-    ? computeLogicalTaskProgress(tasks)
+    ? projectStatusLogicalProgress(tasks)
     : {
         done: state.progress?.done ?? 0,
         active: state.progress?.active ?? 0,
@@ -661,7 +835,7 @@ export function buildStatusJsonSnapshot(
   const tasks = loadTaskFiles(root);
   const authority = readCanonicalRunStatus(root);
   if (!existsSync(dashPath)) {
-    if (tasks.length === 0) return buildNoActiveStatusJson(root);
+    if (tasks.length === 0) return buildNoActiveStatusJson(root, deps);
     const sprintId = authority.sprintId ?? getCurrentSprintId(root) ?? detectSprintId(tasks);
     const lineages = foldTaskLineages(tasks);
     return {
@@ -671,8 +845,10 @@ export function buildStatusJsonSnapshot(
       resumable: authority.resumable,
       sprintId,
       authority,
+      terminalPublication: projectTerminalPublicationStatus(root, authority),
+      providerConcurrency: projectProviderConcurrencyStatus(root, deps),
       pendingApprovals: readPendingApprovals(root),
-      progress: computeLogicalTaskProgress(tasks),
+      progress: projectStatusLogicalProgress(tasks),
       tasks: lineages.map(lineage => ({
         id: lineage.rootId,
         title: lineage.rootTask.title,
@@ -697,13 +873,14 @@ export function buildStatusJsonSnapshot(
   if (
     !authority.active
     && !authority.resumable
+    && !hasNoDurableRunIdentity(authority)
     && (
       authority.lifecycle === 'IDLE'
       || authority.lifecycle === 'COMPLETE'
       || authority.lifecycle === 'ABORTED'
     )
   ) {
-    return buildNoActiveStatusJson(root);
+    return buildNoActiveStatusJson(root, deps);
   }
 
   const state = JSON.parse(readFileSync(dashPath, 'utf-8')) as DashboardState;
@@ -718,17 +895,18 @@ export function buildStatusJsonSnapshot(
     || sprint.status === 'COMPLETE'
     || sprint.phase === 'COMPLETE'
   ) {
-    return buildNoActiveStatusJson(root);
+    return buildNoActiveStatusJson(root, deps);
   }
 
   const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
   const logicalProgress = tasks.length > 0
-    ? computeLogicalTaskProgress(tasks)
-    : state.progress;
+    ? projectStatusLogicalProgress(tasks)
+    : null;
+  const projection = projectDashboardThroughRunAuthority(state, tasks, authority);
+  const projectedState = projection.dashboard;
   const snapshot = verbose
     ? {
-        ...state,
-        progress: logicalProgress,
+        ...projectedState,
         taskSettlements,
         _verbose: {
           agents: tasks.map(task => ({
@@ -738,15 +916,22 @@ export function buildStatusJsonSnapshot(
           })),
         },
       }
-    : { ...state, progress: logicalProgress, taskSettlements };
+    : { ...projectedState, taskSettlements };
   return {
     ...snapshot,
     active: authority.active,
     lifecycle: authority.lifecycle,
     resumable: authority.resumable,
+    sprintId: authority.sprintId,
+    phase: authority.phase,
+    status: authority.status,
     recoveryCommand: authority.recoveryCommand,
     finalizeCommand: authority.finalizeCommand,
     authority,
+    terminalPublication: projectTerminalPublicationStatus(root, authority),
+    providerConcurrency: projectProviderConcurrencyStatus(root, deps),
+    logicalProgress,
+    statusProjection: projection.metadata,
     pendingApprovals: readPendingApprovals(root),
   };
 }
@@ -1066,10 +1251,14 @@ export function registerStatus(
               buildStatusJsonSnapshot(root, dashPath, deps, !!opts.verbose),
             )}\n`;
           }
-          const state = readDashboard(dashPath);
-          if (!state) return null;
+          const rawState = readDashboard(dashPath);
+          if (!rawState) return null;
 
           const tasks = loadTaskFiles(root);
+          const authority = readCanonicalRunStatus(root);
+          const state = opts.raw
+            ? rawState
+            : projectDashboardThroughRunAuthority(rawState, tasks, authority).dashboard;
           const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
           const sections: string[] = [];
           if (opts.raw) {
@@ -1144,8 +1333,12 @@ export function registerStatus(
 
       try {
         const rawData = readFileSync(dashPath, 'utf-8');
-        const state = JSON.parse(rawData) as DashboardState;
+        const rawState = JSON.parse(rawData) as DashboardState;
         const tasks = loadTaskFiles(root);
+        const authority = readCanonicalRunStatus(root);
+        const state = opts.raw
+          ? rawState
+          : projectDashboardThroughRunAuthority(rawState, tasks, authority).dashboard;
         // ─── W0-TRUTH (#491) orphan-gate ─────────────────────────────
         // Crash-case: an ACTIVE-shaped .dashboard whose writer died must not be
         // presented as live. Stale + no live sprint + no task files → honest

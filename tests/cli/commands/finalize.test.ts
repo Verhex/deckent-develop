@@ -9,6 +9,11 @@ const mockPrintError = vi.fn();
 vi.mock('node:fs', () => ({
   existsSync: vi.fn().mockReturnValue(true),
   readdirSync: vi.fn().mockReturnValue(['task-482-002.json', 'task-482-002.result']),
+  readFileSync: vi.fn().mockReturnValue(JSON.stringify({
+    id: '482-002',
+    sprintId: 'sprint-482',
+    status: 'DONE',
+  })),
 }));
 vi.mock('../../../src/orchestra/brain.js', () => ({
   finalizeSprint: (...args: unknown[]) => mockFinalizeSprint(...args),

@@ -55,6 +55,20 @@
 | adr-g-039 | Provider Authority Key Custody, Rotation & Composition | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-487 Learnings** (sprint-487): ## Sprint sprint-487 Learnings
+- Fix: Terminal publication real-binary contract: NO_GO — Verification: node scripts/t...
+- **Sprint sprint-486 Learnings** (sprint-486): ## Sprint sprint-486 Learnings
+- Finalizer terminal-evidence wiring: NO_GO — Host runtime-budget evidence is not term...
+- **Sprint sprint-485 Learnings** (sprint-485): ## Sprint sprint-485 Learnings
+
+## Gains
+- 485-001 — Provider concurrency capability authority — Verified: npx tsc --...
+- **Sprint sprint-484 Learnings** (sprint-484): ## Sprint sprint-484 Learnings
+
+## Gains
+- 484-001 — Enforce recovery-born evaluation honesty with regression coverag...
+- **Sprint sprint-483 Learnings** (sprint-483): ## Sprint sprint-483 Learnings
+- Integrate DOGFOOD-3178 bounded validation evidence: GO_WITH_TECH_DEBT — Budget Landi...
 - **Sprint sprint-482 Learnings** (sprint-482): ## Sprint sprint-482 Learnings
 - Unify finalize and recover adapters: NO_GO — npx tsc --noEmit passed.
 The mandated t...
@@ -66,20 +80,6 @@ The mandated t...
 - **Sprint sprint-478 Learnings** (sprint-478): ## Sprint sprint-478 Learnings
 - Fix: CHAIN-01-ROOT — controlled NO_GO then repair: NO_GO
 - CHAIN-01-ROOT — controlle...
-- **Sprint sprint-477 Learnings** (sprint-477): ## Sprint sprint-477 Learnings
-
-## Gains
-- 477-001 — DENEME-001 — simple document and test — Verified: file-existence...
-- **Sprint sprint-476 Learnings** (sprint-476): ## Sprint sprint-476 Learnings
-- Fix: DENEME-001 — simple document and test: NO_GO
-- DENEME-001 — simple document and...
-- **Sprint sprint-475 Learnings** (sprint-475): ## Sprint sprint-475 Learnings
-- DENEME-001 — simple document and test: NO_GO — Required verification failed: tsc=0, ...
-- **Sprint sprint-473 Learnings** (sprint-473): ## Sprint sprint-473 Learnings
-- undefined: NO_GO
-- LOCK-BIND — bind project root and lock-directory generation: GO_W...
-- **Sprint sprint-471 Learnings** (sprint-471): ## Sprint sprint-471 Learnings
-- S470-RECOVERY — restore four lifecycle invariants only: NO_GO — Runtime budget circu...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -90,4 +90,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×11 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 1698 | Generated: 2026-07-31_
+_Total entries: 1723 | Generated: 2026-07-31_

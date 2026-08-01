@@ -20,6 +20,10 @@ import type { MemoryEntryV2, CreateEntryInput } from '../core/memory-types.js';
 import { extractSprintFromDebtId } from '../core/memory-import.js';
 import { readJsonSafe, debugLog } from '../core/utils.js';
 import { getAgentRole } from '../core/agent-role-contract.js';
+import { resolveFixRepairAuthority } from './fix-repair-authority.js';
+import type {
+  FixRepairAuthorityInput, FixRepairEvidence, FixRepairAuthorityResult,
+} from './fix-repair-authority.js';
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
 
@@ -66,76 +70,153 @@ function regateInheritedScope(
 const FAILURE_EVIDENCE_PATH_RE =
   /(?:src|tests|scripts)\/[\w\-/.]+\.(?:ts|tsx|mjs|cjs|js)/g;
 
-export interface FixWriteAuthorityReview {
-  readonly state: 'accepted' | 'hold';
-  readonly inheritedWritePaths: readonly string[];
-  readonly evidenceWritePaths: readonly string[];
-  readonly addedWritePaths: readonly string[];
-  readonly unresolvedPromptFindings: readonly string[];
-}
-
 /**
- * Derive the smallest additional FIX write set from bounded failure evidence.
- *
- * A path is admitted only when it is:
- * - explicitly named in the typed TaskResult notes envelope,
- * - inside one of the original task's reviewed scope directories, and
- * - tracked by the current repository.
- *
- * Directory entries are used only as a review boundary; they are never copied
- * into filesWrite as a broad grant.
+ * Extract the bounded set of exact repo-relative paths a failed worker named
+ * in its typed `TaskResult.notes` envelope. Read against the FULL notes
+ * string — never a display-truncated slice — so a path only mentioned past
+ * any later truncation boundary is still admitted into the repair review.
  */
-export function deriveFixWriteAuthority(
-  projectRoot: string,
-  task: Task,
-  result: TaskResult,
-): Pick<
-  FixWriteAuthorityReview,
-  'inheritedWritePaths' | 'evidenceWritePaths' | 'addedWritePaths'
-> {
-  const inheritedWritePaths = [...new Set(task.scope?.filesWrite ?? [])].sort();
-  const inherited = new Set(inheritedWritePaths);
-  const directories = (task.scope?.directories ?? [])
-    .map(directory => directory.replace(/\\/g, '/').replace(/^\.\/+/, '').replace(/\/+$/, ''))
-    .filter(Boolean);
-  const evidenceWritePaths = [...new Set((result.notes ?? '').match(FAILURE_EVIDENCE_PATH_RE) ?? [])]
+function extractFailureEvidencePaths(notes: string | undefined): string[] {
+  return [...new Set((notes ?? '').match(FAILURE_EVIDENCE_PATH_RE) ?? [])]
     .map(candidate => candidate.replace(/\\/g, '/').replace(/^\.\/+/, ''))
     .filter(candidate =>
       !candidate.startsWith('/')
       && !candidate.split('/').includes('..'),
     )
     .sort();
-  const mentioned = evidenceWritePaths
-    .filter(candidate =>
-      directories.some(directory =>
-        candidate === directory || candidate.startsWith(`${directory}/`)),
-    )
-    .filter(candidate => !inherited.has(candidate));
-  if (mentioned.length === 0) {
-    return { inheritedWritePaths, evidenceWritePaths, addedWritePaths: [] };
-  }
+}
 
+/** Bounded git-tracked check over exact candidate paths — never a full repo scan. */
+function queryTrackedPaths(projectRoot: string, candidates: readonly string[]): string[] {
+  if (candidates.length === 0) return [];
   try {
-    const tracked = spawnSync('git', ['ls-files', '--', ...mentioned], {
+    const tracked = spawnSync('git', ['ls-files', '--', ...candidates], {
       cwd: projectRoot,
       encoding: 'utf-8',
       maxBuffer: 4 * 1024 * 1024,
       timeout: 5_000,
     });
-    if (tracked.status !== 0 || typeof tracked.stdout !== 'string') {
-      return { inheritedWritePaths, evidenceWritePaths, addedWritePaths: [] };
-    }
-    const trackedPaths = new Set(
-      tracked.stdout.split('\n').map(path => path.trim()).filter(Boolean),
-    );
-    return {
-      inheritedWritePaths,
-      evidenceWritePaths,
-      addedWritePaths: mentioned.filter(candidate => trackedPaths.has(candidate)),
-    };
+    if (tracked.status !== 0 || typeof tracked.stdout !== 'string') return [];
+    return tracked.stdout.split('\n').map(path => path.trim()).filter(Boolean);
   } catch {
-    return { inheritedWritePaths, evidenceWritePaths, addedWritePaths: [] };
+    return [];
   }
+}
+
+/** The repair-authority lineage a task already carried BEFORE this FIX round. */
+export interface FixOriginalAcceptance {
+  readonly taskId: string;
+  readonly state: 'accepted' | 'hold' | 'none';
+  readonly authorityFingerprint?: string;
+  readonly filesRead: readonly string[];
+  readonly filesWrite: readonly string[];
+}
+
+/**
+ * Read the repair-authority record already persisted on `taskId`'s own task
+ * JSON (written when it was itself created as a fix). A fix-of-a-fix carries
+ * that prior lineage forward as `priorImpossibleFingerprints` input instead
+ * of recursively re-deriving it — one bounded disk read, no re-prompting.
+ */
+function readOriginalAcceptance(projectRoot: string, taskId: string): FixOriginalAcceptance {
+  const priorPayload = readJsonSafe<{
+    repairAuthority?: {
+      state?: string;
+      authorityFingerprint?: string;
+      filesRead?: string[];
+      filesWrite?: string[];
+    };
+  }>(join(projectRoot, TASKS_DIR, `task-${taskId}.json`));
+  const prior = priorPayload?.repairAuthority;
+  if (!prior || (prior.state !== 'accepted' && prior.state !== 'hold')) {
+    return { taskId, state: 'none', filesRead: [], filesWrite: [] };
+  }
+  return {
+    taskId,
+    state: prior.state,
+    authorityFingerprint: prior.authorityFingerprint,
+    filesRead: prior.filesRead ?? [],
+    filesWrite: prior.filesWrite ?? [],
+  };
+}
+
+/** Persisted FIX repair-authority review — backed by {@link resolveFixRepairAuthority}. */
+export interface FixRepairAuthorityReview {
+  readonly state: 'accepted' | 'hold';
+  readonly holdReason?: 'unresolved_requirements' | 'repeated_impossible_fingerprint';
+  readonly authorityFingerprint: string;
+  readonly inheritedFilesRead: readonly string[];
+  readonly inheritedFilesWrite: readonly string[];
+  readonly filesRead: readonly string[];
+  readonly filesWrite: readonly string[];
+  readonly addedReadPaths: readonly string[];
+  readonly addedWritePaths: readonly string[];
+  readonly evidenceWritePaths: readonly string[];
+  readonly unresolvedFindings: FixRepairAuthorityResult['unresolvedFindings'];
+  readonly unresolvedPromptFindings: readonly string[];
+  readonly originalAcceptance: FixOriginalAcceptance;
+}
+
+/**
+ * Wire the typed {@link resolveFixRepairAuthority} resolver into FIX
+ * creation. Reviews BOTH the inherited filesRead and filesWrite surface (not
+ * write-only) against the bounded failure evidence extracted from the full
+ * `result.notes`, carries forward the prior repair lineage from
+ * `readOriginalAcceptance` as the repeated-fingerprint input, and returns the
+ * exact fingerprinted delta to persist on the fix task — never a broad
+ * directory-level grant.
+ */
+function buildFixRepairAuthority(
+  projectRoot: string,
+  task: Task,
+  result: TaskResult,
+): FixRepairAuthorityReview {
+  const reviewedDirectories = task.scope?.directories ?? [];
+  const inheritedFilesRead = [...new Set(task.scope?.filesRead ?? [])].sort();
+  const inheritedFilesWrite = [...new Set(task.scope?.filesWrite ?? [])].sort();
+  const evidenceWritePaths = extractFailureEvidencePaths(result.notes);
+  const failureEvidence: FixRepairEvidence[] = evidenceWritePaths.map(path => ({
+    path,
+    access: 'write',
+    evidenceRef: `result.notes:${path}`,
+  }));
+  const trackedPaths = queryTrackedPaths(projectRoot, evidenceWritePaths);
+  const originalAcceptance = readOriginalAcceptance(projectRoot, task.id);
+  const priorImpossibleFingerprints = originalAcceptance.state === 'hold'
+    && originalAcceptance.authorityFingerprint
+    ? [originalAcceptance.authorityFingerprint]
+    : [];
+
+  const input: FixRepairAuthorityInput = {
+    reviewedDirectories,
+    inheritedFilesRead,
+    inheritedFilesWrite,
+    failureEvidence,
+    trackedPaths,
+    priorImpossibleFingerprints,
+  };
+  const resolved = resolveFixRepairAuthority(input);
+  const unresolvedPromptFindings = resolved.unresolvedFindings.map(finding =>
+    finding.path
+      ? `repair evidence path lacks reviewed ${finding.access ?? 'access'} authority (${finding.code}): ${finding.path}`
+      : `repair authority finding: ${finding.code}`,
+  );
+
+  return {
+    state: resolved.state,
+    holdReason: resolved.state === 'hold' ? resolved.reason : undefined,
+    authorityFingerprint: resolved.authorityFingerprint,
+    inheritedFilesRead: resolved.inheritedFilesRead,
+    inheritedFilesWrite: resolved.inheritedFilesWrite,
+    filesRead: resolved.filesRead,
+    filesWrite: resolved.filesWrite,
+    addedReadPaths: resolved.addedReadPaths,
+    addedWritePaths: resolved.addedWritePaths,
+    evidenceWritePaths,
+    unresolvedFindings: resolved.unresolvedFindings,
+    unresolvedPromptFindings,
+    originalAcceptance,
+  };
 }
 
 /**
@@ -523,13 +604,16 @@ export function handleEvaluation(
   // A NO_GO on the final admitted FIX attempt is terminal for this run. The
   // caller owns the configured retry budget and passes this explicit gate so
   // handleEvaluation cannot mint an unbounded `-fix-fix-...` chain. Release
-  // the completed worker's locks; the logical root remains NO_GO and the
-  // post-FIX circuit breaker decides PAUSED vs normal settlement.
+  // the completed worker's locks and park the exhausted attempt as typed
+  // PAUSED. The evaluation ledger still retains NO_GO, while task status
+  // prevents recovery from treating the failed attempt as dispatchable or
+  // complete.
   if (policy.allowPriorityFixCreation === false) {
+    updateTaskStatus(projectRoot, task.id, TaskStatus.PAUSED);
     releaseAllLocks(projectRoot, workerId);
     debugLog(
       'handleEvaluation:fixBudgetExhausted',
-      `task=${task.id} — NO_GO persisted without creating another priority fix`,
+      `task=${task.id} — retry authority exhausted; PAUSED without creating another priority fix`,
     );
     return;
   }
@@ -599,11 +683,7 @@ export function handleEvaluation(
     ...(task.assignedSkills ?? []),
     ...rotationStrategy.addedSkills,
   ]));
-  const authorityDelta = deriveFixWriteAuthority(projectRoot, task, result);
-  const reviewedFilesWrite = [
-    ...authorityDelta.inheritedWritePaths,
-    ...authorityDelta.addedWritePaths,
-  ];
+  const repairAuthority = buildFixRepairAuthority(projectRoot, task, result);
 
   const fixTask: Task = {
     id: `${task.id}-fix`,
@@ -616,7 +696,8 @@ export function handleEvaluation(
     reason: enrichedReason,
     scope: regateInheritedScope(projectRoot, `${task.id}-fix`, {
       ...task.scope,
-      filesWrite: reviewedFilesWrite,
+      filesRead: [...repairAuthority.filesRead],
+      filesWrite: [...repairAuthority.filesWrite],
     }),
     dependencies: [],
     goNogo: task.goNogo,
@@ -632,18 +713,6 @@ export function handleEvaluation(
     createdAt: now(),
   };
 
-  const admittedWritePaths = new Set(fixTask.scope.filesWrite);
-  const unresolvedEvidencePaths = authorityDelta.evidenceWritePaths
-    .filter(path => !admittedWritePaths.has(path));
-  const repairAuthority: FixWriteAuthorityReview = {
-    state: unresolvedEvidencePaths.length === 0 ? 'accepted' : 'hold',
-    inheritedWritePaths: authorityDelta.inheritedWritePaths,
-    evidenceWritePaths: authorityDelta.evidenceWritePaths,
-    addedWritePaths: authorityDelta.addedWritePaths,
-    unresolvedPromptFindings: unresolvedEvidencePaths.map(
-      path => `repair evidence path lacks reviewed write authority: ${path}`,
-    ),
-  };
   if (repairAuthority.state === 'hold') {
     fixTask.status = TaskStatus.PAUSED;
   }

@@ -312,6 +312,28 @@ describe('buildSprintFromTasks — evaluationDecision ?? selfAssessment success 
 });
 
 describe('buildSprintFromTasks — archive-aware collection (FINALIZE-ARCHIVE-BLIND)', () => {
+  it('auto-detection ignores landing proposals and other task-prefixed JSON residue', () => {
+    const tasksDir = join(root, '.tasks');
+    writeTaskFixture(tasksDir, makeTask('900-001'));
+    writeResultFixture(tasksDir, makeResult('900-001'));
+    writeFileSync(
+      join(tasksDir, 'task-900-001.landing-proposal.json'),
+      JSON.stringify({ taskId: '900-001', attemptId: 'attempt-1', sequence: 1 }),
+      'utf-8',
+    );
+    writeFileSync(
+      join(tasksDir, 'task-900-001.json.partial'),
+      JSON.stringify({ id: '900-001', status: 'EXECUTING' }),
+      'utf-8',
+    );
+
+    const { sprintId, tasks, results } = buildSprintFromTasks(root);
+
+    expect(sprintId).toBe(SPRINT_ID);
+    expect(tasks.map(task => task.id)).toEqual(['900-001']);
+    expect(results.map(result => result.taskId)).toEqual(['900-001']);
+  });
+
   it('archived task is included in totals and its archived .result lifts the synthetic NO_GO', () => {
     const tasksDir = join(root, '.tasks');
     writeTaskFixture(tasksDir, makeTask('900-001'));

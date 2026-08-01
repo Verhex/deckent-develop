@@ -404,6 +404,20 @@ export function cleanup(
     for (const file of readdirSync(tasksDir).filter(f => TASK_FILE_EXTENSIONS.some(ext => f.endsWith(ext)))) {
       try { unlinkSync(join(tasksDir, file)); } catch (e) { debugLog('cleanup:unlinkTaskFile', e); }
     }
+    // Atomic writers may leave a process-suffixed temp after a crash
+    // (`.result.tmp.<pid>` / `.landing-proposal.json.tmp.<pid>`). Finalize
+    // preserves this evidence until terminal settlement; sprint-end cleanup
+    // then retires only residue owned by the sprint being cleaned. Never use a
+    // repository-wide tmp glob because another run may share the workspace.
+    const sprintPrefix = `task-${sprint.number}-`;
+    for (const file of readdirSync(tasksDir)) {
+      if (
+        file.startsWith(sprintPrefix)
+        && /\.(?:result|landing-proposal\.json)\.tmp(?:\.\d+)?$/u.test(file)
+      ) {
+        try { unlinkSync(join(tasksDir, file)); } catch (e) { debugLog('cleanup:unlinkTaskTempResidue', e); }
+      }
+    }
   }
 
   // ─── W0-TRUTH (#491, 2026-07-06 live lie) ──────────────────────────────

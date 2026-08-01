@@ -1,0 +1,188 @@
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { TaskEvaluation } from '../../src/core/types.js';
+import type { Task, TaskResult } from '../../src/core/types.js';
+import {
+  buildFinalizerTerminalTruth,
+  publishFencedSprintTerminalReceipt,
+} from '../../src/orchestra/sprint-finalizer.js';
+
+const temporaryRoots: string[] = [];
+
+function projectRoot(): string {
+  const root = mkdtempSync(join(tmpdir(), 'deckent-terminal-receipt-'));
+  temporaryRoots.push(root);
+  return root;
+}
+
+function task(): Task {
+  return {
+    id: '487-002',
+    title: 'Fenced receipt before archive',
+    description: '',
+    model: 'gpt-5.6-sol',
+    effort: 'high',
+    priority: 'NORMAL',
+    reason: 'terminal receipt test',
+    provider: 'codex',
+    authMode: 'subscription',
+    scope: { directories: ['src/orchestra/'], filesRead: [], filesWrite: [] },
+    dependencies: [],
+    goNogo: { goCriteria: 'receipt', noGoCriteria: 'early archive', techDebtAcceptable: 'none' },
+    status: 'DONE',
+    sprintId: 'sprint-487',
+    assignedWorker: 'w-487-002',
+    createdAt: '2026-07-31T00:00:00.000Z',
+  } as Task;
+}
+
+function result(verdict: 'DONE' | 'NO_GO'): TaskResult {
+  return {
+    taskId: '487-002',
+    workerId: 'w-487-002',
+    filesChanged: ['src/orchestra/sprint-finalizer.ts'],
+    linesAdded: 1,
+    linesRemoved: 0,
+    testsPassed: verdict === 'DONE',
+    coverage: 100,
+    selfAssessment: verdict,
+    notes: verdict,
+    workAttribution: {
+      state: 'VERIFIED',
+      attemptId: `attempt-${verdict.toLowerCase()}`,
+      baselineRef: `baseline:${verdict}`,
+      scopeDigest: verdict === 'DONE' ? 'd'.repeat(64) : 'f'.repeat(64),
+    },
+  };
+}
+
+afterEach(() => {
+  for (const root of temporaryRoots.splice(0)) {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+describe('fenced sprint terminal receipt archive boundary', () => {
+  it('publishes one generation-fenced receipt carrying the exact logical settlement digest', () => {
+    const sprintTask = task();
+    const truth = buildFinalizerTerminalTruth({
+      tasks: [sprintTask],
+      evaluations: new Map([['487-002', TaskEvaluation.DONE]]),
+      results: [result('DONE')],
+    });
+    const sprint = {
+      id: 'sprint-487',
+      number: 487,
+      tasks: [sprintTask],
+    } as Parameters<typeof publishFencedSprintTerminalReceipt>[0]['sprint'];
+    const root = projectRoot();
+
+    const first = publishFencedSprintTerminalReceipt({
+      projectRoot: root,
+      sprint,
+      truth,
+      runId: 'run-487',
+      coordinatorGeneration: 7,
+      now: () => '2026-07-31T12:00:00.000Z',
+    });
+    const second = publishFencedSprintTerminalReceipt({
+      projectRoot: root,
+      sprint,
+      truth,
+      runId: 'run-487',
+      coordinatorGeneration: 7,
+      now: () => '2026-07-31T12:01:00.000Z',
+    });
+    const artifact = JSON.parse(readFileSync(first.artifactPath, 'utf-8')) as {
+      receipt: { logicalSettlementDigest: string; coordinatorGeneration: number; authorityVersion: number };
+      terminalEvidence: { cleanupEligibility: { candidate: boolean } };
+      logicalProgress: {
+        lineages: readonly {
+          logicalTaskId: string;
+          attemptIds: readonly string[];
+          attemptCount: number;
+          status: string;
+        }[];
+      };
+    };
+
+    expect(second.receipt).toEqual(first.receipt);
+    expect(artifact.receipt).toMatchObject({
+      logicalSettlementDigest: truth.logicalSettlementDigest,
+      coordinatorGeneration: 7,
+      authorityVersion: 1,
+    });
+    expect(artifact.terminalEvidence.cleanupEligibility.candidate).toBe(true);
+
+    // 488-002: the persisted receipt must expose the plain canonical root task id —
+    // never a composite `taskId + NUL + attemptId` string — while still retaining
+    // the exact per-attempt identity in `attemptIds`.
+    expect(artifact.logicalProgress.lineages).toEqual([
+      { logicalTaskId: '487-002', attemptIds: ['487-002'], attemptCount: 1, status: 'done' },
+    ]);
+    const nulChar = String.fromCharCode(0);
+    const artifactRaw = readFileSync(first.artifactPath, 'utf-8');
+    expect(artifactRaw.includes(nulChar)).toBe(false);
+  });
+
+  it('preserves a settled NO_GO as failed and blocks cleanup without fabricating completion', () => {
+    const sprintTask = task();
+    const truth = buildFinalizerTerminalTruth({
+      tasks: [sprintTask],
+      evaluations: new Map([['487-002', TaskEvaluation.NO_GO]]),
+      results: [result('NO_GO')],
+    });
+
+    const publication = publishFencedSprintTerminalReceipt({
+      projectRoot: projectRoot(),
+      sprint: { id: 'sprint-487', number: 487, tasks: [sprintTask] } as Parameters<
+        typeof publishFencedSprintTerminalReceipt
+      >[0]['sprint'],
+      truth,
+    });
+
+    expect(publication.terminalEvidence.logicalTasks).toEqual([
+      expect.objectContaining({ logicalTaskId: '487-002', state: 'FAILED' }),
+    ]);
+    expect(publication.terminalEvidence.completed).toEqual([]);
+    expect(publication.terminalEvidence.cleanupEligibility).toMatchObject({
+      state: 'BLOCKED',
+      candidate: false,
+      reasons: expect.arrayContaining(['LINEAGE_NOT_COMPLETED']),
+    });
+  });
+
+  it('wires one receipt publication before archive and guards every cleanup step with receipt evidence', () => {
+    const source = readFileSync(
+      new URL('../../src/orchestra/sprint-finalizer.ts', import.meta.url),
+      'utf-8',
+    );
+    const finalizeSource = source.slice(source.indexOf('export async function finalizeSprint('));
+    const publishIndex = finalizeSource.indexOf(
+      'terminalReceiptPublication = publishFencedSprintTerminalReceipt({',
+    );
+    const guardIndex = finalizeSource.indexOf('if (receiptAllowsArchive) {');
+    const archiveIndex = finalizeSource.indexOf(
+      "archiveDirectives(projectRoot, sprint.id, 'CLEANUP'",
+    );
+    const cleanupIndex = finalizeSource.indexOf('archiveOrphanTasks(projectRoot, sprint.id)');
+
+    expect(finalizeSource.match(/publishFencedSprintTerminalReceipt\(\{/gu)).toHaveLength(1);
+    expect(finalizeSource).toContain(
+      'terminalReceiptPublication?.terminalEvidence.cleanupEligibility.candidate === true',
+    );
+    expect(finalizeSource).toContain(
+      "throw new FinalizerTerminalEvidenceError('TERMINAL_RECEIPT_NOT_CLEANUP_ELIGIBLE')",
+    );
+    expect(finalizeSource).toContain(
+      'if (e instanceof FinalizerTerminalEvidenceError) throw e;',
+    );
+    expect(publishIndex).toBeGreaterThan(0);
+    expect(guardIndex).toBeGreaterThan(publishIndex);
+    expect(archiveIndex).toBeGreaterThan(guardIndex);
+    expect(cleanupIndex).toBeGreaterThan(archiveIndex);
+  });
+});

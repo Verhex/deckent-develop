@@ -477,6 +477,31 @@ export async function executeSpawnTask(
     } catch (e) { debugLog('executeSpawnTask:lazyAdapterRebootstrap', e); }
   }
 
+  // Later FIX/XFIX/dependency waves enter through this canonical executor,
+  // not the initial-wave spawner. Publish the same pre-dispatch intent so
+  // status, audit and recovery observe every dynamically born worker. The
+  // event precedes the backend call by design: a failed spawn remains visible.
+  const sprintIdForAssign = getCurrentSprintId(projectRoot) ?? sprintFallbackId;
+  writeEvent(
+    projectRoot,
+    sprintIdForAssign,
+    'brain',
+    'worker',
+    CHANNELS.TASK_ASSIGN,
+    {
+      taskId: task.id,
+      workerId: `w-${task.id}`,
+      model: task.model,
+      agent: task.assignedAgent ?? 'generic',
+      skills: task.assignedSkills ?? [],
+      scope: {
+        directories: task.scope?.directories ?? [],
+        filesWrite: task.scope?.filesWrite ?? [],
+      },
+      provider: taskProvider,
+    },
+  );
+
   // ─── 4. Dispatch — single canonical branch set ───────────────────────────
   if (adapterRouted) {
     const refresh = (adapterRouted as { refreshSupportedModels?: () => Promise<void> }).refreshSupportedModels;

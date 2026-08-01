@@ -85,6 +85,20 @@ describe('archiveOrphanTasks — extended extension support', () => {
     expect(existsSync(join(root, '.tasks', 'task-138-001.json'))).toBe(true);
   });
 
+  it('preserves landing proposals and temporary result residue as non-task evidence', () => {
+    writeFileSync(
+      join(root, '.tasks', 'task-139-004.landing-proposal.json'),
+      JSON.stringify({ taskId: '139-004', sequence: 1 }),
+    );
+    writeFileSync(join(root, '.tasks', 'task-139-004.result.tmp'), '{partial');
+
+    const count = archiveOrphanTasks(root, 'sprint-139');
+
+    expect(count).toBe(0);
+    expect(existsSync(join(root, '.tasks', 'task-139-004.landing-proposal.json'))).toBe(true);
+    expect(existsSync(join(root, '.tasks', 'task-139-004.result.tmp'))).toBe(true);
+  });
+
   it('returns 0 when .tasks/ directory does not exist', () => {
     rmSync(join(root, '.tasks'), { recursive: true, force: true });
 

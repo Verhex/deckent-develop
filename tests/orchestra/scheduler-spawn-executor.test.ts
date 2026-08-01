@@ -73,6 +73,7 @@ import { spawnWorker } from '../../src/orchestra/tmux.js';
 import { waitForResults } from '../../src/orchestra/result-collector.js';
 import { buildWorkerPrompt } from '../../src/orchestra/task-builder.js';
 import { ProviderExecutionIngressHoldError } from '../../src/core/provider-execution-ingress-authority.js';
+import { CHANNELS, readEvents } from '../../src/orchestra/event-stream.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -313,6 +314,28 @@ describe('executeSpawnTask — fix-task routing-lineage inheritance', () => {
     const persisted = JSON.parse(readFileSync(persistedPath, 'utf-8'));
     expect(persisted.status).toBe(TaskStatus.EXECUTING);
     expect(persisted.modelEffort).toBe('high');
+  });
+
+  it('publishes one canonical TASK_ASSIGN event for a dynamically dispatched task', async () => {
+    const task = makeTask('700-EVENT');
+    const backend = makeMockBackend();
+
+    await executeSpawnTask({ task }, baseDeps(root, { backend }));
+
+    const assignments = readEvents(root, 'sprint-sched3', {
+      channel: CHANNELS.TASK_ASSIGN,
+    });
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]).toMatchObject({
+      source: 'brain',
+      target: 'worker',
+      payload: {
+        taskId: '700-EVENT',
+        workerId: 'w-700-EVENT',
+        model: 'claude-sonnet-5',
+        provider: 'claude',
+      },
+    });
   });
 
   it('returns routing-lineage-missing and blocks the spawn when the original task file cannot be read', async () => {

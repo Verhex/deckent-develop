@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -6,8 +6,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildExecutionLandingProposalPromptSegment,
   executionLandingProposalPath,
+  parseLandingProposalV2,
   parseExecutionLandingProposal,
   readExecutionLandingProposal,
+  writeExecutionLandingProposal,
 } from '../../src/core/execution-landing-proposal.js';
 
 const roots: string[] = [];
@@ -38,11 +40,65 @@ function proposal(overrides: Record<string, unknown> = {}): Record<string, unkno
   };
 }
 
+function proposalV2(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    ...proposal(),
+    version: 2,
+    generation: 3,
+    resultReference: {
+      taskId: 'm1-007', attemptId: ATTEMPT, generation: 3,
+      relativePath: '.tasks/task-m1-007.result',
+    },
+    ...overrides,
+  };
+}
+
 afterEach(() => {
   for (const value of roots.splice(0)) rmSync(value, { recursive: true, force: true });
 });
 
 describe('execution landing proposal', () => {
+  it('validates and atomically replaces a structured V2 proposal', () => {
+    const projectRoot = root();
+    const first = proposalV2();
+    const written = writeExecutionLandingProposal(projectRoot, first as never);
+    const path = join(projectRoot, written.relativePath);
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(first);
+
+    writeExecutionLandingProposal(projectRoot, proposalV2({ sequence: 3 }) as never);
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toMatchObject({ sequence: 3, generation: 3 });
+    expect(written.proposalSha256).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it.each([
+    ['task traversal', { taskId: '../m1-007' }],
+    ['Windows-style task traversal', { taskId: '..\\m1-007' }],
+    ['NUL in task identity', { taskId: 'm1-007\0other' }],
+    ['invalid attempt', { attemptId: 'not-an-attempt' }],
+    ['invalid generation', { generation: 0 }],
+    ['invalid sequence', { sequence: 0 }],
+    ['conflicting duplicate identity', { resultReference: { taskId: 'other', attemptId: ATTEMPT, generation: 3, relativePath: '.tasks/task-m1-007.result' } }],
+    ['result traversal', { resultReference: { taskId: 'm1-007', attemptId: ATTEMPT, generation: 3, relativePath: '../task-m1-007.result' } }],
+    ['oversized risks', { unresolvedRisks: Array.from({ length: 51 }, () => 'risk') }],
+  ])('rejects %s before publication', (_name, override) => {
+    const projectRoot = root();
+    expect(() => writeExecutionLandingProposal(projectRoot, proposalV2(override) as never)).toThrow();
+    expect(() => readFileSync(join(projectRoot, '.tasks/task-m1-007.landing-proposal.json'))).toThrow();
+  });
+
+  it('rejects non-serializable input and symlinked destinations', () => {
+    const cyclic = proposalV2();
+    cyclic.summary = cyclic;
+    expect(() => parseLandingProposalV2(cyclic)).toThrow(/cycle/);
+
+    const projectRoot = root();
+    const outside = join(projectRoot, 'outside.json');
+    writeFileSync(outside, 'untouched');
+    symlinkSync(outside, executionLandingProposalPath(projectRoot, 'm1-007'));
+    expect(() => writeExecutionLandingProposal(projectRoot, proposalV2() as never)).toThrow(/symlink/);
+    expect(readFileSync(outside, 'utf8')).toBe('untouched');
+  });
+
   it('accepts only the exact attempt-bound bounded schema', () => {
     expect(parseExecutionLandingProposal(proposal(), {
       taskId: 'm1-007',

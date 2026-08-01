@@ -52,6 +52,18 @@ describe('W0 cleanup state-truth — per-sprint display artifacts die with the s
     expect(existsSync(join(root, '.deckent', 'ci-baseline.json'))).toBe(false);
   });
 
+  it("cleanup('sprint-end') retires only the settled sprint's process-suffixed temp residue", () => {
+    const owned = join(root, '.tasks', 'task-999-004.landing-proposal.json.tmp.276');
+    const foreign = join(root, '.tasks', 'task-998-004.landing-proposal.json.tmp.277');
+    writeFileSync(owned, '{partial');
+    writeFileSync(foreign, '{other-run');
+
+    cleanup(root, makeSprint(), undefined, 'sprint-end');
+
+    expect(existsSync(owned)).toBe(false);
+    expect(existsSync(foreign)).toBe(true);
+  });
+
   it("cleanup('spawn-fail') preserves both for post-mortem", () => {
     cleanup(root, makeSprint(), undefined, 'spawn-fail');
     expect(existsSync(join(root, '.dashboard'))).toBe(true);

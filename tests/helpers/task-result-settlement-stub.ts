@@ -77,6 +77,10 @@ export function createTaskResultSettlementModuleStub(): Record<string, unknown> 
       `/host-state/task-result-settlements/${ref.taskId}/${ref.attemptId}/prompt.txt`,
     taskResultSettlementAttemptPath: (ref: ReturnType<typeof refFor>) =>
       `/host-state/task-result-settlements/${ref.taskId}/${ref.attemptId}/attempt.json`,
+    taskResultSettlementWorkAttributionBaselinePath: (ref: ReturnType<typeof refFor>) =>
+      `/host-state/task-result-settlements/${ref.taskId}/${ref.attemptId}/work-attribution-baseline.txt`,
+    writeTaskResultSettlementWorkAttributionBaselineAtomic: (ref: ReturnType<typeof refFor>) =>
+      `/host-state/task-result-settlements/${ref.taskId}/${ref.attemptId}/work-attribution-baseline.txt`,
     writeTaskResultSettlementAttemptAtomic: (): void => undefined,
     writeTaskResultSettlementAtomic: (): void => undefined,
     writeTaskResultSettlementClosureAtomic: (): void => undefined,

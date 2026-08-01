@@ -52,6 +52,43 @@ const invocationReceiptRefSchema = z.object({
   invocationId: z.string().min(1),
 });
 
+const sha256DigestSchema = z.string().regex(/^[a-f0-9]{64}$/);
+
+const nonCompleteWiringEvidenceSchema = z.discriminatedUnion('state', [
+  z.object({
+    state: z.literal('presence-only'),
+    basis: z.enum(['code-presence', 'test-presence', 'static-reachability', 'import-count']),
+    evidenceRefs: z.array(z.string().min(1)).min(1),
+  }),
+  z.object({
+    state: z.literal('incomplete'),
+    reasonCode: z.enum(['absent', 'unresolved', 'not-executed']),
+    evidenceRefs: z.array(z.string().min(1)),
+  }),
+  z.object({
+    state: z.literal('unsupported'),
+    reasonCode: z.enum([
+      'adapter-unavailable',
+      'capability-unavailable',
+      'environment-unavailable',
+    ]),
+    evidenceRefs: z.array(z.string().min(1)).min(1),
+  }),
+  z.object({
+    state: z.literal('contradictory'),
+    reasonCode: z.enum(['authority-conflict', 'identity-conflict', 'observation-conflict']),
+    evidenceRefs: z.array(z.string().min(1)).min(1),
+  }),
+]);
+
+/** Worker result evidence cannot structurally encode production completion. */
+export const productionWiringResultEvidenceSchema = z.object({
+  version: z.literal(1),
+  contractDigest: sha256DigestSchema,
+  observedBy: z.literal('worker'),
+  evidence: nonCompleteWiringEvidenceSchema,
+});
+
 /** Downstream orchestrator evidence; additive and absent before cross-verification. */
 export const crossVerifyEvidenceSchema = z.union([
   z.object({
@@ -88,6 +125,16 @@ const fileChangeSchema = z.object({
 const boundaryViolationSchema = z.object({
   path: z.string(),
   reason: z.string(),
+});
+
+const workAttributionSchema = z.object({
+  state: z.enum(['VERIFIED', 'HOLD']),
+  attemptId: z.string().min(1),
+  baselineRef: z.string().min(1),
+  baselineSha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  scopeDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  reasonCode: z.string().optional(),
+  claimedOutsideScope: z.array(z.string()).optional(),
 });
 
 /** Provider-agnostic token accounting (§1.3). `source` records provenance honestly. */
@@ -222,6 +269,7 @@ export const taskResultSchema = z.object({
   totalLinesRemoved: z.number().int().nonnegative(),
   diskVerified: z.boolean().default(false),
   boundaryViolations: z.array(boundaryViolationSchema).default([]),
+  workAttribution: workAttributionSchema.optional(),
 
   // resource accounting (orchestrator, provider-agnostic)
   tokenUsage: tokenUsageSchema,
@@ -242,6 +290,7 @@ export const taskResultSchema = z.object({
   totalScore: z.number().nullable().default(null),
   honestGate: honestGateSchema.default({ flagged: false, violation: null }),
   crossVerify: crossVerifyEvidenceSchema.optional(),
+  productionWiringEvidence: productionWiringResultEvidenceSchema.optional(),
 
   // comms (optional)
   handoffNotes: z.string().nullable().default(null),

@@ -198,6 +198,42 @@ export function costGuardShouldComplete(
   return stopped && collectedCount >= totalCount - stillPendingCount;
 }
 
+/**
+ * A run-wide dispatch hold is quiescent when no worker remains in flight.
+ * PAUSED repair descendants and admission-held PENDING tasks intentionally do
+ * not need synthetic results before EXECUTE can hand control to EVALUATE/FIX.
+ */
+export function dispatchHoldShouldComplete(
+  stopped: boolean,
+  inFlightCount: number,
+): boolean {
+  return stopped && inFlightCount === 0;
+}
+
+export interface ExecuteRepairYieldInput {
+  readonly repairEnabled: boolean;
+  readonly inFlightCount: number;
+  readonly pausedCount: number;
+  readonly admittedPendingCount: number;
+  readonly heldPendingCount: number;
+  readonly repairCandidateCount: number;
+}
+
+/**
+ * Canonical EXECUTE -> EVALUATE/FIX yield decision.
+ *
+ * A provider/admission-held PENDING task is not runnable work and therefore
+ * must not pin EXECUTE forever. Conversely, any admitted PENDING task keeps
+ * EXECUTE open so the scheduler gets another dispatch opportunity.
+ */
+export function shouldYieldExecuteToRepair(input: ExecuteRepairYieldInput): boolean {
+  if (!input.repairEnabled || input.inFlightCount > 0) return false;
+  if (input.admittedPendingCount > 0) return false;
+  const repairExists = input.pausedCount > 0 || input.repairCandidateCount > 0;
+  if (!repairExists) return false;
+  return input.pausedCount + input.heldPendingCount > 0 || input.repairCandidateCount > 0;
+}
+
 export function isProviderDispatchHoldFailure(
   result: Pick<
     TaskResult,
@@ -1176,7 +1212,6 @@ export async function waitForResults(
     );
     if (terminal) return;
 
-    taskBudgetHold = true;
     result.selfAssessment = 'NO_GO';
     result.testsPassed = false;
     const reason =
@@ -1334,7 +1369,11 @@ export async function waitForResults(
           // no-op task, e.g. an already-fixed born-item) the guard leaves the
           // worker's claim untouched, and the separate disk-verify NO_GO gate still
           // catches a DONE-with-no-evidence. Mirrors the token/cost enrichment above.
-          if (enrichTask) {
+          // A settled claim-time attribution receipt is stronger than the
+          // repository's final shared-worktree diff. Re-running LP-10 here
+          // would re-attach predecessor/sibling bytes that the settlement
+          // already excluded (RECOVERY-BORN-480-ATTRIBUTION-001).
+          if (enrichTask && !result.workAttribution) {
             try {
               const disk = computeScopedDiskChanges(projectRoot, enrichTask.scope);
               if (disk.filesChanged.length > 0 || disk.linesAdded > 0 || disk.linesRemoved > 0) {
@@ -1635,10 +1674,11 @@ export async function waitForResults(
   // the main-loop dispatch gate, so without this check a nervous respawn would
   // spawn a NEW worker after a cost stop.
   let costGuard: import('./sprint-phases.js').CostGuardMonitor | undefined;
-  // Owner-supplied per-task budgets are enforced independently of the legacy
-  // opt-in transcript cost guard. Unknown evidence and exceeded ceilings both
-  // stop every subsequent dispatch in this run.
-  let taskBudgetHold = false;
+  // Owner-supplied per-task budgets settle only that exact attempt. The only
+  // run-wide budget stop is the API/USD run ceiling (or the explicit legacy
+  // cost guard); a subscription task exhausting its token/turn allowance must
+  // never suppress healthy peers or the FIX lane.
+  let runBudgetHold = false;
   let cumulativeRunCostUsd = 0;
   const budgetCountedTaskIds = new Set<string>();
   let sprintBudgetUsd: number | null = null;
@@ -1650,8 +1690,7 @@ export async function waitForResults(
 
   const applyBudgetEvidence = (task: Task | undefined, result: TaskResult, taskId: string): void => {
     if (recordProviderDispatchHold(task, taskId, result)) return;
-    const runtimeStop = applyRuntimeBudgetStopToResult(projectRoot, taskId, result);
-    if (runtimeStop) taskBudgetHold = true;
+    applyRuntimeBudgetStopToResult(projectRoot, taskId, result);
     if (!task) return;
     const resolvedBillingMode = resolveBillingModeForAuth(
       task.provider,
@@ -1684,7 +1723,7 @@ export async function waitForResults(
     }
     if (taskVerdict.state === 'within-budget' && runCostState === 'within-budget') return;
 
-    taskBudgetHold = true;
+    if (runCostState !== 'within-budget') runBudgetHold = true;
     try {
       writeEvent(projectRoot, sprint.id, 'brain', 'auditor', 'TASK_BUDGET_HOLD', {
         taskId,
@@ -1728,7 +1767,7 @@ export async function waitForResults(
       // classifies it SYNTHETIC_NO_GO (not NOT_DISPATCHED) and the FIX phase
       // may spawn ONE ungated fix worker afterwards — a bounded, documented
       // leak (FIX-phase cost gating is a separate follow-up).
-      if (taskBudgetHold || costGuard?.shouldStopDispatch()) continue;
+      if (runBudgetHold || costGuard?.shouldStopDispatch()) continue;
       await spawnIfNotAssigned(task);
     }
   };
@@ -1936,15 +1975,30 @@ export async function waitForResults(
    * deadlock because parked tasks intentionally have no synthetic result.
    */
   const shouldYieldToDependencyRepair = (): boolean => {
-    if (!deferRepairableDependencyFailures) return false;
     const unfinished = sprint.tasks.filter(task => !collected.has(task.id));
-    if (unfinished.length === 0) return false;
-    if (!unfinished.every(task => task.status === TaskStatus.PAUSED)) return false;
-    return !sprint.tasks.some(task =>
+    const inFlightCount = sprint.tasks.filter(task =>
       task.status === TaskStatus.EXECUTING
       || task.status === TaskStatus.CLAIMED
-      || task.status === TaskStatus.TESTING,
-    );
+      || task.status === TaskStatus.TESTING
+      || task.status === TaskStatus.DOCUMENTING,
+    ).length;
+    const pending = unfinished.filter(task => task.status === TaskStatus.PENDING);
+    const heldPendingCount = pending.filter(task =>
+      runBudgetHold || providerDispatchHolds.has(resolveTaskProvider(task)),
+    ).length;
+    const repairCandidateCount = sprint.tasks.filter(task =>
+      collected.has(task.id)
+      && (task.status === TaskStatus.NO_GO
+        || task.status === TaskStatus.MANUAL_REVIEW_REQUIRED),
+    ).length;
+    return shouldYieldExecuteToRepair({
+      repairEnabled: deferRepairableDependencyFailures,
+      inFlightCount,
+      pausedCount: unfinished.filter(task => task.status === TaskStatus.PAUSED).length,
+      admittedPendingCount: pending.length - heldPendingCount,
+      heldPendingCount,
+      repairCandidateCount,
+    });
   };
 
   // ─── SCHED4 (born-634/635, docs/analysis/scheduler-unify-design-2026-07-11.md
@@ -1971,7 +2025,7 @@ export async function waitForResults(
         trigger: { kind: triggerKind, sequence: ++shadowTickSequence },
         strategy: process.env.DECKENT_LEGACY_FIFO === '1' ? 'legacy-fifo' : 'continuous',
         nowMs: Date.now(),
-        costStop: taskBudgetHold || (costGuard?.shouldStopDispatch() ?? false),
+        costStop: runBudgetHold || (costGuard?.shouldStopDispatch() ?? false),
         slotBudget: Math.max(0, maxWorkers - currentlyExecuting),
         dependencyPipelineEnabled: config.dependency_pipeline_enabled === true,
         deferTerminalDependencyFailure: deferRepairableDependencyFailures,
@@ -2015,7 +2069,7 @@ export async function waitForResults(
       const maxWorkers = config ? resolveEffectiveWorkers(config, getSystemProfile()) : 0;
       return Math.max(0, maxWorkers - currentlyExecuting);
     },
-    getCostStop: () => taskBudgetHold || (costGuard?.shouldStopDispatch() ?? false),
+    getCostStop: () => runBudgetHold || (costGuard?.shouldStopDispatch() ?? false),
     spawnDeps: {
       projectRoot,
       sprintFallbackId: sprint.id,
@@ -2172,7 +2226,7 @@ export async function waitForResults(
         // NOT_DISPATCHED via the existing deadline path. Inert when the guard is
         // disabled (costGuard undefined → the condition is always true), so the
         // default dispatch sequence below is byte-for-byte unchanged.
-        if (!taskBudgetHold && (!costGuard || !costGuard.shouldStopDispatch())) {
+        if (!runBudgetHold && (!costGuard || !costGuard.shouldStopDispatch())) {
           // SCHED5: same injected schedulerDriver as the initial tick above
           // (see its construction comment). Legacy engine runs the exact
           // ADR-064/Sprint 165/Sprint 272 sequence below unchanged; reducer
@@ -2233,9 +2287,14 @@ export async function waitForResults(
       // classifyMissingResult marks them NOT_DISPATCHED (out of the NO_GO
       // blame-fix pipeline), identical to any un-reached task today. Inert when
       // the guard is disabled (costGuard undefined → condition never true).
-      if (taskBudgetHold || costGuard?.shouldStopDispatch()) {
-        const stillPending = sprint.tasks.filter(t => t.status === TaskStatus.PENDING).length;
-        if (costGuardShouldComplete(true, collected.size, taskIds.size, stillPending)) break;
+      if (runBudgetHold || costGuard?.shouldStopDispatch()) {
+        const inFlightCount = sprint.tasks.filter(task =>
+          task.status === TaskStatus.EXECUTING
+          || task.status === TaskStatus.CLAIMED
+          || task.status === TaskStatus.TESTING
+          || task.status === TaskStatus.DOCUMENTING,
+        ).length;
+        if (dispatchHoldShouldComplete(true, inFlightCount)) break;
       }
       const providerHeldPending = sprint.tasks.filter(
         task => task.status === TaskStatus.PENDING

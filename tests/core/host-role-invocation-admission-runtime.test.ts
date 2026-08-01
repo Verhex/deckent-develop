@@ -27,6 +27,7 @@ import {
 } from '../../src/core/provider-truth-store.js';
 import type { RoleInvocationSelected } from '../../src/core/role-invocation-resolver.js';
 import type { InvocationRole } from '../../src/core/invocation-receipt.js';
+import type { ProviderConcurrencyCapabilityRequest } from '../../src/core/provider-concurrency-capability.js';
 
 const roots: string[] = [];
 const T0 = new Date('2026-07-20T12:00:00.000Z');
@@ -213,6 +214,24 @@ function reservation(selected: RoleInvocationSelected): ProviderLimitReservation
   };
 }
 
+function unknownConcurrency(provider: ProviderKey): ProviderConcurrencyCapabilityRequest {
+  const scope = {
+    tenantRef: 'tenant-a',
+    principalRef: `principal-${provider}`,
+    authModeClass: 'subscription',
+  };
+  return {
+    evaluatedAt: T1.toISOString(),
+    configured: { scope, ceiling: 6, evidenceRefs: [`config:${provider}`] },
+    provider: {
+      state: 'unknown', scope,
+      freshness: { observedAt: T0.toISOString(), expiresAt: T5 },
+      evidenceRefs: [`provider-capacity:${provider}`],
+    },
+    host: { scope, ceiling: 6, evidenceRefs: [`host:${provider}`] },
+  };
+}
+
 function request(
   truthStore: ProviderTruthStore,
   role: InvocationRole = 'brain',
@@ -357,6 +376,32 @@ describe('HostRoleInvocationAdmissionRuntime', () => {
       resolution: { selected: { provider: 'claude', model: 'claude-opus-4-8' } },
     });
     expect(result).not.toHaveProperty('executionGrant');
+    truthStore.close();
+    limitStore.close();
+  });
+
+  it('passes caller-authored concurrency authority through the host admission seam', async () => {
+    const { truthStore, limitStore, runtime } = await setup();
+    const buildReservation = vi.fn(reservation);
+    const result = runtime.admit({
+      ...request(truthStore),
+      concurrencyCapabilities: {
+        claude: unknownConcurrency('claude'),
+        codex: unknownConcurrency('codex'),
+      },
+      buildReservation,
+    });
+
+    expect(result).toMatchObject({
+      decision: 'hold',
+      reasonCode: 'fallback_exhausted',
+      resolution: { selected: null },
+      attempts: [
+        { provider: 'claude', concurrency: { decision: 'HOLD' } },
+        { provider: 'codex', concurrency: { decision: 'HOLD' } },
+      ],
+    });
+    expect(buildReservation).not.toHaveBeenCalled();
     truthStore.close();
     limitStore.close();
   });

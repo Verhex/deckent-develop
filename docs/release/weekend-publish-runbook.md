@@ -191,11 +191,22 @@ Issues açık, Discussions açık, branch protection master.
 
 ## 6. Plan-sync bekleyen mutasyonlar (MASTER-PLAN'a işlenecek)
 
-*(şimdilik boş — plan 2026-07-31 itibarıyla güncel: 8070 güncellendi, 8090-8093 + 440 eklendi,
-validator yeşil. Bu bölüme yeni mutasyonlar tarih + satır-ID ile eklenir.)*
+- **2026-08-01 — PUBLISH ERTELENDİ (Alperen kararı):** Deckent ciddi fonksiyon kaybı yaşıyor;
+  öncelik = recovery/onarım. Plana işlenecek mutasyonlar (session'lar ayrışınca tek pakette):
+  - `RELEASE-BETA-001` (8090), `NPM-CHANNEL-001` (8091), `DOCS-TRUTH-PASS-001` (8092),
+    `LAUNCH-COMMS-001` (8093), `REPO-MIGRATION-001` (8070) → **DEFERRED**
+    (gerekçe: owner kararı 2026-08-01, recovery önceliği; review: recovery settle olduktan
+    sonraki ilk sprint-sessiz pencere)
+  - `EXEC-TEMPO-001` (440) → kalır (OPEN) — recovery sonrası tempo işi geçerliliğini koruyor
 
 ## 7. Bu track'in durum günlüğü
 
+- **2026-08-01 — PUBLISH ERTELENDİ.** Deckent fonksiyonalitesini kaybetti; ayağa kaldırma +
+  onarım önceliklendirildi (Alperen). Hafta sonu cutover planı askıda; bu runbook'un tüm
+  mekanik içeriği (sync script taslağı, exclude manifest, README iskeleti, flip checklist)
+  geçerli kalır ve recovery sonrası aynen devreye girer. ⚠️ Açık risk: npm'de `deckent` adı
+  hâlâ rezerve edilmedi (404) — rezerv de `prepublishOnly` build'i gerektirdiğinden deckent
+  yeşile dönmeden yapılamaz; recovery sonrası İLK iş olarak öne alınmalı.
 - **2026-07-31:** Runbook oluşturuldu. npm 404 doğrulandı; tarball audit temiz; `prepublishOnly`
   build-kısıtı tespit edildi; `.deck` root'ta bulundu (migration exclude'una eklendi); sync script
   taslağı hazırlandı. Bekleyen: sprint-sessiz pencerede rezerv publish (Alperen).

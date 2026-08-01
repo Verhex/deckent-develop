@@ -25,10 +25,12 @@ import type {
   RunFlowContext,
   RunFlowGateResult,
   RunFlowPlanLineageRecord,
+  RunFlowPlanSourceAuthority,
   RunFlowPolicyDecision,
   RunFlowProjectionAdoptionRecord,
   RunProposal,
 } from '../core/run-flow-contract.js';
+import { RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION } from '../core/run-flow-contract.js';
 import {
   loadPlannedSprint,
   savePlannedSprint,
@@ -71,8 +73,6 @@ import {
   normalizeExecutionWriteScopePolicy,
 } from '../core/execution-write-scope-policy.js';
 
-export const RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION = 1 as const;
-
 export type RunFlowPlanServiceErrorCode =
   | 'FLOW_ID_CONFLICT'
   | 'UNRESOLVED_DEPENDENCY'
@@ -91,19 +91,6 @@ export class RunFlowPlanServiceError extends Error {
     super(code);
     this.name = 'RunFlowPlanServiceError';
   }
-}
-
-export interface RunFlowPlanSourceAuthority {
-  readonly schemaVersion: typeof RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION;
-  readonly sourceKind: 'intent' | 'directives';
-  readonly contentSha256: string;
-  readonly configSha256: string;
-  readonly proposalSha256: string;
-  /** Full plan-affecting input: context + config + recommendation + flags. */
-  readonly planningInputSha256: string;
-  /** Exact tracked-file evidence consumed by the plan-time scope gate. */
-  readonly scopeInputSha256: string;
-  readonly lineageSha256: string;
 }
 
 export type RunFlowPlanLineage = RunFlowPlanLineageRecord;

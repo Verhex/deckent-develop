@@ -32,8 +32,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   buildOnExitTrap,
+  buildScopeAttributionManifest,
   buildScopedDiffPathspec,
   computeScopeBaselineManifest,
+  reconcileDockerResultWorkAttribution,
 } from '../../src/orchestra/spawn-backend-docker.js';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -372,5 +374,246 @@ describe('buildOnExitTrap — task-start baseline filter (455-003 TIMEOUT-BASELI
     expect(json.selfAssessment).toBe('TIMEOUT_WITH_WORK');
     expect(json.filesChanged).toEqual(['fresh.ts']);
     expect(json.notes).toContain('git diff shows 1 files modified');
+  });
+});
+
+describe('normal result — claim-time work attribution (3175)', () => {
+  function resultFixture(path: string): Record<string, unknown> {
+    return {
+      taskId: 't-attribution',
+      workerId: 'docker-t-attribution',
+      filesChanged: [path],
+      linesAdded: 24,
+      linesRemoved: 6,
+      testsPassed: false,
+      coverage: 0,
+      selfAssessment: 'NO_GO',
+      notes: 'worker-authored final shared-tree diff',
+    };
+  }
+
+  it('excludes unchanged predecessor work from a later normal result', async () => {
+    const repo = freshTmp();
+    await initRepo(repo);
+    writeFileSync(join(repo, 'shared.ts'), 'export const a = 1;\n');
+    await stageBaseline(repo);
+    appendFileSync(join(repo, 'shared.ts'), '// predecessor work\n');
+
+    const attemptId = 'attempt-3175-a';
+    const baselinePath = join(repo, '.scope-baseline');
+    const resultPath = join(repo, '.result.json');
+    writeFileSync(
+      baselinePath,
+      buildScopeAttributionManifest(
+        attemptId,
+        ['shared.ts'],
+        computeScopeBaselineManifest(repo, ['shared.ts']),
+      ),
+      'utf-8',
+    );
+    writeFileSync(resultPath, JSON.stringify(resultFixture('shared.ts')), 'utf-8');
+
+    const outcome = reconcileDockerResultWorkAttribution({
+      projectRoot: repo,
+      resultPath,
+      baselinePath,
+      attemptId,
+      scopeFilesWrite: ['shared.ts'],
+    });
+    const result = JSON.parse(readFileSync(resultPath, 'utf-8')) as Record<string, any>;
+
+    expect(outcome, JSON.stringify(outcome)).toMatchObject({
+      state: 'VERIFIED',
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+    });
+    expect(result.filesChanged).toEqual([]);
+    expect(result.workAttribution).toMatchObject({
+      state: 'VERIFIED',
+      attemptId,
+      baselineRef: expect.stringMatching(/^task-result-work-attribution-baseline:sha256:/),
+      baselineSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+  });
+
+  it('attributes only bytes added after the claim-time baseline', async () => {
+    const repo = freshTmp();
+    await initRepo(repo);
+    writeFileSync(join(repo, 'shared.ts'), 'export const a = 1;\n');
+    await stageBaseline(repo);
+    appendFileSync(join(repo, 'shared.ts'), '// predecessor work\n');
+
+    const attemptId = 'attempt-3175-b';
+    const baselinePath = join(repo, '.scope-baseline');
+    const resultPath = join(repo, '.result.json');
+    writeFileSync(
+      baselinePath,
+      buildScopeAttributionManifest(
+        attemptId,
+        ['shared.ts'],
+        computeScopeBaselineManifest(repo, ['shared.ts']),
+      ),
+      'utf-8',
+    );
+    appendFileSync(join(repo, 'shared.ts'), '// current attempt work\n');
+    writeFileSync(resultPath, JSON.stringify(resultFixture('shared.ts')), 'utf-8');
+
+    const outcome = reconcileDockerResultWorkAttribution({
+      projectRoot: repo,
+      resultPath,
+      baselinePath,
+      attemptId,
+      scopeFilesWrite: ['shared.ts'],
+    });
+
+    expect(outcome, JSON.stringify(outcome)).toMatchObject({
+      state: 'VERIFIED',
+      filesChanged: ['shared.ts'],
+      linesAdded: 1,
+      linesRemoved: 0,
+    });
+    expect(JSON.parse(readFileSync(resultPath, 'utf-8'))).toMatchObject({
+      filesChanged: ['shared.ts'],
+      linesAdded: 1,
+      linesRemoved: 0,
+    });
+  });
+
+  it('preserves canonical structured file-change shape when the worker reported an empty list', async () => {
+    const repo = freshTmp();
+    await initRepo(repo);
+    writeFileSync(join(repo, 'canonical.ts'), 'export const a = 1;\n');
+    await stageBaseline(repo);
+
+    const attemptId = 'attempt-3175-c';
+    const baselinePath = join(repo, '.scope-baseline');
+    const resultPath = join(repo, '.result.json');
+    writeFileSync(
+      baselinePath,
+      buildScopeAttributionManifest(
+        attemptId,
+        ['canonical.ts'],
+        computeScopeBaselineManifest(repo, ['canonical.ts']),
+      ),
+      'utf-8',
+    );
+    appendFileSync(join(repo, 'canonical.ts'), '// current attempt work\n');
+    writeFileSync(resultPath, JSON.stringify({
+      ...resultFixture('canonical.ts'),
+      schemaVersion: '1.0',
+      filesChanged: [],
+    }), 'utf-8');
+
+    const outcome = reconcileDockerResultWorkAttribution({
+      projectRoot: repo,
+      resultPath,
+      baselinePath,
+      attemptId,
+      scopeFilesWrite: ['canonical.ts'],
+    });
+
+    expect(outcome, JSON.stringify(outcome)).toMatchObject({ state: 'VERIFIED' });
+    expect(JSON.parse(readFileSync(resultPath, 'utf-8')).filesChanged).toEqual([{
+      path: 'canonical.ts',
+      status: 'modified',
+      linesAdded: 1,
+      linesRemoved: 0,
+    }]);
+  });
+
+  it('attributes a newly-created scoped file without an empty-blob subprocess probe', async () => {
+    const repo = freshTmp();
+    await initRepo(repo);
+    const attemptId = 'attempt-3175-new-file';
+    const baselinePath = join(repo, '.scope-baseline');
+    const resultPath = join(repo, '.result.json');
+    writeFileSync(
+      baselinePath,
+      buildScopeAttributionManifest(attemptId, ['new.ts'], ''),
+      'utf-8',
+    );
+    writeFileSync(join(repo, 'new.ts'), 'export const created = true;\n', 'utf-8');
+    writeFileSync(resultPath, JSON.stringify(resultFixture('new.ts')), 'utf-8');
+
+    const outcome = reconcileDockerResultWorkAttribution({
+      projectRoot: repo,
+      resultPath,
+      baselinePath,
+      attemptId,
+      scopeFilesWrite: ['new.ts'],
+    });
+
+    expect(outcome, JSON.stringify(outcome)).toMatchObject({
+      state: 'VERIFIED',
+      filesChanged: ['new.ts'],
+      linesAdded: 1,
+      linesRemoved: 0,
+    });
+  });
+
+  it('attributes deletion from the persisted claim-time blob', async () => {
+    const repo = freshTmp();
+    await initRepo(repo);
+    writeFileSync(join(repo, 'deleted.ts'), 'line one\nline two\n', 'utf-8');
+    await stageBaseline(repo);
+    const attemptId = 'attempt-3175-delete-file';
+    const baselinePath = join(repo, '.scope-baseline');
+    const resultPath = join(repo, '.result.json');
+    writeFileSync(
+      baselinePath,
+      buildScopeAttributionManifest(
+        attemptId,
+        ['deleted.ts'],
+        computeScopeBaselineManifest(repo, ['deleted.ts']),
+      ),
+      'utf-8',
+    );
+    rmSync(join(repo, 'deleted.ts'));
+    writeFileSync(resultPath, JSON.stringify(resultFixture('deleted.ts')), 'utf-8');
+
+    const outcome = reconcileDockerResultWorkAttribution({
+      projectRoot: repo,
+      resultPath,
+      baselinePath,
+      attemptId,
+      scopeFilesWrite: ['deleted.ts'],
+    });
+
+    expect(outcome, JSON.stringify(outcome)).toMatchObject({
+      state: 'VERIFIED',
+      filesChanged: ['deleted.ts'],
+      linesAdded: 0,
+      linesRemoved: 2,
+    });
+  });
+
+  it('turns missing attempt authority into a typed HOLD instead of trusting final git diff', async () => {
+    const repo = freshTmp();
+    await initRepo(repo);
+    const resultPath = join(repo, '.result.json');
+    writeFileSync(resultPath, JSON.stringify(resultFixture('shared.ts')), 'utf-8');
+
+    const outcome = reconcileDockerResultWorkAttribution({
+      projectRoot: repo,
+      resultPath,
+      baselinePath: join(repo, '.missing-baseline'),
+      attemptId: undefined,
+      scopeFilesWrite: ['shared.ts'],
+    });
+
+    expect(outcome).toMatchObject({
+      state: 'HOLD',
+      reasonCode: 'ATTRIBUTION_AUTHORITY_UNAVAILABLE',
+      filesChanged: [],
+    });
+    expect(JSON.parse(readFileSync(resultPath, 'utf-8'))).toMatchObject({
+      selfAssessment: 'NO_GO',
+      filesChanged: [],
+      workAttribution: {
+        state: 'HOLD',
+        reasonCode: 'ATTRIBUTION_AUTHORITY_UNAVAILABLE',
+      },
+    });
   });
 });

@@ -327,7 +327,7 @@ export async function planSprint(
       receiptRef: plannerReceiptRef,
     },
   });
-  if (planMode !== 'structured' && parsedDirectives.some(t => t.provider || t.forceModel || t.forceAgent || t.forceSkills)) {
+  if (planMode !== 'structured' && parsedDirectives.some(t => t.provider || t.forceModel || t.forceAgent || t.forceSkills || t.postSettlementProjection)) {
     if (planMode === 'ai') {
       void notify(
         'phase-change', sprintId,
@@ -557,7 +557,7 @@ export async function planSprint(
   // Structured fallback (mode === 'structured' || AI fail + auto)
   if (!plannerResult && (planMode === 'structured' || planMode === 'auto')) {
     const structuredTasks = parsedDirectives;
-    const directiveSources: Array<{ title: string; description: string; scope: TaskScope; provider?: import('../core/types.js').ProviderName; forceModel?: import('../core/types.js').ModelType; forceEffort?: import('../core/types.js').TaskEffort; testTarget?: string; forceAgent?: string; forceSkills?: string[]; excludeAgent?: string[]; excludeSkills?: string[]; priority?: import('../core/types.js').TaskPriority; dependencies?: string[]; authMode?: 'subscription' | 'api'; backend?: 'docker' | 'tmux' | 'subprocess'; modelEffort?: string; smoke?: { command: string; expect: string } }> =
+    const directiveSources: Array<{ title: string; description: string; scope: TaskScope; provider?: import('../core/types.js').ProviderName; forceModel?: import('../core/types.js').ModelType; forceEffort?: import('../core/types.js').TaskEffort; testTarget?: string; forceAgent?: string; forceSkills?: string[]; excludeAgent?: string[]; excludeSkills?: string[]; priority?: import('../core/types.js').TaskPriority; dependencies?: string[]; authMode?: 'subscription' | 'api'; backend?: 'docker' | 'tmux' | 'subprocess'; modelEffort?: string; smoke?: { command: string; expect: string }; postSettlementProjection?: import('../core/task-types.js').PostSettlementPlanProjection }> =
       structuredTasks.length > 0
         ? structuredTasks
         : context.directives
@@ -679,6 +679,10 @@ export async function planSprint(
         // so it lands in the written `.tasks/task-*.json` (previously dropped here,
         // leaving the post-sprint proof-of-function gate with no command to run).
         smoke: src.smoke,
+        // 488-014: thread the parsed PromotionProof directive into the task —
+        // createTask() copies it onto Task.postSettlementProjection, never a
+        // hidden Task of its own (see PostSettlementPlanProjection doc comment).
+        postSettlementProjection: src.postSettlementProjection,
       }, seq++));
     }
   }

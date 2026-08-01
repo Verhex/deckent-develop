@@ -70,7 +70,21 @@ describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
   it('approve → APPROVED + the durable snapshot is persisted from the planned sprint', () => {
     const flowId = generateFlowId('decide-approve');
     appendProposalToCompletionChain({ root, flowId, through: 'PREVIEW_READY' });
-    savePlannedSprint(root, flowId, { revision: 1, sprint: testSprint() });
+    const sourceAuthority = {
+      schemaVersion: 1 as const,
+      sourceKind: 'intent' as const,
+      contentSha256: '1'.repeat(64),
+      configSha256: '2'.repeat(64),
+      proposalSha256: '3'.repeat(64),
+      planningInputSha256: '4'.repeat(64),
+      scopeInputSha256: '5'.repeat(64),
+      lineageSha256: '6'.repeat(64),
+    };
+    savePlannedSprint(root, flowId, {
+      revision: 1,
+      sprint: testSprint(),
+      sourceAuthority,
+    });
 
     const context = decideRunFlow(root, flowId, { decision: 'approve', actor: ACTOR });
 
@@ -80,6 +94,7 @@ describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
     const stored = loadApprovedSnapshot(root, flowId);
     expect(stored?.planDigest).toBe('digest-harness');
     expect((stored?.sprint as Sprint).id).toBe('sprint-decision-test');
+    expect(stored?.sourceAuthority).toEqual(sourceAuthority);
   });
 
   it('the SAME approve from a second surface converges idempotently (deterministic commandId)', () => {

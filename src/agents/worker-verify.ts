@@ -6,7 +6,6 @@
  * doc-only scope detection, and the enforceVerifyLoop async gate.
  */
 import { execSync } from 'node:child_process';
-import { promisify } from 'node:util';
 import { writeFileSync, readFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { AgentStatus } from '../core/types.js';
@@ -14,6 +13,15 @@ import type { TaskScope, VerifyTestsResult } from '../core/types.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { detectFullStack, STACK_COMMANDS } from '../core/stack-detector.js';
 import { createHeartbeat, writeHeartbeat } from './worker.js';
+import {
+  executeAdmittedTypeScriptVerification,
+} from '../orchestra/worker-verify-tool.js';
+import {
+  TypeScriptScopedVerificationAdapter,
+  type TypeScriptScopedVerificationExecutor,
+  type TypeScriptScopedVerificationRequest,
+  type TypeScriptForeignErrorDiagnostics,
+} from '../core/verification-typescript-adapter.js';
 
 // ─── Internal Helpers ───────────────────────────────────────────────
 
@@ -431,12 +439,6 @@ export function runCoverageVerify(
 
 // ─── Enforce Verify Loop (Async Gate) ──────────────────────────────
 
-/** Verify loop gate timeout per command (ms) */
-const VERIFY_LOOP_TIMEOUT_MS = 300_000;
-
-/** Max retry attempts for enforceVerifyLoop */
-const VERIFY_LOOP_MAX_ATTEMPTS = 3;
-
 /** Result of the enforce verify loop gate */
 export interface VerifyLoopResult {
   ok: boolean;
@@ -444,71 +446,92 @@ export interface VerifyLoopResult {
   attempts: number;
 }
 
+export interface WorkerAdmittedTypeScriptVerification {
+  readonly request: TypeScriptScopedVerificationRequest;
+}
+
+export type WorkerAdmittedVerificationResult =
+  | {
+      readonly kind: 'passed';
+      readonly foreignErrorDiagnostics: TypeScriptForeignErrorDiagnostics;
+    }
+  | {
+      readonly kind: 'failed';
+      readonly reason: string;
+      readonly foreignErrorDiagnostics: TypeScriptForeignErrorDiagnostics;
+    }
+  | {
+      readonly kind: 'hold';
+      readonly reason: string;
+      readonly foreignErrorDiagnostics: TypeScriptForeignErrorDiagnostics;
+    };
+
+/**
+ * Consume the adapter's admitted result at the worker boundary. Foreign
+ * concurrent observations are deliberately a diagnostic HOLD, never a task
+ * failure and never a signal to consume a FIX retry.
+ */
+export async function runAdmittedWorkerTypeScriptVerification(
+  verification: WorkerAdmittedTypeScriptVerification,
+  execute: TypeScriptScopedVerificationExecutor = executeAdmittedTypeScriptVerification,
+): Promise<WorkerAdmittedVerificationResult> {
+  const result = await new TypeScriptScopedVerificationAdapter().run(verification.request, execute);
+  if (result.kind === 'hold') {
+    return {
+      kind: 'hold',
+      reason: result.detail,
+      foreignErrorDiagnostics: result.foreignErrorDiagnostics,
+    };
+  }
+  if (result.foreignErrorDiagnostics.observations.length > 0) {
+    return {
+      kind: 'hold',
+      reason: `Foreign verification diagnostics: ${result.foreignErrorDiagnostics.reasonCodes.join(', ')}`,
+      foreignErrorDiagnostics: result.foreignErrorDiagnostics,
+    };
+  }
+  if (result.outcome === 'failed') {
+    return {
+      kind: 'failed',
+      reason: `Admitted TypeScript verification failed with exit code ${result.evidence.exitCode}`,
+      foreignErrorDiagnostics: result.foreignErrorDiagnostics,
+    };
+  }
+  return { kind: 'passed', foreignErrorDiagnostics: result.foreignErrorDiagnostics };
+}
+
 /**
  * Enforce a mandatory verify loop gate before writing a task result.
  *
- * Runs `tsc --noEmit` and `npx vitest run <scope>` up to 3 times.
- * If both pass on any attempt, writes a `.verify-ran` marker file and returns ok=true.
- * If all 3 attempts fail, returns ok=false with the last failure reason.
+ * Consumes one admitted TypeScript verification result. The former ambient
+ * global `npx tsc --noEmit` retry loop is intentionally removed: without an
+ * admission the gate holds, and a foreign concurrent error cannot spend a FIX
+ * retry or become this task's NO_GO verdict.
  */
 export async function enforceVerifyLoop(
   projectRoot: string,
   taskId: string,
-  scope: string | string[],
+  _scope: string | string[],
+  verification?: WorkerAdmittedTypeScriptVerification,
 ): Promise<VerifyLoopResult> {
-  const { exec: execFn } = await import('node:child_process');
-  const execAsync = promisify(execFn);
-  const scopeArg = Array.isArray(scope) ? scope.join(' ') : scope;
-  let lastReason = '';
-
-  for (let attempt = 1; attempt <= VERIFY_LOOP_MAX_ATTEMPTS; attempt++) {
-    try {
-      await execAsync('npx tsc --noEmit', {
-        cwd: projectRoot,
-        timeout: VERIFY_LOOP_TIMEOUT_MS,
-      });
-    } catch (err: unknown) {
-      const isTimeout = err instanceof Error && 'killed' in err && (err as { killed: boolean }).killed;
-      if (isTimeout) {
-        return { ok: false, reason: 'tsc --noEmit timeout (infrastructure failure)', attempts: attempt };
-      }
-      const stderr = err instanceof Error && 'stderr' in err ? String((err as { stderr: unknown }).stderr) : '';
-      const stdout = err instanceof Error && 'stdout' in err ? String((err as { stdout: unknown }).stdout) : '';
-      lastReason = `tsc --noEmit failed (attempt ${attempt}/${VERIFY_LOOP_MAX_ATTEMPTS}): ${(stderr || stdout).slice(0, 500)}`;
-      continue;
-    }
-
-    const vitestCmd = scopeArg ? `npx vitest run ${scopeArg}` : 'npx vitest run';
-    try {
-      await execAsync(vitestCmd, {
-        cwd: projectRoot,
-        timeout: VERIFY_LOOP_TIMEOUT_MS,
-      });
-    } catch (err: unknown) {
-      const isTimeout = err instanceof Error && 'killed' in err && (err as { killed: boolean }).killed;
-      if (isTimeout) {
-        return { ok: false, reason: `vitest run timeout (infrastructure failure)`, attempts: attempt };
-      }
-      const stderr = err instanceof Error && 'stderr' in err ? String((err as { stderr: unknown }).stderr) : '';
-      const stdout = err instanceof Error && 'stdout' in err ? String((err as { stdout: unknown }).stdout) : '';
-      lastReason = `vitest run failed (attempt ${attempt}/${VERIFY_LOOP_MAX_ATTEMPTS}): ${(stderr || stdout).slice(0, 500)}`;
-      continue;
-    }
-
-    const markerPath = join(projectRoot, TASKS_DIR, `task-${taskId}.verify-ran`);
-    const tmpPath = `${markerPath}.tmp`;
-    ensureDir(join(projectRoot, TASKS_DIR));
-    writeFileSync(tmpPath, JSON.stringify({
-      taskId,
-      timestamp: new Date().toISOString(),
-      attempts: attempt,
-      tsc: 'PASS',
-      vitest: 'PASS',
-    }, null, 2), 'utf-8');
-    renameSync(tmpPath, markerPath);
-
-    return { ok: true, attempts: attempt };
+  if (!verification) {
+    return { ok: false, reason: 'Verification isolation admission is required', attempts: 0 };
+  }
+  const result = await runAdmittedWorkerTypeScriptVerification(verification);
+  if (result.kind !== 'passed') {
+    return { ok: false, reason: result.reason, attempts: 1 };
   }
 
-  return { ok: false, reason: lastReason, attempts: VERIFY_LOOP_MAX_ATTEMPTS };
+  const markerPath = join(projectRoot, TASKS_DIR, `task-${taskId}.verify-ran`);
+  const tmpPath = `${markerPath}.tmp`;
+  ensureDir(join(projectRoot, TASKS_DIR));
+  writeFileSync(tmpPath, JSON.stringify({
+    taskId,
+    timestamp: new Date().toISOString(),
+    attempts: 1,
+    typeScript: 'ADMITTED_PASS',
+  }, null, 2), 'utf-8');
+  renameSync(tmpPath, markerPath);
+
+  return { ok: true, attempts: 1 };
 }

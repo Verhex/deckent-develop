@@ -37,6 +37,11 @@ import {
 import type { ExecutionLandingPolicyConfig } from './config-types.js';
 import type { ProviderBillingEvidence } from './provider-billing-evidence.js';
 import { deckentPath } from './state-paths.js';
+import {
+  createProductionWiringPlanEvidence,
+  type ProductionWiringPlanEvidence,
+  type ProductionWiringResultEvidence,
+} from './task-types.js';
 import type { ExecutionBudget } from './work-model.js';
 
 export const TASK_RESULT_SETTLEMENT_SCHEMA_VERSION = 1 as const;
@@ -194,8 +199,120 @@ export interface TaskResultSettlementV1 extends TaskResultSettlementRefV1 {
   result: Record<string, unknown>;
 }
 
+/** Host-attested execution of the plan's exact canonical consumer. */
+export interface ProductionWiringHostConsumerExecutionEvidenceV1 {
+  readonly version: 1;
+  readonly contractDigest: string;
+  readonly observedBy: 'host';
+  readonly consumerId: string;
+  readonly evidenceRefs: readonly string[];
+}
+
+export type ProductionWiringResultSettlementDecision =
+  | {
+      readonly state: 'PRODUCTION_WIRED';
+      readonly contractDigest: string;
+      readonly evidenceRefs: readonly string[];
+    }
+  | {
+      readonly state: 'HOLD';
+      readonly reason:
+        | 'invalid-plan-contract'
+        | 'missing-worker-evidence'
+        | 'invalid-worker-evidence'
+        | 'worker-contract-mismatch'
+        | 'worker-contradiction'
+        | 'missing-host-consumer-execution'
+        | 'invalid-host-consumer-execution'
+        | 'host-contract-mismatch'
+        | 'host-consumer-identity-mismatch';
+    };
+
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+function hasNonBlankEvidenceRefs(value: unknown): value is readonly string[] {
+  return Array.isArray(value)
+    && value.length > 0
+    && value.every(ref => typeof ref === 'string' && ref.trim().length > 0);
+}
+
+function hasValidWorkerWiringEvidence(
+  value: ProductionWiringResultEvidence,
+): boolean {
+  const evidence = value as unknown as Record<string, unknown>;
+  const observation = evidence.evidence as Record<string, unknown> | undefined;
+  return evidence.version === 1
+    && typeof evidence.contractDigest === 'string'
+    && /^[a-f0-9]{64}$/.test(evidence.contractDigest)
+    && evidence.observedBy === 'worker'
+    && observation !== undefined
+    && typeof observation === 'object'
+    && !Array.isArray(observation)
+    && ['presence-only', 'incomplete', 'unsupported', 'contradictory'].includes(String(observation.state))
+    && hasNonBlankEvidenceRefs(observation.evidenceRefs);
+}
+
+function hasValidHostConsumerExecutionEvidence(
+  value: ProductionWiringHostConsumerExecutionEvidenceV1,
+): boolean {
+  const evidence = value as unknown as Record<string, unknown>;
+  return evidence.version === 1
+    && typeof evidence.contractDigest === 'string'
+    && /^[a-f0-9]{64}$/.test(evidence.contractDigest)
+    && evidence.observedBy === 'host'
+    && typeof evidence.consumerId === 'string'
+    && evidence.consumerId.trim().length > 0
+    && hasNonBlankEvidenceRefs(evidence.evidenceRefs);
+}
+
+/**
+ * Settle worker wiring observations only against the exact plan bytes and an
+ * independent host observation that the declared canonical consumer executed.
+ * Worker evidence alone is intentionally never a production-wired verdict.
+ */
+export function settleProductionWiringResultEvidence(input: {
+  readonly plan: ProductionWiringPlanEvidence;
+  readonly workerEvidence?: ProductionWiringResultEvidence;
+  readonly hostConsumerExecution?: ProductionWiringHostConsumerExecutionEvidenceV1;
+}): ProductionWiringResultSettlementDecision {
+  const expectedPlan = createProductionWiringPlanEvidence(input.plan.contract);
+  if (
+    input.plan.version !== expectedPlan.version
+    || input.plan.contractDigest !== expectedPlan.contractDigest
+  ) return { state: 'HOLD', reason: 'invalid-plan-contract' };
+
+  const workerEvidence = input.workerEvidence;
+  if (!workerEvidence) return { state: 'HOLD', reason: 'missing-worker-evidence' };
+  if (!hasValidWorkerWiringEvidence(workerEvidence)) {
+    return { state: 'HOLD', reason: 'invalid-worker-evidence' };
+  }
+  if (workerEvidence.contractDigest !== expectedPlan.contractDigest) {
+    return { state: 'HOLD', reason: 'worker-contract-mismatch' };
+  }
+  if (workerEvidence.evidence.state === 'contradictory') {
+    return { state: 'HOLD', reason: 'worker-contradiction' };
+  }
+
+  const hostConsumerExecution = input.hostConsumerExecution;
+  if (!hostConsumerExecution) {
+    return { state: 'HOLD', reason: 'missing-host-consumer-execution' };
+  }
+  if (!hasValidHostConsumerExecutionEvidence(hostConsumerExecution)) {
+    return { state: 'HOLD', reason: 'invalid-host-consumer-execution' };
+  }
+  if (hostConsumerExecution.contractDigest !== expectedPlan.contractDigest) {
+    return { state: 'HOLD', reason: 'host-contract-mismatch' };
+  }
+  if (hostConsumerExecution.consumerId !== input.plan.contract.canonicalConsumer.consumerId) {
+    return { state: 'HOLD', reason: 'host-consumer-identity-mismatch' };
+  }
+  return {
+    state: 'PRODUCTION_WIRED',
+    contractDigest: expectedPlan.contractDigest,
+    evidenceRefs: [...hostConsumerExecution.evidenceRefs],
+  };
 }
 
 const DOCKER_CONTAINER_PREFIX = 'deckent-w-';
@@ -331,6 +448,40 @@ export function taskResultSettlementPreparedPath(ref: TaskResultSettlementRefV1)
 
 export function taskResultSettlementPromptPath(ref: TaskResultSettlementRefV1): string {
   return resolve(settlementAttemptDir(ref), 'prompt.txt');
+}
+
+/** Host-only immutable bytes used to attribute shared-worktree changes to this attempt. */
+export function taskResultSettlementWorkAttributionBaselinePath(
+  ref: TaskResultSettlementRefV1,
+): string {
+  return resolve(settlementAttemptDir(ref), 'work-attribution-baseline.txt');
+}
+
+/**
+ * Publish claim-time work-attribution bytes under exact-attempt authority.
+ * The settlement store owns the host-only path, first-writer rule, fsync and
+ * private-mode guarantees. Identical replay is idempotent; conflicts fail.
+ */
+export function writeTaskResultSettlementWorkAttributionBaselineAtomic(
+  ref: TaskResultSettlementRefV1,
+  manifest: string,
+): string {
+  const attempt = parseTaskResultSettlementAttempt(readJson(taskResultSettlementAttemptPath(ref)));
+  if (!attempt || !sameRef(attempt, ref)) {
+    throw createExecutionAuthorityError(
+      'Docker work-attribution baseline has no matching durable pending attempt',
+    );
+  }
+  const path = taskResultSettlementWorkAttributionBaselinePath(ref);
+  const bytes = Buffer.from(manifest, 'utf-8');
+  publishBytesFirstWriter(path, bytes);
+  const persisted = readFileSync(path);
+  if (!persisted.equals(bytes)) {
+    throw createExecutionAuthorityError(
+      'Docker work-attribution baseline could not be verified after publication',
+    );
+  }
+  return path;
 }
 
 export function taskResultSettlementPromptMetadataPath(
@@ -1632,6 +1783,113 @@ export function taskProviderTerminalUsageEvidenceRef(
     throw createDockerLifecycleError('Invalid Docker provider terminal usage evidence');
   }
   return `provider-terminal-usage:sha256:${sha256(JSON.stringify(receipt))}`;
+}
+
+// ─── Verification Isolation HOLD Receipt (488-011) ───────────────────
+// Host-observed evidence that 488-010's verification isolation gate
+// (core/verification-isolation-authority.ts's `decideVerificationIsolation`,
+// core/verification-typescript-adapter.ts's `TypeScriptScopedVerificationAdapter`)
+// held for this exact attempt — an admission/environment gap, never worker
+// prose. Consumed by fix-repair-authority.ts's `decideFixRepairAuthority` as
+// the strongest signal that a NO_GO must be parked rather than spending a
+// FIX/retry budget slot. Mirrors the `TaskProviderTerminalBillingReceiptV1`
+// shape exactly: immutable, first-writer, content-addressed, host-owned path
+// outside the worker-mounted project.
+
+export interface TaskVerificationIsolationHoldReceiptV1 extends TaskResultSettlementRefV1 {
+  lifecycleVersion: typeof TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION;
+  state: 'verification-isolation-hold';
+  observedAt: string;
+  /** Reason codes from the isolation authority grant hold or the adapter-level hold/foreign-observation partition — never worker-authored. */
+  reasonCodes: readonly string[];
+  /** Host-observed authority evidence refs backing the hold. */
+  authorityEvidenceRefs: readonly string[];
+}
+
+export function taskVerificationIsolationHoldReceiptPath(
+  ref: TaskResultSettlementRefV1,
+): string {
+  return resolve(settlementAttemptDir(ref), 'verification-isolation-hold.json');
+}
+
+function parseTaskVerificationIsolationHoldReceipt(
+  value: unknown,
+): TaskVerificationIsolationHoldReceiptV1 | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (
+    !hasValidRefShape(record)
+    || record.lifecycleVersion !== TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION
+    || record.state !== 'verification-isolation-hold'
+    || typeof record.observedAt !== 'string'
+    || !Number.isFinite(Date.parse(record.observedAt))
+    || !hasNonBlankEvidenceRefs(record.reasonCodes)
+    || !hasNonBlankEvidenceRefs(record.authorityEvidenceRefs)
+  ) return null;
+  return record as unknown as TaskVerificationIsolationHoldReceiptV1;
+}
+
+export function writeTaskVerificationIsolationHoldReceiptAtomic(
+  ref: TaskResultSettlementRefV1,
+  input: {
+    reasonCodes: readonly string[];
+    authorityEvidenceRefs: readonly string[];
+    observedAt?: string;
+  },
+): TaskVerificationIsolationHoldReceiptV1 {
+  assertPendingAttemptAndClaim(ref);
+  const receipt: TaskVerificationIsolationHoldReceiptV1 = {
+    ...ref,
+    lifecycleVersion: TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION,
+    state: 'verification-isolation-hold',
+    observedAt: input.observedAt ?? new Date().toISOString(),
+    reasonCodes: [...input.reasonCodes],
+    authorityEvidenceRefs: [...input.authorityEvidenceRefs],
+  };
+  if (!parseTaskVerificationIsolationHoldReceipt(receipt)) {
+    throw createExecutionAuthorityError('Invalid Docker verification isolation hold receipt');
+  }
+  const path = taskVerificationIsolationHoldReceiptPath(ref);
+  publishJsonFirstWriter(
+    path,
+    receipt,
+    (existing) => {
+      const parsed = parseTaskVerificationIsolationHoldReceipt(existing);
+      return parsed !== null
+        && sameRef(parsed, ref)
+        && JSON.stringify(parsed.reasonCodes) === JSON.stringify(receipt.reasonCodes)
+        && JSON.stringify(parsed.authorityEvidenceRefs) === JSON.stringify(receipt.authorityEvidenceRefs);
+    },
+  );
+  chmodSync(path, 0o600);
+  const persisted = readTaskVerificationIsolationHoldReceipt(ref);
+  if (!persisted || JSON.stringify(persisted) !== JSON.stringify(receipt)) {
+    throw createExecutionAuthorityError(
+      'Docker verification isolation hold receipt could not be verified after publication',
+    );
+  }
+  return persisted;
+}
+
+export function readTaskVerificationIsolationHoldReceipt(
+  ref: TaskResultSettlementRefV1,
+): TaskVerificationIsolationHoldReceiptV1 | null {
+  const path = taskVerificationIsolationHoldReceiptPath(ref);
+  const receipt = parseTaskVerificationIsolationHoldReceipt(readJson(path));
+  if (!receipt || !sameRef(receipt, ref) || !hasPrivateFileMode(path)) return null;
+  const attempt = parseTaskResultSettlementAttempt(
+    readJson(taskResultSettlementAttemptPath(ref)),
+  );
+  return attempt && sameRef(attempt, ref) ? receipt : null;
+}
+
+export function taskVerificationIsolationHoldEvidenceRef(
+  receipt: TaskVerificationIsolationHoldReceiptV1,
+): string {
+  if (!parseTaskVerificationIsolationHoldReceipt(receipt)) {
+    throw createExecutionAuthorityError('Invalid Docker verification isolation hold evidence');
+  }
+  return `verification-isolation-hold:sha256:${sha256(JSON.stringify(receipt))}`;
 }
 
 /** Host-global, attempt-bound receipt; Docker workers never mount this state root. */

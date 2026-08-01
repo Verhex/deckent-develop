@@ -22,7 +22,7 @@ import {
 
 // ─── Core (type imports) ───────────────────────────────────────────
 import type {
-  Task, TaskResult, Sprint,
+  Task, TaskResult, Sprint, SprintMetrics,
   ResolvedConfig, ProviderName, FixCircuitBreakerConfig,
 } from '../core/types.js';
 import { DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG } from '../core/types.js';
@@ -35,8 +35,10 @@ import {
 } from './cross-verify-production-ingress-authority.js';
 import { ProviderExecutionIngressHoldError } from '../core/provider-execution-ingress-authority.js';
 
-import { TASKS_DIR } from '../core/constants.js';
+import { RECENT_WORKS_DIR, TASKS_DIR } from '../core/constants.js';
 import { DeckentError } from '../core/errors.js';
+import { SPRINT_TERMINAL_PUBLICATION_VERSION } from '../core/sprint-terminal-publication.js';
+import type { SprintTerminalReceiptV1 } from '../core/sprint-terminal-publication.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { debugLog, readJsonSafe, updateLastSprintId } from '../core/utils.js';
@@ -87,8 +89,13 @@ import {
   runPlanPhase, runSpawnPhase, runEvaluatePhase,
   runRollbackCheck, runFixPhase, runRetroPhase,
   runCleanupPhase, pollForResultFile,
+  resolveOuterStagedSettlementBarrier, describeStagedSettlementBlock,
 } from './sprint-phases.js';
-import type { PlanPhaseResult } from './sprint-phases.js';
+import type {
+  PlanPhaseResult, RetroPhaseFailure,
+  OuterStagedSettlementBarrier,
+} from './sprint-phases.js';
+import { publishFinalSprintAuthority } from './sprint-finalizer.js';
 import { evaluateFixCircuitBreaker } from '../core/task-lineage.js';
 
 // ─── Pre-Start Guards (born-672a/672b — snapshot-start guard wiring) ─
@@ -759,6 +766,7 @@ export interface RunSprintOptions {
     readonly flowId: string;
     readonly revision: number;
     readonly planDigest: string;
+    readonly sourceAuthority?: import('../core/run-flow-contract.js').RunFlowPlanSourceAuthority;
   };
   /**
    * Materializes the exact approved task artifacts while project leadership is
@@ -1308,6 +1316,200 @@ export function detectFixSpawnFailure(projectRoot: string): FixSpawnFailure | nu
  * learns the cause immediately instead of after a multi-minute hang.
  */
 const SPRINT_EXIT_LINGER_PROBE_MS = 10_000;
+
+// ═══ Terminal Handoff Authority (487-003) ══════════════════════════
+//
+// The finalizer publishes ONE generation-fenced terminal receipt at the
+// archive boundary (487-002, `publishFencedSprintTerminalReceipt`). This
+// section is the controller-side consumer of that receipt: it decides whether
+// the sprint may cross RETRO → CLEANUP → COMPLETE, and it lets that crossing
+// happen exactly once.
+//
+// Authority direction is strictly one-way — receipt authorizes CLEANUP,
+// CLEANUP authorizes COMPLETE. A missing, malformed, foreign or
+// cleanup-ineligible receipt (and any swallowed finalizer failure) is a
+// recoverable HOLD, never a silent COMPLETE: the caller throws, and because
+// `runSprint`'s `finally` deliberately does NOT clear the PID file or the
+// sprint state, the recovery surfaces still see a live, resumable sprint.
+
+/** Why the controller refused to hand terminal authority onward. */
+export type SprintTerminalHandoffHoldReason =
+  | 'FINALIZER_FAILED'
+  | 'RECEIPT_MISSING'
+  | 'RECEIPT_MALFORMED'
+  | 'RECEIPT_SPRINT_MISMATCH'
+  | 'RECEIPT_CLEANUP_INELIGIBLE'
+  | 'DUPLICATE_PUBLICATION'
+  /** 487-030: an exact staged closure is NO_GO/PAUSED/HOLD/unsettled. */
+  | 'STAGED_CLOSURE_BLOCKED';
+
+export interface SprintTerminalHandoffAuthorized {
+  readonly state: 'AUTHORIZED';
+  readonly sprintId: string;
+  readonly artifactPath: string;
+  readonly receipt: SprintTerminalReceiptV1;
+  /** Settled metrics carried forward — the same object RETRO produced. */
+  readonly metrics: SprintMetrics;
+  /** Identity of this exact terminal publication (once-ledger key). */
+  readonly handoffKey: string;
+}
+
+export interface SprintTerminalHandoffHold {
+  readonly state: 'HOLD';
+  readonly sprintId: string;
+  readonly artifactPath: string;
+  readonly reasonCode: SprintTerminalHandoffHoldReason;
+  readonly detail: string;
+}
+
+export type SprintTerminalHandoffAuthority =
+  | SprintTerminalHandoffAuthorized
+  | SprintTerminalHandoffHold;
+
+/** On-disk location of the finalizer's fenced terminal receipt. */
+export function sprintTerminalReceiptPath(projectRoot: string, sprintId: string): string {
+  return join(projectRoot, RECENT_WORKS_DIR, `${sprintId}-terminal-receipt.json`);
+}
+
+interface PersistedTerminalReceiptShape {
+  readonly version?: unknown;
+  readonly receipt?: Partial<SprintTerminalReceiptV1>;
+  readonly terminalEvidence?: {
+    readonly cleanupEligibility?: {
+      readonly state?: unknown;
+      readonly candidate?: unknown;
+      readonly reasons?: readonly unknown[];
+    };
+    readonly holds?: readonly unknown[];
+  };
+}
+
+function hold(
+  sprintId: string,
+  artifactPath: string,
+  reasonCode: SprintTerminalHandoffHoldReason,
+  detail: string,
+): SprintTerminalHandoffHold {
+  return { state: 'HOLD', sprintId, artifactPath, reasonCode, detail };
+}
+
+/**
+ * Read the finalizer's terminal receipt and decide whether the controller may
+ * proceed into CLEANUP. Pure with respect to sprint state: it only reads the
+ * published artifact and the RETRO outcome, and never mutates either.
+ */
+export function resolveSprintTerminalHandoff(input: {
+  readonly projectRoot: string;
+  readonly sprintId: string;
+  readonly retroOutcome: SprintMetrics | RetroPhaseFailure | undefined | null;
+  /**
+   * 487-030: outer staged-settlement barrier verdict. Independent of the
+   * pre-RETRO gate in `runSprint` — a blocked staged closure can never reach
+   * a terminal publication even if the earlier gate is bypassed. Absent means
+   * "no staged authority supplied", which leaves legacy behaviour unchanged.
+   */
+  readonly stagedSettlement?: OuterStagedSettlementBarrier | null;
+}): SprintTerminalHandoffAuthority {
+  const { projectRoot, sprintId, retroOutcome } = input;
+  const artifactPath = sprintTerminalReceiptPath(projectRoot, sprintId);
+
+  // Staged closure outranks every other terminal signal: an unfinished exact
+  // closure must not be cleaned up or published, however green RETRO looked.
+  const staged = input.stagedSettlement;
+  if (staged && staged.state === 'BLOCKED') {
+    return hold(
+      sprintId, artifactPath, 'STAGED_CLOSURE_BLOCKED',
+      `${describeStagedSettlementBlock(staged)} resume=${staged.resumeCommand}`,
+    );
+  }
+
+  // A finalizer failure is fail-soft inside RETRO but is NEVER swallowed here.
+  if (!retroOutcome || 'finalizeFailed' in retroOutcome) {
+    return hold(sprintId, artifactPath, 'FINALIZER_FAILED', retroOutcome?.error ?? 'metrics-absent');
+  }
+  const metrics = retroOutcome;
+
+  const artifact = readJsonSafe<PersistedTerminalReceiptShape>(artifactPath);
+  if (!artifact) {
+    return hold(sprintId, artifactPath, 'RECEIPT_MISSING', 'no terminal receipt published');
+  }
+
+  const receipt = artifact.receipt;
+  const wellFormed = artifact.version === 1
+    && !!receipt
+    && receipt.version === SPRINT_TERMINAL_PUBLICATION_VERSION
+    && typeof receipt.sprintId === 'string'
+    && typeof receipt.runId === 'string'
+    && typeof receipt.coordinatorGeneration === 'number'
+    && typeof receipt.authorityVersion === 'number'
+    && typeof receipt.logicalSettlementDigest === 'string';
+  if (!wellFormed) {
+    return hold(sprintId, artifactPath, 'RECEIPT_MALFORMED', 'receipt payload failed contract check');
+  }
+
+  if (receipt.sprintId !== sprintId) {
+    return hold(
+      sprintId, artifactPath, 'RECEIPT_SPRINT_MISMATCH',
+      `receipt belongs to ${receipt.sprintId}`,
+    );
+  }
+
+  const eligibility = artifact.terminalEvidence?.cleanupEligibility;
+  const holds = artifact.terminalEvidence?.holds ?? [];
+  if (eligibility?.candidate !== true || eligibility.state !== 'CANDIDATE' || holds.length > 0) {
+    const reasons = (eligibility?.reasons ?? []).map(reason => String(reason)).join(',');
+    return hold(
+      sprintId, artifactPath, 'RECEIPT_CLEANUP_INELIGIBLE',
+      `state=${String(eligibility?.state ?? 'absent')} holds=${holds.length}`
+      + `${reasons ? ` reasons=${reasons}` : ''}`,
+    );
+  }
+
+  return {
+    state: 'AUTHORIZED',
+    sprintId,
+    artifactPath,
+    receipt: receipt as SprintTerminalReceiptV1,
+    metrics,
+    handoffKey: [
+      receipt.sprintId, receipt.runId, receipt.coordinatorGeneration,
+      receipt.authorityVersion, receipt.logicalSettlementDigest,
+    ].join(':'),
+  };
+}
+
+/**
+ * Once-ledger for terminal publications. Keyed by the receipt's own fenced
+ * identity, so a re-run under a fresh generation/authority version is a NEW
+ * publication while a replay of the same receipt is a duplicate.
+ */
+const publishedSprintTerminalHandoffs = new Set<string>();
+
+/**
+ * Claim the single terminal publication for this receipt. The second claim of
+ * the same receipt is a HOLD — the controller must never publish COMPLETE
+ * twice for one settled terminal authority.
+ */
+export function commitSprintTerminalHandoff(
+  authority: SprintTerminalHandoffAuthorized,
+): SprintTerminalHandoffAuthority {
+  if (publishedSprintTerminalHandoffs.has(authority.handoffKey)) {
+    return hold(
+      authority.sprintId, authority.artifactPath, 'DUPLICATE_PUBLICATION',
+      `terminal authority ${authority.handoffKey} already published`,
+    );
+  }
+  publishedSprintTerminalHandoffs.add(authority.handoffKey);
+  return authority;
+}
+
+/** Typed, recoverable HOLD surfaced to the caller (PID + state left intact). */
+export function sprintTerminalHandoffHoldError(held: SprintTerminalHandoffHold): DeckentError {
+  return new DeckentError(
+    'DECKENT_E091',
+    `terminal-authority-hold:${held.sprintId}:${held.reasonCode}:${held.detail}`,
+  );
+}
 
 /**
  * Execute a full sprint lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP.
@@ -2442,6 +2644,67 @@ export async function runSprint(
     summarizeHandoffsObservability(projectRoot, sprint);
   } catch (e) { debugLog('runSprint:handoffSummary', e); }
 
+  // Outer staged-settlement barrier (487-030). Consumed BEFORE RETRO, so a
+  // staged foundation whose exact closure is NO_GO/PAUSED/HOLD/unsettled can
+  // never reach finalize → CLEANUP → COMPLETE. The verdict is computed from
+  // already-collected evaluations/results (no wait loop, no synthetic
+  // settlement); the sprint parks as PAUSED with its state + PID left on disk
+  // so `deckent resume <sprintId>` continues exactly this lifecycle, and the
+  // independently settled tasks stay settled.
+  const stagedSettlement = resolveOuterStagedSettlementBarrier({
+    sprintId: sprint.id,
+    tasks: sprint.tasks,
+    evaluations,
+    results,
+  });
+  if (stagedSettlement.state === 'BLOCKED') {
+    debugLog(
+      'runSprint:stagedSettlementBarrier',
+      `BLOCKED ${describeStagedSettlementBlock(stagedSettlement)}`,
+    );
+    sprint.status = SprintStatus.PAUSED;
+
+    if (heartbeatDaemon) {
+      try { heartbeatDaemon.stop(); } catch (e) { debugLog('runSprint:staged-hold:hb-stop', e); }
+      heartbeatDaemon = null;
+    }
+    await stopResourceMonitor(resourceMonitor);
+    resourceMonitor = null;
+    if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+    if (snapshotInterval) { clearInterval(snapshotInterval); snapshotInterval = null; }
+    if (beforeExitHandler) {
+      process.removeListener('beforeExit', beforeExitHandler);
+      beforeExitHandler = null;
+    }
+
+    emitSprintEvent('SPRINT_PAUSED', {
+      sprintId: sprint.id,
+      reason: 'staged-closure-blocked',
+      evidence: describeStagedSettlementBlock(stagedSettlement),
+      resumeCommand: stagedSettlement.resumeCommand,
+    });
+
+    updateDashboard(projectRoot, {
+      sprint: { id: sprint.id, number: sprint.number, phase: SprintPhase.FIX, status: SprintStatus.PAUSED },
+      agents: [],
+      progress: {
+        done: stagedSettlement.preservedSettledTaskIds.length,
+        active: 0,
+        blocked: stagedSettlement.blockedClosures.length,
+        total: sprint.tasks.length,
+      },
+      alerts: [],
+      updatedAt: now(),
+    });
+
+    releaseSprintLock(projectRoot);
+    clearActiveSprint();
+    try { clearPid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:staged-hold:clearPid', e); }
+
+    // Return BEFORE RETRO/CLEANUP — unfinished authority is never cleaned up.
+    return sprint;
+  }
+
   // Nervous System: FIX→RETRO
   emitPhaseChange(SprintPhase.FIX, SprintPhase.RETRO, sprint.id);
 
@@ -2450,7 +2713,16 @@ export async function runSprint(
   // correlation id so RunSprintOptions.flowId (432-001) actually reaches
   // runRetroPhase → finalizeSprint → completionRecord.flowId (432-003/004) —
   // without this hop the whole chain silently drops the id.
-  await runRetroPhase(projectRoot, sprint, evaluations, results, config, opts?.testMode, opts?.flowId);
+  const retroOutcome = await runRetroPhase(
+    projectRoot,
+    sprint,
+    evaluations,
+    results,
+    config,
+    opts?.testMode,
+    opts?.flowId,
+    true,
+  );
 
   // Nervous System: RETRO complete + RETRO→CLEANUP
   emitSprintEvent('SPRINT_RETRO_COMPLETE', { sprintId: sprint.id });
@@ -2467,8 +2739,42 @@ export async function runSprint(
   await stopResourceMonitor(resourceMonitor);
   resourceMonitor = null;
 
-  // Phase 8: CLEANUP
-  scanInterval = runCleanupPhase(projectRoot, sprint, config, opts, scanInterval, spawnBackend);
+  // Terminal handoff step 1 (487-003): the finalizer's fenced receipt is what
+  // authorizes CLEANUP. Resolving BEFORE the phase runs is the contract — an
+  // unpublished/held terminal authority must not get archive+retention work
+  // done on its behalf, and must never reach COMPLETE. The throw leaves the
+  // PID file and sprint state on disk, so this is a recoverable HOLD.
+  const terminalHandoff = resolveSprintTerminalHandoff({
+    projectRoot,
+    sprintId: sprint.id,
+    retroOutcome,
+    stagedSettlement,
+  });
+  if (terminalHandoff.state === 'HOLD') {
+    debugLog(
+      'runSprint:terminalHandoff',
+      `HOLD ${terminalHandoff.reasonCode}: ${terminalHandoff.detail}`,
+    );
+    throw sprintTerminalHandoffHoldError(terminalHandoff);
+  }
+
+  // Phase 8: CLEANUP — runs only under a published terminal receipt.
+  scanInterval = await runCleanupPhase(projectRoot, sprint, config, opts, scanInterval, spawnBackend);
+
+  // Terminal handoff step 2: claim the single publication for this receipt.
+  // A replay of the same fenced authority is a HOLD, not a second COMPLETE.
+  const terminalPublication = commitSprintTerminalHandoff(terminalHandoff);
+  if (terminalPublication.state === 'HOLD') {
+    debugLog(
+      'runSprint:terminalHandoff',
+      `HOLD ${terminalPublication.reasonCode}: ${terminalPublication.detail}`,
+    );
+    throw sprintTerminalHandoffHoldError(terminalPublication);
+  }
+
+  publishFinalSprintAuthority(
+    projectRoot, sprint, terminalPublication.metrics, config.language ?? 'en',
+  );
 
   // Nervous System: CLEANUP→COMPLETE
   emitPhaseChange(SprintPhase.DECAY, SprintPhase.COMPLETE, sprint.id);

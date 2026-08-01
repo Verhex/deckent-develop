@@ -9,6 +9,126 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint488] - 2026-08-01
+
+### Added
+
+- Canonical logical-progress identity contract
+- Verification isolation authority contract
+- TypeScript scoped verification adapter
+- Worker verification consumer
+- Concurrent verification two-writer canary
+- Post-settlement verification stage contract
+
+### Fixed
+
+- Fix: Finalizer canonical logical-ID producer
+- Fix: Structured landing-proposal schema and atomic writer
+- Fix: Evaluator and FIX-budget isolation semantics
+- Cross-fix: Post-settlement verification stage contract
+- Fix: Planner projection for post-settlement proof
+
+
+_Tasks: 20 total, 8 done, 0 tech debt, 1 no-go_
+
+## [1.0.0-beta.1-sprint487] - 2026-07-31
+
+### Added
+
+- Finalizer terminal truth consumer
+- Fenced receipt before archive
+- Controller terminal handoff
+- CLI receipt-aware status
+- MCP receipt-aware status
+- Self-audit adapter contract
+- Vitest scoped adapter
+- Non-Vitest honest matrix
+- Docker heartbeat single writer
+- In-process worker heartbeat writer
+
+### Changed
+
+- Finalizer audit adapter consumer (completed with tech debt)
+
+### Fixed
+
+- Cross-fix: CLI receipt-aware status
+- Cross-fix: MCP receipt-aware status
+- Fix: Heartbeat authority store
+- FIX fingerprint circuit breaker
+- Cross-fix: FIX dispatch and dependency continuation
+- FIX dispatch and dependency continuation
+- Fix: Sprint-486 quiescence replay
+- Fix: Forced skill lineage preservation
+- Fix: Cross-fix: Wiring evidence schema
+- Fix: Result wiring evidence settlement
+
+
+_Tasks: 32 total, 29 done, 1 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint486] - 2026-07-31
+
+### Added
+
+- Fenced terminal publication contract
+- Strict task artifact classifier
+- Logical progress projection contract
+- Lineage-aware usage and billing authority
+- Monotonic heartbeat authority
+- MCP usage lineage parity
+- Acceptance-bound semantic verdict gate
+- Provider concurrency admission wiring
+- Production wiring contract foundation
+
+### Fixed
+
+- Typed FIX repair-authority resolver
+
+
+_Tasks: 32 total, 10 done, 0 tech debt, 10 no-go_
+
+## [1.0.0-beta.1-sprint485] - 2026-07-31
+
+### Added
+
+- Provider concurrency capability authority
+- Exact-attempt provider execution observation
+- Parametric XVerify admission policy
+- Exact prompt authority drift-race assurance
+- Multi-attempt attribution summary replay
+- Monotonic status closure-window stress contract
+- Sprint terminal evidence assembler
+
+### Fixed
+
+- Evaluation honesty negative-replay fixture
+
+
+_Tasks: 8 total, 8 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint484] - 2026-07-31
+
+### Added
+
+- Enforce recovery-born evaluation honesty with regression coverage
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint483] - 2026-07-31
+
+### Added
+
+- Validate DOGFOOD-3175 claim-time work attribution
+- Validate DOGFOOD-3177 force-finalize coordinator containment
+
+### Changed
+
+- Integrate DOGFOOD-3178 bounded validation evidence (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint482] - 2026-07-31
 
 ### Added

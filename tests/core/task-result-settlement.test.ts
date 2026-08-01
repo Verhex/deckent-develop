@@ -49,6 +49,7 @@ import {
   taskResultSettlementPromptEvidenceRef,
   taskResultSettlementPromptMetadataPath,
   taskResultSettlementPromptPath,
+  taskResultSettlementWorkAttributionBaselinePath,
   taskResultSettlementPath,
   taskProviderActualCallEvidenceRef,
   taskProviderActualCallReceiptPath,
@@ -67,6 +68,7 @@ import {
   writeTaskResultSettlementExecutionContractAtomic,
   writeTaskResultSettlementPreparedAtomic,
   writeTaskResultSettlementPromptAtomic,
+  writeTaskResultSettlementWorkAttributionBaselineAtomic,
   writeTaskResultSettlementLandedRetirementAtomic,
   readTaskResultSettlementLandedRetirement,
   taskResultSettlementLandedRetirementPath,
@@ -263,6 +265,29 @@ describe('host-authoritative Docker TaskResult settlement', () => {
     expect(readTaskResultSettlementPrompt(ref)).toEqual(first);
     expect(taskResultSettlementPromptEvidenceRef(first))
       .toMatch(/^task-result-prompt:[a-f0-9]{64}$/u);
+  });
+
+  it('publishes an immutable private work-attribution baseline under the exact attempt', () => {
+    const { root, state } = fixture();
+    const ref = createTaskResultSettlementRef(root, 'task-attribution-baseline');
+    writeTaskResultSettlementAttemptAtomic(ref);
+    const manifest = 'deckent-work-attribution-v1\0attempt\0scope\nfile.ts\0blob\n';
+
+    const firstPath = writeTaskResultSettlementWorkAttributionBaselineAtomic(ref, manifest);
+    const replayPath = writeTaskResultSettlementWorkAttributionBaselineAtomic(ref, manifest);
+
+    expect(replayPath).toBe(firstPath);
+    expect(firstPath).toBe(taskResultSettlementWorkAttributionBaselinePath(ref));
+    expect(firstPath).toContain(state);
+    expect(firstPath).not.toContain(root);
+    expect(readFileSync(firstPath, 'utf-8')).toBe(manifest);
+    if (process.platform !== 'win32') {
+      expect(statSync(firstPath).mode & 0o077).toBe(0);
+    }
+    expect(() => writeTaskResultSettlementWorkAttributionBaselineAtomic(
+      ref,
+      `${manifest}conflict`,
+    )).toThrow(/Conflicting immutable/u);
   });
 
   it('fails prompt overwrite and detects byte or permission drift on read', () => {

@@ -604,6 +604,9 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
                 flowId,
                 revision: expectedRevision,
                 planDigest: expectedPlanDigest,
+                ...(approvedSnapshot?.sourceAuthority !== undefined
+                  ? { sourceAuthority: approvedSnapshot.sourceAuthority }
+                  : {}),
               },
               onExactPlanMaterialize: () => {
                 materializeExactPlanTaskArtifacts(root, {

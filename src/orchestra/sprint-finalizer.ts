@@ -5,10 +5,11 @@
 // ─── Node Builtins ─────────────────────────────────────────────────
 import {
   readFileSync, writeFileSync, existsSync,
-  mkdirSync, readdirSync, unlinkSync,
+  mkdirSync, readdirSync, renameSync, unlinkSync,
 } from 'node:fs';
 import { promises as fsPromises } from 'node:fs';
 import { join } from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
 // ─── Core (value imports) ──────────────────────────────────────────
@@ -22,6 +23,11 @@ import type {
   ResolvedConfig,
 } from '../core/types.js';
 import { resolveBillingModeForAuth } from '../core/cost-calculator.js';
+import { getMessage } from '../cli/helpers/messages.js';
+import {
+  projectAttributedTaskWork,
+  projectSprintWorkAttribution,
+} from '../core/sprint-work-attribution.js';
 
 import type { TaskDNA } from '../core/routing-types.js';
 
@@ -34,8 +40,33 @@ import { cleanupCounters, runRetention } from '../core/sprint-file-retention.js'
 import { archiveStaleSchedulerShadowJournals } from '../core/scheduler-shadow-retention.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
-import { updateLastSprintId, debugLog } from '../core/utils.js';
+import { updateLastSprintId, debugLog, readJsonSafe } from '../core/utils.js';
 import { getDebtItems } from '../core/debt-store.js';
+
+// ─── Terminal truth (Sprint 486 task 486-007) ─────────────────────
+import {
+  assembleSprintTerminalEvidence,
+  type CoordinatorTerminalEvidence,
+  type ExactAttemptEvidence,
+  type ExactAttemptIdentity,
+  type SprintTerminalEvidence,
+} from './sprint-terminal-evidence.js';
+import {
+  projectLogicalProgress,
+  type LogicalProgressProjection,
+} from '../core/logical-progress-projection.js';
+import {
+  aggregateLineageUsageAuthority,
+  type LineageBillingAuthority,
+  type LineageUsageAuthorityAggregate,
+} from '../core/lineage-usage-authority.js';
+import {
+  createSprintTerminalPublicationState,
+  transitionSprintTerminalPublication,
+  SPRINT_TERMINAL_PUBLICATION_VERSION,
+  type SprintTerminalPublicationStateV1,
+  type SprintTerminalReceiptV1,
+} from '../core/sprint-terminal-publication.js';
 
 // ─── Sprint Reporter ──────────────────────────────────────────────
 import {
@@ -77,6 +108,18 @@ import {
 
 // ─── Result Collector ─────────────────────────────────────────────
 import { buildResultsMap } from './result-collector.js';
+
+// ─── Self-Audit Adapter Registry (ADR-D-004 allowed orchestra → core direction) ──
+// The finalizer owns policy (what may run); the registry owns ecosystem command
+// selection and output parsing. No framework-specific argv lives here.
+import { SelfAuditAdapterRegistry } from '../core/self-audit-adapter.js';
+import type {
+  SelfAuditExecutor,
+  SelfAuditRequest,
+  SelfAuditResult as AdapterSelfAuditResult,
+} from '../core/self-audit-adapter.js';
+import { VitestSelfAuditAdapter } from '../core/self-audit-vitest-adapter.js';
+import { detectProjectStack } from '../core/stack-detector.js';
 
 // ─── Handoff Protocol (B-HANDOFF-PRUNE — Sprint 331 331-006 storage-prune hook) ──
 import { HandoffProtocol } from './handoff-protocol.js';
@@ -181,6 +224,19 @@ export interface FinalizeSprintOptions {
    * `completionRecord.flowId` for later flowId-correlated consumers.
    */
   flowId?: string;
+  /**
+   * Monotonic coordinator generation for the fenced terminal-publication CAS.
+   * Legacy in-process callers are generation 1; restarted/failover coordinators
+   * must thread their durable generation rather than overwriting that authority.
+   */
+  coordinatorGeneration?: number;
+  /**
+   * The in-process Sprint controller still owns delayed cleanup. When true,
+   * finalization prepares metrics/docs but leaves COMPLETE state, PID
+   * retirement, dashboard and completion notification to the controller's
+   * post-cleanup terminal publisher.
+   */
+  deferTerminalAuthority?: boolean;
 }
 
 
@@ -261,12 +317,250 @@ export async function writeRubricDetail(
  * Overall gate = PASS if tsc + vitest + honesty all pass.
  * metrics.jsonl missing → WARNING only, not gate failure.
  */
+/**
+ * Typed non-green outcomes of the scoped audit surface. `ECOSYSTEM_UNSUPPORTED`
+ * and `ADAPTER_HOLD` are honest holds: the gate never reports PASS for a project
+ * type no registered adapter can execute.
+ */
+export type SelfAuditExecutionReasonCode =
+  | 'NO_TEST_REQUIRED'
+  | 'REQUIRED_TEST_MANIFEST_EMPTY'
+  | 'EXECUTION_EVIDENCE_UNPARSEABLE'
+  | 'ECOSYSTEM_UNSUPPORTED'
+  | 'ADAPTER_HOLD';
+
 export interface SelfAuditResult {
   tsc: { status: 'PASS' | 'FAIL'; errors: string[] };
-  vitest: { status: 'PASS' | 'FAIL'; delta: { files: number; pass: number; fail: number; skipped: number } };
+  vitest: {
+    status: 'PASS' | 'FAIL';
+    delta: { files: number; pass: number; fail: number; skipped: number };
+    execution?: {
+      mode: 'scoped' | 'full';
+      command: readonly string[];
+      testFiles: readonly string[];
+      executed: boolean;
+      timedOut: boolean;
+      exitCode: number | null;
+      reasonCode?: SelfAuditExecutionReasonCode;
+      /** Registry adapter that produced the evidence (scoped mode only). */
+      adapterId?: string;
+      /** Typed hold detail when the registry refused to produce green evidence. */
+      holdDetail?: string;
+      /** Adapter-computed digest of the captured execution output. */
+      outputDigest?: string;
+    };
+  };
   honesty: { violations: number; flaggedTasks: string[] };
   observability: { metricsJsonlExists: boolean; lineCount: number };
   overallGate: 'PASS' | 'GATE_FAILURE';
+}
+
+export interface ScopedSelfAuditManifest {
+  readonly testFiles: readonly string[];
+  readonly requiresTests: boolean;
+  readonly requiresTypeScript: boolean;
+  readonly evidenceRefs: readonly string[];
+}
+
+function normalizeScopedAuditPath(value: string): string | null {
+  const normalized = value.replaceAll('\\', '/').replace(/^\.\//u, '');
+  if (
+    normalized.length === 0
+    || normalized.startsWith('/')
+    || /^[A-Za-z]:\//u.test(normalized)
+    || normalized.split('/').some(segment => segment === '' || segment === '.' || segment === '..')
+  ) return null;
+  return normalized;
+}
+
+function isTestFile(path: string): boolean {
+  return /(?:^|\/)(?:tests?|__tests__)\//u.test(path)
+    || /\.(?:test|spec)\.[^/]+$/u.test(path);
+}
+
+function isExecutableSourceFile(path: string): boolean {
+  return /\.(?:[cm]?[jt]sx?|py|rb|php|java|kt|kts|cs|fs|fsx|go|rs|swift|scala|c|cc|cpp|cxx|h|hpp)$/u.test(path);
+}
+
+/**
+ * Derive the finalizer's bounded test manifest from approved task scope and
+ * host-attributed result paths. Worker prose and shell commands are never
+ * executable authority here.
+ */
+export function deriveScopedSelfAuditManifest(
+  tasks: readonly Task[],
+  results: readonly TaskResult[],
+): ScopedSelfAuditManifest {
+  const paths = new Set<string>();
+  const evidenceRefs = new Set<string>();
+  for (const task of tasks) {
+    for (const candidate of task.scope.filesWrite) {
+      const normalized = normalizeScopedAuditPath(candidate);
+      if (normalized) paths.add(normalized);
+    }
+    evidenceRefs.add(`task-scope:${task.id}`);
+  }
+  for (const result of results) {
+    for (const candidate of result.filesChanged ?? []) {
+      const normalized = normalizeScopedAuditPath(candidate);
+      if (normalized) paths.add(normalized);
+    }
+    if (result.workAttribution?.state === 'VERIFIED') {
+      evidenceRefs.add(`work-attribution:${result.taskId}:${result.workAttribution.attemptId}`);
+    }
+  }
+  const ordered = [...paths].sort();
+  const testFiles = ordered.filter(isTestFile);
+  const executableSources = ordered.filter(path => isExecutableSourceFile(path) && !isTestFile(path));
+  return {
+    testFiles,
+    requiresTests: executableSources.length > 0,
+    requiresTypeScript: ordered.some(path => /\.[cm]?tsx?$/u.test(path)),
+    evidenceRefs: [...evidenceRefs].sort(),
+  };
+}
+
+interface BoundedCommandResult {
+  readonly status: number | null;
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly timedOut: boolean;
+}
+
+async function runBoundedCommand(
+  command: string,
+  args: readonly string[],
+  cwd: string,
+  timeoutMs: number,
+): Promise<BoundedCommandResult> {
+  const { spawn } = await import('node:child_process');
+  return await new Promise<BoundedCommandResult>((resolveCommand, rejectCommand) => {
+    const child = spawn(command, [...args], {
+      cwd,
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    child.stdout.on('data', chunk => { stdout += String(chunk); });
+    child.stderr.on('data', chunk => { stderr += String(chunk); });
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGKILL');
+    }, timeoutMs);
+    child.once('error', error => {
+      clearTimeout(timeout);
+      rejectCommand(error);
+    });
+    child.once('close', status => {
+      clearTimeout(timeout);
+      resolveCommand({ status, stdout, stderr, timedOut });
+    });
+  });
+}
+
+/** Bounded deadline for a scoped registry-executed audit run. */
+const SCOPED_SELF_AUDIT_TIMEOUT_MS = 120_000;
+
+/**
+ * Ecosystem assumed when a direct caller supplies no explicit value. Production
+ * ingress (finalizeSprint) always resolves the real project ecosystem instead.
+ */
+const DEFAULT_SELF_AUDIT_ECOSYSTEM = 'vitest';
+
+/**
+ * Adapters shipped with deckent. Registration only — command selection and
+ * output parsing stay inside the adapters.
+ */
+export function createDefaultSelfAuditRegistry(): SelfAuditAdapterRegistry {
+  const registry = new SelfAuditAdapterRegistry();
+  registry.register(new VitestSelfAuditAdapter());
+  return registry;
+}
+
+/**
+ * Resolve the audit ecosystem from the canonical project stack detector. An
+ * undetectable stack stays honest: the registry has no adapter for `unknown`
+ * and the gate holds instead of reporting a green suite it never ran.
+ */
+export function resolveSelfAuditEcosystem(projectRoot: string): string {
+  try {
+    return detectProjectStack(projectRoot).testFramework;
+  } catch (e) {
+    debugLog('resolveSelfAuditEcosystem', `stack detection failed: ${e}`);
+    return 'unknown';
+  }
+}
+
+/** Translate a registry outcome into the gate's vitest-slot evidence. */
+function mapAdapterResultToGateEvidence(
+  result: AdapterSelfAuditResult,
+  request: SelfAuditRequest,
+): SelfAuditResult['vitest'] {
+  const testFiles = request.scope.kind === 'scoped' ? [...request.scope.testFiles] : [];
+  const holdEvidence = (
+    reasonCode: SelfAuditExecutionReasonCode,
+    holdDetail: string,
+    adapterId?: string,
+    timedOut = false,
+  ): SelfAuditResult['vitest'] => ({
+    status: 'FAIL',
+    delta: { files: 0, pass: 0, fail: 0, skipped: 0 },
+    execution: {
+      mode: 'scoped',
+      command: [],
+      testFiles,
+      executed: false,
+      timedOut,
+      exitCode: null,
+      reasonCode,
+      holdDetail,
+      ...(adapterId === undefined ? {} : { adapterId }),
+    },
+  });
+
+  if (result.kind === 'unsupported') {
+    return holdEvidence(
+      'ECOSYSTEM_UNSUPPORTED',
+      `No self-audit adapter supports ecosystem '${result.ecosystem}'`,
+    );
+  }
+  if (result.kind === 'hold') {
+    return holdEvidence(
+      result.reason === 'missing-executed-evidence'
+        ? 'EXECUTION_EVIDENCE_UNPARSEABLE'
+        : 'ADAPTER_HOLD',
+      `${result.reason}: ${result.detail}`,
+      result.adapterId,
+      result.reason === 'execution-timeout',
+    );
+  }
+
+  const { evidence } = result;
+  const unit = (kind: string): number =>
+    evidence.executedUnits.find(candidate => candidate.kind === kind)?.count ?? 0;
+  const executedAssertions = unit('assertion');
+  const failedAssertions = unit('failed-assertion');
+  return {
+    status: result.outcome === 'passed' ? 'PASS' : 'FAIL',
+    delta: {
+      files: unit('file'),
+      pass: executedAssertions - failedAssertions,
+      fail: failedAssertions,
+      skipped: unit('skipped-assertion'),
+    },
+    execution: {
+      mode: 'scoped',
+      command: [evidence.invocation.executable, ...evidence.invocation.argv],
+      testFiles,
+      executed: true,
+      timedOut: false,
+      exitCode: evidence.exitCode,
+      adapterId: evidence.adapterId,
+      outputDigest: evidence.outputDigest,
+    },
+  };
 }
 
 /**
@@ -278,6 +572,19 @@ export interface SelfAuditGateOptions {
   runTsc?: (projectRoot: string) => { status: number; stdout: string; stderr: string };
   /** Override vitest execution (for testing) */
   runVitest?: (projectRoot: string) => { status: number; stdout: string; stderr: string };
+  /** Finalizer-only bounded manifest. Absence means an explicit full audit surface. */
+  scopedManifest?: ScopedSelfAuditManifest;
+  /** Async scoped runner seam; receives shell-free argv. */
+  runScopedCommand?: (
+    command: string,
+    args: readonly string[],
+    projectRoot: string,
+    timeoutMs: number,
+  ) => Promise<BoundedCommandResult>;
+  /** Scoped-mode adapter registry. Defaults to the shipped adapter set. */
+  selfAuditRegistry?: SelfAuditAdapterRegistry;
+  /** Scoped-mode ecosystem id. Production ingress resolves it from the project stack. */
+  selfAuditEcosystem?: string;
   /** Override honesty check results (for testing) */
   honestyResults?: Array<{ taskId: string; violation: boolean }>;
   /** Override metrics.jsonl path check (for testing) */
@@ -296,12 +603,18 @@ export async function runSelfAuditGate(
   try {
     const tscRun = options?.runTsc
       ? options.runTsc(root)
-      : spawnSync('npx', ['tsc', '--noEmit'], {
+      : options?.scopedManifest && !options.scopedManifest.requiresTypeScript
+        ? { status: 0, stdout: '', stderr: '' }
+        : options?.scopedManifest
+          ? await (options.runScopedCommand ?? runBoundedCommand)(
+            'npx', ['tsc', '--noEmit'], root, 30_000,
+          )
+          : spawnSync('npx', ['tsc', '--noEmit'], {
           cwd: root,
           timeout: 30_000,
           stdio: ['pipe', 'pipe', 'pipe'],
           encoding: 'utf-8',
-        });
+          });
 
     if (tscRun.status === 0) {
       tscResult = { status: 'PASS', errors: [] };
@@ -321,45 +634,79 @@ export async function runSelfAuditGate(
   // ── Step 2: vitest run (timeout 300s) + baseline delta ──────────
   let vitestResult: SelfAuditResult['vitest'];
   try {
-    const vitestRun = options?.runVitest
-      ? options.runVitest(root)
-      : spawnSync('npx', ['vitest', 'run', '--reporter=basic'], {
+    const scopedManifest = options?.scopedManifest;
+    if (scopedManifest && scopedManifest.testFiles.length === 0) {
+      const required = scopedManifest.requiresTests;
+      vitestResult = {
+        status: required ? 'FAIL' : 'PASS',
+        delta: { files: 0, pass: 0, fail: 0, skipped: 0 },
+        execution: {
+          mode: 'scoped',
+          command: [],
+          testFiles: [],
+          executed: false,
+          timedOut: false,
+          exitCode: null,
+          reasonCode: required ? 'REQUIRED_TEST_MANIFEST_EMPTY' : 'NO_TEST_REQUIRED',
+        },
+      };
+    } else if (scopedManifest) {
+      // Scoped surface: the adapter registry is the single authority for the
+      // command and for the executed-count evidence that may turn the gate green.
+      const request: SelfAuditRequest = {
+        ecosystem: options?.selfAuditEcosystem ?? DEFAULT_SELF_AUDIT_ECOSYSTEM,
+        projectRoot: root,
+        scope: { kind: 'scoped', testFiles: [...scopedManifest.testFiles] },
+        timeoutMs: SCOPED_SELF_AUDIT_TIMEOUT_MS,
+      };
+      const runScoped = options?.runScopedCommand ?? runBoundedCommand;
+      const execute: SelfAuditExecutor = async invocation => {
+        const run = await runScoped(
+          invocation.executable, invocation.argv, invocation.cwd, invocation.timeoutMs,
+        );
+        return {
+          exitCode: run.status,
+          stdout: run.stdout,
+          stderr: run.stderr,
+          timedOut: run.timedOut,
+        };
+      };
+      const registry = options?.selfAuditRegistry ?? createDefaultSelfAuditRegistry();
+      vitestResult = mapAdapterResultToGateEvidence(await registry.run(request, execute), request);
+    } else {
+      const vitestRun = options?.runVitest
+        ? options.runVitest(root)
+        : spawnSync('npx', ['vitest', 'run', '--reporter=basic'], {
           cwd: root,
           timeout: 120_000,
           stdio: ['pipe', 'pipe', 'pipe'],
           encoding: 'utf-8',
         });
 
-    const vitestOutput = ((vitestRun.stdout ?? '') + (vitestRun.stderr ?? '')).trim();
-    const current = parseVitestBaseline(vitestOutput);
+      const vitestOutput = ((vitestRun.stdout ?? '') + (vitestRun.stderr ?? '')).trim();
+      const current = parseVitestBaseline(vitestOutput);
 
-    // Read pre-sprint baseline for delta calculation
-    const baseline = readBaseline(root, sprintId);
+      // Explicit `deckent audit` full-authority surface: unchanged historical
+      // net-new baseline comparison over the whole repository suite.
+      const baseline = readBaseline(root, sprintId);
 
-    const delta = baseline != null && current != null
-      ? {
+      const delta = baseline != null && current != null
+        ? {
           files: current.files - baseline.files,
           pass: current.pass - baseline.pass,
           fail: current.fail - baseline.fail,
           skipped: current.skipped - baseline.skipped,
         }
-      : { files: 0, pass: 0, fail: current?.fail ?? 0, skipped: 0 };
+        : { files: 0, pass: 0, fail: current?.fail ?? 0, skipped: 0 };
 
-    // B-REGGATE (Sprint 318 forensics): gate on NET-NEW failures (delta vs the
-    // pre-sprint baseline), NOT total failures. Pre-existing failures live in the
-    // baseline → delta excludes them, so GATE_FAILURE fires only when THIS sprint
-    // INTRODUCED regressions (the actionable signal). Total-based gating
-    // (current.fail !== 0) fired on every pre-existing failure → permanent noise →
-    // GO_WITH_GATE_FAILURE was set every sprint and therefore ignored. The
-    // pre-sprint baseline IS the allowlist. No-baseline fallback: conservative —
-    // any current failure counts as a regression so a broken sprint is never
-    // silently passed.
-    const netNewFailures = baseline != null && current != null
-      ? delta.fail
-      : (current?.fail ?? 0);
-    const vitestPassed =
-      vitestRun.status === 0 || (current != null && current.fail === 0) || netNewFailures <= 0;
-    vitestResult = { status: vitestPassed ? 'PASS' : 'FAIL', delta };
+      const netNewFailures = baseline != null && current != null
+        ? delta.fail
+        : (current?.fail ?? 0);
+      const vitestPassed = vitestRun.status === 0
+        || (current != null && current.fail === 0)
+        || netNewFailures <= 0;
+      vitestResult = { status: vitestPassed ? 'PASS' : 'FAIL', delta };
+    }
   } catch (e) {
     vitestResult = { status: 'FAIL', delta: { files: 0, pass: 0, fail: 0, skipped: 0 } };
     debugLog('runSelfAuditGate:vitest', `execution failed: ${e}`);
@@ -387,11 +734,17 @@ export async function runSelfAuditGate(
           const raw = await fsPromises.readFile(join(tasksDir, file), 'utf-8');
           const result = JSON.parse(raw) as { taskId?: string; notes?: string };
           if (result.notes && containsHonestyTrigger(result.notes)) {
-            const taskBaseline = readBaseline(root, sprintId);
-            if (taskBaseline) {
-              const currentCapture = await captureVitestBaseline(root, 180_000);
-              if (currentCapture && currentCapture.fail > taskBaseline.fail) {
-                flaggedTasks.push(result.taskId ?? file);
+            if (options?.scopedManifest) {
+              // Never launch a hidden second suite from the scoped finalizer.
+              // The explicit honesty marker remains visible and fail-closed.
+              flaggedTasks.push(result.taskId ?? file);
+            } else {
+              const taskBaseline = readBaseline(root, sprintId);
+              if (taskBaseline) {
+                const currentCapture = await captureVitestBaseline(root, 180_000);
+                if (currentCapture && currentCapture.fail > taskBaseline.fail) {
+                  flaggedTasks.push(result.taskId ?? file);
+                }
               }
             }
           }
@@ -778,6 +1131,429 @@ export function buildUsageTotals(
 }
 
 
+// ═══ Canonical terminal truth projection (Sprint 486 task 486-007) ════════
+
+export class FinalizerTerminalEvidenceError extends Error {
+  constructor(readonly reasonCode: string) {
+    super(reasonCode);
+    this.name = 'FinalizerTerminalEvidenceError';
+  }
+}
+
+export interface FinalizerLogicalMetrics {
+  readonly totalTasks: number;
+  readonly completedTasks: number;
+  readonly techDebtTasks: number;
+  readonly noGoTasks: number;
+  readonly unevaluatedTasks: number;
+  readonly coveragePercent: number;
+}
+
+export interface FinalizerTerminalTruth {
+  readonly attempts: readonly ExactAttemptEvidence<TaskResult>[];
+  readonly terminalEvidence: SprintTerminalEvidence<TaskResult>;
+  readonly logicalProgress: LogicalProgressProjection;
+  readonly logicalMetrics: FinalizerLogicalMetrics;
+  readonly logicalEvaluations: ReadonlyMap<string, TaskEvaluation>;
+  readonly lineageUsage: readonly LineageUsageAuthorityAggregate[];
+  readonly usageTotals: UsageTotals;
+  readonly logicalSettlementDigest: string;
+}
+
+export interface FinalizerTerminalReceiptPublication {
+  readonly receipt: SprintTerminalReceiptV1;
+  readonly terminalEvidence: SprintTerminalEvidence<TaskResult>;
+  readonly artifactPath: string;
+}
+
+interface PersistedSprintTerminalReceipt {
+  readonly version: 1;
+  readonly publicationState: SprintTerminalPublicationStateV1;
+  readonly receipt: SprintTerminalReceiptV1;
+  readonly terminalEvidence: Pick<
+    SprintTerminalEvidence<TaskResult>,
+    'version' | 'summary' | 'cleanupEligibility' | 'holds'
+  >;
+  readonly logicalProgress: LogicalProgressProjection;
+  readonly lineageUsage: readonly LineageUsageAuthorityAggregate[];
+  readonly writtenAt: string;
+}
+
+function canonicalJson(value: unknown): string {
+  const normalize = (item: unknown): unknown => {
+    if (Array.isArray(item)) return item.map(normalize);
+    if (item !== null && typeof item === 'object') {
+      return Object.fromEntries(Object.entries(item as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, nested]) => [key, normalize(nested)]));
+    }
+    return item;
+  };
+  return JSON.stringify(normalize(value));
+}
+
+function sha256EvidenceRef(kind: string, value: unknown): string {
+  return `${kind}:sha256:${createHash('sha256').update(canonicalJson(value)).digest('hex')}`;
+}
+
+function finiteNonNegative(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+function finiteCoverage(value: unknown): number {
+  return Math.min(100, finiteNonNegative(value));
+}
+
+function asTerminalVerdict(
+  evaluation: TaskEvaluation | undefined,
+): 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO' | null {
+  if (evaluation === TaskEvaluation.DONE
+    || evaluation === TaskEvaluation.GO_WITH_TECH_DEBT
+    || evaluation === TaskEvaluation.NO_GO) return evaluation;
+  return null;
+}
+
+function logicalRootTaskId(taskId: string, tasksById: ReadonlyMap<string, Task>): string {
+  let currentId = taskId;
+  const seen = new Set<string>();
+  while (!seen.has(currentId)) {
+    seen.add(currentId);
+    const parentId = tasksById.get(currentId)?.fixForTaskId;
+    if (!parentId || !tasksById.has(parentId)) return currentId;
+    currentId = parentId;
+  }
+  return currentId;
+}
+
+function lineageBillingAuthority(
+  task: Task,
+  rootResult: TaskResult | undefined,
+  defaultAuthMode: 'subscription' | 'api' | 'hybrid' | undefined,
+): LineageBillingAuthority {
+  const effectiveAuthMode = task.authMode ?? defaultAuthMode;
+  if (effectiveAuthMode === 'hybrid') return 'hybrid';
+  const mode = resolveBillingModeForAuth(task.provider, effectiveAuthMode)
+    ?? rootResult?.cost?.billingMode;
+  if (mode === 'api') return 'metered';
+  if (mode === 'subscription') return 'subscription';
+  if (mode === 'local') return 'local';
+  if (mode === 'free_tier') return 'free-tier';
+  return 'unknown';
+}
+
+function terminalAttemptEvidence(
+  tasks: readonly Task[],
+  evaluations: ReadonlyMap<string, TaskEvaluation>,
+  results: readonly TaskResult[],
+): readonly ExactAttemptEvidence<TaskResult>[] {
+  const tasksById = new Map(tasks.map(task => [task.id, task]));
+  const resultsById = new Map(results.map(result => [result.taskId, result]));
+  const candidateIds = new Set<string>([
+    ...tasks.map(task => task.id),
+    ...evaluations.keys(),
+    ...results.map(result => result.taskId),
+  ]);
+  const identityFor = (taskId: string): ExactAttemptIdentity => {
+    const work = projectAttributedTaskWork(resultsById.get(taskId));
+    return { taskId, attemptId: work.attemptId ?? '' };
+  };
+
+  return [...candidateIds].sort().map(taskId => {
+    const task = tasksById.get(taskId);
+    const result = resultsById.get(taskId);
+    const evaluation = evaluations.get(taskId);
+    const verdict = asTerminalVerdict(evaluation);
+    const identity = identityFor(taskId);
+    const work = projectAttributedTaskWork(result);
+    const parentId = task?.fixForTaskId;
+    const supersedes = parentId && tasksById.has(parentId) ? identityFor(parentId) : null;
+
+    const authority: ExactAttemptEvidence<TaskResult>['authority'] = verdict
+      ? {
+          state: 'TERMINAL',
+          verdict,
+          evidenceRef: sha256EvidenceRef('evaluation', { identity, verdict }),
+        }
+      : evaluation === undefined
+        ? { state: 'UNKNOWN', reasonCode: 'FINAL_EVALUATION_UNAVAILABLE' }
+        : { state: 'UNSETTLED', evidenceRef: sha256EvidenceRef('evaluation', { identity, evaluation }) };
+    const resultEvidence: ExactAttemptEvidence<TaskResult>['result'] = !result
+      ? { state: 'ABSENT' }
+      : verdict
+        ? {
+            state: 'COMPLETE',
+            verdict,
+            evidenceRef: sha256EvidenceRef('task-result', result),
+            payload: result,
+          }
+        : {
+            state: 'PARTIAL',
+            evidenceRef: sha256EvidenceRef('task-result', result),
+            payload: result,
+            reasonCode: 'FINAL_EVALUATION_UNAVAILABLE',
+          };
+    const attribution: ExactAttemptEvidence<TaskResult>['attribution'] = work.state === 'VERIFIED'
+      ? {
+          state: 'VERIFIED',
+          evidenceRef: sha256EvidenceRef('work-attribution', result?.workAttribution),
+          filesChanged: work.filesChanged,
+          linesAdded: work.linesAdded,
+          linesRemoved: work.linesRemoved,
+        }
+      : {
+          state: work.state,
+          reasonCode: work.reasonCode ?? 'ATTRIBUTION_AUTHORITY_UNAVAILABLE',
+        };
+
+    return {
+      logicalTaskId: logicalRootTaskId(taskId, tasksById),
+      identity,
+      ...(supersedes ? { supersedes } : {}),
+      authority,
+      result: resultEvidence,
+      attribution,
+    };
+  });
+}
+
+function buildLineageUsage(
+  tasks: readonly Task[],
+  results: readonly TaskResult[],
+  attempts: readonly ExactAttemptEvidence<TaskResult>[],
+  defaultAuthMode: 'subscription' | 'api' | 'hybrid' | undefined,
+): readonly LineageUsageAuthorityAggregate[] {
+  const tasksById = new Map(tasks.map(task => [task.id, task]));
+  const resultsById = new Map(results.map(result => [result.taskId, result]));
+  const roots = [...new Set(attempts.map(attempt => attempt.logicalTaskId))].sort();
+  const authorityTasks = roots.map(id => {
+    const task = tasksById.get(id);
+    return {
+      id,
+      billingAuthority: task
+        ? lineageBillingAuthority(task, resultsById.get(id), defaultAuthMode)
+        : 'unknown' as const,
+    };
+  });
+  const usageAttempts = attempts.map(attempt => {
+    const result = attempt.result.state === 'COMPLETE' || attempt.result.state === 'PARTIAL'
+      ? attempt.result.payload
+      : undefined;
+    const usage = result?.tokenUsage;
+    const referenceCostUsd = finiteNonNegative(
+      result?.cost?.referenceUsd ?? result?.cost?.usd ?? estimateResultCost(usage),
+    );
+    const rootTask = tasksById.get(attempt.logicalTaskId);
+    const billingAuthority = rootTask
+      ? lineageBillingAuthority(rootTask, resultsById.get(rootTask.id), defaultAuthMode)
+      : 'unknown';
+    const invoicedCost = billingAuthority === 'metered'
+      && result?.cost
+      && !result.cost.pricingSource.startsWith('unknown-model:')
+      && !result.cost.pricingSource.startsWith('unknown-billing:')
+      && !result.cost.pricingSource.startsWith('unverified-api-reference:')
+      ? finiteNonNegative(result.cost.usd)
+      : undefined;
+    return {
+      id: attempt.identity.attemptId,
+      taskId: attempt.identity.taskId,
+      ...(attempt.supersedes ? { fixForTaskId: attempt.supersedes.taskId } : {}),
+      logicalRootTaskId: attempt.logicalTaskId,
+      inputTokens: finiteNonNegative(usage?.inputTokens),
+      outputTokens: finiteNonNegative(usage?.outputTokens),
+      cacheReadTokens: finiteNonNegative(usage?.cacheReadTokens),
+      cacheCreationTokens: finiteNonNegative(usage?.cacheCreationTokens),
+      referenceCostUsd,
+      ...(invoicedCost !== undefined ? { invoicedCostUsd: invoicedCost } : {}),
+    };
+  });
+  return aggregateLineageUsageAuthority({ tasks: authorityTasks, attempts: usageAttempts });
+}
+
+function usageTotalsFromLineages(
+  lineageUsage: readonly LineageUsageAuthorityAggregate[],
+): UsageTotals {
+  return lineageUsage.reduce<UsageTotals>((total, lineage) => ({
+    inputTokens: total.inputTokens + lineage.tokenUsage.inputTokens,
+    outputTokens: total.outputTokens + lineage.tokenUsage.outputTokens,
+    cacheRead: total.cacheRead + lineage.tokenUsage.cacheReadTokens,
+    costUsd: total.costUsd + (lineage.billedUsd.state === 'known' ? lineage.billedUsd.usd : 0),
+    referenceCostUsd: (total.referenceCostUsd ?? 0) + lineage.referenceCostUsd,
+    unknownBillingTaskCount: (total.unknownBillingTaskCount ?? 0)
+      + (lineage.billedUsd.state === 'unknown' ? 1 : 0),
+  }), {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheRead: 0,
+    costUsd: 0,
+    referenceCostUsd: 0,
+    unknownBillingTaskCount: 0,
+  });
+}
+
+export function buildFinalizerTerminalTruth(input: {
+  readonly tasks: readonly Task[];
+  readonly evaluations: ReadonlyMap<string, TaskEvaluation>;
+  readonly results: readonly TaskResult[];
+  readonly defaultAuthMode?: 'subscription' | 'api' | 'hybrid';
+  readonly coordinatorEvidence?: readonly CoordinatorTerminalEvidence[];
+}): FinalizerTerminalTruth {
+  const attempts = terminalAttemptEvidence(input.tasks, input.evaluations, input.results);
+  const terminalEvidence = assembleSprintTerminalEvidence({
+    attempts,
+    coordinatorEvidence: input.coordinatorEvidence ?? [],
+  });
+  const roots = new Set(attempts.map(attempt => attempt.logicalTaskId));
+  const progressResult = projectLogicalProgress({
+    attempts: attempts.map(attempt => ({
+      id: attempt.identity.taskId,
+      logicalTaskId: attempt.logicalTaskId,
+      status: attempt.authority.state === 'TERMINAL'
+        ? attempt.authority.verdict === 'NO_GO' ? 'blocked' : 'done'
+        : 'active',
+      ...(attempt.supersedes
+        ? { fixForAttemptId: attempt.supersedes.taskId }
+        : {}),
+    })),
+    denominator: { kind: 'logical-task', total: roots.size },
+  });
+  if (!progressResult.ok) {
+    throw new FinalizerTerminalEvidenceError(progressResult.diagnostic);
+  }
+
+  const resultsByTaskId = new Map(input.results.map(result => [result.taskId, result]));
+  const currentCoverage = terminalEvidence.logicalTasks.reduce((sum, logicalTask) => {
+    const taskId = logicalTask.resolvingAttempt?.taskId
+      ?? logicalTask.attempts.at(-1)?.taskId;
+    return sum + finiteCoverage(taskId ? resultsByTaskId.get(taskId)?.coverage : undefined);
+  }, 0);
+  const coveragePercent = progressResult.projection.total > 0
+    ? currentCoverage / progressResult.projection.total
+    : 0;
+  const logicalEvaluations = new Map<string, TaskEvaluation>();
+  for (const logicalTask of terminalEvidence.logicalTasks) {
+    if (logicalTask.state === 'COMPLETED') {
+      const completed = terminalEvidence.completed.find(
+        item => item.logicalTaskId === logicalTask.logicalTaskId,
+      );
+      logicalEvaluations.set(
+        logicalTask.logicalTaskId,
+        completed?.verdict === 'GO_WITH_TECH_DEBT'
+          ? TaskEvaluation.GO_WITH_TECH_DEBT
+          : TaskEvaluation.DONE,
+      );
+    } else if (logicalTask.state === 'FAILED') {
+      logicalEvaluations.set(logicalTask.logicalTaskId, TaskEvaluation.NO_GO);
+    }
+  }
+  const techDebtTasks = [...logicalEvaluations.values()]
+    .filter(value => value === TaskEvaluation.GO_WITH_TECH_DEBT).length;
+  const lineageUsage = buildLineageUsage(
+    input.tasks,
+    input.results,
+    attempts,
+    input.defaultAuthMode,
+  );
+  const usageTotals = usageTotalsFromLineages(lineageUsage);
+  const logicalMetrics: FinalizerLogicalMetrics = {
+    totalTasks: progressResult.projection.total,
+    completedTasks: progressResult.projection.done,
+    techDebtTasks,
+    noGoTasks: progressResult.projection.blocked,
+    unevaluatedTasks: progressResult.projection.active,
+    coveragePercent: Number.isFinite(coveragePercent) ? coveragePercent : 0,
+  };
+  const logicalSettlementDigest = createHash('sha256').update(canonicalJson({
+    terminalEvidence,
+    logicalProgress: progressResult.projection,
+    lineageUsage,
+  })).digest('hex');
+  return {
+    attempts,
+    terminalEvidence,
+    logicalProgress: progressResult.projection,
+    logicalMetrics,
+    logicalEvaluations,
+    lineageUsage,
+    usageTotals,
+    logicalSettlementDigest,
+  };
+}
+
+export function publishFencedSprintTerminalReceipt(input: {
+  readonly projectRoot: string;
+  readonly sprint: Sprint;
+  readonly truth: FinalizerTerminalTruth;
+  readonly runId?: string;
+  readonly coordinatorGeneration?: number;
+  readonly now?: () => string;
+}): FinalizerTerminalReceiptPublication {
+  const exactAttemptsSettled = input.truth.terminalEvidence.logicalTasks.every(
+    logicalTask => logicalTask.state === 'COMPLETED' || logicalTask.state === 'FAILED',
+  )
+    && input.truth.terminalEvidence.activeOrUnsettledAttempts.length === 0
+    && input.truth.terminalEvidence.partialResults.length === 0
+    && input.truth.terminalEvidence.holds.length === 0;
+  if (!exactAttemptsSettled) {
+    throw new FinalizerTerminalEvidenceError(
+      `TERMINAL_EVIDENCE_${input.truth.terminalEvidence.cleanupEligibility.state}`,
+    );
+  }
+  const recentWorksDir = join(input.projectRoot, RECENT_WORKS_DIR);
+  mkdirSync(recentWorksDir, { recursive: true });
+  const artifactPath = join(recentWorksDir, `${input.sprint.id}-terminal-receipt.json`);
+  const existing = readJsonSafe<PersistedSprintTerminalReceipt>(artifactPath);
+  const runId = input.runId ?? input.sprint.id;
+  const coordinatorGeneration = input.coordinatorGeneration ?? 1;
+  const state = existing?.publicationState ?? createSprintTerminalPublicationState({
+    version: SPRINT_TERMINAL_PUBLICATION_VERSION,
+    sprintId: input.sprint.id,
+    runId,
+    coordinatorGeneration,
+    authorityVersion: 0,
+  });
+  const transitioned = transitionSprintTerminalPublication(state, {
+    version: SPRINT_TERMINAL_PUBLICATION_VERSION,
+    sprintId: input.sprint.id,
+    runId,
+    coordinatorGeneration,
+    logicalSettlementDigest: input.truth.logicalSettlementDigest,
+    priorAuthorityVersion: state.receipt?.priorAuthorityVersion ?? state.authorityVersion,
+  });
+  if (transitioned.decision === 'hold') {
+    throw new FinalizerTerminalEvidenceError(`TERMINAL_PUBLICATION_${transitioned.reasonCode}`);
+  }
+  const receiptEvidence: CoordinatorTerminalEvidence = {
+    evidenceId: 'sprint-terminal-receipt',
+    kind: 'terminal-receipt',
+    state: 'VERIFIED',
+    evidenceRef: sha256EvidenceRef('terminal-receipt', transitioned.receipt),
+    requiredForCleanup: true,
+  };
+  const terminalEvidence = assembleSprintTerminalEvidence({
+    attempts: input.truth.attempts,
+    coordinatorEvidence: [receiptEvidence],
+  });
+  const artifact: PersistedSprintTerminalReceipt = {
+    version: 1,
+    publicationState: transitioned.state,
+    receipt: transitioned.receipt,
+    terminalEvidence: {
+      version: terminalEvidence.version,
+      summary: terminalEvidence.summary,
+      cleanupEligibility: terminalEvidence.cleanupEligibility,
+      holds: terminalEvidence.holds,
+    },
+    logicalProgress: input.truth.logicalProgress,
+    lineageUsage: input.truth.lineageUsage,
+    writtenAt: input.now?.() ?? new Date().toISOString(),
+  };
+  const tempPath = `${artifactPath}.tmp-${process.pid}-${randomUUID()}`;
+  writeFileSync(tempPath, JSON.stringify(artifact, null, 2) + '\n', 'utf-8');
+  renameSync(tempPath, artifactPath);
+  return { receipt: transitioned.receipt, terminalEvidence, artifactPath };
+}
+
+
 // ═══ KPI Forward-Collection Hook (Sprint 332 332-002) ═════════════
 
 /**
@@ -806,6 +1582,7 @@ export function recordSprintKpis(
   results: readonly TaskResult[],
   tasks: readonly Task[] = [],
   defaultAuthMode?: 'subscription' | 'api' | 'hybrid',
+  authoritativeUsage?: UsageTotals,
 ): boolean {
   try {
     recordKpiMeasurements(
@@ -819,7 +1596,7 @@ export function recordSprintKpis(
         boundaryViolations: metrics.boundaryViolations,
       },
       results,
-      buildUsageTotals(results, tasks, defaultAuthMode),
+      authoritativeUsage ?? buildUsageTotals(results, tasks, defaultAuthMode),
     );
     return true;
   } catch (e) {
@@ -1084,6 +1861,10 @@ export interface CompletionTaskSummary {
   testsPassed: boolean;
   /** Test coverage percent (0 when the task ran no tests / reported none). */
   coverage: number;
+  /** Host-owned work attribution; unavailable claims contribute zero work. */
+  workAttributionState: 'VERIFIED' | 'HOLD' | 'UNAVAILABLE';
+  attemptId: string | null;
+  attributionReason: string | null;
 }
 
 export interface SprintCompletionRecord {
@@ -1092,6 +1873,11 @@ export interface SprintCompletionRecord {
   flowId?: string;
   verdictSummary: CompletionVerdictSummary;
   taskSummary: CompletionTaskSummary[];
+  /** Exact attempts remain available even though taskSummary is logical-task scoped. */
+  attemptEvidence?: readonly ExactAttemptEvidence<TaskResult>[];
+  /** Host-authoritative usage aggregated once per logical lineage. */
+  lineageUsage?: readonly LineageUsageAuthorityAggregate[];
+  logicalProgress?: LogicalProgressProjection;
 }
 
 /**
@@ -1104,6 +1890,7 @@ export function buildSprintCompletionRecord(
   evaluations: Map<string, TaskEvaluation>,
   resultsMap: Map<string, TaskResult>,
   flowId?: string,
+  truth?: FinalizerTerminalTruth,
 ): SprintCompletionRecord {
   const verdictSummary: CompletionVerdictSummary = { done: 0, techDebt: 0, noGo: 0 };
   const taskSummary: CompletionTaskSummary[] = [];
@@ -1111,16 +1898,20 @@ export function buildSprintCompletionRecord(
   for (const [taskId, evaluation] of evaluations) {
     const task = sprint.tasks.find(t => t.id === taskId);
     const result = resultsMap.get(taskId);
+    const work = projectAttributedTaskWork(result);
     taskSummary.push({
       taskId,
       title: task?.title ?? '',
       evaluation,
       selfAssessment: result?.selfAssessment ?? evaluation,
-      filesChanged: result?.filesChanged?.length ?? 0,
-      linesAdded: result?.linesAdded ?? 0,
-      linesRemoved: result?.linesRemoved ?? 0,
+      filesChanged: work.filesChanged.length,
+      linesAdded: work.linesAdded,
+      linesRemoved: work.linesRemoved,
       testsPassed: result?.testsPassed ?? false,
       coverage: result?.coverage ?? 0,
+      workAttributionState: work.state,
+      attemptId: work.attemptId,
+      attributionReason: work.reasonCode,
     });
 
     if (evaluation === TaskEvaluation.NO_GO) verdictSummary.noGo += 1;
@@ -1130,6 +1921,11 @@ export function buildSprintCompletionRecord(
 
   const record: SprintCompletionRecord = { verdictSummary, taskSummary };
   if (flowId) record.flowId = flowId;
+  if (truth) {
+    record.attemptEvidence = truth.attempts;
+    record.lineageUsage = truth.lineageUsage;
+    record.logicalProgress = truth.logicalProgress;
+  }
   return record;
 }
 
@@ -1229,9 +2025,45 @@ export async function finalizeSprint(
     debugLog('finalizeSprint:codeReconcile', `${codeVerifiedTasks.length} tasks reconciled: ${codeVerifiedTasks.join(', ')}`);
   }
 
+  // One canonical terminal projection owns every finalizer denominator. Exact
+  // attempts remain on terminalTruth for evidence/usage, while downstream
+  // task-shaped consumers receive only each lineage's resolving attempt under
+  // its logical root id. This prevents original + FIX attempts from inflating
+  // jobs, KPI measurements, coverage, or rich output.
+  const terminalTruth = buildFinalizerTerminalTruth({
+    tasks: sprint.tasks,
+    evaluations,
+    results,
+    defaultAuthMode: opts?.config?.auth_mode,
+  });
+  const tasksById = new Map(sprint.tasks.map(task => [task.id, task]));
+  const resultsById = new Map(results.map(result => [result.taskId, result]));
+  const logicalTasks = terminalTruth.terminalEvidence.logicalTasks.flatMap(logicalTask => {
+    const rootTask = tasksById.get(logicalTask.logicalTaskId);
+    return rootTask ? [rootTask] : [];
+  });
+  const logicalResults = terminalTruth.terminalEvidence.logicalTasks.flatMap(logicalTask => {
+    const resolvingTaskId = logicalTask.resolvingAttempt?.taskId
+      ?? logicalTask.attempts.at(-1)?.taskId;
+    const result = resolvingTaskId ? resultsById.get(resolvingTaskId) : undefined;
+    return result ? [{ ...result, taskId: logicalTask.logicalTaskId }] : [];
+  });
+  const logicalResultsMap = buildResultsMap(logicalResults);
+  const logicalSprint: Sprint = { ...sprint, tasks: logicalTasks };
+  const logicalEvaluations = new Map(terminalTruth.logicalEvaluations);
+
   // 1. Calculate metrics — tech debt is read DB-first (Task #4d).
   const freshDebt = getDebtItems(projectRoot);
-  const metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
+  const baseMetrics = calculateMetrics(
+    logicalSprint,
+    logicalEvaluations,
+    logicalResults,
+    freshDebt,
+  );
+  const metrics: SprintMetrics = {
+    ...baseMetrics,
+    ...terminalTruth.logicalMetrics,
+  };
   sprint.metrics = metrics;
 
   // ─── KPI forward-collection hook (Sprint 330 Task 8; hardened 332-002) ──
@@ -1243,9 +2075,10 @@ export async function finalizeSprint(
     projectRoot,
     sprint.id,
     metrics,
-    results,
-    sprint.tasks,
+    logicalResults,
+    logicalTasks,
     opts?.config?.auth_mode,
+    terminalTruth.usageTotals,
   );
 
   // ─── Cumulative spend advisory (B6 — warn-only, Sprint 333 333-005) ──
@@ -1260,7 +2093,7 @@ export async function finalizeSprint(
   emitFinalizeSpendAdvisory(
     projectRoot,
     sprint.id,
-    buildUsageTotals(results, sprint.tasks, opts?.config?.auth_mode).costUsd,
+    terminalTruth.usageTotals.costUsd,
   );
 
   // ─── METRIC_EMITTED: sprint summary metrics ──────────────────────
@@ -1387,7 +2220,21 @@ export async function finalizeSprint(
         },
       );
     }
-    const section = buildFilesChangedCostSection(results, { helperCostUsd: helper.helperUsd });
+    const attributed = projectSprintWorkAttribution(results);
+    const excluded = attributed.heldAttempts + attributed.unavailableAttempts;
+    const section = buildFilesChangedCostSection(results, {
+      helperCostUsd: helper.helperUsd,
+      requireVerifiedAttribution: true,
+      ...(excluded > 0
+        ? {
+            attributionWarning: getMessage(
+              'finalize.attribution_excluded',
+              opts?.config?.language ?? 'en',
+              { count: String(excluded) },
+            ),
+          }
+        : {}),
+    });
     appendRetroSection(projectRoot, sprint.id, '## Files Changed & Cost', section);
   } catch (e) { debugLog('finalizeSprint:helperCostWire', e); }
 
@@ -1742,20 +2589,33 @@ export async function finalizeSprint(
   // 10. Rich output (non-fatal — sprint completes even if formatting fails)
   debugLog('finalizeSprint:breadcrumb', 'Step 10 (richOutput) — entering');
   try {
-    const gitDiff = spawnSync('git', ['diff', '--stat', 'HEAD~1'], { encoding: 'utf-8', cwd: projectRoot }).stdout;
+    const attributedDiff = projectSprintWorkAttribution(logicalResults);
+    const gitDiffLines = attributedDiff.filesChanged.map(path => {
+      const attempts = attributedDiff.fileAttemptIds[path] ?? [];
+      return `${path} | attempt ${attempts.join(',')}`;
+    });
+    const excludedAttribution = attributedDiff.heldAttempts + attributedDiff.unavailableAttempts;
+    if (excludedAttribution > 0) {
+      gitDiffLines.push(getMessage(
+        'finalize.attribution_excluded',
+        opts?.config?.language ?? 'en',
+        { count: String(excludedAttribution) },
+      ));
+    }
+    const gitDiff = gitDiffLines.join('\n');
     // output_mode lives on DeckentConfig (raw), not ResolvedConfig — access via cast
     const rawConfig = opts?.config as Record<string, unknown> | undefined;
     const outputMode = (rawConfig?.['output_mode'] as string) ?? 'normal';
-    const richInput = { id: sprint.id, number: sprint.number, tasks: sprint.tasks.map(t => ({ id: t.id, title: t.title })), metrics: sprint.metrics ? { ...sprint.metrics } : undefined };
+    const richInput = { id: sprint.id, number: sprint.number, tasks: logicalTasks.map(t => ({ id: t.id, title: t.title })), metrics: { ...metrics } };
     // Build agent performance data for the performance table
     const attemptedSprint: Sprint = {
-      ...sprint,
-      tasks: sprint.tasks.filter(task => {
-        const result = resultsMap.get(task.id);
+      ...logicalSprint,
+      tasks: logicalTasks.filter(task => {
+        const result = logicalResultsMap.get(task.id);
         return result !== undefined && result.cascadeSkipped !== true;
       }),
     };
-    const agentRows = buildAgentPerformance(attemptedSprint, evaluations, results);
+    const agentRows = buildAgentPerformance(attemptedSprint, logicalEvaluations, logicalResults);
     const agentPerf = agentRows.map(row => ({
       agentId: row.agent,
       totalTasks: row.tasks,
@@ -1763,13 +2623,13 @@ export async function finalizeSprint(
       successRate: row.tasks > 0 ? Math.round((row.done / row.tasks) * 100) : 0,
     }));
     // Extract learnings from evaluation results (task notes from results)
-    const learnings = results
+    const learnings = logicalResults
       .filter(r => r.notes && r.notes.trim().length > 0)
       .map(r => r.notes as string)
       .slice(0, 5);
     const richOutput = formatRichSprintSummary(
       richInput,
-      evaluations,
+      logicalEvaluations,
       { gitDiff, agentPerf, learnings, outputMode: outputMode as 'quiet' | 'normal' | 'verbose' },
     );
     if (richOutput) console.log(richOutput);
@@ -1779,7 +2639,10 @@ export async function finalizeSprint(
   debugLog('finalizeSprint:breadcrumb', 'Step 10b (selfAuditGate) — entering');
   let gateResult: SelfAuditResult | null = null;
   try {
-    gateResult = await runSelfAuditGate(sprint.id, projectRoot);
+    gateResult = await runSelfAuditGate(sprint.id, projectRoot, {
+      scopedManifest: deriveScopedSelfAuditManifest(sprint.tasks, results),
+      selfAuditEcosystem: resolveSelfAuditEcosystem(projectRoot ?? process.cwd()),
+    });
     debugLog('finalizeSprint:selfAuditGate', `Gate completed: overallGate=${gateResult.overallGate}`);
     const currentStatus = sprint.status ?? '';
     const newStatus = applyGateStatus(currentStatus, gateResult);
@@ -1933,6 +2796,46 @@ export async function finalizeSprint(
     }
   }
 
+  // Publish the generation-fenced terminal receipt at the single archive
+  // boundary. Exact attempts and every outcome-shaping gate have settled by
+  // this point. Receipt publication is not completion authority: a settled
+  // NO_GO remains FAILED/BLOCKED in the reassembled evidence, while stale,
+  // partial, deferred, or otherwise held evidence leaves publication null.
+  let terminalReceiptPublication: FinalizerTerminalReceiptPublication | null = null;
+  try {
+    terminalReceiptPublication = publishFencedSprintTerminalReceipt({
+      projectRoot,
+      sprint,
+      truth: terminalTruth,
+      ...(opts?.flowId ? { runId: opts.flowId } : {}),
+      ...(opts?.coordinatorGeneration !== undefined
+        ? { coordinatorGeneration: opts.coordinatorGeneration }
+        : {}),
+    });
+    debugLog(
+      'finalizeSprint:terminalReceipt',
+      `Receipt published at ${terminalReceiptPublication.artifactPath}`,
+    );
+  } catch (e) {
+    debugLog('finalizeSprint:terminalReceipt', `Publication held: ${e}`);
+    // Terminal evidence is a hard authority boundary. Continuing after a
+    // held publication used to write a COMPLETE job/state without a receipt,
+    // leaving status, cleanup, and re-finalize surfaces in contradiction.
+    // Preserve the original typed reason when possible and fail closed before
+    // any archive, job summary, or terminal authority is published.
+    if (e instanceof FinalizerTerminalEvidenceError) throw e;
+    throw new FinalizerTerminalEvidenceError(
+      `TERMINAL_RECEIPT_PUBLICATION_FAILED:${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+
+  const receiptAllowsArchive =
+    terminalReceiptPublication?.terminalEvidence.cleanupEligibility.candidate === true;
+  if (!receiptAllowsArchive) {
+    throw new FinalizerTerminalEvidenceError('TERMINAL_RECEIPT_NOT_CLEANUP_ELIGIBLE');
+  }
+  if (receiptAllowsArchive) {
+
   // 12. Archive DIRECTIVES.md — always archive copy; PRESERVE working DIRECTIVES.md by default.
   //
   // Sprint 168 C0a-4 (BUG-CC fix, Alperen Pre-Flight Step 16 Option B):
@@ -2039,6 +2942,12 @@ export async function finalizeSprint(
     debugLog('finalizeSprint:schedulerShadowRetention',
       `Retention complete: archived=${schedulerShadowResult.archived.length}, bytesFreed=${schedulerShadowResult.bytesFreed}`);
   } catch (e) { debugLog('finalizeSprint:schedulerShadowRetention', e); }
+  } else {
+    debugLog(
+      'finalizeSprint:archiveBoundary',
+      'Archive and retention held until a cleanup-eligible terminal receipt exists',
+    );
+  }
 
   // 13. Write job completion summary to .deckent/runtime/jobs/ for MCP polling and CLI notification
   debugLog('finalizeSprint:breadcrumb', 'Step 13 (jobSummary) — entering');
@@ -2048,8 +2957,8 @@ export async function finalizeSprint(
 
     // Build agent breakdown
     const agentBreakdown: Record<string, number> = {};
-    for (const task of sprint.tasks) {
-      const result = resultsMap.get(task.id);
+    for (const task of logicalTasks) {
+      const result = logicalResultsMap.get(task.id);
       if (!result || result.cascadeSkipped === true) continue;
       const agent = task.assignedAgent ?? 'generic';
       agentBreakdown[agent] = (agentBreakdown[agent] ?? 0) + 1;
@@ -2066,11 +2975,7 @@ export async function finalizeSprint(
     const durationStr = !sprint.startedAt
       ? 'unknown'
       : mins > 0 ? `${mins}dk ${secs}sn` : `${secs}sn`;
-    const usageTotals = buildUsageTotals(
-      results,
-      sprint.tasks,
-      opts?.config?.auth_mode,
-    );
+    const usageTotals = terminalTruth.usageTotals;
 
     // completedTasks already includes TECH_DEBT (see calculateMetrics), so use it directly
     const donePure = metrics.completedTasks - metrics.techDebtTasks;
@@ -2091,19 +2996,20 @@ export async function finalizeSprint(
       selfAssessment: string;
       techDebtDetail: string;
     }> = {};
-    for (const [taskId, evaluation] of evaluations) {
-      const taskResult = resultsMap.get(taskId);
-      const task = sprint.tasks.find(t => t.id === taskId);
+    for (const [taskId, evaluation] of logicalEvaluations) {
+      const taskResult = logicalResultsMap.get(taskId);
+      const task = logicalTasks.find(t => t.id === taskId);
       const isTechDebt = evaluation === TaskEvaluation.GO_WITH_TECH_DEBT;
+      const work = projectAttributedTaskWork(taskResult);
       richEvaluations[taskId] = {
         evaluation,
         title: task?.title ?? '',
         agent: task?.assignedAgent ?? 'generic',
         skills: task?.assignedSkills ?? [],
         reason: taskResult?.notes ?? '',
-        filesChanged: taskResult?.filesChanged ?? [],
-        linesAdded: taskResult?.linesAdded ?? 0,
-        linesRemoved: taskResult?.linesRemoved ?? 0,
+        filesChanged: [...work.filesChanged],
+        linesAdded: work.linesAdded,
+        linesRemoved: work.linesRemoved,
         testsPassed: taskResult?.testsPassed ?? false,
         coverage: taskResult?.coverage ?? 0,
         selfAssessment: taskResult?.selfAssessment ?? evaluation,
@@ -2114,7 +3020,13 @@ export async function finalizeSprint(
     // Rich completion-record (TERM5-FIN — sprint-427 task 1): additive-only,
     // appended as a NEW key below — every pre-existing jobData field/value
     // stays exactly as it was.
-    const completionRecord = buildSprintCompletionRecord(sprint, evaluations, resultsMap, opts?.flowId);
+    const completionRecord = buildSprintCompletionRecord(
+      logicalSprint,
+      logicalEvaluations,
+      logicalResultsMap,
+      opts?.flowId,
+      terminalTruth,
+    );
 
     const jobFile = join(jobsDir, `${sprint.id}.json`);
     const jobData = {
@@ -2241,39 +3153,9 @@ export async function finalizeSprint(
     { fromPhase: 'RETRO', toPhase: 'CLEANUP', sprintId: sprint.id, timestamp: new Date().toISOString() },
   );
 
-  // DECKENT→USER:NOTIFY (Hot Fix H6) — sprint-finalized, fail-safe
-  try {
-    const done = metrics.completedTasks ?? 0;
-    const total = metrics.totalTasks ?? sprint.tasks.length;
-    const noGo = metrics.noGoTasks ?? 0;
-    const debt = metrics.techDebtTasks ?? 0;
-    // MASTER-PLAN 667: never let delivered-but-unjudged work read as failure.
-    // A run that ends before EVALUATE reaches a task used to close as
-    // "0/3 DONE, 0 TECH_DEBT, 0 NO_GO" while two workers had produced real
-    // results on disk (sprint-459). Surface that bucket explicitly.
-    const unevaluated = metrics.unevaluatedTasks ?? 0;
-    const unevaluatedSuffix = unevaluated > 0
-      ? `, ${unevaluated} UNEVALUATED (result on disk, never judged)`
-      : '';
-    void notify(
-      'sprint-finalized',
-      sprint.id,
-      `Sprint ${sprint.id} kapandı`,
-      `${done}/${total} DONE, ${debt} TECH_DEBT, ${noGo} NO_GO${unevaluatedSuffix}`,
-    );
-  } catch (e) { debugLog('finalizeSprint:notify:sprint-finalized', e); }
-
-  // 15. Terminal sprint-state + PID/snapshot cleanup (Sprint 223 Task 013)
-  debugLog('finalizeSprint:breadcrumb', 'Step 15 (terminalStateCleanup) — entering');
-  persistFinalSprintState(projectRoot, sprint);
-  debugLog('finalizeSprint:breadcrumb', 'Step 15 (terminalStateCleanup) — done');
-
-  // 16. Write terminal .dashboard snapshot so /api/status is never stale (DASH-UX-2)
-  debugLog('finalizeSprint:breadcrumb', 'Step 16 (terminalDashboardSnapshot) — entering');
-  try {
-    writeTerminalDashboardSnapshot(projectRoot, sprint, metrics);
-  } catch (e) { debugLog('finalizeSprint:terminalDashboard', e); }
-  debugLog('finalizeSprint:breadcrumb', 'Step 16 (terminalDashboardSnapshot) — done');
+  if (!opts?.deferTerminalAuthority) {
+    publishFinalSprintAuthority(projectRoot, sprint, metrics, opts?.config?.language ?? 'en');
+  }
 
   // Counter cleanup must be the final filesystem action after the terminal
   // event. Deleting `<sprint>-seq` during retention and then emitting
@@ -2283,6 +3165,43 @@ export async function finalizeSprint(
   } catch (e) { debugLog('finalizeSprint:cleanupCountersFinal', e); }
 
   return metrics;
+}
+
+/**
+ * Single terminal authority publisher shared by external finalize and the
+ * in-process controller after every ref'ed cleanup operation has completed.
+ */
+export function publishFinalSprintAuthority(
+  projectRoot: string,
+  sprint: Sprint,
+  metrics: SprintMetrics,
+  lang = 'en',
+): void {
+  debugLog('finalizeSprint:breadcrumb', 'terminal authority publication — entering');
+  persistFinalSprintState(projectRoot, sprint);
+  try {
+    writeTerminalDashboardSnapshot(projectRoot, sprint, metrics);
+  } catch (e) { debugLog('finalizeSprint:terminalDashboard', e); }
+  try {
+    const done = metrics.completedTasks ?? 0;
+    const total = metrics.totalTasks ?? sprint.tasks.length;
+    const noGo = metrics.noGoTasks ?? 0;
+    const debt = metrics.techDebtTasks ?? 0;
+    const unevaluated = metrics.unevaluatedTasks ?? 0;
+    void notify(
+      'sprint-finalized',
+      sprint.id,
+      getMessage('finalize.notification_title', lang, { sprintId: sprint.id }),
+      getMessage('finalize.notification_summary', lang, {
+        done: String(done),
+        total: String(total),
+        debt: String(debt),
+        noGo: String(noGo),
+        unevaluated: String(unevaluated),
+      }),
+    );
+  } catch (e) { debugLog('finalizeSprint:notify:sprint-finalized', e); }
+  debugLog('finalizeSprint:breadcrumb', 'terminal authority publication — done');
 }
 
 /**

@@ -383,9 +383,8 @@ implements MandatoryCrossVerifyInvocationFactory {
     readonly timeoutMs: number;
     readonly verifierModel?: string;
   }): Promise<MandatoryCrossVerifyInvocationFactoryResult> {
-    if (input.config.cross_verify?.enabled !== true
-      || input.config.cross_verify.enforce_refuted !== true) {
-      return hold('xverify_enforcement_disabled', input.task.id);
+    if (input.config.cross_verify?.enabled !== true) {
+      return hold('xverify_disabled', input.task.id);
     }
     const provider = exactVerifierProvider(input.task, input.config);
     if (!provider) {

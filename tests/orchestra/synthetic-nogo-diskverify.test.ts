@@ -50,8 +50,15 @@ const diskVerifyState: {
   result: { hasDiskEvidence: false, linesAdded: 0, untrackedFiles: [] },
 };
 
+const scopedDiskChangesState: {
+  result: { filesChanged: string[]; linesAdded: number; linesRemoved: number };
+} = {
+  result: { filesChanged: [], linesAdded: 0, linesRemoved: 0 },
+};
+
 vi.mock('../../src/orchestra/disk-verify.js', () => ({
   verifyDiskAgainstClaim: vi.fn(() => diskVerifyState.result),
+  computeScopedDiskChanges: vi.fn(() => scopedDiskChangesState.result),
   DISK_VS_CLAIM_MISMATCH_CHANNEL: 'BRAIN→AUDITOR:DISK_VS_CLAIM_MISMATCH',
 }));
 
@@ -149,6 +156,7 @@ describe('collectResults — synthetic exit-0-no-result uniform disk-verify gate
   beforeEach(() => {
     tmpDir = makeTmpDir();
     diskVerifyState.result = { hasDiskEvidence: false, linesAdded: 0, untrackedFiles: [] };
+    scopedDiskChangesState.result = { filesChanged: [], linesAdded: 0, linesRemoved: 0 };
   });
 
   afterEach(() => {
@@ -311,7 +319,48 @@ describe('collectResults — synthetic exit-0-no-result uniform disk-verify gate
     expect(events.find(e => e.channel === 'BRAIN→AUDITOR:DISK_VS_CLAIM_MISMATCH')).toBeUndefined();
   });
 
-  it('(5) .timeout-path regression guard — empty disk + .timeout marker (no .result) → synthetic NO_GO with no reclassification', async () => {
+  it('(5) claim-time VERIFIED attribution is not replaced by the final shared-worktree diff', async () => {
+    const taskId = 'syn-attribution-001';
+    const task = makeTask(taskId);
+    const sprint = makeSprint([task]);
+    const attributedResult = {
+      taskId,
+      workerId: `docker-${taskId}`,
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+      testsPassed: false,
+      coverage: 0,
+      selfAssessment: 'NO_GO',
+      notes: 'No task-local bytes were produced.',
+      workAttribution: {
+        state: 'VERIFIED',
+        attemptId: 'attempt-1',
+        baselineRef: `.tasks/task-${taskId}.scope-baseline`,
+        scopeDigest: 'a'.repeat(64),
+      },
+    } satisfies TaskResult;
+    writeFileSync(
+      join(tmpDir, '.tasks', `task-${taskId}.result`),
+      JSON.stringify(attributedResult),
+      'utf-8',
+    );
+    scopedDiskChangesState.result = {
+      filesChanged: ['src/orchestra/foo.ts'],
+      linesAdded: 213,
+      linesRemoved: 289,
+    };
+
+    const results = await waitForResults(tmpDir, sprint, 5000);
+
+    expect(results).toHaveLength(1);
+    expect(results[0]!.workAttribution?.state).toBe('VERIFIED');
+    expect(results[0]!.filesChanged).toEqual([]);
+    expect(results[0]!.linesAdded).toBe(0);
+    expect(results[0]!.linesRemoved).toBe(0);
+  });
+
+  it('(6) .timeout-path regression guard — empty disk + .timeout marker (no .result) → synthetic NO_GO with no reclassification', async () => {
     // The legacy timeout-path (lines 543-613 in result-collector.ts) must
     // continue to function exactly as before. This test exercises that branch
     // (no .result on disk, only a .timeout marker) and verifies the legacy

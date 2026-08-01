@@ -1,5 +1,81 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-487 Learnings
+- Sprint sprint-487 Learnings: ## Sprint sprint-487 Learnings
+- Fix: Terminal publication real-binary contract: NO_GO — Verification: node scripts/test-binary-contracts.mjs failed with `finalize: terminal receipt was not published before ar
+- Terminal publication real-binary contract: NO_GO — Executed: node scripts/test-binary-contracts.mjs
+Failure: finalize: terminal receipt was not published before archive co
+- Finalizer audit adapter consumer: GO_WITH_TECH_DEBT — Finalizer now consumes the scoped self-audit adapter registry instead of hosting framework logic.
+Production wiring: pro
+- Heartbeat authority store: NO_GO — Implemented the staged-foundation exact-attempt heartbeat authority store with immutable exclusive revisions, store-owne
+- Admitted-versus-attained projection: NO_GO — Verification: npx tsc --noEmit passed. npx vitest run tests/core/provider-concurrency-runtime-projection.test.ts passed
+- Sprint-486 quiescence replay: NO_GO — Declared verification failed: npx vitest run tests/orchestra/execute-fix-quiescence.integration.test.ts timed out after
+- Forced skill lineage preservation: NO_GO — Host contained the exact Docker attempt at LANDING_REQUESTED, but no valid immutable checkpoint could be created from th
+- Cross-fix: Wiring evidence schema: NO_GO — Landing checkpoint initialization failed: sequence 1 was written with invalid JSON due to shell quoting around updatedAt
+- Result wiring evidence settlement: NO_GO — Implemented digest-bound result-wiring settlement. Exact plan identity, worker identity/references, host consumer identi
+
+## Gains
+- 487-001 — Finalizer terminal truth consumer — Producer buildFinalizerTerminalTruth is production-wired exactly once into finalizeSprint after r...
+- 487-002 — Fenced receipt before archive — Production wiring: publishFencedSprintTerminalReceipt is invoked exactly once by finalizeSprint a...
+- 487-003 — Controller terminal handoff — Controller terminal handoff wired: finalizer receipt -> CLEANUP -> COMPLETE, exactly once.
+- 487-004-xfix — Cross-fix: CLI receipt-aware status — Implemented receipt-aware CLI status compatibility in src/cli/commands/status.ts.
+- 487-004 — CLI receipt-aware status — Production wiring: terminal receipt projection is consumed by buildStatusJsonSnapshot, which serv...
+- 487-005-xfix — Cross-fix: MCP receipt-aware status — Investigated src/mcp/tools/status.ts and tests/mcp/status-terminal-receipt.test.ts (both in write...
+- 487-005 — MCP receipt-aware status — Added exported projectTerminalPublicationStatus(authority: CanonicalRunStatus) to src/mcp/tools/s...
+- 487-007 — Self-audit adapter contract — Implemented the staged SelfAuditAdapter foundation with deterministic capability resolution, prov...
+- …and 24 more delivered
+
+## Sprint sprint-486 Learnings
+- Sprint sprint-486 Learnings: ## Sprint sprint-486 Learnings
+- Finalizer terminal-evidence wiring: NO_GO — Host runtime-budget evidence is not terminally measurable: state=unmeasurable, terminal=true, attemptId=e0f3749b-8ba9-4a
+- Controller terminal publication ordering: NO_GO — Runtime budget circuit breaker stopped the worker: cache-read token budget exceeded (1339686 > 1235543). Runtime budget
+- CLI status closure-race wiring: NO_GO — Targeted file/test verification: file=0 vitest=0. TypeScript goCriteria: tsc=2. The failing diagnostics are out-of-scope
+- CLI usage lineage projection: NO_GO — Host contained the exact Docker attempt at LANDING_REQUESTED, but no valid immutable checkpoint could be created from th
+- Reporter logical lineage summary: NO_GO — Focused verification passed: npx vitest run tests/orchestra/sprint-reporter-lineage-summary.test.ts (2 tests) and requir
+- Debt manager FIX authority wiring: NO_GO — Host contained the exact Docker attempt at LANDING_REQUESTED, but no valid immutable checkpoint could be created from th
+- Run-wide prompt policy propagation: NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=false diff [].
+- Forced skill preservation through exact routing: NO_GO — Host contained the exact Docker attempt at LANDING_REQUESTED, but no valid immutable checkpoint could be created from th
+- Docker provider execution observation wire: NO_GO — Host runtime-budget evidence is not terminally measurable: state=unmeasurable, terminal=true, attemptId=1cd74acb-a126-44
+- Parametric XVerify admission runtime wire: NO_GO — Runtime budget circuit breaker stopped the worker: cache-read token budget exceeded (1232024 > 1140298). Runtime budget
+
+## Gains
+- 486-001 — Fenced terminal publication contract — npx tsc --noEmit: PASS
+- 486-002 — Strict task artifact classifier — Targeted Vitest passed; npx tsc --noEmit passed; required classifier/test files are present.
+- 486-003 — Logical progress projection contract — Staged foundation artifact: producer-to-runtime closure is owned by 486-007, 486-009, and 486-012.
+- 486-004 — Lineage-aware usage and billing authority — Verified: test -f src/core/lineage-usage-authority.ts && test -f tests/core/lineage-usage-authori...
+- 486-005 — Monotonic heartbeat authority — npx tsc --noEmit exit: 0\nnpx vitest run tests/core/worker-heartbeat-authority.test.ts exit: 0\nR...
+- 486-006 — Typed FIX repair-authority resolver — Evidence: test -f src/orchestra/fix-repair-authority.ts && test -f tests/orchestra/fix-repair-aut...
+- 486-011 — MCP usage lineage parity — Added projectUsageLineage() to src/mcp/tools/usage.ts as a direct passthrough to aggregateLineage...
+- 486-016 — Acceptance-bound semantic verdict gate — Implemented a deterministic acceptance-bound semantic verdict gate and canonical production evalu...
+- …and 2 more delivered
+
+## Sprint sprint-485 Learnings
+- Sprint sprint-485 Learnings: ## Sprint sprint-485 Learnings
+
+## Gains
+- 485-001 — Provider concurrency capability authority — Verified: npx tsc --noEmit; required file existence check; npx vitest run tests/core/provider-con...
+- 485-002 — Exact-attempt provider execution observation — Implemented src/core/provider-execution-observation.ts: zod-validated start/end evidence schema (...
+- 485-003 — Parametric XVerify admission policy — Implemented pure parametric XVerify admission policy with bounded risk/materiality ordering, per-...
+- 485-004 — Evaluation honesty negative-replay fixture — DoD 4/4 verified.
+- 485-005 — Exact prompt authority drift-race assurance — Added tests/orchestra/prompt-authority-drift-race.test.ts — a race-focused contract around the ex...
+- 485-006 — Multi-attempt attribution summary replay — Bounded discovery was restricted to tests/helpers and tests/orchestra.
+- 485-007 — Monotonic status closure-window stress contract — Wrote a bounded source-process stress contract (vite-node driver against src/cli/commands/status....
+- 485-008 — Sprint terminal evidence assembler — Host runtime-budget evidence is not terminally measurable: state=unmeasurable, terminal=true, att...
+
+## Sprint sprint-484 Learnings
+- Sprint sprint-484 Learnings: ## Sprint sprint-484 Learnings
+
+## Gains
+- 484-001 — Enforce recovery-born evaluation honesty with regression coverage — Implemented a canonical terminal NO_GO veto for explicit selfAssessment=NO_GO, testsPassed=false,...
+
+## Sprint sprint-483 Learnings
+- Sprint sprint-483 Learnings: ## Sprint sprint-483 Learnings
+- Integrate DOGFOOD-3178 bounded validation evidence: GO_WITH_TECH_DEBT — Budget Landing Checkpoint Protocol blocked execution: the first required atomic proposal write failed with Bash exit cod
+
+## Gains
+- 483-001 — Validate DOGFOOD-3175 claim-time work attribution — DOGFOOD-3175 attribution traced: task-result-schema validates and preserves host-authored VERIFIE...
+- 483-002 — Validate DOGFOOD-3177 force-finalize coordinator containment — Fresh real-binary evidence: delayed SIGTERM handling left the coordinator live long enough to ass...
+
 ## Sprint sprint-482 Learnings
 - Sprint sprint-482 Learnings: ## Sprint sprint-482 Learnings
 - Unify finalize and recover adapters: NO_GO — npx tsc --noEmit passed.

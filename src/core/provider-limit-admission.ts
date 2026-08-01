@@ -11,6 +11,12 @@ import type {
   ProviderLimitStore,
 } from './provider-limit-store.js';
 import {
+  resolveProviderConcurrencyCapability,
+  type ProviderConcurrencyCapabilityEvidence,
+  type ProviderConcurrencyCapabilityRequest,
+} from './provider-concurrency-capability.js';
+import type { StoredProviderExecutionInterval } from './provider-execution-observation-store.js';
+import {
   resolveRoleInvocation,
   type ProviderEvidence,
   type RoleInvocationRequest,
@@ -21,6 +27,12 @@ import {
 export interface ProviderLimitAdmissionRequest {
   readonly invocation: RoleInvocationRequest;
   readonly candidateScopes: Readonly<Record<string, ProviderLimitAdmissionCandidateScope>>;
+  /**
+   * Caller-authored provider capacity authorities. When supplied, every selected
+   * provider must have an exact entry; unresolved capacity is resolver evidence
+   * for the existing fallback authority, never a numeric default.
+   */
+  readonly concurrencyCapabilities?: Readonly<Record<string, ProviderConcurrencyCapabilityRequest>>;
   readonly buildReservation: (selected: RoleInvocationSelected) => ProviderLimitReservationRequest;
 }
 
@@ -39,6 +51,103 @@ export interface ProviderLimitAdmissionAttempt {
   readonly model: string;
   readonly reservation: ProviderLimitReservation | null;
   readonly errorRef: string | null;
+  readonly concurrency: ProviderConcurrencyCapabilityEvidence | null;
+}
+
+export interface ProviderConcurrencyRuntimeProjectionRequest {
+  /** Stable, non-secret identity used by direct provider execution observations. */
+  readonly providerPrincipalDigest: string;
+  /** The exact effective-capability result considered by admission for this principal. */
+  readonly capability: ProviderConcurrencyCapabilityEvidence | null;
+  /** Bounded direct provider-runtime intervals for this exact principal only. */
+  readonly intervals: readonly StoredProviderExecutionInterval[];
+}
+
+export interface ProviderConcurrencyRuntimeProjection {
+  readonly providerPrincipalDigest: string;
+  readonly admission: 'ADMITTED' | 'DEGRADED' | 'HOLD';
+  /** Unknown capability remains a HOLD and is never converted to a numeric capacity. */
+  readonly admittedCeiling: number | 'unknown';
+  readonly currentAttained: number;
+  readonly peakAttained: number;
+  readonly evidenceRefs: readonly string[];
+}
+
+interface RuntimeConcurrencyEvent {
+  readonly timestamp: number;
+  readonly delta: 1 | -1;
+}
+
+function assertProviderPrincipalDigest(value: string): void {
+  if (!value || value !== value.trim() || /[\u0000-\u001f\u007f]/u.test(value)) {
+    throw new TypeError('providerPrincipalDigest must be a canonical non-empty string');
+  }
+}
+
+function peakAttainedFromIntervals(
+  providerPrincipalDigest: string,
+  intervals: readonly StoredProviderExecutionInterval[],
+): number {
+  const events: RuntimeConcurrencyEvent[] = [];
+  for (const interval of intervals) {
+    if (interval.providerPrincipalDigest !== providerPrincipalDigest) {
+      throw new ProviderLimitAdmissionError(
+        'IDENTITY_MISMATCH', 'Observed execution interval does not belong to the projected principal',
+      );
+    }
+    events.push({ timestamp: Date.parse(interval.start.observedAt), delta: 1 });
+    if (interval.end !== null) {
+      events.push({ timestamp: Date.parse(interval.end.observedAt), delta: -1 });
+    }
+  }
+  events.sort((left, right) => left.timestamp - right.timestamp || right.delta - left.delta);
+  let attained = 0;
+  let peak = 0;
+  for (const event of events) {
+    attained += event.delta;
+    peak = Math.max(peak, attained);
+  }
+  return peak;
+}
+
+/**
+ * Joins one admitted provider-principal authority to direct provider-runtime
+ * observations. It deliberately accepts one exact principal at a time: callers
+ * choose the bounded principal set, and no provider or container identity is
+ * inferred here.
+ */
+export function projectProviderConcurrencyRuntime(
+  request: ProviderConcurrencyRuntimeProjectionRequest,
+): ProviderConcurrencyRuntimeProjection {
+  assertProviderPrincipalDigest(request.providerPrincipalDigest);
+  const currentAttained = request.intervals.reduce((count, interval) => {
+    if (interval.providerPrincipalDigest !== request.providerPrincipalDigest) {
+      throw new ProviderLimitAdmissionError(
+        'IDENTITY_MISMATCH', 'Observed execution interval does not belong to the projected principal',
+      );
+    }
+    return interval.end === null ? count + 1 : count;
+  }, 0);
+  const capability = request.capability;
+  if (capability === null || capability.decision === 'HOLD'
+    || capability.effectiveAdmittedCeiling === 'unknown') {
+    return {
+      providerPrincipalDigest: request.providerPrincipalDigest,
+      admission: 'HOLD',
+      admittedCeiling: 'unknown',
+      currentAttained,
+      peakAttained: peakAttainedFromIntervals(request.providerPrincipalDigest, request.intervals),
+      evidenceRefs: capability?.evidenceRefs ?? [],
+    };
+  }
+  return {
+    providerPrincipalDigest: request.providerPrincipalDigest,
+    admission: capability.decision,
+    admittedCeiling: capability.effectiveAdmittedCeiling,
+    currentAttained,
+    peakAttained: peakAttainedFromIntervals(request.providerPrincipalDigest, request.intervals),
+    evidenceRefs: capability.evidenceRefs,
+  };
 }
 
 interface ProviderLimitAdmissionBase {
@@ -137,6 +246,12 @@ function reservationQuery(request: ProviderLimitReservationRequest) {
   };
 }
 
+function missingConcurrencyEvidenceRef(provider: string): string {
+  return `provider-concurrency-capability:${createHash('sha256')
+    .update(`missing:${provider}`)
+    .digest('hex')}`;
+}
+
 function terminalResolution(
   resolution: RoleInvocationResolution,
   reasonCode: 'validation_failed' | 'duplicate_invocation',
@@ -217,6 +332,32 @@ export function admitRoleInvocation(
       );
     }
 
+    const provider = String(selected.provider);
+    const concurrencyRequest = request.concurrencyCapabilities?.[provider];
+    if (request.concurrencyCapabilities && !concurrencyRequest) {
+      evidence = withLimitDecision(
+        evidence,
+        provider,
+        true,
+        [missingConcurrencyEvidenceRef(provider)],
+      );
+      continue;
+    }
+    const concurrency = concurrencyRequest
+      ? resolveProviderConcurrencyCapability(concurrencyRequest)
+      : null;
+    if (concurrency?.decision === 'HOLD') {
+      attempts.push({
+        provider,
+        model: selected.model,
+        reservation: null,
+        errorRef: null,
+        concurrency,
+      });
+      evidence = withLimitDecision(evidence, provider, true, concurrency.evidenceRefs);
+      continue;
+    }
+
     const reservationRequest = request.buildReservation(selected);
     if (reservationRequest.provider !== String(selected.provider)
       || reservationRequest.model !== selected.model
@@ -251,7 +392,7 @@ export function admitRoleInvocation(
     } catch (error) {
       const errorRef = errorEvidenceRef(error);
       attempts.push({
-        provider: String(selected.provider), model: selected.model, reservation: null, errorRef,
+        provider, model: selected.model, reservation: null, errorRef, concurrency,
       });
       return {
         decision: 'hold',
@@ -264,7 +405,7 @@ export function admitRoleInvocation(
 
     const ref = providerLimitReservationEvidenceRef(reservation.reservationId);
     attempts.push({
-      provider: String(selected.provider), model: selected.model, reservation, errorRef: null,
+      provider, model: selected.model, reservation, errorRef: null, concurrency,
     });
     if (reservation.decision === 'hold') {
       evidence = withLimitDecision(

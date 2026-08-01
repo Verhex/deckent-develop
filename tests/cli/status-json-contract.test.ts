@@ -28,7 +28,15 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import {
+  closeSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,16 +82,25 @@ async function runStatusDriver(
   args: string[],
   timeoutMs = 10000,
 ): Promise<StatusRunResult> {
-  return await new Promise<StatusRunResult>((resolve) => {
+  return await new Promise<StatusRunResult>((resolve, reject) => {
+    // Some nested Node/Vitest transports return exit 0 while dropping piped
+    // stdout/stderr. Direct child descriptors to OS-backed temp files so an
+    // empty payload is real evidence, never a pipe-transport artefact.
+    const captureDir = mkdtempSync(join(tmpdir(), 'deckent-status-stdio-'));
+    const stdoutPath = join(captureDir, 'stdout');
+    const stderrPath = join(captureDir, 'stderr');
+    const stdoutFd = openSync(stdoutPath, 'w');
+    const stderrFd = openSync(stderrPath, 'w');
+    let settled = false;
+    const closeDescriptors = () => {
+      closeSync(stdoutFd);
+      closeSync(stderrFd);
+    };
     const child = spawn(VITE_NODE_BIN, [driverPath, ...args], {
       cwd: REPO_ROOT,
       env: { ...process.env, DECKENT_TEST_ROOT: fakeRoot },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', stdoutFd, stderrFd],
     });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (b: Buffer) => { stdout += b.toString('utf-8'); });
-    child.stderr.on('data', (b: Buffer) => { stderr += b.toString('utf-8'); });
 
     let timedOut = false;
     const timer = setTimeout(() => {
@@ -91,9 +108,29 @@ async function runStatusDriver(
       child.kill('SIGKILL');
     }, timeoutMs);
 
-    child.on('close', (code) => {
+    child.on('error', (error) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
-      resolve({ code, stdout, stderr, timedOut });
+      closeDescriptors();
+      rmSync(captureDir, { recursive: true, force: true });
+      reject(error);
+    });
+    child.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      closeDescriptors();
+      try {
+        resolve({
+          code,
+          stdout: readFileSync(stdoutPath, 'utf-8'),
+          stderr: readFileSync(stderrPath, 'utf-8'),
+          timedOut,
+        });
+      } finally {
+        rmSync(captureDir, { recursive: true, force: true });
+      }
     });
   });
 }
@@ -135,6 +172,42 @@ function seedStaleActiveDashboard(fakeRoot: string): void {
       sprint: { id: 'sprint-479', number: 479, phase: 'EXECUTE', status: 'ACTIVE' },
       agents: [{ id: 'w-479-001-fix', status: 'EXECUTING' }],
       progress: { done: 0, active: 0, blocked: 18, total: 18 },
+      alerts: [],
+      updatedAt: new Date().toISOString(),
+    }),
+    'utf-8',
+  );
+}
+
+function seedConflictingLiveDashboard(fakeRoot: string): void {
+  const deckentDir = join(fakeRoot, '.deckent');
+  const pidsDir = join(deckentDir, 'pids');
+  mkdirSync(pidsDir, { recursive: true });
+  writeFileSync(
+    join(deckentDir, 'sprint-state.json'),
+    JSON.stringify({ sprintId: 'sprint-981', phase: 'FIX', status: 'FIXING' }),
+    'utf-8',
+  );
+  writeFileSync(
+    join(pidsDir, 'sprint-981.pid'),
+    JSON.stringify({
+      pid: process.pid,
+      sprintId: 'sprint-981',
+      startedAt: new Date().toISOString(),
+    }),
+    'utf-8',
+  );
+  writeFileSync(
+    join(fakeRoot, '.dashboard'),
+    JSON.stringify({
+      sprint: {
+        id: 'sprint-981',
+        number: 981,
+        phase: 'RETRO',
+        status: 'RETROSPECTIVE',
+      },
+      agents: [],
+      progress: { done: 4, active: 0, blocked: 0, total: 3 },
       alerts: [],
       updatedAt: new Date().toISOString(),
     }),
@@ -294,6 +367,37 @@ describe.skipIf(NESTED_FORK_RUNNER)('deckent status --json — no-active-run con
         value: 'ACTIVE-while-canonical-IDLE',
       }),
     ]));
+  }, 15000);
+
+  it('--json projects stale dashboard lifecycle and impossible progress through one authority snapshot', async () => {
+    seedConflictingLiveDashboard(fakeRoot);
+
+    const result = await runStatusDriver(driverPath, fakeRoot, ['--json']);
+
+    expect(result.timedOut).toBe(false);
+    expect(result.code).toBe(0);
+    const parsed = JSON.parse(result.stdout.trim()) as {
+      lifecycle: string;
+      phase: string;
+      status: string;
+      sprint: { phase: string; status: string };
+      progress: { done: number; total: number };
+      statusProjection: {
+        dashboardLifecycleNormalized: boolean;
+        progressAdjusted: boolean;
+      };
+    };
+    expect(parsed).toMatchObject({
+      lifecycle: 'ACTIVE',
+      phase: 'FIX',
+      status: 'FIXING',
+      sprint: { phase: 'FIX', status: 'FIXING' },
+      progress: { done: 3, total: 3 },
+      statusProjection: {
+        dashboardLifecycleNormalized: true,
+        progressAdjusted: true,
+      },
+    });
   }, 15000);
 
   it('COMPLETE dashboard: human + JSON agree it is not live (no unqualified Complete-as-active)', async () => {

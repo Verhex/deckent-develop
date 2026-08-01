@@ -547,7 +547,12 @@ export function archiveOrphanTasks(projectRoot: string, sprintId: string): numbe
   const prefix = `task-${sprintNum}-`;
   const allFiles = readdirSync(tasksDir);
   const taskFiles = allFiles.filter(f =>
-    f.startsWith(prefix) && ORPHAN_TASK_EXTENSIONS.test(f),
+    f.startsWith(prefix)
+      && ORPHAN_TASK_EXTENSIONS.test(f)
+      // Landing proposals are coordinator evidence, not canonical task
+      // records. Preserve them at the live evidence boundary; treating the
+      // `.json` suffix as a task artifact destroys exact landing diagnostics.
+      && !f.endsWith('.landing-proposal.json'),
   );
   // Also archive .prompt-* files for this sprint
   const promptFiles = allFiles.filter(f => f.startsWith('.prompt-'));

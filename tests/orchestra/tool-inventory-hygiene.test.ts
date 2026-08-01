@@ -160,23 +160,52 @@ describe('tool-inventory-hygiene (429-011)', () => {
   });
 
   describe('runCleanupPhase — wired into the sprint-end finalize/cleanup flow', () => {
-    it('removes the completing sprint\'s tool-inventory artifact on a real (non-delayed) cleanup pass', () => {
+    it('removes the completing sprint\'s tool-inventory artifact on a real (non-delayed) cleanup pass', async () => {
       writeToolInventory(root, 'sprint-429', 'python3=yes docker=yes rg=yes');
       const sprint = makeSprint('sprint-429');
 
-      const result = runCleanupPhase(root, sprint, noDelayConfig, undefined, null, undefined);
+      const result = await runCleanupPhase(root, sprint, noDelayConfig, undefined, null, undefined);
 
       expect(result).toBeNull();
       expect(existsSync(toolInventoryPath(root, 'sprint-429'))).toBe(false);
     });
 
-    it('does not touch tool-inventory artifacts when opts.skipCleanup is set', () => {
+    it('does not touch tool-inventory artifacts when opts.skipCleanup is set', async () => {
       writeToolInventory(root, 'sprint-429', 'python3=yes docker=yes rg=yes');
       const sprint = makeSprint('sprint-429');
 
-      runCleanupPhase(root, sprint, noDelayConfig, { skipCleanup: true }, null, undefined);
+      await runCleanupPhase(root, sprint, noDelayConfig, { skipCleanup: true }, null, undefined);
 
       expect(existsSync(toolInventoryPath(root, 'sprint-429'))).toBe(true);
+    });
+
+    it('keeps terminal publication blocked until configured delayed cleanup settles', async () => {
+      vi.useFakeTimers();
+      try {
+        writeToolInventory(root, 'sprint-429', 'python3=yes docker=yes rg=yes');
+        const sprint = makeSprint('sprint-429');
+        const cleanupPromise = runCleanupPhase(
+          root,
+          sprint,
+          { cleanup_delay_ms: 100 } as unknown as ResolvedConfig,
+          undefined,
+          null,
+          undefined,
+        );
+
+        expect(existsSync(toolInventoryPath(root, 'sprint-429'))).toBe(true);
+        let settled = false;
+        void cleanupPromise.then(() => { settled = true; });
+        await vi.advanceTimersByTimeAsync(99);
+        expect(settled).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        await cleanupPromise;
+
+        expect(settled).toBe(true);
+        expect(existsSync(toolInventoryPath(root, 'sprint-429'))).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

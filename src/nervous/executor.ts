@@ -13,10 +13,12 @@ import {
   DEFAULT_APPROVE_TIMEOUT_ATTENDED_MS,
   DEFAULT_APPROVE_TIMEOUT_UNATTENDED_MS,
 } from '../core/config.js';
-import { ACTION_BY_ID } from './action-registry.js';
+import { ACTION_BY_ID, isFencedSchedulerAction } from './action-registry.js';
 import { awaitPanicGateApproval, isLockedPanicAction } from './panic-gate.js';
 import { recordDecision } from './decision-memory.js';
 import { randomUUID } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 // ─── NervousHistory Interface ────────────────────────────────────────────────
 // Defined here until history.ts (Task 8) is implemented.
@@ -104,6 +106,33 @@ export const APPROVE_TIMEOUT_MS = detectAttendedSession()
 export function shouldArmAutoProceed(locked: boolean, approveTimeoutMs: number): boolean {
   return !locked && approveTimeoutMs > 0;
 }
+
+// ─── Scheduler Fencing ────────────────────────────────────────────────────────
+// SCOPE_COLLISION_REORDER (and any future FENCED_SCHEDULER_IDS member) must not
+// be turned loose on whatever payload the detector proposed minutes/hours ago —
+// the .tasks/ state may have moved on (task finished, reordered itself, changed
+// sprint). "Fencing" re-validates the EXACT sprint/task/file identity against
+// current disk state at execution time, immediately before the action handler
+// runs, and produces a typed effect instead of forwarding the free-form payload.
+
+/** Statuses under which a task is still eligible for reorder — same active set
+ *  ScopeCollisionMonitor uses at detection time (detectors/scope-collision.ts). */
+const ACTIVE_TASK_STATUSES: ReadonlySet<string> = new Set(['PENDING', 'CLAIMED', 'EXECUTING']);
+
+interface ParsedCollision {
+  readonly file: string;
+  readonly taskIds: ReadonlyArray<string>;
+}
+
+interface TaskFileSnapshot {
+  sprintId?: string;
+  status?: string;
+  scope?: { filesWrite?: string[] };
+}
+
+type FenceResult =
+  | { readonly ok: true; readonly payload: Record<string, unknown> }
+  | { readonly ok: false; readonly error: string };
 
 // ─── Executor Class ──────────────────────────────────────────────────────────
 
@@ -281,11 +310,129 @@ export class Executor {
     actionId: string,
     payload: Record<string, unknown>,
   ): Promise<Awaited<ReturnType<ActionHandler>>> {
-    const result = await this.actionHandler(actionId, payload);
+    const fenced = isFencedSchedulerAction(actionId)
+      ? this.fenceSchedulerEffect(notification, actionId, payload)
+      : { ok: true as const, payload };
+
+    if (!fenced.ok) {
+      // Stale identity — skip the handler entirely (non-mutating). The caller
+      // (handleAutonomous/handleSuggestTimeout/handleApprove) still folds this
+      // into a real ExecutionRecord appended to history (auditable).
+      return { outcome: 'failure', error: fenced.error };
+    }
+
+    const result = await this.actionHandler(actionId, fenced.payload);
     if (result.outcome === 'success' && notification.fingerprint) {
       recordDecision(this.projectRoot, notification.fingerprint, 'executed');
     }
     return result;
+  }
+
+  /**
+   * Re-validate the exact sprint/task/file identity of a fenced-scheduler action
+   * against CURRENT `.tasks/` state and, if still valid, build the typed effect
+   * that replaces the free-form detector payload before it reaches the handler.
+   */
+  private fenceSchedulerEffect(
+    notification: NervousNotification,
+    actionId: string,
+    payload: Record<string, unknown>,
+  ): FenceResult {
+    switch (actionId) {
+      case 'SCOPE_COLLISION_REORDER':
+        return this.fenceScopeCollisionReorder(notification, payload);
+      default:
+        return { ok: true, payload };
+    }
+  }
+
+  private fenceScopeCollisionReorder(
+    notification: NervousNotification,
+    payload: Record<string, unknown>,
+  ): FenceResult {
+    const sprintId = notification.sprintId;
+    if (!sprintId) {
+      return { ok: false, error: 'stale-scope-collision-reorder: notification has no sprintId identity to fence against' };
+    }
+
+    const collisions = this.parseCollisions(payload['collisions']);
+    if (collisions.length === 0) {
+      return { ok: false, error: 'stale-scope-collision-reorder: no valid collisions in payload' };
+    }
+
+    const tasksDir = join(this.projectRoot, '.tasks');
+    for (const collision of collisions) {
+      if (collision.taskIds.length < 2) {
+        return { ok: false, error: `stale-scope-collision-reorder: ${collision.file} no longer has 2+ colliding tasks` };
+      }
+      for (const taskId of collision.taskIds) {
+        const reason = this.staleTaskReason(tasksDir, sprintId, taskId, collision.file);
+        if (reason) {
+          return { ok: false, error: `stale-scope-collision-reorder: ${reason}` };
+        }
+      }
+    }
+
+    const effect: Record<string, unknown> = {
+      kind: 'SCOPE_COLLISION_REORDER',
+      sprintId,
+      notificationId: notification.id,
+      fencedAt: new Date().toISOString(),
+      collisions: collisions.map(c => ({ file: c.file, taskIds: [...c.taskIds] })),
+    };
+    return { ok: true, payload: effect };
+  }
+
+  /** Parses+validates `payload.collisions` into `{file, taskIds}[]`, dropping
+   *  malformed entries rather than throwing (a detector payload is untrusted). */
+  private parseCollisions(raw: unknown): ParsedCollision[] {
+    if (!Array.isArray(raw)) return [];
+    const result: ParsedCollision[] = [];
+    for (const entry of raw) {
+      if (!entry || typeof entry !== 'object') continue;
+      const file = (entry as Record<string, unknown>)['file'];
+      const rawTaskIds = (entry as Record<string, unknown>)['taskIds'];
+      if (typeof file !== 'string' || file.length === 0) continue;
+      if (!Array.isArray(rawTaskIds)) continue;
+      const taskIds = rawTaskIds.filter((t): t is string => typeof t === 'string' && t.length > 0);
+      if (taskIds.length === 0) continue;
+      result.push({ file, taskIds });
+    }
+    return result;
+  }
+
+  /**
+   * Returns a human-readable staleness reason, or null when `taskId` is still a
+   * live, same-sprint, active task that still writes `file` — i.e. safe to fence.
+   */
+  private staleTaskReason(tasksDir: string, sprintId: string, taskId: string, file: string): string | null {
+    const taskPath = join(tasksDir, `task-${taskId}.json`);
+    if (!existsSync(taskPath)) {
+      return `task ${taskId} no longer exists`;
+    }
+
+    let task: TaskFileSnapshot;
+    try {
+      task = JSON.parse(readFileSync(taskPath, 'utf-8')) as TaskFileSnapshot;
+    } catch {
+      return `task ${taskId} is unreadable`;
+    }
+
+    if (task.sprintId !== sprintId) {
+      return `task ${taskId} belongs to sprint ${task.sprintId ?? 'unknown'}, not ${sprintId} — cross-sprint mutation blocked`;
+    }
+
+    const status = task.status ?? 'PENDING';
+    if (!ACTIVE_TASK_STATUSES.has(status)) {
+      return `task ${taskId} is no longer active (status=${status})`;
+    }
+
+    const filesWrite = task.scope?.filesWrite ?? [];
+    if (!filesWrite.includes(file)) {
+      return `task ${taskId} no longer writes ${file}`;
+    }
+
+    return null;
   }
 
   private async handleAutonomous(

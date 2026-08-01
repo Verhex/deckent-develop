@@ -35,6 +35,8 @@ import {
 } from '../core/constants.js';
 
 import { readJsonSafe, debugLog } from '../core/utils.js';
+// Staged-settlement barrier (487-030): the wiring settlement decision producer.
+import { resolveProductionWiringContract } from '../core/production-wiring-contract.js';
 import { getDebtItems } from '../core/debt-store.js';
 import { isPidAlive as isPidAliveShared } from '../core/pid-liveness.js';
 import type { ProviderAdapter } from '../core/provider.js';
@@ -277,12 +279,27 @@ export async function safeRubricReconcile(
   result: TaskResult,
 ): Promise<EvaluationResult> {
   try {
-    return await reconcileEvaluationSpuriousNoGo(
-      evaluateWithRubric(result, task, undefined, projectRoot), result, task, projectRoot);
+    const scored = evaluateWithRubric(result, task, undefined, projectRoot);
+    if (hasConcreteEvaluationFailure(result)) {
+      return preserveNoGo(scored);
+    }
+    const reconciled = await reconcileEvaluationSpuriousNoGo(
+      scored, result, task, projectRoot);
+    if (
+      scored.decision === 'NO_GO' &&
+      reconciled.decision !== 'NO_GO' &&
+      !hasExactRecoveryProof(task, result, scored)
+    ) {
+      return scored;
+    }
+    return reconciled;
   } catch (rubricErr) {
     const msg = rubricErr instanceof Error ? rubricErr.message : String(rubricErr);
     debugLog('safeRubricReconcile:fault', `task=${task.id} — ${msg}`);
-    const reconstruction = reconstructFromDurableEvidence(result, task, msg);
+    const reconstruction = enforceRecoveryBornEvaluationHonesty(
+      result,
+      reconstructFromDurableEvidence(result, task, msg),
+    );
     try {
       const sidFault = getCurrentSprintId(projectRoot) ?? sprintIdFallback;
       writeEvent(
@@ -305,6 +322,48 @@ export async function safeRubricReconcile(
     result.notes = result.notes ? `${result.notes}\n${faultNote}` : faultNote;
     return reconstruction;
   }
+}
+
+/** Concrete worker/host evidence is a terminal veto, independent of rubric score. */
+function hasConcreteEvaluationFailure(result: TaskResult): boolean {
+  return result.selfAssessment === 'NO_GO'
+    || result.testsPassed === false
+    || result.workAttribution?.state === 'HOLD';
+}
+
+function preserveNoGo(evaluation: EvaluationResult): EvaluationResult {
+  return evaluation.decision === 'NO_GO'
+    ? evaluation
+    : { ...evaluation, decision: 'NO_GO' };
+}
+
+/**
+ * Recovery from a rubric-born NO_GO requires an attempt-scoped, non-empty
+ * attributed change set wholly inside the task's exact WRITE authority plus a
+ * passing row for every evaluated rubric criterion. `scope.filesWrite` is an
+ * allowlist, never a declaration that every permitted file is mandatory.
+ * Aggregate line counts or a final shared-worktree diff are not exact proof.
+ */
+function hasExactRecoveryProof(
+  task: Task,
+  result: TaskResult,
+  scored: EvaluationResult,
+): boolean {
+  if (result.workAttribution?.state !== 'VERIFIED') return false;
+  const changed = [...new Set(result.filesChanged ?? [])];
+  const writeAuthority = new Set(task.scope?.filesWrite ?? []);
+  if (changed.length === 0 || changed.some(file => !writeAuthority.has(file))) {
+    return false;
+  }
+  return scored.rubricScores.length > 0 && scored.rubricScores.every(criterion => criterion.passed);
+}
+
+/** Canonical terminal boundary used immediately before status projection. */
+export function enforceRecoveryBornEvaluationHonesty(
+  result: TaskResult,
+  evaluation: EvaluationResult,
+): EvaluationResult {
+  return hasConcreteEvaluationFailure(result) ? preserveNoGo(evaluation) : evaluation;
 }
 
 /**
@@ -1679,6 +1738,7 @@ export async function runEvaluatePhase(
             evaluation === TaskEvaluation.NO_GO &&
             rubricResult.isPartialPromotable === true &&
             gated.honest &&
+            !hasConcreteEvaluationFailure(result) &&
             !runtimeBudgetAuthority
           ) {
             try {
@@ -2090,6 +2150,10 @@ export async function runEvaluatePhase(
         if (runtimeBudgetAuthority) {
           evaluation = TaskEvaluation.NO_GO;
         }
+        evaluation = toTaskEvaluation(enforceRecoveryBornEvaluationHonesty(
+          result,
+          { ...rubricResult, decision: toAuditDecision(evaluation) },
+        ));
         const runtimeBudgetAuthorityReason = runtimeBudgetAuthority
           ? `host_runtime_budget_exhausted:${runtimeBudgetAuthority.settlementRef.attemptId}`
           : undefined;
@@ -2727,6 +2791,106 @@ export function applyVerifyAndCompleteEnrichment(
   return enriched;
 }
 
+// ─── FIX Dispatch & Dependency Continuation (Sprint 487 — Task 487-019) ──
+// A repair attempt is an ATTEMPT of an existing logical task, never a new
+// work-item: its verdict projects onto the logical root, and the dependency
+// release it authorizes belongs to that root's AGGREGATE settlement — not to
+// the raw worker claim, and not to a single attempt while a sibling attempt of
+// the same lineage is still in flight. When repair remains impossible the
+// dependants stay PAUSED and the withholding is observable rather than silent.
+
+/** Verdicts under which a repair attempt settles its logical lineage. */
+const ACCEPTED_FIX_EVALUATIONS: ReadonlySet<TaskEvaluation> = new Set([
+  TaskEvaluation.DONE,
+  TaskEvaluation.GO_WITH_TECH_DEBT,
+]);
+
+/** Statuses that mean a repair attempt has not reached a terminal verdict yet. */
+const REPAIR_IN_FLIGHT_STATUSES: ReadonlySet<TaskStatus> = new Set([
+  TaskStatus.PENDING,
+  TaskStatus.CLAIMED,
+  TaskStatus.EXECUTING,
+  TaskStatus.TESTING,
+  TaskStatus.DOCUMENTING,
+]);
+
+/** Why an otherwise-settled repair attempt did not release its dependants. */
+export type FixContinuationWithheldReason =
+  | 'no-lineage'
+  | 'repair-rejected'
+  | 'repair-in-flight';
+
+/** Continuation authority derived from one repair attempt's Brain verdict. */
+export interface FixContinuationDecision {
+  /** Logical root the attempt belongs to (absent when the attempt has no lineage). */
+  readonly rootTaskId?: string;
+  /** Verdict is DONE / GO_WITH_TECH_DEBT. */
+  readonly accepted: boolean;
+  /** Project the verdict onto the logical root (lineage fold, analytics). */
+  readonly projectOntoRoot: boolean;
+  /** Release the root's PAUSED dependants (aggregate settlement reached). */
+  readonly unblockDependents: boolean;
+  readonly withheldReason?: FixContinuationWithheldReason;
+  /** Sibling attempts of the same lineage still awaiting a terminal verdict. */
+  readonly pendingAttemptIds: readonly string[];
+}
+
+/**
+ * Decide how one evaluated repair attempt continues its logical lineage.
+ *
+ * Pure (no I/O) so the dispatch→continuation contract is unit-testable apart
+ * from the FIX phase's spawn/collect machinery.
+ *
+ * @param fixTask - the repair attempt that just produced a Brain verdict
+ * @param fixEval - that Brain verdict (never the worker's raw self-claim)
+ * @param tasksById - every task known to this sprint (roots + attempts)
+ */
+export function resolveFixContinuation(
+  fixTask: Task,
+  fixEval: TaskEvaluation,
+  tasksById: ReadonlyMap<string, Task>,
+): FixContinuationDecision {
+  const accepted = ACCEPTED_FIX_EVALUATIONS.has(fixEval);
+  const rootTaskId = resolveFixAncestorIds(fixTask, tasksById).at(-1);
+  if (rootTaskId === undefined) {
+    return {
+      accepted,
+      projectOntoRoot: false,
+      unblockDependents: false,
+      withheldReason: 'no-lineage',
+      pendingAttemptIds: [],
+    };
+  }
+  if (!accepted) {
+    // Repair remains impossible for now: the root keeps its NO_GO projection
+    // and every dependant keeps its PAUSED parking.
+    return {
+      rootTaskId,
+      accepted,
+      projectOntoRoot: false,
+      unblockDependents: false,
+      withheldReason: 'repair-rejected',
+      pendingAttemptIds: [],
+    };
+  }
+  const pendingAttemptIds = [...tasksById.values()]
+    .filter(candidate =>
+      candidate.id !== fixTask.id
+      && candidate.isPriorityFix === true
+      && REPAIR_IN_FLIGHT_STATUSES.has(candidate.status)
+      && resolveFixAncestorIds(candidate, tasksById).includes(rootTaskId),
+    )
+    .map(candidate => candidate.id);
+  return {
+    rootTaskId,
+    accepted,
+    projectOntoRoot: true,
+    unblockDependents: pendingAttemptIds.length === 0,
+    ...(pendingAttemptIds.length > 0 ? { withheldReason: 'repair-in-flight' as const } : {}),
+    pendingAttemptIds,
+  };
+}
+
 /**
  * Run the FIX phase: handle cross-dependencies, reroute fix tasks (V2),
  * spawn fix workers, evaluate fix results.
@@ -2799,6 +2963,39 @@ export async function runFixPhase(
           },
         });
       } catch (e) { debugLog('runFixPhase:sprintTrace', e); }
+    };
+
+    // ─── Brain-Authorized FIX Ingest (487-019) ──────────────────────────
+    // EXECUTE injects an aggregate evaluator so a worker self-claim can never
+    // release a dependency (sprint-controller.ts). The FIX phase did not, so a
+    // repair worker's raw `selfAssessment:"DONE"` flipped the attempt to
+    // TaskStatus.DONE through applyStatusMutation — and computeEffective-
+    // DependencyState aggregates a DONE `<id>-fix` onto its `fixForTaskId`,
+    // so the post-fix scan released the root's dependants on the RAW result.
+    //
+    // 487-019-xfix: the phase runs THREE result waves (main FIX, NOT_DISPATCHED
+    // re-dispatch, POSTFIX-PENDING-SCAN). Only the main wave carried the seam,
+    // so a raw self-claim collected by either sibling wave still settled its
+    // task — and released its dependants — without a Brain verdict. The seam is
+    // therefore phase-scoped: every wave ingests under the same authority, and
+    // the verdict cache spans them so each attempt is scored exactly once (the
+    // post-wave loops reuse it instead of re-running the rubric).
+    const fixVerdicts = new Map<string, { evaluation: TaskEvaluation; rubric: EvaluationResult }>();
+    const evaluateFixIngest = async (
+      ingestTask: Task,
+      ingestResult: TaskResult,
+    ): Promise<TaskEvaluation> => {
+      try {
+        const rubric = await safeRubricReconcile(projectRoot, sprint.id, ingestTask, ingestResult);
+        const evaluation = toTaskEvaluation(rubric);
+        fixVerdicts.set(ingestTask.id, { evaluation, rubric });
+        return evaluation;
+      } catch (e) {
+        // Fail-honest: an unscoreable attempt is DEFERRED (→ PAUSED), never a
+        // release and never a fabricated blame verdict.
+        debugLog('runFixPhase:fixIngestEvaluation', e);
+        return TaskEvaluation.DEFERRED;
+      }
     };
 
     // ─── Provider-Limit FIX Guard (Sprint 272 — Task 006, F1-LIM faz-2b) ──
@@ -3017,6 +3214,8 @@ export async function runFixPhase(
       const fixPhaseTimeout = (config as unknown as Record<string, unknown>).fix_phase_timeout as number | undefined
         ?? opts?.fixPhaseTimeoutMs
         ?? 1_800_000;
+      // Brain-authorized ingest seam (487-019) — declared at phase scope above
+      // so every wave of this phase settles results under the same authority.
       const fixResults = await waitForResults(
         projectRoot,
         fixSprint,
@@ -3026,6 +3225,7 @@ export async function runFixPhase(
           spawnBackend,
           attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
           providerAuthority: opts?.providerAuthority,
+          evaluateCollectedResult: evaluateFixIngest,
         },
         config,
       );
@@ -3035,8 +3235,13 @@ export async function runFixPhase(
         const fixResult = fixResults.find(r => r.taskId === fixTask.id);
         if (fixResult) {
           // Sprint 191 P191-1: projectRoot for spurious NO_GO reconcile (fix-task too)
-          const fixRubricResult = await safeRubricReconcile(projectRoot, sprint.id, fixTask, fixResult);
-          const fixEval = toTaskEvaluation(fixRubricResult);
+          // Reuse the ingest-time verdict when present: one attempt is scored
+          // once, so the status that authorized dependency scheduling and the
+          // verdict recorded here can never diverge.
+          const ingestVerdict = fixVerdicts.get(fixTask.id);
+          const fixRubricResult = ingestVerdict?.rubric
+            ?? await safeRubricReconcile(projectRoot, sprint.id, fixTask, fixResult);
+          const fixEval = ingestVerdict?.evaluation ?? toTaskEvaluation(fixRubricResult);
           const fixAttempt = resolveFixAttemptDepth(fixTask, tasksById);
           handleEvaluation(
             projectRoot,
@@ -3112,14 +3317,18 @@ export async function runFixPhase(
           // A successful attempt resolves the WHOLE logical lineage. A
           // fix-of-a-fix is attempt 3 of the root task, not a second task whose
           // success leaves the original NO_GO projection behind.
+          //
+          // 487-019: the projection/release authority now comes from
+          // resolveFixContinuation — an ACCEPTED verdict (DONE/GWTD) folds onto
+          // the root, anything else leaves the lineage unsettled.
           const ancestorIds = resolveFixAncestorIds(fixTask, tasksById);
-          const originalReconciled =
-            fixEval !== TaskEvaluation.NO_GO && ancestorIds.length > 0;
+          const continuation = resolveFixContinuation(fixTask, fixEval, tasksById);
+          const originalReconciled = continuation.projectOntoRoot;
           if (originalReconciled) {
             // Project the resolved verdict onto the logical root only. Keep
             // intermediate attempt verdicts intact (NO_GO remains NO_GO) so
             // attempt analytics and training traces do not rewrite history.
-            evaluations.set(ancestorIds.at(-1)!, fixEval);
+            evaluations.set(continuation.rootTaskId!, fixEval);
           }
 
           // Sprint 171 Bug B: persist FIX re-evaluation to forensic ledger
@@ -3142,11 +3351,14 @@ export async function runFixPhase(
           // original task's status to DONE in-memory so unblockDependents'
           // doneTasks set picks it up, then re-enable PAUSED dependents
           // whose dependencies are all satisfied.
-          if (
-            fixEval !== TaskEvaluation.NO_GO &&
-            ancestorIds.length > 0
-          ) {
-            const rootTaskId = ancestorIds.at(-1)!;
+          //
+          // 487-019: release only on AGGREGATE settlement. An accepted attempt
+          // whose lineage still has another attempt in flight keeps its
+          // dependants parked; a rejected attempt keeps them parked too — and
+          // both cases are now observable instead of reading as "pending
+          // forever".
+          if (continuation.unblockDependents) {
+            const rootTaskId = continuation.rootTaskId!;
             const originalTask = sprint.tasks.find(t => t.id === rootTaskId);
             if (originalTask && originalTask.status !== TaskStatus.DONE) {
               originalTask.status = TaskStatus.DONE;
@@ -3170,6 +3382,28 @@ export async function runFixPhase(
                 },
               );
             } catch (e) { debugLog('runFixPhase:applyUnblock', e); }
+          } else if (continuation.rootTaskId !== undefined) {
+            try {
+              const pausedDependentTaskIds = sprint.tasks
+                .filter(t =>
+                  t.status === TaskStatus.PAUSED
+                  && (t.dependencies ?? []).includes(continuation.rootTaskId!),
+                )
+                .map(t => t.id);
+              writeEvent(
+                projectRoot, sprintIdForUnblock, 'brain', '*',
+                'BRAIN→*:DEPENDENCY_UNBLOCK_WITHHELD',
+                {
+                  rootTaskId: continuation.rootTaskId,
+                  fixTaskId: fixTask.id,
+                  verdict: fixEval,
+                  reason: continuation.withheldReason,
+                  pendingAttemptIds: continuation.pendingAttemptIds,
+                  pausedDependentTaskIds,
+                  totalWithheld: pausedDependentTaskIds.length,
+                },
+              );
+            } catch (e) { debugLog('runFixPhase:unblockWithheld', e); }
           }
         }
       }
@@ -3243,6 +3477,10 @@ export async function runFixPhase(
               spawnBackend,
               attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
               providerAuthority: opts?.providerAuthority,
+              // 487-019-xfix: a re-dispatched task settles under the same Brain
+              // authority as the main FIX wave — its raw self-claim must never
+              // be the thing that releases a dependant.
+              evaluateCollectedResult: evaluateFixIngest,
             },
             config,
           );
@@ -3277,8 +3515,12 @@ export async function runFixPhase(
               }
               continue;
             }
-            const rRubricResult = await safeRubricReconcile(projectRoot, sprint.id, rTask, rResult);
-            const rEval = toTaskEvaluation(rRubricResult);
+            // Reuse the ingest-time verdict: the verdict that authorized this
+            // task's status can never diverge from the one recorded here.
+            const rIngest = fixVerdicts.get(rTask.id);
+            const rRubricResult = rIngest?.rubric
+              ?? await safeRubricReconcile(projectRoot, sprint.id, rTask, rResult);
+            const rEval = rIngest?.evaluation ?? toTaskEvaluation(rRubricResult);
             handleEvaluation(projectRoot, rTask, rEval, rResult);
             evaluations.set(rTask.id, rEval);
             // TT551: a NOT_DISPATCHED task re-run is the ORIGINAL work-item's
@@ -3368,6 +3610,11 @@ export async function runFixPhase(
             spawnBackend,
             attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
             providerAuthority: opts?.providerAuthority,
+            // 487-019-xfix: this safety-net wave drains exactly the tasks other
+            // tasks are waiting on. Ingesting it on the raw self-claim is the
+            // shortest path from "worker said DONE" to a released dependant, so
+            // it carries the same Brain authority as every other FIX wave.
+            evaluateCollectedResult: evaluateFixIngest,
           },
           config,
         );
@@ -3377,8 +3624,11 @@ export async function runFixPhase(
         for (const pTask of postFixTasks) {
           const pResult = postFixResults.find(r => r.taskId === pTask.id);
           if (!pResult) continue;
-          const pRubricResult = await safeRubricReconcile(projectRoot, sprint.id, pTask, pResult);
-          const pEval = toTaskEvaluation(pRubricResult);
+          // Reuse the ingest-time verdict (one attempt is scored once).
+          const pIngest = fixVerdicts.get(pTask.id);
+          const pRubricResult = pIngest?.rubric
+            ?? await safeRubricReconcile(projectRoot, sprint.id, pTask, pResult);
+          const pEval = pIngest?.evaluation ?? toTaskEvaluation(pRubricResult);
           handleEvaluation(projectRoot, pTask, pEval, pResult);
           evaluations.set(pTask.id, pEval);
           persistBrainVerdict(
@@ -3438,6 +3688,227 @@ export interface FixPhaseFailureOutcome {
   readonly code: string;
   readonly message: string;
   readonly taskId?: string;
+}
+
+
+// ═══ Outer Staged-Settlement Barrier (487-030) ════════════════════
+//
+// A staged foundation task settles as an intermediate artifact ONLY while its
+// exact closure task(s) in the same approved DAG also settle. This barrier is
+// the consumer of that wiring settlement decision at the sprint lifecycle
+// boundary: EVALUATE/FIX/RETRO may never publish an outer COMPLETE while an
+// exact closure is NO_GO, PAUSED, HOLD, absent or simply unsettled.
+//
+// Deliberate properties:
+//   • PURE + non-blocking — it reads evaluations/results already collected and
+//     returns a verdict immediately. There is no polling and no wait loop, so
+//     a missing closure can never turn into an infinite wait.
+//   • It never invents a settlement. Only a real DONE evaluation backed by a
+//     worker result of record settles a closure; anything else holds.
+//   • Independent settled work is preserved verbatim in the verdict, so a
+//     blocked staged DAG does not discard unrelated GO tasks.
+
+/** Why one exact staged closure is not settled. */
+export type StagedClosureBlockReason =
+  | 'closure-task-absent'
+  | 'closure-task-unsettled'
+  | 'closure-task-no-go'
+  | 'closure-task-paused'
+  | 'closure-task-hold';
+
+/** Settlement state of a single exact closure task of a staged foundation. */
+export interface StagedClosureStatus {
+  readonly closureTaskId: string;
+  readonly foundationTaskId: string;
+  readonly dagId: string;
+  readonly settled: boolean;
+  readonly reasonCode: StagedClosureBlockReason | null;
+  readonly detail: string;
+}
+
+export interface OuterStagedSettlementAuthorized {
+  readonly state: 'AUTHORIZED';
+  readonly sprintId: string;
+  readonly stagedFoundationTaskIds: readonly string[];
+  readonly closures: readonly StagedClosureStatus[];
+}
+
+export interface OuterStagedSettlementBlocked {
+  readonly state: 'BLOCKED';
+  readonly sprintId: string;
+  readonly stagedFoundationTaskIds: readonly string[];
+  readonly closures: readonly StagedClosureStatus[];
+  readonly blockedClosures: readonly StagedClosureStatus[];
+  /** Independent settled work this barrier explicitly preserves (never discarded). */
+  readonly preservedSettledTaskIds: readonly string[];
+  /** Operator-runnable command that resumes exactly this held sprint. */
+  readonly resumeCommand: string;
+}
+
+export type OuterStagedSettlementBarrier =
+  | OuterStagedSettlementAuthorized
+  | OuterStagedSettlementBlocked;
+
+interface StagedClosureDemand {
+  readonly closureTaskId: string;
+  readonly foundationTaskId: string;
+  readonly dagId: string;
+}
+
+/**
+ * Collect the exact closure demands declared by every staged-foundation
+ * production-wiring contract in the sprint. A contract that does not resolve
+ * to `staged-foundation` contributes nothing — non-staged sprints are
+ * completely unaffected by this barrier.
+ */
+function collectStagedClosureDemands(
+  tasks: readonly Task[],
+): { demands: StagedClosureDemand[]; foundationTaskIds: string[] } {
+  const demands: StagedClosureDemand[] = [];
+  const foundationTaskIds: string[] = [];
+
+  for (const task of tasks) {
+    const contract = task.productionWiring?.contract;
+    if (!contract) continue;
+    const decision = resolveProductionWiringContract(contract);
+    if (decision.decision !== 'staged-foundation') continue;
+
+    foundationTaskIds.push(task.id);
+    for (const closureTaskId of decision.closureTaskIds) {
+      demands.push({ closureTaskId, foundationTaskId: task.id, dagId: decision.dagId });
+    }
+  }
+  return { demands, foundationTaskIds };
+}
+
+/** Classify one exact closure task against collected evaluations + results. */
+function classifyStagedClosure(
+  demand: StagedClosureDemand,
+  tasks: readonly Task[],
+  evaluations: ReadonlyMap<string, TaskEvaluation>,
+  resultsByTaskId: ReadonlyMap<string, TaskResult>,
+): StagedClosureStatus {
+  const base = {
+    closureTaskId: demand.closureTaskId,
+    foundationTaskId: demand.foundationTaskId,
+    dagId: demand.dagId,
+  };
+  const blocked = (reasonCode: StagedClosureBlockReason, detail: string): StagedClosureStatus =>
+    ({ ...base, settled: false, reasonCode, detail });
+
+  const closureTask = tasks.find(candidate => candidate.id === demand.closureTaskId);
+  if (!closureTask) {
+    return blocked('closure-task-absent', 'exact closure task is not part of this sprint');
+  }
+
+  if (closureTask.status === TaskStatus.PAUSED) {
+    return blocked('closure-task-paused', `closure task status=${closureTask.status}`);
+  }
+  if (closureTask.status === TaskStatus.MANUAL_REVIEW_REQUIRED) {
+    return blocked('closure-task-hold', `closure task status=${closureTask.status}`);
+  }
+
+  const evaluation = evaluations.get(demand.closureTaskId);
+  if (evaluation === undefined) {
+    return blocked('closure-task-unsettled', 'no Brain evaluation of record for the closure task');
+  }
+  if (evaluation === TaskEvaluation.NO_GO) {
+    return blocked('closure-task-no-go', 'closure task evaluated NO_GO');
+  }
+  if (evaluation !== TaskEvaluation.DONE) {
+    // GO_WITH_TECH_DEBT / DEFERRED / NOT_DISPATCHED all fall short of an exact
+    // closure — a staged foundation may not settle behind acknowledged debt.
+    return blocked('closure-task-hold', `closure evaluation=${evaluation} is not exact closure`);
+  }
+
+  const result = resultsByTaskId.get(demand.closureTaskId);
+  if (!result) {
+    return blocked('closure-task-hold', 'closure evaluated DONE without a worker result of record');
+  }
+
+  // A closure task that itself declares production wiring must actually close:
+  // an incomplete/staged/contradictory contract is a failed closure, never a pass.
+  const closureContract = closureTask.productionWiring?.contract;
+  if (closureContract) {
+    const closureDecision = resolveProductionWiringContract(closureContract);
+    if (closureDecision.decision !== 'complete') {
+      return blocked(
+        'closure-task-hold',
+        `closure wiring contract decision=${closureDecision.decision}`,
+      );
+    }
+  }
+
+  return { ...base, settled: true, reasonCode: null, detail: 'exact closure settled' };
+}
+
+/**
+ * Resolve the outer staged-settlement barrier for a sprint.
+ *
+ * Producer: the production-wiring settlement decision
+ * ({@link resolveProductionWiringContract}). Consumer: the sprint phase and
+ * controller terminal gate — see `runSprint` in sprint-controller.ts.
+ */
+export function resolveOuterStagedSettlementBarrier(input: {
+  readonly sprintId: string;
+  readonly tasks: readonly Task[];
+  readonly evaluations: ReadonlyMap<string, TaskEvaluation>;
+  readonly results?: readonly TaskResult[] | null;
+}): OuterStagedSettlementBarrier {
+  const { sprintId, tasks, evaluations } = input;
+  const resultsByTaskId = new Map<string, TaskResult>();
+  for (const result of input.results ?? []) {
+    if (result && typeof result.taskId === 'string') resultsByTaskId.set(result.taskId, result);
+  }
+
+  const { demands, foundationTaskIds } = collectStagedClosureDemands(tasks);
+
+  const seen = new Set<string>();
+  const closures: StagedClosureStatus[] = [];
+  for (const demand of demands) {
+    const key = `${demand.foundationTaskId}->${demand.closureTaskId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    closures.push(classifyStagedClosure(demand, tasks, evaluations, resultsByTaskId));
+  }
+
+  const blockedClosures = closures.filter(closure => !closure.settled);
+  if (blockedClosures.length === 0) {
+    return {
+      state: 'AUTHORIZED',
+      sprintId,
+      stagedFoundationTaskIds: foundationTaskIds,
+      closures,
+    };
+  }
+
+  // Independent settled work survives the hold: every task that reached a GO
+  // verdict and is not itself one of the blocked closures stays settled.
+  const blockedIds = new Set(blockedClosures.map(closure => closure.closureTaskId));
+  const preservedSettledTaskIds = tasks
+    .filter(task => !blockedIds.has(task.id))
+    .filter(task => {
+      const evaluation = evaluations.get(task.id);
+      return evaluation === TaskEvaluation.DONE || evaluation === TaskEvaluation.GO_WITH_TECH_DEBT;
+    })
+    .map(task => task.id);
+
+  return {
+    state: 'BLOCKED',
+    sprintId,
+    stagedFoundationTaskIds: foundationTaskIds,
+    closures,
+    blockedClosures,
+    preservedSettledTaskIds,
+    resumeCommand: `deckent resume ${sprintId}`,
+  };
+}
+
+/** One-line, machine-greppable summary of why the barrier held. */
+export function describeStagedSettlementBlock(blocked: OuterStagedSettlementBlocked): string {
+  return blocked.blockedClosures
+    .map(closure => `${closure.foundationTaskId}->${closure.closureTaskId}:${closure.reasonCode}`)
+    .join(',');
 }
 
 
@@ -3504,6 +3975,7 @@ export async function runRetroPhase(
   config: ResolvedConfig,
   testMode?: boolean,
   flowId?: string,
+  deferTerminalAuthority = false,
 ): Promise<SprintMetrics | RetroPhaseFailure | undefined> {
   if (!testMode) {
     assertTaskResultAuthoritiesReady(
@@ -3603,6 +4075,7 @@ export async function runRetroPhase(
         config,
         onRuleRegen: async (root: string): Promise<void> => { await regenerateRules(root); },
         flowId,
+        deferTerminalAuthority,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -3657,14 +4130,14 @@ export function runDecayPhase(projectRoot: string, sprintId: string): void {
  * Supports delayed cleanup via config.cleanup_delay_ms.
  * @returns null (scan interval is always cleared)
  */
-export function runCleanupPhase(
+export async function runCleanupPhase(
   projectRoot: string,
   sprint: Sprint,
   config: ResolvedConfig,
   opts: RunSprintOptions | undefined,
   scanInterval: ReturnType<typeof setInterval> | null,
   spawnBackend: SpawnBackend | undefined,
-): null {
+): Promise<null> {
   // Clear scan interval
   if (scanInterval) { clearInterval(scanInterval); }
 
@@ -3673,12 +4146,9 @@ export function runCleanupPhase(
     const cleanupDelay = typeof delayMs === 'number' && delayMs > 0 ? delayMs : 0;
     if (cleanupDelay > 0) {
       debugLog('[Brain]', `Cleanup delayed ${cleanupDelay}ms — .tasks/ files remain readable`);
-      const _sprint = sprint;
-      const _spawnBackend = spawnBackend;
-      setTimeout(() => {
-        try { cleanup(projectRoot, _sprint, _spawnBackend); } catch (e) { debugLog('runCleanupPhase:cleanupDelayed', e); }
-        try { cleanupToolInventory(projectRoot, _sprint.id); } catch (e) { debugLog('runCleanupPhase:cleanupToolInventoryDelayed', e); }
-      }, cleanupDelay);
+      await new Promise<void>(resolve => setTimeout(resolve, cleanupDelay));
+      try { cleanup(projectRoot, sprint, spawnBackend); } catch (e) { debugLog('runCleanupPhase:cleanupDelayed', e); }
+      try { cleanupToolInventory(projectRoot, sprint.id); } catch (e) { debugLog('runCleanupPhase:cleanupToolInventoryDelayed', e); }
     } else {
       try {
         cleanup(projectRoot, sprint, spawnBackend);

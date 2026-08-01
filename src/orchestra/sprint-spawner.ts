@@ -17,6 +17,7 @@ import type {
   Task, Sprint, ResolvedConfig,
   AgentInfo, ProviderName,
 } from '../core/types.js';
+import type { RunFlowPlanSourceAuthority } from '../core/run-flow-contract.js';
 
 import { TASKS_DIR } from '../core/constants.js';
 import { canonicalJson } from '../core/audit-writer.js';
@@ -148,6 +149,7 @@ export interface ExactPlanSpawnAuthority {
   readonly flowId: string;
   readonly revision: number;
   readonly planDigest: string;
+  readonly sourceAuthority?: RunFlowPlanSourceAuthority;
 }
 
 export class ExactPlanSpawnAuthorityError extends Error {
@@ -330,6 +332,9 @@ import {
 // ─── Fresh-Eyes Rotation (Sprint 156 Task 012) ───────────────────
 import type { FreshEyesRotationStrategy } from './debt-manager.js';
 
+// ─── Skill Pool (487-023 FORCED-SKILL-LINEAGE — inactive-skill check) ────
+import { SkillPoolManager } from '../core/skill-pool.js';
+
 // ═══ Scope Path Utilities ══════════════════════════════════════════
 
 /**
@@ -494,6 +499,72 @@ function writeProviderUnavailableNoGo(task: Task, projectRoot: string): void {
     );
   } catch (e) {
     debugLog('writeProviderUnavailableNoGo', e);
+  }
+}
+
+/**
+ * 486-018 (FORCED-SKILL-PRESERVE): write an honest NO_GO `.result` when an
+ * operator's explicit `- Skills:` forceSkills names a skill whose SKILL.md
+ * could not be resolved (resolveSkillPrompts already stripped it from
+ * task.assignedSkills — result-collector.ts's own documented contract for an
+ * unreadable skill file). That silent-drop is correct for an auto-selected
+ * skill, but spawning a forced skill's task without its content anyway would
+ * be a silent degrade of an explicit operator directive. An honest NO_GO here
+ * surfaces the exact missing skill id(s) as a typed unavailable, mirroring
+ * writeProviderUnavailableNoGo's honest-fail contract above.
+ */
+function writeForcedSkillUnavailableNoGo(
+  task: Task,
+  projectRoot: string,
+  missingSkillIds: string[],
+  inactiveSkillIds: string[] = [],
+): void {
+  const reasonParts: string[] = [];
+  if (missingSkillIds.length > 0) {
+    reasonParts.push(
+      `forceSkills declared [${missingSkillIds.join(', ')}] but SKILL.md content could not be resolved `
+      + `for ${missingSkillIds.length === 1 ? 'it' : 'them'}. Ensure the skill exists at `
+      + `.deckent/skills/<id>/SKILL.md.`,
+    );
+  }
+  if (inactiveSkillIds.length > 0) {
+    // 487-023 FORCED-SKILL-LINEAGE: a forced skill whose SKILL.md loaded fine
+    // but is administratively disabled in the pool (manifest.json enabled:false)
+    // must not silently activate anyway — same honest-fail contract as a
+    // missing file, distinct typed reason so the two causes are never conflated.
+    reasonParts.push(
+      `forceSkills declared [${inactiveSkillIds.join(', ')}] but ${inactiveSkillIds.length === 1 ? 'it is' : 'they are'} `
+      + `administratively disabled (enabled:false in .deckent/skills/<id>/manifest.json). An explicit `
+      + `operator request cannot silently run on a disabled/inactive skill.`,
+    );
+  }
+  const reason =
+    `Refusing to spawn without every explicitly forced skill active. ${reasonParts.join(' ')}`;
+  const result = {
+    taskId: task.id,
+    workerId: `honestfail-${task.id}`,
+    filesChanged: [] as string[],
+    linesAdded: 0,
+    linesRemoved: 0,
+    testsPassed: false,
+    selfAssessment: 'NO_GO',
+    notes: reason,
+    tokenUsage: {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      provider: task.provider,
+      model: task.model,
+    },
+  };
+  try {
+    writeFileSync(
+      join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
+      JSON.stringify(result, null, 2),
+      'utf-8',
+    );
+  } catch (e) {
+    debugLog('writeForcedSkillUnavailableNoGo', e);
   }
 }
 
@@ -860,7 +931,49 @@ export async function spawnWorkers(
 
     const agentPrompt = await resolveAgentPrompt(projectRoot, task);
     const taskSkillPrompts = await resolveSkillPrompts(projectRoot, task);
-    const prompt = buildWorkerPrompt(task, agentPrompt, taskSkillPrompts, projectRoot, config);
+
+    // 486-018 FORCED-SKILL-PRESERVE: an operator's explicit forceSkills whose
+    // SKILL.md content failed to resolve (resolveSkillPrompts already dropped
+    // it from task.assignedSkills) is a typed HOLD, not a silent spawn short a
+    // forced piece of context. Skip this task's spawn and write an honest
+    // NO_GO instead — same honest-fail shape as writeProviderUnavailableNoGo.
+    const forcedSkillIdsForSpawn = task.forceSkills ?? [];
+    if (forcedSkillIdsForSpawn.length > 0) {
+      const resolvedSkillNames = new Set(taskSkillPrompts.map(p => p.name));
+      const missingForcedSkillIds = forcedSkillIdsForSpawn.filter(id => !resolvedSkillNames.has(id));
+      // 487-023 FORCED-SKILL-LINEAGE: a forced skill whose content resolved but
+      // is administratively disabled in the pool (enabled:false) is a distinct
+      // typed HOLD from "missing" — silently activating a disabled skill just
+      // because its SKILL.md happens to still be readable on disk would defeat
+      // the point of disabling it. Skip ids already flagged missing (no double-count).
+      const skillPool = new SkillPoolManager(projectRoot);
+      const inactiveForcedSkillIds = forcedSkillIdsForSpawn.filter(id => {
+        if (missingForcedSkillIds.includes(id)) return false;
+        const skill = skillPool.getSkill(id);
+        return skill !== undefined && skill.enabled === false;
+      });
+      if (missingForcedSkillIds.length > 0 || inactiveForcedSkillIds.length > 0) {
+        writeForcedSkillUnavailableNoGo(task, projectRoot, missingForcedSkillIds, inactiveForcedSkillIds);
+        task.status = TaskStatus.NO_GO;
+        try {
+          writeFileSync(
+            join(projectRoot, TASKS_DIR, `task-${task.id}.json`),
+            JSON.stringify(task, null, 2),
+            'utf-8',
+          );
+        } catch (e) { debugLog('spawnWorkers:forcedSkillHoldWrite', e); }
+        continue;
+      }
+    }
+
+    const prompt = buildWorkerPrompt(
+      task,
+      agentPrompt,
+      taskSkillPrompts,
+      projectRoot,
+      config,
+      spawnOpts?.exactPlanAuthority,
+    );
     const model = task.model;
     const writeTargets = buildAllowedWriteTargets(task);
     const allowedTools = writeTargets.length > 0
@@ -1668,6 +1781,20 @@ export function routeSprintTasks(
       appendSpawnFallbackRoutingDecision(journalContext, task.id, routing.agent, routing.reason);
     }
     if (routing.skills.length > 0) task.assignedSkills = routing.skills;
+    // 486-018 FORCED-SKILL-PRESERVE: this is the single spawn-routing choke
+    // point every task (plan-time V3, debt-manager FIX rotation, mid-sprint
+    // reroute) passes through before buildWorkerPrompt. Routing above may add
+    // compatible skills, but an operator's explicit forceSkills must never be
+    // silently replaced by a routing-derived (or otherwise upstream-corrupted)
+    // set — union it back in rather than trusting it survived unchanged.
+    const forcedSkillIds = task.forceSkills ?? [];
+    if (forcedSkillIds.length > 0) {
+      const current = task.assignedSkills ?? [];
+      const missingForced = forcedSkillIds.filter(id => !current.includes(id));
+      if (missingForced.length > 0) {
+        task.assignedSkills = Array.from(new Set([...current, ...forcedSkillIds]));
+      }
+    }
   }
 }
 

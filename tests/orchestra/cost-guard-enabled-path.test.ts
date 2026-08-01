@@ -100,6 +100,7 @@ function makeConfig(extra?: Record<string, unknown>): ResolvedConfig {
     projectName: 'test',
     projectRoot: '/tmp/test',
     version: '0.1.0',
+    auth_mode: 'subscription',
     // max_limit_cost_usd MUST be > 0 — checkMidSprintCostGuard no-ops otherwise.
     cost_guard: { enabled: true, max_limit_cost_usd: 1 },
     ...extra,
@@ -163,9 +164,12 @@ describe('born-562 enabled-path — cost-guard trip inside the live wait loop', 
   let spawned: string[];
   let killed: string[];
   let backend: SpawnBackend;
+  let previousXdgStateHome: string | undefined;
 
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'deckent-cg-enabled-'));
+    previousXdgStateHome = process.env.XDG_STATE_HOME;
+    process.env.XDG_STATE_HOME = join(root, '.xdg-state');
     mkdirSync(join(root, '.tasks'), { recursive: true });
     mkdirSync(join(root, '.deckent'), { recursive: true });
     spawned = [];
@@ -189,6 +193,8 @@ describe('born-562 enabled-path — cost-guard trip inside the live wait loop', 
   });
 
   afterEach(() => {
+    if (previousXdgStateHome === undefined) delete process.env.XDG_STATE_HOME;
+    else process.env.XDG_STATE_HOME = previousXdgStateHome;
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -287,5 +293,36 @@ describe('born-562 enabled-path — cost-guard trip inside the live wait loop', 
     expect(spawned).toEqual([]);                   // no respawn under cost stop
     expect(results).toEqual([]);                   // nothing collected — honest empty
     expect(a.status).toBe(TaskStatus.PENDING);     // stillPending → graceful complete
+  }, 10_000);
+
+  it('task-level token exhaustion settles only that task and leaves the next slot dispatchable', async () => {
+    const a = makeTask('a', {
+      status: TaskStatus.EXECUTING,
+      budget: { ...TEST_REMOTE_EXECUTION_BUDGET, maxTokens: 5 },
+    });
+    const b = makeTask('b', { status: TaskStatus.PENDING });
+    const sprint = makeSprint([a, b]);
+    settleTestRuntimeBudget(root, 'a');
+    writeFileSync(join(root, '.tasks', 'task-a.result'), JSON.stringify(doneResult('a')), 'utf-8');
+
+    const results = await waitForResults(
+      root, sprint, 8_000, [b],
+      { spawnBackend: backend, autoApprove: true }, undefined,
+      makeConfig({
+        cost_guard: { enabled: false },
+        activeModeConfig: {
+          max_workers: 1,
+          brain_model: 'claude-opus-4-8',
+          default_model: 'claude-sonnet-5',
+          haiku_allowed: true,
+        },
+      }),
+    );
+
+    expect(spawned).toContain('b');
+    expect(results.map(result => result.taskId).sort()).toEqual(['a', 'b']);
+    // Post-result task budget evidence is recorded for evaluation; it is not a
+    // run-wide dispatch authority and therefore cannot suppress b.
+    expect(results.find(result => result.taskId === 'a')?.selfAssessment).toBe('DONE');
   }, 10_000);
 });
