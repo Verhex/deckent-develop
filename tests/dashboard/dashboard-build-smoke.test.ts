@@ -30,7 +30,7 @@ describe('dashboard build smoke', () => {
       const scriptContent = cmd.includes('build-dashboard.mjs')
         ? readFileSync(join(ROOT, 'scripts', 'build-dashboard.mjs'), 'utf-8')
         : cmd;
-      expect(scriptContent).toMatch(/src[/\\]dashboard/);
+      expect(scriptContent).toMatch(/src[/\\]dashboard|join\('src',\s*'dashboard'\)/);
     });
 
     it('build:all chains tsc and build:dashboard', () => {

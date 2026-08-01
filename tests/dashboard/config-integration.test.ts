@@ -39,7 +39,7 @@ describe("Config API integration — dashboard client", () => {
 
       expect(result.mode).toBe("balanced");
       expect(result.max_workers).toBe(4);
-      expect(result.brain_model).toBe("opus");
+      expect(result.brain_model).toBe("claude-opus-4-8");
       expect(result.language).toBe("en");
       expect(result.memory_budget).toBe(600);
     });
@@ -91,7 +91,7 @@ describe("Config API integration — dashboard client", () => {
 
       expect(result.mode).toBe("economic");
       expect(result.max_workers).toBe(4);
-      expect(result.brain_model).toBe("opus");
+      expect(result.brain_model).toBe("claude-opus-4-8");
     });
 
     it("throws ApiError(422) on validation failure", async () => {
@@ -180,7 +180,7 @@ describe("Config API integration — dashboard client", () => {
       // POST → GET round-trip: all 5 fields must match
       expect(postResult.mode).toBe("performance");
       expect(postResult.max_workers).toBe(8);
-      expect(postResult.brain_model).toBe("opus");
+      expect(postResult.brain_model).toBe("claude-opus-4-8");
       expect(postResult.language).toBe("tr");
       expect(postResult.memory_budget).toBe(900);
 
@@ -226,11 +226,11 @@ describe("Config API integration — dashboard client", () => {
       const getResult = await fetchJson<typeof merged>("/api/config");
 
       expect(postResult.modes.performance.max_workers).toBe(8);
-      expect(postResult.modes.performance.brain_model).toBe("opus");
+      expect(postResult.modes.performance.brain_model).toBe("claude-opus-4-8");
       expect(postResult.modes.balanced.max_workers).toBe(2);
 
       expect(getResult.modes.performance.max_workers).toBe(8);
-      expect(getResult.modes.performance.brain_model).toBe("opus");
+      expect(getResult.modes.performance.brain_model).toBe("claude-opus-4-8");
     });
   });
 
